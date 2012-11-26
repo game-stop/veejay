@@ -27,6 +27,7 @@ typedef struct
 	uint8_t *input[4];
 	uint8_t *output[4];
 	int	strides[4];
+	int	out_strides[4];
 	uint8_t *temp[4];
 	int	iparams[12];
 	float fparam;

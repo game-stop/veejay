@@ -452,13 +452,21 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 	in->width = first->width;
 	in->height= first->height;
 	in->ssm   = first->ssm;
-	in->uv_width = first->uv_width;
-	in->uv_height= first->uv_height;
-	in->shift_v = first->shiftv;
-	in->shift_h = first->shifth;
-	in->len     = in->width * in->height;
-	in->uv_len  = in->uv_width * in->uv_height;
-	
+	if( first->ssm ) {
+		in->uv_width = first->width;
+		in->uv_height= first->uv_height;
+		in->uv_len   = (in->width * in->height);
+		in->shift_v  = 0;
+		in->shift_h  = 0;
+	} else {
+		in->uv_width = first->uv_width;
+		in->uv_height= first->uv_height;
+		in->shift_v = first->shiftv;
+		in->shift_h = first->shifth;
+		in->uv_len  = first->uv_width * first->uv_height;
+	}
+	in->len     = first->width * first->height;
+
 	switch( i ) {
 		case 0:
 			in->data[0]=first->input[0];
@@ -485,21 +493,39 @@ void	vj_task_set_from_frame( VJFrame *in )
 
 	for( i = 0; i < n; i ++ ) {
 		vj_task_arg_t *v= vj_task_args[i];
-		veejay_memset( v, 0, sizeof( vj_task_arg_t ) );
-
+		v->ssm		= in->ssm;
 		v->width	= in->width;
 		v->height	= in->height / n;
 		v->subwid	= in->width / n;
 		v->subhei	= in->height / n;
-		v->uv_width	= in->uv_width;
-		v->uv_height 	= in->uv_height /n;
 		v->strides[0]	= (v->width * v->height);
-		v->strides[1]	= (v->uv_width * v->uv_height);
+		v->uv_width	= in->uv_width;
+		v->uv_height 	= in->uv_height / n;
+		v->strides[1]	= (v->width * v->uv_height) / n;
 		v->strides[2]	= v->strides[1];
-		v->strides[3]	= 0;
 		v->shiftv	= in->shift_v;
-		v->shifth	= in->shift_h;		
-		v->ssm		= in->ssm;
+		v->shifth	= in->shift_h;	
+			
+		if( v->sampling ) {		
+			if( v->ssm == 0 ) { //@ super sample to 4:4:4
+				v->out_strides[1] = (v->width * v->height);
+			} else { //@ subsample 4:2:2
+				v->out_strides[1] = (v->uv_width * v->uv_height );
+				v->strides[1]     = (v->width * v->height);
+			}
+			
+			v->out_strides[0] =  0;
+			v->out_strides[2] = v->out_strides[1];
+			v->strides[2] = v->strides[1];
+			v->strides[0] = 0;			
+		} else {
+		        if( v->ssm == 1 ) { //@ FX in 4:4:4
+					v->strides[1] = (v->width * v->height );
+					v->strides[2] = v->strides[1];
+				}
+		}
+		v->strides[3]   = 0;
+	
 	}	
 }
 
@@ -549,37 +575,18 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	}
 
 	for( j = 1; j < n; j ++ ) {
-		if( f[j]->sampling == 1 ) {	
-			//@ for sampling, must be present:
-			//@   UV planes, width, height, inplace
-			unsigned int start = j * f[j]->strides[1];
-			unsigned int out   = j * f[j]->strides[0];//@ upsampled plane
-			
-			if( f[j]->ssm == 1 ) {
-				f[j]->input[1] = f[0]->input[1] + start;
-				f[j]->input[2] = f[0]->input[2] + start;
-				f[j]->output[1]= f[0]->output[1] + out;
-				f[j]->output[2]= f[0]->output[2] + out;
+		for( i = 0; i < n_planes; i ++ ) {
+			if( f[j]->strides[i] == 0 )
+				continue;
+			if( f[j]->sampling ) {
+				f[j]->input[i] = buf1[i] + (f[j]->out_strides[i] * j);
 			} else {
-				f[j]->input[1] = f[0]->input[1] + out;
-				f[j]->input[2] = f[0]->input[2] + out;
-				f[j]->output[1]= f[0]->output[1] + start;
-				f[j]->output[2]= f[0]->output[2] + start;
-			}
-			f[j]->temp[1]  = NULL;	 
-			f[j]->temp[2]  = NULL;
-		}
-		else {
-			for( i = 0; i < n_planes; i ++ ) {
-				if( f[j]->strides[i] == 0 )
-					continue;
 				f[j]->input[i]  = buf1[i] + (f[j]->strides[i] * j);
-				f[j]->output[i] = buf2[i] + (f[j]->strides[i] * j);
-				if( buf3 != NULL )
-					f[j]->temp[i]   = buf3[i] + (f[j]->strides[i]* j); 
-				f[j]->jobnum = j;
-
-			}	
+			}
+			f[j]->output[i] = buf2[i] + (f[j]->strides[i] * j);
+			if( buf3 != NULL )
+				f[j]->temp[i]   = buf3[i] + (f[j]->strides[i]* j); 
+			f[j]->jobnum = j;
 		}	
 	}
 	

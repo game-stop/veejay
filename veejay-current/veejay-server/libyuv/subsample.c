@@ -781,8 +781,8 @@ static void	chroma_subsample_task( void *ptr )
 		break;
 		case SSM_422_444:
 			//@ src, dst
-	   	 	ss_444_to_422_cp(f->temp[1],f->output[1],f->input[1],f->width,f->subhei);
-		    ss_444_to_422_cp(f->temp[1],f->output[2],f->input[2],f->width,f->subhei);
+	   	 	ss_444_to_422_cp(f->priv,f->output[1],f->input[1],f->width,f->subhei);
+		    	ss_444_to_422_cp(f->priv,f->output[2],f->input[2],f->width,f->subhei);
 #ifdef HAVE_ASM_MMX
 			__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
@@ -840,12 +840,10 @@ void chroma_subsample_cp(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[],
 		uint8_t *temp[3] = { NULL, buffer, NULL };
 		int strides[4] = { 0, frame->len, frame->len, 0 };
 		vj_frame_copy( ycbcr, planes,strides );
+		vj_task_set_sampling( 1 );
 		vj_task_set_from_frame( frame );
 		vj_task_set_int( mode );
-		vj_task_set_sampling( 1 );
-	
 		vj_task_run( ycbcr, planes, temp, NULL, 3,  (performer_job_routine ) &chroma_subsample_task );
-
 		vj_task_free_internal_buf();
 		free(data);
 		return;
@@ -886,17 +884,15 @@ void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
 		uint8_t *temp[3] = { NULL, buffer, NULL };
 		int strides[4] = { 0, frame->len, frame->len, 0 };
 		vj_frame_copy( ycbcr, planes,strides );
+		vj_task_set_sampling( 1 );
 		vj_task_set_from_frame( frame );
 		vj_task_set_int( mode );
-		vj_task_set_sampling( 1 );
-	
 		vj_task_run( ycbcr, planes, temp, NULL, 3,  (performer_job_routine ) &chroma_subsample_task );
-
 		vj_task_free_internal_buf();
 		free(data);
 		return;
   	}
-
+	
 	uint8_t *data = (uint8_t*) vj_malloc( sizeof(uint8_t) * frame->width * 2 );
 
 	switch (mode) {
@@ -933,25 +929,21 @@ void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
 void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 {	
   if( vj_task_available() ) {
-	void *data = vj_task_alloc_internal_buf( frame->uv_len * 2 );
+	void *data = vj_task_alloc_internal_buf( frame->uv_len * 2 ); //@ 4:2:2
 
 	uint8_t *plane = (uint8_t*) data;
 	uint8_t *vplane = plane + frame->uv_len;
 	uint8_t *planes[3] = { NULL, plane,vplane };
 	int strides[4] = { 0, frame->uv_len, frame->uv_len, 0 };
-	vj_task_set_sampling( 0 );
 	vj_frame_copy( ycbcr, planes,strides);
+	vj_task_set_sampling ( 1 );
 	vj_task_set_from_frame( frame );
 	vj_task_set_int( mode );
-	vj_task_set_sampling( 1 );
-	
 	vj_task_run( frame->data,planes, NULL, NULL,3, (performer_job_routine) &chroma_supersample_task );
-
 	vj_task_free_internal_buf();
 	free(data);
 	return;
   }
-	
   uint8_t *data = (uint8_t*) vj_malloc( sizeof(uint8_t) * frame->width * 2 );
 
   switch (mode) {
