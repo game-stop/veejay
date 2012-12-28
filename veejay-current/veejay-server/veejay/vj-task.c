@@ -501,7 +501,7 @@ void	vj_task_set_from_frame( VJFrame *in )
 		v->strides[0]	= (v->width * v->height);
 		v->uv_width	= in->uv_width;
 		v->uv_height 	= in->uv_height / n;
-		v->strides[1]	= (v->width * v->uv_height) / n;
+		v->strides[1]	= v->uv_width * v->uv_height; //(v->width * v->uv_height) / n;
 		v->strides[2]	= v->strides[1];
 		v->shiftv	= in->shift_v;
 		v->shifth	= in->shift_h;	

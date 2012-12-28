@@ -59,9 +59,12 @@ void rawval_apply( VJFrame *frame, int width, int height,
 		  const int new_color_cb, const int new_color_cr)
 {
     unsigned int i;
-	const int uv_len = frame->uv_len;
+	int uv_len = frame->uv_len;
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
+
+	if( frame->ssm )
+		uv_len = frame->len;
 
     for (i = 0; i < uv_len; i++) {
 	if (Cb[i] >= new_color_cb)

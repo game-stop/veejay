@@ -84,7 +84,6 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 //#include <pthread.h>
-#include <libavutil/pixdesc.h>
 typedef struct {
 		void *start;
 		size_t length;
@@ -320,8 +319,6 @@ static	int	v4l2_ffmpeg2v4l2( int pf)
 		default:
 #ifdef STRICT_CHECKING
 			assert( pf >= 0 );
-			veejay_msg(VEEJAY_MSG_WARNING, "v4l2: using BGR24 (default) for unhandled pixfmt '%s'",
-				av_pix_fmt_descriptors[ pf ] );
 #endif
 			return V4L2_PIX_FMT_BGR24;
 	}
@@ -905,15 +902,16 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	int chan = v4l2_channel_choose( v, input_channel );
 	if(chan == -1) {
 		veejay_msg(0, "v4l2: Video device has no input channels ? What video device is that?");
-		free(v);
-		close(fd);
-		return NULL;
+		chan = 0;
+	//	free(v);
+	//	close(fd);
+	//	return NULL;
 	}
 	if( -1 == vioctl( fd, VIDIOC_S_INPUT, &chan )) {
 		int lvl = 0;
 		if( errno == EINVAL )
 			lvl = VEEJAY_MSG_WARNING;
-		veejay_msg(0, "v4l2: VIDIOC_S_INPUT failed with %s, arg was %x", strerror(errno),chan);
+		veejay_msg(lvl, "v4l2: VIDIOC_S_INPUT failed with %s, arg was %x", strerror(errno),chan);
 		if( errno != EINVAL ) {
 			free(v);
 			close(fd);
@@ -925,9 +923,9 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	v->input.index = chan;
 	if( -1 == vioctl( fd, VIDIOC_ENUMINPUT, &(v->input)) ) {
 		veejay_msg(0, "v4l2: VIDIOC_ENUMINPUT failed with %s", strerror(errno));
-		free(v);
-		close(fd);
-		return NULL;
+		//free(v);
+		//close(fd);
+		//return NULL;
 	}
 
 
@@ -991,6 +989,8 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 									 v->buffer.m.offset );
 		
 			if( MAP_FAILED == v->buffers[i].start ) {
+				veejay_msg(0,  "v4l2: mmap( NULL, %d , PROT_READ|PROT_WRITE , MAP_SHARED , %d, %d ) failed.",
+					v->buffer.length,fd, v->buffer.m.offset );
 		//	int k;
 		//	for( k = 0; k < i; k ++ ) 
 		//		munmap( v->buffer[k].start, v->buffer[k].length );
@@ -1061,11 +1061,6 @@ v4l2_rw_fallback:
 		v->sizeimage = v->format.fmt.pix.sizeimage;
 		v->buffers = (bufs*) calloc( 1, sizeof(*v->buffers));
 		veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: read/write buffer size is %d bytes", v->format.fmt.pix.sizeimage );
-		if(v->is_jpeg) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: requested format %s -> %s, %d x %d",
-					&(v->format.fmt.pix.pixelformat), av_pix_fmt_descriptors[ v->info->format ], 
-					v->format.fmt.pix.width, v->format.fmt.pix.height );
-		}
 
 		v->buffers[0].length = v->sizeimage;
 		v->buffers[0].start = malloc( v->sizeimage * 2 );
@@ -1279,6 +1274,7 @@ void	v4l2_close( void *d )
 {
 	v4l2info *v = (v4l2info*) d;
 	int i;
+	
 
 	if( v->rw == 0 ) {
 		if( -1 == vioctl( v->fd, VIDIOC_STREAMOFF, &(v->buftype)) ) {
@@ -1898,8 +1894,8 @@ static	void	*v4l2_grabber_thread( void *v )
 		for( c = 0; c < 4; c ++ )
 			v4l2->out_planes[c] = planes[c];
 
-	veejay_msg(VEEJAY_MSG_INFO, "v4l2: capture format: %d x %d (%s)",
-			v4l2->info->width,v4l2->info->height, av_pix_fmt_descriptors[ v4l2->info->format ].name );
+	veejay_msg(VEEJAY_MSG_INFO, "v4l2: capture format: %d x %d (%x)",
+			v4l2->info->width,v4l2->info->height, v4l2->info->format  );
 	
 	i->grabbing = 1;
 	i->retries  = max_retries;
@@ -1940,7 +1936,7 @@ static	void	*v4l2_grabber_thread( void *v )
 		if( err == -1 ) {
 			if( i->retries < 0 ) {
 				veejay_msg(0,"v4l2: giving up on this device, too many errors.");
-				i->stop = 1;
+				i->stop = 1;	
 				v4l2_close( v4l2 );
 				pthread_exit(NULL);
 				return NULL;
@@ -2063,18 +2059,16 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 	}
 
 	int ready     = 0;
-	int retries   = 50;
+	int retries   = 40;
 	//@ wait until thread is ready
-	while(1) {
-		usleep(100);
-		lock_(i);
+	while(retries) {
 		ready = i->grabbing;
 		if( i->stop ) {
 			ready = i->stop;
 		}
-		unlock_(i);
-		if(ready) 
-		 break;
+		if(ready)
+			break;	
+		usleep(1000);
 		retries--;
 	}
 

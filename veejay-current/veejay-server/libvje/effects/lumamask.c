@@ -68,11 +68,15 @@ static int N__ = 0;
 
 int lumamask_malloc(int width, int height)
 {
-   buf[0] = (uint8_t*)vj_yuvalloc(width,height);
+   buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * width * height);
    if(!buf[0]) return 0;
-   buf[1] = buf[0] + (width *height);
-   buf[2] = buf[1] + (width *height);
 
+   veejay_memset( buf[0], 0, width * height );
+
+   buf[1] = buf[0] + (width *height);
+   veejay_memset( buf[1], 128, width * height );
+   buf[2] = buf[1] + (width *height);
+   veejay_memset( buf[2], 128, width * height );
    n__ = 0;
    N__ = 0;   
    return 1;
@@ -111,11 +115,8 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	// keep copy of original frame
-	veejay_memcpy(buf[0], Y, width * height );
-	veejay_memcpy(buf[1], Cb, (width * height) );
-	veejay_memcpy(buf[2], Cr, (width * height) );
-
+	int strides[4] = { width * height, width * height, width * height ,0};
+	vj_frame_copy( frame->data, buf, strides );
 
 	if( border )
 	{

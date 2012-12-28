@@ -224,12 +224,12 @@ void rotozoom_apply( VJFrame *frame, int width, int height, int mode,
 	int strides[4] = { width*height,width*height,width*height,0};
     switch (autom) {		/* alas must do memcpy */
     case 0:
-	vj_frame_copy1( frame->data, rotobuffer, strides );
+	vj_frame_copy( frame->data, rotobuffer, strides );
 	rotozoom2_apply(frame, rotobuffer, width, height, mode, rotate,
 			zoom);
 	break;
     case 1:
-	vj_frame_copy1( frame->data,rotobuffer, strides );
+	vj_frame_copy( frame->data,rotobuffer, strides );
 	rotozoom1_apply(frame, rotobuffer, width, height, mode, rotate,
 			zoom);
 	break;

@@ -1189,8 +1189,15 @@ static	void	vj_frame_copy_job( void *arg ) {
 	assert( task_get_workers() > 0 );
 #endif
 	for( i = 0; i < 4; i ++ ) {
-		if( info->strides[i] > 0  )
-			veejay_memcpy( info->output[i], info->input[i], info->strides[i] );
+#ifdef STRICT_CHECKING
+		if( info->strides[i] > 0 ) {
+			assert( info->output[i] != NULL );
+			assert( info->input[i] != NULL );
+		}
+#endif
+		if( info->strides[i] == 0 || info->output[i] == NULL || info->output[i] == NULL )
+			continue;
+		veejay_memcpy( info->output[i], info->input[i], info->strides[i] );
 	}
 }
 
@@ -1201,6 +1208,12 @@ static	void	vj_frame_clear_job( void *arg ) {
 	assert( task_get_workers() > 0 );
 #endif
 	for( i = 0; i < 4; i ++ ) {
+#ifdef STRICT_CHECKING
+		if( info->strides[i] > 0 ) {
+			assert( info->input[i] != NULL );
+			assert( info->output[i] != NULL );
+		}
+#endif
 		if( info->strides[i] > 0  )
 			veejay_memset( info->input[i], info->iparam, info->strides[i] );
 	}
@@ -1278,17 +1291,27 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 void	vj_frame_simple_clear(  uint8_t **input, int *strides, int v )
 {
 	int i;
-	for( i = 0; i < 4; i ++ ) 
-		if( strides[i] > 0 )
-		veejay_memset( input[i], v,strides[i] );
+	for( i = 0; i < 4; i ++ ) {
+		if( input[i] == NULL || strides[i] == 0 )
+			continue;
+		veejay_memset( input[i], v , strides[i] );
+	}
 }
 
 
-void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides, int planes )
+void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides  )
 {
 	int i;
-	for( i = 0; i < planes; i ++ ) 
-		veejay_memcpy( output[i],input[i], strides[i] );
+	for( i = 0; i < 4; i ++ )  {
+#ifdef STRICT_CHECKING
+		if( strides[i] > 0 ) {
+			assert( input[i] != NULL );
+			assert( output[i] != NULL );
+		}
+#endif
+		if( input[i] != NULL && output[i] != NULL && strides[i] > 0 )
+			veejay_memcpy( output[i],input[i], strides[i] );
+	}
 }
 
 void	*(* vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides ) = 0;

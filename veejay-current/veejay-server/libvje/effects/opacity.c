@@ -61,7 +61,7 @@ vj_effect *opacity_init(int w, int h)
     ve->limits[1][0] = 255;
     ve->defaults[0] = 150;
     ve->description = "Normal Overlay";
-    ve->sub_format = 0;
+    ve->sub_format = 1;
     ve->extra_frame = 1;
 	ve->parallel = 1;
 	ve->has_user = 0;
@@ -164,14 +164,7 @@ static void	opacity_apply_job( void *arg )
 void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int opacity)
 {
-/*	if( vj_task_available() ) {
-		vj_task_set_from_frame( frame );
-		vj_task_set_int( opacity );
-		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, &opacity_apply_job );
-	} else {
-*/
 	opacity_apply1( frame,frame2,width,height,opacity );
-//	}
 }
 
 void opacity_applyN( VJFrame *frame, VJFrame *frame2, int width,

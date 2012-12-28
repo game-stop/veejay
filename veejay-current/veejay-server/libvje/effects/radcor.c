@@ -64,6 +64,7 @@ int	radcor_malloc( int width, int height )
 	if(!badbuf)
 		return 0;
 	Map    = (uint32_t*) vj_malloc( RUP8(width * height * sizeof(uint32_t)));
+	veejay_memset( Map, 0, RUP8(width * height * sizeof(uint32_t)) );
 	if(!Map)
 		return 0;
 	return 1;

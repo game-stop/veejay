@@ -90,18 +90,21 @@ void	vj_shm_free(void *vv)
 	int res     = pthread_rwlock_destroy( &data->rwlock );
 
 	res = shmdt( v->sms );
-	if(res ) {
+	if(res==-1 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Failed to detach shared memory: %s",strerror(errno));
 	}
 	res = shmctl( v->shm_id, IPC_RMID, NULL );
-	if( res ) {
+	if( res==-1 ) {
 		veejay_msg(0, "Failed to remove shared memory %d: %s", v->shm_id, strerror(errno));
 	} else {
 		veejay_msg(VEEJAY_MSG_INFO, "Shared resource will %d be destroyed.", v->shm_id );
 	}
 
 	if( v->file ) {
-		remove(v->file);
+		res = remove(v->file);
+		if( res == -1 ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Unable to remove file %s", v->file);
+		}
 		free(v->file);
 	}
 
