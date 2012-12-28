@@ -134,14 +134,15 @@ static int int_compare(const void *key1, const void *key2)
 }
 
 int sample_update(sample_info *sample, int s1) {
-  if(s1 <= 0 || s1 >= SAMPLE_MAX_SAMPLES) return 0;
+/*  if(s1 <= 0 || s1 >= SAMPLE_MAX_SAMPLES) return 0;
   if(sample) {
     hnode_t *sample_node = hnode_create(sample);
     hnode_put(sample_node, (void*) s1);
     hnode_destroy(sample_node);
     return 1;
   }
-  return 0;
+  return 0;*/
+		 return 1;
 }
 
 /* Evil code for edl saving/restoring */

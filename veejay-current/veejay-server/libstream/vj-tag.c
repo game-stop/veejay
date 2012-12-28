@@ -209,14 +209,15 @@ int vj_tag_put(vj_tag * tag)
 }
 
 static int vj_tag_update(vj_tag *tag, int id) {
-  if(tag) {
+ /* if(tag) {
     hnode_t *tag_node = hnode_create(tag);
     if(!tag_node) return -1;
     hnode_put(tag_node, (void*) id);
     hnode_destroy(tag_node);
     return 1;
   }
-  return -1;
+  return -1;*/
+  return 1;
 }
 
 int	vj_tag_num_devices()

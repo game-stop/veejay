@@ -412,6 +412,9 @@ void	*vj_task_alloc_internal_buf( unsigned int size )
 {
 	int i;
 	int n = task_get_workers();
+#ifdef STRICT_CHECKING
+	assert( size > 0 );
+#endif
 	uint8_t *buffer     =	 (uint8_t*) vj_malloc( size );
 	unsigned int offset =    ( size / n );
 

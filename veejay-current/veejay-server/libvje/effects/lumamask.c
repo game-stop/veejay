@@ -68,7 +68,7 @@ static int N__ = 0;
 
 int lumamask_malloc(int width, int height)
 {
-   buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * width * height);
+   buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * width * height * 3);
    if(!buf[0]) return 0;
 
    veejay_memset( buf[0], 0, width * height );
