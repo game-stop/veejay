@@ -41,7 +41,7 @@ vj_effect *lumablend_init(int w, int h)
     ve->limits[1][2] = 255;
     ve->limits[0][3] = 0;	/*opacity */
     ve->limits[1][3] = 255;
-    ve->defaults[0] = 2;
+    ve->defaults[0] = 1;
     ve->defaults[1] = 0;
     ve->defaults[2] = 35;
     ve->defaults[3] = 150;
