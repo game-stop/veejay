@@ -2021,11 +2021,9 @@ uint8_t 	*vj_yuvalloc( int w, int h )
 {
 	//@ allocate 4:4:4
 	uint8_t *res = vj_malloc( sizeof(uint8_t) * ( w * h * 3 ) + (3 * w) );
+	veejay_memset( res, 0, w * h * 3);
 	if( res == NULL )
 		return NULL;
-#ifdef STRICT_CHECKING
-	veejay_memset( res, 0 , w * h );
-	veejay_memset( res + (w * h), 128, w * h * 2 );
-#endif
+	
 	return res;
 }
