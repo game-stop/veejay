@@ -104,8 +104,9 @@ void motionblur_apply( VJFrame *frame, int width, int height, int n) {
 			n_motion_frames = 1;
 		}
 	}
-
-	if(n_motion_frames >= n ) {
+	int t = num_threaded_tasks();
+	if( t <= 0 ) t = 1;
+	if(n_motion_frames >= ( n * t ) ) {
 		n_motion_frames = 0;
 	}
 

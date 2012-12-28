@@ -250,8 +250,8 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 	}
 
 	if( !first_frame )
-	{	//@ take current 
-		vj_frame_copy1( lum, prev, len );
+	{	//@ take current
+		veejay_memcpy( prev, lum, len );
 		softblur_apply( &smooth, width,height,0);
 		first_frame++;
 		return;
@@ -352,9 +352,9 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 
 	if(mode >= 3 )
 	{
-		vj_frame_clear1( dstU,128,len);
-		vj_frame_clear1( dstV,128,len);
-		vj_frame_copy1( blurzoombuf, dstY, len );
+		veejay_memset( dstU,128,len);
+		veejay_memset( dstV,128,len);
+		veejay_memcpy( dstY, blurzoombuf, len );
 		return;
 	}
 
