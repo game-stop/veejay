@@ -61,7 +61,7 @@ vj_effect *opacity_init(int w, int h)
     ve->limits[1][0] = 255;
     ve->defaults[0] = 150;
     ve->description = "Normal Overlay";
-    ve->sub_format = 1;
+    ve->sub_format = 0;
     ve->extra_frame = 1;
 	ve->parallel = 1;
 	ve->has_user = 0;

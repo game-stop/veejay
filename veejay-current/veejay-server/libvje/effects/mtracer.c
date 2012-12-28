@@ -50,17 +50,19 @@ vj_effect *mtracer_init(int w, int h)
 }
 // FIXME private
 void mtracer_free() {
-  if(mtrace_buffer[0]) free(mtrace_buffer[0]);
-  mtrace_buffer[0] = NULL;
-  mtrace_buffer[1] = NULL;
+	int i;
+	for( i = 0; i < 3; i ++ ) {
+		if( mtrace_buffer[i] ) 
+			free(mtrace_buffer[i]);
+		mtrace_buffer[i] = NULL;
+	}
 }
 
 int mtracer_malloc(int w, int h)
 {
-   mtrace_buffer[0] = (uint8_t *) vj_yuvalloc(w,h );
-	if(!mtrace_buffer[0]) return 0;
-	mtrace_buffer[1] = mtrace_buffer[0] + (w*h);
-	mtrace_buffer[2] = mtrace_buffer[1] + (w*h);
+   mtrace_buffer[0] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
+   mtrace_buffer[1] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
+   mtrace_buffer[2] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
 	return 1;
 }
 
@@ -77,15 +79,10 @@ void mtracer_apply( VJFrame *frame, VJFrame *frame2,
 
     if (mtrace_counter == 0) {
 	overlaymagic_apply(frame, frame2, width, height, mode,0);
-	veejay_memcpy(mtrace_buffer[0], Y, len);
-	veejay_memcpy(mtrace_buffer[1], Cb, uv_len);
-	veejay_memcpy(mtrace_buffer[2], Cr, uv_len);
+	vj_frame_copy( frame->data, mtrace_buffer, strides );
     } else {
 	overlaymagic_apply(frame, frame2, width, height, mode,0);
-	veejay_memcpy(mtrace_buffer[0], Y, len);
-	veejay_memcpy(mtrace_buffer[1], Cb, uv_len);
-	veejay_memcpy(mtrace_buffer[2], Cr, uv_len);
-
+	vj_frame_copy( frame->data, mtrace_buffer, strides );
     }
 
     mtrace_counter++;

@@ -51,19 +51,23 @@ vj_effect *complexsync_init(int width, int height)
 
 int complexsync_malloc(int width, int height)
 {
-   c_outofsync_buffer[0] = (uint8_t*)vj_yuvalloc(width ,height );
-   c_outofsync_buffer[1] = c_outofsync_buffer[0]  + (width * height );
-   c_outofsync_buffer[2] = c_outofsync_buffer[1] + ( width * height );
+   int i;
+   for( i = 0; i < 3 ; i ++ ) {
+    c_outofsync_buffer[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height );
+    int v = ( i == 0 ? 0: 128 );
+    veejay_memset( c_outofsync_buffer[i], v, width * height ); 
+  } 
    return 1;
 
 }
 
 void complexsync_free() {
-	if(c_outofsync_buffer[0])
-	   free(c_outofsync_buffer[0]);
-   	c_outofsync_buffer[0] = NULL;
-	c_outofsync_buffer[1] = NULL;
-	c_outofsync_buffer[2] = NULL;
+	int i;
+	for( i = 0; i < 3; i ++ ) {
+	 if(c_outofsync_buffer[i])
+	    free(c_outofsync_buffer[i]);
+   	c_outofsync_buffer[i] = NULL;
+	}
 }
 void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int val)
 {
@@ -78,13 +82,11 @@ void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, i
 
 	const unsigned int region = width * val;
 	int strides[4] = { region, region, region, 0 };
-
+	int planes[4] = { width * height, width * height, width * height };
 	int i;
-	for( i = 0; i < 3; i ++ )
-		vj_frame_copy1( frame->data[i], c_outofsync_buffer[i], strides[i] );
-
-	for( i = 0; i < 3; i ++ ) 
-		vj_frame_copy1( frame2->data[i], frame->data[i], strides[i] );
+	
+	vj_frame_copy( frame->data, c_outofsync_buffer, planes );
+	vj_frame_copy( frame2->data, frame->data, planes );
 
         if( (len - region) > 0)
 	{

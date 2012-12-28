@@ -30,6 +30,7 @@ static int *slice_yshift;
 static int n__ = 0;
 static int N__ = 0;
 void slice_recalc(int width, int height, int val);
+#define    RUP8(num)(((num)+8)&~8)
 
 
 
@@ -58,7 +59,7 @@ vj_effect *slice_init(int width,int height)
 
 int 	slice_malloc(int width, int height)
 {
-    slice_frame[0] = (uint8_t*)vj_yuvalloc(width,height);
+    slice_frame[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height * 3));
     if(!slice_frame[0])
 	    return 0;
     slice_frame[1] = slice_frame[0] + (width * height);
@@ -150,7 +151,7 @@ void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
   if(tmp2==1) slice_recalc(width,height,tmp1);
 
   int strides[4] = { len, len, len, 0 };
-	vj_frame_copy1( Y, slice_frame, strides );  
+  vj_frame_copy( frame->data, slice_frame, strides );  
 
   for(y=0; y < height; y++){ 
     for(x=0; x < width; x++) {

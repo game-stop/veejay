@@ -322,6 +322,7 @@ void	veejay_histogram_draw_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int
 void	veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output);
 void	veejay_distance_transform8( uint8_t *plane, int w, int h, uint32_t *output);
 
+uint8_t 	*vj_yuvalloc( int w, int h );
 
 uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M, uint32_t *XX, uint32_t *YY,
 		uint32_t *xsize, uint32_t *ysize, int blob);

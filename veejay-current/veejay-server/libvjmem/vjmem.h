@@ -36,7 +36,6 @@ extern void *vj_strict_calloc(unsigned int size, const char *f, int line );
 //#define vj_calloc(i) vj_strict_calloc(i,__FUNCTION__,__LINE__)
 #define vj_malloc(i) vj_malloc_(i)
 #define vj_calloc(i) vj_calloc_(i)
-extern void *vj_yuvalloc( unsigned int w, unsigned int h );
 extern void fast_memset_dirty(void * to, int val, size_t len);
 extern void fast_memset_finish();
 extern void	packed_plane_clear( size_t len, void *to );
