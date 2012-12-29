@@ -258,7 +258,8 @@ int	vj_vloopback_start_pipe( void *vloop )
 				v->width,v->height,v->palette,v->jfif, strerror(errno) );
 		return 0;
 	}
-	if( format.fmt.pix.pixelformat != v->palette ) {
+	if( format.fmt.pix.pixelformat != v->palette ||
+		format.fmt.pix.width != v->width || format.fmt.pix.height != v->height ) {
 
 		res = ioctl( v->fd, VIDIOC_G_FMT, &format );
 
