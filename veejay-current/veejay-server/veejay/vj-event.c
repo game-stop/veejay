@@ -9596,6 +9596,7 @@ void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	vj_vloopback_close( v->vloopback );
+	v->vloopback = NULL;
 }
 /* 
  * Function that returns the options for a special sample (markers, looptype, speed ...) or

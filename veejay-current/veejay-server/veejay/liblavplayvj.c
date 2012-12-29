@@ -1108,14 +1108,12 @@ static int veejay_screen_update(veejay_t * info )
 		}
 	}
       
-#ifdef HAVE_V4L
 	if( info->vloopback )
 	{
 		vj_vloopback_fill_buffer( info->vloopback , frame );		
 		if( vj_vloopback_get_mode( info->vloopback ))
 			vj_vloopback_write_pipe( info->vloopback );
 	}
-#endif
 
 	//@ FIXME: Both pixbuf and jpeg method is broken for screenshot
 #ifdef HAVE_JPEG
@@ -1211,6 +1209,8 @@ static int veejay_screen_update(veejay_t * info )
 				return 0;
 		
 			}
+			break;
+		case 5:
 			break;
 	default:
 		veejay_change_state(info,LAVPLAY_STATE_STOP);
@@ -2322,6 +2322,28 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 				return -1;
 			}	
 			break;
+		case 5:
+			veejay_msg(VEEJAY_MSG_INFO, "Entering vloopback streaming mode. ");
+			info->vloopback = vj_vloopback_open( info->y4m_file,
+				el->video_norm == 'p' ? 1: 0, 1,
+				info->video_output_width,
+				info->video_output_height,
+				info->pixel_format );
+			if( info->vloopback == NULL ) {
+				veejay_msg(0, "Cannot open %s as vloopback.",
+					info->y4m_file);
+				return -1;
+			}
+			if( vj_vloopback_start_pipe( info->vloopback ) <= 0 )
+			{
+				veejay_msg(0, "Unable to setup vloopback");
+				vj_vloopback_close( info->vloopback );
+				return -1;
+				
+			}
+
+			break;
+
 
 	default:
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345]");
@@ -2828,6 +2850,11 @@ static	void *veejay_playback_thread(void *data)
 	    vj_yuv4mpeg_free(info->y4m );
 	    info->y4m = NULL;
 	   }
+	if( info->vloopback ) {
+		vj_vloopback_close( info->vloopback );
+		info->vloopback = NULL;
+
+	}
 /*
 #ifdef HAVE_GL
 #ifndef X_DISPLAY_MISSING

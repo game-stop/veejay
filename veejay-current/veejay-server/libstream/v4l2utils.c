@@ -132,6 +132,7 @@ typedef struct
 	int		grey;
 	int		threaded;
 	uint32_t	supported_pixel_formats[64];
+	int		is_vloopback;
 } v4l2info;
 
 static struct {
@@ -263,7 +264,7 @@ static	int		v4l2_stop_video_capture( v4l2info *v )
 	return 1;
 }
 
-static int	v4l2_pixelformat2ffmpeg( int pf )
+int	v4l2_pixelformat2ffmpeg( int pf )
 {
 	switch(pf) {
 		case V4L2_PIX_FMT_RGB24:
@@ -301,16 +302,20 @@ static	int	v4l2_ffmpeg2v4l2( int pf)
 		case PIX_FMT_BGR24:
 			return V4L2_PIX_FMT_BGR24;
 		case PIX_FMT_BGR32:
-			return V4L2_PIX_FMT_BGR24;
+			return V4L2_PIX_FMT_BGR32;
 		case PIX_FMT_RGB32:
-			return V4L2_PIX_FMT_RGB24;
+			return V4L2_PIX_FMT_RGB32;
 		case PIX_FMT_YUV420P:
 		case PIX_FMT_YUVJ420P:
 			return V4L2_PIX_FMT_YUV420;
+		case PIX_FMT_YUYV422:
+			return V4L2_PIX_FMT_YUYV;
 		case PIX_FMT_YUV422P:
 			return V4L2_PIX_FMT_YUV422P;
 		case PIX_FMT_YUVJ422P:
 			return V4L2_PIX_FMT_YUV422P;
+		case PIX_FMT_UYVY422:
+			return V4L2_PIX_FMT_UYVY;
 		case PIX_FMT_YUVJ444P:
 		case PIX_FMT_YUV444P:
 			return V4L2_PIX_FMT_YUV32;
@@ -606,6 +611,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	supported     = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_YUYV, wid, hei );
 	if( supported ) {
 		*candidate = V4L2_PIX_FMT_YUYV;
+
 		return 1;
 	}
 
@@ -894,6 +900,11 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			v->capability.driver );
 	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Capture card: %s",
 			v->capability.card );
+	if( strncasecmp( v->capability.card, "Dummy" , 5 ) == 0 ) {
+		v->is_vloopback = 1;
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: This is a dummy device.");
+	}
+
 	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Capture method: %s",
 			(can_read ? "read/write interface" : "mmap"));
 	

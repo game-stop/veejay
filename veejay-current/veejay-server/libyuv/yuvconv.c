@@ -80,6 +80,7 @@ static struct {
 {	PIX_FMT_GRAY8,		"PIX_FMT_GRAY8"},
 {	PIX_FMT_RGB32_1,	"PIX_FMT_RGB32_1"},
 {	PIX_FMT_YUYV422,	"PIX_FMT_YUYV422"},
+{	PIX_FMT_UYVY422,	"PIX_FMT_UYVY422"},
 {	0	,		NULL}
 
 };
@@ -386,8 +387,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			break;
 		case PIX_FMT_YUYV422:
 		case PIX_FMT_UYVY422:
-			f->uv_width = w>>1;
-			f->uv_height = f->height;
+			f->uv_width = 0;
+			f->uv_height = 0;
 			f->stride[0] = w * 2;
 			f->stride[1] = f->stride[2] = 0;
 			break;
@@ -396,6 +397,12 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[0] = w * 3;
 			f->uv_width = 0; f->uv_height=0;
 			f->data[1] = NULL;f->data[2] = NULL;
+			break;
+		case PIX_FMT_BGR32:
+		case PIX_FMT_RGB32:
+			f->stride[0] = w * 4;
+			f->uv_width = 0; f->uv_height = 0;
+			f->data[1] = NULL; f->data[2] = NULL;
 			break;
 		default:
 #ifdef STRICT_CHECKING
@@ -415,7 +422,7 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 {
 #ifdef STRICT_CHECKING
 	assert( fmt == PIX_FMT_RGB24 || fmt == PIX_FMT_BGR24 ||
-		fmt == PIX_FMT_RGBA || fmt == PIX_FMT_RGB32_1 || fmt == PIX_FMT_RGB32 || fmt == PIX_FMT_ARGB);
+		fmt == PIX_FMT_RGBA || fmt == PIX_FMT_RGB32_1 || fmt == PIX_FMT_RGB32 || fmt == PIX_FMT_ARGB || fmt == PIX_FMT_BGR32);
 	assert( w > 0 );
 	assert( h > 0 );
 #endif
@@ -1177,7 +1184,7 @@ void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
 	int n = 3;
-	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB )
+	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB || src->format == PIX_FMT_BGR32 || src->format == PIX_FMT_RGB32  )
 		n = 4;
 	int src_stride[3] = { src->width*n,0,0};
 	int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
@@ -1191,7 +1198,7 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 	vj_sws *s = (vj_sws*) sws;
 	int n = 3;
 	if( dst->format == PIX_FMT_RGBA || dst->format == PIX_FMT_BGRA || dst->format == PIX_FMT_ARGB ||
-	 dst->format == PIX_FMT_RGB32 )
+	 dst->format == PIX_FMT_RGB32 || dst->format == PIX_FMT_BGR32 )
 		n = 4;
 
 	int src_stride[3] = { src->width,src->uv_width,src->uv_width };
@@ -1207,9 +1214,10 @@ void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 	int src_stride[3];
 	int dst_stride[3];
 
+/*
 	int n = 0;
 	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB ||
-	 src->format == PIX_FMT_RGB32 ) {
+	 src->format == PIX_FMT_RGB32 || src->format == PIX_FMT_BGR32 ) {
 		n = 4;
 	} 
 	if( src->format == PIX_FMT_RGB24 || src->format == PIX_FMT_BGR24 ) {
@@ -1223,16 +1231,14 @@ void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 		src_stride[0] = src->width;
 		src_stride[1] = src->uv_width;
 		src_stride[2] = src->uv_width;
-	}
-
-	//@ dst is never rgb
-
+	}*/
+/*
 	dst_stride[0] = dst->width;
 	dst_stride[1] = dst->uv_width;
 	dst_stride[2] = dst->uv_width;
-
-	sws_scale( s->sws, src->data, src_stride, 0, src->height,
-		dst->data, dst_stride );
+*/
+	sws_scale( s->sws, src->data, src->stride, 0, src->height,
+		dst->data, dst->stride );
 }
 void	yuv_convert_and_scale_grey(void *sws , VJFrame *src, VJFrame *dst)
 {
