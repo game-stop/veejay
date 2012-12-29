@@ -78,7 +78,6 @@ static int have_bg = 0;
 static int running = 0;
 static boxes_t *boxes = NULL;
 
-#define    RUP8(num)(((num)+8)&~8)
 int		motionmap_prepare( uint8_t *map[3], int w, int h )
 {
 	if(!previous_img)

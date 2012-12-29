@@ -34,7 +34,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "common.h"
-#define RUP8(num)(((num)+8)&~8)
 
 typedef struct {
 	uint8_t *ripple_data[3];

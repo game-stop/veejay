@@ -2015,15 +2015,3 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 	return n_labels;
 }
 
-#define    ROUND_UP8(num)(((num)+8)&~8)
-
-uint8_t 	*vj_yuvalloc( int w, int h )
-{
-	//@ allocate 4:4:4
-	uint8_t *res = vj_malloc( sizeof(uint8_t) * ( w * h * 3 ) + (3 * w) );
-	veejay_memset( res, 0, w * h * 3);
-	if( res == NULL )
-		return NULL;
-	
-	return res;
-}

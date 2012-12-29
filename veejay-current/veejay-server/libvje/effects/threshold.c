@@ -52,7 +52,6 @@ vj_effect *threshold_init(int w, int h)
 
 
 static uint8_t *binary_img;
-#define    RUP8(num)(((num)+8)&~8)
 
 int		threshold_malloc(int w, int h )
 {

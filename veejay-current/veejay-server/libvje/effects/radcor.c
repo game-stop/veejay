@@ -27,8 +27,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "radcor.h"
-#define    RUP8(num)(((num)+8)&~8)
-
+#include "common.h"
 vj_effect *radcor_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));

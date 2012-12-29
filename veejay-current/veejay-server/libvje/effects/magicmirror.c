@@ -62,16 +62,17 @@ vj_effect *magicmirror_init(int w, int h)
     return ve;
 }
 // FIXME private
-#define    RUP8(num)(((num)+8)&~8)
 
 static int n__ = 0;
 static int N__ = 0;
 int magicmirror_malloc(int w, int h)
 {
-	magicmirrorbuf[0] = (uint8_t*)vj_yuvalloc(w,h);
-	if(!magicmirrorbuf[0]) return 0;
-	magicmirrorbuf[1] = magicmirrorbuf[0] + (w*h);
-	magicmirrorbuf[2] = magicmirrorbuf[1] + (w*h);
+	int i ;
+	for( i = 0; i < 3 ;i ++ ) {
+		magicmirrorbuf[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(w*h));
+		if(!magicmirrorbuf[i])
+			return 0;
+	}
 	
 	funhouse_x = (double*)vj_calloc(sizeof(double) * w );
 	if(!funhouse_x) return 0;
@@ -96,7 +97,11 @@ int magicmirror_malloc(int w, int h)
 
 void magicmirror_free()
 {
-	if(magicmirrorbuf[0]) free(magicmirrorbuf[0]);
+	int i;
+	for( i =0; i < 3 ; i ++ ) {
+		if(magicmirrorbuf[i]) free(magicmirrorbuf[i]);
+		magicmirrorbuf[i] = NULL;
+	}
 	if(funhouse_x) free(funhouse_x);
 	if(funhouse_y) free(funhouse_y);
 	if(cache_x) free(cache_x);

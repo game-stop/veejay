@@ -100,8 +100,6 @@ static int playing    = 0;
 static uint8_t *interpolate_buf = NULL;
 static int running = 0;
 
-#define    RUP8(num)(((num)+8)&~8)
-
 int		motionmap_malloc(int w, int h )
 {
 	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * 3) );

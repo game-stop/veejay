@@ -31,7 +31,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include "common.h"
-#define    RUP8(num)(((num)+8)&~8)
 
 static uint8_t *ripple_data[3];
 

@@ -48,21 +48,24 @@ vj_effect *crosspixel_init(int w, int h)
     return ve;
 }
 // FIXME private
-
 int crosspixel_malloc(int w, int h)
 {
-   cross_pixels[0] = (uint8_t*)vj_yuvalloc(w,h );
-   cross_pixels[1] =  cross_pixels[0] + (w * h );
-   cross_pixels[2] =  cross_pixels[1] + (w *  h);   
+	int i;
+	for( i = 0; i < 3 ; i ++ ) {
+	   cross_pixels[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(w*h) );
+	   if(!cross_pixels[i])
+		return 0;
+	}
     return 1;
 }
 
 void crosspixel_free() {
-	if(cross_pixels[0])
-	 free(cross_pixels[0]);
-	cross_pixels[0] = NULL;
-	cross_pixels[1] = NULL;
-	cross_pixels[2] = NULL;
+	int i;
+	for( i =0; i < 3 ;i ++ ) {
+		if(cross_pixels[i])
+		 free(cross_pixels[i]);
+		cross_pixels[i] = NULL;
+	}
 }
 
 void crosspixel_apply(VJFrame *frame, int w, int h, int t,int v) {

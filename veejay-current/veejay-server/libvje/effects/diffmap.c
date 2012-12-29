@@ -55,7 +55,6 @@ vj_effect *differencemap_init(int w, int h)
 
 static uint8_t *binary_img = NULL;
 static int nframe = 0;
-#define    RUP8(num)(((num)+8)&~8)
 
 int		differencemap_malloc(int w, int h )
 {

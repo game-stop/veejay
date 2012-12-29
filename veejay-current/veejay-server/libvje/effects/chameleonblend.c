@@ -84,26 +84,17 @@ int	chameleonblend_prepare( uint8_t *map[3], int width, int height )
 
 int	chameleonblend_malloc(int w, int h)
 {
-	if( bgimage[0] )
-		free(bgimage[0]);
-	bgimage[0] = (uint8_t*)vj_yuvalloc(w,h);
-	if(!bgimage[0])
-		return 0;
-	bgimage[1] = bgimage[0] + (w*h);
-	bgimage[2] = bgimage[1] + (w*h);
-	if(tmpimage[0])
-		free(tmpimage[0]);
-	tmpimage[0] = (uint8_t*)vj_yuvalloc(w,h);
-	if(!tmpimage[0])
-		return 0;
-	tmpimage[1] = tmpimage[0] + (w*h);
-	tmpimage[2] = tmpimage[1] + (w*h);
+	int i;
+	for( i = 0; i < 3 ; i ++ ) {
+		bgimage[i] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(w*h));
+		if(!bgimage[i])
+			return 0;
+		tmpimage[i] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(w*h));
+		if(!tmpimage[i])
+			return 0;
+	}
 
-	if( sum )
-		free(sum);
 	sum = (int32_t*) vj_calloc( w * h * sizeof(int32_t));
-	if( timebuffer )
-		free(timebuffer);
 	timebuffer = (uint8_t*) vj_calloc( w* h * PLANES );
 
 	has_bg = 0;
@@ -117,12 +108,16 @@ int	chameleonblend_malloc(int w, int h)
 
 void	chameleonblend_free()
 {
-	if( bgimage[0]) free(bgimage[0]);
-	if( tmpimage[0]) free(tmpimage[0]);
+	int i;
+	for( i = 0; i < 3 ;i ++ ) {
+		if( bgimage[i]) free(bgimage[i]);
+		if( tmpimage[i]) free(tmpimage[i]);
+		bgimage[i] = NULL;
+		tmpimage[i] = NULL;
+	}
 	if( timebuffer ) free(timebuffer);
 	if( sum ) free(sum);
-	bgimage[0] = NULL;
-	tmpimage[0] = NULL;
+	
 	timebuffer = NULL;
 	sum = NULL;
 	has_bg = 0;

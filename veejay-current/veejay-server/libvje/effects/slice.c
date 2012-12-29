@@ -30,9 +30,6 @@ static int *slice_yshift;
 static int n__ = 0;
 static int N__ = 0;
 void slice_recalc(int width, int height, int val);
-#define    RUP8(num)(((num)+8)&~8)
-
-
 
 vj_effect *slice_init(int width,int height)
 {

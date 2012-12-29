@@ -58,25 +58,26 @@ vj_effect *bathroom_init(int width,int height)
 static int n__ = 0;
 static int N__ = 0;
 // FIXME private
-
 int bathroom_malloc(int width, int height)
 {
-    bathroom_frame[0] = (uint8_t*)vj_yuvalloc( width, height );
-    if(!bathroom_frame[0]) return 0;
-  
-    bathroom_frame[1] = bathroom_frame[0] + (width * height );
-    bathroom_frame[2] = bathroom_frame[1] + (width * height );
+	int i;
+	for( i = 0; i < 3; i ++ ) {
+   	 bathroom_frame[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height));
+
+   	 if(!bathroom_frame[i]) return 0;
+  	}
 	n__ = 0;
 	N__ = 0;
     return 1;
 }
 
 void bathroom_free() {
- if(bathroom_frame[0])
-	 free(bathroom_frame[0]);
- bathroom_frame[0] = NULL;
- bathroom_frame[1] = NULL;
- bathroom_frame[2] = NULL;
+	int i;	
+	for( i = 0; i < 3 ; i ++ ) { 
+ 		if(bathroom_frame[i])
+			free(bathroom_frame[0]);
+		bathroom_frame[i] = NULL;
+	}
 }
 
 void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)

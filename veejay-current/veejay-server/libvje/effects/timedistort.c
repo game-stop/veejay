@@ -36,7 +36,6 @@
 #include <assert.h>
 #endif
 #define PLANES 32
-#define    RUP8(num)(((num)+8)&~8)
 
 vj_effect *timedistort_init(int w, int h)
 {
