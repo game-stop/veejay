@@ -159,12 +159,14 @@ typedef struct sample_info_t {
     void *encoder;
 //    lav_file_t *encoder_file;
 	void		*encoder_file;
-    long encoder_duration; /* in seconds */
-    long encoder_num_frames;
-    long encoder_succes_frames;
+    long  encoder_frames_to_record;
+    long  encoder_frames_recorded;
+    long  encoder_total_frames_recorded;
+ 
     int encoder_width;
     int encoder_height;
     int encoder_max_size;
+    
     int auto_switch;	
     int selected_entry;
     int effect_toggle;

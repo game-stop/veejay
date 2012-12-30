@@ -2748,11 +2748,12 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample) {
 	if( res == 2)
 	{
 		int df = vj_event_get_video_format();
-		int len = sample_get_total_frames(sample);
 		long frames_left = sample_get_frames_left(sample) ;
+		
 		sample_stop_encoder( sample );
+		
 		n = vj_perform_record_commit_single( info );
-		sample_reset_encoder( sample );
+		
 		if(frames_left > 0 )
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Continue, %d frames left to record", frames_left);
@@ -2766,7 +2767,11 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample) {
 		}
 		else
 		{
+			int len = sample_get_total_frames(sample);
+	
 			veejay_msg(VEEJAY_MSG_DEBUG, "Added new sample %d of %d frames",n,len);
+			sample_reset_encoder( sample );
+			sample_reset_autosplit( sample );
 		}
 	 }
 
@@ -2823,7 +2828,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 		int df = vj_event_get_video_format();
 		long frames_left = vj_tag_get_frames_left(stream_id) ;
 		vj_tag_stop_encoder( stream_id );
-		vj_perform_record_commit_single( info );
+		int n = vj_perform_record_commit_single( info );
 		vj_tag_reset_encoder( stream_id );
 		if(frames_left > 0 )
 		{
@@ -2835,6 +2840,15 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 				report_bug();
 			}
 		}
+		else
+		{
+			long len = vj_tag_get_total_frames(stream_id);
+	
+			veejay_msg(VEEJAY_MSG_DEBUG, "Added new sample %d of %ld frames",n,len);
+			vj_tag_reset_encoder( stream_id );
+			vj_tag_reset_autosplit( stream_id );
+		}
+
 	 }
 
 	

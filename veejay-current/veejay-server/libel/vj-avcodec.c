@@ -595,7 +595,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 
 
-int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[3], uint8_t *buf, int buf_len,
+int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src[3], uint8_t *buf, int buf_len,
 	int in_fmt)
 {
 	vj_encoder *av = (vj_encoder*) encoder;

@@ -380,6 +380,18 @@ void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 	el_switch_jpeg_ = switch_jpeg;
 
 	lav_set_project( dw,dh, fps, pf );
+
+	char *maxFileSize = getenv( "VEEJAY_MAX_FILESIZE" );
+	if( maxFileSize != NULL ) {
+		uint64_t mfs = atol( maxFileSize );
+		if( mfs > AVI_get_MAX_LEN() )
+			mfs = AVI_get_MAX_LEN();
+		if( mfs > 0 ) {
+			AVI_set_MAX_LEN( mfs );
+			veejay_msg(VEEJAY_MSG_INFO, "Changed maximum file size to %ld bytes.", mfs );
+		}
+	}
+
 }
 
 int	vj_el_is_dv(editlist *el)

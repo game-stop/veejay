@@ -2424,14 +2424,14 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	{
 		sample_info *rs = sample_get( seq_rec );
 		e_a = rs->encoder_active;
-		e_d = rs->encoder_duration;
-		e_s = rs->encoder_succes_frames;
+		e_d = rs->encoder_frames_to_record;
+		e_s = rs->encoder_total_frames_recorded;
 	}
 	else
 	{
 		e_a = sample->encoder_active;
-		e_d = sample->encoder_duration;
-		e_s = sample->encoder_succes_frames;
+		e_d = sample->encoder_frames_to_record;
+		e_s = sample->encoder_total_frames_recorded;
 	}
 
 	veejay_sprintf(str,1024,
