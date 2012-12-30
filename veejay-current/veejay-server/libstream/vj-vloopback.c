@@ -234,34 +234,50 @@ int	vj_vloopback_start_pipe( void *vloop )
 #ifdef HAVE_V4L2
 	struct v4l2_capability caps;
 	struct v4l2_format format;
+	struct v4l2_format format1;
 	
 	memset(&caps,0,sizeof(caps));
 	memset(&format,0,sizeof(format));
+	memset(&format1,0,sizeof(format1));
 	
 	int res = ioctl( v->fd, VIDIOC_QUERYCAP, &caps );
 	if( res < 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot query video capabilities: %s", strerror(errno));
 		return 0;
 	}
+
+	format1.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+	res = ioctl( v->fd, VIDIOC_G_FMT, &format1 );
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "The capture device is currently configured in %dx%d@%x",
+			format1.fmt.pix.width,format1.fmt.pix.height,format1.fmt.pix.pixelformat );
+
+
 	format.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
 	format.fmt.pix.width = v->width;
 	format.fmt.pix.height= v->height;
 	format.fmt.pix.pixelformat = v->palette;
-//	format.fmt.pix.sizeimage = v->size;
 	format.fmt.pix.field = V4L2_FIELD_NONE;
 	format.fmt.pix.bytesperline = v->width;
 	format.fmt.pix.colorspace = (v->jfif == 1 ? V4L2_COLORSPACE_JPEG : V4L2_COLORSPACE_SMPTE170M );
 	
 	res = ioctl( v->fd, VIDIOC_S_FMT, &format );
 	if( res < 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR,"Cannot set video format (%dx%d@%x/%x): %s",
+		veejay_msg(VEEJAY_MSG_WARNING,"Cannot set preferred video format (%dx%d@%x/%x): %s",
 				v->width,v->height,v->palette,v->jfif, strerror(errno) );
+	}
+	 
+	res = ioctl( v->fd, VIDIOC_G_FMT, &format );	
+		
+	if( format.fmt.pix.width == 0 || format.fmt.pix.height == 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid video capture resolution %dx%d. Use v4l2loopback-ctl and setup capabilities.", 
+			format.fmt.pix.width, format.fmt.pix.height );	
 		return 0;
 	}
+	
+
 	if( format.fmt.pix.pixelformat != v->palette ||
 		format.fmt.pix.width != v->width || format.fmt.pix.height != v->height ) {
-
-		res = ioctl( v->fd, VIDIOC_G_FMT, &format );
 
 		int	cap_palette = v4l2_pixelformat2ffmpeg( format.fmt.pix.pixelformat );
 		int	src_palette = v4l2_pixelformat2ffmpeg( v->palette );
