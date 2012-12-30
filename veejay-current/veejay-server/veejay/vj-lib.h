@@ -67,7 +67,7 @@ struct mjpeg_sync
    unsigned long frame;      /* Frame (0 - n) for double buffer */
    unsigned long length;     /* number of code bytes in buffer (capture only) */
    unsigned long seq;        /* frame sequence number */
-   struct timeval timestamp; /* timestamp */
+   struct timespec timestamp; /* timestamp */
 };
 #define VJ_SCHED_NONE (1<<0)
 #define VJ_SCHED_SL   (1<<1)
@@ -128,7 +128,7 @@ typedef struct {
     pthread_mutex_t syncinfo_mutex;
     pthread_t signal_thread;
     sigset_t signal_set;
-    struct timeval lastframe_completion;	/* software sync variable */
+    struct timespec lastframe_completion;	/* software sync variable */
 
     long old_field_len;
     uint64_t save_list_len;		/* for editing purposes */

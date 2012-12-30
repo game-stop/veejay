@@ -1870,7 +1870,6 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		}
 	}
 
-
 	editlist *el = ( s1 ? sample_get_editlist(s1) : info->edit_list);
 #ifdef STRICT_CHECKING
 	assert( el != NULL );
@@ -1911,9 +1910,6 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		}
 		
 		vj_perform_copy3( p0_buffer, img, info->effect_frame1->len, uv_len );
-		veejay_memcpy( img[0], p0_buffer[0], info->effect_frame1->len );
-		veejay_memcpy( img[1], p0_buffer[1], uv_len);
-		veejay_memcpy( img[2], p0_buffer[2], uv_len );
 
 	} else {
 		uint32_t i;
@@ -1922,34 +1918,10 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		const float frac = 1.0f / (float) N * n1;
 		const uint32_t len = el->video_width * el->video_height;
 
-
-//@ SSE optimize this, takes about 10ms for 1024x768x3 
-	/*	if(!info->effect_frame1->ssm ) {
-			for( i  = 0; i < len ; i ++ )
-				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
-			for( i  = 0; i < uv_len ; i ++ ) {
-				img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
-				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
-			}
-		} else {
-			for( i  = 0; i < len ; i ++ ) {
-				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
-				img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
-				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
-			}
-
-		}
- 		
-		*/
-
 		vj_frame_slow_threaded( p0_buffer, p1_buffer, img , len, uv_len, frac );
 		
-		//@ copy p0 buffer
 		if( (n1 + 1 ) == N ) {
 			vj_perform_copy3( img, p0_buffer, info->effect_frame1->len,uv_len );
-			//veejay_memcpy( p0_buffer[0], img[0], info->effect_frame1->len );
-			//veejay_memcpy( p0_buffer[1], img[1], uv_len );
-			//veejay_memcpy( p0_buffer[2], img[2], uv_len );
 		}
 
 	}
@@ -2565,6 +2537,7 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 		return;
 	}
 
+
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
 		ret = vj_perform_get_frame_(info, info->uc->sample_id, settings->current_frame_num,frame, p0_buffer, p1_buffer,0 );
@@ -2572,7 +2545,7 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 		ret = vj_perform_get_frame_(info, 0, settings->current_frame_num,frame, p0_buffer, p1_buffer,0 );
 
 	}
-	
+
 	if(ret <= 0)
 	{
 		veejay_msg(0, "Unable to queue video frame %d", 
@@ -3560,7 +3533,6 @@ static	void	vj_perform_record_frame( veejay_t *info )
 static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings )
 {
 	int deep = 0;
-
 	VJFrame *frame = info->effect_frame1;
 	VJFrame *frame2= info->effect_frame2;
 	uint8_t *pri[3];
@@ -3613,6 +3585,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 		vj_perform_record_tag_frame(info);
 
 	int cur_out = info->out_buf;
+
 
 	switch (info->uc->playback_mode)
 	{
@@ -3672,8 +3645,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 	}
 
 	info->out_buf = cur_out;
-
-
+	
 	if( info->settings->feedback && info->settings->feedback_stage > 0 ) 
 	{
 		int idx = info->out_buf;

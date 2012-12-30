@@ -1885,7 +1885,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		if(stat( filename[nf], &fileinfo)!= 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to access file '%s'",filename[nf] );
-			vj_el_free(el);
+			//vj_el_free(el);
 			return NULL;
 		} 
 			fd = fopen(filename[nf], "r");
