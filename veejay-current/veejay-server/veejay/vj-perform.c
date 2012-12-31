@@ -3687,7 +3687,6 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 
 	if(!skip)
 	{
-
 		int speed = settings->current_playback_speed;
 		if( settings->hold_status == 1 ) {
 			speed = 0;
@@ -3719,7 +3718,7 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 			default:
 				break;
 		}
-	}
+	} 
 
 	//@ increase tick
 
