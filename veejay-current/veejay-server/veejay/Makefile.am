@@ -59,7 +59,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
 			$(XML2_LIBS) $(JPEG_LIBS) $(UNICAP_LIBS) $(LIBLO_LIBS) \
 		 	$(FFMPEG_LIBS) $(XINERAMA_LIBS) \
-			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(LIBRT) \
+			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(RT_LIBS) \
 			-DDYNAMIC -O3 -Wall -rdynamic -Wl,-no-undefined 
 
 # *********************************************************************

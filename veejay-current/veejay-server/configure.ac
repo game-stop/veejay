@@ -608,6 +608,13 @@ fi
 AC_SUBST(HAVE_X)
 AM_CONDITIONAL(HAVE_X, test "x$HAVE_X" = "xyes")
 
+
+dnl the check doesnt work on ubuntu, so just fake it.
+RT_LIBS="-lrt"
+AC_CHECK_LIB( rt, clock_gettime, [
+	AC_DEFINE( HAVE_CLOCK_GETTIME, 1, [clock_gettime] )
+	RT_LIBS="-lrt" ])
+AC_SUBST(RT_LIBS)
 dnl Check for Xinerama
 use_xinerama=no
 AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
