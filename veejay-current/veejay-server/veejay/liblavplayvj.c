@@ -2745,7 +2745,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	    info->real_fps = 0;
 #endif
 	    if( info->real_fps > (1000* settings->spvf ) && info->audio ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Decoding video frame takes too long! (measured %ld ms).", info->real_fps);
+		veejay_msg(VEEJAY_MSG_WARNING, "Rendering video frame takes too long! (measured %ld ms).", info->real_fps);
 	    }
 	    
 	    if(!info->audio && skipv ) continue;
