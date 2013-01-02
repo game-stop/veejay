@@ -56,7 +56,13 @@
 #endif
 
 #endif
-
+typedef struct
+{
+	struct SwsContext *sws;
+	SwsFilter	  *src_filter;
+	SwsFilter	  *dst_filter;
+	int	cpu_flags;
+} vj_sws;
 
 static	int		    sws_context_flags_ = 0;
 static  int		    ffmpeg_aclib[64];
@@ -579,7 +585,7 @@ void	yuv_fx_context_destroy( void *ctx )
 }
 
 
-void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fmt, int dst_fmt )
+void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[3], VJFrame *dst, int src_fmt, int dst_fmt )
 {
 #ifdef STRICT_CHECKING
 /*	assert( dst_fmt >= 0 && dst_fmt < 32 );
@@ -592,6 +598,28 @@ void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fm
 	assert( dst->height > 0 );
 	assert( dst->data[0] != NULL );
 #endif
+	vj_sws *s = (vj_sws*) scaler;
+	s->sws = sws_getCachedContext( 
+			s->sws,
+			src->width,
+			src->height,
+			src_fmt,
+			dst->width,
+			dst->height,
+			dst_fmt,
+			s->cpu_flags,
+			NULL,
+			NULL,
+			NULL
+		);
+
+	if(!s->sws)
+	{
+		veejay_msg(0,"sws_getContext failed.");
+		if(s)free(s);
+		return NULL;
+	}	
+/*
 	struct SwsContext *ctx = sws_getContext(
 			src->width,
 			src->height,
@@ -601,11 +629,11 @@ void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fm
 			dst_fmt,
 			sws_context_flags_,
 			NULL,NULL,NULL );
+	*/
 	int dst_stride[3] = { ru4(dst->width),ru4(dst->uv_width),ru4(dst->uv_width) };
+	sws_scale( s->sws, src->data, src_stride, 0, src->height, dst->data, dst_stride);
 
-	sws_scale( ctx, src->data, src_stride, 0, src->height, dst->data, dst_stride);
-
-	sws_freeContext( ctx );
+	//sws_freeContext( ctx );
 
 }
 
@@ -1005,12 +1033,7 @@ int luminance_mean(uint8_t * frame[], int w, int h)
     return sum / count;
 }
 
-typedef struct
-{
-	struct SwsContext *sws;
-	SwsFilter	  *src_filter;
-	SwsFilter	  *dst_filter;
-} vj_sws;
+
 
 void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flagss)
 {
@@ -1102,6 +1125,45 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 	return ((void*)s);
 
 }
+
+void*	yuv_init_cached_swscaler(void *cache,VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flags)
+{
+	vj_sws *s = (vj_sws*) vj_malloc(sizeof(vj_sws));
+	if(!s)
+		return NULL;
+	vj_sws *in = (vj_sws*) cache;
+	
+	int	sws_type = 0;
+
+	veejay_memset( s, 0, sizeof(vj_sws) );
+
+#ifdef  STRICT_CHECKING
+	cpu_flags = cpu_flags | SWS_PRINT_INFO;
+#endif
+
+#ifdef HAVE_ASM_MMX
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
+#endif
+
+	cpu_flags = cpu_flags | SWS_FAST_BILINEAR;
+
+	s->sws = NULL;
+
+	if( cache != NULL && in->sws ) {
+		s->sws = in->sws;
+		in->sws = NULL;
+		yuv_free_swscaler( in ); //@ clean up old ctx now
+		in = NULL;	
+	} 
+
+	if( full_chroma_interpolation_ ) 
+		cpu_flags = cpu_flags |  SWS_FULL_CHR_H_INT;
+
+	s->cpu_flags = cpu_flags;
+
+	return s;
+}
+
 
 void  yuv_crop(VJFrame *src, VJFrame *dst, VJRectangle *rect )
 {

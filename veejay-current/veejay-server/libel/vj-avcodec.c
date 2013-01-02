@@ -201,7 +201,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 		e->context->qblur = 0.0;
 		e->context->max_b_frames = 0;
 		e->context->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
-		e->context->flags = CODEC_FLAG_QSCALE;
+		e->context->flags = CODEC_FLAG2_FAST | CODEC_FLAG_QSCALE;
 		e->context->gop_size = 0;
 		e->context->sub_id = 0;
 		e->context->workaround_bugs = FF_BUG_AUTODETECT;

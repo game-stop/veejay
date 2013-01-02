@@ -2506,6 +2506,7 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 		veejay_msg(VEEJAY_MSG_INFO, "\tPriority is set to %d (RT)", schp.sched_priority );
 	}
 }
+#include <bio2jack/bio2jack.h>
 void breaker() {} 
 /******************************************************
  * veejay_playback_cycle()
@@ -2658,7 +2659,7 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	   audio_tmstmp.tv_sec = sec;
 	   audio_tmstmp.tv_nsec = (1000 * usec);
-	
+	   if( audio_tmstmp.tv_sec ) {
 		//@ measure against bytes written to jack
       		tdiff1 = settings->spvf * (stats.nsync - nvcorr) -  
 				settings->spas * num_audio_bytes_written;
@@ -2668,6 +2669,10 @@ static void veejay_playback_cycle(veejay_t * info)
 		tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec ) + ( (bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec )/1000) * 1.e-6;
 
 		last_tdiff = tdiff1;
+
+
+		
+	   }
 	}
 #endif
 	stats.tdiff = (tdiff1 - tdiff2);
@@ -2683,7 +2688,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	    skipi = 0;
 	   if (info->sync_correction) {
 		if (stats.tdiff > settings->spvf) {
-		    /* Video is ahead audio */
 		    skipa = 1; 
 		    //skipv = 1;
 		    if (info->sync_ins_frames && current_speed != 0) {
@@ -2700,8 +2704,8 @@ static void veejay_playback_cycle(veejay_t * info)
 		    skipv = 1;
    		    if (!info->sync_skip_frames && current_speed != 0)
 			skipi = 1;
-
- 		    nvcorr--;
+ 		    
+		    nvcorr--;
 		    stats.num_corrs_b++;
 		    stats.tdiff += settings->spvf;
 		    stats.stats_changed = 1;
