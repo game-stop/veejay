@@ -239,7 +239,6 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
-			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_TEXMAP);
 		}
 
 		if( frame->ssm == 0 ) 
@@ -258,7 +257,7 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
-			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_TEXMAP);
+	//		n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_TEXMAP);
 			return 0;
 		}
 	}

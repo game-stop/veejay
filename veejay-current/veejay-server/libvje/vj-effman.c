@@ -505,10 +505,10 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	diff_apply( vj_effects[entry]->user_data, frames[0], frames[1],
 		   frames[0]->width, frames[0]->height, arg[0], arg[1],arg[2],arg[3]);
 	break;
-	case VJ_VIDEO_EFFECT_TEXMAP:
+	/*case VJ_VIDEO_EFFECT_TEXMAP:
 	texmap_apply( vj_effects[entry]->user_data, frames[0],frames[1],
 			frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
-	break;
+	break;*/
       case VJ_VIDEO_EFFECT_WHITEFRAME:
 	whiteframe_apply(frames[0], frames[1], frames[0]->width, frames[0]->height);
 	break;
@@ -675,13 +675,13 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 				return	motionmap_prepare(	frame->data,	frame->width,	frame->height );
 			}	
 			break;
-		case	VJ_VIDEO_EFFECT_TEXMAP:
+	/*	case	VJ_VIDEO_EFFECT_TEXMAP:
 			fx_id = vj_effect_real_to_sequence( selector );
 			if( fx_id >= 0 && vj_effects[fx_id] )
 			{	
 				return texmap_prepare( frame->data, frame->width, frame->height );	
 			}
-			break;
+			break;*/
 		case 	VJ_VIDEO_EFFECT_CHAMBLEND:
 			fx_id = vj_effect_real_to_sequence( selector );
 			if( fx_id >= 0 && vj_effects[fx_id])
