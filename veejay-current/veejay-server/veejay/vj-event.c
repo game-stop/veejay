@@ -9274,7 +9274,9 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 	char *priv_msg = NULL;
 	int   len = 0;
 
-	for( i = 1; i < vj_effect_max_effects(); i ++ )
+	int n_fx = vj_effect_max_effects();
+
+	for( i = 1; i < n_fx; i ++ )
 		len += vj_effect_get_summary_len( i );
 
 	priv_msg = (char*) malloc(sizeof(char) * (5 + len + 1000));
@@ -9282,7 +9284,7 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 	sprintf(priv_msg, "%05d", len );
 	char line[1025];
 	char fline[1025];
-	for(i=1; i < vj_effect_max_effects(); i++)
+	for(i=1; i < n_fx; i++)
 	{
 		int effect_id = vj_effect_get_real_id(i);
 		if(vj_effect_get_summary(i,line))
