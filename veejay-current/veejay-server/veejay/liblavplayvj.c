@@ -1239,6 +1239,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
+//	int skip = 0;
 
 	if (info->uc->use_timer ) {
 
@@ -1251,33 +1252,26 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 	struct timespec nsecsleep;
 
 	int usec_since_lastframe=0;
-
 	for (;;) {
 		clock_gettime( CLOCK_REALTIME, &now );
 	    //gettimeofday(&now, 0);
 		
-		usec_since_lastframe = (now.tv_nsec / 1000) - (settings->lastframe_completion.tv_nsec / 1000);
+		usec_since_lastframe = (now.tv_nsec - settings->lastframe_completion.tv_nsec)/1000;
 	
-
-	//    usec_since_lastframe =
-	//	now.tv_usec - settings->lastframe_completion.tv_usec;
-	     //usec_since_lastframe = vj_get_relative_time();
-	    
-		while (usec_since_lastframe < 0)
+		if (usec_since_lastframe < 0)
 			usec_since_lastframe += 1000000;
+//			usec_since_lastframe += 1000000000;
 	    if (now.tv_sec > settings->lastframe_completion.tv_sec + 1)
 			usec_since_lastframe = 1000000;
 
 
-	    if (settings->first_frame || (frame_periods * settings->usec_per_frame - usec_since_lastframe) < (1000000 / HZ))
-			break;
-	    	
-	    /* Assume some other process will get a time-slice before
-	     * we do... and hence the worst-case delay of 1/HZ after
-	     * sleep timer expiry will apply. Reasonable since X will
-	     * probably do something...
-	     */
-	    nsecsleep.tv_nsec = (frame_periods * settings->usec_per_frame - usec_since_lastframe - 1000000 / HZ) * 1000;
+	   if (settings->first_frame || (frame_periods * settings->usec_per_frame - usec_since_lastframe) < (1000000 / HZ)) {
+
+			break;	
+		}
+	
+		nsecsleep.tv_nsec = (settings->usec_per_frame - usec_since_lastframe -  1000000 / HZ) * 1000;    	
+	//    nsecsleep.tv_nsec = (frame_periods * settings->usec_per_frame - usec_since_lastframe - 1000000 / HZ) * 1000;
 	    nsecsleep.tv_sec = 0;
 	    nanosleep(&nsecsleep, NULL);
 	}
@@ -1286,8 +1280,17 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 
     settings->first_frame = 0;
       /* We are done with writing the picture - Now update all surrounding info */
-	
+	struct timespec lasttime;
+	memcpy( &lasttime, &(settings->lastframe_completion), sizeof(struct timespec));
 	clock_gettime( CLOCK_REALTIME, &(settings->lastframe_completion) );
+/*
+	if( skip) {
+		long d1 = (settings->lastframe_completion.tv_sec * 1000000000) + settings->lastframe_completion.tv_nsec;
+		long d2 = (lasttime.tv_sec * 1000000000) + lasttime.tv_nsec;
+
+		double diff = ( ( double) d1-d2)/1000000000.0;
+	}*/
+
 //	gettimeofday(&(settings->lastframe_completion), 0);
     settings->syncinfo[settings->currently_processed_frame].timestamp = settings->lastframe_completion;
 }
@@ -2635,8 +2638,13 @@ static void veejay_playback_cycle(veejay_t * info)
 	    stats.nsync++;
 	    clock_gettime( CLOCK_REALTIME, &time_now);
 
-		stats.tdiff = ( time_now.tv_sec - bs.timestamp.tv_sec ) + 
-					  ( ( time_now.tv_nsec - bs.timestamp.tv_nsec / 1000 ) * 1.e-6);
+		long  d1 = (time_now.tv_sec * 1000000000) + time_now.tv_nsec;
+		long  n1 = (bs.timestamp.tv_sec * 1000000000) +  bs.timestamp.tv_nsec;
+
+		double  dn = ( (double) (d1 - n1) )/10000000.0; // * 1.e7;
+
+		stats.tdiff = dn; // ( time_now.tv_sec - bs.timestamp.tv_sec ) + 
+				 //	  ( ( time_now.tv_nsec - bs.timestamp.tv_nsec / 1000 ) * 1.e-6);
 
 	} 
 	while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (QUEUE_LEN-1));
@@ -2653,25 +2661,33 @@ static void veejay_playback_cycle(veejay_t * info)
 	   long int sec=0;
 	   long int usec=0;
 	   long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
-	   long as    = (el->audio_rate / el->video_fps) * el->audio_bps;
-	   long musec = time_now.tv_nsec / 1000;
-	   long msec  = time_now.tv_sec;
 
 	   audio_tmstmp.tv_sec = sec;
-	   audio_tmstmp.tv_nsec = (1000 * usec);
+	   audio_tmstmp.tv_nsec = usec; //(1000 * usec);
 	   if( audio_tmstmp.tv_sec ) {
 		//@ measure against bytes written to jack
       		tdiff1 = settings->spvf * (stats.nsync - nvcorr) -  
 				settings->spas * num_audio_bytes_written;
-     		
-		//tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_usec - audio_tmstmp.tv_usec) * 1.e-6;
 
-		tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec ) + ( (bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec )/1000) * 1.e-6;
+                                                //1000000000
+		long  d1 = (bs.timestamp.tv_sec * 1000000000) + bs.timestamp.tv_nsec;
+		long  n1 = (audio_tmstmp.tv_sec * 1000000000) + audio_tmstmp.tv_nsec;
 
+		tdiff2 = ( (double) (d1 - n1) )/ 1000000000.0; // * 1.e7;
+		                               //10000000 
 		last_tdiff = tdiff1;
-
+		double tt = tdiff1 - tdiff2;
 
 		
+
+		if( tt > settings->spvf && tt <= (settings->spvf *1.01) ) {
+			tdiff2 += 0.01;
+		}
+		
+
+		//@ tt > spvf
+		//	tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec ) + ( (bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec )/1000) * 1.e-6;
+
 	   }
 	}
 #endif
@@ -2689,16 +2705,15 @@ static void veejay_playback_cycle(veejay_t * info)
 	   if (info->sync_correction) {
 		if (stats.tdiff > settings->spvf) {
 		    skipa = 1; 
-		    //skipv = 1;
+		   // skipv = 1;
 		    if (info->sync_ins_frames && current_speed != 0) {
 			skipi = 1;
 		    }
-		
 		    nvcorr++;
 		    stats.num_corrs_a++;
 		    stats.tdiff -= settings->spvf;
-		    stats.stats_changed = 1;
-		}
+		    stats.stats_changed = 1; 
+		} 
 		if (stats.tdiff < -settings->spvf) {
 		    /* Video is behind audio */
 		    skipv = 1;
@@ -2750,8 +2765,9 @@ static void veejay_playback_cycle(veejay_t * info)
 #endif
 	    if( info->real_fps > (1000* settings->spvf ) && info->audio ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "Rendering video frame takes too long! (measured %ld ms).", info->real_fps);
-	    }
-	    
+		continue;    
+	}
+	
 	    if(!info->audio && skipv ) continue;
 
 	    veejay_mjpeg_queue_buf(info,frame, 1 );

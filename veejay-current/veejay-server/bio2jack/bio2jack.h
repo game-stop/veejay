@@ -138,7 +138,7 @@ enum JACK_PORT_CONNECTION_MODE
 /* defaults to CONNECT_ALL */ 
 void JACK_SetPortConnectionMode(enum JACK_PORT_CONNECTION_MODE mode);
 
-long JACK_OutputStatus(int deviceID,long int *sec, long int *usec);
+long JACK_OutputStatus(int deviceID,long *sec, long *usec);
 
 #ifdef __cplusplus
 }
