@@ -16,9 +16,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* NOTE: All functions that take a jack_driver_t* do NOT lock the device, in order to get a */
-/*       jack_driver_t* you must call getDriver() which will pthread_mutex_lock() */
-
+/*
+  calls functions in veejay
+  replaced gettimeofday for clock_gettime
+ */
 #include <config.h>
 #ifdef HAVE_JACK
 #include <stdio.h>
@@ -196,7 +197,7 @@ typedef struct jack_driver_s
 } jack_driver_t;
 
 
-static char *client_name;       /* the name bio2jack will use when creating a new
+static char *client_name = NULL;       /* the name bio2jack will use when creating a new
                                    jack client. client_name_%deviceID% will be used */
 
 
@@ -223,7 +224,7 @@ typedef jack_nframes_t nframes_t;
 
 /* allocate devices for output */
 /* if you increase this past 10, you might want to update 'out_client_name = ... ' in JACK_OpenDevice */
-#define MAX_OUTDEVICES 10
+#define MAX_OUTDEVICES 4
 static jack_driver_t outDev[MAX_OUTDEVICES];
 
 static pthread_mutex_t device_mutex = PTHREAD_MUTEX_INITIALIZER;        /* this is to lock the entire outDev array
@@ -309,6 +310,7 @@ getDriver(int deviceID)
     {
       JACK_OpenDevice(drv);
       drv->last_reconnect_attempt = now;
+      veejay_msg(VEEJAY_MSG_WARNING, "Last connection attempt to Jack!");
     }
   }
 
@@ -954,13 +956,21 @@ JACK_shutdown(void *arg)
 #endif
 
   TRACE("trying to reconnect right now\n");
+  
   /* lets see if we can't reestablish the connection */
-  if(JACK_OpenDevice(drv) != ERR_SUCCESS)
+  
+  //@ doesnt work anymore.
+  /*if(JACK_OpenDevice(drv) != ERR_SUCCESS)
   {
     ERR("unable to reconnect with jack\n");
-  }
+  }*/
+  
+  ERR("unable to reconnect with jack\n");
+
+  veejay_msg(VEEJAY_MSG_ERROR, "Cannot recover from this error! You will probably need to restart for Audio playback.");
 
   releaseDriver(drv);
+
 }
 
 
