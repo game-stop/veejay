@@ -338,6 +338,7 @@ static	int		v4lvideo_fun(v4lvideo_t *v, int w, int h, int palette, int *cap_pale
 		}
 
 		if(v4lvideo_grab_check( v, palette_descr_[i].id ) == 0 ) {
+#ifdef HAVE_JPEG
 			uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * v->video_width * v->video_height * 4 );
 			veejay_msg(VEEJAY_MSG_DEBUG, "Checking if device outputs in JPEG ...");
 			__v4lvideo_grabstart(v);
@@ -362,6 +363,9 @@ static	int		v4lvideo_fun(v4lvideo_t *v, int w, int h, int palette, int *cap_pale
 			__v4lvideo_grabstop(v);
 			free(tmp);
 			break;
+#else
+			veejay_msg(VEEJAY_MSG_ERROR, "No spport for %s (compiled without libjpeg)", palette_descr_[i].name );
+#endif
 		} else {
 			veejay_msg(VEEJAY_MSG_DEBUG, "No support for %s", palette_descr_[i].name );
 		}
@@ -1016,6 +1020,7 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 		//unlock_(v2);
 
 	} else if ( v1->native == 2 ) {
+#ifdef HAVE_JPEG
 		src = v4lgetaddress(&(v1->vd));
 	//	lock_(v2);
 		uint8_t *tmp[3] = {
@@ -1044,6 +1049,7 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 				v1->has_video = 1;
 
 	//	unlock_(v2);
+#endif
 	} else {
 		VJFrame *srcf = v1->info->src;
 		VJFrame *dstf = v1->info->dst;

@@ -1140,11 +1140,16 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 
 	switch(v->is_jpeg) {
 		case 1:
+#ifdef HAVE_JPEG
 			v4l2_set_output_pointers(v,v->tmpbuf);
 			length = decode_jpeg_raw( src, n, 0,0, v->info->width,v->info->height,v->info->data[0],v->info->data[1],v->info->data[2] );
 			if( length == 0 ) { //@ success
 			  length = 1;
 			}
+#else
+			veejay_msg(0, "v4l2: veejay was compiled without libjpeg");
+			return 0;
+#endif
 			break;
 		case 2:
 		//	length = avcodec_decode_video( v->c, v->picture, &got_picture, v->tmpbuf,src );
@@ -1245,6 +1250,7 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 	int got_picture = 0;
 
 	switch(v->is_jpeg) {
+#ifdef HAVE_JPEG
 		case 1:
 			v4l2_set_output_pointers(v,v->tmpbuf);
 			length = decode_jpeg_raw( src, n, 0,0, v->info->width,v->info->height,v->info->data[0],v->info->data[1],v->info->data[2] );
@@ -1252,6 +1258,7 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 			  length = 1;
 			}
 			break;
+#endif
 		case 2:
 			//length = avcodec_decode_video( v->c, v->picture, &got_picture, v->tmpbuf,src );
 			length = -1;

@@ -38,7 +38,7 @@
 #include <libplugger/specs/FreeFrame.h>
 #define V_BITS 24
 #include <libplugger/freeframe-loader.h>
-
+#include <libvje/vje.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -60,8 +60,13 @@ static int bug_workarround1 = 0;
 //#if (V_BITS == 32)
 #define FF_CAP_V_BITS_VIDEO     FF_CAP_32BITVIDEO
 static	int	freeframe_signature_ = VEVO_PLUG_FF;
+static  VJFrame *freeframe_frame_[4] = { NULL, NULL, NULL, NULL};
+//static  VJFrame *freeframe_outframe_ = NULL;
+static	uint8_t *freeframe_space_ = NULL;
+static	int	freeframe_ready_ = 0;
 static void *rgb_conv_ = NULL;
 static void *yuv_conv_ = NULL;
+#define MAX_IN_CHANNELS 1
 /*#elif (V_BITS == 24)
 #define FF_CAP_V_BITS_VIDEO     FF_CAP_24BITVIDEO
 #else // V_BITS = 16
@@ -69,11 +74,39 @@ static void *yuv_conv_ = NULL;
 #endif*/
 
 void	freeframe_destroy( ) {
-	if( rgb_conv_ ) {
-		yuv_free_swscaler( rgb_conv_ );
-	}
-	if( yuv_conv_ ) {
-		yuv_free_swscaler( yuv_conv_ );
+	int i;
+	yuv_free_swscaler( rgb_conv_ );
+	yuv_free_swscaler( yuv_conv_ );
+	
+	free( freeframe_space_ );
+//	free( freeframe_outframe_ );
+	for( i = 0; i < MAX_IN_CHANNELS; i ++ ) 
+		free( freeframe_frame_[i] );
+}
+
+static	void	freeframe_init( VJFrame *frame )
+{
+	if( freeframe_ready_ == 0 ) {
+		int n = MAX_IN_CHANNELS;
+		int w = frame->width;
+		int h = frame->height;
+		int i;
+		freeframe_space_ = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h * 4 * n);
+		
+		veejay_memset( freeframe_space_, 0 , sizeof( w * h * 4 * n ) );
+		for( i = 0; i < n ; i ++ ) {
+			int offs = w * h * 4 * i;
+			freeframe_frame_[i] = yuv_rgb_template( 
+					freeframe_space_ + offs, w, h, PIX_FMT_RGB32 );
+			
+		}	
+
+		sws_template templ;
+		templ.flags = 1;
+		yuv_conv_ = yuv_init_swscaler( frame,freeframe_frame_[0], &templ, yuv_sws_get_cpu_flags() );
+		rgb_conv_ = yuv_init_swscaler( freeframe_frame_[0],frame, &templ, yuv_sws_get_cpu_flags() );		
+		
+		freeframe_ready_ = 1;	
 	}
 }
 
@@ -136,7 +169,7 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 		n_inputs = 2; 
 	}
 
-	int n_outputs = 0;
+	int n_outputs = 1;
 
 	vevo_property_set( port, "handle", VEVO_ATOM_TYPE_VOIDPTR,1, &handle );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plugin_name );
@@ -353,7 +386,11 @@ void	freeframe_clone_parameter( void *instance, int seq, void *fx_values )
 
 	int n = 0;
 	int i;
-	
+	DWORD inp = 0;
+	error = vevo_property_get( instance, "instance", 0, &inp );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
 	error = vevo_property_get( instance, "num_params",0,&n);
 
 	for( i = 0; i < n; i ++ )
@@ -369,13 +406,14 @@ void	freeframe_clone_parameter( void *instance, int seq, void *fx_values )
 		v.value =  (float) value;
 		v.index = i;
 		
-		q( FF_SETPARAMETER, &v, instance );
+		q( FF_SETPARAMETER, &v, inp );
 	}
 }
 
 
 void *freeframe_plug_init( void *plugin, int w, int h )
 {
+	void *pluginstance;
 	VideoInfoStruct v;
 	v.frameWidth = w;
 	v.frameHeight = h;
@@ -391,71 +429,73 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-
 	plugMainType *q = (plugMainType*) base; 
-	int instance = q( FF_INSTANTIATE, &v, 0).ivalue;
+
+	DWORD instance = q( FF_INSTANTIATE, &v, 0).ivalue;
 	if( instance == FF_FAIL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize plugin");
 		return 0;
 	}
-	vevo_property_set( plugin, "instance", VEVO_ATOM_TYPE_INT, 1, &instance );
+
+	pluginstance = vpn( VEVO_ANONYMOUS_PORT );
+
+	vevo_property_set( pluginstance, "base", VEVO_ATOM_TYPE_VOIDPTR, 1, &base );
+	vevo_property_set( pluginstance, "instance", VEVO_ATOM_TYPE_INT, 1, &instance );
 
 	int num_channels = 0;
 	int i;
 	vevo_property_get( plugin, "num_inputs", 0, &num_channels );
 
-	uint8_t *space = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h * 4 * num_channels);
-	error		   = vevo_property_set( plugin , "HOST_buffer", VEVO_ATOM_TYPE_VOIDPTR, 1, &space );
-	if( error != VEVO_NO_ERROR ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create HOST_buffer");
+	if( num_channels > 4 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "too many input channels: %d", num_channels);
 		return 0;
 	}
-	
+
 	generic_process_f	gpf = freeframe_plug_process;
-	vevo_property_set( plugin,
+	vevo_property_set( pluginstance,
 			"HOST_plugin_process_f",
 			VEVO_ATOM_TYPE_VOIDPTR,
 			1,
 			&gpf );
 
 	generic_push_channel_f	gpu = freeframe_push_channel;
-	vevo_property_set( plugin,
+	vevo_property_set( pluginstance,
 			"HOST_plugin_push_f",
 			VEVO_ATOM_TYPE_VOIDPTR,
 			1,
 			&gpu );
 
 	generic_clone_parameter_f	gcc = freeframe_clone_parameter;
-	vevo_property_set( plugin,
+	vevo_property_set( pluginstance,
 			"HOST_plugin_param_clone_f",
 			VEVO_ATOM_TYPE_VOIDPTR,
 			1,
 			&gcc );
 
 	generic_reverse_clone_parameter_f grc = freeframe_reverse_clone_parameter;
-	vevo_property_set( plugin,
+	vevo_property_set( pluginstance,
 			"HOST_plugin_param_reverse_f",
 			VEVO_ATOM_TYPE_VOIDPTR,
 			1,
 			&grc );
 
 	generic_default_values_f	gdb = freeframe_plug_retrieve_default_values;
-	vevo_property_set( plugin,
+	vevo_property_set( pluginstance,
 			"HOST_plugin_defaults_f",
 			VEVO_ATOM_TYPE_VOIDPTR,
 			1,
 			&gdb );
 
 	generic_deinit_f		gin = freeframe_plug_deinit;
-	vevo_property_set( plugin,
+	vevo_property_set( pluginstance,
 			"HOST_plugin_deinit_f",
 			VEVO_ATOM_TYPE_VOIDPTR,
 			1,
 			&gin );
 
 	generic_push_parameter_f gpp = freeframe_plug_param_f;
-	vevo_property_set( plugin, "HOST_plugin_param_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gpp);
+	vevo_property_set( pluginstance, "HOST_plugin_param_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gpp);
 
 	int n_params = 0;
 	error = vevo_property_get( plugin, "num_params",0,&n_params );
@@ -475,7 +515,6 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 			//this returns garbage:
 			//float value = (float)q( FF_GETPARAMETERDEFAULT, (LPVOID) p, 0).fvalue;
 				
-/*
 			float value = 0.00f + (float) ( 1.0 * (rand()/(RAND_MAX+1.0f)));
 			double dval = (double) value;
 
@@ -488,44 +527,32 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 			q( FF_SETPARAMETER, &sps, instance );
 
 
-			veejay_msg(VEEJAY_MSG_INFO, " feed parameter %d with random value %2.2f", p, value );*/
+			veejay_msg(VEEJAY_MSG_INFO, " feed parameter %d with random value %2.2f", p, value );
 		}
 	}
 
-	return plugin;
+	return pluginstance;
 }
 
 
-void	freeframe_plug_deinit( void *plugin )
+void	freeframe_plug_deinit( void *pluginstance )
 {
 	void *base = NULL;
-	int error = vevo_property_get( plugin, "base", 0, &base);
+	int error = vevo_property_get( pluginstance, "base", 0, &base);
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
 	plugMainType *q = (plugMainType*) base; 
 
-	int instance = 0;
-	error = vevo_property_get( plugin, "instance", 0, &instance );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-
-	if(! instance )
+	DWORD instance = 0;
+	error = vevo_property_get( pluginstance, "instance", 0, &instance );
+	if( error != VEVO_NO_ERROR ) {
 		return;
+	}
 
 	q( FF_DEINSTANTIATE, NULL, instance );
 
-	uint8_t *space = NULL;
-	error = vevo_property_get( plugin, "HOST_buffer",0,&space);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	if( error == VEVO_NO_ERROR ) {
-		free(space);
-	}
-
-	vpf( plugin );
+	vpf( pluginstance );
 }
 
 void	freeframe_plug_free( void *plugin )
@@ -536,40 +563,32 @@ void	freeframe_plug_free( void *plugin )
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-	plugMainType *q = (plugMainType*) base; 
+	plugMainType *q = (plugMainType*) base;
+	
 	q( FF_DEINITIALISE, NULL, 0 );
 }
+
 
 void	freeframe_push_channel( void *instance, int n,int dir, VJFrame *frame )
 {
 	char inkey[10];
 	int i;
 	void *chan = NULL;
-	uint8_t *space = NULL;	
 	int error;
-	if(dir == 1)
-	{
+
+	freeframe_init( frame );
+
+	if(dir == 1){
 		vevo_property_set( instance, "HOST_output", VEVO_ATOM_TYPE_VOIDPTR,1,&frame );
-	}
-	else
-	{
-		error = vevo_property_get( instance, "HOST_buffer",0,&space );
+	} else  {
 #ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
+		assert( freeframe_frame_[n] != NULL );
+		assert(yuv_conv_ != NULL );
+		assert( dir == 0 );
+		assert( n >= 0 && n < 4 );
 #endif
-		uint32_t chan_offset = frame->width * frame->height * 4 * n;
-			
-		VJFrame *dst1 = yuv_rgb_template( space + chan_offset, frame->width,frame->height, PIX_FMT_RGB32 );
+		yuv_convert_and_scale_rgb( yuv_conv_, frame, freeframe_frame_[ n ] );
 
-		if( yuv_conv_ == NULL ) {
-			sws_template templ;
-			templ.flags = 1;
-			yuv_conv_ = yuv_init_swscaler( frame,dst1, &templ, yuv_sws_get_cpu_flags() );	
-		}	
-
-		yuv_convert_and_scale_rgb( yuv_conv_, frame, dst1 );
-
-		free(dst1);
 	}
 	
 }
@@ -584,37 +603,25 @@ int	freeframe_plug_process( void *plugin, double timecode )
 #endif
 
 	plugMainType *q = (plugMainType*) base; 
-	int instance = 0;
+	DWORD instance = 0;
 	error = vevo_property_get( plugin, "instance",0, &instance );	
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
-#endif
-	uint8_t *space = NULL;
-	error = vevo_property_get( plugin, "HOST_buffer",0,&space );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
+	assert( instance != 0 );
 #endif
 	
-	q( FF_PROCESSFRAME, space, instance );
+	q( FF_PROCESSFRAME, freeframe_space_, instance );
 
 	VJFrame *output_frame = NULL;
 	
 	error = vevo_property_get( plugin, "HOST_output", 0,&output_frame );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
+	assert( output_frame != NULL );
 #endif
 	
-	VJFrame *src1 = yuv_rgb_template( space, output_frame->width, output_frame->height, PIX_FMT_RGB32 );
-
-	if( rgb_conv_ == NULL ) {
-		sws_template templ;
-		templ.flags = 1;
-		rgb_conv_ = yuv_init_swscaler( src1,output_frame, &templ, yuv_sws_get_cpu_flags() );	
-	}	
-
-	yuv_convert_and_scale_from_rgb( rgb_conv_, src1, output_frame );
-
-	free(src1);
+	//@ output frame in [0]
+	yuv_convert_and_scale_from_rgb( rgb_conv_, freeframe_frame_[0], output_frame );
 
 	return 1;
 }
@@ -646,7 +653,7 @@ void	freeframe_plug_param_f( void *plugin, int seq_no, void *dargs )
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-	int instance = 0;
+	DWORD instance = 0;
 	error = vevo_property_get( plugin, "instance", 0, &instance );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );

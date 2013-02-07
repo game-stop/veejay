@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.24],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.25],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=24
+VEEJAY_MICRO_VERSION=25
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -122,7 +122,7 @@ AC_PROG_LIBTOOL
 dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
-AM_PROG_CC_STDC
+dnl AM_PROG_CC_STDC
 AC_PROG_YACC
 AM_PROG_LEX
 AC_PROG_CXX

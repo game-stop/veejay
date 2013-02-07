@@ -18,6 +18,7 @@
 
 #ifndef _H_JACK_OUT_H
 #define _H_JACK_OUT_H
+#ifdef HAVE_JACK
 
 #include <jack/jack.h>
 
@@ -145,3 +146,4 @@ long JACK_OutputStatus(int deviceID,long *sec, long *usec);
 #endif
 
 #endif /* #ifndef JACK_OUT_H */
+#endif
