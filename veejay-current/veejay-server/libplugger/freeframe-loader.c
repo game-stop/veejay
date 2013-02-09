@@ -182,34 +182,20 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT, 1, &freeframe_signature_ );
 	
 	int p;
-	int randp = 0;
 	for( p=  0; p < n_params; p ++ )
 	{
+		int randp = 0;
 		int type = q( FF_GETPARAMETERTYPE, (LPVOID) p, 0 ).ivalue;
 		char *pname = q( FF_GETPARAMETERNAME, (LPVOID) p, 0 ).svalue;
-		
-		//@ for some reason, FF_GETPARAMETERDEFAULT .fvalue returns invalid values. 
-		randp = 0;
-		int weirdo1 = q(FF_GETPARAMETERDEFAULT, (LPVOID) p, 0).ivalue;
-		if( weirdo1 == FF_FAIL || weirdo1 == 139 ) { //@ magic value seen 
-			randp = 1; 
-			if(!bug_workarround1) bug_workarround1 = 1;
-		} 
-		float weirdo2 = q(FF_GETPARAMETERDEFAULT,(LPVOID) p,0).fvalue;
-		if( weirdo2 < 0.0f ) {
-			randp = 1;
-			if(!bug_workarround1) bug_workarround1 = 1;
-		}
 
-		// q(FF_GETPARAMTERDEFAULT,p,0).svalue gives garbage. FIXME
+		plugMainUnion v = q(FF_GETPARAMETERDEFAULT, (LPVOID) p, 0 );
+
+		float defval    = v.fvalue;
 
 		int min = 0;
 		int max = 100;
 		int kind = -1;
-		int dvalue = 0;
-
-		if(!randp)  //@ scale plugin's default to vje integer scale
-			dvalue = (int) ( 100.0f * weirdo2);
+		int dvalue = (int) ( 100.0f * defval );
 
 		switch( type )
 		{
@@ -223,30 +209,23 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 				kind  = HOST_PARAM_NUMBER;
 				max   = 255;
 				min   = 0;
-				if(randp)
-					dvalue = 0 + (int)(255.0 * (rand() / (RAND_MAX + 1.0)));
+				dvalue = (int) ( max * defval );
 				break;
 			case FF_TYPE_XPOS:
 				kind = HOST_PARAM_NUMBER;
 				min  = 0;
 				max  = w;
-				if(randp)
-					dvalue = 0 + (int)(w * (rand() / (RAND_MAX + 1.0)));
+				dvalue = 0 + (int)(w * defval);
 
 				break;
 			case FF_TYPE_YPOS:
 				kind = HOST_PARAM_NUMBER;
 				min  = 0;
 				max = h;
-				if(randp)
-					dvalue = 0 + (int)(h * (rand() / (RAND_MAX + 1.0)));
+				dvalue = 0 + (int)(h * defval);
 				break;
 			case FF_TYPE_STANDARD:
 				kind = HOST_PARAM_NUMBER;
-				min  = 0;
-				max  = 100.0;
-				if(randp)
-					dvalue = 0 + (int)(10.0 * (rand() / (RAND_MAX + 1.0))); //@ initialize with low value
 				break;
 
 			default:
@@ -261,23 +240,9 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 		vevo_property_set( parameter, "max", VEVO_ATOM_TYPE_INT,1, &max );
 		vevo_property_set( parameter, "default",VEVO_ATOM_TYPE_INT,1,&dvalue);
 		vevo_property_set( parameter, "HOST_kind", VEVO_ATOM_TYPE_INT,1,&kind );
-#ifdef STRICT_CHECKING
-		if(randp)	
-			veejay_msg(VEEJAY_MSG_WARNING, "Randomized default value to %d for '%s'", dvalue, pname );
-#endif
 		char key[20];	
 		snprintf(key,20, "p%02d", p );
 		vevo_property_set( port, key, VEVO_ATOM_TYPE_VOIDPTR, 1, &parameter );
-	}
-
-	if( bug_workarround1==1 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "FreeFrame: garbage in value returning from FF_GETPARAMETERDEFAULT.");
-		veejay_msg(VEEJAY_MSG_WARNING, "FreeFrame: apply workarround and initialize parameters with random values.");
-		bug_workarround1++;
-	}
-
-	if(randp) {
-		veejay_msg(VEEJAY_MSG_WARNING , "Randomized parameter values for '%s'", plugin_name);
 	}
 
 	free(plugin_name);
@@ -529,6 +494,7 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 
 			veejay_msg(VEEJAY_MSG_INFO, " feed parameter %d with random value %2.2f", p, value );
 		}
+		freeframe_copy_parameters( plugin, pluginstance, n_params );
 	}
 
 	return pluginstance;
@@ -634,8 +600,9 @@ void	freeframe_plug_param_f( void *plugin, int seq_no, void *dargs )
 	// fetch parameter port
 	void *port = NULL;
 	int error = vevo_property_get( plugin, pkey, 0, &port );
-	if( error != VEVO_NO_ERROR ) 
+	if( error != VEVO_NO_ERROR ) { 
 		return;
+	}
 
 	int *args = (int*) dargs;
 	int in_val = args[0];
@@ -662,3 +629,30 @@ void	freeframe_plug_param_f( void *plugin, int seq_no, void *dargs )
 
 	q( FF_SETPARAMETER, &sps, instance );
 }
+
+
+
+void 		freeframe_copy_parameters( void *srcPort, void *dst, int n_params )
+{
+	int p;
+	for( p = 0; p < n_params; p ++ ) {
+		void *src = NULL;
+		char pname[32];
+		sprintf(pname, "p%02d", p );
+		int err   = vevo_property_get( srcPort, pname, 0, &src );		
+		if( err != 0 )
+			continue;
+		char **keys = vevo_list_properties(src);
+		if( keys == NULL )
+			continue;
+		void *dport = vpn( VEVO_ANONYMOUS_PORT );
+		int i;
+		for( i = 0; keys[i] != NULL ; i ++ ) {
+			err = vevo_property_clone( src, dport, keys[i] ,keys[i] );
+			free(keys[i]);	
+		}	
+		free(keys);
+		vevo_property_set( dst,pname, VEVO_ATOM_TYPE_PORTPTR, 1,&dport );
+	}
+}
+

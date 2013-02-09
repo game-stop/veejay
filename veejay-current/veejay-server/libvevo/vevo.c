@@ -3769,7 +3769,7 @@ int		vevo_property_clone( void *port, void *to_port, const char *key, const char
 					}
 				}
 				if( n > 0 ) {
-					if( vevo_property_set( to_port, as_key, t, n, &tmp ) != VEVO_NO_ERROR ) {
+					if( vevo_property_set( to_port, as_key, t, n, tmp ) != VEVO_NO_ERROR ) {
 #ifdef STRICT_CHECKING
 						veejay_msg(VEEJAY_MSG_DEBUG, "%s: %s -> %s unable to store %d elements (%d bytes)", __FUNCTION__, key,as_key, n, (n*sizeof(int32_t)));
 #endif
@@ -3801,7 +3801,7 @@ int		vevo_property_clone( void *port, void *to_port, const char *key, const char
 				}
 
 				if( n > 0 ) {
-					if( vevo_property_set( to_port, as_key, t, n, &tmp ) != VEVO_NO_ERROR ) {
+					if( vevo_property_set( to_port, as_key, t, n, tmp ) != VEVO_NO_ERROR ) {
 #ifdef STRICT_CHECKING
 					veejay_msg(VEEJAY_MSG_DEBUG, "%s: %s -> %s unable to store %d elements (%d bytes)", __FUNCTION__, key,as_key, n, (n*sizeof(double)));
 #endif
@@ -3833,7 +3833,7 @@ int		vevo_property_clone( void *port, void *to_port, const char *key, const char
 				}
 
 				if( n > 0 ) {
-					if( vevo_property_set( to_port, as_key, t, n, &tmp ) != VEVO_NO_ERROR ) {
+					if( vevo_property_set( to_port, as_key, t, n, tmp ) != VEVO_NO_ERROR ) {
 #ifdef STRICT_CHECKING
 					veejay_msg(VEEJAY_MSG_DEBUG, "%s: %s -> %s unable to store %d elements (%d bytes)", __FUNCTION__, key,as_key, n, (n*sizeof(double)));
 #endif
