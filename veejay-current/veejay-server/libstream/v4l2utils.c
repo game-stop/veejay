@@ -888,7 +888,6 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			}
 		} else {
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Preferring mmap() capture, override with VEEJAY_V4L2_CAPTURE_METHOD=0");
-			can_read = 0;
 			cap_read = 1;
 		}
  	}
@@ -1007,9 +1006,11 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 		//		munmap( v->buffer[k].start, v->buffer[k].length );
 	
 				free(v->buffers);
-				free(v);
-				close(fd);
-				return NULL;
+				//free(v);
+				//close(fd);
+				//return NULL;
+				v->rw = 1;
+				goto v4l2_rw_fallback;
 			}
 
 		}
@@ -1018,9 +1019,11 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 		if( v4l2_vidioc_qbuf( v ) == -1 ) {
 				veejay_msg(0, "v4l2: VIDIOC_QBUF failed with:%d, %s", errno,strerror(errno));
 				free(v->buffers);
-				free(v);
-				close(fd);
-				return NULL;
+			//	free(v);
+			//	close(fd);
+			//	return NULL;
+				v->rw = 1;
+				goto v4l2_rw_fallback;
 		}
 
 		if( !v4l2_start_video_capture( v ) ) {
@@ -1038,7 +1041,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 					free(v);
 					return NULL;
 				}
-
+				v->rw = 1;
 				goto v4l2_rw_fallback;
 			} else{
 			  	free(v->buffers);
