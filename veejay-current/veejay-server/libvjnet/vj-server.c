@@ -800,7 +800,6 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 	return num_msg;
 }
 
-
 static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 {
 	int i = 0;
@@ -811,12 +810,13 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 
 	while( i < buf_len ) {
 
-		char tmp_len[8];
+		char tmp_len[10];
 		char net_id[4];
 		int  slen = 0;
 		int	netid = 0;
 
 		char *str_ptr = &s[i];
+		memset( tmp_len, 0, sizeof(tmp_len));
 		
 		if(s[i] == 'V')
 		{
@@ -858,9 +858,8 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 		}
 		else if (s[i] == 'K' )
 		{
-			str_ptr ++;	//@ '[K][ ]
-			            //@      ^
-						
+			str_ptr ++;
+
 			veejay_strncpy( tmp_len, str_ptr, 8 );
 			
 			if( sscanf(tmp_len, "%08d", &slen) <= 0 )
@@ -869,14 +868,14 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 				return 0;
 			}
 
-			str_ptr += 8; // '[K][0][0][0][0][0][0][2][5][ ]'
-			              //@                             ^
-	
-			v[num_msg]->msg = strndup( str_ptr, slen );
+			str_ptr += 8;
+			
+			v[num_msg]->msg = (char*) vj_malloc( sizeof(char) * slen );
+			memcpy( v[num_msg]->msg, str_ptr, slen );
 			v[num_msg]->len = slen;
 			num_msg++;
 
-			i += ( 8 + slen + 1);
+			i += ( 9 + slen );
 		} else {
 			veejay_msg(0, "VIMS: blob '%s' not recognized. First token must be either 'V' or 'K' followed by packet length.",
 					str_ptr );

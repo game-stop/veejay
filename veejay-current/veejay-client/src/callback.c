@@ -2080,8 +2080,10 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	int end = get_nums( "curve_spinend" );
 	int start = get_nums( "curve_spinstart" );
 
+	const int length = end - start + 1;
 
-	if( (end - start) <= 0 || id <= 0 )	
+
+	if( (length) <= 0 || id <= 0 )	
 	{
 		if( id <= 0 )
 			vj_msg(VEEJAY_MSG_INFO, "No FX set on entry %d",i);
@@ -2101,31 +2103,29 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		type = GTK_CURVE_TYPE_FREE;
 	}
 	
-	int len = end - start;
-	float *data = (float*) vj_calloc(sizeof(float) * len );
-	int *values = (int*) vj_calloc(sizeof(int) * len );
+	float *data = (float*) vj_calloc(sizeof(float) * length );
+	int *values = (int*) vj_calloc(sizeof(int) * length );
 
-	unsigned char *kkf = (unsigned char*) vj_calloc( (len*4)+64);
+	unsigned char *kkf = (unsigned char*) vj_calloc( (length*4) + 64);
+	unsigned char *buf = (unsigned char*) vj_calloc( (length*4) + 64 );
 	int min=0,max=0;
 	
-	unsigned char *kf = kkf + 9;	//@ reserve space for header
+	unsigned char *kf = kkf;	//@ reserve space for header
 	
 	_effect_get_minmax( id, &min,&max,j );
 
 	int k;
 
-	get_points_from_curve( curve,  len, data );
-	for( k = 0 ; k < len ; k++ )
-		values[k] = ( (int) ( data[k] * max ));
+	get_points_from_curve( curve,  length, data );
+	for( k = 0 ; k < length ; k++ )
+		values[k] = min + ( (int) ( data[k] * max ));
 
-	int total_len = 9;
 	int row_len   = 3 + 2 + 2 + 8 + 8 + 2;
 	sprintf( (char*)kf, "key%02d%02d%08d%08d%02d",i,j,start,end,type );
-	unsigned char *ptr = kf + row_len;
+	unsigned char *ptr = kkf + row_len;
+	int total_len = row_len;
 
-	total_len += row_len;
-
-	for( k = 0; k < len; k ++ )
+	for( k = 0; k <= length; k ++ )
 	{
 		unsigned char *p = ptr + (k*4);
 		p[0] = values[k] & 0xff;
@@ -2139,15 +2139,11 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	free(values);
 	free(data);
 	
-	char header[10];
-	snprintf( header,10, "K%08d", total_len );
-	for( k = 0; k < 9; k ++ )
-		kkf[k] = header[k];
-
-	printf("[%s]: %d\n", kkf,total_len );
-
-	vj_client_send_buf( info->client, V_CMD, kkf,total_len );
+	sprintf( buf, "K%08d", total_len ); 	
+	memcpy( buf + 9 , kkf, total_len );
+	vj_client_send_buf( info->client, V_CMD, buf,total_len  );
 	free(kkf);
+	free(buf);
 
 	vj_msg( VEEJAY_MSG_INFO, "Saved new animation for parameter %d on entry %d, start at frame %d and end at frame %d",j,i,start,end );
 				

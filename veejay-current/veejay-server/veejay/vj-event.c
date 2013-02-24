@@ -1473,7 +1473,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		return 0;
 
 	}
-
+	
 	veejay_memcpy(head,msg,4);
 
 	if( strncasecmp( head, "bun", 3 ) == 0 )
