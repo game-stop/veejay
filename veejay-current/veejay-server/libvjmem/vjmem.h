@@ -28,7 +28,7 @@ extern void vj_mem_init(void);
 extern int vj_mem_threaded_init(int w, int h);
 extern void vj_mem_threaded_stop(void);
 extern char *get_memcpy_descr( void );
-extern void *vj_malloc_(unsigned int size);
+extern void *vj_malloc_(size_t size);
 extern  void *vj_calloc_(unsigned int size );
 extern void *vj_strict_malloc(unsigned int size, const char *f, int line );
 extern void *vj_strict_calloc(unsigned int size, const char *f, int line );

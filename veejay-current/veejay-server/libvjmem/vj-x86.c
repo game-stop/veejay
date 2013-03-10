@@ -173,7 +173,7 @@ void	vj_mem_threaded_stop()
 		task_stop( tasks );
 }
 
-void *vj_malloc_(unsigned int size)
+void *vj_malloc_(size_t size)
 {
 	if( size <= 0 )
 		return NULL;
