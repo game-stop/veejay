@@ -58,25 +58,26 @@ vj_effect *bathroom_init(int width,int height)
 static int n__ = 0;
 static int N__ = 0;
 // FIXME private
-
 int bathroom_malloc(int width, int height)
 {
-    bathroom_frame[0] = (uint8_t*)vj_yuvalloc( width, height );
-    if(!bathroom_frame[0]) return 0;
-  
-    bathroom_frame[1] = bathroom_frame[0] + (width * height );
-    bathroom_frame[2] = bathroom_frame[1] + (width * height );
+	int i;
+	for( i = 0; i < 3; i ++ ) {
+   	 bathroom_frame[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height));
+
+   	 if(!bathroom_frame[i]) return 0;
+  	}
 	n__ = 0;
 	N__ = 0;
     return 1;
 }
 
 void bathroom_free() {
- if(bathroom_frame[0])
-	 free(bathroom_frame[0]);
- bathroom_frame[0] = NULL;
- bathroom_frame[1] = NULL;
- bathroom_frame[2] = NULL;
+	int i;	
+	for( i = 0; i < 3 ; i ++ ) { 
+ 		if(bathroom_frame[i])
+			free(bathroom_frame[0]);
+		bathroom_frame[i] = NULL;
+	}
 }
 
 void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)
@@ -88,10 +89,8 @@ void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-
-    veejay_memcpy( bathroom_frame[0], Y, len);
-    veejay_memcpy( bathroom_frame[1], Cb, len);
-    veejay_memcpy( bathroom_frame[2], Cr, len);
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy( frame->data, bathroom_frame, strides );
 
     if( y_val <= 0 )
 	y_val = 1;
@@ -121,9 +120,8 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
     uint8_t *Cr = frame->data[2];
 
     unsigned int x,y;
-    veejay_memcpy( bathroom_frame[0], Y, len);
-    veejay_memcpy( bathroom_frame[1], Cb, len);
-    veejay_memcpy( bathroom_frame[2], Cr, len);
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy( frame->data, bathroom_frame, strides );
 
     for(y=0; y < height;y++) {
      for(x=0; x <width; x++) {

@@ -43,6 +43,7 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <veejay/vj-task.h>
 #include <liblzo/lzo.h>
 #include <math.h>
 #include <stdlib.h>
@@ -257,7 +258,6 @@ typedef struct
 	VJFrame *img;
 	int fmt;
         int ref;
-	void *sampler;
 #ifdef SUPPORT_READ_DV2
 	vj_dv_decoder *dv_decoder;
 #endif
@@ -317,9 +317,6 @@ static void	_el_free_decoder( vj_decoder *d )
 		if(d->frame) 
 			free(d->frame);
 
-		if(d->sampler)
-			subsample_free(d->sampler);
-	
 		if(d->img)
 			free(d->img);
 	
@@ -384,6 +381,18 @@ void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 	el_switch_jpeg_ = switch_jpeg;
 
 	lav_set_project( dw,dh, fps, pf );
+
+	char *maxFileSize = getenv( "VEEJAY_MAX_FILESIZE" );
+	if( maxFileSize != NULL ) {
+		uint64_t mfs = atol( maxFileSize );
+		if( mfs > AVI_get_MAX_LEN() )
+			mfs = AVI_get_MAX_LEN();
+		if( mfs > 0 ) {
+			AVI_set_MAX_LEN( mfs );
+			veejay_msg(VEEJAY_MSG_INFO, "Changed maximum file size to %ld bytes.", mfs );
+		}
+	}
+
 }
 
 int	vj_el_is_dv(editlist *el)
@@ -472,7 +481,6 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	if( id == CODEC_ID_YUVLZO )
 	{
 		d->lzo_decoder = lzo_new();
-		d->sampler = subsample_init( width );
 	} else  if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && id != CODEC_ID_YUV420F && id != CODEC_ID_YUV422F)
         {
 		d->codec = avcodec_find_decoder( id );
@@ -486,7 +494,14 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->context->opaque = d;
 		d->frame = avcodec_alloc_frame();
 		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
-		d->img->width = width;	
+		d->img->width = width;
+		int tc = 2 * task_num_cpus();	
+		tc = ( tc < 8 ? 8: tc );
+		veejay_msg(VEEJAY_MSG_DEBUG,"Allowing %d decoding threads. ", 
+			tc );
+		d->context->thread_type = FF_THREAD_FRAME;
+		d->context->thread_count = tc;
+		
 		if ( avcodec_open( d->context, d->codec ) < 0 )
 		{
       		       veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
@@ -1142,9 +1157,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 #ifdef STRICT_CHECKING
 		assert( dst[0] != NULL  && dst[1] != NULL && dst[2] != NULL );
 #endif	
-		veejay_memcpy( dst[0], srci->data[0], el_len_ );
-                veejay_memcpy( dst[1], srci->data[1], el_uv_len_ );
-                veejay_memcpy( dst[2], srci->data[2], el_uv_len_ );
+		int strides[4] = { el_len_, el_uv_len_, el_uv_len_,0 };
+		vj_frame_copy( srci->data, dst, strides );
                 return 1;     
 	}
 
@@ -1177,11 +1191,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int got_picture = 0;
 	int in_uv_len = 0;
 	uint8_t *in[3] = { NULL,NULL,NULL };
-
+	int strides[4] = { el_len_, el_uv_len_, el_uv_len_ ,0};
+	uint8_t *dataplanes[3] = { data , data + el_len_, data + el_len_ + el_uv_len_ };
 	switch( decoder_id )
 	{
 		case CODEC_ID_YUV420:
-			veejay_memcpy( dst[0], data, el_len_);
+			vj_frame_copy1( data,dst[0], el_len_ );
 			in[0] = data; in[1] = data+el_len_ ; in[2] = data + el_len_ + (el_len_/4);
 			if( el_pixel_format_ == FMT_422F ) {
 				yuv_scale_pixels_from_ycbcr( in[0],16.0f,235.0f, el_len_ );
@@ -1191,7 +1206,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 1;
 			break;	
 		case CODEC_ID_YUV420F:
-			veejay_memcpy( dst[0], data, el_len_);
+			vj_frame_copy1( data, dst[0], el_len_);
 			in[0] = data; in[1] = data + el_len_; in[2] = data + el_len_+(el_len_/4);
 			if( el_pixel_format_ == FMT_422 ) {
 				yuv_scale_pixels_from_y( dst[0], el_len_ );
@@ -1203,9 +1218,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 1;
 			break;
 		case CODEC_ID_YUV422:
-			veejay_memcpy( dst[0], data, el_len_);
-            		veejay_memcpy( dst[1], data+el_len_,el_uv_len_);
-            		veejay_memcpy( dst[2], data+el_len_+el_uv_len_, el_uv_len_);
+			vj_frame_copy( dataplanes,dst,strides );
 			if( el_pixel_format_ == FMT_422F ) {
 				yuv_scale_pixels_from_ycbcr( dst[0],16.0f,235.0f, el_len_ );
 				yuv_scale_pixels_from_ycbcr( dst[1],16.0f,240.0f, el_len_/2);
@@ -1213,9 +1226,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 1;
 			break;
 		case CODEC_ID_YUV422F:
-			veejay_memcpy( dst[0], data, el_len_);
-            		veejay_memcpy( dst[1], data+el_len_,el_uv_len_);
-            		veejay_memcpy( dst[2], data+el_len_+el_uv_len_, el_uv_len_);
+			vj_frame_copy( dataplanes, dst, strides );
 			if( el_pixel_format_ == FMT_422 ) {
 				yuv_scale_pixels_from_y( dst[0], el_len_ );
 				yuv_scale_pixels_from_uv( dst[1], el_len_/2);
@@ -1246,7 +1257,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 			break;			
 		default:
-			inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
+		//	inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
 			d->img->width = el->video_width;
 			d->img->uv_width = el->video_width >> 1;
 			d->img->data[0] = dst[0];
@@ -1310,19 +1321,16 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 					VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
 								el->video_width, el->video_height,
 								dst_fmt );
-
-				/*	if(! el->scaler ) {
-						sws_template tmpl;
-						tmpl.flags = 1;
-						el->scaler = yuv_init_swscaler( src1,dst1,&tmpl,yuv_sws_get_cpu_flags() );
-					}
-#ifdef STRICT_CHECKING
-					assert( el->scaler != NULL );
-#endif			
-
-					yuv_convert_and_scale( el->scaler, src1,dst1 );
-				*/
-					yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
+					sws_template tmpl;
+					tmpl.flags = 1;
+					el->scaler = 
+						yuv_init_cached_swscaler( el->scaler, 	
+										src1,
+										dst1,
+										&tmpl,
+										yuv_sws_get_cpu_flags() );
+	
+					yuv_convert_any3( el->scaler, src1,d->frame->linesize,dst1,src1->format,dst1->format);
 
 					free(src1);
 					free(dst1);
@@ -1337,20 +1345,16 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 					VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
 								el->video_width,el->video_height,
 								dst_fmt );
-					/*
-					if(! el->scaler ) {
-						sws_template tmpl;
-						tmpl.flags = 1;
-						el->scaler = yuv_init_swscaler( src1,dst1,&tmpl,yuv_sws_get_cpu_flags() );
-					}
-#ifdef STRICT_CHECKING
-					assert( el->scaler != NULL );
-#endif
+					sws_template tmpl;
+					tmpl.flags = 1;
+					el->scaler = 
+						yuv_init_cached_swscaler( el->scaler, 	
+										src1,
+										dst1,
+										&tmpl,
+										yuv_sws_get_cpu_flags() );
 
-					yuv_convert_and_scale( el->scaler, src1,dst1 );
-					*/
-
-					yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
+					yuv_convert_any3( el->scaler, src1,d->frame->linesize,dst1,src1->format,dst1->format);
 					free(src1);
 					free(dst1);
 				}
@@ -1882,7 +1886,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		if(stat( filename[nf], &fileinfo)!= 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to access file '%s'",filename[nf] );
-			vj_el_free(el);
+			//vj_el_free(el);
 			return NULL;
 		} 
 			fd = fopen(filename[nf], "r");
@@ -2549,7 +2553,7 @@ int		vj_el_framelist_clone( editlist *src, editlist *dst)
 	dst->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * src->video_frames );
 	if(!dst->frame_list)
 		return 0;
-
+	
 	veejay_memcpy(
 		dst->frame_list,
 		src->frame_list,

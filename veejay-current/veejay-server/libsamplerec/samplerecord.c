@@ -99,9 +99,6 @@ int sample_try_filename(int sample_id, char *filename, int format)
 			si->encoder_base[i] = '_';
 	} 
 
-	sprintf(si->encoder_destination, "%s-%05ld.avi",
-		si->encoder_base,si->sequence_num);
-
 	char ext[5];
 	switch(format)
 	{
@@ -119,10 +116,10 @@ int sample_try_filename(int sample_id, char *filename, int format)
 			sprintf(ext,"avi");
 			break;
 	}
-	sprintf(si->encoder_destination, "%s.%s", si->encoder_base , ext);
+	sprintf(si->encoder_destination, "%s-%04d.%s", si->encoder_base , si->sequence_num, ext);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Recording to [%s]", si->encoder_destination);
-	return (sample_update(si,sample_id));	
+	return 1;	
 }
 
 
@@ -144,19 +141,13 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	si->encoder_active = 1;
 	si->encoder_format = format;
 
-	if(si->encoder_total_frames == 0)
-	{
-		si->encoder_duration = nframes; 
-		si->encoder_num_frames = 0;
+	if( si->encoder_total_frames_recorded == 0 ) {
+   	 si->encoder_frames_to_record = nframes;
+   	 si->encoder_frames_recorded  = 0;
+    }
+	else {
+	 si->encoder_frames_recorded = 0;
 	}
-	else
-	{
-		si->encoder_duration = si->encoder_duration - si->encoder_num_frames;
-	}
-
-
-	si->rec_total_bytes= 0;
-	si->encoder_succes_frames = 0;
 
 	int tmp = el->video_width * el->video_height;
 	int tmp1 = (el->video_width/2 ) * el->video_height;
@@ -176,7 +167,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 			case ENCODER_LZO:
 			si->encoder_max_size = (tmp * 3 ); break;
 			default:
-			si->encoder_max_size = ( 16 * 65535 );
+			si->encoder_max_size = 8 * ( 16 * 65535 );
 			break;
 		}
 	
@@ -211,19 +202,6 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s]",  vj_avcodec_get_encoder_name(format),
 	    si->encoder_destination );
 
-	veejay_msg(VEEJAY_MSG_DEBUG,"\t%dx%d@%2.2f %d/%d/%d %s >%09d< f=%c",
-	    el->video_width,
-	    el->video_height,
-	    (float) el->video_fps,
-	    el->audio_bits,
-	    el->audio_chans,
-	    el->audio_rate,
-		(el->video_inter == 1 ? "Full frames" : "Interlaced"),
-		( si->encoder_duration - si->encoder_total_frames),
-		cformat );
-	
-
-	sample_update(si,sample_id);
 	return 0;
 }
 
@@ -270,35 +248,20 @@ int sample_continue_record( int s1 )
 	sample_info *si = sample_get(s1);
 	if(!si) return -1;
 
-	if( si->rec_total_bytes == 0) return -1;
-	if(si->encoder_num_frames > si->encoder_duration)
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Ready recording %d frames", si->encoder_succes_frames);
+	long	bytesRemaining = lav_bytes_remain( si->encoder_file );
+	if( bytesRemaining < (512 * 1024) ) {
+		si->sequence_num ++;
+		veejay_msg(VEEJAY_MSG_WARNING, "Auto splitting file, %ld frames left to record.", 
+			( si->encoder_frames_to_record - si->encoder_total_frames_recorded ) );
+		si->encoder_frames_recorded= 0;	
+		return 2;
+	}
 
-		si->encoder_total_frames = 0;
-		sample_update(si,s1);
+	if( si->encoder_total_frames_recorded >= si->encoder_frames_to_record ) {
+		veejay_msg(VEEJAY_MSG_INFO, "Recorded %ld frames", si->encoder_total_frames_recorded );
 		return 1;
 	}
 
-	if ( si->rec_total_bytes  >= VEEJAY_FILE_LIMIT)
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Auto splitting files (max filesize is %ld)", VEEJAY_FILE_LIMIT);
-		si->sequence_num ++;
-		si->rec_total_bytes = 0;
-
-		printf(" %d %ld %ld (%ld)%ld \n",
-			(int)si->sequence_num,
-			si->rec_total_bytes,
-			si->encoder_num_frames,
-			si->encoder_total_frames,
-			si->encoder_duration);
-
-		si->encoder_total_frames = 0;	
-		sample_update(si,s1);
-		return 2;
-	}
-		
-	
 	return 0;
 }
 
@@ -307,12 +270,13 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
    int buf_len = 0;
    if(!si) return -1;
 
-   if(!si->encoder_active)
-	{
-	 return -1;
-  	}
+   if(!si->encoder_active) {
+		return -1;
+   }
 
-   buf_len =  vj_avcodec_encode_frame(si->encoder, si->encoder_total_frames ++,
+   long nframe = si->encoder_frames_recorded;
+
+   buf_len =  vj_avcodec_encode_frame(si->encoder,  nframe,
 		si->encoder_format, buffer, vj_avcodec_get_buf(si->encoder), si->encoder_max_size, pix_fmt);
 
    if(buf_len <= 0) 
@@ -321,7 +285,7 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
   	veejay_msg(VEEJAY_MSG_ERROR, "Cannot encode frame");
 	return -1;
    }
-	si->rec_total_bytes += buf_len;
+//	si->rec_total_bytes += buf_len;
 
 
    //@ if writing to AVI/QT
@@ -340,16 +304,11 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 		{
 	 	    veejay_msg(VEEJAY_MSG_ERROR, "Error writing output audio [%s] (%d)",lav_strerror(),audio_size);
 		}
-		si->rec_total_bytes += audio_size;
 	}
    }
 
-   //@ otherwise, encoder must be YUV4MPEG
-	/* write OK */
-	si->encoder_succes_frames ++;
-	si->encoder_num_frames ++;
-
-	sample_update(si,s1);
+	si->encoder_frames_recorded ++;
+    si->encoder_total_frames_recorded ++; 
 
 	return (sample_continue_record(s1));
 }
@@ -369,9 +328,6 @@ int sample_stop_encoder(int s1) {
      si->encoder_active = 0;
      si->encoder_file = NULL;
      si->encoder = NULL;
-     sample_update(si,s1);	
-    
-     //sample_reset_encoder(s1);
      return 1; 
   }
    return 0;
@@ -384,33 +340,32 @@ void sample_reset_encoder(int s1) {
 	  /* added sample */
  	si->encoder_active = 0;
 	si->encoder_format = 0;
-	si->encoder_succes_frames = 0;
-	si->encoder_num_frames = 0;
 	si->encoder_width = 0;
 	si->encoder_height = 0;
 	si->encoder_max_size = 0;
 	si->encoder_active = 0;
-	si->rec_total_bytes = 0;
-	si->encoder_duration = 0;
+//	si->rec_total_bytes = 0;
 	si->encoder_file = NULL;
 	si->encoder = NULL;
-
-	sample_update(si, s1);
+	si->encoder_total_frames_recorded = 0;
+	si->encoder_frames_recorded = 0;
+	si->encoder_frames_to_record =0;
 }
+
 
 int sample_get_encoded_frames(int s1) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
   //return ( si->encoder_succes_frames );
-  return ( si->encoder_total_frames );
+  return ( si->encoder_total_frames_recorded );
 }
 
 
-int sample_get_total_frames( int s1 )
+long sample_get_total_frames( int s1 )
 {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
-  return ( si->encoder_total_frames );
+  return ( si->encoder_frames_to_record );
 }
 
 int sample_reset_autosplit(int s1)
@@ -419,16 +374,17 @@ int sample_reset_autosplit(int s1)
   if(!si) return -1;
   bzero( si->encoder_base, 255 );
   bzero( si->encoder_destination , 255 );
-  si->encoder_total_frames = 0;
   si->sequence_num = 0;
-  return (sample_update(si,s1));  
+  return 1;
 }
 
-int sample_get_frames_left(int s1)
+long sample_get_frames_left(int s1)
 {
 	sample_info *si= sample_get(s1);
 	if(!si) return 0;
-	return ( si->encoder_duration - si->encoder_total_frames );
+
+	return ( si->encoder_frames_to_record - 
+		     si->encoder_total_frames_recorded );
 }
 
 int sample_encoder_active(int s1)

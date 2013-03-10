@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "radcor.h"
-
+#include "common.h"
 vj_effect *radcor_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -59,10 +59,11 @@ static int map_upd[3] = {0,0,0};
 
 int	radcor_malloc( int width, int height )
 {
-	badbuf = (uint8_t*) vj_malloc( width * height * 3 * sizeof(uint8_t));
+	badbuf = (uint8_t*) vj_malloc( RUP8( width * height * 3 * sizeof(uint8_t)));
 	if(!badbuf)
 		return 0;
-	Map    = (uint32_t*) vj_malloc( width * height * sizeof(uint32_t));
+	Map    = (uint32_t*) vj_malloc( RUP8(width * height * sizeof(uint32_t)));
+	veejay_memset( Map, 0, RUP8(width * height * sizeof(uint32_t)) );
 	if(!Map)
 		return 0;
 	return 1;
@@ -101,9 +102,9 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 	int nyout = ny;
 
 	//@ copy source image to internal buffer 
-	veejay_memcpy( badbuf, Y, width * height );
-	veejay_memcpy( badbuf + len, Cb, len );
-	veejay_memcpy( badbuf + len + len, Cr, len );
+	uint8_t *dest[3] = { badbuf, badbuf + len, badbuf + len + len };
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy( frame->data, dest, strides );
 
 	uint8_t *Yi = badbuf;
 	uint8_t *Cbi = badbuf + len;
@@ -118,9 +119,9 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 		alphay *= -1.0;
 	}
 
-	veejay_memset( Y, 0, len );
-	veejay_memset( Cb, 128, len );
-	veejay_memset( Cr, 128, len );
+	vj_frame_clear1( Y, 0, len );
+	vj_frame_clear1( Cb, 128, len );
+	vj_frame_clear1( Cr, 128, len );
 
 	int update_map = 0;
 

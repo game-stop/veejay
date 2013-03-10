@@ -196,7 +196,7 @@ static	void	add_to_plugin_list( const char *path )
 		void *plugin = NULL;
 		veejay_msg(VEEJAY_MSG_DEBUG, "Loading %s",fullname );
 
-		if(dlsym( handle, "plugMain" ))
+		if(dlsym( handle, "plugMain" ) && sizeof(long) == 4)
 		{
 			plugin = deal_with_ff( handle, name, base_width_, base_height_ );
 			if( plugin )
@@ -227,8 +227,10 @@ static	void	add_to_plugin_list( const char *path )
 			}
 			else
 				dlclose(handle);
-		} else
+		} else{
 			dlclose(handle);
+			veejay_msg(VEEJAY_MSG_DEBUG, "%s is not compatible.", fullname );
+		}
 
 		if( plugin ) {
 			vevo_property_set( plugin, "so_name",VEVO_ATOM_TYPE_STRING,1,&basename );
@@ -538,10 +540,18 @@ int	plug_sys_detect_plugins(void)
 	veejay_msg(VEEJAY_MSG_INFO, "Veejay plugin system initialized");
 	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
 	//@ display copyright notice in binary form
-	veejay_msg(VEEJAY_MSG_INFO, "\tFreeFrame - cross-platform real-time video effects");
-	veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2002 Marcus Clements www.freeframe.org. All Rights reserved.");
-	veejay_msg(VEEJAY_MSG_INFO, "\thttp://freeframe.sourceforge.net");
-	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d FreeFrame %s",	n_ff_ , n_ff_ == 1 ? "plugin" : "plugins" );
+
+	//@ the freeframe version we use is not compatible with 64 bit systems. So, lets see if long is size 4
+	//@ For every time there is a void* passed as int a gremlin will be happy
+	if( sizeof(long) == 4 ) {
+		if( n_ff_ > 0 ) { 
+			veejay_msg(VEEJAY_MSG_INFO, "\tFreeFrame - cross-platform real-time video effects");
+			veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2002 Marcus Clements www.freeframe.org. All Rights reserved.");
+			veejay_msg(VEEJAY_MSG_INFO, "\thttp://freeframe.sourceforge.net");
+			veejay_msg(VEEJAY_MSG_INFO, "\tFound %d FreeFrame %s",	n_ff_ , n_ff_ == 1 ? "plugin" : "plugins" );
+		}
+	}
+
 	veejay_msg(VEEJAY_MSG_INFO, "\tfrei0r - a minimalistic plugin API for video effects");
 	veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2004 Georg Seidel, Phillip Promesberger and Martin Bayer (GPL)");
 	veejay_msg(VEEJAY_MSG_INFO, "\thttp://www.piksel.org/frei0r");

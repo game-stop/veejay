@@ -36,16 +36,9 @@ typedef enum subsample_mode {
 extern const char *ssm_id[SSM_COUNT];
 extern const char *ssm_description[SSM_COUNT];
 
-void *subsample_init(int buf_len);
-void subsample_free(void *sampler);
-
-void chroma_subsample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
-		      int width, int height);
-void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], uint8_t *dcbcr[],
-		      int width, int height);
-
-void chroma_supersample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
-			int width, int height);
+void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
+void chroma_subsample_cp(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[], uint8_t *dcbcr[] );
+void chroma_supersample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
 
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);
@@ -81,7 +74,7 @@ typedef struct
 } sws_template;
 
 void	yuv_init_lib(int sws_extra_flags, int auto_jpeg_ccir, int scaler_type);
-
+void*	yuv_init_cached_swscaler(void *cache,VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flags);
 void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *templ, int cpu_flags);
 void	yuv_convert_and_scale_packed( void *sws, VJFrame *src, VJFrame *dst );
 
@@ -121,7 +114,7 @@ void	yuv_convert_ac( VJFrame *src, VJFrame *dst, int a, int b );
 
 void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt );
 
-void	yuv_convert_any3( VJFrame *src,int strides[], VJFrame *dst, int a, int b );
+void	yuv_convert_any3( void *scaler, VJFrame *src,int strides[], VJFrame *dst, int a, int b );
 
 
 VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt );

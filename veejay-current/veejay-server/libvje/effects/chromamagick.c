@@ -40,11 +40,13 @@ vj_effect *chromamagick_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 7;
     ve->defaults[1] = 150;
+	ve->parallel = 1;
     ve->description = "Chroma Magic";
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 25;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
+    ve->parallel = 1;
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->has_user = 0;
@@ -280,7 +282,7 @@ void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int width,
 void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
     unsigned int i;
 	const int len = frame->len;
- 	uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	uint8_t *Y2 = frame2->data[0];
@@ -292,29 +294,24 @@ void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int heigh
     const unsigned int o2 = 255 - a;
 
     for (i = 0; i < len; i++) {
-	a = Y[i];
-	b = Y2[i];
+		a = Y[i];
+		b = Y2[i];
+ 		c = a + (2 * b) - op_a;
+		Y[i] = CLAMP_Y(c - (( a * b ) >> 8 ));   
+    }	
+    for( i = 0; i < len ; i ++ ) {
+		a = Cb[i];
+		b = Cb2[i];
 
-	a *= o1;
-	b *= o2;
-	a = a >> 8;
-	b = b >> 8;	
+		c = a + (2 * b);
+		Cb[i] = CLAMP_UV(c - 0xff);
 
-	Y[i] = (a+b) - ((a * b) >> 8);
+		a = Cr[i];
+		b = Cr2[i];
+		c = a + (2 * b);
+		Cr[i] = CLAMP_UV(c - 0xff);
+   	 }
 
-	a = Cb[i]-128;
-	b = Cb2[i]-128;
-	c = (a + b) - (( a * b) >> 8);
-	c += 128;
-	Cb[i] = CLAMP_UV(c);
-
-
-	a = Cr[i]-128;
-	b = Cr2[i]-128;
-	c = (a + b) - ((a*b) >> 8);
-	c += 128;
-	Cr[i] = CLAMP_UV(c);
-    }
 }
 
 void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {

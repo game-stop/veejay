@@ -194,8 +194,8 @@ int contourextract_prepare(uint8_t *map[3], int width, int height)
 	{
 		return 0;
 	}
-	
-	veejay_memcpy( static_bg, map[0], (width*height));
+
+	vj_frame_copy1( map[0], static_bg, (width*height));	
 	
 	VJFrame tmp;
 	veejay_memset( &tmp, 0, sizeof(VJFrame));
@@ -271,8 +271,8 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	contourextract_data *ud = (contourextract_data*) ed;
 
 	if( take_bg != take_bg_ )
-	{
-		veejay_memcpy( static_bg, frame->data[0], frame->len );
+	{	
+		vj_frame_copy1( frame->data[0], static_bg, frame->len );
 		take_bg_ = take_bg;
 		bg_frame_ ++;
 		return;
@@ -298,9 +298,9 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	if(mode==1)
 	{
 		//@ show difference image in grayscale
-		veejay_memcpy( Y, ud->bitmap, len );
-		veejay_memset( Cb, 128, uv_len );
-		veejay_memset( Cr, 128, uv_len );
+		vj_frame_copy1( ud->bitmap, Y, len );
+		vj_frame_clear1( Cb, 128, uv_len );
+		vj_frame_clear1( Cr, 128, uv_len );
 		return;
 	}
 

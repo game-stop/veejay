@@ -41,7 +41,7 @@ vj_effect *complexinvert_init(int w, int h)
     ve->defaults[4] = 2400; /* noise suppression*/
     ve->limits[0][0] = 5;
     ve->limits[1][0] = 900;
-
+    ve->parallel = 1;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
 

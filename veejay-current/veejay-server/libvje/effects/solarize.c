@@ -35,6 +35,7 @@ vj_effect *solarize_init(int w,int h)
     ve->limits[1][0] = 255;
 	// negation by threshold 
     ve->description = "Solarize";
+	ve->parallel = 1;
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;

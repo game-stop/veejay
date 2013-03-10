@@ -30,8 +30,11 @@ typedef struct
 	int    max_files;
 } filelist_t;
 
-
+#ifndef _LARGEFILE_SOURCE
 #define VEEJAY_FILE_LIMIT (1048576 * 2000)
+#else
+#define VEEJAY_FILE_LIMIT LLONG_MAX
+#endif
 int   available_diskspace(void);
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
 

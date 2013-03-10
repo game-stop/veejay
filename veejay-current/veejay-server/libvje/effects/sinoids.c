@@ -50,7 +50,6 @@ vj_effect *sinoids_init(int width, int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Sinoids");
     return ve;
 }
-
 static int n__ = 0;
 static int N__= 0;
 //FIXME private
@@ -59,11 +58,11 @@ int sinoids_malloc(int width, int height)
 	int i = 0;
    sinoids_X = (int*) vj_calloc(sizeof(int) * width);
   if(!sinoids_X) return 0;
-
-  sinoid_frame[0] = (uint8_t*)vj_yuvalloc(width,height);
-  if(!sinoid_frame[0]) return 0;
-  sinoid_frame[1] = sinoid_frame[0] + (width * height);
-  sinoid_frame[2] = sinoid_frame[1] + (width * height);
+	for( i = 0; i < 3 ;i ++ ) {
+ 	 sinoid_frame[i] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width*height));
+	 if(!sinoid_frame[i])
+		return 0;
+	}
 
    n__ = 0;
    N__ = 0; 
@@ -77,12 +76,15 @@ int sinoids_malloc(int width, int height)
 }
 
 void sinoids_free() {
+	int i;
+	for( i = 0; i < 3;  i ++ ) {	
+		if( sinoid_frame[i] ) 
+		  free(sinoid_frame[i]);
+		sinoid_frame[i] = NULL;
+	}
+
 	if(sinoids_X) free(sinoids_X);
-	if(sinoid_frame[0])
-		free(sinoid_frame[0]);
-	sinoid_frame[0] = NULL;
-	sinoid_frame[1] = NULL;
-	sinoid_frame[2] = NULL;
+	
 }
 
 void sinoids_recalc(int width, int z) {

@@ -39,10 +39,8 @@ vj_effect *bgsubtract_init(int width, int height)
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 0;	/* mode */
     ve->limits[1][1] = 1;
-
     ve->defaults[0] = 45;
     ve->defaults[1] = 0;
-
     ve->description = "Substract background (static, requires bg mask)";
     ve->extra_frame = 0;
     ve->sub_format = 0;

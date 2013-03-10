@@ -116,10 +116,10 @@ enum {
 	VJ_VIDEO_EFFECT_PICINPIC = 241,
 	VJ_VIDEO_EFFECT_CHAMBLEND = 242,
 	VJ_VIDEO_EFFECT_RADIOACTIVE = 243,
-	VJ_VIDEO_EFFECT_TEXMAP = 244,
+	VJ_VIDEO_EFFECT_IRIS   = 244,
 	VJ_VIDEO_EFFECT_RIPPLETV = 245,
 	VJ_VIDEO_EFFECT_SLICER = 246,
-	VJ_VIDEO_EFFECT_IRIS   = 247,
+	
 };
 
 enum {
@@ -222,7 +222,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 192
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 248
+#define VJ_VIDEO_EFFECT_MAX 247
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -492,7 +492,7 @@ extern void color_apply(VJFrame *frame, int w, int h, int a,int b, int c);
 //extern void water_apply(VJFrame *frame, int w, int h, int val, int l, int d);
 extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height, int fresh,int loopnum, int decay, int mode, int threshold);
 
-extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity);
+extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity, int mode);
 
 extern void pixelate_apply(VJFrame *frame, int w, int h, int v );
 

@@ -100,8 +100,6 @@ static int playing    = 0;
 static uint8_t *interpolate_buf = NULL;
 static int running = 0;
 
-#define    RUP8(num)(((num)+8)&~8)
-
 int		motionmap_malloc(int w, int h )
 {
 	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * 3) );
@@ -247,9 +245,10 @@ void	motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n )
 
 void	motionmap_store_frame( VJFrame *fx )
 {
-	veejay_memcpy( interpolate_buf, fx->data[0], fx->len );
-	veejay_memcpy( interpolate_buf+fx->len,fx->data[1],fx->len);
-	veejay_memcpy( interpolate_buf+fx->len+fx->len,fx->data[2],fx->len);
+	uint8_t *dest[3] = {
+		interpolate_buf, interpolate_buf + fx->len, interpolate_buf + fx->len + fx->len };
+	int strides[4] = { fx->len, fx->len, fx->len, 0 };
+	vj_frame_copy( fx->data, dest, strides );
 }
 
 void	motionmap_interpolate_frame( VJFrame *fx, int N, int n )
@@ -270,8 +269,7 @@ int	motionmap_prepare( uint8_t *map[3], int width, int height )
 {
 	if(!previous_img)
 		return 0;
-
-	veejay_memcpy( previous_img ,map[0], width *height );
+	vj_frame_copy1( map[0], previous_img, width * height );
 	have_bg = 1;
 	nframe_ = 0;
 	running = 0;
@@ -293,7 +291,7 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		return;
 	}
 
-	veejay_memcpy( original_img, frame->data[0], len );
+	vj_frame_copy1( frame->data[0], original_img, len );
 
 	softblur_apply( frame, width,height,0 );
 	update_bgmask( binary_img, previous_img, frame->data[0], len , threshold);
@@ -335,9 +333,9 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 
 	if( draw )
 	{
-		veejay_memset( Cb, 128, len );
-		veejay_memset( Cr, 128, len );
-		veejay_memcpy( frame->data[0], binary_img, len );
+		vj_frame_clear1( Cb, 128, len );
+		vj_frame_clear1( Cr, 128, len );
+		vj_frame_copy1( binary_img, frame->data[0], len );
 		nframe_++;
 		return;
 	}
@@ -381,10 +379,9 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		uint8_t *dst[3];
 		dst[0] = large_buf + ( n_captured * (len*3) ); 
 		dst[1] = dst[0] + len;
-		dst[2] = dst[1] + len;
-		veejay_memcpy( dst[0], frame->data[0], len );
-		veejay_memcpy( dst[1], frame->data[1], len );
-		veejay_memcpy( dst[2], frame->data[2], len );
+		dst[2] = dst[1] + len;	
+		int strides[4] = { len, len, len, 0 };
+		vj_frame_copy( frame->data, dst, strides );
 		n_captured ++;
 		if( n_captured >= MAXCAPBUF )
 		{
@@ -405,7 +402,7 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		VJFrame b;
 		veejay_memcpy(&b, frame, sizeof(VJFrame));
 		b.data[0] = src[0]; b.data[1] = src[1]; b.data[2] = src[2];
-		opacity_apply( frame, &b, frame->width,frame->height, capbuf );
+		opacity_applyN( frame, &b, frame->width,frame->height, capbuf );
 		
 
 		n_played ++;
@@ -417,7 +414,7 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		nframe_++;
 		return;
 	}
-	veejay_memcpy( frame->data[0], original_img, len );
+	vj_frame_copy1( original_img, frame->data[0], len );
 	nframe_ ++;
 	running = 1;
 }

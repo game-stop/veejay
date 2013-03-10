@@ -90,18 +90,21 @@ void	vj_shm_free(void *vv)
 	int res     = pthread_rwlock_destroy( &data->rwlock );
 
 	res = shmdt( v->sms );
-	if(res ) {
+	if(res==-1 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Failed to detach shared memory: %s",strerror(errno));
 	}
 	res = shmctl( v->shm_id, IPC_RMID, NULL );
-	if( res ) {
+	if( res==-1 ) {
 		veejay_msg(0, "Failed to remove shared memory %d: %s", v->shm_id, strerror(errno));
 	} else {
 		veejay_msg(VEEJAY_MSG_INFO, "Shared resource will %d be destroyed.", v->shm_id );
 	}
 
 	if( v->file ) {
-		remove(v->file);
+		res = remove(v->file);
+		if( res == -1 ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Unable to remove file %s", v->file);
+		}
 		free(v->file);
 	}
 
@@ -168,7 +171,7 @@ int		vj_shm_read( void *vv , uint8_t *dst[3] )
 
 	uint8_t *in[4] = { ptr, ptr + len, ptr + len + uv_len,NULL };
 	int strides[4]    = { len, uv_len, uv_len,0 };
-	vj_frame_copy( in, dst, strides,3 );
+	vj_frame_copy( in, dst, strides );
 
 //	veejay_memcpy( dst[0], ptr, len );
 //	veejay_memcpy( dst[1], ptr + len, uv_len );
@@ -205,7 +208,7 @@ int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[4] )
 	
 	uint8_t *dst[4] = { ptr, ptr + plane_sizes[0], ptr + plane_sizes[0] + plane_sizes[1], NULL };
 	plane_sizes[3] = 0;
-	vj_frame_copy( frame, dst, plane_sizes,3 );
+	vj_frame_copy( frame, dst, plane_sizes );
 
 
 //	veejay_memcpy( ptr , frame[0], plane_sizes[0] );

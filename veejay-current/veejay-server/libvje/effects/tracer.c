@@ -49,20 +49,21 @@ vj_effect *tracer_init(int w, int h)
 
 int 	tracer_malloc(int w, int h)
 {
-	trace_buffer[0] = (uint8_t *) vj_yuvalloc(w ,  h );
-	if(!trace_buffer[0]) return 0;
-	trace_buffer[1] = trace_buffer[0] + ( w * h );
-	trace_buffer[2] = trace_buffer[1] + ( w * h );
+	trace_buffer[0] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
+	trace_buffer[1] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
+	trace_buffer[2] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
 
    return 1;
 }
 
 void tracer_free() {
-	if(trace_buffer[0])
-	 free(trace_buffer[0]);
-	trace_buffer[0] = NULL;
-	trace_buffer[1] = NULL;
-	trace_buffer[2] = NULL;
+	int i;
+	for( i = 0; i < 3 ; i ++ )
+	{
+		if(trace_buffer[i])
+		 free(trace_buffer[i]);
+		trace_buffer[i] = NULL;	
+	}		
 }
 
 void tracer_apply(VJFrame *frame, VJFrame *frame2,
@@ -84,21 +85,15 @@ void tracer_apply(VJFrame *frame, VJFrame *frame2,
 	{
 		for (x = 0; x < len; x++)
 		{
-		    Y[x] =
-			limit_luma(func_opacity(Y[x], Y2[x], op0, op1));
+		    Y[x] = func_opacity(Y[x], Y2[x], op0, op1);
 		}
 		for (x = 0; x < uv_len; x++)
 		{
-	   	 	Cb[x] =
-				limit_chroma(func_opacity
-			     (Cb[x], Cb2[x], op0, op1));
-	   	 	Cr[x] =
-				limit_chroma(func_opacity
-			     (Cr[x], Cr2[x], op0, op1));
+	   	 	Cb[x] = func_opacity(Cb[x], Cb2[x], op0, op1);
+	   	 	Cr[x] = func_opacity(Cr[x], Cr2[x], op0, op1);
 		}
-		veejay_memcpy(trace_buffer[0], Y, len);
-		veejay_memcpy(trace_buffer[1], Cb, uv_len);
-		veejay_memcpy(trace_buffer[2], Cr, uv_len);
+		int strides[4] = { len, uv_len, uv_len, 0 };
+		vj_frame_copy( frame->data, trace_buffer, strides );
     }
 	else
 	{
@@ -114,10 +109,8 @@ void tracer_apply(VJFrame *frame, VJFrame *frame2,
 	    	Cr[x] =
 			((op0 * Cr[x]) + (op1 * trace_buffer[2][x])) >> 8 ; // 255;
 		}
-		veejay_memcpy(trace_buffer[0], Y, len);
-		veejay_memcpy(trace_buffer[1], Cb, uv_len);
-		veejay_memcpy(trace_buffer[2], Cr, uv_len);
-
+		int strides[4] = { len, uv_len, uv_len, 0 };
+		vj_frame_copy( frame->data, trace_buffer, strides );
     }
 
     trace_counter++;

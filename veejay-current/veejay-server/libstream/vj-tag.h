@@ -81,19 +81,15 @@ typedef struct {
     int capture_type;
     int encoder_active;
     unsigned long sequence_num;
-    unsigned long rec_total_bytes;
-//    char *encoder_base;
-    unsigned long encoder_total_frames;
-//    char *encoder_destination;
     char encoder_base[256];
     char encoder_destination[256];
     char descr[TAG_MAX_DESCR_LEN];
     int encoder_format;
     void *encoder;
     lav_file_t *encoder_file;
-    long encoder_duration; /* in seconds */
-    long encoder_num_frames;
-    long encoder_succes_frames;
+    long encoder_total_frames_recorded; /* in seconds */
+    long encoder_frames_to_record;
+    long encoder_frames_recorded;
     int encoder_width;
     int encoder_height;
     int encoder_max_size;
@@ -263,9 +259,6 @@ int 	vj_tag_disable(int t1);
 
 int		vj_tag_sprint_status(int tag_id, int cache,int sa, int ca, int r, int f, int m, int t,int curfps, uint32_t lo, uint32_t hi, int macro,char *str );
 
-//int vj_tag_init_encoder(int t1, char *filename, int format,
-//	int w, int h, double fps, long seconds, int autoplay);
-
 uint8_t		*vj_tag_get_cali_buffer(int t1, int type, int *total, int *len, int *uvlen);
 int 	vj_tag_stop_encoder(int t1);
 int 	vj_tag_set_brightness(int t1, int value);
@@ -300,12 +293,11 @@ int	vj_tag_composite(int t1);
 
 int		vj_tag_init_encoder(int t1, char *filename, int format, long nframes);
 int		vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_size, int pixel_format); 
-int 	vj_tag_get_encoded_frames(int t1);
+long 		vj_tag_get_encoded_frames(int t1);
 long		vj_tag_get_total_frames(int t1);
-long		vj_tag_get_duration(int t1);
 int		vj_tag_reset_autosplit(int t1);
-int		vj_tag_get_frames_left(int t1);
-int 	vj_tag_encoder_active(int t1);
+long		vj_tag_get_frames_left(int t1);
+int 		vj_tag_encoder_active(int t1);
 int		vj_tag_get_num_encoded_files(int t1);
 int		vj_tag_get_encoder_format(int t1);
 int		vj_tag_get_sequenced_file( int t1, char *descr, int num, char *ext);

@@ -64,9 +64,9 @@ int	nervous_malloc(int w, int h )
 	nervous_buf[2] = nervous_buf[1] + (w*h*N_MAX);
 	frames_elapsed = 0;
 
-	veejay_memset( nervous_buf[0], 0, (w*h) * N_MAX );
-	veejay_memset( nervous_buf[1], 128, (w*h) * N_MAX );
-	veejay_memset( nervous_buf[2], 128, (w*h) * N_MAX );
+	vj_frame_clear1( nervous_buf[0], 0, (w*h) * N_MAX );
+	vj_frame_clear1( nervous_buf[1], 128, (w*h) * N_MAX );
+	vj_frame_clear1( nervous_buf[2], 128, (w*h) * N_MAX );
 	
 	return 1;
 }
@@ -92,10 +92,10 @@ void nervous_apply( VJFrame *frame, int width, int height, int delay)
 	uint8_t *NCb= nervous_buf[1] + (uv_len * frames_elapsed );
 	uint8_t *NCr= nervous_buf[2] + (uv_len * frames_elapsed );
 
-	// copy original into nervous buf
-	veejay_memcpy( NY, Y, len );
-	veejay_memcpy( NCb, Cb, uv_len );
-	veejay_memcpy( NCr, Cr, uv_len );
+	uint8_t *dest[3] = { NY, NCb, NCr };
+	int strides[4] = { len, uv_len,uv_len, 0 };
+	// copy original into nervous buf	
+	vj_frame_copy1( frame->data, dest, strides );
 
 	if(frames_elapsed > 0)
 	{
@@ -107,9 +107,11 @@ void nervous_apply( VJFrame *frame, int width, int height, int delay)
 		uint8_t *sCb = nervous_buf[1] + (uv_len * index);
 		uint8_t *sCr = nervous_buf[2] + (uv_len * index);
 		// copy it to dst
-		veejay_memcpy( Y, sY, len );
-		veejay_memcpy( Cb, sCb, uv_len );
-		veejay_memcpy( Cr, sCr, uv_len );
+		dest[0] = sY;
+		dest[1] = sCb;
+		dest[2] = sCr;
+
+		vj_frame_copy1( dest, frame->data, strides );
 	}
 
 	frames_elapsed ++;

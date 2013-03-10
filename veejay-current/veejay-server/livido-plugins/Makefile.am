@@ -24,7 +24,8 @@ install-lividopluginLTLIBRARIES:$(lividoplugin_LTLIBRARIES)
 
 uninstall-lividopluginLTLIBRARIES:
 	list='$(lividoplugin_LTLIBRARIES)'; \
-	for file in $$list; do '
+	for file in $$list; do \
 	 sofile=`basename $$file .la`.so; \
 	 rm -f $(DESTDIR)/$(lividoplugindir)/$$sofile; \
 	done
+

@@ -38,7 +38,8 @@ vj_effect *negatechannel_init(int w, int h)
     ve->defaults[0] = 0;
     ve->defaults[1] = 0xff;
     ve->description = "Negate a channel";
-    ve->sub_format = 0;
+    ve->parallel = 1;
+	ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Y=0, Cb=1, Cr=2", "Value" );

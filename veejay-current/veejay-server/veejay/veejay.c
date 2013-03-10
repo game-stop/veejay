@@ -362,7 +362,7 @@ static int set_option(const char *name, char *value)
 	    }
 #endif
 */
-	    if( info->video_out < 0 || info->video_out > 4 ) {
+	    if( info->video_out < 0 || info->video_out > 5 ) {
 		    fprintf(stderr, "Select a valid output display driver\n");
 		    exit(-1);
 		   }

@@ -76,10 +76,11 @@ vj_effect *radialblur_init(int w,int h)
 
 int	radialblur_malloc(int w, int h)
 {
-	radial_src[0] = (uint8_t*) vj_yuvalloc(w,h);
-	if(!radial_src[0]) return 0;
-	radial_src[1] = radial_src[0] + (w * h);
-	radial_src[2] = radial_src[1] + (w * h);
+	int i;
+	for( i = 0; i < 3; i ++ ) {
+		radial_src[i] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h));
+		if(!radial_src[i]) return 0;
+	}
 	return 1;
 }
 
@@ -114,10 +115,8 @@ void radialblur_apply(VJFrame *frame, int width, int height, int radius, int pow
 
 	if(radius == 0) return;
 	// inplace
-
-	veejay_memcpy( radial_src[0] , Y, len);
-	veejay_memcpy( radial_src[1] , Cb, uv_len); 
-	veejay_memcpy( radial_src[2] , Cr, uv_len);	
+	int strides[4] = { len, uv_len, uv_len, 0 };
+	vj_frame_copy( frame->data, radial_src, strides );
 
 	switch(direction)
 	{
@@ -145,9 +144,10 @@ void radialblur_apply(VJFrame *frame, int width, int height, int radius, int pow
 
 void radialblur_free()
 {
-	if( radial_src[0] )
-		free(radial_src[0]);
-	radial_src[0] = NULL;
-	radial_src[1] = NULL;
-	radial_src[2] = NULL;
+	int i;
+	for( i = 0; i < 3 ; i ++ ) {
+		if( radial_src[i] )
+		   free(radial_src[i]);
+		radial_src[i] = NULL;
+	}
 }

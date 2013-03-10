@@ -1773,7 +1773,7 @@ void		vj_init_vevo_events(void)
 
 	index_map_[VIMS_AUDIO_ENABLE]				=	_new_event(
 				NULL,
-				VIMS_AUDIO_DISABLE,
+				VIMS_AUDIO_ENABLE,
 				"Enable audio playback",
 				vj_event_enable_audio,
 				0,

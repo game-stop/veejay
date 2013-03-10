@@ -150,18 +150,6 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 #ifdef STRICT_CHECKING
 	assert( error == LIVIDO_NO_ERROR );
 #endif
-
-	int hsampling = 0;
-	if( vevo_property_get( channel, "HOST_sampling", 0, &hsampling ) == LIVIDO_NO_ERROR && name[0] == 'i')
-	{
-		void *sampler = NULL;
-		error = vevo_property_get(channel, "HOST_sampler", 0, &sampler );
-#ifdef STRICT_CHECKING
-		assert( error == LIVIDO_NO_ERROR );
-#endif
-		chroma_supersample( hsampling, sampler, pd, frame->width,
-				frame->height );
-	}
 	
 	return 1;
 }
@@ -646,19 +634,12 @@ static	int	find_cheap_palette(livido_port_t *c, livido_port_t *ptr , int w)
 	int palette = LIVIDO_PALETTE_YUV444P;
 	if( match_palette(ptr,palette ))
 	{
-		void *sampler = subsample_init(w);
-		int   mode    = (pref_palette_ == LIVIDO_PALETTE_YUV422P ? SSM_422_444 : SSM_420_JPEG_BOX);
-		
-		vevo_property_set( c, "HOST_sampler", LIVIDO_ATOM_TYPE_VOIDPTR,
-				1,&sampler);
-		vevo_property_set( c, "HOST_sampling", LIVIDO_ATOM_TYPE_INT,
-				1, &mode );
 		vevo_property_set( c, "current_palette", LIVIDO_ATOM_TYPE_INT,
 				1, &palette );
 		return 1;
 	}
 	else {
-		veejay_msg(0, "Support me :%s",__FUNCTION__);
+		veejay_msg(0, "Oops, can handle palette %x :%s",palette,__FUNCTION__);
 	}
 	return 0;
 }
@@ -1111,25 +1092,6 @@ void	livido_plug_process( void *instance, double time_code )
 
 	error = vevo_property_get( instance, "out_channels", 0, &channel );
 
-	if( error == LIVIDO_NO_ERROR &&  vevo_property_get( channel, "HOST_sampling",0,&hsampling ) ==
-			LIVIDO_NO_ERROR )
-	{
-		void *sampler = NULL;
-		error = vevo_property_get( channel, "HOST_sampler",0,&sampler);
-#ifdef STRICT_CHECKING
-		assert( error == LIVIDO_NO_ERROR );
-#endif
-		uint8_t *pd[4];
-		int n = 0;
-		int w = 0;
-		int h = 0;
-		for( n = 0; n < 4; n ++ )
-			vevo_property_get( channel, "pixel_data",n,&pd[n]);
-		vevo_property_get( channel, "width", 0, &w );
-		vevo_property_get( channel, "height", 0, &h );
-		
-		chroma_subsample( hsampling,sampler,pd,w,h );
-	}
 }
 
 void	livido_plug_deinit( void *instance )
@@ -1171,31 +1133,12 @@ void	livido_plug_deinit( void *instance )
 #ifdef STRICT_CHECKING
 		assert( error == LIVIDO_NO_ERROR );
 #endif
-		if( vevo_property_get( ic, "HOST_sampling",0,&hs ) == LIVIDO_NO_ERROR )
-		{
-			void *sampler = NULL;
-			error = vevo_property_get( ic, "HOST_sampler", 0, &sampler );
-#ifdef STRICT_CHECKING
-			assert( error == LIVIDO_NO_ERROR );
-#endif
-			subsample_free(sampler);
-		}
-			
 	}
 
 	void *channel = NULL;
 	int hsampling = 0;
 	error = vevo_property_get( instance, "out_channels", 0, &channel );
 	
-	if( (error == VEVO_NO_ERROR) && vevo_property_get( channel, "HOST_sampling",0,&hsampling ) ==
-			LIVIDO_NO_ERROR )
-	{
-		void *sampler = NULL;
-		error = vevo_property_get(channel, "HOST_sampler",0,&sampler );
-		if(error == VEVO_NO_ERROR )
-			subsample_free(sampler);
-	}
-
 	livido_port_recursive_free( instance );
 	
 	instance = NULL;

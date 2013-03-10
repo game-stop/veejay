@@ -18,6 +18,7 @@
 
 #ifndef _H_JACK_OUT_H
 #define _H_JACK_OUT_H
+#ifdef HAVE_JACK
 
 #include <jack/jack.h>
 
@@ -138,10 +139,11 @@ enum JACK_PORT_CONNECTION_MODE
 /* defaults to CONNECT_ALL */ 
 void JACK_SetPortConnectionMode(enum JACK_PORT_CONNECTION_MODE mode);
 
-long JACK_OutputStatus(int deviceID,long int *sec, long int *usec);
+long JACK_OutputStatus(int deviceID,long *sec, long *usec);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* #ifndef JACK_OUT_H */
+#endif

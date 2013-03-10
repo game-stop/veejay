@@ -196,7 +196,7 @@ int texmap_prepare(uint8_t *map[3], int width, int height)
 		return 0;
 	}
 	
-	veejay_memcpy( static_bg, map[0], (width*height));
+	vj_frame_copy1( map[0], static_bg, (width*height));
 	
 	VJFrame tmp;
 	veejay_memset( &tmp, 0, sizeof(VJFrame));
@@ -297,9 +297,9 @@ void texmap_apply(void *ed, VJFrame *frame,
 	if(mode==1)
 	{
 		//@ show difference image in grayscale
-		veejay_memcpy( Y, ud->bitmap, len );
-		veejay_memset( Cb, 128, len );
-		veejay_memset( Cr, 128, len );
+		vj_frame_copy1( ud->bitmap, Y, len );
+		vj_frame_clear1( Cb, 128, len );
+		vj_frame_clear1( Cr, 128, len );
 		return;
 	}
 

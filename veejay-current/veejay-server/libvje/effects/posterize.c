@@ -31,7 +31,7 @@ vj_effect *posterize_init(int w, int h)
     ve->defaults[0] = 4;
     ve->defaults[1] = 16;
     ve->defaults[2] = 235;
-
+	
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 256;
     ve->limits[0][1] = 0;
@@ -39,6 +39,7 @@ vj_effect *posterize_init(int w, int h)
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 256;
 
+	ve->parallel = 1;
     ve->description = "Posterize (Threshold Range)";
     ve->sub_format = 0;
     ve->extra_frame = 0;

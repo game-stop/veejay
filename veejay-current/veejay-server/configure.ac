@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.21],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.26],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=21
+VEEJAY_MICRO_VERSION=26
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -122,7 +122,7 @@ AC_PROG_LIBTOOL
 dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
-AM_PROG_CC_STDC
+dnl AM_PROG_CC_STDC
 AC_PROG_YACC
 AM_PROG_LEX
 AC_PROG_CXX
@@ -315,7 +315,7 @@ case $host_cpu in
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	CFLAGS="$CFLAGS -fPIC -DPIC"
+	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
@@ -357,6 +357,9 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
     AC_MSG_RESULT([unknown])
     ;;
 esac
+
+CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+
 
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 
@@ -605,6 +608,13 @@ fi
 AC_SUBST(HAVE_X)
 AM_CONDITIONAL(HAVE_X, test "x$HAVE_X" = "xyes")
 
+
+dnl the check doesnt work on ubuntu, so just fake it.
+RT_LIBS="-lrt"
+AC_CHECK_LIB( rt, clock_gettime, [
+	AC_DEFINE( HAVE_CLOCK_GETTIME, 1, [clock_gettime] )
+	RT_LIBS="-lrt" ])
+AC_SUBST(RT_LIBS)
 dnl Check for Xinerama
 use_xinerama=no
 AC_CHECK_LIB( Xinerama, XineramaQueryExtension,

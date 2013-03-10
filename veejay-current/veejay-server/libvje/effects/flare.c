@@ -60,20 +60,23 @@ static uint8_t *flare_buf[3];
 
 int	flare_malloc(int w, int h)
 {
-	flare_buf[0] = (uint8_t*)vj_yuvalloc(w,h);
-	if(!flare_buf[0])
-		return 0;
-	flare_buf[1] = flare_buf[0] + (w*h);
-	flare_buf[2] = flare_buf[1] + (w*h);
+	int i;
+	for( i = 0; i < 3 ;i ++ ) {
+		flare_buf[i] = (uint8_t*) vj_malloc( RUP8(w * h) * sizeof(uint8_t));
+		if(!flare_buf[i])
+			return 0;
+	}
 	return 1;
 }
 
 void	flare_free(void)
 {
-	if(flare_buf[0]) free(flare_buf[0]);
-	flare_buf[0] = NULL;
-	flare_buf[1] = NULL;
-	flare_buf[2] = NULL;
+	int i;
+	for( i = 0; i < 3; i ++ ) {
+		if( flare_buf[i] ) 
+			free(flare_buf[i]);
+		flare_buf[i] = NULL;
+	}
 }
 
 void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
@@ -269,11 +272,8 @@ void flare_apply(VJFrame *A,
 	B.data[0] = flare_buf[0];
 	B.data[1] = flare_buf[1];
 	B.data[2] = flare_buf[2];
-
-	/* copy image data */
-	veejay_memcpy( B.data[0], A->data[0], A->len );
-	veejay_memcpy( B.data[1], A->data[1], A->len );
-	veejay_memcpy( B.data[2], A->data[2], A->len );
+	int strides[4] = { A->len, A->len, A->len, 0 };
+	vj_frame_copy( A->data, B.data,strides );
 
 	/* apply blur on Image, horizontal and vertical
 	   (blur2 is from xine, see radial blur */

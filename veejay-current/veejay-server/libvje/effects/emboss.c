@@ -31,9 +31,9 @@ vj_effect *emboss_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 10;
+    ve->defaults[0] = 8;
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 10;
+    ve->limits[1][0] = 9;
     ve->description = "Various Weird Effects";
     ve->sub_format = 0;
     ve->extra_frame = 0;
@@ -77,8 +77,9 @@ void xtreme_emboss_framedata(VJFrame *frame, int width, int height)
 {
     unsigned int r, c;
     uint8_t *Y = frame->data[0];
-    for (r = 0; r < (width * height); r += width) {
-	for (c = 0; c < width; c++) {
+    int len = ( width * height ) - width;
+    for (r = width; r < len; r += width) {
+	for (c = 1; c < (width-1); c++) {
 	    Y[c + r] = (Y[r - 1 + c - 1] -
 			     Y[r - 1 + c] -
 			     Y[r - 1 + c + 1] +
@@ -118,11 +119,11 @@ void another_try_edge(VJFrame *frame, int w, int h) {
 void lines_white_balance_framedata(VJFrame *frame, int width, int height)
 {
     unsigned int r, c;
-    const unsigned int len = (width * height);
+    const unsigned int len = (width * height) - width;
     uint8_t val;
     uint8_t *Y = frame->data[0];
-    for (r = 0; r < len; r += width) {
-	for (c = 0; c < width; c++) {
+    for (r = width; r < len; r += width) {
+	for (c = 1; c < (width-1); c++) {
 	    val = (Y[r - 1 + c - 1] -
 		   Y[r - 1 + c] -
 		   Y[r - 1 + c + 1] +
@@ -134,38 +135,6 @@ void lines_white_balance_framedata(VJFrame *frame, int width, int height)
 		) / 9;
 	    Y[c + r] = CLAMP_Y(val);
 	}
-    }
-}
-
-/**********************************************************************************************
- *
- * white_emboss_framedata: again, i cannot explain what it looks like.
- *
- **********************************************************************************************/
-void white_emboss_framedata(VJFrame *frame, int width, int height)
-{
-    unsigned int r, c;
-    int val;
-    uint8_t *Y = frame->data[0];
-
-    for (r = 1; r < (width * height ); r += width) {
-	
-	Y[ r + c + 0 ] = pixel_Y_lo_;
-	
-	for (c = 1; c < (width-1); c++) {
-	    val = (Y[r - 1 + c - 1] -
-		   Y[r - 1 + c] -
-		   Y[r - 1 + c + 1] +
-		   Y[r + c - 1] +
-		   Y[r + c] -
-		   Y[r + c + 1] -
-		   Y[r + 1 + c - 1] -
-		   Y[r + 1 + c] - Y[r + 1 + c + 1]
-		) / 9;
-	    Y[c + r] = CLAMP_Y(val);
-	}
-	
-	Y[ r + c + 1] = pixel_Y_lo_; 
     }
 }
 
@@ -326,27 +295,24 @@ void emboss_apply(VJFrame *frame, int width, int height, int n)
 	lines_white_balance_framedata(frame, width, height);
 	break;
     case 3:
-	white_emboss_framedata(frame, width, height);
-	break;
-    case 4:
 	gray_emboss_framedata(frame, width, height);
 	break;
-    case 5:
+    case 4:
 	aggressive_emboss_framedata(frame, width, height);
 	break;
-    case 6:
+    case 5:
 	dark_emboss_framedata(frame, width, height);
 	break;
-    case 7:
+    case 6:
 	grayish_mood_framedata(frame, width, height);
 	break;
-    case 8:
+    case 7:
 	simpleedge_framedata(frame, width, height);
 	break;
-    case 9:
+    case 8:
 	emboss_test_framedata(frame, width, height);
 	break;
-    case 10:
+    case 9:
 	another_try_edge(frame,width,height);
 	break;
     default:

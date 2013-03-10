@@ -39,7 +39,8 @@ vj_effect *lumamagick_init(int width, int height)
     ve->defaults[0] = 1;
     ve->defaults[1] = 100;
     ve->defaults[2] = 100;
-    ve->description = "Luma Magick";
+    ve->parallel = 1;
+	ve->description = "Luma Magick";
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 39;
     ve->limits[0][1] = 0;

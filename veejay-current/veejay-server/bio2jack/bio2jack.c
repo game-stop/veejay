@@ -16,9 +16,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* NOTE: All functions that take a jack_driver_t* do NOT lock the device, in order to get a */
-/*       jack_driver_t* you must call getDriver() which will pthread_mutex_lock() */
-
+/*
+  calls functions in veejay
+  replaced gettimeofday for clock_gettime
+ */
 #include <config.h>
 #ifdef HAVE_JACK
 #include <stdio.h>
@@ -70,9 +71,9 @@
    a 'TIMER("stop\n")' at the end of any function and this does the rest
    (naturally you can place any printf-compliant text you like in the argument
    along with the associated values). */
-static struct timeval timer_now;
+static struct timespec timer_now;
 #define TIMER(format,args...) gettimeofday(&timer_now,0); \
-  veejay_msg(4, "%ld.%06ld: %s::%s(%d) "format, timer_now.tv_sec, timer_now.tv_usec, __FILE__, __FUNCTION__, __LINE__, ##args)
+  veejay_msg(4, "%ld.%06ld: %s::%s(%d) "format, timer_now.tv_sec, timer_now.tv_nsec, __FILE__, __FUNCTION__, __LINE__, ##args)
 #else
 #define TIMER(...)
 #endif
@@ -150,7 +151,7 @@ typedef struct jack_driver_s
   unsigned long rw_buffer1_size;        /* number of bytes in the buffer allocated for processing data in JACK_(Read|Write) */
   char *rw_buffer1;
 
-  struct timeval previousTime;  /* time of last JACK_Callback() write to jack, allows for MS accurate bytes played  */
+  struct timespec previousTime;  /* time of last JACK_Callback() write to jack, allows for MS accurate bytes played  */
 
   unsigned long num_ticks;
   unsigned long chunk_size;
@@ -192,11 +193,11 @@ typedef struct jack_driver_s
 
   /* variables used for trying to restart the connection to jack */
   bool jackd_died;              /* true if jackd has died and we should try to restart it */
-  struct timeval last_reconnect_attempt;
+  struct timespec last_reconnect_attempt;
 } jack_driver_t;
 
 
-static char *client_name;       /* the name bio2jack will use when creating a new
+static char *client_name = NULL;       /* the name bio2jack will use when creating a new
                                    jack client. client_name_%deviceID% will be used */
 
 
@@ -223,7 +224,7 @@ typedef jack_nframes_t nframes_t;
 
 /* allocate devices for output */
 /* if you increase this past 10, you might want to update 'out_client_name = ... ' in JACK_OpenDevice */
-#define MAX_OUTDEVICES 10
+#define MAX_OUTDEVICES 4
 static jack_driver_t outDev[MAX_OUTDEVICES];
 
 static pthread_mutex_t device_mutex = PTHREAD_MUTEX_INITIALIZER;        /* this is to lock the entire outDev array
@@ -247,17 +248,25 @@ static void JACK_CleanupDriver(jack_driver_t * drv);
 
 
 /* Return the difference between two timeval structures in terms of milliseconds */
+
 long
-TimeValDifference(struct timeval *start, struct timeval *end)
+TimeValDifference1(struct timespec *start, struct timespec *end)
 {
   double long ms;               /* milliseconds value */
 
   ms = end->tv_sec - start->tv_sec;     /* compute seconds difference */
   ms *= (double) 1000;          /* convert to milliseconds */
 
-  ms += (double) (end->tv_usec - start->tv_usec) / (double) 1000;       /* add on microseconds difference */
+ 	//  ms += (double) (end->tv_usec - start->tv_usec) / (double) 1000;       /* add on microseconds difference */
 
   return (long) ms;
+}
+
+long
+TimeValDifference( struct timespec *start, struct timespec *end)
+{
+	return (( end->tv_sec * 1000000000) + end->tv_nsec ) -
+	       (( start->tv_sec * 1000000000) + start->tv_nsec );
 }
 
 /* get a device and lock the devices mutex */
@@ -293,14 +302,15 @@ getDriver(int deviceID)
   /* should we try to restart the jack server? */
   if(drv->jackd_died && drv->client == 0)
   {
-    struct timeval now;
-    gettimeofday(&now, 0);
+	struct timespec now;
+	clock_gettime( CLOCK_REALTIME, &now);
 
     /* wait 250ms before trying again */
     if(TimeValDifference(&drv->last_reconnect_attempt, &now) >= 250)
     {
       JACK_OpenDevice(drv);
       drv->last_reconnect_attempt = now;
+      veejay_msg(VEEJAY_MSG_WARNING, "Last connection attempt to Jack!");
     }
   }
 
@@ -516,8 +526,8 @@ JACK_callback(nframes_t nframes, void *arg)
   drv->chunk_size = nframes;
 
   TIMER("start\n");
-  gettimeofday(&drv->previousTime, 0);  /* record the current time */
-
+//  gettimeofday(&drv->previousTime, 0);  /* record the current time */
+  clock_gettime( CLOCK_REALTIME, &drv->previousTime );
   CALLBACK_TRACE("nframes %ld, sizeof(sample_t) == %d\n", (long) nframes,
                  sizeof(sample_t));
 
@@ -550,9 +560,6 @@ JACK_callback(nframes_t nframes, void *arg)
 
       long read = 0;
 
-      CALLBACK_TRACE("playing... jackFramesAvailable = %ld inputFramesAvailable = %ld\n",
-         jackFramesAvailable, inputFramesAvailable);
-
 #if JACK_CLOSE_HACK
       if(drv->in_use == FALSE)
       {
@@ -570,8 +577,6 @@ JACK_callback(nframes_t nframes, void *arg)
          (&drv->callback_buffer2, &drv->callback_buffer2_size,
           jackBytesAvailable))
       {
-
-
         return -1;
       }
 
@@ -951,13 +956,21 @@ JACK_shutdown(void *arg)
 #endif
 
   TRACE("trying to reconnect right now\n");
+  
   /* lets see if we can't reestablish the connection */
-  if(JACK_OpenDevice(drv) != ERR_SUCCESS)
+  
+  //@ doesnt work anymore.
+  /*if(JACK_OpenDevice(drv) != ERR_SUCCESS)
   {
     ERR("unable to reconnect with jack\n");
-  }
+  }*/
+  
+  ERR("unable to reconnect with jack\n");
+
+  veejay_msg(VEEJAY_MSG_ERROR, "Cannot recover from this error! You will probably need to restart for Audio playback.");
 
   releaseDriver(drv);
+
 }
 
 
@@ -2287,7 +2300,7 @@ JACK_GetPositionFromDriver(jack_driver_t * drv, enum pos_enum position,
                            int type)
 {
   long return_val = 0;
-  struct timeval now;
+  struct timespec now;
   long elapsedMS;
   double sec2msFactor = 1000;
 
@@ -2312,7 +2325,8 @@ JACK_GetPositionFromDriver(jack_driver_t * drv, enum pos_enum position,
   {
     type_str = "PLAYED";
     return_val = drv->played_client_bytes;
-    gettimeofday(&now, 0);
+//    gettimeofday(&now, 0);
+    clock_gettime( CLOCK_REALTIME, &now );
 
     elapsedMS = TimeValDifference(&drv->previousTime, &now);    /* find the elapsed milliseconds since last JACK_Callback() */
 
@@ -2526,8 +2540,9 @@ JACK_CleanupDriver(jack_driver_t * drv)
   drv->output_sample_rate_ratio = 1.0;
   drv->input_sample_rate_ratio = 1.0;
   drv->jackd_died = FALSE;
-  gettimeofday(&drv->previousTime, 0);  /* record the current time */
-  gettimeofday(&drv->last_reconnect_attempt, 0);
+  clock_gettime(CLOCK_REALTIME, &drv->previousTime);  /* record the current time */
+//  gettimeofday(&drv->last_reconnect_attempt, 0);
+  memcpy( &drv->last_reconnect_attempt, &drv->previousTime, sizeof(struct timespec));
 }
 
 /* Initialize the jack porting library to a clean state */
@@ -2677,11 +2692,11 @@ JACK_SetClientName(char *name)
   }
 }
 
-long JACK_OutputStatus(int deviceID,long int *sec, long int *usec)
+long JACK_OutputStatus(int deviceID,long *sec, long *usec)
 {
   	jack_driver_t *this = &outDev[deviceID];
-	*sec =	(long int) this->previousTime.tv_sec;
-	*usec = (long int) this->previousTime.tv_usec;
+	*sec =	this->previousTime.tv_sec;
+	*usec = this->previousTime.tv_nsec;
 	return (this->num_ticks * this->chunk_size);
 }
 

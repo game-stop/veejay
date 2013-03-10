@@ -70,7 +70,7 @@
 #include "transitions/vbar.h"
 #include "effects/diff.h"
 #include "effects/bgsubtract.h"
-#include "effects/texmap.h"
+//#include "effects/texmap.h"
 #include "effects/contourextract.h"
 #include "effects/autoeq.h"
 #include "effects/colorhis.h"
@@ -270,7 +270,7 @@ static struct
 } complex_effect_index[] = 
 {
 	{	diff_malloc,		diff_free,			VJ_VIDEO_EFFECT_DIFF },
-	{	texmap_malloc,		texmap_free,			VJ_VIDEO_EFFECT_TEXMAP },
+//	{	texmap_malloc,		texmap_free,			VJ_VIDEO_EFFECT_TEXMAP },
 	{	contourextract_malloc,  contourextract_free,		VJ_IMAGE_EFFECT_CONTOUR },
 	{	cali_malloc,		cali_free,			VJ_IMAGE_EFFECT_CALI },
 	{	picinpic_malloc,	picinpic_free,			VJ_VIDEO_EFFECT_PICINPIC },
@@ -376,6 +376,12 @@ static void 	*vj_effect_activate_ext( int fx_id, int *result )
 	return NULL;
 }
 
+
+int vj_effect_is_parallel(int effect_id)
+{
+	int seq = vj_effect_real_to_sequence(effect_id);
+	return vj_effects[seq]->parallel;
+}
 void *vj_effect_activate(int effect_id, int *result)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
@@ -573,11 +579,11 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[41] = picinpic_init(width,height);
 	vj_effects[42] = chameleonblend_init(width,height);
 	vj_effects[43] = radioactivetv_init(width,height);
-	vj_effects[44] = texmap_init( width,height);
+//	vj_effects[44] = texmap_init( width,height);
 	vj_effects[45] = water_init(width,height);
 	vj_effects[46] = slicer_init(width,height);
-	vj_effects[47] = iris_init(width,height);
-    vj_effects[48] = dummy_init(width,height);
+	vj_effects[44] = iris_init(width,height);
+    vj_effects[47] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -725,7 +731,7 @@ void vj_effect_shutdown() {
     }
 
     diff_destroy();
-    texmap_destroy();
+    //texmap_destroy();
     contourextract_destroy();
     rotozoom_destroy();
     distortion_destroy();

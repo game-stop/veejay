@@ -66,20 +66,25 @@ vj_effect *cutstop_init(int width , int height)
 
 int	cutstop_malloc(int width, int height)
 {
-	vvcutstop_buffer[0] = (uint8_t*)vj_yuvalloc(width,height);
-	vvcutstop_buffer[1] = vvcutstop_buffer[0] + (width  * height );
-	vvcutstop_buffer[2] = vvcutstop_buffer[1] + (width  * height );
+	int i;
+	for( i = 0; i < 3 ;i ++ ) {
+		vvcutstop_buffer[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8( width * height )); 
+		if(!vvcutstop_buffer[i] )
+			return 0;
+	}
+	veejay_memset( vvcutstop_buffer[0],0, width*height);
 	veejay_memset( vvcutstop_buffer[1],128,(width*height));
 	veejay_memset( vvcutstop_buffer[2],128,(width*height));
 	return 1;
 }
 
 void cutstop_free() {
-	if(vvcutstop_buffer[0]) 
-	  free(vvcutstop_buffer[0]);
-	vvcutstop_buffer[0] = NULL;
-	vvcutstop_buffer[1] = NULL;
-	vvcutstop_buffer[2] = NULL;
+	int i;
+	for( i = 0; i < 3; i ++ ) {
+		if(vvcutstop_buffer[i]) 
+		  free(vvcutstop_buffer[i]);
+		vvcutstop_buffer[i] = NULL;
+	}
 }
 
 

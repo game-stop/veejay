@@ -38,39 +38,37 @@ vj_effect *motionblur_init(int width, int height)
     ve->sub_format = 0;
     ve->extra_frame = 0;
 	ve->has_user = 0;
+	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Frames" );
 	 return ve;
 }
-
+static	int	 last_max = 0;
+static int n_motion_frames = 0;
 int motionblur_malloc(int width, int height)
 {
-	previous_frame[0] = (uint8_t*) vj_yuvalloc( width , height );
-	if(!previous_frame[0]) return 0;
-	previous_frame[1] = previous_frame[0] + (width * height);
-	previous_frame[2] = previous_frame[1] + (width  * height);
+	int i;
+	for( i = 0;i < 3 ; i ++ )
+		previous_frame[i] = vj_malloc(sizeof(uint8_t) * width * height);
+	n_motion_frames = 0;
 	return 1;
 }
 
 void motionblur_free() {
-   if(previous_frame[0])
-	   free(previous_frame[0]);
-	previous_frame[0] = NULL;
-	previous_frame[1] = NULL;
-	previous_frame[2] = NULL;
+	int i;
+	for( i =0; i < 3 ; i ++ )
+	  free(previous_frame[i]); 
 }
 
 
-static int n_motion_frames = 0;
 void motionblur_apply( VJFrame *frame, int width, int height, int n) {
 	const int len = width * height;
 	const int uv_len = frame->uv_len;
 
 	unsigned int i;
-    uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-	
         if(n_motion_frames > 0) {
 	  
 	  for(i=0; i < len; i++) {
@@ -89,22 +87,27 @@ void motionblur_apply( VJFrame *frame, int width, int height, int n) {
 	}
 	else 
 	{
-		/* just copy to previous */
-		veejay_memcpy( previous_frame[0], Y, len );
-		veejay_memcpy( previous_frame[1], Cb, uv_len);
-		veejay_memcpy( previous_frame[2], Cr, uv_len);
-		
+		for( i = 0; i < len ;  i ++ ) {
+			previous_frame[0][i] = Y[i];
+		}
+		for( i = 0; i < uv_len ;  i ++ ) {
+			previous_frame[1][i] = Cb[i];
+			previous_frame[2][i] = Cr[i];		
+		}
 	}
 
 	n_motion_frames ++;
 
-	if(n_motion_frames >= n ) {
+	if( last_max != n ) {
+		last_max = n;
+		if( n_motion_frames > last_max ) {
+			n_motion_frames = 1;
+		}
+	}
+	int t = num_threaded_tasks();
+	if( t <= 0 ) t = 1;
+	if(n_motion_frames >= ( n * t ) ) {
 		n_motion_frames = 0;
-
-		veejay_memset( previous_frame[0], 0, (width*height));
-		veejay_memset( previous_frame[1], 0, uv_len);
-		veejay_memset( previous_frame[2], 0, uv_len);
-	
 	}
 
 }

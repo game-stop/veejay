@@ -270,16 +270,16 @@ void neighbours4_apply( VJFrame *frame, int width, int height, int radius, int b
 	uint8_t *dstCr = frame->data[2];
 	double	r      = (double)radius;
 	// keep luma
-	veejay_memcpy( Y2, frame->data[0], frame->len );
-
+	vj_frame_copy1( frame->data[0], Y2, frame->len );
 	create_circle( r, brush_size,width ); 
 
 	relpoint_t *p_points = &points[0];
 
 	if(mode)
 	{
-		veejay_memcpy( chromacity[0], frame->data[1], frame->len );
-		veejay_memcpy( chromacity[1], frame->data[2], frame->len );
+		int strides[4] = { 0,frame->len, frame->len };
+		uint8_t *dest[3] = { NULL, chromacity[0], chromacity[1] };
+		vj_frame_copy( frame->data, dest, strides );
 	}
 
 

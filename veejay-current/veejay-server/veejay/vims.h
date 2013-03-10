@@ -279,7 +279,7 @@ enum {
 
 /* request messages, global */
 #define MAX_SEQUENCES		100
-#define MAX_SPEED		12
+#define MAX_SPEED		32
 #define SAMPLE_MAX_EFFECTS 	20
 #define PATTERN_MAX_TRACKS	3
 #define CELL_LENGTH		30

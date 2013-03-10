@@ -382,19 +382,6 @@ err_out:
   return 0;
 }
 
-// close audio device
-void audio_uninit(int immed) {//@FIXME NULL
-	 struct timeval tv;
-  if (!immed)
-    usec_sleep(audio_get_delay(tv) * 1000 * 1000);
-  // HACK, make sure jack doesn't loop-output dirty buffers
-  audio_reset();
-  usec_sleep(100 * 1000);
-  jack_client_close(client);
-  av_fifo_free(buffer);
-  buffer = NULL;
-}
-
 /**
  * \brief stop playing and empty buffers (for seeking/pause)
  */

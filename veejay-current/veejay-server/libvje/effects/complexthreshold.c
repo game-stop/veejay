@@ -57,7 +57,9 @@ vj_effect *complexthreshold_init(int w, int h)
     ve->limits[1][5] = 255;
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 4;
-    ve->description = "Complex Threshold (fixme)";
+
+	ve->parallel = 1;
+    ve->description = "Complex Threshold";
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->has_user = 0;

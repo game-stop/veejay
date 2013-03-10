@@ -28,7 +28,7 @@
 #include <libvjmem/vjmem.h>
 #include "picinpic.h"
 #include <libyuv/yuvconv.h>
-
+#include "common.h" 
 extern void    vj_get_yuv444_template(VJFrame *src, int w, int h);
 typedef struct
 {
@@ -155,9 +155,9 @@ void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2, int width
 			&(picture->template),
 			yuv_sws_get_cpu_flags()
 		);
-		picture->frame.data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
-		picture->frame.data[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
-		picture->frame.data[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+		picture->frame.data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(len) );
+		picture->frame.data[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(len) );
+		picture->frame.data[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(len) );
 		veejay_memset( picture->frame.data[1],128, len );
 		veejay_memset( picture->frame.data[2],128, len );
 		picture->w = view_width;
@@ -190,6 +190,14 @@ void picinpic_free(void *d)
 		pic_t *my = (pic_t*) d;
 		if(my->scaler)
 			yuv_free_swscaler( my->scaler );
+		int i;
+		for( i = 0; i < 3; i ++ ) {
+			if( my->frame.data[i] ) {
+				free(my->frame.data[i]);
+			}
+			my->frame.data[i] = NULL;
+		}
+		
 		free( my );
 	}
 	d=NULL;

@@ -32,7 +32,7 @@ vj_effect *bwselect_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 16;
     ve->defaults[1] = 235;
-
+	ve->parallel = 1;	
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 0;

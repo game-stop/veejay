@@ -78,13 +78,11 @@ static int have_bg = 0;
 static int running = 0;
 static boxes_t *boxes = NULL;
 
-#define    RUP8(num)(((num)+8)&~8)
 int		motionmap_prepare( uint8_t *map[3], int w, int h )
 {
 	if(!previous_img)
 		return 0;
-
-	veejay_memcpy( previous_img, map[0], w * h );
+	vj_frame_copy( map, previous_img, w*h );	
 	have_bg = 1;
 	nframe_ = 0;
 	running = 0;
@@ -180,12 +178,12 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 	int w = frame->width;
 	int h = frame->height;
 
-	veejay_memcpy( original_img, frame->data[0], len );
+	vj_frame_copy1( frame->data[0], original_img, len );
 
 //	softblur_apply( frame, width,height,0 );
 	if(!have_bg)	
 	{
-		veejay_memcpy( previous_img, frame->data[0], len );
+		vj_frame_copy1( frame->data[0], previous_img, len );
 		have_bg = 1;
 		nframe_ = 0;
 		running = 0;

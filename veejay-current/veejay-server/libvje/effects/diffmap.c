@@ -54,17 +54,11 @@ vj_effect *differencemap_init(int w, int h)
 
 
 static uint8_t *binary_img = NULL;
-static uint8_t *previous_img = NULL;
 static int nframe = 0;
-#define    RUP8(num)(((num)+8)&~8)
 
 int		differencemap_malloc(int w, int h )
 {
-	if(binary_img || previous_img)
-		differencemap_free();
-	
 	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h*2) );
-	previous_img = binary_img + RUP8(w*h);
 	nframe = 0;
 	if(!binary_img) return 0;
 	return 1;
@@ -72,10 +66,9 @@ int		differencemap_malloc(int w, int h )
 
 void		differencemap_free(void)
 {
-	if(binary_img)
+	if(binary_img) 
 		free(binary_img);
 	binary_img = NULL;
-	previous_img = NULL;
 }
 
 #ifndef MIN
@@ -243,14 +236,14 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 	uint8_t *bmap = binary_img;
 
 //	morph_func	p = _dilate_kernel3x3;
-
+	uint8_t *previous_img = binary_img + len;
 //@	take copy of image
-	VJFrame *tmp = vj_malloc(sizeof(VJFrame));
-	veejay_memcpy(tmp, frame, sizeof(VJFrame));
-	tmp->data[0] = previous_img;
-	veejay_memcpy( previous_img, Y, len );
-	softblur_apply( tmp, width,height,0 );
-	free(tmp);
+	vj_frame_copy1( Y, previous_img, len );
+
+	VJFrame tmp;
+	veejay_memcpy(&tmp, frame, sizeof(VJFrame));
+	tmp.data[0] = previous_img;
+	softblur_apply( &tmp, width,height,0 );
 
 	binarify( binary_img,previous_img,threshold,reverse, width,height);
 /*
@@ -282,9 +275,9 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 
 	if(show)
 	{
-		veejay_memcpy(frame->data[0], binary_img, len );
-		veejay_memset(frame->data[1],128, len);
-		veejay_memset(frame->data[2],128, len);
+		vj_frame_copy1( binary_img, frame->data[0], len );
+		vj_frame_clear1( frame->data[1],128, len);
+		vj_frame_clear1(frame->data[2],128, len);
 		return;
 	}
 

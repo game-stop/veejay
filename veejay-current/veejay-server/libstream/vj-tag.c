@@ -209,14 +209,15 @@ int vj_tag_put(vj_tag * tag)
 }
 
 static int vj_tag_update(vj_tag *tag, int id) {
-  if(tag) {
+ /* if(tag) {
     hnode_t *tag_node = hnode_create(tag);
     if(!tag_node) return -1;
     hnode_put(tag_node, (void*) id);
     hnode_destroy(tag_node);
     return 1;
   }
-  return -1;
+  return -1;*/
+  return 1;
 }
 
 int	vj_tag_num_devices()
@@ -982,15 +983,13 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->encoder_format = 0;
     tag->encoder_active = 0;
     tag->encoder_max_size = 0;
-	tag->encoder_succes_frames = 0;
-    tag->encoder_duration = 0;
     tag->encoder_width = 0;
     tag->encoder_height = 0;
-    tag->encoder_num_frames = 0;
     tag->method_filename = (filename == NULL ? NULL :strdup(filename));
-    tag->rec_total_bytes = 0;
-    tag->encoder_total_frames = 0;
-	tag->source = 0;
+    tag->encoder_total_frames_recorded = 0;
+    tag->encoder_frames_recorded = 0;
+    tag->encoder_frames_to_record = 0;
+    tag->source = 0;
     tag->fader_active = 0;
     tag->fader_val = 0.0;
     tag->fader_inc = 0.0;
@@ -1687,15 +1686,13 @@ void vj_tag_reset_encoder(int t1)
    vj_tag *tag = vj_tag_get(t1);
    if(!tag) return;
    tag->encoder_format = 0;
-   tag->encoder_succes_frames = 0;
-   tag->encoder_num_frames = 0;
    tag->encoder_width = 0;
    tag->encoder_height = 0;
    tag->encoder_max_size = 0;
    tag->encoder_active = 0;
-   tag->rec_total_bytes = 0;
-
-   vj_tag_update(tag,t1);
+   tag->encoder_total_frames_recorded = 0;
+   tag->encoder_frames_to_record = 0;
+   tag->encoder_frames_recorded = 0;
 }
 
 int vj_tag_get_encoded_file(int t1, char *description)
@@ -1758,8 +1755,8 @@ int	vj_tag_try_filename(int t1, char *filename, int format)
 			break;
 	}	
 	
-	sprintf(tag->encoder_destination, "%s-%03d.%s", tag->encoder_base, (int)tag->sequence_num, ext);
-	return (vj_tag_update(tag,t1));
+	sprintf(tag->encoder_destination, "%s-%04d.%s", tag->encoder_base, (int)tag->sequence_num, ext);
+	return 1;
 }
 
 
@@ -1799,17 +1796,17 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 			break;
 		}
 
-	if(tag->encoder_total_frames == 0)
+	if(tag->encoder_total_frames_recorded == 0)
 	{
-		tag->encoder_duration = nframes ; 
-		tag->encoder_num_frames = 0;
+		tag->encoder_frames_to_record = nframes ; 
+		tag->encoder_frames_recorded = 0;
 	}
 	else
 	{
-		tag->encoder_duration = tag->encoder_duration - tag->encoder_num_frames;
+		tag->encoder_frames_recorded = 0;
 	}
 
-	if( sufficient_space( tag->encoder_max_size, tag->encoder_num_frames ) == 0 )
+	if( sufficient_space( tag->encoder_max_size, nframes ) == 0 )
 	{
 		vj_avcodec_close_encoder(tag->encoder );
 		tag->encoder_active = 0;
@@ -1848,18 +1845,15 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		    _tag_info->edit_list->video_height,
 		    (float) _tag_info->edit_list->video_fps,
 			0,0,0,
-			(long)( tag->encoder_duration - tag->encoder_total_frames)
+			(long)( tag->encoder_frames_to_record)
 		);
 
 
-	tag->rec_total_bytes= 0;
-	tag->encoder_succes_frames = 0;
 	tag->encoder_width = _tag_info->edit_list->video_width;
 	tag->encoder_height = _tag_info->edit_list->video_height;
 	
-	return vj_tag_update(tag,sample_id);
+	return 1;
 }
-
 
 
 int vj_tag_init_encoder(int t1, char *filename, int format, long nframes ) {
@@ -1881,47 +1875,32 @@ int vj_tag_init_encoder(int t1, char *filename, int format, long nframes ) {
 	veejay_msg(VEEJAY_MSG_ERROR, "It makes no sense to encode for %ld frames", nframes);
 	return 0;
   }
-  /* todo: clean this mess up */
 
   return vj_tag_start_encoder( tag,format, nframes );
 }
 
 int vj_tag_continue_record( int t1 )
 {
-	vj_tag *si = vj_tag_get(t1);
-	if(!si) return -1;
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return -1;
 
-	if( si->rec_total_bytes == 0) return 0;
+	long bytesRemaining = lav_bytes_remain( tag->encoder_file );
+	if( bytesRemaining < (512 * 1024) ) {
+		tag->sequence_num ++;
+		veejay_msg(VEEJAY_MSG_WARNING,
+			"Auto splitting file, %ld frames left to record.",
+			(tag->encoder_frames_to_record - tag->encoder_total_frames_recorded ));
+		tag->encoder_frames_recorded=0;
 
-	if(si->encoder_num_frames >= si->encoder_duration)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Ready recording %ld frames", si->encoder_succes_frames);
-		si->encoder_total_frames  = 0;
-		vj_tag_update(si, t1 );
-		return 1;
-	}
-
-	// 2 GB barrier
-	if (si->rec_total_bytes  >= VEEJAY_FILE_LIMIT)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Auto splitting files (reached internal 2GB barrier)");
-		si->sequence_num ++;
-		si->rec_total_bytes = 0;
-	//	si->encoder_duration
-	//	reset some variables
-
-		printf(" %d %ld %d (%ld)%ld \n",
-			(int)si->sequence_num,
-			si->rec_total_bytes,
-			si->encoder_num_frames,
-			si->encoder_total_frames,
-			si->encoder_duration);
-
-		si->encoder_total_frames = 0;
-		vj_tag_update(si,t1);
 		return 2;
 	}
-		
+	
+	if( tag->encoder_total_frames_recorded >= tag->encoder_frames_to_record)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Recorded %ld frames.",
+			tag->encoder_total_frames_recorded );
+		return 1;
+	}
 	
 	return 0;
 
@@ -3022,18 +3001,10 @@ int vj_tag_get_offset(int t1, int chain_entry)
     return tag->effect_chain[chain_entry]->frame_offset;
 }
 
-int vj_tag_get_encoded_frames(int s1) {
+long vj_tag_get_encoded_frames(int s1) {
   vj_tag *si = vj_tag_get(s1);
   if(!si) return -1;
-  return ( si->encoder_succes_frames );
-  //return ( si->encoder_total_frames );
-}
-
-long vj_tag_get_duration(int s1)
-{
-	vj_tag *t = vj_tag_get(s1);
-	if(!t) return -1;
-	return ( t->encoder_duration );
+  return ( si->encoder_total_frames_recorded );
 }
 
 
@@ -3041,8 +3012,7 @@ long vj_tag_get_total_frames( int s1 )
 {
   vj_tag *si = vj_tag_get(s1);
   if(!si) return -1;
-  return ( si->encoder_total_frames );
-//	return si->encoder_succes_frames;
+  return ( si->encoder_frames_to_record );
 }
 
 int vj_tag_reset_autosplit(int s1)
@@ -3052,14 +3022,14 @@ int vj_tag_reset_autosplit(int s1)
   bzero( si->encoder_base, 255 );
   bzero( si->encoder_destination , 255 );
   si->sequence_num = 0;
-  return (vj_tag_update(si,s1));  
+  return 1;
 }
 
-int vj_tag_get_frames_left(int s1)
+long vj_tag_get_frames_left(int s1)
 {
 	vj_tag *si= vj_tag_get(s1);
 	if(!si) return 0;
-	return ( si->encoder_duration - si->encoder_total_frames );
+	return ( si->encoder_frames_to_record - si->encoder_total_frames_recorded );
 }
 
 int vj_tag_encoder_active(int s1)
@@ -3088,18 +3058,13 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 
    if(!tag->encoder_active) return -1;
 
-		/*
-	int buf_len = encode_jpeg_raw( tag->encoder_buf, tag->encoder_max_size, 100, 0,0,tag->encoder_width,
-		tag->encoder_height, buffer[0], buffer[1], buffer[2]);
-		*/
+	long nframe = tag->encoder_frames_recorded;	
 
-   buf_len =	vj_avcodec_encode_frame( tag->encoder, tag->encoder_total_frames ++, tag->encoder_format, buffer, vj_avcodec_get_buf(tag->encoder), tag->encoder_max_size, pixel_format);
+   buf_len =	vj_avcodec_encode_frame( tag->encoder, nframe, tag->encoder_format, buffer, vj_avcodec_get_buf(tag->encoder), tag->encoder_max_size, pixel_format);
    if(buf_len <= 0 )
 	{
 		return -1;
 	}
-	tag->rec_total_bytes += buf_len;
-	
 
    	if(tag->encoder_file ) {
 		if(lav_write_frame(tag->encoder_file, vj_avcodec_get_buf(tag->encoder), buf_len,1))
@@ -3114,14 +3079,12 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 			{
 		 	    veejay_msg(VEEJAY_MSG_ERROR, "Error writing output audio [%s]",lav_strerror());
 			}
-			tag->rec_total_bytes += ( audio_size * _tag_info->edit_list->audio_bps);
 		}
 	}
 	/* write OK */
-	tag->encoder_succes_frames ++;
-	tag->encoder_num_frames ++;
+	tag->encoder_frames_recorded ++;
+	tag->encoder_total_frames_recorded ++;
 
-	vj_tag_update(tag,t1);
 
 	return (vj_tag_continue_record(t1));
 }
@@ -3863,8 +3826,8 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 			tag->color_b, // no speed,
 			0, // no looping
 			tag->encoder_active,
-			tag->encoder_duration,
-			tag->encoder_succes_frames,
+			tag->encoder_frames_to_record,
+			tag->encoder_total_frames_recorded,
 			vj_tag_size()-1,
 			tag->source_type, // no markers
 			tag->n_frames, // no markers

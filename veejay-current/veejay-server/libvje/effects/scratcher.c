@@ -86,44 +86,42 @@ int scratcher_malloc(int w, int h)
 
 void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 {
-    int uv_len = src->uv_len;
+	int uv_len = src->uv_len;
+	int strides[4] = { (w * h), uv_len, uv_len , 0 };
 	uint8_t *Y = src->data[0];
 	uint8_t *Cb= src->data[1];
 	uint8_t *Cr= src->data[2];
 
+	uint8_t *dest[3] = {
+		frame[0] + (w*h*nframe),
+		frame[1] + (uv_len*nframe),
+		frame[2] + (uv_len*nframe) };
 
-    if (!nreverse) {
-	//printf("copy from buffer at pos %d to display", (w*h*nframe));
-	veejay_memcpy(frame[0] + (w * h * nframe), Y, (w * h));
-	veejay_memcpy(frame[1] + (uv_len * nframe), Cb, uv_len);
-	veejay_memcpy(frame[2] + (uv_len * nframe), Cr, uv_len);
-    } else {
-	//printf("copy frame to buffer at pos %d", (w*h*nframe)); 
-	veejay_memcpy(Y, frame[0] + (w * h * nframe), (w * h));
-	veejay_memcpy(Cb, frame[1] + (uv_len * nframe), uv_len);
-	veejay_memcpy(Cr, frame[2] + (uv_len * nframe), uv_len);
-    }
+	if (!nreverse) {
+		vj_frame_copy( src->data, dest, strides ); 
+    	} else {
+		vj_frame_copy( dest, src, strides );
+    	}
 
-   if (nreverse)
-	nframe--;
-   else
-	nframe++;
+	if (nreverse)
+		nframe--;
+	else
+		nframe++;
 
 
 
-  if (nframe >= n) {
-	if (no_reverse == 0) {
-	    nreverse = 1;
-	    nframe = n - 1;
-	} else {
-	    nframe = 0;
-	}
-    }
+	if (nframe >= n) {
+		if (no_reverse == 0) {
+		    nreverse = 1;
+		    nframe = n - 1;
+		} else {
+		    nframe = 0;
+		}
+    	}
 
-   if (nframe == 0)
-	nreverse = 0;
+   	if (nframe == 0)
+		nreverse = 0;
 
- //  printf("nframe=%d, n=%d, nreverse=%d. no_reverse=%d\n", nframe,n,nreverse,no_reverse);
 }
 
 
@@ -144,13 +142,18 @@ void scratcher_apply(VJFrame *src,
 	VJFrame copy;
 
     if (nframe== 0) {
-	veejay_memcpy(frame[0] + (len * nframe), Y, len);
-	veejay_memcpy(frame[1] + (uv_len * nframe), Cb, uv_len);
-	veejay_memcpy(frame[2] + (uv_len * nframe), Cr, uv_len);
+	int strides[4] = { len, uv_len, uv_len, 0 };
+	vj_frame_copy( src->data, frame, strides );
         return;
     }
-
-    for (x = 0; x < len; x++) {
+	
+	VJFrame srcB;
+	veejay_memcpy( &srcB, src, sizeof(VJFrame) );
+	srcB.data[0] = frame[0] + offset;
+	srcB.data[1] = frame[1] + uv_offset;
+	srcB.data[2] = frame[2] + uv_offset;
+	opacity_applyN( src, &srcB, src->width,src->height, opacity );
+/*    for (x = 0; x < len; x++) {
 	Y[x] =
 	    ((op0 * Y[x]) + (op1 * frame[0][offset + x])) >> 8;
 	}
@@ -162,11 +165,12 @@ void scratcher_apply(VJFrame *src,
 	Cb[x] =
     	     ((op0 * Cb[x]) + (op1 * frame[1][uv_offset + x])) >> 8;
     }
-
+*/
 	copy.uv_len = src->uv_len;
 	copy.data[0] = frame[0];
 	copy.data[1] = frame[1];
 	copy.data[2] = frame[2];
-    store_frame( &copy, width, height, n, no_reverse);
+   	
+	store_frame( &copy, width, height, n, no_reverse);
 
 }

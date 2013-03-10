@@ -1473,7 +1473,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		return 0;
 
 	}
-
+	
 	veejay_memcpy(head,msg,4);
 
 	if( strncasecmp( head, "bun", 3 ) == 0 )
@@ -9274,7 +9274,9 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 	char *priv_msg = NULL;
 	int   len = 0;
 
-	for( i = 1; i < vj_effect_max_effects(); i ++ )
+	int n_fx = vj_effect_max_effects();
+
+	for( i = 1; i < n_fx; i ++ )
 		len += vj_effect_get_summary_len( i );
 
 	priv_msg = (char*) malloc(sizeof(char) * (5 + len + 1000));
@@ -9282,7 +9284,7 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 	sprintf(priv_msg, "%05d", len );
 	char line[1025];
 	char fline[1025];
-	for(i=1; i < vj_effect_max_effects(); i++)
+	for(i=1; i < n_fx; i++)
 	{
 		int effect_id = vj_effect_get_real_id(i);
 		if(vj_effect_get_summary(i,line))
@@ -9596,6 +9598,7 @@ void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	vj_vloopback_close( v->vloopback );
+	v->vloopback = NULL;
 }
 /* 
  * Function that returns the options for a special sample (markers, looptype, speed ...) or

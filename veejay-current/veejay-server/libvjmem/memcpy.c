@@ -136,7 +136,9 @@
 #include <libvjmsg/vj-msg.h>
 #include <aclib/ac.h>
 #include <libyuv/mmx.h>
+#include <libvje/vje.h>
 #include <veejay/vj-task.h>
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -224,9 +226,12 @@ char	*veejay_strncat( char *s1, char *s2, size_t n )
 	return strncat( s1,s2, n);
 }
 
-void	yuyv_plane_clear( size_t len, void *to )
+
+static void	yuyv_plane_clear_job( void *arg )
 {
-	uint8_t *t = (uint8_t*) to;
+	vj_task_arg_t *v = (vj_task_arg_t*) arg;
+	int len = v->strides[0];
+	uint8_t *t = v->input[0];
 	unsigned int i;
 	i = len;
 	for( ; i > 0 ; i -- )
@@ -236,6 +241,30 @@ void	yuyv_plane_clear( size_t len, void *to )
 		t[2] = 0;
 		t[3] = 128;
 		t += 4;
+	}
+}
+
+
+void	yuyv_plane_clear( size_t len, void *to )
+{
+	if( vj_task_available() ) {
+		uint8_t * t    = (uint8_t*) to;
+		uint8_t *in[4] = { t, NULL,NULL,NULL };
+		int 	strides[4] = { len, 0,0,0 };
+		vj_task_run( in, in, NULL, NULL, 1, &yuyv_plane_clear_job );
+	}
+	else {
+		uint8_t *t = (uint8_t*) to;
+		unsigned int i;
+		i = len;
+		for( ; i > 0 ; i -- )
+		{
+			t[0] = 0;
+			t[1] = 128;
+			t[2] = 0;
+			t[3] = 128;
+			t += 4;
+		}
 	}
 }
 static inline unsigned long long int rdtsc()
@@ -386,11 +415,101 @@ void	yuyv_plane_init()
 }
 
 
+static void	yuyv_plane_clear_job( void *arg )
+{
+	vj_task_arg_t *v = (vj_task_arg_t*) arg;
+	int len = v->strides[0];
+	uint8_t *t = v->input[0];
+	unsigned int i;
+	
+#ifdef HAVE_ASM_MMX2
+	__asm __volatile(
+		"movq	(%0),	%%mm0\n"
+		:: "r" (yuyv_mmreg_) : "memory" );
+
+	i = len >> 7;
+	len = len % 128;
+
+	for(; i > 0 ; i -- )
+	{
+		__asm __volatile(
+			PREFETCH" 320(%0)\n"
+			MOVNTQ"	%%mm0,	(%0)\n"
+			MOVNTQ"	%%mm0,	8(%0)\n"
+			MOVNTQ"	%%mm0,	16(%0)\n"
+			MOVNTQ"	%%mm0,	24(%0)\n"
+			MOVNTQ"	%%mm0,	32(%0)\n"
+			MOVNTQ"	%%mm0,	40(%0)\n"
+			MOVNTQ"	%%mm0,	48(%0)\n"
+			MOVNTQ"	%%mm0,	56(%0)\n"
+			MOVNTQ"	%%mm0,	64(%0)\n"
+			MOVNTQ"	%%mm0,	72(%0)\n"
+			MOVNTQ"	%%mm0,	80(%0)\n"
+			MOVNTQ"	%%mm0,	88(%0)\n"
+			MOVNTQ"	%%mm0,	96(%0)\n"
+			MOVNTQ"	%%mm0,	104(%0)\n"
+			MOVNTQ"	%%mm0,	112(%0)\n"
+			MOVNTQ" %%mm0,  120(%0)\n"
+		:: "r" (t) : "memory" );
+		t += 128;
+	}
+#else
+#ifdef HAVE_ASM_MMX
+	__asm __volatile(
+		"movq (%0),	%%mm0\n\t"
+		:: "r" (yuyv_mmreg_): "memory");
+	i = len >> 6;
+	len = len % 64;
+
+	for(; i > 0 ; i -- )
+	{
+		__asm__ __volatile__ (
+			"movq	%%mm0,	(%0)\n"
+			"movq	%%mm0,	8(%0)\n"
+			"movq	%%mm0, 16(%0)\n"
+			"movq	%%mm0, 24(%0)\n"
+			"movq	%%mm0, 32(%0)\n"
+			"movq	%%mm0, 40(%0)\n"
+			"movq   %%mm0, 48(%0)\n"
+			"movq	%%mm0, 56(%0)\n"
+		:: "r" (t) : "memory");
+		t += 64;
+	}
+#endif
+#endif
+#ifdef HAVE_ASM_MMX
+	i = len >> 3;
+	len = i % 8;
+	for( ; i > 0; i -- )
+	{
+		__asm__ __volatile__ (
+			"movq	%%mm0, (%0)\n"
+		:: "r" (t) : "memory" );
+		t += 8;
+	}
+#endif
+	i = len;
+	for( ; i > 0 ; i -- )
+	{
+		t[0] = 0;
+		t[1] = 128;
+		t[2] = 0;
+		t[3] = 128;
+		t += 4;
+	}
+}
+
+
 void	yuyv_plane_clear( size_t len, void *to )
 {
 	uint8_t *t = (uint8_t*) to;
 	unsigned int i;
-
+	if( vj_task_available() ) {
+		int strides[4] = { len, 0,0, 0 };
+		uint8_t *in[4] = { t, NULL,NULL,NULL};
+		vj_task_run( in,in, NULL,strides, 1,(performer_job_routine) &yuyv_plane_clear_job );
+		return;
+	}	
 #ifdef HAVE_ASM_MMX2
 	__asm __volatile(
 		"movq	(%0),	%%mm0\n"
@@ -1070,8 +1189,15 @@ static	void	vj_frame_copy_job( void *arg ) {
 	assert( task_get_workers() > 0 );
 #endif
 	for( i = 0; i < 4; i ++ ) {
-		if( info->strides[i] > 0  )
-			veejay_memcpy( info->output[i], info->input[i], info->strides[i] );
+#ifdef STRICT_CHECKING
+		if( info->strides[i] > 0 ) {
+			assert( info->output[i] != NULL );
+			assert( info->input[i] != NULL );
+		}
+#endif
+		if( info->strides[i] == 0 || info->output[i] == NULL || info->output[i] == NULL )
+			continue;
+		veejay_memcpy( info->output[i], info->input[i], info->strides[i] );
 	}
 }
 
@@ -1082,19 +1208,26 @@ static	void	vj_frame_clear_job( void *arg ) {
 	assert( task_get_workers() > 0 );
 #endif
 	for( i = 0; i < 4; i ++ ) {
+#ifdef STRICT_CHECKING
+		if( info->strides[i] > 0 ) {
+			assert( info->input[i] != NULL );
+			assert( info->output[i] != NULL );
+		}
+#endif
 		if( info->strides[i] > 0  )
 			veejay_memset( info->input[i], info->iparam, info->strides[i] );
 	}
 }
 
-static void	vj_frame_copyN( uint8_t **input, uint8_t **output, int *strides, int planes )
+static void	vj_frame_copyN( uint8_t **input, uint8_t **output, int *strides )
 {
-	vj_task_run( input, output, NULL, strides,planes, (performer_job_routine) &vj_frame_copy_job );
+	vj_task_run( input, output, NULL, strides,4,(performer_job_routine) &vj_frame_copy_job );
 }
 
-static void	vj_frame_clearN( uint8_t **input, uint8_t **output, int *strides, int planes )
+static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 {
-	vj_task_run( input, output, NULL, strides,planes, (performer_job_routine) &vj_frame_clear_job );
+	vj_task_set_int( val );
+	vj_task_run( input, input, NULL, strides,3, (performer_job_routine) &vj_frame_clear_job );
 }
 
 
@@ -1158,29 +1291,46 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 void	vj_frame_simple_clear(  uint8_t **input, int *strides, int v )
 {
 	int i;
-	for( i = 0; i < 4; i ++ ) 
-		if( strides[i] > 0 )
-		veejay_memset( input[i], v,strides[i] );
+	for( i = 0; i < 4; i ++ ) {
+		if( input[i] == NULL || strides[i] == 0 )
+			continue;
+		veejay_memset( input[i], v , strides[i] );
+	}
 }
 
 
-void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides, int planes )
+void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides  )
 {
 	int i;
-	for( i = 0; i < planes; i ++ ) 
-		veejay_memcpy( output[i],input[i], strides[i] );
+	for( i = 0; i < 4; i ++ )  {
+#ifdef STRICT_CHECKING
+		if( strides[i] > 0 ) {
+			assert( input[i] != NULL );
+			assert( output[i] != NULL );
+		}
+#endif
+		if( input[i] != NULL && output[i] != NULL && strides[i] > 0 )
+			veejay_memcpy( output[i],input[i], strides[i] );
+	}
 }
 
-void	*(* vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides, int n_planes ) = 0;
+void	*(* vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides ) = 0;
 
-void	*(* vj_frame_clear)( uint8_t **input, int *strides, int val ) = 0;
+void	*(* vj_frame_clear)( uint8_t **input, int *strides, unsigned int val ) = 0;
 
 void	vj_frame_copy1( uint8_t *input, uint8_t *output, int size )
 {
 	uint8_t *in[4] = { input, NULL,NULL,NULL };
 	uint8_t *ou[4] = { output,NULL,NULL,NULL };
 	int     strides[4] = { size,0,0,0 };
-	vj_frame_copy( in, ou, strides, 1 );
+	vj_frame_copy( in, ou, strides );
+}
+
+void	vj_frame_clear1( uint8_t *input, unsigned int val, int size )
+{
+	uint8_t *in[4] = { input, NULL,NULL,NULL };
+	int     strides[4] = { size,0,0,0 };
+	vj_frame_clear( in, strides, val );
 }
 
 int	find_best_threaded_memcpy(int w, int h) 
@@ -1225,7 +1375,7 @@ int	find_best_threaded_memcpy(int w, int h)
 		num_tasks  = atoi( str2 );
 	
 		if( num_tasks >= MAX_WORKERS ) {
-			veejay_msg(0, "Built-in limit is %d tasks. Change it in libvjmem/vjmem.h ", MAX_WORKERS);
+			veejay_msg(0, "Maximum number of tasks is %d tasks.", MAX_WORKERS);
 			return -1;
 		}
 	
@@ -1240,7 +1390,7 @@ int	find_best_threaded_memcpy(int w, int h)
 			for( k = 0; k < c; k ++ )	
 			{
 				unsigned long long t = rdtsc();
-				vj_frame_copyN( source,dest,planes,4 );
+				vj_frame_copyN( source,dest,planes );
 				t = rdtsc() - t;
 				stats[k] = t;
 			}

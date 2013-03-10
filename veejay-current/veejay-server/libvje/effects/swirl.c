@@ -57,11 +57,13 @@ int swirl_malloc(int w, int h)
 	int h2=h/2;
 	int w2=w/2;
 	int p = 0;
-
-	buf[0] = (uint8_t*) vj_yuvalloc( w , h );
-	if(!buf[0]) return 0;
-	buf[1] = buf[0] + (w * h);
-	buf[2] = buf[1] + (w * h);
+	
+	int i;
+	for( i = 0; i < 3;i ++ ) {
+		buf[i] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h));
+		if(!buf[i])
+			return 0;
+	}
 	
 	polar_map = (double*) vj_calloc(sizeof(double) * w* h );
 	if(!polar_map) return 0;
@@ -86,10 +88,12 @@ int swirl_malloc(int w, int h)
 
 void	swirl_free()
 {
-	if(buf[0])
-		free(buf[0]);
-	buf[1] = NULL;
-	buf[2] = NULL;
+	int i;
+	for( i = 0; i < 3; i ++ ) {
+		if(buf[i])
+			free(buf[i]);
+		buf[i] = NULL;
+	}
 	
 	if(polar_map) 
 		free(polar_map);
@@ -160,9 +164,9 @@ void swirl_apply(VJFrame *frame, int w, int h, int v)
                 _v = v;
 
 	}
-	veejay_memcpy(buf[0], Y,len);
-	veejay_memcpy(buf[1], Cb,len);
-	veejay_memcpy(buf[2], Cr,len);
+
+	int strides[4] = { len, len, len , 0 };
+	vj_frame_copy( frame->data, buf, strides );
 
 	for(i=0; i < len; i++)
 	{

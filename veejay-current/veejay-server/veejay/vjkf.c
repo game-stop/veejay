@@ -98,9 +98,9 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 	free(k_e);
 	free(k_t);
 
-	int len = end - start + 1;
+	int len = end - start;
 
-	result = vj_calloc( (len*4) + 23 );
+	result = vj_calloc( (len*4) + 64 );
 
 	sprintf(result,"key%02d%02d%08d%08d%02d", entry_id,parameter_id,start, end, type );
 
@@ -129,6 +129,9 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 			buf[2] = 0;
 			buf[3] = 0;
 			k++;
+#ifdef STRICT_CHECKING
+			veejay_msg(VEEJAY_MSG_DEBUG, "No keyframe at position %d", i );
+#endif
 		}
 
 		free(key);
@@ -149,7 +152,7 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	int start = 0, end = 0, type = 0;
 	int fx_entry = 0;
 	int n = sscanf( in, "key%2d%2d%8d%8d%2d", &fx_entry,&parameter_id, &start, &end,&type );
-
+	
 	if(n != 5 )
 	{
 		veejay_msg(0, "Unable to unpack parameter_id,start,end");
@@ -160,13 +163,17 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 
 	in += (25);
 
+	unsigned char *ptr = in;
 	for(i = start ; i < end; i ++ )
 	{
-		unsigned char *ptr = in + (i * 4);	
 		int value = 
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
 		char *key = keyframe_id( parameter_id, i );
 		vevo_property_set( port, key, VEVO_ATOM_TYPE_INT, 1, &value );
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "Parameter %d at pos %d has value %d", parameter_id, i, value );
+#endif
+		ptr += 4;
 		free(key);
 	}
 

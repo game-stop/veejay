@@ -64,7 +64,6 @@ vj_effect *radioactivetv_init(int w, int h)
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Zoom ratio", "Strength", "Difference Threshold" );
     return ve;
 }
-#define RUP8(num)(((num)+8)&~8)
 
 
 static  uint8_t *diffbuf = NULL;
@@ -250,8 +249,8 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 	}
 
 	if( !first_frame )
-	{	//@ take current 
-		veejay_memcpy( prev, lum , len );
+	{	//@ take current
+		veejay_memcpy( prev, lum, len );
 		softblur_apply( &smooth, width,height,0);
 		first_frame++;
 		return;

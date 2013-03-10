@@ -134,14 +134,15 @@ static int int_compare(const void *key1, const void *key2)
 }
 
 int sample_update(sample_info *sample, int s1) {
-  if(s1 <= 0 || s1 >= SAMPLE_MAX_SAMPLES) return 0;
+/*  if(s1 <= 0 || s1 >= SAMPLE_MAX_SAMPLES) return 0;
   if(sample) {
     hnode_t *sample_node = hnode_create(sample);
     hnode_put(sample_node, (void*) s1);
     hnode_destroy(sample_node);
     return 1;
   }
-  return 0;
+  return 0;*/
+		 return 1;
 }
 
 /* Evil code for edl saving/restoring */
@@ -2423,14 +2424,14 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	{
 		sample_info *rs = sample_get( seq_rec );
 		e_a = rs->encoder_active;
-		e_d = rs->encoder_duration;
-		e_s = rs->encoder_succes_frames;
+		e_d = rs->encoder_frames_to_record;
+		e_s = rs->encoder_total_frames_recorded;
 	}
 	else
 	{
 		e_a = sample->encoder_active;
-		e_d = sample->encoder_duration;
-		e_s = sample->encoder_succes_frames;
+		e_d = sample->encoder_frames_to_record;
+		e_s = sample->encoder_total_frames_recorded;
 	}
 
 	veejay_sprintf(str,1024,

@@ -23,7 +23,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
-
+#include "common.h"
 vj_effect *zoom_init(int width , int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -58,21 +58,27 @@ vj_effect *zoom_init(int width , int height)
 static int zoom_[4] = { 0,0,0,0 };
 static void *zoom_vp_ = NULL;
 
-static uint8_t *zoom_private_[3];
+static uint8_t *zoom_private_[3] = { NULL, NULL, NULL };
 
 int	zoom_malloc(int width, int height)
 {
-	zoom_private_[0] = (uint8_t*) vj_yuvalloc( width,height );
-	if(!zoom_private_[0] )
-		return 0;
-	zoom_private_[1] = zoom_private_[0] + (width*height);
-	zoom_private_[2] = zoom_private_[1] + (width*height);
+	int i;
+	for( i = 0; i < 3; i ++ ) {	
+		zoom_private_[i] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height));
+		if(!zoom_private_[i])
+			return 0;
+	}
+
 	return 1;
 }
 
 void zoom_free() {
-	if( zoom_private_[0] )
-		free(zoom_private_[0] );
+	int i;
+	for( i = 0; i < 3; i ++ ) {	
+	if( zoom_private_[i] )
+		free(zoom_private_[i] );
+	zoom_private_[i] = NULL;
+	}
 	if( zoom_vp_ )
 		viewport_destroy( zoom_vp_ );
 	zoom_vp_ = NULL;
@@ -90,9 +96,8 @@ void zoom_apply( VJFrame *frame, int width, int height, int x, int y, int factor
 		zoom_[0] = x; zoom_[1] = y; zoom_[2] = factor; zoom_[3] = dir;
 	}
 
-	veejay_memcpy( zoom_private_[0], frame->data[0], (width*height));
-	veejay_memcpy( zoom_private_[1], frame->data[1], (width*height));
-	veejay_memcpy( zoom_private_[2], frame->data[2], (width*height));
+	int strides[4] = { (width*height),(width*height),(width*height), 0 };
+	vj_frame_copy( frame->data, zoom_private_, strides );
 
 	viewport_process_dynamic( zoom_vp_, zoom_private_, frame->data );
 	

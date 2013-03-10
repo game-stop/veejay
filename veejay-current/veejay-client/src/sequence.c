@@ -31,6 +31,7 @@
 #include <src/sequence.h>
 #include <src/utils.h>
 #include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #include <veejay/vje.h>
 #include <veejay/yuvconv.h>
 #include <string.h>

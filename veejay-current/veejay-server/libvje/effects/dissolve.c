@@ -34,6 +34,7 @@ vj_effect *dissolve_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->defaults[0] = 150;
+	ve->parallel = 1;
     ve->description = "Dissolve Overlay";
     ve->sub_format = 1;
     ve->extra_frame = 1;
