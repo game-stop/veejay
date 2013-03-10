@@ -2,7 +2,7 @@ all: pd_linux
 
 include Makefile.defs
 
-VERSION = 0.1.4
+VERSION = 0.1.5
 
 
 .SUFFIXES: .pd_linux
@@ -17,7 +17,7 @@ PD_CFLAGS = -DPD
 
 .c.pd_linux:
 	$(CC) $(PD_CFLAGS) $(OPTI_CFLAGS) $(DEBUG_CFLAGS) -DVERSION=\"$(VERSION)\" -o $*.o -c $*.c
-	$(CC) -export_dynamic  -shared -o $*.pd_linux $*.o -lm
+	$(CC) -rdynamic  -shared -o $*.pd_linux $*.o -lm
 	strip --strip-unneeded $*.pd_linux
 	rm $*.o
 

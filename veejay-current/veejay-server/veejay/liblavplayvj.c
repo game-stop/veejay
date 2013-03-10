@@ -1335,7 +1335,7 @@ void veejay_pipe_write_status(veejay_t * info)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		veejay_sprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %ld %d %d %d %d %d",
+		snprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %ld %d %d %d %d %d %d",
 			info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1361,7 +1361,8 @@ void veejay_pipe_write_status(veejay_t * info)
 		        0,
 			0,
 			0,
-			mstatus );
+			mstatus,
+		        0	);
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
 		if( vj_tag_sprint_status( info->uc->sample_id,cache_used,info->seq->active,info->seq->current, info->real_fps,
@@ -1379,6 +1380,8 @@ void veejay_pipe_write_status(veejay_t * info)
 		info->uc->chain_changed = 0;
     if (info->uc->render_changed == 1)
 		info->uc->render_changed = 0;
+
+
 }
 static	char	*veejay_concat_paths(char *path, char *suffix)
 {
