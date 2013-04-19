@@ -179,6 +179,7 @@ enum {
 };
 
 #ifdef HAVE_SDL
+#define VIMS_MOD_CAPSLOCK 4
 #define	VIMS_MOD_SHIFT	3
 #define VIMS_MOD_NONE	0
 #define VIMS_MOD_CTRL	2
@@ -302,6 +303,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_NONE, "2 1"	},
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_SHIFT,  "1 1"	},
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_CTRL, "0 0"	},
+	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_CAPSLOCK, "3 1"},
 	{ VIMS_MACRO_SELECT,			SDLK_F1,		VIMS_MOD_CTRL, "0"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F2,		VIMS_MOD_CTRL, "1"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F3,		VIMS_MOD_CTRL, "2"	},
@@ -1812,6 +1814,9 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 		vims_mod = VIMS_MOD_ALT;
 	if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) )
 		vims_mod = VIMS_MOD_CTRL;
+	if( (mod & KMOD_CAPS) ) {
+		vims_mod = VIMS_MOD_CAPSLOCK;
+	}
 
 	int vims_key = key->keysym.sym;
 	int index = vims_mod * SDLK_LAST + vims_key;
@@ -10323,6 +10328,53 @@ void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap
 }
 #endif
 
+void	vj_event_sample_next( void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if( v->seq->active ){
+		int p = v->seq->current + 1;
+		int n = v->seq->samples[ p ];
+		if( sample_exists( n ) ) {
+			veejay_set_sample(v, n );
+		}
+	}
+	if( SAMPLE_PLAYING(v)) {
+		int n = v->uc->sample_id + 1;
+		if( sample_exists(n) ) {
+			veejay_set_sample(v,n );
+		} else {
+		    n = 1;
+		    int stop = sample_size() -1;
+		    while(!sample_exists(n) ) {
+			    n ++;
+			    if( n > stop ) {
+				    return;
+			    }
+		    }
+		    veejay_set_sample(v, n );
+		}
+	}
+	else if ( STREAM_PLAYING(v)) {
+		int n = v->uc->sample_id + 1;
+		if( vj_tag_exists(n) ) {
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, n );
+		
+		}
+		else {
+			n = 1;
+			int stop = vj_tag_size()-1;
+			while( !vj_tag_exists(n) ) {
+				n ++;
+				if( n > stop ) {
+					return;
+				}
+			}
+			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, n );	
+		}
+	}
+}
+
+
 void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap )
 {
 	int args[5];
@@ -10500,6 +10552,10 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "No keystrokes to playback!");
 		}
+	}
+	else if ( args[0] == 3 )
+	{
+		vj_event_sample_next( v , NULL, NULL );
 	}
 }
 

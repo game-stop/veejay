@@ -944,6 +944,15 @@ void		vj_init_vevo_events(void)
 				5,
 				NULL );
 
+	index_map_[VIMS_SAMPLE_NEXT] 		= _new_event(
+				NULL,
+				VIMS_SAMPLE_NEXT,
+				"Play next sample in queue",
+				vj_event_sample_next,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
 	index_map_[VIMS_SAMPLE_SET_POSITION]	=	_new_event(
 				"%d %d %d",
 				VIMS_SAMPLE_SET_POSITION,
