@@ -10332,22 +10332,25 @@ void	vj_event_sample_next( void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	if( v->seq->active ){
-		int p = v->seq->current + 1;
+		int s = (v->settings->current_playback_speed < 0 ? -1 : 1 );
+		int p = v->seq->current + s;
+		if( p < 0 ) p = 0;
 		int n = v->seq->samples[ p ];
 		if( sample_exists( n ) ) {
 			veejay_set_sample(v, n );
 		}
 	}
 	if( SAMPLE_PLAYING(v)) {
-		int n = v->uc->sample_id + 1;
+		int s = (v->settings->current_playback_speed < 0 ? -1 : 1 );
+		int n = v->uc->sample_id + s;
 		if( sample_exists(n) ) {
 			veejay_set_sample(v,n );
 		} else {
-		    n = 1;
+		    n = v->uc->sample_id;
 		    int stop = sample_size() -1;
 		    while(!sample_exists(n) ) {
-			    n ++;
-			    if( n > stop ) {
+			    n += s;
+			    if( n > stop || n < 1 ) {
 				    return;
 			    }
 		    }
