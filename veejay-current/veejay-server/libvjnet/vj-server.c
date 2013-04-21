@@ -339,7 +339,8 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 	if (!vjs)
 		return NULL;
 
-	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * (RECV_SIZE+1024) );
+	vjs->recv_bufsize = RECV_SIZE * 1024; //@ 4 MB receive buffer
+	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * vjs->recv_bufsize);
 	if(!vjs->recv_buf)
 	{
 		if(vjs) free(vjs);
@@ -678,8 +679,6 @@ int	_vj_server_empty_queue(vj_server *vje, int link_id)
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
 	
-	veejay_memset( vje->recv_buf, 0, RECV_SIZE );
-	
 	return 1;
 }
 
@@ -960,11 +959,46 @@ int	vj_server_update( vj_server *vje, int id )
 
 	int bytes_received = 0;
 	if(!vje->use_mcast) {
-		bytes_received = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
+
+		int max = vje->recv_bufsize;
+		int bytes_left = 1;
+		char *ptr = vje->recv_buf;
+		int readmore = 0;
+		
+		n = recv( sock_fd, ptr, 1, 0 );
+		if( n != 1 ) {
+			bytes_received = -1;
+		}
+		else {
+			if( *ptr == 'V' || *ptr == 'K' || *ptr == 'D' ) {
+				ptr ++;
+readmore_lbl:
+				n = recv( sock_fd, ptr, RECV_SIZE, 0 );
+				if( n == - 1) {
+					if( errno == EAGAIN ) {
+						goto readmore_lbl;
+					}
+					veejay_msg( 0, "Error: %s", strerror(errno) );
+					bytes_received = -1;
+				}
+				if( n == RECV_SIZE && errno == EAGAIN)
+				{ // deal with large messages
+					ptr += n;
+					bytes_received += n;
+					if( bytes_received > max ) {
+						veejay_msg(VEEJAY_MSG_ERROR,"VIMS message does not fit receive buffer.");
+						return -1;
+					}
+					goto readmore_lbl;
+				}
+				bytes_received += n;
+			}
+		}
+		//bytes_received = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 #ifdef STRICT_CHECKING
 		if( vje->logfd ) {
-			fprintf(vje->logfd, "received %d of %d bytes from handle %d (link %d)\n", 
-					bytes_received,RECV_SIZE, Link[id]->handle,id );
+			fprintf(vje->logfd, "received %d bytes from handle %d (link %d)\n", 
+					bytes_received,Link[id]->handle,id );
 			printbuf( vje->logfd, vje->recv_buf, bytes_received );
 		}
 #endif
@@ -981,7 +1015,7 @@ int	vj_server_update( vj_server *vje, int id )
 			veejay_msg(0, "Networking error with socket %d: %s",sock_fd,strerror(errno));
 		}
 		if( bytes_received == 0 ) {
-			veejay_msg(0, "Link %d closed connection, terminating client connection.",id);
+			veejay_msg(VEEJAY_MSG_WARNING, "Link %d closed connection, terminating client connection.",id);
 		}
 		return -1; // close client now
 	}
@@ -991,10 +1025,10 @@ int	vj_server_update( vj_server *vje, int id )
 	int bytes_left = bytes_received;
 
 	int n_msg = _vj_verify_msg( vje, id, msg_buf, bytes_left ); 
-
+	
 	if(n_msg == 0 && bytes_received > 0)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid instruction '%s'", msg_buf );
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid VIMS instruction '%s'", msg_buf );
 #ifdef STRICT_CHECKING
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "no valid messages in buffer!\n" );

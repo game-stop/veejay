@@ -44,7 +44,8 @@ typedef struct vj_server_t {
     int	send_size;
     int	recv_size;
     int mcast_gray;
-	FILE *logfd;
+    FILE *logfd; 
+    int recv_bufsize;
 } vj_server;
 
 vj_server *vj_server_alloc(int port, char *mcast_group_name, int type);
