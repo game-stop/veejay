@@ -4730,6 +4730,9 @@ static	void	reload_keys()
 		
 		index = (val[1] * MOD_OFFSET) + val[2];
 
+		if( index < 0 || index >= VIMS_MAX )
+			continue;
+
 		vims_keys_list[ index ].keyval 		= val[2];
 		vims_keys_list[ index ].state 		= val[1];
 		vims_keys_list[ index ].event_id 	= val[0];	
