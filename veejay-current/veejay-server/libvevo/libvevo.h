@@ -119,6 +119,8 @@ int	vevo_property_softref( void *port, const char *key );
 
 int	vevo_port_get_total_size( vevo_port_t *port );
 
+char	**vevo_property_get_string_arr( vevo_port_t *p, const char *key );
+
 #define VEVO_ATOM_TYPE_FUNCPTR	11
 #define	VEVO_ATOM_TYPE_VOIDPTR	65
 #define VEVO_ATOM_TYPE_INT	1

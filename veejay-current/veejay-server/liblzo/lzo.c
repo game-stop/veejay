@@ -1,5 +1,5 @@
 /* veejay - Linux VeeJay
- *           (C) 2002-2006 Niels Elburg <nwelburg@gmail.com> 
+ *           (C) 2002-2013 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -25,7 +25,6 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <liblzo/lzo.h>
-
 #include <libyuv/yuvconv.h>
 #include <liblzo/lzoconf.h>
 #include <liblzo/minilzo.h>
@@ -51,27 +50,109 @@ void	lzo_free( void *lzo )
 	}
 	l = NULL;
 }
+/*
+void lzo_print_buf( uint8_t *buf, int len )
+{
+	int i;
+	printf("------ %p, %d\n", buf, len );
+	printf("line     : ");
+	for( i = 1; i < 32; i ++ ) {
+		printf(". ");
+	}
+	printf("\n");
+	for(i = 0; i < len ; i ++ ) {
+		if( (i%32) == 0 )
+			printf("\nline %04d: ",i);
+		printf("%02x", buf[i] );
+	}
+	printf("\n");
+}
+*/
+static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , int *out_lenptr, uint8_t *wrkmem)
+{
+	int out_len = 0;
+	int r = lzo1x_1_compress( in, in_len, out, &out_len, wrkmem );
+	if( r == LZO_E_OK ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "LZO (test) Compressed %lu bytes into %lu bytes\n",
+				(unsigned long) in_len, (unsigned long) out_len );
+		*out_lenptr = out_len;
+	} else {
+		veejay_msg(VEEJAY_MSG_ERROR, "LZO (test) Compression error: %d", r );
+		return 0;
+	}
+
+	if( out_len >= in_len ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "LZO (test) Block contains incompressible data.");
+		return 0;
+	}
+
+	int new_len = in_len;
+	r = lzo1x_decompress( out, out_len, in, &new_len, NULL );
+	if( r == LZO_E_OK && new_len == in_len ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "LZO (test) Decompressed %lu (%lu) bytes back into %lu bytes\n",
+				(unsigned long) *out_lenptr,out_len, (unsigned long) in_len );
+		return 1;
+	}
+
+	veejay_msg(VEEJAY_MSG_ERROR, "LZO (test) Decompression error: %d", r );
+
+	return 0;
+
+}
+
+#define LZO_ALIGN_SIZE(size) \
+	 ( ((size) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ) * sizeof(lzo_align_t)
 
 void	*lzo_new( )
 {
 	lzot *l = (lzot*) vj_calloc(sizeof(lzot));	
 	if (lzo_init() != LZO_E_OK)
    	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize LZO. Could be buggy compiler");
+		veejay_msg(VEEJAY_MSG_ERROR, "LZO Unable to initialize. Could be buggy compiler?");
 		free( l );
 		return NULL;
 	}
 
 	l->wrkmem = (lzo_bytep)
-		vj_calloc( LZO1X_1_MEM_COMPRESS );
+		vj_calloc( LZO_ALIGN_SIZE( LZO1X_1_MEM_COMPRESS ) );
 
 	if(l->wrkmem == NULL )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot allocate work memory for LZO1X_1");
+		veejay_msg(VEEJAY_MSG_ERROR, "LZO Cannot allocate work memory for LZO1X_1");
 		if(l) free(l);
 		return NULL;
 	}
-	veejay_msg(VEEJAY_MSG_DEBUG,"LZO real-time data compression library (v%s, %s).",
+
+
+
+#ifdef STRICT_CHECKING
+	uint8_t in[16384];
+	uint8_t out[16834];
+
+	memset( in, 1, sizeof(in) );
+	memset( out, 0, sizeof(out));
+
+	int out_len = 0;
+
+	int lzo_verify_compression_result = lzo_verify_compression( &in, sizeof(in), &out, &out_len, l->wrkmem );
+       
+	assert( lzo_verify_compression_result == 1 );
+
+	if( lzo_verify_compression_result == 1 ) {
+		int i;
+		for( i = 0; i < sizeof(in); i ++ ) { 
+			if( in[i] != 1 )  //decompression back into 'in'
+				veejay_msg(VEEJAY_MSG_ERROR, "LZO verify error at byte pos %d.", i );
+	
+			assert( in[i] == 1 );
+		}
+
+		veejay_msg(VEEJAY_MSG_DEBUG, "LZO verified compression algorithms successfully.");
+	}
+#endif
+
+
+	veejay_msg(VEEJAY_MSG_DEBUG,"LZO real-time data compression library (v%s, %s) enabled.",
             lzo_version_string(), lzo_version_date());
 
 	l->tmp[0] = NULL;
@@ -86,24 +167,26 @@ static uint32_t str2ulong(unsigned char *str)
    return ( str[0] | (str[1]<<8) | (str[2]<<16) | (str[3]<<24) );
 }
 
-int		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, int ilen )
+long		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, int ilen )
 {
 	lzo_uint out_len =0;
-	lzo_uint len = ilen;
+	lzo_uint src_len = ilen;
 	lzot *l = (lzot*) lzo;
 	lzo_bytep dst = plane;
-	lzo_uintp dst_len = (lzo_uintp) size;
 	lzo_voidp wrkmem = l->wrkmem;
-	int r = lzo1x_1_compress( src, len, dst, dst_len, wrkmem );
-	if( r != LZO_E_OK )
-		return 0;
-	
-	if( dst[0] == 2 && src[1] == dst[1] && src[2] == dst[2] && src[3] == dst[3] && r == 0 ) {
-		veejay_msg(0 , "compression failed. Reported at http://bugs.dyne.org #353 ");
+	int r = lzo1x_1_compress( src, src_len, dst, size, wrkmem );
+	if( r != LZO_E_OK || r < 0 )
+	{
+		veejay_msg(0, "LZO Compression error: %d", r );
 		return 0;
 	}
 
-	return (*size);	
+	long res = (long) (*size);
+#ifdef STRICT_CHECKING
+	assert( res > 0 );
+#endif
+
+	return res;
 }
 
 long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int uv_len)
@@ -114,38 +197,32 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 	unsigned int sum = 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
-	lzo_uint offset = 16;
+	lzo_uint offset = 12;
+
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
-	mode   = str2ulong( linbuf+12 );
 
 	if(len[0] == 0 && len[1] == 0 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "%s", linbuf );
 		return -1;
 	}
 
-	if(len[1] ==0 && len[2] == 0 )
-		mode = 1;
-
 	for( i = 0; i < 3; i ++ )
 	{
-		if( len[i] <= 0 ) 
+		if( len[i] <= 0 ) { 
 			continue;
+		}
+		
 		const lzo_bytep src = (lzo_bytep) (linbuf+offset);
-		veejay_msg(0, "decompressing plane %d, size %d to %p... (%d,%d,%d) off=%d", i, len[i], linbuf+offset,len[0],len[1],len[2],offset );
+		
 		int r = lzo1x_decompress( src, len[i], dst[i], &result_len, l->wrkmem );
-		if( r != LZO_E_OK )
+		if( r != LZO_E_OK || r < 0 )
 			return 0;
 		sum += result_len;
 		offset += len[i];
 
 		result_len = 0;
-	}
-
-	if(mode == 1) {
-		vj_frame_clear1( dst[1],128, uv_len );
-		vj_frame_clear1( dst[2],128, uv_len );
 	}
 
 	return (long)sum;
@@ -168,7 +245,7 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	mode   = str2ulong( linbuf+12 );
 
 	if( len[0] != stride1 || len[1] != stride2 || len[2] != stride3 ) {
-		veejay_msg(0, "Data corruption.");
+		veejay_msg(0, "LZO received corrupted packet.");
 		return 0;
 	}
 
@@ -184,8 +261,9 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 		if( len[i] <= 0 ) 
 			continue;
 
-		const lzo_bytep src = (lzo_bytep) (linbuf+offset);
-		int r = lzo1x_decompress( src, len[i], dst[i], &result_len, l->wrkmem );
+	//	const lzo_bytep src = (lzo_bytep) (linbuf+offset);
+
+		int r = lzo1x_decompress( linbuf+offset, len[i], dst[i], &result_len, l->wrkmem );
 		if( r != LZO_E_OK )
 			return 0;
 		sum += result_len;
@@ -211,8 +289,8 @@ long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	int mode = 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
-	lzo_uint offset = 16;
-	
+	lzo_uint offset = 0;
+	/*
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
@@ -222,7 +300,7 @@ long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 		veejay_msg(0, "Data corruption.");
 		return 0;
 	}
-
+*/
 	len[0] = stride1;
 	len[1] = stride2;
 	len[2] = stride3;
@@ -275,13 +353,13 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	int mode= 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
-	lzo_uint offset = 16;
-
+	lzo_uint offset = 0;
+/*
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
 	mode   = str2ulong( linbuf+12 );
-
+*/
 	if( l->tmp[0] == NULL ) {
 		l->tmp[0] = vj_malloc(sizeof(uint8_t) * w * h * 3); // will do
 		l->tmp[1] = l->tmp[0] + ( w * h );

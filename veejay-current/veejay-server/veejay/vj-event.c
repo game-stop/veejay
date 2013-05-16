@@ -10554,6 +10554,7 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 		else
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "No keystrokes to playback!");
+			veejay_msg(VEEJAY_MSG_INFO, "Use CAPS-LOCK modifier to jump to next or previous sample."); 
 		}
 	}
 	else if ( args[0] == 3 )

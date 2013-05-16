@@ -21,10 +21,9 @@
 #define LZOH
 
 void    *lzo_new(  );
-
+void	lzo_print_buf( uint8_t *buf, int len );
 void	lzo_free( void *lzo );
-
-int  	lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, int ilen );
+long 	lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, int ilen );
 long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h,
 	       uint32_t s1, uint32_t s2, uint32_t s3	);
 long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h );

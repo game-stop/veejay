@@ -33,7 +33,9 @@
 #include <libstream/vj-net.h>
 #include <liblzo/lzo.h>
 #include <time.h>
+#include <libyuv/yuvconv.h>
 
+#define        RUP8(num)(((num)+8)&~8)
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -54,6 +56,7 @@ typedef struct
 	int in_h;
 	int af;
 	uint8_t *buf;
+	void *scaler;
 } threaded_t;
 
 #define STATE_INACTIVE 0
@@ -95,9 +98,6 @@ void	*reader_thread(void *data)
 	v->lzo = lzo_new();
 
 	success = vj_client_connect_dat( v, tag->source_name,tag->video_channel );
-	
-
-	t->buf = (uint8_t*) vj_calloc(sizeof(uint8_t) * 2048 * 1500 );
 
 	if( success > 0 ) {
 			veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name,
@@ -106,13 +106,16 @@ void	*reader_thread(void *data)
 	else if ( tag->source_type != VJ_TAG_TYPE_MCAST ) 
 	{
 		veejay_msg(0, "Unable to connect to %s: %d", tag->source_name, tag->video_channel+5);
-		free(t->buf);
 		pthread_exit(&(t->thread));
 		return NULL;
 	}
 
 	unsigned int	optimistic = 1;
 	unsigned int	optimal    = 8;
+	unsigned int    bufsize    = t->w * t->h * 4;
+
+	t->buf = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( bufsize ) );
+
 
 	for( ;; )
 	{
@@ -186,8 +189,8 @@ void	*reader_thread(void *data)
 			{
 				if(lock(t) != 0 ) //@ lock memory region to write
 					goto NETTHREADEXIT;
-				
-				ret = vj_client_read_i ( v, t->buf,0 );
+			
+				ret = vj_client_read_i ( v, t->buf,bufsize );
 				if( ret <= 0 )
 				{
 					if( tag->source_type == VJ_TAG_TYPE_NET )
@@ -271,6 +274,8 @@ NETTHREADRETRY:
 			vj_client_close(v);
 			veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d was told to exit",tag->source_name,tag->video_channel+5);
 			vj_client_free(v);
+			if( t->scaler )
+				yuv_free_swscaler( t->scaler );
 			free(t->buf);
 			pthread_exit( &(t->thread));
 			return NULL;
@@ -281,6 +286,8 @@ NETTHREADEXIT:
 	vj_client_close(v);
 	veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d was aborted",tag->source_name,tag->video_channel+5);
 	vj_client_free(v);
+	if( t->scaler )
+		yuv_free_swscaler( t->scaler );
 	free(t->buf);
 	pthread_exit( &(t->thread));
 
@@ -356,9 +363,19 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 
 	b = yuv_yuv_template( buffer[0],buffer[1], buffer[2],t->w,t->h,t->f);
 
+
 	if(lock(t) != 0)
 		return 0;
-	yuv_convert_any_ac(a,b, a->format,b->format );
+
+	if( t->scaler == NULL ) {
+		sws_template sws_templ;
+		memset( &sws_templ, 0, sizeof(sws_template));
+		sws_templ.flags = yuv_which_scaler();
+		t->scaler = yuv_init_swscaler( a,b, &sws_templ, yuv_sws_get_cpu_flags() );
+	}
+
+	yuv_convert_and_scale( t->scaler, a,b );
+	
 	t->have_frame = 0;
 	if(unlock(t)!=0)
 		return 0;

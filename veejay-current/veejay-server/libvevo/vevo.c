@@ -3531,6 +3531,29 @@ char            *vevo_property_get_utf8string( void *port, const char *key )
 	return NULL;
 }
 
+char	**vevo_property_get_string_arr( vevo_port_t *p, const char *key )
+{
+	int n = vevo_property_num_elements( p, key );
+	if( n == 0 )
+		return NULL;
+	char **retval = vj_malloc(sizeof(char*) * n );
+	if( retval == NULL )
+		return NULL;
+	int i;
+	for( i = 0; i < n ; i ++ ) {
+		retval[i] = vj_calloc( vevo_property_element_size(p,key,i) + 1 );
+		int err = vevo_property_get( p, key, i, &retval[i] );
+		if( err != VEVO_NO_ERROR ) {
+			for( -- i; i >= 0; i -- ) {
+				free( retval[i] );
+			}
+			free(retval);
+			return NULL;
+		}
+	}
+	return retval;
+}
+
 int
 vevo_property_del(vevo_port_t * p,
 		    const char *key )
@@ -3948,3 +3971,39 @@ void	vevo_dom_dump( void *p, FILE *file )
 	if( lvl == 0 )
 		fclose(file);	
 }*/
+
+
+int	vevo_write_xml( vevo_port_t *root, const char *destination, char *hiearchy[] )
+{
+	char *encoding = "UTF-8";
+	char **properties = vevo_list_properties( root );
+	if( properties == NULL )
+		return 0;
+/*	xmlNodePtr childnode;
+	xmlDocPtr doc = xmlNewDoc( "1.0" );
+	xmlNodePtr rootnode =
+		xmlNewDocNode( doc, NULL , (const xmlChar*) hiearchy[0], NULL );
+	xmlDocSetRootElement( doc, rootnode );
+
+	int i = 0;
+	int level = 1;
+	while( properties[i] != NULL )
+	{
+		int atom_type = vevo_property_atom_type( root, properties[i] );
+		void *port = NULL;
+		
+				childnode = xmlNewChild( rootnode, NULL, (const xmlChar*)
+						hierachy[ level ], NULL );
+				vevo_property_get( port, properties[i], 0, &port );
+		
+
+		i++;
+	}
+
+	xmlNodePtr childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) "timeline", NULL );
+*/
+
+	return 1;	
+
+}
+

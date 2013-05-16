@@ -61,9 +61,9 @@ struct hostent *sock_gethostbyname(const char *name) {
 	struct host_list *current = (struct host_list *) pthread_getspecific(ghbn_key);
 	
 	if (!current) {
-    	current = (struct host_list *) calloc(1, sizeof(struct host_list));
+ 	   	current = (struct host_list *) calloc(1, sizeof(struct host_list));
  		current->hostent.h_name = "busy";
-    	ref_count++;
+	    	ref_count++;
    		pthread_setspecific(ghbn_key, current);
 	}
   
@@ -177,6 +177,7 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	}
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Connected to host '%s' port %d, fd %d", host,port,s->sock_fd );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Receive buffer size is %d bytes, send buffer size is %d bytes", s->recv_size, s->send_size );
 
 	return 1;
 }
@@ -240,7 +241,7 @@ static		int	timed_recv( int fd, void *buf, const int len, int timeout )
 		return -5;
 
 	return recv( fd, buf, len, 0 );
-}*/
+}
 
 void			sock_t_set_timeout( vj_sock_t *s, int t )
 {
@@ -248,30 +249,38 @@ void			sock_t_set_timeout( vj_sock_t *s, int t )
 	setsockopt( s->sock_fd, SOL_SOCKET, SO_SNDTIMEO, (char*) &opt, sizeof(int));
 	setsockopt( s->sock_fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &opt, sizeof(int));
 }
+*/
 
 int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 {
 	int done = 0;
-	int bytes_left = s->recv_size;
+	int bytes_left = len;
 	int n;
+	int bytes_done = 0;
 
-	if( len < bytes_left )
-		bytes_left = len;
-
-	while( done < len )
+	while( bytes_left > 0 )
 	{	
+sock_t_recv_lbl:		
 		//@ setup socket with SO_RCVTIMEO
-		n = recv( s->sock_fd, dst+done,bytes_left, 0 );
+		n = recv( s->sock_fd, dst + bytes_done, bytes_left, MSG_WAITALL );
 		if ( n <= 0 ) {
-			return -1;
+			if( n == -1 ) {
+				if( errno == EAGAIN ) { 
+					veejay_msg(VEEJAY_MSG_ERROR, "Strange things happen in strange places. EAGAIN but socket is MSG_WAITALL");
+					goto sock_t_recv_lbl;
+
+				}
+				veejay_msg(0, "Error while receiving from network: %s", strerror(errno));
+			} 
+			
+			return n;
 		} 
-
-		done += n;
-
-		if( (len-done) < s->recv_size )
-			bytes_left = len - done;
+	
+		bytes_done += n;
+		bytes_left -= n;
 	}
-	return done;
+
+	return bytes_done;
 }
 
 int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
@@ -305,6 +314,7 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 	int n; 
 #ifdef STRICT_CHECKING
 	assert( buf != NULL );
+	assert( len > 0 );
 #endif
 
 	unsigned int length = len;

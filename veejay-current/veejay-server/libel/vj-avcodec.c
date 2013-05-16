@@ -33,7 +33,9 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 //#define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
 
@@ -486,38 +488,34 @@ static void long2str(unsigned char *dst, int32_t n)
 static	int	vj_avcodec_lzo( vj_encoder  *av, uint8_t *src[3], uint8_t *dst , int buf_len )
 {
 	uint8_t *dstI = dst + (3 * 4);
-	int size1 = 0, size2=0,size3=0;
+	uint32_t s1,s2,s3;
+	uint32_t *size1 = &s1, *size2=&s2,*size3=&s3;
 	int i;
-	
-	i = lzo_compress( av->lzo, src[0], dstI, &size1 , av->len);
+
+	i = lzo_compress( av->lzo, src[0], dstI, size1 , av->len);
 	if( i == 0 )
 	{
 		veejay_msg(0,"\tunable to compress Y plane");
 		return 0;
 	}
-	dstI += size1;
-
-	i = lzo_compress( av->lzo, src[1], dstI, &size2 , av->uv_len );
+	i = lzo_compress( av->lzo, src[1], dstI + s1, size2 , av->uv_len );
 	if( i == 0 )
 	{
 		veejay_msg(0,"\tunable to compress U plane");
 		return 0;
 	}
-	
-	dstI += size2;
-	i = lzo_compress( av->lzo, src[2], dstI, &size3 , av->uv_len );
+	i = lzo_compress( av->lzo, src[2], dstI + (s1 + s2), size3 , av->uv_len );
 	if( i == 0 )
 	{
 		veejay_msg(0,"\tunable to compress V plane");
 		return 0;
 	}
-		
 	
-	long2str( dst, size1 );
-	long2str( dst+4,size2);
-	long2str( dst+8,size3);
-	
-	return (size1 + size2 + size3 + 12);
+	long2str( dst, s1 );
+	long2str( dst+4,s2);
+	long2str( dst+8,s3);
+
+	return (s1 + s2 + s3 + 12);
 }
 static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst, int in_fmt )
 {
@@ -559,7 +557,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 	if( av->encoder_id == 998 )
 	{
-		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->uv_len) };
+		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->uv_len), NULL };
 		int strides[4] = { av->len, av->uv_len, av->uv_len, 0 };
 		vj_frame_copy( src, dest, strides );
 
@@ -574,7 +572,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 	if( av->encoder_id == 997 )
 	{
-		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->uv_len) };
+		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->uv_len), NULL };
 		int strides[4] = { av->len, av->uv_len,av->uv_len, 0 };
 		vj_frame_copy( src, dest, strides );
 
