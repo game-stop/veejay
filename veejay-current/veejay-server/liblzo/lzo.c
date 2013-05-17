@@ -68,9 +68,9 @@ void lzo_print_buf( uint8_t *buf, int len )
 	printf("\n");
 }
 */
-static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , int *out_lenptr, uint8_t *wrkmem)
+static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , lzo_uint *out_lenptr, uint8_t *wrkmem)
 {
-	int out_len = 0;
+	lzo_uint out_len = 0;
 	int r = lzo1x_1_compress( in, in_len, out, &out_len, wrkmem );
 	if( r == LZO_E_OK ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "LZO (test) Compressed %lu bytes into %lu bytes\n",
@@ -86,7 +86,7 @@ static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , int *o
 		return 0;
 	}
 
-	int new_len = in_len;
+	lzo_uint new_len = in_len;
 	r = lzo1x_decompress( out, out_len, in, &new_len, NULL );
 	if( r == LZO_E_OK && new_len == in_len ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "LZO (test) Decompressed %lu (%lu) bytes back into %lu bytes\n",
@@ -129,12 +129,14 @@ void	*lzo_new( )
 	uint8_t in[16384];
 	uint8_t out[16834];
 
-	memset( in, 1, sizeof(in) );
-	memset( out, 0, sizeof(out));
+	veejay_memset( in, 1, sizeof(in) );
+	veejay_memset( out, 0, sizeof(out));
 
-	int out_len = 0;
+	lzo_bytep inp = (lzo_bytep) &in[0];
+	lzo_bytep outp = (lzo_bytep) &out[0];
 
-	int lzo_verify_compression_result = lzo_verify_compression( &in, sizeof(in), &out, &out_len, l->wrkmem );
+	lzo_uint out_len = 0;
+	int lzo_verify_compression_result = lzo_verify_compression( inp, sizeof(in), outp, &out_len, l->wrkmem );
        
 	assert( lzo_verify_compression_result == 1 );
 
@@ -174,7 +176,7 @@ long		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size,
 	lzot *l = (lzot*) lzo;
 	lzo_bytep dst = plane;
 	lzo_voidp wrkmem = l->wrkmem;
-	int r = lzo1x_1_compress( src, src_len, dst, size, wrkmem );
+	int r = lzo1x_1_compress( src, src_len, dst, (lzo_uint*) size, wrkmem );
 	if( r != LZO_E_OK || r < 0 )
 	{
 		veejay_msg(0, "LZO Compression error: %d", r );
@@ -273,100 +275,33 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	}
 
 	if(mode == 1) {
-		vj_frame_clear1( dst[1],128, uv_len );
-		vj_frame_clear1( dst[2],128, uv_len );
+		veejay_memset( dst[1], 128, uv_len );
+		veejay_memset( dst[2], 128, uv_len );
 	}
 
 	return (long)sum;
 }
 
-long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h,
-	       	uint32_t stride1, uint32_t stride2, uint32_t stride3	)
-{
-	int i;
-	lzo_uint len[3] = { 0,0,0};
-	int sum = 0;
-	int mode = 0;
-	lzot *l = (lzot*) lzo;
-	lzo_uint result_len = 0;
-	lzo_uint offset = 0;
-	/*
-	len[0] = str2ulong( linbuf );
-	len[1] = str2ulong( linbuf+4 );
-	len[2] = str2ulong( linbuf+8 );
-	mode   = str2ulong( linbuf+12 );
-
-	if( len[0] != stride1 || len[1] != stride2 || len[2] != stride3 ) {
-		veejay_msg(0, "Data corruption.");
-		return 0;
-	}
-*/
-	len[0] = stride1;
-	len[1] = stride2;
-	len[2] = stride3;
-
-/*
-	len[0] = str2ulong( linbuf );
-	len[1] = str2ulong( linbuf+4 );
-	len[2] = str2ulong( linbuf+8 );
-	mode   = str2ulong( linbuf+12 );
-*/
-
-	if(len[1] ==0 && len[2] == 0 )
-		mode = 1;
-
-
-
-	if( l->tmp[0] == NULL ) {
-		l->tmp[0] = vj_malloc(sizeof(uint8_t) * w * h * 3); // will do
-		l->tmp[1] = l->tmp[0] + w * h;
-		l->tmp[2] = l->tmp[1] + ( (w>>1)*h);
-	}
-
-	for( i = 0; i <= 2; i ++ )
-	{
-		if(len[i] <= 0)
-			continue;
-
-		const lzo_bytep src = (lzo_bytep) (linbuf+offset);
-		int r = lzo1x_decompress( src, len[i], l->tmp[i], &result_len, l->wrkmem );
-		if( r != LZO_E_OK )
-			return 0;
-		sum += result_len;
-		offset += len[i];
-	}
-
-	vj_frame_copy1( l->tmp[0], dst[0], w*h);
-	if( mode == 1 ) {
-		vj_frame_clear1(dst[1],128,( (w>>1)*h));
-		vj_frame_clear1(dst[2],128,( (w>>1)*h));
-	} else {
-		yuv422to420planar( l->tmp, dst, w, h );
-	}
-	return (long)sum;
-}
 long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h )
 {
 	int i;
 	lzo_uint len[3] = { 0,0,0};
 	int sum = 0;
-	int mode= 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
 	lzo_uint offset = 0;
-/*
+
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
-	mode   = str2ulong( linbuf+12 );
-*/
+	
 	if( l->tmp[0] == NULL ) {
-		l->tmp[0] = vj_malloc(sizeof(uint8_t) * w * h * 3); // will do
+		l->tmp[0] = vj_malloc(sizeof(uint8_t) * w * h * 2); // will do
 		l->tmp[1] = l->tmp[0] + ( w * h );
 		l->tmp[2] = l->tmp[1] + ( (w>>1) * (h>>1));
 	}
 
-	for( i = 0; i <= 2; i ++ )
+	for( i = 0; i < 3; i ++ )
 	{
 		if( len[i] <= 0 )
 			continue;
@@ -379,13 +314,8 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	}
 	
 	vj_frame_copy1( l->tmp[0], dst[0], w*h);
-	if(mode == 1) {
-		vj_frame_clear1(dst[1],128,( (w>>1)*h));
-		vj_frame_clear1(dst[2],128,( (w>>1)*h));
-	} 
-	else {
-		yuv420to422planar( l->tmp, dst, w, h );
-	}
+	yuv420to422planar( l->tmp, dst, w, h );
+	
 
 	return (long)sum;
 }
