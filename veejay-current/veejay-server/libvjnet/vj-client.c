@@ -514,18 +514,13 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int dstlen )
 			return 2; //@ caller will scale frame in dst
 		} else {
 		
-			int i,n;
-			for( i = 0;i < 3; i ++ ) {
-				if( strides[i] == 0 ) 
-					continue;
-				
-				n = sock_t_recv( v->fd[0], dst[i], strides[i] );
-				if( n != strides[i] ) {
-					veejay_msg(0, "Error receiving packet");
-					return -1;
-				}
-			}	
-		
+			int n = sock_t_recv( v->fd[0], dst, strides[0] + strides[1] + strides[2] );
+			if( n !=  (strides[0] + strides[1] + strides[2] ) )
+			{
+				veejay_msg(0, "Broken video packet");
+				return -1;
+			}
+
 			if( v->in_fmt == v->cur_fmt && v->cur_width == p[0] && v->cur_height == p[1] )
 			       return 1;	
 

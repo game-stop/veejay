@@ -66,6 +66,8 @@ static	int	n_fr_ = 0;
 static  int	n_lvd_ = 0;
 static	int	base_fmt_ = -1;
 
+static  void* instantiate_plugin( const void *plugin, int w , int h );
+
 static	int	select_f( const struct dirent *d )
 {
 	return ( strstr( d->d_name, ".so" ) != NULL );
@@ -86,7 +88,7 @@ char		*plug_describe_param( void *plugin, int p )
 }
 
 
-static	void *instantiate_plugin( void *plugin, int w , int h )
+static	void* instantiate_plugin( const void *plugin, int w , int h )
 {
 	int type = 0;
 #ifdef STRICT_CHECKING
@@ -96,25 +98,28 @@ static	void *instantiate_plugin( void *plugin, int w , int h )
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
+	if( error != VEVO_NO_ERROR )
+		return NULL;
 
+	void *instance = NULL;
+		
 	switch( type )
 	{
 		case VEVO_PLUG_LIVIDO:
-			return livido_plug_init( plugin,w,h, base_fmt_ );
+			instance = livido_plug_init( plugin,w,h, base_fmt_ );
 			break;
 		case VEVO_PLUG_FF:
-			return freeframe_plug_init( plugin,w,h);
+			instance = freeframe_plug_init( plugin,w,h);
 			break;
 		case VEVO_PLUG_FR:
-			return frei0r_plug_init( plugin,w,h,base_fmt_ );
+			instance = frei0r_plug_init( plugin,w,h,base_fmt_ );
 			break;
 		default:
-#ifdef STRICT_CHECKING
-			assert(0);
-#endif
+			veejay_msg(0, "Plugin type not supported.");
 			break;
 	}
-	return NULL;
+	
+	return instance;
 }
 
 
@@ -517,7 +522,7 @@ int	plug_find_generator_plugins(int *total, int seq )
 
 int	plug_sys_detect_plugins(void)
 {
-	index_map_ = (vevo_port_t**) vj_malloc(sizeof(vevo_port_t*) * 256 );
+	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * 256 );
 	illegal_plugins_ = vpn( VEVO_ILLEGAL );
 #ifdef STRICT_CHECKING
 	assert( illegal_plugins_ != NULL );
@@ -814,12 +819,21 @@ char	*plug_describe( int fx_id )
 
 void	*plug_activate( int fx_id )
 {
-	if(!index_map_[fx_id] )
+	if(index_map_[fx_id] == NULL)
 	{
 		veejay_msg(0,"Plugin %d is not loaded",fx_id);
 		return NULL;
 	}
-	return instantiate_plugin( index_map_[fx_id], base_width_,base_height_);
+
+	void *instance = instantiate_plugin( index_map_[fx_id], base_width_,base_height_);
+#ifdef STRICT_CHECKING
+	if( instance ) vevo_port_dump(instance,0);
+#endif
+	if( instance == NULL ) {
+		veejay_msg(0, "Error instantiating plugin.");
+		return NULL;
+	}
+	return instance;
 }
 
 void	plug_clear_namespace( void *fx_instance, void *data )
@@ -903,9 +917,9 @@ void plug_concatenate_all(void *osc, void *msg)
 
 char	*plug_get_name( int fx_id )
 {
-	if(!index_map_[fx_id] )
+	if(index_map_[fx_id] == NULL )
 		return NULL;
-	char *name = get_str_vevo( index_map_[fx_id], "name" );
+	char *name = vevo_property_get_string( index_map_[fx_id], "name" );
 	return name;
 }
 
@@ -941,8 +955,8 @@ int	plug_get_fx_id_by_name( const char *name )
 }
 int	plug_get_num_output_channels( int fx_id )
 {
-	if(!index_map_[fx_id] )
-		return NULL;
+	if(index_map_[fx_id] == NULL)
+		return 0;
 
 	int res = 0;
 	int error = vevo_property_get( index_map_[fx_id], "num_outputs",0,&res);
@@ -954,8 +968,8 @@ int	plug_get_num_output_channels( int fx_id )
 }
 int	plug_get_num_input_channels( int fx_id )
 {
-	if(!index_map_[fx_id] )
-		return NULL;
+	if(index_map_[fx_id] == NULL )
+		return 0;
 
 	int res = 0;
 	int error = vevo_property_get( index_map_[fx_id], "num_inputs",0,&res);
@@ -968,8 +982,8 @@ int	plug_get_num_input_channels( int fx_id )
 
 int	plug_get_num_parameters( int fx_id )
 {
-	if(!index_map_[fx_id] )
-		return NULL;
+	if(index_map_[fx_id] == NULL )
+		return 0;
 
 	int res = 0;
 	int error = vevo_property_get( index_map_[fx_id], "num_params",0,&res);
@@ -1052,7 +1066,7 @@ int	plug_get_coord_parameter_as_dbl( void *fx_instance,const char *key, int k, d
 
 vj_effect *plug_get_plugin( int fx_id ) {
 	void *port = index_map_[fx_id];
-	if(!port)
+	if(port == NULL)
 		return NULL;
 
 	vj_effect *vje = (vj_effect*) vj_calloc(sizeof(vj_effect));

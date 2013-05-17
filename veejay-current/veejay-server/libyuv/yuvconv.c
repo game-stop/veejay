@@ -326,9 +326,9 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 		case PIX_FMT_RGBA:
 			if( p1 != NULL )
 				*p1 = src->len * 4;
-			*p2 = NULL;
-			*p3 = NULL;
-			*p4 = NULL;
+			*p2 = 0;
+			*p3 = 0;
+			*p4 = 0;
 			break;
 		default:	
 			if(p1 != NULL) {
@@ -575,7 +575,7 @@ void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fm
 
 void	yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst )
 {
-	sws_scale( ctx, src->data, src->stride,0,src->height,dst->data,dst->stride );
+	sws_scale( (struct SwsContext*) ctx, src->data, src->stride,0,src->height,dst->data,dst->stride );
 }
 
 void	yuv_fx_context_destroy( void *ctx )

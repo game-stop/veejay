@@ -86,8 +86,8 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 		char *home = getenv("HOME");
 		snprintf(path,sizeof(path)-1, "%s/.veejay/veejay.shm", home );
 		int fd = open( path, O_RDWR );
-		if(!fd) {
-			printf("no env var VEEJAY_SHMID set and no file '%s' found!",path );
+		if(fd <= 0) {
+			printf("no env var VEEJAY_SHMID set and no file '%s' found!\n",path );
 			return LIVIDO_ERROR_HARDWARE;
 		}
 		char buf[256];

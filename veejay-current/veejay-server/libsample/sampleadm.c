@@ -129,8 +129,13 @@ static hash_val_t int_hash(const void *key)
  ****************************************************************************************************/
 static int int_compare(const void *key1, const void *key2)
 {
-    return ((int) key1 < (int) key2 ? -1 :
-	    ((int) key1 > (int) key2 ? +1 : 0));
+#ifdef ARCH_X86_64
+	return ((int64_t) key1 < (int64_t) key2 ? -1 :
+		((int64_t) key1 < (int64_t) key2 ? + 1 : 0 ));
+#else
+    return ((int32_t) key1 < (int32_t) key2 ? -1 :
+	    ((int32_t) key1 > (int32_t) key2 ? +1 : 0));
+#endif
 }
 
 int sample_update(sample_info *sample, int s1) {
@@ -1012,7 +1017,6 @@ int	sample_set_resume(int s1,long position)
 	if(!sample)
 		return -1;
 	sample->resume_pos = position;
-	sample_update(s1,sample);
 	return 1;
 }
 long	sample_get_resume(int s1)

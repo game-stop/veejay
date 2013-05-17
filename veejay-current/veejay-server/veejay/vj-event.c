@@ -1505,8 +1505,8 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	if( dbg_msg == NULL ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "No event knownn by '%d' (%s)", net_id,msg );
 	} else {
-	veejay_msg(VEEJAY_MSG_DEBUG, "VIMS '%s' %s",
-		msg,dbg_msg );
+		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS '%s' %s",msg,dbg_msg );
+		free(dbg_msg);
 	}
 #endif
 #ifndef STRICT_CHECKING

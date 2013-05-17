@@ -64,6 +64,8 @@
 #endif
 #include <veejay/vj-viewport-xml.h>
 
+#include <libplugger/plugload.h>
+
 static veejay_t *_tag_info = NULL;
 static hash_t *TagHash = NULL;
 static int this_tag_id = 0;
@@ -1099,14 +1101,9 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		int agen = plug_find_generator_plugins( &total, 0 );
 		
 		if( agen >= 0 ) {
-			char *plugname = plug_get_name( agen );
 			channel = agen;
-			veejay_msg(VEEJAY_MSG_INFO, "First available generator is '%s'",plugname );
-			free(plugname);
 		}
 	}
-
-
 
 	if(channel >= 0 || filename != NULL)  {
 		char *plugname = NULL;
@@ -1116,16 +1113,12 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 				channel = plug_get_idx_by_name( filename );
 				if( channel == - 1) {
 					veejay_msg(0, "'%s' not found.",filename );
-					if( vj_tag_del( tag->id ) == 0 ) {
-						free(tag->source_name );
-						free(tag);
-					}
+					free(tag->source_name );
+					free(tag);
 					return -1;
 				}
 			}
 		}
-
-		plugname = plug_get_name( channel );
 
 		int foo_arg  = vj_shm_get_id();
 
@@ -1134,25 +1127,24 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 
 		tag->generator = plug_activate(channel);
 		
-		vj_shm_set_id( foo_arg );
+		if(tag->generator != NULL) {
+			vj_shm_set_id( foo_arg );
 
-		if(tag->generator ) {
 			if( plug_get_num_input_channels( channel ) > 0 ||
-				plug_get_num_output_channels( channel ) != 1 ) {
-					veejay_msg(0, "Plug '%s' is not a generator", plugname);
+				plug_get_num_output_channels( channel ) == 0 ) {
+					veejay_msg(0, "Plug '%s' is not a generator", filename);
 					plug_deactivate(tag->generator);
-					tag->generator = NULL;
-					free(plugname);
+					free(tag->source_name);
+					free(tag);
 					return -1;
 			}
-			strcpy( tag->source_name, plugname );
 
-			veejay_msg(VEEJAY_MSG_DEBUG, " -> %s", plugname );
-			free(plugname);
+			strcpy( tag->source_name, filename );
 		}
 		else {
-			veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator '%s'",plugname);
-			free(plugname);
+			veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator '%s'",filename);
+			free(tag->source_name);
+			free(tag);
 			return -1;
 		}
 	}

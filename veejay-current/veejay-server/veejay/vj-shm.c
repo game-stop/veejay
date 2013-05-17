@@ -27,6 +27,7 @@
 #include <sys/shm.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -352,7 +353,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 
 	//@ attach
 	v->sms 	    = shmat( v->shm_id, NULL , 0 );
-	if( v->sms == NULL || v->sms == (uint8_t*) (-1) ) {
+	if( v->sms == NULL || v->sms == (char*) (-1) ) {
 		shmctl( v->shm_id, IPC_RMID, NULL );
 		veejay_msg(0, "Failed to attach to shared memory:%s",strerror(errno));
 		failed_init_cleanup(v);

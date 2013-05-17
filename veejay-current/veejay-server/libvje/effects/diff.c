@@ -185,7 +185,7 @@ void diff_apply(void *ed, VJFrame *frame,
 	free(tmp);
 */
 	//@ clear distance transform map
-	vj_frame_clear1( dt_map, 0 , len * sizeof(uint32_t) );
+	vj_frame_clear1( (uint8_t*) dt_map, 0 , len * sizeof(uint32_t) );
 
 	//@ todo: optimize with mmx
 	binarify( ud->data, static_bg, frame->data[0], threshold, reverse,len );

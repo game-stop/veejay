@@ -40,21 +40,27 @@
 #include <assert.h>
 #endif
 
-char		*get_str_vevo( void *port, const char *key )
-{
-	size_t len = vevo_property_element_size( port, key, 0 );
-	char *ret = NULL;
-	if(len<=0) return NULL;
-	ret = (char*) vj_malloc(sizeof(char) * len );
-	vevo_property_get( port, key, 0, &ret );
-	return ret;
+
+char		*get_str_vevo( void *port, const char *key ){
+	return vevo_property_get_string(port,key);
 }
+
 char		*alloc_str_vevo( void *port, const char *key )
 {
-	size_t len = vevo_property_element_size( port, key, 0 );
-	char *ret = NULL;
+        size_t len = vevo_property_element_size( port, key,0 );
+        char *ret = NULL;
+
 	if(len<=0) return NULL;
-	ret = (char*) vj_malloc(sizeof(char) * len );
+
+	if( vevo_property_get( port, key,0,NULL ) != VEVO_NO_ERROR )
+		return NULL;
+
+#ifdef STRICT_CHECKING
+	int at = vevo_property_atom_type( port, key );
+
+	assert( at == VEVO_ATOM_TYPE_STRING || at == VEVO_ATOM_TYPE_UTF8STRING );
+#endif
+        ret = (char*) vj_malloc(sizeof(char) * len );
 	return ret;
 }
 
