@@ -125,7 +125,7 @@ static const char *intro =
 static const char *license =
 	"This program is licensed as\nFree Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejayhq.net\nhttp://veejay.dyne.org\nhttp://www.sourceforge.net/projects/veejay\nhttp://www.gnu.org";
 static const char *copyr =
-	"(C) 2002-2008 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
+	"(C) 2002-2013 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
 
 #define MLIMIT(var, low, high) \
 if((var) < (low)) { var = (low); } \
