@@ -3267,34 +3267,45 @@ veejay_t *veejay_malloc()
 
 int veejay_main(veejay_t * info)
 {
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
+	video_playback_setup *settings = (video_playback_setup *) info->settings;
 	pthread_attr_t attr;	
 	cpu_set_t cpuset;
 
-    /* Flush the Linux File buffers to disk */
-    sync();
-    
-	CPU_ZERO( &cpuset );
-	CPU_SET ( 1, &cpuset ); /* run on cpu 1 */
+	memset( &attr, 0 , sizeof(pthread_attr_t));
 
-	pthread_attr_init( &attr );
-	if( pthread_attr_setaffinity_np( &attr, sizeof(cpuset) , &cpuset ) != 0 ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Unable to pin playback timer to cpu #1");
+    	/* Flush the Linux File buffers to disk */
+    	sync();
+   
+	if( task_num_cpus() > 1 ) {
+		CPU_ZERO( &cpuset );
+		CPU_SET ( 1, &cpuset ); /* run on cpu 1 */
+
+		int err = pthread_attr_init( &attr );
+		if( err == ENOMEM ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Out of memory error.");
+			return 0;
+
+		}
+		if( pthread_attr_setaffinity_np( &attr, sizeof(cpuset) , &cpuset ) != 0 ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Unable to pin playback timer to cpu #1");
+		}
+		else {
+			veejay_msg(VEEJAY_MSG_INFO,"Pinned playback timer thread to cpu #1");
+		}
 	}
 
-    int err = pthread_create(&(settings->playback_thread),&attr,
+        int err = pthread_create(&(settings->playback_thread),&attr,
 		       veejay_playback_thread, (void *) info);
-    if( err != 0 ) {
-	switch( err ) {
-	 case EAGAIN:
-		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient resources to create playback timer thread.");
-		break;
-	  default:
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create playback timer thread ");
+    	if( err != 0 ) {
+		switch( err ) {
+		 case EAGAIN:
+			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient resources to create playback timer thread.");
+			break;
+	  	default:
+			veejay_msg(VEEJAY_MSG_ERROR, "Failed to create playback timer thread, code %d ", err);
+    		}
+        	return 0;
     	}
-        return 0;
-    }
 
     return 1;
 }

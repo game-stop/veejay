@@ -331,7 +331,14 @@ static 	void	failed_init_cleanup( vj_shm_t *v )
 //@ new producer, puts frame in shm
 void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 {
+#ifdef STRICT_CHECKING
+	assert( frame->width > 0 );
+	assert( frame->height > 0 );
+#endif
 	vj_shm_t *v = (vj_shm_t*) vj_calloc(sizeof(vj_shm_t));
+#ifdef STRICT_CHECKING
+	assert( v != NULL );
+#endif	
 	v->parent   = 1;
 
 	if( vj_shm_file_ref( v, homedir ) == -1 ) {
