@@ -3283,10 +3283,17 @@ int veejay_main(veejay_t * info)
 		veejay_msg(VEEJAY_MSG_WARNING, "Unable to pin playback timer to cpu #1");
 	}
 
-    if (pthread_create(&(settings->playback_thread),&attr,
-		       veejay_playback_thread, (void *) info)) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create playback timer thread");
-		return -1;
+    int err = pthread_create(&(settings->playback_thread),&attr,
+		       veejay_playback_thread, (void *) info);
+    if( err != 0 ) {
+	switch( err ) {
+	 case EAGAIN:
+		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient resources to create playback timer thread.");
+		break;
+	  default:
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create playback timer thread ");
+    	}
+        return 0;
     }
 
     return 1;
