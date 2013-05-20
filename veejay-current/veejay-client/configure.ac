@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([reloaded],[1.5.27],[nwelburg@gmail.com])
+AC_INIT([reloaded],[1.5.28],[nwelburg@gmail.com])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 RELOADED_MAJOR_VERSION=1
 RELOADED_MINOR_VERSION=5
-RELOADED_MICRO_VERSION=27
+RELOADED_MICRO_VERSION=28
 RELOADED_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 RELOADED_CODENAME="Reloaded - build $RELOADED_MAJOR_VERSION $RELOADED_MINOR_VERSION $RELOADED_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -178,7 +178,7 @@ fi
 
 dnl Check for Veejay
 have_veejay=false
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.26 ],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.28 ],
 	[	
 		AC_SUBST(VEEJAY_CFLAGS)
 		AC_SUBST(VEEJAY_LIBS)
@@ -188,7 +188,7 @@ PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.26 ],
 		[have_veejay=false])
 
 if test x$have_veejay != xtrue ; then
-   AC_MSG_ERROR([Cannot find veejay 1.5.26 or later])
+   AC_MSG_ERROR([Cannot find veejay 1.5.28 or later])
 fi
 
 have_pixbuf=false
@@ -690,7 +690,7 @@ AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
-AC_MSG_NOTICE([  - Veejay 1.5.26                 : ${have_veejay}])
+AC_MSG_NOTICE([  - Veejay 1.5.28                 : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
