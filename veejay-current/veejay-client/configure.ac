@@ -522,37 +522,14 @@ fi
 
 AC_MSG_RESULT($CFLAGS)
 
-
-AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
-                    [Defined if building against uninstalled FFmpeg source])
-
-PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=false)
-PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.57.2],have_avcodec=true,have_avcodec=false)
-PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0],have_avformat=true,have_avformat=false)
-PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 0.7.1],have_swscale=true,have_swscale=false)
-if test x$have_swscale = xfalse;
-then
-	AC_MSG_ERROR([libswscale not found.])
-fi
+PKG_CHECK_MODULES(LIBAVUTIL,[libavutil >= 49.7], have_avutil=true,have_avutil=false])
 if test x$have_avutil = xfalse;
 then
-	AC_MSG_ERROR([libavutil not found.])
-fi
-if test x$have_avformat = xfalse;
-then
-	AC_MSG_ERROR([libavformat not found.])
-fi
-if test x$have_avcodec = xfalse;
-then
-	AC_MSG_ERROR([libavcodec not found.])
+       AC_MSG_ERROR([libavutil not found.])
 fi
 
-FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS}"
-FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCALE_LIBS}"
+FFMPEG_CFLAGS="${LIBAVUTIL_CFLAGS}"
 AC_SUBST(FFMPEG_CFLAGS)
-AC_SUBST(FFMPEG_LIBS)
-
-
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
 AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
@@ -692,7 +669,5 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - Veejay 1.5.28                 : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
-AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
-AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])
