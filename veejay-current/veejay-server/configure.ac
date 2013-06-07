@@ -106,10 +106,6 @@ AC_ARG_WITH(jpeg-mmx,
             AC_HELP_STRING([--with-jpegmmx=PFX],
                            [Prefix where jpeg-mmx is installed (optional).]))
 
-AC_ARG_WITH(unicap, AC_HELP_STRING([--without-unicap], [Do not use unicap]),
-		[],	[with_unicap=yes])
-
-
 AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
 
@@ -830,23 +826,6 @@ else
  AC_DEFINE(HAVE_LIBLO,,[define if liblo])
 fi
 
-have_unicap=false
-if test x$with_unicap != xno; then
-PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,have_unicap=true,have_unicap=false)
-fi
-
-if test x$have_unicap = xfalse ; then
-  AC_MSG_WARN([Could not find optional library libunicap])
-else
-have_unicap=true
-AC_SUBST(HAVE_UNICAP)
-AC_DEFINE(HAVE_UNICAP,,[define if unicap])
-fi
-
-AC_SUBST(UNICAP_CFLAGS)
-AC_SUBST(UNICAP_LIBS)
-
-
 dnl *********************************************************************
 dnl Check for the DirectFB library (for Matrox G550 Tvout)
 dnl
@@ -966,7 +945,6 @@ AM_CONDITIONAL(HAVE_V4L2, test x$have_V4l2 = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
-AM_CONDITIONAL(HAVE_UNICAP,test x$have_unicap = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
@@ -1125,7 +1103,6 @@ AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
-AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - V4L1 (obsolete)               : ${have_v4l}])
