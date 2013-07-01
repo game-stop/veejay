@@ -13,7 +13,7 @@ depends=('libxml2' 'ffmpeg' 'ffmpeg-compat' 'sdl' 'gtk2' 'gdk-pixbuf2' 'libsm' )
 optdepends=('unicap' 'liblo' 'libdv' 'libquicktime' 'jack')
 source=()
 md5sums=()
-changelog=('ChangeLog')
+changelog=()
 backup=()
 replaces=()
 
