@@ -219,6 +219,8 @@ dnl Look for X
 AC_PATH_XTRA
 AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
 
+debugCFLAGS=-g
+
 AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fprofile-arcs -ftest-coverage"
@@ -230,7 +232,7 @@ else
 fi
 AC_MSG_CHECKING(whether to compile in assertion checking)
 if test "x$enable_strict" = "xyes" ; then
- debugCFLAGS="$debugCFLAGS -g -DSTRICT_CHECKING"
+ debugCFLAGS="$debugCFLAGS -DSTRICT_CHECKING"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -507,7 +509,6 @@ then
 	AC_MSG_NOTICE([enable_debug = $enable_debug])
 	if test "x$enable_debug" != "xyes" ;
 	then
-		AC_MSG_NOTICE([debug koekje])
 		if test $ac_cv_flag_sse = yes; then
 			CFLAGS="$CFLAGS -msse -mfpmath=sse"
 			AC_MSG_NOTICE([cflags aangepast])
@@ -595,7 +596,7 @@ if test x"$with_extra_cflags" != "x"; then
    CXXFLAGS="$CXXFLAGS $with_extra_cflags"
 fi
 
-reloaded_datadir="${datadir}/reloaded"
+reloaded_datadir="${datarootdir}/reloaded"
 AC_SUBST(reloaded_datadir)
 sh gveejay-paths.sh > gveejay-paths.h
 
@@ -670,3 +671,4 @@ AC_MSG_NOTICE([  - Veejay 1.5.28                 : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])
+AC_MSG_NOTICE([])

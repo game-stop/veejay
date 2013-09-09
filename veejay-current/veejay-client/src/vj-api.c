@@ -6828,7 +6828,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	}
 	snprintf( glade_path, sizeof(glade_path), "%s/%s",RELOADED_DATADIR,glade_file);
 
-
 	veejay_memset( gui->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
 	veejay_memset( gui->sample, 0, 2 );
 	veejay_memset( gui->selection, 0, 3 );
@@ -6849,9 +6848,11 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	gui->client = NULL;
 	gui->main_window = glade_xml_new(glade_path,NULL,NULL);
-	if(!gui->main_window)
+	if(gui->main_window == NULL)
 	{
 		free(gui);
+		veejay_msg( 0, "Cannot find '%s'", glade_path );
+		return;
 	}
 	info = gui;
 

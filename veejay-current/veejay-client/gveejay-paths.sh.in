@@ -1,10 +1,4 @@
 #!/bin/sh -e
-
-prefix="@prefix@"
-datadir="@datadir@"
-
-DATADIRNAME="@DATADIRNAME@"
-
 reloaded_datadir="@reloaded_datadir@"
 
 cat << EOF
