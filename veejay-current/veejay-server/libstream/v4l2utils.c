@@ -365,6 +365,9 @@ static int	v4l2_enum_video_standards( v4l2info *v, char norm )
 				strerror(errno));
 	}
 
+	if( v->is_vloopback )
+		return 1;
+
 	memset( &standard, 0,sizeof(standard));
 	standard.index = 0;
 
@@ -423,8 +426,7 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 	struct v4l2_fmtdesc fmtdesc;
 	struct v4l2_frmsizeenum fmtsize;
 	struct v4l2_frmivalenum frmival;
-	const char *buf_types[] = { "Video Capture" , "Video Output", "Video Overlay" };
-	const char *flags[] = { "uncompressed", "compressed" };
+
 	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: discovering supported video formats");
 
 	//@clear mem
@@ -437,11 +439,9 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 	for( fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		 fmtdesc.type < V4L2_BUF_TYPE_VIDEO_OVERLAY;
 		 fmtdesc.type ++ ) {
-	//	fmtdesc.index = 0;
 		while( vioctl( v->fd, VIDIOC_ENUM_FMT, &fmtdesc ) >= 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Enumerate (%d,%s)", fmtdesc.index, buf_types[ fmtdesc.type ] );
+			veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Enumerate (%d, Video Capture)", fmtdesc.index);
 			veejay_msg(VEEJAY_MSG_DEBUG,"\tindex:%d", fmtdesc.index );
-			veejay_msg(VEEJAY_MSG_DEBUG,"\tflags:%s", flags[ fmtdesc.type ] );
 			veejay_msg(VEEJAY_MSG_DEBUG,"\tdescription:%s", fmtdesc.description );
 			veejay_msg(VEEJAY_MSG_DEBUG,"\tpixelformat:%c%c%c%c",
 						fmtdesc.pixelformat & 0xff,
@@ -452,25 +452,6 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 			v->supported_pixel_formats[ pf_cnt ] = fmtdesc.pixelformat;
 			pf_cnt = (pf_cnt + 1 ) % loop_limit;
 
-			//@ some other day
-		/*	memset( &fmtsize, 0, sizeof(fmtsize));
-			fmtsize.pixel_format = fmtdesc.pixelformat;
-			
-			while( vioctl( v->fd, VIDIOC_ENUM_FRAMESIZES, &fmtsize ) >= 0 ) {
-				if( fmtsize.type == V4L2_FRMSIZE_TYPE_DISCRETE ) {
-					veejay_msg(VEEJAY_MSG_DEBUG, "\t\t%d x %d", fmtsize.discrete.width, fmtsize.discrete.height );
-				} else if( fmtsize.type == V4L2_FRMSIZE_TYPE_STEPWISE ) {
-					veejay_msg(VEEJAY_MSG_DEBUG,"\t\t%d x %d - %d x %d with step %d / %d",
-							fmtsize.stepwise.min_width,
-							fmtsize.stepwise.min_height,
-							fmtsize.stepwise.max_width,
-							fmtsize.stepwise.min_height,
-							fmtsize.stepwise.step_width,
-							fmtsize.stepwise.step_height );
-				}
-				fmtsize.index++;
-			}
-			*/
 			fmtdesc.index ++;
 
 			loop_limit --; //@ endless loop in enumerating video formats 
@@ -489,21 +470,35 @@ static	int	v4l2_tryout_pixel_format( v4l2info *v, int pf, int w, int h, int *src
 	memset( &format, 0, sizeof(format));
 	
 	format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+/*	format.fmt.pix.width = w;
+	format.fmt.pix.height= h;
+	format.fmt.pix.field = V4L2_FIELD_NONE; // V4L2_FIELD_ANY;
+	format.fmt.pix.pixelformat = pf;
+*/
+	if( vioctl( v->fd, VIDIOC_G_FMT, &format ) == -1 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: VIDIOC_G_FMT failed with %s", strerror(errno));
+	}
+
 	format.fmt.pix.width = w;
 	format.fmt.pix.height= h;
-	format.fmt.pix.field = V4L2_FIELD_ANY;
+
+	if( v->is_vloopback )
+		format.fmt.pix.field = V4L2_FIELD_NONE;
+	else
+		format.fmt.pix.field = V4L2_FIELD_ANY;
 
 	format.fmt.pix.pixelformat = pf;
-	
+
 	if( vioctl( v->fd, VIDIOC_TRY_FMT, &format ) == 0 ) {
  		if( format.fmt.pix.pixelformat == pf ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: VIDIOC_TRY_FMT reports OK: %4.4s",
-					(char*) &format.fmt.pix.pixelformat );
 			if( vioctl( v->fd, VIDIOC_S_FMT, &format ) == -1 ) {
 				veejay_msg(0, "v4l2: After VIDIOC_TRY_FMT , VIDIOC_S_FMT fails for: %4.4s",
 						(char*) &format.fmt.pix.pixelformat);
 				return 0;
 			}
+			*src_w = format.fmt.pix.width;
+			*src_h = format.fmt.pix.height;
+			*src_pf = format.fmt.pix.pixelformat;
 			return 1;
 		}
 	}
@@ -638,8 +633,13 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	if( supported ) {
 		return 1;
 	}
-
-
+/*
+	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_JPEG, wid,hei,dw,dh,candidate );
+	if( supported ) {
+		v4l2_setup_jpeg_capture( v, wid,hei );
+		return 1;
+	}
+*/
 	//@ try anything else
 	int k;
 	for( k = 0; k < 64; k ++ ) {
@@ -698,17 +698,13 @@ static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
 
 		yuv_plane_sizes( v->info, &(v->planes[0]),&(v->planes[1]),&(v->planes[2]),&(v->planes[3]) );
 
-		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Using scaler, destination format is in %s (%dx%d), source is in %dx%d",
-			(char*) &cap_pf,
-			wid,
-			hei, src_wid,src_hei );
+		veejay_msg(VEEJAY_MSG_INFO, "v4l2: output in %dx%d, source in %dx%d",
+			wid,hei, src_wid,src_hei );
 
 		if( cap_pf == V4L2_PIX_FMT_JPEG ) {
 			v->info->data[0] = v->tmpbuf[0];
 			v->info->data[1] = v->tmpbuf[1];
 			v->info->data[2] = v->tmpbuf[2];
-		
-		
 		}
 
 		return 1;
@@ -721,7 +717,7 @@ static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
 static void	v4l2_set_output_pointers( v4l2info *v, void *src )
 {
 	uint8_t *map = (uint8_t*) src;
-//@A
+	
 	if( v->planes[0] > 0 ) {
 		v->info->data[0] = map;
 	}
@@ -879,8 +875,8 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	}
 
 	if( (v->capability.capabilities & V4L2_CAP_READWRITE ) == 0  ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: %s does not support read/write interface.", v->capability.card);
-		can_read = 0;
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: %s claims not to support read/write interface.", v->capability.card);
+	//	can_read = 0;
 	}
 
 	if( can_stream == 0 && can_read == 0 ) {
@@ -975,7 +971,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	if( v->rw == 0 ) {
 		v->reqbuf.type 	= V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		v->reqbuf.memory= V4L2_MEMORY_MMAP;
-		v->reqbuf.count = 32;
+		v->reqbuf.count = 2;
 
 		if( -1 == vioctl( fd, VIDIOC_REQBUFS, &(v->reqbuf)) ) {
 			if( errno == EINVAL ) {
@@ -989,6 +985,12 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 		}
 
 		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Card supports %d buffers", v->reqbuf.count );
+		if( v->reqbuf.count > 2 )
+		{
+			v->reqbuf.count = 2;
+			veejay_msg(VEEJAY_MSG_INFO, "v4l2: Using %d buffers", v->reqbuf.count );
+		}
+
 		v->buffers = (bufs*) calloc( v->reqbuf.count, sizeof(*v->buffers));
 
 		int i;
