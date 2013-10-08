@@ -237,10 +237,12 @@ static	int		v4l2_start_video_capture( v4l2info *v )
 
 static	int	v4l2_vidioc_qbuf( v4l2info *v )
 {
+	v->buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
 	int i;
 	for( i = 0; i < v->reqbuf.count ; i ++ ) {
 		veejay_memset( &(v->buffer),0,sizeof(v->buffer));
-		v->buffer.type = v->reqbuf.type;
+		v->buffer.type = v->buftype; //v->reqbuf.type;
 		v->buffer.memory=V4L2_MEMORY_MMAP;
 		v->buffer.index = i;
 
@@ -286,10 +288,11 @@ int	v4l2_pixelformat2ffmpeg( int pf )
 		case V4L2_PIX_FMT_YUV32:
 			return PIX_FMT_YUV444P;
 		case V4L2_PIX_FMT_MJPEG:
-			return PIX_FMT_YUVJ420P; //@ FIXME untested
+			return PIX_FMT_YUVJ420P; //@ does not matter
 		case V4L2_PIX_FMT_JPEG:
 			return PIX_FMT_YUVJ420P; //@ decode_jpeg_raw downsamples all yuv, FIXME: format negotation
 		default:
+			veejay_msg(0, "v4l2: Unhandled pixel format: %d", pf );
 			break;
 		}
 	return PIX_FMT_BGR24;
@@ -354,6 +357,8 @@ static int	v4l2_enum_video_standards( v4l2info *v, char norm )
 	v4l2_std_id current;
 
 	memset( &input, 0,sizeof(input));
+	memset( &current,0,sizeof(current));
+
 	if( -1 == vioctl( v->fd, VIDIOC_G_INPUT, &input.index )) {
 		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: VIDIOC_G_INPUT failed with %s",
 				strerror(errno));
@@ -504,7 +509,6 @@ static	int	v4l2_tryout_pixel_format( v4l2info *v, int pf, int w, int h, int *src
 	}
 
 	if( vioctl( v->fd, VIDIOC_S_FMT, &format ) == -1 ) {
-		veejay_msg(0,"v4l2: negotation of data fails with %s", strerror(errno));
 		return 0;
 	}
 	
@@ -526,7 +530,7 @@ static	int	v4l2_tryout_pixel_format( v4l2info *v, int pf, int w, int h, int *src
 
 	return ( pf == format.fmt.pix.pixelformat);
 }
-
+/*
 static	void	v4l2_setup_jpeg_capture(v4l2info *v, int wid, int hei)
 {
 	struct v4l2_jpegcompression jpegcomp;
@@ -540,13 +544,18 @@ static	void	v4l2_setup_jpeg_capture(v4l2info *v, int wid, int hei)
 	v->tmpbuf[1]  = v->tmpbuf[0] + (wid * hei);
 	v->tmpbuf[2]  = v->tmpbuf[1] + (wid * hei);
 }
-
+*/
 static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_id )
 {
 	struct v4l2_jpegcompression jpegcomp;
+	memset( &jpegcomp, 0, sizeof(jpegcomp));
+	
 	ioctl(v->fd, VIDIOC_G_JPEGCOMP, &jpegcomp);
+
 	jpegcomp.jpeg_markers |= V4L2_JPEG_MARKER_DQT; // DQT
+	
 	ioctl(v->fd, VIDIOC_S_JPEGCOMP, &jpegcomp);
+	
 	v->is_jpeg = 2;
 
 	v->codec = avcodec_find_decoder( codec_id );
@@ -601,6 +610,8 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 				veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Setting grey scale (env)");
 				v->grey=1;
 				return 1;
+			} else {
+				veejay_msg(VEEJAY_MSG_WARNING, "v4l2: User requested greyscale video but device does not support it.");
 			}
 		}
 	}
@@ -611,54 +622,58 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports native format" );
 		return 1;
 	}
+
+	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_JPEG, wid,hei,dw,dh,candidate );
+	if( supported ) {
+		//	v4l2_setup_jpeg_capture( v, wid,hei );
+		if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
+			return 0;
+		}
+
+		*candidate = V4L2_PIX_FMT_JPEG;
+		return 1;
+	}
+
+	supported     = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_MJPEG, wid, hei,dw,dh,candidate );
+	if( supported ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports MJPEG format");
+		if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
+			return 0;
+		}
+		*candidate = V4L2_PIX_FMT_MJPEG;
+		return 1;
+	}
 	
+
 	//@ does capture support YUYV or UYVU
 	supported     = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_YUYV, wid, hei,dw,dh,candidate );
 	if( supported ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports YUY2" );
 		return 1;
 	}
-	
-	supported     = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_UYVY, wid, hei,dw,dh,candidate );
-	if( supported ) {
-		return 1;
-	}
-	
+
 	//@ or RGB 24/32
 	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_RGB24, wid, hei ,dw,dh,candidate);
 	if( supported ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports RGB 24 bit" );
 		return 1;
+
 	}
 	
 	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_RGB32, wid, hei,dw,dh,candidate );
 	if( supported ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports RGB 32 bit");
 		return 1;
 	}
-/*
-	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_JPEG, wid,hei,dw,dh,candidate );
-	if( supported ) {
-		v4l2_setup_jpeg_capture( v, wid,hei );
-		return 1;
-	}
-*/
+	
 	//@ try anything else
+	/*
 	int k;
 	for( k = 0; k < 64; k ++ ) {
 		if( v->supported_pixel_formats[k] == 0 )
 			continue;
-		
-		if( v->supported_pixel_formats[k] == V4L2_PIX_FMT_JPEG ) {
-			v4l2_setup_jpeg_capture( v, wid,hei );
-			*candidate = V4L2_PIX_FMT_JPEG;
-			return 1;
-		}
-		
-		if( v->supported_pixel_formats[k] == V4L2_PIX_FMT_MJPEG) {
-			if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 ) 
-				continue;
-			*candidate = v->supported_pixel_formats[k];
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Using MJPEG decoder" );
-			return 1;
-		}
 		
 		int pf = v4l2_pixelformat2ffmpeg( v->supported_pixel_formats[k] );
 		if( pf >= 0 ) {
@@ -667,7 +682,10 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		}
 
 	}
-	
+	*/
+
+	veejay_msg(VEEJAY_MSG_ERROR, "v4l2: No supported pixel format found!");
+
 	return 0;
 }
 
@@ -688,6 +706,11 @@ static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
 		return 0;
 	}
 
+	if( src_wid == 0 || src_hei == 0 ) {
+		src_wid = wid;
+		src_hei = hei;
+	}
+
 	if( res == 1 ) {
 		v->format.fmt.pix.pixelformat = cap_pf;
 		v->format.fmt.pix.width = src_wid;
@@ -700,13 +723,13 @@ static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
 
 		veejay_msg(VEEJAY_MSG_INFO, "v4l2: output in %dx%d, source in %dx%d",
 			wid,hei, src_wid,src_hei );
-
+/*
 		if( cap_pf == V4L2_PIX_FMT_JPEG ) {
 			v->info->data[0] = v->tmpbuf[0];
 			v->info->data[1] = v->tmpbuf[1];
 			v->info->data[2] = v->tmpbuf[2];
 		}
-
+*/
 		return 1;
 	}
 
@@ -849,6 +872,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 
 	if( v->grey == 1 ) {
 		dst_fmt = PIX_FMT_GRAY8;
+		veejay_msg(VEEJAY_MSG_WARNING,"v4l2: User requested greyscale video");
 	}
 
 	if( -1 == vioctl( fd, VIDIOC_QUERYCAP, &(v->capability) ) ) {
@@ -875,8 +899,8 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	}
 
 	if( (v->capability.capabilities & V4L2_CAP_READWRITE ) == 0  ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: %s claims not to support read/write interface.", v->capability.card);
-	//	can_read = 0;
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: %s does not support read/write interface.", v->capability.card);
+		can_read = 0;
 	}
 
 	if( can_stream == 0 && can_read == 0 ) {
@@ -923,12 +947,10 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	//@ which video input ?
 	int chan = v4l2_channel_choose( v, input_channel );
 	if(chan == -1) {
-		veejay_msg(0, "v4l2: Video device has no input channels ? What video device is that?");
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: Video device without input channels ? Guessing 0 is valid...");
 		chan = 0;
-	//	free(v);
-	//	close(fd);
-	//	return NULL;
 	}
+
 	if( -1 == vioctl( fd, VIDIOC_S_INPUT, &chan )) {
 		int lvl = 0;
 		if( errno == EINVAL )
@@ -939,15 +961,11 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			close(fd);
 			return NULL;
 		}
-		
 	}
 
 	v->input.index = chan;
 	if( -1 == vioctl( fd, VIDIOC_ENUMINPUT, &(v->input)) ) {
-		veejay_msg(0, "v4l2: VIDIOC_ENUMINPUT failed with %s", strerror(errno));
-		//free(v);
-		//close(fd);
-		//return NULL;
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: VIDIOC_ENUMINPUT failed with %s", strerror(errno));
 	}
 
 
@@ -971,7 +989,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	if( v->rw == 0 ) {
 		v->reqbuf.type 	= V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		v->reqbuf.memory= V4L2_MEMORY_MMAP;
-		v->reqbuf.count = 2;
+		v->reqbuf.count = N_FRAMES;
 
 		if( -1 == vioctl( fd, VIDIOC_REQBUFS, &(v->reqbuf)) ) {
 			if( errno == EINVAL ) {
@@ -985,9 +1003,9 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 		}
 
 		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Card supports %d buffers", v->reqbuf.count );
-		if( v->reqbuf.count > 2 )
+		if( v->reqbuf.count > N_FRAMES )
 		{
-			v->reqbuf.count = 2;
+			v->reqbuf.count = N_FRAMES;
 			veejay_msg(VEEJAY_MSG_INFO, "v4l2: Using %d buffers", v->reqbuf.count );
 		}
 
@@ -1009,12 +1027,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			}
 
 			v->buffers[i].length = v->buffer.length;
-			v->buffers[i].start  = mmap( NULL,
-									 v->buffer.length,
-									 PROT_READ | PROT_WRITE,
-									 MAP_SHARED,
-									 fd,
-									 v->buffer.m.offset );
+			v->buffers[i].start  = mmap( NULL, v->buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,fd, v->buffer.m.offset );
 		
 			if( MAP_FAILED == v->buffers[i].start ) {
 				veejay_msg(0,  "v4l2: mmap( NULL, %d , PROT_READ|PROT_WRITE , MAP_SHARED , %d, %d ) failed.",
@@ -1030,9 +1043,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 				v->rw = 1;
 				goto v4l2_rw_fallback;
 			}
-
 		}
-
 
 		if( v4l2_vidioc_qbuf( v ) == -1 ) {
 				veejay_msg(0, "v4l2: VIDIOC_QBUF failed with:%d, %s", errno,strerror(errno));
@@ -1073,9 +1084,7 @@ v4l2_rw_fallback:
 		v->format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		v->format.fmt.pix.width = wid;
 		v->format.fmt.pix.height = hei;
-		//format.fmt.pix.pixelformat;
-		//format.fmt.pix.field
-		//
+		
 		if( -1 == vioctl( v->fd, VIDIOC_S_FMT, &(v->format) ) ) {
 			veejay_msg(0, "V4l2: VIDIOC_S_FMT failed with %s", strerror(errno));
 			close(v->fd);
@@ -1162,6 +1171,33 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 	if(!v->is_jpeg)
 		v4l2_set_output_pointers( v,src );
 
+
+	if( v->is_jpeg == 1 ) {
+		length = decode_jpeg_raw( src, n, 0,0, v->info->width,v->info->height,v->info->data[0],v->info->data[1],v->info->data[2] );
+		if( length == 0 ) { //@ success
+		  length = 1;
+		}
+	} else if( v->is_jpeg == 2 ) {
+		AVPacket pkt;
+		memset( &pkt, 0, sizeof(AVPacket));
+		pkt.data = src;
+	       	pkt.size = length;
+
+	      	int res = avcodec_decode_video2( 
+						v->c, 
+						v->picture, 
+						&got_picture,
+						&pkt );
+
+		v->info->data[0] = v->picture->data[0];
+		v->info->data[1] = v->picture->data[1];
+		v->info->data[2] = v->picture->data[2];
+		v->info->stride[0] = v->picture->linesize[0];
+		v->info->stride[1] = v->picture->linesize[1];
+		v->info->stride[2] = v->picture->linesize[2];
+		v->info->format = v->picture->format;
+	} 
+
 	if( v->scaler == NULL )
 	{
 		sws_template templ;     
@@ -1170,26 +1206,6 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 		v->scaler = yuv_init_swscaler( v->info,v->frames[ 0 ], &templ, yuv_sws_get_cpu_flags() );
 	}
 	
-	if( v->is_jpeg == 1 ) {
-		length = decode_jpeg_raw( src, n, 0,0, v->info->width,v->info->height,v->info->data[0],v->info->data[1],v->info->data[2] );
-		if( length == 0 ) { //@ success
-		  length = 1;
-		}
-	} else if( v->is_jpeg == 2 ) {
-		AVPacket pkt;
-		veejay_memset( &pkt, 0, sizeof(AVPacket));
-		pkt.data = src;
-	       	pkt.size = n;
-
-	      	length = avcodec_decode_video2( v->c, v->picture, &got_picture, &pkt );
-		if( length == -1 ) {
-		 veejay_msg(0,"v4l2: error while decoding mjpeg frame");
-		}	
-		v->info->data[0] = v->picture->data[0];
-		v->info->data[1] = v->picture->data[1];
-		v->info->data[2] = v->picture->data[2];
-	} 
-
 	yuv_convert_and_scale( v->scaler, v->info, v->frames[ v->frameidx ] );
 	
 	lock_(v->video_info);
@@ -1266,6 +1282,33 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 	if(!v->is_jpeg)
 		v4l2_set_output_pointers( v,src );
 
+
+	if( v->is_jpeg == 1 ) {
+		length = decode_jpeg_raw( src, n, 0,0, v->info->width,v->info->height,v->info->data[0],v->info->data[1],v->info->data[2] );
+		if( length == 0 ) { //@ success
+		  length = 1;
+		}
+	} else if( v->is_jpeg == 2 ) {
+		AVPacket pkt;
+		memset( &pkt, 0, sizeof(AVPacket));
+		pkt.data = src;
+	       	pkt.size = length;
+
+	      	int res = avcodec_decode_video2( 
+						v->c, 
+						v->picture, 
+						&got_picture,
+						&pkt );
+
+		v->info->data[0] = v->picture->data[0];
+		v->info->data[1] = v->picture->data[1];
+		v->info->data[2] = v->picture->data[2];
+		v->info->stride[0] = v->picture->linesize[0];
+		v->info->stride[1] = v->picture->linesize[1];
+		v->info->stride[2] = v->picture->linesize[2];
+		v->info->format = v->picture->format;
+	} 
+
 	if( v->scaler == NULL )
 	{
 		sws_template templ;     
@@ -1274,28 +1317,8 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 		v->scaler = yuv_init_swscaler( v->info,v->frames[ 0 ], &templ, yuv_sws_get_cpu_flags() );
 	}
 	
-	if( v->is_jpeg == 1 ) {
-		length = decode_jpeg_raw( src, n, 0,0, v->info->width,v->info->height,v->info->data[0],v->info->data[1],v->info->data[2] );
-		if( length == 0 ) { //@ success
-		  length = 1;
-		}
-	} else if( v->is_jpeg ==2 ) {
-		AVPacket pkt;
-		veejay_memset( &pkt, 0, sizeof(AVPacket));
-		pkt.data = src;
-	       	pkt.size = n;
-
-	      	length = avcodec_decode_video2( v->c, v->picture, &got_picture, &pkt );
-		if( length == -1 ) {
-		 veejay_msg(0,"v4l2: error while decoding frame");
-		}	
-		v->info->data[0] = v->picture->data[0];
-		v->info->data[1] = v->picture->data[1];
-		v->info->data[2] = v->picture->data[2];
-	} 
-
 	yuv_convert_and_scale( v->scaler, v->info, v->frames[ v->frameidx ] );
-	
+
 
 
 	if(!v->rw) {
@@ -1330,26 +1353,27 @@ void	v4l2_close( void *d )
 	if( v->scaler )
 		yuv_free_swscaler( v->scaler );
 	
-	if( v->frames) {
-		int c;
-		if( !v->picture )
-		{
-			for ( i = 0; i < N_FRAMES; i ++ ) {
-				for( c = 0; c < 4; c ++ ) {
-					if( v->out_planes[c] )
-						free(v->frames[i]->data[c]);
-				}
-				free(v->frames[i]);
+	int c;
+	if( !v->picture )
+	{
+		for ( i = 0; i < N_FRAMES; i ++ ) {
+			for( c = 0; c < 4; c ++ ) {
+				if( v->out_planes[c] )
+					free(v->frames[i]->data[c]);
 			}
+			free(v->frames[i]);
 		}
-		free(v->frames);
 	}
+	
+	
 
 	if(v->picture) {
 		free(v->picture->data[0]);
 		free(v->picture->data[1]);
 		free(v->picture->data[2]);
-		free(v->picture);
+		av_free(v->picture);
+		v->picture = NULL;
+
 	}
 	if(v->c) {
 		av_free(v->c);
@@ -1893,6 +1917,7 @@ static	void	*v4l2_grabber_thread( void *v )
 
 	if(!v4l2_verify_file( i->file ) ) {
 		i->stop = 1;
+		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Not a device file: %s" , i->file );
 		pthread_exit(NULL);
 		return NULL;
 	}
@@ -1900,6 +1925,7 @@ static	void	*v4l2_grabber_thread( void *v )
 	v4l2info *v4l2 = v4l2open( i->file, i->channel, i->host_fmt, i->wid, i->hei, i->fps, i->norm );
 	if( v4l2 == NULL ) {
 		veejay_msg(0, "v4l2: error opening v4l2 device '%s'",i->file );
+		unlock_(v);
 		pthread_exit(NULL);
 		return NULL;
 	}
@@ -1907,29 +1933,24 @@ static	void	*v4l2_grabber_thread( void *v )
 	i->v4l2 = v4l2;
 	v4l2->video_info = i;
 	v4l2->threaded = 1;
-	if(v4l2==NULL) {
-		unlock_(v);
-		pthread_exit(NULL);
-		return NULL;
-	}
-		
-		int j,c;
-		int planes[4];
-		yuv_plane_sizes( v4l2->frames[0], &(planes[0]),&(planes[1]),&(planes[2]),&(planes[3]) );
 
+	int j,c;
+	int planes[4];
+	yuv_plane_sizes( v4l2->frames[0], &(planes[0]),&(planes[1]),&(planes[2]),&(planes[3]) );
+//@ FIXME:  VEEJAY_V4L2_NO_THREADING=1 and no framebuffer is allocated ...
 
-		for( j = 0; j < N_FRAMES; j ++ ) {
-			for( c = 0; c < 4; c ++ ) {
-				if( planes[c] > 0 ) {
-					v4l2->frames[j]->data[c] = (uint8_t*) vj_malloc(sizeof(uint8_t) * planes[c] );
-					veejay_msg(VEEJAY_MSG_DEBUG, "%d: allocated buffer[%d] = %d bytes", j,c,planes[c]);
-				}
+	for( j = 0; j < N_FRAMES; j ++ ) {
+		for( c = 0; c < 4; c ++ ) {
+			if( planes[c] > 0 ) {
+				v4l2->frames[j]->data[c] = (uint8_t*) vj_malloc(sizeof(uint8_t) * planes[c] );
+				veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: %d: allocated buffer[%d] = %d bytes", j,c,planes[c]);
 			}
-			v4l2->frames_done[j] = 0;
 		}
+		v4l2->frames_done[j] = 0;
+	}
 
-		for( c = 0; c < 4; c ++ )
-			v4l2->out_planes[c] = planes[c];
+	for( c = 0; c < 4; c ++ )
+		v4l2->out_planes[c] = planes[c];
 
 	veejay_msg(VEEJAY_MSG_INFO, "v4l2: capture format: %d x %d (%x)",
 			v4l2->info->width,v4l2->info->height, v4l2->info->format  );
@@ -1986,6 +2007,7 @@ static	void	*v4l2_grabber_thread( void *v )
 		}
 
 		if( i->stop ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Closing video capture device");
 			v4l2_close(v4l2);
 			pthread_exit(NULL);
 			return NULL;
@@ -2003,6 +2025,7 @@ int	v4l2_thread_start( v4l2_thread_info *i )
 //	pthread_attr_destroy( &(i->attr) );
 
 	if( err == 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Started video capture thread.");
 		return 1;
 	}
 
@@ -2092,11 +2115,14 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 	if( v4l2_thread_start( i ) == 0 ) {
 		free(i->file);
 		free(i);
+		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Unable to start");
 		return NULL;
 	}
 
 	int ready     = 0;
-	int retries   = 40;
+
+	int retries   = 4000;
+	
 	//@ wait until thread is ready
 	while(retries) {
 		ready = i->grabbing;
@@ -2110,6 +2136,7 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 	}
 
 	if( i->stop ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Grabber thread was told to exit.");
 		pthread_mutex_destroy(&(i->mutex));
 		pthread_cond_destroy(&(i->cond));
 	}

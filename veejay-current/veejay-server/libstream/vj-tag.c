@@ -431,7 +431,6 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		}
 		sprintf(refname, "%d", channel );
 		tag->extra = strdup(refname);
-		veejay_msg(VEEJAY_MSG_DEBUG, "Using v4l2");
 #endif
 		return 1;
 	} 
