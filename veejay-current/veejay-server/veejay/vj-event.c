@@ -358,11 +358,13 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 
 #define SEND_MSG(v,str)\
 {\
-if(vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, strlen(str)) < 0) { \
+int bf_len = strlen(str);\
+if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, bf_len) < 0) { \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], v->uc->current_link);} \
 }
+
 
 /* some macros for commonly used checks */
 
@@ -2676,9 +2678,9 @@ void	vj_event_init_keyboard_defaults()
 void vj_event_init()
 {
 	int i;
-	
+#ifdef HAVE_SDL	
 	veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
-
+#endif
 	vj_init_vevo_events();
 #ifdef HAVE_SDL
 	if( !(keyboard_events = hash_create( HASHCOUNT_T_MAX, int_bundle_compare, int_bundle_hash)))
@@ -2962,10 +2964,13 @@ void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 	veejay_t *v = (veejay_t*) ptr;
 	unsigned int i,len=0;
 	char message[256];
-	char *blob = vj_calloc( 1024 * 32 );
+	char *blob = NULL;
 	char line[512];
 	char header[7];
 	int skip = 0;
+#ifdef HAVE_SDL
+	blob = vj_calloc( 1024 * 64 );
+
 	if(!hash_isempty( keyboard_events ))
 	{
 		hscan_t scan;
@@ -3006,11 +3011,12 @@ void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 			}	
 		}
 	}
-
+#endif
 	sprintf( header, "%06d", len );
 
 	SEND_MSG( v, header );
-	SEND_MSG( v, blob );
+	if( blob != NULL )
+		SEND_MSG( v, blob );
 
 	free( blob );
 
@@ -7454,16 +7460,19 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to sample %d",v->uc->sample_id );
                }
 	       composite_set_ui(v->composite, 0 );
+#ifdef HAVE_SDL
 	       if(v->video_out==0 || v->video_out == 2)
 	 	      vj_sdl_grab( v->sdl[0], 0 );
+#endif
 	}
 	else {
 		composite_set_ui( v->composite, 1 );
 		v->settings->composite = 1;
 		v->use_osd=3;
+#ifdef HAVE_SDL
 		if(v->video_out==0 || v->video_out == 2)
 			vj_sdl_grab( v->sdl[0], 1 );
-
+#endif
 		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to exit.");
 	}
 }

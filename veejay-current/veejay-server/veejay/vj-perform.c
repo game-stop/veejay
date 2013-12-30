@@ -127,6 +127,9 @@ static const char *license =
 static const char *copyr =
 	"(C) 2002-2013 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
 
+static const char *donateaddr = 
+	"Veejay's BTC donation address: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n\tLTC donation address: LcccLQCB7DbqGj9u52urRjVi43yYz7WeND\n";
+
 #define MLIMIT(var, low, high) \
 if((var) < (low)) { var = (low); } \
 if((var) > (high)) { var = (high); }
@@ -3160,7 +3163,7 @@ static	char	*vj_perform_print_credits( veejay_t *info )
 {
 	char text[1024];
 	veejay_memset(text,0,sizeof(text));
-	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s\n",VERSION,intro,copyr,license);
+	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s\n%s",VERSION,intro,copyr,license,donateaddr);
 	
 	return strdup(text);
 }
@@ -3358,12 +3361,15 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				sample_reload_config( info->composite,info->uc->sample_id, 1 );
 			//		settings->composite);
 			}
+#ifdef HAVE_SDL
 			if( info->video_out == 0 ) {
 				//@ release focus
 				vj_sdl_grab( info->sdl[0], 0 );
 			}
+#endif
 		}
 
+#ifdef HAVE_SDL
 		if( info->use_osd == 2 ) {
 			osd_text = vj_perform_print_credits(info);	
 			placement= 1;
@@ -3375,6 +3381,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			osd_text = viewport_get_my_help( composite_get_vp(info->composite ) );
 			more_text = vj_perform_osd_status(info);
 		}
+#endif
 	}
 
 	if( settings->composite  ) {

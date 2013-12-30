@@ -1171,13 +1171,15 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 	if(!v->is_jpeg)
 		v4l2_set_output_pointers( v,src );
 
-
+#ifdef HAVE_JPEG
 	if( v->is_jpeg == 1 ) {
 		length = decode_jpeg_raw( src, n, 0,0, v->info->width,v->info->height,v->info->data[0],v->info->data[1],v->info->data[2] );
 		if( length == 0 ) { //@ success
 		  length = 1;
 		}
-	} else if( v->is_jpeg == 2 ) {
+	} else 
+#endif
+	if( v->is_jpeg == 2 ) {
 		AVPacket pkt;
 		memset( &pkt, 0, sizeof(AVPacket));
 		pkt.data = src;
@@ -1282,13 +1284,15 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 	if(!v->is_jpeg)
 		v4l2_set_output_pointers( v,src );
 
-
+#ifdef HAVE_JPEG
 	if( v->is_jpeg == 1 ) {
 		length = decode_jpeg_raw( src, n, 0,0, v->info->width,v->info->height,v->info->data[0],v->info->data[1],v->info->data[2] );
 		if( length == 0 ) { //@ success
 		  length = 1;
 		}
-	} else if( v->is_jpeg == 2 ) {
+	} else
+#endif
+ 	if( v->is_jpeg == 2 ) {
 		AVPacket pkt;
 		memset( &pkt, 0, sizeof(AVPacket));
 		pkt.data = src;

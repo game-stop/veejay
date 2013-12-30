@@ -1105,8 +1105,10 @@ static int	find_fonts(vj_font_t *ec, char *path)
 	int n = scandir(path, &files, dir_selector,alphasort);
 
 	if(n < 0)
+	{
+		veejay_msg(0, "Error reading %s: %s", path, strerror(errno));
 		return 0;
-
+	}
 	while( n -- )
 	{
 		char tmp[1024];

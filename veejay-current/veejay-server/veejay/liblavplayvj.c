@@ -1083,13 +1083,12 @@ static int veejay_screen_update(veejay_t * info )
 
 	vj_perform_get_primary_frame(info,frame);
 
+#ifdef HAVE_SDL
 	if(check_vp)
 	{
 		if( info->video_out == 0 ) {
-	
 			if(!vj_sdl_lock( info->sdl[0] ) )
 				return 0;
-			
 			composite_blit_yuyv( info->composite,frame, vj_sdl_get_yuv_overlay(info->sdl[0]),settings->composite);
 			if(!vj_sdl_unlock( info->sdl[0]) )
 				return 0;
@@ -1098,7 +1097,7 @@ static int veejay_screen_update(veejay_t * info )
 			skip_update = 1;
 		}
 	} 
-
+#endif
 	if( info->shm && vj_shm_get_status(info->shm) == 1 )
 	{
 		int plane_sizes[4] = { info->effect_frame1->len, info->effect_frame1->uv_len,
@@ -1139,7 +1138,8 @@ static int veejay_screen_update(veejay_t * info )
         }
 #endif
 #endif
-			
+		
+#ifdef HAVE_SDL	
 	if(skip_update) {
 		if(info->video_out == 0 ) { 
 		   for(i = 0 ; i < MAX_SDL_OUT; i ++ )
@@ -1157,7 +1157,7 @@ static int veejay_screen_update(veejay_t * info )
 */
 		return 1;
 	}
-
+#endif
     	switch (info->video_out)
 	{
 #ifdef HAVE_SDL
@@ -1361,8 +1361,7 @@ void veejay_pipe_write_status(veejay_t * info)
 		        0,
 			0,
 			0,
-			mstatus,
-		        0	);
+			mstatus);
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
 		if( vj_tag_sprint_status( info->uc->sample_id,cache_used,info->seq->active,info->seq->current, info->real_fps,
@@ -2453,7 +2452,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	if (seteuid(getuid()) < 0)
 	{
 		/* fixme: get rid of sys_errlist and use sys_strerror */
-		veejay_msg(VEEJAY_MSG_ERROR, "Can't set effective user-id: %s", sys_errlist[errno]);
+		veejay_msg(VEEJAY_MSG_ERROR, "Can't set effective user-id: %s", strerror(errno));
 		return -1;
     	}
 	if(info->load_action_file ) {

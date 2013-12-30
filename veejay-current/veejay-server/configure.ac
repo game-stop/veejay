@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.29],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.30],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=29
+VEEJAY_MICRO_VERSION=30
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -808,13 +808,21 @@ dnl ********************************************************************
 dnl Check for the SDL library (for software playback)
 dnl   (defines SDL_CFLAGS and SDL_LIBS)
 dnl ********************************************************************
+dnl have_sdl=false
+dnl if test x$with_sdl != xno ; then
+dnl AM_PATH_SDL(1.2.3,[
+dnl            have_sdl=true
+dnl            AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
+dnl fi
+
 have_sdl=false
 if test x$with_sdl != xno ; then
-AM_PATH_SDL(1.2.3,[
-            have_sdl=true
-            AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
+PKG_CHECK_MODULES( SDL, sdl >= 1.2, have_sdl=true,have_sdl=false)
+if test x$have_sdl = xfalse ; then
+ AC_MSG_ERROR([Could not find SDL 1.2 library!])
 fi
-
+AC_DEFINE(HAVE_SDL,1,[SDL library is installed])
+fi
 have_liblo=false
 PKG_CHECK_MODULES( LIBLO, liblo >= 0.26,have_liblo=true,have_liblo=false)
 if test x$have_liblo = xfalse ; then

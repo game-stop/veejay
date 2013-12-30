@@ -16,8 +16,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
+#include <config.h>
 #include <gtk/gtk.h>
+#ifdef HAVE_SDL
 #include "keyboard.h"
 static struct
 {
@@ -327,4 +328,5 @@ gboolean	key_snooper(GtkWidget *w, GdkEventKey *event, gpointer user_data)
 {
 	return FALSE;
 }
+#endif
 // gtk_key_snooper_install

@@ -201,6 +201,21 @@ if test x$with_pixbuf != xno ; then
                     [have_pixbuf=false])
 fi
 
+have_sdl=false
+if test x$with_sdl != xno ; then
+ PKG_CHECK_MODULES(SDL, [sdl >= 1.2],
+	[
+	 AC_SUBST(SDL_CFLAGS)
+	 AC_SUBST(SDL_LIBS)
+	 have_sdl=true
+	 AC_DEFINE(HAVE_SDL,1,[use sdl keybindings])],
+	[have_sdl=false])
+fi
+
+if test x$have_sdl != xtrue ; then
+ AC_MSG_WARN([Cannot find SDL, reloaded will not be able to map keybindings])
+fi
+
 dnl ********************************************************************
 dnl Check to see if __progname is provided by the system
 dnl ********************************************************************
@@ -522,10 +537,16 @@ fi
 
 AC_MSG_RESULT($CFLAGS)
 
-PKG_CHECK_MODULES(LIBAVUTIL,[libavutil >= 49.7], have_avutil=true,have_avutil=false])
+PKG_CHECK_MODULES(LIBAVUTIL,[libavutil >= 49.7], have_avutil=true,have_avutil=false)
 if test x$have_avutil = xfalse;
 then
        AC_MSG_ERROR([libavutil not found.])
+fi
+
+PKG_CHECK_MODULES( LIBX11, x11, have_x11=true,have_x11=false)
+if test x$have_x11 = xfalse;
+then
+	AC_MSG_ERROR([libx11 not found.])
 fi
 
 FFMPEG_CFLAGS="${LIBAVUTIL_CFLAGS}"

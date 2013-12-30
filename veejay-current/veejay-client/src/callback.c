@@ -1357,6 +1357,7 @@ void	on_vims_take_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
 {
+#ifdef HAVE_SDL
 	int key_val  = info->uc.pressed_key;
 	int key_mod  = info->uc.pressed_mod;
 
@@ -1374,10 +1375,12 @@ void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
 		else
 			vj_msg(VEEJAY_MSG_INFO, "Key binding %s released", strkey );
 	}
+#endif
 }
 
 void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
 {
+#ifdef HAVE_SDL
 	char which_vims[128];
 	sprintf(which_vims, "Press a key to bind VIMS %03d",
 			info->uc.selected_vims_entry );
@@ -1409,6 +1412,7 @@ void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
 					event_id, sdlkey_by_id(key_val) );
 		}
 	}	
+#endif
 }
 
 
