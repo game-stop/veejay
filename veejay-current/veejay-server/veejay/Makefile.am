@@ -19,7 +19,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/libvevo \
 		-I$(top_srcdir)/liblzo \
 		-I$(top_srcdir)/bio2jack \
-		$(FFMPEG_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) \
+		$(FFMPEG_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FREETYPE_CFLAGS) $(FREETYPE2_CFLAGS) \
 		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) $(LIBLO_CFLAGS) \
 		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) $(PTHREAD_CFLAGS)
 
@@ -56,7 +56,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libvevo -lvevo 
 
-libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
+libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FREETYPE_LIBS) $(FREETYPE2_LIBS) \
 			$(XML2_LIBS) $(JPEG_LIBS) $(LIBLO_LIBS) \
 		 	$(FFMPEG_LIBS) $(XINERAMA_LIBS) \
 			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(RT_LIBS) \

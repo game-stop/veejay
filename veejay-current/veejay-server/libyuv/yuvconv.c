@@ -617,7 +617,7 @@ void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[3], VJFrame *d
 	{
 		veejay_msg(0,"sws_getContext failed.");
 		if(s)free(s);
-		return NULL;
+		return;
 	}	
 /*
 	struct SwsContext *ctx = sws_getContext(
@@ -1272,10 +1272,8 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-
-	int src_stride[3];
-	int dst_stride[3];
-
+	int src_stride[3] = { src->width,0,0 };
+	int dst_stride[3] = { dst->width,0,0 };
 /*
 	int n = 0;
 	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB ||

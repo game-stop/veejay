@@ -160,7 +160,7 @@ static	void	mmx_blur(uint8_t *buffer, int width, int height)
 		//	 : "mm0", "mm1", "mm2", "mm3", "mm6");
 	}
 
-	len = (width*height)-1;
+	len = (width*height)-4;
 
 	for (i = len; i > scrsh; i -= 4) {
 		__asm __volatile

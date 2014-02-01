@@ -563,8 +563,11 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 		veejay_msg(0, "v4l2: (untested) Codec not found.");
 		return 0;
 	}
-
-	v->c 	   = avcodec_alloc_context();
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(53, 8, 0)
+	v->c = avcodec_alloc_context();
+#else
+	v->c = avcodec_alloc_context3(v->codec);
+#endif
 	v->c->width= wid;
 	v->c->height= hei;
 	v->picture = avcodec_alloc_frame();
@@ -577,8 +580,11 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 
 	if( v->codec->capabilities & CODEC_CAP_TRUNCATED)
 		v->c->flags |= CODEC_FLAG_TRUNCATED;
-
-	if( avcodec_open( v->c, v->codec ) < 0 ) 
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(53, 8, 0)
+ 	if( avcodec_open( v->c, v->codec ) < 0 ) 
+#else
+	if( avcodec_open2( v->c, v->codec, NULL ) < 0 ) 
+#endif
 	{
 		veejay_msg(0, "v4l2: (untested) Error opening codec");
 		free(v->picture->data[0]);
@@ -1387,7 +1393,7 @@ void	v4l2_close( void *d )
 	}
 	
 	if(v->codec) {
-		avcodec_close(v->codec);
+		avcodec_close(v->c);
 		v->codec = NULL;
 	}
 

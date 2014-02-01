@@ -240,8 +240,12 @@ static const    char    *el_pixfmt_str(int i)
 void	free_av_packet( AVPacket *pkt )
 {
 	if( pkt ) {
-		if( pkt->destruct )
-			pkt->destruct(pkt);
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+	//	av_destruct_packet(pkt);
+#else
+	//	if( pkt->destruct )
+	//		pkt->destruct(pkt);
+#endif
 		pkt->data = NULL;
 		pkt->size = 0;
 	}
@@ -484,7 +488,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	} else  if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && id != CODEC_ID_YUV420F && id != CODEC_ID_YUV422F)
         {
 		d->codec = avcodec_find_decoder( id );
-#if (LIBAVFORMAT_VERSION_MAJOR >= 53)
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
 		d->context = avcodec_alloc_context3(NULL); /* stripe was here! */
 #else
 		d->context = avcodec_alloc_context();
@@ -501,8 +505,12 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 			tc );
 		d->context->thread_type = FF_THREAD_FRAME;
 		d->context->thread_count = tc;
-		
-		if ( avcodec_open( d->context, d->codec ) < 0 )
+
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(53, 8, 0)
+ 		if ( avcodec_open( d->context, d->codec ) < 0 )
+#else
+		if ( avcodec_open2( d->context, d->codec, NULL ) < 0 )
+#endif		
 		{
       		       veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
 		       _el_free_decoder( d );
@@ -1092,7 +1100,7 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 	
 	return 1;
 }
-#if (LIBAVFORMAT_VERSION_MAJOR >= 53)
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
 static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *got_picture, uint8_t *data, int pktsize ) {
 	AVPacket pkt;
 	veejay_memset( &pkt, 0, sizeof(AVPacket));
@@ -1307,6 +1315,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 					pict2.linesize[1] = el->video_width >> 1;
 					pict2.linesize[2] = el->video_width >> 1;
 					pict2.linesize[0] = el->video_width;
+					
 					avpicture_deinterlace(
 						&pict2,
 						(const AVPicture*) d->frame,
@@ -1382,7 +1391,7 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	AVInputFormat *av_input_format = NULL;
 	AVFrame *av_frame = NULL;
 	AVPacket pkt;
-#if (LIBAVFORMAT_VERSION_MAJOR >= 53)
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
 	int err = avformat_open_input( &avformat_ctx, filename, NULL, NULL );
 #else
 	int err = av_open_input_file( &avformat_ctx,filename,NULL,0,NULL );
@@ -1392,30 +1401,55 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to open %s: %d",filename,err );
 		return -1;
 	}
-#if (LIBAVFORMAT_VERSION_MAJOR >= 53 )
+
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53 )
 	err = avformat_find_stream_info( avformat_ctx, NULL );
 #else
 	err = av_find_stream_info( avformat_ctx );
 #endif
+
+
+#ifdef STRICT_CHECKING
+#if  (LIBAVFORMAT_VERSION_MAJOR <= 53)
+	av_dump_format( avformat_ctx,0,filename,0 );
+#endif
+#endif
+
+	if( err > 0 ) {
+		char buf[1024];
+		av_strerror( err, buf, sizeof(buf)-1);
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s" , buf );
+	}
+
 	if(err < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Stream information found in %s",filename);
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+		avformat_close_input(&avformat_ctx);
+#else
 		av_close_input_file( avformat_ctx );
+#endif
 		return -1;
 	}
-	av_read_play(avformat_ctx);
-
-	int i,j;
-	int n = avformat_ctx->nb_streams;
+	
+	unsigned int i,j;
+	unsigned int n = avformat_ctx->nb_streams;
 	int vi = -1;
 	int pix_fmt = -1;
 	veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: File has %d %s", n, ( n == 1 ? "stream" : "streams") );
+
+	if( n > 65535 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "FFmpeg: Probably doesn't work, got garbage from open_input." );
+		veejay_msg(VEEJAY_MSG_WARNING, "Build veejay with an older ffmpeg (for example, FFmpeg 0.8.15 \"Love\")");
+		return -1;
+	}
+
 
 	for( i=0; i < n; i ++ )
 	{
 		if( avformat_ctx->streams[i]->codec )
 		{
-#if (LIBAVFORMAT_VERSION_MAJOR >= 53)
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
  #if (LIBAVFORMAT_VERSION_MINOR <= 5 )
 			if( avformat_ctx->streams[i]->codec->codec_type < CODEC_ID_MP2 ) 
  #else
@@ -1436,15 +1470,24 @@ further:
 				if( !sup_codec ) {
 					veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unrecognized file %s",		
 						avformat_ctx->streams[i]->codec->codec_name );
-					av_close_input_file( avformat_ctx );
-					return -1;
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+						avformat_close_input(&avformat_ctx);
+#else
+						av_close_input_file( avformat_ctx );
+#endif
+					
+						return -1;
 				}
 				codec = avcodec_find_decoder( avformat_ctx->streams[i]->codec->codec_id );
 				if( codec == NULL ) 
 				{
 					veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to find decoder for codec %s", 
 						avformat_ctx->streams[i]->codec->codec_name);	
-					av_close_input_file( avformat_ctx );
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+						avformat_close_input(&avformat_ctx);
+#else
+						av_close_input_file( avformat_ctx );
+#endif
 					return -1;
 				}
 				vi = i;
@@ -1455,13 +1498,21 @@ further:
 
 	if( vi == -1 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: No video streams found");
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+		avformat_close_input(&avformat_ctx);
+#else
 		av_close_input_file( avformat_ctx );
+#endif
 		return -1;
 	}
 
 	codec_ctx = avformat_ctx->streams[vi]->codec;
 	avformat_stream=avformat_ctx->streams[vi];
-	if ( avcodec_open( codec_ctx, codec ) < 0 ) {
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(53, 8, 0)
+ 	if ( avcodec_open( codec_ctx, codec ) < 0 ) {
+#else
+	if ( avcodec_open2( codec_ctx, codec, NULL ) < 0 ) {
+#endif
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to open %s decoder (codec %x)",
 				codec_ctx->codec_name, codec_ctx->codec_id);
 		return -1;
@@ -1485,7 +1536,11 @@ further:
 		av_free(f);
 		free_av_packet(&pkt); 
 		avcodec_close( codec_ctx );
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+		avformat_close_input(&avformat_ctx);
+#else
 		av_close_input_file( avformat_ctx );
+#endif
 		return -1;
 	}
 
@@ -1497,7 +1552,11 @@ further:
 
 	free_av_packet(&pkt); 
 	avcodec_close( codec_ctx );
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+	avformat_close_input(&avformat_ctx);
+#else
 	av_close_input_file( avformat_ctx );
+#endif
 	av_free(f);
 
 	return pix_fmt;

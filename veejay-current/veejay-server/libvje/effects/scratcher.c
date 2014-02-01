@@ -100,7 +100,7 @@ void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 	if (!nreverse) {
 		vj_frame_copy( src->data, dest, strides ); 
     	} else {
-		vj_frame_copy( dest, src, strides );
+		vj_frame_copy( dest, src->data, strides );
     	}
 
 	if (nreverse)

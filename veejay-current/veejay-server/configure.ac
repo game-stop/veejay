@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.30],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.31],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=30
+VEEJAY_MICRO_VERSION=31
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -553,9 +553,9 @@ AC_MSG_RESULT($CFLAGS)
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
-PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=false)
-PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.57.2],have_avcodec=true,have_avcodec=false)
-PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0],have_avformat=true,have_avformat=false)
+PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0 libavutil < 52.48],have_avutil=true,have_avutil=false)
+PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.35.2 libavcodec < 55.39],have_avcodec=true,have_avcodec=false)
+PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0 libavformat < 55.19],have_avformat=true,have_avformat=false)
 PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 0.7.1],have_swscale=true,have_swscale=false)
 if test x$have_swscale = xfalse;
 then
@@ -571,7 +571,7 @@ then
 fi
 if test x$have_avcodec = xfalse;
 then
-	AC_MSG_ERROR([libavcodec not found.])
+	AC_MSG_ERROR([libavcodec >= 51.57 not found.])
 fi
 
 FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS}"
@@ -903,28 +903,42 @@ fi
 
 
 have_freetype=false
-AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
-if test $FREETYPE_CONFIG = yes; then
-  FT_CFLAGS="`freetype-config --cflags`"
-  FT_WORD="`freetype-config --libs`"
-  FT_LDFLAGS=""
-  FT_LIBS=""
-  for word in $FT_WORD ; do
-	beginning=`echo $word | cut -c -2`
-	if test ".$beginning" = ".-L"; then
-		FT_LDFLAGS="$FT_LDFLAGS $word"  
+have_freetype2=false
+PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
+		AC_SUBST(FREETYPE2_CFLAGS)
+		AC_SUBST(FREETYPE2_LIBS)
+		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
+		have_freetype2=true],
+		[have_freetype2=false] )
+
+if test x$have_freetype2 != xtrue; then
+	AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
+	if test $FREETYPE_CONFIG = yes; then
+		FREETYPE_CFLAGS="`freetype-config --cflags`" 
+		FREETYPE_WORD="`freetype-config --libs`"
+		FREETYPE_LIBS=""
+		for word in $FREETYPE_WORD; do	
+			beginning=`echo $word |cut -c -2` 
+			if test ".$beginning" = ".-L"; then
+				FREETYPE_LDFLAGS="$FREETYPE_LDFLAGS $word"
+			else
+				FREETYPE_LIBS="$FREETYPE_LIBS $word"
+			fi
+		done
+		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
+		AC_SUBST(FREETYPE_LIBS)
+		AC_SUBST(FREETYPE_LDFLAGS)
+		AC_SUBST(FREETYPE_CFLAGS)
+		have_freetype=true
+		AC_MSG_NOTICE([Compiling with FreeType])
 	else
-		FT_LIBS="$FT_LIBS $word"
+		AC_MSG_ERROR([Cannot find the freetype-config program])
 	fi
-  done
-  AC_DEFINE(HAVE_FREETYPE,,[Compiling with FreeType])
-  AC_SUBST(FT_LIBS)
-  AC_SUBST(FT_LDFLAGS)
-  AC_SUBST(FT_CFLAGS)
-  have_freetype=true
 else
- AC_MSG_ERROR([Cannot find the freetype-config program])
-fi  
+	AC_MSG_NOTICE([Compiling with FreeType2])
+fi
+
+
 
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
@@ -953,6 +967,7 @@ AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
+AM_CONDITIONAL(HAVE_FREETYPE2, test x$have_freetype2 = xtrue)
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -1100,7 +1115,15 @@ AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
 AC_MSG_NOTICE([  - FFmpeg avutil		         : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
-AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
+
+if test "$have_freetype" = "true"; then
+	AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
+fi
+
+if test "$have_freetype2" = "true"; then
+	AC_MSG_NOTICE([  - FreeType 2 support            : ${have_freetype2}])
+fi
+
 AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])

@@ -41,7 +41,7 @@
 #include <sys/wait.h>
 #include <sys/signal.h>
 #include <sys/ucontext.h>
-
+#include <execinfo.h>
 #include <unistd.h>
 #include <libgen.h>
 

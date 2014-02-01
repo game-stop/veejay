@@ -189,7 +189,12 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 	  if(id != CODEC_ID_DVVIDEO )
 		{
 #endif
-		e->context = avcodec_alloc_context();
+
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(53, 8, 0)
+ 		e->context = avcodec_alloc_context();
+#else
+   		e->context = avcodec_alloc_context3(e->codec);
+#endif
 		e->context->bit_rate = 2750 * 1024;
 		e->context->width = el->video_width;
  		e->context->height = el->video_height;
@@ -217,7 +222,11 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 
 	
 		char *descr = vj_avcodec_get_codec_name( id );
-		if ( avcodec_open( e->context, e->codec ) < 0 )
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(53, 8, 0)
+ 		if ( avcodec_open( e->context, e->codec ) < 0 )
+#else
+		if ( avcodec_open2( e->context, e->codec, NULL ) < 0 )
+#endif
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot open codec '%s'" , descr );
 			if(e->context) free(e->context);
@@ -465,8 +474,12 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 #else
 	av_log_set_level( AV_LOG_VERBOSE );
 #endif
-	av_register_all();
 
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+	avcodec_register_all();
+#else
+	av_register_all();
+#endif
 	return 1;
 }
 
@@ -658,6 +671,6 @@ int		vj_avcodec_encode_audio( void *encoder, int format, uint8_t *src, uint8_t *
 	if(format == ENCODER_YUV420 || ENCODER_YUV422 == format)
 		return 0;
 	vj_encoder *av = encoder;
-	int ret = avcodec_encode_audio( av->context, src, len, nsamples );
+	int ret = avcodec_encode_audio( av->context, dst, len, (const short*) src );
 	return ret;
 }

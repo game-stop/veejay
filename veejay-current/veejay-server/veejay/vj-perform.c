@@ -61,6 +61,10 @@
 
 #define PERFORM_AUDIO_SIZE 16384
 
+#ifndef SAMPLE_FMT_S16
+#define AV_SAMPLE_FMT_S16 SAMPLE_FMT_S16
+#endif
+
 typedef struct {
     uint8_t *Y;
     uint8_t *Cb;
