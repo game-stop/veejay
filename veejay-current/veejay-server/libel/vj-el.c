@@ -50,6 +50,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #ifdef SUPPORT_READ_DV2
 #include "rawdv.h"
 #include "vj-dv.h"
@@ -1449,15 +1450,7 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	{
 		if( avformat_ctx->streams[i]->codec )
 		{
-#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
- #if (LIBAVFORMAT_VERSION_MINOR <= 5 )
-			if( avformat_ctx->streams[i]->codec->codec_type < CODEC_ID_MP2 ) 
- #else
 			if( avformat_ctx->streams[i]->codec->codec_type < CODEC_ID_FIRST_AUDIO )
- #endif
-#else
-			if( avformat_ctx->streams[i]->codec->codec_type == CODEC_TYPE_VIDEO )
-#endif
 			{
 				int sup_codec = 0;
 				for( j = 0; _supported_codecs[j].name != NULL; j ++ ) {

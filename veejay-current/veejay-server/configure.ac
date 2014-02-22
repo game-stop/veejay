@@ -1136,6 +1136,5 @@ AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - V4L1 (obsolete)               : ${have_v4l}])
-#AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 
 cat NEWS
