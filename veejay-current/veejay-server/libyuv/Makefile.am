@@ -2,7 +2,7 @@
 
 MAINTAINERCLEANFILES = Makefile.in
 AM_CFLAGS=$(YUVCFLAGS)
-INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/aclib  -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg -I$(top_srcdir)/libpostproc 
+INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/aclib  -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg -I$(top_srcdir)/libpostproc -I$(FFMPEG_CFLAGS) 
 YUV_LIB_FILE = libyuv.la
 pkginclude_HEADERS=yuvconv.h
 EXTRA_DIST = mmx.h yuvconv.h mmx_macros.h 
