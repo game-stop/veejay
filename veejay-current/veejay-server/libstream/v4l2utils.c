@@ -1399,6 +1399,7 @@ void	v4l2_close( void *d )
 		avcodec_close(v->codec);
 		if(v->c) free(v->c);
 #endif
+	}
 
 	if( v->host_frame )
 		free(v->host_frame );
