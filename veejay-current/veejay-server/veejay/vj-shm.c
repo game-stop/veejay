@@ -28,6 +28,7 @@
 #include <sys/shm.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -331,7 +332,14 @@ static 	void	failed_init_cleanup( vj_shm_t *v )
 //@ new producer, puts frame in shm
 void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 {
+#ifdef STRICT_CHECKING
+	assert( frame->width > 0 );
+	assert( frame->height > 0 );
+#endif
 	vj_shm_t *v = (vj_shm_t*) vj_calloc(sizeof(vj_shm_t));
+#ifdef STRICT_CHECKING
+	assert( v != NULL );
+#endif	
 	v->parent   = 1;
 
 	if( vj_shm_file_ref( v, homedir ) == -1 ) {
@@ -353,7 +361,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 
 	//@ attach
 	v->sms 	    = shmat( v->shm_id, NULL , 0 );
-	if( v->sms == NULL || v->sms == (uint8_t*) (-1) ) {
+	if( v->sms == NULL || v->sms == (char*) (-1) ) {
 		shmctl( v->shm_id, IPC_RMID, NULL );
 		veejay_msg(0, "Failed to attach to shared memory:%s",strerror(errno));
 		failed_init_cleanup(v);

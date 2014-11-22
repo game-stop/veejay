@@ -577,7 +577,7 @@ void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fm
 
 void	yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst )
 {
-	sws_scale( ctx, src->data, src->stride,0,src->height,dst->data,dst->stride );
+	sws_scale( (struct SwsContext*) ctx, src->data, src->stride,0,src->height,dst->data,dst->stride );
 }
 
 void	yuv_fx_context_destroy( void *ctx )
@@ -1274,10 +1274,8 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-
-	int src_stride[3];
-	int dst_stride[3];
-
+	int src_stride[3] = { src->width,0,0 };
+	int dst_stride[3] = { dst->width,0,0 };
 /*
 	int n = 0;
 	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB ||

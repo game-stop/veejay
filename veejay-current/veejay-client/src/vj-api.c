@@ -54,7 +54,9 @@
 #include <gtkknob.h>
 #include <gtktimeselection.h>
 #include <libgen.h>
+#ifdef HAVE_SDL
 #include <src/keyboard.h>
+#endif
 #include <gtk/gtkversion.h>
 #include <gdk/gdk.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -1577,8 +1579,21 @@ void	about_dialog()
 
 	char blob[1024];
 	char *os_str = produce_os_str();
-	sprintf(blob, "Veejay - A visual instrument and realtime video sampler for GNU/Linux\n%s", os_str );
+	const gchar *donate =
+{
+	"You can donate cryptocoins!\n"\
+	"Bitcoin: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n"\
+	"Devcoin: 1DtYKQx6kLnCxX5S8atf6b3dD42A2UavvE\n"\
+	"Litecoin: LcccLQCB7DbqGj9u52urRjVi43yYz7WeND\n"\
+	"Feathercoin: 6i4G4C9jEZuL6R7vSspZ6JMAUP2zb6M1Yu\n" 		
+
+};
+
+	sprintf(blob, "Veejay - A visual instrument and realtime video sampler for GNU/Linux\n%s\n%s", os_str, donate );
+	
 	free(os_str);
+
+
 
     const gchar *license = 
     {
@@ -1628,6 +1643,7 @@ gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data
 	{
 		return FALSE;
 	}
+#ifdef HAVE_SDL
 	if(event->type == GDK_KEY_PRESS)
 	{
 		gchar tmp[100];
@@ -1648,11 +1664,11 @@ gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data
 			g_free(utf8_text);
 		}
 	}
-	
+#endif
 	return FALSE;
 }
-
-gboolean	key_handler( GtkWidget *w, GdkEventKey *event, gpointer user_data)
+#ifdef HAVE_SDL
+static gboolean	key_handler( GtkWidget *w, GdkEventKey *event, gpointer user_data)
 {
 	if(event->type != GDK_KEY_PRESS)
 		return FALSE;
@@ -1667,7 +1683,7 @@ gboolean	key_handler( GtkWidget *w, GdkEventKey *event, gpointer user_data)
 	}
 	return FALSE;
 }
-
+#endif
 static int	check_format_string( char *args, char *format )
 {
 	if(!format || !args )
@@ -1735,7 +1751,7 @@ prompt_keydialog(const char *title, char *msg)
 		gtk_container_add( GTK_CONTAINER(hbox1), arglabel );
 		gtk_container_add( GTK_CONTAINER(hbox1), pentry );
 	} 
-
+#ifdef HAVE_SDL
 	if( info->uc.selected_vims_entry  )
 	{
 		char tmp[100];
@@ -1757,7 +1773,7 @@ prompt_keydialog(const char *title, char *msg)
 			gtk_entry_set_text( GTK_ENTRY(keyentry), tmp );
 		}
 	}
-
+#endif
 
 	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox1 );
 	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox2 );
@@ -4464,15 +4480,16 @@ gboolean
 	int m=0;
 	gchar *key = NULL;
 	gchar *mod = NULL;
-
+#ifdef HAVE_SDL
 	gtk_tree_model_get(model,&iter, VIMS_KEY, &key, -1);
 	gtk_tree_model_get(model,&iter, VIMS_MOD, &mod, -1);
-
+#endif
 	if(sscanf( vimsid, "%d", &event_id ))
 	{
+#ifdef HAVE_SDL
 		k = sdlkey_by_name( key );
 		m = sdlmod_by_name( mod );	
-
+#endif
 		info->uc.selected_vims_entry = event_id;
 
 		if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
@@ -4486,7 +4503,7 @@ gboolean
 
 		if( n_params > 0 && text )
 			info->uc.selected_vims_args = strdup( text );
-
+		
 		info->uc.selected_vims_accel[0] = m;
 		info->uc.selected_vims_accel[1] = k;
 
@@ -4730,6 +4747,9 @@ static	void	reload_keys()
 		
 		index = (val[1] * MOD_OFFSET) + val[2];
 
+		if( index < 0 || index >= VIMS_MAX )
+			continue;
+
 		vims_keys_list[ index ].keyval 		= val[2];
 		vims_keys_list[ index ].state 		= val[1];
 		vims_keys_list[ index ].event_id 	= val[0];	
@@ -4802,8 +4822,13 @@ static	void	reload_bundles()
 		gchar *g_descr 	= NULL;
 		gchar *g_format	= NULL; 
 		gchar *g_content = NULL;
+#ifdef HAVE_SDL
 		gchar *g_keyname  = sdlkey_by_id( val[1] );
 		gchar *g_keymod   = sdlmod_by_id( val[2] );
+#else
+		gchar *g_keyname = "N/A";
+		gchar *g_keymod = "";
+#endif
 		gchar *g_vims[5];	
 
 		sprintf( (char*) g_vims, "%03d", val[0] );
@@ -6825,7 +6850,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	}
 	snprintf( glade_path, sizeof(glade_path), "%s/%s",RELOADED_DATADIR,glade_file);
 
-
 	veejay_memset( gui->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
 	veejay_memset( gui->sample, 0, 2 );
 	veejay_memset( gui->selection, 0, 3 );
@@ -6846,9 +6870,11 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	gui->client = NULL;
 	gui->main_window = glade_xml_new(glade_path,NULL,NULL);
-	if(!gui->main_window)
+	if(gui->main_window == NULL)
 	{
 		free(gui);
+		veejay_msg( 0, "Cannot find '%s'", glade_path );
+		return;
 	}
 	info = gui;
 
@@ -7308,7 +7334,9 @@ gboolean		is_alive( int *do_sync )
 		else
 		{
 			info->watch.state = STATE_PLAYING;
+#ifdef HAVE_SDL
 			info->key_id = gtk_key_snooper_install( key_handler , NULL);
+#endif
 			multrack_audoadd( info->mt, remote, port );
 			*do_sync = 1;
 			if( user_preview ) {

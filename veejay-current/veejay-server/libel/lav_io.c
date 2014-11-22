@@ -1853,8 +1853,7 @@ const char *lav_strerror(void)
          return AVI_strerror();
       default:
          /* No or unknown video format */
-         if(errno) strerror(errno);
-         else sprintf(error_string,"No or unknown video format");
+         sprintf(error_string,"No or unknown video format");
          return error_string;
    }
 }

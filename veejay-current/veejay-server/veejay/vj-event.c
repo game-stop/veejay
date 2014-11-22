@@ -179,6 +179,7 @@ enum {
 };
 
 #ifdef HAVE_SDL
+#define VIMS_MOD_CAPSLOCK 4
 #define	VIMS_MOD_SHIFT	3
 #define VIMS_MOD_NONE	0
 #define VIMS_MOD_CTRL	2
@@ -302,6 +303,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_NONE, "2 1"	},
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_SHIFT,  "1 1"	},
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_CTRL, "0 0"	},
+	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_CAPSLOCK, "3 1"},
 	{ VIMS_MACRO_SELECT,			SDLK_F1,		VIMS_MOD_CTRL, "0"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F2,		VIMS_MOD_CTRL, "1"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F3,		VIMS_MOD_CTRL, "2"	},
@@ -356,11 +358,13 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 
 #define SEND_MSG(v,str)\
 {\
-if(vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, strlen(str)) < 0) { \
+int bf_len = strlen(str);\
+if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, bf_len) < 0) { \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], v->uc->current_link);} \
 }
+
 
 /* some macros for commonly used checks */
 
@@ -1503,8 +1507,8 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	if( dbg_msg == NULL ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "No event knownn by '%d' (%s)", net_id,msg );
 	} else {
-	veejay_msg(VEEJAY_MSG_DEBUG, "VIMS '%s' %s",
-		msg,dbg_msg );
+		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS '%s' %s",msg,dbg_msg );
+		free(dbg_msg);
 	}
 #endif
 #ifndef STRICT_CHECKING
@@ -1812,6 +1816,9 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 		vims_mod = VIMS_MOD_ALT;
 	if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) )
 		vims_mod = VIMS_MOD_CTRL;
+	if( (mod & KMOD_CAPS) ) {
+		vims_mod = VIMS_MOD_CAPSLOCK;
+	}
 
 	int vims_key = key->keysym.sym;
 	int index = vims_mod * SDLK_LAST + vims_key;
@@ -2671,9 +2678,9 @@ void	vj_event_init_keyboard_defaults()
 void vj_event_init()
 {
 	int i;
-	
+#ifdef HAVE_SDL	
 	veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
-
+#endif
 	vj_init_vevo_events();
 #ifdef HAVE_SDL
 	if( !(keyboard_events = hash_create( HASHCOUNT_T_MAX, int_bundle_compare, int_bundle_hash)))
@@ -2957,10 +2964,13 @@ void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 	veejay_t *v = (veejay_t*) ptr;
 	unsigned int i,len=0;
 	char message[256];
-	char *blob = vj_calloc( 1024 * 32 );
+	char *blob = NULL;
 	char line[512];
 	char header[7];
 	int skip = 0;
+#ifdef HAVE_SDL
+	blob = vj_calloc( 1024 * 64 );
+
 	if(!hash_isempty( keyboard_events ))
 	{
 		hscan_t scan;
@@ -3001,11 +3011,12 @@ void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 			}	
 		}
 	}
-
+#endif
 	sprintf( header, "%06d", len );
 
 	SEND_MSG( v, header );
-	SEND_MSG( v, blob );
+	if( blob != NULL )
+		SEND_MSG( v, blob );
 
 	free( blob );
 
@@ -7449,16 +7460,19 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to sample %d",v->uc->sample_id );
                }
 	       composite_set_ui(v->composite, 0 );
+#ifdef HAVE_SDL
 	       if(v->video_out==0 || v->video_out == 2)
 	 	      vj_sdl_grab( v->sdl[0], 0 );
+#endif
 	}
 	else {
 		composite_set_ui( v->composite, 1 );
 		v->settings->composite = 1;
 		v->use_osd=3;
+#ifdef HAVE_SDL
 		if(v->video_out==0 || v->video_out == 2)
 			vj_sdl_grab( v->sdl[0], 1 );
-
+#endif
 		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to exit.");
 	}
 }
@@ -10321,6 +10335,56 @@ void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap
 }
 #endif
 
+void	vj_event_sample_next( void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if( v->seq->active ){
+		int s = (v->settings->current_playback_speed < 0 ? -1 : 1 );
+		int p = v->seq->current + s;
+		if( p < 0 ) p = 0;
+		int n = v->seq->samples[ p ];
+		if( sample_exists( n ) ) {
+			veejay_set_sample(v, n );
+		}
+	}
+	if( SAMPLE_PLAYING(v)) {
+		int s = (v->settings->current_playback_speed < 0 ? -1 : 1 );
+		int n = v->uc->sample_id + s;
+		if( sample_exists(n) ) {
+			veejay_set_sample(v,n );
+		} else {
+		    n = v->uc->sample_id;
+		    int stop = sample_size() -1;
+		    while(!sample_exists(n) ) {
+			    n += s;
+			    if( n > stop || n < 1 ) {
+				    return;
+			    }
+		    }
+		    veejay_set_sample(v, n );
+		}
+	}
+	else if ( STREAM_PLAYING(v)) {
+		int n = v->uc->sample_id + 1;
+		if( vj_tag_exists(n) ) {
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, n );
+		
+		}
+		else {
+			n = 1;
+			int stop = vj_tag_size()-1;
+			while( !vj_tag_exists(n) ) {
+				n ++;
+				if( n > stop ) {
+					return;
+				}
+			}
+			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, n );	
+		}
+	}
+}
+
+
 void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap )
 {
 	int args[5];
@@ -10497,7 +10561,12 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 		else
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "No keystrokes to playback!");
+			veejay_msg(VEEJAY_MSG_INFO, "Use CAPS-LOCK modifier to jump to next or previous sample."); 
 		}
+	}
+	else if ( args[0] == 3 )
+	{
+		vj_event_sample_next( v , NULL, NULL );
 	}
 }
 

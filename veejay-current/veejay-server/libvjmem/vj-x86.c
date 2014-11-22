@@ -27,13 +27,17 @@
 #include <unistd.h>
 #include <aclib/ac.h>
 #include <aclib/imgconvert.h>
+#include <errno.h>
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 extern void find_best_memcpy(void);
 extern void find_best_memset(void);
 extern int find_best_threaded_memcpy(int w, int h);
 extern void yuyv_plane_init();
 
 static int MEM_ALIGNMENT_SIZE = 0;
-static int CACHE_LINE_SIZE = 16;
+static int CACHE_LINE_SIZE = 64;
 
 
 #ifdef ARCH_X86
@@ -179,9 +183,26 @@ void *vj_malloc_(size_t size)
 		return NULL;
 	void *ptr = NULL;
 #ifdef HAVE_POSIX_MEMALIGN
-	posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, size );
+	size_t aligned_size = (size + 3) & ~0x03;
+#ifdef STRICT_CHECKING
+	assert( MEM_ALIGNMENT_SIZE > 0 );
+#endif
+	int err = posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, aligned_size );
+	if( err == EINVAL )
+	{
+		veejay_msg(0, "Memory is not a multiple of %d : %d", sizeof(void*), aligned_size );
+		return NULL;	
+	}
+	if( err == ENOMEM ) 
+	{
+		veejay_msg(0, "Unable to allocate %d bytes of memory",size );
+		return NULL;
+	}
 #else
 #ifdef HAVE_MEMALIGN
+#ifdef STRICT_CHECKING
+	assert( MEM_ALIGNMENT_SIZE > 0 );
+#endif
 	ptr = memalign( MEM_ALIGNMENT_SIZE, size );
 #else	
 	ptr = malloc ( size ) ;

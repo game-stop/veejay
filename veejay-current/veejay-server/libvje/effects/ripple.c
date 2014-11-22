@@ -173,7 +173,7 @@ void ripple_apply(VJFrame *frame, int width, int height, int _w, int _a , int _a
 		  sx = (int) (x+z * ripple_cos[a]);
 		  sy = (int) (y+z * ripple_sin[a]);
 
-		  if(sy > (height-1)) sy = height-1;
+		  if(sy >= (height-1)) sy = height-1;
 		  if(sx > width) sx = width;
 		  if(sx < 0) sx =0;
 		  if(sy < 0) sy =0;

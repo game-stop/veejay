@@ -929,11 +929,11 @@ void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
 void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 {	
   if( vj_task_available() ) {
-	void *data = vj_task_alloc_internal_buf( frame->uv_len * 2 ); //@ 4:2:2
+	void *data = vj_task_alloc_internal_buf( frame->uv_len * 4 ); //@ 4:2:2
 
 	uint8_t *plane = (uint8_t*) data;
 	uint8_t *vplane = plane + frame->uv_len;
-	uint8_t *planes[3] = { NULL, plane,vplane };
+	uint8_t *planes[4] = { NULL, plane,vplane,NULL };
 	int strides[4] = { 0, frame->uv_len, frame->uv_len, 0 };
 	vj_frame_copy( ycbcr, planes,strides);
 	vj_task_set_sampling ( 1 );

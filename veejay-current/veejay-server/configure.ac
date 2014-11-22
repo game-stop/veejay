@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.28],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.32],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=28
+VEEJAY_MICRO_VERSION=32
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -17,7 +17,6 @@ AC_CANONICAL_TARGET
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([1.7])
 AM_MAINTAINER_MODE
-AM_INIT_AUTOMAKE([dist-bzip2])
 
 AC_DEFINE(VEEJAY,1,[Building Veejay])
 AC_DEFINE(HAVE_CONFIG_H,1,[Include config.h])
@@ -105,10 +104,6 @@ AC_ARG_WITH(jpeg,
 AC_ARG_WITH(jpeg-mmx,
             AC_HELP_STRING([--with-jpegmmx=PFX],
                            [Prefix where jpeg-mmx is installed (optional).]))
-
-AC_ARG_WITH(unicap, AC_HELP_STRING([--without-unicap], [Do not use unicap]),
-		[],	[with_unicap=yes])
-
 
 AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
@@ -558,9 +553,9 @@ AC_MSG_RESULT($CFLAGS)
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
-PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=false)
-PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.57.2],have_avcodec=true,have_avcodec=false)
-PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0],have_avformat=true,have_avformat=false)
+PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0 libavutil < 52.48],have_avutil=true,have_avutil=false)
+PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.35.2 libavcodec < 55.39],have_avcodec=true,have_avcodec=false)
+PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0 libavformat < 55.19],have_avformat=true,have_avformat=false)
 PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 0.7.1],have_swscale=true,have_swscale=false)
 if test x$have_swscale = xfalse;
 then
@@ -576,7 +571,7 @@ then
 fi
 if test x$have_avcodec = xfalse;
 then
-	AC_MSG_ERROR([libavcodec not found.])
+	AC_MSG_ERROR([libavcodec >= 51.57 not found.])
 fi
 
 FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS}"
@@ -813,13 +808,21 @@ dnl ********************************************************************
 dnl Check for the SDL library (for software playback)
 dnl   (defines SDL_CFLAGS and SDL_LIBS)
 dnl ********************************************************************
+dnl have_sdl=false
+dnl if test x$with_sdl != xno ; then
+dnl AM_PATH_SDL(1.2.3,[
+dnl            have_sdl=true
+dnl            AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
+dnl fi
+
 have_sdl=false
 if test x$with_sdl != xno ; then
-AM_PATH_SDL(1.2.3,[
-            have_sdl=true
-            AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
+PKG_CHECK_MODULES( SDL, sdl >= 1.2, have_sdl=true,have_sdl=false)
+if test x$have_sdl = xfalse ; then
+ AC_MSG_ERROR([Could not find SDL 1.2 library!])
 fi
-
+AC_DEFINE(HAVE_SDL,1,[SDL library is installed])
+fi
 have_liblo=false
 PKG_CHECK_MODULES( LIBLO, liblo >= 0.26,have_liblo=true,have_liblo=false)
 if test x$have_liblo = xfalse ; then
@@ -829,23 +832,6 @@ else
  AC_SUBST(HAVE_LIBLO)
  AC_DEFINE(HAVE_LIBLO,,[define if liblo])
 fi
-
-have_unicap=false
-if test x$with_unicap != xno; then
-PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,have_unicap=true,have_unicap=false)
-fi
-
-if test x$have_unicap = xfalse ; then
-  AC_MSG_WARN([Could not find optional library libunicap])
-else
-have_unicap=true
-AC_SUBST(HAVE_UNICAP)
-AC_DEFINE(HAVE_UNICAP,,[define if unicap])
-fi
-
-AC_SUBST(UNICAP_CFLAGS)
-AC_SUBST(UNICAP_LIBS)
-
 
 dnl *********************************************************************
 dnl Check for the DirectFB library (for Matrox G550 Tvout)
@@ -917,19 +903,38 @@ fi
 
 
 have_freetype=false
-AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
-if test $FREETYPE_CONFIG = yes; then
-  FT_CFLAGS="`freetype-config --cflags`"
-  FT_WORD="`freetype-config --libs`"
-  FT_LDFLAGS=""
-  FT_LIBS=""
-  for word in $FT_WORD ; do
-	beginning=`echo $word | cut -c -2`
-	if test ".$beginning" = ".-L"; then
-		FT_LDFLAGS="$FT_LDFLAGS $word"  
+have_freetype2=false
+PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
+		AC_SUBST(FREETYPE2_CFLAGS)
+		AC_SUBST(FREETYPE2_LIBS)
+		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
+		have_freetype2=true],
+		[have_freetype2=false] )
+
+if test x$have_freetype2 != xtrue; then
+	AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
+	if test $FREETYPE_CONFIG = yes; then
+		FREETYPE_CFLAGS="`freetype-config --cflags`" 
+		FREETYPE_WORD="`freetype-config --libs`"
+		FREETYPE_LIBS=""
+		for word in $FREETYPE_WORD; do	
+			beginning=`echo $word |cut -c -2` 
+			if test ".$beginning" = ".-L"; then
+				FREETYPE_LDFLAGS="$FREETYPE_LDFLAGS $word"
+			else
+				FREETYPE_LIBS="$FREETYPE_LIBS $word"
+			fi
+		done
+		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
+		AC_SUBST(FREETYPE_LIBS)
+		AC_SUBST(FREETYPE_LDFLAGS)
+		AC_SUBST(FREETYPE_CFLAGS)
+		have_freetype=true
+		AC_MSG_NOTICE([Compiling with FreeType])
 	else
-		FT_LIBS="$FT_LIBS $word"
+		AC_MSG_ERROR([Cannot find the freetype-config program])
 	fi
+<<<<<<< HEAD
   done
   
   dnl freetype in /include/dir/freetype or /include/dir/freetype2
@@ -942,9 +947,13 @@ if test $FREETYPE_CONFIG = yes; then
   AC_SUBST(FT_LDFLAGS)
   AC_SUBST(FT_CFLAGS)
   have_freetype=true
+=======
+>>>>>>> 136a4bf5dccb26747f388e5f3dbe5e612fa39f4a
 else
- AC_MSG_ERROR([Cannot find the freetype-config program])
-fi  
+	AC_MSG_NOTICE([Compiling with FreeType2])
+fi
+
+
 
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
@@ -972,8 +981,8 @@ AM_CONDITIONAL(HAVE_V4L2, test x$have_V4l2 = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
-AM_CONDITIONAL(HAVE_UNICAP,test x$have_unicap = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
+AM_CONDITIONAL(HAVE_FREETYPE2, test x$have_freetype2 = xtrue)
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -1121,7 +1130,15 @@ AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
 AC_MSG_NOTICE([  - FFmpeg avutil		         : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
-AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
+
+if test "$have_freetype" = "true"; then
+	AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
+fi
+
+if test "$have_freetype2" = "true"; then
+	AC_MSG_NOTICE([  - FreeType 2 support            : ${have_freetype2}])
+fi
+
 AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
@@ -1131,10 +1148,8 @@ AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
-AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - V4L1 (obsolete)               : ${have_v4l}])
-#AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 
 cat NEWS

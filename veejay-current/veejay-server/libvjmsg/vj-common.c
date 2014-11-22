@@ -42,7 +42,8 @@
 #include <sys/wait.h>
 #include <sys/signal.h>
 #include <sys/ucontext.h>
-
+#include <execinfo.h>
+#include <unistd.h>
 #include <libgen.h>
 
 /* Bug in gcc prevents from using CPP_DEMANGLE in pure "C" */
@@ -145,8 +146,11 @@ static	void	veejay_addr2line_bt( int n, void *addr, char *sym )
 
 	address = addr;
 	if( info.dli_fbase >= (const void*)0x40000000)
+#ifdef ARCH_X86_64
+		addr = (void*)((const char*) address - (uint64_t) info.dli_fbase );
+#else
 		addr = (void*)((const char*) address - (unsigned int ) info.dli_fbase);
-
+#endif
 	snprintf( cmd,sizeof(cmd), "addr2line --functions --demangle -e $(which %s) %p", info.dli_fname, address);
 	out = popen( cmd, "r");
 	if(!out) {
@@ -256,7 +260,7 @@ void	veejay_backtrace_handler(int n , void *dist, void *x)
 
 				if( !dladdr( ip, &info ))
 					break;
-				char *symname = info.dli_sname;
+				char *symname = (char*) info.dli_sname;
 #ifndef NO_CPP_DEMANGLE
 				int status;
 				char *tmp = __cxa_demangle( symname, NULL, 0,
@@ -299,7 +303,7 @@ void	veejay_backtrace_handler(int n , void *dist, void *x)
 
 	report_bug();
 
-	exit(0);
+	_exit(0);
 }
 
 void veejay_set_debug_level(int level)

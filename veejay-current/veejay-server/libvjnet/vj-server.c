@@ -63,7 +63,7 @@ typedef struct
 	int type;
 } vj_proto;
 
-#define VJ_MAX_PENDING_MSG 128
+#define VJ_MAX_PENDING_MSG 768
 #define RECV_SIZE (4096) 
 #ifdef STRICT_CHECKING
 static	void	printbuf( FILE *f, uint8_t *buf , int len )
@@ -207,7 +207,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		return 0;
 	}
 
-    if (setsockopt( vjs->handle, SOL_SOCKET, SO_REUSEADDR, (const char*) &on, sizeof(on) )== -1)
+    	if (setsockopt( vjs->handle, SOL_SOCKET, SO_REUSEADDR, (const char*) &on, sizeof(on) )== -1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 		return 0;
@@ -222,12 +222,14 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		port_num = port_offset + VJ_STA_PORT;
 
 	vjs->myself.sin_port = htons(port_num);
-	veejay_memset(&(vjs->myself.sin_zero), 0, 8);
+	veejay_memset(&(vjs->myself.sin_zero), 0, sizeof(vjs->myself.sin_zero));
+	
 	if (bind(vjs->handle, (struct sockaddr *) &(vjs->myself), sizeof(vjs->myself) ) == -1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 		return 0;
 	}
+
 	if (listen(vjs->handle, VJ_MAX_CONNECTIONS) == -1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
@@ -273,6 +275,8 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	}
 #endif
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Port: %d [ receive buffer is %d bytes, send buffer is %d bytes ]", port_num, vjs->recv_size, vjs->send_size );
+
 	int flag = 1;
 	if( setsockopt( vjs->handle, IPPROTO_TCP, TCP_NODELAY, (char*) &flag, sizeof(int)) == -1 )
 	{
@@ -283,7 +287,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	link = (vj_link **) vj_malloc(sizeof(vj_link *) * VJ_MAX_CONNECTIONS);
 	if(!link)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Out of memory");
+		veejay_msg(VEEJAY_MSG_ERROR, "Server: Out of memory");
 		return 0;
 	}
 
@@ -339,14 +343,29 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 	if (!vjs)
 		return NULL;
 
-	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * (RECV_SIZE+1024) );
+	vjs->recv_bufsize = RECV_SIZE * 1024; //@ 4 MB receive buffer
+	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * vjs->recv_bufsize);
 	if(!vjs->recv_buf)
 	{
-		if(vjs) free(vjs);
+		free(vjs);
 		return NULL;
 	}	
 
 	vjs->server_type = type;
+
+	char *str_rbufsize = getenv( "VEEJAY_SERVER_RECEIVE_BUFFER_SIZE" );
+	if( str_rbufsize != NULL ) {
+		vjs->recv_bufsize = atoi( str_rbufsize );
+		free(vjs->recv_buf);
+		vjs->recv_buf = (char*) vj_calloc(sizeof(char) * vjs->recv_bufsize );
+		if( vjs->recv_buf == NULL ) {
+			free(vjs);
+			return NULL;
+		}
+		veejay_msg(VEEJAY_MSG_INFO, "Changed receive buffer size to %d bytes (%2.2fKb)",
+				vjs->recv_bufsize, (float) vjs->recv_bufsize / 1024.0f );
+	}
+
 #ifdef STRICT_CHECKING
 	char *netlog = getenv("VEEJAY_LOG_NET_IO" );
 
@@ -360,7 +379,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 		}
 		else {
 			fprintf( vjs->logfd, "Server setup: port %d, name %s type %d\n", port_offset,mcast_group_name,type);
-			fprintf( vjs->logfd, "receive buffer size: %d bytes\n", RECV_SIZE);
+			fprintf( vjs->logfd, "receive buffer size: %d bytes\n", vjs->recv_bufsize);
 		}
 	}
 #endif
@@ -380,7 +399,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 			return vjs;
 	}
 	  
-    return NULL;
+ 	return NULL;
 }
 
 
@@ -515,7 +534,7 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 		{
 			return vj_server_send_frame_now( vje, link_id, buf, len );
 		} else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Link %d's socket not ready for immediate send: %s", link_id, strerror(errno));
+			veejay_msg(VEEJAY_MSG_ERROR, "Link %d's socket not ready for immediate send: %s", link_id, strerror(errno));
 		}
 		return 0;
 	}
@@ -677,8 +696,6 @@ int	_vj_server_empty_queue(vj_server *vje, int link_id)
 	}
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
-	
-	veejay_memset( vje->recv_buf, 0, RECV_SIZE );
 	
 	return 1;
 }
@@ -846,11 +863,11 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 				num_msg++;
 			}
 	
-			if(num_msg >= (VJ_MAX_PENDING_MSG-1) )
+			if(num_msg >= VJ_MAX_PENDING_MSG )
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "VIMS server queue full - got %d/%d messages.",
 					num_msg,VJ_MAX_PENDING_MSG );	
-				return VJ_MAX_PENDING_MSG-1; // cant take more
+				return VJ_MAX_PENDING_MSG; // cant take more
 			}
 	
 			i += ( 5 + slen);
@@ -961,11 +978,46 @@ int	vj_server_update( vj_server *vje, int id )
 
 	int bytes_received = 0;
 	if(!vje->use_mcast) {
-		bytes_received = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
+
+		int max = vje->recv_bufsize;
+		int bytes_left = 1;
+		char *ptr = vje->recv_buf;
+		int readmore = 0;
+		
+		n = recv( sock_fd, ptr, 1, 0 );
+		if( n != 1 ) {
+			bytes_received = -1;
+		}
+		else {
+			if( *ptr == 'V' || *ptr == 'K' || *ptr == 'D' ) {
+				ptr ++;
+readmore_lbl:
+				n = recv( sock_fd, ptr, RECV_SIZE, 0 ); //@ read 4 kb
+				if( n == - 1) {
+					if( errno == EAGAIN ) {
+						goto readmore_lbl;
+					}
+					veejay_msg( 0, "Error: %s", strerror(errno) );
+					bytes_received = -1;
+				}
+				if( n == RECV_SIZE && errno == EAGAIN) //@ read 4kb, but still data left
+				{ // deal with large messages
+					ptr += n;
+					bytes_received += n;
+					if( bytes_received > max ) {
+						veejay_msg(VEEJAY_MSG_ERROR,"VIMS message does not fit receive buffer.");
+						return -1;
+					}
+					goto readmore_lbl;
+				}
+				bytes_received += n;
+			}
+		}
+		//bytes_received = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 #ifdef STRICT_CHECKING
 		if( vje->logfd ) {
-			fprintf(vje->logfd, "received %d of %d bytes from handle %d (link %d)\n", 
-					bytes_received,RECV_SIZE, Link[id]->handle,id );
+			fprintf(vje->logfd, "received %d bytes from handle %d (link %d)\n", 
+					bytes_received,Link[id]->handle,id );
 			printbuf( vje->logfd, vje->recv_buf, bytes_received );
 		}
 #endif
@@ -982,7 +1034,7 @@ int	vj_server_update( vj_server *vje, int id )
 			veejay_msg(0, "Networking error with socket %d: %s",sock_fd,strerror(errno));
 		}
 		if( bytes_received == 0 ) {
-			veejay_msg(0, "Link %d closed connection, terminating client connection.",id);
+			veejay_msg(VEEJAY_MSG_WARNING, "Link %d closed connection, terminating client connection.",id);
 		}
 		return -1; // close client now
 	}
@@ -992,10 +1044,10 @@ int	vj_server_update( vj_server *vje, int id )
 	int bytes_left = bytes_received;
 
 	int n_msg = _vj_verify_msg( vje, id, msg_buf, bytes_left ); 
-
+	
 	if(n_msg == 0 && bytes_received > 0)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid instruction '%s'", msg_buf );
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid VIMS instruction '%s'", msg_buf );
 #ifdef STRICT_CHECKING
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "no valid messages in buffer!\n" );
@@ -1017,7 +1069,7 @@ int	vj_server_update( vj_server *vje, int id )
 		}
 		return nn;
 	} else {
-		veejay_msg(VEEJAY_MSG_ERROR, "Too many messages in queue. Abort client");
+		veejay_msg(VEEJAY_MSG_ERROR, "Queue too small to handle all VIMS messages.");
 		return -1;
 	}
 	return 0;

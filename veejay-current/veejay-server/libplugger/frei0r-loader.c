@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdio.h>
 #include <libplugger/portdef.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -368,7 +369,6 @@ void* 	deal_with_fr( void *handle, char *name)
 		len = 1023;
 	strncpy( tmp_name, finfo.name, len );
 
-
 	char *plug_name = strdup(tmp_name);
 
 	vevo_property_set( port, "num_params", VEVO_ATOM_TYPE_INT, 1, &r_params );
@@ -399,8 +399,6 @@ void* 	deal_with_fr( void *handle, char *name)
 	veejay_msg(VEEJAY_MSG_DEBUG, "\tparameters: %d, input channels: %d, output channels: %d, format: %x",
 			r_params,n_inputs,n_outputs, pixfmt );
 #endif	
-
-
 	return port;
 }
 
@@ -542,7 +540,6 @@ void	frei0r_plug_free( void *plugin )
 	f0r_deinit_f base;
 	if( vevo_property_get( plugin, "deinit", 0, &base) == VEVO_NO_ERROR )
 		(*base)();
-//	vevo_property_get( plugin, "f0r_p", 0, &n );
 }
 
 int	frei0r_process_frame_f( void *plugin )
@@ -649,7 +646,7 @@ void	frei0r_plug_param_f( void *port, int seq_no, void *dargs )
 	(*inf)( &finfo, seq_no );
 
 	char key[20];
-	sprintf(key, "p%02d", seq_no );
+	snprintf(key, sizeof(key)-1, "p%02d", seq_no );
 	void *param = NULL;
 	
 	if(vevo_property_get( parent, key, 0, &param )!=VEVO_NO_ERROR)
@@ -694,6 +691,4 @@ void	frei0r_plug_param_f( void *port, int seq_no, void *dargs )
 void	frei0r_plug_control( void *port, int *args )
 {
 }
-
-
 

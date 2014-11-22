@@ -236,7 +236,8 @@ int		task_start(int max_workers)
 	    max_p = min_p;
 	
 
-    struct sched_param param;
+//    	struct sched_param param;
+//	veejay_memset( &param, 0, sizeof(struct sched_param));
 	cpu_set_t cpuset;
 	pthread_cond_init( &tasks_completed, NULL );
 	pthread_cond_init( &current_task, NULL );
@@ -245,9 +246,9 @@ int		task_start(int max_workers)
 	for( i = 0 ; i < max_workers; i ++ ) {
 		thr_id[i]	= i;
 		pthread_attr_init( &p_attr[i] );
-		pthread_attr_setstacksize( &p_attr[i], 128 * 1024 );
-	  	pthread_attr_setschedpolicy( &p_attr[i], SCHED_FIFO );
- 		pthread_attr_setschedparam( &p_attr[i], &param );
+		pthread_attr_setstacksize( &p_attr[i], 256 * 1024 );
+//	  	pthread_attr_setschedpolicy( &p_attr[i], SCHED_FIFO );
+//		pthread_attr_setschedparam( &p_attr[i], &param );
 
 		if( n_cpu > 1 ) {
 			CPU_ZERO(&cpuset);

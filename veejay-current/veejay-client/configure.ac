@@ -1,12 +1,20 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
+<<<<<<< HEAD
 AC_INIT([reloaded],[1.5.28],[nwelburg@gmail.com])
+=======
+AC_INIT([reloaded],[1.5.30],[nwelburg@gmail.com])
+>>>>>>> 136a4bf5dccb26747f388e5f3dbe5e612fa39f4a
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 RELOADED_MAJOR_VERSION=1
 RELOADED_MINOR_VERSION=5
+<<<<<<< HEAD
 RELOADED_MICRO_VERSION=28
+=======
+RELOADED_MICRO_VERSION=30
+>>>>>>> 136a4bf5dccb26747f388e5f3dbe5e612fa39f4a
 RELOADED_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 RELOADED_CODENAME="Reloaded - build $RELOADED_MAJOR_VERSION $RELOADED_MINOR_VERSION $RELOADED_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -16,7 +24,6 @@ AC_CANONICAL_TARGET
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([1.7])
 AM_MAINTAINER_MODE
-AM_INIT_AUTOMAKE([dist-bzip2])
 
 AC_DEFINE(HAVE_CONFIG_H,1,[Include config.h])
 # libtool versioning
@@ -178,7 +185,7 @@ fi
 
 dnl Check for Veejay
 have_veejay=false
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.26 ],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.28 ],
 	[	
 		AC_SUBST(VEEJAY_CFLAGS)
 		AC_SUBST(VEEJAY_LIBS)
@@ -188,7 +195,7 @@ PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.26 ],
 		[have_veejay=false])
 
 if test x$have_veejay != xtrue ; then
-   AC_MSG_ERROR([Cannot find veejay 1.5.26 or later])
+   AC_MSG_ERROR([Cannot find veejay 1.5.28 or later])
 fi
 
 have_pixbuf=false
@@ -200,6 +207,21 @@ if test x$with_pixbuf != xno ; then
 		     have_pixbuf=true
                      AC_DEFINE(USE_GDK_PIXBUF, 1, [use gdk image load / save])],
                     [have_pixbuf=false])
+fi
+
+have_sdl=false
+if test x$with_sdl != xno ; then
+ PKG_CHECK_MODULES(SDL, [sdl >= 1.2],
+	[
+	 AC_SUBST(SDL_CFLAGS)
+	 AC_SUBST(SDL_LIBS)
+	 have_sdl=true
+	 AC_DEFINE(HAVE_SDL,1,[use sdl keybindings])],
+	[have_sdl=false])
+fi
+
+if test x$have_sdl != xtrue ; then
+ AC_MSG_WARN([Cannot find SDL, reloaded will not be able to map keybindings])
 fi
 
 dnl ********************************************************************
@@ -220,7 +242,11 @@ dnl Look for X
 AC_PATH_XTRA
 AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
 
+<<<<<<< HEAD
 debugCFLAGS=""
+=======
+debugCFLAGS=-g
+>>>>>>> 136a4bf5dccb26747f388e5f3dbe5e612fa39f4a
 
 AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
@@ -519,7 +545,6 @@ then
 	AC_MSG_NOTICE([enable_debug = $enable_debug])
 	if test "x$enable_debug" != "xyes" ;
 	then
-		AC_MSG_NOTICE([debug koekje])
 		if test $ac_cv_flag_sse = yes; then
 			CFLAGS="$CFLAGS -msse -mfpmath=sse"
 			AC_MSG_NOTICE([cflags aangepast])
@@ -533,37 +558,20 @@ fi
 
 AC_MSG_RESULT($CFLAGS)
 
-
-AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
-                    [Defined if building against uninstalled FFmpeg source])
-
-PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=false)
-PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.57.2],have_avcodec=true,have_avcodec=false)
-PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0],have_avformat=true,have_avformat=false)
-PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 0.7.1],have_swscale=true,have_swscale=false)
-if test x$have_swscale = xfalse;
-then
-	AC_MSG_ERROR([libswscale not found.])
-fi
+PKG_CHECK_MODULES(LIBAVUTIL,[libavutil >= 49.7], have_avutil=true,have_avutil=false)
 if test x$have_avutil = xfalse;
 then
-	AC_MSG_ERROR([libavutil not found.])
-fi
-if test x$have_avformat = xfalse;
-then
-	AC_MSG_ERROR([libavformat not found.])
-fi
-if test x$have_avcodec = xfalse;
-then
-	AC_MSG_ERROR([libavcodec not found.])
+       AC_MSG_ERROR([libavutil not found.])
 fi
 
-FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS}"
-FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCALE_LIBS}"
+PKG_CHECK_MODULES( LIBX11, x11, have_x11=true,have_x11=false)
+if test x$have_x11 = xfalse;
+then
+	AC_MSG_ERROR([libx11 not found.])
+fi
+
+FFMPEG_CFLAGS="${LIBAVUTIL_CFLAGS}"
 AC_SUBST(FFMPEG_CFLAGS)
-AC_SUBST(FFMPEG_LIBS)
-
-
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
 AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
@@ -630,7 +638,7 @@ if test x"$with_extra_cflags" != "x"; then
    CXXFLAGS="$CXXFLAGS $with_extra_cflags"
 fi
 
-reloaded_datadir="${datadir}/reloaded"
+reloaded_datadir="${datarootdir}/reloaded"
 AC_SUBST(reloaded_datadir)
 sh gveejay-paths.sh > gveejay-paths.h
 
@@ -701,9 +709,8 @@ AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
-AC_MSG_NOTICE([  - Veejay 1.5.26                 : ${have_veejay}])
+AC_MSG_NOTICE([  - Veejay 1.5.28                 : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
-AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
-AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])
+AC_MSG_NOTICE([])

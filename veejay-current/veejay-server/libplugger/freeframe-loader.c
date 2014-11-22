@@ -73,6 +73,9 @@ static void *yuv_conv_ = NULL;
 #define FF_CAP_V_BITS_VIDEO     FF_CAP_16BITVIDEO
 #endif*/
 
+static void 		freeframe_copy_parameters( void *srcPort, void *dst, int n_params );
+
+
 void	freeframe_destroy( ) {
 	int i;
 	yuv_free_swscaler( rgb_conv_ );
@@ -632,7 +635,7 @@ void	freeframe_plug_param_f( void *plugin, int seq_no, void *dargs )
 
 
 
-void 		freeframe_copy_parameters( void *srcPort, void *dst, int n_params )
+static void 		freeframe_copy_parameters( void *srcPort, void *dst, int n_params )
 {
 	int p;
 	for( p = 0; p < n_params; p ++ ) {

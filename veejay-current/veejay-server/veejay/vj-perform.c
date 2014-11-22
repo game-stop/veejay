@@ -61,6 +61,10 @@
 
 #define PERFORM_AUDIO_SIZE 16384
 
+#ifndef SAMPLE_FMT_S16
+#define AV_SAMPLE_FMT_S16 SAMPLE_FMT_S16
+#endif
+
 typedef struct {
     uint8_t *Y;
     uint8_t *Cb;
@@ -125,7 +129,10 @@ static const char *intro =
 static const char *license =
 	"This program is licensed as\nFree Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejayhq.net\nhttp://veejay.dyne.org\nhttp://www.sourceforge.net/projects/veejay\nhttp://www.gnu.org";
 static const char *copyr =
-	"(C) 2002-2008 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
+	"(C) 2002-2013 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
+
+static const char *donateaddr = 
+	"Veejay's BTC donation address: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n\tLTC donation address: LcccLQCB7DbqGj9u52urRjVi43yYz7WeND\n";
 
 #define MLIMIT(var, low, high) \
 if((var) < (low)) { var = (low); } \
@@ -1072,7 +1079,7 @@ void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
 
 }
 
-static void long2str(unsigned char *dst, int32_t n)
+static void long2str(uint8_t *dst, uint32_t n)
 {
    dst[0] = (n    )&0xff;
    dst[1] = (n>> 8)&0xff;
@@ -1080,63 +1087,56 @@ static void long2str(unsigned char *dst, int32_t n)
    dst[3] = (n>>24)&0xff;
 }
 
-static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_t *p1_len, uint32_t *p2_len, uint32_t *p3_len)
+static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_t *p1_len, uint32_t *p2_len, uint32_t *p3_len)
 {
 	const int len = info->effect_frame1->width * info->effect_frame1->height;
 	const int uv_len = info->effect_frame1->uv_len;
-	uint8_t *dstI = dst + (sizeof(uint8_t) * 16);
-	unsigned int size1=0,size2=0,size3=0;
-	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, &size1, len );
+	uint8_t *dstI = dst + 16;
+
+	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, p1_len, len );
 	if( i == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress Y plane");
-#ifdef STRICT_CHECKING
-		assert(0);
-#endif
 		return 0;
 	}
-	dstI += size1;
-	*p1_len  = size1;
-
-	if( info->settings->mcast_mode == 1 ) {
-		//@ only compress Y plane, set mode in header
-	/*	long2str( dst,size1);
-		long2str( dst+4,0);
-		long2str( dst+8,0);
-		long2str( dst+12, info->settings->mcast_mode );*/
-		return size1;
-	}
-
-	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cb, dstI, &size2, uv_len );
+	uint32_t size1 = ( *p1_len );
+#ifdef STRICT_CHECKING
+	assert(size1>0);
+#endif
+	dstI = dst + 16 + (sizeof(uint8_t) * size1 );
+	
+	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cb, dstI, p2_len, uv_len );
 	if( i == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress U plane");
-#ifdef STRICT_CHECKING
-		assert(0);
-#endif
 		return 0;
 	}
-	dstI += size2;
-	*p2_len = size2;
 
-	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cr, dstI, &size3, uv_len );
+	uint32_t size2 = ( *p2_len );
+#ifdef STRICT_CHECKING
+	assert( size2 > 0);
+#endif
+	dstI = dst + 16 + size1 + size2;
+
+	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cr, dstI, p3_len, uv_len );
 	if( i == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress V plane");
-#ifdef STRICT_CHECKING
-		assert(0);
-#endif
 		return 0;
 	}	
 
-	*p3_len = size3;
+	uint32_t size3 = ( *p3_len );
+
+#ifdef STRICT_CHECKING
+	assert( size3 > 0 );
+#endif
 
 	long2str( dst,size1);
 	long2str( dst+4, size2 );
 	long2str( dst+8, size3 );
 	long2str( dst+12,info->settings->mcast_mode );
 
-	return (size1+size2+size3+16);
+	return 1;
 }
 
 void	vj_perform_done_s2( veejay_t *info ) {
@@ -1148,46 +1148,60 @@ void	vj_perform_done_s2( veejay_t *info ) {
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_link_id)
 {
 	unsigned char info_line[128];
-
-	int compr_len = 0;
+	int compr_ok = 0;
 	uint32_t planes[3];
-	const int data_len = 44;
+	int data_len = 44;  
 
 	memset(info_line, 0, sizeof(info_line) );
 
 	if(socket_buffer == NULL )
-		socket_buffer = vj_malloc( RUP8( info->effect_frame1->width * info->effect_frame1->height ));
+		socket_buffer = vj_malloc( 
+					RUP8( info->effect_frame1->width * info->effect_frame1->height * 3 )
+					);
 
 	uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * data_len );
 
 	if( sbic == 0 ) {
-		compr_len = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2]);
-#ifdef STRICT_CHECKING
-		assert( compr_len > 0 );
-#endif
+		compr_ok = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2]);
+		int total = planes[0] + planes[1] + planes[2] + 16;
+		if( compr_ok == 0 ) {
+			planes[0] = info->effect_frame1->width * info->effect_frame1->height;
+			planes[1] = info->effect_frame1->uv_len;
+			planes[2] = planes[1];
+			veejay_msg(VEEJAY_MSG_WARNING, "Failed to compress frame, sending raw planes: [%d,%d,%d]",
+					planes[0],planes[1],planes[2] );
+			total = 0;
+		}
 		sbic = 1;
 		/* peer to peer connection */
-		snprintf(info_line,
-				data_len + 1, //@ '\0' counts
-				"%04d%04d%04d%08d%08d%08d%08d", info->effect_frame1->width,
-				info->effect_frame1->height, info->effect_frame1->format,
-		      	compr_len,planes[0],planes[1],planes[2] );
-		
-		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * data_len );
+		sprintf(info_line,
+			"%04d%04d%04d%08d%08d%08d%08d", 
+			info->effect_frame1->width,
+			info->effect_frame1->
+			height,info->effect_frame1->format,
+			total,
+			planes[0],
+			planes[1],
+			planes[2] );
+
+
+		veejay_memcpy( socket_buffer, info_line, 44 );
+		if( compr_ok == 0 )
+		{
+			veejay_memcpy( socket_buffer + 44 ,  primary_buffer[info->out_buf]->Y, info->effect_frame1->len );
+			veejay_memcpy( socket_buffer + 44 + info->effect_frame1->len,
+							     primary_buffer[info->out_buf]->Cb, info->effect_frame1->uv_len );
+			veejay_memcpy( socket_buffer + 44 + info->effect_frame1->len + info->effect_frame1->uv_len,
+							     primary_buffer[info->out_buf]->Cr, info->effect_frame1->uv_len );
+			data_len += 16 + info->effect_frame1->len + (info->effect_frame1->uv_len * 2);
+		} else {
+			data_len += 16 + planes[0] + planes[1] + planes[2];
+		}
 	}
 
 	int id = (mcast ? 2: 3);
-	int __socket_len = data_len + compr_len;
+	int __socket_len = data_len;
 	int i;
-
-#ifdef STRICT_CHECKING
-	for( i = 0; i < 8 ; i++ ) {
-			if( info->rlinks[i] != -1 ) {
-				veejay_msg(VEEJAY_MSG_DEBUG, "Send cached frame to link %d now",
-						info->rlinks[i]);
-			}
-		}
-#endif
 
 	if(!mcast) 
 	{
@@ -3153,7 +3167,7 @@ static	char	*vj_perform_print_credits( veejay_t *info )
 {
 	char text[1024];
 	veejay_memset(text,0,sizeof(text));
-	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s\n",VERSION,intro,copyr,license);
+	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s\n%s",VERSION,intro,copyr,license,donateaddr);
 	
 	return strdup(text);
 }
@@ -3351,12 +3365,15 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				sample_reload_config( info->composite,info->uc->sample_id, 1 );
 			//		settings->composite);
 			}
+#ifdef HAVE_SDL
 			if( info->video_out == 0 ) {
 				//@ release focus
 				vj_sdl_grab( info->sdl[0], 0 );
 			}
+#endif
 		}
 
+#ifdef HAVE_SDL
 		if( info->use_osd == 2 ) {
 			osd_text = vj_perform_print_credits(info);	
 			placement= 1;
@@ -3368,6 +3385,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			osd_text = viewport_get_my_help( composite_get_vp(info->composite ) );
 			more_text = vj_perform_osd_status(info);
 		}
+#endif
 	}
 
 	if( settings->composite  ) {

@@ -1083,13 +1083,12 @@ static int veejay_screen_update(veejay_t * info )
 
 	vj_perform_get_primary_frame(info,frame);
 
+#ifdef HAVE_SDL
 	if(check_vp)
 	{
 		if( info->video_out == 0 ) {
-	
 			if(!vj_sdl_lock( info->sdl[0] ) )
 				return 0;
-			
 			composite_blit_yuyv( info->composite,frame, vj_sdl_get_yuv_overlay(info->sdl[0]),settings->composite);
 			if(!vj_sdl_unlock( info->sdl[0]) )
 				return 0;
@@ -1098,7 +1097,7 @@ static int veejay_screen_update(veejay_t * info )
 			skip_update = 1;
 		}
 	} 
-
+#endif
 	if( info->shm && vj_shm_get_status(info->shm) == 1 )
 	{
 		int plane_sizes[4] = { info->effect_frame1->len, info->effect_frame1->uv_len,
@@ -1139,7 +1138,8 @@ static int veejay_screen_update(veejay_t * info )
         }
 #endif
 #endif
-			
+		
+#ifdef HAVE_SDL	
 	if(skip_update) {
 		if(info->video_out == 0 ) { 
 		   for(i = 0 ; i < MAX_SDL_OUT; i ++ )
@@ -1157,7 +1157,7 @@ static int veejay_screen_update(veejay_t * info )
 */
 		return 1;
 	}
-
+#endif
     	switch (info->video_out)
 	{
 #ifdef HAVE_SDL
@@ -1361,8 +1361,7 @@ void veejay_pipe_write_status(veejay_t * info)
 		        0,
 			0,
 			0,
-			mstatus,
-		        0	);
+			mstatus);
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
 		if( vj_tag_sprint_status( info->uc->sample_id,cache_used,info->seq->active,info->seq->current, info->real_fps,
@@ -3267,27 +3266,45 @@ veejay_t *veejay_malloc()
 
 int veejay_main(veejay_t * info)
 {
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
+	video_playback_setup *settings = (video_playback_setup *) info->settings;
 	pthread_attr_t attr;	
 	cpu_set_t cpuset;
 
-    /* Flush the Linux File buffers to disk */
-    sync();
-    
-	CPU_ZERO( &cpuset );
-	CPU_SET ( 1, &cpuset ); /* run on cpu 1 */
+	memset( &attr, 0 , sizeof(pthread_attr_t));
 
-	pthread_attr_init( &attr );
-	if( pthread_attr_setaffinity_np( &attr, sizeof(cpuset) , &cpuset ) != 0 ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Unable to pin playback timer to cpu #1");
+    	/* Flush the Linux File buffers to disk */
+    	sync();
+   
+	if( task_num_cpus() > 1 ) {
+		CPU_ZERO( &cpuset );
+		CPU_SET ( 1, &cpuset ); /* run on cpu 1 */
+
+		int err = pthread_attr_init( &attr );
+		if( err == ENOMEM ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Out of memory error.");
+			return 0;
+
+		}
+		if( pthread_attr_setaffinity_np( &attr, sizeof(cpuset) , &cpuset ) != 0 ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Unable to pin playback timer to cpu #1");
+		}
+		else {
+			veejay_msg(VEEJAY_MSG_INFO,"Pinned playback timer thread to cpu #1");
+		}
 	}
 
-    if (pthread_create(&(settings->playback_thread),&attr,
-		       veejay_playback_thread, (void *) info)) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create playback timer thread");
-		return -1;
-    }
+        int err = pthread_create(&(settings->playback_thread),&attr,
+		       veejay_playback_thread, (void *) info);
+    	if( err != 0 ) {
+		switch( err ) {
+		 case EAGAIN:
+			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient resources to create playback timer thread.");
+			break;
+	  	default:
+			veejay_msg(VEEJAY_MSG_ERROR, "Failed to create playback timer thread, code %d ", err);
+    		}
+        	return 0;
+    	}
 
     return 1;
 }

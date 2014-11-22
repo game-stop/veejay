@@ -33,7 +33,9 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 //#define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
 
@@ -191,7 +193,6 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 		e->context = avcodec_alloc_context3(e->codec);
 #else
 		e->context = avcodec_alloc_context();
-
 #endif
 		e->context->bit_rate = 2750 * 1024;
 		e->context->width = el->video_width;
@@ -206,13 +207,11 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 		e->context->qblur = 0.0;
 		e->context->max_b_frames = 0;
 		e->context->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
-		e->context->flags = CODEC_FLAG2_FAST | CODEC_FLAG_QSCALE;
+		e->context->flags = CODEC_FLAG_QSCALE;
 		e->context->gop_size = 0;
-		e->context->sub_id = 0;
 		e->context->workaround_bugs = FF_BUG_AUTODETECT;
 		e->context->prediction_method = 0;
 		e->context->dct_algo = FF_DCT_AUTO; 
-
 		e->context->pix_fmt = get_ffmpeg_pixfmt( out_pixel_format );
 	
 		if(YUV420_ONLY_CODEC(id))
@@ -472,8 +471,11 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 	av_log_set_level( AV_LOG_QUIET);
 	//av_log_set_level( AV_LOG_VERBOSE );
 	
+#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+	avcodec_register_all();
+#else
 	av_register_all();
-
+#endif
 	return 1;
 }
 
@@ -494,38 +496,34 @@ static void long2str(unsigned char *dst, int32_t n)
 static	int	vj_avcodec_lzo( vj_encoder  *av, uint8_t *src[3], uint8_t *dst , int buf_len )
 {
 	uint8_t *dstI = dst + (3 * 4);
-	int size1 = 0, size2=0,size3=0;
+	uint32_t s1,s2,s3;
+	uint32_t *size1 = &s1, *size2=&s2,*size3=&s3;
 	int i;
-	
-	i = lzo_compress( av->lzo, src[0], dstI, &size1 , av->len);
+
+	i = lzo_compress( av->lzo, src[0], dstI, size1 , av->len);
 	if( i == 0 )
 	{
 		veejay_msg(0,"\tunable to compress Y plane");
 		return 0;
 	}
-	dstI += size1;
-
-	i = lzo_compress( av->lzo, src[1], dstI, &size2 , av->uv_len );
+	i = lzo_compress( av->lzo, src[1], dstI + s1, size2 , av->uv_len );
 	if( i == 0 )
 	{
 		veejay_msg(0,"\tunable to compress U plane");
 		return 0;
 	}
-	
-	dstI += size2;
-	i = lzo_compress( av->lzo, src[2], dstI, &size3 , av->uv_len );
+	i = lzo_compress( av->lzo, src[2], dstI + (s1 + s2), size3 , av->uv_len );
 	if( i == 0 )
 	{
 		veejay_msg(0,"\tunable to compress V plane");
 		return 0;
 	}
-		
 	
-	long2str( dst, size1 );
-	long2str( dst+4,size2);
-	long2str( dst+8,size3);
-	
-	return (size1 + size2 + size3 + 12);
+	long2str( dst, s1 );
+	long2str( dst+4,s2);
+	long2str( dst+8,s3);
+
+	return (s1 + s2 + s3 + 12);
 }
 static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst, int in_fmt )
 {
@@ -567,7 +565,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 	if( av->encoder_id == 998 )
 	{
-		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->uv_len) };
+		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->uv_len), NULL };
 		int strides[4] = { av->len, av->uv_len, av->uv_len, 0 };
 		vj_frame_copy( src, dest, strides );
 
@@ -582,7 +580,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 	if( av->encoder_id == 997 )
 	{
-		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->uv_len) };
+		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->uv_len), NULL };
 		int strides[4] = { av->len, av->uv_len,av->uv_len, 0 };
 		vj_frame_copy( src, dest, strides );
 
@@ -669,6 +667,6 @@ int		vj_avcodec_encode_audio( void *encoder, int format, uint8_t *src, uint8_t *
 	if(format == ENCODER_YUV420 || ENCODER_YUV422 == format)
 		return 0;
 	vj_encoder *av = encoder;
-	int ret = avcodec_encode_audio( av->context, src, len, nsamples );
+	int ret = avcodec_encode_audio( av->context, dst, len, (const short*) src );
 	return ret;
 }

@@ -234,7 +234,6 @@ void chameleon_apply( VJFrame *frame, int width, int height, int mode)
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, tmpimage, strides );
 
-	veejay_memcpy( &source, frame, sizeof(VJFrame));
 	source.data[0] = tmpimage[0];
 	source.data[1] = tmpimage[1];
 	source.data[2] = tmpimage[2];

@@ -30,9 +30,10 @@
 #include <sys/socket.h>
 #include <veejay/vims.h>
 #include <veejay/vj-client.h>
+#include <veejay/vjmem.h>
+#include <veejay/vj-msg.h>
 static int   interactive = 0;
 static int   port_num = 3490;
-static char  *filename = NULL;
 static char  *group_name = NULL;
 static char  *host_name = NULL;
 static vj_client *sayvims = NULL;
@@ -40,10 +41,10 @@ static int colors = 0;
 static int fd_in = 0; // stdin
 static int single_msg = 0;
 static int dump = 0;
-
+static int verbose = 0;
 /* count played frames (delay) */
 static void vj_flush(int frames) { 
-	int n = 0;
+	
 	char status[100];
 	bzero(status,100);
 
@@ -87,6 +88,7 @@ static void Usage(char *progname)
 	fprintf(stderr, " -m\t\tSend single message\n");
 	fprintf(stderr, " -c\t\tColored output\n");
 	fprintf(stderr, " -d\t\tDump status to stdout\n");
+	fprintf(stderr, " -v\t\t\n");
 	fprintf(stderr, "Messages to send to veejay must be wrapped in quotes\n");
 	fprintf(stderr, "You can send multiple messages by seperating them with a whitespace\n");  
 	fprintf(stderr, "Example: %s \"600:;\"\n",progname);
@@ -129,6 +131,10 @@ static int set_option(const char *name, char *value)
 	{
 		dump = 1;
 	}
+	else if(strcmp(name,"v") == 0 )
+	{
+		verbose = 1;
+	}
 	else err++;
 
 	return err;
@@ -159,18 +165,14 @@ int main(int argc, char *argv[])
 {
        	int i;
 	int n = 0;
-	int x = 0;
-	int k =0;
-	char msg[20];
 	char option[2];
-	char ibuf[1024];
 	int err = 0;
 	FILE *infile;
 
-	veejay_set_debug_level(1);
+	veejay_set_debug_level(verbose);
 
 	// parse commandline parameters
-	while( ( n = getopt(argc,argv, "h:g:p:micd")) != EOF)
+	while( ( n = getopt(argc,argv, "h:g:p:micdv")) != EOF)
 	{
 		sprintf(option,"%c",n);
 		err += set_option( option,optarg);
@@ -181,6 +183,10 @@ int main(int argc, char *argv[])
 		Usage( argv[0] );
 		return -1;
 	}
+
+	vj_mem_init();
+
+	veejay_set_debug_level( verbose );
 
 	sayvims = sayvims_connect();
 
@@ -220,7 +226,6 @@ int main(int argc, char *argv[])
 	else
 	{
 		/* read from stdin*/
-		int not_done = 1;
 		infile = fdopen( fd_in, "r" );
 		if(!infile)
 		{
@@ -249,6 +254,7 @@ int main(int argc, char *argv[])
 			}
 		}
 	}
+
 
 
 	vj_flush(1);

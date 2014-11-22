@@ -43,8 +43,8 @@ void		mmap_free(mmap_region_t *map)
 
 mmap_region_t *	mmap_file(int fd, int offset, int length, int fs)
 {
-	mmap_region_t *map = (mmap_region_t*) malloc(sizeof( mmap_region_t ));
-	memset( map, 0, sizeof( mmap_region_t ));
+	mmap_region_t *map = (mmap_region_t*) vj_malloc(sizeof( mmap_region_t ));
+	veejay_memset( map, 0, sizeof( mmap_region_t ));
 
 	map->fd		= fd;
 	map->page_size  = getpagesize();

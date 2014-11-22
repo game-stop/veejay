@@ -4,7 +4,7 @@ MAINTAINERCLEANFILES = Makefile.in
 AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
 		-I$(top_srcdir)/vjmsg \
-		-I$(top_srcdir)/mjpegtools $(FFMPEG_AVUTIL_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) $(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_SWSCALER_CFLAGS) $(PIXBUF_CFLAGS) \
+		-I$(top_srcdir)/mjpegtools $(FFMPEG_CFLAGS) $(PIXBUF_CFLAGS) \
 		$(LIBQUICKTIME_CFLAGS)
  
 VJEL_LIB_FILE = libel.la

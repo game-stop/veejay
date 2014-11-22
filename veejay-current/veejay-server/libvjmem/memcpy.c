@@ -1195,7 +1195,7 @@ static	void	vj_frame_copy_job( void *arg ) {
 			assert( info->input[i] != NULL );
 		}
 #endif
-		if( info->strides[i] == 0 || info->output[i] == NULL || info->output[i] == NULL )
+		if( info->strides[i] <= 0 || info->output[i] == NULL || info->output[i] == NULL )
 			continue;
 		veejay_memcpy( info->output[i], info->input[i], info->strides[i] );
 	}

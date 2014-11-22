@@ -33,6 +33,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include <stdio.h>
 #include <libhash/hash.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
@@ -1461,9 +1462,6 @@ void*	deal_with_livido( void *handle, const char *name )
 		veejay_msg(VEEJAY_MSG_WARNING, "Plugin '%s' uses newer LiViDO API (version %d).", plugin_name, compiled_as);
 		return NULL;
 	}
-
-	plugin_name =  get_str_vevo( filter_templ, "name" );
-
 
 	int n_params = livido_scan_parameters( filter_templ, port );
 
