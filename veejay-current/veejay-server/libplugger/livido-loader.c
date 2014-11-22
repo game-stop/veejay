@@ -28,6 +28,7 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+#include <stdio.h>
 #include <string.h>
 #include <dirent.h>
 #include <fcntl.h>

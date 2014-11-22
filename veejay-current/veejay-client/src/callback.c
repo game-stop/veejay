@@ -2117,15 +2117,15 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	int k;
 
 	get_points_from_curve( curve,  length, data );
-	for( k = 0 ; k < length ; k++ )
-		values[k] = min + ( (int) ( data[k] * max ));
-
+	for( k = 0 ; k < length ; k++ ) {
+		values[k] = (int) ( (float) min + ( data[k] * ((float) max) ));
+	}
 	int row_len   = 3 + 2 + 2 + 8 + 8 + 2;
 	sprintf( (char*)kf, "key%02d%02d%08d%08d%02d",i,j,start,end,type );
 	unsigned char *ptr = kkf + row_len;
 	int total_len = row_len;
 
-	for( k = 0; k <= length; k ++ )
+	for( k = 0; k < length; k ++ )
 	{
 		unsigned char *p = ptr + (k*4);
 		p[0] = values[k] & 0xff;
@@ -2134,6 +2134,8 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		p[3] = (values[k] >> 24) & 0xff;
 
 		total_len += 4;
+
+		veejay_msg( VEEJAY_MSG_DEBUG, "(%d/%d) FX set value %d on frame %d",k,length,values[k], start+k );
 	}
 
 	free(values);

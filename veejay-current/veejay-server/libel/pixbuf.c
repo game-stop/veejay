@@ -104,7 +104,7 @@ static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst
 
 	yuv_convert_any_ac( src, dst, src->format, dst->format );
 	
-	gdk_pixbuf_unref( image ); 
+	g_object_unref( image ); 
 	
 	free(src);
 
@@ -236,7 +236,7 @@ int	vj_picture_probe( const char *filename )
 	if(image)
 	{
 		ret = 1;
-		gdk_pixbuf_unref( image );
+		g_object_unref( image );
 	}
 #endif
 	return ret;
@@ -387,7 +387,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	}
 
 	if( img_ ) 
-		gdk_pixbuf_unref( img_ );
+		g_object_unref( img_ );
 
 	free(src);
 	free(dst);

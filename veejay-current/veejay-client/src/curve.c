@@ -49,7 +49,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	int start = 0, end =0,type=0;
 	int entry  = 0;
 	int n = sscanf( (char*) blob, "key%2d%2d%8d%8d%2d", &entry, &parameter_id, &start, &end,&type );
-	int len = end - start;
+	int len = end - start + 1;
 	int i;
 	int min = 0, max = 0;
 #ifdef STRICT_CHECKING
@@ -70,7 +70,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	unsigned int k = 0;
 	unsigned char *in = blob + 25;
 	float	*vec = (float*) vj_calloc(sizeof(float) * (len+1) );
-	for(i = start ; i < end; i ++ )
+	for(i = start ; i <= end; i ++ )
 	{
 		unsigned char *ptr = in + (i * 4);
 		int value = 
@@ -79,6 +79,8 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
 		float top = 1.0 / (float) max;
 		float val = (float)value * top;
+
+		veejay_msg(4, "FX position %d, value %d", i, value );
 
 		vec[k] = val;
 		k++;

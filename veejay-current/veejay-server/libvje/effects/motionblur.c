@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "motionblur.h"
 #include <config.h>

@@ -309,15 +309,15 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 
     /* the effect chain is initially empty ! */
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
-	si->effect_chain[i] = &sec[i];
-	if (si->effect_chain[i] == NULL) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
-		return NULL;
+		si->effect_chain[i] = &sec[i];
+		if (si->effect_chain[i] == NULL) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
+			return NULL;
 		}
-	si->effect_chain[i]->effect_id = -1;
-	si->effect_chain[i]->volume = 50;
-	si->effect_chain[i]->channel = ( sample_size() <= 0 ? si->sample_id : sample_size()-1);
-	si->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
+		si->effect_chain[i]->effect_id = -1;
+		si->effect_chain[i]->volume = 50;
+		si->effect_chain[i]->channel = ( sample_size() <= 0 ? si->sample_id : sample_size()-1);
+		si->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
     }
 #ifdef HAVE_FREETYPE
     si->dict = vpn( VEVO_ANONYMOUS_PORT );
@@ -1244,10 +1244,13 @@ int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int 
 	 for( i = 0; i < arg_len; i ++ )
 	 {
 		int tmp = 0;
-		if(!get_keyframe_value( sample->effect_chain[position]->kf, n_frame, i, &tmp ) )
+		if(!get_keyframe_value( sample->effect_chain[position]->kf, n_frame, i, &tmp ) ) {
 			args[i] = sample->effect_chain[position]->arg[i];
-		else
+			veejay_msg(4, "%d - FX [%d] P%d : %d", n_frame,position, i, args[i] );
+		}
+		else {
 			args[i] = tmp;
+		}
 	 }
     }
     else
@@ -2043,6 +2046,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
 			sample->effect_chain[c]->fx_instance = NULL;
 		}
 	}
+	
     }
 
 
@@ -2096,6 +2100,13 @@ int sample_chain_add(int s1, int c, int effect_nr)
         veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with sample %d",
 			vj_effect_get_description(sample->effect_chain[c]->effect_id),c,sample->effect_chain[c]->channel);
     }
+
+    //clear fx anim
+    sample->effect_chain[c]->kf_status = 0;
+	if(sample->effect_chain[c]->kf)
+		vpf(sample->effect_chain[c]->kf );
+	sample->effect_chain[c]->kf = vpn(VEVO_ANONYMOUS_PORT );
+
     sample_update(sample,s1);
 
     return 1;			/* return position on which it was added */

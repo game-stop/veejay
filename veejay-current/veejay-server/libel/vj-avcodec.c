@@ -187,7 +187,12 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 	  if(id != CODEC_ID_DVVIDEO )
 		{
 #endif
+#if LIBAVCODEC_BUILD > 5400
+		e->context = avcodec_alloc_context3(e->codec);
+#else
 		e->context = avcodec_alloc_context();
+
+#endif
 		e->context->bit_rate = 2750 * 1024;
 		e->context->width = el->video_width;
  		e->context->height = el->video_height;
@@ -217,7 +222,11 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 
 	
 		char *descr = vj_avcodec_get_codec_name( id );
+#if LIBAVCODEC_BUILD > 5400
+		if ( avcodec_open2( e->context, e->codec, NULL ) )
+#else
 		if ( avcodec_open( e->context, e->codec ) < 0 )
+#endif
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot open codec '%s'" , descr );
 			if(e->context) free(e->context);
@@ -460,11 +469,9 @@ void 		*vj_avcodec_start( editlist *el, int encoder, char *filename )
 int		vj_avcodec_init( int pixel_format, int verbose)
 {
 	out_pixel_format = pixel_format;
-#ifndef STRICT_CHECKING
 	av_log_set_level( AV_LOG_QUIET);
-#else
-	av_log_set_level( AV_LOG_VERBOSE );
-#endif
+	//av_log_set_level( AV_LOG_VERBOSE );
+	
 	av_register_all();
 
 	return 1;

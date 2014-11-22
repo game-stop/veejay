@@ -17,7 +17,9 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
+#include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
@@ -326,9 +328,9 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 		case PIX_FMT_RGBA:
 			if( p1 != NULL )
 				*p1 = src->len * 4;
-			*p2 = NULL;
-			*p3 = NULL;
-			*p4 = NULL;
+			*p2 = 0;
+			*p3 = 0;
+			*p4 = 0;
 			break;
 		default:	
 			if(p1 != NULL) {
@@ -617,7 +619,7 @@ void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[3], VJFrame *d
 	{
 		veejay_msg(0,"sws_getContext failed.");
 		if(s)free(s);
-		return NULL;
+		return;
 	}	
 /*
 	struct SwsContext *ctx = sws_getContext(

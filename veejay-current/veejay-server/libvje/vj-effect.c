@@ -959,7 +959,7 @@ int vj_effect_get_summary(int entry, char *dst)
 	if(!vj_effects[entry])
 		return 0;
 
-	sprintf(dst,"%03d%s%03d%1d%1d%02d",
+	sprintf(dst,"%03zu%s%03d%1d%1d%02d",
 		strlen( vj_effects[entry]->description),
 		vj_effects[entry]->description,
 		vj_effect_get_real_id(entry),
@@ -971,7 +971,7 @@ int vj_effect_get_summary(int entry, char *dst)
 	{
 		bzero(tmp,512);
 		sprintf(tmp,
-			"%06d%06d%06d%03d%s",
+			"%06d%06d%06d%03zu%s",
 			vj_effects[entry]->limits[0][i],
 			vj_effects[entry]->limits[1][i],
 			vj_effects[entry]->defaults[i],

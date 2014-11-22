@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.26],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.28],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=27
+VEEJAY_MICRO_VERSION=28
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -931,7 +931,13 @@ if test $FREETYPE_CONFIG = yes; then
 		FT_LIBS="$FT_LIBS $word"
 	fi
   done
+  
+  dnl freetype in /include/dir/freetype or /include/dir/freetype2
+  FTPATHTOKENS=${FT_CFLAGS##*/}
+
   AC_DEFINE(HAVE_FREETYPE,,[Compiling with FreeType])
+  AC_DEFINE_UNQUOTED(FT_FTSNAMES_H,"$FTPATHTOKENS/ftsnames.h",[location of ftsnames.h (freetype)])
+  AC_DEFINE_UNQUOTED(FT_TTNAMEID_H,"$FTPATHTOKENS/ttnameid.h",[location of ttnameid.h (freetype)])
   AC_SUBST(FT_LIBS)
   AC_SUBST(FT_LDFLAGS)
   AC_SUBST(FT_CFLAGS)

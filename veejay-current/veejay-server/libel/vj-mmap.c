@@ -16,14 +16,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  */
-#include <libel/vj-mmap.h>
-#include <libvjmsg/vj-msg.h>
+#include <config.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <stdint.h>
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
+#include <libel/vj-mmap.h>
+#include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
+
 #define PADDED(a,m) ( a > 0 ? (a / m->page_size) * m->page_size  : 0)
 
 void		mmap_free(mmap_region_t *map)

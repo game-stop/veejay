@@ -1517,12 +1517,9 @@
 					      <property name="visible">True</property>
 					      <property name="items" translatable="yes">MJPEG
 DVVIDEO
-MPEG4
-MSMPEG4V3
 YUV
 Quicktime-DV
-Quicktime-MJPEG
-MLZO</property>
+Quicktime-MJPEG</property>
 					      <property name="add_tearoffs">False</property>
 					      <property name="has_frame">True</property>
 					      <property name="focus_on_click">True</property>
@@ -3559,12 +3556,9 @@ MLZO</property>
 					      <property name="visible">True</property>
 					      <property name="items" translatable="yes">MJPEG
 DVVIDEO
-MPEG4
-MSMPEG4V3
 YUV
 Quicktime-DV
-Quicktime-MJPEG
-MLZO</property>
+Quicktime-MJPEG</property>
 					      <property name="add_tearoffs">False</property>
 					      <property name="has_frame">True</property>
 					      <property name="focus_on_click">True</property>

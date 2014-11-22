@@ -1335,7 +1335,7 @@ void veejay_pipe_write_status(veejay_t * info)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		snprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %ld %d %d %d %d %d %d",
+		snprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -2453,7 +2453,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	if (seteuid(getuid()) < 0)
 	{
 		/* fixme: get rid of sys_errlist and use sys_strerror */
-		veejay_msg(VEEJAY_MSG_ERROR, "Can't set effective user-id: %s", sys_errlist[errno]);
+		veejay_msg(VEEJAY_MSG_ERROR, "Can't set effective user-id: %s", strerror(errno));
 		return -1;
     	}
 	if(info->load_action_file ) {

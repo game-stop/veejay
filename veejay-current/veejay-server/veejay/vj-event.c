@@ -324,7 +324,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 #define VIMS_LONG_PARAMS (1<<3)				/* long string arguments (bundle, plugin) */
 #define VIMS_ALLOW_ANY (1<<4)				/* use defaults when optional arguments are not given */			
 
-#define FORMAT_MSG(dst,str) sprintf(dst,"%03d%s",strlen(str),str)
+#define FORMAT_MSG(dst,str) sprintf(dst,"%03zu%s",strlen(str),str)
 #define APPEND_MSG(dst,str) veejay_strncat(dst,str,strlen(str))
 #define SEND_MSG_DEBUG(v,str) \
 {\
@@ -335,7 +335,7 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 for(__done = 0; __len > (__done + 80); __done += 80)\
 {\
 	char *__tmp = strndup( str+__done, 80 );\
-veejay_msg(VEEJAY_MSG_INFO, "[%d][%s]",strlen(str),__tmp);\
+veejay_msg(VEEJAY_MSG_INFO, "[%zu][%s]",strlen(str),__tmp);\
 	if(__tmp) free(__tmp);\
 }\
 veejay_msg(VEEJAY_MSG_INFO, "[%s]", str + __done );\
@@ -2991,7 +2991,7 @@ void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 
 				if(!skip)
 				{
-					snprintf( line, 512, "%04d%03d%03d%03d%s",
+					snprintf( line, 512, "%04d%03d%03d%03zu%s",
 						ev->event_id, ev->key_mod, ev->key_symbol, strlen(message), message );
 					int line_len = strlen(line);
 					len += line_len;
@@ -8354,12 +8354,12 @@ void	vj_event_send_track_list		(	void *ptr,	const char format[], 	va_list ap 	)
 					char cmd[275];
 					char space[275];
 					snprintf(space,sizeof(space)-1,"%s %d", tag->descr, tag->id );
-					snprintf(cmd,sizeof(cmd)-1,"%03d%s",strlen(space),space);
+					snprintf(cmd,sizeof(cmd)-1,"%03zu%s",strlen(space),space);
 					APPEND_MSG(print_buf,cmd); 
 				}
 			}
 		}
-		sprintf(s_print_buf, "%05d%s",strlen(print_buf),print_buf);
+		sprintf(s_print_buf, "%05zu%s",strlen(print_buf),print_buf);
 		free(print_buf);
 	}
 
@@ -8397,7 +8397,7 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 				veejay_memset(line,0,300);
 				//vj_tag_get_description( i, source_name );
 				vj_tag_get_source_name( i, source_name );
-				sprintf(line,"%05d%02d%03d%03d%03d%03d%03d%s",
+				sprintf(line,"%05d%02d%03d%03d%03d%03d%03zu%s",
 					i,
 					vj_tag_get_type(i),
 					tag->color_r,
@@ -8407,11 +8407,11 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 					strlen(source_name),
 					source_name
 				);
-				sprintf(cmd, "%03d%s",strlen(line),line);
+				sprintf(cmd, "%03zu%s",strlen(line),line);
 				APPEND_MSG(print_buf,cmd); 
 			}
 		}
-		sprintf(s_print_buf, "%05d%s",strlen(print_buf),print_buf);
+		sprintf(s_print_buf, "%05zu%s",strlen(print_buf),print_buf);
 		free(print_buf);
 	}
 
@@ -8786,15 +8786,13 @@ void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
 			if(list->files[i]==NULL)
 				continue;
 
-			snprintf(tmp,sizeof(tmp), "%04d%s",strlen( list->files[i] ), list->files[i] );
+			snprintf(tmp,sizeof(tmp), "%04zu%s",strlen( list->files[i] ), list->files[i] );
 
 			strcat( s_print_buf,tmp);
 		}
 
 		free_media_files(v,list);
 	}
-
-	printf( s_print_buf );
 
 	SEND_MSG(v, s_print_buf );
 	free( s_print_buf );
@@ -8837,7 +8835,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 				*/
 				sample_get_description( i, description );
 				
-				sprintf(cmd,"%05d%09d%09d%03d%s",
+				sprintf(cmd,"%05d%09d%09d%03zu%s",
 					i,
 					start_frame,	
 					end_frame,
@@ -8849,7 +8847,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 			}
 
 		}
-		sprintf(s_print_buf, "%08d%s", strlen(print_buf),print_buf);
+		sprintf(s_print_buf, "%08zu%s", strlen(print_buf),print_buf);
 		free(print_buf);
 	}
 	SEND_MSG(v, s_print_buf);
@@ -9109,7 +9107,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 				APPEND_MSG(print_buf,line);
 			}
 		}
-		sprintf(s_print_buf, "%03d%s",strlen(print_buf), print_buf);
+		sprintf(s_print_buf, "%03zu%s",strlen(print_buf), print_buf);
 		free(print_buf);
 
 	} else if(STREAM_PLAYING(v))
@@ -9134,7 +9132,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 				APPEND_MSG(print_buf, line);
 			}
 		}
-		sprintf(s_print_buf, "%03d%s",strlen( print_buf ), print_buf);
+		sprintf(s_print_buf, "%03zu%s",strlen( print_buf ), print_buf);
 		free(print_buf);
 	} else {
 		sprintf(s_print_buf, "000");
@@ -9172,7 +9170,7 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 		n_frames,
 		v->audio
 		);	
-	sprintf(s_print_buf, "%03d%s",strlen(info_msg), info_msg);
+	sprintf(s_print_buf, "%03zu%s",strlen(info_msg), info_msg);
 	SEND_MSG(v,s_print_buf);
 	free(s_print_buf);
 }
@@ -9289,7 +9287,7 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 		int effect_id = vj_effect_get_real_id(i);
 		if(vj_effect_get_summary(i,line))
 		{
-			sprintf(fline, "%03d%s", strlen(line), line );
+			sprintf(fline, "%03zu%s", strlen(line), line );
 			veejay_strncat( priv_msg, fline, strlen(fline) );
 		}
 	}
@@ -9734,7 +9732,7 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 	if(failed)
 		sprintf( s_print_buf, "%05d", 0 );
 	else
-		sprintf( s_print_buf, "%05d%s%s",strlen(prefix) + strlen(options), prefix,options );
+		sprintf( s_print_buf, "%05zu%s%s",strlen(prefix) + strlen(options), prefix,options );
 
 	SEND_MSG(v , s_print_buf );
 	free(s_print_buf);

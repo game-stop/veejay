@@ -2146,6 +2146,10 @@ int vj_tag_chain_free(int t1)
 			{
 				vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance);
 				tag->effect_chain[i]->fx_instance = NULL;
+				if(tag->effect_chain[i]->kf)
+					vpf(tag->effect_chain[i]->kf );
+				tag->effect_chain[i]->kf = vpn(VEVO_ANONYMOUS_PORT );
+
 				sum++;
 			}
 	  	}
@@ -2312,6 +2316,11 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 	 tag->effect_chain[position]->channel = t1;
     }
 
+	tag->effect_chain[position]->kf_status = 0;
+	if(tag->effect_chain[position]->kf)
+		vpf(tag->effect_chain[position]->kf );
+	tag->effect_chain[position]->kf = vpn(VEVO_ANONYMOUS_PORT );
+
     if (!vj_tag_update(tag,t1))
 		return 0;
     return 1;
@@ -2437,8 +2446,9 @@ int vj_tag_get_all_effect_args(int t1, int position, int *args,
 			int tmp = 0;
 			if(!get_keyframe_value( tag->effect_chain[position]->kf, n_frame, i ,&tmp ) )
 				args[i] = tag->effect_chain[position]->arg[i];
-			else
+			else {
 				args[i] = tmp;
+			}
 		}
 	}
 	else
@@ -2892,7 +2902,7 @@ void vj_tag_get_source_name(int t1, char *dst)
 {
     vj_tag *tag = vj_tag_get(t1);
     if (tag) {
-	sprintf(dst, tag->source_name);
+	sprintf(dst, "%s", tag->source_name);
     } else {
 	vj_tag_get_description( tag->source_type, dst );
     }
@@ -2902,7 +2912,7 @@ void vj_tag_get_method_filename(int t1, char *dst)
 {
     vj_tag *tag = vj_tag_get(t1);
     if (tag) {
-	if(tag->method_filename != NULL) sprintf(dst, tag->method_filename);
+	if(tag->method_filename != NULL) sprintf(dst, "%s", tag->method_filename);
     }
 }
 

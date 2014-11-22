@@ -95,7 +95,7 @@ void nervous_apply( VJFrame *frame, int width, int height, int delay)
 	uint8_t *dest[3] = { NY, NCb, NCr };
 	int strides[4] = { len, uv_len,uv_len, 0 };
 	// copy original into nervous buf	
-	vj_frame_copy1( frame->data, dest, strides );
+	vj_frame_copy( frame->data, dest, strides );
 
 	if(frames_elapsed > 0)
 	{
@@ -111,7 +111,7 @@ void nervous_apply( VJFrame *frame, int width, int height, int delay)
 		dest[1] = sCb;
 		dest[2] = sCr;
 
-		vj_frame_copy1( dest, frame->data, strides );
+		vj_frame_copy( dest, frame->data, strides );
 	}
 
 	frames_elapsed ++;

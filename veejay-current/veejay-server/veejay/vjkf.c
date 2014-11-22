@@ -98,7 +98,7 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 	free(k_e);
 	free(k_t);
 
-	int len = end - start;
+	int len = end - start + 1;
 
 	result = vj_calloc( (len*4) + 64 );
 
@@ -106,7 +106,7 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 
 	unsigned char *out = result + 25;
 
-	for( i = start; i < end; i ++ )
+	for( i = start; i <= end; i ++ )
 	{
 		char *key = keyframe_id( parameter_id, i );
 		int value = 0;
@@ -119,9 +119,14 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 			buf[1] = (value >> 8) & 0xff;
 			buf[2] = (value >> 16) & 0xff;
 			buf[3] = (value >> 24) & 0xff;
-			k++;
 		}
 		else
+		{
+			veejay_msg(VEEJAY_MSG_WARNING, "No keyframe at position %d", i );
+		}
+		k++;
+		
+	/*	else
 		{
 			unsigned char *buf = out + (4 * k);
 			buf[0] = 0;
@@ -132,7 +137,7 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 #ifdef STRICT_CHECKING
 			veejay_msg(VEEJAY_MSG_DEBUG, "No keyframe at position %d", i );
 #endif
-		}
+		}*/
 
 		free(key);
 	}
@@ -164,7 +169,7 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	in += (25);
 
 	unsigned char *ptr = in;
-	for(i = start ; i < end; i ++ )
+	for(i = start ; i <= end; i ++ )
 	{
 		int value = 
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
@@ -264,7 +269,7 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 	snprintf(xmlbuf, 100,"%d", type );
 	xmlNewChild(node, NULL, (const xmlChar*) k_t, xmlbuf );
 
-	for( i = start; i < end; i ++ )
+	for( i = start; i <= end; i ++ )
 	{
 		char *key = keyframe_id( parameter_id, i );
 		int value = 0;

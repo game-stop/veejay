@@ -17,7 +17,7 @@
  */
 #include <stdio.h>
 #include <stdint.h>
-
+#include <stdlib.h>
 #include "split.h"
 static uint8_t *split_fixme[3];
 vj_effect *split_init(int width,int height)

@@ -227,6 +227,15 @@ static struct {
 {       0       ,         NULL}
 };
 
+
+static void vj_el_av_close_input_file( AVFormatContext *s ) {
+#if LIBAVCODEC_BUILD > 5400
+	avformat_close_input(&s);
+#else
+	av_close_input_file(s);
+#endif
+}
+
 static const    char    *el_pixfmt_str(int i)
 {
         int j;
@@ -501,8 +510,11 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 			tc );
 		d->context->thread_type = FF_THREAD_FRAME;
 		d->context->thread_count = tc;
-		
+#if LIBAVCODEC_BUILD > 5400
+		if ( avcodec_open2( d->context, d->codec, NULL ) < 0 )
+#else	
 		if ( avcodec_open( d->context, d->codec ) < 0 )
+#endif
 		{
       		       veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
 		       _el_free_decoder( d );
@@ -1400,7 +1412,7 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	if(err < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Stream information found in %s",filename);
-		av_close_input_file( avformat_ctx );
+		vj_el_av_close_input_file( avformat_ctx );
 		return -1;
 	}
 	av_read_play(avformat_ctx);
@@ -1436,7 +1448,7 @@ further:
 				if( !sup_codec ) {
 					veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unrecognized file %s",		
 						avformat_ctx->streams[i]->codec->codec_name );
-					av_close_input_file( avformat_ctx );
+					vj_el_av_close_input_file( avformat_ctx );
 					return -1;
 				}
 				codec = avcodec_find_decoder( avformat_ctx->streams[i]->codec->codec_id );
@@ -1444,7 +1456,7 @@ further:
 				{
 					veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to find decoder for codec %s", 
 						avformat_ctx->streams[i]->codec->codec_name);	
-					av_close_input_file( avformat_ctx );
+					vj_el_av_close_input_file( avformat_ctx );
 					return -1;
 				}
 				vi = i;
@@ -1455,13 +1467,18 @@ further:
 
 	if( vi == -1 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: No video streams found");
-		av_close_input_file( avformat_ctx );
+		vj_el_av_close_input_file( avformat_ctx );
 		return -1;
 	}
 
 	codec_ctx = avformat_ctx->streams[vi]->codec;
 	avformat_stream=avformat_ctx->streams[vi];
-	if ( avcodec_open( codec_ctx, codec ) < 0 ) {
+#if LIBAVCODEC_BUILD > 5400
+	if ( avcodec_open2( codec_ctx, codec, NULL ) < 0 )
+#else
+	if ( avcodec_open( codec_ctx, codec ) < 0 ) 
+#endif
+	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to open %s decoder (codec %x)",
 				codec_ctx->codec_name, codec_ctx->codec_id);
 		return -1;
@@ -1485,7 +1502,7 @@ further:
 		av_free(f);
 		free_av_packet(&pkt); 
 		avcodec_close( codec_ctx );
-		av_close_input_file( avformat_ctx );
+		vj_el_av_close_input_file( avformat_ctx );
 		return -1;
 	}
 
@@ -1497,7 +1514,7 @@ further:
 
 	free_av_packet(&pkt); 
 	avcodec_close( codec_ctx );
-	av_close_input_file( avformat_ctx );
+	vj_el_av_close_input_file( avformat_ctx );
 	av_free(f);
 
 	return pix_fmt;
@@ -2340,10 +2357,10 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		{
 			snprintf(fourcc,sizeof(fourcc),"%s", "????");
 			vj_el_get_file_fourcc( el, j, fourcc );
-			snprintf(filename,sizeof(filename),"%03d%s%04d%010ld%02d%s",
+			snprintf(filename,sizeof(filename),"%03zu%s%04lu%010lu%02zu%s",
 				strlen( el->video_file_list[j]  ),
 				el->video_file_list[j],
-				(unsigned long) j,
+				(long unsigned int) j,
 				el->num_frames[j],
 				strlen(fourcc),
 				fourcc 
@@ -2359,7 +2376,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 
 	char first[256];
 	char tmpbuf[256];
-	snprintf(first,sizeof(first), "%016lld%016lld",oldfile, oldframe);
+	snprintf(first,sizeof(first), "%016" PRId64 "%016" PRId64 ,oldfile, oldframe);
 #ifdef STRICT_CHECKING
 	dbg_buflen -= strlen(first);
 	assert( dbg_buflen > 0 );
@@ -2372,7 +2389,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		if ( index[ N_EL_FILE(n) ] != oldfile ||
 			N_EL_FRAME(n) != oldframe + 1 )	
 		{
-			snprintf( tmpbuf,sizeof(tmpbuf), "%016lld%016lld%016lld",
+			snprintf( tmpbuf,sizeof(tmpbuf), "%016" PRId64 "%016" PRId64 "%016llu",
 				 oldframe,
 				 index[N_EL_FILE(n)],
 				 N_EL_FRAME(n) );
@@ -2387,7 +2404,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
     	}
 
 	char last_word[64];
-	sprintf(last_word,"%016lld", oldframe);
+	sprintf(last_word,"%016" PRId64, oldframe);
 #ifdef STRICT_CHECKING
 	dbg_buflen -= 16;
 	assert( dbg_buflen > 0 );
@@ -2462,20 +2479,20 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 	oldfile = index[N_EL_FILE(n)];
 	oldframe = N_EL_FRAME(n);
 
-    	fprintf(fd, "%lld %lld ", oldfile, oldframe);
+    	fprintf(fd, "%" PRId64 " %" PRId64 " ", oldfile, oldframe);
     	for (i = n1 + 1; i <= n2; i++)
 	{
 		n = el->frame_list[i];
 		if (index[N_EL_FILE(n)] != oldfile
 		    || N_EL_FRAME(n) != oldframe + 1)
 		{
-		    fprintf(fd, "%lld\n", oldframe);
-	    	fprintf(fd, "%lld %lld ",index[N_EL_FILE(n)], N_EL_FRAME(n));
+		    fprintf(fd, "%" PRId64 "\n", oldframe);
+	    	fprintf(fd, "%" PRId64 " %llu ",index[N_EL_FILE(n)], N_EL_FRAME(n));
 		}
 		oldfile = index[N_EL_FILE(n)];
 		oldframe = N_EL_FRAME(n);
     	}
-    	n = fprintf(fd, "%lld\n", oldframe);
+    	n = fprintf(fd, "%" PRId64 "\n", oldframe);
 
     	/* We did not check if all our prints succeeded, so check at least the last one */
     	if (n <= 0)

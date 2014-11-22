@@ -552,7 +552,11 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 		return 0;
 	}
 
+#if LIBAVCODEC_BUILD > 5400
+	v->c	   = avcodec_alloc_context3( v->codec );
+#else
 	v->c 	   = avcodec_alloc_context();
+#endif
 	v->c->width= wid;
 	v->c->height= hei;
 	v->picture = avcodec_alloc_frame();
@@ -563,7 +567,11 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 	if( v->codec->capabilities & CODEC_CAP_TRUNCATED)
 		v->c->flags |= CODEC_FLAG_TRUNCATED;
 
+#if LIBAVCODEC_BUILD > 5400
+	if( avcodec_open2( v->c, v->codec, NULL ) < 0 )
+#else
 	if( avcodec_open( v->c, v->codec ) < 0 ) 
+#endif
 	{
 		veejay_msg(0, "v4l2: (untested) Error opening codec");
 		free(v->picture->data[0]);
@@ -1335,15 +1343,18 @@ void	v4l2_close( void *d )
 		free(v->picture->data[2]);
 		free(v->picture);
 	}
-	if(v->c) {
-		av_free(v->c);
-	}
+
 	if(v->tmpbuf) {
 		free(v->tmpbuf);
 	}
 	
 	if(v->codec) {
+#if LIBAVCODEC_BUILD > 5400
+		avcodec_close(v->c);
+#else
 		avcodec_close(v->codec);
+		if(v->c) free(v->c);
+#endif
 		v->codec = NULL;
 	}
 
@@ -1826,7 +1837,7 @@ char **v4l2_get_device_list()
 	for( i = 0;i < n_devices; i ++ ) {
 		char tmp[1024];
 		
-		snprintf(tmp, sizeof(tmp) - 1, "%03dDevice %02d%03d%s%s",
+		snprintf(tmp, sizeof(tmp) - 1, "%03dDevice %02d%03zu%s%s",
 				9, // 'Device xx'
 				i, // 'device num'
 				(5 + strlen(list[i])), //@ '/dev/' + device

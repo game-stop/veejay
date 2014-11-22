@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([reloaded],[1.5.26],[nwelburg@gmail.com])
+AC_INIT([reloaded],[1.5.28],[nwelburg@gmail.com])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 RELOADED_MAJOR_VERSION=1
 RELOADED_MINOR_VERSION=5
-RELOADED_MICRO_VERSION=26
+RELOADED_MICRO_VERSION=28
 RELOADED_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 RELOADED_CODENAME="Reloaded - build $RELOADED_MAJOR_VERSION $RELOADED_MINOR_VERSION $RELOADED_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -220,6 +220,8 @@ dnl Look for X
 AC_PATH_XTRA
 AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
 
+debugCFLAGS=""
+
 AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fprofile-arcs -ftest-coverage"
@@ -229,9 +231,18 @@ if test "x$enable_profiling" = "xyes" ; then
 else
  AC_MSG_RESULT([no])
 fi
+
+AC_MSG_CHECKING(whether to compile in debug symbols)
+if test "x$enable_debug" = "xyes" ; then
+ debugCFLAGS="$debugCFLAGS -g"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
+
 AC_MSG_CHECKING(whether to compile in assertion checking)
 if test "x$enable_strict" = "xyes" ; then
- debugCFLAGS="$debugCFLAGS -g -DSTRICT_CHECKING"
+ debugCFLAGS="$debugCFLAGS -DSTRICT_CHECKING"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])

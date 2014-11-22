@@ -30,6 +30,8 @@ typedef struct
 	int    max_files;
 } filelist_t;
 
+filelist_t *find_media_files( veejay_t *info );
+
 #ifndef _LARGEFILE_SOURCE
 #define VEEJAY_FILE_LIMIT (1048576 * 2000)
 #else

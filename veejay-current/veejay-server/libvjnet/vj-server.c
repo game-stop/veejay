@@ -810,7 +810,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 
 	while( i < buf_len ) {
 
-		char tmp_len[10];
+		char tmp_len[32];
 		char net_id[4];
 		int  slen = 0;
 		int	netid = 0;
@@ -858,7 +858,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 		}
 		else if (s[i] == 'K' )
 		{
-			str_ptr ++;
+			str_ptr ++; //@ [K][ ]
 
 			veejay_strncpy( tmp_len, str_ptr, 8 );
 			
@@ -876,6 +876,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			num_msg++;
 
 			i += ( 9 + slen );
+
 		} else {
 			veejay_msg(0, "VIMS: blob '%s' not recognized. First token must be either 'V' or 'K' followed by packet length.",
 					str_ptr );

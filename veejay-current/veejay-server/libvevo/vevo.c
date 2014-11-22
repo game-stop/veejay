@@ -84,6 +84,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #define _GNU_SOURCE
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -3057,7 +3058,7 @@ int	vevo_sscanf_property( vevo_port_t *port, const char *s)
 					n = sscanf( arg, "%d", &(i32_val[cur_elem]));
 					break;
 				case 'D':
-					n = sscanf( arg, "%lld", &(i64_val[cur_elem]));
+					n = sscanf( arg, "%" SCNd64, &(i64_val[cur_elem]));
 					break;
 				case 'g':
 					n = sscanf( arg, "%lf", &(dbl_val[cur_elem]));
@@ -3212,7 +3213,7 @@ char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key)
 		  return NULL;
 		   }
 			 else {
-				      sprintf(val, "'%lld'", a[i]);
+				      sprintf(val, "'%" PRId64 "'", a[i]);
 				      strcat(tmp,val);
 				      strcat(tmp," ");
 	 		}
@@ -3275,7 +3276,7 @@ char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
 			case 'D':
 				error = vevo_property_get(port,key,n_elems,&i64_val);
 				if( error == VEVO_NO_ERROR ) {
-					sprintf(tmp, "%lld:", i64_val );
+					sprintf(tmp, "%" PRId64 ":", i64_val );
 				} else if( error == VEVO_ERROR_PROPERTY_EMPTY ) {
 					tmp[0] = ':';
 				} else
@@ -3407,7 +3408,7 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 					n = sscanf( arg, "%d", &(i32_val[cur_elem]));
 					break;
 				case 'D':
-					n = sscanf( arg, "%lld", &(i64_val[cur_elem]));
+					n = sscanf( arg, "%" PRId64, &(i64_val[cur_elem]));
 #ifdef STRICT_CHECKING
 					assert( n == 1 );
 #endif

@@ -32,6 +32,8 @@
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <libhash/hash.h>
 #include <libvje/vje.h>
 #include <veejay/vims.h>
