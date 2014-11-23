@@ -75,7 +75,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	
 
 		float top = 1.0 / (float) max;
-		float val = (float) min + ( (float)value * top );
+		float val = ( (float)value * top );
 
 		veejay_msg(4, "Load FX Anim position %d, value %f", i, val );
 

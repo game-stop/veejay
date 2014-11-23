@@ -147,8 +147,6 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 	veejay_msg(VEEJAY_MSG_DEBUG, "KF %p pack: range=%d-%d, FX entry %d, P%d, type %d",
 		port,start,end, entry_id,parameter_id, type );
 
-	vevo_port_dump( port, 0 );
-
 	return result;
 }
 
@@ -194,8 +192,6 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	free(k_t);
 
 	*entry = fx_entry;
-
-	vevo_port_dump(port, 0 );
 
 	return 1;
 }
