@@ -49,19 +49,16 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	int start = 0, end =0,type=0;
 	int entry  = 0;
 	int n = sscanf( (char*) blob, "key%2d%2d%8d%8d%2d", &entry, &parameter_id, &start, &end,&type );
-	int len = end - start + 1;
+	int len = end - start;
 	int i;
 	int min = 0, max = 0;
 #ifdef STRICT_CHECKING
 	assert( fx_entry == entry );
 #endif
 
-	if( len <= 0 )
-		return -1;
-
-	if(n != 5 )	
+	if(n != 5 || len <= 0 )	
 	{
-		veejay_msg(0, "Error parsing KF headeR");
+		veejay_msg(0, "Error parsing FX Anim KF header");
 		return -1;
 	}
 
@@ -69,18 +66,18 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
 	unsigned int k = 0;
 	unsigned char *in = blob + 25;
-	float	*vec = (float*) vj_calloc(sizeof(float) * (len+1) );
-	for(i = start ; i <= end; i ++ )
+	float	*vec = (float*) vj_calloc(sizeof(float) * len );
+	for(i = start ; i < end; i ++ )
 	{
-		unsigned char *ptr = in + (i * 4);
+		unsigned char *ptr = in + (k * 4);
 		int value = 
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
 	
 
 		float top = 1.0 / (float) max;
-		float val = (float)value * top;
+		float val = (float) min + ( (float)value * top );
 
-		veejay_msg(4, "FX position %d, value %d", i, value );
+		veejay_msg(4, "Load FX Anim position %d, value %f", i, val );
 
 		vec[k] = val;
 		k++;

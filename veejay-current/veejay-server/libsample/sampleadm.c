@@ -1250,7 +1250,6 @@ int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int 
 		int tmp = 0;
 		if(!get_keyframe_value( sample->effect_chain[position]->kf, n_frame, i, &tmp ) ) {
 			args[i] = sample->effect_chain[position]->arg[i];
-			veejay_msg(4, "%d - FX [%d] P%d : %d", n_frame,position, i, args[i] );
 		}
 		else {
 			args[i] = tmp;

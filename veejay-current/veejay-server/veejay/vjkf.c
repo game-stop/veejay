@@ -98,7 +98,7 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 	free(k_e);
 	free(k_t);
 
-	int len = end - start + 1;
+	int len = end - start;
 
 	result = vj_calloc( (len*4) + 64 );
 
@@ -106,7 +106,7 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 
 	unsigned char *out = result + 25;
 
-	for( i = start; i <= end; i ++ )
+	for( i = start; i < end; i ++ )
 	{
 		char *key = keyframe_id( parameter_id, i );
 		int value = 0;
@@ -147,6 +147,8 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 	veejay_msg(VEEJAY_MSG_DEBUG, "KF %p pack: range=%d-%d, FX entry %d, P%d, type %d",
 		port,start,end, entry_id,parameter_id, type );
 
+	vevo_port_dump( port, 0 );
+
 	return result;
 }
 
@@ -169,15 +171,12 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	in += (25);
 
 	unsigned char *ptr = in;
-	for(i = start ; i <= end; i ++ )
+	for(i = start ; i < end; i ++ )
 	{
 		int value = 
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
 		char *key = keyframe_id( parameter_id, i );
 		vevo_property_set( port, key, VEVO_ATOM_TYPE_INT, 1, &value );
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG, "Parameter %d at pos %d has value %d", parameter_id, i, value );
-#endif
 		ptr += 4;
 		free(key);
 	}
@@ -195,6 +194,8 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	free(k_t);
 
 	*entry = fx_entry;
+
+	vevo_port_dump(port, 0 );
 
 	return 1;
 }
@@ -269,7 +270,7 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 	snprintf(xmlbuf, 100,"%d", type );
 	xmlNewChild(node, NULL, (const xmlChar*) k_t, xmlbuf );
 
-	for( i = start; i <= end; i ++ )
+	for( i = start; i < end; i ++ )
 	{
 		char *key = keyframe_id( parameter_id, i );
 		int value = 0;
@@ -376,8 +377,13 @@ int	get_keyframe_value(void *port, int n_frame, int parameter_id, int *result )
 	char *key = keyframe_id( parameter_id, n_frame );
 	
 	int error = vevo_property_get( port, key, 0, result );
-	if( error != VEVO_NO_ERROR )
+	if( error != VEVO_NO_ERROR ) {
+		free(key);
 		return 0;
+	}
+	
+	free(key);
+
 	return 1;
 }
 

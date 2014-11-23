@@ -808,6 +808,8 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 				return 0;
 			}
 
+			i += 9;
+
 		} else {
 			veejay_msg(0, "parse error.");
 			return 0;
@@ -890,6 +892,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			v[num_msg]->msg = (char*) vj_malloc( sizeof(char) * slen );
 			memcpy( v[num_msg]->msg, str_ptr, slen );
 			v[num_msg]->len = slen;
+			
 			num_msg++;
 
 			i += ( 9 + slen );

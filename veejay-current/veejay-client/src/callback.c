@@ -2084,7 +2084,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	int end = get_nums( "curve_spinend" );
 	int start = get_nums( "curve_spinstart" );
 
-	const int length = end - start + 1;
+	const int length = end - start;
 
 
 	if( (length) <= 0 || id <= 0 )	
@@ -2107,53 +2107,41 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		type = GTK_CURVE_TYPE_FREE;
 	}
 	
-	float *data = (float*) vj_calloc(sizeof(float) * length );
-	int *values = (int*) vj_calloc(sizeof(int) * length );
-
-	unsigned char *kkf = (unsigned char*) vj_calloc( (length*4) + 64);
-	unsigned char *buf = (unsigned char*) vj_calloc( (length*4) + 64 );
 	int min=0,max=0;
-	
-	unsigned char *kf = kkf;	//@ reserve space for header
-	
-	_effect_get_minmax( id, &min,&max,j );
+	float *data = (float*) vj_calloc( sizeof(float) * length );
 
+	_effect_get_minmax( id, &min, &max,j );
+
+	get_points_from_curve( curve, length, data );
+
+	char header[34];
+	
+	int msg_len = 25 + (4*length); /*K00000000 */
+
+	snprintf(header,sizeof(header), "K%08dkey%02d%02d%08d%08d%02d",msg_len,i,j,start,end,type );
+	
+	char *buf = (char*) vj_calloc( sizeof(char) * msg_len + 9 );
+	strncpy( buf, header, sizeof(header));
+	
+	char *ptr = buf + sizeof(header);
 	int k;
-
-	get_points_from_curve( curve,  length, data );
 	for( k = 0 ; k < length ; k++ ) {
-		values[k] = (int) ( (float) min + ( data[k] * ((float) max) ));
-	}
-	int row_len   = 3 + 2 + 2 + 8 + 8 + 2;
-	sprintf( (char*)kf, "key%02d%02d%08d%08d%02d",i,j,start,end,type );
-	unsigned char *ptr = kkf + row_len;
-	int total_len = row_len;
+		int pval = (int) ( (float) min + ( data[k] * ((float) max) ));
+		ptr[0] = pval & 0xff;
+		ptr[1] = (pval >> 8) & 0xff;
+		ptr[2] = (pval >> 16) & 0xff;
+		ptr[3] = (pval >> 24) & 0xff;
 
-	for( k = 0; k < length; k ++ )
-	{
-		unsigned char *p = ptr + (k*4);
-		p[0] = values[k] & 0xff;
-		p[1] = (values[k] >> 8) & 0xff;
-		p[2] = (values[k] >> 16) & 0xff;
-		p[3] = (values[k] >> 24) & 0xff;
-
-		total_len += 4;
-
-		veejay_msg( VEEJAY_MSG_DEBUG, "(%d/%d) FX set value %d on frame %d",k,length,values[k], start+k );
+		ptr += 4;
+		veejay_msg( VEEJAY_MSG_DEBUG, "(%d/%d) FX set value %d on frame %d",k,length,pval, start+k );
 	}
 
-	free(values);
-	free(data);
-	
-	sprintf( buf, "K%08d", total_len ); 	
-	memcpy( buf + 9 , kkf, total_len );
-	vj_client_send_buf( info->client, V_CMD, buf,total_len  );
-	free(kkf);
-	free(buf);
+	vj_client_send_buf( info->client, V_CMD, buf, msg_len + 9  );
 
 	vj_msg( VEEJAY_MSG_INFO, "Saved new animation for parameter %d on entry %d, start at frame %d and end at frame %d",j,i,start,end );
 				
-
+	free(buf);
+	free(data);
 }
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
