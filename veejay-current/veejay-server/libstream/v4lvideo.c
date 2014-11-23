@@ -464,6 +464,9 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 						(p->src_fmt==PIX_FMT_RGB24? "RGB" : "BGR" ));
 				}
 			}	
+			else {
+				veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_SWAP_RGB=[0|1] not set");
+			}
 			p->src = yuv_rgb_template( NULL, p->w,p->h, p->src_fmt );
 		}
 		else {

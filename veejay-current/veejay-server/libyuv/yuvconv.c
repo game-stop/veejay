@@ -64,6 +64,9 @@ typedef struct
 	SwsFilter	  *src_filter;
 	SwsFilter	  *dst_filter;
 	int	cpu_flags;
+	int 	format;	
+	int	width;
+	int	height;
 } vj_sws;
 
 static	int		    sws_context_flags_ = 0;
@@ -577,6 +580,7 @@ void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fm
 
 void	yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst )
 {
+	//FIXME
 	sws_scale( (struct SwsContext*) ctx, src->data, src->stride,0,src->height,dst->data,dst->stride );
 }
 
@@ -601,43 +605,13 @@ void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[3], VJFrame *d
 	assert( dst->data[0] != NULL );
 #endif
 	vj_sws *s = (vj_sws*) scaler;
-	s->sws = sws_getCachedContext( 
-			s->sws,
-			src->width,
-			src->height,
-			src_fmt,
-			dst->width,
-			dst->height,
-			dst_fmt,
-			s->cpu_flags,
-			NULL,
-			NULL,
-			NULL
-		);
 
-	if(!s->sws)
-	{
-		veejay_msg(0,"sws_getContext failed.");
-		if(s)free(s);
-		return;
-	}	
-/*
-	struct SwsContext *ctx = sws_getContext(
-			src->width,
-			src->height,
-			src_fmt,
-			dst->width,
-			dst->height,
-			dst_fmt,
-			sws_context_flags_,
-			NULL,NULL,NULL );
-	*/
-	int dst_stride[3] = { ru4(dst->width),ru4(dst->uv_width),ru4(dst->uv_width) };
-	sws_scale( s->sws, src->data, src_stride, 0, src->height, dst->data, dst_stride);
-
-	//sws_freeContext( ctx );
-
-}
+	if(s->sws) {
+		int dst_stride[3] = { ru4(dst->width),ru4(dst->uv_width),ru4(dst->uv_width) };
+		sws_scale( s->sws, src->data, src_stride, 0, src->height, dst->data, dst_stride);
+	
+	}
+}	
 
 
 /* convert 4:2:0 to yuv 4:2:2 packed */
@@ -1039,31 +1013,32 @@ int luminance_mean(uint8_t * frame[], int w, int h)
 
 void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flagss)
 {
-	vj_sws *s = (vj_sws*) vj_malloc(sizeof(vj_sws));
+	vj_sws *s = (vj_sws*) vj_calloc(sizeof(vj_sws));
 	if(!s)
 		return NULL;
 
 	int	sws_type = 0;
+	int 	cpu_flags = 0;
 
-	veejay_memset( s, 0, sizeof(vj_sws) );
-
-	int cpu_flags = 0;
 #ifdef  STRICT_CHECKING
 	cpu_flags = cpu_flags | SWS_PRINT_INFO;
 #endif
-
 #ifdef HAVE_ASM_MMX
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
 #endif
-//#ifdef HAVE_ASM_3DNOW
-//	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
-//#endif
-//#ifdef HAVE_ASM_MMX2
-//	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
-//#endif
-//#ifdef HAVE_ALTIVEC
-//	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
-//#endif
+#ifdef HAVE_ASM_MMX2
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
+#endif
+#ifdef HAVE_ASM_3DNOW
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
+#endif
+#ifdef HAVE_ASM_SSE2
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_SSE2;
+#endif
+#ifdef HAVE_ALTIVEC
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
+#endif
+	
 	switch(tmpl->flags)
 	{
 		case 1:
@@ -1123,21 +1098,19 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 		if(s)free(s);
 		return NULL;
 	}	
-
+	else 
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "sws context: %dx%d in %d -> %dx%d in %d",
+			src->width,src->height,src->format, dst->width,dst->height,dst->format );
+	}
 	return ((void*)s);
 
 }
 
-void*	yuv_init_cached_swscaler(void *cache,VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flags)
+static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flagss)
 {
-	vj_sws *s = (vj_sws*) vj_malloc(sizeof(vj_sws));
-	if(!s)
-		return NULL;
-	vj_sws *in = (vj_sws*) cache;
-	
 	int	sws_type = 0;
-
-	veejay_memset( s, 0, sizeof(vj_sws) );
+	int 	cpu_flags = 0;
 
 #ifdef  STRICT_CHECKING
 	cpu_flags = cpu_flags | SWS_PRINT_INFO;
@@ -1146,24 +1119,115 @@ void*	yuv_init_cached_swscaler(void *cache,VJFrame *src, VJFrame *dst, sws_templ
 #ifdef HAVE_ASM_MMX
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
 #endif
-
-	cpu_flags = cpu_flags | SWS_FAST_BILINEAR;
-
-	s->sws = NULL;
-
-	if( cache != NULL && in->sws ) {
-		s->sws = in->sws;
-		in->sws = NULL;
-		yuv_free_swscaler( in ); //@ clean up old ctx now
-		in = NULL;	
-	} 
+#ifdef HAVE_ASM_MMX2
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
+#endif
+#ifdef HAVE_ASM_3DNOW
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
+#endif
+#ifdef HAVE_ASM_SSE2
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_SSE2;
+#endif
+#ifdef HAVE_ALTIVEC
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
+#endif
+	switch(tmpl->flags)
+	{
+		case 1:
+			cpu_flags = cpu_flags|SWS_FAST_BILINEAR;
+			break;
+		case 2:
+			cpu_flags = cpu_flags|SWS_BILINEAR;
+			break;
+		case 4:
+			cpu_flags = cpu_flags|SWS_BICUBIC;
+			break;
+		case 3:
+			cpu_flags = cpu_flags |SWS_POINT;
+			break;
+		case 5:
+			cpu_flags = cpu_flags|SWS_X;
+			break;
+		case 6:
+			cpu_flags = cpu_flags | SWS_AREA;
+			break;
+		case 7:
+			cpu_flags = cpu_flags | SWS_BICUBLIN;
+			break;
+		case 8: 
+			cpu_flags = cpu_flags | SWS_GAUSS;
+			break;
+		case 9:
+			cpu_flags = cpu_flags | SWS_SINC;
+			break;
+		case 10:
+			cpu_flags = cpu_flags |SWS_LANCZOS;
+			break;
+		case 11:
+			cpu_flags = cpu_flags | SWS_SPLINE;
+			break;
+	}	
 
 	if( full_chroma_interpolation_ ) 
 		cpu_flags = cpu_flags |  SWS_FULL_CHR_H_INT;
 
-	s->cpu_flags = cpu_flags;
+	if( !sws_isSupportedInput( src->format ) ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "No support for input format");
+	}
+	if( !sws_isSupportedOutput( dst->format ) ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "No support for output format");
+	}
 
-	return s;
+	if( s->sws != NULL ) {
+		if( s->width != src->width || s->format != src->format || s->height != src->height ) {
+			sws_freeContext( s->sws );
+			s->sws = NULL;
+		}
+	}
+
+	if( s->sws == NULL ) {
+		s->sws = sws_getContext(
+			src->width,
+			src->height,
+			src->format,
+			dst->width,
+			dst->height,
+			dst->format,
+			cpu_flags,
+			s->src_filter,
+			s->dst_filter,
+			NULL
+		);
+		s->width = src->width;
+		s->height = src->height;
+		s->format = src->format;
+		veejay_msg(VEEJAY_MSG_DEBUG, "sws new context: %dx%d in %d -> %dx%d in %d",
+			src->width,src->height,src->format, dst->width,dst->height,dst->format );
+	}
+
+	if( s->sws == NULL )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Failed to get scaler context for %dx%d in %d -> %dx%d in %d",
+			src->width,src->height,src->format, dst->width,dst->height,dst->format );
+
+		return NULL;
+	}
+
+	
+	return (void*) s;
+}
+
+
+void*	yuv_init_cached_swscaler(void *cache,VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flags)
+{
+	vj_sws *ctx = (vj_sws*) cache;
+	if( ctx == NULL )
+	{
+		ctx = (vj_sws*) vj_calloc(sizeof(vj_sws));
+		return yuv_init_sws_cached_context(ctx,src, dst, tmpl, cpu_flags);
+	}
+	
+	return yuv_init_sws_cached_context( ctx, src, dst, tmpl, cpu_flags);
 }
 
 
@@ -1230,8 +1294,12 @@ void	yuv_free_swscaler(void *sws)
 	{
 		vj_sws *s = (vj_sws*) sws;
 		if(s->sws)
+		{
 			sws_freeContext( s->sws );
+			s->sws = NULL;
+		}
 		if(s) free(s);
+		sws = NULL;
 	}
 }
 

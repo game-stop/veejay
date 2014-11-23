@@ -212,6 +212,10 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	{
 		hw_on = atoi(hw_env);	
 	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env SDL_VIDEO_HWACCEL=[0|1] not set");
+	}
+
 	int extra_flags = (ncpu > 1  ? SDL_ASYNCBLIT : 0 );
 	int extra_fs_flags = 0;
 	int manual_positioning = 0;
@@ -224,6 +228,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		manual_positioning = 1;
 	} else {
 		extra_fs_flags = SDL_FULLSCREEN;
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_SCREEN_GEOMETRY and VEEJAY_SCREEN_SIZE not set");
 	}
 
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)

@@ -365,6 +365,9 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 		veejay_msg(VEEJAY_MSG_INFO, "Changed receive buffer size to %d bytes (%2.2fKb)",
 				vjs->recv_bufsize, (float) vjs->recv_bufsize / 1024.0f );
 	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG,"env VEEJAY_SERVER_RECEIVE_BUFFER_SIZE=[num bytes] not set");
+	}
 
 #ifdef STRICT_CHECKING
 	char *netlog = getenv("VEEJAY_LOG_NET_IO" );
@@ -381,6 +384,8 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 			fprintf( vjs->logfd, "Server setup: port %d, name %s type %d\n", port_offset,mcast_group_name,type);
 			fprintf( vjs->logfd, "receive buffer size: %d bytes\n", vjs->recv_bufsize);
 		}
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_LOG_NET_IO=logfile not set");
 	}
 #endif
 	

@@ -2390,6 +2390,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		char *chanid = getenv("VEEJAY_DEFAULT_CHANNEL");
 		if(chanid != NULL )
 			default_chan = atoi(chanid);
+		else 
+			veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_DEFAULT_CHANNEL=channel not set (defaulting to 1)");
+
 		snprintf(vidfile,sizeof(vidfile),"/dev/video%d", (def_tags-1));
 		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, vidfile, info->nstreams, default_chan, (def_tags-1) );
 		if( nid> 0)
@@ -3167,10 +3170,16 @@ veejay_t *veejay_malloc()
 	if( interpolate_chroma ) {
 		sscanf( interpolate_chroma, "%d", &status );
 		}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_INTERPOLATE_CHROMA=[0|1] not set");
+	}
 
 	char *auto_ccir_jpeg = getenv("VEEJAY_AUTO_SCALE_PIXELS");
 	if( auto_ccir_jpeg ) {
 		sscanf( auto_ccir_jpeg, "%d", &acj );
+	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_AUTO_SCALE_PIXELS=[0|1] not set");
 	}
 
 	char *key_repeat_interval = getenv("VEEJAY_SDL_KEY_REPEAT_INTERVAL");
@@ -3178,12 +3187,21 @@ veejay_t *veejay_malloc()
 	if(key_repeat_interval) {
 		sscanf( key_repeat_interval, "%d", &(info->settings->repeat_interval));
 	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_SDL_KEY_REPEAT_INTERVAL=[Num] not set");
+	}
 	if( key_repeat_delay) {
 		sscanf( key_repeat_delay, "%d", &(info->settings->repeat_delay));
+	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_SDL_KEY_REPEAT_DELAY=[Num] not set");
 	}
 
 	char *best_performance = getenv( "VEEJAY_PERFORMANCE");
 	int default_zoomer = 1;
+	if(!best_performance) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_PERFORMANCE=[fastest|quality] not set");
+	}
 
 	char *max_cache = getenv( "VEEJAY_PLAYBACK_CACHE");
 	if( max_cache ) {
@@ -3195,6 +3213,8 @@ veejay_t *veejay_malloc()
 		}
 		if( mb == 0 )
 			info->no_caching = 0;
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_PLAYBACK_CACHE=[megabytes] not set");
 	}
 
 	char *sdlfs = getenv("VEEJAY_FULLSCREEN");
@@ -3205,6 +3225,8 @@ veejay_t *veejay_malloc()
 				(val== 1 ? "fullscreen" : "windowed" ) );
 			info->settings->full_screen = val;
 		}
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_FULLSCREEN=[0|1] not set");
 	}
 
 	info->pause_render = 1;// old behaviour was always to pause everything on speed=0
@@ -3218,6 +3240,8 @@ veejay_t *veejay_malloc()
 					 		    "stop rendering on pause" ) );
 			info->pause_render = val;
 		}
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_PAUSE_EVERYTHING=[0|1] (continues rendering is ON)");
 	}
 
 	if( best_performance) {
@@ -3887,7 +3911,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 
 	if(num_files<=0 || files == NULL)
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Fallback to dummy - no video files given at commandline");
 		info->dummy->active = 1;
 	}
 	
@@ -3919,6 +3942,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			       dw = (override_norm == 'p' ? 352 : 360 );
 		       	       dh = dh / 2;
 			}	       
+		}
+		else {
+			veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_RUN_MODE not set to CLASSIC");
 		}
 
 		if( !info->dummy->width )
@@ -3953,6 +3979,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			veejay_msg(VEEJAY_MSG_DEBUG, "Dummy Audio: %f KHz, %d channels, %d bps, %d bit audio",
 				(float)el->audio_rate/1000.0,el->audio_chans,el->audio_bps,el->audio_bits);
 		}
+		
 		veejay_msg(VEEJAY_MSG_DEBUG,"Dummy Video: %dx%d, chroma %x, framerate %2.2f, norm %s",
 					info->dummy->width,info->dummy->height, info->dummy->chroma,info->dummy->fps,
 					(info->dummy->norm == 'n' ? "NTSC" :"PAL"));

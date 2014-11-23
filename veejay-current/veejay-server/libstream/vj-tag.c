@@ -311,6 +311,9 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 	if( v4l2threading ) {
 		no_v4l2_threads_ = atoi(v4l2threading);
 	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_V4L2_NO_THREADING=[0|1] not set");
+	}
 
 
     return 0;

@@ -462,8 +462,10 @@ void	vj_el_setup_cache( editlist *el )
 
 void	vj_el_clear_cache( editlist *el )
 {
-	if(el->cache)
-		reset_cache(el->cache);
+	if( el != NULL ) {
+		if(el->cache)
+			reset_cache(el->cache);
+	}
 }
 
 void	vj_el_deinit()
@@ -2200,6 +2202,7 @@ void	vj_el_free(editlist *el)
 	}
 	if( el->scaler )
 		yuv_free_swscaler( el->scaler );
+	
 	free(el);
 
 	el = NULL;

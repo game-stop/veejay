@@ -623,6 +623,10 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 			}
 		}
 	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG,"env VEEJAY_V4L2_GREYSCALE_ONLY=[0|1] not set");
+	}
 	
 	//@ does capture card support our native format
 	int supported = v4l2_tryout_pixel_format( v, native_pixel_format, wid, hei,dw,dh,candidate );
@@ -931,7 +935,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 					break;
 			}
 		} else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Preferring mmap() capture, override with VEEJAY_V4L2_CAPTURE_METHOD=0");
+			veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_V4L2_CAPTURE_METHOD=[0|1] not set , defaulting to mmap() capture");
 			cap_read = 1;
 		}
  	}
@@ -1921,6 +1925,10 @@ static	void	*v4l2_grabber_thread( void *v )
 	if(retry) {
 			max_retries = atoi( retry );
 	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_V4L2_MAX_RETRIES=[Num] not set (defaulting to %d)", max_retries );
+	}
+
 	if( max_retries < 0 || max_retries > 99999 ) {
 		max_retries = 15;
 		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: VEEJAY_V4L2_MAX_RETRIES out of bounds, set to default (%d)",max_retries);

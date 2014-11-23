@@ -885,7 +885,7 @@ int sample_del(int sample_id)
   
 	    if(si->edit_list)
 		{
-			vj_el_free(si->edit_list);
+			//vj_el_free(si->edit_list);
 			si->edit_list = NULL;
 		}
 	    if(si->encoder_base )
@@ -917,22 +917,54 @@ int sample_del(int sample_id)
     return 0;
 }
 
+static void sample_free_el(void *port) {
+	int i;
+	char **keys = vevo_list_properties(port);
+ 	if(keys) {
+		for( i = 0; keys[i] != NULL; i ++ ) {
+			void *el = NULL;
+			if(vevo_property_get(port, keys[i], 0, &el ) == VEVO_NO_ERROR ) {
+				vj_el_free( (editlist*) el );
+			}
+			free(keys[i]);
+		}
+		free(keys);
+	}
+}
 
 void sample_del_all()
 {
     int end = sample_size();
     int i;
 
+    editlist *el = NULL;
+	
+    void *port = vpn(VEVO_ANONYMOUS_PORT);
+
     for (i = 1; i < end; i++) {
 		if (sample_exists(i)) {
 			sample_chain_clear(i);
+    			sample_info *si = sample_get(i);
+			if(si->edit_list) {
+				char key[32];
+				snprintf(key, "p%p", si->edit_list );
+				if( vevo_property_get( port, key, 0, NULL ) == VEVO_ERROR_NOSUCH_PROPERTY ) {
+					vevo_property_set( port, key, VEVO_ATOM_TYPE_VOIDPTR,1,&(si->edit_list));
+				}
+			}
+
 			sample_del(i);
 		}
-    }
+     }
+
+     sample_free_el( port );
+
+     vpf(port);
+
 
 	memset( avail_num, 0, sizeof(int) * SAMPLE_MAX_SAMPLES );
 	next_avail_num = 0;
-    this_sample_id = 0;
+	this_sample_id = 0;
 
 	hash_free_nodes( SampleHash );
 

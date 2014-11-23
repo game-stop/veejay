@@ -188,6 +188,9 @@ int	vj_vloopback_start_pipe( void *vloop )
 		v->iov = atoi(dbg);
 		veejay_msg(VEEJAY_MSG_INFO,"vloop: debug level set to %d", v->iov );
 	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_LOOPBACK_DEBUG=[0|1] not set");
+	}
 
 #ifdef HAVE_V4L
 	struct video_capability caps;
