@@ -904,55 +904,40 @@ fi
 
 have_freetype=false
 have_freetype2=false
-PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
-		AC_SUBST(FREETYPE2_CFLAGS)
-		AC_SUBST(FREETYPE2_LIBS)
-		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
-		have_freetype2=true],
-		[have_freetype2=false] )
+dnl PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
+dnl		AC_SUBST(FREETYPE2_CFLAGS)
+dnl		AC_SUBST(FREETYPE2_LIBS)
+dnl		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
+dnl		have_freetype2=true],
+dnl		[have_freetype2=false] )
 
 if test x$have_freetype2 != xtrue; then
 	AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
 	if test $FREETYPE_CONFIG = yes; then
-		FREETYPE_CFLAGS="`freetype-config --cflags`" 
-		FREETYPE_WORD="`freetype-config --libs`"
-		FREETYPE_LIBS=""
-		for word in $FREETYPE_WORD; do	
+		FT_CFLAGS="`freetype-config --cflags`" 
+		FT_WORD="`freetype-config --libs`"
+		FT_LIBS=""
+		for word in $FT_WORD; do	
 			beginning=`echo $word |cut -c -2` 
 			if test ".$beginning" = ".-L"; then
-				FREETYPE_LDFLAGS="$FREETYPE_LDFLAGS $word"
+				FT_LDFLAGS="$FT_LDFLAGS $word"
 			else
-				FREETYPE_LIBS="$FREETYPE_LIBS $word"
+				FT_LIBS="$FT_LIBS $word"
 			fi
 		done
 		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
-		AC_SUBST(FREETYPE_LIBS)
-		AC_SUBST(FREETYPE_LDFLAGS)
-		AC_SUBST(FREETYPE_CFLAGS)
+		FTPATHTOKENS=${FT_CFLAGS##*/}
+		AC_DEFINE_UNQUOTED(FT_FTSNAMES_H,"$FTPATHTOKENS/ftsnames.h",[location of ftsnames.h (freetype)])
+		AC_DEFINE_UNQUOTED(FT_TTNAMEID_H,"$FTPATHTOKENS/ttnameid.h",[location of ttnameid.h (freetype)])
+		AC_SUBST(FT_LIBS)
+		AC_SUBST(FT_LDFLAGS)
+		AC_SUBST(FT_CFLAGS)
 		have_freetype=true
 		AC_MSG_NOTICE([Compiling with FreeType])
 	else
 		AC_MSG_ERROR([Cannot find the freetype-config program])
 	fi
-<<<<<<< HEAD
-  done
-  
-  dnl freetype in /include/dir/freetype or /include/dir/freetype2
-  FTPATHTOKENS=${FT_CFLAGS##*/}
-
-  AC_DEFINE(HAVE_FREETYPE,,[Compiling with FreeType])
-  AC_DEFINE_UNQUOTED(FT_FTSNAMES_H,"$FTPATHTOKENS/ftsnames.h",[location of ftsnames.h (freetype)])
-  AC_DEFINE_UNQUOTED(FT_TTNAMEID_H,"$FTPATHTOKENS/ttnameid.h",[location of ttnameid.h (freetype)])
-  AC_SUBST(FT_LIBS)
-  AC_SUBST(FT_LDFLAGS)
-  AC_SUBST(FT_CFLAGS)
-  have_freetype=true
-=======
->>>>>>> 136a4bf5dccb26747f388e5f3dbe5e612fa39f4a
-else
-	AC_MSG_NOTICE([Compiling with FreeType2])
 fi
-
 
 
 dnl **********************************************************************
