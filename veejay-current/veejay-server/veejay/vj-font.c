@@ -1125,6 +1125,7 @@ static int	find_fonts(vj_font_t *ec, char *path)
 	return 1;
 }
 
+
 static char 	*select_font( vj_font_t *ec, int id )
 {
 	if( id < 0 || id >= ec->font_index )
@@ -1832,8 +1833,12 @@ void	*vj_font_single_init( int w, int h, float fps,char *path )
 	find_fonts(f,fontpath);
 	if( f->font_index <= 0 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Please put some TrueType font files in %s",fontpath);
-		return NULL;
+		veejay_msg(VEEJAY_MSG_WARNING, "Please put a TrueType font file for the OSD in %s",fontpath);
+		find_fonts( f, "/usr/share/fonts/truetype/freefont" );
+		if( f->font_index <= 0 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Can't read default truetype font path /usr/share/fonts/truetype/freefont");
+			return NULL;
+		}
 	}
 
 	veejay_msg(VEEJAY_MSG_INFO, "Loaded %d TrueType fonts", f->font_index );
