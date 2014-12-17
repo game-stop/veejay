@@ -204,7 +204,8 @@ dnl ====== check for PKG_CONFIG_PATH
 if test x"$PKG_CONFIG_PATH" = x ; then
 	AC_MSG_NOTICE([The PKG_CONFIG_PATH variable was not set])
 	AC_MSG_NOTICE([You should set it to the directories that contain the .pc files])
-	AC_MSG_ERROR([Abort])
+
+        PKG_CONFIG_PATH=/usr/lib/pkgconfig
 fi
 
 AC_MSG_CHECKING(whether to compile in debugging information)
