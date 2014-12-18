@@ -90,6 +90,8 @@ typedef struct {
 
 #define	RUP8(num)(((num)+8)&~8)
 
+extern int pixel_Y_lo_;
+
 static	varcache_t	pvar_;
 static	void		*lzo_;
 static void 	*effect_sampler = NULL;
@@ -132,7 +134,7 @@ static const char *copyr =
 	"(C) 2002-2013 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
 
 static const char *donateaddr = 
-	"Veejay's BTC donation address: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n\tLTC donation address: LcccLQCB7DbqGj9u52urRjVi43yYz7WeND\n";
+	"Veejay's BTC donation address: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n";
 
 #define MLIMIT(var, low, high) \
 if((var) < (low)) { var = (low); } \
@@ -165,7 +167,7 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,int chain_ent
 static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chain_entry );
 static void vj_perform_reverse_audio_frame(veejay_t * info, int len, uint8_t *buf );
 
-
+extern int  pixel_Y_lo_;
 
 static	void	vj_perform_copy( ycbcr_frame *src, ycbcr_frame *dst, int Y_len, int UV_len )
 {
@@ -493,8 +495,12 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 
 static long vj_perform_alloc_row(veejay_t *info, int c, int frame_len)
 {
-	uint8_t *buf = vj_malloc(sizeof(uint8_t) * RUP8(helper_frame->len * 3 * 3));
-	mlock( buf, RUP8(helper_frame->len * 3 * 3));
+#ifdef STRICT_CHECKING
+	assert( frame_len == helper_frame->len );
+#endif
+	int len = helper_frame->len + helper_frame->width;
+	uint8_t *buf = vj_malloc(sizeof(uint8_t) * RUP8(len * 3 * 3));
+	mlock( buf, RUP8(len * 3 * 3));
 
 #ifdef STRICT_CHECKING
 	assert ( buf != NULL );
@@ -503,20 +509,21 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int frame_len)
 		return 0;
 
 	frame_buffer[c]->Y = buf;
-	frame_buffer[c]->Cb = frame_buffer[c]->Y + RUP8(frame_len);
-	frame_buffer[c]->Cr = frame_buffer[c]->Cb + RUP8(frame_len);
+	frame_buffer[c]->Cb = frame_buffer[c]->Y + RUP8(len);
+	frame_buffer[c]->Cr = frame_buffer[c]->Cb + RUP8(len);
 
 	frame_buffer[c]->ssm = info->effect_frame1->ssm;
-	frame_buffer[c]->P0  = buf + RUP8(helper_frame->len*3);
-	frame_buffer[c]->P1  = frame_buffer[c]->P0 + RUP8(helper_frame->len*3);
-	return (long) (RUP8(helper_frame->len*3*3));
+	frame_buffer[c]->P0  = buf + RUP8(len*3);
+	frame_buffer[c]->P1  = frame_buffer[c]->P0 + RUP8(len*3);
+	return (long) (RUP8(len*3*3));
 }
 
 static void vj_perform_free_row(int c)
 {
 	if(frame_buffer[c]->Y)
 	{
-		munlock( frame_buffer[c]->Y, RUP8(helper_frame->len * 3 * 3) );
+		int len = helper_frame->len + helper_frame->width;
+		munlock( frame_buffer[c]->Y, RUP8(len * 3 * 3) );
 		free( frame_buffer[c]->Y );
 	}
 	frame_buffer[c]->Y = NULL;
@@ -589,7 +596,7 @@ static int vj_perform_record_buffer_init()
 		record_buffer->Y = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(helper_frame->len));
 	if(!record_buffer->Y) return 0;
 
-	veejay_memset( record_buffer->Y , 16, helper_frame->len );
+	veejay_memset( record_buffer->Y , pixel_Y_lo_, helper_frame->len );
 	veejay_memset( record_buffer->Cb, 128, helper_frame->uv_len );
  	veejay_memset( record_buffer->Cr, 128, helper_frame->uv_len );
 
@@ -633,43 +640,44 @@ int vj_perform_init(veejay_t * info)
     primary_buffer =
 	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 8); 
     
+    const int buf_len = frame_len + w;
+
     if(!primary_buffer) return 0;
 	for( c = 0; c < 6; c ++ )
 	{
 		primary_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
-		primary_buffer[c]->Y = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8((frame_len+w) * 3) );
-		mlock( primary_buffer[c]->Y, RUP8((frame_len+w) * 3) );
+		primary_buffer[c]->Y = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(buf_len) * 3 );
+		mlock( primary_buffer[c]->Y, RUP8(buf_len) * 3 );
 #ifdef STRICT_CHECKING
 		assert( primary_buffer[c] != NULL );
 		assert( primary_buffer[c]->Y != NULL );
 #endif
-		primary_buffer[c]->Cb = primary_buffer[c]->Y + (frame_len + w);
-		primary_buffer[c]->Cr = primary_buffer[c]->Cb + (frame_len +w);
+		primary_buffer[c]->Cb = primary_buffer[c]->Y + RUP8(buf_len);
+		primary_buffer[c]->Cr = primary_buffer[c]->Cb + RUP8(buf_len);
 
-		veejay_memset( primary_buffer[c]->Y,   0, (frame_len+w));
-		veejay_memset( primary_buffer[c]->Cb,128, (frame_len+w));
-		veejay_memset( primary_buffer[c]->Cr,128, (frame_len+w));
+		veejay_memset( primary_buffer[c]->Y, pixel_Y_lo_, RUP8(buf_len));
+		veejay_memset( primary_buffer[c]->Cb,128, RUP8(buf_len));
+		veejay_memset( primary_buffer[c]->Cr,128, RUP8(buf_len));
 	}
 
 
 	primary_buffer[6] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 	primary_buffer[6]->Y = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(512 * 512 * 3));
+	
 	//@ layout of primary_buffer[6] is flat, only Y
 	mlock( primary_buffer[6]->Y, RUP8(512 * 512 * 3));
-
-
 	primary_buffer[7] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
-	primary_buffer[7]->Y = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(w * h * 3));
-	primary_buffer[7]->Cb = primary_buffer[7]->Y + ( RUP8(w*h));
-	primary_buffer[7]->Cr = primary_buffer[7]->Cb + ( RUP8(w*h));
-	mlock( primary_buffer[7]->Y, RUP8(w * h * 3));
-
+	primary_buffer[7]->Y = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(buf_len) * 3);
+	primary_buffer[7]->Cb = primary_buffer[7]->Y + ( RUP8(buf_len));
+	primary_buffer[7]->Cr = primary_buffer[7]->Cb + ( RUP8(buf_len));
+	mlock( primary_buffer[7]->Y, RUP8(buf_len) * 3);
 
     video_output_buffer_convert = 0;
     video_output_buffer =
 	(ycbcr_frame**) vj_malloc(sizeof(ycbcr_frame*) * 2 );
+
     if(!video_output_buffer)
-	return 0;
+		return 0;
 
     veejay_memset( ppm_path,0,sizeof(ppm_path));
 
@@ -683,31 +691,33 @@ int vj_perform_init(veejay_t * info)
 
     sample_record_init(frame_len);
     vj_tag_record_init(w,h);
+
+	int plane_len = sizeof(uint8_t) * (RUP8(buf_len) * 2);
+
     // to render fading of effect chain:
-    temp_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len+16) * 2 );
-    mlock( temp_buffer[0], RUP8(frame_len+16) * 2 );
+    temp_buffer[0] = (uint8_t*)vj_malloc( plane_len );
+    mlock( temp_buffer[0], plane_len );
 
     if(!temp_buffer[0]) return 0;
-	veejay_memset( temp_buffer[0], 16,  RUP8(frame_len+16) * 2  );
-    temp_buffer[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len+16) * 2);
+	veejay_memset( temp_buffer[0], pixel_Y_lo_, plane_len);
+    temp_buffer[1] = (uint8_t*)vj_malloc( plane_len );
     if(!temp_buffer[1]) return 0;
-	veejay_memset( temp_buffer[1],128, (sizeof(uint8_t) * RUP8(frame_len+16) * 2)  );
-    temp_buffer[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len+16) * 2 );
+	veejay_memset( temp_buffer[1],128,plane_len);
+    temp_buffer[2] = (uint8_t*)vj_malloc( plane_len );
     if(!temp_buffer[2]) return 0;
-	veejay_memset( temp_buffer[2], 128,sizeof(uint8_t) * RUP8(frame_len+16) * 2 );
+	veejay_memset( temp_buffer[2],128, plane_len);
+
     // to render fading of effect chain:
-
-    
-
 	for(c = 0; c < 4; c ++ ) {
-		feedback_buffer[c] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(frame_len+16) );
-		mlock( feedback_buffer[c],  RUP8(frame_len+16) );
-		veejay_memset( feedback_buffer[c], 0, RUP8(frame_len) );
+		feedback_buffer[c] = (uint8_t*) vj_malloc( plane_len );
+		mlock( feedback_buffer[c],  plane_len );
+		veejay_memset( feedback_buffer[c], pixel_Y_lo_, plane_len );
 	}
 
     /* allocate space for frame_buffer, the place we render effects  in */
     for (c = 0; c < SAMPLE_MAX_EFFECTS; c++) {
-	frame_buffer[c] = (ycbcr_frame *) vj_calloc(sizeof(ycbcr_frame));
+		frame_buffer[c] = (ycbcr_frame *) 
+			vj_calloc(sizeof(ycbcr_frame));
         if(!frame_buffer[c]) return 0;
     }
 
@@ -719,8 +729,8 @@ int vj_perform_init(veejay_t * info)
 	vj_perform_clear_cache();
 	veejay_memset( frame_info[0],0,SAMPLE_MAX_EFFECTS);
 
-	    helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
-	    veejay_memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
+	helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
+	veejay_memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
  
    	// vj_perform_record_buffer_init();
     
@@ -1064,7 +1074,7 @@ void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
 
 	video_output_buffer[i]->Y = (uint8_t*)
 			vj_malloc(sizeof(uint8_t) * RUP8( dst_w * dst_h) );
-	veejay_memset( video_output_buffer[i]->Y, 16, dst_w * dst_h );
+	veejay_memset( video_output_buffer[i]->Y, pixel_Y_lo_, dst_w * dst_h );
 	video_output_buffer[i]->Cb = (uint8_t*)
 			vj_malloc(sizeof(uint8_t) * RUP8( dst_w * dst_h) );
 	veejay_memset( video_output_buffer[i]->Cb, 128, dst_w * dst_h );

@@ -1300,7 +1300,6 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 	char *name2 = strndup( zn.string, zn.string_len );
 	*/
 
-veejay_msg(0, "name1=%s,name2=%s",name1,name2);
 
 	if(name1 == NULL  || name2 == NULL ) {
 		FT_Done_Face(face);
