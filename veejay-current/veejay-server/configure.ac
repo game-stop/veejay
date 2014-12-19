@@ -180,14 +180,14 @@ case $host in
   *-*-linux*)
 	AC_CHECK_HEADER(linux/version.h,
 		[have_linux=true
-	         AC_DEFINE(HAVE_LINUX,,[Linux platform])
+	         AC_DEFINE(HAVE_LINUX,1,[Linux platform])
 		],
 		[AC_MSG_ERROR([version.h not found - please install the linux kernel headers])
 		])
 		LIBM_LIBS="-lm"
 	;;
    *-apple-darwin*)
-		AC_DEFINE(HAVE_DARWIN,,[MAC OS X Darin])
+		AC_DEFINE(HAVE_DARWIN,1,[MAC OS X Darin])
 		dnl OS-X/Darwin needs no-cpp-precomp
 		CFLAGS="$CFLAGS -no-cpp-precomp"
 		have_darwin=true
@@ -283,7 +283,7 @@ YUVCFLAGS="-fif-conversion"
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
-	AC_DEFINE(HAVE_X86CPU,, [Compiling for x86 architecture CPU])
+	AC_DEFINE(HAVE_X86CPU,1, [Compiling for x86 architecture CPU])
 	AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
 	have_x86cpu=true
 
@@ -307,15 +307,15 @@ case $host_cpu in
 	
     ;;
   x86_64*|k8-*)
-    	AC_DEFINE(HAVE_X86_CPU,, [Compiling for x86-64 architecture CPU])
+    	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
 	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
-	AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
-	AC_DEFINE(ARCH_PPC,,[Compiling for PowerPC])
+	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
+	AC_DEFINE(ARCH_PPC,1,[Compiling for PowerPC])
 	have_ppccpu=true
 
 	case $host in
@@ -330,8 +330,8 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
     	esac
     ;;
    mips | mipsel)
-	AC_DEFINE(ARCH_MIPS,,[Compiling for MIPS CPU])
-	AC_DEFINE(HAVE_MIPS,,[Compiling for MIPS CPU])
+	AC_DEFINE(ARCH_MIPS,1,[Compiling for MIPS CPU])
+	AC_DEFINE(HAVE_MIPS,1,[Compiling for MIPS CPU])
 	have_mips=true
 	AC_MSG_CHECKING([if we are compiling on playstation2 hardware])
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
@@ -343,7 +343,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 
 	if test x$have_ps2 = xtrue ; then
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_PS2,,[Compile for playstation2])
+		AC_DEFINE(HAVE_PS2,1,[Compile for playstation2])
 	else
 		AC_MSG_RESULT(no)
 	fi
@@ -375,8 +375,8 @@ then
 	])
 
 	if test $ac_cv_flag_mmx = yes; then
-       		AC_DEFINE(HAVE_ASM_MMX,,[Compiling in MMX support])
-		AC_DEFINE(HAVE_MMX,,[Compiling in MMX support])
+       		AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
+		AC_DEFINE(HAVE_MMX,1,[Compiling in MMX support])
        		have_asm_mmx=true
 	fi
 
@@ -389,8 +389,8 @@ then
 	])
 
 	if test $ac_cv_flag_sse = yes; then
-		AC_DEFINE(HAVE_ASM_SSE,,[Compiling in SSE support])
-		AC_DEFINE(HAVE_SSE,,[Compiling in SSE support])
+		AC_DEFINE(HAVE_ASM_SSE,1,[Compiling in SSE support])
+		AC_DEFINE(HAVE_SSE,1,[Compiling in SSE support])
 		have_asm_sse=true
 	fi
 
@@ -405,8 +405,8 @@ then
 	])
 
 	if test $ac_cv_flag_sse2 = yes; then
-		AC_DEFINE(HAVE_ASM_SSE2,,[Compiling in SSE2 support])
-		AC_DEFINE(HAVE_SSE2,,[Compiling in SSE2 support])
+		AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in SSE2 support])
+		AC_DEFINE(HAVE_SSE2,1,[Compiling in SSE2 support])
 		have_asm_sse2=true
 	fi
 
@@ -419,7 +419,7 @@ then
 	])
 
 	if test $ac_cv_flag_3dnow = yes; then
-		AC_DEFINE(HAVE_ASM_3DNOW,,[Compiling in 3Dnow])
+		AC_DEFINE(HAVE_ASM_3DNOW,1,[Compiling in 3Dnow])
 		have_asm_3dnow=true
 	fi
 
@@ -432,7 +432,7 @@ then
 	])
 
 	if test $ac_cv_flag_cmov = yes; then
-		AC_DEFINE(HAVE_CMOV,,[Compiling in CMOV])
+		AC_DEFINE(HAVE_CMOV,1,[Compiling in CMOV])
 		have_cmov=true
 	fi
 
@@ -447,9 +447,8 @@ then
 	])
 
 	if test $ac_cv_flag_mmx2 = yes; then
-		AC_DEFINE(HAVE_ASM_MMX2,,[Compiling in MMX2])
-		AC_DEFINE(HAVE_MMX2,,[Compiling in MMX2])
-		AC_DEFINE(HAVE_ASM_MMXEXT,,[Compiling in MMXEXT])
+		AC_DEFINE(HAVE_ASM_MMX2,1,[Compiling in MMX2])
+		AC_DEFINE(HAVE_ASM_MMXEXT,1,[Compiling in MMXEXT])
 		have_asm_mmx2=true
 	fi
 
@@ -493,7 +492,7 @@ EOF
       # add -O3 flag
       ALTIVEC_CFLAGS="-O3 ${ALTIVEC_CFLAGS}"
       AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_ALTIVEC,,
+      AC_DEFINE(HAVE_ALTIVEC,1,
 				[Inline PPC Altivec primitives available])
       AC_SUBST(ALTIVEC_CFLAGS)
     else
@@ -680,12 +679,12 @@ AC_SUBST(PTHREAD_LIBS)
 have_pthread=false
 AC_CHECK_LIB(pthread, pthread_create,
   [ PTHREAD_LIBS="-lpthread" 
-    AC_DEFINE(HAVE_LIBPTHREAD,,[Compiling with pthread library])
+    AC_DEFINE(HAVE_LIBPTHREAD,1,[Compiling with pthread library])
     have_pthread=true ],,)
 
 AC_CHECK_FUNC(pthread_attr_getstacksize,
 	          [
-				AC_DEFINE(HAVE_PTHREADSTACKSIZE,,[Using pthread stack size])
+				AC_DEFINE(HAVE_PTHREADSTACKSIZE,1,[Using pthread stack size])
 			  ] )
 
 if test x$have_pthread != xtrue ; then
@@ -695,7 +694,7 @@ fi
 have_dl_dlopen=false
 AC_CHECK_LIB(dl,dlopen)
 if test "$ac_cv_lib_dl_dlopen" = "yes"; then
- AC_DEFINE(HAVE_DL_DLOPEN,,[Compile with dlopen support])
+ AC_DEFINE(HAVE_DL_DLOPEN,1,[Compile with dlopen support])
  have_dl_dlopen=true
 fi
 
@@ -755,7 +754,7 @@ if test x$with_jpeg != xno ; then
 	fi
 
 	if test x$have_jpeg = xtrue ; then
-		AC_DEFINE(HAVE_JPEG,,[Define is JPEG libraries are available])
+		AC_DEFINE(HAVE_JPEG,1,[Define is JPEG libraries are available])
 	fi
 fi
 have_pixbuf=false
@@ -840,7 +839,7 @@ if test x$have_liblo = xfalse ; then
 else
  have_liblo=true
  AC_SUBST(HAVE_LIBLO)
- AC_DEFINE(HAVE_LIBLO,,[define if liblo])
+ AC_DEFINE(HAVE_LIBLO,1,[define if liblo])
 fi
 
 dnl *********************************************************************
@@ -854,7 +853,7 @@ PKG_CHECK_MODULES(DIRECTFB, directfb >= 0.9.17, have_directfb=true,
 if test x$have_directfb = xtrue ; then
 AC_SUBST(DIRECTFB_LIBS)
 AC_SUBST(DIRECTFB_CFLAGS)
-AC_DEFINE(HAVE_DIRECTFB,,[Compiling with DirectFB])
+AC_DEFINE(HAVE_DIRECTFB,1,[Compiling with DirectFB])
 fi
 fi
 
@@ -869,7 +868,7 @@ if test x$with_jack != xno ; then
   if test x$have_jack = xtrue ; then
     AC_SUBST(JACK_LIBS)
     AC_SUBST(JACK_CFLAGS)
-    AC_DEFINE(HAVE_JACK,,[Compiling in Jack])
+    AC_DEFINE(HAVE_JACK,1,[Compiling in Jack])
   fi
 fi
 
@@ -935,7 +934,7 @@ if test x$have_freetype2 != xtrue; then
 				FT_LIBS="$FT_LIBS $word"
 			fi
 		done
-		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
+		AC_DEFINE(HAVE_FREETYPE,1,[compiling with freetype])
 		FTPATHTOKENS=${FT_CFLAGS##*/}
 		AC_DEFINE_UNQUOTED(FT_FTSNAMES_H,"$FTPATHTOKENS/ftsnames.h",[location of ftsnames.h (freetype)])
 		AC_DEFINE_UNQUOTED(FT_TTNAMEID_H,"$FTPATHTOKENS/ttnameid.h",[location of ttnameid.h (freetype)])
@@ -965,7 +964,6 @@ AM_CONDITIONAL(HAVE_ASM_NASM, test x$have_asm_nasm = xtrue)
 AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
-AM_CONDITIONAL(HAVE_MMX2, test x$have_asm_mmx2 = xtrue)
 AM_CONDITIONAL(HAVE_SDL, test x$have_sdl = xtrue)
 AM_CONDITIONAL(HAVE_XML2, test x$have_xml2 = xtrue)
 AM_CONDITIONAL(HAVE_JACK, test x$have_jack = xtrue)
