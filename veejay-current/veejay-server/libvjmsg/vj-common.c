@@ -46,6 +46,7 @@
 #include <unistd.h>
 #include <libgen.h>
 
+#include <mjpeg_logging.h>
 /* Bug in gcc prevents from using CPP_DEMANGLE in pure "C" */
 #if !defined(__cplusplus) && !defined(NO_CPP_DEMANGLE)
 #define NO_CPP_DEMANGLE
@@ -316,6 +317,8 @@ void veejay_set_debug_level(int level)
 	{
 		_debug_level = 0;
 	}
+
+    	mjpeg_default_handler_verbosity( _debug_level ? 1:0);
 }
 
 void veejay_set_colors(int l)

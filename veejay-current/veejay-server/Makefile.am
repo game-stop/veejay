@@ -1,6 +1,13 @@
 # Process with automake to produce Makefile.in
 
-SUBDIRS = mjpegtools aclib libOSC libhash libvjmsg libvjmem 
+if HAVE_MJPEGTOOLS
+SUBDIRS = 
+else
+SUBDIRS = mjpegtools 
+endif
+
+SUBDIRS += aclib
+SUBDIRS += libOSC libhash libvjmsg libvjmem 
 SUBDIRS += bio2jack libvevo liblzo libvje libplugger libsample libvjnet libyuv libel libstream libsamplerec
 SUBDIRS += veejay 
 SUBDIRS += livido-plugins

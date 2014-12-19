@@ -45,7 +45,7 @@ if [ -f configure ]; then
 		echo "On ubuntu/debian systems you will most likely need to install the *-dev packages"
 		echo "According to http://www.veejayhq.net/2009/01/veejay-howto-compile/ you could use:"
 		echo "$ sudo apt-get install build-essential autogen autotools-dev autoconf automake1.8 libtool libsdl1.2-dev \
-libjack0.100.0-dev libquicktime-dev libxml2-dev libglade2-dev libgtk2.0-dev libmjpegtools-dev \
+libjack0.100.0-dev libquicktime-dev libxml2-dev libglade2-dev libgtk2.0-dev \
 libavcodec-dev libjpeg62-dev libavformat-dev libswscale-dev libdv-dev xorg-dev libasound-dev \
 libsamplerate-dev
 "

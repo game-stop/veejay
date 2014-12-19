@@ -376,7 +376,7 @@ static int set_option(const char *name, char *value)
     } else if (strcmp(name, "size") == 0 || strcmp(name, "s") == 0) {
 	if (sscanf(value, "%dx%d", &info->bes_width, &info->bes_height) !=
 	    2) {
-	    mjpeg_error("--size parameter requires NxN argument");
+	    fprintf(stderr,"--size parameter requires NxN argument");
 	    nerr++;
 	}
      }
@@ -590,7 +590,7 @@ static int check_command_line_options(int argc, char *argv[])
 	Usage(argv[0]);
 
     veejay_set_debug_level(info->verbose);
-    mjpeg_default_handler_verbosity( (info->verbose ? 1:0) );
+
     
     if(!info->dump)
 	{

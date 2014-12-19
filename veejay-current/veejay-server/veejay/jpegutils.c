@@ -33,7 +33,7 @@
 #include <jerror.h>
 #include <assert.h>
 
-#include <mjpegtools/mjpeg_logging.h>
+#include <libvjmsg/vj-msg.h>
 
 #include "jpegutils.h"
 #include <libel/lav_io.h>
@@ -206,7 +206,7 @@ static void init_destination(j_compress_ptr cinfo)
 static boolean empty_output_buffer(j_compress_ptr cinfo)
 {
     /*FIXME: */
-    mjpeg_error("Given jpeg buffer was too small!");
+    veejay_msg(0,"Given jpeg buffer was too small!");
     ERREXIT(cinfo, JERR_BUFFER_SIZE);	/* shouldn't be FILE_WRITE but BUFFER_OVERRUN! */
     return TRUE;
 }
@@ -325,7 +325,10 @@ static void add_huff_table(j_decompress_ptr dinfo,
     for (len = 1; len <= 16; len++)
 	nsymbols += bits[len];
     if (nsymbols < 1 || nsymbols > 256)
-	mjpeg_error_exit1("jpegutils.c:  add_huff_table failed badly. ");
+    {
+      veejay_msg(0, "(jpegutils) HUFFMAN table failed badly");
+      return;
+    }
 
     memcpy((*htblptr)->huffval, val, nsymbols * sizeof(UINT8));
 }
@@ -529,7 +532,7 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
     jpeg_start_decompress(&dinfo);
 
     if (dinfo.output_components != 3) {
-	mjpeg_error("Output components of JPEG image = %d, must be 3",
+	veejay_msg(0,"Output components of JPEG image = %d, must be 3",
 		    dinfo.output_components);
 	goto ERR_EXIT;
     }
@@ -541,16 +544,16 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 
     if ((hsf[0] != 2 && hsf[0] != 1) || hsf[1] != 1 || hsf[2] != 1 ||
 	(vsf[0] != 1 && vsf[0] != 2) || vsf[1] != 1 || vsf[2] != 1) {
-	mjpeg_error
-	    ("Unsupported sampling factors, hsf=(%d, %d, %d) vsf=(%d, %d, %d) !",
+	veejay_msg
+	    (0,"Unsupported sampling factors, hsf=(%d, %d, %d) vsf=(%d, %d, %d) !",
 	     hsf[0], hsf[1], hsf[2], vsf[0], vsf[1], vsf[2]);
 	goto ERR_EXIT;
     }
 
     if (hsf[0] == 1) {
 	if (height % 8 != 0) {
-	    mjpeg_error
-		("YUV 4:4:4 sampling, but image height %d not dividable by 8 !\n",
+	    veejay_msg
+		(0,"YUV 4:4:4 sampling, but image height %d not dividable by 8 !\n",
 		 height);
 	    goto ERR_EXIT;
 	}
@@ -579,8 +582,8 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
     } else if (2 * dinfo.output_height == height) {
 	numfields = 2;
     } else {
-	mjpeg_error
-	    ("Read JPEG: requested height = %d, height of image = %d",
+	veejay_msg
+	    (0,"Read JPEG: requested height = %d, height of image = %d",
 	     height, dinfo.output_height);
 	goto ERR_EXIT;
     }
@@ -588,7 +591,7 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
     /* Width is more flexible */
 
     if (dinfo.output_width > MAX_LUMA_WIDTH) {
-	mjpeg_error("Image width of %d exceeds max", dinfo.output_width);
+	veejay_msg(0,"Image width of %d exceeds max", dinfo.output_width);
 	goto ERR_EXIT;
     }
     if (width < 2 * dinfo.output_width / 3) {
@@ -639,7 +642,7 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 		yl = yc = (1 - field);
 		break;
 	    default:
-		mjpeg_error("Input is interlaced but no interlacing set");
+		veejay_msg(0,"Input is interlaced but no interlacing set");
 		goto ERR_EXIT;
 	    }
 	} else
@@ -807,8 +810,8 @@ int decode_jpeg_gray_raw(unsigned char *jpeg_data, int len,
     dinfo.dct_method = JDCT_DEFAULT;	
 
     if (dinfo.jpeg_color_space != JCS_GRAYSCALE) {
-	mjpeg_error
-	    ("FATAL: Expected grayscale colorspace for JPEG raw decoding");
+	veejay_msg
+	    (0,"FATAL: Expected grayscale colorspace for JPEG raw decoding");
 	goto ERR_EXIT;
     }
 
@@ -829,8 +832,8 @@ int decode_jpeg_gray_raw(unsigned char *jpeg_data, int len,
     } else if (2 * dinfo.output_height == height) {
 	numfields = 2;
     } else {
-	mjpeg_error
-	    ("Read JPEG: requested height = %d, height of image = %d",
+	veejay_msg
+	    (0,"Read JPEG: requested height = %d, height of image = %d",
 	     height, dinfo.output_height);
 	goto ERR_EXIT;
     }
@@ -838,7 +841,7 @@ int decode_jpeg_gray_raw(unsigned char *jpeg_data, int len,
     /* Width is more flexible */
 
     if (dinfo.output_width > MAX_LUMA_WIDTH) {
-	mjpeg_error("Image width of %d exceeds max", dinfo.output_width);
+	veejay_msg(0,"Image width of %d exceeds max", dinfo.output_width);
 	goto ERR_EXIT;
     }
     if (width < 2 * dinfo.output_width / 3) {
@@ -889,7 +892,7 @@ int decode_jpeg_gray_raw(unsigned char *jpeg_data, int len,
 		yl = yc = (1 - field);
 		break;
 	    default:
-		mjpeg_error("Input is interlaced but no interlacing set");
+		veejay_msg(0,"Input is interlaced but no interlacing set");
 		goto ERR_EXIT;
 	    }
 	} else
@@ -1054,13 +1057,13 @@ int encode_jpeg_raw(unsigned char *jpeg_data, int len, int quality,int dct_metho
 
 
     if ((width > 4096) || (height > 4096)) {
-	mjpeg_error
-	    ("Image dimensions (%dx%d) exceed veejay' max (4096x4096)",
+	veejay_msg
+	    (0,"Image dimensions (%dx%d) exceed veejay' max (4096x4096)",
 	     width, height);
 	goto ERR_EXIT;
     }
     if ((width % 16) || (height % 16)) {
-	mjpeg_error("Image dimensions (%dx%d) not multiples of 16", width,
+	veejay_msg(0,"Image dimensions (%dx%d) not multiples of 16", width,
 		    height);
 	goto ERR_EXIT;
     }
@@ -1073,8 +1076,8 @@ int encode_jpeg_raw(unsigned char *jpeg_data, int len, int quality,int dct_metho
     default:
 	numfields = 1;
 	if (height > 2048) {
-	    mjpeg_error
-		("Image height (%d) exceeds lavtools max for non-interlaced frames",
+	    veejay_msg
+		(0,"Image height (%d) exceeds lavtools max for non-interlaced frames",
 		 height);
 	    goto ERR_EXIT;
 	}
@@ -1101,7 +1104,7 @@ int encode_jpeg_raw(unsigned char *jpeg_data, int len, int quality,int dct_metho
 		yl = yc = (1 - field);
 		break;
 	    default:
-		mjpeg_error("Input is interlaced but no interlacing set");
+		veejay_msg(0,"Input is interlaced but no interlacing set");
 		goto ERR_EXIT;
 	    }
 	} else

@@ -550,6 +550,15 @@ fi
 
 AC_MSG_RESULT($CFLAGS)
 
+have_mjpegtools=false
+PKG_CHECK_MODULES( MJPEGTOOLS, [mjpegtools >= 1.6],
+	[
+		have_mjpegtools=true
+		AC_DEFINE( HAVE_MJPEGTOOLS, 1, [Mjpegtools installed])
+		AC_MSG_NOTICE([Mjpegtools are installed])
+	])
+
+
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
@@ -969,6 +978,7 @@ AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE2, test x$have_freetype2 = xtrue)
+AM_CONDITIONAL(HAVE_MJPEGTOOLS, test x$have_mjpegtools = xtrue )
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -1043,9 +1053,14 @@ $srcdir/buildinfo.sh
 dnl **********************************************************************
 dnl Output a Makefile or two and the lib/header descriptor script
 dnl
+
+AC_CONFIG_FILES([Makefile])
+
+if test "$have_mjpegtools" = "false" ; then
+	AC_CONFIG_FILES([mjpegtools/Makefile])
+fi
+
 AC_CONFIG_FILES([
-Makefile
-mjpegtools/Makefile
 aclib/Makefile
 libOSC/Makefile
 libhash/Makefile
@@ -1129,6 +1144,10 @@ AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 
+if test "$have_mjpegtools" = "true"; then
+	AC_MSG_NOTICE([  - Mjpegtools support            : ${have_mjpegtools}])
+fi
+
 AC_MSG_NOTICE([ Optional dependencies])
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
@@ -1137,5 +1156,6 @@ AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - V4L1 (obsolete)               : ${have_v4l}])
+
 
 cat NEWS
