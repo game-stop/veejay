@@ -1895,9 +1895,18 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 	}
 
 	editlist *el = ( s1 ? sample_get_editlist(s1) : info->edit_list);
-#ifdef STRICT_CHECKING
-	assert( el != NULL );
-#endif
+	if( el == NULL ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Selected mixing source and ID does not exist, Use / to toggle mixing type!" );
+		if( info->edit_list == NULL ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "No plain source playing");
+			return 0;
+		} else {
+			veejay_msg(VEEJAY_MSG_WARNING, "Fetching frame %d from plain source",
+				nframe );
+			el = info->edit_list;
+		}
+	}
+
 	int cur_sfd = (s1 ? sample_get_framedups(s1 ) : info->settings->simple_frame_dup );
 
 	if( max_sfd <= 1 )
