@@ -134,7 +134,6 @@
 #include <time.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
-#include <aclib/ac.h>
 #include <libyuv/mmx.h>
 #include <libvje/vje.h>
 #include <veejay/vj-task.h>
@@ -1051,7 +1050,7 @@ static struct {
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
      { "MMX/MMX2/SSE optimized memcpy()",    fast_memcpy, 0},
 #endif  
-     { "aclib optimized ac_memcpy()", (void*) ac_memcpy, 0 },
+   //  { "aclib optimized ac_memcpy()", (void*) ac_memcpy, 0 },
      { NULL, NULL, 0},
 };
 
