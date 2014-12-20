@@ -20,6 +20,7 @@
 #include <config.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <libvjmem/vjmem.h>
 #include "scratcher.h"
 #include "common.h"
 #include "magicoverlays.h"
@@ -51,18 +52,18 @@ vj_effect *mtracer_init(int w, int h)
 // FIXME private
 void mtracer_free() {
 	int i;
-	for( i = 0; i < 3; i ++ ) {
-		if( mtrace_buffer[i] ) 
-			free(mtrace_buffer[i]);
-		mtrace_buffer[i] = NULL;
-	}
+	if( mtrace_buffer[0] ) 
+		free(mtrace_buffer[0]);
+	mtrace_buffer[i] = NULL;
 }
 
 int mtracer_malloc(int w, int h)
 {
-   mtrace_buffer[0] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
-   mtrace_buffer[1] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
-   mtrace_buffer[2] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
+	mtrace_buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h*3));
+	mtrace_buffer[1] = mtrace_buffer[0] + RUP8(w*h);
+	mtrace_buffer[2] = mtrace_buffer[1] + RUP8(w*h*2);
+	vj_frame_clear1( mtrace_buffer[0], pixel_Y_lo_, RUP8(w*h) );
+	vj_frame_clear1( mtrace_buffer[1], 128, RUP8(w*h*2)) ;
 	return 1;
 }
 

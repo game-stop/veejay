@@ -19,6 +19,8 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvjmem/vjmem.h>
+#include "common.h"
 #include "complexsync.h"
 #include <stdlib.h>
 
@@ -52,22 +54,21 @@ vj_effect *complexsync_init(int width, int height)
 int complexsync_malloc(int width, int height)
 {
    int i;
-   for( i = 0; i < 3 ; i ++ ) {
-    c_outofsync_buffer[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height );
-    int v = ( i == 0 ? 0: 128 );
-    veejay_memset( c_outofsync_buffer[i], v, width * height ); 
-  } 
+   c_outofsync_buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height*3) );
+   c_outofsync_buffer[1] = c_outofsync_buffer[0] + RUP8(width*height);
+   c_outofsync_buffer[2] = c_outofsync_buffer[1] + RUP8(width*height);
+  
+   vj_frame_clear1( c_outofsync_buffer[0] , pixel_Y_lo_ , RUP8(width*height));
+   vj_frame_clear1( c_outofsync_buffer[1] , 128, RUP8(width*height*2) );
    return 1;
 
 }
 
 void complexsync_free() {
-	int i;
-	for( i = 0; i < 3; i ++ ) {
-	 if(c_outofsync_buffer[i])
-	    free(c_outofsync_buffer[i]);
-   	c_outofsync_buffer[i] = NULL;
-	}
+	 if(c_outofsync_buffer[0])
+	    free(c_outofsync_buffer[0]);
+   	 c_outofsync_buffer[0] = NULL;
+	
 }
 void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int val)
 {

@@ -87,12 +87,16 @@ int	chameleonblend_malloc(int w, int h)
 	int i;
 	for( i = 0; i < 3 ; i ++ ) {
 		bgimage[i] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(w*h));
-		if(!bgimage[i])
-			return 0;
 		tmpimage[i] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(w*h));
-		if(!tmpimage[i])
-			return 0;
 	}
+
+	vj_frame_clear1( bgimage[0], pixel_Y_lo_, RUP8(w*h));
+	vj_frame_clear1( tmpimage[0], pixel_Y_lo_, RUP8(w*h));
+	for( i = 1; i < 3; i ++ ) {
+		vj_frame_clear1( bgimage[i], 128, RUP8(w*h));
+		vj_frame_clear1( tmpimage[i], 128, RUP8(w*h));
+	}
+
 
 	sum = (int32_t*) vj_calloc( w * h * sizeof(int32_t));
 	timebuffer = (uint8_t*) vj_calloc( w* h * PLANES );

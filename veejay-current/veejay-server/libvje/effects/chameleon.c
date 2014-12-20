@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
+#include <libvjmsg/vj-msg.h>
 #include <config.h>
 #include "chameleon.h"
 #include "common.h"
@@ -65,8 +66,10 @@ static uint8_t		*bgimage[3] = { NULL,NULL,NULL};
 
 int	chameleon_prepare( uint8_t *map[3], int width, int height )
 {
-	if(!bgimage[0])
+	if(!bgimage[0]) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Take a backdrop snapshot!");
 		return 0;
+	}
 
 	
 	//@ copy the iamge
@@ -90,9 +93,16 @@ int	chameleon_malloc(int w, int h)
 {
 	int i;
 	for( i = 0; i < 3; i ++ ) {
-		bgimage[i] = vj_malloc(sizeof(uint8_t) * w * h );
-		tmpimage[i] = vj_malloc(sizeof(uint8_t) * w * h );	
+		bgimage[i] = vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
+		tmpimage[i] = vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
 	}
+	vj_frame_clear1( bgimage[0], pixel_Y_lo_, RUP8(w*h));
+	vj_frame_clear1( tmpimage[0], pixel_Y_lo_, RUP8(w*h));
+	for( i = 1; i < 3; i ++ ) {
+		vj_frame_clear1( bgimage[i], 128, RUP8(w*h));
+		vj_frame_clear1( tmpimage[i], 128, RUP8(w*h));
+	}
+	
 	
 	sum = (int32_t*) vj_calloc( w * h * sizeof(int32_t));
 	

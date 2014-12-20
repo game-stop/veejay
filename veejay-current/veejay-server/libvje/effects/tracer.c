@@ -49,21 +49,19 @@ vj_effect *tracer_init(int w, int h)
 
 int 	tracer_malloc(int w, int h)
 {
-	trace_buffer[0] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
-	trace_buffer[1] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
-	trace_buffer[2] = (uint8_t *) vj_malloc(sizeof(uint8_t) * w * h );
 
-   return 1;
+	trace_buffer[0] = (uint8_t *) vj_malloc(sizeof(uint8_t) * RUP8(w * h * 3) );
+	trace_buffer[1] = trace_buffer[0] + RUP8(w*h);
+	trace_buffer[2] = trace_buffer[1] + RUP8(w*h);
+	vj_frame_clear1( trace_buffer[0], pixel_Y_lo_, RUP8(w*h));
+	vj_frame_clear1( trace_buffer[1], 128, RUP8(w*h*2) );
+   	return 1;
 }
 
 void tracer_free() {
-	int i;
-	for( i = 0; i < 3 ; i ++ )
-	{
-		if(trace_buffer[i])
-		 free(trace_buffer[i]);
-		trace_buffer[i] = NULL;	
-	}		
+	if(trace_buffer[0])
+		free(trace_buffer[0]);
+	trace_buffer[0] = NULL;	
 }
 
 void tracer_apply(VJFrame *frame, VJFrame *frame2,
