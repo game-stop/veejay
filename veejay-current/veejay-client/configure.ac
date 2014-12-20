@@ -1,20 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-<<<<<<< HEAD
-AC_INIT([reloaded],[1.5.28],[nwelburg@gmail.com])
-=======
-AC_INIT([reloaded],[1.5.30],[nwelburg@gmail.com])
->>>>>>> 136a4bf5dccb26747f388e5f3dbe5e612fa39f4a
+AC_INIT([reloaded],[1.5.33],[nwelburg@gmail.com])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 RELOADED_MAJOR_VERSION=1
 RELOADED_MINOR_VERSION=5
-<<<<<<< HEAD
-RELOADED_MICRO_VERSION=28
-=======
-RELOADED_MICRO_VERSION=30
->>>>>>> 136a4bf5dccb26747f388e5f3dbe5e612fa39f4a
+RELOADED_MICRO_VERSION=33
 RELOADED_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 RELOADED_CODENAME="Reloaded - build $RELOADED_MAJOR_VERSION $RELOADED_MINOR_VERSION $RELOADED_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -144,7 +136,7 @@ dnl ====== check for PKG_CONFIG_PATH
 if test x"$PKG_CONFIG_PATH" = x ; then
 	AC_MSG_NOTICE([The PKG_CONFIG_PATH variable was not set])
 	AC_MSG_NOTICE([You should set it to the directories that contain the .pc files])
-	AC_MSG_ERROR([Abort])
+	PKG_CONFIG_PATH=/usr/lib/pkgconfig
 fi
 
 
@@ -242,11 +234,7 @@ dnl Look for X
 AC_PATH_XTRA
 AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
 
-<<<<<<< HEAD
-debugCFLAGS=""
-=======
 debugCFLAGS=-g
->>>>>>> 136a4bf5dccb26747f388e5f3dbe5e612fa39f4a
 
 AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
