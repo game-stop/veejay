@@ -640,7 +640,6 @@ static void print_license()
 
 	veejay_msg(VEEJAY_MSG_INFO,
         "Veejay's BTC donation address: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ");
-	veejay_msg(VEEJAY_MSG_INFO, "\tLTC donation address: LcccLQCB7DbqGj9u52urRjVi43yYz7WeND");
 }
 
 static void donothing(int sig)
