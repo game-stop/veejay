@@ -26,8 +26,8 @@
 #include "ghost.h"
 
 static uint8_t 		*ghost_buf[3];
-static uint8_t 		*diff_map;
-static int			 diff_period;
+static uint8_t 		*diff_map = NULL;
+static int		 diff_period = 0;
 
 vj_effect *ghost_init(int w, int h)
 {
@@ -47,19 +47,20 @@ vj_effect *ghost_init(int w, int h)
     return ve;
 }
 
-// FIXME private 
 int	ghost_malloc(int w, int h)
 {
 	const int len = (w * h );
 	int i;
 
-	for( i = 0; i < 3 ; i ++ )
-	{
-   		ghost_buf[i] = (uint8_t*) vj_calloc( sizeof(uint8_t) * len);
-		if(!ghost_buf[i])
-			return 0;
-	}
-	diff_map = (uint8_t*) vj_calloc( sizeof(uint8_t) * len);
+	ghost_buf[0] = vj_malloc( sizeof(uint8_t) * RUP8(len*3));
+	ghost_buf[1] = ghost_buf[0] + RUP8(len);
+	ghost_buf[2] = ghost_buf[1] + RUP8(len);
+
+	vj_frame_clear1( ghost_buf[0], pixel_Y_lo_, RUP8(len));
+	vj_frame_clear1( ghost_buf[1], 128, RUP8(len*2));
+
+	diff_map = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(len));
+	vj_frame_clear1( diff_map, 0, RUP8(len));
 	diff_period = 0;
 
 	return 1;
@@ -68,14 +69,13 @@ int	ghost_malloc(int w, int h)
 void ghost_free()
 {
 	int i;
-	for(i = 0 ; i < 3; i ++ )
-	{
-		if(ghost_buf[i])
-			free(ghost_buf[i]);
-		ghost_buf[i] = NULL;
-	}
+	if(ghost_buf[0])
+		free(ghost_buf[0]);
+	ghost_buf[i] = NULL;
+	
 	if( diff_map )
 		free(diff_map);
+	diff_map = NULL;
 }
 
 void ghost_apply(VJFrame *frame,
@@ -83,9 +83,9 @@ void ghost_apply(VJFrame *frame,
 {
 	register int q,z=0;
  	int x,y,i,tmp;
-    const int len = frame->len;
-    const unsigned int op_a = opacity;
-    const unsigned int op_b = 255 - op_a;
+    	const int len = frame->len;
+    	const unsigned int op_a = opacity;
+    	const unsigned int op_b = 255 - op_a;
 	uint8_t *srcY = frame->data[0];
 	uint8_t *srcCb= frame->data[1];
 	uint8_t *srcCr= frame->data[2];
@@ -101,9 +101,8 @@ void ghost_apply(VJFrame *frame,
 	// first time running 
 	if(diff_period == 0)
 	{
-		veejay_memcpy( dY, srcY, len   );
-		veejay_memcpy( dCb,srcCb, len  );
-		veejay_memcpy( dCr,srcCr, len  );
+		int strides[4] = { len, len, len, 0 };
+		vj_frame_copy( frame->data, ghost_buf, strides );
 		diff_period = 1;
 		return;
 	}
