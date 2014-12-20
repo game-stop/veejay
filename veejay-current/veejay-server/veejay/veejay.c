@@ -655,7 +655,7 @@ static void	sigsegfault_handler(void) {
 	sigemptyset(&sigst.sa_mask);
 	sigaddset(&sigst.sa_mask, SIGSEGV );
 	sigst.sa_flags = SA_SIGINFO | SA_ONESHOT;
-	if( sigaction(SIGSEGV, &sigst, NULL == - 1) )
+	if( sigaction(SIGSEGV, &sigst, NULL) == - 1) 
 		veejay_msg(0,"sigaction");
 }
 
