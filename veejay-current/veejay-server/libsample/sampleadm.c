@@ -40,6 +40,7 @@
 #include <libsample/sampleadm.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include <libvjmem/vjmem.h>
 #include <libvevo/vevo.h>
 #include <libvevo/libvevo.h>
@@ -949,7 +950,7 @@ void sample_del_all()
     			sample_info *si = sample_get(i);
 			if(si->edit_list) {
 				char key[32];
-				snprintf(key, "p%p", si->edit_list );
+				snprintf(key,sizeof(key), "p%p", si->edit_list );
 				if( vevo_property_get( port, key, 0, NULL ) == VEVO_ERROR_NOSUCH_PROPERTY ) {
 					vevo_property_set( port, key, VEVO_ATOM_TYPE_VOIDPTR,1,&(si->edit_list));
 				}

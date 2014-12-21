@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <sys/statfs.h>
 #include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include <veejay/vj-misc.h>
 #include <veejay/vj-lib.h>
 #include <libvjmem/vjmem.h>

@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
+#include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif

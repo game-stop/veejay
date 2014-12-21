@@ -38,6 +38,7 @@
 #ifdef SUPPORT_READ_DV2
 #include <libstream/vj-dv1394.h>
 #endif
+#include <libsubsample/subsample.h>
 #include <libvjmsg/vj-msg.h>
 #include <libel/vj-avcodec.h>
 #include <libvjnet/vj-client.h>
@@ -64,7 +65,6 @@
 #include <veejay/vj-viewport-xml.h>
 
 #include <libplugger/plugload.h>
-
 static veejay_t *_tag_info = NULL;
 static hash_t *TagHash = NULL;
 static int this_tag_id = 0;

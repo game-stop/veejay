@@ -29,6 +29,8 @@
 #include <sched.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
 #include <veejay/vj-event.h>
 #include <veejay/libveejay.h>

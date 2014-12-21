@@ -34,6 +34,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
 #include <libvje/effects/common.h>
+#include <libsubsample/subsample.h>
 #include <libvevo/libvevo.h>
 #include <mjpegtools/mpegconsts.h>
 #include <mjpegtools/mpegtimecode.h>

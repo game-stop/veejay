@@ -83,7 +83,7 @@ void isolate_apply( VJFrame *frame, int width,
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-	int iy,iu,iv;
+	int iy=0,iu=0,iv=0;
 	_rgb2yuv(r,g,b,iy,iu,iv);
 	_y = (float) iy;
 	aa = (float) iu;

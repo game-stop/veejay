@@ -31,6 +31,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <libOSC/libosc.h>
+#include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>

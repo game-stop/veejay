@@ -1,8 +1,6 @@
 INCLUDES = -I$(top_srcdir)/libOSC -I$(includedir)
-AM_CFLAGS=$(OP_CFLAGS)
 OSC_LIB_FILE = libOSC.la 
 noinst_LTLIBRARIES = $(OSC_LIB_FILE)
-libOSC_la_CFLAGS = $(AM_CFLAGS)
 libOSC_la_SOURCES = OSC-address-space.c \
 		 OSC-callbacklist.c \
 		 OSC-drop.c \

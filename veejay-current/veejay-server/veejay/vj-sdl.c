@@ -25,6 +25,8 @@
 #ifdef HAVE_SDL
 #include <veejay/vj-sdl.h>
 #include <SDL/SDL_syswm.h>
+#include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>

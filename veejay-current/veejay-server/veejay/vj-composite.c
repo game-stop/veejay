@@ -29,11 +29,12 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-composite.h>
 #include <veejay/vj-misc.h>
 #include <libavutil/pixfmt.h>
-
+#include <libsubsample/subsample.h>
 #ifdef HAVE_XML2
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>

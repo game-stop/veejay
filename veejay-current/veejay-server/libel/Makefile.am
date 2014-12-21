@@ -1,7 +1,6 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES = Makefile.in
-AM_CFLAGS=$(OP_CFLAGS)
 
 INCLUDES =	-I$(top_srcdir) \
 	 	-I$(includedir) \

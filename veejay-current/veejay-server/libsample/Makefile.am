@@ -9,7 +9,6 @@ endif
 
 INCLUDES += $(FFMPEG_CFLAGS) $(XML2_CFLAGS) $(MJPEGTOOLS_CFLAGS)
 
-AM_CFLAGS=$(OP_CFLAGS)
 SAMPLE_LIB_FILE = libsample.la
 noinst_LTLIBRARIES = $(SAMPLE_LIB_FILE)
 libsample_la_SOURCES = sampleadm.c 

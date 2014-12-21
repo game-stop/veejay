@@ -23,22 +23,6 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
-typedef enum subsample_mode {
-    SSM_UNKNOWN = 0,
-    SSM_420_JPEG_TR = 1,
-    SSM_420_JPEG_BOX = 2,
-    SSM_420_MPEG2 = 3,
-    SSM_422_444 = 4, 
-    SSM_420_422 = 5, 
-    SSM_COUNT = 6,
-} subsample_mode_t;
-
-extern const char *ssm_id[SSM_COUNT];
-extern const char *ssm_description[SSM_COUNT];
-
-void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
-void chroma_subsample_cp(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[], uint8_t *dcbcr[] );
-void chroma_supersample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
 
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);

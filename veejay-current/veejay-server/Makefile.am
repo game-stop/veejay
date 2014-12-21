@@ -8,7 +8,7 @@ endif
 
 SUBDIRS += aclib
 SUBDIRS += libOSC libhash libvjmsg libvjmem 
-SUBDIRS += bio2jack libvevo liblzo libvje libplugger libsample libvjnet libyuv libel libstream libsamplerec
+SUBDIRS += bio2jack libvevo liblzo libvje libplugger libsample libvjnet libsubsample libyuv libel libstream libsamplerec
 SUBDIRS += veejay 
 SUBDIRS += livido-plugins
 SUBDIRS += man

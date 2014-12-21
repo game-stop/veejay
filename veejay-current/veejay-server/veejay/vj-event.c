@@ -32,6 +32,7 @@
 #include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
+#include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
 #include <veejay/vj-perform.h>
 #include <veejay/libveejay.h>
@@ -2935,7 +2936,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 void	vj_event_set_rgb_parameter_type(void *ptr, const char format[], va_list ap)
 {	
 	
-	int args[2];
+	int args[3];
 	char *s = NULL;
 	P_A(args,s,format,ap);
 	if(args[0] >= 0 && args[0] <= 3 )
@@ -4177,7 +4178,7 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
 
 void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
 {
-	int args[2];
+	int args[3];
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
 	P_A(args, s, format, ap);
@@ -4196,13 +4197,13 @@ void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
 	int cha = sample_get_chain_channel( v->uc->sample_id, entry );
 
 //	if( src == VJ_TAG_TYPE_NONE ) {
-		int pos = sample_get_offset( cha,entry );
+	int pos = sample_get_offset( cha,entry );
 			
-		pos += args[2];
+	pos += args[2];
 
-		sample_set_offset( cha,entry, pos );
+	sample_set_offset( cha,entry, pos );
 
-		veejay_msg(VEEJAY_MSG_INFO, "Changed frame position to %d for sample %d on FX entry %d (only)", pos,cha,entry );
+	veejay_msg(VEEJAY_MSG_INFO, "Changed frame position to %d for sample %d on FX entry %d (only)", pos,cha,entry );
 		
 //	}
 
@@ -4433,10 +4434,6 @@ void vj_event_sample_set_marker_clear(void *ptr, const char format[],va_list ap)
 		if( sample_marker_clear( args[0] ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker cleared", args[0]);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for sample %d",args[1],args[2],args[0]);
 		}
 	}
 	else
@@ -6961,7 +6958,7 @@ void	vj_event_v4l_blackframe( void *ptr, const char format[] , va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 
 	char *str = NULL;
-	int args[3];
+	int args[4];
 	
 	P_A(args,str,format,ap);
 	
@@ -8528,7 +8525,7 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_get_image_part			(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	int args[4];
+	int args[5];
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
@@ -8728,8 +8725,6 @@ void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	)
 		SEND_MSG(v, "000000000" );
 		return;
 	}
-
-	vj_tag *tag = vj_tag_get(id);
 
 	int total_len = 0;
 	int uv_len    = 0;

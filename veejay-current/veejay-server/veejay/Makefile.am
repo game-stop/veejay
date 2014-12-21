@@ -1,7 +1,6 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES = Makefile.in
-AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" 
 
@@ -20,6 +19,7 @@ INCLUDES += -I /usr/X11R6/include -I$(top_srcdir)/libOSC \
 		-I$(top_srcdir)/libvjnet \
 		-I$(top_srcdir)/libel \
 		-I$(top_srcdir)/libstream \
+		-I$(top_srcdir)/libsubsample \
 		-I$(top_scrdir)/libyuv \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
@@ -57,6 +57,7 @@ libveejay_la_LIBADD = 	-L$(top_builddir)/libOSC  -lOSC \
 			-L$(top_builddir)/libel -lel \
 			-L$(top_builddir)/libstream -lstream \
 			-L$(top_builddir)/aclib -lac \
+			-L$(top_builddir)/libsubsample -lsubsample \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libvevo -lvevo 

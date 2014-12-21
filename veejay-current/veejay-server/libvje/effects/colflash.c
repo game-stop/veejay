@@ -70,7 +70,7 @@ void colflash_apply( VJFrame *frame, int width, int height, int f,int r, int g, 
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-	uint8_t y,u,v;
+	uint8_t y=0,u=0,v=0;
 
 	_rgb2yuv( r,g,b,y,u,v );
 	

@@ -27,6 +27,7 @@
 #include <libstream/vj-tag.h>
 #include <libvjnet/vj-server.h>
 #include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
 #include <libel/vj-el.h>
 #include <math.h>
@@ -3183,8 +3184,8 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 	}
 
 	MPEG_timecode_t tc;
-	char timecode[20];
-	char tmp[32];
+	char timecode[64];
+	char tmp[64];
 	char buf[256];
 	veejay_memset(&tc,0,sizeof(MPEG_timecode_t));
 	veejay_memset(&tmp,0,sizeof(tmp));
@@ -3194,7 +3195,7 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 
         mpeg_timecode(&tc, settings->current_frame_num, n, info->current_edit_list->video_fps );
 
-        snprintf(timecode, 20, "%2d:%2.2d:%2.2d:%2.2d",
+        snprintf(timecode, sizeof(timecode), "%2d:%2.2d:%2.2d:%2.2d",
                 tc.h, tc.m, tc.s, tc.f );
 
 

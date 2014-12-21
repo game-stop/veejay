@@ -20,6 +20,7 @@
 #include <string.h>
 #include <libsample/sampleadm.h>
 #include <libvjmsg/vj-msg.h>
+#include <libsubsample/subsample.h>
 #include <libsamplerec/samplerecord.h>
 #include <veejay/vj-misc.h>
 #include <libavutil/avutil.h>

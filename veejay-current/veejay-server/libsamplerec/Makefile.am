@@ -12,7 +12,6 @@ endif
 
 INCLUDES += $(XML2_CFLAGS) $(FFMPEG_CFLAGS) $(MJPEGTOOLS_CFLAGS)
 
-AM_CFLAGS=$(OP_CFLAGS)
 SAMPLEREC_LIB_FILE = libsamplerec.la
 noinst_LTLIBRARIES = $(SAMPLEREC_LIB_FILE)
 libsamplerec_la_SOURCES =	samplerecord.c 

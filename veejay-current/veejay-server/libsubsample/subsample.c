@@ -31,7 +31,10 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <assert.h>
+#include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include <mjpegtools/mjpeg_types.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>

@@ -69,7 +69,6 @@
 #include <veejay/x11misc.h>
 #endif
 #include <libvjnet/vj-client.h>
-#include <veejay/vj-misc.h>
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
 #endif
@@ -81,6 +80,8 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
+#include <libsubsample/subsample.h>
+#include <veejay/vj-misc.h>
 #include <veejay/vj-perform.h>
 #include <veejay/vj-plug.h>
 #include <veejay/vj-lib.h>

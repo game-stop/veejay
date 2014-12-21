@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.34],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.35],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=34
+VEEJAY_MICRO_VERSION=35
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -37,6 +37,8 @@ AC_CONFIG_MACRO_DIR([m4])
 
 dnl kill CFLAGS
 CFLAGS=""
+
+
 AC_ARG_ENABLE(strict,
 		AC_HELP_STRING([--enable-strict],
 			     [Compile in paranoia assertion checking]))
@@ -284,8 +286,7 @@ have_ppccpu=false
 have_ps2=false
 
 OP_CFLAGS=""
-YUVCFLAGS="-fif-conversion"
-
+SUBSAMPLE_CFLAGS=""
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
@@ -296,16 +297,15 @@ case $host_cpu in
 	PROGRAM_NOPIC="-fno-PIC"
 
 	if test "x$enable_debug" != "xyes" ; then
-		OP_CFLAGS="-O3"
+		OP_CFLAGS="-O2"
  	fi
 
 	AC_SUBST(OP_CFLAGS)
-	AC_SUBST(YUVCFLAGS)
 
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in
 		i686)
-			CFLAGS="$CFLAGS"
+			CFLAGS="$CFLAGS $OP_CFLAGS"
 		;;
 	*)
 		;;
@@ -317,7 +317,13 @@ case $host_cpu in
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
+	if test "x$enable_debug" != "xyes" ; then
+		OP_CFLAGS="-O2"
+ 	fi
+
+	AC_SUBST(OP_CFLAGS)
+	SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+	CFLAGS="$CFLAGS -m64 -fPIC -DPIC $OP_CFLAGS"
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
@@ -986,7 +992,9 @@ dnl We do this last as it can screw up library detection etc...
 
 CFLAGS="$ARCHFLAGS $CFLAGS"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
+SUBSAMPLE_CFLAGS="$ARCHFLAGS $SUBSAMPLE_CFLAGS"
 
+AC_SUBST(SUBSAMPLE_CFLAGS)
 
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
@@ -1073,6 +1081,7 @@ libvje/Makefile
 libplugger/Makefile
 libsample/Makefile
 libvjnet/Makefile
+libsubsample/Makefile
 libyuv/Makefile
 libel/Makefile
 libstream/Makefile
@@ -1091,8 +1100,6 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Veejay ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
-AC_MSG_NOTICE([                 $YUVCFLAGS])
-AC_MSG_NOTICE([			$OP_CFLAGS])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])
