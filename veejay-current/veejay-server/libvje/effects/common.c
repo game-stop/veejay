@@ -22,12 +22,16 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <math.h>
-#include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
+#include <libvjmem/vjmem.h>
 #include "common.h"
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+
+
+extern void veejay_msg(int type, const char format[], ...);
+
 char	**vje_build_param_list( int num, ... )
 {
 	va_list args;

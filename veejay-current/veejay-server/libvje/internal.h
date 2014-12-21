@@ -609,4 +609,17 @@ extern void cali_apply(void *d , VJFrame *frame,
                 int width, int height, 
                 int mode, int full);
 
+extern void waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, int loopnum, int decay);
+
+extern void radcor_apply( VJFrame *frame, int width, int height, int a, int b, int c);
+
+extern void bgsubtract_apply(VJFrame *frame,int width,int height,int mode, int threshold);
+
+extern int motionmap_prepare( uint8_t *map[3], int w, int h );
+extern int chameleon_prepare( uint8_t *bg[3], int w, int h );
+extern int bgsubtract_prepare(uint8_t *map[3], int w, int h); 
+extern int contourextract_prepare(uint8_t *map[3], int w, int h);
+extern int chameleonblend_prepare( uint8_t *bg[3],int w, int h );
+
+
 #endif

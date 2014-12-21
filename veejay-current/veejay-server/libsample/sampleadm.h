@@ -347,7 +347,7 @@ extern int	sample_usable_edl( int s1 );
 
 extern int sample_cache_used( int s1 );
 extern void        sample_free();
-
+extern int	sample_load_composite_config( void *compiz, int s1 );
 extern int sample_stop_playing(int s1, int new_s1);
 extern int sample_start_playing(int s1, int no_cache);
 extern int sample_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);

@@ -20,6 +20,8 @@ int vj_perform_init_audio(veejay_t * info);
 
 void vj_perform_free(veejay_t *info);
 
+void	vj_perform_done_s2( veejay_t *info );
+
 int vj_perform_audio_start(veejay_t * info);
 
 void vj_perform_audio_status(struct timeval tmpstmp, unsigned int nb_out,

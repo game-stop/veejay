@@ -6637,8 +6637,10 @@ static	void	theme_response( gchar *string )
 	snprintf(theme_config,sizeof(theme_config), "%stheme.config", theme_dir );
 	snprintf(theme_file,sizeof(theme_file), "%s/%s/gveejay.rc", theme_dir, string );
 	int fd = open( theme_config , O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
+	
 	if(fd > 0)
 	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Setting up theme %s in %s", string, theme_file );
 		write( fd, string, strlen(string));
 		close(fd);
 		vj_msg(VEEJAY_MSG_INFO, "Restart GveejayReloaded for changes to take effect");
@@ -6651,7 +6653,7 @@ static	void	theme_response( gchar *string )
 	}
 	else
 	{
-		vj_msg(VEEJAY_MSG_ERROR, "Unable to write to %s", theme_config );
+		vj_msg(VEEJAY_MSG_ERROR, "Unable to write to %s", theme_file );
 	}
 
 }

@@ -88,7 +88,8 @@ typedef struct vj_osc_t {
 
 /* VIMS does the job */
 extern void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen, int type);
-
+extern char *vj_event_vevo_get_event_name( int id );
+ 
 
 #define OSC_STRING_SIZE 255
 #define OPUSH(p) { _old_p_mode = osc_info->uc->playback_mode; osc_info->uc->playback_mode = p; } 

@@ -1529,7 +1529,7 @@ void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 	}
 }
 #else
-static	inline	copy8( uint8_t *to, uint8_t *to2, uint8_t *from ) {
+static	inline	void copy8( uint8_t *to, uint8_t *to2, uint8_t *from ) {
 	__asm__ __volatile__ (
 			"movq	(%0),	%%mm0\n" 
 			"movq	%%mm0,	(%1)\n"

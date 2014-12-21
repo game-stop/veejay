@@ -20,6 +20,7 @@
 
 
 #include <config.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -27,7 +28,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
 #include <libvjnet/vj-client.h>
-
+#include <veejay/vj-share.h>
 
 static vj_client	*vj_share_connect(char *hostname, int port)
 {

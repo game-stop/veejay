@@ -97,15 +97,15 @@ void tracer_apply(VJFrame *frame, VJFrame *frame2,
 	{
 		for (x = 0; x < len; x++)
 		{
-	  	  Y[x] =
+	  	      Y[x] =
 			((op0 * Y[x]) + (op1 * trace_buffer[0][x])) >> 8; // / 255;
 		}
 		for (x = 0; x < uv_len; x++)
 		{
-	    	Cb[x] =
-			((op0 * Cb[x]) + (op1 * trace_buffer[1][x])) >> 8 ; // 255;
-	    	Cr[x] =
-			((op0 * Cr[x]) + (op1 * trace_buffer[2][x])) >> 8 ; // 255;
+	   	 	Cb[x] =
+		 	 ((op0 * Cb[x]) + (op1 * trace_buffer[1][x])) >> 8 ; // 255;
+	    		Cr[x] =
+		 	 ((op0 * Cr[x]) + (op1 * trace_buffer[2][x])) >> 8 ; // 255;
 		}
 		int strides[4] = { len, uv_len, uv_len, 0 };
 		vj_frame_copy( frame->data, trace_buffer, strides );

@@ -300,7 +300,8 @@ double m_get_polar_y(double r, double a);
 inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
 inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
 
-
+extern void viewport_destroy(void *v);
+extern void	vj_get_yuvgrey_template(VJFrame *src, int w, int h);
 extern	int     motionmap_active();
 extern void	motionmap_scale_to( int p1max, int p2max,int p1min,int p2min, int *p1val, int *p2val, int *pos, int *len );
 extern void	motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n );

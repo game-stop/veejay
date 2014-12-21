@@ -151,4 +151,5 @@ void yuv444_yvu444_1plane(
 		const int height,
 		uint8_t *dst_buffer);
 
+int	yuv_which_scaler();
 #endif

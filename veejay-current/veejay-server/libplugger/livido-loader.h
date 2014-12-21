@@ -67,4 +67,11 @@ char	*livido_describe_parameter_format_osc( void *instance, int p );
 void	livido_plug_free_namespace( void *fx_instance , void *data );
 
 void	*livido_get_name_space( void *instance );
+
+// utility
+int	livido_plug_get_coord_parameter_as_dbl( void *fx_instance,const char *key, int k, double *res_x, double *res_y );
+int	livido_plug_parameter_get_range_dbl( void *fx_instance,const char *key, int k, double *min, double *max, int *dkind );
+int     livido_set_parameter_from_string( void *instance, int p, const char *str, void *fx_values );
+int	livido_plug_get_number_parameter_as_dbl( void *fx_instance,const char *key, int k, double *res );
+int	livido_plug_get_index_parameter_as_dbl( void *fx_instance, const char *key,int k, double *res );
 #endif

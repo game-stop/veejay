@@ -54,6 +54,7 @@
 #include <sys/wait.h>
 #include <sys/signal.h>
 #include <sys/statfs.h>
+#include <sys/sysinfo.h>
 #include <time.h>
 #include "jpegutils.h"
 #include "vj-event.h"
@@ -92,6 +93,9 @@
 #include <veejay/vj-composite.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-OSC.h>
+#include <veejay/vj-task.h>
+#include <libplugger/plugload.h>
+#include <libstream/vj-vloopback.h>
 #define QUEUE_LEN 1
 #include <veejay/vims.h>
 #ifdef STRICT_CHECKING
@@ -230,8 +234,11 @@ struct mjpeg_params
 #include <libel/vj-el.h>
 #define VALUE_NOT_FILLED -10000
 
-extern void vj_osc_set_veejay_t(veejay_t *t);
 
+extern void vj_osc_set_veejay_t(veejay_t *t);
+extern void GoMultiCast(const char *groupname);
+extern void set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
+ 
 #ifdef HAVE_SDL
 extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 #endif
@@ -433,7 +440,7 @@ int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos) {
   }
 
   settings->hold_status = 1;
-
+  return 1;
 }
 static void	veejay_sample_resume_at( veejay_t *info, int cur_id )
 {
@@ -1734,7 +1741,7 @@ static void *veejay_geo_stat_thread(void *arg)
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-    vj_server_geo_stats();
+  //  vj_server_geo_stats();
 
     return NULL;
 }

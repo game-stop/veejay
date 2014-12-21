@@ -148,5 +148,8 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len );
 
 void	vj_el_get_video_fourcc(editlist *el, int num, char *fourcc);
 
+int	detect_pixel_format_with_ffmpeg( const char *filename );
+
+int	vj_el_pixfmt_to_veejay(int pix_fmt );
 
 #endif

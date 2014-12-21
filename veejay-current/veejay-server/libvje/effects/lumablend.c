@@ -120,7 +120,7 @@ void opacity_by_threshold_blur(uint8_t * yuv1[3], uint8_t * yuv2[3],
 {
 
     unsigned int x, y, len = width * height - width;
-    uint8_t a1, a2;
+    uint8_t a1=threshold, a2=threshold2;
     unsigned int op0, op1;
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;

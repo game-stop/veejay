@@ -28,6 +28,8 @@
 #include <aclib/ac.h>
 #include <aclib/imgconvert.h>
 #include <errno.h>
+#include <libvje/vje.h>
+#include <veejay/vj-task.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif

@@ -23,6 +23,8 @@
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vjkf.h>
+#include <veejay/vj-splitdisplay.h> //FIXME
+#include <veejay/vj-shm.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -80,6 +82,7 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
 extern void dummy_rgb_apply(VJFrame *frame, int width, int height, int r, int g, int b);
 extern int   sufficient_space(int max_size, int nframes);
 extern unsigned char *UTF8toLAT1(unsigned char *in);
+extern int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *data, int len, int uv_len );
 
 typedef struct
 {

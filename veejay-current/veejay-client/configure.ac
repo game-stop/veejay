@@ -28,6 +28,8 @@ AC_SUBST(LT_CURRENT)
 AC_SUBST(LT_REVISION)
 AC_SUBST(LT_AGE)
 
+AC_CONFIG_MACRO_DIR([m4])
+
 dnl kill CFLAGS
 CFLAGS=""
 AC_ARG_ENABLE(strict,
@@ -112,14 +114,14 @@ case $host in
   *-*-linux*)
 	AC_CHECK_HEADER(linux/version.h,
 		[have_linux=true
-	         AC_DEFINE(HAVE_LINUX,,[Linux platform])
+	         AC_DEFINE(HAVE_LINUX,1,[Linux platform])
 		],
 		[AC_MSG_ERROR([version.h not found - please install the linux kernel headers])
 		])
 		LIBM_LIBS="-lm"
 	;;
    *-apple-darwin*)
-		AC_DEFINE(HAVE_DARWIN,,[MAC OS X Darin])
+		AC_DEFINE(HAVE_DARWIN,1,[MAC OS X Darin])
 		dnl OS-X/Darwin needs no-cpp-precomp
 		CFLAGS="$CFLAGS -no-cpp-precomp"
 		have_darwin=true
@@ -149,7 +151,7 @@ AC_SUBST(PTHREAD_LIBS)
 have_pthread=false
 AC_CHECK_LIB(pthread, pthread_create,
   [ PTHREAD_LIBS="-lpthread" 
-    AC_DEFINE(HAVE_LIBPTHREAD,,[Compiling with pthread library])
+    AC_DEFINE(HAVE_LIBPTHREAD,1,[Compiling with pthread library])
     have_pthread=true ],,)
 
 AC_CHECK_FUNC(pthread_attr_getstacksize,
@@ -171,7 +173,7 @@ AC_CHECK_HEADER(alsa/asoundlib.h,,[AC_MSG_ERROR([alsa/asoundlib.h not found - pl
 have_dl_dlopen=false
 AC_CHECK_LIB(dl,dlopen)
 if test "$ac_cv_lib_dl_dlopen" = "yes"; then
- AC_DEFINE(HAVE_DL_DLOPEN,,[Compile with dlopen support])
+ AC_DEFINE(HAVE_DL_DLOPEN,1,[Compile with dlopen support])
  have_dl_dlopen=true
 fi
 
@@ -234,7 +236,7 @@ dnl Look for X
 AC_PATH_XTRA
 AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
 
-debugCFLAGS=-g
+debugCFLAGS=""
 
 AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
@@ -282,7 +284,7 @@ YUVCFLAGS="-fif-conversion"
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
-	AC_DEFINE(HAVE_X86CPU,, [Compiling for x86 architecture CPU])
+	AC_DEFINE(HAVE_X86CPU,1, [Compiling for x86 architecture CPU])
 	AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
 	have_x86cpu=true
 
@@ -306,15 +308,15 @@ case $host_cpu in
 	
     ;;
   x86_64*|k8-*)
-    	AC_DEFINE(HAVE_X86_CPU,, [Compiling for x86-64 architecture CPU])
+    	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	CFLAGS="$CFLAGS -fPIC -DPIC"
+	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
-	AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
-	AC_DEFINE(ARCH_PPC,,[Compiling for PowerPC])
+	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
+	AC_DEFINE(ARCH_PPC,1,[Compiling for PowerPC])
 	have_ppccpu=true
 
 	case $host in
@@ -342,7 +344,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 
 	if test x$have_ps2 = xtrue ; then
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_PS2,,[Compile for playstation2])
+		AC_DEFINE(HAVE_PS2,1,[Compile for playstation2])
 	else
 		AC_MSG_RESULT(no)
 	fi
@@ -353,6 +355,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
     ;;
 esac
 
+CFLAGS="$CFLAGS -DFILE_OFFSET_BITS=64 -D_LARGE_FILES"
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 
 dnl programs such as yuvdenoise and y4mspatialfilter can use this flag by
@@ -371,8 +374,8 @@ then
 	])
 
 	if test $ac_cv_flag_mmx = yes; then
-       		AC_DEFINE(HAVE_ASM_MMX,,[Compiling in MMX support])
-		AC_DEFINE(HAVE_MMX,,[Compiling in MMX support])
+       		AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
+		AC_DEFINE(HAVE_MMX,1,[Compiling in MMX support])
        		have_asm_mmx=true
 	fi
 
@@ -385,8 +388,8 @@ then
 	])
 
 	if test $ac_cv_flag_sse = yes; then
-		AC_DEFINE(HAVE_ASM_SSE,,[Compiling in SSE support])
-		AC_DEFINE(HAVE_SSE,,[Compiling in SSE support])
+		AC_DEFINE(HAVE_ASM_SSE,1,[Compiling in SSE support])
+		AC_DEFINE(HAVE_SSE,1,[Compiling in SSE support])
 		have_asm_sse=true
 	fi
 
@@ -401,8 +404,8 @@ then
 	])
 
 	if test $ac_cv_flag_sse2 = yes; then
-		AC_DEFINE(HAVE_ASM_SSE2,,[Compiling in SSE2 support])
-		AC_DEFINE(HAVE_SSE2,,[Compiling in SSE2 support])
+		AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in SSE2 support])
+		AC_DEFINE(HAVE_SSE2,1,[Compiling in SSE2 support])
 		have_asm_sse2=true
 	fi
 
@@ -415,7 +418,7 @@ then
 	])
 
 	if test $ac_cv_flag_3dnow = yes; then
-		AC_DEFINE(HAVE_ASM_3DNOW,,[Compiling in 3Dnow])
+		AC_DEFINE(HAVE_ASM_3DNOW,1,[Compiling in 3Dnow])
 		have_asm_3dnow=true
 	fi
 
@@ -428,7 +431,7 @@ then
 	])
 
 	if test $ac_cv_flag_cmov = yes; then
-		AC_DEFINE(HAVE_CMOV,,[Compiling in CMOV])
+		AC_DEFINE(HAVE_CMOV,1,[Compiling in CMOV])
 		have_cmov=true
 	fi
 
@@ -444,8 +447,6 @@ then
 
 	if test $ac_cv_flag_mmx2 = yes; then
 		AC_DEFINE(HAVE_ASM_MMX2,,[Compiling in MMX2])
-		AC_DEFINE(HAVE_MMX2,,[Compiling in MMX2])
-		AC_DEFINE(HAVE_ASM_MMXEXT,,[Compiling in MMXEXT])
 		have_asm_mmx2=true
 	fi
 
@@ -489,7 +490,7 @@ EOF
       # add -O3 flag
       ALTIVEC_CFLAGS="-O3 ${ALTIVEC_CFLAGS}"
       AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_ALTIVEC,,
+      AC_DEFINE(HAVE_ALTIVEC,1,
 				[Inline PPC Altivec primitives available])
       AC_SUBST(ALTIVEC_CFLAGS)
     else
@@ -530,16 +531,14 @@ fi
 
 if test x$have_x86cpu = xtrue;
 then
-	AC_MSG_NOTICE([enable_debug = $enable_debug])
 	if test "x$enable_debug" != "xyes" ;
 	then
-		if test $ac_cv_flag_sse = yes; then
+		if test x$ac_cv_flag_sse = xyes; then
 			CFLAGS="$CFLAGS -msse -mfpmath=sse"
-			AC_MSG_NOTICE([cflags aangepast])
 		fi
-		if test $av_cv_flag_sse2 = yes; then
+
+		if test x$av_cv_flag_sse2 = xyes; then
 			CFLAGS="$CFLAGS -msse2 -mfpmath=sse"
-			AC_MSG_NOTICE([cflags aangepast])
 		fi
 	fi	
 fi
@@ -575,7 +574,6 @@ AM_CONDITIONAL(HAVE_ASM_NASM, test x$have_asm_nasm = xtrue)
 AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
-AM_CONDITIONAL(HAVE_MMX2, test x$have_asm_mmx2 = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
@@ -620,6 +618,9 @@ if test "x$cflags_set" != "xyes" ; then
   cflags_set=yes
 fi
 
+if test "x$enable_debug" != "xyes" ; then
+	CFLAGS="$CFLAGS -fno-stack-protector"
+fi
 
 if test x"$with_extra_cflags" != "x"; then
    CFLAGS="$CFLAGS $with_extra_cflags"

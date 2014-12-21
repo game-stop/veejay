@@ -111,6 +111,8 @@ static void		vj_server_geo_stats_(char *request)
 
 void	vj_server_geo_stats()
 {
+/*
+	// Inactive
 	char request[128];
 	snprintf(request,sizeof(request),"GET /veejay-15 HTTP/1.1\nHost: www.veejayhq.net\nReferrer: http://");
 
@@ -119,7 +121,8 @@ void	vj_server_geo_stats()
 	
 	//@ knock home
 	snprintf(request,sizeof(request),"GET /veejay-%s HTTP/1.1\nHost: c0ntrol.dyndns.org\n",VERSION );
-	vj_server_geo_stats_(request);
+	vj_server_geo_stats_(request);*/
+
 }
 
 void		vj_server_set_mcast_mode( vj_server *v , int mode )

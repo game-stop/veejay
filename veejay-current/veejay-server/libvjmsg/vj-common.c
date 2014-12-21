@@ -195,7 +195,6 @@ void	veejay_print_backtrace()
 	char **strings;
 
 	int i_size = sizeof(void*);
-	int n_size = i_size * 2 + 1;	
 
 	s = backtrace( space, 100 );
 	strings = backtrace_symbols(space,s);

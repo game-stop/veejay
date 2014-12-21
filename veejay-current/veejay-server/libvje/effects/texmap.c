@@ -60,6 +60,11 @@ typedef struct
 
 static	point_t	**points = NULL;
 
+extern void *viewport_fx_init_map( int wid, int hei, int x1, int y1,  
+                int x2, int y2, int x3, int y3, int x4, int y4);
+extern void            viewport_line (uint8_t *plane,int x1, int y1, int x2, int y2, int w, int h, uint8_t col);
+extern void            viewport_process_dynamic_map( void *data, uint8_t *in[3], uint8_t *out[3], uint32_t *map, int feather );
+
 vj_effect *texmap_init(int width, int height)
 {
     //int i,j;

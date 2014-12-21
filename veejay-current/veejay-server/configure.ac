@@ -531,15 +531,16 @@ if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 fi
 
 
-if test x$have_x86cpu = xtrue ;
+if test x$have_x86cpu = xtrue;
 then
 	if test "x$enable_debug" != "xyes" ;
 	then
-		if test x$ac_cv_flag_sse = yes; then
+		if test x$ac_cv_flag_sse = xyes; then
 			CFLAGS="$CFLAGS -msse -mfpmath=sse"
+	
 		fi
 
-		if test x$av_cv_flag_sse2 = yes; then
+		if test x$av_cv_flag_sse2 = xyes; then
 			CFLAGS="$CFLAGS -msse2 -mfpmath=sse"
 		fi
 	fi	
@@ -997,7 +998,7 @@ if test "x$enable_compile_warnings" != "xno" ; then
  if test "x$GCC" = "xyes" ; then
     case "$CFLAGS" in
      *-Wall*) ;;
-     *) warnCFLAGS="" ;;
+     *) warnCFLAGS="-Wall -Wunused " ;;
     esac
   if test "x$enable_compile_warnings" = "xyes" ; then
     warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wundef -Wshadow -Wbad-function-cast -Wconversion -Wpadded -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual -Wall"
@@ -1020,8 +1021,9 @@ if test "x$cflags_set" != "xyes" ; then
   cflags_set=yes
 fi
 
-
-CFLAGS="$CFLAGS -fno-stack-protector"
+if test "x$enable_debug" != "xyes" ; then
+	CFLAGS="$CFLAGS -fno-stack-protector"
+fi
 
 if test x"$with_extra_cflags" != "x"; then
    CFLAGS="$CFLAGS $with_extra_cflags"

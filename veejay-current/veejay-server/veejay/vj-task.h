@@ -53,6 +53,7 @@ void	vj_task_init();
 
 int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func );
 
+int	vj_task_available();
 
 void	*vj_task_alloc_internal_buf( unsigned int w );
 void	vj_task_set_float( float f );
@@ -71,7 +72,8 @@ int	task_start(int max_workers);
 void	task_stop(int max_workers);
 void	task_init();
 int	task_num_cpus();
-
+void	vj_task_set_overlap( int val );
+void	vj_task_set_sampling( int s );
 void	performer_job( int job_num );
 
 int	num_threaded_tasks();

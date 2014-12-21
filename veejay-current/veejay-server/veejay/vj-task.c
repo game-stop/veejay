@@ -45,6 +45,7 @@
 #include <veejay/vj-misc.h>
 #include <veejay/vj-lib.h>
 #include <libvjmem/vjmem.h>
+#include <libvjmsg/vj-msg.h>
 #include <libvje/internal.h>
 #include <veejay/vj-task.h>
 #include <libvje/vje.h>

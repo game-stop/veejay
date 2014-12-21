@@ -30,7 +30,7 @@
 #include <config.h>
 #include "chameleon.h"
 #include "common.h"
-
+#include "softblur.h"
 vj_effect *chameleon_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
