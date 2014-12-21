@@ -1154,7 +1154,7 @@ void	vj_perform_done_s2( veejay_t *info ) {
 
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_link_id)
 {
-	unsigned char info_line[128];
+	char info_line[128];
 	int compr_ok = 0;
 	uint32_t planes[3];
 	int data_len = 44;  
@@ -1378,7 +1378,6 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 			    int chain_entry)
 
 {
-    video_playback_setup *settings = (video_playback_setup*) info->settings;
     int a = info->uc->sample_id;
     int b = sub_sample;
     //int trim_val = sample_get_trimmer(a, chain_entry);
@@ -1387,12 +1386,11 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
     int sample_b[4];
 
     int offset = sample_get_offset(a, chain_entry);	
-    int len_a, len_b;
+    int len_b;
 	if(sample_get_short_info(b,&sample_b[0],&sample_b[1],&sample_b[2],&sample_b[3])!=0) return -1;
 
 	if(sample_get_short_info(a,&sample_a[0],&sample_a[1],&sample_a[2],&sample_a[3])!=0) return -1;
 
-	len_a = sample_a[1] - sample_a[0];
 	len_b = sample_b[1] - sample_b[0];
 
 	int max_sfd = sample_get_framedup( b );
@@ -1495,7 +1493,6 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,
 			    int chain_entry)
 
 {
-    video_playback_setup *settings = (video_playback_setup*) info->settings;
     //int trim_val = sample_get_trimmer(a, chain_entry);
 
     int sample[4];
@@ -1662,7 +1659,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 				//@ clip sc into range, there isn't a resampler for every speed
 				if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED;
 
-				n_samples = audio_resample( resample_context[sc],audio_buf, sambuf, n_samples );
+				n_samples = audio_resample( resample_context[sc],(short*) audio_buf, (short*) sambuf, n_samples );
 			}
 		} else if( speed == 0 ) {
 			n_samples = len = pred_len;
@@ -1700,7 +1697,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 			if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED; 
 			// @ resample buffer
 			n_samples = audio_resample( downsample_context[ sc ], 
-					down_sample_buffer,audio_buf, n_samples  );
+					(short*) down_sample_buffer,(short*) audio_buf, n_samples  );
 			*sampled_down = n_samples / max_sfd;
 			val = n_samples / max_sfd;
 			n_samples = pred_len;
@@ -1739,7 +1736,6 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		temp_buffer[0] + info->effect_frame1->len,
 		temp_buffer[1] + info->effect_frame1->len,
 		temp_buffer[2] + info->effect_frame1->len};
-    video_playback_setup *settings = info->settings;
 #ifdef STRICT_CHECKING
 	assert( info->effect_frame1->len > 0 );
 #endif
@@ -1861,7 +1857,6 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 	if(check_sample && info->settings->feedback == 0) {
 		if(info->uc->sample_id == s1 && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ) {
 
-			uint8_t *source[3];
 			if( max_sfd <= 1 ) {
 				
 				vj_perform_copy2( primary_buffer[0], img, info->effect_frame1->len, 	(info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len ) );
@@ -1906,13 +1901,11 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		return vj_el_get_video_frame( el, nframe, img );
 
 	int speed = info->settings->current_playback_speed;
-	int loops = (s1 ? sample_get_loopcount(s1) : 0 );
+	//int loops = (s1 ? sample_get_loopcount(s1) : 0 );
 	int uv_len = (info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len );
 
 	long p0_frame = 0;
 	long p1_frame = 0;
-	int  p0       = 0;
-	int  p1       = 0;
 
 	long	start = ( s1 ? sample_get_startFrame(s1) : info->settings->min_frame_num);
 	long	end   = ( s1 ? sample_get_endFrame(s1) : info->settings->max_frame_num );
@@ -1920,25 +1913,24 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 	if( cur_sfd == 0 ) {
 		if( speed > 0 && nframe == end ){ //@ p0 = last frame
 			p0_frame = end;
-			p0       = vj_el_get_video_frame( el, p0_frame, p0_buffer );
+			vj_el_get_video_frame( el, p0_frame, p0_buffer );
 			p1_frame = start;
-			p1	 = vj_el_get_video_frame( el, p1_frame, p1_buffer );
+			vj_el_get_video_frame( el, p1_frame, p1_buffer );
 		} else if( speed < 0 && nframe == start)  { //@ p0 = first frame
 			p0_frame = start;
-			p0	 = vj_el_get_video_frame( el, p0_frame, p0_buffer );
+			vj_el_get_video_frame( el, p0_frame, p0_buffer );
 			p1_frame = end;
-			p1	 = vj_el_get_video_frame( el, p1_frame, p1_buffer );
+			vj_el_get_video_frame( el, p1_frame, p1_buffer );
 		} else {
 			p0_frame = nframe;
-			p0       = vj_el_get_video_frame( el, p0_frame, p0_buffer );
+			vj_el_get_video_frame( el, p0_frame, p0_buffer );
 			p1_frame = nframe + speed;
-			p1	 = vj_el_get_video_frame( el, p1_frame, p1_buffer );
+			vj_el_get_video_frame( el, p1_frame, p1_buffer );
 		}
 		
 		vj_perform_copy3( p0_buffer, img, info->effect_frame1->len, uv_len );
 
 	} else {
-		uint32_t i;
 		const uint32_t N = max_sfd;
 		const uint32_t n1 = cur_sfd;
 		const float frac = 1.0f / (float) N * n1;
@@ -1999,7 +1991,6 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 #ifdef STRICT_CHECKING
 	assert( info->effect_frame1->len > 0 );
 #endif
-	video_playback_setup *settings = info->settings;
 
     switch (type)
     {
@@ -2040,7 +2031,6 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 				vj_tag_set_active(sample_id, 0); // stop stream
 
 			frame_buffer[chain_entry]->ssm = 0;
-			video_playback_setup *settings = info->settings;
 			if( dovp==2)
 			{
 				void *vp = vj_tag_get_composite_view( sample_id );
@@ -2264,8 +2254,6 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 	int ssm = current_ssm;
 	video_playback_setup *settings = info->settings;
 	vjp_kf *setup = NULL;
-	VJFrame   **f = frames;
-	VJFrameInfo *i = frameinfo;
 		
 	VJFrame a,b;
 	veejay_memcpy(&a, frames[1], sizeof(VJFrame));
@@ -2491,12 +2479,11 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
 	int chain_entry;
 	vjp_kf *setup;
 	VJFrame *frames[2];
-	VJFrameInfo *frameinfo;
-    	setup = info->effect_info;
+    	
+	setup = info->effect_info;
 
 	frames[0] = info->effect_frame1;
 	frames[1] = info->effect_frame2;
-    	frameinfo = info->effect_frame_info;
     	setup->ref = info->uc->sample_id;
     	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
@@ -2579,11 +2566,10 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 	//	veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 	}
 }
-static uint32_t rec_audio_sample_ = 0;
+static int rec_audio_sample_ = 0;
 static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3], int sample)
 {
 	int audio_len = 0;
-	long nframe = info->settings->current_frame_num;
 	uint8_t *buf = NULL;
 
 	if( info->current_edit_list->has_audio )
@@ -2602,7 +2588,6 @@ static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3], int
 	
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[3])
 {
-	long nframe = info->settings->current_frame_num;
 	int sample_id = info->uc->sample_id;
 	
 	if(info->settings->offline_record)
@@ -2733,7 +2718,6 @@ void vj_perform_record_stop(veejay_t *info)
 
 
 void vj_perform_record_sample_frame(veejay_t *info, int sample) {
-	video_playback_setup *settings = info->settings;
 	uint8_t *frame[3];
 	int res = 1;
 	int n = 0;
@@ -2882,7 +2866,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 		//veejay_memcpy(frame[0],feedback_buffer[0],info->effect_frame1->len );
 		//veejay_memcpy(frame[1],feedback_buffer[1],info->effect_frame1->uv_len );
 		//veejay_memcpy(frame[2],feedback_buffer[2],info->effect_frame1->uv_len );	
-		return;
+		return 1;
 	}
     
 
@@ -3074,7 +3058,7 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 
 }
 #ifdef HAVE_JACK
-static uint32_t play_audio_sample_ = 0;
+static int play_audio_sample_ = 0;
 #endif
 int vj_perform_queue_audio_frame(veejay_t *info)
 {
@@ -3341,7 +3325,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	VJFrame *frame = info->effect_frame1;
 	VJFrame *frame2= info->effect_frame2;
 	uint8_t *pri[3];
-	uint8_t *buf[3];
 	char *osd_text = NULL;
 	char *more_text = NULL;
 	int   placement= 0;
@@ -3414,20 +3397,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 						 frame->width,frame->height, pff);
 		frame->ssm = composite_process(info->composite,out,in,settings->composite,pff); 
 
-		if(osd_text == NULL && info->use_osd == 3 ) {
-			int fx_mode=0;
-			int cur_e = 0;
-			int fx_id = 0;
-			if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
-				cur_e   = vj_tag_get_selected_entry(info->uc->sample_id);
-				fx_mode = vj_tag_get_chain_status( info->uc->sample_id,cur_e );
-			} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ) {
-				cur_e   = sample_get_selected_entry(info->uc->sample_id);
-				fx_mode = sample_get_chain_status(info->uc->sample_id,cur_e);
-			}
-			//osd_text = get_embedded_help(fx_mode,info->uc->playback_mode,cur_e,info->uc->sample_id );
-		}
-
 		if(osd_text) {
 			void *vp = composite_get_vp( info->composite );
 			if(!frame->ssm) {
@@ -3488,18 +3457,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
     	} 
 
 
-}
-
-static	void	vj_perform_font_render2(veejay_t *info, uint8_t *frame[3],video_playback_setup *settings )
-{
-#ifdef STRICT_CHECKING
-//	assert( info->effect_frame1->ssm == 1 );
-#endif
-#ifdef HAVE_FREETYPE
-	int n = vj_font_norender( info->font, settings->current_frame_num );
-	if( n > 0 )
-		vj_font_render( info->font, frame , settings->current_frame_num );
-#endif
 }
 
 static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settings )
@@ -3567,7 +3524,6 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 {
 	int deep = 0;
 	VJFrame *frame = info->effect_frame1;
-	VJFrame *frame2= info->effect_frame2;
 	uint8_t *pri[3];
 	pri[0] = primary_buffer[0]->Y;
 	pri[1] = primary_buffer[0]->Cb;
