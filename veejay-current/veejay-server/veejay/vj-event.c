@@ -44,6 +44,9 @@
 #include <mjpegtools/mpegtimecode.h>
 #include <veejay/vims.h>
 #include <veejay/vj-event.h>
+#ifdef HAVE_JACK
+#include <veejay/vj-jack.h>
+#endif
 #include <libstream/vj-tag.h>
 #include <libstream/vj-vloopback.h>
 #include <liblzo/lzo.h>
@@ -141,7 +144,7 @@ static	void	*macro_bank_[12];
 static	void	*macro_port_ = NULL;
 static  int	current_macro_ = 0;
 static	int	macro_status_ = 0;
-static	int	macro_key_    = 1;
+
 static	int	macro_line_[3] = {-1 ,0,0};
 static  int	macro_current_age_ = 0;
 static  int	macro_expected_age_ = 0;
@@ -395,7 +398,7 @@ static int SAMPLE_PLAYING( veejay_t *v ) {
 #define P_A(a,b,c,d)\
 {\
 int __z = 0;\
-unsigned char *__tmpstr = NULL;\
+char *__tmpstr = NULL;\
 if(a!=NULL){\
 unsigned int __rp;\
 unsigned int __rplen = (sizeof(a) / sizeof(int) );\
@@ -462,7 +465,7 @@ static	struct {
 	{ "Cursor Up/Down Select FX from FX list\n"},
 	{ "ENTER Add selected FX to current FX slot\n"},
 	
-	NULL
+	{ NULL }
 };
 
 static struct {
@@ -1053,13 +1056,12 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
 		return NULL;
 	}	
 	len = strlen(bundle_msg);
-	m = (vj_msg_bundle*) malloc(sizeof(vj_msg_bundle));
+	m = (vj_msg_bundle*) vj_calloc(sizeof(vj_msg_bundle));
 	if(!m) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message");
 		return NULL;
 	}
-	memset(m, 0, sizeof(m) );
 	m->bundle = (char*) vj_calloc(sizeof(char) * len+1);
 	m->accelerator = 0;
 	m->modifier = 0;
@@ -1091,7 +1093,7 @@ void vj_event_trigger_function(void *ptr, vj_event f, int max_args, const char *
 
 
 /* parse a keyframe packet */
-void	vj_event_parse_kf( veejay_t *v, unsigned char *msg, int len )
+void	vj_event_parse_kf( veejay_t *v, char *msg, int len )
 {
 	if(SAMPLE_PLAYING(v))
 	{
@@ -1268,7 +1270,6 @@ static	void	init_vims_for_macro()
 
 static	int	valid_for_macro(int net_id)
 {
-	int k;
 	if(net_id > 400 || net_id >= 388 || (net_id >= 80 && net_id <= 86) || (net_id >= 50 && net_id <= 59))
 		return 0;
 
@@ -2049,7 +2050,7 @@ static	int	get_fstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, float *
 static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *dst )
 {
 	xmlChar *tmp = NULL;
-	char *t = NULL;
+	unsigned char *t = NULL;
 	int tmp_i = 0;
 	int n = 0;
 	if(! xmlStrcmp( cur->name, what ))
@@ -2236,13 +2237,10 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 	}
 
 	veejay_set_colors( c );
-	if(sample_list)
-	{
-		v->settings->action_scheduler.sl = strdup( sample_list );
-		veejay_msg(VEEJAY_MSG_DEBUG, "Scheduled '%s' for restart", sample_list );
+	v->settings->action_scheduler.sl = strdup( sample_list );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Scheduled '%s' for restart", sample_list );
 		
-		v->settings->action_scheduler.state = 1;
-	}
+	v->settings->action_scheduler.state = 1;
 }
 
 void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
@@ -2297,7 +2295,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 		}
 
 		vj_msg_bundle *m = vj_event_bundle_new( msg, event_id);
-		if(!msg)
+		if(!m)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to create new Bundle %d - [%s]", event_id, msg );
 			return;
@@ -3397,7 +3395,6 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 
 	//int id = args[0];
 	int id = 0;
-	int status = args[0];
 
 	switch(v->video_out)
 	{
@@ -3812,7 +3809,6 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	if(!STREAM_PLAYING(v))
 	{
-		video_playback_setup *s = v->settings;
 		char *str = NULL;
 		P_A(args,str,format,ap);
 		if(args[0] == -1 )
@@ -4196,7 +4192,7 @@ void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
 	if( entry == -1 )
 		entry = sample_get_selected_entry(v->uc->sample_id);
 
-	int src = sample_get_chain_source(v->uc->sample_id, entry);
+	sample_get_chain_source(v->uc->sample_id, entry);
 	int cha = sample_get_chain_channel( v->uc->sample_id, entry );
 
 //	if( src == VJ_TAG_TYPE_NONE ) {
@@ -4844,8 +4840,6 @@ void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
-	int mf;
-	video_playback_setup *s = v->settings;
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
@@ -4884,8 +4878,6 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
-	int mf;
-	video_playback_setup *s = v->settings;
 	char *str = NULL;
 	P_A(args,str,format,ap);
 	if(!SAMPLE_PLAYING(v))
@@ -5349,7 +5341,6 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 
 void	vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
 {
-	veejay_t *v = (veejay_t*) ptr;
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
@@ -6780,7 +6771,6 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
                 }
 
 		editlist *el = sample_get_editlist( v->uc->sample_id );
-		long length = el->total_frames;
 		if(!el)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL");
@@ -7313,7 +7303,6 @@ void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
 	float point_x =  ( (float) args[2] / (float) args[1] );
 	float point_y =  ( (float) args[3] / (float) args[1] );
 
-	video_playback_setup *settings = v->settings;
 	v->settings->cx = point_x;
 	v->settings->cy = point_y;
 	v->settings->cn = args[0];
@@ -7421,7 +7410,7 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[2];
-	unsigned char *str = NULL;
+	char *str = NULL;
 	P_A(args,str,format,ap);
 	if(args[0] == 0) args[0] = v->uc->sample_id;
 	if(args[0] == -1) args[0] = vj_tag_size()-1;
@@ -8901,7 +8890,6 @@ void	vj_event_send_sample_stack		(	void *ptr,	const char format[],	va_list ap )
 	char line[32];
 	int args[4];
 	char *str = NULL;
-	int error = 1;
 
 	char	buffer[1024];
 	char    message[1024];  
@@ -8952,8 +8940,6 @@ void	vj_event_send_sample_stack		(	void *ptr,	const char format[],	va_list ap )
 			strncat( buffer, line, strlen(line));
 		}
 	}	
-
-
 
 	FORMAT_MSG( message, buffer );
 	SEND_MSG(   v, message );
@@ -9302,7 +9288,6 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 	char fline[1025];
 	for(i=1; i < n_fx; i++)
 	{
-		int effect_id = vj_effect_get_real_id(i);
 		if(vj_effect_get_summary(i,line))
 		{
 			sprintf(fline, "%03zu%s", strlen(line), line );
@@ -10134,7 +10119,6 @@ void	vj_event_reset_kf( void *ptr,	const char format[], 	va_list ap	)
 
 static	void	*select_dict( veejay_t *v , int n )
 {
-	void *dict = NULL;
 	if( SAMPLE_PLAYING(v) )
 		return sample_get_dict( n );
 	else if(STREAM_PLAYING(v))
@@ -10144,7 +10128,7 @@ static	void	*select_dict( veejay_t *v , int n )
 
 void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 {
-	unsigned char text[2048];
+	char text[2048];
 	int args[6];
 	int k;
 	veejay_t *v = (veejay_t*)ptr;
@@ -10173,7 +10157,7 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 	}
 	for( k = 0; k < len ; k ++ ) {
 		if( !isprint( text[k] ) )
-			text[k] == 0x20;
+			text[k] = 0x20;
 	}
 		
 
@@ -10505,7 +10489,6 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[2] = {0,0};
-	int k,i;
 	char *str = NULL;
 	P_A(args,str,format,ap);
 

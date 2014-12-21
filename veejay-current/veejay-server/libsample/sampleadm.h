@@ -249,7 +249,7 @@ extern int	sample_chain_set_kf_status( int s1, int entry, int status );
 extern int	sample_get_kf_status( int s1, int entry );
 extern unsigned char * sample_chain_get_kfs( int s1, int entry, int parameter_id, int *len );
 extern int     sample_chain_set_kf_status( int s1, int entry, int status );
-extern int     sample_chain_set_kfs( int s1, int len, unsigned char *data );
+extern int     sample_chain_set_kfs( int s1, int len, char *data );
 extern int	sample_chain_reset_kf( int s1, int entry );
 extern int	sample_has_cali_fx(int sample_id);
 extern void	sample_cali_prepare( int sample_id, int slot, int chan );

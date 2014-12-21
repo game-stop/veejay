@@ -46,7 +46,6 @@
 #include <build.h>
 extern long vj_el_get_mem_size();
 
-static int run_server = 1;
 static veejay_t *info = NULL;
 static float override_fps = 0.0;
 static int default_geometry_x = -1;
@@ -662,10 +661,10 @@ static void	sigsegfault_handler(void) {
 int main(int argc, char **argv)
 {
 	video_playback_setup *settings;
-	char *dont_use; 
+	 
     	sigset_t allsignals;
     	struct sigaction action;
-	struct sched_param schp;
+	
 	int i;
 	fflush(stdout);
 
@@ -775,7 +774,7 @@ int main(int argc, char **argv)
 //	veejay_set_frame(info, 0);
 //	veejay_set_speed(info, 1);
 	
-	int sig;
+	
 	int current_state = LAVPLAY_STATE_PLAYING;
 
 	while( 1 ) { //@ until your PC stops working

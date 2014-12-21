@@ -1475,7 +1475,6 @@ void	veejay_check_homedir(void *arg)
 	veejay_t *info = (veejay_t *) arg;
 	char path[1024];
 	char tmp[1024];
-	struct stat s;
 	char *home = getenv("HOME");
 	if(!home)
 	{
@@ -1592,14 +1591,12 @@ static	void	veejay_event_handle(veejay_t *info)
 		int shift_pressed = 0;
 		int alt_pressed = 0;
 		int mouse_x=0,mouse_y=0,but=0;
-		int res = 0;
 		while(SDL_PollEvent(&event) == 1) 
 		{
-			SDL_KeyboardEvent *k = &event.key;
 			int mod = SDL_GetModState();
 			if( event.type == SDL_KEYDOWN || event.type == SDL_MOUSEBUTTONDOWN)
 			{
-				res = vj_event_single_fire( (void*) info, event, 0);
+				vj_event_single_fire( (void*) info, event, 0);
 			}
 			if( event.type == SDL_MOUSEMOTION )
 			{
@@ -2536,7 +2533,6 @@ static void veejay_playback_cycle(veejay_t * info)
     int first_free, skipv, skipa, skipi, nvcorr,frame;
     struct mjpeg_params bp;
     long ts, te;
-    long frame_number[2];
     int n;
 
     veejay_set_instance( info );
@@ -2614,7 +2610,6 @@ static void veejay_playback_cycle(veejay_t * info)
 
    
     for(n = 0; n < QUEUE_LEN ; n ++ ) {
-		frame_number[n] = settings->current_frame_num;
         veejay_mjpeg_queue_buf(info, n,1 );
     }
 
@@ -2736,7 +2731,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	    }
 	   
 	    frame  = n % QUEUE_LEN;
-	    frame_number[frame] = settings->current_frame_num;
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
@@ -2864,7 +2858,6 @@ static	void *veejay_playback_thread(void *data)
 
    
 
-	int mode, id;
     Welcome(info);
     veejay_playback_cycle(info);
     veejay_close(info);
@@ -3401,7 +3394,6 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 }
 editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end)
 {
-	uint64_t i;
 	uint64_t n1 = (uint64_t) start;
 	uint64_t n2 = (uint64_t) end;
 

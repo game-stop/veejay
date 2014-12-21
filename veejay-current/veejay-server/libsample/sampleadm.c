@@ -2027,7 +2027,7 @@ unsigned char *	sample_chain_get_kfs( int s1, int entry, int parameter_id, int *
    return NULL;
 }
 
-int	sample_chain_set_kfs( int s1, int len, unsigned char *data )
+int	sample_chain_set_kfs( int s1, int len, char *data )
 {
    sample_info *sample = sample_get(s1);
    if (!sample)
