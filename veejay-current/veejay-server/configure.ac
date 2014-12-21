@@ -109,6 +109,12 @@ AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
 
 
+user_specified_target=
+AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
+					 [Set a specific sub-architecture (defaults to native)]),
+		[ user_specified_target="$withval" ] )
+
+
 AC_GNU_SOURCE
 
 dnl Initialize libtool
@@ -507,6 +513,7 @@ if test ! -r $srcdir/cpuinfo.sh; then
 fi
 
 
+
 if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 	if test x$host_alias != x; then
 		dnl Cross compiling
@@ -519,13 +526,7 @@ if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 	else
 		AC_MSG_CHECKING(sub-architecture settings)
 		chmod +x $srcdir/cpuinfo.sh
-
-		if test x$have_x86cpu = xtrue; then
-       			ARCHFLAGS=`$srcdir/cpuinfo.sh x86`
-		fi
-  		if test x$have_ppccpu = xtrue; then
-       			ARCHFLAGS=`$srcdir/cpuinfo.sh ppc`
-  		fi
+       		ARCHFLAGS=`$srcdir/cpuinfo.sh $user_specified_target`
 		AC_MSG_RESULT($ARCHFLAGS)
   	fi
 fi
@@ -1129,7 +1130,7 @@ AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
-AC_MSG_NOTICE([  - FFmpeg avutil		         : ${have_avutil} ])
+AC_MSG_NOTICE([  - FFmpeg avutil		    : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 
 if test "$have_freetype" = "true"; then

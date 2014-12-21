@@ -57,6 +57,11 @@ AC_ARG_WITH(pixbuf,
             AC_HELP_STRING([--without-pixbuf], [Do not use GDK pixbuf]),
             [], [with_pixbuf=yes])
 
+user_specified_target=
+AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
+                                         [Set a specific sub-architecture (defaults to native)]),
+                [ user_specified_target="$withval" ])
+
 AC_GNU_SOURCE
 
 dnl Initialize libtool
@@ -517,13 +522,7 @@ if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 	else
 		AC_MSG_CHECKING(sub-architecture settings)
 		chmod +x $srcdir/cpuinfo.sh
-
-		if test x$have_x86cpu = xtrue; then
-       			ARCHFLAGS=`$srcdir/cpuinfo.sh x86`
-		fi
-  		if test x$have_ppccpu = xtrue; then
-       			ARCHFLAGS=`$srcdir/cpuinfo.sh ppc`
-  		fi
+		ARCHFLAGS=`$srcdir/cpuinfo.sh $user_specified_target`
 		AC_MSG_RESULT($ARCHFLAGS)
   	fi
 fi
