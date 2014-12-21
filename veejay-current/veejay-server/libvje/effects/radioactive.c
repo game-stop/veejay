@@ -76,7 +76,6 @@ static  int	buf_height = 0;
 static  int	buf_area = 0;
 static  int	buf_margin_left = 0;
 static  int	buf_margin_right = 0;
-static	void	*convert_rgb = NULL;
 static	int	first_frame=0;
 static	int	last_mode=0;
 static	float	ratio_ = 0.95;
@@ -231,7 +230,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 	uint8_t *dstY = lum;
 	uint8_t *dstU = frame->data[1];
 	uint8_t *dstV = frame->data[2];
-	uint8_t *p, *src = lum;
+	uint8_t *p;
 	uint8_t *blueY = blue->data[0];
 	uint8_t *blueU = blue->data[1];
 	uint8_t *blueV = blue->data[2];

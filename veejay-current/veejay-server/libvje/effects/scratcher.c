@@ -131,20 +131,16 @@ void scratcher_apply(VJFrame *src,
 		     int no_reverse)
 {
 
-    unsigned int x,len = src->len;
+    unsigned int len = src->len;
     unsigned int op1 = (opacity > 255) ? 255 : opacity;
-    unsigned int op0 = 255 - op1;
     int offset = len * nframe;
     int uv_len = src->uv_len;
     int uv_offset = uv_len * nframe;
-	uint8_t *Y = src->data[0];
-	uint8_t *Cb = src->data[1];
-	uint8_t *Cr = src->data[2];
 	VJFrame copy;
 
     if (nframe== 0) {
-	int strides[4] = { len, uv_len, uv_len, 0 };
-	vj_frame_copy( src->data, frame, strides );
+		int strides[4] = { len, uv_len, uv_len, 0 };
+		vj_frame_copy( src->data, frame, strides );
         return;
     }
 	
@@ -154,19 +150,6 @@ void scratcher_apply(VJFrame *src,
 	srcB.data[1] = frame[1] + uv_offset;
 	srcB.data[2] = frame[2] + uv_offset;
 	opacity_applyN( src, &srcB, src->width,src->height, opacity );
-/*    for (x = 0; x < len; x++) {
-	Y[x] =
-	    ((op0 * Y[x]) + (op1 * frame[0][offset + x])) >> 8;
-	}
-
-    for(x=0; x < uv_len; x++) {
-	Cr[x] =
-	    ((op0 * Cr[x]) + (op1 * frame[2][uv_offset + x])) >> 8;
-
-	Cb[x] =
-    	     ((op0 * Cb[x]) + (op1 * frame[1][uv_offset + x])) >> 8;
-    }
-*/
 	copy.uv_len = src->uv_len;
 	copy.data[0] = frame[0];
 	copy.data[1] = frame[1];

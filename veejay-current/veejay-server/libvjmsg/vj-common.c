@@ -128,7 +128,7 @@ timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y)
   return x->tv_sec < y->tv_sec;
 }
 
-static	void	veejay_addr2line_bt( int n, void *addr, char *sym )
+static	void	veejay_addr2line_bt( int n, void *addr, void *sym )
 {
 	int res;
 	Dl_info info;
@@ -137,7 +137,6 @@ static	void	veejay_addr2line_bt( int n, void *addr, char *sym )
 	char cmd[1024];
 	char line[1024], *line_ptr, *line_pos;
 	char func_name[1024];
-	int  line_no;
 
 	res = dladdr( addr, &info );
 	if( (res == 0) || !info.dli_fname || !info.dli_fname[0] ) {
@@ -155,12 +154,11 @@ static	void	veejay_addr2line_bt( int n, void *addr, char *sym )
 	snprintf( cmd,sizeof(cmd), "addr2line --functions --demangle -e $(which %s) %p", info.dli_fname, address);
 	out = popen( cmd, "r");
 	if(!out) {
-		veejay_msg(VEEJAY_MSG_INFO, "\t%d %s (addr2line error)", n, sym );
+		veejay_msg(VEEJAY_MSG_INFO, "\t%d %p (addr2line error)", n, sym );
 		return;
 	}
 
 	func_name[0] = '\0';
-	line_no = 0;
 
 	while( !feof(out)) {
 		line_ptr = fgets(line,sizeof(line)-1,out);
@@ -169,7 +167,6 @@ static	void	veejay_addr2line_bt( int n, void *addr, char *sym )
 			if( line_pos )
 				line_pos[0] = '\0';
 			if( strchr( line_ptr, ':' )) {
-				line_no = 1;
 				veejay_msg(VEEJAY_MSG_INFO, "\t%d %s %s (@%x)",
 						n,
 						line_ptr,
@@ -193,8 +190,6 @@ void	veejay_print_backtrace()
 	void *space[100];
 	size_t i,s;
 	char **strings;
-
-	int i_size = sizeof(void*);
 
 	s = backtrace( space, 100 );
 	strings = backtrace_symbols(space,s);
@@ -243,17 +238,17 @@ void	veejay_backtrace_handler(int n , void *dist, void *x)
 
 #if defined(SIGSEGV_STACK_IA64) || defined(SIGSEGV_STACK_X86)
 #if defined(SIGSEGV_STACK_X86)
-			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %x",
+			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %08x",
 					strerr,ist->si_addr, puc->uc_mcontext.gregs[REG_EIP]);
-			veejay_addr2line_bt( 0, puc->uc_mcontext.gregs[REG_EIP] ,  puc->uc_mcontext.gregs[REG_EIP] );
+			veejay_addr2line_bt( 0, (void*) puc->uc_mcontext.gregs[REG_EIP] , (void*) puc->uc_mcontext.gregs[REG_EIP] );
 #elif defined(SIGSEGV_STACK_IA64)
-			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %x",
+			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %08x",
 					strerr,ist->si_addr, puc->uc_mcontext.gregs[REG_RIP]);
-			veejay_addr2line_bt( 0, puc->uc_mcontext.gregs[REG_RIP], puc->uc_mcontext.gregs[REG_RIP] );
+			veejay_addr2line_bt( 0, (void*) puc->uc_mcontext.gregs[REG_RIP], (void*) puc->uc_mcontext.gregs[REG_RIP] );
 #endif
 #endif
 			for( i = 0; i < NGREG; i ++ ) {
-				veejay_msg(VEEJAY_MSG_INFO, "\tregister [%2d]\t=%x",i,puc->uc_mcontext.gregs[i]);
+				veejay_msg(VEEJAY_MSG_INFO, "\tregister [%2d]\t=%08x",i,puc->uc_mcontext.gregs[i]);
 			}
 
 			while( bp && ip ) {
@@ -348,10 +343,7 @@ void veejay_msg(int type, const char format[], ...)
     char buf[1024];
     va_list args;
     int line = 0;
-	struct timeval timenow;
     FILE *out = (_no_msg ? stderr: stdout );
-	char tmbuf[64];
-	char timebuf[64];
     if( type != VEEJAY_MSG_ERROR && _no_msg )
 		return;
 

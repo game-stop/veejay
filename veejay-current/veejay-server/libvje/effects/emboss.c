@@ -46,7 +46,7 @@ vj_effect *emboss_init(int w, int h)
 void simpleedge_framedata(VJFrame *frame, int width, int height)
 {
     unsigned int x, y;
-    uint8_t a1, a2, a3, b1, b2, b3, c1, c2, c3;
+    uint8_t a1, a2, a3, b1, b2, b3, c1, c2;
     uint8_t *Y = frame->data[0];
     for (y = 1; y < (height-1); y++) {
 	for (x = 1; x < (width-1); x++) {
@@ -58,7 +58,6 @@ void simpleedge_framedata(VJFrame *frame, int width, int height)
 	    b3 = Y[y * width + (x + 1)];
 	    c1 = Y[(y + 1) * width + (x - 1)];
 	    c2 = Y[(y + 1) * width + x];
-	    c3 = Y[(y + 1) * width + (x + 1)];
 	    if (b2 > a1 && b2 > a2 && b2 > a3 &&
 		b2 > b1 && b2 > b3 && b3 > c1 && b2 > c2 && b2 > c2)
 		Y[y * width + x] = pixel_Y_hi_;

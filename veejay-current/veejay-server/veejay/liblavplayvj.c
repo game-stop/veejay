@@ -764,7 +764,6 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 #endif
 	if(info->composite )
 	{
-		int cur_composite = info->settings->composite;
 		info->settings->composite = sample_load_composite_config( info->composite , sample_id );
 		void *cur = sample_get_composite_view(sample_id);
 		switch(info->settings->composite) {
@@ -836,7 +835,6 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	  info->uc->sample_id = stream_id;
 	if(info->composite )
 	{
-		int cur_composite = info->settings->composite;
 		info->settings->composite = vj_tag_load_composite_config( info->composite , stream_id );
 		void *cur =vj_tag_get_composite_view(stream_id);
 		switch(info->settings->composite) {	
@@ -1069,7 +1067,9 @@ void veejay_stop_sampling(veejay_t * info)
 static int veejay_screen_update(veejay_t * info )
 {
 	uint8_t *frame[3];
+#ifdef HAVE_DIRECTFB
 	uint8_t *c_frame[3];
+#endif
 	int i = 0;
 	int skip_update = 0;
 
@@ -1307,7 +1307,6 @@ void veejay_pipe_write_status(veejay_t * info)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     int d_len = 0;
-    int res = 0;
     int pm = info->uc->playback_mode;
     int total_slots = sample_size()-1;
     int tags = vj_tag_true_size() -1;
@@ -1736,7 +1735,6 @@ static	void	veejay_event_handle(veejay_t *info)
 
 static void *veejay_geo_stat_thread(void *arg)
 {
-    veejay_t *info = (veejay_t *) arg;
    /* Allow easy shutting down by other processes... */
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -2021,7 +2019,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	available_diskspace();
 
 	int id=0;
-	int mode=0;
 	int has_config = 0;
 
 	if(info->load_action_file)
@@ -2392,7 +2389,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	if(def_tags && id <= 0)
 	{
 		char vidfile[1024];
-		int n = vj_tag_num_devices();
 		int default_chan = 1;
 		char *chanid = getenv("VEEJAY_DEFAULT_CHANNEL");
 		if(chanid != NULL )
@@ -2497,9 +2493,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
     	return 0;
 }
 
-static	int	sched_ncpus() {
+/*static	int	sched_ncpus() {
 	return sysconf( _SC_NPROCESSORS_ONLN );
-}
+}*/
 
 static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 {
@@ -3173,7 +3169,6 @@ veejay_t *veejay_malloc()
 
 	int status = 0;
 	int acj    = 0;
-	int tl     = 0;
 	char *interpolate_chroma = getenv("VEEJAY_INTERPOLATE_CHROMA");
 	if( interpolate_chroma ) {
 		sscanf( interpolate_chroma, "%d", &status );
@@ -3406,7 +3401,7 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 }
 editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end)
 {
-	uint64_t k, i;
+	uint64_t i;
 	uint64_t n1 = (uint64_t) start;
 	uint64_t n2 = (uint64_t) end;
 
@@ -3447,9 +3442,6 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		return NULL;
    	}
-
-    	k = 0;
-
 
 //veejay_msg(0, "start of framelist: %p, end = %p", &(el->frame_list[n1]), &(el->frame_list[n2+1]) );
 //veejay_msg(0, "memcpy %p, %p", el->frame_list + n1, el->frame_list + n1 + len );

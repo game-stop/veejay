@@ -215,8 +215,7 @@ static	void	binarify( uint8_t *dst, uint8_t *src, int threshold,int reverse, int
 
 void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse )
 {
-	unsigned int i,x,y;
-	int len = (width * height);
+	unsigned int y;
     	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -224,10 +223,7 @@ void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int
 	uint8_t *Cb2=frame2->data[1];
 	uint8_t *Cr2=frame2->data[2];
 
-	const uint8_t kernel[9] = { 1,1,1, 1,1,1, 1,1,1 };
 	uint8_t *bmap = binary_img;
-
-//	morph_func	p = _dilate_kernel3x3;
 
 	softblur_apply( frame, width,height,0 );
 

@@ -736,9 +736,6 @@ int vj_perform_init(veejay_t * info)
     
 	lzo_ = lzo_new();
 
-	int vp = 0;  int frontback = 0;
-	int pvp = 0;
-
 	veejay_memset( &pvar_, 0, sizeof( varcache_t));
 
 	return 1;
@@ -1251,11 +1248,6 @@ void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, i
 		
 		if( video_output_buffer_convert == 0 )
 		{
-			uint8_t *src_frame[3];
-			src_frame[0] = video_output_buffer[0]->Y;
-			src_frame[1] = video_output_buffer[0]->Cb;
-			src_frame[2] = video_output_buffer[0]->Cr;
-
 			VJFrame *srci = yuv_yuv_template( video_output_buffer[0]->Y, video_output_buffer[0]->Cb,
 						 video_output_buffer[0]->Cr, w, h, 
 						 get_ffmpeg_pixfmt(info->pixel_format));

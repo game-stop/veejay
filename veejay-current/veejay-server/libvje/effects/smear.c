@@ -68,7 +68,7 @@ static void _smear_apply_x(VJFrame *frame, int width, int height, int val)
 }
 static void _smear_apply_x_avg(VJFrame *frame, int width, int height, int val)
 {
-    unsigned int i,j;
+    unsigned int j;
     unsigned int x,y;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

@@ -50,7 +50,7 @@ vj_effect *ghost_init(int w, int h)
 int	ghost_malloc(int w, int h)
 {
 	const int len = (w * h );
-	int i;
+	
 
 	ghost_buf[0] = vj_malloc( sizeof(uint8_t) * RUP8(len*3));
 	ghost_buf[1] = ghost_buf[0] + RUP8(len);
@@ -82,7 +82,7 @@ void ghost_apply(VJFrame *frame,
 			   int width, int height, int opacity)
 {
 	register int q,z=0;
- 	int x,y,i,tmp;
+ 	int x,y,i;
     	const int len = frame->len;
     	const unsigned int op_a = opacity;
     	const unsigned int op_b = 255 - op_a;

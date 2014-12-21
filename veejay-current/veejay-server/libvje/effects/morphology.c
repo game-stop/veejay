@@ -101,9 +101,8 @@ void morphology_apply( VJFrame *frame, int width, int height, int threshold, int
 {
     unsigned int i,x,y;
     int len = (width * height);
-	int c = 0,t=0,k=0;
+	int t=0;
     int uv_len = frame->uv_len;
-	uint8_t pixel;
     uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

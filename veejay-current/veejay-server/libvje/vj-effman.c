@@ -759,7 +759,7 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 			if( isP > 1 )
 				vj_task_set_overlap( frames[0]->width );
 
-			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 3, &vj_effman_apply_job );
+			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 3, (performer_job_routine) &vj_effman_apply_job );
 		} 
 		else {
 			

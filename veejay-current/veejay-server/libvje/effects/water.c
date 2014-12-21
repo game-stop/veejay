@@ -498,7 +498,6 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 	signed char *vp;
 	uint8_t *src,*dest;
 	const int len = frame->len;
-	int dummy = 0;
 	water_t *w = (water_t*) user_data;
 
 	if(w->last_fresh_rate != fresh_rate)

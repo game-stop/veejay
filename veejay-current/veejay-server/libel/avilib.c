@@ -132,6 +132,7 @@ uint64_t AVI_MAX_LEN = (UINT_MAX-(1<<20)*16-HEADERBYTES);
 uint64_t AVI_set_MAX_LEN( uint64_t n )
 {
 	AVI_MAX_LEN = n;
+	return n;
 }
 
 uint64_t AVI_get_MAX_LEN()
@@ -1041,7 +1042,7 @@ static int valid_info_tag(char *c)
 // returns the length of written stream (-1 on error)
 static int avi_parse_comments (int fd, char *buf, int space_left) 
 {
-    int len=0, readlen=0, k;
+    int len=0, k;
     char *data, *c, *d;
     struct stat st;
     
@@ -1060,8 +1061,9 @@ static int avi_parse_comments (int fd, char *buf, int space_left)
 	return -1;
     }
 
-    readlen = avi_read ( fd, data, st.st_size);
-
+    int readlen = avi_read ( fd, data, st.st_size);
+    if( readlen < 0 )
+	return -1;
     //printf("Read %d bytes from %d\n", readlen, fd);
 
     c = data;

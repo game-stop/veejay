@@ -465,24 +465,6 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 #define ru4(num)  (((num)+3)&~3)
 
 
-static struct
-{
-	int ffmpeg;
-	int aclib;
-} ffmpegaclib[] = 
-{
-	{ PIX_FMT_YUV420P,	IMG_YUV420P },
-	{ PIX_FMT_YUV422P,	IMG_YUV422P },
-	{ PIX_FMT_YUV444P,	IMG_YUV444P },
-	{ PIX_FMT_RGB24,	IMG_RGB24 },
-	{ PIX_FMT_BGR24,	IMG_BGR24 },
-	{ PIX_FMT_RGB32,	IMG_ARGB32 },
-	{ PIX_FMT_RGBA,		IMG_RGBA32 },
-	{ PIX_FMT_RGB32_1,	IMG_RGBA32 },
-	{ PIX_FMT_GRAY8,	IMG_GRAY8 },
-	{ -1,			-1},
-};
-
 void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt )
 {
 #ifdef STRICT_CHECKING
@@ -580,8 +562,7 @@ void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fm
 
 void	yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst )
 {
-	//FIXME
-	sws_scale( (struct SwsContext*) ctx, src->data, src->stride,0,src->height,dst->data,dst->stride );
+	sws_scale( (struct SwsContext*) ctx,(const uint8_t * const*) src->data, src->stride,0,src->height,(uint8_t * const*) dst->data,dst->stride );
 }
 
 void	yuv_fx_context_destroy( void *ctx )
@@ -608,7 +589,7 @@ void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[3], VJFrame *d
 
 	if(s->sws) {
 		int dst_stride[3] = { ru4(dst->width),ru4(dst->uv_width),ru4(dst->uv_width) };
-		sws_scale( s->sws, src->data, src_stride, 0, src->height, dst->data, dst_stride);
+		sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride);
 	
 	}
 }	
@@ -1017,7 +998,6 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 	if(!s)
 		return NULL;
 
-	int	sws_type = 0;
 	int 	cpu_flags = 0;
 
 #ifdef  STRICT_CHECKING
@@ -1109,7 +1089,6 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 
 static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flagss)
 {
-	int	sws_type = 0;
 	int 	cpu_flags = 0;
 
 #ifdef  STRICT_CHECKING
@@ -1235,13 +1214,6 @@ void  yuv_crop(VJFrame *src, VJFrame *dst, VJRectangle *rect )
 {
 	int x;
 	int y;
-	uint8_t *sy = src->data[0];
-	uint8_t *su = src->data[1];
-	uint8_t *sv = src->data[2];
-
-	uint8_t *dstY = dst->data[0];	
-	uint8_t *dstU = dst->data[1];
-	uint8_t *dstV = dst->data[2];
 	int i = 0;
 
 	for( i = 0 ; i < 3 ; i ++ )
@@ -1306,11 +1278,10 @@ void	yuv_free_swscaler(void *sws)
 void	yuv_convert_and_scale_gray_rgb(void *sws,VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-	int src_stride[3] = { src->width,0,0 };
-	int dst_stride[3] = { src->width * 3, 0,0 };
+	const int src_stride[3] = { src->width,0,0 };
+	const int dst_stride[3] = { src->width * 3, 0,0 };
 
-	sws_scale( s->sws, src->data,src_stride, 0,src->height,
-		dst->data, dst_stride );
+	sws_scale( s->sws,(const uint8_t * const*) src->data,src_stride, 0,src->height,(uint8_t * const*)dst->data, dst_stride );
 }
 void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
@@ -1318,11 +1289,10 @@ void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 	int n = 3;
 	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB || src->format == PIX_FMT_BGR32 || src->format == PIX_FMT_RGB32  )
 		n = 4;
-	int src_stride[3] = { src->width*n,0,0};
-	int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
+	const int src_stride[3] = { src->width*n,0,0};
+	const int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
 
-	sws_scale( s->sws, src->data, src_stride, 0, src->height,
-		dst->data, dst_stride );
+	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height, (uint8_t * const*)dst->data, dst_stride );
 }
 
 void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
@@ -1333,17 +1303,16 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 	 dst->format == PIX_FMT_RGB32 || dst->format == PIX_FMT_BGR32 )
 		n = 4;
 
-	int src_stride[3] = { src->width,src->uv_width,src->uv_width };
-	int dst_stride[3] = { dst->width*n,0,0 };
+	const int src_stride[3] = { src->width,src->uv_width,src->uv_width };
+	const int dst_stride[3] = { dst->width*n,0,0 };
 
-	sws_scale( s->sws, src->data, src_stride, 0, src->height,
-		dst->data, dst_stride );
+	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride );
 }
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-	int src_stride[3] = { src->width,0,0 };
-	int dst_stride[3] = { dst->width,0,0 };
+//	const int src_stride[3] = { src->width,0,0 };
+//	const int dst_stride[3] = { dst->width,0,0 };
 /*
 	int n = 0;
 	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB ||
@@ -1367,26 +1336,23 @@ void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 	dst_stride[1] = dst->uv_width;
 	dst_stride[2] = dst->uv_width;
 */
-	sws_scale( s->sws, src->data, src->stride, 0, src->height,
-		dst->data, dst->stride );
+	sws_scale( s->sws,(const uint8_t * const*) src->data, src->stride, 0, src->height,(uint8_t * const*)dst->data, dst->stride );
 }
 void	yuv_convert_and_scale_grey(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-	int src_stride[3] = { src->width,0,0 };
-	int dst_stride[3] = { dst->width,0,0 };
+	const int src_stride[3] = { src->width,0,0 };
+	const int dst_stride[3] = { dst->width,0,0 };
 
-	sws_scale( s->sws, src->data, src_stride, 0, src->height,
-		dst->data, dst_stride );
+	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride );
 }
 void	yuv_convert_and_scale_packed(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-	int src_stride[3] = { src->width,src->uv_width,src->uv_width };
-	int dst_stride[3] = { dst->width * 2,0,0 };
+	const int src_stride[3] = { src->width,src->uv_width,src->uv_width };
+	const int dst_stride[3] = { dst->width * 2,0,0 };
 
-	sws_scale( s->sws, src->data, src_stride, 0, src->height,
-		dst->data, dst_stride );
+	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*)dst->data, dst_stride );
 }
 
 int	yuv_sws_get_cpu_flags(void)
@@ -1597,7 +1563,7 @@ void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
 	if(vj_task_available() ) {
 		uint8_t *in[4] = { plane,NULL,NULL,NULL };
 		int strides[4] = { len * 2, 0, 0, 0 };
-		vj_task_run( in,in,NULL, strides, 1, &yuy2_scale_pixels_from_yuv_job );
+		vj_task_run( in,in,NULL, strides, 1, (performer_job_routine) &yuy2_scale_pixels_from_yuv_job );
 	}
 	else {
 		unsigned int rlen = 2 * len ;
@@ -1630,7 +1596,7 @@ void	yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len )
 	if(vj_task_available() ) {
 		uint8_t *in[4] = { plane,NULL,NULL,NULL };
 		int strides[4] = { len * 2, 0, 0, 0 };
-		vj_task_run( in,in,NULL, strides, 1, &yuy2_scale_pixels_from_ycbcr_job );
+		vj_task_run( in,in,NULL, strides, 1, (performer_job_routine) &yuy2_scale_pixels_from_ycbcr_job );
 	}
 	else {
 		unsigned int rlen = 2 * len ;

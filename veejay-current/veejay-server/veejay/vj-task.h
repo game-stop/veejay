@@ -20,7 +20,9 @@
 
 #ifndef VJTASK_H
 #define VJTASK_H
-typedef	void	*(*performer_job_routine)(void *);
+//typedef	void	*(*performer_job_routine)(void *);
+
+typedef void *(*performer_job_routine)(void(*)(void*));
 
 typedef struct
 {

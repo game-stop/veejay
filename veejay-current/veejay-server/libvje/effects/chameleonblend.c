@@ -232,9 +232,6 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 
 void chameleonblend_apply( VJFrame *frame, VJFrame *source, int width, int height, int mode )
 {
-	unsigned int i;
-	const int len = (width * height);
-	int interpolate = 0;
 	uint32_t activity = 0;
 	int auto_switch = 0;
 	int tmp1,tmp2;

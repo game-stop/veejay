@@ -61,7 +61,7 @@ void colormap_apply( VJFrame *frame, int width, int height, int r, int g, int b)
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-    uint8_t dummy = 0;
+	int dummy = 0;
 	for(i = 1; i < 256; i ++ )
 	{
 		COLOR_rgb2yuv( (r % i),(g % i),(b % i), dummy, u_[i-1],v_[i-1]);

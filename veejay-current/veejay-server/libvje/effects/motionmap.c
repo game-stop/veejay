@@ -88,7 +88,6 @@ static uint8_t *previous_img = NULL;
 static uint32_t histogram_[HIS_LEN];
 static uint8_t *large_buf = NULL;
 static uint32_t nframe_ =0;
-static uint32_t activity_total_ = 0;
 static uint32_t max_d = ACT_TOP;
 static int current_his_len = HIS_DEFAULT;
 static	uint32_t	key1_ = 0, key2_ = 0, keyv_ = 0, keyp_ = 0;
@@ -150,13 +149,11 @@ void		motionmap_free(void)
 static	void	update_bgmask( uint8_t *dst,uint8_t *in, uint8_t *src, int len, int threshold )
 {
 	int i;
-	unsigned int op0,op1;
 	for( i =0; i < len ; i ++ )
 	{
 	  if( abs(in[i] - src[i]) > threshold )
 	  {
 		dst[i] = 0xff;
-		//in[i] = (in[i] + src[i])>>1;
 	 }
 	 else
 	 {
@@ -281,9 +278,8 @@ static int stop_capture_ = 0;
 static int reaction_ready_ = 0;
 void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int reverse, int draw, int history, int capbuf )
 {
-	unsigned int i,x,y;
+	unsigned int i,y;
 	int len = (width * height);
-    	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	if(!have_bg) {

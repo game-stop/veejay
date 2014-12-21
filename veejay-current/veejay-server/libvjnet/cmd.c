@@ -253,7 +253,6 @@ void			sock_t_set_timeout( vj_sock_t *s, int t )
 
 int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 {
-	int done = 0;
 	int bytes_left = len;
 	int n;
 	int bytes_done = 0;
@@ -287,10 +286,8 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 {
 	int n; 
 	int length = len;
-	int bw = 0;
 	int done = 0;
 	while( length > 0 ) {
-		bw = length;
 		n = send( s->sock_fd, buf, length , MSG_NOSIGNAL );
 		if( n == -1 ) {
 #ifdef STRICT_CHECKING

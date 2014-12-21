@@ -104,8 +104,6 @@ void magicscratcher_apply(VJFrame *frame,
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-	int uv_width = frame->uv_width;
-	int uv_height = frame->uv_height;
     /* param 6 is cool ,8,7,10,13,15, ,9,11,12,14, 
 
        16 voor default ?, 17 (!),18,19, 20(!), 21, 24,,25,30 */

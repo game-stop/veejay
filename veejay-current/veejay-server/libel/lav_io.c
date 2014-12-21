@@ -678,7 +678,6 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 
 int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
 {
-	int res;
 #ifdef HAVE_LIBQUICKTIME
    int i, j;
    int16_t *qt_audio = (int16_t *)buff, **qt_audion;

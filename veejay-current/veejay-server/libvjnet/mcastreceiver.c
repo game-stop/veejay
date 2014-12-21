@@ -43,11 +43,6 @@
 #include <assert.h>
 #endif
 
-static 	void	print_error(char *msg)
-{
-	veejay_msg(VEEJAY_MSG_ERROR,"%s: %s\n", msg,strerror(errno));
-}
-
 typedef struct
 {
 	packet_header_t	hdr;
@@ -173,31 +168,6 @@ int	mcast_poll( mcast_receiver *v )
 		return 0;
 	return 1;
 }
-
-static int	mcast_poll_timeout( mcast_receiver *v, long timeout )
-{
-	fd_set fds;
-	struct timeval tv;
-	int n = 0;
-	tv.tv_sec = 0;
-	tv.tv_usec = timeout; // 0.05 seconds
-	FD_ZERO( &fds );	
-	FD_SET( v->sock_fd, &fds );
-
-	if( timeout == 0 )
-		n = select( v->sock_fd + 1, &fds, NULL,NULL, NULL );
-	else
-		n = select( v->sock_fd + 1, &fds, 0,0, &tv );
-	if(n == -1)
-		veejay_msg(0, "Multicast receiver select error: %s", strerror(errno));
-
-	if( n <= 0)
-		return 0;
-
-	return 1;
-}
-
-
 
 int	mcast_recv( mcast_receiver *v, void *buf, int len )
 {

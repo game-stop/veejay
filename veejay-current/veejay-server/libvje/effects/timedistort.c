@@ -144,7 +144,6 @@ void timedistort_apply( VJFrame *frame, int width, int height, int val)
 	int interpolate = 1;
 	int motion = 0;
 	int tmp1,tmp2;
-	int stor_local = 0;
 	if(motionmap_active()) //@ use motion mapping frame
 	{
 		motionmap_scale_to( 255,255,1,1,&tmp1,&tmp2, &n__,&N__ );

@@ -63,7 +63,6 @@ int	is_mapped( mmap_region_t *map, int offset, int size )
 {
 	// check if memory is in mapped region
 	off_t real_offset = PADDED( offset, map );
-	size_t padding    = offset % map->page_size;
 
 	long rel_o = (map->mem_offset > 0 ? offset - map->mem_offset : offset );
 
@@ -129,7 +128,6 @@ int	munmap_file( mmap_region_t *map )
 
 int	mmap_read( mmap_region_t *map,int offset, int bytes, uint8_t *buf )
 {
-	size_t padding = offset % map->page_size;
 	if( !is_mapped( map, offset, bytes ))
 	{
 		remap_file( map, offset );

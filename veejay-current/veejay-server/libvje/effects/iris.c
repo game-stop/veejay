@@ -57,7 +57,6 @@ void iris_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int val
 {
     int i,j,k=0;
     int len = (width * height);
-    int uv_len = frame->uv_len;
 
     uint8_t *Y0 = frame->data[0];
     uint8_t *Cb0 = frame->data[1];

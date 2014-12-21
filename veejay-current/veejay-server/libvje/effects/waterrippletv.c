@@ -44,7 +44,6 @@ static const int point = 16;
 static const int impact = 2;
 //static const int decay = 8;
 //static const int loopnum = 2;
-static int bgIsSet = 0;
 static int tick = 0;
 
 /* from EffecTV:

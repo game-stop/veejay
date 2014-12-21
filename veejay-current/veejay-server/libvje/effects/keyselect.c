@@ -139,7 +139,7 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 {
 
    uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
+    uint8_t *bg_y;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
     int kfgy_scale, kg;
     int cb, cr;
@@ -182,8 +182,6 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
     fg_cr = Cr;
 	/* 2005: swap these !! */
     bg_y = Y2;
-    bg_cb = Cb2;
-    bg_cr = Cr2;
 
     for (pos = (width * height); pos != 0; pos--) {
 	short xx, yy;

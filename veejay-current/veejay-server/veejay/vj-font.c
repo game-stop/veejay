@@ -140,9 +140,7 @@ static long	vj_font_timecode_to_pos( vj_font_t *font, const char *tc );
 static srt_seq_t	*vj_font_new_srt_sequence(vj_font_t *font, int id,char *text, long lo, long hi );
 static void	vj_font_del_srt_sequence( vj_font_t *f, int seq_id );
 static void	vj_font_store_srt_sequence( vj_font_t *f, srt_seq_t *s );
-static int	font_selector( const struct dirent *dir );
 static int      find_fonts(vj_font_t *ec, char *path);
-static void     print_fonts(vj_font_t *ec);
 static char 	*select_font( vj_font_t *ec, int id );
 static  void    vj_font_substract_timecodes( vj_font_t *font, const char *tc_srt, long *lo, long *hi );
 static char     *vj_font_split_strd( const char *str );
@@ -150,8 +148,6 @@ static char     *vj_font_split_str( const char *str );
 
 static	char	*get_font_name( vj_font_t *f,const char *font, int id );
 static	int	get_default_font( vj_font_t *f );
-
-static int	test_font( vj_font_t *f , const char *font, int id);
 
 static	void	font_lock(vj_font_t *f)
 {
@@ -1019,15 +1015,6 @@ char 	**vj_font_get_all_fonts( void *font )
 	return res;
 }
 
-static int	font_selector( const struct dirent *dir )
-{	
-	if(strstr(dir->d_name, ".ttf" )) return 1;
-	if(strstr(dir->d_name, ".TTF" )) return 1;
-//	if(strstr(dir->d_name, ".pfa" )) return 1;
-//	if(strstr(dir->d_name, ".pcf.gz" )) return 1;
-	return 0;
-}
-
 static int	dir_selector( const struct dirent *dir )
 {	
 	return 1;
@@ -1228,118 +1215,6 @@ static	char	*get_font_name( vj_font_t *f,const char *font, int id )
 
 	return fontName;
 }
-
-static int	test_font( vj_font_t *f , const char *font, int id)
-{
-	char name[1024];
-	FT_Face face;
-	int error;
-	FT_SfntName sn,qn,zn;	
-	FT_SfntName	sname;
-	FT_UInt		snamei,snamec;
-	char	*name1 = NULL;
-	char 	*name2 = NULL;
-
-	if ( (error = FT_New_Face( f->library, font, 0, &face )) != 0)
-	{
-		return 0;
-	}
-
-	memset( &qn, 0,sizeof( FT_SfntName ) );
-	memset( &zn, 0, sizeof( FT_SfntName ));
-	memset( &sn, 0, sizeof( FT_SfntName ));
-
-//	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_FAMILY, &qn );
-
-	snamec = FT_Get_Sfnt_Name_Count(face);
-
-	for(snamei=0;snamei<snamec;snamei++) {
-		
-		if(FT_Get_Sfnt_Name(face,snamei,&qn) != 0 )
-			continue;
-		
-		if(strlen(qn.string) == 0 ) 
-			continue;
-
-	/*	if( qn.platform_id == TT_PLATFORM_MICROSOFT &&
-			( qn.encoding_id==TT_MS_ID_SYMBOL_CS || qn.encoding_id==TT_MS_ID_UNICODE_CS) &&
-			( qn.language_id &0xff ) == 0x9) {
-	*/
-		switch(qn.name_id) {
-			case TT_NAME_ID_FONT_FAMILY:
-				if( name1 ) free(name1);
-				name1=strndup(qn.string,qn.string_len);
-				break;
-			case TT_NAME_ID_PS_NAME:
-				if(name1==NULL)
-					name1=strndup(qn.string,qn.string_len);
-				break;
-			case TT_NAME_ID_FONT_SUBFAMILY:
-				if(name2) free(name2);
-				name2=strndup(qn.string,qn.string_len);
-				break;
-			default:
-				continue;
-		}
-//		}
-	}
-	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_SUBFAMILY, &zn );
-
-
-	if( !zn.string || !qn.string ||  qn.string_len <= 0 || zn.string_len <= 0 )
-	{
-		FT_Done_Face(face);
-		if(name1 != NULL )
-			free(name1);
-		if(name2 != NULL )
-			free(name2);
-		return 0;
-	}
-	/*
-	char *name1 = strndup( qn.string, qn.string_len );
-	char *name2 = strndup( zn.string, zn.string_len );
-	*/
-
-
-	if(name1 == NULL  || name2 == NULL ) {
-		FT_Done_Face(face);
-		return 0;
-	}
-
-	int n1 = strlen(name1);
-	int n2 = n1 + strlen(name2);
-
-	if( n2 <= 2 || (n2+n1) > 150)
-	{
-		FT_Done_Face(face);
-		free(name1);
-		free(name2);
-		return 0;
-	}
-	
-	snprintf( name,1024,"%s (%s)", name1, name2);
-	
-	f->font_list[id] = strdup( name );
-	
-	free(name1);
-	free(name2);
-	
-	FT_Done_Face( face );
-	return 1;
-}
-
-
-
-static void	print_fonts(vj_font_t *ec)
-{
-	int i;
-	for(i =0 ; i < ec->font_index ; i ++ )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "[%03d] : [%s]", 
-			i, ec->font_list[i] );
-	}
-}
-
 
 void vj_font_set_outline_and_border( void *font, int outline, int border)
 {
@@ -1772,7 +1647,6 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 //	f->text_buffer = (srt_cycle_t*)
 //		vj_calloc(sizeof(srt_cycle_t) *	(sizeof(srt_cycle_t)*22500));
 //	f->text_max_size = 22500;
-	//print_fonts(f);
 
 	pthread_mutex_init( &(f->mutex), NULL );
 	
@@ -1860,7 +1734,6 @@ void	*vj_font_single_init( int w, int h, float fps,char *path )
 //	f->text_buffer = (srt_cycle_t*)
 //		vj_calloc(sizeof(srt_cycle_t) *	(sizeof(srt_cycle_t)*22500));
 //	f->text_max_size = 22500;
-	//print_fonts(f);
 
 	pthread_mutex_init( &(f->mutex), NULL );
 	

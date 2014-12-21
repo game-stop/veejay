@@ -30,7 +30,7 @@
 #include <libvjmem/vjmem.h>
 #include "softblur.h"
 static uint8_t *static_bg = NULL;
-static int *dt_map = NULL;
+static uint32_t *dt_map = NULL;
 
 typedef struct
 {
@@ -214,7 +214,7 @@ void diff_apply(void *ed, VJFrame *frame,
 			} else if ( dt_map[i] == 1 ) {
 				Y[i] = 0xff;
 			} else {
-				Y[i] = 0;	//@ black (background)
+				Y[i] = pixel_Y_lo_;	//@ black (background)
 			}
 			Cb[i] = 128;	
 			Cr[i] = 128;
@@ -223,7 +223,6 @@ void diff_apply(void *ed, VJFrame *frame,
 	}
 
 	//@ process dt map
-	uint8_t *bin = ud->data;
 	for( i = 0; i < len ;i ++ )
 	{
 		if( dt_map[ i ] >= feather )
@@ -234,7 +233,7 @@ void diff_apply(void *ed, VJFrame *frame,
 		}
 		else
 		{
-			Y[i] = 0;
+			Y[i] =  pixel_Y_lo_;
 			Cb[i] = 128;
 			Cr[i] = 128;
 		}

@@ -114,7 +114,6 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
     unsigned int i;
     unsigned int len = (width * height);
     unsigned int y_val = val;
-    unsigned int tmp = 0;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];

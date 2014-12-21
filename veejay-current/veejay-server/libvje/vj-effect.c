@@ -169,6 +169,7 @@
 #include "effects/diffmap.h"
 #include "effects/picinpic.h"
 #include "effects/cali.h"
+#include "effects/bgsubtract.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -191,8 +192,6 @@ void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo)
 	pixel_U_lo_ = Ylo;
 	pixel_Y_lo_ = Ulo;
 }
-
-static	void	*__plugin_ref = NULL;
 
 static struct
 {
@@ -772,7 +771,6 @@ int vj_effect_real_to_sequence(int effect_id)
 {
     if( effect_id >= VJ_EXT_EFFECT )
     {
-	int n = effect_id;
 	effect_id -= VJ_EXT_EFFECT;
 	effect_id += MAX_EFFECTS;
 	return effect_id;

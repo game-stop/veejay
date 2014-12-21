@@ -174,7 +174,7 @@ void opacity_applyN( VJFrame *frame, VJFrame *frame2, int width,
 	if( vj_task_available() ) {
 		vj_task_set_from_frame( frame );
 		vj_task_set_int( opacity );
-		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, &opacity_apply_job );
+		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, (performer_job_routine) &opacity_apply_job );
 	} else {
 		opacity_apply1( frame,frame2,width,height,opacity );
 	}
@@ -203,7 +203,7 @@ void	opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_le
 	if( vj_task_available() ) {
 		vj_task_set_from_args( len,uv_len );
 		vj_task_set_int( opacity );
-		vj_task_run( src1, src2, NULL, NULL, 3, &opacity_apply_job );
+		vj_task_run( src1, src2, NULL, NULL, 3, (performer_job_routine) &opacity_apply_job );
 	} else {
 		opacity_blend_apply1( src1,src2,len,uv_len,opacity );
 	}

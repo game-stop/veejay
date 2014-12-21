@@ -35,7 +35,6 @@ extern void veejay_msg(int type, const char format[], ...);
 char	**vje_build_param_list( int num, ... )
 {
 	va_list args;
-	char buf[1024];
 	char **list;
 	char *tmp = NULL;
 	list = (char**) vj_malloc(sizeof(char*) * (num+1) );
@@ -796,7 +795,7 @@ uint8_t bl_pix_difference_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_diffnegate_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    uint8_t a, b;
     a = 0xff - y1;
     b = y2;
     return ( 0xff - abs(a - b) );
@@ -1093,9 +1092,7 @@ uint8_t bl_pix_add_distorted_C(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_sub_distorted_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_Y, a, b;
-    a = y1;
-    b = y2;
+    uint8_t new_Y;
     new_Y = y1 - y2;
     new_Y -= y2;
     return new_Y;
@@ -1436,9 +1433,8 @@ static	uint32_t	veejay_histogram_median( uint32_t *h )
 
 static	void	build_histogram_rgb( uint8_t *rgb, histogram_t *h, VJFrame *f)
 {
-	unsigned int i,j, len;
+	unsigned int i,j;
         uint32_t *Hr,*Hb,*Hg;
-        uint8_t  *p;
 
         Hr = h->hR;
 	Hg = h->hG;
@@ -1649,7 +1645,7 @@ void	veejay_histogram_equalize( void *his, VJFrame *f , int intensity, int stren
 	histogram_t *h = (histogram_t*) his;
 	uint32_t LUT[256];
 	unsigned int i;
-	uint8_t *u,*v,*y;
+	uint8_t *y;
 	unsigned int len;
 
 	len = f->len;

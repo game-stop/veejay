@@ -417,7 +417,6 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 {
 	unsigned int total = 0;
 	unsigned int bytes_left = len;
-	int n;
 #ifdef STRICT_CHECKING
 	assert( vje->send_size > 0 );
 	assert( len > 0 );
@@ -498,8 +497,6 @@ int	vj_server_link_can_read( vj_server *vje, int link_id)
 static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, int len )
 {
     unsigned int total = 0;
-    unsigned int bytes_left = len;
-    int n;
 #ifdef STRICT_CHECKING
 	assert( vje->send_size > 0 );
 	assert( len > 0 );
@@ -993,7 +990,6 @@ int	vj_server_update( vj_server *vje, int id )
 		int max = vje->recv_bufsize;
 		int bytes_left = 1;
 		char *ptr = vje->recv_buf;
-		int readmore = 0;
 		
 		n = recv( sock_fd, ptr, 1, 0 );
 		if( n != 1 ) {

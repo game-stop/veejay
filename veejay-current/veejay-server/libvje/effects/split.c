@@ -200,12 +200,7 @@ void dosquarefib(VJFrame *frame, int width, int height)
 
 void split_push_downscale_uh(VJFrame *frame, int width, int height)
 {
-
-   unsigned int len = frame->len/2;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-
+	unsigned int len = frame->len/2;
 	int	strides[4] = { len,len,len ,0};
 	vj_frame_copy( frame->data, split_fixme,strides );
 

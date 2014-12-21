@@ -1115,7 +1115,6 @@ void find_best_memcpy()
 
      int c = MAX_WORKERS;
      int k;
-     unsigned long long int statistics[c];
      for( k = 0; k < c; k ++ ) {
       for (i=1; memcpy_method[i].name; i++) {
           t = rdtsc();
@@ -1268,7 +1267,7 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 		vj_task_run( p0_buffer, img, p1_buffer,strides, 4,(performer_job_routine) &vj_frame_slow_job );
 	
 	} else {
-		int i,j;
+		int i;
 		if( uv_len != len ) { 
 			for( i  = 0; i < len ; i ++ ) {
 				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
@@ -1348,9 +1347,7 @@ int	find_best_threaded_memcpy(int w, int h)
 	long c = 100;
 	
 	long k;
-	int j;
 	unsigned long long stats[c];
-	unsigned long long best_avg[c];
 
 	task_init();
 

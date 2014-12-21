@@ -53,7 +53,6 @@ vj_effect *complexsync_init(int width, int height)
 
 int complexsync_malloc(int width, int height)
 {
-   int i;
    c_outofsync_buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height*3) );
    c_outofsync_buffer[1] = c_outofsync_buffer[0] + RUP8(width*height);
    c_outofsync_buffer[2] = c_outofsync_buffer[1] + RUP8(width*height);
@@ -77,9 +76,6 @@ void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, i
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
 
 	const unsigned int region = width * val;
 	int strides[4] = { region, region, region, 0 };

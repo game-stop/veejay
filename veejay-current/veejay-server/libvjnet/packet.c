@@ -78,7 +78,6 @@ int			packet_get_data(packet_header_t *h, const void *data, uint8_t *plane )
 
 int			packet_get_info(frame_info_t *i, const void *data )
 {
-	size_t len = sizeof(packet_header_t);
 	veejay_memcpy(i, data + sizeof(packet_header_t), sizeof(frame_info_t));
 	return 1;
 }

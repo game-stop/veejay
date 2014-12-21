@@ -233,7 +233,6 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 	uint8_t *Cr2=frame2->data[2];
 
 	const uint8_t kernel[9] = { 1,1,1, 1,1,1, 1,1,1 };
-	uint8_t *bmap = binary_img;
 
 //	morph_func	p = _dilate_kernel3x3;
 	uint8_t *previous_img = binary_img + len;
@@ -246,31 +245,6 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 	softblur_apply( &tmp, width,height,0 );
 
 	binarify( binary_img,previous_img,threshold,reverse, width,height);
-/*
-
-#ifdef HAVE_ASM_MMX
-	int work = (width*height)>>3;
-	load_chroma( 128 );
-	for( y = 0 ; y < work; y ++ )
-	{
-		load_binary_map( bmap );
-		map_luma(Y , Y2 );
-		map_chroma( Cb, Cb2 );
-		map_chroma( Cr, Cr2 );
-		//@ we could mmx-ify dilation
-		Y  += 8;
-		Y2 += 8;	
-		Cb += 8;
-		Cb2 += 8;
-		Cr += 8;
-		Cr2 +=8;
-		bmap += 8; 
-	}
-
- 	 __asm__ __volatile__ ( _EMMS:::"memory");
-#else
-*/
-
 	//@ clear image
 
 	if(show)

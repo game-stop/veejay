@@ -33,8 +33,6 @@ static	recalc(int w, int h , uint8_t *Yin, int v1, int v2 )
   unsigned int l = w * h;
   unsigned int valx = (w / 100.0) * v1;
   unsigned int valy = (h / 100.0) * v1;
-  unsigned int modx = (w / 100.0) * v2;
-  unsigned int mody = (h / 100.0) * v2;
   for(x = dx = 0; x < w; x++) 
   {
 	p = 0 + (int)( l * (rand()/RAND_MAX + 0.0) );

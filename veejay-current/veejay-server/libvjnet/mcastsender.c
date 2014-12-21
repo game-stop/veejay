@@ -167,7 +167,6 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 {
 	int n_chunks = total_len / CHUNK_SIZE;
 	int i;
-	int tb = 0;
 	packet_header_t header = packet_construct_header( 1 );
 	frame_info_t	info;
 	info.fmt = frame->format;

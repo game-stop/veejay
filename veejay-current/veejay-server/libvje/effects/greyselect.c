@@ -63,8 +63,7 @@ void greyselect_apply( VJFrame *frame, int width,
 		   int b)
 {
 
-    uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
+    uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
     int kfgy_scale, kg;
     int cb, cr;
@@ -95,13 +94,8 @@ void greyselect_apply( VJFrame *frame, int width,
     kg = kg1;
 
     /* intialize pointers */
-    fg_y = Y;
     fg_cb = Cb;
     fg_cr = Cr;
-
-    bg_y = Y;
-    bg_cb = Cb;
-    bg_cr = Cr;
 
     for (pos = (width * height); pos != 0; pos--) {
 	short xx, yy;

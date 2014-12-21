@@ -68,6 +68,8 @@ void lzo_print_buf( uint8_t *buf, int len )
 	printf("\n");
 }
 */
+
+/*
 static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , lzo_uint *out_lenptr, uint8_t *wrkmem)
 {
 	lzo_uint out_len = 0;
@@ -99,7 +101,7 @@ static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , lzo_ui
 	return 0;
 
 }
-
+*/
 #define LZO_ALIGN_SIZE(size) \
 	 ( ((size) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ) * sizeof(lzo_align_t)
 
@@ -171,7 +173,6 @@ static uint32_t str2ulong(unsigned char *str)
 
 long		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, int ilen )
 {
-	lzo_uint out_len =0;
 	lzo_uint src_len = ilen;
 	lzot *l = (lzot*) lzo;
 	lzo_bytep dst = plane;
@@ -195,7 +196,6 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 {
 	unsigned int i;
 	lzo_uint len[3] = { 0,0,0};
-	unsigned int mode = 0;
 	unsigned int sum = 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;

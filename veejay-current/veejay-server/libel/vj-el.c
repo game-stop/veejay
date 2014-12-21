@@ -1208,7 +1208,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	uint8_t *data = ( in_cache == NULL ? d->tmp_buffer: in_cache );
 	int inter = 0;
 	int got_picture = 0;
-	int in_uv_len = 0;
 	uint8_t *in[3] = { NULL,NULL,NULL };
 	int strides[4] = { el_len_, el_uv_len_, el_uv_len_ ,0};
 	uint8_t *dataplanes[3] = { data , data + el_len_, data + el_len_ + el_uv_len_ };
@@ -1398,9 +1397,6 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	AVCodec *codec = NULL;
 	AVCodecContext *codec_ctx = NULL;
 	AVFormatContext *avformat_ctx = NULL;
-	AVStream *avformat_stream = NULL;	
-	AVInputFormat *av_input_format = NULL;
-	AVFrame *av_frame = NULL;
 	AVPacket pkt;
 #if LIBAVCODEC_BUILD > 5400
 	int err = avformat_open_input( &avformat_ctx, filename, NULL, NULL );
@@ -1493,7 +1489,6 @@ further:
 	}
 
 	codec_ctx = avformat_ctx->streams[vi]->codec;
-	avformat_stream=avformat_ctx->streams[vi];
 #if LIBAVCODEC_BUILD > 5400
 	if ( avcodec_open2( codec_ctx, codec, NULL ) < 0 )
 #else
@@ -1507,7 +1502,6 @@ further:
 
 	veejay_memset( &pkt, 0, sizeof(AVPacket));
 	AVFrame *f = avcodec_alloc_frame();
-	int input_pix_fmt = -1;
 
 	int got_picture = 0;
 	while( (av_read_frame(avformat_ctx, &pkt) >= 0 ) ) {
@@ -1694,7 +1688,6 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 
 int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 {
-    long pos, asize;
     int ret = 0;
     uint64_t n;	
 	int ns0, ns1;
@@ -1725,9 +1718,6 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 
     ns1 = (double) (N_EL_FRAME(n) + 1) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
-
-    //asize = el->audio_rate / el->video_fps;
-    pos = nframe * asize;
 
     ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
 
@@ -1790,7 +1780,6 @@ int	vj_el_init_422_frame(editlist *el, VJFrame *frame)
 int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int num )
 {
 	// get audio from current frame + n frames
-    long pos, asize;
     int ret = 0;
     uint64_t n;	
     int ns0, ns1;
@@ -1816,7 +1805,6 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
 
     //asize = el->audio_rate / el->video_fps;
-    pos = nframe * asize;
     ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
 
     if (ret < 0)

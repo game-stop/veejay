@@ -909,8 +909,6 @@ storage_put_atom_value(__vevo_port_t * port, void *src, int n,
 static void
 storage_put_atom_func(__vevo_port_t * port, void (*set_func)(),int (*get_func)(), vevo_storage_t * d, int v)
 {
-    int i;
-
     if( set_func == NULL && get_func == NULL )
     {
 	 	vevo_free_atom(port,d->elements.atom);
@@ -1073,13 +1071,6 @@ int vevo_property_atom_type(vevo_port_t * p, const char *key)
 
 
 static	int	vevo_storage_size( vevo_storage_t *stor ) {
-    int atom_type; /*!< atom type */
-    union { /*! \union elements one or more atoms */
-	atom_t *atom; 
-	atom_t **array;
-    } elements;
-    int num_elements; /*!< number of atoms */
-
     int i;
     if( stor->num_elements == 0 ) 
 	    return 0;
@@ -2690,7 +2681,6 @@ static void	vevo_port_recurse_free( vevo_port_t *sorted_port, vevo_port_t *p )
 
 static int	vevo_port_ref_verify( vevo_port_t *p) 
 {
-	int err = 0;
 /*
 #ifdef STRICT_CHECKING
 	char **item = NULL;
@@ -2779,7 +2769,6 @@ static	char	*vevo_format_inline_property( vevo_port_t *port, int n_elem, int typ
 	{
 		int len = n_elem * strlen(token) + 1;
 		res = (char*) calloc(1, sizeof(char) * len );
-		int i;
 		/*for( i =0; i < n_elem; i ++ ) {
 			while( *res ) *res ++;
 			while( *res++ = *token++ );
@@ -3172,7 +3161,6 @@ char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key)
 	}
 	
 	int i;
-	int size = 0;
 	int atom = vevo_property_atom_type( port , key );
 
 	memset(tmp,0,sizeof(tmp));
@@ -3617,7 +3605,6 @@ vevo_property_del(vevo_port_t * p,
 		if( idxkey == hash_key ) {
 			//node at beginning of list?
 			if( node == list ) {
-				port_index_t *start = list;
 				port->index = NULL;
 				if( node->next != NULL )
 						port->index = node->next;
@@ -3988,7 +3975,6 @@ void	vevo_dom_dump( void *p, FILE *file )
 
 int	vevo_write_xml( vevo_port_t *root, const char *destination, char *hiearchy[] )
 {
-	char *encoding = "UTF-8";
 	char **properties = vevo_list_properties( root );
 	if( properties == NULL )
 		return 0;

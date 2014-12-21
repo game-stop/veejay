@@ -216,7 +216,7 @@ void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-    int a, b,c;
+    int a, b;
     const int op_b = 255 - op_a;
     for (i = 0; i < len; i++) {
 	a = (Y[i] * op_a) >> 8;
@@ -241,7 +241,7 @@ void chromamagic_selectunfreeze(VJFrame *frame, VJFrame *frame2,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-    int c, a, b;
+    int a, b;
     const int op_b = 255 - op_a;
     for (i = 0; i < len; i++) {
 	a = (Y[i] * op_a) >> 8;
@@ -267,7 +267,7 @@ void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-    int c, a, b;
+    int a, b;
     const int op_b = 255 - op_a;
 
     for (i = 0; i < len; i++) {
@@ -290,8 +290,6 @@ void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int heigh
 	uint8_t *Cr2 = frame2->data[2];
 
     int a=0, b=0, c=0;
-    const unsigned int o1 = op_a;
-    const unsigned int o2 = 255 - a;
 
     for (i = 0; i < len; i++) {
 		a = Y[i];
@@ -325,7 +323,7 @@ void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int heig
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	int a,b,c,d;
+	int a,b,d;
 	const unsigned int o1 = op_a;
 	const unsigned int o2 = 255 - o1;
 #define MAGIC_THRESHOLD 40
@@ -364,7 +362,7 @@ void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	int a,b,c;	
+	int a,b;	
 	const unsigned int o1 = op_a;
  	const unsigned int o2 = 255 - op_a;
 	for(i=0; i < len; i++) {
@@ -481,7 +479,7 @@ void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	int a,b,c;
+	int a,b;
 
 	for(i=0; i < len; i++) {
 		a = Y[i];
@@ -589,7 +587,7 @@ void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a 
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	int a,b,c;
+	int a,b;
 	const unsigned int o1 = op_a;
 
 	for(i=0; i < len; i++) {

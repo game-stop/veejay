@@ -58,7 +58,7 @@ int bgsubtract_malloc(int width, int height)
 	return 1;
 }
 
-void bgsubtract_free(void *d)
+void bgsubtract_free()
 {
 	if( static_bg )
 		free(static_bg );

@@ -57,7 +57,9 @@ static void vj_flush(vj_client *sayvims,int frames) {
                         char sta_len[6];
                         bzero(sta_len, 6 );
                         int nb = vj_client_read( sayvims, V_STATUS, sta_len, 5 );
-                        if(sta_len[0] == 'V' )
+                        if( nb <= 0 )
+				break;
+			if(sta_len[0] == 'V' )
                         {
                                 int bytes = 0;
                                 sscanf( sta_len + 1, "%03d", &bytes );
@@ -69,8 +71,8 @@ static void vj_flush(vj_client *sayvims,int frames) {
                                         {
                                                 frames -- ;
                                         }
-										if( n<= 0)
-											break;
+					if( n<= 0)
+				    	   break;
                                 }
                         }
                 }

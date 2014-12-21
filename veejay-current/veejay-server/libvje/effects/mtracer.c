@@ -76,25 +76,22 @@ void mtracer_apply( VJFrame *frame, VJFrame *frame2,
     VJFrame m;
     unsigned int len = frame->len;
     unsigned int uv_len = frame->uv_len;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
 	int strides[4] = { len, uv_len, uv_len, 0 };
 
     memcpy( &m, frame, sizeof(VJFrame ));
 
     if (mtrace_counter == 0) {
-	overlaymagic_apply(frame, frame2, width, height, mode,0);
-	vj_frame_copy1( mtrace_buffer[0], frame->data[0], len );
-	vj_frame_copy1( mtrace_buffer[1], frame->data[1], uv_len );
-	vj_frame_copy1( mtrace_buffer[2], frame->data[2], uv_len );
+		overlaymagic_apply(frame, frame2, width, height, mode,0);
+		vj_frame_copy1( mtrace_buffer[0], frame->data[0], len );
+		vj_frame_copy1( mtrace_buffer[1], frame->data[1], uv_len );
+		vj_frame_copy1( mtrace_buffer[2], frame->data[2], uv_len );
     } else {
-	overlaymagic_apply(frame, frame2, width, height, mode,0);
-	m.data[0] = mtrace_buffer[0];
-	m.data[1] = mtrace_buffer[1];
-	m.data[2] = mtrace_buffer[2];
-	overlaymagic_apply( &m, frame2, width,height, mode, 0 );
-	vj_frame_copy( mtrace_buffer,frame->data, strides );
+		overlaymagic_apply(frame, frame2, width, height, mode,0);
+		m.data[0] = mtrace_buffer[0];
+		m.data[1] = mtrace_buffer[1];
+		m.data[2] = mtrace_buffer[2];
+		overlaymagic_apply( &m, frame2, width,height, mode, 0 );
+		vj_frame_copy( mtrace_buffer,frame->data, strides );
     }
 
     mtrace_counter++;

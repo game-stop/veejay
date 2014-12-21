@@ -143,7 +143,6 @@ void cali_apply(void *ed, VJFrame *frame, int w, int h,int mode, int full)
 	uint8_t *Y = frame->data[0];
 	uint8_t *U = frame->data[1];
 	uint8_t *V = frame->data[2];
-	const int min_Y = get_pixel_range_min_Y();
 	const int chroma = 127;	
 	const int uv_len = frame->uv_len;
 	int p,i;
@@ -213,7 +212,7 @@ void cali_apply(void *ed, VJFrame *frame, int w, int h,int mode, int full)
 		for( i = 0; i <(w*h); i ++ ) {
 			p = ( Y[i] - by[i] );
 			if( p < 0 )
-				Y[i] = 0;
+				Y[i] = pixel_Y_lo_;
 			else
 				Y[i] = p;
 		}

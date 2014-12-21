@@ -235,7 +235,7 @@ void _lumamagick_divide(VJFrame *frame, VJFrame *frame2, int width,
 {
     unsigned int i;
     const unsigned int len = width * height;
-    int a, b, c;
+    int b, c;
     const double opacity_a = op_a * 0.01;
     const double opacity_b = op_b * 0.01;
   	uint8_t *Y = frame->data[0];
