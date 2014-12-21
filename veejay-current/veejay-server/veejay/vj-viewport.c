@@ -166,8 +166,6 @@ static	float		vsx(viewport_t *v, float x);
 static	float		vsy(viewport_t *v, float y);
 
 static void		viewport_draw_col( void *data, uint8_t *img, uint8_t *u, uint8_t *v );
-static void		viewport_draw( void *data, uint8_t *img );
-static inline	int	grab_pixel( uint8_t *plane, int x, int y, int w );
 static int		viewport_update_perspective( viewport_t *v, float *values );
 static void		viewport_process( viewport_t *p );
 static int		viewport_configure( 
@@ -195,7 +193,6 @@ static void		viewport_translate_matrix( matrix_t *M, float x, float y );
 static matrix_t		*viewport_identity_matrix(void);
 static matrix_t		*viewport_matrix(void);
 static void		viewport_find_transform( float *coord, matrix_t *M );
-static void		viewport_print_matrix( matrix_t *M );
 void 		viewport_line (uint8_t *plane,int x1, int y1, int x2, int y2, int w, int h, uint8_t col);
 static void		draw_point( uint8_t *plane, int x, int y, int w, int h, int size, int col );
 static viewport_config_t *viewport_load_settings( const char *dir, int mode );
@@ -226,13 +223,16 @@ static	inline int int_min(int a, int b )
 	return MIN(a,b);
 }
 #endif
-
+/*
 static void		viewport_print_matrix( matrix_t *M )
 {
 	veejay_msg(0, "|%f\t%f\t%f", M->m[0][0], M->m[0][1], M->m[0][2] );
 	veejay_msg(0, "|%f\t%f\t%f", M->m[1][0], M->m[1][1], M->m[1][2] );
 	veejay_msg(0, "|%f\t%f\t%f", M->m[2][0], M->m[2][1], M->m[2][2] );
 }
+*/
+extern unsigned char *UTF8toLAT1(unsigned char*);
+
 /*
  * Bresenham line implementation from Xine
  */
@@ -358,7 +358,7 @@ void viewport_line (uint8_t *plane,
   }
 }
 
-static	void	draw_dot( uint8_t *plane, int x, int y, int w, int h, int size, int col )
+/*static	void	draw_dot( uint8_t *plane, int x, int y, int w, int h, int size, int col )
 {
 	int x1 = x - size *2;
 	int y1 = y - size*2;
@@ -376,7 +376,8 @@ static	void	draw_dot( uint8_t *plane, int x, int y, int w, int h, int size, int 
 		for( j = x1; j < x2 ; j ++ )
 			plane[ y * w + x ] = col;
 	}
-}
+}*/
+
 static	void	draw_point( uint8_t *plane, int x, int y, int w, int h, int size, int col )
 {
 	int x1 = x - size *2;
@@ -1411,7 +1412,7 @@ static int      nearest_div(int val )
                 val--;
         return val;
 }
-static int      nearest_div4(int val )
+/*static int      nearest_div4(int val )
 {
         int r = val % 4;
         while(r--)
@@ -1425,7 +1426,7 @@ static int      nearest_div16(int val )
                 val--;
         return val;
 }
-
+*/
 static	void	*viewport_init_swscaler(ui_t *u, int w, int h)
 {
 	uint8_t *dummy[3] = { NULL,NULL,NULL };

@@ -100,7 +100,7 @@ int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *d
 	assert( meanU > 0 );
 	assert( meanV > 0 );
 #endif
-
+	return 1;
 }
 
 

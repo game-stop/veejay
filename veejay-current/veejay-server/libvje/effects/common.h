@@ -48,6 +48,8 @@ extern int  pixel_U_lo_;
 
 extern void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 
+extern void veejay_msg(int type, const char format[], ...);
+
 #ifndef ARCH_X86
 # define sin_cos(si, co, x)     si = sin(x); co = cos(x)
 # define fast_sqrt( res,x ) res = sqrt(x) 

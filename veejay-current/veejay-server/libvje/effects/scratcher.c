@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include "scratcher.h"
 #include "common.h"
+#include "opacity.h" 
 #include <libvjmem/vjmem.h>
 
 static uint8_t *frame[3];

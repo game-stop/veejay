@@ -67,4 +67,6 @@ void	vj_get_yuv444_template(VJFrame *src, int w, int h);
 
 int	verify_working_dir();
 
+void	free_media_files( veejay_t *info, filelist_t *fl );
+
 #endif

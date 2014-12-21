@@ -29,9 +29,6 @@
 #include <assert.h>
 #endif
 
-
-extern void veejay_msg(int type, const char format[], ...);
-
 char	**vje_build_param_list( int num, ... )
 {
 	va_list args;

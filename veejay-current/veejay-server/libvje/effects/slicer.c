@@ -27,7 +27,7 @@
 static int *slice_xshift;
 static int *slice_yshift;
 
-static	recalc(int w, int h , uint8_t *Yin, int v1, int v2 )
+static	void recalc(int w, int h , uint8_t *Yin, int v1, int v2 )
 {
   unsigned int x,y,dx,dy,r,p;
   unsigned int l = w * h;

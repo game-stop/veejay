@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
+#include "softblur.h"
 #include "chameleon.h"
 #include "common.h"
 

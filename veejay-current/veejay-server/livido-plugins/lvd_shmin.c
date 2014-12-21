@@ -35,7 +35,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
-
+#include <unistd.h>
+#include <string.h>
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
 
@@ -209,8 +210,6 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 
 livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
 {
-	int len =0;
-	int i = 0;
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
 	uint8_t *O[4]= {NULL,NULL,NULL,NULL};
 
@@ -224,7 +223,6 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		return LIVIDO_ERROR_HARDWARE; //@ error codes in livido flanky
 
 	int uv_len = lvd_uv_plane_len( palette,w,h );
-	len = w * h;
 
     char  *addr = NULL; 
 	error = livido_property_get( my_instance, "PLUGIN_private", 0, &addr );
@@ -274,7 +272,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		in[2] = in[1] + ( (srcW>>1) * srcH);
 	}
 
-	sws_scale( sws, in, strides,0, srcH, O, dst_strides );
+	sws_scale( sws, (const uint8_t *const *)in, strides,0, srcH,(uint8_t * const*) O, dst_strides );
 
 	/*
 	livido_memcpy( O[0], y, len );
@@ -298,10 +296,9 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 	livido_port_t *port = NULL;
 	livido_port_t *in_params[3];
-	livido_port_t *in_chans[3];
-	livido_port_t *out_chans[1];
 	livido_port_t *info = NULL;
 	livido_port_t *filter = NULL;
+	livido_port_t *out_chans[1];
 
 	//@ setup root node, plugin info
 	info = livido_port_new( LIVIDO_PORT_TYPE_PLUGIN_INFO );

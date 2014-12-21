@@ -68,10 +68,9 @@ int	ghost_malloc(int w, int h)
 
 void ghost_free()
 {
-	int i;
 	if(ghost_buf[0])
 		free(ghost_buf[0]);
-	ghost_buf[i] = NULL;
+	ghost_buf[0] = NULL;
 	
 	if( diff_map )
 		free(diff_map);

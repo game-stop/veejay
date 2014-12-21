@@ -82,12 +82,8 @@ void	nervous_free(void)
 
 void nervous_apply( VJFrame *frame, int width, int height, int delay)
 {
-    unsigned int i;
     int len = (width * height);
     int uv_len = frame->uv_len;
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
 	uint8_t *NY = nervous_buf[0] + (len * frames_elapsed );
 	uint8_t *NCb= nervous_buf[1] + (uv_len * frames_elapsed );
 	uint8_t *NCr= nervous_buf[2] + (uv_len * frames_elapsed );
@@ -100,8 +96,7 @@ void nervous_apply( VJFrame *frame, int width, int height, int delay)
 	if(frames_elapsed > 0)
 	{
 		// take a random frame
-		unsigned int index = (unsigned int) ((double)frames_elapsed *
-				rand() / (RAND_MAX+1.0) );
+		unsigned int index = (unsigned int) ((double)frames_elapsed * rand() / (RAND_MAX+1.0) );
 		// setup pointers
 		uint8_t *sY = nervous_buf[0] + (len * index);
 		uint8_t *sCb = nervous_buf[1] + (uv_len * index);

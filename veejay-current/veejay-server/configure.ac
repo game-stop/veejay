@@ -1130,7 +1130,7 @@ AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
-AC_MSG_NOTICE([  - FFmpeg avutil		    : ${have_avutil} ])
+AC_MSG_NOTICE([  - FFmpeg avutil		     : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 
 if test "$have_freetype" = "true"; then

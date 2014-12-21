@@ -94,8 +94,6 @@ extern int pixel_Y_lo_;
 
 static	varcache_t	pvar_;
 static	void		*lzo_;
-static void 	*effect_sampler = NULL;
-static void	*crop_sampler = NULL;
 static VJFrame *crop_frame = NULL;
 static ycbcr_frame **video_output_buffer = NULL; /* scaled video output */
 static int	video_output_buffer_convert = 0;
@@ -165,7 +163,9 @@ static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4]);
 static int vj_perform_record_commit_single(veejay_t *info);
 static int vj_perform_get_subframe(veejay_t * info, int sub_sample,int chain_entyr );
 static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chain_entry );
+#ifdef HAVE_JACK
 static void vj_perform_reverse_audio_frame(veejay_t * info, int len, uint8_t *buf );
+#endif
 
 extern int  pixel_Y_lo_;
 
@@ -1325,6 +1325,7 @@ static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 	return err;
 }
 
+#ifdef HAVE_JACK
 static void vj_perform_reverse_audio_frame(veejay_t * info, int len,
 				    uint8_t * buf)
 {
@@ -1338,7 +1339,7 @@ static void vj_perform_reverse_audio_frame(veejay_t * info, int len,
 		veejay_memcpy(buf+(x-i-bps), sample,bps);
 	}
 }
-
+#endif
 
 static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int chain_entry, int width, int height)
 {
@@ -3070,8 +3071,11 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 
 
 	return follow;
+
 }
+#ifdef HAVE_JACK
 static uint32_t play_audio_sample_ = 0;
+#endif
 int vj_perform_queue_audio_frame(veejay_t *info)
 {
 	if( info->audio == NO_AUDIO || !info->current_edit_list->has_audio)
@@ -3479,7 +3483,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 	if (info->uc->take_bg==1)
     	{
-        	int d = vj_perform_take_bg(info,frame,1);
+        	vj_perform_take_bg(info,frame,1);
         	info->uc->take_bg = 0;
     	} 
 

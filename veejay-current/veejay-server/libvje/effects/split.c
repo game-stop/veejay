@@ -623,10 +623,6 @@ void split_v_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 	}
     }
 
-
-
-
-
 }
 
 void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
@@ -634,13 +630,6 @@ void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
 {
    	const int len = frame->len / 2;
    	const int uv_len = frame->uv_len / 2;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-
 	int strides[4] = { len,uv_len,uv_len, 0 };
 
 	vj_frame_copy( frame2->data, frame->data, strides );    
@@ -650,12 +639,6 @@ void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
 {
 	const unsigned int len = frame->len / 2;
 	const unsigned int uv_len = frame->uv_len / 2;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
 	int strides[4] = { len, uv_len, uv_len, 0 };
 	vj_frame_copy( frame2->data,frame->data, strides );
 }
@@ -664,12 +647,6 @@ void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 {
 	const unsigned int len = frame->len / 2;
 	const unsigned int uv_len = frame->uv_len / 2;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
 	int strides[4] = { len,uv_len,uv_len, 0 };
 	vj_frame_copy( frame2->data, frame->data, strides );
 }
@@ -679,12 +656,6 @@ void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 {
 	const unsigned int len = frame->len / 2;
 	const unsigned int uv_len = frame->uv_len / 2;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
 	int strides[4] = { len, uv_len, uv_len, 0 };
 	vj_frame_copy( frame2->data, frame->data, strides );
 }

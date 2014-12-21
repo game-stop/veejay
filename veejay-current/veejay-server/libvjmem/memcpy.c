@@ -1312,9 +1312,16 @@ void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides  )
 	}
 }
 
-void	*(* vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides ) = 0;
+typedef void *(*frame_copy_routine)( uint8_t **input, uint8_t **output, int *strides );
+typedef void *(*frame_clear_routine)( uint8_t **input, int *strides, unsigned int val );
 
-void	*(* vj_frame_clear)( uint8_t **input, int *strides, unsigned int val ) = 0;
+frame_copy_routine vj_frame_copy = 0;
+frame_clear_routine vj_frame_clear = 0;
+
+
+//void	*(*vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides ) = 0;
+
+//void	*(*vj_frame_clear)( uint8_t **input, int *strides, unsigned int val ) = 0;
 
 void	vj_frame_copy1( uint8_t *input, uint8_t *output, int size )
 {
@@ -1415,12 +1422,12 @@ int	find_best_threaded_memcpy(int w, int h)
 	if( num_tasks > 1 ) {	
 		veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer.", num_tasks, cpus );
 		veejay_msg( VEEJAY_MSG_DEBUG,"Use envvar VEEJAY_MULTITHREAD_TASKS=<num threads> to customize.");
-		vj_frame_copy = vj_frame_copyN;
-		vj_frame_clear= vj_frame_clearN;
+		vj_frame_copy = (frame_copy_routine) vj_frame_copyN;
+		vj_frame_clear= (frame_clear_routine) vj_frame_clearN;
 	}
 	else {
-		vj_frame_copy = vj_frame_simple_copy;
-		vj_frame_clear = vj_frame_simple_clear;
+		vj_frame_copy = (frame_copy_routine) vj_frame_simple_copy;
+		vj_frame_clear = (frame_clear_routine) vj_frame_simple_clear;
 	}
 
 	free(src);

@@ -46,6 +46,7 @@
 #include <libplugger/defs.h>
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
+#include <libplugger/utility.h>
 #include <libyuv/yuvconv.h>
 
 #include <libavutil/avutil.h>
@@ -71,6 +72,10 @@ static  int	n_lvd_ = 0;
 static	int	base_fmt_ = -1;
 
 static  void* instantiate_plugin( const void *plugin, int w , int h );
+
+//forward decl
+void plug_print_all();
+
 
 static	int	select_f( const struct dirent *d )
 {
@@ -427,11 +432,6 @@ static	int	scan_plugins()
 	if( read( fd, data, CONFIG_FILE_LEN ) > 0 )
 	{
 		int len = strlen(data);
-		int j;
-		int k = 0;
-		char value[PATH_MAX];
-		bzero( value, PATH_MAX );
-		
 		char *pch = strtok( data, "\n" );
 		while( pch != NULL )
 		{

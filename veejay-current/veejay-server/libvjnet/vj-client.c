@@ -51,6 +51,8 @@
 
 #define PACKET_LEN (65535*2)
 
+extern int get_ffmpeg_pixfmt( int p);
+
 vj_client *vj_client_alloc( int w, int h, int f )
 {
 	vj_client *v = (vj_client*) vj_calloc(sizeof(vj_client));

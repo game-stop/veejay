@@ -35,6 +35,9 @@
 #include <veejay/vj-lib.h>
 #include <veejay/vj-perform.h>
 #include <veejay/libveejay.h>
+#include <veejay/vj-viewport.h>
+#include <veejay/vj-composite.h>
+#include <veejay/vj-shm.h>
 #include <libel/vj-avcodec.h>
 #include <libsamplerec/samplerecord.h>
 #include <mjpegtools/mpegconsts.h>
@@ -55,6 +58,7 @@
 #include <libvevo/libvevo.h>
 #include <veejay/vj-OSC.h>
 #include <libvjnet/vj-server.h>
+#include <veejay/vj-share.h>
 #include <veejay/vevo.h>
 #include <veejay/vj-misc.h>
 /* Highest possible SDL Key identifier */

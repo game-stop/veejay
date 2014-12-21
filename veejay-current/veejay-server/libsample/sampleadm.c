@@ -49,6 +49,8 @@
 #include <libel/elcache.h>
 #include <veejay/vj-misc.h>
 #include <veejay/vj-viewport-xml.h>
+#include <veejay/vj-viewport.h>
+#include <veejay/vj-misc.h>
 #include <libstream/vj-tag.h>
 //#define KAZLIB_OPAQUE_DEBUG 1
 

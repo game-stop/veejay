@@ -49,7 +49,8 @@
 #include <libvjmem/vjmem.h>
 #define QUICKTIME_MJPG_TAG 0x6d6a7067
 extern int vj_el_get_decoder_from_fourcc( const char *fourcc );
-
+extern int get_ffmpeg_pixfmt(int p);
+extern int detect_pixel_format_with_ffmpeg( const char *filename );
 
 extern int AVI_errno;
 static int _lav_io_default_chroma = CHROMAUNKNOWN;
