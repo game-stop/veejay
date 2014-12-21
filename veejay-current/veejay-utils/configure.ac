@@ -6,7 +6,7 @@ AC_CONFIG_SRCDIR([src/sayVIMS.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=1
-VEEJAY_MICRO_VERSION=4
+VEEJAY_MICRO_VERSION=5
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Utilities - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -14,9 +14,9 @@ dnl AX_CONFIG_PREFIXED_HEADER([veejay-config.h], [VEEJAY], [config.h])
 
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
+AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([1.7])
 AM_MAINTAINER_MODE
-AM_INIT_AUTOMAKE([dist-bzip2])
 
 AC_DEFINE(VEEJAYUTIL,1,[Building Veejay Utilities])
 AC_DEFINE(HAVE_CONFIG_H,1,[Include config.h])
@@ -32,6 +32,7 @@ AC_SUBST(LT_AGE)
 dnl **********************************************************************
 dnl Options
 
+AC_CONFIG_MACRO_DIR([m4])
 
 dnl kill CFLAGS
 CFLAGS=""
@@ -135,7 +136,7 @@ dnl		fi
 		LIBM_LIBS="-lm"
 	;;
    *-apple-darwin*)
-		AC_DEFINE(HAVE_DARWIN,,[MAC OS X Darin])
+		AC_DEFINE(HAVE_DARWIN,1,[MAC OS X Darin])
 		dnl OS-X/Darwin needs no-cpp-precomp
 		CFLAGS="$CFLAGS -no-cpp-precomp"
 		have_darwin=true
@@ -152,7 +153,7 @@ dnl ====== check for PKG_CONFIG_PATH
 if test x"$PKG_CONFIG_PATH" = x ; then
 	AC_MSG_NOTICE([The PKG_CONFIG_PATH variable was not set])
 	AC_MSG_NOTICE([You should set it to the directories that contain the .pc files])
-	AC_MSG_ERROR([Abort])
+	PKG_CONFIG_PATH=/usr/lib/pkgconfig
 fi
 
 
@@ -240,7 +241,7 @@ YUVCFLAGS="-fif-conversion"
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
-	AC_DEFINE(HAVE_X86CPU,, [Compiling for x86 architecture CPU])
+	AC_DEFINE(HAVE_X86CPU,1, [Compiling for x86 architecture CPU])
 	AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
 	have_x86cpu=true
 
@@ -264,15 +265,15 @@ case $host_cpu in
 	
     ;;
   x86_64*|k8-*)
-    	AC_DEFINE(HAVE_X86_CPU,, [Compiling for x86-64 architecture CPU])
+    	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	CFLAGS="$CFLAGS -fPIC -DPIC"
+	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
-	AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
-	AC_DEFINE(ARCH_PPC,,[Compiling for PowerPC])
+	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
+	AC_DEFINE(ARCH_PPC,1,[Compiling for PowerPC])
 	have_ppccpu=true
 
 	case $host in
@@ -300,7 +301,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 
 	if test x$have_ps2 = xtrue ; then
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_PS2,,[Compile for playstation2])
+		AC_DEFINE(HAVE_PS2,1,[Compile for playstation2])
 	else
 		AC_MSG_RESULT(no)
 	fi
@@ -329,8 +330,8 @@ then
 	])
 
 	if test $ac_cv_flag_mmx = yes; then
-       		AC_DEFINE(HAVE_ASM_MMX,,[Compiling in MMX support])
-		AC_DEFINE(HAVE_MMX,,[Compiling in MMX support])
+       		AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
+		AC_DEFINE(HAVE_MMX,1,[Compiling in MMX support])
        		have_asm_mmx=true
 	fi
 
@@ -343,8 +344,8 @@ then
 	])
 
 	if test $ac_cv_flag_sse = yes; then
-		AC_DEFINE(HAVE_ASM_SSE,,[Compiling in SSE support])
-		AC_DEFINE(HAVE_SSE,,[Compiling in SSE support])
+		AC_DEFINE(HAVE_ASM_SSE,1,[Compiling in SSE support])
+		AC_DEFINE(HAVE_SSE,1,[Compiling in SSE support])
 		have_asm_sse=true
 	fi
 
@@ -359,8 +360,8 @@ then
 	])
 
 	if test $ac_cv_flag_sse2 = yes; then
-		AC_DEFINE(HAVE_ASM_SSE2,,[Compiling in SSE2 support])
-		AC_DEFINE(HAVE_SSE2,,[Compiling in SSE2 support])
+		AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in SSE2 support])
+		AC_DEFINE(HAVE_SSE2,1,[Compiling in SSE2 support])
 		have_asm_sse2=true
 	fi
 
@@ -373,7 +374,7 @@ then
 	])
 
 	if test $ac_cv_flag_3dnow = yes; then
-		AC_DEFINE(HAVE_ASM_3DNOW,,[Compiling in 3Dnow])
+		AC_DEFINE(HAVE_ASM_3DNOW,1,[Compiling in 3Dnow])
 		have_asm_3dnow=true
 	fi
 
@@ -386,7 +387,7 @@ then
 	])
 
 	if test $ac_cv_flag_cmov = yes; then
-		AC_DEFINE(HAVE_CMOV,,[Compiling in CMOV])
+		AC_DEFINE(HAVE_CMOV,1,[Compiling in CMOV])
 		have_cmov=true
 	fi
 
@@ -447,7 +448,7 @@ EOF
       # add -O3 flag
       ALTIVEC_CFLAGS="-O3 ${ALTIVEC_CFLAGS}"
       AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_ALTIVEC,,
+      AC_DEFINE(HAVE_ALTIVEC,1,
 				[Inline PPC Altivec primitives available])
       AC_SUBST(ALTIVEC_CFLAGS)
     else
@@ -506,8 +507,6 @@ AM_CONDITIONAL(HAVE_ASM_NASM, test x$have_asm_nasm = xtrue)
 AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
-AM_CONDITIONAL(HAVE_MMX2, test x$have_asm_mmx2 = xtrue)
-AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 
 CFLAGS="$ARCHFLAGS $CFLAGS"
