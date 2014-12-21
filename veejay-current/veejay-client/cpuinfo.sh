@@ -249,7 +249,7 @@ if test "$proc" = "i386" ; then
 	do_cc -march=$proc $_opt_mcpu=$proc || proc=error
 fi
 if test "$proc" = "error" ; then
-	echo "Your $CC does not even support \"i386\" for '-march' and $_opt_mcpu."
+#dont care , dont set
 	_mcpu=""
 	_march=""
 elif test "$proc" = "i586-i686"; then
