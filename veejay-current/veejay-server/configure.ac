@@ -37,7 +37,8 @@ AC_CONFIG_MACRO_DIR([m4])
 
 dnl kill CFLAGS
 CFLAGS=""
-
+dnl enable auto vectorization for libvjmem, libvje and libyuv
+OPTCFLAGS="" 
 
 AC_ARG_ENABLE(strict,
 		AC_HELP_STRING([--enable-strict],
@@ -301,16 +302,9 @@ case $host_cpu in
  	fi
 
 	AC_SUBST(OP_CFLAGS)
-
-   	dnl If the host is pentium, align on double word boundary
-    	case $host_cpu in
-		i686)
-			CFLAGS="$CFLAGS $OP_CFLAGS"
-		;;
-	*)
-		;;
-	esac 
-	
+	SUBSAMPLE_CFLAGS=""
+	CFLAGS="$CFLAGS $OP_CFLAGS"
+	OPTCFLAGS="-O3"
     ;;
   x86_64*|k8-*)
     	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
@@ -324,6 +318,7 @@ case $host_cpu in
 	AC_SUBST(OP_CFLAGS)
 	SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
 	CFLAGS="$CFLAGS -m64 -fPIC -DPIC $OP_CFLAGS"
+	OPTCFLAGS="-O3 -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
@@ -544,11 +539,13 @@ then
 	then
 		if test x$ac_cv_flag_sse = xyes; then
 			CFLAGS="$CFLAGS -msse -mfpmath=sse"
+			OPTCFLAGS="$OPTCFLAGS -msse -mfpmath=sse"
 	
 		fi
 
-		if test x$av_cv_flag_sse2 = xyes; then
+		if test x$ac_cv_flag_sse2 = xyes; then
 			CFLAGS="$CFLAGS -msse2 -mfpmath=sse"
+			OPTCFLAGS="$OPTCFLAGS -msse2 -mfpmath=sse"
 		fi
 	fi	
 fi
@@ -993,8 +990,10 @@ dnl We do this last as it can screw up library detection etc...
 CFLAGS="$ARCHFLAGS $CFLAGS"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
 SUBSAMPLE_CFLAGS="$ARCHFLAGS $SUBSAMPLE_CFLAGS"
+OPTCFLAGS="$ARCHFLAGS $OPTCFLAGS"
 
 AC_SUBST(SUBSAMPLE_CFLAGS)
+AC_SUBST(OPTCFLAGS)
 
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
@@ -1100,6 +1099,7 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Veejay ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
+AC_MSG_NOTICE([   FX library flags: $OPTCFLAGS])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])

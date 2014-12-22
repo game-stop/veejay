@@ -2,8 +2,8 @@
 
 MAINTAINERCLEANFILES=Makefile.in
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg $(FFMPEG_CFLAGS) $(GLIB_CFLAGS)   
-
-AM_CFLAGS = $(FREEFRAME_CFLAGS)
+CFLAGS =
+AM_CFLAGS = $(OPTCFLAGS) $(FREEFRAME_CFLAGS)
 
 pkginclude_HEADERS=vje.h
 

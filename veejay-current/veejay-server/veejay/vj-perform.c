@@ -130,7 +130,7 @@ static const char *intro =
 static const char *license =
 	"This program is licensed as\nFree Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejayhq.net\nhttp://veejay.dyne.org\nhttp://www.sourceforge.net/projects/veejay\nhttp://www.gnu.org";
 static const char *copyr =
-	"(C) 2002-2013 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
+	"(C) 2002-2014 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
 
 static const char *donateaddr = 
 	"Veejay's BTC donation address: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n";

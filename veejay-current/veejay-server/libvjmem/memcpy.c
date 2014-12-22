@@ -1241,21 +1241,27 @@ static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 		}
 */
 
+
+static inline void vj_frame_slow1( const uint8_t *a, const uint8_t *b, uint8_t *dst, const int len, const float frac )
+{
+	int i;
+	for( i = 0; i < len; i ++  ) {
+		dst[i] = a[i] + ( frac * ( b[i] - a[i] ) ); 
+	}
+}
+
 static void	vj_frame_slow_job( void *arg )
 {
 	vj_task_arg_t *job = (vj_task_arg_t*) arg;
 	int i,j;
 	uint8_t **img = job->output;
-	uint8_t **p0_buffer = job->input;
-	uint8_t **p1_buffer = job->temp;
+	const uint8_t **p0_buffer = job->input;
+	const uint8_t **p1_buffer = job->temp;
 	const float frac = job->fparam;
 	
 	for( i = 0; i < 3; i ++ ) {
-		for( j = 0; j < job->strides[i]; j ++  ) {
-			img[i][j] = p0_buffer[i][j] + ( frac * (p1_buffer[i][j] - p0_buffer[i][j]));
-		}
+		vj_frame_slow1( p0_buffer[i], p1_buffer[i], img[i],(const int) job->strides[i], frac );
 	}
-
 }
 
 
