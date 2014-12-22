@@ -2609,7 +2609,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		return ;
     }
 
-   
+  
     for(n = 0; n < QUEUE_LEN ; n ++ ) {
         veejay_mjpeg_queue_buf(info, n,1 );
     }
@@ -2706,29 +2706,28 @@ static void veejay_playback_cycle(veejay_t * info)
 	    skipv = 0;
 	    skipa = 0;
 	    skipi = 0;
-	   if (info->sync_correction) {
-		if (stats.tdiff > settings->spvf) {
-		    skipa = 1; 
-		   // skipv = 1;
-		    if (info->sync_ins_frames && current_speed != 0) {
-			skipi = 1;
-		    }
-		    nvcorr++;
-		    stats.num_corrs_a++;
-		    stats.tdiff -= settings->spvf;
-		    stats.stats_changed = 1; 
-		} 
-		if (stats.tdiff < -settings->spvf) {
-		    /* Video is behind audio */
-		    skipv = 1;
-   		    if (!info->sync_skip_frames && current_speed != 0)
-			skipi = 1;
- 		    
-		    nvcorr--;
-		    stats.num_corrs_b++;
-		    stats.tdiff += settings->spvf;
-		    stats.stats_changed = 1;
-		}
+		if (info->sync_correction) {
+			if (stats.tdiff > settings->spvf) {
+		    	skipa = 1; 
+		    	if (info->sync_ins_frames && current_speed != 0) {
+					skipi = 1;
+		    	}
+		   		nvcorr++;
+		   	 	stats.num_corrs_a++;
+		    	stats.tdiff -= settings->spvf;
+		    	stats.stats_changed = 1; 
+			} 
+			if (stats.tdiff < -settings->spvf) {
+		    	/* Video is behind audio */
+		    	skipv = 1;
+   		    	if (!info->sync_skip_frames && current_speed != 0) {
+					skipi = 1;
+ 		   		} 
+		    	nvcorr--;
+		    	stats.num_corrs_b++;
+		   		stats.tdiff += settings->spvf;
+		   		stats.stats_changed = 1;
+			}
 	    }
 	   
 	    frame  = n % QUEUE_LEN;
@@ -2762,18 +2761,14 @@ static void veejay_playback_cycle(veejay_t * info)
 	     } 
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
-            info->real_fps = (int)( te - ts );
+        info->real_fps = (int)( te - ts );
 #else
 	    info->real_fps = 0;
 #endif
-	    if( info->real_fps > (1000* settings->spvf ) && info->audio ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Rendering video frame takes too long! (measured %ld ms).", info->real_fps);
-	        //continue;
+	    if( info->real_fps > (1000 * settings->spvf ) && info->audio == AUDIO_PLAY) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Rendering audio/video frame takes too long (measured %ld ms). Can't keep pace with audio!", info->real_fps);
 	    }
 	
-	    if(!info->audio && skipv )
-		 continue;
-
 	    veejay_mjpeg_queue_buf(info,frame, 1 );
 	
 	    stats.nqueue ++;
@@ -2782,9 +2777,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		/* output statistics */
 	if (el->has_audio && (info->audio==AUDIO_PLAY))
 	    stats.audio = settings->audio_mute ? 0 : 1;
-	stats.stats_changed = 0;
-//	stats.frame = settings->current_frame_num;
-//	stats.nsync = 0;
+		stats.stats_changed = 0;
     }
 
   FINISH:
@@ -2793,8 +2786,8 @@ static void veejay_playback_cycle(veejay_t * info)
      * Never try to sync on the last buffer, it is a hostage of
      * the codec since it is played over and over again
      */
-    if (info->audio_running || info->audio ==AUDIO_PLAY)
-	vj_perform_audio_stop(info);
+    if (info->audio_running || info->audio == AUDIO_PLAY)
+		vj_perform_audio_stop(info);
 }
 
 /******************************************************
