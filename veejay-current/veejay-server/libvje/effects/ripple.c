@@ -36,7 +36,7 @@
 #include "common.h"
 #include "ripple.h"
 
-#define RIPPLE_DEGREES 360.0
+#define RIPPLE_DEGREES 360
 #define RIPPLE_VAL 180.0
 
 static double *ripple_table;
@@ -75,13 +75,13 @@ vj_effect *ripple_init(int width, int height)
 int	ripple_malloc(int width, int height)
 {
    int i;
-    ripple_table = (double*) vj_malloc(sizeof(double) * width * height + 16);
+    ripple_table = (double*) vj_malloc(sizeof(double) * RUP8(width * height) );
     if(!ripple_table) return 0;
-    ripple_data[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width *height) );
+    ripple_data[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) );
     if(!ripple_data[0]) return 0; 
-    ripple_data[1] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width *height) );
+    ripple_data[1] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) );
     if(!ripple_data[1]) return 0;
-    ripple_data[2] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width *height) );
+    ripple_data[2] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) );
     if(!ripple_data[1]) return 0;
 
     ripple_sin = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
@@ -150,11 +150,6 @@ void ripple_apply(VJFrame *frame, int width, int height, int _w, int _a , int _a
 	
 	int strides[4] = { width * height, width * height, width * height,0 };
 	vj_frame_copy( frame->data, ripple_data , strides );
-/*
-	veejay_memcpy( ripple_data[0], Y, (width*height));
-	veejay_memcpy( ripple_data[1], Cb, (width*height));
-	veejay_memcpy( ripple_data[2], Cr, (width*height));
-*/
 	if (have_calc_data==0) {
   	   for(y=0; y < height-1;y++) {
 		for (x=0; x < width; x++) {
