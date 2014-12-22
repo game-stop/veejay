@@ -12,8 +12,8 @@
         x10x0x10x0         x10x0x10x0x10x   10x0x10x0x10x0  x10x  10x0    0x0x        0x10      0x0x
           0x0x10           x10x0x10x0x10x   10x0x10x0x10x0    0x010x0     0x0x        0x10      0x0x    
 
-									              version 1.4	
-										      March 2009
+									              version 1.5	
+										      December 2014
 
        =========================================
  
@@ -32,25 +32,29 @@ While playing, you can record the resulting video directly to disk (video sampli
 
 ====== quick install:
 
-   check that PKG_CONFIG_PATH is set: 
-   echo $PKG_CONFIG_PATH
-
-   on some distributions, like Arch, you need to install ffmpeg-compat
-   and set PKG_CONFIG_PATH to first include /usr/lib/ffmpeg-compat/pkg-config
-   follow by the other directories that contain .pc files.
-
    order of packages:
     veejay-server, veejay-client, veejay-utils
 
    for each package:
+     ./autogen.sh
      ./configure
      make && make install
 
+   to build for a specific target:
+     ./configure --with-arch-target=generic|core2|k6 
 
-   for plugins:
+
+   if you want to debug veejay-server (or if you want to submit a meaningful backtrace), build with:
+
+     ./configure --enable-debug
+
+
+   to build plugins:
 
    cd veejay-sever/livido-plugins
    ./RUNME.sh /tmp/plugins
+
+   install the plugins in your home-dir:
 
    mkdir ~/.veejay    # or start veejay 
    echo "/tmp/plugins" >> ~/.veejay/plugins.cfg
@@ -59,7 +63,7 @@ While playing, you can record the resulting video directly to disk (video sampli
 
 
 
-	FEATURE OVERVIEW
+FEATURE OVERVIEW
 
 General
 -------
