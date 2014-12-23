@@ -47,6 +47,8 @@ static double *ripple_cos;
 static int ripple_waves = 0;
 static int ripple_ampli = 0;
 static int ripple_attn = 0;
+static int have_calc_data = 0;
+
 // FIXME private
 vj_effect *ripple_init(int width, int height)
 {
@@ -111,6 +113,7 @@ void ripple_free() {
 	ripple_sin = NULL;
 	ripple_cos = NULL;
 	ripple_table = NULL;
+	have_calc_data = 0;
 }
 
 
@@ -124,7 +127,6 @@ void ripple_apply(VJFrame *frame, int width, int height, int _w, int _a , int _a
 	double waves = (_w/10.0);
 	double ampli = (double) (_a/10.0);
 	double attenuation = (_att/10.0);
-	int have_calc_data = 1;
 	
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
@@ -184,7 +186,7 @@ void ripple_apply(VJFrame *frame, int width, int height, int _w, int _a , int _a
 	else {
 	   for(y=0; y < height-1;y++) {
 		for (x=0; x < width; x++) {
-		  sx = ripple_table[(y*width)+x];	
+		  sx = (int) ripple_table[(y*width)+x];	
 		  Y[(y * width) +x] = ripple_data[0][sx];
 		  Cb[(y * width) +x] = ripple_data[1][sx];
 		  Cr[(y * width) +x] = ripple_data[2][sx];
