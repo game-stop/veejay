@@ -222,6 +222,7 @@ debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
  debugCFLAGS="-g"
  CFLAGS="$CFLAGS $debugCFLAGS"
+ OPTCFLAGS="$OPTCFLAGS $debugCFLAGS"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -299,12 +300,12 @@ case $host_cpu in
 
 	if test "x$enable_debug" != "xyes" ; then
 		OP_CFLAGS="-O2"
+		OPT_CFLAGS="-O3"
  	fi
 
 	AC_SUBST(OP_CFLAGS)
 	SUBSAMPLE_CFLAGS=""
 	CFLAGS="$CFLAGS $OP_CFLAGS"
-	OPTCFLAGS="-O3"
     ;;
   x86_64*|k8-*)
     	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
@@ -313,12 +314,12 @@ case $host_cpu in
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
 		OP_CFLAGS="-O2"
+		OPT_CFLAGS="-O3 -m64 -fPIC -DPIC"
  	fi
 
 	AC_SUBST(OP_CFLAGS)
 	SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
 	CFLAGS="$CFLAGS -m64 -fPIC -DPIC $OP_CFLAGS"
-	OPTCFLAGS="-O3 -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
