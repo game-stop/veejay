@@ -683,7 +683,9 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
    int i, j;
    int16_t *qt_audio = (int16_t *)buff, **qt_audion;
    int channels = lav_audio_channels(lav_file);
-
+#ifdef HAVE_LIBQUICKTIME
+   int res=0;
+#endif
    qt_audion = malloc(channels * sizeof (int16_t **));
    for (i = 0; i < channels; i++)
 	qt_audion[i] = (int16_t *)malloc(samps * lav_file->bps);
