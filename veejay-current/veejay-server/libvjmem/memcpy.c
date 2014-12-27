@@ -1514,12 +1514,9 @@ static void	vj_frame_slow_job( void *arg )
 void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
 	if( vj_task_available() ) {
-		long t1 = SDL_GetTicks();
 		int strides[4] = { len, uv_len, uv_len, 0 };
 		vj_task_set_float( frac );
 		vj_task_run( p0_buffer, img, p1_buffer,strides, 4,(performer_job_routine) &vj_frame_slow_job );
-		long t2 = SDL_GetTicks();
-		veejay_msg(0, "%s: %ld ms", __FUNCTION__, t2-t1);
 	} else {
 		int i;
 		if( uv_len != len ) { 
