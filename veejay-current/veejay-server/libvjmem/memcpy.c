@@ -190,6 +190,9 @@ __asm__ __volatile__(\
   : "memory");\
 }
 
+
+
+
 /* for small memory blocks (<256 bytes) this version is faster */
 #define small_memset(to,val,n)\
 {\
@@ -306,6 +309,15 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 #define _MMREG_SIZE 64 
 #endif
 
+#ifdef HAVE_ASM_AVX
+#define AVX_MMREG_SIZE 32
+#endif
+#ifdef HAVE_ASM_SSE
+#define SSE_MMREG_SIZE 16
+#endif
+#ifdef HAVE_ASM_MMX
+#define MMX_MMREG_SIZE 8
+#endif
 #undef PREFETCH
 #undef EMMS
 
@@ -623,6 +635,225 @@ void	packed_plane_clear( size_t len, void *to )
 		t += 4;
 	}
 }
+
+
+#ifdef HAVE_ASM_AVX
+static void * avx_memcpy(void * to, const void * from, size_t len)
+{
+  void *retval;
+  size_t i;
+  retval = to;
+
+  /* PREFETCH has effect even for MOVSB instruction ;) */
+  __asm__ __volatile__ (
+    "   prefetchnta (%0)\n"
+    "   prefetchnta 32(%0)\n"
+    "   prefetchnta 64(%0)\n"
+    "   prefetchnta 96(%0)\n"
+    "   prefetchnta 128(%0)\n"
+    "   prefetchnta 160(%0)\n"
+    "   prefetchnta 192(%0)\n"
+    "   prefetchnta 224(%0)\n"
+    "   prefetchnta 256(%0)\n"
+    "   prefetchnta 288(%0)\n"
+    : : "r" (from) );
+
+  if(len >= _MIN_LEN)
+  {
+    register uintptr_t delta;
+    /* Align destinition to MMREG_SIZE -boundary */
+    delta = ((uintptr_t)to)&(AVX_MMREG_SIZE-1);
+    if(delta)
+    {
+      delta=AVX_MMREG_SIZE-delta;
+      len -= delta;
+      small_memcpy(to, from, delta);
+    }
+    i = len >> 7; /* len/128 */
+    len&=127;
+    if(((uintptr_t)from) & 31)
+      /* if SRC is misaligned */
+      for(; i>0; i--)
+      {
+        __asm__ __volatile__ (
+        "prefetchnta 320(%0)\n"
+        "prefetchnta 352(%0)\n"
+        "prefetchnta 384(%0)\n"
+        "prefetchnta 416(%0)\n"
+        "vmovups    (%0), %%ymm0\n"
+        "vmovups  32(%0), %%ymm1\n"
+        "vmovups  64(%0), %%ymm2\n"
+        "vmovups  96(%0), %%ymm3\n"
+        "vmovntps %%ymm0,   (%1)\n"
+        "vmovntps %%ymm1, 32(%1)\n"
+        "vmovntps %%ymm2, 64(%1)\n"
+        "vmovntps %%ymm3, 96(%1)\n"
+        :: "r" (from), "r" (to) : "memory");
+        from = ((const unsigned char *)from) + 128;
+        to = ((unsigned char *)to) + 128;
+      }
+    else
+      /*
+         Only if SRC is aligned on 16-byte boundary.
+         It allows to use movaps instead of movups, which required data
+         to be aligned or a general-protection exception (#GP) is generated.
+      */
+      for(; i>0; i--)
+      {
+        __asm__ __volatile__ (
+        "prefetchnta 320(%0)\n"
+        "prefetchnta 352(%0)\n"
+        "prefetchnta 384(%0)\n"
+        "prefetchnta 416(%0)\n"
+        "vmovaps    (%0), %%ymm0\n"
+        "vmovaps  32(%0), %%ymm1\n"
+        "vmovaps  64(%0), %%ymm2\n"
+        "vmovaps  96(%0), %%ymm3\n"
+        "vmovntps %%ymm0,   (%1)\n"
+        "vmovntps %%ymm1, 32(%1)\n"
+        "vmovntps %%ymm2, 64(%1)\n"
+        "vmovntps %%ymm3, 96(%1)\n"
+        :: "r" (from), "r" (to) : "memory");
+        from = ((const unsigned char *)from) + 128;
+        to = ((unsigned char *)to) + 128;
+      }
+    /* since movntq is weakly-ordered, a "sfence"
+     * is needed to become ordered again. */
+    __asm__ __volatile__ ("sfence":::"memory");
+  }
+  /*
+   *	Now do the tail of the block
+   */
+  if(len) __memcpy(to, from, len);
+  return retval;
+}
+#endif /* HAVE_ASM_AVX */
+
+#ifdef HAVE_ASM_MMX
+#define _MMX1_MIN_LEN 0x800 /* 2k blocks */
+static void * mmx_memcpy(void * to, const void * from, size_t len)
+{
+  void *retval;
+  size_t i;
+  retval = to;
+
+  if(len >= _MMX1_MIN_LEN)
+  {
+    register uintptr_t delta;
+    /* Align destinition to MMREG_SIZE -boundary */
+    delta = ((uintptr_t)to)&(MMX_MMREG_SIZE-1);
+    if(delta)
+    {
+      delta=MMX_MMREG_SIZE-delta;
+      len -= delta;
+      small_memcpy(to, from, delta);
+    }
+    i = len >> 6; /* len/64 */
+    len&=63;
+    for(; i>0; i--)
+    {
+      __asm__ __volatile__ (
+      "movq (%0), %%mm0\n"
+      "movq 8(%0), %%mm1\n"
+      "movq 16(%0), %%mm2\n"
+      "movq 24(%0), %%mm3\n"
+      "movq 32(%0), %%mm4\n"
+      "movq 40(%0), %%mm5\n"
+      "movq 48(%0), %%mm6\n"
+      "movq 56(%0), %%mm7\n"
+      "movq %%mm0, (%1)\n"
+      "movq %%mm1, 8(%1)\n"
+      "movq %%mm2, 16(%1)\n"
+      "movq %%mm3, 24(%1)\n"
+      "movq %%mm4, 32(%1)\n"
+      "movq %%mm5, 40(%1)\n"
+      "movq %%mm6, 48(%1)\n"
+      "movq %%mm7, 56(%1)\n"
+      :: "r" (from), "r" (to) : "memory");
+      from = ((const unsigned char *)from) + 64;
+      to = ((unsigned char *)to) + 64;
+    }
+    __asm__ __volatile__ ("emms":::"memory");
+  }
+  /*
+   *	Now do the tail of the block
+   */
+  if(len) __memcpy(to, from, len);
+  return retval;
+}
+#endif
+
+#ifdef HAVE_ASM_MMX2
+static void * mmx2_memcpy(void * to, const void * from, size_t len)
+{
+  void *retval;
+  size_t i;
+  retval = to;
+
+  /* PREFETCH has effect even for MOVSB instruction ;) */
+  __asm__ __volatile__ (
+    "   prefetchnta (%0)\n"
+    "   prefetchnta 32(%0)\n"
+    "   prefetchnta 64(%0)\n"
+    "   prefetchnta 96(%0)\n"
+    "   prefetchnta 128(%0)\n"
+    "   prefetchnta 160(%0)\n"
+    "   prefetchnta 192(%0)\n"
+    "   prefetchnta 224(%0)\n"
+    "   prefetchnta 256(%0)\n"
+    "   prefetchnta 288(%0)\n"
+    : : "r" (from) );
+
+  if(len >= _MIN_LEN)
+  {
+    register uintptr_t delta;
+    /* Align destinition to MMREG_SIZE -boundary */
+    delta = ((uintptr_t)to)&(MMX_MMREG_SIZE-1);
+    if(delta)
+    {
+      delta=MMX_MMREG_SIZE-delta;
+      len -= delta;
+      small_memcpy(to, from, delta);
+    }
+    i = len >> 6; /* len/64 */
+    len&=63;
+    for(; i>0; i--)
+    {
+      __asm__ __volatile__ (
+      "prefetchnta 320(%0)\n"
+      "prefetchnta 352(%0)\n"
+      "movq (%0), %%mm0\n"
+      "movq 8(%0), %%mm1\n"
+      "movq 16(%0), %%mm2\n"
+      "movq 24(%0), %%mm3\n"
+      "movq 32(%0), %%mm4\n"
+      "movq 40(%0), %%mm5\n"
+      "movq 48(%0), %%mm6\n"
+      "movq 56(%0), %%mm7\n"
+      "movntq %%mm0, (%1)\n"
+      "movntq %%mm1, 8(%1)\n"
+      "movntq %%mm2, 16(%1)\n"
+      "movntq %%mm3, 24(%1)\n"
+      "movntq %%mm4, 32(%1)\n"
+      "movntq %%mm5, 40(%1)\n"
+      "movntq %%mm6, 48(%1)\n"
+      "movntq %%mm7, 56(%1)\n"
+      :: "r" (from), "r" (to) : "memory");
+      from = ((const unsigned char *)from) + 64;
+      to = ((unsigned char *)to) + 64;
+    }
+     /* since movntq is weakly-ordered, a "sfence"
+     * is needed to become ordered again. */
+    __asm__ __volatile__ ("sfence":::"memory");
+    __asm__ __volatile__ ("emms":::"memory");
+  }
+  /*
+   *	Now do the tail of the block
+   */
+  if(len) __memcpy(to, from, len);
+  return retval;
+}
+#endif
 
 
 #if defined (HAVE_ASM_SSE) || defined (HAVE_ASM_MMX) || defined( HAVE_ASM_MMX2 )
@@ -1047,6 +1278,15 @@ static struct {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
      { "linux kernel memcpy()",     linux_kernel_memcpy, 0},
 #endif
+#ifdef HAVE_ASM_AVX
+     { "AVX optimized memcpy()", avx_memcpy, 0 },
+#endif
+#ifdef HAVE_ASM_MMX
+     { "MMX optimized memcpy()", mmx_memcpy, 0 },
+#endif
+#ifdef HAVE_ASM_MMX2
+     { "MMX2 optimized memcpy()", mmx2_memcpy, 0 },
+#endif
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
      { "MMX/MMX2/SSE optimized memcpy()",    fast_memcpy, 0},
 #endif  
@@ -1241,15 +1481,15 @@ static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 		}
 */
 
-
 static inline void vj_frame_slow1( const uint8_t *a, const uint8_t *b, uint8_t *dst, const int len, const float frac )
 {
 	int i;
 	for( i = 0; i < len; i ++  ) {
 		dst[i] = a[i] + ( frac * ( b[i] - a[i] ) ); 
 	}
-}
 
+}
+#define ALIGN 8
 static void	vj_frame_slow_job( void *arg )
 {
 	vj_task_arg_t *job = (vj_task_arg_t*) arg;
@@ -1259,19 +1499,27 @@ static void	vj_frame_slow_job( void *arg )
 	const uint8_t **p1_buffer = job->temp;
 	const float frac = job->fparam;
 	
-	for( i = 0; i < 3; i ++ ) {
-		vj_frame_slow1( p0_buffer[i], p1_buffer[i], img[i],(const int) job->strides[i], frac );
+	for ( i = 0; i < 3; i ++ ) {
+		uint8_t *a = __builtin_assume_aligned(p0_buffer[i],ALIGN);
+		uint8_t *b = __builtin_assume_aligned(p1_buffer[i],ALIGN);
+		uint8_t *d = __builtin_assume_aligned(img[i], ALIGN);
+		const unsigned int len = job->strides[i];
+		vj_frame_slow1(d,a,b,len,frac );	
 	}
+
 }
+
 
 
 void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
 	if( vj_task_available() ) {
+		long t1 = SDL_GetTicks();
 		int strides[4] = { len, uv_len, uv_len, 0 };
 		vj_task_set_float( frac );
 		vj_task_run( p0_buffer, img, p1_buffer,strides, 4,(performer_job_routine) &vj_frame_slow_job );
-	
+		long t2 = SDL_GetTicks();
+		veejay_msg(0, "%s: %ld ms", __FUNCTION__, t2-t1);
 	} else {
 		int i;
 		if( uv_len != len ) { 

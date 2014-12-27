@@ -300,7 +300,7 @@ case $host_cpu in
 
 	if test "x$enable_debug" != "xyes" ; then
 		OP_CFLAGS="-O2"
-		OPT_CFLAGS="-O3"
+		OPTCFLAGS="-O3 -ftree-vectorize"
  	fi
 
 	AC_SUBST(OP_CFLAGS)
@@ -314,7 +314,7 @@ case $host_cpu in
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
 		OP_CFLAGS="-O2"
-		OPT_CFLAGS="-O3 -m64 -fPIC -DPIC"
+		OPTCFLAGS="-O3 -m64 -ftree-vectorize -fPIC -DPIC"
  	fi
 
 	AC_SUBST(OP_CFLAGS)
@@ -426,9 +426,20 @@ then
 		fi
 	])
 
+
 	if test $ac_cv_flag_3dnow = yes; then
-		AC_DEFINE(HAVE_ASM_3DNOW,1,[Compiling in 3Dnow])
-		have_asm_3dnow=true
+		AC_MSG_CHECKING([if your CPU understands 3DNOW femms])
+		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
+				[[__asm__ __volatile__("femms":::"memory");]])],
+			[have_asm_3dnow=true],
+			[have_asm_3dnow=false])
+		if test $have_asm_3dnow = true; then
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_ASM_3DNOW,1,[Compiling in 3Dnow])
+			have_asm_3dnow=true
+		else
+			AC_MSG_RESULT(no)
+		fi
 	fi
 
 	AC_CACHE_CHECK(for CMOV on processor(s), ac_cv_flag_cmov, [
@@ -459,6 +470,16 @@ then
 		AC_DEFINE(HAVE_ASM_MMXEXT,1,[Compiling in MMXEXT])
 		have_asm_mmx2=true
 	fi
+
+	ac_cv_flag_avx=yes
+	AC_MSG_CHECKING([for AVX assembler])
+	AC_COMPILE_IFELSE(
+		[AC_LANG_PROGRAM([[]], 
+			[[asm("vmovaps %ymm1,%ymm0");]])],
+				[AC_DEFINE(HAVE_ASM_AVX,1,[define if compiler supports avx inline assembler])
+					AC_MSG_RESULT(yes)
+					ac_cv_flag_avx=no
+				],[AC_MSG_RESULT(no)])
 
 fi
 
@@ -1112,6 +1133,7 @@ AC_MSG_NOTICE([    SSE     enabled     : ${ac_cv_flag_sse}])
 AC_MSG_NOTICE([    SSE2    enabled     : ${ac_cv_flag_sse2}])
 AC_MSG_NOTICE([    3DNOW   enabled     : ${ac_cv_flag_3dnow}])
 AC_MSG_NOTICE([    CMOV    enabled     : ${ac_cv_flag_cmov}])
+AC_MSG_NOTICE([    AVX     enabled     : ${ac_cv_flag_avx}])
 fi
 
 if test "$have_ppccpu" = "true" ; then
