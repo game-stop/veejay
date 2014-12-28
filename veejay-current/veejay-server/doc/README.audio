@@ -1,0 +1,60 @@
+AUDIO support
+-------------
+
+Veejay has limited audio support.
+
+
+PREPARE
+-------
+
+You need an AVI file with an audio track encoded in PCM WAVE, 44-48Khz, 2 channels (stereo) and 8 or 16 bit per sample.
+
+
+RUN
+---
+
+Veejay only has support for jackd1 (the old jack)
+
+Start jackd prior to starting veejay:
+
+# jackd -d alsa -P
+
+
+Now, start veejay:
+
+# veejay -m80 /path/to/mjpeg.avi
+
+Use the -m commandline option to allow veejay to cache video frames when sampling. This will reduce disk latency,
+allowing for smoother audio playback (especially when used in combination of speed/pitch changes) 
+
+The -m commandline option is further explained in docs/HowtoCache.txt
+
+AUDIO PLAYBACK PROBLEMS
+-----------------------
+
+Q: What can I do about the warning "Rendering audio/video frame takes too long (measured 44 ms). Can't keep pace with audio!" 
+
+
+A(1): You can start veejay with the -m commandline option. The warnings are less frequent or dissapear when the whole sample is cached in memory.
+
+A(2): You can disable veejay's multithreaded pixel operations:
+  
+# export VEEJAY_MULTITHREAD_TASKS=0
+# veejay -m80 /path/to/mjpeg.avi
+
+A(3): Have a dedicated veejay-server machine and connect with reloaded through the network
+
+A(4): Run with a different video codec or lower the video resolution
+
+
+
+KEYS
+----
+
+      [ a,s,d,f,g,h,j,k,l ] : Increase speed 1x,2x,3x,...
+
+ALT + [ a,s,d,f,g,h,j,k,l ] : Decrease speed (1/2,1/4, ...)
+
+KP 6 / ->                   : Play forward
+
+KP 4 / <-                   : Play backward

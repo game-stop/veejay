@@ -5,7 +5,7 @@ Prerequisities ¶
 Required:
 
     * MJPEG Tools
-    * FFmpeg
+    * FFmpeg (libavcodec, libavformat, libavutil, libswscale)
     * libxml2 for saving project data
     * SDL for the video window
     * libdv for playback of DV Video
@@ -20,6 +20,11 @@ Required:
     * Libquicktime for Quicktime]
     * openGL library (gl.h and libGL.so) for the video window
     * Unicap API for more video input devices] 
+    * Video4Linux II
+    * libpthread
+
+Optional:
+    * liblo
 
 You should check with the package manager of your distribution to see if all development packages have been installed, among others this includes:
 
@@ -39,76 +44,80 @@ If you are one of those lucky users with a distribution without any compiler pre
 Preperation ¶
 Configuration ¶
 
+Normally, you can just run 'configure'. If you have cloned the veejay git respository, you will need to run autogen.sh first to produce the configure file.
+
+
+Options
+-------
+
 Before running configure, check if the PKG_CONFIG_PATH variable is setup correctly:
 
  $ echo $PKG_CONFIG_PATH
 
 If echo is silent, you must set the PKG_CONFIG_PATH to point to the directory containing all your .pc files (like for example libdv.pc or jack.pc )
 
- $ find /usr -name libdv.pc
- /usr/local/lib/pkgconfig/libdv.pc
+Configure options:
+------------------
 
- $ export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+ --enable-debug	                 : Builds veejay for debugging purposes (disables optimization)
+ --with-arch-target=<cpu_type>   : Builds veejay for a "generic" or a specific architecture.
+                                   See gcc's 'Intel 386 and AMD x86-64 Options' for -march
+
+Compilation:
+------------
 
 1. Get the sources from Veejay's repository:
 
-  $ svn co svn://dyne.org/veejay/trunk/veejay/current
+  $ git clone git://code.dyne.org/veejay.git veejay
 
 2. Enter the source directory and run autogen.sh
 
-  $ cd veejay-current
+  $ cd veejay/veejay-current
+  $ cd veejay-server
   $ sh autogen.sh
 
 3. Run ./configure
 
   $ ./configure
 
-If you want to disable the graphical interfaces for some reason, use:
-
-  $ ./configure --without-gveejayreloaded --without-gveejay
-
-Building ¶
-
-Type 'make' to build veejay
+4. Type 'make' to build veejay
 
   $ make 
 
-Installing ¶
+5. Installing 
 
   $ sudo make install
 
-or
+6. Continue with building veejay-client and veejay-utils 
 
-  $ su
-  # make install
+  $ cd veejay-client 
+  $ sh autogen.sh
+  $ ./configure
+  $ make && sudo make install
 
-Running veejay ¶
+  $ cd veejay-utils
+  $ sh autogen.sh
+  $ ./configure
+  $ make && sudo make install
+
+
+Running veejay 
+--------------
 
 Test if veejay works:
 
   $ veejay -d -n
 
-To run veejay without accelerated display:
-
-  $ veejay -O5 -d -n
-
-To run veejay in verbose mode:
-
-  $ veejay -O5 -d -n -v
-
-To run veejay with openGL display:
-
-  $ veejay -O4 -d -n
-
 Start another terminal and type:
 
- $ gveejayreloaded
+ $ reloaded
 
 or
 
- $ gveejayreloaded -n
+ $ reloaded -t
 
-Stopping veejay ¶
+Stopping veejay
+---------------
 
 Open another terminal
 
