@@ -699,7 +699,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 
 	for( p = MAX_EFFECTS; p < p_stop; p ++ )
 		vj_effects[p] = plug_get_plugin( (p-MAX_EFFECTS) );
-	veejay_msg(VEEJAY_MSG_INFO, "Found %d effects", p_stop ); 
+
 }
 
 void vj_effect_free(vj_effect *ve) {

@@ -1477,7 +1477,7 @@ void*	deal_with_livido( void *handle, const char *name )
 
 
 
-	veejay_msg(0, "Loading LiVIDO-%d plugin '%s' , %d IP, %d OP" , compiled_as, plugin_name, n_params, n_oparams );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Loading LiVIDO-%d plugin '%s' , %d IP, %d OP" , compiled_as, plugin_name, n_params, n_oparams );
 	
 #ifdef STRICT_CHECKING
 	assert( plugin_name != NULL );

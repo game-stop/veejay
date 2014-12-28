@@ -423,7 +423,6 @@ static	int	scan_plugins()
 
 	int fd = open( path, O_RDONLY );
 	if( fd < 0 ) {
-		veejay_msg(0, "unable to open veejay plugin configuration file : $HOME/.veejay/plugins.cfg");
 		return 0;
 	}
 
@@ -541,8 +540,8 @@ int	plug_sys_detect_plugins(void)
 
 	if(!scan_plugins())
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,
-				"Cannot locate plugins in $HOME/.veejay/plugins.cfg" );
+		veejay_msg(VEEJAY_MSG_WARNING,
+				"No plugins found in $HOME/.veejay/plugins.cfg" );
 		return 0;
 	}
 

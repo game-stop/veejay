@@ -515,8 +515,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->img->width = width;
 		int tc = 2 * task_num_cpus();	
 		tc = ( tc < 8 ? 8: tc );
-		veejay_msg(VEEJAY_MSG_DEBUG,"Allowing %d decoding threads. ", 
-			tc );
+		veejay_msg(VEEJAY_MSG_DEBUG,"Using %d FFmpeg decoder threads", tc );
 		d->context->thread_type = FF_THREAD_FRAME;
 		d->context->thread_count = tc;
 #if LIBAVCODEC_BUILD > 5400
@@ -999,30 +998,24 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 void		vj_el_show_formats(void)
 {
 #ifdef SUPPORT_READ_DV2
-		veejay_msg(VEEJAY_MSG_INFO,
+		veejay_msg(VEEJAY_MSG_DEBUG,
 			"Video containers: AVI (up to 32gb), RAW DV and Quicktime");
 #else
-		veejay_msg(VEEJAY_MSG_INFO,
+		veejay_msg(VEEJAY_MSG_DEBUG,
 			"Video containers: AVI (up to 32gb) and  Quicktime");
 #endif
-		veejay_msg(VEEJAY_MSG_INFO,
+		veejay_msg(VEEJAY_MSG_DEBUG,
 			"Video fourcc (preferred): mjpg, mjpb, mjpa, dv, dvsd,sp5x,dmb1,dvcp,dvhd, yv16,i420");
-		veejay_msg(VEEJAY_MSG_INFO,
+		veejay_msg(VEEJAY_MSG_DEBUG,
 			"Video codecs (preferred): YV16, I420, Motion Jpeg or Digital Video");
-		veejay_msg(VEEJAY_MSG_INFO,
+		veejay_msg(VEEJAY_MSG_DEBUG,
 			"If the video file is made up out of only I-frames (whole images), you can also decode:");
-		veejay_msg(VEEJAY_MSG_INFO,
+		veejay_msg(VEEJAY_MSG_DEBUG,
 			" mpg4,mp4v,svq3,svq1,rpza,hfyu,mp42,mpg43,davc,div3,x264,h264,avc1,m4s2,divx,xvid");
-		veejay_msg(VEEJAY_MSG_INFO,
-			"Use veejay's internal format YV16 to reduce CPU usage");
 		
 #ifdef USE_GDK_PIXBUF
-		veejay_msg(VEEJAY_MSG_INFO,
-			"Image types supported:");
 		vj_picture_display_formats();
 #endif
-
-
 		
 }
 

@@ -2499,7 +2499,7 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 {
 	struct sched_param schp;
 	veejay_memset( &schp, 0, sizeof(schp));
-	schp.sched_priority = sched_get_priority_max( SCHED_FIFO );
+	schp.sched_priority = (int)( sched_get_priority_max( SCHED_FIFO ) * 0.85f);
 
 	if( sched_setscheduler( pid, SCHED_FIFO, &schp ) != 0 )
 	{
@@ -2512,7 +2512,7 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 	else
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Using First-In-First-Out II scheduling for process %d", pid);
-		veejay_msg(VEEJAY_MSG_INFO, "\tPriority is set to %d (RT)", schp.sched_priority );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Priority is set to %d (RT)", schp.sched_priority );
 	}
 }
 #include <bio2jack/bio2jack.h>
@@ -3309,7 +3309,7 @@ int veejay_main(veejay_t * info)
    
 	if( task_num_cpus() > 1 ) {
 		CPU_ZERO( &cpuset );
-		CPU_SET ( 1, &cpuset ); /* run on cpu 1 */
+		CPU_SET ( 0, &cpuset ); /* run on the first cpu */
 
 		int err = pthread_attr_init( &attr );
 		if( err == ENOMEM ) {

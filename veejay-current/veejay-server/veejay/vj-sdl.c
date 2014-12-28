@@ -283,12 +283,14 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Video output driver: SDL");
-	veejay_msg( (info->hw_available ? VEEJAY_MSG_DEBUG : VEEJAY_MSG_WARNING), " hw_surface = %s",
-			(info->hw_available ? "Yes" : "No"));
+	if( info->hw_available == 0 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "(SDL) Hardware surface not available");
+	}
 	veejay_msg(VEEJAY_MSG_DEBUG, " window manager = %s",
-			(info->wm_available ? "Yes" : "No" ));
-	veejay_msg((info->blit_hw ? VEEJAY_MSG_DEBUG : VEEJAY_MSG_WARNING), " BLIT acceleration: %s ",
-			( info->blit_hw ? "Yes" : "No" ) );
+			(info->wm_available ? "Yes" : "No" ));	
+	if( info->blit_hw == 0 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "(SDL) No BLIT acceleration");
+	}
 	veejay_msg(VEEJAY_MSG_DEBUG, " Software surface: %s",
 			( info->blit_sw ? "Yes" : "No" ) );
 	veejay_msg(VEEJAY_MSG_DEBUG, " Preferred depth: %d bits/pixel", info->vfmt->BitsPerPixel);

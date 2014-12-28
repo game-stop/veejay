@@ -600,7 +600,7 @@ static int check_command_line_options(int argc, char *argv[])
 			switch_jpeg )<=0)
        {
 			vj_el_show_formats();
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video file(s), codec/format not supported)");
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video file(s)");
 			nerr++;
        }
 	}

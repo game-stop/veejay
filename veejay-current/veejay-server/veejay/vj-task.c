@@ -60,8 +60,8 @@ static	vj_task_arg_t *vj_task_args[MAX_WORKERS];
 //@ task
 struct task
 {
-    int     task_id;
- 	void	*data;
+	int8_t   task_id;
+	void	*data;
 	performer_job_routine handler;
 	struct  task    *next;
 };
@@ -74,7 +74,7 @@ typedef struct {
 
 //@ no dynamic, static allocation here.
 static int	total_tasks_	=	0;
-static int tasks_done[MAX_WORKERS];
+static uint8_t tasks_done[MAX_WORKERS];
 static int tasks_todo = 0;
 static int exitFlag = 0;
 static pthread_mutex_t	queue_mutex;
@@ -91,6 +91,8 @@ static int	 thr_id[MAX_WORKERS];
 static	pjob_t *job_list[MAX_WORKERS];
 static int	n_cpu = 1;
 
+static struct task running_tasks[MAX_WORKERS];
+
 #define __lock() pthread_mutex_lock(&queue_mutex)
 #define __unlock() pthread_mutex_unlock(&queue_mutex)
 
@@ -99,37 +101,31 @@ int	task_get_workers()
 	return numThreads;
 }
 
-static void	task_add(int task_no, performer_job_routine fp , void *data)
+static void	task_add(uint8_t task_no, performer_job_routine fp , void *data)
 {
-	struct	task	*enqueue_task = (struct task*) malloc( sizeof(struct task));
-	if(!enqueue_task) {
-		veejay_msg(0,"Failed to allocate memory for threaded task!");
-		return;
-	}
+	struct task *enqueue_task = &(running_tasks[task_no]);
 
-	enqueue_task->task_id	=	task_no;
+	enqueue_task->task_id 	=	task_no;
 	enqueue_task->handler	=	fp;
-	enqueue_task->data		= 	data;
-	enqueue_task->next		= 	NULL;
+	enqueue_task->data	= 	data;
+	enqueue_task->next	= 	NULL;
 
 	if( total_tasks_ == 0 ) {
-		tasks_				=	enqueue_task;
-		tail_task_			=	tasks_;
+		tasks_		=	enqueue_task;
+		tail_task_	=	tasks_;
 	}
 	else {
-		tail_task_->next	=	enqueue_task;
-		tail_task_			=	enqueue_task;
+		tail_task_->next=	enqueue_task;
+		tail_task_	=	enqueue_task;
 	}
 
 	total_tasks_ ++;
 
 	pthread_cond_signal( &current_task );
-		
 }
 
 struct	task	*task_get()
 {
-//	__lock();
 	struct task *t = NULL;
 	if( total_tasks_ > 0  ) {
 		t 		=	tasks_;
@@ -141,7 +137,6 @@ struct	task	*task_get()
 
 		total_tasks_ --;
 	}
-//	__unlock();
 	return t;
 }
 
@@ -177,14 +172,9 @@ void		*task_thread(void *data)
 		t = task_get();
 		__unlock();
 	
-
-	//	__lock();
-//		t = task_get();
-//		__unlock();
-	
 		if( t ) {
 			task_run( t, t->data, id );
-			free(t);
+			//free(t);
 			t = NULL;
 		}
 	}
@@ -215,6 +205,7 @@ void		task_init()
 		memset( vj_task_args[i], 0, sizeof(vj_task_arg_t));
 		p_thread_args[i] = malloc( sizeof(int) );
 		memset( p_thread_args[i], 0, sizeof(int));
+		memset( &(running_tasks[i]), 0, sizeof(struct task));
 	}
 
 	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
@@ -263,16 +254,22 @@ int		task_start(int max_workers)
 	for( i = 0 ; i < max_workers; i ++ ) {
 		thr_id[i]	= i;
 		pthread_attr_init( &p_attr[i] );
-		pthread_attr_setstacksize( &p_attr[i], 256 * 1024 );
+//		pthread_attr_setstacksize( &p_attr[i], 256 * 1024 );
 		pthread_attr_setinheritsched( &p_attr[i], PTHREAD_EXPLICIT_SCHED );
 		pthread_attr_setschedpolicy( &p_attr[i], SCHED_FIFO );
 		pthread_attr_setschedparam( &p_attr[i], &param );
 
 		if( n_cpu > 1 ) {
+			int selected_cpu = ((i+1)%n_cpu);
 			CPU_ZERO(&cpuset);
-			CPU_SET( ((i+1) % n_cpu ), &cpuset );
+			CPU_SET( selected_cpu, &cpuset );
+			
 			if(pthread_attr_setaffinity_np( &p_attr[i], sizeof(cpuset), &cpuset ) != 0 )
 				veejay_msg(0,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
+			else
+				veejay_msg(VEEJAY_MSG_DEBUG, "Task thread %d has CPU affinity %d",
+					i, selected_cpu ); 
+			
 		}
 
 		*p_thread_args[i] = i;
@@ -322,7 +319,7 @@ void		task_stop(int max_workers)
 
 void	performer_job( int n )
 {
-	int i;
+	uint8_t i;
 	__lock();
 	tasks_todo = n;
 	veejay_memset( tasks_done, 0, sizeof(tasks_done));
@@ -338,7 +335,7 @@ void	performer_job( int n )
 
 	while(!stop) {
 		__lock();
-		int done = 0;
+		uint8_t done = 0;
 		for( i = 0 ; i < tasks_todo; i ++ ) {
 			done += tasks_done[i];
 		}

@@ -303,13 +303,14 @@ static	void display_if_writeable( gpointer a, gpointer b )
 	if( gdk_pixbuf_format_is_writable( data ))
 		*list = g_slist_prepend( *list, data );
 	gchar *name = gdk_pixbuf_format_get_name( data );
+	veejay_msg( VEEJAY_MSG_DEBUG, "\t%s", name);
 	if( name ) g_free(name);
 } 
 void	vj_picture_display_formats()
 {
 	GSList *f = gdk_pixbuf_get_formats();
 	GSList *res = NULL;
-
+	veejay_msg(VEEJAY_MSG_DEBUG, "List of supported image formats:");
 	g_slist_foreach( f, display_if_writeable, &res);
 
 	g_slist_free( f );
@@ -341,7 +342,6 @@ void	vj_picture_init( void *templ )
 		// cool stuff
 #ifdef USE_GDK_PIXBUF
 		g_type_init();
-		veejay_msg(VEEJAY_MSG_DEBUG, "Using gdk pixbuf %s", gdk_pixbuf_version );
 #endif
 		__initialized = 1;
 	}
