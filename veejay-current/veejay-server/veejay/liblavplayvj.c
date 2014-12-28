@@ -1502,13 +1502,13 @@ void	veejay_check_homedir(void *arg)
 	struct statfs ts;
 	if( statfs( tmp, &ts ) != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING,"\tNo plugins.cfg found (see DOC/HowtoPlugins)");
+		veejay_msg(VEEJAY_MSG_WARNING,"No plugins.cfg found (see DOC/HowtoPlugins)");
 	}
 	sprintf(tmp, "%s/viewport.cfg", path);
 	memset( &ts,0,sizeof(struct statfs));
 	if( statfs( tmp, &ts ) != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING,"\tNo viewport.cfg found (start veejay with -D -w -h and press CTRL-V to setup viewport)");
+		veejay_msg(VEEJAY_MSG_WARNING,"No viewport.cfg found (start veejay with -D -w -h and press CTRL-V to setup viewport)");
 	}
 
 }
@@ -2142,7 +2142,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	veejay_msg(VEEJAY_MSG_DEBUG, "               %d x %d (h=%d,v=%d)",
 			info->effect_frame1->uv_width,info->effect_frame1->uv_height,
 			info->effect_frame1->shift_v, info->effect_frame1->shift_h );
-	veejay_msg(VEEJAY_MSG_DEBUG, "		     Y=%d bytes, UV=%d bytes",
+	veejay_msg(VEEJAY_MSG_DEBUG, "               Y=%d bytes, UV=%d bytes",
 			info->effect_frame1->len,
 			info->effect_frame1->uv_len );
 	

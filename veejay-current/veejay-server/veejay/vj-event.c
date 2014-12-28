@@ -8296,13 +8296,13 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 	    		}
 		}
     	}
-
-	//vj_el_print( sample_get_editlist( id ) );
-
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		"Sample has EDL %p, Plain at %p", sample_get_editlist( id ), v->current_edit_list );
-
 	veejay_msg(VEEJAY_MSG_PRINT, "\n");
+
+	if(  sample_get_editlist(id) == v->current_edit_list ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sample is using EDL from plain video");
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sample is using its own EDL");
+	}
 
 }
 

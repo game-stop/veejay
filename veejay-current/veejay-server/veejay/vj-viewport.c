@@ -1444,8 +1444,8 @@ static	void	*viewport_init_swscaler(ui_t *u, int w, int h)
 	void *scaler = yuv_init_swscaler( srci,dsti,&t,yuv_sws_get_cpu_flags());
 
 	veejay_msg(VEEJAY_MSG_INFO,
-			"Scaling from %dx%d to %dx%d with a scale of %f",
-			w,h,u->sw,u->sh,u->scale );
+			"Scaling from %dx%d to %dx%d",
+			w,h,u->sw,u->sh);
 
 	free(srci);	
 	free(dsti);

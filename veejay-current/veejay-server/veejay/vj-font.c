@@ -1094,7 +1094,7 @@ static int	find_fonts(vj_font_t *ec, char *path)
 
 	if(n < 0)
 	{
-		veejay_msg(0, "Error reading %s: %s", path, strerror(errno));
+		veejay_msg(VEEJAY_MSG_DEBUG, "Error reading %s: %s", path, strerror(errno));
 		return 0;
 	}
 	while( n -- )
@@ -1628,7 +1628,7 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 		} 
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Loaded %d TrueType fonts", f->font_index );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Loaded %d TrueType fonts", f->font_index );
 
 	qsort( f->font_table, f->font_index, sizeof(char*), compare_strings );
 	qsort( f->font_list,  f->font_index, sizeof(char*), compare_strings );

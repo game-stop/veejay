@@ -1191,8 +1191,8 @@ static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, 
 		s->width = src->width;
 		s->height = src->height;
 		s->format = src->format;
-		veejay_msg(VEEJAY_MSG_DEBUG, "sws new context: %dx%d in %d -> %dx%d in %d",
-			src->width,src->height,src->format, dst->width,dst->height,dst->format );
+//		veejay_msg(VEEJAY_MSG_DEBUG, "sws new context: %dx%d in %d -> %dx%d in %d",
+//			src->width,src->height,src->format, dst->width,dst->height,dst->format );
 	}
 
 	if( s->sws == NULL )

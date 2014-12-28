@@ -1635,10 +1635,11 @@ int	find_best_threaded_memcpy(int w, int h)
 	memset( src, 0, sizeof(uint8_t) * w * h * 4 );
 	memset( dst, 0, sizeof(uint8_t) * w * h * 4 );
 
-	long c = 100;
+	long c = 1000;
 	
 	long k;
 	unsigned long long stats[c];
+	unsigned long long sstats[c];
 
 	task_init();
 
@@ -1666,13 +1667,16 @@ int	find_best_threaded_memcpy(int w, int h)
 			return -1;
 		}
 	
-		veejay_msg(VEEJAY_MSG_DEBUG, "Testing your settings ..."); 
 		if( num_tasks > 1 )
 		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Testing your system ...");
+
 			if( task_start( num_tasks ) != num_tasks ) {
 				veejay_msg(0,"Failed to launch %d threads ?!", num_tasks);
+				veejay_msg(0,"Please set env VEEJAY_MULTITHREAD_TASKS=0");
 				return -1;
 			}	
+
 
 			for( k = 0; k < c; k ++ )	
 			{
@@ -1682,20 +1686,36 @@ int	find_best_threaded_memcpy(int w, int h)
 				stats[k] = t;
 			}
 		
-			int sum = 0;
+			int sum = 0,j;
 			for( k = 0; k < c ;k ++ )
 				sum += stats[k];
 
 			unsigned long long best_time = (sum / c );
-			veejay_msg(VEEJAY_MSG_DEBUG, "Timing results for copying %2.2f MB data with %d thread(s): %lld",
-				(c * (w*h) *4) /1048576.0f, num_tasks, best_time);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Timing results for copying %2.2f MB data with %d thread(s): %2.2f ms",
+				(c * (w*h) *4) /1048576.0f, num_tasks, (float) best_time*0.1f);
 		
 			task_stop( num_tasks );
 
-			veejay_msg( VEEJAY_MSG_INFO, "Threadpool is %d threads.", num_tasks );	
+			for( k = 0; k < c; k ++ ) {
+				unsigned long long t = rdtsc();
+				for( j = 0; j < 4; j ++ ) {
+					veejay_memcpy( dest[j], source[j], planes[j] );
+				}
+				t = rdtsc() - t;
+				sstats[k] = t;
+			}
+
+			int ssum = 0;
+			for( k = 0; k < c; k ++ ) 
+				ssum += sstats[k];
+
+			unsigned long long best_single_time = (ssum/c);
+
+			veejay_msg(VEEJAY_MSG_DEBUG, "Timing results for copying %2.2f MB data with no multithreading: %2.2f ms",
+				(c * (w*h) *4) /1048576.0f, (float) best_single_time*0.1f);
 		}
 		else {
-			veejay_msg( VEEJAY_MSG_WARNING, "Not multithreading pixel operations.");
+			veejay_msg( VEEJAY_MSG_DEBUG, "Not multithreading pixel operations (VEEJAY_MULTITHREAD_TASKS=%d)", num_tasks);
 		}
 	}
 	
