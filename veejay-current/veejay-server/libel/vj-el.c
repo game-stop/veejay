@@ -247,6 +247,11 @@ static const    char    *el_pixfmt_str(int i)
         return pixfmtstr[0].s;
 }
 
+void	vj_el_set_mmap_size( int size )
+{
+	mmap_size = size;
+}
+
 void	free_av_packet( AVPacket *pkt )
 {
 	if( pkt ) {
@@ -439,20 +444,17 @@ void	vj_el_set_caching(int status)
 	never_cache_ = status;
 }
 
-//@ iterateovers over sample fx chain
 void	vj_el_setup_cache( editlist *el )
 {
-//@ FIXME: user setting to prevent cache setup!
 	if(!el->cache && !never_cache_)
 	{
 		int n_slots = mem_chunk_ / el->max_frame_size;
-//		if( n_slots < (el->video_frames - 1) )
-		if( n_slots < el->total_frames )
+		if( el->total_frames > n_slots)
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Not caching this EDL to memory (Cachesize too small)");
 			veejay_msg(VEEJAY_MSG_DEBUG, "try increasing cache size with -m commandline parameter");
 		}
-		else if( el->max_frame_size > 1024 )
+		else
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "EditList caches at most %d slots (chunk=%d, framesize=%d)", n_slots, mem_chunk_, el->max_frame_size ); 
 			el->cache = init_cache( n_slots );
@@ -2516,13 +2518,6 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 	return 1;
 }
 
-void	vj_el_frame_cache(int n )
-{
-	if(n > 1  || n < 1000)
-	{
-		mmap_size = n;
-	}
-}
 
 editlist	*vj_el_soft_clone(editlist *el)
 {

@@ -90,6 +90,7 @@ void	vj_el_init_chunk(int n);
 
 int	vj_el_is_dv(editlist *el);
 
+void	vj_el_set_mmap_size( int size );
 
 void	vj_el_free(editlist *el);
 

@@ -1920,8 +1920,8 @@ int AVI_close(avi_t *AVI)
 
    /* Even if there happened an error, we first clean up */
    if( AVI->mmap_region )
-	   mmap_free( AVI->mmap_region );
-   
+	  mmap_free( AVI->mmap_region );
+
    if (AVI->comment_fd>0)
        close(AVI->comment_fd);
    AVI->comment_fd = -1;
@@ -2104,8 +2104,22 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
 
   if (AVI_errno)
       return AVI=NULL;
-  else
-      return AVI;
+  
+ 
+  
+  if(!AVI_errno && mmap_size > 0)
+  {
+	long file_size = (long)lseek( AVI->fdes, 0, SEEK_END );
+	lseek( AVI->fdes, AVI->movi_start, SEEK_SET );
+	AVI->mmap_size = AVI->width * AVI->height * mmap_size;
+	if(AVI->mmap_size > 0 )
+	{
+		AVI->mmap_region =
+			mmap_file( AVI->fdes,0,AVI->mmap_size,file_size );
+	}
+  }
+
+	return AVI;
 }
 
 avi_t *AVI_open_fd(int fd, int getIndex, int mmap_size)

@@ -173,8 +173,6 @@ static void Usage(char *progname)
 	fprintf(stderr,
 			"  -T/--multicast-vims \t\tmulticast VIMS\n");
 	
-	fprintf(stderr,
-			"     --map-from-file <num>\tmap N frames to memory\n");
  	fprintf(stderr,
 			"  -m/--memory <num>\t\tMaximum memory to use for cache (0=disable, default=0 max=100)\n");  
 	fprintf(stderr,
@@ -397,9 +395,6 @@ static int set_option(const char *name, char *value)
 	veejay_strncpy(info->action_file[1],(char*) optarg, strlen( (char*) optarg));
 	info->load_action_file = 1;
 	}
-	else if(strcmp(name,"map-from-file") == 0 ) {
-		info->seek_cache = atoi(optarg);
-	}
 	else if (strcmp(name, "geometry-x") == 0 || strcmp(name, "x")==0) {
 		default_geometry_x = atoi(optarg);
 	}
@@ -529,7 +524,6 @@ static int check_command_line_options(int argc, char *argv[])
 	{"yuv",1,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
-	{"map-from-file",1,0,0},
 	{"composite",0,0,0},
 	{"quit",0,0,0},
 	{"memory",1,0,0},

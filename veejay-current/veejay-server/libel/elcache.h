@@ -25,6 +25,6 @@ void	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int
 void	free_cache(void *cache);
 void	*init_cache( unsigned int n_slots );
 void  reset_cache(void *cache);
-int   cache_avail_mb(); 
+long   cache_avail_mb(); 
 
 #endif

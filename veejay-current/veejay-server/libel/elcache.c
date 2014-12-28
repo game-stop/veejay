@@ -147,7 +147,7 @@ void	reset_cache(void *cache)
 	}
 }
 
-int	cache_avail_mb()
+long	cache_avail_mb()
 {
 	return ( total_mem_used_ == 0 ? 0 : total_mem_used_ / (1024 * 1024 ));
 }

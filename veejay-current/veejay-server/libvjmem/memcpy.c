@@ -1278,9 +1278,9 @@ static struct {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
      { "linux kernel memcpy()",     linux_kernel_memcpy, 0},
 #endif
-#ifdef HAVE_ASM_AVX
-     { "AVX optimized memcpy()", avx_memcpy, 0 },
-#endif
+//#ifdef HAVE_ASM_AVX
+//     { "AVX optimized memcpy()", avx_memcpy, 0 },
+//#endif
 #ifdef HAVE_ASM_MMX
      { "MMX optimized memcpy()", mmx_memcpy, 0 },
 #endif

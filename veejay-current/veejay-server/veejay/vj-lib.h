@@ -325,7 +325,6 @@ typedef struct {
     int no_bezerk;
     int pixel_format;
 	dummy_t *dummy;
-	int seek_cache;
 	int bes_width;
 	int bes_height;
 	char *status_what;

@@ -2516,7 +2516,6 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 	}
 }
 #include <bio2jack/bio2jack.h>
-void breaker() {} 
 /******************************************************
  * veejay_playback_cycle()
  *   the playback cycle
@@ -3001,7 +3000,7 @@ int vj_server_setup(veejay_t * info)
  ******************************************************/
 int	prepare_cache_line(int perc, int n_slots)
 {
-	int total = 0; 
+	long total = 0; 
 	char line[128];
 	FILE *file = fopen( "/proc/meminfo","r");
 	if(!file)
@@ -3019,27 +3018,46 @@ int	prepare_cache_line(int perc, int n_slots)
 	fclose( file );
 	sscanf( line, "%*s %i %i %i %i", &total,&avail,&buffer,&cache );
 */
-	double p = (double) perc * 0.01;
+	double p = (double) perc * 0.01f;
 	int max_memory = (p * total);
+	int mmap_memory = (int) (0.01f * (float) total);
+
+	char *user_defined_mmap = getenv( "VEEJAY_MMAP_PER_FILE" );
+	if( user_defined_mmap ) {
+		max_memory = atoi( user_defined_mmap ) * 1024;
+		veejay_msg(VEEJAY_MSG_DEBUG, "User-defined %2.2f Mb mmap size per AVI file",
+			 (float) (max_memory / 1024.0f));
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "You can define mmap size per AVI file with VEEJAY_MMAP_PER_FILE=Kb");
+	}
+
+	max_memory -= mmap_memory;
+
 	if( n_slots <= 0)
 	 n_slots = 1;
 
-	int chunk_size = (max_memory <= 0 ? 0: max_memory / n_slots ); 
+	int chunk_size = (int) (max_memory <= 0 ? 0: max_memory / n_slots ); 
 
 	chunk_size_ = chunk_size;
 	n_cache_slots_ = n_slots;
+
+	vj_el_set_mmap_size( mmap_memory );	
 
 	total_mem_mb_ = total / 1024;
 	if(chunk_size > 0 )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "%d Kb total system RAM , Consuming up to %2.2f Mb",
-				total, (float)max_memory / 1024.0 );
+				total, (float)max_memory / 1024.0f );
 		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Kb (%2.2f Mb) per sample",
 				chunk_size, (float) chunk_size/1024.0);
 		vj_el_init_chunk( chunk_size );
 	}
-	else
+	else {
 		veejay_msg(VEEJAY_MSG_INFO, "Memory cache disabled");
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "Memory map size per EDL is %2.2f Mb",
+				(float) mmap_memory / 1024.0f);
+
 
 	return 1;
 }
@@ -3893,7 +3911,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-	vj_el_frame_cache(info->seek_cache );
 
 	if(num_files<=0 || files == NULL)
 	{
