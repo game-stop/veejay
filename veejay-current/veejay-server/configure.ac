@@ -471,15 +471,15 @@ then
 		have_asm_mmx2=true
 	fi
 
-	ac_cv_flag_avx=yes
-	AC_MSG_CHECKING([for AVX assembler])
-	AC_COMPILE_IFELSE(
-		[AC_LANG_PROGRAM([[]], 
-			[[asm("vmovaps %ymm1,%ymm0");]])],
-				[AC_DEFINE(HAVE_ASM_AVX,1,[define if compiler supports avx inline assembler])
-					AC_MSG_RESULT(yes)
-					ac_cv_flag_avx=no
-				],[AC_MSG_RESULT(no)])
+dnl	ac_cv_flag_avx=yes
+dnl	AC_MSG_CHECKING([for AVX assembler])
+dnl	AC_COMPILE_IFELSE(
+dnl		[AC_LANG_PROGRAM([[]], 
+dnl			[[asm("vmovaps %ymm1,%ymm0");]])],
+dnl				[AC_DEFINE(HAVE_ASM_AVX,1,[define if compiler supports avx inline assembler])
+dnl					AC_MSG_RESULT(yes)
+dnl					ac_cv_flag_avx=no
+dnl				],[AC_MSG_RESULT(no)])
 
 fi
 
