@@ -507,7 +507,6 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 		}
 	}
 #else
-
 	const int mmx_stride = stride >> 3;
 	int left = (mmx_stride % 16);
 	for( y = height -1 ; y > 0; y -- ) {
@@ -516,11 +515,6 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 		unsigned int x1 = 0,x2=0;	
 		for( x = 0; x < stride; x += 16, x1 += 32 ) {
 			subsample_up_1x16to1x32( &src[x], &dst[x1] );
-		}
-		for(x2=0; x2 < left; x2++) // for 1 row
-		{
-			dst[x2 + x + 0] = src[x1 + x2]; //put to dst
-			dst[x2 + x + 1] = src[x1 + x2];
 		}
 	}
 	_EMMS
@@ -552,11 +546,6 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 		unsigned int x1 = 0,x2=0;	
 		for( x = 0; x < stride; x += 16, x1 += 32 ) {
 			subsample_up_1x16to1x32(&src[x], &dst[x1] );
-		}
-		for(x2=0; x2 < left; x2++) // for 1 row
-		{
-			dst[x2 + x + 0] = src[x1 + x2]; //put to dst
-			dst[x2 + x + 1] = src[x1 + x2];
 		}
 	}
 	_EMMS
