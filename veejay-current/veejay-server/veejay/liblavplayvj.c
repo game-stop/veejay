@@ -3020,7 +3020,7 @@ int	prepare_cache_line(int perc, int n_slots)
 */
 	double p = (double) perc * 0.01f;
 	int max_memory = (p * total);
-	int mmap_memory = (int) (0.01f * (float) total);
+	int mmap_memory = (int) (0.005f * (float) total);
 
 	char *user_defined_mmap = getenv( "VEEJAY_MMAP_PER_FILE" );
 	if( user_defined_mmap ) {
