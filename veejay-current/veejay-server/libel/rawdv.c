@@ -81,7 +81,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	{
 		dv_decoder_free(decoder); 
 		rawdv_free(dv);
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot open '%s'",filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open file '%s'",filename);
 		if(tmp)free(tmp);
 		return NULL;
 	}
@@ -90,7 +90,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	if( file_size < DV_HEADER_SIZE)
 	{
 		dv_decoder_free(decoder);
-		veejay_msg(VEEJAY_MSG_ERROR, "% is too small! ", filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "File %s is not a DV file", filename);
 		rawdv_free(dv);
 		if(tmp) free(tmp);
 		return NULL;
@@ -99,7 +99,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	if( lseek(dv->fd,0, SEEK_SET ) < 0)
 	{
 		dv_decoder_free(decoder);
-		veejay_msg(VEEJAY_MSG_ERROR, "Seek errror");
+		veejay_msg(VEEJAY_MSG_ERROR, "Seek error in %s", filename);
 		rawdv_free(dv);
 		if(tmp) free(tmp);
 		return NULL;
@@ -115,7 +115,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	if( dv->mmap_region == NULL )
 	{
 		if(mmap_size>0)
-			veejay_msg(VEEJAY_MSG_DEBUG, "Mmap failed - fallback to read");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Mmap of DV file failed - fallback to read");
 		n = read( dv->fd, tmp, DV_HEADER_SIZE );
 	}
 	else
@@ -137,7 +137,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 		dv_decoder_free( decoder );
 		rawdv_free(dv);
 		if(tmp) free(tmp);
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot parse header");
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot parse header of file %s", filename);
 		return NULL;
 	}
 /*	if(decoder->sampling == e_dv_sample_411)

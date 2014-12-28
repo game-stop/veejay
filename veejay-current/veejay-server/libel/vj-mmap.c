@@ -99,7 +99,7 @@ int	remap_file( mmap_region_t *map, int offset )
 	map->map_start = mmap( 0, real_length, PROT_READ, MAP_SHARED, map->fd, real_offset );
 	if( map->map_start == MAP_FAILED)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "mmap error %s", strerror(errno));
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to map memory: %s", strerror(errno));
 		return 0;
 	}
 
@@ -119,7 +119,7 @@ int	munmap_file( mmap_region_t *map )
 	int n = munmap( map->map_start, map->map_length );
 	if(n==-1)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "leaving garbage %s",
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to unmap memory: %s",
 			strerror(errno));
 	}
 	map->map_start = NULL;

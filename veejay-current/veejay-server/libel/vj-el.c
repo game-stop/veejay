@@ -452,7 +452,7 @@ void	vj_el_setup_cache( editlist *el )
 		if( el->total_frames > n_slots)
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Not caching this EDL to memory (Cachesize too small)");
-			veejay_msg(VEEJAY_MSG_DEBUG, "try increasing cache size with -m commandline parameter");
+			veejay_msg(VEEJAY_MSG_DEBUG, "You can increase the cache size with the -m commandline parameter");
 		}
 		else
 		{
@@ -922,7 +922,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	if(!compr_type)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get codec information from lav file");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to read codec information from file");
 		if(el->lav_fd[n])
 		 lav_close( el->lav_fd[n] );
 		el->lav_fd[n] = NULL;
@@ -1196,7 +1196,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	{
 		if( d == NULL )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Codec not initlaized");
+			veejay_msg(VEEJAY_MSG_ERROR, "Codec %x was not initialized", decoder_id);
 			return -1;
 		}
 		if(lav_filetype( el->lav_fd[N_EL_FILE(n)] ) != 'x')
@@ -1701,22 +1701,16 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 		return 1;
 	}
 
-    	if (!el->has_audio)
+    if (!el->has_audio)
 		return 0;
-    	if (nframe < 0)
+    
+	if (nframe < 0)
 		nframe = 0;
 
 	if (nframe >= el->video_frames)
 		nframe = el->video_frames-1;
 
-
     n = el->frame_list[nframe];
-
-    /*if( lav_is_DV( el->lav_fd[N_EL_FILE(n)] ) )
-    {
-	lav_set_video_position( el->lav_fd[N_EL_FILE(n)] , nframe );
-	return lav_read_audio( el->lav_fd[N_EL_FILE(n)], dst, 0  );
-    }*/
 
     ns1 = (double) (N_EL_FRAME(n) + 1) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
@@ -1728,12 +1722,16 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 	    veejay_msg(0,"Unable to seek to frame position %ld", ns0);
 		return -1;
 	}
-    //mlt need int16_t
-    ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
-    if (ret < 0)
- 	return -1;
-    return (ns1 - ns0);
 
+    ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
+    if (ret < 0) {
+	    veejay_msg(0, "Error reading audio data at frame position %ld", ns0);
+		int ns = el->audio_rate / el->video_fps;
+		veejay_memset( dst, 0, sizeof(uint8_t) * ns * el->audio_bps );
+		return 1;
+	}
+    
+	return (ns1 - ns0);
 }
 
 int	vj_el_init_420_frame(editlist *el, VJFrame *frame)
@@ -1951,7 +1949,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 				{
 					if (el->video_norm == 'n')
 					{
-					    	veejay_msg(VEEJAY_MSG_WARNING,"Norm allready set to NTSC, ignoring new norm PAL");
+					    	veejay_msg(VEEJAY_MSG_WARNING,"Norm already set to NTSC, ignoring new norm PAL");
 					}
 					else
 						el->video_norm = 'p';

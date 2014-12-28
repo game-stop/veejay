@@ -120,7 +120,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 	{
 		if(!is_dv_resolution(el->video_width, el->video_height ))
 		{	
-			veejay_msg(VEEJAY_MSG_ERROR,"\tVideo dimensions do not match required resolution");
+			veejay_msg(VEEJAY_MSG_ERROR,"\tSource video is not in DV resolution");
 			return NULL;
 		}
 		else
@@ -174,7 +174,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 			if(!e->codec)
 			{
 			 char *descr = vj_avcodec_get_codec_name(id);
-			 veejay_msg(VEEJAY_MSG_ERROR, "Cannot find Encoder codec %s", 	descr );
+			 veejay_msg(VEEJAY_MSG_ERROR, "Unable to find encoder '%s'", 	descr );
 			 free(descr);
 			}
 #ifdef __FALLBACK_LIBDV
@@ -227,7 +227,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 		if ( avcodec_open( e->context, e->codec ) < 0 )
 #endif
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot open codec '%s'" , descr );
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open codec '%s'" , descr );
 			if(e->context) free(e->context);
 			if(e) free(e);
 			if(descr) free(descr);
@@ -235,7 +235,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened encoder %s", descr );
+			veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened codec %s", descr );
 			free(descr);
 		}
 #ifdef __FALLBACK_LIBDV
@@ -267,27 +267,6 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 			break;
 		}
 
-
-/*
-	if( el->has_audio )
-	{
-		e->audiocodec = avcodec_find_encoder( CODEC_ID_PCM_U8 );
-		if(!e->audiocodec)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error initializing audio codec");
-			if(e) free(e);
-		}
-		e->context->sample_rate = el->audio_rate;
-		e->context->channels	= el->audio_chans;
-		if( avcodec_open( e->context, e->audiocodec ) < 0)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot open audio context");
-			if(e) free(e);
-			return NULL;
-		}
-
-	}
-*/
 	return e;
 }
 void		vj_avcodec_close_encoder( vj_encoder *av )
@@ -310,6 +289,9 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 #endif
 		if(av->y4m)
 			vj_yuv4mpeg_free( (vj_yuv*) av->y4m );
+		if(av->frame)
+			avcodec_free_frame(av->frame);
+
 		free(av);
 	}
 	av = NULL;
@@ -662,11 +644,3 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	return avcodec_encode_video( av->context, buf, buf_len, &pict );
 }
 
-int		vj_avcodec_encode_audio( void *encoder, int format, uint8_t *src, uint8_t *dst, int len, int nsamples )
-{
-	if(format == ENCODER_YUV420 || ENCODER_YUV422 == format)
-		return 0;
-	vj_encoder *av = encoder;
-	int ret = avcodec_encode_audio( av->context, dst, len, (const short*) src );
-	return ret;
-}

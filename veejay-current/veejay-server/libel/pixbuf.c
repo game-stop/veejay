@@ -359,7 +359,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 
 	if(!img_)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cant allocate buffer for RGB");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate buffer for RGB");
 		return 0;
 	}
 	
