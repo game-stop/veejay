@@ -1483,12 +1483,45 @@ static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 
 static inline void vj_frame_slow1( const uint8_t *a, const uint8_t *b, uint8_t *dst, const int len, const float frac )
 {
+#ifndef HAVE_ASM_MMX
 	int i;
 	for( i = 0; i < len; i ++  ) {
 		dst[i] = a[i] + ( frac * ( b[i] - a[i] ) ); 
 	}
+#else
+	uint32_t ialpha = (256 * frac);
+        unsigned int i;
 
+        ialpha |= ialpha << 16;
+
+        __asm __volatile
+                ("\n\t pxor %%mm6, %%mm6"
+                 ::);
+
+        for (i = 0; i < len; i += 4) {
+                __asm __volatile
+                        ("\n\t movd %[alpha], %%mm3"
+                         "\n\t movd %[src2], %%mm0"
+                         "\n\t psllq $32, %%mm3"
+                         "\n\t movd %[alpha], %%mm2"
+                         "\n\t movd %[src1], %%mm1"
+                         "\n\t por %%mm3, %%mm2"
+                         "\n\t punpcklbw %%mm6, %%mm0"  
+                         "\n\t punpcklbw %%mm6, %%mm1"  
+                         "\n\t psubsw %%mm1, %%mm0"     
+                         "\n\t pmullw %%mm2, %%mm0"     
+                         "\n\t psrlw $8, %%mm0"        
+                         "\n\t paddb %%mm1, %%mm0"     
+                         "\n\t packuswb %%mm0, %%mm0"
+                         "\n\t movd %%mm0, %[dest]"
+                         : [dest] "=m" (*(dst + i))
+                         : [src1] "m" (*(a + i))
+                         , [src2] "m" (*(b + i))
+                         , [alpha] "m" (ialpha));
+        }
+#endif
 }
+
 #define ALIGN 8
 static void	vj_frame_slow_job( void *arg )
 {
