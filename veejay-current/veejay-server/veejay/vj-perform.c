@@ -3650,6 +3650,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 		// allow to queue from
 		info->settings->feedback_stage = 2;
 	}
+
 	return res;
 }
 

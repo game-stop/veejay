@@ -1500,11 +1500,11 @@ static inline void vj_frame_slow1( const uint8_t *a, const uint8_t *b, uint8_t *
 
         for (i = 0; i < len; i += 4) {
                 __asm __volatile
-                        ("\n\t movd %[alpha], %%mm3"
-                         "\n\t movd %[src2], %%mm0"
+                        ("\n\t movq %[alpha], %%mm3"
+                         "\n\t movq %[src2], %%mm0"
                          "\n\t psllq $32, %%mm3"
-                         "\n\t movd %[alpha], %%mm2"
-                         "\n\t movd %[src1], %%mm1"
+                         "\n\t movq %[alpha], %%mm2"
+                         "\n\t movq %[src1], %%mm1"
                          "\n\t por %%mm3, %%mm2"
                          "\n\t punpcklbw %%mm6, %%mm0"  
                          "\n\t punpcklbw %%mm6, %%mm1"  
@@ -1512,8 +1512,8 @@ static inline void vj_frame_slow1( const uint8_t *a, const uint8_t *b, uint8_t *
                          "\n\t pmullw %%mm2, %%mm0"     
                          "\n\t psrlw $8, %%mm0"        
                          "\n\t paddb %%mm1, %%mm0"     
-                         "\n\t packuswb %%mm0, %%mm0"
-                         "\n\t movd %%mm0, %[dest]"
+                         "\n\t packuswb %%mm0, %%mm0\n\t"
+			 MOVNTQ"        %%mm0, %[dest]\n\t"
                          : [dest] "=m" (*(dst + i))
                          : [src1] "m" (*(a + i))
                          , [src2] "m" (*(b + i))

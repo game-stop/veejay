@@ -21,8 +21,6 @@
 #ifndef SUBSAMPLE_MMX
 #define SUBSAMPLE_MMX
 
-#define _EMMS __asm__ __volatile__ ( "emms":::"memory");
-
 /*
  
  down sampling is done by dropping every 2nd pixel:
@@ -65,7 +63,7 @@ static	inline	void	subsample_down_1x16to1x8( uint8_t *out, const uint8_t *in )
 		"packuswb	%%mm3,%%mm5\n\t"
 		"psrlq		$32, %%mm2\n\t"
 		"por		%%mm5,%%mm2\n\t"
-		"movq		%%mm2, (%1)\n\t"
+		MOVNTQ"		%%mm2, (%1)\n\t"
 		:: "r" (in), "r" (out)
 	);
 }
@@ -88,14 +86,14 @@ static inline void 	subsample_down_1x32to1x16( uint8_t *out, const uint8_t *in )
 		"packuswb	%%mm2,%%mm5\n\t"
 		"psrlq		$32,%%mm3\n\t"
 		"por		%%mm5,%%mm3\n\t"
-		"movq		%%mm3, (%1)\n\t"
+		MOVNTQ"		%%mm3, (%1)\n\t"
 
 		"pxor		%%mm5,%%mm5\n\t"
 		"packuswb	%%mm6,%%mm3\n\t"
 		"packuswb	%%mm7,%%mm5\n\t"
 		"psrlq		$32, %%mm3\n\t"
 		"por		%%mm5,%%mm3\n\t"
-		"movq		%%mm3,8(%1)\n\t"
+		MOVNTQ"		%%mm3,8(%1)\n\t"
 
 		:: "r" (in), "r" (out)
 	);
@@ -115,9 +113,9 @@ static	inline	void	subsample_up_1x8to1x16( uint8_t *in, uint8_t *out )
 		"\n\tpsrlq	$8, %%mm5"    
 		"\n\tpsrlq	$8, %%mm6"  
 		"\n\tpor	%%mm5,%%mm2"
-		"\n\tpor	%%mm6,%%mm4"	
-		"\n\tmovq	%%mm2, (%1)"
-		"\n\tmovq	%%mm4, 8(%1)"
+		"\n\tpor	%%mm6,%%mm4\n\t"	
+		MOVNTQ"		%%mm2, (%1)\n\t"
+		MOVNTQ"		%%mm4, 8(%1)\n\t"
 		:: "r" (in), "r" (out)
 	);
 }
@@ -147,12 +145,12 @@ static inline void	subsample_up_1x16to1x32( uint8_t *in, uint8_t *out )
 		"\n\tpsrlq	$8, %%mm5"    
 		"\n\tpsrlq	$8, %%mm6"  
 		"\n\tpor	%%mm5,%%mm3"
-		"\n\tpor	%%mm6,%%mm7"
+		"\n\tpor	%%mm6,%%mm7\n\t"
 	
-		"\n\tmovq	%%mm2, (%1)"
-		"\n\tmovq	%%mm4, 8(%1)"
-		"\n\tmovq	%%mm3,16(%1)"
-		"\n\tmovq	%%mm7,24(%1)"
+		MOVNTQ"		%%mm2, (%1)\n\t"
+		MOVNTQ"		%%mm4, 8(%1)\n\t"
+		MOVNTQ"		%%mm3,16(%1)\n\t"
+		MOVNTQ"		%%mm7,24(%1)\n\t"
 		:: "r" (in), "r" (out)
 	);
 }

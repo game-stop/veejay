@@ -32,6 +32,7 @@
 #include <libswscale/swscale.h>
 #include <libavcodec/avcodec.h>
 #include <veejay/vj-task.h>
+#include <libyuv/mmx_macros.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -41,23 +42,6 @@
 #include <assert.h>
 #endif
 
-
-#ifdef HAVE_ASM_MMX
-#undef HAVE_K6_2PLUS
-#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
-#define HAVE_K6_2PLUS
-#endif
-
-#undef _EMMS
-
-#ifdef HAVE_K6_2PLUS
-/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
-#define _EMMS     "femms"
-#else
-#define _EMMS     "emms"
-#endif
-
-#endif
 typedef struct
 {
 	struct SwsContext *sws;
@@ -730,7 +714,7 @@ static mmx_t mmx_00ffw =   { 0x00ff00ff00ff00ffLL };
                            MOVQ_R2M(mm6, *dst_y);\
                            movd_r2m(mm0, *dst_u);\
                            movd_r2m(mm1, *dst_v);
-
+/*
 #define MMX_YUV422_YUYV "                                                 \n\
 movq       (%1), %%mm0  # Load 8 Y            y7 y6 y5 y4 y3 y2 y1 y0     \n\
 movd       (%2), %%mm1  # Load 4 Cb           00 00 00 00 u3 u2 u1 u0     \n\
@@ -742,39 +726,66 @@ movq      %%mm2, (%0)   # Store low YUYV                                  \n\
 punpckhbw %%mm1, %%mm0  #                     v3 y7 u3 y6 v2 y5 u2 y4     \n\
 movq      %%mm0, 8(%0)  # Store high YUYV                                 \n\
 "
+*/
+
+//inline this function from libswscale
+static inline void yuvPlanartoyuy2(const uint8_t *ysrc, const uint8_t *usrc, const uint8_t *vsrc, uint8_t *dst,
+                                           int width, int height,
+                                           int lumStride, int chromStride, int dstStride, int vertLumPerChroma)
+{
+    int y;
+    const x86_reg chromWidth= width>>1;
+
+    for (y=0; y<height; y++) {
+        __asm__ volatile(
+            "xor                 %%"REG_a", %%"REG_a"   \n\t"
+            ".p2align                    4              \n\t"
+            "1:                                         \n\t"
+            PREFETCH"    32(%1, %%"REG_a", 2)           \n\t"
+            PREFETCH"    32(%2, %%"REG_a")              \n\t"
+            PREFETCH"    32(%3, %%"REG_a")              \n\t"
+            "movq          (%2, %%"REG_a"), %%mm0       \n\t" // U(0)
+            "movq                    %%mm0, %%mm2       \n\t" // U(0)
+            "movq          (%3, %%"REG_a"), %%mm1       \n\t" // V(0)
+            "punpcklbw               %%mm1, %%mm0       \n\t" // UVUV UVUV(0)
+            "punpckhbw               %%mm1, %%mm2       \n\t" // UVUV UVUV(8)
+
+            "movq        (%1, %%"REG_a",2), %%mm3       \n\t" // Y(0)
+            "movq       8(%1, %%"REG_a",2), %%mm5       \n\t" // Y(8)
+            "movq                    %%mm3, %%mm4       \n\t" // Y(0)
+            "movq                    %%mm5, %%mm6       \n\t" // Y(8)
+            "punpcklbw               %%mm0, %%mm3       \n\t" // YUYV YUYV(0)
+            "punpckhbw               %%mm0, %%mm4       \n\t" // YUYV YUYV(4)
+            "punpcklbw               %%mm2, %%mm5       \n\t" // YUYV YUYV(8)
+            "punpckhbw               %%mm2, %%mm6       \n\t" // YUYV YUYV(12)
+
+            MOVNTQ"                  %%mm3,   (%0, %%"REG_a", 4)    \n\t"
+            MOVNTQ"                  %%mm4,  8(%0, %%"REG_a", 4)    \n\t"
+            MOVNTQ"                  %%mm5, 16(%0, %%"REG_a", 4)    \n\t"
+            MOVNTQ"                  %%mm6, 24(%0, %%"REG_a", 4)    \n\t"
+
+            "add                        $8, %%"REG_a"   \n\t"
+            "cmp                        %4, %%"REG_a"   \n\t"
+            " jb                        1b              \n\t"
+            ::"r"(dst), "r"(ysrc), "r"(usrc), "r"(vsrc), "g" (chromWidth)
+            : "%"REG_a
+        );
+        if ((y&(vertLumPerChroma-1)) == vertLumPerChroma-1) {
+            usrc += chromStride;
+            vsrc += chromStride;
+        }
+        ysrc += lumStride;
+        dst  += dstStride;
+    }
+    __asm__(_EMMS"       \n\t"
+            SFENCE"     \n\t"
+            :::"memory");
+}
 
 
 void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 {
-	int j,jmax,imax,i;
-	uint8_t *dst = dstI;
-	uint8_t *src_y = src[0];
-	uint8_t *src_u = src[1];
-	uint8_t *src_v = src[2];
-	
-	jmax = w >> 3;
-	imax = h;
-
-	for( i = imax; i-- ; )
-	{
-		for( j = jmax ; j -- ; )
-		{
-	/*		__asm__( ".align 8" MMX_YUV422_YUYV
-				: : "r" (dst), "r" (src_y), "r" (src_u),
-				    "r" (src_v) );
-	*/
-    __asm__( ".p2align 3" MMX_YUV422_YUYV
-                     : : "r" (dst), "r" (src_y), "r" (src_u), "r" (src_v) );
-
-			dst += 16;
-			src_y += 8;
-			src_u += 4;
-			src_v += 4;
-		}
-	}
-#ifdef HAVE_ASM_MMX
-        __asm__ __volatile__ ( _EMMS:::"memory");
-#endif
+	yuvPlanartoyuy2( src[0], src[1], src[2], dstI, w, h, w, w, w * 2, 2 );
 }
 
 

@@ -24,7 +24,8 @@
 #include <config.h>
 #include <stdint.h>
 #ifdef HAVE_ASM_MMX
-#include "mmx.h"
+#include <libyuv/mmx.h>
+#include <libyuv/mmx_macros.h>
 #include "subsample-mmx.h"
 #endif
 
@@ -403,7 +404,10 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 		dst -= width;	
 		dst2 -= width;
 	}
-	_EMMS
+
+	__asm__(_EMMS"       \n\t"
+            	SFENCE"     \n\t"
+            	:::"memory");
 #endif
 }
 
@@ -484,7 +488,9 @@ static void ss_444_to_422_cp(uint8_t *buffer, uint8_t *dest, int width, int heig
 	}
 
 #ifdef HAVE_ASM_MMX
-	_EMMS
+	__asm__(_EMMS"       \n\t"
+           	SFENCE"     \n\t"
+            	:::"memory");
 #endif
 }
 
@@ -517,8 +523,10 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 			subsample_up_1x16to1x32( &src[x], &dst[x1] );
 		}
 	}
-	_EMMS
 
+	__asm__(_EMMS"       \n\t"
+           	SFENCE"     \n\t"
+            	:::"memory");
 #endif
 }
 
@@ -548,7 +556,10 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 			subsample_up_1x16to1x32(&src[x], &dst[x1] );
 		}
 	}
-	_EMMS
+
+	__asm__(_EMMS"       \n\t"
+           	SFENCE"     \n\t"
+            	:::"memory");
 #endif
 
 }
