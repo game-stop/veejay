@@ -1074,3 +1074,4 @@ int vj_effect_is_valid(int effect_id)
 		return 1;
 	return 0;
 }
+

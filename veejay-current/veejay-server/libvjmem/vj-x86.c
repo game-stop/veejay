@@ -35,9 +35,9 @@
 #endif
 extern void find_best_memcpy(void);
 extern void find_best_memset(void);
-extern int find_best_threaded_memcpy(int w, int h);
 extern void yuyv_plane_init();
-
+extern void benchmark_tasks(int n_tasks, long n_frames, int w, int h);
+extern void init_parallel_tasks(int n_tasks);
 static int MEM_ALIGNMENT_SIZE = 0;
 static int CACHE_LINE_SIZE = 64;
 
@@ -143,7 +143,6 @@ void vj_mem_init(void)
 
 	ac_imgconvert_init(AC_ALL);
 
-
 #ifdef ARCH_X86 
 	CACHE_LINE_SIZE = get_cache_line_size();
 #endif
@@ -154,20 +153,55 @@ void vj_mem_init(void)
 #endif
 	find_best_memcpy();	
 	find_best_memset();
+
+	task_init();
 }
 
 int	vj_mem_threaded_init(int w, int h)
 {
-	int n = find_best_threaded_memcpy(w, h);
-	if( n > 1 ) {
-		int res = task_start( n );
-		if( res != n ) {
-			veejay_msg(0, "Failed to initialize threadpool of %d threads.", n );
+	int n_cpus = task_num_cpus();
+	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
+	
+	int num_tasks = 1;
+	
+	if( str2 != NULL ) {
+		num_tasks  = atoi( str2 );
+	
+		if( num_tasks >= MAX_WORKERS ) {
+			veejay_msg(0, "Maximum number of tasks is %d tasks.", MAX_WORKERS);
+			return -1;
+		}
+	
+		if( num_tasks <= 1 ) {
+			veejay_msg( VEEJAY_MSG_DEBUG, "Not multithreading pixel operations (VEEJAY_MULTITHREAD_TASKS=%d)", num_tasks);
+		}
+	} 
+	else {
+		if( w >= 720 && h >= 480) {
+			num_tasks = n_cpus - 1;
+			if( num_tasks < 1 )
+				num_tasks = 1;
+
+			if( num_tasks > 1 )
+				veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer.", num_tasks, n_cpus-1 );
+
+		}
+		
+	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Set maximum number of multithread tasks to %d", num_tasks );
+	veejay_msg( VEEJAY_MSG_DEBUG,"Use envvar VEEJAY_MULTITHREAD_TASKS=<num threads> to change");
+
+	init_parallel_tasks( num_tasks ); // sets functions pointer to single/multi threaded versions
+	
+	if( num_tasks > 1 ) {
+		int res = task_start( num_tasks );
+		if( res != num_tasks ) {
+			veejay_msg(0, "Failed to initialize threadpool of %d threads.", num_tasks );
 			return 0;
 		}
+		veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer.", num_tasks, n_cpus );
 	}
-	if( n == - 1)
-		return 0;
 
 	return 1;
 }

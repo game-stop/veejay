@@ -51,11 +51,10 @@ typedef struct
 	uint8_t *overlaprow;
 } vj_task_arg_t;
 
-void	vj_task_init();
 
 int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func );
 
-int	vj_task_available();
+uint8_t	vj_task_available();
 
 void	*vj_task_alloc_internal_buf( unsigned int w );
 void	vj_task_set_float( float f );
@@ -70,15 +69,15 @@ void	vj_task_set_from_args( int len, int uv_len );
 void	vj_task_set_param( int v, int idx );
 void	vj_task_free_internal_buf();
 void	*vj_task_get_internal_buf();
-int	task_start(int max_workers);
-void	task_stop(int max_workers);
+int	task_start(unsigned int max_workers);
+void	task_stop(unsigned int max_workers);
 void	task_init();
 int	task_num_cpus();
 void	vj_task_set_overlap( int val );
 void	vj_task_set_sampling( int s );
-void	performer_job( int job_num );
+void	performer_job( uint8_t job_num );
 
-int	num_threaded_tasks();
+uint8_t	num_threaded_tasks();
 
 #endif
 

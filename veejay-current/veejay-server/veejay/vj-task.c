@@ -73,32 +73,54 @@ typedef struct {
 } pjob_t;
 
 //@ no dynamic, static allocation here.
-static int	total_tasks_	=	0;
-static uint8_t tasks_done[MAX_WORKERS];
-static int tasks_todo = 0;
-static int exitFlag = 0;
-static pthread_mutex_t	queue_mutex;
-static pthread_cond_t 	tasks_completed;
-static pthread_cond_t	current_task;
-static	int	numThreads	= 0;
-struct	task	*tasks_		= NULL;
-struct	task	*tail_task_	= NULL;
+static struct task running_tasks[MAX_WORKERS];
+static pthread_mutex_t queue_mutex;
+static pthread_cond_t tasks_completed;
+static pthread_cond_t current_task;
+struct task *tasks_ = NULL;
+struct task *tail_task_= NULL;
 static pthread_t p_threads[MAX_WORKERS];
-static int *p_thread_args[MAX_WORKERS];
+static uint8_t *p_thread_args[MAX_WORKERS];
 static pthread_attr_t p_attr[MAX_WORKERS];
-static int	 p_tasks[MAX_WORKERS];
-static int	 thr_id[MAX_WORKERS];
 static	pjob_t *job_list[MAX_WORKERS];
-static int	n_cpu = 1;
-
+static uint8_t p_tasks[MAX_WORKERS];
+static pjob_t *job_list[MAX_WORKERS];
+static int n_cpu = 1;
+static uint8_t numThreads = 0;
+static uint8_t total_tasks = 0;
+static uint8_t tasks_done[MAX_WORKERS];
+static uint8_t tasks_todo = 0;
+static int exitFlag = 0;
 static struct task running_tasks[MAX_WORKERS];
 
 #define __lock() pthread_mutex_lock(&queue_mutex)
 #define __unlock() pthread_mutex_unlock(&queue_mutex)
 
-int	task_get_workers()
+static void		task_reset()
 {
-	return numThreads;
+	unsigned int i;
+
+	memset( &p_threads,0,sizeof(p_threads));
+	memset( &p_tasks,0,sizeof(p_tasks));
+	memset( job_list,0,sizeof(pjob_t*) * MAX_WORKERS );
+	memset( &vj_task_args,0,sizeof(vj_task_arg_t*) * MAX_WORKERS );
+	for( i = 0; i < MAX_WORKERS; i ++ ) {
+		job_list[i] = vj_malloc(sizeof(pjob_t));
+		vj_task_args[i] = vj_malloc(sizeof(vj_task_arg_t));
+		memset( job_list[i],0, sizeof(pjob_t));
+		memset( vj_task_args[i],0, sizeof(vj_task_arg_t));
+		p_thread_args[i] = malloc( sizeof(uint8_t) );
+		memset( p_thread_args[i],0, sizeof(uint8_t));
+		memset( &(running_tasks[i]), 0, sizeof(struct task));
+	}
+
+	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
+	if( n_cpu <= 0 )
+	{
+		n_cpu = 1;
+	}
+
+	numThreads = 0;
 }
 
 static void	task_add(uint8_t task_no, performer_job_routine fp , void *data)
@@ -110,7 +132,7 @@ static void	task_add(uint8_t task_no, performer_job_routine fp , void *data)
 	enqueue_task->data	= 	data;
 	enqueue_task->next	= 	NULL;
 
-	if( total_tasks_ == 0 ) {
+	if( total_tasks == 0 ) {
 		tasks_		=	enqueue_task;
 		tail_task_	=	tasks_;
 	}
@@ -119,28 +141,26 @@ static void	task_add(uint8_t task_no, performer_job_routine fp , void *data)
 		tail_task_	=	enqueue_task;
 	}
 
-	total_tasks_ ++;
-
-	pthread_cond_signal( &current_task );
+	total_tasks ++;
 }
 
 struct	task	*task_get()
 {
 	struct task *t = NULL;
-	if( total_tasks_ > 0  ) {
-		t 		=	tasks_;
+	if( total_tasks > 0  ) {
+		t 	=	tasks_;
 		tasks_	=	tasks_->next;
 
 		if( tasks_ == NULL ) {
 			tail_task_ = NULL;
 		}
 
-		total_tasks_ --;
+		total_tasks --;
 	}
 	return t;
 }
 
-void		task_run( struct task *task, void *data, int id)
+void		task_run( struct task *task, void *data, uint8_t id)
 {
 	if( task )
 	{
@@ -155,12 +175,13 @@ void		task_run( struct task *task, void *data, int id)
 
 void		*task_thread(void *data)
 {
-	const int id = (const int) *((int *) data);
+	const uint8_t id = (const uint8_t) *((uint8_t *) data);
 	for( ;; ) 
 	{
 		struct task *t = NULL;
+
 		__lock();
-		while( total_tasks_ == 0 ) {
+		while( total_tasks == 0 ) {
 			if( exitFlag ) {
 				__unlock();
 				pthread_exit(0);
@@ -174,47 +195,18 @@ void		*task_thread(void *data)
 	
 		if( t ) {
 			task_run( t, t->data, id );
-			//free(t);
-			t = NULL;
 		}
 	}
 }
 
-
-void	task_free()
+static inline uint8_t	task_get_workers()
 {
-	int i;
-	for ( i = 0; i < MAX_WORKERS; i ++ ) {
-		free(job_list[i]);
-	}
+	return numThreads;
 }
 
 void		task_init()
 {
-	int i;
-
-	memset( &thr_id, 0,sizeof(thr_id));
-	memset( &p_threads,0,sizeof(p_threads));
-	memset( &p_tasks, 0,sizeof(p_tasks));
-	memset( job_list, 0,sizeof(pjob_t*) * MAX_WORKERS );
-	memset( &vj_task_args,0,sizeof(vj_task_arg_t*) * MAX_WORKERS );
-	for( i = 0; i < MAX_WORKERS; i ++ ) {
-		job_list[i] = vj_malloc(sizeof(pjob_t));
-		vj_task_args[i] = vj_malloc(sizeof(vj_task_arg_t));
-		memset( job_list[i], 0, sizeof(pjob_t));
-		memset( vj_task_args[i], 0, sizeof(vj_task_arg_t));
-		p_thread_args[i] = malloc( sizeof(int) );
-		memset( p_thread_args[i], 0, sizeof(int));
-		memset( &(running_tasks[i]), 0, sizeof(struct task));
-	}
-
-	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
-	if( n_cpu <= 0 )
-	{
-		n_cpu = 1;
-	}
-
-	numThreads = 0;
+	task_reset();
 }
 
 int		task_num_cpus()
@@ -222,10 +214,10 @@ int		task_num_cpus()
 	return n_cpu;
 }
 
-int		task_start(int max_workers)
+int		task_start(unsigned int max_workers)
 {
 	struct sched_param param;
-	int i;
+	uint8_t i;
 	if( max_workers >= MAX_WORKERS ) {
 		veejay_msg(0, "Maximum number of threads is %d", MAX_WORKERS );
 		return 0;
@@ -235,7 +227,7 @@ int		task_start(int max_workers)
     	int max_p = sched_get_priority_max( SCHED_FIFO );
     	int min_p = sched_get_priority_min( SCHED_FIFO );
 
-    	max_p = (int) ( ((float) max_p) * 0.90f );
+    	max_p = (int) ( ((float) max_p) * 0.95f );
     	if( max_p < min_p )
 	    max_p = min_p;
 	
@@ -252,7 +244,6 @@ int		task_start(int max_workers)
 	__lock();
 	
 	for( i = 0 ; i < max_workers; i ++ ) {
-		thr_id[i]	= i;
 		pthread_attr_init( &p_attr[i] );
 //		pthread_attr_setstacksize( &p_attr[i], 256 * 1024 );
 		pthread_attr_setinheritsched( &p_attr[i], PTHREAD_EXPLICIT_SCHED );
@@ -260,15 +251,15 @@ int		task_start(int max_workers)
 		pthread_attr_setschedparam( &p_attr[i], &param );
 
 		if( n_cpu > 1 ) {
-			int selected_cpu = ((i+1)%n_cpu);
+			unsigned int selected_cpu = ((i+1)%n_cpu);
 			CPU_ZERO(&cpuset);
 			CPU_SET( selected_cpu, &cpuset );
 			
 			if(pthread_attr_setaffinity_np( &p_attr[i], sizeof(cpuset), &cpuset ) != 0 )
 				veejay_msg(0,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
-			else
-				veejay_msg(VEEJAY_MSG_DEBUG, "Task thread %d has CPU affinity %d",
-					i, selected_cpu ); 
+//			else
+//				veejay_msg(VEEJAY_MSG_DEBUG, "Task thread %d has CPU affinity %d",
+//					i, selected_cpu ); 
 			
 		}
 
@@ -290,14 +281,14 @@ int		task_start(int max_workers)
 	return numThreads;
 }
 
-int	num_threaded_tasks()
+uint8_t	num_threaded_tasks()
 {
 	return numThreads;
 }
 
-void		task_stop(int max_workers)
+void		task_stop(unsigned int max_workers)
 {
-	int i;
+	unsigned int i;
 
 	__lock();	
 	exitFlag = 1;
@@ -313,36 +304,38 @@ void		task_stop(int max_workers)
 	pthread_cond_destroy( &tasks_completed );
 	pthread_cond_destroy( &current_task );	
 
-	task_init();
+	task_reset();
 	
 }
 
-void	performer_job( int n )
+void	performer_job( uint8_t n )
 {
 	uint8_t i;
+
 	__lock();
 	tasks_todo = n;
 	veejay_memset( tasks_done, 0, sizeof(tasks_done));
-
 	for( i = 0; i < n; i ++ ) {
 		pjob_t *slot  = job_list[i];
 		task_add( i, slot->job, slot->arg );
 	}
-
+	pthread_cond_signal( &current_task );
 	__unlock();
 
-	int stop = 0;
+	uint8_t stop = 0;
 
 	while(!stop) {
-		__lock();
 		uint8_t done = 0;
+		
+		__lock();
+
 		for( i = 0 ; i < tasks_todo; i ++ ) {
 			done += tasks_done[i];
 		}
 
 		if( done < tasks_todo ) {
-			pthread_cond_wait( &tasks_completed, &queue_mutex );
 			done = 0;
+			pthread_cond_wait( &tasks_completed, &queue_mutex );
 			for( i = 0 ; i < tasks_todo; i ++ ) {
 				done += tasks_done[i];
 			}
@@ -358,38 +351,38 @@ void	performer_job( int n )
 }
 
 void	vj_task_set_float( float f ){
-	int i;
-	int n = task_get_workers();
+	uint8_t i;
+	uint8_t n = task_get_workers();
 	for( i = 0; i < n; i ++ )
 		vj_task_args[i]->fparam = f;
 }
 
 void	vj_task_set_int( int val ){
-	int i;
-	int n = task_get_workers();
+	uint8_t i;
+	uint8_t n = task_get_workers();
 
 	for( i = 0; i < n; i ++ )
 		vj_task_args[i]->iparam = val;
 }
 void	vj_task_set_param( int val , int idx ){
-	int i;
-	int n = task_get_workers();
+	uint8_t i;
+	uint8_t n = task_get_workers();
 
 	for( i = 0; i < n; i ++ )
 		vj_task_args[i]->iparams[idx] = val;
 }
 
 void	vj_task_set_overlap( int val ){
-	int i;
-	int n = task_get_workers();
+	uint8_t i;
+	uint8_t n = task_get_workers();
 
 	for( i = 0; i < n; i ++ )
 		vj_task_args[i]->overlap = val;
 }
 
 void	vj_task_set_wid( int w ) {
-	int i;
-	int n = task_get_workers();
+	uint8_t i;
+	uint8_t n = task_get_workers();
 
 	for( i = 0; i < n; i ++ ) {
 		vj_task_args[i]->subwid = w;
@@ -397,8 +390,8 @@ void	vj_task_set_wid( int w ) {
 	}
 }
 void	vj_task_set_hei( int h ) {
-	int i;
-	int n = task_get_workers();
+	uint8_t i;
+	uint8_t n = task_get_workers();
 
 	for( i = 0; i < n; i ++ ) {
 		vj_task_args[i]->height = h;
@@ -406,15 +399,15 @@ void	vj_task_set_hei( int h ) {
 	}
 }
 
-int	vj_task_available()
+uint8_t	vj_task_available()
 {
 	return ( task_get_workers() > 1 ? 1 : 0);
 }
 
 void	vj_task_set_shift( int v, int h )
 {
-	int i;  
-	int n = task_get_workers();
+	uint8_t i;  
+	uint8_t n = task_get_workers();
 
 	for( i = 0; i < n; i ++ ) {
 		vj_task_args[i]->shifth = h;
@@ -424,8 +417,8 @@ void	vj_task_set_shift( int v, int h )
 
 void	*vj_task_alloc_internal_buf( unsigned int size )
 {
-	int i;
-	int n = task_get_workers();
+	uint8_t i;
+	uint8_t n = task_get_workers();
 #ifdef STRICT_CHECKING
 	assert( size > 0 );
 #endif
@@ -439,8 +432,8 @@ void	*vj_task_alloc_internal_buf( unsigned int size )
 
 void	vj_task_set_ptr( void *ptr )
 {
-	int i;
-	int n = task_get_workers();
+	uint8_t i;
+	uint8_t n = task_get_workers();
 
 	for( i = 0; i < n; i ++ ) {
 		vj_task_args[i]->ptr = ptr;
@@ -449,8 +442,8 @@ void	vj_task_set_ptr( void *ptr )
 
 void	vj_task_set_from_args( int len, int uv_len )
 {
-	int n = task_get_workers();
-	int i;
+	uint8_t n = task_get_workers();
+	uint8_t i;
 	
 	for( i = 0; i < n; i ++ ) {
 		vj_task_arg_t *v = vj_task_args[i];
@@ -504,8 +497,8 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 
 void	vj_task_set_from_frame( VJFrame *in )
 {
-	int n = task_get_workers();
-	int i;
+	uint8_t n = task_get_workers();
+	uint8_t i;
 
 	for( i = 0; i < n; i ++ ) {
 		vj_task_arg_t *v= vj_task_args[i];
@@ -547,8 +540,8 @@ void	vj_task_set_from_frame( VJFrame *in )
 
 void	vj_task_set_sampling( int s )
 {
-	int n = task_get_workers();
-	int i;
+	uint8_t n = task_get_workers();
+	uint8_t i;
 	
 	for( i = 0; i < n; i ++ ) {
 		vj_task_arg_t *v = vj_task_args[i];
@@ -556,16 +549,14 @@ void	vj_task_set_sampling( int s )
 	}
 }
 
-extern int  pixel_Y_lo_;
-
 int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func )
 {
-	int n = task_get_workers();
+	uint8_t n = task_get_workers();
 	if( n <= 1 )
 		return 0;
 
 	vj_task_arg_t **f = (vj_task_arg_t**) vj_task_args;
-	int i,j;
+	unsigned int i,j;
 
 	for ( i = 0; i < n_planes; i ++ ) {
 		if( f[0]->sampling == 1 && i == 0 ){
@@ -614,9 +605,9 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	for( j = 0; j < n; j ++ ) {
 		if( f[j]->overlap > 0 ) {
 			f[j]->overlaprow = (uint8_t*) vj_malloc( sizeof(uint8_t) * f[j]->overlap );
-			int offset       =  (f[j]->strides[0] * j) + (f[j]->strides[0] - f[j]->overlap);
+			unsigned int offset       =  (f[j]->strides[0] * j) + (f[j]->strides[0] - f[j]->overlap);
 			if( (offset+f[j]->overlap) > (f[j]->width * f[j]->height * n) ) {
-				veejay_memset( f[j]->overlaprow, pixel_Y_lo_, f[j]->overlap );
+				veejay_memset( f[j]->overlaprow, 0, f[j]->overlap );
 			} else {	
 				veejay_memcpy(
 					f[j]->overlaprow,
@@ -642,8 +633,8 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 
 void	vj_task_free_internal_buf()
 {
-	int n = task_get_workers();
-	int i;
+	uint8_t n = task_get_workers();
+	uint8_t i;
 	
 	for( i = 0; i < n; i ++ )
 		vj_task_args[0]->priv = NULL;

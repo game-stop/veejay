@@ -41,8 +41,12 @@ typedef int32_t x86_reg;
 typedef int x86_reg;
 #endif
 
-
+#ifdef HAVE_ASM_3DNOW
+#define _EMMS     "femms"
+#else
 #define _EMMS     "emms"
+#endif
+
 
 #endif
 

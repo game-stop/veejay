@@ -236,7 +236,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 			"  -o/--output-file [file]\tWrite to file (for use with Y4M Stream)\n");
 #ifdef HAVE_SDL
-    fprintf(stderr,
+        fprintf(stderr,
 	    "  -s/--size NxN\t\t\tDisplay dimension for video window, use Width x Height\n");
 
 	fprintf(stderr,
@@ -245,11 +245,11 @@ static void Usage(char *progname)
 		"  -y/--geometry-y <num> \tTop left y offset for SDL video window\n");
 
 	fprintf(stderr,
-		"  --no-keyboard\t\tdisable keyboard for SDL video window\n");
+		"  --no-keyboard\t\t\tdisable keyboard for SDL video window\n");
 	fprintf(stderr,
-		"  --no-mouse\t\tdisable mouse for SDL video window\n");
+		"  --no-mouse\t\t\tdisable mouse for SDL video window\n");
 	fprintf(stderr, 
-		"  --show-cursor\t\tshow mouse cursor in SDL video window\n");	
+		"  --show-cursor\t\t\tshow mouse cursor in SDL video window\n");	
 #endif
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with capture device <num> \n");
@@ -275,6 +275,9 @@ static void Usage(char *progname)
 		"  -w/--output-width <num>\tSet output video width (Projection)\n");
 	fprintf(stderr,
 		"  -h/--output-height <num>\tSet output video height (Projection)\n");
+
+	fprintf(stderr,
+		"  -Q/--benchmark NxN\t\tveejay benchmark using NxN resolution\n");
 
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
@@ -370,12 +373,25 @@ static int set_option(const char *name, char *value)
 		veejay_strncpy(info->y4m_file,(char*) optarg, strlen( (char*) optarg));
     } else if (strcmp(name, "preserve-pathnames") == 0 ) {
 		info->preserve_pathnames = 1;
+	} else if (strcmp(name, "benchmark" ) == 0 || strcmp(name, "Q") ) {
+		int w=0,h=0;
+		int n = 0;
+		if( value != NULL )
+			n = sscanf(value, "%dx%d", &w,&h );
+		if( n != 2 || value == NULL ) {
+			fprintf(stderr,"-Q/--benchmark parameter requires NxN argument\n");
+		    	nerr++;
+		} 
+		if( n == 2 ) {
+		    benchmark_veejay(w,h);
+		    exit(0);
+		}
     } else if (strcmp(name, "deinterlace") == 0 || strcmp(name, "I" )==0) {
 		info->auto_deinterlace = 1;
     } else if (strcmp(name, "size") == 0 || strcmp(name, "s") == 0) {
 	if (sscanf(value, "%dx%d", &info->bes_width, &info->bes_height) !=
 	    2) {
-	    fprintf(stderr,"--size parameter requires NxN argument");
+	    fprintf(stderr,"-S/--size parameter requires NxN argument\n");
 	    nerr++;
 	}
      }
@@ -486,6 +502,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
 	{"size", 1, 0, 0},	/* -S/--size            */
+	{"benchmark", 1, 0, 0}, /* -Q/--benchmark	 */
 /*#ifdef HAVE_XINERAMA
 #ifndef X_DISPLAY_MISSING
 	{"xinerama",1,0,0},
@@ -544,12 +561,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:Q:nILPVDugvBdibjqeZ:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:Q:nILPVDugvBdibjqeZ:"
 						   )) != EOF)
 #endif
     {

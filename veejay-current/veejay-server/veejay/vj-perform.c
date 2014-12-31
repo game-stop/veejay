@@ -625,7 +625,7 @@ int vj_perform_init(veejay_t * info)
     const int frame_len = ((w * h)/7) * 8;
     int c;
 
-    if(!vj_mem_threaded_init(  info->video_output_width, info->video_output_height ) )
+    if(!vj_mem_threaded_init( info->video_output_width, info->video_output_height ) )
 	return 0;
 
     // buffer used to store encoded frames (for plain and sample mode)

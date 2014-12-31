@@ -135,6 +135,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <libyuv/mmx.h>
+#include <libyuv/mmx_macros.h>
 #include <libvje/vje.h>
 #include <veejay/vj-task.h>
 
@@ -143,35 +144,11 @@
 #endif
 #define BUFSIZE 1024
 
-#ifndef HAVE_ASM_SSE
-/*
-   P3 processor has only one SSE decoder so can execute only 1 sse insn per
-   cpu clock, but it has 3 mmx decoders (include load/store unit)
-   and executes 3 mmx insns per cpu clock.
-   P4 processor has some chances, but after reading:
-   http://www.emulators.com/pentium4.htm
-   I have doubts. Anyway SSE2 version of this code can be written better.
-*/
-#undef HAVE_SSE
-#endif
-
-#undef HAVE_ONLY_MMX1
-#if defined(HAVE_ASM_MMX) && !defined(HAVE_ASM_MMX2) && !defined(HAVE_ASM_3DNOW) && !defined(HAVE_ASM_SSE)
-/*  means: mmx v.1. Note: Since we added alignment of destinition it speedups
-    of memory copying on PentMMX, Celeron-1 and P2 upto 12% versus
-    standard (non MMX-optimized) version.
-    Note: on K6-2+ it speedups memory copying upto 25% and
-          on K7 and P3 about 500% (5 times). */
-#define HAVE_ONLY_MMX1
-#endif
-
 
 #undef HAVE_K6_2PLUS
 #if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW)
 #define HAVE_K6_2PLUS
 #endif
-
-
 
 /* definitions */
 #define BLOCK_SIZE 4096
@@ -321,14 +298,6 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 #undef PREFETCH
 #undef EMMS
 
-#undef _MIN_LEN
-#ifdef HAVE_ASM_MMX2 //@ was ifndef HAVE_MMX1
-#define _MIN_LEN 0x40
-#else
-#define _MIN_LEN 0x800  /* 2K blocks */
-#endif
-
-
 #ifdef HAVE_ASM_MMX2
 #define PREFETCH "prefetchnta"
 #elif defined ( HAVE_ASM_3DNOW )
@@ -337,21 +306,11 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 #define PREFETCH "/nop"
 #endif
 
-/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
 #ifdef HAVE_ASM_3DNOW
 #define EMMS     "femms"
 #else
 #define EMMS     "emms"
 #endif
-
-#undef MOVNTQ
-#ifdef HAVE_ASM_MMX2
-#define MOVNTQ "movntq"
-#else
-#define MOVNTQ "movq"
-#endif
-
-
 
 char	*veejay_strncpy( char *dest, const char *src, size_t n )
 {
@@ -392,26 +351,6 @@ char	*veejay_strncat( char *s1, char *s2, size_t n )
 		return veejay_memcpy(s,s2, n+1 );
 	}
 	return s1;
-}
-
-void	prefetch_memory( void *from )
-{
-#ifndef HAVE_MMX1
-	__asm__ __volatile__ (
-			PREFETCH" (%0)\n"
-			PREFETCH" 64(%0)\n"
-			PREFETCH" 128(%0)\n"
-			PREFETCH" 192(%0)\n"
-			PREFETCH" 256(%0)\n"
-		:: "r" (from));
-#else
-#ifdef HAVE_ASM_SSE
-	__asm__ __volatile__ (
-		PREFETCH" 320(%0)\n"
-		:: "r" (from));
-	
-#endif
-#endif
 }
 
 
@@ -658,7 +597,7 @@ static void * avx_memcpy(void * to, const void * from, size_t len)
     "   prefetchnta 288(%0)\n"
     : : "r" (from) );
 
-  if(len >= _MIN_LEN)
+  if(len >= MIN_LEN)
   {
     register uintptr_t delta;
     /* Align destinition to MMREG_SIZE -boundary */
@@ -804,7 +743,7 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
     "   prefetchnta 288(%0)\n"
     : : "r" (from) );
 
-  if(len >= _MIN_LEN)
+  if(len >= MIN_LEN)
   {
     register uintptr_t delta;
     /* Align destinition to MMREG_SIZE -boundary */
@@ -864,7 +803,6 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	retval = to;
 	unsigned char *t = to;
 	unsigned char *f = (unsigned char *)from;
-#ifndef HAVE_ONLY_MMX1
 	/* PREFETCH has effect even for MOVSB instruction ;) */
 	__asm__ __volatile__ (
 		PREFETCH" (%0)\n"
@@ -873,8 +811,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		PREFETCH" 192(%0)\n"
 		PREFETCH" 256(%0)\n"
 		: : "r" (f) );
-#endif
-	if(len >= _MIN_LEN)
+	if(len >= MIN_LEN)
 	{
 	  register unsigned long int delta;
 	  /* Align destinition to MMREG_SIZE -boundary */
@@ -945,9 +882,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	for(; ((int)to & (BLOCK_SIZE-1)) && i>0; i--)
 	{
 		__asm__ __volatile__ (
-#ifndef HAVE_ONLY_MMX1
 		PREFETCH" 320(%0)\n"
-#endif
 		"movq (%0), %%mm0\n"
 		"movq 8(%0), %%mm1\n"
 		"movq 16(%0), %%mm2\n"
@@ -1035,9 +970,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	for(; i>0; i--)
 	{
 		__asm__ __volatile__ (
-#ifndef HAVE_ONLY_MMX1
         	PREFETCH" 320(%0)\n"
-#endif
 		"movq (%0), %%mm0\n"
 		"movq 8(%0), %%mm1\n"
 		"movq 16(%0), %%mm2\n"
@@ -1098,7 +1031,7 @@ void fast_memset_dirty(void * to, int val, size_t len)
 	size_t i;
 	unsigned char mm_reg[_MMREG_SIZE], *pmm_reg;
 	unsigned char *t = to;
-        if(len >= _MIN_LEN)
+        if(len >= MIN_LEN)
 	{
 	  register unsigned long int delta;
           delta = ((unsigned long int)to)&(_MMREG_SIZE-1);
@@ -1185,7 +1118,7 @@ void * fast_memset(void * to, int val, size_t len)
 	unsigned char *t = to;
   	retval = to;
 //	veejay_msg(0, "clear %d bytes in %p",len,val);
-        if(len >= _MIN_LEN)
+        if(len >= MIN_LEN)
 	{
 	  register unsigned long int delta;
           delta = ((unsigned long int)to)&(_MMREG_SIZE-1);
@@ -1423,9 +1356,6 @@ void find_best_memset()
 static	void	vj_frame_copy_job( void *arg ) {
 	int i;
 	vj_task_arg_t *info = (vj_task_arg_t*) arg;
-#ifdef STRICT_CHECKING
-	assert( task_get_workers() > 0 );
-#endif
 	for( i = 0; i < 4; i ++ ) {
 #ifdef STRICT_CHECKING
 		if( info->strides[i] > 0 ) {
@@ -1481,7 +1411,7 @@ static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 		}
 */
 
-static inline void vj_frame_slow1( const uint8_t *a, const uint8_t *b, uint8_t *dst, const int len, const float frac )
+static inline void vj_frame_slow1( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
 {
 #ifndef HAVE_ASM_MMX
 	int i;
@@ -1500,11 +1430,11 @@ static inline void vj_frame_slow1( const uint8_t *a, const uint8_t *b, uint8_t *
 
         for (i = 0; i < len; i += 4) {
                 __asm __volatile
-                        ("\n\t movq %[alpha], %%mm3"
-                         "\n\t movq %[src2], %%mm0"
+                        ("\n\t movd %[alpha], %%mm3"
+                         "\n\t movd %[src2], %%mm0"
                          "\n\t psllq $32, %%mm3"
-                         "\n\t movq %[alpha], %%mm2"
-                         "\n\t movq %[src1], %%mm1"
+                         "\n\t movd %[alpha], %%mm2"
+                         "\n\t movd %[src1], %%mm1"
                          "\n\t por %%mm3, %%mm2"
                          "\n\t punpcklbw %%mm6, %%mm0"  
                          "\n\t punpcklbw %%mm6, %%mm1"  
@@ -1513,35 +1443,45 @@ static inline void vj_frame_slow1( const uint8_t *a, const uint8_t *b, uint8_t *
                          "\n\t psrlw $8, %%mm0"        
                          "\n\t paddb %%mm1, %%mm0"     
                          "\n\t packuswb %%mm0, %%mm0\n\t"
-			 MOVNTQ"        %%mm0, %[dest]\n\t"
+			 "\n\t movd %%mm0, %[dest]\n\t"
                          : [dest] "=m" (*(dst + i))
                          : [src1] "m" (*(a + i))
                          , [src2] "m" (*(b + i))
                          , [alpha] "m" (ialpha));
         }
+
+
 #endif
+
+    	
 }
 
-#define ALIGN 8
 static void	vj_frame_slow_job( void *arg )
 {
 	vj_task_arg_t *job = (vj_task_arg_t*) arg;
 	int i,j;
 	uint8_t **img = job->output;
-	const uint8_t **p0_buffer = job->input;
-	const uint8_t **p1_buffer = job->temp;
+	uint8_t **p0_buffer = job->input;
+	uint8_t **p1_buffer = job->temp;
 	const float frac = job->fparam;
 	
 	for ( i = 0; i < 3; i ++ ) {
-		uint8_t *a = __builtin_assume_aligned(p0_buffer[i],ALIGN);
-		uint8_t *b = __builtin_assume_aligned(p1_buffer[i],ALIGN);
-		uint8_t *d = __builtin_assume_aligned(img[i], ALIGN);
+		uint8_t *a = p0_buffer[i];
+		uint8_t *b = p1_buffer[i];
+		uint8_t *d = img[i];
 		const unsigned int len = job->strides[i];
 		vj_frame_slow1(d,a,b,len,frac );	
 	}
 
+
 }
 
+void	vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
+{
+	vj_frame_slow1(img[0],p0_buffer[0],p1_buffer[0],len,frac );	
+	vj_frame_slow1(img[1],p0_buffer[1],p1_buffer[1],uv_len,frac );	
+	vj_frame_slow1(img[2],p0_buffer[2],p1_buffer[2],uv_len,frac );	
+}
 
 
 void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
@@ -1550,7 +1490,18 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 		int strides[4] = { len, uv_len, uv_len, 0 };
 		vj_task_set_float( frac );
 		vj_task_run( p0_buffer, img, p1_buffer,strides, 4,(performer_job_routine) &vj_frame_slow_job );
-	} else {
+	} 
+	else {
+		vj_frame_slow_single( p0_buffer, p1_buffer, img, len, uv_len, frac );
+	}
+   
+#ifdef HAVE_ASM_MMX
+	__asm __volatile(_EMMS"       \n\t"
+              		 SFENCE"     \n\t"
+                	:::"memory");	
+	
+#endif
+/*
 		int i;
 		if( uv_len != len ) { 
 			for( i  = 0; i < len ; i ++ ) {
@@ -1567,7 +1518,8 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
 			}
 		}
-	}
+	*/
+
 }
 
 void	vj_frame_simple_clear(  uint8_t **input, int *strides, int v )
@@ -1602,11 +1554,6 @@ typedef void *(*frame_clear_routine)( uint8_t **input, int *strides, unsigned in
 frame_copy_routine vj_frame_copy = 0;
 frame_clear_routine vj_frame_clear = 0;
 
-
-//void	*(*vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides ) = 0;
-
-//void	*(*vj_frame_clear)( uint8_t **input, int *strides, unsigned int val ) = 0;
-
 void	vj_frame_copy1( uint8_t *input, uint8_t *output, int size )
 {
 	uint8_t *in[4] = { input, NULL,NULL,NULL };
@@ -1622,110 +1569,194 @@ void	vj_frame_clear1( uint8_t *input, unsigned int val, int size )
 	vj_frame_clear( in, strides, val );
 }
 
-int	find_best_threaded_memcpy(int w, int h) 
+static unsigned long benchmark_single_slow(long c, int n_tasks, uint8_t **source, uint8_t **dest, int *planes)
 {
-	uint8_t *src = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 4 );
-	uint8_t *dst = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 4 );
-
-	int planes[4] = { w * h, w * h, w * h , w * h };
-
-	uint8_t *source[4] = { src, src + (w*h), src + (w * h * 2), src + (w * h * 3), };
-	uint8_t *dest[4] = { dst,dst + (w*h), dst + (w*h*2), dst + (w * h * 3)};
-
-	memset( src, 0, sizeof(uint8_t) * w * h * 4 );
-	memset( dst, 0, sizeof(uint8_t) * w * h * 4 );
-
-	long c = 1000;
-	
 	long k;
 	unsigned long long stats[c];
-	unsigned long long sstats[c];
+	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
-	task_init();
+	task_start( n_tasks );
 
-	int cpus = task_num_cpus();
-	int preferred_tasks = 1;
-        int warn_user = 0;
-
-	if( w <= 720 && h <= 480 )
+	for( k = 0; k < c; k ++ )	
 	{
-		preferred_tasks = 1; //@ classic, run in 1/4 PAL, low res, fast, keep it outside threadpooling.
+		unsigned long long t = rdtsc();
+		vj_frame_slow_single( source, source, dest, planes[0], planes[1]/2, 0.67f );
+		t = rdtsc() - t;
+		stats[k] = t;
 	}
-	else {
-	     preferred_tasks = (cpus * 2 );
-	}
 
-	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
-	
-	int num_tasks = preferred_tasks;
-	
-	if( str2 != NULL ) {
-		num_tasks  = atoi( str2 );
-	
-		if( num_tasks >= MAX_WORKERS ) {
-			veejay_msg(0, "Maximum number of tasks is %d tasks.", MAX_WORKERS);
-			return -1;
-		}
-	
-		if( num_tasks > 1 )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Testing your system ...");
-
-			if( task_start( num_tasks ) != num_tasks ) {
-				veejay_msg(0,"Failed to launch %d threads ?!", num_tasks);
-				veejay_msg(0,"Please set env VEEJAY_MULTITHREAD_TASKS=0");
-				return -1;
-			}	
-
-
-			for( k = 0; k < c; k ++ )	
-			{
-				unsigned long long t = rdtsc();
-				vj_frame_copyN( source,dest,planes );
-				t = rdtsc() - t;
-				stats[k] = t;
-			}
+	task_stop( n_tasks );
 		
-			int sum = 0,j;
-			for( k = 0; k < c ;k ++ )
-				sum += stats[k];
+	int sum = 0,j;
+	for( k = 0; k < c ;k ++ )
+		sum += stats[k];
 
-			unsigned long long best_time = (sum / c );
-			veejay_msg(VEEJAY_MSG_DEBUG, "Timing results for copying %2.2f MB data with %d thread(s): %2.2f ms",
-				(c * (w*h) *4) /1048576.0f, num_tasks, (float) best_time*0.1f);
+	unsigned long long best_time = (sum / c );
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
+			(float)(bytes /1048576.0f), (best_time/1000.0f));
+
+	return best_time;
+}
+
+
+static unsigned long benchmark_threaded_slow(long c, int n_tasks, uint8_t **source, uint8_t **dest, int *planes)
+{
+	long k;
+	unsigned long long stats[c];
+	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+
+	task_start( n_tasks );
+
+	for( k = 0; k < c; k ++ )	
+	{
+		unsigned long long t = rdtsc();
+		vj_frame_slow_threaded( source, source, dest, planes[0], planes[1]/2, 0.67f );
+		t = rdtsc() - t;
+		stats[k] = t;
+	}
+
+	task_stop( n_tasks );
 		
-			task_stop( num_tasks );
+	int sum = 0,j;
+	for( k = 0; k < c ;k ++ )
+		sum += stats[k];
 
-			for( k = 0; k < c; k ++ ) {
-				unsigned long long t = rdtsc();
-				for( j = 0; j < 4; j ++ ) {
-					veejay_memcpy( dest[j], source[j], planes[j] );
-				}
-				t = rdtsc() - t;
-				sstats[k] = t;
-			}
+	unsigned long long best_time = (sum / c );
 
-			int ssum = 0;
-			for( k = 0; k < c; k ++ ) 
-				ssum += sstats[k];
+	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
+			(float)(bytes /1048576.0f), (best_time/1000.0f));
 
-			unsigned long long best_single_time = (ssum/c);
+	return best_time;
+}
 
-			veejay_msg(VEEJAY_MSG_DEBUG, "Timing results for copying %2.2f MB data with no multithreading: %2.2f ms",
-				(c * (w*h) *4) /1048576.0f, (float) best_single_time*0.1f);
+
+static unsigned long benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest, uint8_t **source, int *planes)
+{
+	long k;
+	unsigned long long stats[c];
+	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+
+	task_start( n_tasks );
+	
+	for( k = 0; k < c; k ++ )	
+	{
+		unsigned long long t = rdtsc();
+		vj_frame_copyN( source,dest,planes );
+		t = rdtsc() - t;
+		stats[k] = t;
+	}
+
+	task_stop( n_tasks );
+		
+	int sum = 0,j;
+	for( k = 0; k < c ;k ++ )
+		sum += stats[k];
+
+	unsigned long long best_time = (sum / c );
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
+			(float)(bytes /1048576.0f), (best_time/1000.0f));
+
+	return best_time;
+}
+
+static unsigned long benchmark_single_copy(long c,int dummy, uint8_t **dest, uint8_t **source, int *planes)
+{
+	long k; int j;
+	unsigned long long stats[c];
+	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+	for( k = 0; k < c; k ++ ) {
+		unsigned long long t = rdtsc();
+		for( j = 0; j < 4; j ++ ) {
+			veejay_memcpy( dest[j], source[j], planes[j] );
 		}
-		else {
-			veejay_msg( VEEJAY_MSG_DEBUG, "Not multithreading pixel operations (VEEJAY_MULTITHREAD_TASKS=%d)", num_tasks);
-		}
+		t = rdtsc() - t;
+		stats[k] = t;
+	}
+
+	int sum = 0;
+	for( k = 0; k < c; k ++ ) 
+		sum += stats[k];
+
+	unsigned long long best_time = (sum/c);
+	
+	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
+			(float)(bytes /1048576.0f), (best_time/1000.0f));
+
+	return best_time;
+}
+
+typedef unsigned long (*benchmark_func)(long c, int dummy, uint8_t **dest, uint8_t **source, int *planes);
+
+
+void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, uint8_t **dest, uint8_t **source, int *planes )
+{
+	unsigned long N = 8;
+	unsigned long stats[N];	
+	int i;
+	unsigned long fastest = 0;
+	float work_size = (planes[0] + planes[1] + planes[2] + planes[3]) / 1048576.0f;
+
+	veejay_msg(VEEJAY_MSG_INFO, "run test '%s' on chunks of %2.2f MB:", str, work_size );
+
+	
+	for( i = 0; i < N; i ++ )
+	{
+		stats[i] = f( n_frames, n_tasks, source, dest, planes );
+		if( stats[i] > fastest )
+			fastest = stats[i];
 	}
 	
-	if( warn_user && num_tasks > 1){
-		veejay_msg(VEEJAY_MSG_WARNING, "(Experimental) Enabling multicore support!");
+	unsigned long sum = 0;
+	unsigned long slowest=fastest;
+	for( i = 0; i < N; i ++ )
+	{
+		if( stats[i] < fastest ) {
+			fastest = stats[i];
+		}	
+		sum += stats[i];
 	}
 
-	if( num_tasks > 1 ) {	
-		veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer.", num_tasks, cpus );
-		veejay_msg( VEEJAY_MSG_DEBUG,"Use envvar VEEJAY_MULTITHREAD_TASKS=<num threads> to customize.");
+	float average = (sum / N);
+
+	veejay_msg(VEEJAY_MSG_INFO, "run done: best score for %s is %2.4f ms, worst is %2.4f ms, average is %2.4f ms", 
+		str, fastest/1000.0f, slowest/1000.0f, average/1000.0f );
+}
+
+void benchmark_tasks(int n_tasks, long n_frames, int w, int h)
+{
+	unsigned int len = w * h;
+	unsigned int uv_len = (w/2) * h;
+	unsigned int total = len + uv_len + uv_len;
+	uint8_t *src = (uint8_t*) vj_malloc(sizeof(uint8_t) * total );
+	uint8_t *dst = (uint8_t*) vj_malloc(sizeof(uint8_t) * total );
+
+	int planes[4] = { len, uv_len, uv_len , 0 };
+	int i;
+	uint8_t *source[4] = { src, src + len, src + len + uv_len, NULL };
+	uint8_t *dest[4] = { dst,dst + len, dst + len + uv_len, NULL};
+
+	memset( src, 16, sizeof(uint8_t) * total );
+	memset( dst, 240, sizeof(uint8_t) * total );
+
+	run_benchmark_test( n_tasks, benchmark_single_copy, "single-threaded memory copy", n_frames, dest, source, planes );
+	run_benchmark_test( n_tasks, benchmark_single_slow, "single-threaded slow frame", n_frames, dest, source, planes );
+
+	if( n_tasks > 1 ) {
+		veejay_msg(VEEJAY_MSG_INFO, "Using %d tasks", n_tasks );
+		run_benchmark_test( n_tasks, benchmark_threaded_slow, "multi-threaded slow frame", n_frames, dest, source, planes );
+		run_benchmark_test( n_tasks, benchmark_threaded_copy, "multi-threaded memory copy", n_frames, dest, source, planes );
+	}
+
+	free(src);
+	free(dst);
+}
+
+
+void	init_parallel_tasks(int n_tasks) 
+{
+	if( n_tasks > 1 ) {	
 		vj_frame_copy = (frame_copy_routine) vj_frame_copyN;
 		vj_frame_clear= (frame_clear_routine) vj_frame_clearN;
 	}
@@ -1733,9 +1764,24 @@ int	find_best_threaded_memcpy(int w, int h)
 		vj_frame_copy = (frame_copy_routine) vj_frame_simple_copy;
 		vj_frame_clear = (frame_clear_routine) vj_frame_simple_clear;
 	}
-
-	free(src);
-	free(dst);
-
-	return num_tasks;
 }
+
+void	benchmark_veejay(int w, int h)
+{
+	if( w < 64  )
+		w = 64;
+	if( h < 64)
+		h = 64;
+
+	int n_tasks = task_num_cpus();
+	init_parallel_tasks( n_tasks );
+	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
+	if( str2 ) {
+		n_tasks = atoi(str2);
+	}
+	
+	int n_frames = 100;
+	veejay_msg(VEEJAY_MSG_INFO, "Benchmark %dx%d YUVP 4:2:2 (%d frames)", w,h,n_frames);
+	benchmark_tasks( n_tasks, n_frames,w,h );
+}
+
