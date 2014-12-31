@@ -305,6 +305,7 @@ static int set_option(const char *name, char *value)
 	info->uc->port = atoi(optarg);
     } else if (strcmp(name, "verbose") == 0 || strcmp(name, "v") == 0) {
 	info->verbose = 1;
+	veejay_set_debug_level(info->verbose);
     } else if (strcmp(name, "no-color") == 0 || strcmp(name,"n") == 0)
 	{
 	 veejay_set_colors(0);
@@ -601,9 +602,6 @@ static int check_command_line_options(int argc, char *argv[])
     if (nerr)
 	Usage(argv[0]);
 
-    veejay_set_debug_level(info->verbose);
-
-    
     if(!info->dump)
 	{
        if(veejay_open_files(

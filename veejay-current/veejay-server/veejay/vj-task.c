@@ -74,7 +74,7 @@ typedef struct {
 
 //@ no dynamic, static allocation here.
 static struct task running_tasks[MAX_WORKERS];
-static pthread_mutex_t queue_mutex;
+static pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t tasks_completed;
 static pthread_cond_t current_task;
 struct task *tasks_ = NULL;
@@ -238,14 +238,9 @@ int		task_start(unsigned int max_workers)
 	cpu_set_t cpuset;
 	pthread_cond_init( &tasks_completed, NULL );
 	pthread_cond_init( &current_task, NULL );
-
-	pthread_mutex_init( &queue_mutex , NULL);
-
-	__lock();
 	
 	for( i = 0 ; i < max_workers; i ++ ) {
 		pthread_attr_init( &p_attr[i] );
-//		pthread_attr_setstacksize( &p_attr[i], 256 * 1024 );
 		pthread_attr_setinheritsched( &p_attr[i], PTHREAD_EXPLICIT_SCHED );
 		pthread_attr_setschedpolicy( &p_attr[i], SCHED_FIFO );
 		pthread_attr_setschedparam( &p_attr[i], &param );
@@ -257,10 +252,6 @@ int		task_start(unsigned int max_workers)
 			
 			if(pthread_attr_setaffinity_np( &p_attr[i], sizeof(cpuset), &cpuset ) != 0 )
 				veejay_msg(0,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
-//			else
-//				veejay_msg(VEEJAY_MSG_DEBUG, "Task thread %d has CPU affinity %d",
-//					i, selected_cpu ); 
-			
 		}
 
 		*p_thread_args[i] = i;
@@ -268,15 +259,13 @@ int		task_start(unsigned int max_workers)
 		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, p_thread_args[i] ) )
 		{
 			veejay_msg(0, "%s: error starting thread %d/%d", __FUNCTION__,i,max_workers );
-			
+			__unlock();
 			memset( &p_threads[i], 0, sizeof(pthread_t) );
 			return -1;
 		}
 	}
 
 	numThreads = max_workers;
-
-	__unlock();
 
 	return numThreads;
 }
@@ -300,7 +289,6 @@ void		task_stop(unsigned int max_workers)
 		pthread_attr_destroy( &p_attr[i] );
 	}
 
-	pthread_mutex_destroy( &queue_mutex );
 	pthread_cond_destroy( &tasks_completed );
 	pthread_cond_destroy( &current_task );	
 

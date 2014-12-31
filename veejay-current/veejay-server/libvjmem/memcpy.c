@@ -1575,8 +1575,6 @@ static unsigned long benchmark_single_slow(long c, int n_tasks, uint8_t **source
 	unsigned long long stats[c];
 	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
-	task_start( n_tasks );
-
 	for( k = 0; k < c; k ++ )	
 	{
 		unsigned long long t = rdtsc();
@@ -1585,8 +1583,6 @@ static unsigned long benchmark_single_slow(long c, int n_tasks, uint8_t **source
 		stats[k] = t;
 	}
 
-	task_stop( n_tasks );
-		
 	int sum = 0,j;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
@@ -1606,8 +1602,6 @@ static unsigned long benchmark_threaded_slow(long c, int n_tasks, uint8_t **sour
 	unsigned long long stats[c];
 	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
-	task_start( n_tasks );
-
 	for( k = 0; k < c; k ++ )	
 	{
 		unsigned long long t = rdtsc();
@@ -1616,8 +1610,6 @@ static unsigned long benchmark_threaded_slow(long c, int n_tasks, uint8_t **sour
 		stats[k] = t;
 	}
 
-	task_stop( n_tasks );
-		
 	int sum = 0,j;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
@@ -1637,8 +1629,6 @@ static unsigned long benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest
 	unsigned long long stats[c];
 	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
-	task_start( n_tasks );
-	
 	for( k = 0; k < c; k ++ )	
 	{
 		unsigned long long t = rdtsc();
@@ -1647,8 +1637,6 @@ static unsigned long benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest
 		stats[k] = t;
 	}
 
-	task_stop( n_tasks );
-		
 	int sum = 0,j;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
@@ -1745,8 +1733,10 @@ void benchmark_tasks(int n_tasks, long n_frames, int w, int h)
 
 	if( n_tasks > 1 ) {
 		veejay_msg(VEEJAY_MSG_INFO, "Using %d tasks", n_tasks );
+		task_start(n_tasks);
 		run_benchmark_test( n_tasks, benchmark_threaded_slow, "multi-threaded slow frame", n_frames, dest, source, planes );
 		run_benchmark_test( n_tasks, benchmark_threaded_copy, "multi-threaded memory copy", n_frames, dest, source, planes );
+		task_stop(n_tasks);
 	}
 
 	free(src);
