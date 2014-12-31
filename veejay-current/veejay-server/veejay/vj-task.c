@@ -259,7 +259,6 @@ int		task_start(unsigned int max_workers)
 		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, p_thread_args[i] ) )
 		{
 			veejay_msg(0, "%s: error starting thread %d/%d", __FUNCTION__,i,max_workers );
-			__unlock();
 			memset( &p_threads[i], 0, sizeof(pthread_t) );
 			return -1;
 		}
