@@ -69,7 +69,7 @@ void vj_effman_apply_plug_effect(
 		plug_push_frame(instance, 1, 0, frames[0] );
 
 	
-	plug_process( instance );
+	plug_process( instance, (double) frameinfo->timecode );
 }
 
 void vj_effman_apply_image_effect(

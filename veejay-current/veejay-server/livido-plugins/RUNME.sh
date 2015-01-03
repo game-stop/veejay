@@ -1,9 +1,9 @@
 #!/bin/bash
-
+#FIXME: replace me with real build tool
 OUTDIR=$1
 
 MY_CC=gcc
-MY_CFLAGS="-g -DIS_LIVIDO_PLUGIN"
+MY_CFLAGS="-g -fPIC -DIS_LIVIDO_PLUGIN"
 
 MY_INCLUDES="-I `pwd`"
 

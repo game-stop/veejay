@@ -37,7 +37,7 @@ int	plug_set_param_from_str( void *plugin , int p, const char *str, void *fx_val
 void	*plug_activate( int fx_id );
 void	plug_deactivate( void *instance );
 void	plug_push_frame( void *instance, int out, int seq_num, void *frame );
-void	plug_process( void *instance );
+void	plug_process( void *instance, double timecode );
 void	plug_get_defaults( void *instance, void *fx_values );
 void	plug_set_parameter( void *instance, int seq_num, int n_elements,void *value );
 int	plug_clone_from_output_parameters( void *instance, void *fx_values );

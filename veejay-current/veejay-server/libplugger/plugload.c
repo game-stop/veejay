@@ -1019,7 +1019,7 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 
 
 
-void	plug_process( void *instance )
+void	plug_process( void *instance, double timecode )
 {
 #ifdef STRICT_CHECKING
 	assert( instance != NULL );
@@ -1029,7 +1029,7 @@ void	plug_process( void *instance )
 #ifdef STRICT_CHECKING
 	assert( error == 0 );
 #endif
-	(*gpf)( instance,0.0 );
+	(*gpf)( instance, timecode );
 }
 
 

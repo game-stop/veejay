@@ -1088,7 +1088,7 @@ void	livido_plug_process( void *instance, double time_code )
 	assert( (*process) != NULL );
 #endif
 
-	(*process)( instance, 0.0 );
+	(*process)( instance, time_code );
 
 	//see if output channel needs downsampling
 	void *channel = NULL;

@@ -2368,6 +2368,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 	frames[1] = info->effect_frame2;
     	
 	frameinfo = info->effect_frame_info;
+	frameinfo->timecode = settings->current_frame_num;
     	
 	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
