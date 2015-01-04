@@ -277,7 +277,7 @@ static void Usage(char *progname)
 		"  -h/--output-height <num>\tSet output video height (Projection)\n");
 
 	fprintf(stderr,
-		"  -Q/--benchmark NxN\t\tveejay benchmark using NxN resolution\n");
+		"  --benchmark NxN\t\tveejay benchmark using NxN resolution\n");
 
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
@@ -374,13 +374,13 @@ static int set_option(const char *name, char *value)
 		veejay_strncpy(info->y4m_file,(char*) optarg, strlen( (char*) optarg));
     } else if (strcmp(name, "preserve-pathnames") == 0 ) {
 		info->preserve_pathnames = 1;
-	} else if (strcmp(name, "benchmark" ) == 0 || strcmp(name, "Q") ) {
+	} else if (strcmp(name, "benchmark" ) == 0 ) {
 		int w=0,h=0;
 		int n = 0;
 		if( value != NULL )
 			n = sscanf(value, "%dx%d", &w,&h );
 		if( n != 2 || value == NULL ) {
-			fprintf(stderr,"-Q/--benchmark parameter requires NxN argument\n");
+			fprintf(stderr,"  --benchmark parameter requires NxN argument\n");
 		    	nerr++;
 		} 
 		if( n == 2 ) {
@@ -503,7 +503,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
 	{"size", 1, 0, 0},	/* -S/--size            */
-	{"benchmark", 1, 0, 0}, /* -Q/--benchmark	 */
+	{"benchmark", 1, 0, 0}, /* --benchmark	 */
 /*#ifdef HAVE_XINERAMA
 #ifndef X_DISPLAY_MISSING
 	{"xinerama",1,0,0},
@@ -562,12 +562,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:Q:nILPVDugvBdibjqeZ:",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:Q:nILPVDugvBdibjqeZ:"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:"
 						   )) != EOF)
 #endif
     {
