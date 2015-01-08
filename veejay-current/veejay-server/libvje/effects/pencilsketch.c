@@ -232,12 +232,12 @@ void pencilsketch_apply(
 					d /= 100;
 					m = ( m + d );
 					y = ((((y << 1) - (0xff - m))>>1) + Y[i])>>1;
-					//Y[i] = 0xff;	
-					//Y[i] = _pff(y,yb,threshold_max);
+					Y[i] = 0xff;	
+					Y[i] = _pff(y,yb,threshold_max);
 					//@ this introduces lines into the image,
 					//@ one for each task . FIXME
 					//@ for now, just silently copy upper row
-					Y[i] = Y[i-width];
+					//Y[i] = Y[i-width];
 				}
 				else
 				{
