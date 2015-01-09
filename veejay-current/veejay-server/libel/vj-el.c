@@ -845,12 +845,12 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	
 		if (el->video_height != lav_video_height(el->lav_fd[n]) ||
 		    el->video_width != lav_video_width(el->lav_fd[n])) {
-		    veejay_msg(VEEJAY_MSG_WARNING,"File %s: Geometry %dx%d does not match %dx%d.",
+		    veejay_msg(VEEJAY_MSG_WARNING,"File %s: Geometry %dx%d does not match %dx%d (performance penalty).",
 				filename, lav_video_width(el->lav_fd[n]),
 				lav_video_height(el->lav_fd[n]), el->video_width,
 				el->video_height);
+		    
 		    //nerr++;
-	
 		}
 	if (el->video_inter != lav_video_interlacing(el->lav_fd[n])) {
 	    if(force)
