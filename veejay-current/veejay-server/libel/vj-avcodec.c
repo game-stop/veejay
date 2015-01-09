@@ -453,7 +453,7 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 	av_log_set_level( AV_LOG_QUIET);
 	//av_log_set_level( AV_LOG_VERBOSE );
 	
-#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
+#if LIBAVCODEC_BUILD < 5400
 	avcodec_register_all();
 #else
 	av_register_all();

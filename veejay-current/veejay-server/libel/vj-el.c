@@ -507,8 +507,8 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 #else
 		d->context = avcodec_alloc_context();
 #endif
-		d->context->width = width;
-		d->context->height = height;
+	//	d->context->width = width;
+	//	d->context->height = height;
 		d->context->opaque = d;
 		d->frame = avcodec_alloc_frame();
 		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
@@ -845,13 +845,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	
 		if (el->video_height != lav_video_height(el->lav_fd[n]) ||
 		    el->video_width != lav_video_width(el->lav_fd[n])) {
-		    veejay_msg(VEEJAY_MSG_ERROR,"File %s: Geometry %dx%d does not match %dx%d.",
+		    veejay_msg(VEEJAY_MSG_WARNING,"File %s: Geometry %dx%d does not match %dx%d.",
 				filename, lav_video_width(el->lav_fd[n]),
 				lav_video_height(el->lav_fd[n]), el->video_width,
 				el->video_height);
-		    nerr++;
-
-	}
+		    //nerr++;
+	
+		}
 	if (el->video_inter != lav_video_interlacing(el->lav_fd[n])) {
 	    if(force)
 	    veejay_msg(VEEJAY_MSG_WARNING,"File %s: Interlacing is %d should be %d",
@@ -1118,6 +1118,7 @@ static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *g
 }
 #endif
 
+
 int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 {
 	if( el->has_video == 0 || el->is_empty )
@@ -1125,6 +1126,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		vj_el_dummy_frame( dst, el, el->pixel_format );
 		return 2;
 	}
+	sws_template tmpl;
+	tmpl.flags = 1;
 
 	int res = 0;
    	uint64_t n;
@@ -1329,16 +1332,14 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 						src_fmt,
 						el->video_width,
 						el->video_height);
-
+				
 					VJFrame *src1 = yuv_yuv_template( d->deinterlace_buffer[0],
 								d->deinterlace_buffer[1], d->deinterlace_buffer[2],
-								el->video_width, el->video_height,	
+								d->frame->width, d->frame->height,	
 								src_fmt );
 					VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
 								el->video_width, el->video_height,
 								dst_fmt );
-					sws_template tmpl;
-					tmpl.flags = 1;
 					el->scaler = 
 						yuv_init_cached_swscaler( el->scaler, 	
 										src1,
@@ -1356,13 +1357,11 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				{
 					VJFrame *src1 = yuv_yuv_template( d->frame->data[0],
 								d->frame->data[1], d->frame->data[2],
-								el->video_width,el->video_height,
+								d->frame->width,d->frame->height,
 								src_fmt );
 					VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
 								el->video_width,el->video_height,
 								dst_fmt );
-					sws_template tmpl;
-					tmpl.flags = 1;
 					el->scaler = 
 						yuv_init_cached_swscaler( el->scaler, 	
 										src1,
@@ -1391,6 +1390,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 int	detect_pixel_format_with_ffmpeg( const char *filename )
 {
+	char errbuf[512];
 	AVCodec *codec = NULL;
 	AVCodecContext *codec_ctx = NULL;
 	AVFormatContext *avformat_ctx = NULL;
@@ -1402,7 +1402,8 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 #endif
 
 	if(err < 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to open %s: %d",filename,err );
+		av_strerror( err, errbuf, sizeof(errbuf));
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s: %s", filename,errbuf );
 		return -1;
 	}
 
@@ -1412,22 +1413,19 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	err = av_find_stream_info( avformat_ctx );
 #endif
 
-
 #ifdef STRICT_CHECKING
 #if  (LIBAVFORMAT_VERSION_MAJOR <= 53)
 	av_dump_format( avformat_ctx,0,filename,0 );
 #endif
 #endif
 
-	if( err > 0 ) {
-		char buf[1024];
-		av_strerror( err, buf, sizeof(buf)-1);
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s" , buf );
+	if( err < 0 ) {
+		av_strerror( err, errbuf, sizeof(errbuf));
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s: %s" ,filename,errbuf );
 	}
 
 	if(err < 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Stream information found in %s",filename);
 		vj_el_av_close_input_file( avformat_ctx );
 		return -1;
 	}
