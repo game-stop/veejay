@@ -28,6 +28,7 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <execinfo.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -45,22 +46,11 @@
 #include <execinfo.h>
 #include <unistd.h>
 #include <libgen.h>
-
 #include <mjpeg_logging.h>
-/* Bug in gcc prevents from using CPP_DEMANGLE in pure "C" */
-#if !defined(__cplusplus) && !defined(NO_CPP_DEMANGLE)
-#define NO_CPP_DEMANGLE
-#endif
-#ifndef NO_CPP_DEMANGLE
-#include <cxxabi.h>
-#endif
-
-#if defined(REG_RIP)
-#define SIGSEGV_STACK_IA64
-#elif defined(REG_EIP)
-#define SIGSEGV_STACK_X86
-#else
-#define SIGSEGV_STACK_GENERIC
+#include <sysexits.h>
+#ifdef HAVE_LIBUNWIND
+#define UNW_LOCAL_ONLY
+#include <libunwind.h>
 #endif
 
 #define TXT_RED		"\033[0;31m"
@@ -80,9 +70,11 @@ static int _debug_level = 0;
 static int _color_level = 1;
 static int _no_msg = 0;
 
+#ifdef STRICT_CHECKING
 __thread struct timeval _start_time;
 __thread int timerdy = 0;
 __thread int _start_time_offset = 0;
+#endif
 
 #define MAX_LINES 100 
 typedef struct
@@ -96,7 +88,7 @@ static	vj_msg_hist	_message_history;
 static	int		_message_his_status = 0;
 */
 
- 	
+#ifdef STRICT_CHECKING 	
 
 /* Subtract the `struct timeval' values X and Y,
    storing the result in RESULT.
@@ -127,64 +119,69 @@ timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y)
   /* Return 1 if result is negative. */
   return x->tv_sec < y->tv_sec;
 }
-
-static	void	veejay_addr2line_bt( int n, void *addr, void *sym )
-{
-	int res;
-	Dl_info info;
-	const void *address;
-	FILE *out;
-	char cmd[1024];
-	char line[1024], *line_ptr, *line_pos;
-	char func_name[1024];
-
-	res = dladdr( addr, &info );
-	if( (res == 0) || !info.dli_fname || !info.dli_fname[0] ) {
-		veejay_msg(VEEJAY_MSG_INFO, "\t%d ?:ACCESS VIOLATION", n);
-		return;
-	}
-
-	address = addr;
-	if( info.dli_fbase >= (const void*)0x40000000)
-#ifdef ARCH_X86_64
-		addr = (void*)((const char*) address - (uint64_t) info.dli_fbase );
-#else
-		addr = (void*)((const char*) address - (unsigned int ) info.dli_fbase);
 #endif
-	snprintf( cmd,sizeof(cmd), "addr2line --functions --demangle -e $(which %s) %p", info.dli_fname, address);
-	out = popen( cmd, "r");
-	if(!out) {
-		veejay_msg(VEEJAY_MSG_INFO, "\t%d %p (addr2line error)", n, sym );
+
+#ifdef HAVE_LIBUNWIND
+static void addr2line_unw( unw_word_t addr, char*file, size_t len, int *line )
+{
+	static char buf[512];
+	snprintf(buf, sizeof(buf), "addr2line -C -e /usr/local/bin/veejay -f -i %lx", addr );
+	FILE *fd = popen( buf, "r" );
+	if( fd == NULL ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "failed: %s", buf );
 		return;
 	}
 
-	func_name[0] = '\0';
+	fgets( buf, sizeof(buf), fd );
+	fgets( buf, sizeof(buf), fd );
 
-	while( !feof(out)) {
-		line_ptr = fgets(line,sizeof(line)-1,out);
-		if(line_ptr && line_ptr[0]) {
-			line_pos = strchr( line_ptr, '\n');
-			if( line_pos )
-				line_pos[0] = '\0';
-			if( strchr( line_ptr, ':' )) {
-				veejay_msg(VEEJAY_MSG_INFO, "\t%d %s %s (@%x)",
-						n,
-						line_ptr,
-						func_name,
-						addr);
-				func_name[0] = '\0';
-			} else {
-				if( func_name[0] )
-					veejay_msg(VEEJAY_MSG_INFO, "%d\t%s", n, func_name );
-				snprintf(func_name, sizeof(func_name), "%s", line_ptr );
-			}
+	if( buf[0] != '?' ) {
+		int line = -1;
+		char *p = buf;
+
+		while( *p != ':' ) {
+			p++;
 		}
+
+		*p++ = 0;
+		strncpy( file, len, buf );
+		sscanf( p, "%d", line );
 	}
-	if( func_name[0] )
-		veejay_msg(VEEJAY_MSG_INFO, "%03d %s",n,func_name );
-	fclose(out);
+	else {
+		strncpy( file,"optimized out", sizeof(file));
+		*line = 0;
+	}
+
+	pclose( fd );
 }
 
+void 	veejay_print_backtrace()
+{
+	char name[512];
+	unw_cursor_t cursor; 
+	unw_context_t uc;
+	unw_word_t ip, sp, offp;
+	
+	unw_getcontext( &uc );
+	unw_init_local( &cursor, &uc );
+
+	while( unw_step( &cursor ) > 0 )
+	{
+		char file[512];
+		int line = 0;
+		veejay_memset(name,0,sizeof(name));
+		unw_get_proc_name( &cursor, name, sizeof(name), &offp );
+		unw_get_reg( &cursor, UNW_REG_IP, &ip );
+		unw_get_reg( &cursor, UNW_REG_SP, &sp );
+
+		addr2line_unw( (long) ip, file, sizeof(file), &line );
+		if( line >= 0 )
+			veejay_msg(VEEJAY_MSG_ERROR, "\t at %s (%s:%d)", name, file, line );
+		else
+			veejay_msg(VEEJAY_MSG_ERROR, "\t at %s", name );
+	}
+}
+#else
 void	veejay_print_backtrace()
 {
 	void *space[100];
@@ -195,11 +192,10 @@ void	veejay_print_backtrace()
 	strings = backtrace_symbols(space,s);
 
 	for( i = 0; i < s ; i ++ ) 
-		veejay_addr2line_bt( i + 1, space[i],strings[i] );
-
+		veejay_msg(VEEJAY_MSG_ERROR, "%s", strings[i] );
 
 }
-
+#endif
 void	veejay_backtrace_handler(int n , void *dist, void *x)
 {
 	siginfo_t *ist = (siginfo_t*) dist;
@@ -214,91 +210,23 @@ void	veejay_backtrace_handler(int n , void *dist, void *x)
 #define SICCASE(c) case c: strerr = #c
 	switch(n) {
 		case SIGSEGV:
-			switch(ist->si_code) {
-				SICCASE(SEGV_MAPERR);
-				SICCASE(SEGV_ACCERR);
-			}
-			
-		//@ print stack
-#ifndef SIGSEGV_NOSTACK
-#if defined(SIGSEGV_STACK_IA64) || defined(SIGSEGV_STACK_X86)
-#if defined(SIGSEGV_STACK_IA64)
-			ip = (void*) puc->uc_mcontext.gregs[REG_RIP];
-			bp= (void**) puc->uc_mcontext.gregs[REG_RBP];
-#elif defined(SIGSEGV_STACK_X86)
-			ip = (void*) puc->uc_mcontext.gregs[REG_EIP];
-			bp = (void**) puc->uc_mcontext.gregs[REG_EBP];
-#endif
-#endif
-#endif
-
 			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system."); //@ Suggested by Matthijs
 			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge."); //@
 			veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision..."); //@
 
-#if defined(SIGSEGV_STACK_IA64) || defined(SIGSEGV_STACK_X86)
-#if defined(SIGSEGV_STACK_X86)
-			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %08x",
-					strerr,ist->si_addr, puc->uc_mcontext.gregs[REG_EIP]);
-			veejay_addr2line_bt( 0, (void*) puc->uc_mcontext.gregs[REG_EIP] , (void*) puc->uc_mcontext.gregs[REG_EIP] );
-#elif defined(SIGSEGV_STACK_IA64)
-			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %08x",
-					strerr,ist->si_addr, puc->uc_mcontext.gregs[REG_RIP]);
-			veejay_addr2line_bt( 0, (void*) puc->uc_mcontext.gregs[REG_RIP], (void*) puc->uc_mcontext.gregs[REG_RIP] );
-#endif
-#endif
-			for( i = 0; i < NGREG; i ++ ) {
-				veejay_msg(VEEJAY_MSG_INFO, "\tregister [%2d]\t=%08x",i,puc->uc_mcontext.gregs[i]);
-			}
-
-			while( bp && ip ) {
-
-				if( !dladdr( ip, &info ))
-					break;
-				char *symname = (char*) info.dli_sname;
-#ifndef NO_CPP_DEMANGLE
-				int status;
-				char *tmp = __cxa_demangle( symname, NULL, 0,
-						&status );
-				if( status == 0 && tmp )
-					symname = tmp;
-#endif
-
-				veejay_msg(VEEJAY_MSG_INFO,"\t\t%d\t: %p <%s+%lu> (%s)",
-						++f,
-						ip,
-						symname,
-						(unsigned long) ip - (unsigned long) info.dli_saddr,
-						info.dli_fname );
-#ifndef NO_CPP_DEMANGLE
-				if(tmp)
-					free(tmp);
-#endif
-
-				if(info.dli_sname && !strcmp(info.dli_sname, "main"))
-					break;
-
-				ip = bp[1];
-				bp = (void**) bp[0];
-
-			}
-
+			veejay_print_backtrace();
+			break;
+		default:
+			veejay_print_backtrace();
 			break;
 	}
 
-#if defined(SIGSEGV_STACK_IA64) || defined(SIGSEGV_STACK_X86)
-#if defined(SIGSEGV_STACK_IA64)
-	veejay_print_backtrace(puc->uc_mcontext.gregs[REG_RIP]);	
-#elif defined(SIGSEGV_STACK_X86)
-	veejay_print_backtrace(puc->uc_mcontext.gregs[REG_EIP]);
-#endif
-#endif
 	//@ Bye
 	veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");
 
 	report_bug();
 
-	_exit(0);
+	exit(EX_SOFTWARE);
 }
 
 void veejay_set_debug_level(int level)
@@ -355,7 +283,6 @@ void veejay_msg(int type, const char format[], ...)
     vsnprintf(buf, sizeof(buf) - 1, format, args);
 
 #ifdef STRICT_CHECKING
-	
 	struct tm *nowtm = NULL;
 	
 	gettimeofday( &timenow, NULL );

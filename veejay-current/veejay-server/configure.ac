@@ -976,6 +976,36 @@ if test x$have_freetype2 != xtrue; then
 fi
 
 
+
+AC_MSG_CHECKING(if libunwind is installed)
+have_unwind=false
+
+PKG_CHECK_MODULES( LIBUNWIND, libunwind, [have_unwind=true], [
+	OLDLIBS="$LIBS"
+	LIBS="$LIBS -lunwind"
+	AC_CACHE_CHECK([for libunwind support], [ac_cv_libunwind],
+	 [AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#define UNW_LOCAL_ONLY
+#include <libunwind.h>
+]],[[
+unw_context_t ctx;
+unw_getcontext( &ctx );
+]])],[ac_cv_libunwind=yes],[ac_cv_libunwind=no])])
+	LIBS="$OLDLIBS"
+
+	if test "$ac_cv_libunwind" = yes; then
+		LIBUNWIND_CFLAGS=
+		LIBUNWIND_LIBS=-lunwind
+		have_unwind=true
+	fi
+])
+
+if test x$have_unwind = xtrue ; then
+   AC_SUBST(LIBUNWIND_LIBS)
+   AC_SUBST(LIBUNWIND_CFLAGS)
+   AC_DEFINE(HAVE_LIBUNWIND,1,[Define if you have libunwind installed])
+fi
+
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
 AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
@@ -1187,6 +1217,6 @@ AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - V4L1 (obsolete)               : ${have_v4l}])
-
+AC_MSG_NOTICE([  - libunwind                     : ${have_unwind}])
 
 cat NEWS
