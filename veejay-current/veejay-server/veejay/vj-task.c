@@ -232,17 +232,20 @@ int		task_start(unsigned int max_workers)
 	    max_p = min_p;
 	
 	veejay_memset( &param, 0, sizeof(param));
-
-	param.sched_priority =  max_p;
-	
+	int euid = geteuid();
+	if( euid == 0 ) {
+		param.sched_priority =  max_p;
+	}
 	cpu_set_t cpuset;
 	pthread_cond_init( &tasks_completed, NULL );
 	pthread_cond_init( &current_task, NULL );
 	
 	for( i = 0 ; i < max_workers; i ++ ) {
 		pthread_attr_init( &p_attr[i] );
-		pthread_attr_setinheritsched( &p_attr[i], PTHREAD_EXPLICIT_SCHED );
-		pthread_attr_setschedpolicy( &p_attr[i], SCHED_FIFO );
+		if( euid == 0 ) {
+			pthread_attr_setinheritsched( &p_attr[i], PTHREAD_EXPLICIT_SCHED );
+			pthread_attr_setschedpolicy( &p_attr[i], SCHED_FIFO );
+		}
 		pthread_attr_setschedparam( &p_attr[i], &param );
 
 		if( n_cpu > 1 ) {
