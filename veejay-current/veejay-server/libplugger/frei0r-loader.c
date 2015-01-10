@@ -107,6 +107,7 @@ static struct  {
 	{ "opencvfacedetect", 0, 1 }, /* default initialization fails */ 
 	{ "Curves", 0, 1 },
 	{ "scanline0r",0, 1 },
+	{ "RGB-Parade", 0, 1 },
 	{ NULL, 0, 0 },
 };
 

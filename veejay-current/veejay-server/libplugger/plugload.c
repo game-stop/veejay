@@ -128,7 +128,8 @@ static	void* instantiate_plugin( const void *plugin, int w , int h )
 			break;
 	}
 
-	vevo_property_set( instance, "HOST_type", VEVO_ATOM_TYPE_INT, 1, &type );
+	if( instance != NULL )
+		vevo_property_set( instance, "HOST_type", VEVO_ATOM_TYPE_INT, 1, &type );
 
 	
 	return instance;
