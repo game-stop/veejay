@@ -144,8 +144,8 @@ static void addr2line_unw( unw_word_t addr, char*file, size_t len, int *line )
 		}
 
 		*p++ = 0;
-		strncpy( file, len, buf );
-		sscanf( p, "%d", line );
+		strncpy( file, buf, len );
+		sscanf( p, "%d", &line );
 	}
 	else {
 		strcpy( file, "optimized out" );
@@ -200,15 +200,6 @@ void	veejay_print_backtrace()
 void	veejay_backtrace_handler(int n , void *dist, void *x)
 {
 	siginfo_t *ist = (siginfo_t*) dist;
-	static char *strerr = "???";
-	static struct ucontext *puc;
-	int i,f=0;
-	void *ip = NULL;
-	void **bp = NULL;
-	Dl_info info;
-	
-	puc = (struct ucontext*) x;
-#define SICCASE(c) case c: strerr = #c
 	switch(n) {
 		case SIGSEGV:
 			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system."); //@ Suggested by Matthijs
