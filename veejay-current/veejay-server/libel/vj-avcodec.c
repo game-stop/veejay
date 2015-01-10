@@ -289,9 +289,13 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 #endif
 		if(av->y4m)
 			vj_yuv4mpeg_free( (vj_yuv*) av->y4m );
-		if(av->frame)
+		if(av->frame) {
+#if LIBAVCODEC_BUILD > 5400
 			avcodec_free_frame(av->frame);
-
+#else
+			av_frame_free(av->frame);
+#endif
+		}
 		free(av);
 	}
 	av = NULL;
