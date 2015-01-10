@@ -148,7 +148,7 @@ static void addr2line_unw( unw_word_t addr, char*file, size_t len, int *line )
 		sscanf( p, "%d", line );
 	}
 	else {
-		strncpy( file,"optimized out", sizeof(file));
+		strcpy( file, "optimized out" );
 		*line = 0;
 	}
 
@@ -170,6 +170,7 @@ void 	veejay_print_backtrace()
 		char file[512];
 		int line = 0;
 		veejay_memset(name,0,sizeof(name));
+		veejay_memset(file, 0,sizeof(file));
 		unw_get_proc_name( &cursor, name, sizeof(name), &offp );
 		unw_get_reg( &cursor, UNW_REG_IP, &ip );
 		unw_get_reg( &cursor, UNW_REG_SP, &sp );
