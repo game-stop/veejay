@@ -225,7 +225,6 @@ static int hastrackports = 0;
  \return TRUE if an object is soft referenced
  */ 
 static int vevo_property_is_soft_referenced(vevo_port_t * p, const char *key );
-
 //! Recursivly free all ports
 /*!
 \param sorted_port port to collect all atoms of type VEVO_ATOM_TYPE_PORTPTR in port p
@@ -416,17 +415,7 @@ for( i = 0; i < t->num_elements ; i ++ )\
  \return vevo_storage_t a new vevo_storage_t object
 */
 static vevo_storage_t *vevo_new_storage(__vevo_port_t *port );
-/*
-static int	vevo_port_ref_verify( vevo_port_t *p) ;
-*/
-//! Copy a value into a new atom
-/*!
- \param port port
- \param src address of value to store
- \param n number of elements to store
- \param d vevo_storage_t destination
- \param v atom type
- */
+
 static void
 storage_put_atom_value(__vevo_port_t * port, void *src, int n,
 		       vevo_storage_t * d, int v);
@@ -446,7 +435,6 @@ static inline ukey_t hash_key_code( const char *str )
 
         return hash;
 }
-
 //! Flag a property as soft referenced. Use to avoid freeing a linked pointer.
 /*!
  \param p port
@@ -477,13 +465,14 @@ int vevo_property_soft_reference(vevo_port_t * p, const char *key)
     return VEVO_NO_ERROR;
 }
 
-
+#ifdef STRICT_CHECKING
 //! Flag a property as read-only. Use to avoid overriding the value
 /*!
  \param p port
  \param key property to set as readonly
  \return error code
  */
+
 static int vevo_property_finalize(vevo_port_t * p, const char *key)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
@@ -507,6 +496,7 @@ static int vevo_property_finalize(vevo_port_t * p, const char *key)
     }
     return VEVO_ERROR_NOSUCH_PROPERTY;
 }
+#endif
 
 int	vevo_property_protect( vevo_port_t *p, const char *key  )
 {
@@ -1117,16 +1107,11 @@ int vevo_property_atom_size(vevo_port_t * p, const char *key)
 	}
     return -1;
 }
+
+#ifdef STRICT_CHECKING
 static int vevo_property_is_protected(vevo_port_t * p, const char *key)
 {
-#ifdef STRICT_CHECKING
-    assert(p != NULL);
-    assert(key != NULL);
-#endif
     __vevo_port_t *port = (__vevo_port_t *) p;
-#ifdef STRICT_CHECKING
-    assert(port != NULL);
-#endif
     ukey_t hash_key = hash_key_code(key);
 
     if (!port->table) {
@@ -1135,11 +1120,6 @@ static int vevo_property_is_protected(vevo_port_t * p, const char *key)
 	    return ( node->st->flags & VEVO_PROPERTY_PROTECTED );
     } else {
 	hnode_t *node = NULL;
-#ifdef STRICT_CHECKING
-	assert(port->table != NULL);
-//	assert(hash_verify(port->table) != 0);
-#endif
-
 	if ((node = property_exists(port, hash_key)) != NULL) {
 	    vevo_storage_t *stor = (vevo_storage_t *) hnode_get(node);
 	    if (stor)
@@ -1148,6 +1128,7 @@ static int vevo_property_is_protected(vevo_port_t * p, const char *key)
     }
     return VEVO_NO_ERROR;
 }
+#endif
 
 //! Return size of an Atom at a given index
 /*!
@@ -1989,11 +1970,10 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
     __vevo_port_t *port = (__vevo_port_t *) p;
     if(!p) return NULL;
     
-    int n = 1024;	// null terminated list of keys
-    int i = 0;
+    unsigned int N = 8;	// null terminated list of keys 2 -> 4 -> 8 -> 16 etc
+    int idx = 0;
 
-    vevo_storage_t **list = (vevo_storage_t**)malloc(sizeof(vevo_storage_t*) * n );
-    memset(list,0,sizeof(vevo_storage_t*) * n );
+    vevo_storage_t **list = (vevo_storage_t**)malloc(sizeof(vevo_storage_t*) * N );
 
     if( port->table)
     {
@@ -2010,10 +1990,16 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 			int type = 0;
 			int ec = atom_get_value(s, 0, &type);
 			if( ec == VEVO_NO_ERROR && !s->softlink ) {
-				list[i++] = s;
+				list[idx] = s;
+				idx ++;
+				if( idx >= N ) {
+					N *= 2;
+					list = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
+				}
 			}
 		}
 	}
+	list[idx] = NULL;
     }
     else
     {
@@ -2030,11 +2016,17 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 			int type = 0;
 			int ec = atom_get_value(l->st, 0, &type);
 			if( ec == VEVO_NO_ERROR && !s->softlink ) {
-				list[i++] = s;
+				list[idx] = s;
+				idx ++;
+				if( idx >= N ) {
+					N *= 2;
+					list = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
+				}
 			}
 		}
 		l = n;
 	}
+	list[idx] = NULL;
     }
     return list;
 }
@@ -2064,18 +2056,6 @@ void	vevo_report_stats()
 #else
 	veejay_msg(0, "recompile with -DVEVO_TRACKPORTS");
 #endif
-	/*
-#ifdef VVERBOSE
-#ifdef STRICT_CHECKING
-	if( port_ref_ )
-	{
-		int errs = vevo_port_ref_verify( port_ref_ );
-		if(errs > 0)
-			veejay_msg(0,"%d VEVO ports are still referenced",errs);
-		vevo_port_free( port_ref_ );
-	}
-#endif
-#endif*/
 }
 
 static	int	vevo_port_get_port( void *port, vevo_storage_t *item, void *res )
@@ -2115,9 +2095,6 @@ void	*vevo_port_register( vevo_port_t *in, vevo_port_t *ref )
 		sprintf(pkey,"%p", ref);
 		if( vevo_property_exists( port, pkey ) == 0 )
 			vevo_property_set( port, pkey,VEVO_ATOM_TYPE_PORTPTR, 1 , &ref );
-#ifdef STRICT_CHECKING
-			veejay_msg(0, "ports all mangled");
-#endif
 	}
 	return port;
 }
@@ -2150,15 +2127,9 @@ int	vevo_union_ports( void *port_a, void *port_b, int filter_type )
 		assert( n <= 1 );
 #endif
 		void *v = NULL;
-		error = vevo_property_get( port_a, Ea[i], 0, &v );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
-		error = vevo_property_set( port_b, Ea[i], 
-				VEVO_ATOM_TYPE_VOIDPTR,1, &v );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
+		if(vevo_property_get( port_a, Ea[i], 0, &v ) == VEVO_NO_ERROR ) {
+			vevo_property_set( port_b, Ea[i],VEVO_ATOM_TYPE_VOIDPTR,1, &v );
+		}
 	}
 	free( Ea[i] );	
    }
@@ -2393,22 +2364,13 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 {
 	if(port == NULL)
 		return;   
-/*
-#ifdef STRICT_CHECKING	
-	veejay_msg(0, "---- PORT %p", port );
-	vevo_port_scan_free( port );
-	veejay_msg(0, "------------");
-	vevo_port_dump( port, 0 );
-	vevo_port_validate_ports( port, NULL );
-#endif
-*/
+
    	__vevo_port_t *vp = (__vevo_port_t *) port;
 	if( vp->index == NULL ) {	
 		port = NULL;
 		return;
 	}
 
-	int i;
 	vevo_storage_t **item = vevo_list_nodes_( port, VEVO_ATOM_TYPE_PORTPTR );
 	if(!item)
 	{
@@ -2416,6 +2378,8 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 		free(item);
 		return;
 	}
+
+	int i;
 
 	for( i = 0; item[i] != NULL ; i ++ )
 	{
@@ -2447,54 +2411,7 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 	vevo_port_free_( port );
 	port = NULL;
 }	
-/*	
-void	vevo_port_recursive_free( vevo_port_t *port )
-{
-	if(!port)
-		return;
-
-	void *sor = vevo_port_register( NULL,NULL );
 	
-#ifdef STRICT_CHECKING
-	assert( sor != NULL );
-#endif
-	
-	vevo_port_recurse_free( sor, port );
-
-	int i;
-	vevo_storage_t **item = vevo_list_nodes_( sor, VEVO_ATOM_TYPE_PORTPTR );
-	if(!item)
-	{
-		vevo_port_free_(sor);
-		vevo_port_free_(port);
-		return;
-	}
-
-#ifdef STRICT_CHECKING
-	assert( item != NULL );
-#endif
-	for( i = 0; item[i] != NULL ; i ++ )
-	{
-		void *sub_port = NULL;
-		int ec = atom_get_value( item[i],0,&sub_port );
-		
-		if( ec == VEVO_NO_ERROR )
-		{
-#ifdef STRICT_CHECKING
-			assert(sub_port != NULL);
-#endif
-			vevo_port_free_( sub_port );
-		}
-	}
-	
-	free(item);	
-
-	vevo_port_free_( sor );
-
-	vevo_port_free_(port);
-}
-*/
-
 /*
 char	**vevo_port_deepen_namespace( void *port, char *path)
 {
@@ -2673,60 +2590,6 @@ static void	vevo_port_recurse_free( vevo_port_t *sorted_port, vevo_port_t *p )
 	free(item);
 }
 
-//! Run over port reference port and verify that all ports have been freed
-/*!
- \param p pointer to reference port
- \return error code
-*/
-
-static int	vevo_port_ref_verify( vevo_port_t *p) 
-{
-/*
-#ifdef STRICT_CHECKING
-	char **item = NULL;
-	int i;
-	int ref_count = 0;
-	item = vevo_list_properties( p );
-	if( item == NULL )
-	{
-		veejay_msg(0, "%s: No properties in %p",p);
-		return 1;
-	}
-	for( i = 0; item[i] != NULL ; i ++ )
-	{
-		int error = vevo_property_get( port_ref_,item[i],0,&ref_count);
-
-		if( error == VEVO_ERROR_PROPERTY_EMPTY )
-			ref_count = 0;
-		else
-		{
-			if( error != VEVO_NO_ERROR )
-			{
-				veejay_msg(0, "Port '%p' reference unexpected error %d)", item[i],error );
-				err++;
-			}
-		}
-		
-		if( ref_count != 0 )
-		{
-			void *which_port = NULL;
-			error = vevo_property_get( port_ref_, item[i],0, &which_port );
-			if( error )
-				veejay_msg(0, "Port '%s' retrieval returns error %d", item[i],error );
-//			else
-//				veejay_msg(0, "Reference to Port %s exists, but may be invalid", item[i]);
-//			veejay_msg(0, "Port '%s' reference count is %d",item[i], ref_count);
-			err++;
-		}
-		ref_count = 1;
-		free(item[i]);
-	}
-	free(item);
-#endif
-	return err;
-*/
-	return 1;
-}
 static	char	*vevo_property_get_str( vevo_port_t *port, const char *key )
 {
   	size_t len = vevo_property_element_size( port, key,0 );

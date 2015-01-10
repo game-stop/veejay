@@ -115,7 +115,7 @@ static struct  {
 static inline int frei0r_param_set_double(f0r_set_param_value_f q,void *plugin, int seq_no,int offset, int *args )
 {
 	double value = (double) args[offset] / 100.0f;
-	f0r_param_t *fparam = &value;
+	f0r_param_t *fparam = (f0r_param_t*) &value;
 	(*q)( plugin, fparam, seq_no );
 
 	return 1;
@@ -124,7 +124,7 @@ static inline int frei0r_param_set_double(f0r_set_param_value_f q,void *plugin, 
 static inline int frei0r_param_set_bool(f0r_set_param_value_f q,void *plugin, int seq_no, int offset, int *args )
 {
 	double value = (args[offset] == 1 ? 1.0: 0.0 );
-	f0r_param_t *fparam = &value;
+	f0r_param_t *fparam = (f0r_param_t*) &value;
 	(*q)( plugin, fparam, seq_no );
 
 	return 1;
@@ -135,7 +135,7 @@ static inline int frei0r_param_set_position(f0r_set_param_value_f q,void *plugin
 	f0r_param_t *fparam = NULL;
 	pos.x =( ( (float) width / 100.0f) * args[offset] );
 	pos.y =( ( (float) height / 100.0f) * args[offset+1] );
-	fparam = &pos;
+	fparam = (f0r_param_t*) &pos;
 	(*q)( plugin, fparam, seq_no );
 
 	return 2;
@@ -147,7 +147,7 @@ static inline int frei0r_param_set_color(f0r_set_param_value_f q,void *plugin, i
 	col.r = ( args[offset] / 255.0f);
 	col.g = ( args[offset+1] / 255.0f);
 	col.b = ( args[offset+2] / 255.0f);
-	fparam = &col;
+	fparam = (f0r_param_t*) &col;
 	(*q)( plugin, fparam, seq_no );
 	
 	return 3;
@@ -205,11 +205,10 @@ void	frei0r_plug_param_f( void *port, int num_args, int *args )
 #endif
 	int width = 1;
 	int height = 1;
-	int offset = 0;
+
 	vevo_property_get( port, "HOST_plugin_width", 0, &width );
 	vevo_property_get( port, "HOST_plugin_height", 0, &height );
 
-	int seq_no = 0;
 	int vj_seq_no = 0;
 	int done = 0;
 
@@ -303,7 +302,7 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 	return 1;
 }
 
-static char 	*split_parameter_name( char *name, char *vj_name ) 
+static char 	*split_parameter_name( const char *name, const char *vj_name ) 
 {
 	int len = strlen(name) + strlen(vj_name) + 5;
 	char *str = malloc(len);
@@ -311,7 +310,7 @@ static char 	*split_parameter_name( char *name, char *vj_name )
 	return str;
 }
 
-static void 	*init_parameter_port( int min, int max, int def, char *name, int seq_no, int type )
+static void 	*init_parameter_port( int min, int max, int def,const char *name, int seq_no, int type )
 {
 	void *parameter = vpn( VEVO_FR_PARAM_PORT );
 	char *dname = strdup(name);
@@ -473,8 +472,6 @@ void* 	deal_with_fr( void *handle, char *name)
 	f0r_param_info_t pinfo;
 
 	memset( &finfo,0,sizeof(f0r_plugin_info_t));
-	memset( &pinfo,0,sizeof(f0r_param_info_t));
-
 
 	if( (*f0r_init)() == 0)
 	{
@@ -553,20 +550,19 @@ void* 	deal_with_fr( void *handle, char *name)
 		return NULL;
 	}
 
-	//@ bang, if plug behaves badly. veejay crashes. is it blacklisted?
 	veejay_msg(VEEJAY_MSG_DEBUG, "Frei0r plugin '%s' version %d.%d by %s",
 			plugin_name, finfo.major_version, finfo.minor_version, finfo.author );
-	//@FIXME: blacklist
 	
 	int n_params = finfo.num_params;
 	int r_params = 0;
 	int p = 0;
-	int using = 0;
 	if( set_params == NULL )
-		n_params = 0; // lol
+		n_params = 0; 
 
 	for ( p = 0; p < n_params; )
 	{
+		veejay_memset( &pinfo,0,sizeof(f0r_param_info_t));
+
 		(*f0r_param)(&pinfo,p);
 		
 		int vj_args = frei0r_to_vj_np( pinfo.type );
@@ -608,7 +604,7 @@ void* 	deal_with_fr( void *handle, char *name)
 			pixfmt = PIX_FMT_BGRA;
 			break;
 		case F0R_COLOR_MODEL_RGBA8888:
-		case F0R_COLOR_MODEL_PACKED32: //lol
+		case F0R_COLOR_MODEL_PACKED32: 
 			pixfmt = PIX_FMT_RGBA;
 			break;
 		default:
@@ -643,7 +639,6 @@ void	frei0r_plug_deinit( void *plugin )
 			(*base)(instance);
 	}
 
-
 	fr0_conv_t *fr = NULL;
 	err = vevo_property_get( plugin, "HOST_conv",0,&fr);
 	if( fr && err == VEVO_NO_ERROR ){
@@ -655,7 +650,7 @@ void	frei0r_plug_deinit( void *plugin )
 		free(fr);
 		fr = NULL;
 	}
-	
+
 	vpf(plugin);
 	plugin = NULL;
 }
@@ -682,15 +677,15 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 		return NULL;
 	}
 
-	vevo_property_set(instance, "frei0r", VEVO_ATOM_TYPE_PORTPTR, 1, &k);
+	vevo_property_set(instance, "frei0r", VEVO_ATOM_TYPE_VOIDPTR, 1, &k);
 	
 	vevo_property_set( instance, "parent", VEVO_ATOM_TYPE_VOIDPTR, 1,&plugin);
 
 
-	generic_push_channel_f gpc = frei0r_push_frame_f;
-	generic_process_f      gpf = frei0r_process_frame_f;
-	generic_push_parameter_f gpp = frei0r_plug_param_f;
-	generic_deinit_f	 gdd = frei0r_plug_deinit;
+	generic_push_channel_f gpc = (generic_push_channel_f) frei0r_push_frame_f;
+	generic_process_f      gpf = (generic_process_f) frei0r_process_frame_f;
+	generic_push_parameter_f gpp = (generic_push_parameter_f) frei0r_plug_param_f;
+	generic_deinit_f	 gdd = (generic_deinit_f) frei0r_plug_deinit;
 
 	vevo_property_set( instance, "HOST_plugin_param_f", VEVO_ATOM_TYPE_VOIDPTR, 1, &gpp);
 	vevo_property_set( instance, "HOST_plugin_push_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gpc);
@@ -743,18 +738,16 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 	vevo_property_set( instance, "HOST_conv", VEVO_ATOM_TYPE_VOIDPTR,1,&frptr);
 
 	int n_inputs = 0;
-	int err = vevo_property_get(plugin, "num_inputs", 0, &n_inputs );
-		err = vevo_property_set( instance, "num_inputs", VEVO_ATOM_TYPE_INT, 1, &n_inputs );
-		err = vevo_property_get( plugin, "num_outputs", 0, &n_inputs );
-		err = vevo_property_set( instance, "num_outputs", VEVO_ATOM_TYPE_INT,1,&n_inputs );
+	vevo_property_get(plugin, "num_inputs", 0, &n_inputs );
+	vevo_property_set( instance, "num_inputs", VEVO_ATOM_TYPE_INT, 1, &n_inputs );
+	vevo_property_get( plugin, "num_outputs", 0, &n_inputs );
+	vevo_property_set( instance, "num_outputs", VEVO_ATOM_TYPE_INT,1,&n_inputs );
 
 	return instance;
 }
 
 void	frei0r_plug_free( void *plugin )
 {
-	int n = 0;
-	//FIXME: not used
 	f0r_deinit_f base;
 	if( vevo_property_get( plugin, "deinit", 0, &base) == VEVO_NO_ERROR )
 		(*base)();
@@ -775,8 +768,6 @@ int	frei0r_process_frame_f( void *plugin )
 	f0r_update2_f base2;
 	vevo_property_get( parent, "process_mix", 0, &base2 );
 
-
-
 	vevo_property_get( plugin, "frei0r",0, &instance );		
 	
 	fr0_conv_t *fr = NULL;
@@ -794,7 +785,7 @@ int	frei0r_process_frame_f( void *plugin )
 
 	if( n_inputs == 0 && n_outputs == 1 ) {
 		
-		(*base)( instance, rand(), fr->buf, fr->buf );
+		(*base)( instance, rand(), (const uint32_t*) fr->buf, (uint32_t*) fr->buf );
 		
 		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[0], dst );
 		
@@ -802,14 +793,14 @@ int	frei0r_process_frame_f( void *plugin )
 
 	} else if( n_inputs == 1 ) {
 
-		(*base)( instance, rand(), fr->in[0]->data[0],fr->in[1]->data[0] );
+		(*base)( instance, rand(), (const uint32_t*) fr->in[0]->data[0], (uint32_t*) fr->in[1]->data[0] );
 	
 		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[1], dst );
 
 	} else if ( n_inputs == 2 ) {
 
 		
-		(*base2)( instance, rand(), fr->in[0]->data[0],fr->in[1]->data[0],NULL,fr->in[2]->data[0] );
+		(*base2)( instance, rand(), (const uint32_t*) fr->in[0]->data[0],(const uint32_t*) fr->in[1]->data[0],NULL, (uint32_t*) fr->in[2]->data[0] );
 
 		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[2], dst );
 
