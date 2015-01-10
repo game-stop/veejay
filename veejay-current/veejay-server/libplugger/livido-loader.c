@@ -1466,8 +1466,6 @@ void*	deal_with_livido( void *handle, const char *name )
 	}
 
 	int n_params = livido_scan_parameters( filter_templ, port );
-
-
 	int n_oparams = livido_scan_out_parameters( filter_templ, port );
 	
 //@ p%02d is a key with a portptr value. it contains min,max,defaults for each plugin setup()	
@@ -1482,8 +1480,8 @@ void*	deal_with_livido( void *handle, const char *name )
 #ifdef STRICT_CHECKING
 	assert( plugin_name != NULL );
 #endif
-	char *clone_name = (char*) vj_malloc( strlen(plugin_name) + 4);
-	sprintf(clone_name, "LVD%s", plugin_name );
+	char *clone_name = (char*) vj_malloc( strlen(plugin_name) + 5);
+	sprintf(clone_name, "LVD %s", plugin_name );
 
 	vevo_property_set( port, "num_params", VEVO_ATOM_TYPE_INT, 1, &n_params );
 	vevo_property_set( port, "num_out_params", VEVO_ATOM_TYPE_INT,1,&n_oparams );

@@ -127,6 +127,9 @@ static	void* instantiate_plugin( const void *plugin, int w , int h )
 			veejay_msg(0, "Plugin type not supported.");
 			break;
 	}
+
+	vevo_property_set( instance, "HOST_type", VEVO_ATOM_TYPE_INT, 1, &type );
+
 	
 	return instance;
 }
@@ -146,10 +149,10 @@ static	void	deinstantiate_plugin( void *instance )
 	instance = NULL;
 }
 
-static	void	add_to_plugin_list( const char *path )
+static	int	add_to_plugin_list( const char *path )
 {
-	if(!path)
-		return;
+	if(path == NULL)
+		return 0;
 
 	int i;
 	char fullname[PATH_MAX+1];
@@ -162,24 +165,26 @@ static	void	add_to_plugin_list( const char *path )
 
 	if( res != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "File or directory '%s' does not exist (skip)", path);
-		return;
+		veejay_msg(VEEJAY_MSG_DEBUG, "File or directory '%s' does not exist (skip)", path);
+		return 0;
 	}
 	
 	if( S_ISREG( sbuf.st_mode ) )
 	{
 		vevo_property_set( illegal_plugins_, path, LIVIDO_ATOM_TYPE_STRING, 0, NULL );
-		return;
+		return 0;
 	}
 
 	if( !S_ISDIR( sbuf.st_mode ) )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Not a directory : '%s'", path );
-		return;
+		veejay_msg(VEEJAY_MSG_DEBUG, "Not a directory : '%s'", path );
+		return 0;
 	}
 	int n_files = scandir( path, &files, select_f, alphasort );
-	if( n_files <= 0 )
-		return;
+	if( n_files <= 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "No plugins found in %s", path );
+		return 0;
+	}
 
 	for( i = 0 ; i < n_files; i ++ )
 	{
@@ -187,7 +192,7 @@ static	void	add_to_plugin_list( const char *path )
 
 		if( vevo_property_get( illegal_plugins_, name, 0 , NULL ) == 0 )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "'%s' marked as bad", name);
+			veejay_msg(VEEJAY_MSG_DEBUG, "'%s' marked as bad", name);
 			continue; 
 		}
 		bzero(fullname , PATH_MAX+1);
@@ -257,6 +262,8 @@ static	void	add_to_plugin_list( const char *path )
 	for( i = 0; i < n_files; i ++ )
 		free( files[i] );
 	free(files);
+
+	return n_files;
 }
 
 static	void	free_plugin(void *plugin)
@@ -542,8 +549,12 @@ int	plug_sys_detect_plugins(void)
 	{
 		veejay_msg(VEEJAY_MSG_WARNING,
 				"No plugins found in $HOME/.veejay/plugins.cfg" );
-		return 0;
 	}
+
+	veejay_msg(VEEJAY_MSG_INFO, "Looking for plugins in common locations ...");
+	add_to_plugin_list("/usr/local/lib/livido-plugins");
+	add_to_plugin_list("/usr/lib/frei0r-1");
+	
 
 	veejay_msg(VEEJAY_MSG_INFO, "Veejay plugin system initialized");
 	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
@@ -560,22 +571,24 @@ int	plug_sys_detect_plugins(void)
 		}
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "\tfrei0r - a minimalistic plugin API for video effects");
-	veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2004 Georg Seidel, Phillip Promesberger and Martin Bayer (GPL)");
-	veejay_msg(VEEJAY_MSG_INFO, "\thttp://www.piksel.org/frei0r");
-	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d frei0r %s",
-		n_fr_ , n_fr_ == 1 ? "plugin" : "plugins" );
-
-	veejay_msg(VEEJAY_MSG_WARNING, "\tPerformance penalty for frei0r and FreeFrame: native -> RGB -> native.");
-
-	veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
-	veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2005 Gabriel 'Salsaman' Finch, Dennis 'Jaromil' Rojo");
-	veejay_msg(VEEJAY_MSG_INFO, "\t                   Daniel Fischer, Martin Bayer, Kentaro Fukuchi and Andraz Tori");
-	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d Livido %s",
-		n_lvd_, n_lvd_ == 1 ? "plugin" :"plugins" );
-	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
+	if( n_fr_ > 0 ) {
+		veejay_msg(VEEJAY_MSG_INFO, "\tfrei0r - a minimalistic plugin API for video effects");
+		veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2004 Georg Seidel, Phillip Promesberger and Martin Bayer (GPL)");
+		veejay_msg(VEEJAY_MSG_INFO, "\thttp://www.piksel.org/frei0r");
+		veejay_msg(VEEJAY_MSG_INFO, "\tFound %d frei0r %s",
+			n_fr_ , n_fr_ == 1 ? "plugin" : "plugins" );
 	
-	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
+
+		veejay_msg(VEEJAY_MSG_WARNING, "\tPerformance penalty for frei0r and FreeFrame: native -> RGB -> native.");
+	}	
+
+	if( n_lvd_ > 0 ) {
+		veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
+		veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2005 Niels Elburg, Gabriel 'Salsaman' Finch, Dennis 'Jaromil' Rojo");
+		veejay_msg(VEEJAY_MSG_INFO, "\t                   Daniel Fischer, Martin Bayer, Kentaro Fukuchi and Andraz Tori");
+		veejay_msg(VEEJAY_MSG_INFO, "\tFound %d Livido %s",
+			n_lvd_, n_lvd_ == 1 ? "plugin" :"plugins" );
+	}
 	
 	plug_print_all();
 	
@@ -623,6 +636,15 @@ void	plug_clone_parameters( void *instance, void *fx_values )
 	(*gcc)( instance, 0, fx_values );
 }
 
+int	plug_is_frei0r( void *instance )
+{
+	int type = 0;
+	vevo_property_get(instance, "HOST_type", 0, &type );
+	if( type == VEVO_PLUG_FR )
+		return 1;
+	return 0;
+}
+
 void	plug_set_parameter( void *instance, int seq_num,int n_elements,void *value )
 {
 #ifdef STRICT_CHECKING
@@ -634,6 +656,10 @@ void	plug_set_parameter( void *instance, int seq_num,int n_elements,void *value 
 		(*gpp)( instance, seq_num, value );
 }
 
+void 	plug_set_parameters( void *instance, int n_args, void *values )
+{
+	frei0r_plug_param_f( instance, n_args, (int*) values );
+}
 void	plug_get_defaults( void *instance, void *fx_values )
 {
 #ifdef STRICT_CHECKING
@@ -645,8 +671,8 @@ void	plug_get_defaults( void *instance, void *fx_values )
 	assert( error == VEVO_NO_ERROR );
 #endif
 	(*gdv)( instance, fx_values );
-
 }
+
 void	plug_set_defaults( void *instance, void *fx_values )
 {
 #ifdef STRICT_CHECKING
@@ -1017,8 +1043,6 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 		(*gpu)( instance, seq_num,out, frame );
 }
 
-
-
 void	plug_process( void *instance, double timecode )
 {
 #ifdef STRICT_CHECKING
@@ -1110,6 +1134,10 @@ vj_effect *plug_get_plugin( int fx_id ) {
 				param_descr[valid_p] = vevo_property_get_string(parameter,"name");
 				if(param_descr[valid_p]==NULL)
 					param_descr[valid_p] = strdup( "Number" );
+		//		veejay rbg parameter is always p01
+		//		if( vevo_property_get( parameter, "rgb_conv", 0, NULL ) == VEVO_NO_ERROR ) {
+		//			vje->rgb_conv = 1;
+		//		}
 				valid_p ++;
 			}
 		}		

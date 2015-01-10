@@ -11,9 +11,9 @@ void	frei0r_plug_free( void *plugin );
 
 int	frei0r_plug_process( void *plugin, void *in, void *out );
 
-void	frei0r_plug_control( void *plugin, int *args );
-
 void	frei0r_plug_process_ext( void *plugin, void *in1, void *in2, void *out);
+
+void	frei0r_plug_param_f( void *port, int num_args, int *dargs );
 
 int	init_frei0r(int w, int h, int pf);
 #endif

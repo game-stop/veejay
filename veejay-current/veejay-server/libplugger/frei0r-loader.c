@@ -1,6 +1,6 @@
 /* veejay - Linux VeeJay - libplugger utility
  *           (C) 2010      Niels Elburg <nwelburg@gmail.com> ported from veejay-ng
- * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
+ * 	     (C) 2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -67,7 +67,9 @@ typedef void (*f0r_update_f)(f0r_instance_t instance, double time, const uint32_
 typedef void (*f0r_update2_f)(f0r_instance_t instance, double time, const uint32_t *inframe1, const uint32_t *inframe2, const uint32_t *inframe3, uint32_t *outframe);
 
 typedef void (*f0r_set_param_value_f)(f0r_instance_t *instance, f0r_param_t *param, int param_index);
-void	frei0r_plug_param_f( void *port, int seq_no, void *value );
+
+typedef void (*f0r_get_param_value_f)(f0r_instance_t *instance, f0r_param_t *param, int param_index );
+
 int	frei0r_push_frame_f( void *plugin, int dir, int seqno, VJFrame *in );
 int	frei0r_process_frame_f( void *plugin );
 int	frei0r_get_param_f( void *port, void *dst );
@@ -85,10 +87,169 @@ typedef struct
 static	void	*in_scaler__ = NULL;
 static 	void	*out_scaler__ = NULL;
 
+static inline int frei0r_to_vj_np( int hint )
+{
+	switch(hint) {
+		case F0R_PARAM_BOOL: return 1;
+		case F0R_PARAM_DOUBLE: return 1;
+		case F0R_PARAM_POSITION: return 2;
+		case F0R_PARAM_COLOR: return 3;
+	}
+	return 0;
+}
+
+static struct  {
+	const char *name;
+	int	major;
+	int	minor;
+} frei0r_black_list[] = { /* plugins that crash in f0r_update() */
+	{ "Scale0Tilt", 0, 1 }, 
+	{ "opencvfacedetect", 0, 1 }, /* default initialization fails */ 
+	{ "Curves", 0, 1 },
+	{ "scanline0r",0, 1 },
+	{ NULL, 0, 0 },
+};
+
+static inline int frei0r_param_set_double(f0r_set_param_value_f q,void *plugin, int seq_no,int offset, int *args )
+{
+	double value = (double) args[offset] / 100.0f;
+	f0r_param_t *fparam = &value;
+	(*q)( plugin, fparam, seq_no );
+
+	return 1;
+}
+
+static inline int frei0r_param_set_bool(f0r_set_param_value_f q,void *plugin, int seq_no, int offset, int *args )
+{
+	double value = (args[offset] == 1 ? 1.0: 0.0 );
+	f0r_param_t *fparam = &value;
+	(*q)( plugin, fparam, seq_no );
+
+	return 1;
+}
+static inline int frei0r_param_set_position(f0r_set_param_value_f q,void *plugin, int seq_no,int offset, int *args, int width, int height )
+{
+	f0r_param_position_t pos;
+	f0r_param_t *fparam = NULL;
+	pos.x =( ( (float) width / 100.0f) * args[offset] );
+	pos.y =( ( (float) height / 100.0f) * args[offset+1] );
+	fparam = &pos;
+	(*q)( plugin, fparam, seq_no );
+
+	return 2;
+}
+static inline int frei0r_param_set_color(f0r_set_param_value_f q,void *plugin, int seq_no,int offset, int *args)
+{
+	f0r_param_color_t col;
+	f0r_param_t *fparam = NULL;
+	col.r = ( args[offset] / 255.0f);
+	col.g = ( args[offset+1] / 255.0f);
+	col.b = ( args[offset+2] / 255.0f);
+	fparam = &col;
+	(*q)( plugin, fparam, seq_no );
+	
+	return 3;
+}
+static inline void *frei0r_plug_get_param( void *parent, int vj_seq_no, int *hint )
+{
+	char key[20];
+	snprintf(key, sizeof(key)-1, "p%02d", vj_seq_no );
+	void *param = NULL;
+	
+	if(vevo_property_get( parent, key, 0, &param ) != VEVO_NO_ERROR) {
+		return NULL;
+	}
+
+	int type = -1;
+
+	vevo_property_get( param, "hint", 0, &type );
+	
+	*hint = type;
+
+	return param;
+}
+
+void	frei0r_plug_param_f( void *port, int num_args, int *args )
+{
+	void *plugin = NULL;
+	int err	     = vevo_property_get(port, "frei0r",0,&plugin);
+	if( err != VEVO_NO_ERROR ) {
+		return;
+	}
+
+	void *parent = NULL;
+	err 	     = vevo_property_get(port, "parent",0,&parent);
+	if( err != VEVO_NO_ERROR)  {
+		return;
+	}
+
+	int np = 0;
+	err = vevo_property_get( parent, "num_params",0,&np);
+	
+	if( np == 0 ) {
+		return; //@ plug accepts no params but set param is called anyway 
+	}
+
+	f0r_set_param_value_f q = NULL;
+
+	err = vevo_property_get( parent, "set_params", 0, &q);
+       
+	if( err != VEVO_NO_ERROR ) {
+		return;
+	}
+#ifdef STRICT_CHECKING
+	f0r_get_param_value_f w = NULL;
+	vevo_property_get( parent, "get_params", 0, &w );
+#endif
+	int width = 1;
+	int height = 1;
+	int offset = 0;
+	vevo_property_get( port, "HOST_plugin_width", 0, &width );
+	vevo_property_get( port, "HOST_plugin_height", 0, &height );
+
+	int seq_no = 0;
+	int vj_seq_no = 0;
+	int done = 0;
+
+	while( done == 0 ) {
+		int hint = 0;
+		void *param = frei0r_plug_get_param(parent, vj_seq_no, &hint );
+		if(param == NULL ) {
+			vj_seq_no ++;
+			if( vj_seq_no >= num_args )
+				done = 1;
+			continue;
+		}
+
+		int seq_no = 0;
+		vevo_property_get( param, "seqno", 0, &seq_no );
+		
+		switch( hint ) {
+			case F0R_PARAM_BOOL: 
+				frei0r_param_set_bool(q,plugin, seq_no, vj_seq_no, args );
+				break;
+			case F0R_PARAM_DOUBLE:
+				frei0r_param_set_double(q,plugin, seq_no, vj_seq_no, args );
+				break;
+			case F0R_PARAM_POSITION: 
+				frei0r_param_set_position(q,plugin,seq_no,vj_seq_no,args,width,height);
+				break;
+			case F0R_PARAM_COLOR:
+				frei0r_param_set_color(q,plugin,seq_no,vj_seq_no,args);
+				break;
+		}
+
+		vj_seq_no += frei0r_to_vj_np( hint );
+		if( vj_seq_no >= num_args )
+			done = 1;
+
+	}
+}
+
 int	frei0r_get_param_f( void *port, void *dst )
 {
 	void *instance = NULL;
-	int  err = vevo_property_get(port, "frei0r",0,&instance );
+	int err = vevo_property_get(port, "frei0r",0,&instance );
 	if( err != VEVO_NO_ERROR )
 		return 0;
 
@@ -117,7 +278,6 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 	if( err != VEVO_NO_ERROR )
 		return 0;
 
-	int i = 0;
 
 	fr0_conv_t *fr = NULL;
 	err = vevo_property_get(plugin, "HOST_conv",0,&fr);
@@ -127,8 +287,6 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 	if( dir == 1 ) { //@ output channel push
 		if( seqno == 0 ) 	
 			fr->last = in; //@ 1 output channel 
-	
-
 		return 1;	
 	}
 	else if ( dir == 0  ) {
@@ -143,66 +301,111 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 	return 1;
 }
 
-static	int	init_param_fr( void *port, int p,f0r_param_info_t *info, int hint, int pcount)
+static char 	*split_parameter_name( char *name, char *vj_name ) 
+{
+	int len = strlen(name) + strlen(vj_name) + 5;
+	char *str = malloc(len);
+	snprintf(str,len, "%s (%s)",name,vj_name );
+	return str;
+}
+
+static void 	*init_parameter_port( int min, int max, int def, char *name, int seq_no, int type )
 {
 	void *parameter = vpn( VEVO_FR_PARAM_PORT );
-	int min[] = { 0,0,0,0};
-	int max[] = { 100,100,100,100 };
-	int dv[] = { 50,50,50,50};
-	int n_values = 0;
+	char *dname = strdup(name);
 
-	switch(hint)
+	vevo_property_set( parameter, "name", VEVO_ATOM_TYPE_STRING,1,&dname );
+	vevo_property_set( parameter, "min", VEVO_ATOM_TYPE_INT, 1, &min);
+	vevo_property_set( parameter, "seqno", VEVO_ATOM_TYPE_INT,1,&seq_no);
+	vevo_property_set( parameter, "max", VEVO_ATOM_TYPE_INT,1 , &max);
+	vevo_property_set( parameter, "default", VEVO_ATOM_TYPE_INT,1, &def );
+	vevo_property_set( parameter, "hint", VEVO_ATOM_TYPE_INT,1, &type );	
+
+	if( type == F0R_PARAM_COLOR ) {
+		int rgb = 1;
+		vevo_property_set( parameter, "rgb_conv", VEVO_ATOM_TYPE_INT,1 , &rgb );
+	}
+
+	free(dname);
+	return parameter;
+}
+
+static void store_parameter_port( void *port, int seq_no, void *parameter_port )
+{
+	char key[20];	
+	snprintf(key,20, "p%02d", seq_no );
+	vevo_property_set( port, key, VEVO_ATOM_TYPE_PORTPTR, 1, &parameter_port );
+}
+
+#define _VJ_MAX_PARAMS 8
+
+static int init_param_fr( void *port, f0r_param_info_t *info, int offset, int frei0r_param_count)
+{
+	int np = 0;
+	int size = frei0r_to_vj_np( info->type );
+	switch(info->type)
 	{
 		case F0R_PARAM_DOUBLE:
-			n_values = 1;
+			if( (offset+size) < _VJ_MAX_PARAMS ) {
+				store_parameter_port( port, offset, init_parameter_port( 0, 100,10, info->name,frei0r_param_count, info->type ) );
+				np = size;
+			}
 			break;
 		case F0R_PARAM_BOOL:
-			max[0] = 1;
-			dv[0] = 0;
-			n_values = 1;
+			if( (offset+size) < _VJ_MAX_PARAMS ) {
+				store_parameter_port( port, offset, init_parameter_port( 0, 1,0, info->name,frei0r_param_count, info->type ) );
+				np = size;
+			}
 			break;
 		case F0R_PARAM_COLOR:
-			n_values = 3;
+			if( (offset+size) < _VJ_MAX_PARAMS ) {
+				char *red = split_parameter_name( info->name, "Red" );
+				store_parameter_port( port, offset, init_parameter_port(0, 255,255, red,frei0r_param_count, info->type) );
+				char *green = split_parameter_name( info->name, "Green" );
+				store_parameter_port( port, offset+1, init_parameter_port(0, 255,255, green,frei0r_param_count, info->type) );
+				char *blue = split_parameter_name( info->name, "Blue" );
+				store_parameter_port( port, offset+2, init_parameter_port(0, 255,255, blue,frei0r_param_count, info->type) );
+				np = size;
+				free(red); free(green); free(blue);
+			}
 			break;
 		case F0R_PARAM_POSITION:
-			n_values = 2;
+			if( (offset+size) < _VJ_MAX_PARAMS ) {
+				char *x = split_parameter_name( info->name, "X" );
+				store_parameter_port( port, offset+1, init_parameter_port(0,100,100, x,frei0r_param_count, info->type ));
+				char *y = split_parameter_name( info->name, "Y" );
+				store_parameter_port( port, offset+2, init_parameter_port(0,100,100, y,frei0r_param_count, info->type ));
+				np = size;	
+				free(x);
+				free(y);
+			}
 			break;
 		default:
-			return 0;
+			veejay_msg(VEEJAY_MSG_DEBUG, "frei0r %d '%s' not supported" , frei0r_param_count,
+					info->name );
 			break;
 	}
 
-	if( n_values > 0 )
-	{
-		int values[n_values];
-		int k;
-		for( k = 0; k < n_values; k ++ ) 
-			values[k] = dv[k];
-	
-		vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_INT, n_values, &values );	
-	}
-
-	vevo_property_set( parameter, "name", VEVO_ATOM_TYPE_STRING,1,&(info->name));
-	vevo_property_set( parameter, "min", VEVO_ATOM_TYPE_INT,n_values, (n_values==1? &(min[0]): min) );
-	vevo_property_set( parameter, "max", VEVO_ATOM_TYPE_INT,n_values, (n_values==1? &(max[0]):max) );
-	vevo_property_set( parameter, "default", VEVO_ATOM_TYPE_INT,n_values, (n_values==1?&dv[0]: dv) );
-	vevo_property_set( parameter, "hint", VEVO_ATOM_TYPE_INT,1, &hint );
-	vevo_property_set( parameter, "seqno", VEVO_ATOM_TYPE_INT,1,&pcount);
-
-	char key[20];	
-	snprintf(key,20, "p%02d", p );
-	vevo_property_set( port, key, VEVO_ATOM_TYPE_PORTPTR, 1, &parameter );
-
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG, " -> Parameter %d '%s' %d - %d ", pcount,info->name,min[0],max[0] );
-#endif
-
-	return n_values;
+	return np;
 }
+
+static int is_bad_frei0r_plugin( f0r_plugin_info_t *info )
+{
+	int i;
+	for( i = 0; frei0r_black_list[i].name != NULL; i ++ ) {
+		if(strcasecmp( info->name, frei0r_black_list[i].name ) == 0 ) {
+			if( info->major_version <= frei0r_black_list[i].major &&
+			    info->minor_version <= frei0r_black_list[i].minor ) {
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
 void* 	deal_with_fr( void *handle, char *name)
 {
 	void *port = vpn( VEVO_FR_PORT );
-	char *plugin_name = NULL;
 	f0r_init_f	f0r_init	= dlsym( handle, "f0r_init" );
 	if( f0r_init == NULL )
 	{
@@ -240,6 +443,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	void	*processf	= dlsym( handle, "f0r_update" );
 	void	*processm	= dlsym( handle, "f0r_update2" );
 	void	*set_params	= dlsym( handle, "f0r_set_param_value" );
+	void	*get_params	= dlsym( handle, "f0r_get_param_value" );
 
 	vevo_property_set( port, "handle", VEVO_ATOM_TYPE_VOIDPTR,1, &handle );
 	vevo_property_set( port, "init", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_init );
@@ -260,6 +464,8 @@ void* 	deal_with_fr( void *handle, char *name)
 		vevo_property_set( port, "process_mix", VEVO_ATOM_TYPE_VOIDPTR, 1, &processm);
 	if( set_params != NULL )
 		vevo_property_set( port, "set_params", VEVO_ATOM_TYPE_VOIDPTR,1,&set_params);	
+	if( get_params != NULL )
+		vevo_property_set( port, "get_params", VEVO_ATOM_TYPE_VOIDPTR, 1, &get_params );
 
     	f0r_plugin_info_t finfo;
 	f0r_param_info_t pinfo;
@@ -285,6 +491,20 @@ void* 	deal_with_fr( void *handle, char *name)
 		vpf(port);
 		return NULL;	
 	}
+
+	if( is_bad_frei0r_plugin( &finfo ) ) { 
+		veejay_msg(VEEJAY_MSG_ERROR, "\tFrei0r %s-%d.%d is blacklisted. Please upgrade this plug-in to a newer version.",
+				finfo.name, finfo.major_version, finfo.minor_version);
+		(*f0r_deinit)();
+		vpf(port);
+		return NULL;
+	}
+
+	char plugin_name[512];
+	snprintf( plugin_name, sizeof(plugin_name) , "frei0r %s", finfo.name ); 
+
+	char *plug_name = strdup( plugin_name );
+
 	int extra = 0;
 	int n_inputs = 0;
 	int n_outputs = 0;
@@ -332,44 +552,45 @@ void* 	deal_with_fr( void *handle, char *name)
 	}
 
 	//@ bang, if plug behaves badly. veejay crashes. is it blacklisted?
-	veejay_msg(VEEJAY_MSG_DEBUG, "Frei0r plugin '%s' version %d.%d",
-			name, finfo.major_version, finfo.minor_version );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Frei0r plugin '%s' version %d.%d by %s",
+			plugin_name, finfo.major_version, finfo.minor_version, finfo.author );
 	//@FIXME: blacklist
 	
 	int n_params = finfo.num_params;
 	int r_params = 0;
 	int p = 0;
-
+	int using = 0;
 	if( set_params == NULL )
 		n_params = 0; // lol
 
-	for ( p = 0; p < n_params; p ++ )
+	for ( p = 0; p < n_params; )
 	{
 		(*f0r_param)(&pinfo,p);
-	
-		int fr_params = init_param_fr(port,p,&pinfo,pinfo.type,p);
+		
+		int vj_args = frei0r_to_vj_np( pinfo.type );
+		if(vj_args == 0 ) {
+			p ++;
+			continue;
+		}
+		
+		if( (r_params + vj_args) < _VJ_MAX_PARAMS )
+		{
+			init_param_fr(port, &pinfo, r_params, p );
+			r_params += vj_args;
+		}
 
+		if( r_params >= 7 ) {
+			break;
+		}
 
-		r_params += fr_params;
+		p ++;
 	}
 
 
-
-	if( r_params > 8 ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Maximum parameter count reached, allowing %d/%d parameters.",
-				8,r_params);
-		r_params = 8;
+	if( n_params > 8 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Frei0r plugin has %d parameters, only using %d", n_params, r_params );
 	}
 
-
-	char tmp_name[1024];
-	memset( tmp_name,0,sizeof(tmp_name));
-	int len = (finfo.name == NULL ? 0 : strlen(finfo.name));
-	if( len > 1023 )
-		len = 1023;
-	strncpy( tmp_name, finfo.name, len );
-
-	char *plug_name = strdup(tmp_name);
 
 	vevo_property_set( port, "num_params", VEVO_ATOM_TYPE_INT, 1, &r_params );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plug_name );
@@ -379,7 +600,6 @@ void* 	deal_with_fr( void *handle, char *name)
 	vevo_property_set( port, "num_outputs", VEVO_ATOM_TYPE_INT,1, &n_outputs );
 	
 	int pixfmt = PIX_FMT_RGB24;
-	free(plug_name);
 
 	switch( finfo.color_model ) {
 		case F0R_COLOR_MODEL_BGRA8888:
@@ -395,26 +615,20 @@ void* 	deal_with_fr( void *handle, char *name)
 
 	vevo_property_set( port, "format", VEVO_ATOM_TYPE_INT,1,&pixfmt);
 
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG, "\tparameters: %d, input channels: %d, output channels: %d, format: %x",
-			r_params,n_inputs,n_outputs, pixfmt );
-#endif	
+	free( plug_name );
+
 	return port;
 }
 
 void	frei0r_plug_deinit( void *plugin )
 {
-	int state = 0;
-	
 	void *parent = NULL;
 	int err	     = vevo_property_get( plugin, "parent",0, &parent );	
 	if( err != VEVO_NO_ERROR ) {
 		veejay_msg(0,"Unable to free plugin.");
 		return;
 	}
-#ifdef STRICT_CHECKING
-	vevo_port_dump( parent, 0 );
-#endif
+
 	f0r_destruct_f base = NULL;
 	err = vevo_property_get( parent, "destruct", 0, &base);
 
@@ -481,6 +695,10 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 	vevo_property_set( instance, "HOST_plugin_process_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gpf);
 	vevo_property_set( instance, "HOST_plugin_deinit_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gdd);
 
+	vevo_property_set( instance, "HOST_plugin_width",VEVO_ATOM_TYPE_INT,1,&w );
+	vevo_property_set( instance, "HOST_plugin_height",VEVO_ATOM_TYPE_INT,1,&h );
+
+
 	int frfmt = 0;
 	vevo_property_get( plugin, "format",0,&frfmt ); 
 
@@ -509,12 +727,10 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 	
 	if( n_in == 0 ) {
 		fr->in[0] = yuv_rgb_template( fr->buf, w, h, frfmt );
-		//fr->in[0] = yuv_yuv_template( NULL,NULL,NULL,w,h,pf );
 	}
 
 	if( out_scaler__ == NULL ) {
 		out_scaler__	= yuv_init_swscaler( fr->in[0], 	fr->out, 	&templ, yuv_sws_get_cpu_flags()); // rgb -> yuv
-		//@ allocate a scaler and assume rest of scalers is same. (haha)
 	}
 
 	if( n_in > 0 && in_scaler__ == NULL) { 
@@ -599,96 +815,3 @@ int	frei0r_process_frame_f( void *plugin )
 
 	return 1;
 }
-
-
-void	frei0r_plug_param_f( void *port, int seq_no, void *dargs )
-{
-	void *plugin = NULL;
-	int err	     = vevo_property_get(port, "frei0r",0,&plugin);
-	if( err != VEVO_NO_ERROR ) {
-		return;
-	}
-	f0r_set_param_value_f q;
-	f0r_get_param_info_f  inf = NULL;
-	f0r_param_position_t pos;	
-	f0r_param_color_t col;
-	f0r_param_t *fparam = NULL;
-	int np = 0;
-	err = vevo_property_get(port, "num_params",0,&np);
-	
-	if( seq_no > np || np == 0 ) {
-		return; //@ plug accepts no params but set param is called anyway 
-	}
-
-	void *parent = NULL;
-	err 	     = vevo_property_get(port, "parent",0,&parent);
-	if( err != VEVO_NO_ERROR)  {
-		return;
-	}
-
-	double value = 0.0;
-	int *args = (int*) dargs;
-
-	err = vevo_property_get( parent, "set_params", 0, &q);
-       
-	if( err != VEVO_NO_ERROR ) {
-		veejay_msg(0, "dont know how to set parameter %d",seq_no);
-		return;
-	}
-
-	f0r_param_info_t finfo;
-		
-	if( vevo_property_get( parent, "parameters",0,&inf ) != VEVO_NO_ERROR )
-		return;
-	
-
-
-	(*inf)( &finfo, seq_no );
-
-	char key[20];
-	snprintf(key, sizeof(key)-1, "p%02d", seq_no );
-	void *param = NULL;
-	
-	if(vevo_property_get( parent, key, 0, &param )!=VEVO_NO_ERROR)
-		param = NULL;
-
-	switch( finfo.type ) {
-		case F0R_PARAM_BOOL:
-			value = ( (int) args[0]);
-			fparam = &value;
-			if(param) vevo_property_set( param, "value", VEVO_ATOM_TYPE_INT, 1,&args[0]);
-			break;
-		case F0R_PARAM_DOUBLE:
-			value = ((double)args[0]*0.01);
-			fparam=&value;
-			if(param) vevo_property_set( param,"value", VEVO_ATOM_TYPE_INT,1,&args[0]);
-			break;
-		case F0R_PARAM_POSITION:
-			pos.x = ( (float) args[0] * 0.01);
-			pos.y = ( (float) args[1] * 0.01);
-			fparam = &pos;
-			if(param) vevo_property_set( param,"value",VEVO_ATOM_TYPE_INT,2, args );
-			break;
-		case F0R_PARAM_COLOR:
-			col.r = ( (double) args[0] * 0.01);
-			col.g = ( (double) args[1] * 0.01);
-			col.b = ( (double) args[2] * 0.01);
-			fparam = &col;
-			if(param) vevo_property_set( param, "value", VEVO_ATOM_TYPE_INT,3, args);
-			break;
-		default:
-			veejay_msg(VEEJAY_MSG_DEBUG, "Parameter type %d not supported.",finfo.type);
-			break;
-	}
-	
-	if( fparam && param ) {
-		int fr0_seq_no = 0;
-		vevo_property_get(param, "seqno", 0,&fr0_seq_no);
-		(*q)( plugin, fparam, seq_no );
-	}
-}
-
-void	frei0r_plug_control( void *port, int *args )
-{
-}
-

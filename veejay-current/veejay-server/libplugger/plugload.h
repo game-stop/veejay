@@ -40,6 +40,7 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame );
 void	plug_process( void *instance, double timecode );
 void	plug_get_defaults( void *instance, void *fx_values );
 void	plug_set_parameter( void *instance, int seq_num, int n_elements,void *value );
+void	plug_set_parameters( void *instance, int n_arg, void *darg );
 int	plug_clone_from_output_parameters( void *instance, void *fx_values );
 char	*plug_get_osc_format(void *fx_instance, int p);
 //@ see generic_osc_cb_f in defs.h
@@ -54,4 +55,5 @@ vj_effect *plug_get_plugin( int fx_id );
 void	*plug_get_by_so_name( char *soname );
 int	plug_get_idx_by_name( char *name);
 int 	plug_get_idx_by_so_name( char *soname );
+int	plug_is_frei0r( void *instance );
 #endif

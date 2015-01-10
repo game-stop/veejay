@@ -53,12 +53,16 @@ void vj_effman_apply_plug_effect(
 #endif
 	int n 	    = plug_get_num_input_channels( plug_id );
 
-	n_arg	    = plug_get_num_parameters( plug_id );
-
 	int i;
 
-	for( i = 0; i < n_arg; i ++ ) {
-		plug_set_parameter(instance,i, 1, &(arg[i]) );
+	if( plug_is_frei0r( instance ) ) {
+		plug_set_parameters( instance, n_arg, arg );
+	} else {
+		n_arg	    = plug_get_num_parameters( plug_id );
+
+		for( i = 0; i < n_arg; i ++ ) {
+			plug_set_parameter(instance,i, 1, &(arg[i]) );
+		}
 	}
 
 	for( i = 0; i < n; i ++ ) {
