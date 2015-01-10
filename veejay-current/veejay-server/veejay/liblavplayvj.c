@@ -1430,7 +1430,7 @@ static	int	veejay_create_homedir(char *path)
 	{
 		if( errno != EEXIST )
 		{
-			veejay_msg(0, "Unable to create %s - No veejay home setup (error=%s)", strerror(errno));
+			veejay_msg(0, "Unable to create %s - No veejay home setup (%s)", strerror(errno));
 			return 0;	
 		}
 	}
@@ -1439,7 +1439,7 @@ static	int	veejay_create_homedir(char *path)
 	if( mkdir(recovery_dir,0700) == -1 ) {
 		if( errno != EEXIST )
 		{
-			veejay_msg(0, "%s", strerror(errno));
+			veejay_msg(0, "%s (%s)", strerror(errno), path);
 			free(recovery_dir);
 			return 0;
 		}
@@ -1450,7 +1450,7 @@ static	int	veejay_create_homedir(char *path)
 	if( mkdir(theme_dir,0700) == -1 ) {
 		if( errno != EEXIST )
 		{
-			veejay_msg(0, "%s", strerror(errno));
+			veejay_msg(0, "%s (%s)", strerror(errno), path);
 			free(theme_dir);
 			return 0;
 		}
@@ -1461,7 +1461,7 @@ static	int	veejay_create_homedir(char *path)
 	if( mkdir(font_dir,0700) == -1 ) {
 		if( errno != EEXIST )
 		{
-			veejay_msg(0, "%s", strerror(errno));
+			veejay_msg(0, "%s (%s)", strerror(errno), path);
 			free(font_dir);
 			return 0;
 		}
