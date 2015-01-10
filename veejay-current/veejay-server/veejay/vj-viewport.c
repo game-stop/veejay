@@ -68,18 +68,7 @@
 #define min4(a,b,c,d) MIN(MIN(MIN(a,b),c),d)
 #define max4(a,b,c,d) MAX(MAX(MAX(a,b),c),d)
 
-#undef _PREFETCH
-#undef _PREFETCHW
-#ifdef HAVE_ASM_DNOW
-#define _PREFETCH  "prefetch"
-#define _PREFETCHW "prefetchw"
-#elif defined ( HAVE_ASM_MMX2 )
-#define _PREFETCH "prefetchnta"
-#define _PREFETCHW "prefetcht0"
-#else
-#define _PREFETCH "/nop"
-#define _PREFETCHW "/nop"
-#endif
+#include <xmmintrin.h>
 
 #define GRID_STEP 1
 #define GRID_START 44
@@ -3186,14 +3175,6 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 
 	yuyv_plane_clear( len*2, plane_yuyv); 
 
-#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE ) 
-	fast_memset_finish(); // finish yuyv_plane_clear
-#endif
-	__builtin_prefetch( inY, 0 ,3);
-	__builtin_prefetch( inU, 0 ,3);
-	__builtin_prefetch( inV, 0 ,3);
-	__builtin_prefetch( plane_yuyv, 1,3);
-
 	for( y = ty1 ; y < ty2; y ++ )
 	{
 		for( x = tx1; x < tx2; x += 2 )
@@ -3233,11 +3214,7 @@ void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *ou
 
 	// clear the yuyv plane (black)
 	y  = ty1 * w;
-	yuyv_plane_clear( len*3, out_img); //@optimize FIXME
-
-#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE ) 
-	fast_memset_finish(); // finish yuyv_plane_clear
-#endif
+	yuyv_plane_clear( len*2, out_img); 
 
 	for( y = ty1 ; y < ty2; y ++ )
 	{
