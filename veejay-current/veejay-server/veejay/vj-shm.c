@@ -47,7 +47,7 @@
 
 typedef struct {
 	int shm_id;
-	char *sms;
+	void *sms;
 	char	*env_shm_id;
 	int parent;
 	key_t key;
@@ -91,10 +91,6 @@ void	vj_shm_free(void *vv)
 
 	int res     = pthread_rwlock_destroy( &data->rwlock );
 
-	res = shmdt( v->sms );
-	if(res==-1 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Failed to detach shared memory: %s",strerror(errno));
-	}
 	res = shmctl( v->shm_id, IPC_RMID, NULL );
 	if( res==-1 ) {
 		veejay_msg(0, "Failed to remove shared memory %d: %s", v->shm_id, strerror(errno));
@@ -135,11 +131,8 @@ int		vj_shm_get_status( void *vv )
 int		vj_shm_stop( void *vv )
 {
 	vj_shm_t *v = (vj_shm_t*) vv;
-	
-	vj_shared_data *data = (vj_shared_data*) v->sms;
 
-
-	int res = shmdt( data );
+	int res = shmdt(v->sms);
 	if( res ) {
 		veejay_msg(0,"failed to detach shared memory: %s",strerror(errno));
 		return -1;
@@ -166,7 +159,7 @@ int		vj_shm_read( void *vv , uint8_t *dst[3] )
 	//	veejay_msg(0, "%s",strerror(errno));
 		return -1;
 	}
-	uint8_t *ptr = v->sms + HEADER_LENGTH;
+	uint8_t *ptr = ( (uint8_t*) v->sms ) + HEADER_LENGTH;
 	
 	int len = data->header[0] * data->header[1]; //@ 
 	int uv_len = len / 2;
@@ -206,7 +199,7 @@ int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[4] )
 		return -1;
 	}
 
-	uint8_t *ptr = (uint8_t*) v->sms + HEADER_LENGTH;
+	uint8_t *ptr = ( (uint8_t*) v->sms) + HEADER_LENGTH;
 	
 	uint8_t *dst[4] = { ptr, ptr + plane_sizes[0], ptr + plane_sizes[0] + plane_sizes[1], NULL };
 	plane_sizes[3] = 0;
@@ -348,7 +341,6 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	}
 
 	long size = (frame->width * frame->height * 4);
-	long offset = HEADER_LENGTH;
 
 	//@ create
 	v->shm_id = shmget( v->key,size, IPC_CREAT |0666 );
@@ -360,7 +352,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	}
 
 	//@ attach
-	v->sms 	    = shmat( v->shm_id, NULL , 0 );
+	v->sms 	    =  shmat( v->shm_id, NULL , 0 );
 	if( v->sms == NULL || v->sms == (char*) (-1) ) {
 		shmctl( v->shm_id, IPC_RMID, NULL );
 		veejay_msg(0, "Failed to attach to shared memory:%s",strerror(errno));
@@ -379,7 +371,9 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	veejay_memset( V, 128, (frame->width*frame->height)/2);
 
 	//@ set up frame info (fixme, incomplete)
-	vj_shared_data *data = (vj_shared_data*) &(v->sms[0]);
+//	vj_shared_data *data = (vj_shared_data*) &(v->sms[0]);
+
+	vj_shared_data *data = (vj_shared_data*) v->sms;
 	data->resource_id    = v->shm_id;
 	data->header[0]      = frame->width;
 	data->header[1]      = frame->height;
