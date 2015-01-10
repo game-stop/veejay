@@ -90,6 +90,7 @@ typedef struct {
 } bufs;
 
 #define N_FRAMES 2
+#define LOOP_LIMIT 64
 
 typedef struct
 {
@@ -131,8 +132,9 @@ typedef struct
 	int		processed_buffer;
 	int		grey;
 	int		threaded;
-	uint32_t	supported_pixel_formats[64];
+	uint32_t	supported_pixel_formats[LOOP_LIMIT];
 	int		is_vloopback;
+	int		n_pixel_formats;
 } v4l2info;
 
 static struct {
@@ -295,8 +297,10 @@ int	v4l2_pixelformat2ffmpeg( int pf )
 			veejay_msg(0, "v4l2: Unhandled pixel format: %d", pf );
 			break;
 		}
+
 	return PIX_FMT_BGR24;
 }
+
 static	int	v4l2_ffmpeg2v4l2( int pf)
 {
 	switch(pf) {
@@ -322,7 +326,6 @@ static	int	v4l2_ffmpeg2v4l2( int pf)
 		case PIX_FMT_YUVJ444P:
 		case PIX_FMT_YUV444P:
 			return V4L2_PIX_FMT_YUV32;
-
 
 		default:
 #ifdef STRICT_CHECKING
@@ -437,9 +440,7 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 	//@clear mem
 	memset( &fmtdesc, 0, sizeof( fmtdesc ));
 
-	int loop_limit = 64;
-
-	int pf_cnt = 0;
+	int loop_limit = LOOP_LIMIT;
 
 	for( fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		 fmtdesc.type < V4L2_BUF_TYPE_VIDEO_OVERLAY;
@@ -454,8 +455,8 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 						(fmtdesc.pixelformat >> 16) & 0xff,
 						(fmtdesc.pixelformat >> 24) & 0xff );
 	
-			v->supported_pixel_formats[ pf_cnt ] = fmtdesc.pixelformat;
-			pf_cnt = (pf_cnt + 1 ) % loop_limit;
+			v->supported_pixel_formats[ v->n_pixel_formats ] = fmtdesc.pixelformat;
+			v->n_pixel_formats = (v->n_pixel_formats + 1 ) % loop_limit;
 
 			fmtdesc.index ++;
 
@@ -681,20 +682,17 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	}
 	
 	//@ try anything else
-	/*
 	int k;
-	for( k = 0; k < 64; k ++ ) {
+	for( k = 0; k < v->n_pixel_formats; k ++ ) {
 		if( v->supported_pixel_formats[k] == 0 )
 			continue;
 		
-		int pf = v4l2_pixelformat2ffmpeg( v->supported_pixel_formats[k] );
-		if( pf >= 0 ) {
-			*candidate = v->supported_pixel_formats[k];
+		supported = v4l2_pixelformat2ffmpeg( v->supported_pixel_formats[k] );
+		if( supported >= 0 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports %x", supported );
 			return 1;
 		}
-
 	}
-	*/
 
 	veejay_msg(VEEJAY_MSG_ERROR, "v4l2: No supported pixel format found!");
 
