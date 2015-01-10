@@ -47,6 +47,7 @@
  * This module provides a Frei0r Host
  */
 #include <libplugger/specs/frei0r.h>
+#define    RUP8(num)(((num)+8)&~8)
 
 static int frei0r_signature_ = VEVO_PLUG_FR;
 
@@ -712,11 +713,11 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 	vevo_property_get( plugin, "num_inputs",0,&n_in );
 	vevo_property_get( plugin, "num_outputs",0,&n_out );
 	
-	int n_planes = 4 * (n_out + n_in);
+	int n_planes = 4 * (n_out + n_in + 1);
 
 	fr0_conv_t *fr = (fr0_conv_t*) vj_calloc(sizeof(fr0_conv_t));
 	int i;
-	fr->buf        = (uint8_t*) vj_calloc((sizeof(uint8_t) * w * h * n_planes) * (n_in+1) );
+	fr->buf        = (uint8_t*) vj_malloc((sizeof(uint8_t) * RUP8( w * h * n_planes ) ));
 	uint8_t *bufx  = fr->buf;
 
 	for( i = 0; i < (n_in+1); i ++ ) { //@ extra buffer for rgb output
