@@ -76,15 +76,9 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	GIMP_rgb2yuv(r,g,b,y,u,v);
 
-	//@ fill frame
-	for( i = 0; i < len; i ++ ) {
-		O[0][i] = y;
-	}
-	for( i = 0; i < uv_len; i ++ ) {
-		O[1][i] = u;
-		O[2][i] = v;
-	}		
-
+	livido_memset( O[0], y, len );
+	livido_memset( O[1], u, uv_len );
+	livido_memset( O[2], v, uv_len );
 
 	return LIVIDO_NO_ERROR;
 }
