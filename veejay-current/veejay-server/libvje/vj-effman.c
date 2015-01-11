@@ -633,6 +633,11 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	case VJ_VIDEO_EFFECT_RADIOACTIVE:
 	radioactivetv_apply( frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 	break;
+	case VJ_VIDEO_EFFECT_AVERAGEBLEND:
+	average_blend_apply(frames[0], frames[1], frames[0]->width,
+		      frames[0]->height, arg[0]);
+	break;
+
    
       default:
 	break;

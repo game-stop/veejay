@@ -170,6 +170,7 @@
 #include "effects/picinpic.h"
 #include "effects/cali.h"
 #include "effects/bgsubtract.h"
+#include "effects/average-blend.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -581,8 +582,9 @@ void vj_effect_initialize(int width, int height, int full_range)
 //	vj_effects[44] = texmap_init( width,height);
 	vj_effects[45] = water_init(width,height);
 	vj_effects[46] = slicer_init(width,height);
+	vj_effects[47] = average_blend_init(width,height);
 	vj_effects[44] = iris_init(width,height);
-    vj_effects[47] = dummy_init(width,height);
+    vj_effects[48] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
