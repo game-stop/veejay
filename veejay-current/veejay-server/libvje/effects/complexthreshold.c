@@ -35,14 +35,14 @@ vj_effect *complexthreshold_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 80;	/* angle */
+    ve->defaults[0] = 4500;	/* angle */
     ve->defaults[1] = 0;	/* r */
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 255;	/* b */
     ve->defaults[4] = 1;	/* smoothen level */
     ve->defaults[5] = 255;	/* threshold */
-    ve->limits[0][0] = 5;
-    ve->limits[1][0] = 900;
+    ve->limits[0][0] = 1;
+    ve->limits[1][0] = 9000;
 
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
@@ -55,11 +55,12 @@ vj_effect *complexthreshold_init(int w, int h)
 
     ve->limits[0][5] = 0;
     ve->limits[1][5] = 255;
+
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 4;
 
 	ve->parallel = 1;
-    ve->description = "Complex Threshold";
+    ve->description = "Complex Threshold (RGB)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->has_user = 0;
@@ -75,34 +76,16 @@ int accept_tpixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
     short xx, yy;
     /* convert foreground to xz coordinates where x direction is
        defined by key color */
-    int val;
+    uint8_t val;
 
     xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
-
-    if (xx < -128) {
-	xx = -128;
-    }
-    if (xx > 127) {
-	xx = 127;
-    }
-
     yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
-
-    if (yy < -128) {
-	yy = -128;
-    }
-    if (yy > 127) {
-	yy = 127;
-    }
-
 
     /* accept angle should not be > 90 degrees 
        reasonable results between 10 and 80 degrees.
      */
 
     val = (xx * accept_angle_tg) >> 4;
-    if (val > 127)
-	val = 127;
     if (abs(yy) < val) {
 	return 1;
     }
@@ -121,8 +104,8 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 
     int cb, cr;
     int kbg, x1, y1;
-    float kg1, tmp, aa = 128, bb = 128, _y = 0;
-    float angle = (float) i_angle / 10.0;
+    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
+    float angle = (float) i_angle / 100.0f;
     //float noise_level = 350.0;
     unsigned int pos;
     int matrix[5];
@@ -141,8 +124,8 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 	bb = (float)iv;
 
     tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 127 * (aa / tmp);
-    cr = 127 * (bb / tmp);
+    cb = 255 * (aa / tmp);
+    cr = 255 * (bb / tmp);
     kg1 = tmp;
 
     /* obtain coordinate system for cb / cr */
@@ -200,32 +183,12 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 	    /* convert foreground to xz coordinates where x direction is
 	       defined by key color */
 	    xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-
-	    if (xx < -128) {
-		xx = -128;
-	    }
-	    if (xx > 127) {
-		xx = 127;
-	    }
-
 	    yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
 
-	    if (yy < -128) {
-		yy = -128;
-	    }
-	    if (yy > 127) {
-		yy = 127;
-	    }
-
 	    val = (xx * accept_angle_tg) >> 4;
-	    if (val > 127)
-		val = 127;
 	    /* see if pixel is within range of color and threshold */
 	    if (abs(yy) < val && fg_y[pos] > threshold) {
 
-		val = (xx * accept_angle_tg) >> 4;
-		if (val > 127)
-		    val = 127;
 		val = (yy * accept_angle_ctg) >> 4;
 
 		x1 = abs(val);
@@ -233,35 +196,16 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 		tmp1 = xx - x1;
 
 		kbg = (tmp1 * one_over_kc) >> 1;
-		if (kbg < 0)
-		    kbg = 0;
-		if (kbg > 255)
-		    kbg = 255;
-
 		val = (tmp1 * kfgy_scale) >> 4;
-		if (val > 0xff)
-		    val = 0xff;
 
 		Y[pos] = fg_y[pos] - val;
 		/* convert suppressed fg back to cbcr */
 		Cb[pos] = ((x1 * cb) - (y1 * cr)) >> 7;
 		Cr[pos] = ((x1 * cr) - (y1 * cb)) >> 7;
 
-		val = (yy * yy) + (kg * kg);
-		if (val > 0xff)
-		    val = 0xff;
-		if (val < (35 * 35)) {
-		    kbg = 255;
-		}
-
 		Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	//	Y[pos] = CLAMP_Y(val);
-
 		Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	//	Cb[pos] = CLAMP_UV(val);
-
 		Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	//	Cr[pos] = CLAMP_UV(val);
 	    }
 	}
     }

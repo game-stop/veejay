@@ -32,32 +32,32 @@ vj_effect *keyselect_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 300;	/* angle */
-    ve->defaults[1] = 255;	/* r */
+    ve->defaults[0] = 4500;	/* angle */
+    ve->defaults[1] = 0;	/* r */
     ve->defaults[2] = 0;	/* g */
-    ve->defaults[3] = 0;	/* b */
+    ve->defaults[3] = 255;	/* b */
     ve->defaults[4] = 3;	/* blend type */
     ve->defaults[5] = 2400;	/* noise suppression */
-    ve->limits[0][0] = 5;
-    ve->limits[1][0] = 900;
+    ve->limits[0][0] = 1;
+    ve->limits[1][0] = 9000;
 
     ve->limits[0][1] = 0;
-    ve->limits[1][1] = 256;
+    ve->limits[1][1] = 255;
 
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 256;
+    ve->limits[1][2] = 255;
 
     ve->limits[0][3] = 0;
-    ve->limits[1][3] = 256;
+    ve->limits[1][3] = 255;
 
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 7;
 
 	ve->limits[0][5] = 0;
-	ve->limits[1][5] = 3500;
+	ve->limits[1][5] = 5500;
 	ve->has_user = 0;
     ve->parallel = 1;
-	ve->description = "Blend by Color Key";
+	ve->description = "Blend by Color Key (RGB)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->rgb_conv = 1;
@@ -87,13 +87,13 @@ uint8_t blend_func3(uint8_t a , uint8_t b) {
 
 uint8_t blend_func4(uint8_t a, uint8_t b) {
 	uint8_t val;
-	val = (a * a) / ( 256 - b );
+	val = (a * a) / ( 0xff - b );
 	return CLAMP_Y(val);
 }
 
 uint8_t blend_func5(uint8_t a, uint8_t b) {
 	uint8_t val;
-	int c = 256 - b;
+	uint8_t c = 0xff - b;
 	val = b / c;
 	return CLAMP_Y(val);
 }
@@ -144,9 +144,9 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
     int kfgy_scale, kg;
     int cb, cr;
     int kbg, x1, y1;
-    float kg1, tmp, aa = 128, bb = 128, _y = 0;
-    float angle = (float) i_angle * 0.1f;
-    float noise_level = (i_noise * 0.01f);
+    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
+    float angle = (float) i_angle / 100.0f;
+    float noise_level = (i_noise / 100.0f);
     unsigned int pos;
     uint8_t val, tmp1;
     uint8_t *Y = frame->data[0];
@@ -161,8 +161,8 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 	aa = (float) iu;
 	bb = (float) iv;
     tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 127 * (aa / tmp);
-    cr = 127 * (bb / tmp);
+    cb =255 * (aa / tmp);
+    cr =255 * (bb / tmp);
     kg1 = tmp;
 
     blend_func blend_pixel = get_blend_func(mode);
@@ -189,31 +189,13 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 	   defined by key color */
 
 	xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-
-	if (xx < -128) {
-	    xx = -128;
-	}
-	if (xx > 127) {
-	    xx = 127;
-	}
-
 	yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-
-	if (yy < -128) {
-	    yy = -128;
-	}
-	if (yy > 127) {
-	    yy = 127;	
-	}
-
 
 	/* accept angle should not be > 90 degrees 
 	   reasonable results between 10 and 80 degrees.
 	 */
 
 	val = (xx * accept_angle_tg) >> 4;
-	if (val > 127)
-	    val = 127;
 	if (abs(yy) < val) {
 	    /* compute fg, suppress fg in xz according to kfg 
 	*/
@@ -224,10 +206,6 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 	    tmp1 = xx - x1;
 
 	    kbg = (tmp1 * one_over_kc) >> 1;
-	    if (kbg < 0)
-		kbg = 0;
-	    if (kbg > 255)
-		kbg = 255;
 
 	    val = (tmp1 * kfgy_scale) >> 4;
 	    val = fg_y[pos] - val;
@@ -236,9 +214,9 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 
 	    // convert suppressed fg back to cbcr 
 		// cb,cr are signed, go back to unsigned !
-	    val = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
+	    val = ((x1 * cb) - (y1 * cr)) >> 7;
 	    Cb[pos] = val;
-	    val = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
+	    val = ((x1 * cr) - (y1 * cb)) >> 7;
 	    Cr[pos] = val;
 	    // deal with noise 
 
@@ -246,9 +224,8 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 	    if (val < (noise_level * noise_level)) {
 		kbg = 255;
 	    }
-	 	val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-		Y[pos] = blend_pixel( val, fg_y[pos] );
-		
+	    val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
+	    Y[pos] = blend_pixel( val, fg_y[pos] );
 	}
     }
 

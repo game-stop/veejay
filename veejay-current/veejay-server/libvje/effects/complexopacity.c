@@ -36,13 +36,13 @@ vj_effect *complexopacity_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 80;	/* angle */
+    ve->defaults[0] = 4500;	/* angle */
     ve->defaults[1] = 0;	/* r */
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 255;	/* b */
     ve->defaults[4] = 150;	/* opacity */
-    ve->limits[0][0] = 5;
-    ve->limits[1][0] = 900;
+    ve->limits[0][0] = 1;
+    ve->limits[1][0] = 9000;
 
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
@@ -55,9 +55,10 @@ vj_effect *complexopacity_init(int w, int h)
 
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 255;
+
 	ve->has_user = 0;
 	ve->parallel = 1;
-	ve->description = "Complex Overlay";
+	ve->description = "Complex Overlay (RGB)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
@@ -75,33 +76,15 @@ int accept_ipixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
     uint8_t val;
 
     xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
-
-    if (xx < -128) {
-	xx = -128;
-    }
-    if (xx > 127) {
-	xx = 127;
-    }
-
     yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
-
-    if (yy < -128) {
-	yy = -128;
-    }
-    if (yy > 127) {
-	yy = 127;
-    }
-
 
     /* accept angle should not be > 90 degrees 
        reasonable results between 10 and 80 degrees.
      */
 
     val = (xx * accept_angle_tg) >> 4;
-    if (val > 127)
-	val = 127;
     if (abs(yy) < val) {
-	return 1;
+		return 1;
     }
     return 0;
 }
@@ -116,10 +99,9 @@ void complexopacity_apply(VJFrame *frame, int width,
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
     int kfgy_scale, kg;
 
-    int cb, cr;
-    float kg1, tmp, aa = 128, bb = 128, _y = 0;
-    float angle = (float) i_angle / 10.0;
-    //float noise_level = 350.0;
+    uint8_t cb, cr;
+    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
+    float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     int matrix[5];
     uint8_t val;
@@ -133,8 +115,8 @@ void complexopacity_apply(VJFrame *frame, int width,
 	aa = (float) iu;
 	bb = (float) iv;  
     tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 127 * (aa / tmp);
-    cr = 127 * (bb / tmp);
+    cb = 255 * (aa / tmp);
+    cr = 255 * (bb / tmp);
     kg1 = tmp;
 
     /* obtain coordinate system for cb / cr */
@@ -192,31 +174,16 @@ void complexopacity_apply(VJFrame *frame, int width,
 	    /* convert foreground to xz coordinates where x direction is
 	       defined by key color */
 	    xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-
-	    if (xx < -128) {
-		xx = -128;
-	    }
-	    if (xx > 127) {
-		xx = 127;
-	    }
-
 	    yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-
-	    if (yy < -128) {
-		yy = -128;
-	    }
-	    if (yy > 127) {
-		yy = 127;
-	    }
 
 	    val = (xx * accept_angle_tg) >> 4;
 	    if (val > 127)
-		val = 127;
+			val = 127;
 	    /* see if pixel is within range of color and opacity it */
 	    if (abs(yy) < val ) {
-		Y[pos] = 255 - Y[pos];
-		Cb[pos] = 255 - Cb[pos];
-		Cr[pos] = 255 - Cr[pos];
+			Y[pos] = 255 - Y[pos];
+			Cb[pos] = 255 - Cb[pos];
+			Cr[pos] = 255 - Cr[pos];
 	    }
 	}
     }
