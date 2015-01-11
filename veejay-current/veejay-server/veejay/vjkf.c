@@ -169,7 +169,7 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	in += (25);
 
 	unsigned char *ptr = in;
-	for(i = start ; i < end; i ++ )
+	for(i = start ; i <= end; i ++ )
 	{
 		int value = 
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );

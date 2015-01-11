@@ -2084,7 +2084,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	int end = get_nums( "curve_spinend" );
 	int start = get_nums( "curve_spinstart" );
 
-	const int length = end - start;
+	const int length = end - start + 1;
 
 
 	if( (length) <= 0 || id <= 0 )	
