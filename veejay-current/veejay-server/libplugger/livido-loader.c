@@ -21,8 +21,6 @@
 /** \defgroup livido Livido Host
  *
  * See livido specification at http://livido.dyne.org
- *
- * This implements an almost complete and hopefully "correct" livido host.
  */
 #include <config.h>
 #ifdef STRICT_CHECKING
@@ -50,6 +48,7 @@
 //#include <veejay/oscservit.h>
 #include <libplugger/utility.h>
 #include <libplugger/livido-loader.h>
+#include <libsubsample/subsample.h>
 #include <veejay/vj-shm.h>
 #include <veejay/vims.h>
 #define LIVIDO_COPY 1
@@ -154,6 +153,22 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 #ifdef STRICT_CHECKING
 	assert( error == LIVIDO_NO_ERROR );
 #endif
+
+
+	if( name[0] ==  'i' ) {
+		int current_palette = 0;
+		vevo_property_get( channel, "current_palette", 0, &current_palette );
+		if( current_palette != pref_palette_ ) {
+			switch( current_palette ) {
+				case LIVIDO_PALETTE_YUV444P:
+					chroma_supersample ( SSM_422_444, frame, frame->data );
+					break;
+				
+			}
+		}
+	
+	}
+
 	
 	return 1;
 }
@@ -1070,7 +1085,6 @@ void	livido_push_channel( void *instance,int n,int dir, VJFrame *frame ) // in_c
 
 	char *key = (dir == 0 ? "in_channels" : "out_channels" );
 	livido_push_channel_local(instance, key, n, frame );
-
 }
 
 void	livido_plug_process( void *instance, double time_code )
@@ -1090,11 +1104,31 @@ void	livido_plug_process( void *instance, double time_code )
 
 	(*process)( instance, time_code );
 
-	//see if output channel needs downsampling
 	void *channel = NULL;
-	int hsampling = 0;
-
+	//see if output channel needs downsampling
 	error = vevo_property_get( instance, "out_channels", 0, &channel );
+
+	if( error != LIVIDO_NO_ERROR )
+		return;
+
+	int current_palette = 0;
+	vevo_property_get( channel, "current_palette", 0, &current_palette );
+	if( current_palette != pref_palette_ ) {
+		switch( current_palette ) {
+			case LIVIDO_PALETTE_YUV444P: {
+				VJFrame frame; VJFrame *f = &frame;
+				vevo_property_get( channel, "width", 0, &(f->width));
+				vevo_property_get( channel, "height", 0, &(f->height));
+				int i;
+				for( i = 0; i < 3; i ++ ) {
+					vevo_property_get( channel, "pixel_data", i, &(f->data[i]));
+				}
+				chroma_subsample( SSM_422_444, f, f->data );
+			}
+			break;
+			
+		}
+	}
 
 }
 

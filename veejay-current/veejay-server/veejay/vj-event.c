@@ -1703,11 +1703,6 @@ void vj_event_update_remote(void *ptr)
 	if( p3 )
 	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
 
-//	if( has_n )
-//	{
-//		return;
-//	}
-
 	if( v->settings->use_vims_mcast )
 	{
 		int res = vj_server_update(v->vjs[VEEJAY_PORT_MAT],0 );
