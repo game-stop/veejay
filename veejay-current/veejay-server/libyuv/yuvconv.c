@@ -202,6 +202,7 @@ int	yuv_which_scaler()
 {
 	return global_scaler_;
 }
+
 void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 {
 	sws_context_flags_ = yuv_sws_get_cpu_flags();
@@ -225,10 +226,6 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 		auto_conversion_ccir_jpeg_ = 1;
 	}
 
-	int my_ac_flags = ac_cpuinfo();
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "CPU Flags available:", ac_flagstotext( my_ac_flags ));
-
 	// initialize tables for jpeg <-> ccir conversion
 	veejay_memset( jpeg_to_CCIR_tableY, 0, sizeof( jpeg_to_CCIR_tableY ) );
 	veejay_memset( CCIR_to_jpeg_tableY, 0, sizeof( CCIR_to_jpeg_tableY ) );
@@ -248,26 +245,25 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 		CCIR_to_jpeg_tableUV[i]= _CLAMP( (float)i * d - 16.0f ,  0.0f, 255.0f );
 	}
 
-	//ac_init( AC_ALL );
+	int flags = ac_cpuinfo();
+	
+	ac_init( flags );
 
-	//ac_imgconvert_init(AC_ALL);
+	veejay_msg(VEEJAY_MSG_DEBUG, "(aclib) CPU Flags available:", ac_flagstotext( flags ));
 
 	veejay_memset( ffmpeg_aclib, 0, sizeof(ffmpeg_aclib ));
 
 	put( PIX_FMT_YUV420P, IMG_YUV420P );
 	put( PIX_FMT_YUV422P, IMG_YUV422P );
 	put( PIX_FMT_YUV444P, IMG_YUV444P );
-	put( PIX_FMT_YUVJ420P, IMG_YUV420P ); //@wrong, but size fits
+	put( PIX_FMT_YUVJ420P, IMG_YUV420P ); 
 	put( PIX_FMT_YUVJ422P, IMG_YUV422P );
 	put( PIX_FMT_YUVJ422P, IMG_YUV422P ); 
-//	put( PIX_FMT_RGB24,   IMG_RGB24 );
-//	put( PIX_FMT_BGR24,   IMG_BGR24 );
 	put( PIX_FMT_RGB24,   IMG_BGR24 );
 	put( PIX_FMT_BGR24,   IMG_RGB24 );
-//	put( PIX_FMT_RGB32,   IMG_ARGB32 );
 	put( PIX_FMT_RGB32,   IMG_RGBA32 );
 	put( PIX_FMT_RGBA,    IMG_RGBA32 );
-	put( PIX_FMT_ARGB,	  IMG_ARGB32 );
+	put( PIX_FMT_ARGB,    IMG_ARGB32 );
 	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
 	put( PIX_FMT_YUYV422, IMG_YUY2);
 	put( PIX_FMT_GRAY8,   IMG_Y8 );
@@ -504,38 +500,6 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
         	verify_CCIR_auto( src_fmt,dst_fmt, dst );
 
 }
-/*
-void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
-{
-	yuv_pixstr( __FUNCTION__, "src_fmt", src_fmt );
-	yuv_pixstr( __FUNCTION__, "dst_fmt", dst_fmt );
-		
-#ifdef STRICT_CHECKING
-	assert( dst_fmt >= 0 && dst_fmt < 32 );
-	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
-		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
-		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
-		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
-		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
-		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8  );
-	assert( src->width > 0 );
-	assert( dst->width > 0 );
-#endif
-
-	struct SwsContext  *ctx = sws_getContext(
-			src->width,
-			src->height,
-			src_fmt,
-			dst->width,
-			dst->height,
-			dst_fmt,
-			sws_context_flags_,
-			NULL,NULL,NULL );
-
-	sws_scale( ctx, src->data, src->stride,0, src->height,dst->data, dst->stride );
-
-	sws_freeContext( ctx );
-}*/
 
 void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 {
@@ -1322,31 +1286,6 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-//	const int src_stride[3] = { src->width,0,0 };
-//	const int dst_stride[3] = { dst->width,0,0 };
-/*
-	int n = 0;
-	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB ||
-	 src->format == PIX_FMT_RGB32 || src->format == PIX_FMT_BGR32 ) {
-		n = 4;
-	} 
-	if( src->format == PIX_FMT_RGB24 || src->format == PIX_FMT_BGR24 ) {
-		n = 3;
-	}
-	if( n > 0 ) {
-		src_stride[0] = src->width * n;
-		src_stride[1] = 0;
-		src_stride[2] = 0;
-	} else {
-		src_stride[0] = src->width;
-		src_stride[1] = src->uv_width;
-		src_stride[2] = src->uv_width;
-	}*/
-/*
-	dst_stride[0] = dst->width;
-	dst_stride[1] = dst->uv_width;
-	dst_stride[2] = dst->uv_width;
-*/
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src->stride, 0, src->height,(uint8_t * const*)dst->data, dst->stride );
 }
 void	yuv_convert_and_scale_grey(void *sws , VJFrame *src, VJFrame *dst)
@@ -1559,7 +1498,6 @@ static void	yuy2_scale_pixels_from_yuv_job( void *arg )
 	uint8_t *plane = v->input[0];
 	int	 len   = v->strides[0];
 
-//	unsigned int rlen = 2 * len ;
 	unsigned int i;
 	for( i = 0; i < len; i += 4 ) {
 		plane[i+0] = jpeg_to_CCIR_tableY[ plane[i+0] ];
@@ -1669,7 +1607,6 @@ void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len )
 void	yuv_scale_pixels_from_y( uint8_t *plane, int len )
 {
 	unsigned int i;
-//	float    s = (max - min) / 255.0f;
 
 	for( i = 0; i < len ; i ++ ) {
 		plane[i] = jpeg_to_CCIR_tableY[ plane[i] ];
@@ -1678,7 +1615,6 @@ void	yuv_scale_pixels_from_y( uint8_t *plane, int len )
 void	yuv_scale_pixels_from_uv( uint8_t *plane, int len )
 {
 	unsigned int i;
-//	float    s = (max - min) / 255.0f;
 
 	for( i = 0; i < len ; i ++ ) {
 		plane[i] = jpeg_to_CCIR_tableUV[ plane[i] ];
@@ -1689,16 +1625,9 @@ void	yuv_scale_pixels_from_uv( uint8_t *plane, int len )
 void	yuv_scale_pixels_from_ycbcr( uint8_t *plane, float min, float max, int len )
 {
 	unsigned int i;
-//	float    s = 255.0f / ( max-min );
 
 	if( max == 235.0f ) {
 		for( i = 0; i < len ; i ++ ) {
-/*		float res = ( (float) plane[i]  * s - 16.0f );
-		if( res > 255.0f )
-			res = 255.0f;
-		else if ( res < 0.0f )
-			res = 0.0f;
-		plane[i] = (uint8_t) res;*/
 			plane[i] = CCIR_to_jpeg_tableY[ plane[i] ];
 		}
 	} else if ( max == 240.0f ) {
@@ -1755,14 +1684,9 @@ void yuv444_yvu444_1plane(
 	uint8_t *yp = data[0];
 	uint8_t *up = data[2];
 	uint8_t *vp = data[1];
-	int len = (width * height) / 4;
+	int len = (width * height) >> 2;
 	uint8_t *dst = dst_buffer;
 
-	__builtin_prefetch( yp, 0 ,3);
-	__builtin_prefetch( up, 0 ,3);
-	__builtin_prefetch( vp, 0 ,3);
-	__builtin_prefetch( dst, 1,3);
-	
 	for( x=0; x < len; x ++ )
 	{
 		dst[0] = packv0__( yp[0],up[0],vp[0],yp[1]);
