@@ -13,7 +13,7 @@
           0x0x10           x10x0x10x0x10x   10x0x10x0x10x0    0x010x0     0x0x        0x10      0x0x    
 
 									              version 1.5	
-										      December 2014
+										      January 2015
 
        =================================================================================================
  
@@ -138,8 +138,9 @@ Viewing
 
 Additional
 ----------
- # Support for FreeFrame plugins
+ # Support for FreeFrame plugins (only for 32 bit systems!)
  # Support for Frei0r plugins
+ # Support for LiVIDO plugins
 
 
 
