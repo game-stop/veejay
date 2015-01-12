@@ -32,7 +32,7 @@
 #endif
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
-
+#include <libavcodec/version.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -95,6 +95,13 @@ char*	vj_avcodec_get_codec_name(int codec_id )
 	char *res = strdup(name);
 	return res;
 }
+
+void			vj_libav_ffmpeg_version()
+{
+	veejay_msg( VEEJAY_MSG_INFO, "libav versions:");
+	veejay_msg( VEEJAY_MSG_INFO, "\tavcodec-%d.%d.%d (%d)", LIBAVCODEC_VERSION_MAJOR, LIBAVCODEC_VERSION_MINOR, LIBAVCODEC_VERSION_MICRO, LIBAVCODEC_BUILD );
+}
+
 
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av )
 {

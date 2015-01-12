@@ -66,6 +66,7 @@ int		vj_avcodec_encode_frame(void *encoder,long nframe, int format, uint8_t *src
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av );
 const char		*vj_avcodec_get_encoder_name(int encoder);
 int		vj_avcodec_free();
+void vj_libav_ffmpeg_version();
 
 /* color space conversion routines, should go somewhere else someday
    together with subsample.c/colorspace.c into some lib

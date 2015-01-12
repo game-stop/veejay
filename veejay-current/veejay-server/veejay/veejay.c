@@ -47,7 +47,7 @@
 #include <veejay/vj-OSC.h>
 #include <build.h>
 extern long vj_el_get_mem_size();
-
+extern void vj_libav_ffmpeg_version();
 static veejay_t *info = NULL;
 static float override_fps = 0.0;
 static int default_geometry_x = -1;
@@ -114,7 +114,6 @@ static void CompiledWith()
 #ifdef HAVE_JACK
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Jack audio server");
 #endif
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Video4linux");
 #ifdef SUPPORT_READ_DV2
 	veejay_msg(VEEJAY_MSG_INFO,"\tSupport for Digital Video enabled");
 #endif
@@ -147,6 +146,9 @@ static void CompiledWith()
 #ifdef HAVE_DIRECTFB
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing DirectFB");
 #endif
+
+	vj_libav_ffmpeg_version();
+
 	exit(0);
 }
 

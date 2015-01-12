@@ -688,8 +688,10 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 			continue;
 		
 		supported = v4l2_pixelformat2ffmpeg( v->supported_pixel_formats[k] );
-		if( supported >= 0 ) {
+		if( supported ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports %x", supported );
+			*candidate = supported;
+
 			return 1;
 		}
 	}
@@ -731,8 +733,8 @@ static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
 
 		yuv_plane_sizes( v->info, &(v->planes[0]),&(v->planes[1]),&(v->planes[2]),&(v->planes[3]) );
 
-		veejay_msg(VEEJAY_MSG_INFO, "v4l2: output in %dx%d, source in %dx%d",
-			wid,hei, src_wid,src_hei );
+		veejay_msg(VEEJAY_MSG_INFO, "v4l2: output in %dx%d, source in %dx%d %x",
+			wid,hei, src_wid,src_hei, cap_pf );
 /*
 		if( cap_pf == V4L2_PIX_FMT_JPEG ) {
 			v->info->data[0] = v->tmpbuf[0];
