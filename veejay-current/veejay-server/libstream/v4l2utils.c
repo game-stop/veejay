@@ -680,7 +680,13 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports RGB 32 bit");
 		return 1;
 	}
-	
+
+	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_YUV420, wid, hei,dw,dh,candidate );
+	if( supported ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports YUV420");
+		return 1;
+	}
+
 	//@ try anything else
 	int k;
 	for( k = 0; k < v->n_pixel_formats; k ++ ) {
