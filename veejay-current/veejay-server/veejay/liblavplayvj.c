@@ -777,13 +777,12 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
 	 info->uc->render_changed = 1; /* different render list */
     
-	if(	info->settings->sample_restart )
-	 sample_reset_offset( sample_id );	/* reset mixing offsets */
-    	 
+	 if( info->settings->sample_restart )
+		 sample_reset_offset( sample_id );	/* reset mixing offsets */
 	
 	 veejay_sample_resume_at( info, sample_id );
 
-     veejay_set_speed(info, speed);
+     	 veejay_set_speed(info, speed);
  	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, Loop=%d)",
 			sample_id, tmp,info->sfd, speed, start, looptype );
 	 
@@ -863,7 +862,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		}
 	} else if ( new_pm == VJ_PLAYBACK_MODE_PLAIN ) {
 		if( info->edit_list->video_frames < 1 ) {
-			veejay_msg( 0, "No video frames in EDL!");
+			veejay_msg( 0, "No video frames in EditList!");
 			return;	
 		}
 	}
@@ -920,7 +919,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		video_playback_setup *settings = info->settings;
 		settings->min_frame_num = 0;
 		settings->max_frame_num = info->edit_list->total_frames;
-		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
+		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d.",
 			(int)settings->min_frame_num,  (int)settings->max_frame_num );
 
 	}
@@ -962,15 +961,17 @@ void veejay_set_sample(veejay_t * info, int sampleid)
    	if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
 	{
 		veejay_start_playing_stream(info,sampleid );
-    }
-    else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+    	}
+    	else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
 		if( info->uc->sample_id == sampleid )
 		{
 			veejay_sample_resume_at( info, sampleid );
 		}
 		else
+		{
 			veejay_start_playing_sample(info,sampleid );
+		}
 	}
 }
 
@@ -982,7 +983,6 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 int veejay_create_tag(veejay_t * info, int type, char *filename,
 			int index, int channel, int device)
 {
-
 	if( type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST ) {
 		if( (filename != NULL) && ((strcasecmp( filename, "localhost" ) == 0)  || (strcmp( filename, "127.0.0.1" ) == 0)) ) {
 			if( channel == info->uc->port )	{
@@ -1109,7 +1109,6 @@ static int veejay_screen_update(veejay_t * info )
 			vj_vloopback_write_pipe( info->vloopback );
 	}
 
-	//@ FIXME: Both pixbuf and jpeg method is broken for screenshot
 #ifdef HAVE_JPEG
 #ifdef USE_GDK_PIXBUF 
         if (info->uc->hackme == 1)
@@ -1141,15 +1140,6 @@ static int veejay_screen_update(veejay_t * info )
 			if( info->sdl[i] )
 				vj_sdl_flip(info->sdl[i]);
 		}
-		/*
-#ifdef HAVE_GL
-		else if (info->video_out == 3 ) {
-			composite_blit_ycbcr( info->composite, frame, settings->composite, info->gl );
-			x_display_push_yvu( info->gl, info->video_output_width,info->video_output_height,
-						info->pixel_format );
-		}
-#endif
-*/
 		return 1;
 	}
 #endif
@@ -1186,14 +1176,6 @@ static int veejay_screen_update(veejay_t * info )
 	    		}
 #endif
 			 break;
-			 /*
-		case 3:
-#ifdef HAVE_GL
-			x_display_push( info->gl, frame , info->current_edit_list->video_width,
-					 info->current_edit_list->video_height, 
-					info->current_edit_list->pixel_format 	);
-#endif
-			break;*/
 		case 3:
 			break;	
 		case 4:
@@ -1202,7 +1184,6 @@ static int veejay_screen_update(veejay_t * info )
 				veejay_change_state(info,LAVPLAY_STATE_STOP);
 
 				return 0;
-		
 			}
 			break;
 		case 5:
@@ -1212,7 +1193,6 @@ static int veejay_screen_update(veejay_t * info )
 		return 0;
 		break;
     }
-
   	
     return 1;
 }
@@ -1234,59 +1214,37 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-//	int skip = 0;
 
 	if (info->uc->use_timer ) {
+		struct timespec now;
+		struct timespec nsecsleep;
 
-    /* I really *wish* the timer was higher res on x86 Linux... 10mSec
-     * is a *pain*.  Sooo wasteful here...
-     */
-
-	struct timespec now;
-//	struct timeval now;
-	struct timespec nsecsleep;
-
-	int usec_since_lastframe=0;
-	for (;;) {
-		clock_gettime( CLOCK_REALTIME, &now );
-	    //gettimeofday(&now, 0);
+		int usec_since_lastframe=0;
+		for (;;) {
+			clock_gettime( CLOCK_REALTIME, &now );
 		
-		usec_since_lastframe = (now.tv_nsec - settings->lastframe_completion.tv_nsec)/1000;
+			usec_since_lastframe = (now.tv_nsec - settings->lastframe_completion.tv_nsec)/1000;
+		
+			if (usec_since_lastframe < 0)
+				usec_since_lastframe += 1000000;
+	  		if (now.tv_sec > settings->lastframe_completion.tv_sec + 1)
+				usec_since_lastframe = 1000000;
+
+	   		if (settings->first_frame || (frame_periods * settings->usec_per_frame - usec_since_lastframe) < (1000000 / HZ)) {
+				break;	
+			}
 	
-		if (usec_since_lastframe < 0)
-			usec_since_lastframe += 1000000;
-//			usec_since_lastframe += 1000000000;
-	    if (now.tv_sec > settings->lastframe_completion.tv_sec + 1)
-			usec_since_lastframe = 1000000;
-
-
-	   if (settings->first_frame || (frame_periods * settings->usec_per_frame - usec_since_lastframe) < (1000000 / HZ)) {
-
-			break;	
+			nsecsleep.tv_nsec = (settings->usec_per_frame - usec_since_lastframe -  1000000 / HZ) * 1000;    	
+	    	nsecsleep.tv_sec = 0;
+	    	nanosleep(&nsecsleep, NULL);
 		}
-	
-		nsecsleep.tv_nsec = (settings->usec_per_frame - usec_since_lastframe -  1000000 / HZ) * 1000;    	
-	//    nsecsleep.tv_nsec = (frame_periods * settings->usec_per_frame - usec_since_lastframe - 1000000 / HZ) * 1000;
-	    nsecsleep.tv_sec = 0;
-	    nanosleep(&nsecsleep, NULL);
-	}
     }
 
-
     settings->first_frame = 0;
-      /* We are done with writing the picture - Now update all surrounding info */
+	
 	struct timespec lasttime;
-	memcpy( &lasttime, &(settings->lastframe_completion), sizeof(struct timespec));
+	veejay_memcpy( &lasttime, &(settings->lastframe_completion), sizeof(struct timespec));
 	clock_gettime( CLOCK_REALTIME, &(settings->lastframe_completion) );
-/*
-	if( skip) {
-		long d1 = (settings->lastframe_completion.tv_sec * 1000000000) + settings->lastframe_completion.tv_nsec;
-		long d2 = (lasttime.tv_sec * 1000000000) + lasttime.tv_nsec;
-
-		double diff = ( ( double) d1-d2)/1000000000.0;
-	}*/
-
-//	gettimeofday(&(settings->lastframe_completion), 0);
     settings->syncinfo[settings->currently_processed_frame].timestamp = settings->lastframe_completion;
 }
 
@@ -1305,10 +1263,7 @@ void veejay_pipe_write_status(veejay_t * info)
 	total_slots = 0;
 
    int mstatus = vj_event_macro_status();
-
-
    int curfps  = (int) ( 100.0f / settings->spvf );
-   
 
     switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
@@ -1454,8 +1409,6 @@ static	int	veejay_create_homedir(char *path)
 		}
 	}
 	free(font_dir);
-// on dynebolic, we copy mplayer's font to veejay's homedir
-//	system("cp /usr/share/mplayer/font/arial.ttf ~/.veejay/fonts");
 	return 1;
 }
 void	veejay_check_homedir(void *arg)
@@ -1473,7 +1426,6 @@ void	veejay_check_homedir(void *arg)
 	sprintf(path, "%s/.veejay", home );
 	info->homedir = strndup( path, 1024 );
 
-
 	if( veejay_valid_homedir(path) == 0)
 	{
 		if( veejay_create_homedir(path) == 0 )
@@ -1482,7 +1434,6 @@ void	veejay_check_homedir(void *arg)
 				"Can't create %s",path);
 			return;
 		}
-		
 	}
 
 	sprintf(tmp, "%s/plugins.cfg", path );
@@ -1701,30 +1652,12 @@ static	void	veejay_event_handle(veejay_t *info)
 		info->uc->mouse[2] = but;
 	}
 #endif
-	/*
-#ifdef HAVE_GL
-	if(info->video_out == 3 )
-	{
-		x_display_mouse_grab( info->gl, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],
-					info->uc->mouse[3] );
-
-		x_display_event( info->gl, info->current_edit_list->video_width, info->current_edit_list->video_hei,,ght );
-
-		x_display_mouse_update( info->gl, &(info->uc->mouse[0]), &(info->uc->mouse[1]), &(info->uc->mouse[2]),
-						&(info->uc->mouse[3]));
-	}
-#endif
-	*/
-
 }
 
 static void *veejay_geo_stat_thread(void *arg)
 {
-   /* Allow easy shutting down by other processes... */
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-  //  vj_server_geo_stats();
 
     return NULL;
 }
@@ -1752,10 +1685,6 @@ static void *veejay_mjpeg_playback_thread(void *arg)
     while (settings->state != LAVPLAY_STATE_STOP) {
 	pthread_mutex_lock(&(settings->valid_mutex));
 	while (settings->valid[settings->currently_processed_frame] == 0) {
-#ifdef STRICT_CHECKING
-   //	veejay_msg(VEEJAY_MSG_DEBUG, "Playback thread: sleeping for new frames (waiting for frame %d)", 
-   //       settings->currently_processed_frame);
-#endif		
 	    pthread_cond_wait(&
 			      (settings->
 			       buffer_filled[settings->
@@ -1781,7 +1710,6 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 		settings->buffer_entry[settings->currently_processed_frame];
 
 	// timestamp frame after sync
-
 	veejay_mjpeg_software_frame_sync(info,
 					  settings->valid[settings->
 							  currently_processed_frame]);
@@ -1824,7 +1752,7 @@ int veejay_open(veejay_t * info)
     veejay_msg(VEEJAY_MSG_DEBUG, 
 		"Initializing the threading system");
 
-    memset( &(settings->lastframe_completion), 0, sizeof(struct timeval));
+    veejay_memset( &(settings->lastframe_completion), 0, sizeof(struct timeval));
 
     pthread_mutex_init(&(settings->valid_mutex), NULL);
     pthread_mutex_init(&(settings->syncinfo_mutex), NULL);
@@ -3341,7 +3269,6 @@ int veejay_main(veejay_t * info)
 
 static void	veejay_reset_el_buffer( veejay_t *info )
 {
-	
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
 
@@ -3350,12 +3277,10 @@ static void	veejay_reset_el_buffer( veejay_t *info )
 
     settings->save_list = NULL;
     settings->save_list_len = 0;
-
 }
 
 int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 {
-
     if(el->is_empty)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "No frames in EDL to copy");
@@ -3512,16 +3437,12 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
     	return 1;
 }
 
-
-
-
 /******************************************************
  * veejay_edit_cut()
  *   cut a number of frames into a buffer
  *
  * return value: 1 on succes, 0 on error
  ******************************************************/
-
 int veejay_edit_cut(veejay_t * info, editlist *el, long start, long end)
 {
 	if( el->is_empty )
@@ -3536,7 +3457,6 @@ int veejay_edit_cut(veejay_t * info, editlist *el, long start, long end)
 
     return 1;
 }
-
 
 /******************************************************
  * veejay_edit_paste()
@@ -3799,16 +3719,12 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
 	return 1;
 }
 
-
-
 /******************************************************
  * veejay_toggle_audio()
  *   mutes or unmutes audio (1 = on, 0 = off)
  *
  * return value: 1 on succes, 0 on error
  ******************************************************/
-
-
 int veejay_toggle_audio(veejay_t * info, int audio)
 {
     video_playback_setup *settings =
@@ -3826,13 +3742,9 @@ int veejay_toggle_audio(veejay_t * info, int audio)
 
     veejay_msg(VEEJAY_MSG_DEBUG, 
 		"Audio playback was %s", audio == 0 ? "muted" : "unmuted");
-    
  
     return 1;
 }
-
-
-
 /*** Methods for saving the currently played movie to editlists or open new movies */
 
 /******************************************************
@@ -3900,7 +3812,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	info->dummy->width = info->video_output_width;
 	info->dummy->height= info->video_output_height;
 
-	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
 	{
 		info->dummy->norm =  'p';
@@ -3962,7 +3873,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		veejay_msg(VEEJAY_MSG_DEBUG,"Dummy Video: %dx%d, chroma %x, framerate %2.2f, norm %s",
 					info->dummy->width,info->dummy->height, info->dummy->chroma,info->dummy->fps,
 					(info->dummy->norm == 'n' ? "NTSC" :"PAL"));
-
 	}
 	else
 	{
@@ -3994,7 +3904,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		info->settings->output_fps = info->current_edit_list->video_fps;
 	}
-
 
 	return 1;
 }
@@ -4035,7 +3944,6 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 #ifdef USE_GDK_PIXBUF
 	vj_picture_init( &(info->settings->sws_templ));
 #endif
-
 
 	/* override options */
 	if(ofps<=0.0)
