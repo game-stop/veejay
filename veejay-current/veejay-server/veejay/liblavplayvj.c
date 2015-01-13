@@ -1284,7 +1284,8 @@ void veejay_pipe_write_status(veejay_t * info)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		snprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		// 26 status symbols
+		snprintf(info->status_what,1024, " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1495,7 +1496,7 @@ static void veejay_handle_callbacks(veejay_t *info) {
 	for( i = 0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
 		if( !vj_server_link_can_write( info->vjs[VEEJAY_PORT_STA],  i ) ) 
 			continue;
-		int res = vj_server_send( info->vjs[VEEJAY_PORT_STA], i, info->status_line, status_line_len);
+		int res = vj_server_send( info->vjs[VEEJAY_PORT_STA], i, (uint8_t*)info->status_line, status_line_len);
 		if( res < 0 ) {
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_CMD], i );
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_STA], i );
@@ -2915,7 +2916,7 @@ int vj_server_setup(veejay_t * info)
  ******************************************************/
 int	prepare_cache_line(int perc, int n_slots)
 {
-	long total = 0; 
+	int total = 0; 
 	char line[128];
 	FILE *file = fopen( "/proc/meminfo","r");
 	if(!file)
