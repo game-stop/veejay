@@ -929,24 +929,25 @@ const char *lav_video_compressor(lav_file_t *lav_file)
 #ifdef SUPPORT_READ_DV2
    if( video_format == 'b' )
    {
-	const char *tmp = (const char*) strdup("dvsd");
+	const char tmp[] = "dvsd";
 	return tmp;
    }
 #endif
 #ifdef USE_GDK_PIXBUF
    if( video_format == 'x')
    {
-	const char *tmp = (const char*) strdup("PICT");
+	const char tmp[] = "PICT";
 	return tmp;
    }
 #endif
    if( video_format == 'L' )
    {
-	   return (strdup("mlzo"));
+	const char tmp[] = "mlzo";
+	return tmp;
    }
 #ifdef HAVE_LIBQUICKTIME
-	if(lav_file->format == 'q' || lav_file->format == 'Q')
-		return quicktime_video_compressor(lav_file->qt_fd,0);
+   if(lav_file->format == 'q' || lav_file->format == 'Q')
+	return quicktime_video_compressor(lav_file->qt_fd,0);
 #endif
    return AVI_video_compressor(lav_file->avi_fd);
 }

@@ -51,9 +51,8 @@ typedef struct
 	int	audio_bps;
 
 	long 	video_frames; 
-	long	total_frames;
 	long	num_video_files;
-
+	uint64_t 	total_frames;
 	long	max_frame_size;
 	int	MJPG_chroma;
 
@@ -146,8 +145,6 @@ void	vj_el_set_caching(int status);
 int	vj_el_bogus_length( editlist *el, long nframe );
 
 int	vj_el_set_bogus_length( editlist *el, long nframe, int len );
-
-void	vj_el_get_video_fourcc(editlist *el, int num, char *fourcc);
 
 int	detect_pixel_format_with_ffmpeg( const char *filename );
 

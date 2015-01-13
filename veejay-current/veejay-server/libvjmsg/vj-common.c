@@ -584,3 +584,12 @@ void    report_bug(void)
 
 }
 
+int	has_env_setting( const char *env, const char *value )
+{
+	char *tmp = getenv( env );
+	if( tmp ) {
+		if( strncasecmp( value, tmp, strlen(value)) == 0 )
+			return 1;
+	}
+	return 0;
+}

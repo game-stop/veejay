@@ -139,7 +139,6 @@ typedef struct {
     int min_frame_num;		/* the lowest frame to be played back - normally 0 */
     int max_frame_num;		/* the latest frame to be played back - normally num_frames - 1 */
     int current_frame_num;	/* the current frame */
-    int previous_frame_num;	/* previous frame num */
     int current_playback_speed;	/* current playback speed */
     int currently_processed_frame;	/* changes constantly */
     int currently_synced_frame;	/* changes constantly */

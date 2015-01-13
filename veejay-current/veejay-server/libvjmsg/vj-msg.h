@@ -43,4 +43,5 @@ extern void	veejay_reap_messages(void);
 extern char *veejay_pop_messages(int *num_lines, int *total_len);
 extern int	veejay_get_file_ext( char *file, char *dst, int dlen);
 extern void	veejay_chomp_str( char *str, int *dlen );
+extern int	has_env_setting( const char *env, const char *value );
 #endif

@@ -380,46 +380,43 @@ int veejay_set_speed(veejay_t * info, int speed)
     switch (info->uc->playback_mode)
 	{
 
-	case VJ_PLAYBACK_MODE_PLAIN:
-		len = info->current_edit_list->total_frames;
-		if( abs(speed) <= len )
-			settings->current_playback_speed = speed;	
-		else
-			veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d too high to set!", speed);
+		case VJ_PLAYBACK_MODE_PLAIN:
+			if( abs(speed) <= info->current_edit_list->total_frames )
+				settings->current_playback_speed = speed;	
+			else
+				veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d too high to set!", speed);
 
-		break;
-    case VJ_PLAYBACK_MODE_SAMPLE:
-		len = sample_get_endFrame(info->uc->sample_id) - sample_get_startFrame(info->uc->sample_id);
-		if( speed < 0)
-		{
-			if ( (-1*len) > speed )
+			break;
+		case VJ_PLAYBACK_MODE_SAMPLE:
+			len = sample_get_endFrame(info->uc->sample_id) - sample_get_startFrame(info->uc->sample_id);
+			if( speed < 0)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR,"Speed %d too high to set!",speed);
-				return 1;
-			}
-		}
-		else
-		{
-			if(speed >= 0)
-			{
-				if( len < speed )
+				if ( (-1*len) > speed )
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Speed %d too high to set",speed);
+					veejay_msg(VEEJAY_MSG_ERROR,"Speed %d too high to set!",speed);
 					return 1;
 				}
 			}
-		}
-		if(sample_set_speed(info->uc->sample_id, speed) != -1)
-			settings->current_playback_speed = speed;
-		break;
-
-    case VJ_PLAYBACK_MODE_TAG:
-		
-		settings->current_playback_speed = 1;
-		break;
-    default:
-		veejay_msg(VEEJAY_MSG_ERROR, "Unknown playback mode");
-		break;
+			else
+			{
+				if(speed >= 0)
+				{
+					if( len < speed )
+					{
+						veejay_msg(VEEJAY_MSG_ERROR, "Speed %d too high to set",speed);
+						return 1;
+					}
+				}
+			}
+			if(sample_set_speed(info->uc->sample_id, speed) != -1)
+				settings->current_playback_speed = speed;
+			break;
+    	case VJ_PLAYBACK_MODE_TAG:
+			settings->current_playback_speed = 1;
+			break;
+    	default:
+			veejay_msg(VEEJAY_MSG_ERROR, "Unknown playback mode");
+			break;
     }
 
 
@@ -468,14 +465,14 @@ int veejay_increase_frame(veejay_t * info, long num)
 
    if( info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN)
    {
-		if(settings->current_frame_num < settings->min_frame_num) return 0;
-		if(settings->current_frame_num > settings->max_frame_num) return 0;
+		if((settings->current_frame_num + num) < settings->min_frame_num) return 0;
+		if((settings->current_frame_num + num) > settings->max_frame_num) return 0;
    }
    else   if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
    {
-		if ((settings->current_frame_num + num) <=
+		if ((settings->current_frame_num + num) <
 		    sample_get_startFrame(info->uc->sample_id)) return 0;
-		if((settings->current_frame_num + num) >=
+		if((settings->current_frame_num + num) >
 		    sample_get_endFrame(info->uc->sample_id)) return 0;
     
     }
@@ -653,11 +650,9 @@ int veejay_init_editlist(veejay_t * info)
     editlist *el = info->edit_list;
 
     /* Set min/max options so that it runs like it should */
-    settings->min_frame_num = 1;
-//    settings->max_frame_num = el->video_frames - 1;
+    settings->min_frame_num = 0;
     settings->max_frame_num = el->total_frames;
     settings->current_frame_num = settings->min_frame_num;
-    settings->previous_frame_num = 1;
     settings->spvf = 1.0 / el->video_fps;
     settings->msec_per_frame = 1000 / settings->spvf;
 
@@ -697,14 +692,6 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 	}
 
 	sample_chain_free( info->uc->sample_id );
-/*&	int n;
-	for( n = 0; n < 3 ; n ++ ) {
-		if(info->settings->fxrow[n] ) {
-			vj_effect_deactivate( info->settings->fxrow[n] , sample_get_plugin( info->uc->sample_id,);
-			info->settings->fxrow[n] = 0;
-		}
-	}*/
-	
 	veejay_reset_el_buffer(info);
 	sample_set_framedups(info->uc->sample_id,0);
 	sample_set_resume(info->uc->sample_id, info->settings->current_frame_num );
@@ -931,7 +918,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		assert(info->current_edit_list != NULL );
 #endif
 		video_playback_setup *settings = info->settings;
-		settings->min_frame_num = 1;
+		settings->min_frame_num = 0;
 		settings->max_frame_num = info->edit_list->total_frames;
 		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
 			(int)settings->min_frame_num,  (int)settings->max_frame_num );
@@ -2565,7 +2552,7 @@ static void veejay_playback_cycle(veejay_t * info)
 			assert( info->edit_list != NULL );
 #endif
 			video_playback_setup *settings = info->settings;
-			settings->min_frame_num = 1;
+			settings->min_frame_num = 0;
 			settings->max_frame_num = info->edit_list->total_frames;
 			veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
 				(int)settings->min_frame_num,  (int)settings->max_frame_num );
@@ -3417,13 +3404,13 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 		return 0;
 	}
 
-	if( n2 >= el->video_frames)
+	if( n2 > el->total_frames)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Sample end is outside of editlist");
 		return NULL;
 	}
 
-	if(len <= 0 )
+	if(len < 1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Sample too short!");
 		return NULL;
@@ -3437,7 +3424,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 		return NULL;
 	}
 
-    /* copy edl frames */
+    	/* copy edl frames */
    	new_el->frame_list = (uint64_t *) vj_malloc(  sizeof(uint64_t) * len );
 
 	if (!new_el->frame_list)
@@ -3447,15 +3434,9 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 		return NULL;
    	}
 
-//veejay_msg(0, "start of framelist: %p, end = %p", &(el->frame_list[n1]), &(el->frame_list[n2+1]) );
-//veejay_msg(0, "memcpy %p, %p", el->frame_list + n1, el->frame_list + n1 + len );
 	veejay_memcpy( new_el->frame_list , el->frame_list + n1, sizeof(uint64_t) * len );
 	new_el->video_frames = len;
 	new_el->total_frames = len - 1;
-//	for (i = n1; i <= n2; i++)
-//		new_el->frame_list[k++] = el->frame_list[i];
-
-//    	new_el->video_frames = k;
 	return new_el;
 }
 
@@ -3602,7 +3583,7 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 	{
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		return 0;
-    }
+   	}
 
    	k = (uint64_t)settings->save_list_len;
     	for (i = el->total_frames; i >= destination && i > 0; i--)
@@ -3619,7 +3600,6 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 		k++;
 	}
 	el->video_frames += settings->save_list_len;
-	el->total_frames = el->video_frames - 1;
 	if(el->is_empty)
 		el->is_empty = 0;
     	veejay_increase_frame(info, 0);
@@ -3647,7 +3627,7 @@ int veejay_edit_move(veejay_t * info,editlist *el, long start, long end,
 		return 0;
 	
     if (destination > el->total_frames || destination < 0
-		|| start < 0 || end < 0 || start >= el->video_frames
+		|| start < 0 || end < 0 || start >= el->total_frames
 		|| end > el->total_frames || end < start)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid parameters for moving video from %ld - %ld to position %ld",
@@ -3717,8 +3697,8 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 			free(files[0]);
 
 		if( res > 0 ) {
-			sample_set_endframe( id, sample_edl->video_frames - 1);
-			veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d new ending position is %ld",id, sample_edl->video_frames - 1 );
+			sample_set_endframe( id, sample_edl->total_frames );
+			veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d new ending position is %ld",id, sample_edl->video_frames );
 			return id;
 		}
 		return -1;
@@ -3813,9 +3793,8 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
 	}
  
 	el->video_frames = c;
-	el->total_frames = el->video_frames - 1;
 	settings->max_frame_num = el->total_frames;
-	settings->min_frame_num = 1;
+	settings->min_frame_num = 0;
 
 	return 1;
 }
@@ -3939,12 +3918,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		int dw = 720;
 		int dh = (override_norm == 'p' ? 576 : 480);
 
-		char *runClassic = getenv( "VEEJAY_RUN_MODE" );
-		if( runClassic ) {
-			if( strncasecmp("CLASSIC",runClassic,7 ) == 0 ) {
-			       dw = (override_norm == 'p' ? 352 : 360 );
-		       	       dh = dh / 2;
-			}	       
+		if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
+		       dw = (override_norm == 'p' ? 352 : 360 );
+	  	       dh = dh / 2;
 		}
 		else {
 			veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_RUN_MODE not set to CLASSIC");
