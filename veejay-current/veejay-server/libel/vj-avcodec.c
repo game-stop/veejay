@@ -33,6 +33,7 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libavcodec/version.h>
+#include <libavformat/avformat.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -296,13 +297,6 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 #endif
 		if(av->y4m)
 			vj_yuv4mpeg_free( (vj_yuv*) av->y4m );
-		if(av->frame) {
-#if LIBAVCODEC_BUILD > 5400
-			avcodec_free_frame(av->frame);
-#else
-			av_frame_free(av->frame);
-#endif
-		}
 		free(av);
 	}
 	av = NULL;
@@ -623,8 +617,7 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	}
 #endif
 	AVFrame pict;
-	int res=0;
-	int stride,h2,w2,size,size2,stride2;
+	int stride,w2,stride2;
 	veejay_memset( &pict, 0, sizeof(pict));
 
 	pict.quality = 1;
@@ -634,12 +627,8 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	pict.data[2] = src[2];
 
 	stride = ROUND_UP_4( av->width );
-	h2 = ROUND_UP_X( av->height, av->shift_y );
-	size = stride * h2;
 	w2 = DIV_ROUND_UP_X(av->width, av->shift_x);
 	stride2 = ROUND_UP_4( w2 );
-	h2 = DIV_ROUND_UP_X(av->height, av->shift_y );
-	size2 = stride2 * h2;
 	pict.linesize[0] = stride;
 	pict.linesize[1] = stride2;
 	pict.linesize[2] = stride2;

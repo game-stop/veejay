@@ -42,7 +42,7 @@ typedef struct
 {
 	AVCodec *codec;
 	AVCodec *audiocodec;
-	AVFrame *frame;
+//	AVFrame *frame;
 	AVCodecContext	*context;
 	int out_fmt;
 	int uv_len;
