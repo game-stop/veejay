@@ -1075,8 +1075,8 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 					free(tag);
 					return -1;
 			}
-
-			strcpy( tag->source_name, filename );
+			if( filename != NULL )
+				strcpy( tag->source_name, filename );
 		}
 		else {
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator '%s'",filename);
