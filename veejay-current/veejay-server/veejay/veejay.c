@@ -316,7 +316,10 @@ static int set_option(const char *name, char *value)
     } else if ( strcmp(name, "A" ) == 0 || strcmp(name, "capture-device" ) == 0 ) {
 	live = atoi(optarg);
     } else if ( strcmp(name, "Z" ) == 0 || strcmp(name, "load-generators" ) == 0 ) {
-		ta = atoi(optarg);
+		if( sscanf( optarg, "%d",&ta ) != 1 ) {
+			fprintf(stderr, "-Z/--load-generators requires an argument\n");
+			nerr++;
+		}
 	} else if (strcmp(name, "bezerk") == 0 || strcmp(name, "b") == 0) {
 	info->no_bezerk = 0;
     } else if (strcmp(name, "timer") == 0 || strcmp(name, "t") == 0) {
@@ -684,7 +687,6 @@ int main(int argc, char **argv)
 	vj_mem_init();
 	vevo_strict_init();
 	
-
 	info = veejay_malloc();
 	if (!info) {
 		vj_mem_threaded_stop();
@@ -694,10 +696,10 @@ int main(int argc, char **argv)
    	settings = (video_playback_setup *) info->settings;
 
 	if(!check_command_line_options(argc, argv))
-    {
+	{
 		veejay_free(info);
 		return 0;
-    }
+    	}
 
 	
    	if(info->dump)

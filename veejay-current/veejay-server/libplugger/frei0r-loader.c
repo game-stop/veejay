@@ -42,12 +42,11 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-/** \defgroup freior Freior Host
- *
- * This module provides a Frei0r Host
- */
+
 #include <libplugger/specs/frei0r.h>
 #define    RUP8(num)(((num)+8)&~8)
+#define _VJ_MAX_PARAMS 8
+
 
 static int frei0r_signature_ = VEVO_PLUG_FR;
 
@@ -152,16 +151,41 @@ static inline int frei0r_param_set_color(f0r_set_param_value_f q,void *plugin, i
 	
 	return 3;
 }
-static inline void *frei0r_plug_get_param( void *parent, int vj_seq_no, int *hint )
+
+static	void	*frei0r_plug_get_parameter_port(void *plugin, int seq_no)
 {
 	char key[20];
-	snprintf(key, sizeof(key)-1, "p%02d", vj_seq_no );
+	snprintf(key, sizeof(key), "p%02d", seq_no );
 	void *param = NULL;
 	
-	if(vevo_property_get( parent, key, 0, &param ) != VEVO_NO_ERROR) {
+	if(vevo_property_get( plugin, key, 0, &param ) != VEVO_NO_ERROR) {
 		return NULL;
 	}
+	return param;
+}
 
+static int frei0r_plug_get_default_param(void *plugin, int k)
+{
+	void *param = frei0r_plug_get_parameter_port( plugin, k );
+	int v = 0.0;
+	if( param ) {
+		vevo_property_get( param, "default", 0, &v );
+	}
+	return v;
+}
+
+static void frei0r_param_set_default(void *plugin, int k, int value)
+{
+	void *param = frei0r_plug_get_parameter_port( plugin, k );
+	int v = value;
+	if( param ) {
+		vevo_property_set( param, "default",VEVO_ATOM_TYPE_INT, 1, &v );
+	}
+}
+
+static inline void *frei0r_plug_get_param( void *parent, int vj_seq_no, int *hint )
+{
+	void *param = frei0r_plug_get_parameter_port( parent, vj_seq_no );
 	int type = -1;
 
 	vevo_property_get( param, "hint", 0, &type );
@@ -338,8 +362,6 @@ static void store_parameter_port( void *port, int seq_no, void *parameter_port )
 	vevo_property_set( port, key, VEVO_ATOM_TYPE_PORTPTR, 1, &parameter_port );
 }
 
-#define _VJ_MAX_PARAMS 8
-
 static int init_param_fr( void *port, f0r_param_info_t *info, int offset, int frei0r_param_count)
 {
 	int np = 0;
@@ -403,6 +425,62 @@ static int is_bad_frei0r_plugin( f0r_plugin_info_t *info )
 	}
 	return 0;
 }
+
+static	FILE	*frei0r_open_config(const char *basedir, const char *filename, char *mode, int chkdir )
+{
+	char path[PATH_MAX];
+	char *home = getenv( "HOME" );
+	if(!home) {
+		return NULL;
+	}
+
+	snprintf( path, sizeof(path), "%s/.veejay/%s", home, basedir);
+
+	if( chkdir ) {
+		struct stat st;
+		veejay_memset(&st,0,sizeof(struct stat));
+		if( stat( path, &st ) == -1 ) {
+			if(mkdir( path, 0700 ) == -1 ) {
+				return NULL;
+			}
+		}
+	}
+
+	snprintf( path, sizeof(path), "%s/.veejay/%s/%s.cfg", home,basedir, filename);
+	return fopen( path, mode );
+}
+
+void	frei0r_read_plug_configuration(void *plugin, const char *name)
+{
+	FILE *f = frei0r_open_config( "frei0r", name, "r",0 );
+	if(!f) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "No configuration file for frei0r plugin %s", name);
+		FILE *cfg = frei0r_open_config( "frei0r", name, "w",1 );
+		if( cfg ) {
+			int i;
+			int n_params = 0;
+			vevo_property_get( plugin, "num_params", 0, &n_params );
+			for( i = 0; i < n_params; i ++ ) 
+			{	
+				fprintf(cfg,"%d ", frei0r_plug_get_default_param(plugin, i)); //write out all default values
+			}
+		
+			fclose(cfg);
+		}
+		return;
+	}
+
+	int p = 0;
+	int dbl = 0.0;
+
+	while( (fscanf( f, "%d", &dbl )) == 1 ) {
+		frei0r_param_set_default( plugin, p, dbl );
+		p++;
+	}
+
+	fclose(f);
+}
+
 
 void* 	deal_with_fr( void *handle, char *name)
 {
@@ -614,6 +692,8 @@ void* 	deal_with_fr( void *handle, char *name)
 	vevo_property_set( port, "format", VEVO_ATOM_TYPE_INT,1,&pixfmt);
 
 	free( plug_name );
+
+	frei0r_read_plug_configuration(port, name);
 
 	return port;
 }

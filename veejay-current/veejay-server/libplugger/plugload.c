@@ -1119,7 +1119,7 @@ vj_effect *plug_get_plugin( int fx_id ) {
 		int valid_p = 0;
 		char **param_descr = NULL;
 		if( vje->num_params > 0 ) 
-			param_descr = (char**) vj_calloc(sizeof(char*) * (vje->num_params+1) );
+			param_descr = (char**) vj_calloc(sizeof(char*) * vje->num_params );
 
 		for( k = 0; k < vje->num_params;k++ )
 		{
