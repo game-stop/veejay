@@ -709,12 +709,13 @@ void vj_effect_free(vj_effect *ve) {
   if(ve->limits[1]) free(ve->limits[1]);
   if(ve->defaults) free(ve->defaults);
   int i = 0;
-  if( ve->param_description != NULL ) {
+/*  if( ve->param_description != NULL ) {
   	for( i = 0; ve->param_description[i] != NULL; i ++ )
 		  free(ve->param_description[i]);
   
    	free(ve->param_description);
-  }
+  } */
+	// FIXME cleanup
    // if(ve->vjed) free(ve->vjed);
     free(ve);
 }
