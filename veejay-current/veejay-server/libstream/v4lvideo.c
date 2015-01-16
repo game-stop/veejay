@@ -37,6 +37,7 @@
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
 #include <libstream/frequencies.h>
+#include <time.h>
 #include <string.h>
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
@@ -806,6 +807,11 @@ static	void	*v4lvideo_grabber_thread( void * vv )
 	int retry = 4;
 	int flag  = 0;
 
+	struct timespec req;
+
+	req.sec = 0;
+	req.nsec = 20000 * 1000;
+
 	veejay_msg(VEEJAY_MSG_DEBUG, "Capture device thread enters inner loop");
 RESTART:
 	while( v->active ) {
@@ -816,7 +822,7 @@ PAUSED:
 				__v4lvideo_grabstop( v );
 			}
 			unlock_(i);
-			usleep( 20000 );
+			nanosleep( &req, NULL);
 			goto PAUSED;
 		} else {
 			if(!v->grabbing) {
@@ -824,7 +830,7 @@ PAUSED:
 				veejay_msg(VEEJAY_MSG_DEBUG, "Trying to start capturing.");
 				__v4lvideo_grabstart(v);
 				unlock_(i);
-				usleep( 20000 );
+				nanosleep(&req, NULL );
 				goto RESTART;
 			}
 		}

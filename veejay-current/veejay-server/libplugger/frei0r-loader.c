@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <libplugger/portdef.h>
+#include <libplugger/defaults.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -426,36 +427,12 @@ static int is_bad_frei0r_plugin( f0r_plugin_info_t *info )
 	return 0;
 }
 
-static	FILE	*frei0r_open_config(const char *basedir, const char *filename, char *mode, int chkdir )
-{
-	char path[PATH_MAX];
-	char *home = getenv( "HOME" );
-	if(!home) {
-		return NULL;
-	}
-
-	snprintf( path, sizeof(path), "%s/.veejay/%s", home, basedir);
-
-	if( chkdir ) {
-		struct stat st;
-		veejay_memset(&st,0,sizeof(struct stat));
-		if( stat( path, &st ) == -1 ) {
-			if(mkdir( path, 0700 ) == -1 ) {
-				return NULL;
-			}
-		}
-	}
-
-	snprintf( path, sizeof(path), "%s/.veejay/%s/%s.cfg", home,basedir, filename);
-	return fopen( path, mode );
-}
-
 void	frei0r_read_plug_configuration(void *plugin, const char *name)
 {
-	FILE *f = frei0r_open_config( "frei0r", name, "r",0 );
+	FILE *f = plug_open_config( "frei0r", name, "r",0 );
 	if(!f) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "No configuration file for frei0r plugin %s", name);
-		FILE *cfg = frei0r_open_config( "frei0r", name, "w",1 );
+		FILE *cfg = plug_open_config( "frei0r", name, "w",1 );
 		if( cfg ) {
 			int i;
 			int n_params = 0;

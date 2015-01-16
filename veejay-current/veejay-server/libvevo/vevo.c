@@ -2996,7 +2996,7 @@ char	**vevo_sprintf_port( vevo_port_t *port )
 		if(buf)
 		{	
 			res[k++] = strdup( buf );
-			free(p);
+			free(buf);
 		}
 		free(keys[i]);
 		
@@ -3621,7 +3621,6 @@ void	vevo_port_dump( void *p, int lvl )
 	}
 	if(tabs) free(tabs);
 	free(keys);
-
 }
 
 int		vevo_property_clone( void *port, void *to_port, const char *key, const char *as_key )

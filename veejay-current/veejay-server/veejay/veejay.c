@@ -29,6 +29,7 @@
 #include <sched.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <time.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
@@ -680,7 +681,7 @@ int main(int argc, char **argv)
 	 
     	sigset_t allsignals;
     	struct sigaction action;
-	
+	struct timespec req;
 	int i;
 	fflush(stdout);
 
@@ -792,9 +793,12 @@ int main(int argc, char **argv)
 	
 	int current_state = LAVPLAY_STATE_PLAYING;
 
+	req.tv_sec = 5;
+	req.tv_nsec = 1001; 
+
 	while( 1 ) { //@ until your PC stops working
 		
-		usleep(50000);
+		nanosleep( &req, NULL );
 
 		current_state = veejay_get_state(info);
 		

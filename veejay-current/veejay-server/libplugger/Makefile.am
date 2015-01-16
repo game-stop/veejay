@@ -5,5 +5,5 @@ INCLUDES = 	-I$(top_srcdir)/libplugger -I$(includedir) -I$(top_srcdir)/libhash -
 LIBVJPLUG_LIB_FILE = libvjplug.la
 noinst_LTLIBRARIES = $(LIBVJPLUG_LIB_FILE)
 
-libvjplug_la_SOURCES = utility.c weed-utils.c freeframe-loader.c frei0r-loader.c livido-loader.c plugload.c
+libvjplug_la_SOURCES = defaults.c utility.c weed-utils.c freeframe-loader.c frei0r-loader.c livido-loader.c plugload.c
 

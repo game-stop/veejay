@@ -522,9 +522,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
 		d->img->width = width;
 
-		int tc = 2 * task_num_cpus();	
-		tc = ( tc < 8 ? 8: tc );
-
+		unsigned int tc = task_num_cpus();
 		veejay_msg(VEEJAY_MSG_DEBUG,"Using %d FFmpeg decoder threads", tc );
 		d->context->thread_type = FF_THREAD_FRAME;
 		d->context->thread_count = tc;

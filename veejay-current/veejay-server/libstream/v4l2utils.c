@@ -71,6 +71,7 @@
 #include <stdint.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <time.h>
 #include <poll.h>
 #include <libvje/vje.h>
 #include <libavutil/pixfmt.h>
@@ -1922,10 +1923,9 @@ char **v4l2_get_device_list()
 //@   - error to capture frame after n retries 
 static	void	*v4l2_grabber_thread( void *v )
 {
+	struct timespec req;
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL );
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-
 	int max_retries = 15;
 	char *retry = getenv( "VEEJAY_V4L2_MAX_RETRIES" );
 	if(retry) {
@@ -1942,6 +1942,8 @@ static	void	*v4l2_grabber_thread( void *v )
 
 	lock_( v );
 	v4l2_thread_info *i = (v4l2_thread_info*) v;
+	req.tv_sec = 0;
+	req.tv_nsec = 1000 * 1000;
 
 	if(!v4l2_verify_file( i->file ) ) {
 		i->stop = 1;
@@ -2007,7 +2009,7 @@ static	void	*v4l2_grabber_thread( void *v )
 		unlock_(i);
 		
 		if( ( !v4l2->is_streaming && v4l2->rw == 0 ) || ( v4l2->rw == 1 && v4l2->pause_read ) ) {
-			usleep(1000);
+			nanosleep(&req, NULL);
 			continue;
 		} 
 
@@ -2124,6 +2126,7 @@ v4l2_thread_info *v4l2_thread_info_get( void *vv ) {
 
 void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, float fps, char norm )
 {
+	struct timespec req;
 	v4l2_thread_info *i = (v4l2_thread_info*) vj_calloc(sizeof(v4l2_thread_info));
 	i->file = strdup(file);
 	i->channel = channel;
@@ -2132,6 +2135,9 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 	i->hei = hei;
 	i->fps = fps;
 	i->norm = norm;
+
+	req.tv_sec= 0;
+	req.tv_nsec = 1000 * 1000;
 
 	pthread_mutexattr_t type;
 	pthread_mutexattr_init(&type);
@@ -2159,7 +2165,7 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 		}
 		if(ready)
 			break;	
-		usleep(1000);
+		nanosleep(&req, NULL);
 		retries--;
 	}
 
