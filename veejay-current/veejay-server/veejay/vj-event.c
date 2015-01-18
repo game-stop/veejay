@@ -7466,6 +7466,7 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 void	vj_event_toggle_osl( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
+#ifdef HAVE_SDL_TTF
 	if( v->settings->composite ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Sorry, on-screen-logging is not supported yet in projection mapping. Start veejay with -D");
 	} else {
@@ -7473,6 +7474,9 @@ void	vj_event_toggle_osl( void *ptr, const char format[], va_list ap )
 		veejay_msg(VEEJAY_MSG_INFO, "On screen logging is now %s",
 			(veejay_log_to_ringbuffer() ? "enabled": "disabled" ));
 	}
+#else
+	veejay_msg(VEEJAY_MSG_WARNING, "Sorry, on-screen-logging requires veejay to be build with SDL_ttf");
+#endif
 }
 
 void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap )
