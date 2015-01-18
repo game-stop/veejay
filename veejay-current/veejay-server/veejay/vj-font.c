@@ -150,6 +150,8 @@ static char     *vj_font_split_str( const char *str );
 static	char	*get_font_name( vj_font_t *f,const char *font, int id );
 static	int	get_default_font( vj_font_t *f );
 
+static  char	selected_default_font[1024];
+
 static	void	font_lock(vj_font_t *f)
 {
 	pthread_mutex_lock( &(f->mutex) );
@@ -1424,6 +1426,8 @@ static int	configure(vj_font_t *f, int size, int font)
 	}
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Using font %s, size %d (#%d)", f->font, size, font );
+	veejay_memset( selected_default_font, 0, sizeof(selected_default_font));
+	strncpy( selected_default_font, f->font,strlen(f->font)) ;
 
 	if( f->face )
 	{
@@ -1605,7 +1609,8 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 		veejay_msg(VEEJAY_MSG_ERROR,"Cannot load FreeType (error #%d) \n",error);
 		return NULL;
 	}
-	
+
+
 	find_fonts(f,"/usr/X11R6/lib/X11/fonts/TTF");
 	find_fonts(f,"/usr/X11R6/lib/X11/fonts/Type1");
 	find_fonts(f,"/usr/X11R6/lib/X11/truetype");
@@ -2265,6 +2270,15 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y )
 	    	
       		x += slot->advance.x >> 6;
     	}
+}
+
+char	*vj_font_default()
+{
+	int n = strlen( selected_default_font );
+	if( n <= 0 )
+		return NULL;
+
+	return selected_default_font;
 }
 
 

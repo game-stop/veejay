@@ -97,6 +97,9 @@
 #include <veejay/vj-task.h>
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
+#ifdef HAVE_SDL_TTF
+#include <veejay/vj-sdl-font.h>
+#endif
 #define QUEUE_LEN 1
 #include <veejay/vims.h>
 #ifdef STRICT_CHECKING

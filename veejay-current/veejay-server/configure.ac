@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.45],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.46],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=45
+VEEJAY_MICRO_VERSION=46
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -853,12 +853,22 @@ dnl fi
 
 have_sdl=false
 if test x$with_sdl != xno ; then
-PKG_CHECK_MODULES( SDL, sdl >= 1.2, have_sdl=true,have_sdl=false)
+PKG_CHECK_MODULES( SDL, sdl >= 1.2.4, have_sdl=true,have_sdl=false)
 if test x$have_sdl = xfalse ; then
- AC_MSG_ERROR([Could not find SDL 1.2 library!])
+ AC_MSG_ERROR([Could not find SDL 1.2.4 library!])
 fi
 AC_DEFINE(HAVE_SDL,1,[SDL library is installed])
 fi
+
+have_sdl_ttf=false
+if test x$with_sdl != xno ; then
+	PKG_CHECK_MODULES( SDL_TTF, SDL_ttf <= 2.0.11, have_sdl_ttf=true,have_sdl_ttf=false)
+	AC_DEFINE(HAVE_SDL_TTF,1,[SDL_TTF library is installed])
+	AC_SUBST(SDL_TTF_CFLAGS)
+	AC_SUBST(SDL_TTF_LIBS)
+fi
+
+
 have_liblo=false
 PKG_CHECK_MODULES( LIBLO, liblo >= 0.26,have_liblo=true,have_liblo=false)
 if test x$have_liblo = xfalse ; then
@@ -1192,6 +1202,7 @@ AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
 AC_MSG_NOTICE([  - FFmpeg avutil		     : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
+AC_MSG_NOTICE([  - SDL on-screen-logging         : ${have_sdl_ttf}])
 
 if test "$have_freetype" = "true"; then
 	AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])

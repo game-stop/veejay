@@ -2673,6 +2673,16 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[ VIMS_OSL ]				=	_new_event(
+				NULL,
+				VIMS_OSL,
+				"On screen logging (if enabled)",
+				vj_event_toggle_osl,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL 
+				);
+	
 	index_map_[ VIMS_OSD_EXTRA ]			=	_new_event(
 				NULL,
 				VIMS_OSD_EXTRA,

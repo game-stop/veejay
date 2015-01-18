@@ -307,6 +307,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_SAMPLE_TOGGLE_LOOP,		SDLK_KP_MULTIPLY,	VIMS_MOD_NONE,NULL	},
 	{ VIMS_SWITCH_SAMPLE_STREAM,		SDLK_ESCAPE,		VIMS_MOD_NONE, NULL	},
 	{ VIMS_PRINT_INFO,			SDLK_HOME,		VIMS_MOD_NONE, NULL	},
+	{ VIMS_OSL,				SDLK_HOME,		VIMS_MOD_CTRL, NULL	},
 	{ VIMS_SAMPLE_CLEAR_MARKER,		SDLK_BACKSPACE,		VIMS_MOD_NONE, NULL },
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_NONE, "2 1"	},
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_SHIFT,  "1 1"	},
@@ -7462,6 +7463,18 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 	}
 }
 
+void	vj_event_toggle_osl( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if( v->settings->composite ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Sorry, on-screen-logging is not supported yet in projection mapping. Start veejay with -D");
+	} else {
+		veejay_toggle_osl();
+		veejay_msg(VEEJAY_MSG_INFO, "On screen logging is now %s",
+			(veejay_log_to_ringbuffer() ? "enabled": "disabled" ));
+	}
+}
+
 void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7486,6 +7499,12 @@ void	vj_event_toggle_copyright( void *ptr, const char format[], va_list ap )
 		v->use_osd = 2;
 	else
 		v->use_osd = (old_osd==-1?0: old_osd);
+
+	if(v->use_osd == 2 ) {
+		if( veejay_log_to_ringbuffer()) 
+			veejay_toggle_osl();
+	} 
+
 }
 void	vj_event_toggle_osd_extra( void *ptr, const char format[], va_list ap )
 {
@@ -8065,7 +8084,6 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 	if( vj_tag_get_composite( id ) ) 
 		veejay_msg(VEEJAY_MSG_INFO, "This tag is transformed when used as secundary input.");
 
-	veejay_msg(VEEJAY_MSG_INFO,  "|-----------------------------------|");	
 	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
 		y = vj_tag_get_effect_any(id, i);
@@ -8078,31 +8096,21 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 				(vj_effect_get_subformat(y) == 1 ? "2x2" : "1x1")
 			);
 
+
+			char tmp[256] = {0};
 			for (j = 0; j < vj_effect_get_num_params(y); j++)
 			{
+				char small[32];
 				value = vj_tag_get_effect_arg(id, i, j);
-				if (j == 0)
-				{
-		    			veejay_msg(VEEJAY_MSG_PRINT, "          [%04d]", value);
-				}
-				else
-				{
-		    			veejay_msg(VEEJAY_MSG_PRINT, " [%04d]",value);
-				}
-				
+				snprintf( small,sizeof(small), "P%d = %d ",j,value );
+				strcat( tmp, value );	
 	    		}
-	    		veejay_msg(VEEJAY_MSG_PRINT, "\n");
 
 			if (vj_effect_get_extra_frame(y) == 1)
 			{
 				int source = vj_tag_get_chain_source(id, i);
-				veejay_msg(VEEJAY_MSG_INFO, "     V %s [%d]",(source == VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),
-			    		vj_tag_get_chain_channel(id,i)
-					);
-				//veejay_msg(VEEJAY_MSG_INFO, "     A: %s",   vj_tag_get_chain_audio(id, i) ? "yes" : "no");
+				veejay_msg(VEEJAY_MSG_INFO, "Mixing with %s %d",(source == VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),vj_tag_get_chain_channel(id,i));
 	    		}
-
-	    		veejay_msg(VEEJAY_MSG_PRINT, "\n");
 		}
     	}
 }
@@ -8214,10 +8222,10 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 	sprintf(curtime, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
 	sample_get_description( id, sampletitle );
 
-	veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	veejay_msg(VEEJAY_MSG_INFO, 
-		"Sample '%s'[%4d]/[%4d]\t[duration: %s | %8ld]",
-		sampletitle,id,sample_size()-1,timecode,len);
+		"Sample %s [%4d]/[%4d]\t[duration: %s | %8ld] @%8ld %s",
+		sampletitle,id,sample_size()-1,timecode,len, (long)v->settings->current_frame_num,
+		curtime);
 	
 	if( sample_get_composite( id ) )
 		veejay_msg(VEEJAY_MSG_INFO, "This sample will be transformed when used as secundary input.");
@@ -8229,18 +8237,13 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 			curtime,(long)v->settings->current_frame_num);
 
 	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "               \t[timecode: %s | %8ld ]",
-			curtime,(long)v->settings->current_frame_num);
-	}
+	
 	veejay_msg(VEEJAY_MSG_INFO, 
-		"[%09ld] - [%09ld] @ %4.2f (speed %d)",
-		start,end, (float)speed * v->current_edit_list->video_fps,speed);
-	veejay_msg(VEEJAY_MSG_INFO,
-		"[%s looping]",
+		"[%09ld] - [%09ld] @ %4.2f [speed %d] [%s looping]",
+		start,end, (float)speed * v->current_edit_list->video_fps,speed,
 		(sample_get_looptype(id) ==
 		2 ? "pingpong" : (sample_get_looptype(id)==1 ? "normal" : (sample_get_looptype(id)==3 ? "random" : "none"))  )
+
 		);
 
 	int first = 0;
@@ -8249,49 +8252,41 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 		y = sample_get_effect_any(id, i);
 		if (y != -1)
 		{
-			if(!first)
+		
+			char tmp[256] = { 0 };
+	    		for (j = 0; j < vj_effect_get_num_params(y); j++)
 			{
-			 veejay_msg(VEEJAY_MSG_INFO, "\nI: E F F E C T  C H A I N\nI:");
-			 veejay_msg(VEEJAY_MSG_INFO,"Entry|Effect ID|SW | Name");
-				first = 1;
+				char small[32];
+				value = sample_get_effect_arg(id, i, j);
+				
+				snprintf(small, sizeof(small), "P%d = %d ",j, value );
+				strcat( tmp, small );
 			}
-			veejay_msg(VEEJAY_MSG_INFO, "%02d   |%03d      |%s| %s %s",
+
+			veejay_msg(VEEJAY_MSG_INFO, "%02d | %03d | %s |%s %s {%s}",
 				i,
 				y,
 				sample_get_chain_status(id,i) ? "on " : "off", vj_effect_get_description(y),
-				(vj_effect_get_subformat(y) == 1 ? "2x2" : "1x1")
+				(vj_effect_get_subformat(y) == 1 ? "2x2" : "1x1"),
+				tmp
 			);
 
-	    		for (j = 0; j < vj_effect_get_num_params(y); j++)
-			{
-				value = sample_get_effect_arg(id, i, j);
-				if (j == 0)
-				{
-		    			veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\tP%d=[%d]",j, value);
-				}
-				else
-				{
-		    			veejay_msg(VEEJAY_MSG_PRINT, " P%d=[%d] ",j,value);
-				}
-			}
-			veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	    		if (vj_effect_get_extra_frame(y) == 1)
 			{
 				int source = sample_get_chain_source(id, i);
 				int sample_offset = sample_get_offset(id,i);
 				int c = sample_get_chain_channel(id,i);
-			   int sample_speed = 0;
-			   if( source == VJ_TAG_TYPE_NONE )
+				int sample_speed = 0;
+				if( source == VJ_TAG_TYPE_NONE )
 				   sample_speed = sample_get_speed(c);
 	 
-				veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\t Mixing with %s %d at speed %d, position %d\n",(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"),
+				veejay_msg(VEEJAY_MSG_INFO, "Mixing with %s %d at speed %d, position %d",(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"),
 			    		c,
 						sample_speed,
 						sample_offset );
 	    		}
 		}
     	}
-	veejay_msg(VEEJAY_MSG_PRINT, "\n");
 
 	if(  sample_get_editlist(id) == v->current_edit_list ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Sample is using EDL from plain video");

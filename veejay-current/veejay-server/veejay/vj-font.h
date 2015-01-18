@@ -54,4 +54,5 @@ void    vj_font_xml_pack( xmlNodePtr node, void *font );
 void    vj_font_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *font );
 int   vj_font_norender(void *ctx, long position);
 void	vj_font_render_osd_status( void *ctx, void *_picture, char *status_str, int placement );
+char	*vj_font_default();
 #endif

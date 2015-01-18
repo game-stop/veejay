@@ -24,6 +24,9 @@
 #include <config.h>
 #ifdef HAVE_SDL
 #include <veejay/vj-sdl.h>
+#ifdef HAVE_SDL_TTF
+#include <veejay/vj-sdl-font.h>
+#endif
 #include <SDL/SDL_syswm.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
@@ -232,6 +235,11 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		extra_fs_flags = SDL_FULLSCREEN;
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_SCREEN_GEOMETRY and VEEJAY_SCREEN_SIZE not set");
 	}
+#ifdef HAVE_SDL_TTF
+	vjsdl->font = vj_sdl_font_init();
+	if(vjsdl->font == NULL ) 
+		return 0;
+#endif
 
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 	{
@@ -573,16 +581,18 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 	assert( yuv420[1] != NULL );
 	assert( yuv420[2] != NULL );
 #endif
+
+#ifdef HAVE_SDL_TTF
+	if( veejay_log_to_ringbuffer() ) {
+		vj_sdl_draw_to_buffer( vjsdl->font, vjsdl->width, vjsdl->height );
+		vj_sdl_font_logging( vjsdl->font, yuv420, vjsdl->width, vjsdl->height );
+	}
+#endif
 	VJFrame *src = yuv_yuv_template( yuv420[0],yuv420[1],yuv420[2],vjsdl->width,vjsdl->height, vjsdl->ffmpeg_pixfmt );
 	VJFrame *dst = yuv_yuv_template(  vjsdl->yuv_overlay->pixels[0],NULL,NULL,vjsdl->width,vjsdl->height,PIX_FMT_YUYV422);
 
 	yuv_convert_and_scale_packed( vjsdl->scaler, src,dst );
 
-	/*if(vjsdl->pix_fmt == FMT_420 || vjsdl->pix_fmt == FMT_420F)
-		yuv420p_to_yuv422( yuv420, vjsdl->yuv_overlay->pixels[0],vjsdl->width,vjsdl->height);
-	else
-		yuv422_to_yuyv( yuv420, vjsdl->yuv_overlay->pixels[0], vjsdl->width,vjsdl->height);
-	*/
 	if (!vj_sdl_unlock(vjsdl))
 		return 0;
 
@@ -601,11 +611,15 @@ void	vj_sdl_quit()
 
 void vj_sdl_free(vj_sdl * vjsdl)
 {
+#ifdef HAVE_SDL_TTF
+	if( vjsdl->font ) 
+		vj_sdl_font_free(vjsdl->font);
+#endif
 	if( vjsdl->yuv_overlay)
  	   SDL_FreeYUVOverlay(vjsdl->yuv_overlay);
 	if( vjsdl->scaler )
 	   yuv_free_swscaler(vjsdl->scaler);
+
 	free(vjsdl);
-//    SDL_Quit();
 }
 #endif

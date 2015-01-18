@@ -29,7 +29,7 @@ enum {
     VEEJAY_MSG_DEBUG = 4,
 };
 
-extern void	veejay_backtrace_handler(int n , void *ist, void *x);
+extern void veejay_backtrace_handler(int n , void *ist, void *x);
 extern void veejay_strrep(char *s, char delim, char tok);
 extern void report_bug();
 extern void veejay_msg(int type, const char format[], ...);
@@ -37,11 +37,14 @@ extern int veejay_is_colored();
 extern void veejay_set_debug_level(int level);
 extern void veejay_set_colors(int level);
 extern void veejay_silent();
-extern int  veejay_is_silent();
-extern int	veejay_keep_messages(void);
-extern void	veejay_reap_messages(void);
+extern int veejay_is_silent();
+extern int veejay_keep_messages(void);
+extern void veejay_reap_messages(void);
 extern char *veejay_pop_messages(int *num_lines, int *total_len);
-extern int	veejay_get_file_ext( char *file, char *dst, int dlen);
-extern void	veejay_chomp_str( char *str, int *dlen );
-extern int	has_env_setting( const char *env, const char *value );
+extern int veejay_get_file_ext( char *file, char *dst, int dlen);
+extern void veejay_chomp_str( char *str, int *dlen );
+extern int has_env_setting( const char *env, const char *value );
+extern char* veejay_msg_ringfetch();
+extern int veejay_log_to_ringbuffer();
+extern void veejay_toggle_osl();
 #endif

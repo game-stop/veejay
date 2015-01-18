@@ -52,7 +52,7 @@
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 #endif
-
+#include <semaphore.h>
 #define TXT_RED		"\033[0;31m"
 #define TXT_RED_B 	"\033[1;31m"
 #define TXT_GRE		"\033[0;32m"
@@ -83,6 +83,14 @@ typedef struct
 	int	r_index;
 	int	w_index;
 } vj_msg_hist;
+
+typedef struct {
+	sem_t *semaphore;
+	char **dommel;
+	uint64_t pos;
+	ssize_t size;
+} message_ring_t;
+
 /*
 static	vj_msg_hist	_message_history;
 static	int		_message_his_status = 0;
@@ -257,6 +265,68 @@ int veejay_is_silent()
 	return 0;
 }
 
+#define MESSAGE_RING_SIZE 5000
+static message_ring_t *msg_ring = NULL;
+static msg_ring_enabled = 0;
+void	veejay_init_msg_ring()
+{
+	msg_ring = vj_calloc( sizeof(message_ring_t));
+	msg_ring->dommel = vj_calloc( sizeof(char*) * MESSAGE_RING_SIZE );
+	msg_ring->semaphore = vj_malloc(sizeof(sem_t));
+	msg_ring->size = MESSAGE_RING_SIZE;
+	sem_init( msg_ring->semaphore, 0, 0 );
+}
+
+static void veejay_msg_ringbuffer( char *line )
+{
+	uint64_t pos = __sync_fetch_and_add( &msg_ring->pos, 1) % MESSAGE_RING_SIZE;
+	//using gcc atomic built-ins
+	while(!__sync_bool_compare_and_swap( &(msg_ring->dommel[pos]), NULL, line ));
+	sem_post( msg_ring->semaphore );
+}
+
+int	veejay_log_to_ringbuffer()
+{
+	return ( msg_ring == NULL ? 0 : msg_ring_enabled );
+}
+
+void	veejay_toggle_osl()
+{
+	msg_ring_enabled = (msg_ring_enabled == 0 ? 1: 0);
+}
+
+static uint64_t pos = 0;
+char	*veejay_msg_ringfetch()
+{
+	char *line = NULL;
+	if( sem_trywait( msg_ring->semaphore ) != 0 )
+		return NULL;
+
+	if( msg_ring->dommel[pos] == NULL )
+		return NULL;
+
+	line = strdup( msg_ring->dommel[pos]);
+	free(msg_ring->dommel[ pos ]);
+	msg_ring->dommel[ pos ] = NULL;
+	pos = (pos + 1) % MESSAGE_RING_SIZE;
+	return line;
+}
+
+static inline void veejay_msg_prnt(const char *line, const char *format, FILE *out, 
+			          const char *prefix, const char *end )
+{
+	if( msg_ring_enabled == 0 ) {
+		if( end ) {
+			fprintf( out, format, prefix, line, end );
+		} else{
+			fprintf(out,format, prefix, line);
+		}
+	}
+	else {
+		veejay_msg_ringbuffer( strdup(line) );
+	}
+}
+
 void veejay_msg(int type, const char format[], ...)
 {
     char prefix[128];
@@ -274,104 +344,6 @@ void veejay_msg(int type, const char format[], ...)
     va_start(args, format);
     vsnprintf(buf, sizeof(buf) - 1, format, args);
 
-#ifdef STRICT_CHECKING
-	struct tm *nowtm = NULL;
-	
-	gettimeofday( &timenow, NULL );
-	if( !timerdy  ) {
-		memcpy( &_start_time, &timenow, sizeof(struct timeval));
-		timerdy = 1;
-		timeval_subtract( &timenow,&timenow,&_start_time);
-		nowtm = localtime(&timenow);
-		if(nowtm->tm_hour > 0 )
-			_start_time_offset = nowtm->tm_hour; // wat
-	}
-	else {
-		timeval_subtract( &timenow, &timenow, &_start_time );
-		nowtm = localtime(&timenow);
-	}
-
-	nowtm->tm_hour -= _start_time_offset;
-
-	strftime( tmbuf,sizeof(tmbuf), "%H:%M:%S",nowtm );
-	snprintf( timebuf, sizeof(timebuf), "%s.%06d", tmbuf, timenow.tv_usec );
-
- /*
-    if(!_message_his_status)
-    {
-	veejay_memset( &_message_history , 0 , sizeof(vj_msg_hist));
-	_message_his_status = 1;
-    }
-*/
-    if(_color_level)
-    {
-	  switch (type) {
-	    case 2: //info
-		sprintf(prefix, "%s %s I: ", TXT_GRE,timebuf);
-		break;
-	    case 1: //warning
-		sprintf(prefix, "%s %s W: ", TXT_YEL,timebuf);
-		break;
-	    case 0: // error
-		sprintf(prefix, "%s %s E: ", TXT_RED,timebuf);
-		break;
-	    case 3:
-	        line = 1;
-		break;
-	    case 4: // debug
-		sprintf(prefix, "%s %s D: ", TXT_BLU,timebuf);
-		break;
-	 }
-
- 	 if(!line)
-	     fprintf(out,"%s %s %s\n",prefix, buf, TXT_END);
-	     else
-	     fprintf(out,"%s%s%s", TXT_GRE, buf, TXT_END );
-/* 
-	if( _message_history.w_index < MAX_LINES )
-	{
-		if(type == 3)
-			sprintf(sline, "%s", buf );
-		else
-			sprintf( sline, "%s\n", buf );	
-		_message_history.msg[_message_history.w_index ++ ] = strndup(sline,200);
-	}*/
-     }
-     else
-     {
-	   switch (type) {
-	    case 2: //info
-		sprintf(prefix, "%s I: ",timebuf);
-		break;
-	    case 1: //warning
-		sprintf(prefix, "%s W: ",timebuf);
-		break;
-	    case 0: // error
-		sprintf(prefix, "%s E: ",timebuf);
-		break;
-	    case 3:
-	        line = 1;
-		break;
-	    case 4: // debug
-		sprintf(prefix, "%s D: ",timebuf);
-		break;
-	   }
-
-	   if(!line)
-	     fprintf(out,"%s %s\n", prefix, buf);
-	     else
-	     fprintf(out,"%s", buf );
-
-	/*  if( _message_history.w_index < MAX_LINES )
-	  {
-		if(type == 3 )
-			sprintf(sline, "%s", buf );
-		else
-			sprintf(sline, "%s\n", buf );
-		_message_history.msg[_message_history.w_index ++ ] = strdup(sline);
-	  }*/
-     }
-#else
     if(_color_level)
     {
 	  switch (type) {
@@ -392,19 +364,12 @@ void veejay_msg(int type, const char format[], ...)
 		break;
 	 }
 
- 	 if(!line)
-	     fprintf(out,"%s %s %s\n",prefix, buf, TXT_END);
-	     else
-	     fprintf(out,"%s%s%s", TXT_GRE, buf, TXT_END );
-/* 
-	if( _message_history.w_index < MAX_LINES )
-	{
-		if(type == 3)
-			sprintf(sline, "%s", buf );
-		else
-			sprintf( sline, "%s\n", buf );	
-		_message_history.msg[_message_history.w_index ++ ] = strndup(sline,200);
-	}*/
+ 	 if(!line) {
+		veejay_msg_prnt( buf, "%s%s%s\n", out, prefix, TXT_END );
+	 }
+	 else {
+		veejay_msg_prnt( buf, "%s%s%s", out, TXT_GRE, TXT_END );
+	}
      }
      else
      {
@@ -426,22 +391,12 @@ void veejay_msg(int type, const char format[], ...)
 		break;
 	   }
 
-	   if(!line)
-	     fprintf(out,"%s %s\n", prefix, buf);
-	     else
-	     fprintf(out,"%s", buf );
-
-	/*  if( _message_history.w_index < MAX_LINES )
-	  {
-		if(type == 3 )
-			sprintf(sline, "%s", buf );
-		else
-			sprintf(sline, "%s\n", buf );
-		_message_history.msg[_message_history.w_index ++ ] = strdup(sline);
-	  }*/
+	   if(!line) {
+		veejay_msg_prnt( buf, "%s%s\n", out, prefix, NULL );
+	   } else {
+		veejay_msg_prnt( buf, "%s%s", out, prefix, NULL );
+	   }
      }
-
-#endif
      va_end(args);
 }
 

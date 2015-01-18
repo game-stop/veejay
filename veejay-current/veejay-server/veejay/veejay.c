@@ -65,6 +65,7 @@ static int n_slots_ = 0;
 static int max_mem_ = 0;
 static int live =0;
 static int ta = 0;
+static int osl = 0;
 static void CompiledWith()
 {
 	veejay_msg(VEEJAY_MSG_INFO,"Compilation flags:");
@@ -489,7 +490,7 @@ static int set_option(const char *name, char *value)
 	else if (strcmp(name, "dummy") == 0 || strcmp(name, "d" ) == 0 )
 	{
 		info->dummy->active = 1; // enable DUMMY MODE
-	}	
+	}
     	else
 		nerr++;			/* unknown option - error */
 
@@ -686,6 +687,7 @@ int main(int argc, char **argv)
 	fflush(stdout);
 
 	vj_mem_init();
+
 	vevo_strict_init();
 	
 	info = veejay_malloc();
@@ -767,7 +769,7 @@ int main(int argc, char **argv)
 		live,
 	    ta	)< 0)
 	{	
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Vveejay");
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
 		return 0;
 	}
 
@@ -776,6 +778,8 @@ int main(int argc, char **argv)
 
 
 	print_license();
+
+	veejay_init_msg_ring();  // rest of logging to screen
 
     	if(!veejay_main(info))
 	{
@@ -787,14 +791,11 @@ int main(int argc, char **argv)
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Started playback");
 
-//	veejay_set_frame(info, 0);
-//	veejay_set_speed(info, 1);
-	
-	
+
 	int current_state = LAVPLAY_STATE_PLAYING;
 
-	req.tv_sec = 5;
-	req.tv_nsec = 1001; 
+	req.tv_sec = 0;
+	req.tv_nsec = 4000 * 1000; 
 
 	while( 1 ) { //@ until your PC stops working
 		

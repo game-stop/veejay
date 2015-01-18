@@ -276,6 +276,7 @@ void	vj_event_font_set_size_and_font(void *ptr,const char format[],	va_list	ap	)
 void	vj_event_select_subtitle( void *ptr, const char format[],  va_list ap	);
 void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_copyright( void *ptr, const char format[], va_list ap );
+void	vj_event_toggle_osl( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_osd_extra(void *ptr, const char format[], va_list ap);
 void	vj_event_get_image_part(void *ptr, const char format[], va_list ap);
 void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap );

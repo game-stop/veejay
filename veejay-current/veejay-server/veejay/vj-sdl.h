@@ -47,6 +47,8 @@ typedef struct vj_sdl_t {
     void *display;
     void *scaler;
     int ffmpeg_pixfmt;
+    uint8_t *buf;
+    void *font;
 } vj_sdl;
 
 vj_sdl *vj_sdl_allocate(int width, int height, int pixel_format, int k, int m, int s);
@@ -58,7 +60,7 @@ int vj_sdl_unlock(vj_sdl * vjsdl);
 int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420);
 int vj_sdl_direct_yuv_overlay(vj_sdl * vjsdl, uint8_t * buffer, int buflen,
 			      int dataformat);
-void vj_sdl_free(vj_sdl * vjsdl);
+void vj_sdl_free(vj_sdl *vjsdl);
 void vj_sdl_quit();
 uint8_t	*vj_sdl_get_yuv_overlay(vj_sdl *vjsdl );
 void	vj_sdl_set_title( const char *caption );
