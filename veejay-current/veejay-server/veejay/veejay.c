@@ -47,6 +47,7 @@
 #include <unistd.h>
 #include <veejay/vj-OSC.h>
 #include <build.h>
+extern void	veejay_init_msg_ring(); 
 extern long vj_el_get_mem_size();
 extern void vj_libav_ffmpeg_version();
 static veejay_t *info = NULL;

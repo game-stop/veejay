@@ -35,6 +35,11 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+
+#ifndef	O_BINARY
+#define O_BINARY 0
+#endif
+
 #define INFO_LIST
 
 // add a new riff chunk after XX MB
@@ -44,26 +49,11 @@
 
 // Maximum number of indices per stream
 #define NR_IXNN_CHUNKS 32
-/* There is an experimental kernel patch available at 
- *   http://www.tech9.net/rml/linux/
- * that adds the O_STREAMING flag for open().  Files opened this way will
- * bypass the linux buffer cache entirely, so that writing multi-gigabyte files
- * with lavrec will not cause everything in memory to get swapped to disk.
- * This is highly desirable, hopefuly it will be merged with the mainstream
- * kernel.
- *
- * we leave it out if it's unknown, since its value differs per arch...
- */
-
-
-#ifndef O_STREAMING
-#define O_STREAMING 0
-#endif
-
 
 #define DEBUG_ODML
 #undef DEBUG_ODML
 
+extern int lav_detect_endian (void);
 /* The following variable indicates the kind of error */
 
 long AVI_errno = 0;
@@ -122,13 +112,7 @@ static ssize_t avi_write (int fd, char *buf, size_t len)
 /* HEADERBYTES: The number of bytes to reserve for the header */
 
 #define HEADERBYTES 2048
-
-#ifdef _LARGEFILE_SOURCE
-uint64_t AVI_MAX_LEN = LONG_MAX - HEADERBYTES; //@ not much larger, but a little. 
-#else
-uint64_t AVI_MAX_LEN = (UINT_MAX-(1<<20)*16-HEADERBYTES);
-#endif
-
+static uint64_t AVI_MAX_LEN = (UINT_MAX-(1<<20)*16-HEADERBYTES);
 uint64_t AVI_set_MAX_LEN( uint64_t n )
 {
 	AVI_MAX_LEN = n;
@@ -154,13 +138,11 @@ static void long2str(unsigned char *dst, int32_t n)
    dst[3] = (n>>24)&0xff;
 }
 
-#ifdef WORDS_BIGENDIAN
 static void short2str(unsigned char *dst, int32_t n)
 {
    dst[0] = (n    )&0xff;
    dst[1] = (n>> 8)&0xff;
 }
-#endif
 
 /* Convert a string of 4 or 2 bytes to a number,
    also working on big endian machines */
@@ -658,7 +640,7 @@ avi_t* AVI_open_output_file(char * filename)
   // AVI->fdes = open(filename, O_RDWR|O_CREAT|O_BINARY,
     //                S_IRUSR | S_IWUSR | S_IGRP | S_IROTH);
 
-	AVI->fdes = open(filename, O_RDWR | O_CREAT | O_STREAMING, 0644 );
+	AVI->fdes = open(filename, O_RDWR | O_CREAT | O_BINARY, 0644 );
    
    if (AVI->fdes < 0)
    {
@@ -767,7 +749,7 @@ int AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
 int avi_update_header(avi_t *AVI)
 {
    int njunk, sampsize, hasIndex, ms_per_frame, frate, flag;
-   unsigned long movi_len, hdrl_start, strl_start, j;
+   int movi_len, hdrl_start, strl_start, j;
    unsigned char AVI_header[HEADERBYTES];
    long nhb;
    unsigned long xd_size, xd_size_align2;
@@ -3256,8 +3238,8 @@ int AVI_set_video_position(avi_t *AVI, long frame)
 	assert( AVI->video_index );
 	assert( frame >= 0 && frame < AVI->video_frames);
 #endif
-//   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
-//   if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
+   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
+   if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
 //   if (frame < 0 ) frame = 0;
      AVI->video_pos = frame;
    return 0;
@@ -3274,16 +3256,13 @@ int AVI_set_audio_bitrate(avi_t *AVI, long bitrate)
 
 long AVI_read_frame(avi_t *AVI, char *vidbuf, int *keyframe)
 {
-   long n;
 #ifdef STRICT_CHECKING
 	assert( AVI->mode != AVI_MODE_WRITE );
 	assert( AVI->video_index );
 	assert( AVI->video_pos >= 0 && AVI->video_pos < AVI->video_frames );
 #endif
 //  if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
-//   if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
-//   if(AVI->video_pos < 0 || AVI->video_pos >= AVI->video_frames) return -1;
-    n = AVI->video_index[AVI->video_pos].len;
+    long n = AVI->video_index[AVI->video_pos].len;
 
    *keyframe = (AVI->video_index[AVI->video_pos].key==0x10) ? 1:0;
 
@@ -3368,12 +3347,8 @@ long AVI_read_audio(avi_t *AVI, char *audbuf, long bytes)
    long nr, left, todo;
    off_t pos;
 
-//   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
-//   if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
-#ifdef STRICT_CHECKING
-	assert( AVI->mode != AVI_MODE_WRITE );
-	assert( AVI->track[AVI->aptr].audio_index );
-#endif
+   if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
+   if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
    nr = 0; /* total number of bytes read */
 
    if (bytes==0) {
@@ -3402,7 +3377,9 @@ long AVI_read_audio(avi_t *AVI, char *audbuf, long bytes)
 		AVI_errno = AVI_ERR_READ;
 		return -1;
 	}
-      if(lseek(AVI->fdes, pos, SEEK_SET) == -1)
+ 
+
+     if(lseek(AVI->fdes, pos, SEEK_SET) == -1)
 	{
 		AVI_errno = AVI_ERR_READ;
 		return -1;
@@ -3426,9 +3403,9 @@ long AVI_read_audio_chunk(avi_t *AVI, char *audbuf)
    off_t pos;
 
 //   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
-//   if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
+     if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
 
-//   if (AVI->track[AVI->aptr].audio_posc+1>AVI->track[AVI->aptr].audio_chunks) return -1;
+     if (AVI->track[AVI->aptr].audio_posc+1>AVI->track[AVI->aptr].audio_chunks) return -1;
 
 #ifdef STRICT_CHECKING
 	assert( AVI->mode != AVI_MODE_WRITE );
@@ -3660,11 +3637,11 @@ int AVI_read_wave_header( int fd, struct wave_header * wave )
 	return -1;
     }
 
-#ifdef WORDS_BIGENDIAN
 #define x_FIXUP(field) \
     ((field) = (sizeof(field) == 4 ? str2ulong((unsigned char*)&(field)) \
 				   : str2ushort((unsigned char*)&(field))))
 
+    if(lav_detect_endian()) {
     x_FIXUP(wave->riff.len);
     x_FIXUP(wave->format.len);
     x_FIXUP(wave->common.wFormatTag);
@@ -3674,9 +3651,9 @@ int AVI_read_wave_header( int fd, struct wave_header * wave )
     x_FIXUP(wave->common.wBlockAlign);
     x_FIXUP(wave->common.wBitsPerSample);
     x_FIXUP(wave->data.len);
+	}
 
 #undef x_FIXUP
-#endif
 
     return 0;
 }
@@ -3688,12 +3665,12 @@ int AVI_write_wave_header( int fd, const struct wave_header * wave )
 
 
 
-#ifdef WORDS_BIGENDIAN
 #define x_FIXUP(field) \
     ((sizeof(field) == 4 ? long2str((unsigned char*)&(field),(field)) \
 			 : short2str((unsigned char*)&(field),(field))))
 
-    x_FIXUP(buffer.riff.len);
+    if( lav_detect_endian()) {
+	x_FIXUP(buffer.riff.len);
     x_FIXUP(buffer.format.len);
     x_FIXUP(buffer.common.wFormatTag);
     x_FIXUP(buffer.common.wChannels);
@@ -3702,9 +3679,9 @@ int AVI_write_wave_header( int fd, const struct wave_header * wave )
     x_FIXUP(buffer.common.wBlockAlign);
     x_FIXUP(buffer.common.wBitsPerSample);
     x_FIXUP(buffer.data.len);
+	}
 
 #undef x_FIXUP
-#endif
 
     veejay_memcpy(buf+ 0, &buffer.riff.id, 4);
     veejay_memcpy(buf+ 4, &buffer.riff.len, 4);
@@ -3737,21 +3714,20 @@ int AVI_write_wave_header( int fd, const struct wave_header * wave )
 size_t AVI_read_wave_pcm_data( int fd, void * buffer, size_t buflen )
 {
     int doneread = avi_read(fd, buffer, buflen);
+    char * bufptr = buffer;
+    size_t i;
+    char tmp;
 
-#ifdef WORDS_BIGENDIAN
-    {
-	char * bufptr = buffer;
-	size_t i;
-	char tmp;
-    
-	for( i=0; i<doneread; i+=2 )
-	{
-	    tmp = bufptr[i];
-	    bufptr[i] = bufptr[i+1];
-	    bufptr[i+1] = tmp;
-	}
-    }
-#endif
+
+   if (lav_detect_endian())
+       {
+       for ( i=0; i<doneread; i+=2 )
+	   {
+	   tmp = bufptr[i];
+	   bufptr[i] = bufptr[i+1];
+	   bufptr[i+1] = tmp;
+	   }
+        }
 
     return doneread;
 }
@@ -3759,44 +3735,40 @@ size_t AVI_read_wave_pcm_data( int fd, void * buffer, size_t buflen )
 size_t AVI_write_wave_pcm_data( int fd, const void * data, size_t datalen )
 {
     size_t totalwritten = 0;
-
-#ifdef WORDS_BIGENDIAN
     const char * inptr = data;
     char buffer[2048];
     size_t i, buflen, donewritten;
+ 
+    if (lav_detect_endian())
+       {
+       while (datalen > 0)
+           {
+	   buflen = datalen;
+	   if( buflen > sizeof(buffer) )
+	       buflen = sizeof(buffer);
 
-    while( datalen>0 )
-    {
-	buflen = datalen;
-	if( buflen > sizeof(buffer) )
-	{
-	    buflen = sizeof(buffer);
-	}
-
-	for( i=0; i<buflen; i+=2 )
-	{
-	    buffer[i]   = inptr[i+1];
-	    buffer[i+1] = inptr[i];
-	}
-
-	donewritten = avi_write(fd, buffer, buflen);
-	totalwritten += donewritten;
-	if( buflen != donewritten )
-	{
+	   for ( i=0; i<buflen; i+=2 )
+	       {
+	       buffer[i]   = inptr[i+1];
+	       buffer[i+1] = inptr[i];
+	       }
+	   donewritten = avi_write(fd, buffer, buflen);
+	   totalwritten += donewritten;
+	   if ( buflen != donewritten )
+	       {
+	       AVI_errno = AVI_ERR_WRITE;
+	       return totalwritten;
+	       }
+	    datalen -= buflen;
+	    inptr += buflen;
+	    }
+        }
+    else
+        {
+        totalwritten = avi_write(fd, (char *)data, datalen);
+        if ( datalen != totalwritten )
 	    AVI_errno = AVI_ERR_WRITE;
-	    return totalwritten;
-	}
-
-	datalen -= buflen;
-	inptr += buflen;
-    }
-#else
-    totalwritten = avi_write(fd, (char *)data, datalen);
-    if( datalen != totalwritten )
-    {
-	AVI_errno = AVI_ERR_WRITE;
-    }
-#endif
+        }
 
     return totalwritten;
 

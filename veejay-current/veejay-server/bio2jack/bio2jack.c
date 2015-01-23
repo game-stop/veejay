@@ -35,9 +35,6 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <libvjmsg/vj-msg.h>
-#ifdef HAVE_SAMPLERATE
-#include <samplerate.h>
-#endif
 #include "bio2jack.h"
 
 /* enable/disable TRACING through the JACK_Callback() function */
@@ -114,6 +111,8 @@ static struct timespec timer_now;
 
 #define MAX_OUTPUT_PORTS  10
 #define MAX_INPUT_PORTS   10
+
+#define DEFAULT_VOLUME 100
 
 typedef struct jack_driver_s
 {
@@ -208,9 +207,6 @@ static bool do_sample_rate_conversion;  /* whether the client has requested samp
   Which SRC converter function we should use when doing sample rate conversion.
   Default to the fastest of the 'good quality' set.
  */
-#ifdef HAVE_SAMPLE_RATE
-static int preferred_src_converter = SRC_SINC_FASTEST;
-#endif
 static bool init_done = 0;      /* just to prevent clients from calling JACK_Init twice, that would be very bad */
 
 static enum JACK_PORT_CONNECTION_MODE port_connection_mode = CONNECT_ALL;
@@ -580,76 +576,6 @@ JACK_callback(nframes_t nframes, void *arg)
         return -1;
       }
 
-      /* do sample rate conversion if needed & requested */
-#ifdef HAVE_SAMPLERATE
-      if(drv->output_src && drv->output_sample_rate_ratio != 1.0)
-      {
-        long bytes_needed_write = nframes * drv->bytes_per_jack_output_frame;
-
-        /* make a very good guess at how many raw bytes we'll need to satisfy jack's request after conversion */
-        long bytes_needed_read = min(inputBytesAvailable,
-                                     (double) (bytes_needed_write +
-                                               drv->
-                                               output_sample_rate_ratio
-                                               *
-                                               drv->
-                                               bytes_per_jack_output_frame)
-                                     / drv->output_sample_rate_ratio);
-        DEBUG("guessing that we need %ld bytes in and %ld out for rate conversion ratio = %f\n",
-           bytes_needed_read, bytes_needed_write,
-           drv->output_sample_rate_ratio);
-
-        if(!ensure_buffer_size(&drv->callback_buffer1,
-                               &drv->callback_buffer1_size,
-                               bytes_needed_read))
-        {
-          ERR("could not realloc callback_buffer2!\n");
-          return 1;
-        }
-        if(!ensure_buffer_size(&drv->callback_buffer2,
-                               &drv->callback_buffer2_size,
-                               bytes_needed_write))
-        {
-          ERR("could not realloc callback_buffer2!\n");
-          return 1;
-        }
-
-        if(jackFramesAvailable && inputBytesAvailable > 0)
-        {
-          /* read in the data, but don't move the read pointer until we know how much SRC used */
-          jack_ringbuffer_peek(drv->pPlayPtr, drv->callback_buffer1,
-                               bytes_needed_read);
-
-          SRC_DATA srcdata;
-          srcdata.data_in = (sample_t *) drv->callback_buffer1;
-          srcdata.input_frames = bytes_needed_read / drv->bytes_per_jack_output_frame;
-          srcdata.src_ratio = drv->output_sample_rate_ratio;
-          srcdata.data_out = (sample_t *) drv->callback_buffer2;
-          srcdata.output_frames = nframes;
-          srcdata.end_of_input = 0;     // it's a stream, it never ends
-          DEBUG("input_frames = %ld, output_frames = %ld\n",
-                srcdata.input_frames, srcdata.output_frames);
-          /* convert the sample rate */
-          src_error = src_process(drv->output_src, &srcdata);
-          DEBUG("used = %ld, generated = %ld, error = %d: %s.\n",
-                srcdata.input_frames_used, srcdata.output_frames_gen,
-                src_error, src_strerror(src_error));
-
-          if(src_error == 0)
-          {
-            /* now we can move the read pointer */
-            jack_ringbuffer_read_advance(drv->pPlayPtr,
-                                         srcdata.
-                                         input_frames_used *
-                                         drv->bytes_per_jack_output_frame);
-            /* add on what we wrote */
-            read = srcdata.input_frames_used * drv->bytes_per_output_frame;
-            jackFramesAvailable -= srcdata.output_frames_gen;   /* take away what was used */
-          }
-        }
-      }
-      else                      /* no resampling needed or requested */
-      {
         /* read as much data from the buffer as is available */
         if(jackFramesAvailable && inputBytesAvailable > 0)
         {
@@ -661,21 +587,7 @@ JACK_callback(nframes_t nframes, void *arg)
           read = numFramesToWrite * drv->bytes_per_output_frame;
           jackFramesAvailable -= numFramesToWrite;      /* take away what was written */
         }
-      }
-#else
-        /* read as much data from the buffer as is available */
-        if(jackFramesAvailable && inputBytesAvailable > 0)
-        {
-          /* write as many bytes as we have space remaining, or as much as we have data to write */
-          numFramesToWrite = min(jackFramesAvailable, inputFramesAvailable);
-          jack_ringbuffer_read(drv->pPlayPtr, drv->callback_buffer2,
-                               jackBytesAvailable);
-          /* add on what we wrote */
-          read = numFramesToWrite * drv->bytes_per_output_frame;
-          jackFramesAvailable -= numFramesToWrite;      /* take away what was written */
-        }
- 
-#endif
+
       drv->written_client_bytes += read;
       drv->played_client_bytes += drv->clientBytesInJack;       /* move forward by the previous bytes we wrote since those must have finished by now */
       drv->clientBytesInJack = read;    /* record the input bytes we wrote to jack */
@@ -692,18 +604,18 @@ JACK_callback(nframes_t nframes, void *arg)
                                jackFramesAvailable);
       }
 
-      /* if we aren't converting or we are converting and src_error == 0 then we should */
       /* apply volume and demux */
-#ifdef HAVE_SAMPLERATE
-      if(!(drv->output_src && drv->output_sample_rate_ratio != 1.0) || (src_error == 0))
+      if(drv->output_sample_rate_ratio == 1.0)
       {
-          /* apply volume */
           for(i = 0; i < drv->num_output_channels; i++)
           {
+		if( drv->volume[i] == DEFAULT_VOLUME )
+			continue;
+
               if(drv->volumeEffectType == dbAttenuation)
               {
-                  /* assume the volume setting is dB of attenuation, a volume of 0 */
-                  /* is 0dB attenuation */
+                  // assume the volume setting is dB of attenuation, a volume of 0 
+                  // is 0dB attenuation 
                   float volume = powf(10.0, -((float) drv->volume[i]) / 20.0);
                   float_volume_effect((sample_t *) drv->callback_buffer2 + i,
                                       (nframes - jackFramesAvailable), volume, drv->num_output_channels);
@@ -714,8 +626,7 @@ JACK_callback(nframes_t nframes, void *arg)
                                       drv->num_output_channels);
               }
           }
-	}
-#endif
+	} 
 	if( !(drv->output_sample_rate_ratio != 1.0))
 	{
           /* demux the stream: we skip over the number of samples we have output channels as the channel data */
@@ -749,77 +660,6 @@ JACK_callback(nframes_t nframes, void *arg)
             nframes, drv->num_input_channels);
       }
 
-      /* do sample rate conversion if needed & requested */
-#ifdef HAVE_SAMPLERATE
-      if(drv->input_src && drv->input_sample_rate_ratio != 1.0)
-      {
-        /* make a very good guess at how many raw bytes we'll need to read all the data jack gave us */
-        long bytes_needed_write = (double) (jack_bytes +
-                                            drv->input_sample_rate_ratio *
-                                            drv->bytes_per_jack_input_frame) *
-          drv->input_sample_rate_ratio;
-        DEBUG("guessing that we need %ld bytes in and %ld out for rate conversion ratio = %f\n",
-              nframes * drv->bytes_per_jack_input_frame,
-              bytes_needed_write, drv->input_sample_rate_ratio);
-
-        if(!ensure_buffer_size(&drv->callback_buffer2,
-                               &drv->callback_buffer2_size,
-                               bytes_needed_write))
-        {
-          ERR("could not realloc callback_buffer2!\n");
-          return 1;
-        }
-
-        SRC_DATA srcdata;
-        srcdata.data_in = (sample_t *) drv->callback_buffer1;
-        srcdata.input_frames = nframes;
-        srcdata.src_ratio = drv->input_sample_rate_ratio;
-        srcdata.data_out = (sample_t *) drv->callback_buffer2;
-        srcdata.output_frames = drv->callback_buffer2_size / drv->bytes_per_jack_input_frame;
-        srcdata.end_of_input = 0;       // it's a stream, it never ends
-        DEBUG("input_frames = %ld, output_frames = %ld\n",
-              srcdata.input_frames, srcdata.output_frames);
-        /* convert the sample rate */
-        src_error = src_process(drv->input_src, &srcdata);
-        DEBUG("used = %ld, generated = %ld, error = %d: %s.\n",
-              srcdata.input_frames_used, srcdata.output_frames_gen,
-              src_error, src_strerror(src_error));
-
-        if(src_error == 0)
-        {
-          long write_space = jack_ringbuffer_write_space(drv->pRecPtr);
-          long bytes_used =  srcdata.output_frames_gen * drv->bytes_per_jack_input_frame;
-          /* if there isn't enough room, make some.  sure this discards data, but when dealing with input sources
-             it seems like it's better to throw away old data than new */
-          if(write_space < bytes_used)
-          {
-            /* the ringbuffer is designed such that only one thread should ever access each pointer.
-               since calling read_advance here will be touching the read pointer which is also accessed
-               by JACK_Read, we need to lock the mutex first for safety */
-            jack_driver_t *d = tryGetDriver(drv->deviceID);
-            if( d )
-            {
-              /* double check the write space after we've gained the lock, just
-                 in case JACK_Read was being called before we gained it */
-              write_space = jack_ringbuffer_write_space(drv->pRecPtr);
-              if(write_space < bytes_used)
-              {
-                /* hey, we warn about underruns, we might as well warn about overruns as well */
-                WARN("buffer overrun of %ld bytes\n", jack_bytes - write_space);
-                jack_ringbuffer_read_advance(drv->pRecPtr, bytes_used - write_space);
-              }
-
-              releaseDriver(drv);
-            }
-          }
-
-          jack_ringbuffer_write(drv->pRecPtr, drv->callback_buffer2,
-                                bytes_used);
-        }
-      }
-      else                      /* no resampling needed */
-      {
-#endif
         long write_space = jack_ringbuffer_write_space(drv->pRecPtr);
         /* if there isn't enough room, make some.  sure this discards data, but when dealing with input sources
            it seems like it's better to throw away old data than new */
@@ -845,9 +685,6 @@ JACK_callback(nframes_t nframes, void *arg)
 
         jack_ringbuffer_write(drv->pRecPtr, drv->callback_buffer1,
                               jack_bytes);
-#ifdef HAVE_SAMPLERATE
-      }
-#endif
     }
   }
   else if(drv->state == PAUSED  ||
@@ -918,15 +755,6 @@ JACK_srate(nframes_t nframes, void *arg)
   drv->jack_sample_rate = (long) nframes;
   drv->output_sample_rate_ratio = 1.0;
   drv->input_sample_rate_ratio = 1.0;
-#ifdef HAVE_SAMPLERATE
-  /* make sure to recalculate the ratios needed for proper sample rate conversion */
-  drv->output_sample_rate_ratio = (double) drv->jack_sample_rate / (double) drv->client_sample_rate;
-  if(drv->output_src) src_set_ratio(drv->output_src, drv->output_sample_rate_ratio);
-
-  drv->input_sample_rate_ratio = (double) drv->client_sample_rate / (double) drv->jack_sample_rate;
-  if(drv->input_src) src_set_ratio(drv->input_src, drv->input_sample_rate_ratio);
-#endif
-  TRACE("the sample rate is now %lu/sec\n", (long) nframes);
   return 0;
 }
 
@@ -1658,50 +1486,6 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
     TRACE("succeeded opening jack device\n");
   }
 
-  /* setup SRC objects just in case they'll be needed but only if requested */
-#ifdef HAVE_SAMPLERATE
-  if(do_sample_rate_conversion)
-  {
-    int error;
-    if(drv->num_output_channels > 0)
-    {
-      drv->output_src = src_new(preferred_src_converter, drv->num_output_channels, &error);
-      if(error != 0)
-      {
-        src_delete(drv->output_src);
-        drv->output_src = 0;
-        ERR("Could not created SRC object for output stream %d: %s\n",
-            error, src_strerror(error));
-      }
-    }
-    if(drv->num_input_channels > 0)
-    {
-      drv->input_src = src_new(preferred_src_converter, drv->num_input_channels, &error);
-      if(error != 0)
-      {
-        src_delete(drv->input_src);
-        drv->input_src = 0;
-        ERR("Could not created SRC object for input stream %d: %s\n",
-            error, src_strerror(error));
-      }
-    }
-  }
-#endif
-/*  if((long) (*rate) != drv->jack_sample_rate)
-  {
-    TRACE("rate of %ld doesn't match jack sample rate of %ld, returning error\n",
-          *rate, drv->jack_sample_rate);
-    *rate = drv->jack_sample_rate;
-#if JACK_CLOSE_HACK
-    JACK_CloseDevice(drv, TRUE);
-#else
-    JACK_CloseDevice(drv);
-#endif
-    releaseDriver(drv);
-    pthread_mutex_unlock(&device_mutex);
-    return ERR_RATE_MISMATCH;
-  } */
-
   drv->allocated = TRUE;        /* record that we opened this device */
 
   DEBUG("sizeof(sample_t) == %d\n", sizeof(sample_t));
@@ -1775,13 +1559,6 @@ JACK_Close(int deviceID)
   drv->pRecPtr = 0;
 
   /* free the SRC objects */
-#ifdef HAVE_SAMPLERATE
-  if(drv->output_src) src_delete(drv->output_src);
-  drv->output_src = 0;
-
-  if(drv->input_src) src_delete(drv->input_src);
-  drv->input_src = 0;
-#endif
   drv->allocated = FALSE;       /* release this device */
 
   pthread_mutex_unlock(&device_mutex);
@@ -2545,6 +2322,7 @@ JACK_CleanupDriver(jack_driver_t * drv)
   memcpy( &drv->last_reconnect_attempt, &drv->previousTime, sizeof(struct timespec));
 }
 
+
 /* Initialize the jack porting library to a clean state */
 void
 JACK_Init(void)
@@ -2578,7 +2356,7 @@ JACK_Init(void)
     drv->deviceID = x;
 
     for(y = 0; y < MAX_OUTPUT_PORTS; y++)       /* make all volume 25% as a default */
-      drv->volume[y] = 25;
+      drv->volume[y] = DEFAULT_VOLUME;
 
     JACK_CleanupDriver(drv);
     JACK_ResetFromDriver(drv);
@@ -2653,9 +2431,6 @@ JACK_GetJackBufferedBytes(int deviceID)
 void
 JACK_DoSampleRateConversion(bool value)
 {
-#ifdef HAVE_SAMPLERATE
-  do_sample_rate_conversion = value;
-#endif
 }
 
 /* FIXME: put the filename of the resample library header file with the decoders in here */
@@ -2664,9 +2439,6 @@ JACK_DoSampleRateConversion(bool value)
 void
 JACK_SetSampleRateConversionFunction(int converter)
 {
-#ifdef HAVE_SAMPLERATE
-  preferred_src_converter = converter;
-#endif
 }
 
 /* set the client name that will be reported to jack when we open a */

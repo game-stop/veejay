@@ -87,10 +87,6 @@ AC_ARG_WITH(sdl,
 AC_ARG_WITH(jack,
 		AC_HELP_STRING([--without-jack], [Do not use jack.]),
 		[], [with_jack=yes])
-AC_ARG_WITH(samplerate,
-		AC_HELP_STRING([--without-samplerate], [Do not use libsamplerate.]),
-		[], [with_samplerate=yes])
-
 
 AC_ARG_ENABLE(v4l1,
 		AC_HELP_STRING([--enable-v4l1],
@@ -905,24 +901,11 @@ have_jack=false
 if test x$with_jack != xno ; then
   PKG_CHECK_MODULES(JACK, jack >= 0.1, have_jack=true, have_jack=false)
   if test x$have_jack = xtrue ; then
-    AC_SUBST(JACK_LIBS)
-    AC_SUBST(JACK_CFLAGS)
-    AC_DEFINE(HAVE_JACK,1,[Compiling in Jack])
+  	AC_SUBST(JACK_LIBS)
+   	AC_SUBST(JACK_CFLAGS)
+    	AC_DEFINE(HAVE_JACK,1,[Compiling in Jack])
   fi
 fi
-
-dnl have_samplerate=false
-dnl if test x$with_samplerate != xno ; then
-dnl	PKG_CHECK_MODULES( SAMPLERATE, samplerate >= 0.0.15,
-dnl			  have_samplerate=true,have_samplerate=false)
-dnl	if test x$have_jack = xtrue ; then
-dnl		AC_DEFINE(HAVE_SAMPLERATE,1,[Compiling in libsamplerate])
-dnl		AC_SUBST(SAMPLERATE_CFLAGS)
-dnl		AC_SUBST(SAMPLERATE_LIBS)
-dnl	else
-dnl	 AC_MSG_WARN([libsamplerate >= 0.0.15 is required, get it at http://www.mega-nerd.com/SRC])
-dnl	fi
-dnl fi
 
 dnl ********************************************************************
 dnl Check for the libxml2 library (for saving/loading project files)
