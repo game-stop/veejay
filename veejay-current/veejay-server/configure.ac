@@ -863,9 +863,11 @@ fi
 have_sdl_ttf=false
 if test x$with_sdl != xno ; then
 	PKG_CHECK_MODULES( SDL_TTF, SDL_ttf <= 2.0.11, have_sdl_ttf=true,have_sdl_ttf=false)
-	AC_DEFINE(HAVE_SDL_TTF,1,[SDL_TTF library is installed])
-	AC_SUBST(SDL_TTF_CFLAGS)
-	AC_SUBST(SDL_TTF_LIBS)
+	if test x$have_sdl_ttf = xtrue ; then
+		AC_DEFINE(HAVE_SDL_TTF,1,[SDL_TTF library is installed])
+		AC_SUBST(SDL_TTF_CFLAGS)
+		AC_SUBST(SDL_TTF_LIBS)
+	fi
 fi
 
 

@@ -282,41 +282,9 @@ int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int
 	return 0;
 }
 
-static struct {
-        int i;
-        char *s;
-} pixstr[] = {
-        {PIX_FMT_YUV420P, "YUVPIX_FMT_YUV420P"},
-{       PIX_FMT_YUV422P, "4:2:2 planar, Y-Cb-Cr ( 422P )"},
-{       PIX_FMT_YUVJ420P, "4:2:0 planar, Y-U-V (420P JPEG)"},
-{       PIX_FMT_YUVJ422P, "4:2:2 planar, Y-U-V (422P JPEG)"},
-{       PIX_FMT_RGB24,    "RGB 24 bit"},
-{       PIX_FMT_BGR24,    "BGR 24 bit"},
-{       PIX_FMT_YUV444P,  "YUV 4:4:4 planar, Y-Cb-Cr (444P)"},
-{       PIX_FMT_YUVJ444P, "YUV 4:4:4 planar, Y-U-V (444P JPEG)"},
-{       PIX_FMT_RGB32,    "RGB 32 bit"},
-{       PIX_FMT_BGR32,    "BGR 32 bit"},
-{       PIX_FMT_GRAY8,    "Greyscale"},
-{       PIX_FMT_RGB32_1,  "RGB 32 bit LE"},
-{       0       ,               NULL}
-
-};
-
-
-static const    char    *unicap_pf_str(int i)
-{
-        int j;
-        for( j = 0; pixstr[j].s != NULL ; j ++ ) {
-                if( i == pixstr[j].i )
-                        return pixstr[j].s;
-        }
-        return NULL;
-}
-
 static void	composite_scale( composite_t *c, VJFrame *input, VJFrame *output )
 {
 #ifdef STRICT_CHECKING
-	assert( unicap_pf_str(input->format) != NULL );
 	assert( c->scaler != NULL );
 #endif
 	yuv_convert_and_scale(c->scaler,input,output);
