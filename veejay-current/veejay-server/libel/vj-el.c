@@ -493,8 +493,7 @@ int	vj_el_cache_size()
 	return cache_avail_mb();
 }
 
-//@ pixel_format = input pixel format FIXME
-vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixel_format, int out_fmt)
+vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixel_format, int out_fmt, long max_frame_size)
 {
         vj_decoder *d = (vj_decoder*) vj_calloc(sizeof(vj_decoder));
         if(!d)
@@ -515,13 +514,11 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 #else
 		d->context = avcodec_alloc_context();
 #endif
-	//	d->context->width = width;
-	//	d->context->height = height;
 		d->context->opaque = d;
 		d->frame = avcodec_alloc_frame();
 		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
 		d->img->width = width;
-
+		d->img->height = height;
 		unsigned int tc = task_num_cpus();
 		veejay_msg(VEEJAY_MSG_DEBUG,"Using %d FFmpeg decoder threads", tc );
 		d->context->thread_type = FF_THREAD_FRAME;
@@ -537,24 +534,10 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
        		       return NULL;
       		}
 	}
-		
-        d->tmp_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 4 );
-        if(!d->tmp_buffer)
-	{
-		free(d);
-                return NULL;
-	}
+
+	d->tmp_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * max_frame_size );
+
         d->fmt = id;
-        veejay_memset( d->tmp_buffer, 0, width * height * 4 );
-
-        d->deinterlace_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 3);
-        if(!d->deinterlace_buffer[0]) { if(d) free(d); return NULL; }
-
-		d->deinterlace_buffer[1] = d->deinterlace_buffer[0] + (width * height );
-		d->deinterlace_buffer[2] = d->deinterlace_buffer[0] + (2 * width * height );
-		
-        veejay_memset( d->deinterlace_buffer[0], 0, width * height * 3 );
-
         return d;
 }
 
@@ -604,6 +587,21 @@ int	get_ffmpeg_pixfmt( int pf )
 int       get_ffmpeg_shift_size(int fmt)
 {
 	return 0;
+}
+
+static long get_max_frame_size( lav_file_t *fd )
+{
+	long total_frames = lav_video_frames( fd );
+	long i;
+	long res = 0;
+	for (i = 0; i < total_frames; i++)
+	{
+		long tmp = lav_frame_size( fd, i );
+		if( tmp > res ) {
+			res = tmp;
+		} 
+   	}
+	return (((res)+8)&~8);
 }
 
 
@@ -959,9 +957,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		}
 		if( el_codecs[c_i] == NULL )
 		{
-		//	el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, pix_fmt );
+			long max_frame_size = get_max_frame_size( el->lav_fd[n] );
 			int ff_pf = get_ffmpeg_pixfmt( el_pixel_format_ );
-			el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, el->yuv_taste[ n ],ff_pf );
+			el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, el->yuv_taste[ n ],ff_pf, max_frame_size );
 			if(!el_codecs[c_i])
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize %s codec", compr_type);
@@ -1310,6 +1308,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			{
 				if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
 				{
+					if( d->deinterlace_buffer[0] == NULL ) {
+					     d->deinterlace_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * el->video_width * el->video_height * 3);
+					     if(!d->deinterlace_buffer[0]) { if(d) free(d); return NULL; }
+					     d->deinterlace_buffer[1] = d->deinterlace_buffer[0] + (el->video_width * el->video_height );
+					     d->deinterlace_buffer[2] = d->deinterlace_buffer[0] + (2 * el->video_width * el->video_height );
+					}
 					AVPicture pict2;
 					veejay_memset(&pict2,0,sizeof(AVPicture));
 					pict2.data[0] = d->deinterlace_buffer[0];
@@ -1545,7 +1549,7 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 		return -1;
 	}
 	
-    int decoder_id = lav_video_compressor_type( lav );
+    	int decoder_id = lav_video_compressor_type( lav );
 
 	if( decoder_id < 0 )
 	{
@@ -1574,13 +1578,16 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 			veejay_msg(0 ,"Unsupported pixel format");
 			break;			
 	}
+	long max_frame_size = get_max_frame_size( lav );
+
 	vj_decoder *d = _el_new_decoder(
 				decoder_id,
 				lav_video_width( lav),
 				lav_video_height( lav),
 			   	(float) lav_frame_rate( lav ),
 				in_pix_fmt,
-				out_pix_fmt );
+				out_pix_fmt,
+				max_frame_size );
 
 	if(!d)
 	{
@@ -1831,7 +1838,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->pixel_format = fmt;
 
 	el->auto_deinter = deinterlace;
-	el->max_frame_size = width*height*3;
+	el->max_frame_size = width * height * 3;
 	el->last_afile = -1;
 	el->last_apos = 0;
 	el->frame_list = NULL;
@@ -1864,7 +1871,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	int n2=0;
 	long nl=0;
 	uint64_t n =0;
-	bzero(line,1024);
+	veejay_memset(line,0,sizeof(line));
 	if(!el) return NULL;
 
 	el->has_video = 1; //assume we get it   
@@ -2079,27 +2086,8 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 
 	/* do we have anything? */
 
-	/* Calculate maximum frame size */
-
-	for (i = 0; i < el->video_frames; i++)
-	{
-		n = el->frame_list[i];
-		if(!el->lav_fd[N_EL_FILE(n)] )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "\tUnable to read file");
-			vj_el_free(el);
-			return NULL;
-		}
-		if (lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n)) >
-		    el->max_frame_size)
-		    el->max_frame_size =
-			lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
-
-
-   	}
 
 	/* Pick a pixel format */
-	
 	el->pixel_format = el_pixel_format_;
 	el->total_frames = el->video_frames-1;
 	/* Help for audio positioning */
@@ -2222,10 +2210,6 @@ void	vj_el_print(editlist *el)
 
 
 	veejay_msg(VEEJAY_MSG_INFO, "\tDuration: %s (%2d hours, %2d minutes)(%ld frames)", timecode,ttc.h,ttc.m,el->video_frames);
-
-
-
-
 }
 
 MPEG_timecode_t get_timecode(editlist *el, long num_frames)
