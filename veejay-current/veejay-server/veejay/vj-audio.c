@@ -430,14 +430,10 @@ int audio_play(void *data, int len, int flags) {
 
 static int usec_sleep(int usec_delay)
 {
-#ifdef HAVE_NANOSLEEP
     struct timespec ts;
     ts.tv_sec  =  usec_delay / 1000000;
     ts.tv_nsec = (usec_delay % 1000000) * 1000;
-    return nanosleep(&ts, NULL);
-#else
-    return usleep(usec_delay);
-#endif
+    return clock_nanosleep(CLOCK_REALTIME,0,&ts, NULL);
 }
 
 static unsigned int GetTimer(void){

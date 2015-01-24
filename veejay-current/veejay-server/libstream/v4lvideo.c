@@ -822,7 +822,7 @@ PAUSED:
 				__v4lvideo_grabstop( v );
 			}
 			unlock_(i);
-			nanosleep( &req, NULL);
+			clock_nanosleep( CLOCK_REALTIME,0,&req, NULL);
 			goto PAUSED;
 		} else {
 			if(!v->grabbing) {
@@ -830,7 +830,7 @@ PAUSED:
 				veejay_msg(VEEJAY_MSG_DEBUG, "Trying to start capturing.");
 				__v4lvideo_grabstart(v);
 				unlock_(i);
-				nanosleep(&req, NULL );
+				clock_nanosleep(CLOCK_REALTIME,0,&req, NULL );
 				goto RESTART;
 			}
 		}

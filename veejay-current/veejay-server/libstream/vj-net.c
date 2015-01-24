@@ -78,7 +78,7 @@ static	void	net_delay(long nsec, long sec )
 	struct timespec ts;
 	ts.tv_sec = sec;
 	ts.tv_nsec = MS_TO_NANO( nsec);
-	nanosleep( &ts, NULL );
+	clock_nanosleep( CLOCK_REALTIME,0, &ts, NULL );
 }
 
 

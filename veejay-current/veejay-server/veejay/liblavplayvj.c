@@ -1238,8 +1238,8 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 			}
 	
 			nsecsleep.tv_nsec = (settings->usec_per_frame - usec_since_lastframe -  1000000 / HZ) * 1000;    	
-	    	nsecsleep.tv_sec = 0;
-	    	nanosleep(&nsecsleep, NULL);
+	    		nsecsleep.tv_sec = 0;
+	    		clock_nanosleep(CLOCK_REALTIME,0, &nsecsleep, NULL);
 		}
     }
 
@@ -1957,7 +1957,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			veejay_msg(VEEJAY_MSG_WARNING, "Not timing audio/video");
 		break;
     		default:
-			veejay_msg(VEEJAY_MSG_DEBUG, "Using nanosleep timer");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using clock_nanosleep timer");
 		break;
     	}    
 #ifdef STRICT_CHECKING
