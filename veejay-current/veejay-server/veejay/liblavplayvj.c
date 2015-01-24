@@ -507,9 +507,9 @@ int veejay_free(veejay_t * info)
    	//vj_el_free(info->edit_list);
    	vj_avcodec_free();
 
-	vj_el_deinit();	
+	sample_free(info->edit_list);
 
-	sample_free();
+	vj_el_deinit();
 
 //	vj_tag_free();
 
@@ -1936,18 +1936,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	available_diskspace();
 
 	int id=0;
-	int has_config = 0;
-
-	if(info->load_action_file)
-	{
-		if(veejay_load_action_file(info, info->action_file[0] ))
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file[0] );
-			has_config = 1;
-		} else {
-			veejay_msg(VEEJAY_MSG_WARNING, "File %s is not an action file", info->action_file[0]);
-		}
-	}
 
 	if(info->video_out<0)
 	{
@@ -2095,24 +2083,23 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->settings->zoom = 0;
 		info->settings->composite = comp_mode;
 	}
-	if(!has_config) {
-		 if(info->video_output_width <= 0 ) {
-	 		 info->video_output_width = el->video_width;
-	   		 info->video_output_height = el->video_height;
-			}
+
+        if(info->video_output_width <= 0 || info->video_output_height <=0 ) {
+		 info->video_output_width = el->video_width;
+   		 info->video_output_height = el->video_height;
 	}
 
 	if(!info->bes_width)
 		info->bes_width = info->video_output_width;
 	if(!info->bes_height)
 		info->bes_height = info->video_output_height;	
-	
-	if(el->has_audio)
+
+	info->audio = NO_AUDIO;
+
+	if( el->has_audio && vj_perform_init_audio(info))
 	{
-		if (vj_perform_init_audio(info))
-			veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
-		else
-			info->audio = NO_AUDIO;
+		veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
+		info->audio = AUDIO_PLAY;
 	}
 
   	veejay_msg(VEEJAY_MSG_INFO, 
@@ -2128,7 +2115,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->video_output_height);
    
     	if(info->dump) vj_effect_dump(); 	
-    	
+    
+	
 	if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
 	{
 	
@@ -2326,7 +2314,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
 		info->uc->sample_id = nid;
 	}
-	else if( info->uc->file_as_sample && id <= 0 && !has_config)
+	else if( info->uc->file_as_sample && id <= 0)
 	{
 		long i,n=el->num_video_files;
 		for(i = 0; i < n; i ++ )
@@ -2378,18 +2366,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		veejay_msg(VEEJAY_MSG_ERROR, "Can't set effective user-id: %s", strerror(errno));
 		return -1;
     	}
-	if(info->load_action_file ) {
-	  if(sample_readFromFile( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
-			 &(info->uc->sample_id), &(info->uc->playback_mode)  ))
-	   {
-			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file[1]);
-	    }
-	}
 
-
-	//@ FIXME
-	//
-    	veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
+    	//veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
 
     	if (!veejay_mjpeg_set_playback_rate(info, el->video_fps, el->video_norm == 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
 		return -1;
@@ -2406,6 +2384,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;   
       	}
 	
+	veejay_change_state(info, LAVPLAY_STATE_PLAYING );
 
     	return 0;
 }
@@ -2501,7 +2480,25 @@ static void veejay_playback_cycle(veejay_t * info)
 			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d", info->uc->sample_id);
 			break;
 	}
-    
+    	if(info->load_action_file)
+	{
+		if(veejay_load_action_file(info, info->action_file[0] ))
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file[0] );
+		} else {
+			veejay_msg(VEEJAY_MSG_WARNING, "File %s is not an action file", info->action_file[0]);
+		}
+	}
+
+	if(info->load_action_file ) {
+	  if(sample_readFromFile( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
+			 &(info->uc->sample_id), &(info->uc->playback_mode)  ))
+	   {
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file[1]);
+	    }
+	}
+
+
     vj_perform_queue_video_frame(info,0);
     vj_perform_queue_audio_frame(info);
      
@@ -3067,8 +3064,8 @@ veejay_t *veejay_malloc()
 	info->rmodes[i] = -1;
 	}
 
-    veejay_memset(info->action_file[0],0,256); 
-    veejay_memset(info->action_file[1],0,256); 
+    veejay_memset(info->action_file[0],0,sizeof(info->action_file)); 
+    veejay_memset(info->action_file[1],0,sizeof(info->action_file)); 
 
     for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++)
 		info->effect_info->tmp[i] = 0;

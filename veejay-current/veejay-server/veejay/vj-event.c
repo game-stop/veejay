@@ -4973,7 +4973,7 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
 			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_PLAIN, 0 );
 		}
 	}
-	sample_del_all();
+	sample_del_all(v->edit_list);
 	veejay_msg(VEEJAY_MSG_INFO, "Deleted all samples (%d remaining)",sample_size());
 } 
 

@@ -208,7 +208,7 @@ extern int sample_is_deleted(int s1);
 extern int sample_exists(int sample_id);
 extern int sample_verify_delete( int sample_id, int sample_type );
 extern int sample_del(int sample_id);
-extern void sample_del_all();
+extern void sample_del_all(void *edl);
 extern int sample_get_startFrame(int sample_id);
 extern int sample_get_endFrame(int sample_id);
 extern int sample_set_marker_start(int sample_id, int marker);
@@ -346,7 +346,7 @@ extern int     sample_video_length( int s1 );
 extern int	sample_usable_edl( int s1 );
 
 extern int sample_cache_used( int s1 );
-extern void        sample_free();
+extern void        sample_free(void *edl);
 extern int	sample_load_composite_config( void *compiz, int s1 );
 extern int sample_stop_playing(int s1, int new_s1);
 extern int sample_start_playing(int s1, int no_cache);

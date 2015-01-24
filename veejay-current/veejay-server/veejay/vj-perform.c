@@ -777,11 +777,6 @@ int vj_perform_init_audio(veejay_t * info)
 #else
 	int i;
 
-	if(!info->audio )
-	{
-		veejay_msg(0,"No audio found");
-		return 0;
-	}
 	top_audio_buffer =
 	    (uint8_t *) vj_calloc(sizeof(uint8_t) * 8 * PERFORM_AUDIO_SIZE);
 	if(!top_audio_buffer)

@@ -207,12 +207,12 @@ void sample_init(int len, void *font)
     sample_font_ = font;
 }
 
-void	sample_free()
+void	sample_free(void *edl)
 {
 	if(!SampleHash)
 		return;
 	
-	sample_del_all();
+	sample_del_all(edl);
 /*
 	hscan_t scan;
 	hash_scan_begin( &scan, (hash_t*) SampleHash );
@@ -935,7 +935,7 @@ static void sample_free_el(void *port) {
 	}
 }
 
-void sample_del_all()
+void sample_del_all(void *edl)
 {
     int end = sample_size();
     int i;
@@ -948,7 +948,7 @@ void sample_del_all()
 		if (sample_exists(i)) {
 			sample_chain_clear(i);
     			sample_info *si = sample_get(i);
-			if(si->edit_list) {
+			if(si->edit_list && edl != si->edit_list) {
 				char key[32];
 				snprintf(key,sizeof(key), "p%p", si->edit_list );
 				if( vevo_property_get( port, key, 0, NULL ) == VEVO_ERROR_NOSUCH_PROPERTY ) {
