@@ -683,6 +683,7 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
    int i, j;
    int16_t *qt_audio = (int16_t *)buff, **qt_audion;
    int channels = lav_audio_channels(lav_file);
+   int bits = lav_audio_bits(lav_file);
 #ifdef HAVE_LIBQUICKTIME
    int res=0;
 #endif
@@ -695,16 +696,37 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
       case 'Q':
-	/* Deinterleave the audio into the two channels. */
-	for (i = 0; i < samps; i++)
-	    {
-	    for (j = 0; j < channels; j++)
-		qt_audion[j][i] = qt_audio[(channels*i) + j];
-	    }
-	res = lqt_encode_audio_track(lav_file->qt_fd, qt_audion, NULL,samps,0);
-	for (j = 0; j < channels; j++)
-	    free(qt_audion[j]);
-	free(qt_audion);
+	if (bits != 16 || channels > 1)
+	 {
+    /* Deinterleave the audio into the two channels and/or convert
+     * bits per sample to the required format.
+     */
+    qt_audion = malloc(channels * sizeof(*qt_audion));
+    for (i = 0; i < channels; i++)
+      qt_audion[i] = malloc(samps * sizeof(**qt_audion));
+
+    if (bits == 16)
+      for (i = 0; i < samps; i++)
+			for (j = 0; j < channels; j++)
+			  qt_audion[j][i] = qt_audio[channels * i + j];
+   else if (bits == 8)
+		for (i = 0; i < samps; i++)
+		  for (j = 0; j < channels; j++)
+		    qt_audion[j][i] = ((int16_t)(buff[channels * i + j]) << 8) ^ 0x8000;
+
+   if (bits == 8 || bits == 16)
+      res = lqt_encode_audio_track(lav_file->qt_fd, qt_audion, NULL, samps, 0);
+
+	for (i = 0; i < channels; i++)
+		free(qt_audion[i]);
+		free(qt_audion);
+  	} 
+	else 
+	{
+		qt_audion = &qt_audio;
+		res = lqt_encode_audio_track(lav_file->qt_fd, qt_audion, NULL, samps, 0);
+  	}
+
 	return res;
         break;
 #endif
@@ -1347,12 +1369,12 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
  			* the sar values in the lav_fd structure.  Hardwired (like everywhere else)
 			* to only look at track 0.
 			*/
-	 /*
+	 
 		 	if (lqt_get_pasp(lav_fd->qt_fd, 0, &pasp) != 0)
 	     		{
 	   	 		lav_fd->sar_w = pasp.hSpacing;
 	   			lav_fd->sar_h = pasp.vSpacing;
-	     		}*/
+	     		}
 			/*
  			 * If a 'fiel' atom is present (not guaranteed) then use it to set the
  			 * interlacing type.
