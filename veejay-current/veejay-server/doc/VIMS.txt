@@ -60,6 +60,17 @@ The semicolon must be given to indicate the end of this message
 
 A message bundle is a special message that contains an ordered list of at least 1 or more messages. Each message is executed from left to right (first in, first out) while parsing the bundle.   
 
+You can dynamically assign keybindings to trigger a bundle in reloaded ( View -> Bundles )
+
+There is an example Action File that a number of bundles with keybindings:
+
+  $ veejay -v /path/to/video.avi -F test/livecinema/action-file.xml
+
+The bundles can be triggered by the keys SHIFT + [ q,w,e,r,t,y,u,i,o,p,a,s,d,f,g,h,j,k,l,z,x,c,v,b,n,m ] 
+
+
+Structure of bundled message
+============================
 
 Example:
 
