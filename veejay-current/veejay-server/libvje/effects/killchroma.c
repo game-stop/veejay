@@ -51,21 +51,12 @@ void killchroma_apply(VJFrame *frame, int width, int height, int n)
 {
 	if(n==0)
 	{
-#ifdef HAVE_ASM_MMX
-		memset_ycbcr( frame->data[1], frame->data[1], 128, frame->uv_width,frame->uv_height );
-		memset_ycbcr( frame->data[2], frame->data[2], 128, frame->uv_width,frame->uv_height );
-#else
-		memset( frame->data[1], 128, frame->uv_len);
-		memset( frame->data[2], 128, frame->uv_len);
-#endif
+		veejay_memset( frame->data[1], 128, frame->uv_len );
+		veejay_memset( frame->data[2], 128, frame->uv_len );
 	}
 	else
 	{
-#ifdef HAVE_ASM_MMX
-		memset_ycbcr( frame->data[n], frame->data[n], 128,frame->uv_width, frame->uv_height );
-#else
-		memset( frame->data[n], 128,  frame->uv_len );
-#endif
+		veejay_memset( frame->data[n], 128, frame->uv_len );
 	}
 }
 void killchroma_free(){}

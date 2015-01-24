@@ -133,34 +133,6 @@ int diff_prepare(void *user, uint8_t *map[3], int width, int height)
 	return 1;
 }
 
-static	void	binarify( uint8_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
-{
-	int i;
-
-	if(!reverse)
-	{
-		for( i = 0; i < len; i ++ )
-		{
-			if ( abs(bg[i] - src[i]) <= threshold )
-				dst[i] = 0;
-			else
-				dst[i] = 0xff;
-		}
-
-	}
-	else
-	{
-		for( i = 0; i < len; i ++ )
-		{
-			if ( abs(bg[i] - src[i]) >= threshold )
-				dst[i] = 0;
-			else
-				dst[i] = 0xff;
-		
-		}
-	}
-}
-
 
 void diff_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 

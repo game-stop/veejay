@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "negatechannel.h"
-
+#include "common.h"
 vj_effect *negatechannel_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -45,44 +45,6 @@ vj_effect *negatechannel_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Y=0, Cb=1, Cr=2", "Value" );
     return ve;
 }
-
-#ifdef HAVE_ASM_MMX
-#undef HAVE_K6_2PLUS
-#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
-#define HAVE_K6_2PLUS
-#endif
-
-#undef _EMMS
-
-#ifdef HAVE_K6_2PLUS
-/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
-#define _EMMS     "femms"
-#else
-#define _EMMS     "emms"
-#endif
-static	inline void	negate_mask(uint8_t val)
-{
-	uint8_t mask[8] = { val,val,val,val,  val,val,val,val };
-//	uint64_t mask = 0xffffffffffffffffLL;
-        uint8_t *m    = (uint8_t*)&mask;
-	
-	__asm __volatile(
-		"movq	(%0),	%%mm4\n\t"
-		:: "r" (m) );
-}
-
-static	inline void	mmx_negate( uint8_t *dst, uint8_t *in )
-{
-	__asm __volatile(
-		"movq	(%0),	%%mm0\n\t"
-		"movq	%%mm4,	%%mm1\n\t"
-		"psubb	%%mm0,  %%mm1\n\t"
-		"movq	%%mm1,	(%1)\n\t"
-		:: "r" (in) , "r" (dst)
-	);
-}
-
-#endif
 
 void negatechannel_apply( VJFrame *frame, int width, int height, int chan, int val)
 {
@@ -122,13 +84,13 @@ void negatechannel_apply( VJFrame *frame, int width, int height, int chan, int v
     int left = len % 8;
     int work=  len >> 3;
 
-    negate_mask(val);
+    vje_load_mask(val);
 
     switch( chan ) {
 	case 0:
     for( i = 0; i < work ; i ++ )
     {
-	mmx_negate( Y, Y );	
+	vje_mmx_negate( Y, Y );	
 	Y += 8;
     }	
 
@@ -147,7 +109,7 @@ void negatechannel_apply( VJFrame *frame, int width, int height, int chan, int v
     left = uv_len % 8;
     for( i = 0; i < work ; i ++ )
     {
-	mmx_negate( Cb, Cb );
+	vje_mmx_negate( Cb, Cb );
 	Cr += 8;
     }
 
@@ -165,7 +127,7 @@ void negatechannel_apply( VJFrame *frame, int width, int height, int chan, int v
     left = uv_len % 8;
     for( i = 0; i < work ; i ++ )
     {
-	mmx_negate( Cr, Cr );
+	vje_mmx_negate( Cr, Cr );
 	Cr += 8;
     }
 
@@ -180,7 +142,6 @@ void negatechannel_apply( VJFrame *frame, int width, int height, int chan, int v
 	break;
  }
 
-	__asm__ __volatile__ ( _EMMS:::"memory");
-
+ do_emms;
 #endif
 }

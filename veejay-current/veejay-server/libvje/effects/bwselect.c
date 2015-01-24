@@ -64,13 +64,8 @@ void bwselect_apply(VJFrame *frame, int width, int height, int min_threshold, in
 			}
 		}
 	}
-#ifdef HAVE_ASM_MMX
-	memset_ycbcr( Cb, Cb, 128, frame->uv_width, frame->uv_height);
-	memset_ycbcr( Cr, Cr, 128, frame->uv_width, frame->uv_height);
-#else
-	memset(Cb, 128, frame->uv_len);
-	memset(Cr, 128, frame->uv_len);
-#endif	
+	veejay_memset(Cb, 128, frame->uv_len);
+	veejay_memset(Cr, 128, frame->uv_len);
 }
 
 void bwselect_free(){}

@@ -1306,18 +1306,161 @@ int calculate_cbcr_value(uint8_t *Cb,uint8_t *Cr, int w, int h) {
 }
 
 #ifdef HAVE_ASM_MMX
-
-#define MMX_load8byte_mm7(data)__asm__("\n\t movq %0,%%mm7\n" : "=m" (data):)
-
-#endif 
-
-void	memset_ycbcr(	uint8_t *in, 
-			uint8_t *out, 
-			uint8_t val, 
-			unsigned int width, 
-			unsigned int height)
+void     vje_load_mask(uint8_t val)
 {
-	veejay_memset( in, val, (width*height) );
+        uint8_t mask[8] = { val,val,val,val,  val,val,val,val };
+        uint8_t *m    = (uint8_t*)&mask;
+        
+        __asm __volatile(
+                "movq   (%0),   %%mm4\n\t"
+                :: "r" (m) );
+}
+
+void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int val, int len )
+{
+	unsigned int i;
+  	uint8_t mask[8] = { val,val,val,val,  val,val,val,val };
+        uint8_t *m    = (uint8_t*)&mask;
+        
+        __asm __volatile(
+                "movq   (%0),   %%mm7\n\t"
+                :: "r" (m) );
+
+
+	for( i = len; i > 8; i -= 8 ) {
+		__asm __volatile(
+			"\n\t movq %[srcA], %%mm0"
+			"\n\t movq %[srcB], %%mm1"
+			"\n\t psubusb %%mm1,%%mm0" 
+			"\n\t psubusb %%mm2,%%mm1" 
+			"\n\t psubusb %%mm1,%%mm0" 
+			"\n\t psubusb %%mm7,%%mm0" 
+			"\n\t movq %%mm0, %[dest]"
+			: [dest] "=m" (*(O + i))
+			: [srcA] "m" (*(A + i ))
+			, [srcB] "m" (*(B + i )));
+	}
+	
+	do_emms;	
+}
+
+void     vje_mmx_negate( uint8_t *dst, uint8_t *in )
+{
+        __asm __volatile(
+                "movq   (%0),   %%mm0\n\t"
+                "movq   %%mm4,  %%mm1\n\t"
+                "psubb  %%mm0,  %%mm1\n\t"
+                "movq   %%mm1,  (%1)\n\t"
+                :: "r" (in) , "r" (dst)
+        );
+}
+
+void 	vje_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len )
+{
+	unsigned int i;
+
+	vje_load_mask( val );
+
+	for( i = len; i > 8; i -= 8 ) {
+		vje_mmx_negate( dst + i, in + i );
+	}
+
+
+}
+
+void	binarify_1src( uint8_t *dst, uint8_t *src, uint8_t v, int reverse,int w, int h )
+{
+	int len = (w * h)>>3;
+	int i;
+	uint8_t *s = src;
+	uint8_t *d = dst;
+
+	uint8_t mm[8] = { v,v,v,v, v,v,v,v };
+	uint8_t *m = (uint8_t*) &(mm[0]);
+	__asm __volatile(
+		"movq	(%0),	%%mm7\n\t"
+		:: "r" (m) );
+
+	uint8_t *p = dst;
+
+	for( i = 0; i < len ; i ++ )
+	{
+		__asm __volatile(
+			"movq (%0),%%mm0\n\t"
+			"pcmpgtb %%mm7,%%mm0\n\t"
+			"movq %%mm0,(%1)\n\t"
+			:: "r" (s), "r" (d)
+		);
+		s += 8;
+		d += 8;
+	}
+
+	if( reverse )
+	{
+		__asm __volatile(
+			"pxor	%%mm4,%%mm4" ::
+			 );
+		for( i = 0; i < len ; i ++ )
+		{
+			__asm __volatile(
+			     "movq	(%0), %%mm0\n\t"
+	      		     "pcmpeqb  %%mm4,  %%mm0\n\t"
+        		     "movq   %%mm0,  (%1)\n\t"
+			:: "r" (p), "r" (p) 
+			);
+			p += 8;
+		}
+	}
+
+	do_emms;
+}
+
+
+#else
+void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len )
+{	
+	unsigned int i;
+	for( i = 0; i < len; i ++ ) {
+		O[i] = ( abs( A[i] - B[i] ) > threshold ? 0xff : 0 );
+	}	
+}
+
+void 	vj_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len )
+{
+	unsigned int i;
+	for( i = 0; i < len; i++ ) {
+		dst[i] = val - in[i];
+	}	
+}
+void	binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, int w, int h )
+{
+	const int len = w*h;
+	int i;
+	if(!reverse)
+	for( i = 0; i < len; i ++ )
+	{
+		dst[i] = (  src[i] <= threshold ? 0: 0xff );
+	}
+	else
+		for( i = 0; i < len; i ++ )
+			dst[i] = (src[i] > threshold ? 0: 0xff );
+}
+
+
+#endif
+
+void	binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
+{
+	int i;
+	if(!reverse)
+	{
+		vje_diff_plane( bg, src, bm, threshold,len );
+		vje_mmx_negate_frame( bm,bm, 0xff, len );
+	}
+	else
+	{
+		vje_diff_plane( bg, src, bm, threshold, len );
+	}
 }
 
 double	m_get_radius( int x, int y )

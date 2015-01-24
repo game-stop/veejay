@@ -46,7 +46,7 @@
 #include "opacity.h"
 
 typedef int (*morph_func)(uint8_t *kernel, uint8_t mt[9] );
-#define HIS_DEFAULT 2
+#define HIS_DEFAULT 15
 #define HIS_LEN (8*25)
 #define ACT_TOP 4000
 #define MAXCAPBUF 55
@@ -60,7 +60,7 @@ vj_effect *motionmap_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;  // motionmap
     ve->limits[1][0] = 255;
-    ve->limits[0][1] = 50;  // reverse
+    ve->limits[0][1] = 50;  // motion energy
     ve->limits[1][1] = 10000;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
@@ -78,7 +78,7 @@ vj_effect *motionmap_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->n_out = 2;
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Reverse","Draw","History" ,"Capture length");
+	ve->param_description = vje_build_param_list( ve->num_params, "Difference Threshold", "Maximum Motion Energy","Draw Motion Map","History in frames" ,"Capture length");
     return ve;
 }
 
@@ -112,6 +112,7 @@ int		motionmap_malloc(int w, int h )
 	}
 	interpolate_buf = vj_malloc( sizeof(uint8_t) * RUP8(w*h*3));
 	veejay_msg(2, "This is 'Motion Mapping'");
+	veejay_msg(2, "This FX calculates motion energy activity levels over a period of time to scale FX parameters");
 	veejay_msg(2, "Add any of the following to the FX chain (if not already present)");
 	veejay_msg(2, "\tBathroom Window, Displacement Mapping, Multi Mirrors, Magic Mirror, Sinoids");
 	veejay_msg(2, "\tSlice Window , Smear, ChameleonTV and TimeDistort TV");
@@ -149,17 +150,7 @@ void		motionmap_free(void)
 static	void	update_bgmask( uint8_t *dst,uint8_t *in, uint8_t *src, int len, int threshold )
 {
 	int i;
-	for( i =0; i < len ; i ++ )
-	{
-	  if( abs(in[i] - src[i]) > threshold )
-	  {
-		dst[i] = 0xff;
-	 }
-	 else
-	 {
-		dst[i] = 0;
-	 }
-	}
+	vje_diff_plane( in, src, dst, threshold, len );
 }
 
 uint8_t	*motionmap_interpolate_buffer()
@@ -189,7 +180,6 @@ void	motionmap_scale_to( int p1max, int p2max, int p1min, int p2min, int *p1val,
 
 	if( keyv_ > max_d )
 	{
-		veejay_msg(0, "Motion rollover  = %d", keyv_ % max_d );
 		keyv_ = max_d;
 	}
 
@@ -212,6 +202,11 @@ void	motionmap_scale_to( int p1max, int p2max, int p1min, int p2min, int *p1val,
 	*p2val = p2min + (int) ((p2max-p2min) * pw);
 	*len = current_his_len;
 	*pos = n;
+	
+	veejay_msg(VEEJAY_MSG_DEBUG, 
+		"Change from [%d-%d] to %d [%d-%d] to %d in %d frames",
+			p1min,p1max,*p1val,p2min,p2max,*p2val,current_his_len);
+
 //	veejay_msg(0, "%s:%s p1=%d,p2=%d, len=%d,pos=%d",
 //		__FILE__,__FUNCTION__,*p1val,*p2val, *len, *pos );
 
@@ -283,7 +278,7 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	if(!have_bg) {
-		veejay_msg(VEEJAY_MSG_ERROR,"Take a background snapshot first!");
+		veejay_msg(VEEJAY_MSG_ERROR,"Motion Mapping: Snap the background frame with VIMS 339 or mask button in reloaded");
 		return;
 	}
 

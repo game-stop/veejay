@@ -87,138 +87,6 @@ static int _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
 			return 1;
 	return 0;
 }
-/*
-#ifdef HAVE_ASM_MMX
-#undef HAVE_K6_2PLUS
-#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
-#define HAVE_K6_2PLUS
-#endif
-
-#undef _EMMS
-
-#ifdef HAVE_K6_2PLUS
-#define _EMMS     "femms"
-#else
-#define _EMMS     "emms"
-#endif
-
-static	inline	void	load_binary_map( uint8_t *mask )
-{
-	__asm __volatile(
-		"movq	(%0),	%%mm0\n\t"
-		:: "r" (mask) 
-	);
-}
-
-static		inline	void	map_luma( uint8_t *dst, uint8_t *B )
-//static	inline	void	map_luma( uint8_t *dst, uint8_t *B, uint8_t *mask )
-{
-	__asm __volatile(
-	//	"movq	(%0),	%%mm0\n\t"
-		"movq	(%0),	%%mm1\n\t"
-		"pand	%%mm0,  %%mm1\n\t"
-		"movq	%%mm1,  (%1)\n\t"
-	//	:: "r" (mask), "r" (B), "r" (dst) 
-		:: "r" (B) , "r" (dst)
-	);
-}
-
-static	inline	void	load_chroma( uint8_t val )
-{
-	uint8_t mask[8] = { val,val,val,val, val,val,val,val };
-	uint8_t *m = &mask[0];
-
-	__asm __volatile(
-		"movq	(%0),	%%mm3\n\t # mm3: 128,128,128,128, ..."  
-		:: "r" (m)
-	);
-}
-
-static	inline	void	map_chroma( uint8_t *dst, uint8_t *B )
-{
-	__asm	__volatile(
-		"movq	(%0),	%%mm1\n\t"
-		"pand	%%mm0,   %%mm1\n\t"
-		"pxor	%%mm5,  %%mm5\n\t"
-		"pcmpeqb %%mm1,%%mm5\n\t"
-		"pand	%%mm3,%%mm5\n\t"
-		"paddb	%%mm5,%%mm1\n\t"
-		"movq	%%mm1,  (%1) \n\t"
-		:: "r" (B), "r" (dst)
-	);
-
-}
-
-static	void	load_differencemapmm7(uint8_t v)
-{
-	uint8_t mm[8] = { v,v,v,v, v,v,v,v };
-	uint8_t *m = (uint8_t*) &(mm[0]);
-	__asm __volatile(
-		"movq	(%0),	%%mm7\n\t"
-		:: "r" (m) );
-}
-#endif
-
-
-
-static	void	binarify( uint8_t *dst, uint8_t *src, uint8_t *prev, uint8_t threshold, int reverse,int w, int h )
-{
-	int len = (w * h)>>3;
-	int i;
-	uint8_t *s = src;
-	uint8_t *d = dst;
-	load_differencemapmm7( threshold );
-
-
-	uint8_t *p = dst;
-
-	for( i = 0; i < len ; i ++ )
-	{
-		__asm __volatile(
-			"movq (%0),%%mm0\n\t"
-			"pcmpgtb %%mm7,%%mm0\n\t"
-			"movq %%mm0,(%1)\n\t"
-			:: "r" (s), "r" (d)
-		);
-		s += 8;
-		d += 8;
-	}
-
-	if( reverse )
-	{
-		__asm __volatile(
-			"pxor	%%mm4,%%mm4" ::
-			 );
-		for( i = 0; i < len ; i ++ )
-		{
-			__asm __volatile(
-			     "movq	(%0), %%mm0\n\t"
-	      		     "pcmpeqb  %%mm4,  %%mm0\n\t"
-        		     "movq   %%mm0,  (%1)\n\t"
-			:: "r" (p), "r" (p) 
-			);
-			p += 8;
-		}
-	}
-}
-
-
-#else*/
-static	void	binarify( uint8_t *dst, uint8_t *src,int threshold,int reverse, int w, int h )
-{
-	const int len = w*h;
-	int i;
-	if(!reverse)
-	{
-		for( i = 0; i < len; i ++ )
-			dst[i] = (  src[i] <= threshold ? 0: 0xff );
-	}
-	else
-	{
-		for( i = 0; i < len; i ++ )
-			dst[i] = ( src[i] >= threshold ? 0: 0xff );
-	}
-}
 
 void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse,
 		int show )
@@ -244,7 +112,7 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 	tmp.data[0] = previous_img;
 	softblur_apply( &tmp, width,height,0 );
 
-	binarify( binary_img,previous_img,threshold,reverse, width,height);
+	binarify_1src( binary_img,previous_img,threshold,reverse, width,height);
 	//@ clear image
 
 	if(show)

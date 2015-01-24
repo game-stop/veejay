@@ -168,10 +168,11 @@ void timedistort_apply( VJFrame *frame, int width, int height, int val)
 		}
 		else
 		{
-			for( i = 0; i < len ; i ++ )
+			/*for( i = 0; i < len ; i ++ )
 			{
 				diff[i] = (abs(prev[i] - Y[i])> val ? 0xff: 0 );
-			}
+			}*/
+			vje_diff_plane( prev, Y, diff, val, len );
 			vj_frame_copy1( Y, prev, len );
 			VJFrame smooth;
 			veejay_memcpy(&smooth,frame, sizeof(VJFrame));

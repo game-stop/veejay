@@ -17,12 +17,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+#include <stdlib.h>
+#include <config.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "softblur.h"
-#include <stdlib.h>
-#include <config.h>
+#include "common.h"
 
 vj_effect *softblur_init(int w,int h)
 {
@@ -97,23 +98,8 @@ void softblur3_apply(VJFrame *frame, int width, int height ) {
 
 
 }
-#ifdef HAVE_ASM_MMX
-
-#undef HAVE_K6_2PLUS
-#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
-#define HAVE_K6_2PLUS
-#endif
-
-#undef _EMMS
-
-#ifdef HAVE_K6_2PLUS
-/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
-#define _EMMS     "femms"
-#else
-#define _EMMS     "emms"
-#endif
     	
-
+#ifdef HAVE_ASM_MMX
 /* mmx_blur() taken from libvisual plugins
  *
  * Libvisual-plugins - Standard plugins for libvisual
@@ -185,8 +171,7 @@ static	void	mmx_blur(uint8_t *buffer, int width, int height)
 		);//	 : "mm0", "mm1", "mm2", "mm3", "mm6");
 	}
 
- 	 __asm__ __volatile__ ( _EMMS:::"memory");
-
+	do_emms;
 }
 
 #endif

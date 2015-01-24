@@ -40,16 +40,8 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "opacity.h"
-#undef _EMMS
+#include "common.h"
 #include <veejay/vj-task.h>
-#ifdef HAVE_K6_2PLUS
-/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
-#define _EMMS     "femms"
-#else
-#define _EMMS     "emms"
-#endif
-
-#define do_emms 	 __asm__ __volatile__ ( _EMMS:::"memory")
 
 vj_effect *opacity_init(int w, int h)
 {

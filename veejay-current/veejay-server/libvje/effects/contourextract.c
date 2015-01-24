@@ -122,7 +122,6 @@ int contourextract_malloc(void **d, int width, int height)
 	dh_ = nearest_div( height / 8 );
 
 	my->current = (uint8_t*) vj_calloc( ru8( sizeof(uint8_t) * dw_ * dh_ * 3 ) );
-	my->data = (uint32_t*) vj_calloc( ru8(sizeof(uint32_t) * width * height) );
 	my->bitmap = (uint8_t*) vj_calloc( ru8(sizeof(uint8_t) * width * height ));
 	
 	if(static_bg == NULL)	
@@ -162,7 +161,6 @@ void contourextract_free(void *d)
 	if(d)
 	{
 		contourextract_data *my = (contourextract_data*) d;
-		if(my->data) free(my->data);
 		if(my->current) free(my->current);
 		if(my->bitmap) free(my->bitmap);
 		free(d);
@@ -206,33 +204,6 @@ int contourextract_prepare(uint8_t *map[3], int width, int height)
 
 	veejay_msg(2, "Contour extraction: Snapped background frame");
 	return 1;
-}
-
-static	void	binarify( uint8_t *bm, uint32_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
-{
-	int i;
-	if(!reverse)
-	{
-		for( i = 0; i < len; i ++ )
-		{
-			if ( abs(bg[i] - src[i]) <= threshold )
-			{	dst[i] = 0; bm[i] = 0; }
-			else
-			{	dst[i] = 1; bm[i] = 0xff; }
-		}
-
-	}
-	else
-	{
-		for( i = 0; i < len; i ++ )
-		{
-			if ( abs(bg[i] - src[i]) >= threshold )
-			{	dst[i] = 0; bm[i] = 0; }
-			else
-			{	dst[i] = 1; bm[i] = 0xff; }
-		
-		}
-	}
 }
 
 static	void	contourextract_centroid()
@@ -293,7 +264,7 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	veejay_memset( dt_map, 0 , len * sizeof(uint32_t) );
 
 	//@ todo: optimize with mmx
-	binarify( ud->bitmap, ud->data, static_bg, frame->data[0], threshold, reverse,len );
+	binarify( ud->bitmap,static_bg, frame->data[0], threshold, reverse,len );
 
 	if(mode==1)
 	{
@@ -305,7 +276,7 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	}
 
 	//@ calculate distance map
-	veejay_distance_transform( ud->data, width, height, dt_map );
+	veejay_distance_transform( ud->bitmap, width, height, dt_map );
 
 	to_shrink_.data[0] = ud->bitmap;
 	shrinked_.data[0] = ud->current;

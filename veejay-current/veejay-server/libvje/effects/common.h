@@ -1,10 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2007 Niels Elburg <elburg@hio.hen.nl>
- *
- * some portion by: (referenced)
- * Copyright (C) 2001 Matthew J. Marjanovic <maddog@mir.com>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.coml>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -50,6 +47,10 @@ extern void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 
 extern void veejay_msg(int type, const char format[], ...);
 
+#ifdef HAVE_ASM_MMX
+#define do_emms          __asm__ __volatile__ ( "emms":::"memory" )
+#endif
+
 #ifndef ARCH_X86
 # define sin_cos(si, co, x)     si = sin(x); co = cos(x)
 # define fast_sqrt( res,x ) res = sqrt(x) 
@@ -65,8 +66,6 @@ extern void veejay_msg(int type, const char format[], ...);
 # define fast_abs(res,x)	asm ("fabs" : "=t" (res) : "0" (x))
 # define fast_exp(res,x)	asm ("fexp" : "=t" (res) : "0" (x))
 #endif
-
-
 
 #define Y_Red 		( 0.29900)
 #define Y_Green 	( 0.58700)
@@ -215,8 +214,6 @@ matrix_t matrix_placementA(int photoindex, int size, int w , int h);
 matrix_t matrix_placementB(int photoindex, int size, int w , int h);
 matrix_f	get_matrix_func(int type);
 
-
-
 int power_of(int size);
 int max_power(int w);
 
@@ -230,12 +227,8 @@ void blackborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 			 uint8_t * input_v, int width, int height, int top,
 			 int bottom, int left, int right, int shiftw, int shifth, int color);
 
-void
-deinterlace(uint8_t *data, int width, int height, int noise);
-
-
+void deinterlace(uint8_t *data, int width, int height, int noise);
 _pf		_get_pf(int type);
-
 
 uint8_t bl_pix_additive_Y(uint8_t y1, uint8_t y2);
 uint8_t bl_pix_divide_Y(uint8_t y1, uint8_t y2);
@@ -286,45 +279,43 @@ unsigned int fastrand(int val);
 int bl_pix_get_color_y(int color_num);
 int bl_pix_get_color_cb(int color_num);
 int bl_pix_get_color_cr(int color_num);
-
-
-void	memset_ycbcr(	uint8_t *in, 
-			uint8_t *out, 
-			uint8_t val, 
-			unsigned int width, 
-			unsigned int height);
-
 double m_get_radius(int x, int y);
 double m_get_angle(int x, int y);
 double m_get_polar_x(double r, double a);
 double m_get_polar_y(double r, double a);
-
 inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
 inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
-
 extern void viewport_destroy(void *v);
-extern void	vj_get_yuvgrey_template(VJFrame *src, int w, int h);
-extern	int     motionmap_active();
-extern void	motionmap_scale_to( int p1max, int p2max,int p1min,int p2min, int *p1val, int *p2val, int *pos, int *len );
-extern void	motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n );
-extern void	motionmap_store_frame(VJFrame *fx);
-extern void	motionmap_interpolate_frame(VJFrame *fx, int N, int n);
+extern void vj_get_yuvgrey_template(VJFrame *src, int w, int h);
+extern	int motionmap_active();
+extern void motionmap_scale_to( int p1max, int p2max,int p1min,int p2min, int *p1val, int *p2val, int *pos, int *len );
+extern void motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n );
+extern void motionmap_store_frame(VJFrame *fx);
+extern void motionmap_interpolate_frame(VJFrame *fx, int N, int n);
 extern uint8_t *motionmap_bgmap();
 extern uint32_t motionmap_activity();
 
-void	veejay_histogram_analyze( void *his, VJFrame *f , int t);
-void	veejay_histogram_del(void *his);
-void	*veejay_histogram_new();
-void	veejay_histogram_draw( void *his, VJFrame *src, VJFrame *dst , int intensity, int strength );
-void	veejay_histogram_equalize( void *his, VJFrame *f, int intensity, int strength );
+void veejay_histogram_analyze( void *his, VJFrame *f , int t);
+void veejay_histogram_del(void *his);
+void *veejay_histogram_new();
+void veejay_histogram_draw( void *his, VJFrame *src, VJFrame *dst , int intensity, int strength );
+void veejay_histogram_equalize( void *his, VJFrame *f, int intensity, int strength );
 
-void	veejay_histogram_analyze_rgb( void *his, uint8_t *rgb, VJFrame *f );
-void	veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
-void	veejay_histogram_draw_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
+void veejay_histogram_analyze_rgb( void *his, uint8_t *rgb, VJFrame *f );
+void veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
+void veejay_histogram_draw_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
 
-void	veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output);
-void	veejay_distance_transform8( uint8_t *plane, int w, int h, uint32_t *output);
+void veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output);
+void veejay_distance_transform8( uint8_t *plane, int w, int h, uint32_t *output);
 
-uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M, uint32_t *XX, uint32_t *YY,
-		uint32_t *xsize, uint32_t *ysize, int blob);
+uint8_t veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M, uint32_t *XX, uint32_t *YY,uint32_t *xsize, uint32_t *ysize, int blob);
 
+
+void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len );
+void binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, int w, int h );
+void binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len);
+#ifdef HAVE_ASM_MMX
+void vje_load_mask(uint8_t val);
+void vje_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len );
+void vje_mmx_negate( uint8_t *dst, uint8_t *in );
+#endif
