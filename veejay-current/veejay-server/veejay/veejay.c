@@ -792,7 +792,6 @@ int main(int argc, char **argv)
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Started playback");
 
-
 	int current_state = LAVPLAY_STATE_PLAYING;
 
 	req.tv_sec = 0;

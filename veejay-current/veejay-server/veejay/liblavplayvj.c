@@ -1722,12 +1722,12 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 
 	pthread_mutex_lock(&(settings->valid_mutex));
 	settings->valid[settings->currently_processed_frame] = 0;
-	pthread_mutex_unlock(&(settings->valid_mutex));
-
 	pthread_cond_broadcast(&
 			       (settings->
 				buffer_done[settings->
 					    currently_processed_frame]));
+	pthread_mutex_unlock(&(settings->valid_mutex));
+
 
 	settings->currently_processed_frame = 
 	    (settings->currently_processed_frame + 1) % 1;
@@ -1787,10 +1787,10 @@ int veejay_open(veejay_t * info)
 
     }
     //@ collect geo statistics; how many times was veejay started from which geographical location
-    if( pthread_create( &(settings->geo_stat), NULL, veejay_geo_stat_thread, (void*) info ) ) {
-	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start geo stat thread.");
-	    return 0;
-	   }
+    //if( pthread_create( &(settings->geo_stat), NULL, veejay_geo_stat_thread, (void*) info ) ) {
+//	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start geo stat thread.");
+//	    return 0;
+//	   }
     return 1;
 }
 
@@ -1971,9 +1971,19 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
 	}
 
+	el = info->edit_list;
+
+	if( info->video_output_width <= 0 || info->video_output_height <= 0 ) {
+		info->video_output_width = el->video_width;
+		info->video_output_height = el->video_height;
+	}
+
+	if(!vj_mem_threaded_init( info->video_output_width, info->video_output_height ) )
+		return 0;
+
+
 	vj_tag_set_veejay_t(info);
 
-	el = info->edit_list;
 
 #ifdef HAVE_V4L
 	int driver = 1;
@@ -1991,11 +2001,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
     	}
 
-	if( info->video_output_width <= 0 || info->video_output_height <= 0 ) {
-		info->video_output_width = el->video_width;
-		info->video_output_height = el->video_height;
-	}
-	
 	info->font = vj_font_init( el->video_width,   el->video_height,	   el->video_fps,0 );
 
 	if(!info->font) {
@@ -2058,6 +2063,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
 		return -1;
     	}
+	info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
+	if( !info->shm ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize shared resource!");
+	}
 
 
 	if( info->settings->composite )
@@ -2367,25 +2376,19 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
     	}
 
-    	//veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
-
-    	if (!veejay_mjpeg_set_playback_rate(info, el->video_fps, el->video_norm == 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
+       	if (!veejay_mjpeg_set_playback_rate(info, el->video_fps, el->video_norm == 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
 		return -1;
     	}
 
-	info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
-	if( !info->shm ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize shared resource!");
-	}
+//	veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
 
    	if(veejay_open(info) != 1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize the threading system");
 		return -1;   
       	}
-	
-	veejay_change_state(info, LAVPLAY_STATE_PLAYING );
 
+	
     	return 0;
 }
 
@@ -3049,7 +3052,7 @@ veejay_t *veejay_malloc()
     info->rmodes = (int*) vj_calloc(sizeof(int) * VJ_MAX_CONNECTIONS );
     info->settings->currently_processed_entry = -1;
     info->settings->first_frame = 1;
-    info->settings->state = LAVPLAY_STATE_STOP;
+    info->settings->state = LAVPLAY_STATE_PLAYING;
     info->settings->composite = 1;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->use_timer = 2;
