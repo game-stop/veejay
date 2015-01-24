@@ -1,0 +1,57 @@
+Debugging veejay
+----------------
+
+There are various ways to submit useful bug-reports
+
+Basically, send as much logging as possible, 
+
+
+=== VERBOSIVE CONSOLE LOGGING ===
+
+1) Run veejay with the verbose flag:
+
+$ veejay -v -n > /tmp/logfile
+
+To watch it:
+
+$ tail -f /tmp/logfile
+
+=== NETWORK EVENT LOG ===
+
+2) If it crashes in combination with reloaded or another external, enable all network logging:
+
+$ export VEEJAY_LOG_NET_IO=/tmp/vims.logfile
+
+$ veejay -v -n -> /tmp/console.logfile
+
+=== POST CRASH ===
+
+3) When it has crashed, there are files in your $HOME/.veejay/recovery directory
+
+The files come in pairs, an editlist and a samplelist with veejays pid number.
+The recovery files can be loaded with:
+
+$ veejay /path/to/recovery_editlist_p???.edl -l /path/to/recovery_samplelist_p???.sl
+
+
+
+=== DIGGING DEEPER ===
+
+From the source:
+----------------
+
+1) Run configure --enable-debug
+
+2) Run veejay in gdb
+
+$ gdb /path/to/veejay
+...
+$ bt
+
+3) Run veejay with valgrind
+
+$ valgrind --leak-check=yes --leak-resolution=high --log-file=/tmp/valgrind.veejay.log /path/to/veejay -n -v ...
+
+$ valgrind --tool=helgrind /path/to/veejay -n -v
+
+
