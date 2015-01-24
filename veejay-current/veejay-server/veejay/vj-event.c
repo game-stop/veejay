@@ -2129,14 +2129,12 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 
 #define __xml_cint( buf, var , node, name )\
 {\
-veejay_msg(0,"Try i '%s', '%s'",name,buf);\
 sprintf(buf,"%d", var);\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
 }
 
 #define __xml_cfloat( buf, var , node, name )\
 {\
-veejay_msg(0,"Try f '%s', '%s'",name,buf);\
 sprintf(buf,"%f", var);\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
 }
@@ -2144,7 +2142,6 @@ xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
 #define __xml_cstr( buf, var , node, name )\
 {\
 if(var != NULL){\
-veejay_msg(0,"Try s '%s', '%s'",name,buf);\
 veejay_strncpy(buf,var,strlen(var));\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );}\
 }
