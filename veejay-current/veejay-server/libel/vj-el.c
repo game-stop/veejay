@@ -2084,7 +2084,11 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		return NULL;
 	}
 
-	/* do we have anything? */
+	for( i = 0; i < el->num_video_files; i ++ ) {
+		long tmp = get_max_frame_size( el->lav_fd[i] );
+		if( tmp > el->max_frame_size )
+			el->max_frame_size = tmp;
+	}
 
 
 	/* Pick a pixel format */
