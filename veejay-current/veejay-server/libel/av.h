@@ -20,7 +20,10 @@
 #ifndef AV_H
 #define AV_H
 #include <libavcodec/version.h>
-#if LIBAVCODEC_VERSION_MAJOR > 55
+
+#define FF_VJE_BACKPORT (LIBAVCODEC_VERSION_MAJOR >= 56 && LIBAVCODEC_VERSION_MINOR >= 1)
+
+#if FF_VJE_BACKPORT
 
 #ifndef CODEC_ID_MJPEGB
 #define CODEC_ID_MJPEGB AV_CODEC_ID_MJPEGB

@@ -17,6 +17,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
+#include <stdio.h>
 #include <libel/vj-avcodec.h>
 #include <libel/vj-el.h>
 #include <libvjmsg/vj-msg.h>
@@ -72,27 +73,27 @@ static int out_pixel_format = FMT_422F;
 
 char*	vj_avcodec_get_codec_name(int codec_id )
 {
-	char name[20];
+	char name[64];
 	switch(codec_id)
 	{
-		case CODEC_ID_MJPEG: sprintf(name, "MJPEG"); break;
-		case CODEC_ID_MPEG4: sprintf(name, "MPEG4"); break;
-		case CODEC_ID_MJPEGB: sprintf(name,"MJPEGB");break;
-		case CODEC_ID_MSMPEG4V3: sprintf(name, "DIVX"); break;
-		case CODEC_ID_DVVIDEO: sprintf(name, "DVVideo"); break;
-		case CODEC_ID_LJPEG: sprintf(name, "LJPEG" );break;
-		case CODEC_ID_SP5X: sprintf(name, "SP5x"); break;
-		case CODEC_ID_THEORA: sprintf(name,"Theora");break;
-		case CODEC_ID_H264: sprintf(name, "H264");break;
-		case 997 : sprintf(name, "RAW YUV 4:2:2 Planar JPEG"); break;
-		case 996 : sprintf(name, "RAW YUV 4:2:0 Planar JPEG"); break;
-		case 995 : sprintf(name, "YUV4MPEG Stream 4:2:2"); break;
-		case 994 : sprintf(name, "YUV4MPEG Stream 4:2:0"); break;
-		case 999 : sprintf(name, "RAW YUV 4:2:0 Planar"); break;
-		case 998 : sprintf(name, "RAW YUV 4:2:2 Planar"); break;
-		case 900 : sprintf(name, "LZO YUV 4:2:2 Planar"); break;
+		case CODEC_ID_MJPEG: snprintf(name,sizeof(name),"MJPEG"); break;
+		case CODEC_ID_MPEG4: snprintf(name,sizeof(name), "MPEG4"); break;
+		case CODEC_ID_MJPEGB: snprintf(name,sizeof(name),"MJPEGB");break;
+		case CODEC_ID_MSMPEG4V3: snprintf(name,sizeof(name), "DIVX"); break;
+		case CODEC_ID_DVVIDEO: snprintf(name,sizeof(name), "DVVideo"); break;
+		case CODEC_ID_LJPEG: snprintf(name,sizeof(name), "LJPEG" );break;
+		case CODEC_ID_SP5X: snprintf(name,sizeof(name), "SP5x"); break;
+		case CODEC_ID_THEORA: snprintf(name,sizeof(name),"Theora");break;
+		case CODEC_ID_H264: snprintf(name,sizeof(name), "H264");break;
+		case 997 : snprintf(name,sizeof(name), "RAW YUV 4:2:2 Planar JPEG"); break;
+		case 996 : snprintf(name,sizeof(name), "RAW YUV 4:2:0 Planar JPEG"); break;
+		case 995 : snprintf(name,sizeof(name), "YUV4MPEG Stream 4:2:2"); break;
+		case 994 : snprintf(name,sizeof(name), "YUV4MPEG Stream 4:2:0"); break;
+		case 999 : snprintf(name,sizeof(name), "RAW YUV 4:2:0 Planar"); break;
+		case 998 : snprintf(name,sizeof(name), "RAW YUV 4:2:2 Planar"); break;
+		case 900 : snprintf(name,sizeof(name), "LZO YUV 4:2:2 Planar"); break;
 		default:
-			sprintf(name, "Unknown"); break;
+			snprintf(name,sizeof(name), "Unknown"); break;
 	}
 	char *res = strdup(name);
 	return res;
@@ -586,7 +587,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	return 0;
 }
 
-#if LIBAVCODEC_VERSION_MAJOR > 55
+#if FF_VJE_BACKPORT
 static int avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame)
 {
 	AVPacket pkt;
