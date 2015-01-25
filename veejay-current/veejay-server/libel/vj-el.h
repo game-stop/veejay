@@ -61,6 +61,7 @@ typedef struct
 	int		yuv_taste[MAX_EDIT_LIST_FILES];
 
 	long 		num_frames[MAX_EDIT_LIST_FILES];
+	long		max_frame_sizes[MAX_EDIT_LIST_FILES];
 	uint64_t 	*frame_list;
 
 	int 		last_afile;

@@ -972,6 +972,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 				el->video_file_list[n] = NULL;
 				return -1;
 			}
+
+			el->max_frame_sizes[n] = max_frame_size;
 		}
 	}
 
@@ -2084,13 +2086,23 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		return NULL;
 	}
 
-	for( i = 0; i < el->num_video_files; i ++ ) {
-		long tmp = get_max_frame_size( el->lav_fd[i] );
-		if( tmp > el->max_frame_size )
-			el->max_frame_size = tmp;
+
+	long cur_max_frame_size = 0;
+	for ( i = 0; i < el->num_video_files; i ++ ) {
+		if( el->max_frame_sizes[i] > cur_max_frame_size )
+		 cur_max_frame_size = el->max_frame_sizes[i];
 	}
 
+	if( cur_max_frame_size == 0 ) {
+		for( i = 0; i < el->num_video_files; i ++ ) {
+			long tmp = get_max_frame_size( el->lav_fd[i] );
+			if( tmp > cur_max_frame_size )
+				cur_max_frame_size = tmp;
+		}
+	}
 
+	el->max_frame_size = cur_max_frame_size;
+	
 	/* Pick a pixel format */
 	el->pixel_format = el_pixel_format_;
 	el->total_frames = el->video_frames-1;
