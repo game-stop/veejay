@@ -8104,7 +8104,7 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 				char small[32];
 				value = vj_tag_get_effect_arg(id, i, j);
 				snprintf( small,sizeof(small), "P%d = %d ",j,value );
-				strcat( tmp, value );	
+				strcat( tmp, small );	
 	    		}
 
 			if (vj_effect_get_extra_frame(y) == 1)
