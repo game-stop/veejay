@@ -84,6 +84,7 @@
 #include <veejay/jpegutils.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
+#include <libel/av.h>
 //#include <pthread.h>
 typedef struct {
 		void *start;

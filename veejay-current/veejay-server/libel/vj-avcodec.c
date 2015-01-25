@@ -34,6 +34,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavcodec/version.h>
 #include <libavformat/avformat.h>
+#include <libel/av.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -585,7 +586,17 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	return 0;
 }
 
-
+#if LIBAVCODEC_VERSION_MAJOR > 55
+static int avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame)
+{
+	AVPacket pkt;
+	veejay_memset(&pkt,0,sizeof(pkt));
+	int got_packet_ptr = 0;
+	pkt.data = buf;
+	pkt.size = len;
+	return avcodec_encode_video2( ctx, &pkt, frame, &got_packet_ptr);
+}
+#endif
 
 int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src[3], uint8_t *buf, int buf_len,
 	int in_fmt)

@@ -43,6 +43,7 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libel/av.h>
 #include <veejay/vj-task.h>
 #include <liblzo/lzo.h>
 #include <math.h>
