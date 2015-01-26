@@ -33,7 +33,6 @@
 #endif
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
-#include <libavcodec/version.h>
 #include <libavformat/avformat.h>
 #include <libel/av.h>
 #ifdef STRICT_CHECKING
@@ -587,7 +586,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	return 0;
 }
 
-#if FF_VJE_BACKPORT
+#if FF_NO_VIDEO_ENCODE
 static int avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame)
 {
 	AVPacket pkt;
