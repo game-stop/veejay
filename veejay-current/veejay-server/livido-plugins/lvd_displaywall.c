@@ -104,6 +104,8 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	int video_area = w * h * 3;
 
 	displaywall_t *entry = (displaywall_t*) livido_malloc(sizeof(displaywall_t));
+	livido_memset( entry, 0, sizeof(displaywall_t));
+
 	entry->vecx = (int *)livido_malloc(sizeof(int) * video_area);
 	entry->vecy = (int *)livido_malloc(sizeof(int) * video_area);
 	if(entry->vecx == NULL || entry->vecy == NULL) {
