@@ -124,89 +124,6 @@ void	veejay_set_instance( veejay_t *info )
 
 static void	veejay_schedule_fifo( veejay_t *info, int pid );
 
-// following struct copied from ../utils/videodev.h
-
-/* This is identical with the mgavideo internal params struct, 
-   please tell me if you change this struct here ! <gz@lysator.liu.se) */
-struct mjpeg_params
-{
-
-   /* The following parameters can only be queried */
-
-   int major_version;            /* Major version number of driver */
-   int minor_version;            /* Minor version number of driver */
-
-   /* Main control parameters */
-
-   int input;                    /* Input channel: 0 = Composite, 1 = S-VHS */
-   int norm;                     /* Norm: VIDEO_MODE_PAL or VIDEO_MODE_NTSC */
-   int decimation;               /* decimation of captured video,
-                                    enlargement of video played back.
-                                    Valid values are 1, 2, 4 or 0.
-                                    0 is a special value where the user
-                                    has full control over video scaling */
-
-   /* The following parameters only have to be set if decimation==0,
-      for other values of decimation they provide the data how the image is captured */
-
-   int HorDcm;                    /* Horizontal decimation: 1, 2 or 4 */
-   int VerDcm;                    /* Vertical decimation: 1 or 2 */
-   int TmpDcm;                    /* Temporal decimation: 1 or 2,
-                                     if TmpDcm==2 in capture every second frame is dropped,
-                                     in playback every frame is played twice */
-   int field_per_buff;            /* Number of fields per buffer: 1 or 2 */
-   int img_x;                     /* start of image in x direction */
-   int img_y;                     /* start of image in y direction */
-   int img_width;                 /* image width BEFORE decimation,
-                                     must be a multiple of HorDcm*16 */
-   int img_height;                /* image height BEFORE decimation,
-                                     must be a multiple of VerDcm*8 */
-
-   /* --- End of parameters for decimation==0 only --- */
-
-   /* JPEG control parameters */
-
-   int  quality;                  /* Measure for quality of compressed images.
-                                     Scales linearly with the size of the compressed images.
-                                     Must be beetween 0 and 100, 100 is a compression
-                                     ratio of 1:4 */
-
-   int  odd_even;                 /* Which field should come first ???
-                                     This is more aptly named "top_first",
-                                     i.e. (odd_even==1) --> top-field-first */
-
-   int  APPn;                     /* Number of APP segment to be written, must be 0..15 */
-   int  APP_len;                  /* Length of data in JPEG APPn segment */
-   char APP_data[60];             /* Data in the JPEG APPn segment. */
-
-   int  COM_len;                  /* Length of data in JPEG COM segment */
-   char COM_data[60];             /* Data in JPEG COM segment */
-
-   unsigned long jpeg_markers;    /* Which markers should go into the JPEG output.
-                                     Unless you exactly know what you do, leave them untouched.
-                                     Inluding less markers will make the resulting code
-                                     smaller, but there will be fewer aplications
-                                     which can read it.
-                                     The presence of the APP and COM marker is
-                                     influenced by APP0_len and COM_len ONLY! */
-#define JPEG_MARKER_DHT (1<<3)    /* Define Huffman Tables */
-#define JPEG_MARKER_DQT (1<<4)    /* Define Quantization Tables */
-#define JPEG_MARKER_DRI (1<<5)    /* Define Restart Interval */
-#define JPEG_MARKER_COM (1<<6)    /* Comment segment */
-#define JPEG_MARKER_APP (1<<7)    /* App segment, driver will allways use APP0 */
-
-   int  VFIFO_FB;                 /* Flag for enabling Video Fifo Feedback.
-                                     If this flag is turned on and JPEG decompressing
-                                     is going to the screen, the decompress process
-                                     is stopped every time the Video Fifo is full.
-                                     This enables a smooth decompress to the screen
-                                     but the video output signal will get scrambled */
-
-   /* Misc */
-
-	char reserved[312];  /* Makes 512 bytes for this structure */
-};
-
 //#include <videodev_mjpeg.h>
 #include <pthread.h>
 #include <signal.h>
@@ -1253,8 +1170,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 
 void veejay_pipe_write_status(veejay_t * info)
 {
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
+    video_playback_setup *settings = (video_playback_setup *) info->settings;
     int d_len = 0;
     int pm = info->uc->playback_mode;
     int total_slots = sample_size()-1;
@@ -1262,8 +1178,6 @@ void veejay_pipe_write_status(veejay_t * info)
 	int cache_used = 0;
 	if(tags>0)
 		total_slots+=tags;
-   if(total_slots < 0)
-	total_slots = 0;
 
    int mstatus = vj_event_macro_status();
    int curfps  = (int) ( 100.0f / settings->spvf );
@@ -1658,15 +1572,6 @@ static	void	veejay_event_handle(veejay_t *info)
 #endif
 }
 
-static void *veejay_geo_stat_thread(void *arg)
-{
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-    return NULL;
-}
-
-
 static void *veejay_mjpeg_playback_thread(void *arg)
 {
     veejay_t *info = (veejay_t *) arg;
@@ -1786,35 +1691,9 @@ int veejay_open(veejay_t * info)
 
 
     }
-    //@ collect geo statistics; how many times was veejay started from which geographical location
-    //if( pthread_create( &(settings->geo_stat), NULL, veejay_geo_stat_thread, (void*) info ) ) {
-//	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start geo stat thread.");
-//	    return 0;
-//	   }
-    return 1;
+    
+	return 1;
 }
-
-static int veejay_mjpeg_get_params(veejay_t * info,
-				    struct mjpeg_params *bp)
-{
-    int i;
-    /* Set some necessary params */
-    bp->decimation = 1;
-    bp->quality = 50;		/* default compression factor 8 */
-    bp->odd_even = 1;
-    bp->APPn = 0;
-    bp->APP_len = 0;		/* No APPn marker */
-    for (i = 0; i < 60; i++)
-	bp->APP_data[i] = 0;
-    bp->COM_len = 0;		/* No COM marker */
-    for (i = 0; i < 60; i++)
-	bp->COM_data[i] = 0;
-    bp->VFIFO_FB = 1;
-    veejay_memset( bp->reserved, 0, sizeof(bp->reserved));
-
-    return 1;
-}
-
 
 static int veejay_mjpeg_set_playback_rate(veejay_t * info,
 					   double video_fps, int norm)
@@ -1825,24 +1704,23 @@ static int veejay_mjpeg_set_playback_rate(veejay_t * info,
 	(video_playback_setup *) info->settings;
 
     switch (norm) {
-    case VIDEO_MODE_PAL:
-    case VIDEO_MODE_SECAM:
-	norm_usec_per_frame = 1000000 / 25;	/* 25Hz */
-	break;
-    case VIDEO_MODE_NTSC:
-	norm_usec_per_frame = 1001000 / 30;	/* 30ish Hz */
-	break;
-    default:
-	    veejay_msg(VEEJAY_MSG_WARNING, 
-			"Unknown video norm! Use PAL , SECAM or NTSC");
-	    norm_usec_per_frame = 1000000 / (long) video_fps;
-	    break;
+	    case VIDEO_MODE_PAL:
+   		case VIDEO_MODE_SECAM:
+			norm_usec_per_frame = 1000000 / 25;	/* 25Hz */
+			break;
+    	case VIDEO_MODE_NTSC:
+			norm_usec_per_frame = 1001000 / 30;	/* 30ish Hz */
+			break;
+    	default:
+	    	veejay_msg(VEEJAY_MSG_WARNING, "Unknown video norm! Use PAL , SECAM or NTSC");
+	    		norm_usec_per_frame = 1000000 / (long) video_fps;
+	    	break;
 	}
 
     if (video_fps != 0.0)
-	target_usec_per_frame = (int) (1000000.0 / video_fps);
+		target_usec_per_frame = (int) (1000000.0 / video_fps);
     else
-	target_usec_per_frame = norm_usec_per_frame;
+		target_usec_per_frame = norm_usec_per_frame;
 
     settings->usec_per_frame = target_usec_per_frame;
 
@@ -2432,7 +2310,6 @@ static void veejay_playback_cycle(veejay_t * info)
     struct timespec time_now;
     double tdiff1=0.0, tdiff2=0.0;
     int first_free, skipv, skipa, skipi, nvcorr,frame;
-    struct mjpeg_params bp;
     long ts, te;
     int n;
 
@@ -2510,24 +2387,9 @@ static void veejay_playback_cycle(veejay_t * info)
            return;
     }
 
-    bp.input = 0;
-    bp.norm = (el->video_norm == 'n') ? VIDEO_MODE_NTSC : VIDEO_MODE_PAL;
-
-    veejay_msg(VEEJAY_MSG_DEBUG, "Output norm: %s", bp.norm == VIDEO_MODE_NTSC ? "NTSC" : "PAL");
-
-    bp.norm = el->video_norm == VIDEO_MODE_NTSC ? 480 : 576;
-
     veejay_msg(VEEJAY_MSG_DEBUG, "Output dimensions: %dx%d, backend scaler: %dx%d",
 		info->video_output_width,info->video_output_height,info->bes_width,info->bes_height );
 
-    bp.odd_even = (el->video_inter == LAV_INTER_TOP_FIRST);
-
-    if (!veejay_mjpeg_get_params(info, &bp)) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Uhm?");
-		return ;
-    }
-
-  
     for(n = 0; n < QUEUE_LEN ; n ++ ) {
         veejay_mjpeg_queue_buf(info, n,1 );
     }
@@ -2552,20 +2414,16 @@ static void veejay_playback_cycle(veejay_t * info)
 	    }
 
 	   frame = bs.frame;
-	   /* Since we queue the frames in order, we have to get them back in order */
-       	   if (frame != stats.nsync % QUEUE_LEN) {
-            	veejay_msg(0,"**INTERNAL ERROR: Bad frame order on sync: frame = %d, nsync = %d, br.count = %ld",frame, stats.nsync, QUEUE_LEN);
-       	    }
 
-	    stats.nsync++;
-	    clock_gettime( CLOCK_REALTIME, &time_now);
+	   stats.nsync++;
+	   clock_gettime( CLOCK_REALTIME, &time_now);
 
-		long  d1 = (time_now.tv_sec * 1000000000) + time_now.tv_nsec;
-		long  n1 = (bs.timestamp.tv_sec * 1000000000) +  bs.timestamp.tv_nsec;
+	   long  d1 = (time_now.tv_sec * 1000000000) + time_now.tv_nsec;
+	   long  n1 = (bs.timestamp.tv_sec * 1000000000) +  bs.timestamp.tv_nsec;
 
-		double  dn = ( (double) (d1 - n1) )/10000000.0; // * 1.e7;
+	   double  dn = ( (double) (d1 - n1) )/10000000.0; // * 1.e7;
 
-		stats.tdiff = dn; // ( time_now.tv_sec - bs.timestamp.tv_sec ) + 
+	   stats.tdiff = dn; // ( time_now.tv_sec - bs.timestamp.tv_sec ) + 
 				 //	  ( ( time_now.tv_nsec - bs.timestamp.tv_nsec / 1000 ) * 1.e-6);
 
 	} 
@@ -2679,7 +2537,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	     } 
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
-        info->real_fps = (int)( te - ts );
+            info->real_fps = (int)( te - ts );
 #else
 	    info->real_fps = 0;
 #endif
@@ -2735,7 +2593,6 @@ static void Welcome(veejay_t *info)
 		veejay_msg(VEEJAY_MSG_INFO, "Software composite - projection screen is %d x %d",
 			info->video_output_width, info->video_output_height );
 	}
-	
 
 	veejay_msg(VEEJAY_MSG_INFO,"Type 'man veejay' in a shell to learn more about veejay");
 	veejay_msg(VEEJAY_MSG_INFO,"For a list of events, type 'veejay -u |less' in a shell");
@@ -2767,8 +2624,6 @@ static	void *veejay_playback_thread(void *data)
     pthread_sigmask( SIG_BLOCK, &mask, NULL );
 
     veejay_schedule_fifo( info, getpid());
-
-   
 
     Welcome(info);
     veejay_playback_cycle(info);
@@ -3067,8 +2922,8 @@ veejay_t *veejay_malloc()
 	info->rmodes[i] = -1;
 	}
 
-    veejay_memset(info->action_file[0],0,sizeof(info->action_file)); 
-    veejay_memset(info->action_file[1],0,sizeof(info->action_file)); 
+    veejay_memset(info->action_file[0],0,sizeof(info->action_file[0])); 
+    veejay_memset(info->action_file[1],0,sizeof(info->action_file[1])); 
 
     for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++)
 		info->effect_info->tmp[i] = 0;
@@ -3939,7 +3794,7 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	}
 
 	if(force_pix_fmt > 0 ) {
-	  veejay_msg(VEEJAY_MSG_WARNING , "Output pixel format set to %s by user", text );
+	  	veejay_msg(VEEJAY_MSG_WARNING , "Output pixel format set to %s by user", text );
 	}
 	else
 		veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
