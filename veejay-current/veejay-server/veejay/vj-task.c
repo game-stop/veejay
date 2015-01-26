@@ -592,29 +592,9 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 		job_list[i]->arg = f[i];
 	}	
 
-	for( j = 0; j < n; j ++ ) {
-		if( f[j]->overlap > 0 ) {
-			f[j]->overlaprow = (uint8_t*) vj_malloc( sizeof(uint8_t) * f[j]->overlap );
-			unsigned int offset       =  (f[j]->strides[0] * j) + (f[j]->strides[0] - f[j]->overlap);
-			if( (offset+f[j]->overlap) > (f[j]->width * f[j]->height * n) ) {
-				veejay_memset( f[j]->overlaprow, 0, f[j]->overlap );
-			} else {	
-				veejay_memcpy(
-					f[j]->overlaprow,
-					f[j]->input[0] + offset,
-					f[j]->overlap );
-			}
-		}
-	}
-
 	performer_job( n );
 
 	for( j = 0; j < n; j ++ ) {
-		if( f[j]->overlaprow ) {
-			free(f[j]->overlaprow);
-			f[j]->overlaprow = NULL;
-		}
-		f[j]->overlap = 0;
 		f[j]->sampling = 0;
 	}
 

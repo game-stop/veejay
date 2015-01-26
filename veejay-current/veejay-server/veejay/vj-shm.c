@@ -276,6 +276,7 @@ static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
 		snprintf(path, sizeof(path) - 1, "%s/veejay_shm_out-%d.shm_id", homedir, tries );
 		if( vj_shm_file_ref_use_this( path ) )	
 			break;
+
 		tries ++;
 	}
 
@@ -311,8 +312,10 @@ static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
 static 	void	failed_init_cleanup( vj_shm_t *v )
 {
 	if(v->file) {
-		if( vj_shm_file_ref_use_this(v->file) == 0 )
+		if( vj_shm_file_ref_use_this(v->file) == 0 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Removed shared resource file %s", v->file );
 			remove(v->file);
+		}
 		free(v->file);
 	}
 	if( v->sms && v->shm_id > 0)

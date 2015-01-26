@@ -721,9 +721,9 @@ static void	vj_effman_apply_job( void *arg )
 	frames[0] = &frame;
 	frames[1] = &frame2;
 
-	if( v->overlap ) {
-		frame.data[3] = v->overlaprow;
-	}
+//f( v->overlap ) {
+//frame.data[3] = v->overlaprow;
+//
 
 	if( selector > 200 )	
 	{
@@ -765,8 +765,6 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 			int i;
 			for ( i = 0; i < n_a; i ++ )
 				vj_task_set_param( arguments[i], i );
-			if( isP > 1 )
-				vj_task_set_overlap( frames[0]->width );
 
 			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 3, (performer_job_routine) &vj_effman_apply_job );
 		} 

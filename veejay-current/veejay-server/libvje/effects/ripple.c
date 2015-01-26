@@ -77,13 +77,13 @@ vj_effect *ripple_init(int width, int height)
 int	ripple_malloc(int width, int height)
 {
    int i;
-    ripple_table = (double*) vj_malloc(sizeof(double) * RUP8(width * height) );
+    ripple_table = (double*) vj_malloc(sizeof(double) * RUP8(width * height) + width );
     if(!ripple_table) return 0;
-    ripple_data[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) );
+    ripple_data[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) + width );
     if(!ripple_data[0]) return 0; 
-    ripple_data[1] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) );
+    ripple_data[1] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) + width );
     if(!ripple_data[1]) return 0;
-    ripple_data[2] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) );
+    ripple_data[2] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) + width );
     if(!ripple_data[1]) return 0;
 
     ripple_sin = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
@@ -170,7 +170,7 @@ void ripple_apply(VJFrame *frame, int width, int height, int _w, int _a , int _a
 		  sx = (int) (x+z * ripple_cos[a]);
 		  sy = (int) (y+z * ripple_sin[a]);
 
-		  if(sy >= (height-1)) sy = height-1;
+		  if(sy > (height-1)) sy = height-1;
 		  if(sx > width) sx = width;
 		  if(sx < 0) sx =0;
 		  if(sy < 0) sy =0;

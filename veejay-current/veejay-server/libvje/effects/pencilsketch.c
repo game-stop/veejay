@@ -212,39 +212,30 @@ void pencilsketch_apply(
 			}
 		}
 
-		len = frame->len - width;
+		for(i = len; i < (len+width-1); i ++ ) {
+			y = Y[i];
+			yb = y;
 
-		if( vj_task_available() )
-		{ 
-			int j = 0;
-			uint8_t *oV = frame->data[3];	
-		
-			for(i=len; i < (len+width); i++, j++)
+			/* substract user defined mask from image */
+			if(y >= threshold_min && y <= threshold_max)
 			{
-				y = Y[i];
-				yb = y;
-	
-				if(y >= threshold_min && y <= threshold_max)
-				{
-					m =( Y[i] + Y[i+1] + oV[j] + oV[j-1] + 2 ) >> 2;
-					d = Y[i] - m;
-					d *= 500;
-					d /= 100;
-					m = ( m + d );
-					y = ((((y << 1) - (0xff - m))>>1) + Y[i])>>1;
-					Y[i] = 0xff;	
-					Y[i] = _pff(y,yb,threshold_max);
-					//@ this introduces lines into the image,
-					//@ one for each task . FIXME
-					//@ for now, just silently copy upper row
-					//Y[i] = Y[i-width];
-				}
-				else
-				{
-					Y[i] = pixel_Y_hi_;
-				}
+				/* sharpen the pixels */
+				m = (Y[i] + Y[i+1] + Y[i] + Y[i+1]+2) >> 2;
+				d = Y[i] - m;
+				d *= 500;
+				d /= 100;
+				m = m + d;
+				y = ((((y << 1) - (0xff - m))>>1) + Y[i])>>1;
+				/* apply blend operation on masked pixel */
+				Y[i] = _pff(y,yb,threshold_max);
 			}
-		} 
+			else
+			{
+				Y[i] = pixel_Y_hi_;
+			}
+		
+		}
+
 
 	}
 	/* data in I420 or YV12 */

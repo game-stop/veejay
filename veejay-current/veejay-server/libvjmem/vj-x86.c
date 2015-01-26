@@ -178,7 +178,7 @@ int	vj_mem_threaded_init(int w, int h)
 	} 
 	else {
 		if( w >= 720 && h >= 480) {
-			num_tasks = n_cpus - 1;
+			num_tasks = n_cpus;
 			if( num_tasks < 1 )
 				num_tasks = 1;
 
