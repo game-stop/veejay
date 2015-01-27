@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2012 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2012-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -125,20 +125,20 @@ static void		task_reset()
 
 static void	task_add(uint8_t task_no, performer_job_routine fp , void *data)
 {
-	struct task *enqueue_task = &(running_tasks[task_no]);
+	struct task *qp_task = &(running_tasks[task_no]);
 
-	enqueue_task->task_id 	=	task_no;
-	enqueue_task->handler	=	fp;
-	enqueue_task->data	= 	data;
-	enqueue_task->next	= 	NULL;
+	qp_task->task_id 	=	task_no;
+	qp_task->handler	=	fp;
+	qp_task->data	= 	data;
+	qp_task->next	= 	NULL;
 
 	if( total_tasks == 0 ) {
-		tasks_		=	enqueue_task;
+		tasks_		=	qp_task;
 		tail_task_	=	tasks_;
 	}
 	else {
-		tail_task_->next=	enqueue_task;
-		tail_task_	=	enqueue_task;
+		tail_task_->next=	qp_task;
+		tail_task_	=	qp_task;
 	}
 
 	total_tasks ++;
@@ -362,56 +362,15 @@ void	vj_task_set_param( int val , int idx ){
 		vj_task_args[i]->iparams[idx] = val;
 }
 
-void	vj_task_set_overlap( int val ){
-	uint8_t i;
-	uint8_t n = task_get_workers();
-
-	for( i = 0; i < n; i ++ )
-		vj_task_args[i]->overlap = val;
-}
-
-void	vj_task_set_wid( int w ) {
-	uint8_t i;
-	uint8_t n = task_get_workers();
-
-	for( i = 0; i < n; i ++ ) {
-		vj_task_args[i]->subwid = w;
-		vj_task_args[i]->width = w;
-	}
-}
-void	vj_task_set_hei( int h ) {
-	uint8_t i;
-	uint8_t n = task_get_workers();
-
-	for( i = 0; i < n; i ++ ) {
-		vj_task_args[i]->height = h;
-		vj_task_args[i]->subhei = h;
-	}
-}
-
 uint8_t	vj_task_available()
 {
 	return ( task_get_workers() > 1 ? 1 : 0);
-}
-
-void	vj_task_set_shift( int v, int h )
-{
-	uint8_t i;  
-	uint8_t n = task_get_workers();
-
-	for( i = 0; i < n; i ++ ) {
-		vj_task_args[i]->shifth = h;
-		vj_task_args[i]->shiftv = v;
-	}
 }
 
 void	*vj_task_alloc_internal_buf( unsigned int size )
 {
 	uint8_t i;
 	uint8_t n = task_get_workers();
-#ifdef STRICT_CHECKING
-	assert( size > 0 );
-#endif
 	uint8_t *buffer     =	 (uint8_t*) vj_malloc( size );
 
 	for( i = 0; i < n; i ++ ) {
@@ -495,12 +454,10 @@ void	vj_task_set_from_frame( VJFrame *in )
 		v->ssm		= in->ssm;
 		v->width	= in->width;
 		v->height	= in->height / n;
-		v->subwid	= in->width / n;
-		v->subhei	= in->height / n;
 		v->strides[0]	= (v->width * v->height);
 		v->uv_width	= in->uv_width;
 		v->uv_height 	= in->uv_height / n;
-		v->strides[1]	= v->uv_width * v->uv_height; //(v->width * v->uv_height) / n;
+		v->strides[1]	= v->uv_width * v->uv_height; 
 		v->strides[2]	= v->strides[1];
 		v->shiftv	= in->shift_v;
 		v->shifth	= in->shift_h;	
@@ -519,12 +476,11 @@ void	vj_task_set_from_frame( VJFrame *in )
 			v->strides[0] = 0;			
 		} else {
 		        if( v->ssm == 1 ) { //@ FX in 4:4:4
-					v->strides[1] = (v->width * v->height );
-					v->strides[2] = v->strides[1];
-				}
+				v->strides[1] = (v->width * v->height );
+				v->strides[2] = v->strides[1];
+			}
 		}
 		v->strides[3]   = 0;
-	
 	}	
 }
 

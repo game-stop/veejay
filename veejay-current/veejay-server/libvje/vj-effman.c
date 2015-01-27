@@ -742,6 +742,10 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 	int entry = vj_effect_real_to_sequence( selector );
 	int n_a   = vj_effect_get_num_params( selector );
 
+	if( n_a > 10 )  {
+		n_a = 10;
+	}
+
 	if( !frames || !frames[0] ) return VJE_NO_FRAMES;
 
 	if( !vj_effect_initialized( selector, ptr ) ) {
@@ -760,12 +764,12 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 		if( vj_task_available() && isP > 0 ) {
 			vj_task_set_from_frame( frames[0] );
 			vj_task_set_int( selector );
-			vj_task_set_param( entry, 11 );
+			vj_task_set_param( entry, 11 ); // 10 + 1
 			vj_task_set_ptr( (void*) kf );
 			int i;
 			for ( i = 0; i < n_a; i ++ )
 				vj_task_set_param( arguments[i], i );
-
+			
 			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 3, (performer_job_routine) &vj_effman_apply_job );
 		} 
 		else {

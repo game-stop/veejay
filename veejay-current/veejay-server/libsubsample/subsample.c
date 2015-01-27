@@ -619,20 +619,20 @@ static void	chroma_subsample_task( void *ptr )
 	switch (f->iparam) {
 		case SSM_420_JPEG_BOX:
 		case SSM_420_JPEG_TR: 
-			ss_444_to_420jpeg(f->input[1], f->width, f->subhei);
-  			ss_444_to_420jpeg(f->input[2], f->width, f->subhei);
+			ss_444_to_420jpeg(f->input[1], f->width, f->height);
+  			ss_444_to_420jpeg(f->input[2], f->width, f->height);
     		break;
 		case SSM_420_MPEG2:
-			ss_444_to_420mpeg2(f->input[1], f->width, f->subhei);
-			ss_444_to_420mpeg2(f->input[2], f->width, f->subhei);
+			ss_444_to_420mpeg2(f->input[1], f->width, f->height);
+			ss_444_to_420mpeg2(f->input[2], f->width, f->height);
 		break;
 		case SSM_422_444:
-	   	 	ss_444_to_422_cp(f->output[1],f->input[1],f->width,f->subhei);
-		    	ss_444_to_422_cp(f->output[2],f->input[2],f->width,f->subhei);
+	   	 	ss_444_to_422_cp(f->output[1],f->input[1],f->width,f->height);
+		    	ss_444_to_422_cp(f->output[2],f->input[2],f->width,f->height);
     		break;
 		case SSM_420_422:
-    			ss_422_to_420(f->input[1],f->width,f->subhei);
-   			ss_422_to_420(f->input[2],f->width,f->subhei);
+    			ss_422_to_420(f->input[1],f->width,f->height);
+   			ss_422_to_420(f->input[2],f->width,f->height);
    		break;
 		default:
 		break;
@@ -645,20 +645,20 @@ static void chroma_supersample_task( void *ptr )
 
 	switch (f->iparam) {
 	 case SSM_420_JPEG_BOX:
-      		ss_420jpeg_to_444(f->input[1], f->width, f->subhei);
-   	 	ss_420jpeg_to_444(f->input[2], f->width, f->subhei);
+      		ss_420jpeg_to_444(f->input[1], f->width, f->height);
+   	 	ss_420jpeg_to_444(f->input[2], f->width, f->height);
     		break;
  	 case SSM_420_JPEG_TR:
-   		tr_420jpeg_to_444(f->priv,f->input[1], f->width, f->subhei);
-   		tr_420jpeg_to_444(f->priv,f->input[2], f->width, f->subhei);
+   		tr_420jpeg_to_444(f->priv,f->input[1], f->width, f->height);
+   		tr_420jpeg_to_444(f->priv,f->input[2], f->width, f->height);
    		break;
   	 case SSM_422_444:
-		tr_422_to_444t(f->input[1],f->output[1],f->width,f->subhei);
-   		tr_422_to_444t(f->input[2],f->output[2],f->width,f->subhei);
+		tr_422_to_444t(f->input[1],f->output[1],f->width,f->height);
+   		tr_422_to_444t(f->input[2],f->output[2],f->width,f->height);
     		break;
   	case SSM_420_422:
-  		ss_420_to_422( f->input[1], f->width, f->subhei );
-    		ss_420_to_422( f->input[2], f->width, f->subhei );
+  		ss_420_to_422( f->input[1], f->width, f->height );
+    		ss_420_to_422( f->input[2], f->width, f->height );
     		break;
   	default:
    	 	break;
