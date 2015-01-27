@@ -47,6 +47,7 @@ vj_effect *coloradjust_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = 0;
 	ve->has_user = 0;
+	ve->parallel = 1;
     return ve;
 }
 

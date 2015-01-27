@@ -43,6 +43,7 @@ vj_effect *color_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Intensity Y", "Intensity U", "Intensity V" ); 
 	ve->has_user = 0;
     ve->extra_frame = 0;
+	ve->parallel = 1;
     return ve;
 }
 
