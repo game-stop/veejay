@@ -23,7 +23,12 @@
 
 #define FF_VJE_BACKPORT (LIBAVCODEC_VERSION_MAJOR >= 56 && LIBAVCODEC_VERSION_MINOR >= 1)
 
-#define FF_NO_VIDEO_ENCODE (LIBAVCODEC_VERSION_MICRO <= 0 && LIBAVCODEC_VERSION_MAJOR >= 56)
+//#define FF_NO_VIDEO_ENCODE (LIBAVCODEC_VERSION_MICRO <= 0 && LIBAVCODEC_VERSION_MAJOR >= 56)
+extern int avcodec_encode_video(AVCodecContext *avctx, uint8_t *buf, int buf_size,const AVFrame *pict) __attribute__((weak));
+
+extern int avcodec_encode_video2(AVCodecContext *avctx, AVPacket *avpkt,const AVFrame *frame, int *got_packet_ptr) __attribute__((weak));
+
+
 
 #if FF_VJE_BACKPORT
 

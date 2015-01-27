@@ -586,17 +586,21 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	return 0;
 }
 
-#if FF_NO_VIDEO_ENCODE
-static int avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame)
+static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame)
 {
-	AVPacket pkt;
-	veejay_memset(&pkt,0,sizeof(pkt));
-	int got_packet_ptr = 0;
-	pkt.data = buf;
-	pkt.size = len;
-	return avcodec_encode_video2( ctx, &pkt, frame, &got_packet_ptr);
+	if( avcodec_encode_video2) {
+		AVPacket pkt;
+		veejay_memset(&pkt,0,sizeof(pkt));
+		int got_packet_ptr = 0;
+		pkt.data = buf;
+		pkt.size = len;
+		return avcodec_encode_video2( ctx, &pkt, frame, &got_packet_ptr);
+	}
+	else if( avcodec_encode_video ) {
+		return avcodec_encode_video(ctx,buf,len,frame);
+	}
+	return 0;
 }
-#endif
 
 int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src[3], uint8_t *buf, int buf_len,
 	int in_fmt)
@@ -652,6 +656,6 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 		pict.data[2] = av->data[2];
 	}
 
-	return avcodec_encode_video( av->context, buf, buf_len, &pict );
+	return vj_avcodec_encode_video( av->context, buf, buf_len, &pict );
 }
 
