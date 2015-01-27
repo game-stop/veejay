@@ -151,7 +151,6 @@ void	vj_tag_free(void);
 int	vj_tag_set_stream_color(int t1, int r, int g, int b);
 int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b );
 int	vj_tag_set_stream_layout( int t1, int stream_id_g, int screen_no_b, int value );
-int vj_tag_get_stream_layout( int t1, char *v );
 /* create a new tag, type is yuv4mpeg or v4l  
    stream_nr indicates which stream to take of the same type
  */

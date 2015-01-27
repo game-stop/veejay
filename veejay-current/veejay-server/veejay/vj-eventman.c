@@ -1249,19 +1249,6 @@ void		vj_init_vevo_events(void)
 				NULL,
 				NULL );	
 
-	index_map_[ VIMS_STREAM_NEW_SPLITTER ]		=   _new_event(
-				"%d %d",
-				VIMS_STREAM_NEW_SPLITTER,
-				"New splitted screen",
-				vj_event_new_splitter,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
-				"Number of (vertical) screens",
-				3,
-				"Screen layout (binary)",
-				1,
-				NULL );	
-
 	index_map_[VIMS_STREAM_NEW_GENERATOR]		=	_new_event(
 				"%d %s",
 				VIMS_STREAM_NEW_GENERATOR,

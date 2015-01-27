@@ -9826,24 +9826,6 @@ void	vj_event_connect_shm( void *ptr, const char format[], va_list ap )
 
 }
 
-void	vj_event_new_splitter( void *ptr, const char format[], va_list ap )
-{
-		veejay_t *v = (veejay_t*) ptr;
-	int args[2];
-	char str[255];
-	P_A(args,str,format,ap);
-	
-	//@ port, shm_id
-	int id = veejay_create_tag( v, VJ_TAG_TYPE_SPLITTER, NULL, v->nstreams, args[0],args[1]);
-	vj_event_send_new_id( v, id );
-	if( id <= 0 ) {
-		veejay_msg(0, "Unable to create new splitter %d", id );
-	}
-
-
-}
-
-
 #ifdef HAVE_FREETYPE
 void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	)
 {

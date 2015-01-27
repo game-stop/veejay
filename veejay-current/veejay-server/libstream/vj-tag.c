@@ -23,7 +23,6 @@
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vjkf.h>
-#include <veejay/vj-splitdisplay.h> //FIXME
 #include <veejay/vj-shm.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -764,25 +763,6 @@ int	vj_tag_set_stream_layout( int t1, int stream_id_g, int screen_no_b, int valu
 	return (vj_tag_update(tag,t1));
 }
 
-int	vj_tag_get_stream_layout( int t1, char *dst )
-{
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return 0;
-
-	vj_split_get_layout( tag->generator, dst );
-
-	int *res = vj_split_get_samples( tag->generator );
-
-	int n = strlen(dst);
-	int k;
-	for( k = 0;k < n; k ++ ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "slot %d sample %d status %d",
-				k, res[k], dst[k]);
-	}
-
-	return 1;
-}
-
 int	vj_tag_set_stream_color(int t1, int r, int g, int b)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -1022,13 +1002,6 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	}
 	tag->active = 1;
 	break;
-	case VJ_TAG_TYPE_SPLITTER:
-		sprintf(tag->source_name, "[Three Split]");
-		tag->generator = vj_split_display( el->video_width, el->video_height );
-		if(tag->generator==NULL ) {
-			return -1;
-		}
-		break;
 	case VJ_TAG_TYPE_GENERATOR:
 
 	sprintf(tag->source_name, "[GEN]" );
@@ -1307,11 +1280,6 @@ int vj_tag_del(int id)
 		net_thread_stop(tag);	
 		break;
 	case VJ_TAG_TYPE_COLOR:
-		break;
-	case VJ_TAG_TYPE_SPLITTER:
-		if(tag->generator) {
-			vj_split_destroy(tag->generator);
-		}
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
@@ -2765,9 +2733,6 @@ void vj_tag_get_method_filename(int t1, char *dst)
 void	vj_tag_get_by_type(int type, char *description )
 {
  	switch (type) {
-	case VJ_TAG_TYPE_SPLITTER:
-	sprintf(description, "Splitter");
-	break;
 	case VJ_TAG_TYPE_GENERATOR:
 	sprintf(description, "Generator");
 	break;
@@ -3611,9 +3576,6 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		vj_dv1394_read_frame( vj_tag_input->dv1394[tag->index], buffer , abuffer,vj_tag_input->pix_fmt);
 		break;
 #endif
-	case VJ_TAG_TYPE_SPLITTER:
-		vj_split_process_frame( tag->generator, buffer );
-		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		_tmp.len     = len;
 		_tmp.uv_len  = uv_len;
