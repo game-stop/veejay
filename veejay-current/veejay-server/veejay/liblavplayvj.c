@@ -1161,10 +1161,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
     }
 
     settings->first_frame = 0;
-	
-	struct timespec lasttime;
-	veejay_memcpy( &lasttime, &(settings->lastframe_completion), sizeof(struct timespec));
-	clock_gettime( CLOCK_REALTIME, &(settings->lastframe_completion) );
+    clock_gettime( CLOCK_REALTIME, &(settings->lastframe_completion) );
     settings->syncinfo[settings->currently_processed_frame].timestamp = settings->lastframe_completion;
 }
 
@@ -1622,17 +1619,12 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	veejay_mjpeg_software_frame_sync(info,
 					  settings->valid[settings->
 							  currently_processed_frame]);
-	settings->syncinfo[settings->currently_processed_frame].frame =
-	    settings->currently_processed_frame;
+	settings->syncinfo[settings->currently_processed_frame].frame = settings->currently_processed_frame;
 
 	pthread_mutex_lock(&(settings->valid_mutex));
 	settings->valid[settings->currently_processed_frame] = 0;
-	pthread_cond_broadcast(&
-			       (settings->
-				buffer_done[settings->
-					    currently_processed_frame]));
+	pthread_cond_broadcast(&(settings->buffer_done[settings->currently_processed_frame]));
 	pthread_mutex_unlock(&(settings->valid_mutex));
-
 
 	settings->currently_processed_frame = 
 	    (settings->currently_processed_frame + 1) % 1;
@@ -1646,8 +1638,8 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 
 char	*veejay_title(veejay_t *info)
 {
-	char tmp[64];
-	sprintf(tmp, "Veejay %s on port %d in %dx%d@%2.2f", VERSION,
+	char tmp[128];
+	snprintf(tmp,sizeof(tmp), "Veejay %s on port %d in %dx%d@%2.2f", VERSION,
 	      info->uc->port, info->video_output_width,info->video_output_height,info->edit_list->video_fps );
 	return strdup(tmp);
 }
@@ -1658,8 +1650,7 @@ int veejay_open(veejay_t * info)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     int i;
-    veejay_msg(VEEJAY_MSG_DEBUG, 
-		"Initializing the threading system");
+    veejay_msg(VEEJAY_MSG_DEBUG, "Initializing the threading system");
 
     veejay_memset( &(settings->lastframe_completion), 0, sizeof(struct timeval));
 
@@ -1768,8 +1759,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
     pthread_mutex_unlock(&(settings->valid_mutex));
     veejay_memcpy(bs, &(settings->syncinfo[settings->currently_synced_frame]),sizeof(struct mjpeg_sync));
 
-    settings->currently_synced_frame =
-		(settings->currently_synced_frame + 1) % QUEUE_LEN;
+    settings->currently_synced_frame = (settings->currently_synced_frame + 1) % QUEUE_LEN;
 	
     return 1;
 }
@@ -1785,13 +1775,11 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
 
-    veejay_msg(VEEJAY_MSG_DEBUG, 
-		"Closing down the threading system ");
+    veejay_msg(VEEJAY_MSG_DEBUG, "Closing down the threading system ");
 
     pthread_cancel(settings->software_playback_thread);
     if (pthread_join(settings->software_playback_thread, NULL)) {
-	veejay_msg(VEEJAY_MSG_ERROR, 
-		    "Failure deleting software playback thread");
+	veejay_msg(VEEJAY_MSG_ERROR,"Failure deleting software playback thread");
 	return 0;
     }
 
