@@ -2,7 +2,7 @@
 # neededforbuild update-desktop-files gtk2-devel-packages glib2 gtk2 libglade3 libdv libxml2 jack DirectFB SDL libjpeg freetype2 gtk2-devel glib2-devel libglade-devel libxml2-devel jack-devel pkgconfig SDL-devel libjpeg-devel freetype2-devel valgrind alsa-devel alsa slang-devel slang libstdc++-devel libstdc++ zlib-devel zlib
 
 %define name    veejay
-%define	version 1.3
+%define	version 1.5
 %define release stable
 %define prefix  /usr
 
@@ -80,8 +80,7 @@ CXXFLAGS="$RPM_OPT_FLAGS" \
 ./configure \
 	--prefix=%{prefix} \
 	--mandir=%{_mandir} \
-	--with-gveejayreloaded \
-	--with-swscaler
+	--with-arch-target=generic
 
 %build
 # Setup for parallel builds
@@ -118,6 +117,7 @@ rm -f %{buildroot}%{_libdir}/lib*.la
 %{_mandir}/man1/*
 
 %changelog -n veejay
+* Jan 2015 - update build (niels)
 * Wed Mar 21 2007 - cleanup
 * Sat Nov 20 2005 - bla
 * Sat Apr 23 2005 - oc2pus@arcor.de 0.8-0.oc2pus.1

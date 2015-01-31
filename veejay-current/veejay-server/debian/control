@@ -2,30 +2,28 @@ Source: veejay
 Section: video
 Priority: optional
 Maintainer: Niels Elburg <nwelburg@gmail.com>
+Standards-Version: 3.8.4
 Build-Depends: debhelper,
                autotools-dev,
-               d-shlibs,
-               flex,bison,
                libavcodec-dev,
                libavformat-dev,
                libavutil-dev,
-               libdirectfb-dev,
-               libdv4-dev,
                libgtk2.0-dev,
                libjack-dev,
-               libjpeg62-dev,
+               libjpeg-dev,
                libsdl1.2-dev,
                libswscale-dev,
                libxml2-dev,
-               libx11-dev
-Standards-Version: 3.8.4
-Homepage: http://www.veejayhq.net/
+               libx11-dev,
+               libmjpegtools-dev,
+               libfreetype6-dev,
+               libquicktime-dev
 
+Homepage: http://www.veejayhq.net/
 Package: veejay
 Architecture: any 
-Depends: ${shlibs:Depends}, ${misc:Depends}, libveejay0 (>= ${source:Version}),
-		ffmpeg,jackd
-Recommends: reloaded (>= 1.5.6)
+Depends: ${shlibs:Depends}, ${misc:Depends}, libveejay (>= ${source:Version})
+Recommends: reloaded (>= 1.5.21)
 Suggests: veejay-utils, frei0r-plugins
 Description:Veejay a visual instrument and realtime video sampler.
  With veejay, you can play the video like you would play a piano. The
@@ -61,9 +59,9 @@ Description: Veejay a visual instrument and realtime video sampler.
  model with multiple clients.
  .
  This package contains the debugging symbols.
- .
 
-Package: libveejay0
+
+Package: libveejay
 Architecture: any
 Section: libs
 Depends: ${shlibs:Depends}, ${misc:Depends}

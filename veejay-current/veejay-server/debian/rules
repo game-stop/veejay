@@ -1,21 +1,18 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
 
-export PKG_CONFIG_PATH=/usr/lib/pkgconfig
-
-%:
 	dh $@
 
 override_dh_auto_configure:
 ifeq ($(DEB_HOST_ARCH),i386)
-	dh_auto_configure -- --enable-debug
+	sh autogen.sh
+	dh_auto_configure -- -with-arch-target=generic
 	sed -i "s%#define HAVE_ASM_3DNOW%/* #undef HAVE_ASM_3DNOW */%g" config.h
-	sed -i "s%#define HAVE_ASM_MMX2%/* #undef HAVE_ASM_MMX2 */%g" config.h
-	sed -i "s%#define HAVE_ASM_SSE2%/* #undef HAVE_ASM_SSE2 */%g" config.h
 	sed -i "s%#define HAVE_CMOV%/* #undef HAVE_CMOV */%g" config.h	
 endif
 ifeq ($(DEB_HOST_ARCH),amd64)
-	dh_auto_configure -- --enable-debug
+	sh autogen.sh
+	dh_auto_configure -- --with-arch-target=generic
 	sed -i "s%#define HAVE_ASM_3DNOW%/* #undef HAVE_ASM_3DNOW */%g" config.h
 endif
 

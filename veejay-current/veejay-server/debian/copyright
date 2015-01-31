@@ -1,12 +1,14 @@
 This work was packaged for Debian by:
 
+    Niels Elburg <nwelburg@gmail.com>, Jan. 2015
     Jof Thibaut <tangostudio@tuxfamily.org> on Tue, 01 Feb 2011 22:48:10 +0100
+   
 
 It was downloaded from http://www.veejayhq.net/
 
 Upstream Author(s): 
 
-    Niels Elburg <nelburg@looze.net>
+    Niels Elburg <nwelburg@gmail.com>
 
     Veejay contributors:
     Jeff Carpenter
@@ -50,6 +52,10 @@ License:
 The Debian packaging is:
 
     Copyright (C) 2011 Jof Thibaut <tangostudio@tuxfamily.org>
+    and is licensed under the GPL version 3, 
+    see `/usr/share/common-licenses/GPL-3'.
+
+    Copyright (C) 2015 Niels Elburg <nwelburg@gmail.com>
     and is licensed under the GPL version 3, 
     see `/usr/share/common-licenses/GPL-3'.
 
