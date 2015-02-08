@@ -1,0 +1,21 @@
+Source: veejay-client
+Section: video
+Priority: optional
+Maintainer: Niels Elburg <nwelburg@gmail.com>
+Build-Depends: debhelper (>= 8.0.0), autotools-dev, libavcodec-dev,libavformat-dev,libavutil-dev,libswscale-dev,libgtk2.0-dev,libsdl1.2-dev,libxml2-dev,libx11-dev,libmjpegtools-dev,libasound2-dev,libglade2-dev,libgtk2.0-dev,libx11-dev,veejay (>= 1.5.47)
+Standards-Version: 3.9.4
+Homepage: http://www.veejayhq.net
+Vcs-Git: git://code.dyne.org/veejay.git
+
+Package: veejay-client
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, veejay (>= 1.5.47)
+Description:  Reloaded, a graphical interface for veejay.
+ This program requires a running veejay. 
+ Features:
+ * Thin client (TCP/IP) 
+ * MIDI support (auto learning)
+ * Slick interface designed for live performing
+ * Tracks multiple veejay servers
+
+

@@ -1,0 +1,5 @@
+veejay (1.5.47-1) unstable; urgency=low
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- Niels Elburg <nwelburg@gmail.com>  Sat, 07 Feb 2015 19:18:35 +0100
