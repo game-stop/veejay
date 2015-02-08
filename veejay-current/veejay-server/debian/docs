@@ -1,3 +1,15 @@
-NEWS
 README
-TODO
+docs/HowtoCache.txt
+docs/HowToDebugging.txt
+docs/HowtoCompile.txt
+docs/HowtoUbuntu.txt
+docs/HowtoVideoCodecs.txt
+docs/HowtoVeejay-PureData.html
+docs/NET.txt
+docs/README.audio
+docs/README.performance
+docs/README.quickstart
+docs/README.whatis
+docs/veejay-HOWTO.html
+docs/VIMS.txt
+docs/YCbCr.txt
