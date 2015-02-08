@@ -1,0 +1,35 @@
+Source: veejay
+Section: video
+Priority: optional
+Maintainer: Niels Elburg <nwelburg@gmail.com>
+Build-Depends: debhelper (>= 8.0.0), autotools-dev, libavcodec-dev,libavformat-dev,libavutil-dev,libswscale-dev,libgtk2.0-dev,libjack-dev,libjpeg-dev,libsdl1.2-dev,libxml2-dev,libx11-dev,libmjpegtools-dev,libfreetype6-dev,libquicktime-dev
+Standards-Version: 3.9.4
+Homepage: http://www.veejayhq.net
+Vcs-Git: git://code.dyne.org/veejay.git
+
+Package: veejay
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Veejay a visual instrument and realtime video sampler.
+ With veejay, you can play the video like you would play a piano. The
+ engine is based upon ffmpeg and the mjpegtools featuring a client-server
+ model with multiple clients.
+ .
+ Veejay boasts the following powerfull features.
+ .
+ While playing, you can record the resulting video directly to disk 
+ (video sampling).
+ .
+ All effects are realtime and optimized for use on modern processors.
+ .
+ Veejay likes the sound of your videos as much as their images: sound is
+ kept in sync (pitched when needed - trickplay) and delivered to JACK for
+ possible further processing.
+ .
+ Can cluster to allow a number of machines to work together over the
+ network (uncompressed streaming, veejay chaining).
+ .
+ And much more...
+ .
+
+
