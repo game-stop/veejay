@@ -1,9 +1,3 @@
-This work was packaged for Debian by:
-
-    Jof Thibaut <tangostudio@tuxfamily.org> on Tue, 01 Feb 2011 23:11:57 +0100
-
-It was downloaded from http://www.veejayhq.net/
-
 Upstream Author(s):
 
     Glade-2 interface design
@@ -26,14 +20,13 @@ Upstream Author(s):
     CellRendererSpin 15 minute hack - good enough
     Tim Philipp Müller
 
-    Debian package files by
+    Initial debian packaging by
     Jof Thibaut <tangostudio@tuxfamily.org> 
    
 
-
 Copyright: 
 
-    Copyright (C) 2008-2011, Niels Elburg VeejayHQ.
+    Copyright (C) 2008-2015, Niels Elburg VeejayHQ.
 
 License:
 
