@@ -1,11 +1,13 @@
 lividoplugin_LTLIBRARIES = \
-			   lvd_shmin.la \
-			   lvd_shmout.la \
-			   lvd_solid.la 
+			   lvd_solid.la \
+			   lvd_colortone.la \
+			   lvd_displaywall.la \
+			   lvd_stroboscope.la \
 
-lvd_shmin_la_SOURCES = lvd_shmin.c
-lvd_shmout_la_SOURCES= lvd_shmout.c
 lvd_solid_la_SOURCES = lvd_solid.c
+lvd_colortone_la_SOURCES = lvd_colortone.c
+lvd_displaywall_la_SOURCES = lvd_displaywall.c
+lvd_stroboscope_la_SOURCES = lvd_stroboscope.c
 
 INCLUDES=$(FFMPEG_CFLAGS)
 AM_CFLAGS=-I@top_srcdir@/include 

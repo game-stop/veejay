@@ -71,7 +71,17 @@ static	int	n_fr_ = 0;
 static  int	n_lvd_ = 0;
 static	int	base_fmt_ = -1;
 
-static  void* instantiate_plugin( const void *plugin, int w , int h );
+static struct {
+	const char *path;
+} plugger_paths[] = {
+	{ "/usr/local/lib/frei0r-1" },
+	{ "/usr/lib/frei0r-1"},
+	{ "/usr/local/lib64/frei0r-1"},
+	{ "/usr/lib64/frei0r-1"},
+	{ "/usr/local/lib/livido-plugins"},
+	{ "/usr/lib/livido-plugins"},
+	NULL,
+};
 
 //forward decl
 void plug_print_all();
@@ -553,11 +563,13 @@ int	plug_sys_detect_plugins(void)
 	}
 
 	veejay_msg(VEEJAY_MSG_INFO, "Looking for plugins in common locations ...");
-	add_to_plugin_list("/usr/local/lib/livido-plugins");
-	add_to_plugin_list("/usr/lib/frei0r-1");
 	
+	int i;
+	for( i = 0; plugger_paths[i].path != NULL; i ++ ) {
+		add_to_plugin_list( plugger_paths[i].path );
+	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Veejay plugin system initialized");
+	(VEEJAY_MSG_INFO, "Veejay plugin system initialized");
 	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
 	//@ display copyright notice in binary form
 

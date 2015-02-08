@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.46],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.47],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
@@ -108,7 +108,7 @@ AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
 
 
-user_specified_target=
+user_specified_target="generic"
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
 					 [Set a specific sub-architecture (defaults to native)]),
 		[ user_specified_target="$withval" ] )
@@ -704,11 +704,6 @@ AC_CHECK_LIB(pthread, pthread_create,
   [ PTHREAD_LIBS="-lpthread" 
     AC_DEFINE(HAVE_LIBPTHREAD,1,[Compiling with pthread library])
     have_pthread=true ],,)
-
-AC_CHECK_FUNC(pthread_attr_getstacksize,
-	          [
-				AC_DEFINE(HAVE_PTHREADSTACKSIZE,1,[Using pthread stack size])
-			  ] )
 
 if test x$have_pthread != xtrue ; then
 	AC_MSG_ERROR([Cannot find pthread library])
