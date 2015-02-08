@@ -2,7 +2,7 @@
 # Modified for ArchLinux by Niels <nwelburg@gmail.com>
 pkgname=sayVIMS
 pkgrel=1
-pkgver=1.5.9
+pkgver=1.5.47
 pkgdesc="sayVIMS is the commandline utility for veejay remote-access"
 arch=('i686' 'x86_64')
 url="http://www.veejayhq.net"
