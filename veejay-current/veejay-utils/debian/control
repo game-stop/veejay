@@ -1,0 +1,16 @@
+Source: veejay-utils
+Section: video
+Priority: optional
+Maintainer: Niels Elburg <nwelburg@gmail.com>
+Build-Depends: debhelper (>= 8.0.0), autotools-dev,veejay (>= 1.5.47)
+Standards-Version: 3.9.4
+Homepage: http://www.veejayhq.net
+Vcs-Git: git://code.dyne.org/veejay.git
+
+Package: veejay-utils
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, veejay (>= 1.5.47)
+Description:  Additional command line utilities for veejay
+ This package contains sendVIMS, a program to communicate with veejay over the network or local machine.
+
+
