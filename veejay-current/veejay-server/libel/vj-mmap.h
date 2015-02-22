@@ -35,19 +35,19 @@ typedef struct
 } mmap_region_t;
 
 // map file portion to memory, return mapped region
-mmap_region_t *	mmap_file(int fd, int offset, int length, int fs);
+mmap_region_t *	mmap_file(int fd, long offset, long length, int fs);
 
 // see if requested boundaries is mapped in memory  
-int	is_mapped( mmap_region_t *map, int offset, int size );
+int	is_mapped( mmap_region_t *map, long offset, long size );
 
 // remap a portion of a file in memory
-int	remap_file( mmap_region_t *map, int offset );
+int	remap_file( mmap_region_t *map, long offset );
 
 // unmap memory
 int	munmap_file( mmap_region_t *map );
 
 void	mmap_free(mmap_region_t *map );
 
-int	mmap_read( mmap_region_t *map, int offset, int bytes, uint8_t *buf);
+long	mmap_read( mmap_region_t *map, long offset, long bytes, uint8_t *buf);
 
 #endif

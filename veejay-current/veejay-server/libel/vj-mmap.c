@@ -41,7 +41,7 @@ void		mmap_free(mmap_region_t *map)
 	map = NULL;
 }
 
-mmap_region_t *	mmap_file(int fd, int offset, int length, int fs)
+mmap_region_t *	mmap_file(int fd, long offset, long length, int fs)
 {
 	mmap_region_t *map = (mmap_region_t*) vj_malloc(sizeof( mmap_region_t ));
 	veejay_memset( map, 0, sizeof( mmap_region_t ));
@@ -59,7 +59,7 @@ mmap_region_t *	mmap_file(int fd, int offset, int length, int fs)
 }
 
 
-int	is_mapped( mmap_region_t *map, int offset, int size )
+int	is_mapped( mmap_region_t *map, long offset, long size )
 {
 	// check if memory is in mapped region
 	off_t real_offset = PADDED( offset, map );
@@ -78,7 +78,7 @@ int	is_mapped( mmap_region_t *map, int offset, int size )
 	return 0;
 }
 
-int	remap_file( mmap_region_t *map, int offset )
+int	remap_file( mmap_region_t *map, long offset )
 {
 	size_t padding = offset % map->page_size;
 	size_t new_length = map->map_length;
@@ -126,16 +126,24 @@ int	munmap_file( mmap_region_t *map )
 	return n;
 }
 
-int	mmap_read( mmap_region_t *map,int offset, int bytes, uint8_t *buf )
+long	mmap_read( mmap_region_t *map,long offset, long bytes, uint8_t *buf )
 {
 	if( !is_mapped( map, offset, bytes ))
 	{
-		remap_file( map, offset );
+		if(remap_file( map, offset ) == 0 ) {
+			return -1;
+		}
+		if(!is_mapped(map, offset, bytes)) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to map %ld bytes from position %ld" , bytes, offset );
+			return -1;
+		}
 	}
 
-	int rel_offset = (map->mem_offset > 0 ? offset - map->mem_offset : offset );
+	long rel_offset = (map->mem_offset > 0 ? offset - map->mem_offset : offset );
 
 	uint8_t *d1 = map->data_start + rel_offset;
+
 	veejay_memcpy( buf, d1, bytes );
+	
 	return bytes;
 }

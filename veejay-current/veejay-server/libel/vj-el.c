@@ -331,11 +331,11 @@ static void	_el_free_decoder( vj_decoder *d )
 		if(d->context)
 		{
 			avcodec_close( d->context ); 
-			free( d->context );
+//			free( d->context );
 			d->context = NULL;
 		}
-		if(d->frame) 
-			free(d->frame);
+//		if(d->frame) 
+//			free(d->frame);
 
 		if(d->img)
 			free(d->img);
@@ -1676,7 +1676,7 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 
 	}
 
-	_el_free_decoder( d );
+//	_el_free_decoder( d );
 	
 	return ret;  
 }
