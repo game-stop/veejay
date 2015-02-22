@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.47],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.48],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=47
+VEEJAY_MICRO_VERSION=48
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -573,13 +573,8 @@ fi
 AC_MSG_RESULT($CFLAGS)
 
 have_mjpegtools=false
-PKG_CHECK_MODULES( MJPEGTOOLS, [mjpegtools >= 1.6],
-	[
-		have_mjpegtools=true
-		AC_DEFINE( HAVE_MJPEGTOOLS, 1, [Mjpegtools installed])
-		AC_MSG_NOTICE([Mjpegtools are installed])
-	])
-
+AC_SUBST(MJPEGTOOLS_CFLAGS)
+AC_SUBST(MJPGETOOLS_LIBS)
 
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
