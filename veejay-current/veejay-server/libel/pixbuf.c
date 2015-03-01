@@ -412,8 +412,8 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 
 	uint8_t *dest[3];	
 	dest[0] = vj_perform_get_preview_buffer();
-	dest[1] = dest[0] + frame->len;
-	dest[2] = dest[1] + frame->uv_len;
+	dest[1] = dest[0] + (out_w * out_h);
+	dest[2] = dest[1] + (out_w * out_h)/4; //@ destination is yuv 4:2:0
 
 
 	int dst_fmt = (pixfmt == PIX_FMT_YUVJ420P || pixfmt == PIX_FMT_YUVJ422P ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );

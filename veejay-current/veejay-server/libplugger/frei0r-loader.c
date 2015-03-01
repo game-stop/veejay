@@ -320,15 +320,7 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 			return 0;
 		}
 	
-		if(in->stand && seqno == 0) {
-			fr->in[seqno]->data[0] = in->data[0];
-			fr->in[seqno]->data[1] = in->data[1];
-			fr->in[seqno]->data[2] = in->data[2];
-			//rgb format
-		} else {
-			yuv_convert_and_scale_rgb( in_scaler__, in, fr->in[seqno]); //@ yuv -> rgb
-			in->stand = 1;
-		}
+		yuv_convert_and_scale_rgb( in_scaler__, in, fr->in[seqno]); //@ yuv -> rgb
 		if(seqno == 0)
 			fr->last = in;
 	}
@@ -843,9 +835,15 @@ int	frei0r_process_frame_f( void *plugin )
 
 	int n_inputs = 0;
 	err = vevo_property_get(plugin, "num_inputs", 0, &n_inputs );
+	if( err != VEVO_NO_ERROR ) {
+		n_inputs = 0;
+	}
 
 	int n_outputs = 0;
 	err = vevo_property_get(plugin, "num_outputs",0, &n_outputs );
+	if( err != VEVO_NO_ERROR ) {
+		n_outputs = 0;
+	}
 
 	if( n_inputs == 0 && n_outputs == 1 ) {
 		

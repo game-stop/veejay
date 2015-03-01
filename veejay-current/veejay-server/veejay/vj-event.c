@@ -8585,7 +8585,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	w = args[0]; 
 	h = args[1];
 
-	if( w <= 0 || h <= 0 || w >= 2000 || h >= 2000 )
+	if( w <= 0 || h <= 0 || w >= 4096 || h >= 4096 )
 	{
 		veejay_msg(0, "Invalid image dimension %dx%d requested",w,h );
 		SEND_MSG(v, "0000000" );
@@ -8594,6 +8594,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	veejay_image_t *img = NULL;
 	int pixel_format = get_ffmpeg_pixfmt(v->pixel_format);
+	int preview_size = 0;
 	VJFrame frame;
 	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
 	vj_perform_get_primary_frame( v, frame.data );
@@ -8625,6 +8626,16 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 				frame.len = frame.width * frame.height;
 				frame.uv_len = frame.uv_width * frame.uv_height;
 				break;
+			case PIX_FMT_YUV420P:
+			case PIX_FMT_YUVJ420P:
+				frame.uv_width = frame.width / 2;
+				frame.uv_height= frame.height / 2;
+				frame.ssm = 0;
+				frame.shift_v = 1;
+				frame.shift_h = 1;
+				frame.len = frame.width * frame.height;
+				frame.uv_len = frame.uv_width * frame.uv_height;
+				break;
 			}
 	}
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
@@ -8641,7 +8652,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 				h,
 				pixel_format );
 
-	int dstlen = (use_bw_preview_ ? ( w * h ) : (( w * h ) + ((w * h)/2)) );
+	int dstlen = (use_bw_preview_ ? ( w * h ) : ( ( w * h )/4 ) * 2 + (w * h) );
 
 	char header[8];
 	sprintf( header, "%06d%1d", dstlen, use_bw_preview_ );
