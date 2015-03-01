@@ -4354,8 +4354,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 					case STREAM_YUV4MPEG	:sprintf(source,"y4n %d",values[0]);break;
 					case STREAM_DV1394	:sprintf(source,"dv1394 %d",values[0]);break;
 					case STREAM_PICTURE	:sprintf(source,"image %d",values[0]);break;
+					case STREAM_GENERATOR   :sprintf(source,"Z%d",values[0]);break;
 					default:
-					sprintf(source,"??? %d", values[0]);	
+						sprintf(source,"??? %d", values[0]);	
 				}
 				gchar *gsource = _utf8str( descr );
 				gchar *gtype = _utf8str( source );
