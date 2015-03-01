@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([reloaded],[1.5.47],[nwelburg@gmail.com])
+AC_INIT([reloaded],[1.5.49],[nwelburg@gmail.com])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 RELOADED_MAJOR_VERSION=1
 RELOADED_MINOR_VERSION=5
-RELOADED_MICRO_VERSION=47
+RELOADED_MICRO_VERSION=49
 RELOADED_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 RELOADED_CODENAME="Reloaded - build $RELOADED_MAJOR_VERSION $RELOADED_MINOR_VERSION $RELOADED_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -184,7 +184,7 @@ fi
 
 dnl Check for Veejay
 have_veejay=false
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.28 ],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.49 ],
 	[	
 		AC_SUBST(VEEJAY_CFLAGS)
 		AC_SUBST(VEEJAY_LIBS)
@@ -194,7 +194,7 @@ PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.28 ],
 		[have_veejay=false])
 
 if test x$have_veejay != xtrue ; then
-   AC_MSG_ERROR([Cannot find veejay 1.5.28 or later])
+   AC_MSG_ERROR([Cannot find veejay 1.5.49 or later])
 fi
 
 have_pixbuf=false
