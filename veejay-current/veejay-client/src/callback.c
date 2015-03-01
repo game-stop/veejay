@@ -640,6 +640,36 @@ void	on_slider_p7_value_changed(GtkWidget *w, gpointer user_data)
 	slider_changed( 7, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
+void	on_slider_p8_value_changed(GtkWidget *w, gpointer user_data)
+{
+	slider_changed( 8, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+
+void	on_slider_p9_value_changed(GtkWidget *w, gpointer user_data)
+{
+	slider_changed( 9, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+
+void	on_slider_p10_value_changed(GtkWidget *w, gpointer user_data)
+{
+	slider_changed( 10, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	on_slider_p12_value_changed(GtkWidget *w, gpointer user_data)
+{
+	slider_changed( 12, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	on_slider_p13_value_changed(GtkWidget *w, gpointer user_data)
+{
+	slider_changed( 13, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	on_slider_p14_value_changed(GtkWidget *w, gpointer user_data)
+{
+	slider_changed( 14, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	on_slider_p15_value_changed(GtkWidget *w, gpointer user_data)
+{
+	slider_changed( 15, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
 void	on_inc_p0_clicked(GtkWidget *w, gpointer user_data)
 {
 	param_changed( 0, 1 , "slider_p0" );
@@ -708,8 +738,70 @@ void	on_dec_p7_clicked(GtkWidget *w, gpointer user_data)
 {
 	param_changed( 7, -1, "slider_p7");
 }
-
-
+void	on_inc_p8_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed(8, 1 , "slider_p8" );
+}
+void	on_dec_p8_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed( 8, -1, "slider_p8");
+}
+void	on_inc_p9_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed(9, 1 , "slider_p9" );
+}
+void	on_dec_p9_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed( 9, -1, "slider_p9");
+}
+void	on_inc_p10_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed(10, 1 , "slider_p10" );
+}
+void	on_dec_p10_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed( 10, -1, "slider_p10");
+}
+void	on_inc_p11_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed(11, 1 , "slider_p11" );
+}
+void	on_dec_p11_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed( 11, -1, "slider_p11");
+}
+void	on_inc_p12_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed(12, 1 , "slider_p12" );
+}
+void	on_dec_p12_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed( 12, -1, "slider_p12");
+}
+void	on_inc_p13_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed(13, 1 , "slider_p13" );
+}
+void	on_dec_p13_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed( 13, -1, "slider_p13");
+}
+void	on_inc_p14_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed(14, 1 , "slider_p14" );
+}
+void	on_dec_p14_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed( 14, -1, "slider_p14");
+}
+void	on_inc_p15_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed(15, 1 , "slider_p15" );
+}
+void	on_dec_p15_clicked(GtkWidget *w, gpointer user_data)
+{
+	param_changed( 15, -1, "slider_p15");
+}
 
 void	on_button_stoplaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -2100,11 +2192,11 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	int type = 0;
 	if( is_button_toggled( "curve_typelinear" ) ) {
-		type = GTK_CURVE_TYPE_LINEAR;
+		type = 0; //GTK_CURVE_TYPE_LINEAR;
 	} else if ( is_button_toggled( "curve_typespline" ) ) {
-		type = GTK_CURVE_TYPE_SPLINE;
+		type = 1; //GTK_CURVE_TYPE_SPLINE;
 	} else if ( is_button_toggled( "curve_typefreehand" ) ) {
-		type = GTK_CURVE_TYPE_FREE;
+		type = 2; //GTK_CURVE_TYPE_FREE;
 	}
 	
 	int min=0,max=0;
@@ -2214,7 +2306,16 @@ void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 		return;
 
 	int i = info->uc.selected_chain_entry;
-	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d", i, k );
+	int type = 0;
+	if(  is_button_toggled("curve_typespline")) {
+		type = 1;
+	} else if ( is_button_toggled("curve_typefreehand")) {
+		type = 2;
+	} else if (is_button_toggled("curve_typelinear")) {
+		type = 0;
+	}
+
+	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d", i, k,type );
 }
 
 void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
@@ -2279,6 +2380,77 @@ void	on_kf_p7_toggled( GtkWidget *widget, gpointer user_data)
 
 	if( is_button_toggled("kf_p7"))
 		kf_changed( 7 );
+}
+void	on_kf_p8_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("kf_p8"))
+		kf_changed( 8 );
+}
+void	on_kf_p9_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("kf_p9"))
+		kf_changed( 9 );
+}
+void	on_kf_p10_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("kf_p10"))
+		kf_changed( 10 );
+}
+
+void	on_kf_p11_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("kf_p11"))
+		kf_changed( 11 );
+}
+
+void	on_kf_p12_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("kf_p12"))
+		kf_changed( 12 );
+}
+
+
+void	on_kf_p13_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("kf_p13"))
+		kf_changed( 13 );
+}
+
+
+void	on_kf_p14_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("kf_p14"))
+		kf_changed( 14 );
+}
+
+void	on_kf_p15_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("kf_p15"))
+		kf_changed( 15 );
 }
 
 void	on_curve_toggleglobal_toggled(GtkWidget *widget, gpointer user_data)

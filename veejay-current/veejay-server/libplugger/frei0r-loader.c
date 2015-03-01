@@ -46,7 +46,7 @@
 
 #include <libplugger/specs/frei0r.h>
 #define    RUP8(num)(((num)+8)&~8)
-#define _VJ_MAX_PARAMS 8
+#define _VJ_MAX_PARAMS 32
 
 
 static int frei0r_signature_ = VEVO_PLUG_FR;
@@ -319,7 +319,16 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 		if( seqno < 0 || seqno > 1 ) {
 			return 0;
 		}
-		yuv_convert_and_scale_rgb( in_scaler__, in, fr->in[seqno]); //@ yuv -> rgb
+	
+		if(in->stand && seqno == 0) {
+			fr->in[seqno]->data[0] = in->data[0];
+			fr->in[seqno]->data[1] = in->data[1];
+			fr->in[seqno]->data[2] = in->data[2];
+			//rgb format
+		} else {
+			yuv_convert_and_scale_rgb( in_scaler__, in, fr->in[seqno]); //@ yuv -> rgb
+			in->stand = 1;
+		}
 		if(seqno == 0)
 			fr->last = in;
 	}
@@ -329,9 +338,9 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 
 static char 	*split_parameter_name( const char *name, const char *vj_name ) 
 {
-	int len = strlen(name) + strlen(vj_name) + 5;
+	int len = strlen(name) + strlen(vj_name) + 4;
 	char *str = malloc(len);
-	snprintf(str,len, "%s (%s)",name,vj_name );
+	snprintf(str,len, "%s_(%s)", name,vj_name );
 	return str;
 }
 
@@ -339,6 +348,13 @@ static void 	*init_parameter_port( int min, int max, int def,const char *name, i
 {
 	void *parameter = vpn( VEVO_FR_PARAM_PORT );
 	char *dname = strdup(name);
+
+	int n = 0;
+	while( dname[n] != '\0' ) {
+		if(dname[n] == ' ')
+			dname[n] = '_';
+		n++;
+	}
 
 	vevo_property_set( parameter, "name", VEVO_ATOM_TYPE_STRING,1,&dname );
 	vevo_property_set( parameter, "min", VEVO_ATOM_TYPE_INT, 1, &min);
@@ -605,8 +621,8 @@ void* 	deal_with_fr( void *handle, char *name)
 		return NULL;
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Frei0r plugin '%s' version %d.%d by %s",
-			plugin_name, finfo.major_version, finfo.minor_version, finfo.author );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Frei0r plugin '%s' version %d.%d by %s (%d in parameters, %d in channels)",
+			plugin_name, finfo.major_version, finfo.minor_version, finfo.author, finfo.num_params, n_inputs );
 	
 	int n_params = finfo.num_params;
 	int r_params = 0;
@@ -632,16 +648,7 @@ void* 	deal_with_fr( void *handle, char *name)
 			r_params += vj_args;
 		}
 
-		if( r_params >= 7 ) {
-			break;
-		}
-
 		p ++;
-	}
-
-
-	if( n_params > 8 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Frei0r plugin has %d parameters, only using %d", n_params, r_params );
 	}
 
 

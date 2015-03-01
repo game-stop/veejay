@@ -31,17 +31,7 @@
 #endif
 #define SAMPLE_MAX_SAMPLES  16384 /* 4096 samples at most */
 
-#define SAMPLE_MAX_PARAMETERS 10	/* 10 parameters per effect at most */
-#define SAMPLE_ARG1 0
-#define SAMPLE_ARG2 1
-#define SAMPLE_ARG3 2
-#define SAMPLE_ARG4 3
-#define SAMPLE_ARG5 4
-#define SAMPLE_ARG6 5
-#define SAMPLE_ARG7 6
-#define SAMPLE_ARG8 7
-#define SAMPLE_ARG9 8
-#define SAMPLE_ARG10 9
+#define SAMPLE_MAX_PARAMETERS 32	/* 32 parameters per effect at most */
 #ifdef HAVE_XML2
 #define XMLTAG_RENDER_ENTRY "render_entry"
 #define XMLTAG_SAMPLES    "veejay_samples"
@@ -116,6 +106,7 @@ typedef struct sample_eff_t {
     int is_rendering;		/* is rendering */
     void *kf;			/* keyframe values for this entry */
     int kf_status;	        /* use keyframed values */
+    int kf_type;		/* store type used */
     void *fx_instance;		/* lib plugger instance */
 } sample_eff_chain;
 
@@ -246,7 +237,7 @@ extern int sample_set_chain_source(int sample_id, int position, int source);
 extern int sample_get_sub_audio(int s1);
 void    *sample_get_kf_port( int s1, int entry );
 extern int	sample_chain_set_kf_status( int s1, int entry, int status );
-extern int	sample_get_kf_status( int s1, int entry );
+extern int	sample_get_kf_status( int s1, int entry, int *type );
 extern unsigned char * sample_chain_get_kfs( int s1, int entry, int parameter_id, int *len );
 extern int     sample_chain_set_kf_status( int s1, int entry, int status );
 extern int     sample_chain_set_kfs( int s1, int len, char *data );
@@ -269,7 +260,7 @@ extern int sample_get_trimmer(int s1, int position);
 extern int sample_set_trimmer(int s1, int position, int trimmer);
 extern int sample_get_short_info(int sample_id, int *, int *, int *, int *) ;
 extern int sample_get_chain_volume(int s1, int position);
-
+extern void    sample_set_kf_type(int s1, int entry, int type );
 /* set volume of audio data coming to the chain */
 extern int sample_set_chain_volume(int s1, int position, int volume);
 

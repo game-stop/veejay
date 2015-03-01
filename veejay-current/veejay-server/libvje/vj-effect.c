@@ -955,7 +955,7 @@ int vj_effect_get_summary(int entry, char *dst)
 {
 	int p = vj_effects[entry]->num_params;
 	int i;		
-	char tmp[512];
+	char tmp[4096];
 
 	if(!vj_effects[entry])
 		return 0;
@@ -970,8 +970,7 @@ int vj_effect_get_summary(int entry, char *dst)
 		);
 	for(i=0; i < p; i++)
 	{
-		bzero(tmp,512);
-		sprintf(tmp,
+		snprintf(tmp,sizeof(tmp),
 			"%06d%06d%06d%03zu%s",
 			vj_effects[entry]->limits[0][i],
 			vj_effects[entry]->limits[1][i],

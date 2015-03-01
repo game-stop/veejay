@@ -22,7 +22,6 @@
 #include <gtk/gtkversion.h>
 #include <gtk/gtk.h>
 #include <gdk/gdk.h>
-#define MAX_PARAMETERS  8
 #define MAX_CHAIN_LEN	20
 
 

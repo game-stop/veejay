@@ -149,20 +149,33 @@ enum
 	ENTRY_FXID = 0,
 	ENTRY_ISVIDEO = 1,
 	ENTRY_NUM_PARAMETERS = 2,
-	ENTRY_P0 = 3,
-	ENTRY_P1 = 4,
-	ENTRY_P2 = 5,
-	ENTRY_P3 = 6,
-	ENTRY_P4 = 7,
-	ENTRY_P5 = 8,
-	ENTRY_P6 = 9,
-	ENTRY_P7 = 10,
-	ENTRY_UNUSED = 11,
-	ENTRY_FXSTATUS = 12,
-	ENTRY_UNUSED2 = 13,
-	ENTRY_SOURCE = 14,
-	ENTRY_CHANNEL = 15
+	ENTRY_KF_TYPE = 3,
+	ENTRY_KF_START = 4,
+	ENTRY_KF_END = 5,
+	ENTRY_KF_STATUS = 6,
+	ENTRY_SOURCE = 7,
+	ENTRY_CHANNEL = 8,
+	ENTRY_VIDEO_ENABLED = 9,
+	ENTRY_AUDIO_ENABLED = 10,
+	ENTRY_P0 = 11,
+	ENTRY_P1 = 12,
+	ENTRY_P2 = 13,
+	ENTRY_P3 = 14,
+	ENTRY_P4 = 15,
+	ENTRY_P5 = 16,
+	ENTRY_P6 = 17,
+	ENTRY_P8 = 18,
+	ENTRY_P9 = 19,
+	ENTRY_P10 = 20,
+	ENTRY_P11 = 21,
+	ENTRY_P12 = 22,
+	ENTRY_P13 = 23,
+	ENTRY_P14 = 24,
+	ENTRY_P15 = 25,
+	ENTRY_LAST = 26
 };
+
+#define ENTRY_PARAMSET ENTRY_AUDIO_ENABLED
 
 enum
 {
@@ -219,7 +232,7 @@ typedef struct
 	int	selected_vims_entry;
 	int	selected_vims_accel[2];
 	int	render_record; 
-	int	entry_tokens[21];
+	int	entry_tokens[ENTRY_LAST];
 	int	iterator;
 	int	selected_effect_id;
 	int	reload_hint[NUM_HINTS];
@@ -502,6 +515,13 @@ enum
 	VIMS_FORMAT=5,
 	VIMS_CONTENTS=6,
 };
+
+typedef struct 
+{
+	const char *text;
+} slider_name_t;
+
+static slider_name_t *slider_names_ = NULL;
 
 #define MAX_PATH_LEN 1024
 #define VEEJAY_MSG_OUTPUT	4
@@ -1025,7 +1045,7 @@ static void	setup_v4l_devices()
 
 }
 
-
+#define SAMPLE_MAX_PARAMETERS 32
 
 static	gchar*  format_selection_time(int start, int end);
 
@@ -1047,11 +1067,11 @@ typedef struct
 } el_constr;
 
 typedef struct {
-	int defaults[10];
-	int min[10];
-	int max[10];
+	int defaults[SAMPLE_MAX_PARAMETERS];
+	int min[SAMPLE_MAX_PARAMETERS];
+	int max[SAMPLE_MAX_PARAMETERS];
 	char description[150];
-	char *param_description[10];
+	char *param_description[SAMPLE_MAX_PARAMETERS];
 	int  id;
 	int  is_video;
 	int num_arg;
@@ -1326,10 +1346,7 @@ effect_constr* _effect_new( char *effect_line )
 	sscanf(len, "%03d", &descr_len);
 	if(descr_len <= 0) return NULL;
 
-	ec = g_new( effect_constr, 1);
-	veejay_memset(ec,0,sizeof(ec));
-	veejay_memset(ec->param_description,0,sizeof(ec->param_description));
-	veejay_memset(ec->description,0,sizeof(ec->description));
+	ec = vj_calloc( sizeof(effect_constr));
 	strncpy( ec->description, effect_line+3, descr_len );
 	tokens = sscanf(effect_line+(descr_len+3), "%03d%1d%1d%02d", &(ec->id),&(ec->is_video),
 		&(ec->has_rgb), &(ec->num_arg));
@@ -1337,18 +1354,20 @@ effect_constr* _effect_new( char *effect_line )
 	for(p=0; p < ec->num_arg; p++)
 	{
 		int len = 0;
-		sscanf(effect_line+offset,"%06d%06d%06d%03d",
+		int n = sscanf(effect_line+offset,"%06d%06d%06d%03d",
 			&(ec->min[p]), &(ec->max[p]),&(ec->defaults[p]),&len );
-#ifdef STRICT_CHECKING
-		assert(len>0);
-#endif
+		if( n <= 0 )
+		{
+			veejay_msg(0,"Parse error in FX list" );	       
+			break;
+		}
 		ec->param_description[p] = (char*) vj_calloc(sizeof(char) * (len+1) );
 		strncpy( ec->param_description[p], effect_line + offset + 6 + 6 + 6 + 3, len );
-		
 		offset += 3;
 		offset += len;
 		offset+=18; 
 	}
+
 	return ec;
 }
 
@@ -2212,16 +2231,12 @@ static  void	update_curve_widget(const char *name)
 			char but[25];
 			sprintf(but, "kf_p%d", p);
 			set_toggle_button( but, 1 );
-
 			info->uc.selected_parameter_id = p;
-			switch( curve_type )
-       			{
-       				case GTK_CURVE_TYPE_LINEAR: set_toggle_button( "curve_typelinear", 1 ); break;
-       		         	case GTK_CURVE_TYPE_SPLINE: set_toggle_button( "curve_typespline", 1 ); break;
-       		         	case GTK_CURVE_TYPE_FREE: set_toggle_button( "curve_typefree",1 ); break;
-     		           	default:
-	                	break;
-		        }
+			switch( curve_type ) {
+				case GTK_CURVE_TYPE_SPLINE: set_toggle_button( "curve_typespline", 1 );break;
+				case GTK_CURVE_TYPE_FREE: set_toggle_button( "curve_typefree",1 ); break;
+				default: set_toggle_button( "curve_typelinear", 1 ); break;
+			}
 		}
 	}
 
@@ -2639,9 +2654,9 @@ static	void	update_rgbkey()
 			3 = p0 , 4 = p1, 5 = p2, 6 = p3 ... */
 
 
-		color.red = 255 * p[3];
-		color.green = 255 * p[4];
-		color.blue = 255 * p[5];
+		color.red = 255 * p[ENTRY_P0];
+		color.green = 255 * p[ENTRY_P1];
+		color.blue = 255 * p[ENTRY_P2];
 
 		gtk_color_selection_set_current_color(
 			GTK_COLOR_SELECTION( colorsel ),
@@ -2738,8 +2753,8 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 		else
 		{
 			gchar *descr = _utf8str( _effect_get_description( effect_id ));
-			int on = gui->uc.entry_tokens[16];
-			GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_FXSTATUS] );
+			int on = gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED];
+			GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
 			GdkPixbuf *kf_toggle = update_pixmap_kf( on );
 			gtk_list_store_set( GTK_LIST_STORE(model),iter,
 				FXC_ID, entry,
@@ -2830,7 +2845,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		info->uc.reload_hint[HINT_ENTRY] == 1 )
 	{
 		info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
-		if(info->uc.selected_chain_entry < 0 || info->uc.selected_chain_entry > 19 )
+		if(info->uc.selected_chain_entry < 0 || info->uc.selected_chain_entry >= MAX_CHAIN_LEN  )
 			info->uc.selected_chain_entry = 0;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
 		load_parameter_info();
@@ -3446,37 +3461,38 @@ static	void	load_v4l_info()
 
 static	gint load_parameter_info()
 {
-	int	*st = &(info->uc.entry_tokens[0]);
+	int	*p = &(info->uc.entry_tokens[0]);
 	int	len = 0;
-	int	p[20];
-	int 	i;
+	int 	i = 0;
 
-	veejay_memset( p, 0, sizeof(p));
+	veejay_memset( p, 0, sizeof(info->uc.entry_tokens));
 		
-	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
-		info->uc.selected_chain_entry );
+	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, info->uc.selected_chain_entry );
 
 	gchar *answer = recv_vims(3,&len);
 	if(len <= 0 || answer == NULL )
 	{
 		if(answer) g_free(answer);
-		for( i = 0; i < 16; i ++ )
-			st[i] = 0;
+		veejay_memset(p,0,sizeof(info->uc.entry_tokens));
 		if(info->uc.selected_rgbkey )
 			disable_widget("rgbkey");
 		return 0;
 	}
-	int res = sscanf( answer,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-		p+0,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,
-		p+11,p+12,p+13,p+14,p+15, p + 16,   p+17,p+18,p+19);
 
-	if( res <= 0 )
-	{
-		for( i = 0; i < 20; i ++ )
-			st[i] = 0;
+	char *ptr;
+	char *token = strtok_r( answer," ", &ptr );
+	if(!token) {
+		veejay_msg(0,"Invalid reply from %d", VIMS_CHAIN_GET_ENTRY );
 		return 0;
 	}
+	p[i] = atoi(token);
+	while( (token = strtok_r( NULL, " ", &ptr ) ) != NULL )
+	{
+		i++;
+		p[i] = atoi( token );
+	}
+
+	int expected = ENTRY_PARAMSET + _effect_get_np( p[0] );
 
 	info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
 	if(info->uc.selected_rgbkey)
@@ -3490,36 +3506,32 @@ static	gint load_parameter_info()
 		info->uc.selected_rgbkey = 0;
 	}	 
 		
-	for( i = 0; i < 20; i ++ )
-		st[i] = p[i];
-
-	set_toggle_button( "curve_toggleentry", p[16] );
+	set_toggle_button( "curve_toggleentry", p[ENTRY_KF_STATUS] );
 
 	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
 	{
 		update_spin_range( "curve_spinstart", 
 			info->status_tokens[SAMPLE_START], 
-			info->status_tokens[SAMPLE_END], p[17] );
+			info->status_tokens[SAMPLE_END], p[ENTRY_KF_START] );
 		update_spin_range( "curve_spinend", info->status_tokens[SAMPLE_START],
-			info->status_tokens[SAMPLE_END] ,p[18] );
+			info->status_tokens[SAMPLE_END] ,p[ENTRY_KF_END] );
 	}
 	else
 	{
 		int nl = get_nums("stream_length") + 1 ;
-		update_spin_range( "curve_spinstart", 0, nl, p[17] );
-		update_spin_range( "curve_spinend", 0,nl, p[18] );
+		update_spin_range( "curve_spinstart", 0, nl, p[ENTRY_KF_START] );
+		update_spin_range( "curve_spinend", 0,nl, p[ENTRY_KF_END] );
 	}	
 
-	switch( p[19] )
+	switch( p[ENTRY_KF_TYPE] )
 	{
-		case GTK_CURVE_TYPE_LINEAR: set_toggle_button( "curve_typelinear", 1 ); break;
-		case GTK_CURVE_TYPE_SPLINE: set_toggle_button( "curve_typespline", 1 ); break;
-		case GTK_CURVE_TYPE_FREE: set_toggle_button( "curve_typefree",1 ); break;
+		case 1: set_toggle_button( "curve_typespline", 1 ); break;
+		case 2: set_toggle_button( "curve_typefree",1 ); break;
 		default:
+			case GTK_CURVE_TYPE_LINEAR: set_toggle_button( "curve_typelinear", 1 ); break;
 		break;
 	}
 			
-
 	g_free(answer);
 
 	return 1;
@@ -3566,8 +3578,8 @@ static	void	load_effectchain_info()
 		gchar toggle[4];
 		gchar kf_toggle[4];
 		guint arr[6];
-		veejay_memset(toggle,0,4);
-		veejay_memset(kf_toggle,0,4);
+		veejay_memset(toggle,0,sizeof(toggle));
+		veejay_memset(kf_toggle,0,sizeof(kf_toggle));
 		veejay_memset(arr,0,sizeof(arr));
 		char line[12];
 		veejay_memset(line,0,sizeof(line));
@@ -3589,7 +3601,7 @@ static	void	load_effectchain_info()
 		if( last_index == arr[0])
 		{
 			gchar *utf8_name = _utf8str( name );
-			int on = info->uc.entry_tokens[16];
+			int on = info->uc.entry_tokens[ENTRY_VIDEO_ENABLED];
 			gtk_list_store_append( store, &iter );
 			GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
 			GdkPixbuf *kf_toggle = update_pixmap_kf( on );
@@ -4053,14 +4065,15 @@ void	load_effectlist_info()
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
 	GtkWidget *tree2 = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
 	GtkListStore *store,*store2;
-	
+	char line[4096];
+
 	GtkTreeIter iter;
 	gint i,offset=0;
 	
 	
 	gint fxlen = 0;
 	single_vims( VIMS_EFFECT_LIST );
-	gchar *fxtext = recv_vims(5,&fxlen);
+	gchar *fxtext = recv_vims(6,&fxlen);
 	_effect_reset();
  	reset_tree( "tree_effectlist");
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
@@ -4078,8 +4091,7 @@ void	load_effectlist_info()
 		if(len > 0)
 		{
 			effect_constr *ec;
-			char line[512];
-			veejay_memset( line,512,sizeof(line));
+			veejay_memset( line,sizeof(line),sizeof(line));
 			strncpy( line, fxtext + offset, len );
 			ec = _effect_new(line);
 			if(ec) info->effect_info = g_list_append( info->effect_info, ec );
@@ -6221,7 +6233,7 @@ static void	process_reload_hints(int *history, int pm)
 			enable_widget( "frame_fxtree4");
 			enable_widget( "tree_sources");
 			enable_widget( "rgbkey" );
-			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
+			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_VIDEO_ENABLED] );
 			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
 			for( i = 0; i < np ; i ++ )
 			{
@@ -6235,7 +6247,7 @@ static void	process_reload_hints(int *history, int pm)
 				gtk_widget_set_tooltip_text(	glade_xml_get_widget_(info->main_window, slider_name), tt1 );
 				enable_widget( button_name );
 				gint min,max,value;
-				value = entry_tokens[3 + i];
+				value = entry_tokens[ENTRY_PARAMSET + i];
 				if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
 				{
 					update_slider_range( slider_name,min,max, value, 0);
@@ -6249,7 +6261,7 @@ static void	process_reload_hints(int *history, int pm)
 		}
 		update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);	
 
-		for( i = np; i < 8 ; i ++ )
+		for( i = np; i < MAX_UI_PARAMETERS; i ++ )
 		{
 			sprintf(slider_name, "slider_p%d",i);
 			gint min = 0, max = 1, value = 0;
@@ -6703,7 +6715,7 @@ void	vj_gui_wipe()
 {
 	int i;
 	veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
-	veejay_memset( info->uc.entry_tokens,0, sizeof(int) * 21);
+	veejay_memset( info->uc.entry_tokens,0, sizeof(int) * ENTRY_LAST);
 	for( i = 0 ; i < 4; i ++ )
 	{
 		veejay_memset(info->history_tokens[i],0, sizeof(int) * (STATUS_TOKENS+1));
@@ -6725,21 +6737,6 @@ GtkWidget	*new_bank_pad(GtkWidget *box, int type)
 
 	return pad;
 }
-static struct {
-	const char *text;
-} slider_names_[] = 
-{
-	{ "slider_p0" },
-	{ "slider_p1" },
-	{ "slider_p2" },
-	{ "slider_p3" },	
-	{ "slider_p4" },
-	{ "slider_p5" },
-	{ "slider_p6" },	
-	{ "slider_p7" },
-	{ "slider_p8" },
-	{ NULL },
-};
 
 gboolean	slider_scroll_event( GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
 {
@@ -6856,14 +6853,19 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	veejay_memset( gui->sample, 0, 2 );
 	veejay_memset( gui->selection, 0, 3 );
 	veejay_memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
-	veejay_memset( gui->uc.entry_tokens,0, sizeof(int) * 21);
+	veejay_memset( gui->uc.entry_tokens,0, sizeof(int) * ENTRY_LAST);
 	gui->prev_mode = -1; 
 	veejay_memset( &(gui->el), 0, sizeof(veejay_el_t));
 	gui->sample_banks = (sample_bank_t**) vj_calloc(sizeof(sample_bank_t*) * NUM_BANKS );
 			
-	for( i = 0 ; i < 4; i ++ )
-	{
+	for( i = 0 ; i < 4; i ++ ) {
 		gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * (STATUS_TOKENS+1));
+	}
+
+	slider_names_ = (char**) vj_calloc(sizeof(slider_name_t) * MAX_UI_PARAMETERS );
+	for( i = 0; i < MAX_UI_PARAMETERS; i ++ ) {
+		snprintf(text,sizeof(text)," slider_p%d" , i );
+		slider_names_[i].text = strdup( text );
 	}
 
 	gui->uc.reload_force_avoid = FALSE;
@@ -6913,7 +6915,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	debug_spinboxes();
 #endif
 
-	sprintf(text, "Reloaded - version %s",VERSION);
+	snprintf(text, sizeof(text), "Reloaded - version %s",VERSION);
 	gtk_label_set_text( GTK_LABEL(glade_xml_get_widget_(info->main_window, "build_revision")), text);
 
 	g_signal_connect_after( GTK_OBJECT(mainw), "client_event",
@@ -6935,19 +6937,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	//SEQ
 	create_sequencer_slots( 10,10 );
-
-	char slider_name[16];
-	for( i = 0 ; i < 8 ; i ++ ) {
-		sprintf(slider_name, "slider_p%d",i);
-		GtkWidget *slider = glade_xml_get_widget( info->main_window, slider_name );
-		g_signal_connect( GTK_OBJECT(slider), "scroll-event", G_CALLBACK(slider_scroll_event), (gpointer) i );
-	}
-
-	g_signal_connect( GTK_OBJECT( glade_xml_get_widget(info->main_window, "speed_slider") ), "scroll-event",
-				G_CALLBACK(speed_scroll_event), NULL );
-	g_signal_connect( GTK_OBJECT( glade_xml_get_widget(info->main_window, "slow_slider") ), "scroll-event",
-				G_CALLBACK(slow_scroll_event), NULL );
-
 
 	veejay_memset( vj_event_list, 0, sizeof( vj_event_list ));
 	veejay_memset( vims_keys_list, 0, sizeof( vims_keys_list) );
@@ -7064,6 +7053,18 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	if( load_midi )
 			vj_midi_load(info->midi,midi_file);
 
+	char slider_name[16];
+	for( i = 0 ; i < MAX_UI_PARAMETERS; i ++ ) {
+		sprintf(slider_name, "slider_p%d",i);
+		GtkWidget *slider = glade_xml_get_widget( info->main_window, slider_name );
+		g_signal_connect( GTK_OBJECT(slider), "scroll-event", G_CALLBACK(slider_scroll_event), (gpointer) i );
+		update_slider_range( slider_name, 0,1,0,0);
+	}
+
+	g_signal_connect( GTK_OBJECT( glade_xml_get_widget(info->main_window, "speed_slider") ), "scroll-event",
+				G_CALLBACK(speed_scroll_event), NULL );
+	g_signal_connect( GTK_OBJECT( glade_xml_get_widget(info->main_window, "slow_slider") ), "scroll-event",
+				G_CALLBACK(slow_scroll_event), NULL );
 
 	GtkWidget *lw = glade_xml_get_widget_( info->main_window, "veejay_connection");
 

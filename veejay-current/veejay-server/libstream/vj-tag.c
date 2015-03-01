@@ -1131,6 +1131,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		    tag->effect_chain[i]->arg[j] = 0;
 		}
 		tag->effect_chain[i]->kf_status = 0;
+		tag->effect_chain[i]->kf_type = 0;
 		tag->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
     }
     if (!vj_tag_put(tag))	
@@ -2004,19 +2005,33 @@ int	vj_tag_chain_reset_kf( int s1, int entry )
    vj_tag *tag = vj_tag_get(s1);
    if (!tag) return -1;
    tag->effect_chain[entry]->kf_status = 0;
+   tag->effect_chain[entry]->kf_type = 0;
    if(tag->effect_chain[entry]->kf)
      vpf( tag->effect_chain[entry]->kf);
    tag->effect_chain[entry]->kf = vpn( VEVO_ANONYMOUS_PORT );
    return 1;	
 }
 
-int	vj_tag_get_kf_status(int s1, int entry )
+int	vj_tag_get_kf_status(int s1, int entry, int *type )
 {
    vj_tag *tag = vj_tag_get(s1);
    if (!tag)
 	return 0;
+   if(type != NULL)
+	   *type = tag->effect_chain[entry]->kf_type;
+
    return tag->effect_chain[entry]->kf_status;
 }
+
+void	vj_tag_set_kf_type(int s1, int entry, int type )
+{
+   vj_tag *tag = vj_tag_get(s1);
+   if (!tag)
+	return 0;
+   tag->effect_chain[entry]->kf_type = type;
+}
+
+
 int	vj_tag_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type)
 {
   vj_tag *tag = vj_tag_get(s1);
@@ -2159,6 +2174,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     }
 
 	tag->effect_chain[position]->kf_status = 0;
+	tag->effect_chain[position]->kf_type = 0;
 	if(tag->effect_chain[position]->kf)
 		vpf(tag->effect_chain[position]->kf );
 	tag->effect_chain[position]->kf = vpn(VEVO_ANONYMOUS_PORT );
@@ -3717,6 +3733,7 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
     int e_flag = 0;
     int volume = 0;
     int anim= 0;
+    int anim_type = 0;
     int a_flag = 0;
     int chain_index = 0;
 
@@ -3804,6 +3821,15 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
+	if (!xmlStrcmp(cur->name, (const xmlChar *) "kf_type")) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		anim_type = atoi(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
 
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTACTIVE)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
@@ -3881,6 +3907,7 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 				{
 					veejay_msg(VEEJAY_MSG_INFO, "Animating FX %d on entry %d (status=%d)", t->effect_chain[chain_index]->effect_id, j,anim);
 					vj_tag_chain_set_kf_status(dst_sample, chain_index, anim );
+					vj_tag_set_kf_type( dst_sample,chain_index,anim_type);
 				}
 				j++;
 			}
@@ -4156,6 +4183,11 @@ static void tagCreateEffect(xmlNodePtr node, sample_eff_chain * effect, int posi
 
 	sprintf(buffer, "%d", effect->kf_status );
 	xmlNewChild(node,NULL,(const xmlChar*) "kf_status", (const xmlChar*)buffer);
+
+	sprintf(buffer, "%d", effect->kf_type );
+	xmlNewChild(node,NULL,(const xmlChar*) "kf_type", (const xmlChar*)buffer);
+
+
 
     childnode =
 	xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENTS, NULL);

@@ -664,15 +664,17 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 	index_map_[VIMS_SAMPLE_KF_STATUS]		=	_new_event(
-				"%d %d",
+				"%d %d %d",
 				VIMS_SAMPLE_KF_STATUS,
 				"Change KF play status for entry X",
 				vj_event_set_kf_status,
-				2,
+				3,
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Entry ID",
 				0,
 				"Status value",
+				0,
+				"Curve type",
 				0,
 				NULL );
 	index_map_[VIMS_SAMPLE_KF_RESET]		=	_new_event(
@@ -1462,12 +1464,12 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 	index_map_[VIMS_CHAIN_ENTRY_SET_PRESET]			=	_new_event(
-				"%d %d %d %d %d %d %d %d %d %d %d",
+				"%d %d %d %s",
 				VIMS_CHAIN_ENTRY_SET_PRESET,
 				"Preset effect on chain entry",
 				vj_event_chain_entry_preset,
-				11,
-				VIMS_REQUIRE_ALL_PARAMS,
+				4,
+				VIMS_LONG_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
 				"Chain Index (-1=current",

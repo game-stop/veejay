@@ -59,4 +59,6 @@
 #define STREAM_DURATION  10
 #define STREAM_RECORDING 9
 
+#define MAX_UI_PARAMETERS  16
+
 #endif

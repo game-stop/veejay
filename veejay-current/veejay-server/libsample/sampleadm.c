@@ -1976,6 +1976,7 @@ int	sample_chain_reset_kf( int s1, int entry )
 	sample_info *sample = sample_get(s1);
         if(!sample) return 0;
 	sample->effect_chain[entry]->kf_status = 0;
+	sample->effect_chain[entry]->kf_type = 0;
 	if(sample->effect_chain[entry]->kf)
 	  vpf(sample->effect_chain[entry]->kf );
 	sample->effect_chain[entry]->kf = vpn(VEVO_ANONYMOUS_PORT );
@@ -1996,12 +1997,24 @@ void	*sample_get_kf_port( int s1, int entry )
 	return sample->effect_chain[entry]->kf;
 }
 
-int	sample_get_kf_status( int s1, int entry )
+int	sample_get_kf_status( int s1, int entry, int *type )
 {
         sample_info *sample = sample_get(s1);
         if(!sample) return 0;
+	if(type != NULL)
+		*type = sample->effect_chain[entry]->kf_type;
+
 	return sample->effect_chain[entry]->kf_status;
 }
+
+void	sample_set_kf_type(int s1, int entry, int type )
+{
+        sample_info *sample = sample_get(s1);
+        if(!sample) return 0;
+
+	sample->effect_chain[entry]->kf_type = type;
+}
+
 
 int	sample_chain_set_kf_status( int s1, int entry, int status )
 {
@@ -2141,6 +2154,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
 
     //clear fx anim
     sample->effect_chain[c]->kf_status = 0;
+    sample->effect_chain[c]->kf_type = 0;
 	if(sample->effect_chain[c]->kf)
 		vpf(sample->effect_chain[c]->kf );
 	sample->effect_chain[c]->kf = vpn(VEVO_ANONYMOUS_PORT );
@@ -2629,6 +2643,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
     int a_flag = 0;
     int chain_index = 0;
     int kf_status = 0;
+    int kf_type = 0;
     xmlNodePtr anim = NULL;
 
     for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
@@ -2747,7 +2762,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
-
+	
 	if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_status" )) {
 	   xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
   	   chTemp = UTF8toLAT1(xmlTemp);
@@ -2755,7 +2770,15 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
 		{  kf_status = atoi(chTemp); free(chTemp); }
 	   if(xmlTemp) xmlFree(xmlTemp);
 	}
-	// xmlTemp and chTemp should be freed after use
+	if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_type" )) {
+	   xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+  	   chTemp = UTF8toLAT1(xmlTemp);
+	   if(chTemp) {
+		   kf_type = atoi(chTemp); free(chTemp);
+	   }
+	   if(xmlTemp) xmlFree(xmlTemp);
+	}
+
 	xmlTemp = NULL;
 	chTemp = NULL;
 	cur = cur->next;
@@ -2793,6 +2816,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
 	{
 		ParseKeys( doc, anim, skel->effect_chain[ chain_index ]->kf );
 		sample_chain_set_kf_status( dst_sample, chain_index, kf_status );
+		sample_set_kf_type(dst_sample,chain_index,kf_type);
 	}
     } 
 
@@ -3389,6 +3413,8 @@ void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
 	sprintf(buffer, "%d", effect->kf_status );
 	xmlNewChild(node,NULL,(const xmlChar*) "kf_status", (const xmlChar*) buffer );
    
+	sprintf(buffer, "%d", effect->kf_type );
+	xmlNewChild(node,NULL,(const xmlChar*) "kf_type", (const xmlChar*) buffer );
 
     childnode =
 	xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENTS, NULL);

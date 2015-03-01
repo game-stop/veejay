@@ -689,7 +689,6 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 		}
 	}
 
-
 	 info->uc->sample_id = sample_id;
 	 info->last_sample_id = sample_id;
 
@@ -2912,9 +2911,6 @@ veejay_t *veejay_malloc()
 
     veejay_memset(info->action_file[0],0,sizeof(info->action_file[0])); 
     veejay_memset(info->action_file[1],0,sizeof(info->action_file[1])); 
-
-    for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++)
-		info->effect_info->tmp[i] = 0;
 
 #ifdef HAVE_SDL
     info->video_out = 0;

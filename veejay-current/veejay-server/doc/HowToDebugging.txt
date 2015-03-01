@@ -20,7 +20,7 @@ $ tail -f /tmp/logfile
 
 2) If it crashes in combination with reloaded or another external, enable all network logging:
 
-$ export VEEJAY_LOG_NET_IO=/tmp/vims.logfile
+$ export VEEJAY_LOG_NET_IO=on
 
 $ veejay -v -n -> /tmp/console.logfile
 

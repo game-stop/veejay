@@ -48,8 +48,10 @@
 #include <libplugger/specs/livido.h>
 #include <libplugger/utility.h>
 #include <libyuv/yuvconv.h>
-
 #include <libavutil/avutil.h>
+#ifndef SAMPLE_MAX_PARAMETERS
+#define SAMPLE_MAX_PARAMETERS 32 //sampleadm.h
+#endif
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1118,10 +1120,10 @@ vj_effect *plug_get_plugin( int fx_id ) {
 	vevo_property_get( port, "mixer", 0, &(vje->extra_frame));
 
 	if( vje->num_params > 0 ) {
-		if( vje->num_params > 8 ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "%s has %d parameters, supporting only 8.",
-				vje->description,vje->num_params );
-			vje->num_params = 8;
+		if( vje->num_params > SAMPLE_MAX_PARAMETERS ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "%s has %d parameters, supporting only %d.",
+				vje->description,vje->num_params, SAMPLE_MAX_PARAMETERS );
+			vje->num_params = SAMPLE_MAX_PARAMETERS;
 		}
 		vje->defaults = (int*) vj_calloc(sizeof(int) * vje->num_params);
 		vje->limits[0]= (int*) vj_calloc(sizeof(int) * vje->num_params);

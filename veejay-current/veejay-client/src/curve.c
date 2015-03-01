@@ -43,6 +43,7 @@ void	set_points_in_curve( int type, GtkWidget *curve)
 	gtk_curve_set_curve_type( GTK_CURVE(curve), type );
 }
 
+
 int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *curve_type)
 {
 	int parameter_id = 0;
@@ -84,11 +85,17 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	}
 	
 	gtk_curve_set_vector( GTK_CURVE( curve ), len, vec );
-	gtk_curve_set_curve_type( GTK_CURVE(curve), type );
+
+	switch( type ) {
+		case 1: *curve_type = GTK_CURVE_TYPE_SPLINE; break;
+		case 2: *curve_type = GTK_CURVE_TYPE_FREE; break;
+		default: *curve_type = GTK_CURVE_TYPE_LINEAR; break;
+	}
+
+	gtk_curve_set_curve_type( GTK_CURVE(curve), *curve_type );
 
 	*lo = start;
 	*hi = end;
-	*curve_type = type;
 
 	free(vec);
 
