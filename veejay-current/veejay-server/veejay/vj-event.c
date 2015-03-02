@@ -1298,7 +1298,7 @@ static	int	vj_event_verify_args( int *fx, int net_id , int arglen, int np, int p
 	}	
 	else
 	{
-		if( arglen <= 3 )
+		if( arglen < 3 )
 		{
 			dump_arguments_(net_id, arglen,np,prefixed, fmt );
 			return 0;
