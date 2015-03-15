@@ -52,6 +52,7 @@ typedef struct
 	int	  real_w;
 	int	  real_h;
 	int	  fmt;
+	void	*scaler;
 } vj_pixbuf_t;
 
 
@@ -64,14 +65,13 @@ typedef struct
 } vj_pixbuf_out_t;
 
 static int	__initialized = 0;
-static void*	scaler = NULL;
 
 
 extern int	get_ffmpeg_pixfmt(int id);
 
 extern uint8_t *vj_perform_get_preview_buffer();
 
-static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst_fmt,
+static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, int dst_h, int dst_fmt,
 			uint8_t *dY, uint8_t *dU, uint8_t *dV )
 {
 #ifdef USE_GDK_PIXBUF
@@ -101,16 +101,23 @@ static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst
 	if( stride != src->stride[0] )
 		src->stride[0] = stride;
 
+	veejay_msg(VEEJAY_MSG_DEBUG,"Image '%s': %dx%d, format %x to %dx%d, format %x",
+			filename,src->width,src->height,img_fmt,dst->width,dst->height,dst->format );
+	if( !(dst->width%2) || !(dst->height%2) ) {
+		veejay_msg(VEEJAY_MSG_WARNING,"Image output dimensions not a multiple of 2, result may be corrupt");
+		veejay_msg(VEEJAY_MSG_WARNING,"You should set -w and -h to a multiple of 2,4,8 or 16" );
+	}
+
 	veejay_msg(VEEJAY_MSG_DEBUG,"Image is %dx%d (src=%d, stride=%d, dstfmt=%d), scaling to %dx%d",
 				src->width,src->height,img_fmt, stride,dst_fmt,dst->width,dst->height );
 
-	if(scaler == NULL) {
+	if(pic->scaler == NULL) {
 		sws_template tmpl;
 		tmpl.flags = 1;
-		scaler = yuv_init_cached_swscaler( scaler, src,dst, &tmpl, yuv_sws_get_cpu_flags());
+		pic->scaler = yuv_init_cached_swscaler( pic->scaler, src,dst, &tmpl, yuv_sws_get_cpu_flags());
 	}
 
-	yuv_convert_any3( scaler, src, src->stride, dst, src->format, dst->format );
+	yuv_convert_any3( pic->scaler, src, src->stride, dst, src->format, dst->format );
 	
 	g_object_unref( image ); 
 	
@@ -135,13 +142,11 @@ void	vj_picture_cleanup( void *pic )
 			free( picture->img );
 		if(picture->space)
 			free(picture->space);
+		if(picture->scaler)
+			free(picture->scaler);
+
 		if( picture )
 			free(picture);		
-	}
-
-	if( scaler ) {
-		yuv_free_swscaler( scaler );
-		scaler = NULL;
 	}
 
 	picture = NULL;
@@ -223,6 +228,7 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 		assert(pic->space != NULL );
 #endif
 	pic->img = open_pixbuf(
+			pic,
 			filename,	
 			v_outw,
 			v_outh,
