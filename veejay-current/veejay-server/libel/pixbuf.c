@@ -64,6 +64,8 @@ typedef struct
 } vj_pixbuf_out_t;
 
 static int	__initialized = 0;
+static void*	scaler = NULL;
+
 
 extern int	get_ffmpeg_pixfmt(int id);
 
@@ -102,7 +104,13 @@ static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst
 	veejay_msg(VEEJAY_MSG_DEBUG,"Image is %dx%d (src=%d, stride=%d, dstfmt=%d), scaling to %dx%d",
 				src->width,src->height,img_fmt, stride,dst_fmt,dst->width,dst->height );
 
-	yuv_convert_any_ac( src, dst, src->format, dst->format );
+	if(scaler == NULL) {
+		sws_template tmpl;
+		tmpl.flags = 1;
+		scaler = yuv_init_cached_swscaler( scaler, src,dst, &tmpl, yuv_sws_get_cpu_flags());
+	}
+
+	yuv_convert_any3( scaler, src, src->stride, dst, src->format, dst->format );
 	
 	g_object_unref( image ); 
 	
@@ -130,6 +138,12 @@ void	vj_picture_cleanup( void *pic )
 		if( picture )
 			free(picture);		
 	}
+
+	if( scaler ) {
+		yuv_free_swscaler( scaler );
+		scaler = NULL;
+	}
+
 	picture = NULL;
 }
 
@@ -204,7 +218,7 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			break;
 	}
 
-	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * (3 * len));
+	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * (4 * len));
 #ifdef STRICT_CHECKING
 		assert(pic->space != NULL );
 #endif

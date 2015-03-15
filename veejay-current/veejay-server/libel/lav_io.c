@@ -770,13 +770,14 @@ long lav_video_frames(lav_file_t *lav_file)
 #endif
 #ifdef USE_GDK_PIXBUF
 	case 'x':
-		return lav_file->bogus_len;
+		return 2;//lav_file->bogus_len;
 #endif
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
       case 'Q':
          return quicktime_video_length(lav_file->qt_fd,0);
 #endif
+
       default:
 	 	return AVI_video_frames( lav_file->avi_fd );
    }
@@ -945,27 +946,28 @@ int lav_video_compressor_type(lav_file_t *lav_file)
 	return AVI_video_compressor_type( lav_file->avi_fd );
 }
 
+#define FOURCC_DV "dvsd"
+#define FOURCC_PIC "pict"
+#define FOURCC_LZO "mlzo" 
+
 const char *lav_video_compressor(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
 #ifdef SUPPORT_READ_DV2
    if( video_format == 'b' )
    {
-	const char tmp[] = "dvsd";
-	return tmp;
+	return FOURCC_DV;
    }
 #endif
 #ifdef USE_GDK_PIXBUF
    if( video_format == 'x')
    {
-	const char tmp[] = "PICT";
-	return tmp;
+	return FOURCC_PIC;
    }
 #endif
    if( video_format == 'L' )
    {
-	const char tmp[] = "mlzo";
-	return tmp;
+	return FOURCC_LZO;
    }
 #ifdef HAVE_LIBQUICKTIME
    if(lav_file->format == 'q' || lav_file->format == 'Q')

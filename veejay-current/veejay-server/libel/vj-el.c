@@ -307,10 +307,13 @@ static	int _el_get_codec(int id, int in_pix_fmt )
 static	int	_el_get_codec_id( const char *fourcc )
 {
 	int i;
-	for( i = 0; _supported_fourcc[i].name != NULL ; i ++ )
-		if( strncasecmp( fourcc, _supported_fourcc[i].name, strlen(_supported_fourcc[i].name) ) == 0 ) {
+	int len = strlen( fourcc );
+	for( i = 0; _supported_fourcc[i].name != NULL ; i ++ ) {
+		if( strncasecmp( fourcc, _supported_fourcc[i].name,len ) == 0 ) {
 			return _supported_fourcc[i].id;
 		}
+	}
+	veejay_msg(VEEJAY_MSG_DEBUG,"No decoder found for fourcc %s" , fourcc );
 	return -1;
 }
 
@@ -1133,7 +1136,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 	if( nframe < 0 || nframe > el->total_frames )
 	{
-		veejay_msg(0, "trap caller!");
 		return 0;
 	}	
 

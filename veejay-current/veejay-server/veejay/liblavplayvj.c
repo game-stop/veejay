@@ -3651,46 +3651,8 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		info->dummy->active = 1;
 	}
 	
-	//@ set dummy to output dimensions, fallback to internal defaults if fail
-	info->dummy->width = info->video_output_width;
-	info->dummy->height= info->video_output_height;
-
 	if( info->dummy->active )
 	{
-		info->dummy->norm =  'p';
-		if( override_norm == 'n' ) {
-			if(!info->dummy->fps) //@ if not set
-				info->dummy->fps = 30000.0/1001;
-			info->dummy->norm = 'n';
-		} 
-		if(!info->dummy->fps)
-			info->dummy->fps = settings->output_fps;
-
-		if(!info->dummy->fps)
-			info->dummy->fps = ( override_norm == 'p' ? 25.0f : 29.97f );
-	
-		int dw = 720;
-		int dh = (override_norm == 'p' ? 576 : 480);
-
-		if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
-		       dw = (override_norm == 'p' ? 352 : 360 );
-	  	       dh = dh / 2;
-		}
-		else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_RUN_MODE not set to CLASSIC");
-		}
-
-		if( !info->dummy->width )
-			info->dummy->width  = dw;
-		if( !info->dummy->height)
-			info->dummy->height = dh;
-		
-		info->dummy->chroma = CHROMA422;
-		if( info->audio ) {
-			if( !info->dummy->arate)
-				info->dummy->arate = 48000;
-		}
-
 		info->edit_list = vj_el_dummy( 0, 
 				info->auto_deinterlace,
 				info->dummy->chroma,
@@ -3751,6 +3713,47 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	return 1;
 }
 
+static void configure_dummy_defaults(veejay_t *info, char override_norm, float fps)
+{
+	info->dummy->width = info->video_output_width;
+	info->dummy->height= info->video_output_height;
+	
+
+	info->dummy->norm =  'p';
+	if( override_norm == 'n' ) {
+		if(!info->dummy->fps) //@ if not set
+			info->dummy->fps = 30000.0/1001;
+		info->dummy->norm = 'n';
+	} 
+	
+	info->dummy->fps = fps;
+
+	if(info->dummy->fps < 0.0f)
+		info->dummy->fps = ( override_norm == 'p' ? 25.0f : 29.97f );
+	
+	int dw = 720;
+	int dh = (override_norm == 'p' ? 576 : 480);
+
+	if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
+	       dw = (override_norm == 'p' ? 352 : 360 );
+	 	       dh = dh / 2;
+	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_RUN_MODE not set to CLASSIC");
+	}
+
+	if( !info->dummy->width )
+		info->dummy->width  = dw;
+	if( !info->dummy->height)
+		info->dummy->height = dh;
+		
+	info->dummy->chroma = CHROMA422;
+	if( info->audio ) {
+		if( !info->dummy->arate)
+			info->dummy->arate = 48000;
+	}
+}
+
 int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm, int switch_jpeg)
 {
 	int ret = 0;
@@ -3783,14 +3786,18 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	else
 		veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
 
+	/* override options */
+	if(ofps<=0.0f)
+		ofps = settings->output_fps;
+	if(ofps<=0.0f)
+		ofps = 25.0f;
+
+	configure_dummy_defaults(info,override_norm, ofps);
+
 	vj_el_init( info->pixel_format, switch_jpeg, info->dummy->width,info->dummy->height, info->dummy->fps );
 #ifdef USE_GDK_PIXBUF
 	vj_picture_init( &(info->settings->sws_templ));
 #endif
-
-	/* override options */
-	if(ofps<=0.0)
-		ofps = settings->output_fps;
 
 	settings->output_fps = ofps;
 
