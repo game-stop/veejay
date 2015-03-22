@@ -63,6 +63,7 @@ void	vj_event_chain_entry_channel_dec	(	void *ptr,	const char format[],	va_list 
 void 	vj_event_chain_entry_preset		(	void *ptr,	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_select		(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_chain_entry_set_arg_val	(	void *ptr,	const char format[],	va_list ap	);
+void 	vj_event_chain_entry_set_narg_val	(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_chain_entry_set		(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_chain_entry_src_toggle		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_chain_entry_source		(	void *ptr, 	const char format[], 	va_list ap	);

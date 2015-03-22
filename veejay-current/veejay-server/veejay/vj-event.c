@@ -1827,7 +1827,7 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 		if(!bun)
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Requested BUNDLE %d does not exist", event_id);
-			return;
+			return 0;
 		}
 		vj_event_parse_bundle( (veejay_t*) ptr, bun->bundle );
 	}
@@ -5687,6 +5687,85 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 		veejay_msg(VEEJAY_MSG_INFO , "Entry %d has effect %s",
 			c, vj_effect_get_description(effect_id));
 	}
+}
+void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap)
+{
+	int args[SAMPLE_MAX_PARAMETERS];
+	veejay_t *v = (veejay_t*)ptr;
+	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
+        char str[4096];
+        P_A(args,str,format,ap);    
+	long int tmp = 0;
+	char *end = str;
+	int base = 10;
+	int index = 3; // sample, chain, fx_id
+	float value = 0.0f;
+
+	if( sscanf( str, "%f" , &value ) != 1 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid value." );
+		return;
+	}
+
+	if(SAMPLE_PLAYING(v)) 
+	{
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
+		if(sample_exists(args[0]))
+		{
+			int effect = sample_get_effect_any(v->uc->sample_id, args[1]);
+			int num_p   = vj_effect_get_num_params(effect);
+			if( args[2] > num_p ) {
+				args[2] = num_p;
+			}
+
+			float min = (float) vj_effect_get_min_limit(effect, args[2]);
+			float max = (float) vj_effect_get_max_limit(effect, args[2]);
+
+			float val = min + (max * value);
+
+			if(sample_set_effect_arg(args[0],args[1],args[2],(int) val )==-1)	
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",args[2],(int)v,vj_effect_get_description(effect));
+			}
+			v->uc->chain_changed = 1;
+		}
+	} else if( STREAM_PLAYING(v)) 
+	{
+		if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
+		if(vj_tag_exists(v->uc->sample_id)) 
+		{
+			int effect = vj_tag_get_effect_any(v->uc->sample_id, args[1]);
+			int num_p   = vj_effect_get_num_params(effect);
+			if( args[2] > num_p ) {
+				args[2] = num_p;
+			}
+
+			float min = (float) vj_effect_get_min_limit(effect, args[2]);
+			float max = (float) vj_effect_get_max_limit(effect, args[2]);
+
+			float val = min + (max * value);
+
+			if(vj_tag_set_effect_arg(args[0],args[1],args[2],(int) val)==-1)
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",args[2],(int)v,vj_effect_get_description(effect));
+			}
+			v->uc->chain_changed = 1;
+		}
+	}
+
 }
 
 void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)

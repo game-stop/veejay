@@ -1479,7 +1479,25 @@ void		vj_init_vevo_events(void)
 				"space separated value string",
 				NULL,
 				NULL );	
-		
+	
+
+	index_map_[VIMS_CHAIN_ENTRY_SET_NARG_VAL]		=	_new_event(
+				"%d %d %d %s",
+				VIMS_CHAIN_ENTRY_SET_ARG_VAL,
+				"Set a normalized parameter value ( 0.0 - 1.0 )",
+				vj_event_chain_entry_set_narg_val,
+				4,
+				VIMS_LONG_PARAMS,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Chain Index (-1=current)",
+				-1,
+				"Parameter number",
+				0,
+				"Value",
+				0,
+				NULL );
+
 	index_map_[VIMS_CHAIN_ENTRY_SET_ARG_VAL]		=	_new_event(
 				"%d %d %d %d",
 				VIMS_CHAIN_ENTRY_SET_ARG_VAL,
