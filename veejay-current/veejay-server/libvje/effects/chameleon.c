@@ -56,10 +56,10 @@ static int n__ = 0;
 
 static	int	has_bg = 0;
 static int32_t	*sum = NULL;
-static uint8_t		*timebuffer = NULL;
-static uint8_t		*tmpimage[3] = { NULL,NULL,NULL};
+static uint8_t	*timebuffer = NULL;
+static uint8_t	*tmpimage[3] = { NULL,NULL,NULL};
 static	int	plane = 0;
-static uint8_t		*bgimage[3] = { NULL,NULL,NULL};
+static uint8_t	*bgimage[3] = { NULL,NULL,NULL};
 
 #define PLANES_DEPTH 6
 #define	PLANES (1<< PLANES_DEPTH)
@@ -104,9 +104,8 @@ int	chameleon_malloc(int w, int h)
 	}
 	
 	
-	sum = (int32_t*) vj_calloc( w * h * sizeof(int32_t));
-	
-	timebuffer = (uint8_t*) vj_calloc( w* h * PLANES );
+	sum = (int32_t*) vj_calloc( RUP8(w * h) * sizeof(int32_t));
+	timebuffer = (uint8_t*) vj_calloc( RUP8(w * h) * PLANES );
 
 	has_bg = 0;
 	plane = 0;

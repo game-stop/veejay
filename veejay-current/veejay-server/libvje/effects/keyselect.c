@@ -86,9 +86,11 @@ uint8_t blend_func3(uint8_t a , uint8_t b) {
 
 
 uint8_t blend_func4(uint8_t a, uint8_t b) {
-	uint8_t val;
-	val = (a * a) / ( 0xff - b );
-	return CLAMP_Y(val);
+	uint8_t c = 0xff - b;
+	if( c == 0 )
+		return CLAMP_Y(c);
+
+	return CLAMP_Y( (a*a)/c  );
 }
 
 uint8_t blend_func5(uint8_t a, uint8_t b) {
