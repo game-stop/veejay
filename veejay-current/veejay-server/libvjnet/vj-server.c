@@ -1159,3 +1159,55 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 	return msg;
 }
 
+
+char *vj_server_my_ip()
+{
+	struct addrinfo h;
+
+	char hostname[512];
+	if( gethostname(hostname,sizeof(hostname)) < 0 ) {
+		return NULL;
+	}
+
+	char *target = "8.8.8.8"; //google public dns
+	char *port = "53";
+
+	veejay_memset(&h,0,sizeof(h));
+	h.ai_family = AF_INET;
+	h.ai_socktype = SOCK_STREAM;
+
+	struct addrinfo* info;
+	int ret = 0;
+	if((ret = getaddrinfo( target, port, &h, &info )) != 0 ) {
+		return NULL;
+	}
+
+	if( info->ai_family == AF_INET6 ) {
+		return NULL;
+	}
+
+	int sock = socket( info->ai_family, info->ai_socktype, info->ai_protocol);
+	if( sock <= 0 )
+		return NULL;
+
+	if( connect(sock, info->ai_addr, info->ai_addrlen ) < 0 ) {
+		close(sock);
+		return NULL;
+	}
+
+	struct sockaddr_in local;
+	socklen_t len = sizeof(local);
+	if( getsockname( sock, (struct sockaddr*)&local, &len ) < 0 ) {
+		close(sock);
+		return NULL;
+	}
+
+	char tmp[INET_ADDRSTRLEN ];
+	if( inet_ntop( local.sin_family, &(local.sin_addr), tmp, sizeof(tmp))==NULL) {
+		return NULL;
+	}
+
+	close(sock);
+
+	return strdup(tmp);
+}
