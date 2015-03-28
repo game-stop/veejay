@@ -102,6 +102,7 @@
 #endif
 #define QUEUE_LEN 1
 #include <veejay/vims.h>
+#include <libqrwrap/qrwrapper.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -2027,6 +2028,21 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
 	}
 
+	char *my_ip = (info->qrcode == 1 ? vj_server_my_ip() : "http://veejayhq.net/contributing/" );
+	if( my_ip != NULL ) {
+		char outfile[1024];
+		char connectionStr[1024];
+		snprintf( connectionStr, sizeof(connectionStr),"%s:%d",my_ip, info->uc->port );
+		snprintf( outfile, sizeof(outfile), "%s/QR-%d.png",info->homedir, info->uc->port );
+		if(info->qrcode ==1 )
+			free(my_ip);
+		if( qrwrap_encode_string( outfile , connectionStr ) ) {
+			veejay_msg(VEEJAY_MSG_INFO,"Connection info encoded to QR (%s -> %s)", connectionStr, outfile);
+		}
+	} else {
+		veejay_msg(VEEJAY_MSG_WARNING,"Unable to get external IP address" );
+	}
+
     	/* now setup the output driver */
     	switch (info->video_out)
 	 {
@@ -3642,10 +3658,6 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 // open_video_files is called BEFORE init
 static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force , char override_norm)
 {
-	
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
-
 	if(num_files<=0 || files == NULL)
 	{
 		info->dummy->active = 1;

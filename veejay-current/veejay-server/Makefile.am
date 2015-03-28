@@ -7,7 +7,7 @@ SUBDIRS = mjpegtools
 endif
 
 SUBDIRS += aclib
-SUBDIRS += libOSC libhash libvjmsg libvjmem 
+SUBDIRS += libOSC libhash libvjmsg libvjmem libqrwrap 
 SUBDIRS += bio2jack libvevo liblzo libvje libplugger libsample libvjnet libsubsample libyuv libel libstream libsamplerec
 SUBDIRS += veejay 
 SUBDIRS += livido-plugins

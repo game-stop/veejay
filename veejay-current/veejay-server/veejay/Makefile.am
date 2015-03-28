@@ -24,10 +24,11 @@ INCLUDES += -I /usr/X11R6/include -I$(top_srcdir)/libOSC \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
 		-I$(top_srcdir)/liblzo \
+		-I$(top_srcdir)/libqrwrap \
 		-I$(top_srcdir)/bio2jack \
 		$(FFMPEG_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) $(MJPEGTOOLS_CFLAGS) \
 		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) $(LIBLO_CFLAGS) \
-		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) $(LIBUNWIND_CFLAGS) $(PTHREAD_CFLAGS)
+		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) $(LIBUNWIND_CFLAGS) $(PTHREAD_CFLAGS) $(LIBQRENCODE_CFLAGS)
 
 pkginclude_HEADERS = vims.h
 
@@ -60,6 +61,7 @@ libveejay_la_LIBADD = 	-L$(top_builddir)/libOSC  -lOSC \
 			-L$(top_builddir)/libsubsample -lsubsample \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
+			-L$(top_builddir)/libqrwrap -lqrwrap \
 			-L$(top_builddir)/libvevo -lvevo 
 
 if !HAVE_MJPEGTOOLS
@@ -68,8 +70,8 @@ endif
 
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(SDL_TTF_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
 			$(XML2_LIBS) $(JPEG_LIBS) $(LIBLO_LIBS) $(LIBUNWIND_LIBS) \
-		 	$(FFMPEG_LIBS) $(XINERAMA_LIBS) $(MJPEGTOOLS_LIBS) \
-			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(RT_LIBS) \
+		 	$(FFMPEG_LIBS) $(XINERAMA_LIBS) $(MJPEGTOOLS_LIBS) $(LIBPNG_LIBS) \
+			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(RT_LIBS) $(LIBQRENCODE_LIBS) \
 			-DDYNAMIC -O3 -Wall -rdynamic -Wl,-no-undefined 
 
 # *********************************************************************

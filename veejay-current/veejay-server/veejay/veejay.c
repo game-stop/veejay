@@ -283,7 +283,10 @@ static void Usage(char *progname)
 
 	fprintf(stderr,
 		"  --benchmark NxN\t\tveejay benchmark using NxN resolution\n");
-
+#ifdef HAVE_QRENCODE  
+	fprintf(stderr,
+		"  --qrcode-connection-info\tEncode veejay's external IP and port number into QR code\n" );
+#endif
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
@@ -325,6 +328,8 @@ static int set_option(const char *name, char *value)
 		}
 	} else if (strcmp(name, "bezerk") == 0 || strcmp(name, "b") == 0) {
 	info->no_bezerk = 0;
+	} else if (strcmp(name, "qrcode-connection-info" ) == 0 ) {
+		info->qrcode = 1;
     } else if (strcmp(name, "timer") == 0 || strcmp(name, "t") == 0) {
 	info->uc->use_timer = atoi(optarg);
 	if (info->uc->use_timer < 0 || info->uc->use_timer > 2) {
@@ -557,6 +562,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"capture-device",1,0,0},
 	{"swap-range",0,0,0},
 	{"load-generators",1,0,0},
+	{"qrcode-connection-info",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif

@@ -3337,6 +3337,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				 pri );
                      		   frame->ssm = 1;
                 	}
+			
 			if( viewport_active(vp) )
 			{
 				VJFrame *tst = composite_get_draw_buffer( info->composite );
@@ -3366,6 +3367,12 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
     	{
         	info->uc->take_bg = vj_perform_take_bg(info,frame,0);
     	} 
+
+	if(placement == 1){
+		/* draw qr picture if present */
+		qrwrap_draw( frame, info->uc->port, info->homedir, frame->height/4,frame->height/4, frame->format );
+	}
+
 
 	if( frame->ssm == 1 )
 	{

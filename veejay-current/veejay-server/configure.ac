@@ -576,6 +576,22 @@ have_mjpegtools=false
 AC_SUBST(MJPEGTOOLS_CFLAGS)
 AC_SUBST(MJPGETOOLS_LIBS)
 
+PKG_CHECK_MODULES(LIBPNG, [libpng], have_libpng=true,have_libpng=false)
+PKG_CHECK_MODULES(LIBQRENCODE,[libqrencode >= 3.4.4], have_qrencode=true,have_qrencode=false)
+if test x$have_qrencode = xfalse;
+then
+	AC_MSG_WARN([libqrencode is not present])
+else
+	if test x$have_libpng = xfalse;
+	then
+		AC_MSG_ERROR([libpng is not present])
+	fi
+	AC_DEFINE( HAVE_QRENCODE,1,[Use QREncode] )
+fi
+AC_SUBST(LIBQRENCODE_LIBS)
+AC_SUBST(LIBQRENCODE_CFLAGS)
+AC_SUBST(LIBPNG_LIBS)
+AC_SUBST(LIBPNG_CFLAGS)
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
@@ -1117,6 +1133,7 @@ libvje/Makefile
 libplugger/Makefile
 libsample/Makefile
 libvjnet/Makefile
+libqrwrap/Makefile
 libsubsample/Makefile
 libyuv/Makefile
 libel/Makefile
