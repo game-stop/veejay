@@ -5699,9 +5699,9 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 	char *end = str;
 	int base = 10;
 	int index = 3; // sample, chain, fx_id
-	float value = 0.0f;
+	int value = 0;
 
-	if( sscanf( str, "%f" , &value ) != 1 ) {
+	if( sscanf( str, "%d" , &value ) != 1 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid value." );
 		return;
 	}
@@ -5727,7 +5727,7 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 			float min = (float) vj_effect_get_min_limit(effect, args[2]);
 			float max = (float) vj_effect_get_max_limit(effect, args[2]);
 
-			float val = min + (max * value);
+			float val = min + (max * ((float) value / 100.0f));
 
 			if(sample_set_effect_arg(args[0],args[1],args[2],(int) val )==-1)	
 			{
