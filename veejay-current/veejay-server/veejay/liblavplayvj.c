@@ -1867,7 +1867,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
     	}
 
-	info->font = vj_font_init( el->video_width,   el->video_height,	   el->video_fps,0 );
+	info->font = vj_font_init( el->video_width,el->video_height,el->video_fps,0 );
 
 	if(!info->font) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system.");
@@ -1877,16 +1877,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	if(info->settings->composite)
 	{
-		info->osd = vj_font_single_init( info->video_output_width,info->video_output_height,
-					  el->video_fps ,info->homedir  );
+		info->osd = vj_font_single_init( info->video_output_width,info->video_output_height,el->video_fps,info->homedir  );
 
 	}
 	else
 	{	
-		info->osd = vj_font_single_init( el->video_width,
-				   		el->video_height,
-				  		el->video_fps,
-						info->homedir );
+		info->osd = vj_font_single_init( el->video_width,el->video_height,el->video_fps,info->homedir );
 	}
 	
 

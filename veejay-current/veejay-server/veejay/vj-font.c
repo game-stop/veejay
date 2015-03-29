@@ -1687,7 +1687,7 @@ void	*vj_font_single_init( int w, int h, float fps,char *path )
 	f->text_height = 0;
 	
 	int tmp = (w / 100) * 3;
-	if(tmp>15) tmp = 14;
+	if(tmp>18) tmp = 18;
 	if(tmp<11) tmp = 11;
 	f->current_size = tmp;
 

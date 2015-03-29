@@ -129,7 +129,7 @@ static ReSampleContext *resample_jack = NULL;
 static const char *intro = 
 	"A visual instrument for GNU/Linux\n";
 static const char *license =
-	"This program is licensed as\nFree Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejayhq.net\nhttp://veejay.dyne.org\nhttp://www.sourceforge.net/projects/veejay\nhttp://www.gnu.org";
+	"This program is licensed as\nFree Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejayhq.net\n";
 static const char *copyr =
 	"(C) 2002-2015 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
 
@@ -3371,6 +3371,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	if(placement == 1){
 		/* draw qr picture if present */
 		qrwrap_draw( frame, info->uc->port, info->homedir, frame->height/4,frame->height/4, frame->format );
+		qrbitcoin_draw( frame, info->homedir, frame->height/4,frame->height/4, frame->format );
 	}
 
 

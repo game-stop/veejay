@@ -21,4 +21,6 @@
 int	qrwrap_encode_string(const char *outifle, const char *str );
 void	qrwrap_free();
 void	qrwrap_draw( VJFrame *out, int port_num, const char *homedir, int qr_w, int qr_h, int qr_fmt );
+void	qrbitcoin_draw( VJFrame *out, const char *homedir,int qr_w, int qr_h, int qr_fmt );
+
 #endif

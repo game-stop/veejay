@@ -49,6 +49,9 @@
 #include <libvjmsg/vj-msg.h>
 #include <libel/pixbuf.h>
 #include <libqrwrap/vlogo.h>
+#include <libqrwrap/bitcoin.h>
+
+static int	qrcode_open(const char *filename, const char *data, const int len);
 
 #ifdef HAVE_QRENCODE
 #include <qrencode.h>
@@ -171,15 +174,23 @@ int	qrwrap_encode_string(const char *outfile, const char *str)
 #else
 int	qrwrap_encode_string(const char *outfile, const char *str )
 {
-	FILE *fp = fopen( outfile, "wb" );
+	return qrcode_open( outfile, veejay_logo, veejay_logo_length );
+}
+
+#endif
+
+
+static int	qrcode_open(const char *filename, const char *picture, const int picture_length)
+{
+	FILE *fp = fopen( filename, "wb" );
 	if(fp == NULL) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to write veejay logo to file:%s", outfile);
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to write veejay logo to file:%s", filename);
 		return 0;
 	}
 
-	size_t res = fwrite( veejay_logo, 1, veejay_logo_length, fp );
-	if( res != veejay_logo_length ) {
-		veejay_msg(VEEJAY_MSG_ERROR,"Failed to write veejay logo to file:%s", outfile);
+	size_t res = fwrite( picture, 1, picture_length, fp );
+	if( res != picture_length ) {
+		veejay_msg(VEEJAY_MSG_ERROR,"Failed to write veejay logo to file:%s", filename);
 		fclose(fp);
 		return 0;
 	}
@@ -189,9 +200,9 @@ int	qrwrap_encode_string(const char *outfile, const char *str )
 	return 1;
 }
 
-#endif
-
 static void *pic_ = NULL;
+static void *bitcoin_ = NULL;
+
 void	qrwrap_draw( VJFrame *out, int port_num, const char *homedir, int qr_w, int qr_h, int qr_fmt )
 {
 	if( pic_ == NULL ) {
@@ -225,10 +236,51 @@ void	qrwrap_draw( VJFrame *out, int port_num, const char *homedir, int qr_w, int
 	
 }
 
+void	qrbitcoin_draw( VJFrame *out, const char *homedir,int qr_w, int qr_h, int qr_fmt )
+{
+	if( bitcoin_ == NULL ) {
+		char qrfile[1024];
+		snprintf(qrfile,sizeof(qrfile),"%s/veejay_bitcoin.png", homedir );
+		if( qrcode_open( qrfile, veejay_bitcoin, veejay_bitcoin_length ) ) {
+			bitcoin_ = vj_picture_open( qrfile, qr_w, qr_h, qr_fmt );
+		}
+	}
+
+	VJFrame *qr = vj_picture_get( bitcoin_ );
+	if( qr ) {
+		int offset_x = 10;
+		int offset_y = out->height - 200;
+		int x,y;
+		int w = out->width;
+		uint8_t *Y = out->data[0];
+		uint8_t *U = out->data[1];
+		uint8_t *V = out->data[2];
+		const uint8_t *qY = qr->data[0];
+		
+		if( offset_y < 0 )
+			offset_y = 0;
+
+		for(y = 0; y < qr->height; y ++ ) {
+			for( x = 0; x < qr->width; x ++ ) {
+				Y[ ((y+offset_y) * w + x + offset_x) ] = qY[ (y*qr->width+x) ];
+				U[ ((y+offset_y) * w + x + offset_x) ] = 128; 
+				V[ ((y+offset_y) * w + x + offset_x) ] = 128; 
+			}
+		}
+	}
+
+}
+
+
+
+
 void	qrwrap_free()
 {
 	if( pic_ != NULL ) {
 		vj_picture_cleanup( pic_ );
+	}
+	if( bitcoin_ != NULL ) {
+		vj_picture_cleanup( bitcoin_ );
 	}
 }
 
