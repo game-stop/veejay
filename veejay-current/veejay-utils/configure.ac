@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay-utils],[1.1.5],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay-utils],[1.1.6],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/sayVIMS.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=1
-VEEJAY_MICRO_VERSION=5
+VEEJAY_MICRO_VERSION=6
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Utilities - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -111,7 +111,16 @@ AC_CHECK_SIZEOF([long int])
 AC_CHECK_SIZEOF([size_t])
 AC_CHECK_SIZEOF([float])
 
+  
+PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=false)
 
+if test x$have_avutil = xtrue;
+then
+	AC_DEFINE( BASE64_AVUTIL,1,[Use avutil base64])
+fi
+
+AC_SUBST(LIBAVUTIL_CFLAGS)
+AC_SUBST(LIBAVUTIL_LIBS)
 
 AC_SUBST(LIBGETOPT_LIB)
 
@@ -606,5 +615,6 @@ fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - Veejay                        : ${have_veejay}])
-AC_MSG_NOTICE([  - MJPEGTools                    : ${have_mjpegtools}])
-
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([ Optional dependencies:])
+AC_MSG_NOTICE([  - AVUtil                        : ${have_avutil}])
