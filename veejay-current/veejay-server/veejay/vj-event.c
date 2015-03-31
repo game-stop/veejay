@@ -9082,6 +9082,142 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 		SEND_MSG(v,line);
 }
 
+
+void	vj_event_send_chain_entry_parameters	( 	void *ptr,	const char format[],	va_list ap	)
+{
+	char fline[1024];
+	char line[1024];
+	int args[4];
+	char *str = NULL;
+	int error = 1;
+	veejay_t *v = (veejay_t*)ptr;
+
+	veejay_memset(line,0,sizeof(line));
+
+	P_A(args,str,format,ap);
+	sprintf(line, "%03d", 0);
+
+	char param[1024];
+
+	if( SAMPLE_PLAYING(v)  )
+	{
+		if(args[0] == 0) 
+			args[0] = v->uc->sample_id;
+
+		if(args[1]==-1)
+			args[1] = sample_get_selected_entry(args[0]);
+
+		int effect_id = sample_get_effect_any(args[0], args[1]);
+		
+		if(effect_id > 0)
+		{
+			int is_video = vj_effect_get_extra_frame(effect_id);
+			int params[SAMPLE_MAX_PARAMETERS];
+			int p;
+			int video_on = sample_get_chain_status(args[0],args[1]);
+			int num_params = vj_effect_get_num_params(effect_id);
+			int kf_type = 0;
+			int kf_status = sample_get_kf_status( args[0],args[1],&kf_type );
+
+			for(p = 0 ; p < num_params; p++)
+				params[p] = sample_get_effect_arg(args[0],args[1],p);
+			for(p = num_params; p < SAMPLE_MAX_PARAMETERS; p++)
+				params[p] = 0;
+
+			snprintf( param, sizeof(param), "%d %d %d %d 0 0 %d %d %d %d 0 ", effect_id, is_video, num_params,
+			       kf_type,kf_status,
+			       sample_get_chain_source(args[0],args[1]),
+			       sample_get_chain_channel(args[0],args[1]),
+			       video_on);
+
+			strncat( line, param, strlen(param));
+			for(p = 0; p < num_params - 1; p ++ ) {
+				snprintf(param,sizeof(param), "%d %d %d %d ", params[p],
+					vj_effect_get_min_limit( effect_id, p ),
+				 	vj_effect_get_max_limit( effect_id, p ),
+					vj_effect_get_default( effect_id,p )	
+					);
+				strncat( line, param,strlen(param));
+			}
+			snprintf(param, sizeof(param),"%d %d %d %d",params[p],
+					vj_effect_get_min_limit( effect_id, p ),
+				 	vj_effect_get_max_limit( effect_id, p ),
+					vj_effect_get_default( effect_id,p )	
+					);
+
+			strncat( line,param,strlen(param));
+
+			error = 0;
+		}
+	}
+	
+	if(STREAM_PLAYING(v))
+	{
+		if(args[0] == 0) 
+			args[0] = v->uc->sample_id;
+
+		if(args[1] == -1)
+			args[1] = vj_tag_get_selected_entry(args[0]);
+
+ 		int effect_id = vj_tag_get_effect_any(args[0], args[1]);
+
+		if(effect_id > 0)
+		{
+			int is_video = vj_effect_get_extra_frame(effect_id);
+			int params[SAMPLE_MAX_PARAMETERS];
+			int p;
+			int num_params = vj_effect_get_num_params(effect_id);
+
+			int video_on = vj_tag_get_chain_status(args[0], args[1]);
+			int kf_type = 0;
+			int kf_status = vj_tag_get_kf_status( args[0],args[1], &kf_type );
+
+			for(p = 0 ; p < num_params; p++)
+				params[p] = vj_tag_get_effect_arg(args[0],args[1],p);
+			for(p = num_params; p < SAMPLE_MAX_PARAMETERS;p++)
+				params[p] = 0;
+
+			snprintf( param, sizeof(param), "%d %d %d %d 0 0 %d %d %d %d 0 ", effect_id, is_video, num_params,	
+			       kf_type,
+		       	       kf_status,	       
+			       vj_tag_get_chain_source(args[0],args[1]),
+			       vj_tag_get_chain_channel(args[0],args[1]),
+			       video_on);
+
+			strncat( line, param, strlen(param));
+			for(p = 0; p < num_params - 1; p ++ ) {
+				snprintf(param,sizeof(param), "%d %d %d %d ", params[p],
+					vj_effect_get_min_limit( effect_id, p ),
+				 	vj_effect_get_max_limit( effect_id, p ),
+					vj_effect_get_default( effect_id,p )	
+					);
+
+				strncat( line, param,strlen(param));
+			}
+			snprintf(param, sizeof(param),"%d %d %d %d",params[p],
+					vj_effect_get_min_limit( effect_id, p ),
+				 	vj_effect_get_max_limit( effect_id, p ),
+					vj_effect_get_default( effect_id,p )	
+					);
+
+			strncat( line,param,strlen(param));
+
+			error = 0;
+		}
+	}
+
+	if(!error)
+	{
+		snprintf(fline,sizeof(fline),"%04zu%s",strlen(line),line);
+		SEND_MSG(v, fline);
+	}
+	else {
+		SEND_MSG(v,line);
+	}
+}
+
+
+
 void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	int i;

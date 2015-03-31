@@ -2111,6 +2111,21 @@ void		vj_init_vevo_events(void)
 				"Chain Index",
 				-1,
 				NULL );
+
+	index_map_[VIMS_CHAIN_GET_PARAMETERS]			=	_new_event(
+				"%d %d",
+				VIMS_CHAIN_GET_ENTRY,
+				"GUI: Get effect chain index details (incl. min/max/default)",
+				vj_event_send_chain_entry_parameters,
+				2,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Chain Index",
+				-1,
+				NULL );
+
+
 	index_map_[VIMS_EFFECT_LIST]				=	_new_event(
 				NULL,
 				VIMS_EFFECT_LIST,
