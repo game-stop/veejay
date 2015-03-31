@@ -76,6 +76,7 @@ static struct {
 	{ VIMS_WORKINGDIR,8},
 	{ VIMS_SAMPLE_STACK,3},
 	{ VIMS_GET_IMAGE,8},
+	{ VIMS_CHAIN_GET_PARAMETERS,4},
 	{ VIMS_GET_SHM,SHM_ID_LEN },
 	{ 0,0 },
 };

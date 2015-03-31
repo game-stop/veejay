@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay-utils],[1.1.6],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay-utils],[1.1.7],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/sayVIMS.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=1
-VEEJAY_MICRO_VERSION=6
+VEEJAY_MICRO_VERSION=7
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Utilities - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -185,7 +185,7 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
 fi
 
 
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.3],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.50],
 		[	
 		AC_SUBST(VEEJAY_CFLAGS)
 		AC_SUBST(VEEJAY_LIBS)
