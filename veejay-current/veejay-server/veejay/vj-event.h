@@ -187,6 +187,7 @@ void	vj_event_send_sample_list			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_send_chain_entry_parameters    (	void *ptr,	const char format[], 	va_list ap 	);
 void	vj_event_send_sample_history_list		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	);
