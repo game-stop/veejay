@@ -1,0 +1,27 @@
+
+Veejay/Android
+================
+
+
+veejay-server must be compiled with the libqrencode dependency.
+
+ libqrencode (https://fukuchi.org/works/qrencode/)
+
+
+If veejay is compiled with QR code support, you can give it the 'qrcode-connection-info' commandline switch:
+
+$ veejay ... -qrcode-connection-info
+
+Press CTRL-C to display the QR code
+
+
+If you have the android VJ remote control App, you can connect to veejay by entering the veejay's ip address or by scanning veejay's QR code.
+
+
+Technical:
+----------
+
+Veejay's server address is encoded as string HOST:PORTNUMBER, for example '192.168.10.10:3490' or 'veejay-pc.dark.net:3490' and placed in $HOME/.veejay as QR-3490.png
+
+The image is regenerated at each startup.
+
