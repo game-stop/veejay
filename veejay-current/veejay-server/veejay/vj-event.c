@@ -5756,7 +5756,7 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 			float min = (float) vj_effect_get_min_limit(effect, args[2]);
 			float max = (float) vj_effect_get_max_limit(effect, args[2]);
 
-			float val = min + (max * value);
+			float val = min + (max * ((float)value/100.0f));
 
 			if(vj_tag_set_effect_arg(args[0],args[1],args[2],(int) val)==-1)
 			{
