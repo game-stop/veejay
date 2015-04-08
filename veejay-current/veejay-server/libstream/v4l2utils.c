@@ -422,6 +422,12 @@ static int	v4l2_enum_video_standards( v4l2info *v, char norm )
 
 	if (-1 == ioctl (v->fd, VIDIOC_S_STD, &std_id)) {
 		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: unable to set video standard: %s", strerror(errno));
+
+		if( errno == ENOTTY ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: probably your video input device does not support the requested format" );
+			return 0;
+		}
+
 		return 1;//@ show must go on 
 	} else {
 		veejay_msg(VEEJAY_MSG_INFO,"v4l2: set video standard %s", v4l2_get_std(std_id));
@@ -456,7 +462,6 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 						(fmtdesc.pixelformat >> 8 ) & 0xff,
 						(fmtdesc.pixelformat >> 16) & 0xff,
 						(fmtdesc.pixelformat >> 24) & 0xff );
-	
 			v->supported_pixel_formats[ v->n_pixel_formats ] = fmtdesc.pixelformat;
 			v->n_pixel_formats = (v->n_pixel_formats + 1 ) % loop_limit;
 
@@ -1197,6 +1202,7 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 		if( length == 0 ) { //@ success
 		  length = 1;
 		}
+		v->info->format = PIX_FMT_YUV420P;
 	} else 
 #endif
 	if( v->is_jpeg == 2 ) {
@@ -1218,6 +1224,9 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 		v->info->stride[1] = v->picture->linesize[1];
 		v->info->stride[2] = v->picture->linesize[2];
 		v->info->format = v->picture->format;
+		if(v->info->format == -1) {
+			v->info->format = v->c->pix_fmt;
+		}
 	} 
 
 	if( v->scaler == NULL )
