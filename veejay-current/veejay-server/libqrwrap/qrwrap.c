@@ -248,7 +248,7 @@ void	qrbitcoin_draw( VJFrame *out, const char *homedir,int qr_w, int qr_h, int q
 
 	VJFrame *qr = vj_picture_get( bitcoin_ );
 	if( qr ) {
-		int offset_x = 10;
+		int offset_x = out->width - qr->width - 10;
 		int offset_y = out->height - 200;
 		int x,y;
 		int w = out->width;
@@ -259,6 +259,8 @@ void	qrbitcoin_draw( VJFrame *out, const char *homedir,int qr_w, int qr_h, int q
 		
 		if( offset_y < 0 )
 			offset_y = 0;
+		if( offset_x < 0 )
+			offset_x = 0;
 
 		for(y = 0; y < qr->height; y ++ ) {
 			for( x = 0; x < qr->width; x ++ ) {
