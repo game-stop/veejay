@@ -2295,10 +2295,9 @@ int	vj_font_norender(void *ctx, long position)
 	int jobs = 0;
 	for( i = 0; i < f->index_len; i ++ ) {
 		srt_seq_t *s = f->index[i];
-		if(!s) 
+		if(!s || !s->text) 
 			continue;
 		if(s->start <= position && s->end >= position ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Subtitle %p, Render %s on %ld",s, s->text, position);
 			jobs ++;	
 		}
 	}

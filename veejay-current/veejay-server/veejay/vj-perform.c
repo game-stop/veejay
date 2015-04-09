@@ -3283,7 +3283,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				composite_set_backing(info->composite,cur);
 				vj_tag_reload_config( info->composite,info->uc->sample_id, 1);
 
-//					settings->composite);
 			} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
 				void *cur = sample_get_composite_view(info->uc->sample_id);
 				if(cur==NULL) {
@@ -3292,7 +3291,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				}
 				composite_set_backing(info->composite,cur);
 				sample_reload_config( info->composite,info->uc->sample_id, 1 );
-			//		settings->composite);
 			}
 #ifdef HAVE_SDL
 			if( info->video_out == 0 ) {
@@ -3318,17 +3316,15 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	}
 
 	if( settings->composite  ) {
-		VJFrame *out = yuv_yuv_template( pri[0],pri[1],pri[2],info->video_output_width,info->video_output_height,
-					get_ffmpeg_pixfmt( info->pixel_format));
+		VJFrame *out = yuv_yuv_template( pri[0],pri[1],pri[2],info->video_output_width,info->video_output_height,get_ffmpeg_pixfmt( info->pixel_format));
 
 		int pff = frame->format; //get_ffmpeg_pixfmt(info->pixel_format);
 		if( frame->ssm == 1 )
 			pff = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
-		VJFrame *in  = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
-						 frame->width,frame->height, pff);
+		VJFrame *in  = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2], frame->width,frame->height, pff);
 		frame->ssm = composite_process(info->composite,out,in,settings->composite,pff); 
 
-		if(osd_text) {
+		if(osd_text && info->uc->playback_mode != VJ_PLAYBACK_MODE_TAG) { // for some reason, tag mode does not display font. lets not even try to render then
 			void *vp = composite_get_vp( info->composite );
 			if(!frame->ssm) {
                         	chroma_supersample(
@@ -3351,7 +3347,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				if(more_text)
 					vj_font_render_osd_status(info->osd,out,more_text,0);
 				
-				vj_font_render_osd_status(info->osd, info->effect_frame1, osd_text,placement );
+				vj_font_render_osd_status(info->osd, frame, osd_text,placement );
 			}
 		}
 		free(out);	
@@ -3373,7 +3369,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		qrwrap_draw( frame, info->uc->port, info->homedir, frame->height/4,frame->height/4, frame->format );
 		qrbitcoin_draw( frame, info->homedir, frame->height/4,frame->height/4, frame->format );
 	}
-
 
 	if( frame->ssm == 1 )
 	{
@@ -3467,7 +3462,7 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 	pri[0] = primary_buffer[0]->Y;
 	pri[1] = primary_buffer[0]->Cb;
 	pri[2] = primary_buffer[0]->Cr;
-	if( frame->ssm == 1 )
+/*	if( frame->ssm == 1 )
 	{
 		chroma_subsample(
 		settings->sample_mode,
@@ -3475,7 +3470,7 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 			pri );
 		frame->ssm = 0;
 	}
-	
+	*/
 	vj_perform_finish_chain( info );
 
 	vj_perform_render_font( info, settings);

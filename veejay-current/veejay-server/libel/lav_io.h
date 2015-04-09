@@ -74,7 +74,7 @@ typedef struct
    int         bps;
    int         is_MJPG;
    int         MJPG_chroma;
-   int	       mmap_size;
+   long	       mmap_size;
    int	       bogus_len;
 } lav_file_t;
 
@@ -111,7 +111,7 @@ int  lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf);
 int  lav_set_audio_position(lav_file_t *lav_file, long clip);
 int  lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps);
 int  lav_filetype(lav_file_t *lav_file);
-lav_file_t *lav_open_input_file(char *filename, int mmap_size);
+lav_file_t *lav_open_input_file(char *filename, long mmap_size);
 int  lav_get_field_size(uint8_t * jpegdata, long jpeglen);
 const char *lav_strerror(void);
 int  lav_fileno( lav_file_t *lav_file );

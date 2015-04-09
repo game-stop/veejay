@@ -354,7 +354,7 @@ void	composite_blit_yuyv( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which
 		if (c->proj_width != c->img_width &&
 			c->proj_height != c->img_height && which_vp == 2  )
 			{
-					yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
+				yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
 			} 
 			else {
 				yuv422_to_yuyv(in,yuyv,c->proj_width,c->proj_height );	

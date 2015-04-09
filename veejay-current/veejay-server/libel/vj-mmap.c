@@ -53,8 +53,8 @@ mmap_region_t *	mmap_file(int fd, long offset, long length, int fs)
 	map->eof = fs;
 	map->mem_offset = offset;
 	remap_file( map, offset );
-	veejay_msg(VEEJAY_MSG_DEBUG, "Memory map region is %f Mb",
-		( (float) length / 1048576.0 ) );
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tmemory map region is %f Mb",( (float) length / 1048576.0f ) );
 	return map;
 }
 
@@ -119,8 +119,7 @@ int	munmap_file( mmap_region_t *map )
 	int n = munmap( map->map_start, map->map_length );
 	if(n==-1)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to unmap memory: %s",
-			strerror(errno));
+		veejay_msg(VEEJAY_MSG_WARNING, "Unable to unmap memory: %s",strerror(errno));
 	}
 	map->map_start = NULL;
 	return n;

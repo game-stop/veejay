@@ -212,6 +212,8 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 		e->context->frame_rate = el->video_fps;
 		e->context->frame_rate_base = 1;
 #endif
+		e->context->sample_aspect_ratio.den = 1;
+		e->context->sample_aspect_ratio.num = 1;
 		e->context->qcompress = 0.0;
 		e->context->qblur = 0.0;
 		e->context->max_b_frames = 0;
@@ -222,7 +224,6 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 		e->context->prediction_method = 0;
 		e->context->dct_algo = FF_DCT_AUTO; 
 		e->context->pix_fmt = get_ffmpeg_pixfmt( out_pixel_format );
-	
 		if(YUV420_ONLY_CODEC(id))
 			e->context->pix_fmt = ( out_pixel_format == FMT_422F ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
 
@@ -237,7 +238,9 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 #endif
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open codec '%s'" , descr );
-			if(e->context) free(e->context);
+			//if(e->context) free(e->context);
+			avcodec_free_context( &(e->context) );
+			
 			if(e) free(e);
 			if(descr) free(descr);
 			return NULL;
@@ -285,7 +288,7 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 		if(av->context)
 		{
 			avcodec_close( av->context );
-			free(av->context);	
+			avcodec_free_context( &av->context );
 			av->context = NULL;
 		}
 		if(av->data[0])
@@ -456,7 +459,9 @@ void 		*vj_avcodec_start( editlist *el, int encoder, char *filename )
 int		vj_avcodec_init( int pixel_format, int verbose)
 {
 	out_pixel_format = pixel_format;
+	
 	av_log_set_level( AV_LOG_QUIET);
+	
 	//av_log_set_level( AV_LOG_VERBOSE );
 	
 #if LIBAVCODEC_BUILD < 5400
@@ -586,19 +591,29 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	return 0;
 }
 
-static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame)
+static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame )
 {
+
 	if( avcodec_encode_video2) {
 		AVPacket pkt;
 		veejay_memset(&pkt,0,sizeof(pkt));
 		int got_packet_ptr = 0;
 		pkt.data = buf;
 		pkt.size = len;
-		return avcodec_encode_video2( ctx, &pkt, frame, &got_packet_ptr);
+
+		int res = avcodec_encode_video2( ctx, &pkt, frame, &got_packet_ptr);
+
+		veejay_msg(0, "Result %d, size %d", res, pkt.size );
+		if( res == -1 ) {
+			return res;
+		}
+
+		return pkt.size;
 	}
 	else if( avcodec_encode_video ) {
 		return avcodec_encode_video(ctx,buf,len,frame);
 	}
+
 	return 0;
 }
 

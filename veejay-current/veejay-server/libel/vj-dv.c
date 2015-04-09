@@ -109,11 +109,6 @@ int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3])
     time_t now = time(NULL);
     uint8_t *pixels[3];
     int w=0; int h = 0;
-    if (!input_buf)
-		return 0;
-
- //   pixels[0] = (uint8_t *) encoder->dv_video;
-
 
      pixels[0] = (uint8_t*) encoder->buffer;
 

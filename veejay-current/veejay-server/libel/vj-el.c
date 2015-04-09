@@ -208,7 +208,7 @@ static struct
 	{ NULL, 0 }
 };
 
-static	int mmap_size = 0;
+static	long mmap_size = 0;
 static struct {
         int i;
         char *s;
@@ -248,7 +248,7 @@ static const    char    *el_pixfmt_str(int i)
         return pixfmtstr[0].s;
 }
 
-void	vj_el_set_mmap_size( int size )
+void	vj_el_set_mmap_size( long size )
 {
 	mmap_size = size;
 }
@@ -378,11 +378,12 @@ static void release_buffer(struct AVCodecContext *context, AVFrame *av_frame){
 }*/
 
 static int el_pixel_format_ = 1;
-static int el_len_ = 0;
-static int el_uv_len_ = 0;
 static int el_uv_wid_ = 0;
 static long mem_chunk_ = 0;
 static int el_switch_jpeg_ = 0;
+
+static VJFrame *el_out_ = NULL;
+
 long	vj_el_get_mem_size()
 {
 	return mem_chunk_;
@@ -408,6 +409,8 @@ void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 
 	lav_set_project( dw,dh, fps, pf );
 
+	el_out_ = yuv_yuv_template( NULL,NULL,NULL, dw,dh, get_ffmpeg_pixfmt(pf) );
+
 	char *maxFileSize = getenv( "VEEJAY_MAX_FILESIZE" );
 	if( maxFileSize != NULL ) {
 		uint64_t mfs = atol( maxFileSize );
@@ -415,7 +418,7 @@ void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 			mfs = AVI_get_MAX_LEN();
 		if( mfs > 0 ) {
 			AVI_set_MAX_LEN( mfs );
-			veejay_msg(VEEJAY_MSG_INFO, "Changed maximum file size to %ld bytes.", mfs );
+			veejay_msg(VEEJAY_MSG_INFO, "Changed maximum file size" );
 		}
 	}
 
@@ -657,12 +660,11 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     	if (el->num_video_files >= 1)
 		chroma = el->MJPG_chroma;
         
-	int in_pixel_format = 	vj_el_pixfmt_to_veejay(
-					detect_pixel_format_with_ffmpeg( filename ));
+	int in_pixel_format = vj_el_pixfmt_to_veejay( detect_pixel_format_with_ffmpeg( filename ));
 	
  
     	n = el->num_video_files;
-	lav_file_t	*elfd = lav_open_input_file(filename,mmap_size );
+	lav_file_t *elfd = lav_open_input_file(filename,mmap_size );
 
 	el->lav_fd[n] = NULL;
 
@@ -944,6 +946,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
      // initialze a decoder if needed
 	decoder_id = _el_get_codec_id( compr_type );
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tCodec %d", decoder_id );
 	if(decoder_id > 0 && decoder_id != 0xffff)
 	{
 		int c_i = _el_get_codec(decoder_id, el->yuv_taste[n] );
@@ -1109,7 +1112,6 @@ static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *g
 }
 #endif
 
-
 int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 {
 	if( el->has_video == 0 || el->is_empty )
@@ -1172,7 +1174,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 #ifdef STRICT_CHECKING
 		assert( dst[0] != NULL  && dst[1] != NULL && dst[2] != NULL );
 #endif	
-		int strides[4] = { el_len_, el_uv_len_, el_uv_len_,0 };
+		int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len,0 };
 		vj_frame_copy( srci->data, dst, strides );
                 return 1;     
 	}
@@ -1205,28 +1207,30 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int inter = 0;
 	int got_picture = 0;
 	uint8_t *in[3] = { NULL,NULL,NULL };
-	int strides[4] = { el_len_, el_uv_len_, el_uv_len_ ,0};
-	uint8_t *dataplanes[3] = { data , data + el_len_, data + el_len_ + el_uv_len_ };
+	int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len ,0};
+	uint8_t *dataplanes[3] = { data , data + el_out_->len, data + el_out_->len + el_out_->uv_len };
 	switch( decoder_id )
 	{
 		case CODEC_ID_YUV420:
-			vj_frame_copy1( data,dst[0], el_len_ );
-			in[0] = data; in[1] = data+el_len_ ; in[2] = data + el_len_ + (el_len_/4);
+			vj_frame_copy1( data,dst[0], el_out_->len );
+			in[0] = data; 
+			in[1] = data+el_out_->len; 
+			in[2] = data+el_out_->len + (el_out_->len/4);
 			if( el_pixel_format_ == FMT_422F ) {
-				yuv_scale_pixels_from_ycbcr( in[0],16.0f,235.0f, el_len_ );
-				yuv_scale_pixels_from_ycbcr( in[1],16.0f,240.0f, el_len_/2);
+				yuv_scale_pixels_from_ycbcr( in[0],16.0f,235.0f, el_out_->len );
+				yuv_scale_pixels_from_ycbcr( in[1],16.0f,240.0f, el_out_->len/2); 
 			}
 			yuv420to422planar( in , dst, el->video_width,el->video_height );
 			return 1;
 			break;	
 		case CODEC_ID_YUV420F:
-			vj_frame_copy1( data, dst[0], el_len_);
-			in[0] = data; in[1] = data + el_len_; in[2] = data + el_len_+(el_len_/4);
+			vj_frame_copy1( data, dst[0], el_out_->len);
+			in[0] = data;
+			in[1] = data + el_out_->len;
+			in[2] = data + el_out_->len+(el_out_->len/4);
 			if( el_pixel_format_ == FMT_422 ) {
-				yuv_scale_pixels_from_y( dst[0], el_len_ );
-				yuv_scale_pixels_from_uv( dst[1], el_len_ / 2 );
-			//	yuv_scale_pixels_from_yuv( dst[0],16.0f,235.0f, el_len_ );
-			//	yuv_scale_pixels_from_yuv( dst[1],16.0f,240.0f, el_len_/2);
+				yuv_scale_pixels_from_y( dst[0], el_out_->len );
+				yuv_scale_pixels_from_uv( dst[1], el_out_->len/2);
 			}
 			yuv420to422planar( in , dst, el->video_width,el->video_height );
 			return 1;
@@ -1234,20 +1238,17 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		case CODEC_ID_YUV422:
 			vj_frame_copy( dataplanes,dst,strides );
 			if( el_pixel_format_ == FMT_422F ) {
-				yuv_scale_pixels_from_ycbcr( dst[0],16.0f,235.0f, el_len_ );
-				yuv_scale_pixels_from_ycbcr( dst[1],16.0f,240.0f, el_len_/2);
+				yuv_scale_pixels_from_ycbcr( dst[0],16.0f,235.0f, el_out_->len );
+				yuv_scale_pixels_from_ycbcr( dst[1],16.0f,240.0f, el_out_->len/2);
 			}	
 			return 1;
 			break;
 		case CODEC_ID_YUV422F:
 			vj_frame_copy( dataplanes, dst, strides );
 			if( el_pixel_format_ == FMT_422 ) {
-				yuv_scale_pixels_from_y( dst[0], el_len_ );
-				yuv_scale_pixels_from_uv( dst[1], el_len_/2);
-			//	yuv_scale_pixels_from_yuv( dst[0],16.0f,235.0f, el_len_ );
-			//	yuv_scale_pixels_from_yuv( dst[1],16.0f,240.0f, el_len_ );
+				yuv_scale_pixels_from_y( dst[0], el_out_->len );
+				yuv_scale_pixels_from_uv( dst[1], el_out_->len/2);
 			}
-
 			return 1;
 			break;
 		case CODEC_ID_DVVIDEO:
@@ -1349,6 +1350,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 										&tmpl,
 										yuv_sws_get_cpu_flags() );
 	
+					
 					yuv_convert_any3( el->scaler, src1,d->frame->linesize,dst1,src1->format,dst1->format);
 
 					free(src1);
@@ -1372,6 +1374,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 										yuv_sws_get_cpu_flags() );
 
 					yuv_convert_any3( el->scaler, src1,d->frame->linesize,dst1,src1->format,dst1->format);
+							
 					free(src1);
 					free(dst1);
 				}
@@ -1848,17 +1851,6 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->frame_list = NULL;
 	el->has_video = 0;
 	el->cache = NULL;
-	el_len_ = el->video_width * el->video_height;
-	el_uv_len_ = el_len_;
-
-	switch(fmt)
-	{
-		case FMT_422:
-		case FMT_422F:
-			el_uv_len_ = el_len_ / 2;
-			el_uv_wid_ = el->video_width;
-			break;
-	}
 
 	return el;
 }
@@ -2117,17 +2109,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
     //if(el->video_inter != 0 ) el->auto_deinter = 0;
 	el->auto_deinter = 0;
 
-	el_len_ = el->video_width * el->video_height;
-	el_uv_len_ = el_len_;
-
-	switch( el_pixel_format_ )
-	{
-		case FMT_422:
-		case FMT_422F:
-			el_uv_len_ = el_len_ / 2;
-			el_uv_wid_ = el->video_width;
-			break;
-	}
 
 	return el;
 }
@@ -2322,7 +2303,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		n = el->frame_list[j];
 		if ( index[ N_EL_FILE(n) ] != oldfile ||
 			N_EL_FRAME(n) != oldframe + 1 )	{
-				len += (3*16);
+				len += 64;
 			}
 		oldfile = index[N_EL_FILE(n)];
 		oldframe = N_EL_FRAME(n);
@@ -2365,8 +2346,8 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	}
 
 
-	char first[256];
-	char tmpbuf[256];
+	char first[128];
+	char tmpbuf[128];
 	snprintf(first,sizeof(first), "%016" PRId64 "%016" PRId64 ,oldfile, oldframe);
 #ifdef STRICT_CHECKING
 	dbg_buflen -= strlen(first);
@@ -2388,19 +2369,15 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 			dbg_buflen -= strlen(tmpbuf);
 			assert( dbg_buflen > 0 );
 #endif
-			veejay_strncat( result, tmpbuf, strlen(tmpbuf) );
+			strncat( result, tmpbuf, strlen(tmpbuf) );
 		}
 		oldfile = index[N_EL_FILE(n)];
 		oldframe = N_EL_FRAME(n);
     	}
 
-	char last_word[64];
-	sprintf(last_word,"%016" PRId64, oldframe);
-#ifdef STRICT_CHECKING
-	dbg_buflen -= 16;
-	assert( dbg_buflen > 0 );
-#endif
-	veejay_strncat( result, last_word, 16 );
+	char last_word[32];
+	snprintf(last_word,sizeof(last_word),"%016" PRId64, oldframe);
+	veejay_strncat( result, last_word, strlen(last_word) );
 
 	int datalen = strlen(result);
 	*bytes_written =  datalen;

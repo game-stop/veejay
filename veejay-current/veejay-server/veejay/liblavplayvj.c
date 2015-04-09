@@ -2792,14 +2792,13 @@ int	prepare_cache_line(int perc, int n_slots)
 	sscanf( line, "%*s %i %i %i %i", &total,&avail,&buffer,&cache );
 */
 	double p = (double) perc * 0.01f;
-	int max_memory = (p * total);
-	int mmap_memory = (int) (0.005f * (float) total);
+	long max_memory = (p * total);
+	long mmap_memory = (long) (0.005f * (float) total);
 
 	char *user_defined_mmap = getenv( "VEEJAY_MMAP_PER_FILE" );
 	if( user_defined_mmap ) {
 		max_memory = atoi( user_defined_mmap ) * 1024;
-		veejay_msg(VEEJAY_MSG_DEBUG, "User-defined %2.2f Mb mmap size per AVI file",
-			 (float) (max_memory / 1024.0f));
+		veejay_msg(VEEJAY_MSG_DEBUG, "User-defined %2.2f Kb mmap size per AVI file",(float) (max_memory / 1024.0f));
 	} else {
 		veejay_msg(VEEJAY_MSG_DEBUG, "You can define mmap size per AVI file with VEEJAY_MMAP_PER_FILE=Kb");
 	}
@@ -2807,7 +2806,7 @@ int	prepare_cache_line(int perc, int n_slots)
 	max_memory -= mmap_memory;
 
 	if( n_slots <= 0)
-	 n_slots = 1;
+		n_slots = 1;
 
 	int chunk_size = (int) (max_memory <= 0 ? 0: max_memory / n_slots ); 
 
@@ -2819,17 +2818,14 @@ int	prepare_cache_line(int perc, int n_slots)
 	total_mem_mb_ = total / 1024;
 	if(chunk_size > 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "%d Kb total system RAM , Consuming up to %2.2f Mb",
-				total, (float)max_memory / 1024.0f );
-		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Kb (%2.2f Mb) per sample",
-				chunk_size, (float) chunk_size/1024.0);
+		veejay_msg(VEEJAY_MSG_INFO, "%d Kb total system RAM , Consuming up to %2.2f Mb",total, (float)max_memory / 1024.0f );
+		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Kb (%2.2f Mb) per sample",chunk_size, (float) chunk_size/1024.0);
 		vj_el_init_chunk( chunk_size );
 	}
 	else {
 		veejay_msg(VEEJAY_MSG_INFO, "Memory cache disabled");
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "Memory map size per EDL is %2.2f Mb",
-				(float) mmap_memory / 1024.0f);
+	veejay_msg(VEEJAY_MSG_INFO, "Memory map size per EDL is %2.2f Mb",(float) mmap_memory / 1024.0f);
 
 
 	return 1;
@@ -3491,17 +3487,12 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 
 		return -1;
 	}
-	// the editlist dimensions must match (there's more)
+
 	if( sample_edl->video_width != info->edit_list->video_width ||
 	    sample_edl->video_height != info->edit_list->video_height )
 	{
-		if(sample_edl) 
-			vj_el_free(sample_edl);
-		veejay_msg(0, "Frame dimensions do not match. Abort");
-	 	if(files[0]) free(files[0]);
-
-		return -1;
-	}
+		veejay_msg(VEEJAY_MSG_WARNING, "Video dimensions do not match!");
+	} 
 
 	// the sample is not there yet,create it
 	if(!sample)
@@ -3511,17 +3502,11 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		{
 			sample->edit_list = sample_edl;
 			sample_store(sample);
-			//	sample_set_editlist( sample->sample_id , sample_edl );
 
-			veejay_msg(VEEJAY_MSG_INFO,
-				"Created new sample %d from file %s",sample->sample_id,
-					files[0]);
+			veejay_msg(VEEJAY_MSG_INFO,"Created new sample %d from file %s",sample->sample_id,	files[0]);
 		}
 		else
-			veejay_msg(VEEJAY_MSG_ERROR,
-			"Failed to create new sample from file '%s'",
-			 files[0]);
-
+			veejay_msg(VEEJAY_MSG_ERROR,"Failed to create new sample from file '%s'", files[0]);
 	}
 
 	// free temporary values

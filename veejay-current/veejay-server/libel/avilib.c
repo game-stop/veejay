@@ -2089,15 +2089,17 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
   
  
   
-  if(!AVI_errno && mmap_size > 0)
+  if(!AVI_errno)
   {
 	long file_size = (long)lseek( AVI->fdes, 0, SEEK_END );
 	lseek( AVI->fdes, AVI->movi_start, SEEK_SET );
-	AVI->mmap_size = AVI->width * AVI->height * mmap_size;
-	if(AVI->mmap_size > 0 )
-	{
-		AVI->mmap_region =
-			mmap_file( AVI->fdes,0,AVI->mmap_size,file_size );
+	long tmp = AVI->width * AVI->height * mmap_size;
+	if( tmp > file_size )
+		tmp = file_size;
+
+	AVI->mmap_size = tmp;
+	if(AVI->mmap_size > 0 ) {
+		AVI->mmap_region = mmap_file( AVI->fdes,0,AVI->mmap_size,file_size );
 	}
   }
 

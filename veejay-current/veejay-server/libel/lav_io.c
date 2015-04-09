@@ -1249,7 +1249,7 @@ int lav_filetype(lav_file_t *lav_file)
    return lav_file->format;
 }
 
-lav_file_t *lav_open_input_file(char *filename, int mmap_size)
+lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 {
    int n;
    char *video_comp = NULL;

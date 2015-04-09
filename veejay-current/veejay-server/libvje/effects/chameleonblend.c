@@ -257,20 +257,22 @@ void chameleonblend_apply( VJFrame *frame, VJFrame *source, int width, int heigh
 	{
 		if( activity <= 40 )
 		{
+			veejay_msg(2, "Activity > 40, draw disappearing" );
 			// into the wall
 			drawDisappearing( source, frame );
 		}
 		else
 		{
+			veejay_msg(2, "Activity > 40, draw appearing" );
 			// out of the wall
 			drawAppearing( source, frame );
 		}
 	}
-
-	if( mode == 0 )
-		drawDisappearing( source, frame );
-	else
-		drawAppearing( source, frame );
-	
+	else {
+		if( mode == 0 )
+			drawDisappearing( source, frame );
+		else
+			drawAppearing( source, frame );
+	}
 
 }
