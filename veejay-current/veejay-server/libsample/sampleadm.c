@@ -2274,7 +2274,7 @@ int sample_chain_clear(int s1)
 		}
 	}
 	sample->effect_chain[i]->source_type = 0;
-	sample->effect_chain[i]->channel = 0;
+	sample->effect_chain[i]->channel = s1;
 	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
 	    sample->effect_chain[i]->arg[j] = 0;
     }

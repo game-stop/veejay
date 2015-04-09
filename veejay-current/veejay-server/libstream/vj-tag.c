@@ -2714,8 +2714,8 @@ int vj_tag_chain_remove(int t1, int index)
 	
 	tag->effect_chain[index]->kf = vpn(VEVO_ANONYMOUS_PORT);
     
-	tag->effect_chain[index]->source_type = 0;
-	tag->effect_chain[index]->channel     = 0;
+    tag->effect_chain[index]->source_type = 1;
+    tag->effect_chain[index]->channel     = t1; //set to self
 
 	int j;
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
