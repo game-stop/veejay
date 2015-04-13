@@ -328,10 +328,6 @@ int		vj_avcodec_find_codec( int encoder )
 			return 997;
 		case ENCODER_YUV420F:
 			return 996;
-		case ENCODER_MPEG4:
-			return CODEC_ID_MPEG4;
-		case ENCODER_DIVX:
-			return CODEC_ID_MSMPEG4V3;
 		case ENCODER_LZO:
 			return 900;
 		case ENCODER_YUV4MPEG:
@@ -369,10 +365,6 @@ char		vj_avcodec_find_lav( int encoder )
 			return 'V';
 		case ENCODER_YUV420F:
 			return 'v';
-		case ENCODER_MPEG4:
-			return 'M';
-		case ENCODER_DIVX:
-			return 'D';
 		case ENCODER_LZO:
 			return 'L';
 		case ENCODER_YUV4MPEG:
@@ -400,7 +392,6 @@ static struct {
 	{ "YUV 4:2:2 Planar, CCIR 601. 16-235/16-240", ENCODER_YUV422 },
 	{ "YUV 4:2:0 Planar, CCIR 601, 16-235/16-240", ENCODER_YUV420 },
 	{ "YUV 4:2:2 Planar, LZO compressed (experimental)", ENCODER_LZO },
-	{ "MPEG4", ENCODER_MPEG4 },
 	{ "DIVX",  ENCODER_DIVX },
 	{ "Quicktime DV", ENCODER_QUICKTIME_DV },
 	{ "Quicktime MJPEG", ENCODER_QUICKTIME_MJPEG },	

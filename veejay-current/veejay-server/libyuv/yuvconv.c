@@ -76,6 +76,10 @@ static struct {
 {	PIX_FMT_RGB32_1,	"PIX_FMT_RGB32_1"},
 {	PIX_FMT_YUYV422,	"PIX_FMT_YUYV422"},
 {	PIX_FMT_UYVY422,	"PIX_FMT_UYVY422"},
+{	PIX_FMT_0BGR,		"PIX_FMT_0BGR"},
+{	PIX_FMT_0RGB,		"PIX_FMT_0RBB"},
+{	PIX_FMT_BGR0,		"PIX_FMT_BGR0"},
+{	PIX_FMT_RGB0,		"PIX_FMT_RGB0"},
 {	0	,		NULL}
 
 };
@@ -263,6 +267,10 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 	put( PIX_FMT_BGR24,   IMG_RGB24 );
 	put( PIX_FMT_RGB32,   IMG_RGBA32 );
 	put( PIX_FMT_RGBA,    IMG_RGBA32 );
+	put( PIX_FMT_0BGR,	IMG_ABGR32 );
+	put( PIX_FMT_BGR0,	IMG_BGRA32 );
+	put( PIX_FMT_RGB0,	IMG_RGBA32 );
+	put( PIX_FMT_0RGB,	IMG_ARGB32 );
 	put( PIX_FMT_ARGB,    IMG_ARGB32 );
 	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
 	put( PIX_FMT_YUYV422, IMG_YUY2);
@@ -309,6 +317,10 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 			*p4 = 0;
 			break;
 		case PIX_FMT_RGBA:
+		case PIX_FMT_RGB0:
+		case PIX_FMT_BGR0:
+		case PIX_FMT_0BGR:
+		case PIX_FMT_0RGB:
 			if( p1 != NULL )
 				*p1 = src->len * 4;
 			*p2 = 0;
@@ -391,6 +403,10 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			break;
 		case PIX_FMT_BGR32:
 		case PIX_FMT_RGB32:
+		case PIX_FMT_RGB0:
+		case PIX_FMT_BGR0:
+		case PIX_FMT_0BGR:
+		case PIX_FMT_0RGB:
 			f->stride[0] = w * 4;
 			f->uv_width = 0; f->uv_height = 0;
 			f->data[1] = NULL; f->data[2] = NULL;
@@ -411,12 +427,6 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 
 VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 {
-#ifdef STRICT_CHECKING
-	assert( fmt == PIX_FMT_RGB24 || fmt == PIX_FMT_BGR24 ||
-		fmt == PIX_FMT_RGBA || fmt == PIX_FMT_RGB32_1 || fmt == PIX_FMT_RGB32 || fmt == PIX_FMT_ARGB || fmt == PIX_FMT_BGR32);
-	assert( w > 0 );
-	assert( h > 0 );
-#endif
 	VJFrame *f = (VJFrame*) vj_calloc(sizeof(VJFrame));
 	f->format = fmt;
 	f->data[0] = rgb_buffer;
@@ -447,7 +457,7 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 
 void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt )
 {
-#ifdef STRICT_CHECKING
+#ifdef STRICT_CHEdCKING
 	assert( dst_fmt >= 0 && dst_fmt < 32 );
 	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
 		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
@@ -467,7 +477,6 @@ void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst
 				src->width,src->height,dst_fmt );
 		yuv_pixstr( __FUNCTION__, "src_fmt", src_fmt );
 		yuv_pixstr( __FUNCTION__, "dst_fmt", dst_fmt );
-
 	}
 }
 
@@ -1262,7 +1271,8 @@ void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
 	int n = 3;
-	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB || src->format == PIX_FMT_BGR32 || src->format == PIX_FMT_RGB32  )
+	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB || src->format == PIX_FMT_BGR32 || src->format == PIX_FMT_RGB32 ||
+	    src->format == PIX_FMT_BGR0 || src->format == PIX_FMT_0BGR || src->format == PIX_FMT_RGB0 || src->format == PIX_FMT_0RGB )
 		n = 4;
 	const int src_stride[3] = { src->width*n,0,0};
 	const int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
@@ -1275,7 +1285,8 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 	vj_sws *s = (vj_sws*) sws;
 	int n = 3;
 	if( dst->format == PIX_FMT_RGBA || dst->format == PIX_FMT_BGRA || dst->format == PIX_FMT_ARGB ||
-	 dst->format == PIX_FMT_RGB32 || dst->format == PIX_FMT_BGR32 )
+	 dst->format == PIX_FMT_RGB32 || dst->format == PIX_FMT_BGR32 || dst->format == PIX_FMT_BGR0 || dst->format == PIX_FMT_0BGR || 
+	 dst->format == PIX_FMT_RGB0 || dst->format == PIX_FMT_0RGB  )
 		n = 4;
 
 	const int src_stride[3] = { src->width,src->uv_width,src->uv_width };

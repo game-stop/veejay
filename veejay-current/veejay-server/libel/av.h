@@ -104,6 +104,10 @@ extern int avcodec_encode_video2(AVCodecContext *avctx, AVPacket *avpkt,const AV
 #define CODEC_ID_FIRST_AUDIO AV_CODEC_ID_FIRST_AUDIO
 #endif
 
+#ifndef CODEC_ID_FIST_SUBTITLE
+#define CODEC_ID_FIRST_SUBTITLE AV_CODEC_ID_FIRST_SUBTITLE
+#endif
+
 #endif
 
 #endif

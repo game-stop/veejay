@@ -1449,12 +1449,8 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 				video_comp = strdup( "PICT" );
 				ret = 1;
 				alt = 1;
-				veejay_msg(VEEJAY_MSG_DEBUG,
-						"\tLoaded image file");
+				veejay_msg(VEEJAY_MSG_DEBUG,"\tLoaded image file");
 			}
-			else
-				veejay_msg(VEEJAY_MSG_DEBUG,
-						"\tNot a Image file");
 		}
 #endif
    	}
@@ -1462,8 +1458,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 	if(ret == 0 || video_comp == NULL || alt == 0)
 	{
 		free(lav_fd);
-		internal_error = ERROR_FORMAT; /* Format not recognized */
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load file '%s', code=%x, video=%s", filename,ret,video_comp);
+		internal_error = ERROR_FORMAT;
 		return 0;
 	}
 	
