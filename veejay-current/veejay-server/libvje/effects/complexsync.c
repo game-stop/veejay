@@ -24,7 +24,7 @@
 #include "complexsync.h"
 #include <stdlib.h>
 
-static uint8_t *c_outofsync_buffer[3];
+static uint8_t *c_outofsync_buffer[3] = { NULL,NULL,NULL };
 
 vj_effect *complexsync_init(int width, int height)
 {
@@ -46,8 +46,8 @@ vj_effect *complexsync_init(int width, int height)
     ve->description = "Out of Sync -Replace selection-";
     ve->sub_format = 1;
     ve->extra_frame = 1;
-	ve->has_user = 0;	
-	ve->param_description = vje_build_param_list( ve->num_params, "Vertical size", "Mode", "Framespeed" );
+    ve->has_user = 0;	
+    ve->param_description = vje_build_param_list( ve->num_params, "Vertical size", "Mode", "Framespeed" );
     return ve;
 }
 
@@ -67,8 +67,8 @@ void complexsync_free() {
 	 if(c_outofsync_buffer[0])
 	    free(c_outofsync_buffer[0]);
    	 c_outofsync_buffer[0] = NULL;
-	
 }
+
 void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int val)
 {
 
@@ -77,17 +77,21 @@ void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, i
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-	const unsigned int region = width * val;
+	int region = width * val;
+
 	int strides[4] = { region, region, region, 0 };
-	int planes[4] = { width * height, width * height, width * height };
-	int i;
+	int planes[4] = { len, len, len, 0 };
 	
+	int i;
+
 	vj_frame_copy( frame->data, c_outofsync_buffer, planes );
 	vj_frame_copy( frame2->data, frame->data, planes );
 
         if( (len - region) > 0)
 	{
 		uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
-		vj_frame_copy( c_outofsync_buffer, dest, strides );
+		int dst_strides[4] = { len - region, len - region, len - region,0 };
+
+		vj_frame_copy( c_outofsync_buffer, dest, dst_strides );
 	}
 }
