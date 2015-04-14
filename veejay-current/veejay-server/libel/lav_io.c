@@ -50,7 +50,6 @@
 #define QUICKTIME_MJPG_TAG 0x6d6a7067
 extern int vj_el_get_decoder_from_fourcc( const char *fourcc );
 extern int get_ffmpeg_pixfmt(int p);
-extern int detect_pixel_format_with_ffmpeg( const char *filename );
 
 extern int AVI_errno;
 static int _lav_io_default_chroma = CHROMAUNKNOWN;
@@ -941,9 +940,9 @@ int lav_video_compressor_type(lav_file_t *lav_file)
 		const char *compressor = quicktime_video_compressor(lav_file->qt_fd,0);
 		return	vj_el_get_decoder_from_fourcc( compressor );
 	}
-			//		return quicktime_video_compressor(lav_file->qt_fd,0);
 #endif
-	return AVI_video_compressor_type( lav_file->avi_fd );
+	return vj_el_get_decoder_from_fourcc( AVI_video_compressor(lav_file->avi_fd) );
+
 }
 
 #define FOURCC_DV "dvsd"
@@ -1743,7 +1742,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 	   jpg_height = get_int2(frame + jpeg_image_offset + 5);
 	   jpg_width  = get_int2(frame + jpeg_image_offset + 7);
 
-	   if( strncasecmp( frame + 6, "LAVC", 4 ) == 0 ) {
+	/*   if( strncasecmp( frame + 6, "LAVC", 4 ) == 0 ) {
 		   int pf = detect_pixel_format_with_ffmpeg( filename );
 		   switch(pf) {
 			case PIX_FMT_YUV422P: lav_fd->MJPG_chroma = CHROMA422;break;
@@ -1760,7 +1759,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 			 if(frame) free(frame);
 		  	 return lav_fd;
 		   }
-	   } 
+	   } */
 
 	   /* check height */
 	

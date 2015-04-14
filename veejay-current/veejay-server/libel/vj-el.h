@@ -58,7 +58,8 @@ typedef struct
 
 	char		*(video_file_list[MAX_EDIT_LIST_FILES]);
 	lav_file_t	*(lav_fd[MAX_EDIT_LIST_FILES]);
-	int		yuv_taste[MAX_EDIT_LIST_FILES];
+	int		pixfmt[MAX_EDIT_LIST_FILES];
+	void		*ctx[MAX_EDIT_LIST_FILES];
 
 	long 		num_frames[MAX_EDIT_LIST_FILES];
 	long		max_frame_sizes[MAX_EDIT_LIST_FILES];
@@ -146,8 +147,6 @@ void	vj_el_set_caching(int status);
 int	vj_el_bogus_length( editlist *el, long nframe );
 
 int	vj_el_set_bogus_length( editlist *el, long nframe, int len );
-
-int	detect_pixel_format_with_ffmpeg( const char *filename );
 
 int	vj_el_pixfmt_to_veejay(int pix_fmt );
 

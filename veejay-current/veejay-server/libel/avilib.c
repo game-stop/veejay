@@ -3099,9 +3099,6 @@ multiple_riff:
    lseek(AVI->fdes,AVI->movi_start,SEEK_SET);
    AVI->video_pos = 0;
 
-	    AVI->ffmpeg_codec_id =
-		    vj_el_get_decoder_from_fourcc( AVI->compressor );
-
    return(0);
 }
 
@@ -3782,7 +3779,3 @@ int AVI_fileno(avi_t *AVI)
 	return AVI->fdes;
 }
 
-int	AVI_video_compressor_type(avi_t *AVI)
-{
-	return AVI->ffmpeg_codec_id;
-}

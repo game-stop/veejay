@@ -443,7 +443,6 @@ int AVI_read_wave_header( int fd, struct wave_header * wave );
 int AVI_write_wave_header( int fd, const struct wave_header * wave );
 size_t AVI_read_wave_pcm_data( int fd, void * buffer, size_t buflen );
 size_t AVI_write_wave_pcm_data( int fd, const void * buffer, size_t buflen );
-int    AVI_video_compressor_type(avi_t *AVI);
 int AVI_fileno(avi_t *AVI);
 uint64_t AVI_get_MAX_LEN();
 uint64_t AVI_set_MAX_LEN( uint64_t n );
