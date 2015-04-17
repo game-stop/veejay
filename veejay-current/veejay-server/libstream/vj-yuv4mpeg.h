@@ -18,7 +18,6 @@
  */
 #ifndef VJ_YUV4MPEG_H
 #define VJ_YUV4MPEG_H
-#include <libel/vj-el.h>
 #include <mjpegtools/mpegconsts.h>
 
 typedef struct {
@@ -35,14 +34,16 @@ typedef struct {
     int fd;
     int has_audio;
     int audio_bits;
+    int format;
     float video_fps;
     long audio_rate;
     void *scaler;
     uint8_t *buf[4];
     int  is_jpeg;
+    VJFrame *dst;
 } vj_yuv;
 
-vj_yuv *vj_yuv4mpeg_alloc(editlist * el, int dst_w, int dst_h, int out_pix_fmt);
+vj_yuv *vj_yuv4mpeg_alloc(int dst_w, int dst_h,float fps, int out_pix_fmt);
 
 
 uint8_t *vj_yuv_get_buf( void *v );
@@ -53,9 +54,9 @@ int vj_yuv_stream_start_read_fd( vj_yuv *, int fd, int width,int height );
 
 int vj_yuv_stream_start_read(vj_yuv *, char *, int width, int height);
 
-int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el, int outchroma);
+int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, VJFrame *frame, int outchroma);
 
-int vj_yuv_stream_start_write(vj_yuv *,editlist *, char *, int);
+int vj_yuv_stream_start_write(vj_yuv *, VJFrame *frame, char *, int);
 
 void vj_yuv_stream_stop_read(vj_yuv * yuv4mpeg);
 
@@ -67,11 +68,9 @@ int vj_yuv_put_frame(vj_yuv * vjyuv, uint8_t **);
 
 int vj_yuv_get_aframe(vj_yuv * vjyuv, uint8_t * audio);
 
-int vj_yuv_put_aframe(uint8_t * audio, editlist *el, int len);
+int vj_yuv_write_wave_header(VJFrame *frame, char *outfile);
 
-int vj_yuv_write_wave_header(editlist * el, char *outfile);
+int vj_yuv_stream_open_pipe(vj_yuv *, char *);
 
-int vj_yuv_stream_open_pipe(vj_yuv *, char *, editlist *el);
-
-int vj_yuv_stream_header_pipe( vj_yuv *, editlist *el );
+int vj_yuv_stream_header_pipe( vj_yuv *, VJFrame *frame);
 #endif

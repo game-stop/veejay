@@ -593,9 +593,6 @@ int veejay_init_editlist(veejay_t * info)
    veejay_msg(VEEJAY_MSG_DEBUG, "1.0/Seconds per video Frame = %4.4f",	1.0 / settings->spvf);
    veejay_msg(VEEJAY_MSG_DEBUG, "1.0/%ld = %g Seconds per audio Frame", el->audio_rate, settings->spas );
 
-   vj_el_set_image_output_size( el, info->dummy->width, info->dummy->height,		
-				    info->dummy->fps, info->pixel_format );
-
    return 0;
 }
 
@@ -1839,11 +1836,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	el = info->edit_list;
 
-	if( info->video_output_width <= 0 || info->video_output_height <= 0 ) {
-		info->video_output_width = el->video_width;
-		info->video_output_height = el->video_height;
-	}
-
 	if(!vj_mem_threaded_init( info->video_output_width, info->video_output_height ) )
 		return 0;
 
@@ -1862,12 +1854,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	int driver = 1;
 #endif
 
-	if (vj_tag_init(el->video_width, el->video_height, info->pixel_format,driver) != 0) {
+	if (vj_tag_init(info->video_output_width, info->video_output_height, info->pixel_format,driver) != 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing Stream Manager");
 		return -1;
     	}
 
-	info->font = vj_font_init( el->video_width,el->video_height,el->video_fps,0 );
+	info->font = vj_font_init( info->video_output_width,info->video_output_height,el->video_fps,0 );
 
 	if(!info->font) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system.");
@@ -1882,7 +1874,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	}
 	else
 	{	
-		info->osd = vj_font_single_init( el->video_width,el->video_height,el->video_fps,info->homedir );
+		info->osd = vj_font_single_init( info->video_output_width,info->video_output_height,el->video_fps,info->homedir );
 	}
 	
 
@@ -1892,23 +1884,23 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	}
 
 
- 	sample_init( (el->video_width * el->video_height), info->font ); 
+ 	sample_init( (info->video_output_width * info->video_output_height), info->font ); 
 
 	sample_set_project( info->pixel_format,
 			    info->auto_deinterlace,
 			    info->preserve_pathnames,
 				0,
-			    el->video_norm );
+			    el->video_norm,
+		       	    info->video_output_width,
+			    info->video_output_height);
 
 	int full_range = veejay_set_yuv_range( info );
 
-	if(!vj_el_init_422_frame( el, info->effect_frame1)) return 0;
-	if(!vj_el_init_422_frame( el, info->effect_frame2)) return 0;
 	info->settings->sample_mode = SSM_422_444;
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:2 Planar, %d x %d",
-				el->video_width,
-				el->video_height);
+				info->video_output_width,
+				info->video_output_height);
 	veejay_msg(VEEJAY_MSG_DEBUG, "FX Frame Info: %d x %d, ssm=%d, format=%d",
 			info->effect_frame1->width,info->effect_frame1->height,
 			info->effect_frame1->ssm,
@@ -1934,7 +1926,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	if( info->settings->composite )
 	{
 		int o1 = info->video_output_width * info->video_output_height;
-		int o2 = el->video_width * el->video_height;
+		int o2 = info->effect_frame1->len;
 		int comp_mode = 2;
 		if( o2 > o1 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to perform viewport rendering when input resolution is larger then output resolution.");
@@ -1942,7 +1934,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		}
 
 		info->composite = composite_init( info->video_output_width, info->video_output_height,
-						  el->video_width, el->video_height,
+						  info->video_output_width, info->video_output_height,
 						  info->homedir,
 						  info->settings->sample_mode,
 						  yuv_which_scaler(),
@@ -1953,11 +1945,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		}
 		info->settings->zoom = 0;
 		info->settings->composite = comp_mode;
-	}
-
-        if(info->video_output_width <= 0 || info->video_output_height <=0 ) {
-		 info->video_output_width = el->video_width;
-   		 info->video_output_height = el->video_height;
 	}
 
 	if(!info->bes_width)
@@ -1975,22 +1962,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
   	veejay_msg(VEEJAY_MSG_INFO, 
 		"Initialized %d Image- and Video Effects", vj_effect_max_effects());
-    	vj_effect_initialize( el->video_width,el->video_height,	full_range);
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		"BES %d x %d, Video %d x %d , Screen %d x %d",
-		info->bes_width,
-		info->bes_height,	
-		el->video_width,
-		el->video_height,
-		info->video_output_width,
-		info->video_output_height);
+    	vj_effect_initialize( info->video_output_width,info->video_output_height,full_range);
    
     	if(info->dump) vj_effect_dump(); 	
-    
 	
 	if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
 	{
-	
 		if(sample_readFromFile( info->settings->action_scheduler.sl,
 				info->composite,
 				info->seq, info->font, el, &(info->uc->sample_id), &(info->uc->playback_mode) ) )
@@ -2117,9 +2094,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		break;
 
 		case 4:
-			veejay_msg(VEEJAY_MSG_INFO, "Entering Y4M streaming mode.");
-			info->y4m = vj_yuv4mpeg_alloc( el, info->video_output_width,info->video_output_height, info->pixel_format );
-			if( vj_yuv_stream_start_write( info->y4m, el, info->y4m_file, Y4M_CHROMA_420JPEG ) == -1 ) {
+			veejay_msg(VEEJAY_MSG_INFO, "Entering Y4M streaming mode (420JPEG)");
+			info->y4m = vj_yuv4mpeg_alloc( info->video_output_width,info->video_output_height,info->effect_frame1->fps, info->pixel_format );
+			if( vj_yuv_stream_start_write( info->y4m, info->effect_frame1, info->y4m_file, Y4M_CHROMA_420JPEG ) == -1 ) {
 				return -1;
 			}	
 			break;
@@ -2145,6 +2122,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 			break;
 
+		case 6:
+			veejay_msg(VEEJAY_MSG_INFO, "Entering Y4M streaming mode (422)");
+			info->y4m = vj_yuv4mpeg_alloc( info->video_output_width,info->video_output_height,info->effect_frame1->fps, info->pixel_format );
+			if( vj_yuv_stream_start_write( info->y4m, info->effect_frame1, info->y4m_file, Y4M_CHROMA_422 ) == -1 ) {
+				return -1;
+			}	
+			break;
 
 	default:
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345]");
@@ -2298,7 +2282,6 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
  * veejay_playback_cycle()
  *   the playback cycle
  ******************************************************/
-static double last_tdiff = 0.0;
 static void veejay_playback_cycle(veejay_t * info)
 {
     video_playback_stats stats;
@@ -2573,8 +2556,8 @@ static void veejay_playback_cycle(veejay_t * info)
 static void Welcome(veejay_t *info)
 {
 	veejay_msg(VEEJAY_MSG_WARNING, "Video project settings: %ldx%ld, Norm: [%s], fps [%2.2f], %s",
-			info->current_edit_list->video_width,
-			info->current_edit_list->video_height,
+			info->video_output_width,
+			info->video_output_height,
 			info->current_edit_list->video_norm == 'n' ? "NTSC" : "PAL",
 			info->current_edit_list->video_fps, 
 			info->current_edit_list->video_inter==0 ? "Not interlaced" : "Interlaced" );
@@ -2858,14 +2841,6 @@ veejay_t *veejay_malloc()
 
 	info->uc = (user_control *) vj_calloc(sizeof(user_control));
     if (!(info->uc)) 
-		return NULL;
-
-    info->effect_frame1 = (VJFrame*) vj_calloc(sizeof(VJFrame));
-	if(!info->effect_frame1)
-		return NULL;
-
-    info->effect_frame2 = (VJFrame*) vj_calloc(sizeof(VJFrame));
-	if(!info->effect_frame2)
 		return NULL;
 
     info->effect_frame_info = (VJFrameInfo*) vj_calloc(sizeof(VJFrameInfo));
@@ -3284,7 +3259,7 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
     	}
 
     	el->video_frames -= (n2 - n1 + 1);
-	el->total_frames = el->video_frames - 1;
+	el->total_frames -= (n2 - n1 + 1);
     	return 1;
 }
 
@@ -3371,6 +3346,9 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 		k++;
 	}
 	el->video_frames += settings->save_list_len;
+
+	el->total_frames += settings->save_list_len -1;
+
 	if(el->is_empty)
 		el->is_empty = 0;
     	veejay_increase_frame(info, 0);
@@ -3478,7 +3456,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	// create initial edit list for sample (is currently playing)
 	if(!sample_edl) 
 		sample_edl = vj_el_init_with_args( files,1,info->preserve_pathnames,info->auto_deinterlace,0,
-				info->edit_list->video_norm , info->pixel_format);
+				info->edit_list->video_norm , info->pixel_format, info->video_output_width, info->video_output_height);
 	// if that fails, bye
 	if(!sample_edl)
 	{
@@ -3487,12 +3465,6 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 
 		return -1;
 	}
-
-	if( sample_edl->video_width != info->edit_list->video_width ||
-	    sample_edl->video_height != info->edit_list->video_height )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Video dimensions do not match!");
-	} 
 
 	// the sample is not there yet,create it
 	if(!sample)
@@ -3528,7 +3500,7 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
 	n = el->num_video_files;
 
 	int res = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
-		info->edit_list->video_norm );
+		info->edit_list->video_norm, info->pixel_format, info->video_output_width, info->video_output_height );
 
 	if (res < 0)
 	{
@@ -3671,9 +3643,15 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		veejay_msg(VEEJAY_MSG_DEBUG,"Dummy Video: %dx%d, chroma %x, framerate %2.2f, norm %s",
 					info->dummy->width,info->dummy->height, info->dummy->chroma,info->dummy->fps,
 					(info->dummy->norm == 'n' ? "NTSC" :"PAL"));
+
+		info->video_output_width = info->dummy->width;
+		info->video_output_height = info->dummy->height;
 	}
 	else
 	{
+		int tmp_wid = info->video_output_width;
+		int tmp_hei = info->video_output_height;
+
 	    	info->edit_list = 
 			vj_el_init_with_args(
 					files,
@@ -3682,15 +3660,15 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 					info->auto_deinterlace,
 				       	force,
 					override_norm,
-					info->pixel_format);
+					info->pixel_format, tmp_wid, tmp_hei);
 		if(!info->edit_list ) 
 			return 0;
 	}
 
 	//@ set current
 	info->current_edit_list = info->edit_list;
-	info->effect_frame_info->width = info->current_edit_list->video_width;
-	info->effect_frame_info->height= info->current_edit_list->video_height;
+	info->effect_frame_info->width = info->video_output_width;
+	info->effect_frame_info->height= info->video_output_height;
 
 	if(info->settings->output_fps > 0.0)
 	{
@@ -3706,12 +3684,10 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	return 1;
 }
 
-static void configure_dummy_defaults(veejay_t *info, char override_norm, float fps)
+static void configure_dummy_defaults(veejay_t *info, char override_norm, float fps, char **files, int n_files)
 {
 	info->dummy->width = info->video_output_width;
 	info->dummy->height= info->video_output_height;
-	
-
 	info->dummy->norm =  'p';
 	if( override_norm == 'n' ) {
 		if(!info->dummy->fps) //@ if not set
@@ -3726,7 +3702,7 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	
 	int dw = 720;
 	int dh = (override_norm == 'p' ? 576 : 480);
-
+	float dfps = fps;
 	if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
 	       dw = (override_norm == 'p' ? 352 : 360 );
 	 	       dh = dh / 2;
@@ -3735,16 +3711,33 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_RUN_MODE not set to CLASSIC");
 	}
 
-	if( !info->dummy->width )
+	if(!info->dummy->active) {
+		if( n_files > 0  && (info->video_output_width <= 0 || info->video_output_height <= 0 )) {
+			vj_el_scan_video_file( files[0], &dw, &dh, &dfps );
+
+			info->video_output_width = dw;
+			info->video_output_height = dh;
+		}
+	} else {
+		info->video_output_width = dw;
+		info->video_output_height = dh;
+	}
+
+	if( info->dummy->width <= 0 )
 		info->dummy->width  = dw;
-	if( !info->dummy->height)
+	if( info->dummy->height <= 0)
 		info->dummy->height = dh;
-		
-	info->dummy->chroma = CHROMA422;
+	if( info->dummy->fps <= 0)
+		info->dummy->height = dfps;
+
+	info->dummy->chroma = get_chroma_from_pixfmt( vj_to_pixfmt( info->pixel_format ) );
+
 	if( info->audio ) {
 		if( !info->dummy->arate)
 			info->dummy->arate = 48000;
 	}
+
+	info->settings->output_fps = dfps;
 }
 
 int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm, int switch_jpeg)
@@ -3769,7 +3762,7 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 			sprintf(text, "4:2:2 [0-255]");
 			break;
 		default:
-			veejay_msg(VEEJAY_MSG_ERROR, "Unknown pixel format set"); 
+			veejay_msg(VEEJAY_MSG_ERROR, "Unsupported pixel format selected"); 
 			return 0;
 	}
 
@@ -3785,14 +3778,18 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	if(ofps<=0.0f)
 		ofps = 25.0f;
 
-	configure_dummy_defaults(info,override_norm, ofps);
+	configure_dummy_defaults(info,override_norm, ofps,files,num_files);
 
 	vj_el_init( info->pixel_format, switch_jpeg, info->dummy->width,info->dummy->height, info->dummy->fps );
 #ifdef USE_GDK_PIXBUF
 	vj_picture_init( &(info->settings->sws_templ));
 #endif
 
-	settings->output_fps = ofps;
+
+	info->effect_frame1 = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, vj_to_pixfmt(info->pixel_format) );
+	info->effect_frame1->fps = info->settings->output_fps;
+	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, vj_to_pixfmt(info->pixel_format) );
+	info->effect_frame2->fps = info->settings->output_fps;
 
 	if(num_files == 0)
 	{

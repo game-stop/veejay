@@ -117,7 +117,7 @@ uint8_t 		*vj_avcodec_get_buf( vj_encoder *av )
 	return av->data[0];
 }
 
-static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
+static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filename)
 {
 	vj_encoder *e = (vj_encoder*) vj_calloc(sizeof(vj_encoder));
 	if(!e) return NULL;
@@ -127,21 +127,21 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 #ifdef SUPPORT_READ_DV2
 	if( id == CODEC_ID_DVVIDEO )
 	{
-		if(!is_dv_resolution(el->video_width, el->video_height ))
+		if(!is_dv_resolution(frame->width, frame->height ))
 		{	
 			veejay_msg(VEEJAY_MSG_ERROR,"\tSource video is not in DV resolution");
 			return NULL;
 		}
 		else
 		{
-			e->dv = (void*)vj_dv_init_encoder( (void*)el , out_pixel_format);
+			e->dv = (void*)vj_dv_init_encoder( (void*)frame , out_pixel_format);
 		}
 	}
 	else {
 #endif
-		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * el->video_width * el->video_height * 3 );
-		e->data[1] = e->data[0] + el->video_width * el->video_height;
-		e->data[2] = e->data[1] + el->video_width * el->video_height; //@ for all pixfmt
+		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * frame->width * frame->height * 3 );
+		e->data[1] = e->data[0] + frame->width * frame->height;
+		e->data[2] = e->data[1] + frame->width * frame->height; //@ for all pixfmt
 #ifdef SUPPORT_READ_DV2
 	}
 #endif
@@ -152,9 +152,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 	}
 
 	if( id == 995 || id == 994) {
-		e->y4m = vj_yuv4mpeg_alloc(el, el->video_width,
-					       el->video_height,
-			       		       out_pixel_format	);
+		e->y4m = vj_yuv4mpeg_alloc(frame->width,frame->height,frame->fps, out_pixel_format );
 		if( !e->y4m) {
 			veejay_msg(0, "Error while trying to setup Y4M stream, abort.");
 			return NULL;
@@ -165,7 +163,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 			chroma_val = Y4M_CHROMA_420MPEG2;
 		}
 
-		if( vj_yuv_stream_start_write( e->y4m, el,filename,chroma_val )== -1 )
+		if( vj_yuv_stream_start_write( e->y4m, frame,filename,chroma_val )== -1 )
 		{
 			veejay_msg(0, "Unable to write header to  YUV4MPEG stream");
 			vj_yuv4mpeg_free( e->y4m );
@@ -204,12 +202,12 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 		e->context = avcodec_alloc_context();
 #endif
 		e->context->bit_rate = 2750 * 1024;
-		e->context->width = el->video_width;
- 		e->context->height = el->video_height;
+		e->context->width = frame->width;
+ 		e->context->height = frame->height;
 #if LIBAVCODEC_BUILD > 5010
-		e->context->time_base = (AVRational) { 1, el->video_fps };
+		e->context->time_base = (AVRational) { 1, frame->fps };
 #else
-		e->context->frame_rate = el->video_fps;
+		e->context->frame_rate = frame->fps;
 		e->context->frame_rate_base = 1;
 #endif
 		e->context->sample_aspect_ratio.den = 1;
@@ -255,30 +253,15 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 #endif
 	}
 
-	e->width = el->video_width;
-	e->height = el->video_height;
+	e->width = frame->width;
+	e->height = frame->height;
 	e->encoder_id = id;
-
-
-	switch(pf) {
-		case PIX_FMT_YUVJ422P:
-		case PIX_FMT_YUV422P:
-			e->shift_y = 0;
-			e->shift_x = 1;
-			e->len = el->video_width * el->video_height;
-			e->uv_len = e->len / 2;
-			e->out_fmt = (pf == PIX_FMT_YUVJ422P ? FMT_422F : FMT_422 );
-			break;
-		case PIX_FMT_YUVJ420P:
-		case PIX_FMT_YUV420P:
-			e->shift_y = 1;
-			e->shift_x = 1;
-			e->len = el->video_width * el->video_height;
-			e->uv_len = e->len / 4;
-			e->out_fmt = (pf == PIX_FMT_YUVJ420P ? FMT_420F : FMT_420 );
-			break;
-		}
-
+	e->shift_y = frame->shift_v;
+	e->shift_x = frame->shift_h;
+	e->len = frame->len;
+	e->uv_len = frame->uv_len;
+	e->out_fmt = pixfmt_to_vj( pf );
+	
 	return e;
 }
 void		vj_avcodec_close_encoder( vj_encoder *av )
@@ -427,7 +410,7 @@ int		vj_avcodec_stop( void *encoder , int fmt)
 	return 1;
 }
 
-void 		*vj_avcodec_start( editlist *el, int encoder, char *filename )
+void 		*vj_avcodec_start( VJFrame *frame, int encoder, char *filename )
 {
 	int codec_id = vj_avcodec_find_codec( encoder );
 	void *ee = NULL;
@@ -437,7 +420,7 @@ void 		*vj_avcodec_start( editlist *el, int encoder, char *filename )
 		return NULL;
 	}
 #endif	
-	ee = vj_avcodec_new_encoder( codec_id, el ,filename);
+	ee = vj_avcodec_new_encoder( codec_id, frame ,filename);
 	if(!ee)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "\tFailed to start encoder %x",encoder);

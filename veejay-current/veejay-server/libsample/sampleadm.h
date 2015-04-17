@@ -331,7 +331,7 @@ extern	void	*sample_get_dict( int sample_id );
 
 extern int sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active );
 
-extern void        sample_set_project(int fmt, int deinterlace, int flags, int force, char norm );
+extern void        sample_set_project(int fmt, int deinterlace, int flags, int force, char norm, int w, int h );
 
 extern int     sample_video_length( int s1 );
 extern int	sample_usable_edl( int s1 );

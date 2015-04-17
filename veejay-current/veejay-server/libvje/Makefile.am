@@ -27,7 +27,7 @@ EXTRA_DIST += effects/autoeq.h effects/crosspixel.h effects/mask.h effects/rawva
 		      effects/chromium.h effects/flare.h effects/noiseadd.h effects/solarize.h \
 		      effects/colflash.h effects/flip.h effects/noisepencil.h effects/split.h \
 		      effects/colmorphology.h effects/frameborder.h effects/opacityadv.h effects/swirl.h \
-		      effects/coloradjust.h effects/gamma.h effects/opacity.h effects/iris.h effects/texmap.h \
+		      effects/coloradjust.h effects/gamma.h effects/opacity.h effects/iris.h \
 		      effects/color.h effects/ghost.h effects/opacitythreshold.h effects/threshold.h \
 		      effects/colorhis.h effects/greyselect.h effects/overclock.h effects/timedistort.h \
 		      effects/colormap.h effects/isolate.h effects/pencilsketch.h effects/tracer.h \
@@ -85,7 +85,7 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/ghost.c effects/blob.c effects/radcor.c effects/boids.c effects/nervous.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
-			effects/contourextract.c effects/texmap.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
+			effects/contourextract.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
 			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c effects/median.c effects/average-blend.c
 
 

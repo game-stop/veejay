@@ -647,58 +647,30 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 
 int vj_effect_prepare( VJFrame *frame, int selector)
 {
-	int fx_id = 0;
+	int fx_id = vj_effect_real_to_sequence( selector );
+	if( fx_id < 0 || fx_id > MAX_EFFECTS )
+		return 0;
+
 	switch( selector ) {
 		case VJ_IMAGE_EFFECT_BGSUBTRACT:
-			fx_id = vj_effect_real_to_sequence( selector );
-			if( fx_id >= 0 && vj_effects[fx_id] ) {
-				return bgsubtract_prepare( frame->data, frame->width,frame->height );
-			}
+			return bgsubtract_prepare( frame->data, frame->width,frame->height );
 			break;	
 		case 	VJ_IMAGE_EFFECT_CONTOUR:
-			fx_id = vj_effect_real_to_sequence(selector);
-			if(fx_id>=0 && vj_effects[fx_id] ) {
-				return contourextract_prepare(frame->data,frame->width,frame->height );
-			}
+			return contourextract_prepare(frame->data,frame->width,frame->height );
 			break;
 		case	VJ_VIDEO_EFFECT_DIFF:
 			if( !vj_effect_has_cb(selector))
 				return 0;
-			fx_id = vj_effect_real_to_sequence( selector );
-			if( fx_id >= 0 && vj_effects[fx_id]->user_data != NULL)
-			{
-				return diff_prepare(	(void*) vj_effects[fx_id]->user_data,	frame->data,	frame->width,	frame->height );
-			}	
+			return diff_prepare(	(void*) vj_effects[fx_id]->user_data,	frame->data,	frame->width,	frame->height );
 			break;
 		case 	VJ_IMAGE_EFFECT_CHAMELEON:
-			fx_id = vj_effect_real_to_sequence( selector );
-			if( fx_id >= 0 && vj_effects[fx_id])
-			{
-				return chameleon_prepare(	frame->data,	frame->width,	frame->height );
-			}	
+			return chameleon_prepare(	frame->data,	frame->width,	frame->height );
 			break;
 		case 	VJ_IMAGE_EFFECT_MOTIONMAP:
-			fx_id = vj_effect_real_to_sequence( selector );
-			if( fx_id >= 0 && vj_effects[fx_id])
-			{
-				return	motionmap_prepare(	frame->data,	frame->width,	frame->height );
-			}	
+			return	motionmap_prepare(	frame->data,	frame->width,	frame->height );
 			break;
-	/*	case	VJ_VIDEO_EFFECT_TEXMAP:
-			fx_id = vj_effect_real_to_sequence( selector );
-			if( fx_id >= 0 && vj_effects[fx_id] )
-			{	
-				return texmap_prepare( frame->data, frame->width, frame->height );	
-			}
-			break;*/
 		case 	VJ_VIDEO_EFFECT_CHAMBLEND:
-			fx_id = vj_effect_real_to_sequence( selector );
-			if( fx_id >= 0 && vj_effects[fx_id])
-			{
-				return chameleonblend_prepare(	frame->data,	frame->width,	frame->height );
-			}	
-			break;
-
+			return chameleonblend_prepare(	frame->data,	frame->width,	frame->height );
 		default:
 			break;
 	}

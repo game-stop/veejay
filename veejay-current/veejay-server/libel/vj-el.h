@@ -60,7 +60,7 @@ typedef struct
 	lav_file_t	*(lav_fd[MAX_EDIT_LIST_FILES]);
 	int		pixfmt[MAX_EDIT_LIST_FILES];
 	void		*ctx[MAX_EDIT_LIST_FILES];
-
+	void		*decoders[MAX_EDIT_LIST_FILES];
 	long 		num_frames[MAX_EDIT_LIST_FILES];
 	long		max_frame_sizes[MAX_EDIT_LIST_FILES];
 	uint64_t 	*frame_list;
@@ -76,10 +76,11 @@ typedef struct
 	void		*scaler;
 } editlist;  
 
-int     test_video_frame( lav_file_t *lav,int out_pix_fmt);
+int     test_video_frame(editlist *el, int n, lav_file_t *lav,int out_pix_fmt);
 
+void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps );
 
-editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm, int fmt);
+editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm, int fmt, int w, int h);
 
 int	vj_el_cache_size();
 
@@ -138,9 +139,7 @@ void	vj_el_clear_cache( editlist *el );
 
 int     get_ffmpeg_pixfmt( int pf );
 
-void    vj_el_set_image_output_size(editlist *el,int w, int h, float fps, int pf);
-
-int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm);
+int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm, int w, int h, int fmt);
 
 void	vj_el_set_caching(int status);
 

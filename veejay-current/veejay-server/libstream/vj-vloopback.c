@@ -98,7 +98,7 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 
 	v->fd = open( device_name, O_RDWR ); //, S_IRUSR|S_IWUSR );
 	if( v->fd <= 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot open vloopback device %s: %s", device_name, strerror(errno) );
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot open vloopback device '%s': %s", device_name, strerror(errno) );
 		return ret;
 	}
 

@@ -544,8 +544,8 @@ static int	vj_perform_verify_rows(veejay_t *info )
 		return 0;
 
 	int c,v,has_rows = 0;
-	const int w = info->current_edit_list->video_width;
-	const int h = info->current_edit_list->video_height;
+	const int w = info->video_output_width;
+	const int h = info->video_output_height;
 #ifdef STRICT_CHECKING
 	long total_size = 0;
 #endif
@@ -630,8 +630,9 @@ static	char ppm_path[1024];
 int vj_perform_init(veejay_t * info)
 {
 	#define PRIMARY_FRAMES 8
-    const int w = info->edit_list->video_width;
-    const int h = info->edit_list->video_height;
+	const int w = info->video_output_width;
+	const int h = info->video_output_height;
+
 	const long frame_len = RUP8( (((w*h)+w)/7)*8 );
     unsigned int c;
 	long total_used = 0;
@@ -749,8 +750,6 @@ int vj_perform_init(veejay_t * info)
 
 
 static void vj_perform_close_audio() {
-	int i;
-
 	if( lin_audio_buffer_ )
 		free(lin_audio_buffer_ );
 	veejay_memset( audio_buffer, 0, sizeof(uint8_t*) * SAMPLE_MAX_EFFECTS );
@@ -916,14 +915,13 @@ void vj_perform_free(veejay_t * info)
 
 int vj_perform_audio_start(veejay_t * info)
 {
-	int res;
 	editlist *el = info->edit_list;	
 
 	if (el->has_audio)
 	{
 #ifdef HAVE_JACK
 		vj_jack_initialize();
-		res = vj_jack_init(el);
+		int res = vj_jack_init(el);
 		if( res <= 0 ) {	
 			veejay_msg(0, "Audio playback disabled");
 			info->audio = NO_AUDIO;
@@ -993,8 +991,9 @@ void	vj_perform_get_output_frame( uint8_t **frame )
 }
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h)
 {
-	*w = info->current_edit_list->video_width - info->settings->viewport.left - info->settings->viewport.right;
-	*h = info->current_edit_list->video_height - info->settings->viewport.top - info->settings->viewport.bottom;
+	*w = info->video_output_width - info->settings->viewport.left - info->settings->viewport.right;
+	*h = info->video_output_height - info->settings->viewport.top - info->settings->viewport.bottom;
+
 }
 
 int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
@@ -1005,8 +1004,8 @@ int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
 		veejay_memset( &src, 0, sizeof(VJFrame));
 
 		vj_get_yuv_template( &src,
-				info->current_edit_list->video_width,
-				info->current_edit_list->video_height,
+				info->video_output_width,
+				info->video_output_height,
 				info->pixel_format );
 
 		src.data[0] = primary_buffer[0]->Y;
@@ -1280,13 +1279,12 @@ int	vj_perform_is_ready(veejay_t *info)
 
 void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )   
 {
-	editlist *el = info->current_edit_list;
 	uint8_t *pframe[3];
 	pframe[0] = primary_buffer[info->out_buf]->Y;
 	pframe[1] = primary_buffer[info->out_buf]->Cb;
 	pframe[2] = primary_buffer[info->out_buf]->Cr;
-	yuv422to420planar( pframe, temp_buffer, el->video_width,el->video_height );
-	veejay_memcpy( pframe[0],frame[0], el->video_width * el->video_height );
+	yuv422to420planar( pframe, temp_buffer, info->effect_frame1->width, info->effect_frame1->height );
+	veejay_memcpy( pframe[0],frame[0], info->effect_frame1->len );
 
 	frame[0] = temp_buffer[0];
 	frame[1] = temp_buffer[1];
@@ -1695,8 +1693,8 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 				   int type, int chain_entry )
 {				/* second sample */
-    int width = info->current_edit_list->video_width;
-    int height = info->current_edit_list->video_height;
+    int width = info->video_output_width;
+    int height = info->video_output_height;
     int error = 1;
     int nframe;
     int len = 0;
@@ -1899,7 +1897,7 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		const uint32_t N = max_sfd;
 		const uint32_t n1 = cur_sfd;
 		const float frac = 1.0f / (float) N * n1;
-		const uint32_t len = el->video_width * el->video_height;
+		const uint32_t len = info->video_output_width * info->video_output_height;
 
 		vj_frame_slow_threaded( p0_buffer, p1_buffer, img , len, uv_len, frac );
 		
@@ -1931,8 +1929,8 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t 
 static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 			       int chain_entry)
 {				/* second sample */
-    int width = info->current_edit_list->video_width;
-    int height = info->current_edit_list->video_height;
+    int width = info->video_output_width;
+    int height = info->video_output_height;
     int error = 1;
     int nframe;
     int len;
@@ -2073,7 +2071,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
     	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
     	frames[0]->data[2] = primary_buffer[0]->Cr;
-	frames[0]->format  = info->pixel_format;
+//	frames[0]->format  = info->pixel_format;
 	vjp_kf *setup;
     	setup = info->effect_info;
     	setup->ref = info->uc->sample_id;
@@ -2098,7 +2096,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-				frames[1]->format  = info->pixel_format;
+			//	frames[1]->format  = info->pixel_format;
 				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;
 
 				int done   = 0;
@@ -2694,7 +2692,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample) {
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Continue, %d frames left to record", frames_left);
 			if( sample_init_encoder( sample, NULL,
-				df, info->current_edit_list, frames_left)==-1)
+				df, info->effect_frame1, info->current_edit_list, frames_left)==-1)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,
 				"Error while auto splitting "); 
@@ -2840,9 +2838,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 		dumb.data[1] = frame[1];
 		dumb.data[2] = frame[2];
 
-		dummy_apply(&dumb,
-		    info->current_edit_list->video_width,
-		    info->current_edit_list->video_height, VJ_EFFECT_COLOR_BLACK);
+		dummy_apply(&dumb,info->video_output_width,info->video_output_height,VJ_EFFECT_COLOR_BLACK );
   	}
  	 return 1;      	
 }
@@ -3389,8 +3385,9 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
         	vj_perform_take_bg(info,frame,1);
         	info->uc->take_bg = 0;
     	} 
-
-
+	
+	if( frame2->data[0] == frame->data[0] )
+		frame->ssm = 0;
 }
 
 static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settings )

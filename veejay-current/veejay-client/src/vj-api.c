@@ -5121,46 +5121,71 @@ static	void	reload_editlist_contents()
 	{
 		return;
 	}
-	char	str_nf[4];
+	
+	el_constr *el;
 
-	strncpy( str_nf, eltext , sizeof(str_nf));
-	sscanf( str_nf, "%04d", &num_files );
+	char *tmp = strndup( eltext + offset, 4 );
+	if( sscanf( tmp,"%d",&num_files ) != 1 ) {
+		free(tmp);
+		g_free(eltext);
+		return;
+	}
+	free(tmp);
 
 	offset += 4;
-	int n = 0;
-	el_constr *el;
 
 	for( i = 0; i < num_files ; i ++ )	
 	{
-		int itmp =0;
-		char *tmp1 = (char*) strndup( eltext+offset, 4 );
-		int line_len = 0;
-		char fourcc[4];
-		veejay_memset(fourcc,0,sizeof(fourcc));
-		n = sscanf( tmp1, "%04d", &line_len ); // line len
-		if(line_len>0)
-		{
-			offset += 4;
-			char *line = (char*)strndup( eltext + offset, line_len );
-			offset += line_len;
-			char *tmp = (char*) strndup( line, 3 );
-			sscanf(tmp, "%03d",&itmp );
-			char *file = strndup( line + 3, itmp );
+		int name_len = 0;
+		tmp = strndup( eltext + offset, 3 );
+		if( sscanf( tmp,"%d", &name_len ) != 1 ) {
 			free(tmp);
-			tmp = (char*) strndup( line + 3 + itmp, 16 );
-			int a,b,c;
-			int n = sscanf(tmp, "%04d%010d%02d", &a,&b,&c);
-			free(tmp);
-			if( n == 3 )
-			{
-				strncpy(fourcc, line + 3 + itmp + 16, c );
-				el = _el_entry_new( i, file,   b, fourcc );
-				info->editlist = g_list_append( info->editlist, el );
-			}
-			free(line);
-			free(file);
+			g_free(eltext);
+			return;
 		}
-		free(tmp1);
+		offset += 3;
+		free(tmp);
+		char *file = strndup( eltext + offset, name_len );
+		
+		offset += name_len;
+		int iter = 0;
+		tmp = strndup( eltext + offset, 4 );
+		if( sscanf( tmp, "%d", &iter ) != 1 ) {
+			free(tmp);
+			g_free(eltext);
+			return;
+		}
+		free(tmp);
+		offset += 4;
+		
+		long num_frames = 0;
+		tmp = strndup( eltext + offset, 10 );
+		if( sscanf(tmp, "%ld", &num_frames ) != 1 ) {
+			free(tmp);
+			g_free(eltext);
+			return;
+		}
+		free(tmp);
+		offset += 10;
+		
+		int fourcc_len = 0;
+		tmp = strndup( eltext + offset, 2 );
+		if( sscanf( tmp, "%d", &fourcc_len) != 1 ) {
+			free(tmp);
+			g_free(eltext);
+			return;
+		}
+		free(tmp);
+		offset += fourcc_len;
+		char *fourcc = strndup( eltext + offset - 1, fourcc_len );
+		
+		el = _el_entry_new( iter, file, num_frames, fourcc );
+		info->editlist = g_list_append( info->editlist, el );
+		
+		offset += 2;
+
+		free(file);
+		free(fourcc);
 	}
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	store = GTK_LIST_STORE(model);
@@ -5229,7 +5254,6 @@ static	void	reload_editlist_contents()
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 		
 	g_free( eltext );
-	
 }
 
 // execute after el change:

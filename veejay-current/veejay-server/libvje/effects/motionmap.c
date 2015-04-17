@@ -138,6 +138,7 @@ void		motionmap_free(void)
 	keyv_ = 0;
 	keyp_ = 0;
 	binary_img = NULL;
+	previous_img = NULL;
 }
 
 #ifndef MIN

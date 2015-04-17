@@ -76,7 +76,7 @@ static int video_driver_  = -1; // V4lUtils
 static int no_v4l2_threads_ = 0;
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
-int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
+int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 
 extern void dummy_rgb_apply(VJFrame *frame, int width, int height, int r, int g, int b);
 extern int   sufficient_space(int max_size, int nframes);
@@ -425,10 +425,10 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 #elif HAVE_V4L2
 		if(  no_v4l2_threads_ ) {
 			vj_tag_input->unicap[stream_nr] = v4l2open( refname, channel, palette,width,height,
-				_tag_info->edit_list->video_fps,_tag_info->edit_list->video_norm );
+				_tag_info->effect_frame1->fps,_tag_info->edit_list->video_norm );
 		} else {
 			vj_tag_input->unicap[stream_nr] = v4l2_thread_new( refname, channel,palette,width,height,
-			_tag_info->edit_list->video_fps,_tag_info->edit_list->video_norm );
+			_tag_info->effect_frame1->fps,_tag_info->edit_list->video_norm );
 		}
 		if( !vj_tag_input->unicap[stream_nr] ) {
 			veejay_msg(0, "Unable to open device %d (%s)",device_num, refname );
@@ -444,7 +444,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 }
 
 #ifdef USE_GDK_PIXBUF
-int _vj_tag_new_picture( vj_tag *tag, int stream_nr, editlist *el)
+int _vj_tag_new_picture( vj_tag *tag, int stream_nr, int width, int height, float fps)
 {
 	int stop = 0;
 	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
@@ -462,7 +462,7 @@ int _vj_tag_new_picture( vj_tag *tag, int stream_nr, editlist *el)
 
 	veejay_msg(VEEJAY_MSG_INFO, "Opened [%s] , %d x %d @ %2.2f fps ",
 			tag->source_name,
-			el->video_width, el->video_height, el->video_fps );
+			width, height, fps );
 
 	return 1;
 }
@@ -575,7 +575,7 @@ int		vj_tag_cali_write_file( int t1, char *name, editlist *el ) {
 }
 
 
-static int	cali_read_file( cali_tag_t *p, char *file,editlist *el )
+static int	cali_read_file( cali_tag_t *p, char *file,int w, int h )
 {
 	FILE *f = fopen( file , "r" );
 	if( f == NULL ) {
@@ -585,8 +585,6 @@ static int	cali_read_file( cali_tag_t *p, char *file,editlist *el )
 	char	buf[256];
 
 	char	*header = fgets( buf, sizeof(buf), f );
-	int 	w	= 0;
-	int	h	= 0;
 	int	len	= 0;
 	int	uv_len  = 0;
 	int	offset  = 0;
@@ -599,12 +597,6 @@ static int	cali_read_file( cali_tag_t *p, char *file,editlist *el )
 			&mean[0],&mean[1],&mean[2] ) != 8  )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid header.");
-		return 0;
-	}
-
-	if( w != el->video_width || h != el->video_height ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Dimensions do not match, abort.");
-		fclose(f);
 		return 0;
 	}
 
@@ -656,7 +648,7 @@ CALIREADERR:
 	return 0;
 }
 
-int	_vj_tag_new_cali( vj_tag *tag, int stream_nr, editlist *el )
+int	_vj_tag_new_cali( vj_tag *tag, int stream_nr, int w, int h )
 {
 	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
 	
@@ -667,7 +659,7 @@ int	_vj_tag_new_cali( vj_tag *tag, int stream_nr, editlist *el )
 		return 0;
 	memset(p, 0, sizeof(cali_tag_t));
 
-	if(!cali_read_file( p, tag->source_name,el ) ) {
+	if(!cali_read_file( p, tag->source_name,w,h ) ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to find dark frame '%s'", tag->source_name );
 		free(p);
 		return 0;
@@ -698,17 +690,16 @@ uint8_t	*vj_tag_get_cali_data( int t1, int what ) {
 	return NULL;
 }
 
-int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el)
+int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps)
 {
     if (stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN)
 	return 0;
-    vj_tag_input->stream[stream_nr] = vj_yuv4mpeg_alloc(el,el->video_width,el->video_height, _tag_info->pixel_format);
+    vj_tag_input->stream[stream_nr] = vj_yuv4mpeg_alloc(w, h, fps, _tag_info->pixel_format);
 
     if(vj_tag_input->stream[stream_nr] == NULL) 
 	return 0;
 
-    if(vj_yuv_stream_start_read(vj_tag_input->stream[stream_nr],tag->source_name,
-			 el->video_width, el->video_height) != 0) 
+    if(vj_yuv_stream_start_read(vj_tag_input->stream[stream_nr],tag->source_name,w,h ) != 0 )
     {
  	veejay_msg(VEEJAY_MSG_ERROR,"Unable to read from %s",tag->source_name);
 	vj_yuv4mpeg_free( vj_tag_input->stream[stream_nr] );
@@ -829,10 +820,12 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 {
     int i, j;
     int palette;
-    int w = el->video_width;
-    int h = el->video_height;	/* FIXME */
     int id = 0;
     int n;
+    int w = _tag_info->effect_frame1->width;
+    int h = _tag_info->effect_frame1->height;
+    float fps = _tag_info->effect_frame1->fps;
+
     char sourcename[255];
  
     vj_tag *tag;
@@ -983,18 +976,18 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 #ifdef USE_GDK_PIXBUF
 	case VJ_TAG_TYPE_PICTURE:
 	sprintf(tag->source_name, "%s", filename);
-	if( _vj_tag_new_picture(tag, stream_nr, el) != 1 )
+	if( _vj_tag_new_picture(tag, stream_nr, w, h, fps) != 1 )
 		return -1;
 	break;
 #endif
     case VJ_TAG_TYPE_CALI:
 	sprintf(tag->source_name,"%s",filename);
-	if(_vj_tag_new_cali( tag,stream_nr,el) != 1 ) 
+	if(_vj_tag_new_cali( tag,stream_nr,w,h) != 1 ) 
 		return -1;
 	break;
     case VJ_TAG_TYPE_YUV4MPEG:
 	sprintf(tag->source_name, "%s", filename);
-	if (_vj_tag_new_yuv4mpeg(tag, stream_nr, el) != 1)
+	if (_vj_tag_new_yuv4mpeg(tag, stream_nr, w,h,fps) != 1)
 	{
 	    if(tag->source_name) free(tag->source_name);
 	    if(tag) free(tag);
@@ -1659,7 +1652,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	char cformat = vj_avcodec_find_lav( format );
 	int sample_id = tag->id;
 	
-	tag->encoder =  vj_avcodec_start( _tag_info->edit_list , format, tag->encoder_destination );
+	tag->encoder =  vj_avcodec_start( _tag_info->effect_frame1, format, tag->encoder_destination );
 	if(!tag->encoder)
 	{
 		veejay_msg(0, "Unable to use selected encoder, please choose another.");
@@ -1668,10 +1661,10 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	tag->encoder_active = 1;
 	tag->encoder_format = format;
 
-	int tmp = _tag_info->edit_list->video_width * _tag_info->edit_list->video_height;
+	int tmp = _tag_info->effect_frame1->len;
 
 	if(format==ENCODER_DVVIDEO)
-		tag->encoder_max_size = ( _tag_info->edit_list->video_height == 480 ? 120000: 144000);
+		tag->encoder_max_size = ( _tag_info->video_output_height == 480 ? 120000: 144000);
 	else
 		switch(format)
 		{
@@ -1711,10 +1704,10 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		tag->encoder_file = lav_open_output_file(
 			tag->encoder_destination,
 			cformat,
-			_tag_info->edit_list->video_width,
-			_tag_info->edit_list->video_height,
-			_tag_info->edit_list->video_inter,
-			_tag_info->edit_list->video_fps,
+			_tag_info->effect_frame1->width,
+			_tag_info->effect_frame1->height,
+			0,
+			_tag_info->effect_frame1->fps,
 			0,
 			0,
 			0
@@ -1734,16 +1727,16 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 
 	veejay_msg(VEEJAY_MSG_INFO, "Recording to file [%s] %ldx%ld@%2.2f %d/%d/%d >%09ld<",
 		    tag->encoder_destination, 
-		    _tag_info->edit_list->video_width,
-		    _tag_info->edit_list->video_height,
-		    (float) _tag_info->edit_list->video_fps,
+		    _tag_info->effect_frame1->width,
+		    _tag_info->effect_frame1->height,
+		    (float) _tag_info->effect_frame1->fps,
 			0,0,0,
 			(long)( tag->encoder_frames_to_record)
 		);
 
 
-	tag->encoder_width = _tag_info->edit_list->video_width;
-	tag->encoder_height = _tag_info->edit_list->video_height;
+	tag->encoder_width = _tag_info->effect_frame1->width;
+	tag->encoder_height = _tag_info->effect_frame1->height;
 	
 	return 1;
 }

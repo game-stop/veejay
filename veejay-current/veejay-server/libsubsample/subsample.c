@@ -733,8 +733,8 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
  			tr_422_to_444(ycbcr[2],frame->width,frame->height);
     		break;
  		case SSM_420_422:
-    		ss_420_to_422( ycbcr[1], frame->width, frame->height );
-    		ss_420_to_422( ycbcr[2], frame->width, frame->height );
+    			ss_420_to_422( ycbcr[1], frame->width, frame->height );
+    			ss_420_to_422( ycbcr[2], frame->width, frame->height );
     		break;
   		default:
    		break;

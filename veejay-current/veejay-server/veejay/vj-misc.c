@@ -232,14 +232,17 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 	if( pass == 0 ) {
 		if(frame->ssm = 1 ) {
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_CHAMBLEND );
-			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CHAMELEON );		
-			return 1;
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CHAMELEON );
+			if(n > 0 )
+				return 1;
 		}	
 		if(frame->ssm == 0) {
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
+			if( n > 0 )
+				return 1;
 		}
 
 		if( frame->ssm == 0 ) 
@@ -248,17 +251,16 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_CHAMBLEND );
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CHAMELEON );
 			frame->ssm = 1;
-			return 1;
-		}	
-		return 0;
+			return 0;
+		}
+
+		return (n > 0 ? 0: 1 );
 	} else {
-	
 		if(frame->ssm == 0) {
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
-	//		n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_TEXMAP);
 			return 0;
 		}
 	}

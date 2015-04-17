@@ -124,7 +124,7 @@ int sample_try_filename(int sample_id, char *filename, int format)
 }
 
 
-static int sample_start_encoder(sample_info *si, editlist *el, int format, long nframes)
+static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, int format, long nframes)
 {
 	char descr[100];
 	char cformat = vj_avcodec_find_lav( format );
@@ -134,7 +134,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 
 	int sample_id = si->sample_id;
 
-	si->encoder = vj_avcodec_start( el, format, si->encoder_destination );
+	si->encoder = vj_avcodec_start( frame, format, si->encoder_destination );
 	if(!si->encoder)
 		return -1;
 
@@ -150,30 +150,29 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	 si->encoder_frames_recorded = 0;
 	}
 
-	int tmp = el->video_width * el->video_height;
-	int tmp1 = (el->video_width/2 ) * el->video_height;
+	int tmp = frame->len;
+	int tmp1 = frame->uv_len;
 
-	if(format==ENCODER_DVVIDEO)
-		si->encoder_max_size = ( el->video_height == 480 ? 120000: 144000);
-	else
-		switch(format)
-		{
-			case ENCODER_YUV420:
-			case ENCODER_YUV420F:
-			 si->encoder_max_size= 2048 + tmp + (tmp/4) + (tmp/4);break;
-			case ENCODER_YUV422:
-			case ENCODER_YUV422F:
-			case ENCODER_YUV4MPEG:
-			si->encoder_max_size = 2048 + tmp + tmp1 + tmp1;break;
-			case ENCODER_LZO:
-			si->encoder_max_size = (tmp * 3 ); break;
-			default:
-			si->encoder_max_size = 8 * ( 16 * 65535 );
-			break;
-		}
+	switch(format)
+	{
+		case ENCODER_YUV420:
+		case ENCODER_YUV420F:
+		 si->encoder_max_size= 2048 + tmp + (tmp/4) + (tmp/4);break;
+		case ENCODER_YUV422:
+		case ENCODER_YUV422F:
+		case ENCODER_YUV4MPEG:
+		si->encoder_max_size = 2048 + tmp + tmp1 + tmp1;break;
+		case ENCODER_LZO:
+		si->encoder_max_size = (tmp * 3 ); break;
+		case ENCODER_DVVIDEO:
+		si->encoder_max_size = ( frame->height == 480 ? 120000: 144000); break;
+		default:
+		si->encoder_max_size = 8 * ( 16 * 65535 );
+		break;
+	}
 	
-	si->encoder_width = el->video_width;
-	si->encoder_height = el->video_height;
+	si->encoder_width = frame->width;
+	si->encoder_height =  frame->height;
 
 
 	if( sufficient_space( si->encoder_max_size, nframes ) == 0 )
@@ -187,8 +186,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	if( cformat != 'S' ) {
 
 		si->encoder_file = (void*)lav_open_output_file(si->encoder_destination,cformat,
-			el->video_width,el->video_height,el->video_inter,
-			el->video_fps,el->audio_bits, el->audio_chans, el->audio_rate );
+			frame->width,frame->height,0,frame->fps,el->audio_bits, el->audio_chans, el->audio_rate );
 		
 		if(!si->encoder_file)
 		{
@@ -206,8 +204,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	return 0;
 }
 
-int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
-	long nframes) {
+int sample_init_encoder(int sample_id, char *filename, int format, VJFrame *frame, editlist *el, long nframes) {
 
 	sample_info *si;
 
@@ -227,7 +224,7 @@ int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
 		return -1;
 	}
 	if(nframes <= 0) return -1;
-	if(!el) return -1;
+	if(!el || !frame) return -1;
 
 	if(si->encoder_active) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Sample is already encoding to [%s]",
@@ -235,7 +232,7 @@ int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
 		return -1;
 	}
 
-	if (sample_start_encoder( si , el, format, nframes ) == 0) 	
+	if (sample_start_encoder( si , frame, el, format, nframes ) == 0) 	
 	{
 		return 1;
 	}

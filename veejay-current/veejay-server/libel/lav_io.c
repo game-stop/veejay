@@ -1835,10 +1835,9 @@ int lav_get_field_size(uint8_t * jpegdata, long jpeglen)
    return jpeg_padded_len;
 }
 
-static char error_string[4096];
-
 const char *lav_strerror(void)
 {
+   static char error_string[1024];
 
    switch(internal_error)
    {
@@ -1874,7 +1873,7 @@ const char *lav_strerror(void)
          return AVI_strerror();
       default:
          /* No or unknown video format */
-         sprintf(error_string,"No or unknown video format");
+         snprintf(error_string,sizeof(error_string),"No or unknown video format");
          return error_string;
    }
 }

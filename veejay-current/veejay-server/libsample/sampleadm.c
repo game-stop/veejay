@@ -161,16 +161,21 @@ typedef struct
 	int flags;
 	int force;
 	char norm;
+	int width;
+	int height;
 } sample_setting;
 
 static sample_setting __sample_project_settings;
-void	sample_set_project(int fmt, int deinterlace, int flags, int force, char norm )
+void	sample_set_project(int fmt, int deinterlace, int flags, int force, char norm, int w, int h )
 {
 	__sample_project_settings.fmt = fmt;
 	__sample_project_settings.deinterlace = deinterlace;
 	__sample_project_settings.flags = flags;
 	__sample_project_settings.force = force;
 	__sample_project_settings.norm = norm;
+	__sample_project_settings.width = w;
+	__sample_project_settings.height = h;
+
 } 
 void	*sample_get_dict( int sample_id )
 {
@@ -3216,7 +3221,9 @@ int sample_read_edl( sample_info *sample )
 			__sample_project_settings.deinterlace,
 			__sample_project_settings.force,
 			__sample_project_settings.norm,
-			__sample_project_settings.fmt );
+			__sample_project_settings.fmt,
+		        __sample_project_settings.width,
+			__sample_project_settings.height);
 
 	if(sample->edit_list)
 	{

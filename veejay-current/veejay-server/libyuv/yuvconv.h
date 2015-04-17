@@ -23,6 +23,12 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
+int get_pixfmt_from_chroma(int chroma);
+int get_chroma_from_pixfmt(int pixfmt);
+int vj_to_pixfmt(int fmt);
+int pixfmt_to_vj(int pixfmt);
+int pixfmt_is_full_range(int pixfmt);
+int vj_is_full_range(int fmt);
 
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);

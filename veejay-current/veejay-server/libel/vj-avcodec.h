@@ -83,7 +83,7 @@ int		yuv420p_to_yuv422p2( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3
 
 void	yuv422p_to_yuv420p3( uint8_t *src, uint8_t *dst[3], int w, int h);
 
-void 		*vj_avcodec_start( editlist *el, int encoder, char *filename );
+void 		*vj_avcodec_start( VJFrame *frame, int encoder, char *filename );
 
 int		vj_avcodec_stop( void *encoder , int fmt);
 

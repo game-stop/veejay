@@ -221,7 +221,7 @@ static void Usage(char *progname)
 	    	"  -c/--synchronization [01]\tSync correction off/on (default on)\n");
 
     fprintf(stderr,
-	    	"  -O/--output [0..4]\t\tOutput video\n");
+	    	"  -O/--output [0..6]\t\tOutput video\n");
 #ifdef HAVE_SDL
 	fprintf(stderr,
 			"\t\t\t\t0 = SDL (default)\t\n");
@@ -237,7 +237,14 @@ static void Usage(char *progname)
 	fprintf(stderr,
 			"\t\t\t\t3 = Head less (no video output)\n");	
 	fprintf(stderr,
-			"\t\t\t\t4 = Y4M Stream\n");
+			"\t\t\t\t4 = Y4M Stream 4:2:0 (requires -o <filename>)\n");
+
+	fprintf(stderr,
+			"\t\t\t\t5 = Vloopback device (requires -o <filename>)\n");
+
+	fprintf(stderr,
+			"\t\t\t\t6 = Y4M Stream 4:2:2 (requires -o <filename>)\n");
+
 	fprintf(stderr,
 			"  -o/--output-file [file]\tWrite to file (for use with Y4M Stream)\n");
 #ifdef HAVE_SDL
@@ -375,7 +382,7 @@ static int set_option(const char *name, char *value)
 	    }
 #endif
 */
-	    if( info->video_out < 0 || info->video_out > 5 ) {
+	    if( info->video_out < 0 || info->video_out > 6 ) {
 		    fprintf(stderr, "Select a valid output display driver\n");
 		    exit(-1);
 		   }

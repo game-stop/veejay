@@ -33,6 +33,17 @@
 #include <libavcodec/avcodec.h>
 #include <veejay/vj-task.h>
 #include <libyuv/mmx_macros.h>
+
+#define Y4M_CHROMA_420JPEG     0  /* 4:2:0, H/V centered, for JPEG/MPEG-1 */
+#define Y4M_CHROMA_420MPEG2    1  /* 4:2:0, H cosited, for MPEG-2         */
+#define Y4M_CHROMA_420PALDV    2  /* 4:2:0, alternating Cb/Cr, for PAL-DV */
+#define Y4M_CHROMA_444         3  /* 4:4:4, no subsampling, phew.         */
+#define Y4M_CHROMA_422         4  /* 4:2:2, H cosited                     */
+#define Y4M_CHROMA_411         5  /* 4:1:1, H cosited                     */
+#define Y4M_CHROMA_MONO        6  /* luma plane only                      */
+#define Y4M_CHROMA_444ALPHA    7  /* 4:4:4 with an alpha channel          */
+
+
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -199,6 +210,82 @@ int	yuv_use_auto_ccir_jpeg()
 {
 	return auto_conversion_ccir_jpeg_;
 }
+
+int get_chroma_from_pixfmt(int pixfmt) {
+	int chroma;
+	switch(pixfmt) {
+		case PIX_FMT_YUVJ420P: chroma = Y4M_CHROMA_420JPEG; break;
+		case PIX_FMT_YUV420P: chroma = Y4M_CHROMA_420MPEG2; break;
+		case PIX_FMT_YUV422P: chroma = Y4M_CHROMA_422; break;
+		case PIX_FMT_YUV444P: chroma = Y4M_CHROMA_444; break;
+		case PIX_FMT_YUVJ422P: chroma = Y4M_CHROMA_422; break; //FIXME
+		case PIX_FMT_YUVJ444P: chroma = Y4M_CHROMA_444; break; //FIXME
+		case PIX_FMT_YUV411P: chroma = Y4M_CHROMA_411; break;
+		case PIX_FMT_GRAY8: chroma = PIX_FMT_GRAY8; break;
+		default:
+			chroma = Y4M_CHROMA_444;
+			break;
+	}
+	return chroma;
+}
+
+int get_pixfmt_from_chroma(int chroma) {
+	int src_fmt;
+	switch( chroma ) {
+		case Y4M_CHROMA_420JPEG: src_fmt = PIX_FMT_YUVJ420P; break;
+		case Y4M_CHROMA_420MPEG2:
+		case Y4M_CHROMA_420PALDV:
+				src_fmt = PIX_FMT_YUV420P; break;
+		case Y4M_CHROMA_422:
+				src_fmt = PIX_FMT_YUV422P; break;
+		case Y4M_CHROMA_444:
+				src_fmt = PIX_FMT_YUV444P; break;
+		case Y4M_CHROMA_411:
+				src_fmt = PIX_FMT_YUV411P; break;
+		case Y4M_CHROMA_MONO:
+				src_fmt = PIX_FMT_GRAY8; break;
+		default:
+				src_fmt = -1;
+		break;
+	}
+	return src_fmt;
+}
+
+int	vj_to_pixfmt(int fmt) {
+	int pixfmt;
+	switch(fmt) {
+		case FMT_420: pixfmt = PIX_FMT_YUV420P; break;
+		case FMT_420F: pixfmt = PIX_FMT_YUVJ420P; break;
+		case FMT_422: pixfmt = PIX_FMT_YUV422P; break;
+		case FMT_422F: pixfmt = PIX_FMT_YUVJ422P; break;
+		case FMT_444: pixfmt = PIX_FMT_YUV444P;break;
+		default:
+			pixfmt = -1;
+			break;
+	}
+	return pixfmt;
+}
+
+int	pixfmt_to_vj(int pixfmt) {
+	int fmt;
+	switch(pixfmt) {
+		case PIX_FMT_YUV420P: fmt = FMT_420; break;
+		case PIX_FMT_YUVJ420P: fmt = FMT_420F; break;
+		case PIX_FMT_YUVJ422P: fmt = FMT_422F; break;
+		case PIX_FMT_YUV422P: fmt = FMT_422; break;
+		default: fmt = -1; break;
+	}
+	return fmt;
+}
+
+int	vj_is_full_range(int fmt) {
+	return ( fmt == FMT_420F || fmt == FMT_422F ) ? 1: 0;
+}
+
+int	pixfmt_is_full_range(int pixfmt) {
+	return ( pixfmt == PIX_FMT_YUVJ420P || pixfmt == PIX_FMT_YUVJ422P || pixfmt == PIX_FMT_YUVJ444P ) ? 1:0;
+}
+
 
 static int	global_scaler_ = SWS_FAST_BILINEAR;
 static int	full_chroma_interpolation_ = 0;

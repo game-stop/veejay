@@ -67,11 +67,9 @@ static uint8_t	*bgimage[3] = { NULL,NULL,NULL};
 int	chameleon_prepare( uint8_t *map[3], int width, int height )
 {
 	if(!bgimage[0]) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Take a backdrop snapshot!");
 		return 0;
 	}
 
-	
 	//@ copy the iamge
 	int strides[4] = { width * height, width * height, width * height, 0 };
 	vj_frame_copy( map, bgimage, strides );	
@@ -122,6 +120,8 @@ void	chameleon_free()
 	for( i = 0; i < 3; i ++ ) {
 		free(bgimage[i]);
 		free(tmpimage[i]);
+		bgimage[i] = NULL;
+		tmpimage[i] = NULL;
 	}
 	free(timebuffer);
 	free(sum);

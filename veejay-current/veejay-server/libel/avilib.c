@@ -36,6 +36,8 @@
 #include <assert.h>
 #endif
 
+#define    RUP8(num)(((num)+8)&~8)
+
 #ifndef	O_BINARY
 #define O_BINARY 0
 #endif
@@ -302,22 +304,19 @@ static int avi_init_super_index(avi_t *AVI, unsigned char *idxtag, avisuperindex
     veejay_memset (sil->dwReserved, 0, sizeof (sil->dwReserved));
 
     // NR_IXNN_CHUNKS == allow 32 indices which means 32 GB files -- arbitrary
-    sil->aIndex = vj_malloc (sil->wLongsPerEntry * NR_IXNN_CHUNKS * sizeof (uint32_t));
+    sil->aIndex = vj_calloc( RUP8(sil->wLongsPerEntry * NR_IXNN_CHUNKS) * sizeof (uint32_t));
     if (!sil->aIndex) {
 	AVI_errno = AVI_ERR_NO_MEM;
 	return -1;
     }
-    veejay_memset (sil->aIndex, 0, sil->wLongsPerEntry * NR_IXNN_CHUNKS * sizeof (uint32_t));
 
-    sil->stdindex = vj_malloc (NR_IXNN_CHUNKS * sizeof (avistdindex_chunk *));
+    sil->stdindex = vj_calloc(RUP8( NR_IXNN_CHUNKS * sizeof (avistdindex_chunk *)));
     if (!sil->stdindex) {
 	AVI_errno = AVI_ERR_NO_MEM;
 	return -1;
     }
     for (k = 0; k < NR_IXNN_CHUNKS; k++) {
-	sil->stdindex[k] = vj_malloc (sizeof (avistdindex_chunk));
-	veejay_memset(sil->stdindex[k], 0, sizeof (avistdindex_chunk));
-	// gets rewritten later
+	sil->stdindex[k] = vj_calloc (sizeof (avistdindex_chunk));
 	sil->stdindex[k]->qwBaseOffset = (uint64_t)k * NEW_RIFF_THRES;
     }
 
@@ -343,7 +342,7 @@ static int avi_add_std_index(avi_t *AVI, unsigned char *idxtag, unsigned char *s
 
     //stdil->qwBaseOffset = AVI->video_superindex->aIndex[ cur_std_idx ]->qwOffset;
 
-    stdil->aIndex = vj_malloc(stdil->dwSize * sizeof (uint32_t) * stdil->wLongsPerEntry);
+    stdil->aIndex = vj_calloc(stdil->dwSize * sizeof (uint32_t) * stdil->wLongsPerEntry);
 
     if (!stdil->aIndex) {
 	AVI_errno = AVI_ERR_NO_MEM;
@@ -1930,17 +1929,21 @@ int AVI_close(avi_t *AVI)
        if(AVI->track[j].audio_superindex) {
 	   // shortcut
 	   avisuperindex_chunk *a = AVI->track[j].audio_superindex;
-	   for (k = 0; k < NR_IXNN_CHUNKS; k++) {
-	       if (a->stdindex && a->stdindex[k]) {
-		   if (a->stdindex[k]->aIndex) {
-		       free(a->stdindex[k]->aIndex);
-		   }
-		   free(a->stdindex[k]);
-	       }
+	   if( a ) {
+		/*	if( a->stdindex ) {
+      		   for (k = 0; k < NR_IXNN_CHUNKS; k++) {
+	        	if (a->stdindex && a->stdindex[k]) {
+	 	 	  if (a->stdindex[k]->aIndex) {
+		 	      free(a->stdindex[k]->aIndex);
+		 	  }
+			   free(a->stdindex[k]);
+	       		}
+	     	   }
+	     	   free(a->stdindex);
+		} */
+	     	if(a->aIndex) free(a->aIndex);
+	     	free(a);
 	   }
-	   if(a->stdindex) free(a->stdindex);
-	   if(a->aIndex) free(a->aIndex);
-	   free(a);
        }
    }
 
@@ -3281,8 +3284,7 @@ long AVI_read_frame(avi_t *AVI, char *vidbuf, int *keyframe)
    }
    else
    {
-	n = mmap_read( AVI->mmap_region, AVI->video_index[ AVI->video_pos].pos,
-		n, vidbuf );
+	n = mmap_read( AVI->mmap_region, AVI->video_index[ AVI->video_pos].pos, n, vidbuf );
    }
    
 

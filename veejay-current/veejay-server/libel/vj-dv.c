@@ -23,7 +23,6 @@
 #include <libvjmsg/vj-msg.h>
 #ifdef SUPPORT_READ_DV2
 #include <libdv/dv.h>
-#include <libel/vj-el.h>
 #include <stdint.h>
 #include <libel/vj-dv.h>
 #include <libel/vj-avcodec.h>
@@ -74,20 +73,19 @@ vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_
 static	sws_template dv_templ;
 
 /* init the dv encoder and encode buffer */
-vj_dv_encoder *vj_dv_init_encoder(void * edl, int pixel_format)
+vj_dv_encoder *vj_dv_init_encoder(void * edl, int pixel_format, int isPAL)
 {
-	editlist *el = (editlist*) edl;
+	VJFrame *frame = (VJFrame*) edl;
 	vj_dv_encoder *e = (vj_dv_encoder*) vj_malloc(sizeof(vj_dv_encoder));
 	if(!e) return NULL;
 	e->encoder = dv_encoder_new(0,0,0);
-	e->encoder->isPAL = (el->video_norm == 'p' ? 1 : 0);
-	e->encoder->is16x9 = (el->video_width / el->video_height >= 1.777 ? 1: 0);
+	e->encoder->isPAL = isPAL;
+	e->encoder->is16x9 = (frame->width / frame->height >= 1.777 ? 1: 0);
 	e->encoder->vlc_encode_passes = 3;
     	e->encoder->static_qno = 0;
     	e->encoder->force_dct = DV_DCT_AUTO;
     	e->fmt = pixel_format;
-	e->buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) *
-				el->video_width * el->video_height * 3 );
+	e->buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * frame->width * frame->height * 3 );
     	e->dv_video =
 	(uint8_t *) vj_calloc(sizeof(uint8_t) * 
 			   (e->encoder->isPAL ?
@@ -140,10 +138,6 @@ int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3])
 	   }
 
     yuv_convert_and_scale_packed( encoder->scaler, src,dst );
-
-//    if( encoder->fmt == FMT_422F ) {
-//	yuy2_scale_pixels_from_yuv( encoder->buffer, w * h );
-  //  }
 
     dv_encode_full_frame( encoder->encoder, pixels, e_dv_color_yuv,encoder->dv_video);
     dv_encode_metadata(encoder->dv_video, encoder->encoder->isPAL,encoder->encoder->is16x9, &now, 0);
@@ -389,12 +383,6 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 				d->decoder->num_dif_seqs );
 		return 0;
 	}
-#ifdef STRICT_CHECKING
-//	if ( d->decoder->sampling == e_dv_sample_420 )
-//		assert( d->fmt == FMT_420 || d->fmt == FMT_420F );
-//	if ( d->decoder->sampling == e_dv_sample_422 )
-//		assert( d->fmt == FMT_422 || d->fmt == FMT_422F );
-#endif
        
     	if ( d->decoder->sampling == e_dv_sample_422 || d->decoder->sampling ==
 				e_dv_sample_411 )
@@ -412,8 +400,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 
 		//@ this works
 		VJFrame *src = yuv_yuv_template( d->dv_video, NULL,NULL,width,height,PIX_FMT_YUYV422 );
-		VJFrame *dst = yuv_yuv_template( Y,Cb,Cr,width,height,
-				( d->fmt == FMT_422 ? PIX_FMT_YUV422P : PIX_FMT_YUVJ422P ) );
+		VJFrame *dst = yuv_yuv_template( Y,Cb,Cr,width,height, d->fmt );
 
 		yuv_convert_any_ac( src,dst, src->format,dst->format );
 		free(src);
@@ -439,7 +426,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 
                 yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
 
-		if( yuv_use_auto_ccir_jpeg() && fmt == FMT_422F) {
+		if( yuv_use_auto_ccir_jpeg() && fmt == PIX_FMT_YUVJ422F) {
 			yuv_scale_pixels_from_ycbcr(
 					Y, 16.0f, 235.0f, width * height);
 			yuv_scale_pixels_from_ycbcr(

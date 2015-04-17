@@ -4624,7 +4624,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->current_edit_list, args[0]) == 1)
+	if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->effect_frame1, v->current_edit_list, args[0]) == 1)
 	{
 		video_playback_setup *s = v->settings;
 		s->sample_record_id = v->uc->sample_id;
@@ -8766,7 +8766,7 @@ void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	)
 	}
 	else {
 		char header[128];//FIXME
-		sprintf( header, "%03d%08d%06d%06d%06d%06d",8+6+6+6+6,len, len, 0, v->current_edit_list->video_width, v->current_edit_list->video_height );
+		sprintf( header, "%03d%08d%06d%06d%06d%06d",8+6+6+6+6,len, len, 0, v->video_output_width, v->video_output_height );
 		SEND_MSG( v, header );
 
 		int res = vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, buf,len);
@@ -9342,7 +9342,7 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 
 
 	char *msg = (char*) vj_el_write_line_ascii( el, &b );
-
+	
 
 	char *s_print_buf = get_print_buf( b + 8 );
 	snprintf( s_print_buf, (b+8),"%06d%s", b, msg );
@@ -10294,8 +10294,8 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 
 
 	if( args[3] < 0 || args[4] < 0 ||
-			args[3] >= v->current_edit_list->video_width ||
-			args[4] >= v->current_edit_list->video_height )
+			args[3] >= v->video_output_width ||
+			args[4] >= v->video_output_height )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,
 				"Invalid XY position");
