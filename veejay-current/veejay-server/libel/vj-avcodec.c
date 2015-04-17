@@ -312,6 +312,7 @@ char		vj_avcodec_find_lav( int encoder )
 	switch( encoder)
 	{
 		case ENCODER_MJPEG:
+		case ENCODER_HUFFYUV:
 			return 'a';
 		case ENCODER_QUICKTIME_MJPEG:
 		       	return 'q';
