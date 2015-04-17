@@ -99,8 +99,9 @@ void transblend_apply( VJFrame *frame, VJFrame *frame2, int width,
 	    Y[p] = func_y(Y[p], Y2[q]);
 	}
     }
+
     for (y = 0; y < (theight >> frame->shift_v); y++) {
-	for (x = 0; x < (twidth / frame->shift_h); x++) {
+	for (x = 0; x < (twidth >> frame->shift_h); x++) {
 	    p = (uvy2 + y) * uv_width + uvx2 + x;
 	    q = (uvy1 + y) * uv_width + uvx1 + x;
 	    Cb[p] = func_c( Cb[p], Cb2[q]);
