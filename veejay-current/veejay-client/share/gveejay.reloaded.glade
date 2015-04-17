@@ -6579,15 +6579,16 @@
                                                     <property name="items" translatable="yes">VJ20 (YUV 4:2:0 Planar)
 VJ22 (YUV 4:2:2 Planar)
 MJPEG
+MJPEGB
+HUFFYUV
 DVVIDEO
-MPEG4
-MSMPEG4V3
 YV16 (YCbCr 4:2:2 Planar)
 I420 (YCbCr 4:2:0 Planar)
 Quicktime-DV
 Quicktime-MJPEG
 MLZO
-YUV (current)</property>
+YUV (current)
+</property>
                                                     <child internal-child="entry">
                                                       <widget class="GtkEntry" id="comboboxentry-entry6">
                                                         <property name="can_focus">False</property>
@@ -12490,6 +12491,18 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>

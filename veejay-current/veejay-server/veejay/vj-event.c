@@ -7557,8 +7557,7 @@ static struct {
 	{ "y422", ENCODER_YUV422 },
 	{ "i420", ENCODER_YUV420 },
 	{ "y420", ENCODER_YUV420 },
-	{ "div3", ENCODER_DIVX   },
-	{ "mpeg4", ENCODER_MPEG4 },
+	{ "huffyuv", ENCODER_HUFFYUV },
 #ifdef SUPPORT_READ_DV2
 	{ "dvvideo", ENCODER_DVVIDEO },
 #endif

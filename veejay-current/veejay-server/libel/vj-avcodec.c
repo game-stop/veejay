@@ -39,26 +39,6 @@
 #include <assert.h>
 #endif
 
-//#define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
-
-//#define YUV420_ONLY_CODEC(id) ( (id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4 ) ? 1 : 0 )
-
-static	int	YUV420_ONLY_CODEC(int id ) 
-{
-	switch(id) {
-	//	case CODEC_ID_MJPEG: 
-	//	case CODEC_ID_MJPEGB:
-		case CODEC_ID_MPEG4:
-	//	case CODEC_ID_LJPEG:
-		case CODEC_ID_MSMPEG4V3:
-//		case CODEC_ID_SP5X: 
-//		case CODEC_ID_THEORA:
-//		case CODEC_ID_H264:;
-
-			return 1;
-	}
-	return 0;
-}
 
 //from gst-ffmpeg, round up a number
 #define GEN_MASK(x) ((1<<(x))-1)
@@ -84,6 +64,7 @@ char*	vj_avcodec_get_codec_name(int codec_id )
 		case CODEC_ID_SP5X: snprintf(name,sizeof(name), "SP5x"); break;
 		case CODEC_ID_THEORA: snprintf(name,sizeof(name),"Theora");break;
 		case CODEC_ID_H264: snprintf(name,sizeof(name), "H264");break;
+		case CODEC_ID_HUFFYUV: snprintf(name,sizeof(name),"HuffYUV");break;
 		case 997 : snprintf(name,sizeof(name), "RAW YUV 4:2:2 Planar JPEG"); break;
 		case 996 : snprintf(name,sizeof(name), "RAW YUV 4:2:0 Planar JPEG"); break;
 		case 995 : snprintf(name,sizeof(name), "YUV4MPEG Stream 4:2:2"); break;
@@ -139,9 +120,9 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	}
 	else {
 #endif
-		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * frame->width * frame->height * 3 );
-		e->data[1] = e->data[0] + frame->width * frame->height;
-		e->data[2] = e->data[1] + frame->width * frame->height; //@ for all pixfmt
+		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * frame->len );
+		e->data[1] = e->data[0] + frame->len;
+		e->data[2] = e->data[1] + frame->uv_len;
 #ifdef SUPPORT_READ_DV2
 	}
 #endif
@@ -222,7 +203,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		e->context->prediction_method = 0;
 		e->context->dct_algo = FF_DCT_AUTO; 
 		e->context->pix_fmt = get_ffmpeg_pixfmt( out_pixel_format );
-		if(YUV420_ONLY_CODEC(id))
+		if( id == CODEC_ID_MJPEG ) 
 			e->context->pix_fmt = ( out_pixel_format == FMT_422F ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
 
 		pf = e->context->pix_fmt;
@@ -301,8 +282,10 @@ int		vj_avcodec_find_codec( int encoder )
 			return CODEC_ID_DVVIDEO;
 		case ENCODER_MJPEGB:
 			return CODEC_ID_MJPEGB;
+		case ENCODER_HUFFYUV:
+			return CODEC_ID_HUFFYUV;
 		case ENCODER_LJPEG:
-			return CODEC_ID_LJPEG;
+			return CODEC_ID_LJPEG;	
 		case ENCODER_YUV420:
 			return 999;
 		case ENCODER_YUV422:
@@ -368,8 +351,8 @@ static struct {
 	{ "Invalid codec", -1 },
 	{ "DV2", ENCODER_DVVIDEO },
 	{ "MJPEG", ENCODER_MJPEG },
-	{ "LJPEG", ENCODER_LJPEG },
 	{ "MJPEGB", ENCODER_MJPEGB },
+	{ "HuffYUV", ENCODER_HUFFYUV },
 	{ "YUV 4:2:2 Planar, 0-255 full range", ENCODER_YUV422F },
 	{ "YUV 4:2:0 Planar, 0-255 full range", ENCODER_YUV420F },
 	{ "YUV 4:2:2 Planar, CCIR 601. 16-235/16-240", ENCODER_YUV422 },
@@ -567,7 +550,6 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame )
 {
-
 	if( avcodec_encode_video2) {
 		AVPacket pkt;
 		veejay_memset(&pkt,0,sizeof(pkt));
@@ -577,12 +559,11 @@ static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, 
 
 		int res = avcodec_encode_video2( ctx, &pkt, frame, &got_packet_ptr);
 
-		veejay_msg(0, "Result %d, size %d", res, pkt.size );
-		if( res == -1 ) {
-			return res;
+		if( res == 00 ) {
+			return pkt.size;
 		}
 
-		return pkt.size;
+		return 0;
 	}
 	else if( avcodec_encode_video ) {
 		return avcodec_encode_video(ctx,buf,len,frame);
@@ -636,14 +617,6 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	pict.linesize[0] = stride;
 	pict.linesize[1] = stride2;
 	pict.linesize[2] = stride2;
-
-	if( YUV420_ONLY_CODEC(av->encoder_id)) {
-		vj_frame_copy1(src[0],av->data[0], av->width * av->height);
-		yuv422to420planar(src , av->data, av->width,av->height );
-		pict.data[0] = av->data[0];
-		pict.data[1] = av->data[1];
-		pict.data[2] = av->data[2];
-	}
 
 	return vj_avcodec_encode_video( av->context, buf, buf_len, &pict );
 }
