@@ -971,7 +971,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 	uint8_t *data = ( in_cache == NULL ? d->tmp_buffer: in_cache );
 	int inter = 0;
-	int got_picture = 0;
 	uint8_t *in[3] = { NULL,NULL,NULL };
 	int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len ,0};
 	uint8_t *dataplanes[3] = { data , data + el_out_->len, data + el_out_->len + el_out_->uv_len };
@@ -1330,11 +1329,19 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps )
 		*dh = c->height;
 		*dfps = (float) c->time_base.den;
 
-		veejay_msg(VEEJAY_MSG_DEBUG, "Using video settings from first loaded video %s: %dx%d@%2.2f",
-				filename,*dw,*dh,*dfps);
-	
 		avhelper_close_decoder(tmp);
+	} else {
+		lav_file_t *fd = lav_open_input_file( filename, mmap_size );
+		if( fd ) {
+			*dw = lav_video_width( fd );
+			*dh = lav_video_height( fd );
+			*dfps = lav_frame_rate( fd );
+			lav_close(fd);
+		}
+		
 	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Using video settings from first loaded video %s: %dx%d@%2.2f", filename,*dw,*dh,*dfps);
 }
 
 
