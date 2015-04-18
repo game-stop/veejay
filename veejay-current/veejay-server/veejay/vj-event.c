@@ -7168,7 +7168,7 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 	}
 
 	if ( args[1] == 1 ) {
-
+		int old = v->settings->composite;
 		int mode = v->settings->composite;
 		if( mode == 0 ) {
 			if( SAMPLE_PLAYING(v) ) {

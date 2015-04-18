@@ -1918,7 +1918,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->composite2 = info->composite; // save ptr, composite
 
 		info->settings->zoom = 0;
-		info->settings->composite = comp_mode;
+		info->settings->composite = ( comp_mode == 1 ? 1: 0);
 	}
 
 	if(!info->bes_width)
@@ -3021,7 +3021,7 @@ int veejay_main(veejay_t * info)
 	memset( &attr, 0 , sizeof(pthread_attr_t));
 
     	/* Flush the Linux File buffers to disk */
-    	sync();
+    	//sync();
    
 	if( task_num_cpus() > 1 ) {
 		CPU_ZERO( &cpuset );

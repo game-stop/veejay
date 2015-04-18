@@ -3191,37 +3191,30 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
         	}
 
 		composite_process(info->composite,&out,info->effect_frame1,settings->composite,frame->format); 
-
+		// draw font/qr in transformed image
 		if(osd_text ) {
-		/*	void *vp = composite_get_vp( info->composite );
-			if( viewport_active(vp) )
-			{
-				VJFrame *tst = composite_get_draw_buffer( info->composite );
-				if(tst) { 
+			VJFrame *tst = composite_get_draw_buffer( info->composite );
+			if(tst) {
+			        if( info->use_osd == 3 ) {	
 					vj_font_render_osd_status(info->osd,tst,osd_text,placement);
 					if(more_text)
 						vj_font_render_osd_status(info->osd,tst,more_text,0);
-					free(tst);
 				}
-			} else { 	
-				if(more_text)
-					vj_font_render_osd_status(info->osd,info->effect_frame1,more_text,0);
-				
-				vj_font_render_osd_status(info->osd, frame, osd_text,placement );
-			} */
-			VJFrame *tst = composite_get_draw_buffer( info->composite );
-			if(tst) { 
-				vj_font_render_osd_status(info->osd,tst,osd_text,placement);
-				if(more_text)
-					vj_font_render_osd_status(info->osd,tst,more_text,0);
-				qrwrap_draw( tst, info->uc->port, info->homedir, tst->height/4,tst->height/4, tst->format );
-				qrbitcoin_draw( tst, info->homedir, tst->height/4,tst->height/4, tst->format );
-		
 				free(tst);
 			}
-
-		}
+		} 
 	} 
+	else {
+		if( osd_text ) 
+			vj_font_render_osd_status(info->osd,frame,osd_text,placement);
+		if(more_text)
+			vj_font_render_osd_status(info->osd,frame,more_text,0);
+		if(info->use_osd == 2 ){
+			/* draw qr picture if present */
+			qrwrap_draw( frame, info->uc->port, info->homedir, frame->height/4,frame->height/4, frame->format );
+			qrbitcoin_draw( frame, info->homedir, frame->height/4,frame->height/4, frame->format );
+		}
+	}
 	if( osd_text)
 		free(osd_text);
 	if( more_text)	
@@ -3232,13 +3225,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
     	{
         	info->uc->take_bg = vj_perform_take_bg(info,frame,0);
     	} 
-
-
-	if(settings->composite == 0){
-		/* draw qr picture if present */
-		qrwrap_draw( frame, info->uc->port, info->homedir, frame->height/4,frame->height/4, frame->format );
-		qrbitcoin_draw( frame, info->homedir, frame->height/4,frame->height/4, frame->format );
-	}
 
 	if( frame->ssm == 1 )
 	{
