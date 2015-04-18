@@ -3021,7 +3021,7 @@ int veejay_main(veejay_t * info)
 	memset( &attr, 0 , sizeof(pthread_attr_t));
 
     	/* Flush the Linux File buffers to disk */
-    	//sync();
+    	sync();
    
 	if( task_num_cpus() > 1 ) {
 		CPU_ZERO( &cpuset );

@@ -2984,8 +2984,6 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 	char tmp[64];
 	char buf[256];
 	veejay_memset(&tc,0,sizeof(MPEG_timecode_t));
-	veejay_memset(&tmp,0,sizeof(tmp));
-	veejay_memset(&buf,0,sizeof(buf));
         y4m_ratio_t ratio = mpeg_conform_framerate( (double)info->current_edit_list->video_fps );
         int n = mpeg_framerate_code( ratio );
 
@@ -3014,7 +3012,7 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 	
 	switch(info->uc->playback_mode) {
 		case VJ_PLAYBACK_MODE_SAMPLE:
-			snprintf(buf,256, "(S) %s %d of %d Cache=%dMb Cost=%dms",
+			snprintf(buf,256, "%s %d of %d Cache=%dMb Cost=%dms",
 					timecode,
 					info->uc->sample_id,
 					sample_size()-1,
@@ -3022,7 +3020,7 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 					info->real_fps );
 			break;
 		case VJ_PLAYBACK_MODE_TAG:
-			snprintf(buf,256, "(T) %s %d of %d Cost=%dms",
+			snprintf(buf,256, "%s %d of %d Cost=%dms",
 					timecode,
 					info->uc->sample_id,
 					vj_tag_size(),
@@ -3183,7 +3181,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		VJFrame out;
 		veejay_memcpy( &out, info->effect_frame1, sizeof(VJFrame));
 		if( out.ssm ) 
-				out.format = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
+			out.format = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
 			
 		if(!frame->ssm) {
           	  chroma_supersample(settings->sample_mode,frame,pri );
@@ -3249,7 +3247,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settings )
 {
-//	VJFrame *frame = font_frame;
 	VJFrame	*frame = info->effect_frame1;
 
     	frame->data[0] = primary_buffer[0]->Y;
@@ -3439,7 +3436,6 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 		pvar_.follow_now[0] = 0;
 		pvar_.follow_now[1] = 0;
 	}
-
 
 	if(!skip)
 	{
