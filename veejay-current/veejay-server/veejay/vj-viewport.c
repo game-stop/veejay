@@ -185,7 +185,6 @@ static void		viewport_find_transform( float *coord, matrix_t *M );
 void 		viewport_line (uint8_t *plane,int x1, int y1, int x2, int y2, int w, int h, uint8_t col);
 static void		draw_point( uint8_t *plane, int x, int y, int w, int h, int size, int col );
 static viewport_config_t *viewport_load_settings( const char *dir, int mode );
-static void		viewport_save_settings( viewport_t *v , int frontback);
 static	void		viewport_prepare_process( viewport_t *v );
 static	void	viewport_compute_grid( viewport_t *v );
 
@@ -476,7 +475,7 @@ char *viewport_get_my_help(void *vv)
 	sprintf(startup_mode, "%s", (v->initial_active==1 ? "Active" :"Inactive"  ));
 	int gw = v->grid_width;
 	int gh = v->grid_height;
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + i: Transform secundary input\nCTRL + v: Transform sec. input in grayscale/color \nCTRL + a: %s on startup.\nCTRL + s: Exit this screen.\n%s\n\n",
+	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Enable/disable transform\nCTRL + a: %s on startup.\nCTRL + s: Exit this screen.\n%s\n\n",
 			reverse_mode,
 			startup_mode,
 			scroll_mode
@@ -1432,10 +1431,6 @@ static	void	*viewport_init_swscaler(ui_t *u, int w, int h)
 	u->sy   = (float)h / (float) u->sh;
 	void *scaler = yuv_init_swscaler( srci,dsti,&t,yuv_sws_get_cpu_flags());
 
-	veejay_msg(VEEJAY_MSG_INFO,
-			"Scaling from %dx%d to %dx%d",
-			w,h,u->sw,u->sh);
-
 	free(srci);	
 	free(dsti);
 
@@ -1934,8 +1929,9 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 	return vc;
 }
 
-static	void	viewport_save_settings( viewport_t *v, int frontback )
+void	viewport_save_settings( void *ptr, int frontback )
 {
+	viewport_t *v = (viewport_t *) ptr;
 	char path[1024];
 	sprintf(path, "%s/viewport.cfg", v->homedir );
 

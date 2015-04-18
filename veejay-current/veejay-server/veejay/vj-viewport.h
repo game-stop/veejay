@@ -62,6 +62,7 @@ void	viewport_set_initial_active( void *vv, int status );
 int	viewport_get_initial_active( void *vv );
 char 	*viewport_get_my_help(void *vv);
 int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int inc_x, int inc_y);
+void    viewport_save_settings( void *v, int frontback );
 
 #endif
 

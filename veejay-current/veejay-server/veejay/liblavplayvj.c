@@ -434,8 +434,8 @@ int veejay_free(veejay_t * info)
 	vj_effect_shutdown();
 
 
-	if( info->settings->composite )
-		composite_destroy( info->composite );
+	if( info->settings->composite2 )
+		composite_destroy( info->composite2 );
 	if( info->settings->action_scheduler.state )
 	{
 		if(info->settings->action_scheduler.sl )
@@ -603,10 +603,12 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 		veejay_msg(0, "Error while stopping sample %d", new_sample_id );
 		return 0;
 	}
+	//FIXME
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
 			info->settings->composite = 1; // back to top
 		} 
+	
 	}
 
 	sample_chain_free( info->uc->sample_id );
@@ -670,20 +672,10 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 #endif
 	if(info->composite )
 	{
-		info->settings->composite = sample_load_composite_config( info->composite , sample_id );
-		void *cur = sample_get_composite_view(sample_id);
-		switch(info->settings->composite) {
-			case 1:
-			case 2: 
-#ifdef STRICT_CHECKING
-				assert( cur != NULL );
-#endif
-				composite_set_backing(info->composite,cur);
-				veejay_msg(VEEJAY_MSG_INFO, "Using perspective transform for this Sample");
-				break;
-			case 0: 
-				info->settings->composite = 2; //cur_composite; 
-				break;
+		int has_cfg = sample_load_composite_config( info->composite , sample_id );
+		if( has_cfg && info->settings->composite == 1 ) {
+			void *cur = sample_get_composite_view(sample_id);
+			if( cur ) composite_set_backing(info->composite,cur);
 		}
 	}
 
@@ -735,29 +727,21 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 	  }
 #endif
-	  info->last_tag_id = stream_id;
-	  info->uc->sample_id = stream_id;
-	if(info->composite )
+	info->last_tag_id = stream_id;
+	info->uc->sample_id = stream_id;
+
+  	if(info->composite )
 	{
-		info->settings->composite = vj_tag_load_composite_config( info->composite , stream_id );
-		void *cur =vj_tag_get_composite_view(stream_id);
-		switch(info->settings->composite) {	
-			case 1:
-			case 2:
-#ifdef STRICT_CHECKING
-				assert( cur != NULL );
-#endif
-				composite_set_backing(info->composite,cur);
-				veejay_msg(VEEJAY_MSG_INFO, "Using perspective transform for this Stream");
-				break;
-			case 0: info->settings->composite = 2; break;
+		int has_cfg = vj_tag_load_composite_config( info->composite , stream_id );
+		if( has_cfg && info->settings->composite == 1 ) {
+			void *cur = vj_tag_get_composite_view(stream_id);
+			if( cur ) composite_set_backing(info->composite,cur);
 		}
 	}
-	
-	 veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp,
-			settings->max_frame_num );
 
-	 info->current_edit_list = info->edit_list;
+	veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp, settings->max_frame_num );
+
+	info->current_edit_list = info->edit_list;
   	 
 	veejay_reset_el_buffer(info);
 	
@@ -766,7 +750,6 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 {
-	//@ check safity of samples
 	if( new_pm == VJ_PLAYBACK_MODE_SAMPLE ) {
 		if(!sample_exists(sample_id)) {
 			veejay_msg(0,"Sample %d does not exist!");
@@ -789,10 +772,9 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		int cur_id = info->uc->sample_id;
 		if( cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_SAMPLE )
 		{
-			int pos = 0;
 			if( info->settings->sample_restart )
 			{
-				pos = sample_get_startFrame( cur_id );
+				long pos = sample_get_startFrame( cur_id );
 
 				veejay_set_frame(info, pos );
 			
@@ -836,8 +818,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		video_playback_setup *settings = info->settings;
 		settings->min_frame_num = 0;
 		settings->max_frame_num = info->edit_list->total_frames;
-		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d.",
-			(int)settings->min_frame_num,  (int)settings->max_frame_num );
+		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %ld - %ld", (long)settings->min_frame_num,  (long)settings->max_frame_num );
 
 	}
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
@@ -957,9 +938,6 @@ void veejay_stop_sampling(veejay_t * info)
     info->uc->sample_start = 0;
     info->uc->sample_end = 0;
     info->current_edit_list = info->edit_list;
-#ifdef STRICT_CHECKING
-	assert(info->edit_list != NULL );
-#endif
 }
 
 /******************************************************
@@ -1925,14 +1903,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	if( info->settings->composite )
 	{
-		int o1 = info->video_output_width * info->video_output_height;
-		int o2 = info->effect_frame1->len;
-		int comp_mode = 2;
-		if( o2 > o1 ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to perform viewport rendering when input resolution is larger then output resolution.");
-			return -1;
-		}
-
+		int comp_mode = info->settings->composite;
 		info->composite = composite_init( info->video_output_width, info->video_output_height,
 						  info->video_output_width, info->video_output_height,
 						  info->homedir,
@@ -1943,6 +1914,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		if(!info->composite) {
 			return -1;
 		}
+
+		info->composite2 = info->composite; // save ptr, composite
+
 		info->settings->zoom = 0;
 		info->settings->composite = comp_mode;
 	}
@@ -2282,6 +2256,7 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
  * veejay_playback_cycle()
  *   the playback cycle
  ******************************************************/
+static double last_tdiff = 0.0;
 static void veejay_playback_cycle(veejay_t * info)
 {
     video_playback_stats stats;
@@ -3703,9 +3678,10 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	int dw = 720;
 	int dh = (override_norm == 'p' ? 576 : 480);
 	float dfps = fps;
+	float tmp_fps = 0.0f;
 	if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
 	       dw = (override_norm == 'p' ? 352 : 360 );
-	 	       dh = dh / 2;
+	       dh = dh / 2;
 	}
 	else {
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_RUN_MODE not set to CLASSIC");
@@ -3713,7 +3689,7 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 
 	if(!info->dummy->active) {
 		if( n_files > 0  && (info->video_output_width <= 0 || info->video_output_height <= 0 )) {
-			vj_el_scan_video_file( files[0], &dw, &dh, &dfps );
+			vj_el_scan_video_file( files[0], &dw, &dh, &tmp_fps );
 
 			info->video_output_width = dw;
 			info->video_output_height = dh;
@@ -3721,6 +3697,10 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	} else {
 		info->video_output_width = dw;
 		info->video_output_height = dh;
+	}
+
+	if( tmp_fps > 0.0f && fps <= 0.0f ) {
+		dfps = tmp_fps;
 	}
 
 	if( info->dummy->width <= 0 )

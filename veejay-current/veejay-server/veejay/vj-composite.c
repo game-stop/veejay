@@ -151,12 +151,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 
 	c->back1 = NULL;
 
-/*	c->back1  = viewport_clone( c->vp1, iw, ih );
-	if(!c->back1 ) {
-		return NULL;
-	}
-	viewport_reconfigure(c->back1);*/
-
 	veejay_msg(VEEJAY_MSG_INFO, "Configuring projection:");
 	veejay_msg(VEEJAY_MSG_INFO, "\tSoftware scaler  : %s", yuv_get_scaler_name(zoom_type) );
 	veejay_msg(VEEJAY_MSG_INFO, "\tVideo resolution : %dx%d", iw,ih );
@@ -206,7 +200,7 @@ void	composite_destroy( void *compiz )
 	{
 		if(c->proj_plane[0]) free(c->proj_plane[0]);
 		if(c->vp1) viewport_destroy( c->vp1 );
-		//if(c->back1) viewport_destroy(c->back1);
+		if(c->back1) viewport_destroy(c->back1);
 		if(c->scaler)	yuv_free_swscaler( c->scaler );	
 		if(c->back_scaler) yuv_free_swscaler(c->back_scaler);
 		if(c->frame1) free(c->frame1);
@@ -228,6 +222,8 @@ void	composite_set_status(void *compiz, int mode)
 {
 	composite_t *c = (composite_t*) compiz; 
 	viewport_set_initial_active( c->vp1, mode );
+
+	viewport_save_settings( c->vp1, 1 );
 }
 
 void	composite_set_ui(void *compiz, int status )
@@ -365,20 +361,9 @@ void	composite_blit_yuyv( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which
 
 	if( which_vp == 1 && !vp1_active ) {
 		viewport_produce_full_img_yuyv( c->vp1,c->proj_plane,yuyv);
-	/*	if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
-			yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
-		}*/
 		return;
 	}
 
-	if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
-		//@scale to full range yuv
-		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
-		yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
-	} else {
-		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
-	}
-	
 }
 
 //@OBSOLETE
@@ -387,53 +372,6 @@ void	composite_blit_ycbcr( void *compiz,
                               int which_vp,
 			      void *gl )
 {
-	composite_t *c = (composite_t*) compiz;
-	int vp1_active = viewport_active(c->vp1);
-
-	int blit_back = c->has_back;
-#ifdef HAVE_GL
-	uint8_t *gl_buffer = x_display_get_buffer(gl);
-	
-	c->has_back   = 0;
-
-//@ frame in 444
-
-	if( which_vp == 2 && vp1_active ) {
-		yuv444_yvu444_1plane(c->proj_plane,c->proj_width,c->proj_height, gl_buffer);
-		return;
-	} else if (which_vp == 2 ) {
-		if (c->proj_width != c->img_width &&
-			c->proj_height != c->img_height && which_vp == 2  )
-			{
-				yuv444_yvu444_1plane(c->proj_plane,c->proj_width,c->proj_height, gl_buffer);
-			} 
-			else {
-				yuv444_yvu444_1plane(in,c->proj_width,c->proj_height, gl_buffer);
-			}
-		return;
-	} 
-
-	if( which_vp == 1 && !vp1_active ) {
-		viewport_produce_full_img_packed( c->vp1,c->proj_plane,gl_buffer);
-		//if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
-		//	yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
-		//}
-		return;
-	}
-
-	yuv444_yvu444_1plane(c->proj_plane,c->proj_width,c->proj_height, gl_buffer);
-
-/*	if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
-		//@scale to full range yuv
-		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
-		yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
-	} else {
-		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
-	}
-
-	*/
-
-#endif
 }
 
 
@@ -514,34 +452,6 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	return 1;
 }
 
-
-/* Chained Frame */
-int	composite_processX(  void *compiz, void *back1, uint8_t *out_data[3], VJFrame *input )
-{
-	composite_t *c = (composite_t*) compiz;
-#ifdef STRICT_CHECKING
-	assert( input->width == c->frame1->width );
-	assert( input->height == c->frame1->height );
-#endif
-
-/*	if(!input->ssm) 
-	{
-		chroma_supersample( c->sample_mode, input, input->data);
-		input->ssm = 1;
-	} */
-#ifdef STRICT_CHECKING
-	assert( input->data[0] != out_data[0] );
-	assert( input->data[1] != out_data[1] );
-	assert( input->data[2] != out_data[2] );
-	assert( back1 != NULL );
-#endif
-	viewport_produce_bw_img( back1,input->data,out_data,c->Y_only);
-
-	c->has_back = 1;
-
-	return 1; //* supersampled */
-}
-
 int	composite_get_colormode(void *compiz)
 {
 	composite_t *c = (composite_t*) compiz;
@@ -556,8 +466,6 @@ void	composite_set_colormode( void *compiz, int mode )
 	else if( mode == 1 )
 		c->Y_only = 1;
 }
-
-
 
 void	*composite_get_draw_buffer( void *compiz )
 {

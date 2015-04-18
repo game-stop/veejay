@@ -765,6 +765,7 @@ static void vj_perform_close_audio() {
 	if(audio_render_buffer) free( audio_render_buffer );
 	if(down_sample_buffer) free( down_sample_buffer );
 #ifdef HAVE_JACK
+	int i;
 	for(i=0; i <= MAX_SPEED; i ++)
 	{
 		if(resample_context[i])
@@ -3125,6 +3126,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	pri[0] = primary_buffer[destination]->Y;
 	pri[1] = primary_buffer[destination]->Cb;
 	pri[2] = primary_buffer[destination]->Cr;
+
 	if( settings->composite  )
 	{ //@ scales in software
 		if( settings->ca ) {
@@ -3178,19 +3180,20 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	}
 
 	if( settings->composite  ) {
-			VJFrame out;
-			veejay_memcpy( &out, info->effect_frame1, sizeof(VJFrame));
-			if( out.ssm ) 
-					out.format = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
+		VJFrame out;
+		veejay_memcpy( &out, info->effect_frame1, sizeof(VJFrame));
+		if( out.ssm ) 
+				out.format = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
 			
 		if(!frame->ssm) {
-            chroma_supersample(settings->sample_mode,frame,pri );
-            frame->ssm = 1;
-        } 
+          	  chroma_supersample(settings->sample_mode,frame,pri );
+          	  frame->ssm = 1;
+        	}
+
 		composite_process(info->composite,&out,info->effect_frame1,settings->composite,frame->format); 
 
-		if(osd_text && info->uc->playback_mode != VJ_PLAYBACK_MODE_TAG) { // for some reason, tag mode does not display font. lets not even try to render then
-			void *vp = composite_get_vp( info->composite );
+		if(osd_text ) {
+		/*	void *vp = composite_get_vp( info->composite );
 			if( viewport_active(vp) )
 			{
 				VJFrame *tst = composite_get_draw_buffer( info->composite );
@@ -3205,9 +3208,19 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 					vj_font_render_osd_status(info->osd,info->effect_frame1,more_text,0);
 				
 				vj_font_render_osd_status(info->osd, frame, osd_text,placement );
+			} */
+			VJFrame *tst = composite_get_draw_buffer( info->composite );
+			if(tst) { 
+				vj_font_render_osd_status(info->osd,tst,osd_text,placement);
+				if(more_text)
+					vj_font_render_osd_status(info->osd,tst,more_text,0);
+				qrwrap_draw( tst, info->uc->port, info->homedir, tst->height/4,tst->height/4, tst->format );
+				qrbitcoin_draw( tst, info->homedir, tst->height/4,tst->height/4, tst->format );
+		
+				free(tst);
 			}
+
 		}
-		//free(in);
 	} 
 	if( osd_text)
 		free(osd_text);
@@ -3220,7 +3233,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
         	info->uc->take_bg = vj_perform_take_bg(info,frame,0);
     	} 
 
-	if(placement == 1){
+
+	if(settings->composite == 0){
 		/* draw qr picture if present */
 		qrwrap_draw( frame, info->uc->port, info->homedir, frame->height/4,frame->height/4, frame->format );
 		qrbitcoin_draw( frame, info->homedir, frame->height/4,frame->height/4, frame->format );

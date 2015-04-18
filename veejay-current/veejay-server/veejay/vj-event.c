@@ -7145,11 +7145,10 @@ void	vj_event_vp_proj_toggle(void *ptr, const char format[],va_list ap )
 		return;
 	}
 
-	int mode = !composite_get_status(v->composite);
-	composite_set_status( v->composite, mode );
+	int mode = !composite_get_status(v->composite2);
+	composite_set_status( v->composite2, mode );
 
-	veejay_msg(VEEJAY_MSG_INFO, "Projection transform is now %s",
-			(mode==0? "inactive" : "active"));
+	veejay_msg(VEEJAY_MSG_INFO, "Projection transform is now %s on startup.",(mode==0? "inactive" : "active"));
 }
 
 void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
@@ -7166,63 +7165,22 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 
 	if( args[0] == 1 )
 	{
-	/*	int cs = composite_get_colormode(v->composite);
-		if(cs == 0 )
-			cs = 1;
-		else 
-			cs = 0;	
-		composite_set_colormode( v->composite, cs );
-		veejay_msg(VEEJAY_MSG_INFO ,"Secundary Input renders in %s", (cs == 1 ?"Grayscale" : "Color" ) );
-		return;*/
 	}
 
 	if ( args[1] == 1 ) {
-		if(v->settings->composite == 1 ) 
-			v->settings->composite = 2;
-		else if (v->settings->composite == 2 )
+
+		int mode = v->settings->composite;
+		if( mode == 0 ) {
+			if( SAMPLE_PLAYING(v) ) {
+				sample_set_composite( v->composite, v->uc->sample_id, 1 );
+			} else if (STREAM_PLAYING(v) ) {
+				vj_tag_set_composite( v->composite, v->uc->sample_id, 1 );
+			}
 			v->settings->composite = 1;
-		veejay_msg(VEEJAY_MSG_INFO, "Focus on %s, press CTRL-h for more help.", (v->settings->composite == 1 ? "Projection" : "Secundary Input"));
-		if( SAMPLE_PLAYING(v) ) {
-
-		/*	sample_reload_config( v->composite, v->uc->sample_id,v->settings->composite );
-
-			if(v->settings->composite == 2 && sample_get_composite(v->uc->sample_id ) == 0 )
-			{
-				sample_set_composite( v->composite, v->uc->sample_id, 2  );
-				void *cur = sample_get_composite_view(v->uc->sample_id);
-				if(cur==NULL) {
-					cur = composite_clone( v->composite );
-				}
-				composite_set_backing(v->composite,cur );
-				veejay_msg(0, "Saved calibration to current sample");
-			}*/
-			sample_set_composite( v->composite, v->uc->sample_id, v->settings->composite  );
-
-			veejay_msg(VEEJAY_MSG_INFO,
-				"Secundary input sample %d will %s.", v->uc->sample_id,
-				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
-		} else if (STREAM_PLAYING(v)) {
-			
-		/*	vj_tag_reload_config( v->composite, v->uc->sample_id,v->settings->composite );
-
-			if(v->settings->composite == 2 && vj_tag_get_composite(v->uc->sample_id) == 0 )
-			{
-				vj_tag_set_composite( v->composite, v->uc->sample_id, 2  );
-				void *cur = vj_tag_get_composite_view(v->uc->sample_id);
-				if(cur==NULL) {
-					cur = composite_clone( v->composite );
-				}
-				composite_set_backing(v->composite,cur );
-				
-				veejay_msg(0, "Saved calibration to current sample");
-			}*/
-
-			vj_tag_set_composite( v->composite, v->uc->sample_id, v->settings->composite  );
-
-			veejay_msg(VEEJAY_MSG_INFO,
-				"Secundary input stream %d will %s.", v->uc->sample_id,
-				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
-
+		} else if ( mode == 1 ) {
+			v->settings->composite = 0;
+		} else if ( mode == 2 ) {
+			v->settings->composite = 1;
 		}
 	} 
 
@@ -7408,10 +7366,10 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( v->settings->composite && composite_get_ui( v->composite ) ) {
-		if(v->use_osd==3) 
-			v->use_osd = 0;
-		v->settings->composite = 2;
+	if( v->settings->composite == 2 && composite_get_ui( v->composite ) ) {
+//		if(v->use_osd==3) 
+//			v->use_osd = 0;
+//		v->settings->composite = 2;
 		if(STREAM_PLAYING(v)) {
 			void *cur = vj_tag_get_composite_view(v->uc->sample_id);
 			if(cur == NULL ) {
@@ -7428,16 +7386,19 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 			}
                        	sample_reload_config( v->composite,v->uc->sample_id, v->settings->composite);
 			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to sample %d",v->uc->sample_id );
-               }
+               } else {
+			//FIXME plain mode restore
+	       }
 	       composite_set_ui(v->composite, 0 );
+	       v->settings->composite = 1;
 #ifdef HAVE_SDL
 	       if(v->video_out==0 || v->video_out == 2)
 	 	      vj_sdl_grab( v->sdl[0], 0 );
 #endif
 	}
 	else {
-		composite_set_ui( v->composite, 1 );
-		v->settings->composite = 1;
+		composite_set_ui( v->composite, 2 );
+		v->settings->composite = 2;
 		v->use_osd=3;
 #ifdef HAVE_SDL
 		if(v->video_out==0 || v->video_out == 2)
@@ -8630,7 +8591,6 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 		return;
 	}
 
-	veejay_image_t *img = NULL;
 	int pixel_format = get_ffmpeg_pixfmt(v->pixel_format);
 	int preview_size = 0;
 	VJFrame frame;
