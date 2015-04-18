@@ -3595,46 +3595,6 @@ void	vj_event_render_depth( void *ptr, const char format[] , va_list ap )
 void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	if(v->composite) {
-	if(STREAM_PLAYING(v))
-	{
-		if( vj_tag_get_composite_view(v->uc->sample_id) == NULL ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "No perspective transform setup for Stream %d, play it and press CTRL-s",
-				v->uc->sample_id );
-			return;
-		}
-
-		int status = vj_tag_get_composite( v->uc->sample_id );
-		if( status == 1 || status == 2 ) {
-			status = 0;
-		} else {
-			status = 2;
-		}
-		vj_tag_set_composite( v->composite, v->uc->sample_id, status );
-
-		veejay_msg(VEEJAY_MSG_INFO, "Stream #%d will %s be transformed when used as secundary input",
-			v->uc->sample_id, (status==2? "now" : "not"));
-		veejay_msg(VEEJAY_MSG_INFO, "Press CTRL+i again to toggle.");
-
-	} else if (SAMPLE_PLAYING(v)) {
-		if( sample_get_composite_view(v->uc->sample_id ) == NULL ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "No perspective transform setup for Sample %d, play it and press CTRL-s",
-				v->uc->sample_id );
-			return;
-		}
-		int status = sample_get_composite( v->uc->sample_id );
-		if( status == 1 || status == 2 ) 
-			status = 0;
-		else 
-			status = 2;
-
-		sample_set_composite( v->composite, v->uc->sample_id, status );
-		veejay_msg(VEEJAY_MSG_INFO, "Sample #%d will %s be transformed when used as secundary input",
-			v->uc->sample_id, (status==2? "now" : "not"));
-		veejay_msg(VEEJAY_MSG_INFO, "Press CTRL+i again to toggle.");
-
-		}
-	}
 }
 
 void vj_event_play_reverse(void *ptr,const char format[],va_list ap) 

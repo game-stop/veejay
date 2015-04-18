@@ -135,7 +135,8 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	sws_templ.flags = zoom_type;
 
 	c->frame1 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,get_ffmpeg_pixfmt( pf ));
-	c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, (pf == FMT_422 ? PIX_FMT_YUV444P: PIX_FMT_YUVJ444P ));
+	c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, c->frame1->format );
+	//c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, (pf == FMT_422 ? PIX_FMT_YUV444P: PIX_FMT_YUVJ444P ));
 	c->frame3 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw,ph,c->frame1->format );
 	c->frame4 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,c->frame1->format );
 
@@ -364,9 +365,9 @@ void	composite_blit_yuyv( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which
 
 	if( which_vp == 1 && !vp1_active ) {
 		viewport_produce_full_img_yuyv( c->vp1,c->proj_plane,yuyv);
-		if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
+	/*	if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
 			yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
-		}
+		}*/
 		return;
 	}
 
@@ -507,7 +508,8 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	} 
 	else if ( which_vp == 1 ) 
 	{
-		composite_scale( c, input, c->frame2 );	
+		int strides[4] = { input->len, input->len, input->len, 0 };
+		vj_frame_copy( input, c->frame2, strides );
 	}
 	return 1;
 }
@@ -522,11 +524,11 @@ int	composite_processX(  void *compiz, void *back1, uint8_t *out_data[3], VJFram
 	assert( input->height == c->frame1->height );
 #endif
 
-	if(!input->ssm) /* supersample to YUV 4:4:4 */
+/*	if(!input->ssm) 
 	{
 		chroma_supersample( c->sample_mode, input, input->data);
 		input->ssm = 1;
-	}
+	} */
 #ifdef STRICT_CHECKING
 	assert( input->data[0] != out_data[0] );
 	assert( input->data[1] != out_data[1] );
