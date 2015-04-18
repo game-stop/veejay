@@ -23,25 +23,24 @@
 #include <config.h>
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
+#include "common.h"
 #include "slicer.h"
-static int *slice_xshift;
-static int *slice_yshift;
+static int *slice_xshift = NULL;
+static int *slice_yshift = NULL;
 
-static	void recalc(int w, int h , uint8_t *Yin, int v1, int v2 )
+static	void recalc(int w, int h , uint8_t *Yinp, int v1, int v2 )
 {
-  unsigned int x,y,dx,dy,r,p;
-  unsigned int l = w * h;
-  unsigned int valx = (w / 100.0) * v1;
-  unsigned int valy = (h / 100.0) * v1;
+  int x,y,dx,dy,r,p;
+  int l = w * h;
+  int valx = v1;//(w / 100.0) * v1;
+  int valy = v2;//(h / 100.0) * v1;
   for(x = dx = 0; x < w; x++) 
   {
-	p = 0 + (int)( l * (rand()/RAND_MAX + 0.0) );
- 
 	if(dx==0)
-       	{ 
-                r = ((Yin[p] & valx))-((valx>>1)+1); 
-                dx = 8 + ( (Yin[p] & ((valx>>1))-1) );
-		
+       	{
+	        uint8_t *Yin = Yinp + (x * h);
+                r = ((rand() & valx))-((valx>>1)+1); 
+                dx = 8 + ( (Yin[x] & ((valx>>1))-1) );
         }
         else
         {
@@ -52,12 +51,11 @@ static	void recalc(int w, int h , uint8_t *Yin, int v1, int v2 )
  
   for(y=dy=0; y < h; y++) 
   {
-	p = 0 + (int)( l * rand()/RAND_MAX + 0.0 );
    	if(dy==0) 
 	{ 
-		r = (Yin[p] & valy)-((valy>>1)+1); 
-		dy = ( 8 + Yin[p] & ((valy>>1)-1) );
-
+		uint8_t *Yin = Yinp + (y * w);
+		r = (rand() & valy)-((valy>>1)+1); 
+		dy = ( 8 + Yin[x] & ((valy>>1)-1) );
 	} 
 	else 
 	{ 
@@ -86,10 +84,10 @@ vj_effect *slicer_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 2;
-    ve->limits[1][0] = 100;
-    ve->limits[0][1] = 2;
-    ve->limits[1][1] = 100;
+    ve->limits[0][0] = 1;
+    ve->limits[1][0] = w;
+    ve->limits[0][1] = 1;
+    ve->limits[1][1] = h;
     ve->defaults[0] = 16;
     ve->defaults[1] = 16;
     ve->description = "Slicer";
@@ -104,7 +102,7 @@ vj_effect *slicer_init(int w, int h)
 void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int val1, int val2)
 {
-	unsigned int x,y,p;
+	int x,y,p,q;
 	const unsigned int len = (width * height);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
@@ -112,7 +110,10 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Y2= frame2->data[0];
 	uint8_t *Cb2=frame2->data[1];
 	uint8_t *Cr2=frame2->data[2];
-	unsigned int dx,dy;
+	int dx,dy;
+
+	srand( val1 * val2 );
+
 	recalc( width, height, Y2, val1 ,val2 );
 
   	for(y=0; y < height; y++){ 
@@ -120,10 +121,15 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
         	dx = x + slice_xshift[y]; 
 		dy = y + slice_yshift[x];
 		p = dy * width + dx;
+		q = y * width + x;
 		if( p >= 0 && p < len ) {
-               	 Y[(y*width)+x] = Y2[p];
-               	 Cb[(y*width)+x] = Cb2[p];
-                 Cr[(y*width)+x] = Cr2[p];
+               	 Y[q] = Y2[p];
+               	 Cb[q] = Cb2[p];
+                 Cr[q] = Cr2[p];
+		} else {
+		  Y[q] = pixel_Y_lo_;
+		  Cb[q] = 128;
+		  Cr[q] = 128;
 		}
             }
         }
