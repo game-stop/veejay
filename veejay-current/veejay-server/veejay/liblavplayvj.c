@@ -2370,38 +2370,19 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_JACK
 	if ( info->audio==AUDIO_PLAY && el->has_audio ) 
 	{
-	  struct timespec audio_tmstmp;
-	  // struct timeval audio_tmstmp;	
+	   struct timespec audio_tmstmp;
 	   long int sec=0;
 	   long int usec=0;
 	   long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
 
 	   audio_tmstmp.tv_sec = sec;
-	   audio_tmstmp.tv_nsec = usec; //(1000 * usec);
+	   audio_tmstmp.tv_nsec = usec;
 	   if( audio_tmstmp.tv_sec ) {
-		//@ measure against bytes written to jack
-      		tdiff1 = settings->spvf * (stats.nsync - nvcorr) -  
-				settings->spas * num_audio_bytes_written;
-
-                                                //1000000000
-		long  d1 = (bs.timestamp.tv_sec * 1000000000) + bs.timestamp.tv_nsec;
-		long  n1 = (audio_tmstmp.tv_sec * 1000000000) + audio_tmstmp.tv_nsec;
-
-		tdiff2 = ( (double) (d1 - n1) )/ 1000000000.0; // * 1.e7;
-		                               //10000000 
-		last_tdiff = tdiff1;
-		double tt = tdiff1 - tdiff2;
-
-		
-
-		if( tt > settings->spvf && tt <= (settings->spvf *1.01) ) {
-			tdiff2 += 0.01;
-		}
-		
-
-		//@ tt > spvf
-		//	tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec ) + ( (bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec )/1000) * 1.e-6;
-
+		tdiff1 = settings->spvf * (stats.nsync - nvcorr) -
+               		settings->spas * num_audio_bytes_written;
+            
+		tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) +
+               		(bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec) * 1.e-9;
 	   }
 	}
 #endif
