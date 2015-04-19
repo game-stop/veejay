@@ -247,6 +247,51 @@ typedef struct
 	void	      *lzo_decoder;
 } vj_decoder;
 
+
+char	vj_el_get_default_norm( float fps )
+{
+	if( fps == 25.0f )
+		return 'p';
+	if( fps > 23.0f && fps < 24.0f )
+		return 's';
+	if( fps > 29.0f && fps < 30.0f )
+		return 'n';
+	return 'p';
+}
+
+float	vj_el_get_default_framerate( int norm )
+{
+	switch( norm ) {
+		case VIDEO_MODE_PAL:
+		case VIDEO_MODE_SECAM:
+			return 25.0f;
+		case VIDEO_MODE_NTSC:
+			return 29.97f;
+		default:
+			veejay_msg(VEEJAY_MSG_WARNING, "Unknown video norm! Use 'p' (PAL), 'n' (NTSC) or 's' (SECAM)");
+	}
+	return 30.0f;
+}
+
+int	vj_el_get_usec_per_frame( int norm, float video_fps ) 
+{
+	int norm_usec_per_frame = 0;
+
+	switch (norm) {
+	    case VIDEO_MODE_PAL:
+			norm_usec_per_frame = 1000000 / 25;	/* 25Hz */
+			break;
+	    case VIDEO_MODE_NTSC:
+			norm_usec_per_frame = 1001000 / 30;	/* 30ish Hz */
+			break;
+    	    default:
+	    		norm_usec_per_frame = 1000000 / (long) video_fps;
+	    		break;
+    	}
+
+	return norm_usec_per_frame;
+}
+
 int		vj_el_get_decoder_from_fourcc( const char *fourcc )
 {
 	return avhelper_get_codec_by_name( fourcc );
@@ -658,22 +703,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 		if (!el->video_norm)
 		{
-		    /* TODO: This guessing here is a bit dubious but it can be over-ridden */
-		    if (el->video_fps > 24.95 && el->video_fps < 25.05)
-			el->video_norm = 'p';
-		    else if (el->video_fps > 29.92 && el->video_fps <= 30.02)
-			el->video_norm = 'n';
+			el->video_fps = vj_el_get_default_norm( el->video_fps );
 		}
 
 		if (!el->video_norm)
 		{
-			if(override_norm == 'p' || override_norm == 'n')
+			if(override_norm == 'p' || override_norm == 'n' || override_norm == 's')
 				el->video_norm = override_norm;
-			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Invalid video norm - override with -N / --norm");
-				nerr++;
-			}
 		}
 	
 		if(!el->is_empty)
@@ -1320,15 +1356,15 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	return el;
 }
 
-void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps )
+void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long *arate )
 {
 	void *tmp = avhelper_get_decoder( filename, PIX_FMT_YUVJ422P, -1, -1 );
 	if( tmp ) {
 		AVCodecContext *c = avhelper_get_codec_ctx( tmp );
 		*dw = c->width;
 		*dh = c->height;
-		*dfps = (float) c->time_base.den;
-
+		*dfps = (float) c->time_base.den / c->time_base.num;
+		*arate = c->sample_rate;
 		avhelper_close_decoder(tmp);
 	} else {
 		lav_file_t *fd = lav_open_input_file( filename, mmap_size );
@@ -1336,6 +1372,7 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps )
 			*dw = lav_video_width( fd );
 			*dh = lav_video_height( fd );
 			*dfps = lav_frame_rate( fd );
+			*arate = lav_audio_rate( fd );
 			lav_close(fd);
 		}
 		
@@ -1375,11 +1412,10 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		return NULL;	
 	}
 
-	if(strcmp(filename[0], "+p" ) == 0 || strcmp(filename[0], "+n") == 0 ) {
+	if(strcmp(filename[0], "+p" ) == 0 || strcmp(filename[0], "+n") == 0 || strcmp(filename[0],"+s") == 0 ) {
 		el->video_norm = filename[0][1];
 		nf = 1;
 	}
-
 
 	if(force)
 	{
@@ -1411,30 +1447,20 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 			    	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list %s opened", filename[nf]);
 			    	/* Read second line: Video norm */
 			    	fgets(line, 1024, fd);
-			    	if (line[0] != 'N' && line[0] != 'n' && line[0] != 'P' && line[0] != 'p')
+			    	if (line[0] != 'N' && line[0] != 'n' && line[0] != 'P' && line[0] != 'p' && line[0] != 's' && line[0] != 'S')
 				{
-					veejay_msg(VEEJAY_MSG_ERROR,"Edit list second line is not NTSC/PAL");
+					veejay_msg(VEEJAY_MSG_ERROR,"Edit list second line is not NTSC/PAL/SECAM");
 					vj_el_free(el);
 					return NULL;
 				}
-				veejay_msg(VEEJAY_MSG_DEBUG,"Edit list norm is %s", line[0] =='N' || line[0] == 'n' ? "NTSC" : "PAL" );
-			    	if (line[0] == 'N' || line[0] == 'n')
-					{
-						if (el->video_norm == 'p')
-						{	
-							veejay_msg(VEEJAY_MSG_WARNING, "Norm already set to PAL, ignoring new norm 'NTSC'");
-						}
-						else el->video_norm = 'n';
-					}
-		    		else
-				{
-					if (el->video_norm == 'n')
-					{
-					    	veejay_msg(VEEJAY_MSG_WARNING,"Norm already set to NTSC, ignoring new norm PAL");
-					}
-					else
-						el->video_norm = 'p';
+				
+				if( el->video_norm != '\0' ) {
+					veejay_msg(VEEJAY_MSG_WARNING,"Norm already set to, ignoring new norm");
+				}
+				else {
+					el->video_norm = tolower(line[0]);
 			    	}
+
 		   	 	/* read third line: Number of files */
 		    		fgets(line, 1024, fd);
 		    		sscanf(line, "%d", &num_list_files);

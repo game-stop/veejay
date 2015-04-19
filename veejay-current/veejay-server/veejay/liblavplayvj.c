@@ -72,10 +72,6 @@
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
 #endif
-#define VIDEO_MODE_PAL		0
-#define VIDEO_MODE_NTSC		1
-#define VIDEO_MODE_SECAM	2
-#define VIDEO_MODE_AUTO		3
 
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
@@ -553,13 +549,12 @@ void	veejay_set_framerate( veejay_t *info , float fps )
 {
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
 	settings->spvf = 1.0 / fps;
-	settings->msec_per_frame = 1000 / settings->spvf;
-	if (info->current_edit_list->has_audio && (info->audio==AUDIO_PLAY || info->audio==AUDIO_RENDER))
+/*	if (info->current_edit_list->has_audio && (info->audio==AUDIO_PLAY || info->audio==AUDIO_RENDER))
         	settings->spas = 1.0 / (double) info->current_edit_list->audio_rate;
    	else
-        	settings->spas = 0;
+        	settings->spas = 0;*/
 
-        settings->usec_per_frame = (int)(1000000.0 / fps);
+        settings->usec_per_frame = vj_el_get_usec_per_frame( info->current_edit_list->video_norm, fps);
 }
 
 
@@ -574,26 +569,19 @@ int veejay_init_editlist(veejay_t * info)
     settings->min_frame_num = 0;
     settings->max_frame_num = el->total_frames;
     settings->current_frame_num = settings->min_frame_num;
-    settings->spvf = 1.0 / el->video_fps;
-    settings->msec_per_frame = 1000 / settings->spvf;
 
     /* Seconds per audio sample: */
- 
-   if( !el->has_audio )
-	veejay_msg(VEEJAY_MSG_DEBUG, "EditList has no audio");
+    if (info->audio==AUDIO_PLAY && info->dummy->arate > 0)
+    {
+	settings->spas = 1.0 / (double) info->dummy->arate;
+    }
+    else
+    {
+ 	settings->spas = 0.0;
+    }
+    veejay_msg(VEEJAY_MSG_DEBUG, "1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
 
-   if (el->has_audio && info->audio==AUDIO_PLAY)
-   {
-	settings->spas = 1.0 / (double) el->audio_rate;
-   }
-   else
-   {
-	settings->spas = 0.;
-   }
-   veejay_msg(VEEJAY_MSG_DEBUG, "1.0/Seconds per video Frame = %4.4f",	1.0 / settings->spvf);
-   veejay_msg(VEEJAY_MSG_DEBUG, "1.0/%ld = %g Seconds per audio Frame", el->audio_rate, settings->spas );
-
-   return 0;
+    return 0;
 }
 
 static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
@@ -603,12 +591,11 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 		veejay_msg(0, "Error while stopping sample %d", new_sample_id );
 		return 0;
 	}
-	//FIXME
+	
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
 			info->settings->composite = 1; // back to top
 		} 
-	
 	}
 
 	sample_chain_free( info->uc->sample_id );
@@ -1615,7 +1602,7 @@ char	*veejay_title(veejay_t *info)
 {
 	char tmp[128];
 	snprintf(tmp,sizeof(tmp), "Veejay %s on port %d in %dx%d@%2.2f", VERSION,
-	      info->uc->port, info->video_output_width,info->video_output_height,info->edit_list->video_fps );
+	      info->uc->port, info->video_output_width,info->video_output_height,info->dummy->fps );
 	return strdup(tmp);
 }
 
@@ -1661,34 +1648,27 @@ int veejay_open(veejay_t * info)
 	return 1;
 }
 
-static int veejay_mjpeg_set_playback_rate(veejay_t * info,
-					   double video_fps, int norm)
+static int veejay_get_norm( char n )
 {
-    int norm_usec_per_frame = 0;
-    int target_usec_per_frame;
+	if( n == 'p' )
+		return VIDEO_MODE_PAL;
+	if( n == 's' )
+		return VIDEO_MODE_SECAM;
+	if( n == 'n' )
+		return VIDEO_MODE_NTSC;
+
+	veejay_msg(VEEJAY_MSG_WARNING, "Unknown video norm! Use PAL, SECAM or NTSC");
+	return VIDEO_MODE_PAL;
+}
+
+static int veejay_mjpeg_set_playback_rate(veejay_t * info, float video_fps, int norm)
+{
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
+    settings->spvf = 1.0 / video_fps;
 
-    switch (norm) {
-	    case VIDEO_MODE_PAL:
-   		case VIDEO_MODE_SECAM:
-			norm_usec_per_frame = 1000000 / 25;	/* 25Hz */
-			break;
-    	case VIDEO_MODE_NTSC:
-			norm_usec_per_frame = 1001000 / 30;	/* 30ish Hz */
-			break;
-    	default:
-	    	veejay_msg(VEEJAY_MSG_WARNING, "Unknown video norm! Use PAL , SECAM or NTSC");
-	    		norm_usec_per_frame = 1000000 / (long) video_fps;
-	    	break;
-	}
 
-    if (video_fps != 0.0)
-		target_usec_per_frame = (int) (1000000.0 / video_fps);
-    else
-		target_usec_per_frame = norm_usec_per_frame;
-
-    settings->usec_per_frame = target_usec_per_frame;
+    settings->usec_per_frame = vj_el_get_usec_per_frame( (info->audio == AUDIO_PLAY ? norm: 'x'), video_fps );
 
     return 1;
 }
@@ -1926,12 +1906,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	if(!info->bes_height)
 		info->bes_height = info->video_output_height;	
 
-	info->audio = NO_AUDIO;
-
-	if( el->has_audio && vj_perform_init_audio(info))
-	{
+	if( el->has_audio && vj_perform_init_audio(info) && info->audio == AUDIO_PLAY)	{
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
-		info->audio = AUDIO_PLAY;
 	}
 
   	veejay_msg(VEEJAY_MSG_INFO, 
@@ -2211,7 +2187,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
     	}
 
-       	if (!veejay_mjpeg_set_playback_rate(info, el->video_fps, el->video_norm == 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
+       	if (!veejay_mjpeg_set_playback_rate(info, info->dummy->fps, veejay_get_norm(info->dummy->norm) ))
+	{
 		return -1;
     	}
 
@@ -3647,38 +3624,28 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 
 	if(info->settings->output_fps > 0.0)
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Overriding Framerate with %2.2f", 
-			info->settings->output_fps);
+		veejay_msg(VEEJAY_MSG_WARNING, "Overriding Framerate with %2.2f", info->settings->output_fps);
 		info->current_edit_list->video_fps = info->settings->output_fps;
 	}	
-	else
-	{
-		info->settings->output_fps = info->current_edit_list->video_fps;
-	}
 
 	return 1;
 }
+
 
 static void configure_dummy_defaults(veejay_t *info, char override_norm, float fps, char **files, int n_files)
 {
 	info->dummy->width = info->video_output_width;
 	info->dummy->height= info->video_output_height;
-	info->dummy->norm =  'p';
-	if( override_norm == 'n' ) {
-		if(!info->dummy->fps) //@ if not set
-			info->dummy->fps = 30000.0/1001;
-		info->dummy->norm = 'n';
-	} 
-	
 	info->dummy->fps = fps;
 
 	if(info->dummy->fps < 0.0f)
-		info->dummy->fps = ( override_norm == 'p' ? 25.0f : 29.97f );
+		info->dummy->fps = vj_el_get_default_framerate( override_norm );
 	
 	int dw = 720;
 	int dh = (override_norm == 'p' ? 576 : 480);
 	float dfps = fps;
 	float tmp_fps = 0.0f;
+	long tmp_arate = 0;
 	if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
 	       dw = (override_norm == 'p' ? 352 : 360 );
 	       dh = dh / 2;
@@ -3689,7 +3656,7 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 
 	if(!info->dummy->active) {
 		if( n_files > 0  && (info->video_output_width <= 0 || info->video_output_height <= 0 )) {
-			vj_el_scan_video_file( files[0], &dw, &dh, &tmp_fps );
+			vj_el_scan_video_file( files[0], &dw, &dh, &tmp_fps, &tmp_arate );
 
 			info->video_output_width = dw;
 			info->video_output_height = dh;
@@ -3703,18 +3670,29 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 		dfps = tmp_fps;
 	}
 
+	if( override_norm != '\0' ) {
+		int selected_norm = veejay_get_norm( override_norm );
+		dfps = vj_el_get_default_framerate( selected_norm );
+		info->dummy->norm = override_norm;
+	} else {
+		info->dummy->norm = vj_el_get_default_norm( dfps );
+	}
+
+
 	if( info->dummy->width <= 0 )
 		info->dummy->width  = dw;
 	if( info->dummy->height <= 0)
 		info->dummy->height = dh;
 	if( info->dummy->fps <= 0)
-		info->dummy->height = dfps;
+		info->dummy->fps = dfps;
 
 	info->dummy->chroma = get_chroma_from_pixfmt( vj_to_pixfmt( info->pixel_format ) );
 
 	if( info->audio ) {
+		if( tmp_arate == 0 ) 
+			tmp_arate = 48000;
 		if( !info->dummy->arate)
-			info->dummy->arate = 48000;
+			info->dummy->arate = tmp_arate;
 	}
 
 	info->settings->output_fps = dfps;
@@ -3751,12 +3729,6 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	}
 	else
 		veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
-
-	/* override options */
-	if(ofps<=0.0f)
-		ofps = settings->output_fps;
-	if(ofps<=0.0f)
-		ofps = 25.0f;
 
 	configure_dummy_defaults(info,override_norm, ofps,files,num_files);
 

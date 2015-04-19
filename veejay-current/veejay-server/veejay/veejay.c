@@ -60,7 +60,7 @@ static	int	show_cursor = 0;
 static int force_video_file = 0; // unused
 static int override_pix_fmt = 0;
 static int switch_jpeg = 0;
-static char override_norm = 'p';
+static char override_norm = '\0';
 static int auto_loop = 0;
 static int n_slots_ = 0;
 static int max_mem_ = 0;
@@ -281,7 +281,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
 	fprintf(stderr,
-		"  -N/--norm <num>\t\tSet video norm [0=PAL, 1=NTSC (defaults to PAL)]\n");
+		"  -N/--norm <num>\t\tSet video norm [0=PAL, 1=NTSC, 2=SECAM (defaults to PAL)]\n");
 
 	fprintf(stderr,
 		"  -w/--output-width <num>\tSet output video width (Projection)\n");
@@ -460,6 +460,10 @@ static int set_option(const char *name, char *value)
 		int val = atoi(optarg);
 		if(val == 1 )	
 			override_norm = 'n';
+		if(val == 0 )
+			override_norm = 'p';
+		if(val == 2 )
+			override_norm = 's';
 	}
 	else if(strcmp(name, "D") == 0 || strcmp(name, "composite") == 0)
 	{

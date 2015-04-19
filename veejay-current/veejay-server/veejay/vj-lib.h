@@ -135,7 +135,6 @@ typedef struct {
 
     double spvf;		/* seconds per video frame */
     int usec_per_frame;		/* milliseconds per frame */
-    int msec_per_frame;
     int min_frame_num;		/* the lowest frame to be played back - normally 0 */
     int max_frame_num;		/* the latest frame to be played back - normally num_frames - 1 */
     int current_frame_num;	/* the current frame */

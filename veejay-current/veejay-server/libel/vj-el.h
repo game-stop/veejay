@@ -27,10 +27,10 @@
 /* ((file)&0xfff<<52) */
 #define EL_ENTRY(file,frame) ( ((file)<<52) | ((frame)& 0xfffffffffffffLLU) )
 
-//#define	FMT_420 0
-//#define FMT_422 1
-//#define MAX_EDITLIST_FILES 4096
-
+#define VIDEO_MODE_PAL		0
+#define VIDEO_MODE_NTSC		1
+#define VIDEO_MODE_SECAM	2
+#define VIDEO_MODE_AUTO		3
 
 typedef struct 
 {
@@ -78,7 +78,7 @@ typedef struct
 
 int     test_video_frame(editlist *el, int n, lav_file_t *lav,int out_pix_fmt);
 
-void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps );
+void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long *arate );
 
 editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm, int fmt, int w, int h);
 
@@ -148,5 +148,11 @@ int	vj_el_bogus_length( editlist *el, long nframe );
 int	vj_el_set_bogus_length( editlist *el, long nframe, int len );
 
 int	vj_el_pixfmt_to_veejay(int pix_fmt );
+
+int	vj_el_get_usec_per_frame( int norm, float video_fps );
+
+float	vj_el_get_default_framerate( int norm );
+
+char	vj_el_get_default_norm( float fps );
 
 #endif
