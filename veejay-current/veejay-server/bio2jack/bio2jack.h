@@ -119,6 +119,8 @@ unsigned long JACK_GetBytesPerInputFrame(int deviceID);
 int  JACK_GetNumInputChannels(int deviceID);
 int  JACK_GetNumOutputChannels(int deviceID);
 
+void JACK_ResetBuffer(int deviceID);
+
 long JACK_GetSampleRate(int deviceID); /* samples per second */
 
 void JACK_SetClientName(char *name); /* sets the name that bio2jack will use when

@@ -2249,7 +2249,6 @@ static void veejay_playback_cycle(veejay_t * info)
 
     veejay_set_instance( info );
     stats.tdiff = 0.0;
-    stats.stats_changed = 0;
     stats.num_corrs_a = 0;
     stats.num_corrs_b = 0;
     stats.nsync = 0;
@@ -2332,92 +2331,83 @@ static void veejay_playback_cycle(veejay_t * info)
     settings->spas = 1.0 / (double) el->audio_rate;
 
     while (settings->state != LAVPLAY_STATE_STOP) {
-	first_free = stats.nsync;
-
-	int current_speed = settings->current_playback_speed;
-
-
-	do {
-	    if (settings->state == LAVPLAY_STATE_STOP) {
-			goto FINISH;
-		}
-
-	   if (!veejay_mjpeg_sync_buf(info, &bs)) {
-			veejay_change_state_save(info, LAVPLAY_STATE_STOP);
-			goto FINISH;
-	    }
-
-	   frame = bs.frame;
-
-	   stats.nsync++;
-	   clock_gettime( CLOCK_REALTIME, &time_now);
-
-	   long  d1 = (time_now.tv_sec * 1000000000) + time_now.tv_nsec;
-	   long  n1 = (bs.timestamp.tv_sec * 1000000000) +  bs.timestamp.tv_nsec;
-
-	   double  dn = ( (double) (d1 - n1) )/10000000.0; // * 1.e7;
-
-	   stats.tdiff = dn; // ( time_now.tv_sec - bs.timestamp.tv_sec ) + 
-				 //	  ( ( time_now.tv_nsec - bs.timestamp.tv_nsec / 1000 ) * 1.e-6);
-
-	} 
-	while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (QUEUE_LEN-1));
+		int current_speed = settings->current_playback_speed;
 	
-	if ((stats.nsync - first_free) > ( QUEUE_LEN - 3))
-         veejay_msg(VEEJAY_MSG_WARNING, "Source too slow, can not keep pace!");
+		first_free = stats.nsync;
 
-	veejay_event_handle(info);
-#ifdef HAVE_JACK
-	if ( info->audio==AUDIO_PLAY && el->has_audio ) 
-	{
-	   struct timespec audio_tmstmp;
-	   long int sec=0;
-	   long int usec=0;
-	   long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
+		do {
+	    	if (settings->state == LAVPLAY_STATE_STOP) {
+				goto FINISH;
+			}
 
-	   audio_tmstmp.tv_sec = sec;
-	   audio_tmstmp.tv_nsec = usec;
-	   if( audio_tmstmp.tv_sec ) {
-		tdiff1 = settings->spvf * (stats.nsync - nvcorr) -
-               		settings->spas * num_audio_bytes_written;
-            
-		tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) +
-               		(bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec) * 1.e-9;
-	   }
-	}
-#endif
-	stats.tdiff = (tdiff1 - tdiff2);
+		    if (!veejay_mjpeg_sync_buf(info, &bs)) {
+				veejay_change_state_save(info, LAVPLAY_STATE_STOP);
+				goto FINISH;
+	    	}
+
+	   		frame = bs.frame;
+
+	   		stats.nsync++;
+	   		clock_gettime( CLOCK_REALTIME, &time_now);
+
+	  		long  d1 = (time_now.tv_sec * 1000000000) + time_now.tv_nsec;
+	   		long  n1 = (bs.timestamp.tv_sec * 1000000000) +  bs.timestamp.tv_nsec;
+
+	   		double  dn = ( (double) (d1 - n1) )/10000000.0; // * 1.e7;
+
+	   		stats.tdiff = dn; 
+		} 
+		while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (QUEUE_LEN-1));
+	
+
+		veejay_event_handle(info);
+
 #ifdef HAVE_JACK
-   	if(info->audio == AUDIO_PLAY )
-		vj_jack_continue( settings->current_playback_speed );
+		if ( info->audio==AUDIO_PLAY && el->has_audio ) 
+		{
+			vj_jack_continue( settings->current_playback_speed );
+		
+			struct timespec audio_tmstmp;
+	   		long int sec=0;
+	   		long int usec=0;
+	   		long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
+
+	   		audio_tmstmp.tv_sec = sec;
+	  		audio_tmstmp.tv_nsec = usec;
+
+	   		if( audio_tmstmp.tv_sec ) {
+				tdiff1 = settings->spvf * (stats.nsync - nvcorr) - settings->spas * num_audio_bytes_written;
+				tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec) * 1.e-9;
+	  		}
+		}
 #endif
+		stats.tdiff = (tdiff1 - tdiff2);
+	
 	/* Fill and queue free buffers again */
 	for (n = first_free; n < stats.nsync;) {
-	    /* Audio/Video sync correction */
+		/* Audio/Video sync correction */
 	    skipv = 0;
 	    skipa = 0;
 	    skipi = 0;
 		if (info->sync_correction) {
 			if (stats.tdiff > settings->spvf) {
-		    	skipa = 1; 
-		    	if (info->sync_ins_frames && current_speed != 0) {
-					skipi = 1;
-		    	}
-		   		nvcorr++;
-		   	 	stats.num_corrs_a++;
-		    	stats.tdiff -= settings->spvf;
-		    	stats.stats_changed = 1; 
+		    		skipa = 1; 
+		    		if (info->sync_ins_frames && current_speed != 0) {
+						skipi = 1;
+			    	}
+			   		nvcorr++;
+		   			stats.num_corrs_a++;
+		    		stats.tdiff -= settings->spvf;
 			} 
 			if (stats.tdiff < -settings->spvf) {
-		    	/* Video is behind audio */
-		    	skipv = 1;
-   		    	if (!info->sync_skip_frames && current_speed != 0) {
-					skipi = 1;
- 		   		} 
-		    	nvcorr--;
-		    	stats.num_corrs_b++;
-		   		stats.tdiff += settings->spvf;
-		   		stats.stats_changed = 1;
+		    		/* Video is behind audio */
+		    		skipv = 1;
+   		    		if (!info->sync_skip_frames && current_speed != 0) {
+						skipi = 1;
+ 		   			} 
+		    		nvcorr--;
+		    		stats.num_corrs_b++;
+		   			stats.tdiff += settings->spvf;
 			}
 	    }
 	   
@@ -2425,9 +2415,8 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-	
 		if( info->pause_render ) {
-			int hti = settings->current_playback_speed ? 1:0;
+			int hti = (settings->current_playback_speed == 0 ? 0 : 1);
 			if( hti == 0 ) 
 					hti = info->sfd ? 1: 0;
 			if( hti ) {
@@ -2435,7 +2424,6 @@ static void veejay_playback_cycle(veejay_t * info)
 			} else {
 				settings->buffer_entry[frame] = settings->current_frame_num;
 			}
-		    
 		} else {
 			settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
 		}
@@ -2449,17 +2437,23 @@ static void veejay_playback_cycle(veejay_t * info)
 		
 		   if(!skipi)	
 		 	  vj_perform_queue_frame( info, skipi );
+
 	     } 
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
-            info->real_fps = (int)( te - ts );
+        info->real_fps = (int)( te - ts );
 #else
 	    info->real_fps = 0;
 #endif
-	    if( info->real_fps > (1000 * settings->spvf ) && info->audio == AUDIO_PLAY) {
-			veejay_msg(VEEJAY_MSG_WARNING, "Rendering audio/video frame takes too long (measured %ld ms). Can't keep pace with audio!", info->real_fps);
+
+	    if( stats.tdiff > settings->spvf || info->real_fps > (1000 * settings->spvf) && info->audio == AUDIO_PLAY) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Rendering audio/video frame takes too long (measured %ld ms, out of sync by %g). Can't keep pace with audio!", stats.tdiff, info->real_fps);
 	    }
-	
+
+		if( skipv ) { 
+				continue;
+		} 
+
 	    veejay_mjpeg_queue_buf(info,frame, 1 );
 	
 	    stats.nqueue ++;
@@ -2468,7 +2462,6 @@ static void veejay_playback_cycle(veejay_t * info)
 		/* output statistics */
 	if (el->has_audio && (info->audio==AUDIO_PLAY))
 	    stats.audio = settings->audio_mute ? 0 : 1;
-		stats.stats_changed = 0;
     }
 
   FINISH:

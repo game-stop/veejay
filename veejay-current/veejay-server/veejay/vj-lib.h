@@ -212,7 +212,6 @@ typedef struct {
 } video_playback_setup;
 
 typedef struct {
-    int stats_changed;		/* has anything bad happened?                        */
     unsigned int frame;		/* current frame which is being played back          */
     unsigned int num_corrs_a;	/* Number of corrections because video ahead audio   */
     unsigned int num_corrs_b;	/* Number of corrections because video behind audio  */

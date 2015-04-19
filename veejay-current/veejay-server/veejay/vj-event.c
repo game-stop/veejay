@@ -7843,9 +7843,9 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 
 	if( v->audio != NO_AUDIO )
 	{
+		vj_jack_reset();
 		vj_jack_disable();
 		v->audio = NO_AUDIO;
-		vj_jack_reset();
 	}
 #endif
 }

@@ -711,6 +711,11 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			if(override_norm == 'p' || override_norm == 'n' || override_norm == 's')
 				el->video_norm = override_norm;
 		}
+
+		if( !el->video_norm ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to detect video norm, using PAL" );
+			el->video_norm = 'p';
+		}
 	
 		if(!el->is_empty)
 		{

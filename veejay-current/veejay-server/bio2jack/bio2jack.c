@@ -2250,6 +2250,21 @@ JACK_GetMaxOutputBufferedBytes(int deviceID)
   return return_val;
 }
 
+
+/* Reset ringbuffer */
+void
+JACK_ResetBuffer(int deviceID)
+{
+  jack_driver_t *drv = getDriver(deviceID);
+
+  if(drv->pPlayPtr) {
+	  jack_ringbuffer_reset( drv->pPlayPtr );
+  }
+  releaseDriver(drv);
+}
+
+
+
 /* Return the number of input bytes we buffer max */
 long
 JACK_GetMaxInputBufferedBytes(int deviceID)

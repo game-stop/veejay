@@ -112,7 +112,6 @@ static int frame_info[64][SAMPLE_MAX_EFFECTS];	/* array holding frame lengths  *
 static uint8_t *audio_buffer[SAMPLE_MAX_EFFECTS];	/* the audio buffer */
 static uint8_t *lin_audio_buffer_ = NULL;
 static uint8_t *top_audio_buffer = NULL;
-static uint8_t *resample_audio_buffer = NULL;
 static uint8_t *audio_render_buffer = NULL;
 static uint8_t *down_sample_buffer = NULL;
 static uint8_t *temp_buffer[4];
@@ -126,7 +125,7 @@ static void vj_perform_record_buffer_free();
 #ifdef HAVE_JACK
 static ReSampleContext *resample_context[(MAX_SPEED+1)];
 static ReSampleContext *downsample_context[(MAX_SPEED+1)];
-static ReSampleContext *resample_jack = NULL;
+static int last_rate_[2] = { 0, 0 };
 #endif
 static const char *intro = 
 	"A visual instrument for GNU/Linux\n";
@@ -758,7 +757,6 @@ static void vj_perform_close_audio() {
 	veejay_memset( audio_buffer, 0, sizeof(uint8_t*) * SAMPLE_MAX_EFFECTS );
 
 	if(top_audio_buffer) free(top_audio_buffer);
-	if(resample_audio_buffer) free(resample_audio_buffer);
 	if(audio_render_buffer) free( audio_render_buffer );
 	if(down_sample_buffer) free( down_sample_buffer );
 #ifdef HAVE_JACK
@@ -771,8 +769,6 @@ static void vj_perform_close_audio() {
 			audio_resample_close( downsample_context[i]);
 	}
 
-	if(resample_jack)
-		audio_resample_close(resample_jack); 
 #endif
 	veejay_msg(VEEJAY_MSG_INFO, "Stopped Audio playback task");
 }
@@ -796,10 +792,6 @@ int vj_perform_init_audio(veejay_t * info)
 	if(!audio_render_buffer)
 		return 0;
 
-	resample_audio_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE * 2);
-	if(!resample_audio_buffer) 
-		return 0;
-
 	lin_audio_buffer_ = (uint8_t*) vj_calloc( sizeof(uint8_t) * PERFORM_AUDIO_SIZE * SAMPLE_MAX_EFFECTS );
 	if(!lin_audio_buffer_)
 		return 0;
@@ -820,10 +812,10 @@ int vj_perform_init_audio(veejay_t * info)
 					out_rate,
 					SAMPLE_FMT_S16,
 					SAMPLE_FMT_S16,
-					16,
-					10,
+					MAX_SPEED,
+					MAX_SPEED,
 					0,
-					1.0
+					0.8
 					);
 		if(!resample_context[i])
 		{
@@ -837,10 +829,10 @@ int vj_perform_init_audio(veejay_t * info)
 					down_rate,
 					SAMPLE_FMT_S16,
 					SAMPLE_FMT_S16,
-					16,
-					10,
+					MAX_SPEED,
+					MAX_SPEED,
 					0,
-					1.0 );
+					0.8 );
        
 		if(!downsample_context[i])
 		{
@@ -955,11 +947,6 @@ void vj_perform_audio_stop(veejay_t * info)
     if (info->edit_list->has_audio) {
 #ifdef HAVE_JACK
 	vj_jack_stop();
-    	   if(resample_jack)
-	{
-		audio_resample_close(resample_jack);
-		resample_jack = NULL;
-	}
 #endif
 	info->audio = NO_AUDIO;
     }
@@ -1383,11 +1370,11 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,int chain_ent
 	cur_sfd ++;
 
 	if( max_sfd > 0 ) {
-		if( cur_sfd >= max_sfd )
+		if( cur_sfd > max_sfd )
 		{
 			cur_sfd = 0;
 		}
-		sample_set_framedups( b , cur_sfd);
+		if( sub_sample != a ) sample_set_framedups( b , cur_sfd);
 		if( cur_sfd != 0 ) {
 			return 1;
 		}
@@ -1584,6 +1571,14 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 	int cur_sfd = sample_get_framedups( info->uc->sample_id );
 	int max_sfd = sample_get_framedup( info->uc->sample_id );
 
+	if( last_rate_[0] != speed || last_rate_[1] != max_sfd ) {
+		veejay_memset( temporary_buffer, 0, (2* PERFORM_AUDIO_SIZE * MAX_SPEED) );
+		if( max_sfd > 0 )
+			veejay_memset( down_sample_buffer,0,PERFORM_AUDIO_SIZE * MAX_SPEED * 4 );
+		last_rate_[0] = speed;
+		last_rate_[1] = max_sfd;
+	}
+
 	if( cur_sfd <= 0 )
 	{
 		if (speed > 1 || speed < -1) 
@@ -1659,10 +1654,10 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 		{
 			veejay_memset( audio_buf + (n_samples * bps ) , 0, (pred_len- n_samples) * bps );
 			n_samples = pred_len;
-		}
+		} 
 
-	} 
-
+	}
+	
 	if( cur_sfd <= max_sfd  && max_sfd > 1)
 	{
 		int val = *sampled_down;
@@ -1674,15 +1669,20 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 			// @ resample buffer
 			n_samples = audio_resample( downsample_context[ sc ], 
 					(short*) down_sample_buffer,(short*) audio_buf, n_samples  );
+
 			*sampled_down = n_samples / max_sfd;
 			val = n_samples / max_sfd;
-			n_samples = pred_len;
+			n_samples = val;
 		}
 		else
 		{
-			n_samples = pred_len;
+			n_samples = *sampled_down;
 		}
-		veejay_memcpy( audio_buf, down_sample_buffer + (cur_sfd * val *bps ), val * bps );
+
+		veejay_memcpy( audio_buf, down_sample_buffer + (cur_sfd * val * bps ), val * bps );
+
+	} else {
+		*sampled_down = 0;
 	}
 
 	return n_samples;
@@ -2018,10 +2018,10 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 				frames[0]->ssm = 1;	
 			}
 			else if(!sub_mode && frames[0]->ssm == 1)
-            {
-                 chroma_subsample(settings->sample_mode,frames[0],frames[0]->data);
-                 frames[0]->ssm = 0;
-            }
+   			{
+                		chroma_subsample(settings->sample_mode,frames[0],frames[0]->data);
+                 		frames[0]->ssm = 0;
+           		}
 
 			if(vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 						(int) settings->current_frame_num, 
@@ -2191,10 +2191,10 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
     	
 	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
-    frames[0]->data[2] = primary_buffer[0]->Cr;
+    	frames[0]->data[2] = primary_buffer[0]->Cr;
 
 	vjp_kf *setup = info->effect_info;
-    setup->ref = info->uc->sample_id;
+    	setup->ref = info->uc->sample_id;
 
 	if (sample_get_chain_status(info->uc->sample_id, chain_entry))
 	{
@@ -2375,9 +2375,7 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 
 	if(ret <= 0)
 	{
-		veejay_msg(0, "Unable to queue video frame %d", 
-			settings->current_frame_num );
-	//	veejay_change_state_save(info, LAVPLAY_STATE_STOP);
+		veejay_msg(0, "Unable to queue video frame %d", settings->current_frame_num );
 	}
 }
 static int rec_audio_sample_ = 0;
@@ -3361,7 +3359,6 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 			if(vj_perform_verify_rows(info))
 		   	 	vj_perform_sample_complete_buffers(info, &is444);
-
 			
 			cur_out = vj_perform_render_magic( info, info->settings );
 		   	res = 1;
@@ -3465,14 +3462,14 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 			default:
 				break;
 		}
-	} 
 
-	//@ increase tick
-  	vj_perform_clear_cache();
-
-	settings->cycle_count[0] ++;
-	if( settings->cycle_count[0] == 0 )
-		settings->cycle_count[1] ++;
+		//@ increase tick
+	  	vj_perform_clear_cache();
+	
+		settings->cycle_count[0] ++;
+		if( settings->cycle_count[0] == 0 )
+			settings->cycle_count[1] ++;
+	}
 
 	return 0;
 }

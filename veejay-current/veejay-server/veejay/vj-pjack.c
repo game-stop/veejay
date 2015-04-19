@@ -158,7 +158,7 @@ void	vj_jack_disable()
 
 void	vj_jack_reset()
 {
-	JACK_Reset(driver);
+	JACK_ResetBuffer(driver);
 }
 
 int	vj_jack_c_play(void *data, int len, int entry)
