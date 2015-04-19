@@ -516,8 +516,6 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
 	frame_buffer[c]->Y = buf;
 	frame_buffer[c]->Cb = frame_buffer[c]->Y + frame_len;
 	frame_buffer[c]->Cr = frame_buffer[c]->Cb + frame_len;
-
-	frame_buffer[c]->ssm = info->effect_frame1->ssm;
 	frame_buffer[c]->P0  = buf + (frame_len * 3);
 	frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*3);
 	return (frame_len * 3 * 3);
@@ -535,7 +533,6 @@ static void vj_perform_free_row(int c)
 	frame_buffer[c]->Y = NULL;
 	frame_buffer[c]->Cb = NULL;
 	frame_buffer[c]->Cr = NULL;
-	frame_buffer[c]->ssm = 0;
 	frame_buffer[c]->P0 = NULL;
 	frame_buffer[c]->P1 = NULL;
 	cached_sample_frames[c+1] = 0;
@@ -1856,15 +1853,17 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 
 static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *frame[3], uint8_t *p0plane, uint8_t *p1plane)
 {
+	const int uv_len = (info->effect_frame1->ssm ? info->effect_frame1->uv_len : info->effect_frame1->len );
+
 	uint8_t *p0_buffer[3] = {
 		p0plane,
 		p0plane + info->effect_frame1->len,
-		p0plane + info->effect_frame1->len + info->effect_frame1->len 
+		p0plane + info->effect_frame1->len + uv_len
 	};
 	uint8_t *p1_buffer[3] = {
 		p1plane,
 		p1plane + info->effect_frame1->len,
-		p1plane + info->effect_frame1->len + info->effect_frame1->len
+		p1plane + info->effect_frame1->len + uv_len
 	};
 
 	return vj_perform_get_frame_(info, s1, nframe,frame, p0_buffer, p1_buffer,1 );
@@ -1887,9 +1886,6 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
 		frame_buffer[chain_entry]->Cr };
-#ifdef STRICT_CHECKING
-	assert( info->effect_frame1->len > 0 );
-#endif
 
     switch (type)
     {
@@ -1932,7 +1928,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	break;
     case VJ_TAG_TYPE_NONE:
 	    	nframe = vj_perform_get_subframe(info, sample_id, chain_entry); // get exact frame number to decode
- 	  		centry = vj_perform_sample_is_cached(info,sample_id, chain_entry);
+ 	  	centry = vj_perform_sample_is_cached(info,sample_id, chain_entry);
 	    	if(centry == -1 || info->no_caching) {
 				len = vj_perform_get_frame_fx( info, sample_id, nframe, fb, frame_buffer[chain_entry]->P0, frame_buffer[chain_entry]->P1 );	
 			    if(len > 0 )
@@ -1982,8 +1978,8 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 					vj_perform_apply_secundary_tag(info,sub_id,source,chain_entry ); // get it
 			 		frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 			frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
-		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-					frames[1]->ssm     = frame_buffer[chain_entry]->ssm;
+		    			frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
+					frames[1]->ssm     = 0; 
 
 					int done   = 0;
 					int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
@@ -1994,7 +1990,6 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 							done = 1;
 						}
 					}
-
 					// sample B
 	   				if(sub_mode && frames[1]->ssm == 0)
 					{
@@ -2223,7 +2218,7 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;	
+				frames[1]->ssm     = 0; 
 				int done   = 0;
 				int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
 				if(do_ssm >= 0 ) {
@@ -2246,12 +2241,12 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 				}
 				else if(frames[1]->ssm == 1 && !sub_mode )
 				{	
-					frames[1]->ssm = 0;
-					frame_buffer[chain_entry]->ssm = 0;
 					chroma_subsample(
 						settings->sample_mode,
 						frames[1],
 						frames[1]->data );
+					frames[1]->ssm = 0;
+					frame_buffer[chain_entry]->ssm = 0;
 				}
 				
 				if(!done && do_ssm >= 0) {
