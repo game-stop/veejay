@@ -2857,7 +2857,6 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 {
 	if( info->audio == NO_AUDIO || !info->current_edit_list->has_audio)
 		return 1;
-
 #ifdef HAVE_JACK
 	editlist *el = info->current_edit_list;
 	video_playback_setup *settings = info->settings;

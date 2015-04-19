@@ -2446,9 +2446,10 @@ static void veejay_playback_cycle(veejay_t * info)
 	    info->real_fps = 0;
 #endif
 
-	    if( stats.tdiff > settings->spvf || info->real_fps > (1000 * settings->spvf) && info->audio == AUDIO_PLAY) {
+	    if( (stats.tdiff > settings->spvf || info->real_fps > (1000 * settings->spvf)) && info->audio == AUDIO_PLAY) {
 			veejay_msg(VEEJAY_MSG_WARNING, "Rendering audio/video frame takes too long (measured %ld ms, out of sync by %g). Can't keep pace with audio!", stats.tdiff, info->real_fps);
-	    }
+			
+		}
 
 		if( skipv ) { 
 				continue;
