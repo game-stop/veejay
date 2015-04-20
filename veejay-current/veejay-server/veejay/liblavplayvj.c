@@ -2336,14 +2336,14 @@ static void veejay_playback_cycle(veejay_t * info)
 		first_free = stats.nsync;
 
 		do {
-	    	if (settings->state == LAVPLAY_STATE_STOP) {
+	    		if (settings->state == LAVPLAY_STATE_STOP) {
 				goto FINISH;
 			}
 
-		    if (!veejay_mjpeg_sync_buf(info, &bs)) {
+			    if (!veejay_mjpeg_sync_buf(info, &bs)) {
 				veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 				goto FINISH;
-	    	}
+	    		}
 
 	   		frame = bs.frame;
 
@@ -2386,19 +2386,20 @@ static void veejay_playback_cycle(veejay_t * info)
 	/* Fill and queue free buffers again */
 	for (n = first_free; n < stats.nsync;) {
 		/* Audio/Video sync correction */
-	    skipv = 0;
-	    skipa = 0;
-	    skipi = 0;
+		skipv = 0;
+		skipa = 0;
+	   	skipi = 0;
 		if (info->sync_correction) {
 			if (stats.tdiff > settings->spvf) {
 		    		skipa = 1; 
 		    		if (info->sync_ins_frames && current_speed != 0) {
 						skipi = 1;
 			    	}
-			   		nvcorr++;
+					nvcorr++;
 		   			stats.num_corrs_a++;
 		    		stats.tdiff -= settings->spvf;
 			} 
+
 			if (stats.tdiff < -settings->spvf) {
 		    		/* Video is behind audio */
 		    		skipv = 1;
@@ -2436,23 +2437,23 @@ static void veejay_playback_cycle(veejay_t * info)
 			vj_perform_queue_video_frame(info,skipi);
 		
 		   if(!skipi)	
-		 	  vj_perform_queue_frame( info, skipi );
+		 	  vj_perform_queue_frame(info,skipi);
 
 	     } 
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
-        info->real_fps = (int)( te - ts );
+		info->real_fps = (int)( te - ts );
 #else
 	    info->real_fps = 0;
 #endif
 
-	    if( (stats.tdiff > settings->spvf || info->real_fps > (1000 * settings->spvf)) && info->audio == AUDIO_PLAY) {
+	    if( (stats.tdiff > settings->spvf || info->real_fps > (1000 * settings->spvf)) && info->real_fps && info->audio == AUDIO_PLAY) {
 			veejay_msg(VEEJAY_MSG_WARNING, "Rendering audio/video frame takes too long (measured %ld ms, out of sync by %g). Can't keep pace with audio!", stats.tdiff, info->real_fps);
 			
 		}
 
 		if( skipv ) { 
-				continue;
+			continue;
 		} 
 
 	    veejay_mjpeg_queue_buf(info,frame, 1 );

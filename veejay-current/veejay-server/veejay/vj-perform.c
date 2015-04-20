@@ -1979,7 +1979,7 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 			 		frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 			frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    			frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-					frames[1]->ssm     = 0; 
+					//frames[1]->ssm     = 0; 
 
 					int done   = 0;
 					int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
@@ -2218,7 +2218,7 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-				frames[1]->ssm     = 0; 
+				//frames[1]->ssm     = 0; 
 				int done   = 0;
 				int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
 				if(do_ssm >= 0 ) {
