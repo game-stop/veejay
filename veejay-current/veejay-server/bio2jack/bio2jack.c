@@ -58,7 +58,7 @@
 
 #define ENABLE_WARNINGS         0
 
-#define DEFAULT_RB_SIZE         4096
+#define DEFAULT_RB_SIZE         8192
 
 #define OUTFILE stderr
 
@@ -152,8 +152,6 @@ typedef struct jack_driver_s
 
   struct timespec previousTime;  /* time of last JACK_Callback() write to jack, allows for MS accurate bytes played  */
 
-  unsigned long num_ticks;
-  unsigned long chunk_size;
   unsigned long written_client_bytes;   /* input bytes we wrote to jack, not necessarily actual bytes we wrote to jack due to channel and other conversion */
   unsigned long played_client_bytes;    /* input bytes that jack has played */
 
@@ -504,6 +502,18 @@ ensure_buffer_size(char **buffer, unsigned long *cur_size,
   return FALSE;
 }
 
+static int
+JACK_xrun_callback(void *arg)
+{
+  jack_driver_t *drv = (jack_driver_t *) arg;
+  
+ // JACK_ResetBuffer(drv->deviceID);
+JACK_SetState(drv->deviceID, PAUSED);
+  veejay_msg(1, "xrun detected. You are doing too much");
+
+  return 0;
+}
+
 /******************************************************************
  *    JACK_callback
  *
@@ -517,9 +527,6 @@ JACK_callback(nframes_t nframes, void *arg)
   jack_driver_t *drv = (jack_driver_t *) arg;
 
   unsigned int i;
-
-
-  drv->chunk_size = nframes;
 
   TIMER("start\n");
 //  gettimeofday(&drv->previousTime, 0);  /* record the current time */
@@ -591,7 +598,7 @@ JACK_callback(nframes_t nframes, void *arg)
       drv->written_client_bytes += read;
       drv->played_client_bytes += drv->clientBytesInJack;       /* move forward by the previous bytes we wrote since those must have finished by now */
       drv->clientBytesInJack = read;    /* record the input bytes we wrote to jack */
-      drv->num_ticks ++;
+	
       /* see if we still have jackBytesLeft here, if we do that means that we
          ran out of wave data to play and had a buffer underrun, fill in
          the rest of the space with zero bytes so at least there is silence */
@@ -887,6 +894,9 @@ JACK_OpenDevice(jack_driver_t * drv)
   /* tell the JACK server to call `srate()' whenever
      the sample rate of the system changes. */
   jack_set_sample_rate_callback(drv->client, JACK_srate, drv);
+
+  /* set xrun callback */
+  jack_set_xrun_callback(drv->client, JACK_xrun_callback, drv);
 
   /* tell the JACK server to call `jack_shutdown()' if
      it ever shuts down, either entirely, or if it
@@ -1441,7 +1451,6 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
   JACK_ResetFromDriver(drv);    /* flushes all queued buffers, sets status to STOPPED and resets some variables */
 
   /* drv->jack_sample_rate is set by JACK_OpenDevice() */
-//@ veejay resamples
     drv->client_sample_rate = *rate;
   drv->bits_per_channel = bits_per_channel;
   drv->num_input_channels = input_channels;
@@ -2484,7 +2493,8 @@ long JACK_OutputStatus(int deviceID,long *sec, long *usec)
   	jack_driver_t *this = &outDev[deviceID];
 	*sec =	this->previousTime.tv_sec;
 	*usec = this->previousTime.tv_nsec;
-	return (this->num_ticks * this->chunk_size);
+
+	return ( this->written_client_bytes / this->bytes_per_output_frame);
 }
 
 
