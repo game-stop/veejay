@@ -102,7 +102,7 @@ int	vj_el_append_video_file(editlist *el, char *filename);
 
 int	vj_el_write_editlist( char *filename, long start, long end, editlist *el );
 
-int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3]);
+int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4]);
 
 void    vj_el_break_cache( editlist *el );
 

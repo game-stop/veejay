@@ -47,6 +47,7 @@
 #define ROUND_UP_4(x) ROUND_UP_X (x, 2)
 #define ROUND_UP_8(x) ROUND_UP_X (x, 3)
 #define DIV_ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) >> (x))
+#define RUP8(num)(((num)+8)&~8)
 
 static int out_pixel_format = FMT_422F; 
 
@@ -120,9 +121,10 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	}
 	else {
 #endif
-		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * frame->len );
+		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(frame->len + frame->uv_len + frame->uv_len) );
 		e->data[1] = e->data[0] + frame->len;
 		e->data[2] = e->data[1] + frame->uv_len;
+		e->data[3] = NULL;
 #ifdef SUPPORT_READ_DV2
 	}
 #endif
@@ -476,7 +478,7 @@ static	int	vj_avcodec_lzo( vj_encoder  *av, uint8_t *src[3], uint8_t *dst , int 
 
 	return (s1 + s2 + s3 + 12);
 }
-static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst, int in_fmt )
+static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst, int in_fmt )
 {
 	if(!av)
 	{
@@ -573,7 +575,7 @@ static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, 
 	return 0;
 }
 
-int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src[3], uint8_t *buf, int buf_len,
+int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src[4], uint8_t *buf, int buf_len,
 	int in_fmt)
 {
 	vj_encoder *av = (vj_encoder*) encoder;

@@ -263,7 +263,7 @@ int sample_continue_record( int s1 )
 	return 0;
 }
 
-int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size, int pix_fmt) {
+int sample_record_frame(int s1, uint8_t *buffer[4], uint8_t *abuff, int audio_size, int pix_fmt) {
    sample_info *si = sample_get(s1);
    int buf_len = 0;
    if(!si) return -1;

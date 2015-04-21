@@ -1782,7 +1782,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int t
     }
 }
 
-static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *img[3], uint8_t *p0_buffer[3], uint8_t *p1_buffer[3], int check_sample )
+static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *img[4], uint8_t *p0_buffer[4], uint8_t *p1_buffer[4], int check_sample )
 {
 	int max_sfd = (s1 ? sample_get_framedup( s1 ) : info->sfd );
 
@@ -1866,19 +1866,21 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 }
 
 
-static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *frame[3], uint8_t *p0plane, uint8_t *p1plane)
+static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *frame[4], uint8_t *p0plane, uint8_t *p1plane)
 {
 	const int uv_len = (info->effect_frame1->ssm ? info->effect_frame1->uv_len : info->effect_frame1->len );
 
-	uint8_t *p0_buffer[3] = {
+	uint8_t *p0_buffer[4] = {
 		p0plane,
 		p0plane + info->effect_frame1->len,
-		p0plane + info->effect_frame1->len + uv_len
+		p0plane + info->effect_frame1->len + uv_len,
+		NULL,
 	};
-	uint8_t *p1_buffer[3] = {
+	uint8_t *p1_buffer[4] = {
 		p1plane,
 		p1plane + info->effect_frame1->len,
-		p1plane + info->effect_frame1->len + uv_len
+		p1plane + info->effect_frame1->len + uv_len,
+		NULL
 	};
 
 	return vj_perform_get_frame_(info, s1, nframe,frame, p0_buffer, p1_buffer,1 );
@@ -1897,10 +1899,11 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
     int res = 1;
     int centry = -1;
 
-    uint8_t *fb[3] = {
+    uint8_t *fb[4] = {
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
-		frame_buffer[chain_entry]->Cr };
+		frame_buffer[chain_entry]->Cr,
+   		NULL };
 
     switch (type)
     {
@@ -2358,21 +2361,24 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
 static void vj_perform_plain_fill_buffer(veejay_t * info)
 {
 	video_playback_setup *settings = (video_playback_setup*)  info->settings;
-	uint8_t *frame[3];
+	uint8_t *frame[4];
 	int ret = 0;
 	frame[0] = primary_buffer[0]->Y;
 	frame[1] = primary_buffer[0]->Cb;
 	frame[2] = primary_buffer[0]->Cr;
+	frame[3] = NULL;
 
-	uint8_t *p0_buffer[3] = {
+	uint8_t *p0_buffer[4] = {
 		primary_buffer[7]->Y,
 		primary_buffer[7]->Cb,
-		primary_buffer[7]->Cr };
+		primary_buffer[7]->Cr,
+       		NULL	};
 
-	uint8_t *p1_buffer[3]= {
+	uint8_t *p1_buffer[4]= {
 		primary_buffer[4]->Y,
 		primary_buffer[4]->Cb,
-		primary_buffer[4]->Cr };
+		primary_buffer[4]->Cr,
+       		NULL	};
 
 	if( info->settings->feedback && info->settings->feedback_stage > 1 ) {
 		vj_perform_copy3( feedback_buffer, frame, info->effect_frame1->len, info->effect_frame1->uv_len );
@@ -2394,7 +2400,7 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 	}
 }
 static int rec_audio_sample_ = 0;
-static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3], int sample)
+static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[4], int sample)
 {
 	int audio_len = 0;
 	int res = 0;
@@ -2410,7 +2416,7 @@ static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3], int
 }
 
 	
-static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[3])
+static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
 {
 	int sample_id = info->uc->sample_id;
 	
@@ -2538,13 +2544,13 @@ void vj_perform_record_stop(veejay_t *info)
 
 
 void vj_perform_record_sample_frame(veejay_t *info, int sample) {
-	uint8_t *frame[3];
+	uint8_t *frame[4];
 	int res = 1;
 	int n = 0;
 	frame[0] = primary_buffer[0]->Y;
 	frame[1] = primary_buffer[0]->Cb;
 	frame[2] = primary_buffer[0]->Cr;
-	
+	frame[3] = NULL;	
 	if( available_diskspace() )
 		res = vj_perform_render_sample_frame(info, frame, sample);
 
@@ -2600,7 +2606,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample) {
 
 void vj_perform_record_tag_frame(veejay_t *info) {
 	video_playback_setup *settings = info->settings;
-	uint8_t *frame[3];
+	uint8_t *frame[4];
 	int res = 1;
 	int stream_id = info->uc->sample_id;
 	if( settings->offline_record )
@@ -2614,12 +2620,14 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 		frame[0] = record_buffer->Y;
 		frame[1] = record_buffer->Cb;
 		frame[2] = record_buffer->Cr;
+		frame[3] = NULL;
 	}
 	else
 	{
 		frame[0] = primary_buffer[0]->Y;
 		frame[1] = primary_buffer[0]->Cb;
 		frame[2] = primary_buffer[0]->Cr;
+		frame[3] = NULL;
 	}
 
 	if(available_diskspace())

@@ -801,6 +801,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	void *retval;
 	size_t i;
 	retval = to;
+
 	unsigned char *t = to;
 	unsigned char *f = (unsigned char *)from;
 	/* PREFETCH has effect even for MOVSB instruction ;) */

@@ -933,7 +933,7 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 	return 1;
 }
 
-int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
+int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 {
 	if( el->has_video == 0 || el->is_empty )
 	{

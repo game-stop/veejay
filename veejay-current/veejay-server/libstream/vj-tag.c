@@ -2880,7 +2880,7 @@ int	vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *a
 	return 1;
 }
 
-int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_size,int pixel_format) {
+int vj_tag_record_frame(int t1, uint8_t *buffer[4], uint8_t *abuff, int audio_size,int pixel_format) {
    vj_tag *tag = vj_tag_get(t1);
    int buf_len = 0;
    if(!tag) return -1;

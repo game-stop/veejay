@@ -63,7 +63,7 @@ typedef struct
 
 int		vj_avcodec_init(int pix, int verbose);
 char		vj_avcodec_find_lav(int format);
-int		vj_avcodec_encode_frame(void *encoder,long nframe, int format, uint8_t *src[3], uint8_t *dst, int dst_len, int pixel_format);
+int		vj_avcodec_encode_frame(void *encoder,long nframe, int format, uint8_t *src[4], uint8_t *dst, int dst_len, int pixel_format);
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av );
 const char		*vj_avcodec_get_encoder_name(int encoder);
 int		vj_avcodec_free();
