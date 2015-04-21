@@ -703,7 +703,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 		if (!el->video_norm)
 		{
-			el->video_fps = vj_el_get_default_norm( el->video_fps );
+			el->video_norm = vj_el_get_default_norm( el->video_fps );
 		}
 
 		if (!el->video_norm)
