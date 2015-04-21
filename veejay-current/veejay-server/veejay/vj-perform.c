@@ -145,7 +145,7 @@ if((var) > (high)) { var = (high); }
 //forward
 static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int current_ssm,int chain_entry, VJFrame **frames, VJFrameInfo *frameinfo );
 static	int	vj_perform_preprocess_has_ssm( veejay_t *info, int id, int mode);
-static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *frame[3], uint8_t *p0plane, uint8_t *p1plane);
+static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *frame[4], uint8_t *p0plane, uint8_t *p1plane);
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame);
 static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame);
 static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame);
@@ -1714,10 +1714,11 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int t
     int nframe;
     int len = 0;
     int centry = -1;
-    uint8_t *fb[3] = {
+    uint8_t *fb[4] = {
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
-		frame_buffer[chain_entry]->Cr };
+		frame_buffer[chain_entry]->Cr,
+   		NULL };
 
     switch (type)
     {		
@@ -2027,6 +2028,8 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 						vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
 
 					}
+
+					frames[1]->ssm = 0;
 				}
 			}
 		
@@ -2273,6 +2276,8 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 
 					}
 				}
+
+				frames[1]->ssm = 0;
 			}
 
 			if( sub_mode && frames[0]->ssm == 0)
