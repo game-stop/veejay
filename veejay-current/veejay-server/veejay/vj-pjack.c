@@ -152,12 +152,6 @@ void	vj_jack_disable()
 	JACK_SetState( driver, STOPPED );
 }
 
-
-void	vj_jack_reset()
-{
-	JACK_ResetBuffer(driver);
-}
-
 int	vj_jack_c_play(void *data, int len, int entry)
 {
 	return 0;
