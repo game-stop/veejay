@@ -137,6 +137,9 @@ typedef struct jack_driver_s
   unsigned long bytes_per_jack_output_frame;    /* (num_output_channels * bits_per_channel) / 8 */
   unsigned long bytes_per_jack_input_frame;     /* (num_input_channels * bits_per_channel) / 8 */
 
+//  long ticks;
+//  long chunk_size;
+
   unsigned long latencyMS;      /* latency in ms between writing and actual audio output of the written data */
 
   long clientBytesInJack;       /* number of INPUT bytes(from the client of bio2jack) we wrote to jack(not necessary the number of bytes we wrote to jack) */
@@ -507,8 +510,8 @@ JACK_xrun_callback(void *arg)
 {
   jack_driver_t *drv = (jack_driver_t *) arg;
   
- // JACK_ResetBuffer(drv->deviceID);
-JACK_SetState(drv->deviceID, PAUSED);
+  // JACK_ResetBuffer(drv->deviceID);
+  JACK_SetState(drv->deviceID, PAUSED);
   veejay_msg(1, "xrun detected. You are doing too much");
 
   return 0;
@@ -527,6 +530,8 @@ JACK_callback(nframes_t nframes, void *arg)
   jack_driver_t *drv = (jack_driver_t *) arg;
 
   unsigned int i;
+
+//  drv->chunk_size = nframes;
 
   TIMER("start\n");
 //  gettimeofday(&drv->previousTime, 0);  /* record the current time */
@@ -554,7 +559,7 @@ JACK_callback(nframes_t nframes, void *arg)
     if(drv->num_output_channels > 0)
     {
       unsigned long jackFramesAvailable = nframes;      /* frames we have left to write to jack */
-      unsigned long numFramesToWrite;   /* num frames we are writing */
+      unsigned long numFramesToWrite = nframes;   /* num frames we are writing */
       size_t inputBytesAvailable = jack_ringbuffer_read_space(drv->pPlayPtr);
       unsigned long inputFramesAvailable;       /* frames we have available */
 
@@ -569,7 +574,6 @@ JACK_callback(nframes_t nframes, void *arg)
         /* output silence if nothing is being outputted */
         for(i = 0; i < drv->num_output_channels; i++)
           sample_silence_float(out_buffer[i], nframes);
-
         return -1;
       }
 #endif
@@ -594,6 +598,8 @@ JACK_callback(nframes_t nframes, void *arg)
           read = numFramesToWrite * drv->bytes_per_output_frame;
           jackFramesAvailable -= numFramesToWrite;      /* take away what was written */
         }
+
+//      drv->ticks ++;
 
       drv->written_client_bytes += read;
       drv->played_client_bytes += drv->clientBytesInJack;       /* move forward by the previous bytes we wrote since those must have finished by now */
@@ -2493,7 +2499,7 @@ long JACK_OutputStatus(int deviceID,long *sec, long *usec)
   	jack_driver_t *this = &outDev[deviceID];
 	*sec =	this->previousTime.tv_sec;
 	*usec = this->previousTime.tv_nsec;
-
+//	return (this->ticks * this->chunk_size); 
 	return ( this->written_client_bytes / this->bytes_per_output_frame);
 }
 
