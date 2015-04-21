@@ -2779,15 +2779,19 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 	opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
 
 	if( follow ) {
-		//@ find something to jump to, start with last on chain
-		int i;
-		
-		for( i = SAMPLE_MAX_EFFECTS - 1; i > 0; i -- ) {
-			if( sample_get_chain_channel( info->uc->sample_id, i ) > 0 ) {
-				pvar_.follow_now[0] = sample_get_chain_channel(info->uc->sample_id, i );
-				pvar_.follow_now[1] = sample_get_chain_source( info->uc->sample_id, i );
+		//@ find first to jump to
+		int i,k;
+		int tmp = 0;	
+		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++) {
+			k = sample_get_chain_channel(info->uc->sample_id, i );
+			tmp = sample_get_chain_source( info->uc->sample_id, i );
+			if( (tmp == 0 && sample_exists(k) || (tmp > 0 && vj_tag_exists(k)) )) {
+				pvar_.follow_now[1] = tmp;	
+				pvar_.follow_now[0] = k;
+				break;
 			}
 		}
+		
 	}
 
 	return follow;
@@ -2846,13 +2850,16 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 	opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
 
 	if( follow ) {
-		//@ find something to jump to, start with last on chain
+		//@ find first to jump to
 		int i;
-		
-		for( i = SAMPLE_MAX_EFFECTS - 1; i > 0; i -- ) {
-			if( sample_get_chain_channel( info->uc->sample_id, i ) > 0 ) {
-				pvar_.follow_now[0] = vj_tag_get_chain_channel(info->uc->sample_id, i );
-				pvar_.follow_now[1] = vj_tag_get_chain_source( info->uc->sample_id, i );
+		int tmp=0,k;
+		for( i = 0; i < SAMPLE_MAX_EFFECTS - 1; i ++ ) {
+			k = vj_tag_get_chain_channel(info->uc->sample_id, i );
+			tmp = vj_tag_get_chain_source( info->uc->sample_id, i );
+			if( (tmp == 0 && sample_exists(k) || (tmp > 0 && vj_tag_exists(k)) )) {
+				pvar_.follow_now[1] = tmp;	
+				pvar_.follow_now[0] = k;
+				break;
 			}
 		}
 	}
@@ -3434,10 +3441,10 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 
 		if( pvar_.follow_now[1] == 0 ) {
 			info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
-			veejay_set_sample( info, pvar_.follow_now[1] );
+			veejay_set_sample( info, pvar_.follow_now[0] );
 		} else {
 			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
-			veejay_set_sample( info, pvar_.follow_now[1] );
+			veejay_set_sample( info, pvar_.follow_now[0] );
 		}
 
 		pvar_.follow_run    = 0;
