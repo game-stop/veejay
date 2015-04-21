@@ -34,7 +34,7 @@
 #include <libvjmem/vjmem.h>
 #include "lumamask.h"
 #include "common.h"
-static uint8_t *buf[3] = { NULL,NULL,NULL };
+static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
 
 vj_effect *lumamask_init(int width, int height)
 {
@@ -165,12 +165,25 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 					nx += width;
 				while( ny < 0 )
 					ny += height;
-				if( ny >= height ) ny = height - 1;
-				if( nx > width ) nx = width;	
+				//if( ny >= height ) ny = height - 1;
+				//if( nx > width ) nx = width;	
 
-				Y[y*width+x] = Y2[ny * width + nx];
-                                Cb[y*width+x] = Cb2[ny * width + nx];
-                                Cr[y*width+x] = Cr2[ny * width + nx];
+				//Y[y*width+x] = Y2[ny * width + nx];
+                                //Cb[y*width+x] = Cb2[ny * width + nx];
+                                //Cr[y*width+x] = Cr2[ny * width + nx];
+				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
+        	                {
+                	 		Y[y*width+x] = 16;
+                       	 		Cb[y*width+x] = 128;
+                         	      	Cr[y*width+x] = 128;
+                        	}
+                       		else
+                       		{
+                        	        Y[y*width+x] = Y2[ny * width + nx];
+                       	        	Cb[y*width+x] = Cb2[ny * width + nx];
+                       	        	Cr[y*width+x] = Cr2[ny * width + nx];
+                       		}
+
 			}
 		}
 	}
@@ -188,4 +201,5 @@ void lumamask_free()
   buf[0] = NULL;
   buf[1] = NULL;
   buf[2] = NULL;
+  buf[3] = NULL;
 }

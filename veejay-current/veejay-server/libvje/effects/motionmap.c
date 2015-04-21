@@ -238,8 +238,8 @@ void	motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n )
 
 void	motionmap_store_frame( VJFrame *fx )
 {
-	uint8_t *dest[3] = {
-		interpolate_buf, interpolate_buf + fx->len, interpolate_buf + fx->len + fx->len };
+	uint8_t *dest[4] = {
+		interpolate_buf, interpolate_buf + fx->len, interpolate_buf + fx->len + fx->len,NULL };
 	int strides[4] = { fx->len, fx->len, fx->len, 0 };
 	vj_frame_copy( fx->data, dest, strides );
 }
