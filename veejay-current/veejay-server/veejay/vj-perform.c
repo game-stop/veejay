@@ -202,7 +202,7 @@ static inline void vj_perform_play_audio( uint8_t *source, int len )
 static int vj_perform_previously_sampled(int chain_entry, int sub_id, int *ref )
 {
 	int i = 0;
-	for( i = 0; i < chain_entry; i ++ ) {
+	for( i = chain_entry; i > 0; i -- ) {
 		if( ref[i] == sub_id )
 			return frame_buffer[ i ]->ssm;
 	}
@@ -2295,7 +2295,6 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 
 					}
 				}
-
 			}
 
 			if( sub_mode && frames[0]->ssm == 0)
@@ -2328,7 +2327,6 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 						}
 					}
 				}
-
 	    	} // if
 	} // status
 }
@@ -3380,7 +3378,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 	int is444 = 0;
 	int res = 0;
-
+	int i = 0;
 	int safe_ff = pvar_.follow_fade;
 	veejay_memset( &pvar_, 0, sizeof(varcache_t));
 	pvar_.follow_fade = safe_ff;
