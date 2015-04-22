@@ -199,6 +199,16 @@ static inline void vj_perform_play_audio( uint8_t *source, int len )
 }
 #endif
 
+static int vj_perform_previously_sampled(int chain_entry, int sub_id, int *ref )
+{
+	int i = 0;
+	for( i = 0; i < chain_entry; i ++ ) {
+		if( ref[i] == sub_id )
+			return frame_buffer[ i ]->ssm;
+	}
+	return 0;
+}
+
 static int vj_perform_tag_is_cached(veejay_t *info, int chain_entry, int tag_id)
 {
  	int c;
@@ -2009,6 +2019,12 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 							done = 1;
 						}
 					}
+
+
+					if( chain_entry >= 1) {
+						frames[1]->ssm = (source != 0 ? vj_perform_previously_sampled(chain_entry,sub_id,cached_tag_frames) : 0);
+					}
+
 					// sample B
 	   				if(sub_mode && frames[1]->ssm == 0)
 					{
@@ -2029,7 +2045,6 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 
 					}
 
-					frames[1]->ssm = 0;
 				}
 			}
 		
@@ -2251,6 +2266,10 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 					}
 				}
 
+				if( chain_entry >= 1) {
+					frames[1]->ssm = (source == 0 ? vj_perform_previously_sampled(chain_entry,sub_id,cached_sample_frames) : 0);
+				}
+
 				if(frames[1]->ssm == 0 && sub_mode)
 				{
 					chroma_supersample(
@@ -2277,7 +2296,6 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 					}
 				}
 
-				frames[1]->ssm = 0;
 			}
 
 			if( sub_mode && frames[0]->ssm == 0)
