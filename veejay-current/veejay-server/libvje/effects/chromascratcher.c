@@ -25,7 +25,7 @@
 #include "chromascratcher.h"
 #include "chromamagick.h"
 #define    RUP8(num)(((num)+8)&~8)
-static uint8_t *cframe[3] = {NULL,NULL,NULL};
+static uint8_t *cframe[4] = {NULL,NULL,NULL,NULL};
 static int cnframe = 0;
 static int cnreverse = 0;
 static int chroma_restart = 0;
@@ -70,7 +70,10 @@ int	chromascratcher_malloc(int w, int h)
     cframe[1] = cframe[0] + ( w * h * 50 );
     cframe[2] = cframe[1] + ( w * h * 50 );
 
-    veejay_memset( &_tmp, 0,sizeof(VJFrame));
+
+    int strides[4] = { w * h * 50, w * h * 50, w * h * 50, 0 };
+    vj_frame_clear( cframe, strides, 128 );
+	
 
     return 1;
 }
@@ -83,20 +86,17 @@ void chromascratcher_free() {
    cframe[2] = NULL;
 }
 
-void chromastore_frame(uint8_t * yuv1[3], int w, int h, int n,
-		       int no_reverse)
-{
-     if (cnreverse)
-	cnframe--;
-    else
-	cnframe++;
+void chromastore_frame(uint8_t *yuv1[3], int w, int h, int n, int no_reverse)
+{ 
+  	if( n == 0 && cnframe == 0 )
+		return;
 
- 
-  
     if (cnframe >= n) {
 	if (no_reverse == 0) {
 	    cnreverse = 1;
 	    cnframe = n - 1;
+	    if( cnframe < 1 )
+		    cnframe = 1;
 	} else {
 	    cnframe = 0;
 	}
@@ -113,6 +113,13 @@ void chromastore_frame(uint8_t * yuv1[3], int w, int h, int n,
 	veejay_memcpy(yuv1[1], cframe[1] + (w * h * cnframe), (w * h));
 	veejay_memcpy(yuv1[2], cframe[2] + (w * h * cnframe), (w * h));
     }
+
+     if (cnreverse)
+	cnframe = (cnframe - 1 ) % 50;
+    else
+	cnframe = (cnframe + 1) % 50;
+
+
 
 }
 
