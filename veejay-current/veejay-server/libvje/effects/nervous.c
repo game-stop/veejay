@@ -31,9 +31,10 @@
 #include <libvjmem/vjmem.h>
 #include "nervous.h"
 
-#define		N_MAX	25
+#define		N_MAX	100
+#define        RUP8(num)(((num)+8)&~8)
 
-static uint8_t *nervous_buf[3]; // huge buffer
+static uint8_t *nervous_buf[4] = { NULL,NULL,NULL,NULL }; // huge buffer
 static int		frames_elapsed;
 
 vj_effect *nervous_init(int w, int h)
@@ -57,9 +58,9 @@ vj_effect *nervous_init(int w, int h)
 
 int	nervous_malloc(int w, int h )
 {
-	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * N_MAX * 3);
-
+	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * N_MAX * 3));
 	if(!nervous_buf[0]) return 0;
+
 	nervous_buf[1] = nervous_buf[0] + (w*h*N_MAX);
 	nervous_buf[2] = nervous_buf[1] + (w*h*N_MAX);
 	frames_elapsed = 0;
@@ -76,8 +77,9 @@ void	nervous_free(void)
 	if( nervous_buf[0] ) free(nervous_buf[0]);
 	nervous_buf[0] = NULL;
 	nervous_buf[1] = NULL;
-	 nervous_buf[2] = NULL;
-}
+	nervous_buf[2] = NULL;
+	nervous_buf[3] = NULL;
+}	
 
 
 void nervous_apply( VJFrame *frame, int width, int height, int delay)

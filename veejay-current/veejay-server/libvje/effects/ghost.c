@@ -25,7 +25,7 @@
 #include "common.h"
 #include "ghost.h"
 
-static uint8_t 		*ghost_buf[3];
+static uint8_t 		*ghost_buf[4] = { NULL,NULL,NULL, NULL};
 static uint8_t 		*diff_map = NULL;
 static int		 diff_period = 0;
 

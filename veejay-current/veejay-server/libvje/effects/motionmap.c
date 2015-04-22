@@ -258,7 +258,7 @@ void	motionmap_interpolate_frame( VJFrame *fx, int N, int n )
         motionmap_lerp_frame( fx, &prev, N, n );
 }
 
-int	motionmap_prepare( uint8_t *map[3], int width, int height )
+int	motionmap_prepare( uint8_t *map[4], int width, int height )
 {
 	if(!previous_img)
 		return 0;
@@ -368,10 +368,11 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 
 	if( capturing )
 	{
-		uint8_t *dst[3];
+		uint8_t *dst[4];
 		dst[0] = large_buf + ( n_captured * (len*3) ); 
 		dst[1] = dst[0] + len;
 		dst[2] = dst[1] + len;	
+		dst[3] = NULL;
 		int strides[4] = { len, len, len, 0 };
 		vj_frame_copy( frame->data, dst, strides );
 		n_captured ++;
@@ -383,10 +384,11 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 	}
 	else if (playing )
 	{
-		uint8_t *src[3];
+		uint8_t *src[4];
 		src[0] = large_buf + ( n_played * (len*3));
 		src[1] = src[0]+ len;
 		src[2] = src[1]+ len;
+		src[3] = NULL;
 	/*  veejay_memcpy( frame->data[0], src[0], len );
 		veejay_memcpy( frame->data[1], src[1], len );
 		veejay_memcpy( frame->data[2], src[2], len );*/

@@ -31,7 +31,7 @@
 #include <libvjmem/vjmem.h>
 #include "bathroom.h"
 #include "common.h"
-static uint8_t *bathroom_frame[3];
+static uint8_t *bathroom_frame[4] = { NULL,NULL,NULL,NULL };
 
 vj_effect *bathroom_init(int width,int height)
 {
@@ -57,7 +57,6 @@ vj_effect *bathroom_init(int width,int height)
 
 static int n__ = 0;
 static int N__ = 0;
-// FIXME private
 int bathroom_malloc(int width, int height)
 {
 	int i;

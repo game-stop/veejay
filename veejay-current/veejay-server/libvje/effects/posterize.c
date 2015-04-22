@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "posterize.h"
+#include "common.h"
 vj_effect *posterize_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -68,7 +69,7 @@ static void _posterize_y_simple(uint8_t *src[3], int len, int value, int thresho
 		}
 		else
 		{
-			if( Y < threshold_min) Y = 16; else Y = 235;
+			if( Y < threshold_min) Y = pixel_Y_lo_; else Y = pixel_Y_hi_;
 		}
 	}
 }

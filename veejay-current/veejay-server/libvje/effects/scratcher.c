@@ -27,7 +27,7 @@
 #include "opacity.h" 
 #include <libvjmem/vjmem.h>
 
-static uint8_t *frame[3];
+static uint8_t *frame[4] = { NULL,NULL,NULL,NULL };
 static  int nframe = 0;
 static int nreverse = 0;
 
@@ -94,10 +94,11 @@ void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 	uint8_t *Cb= src->data[1];
 	uint8_t *Cr= src->data[2];
 
-	uint8_t *dest[3] = {
+	uint8_t *dest[4] = {
 		frame[0] + (w*h*nframe),
 		frame[1] + (uv_len*nframe),
-		frame[2] + (uv_len*nframe) };
+		frame[2] + (uv_len*nframe),
+       		NULL	};
 
 	if (!nreverse) {
 		vj_frame_copy( src->data, dest, strides ); 

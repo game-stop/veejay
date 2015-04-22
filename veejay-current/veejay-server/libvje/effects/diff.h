@@ -27,7 +27,7 @@
 vj_effect *diff_init(int width, int height);
 void diff_free(void *d);
 int diff_malloc(void **c, int w, int h);
-int diff_prepare(void *d, uint8_t *map[3], int w, int h); 
+int diff_prepare(void *d, uint8_t *map[4], int w, int h); 
 void diff_apply(void *d , VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
 		int th, int reverse, int show, int feather);

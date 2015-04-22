@@ -57,14 +57,14 @@ static int n__ = 0;
 static	int	has_bg = 0;
 static int32_t	*sum = NULL;
 static uint8_t	*timebuffer = NULL;
-static uint8_t	*tmpimage[3] = { NULL,NULL,NULL};
+static uint8_t	*tmpimage[4] = { NULL,NULL,NULL, NULL};
 static	int	plane = 0;
-static uint8_t	*bgimage[3] = { NULL,NULL,NULL};
+static uint8_t	*bgimage[4] = { NULL,NULL,NULL, NULL};
 
 #define PLANES_DEPTH 6
 #define	PLANES (1<< PLANES_DEPTH)
 
-int	chameleon_prepare( uint8_t *map[3], int width, int height )
+int	chameleon_prepare( uint8_t *map[4], int width, int height )
 {
 	if(!bgimage[0]) {
 		return 0;

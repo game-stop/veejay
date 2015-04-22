@@ -524,11 +524,11 @@ extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int opa
 
 extern void overclock_apply(VJFrame *frame, int w, int h, int val, int r);
 
-extern int bgsubstract_prepare(void *user, uint8_t *map[3], int width, int height);
+extern int bgsubstract_prepare(void *user, uint8_t *map[4], int width, int height);
 
 extern void bgsubstract_apply(VJFrame *frame,int width, int height, int mode, int threshold );
 
-extern int diff_prepare(void *data, uint8_t *map[3], int w, int h);
+extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
 
 extern void	cartonize_apply( VJFrame *frame, int w, int h, int b1, int b2, int b3 );
 
@@ -616,11 +616,11 @@ extern void radcor_apply( VJFrame *frame, int width, int height, int a, int b, i
 
 extern void bgsubtract_apply(VJFrame *frame,int width,int height,int mode, int threshold);
 
-extern int motionmap_prepare( uint8_t *map[3], int w, int h );
-extern int chameleon_prepare( uint8_t *bg[3], int w, int h );
-extern int bgsubtract_prepare(uint8_t *map[3], int w, int h); 
-extern int contourextract_prepare(uint8_t *map[3], int w, int h);
-extern int chameleonblend_prepare( uint8_t *bg[3],int w, int h );
+extern int motionmap_prepare( uint8_t *map[4], int w, int h );
+extern int chameleon_prepare( uint8_t *bg[4], int w, int h );
+extern int bgsubtract_prepare(uint8_t *map[4], int w, int h); 
+extern int contourextract_prepare(uint8_t *map[4], int w, int h);
+extern int chameleonblend_prepare( uint8_t *bg[4],int w, int h );
 
 
 #endif

@@ -24,9 +24,9 @@
 #include <stdlib.h>
 #include "common.h"
 
-static uint8_t *slice_frame[3];
-static int *slice_xshift;
-static int *slice_yshift;
+static uint8_t *slice_frame[4] = { NULL,NULL,NULL,NULL };
+static int *slice_xshift = NULL;
+static int *slice_yshift = NULL;
 static int n__ = 0;
 static int N__ = 0;
 void slice_recalc(int width, int height, int val);

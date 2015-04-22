@@ -24,7 +24,7 @@
 #include "common.h"
 #include <stdlib.h>
 
-static uint8_t *cross_pixels[3];
+static uint8_t *cross_pixels[4] = { NULL,NULL,NULL, NULL};
 
 vj_effect *crosspixel_init(int w, int h)
 {
@@ -47,7 +47,7 @@ vj_effect *crosspixel_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Size" );
     return ve;
 }
-// FIXME private
+
 int crosspixel_malloc(int w, int h)
 {
 	int i;
@@ -92,7 +92,7 @@ void crosspixel_apply(VJFrame *frame, int w, int h, int t,int v) {
     }
     else
     {
-	    vj_frame_clear1(Y, 235, len);
+	    vj_frame_clear1(Y, pixel_Y_hi_, len);
 	    vj_frame_clear1(Cb, 128, uv_len);
 	    vj_frame_clear1(Cr, 128, uv_len);
     }

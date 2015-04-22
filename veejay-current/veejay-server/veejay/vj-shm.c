@@ -144,7 +144,7 @@ int		vj_shm_get_shm_id( void *vv )
 	return v->shm_id;
 }
 
-int		vj_shm_read( void *vv , uint8_t *dst[3] )
+int		vj_shm_read( void *vv , uint8_t *dst[4] )
 {
 	vj_shm_t *v         = (vj_shm_t*) vv;
 	vj_shared_data *data = (vj_shared_data*) v->sms;
@@ -181,7 +181,7 @@ int		vj_shm_read( void *vv , uint8_t *dst[3] )
 
 int rot_val =0;
 
-int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[4] )
+int		vj_shm_write( void *vv, uint8_t *frame[4], int plane_sizes[4] )
 {
 	vj_shm_t *v         = (vj_shm_t*) vv;
 	vj_shared_data *data = (vj_shared_data*) v->sms;

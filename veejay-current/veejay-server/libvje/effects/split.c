@@ -19,7 +19,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "split.h"
-static uint8_t *split_fixme[3];
+static uint8_t *split_fixme[4] = { NULL,NULL,NULL, NULL };
 vj_effect *split_init(int width,int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -110,10 +110,11 @@ void split_fib_downscaleb(VJFrame *frame, int width, int height)
     split_fib_downscale(frame, width, height);
 
     int strides[4] = { len, uv_len, uv_len, 0 };
-    uint8_t *output[3] = {
+    uint8_t *output[4] = {
 	Y + len,
 	Cb + uv_len,
-	Cr + uv_len };
+	Cr + uv_len,
+   	NULL };
 
     vj_frame_copy( frame->data, output, strides );
 }
@@ -240,7 +241,7 @@ void split_push_downscale_lh(VJFrame *frame, int width, int height)
     }
 
 	int strides[4] = { hlen, uv_hlen, uv_hlen,0 };
-	uint8_t *input[3] = { Y + hlen, Cb + uv_hlen, Cr + uv_hlen };
+	uint8_t *input[4] = { Y + hlen, Cb + uv_hlen, Cr + uv_hlen, NULL };
 	vj_frame_copy( split_fixme, input, strides );
 }
 

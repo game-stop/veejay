@@ -82,6 +82,8 @@ static int sampleadm_state = SAMPLE_PEEK;	/* default state */
 extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp);
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_size();
+extern int    veejay_sprintf( char *s, size_t size, const char *format, ... );
+
 typedef struct
 {
         int   active;
@@ -858,8 +860,6 @@ int sample_verify_delete( int sample_id, int sample_type )
 				{
 					s->effect_chain[j]->channel = i;
 					s->effect_chain[j]->source_type = 0;
-	veejay_msg(VEEJAY_MSG_INFO, "Dereferenced mix entry %d of Sample %d",
-		j, i );
 					sample_update( s, i );
 				}
 			}
@@ -2015,7 +2015,7 @@ int	sample_get_kf_status( int s1, int entry, int *type )
 void	sample_set_kf_type(int s1, int entry, int type )
 {
         sample_info *sample = sample_get(s1);
-        if(!sample) return 0;
+        if(!sample) return;
 
 	sample->effect_chain[entry]->kf_type = type;
 }
@@ -2927,7 +2927,6 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
     xmlChar *xmlTemp = NULL;
     unsigned char *chTemp = NULL;
     xmlNodePtr subs = NULL;
-    int post_check = 0;
 
     if(!sample_read_edl( skel )) {
         veejay_msg(VEEJAY_MSG_WARNING, "No saved edit decision list '%s' for sample %d", skel->edit_list_file, skel->sample_id );
@@ -2935,7 +2934,6 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 		veejay_msg(VEEJAY_MSG_WARNING, "Plainmode is dummy !");
 	}
 	veejay_msg(VEEJAY_MSG_WARNING, "Using plainmode to play sample %d", skel->sample_id );
-	post_check = 1;
 	skel->edit_list = NULL;
     }
     if(!skel->edit_list)
@@ -3266,7 +3264,6 @@ int	is_samplelist(char *filename)
 void	LoadSubtitles( sample_info *skel, char *file, void *font )
 {
 	char tmp[512];
-	float fps = 25.0;
 
 	sprintf(tmp, "%s-SUB-%d.srt", file,skel->sample_id );
 #ifdef STRICT_CHECKING

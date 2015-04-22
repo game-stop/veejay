@@ -24,7 +24,7 @@
 #include "motionblur.h"
 #include <config.h>
 
-static uint8_t *previous_frame[3];
+static uint8_t *previous_frame[3] = { NULL,NULL,NULL };
 vj_effect *motionblur_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));

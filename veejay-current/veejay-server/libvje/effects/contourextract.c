@@ -186,7 +186,7 @@ void contourextract_free(void *d)
 	d = NULL;
 }
 
-int contourextract_prepare(uint8_t *map[3], int width, int height)
+int contourextract_prepare(uint8_t *map[4], int width, int height)
 {
 	if(!static_bg )
 	{
@@ -276,7 +276,7 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	}
 
 	//@ calculate distance map
-	veejay_distance_transform( ud->bitmap, width, height, dt_map );
+	veejay_distance_transform8( ud->bitmap, width, height, dt_map );
 
 	to_shrink_.data[0] = ud->bitmap;
 	shrinked_.data[0] = ud->current;

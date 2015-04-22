@@ -836,10 +836,10 @@ uint8_t bl_pix_unfreeze_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (a < 16) {
-	new_Y = 16;
+    if (a < pixel_Y_lo_) {
+	new_Y = pixel_Y_lo_;
     } else {
-	if(b > 235) b = 235;
+	if(b > pixel_Y_hi_) b = pixel_Y_hi_;
 	new_Y = 0xff - ((0xff - b) * (0xff - b)) / a;
     }
     return new_Y;
@@ -939,8 +939,8 @@ uint8_t bl_pix_dblbneg_C(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_muldiv_Y(uint8_t y1, uint8_t y2)
 {
-	if( y2 > 235 ) y2 = 235;
-	if( y1 < 16 ) y1 = 16;
+	if( y2 > pixel_Y_hi_ ) y2 = pixel_Y_hi_;
+	if( y1 < pixel_Y_lo_ ) y1 = pixel_Y_lo_;
 	return ( (y1*y1) / (0xff - y2 ) );
 }
 
@@ -956,8 +956,8 @@ uint8_t bl_pix_add_Y(uint8_t y1, uint8_t y2)
     if ((0xff - b) <= 0) {
 	new_Y = (a * a) >> 8;
     } else {
-	if( b > 235)
-		b= 235;
+	if( b > pixel_Y_hi_)
+		b= pixel_Y_hi_;
 	new_Y = (a * a) / (0xff - b);
     }
     return new_Y;
@@ -1019,17 +1019,17 @@ uint8_t bl_pix_selunfreeze_Y(uint8_t y1, uint8_t y2)
     a = y1;
     b = y2;
     if (a > b) {
-	if (b < 16) {
-	    new_Y = 16;
+	if (b < pixel_Y_lo_) {
+	    new_Y = pixel_Y_lo_;
 	} else {
-	    if( a > 235 ) a = 235;
+	    if( a > pixel_Y_hi_ ) a = pixel_Y_hi_;
 	    new_Y = 0xff - ((0xff - a) * (0xff - a)) / b;
-	    if (new_Y < 16)
-		new_Y = 16;
+	    if (new_Y < pixel_Y_lo_)
+		new_Y = pixel_Y_lo_;
 	}
 	return new_Y;
     }
-    return 0;
+    return pixel_Y_lo_;
 }
 
 uint8_t bl_pix_seldiff_Y(uint8_t y1, uint8_t y2)

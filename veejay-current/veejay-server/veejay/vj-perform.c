@@ -3139,7 +3139,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 {
 	VJFrame *frame = info->effect_frame1;
 	VJFrame *frame2= info->effect_frame2;
-	uint8_t *pri[3];
+	uint8_t *pri[4];
 	char *osd_text = NULL;
 	char *more_text = NULL;
 	int   placement= 0;
@@ -3147,7 +3147,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	pri[0] = primary_buffer[destination]->Y;
 	pri[1] = primary_buffer[destination]->Cb;
 	pri[2] = primary_buffer[destination]->Cr;
-
+	pri[3] = NULL;
 	if( settings->composite  )
 	{ //@ scales in software
 		if( settings->ca ) {

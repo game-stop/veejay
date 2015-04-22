@@ -23,7 +23,7 @@
 #include "scratcher.h"
 #include "common.h"
 
-static uint8_t *trace_buffer[3];
+static uint8_t *trace_buffer[4] = { NULL,NULL,NULL,NULL};
 static int trace_counter = 0;
 
 vj_effect *tracer_init(int w, int h)

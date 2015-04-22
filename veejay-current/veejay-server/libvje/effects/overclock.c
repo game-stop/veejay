@@ -46,7 +46,7 @@ vj_effect *overclock_init(int w, int h)
     return ve;
 }
 
-static uint8_t *oc_buf[3];
+static uint8_t *oc_buf[3] = { NULL,NULL,NULL };
 
 //copied from xine
 static inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep){

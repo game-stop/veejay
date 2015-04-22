@@ -24,7 +24,8 @@
 #include "magicscratcher.h"
 #include "common.h"
 
-static uint8_t *mframe;
+#define        RUP8(num)(((num)+8)&~8)
+static uint8_t *mframe = NULL;
 static int m_frame = 0;
 static int m_reverse = 0;
 static int m_rerun = 0;
@@ -53,11 +54,10 @@ vj_effect *magicscratcher_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Scratch frames", "PingPong");
     return ve;
 }
-//FIXME: private
 int magicscratcher_malloc(int w, int h)
 {
    mframe =
-	(uint8_t *) vj_calloc(w * h * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
+	(uint8_t *) vj_calloc( RUP8(w * h) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
    if(!mframe) return 0;
    return 1;
 	

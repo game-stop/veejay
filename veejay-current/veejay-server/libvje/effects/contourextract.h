@@ -27,7 +27,7 @@
 vj_effect *contourextract_init(int width, int height);
 void contourextract_free(void *d);
 int contourextract_malloc(void **c, int w, int h);
-int contourextract_prepare(uint8_t *map[3], int w, int h); 
+int contourextract_prepare(uint8_t *map[4], int w, int h); 
 void contourextract_apply(void *d , VJFrame *frame,int width, int height, 
 		int th, int reverse, int show, int feather, int blob);
 void	contourextract_destroy();

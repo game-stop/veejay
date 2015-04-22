@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "morphology.h"
-
+#include "common.h"
 typedef uint8_t (*morph_func)(uint8_t *kernel, uint8_t mt[9] );
 
 vj_effect *morphology_init(int w, int h)
@@ -74,8 +74,8 @@ static uint8_t _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
 	/* consider all background pixels (0) in input image */	
 	for(x = 0; x < 9; x ++ )
 		if((kernel[x] * img[x]) > 0 )
-			return 235;
-	return 16;
+			return pixel_Y_hi_;
+	return pixel_Y_lo_;
 }
 
 
@@ -85,8 +85,8 @@ static uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
 	/* consider all background pixels (0) in input image */	
 	for(x = 0; x < 9; x ++ )
 		if(kernel[x] && img[x] == 0 )
-			return 16;
-	return 235;
+			return pixel_Y_lo_;
+	return pixel_Y_hi_;
 }
 
 morph_func	_morphology_function(int i)

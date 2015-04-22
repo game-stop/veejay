@@ -71,7 +71,6 @@ void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int
 	for( i = 0 ; i < len ; i ++ )	
 	{
 		tmp = Y[i];
-	//	if(tmp < 16 ) tmp = 16; else if(tmp > 235 ) tmp = 235;
 		Y[i] = (tmp / base) * base; // loose fractional part
 	}
 
@@ -79,8 +78,6 @@ void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int
 	for( i = 0; i < uv_len; i ++ )
 	{
 		p = Cb[i] - 128;
-		//if( p < -127 ) p = -127;
-	//	if( p > 127  ) p = 127;
 		Cb[i] = (p / ubase) * ubase + 128;
 	}
 
@@ -88,8 +85,6 @@ void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int
 	for( i = 0; i < uv_len; i ++ )
 	{
 		p = Cr[i] - 128;
-		//if( p < -127 ) p = -127;
-	//	if( p > 127 ) p = 127;
 		Cr[i] = (p / vbase) * vbase + 128;
 	}
 

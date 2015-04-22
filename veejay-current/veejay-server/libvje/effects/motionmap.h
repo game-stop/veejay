@@ -28,5 +28,5 @@ vj_effect *motionmap_init(int w, int h);
 void motionmap_apply( VJFrame *frame, int width, int height, int t, int n, int draw, int histo, int op);
 int	motionmap_malloc(int w,int h);
 void	motionmap_free(void);
-int		motionmap_prepare( uint8_t *map[3], int w, int h );
+int		motionmap_prepare( uint8_t *map[4], int w, int h );
 #endif

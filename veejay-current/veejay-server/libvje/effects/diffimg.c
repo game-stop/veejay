@@ -32,7 +32,7 @@ vj_effect *diffimg_init(int width, int height)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 6;/* type */
     ve->defaults[1] = 15;	/* min */
-    ve->defaults[2] = 235;	/* max */
+    ve->defaults[2] = 240;	/* max */
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 7;
@@ -72,7 +72,7 @@ void diffimg_apply(
 	for(i=0; i < len; i++)
 	{
 		y = Y[i];
-		if( y < 16 ) y = 16; else if (y > 235) y = 235;
+		if( y < 16 ) y = 16; else if (y > pixel_Y_hi_) y = pixel_Y_hi_;
 		yb = y;
 		if(y >= threshold_min && y <= threshold_max)
 		{
@@ -82,7 +82,7 @@ void diffimg_apply(
 			d /= 100;
 			m = m + d;
 			y = ((((y << 1) - (255 - m))>>1) + Y[i])>>1;
-			if(y < 16) y = 16; else if (y>235) y = 235;
+			if(y < 16) y = 16; else if (y>pixel_Y_hi_) y = pixel_Y_hi_;
 			Y[i] = _pff(y,yb);
 		}
 	}

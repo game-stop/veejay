@@ -24,7 +24,7 @@
 #include "complexsync.h"
 #include <stdlib.h>
 
-static uint8_t *c_outofsync_buffer[3] = { NULL,NULL,NULL };
+static uint8_t *c_outofsync_buffer[4] = { NULL,NULL,NULL, NULL };
 
 vj_effect *complexsync_init(int width, int height)
 {

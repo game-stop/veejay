@@ -24,7 +24,7 @@
 #include "common.h"
 #include "chromascratcher.h"
 #include "chromamagick.h"
-static uint8_t *cframe[3];
+static uint8_t *cframe[3] = {NULL,NULL,NULL};
 static int cnframe = 0;
 static int cnreverse = 0;
 static int chroma_restart = 0;

@@ -267,7 +267,7 @@ int veejay_is_silent()
 
 #define MESSAGE_RING_SIZE 5000
 static message_ring_t *msg_ring = NULL;
-static msg_ring_enabled = 0;
+static int msg_ring_enabled = 0;
 void	veejay_init_msg_ring()
 {
 	msg_ring = vj_calloc( sizeof(message_ring_t));

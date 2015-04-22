@@ -37,7 +37,7 @@
 #include "common.h"
 
 typedef struct {
-	uint8_t *ripple_data[3];
+	uint8_t *ripple_data[4];
 	uint8_t *diff_img;
  	int stat;
 	signed char *vtable;

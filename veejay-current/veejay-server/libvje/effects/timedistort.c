@@ -59,7 +59,7 @@ vj_effect *timedistort_init(int w, int h)
 static int n__ = 0;
 static int N__ = 0;
 static	uint8_t	*nonmap = NULL;
-static uint8_t *planes[3] = { NULL, NULL, NULL };
+static uint8_t *planes[4] = { NULL, NULL, NULL, NULL };
 static uint8_t *planetableY[PLANES];
 static uint8_t *planetableU[PLANES];
 static uint8_t *planetableV[PLANES];
@@ -189,7 +189,7 @@ void timedistort_apply( VJFrame *frame, int width, int height, int val)
 #endif
 
 	//@ process
-	uint8_t *planeTables[3] = { planetableY[plane], planetableU[plane], planetableV[plane] };
+	uint8_t *planeTables[4] = { planetableY[plane], planetableU[plane], planetableV[plane], NULL };
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, planeTables, strides );
 

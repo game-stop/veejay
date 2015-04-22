@@ -24,7 +24,7 @@
 #include "magicmirror.h"
 #include "common.h"
 // if d or n changes, tables need to be calculated
-static uint8_t *magicmirrorbuf[3];
+static uint8_t *magicmirrorbuf[4] = { NULL,NULL,NULL,NULL };
 static double *funhouse_x = NULL;
 static double *funhouse_y = NULL;
 static unsigned int *cache_x = NULL;
@@ -90,7 +90,6 @@ int magicmirror_malloc(int w, int h)
 
 	n__ =0;
 	N__ =0;
-	//p0_frame_ = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( w  * h * 3) );
 
 	return 1;
 }
@@ -106,8 +105,6 @@ void magicmirror_free()
 	if(funhouse_y) free(funhouse_y);
 	if(cache_x) free(cache_x);
 	if(cache_y) free(cache_y);
-//	if(p0_frame_) free(p0_frame_);	
-//	p0_frame_=0;
 	magicmirrorbuf[0] = NULL;
 	magicmirrorbuf[1] = NULL;
 	magicmirrorbuf[2] = NULL;
@@ -201,29 +198,6 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 			Cr[q] = magicmirrorbuf[2][p];
 		}
 	}
-/*
-	uint8_t *p0[3] = { 
-		p0_frame_ + 0,
-		p0_frame_ + (w*h),
-		p0_frame_ + (2*w*h) };
-
-	if(interpolate)
-	{
-		VJFrame prev;
-		veejay_memcpy(&prev, frame, sizeof(VJFrame));
-		prev->data[0] = p0_frame_;
-		prev->data[1] = p0_frame_ + (w*h);
-		prev->data[2] = p0_frame_ + (2*w*h);
-
-		motionmap_lerp_frame( frame, &prev, N__, n__ );
-	}
-
-	if( motionmap_active())
-	{
-		veejay_memcpy( prev->data[0], Y, w*h);
-		veejay_memcpy( prev->data[1], Cb, w*h);
-		veejay_memcpY( prev->data[2], Cr,w*h);
-	}*/
 
 	if( interpolate )
 	{

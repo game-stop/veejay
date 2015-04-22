@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include "common.h"
 #include <math.h>
+#define    RUP8(num)(((num)+8)&~8)
+
 vj_effect *fisheye_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -39,17 +41,15 @@ vj_effect *fisheye_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Value" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Curve" );
     return ve;
 }
 
-//FIXME private
 static int _v = 0;
-
-static double *polar_map;
-static double *fish_angle;
-static int *cached_coords; 
-static uint8_t *buf[3];
+static double *polar_map = NULL;
+static double *fish_angle = NULL;
+static int *cached_coords = NULL; 
+static uint8_t *buf[3] = { NULL,NULL,NULL };
 
 int	fisheye_malloc(int w, int h)
 {
@@ -58,17 +58,17 @@ int	fisheye_malloc(int w, int h)
 	int w2=w/2;
 	int p =0;
 
-	buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h  *  3  );
+	buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h  *  3 ) );
 	if(!buf[0]) return 0;
 	buf[1] = buf[0] + (w*h);
 	buf[2] = buf[1] + (w*h);
 
-	polar_map = (double*) vj_calloc(sizeof(double) * w* h );
+	polar_map = (double*) vj_calloc(sizeof(double) * RUP8(w* h) );
 	if(!polar_map) return 0;
-	fish_angle = (double*) vj_calloc(sizeof(double) * w* h );
+	fish_angle = (double*) vj_calloc(sizeof(double) * RUP8(w* h) );
 	if(!fish_angle) return 0;
 
-	cached_coords = (int*) vj_calloc(sizeof(int) * w * h);
+	cached_coords = (int*) vj_calloc(sizeof(int) * RUP8( w * h));
 	if(!cached_coords) return 0;
 
 	for(y=(-1 *h2); y < (h-h2); y++)

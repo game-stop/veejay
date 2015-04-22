@@ -57,10 +57,10 @@ void bwselect_apply(VJFrame *frame, int width, int height, int min_threshold, in
 		for(c=0; c < width; c++) {
 			uint8_t p = Y[r+c];
 			if( p > min_threshold && p < max_threshold) {
-				Y[r+c] = 235;
+				Y[r+c] = pixel_Y_hi_;
 			}
 			else {
-				Y[r+c] = 16;
+				Y[r+c] = pixel_Y_lo_;
 			}
 		}
 	}

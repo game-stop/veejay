@@ -26,20 +26,20 @@ void	composite_set_colormode( void *compiz, int mode );
 
 int	composite_get_colormode(void *compiz);
 
-int	composite_get_original_frame(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp, int row_start, int row_end );
+int	composite_get_original_frame(void *compiz, uint8_t *current_in[4], uint8_t *out[4], int which_vp, int row_start, int row_end );
 
-int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int mode );
+int	composite_get_top(void *compiz, uint8_t *current_in[4], uint8_t *out[4], int mode );
 
-int	composite_processX(  void *compiz, void *back1,uint8_t *tmp_data[3], VJFrame *input );
+int	composite_processX(  void *compiz, void *back1,uint8_t *tmp_data[4], VJFrame *input );
 
 int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp, int pixfmt );
 
-void	composite_blit_ycbcr( void *compiz,uint8_t *in[3], int which_vp, void *gl );
+void	composite_blit_ycbcr( void *compiz,uint8_t *in[4], int which_vp, void *gl );
 
 
-void	composite_blit_yuyv( void *compiz,uint8_t *in[3], uint8_t *yuyv, int which_vp );
+void	composite_blit_yuyv( void *compiz,uint8_t *in[4], uint8_t *yuyv, int which_vp );
 
-int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y );
+int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y );
 
 void	composite_destroy( void *compiz );
 

@@ -232,7 +232,7 @@ void neighbours_apply( VJFrame *frame, int width, int height, int brush_size, in
 	if(mode)
 	{
 		int strides[4] = { 0,frame->len, frame->len };
-		uint8_t *dest[3] = { NULL, chromacity[0], chromacity[1] };
+		uint8_t *dest[4] = { NULL, chromacity[0], chromacity[1],NULL };
 		vj_frame_copy( frame->data, dest, strides );
 	}
 

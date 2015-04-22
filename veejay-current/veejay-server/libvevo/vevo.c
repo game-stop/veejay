@@ -2115,7 +2115,6 @@ int	vevo_union_ports( void *port_a, void *port_b, int filter_type )
 
    char **Ea = vevo_list_properties( port_a );
    int i;
-   int error;
    for( i = 0; Ea[i] != NULL; i ++ )
    {
 	if(!vevo_property_exists( port_b, Ea[i] )&& vevo_property_atom_type( port_a, Ea[i] ) == 

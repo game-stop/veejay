@@ -48,7 +48,7 @@ vj_effect *swirl_init(int w, int h)
 static double *polar_map;
 static double *fish_angle;
 static int *cached_coords;
-static uint8_t *buf[3];
+static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
 
 
 int swirl_malloc(int w, int h)

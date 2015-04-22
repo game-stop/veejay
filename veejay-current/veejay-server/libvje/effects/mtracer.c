@@ -26,7 +26,7 @@
 #include "magicoverlays.h"
 
 
-static uint8_t *mtrace_buffer[3];
+static uint8_t *mtrace_buffer[4] = { NULL,NULL,NULL,NULL };
 static int mtrace_counter = 0;
 
 vj_effect *mtracer_init(int w, int h)

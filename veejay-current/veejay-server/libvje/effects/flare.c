@@ -56,7 +56,7 @@ vj_effect *flare_init(int w, int h)
 	return ve;
 }
 
-static uint8_t *flare_buf[3];
+static uint8_t *flare_buf[4] = { NULL,NULL,NULL,NULL};
 
 int	flare_malloc(int w, int h)
 {

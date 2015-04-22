@@ -27,8 +27,8 @@
 #include "sinoids.h"
 #include "common.h"
 
-static int *sinoids_X;
-static uint8_t *sinoid_frame[3];
+static int *sinoids_X = NULL;
+static uint8_t *sinoid_frame[3] = { NULL,NULL,NULL };
 
 vj_effect *sinoids_init(int width, int height)
 {

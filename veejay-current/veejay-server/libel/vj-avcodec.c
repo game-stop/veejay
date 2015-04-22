@@ -488,7 +488,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst
 
 	if( av->encoder_id == 999 )
 	{
-		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->len/4) };
+		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->len/4),NULL };
 		vj_frame_copy1(src[0], dest[0],  av->len );
 		yuv422to420planar( src,dest, av->width,av->height );
 
@@ -502,7 +502,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst
 	}
 	if( av->encoder_id == 996 )
 	{
-		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->len/4) };
+		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->len/4),NULL };
 		vj_frame_copy1( src[0], dest[0], av->len );
 		yuv422to420planar( src,dest, av->width,av->height );
 

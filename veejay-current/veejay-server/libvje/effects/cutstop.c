@@ -27,8 +27,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static uint8_t *vvcutstop_buffer[3];
-static unsigned int frq_cnt;
+static uint8_t *vvcutstop_buffer[4] = { NULL,NULL,NULL,NULL };
+static unsigned int frq_cnt = 0;
 
 vj_effect *cutstop_init(int width , int height)
 {

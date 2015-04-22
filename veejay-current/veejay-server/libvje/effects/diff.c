@@ -113,7 +113,7 @@ void diff_free(void *d)
 	d = NULL;
 }
 
-int diff_prepare(void *user, uint8_t *map[3], int width, int height)
+int diff_prepare(void *user, uint8_t *map[4], int width, int height)
 {
 	if(!static_bg )
 	{

@@ -65,7 +65,7 @@ void bgsubtract_free()
 	static_bg = NULL;
 }
 
-int bgsubtract_prepare(uint8_t *map[3], int width, int height)
+int bgsubtract_prepare(uint8_t *map[4], int width, int height)
 {
 	if(!static_bg )
 	{

@@ -58,7 +58,7 @@ vj_effect *zoom_init(int width , int height)
 static int zoom_[4] = { 0,0,0,0 };
 static void *zoom_vp_ = NULL;
 
-static uint8_t *zoom_private_[3] = { NULL, NULL, NULL };
+static uint8_t *zoom_private_[4] = { NULL, NULL, NULL, NULL };
 
 int	zoom_malloc(int width, int height)
 {

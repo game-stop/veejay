@@ -1188,8 +1188,6 @@ int	vj_tag_verify_delete(int id, int type )
 				{
 					s->effect_chain[j]->channel = i;
 					s->effect_chain[j]->source_type = 1;
-	veejay_msg(VEEJAY_MSG_INFO, "Dereferenced mix entry %d of Stream %d",
-		j, i );
 					vj_tag_update( s, i );
 				}
 			}

@@ -40,7 +40,7 @@
 #define RIPPLE_VAL 180.0
 
 static double *ripple_table;
-static uint8_t *ripple_data[3];
+static uint8_t *ripple_data[4] = { NULL,NULL,NULL,NULL };
 static double *ripple_sin;
 static double *ripple_cos;
 

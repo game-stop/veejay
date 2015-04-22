@@ -18,6 +18,6 @@ Why YUV ?
 
 	- Many video codecs decode into some YUV flavour
 	- Many capture devices deliver YUV 
-	- Software conversion of RGB <-> YUV is expensive
-	- Consumes less bandwith then RGB
+	- Software conversion of RGB <-> YUV was expensive
+	- Consumes less memory bandwith then RGB
 

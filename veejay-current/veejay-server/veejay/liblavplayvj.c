@@ -2234,7 +2234,6 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
  * veejay_playback_cycle()
  *   the playback cycle
  ******************************************************/
-static double last_tdiff = 0.0;
 static void veejay_playback_cycle(veejay_t * info)
 {
     video_playback_stats stats;
@@ -3685,8 +3684,6 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm, int switch_jpeg)
 {
 	int ret = 0;
-   	 video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
 
 	switch( force_pix_fmt ) {
 			case 1: info->pixel_format = FMT_422;break;

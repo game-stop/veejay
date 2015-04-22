@@ -50,8 +50,8 @@
 #endif
 typedef struct
 {
-	uint8_t *proj_plane[3];
-	uint8_t *mirror_plane[3];
+	uint8_t *proj_plane[4];
+	uint8_t *mirror_plane[4];
 	void *vp1;
 	void *back1;
 	void *scaler;
@@ -268,7 +268,7 @@ void	*composite_load_config( void *compiz, void *vc, int *result )
 	return NULL;
 }
 
-int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
+int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
 {
 	composite_t *c = (composite_t*) compiz; 
 	if(viewport_external_mouse( c->vp1, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y )) {
@@ -287,7 +287,7 @@ static void	composite_scale( composite_t *c, VJFrame *input, VJFrame *output )
 	yuv_convert_and_scale(c->scaler,input,output);
 }
 
-int	composite_get_original_frame(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp, int row_start, int row_end )
+int	composite_get_original_frame(void *compiz, uint8_t *current_in[4], uint8_t *out[4], int which_vp, int row_start, int row_end )
 {
 	composite_t *c = (composite_t*) compiz;
 	if( c->has_mirror_plane ) {
@@ -301,7 +301,7 @@ int	composite_get_original_frame(void *compiz, uint8_t *current_in[3], uint8_t *
 	return -1;
 }
 
-int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp )
+int	composite_get_top(void *compiz, uint8_t *current_in[4], uint8_t *out[4], int which_vp )
 {
 	composite_t *c = (composite_t*) compiz;
 	int vp1_active = viewport_active(c->vp1);
@@ -335,7 +335,7 @@ int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int
 }
 
 /* Top frame, blit */
-void	composite_blit_yuyv( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
+void	composite_blit_yuyv( void *compiz, uint8_t *in[4], uint8_t *yuyv, int which_vp )
 {
 	composite_t *c = (composite_t*) compiz;
 	int vp1_active = viewport_active(c->vp1);
@@ -368,7 +368,7 @@ void	composite_blit_yuyv( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which
 
 //@OBSOLETE
 void	composite_blit_ycbcr( void *compiz, 
-			      uint8_t *in[3], 
+			      uint8_t *in[4], 
                               int which_vp,
 			      void *gl )
 {
