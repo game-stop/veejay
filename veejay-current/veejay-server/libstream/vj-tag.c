@@ -1769,7 +1769,7 @@ int vj_tag_continue_record( int t1 )
 	if(!tag) return -1;
 
 	long bytesRemaining = lav_bytes_remain( tag->encoder_file );
-	if( bytesRemaining < (512 * 1024) ) {
+	if( bytesRemaining >= 0 && bytesRemaining < (512 * 1024) ) {
 		tag->sequence_num ++;
 		veejay_msg(VEEJAY_MSG_WARNING,
 			"Auto splitting file, %ld frames left to record.",
