@@ -531,9 +531,9 @@ long	lav_bytes_remain( lav_file_t *lav_file )
 		case 'd':
  		  return AVI_bytes_remain( lav_file->avi_fd );
 		default:
-		 return 0;
+		 return -1;
 	} 
-	return 0;
+	return -1;
 }
 
 
@@ -1170,8 +1170,10 @@ int lav_set_audio_position(lav_file_t *lav_file, long clip)
 	return 0;
 #endif
 #ifdef HAVE_LIBQUICKTIME
-	if(video_format =='q'|| video_format == 'Q')
+	if(video_format =='q'|| video_format == 'Q' ) {
 		quicktime_set_audio_position(lav_file->qt_fd,clip,0);
+		return 1;
+	}
 #endif
    return (AVI_set_audio_position(lav_file->avi_fd,clip*lav_file->bps));
 }
