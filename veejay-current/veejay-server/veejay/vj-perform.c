@@ -203,8 +203,12 @@ static int vj_perform_previously_sampled(int chain_entry, int sub_id, int *ref )
 {
 	int i = 0;
 	for( i = chain_entry; i > 0; i -- ) {
+		if( frame_buffer[i]->ssm == -1 )
+			continue;
 		if( ref[i] == sub_id )
 			return frame_buffer[ i ]->ssm;
+
+		return frame_buffer[i]->ssm;
 	}
 	return 0;
 }
@@ -2008,7 +2012,6 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 			 		frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 			frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    			frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-					//frames[1]->ssm     = 0; 
 
 					int done   = 0;
 					int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
@@ -2254,7 +2257,7 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-				//frames[1]->ssm     = 0; 
+				
 				int done   = 0;
 				int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
 				if(do_ssm >= 0 ) {
@@ -3390,6 +3393,10 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 	info->effect_frame1->ssm = 0;
 	info->effect_frame2->ssm = 0;
+
+	for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+		frame_buffer[i]->ssm = -1;
+	}
 
 	switch (info->uc->playback_mode)
 	{
