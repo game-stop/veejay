@@ -3412,12 +3412,15 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 			sample->speed = info->settings->current_playback_speed;
 			veejay_msg(VEEJAY_MSG_INFO,"Created new sample %d from file %s",sample->sample_id,	files[0]);
 		}
-		else
+		else {
 			veejay_msg(VEEJAY_MSG_ERROR,"Failed to create new sample from file '%s'", files[0]);
+			return -1;
+		}
 	}
 
 	// free temporary values
    	if(files[0]) free(files[0]);
+
 
     return sample->sample_id;
 }
