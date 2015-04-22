@@ -40,11 +40,11 @@ vj_effect *chromascratcher_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 50; /* uses the chromamagick effect for scratchign */
+    ve->limits[1][0] = (MAX_SCRATCH_FRAMES-1); /* uses the chromamagick effect for scratchign */
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 50;
+    ve->limits[1][2] = 25;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
 
@@ -64,16 +64,15 @@ vj_effect *chromascratcher_init(int w, int h)
 int	chromascratcher_malloc(int w, int h)
 {
     cframe[0] =
-	(uint8_t *) vj_malloc( RUP8(w * h * 3) * 51 * sizeof(uint8_t) );
+	(uint8_t *) vj_malloc( RUP8(w * h * 3) * MAX_SCRATCH_FRAMES * sizeof(uint8_t) );
     if(!cframe[0]) return 0;			   
 
-    cframe[1] = cframe[0] + ( w * h * 50 );
-    cframe[2] = cframe[1] + ( w * h * 50 );
+    cframe[1] = cframe[0] + ( w * h * MAX_SCRATCH_FRAMES );
+    cframe[2] = cframe[1] + ( w * h * MAX_SCRATCH_FRAMES );
 
 
-    int strides[4] = { w * h * 50, w * h * 50, w * h * 50, 0 };
+    int strides[4] = { w * h * MAX_SCRATCH_FRAMES, w * h * MAX_SCRATCH_FRAMES, w * h * MAX_SCRATCH_FRAMES, 0 };
     vj_frame_clear( cframe, strides, 128 );
-	
 
     return 1;
 }
@@ -86,42 +85,45 @@ void chromascratcher_free() {
    cframe[2] = NULL;
 }
 
-void chromastore_frame(uint8_t *yuv1[3], int w, int h, int n, int no_reverse)
-{ 
-  	if( n == 0 && cnframe == 0 )
-		return;
+void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
+{
+	int strides[4] = { (w * h), (w*h), (w*h) , 0 };
+	uint8_t *Y = src->data[0];
+	uint8_t *Cb= src->data[1];
+	uint8_t *Cr= src->data[2];
 
-    if (cnframe >= n) {
-	if (no_reverse == 0) {
-	    cnreverse = 1;
-	    cnframe = n - 1;
-	    if( cnframe < 1 )
-		    cnframe = 1;
-	} else {
-	    cnframe = 0;
-	}
-    }
-    if (cnframe == 0)
-	cnreverse = 0;
+	uint8_t *dest[4] = {
+		cframe[0] + (w*h*cnframe),
+		cframe[1] + (w*h*cnframe),
+		cframe[2] + (w*h*cnframe),
+       		NULL	};
 
-    if (!cnreverse) {
-	veejay_memcpy(cframe[0] + (w * h * cnframe), yuv1[0], (w * h));
-	veejay_memcpy(cframe[1] + (w * h * cnframe), yuv1[1], (w * h));
-	veejay_memcpy(cframe[2] + (w * h * cnframe), yuv1[2], (w * h));
-    } else {
-	veejay_memcpy(yuv1[0], cframe[0] + (w * h * cnframe), (w * h));
-	veejay_memcpy(yuv1[1], cframe[1] + (w * h * cnframe), (w * h));
-	veejay_memcpy(yuv1[2], cframe[2] + (w * h * cnframe), (w * h));
-    }
+	if (!cnreverse) {
+		vj_frame_copy( src->data, dest, strides ); 
+    	} else {
+		vj_frame_copy( dest, src->data, strides );
+    	}
 
-     if (cnreverse)
-	cnframe = (cnframe - 1 ) % 50;
-    else
-	cnframe = (cnframe + 1) % 50;
+	if (cnreverse)
+		cnframe--;
+	else
+		cnframe++;
 
+	if (cnframe >= n) {
+		if (no_reverse == 0) {
+		    cnreverse = 1;
+		    cnframe = n - 1;
+		} else {
+		    cnframe = 0;
+		}
+    	}
 
+   	if (cnframe == 0)
+		cnreverse = 0;
 
 }
+
+
 
 void chromascratcher_apply(VJFrame *frame,
 			   int width, int height, int mode, int opacity,
@@ -141,72 +143,68 @@ void chromascratcher_apply(VJFrame *frame,
 	_tmp.data[2] = cframe[2];
 
     if(no_reverse != chroma_restart)
-	{
+    {
 		chroma_restart = no_reverse;
 		cnframe = n;
-	}
+    }
 
-    if (cnframe == 0)
-	{
-		veejay_memcpy(cframe[0] + (len * cnframe), Y, len);
-		veejay_memcpy(cframe[1] + (len * cnframe), Cb, len);
-		veejay_memcpy(cframe[2] + (len * cnframe), Cr, len);
+    if( cnframe == 0 ) {
+	_tmp.data[0] = frame->data[0];
+	_tmp.data[1] = frame->data[1];
+	_tmp.data[2] = frame->data[2];
     }
 
     if(mode>3) {
-		mode-=3;
-   	   chromamagick_apply( frame,&_tmp,width, height,mode,opacity);
+	   int matte_mode = mode - 3;
+   	   chromamagick_apply( frame,&_tmp,width, height,matte_mode,opacity);
     }
     else {
-
-
 	    switch (mode) {		/* scratching with a sequence of frames (no scene changes) */
 
-
-    case 0:
-		/* moving parts will dissapear over time */
+		case 0:
+			/* moving parts will dissapear over time */
+			for (i = 0; i < len; i++) {
+			    if (cframe[0][offset + i] < Y[i]) {
+					Y[i] = cframe[0][offset + i];
+					Cb[i] = cframe[1][offset + i];
+					Cr[i] = cframe[2][offset + i];
+			    }
+			}
+			break;
+   		 case 1:
+			for (i = 0; i < len; i++) {
+			    /* moving parts will remain visible */
+			    if (cframe[0][offset + i] > Y[i]) {
+					Y[i] = cframe[0][offset + i];
+					Cb[i] = cframe[1][offset + i];
+					Cr[i] = cframe[2][offset + i];
+		    		}
+			}
+		break;
+  	  case 2:
 		for (i = 0; i < len; i++) {
-		    if (cframe[0][offset + i] < Y[i]) {
+		    if ((cframe[0][offset + i] * op_a) < (Y[i] * op_b)) {
 				Y[i] = cframe[0][offset + i];
 				Cb[i] = cframe[1][offset + i];
-				Cr[i] = cframe[2][offset + i];
-		    }
+					Cr[i] = cframe[2][offset + i];
+	 	   }
 		}
-	break;
-    case 1:
+		break;
+	   case 3:
 		for (i = 0; i < len; i++) {
 		    /* moving parts will remain visible */
-		    if (cframe[0][offset + i] > Y[i]) {
-				Y[i] = cframe[0][offset + i];
-				Cb[i] = cframe[1][offset + i];
-				Cr[i] = cframe[2][offset + i];
-		    }
-		}
-	break;
-    case 2:
-	for (i = 0; i < len; i++) {
-	    if ((cframe[0][offset + i] * op_a) < (Y[i] * op_b)) {
+		    if ((cframe[0][offset + i] * op_a) > (Y[i] * op_b)) {
 			Y[i] = cframe[0][offset + i];
 			Cb[i] = cframe[1][offset + i];
 			Cr[i] = cframe[2][offset + i];
-	    }
-	}
-	break;
-    case 3:
-	for (i = 0; i < len; i++) {
-	    /* moving parts will remain visible */
-	    if ((cframe[0][offset + i] * op_a) > (Y[i] * op_b)) {
-		Y[i] = cframe[0][offset + i];
-		Cb[i] = cframe[1][offset + i];
-		Cr[i] = cframe[2][offset + i];
-	    }
-	}
-	break;
+		    }
+		}
+		break;
     
+		}
+
 	}
 
-	}   // else
 
-
-    chromastore_frame(frame->data, width, height, n, no_reverse);
+	chromastore_frame(frame->data, width, height, n, no_reverse);
 }

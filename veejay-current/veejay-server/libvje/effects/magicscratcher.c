@@ -59,6 +59,7 @@ int magicscratcher_malloc(int w, int h)
    mframe =
 	(uint8_t *) vj_calloc( RUP8(w * h) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
    if(!mframe) return 0;
+   vj_frame_clear1( mframe, w * h * MAX_SCRATCH_FRAMES, 0 );
    return 1;
 	
 }
@@ -91,7 +92,6 @@ void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
     if (m_frame == 0)
 	m_reverse = 0;
 
-     m_rerun = m_frame;
 }
 
 
@@ -152,29 +152,22 @@ void magicscratcher_apply(VJFrame *frame,
 
     func_y = get_pix_func_Y((const int) mode);
 
-    /* kill chroma in channel */
-	veejay_memset( Cb, 128, frame->uv_len);
-	veejay_memset( Cr, 128, frame->uv_len);
-
     if (m_frame == 0) {
-	if( m_rerun > 0 ) {
-	  veejay_memcpy( mframe + (len * m_rerun) , Y , len );  
-	  m_rerun = m_frame;
-         }
-	else {
   	  veejay_memcpy(mframe + (len * m_frame), Y, len);
- 	}
-	m_frame ++;
+	  if( m_rerun > 0 ) {
+		  veejay_memcpy( mframe + (len * m_rerun) , Y , len );  
+	  }
     }
 
     for (x = 0; x < len; x++) {
 		Y[x] = func_y( mframe[offset + x], Y[x]);
     }
-    if (m_frame > 0) {
-		veejay_memset(mframe + (len * (m_frame - 1)), 16, len);
-    }
+    
+    veejay_memset( Cb, 128, frame->uv_len);
+    veejay_memset( Cr, 128, frame->uv_len);
+
+    m_rerun = m_frame;
 
     store_mframe(frame->data, width, height, n, no_reverse);
 
-    //printf( "[%d] , reverse = %d, offset = %d, n = %d\n",m_frame,m_reverse,offset,n);
 }

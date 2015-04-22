@@ -27,7 +27,7 @@
 #include <sys/types.h>
 #include <libvje/vje.h>
 #include <math.h>
-#define MAX_SCRATCH_FRAMES 25
+#define MAX_SCRATCH_FRAMES 50
 #define func_opacity(a,b,p,q) (  ((a * p) + (b * q)) >> 8 )
 #define limit_luma(c)  ( c < 16 ? 16 : ( c > 235 ? 235 : c) )
 #define limit_chroma(c) ( c < 16 ? 16 :  ( c > 240 ? 240 : c) )
