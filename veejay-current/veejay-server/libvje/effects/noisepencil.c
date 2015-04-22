@@ -24,7 +24,7 @@
 #include <libvjmem/vjmem.h>
 #include "noisepencil.h"
 
-static uint8_t *Yb_frame;
+static uint8_t *Yb_frame = NULL;
 
 vj_effect *noisepencil_init(int width , int height)
 {
@@ -55,7 +55,6 @@ vj_effect *noisepencil_init(int width , int height)
     return ve;
 }
 
-//FIXME private
 int  noisepencil_malloc(int width,int height)
 {
   Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * width * height);

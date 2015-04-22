@@ -24,12 +24,13 @@
 #include "common.h"
 #include "chromascratcher.h"
 #include "chromamagick.h"
+#define    RUP8(num)(((num)+8)&~8)
 static uint8_t *cframe[3] = {NULL,NULL,NULL};
 static int cnframe = 0;
 static int cnreverse = 0;
 static int chroma_restart = 0;
 
-static VJFrame *_tmp;
+static VJFrame _tmp;
 
 vj_effect *chromascratcher_init(int w, int h)
 {
@@ -39,11 +40,11 @@ vj_effect *chromascratcher_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 25; /* uses the chromamagick effect for scratchign */
+    ve->limits[1][0] = 50; /* uses the chromamagick effect for scratchign */
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 25;
+    ve->limits[1][2] = 50;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
 
@@ -59,32 +60,27 @@ vj_effect *chromascratcher_init(int w, int h)
 
       return ve;
 }
-// FIXME private 
+
 int	chromascratcher_malloc(int w, int h)
 {
     cframe[0] =
-	(uint8_t *) vj_malloc(w * h * sizeof(uint8_t) * 25 * 3 );
+	(uint8_t *) vj_malloc( RUP8(w * h * 3) * 51 * sizeof(uint8_t) );
     if(!cframe[0]) return 0;			   
-    _tmp = (VJFrame*) vj_calloc(sizeof(VJFrame));
 
-    cframe[1] = cframe[0] + ( w * h * 25 );
-    cframe[2] = cframe[1] + ( w * h * 25 );
+    cframe[1] = cframe[0] + ( w * h * 50 );
+    cframe[2] = cframe[1] + ( w * h * 50 );
 
-	veejay_memset( cframe[0], 0,  (w*h*25));
-	veejay_memset( cframe[1], 128,(w*h*25));
-	veejay_memset( cframe[2], 128,(w*h*25));
-    
+    veejay_memset( &_tmp, 0,sizeof(VJFrame));
+
     return 1;
 }
 
 void chromascratcher_free() {
    if(cframe[0])
 	   free(cframe[0]);
-   if(_tmp) free(_tmp);
    cframe[0] = NULL;
    cframe[1] = NULL;
    cframe[2] = NULL;
-   _tmp = NULL;
 }
 
 void chromastore_frame(uint8_t * yuv1[3], int w, int h, int n,
@@ -132,10 +128,10 @@ void chromascratcher_apply(VJFrame *frame,
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-    veejay_memcpy( _tmp, frame, (sizeof(VJFrame)));
-	_tmp->data[0] = cframe[0];
-	_tmp->data[1] = cframe[1];
-	_tmp->data[2] = cframe[2];
+    veejay_memcpy( &_tmp, frame, (sizeof(VJFrame)));
+	_tmp.data[0] = cframe[0];
+	_tmp.data[1] = cframe[1];
+	_tmp.data[2] = cframe[2];
 
     if(no_reverse != chroma_restart)
 	{
@@ -152,7 +148,7 @@ void chromascratcher_apply(VJFrame *frame,
 
     if(mode>3) {
 		mode-=3;
-   	   chromamagick_apply( frame,_tmp,width, height,mode,opacity);
+   	   chromamagick_apply( frame,&_tmp,width, height,mode,opacity);
     }
     else {
 
