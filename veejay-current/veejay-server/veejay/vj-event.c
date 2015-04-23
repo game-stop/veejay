@@ -10107,7 +10107,6 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 	void *dict = select_dict( v, v->uc->sample_id );
 	if(!dict)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode for subtitles");
 		return;
 	}
 
@@ -10160,7 +10159,6 @@ void	vj_event_upd_subtitle(	void *ptr,	const char format[],	va_list	ap	)
         void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {
-                veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode for subtitles");
                 return;
         }
 
@@ -10184,7 +10182,6 @@ void	vj_event_del_subtitle(	void *ptr,	const char format[],	va_list	ap	)
         void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {
-                veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode for subtitles");
                 return;
         }
 
@@ -10209,7 +10206,6 @@ void	vj_event_font_set_position(	void *ptr,	const char format[],	va_list	ap	)
         void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {
-                veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode for subtitles");
                 return;
         }
 	vj_font_set_dict( v->font, dict );
@@ -10231,7 +10227,6 @@ void	vj_event_font_set_color(	void *ptr,	const char format[],	va_list	ap	)
 	void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {
-                veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode for subtitles");
                 return;
         }
         vj_font_set_dict( v->font, dict );
@@ -10276,7 +10271,6 @@ void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap
 	void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {
-                veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode for subtitles");
                 return;
         }
         vj_font_set_dict( v->font, dict );
