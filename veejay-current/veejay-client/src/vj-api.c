@@ -3182,8 +3182,7 @@ void	donatenow()
 {
 	char URL[512];
 	snprintf(URL , sizeof(URL),	
-	 "firefox \"http://www.veejayhq.net/donate\"" );
-
+	 "firefox \"http://www.veejayhq.net/contributing\"" );
 	printf(URL);
 
 	system(URL);
