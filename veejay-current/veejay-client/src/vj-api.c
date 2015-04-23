@@ -299,6 +299,8 @@ static 	int	NUM_SAMPLES_PER_PAGE = 12;
 static	int	NUM_SAMPLES_PER_COL = 6;
 static	int	NUM_SAMPLES_PER_ROW = 2;
 
+static int use_key_snoop = 0;
+
 #define MOD_OFFSET 200
 #define SEQUENCE_LENGTH 1024
 #define MEM_SLOT_SIZE 32
@@ -7098,6 +7100,14 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 
 
+	char *have_snoop = getenv( "RELOADED_KEY_SNOOP" );
+	if( have_snoop == NULL ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Use setenv RELOADED_KEY_SNOOP=1 to mirror veejay server keyb layout" );
+	}else {
+		use_key_snoop = atoi(have_snoop);
+		if( use_key_snoop < 0 || use_key_snoop > 1 )
+			use_key_snoop = 0;
+	}
 }
 
 void	vj_gui_preview(void)
@@ -7362,9 +7372,13 @@ gboolean		is_alive( int *do_sync )
 		else
 		{
 			info->watch.state = STATE_PLAYING;
+
+			if( use_key_snoop ) {
+
 #ifdef HAVE_SDL
-			info->key_id = gtk_key_snooper_install( key_handler , NULL);
+				info->key_id = gtk_key_snooper_install( key_handler , NULL);
 #endif
+			}
 			multrack_audoadd( info->mt, remote, port );
 			*do_sync = 1;
 			if( user_preview ) {
@@ -7407,6 +7421,7 @@ void	vj_gui_disconnect()
 	multitrack_close_track(info->mt);
 
 	reloaded_schedule_restart();
+	info->key_id = 0;
 }
 
 void	vj_gui_disable()
