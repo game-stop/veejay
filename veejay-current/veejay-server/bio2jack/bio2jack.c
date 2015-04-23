@@ -76,36 +76,30 @@ static struct timespec timer_now;
 #endif
 
 #if TRACE_ENABLE
-#define TRACE(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
-         fflush(OUTFILE);
+#define TRACE(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);
 #else
 #define TRACE(...)
 #endif
 
 #if DEBUG_OUTPUT
-#define DEBUG(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
-         fflush(OUTFILE);
+#define DEBUG(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);
 #else
 #define DEBUG(...)
 #endif
 
 #if TRACE_CALLBACK
-#define CALLBACK_TRACE(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
-         fflush(OUTFILE);
+#define CALLBACK_TRACE(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);
 #else
 #define CALLBACK_TRACE(...)
 #endif
 
 #if ENABLE_WARNINGS
-#define WARN(format,args...) veejay_msg(1, "WARN: %s::%s(%d) "format, __FILE__,__FUNCTION__,__LINE__,##args);	\
-         fflush(OUTFILE);
+#define WARN(format,args...) veejay_msg(1, "bio2jack: "format,##args);	
 #else
 #define WARN(...)
 #endif
 
-#define ERR(format,args...) veejay_msg(0, "ERR: %s::%s(%d) "format, __FILE__,__FUNCTION__,__LINE__,##args);	\
-         fflush(OUTFILE);
-
+#define ERR(format,args...) veejay_msg(0, "bio2jack: "format,##args);	
 #define min(a,b)   (((a) < (b)) ? (a) : (b))
 #define max(a,b)   (((a) < (b)) ? (b) : (a))
 
@@ -294,7 +288,7 @@ getDriver(int deviceID)
   jack_driver_t *drv = &outDev[deviceID];
 
   if(pthread_mutex_lock(&drv->mutex) != 0)
-    ERR("lock returned an error\n");
+    ERR("lock returned an error");
 
   /* should we try to restart the jack server? */
   if(drv->jackd_died && drv->client == 0)
@@ -337,7 +331,7 @@ tryGetDriver(int deviceID)
     return 0;
   }
 
-  ERR("lock returned an error\n");
+  ERR("lock returned an error");
   return 0;
 }
 
@@ -348,7 +342,7 @@ tryGetDriver(int deviceID)
    really need to know when the lock was release for the sake of debugging.
 */
 #if TRACE_getReleaseDevice
-#define releaseDriver(x) TRACE("releasing driver %d\n",x->deviceID); _releaseDriver(x);
+#define releaseDriver(x) TRACE("releasing driver %d",x->deviceID); _releaseDriver(x);
 void
 _releaseDriver(jack_driver_t * drv)
 #else
@@ -362,7 +356,7 @@ releaseDriver(jack_driver_t * drv)
      #endif
    */
   if(pthread_mutex_unlock(&drv->mutex) != 0)
-    ERR("lock returned an error\n");
+    ERR("lock returned an error");
 }
 
 
@@ -540,7 +534,7 @@ JACK_callback(nframes_t nframes, void *arg)
                  sizeof(sample_t));
 
   if(!drv->client)
-    ERR("client is closed, this is weird...\n");
+    ERR("client is closed, this is weird...");
 
   sample_t *out_buffer[MAX_OUTPUT_PORTS];
   /* retrieve the buffers for the output ports */
@@ -661,7 +655,7 @@ JACK_callback(nframes_t nframes, void *arg)
 
       if(!ensure_buffer_size(&drv->callback_buffer1, &drv->callback_buffer1_size, jack_bytes))
       {
-        ERR("allocated %lu bytes, need %lu bytes\n",
+        ERR("allocated %lu bytes, need %lu bytes",
             drv->callback_buffer1_size, jack_bytes);
         return -1;
       }
@@ -689,7 +683,7 @@ JACK_callback(nframes_t nframes, void *arg)
             write_space = jack_ringbuffer_write_space(drv->pRecPtr);
             if(write_space < jack_bytes)
             {
-             ERR("buffer overrun of %ld bytes\n", jack_bytes - write_space);
+             ERR("buffer overrun of %ld bytes", jack_bytes - write_space);
              jack_ringbuffer_read_advance(drv->pRecPtr, jack_bytes - write_space);
             }
 	          releaseDriver(drv);
@@ -806,7 +800,7 @@ JACK_shutdown(void *arg)
     ERR("unable to reconnect with jack\n");
   }*/
   
-  ERR("unable to reconnect with jack\n");
+  ERR("unable to reconnect with jack");
 
   veejay_msg(VEEJAY_MSG_ERROR, "Cannot recover from this error! You will probably need to restart for Audio playback.");
 
@@ -823,7 +817,7 @@ JACK_shutdown(void *arg)
 static void
 JACK_Error(const char *desc)
 {
-  ERR("%s\n", desc);
+  ERR("%s", desc);
 }
 
 
@@ -878,7 +872,7 @@ JACK_OpenDevice(jack_driver_t * drv)
     TRACE("trying once more to jack_client_new");
     if((drv->client = jack_client_new(our_client_name)) == 0)
     {
-      ERR("jack server not running?\n");
+      ERR("jack server not running?");
       free(our_client_name);
       return ERR_OPENING_JACK;
     }
@@ -957,7 +951,7 @@ JACK_OpenDevice(jack_driver_t * drv)
   TRACE("calling jack_activate()\n");
   if(jack_activate(drv->client))
   {
-    ERR("cannot activate client\n");
+    ERR("cannot activate client");
     return ERR_OPENING_JACK;
   }
 
@@ -1013,7 +1007,7 @@ JACK_OpenDevice(jack_driver_t * drv)
         TRACE("jack_connect() to port %d('%p')\n", i, drv->output_port[i]);
         if(jack_connect(drv->client, jack_port_name(drv->output_port[i]), ports[i]))
         {
-          ERR("cannot connect to output port %d('%s')\n", i, ports[i]);
+          ERR("cannot connect to output port %d('%s')", i, ports[i]);
           failed = 1;
         }
       }
@@ -1034,7 +1028,7 @@ JACK_OpenDevice(jack_driver_t * drv)
                   if(jack_connect(drv->client, jack_port_name(drv->output_port[n]), ports[i]))
                   {
                       // non fatal
-                      ERR("cannot connect to output port %d('%s')\n", n, ports[i]);
+                      ERR("cannot connect to output port %d('%s')", n, ports[i]);
                   }
               }
           }
@@ -1047,7 +1041,7 @@ JACK_OpenDevice(jack_driver_t * drv)
                   if(jack_connect(drv->client, jack_port_name(drv->output_port[i]), ports[n]))
                   {
                       // non fatal
-                      ERR("cannot connect to output port %d('%s')\n", i, ports[n]);
+                      ERR("cannot connect to output port %d('%s')", i, ports[n]);
                   }
               }
           }
@@ -1066,7 +1060,7 @@ JACK_OpenDevice(jack_driver_t * drv)
 
         if(!ports)
         {
-          ERR("jack_get_ports() failed to find ports with jack port flags of 0x%lX'\n",
+          ERR("jack_get_ports() failed to find ports with jack port flags of 0x%lX'",
               drv->jack_output_port_flags);
           return ERR_PORT_NOT_FOUND;
         }
@@ -1077,7 +1071,7 @@ JACK_OpenDevice(jack_driver_t * drv)
         TRACE("jack_connect() to port %d('%p')\n", i, drv->output_port[i]);
         if(jack_connect(drv->client, jack_port_name(drv->output_port[i]), ports[0]))
         {
-          ERR("cannot connect to output port %d('%s')\n", 0, ports[0]);
+          ERR("cannot connect to output port %d('%s')", 0, ports[0]);
           failed = 1;
         }
         free(ports);            /* free the returned array of ports */
@@ -1135,7 +1129,7 @@ JACK_OpenDevice(jack_driver_t * drv)
         TRACE("jack_connect() to port %d('%p')\n", i, drv->input_port[i]);
         if(jack_connect(drv->client, ports[i], jack_port_name(drv->input_port[i])))
         {
-          ERR("cannot connect to input port %d('%s')\n", i, ports[i]);
+          ERR("cannot connect to input port %d('%s')", i, ports[i]);
           failed = 1;
         }
       }
@@ -1152,7 +1146,7 @@ JACK_OpenDevice(jack_driver_t * drv)
           if(jack_connect(drv->client, ports[i], jack_port_name(drv->input_port[n])))
           {
             // non fatal
-            ERR("cannot connect to input port %d('%s')\n", n, ports[i]);
+            ERR("cannot connect to input port %d('%s')", n, ports[i]);
           }
         }
       }
@@ -1165,7 +1159,7 @@ JACK_OpenDevice(jack_driver_t * drv)
           if(jack_connect(drv->client, ports[n], jack_port_name(drv->input_port[i])))
           {
             // non fatal
-            ERR("cannot connect to input port %d('%s')\n", i, ports[n]);
+            ERR("cannot connect to input port %d('%s')", i, ports[n]);
           }
         }
       }
@@ -1183,7 +1177,7 @@ JACK_OpenDevice(jack_driver_t * drv)
 
         if(!ports)
         {
-          ERR("jack_get_ports() failed to find ports with jack port flags of 0x%lX'\n",
+          ERR("jack_get_ports() failed to find ports with jack port flags of 0x%lX'",
               drv->jack_input_port_flags);
           return ERR_PORT_NOT_FOUND;
         }
@@ -1194,7 +1188,7 @@ JACK_OpenDevice(jack_driver_t * drv)
         TRACE("jack_connect() to port %d('%p')\n", i, drv->input_port[i]);
         if(jack_connect(drv->client, jack_port_name(drv->input_port[i]), ports[0]))
         {
-          ERR("cannot connect to input port %d('%s')\n", 0, ports[0]);
+          ERR("cannot connect to input port %d('%s')", 0, ports[0]);
           failed = 1;
         }
         free(ports);            /* free the returned array of ports */
@@ -1251,8 +1245,7 @@ JACK_CloseDevice(jack_driver_t * drv)
       TRACE("after jack_deactivate()\n");
       int errorCode = jack_client_close(drv->client);
       if(errorCode)
-        ERR("jack_client_close() failed returning an error code of %d\n",
-            errorCode);
+        ERR("jack_client_close() failed returning an error code of %d", errorCode);
     }
 
     /* reset client */
@@ -1358,7 +1351,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
 
   if(input_channels < 1 && output_channels < 1)
   {
-    ERR("no input OR output channels, nothing to do\n");
+    ERR("no input OR output channels, nothing to do");
     return ERR_OPENING_JACK;
   }
 
@@ -1368,7 +1361,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
   case 16:
     break;
   default:
-    ERR("invalid bits_per_channel\n");
+    ERR("invalid bits_per_channel");
     return ERR_OPENING_JACK;
   }
 
@@ -1387,7 +1380,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
 
   if(!drv)
   {
-    ERR("no more devices available\n");
+    ERR("no more devices available");
     return ERR_OPENING_JACK;
   }
 
@@ -1399,7 +1392,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
 
   if(output_channels > MAX_OUTPUT_PORTS)
   {
-    ERR("output_channels == %d, MAX_OUTPUT_PORTS == %d\n", output_channels,
+    ERR("output_channels == %d, MAX_OUTPUT_PORTS == %d", output_channels,
         MAX_OUTPUT_PORTS);
     releaseDriver(drv);
     pthread_mutex_unlock(&device_mutex);
@@ -1408,7 +1401,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
 
   if(input_channels > MAX_INPUT_PORTS)
   {
-    ERR("input_channels == %d, MAX_INPUT_PORTS == %d\n", input_channels,
+    ERR("input_channels == %d, MAX_INPUT_PORTS == %d", input_channels,
         MAX_INPUT_PORTS);
     releaseDriver(drv);
     pthread_mutex_unlock(&device_mutex);
@@ -1425,7 +1418,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
      && ((jack_port_name_count < output_channels)
          || (jack_port_name_count < input_channels)))
   {
-    ERR("specified individual port names but not enough, gave %d names, need %d\n",
+    ERR("specified individual port names but not enough, gave %d names, need %d",
        jack_port_name_count, output_channels);
     releaseDriver(drv);
     pthread_mutex_unlock(&device_mutex);
@@ -1630,7 +1623,7 @@ JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
   long jack_bytes = frames * drv->bytes_per_jack_output_frame;
   if(!ensure_buffer_size(&drv->rw_buffer1, &drv->rw_buffer1_size, jack_bytes))
   {
-    ERR("couldn't allocate enough space for the buffer\n");
+    ERR("couldn't allocate enough space for the buffer");
     releaseDriver(drv);
     return 0;
   }
@@ -1712,7 +1705,7 @@ JACK_Read(int deviceID, unsigned char *data, unsigned long bytes)
   long jack_bytes = frames * drv->bytes_per_jack_input_frame;
   if(!ensure_buffer_size(&drv->rw_buffer1, &drv->rw_buffer1_size, jack_bytes))
   {
-    ERR("couldn't allocate enough space for the buffer\n");
+    ERR("couldn't allocate enough space for the buffer");
     releaseDriver(drv);
     return 0;
   }
@@ -1834,7 +1827,7 @@ JACK_GetVolumeForChannel(int deviceID, unsigned int channel,
   /* ensure that we have the channel we are getting volume for */
   if(channel > (drv->num_output_channels - 1))
   {
-    ERR("asking for channel index %d but we only have %ld channels\n", channel, drv->num_output_channels);
+    ERR("asking for channel index %d but we only have %ld channels", channel, drv->num_output_channels);
     releaseDriver(drv);
     return;
   }
@@ -2490,7 +2483,7 @@ JACK_SetClientName(char *name)
     if(client_name)
       snprintf(client_name, size, "%s", name);
     else
-      ERR("unable to allocate %d bytes for client_name\n", size);
+      ERR("unable to allocate %d bytes for client_name", size);
   }
 }
 

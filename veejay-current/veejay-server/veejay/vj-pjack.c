@@ -52,7 +52,7 @@ static int _vj_jack_start(int *dri)
 		switch(err)
 		{
 			case ERR_OPENING_JACK:
-			  veejay_msg(0, "Unable to open Jackd (is jackd running?");
+			  veejay_msg(0, "Unable to make a connection with Jack" );
 			  break;
 			case ERR_RATE_MISMATCH:
 			  veejay_msg(0, "Jackd cannot handle samplerate of %d Hz", audio_rate);
