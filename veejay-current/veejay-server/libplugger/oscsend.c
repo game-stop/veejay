@@ -28,9 +28,6 @@
 #include <lo/lo.h>
 
 //@ client side implementation
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 typedef struct
 {
@@ -106,10 +103,6 @@ static	void veejay_add_arguments_ ( lo_message lmsg, const char *format, va_list
 				lo_message_add_double( lmsg, g); }
 				break;
 			default:
-#ifdef STRICT_CHECKING
-				veejay_msg(0, "Invalid format : '%c' %x",*format,*format);
-				assert(0);
-#endif
 				break;
 		}
 		*format ++;
@@ -172,9 +165,6 @@ static	int	_vevo_get_int( void *port, const char *key, int n_elem, lo_message lm
 	for( i = 0; i < n_elem; i ++ )
 	{
 		error = vevo_property_get( port, key, i, &(values[i]));
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		lo_message_add_int32( lmsg, values[i]);
 
 	}
@@ -193,9 +183,6 @@ static	int	_vevo_get_dbl( void *port, const char *key, int n_elem, lo_message lm
 	for( i = 0; i < n_elem; i ++ )
 	{
 		error = vevo_property_get( port, key, i, &(values[i]));
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		lo_message_add_double( lmsg, values[i]);
 	}
 	return VEVO_NO_ERROR;
@@ -205,9 +192,6 @@ int	veejay_vevo_send_osc( void *osc, const char *msg, void *vevo_port )
 {
 	char  **keys = vevo_list_properties( vevo_port );
 	int i;
-#ifdef STRICT_CHECKING
-	assert( keys != NULL );
-#endif
 	lo_message lmsg = lo_message_new();
 	oscclient_t *c  = (oscclient_t*) osc;
 
@@ -215,10 +199,6 @@ int	veejay_vevo_send_osc( void *osc, const char *msg, void *vevo_port )
 	for ( i = 0; keys[i] != NULL; i ++ )
 	{
 		char *format = vevo_format_kind( vevo_port, keys[i] );
-#ifdef STRICT_CHECKING
-		assert( format != NULL );
-#endif
-
 		int n_elems = vevo_property_num_elements( vevo_port, keys[i] );
 
 		while( *format )
@@ -232,9 +212,6 @@ int	veejay_vevo_send_osc( void *osc, const char *msg, void *vevo_port )
 					_vevo_get_dbl( vevo_port, keys[i], n_elems, lmsg );
 					break;
 				default:
-#ifdef STRICT_CHECKING
-					assert(0);
-#endif
 					break;
 			}
 			*format++;
@@ -263,9 +240,6 @@ void	veejay_xbundle_add( void *osc, const char *window, const char *widget, cons
 	{
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message lmsg = lo_message_new();
 
 	if(!window)
@@ -290,9 +264,6 @@ void	veejay_bundle_add_blobs( void *osc, const char *msg, void *blub, void *blab
 	{
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message lmsg = lo_message_new();
 	lo_blob    blob = (lo_blob) blub;
 	lo_blob    blob2 = (lo_blob) blab;
@@ -311,9 +282,6 @@ void	veejay_bundle_add_blob( void *osc, const char *msg, void *blub )
 	{
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message lmsg = lo_message_new();
 	lo_blob    blob = (lo_blob) blub;
 	lo_message_add_blob( lmsg, blob );
@@ -327,9 +295,6 @@ void	veejay_bundle_add( void *osc, const char *msg, const char *format, ... )
 	{
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message lmsg = lo_message_new();
 	
 	lo_message_add_string(lmsg, c->window );
@@ -404,9 +369,6 @@ void	*veejay_message_new_widget( void *osc, const char *str1,const char *str2, i
 void	veejay_message_widget_done( void *osc, void *msg )
 {
 	oscclient_t *c = (oscclient_t*) osc;
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message	*lmsg = (lo_message*) msg;
 	lo_bundle_add_message( c->bundle, "/create/channels", lmsg );
 }
@@ -414,9 +376,6 @@ void	veejay_message_widget_done( void *osc, void *msg )
 void	veejay_message_add_argument( void *osc, void *msg, const char *format, ... )
 {
 	oscclient_t *c = (oscclient_t*) osc;
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message	*lmsg = (lo_message*) msg;
 
 	va_list ap;
@@ -427,27 +386,18 @@ void	veejay_message_add_argument( void *osc, void *msg, const char *format, ... 
 void	veejay_message_pulldown_done( void *osc, void *msg )
 {
 	oscclient_t *c = (oscclient_t*) osc;
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message	*lmsg = (lo_message*) msg;
 	lo_bundle_add_message( c->bundle, "/create/pulldown", lmsg );
 }
 void	veejay_message_pulldown_done_update( void *osc, void *msg )
 {
 	oscclient_t *c = (oscclient_t*) osc;
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message	*lmsg = (lo_message*) msg;
 	lo_bundle_add_message( c->bundle, "/update/pulldown", lmsg );
 }
 void	veejay_message_linked_pulldown_done( void *osc, void *msg )
 {
 	oscclient_t *c = (oscclient_t*) osc;
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message	*lmsg = (lo_message*) msg;
 	lo_bundle_add_message( c->bundle, "/create/fxpulldown", lmsg );
 }
@@ -465,10 +415,6 @@ void	veejay_bundle_plugin_add( void *osc, const char *window, const char *path, 
 	lo_message_add_string(lmsg, path );
 
 	int n_elem = strlen( format );
-#ifdef STRICT_CHECKING
-	assert( n_elem == 1 );
-#endif
-	
 	int ival;
 	char *str;
 	double gval;
@@ -533,9 +479,6 @@ void	veejay_bundle_sample_add( void *osc, int id, const char *word, const char *
 {
 	char osc_path[256];
 	oscclient_t *c = (oscclient_t*) osc;
-#ifdef STRICT_CHECKING
-	assert( c->window != NULL );
-#endif
 	if(!c->bundle)
 	{
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
@@ -719,9 +662,6 @@ void	veejay_ui_bundle_add( void *osc, const char *msg, const char *format, ... )
 	{
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
-#ifdef STRICT_CHECKING
-	assert( c->bundle != NULL );
-#endif
 	lo_message lmsg = lo_message_new();
 	
 	va_list ap;

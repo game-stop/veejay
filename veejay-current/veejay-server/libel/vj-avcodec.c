@@ -35,10 +35,6 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libel/av.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 
 //from gst-ffmpeg, round up a number
 #define GEN_MASK(x) ((1<<(x))-1)

@@ -35,9 +35,6 @@
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
 #include <libyuv/yuvconv.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #define    RUP8(num)(((num)+8)&~8)
 
 typedef struct
@@ -217,16 +214,16 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			ulen = len / 2;
 			break;
 		default:
-#ifdef STRICT_CHECKING
-		assert(0);
-#endif
 			break;
 	}
 
 	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * (4 * len));
-#ifdef STRICT_CHECKING
-		assert(pic->space != NULL );
-#endif
+	if(!pic->space) {
+		free(pic->filename);
+		free(pic);
+		return NULL;
+	}
+
 	pic->img = open_pixbuf(
 			pic,
 			filename,	
@@ -238,6 +235,8 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			pic->space + len + ulen );
 	if(!pic->img) {
 		free(pic->space);
+		free(pic->filename);
+		free(pic);
 		return NULL;
 	}
 

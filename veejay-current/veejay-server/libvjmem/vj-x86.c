@@ -30,9 +30,6 @@
 #include <errno.h>
 #include <libvje/vje.h>
 #include <veejay/vj-task.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 extern void find_best_memcpy(void);
 extern void find_best_memset(void);
 extern void yuyv_plane_init();
@@ -220,9 +217,6 @@ void *vj_malloc_(size_t size)
 	void *ptr = NULL;
 #ifdef HAVE_POSIX_MEMALIGN
 	size_t aligned_size = (size + 3) & ~0x03;
-#ifdef STRICT_CHECKING
-	assert( MEM_ALIGNMENT_SIZE > 0 );
-#endif
 	int err = posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, aligned_size );
 	if( err == EINVAL )
 	{
@@ -236,9 +230,6 @@ void *vj_malloc_(size_t size)
 	}
 #else
 #ifdef HAVE_MEMALIGN
-#ifdef STRICT_CHECKING
-	assert( MEM_ALIGNMENT_SIZE > 0 );
-#endif
 	ptr = memalign( MEM_ALIGNMENT_SIZE, size );
 #else	
 	ptr = malloc ( size ) ;

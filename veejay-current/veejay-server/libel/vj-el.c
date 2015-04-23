@@ -66,10 +66,6 @@
 #define CODEC_ID_YUVLZO 900
 #define DUMMY_FRAMES 2
 
-//@@ !
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 static struct
 {
 	const char *name;
@@ -363,9 +359,6 @@ void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 	el_height_ = dh;
 	el_fps_ = fps;
 
-#ifdef STRICT_CHECKING
-	assert( pf == FMT_422 || pf == FMT_422F );
-#endif
 	el_switch_jpeg_ = switch_jpeg;
 
 	lav_set_project( dw,dh, fps, pf );
@@ -990,9 +983,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 				N_EL_FRAME(n));
 			return -1;
 		}
-#ifdef STRICT_CHECKING
-		assert( dst[0] != NULL  && dst[1] != NULL && dst[2] != NULL );
-#endif	
 		int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len,0 };
 		vj_frame_copy( srci->data, dst, strides );
                 return 1;     
@@ -1772,9 +1762,6 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	char	filename[2048];		    //@ TRACE
 	char	fourcc[6];                  //@ TRACE
 
-#ifdef STRICT_CHECKING
-	int	dbg_buflen = 0;
-#endif
 	/* get which files are actually referenced in the edit list entries */
 
 	int est_len = 0;
@@ -1830,9 +1817,6 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
  
 	est_len = 2 * len;
 
-#ifdef STRICT_CHECKING
-	dbg_buflen = est_len;
-#endif
 	result = (char*) vj_calloc(sizeof(char) * est_len );
 	sprintf(result, "%04d",nnf );
 
@@ -1882,9 +1866,6 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 
 	int datalen = strlen(result);
 	*bytes_written =  datalen;
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG, "EL estimated %d bytes, %d remaining bytes, %d used bytes",est_len,dbg_buflen,datalen);
-#endif	
 	return result;
 }
 

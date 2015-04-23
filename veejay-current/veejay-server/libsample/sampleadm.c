@@ -1013,9 +1013,6 @@ void	*sample_get_plugin( int s1, int position, void *ptr)
 
 int sample_get_effect_any(int s1, int position) {
 	sample_info *sample = sample_get(s1);
-#ifdef STRICT_CHECKING
-	assert( position >= 0 && position < SAMPLE_MAX_EFFECTS );
-#endif
 	//	if(position >= SAMPLE_MAX_EFFECTS || position < 0 ) return -1;
 	if(sample) {
 		return sample->effect_chain[position]->effect_id;
@@ -1552,19 +1549,12 @@ int	sample_load_composite_config( void *compiz, int s1 )
 	int val = 0;
 	void *temp = composite_load_config( compiz, sample->viewport_config , &val );
 	if( temp == NULL || val == -1 ) {
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG,"No composite config for sample %d",s1);
-#endif
 		return 0;
 	}
 	
 	sample->composite = val;
 	sample->viewport  = temp;
 	sample_update(sample,s1);
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG, "Loaded config for sample %d, mode %d",
-			s1, val );
-#endif
 	return sample->composite;
 }
 
@@ -1591,10 +1581,6 @@ int	sample_set_composite(void *compiz, int s1, int composite)
 		sample->composite = 1; 
 		return sample_update(sample,s1);
 	}
-#ifdef STRICT_CHECKING
-	assert( sample->viewport_config != NULL );
-	assert( compiz != NULL );
-#endif
 	composite_add_to_config( compiz, sample->viewport_config, composite );
 
 	return ( sample_update(sample,s1));
@@ -1815,9 +1801,6 @@ int sample_set_endframe(int s1, long frame_num)
 
     if(sample->play_length)
     {
-#ifdef STRICT_CHECKING
-	assert( sample->edit_list != NULL );
-#endif
 	int new_len = ( frame_num - sample->first_frame );
 	if( new_len <= 1 )
 		new_len = 1;
@@ -2482,9 +2465,6 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 
     	if (!sample)
     	{
-#ifdef STRICT_CHECKING
-		veejay_msg(0, "Fatal : sample %d is invalid, cannot produce a valid status line", s1 );
-#endif
 		return -1;
 	}
 	int e_a, e_d, e_s;
@@ -3265,10 +3245,7 @@ void	LoadSubtitles( sample_info *skel, char *file, void *font )
 {
 	char tmp[512];
 
-	sprintf(tmp, "%s-SUB-%d.srt", file,skel->sample_id );
-#ifdef STRICT_CHECKING
-	assert( skel->dict != NULL );
-#endif
+	snprintf(tmp,sizeof(tmp), "%s-SUB-%d.srt", file,skel->sample_id );
 	vj_font_load_srt( font, tmp );
 }
 

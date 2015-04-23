@@ -37,10 +37,6 @@
 #define DV_NTSC_SIZE 120000
 #define DV_AUDIO_MAX_SAMPLES 1944
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 int	is_dv_resolution(int w, int h)
 {
 	if( h == NTSC_H && w == NTSC_W )

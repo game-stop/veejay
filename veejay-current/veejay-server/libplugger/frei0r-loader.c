@@ -40,9 +40,6 @@
 #include <stdio.h>
 #include <libplugger/portdef.h>
 #include <libplugger/defaults.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 #include <libplugger/specs/frei0r.h>
 #define    RUP8(num)(((num)+8)&~8)
@@ -224,10 +221,6 @@ void	frei0r_plug_param_f( void *port, int num_args, int *args )
 	if( err != VEVO_NO_ERROR ) {
 		return;
 	}
-#ifdef STRICT_CHECKING
-	f0r_get_param_value_f w = NULL;
-	vevo_property_get( parent, "get_params", 0, &w );
-#endif
 	int width = 1;
 	int height = 1;
 

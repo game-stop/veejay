@@ -16,10 +16,6 @@
 #include <libvjmem/vjmem.h>
 #include "pool.h"
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 //! \typedef space_t structure
 /*! The space_t structure is a linked list of spaces.
    Each space has a magazine that can hold up to ROUNDS_PER_MAG rounds.
@@ -42,9 +38,6 @@ typedef struct
 {
 	space_t **spaces;	/*!<  array of spaces */
 	space_t *space;		/*!<  single space */
-#ifdef STRICT_CHECKING
-	int	msize;
-#endif
 } pool_t;
 
 //!Allocate a new space of a fixed size
@@ -58,9 +51,6 @@ static space_t	*alloc_space( size_t bs )
 	unsigned char *p;
 	space_t *s;
 	s = (space_t*) vj_malloc(sizeof(space_t));
-#ifdef STRICT_CHECKING
-	assert( s != NULL );
-#endif
 	s->area = vj_calloc(bs * (ROUNDS_PER_MAG+1));
 	s->mag  = vj_calloc( sizeof(void*) * (ROUNDS_PER_MAG + 2) );
 	
@@ -77,12 +67,7 @@ static space_t	*alloc_space( size_t bs )
 
 int	vevo_pool_size( void *p )
 {
-#ifdef STRICT_CHECKING
-	pool_t *pool = (pool_t*) p;
-	return pool->msize;
-#else
 	return 0;
-#endif
 }
 
 //! Allocate a new pool with spaces of various fixed sizes
@@ -97,9 +82,6 @@ void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t
 {
 	unsigned int Msize = Mend + 1;
 	pool_t *p = (pool_t*) vj_malloc(sizeof(pool_t)); //@ FIXME: reachable
-#ifdef STRICT_CHECKING
-	assert( p != NULL );
-#endif
 	p->space = NULL;
 	p->spaces = (space_t**) vj_malloc(sizeof(space_t*) * Msize );
 	p->spaces[M4b] = alloc_space( sizeof(int32_t) );
@@ -111,22 +93,6 @@ void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t
 	p->spaces[Matom] = alloc_space( atom_size );
 	p->spaces[Midx]  = alloc_space( index_size );
 	p->spaces[Mend] = NULL;
-#ifdef STRICT_CHECKING
-	int sp_size = sizeof(space_t);
-	int n       = sizeof(void*) * (ROUNDS_PER_MAG+1);
-	int na      = ROUNDS_PER_MAG;
-
-	p->msize = sizeof(space_t*) * Msize;
-	p->msize += (na * sizeof(int32_t)) + sp_size + n;
-	p->msize += (na * sizeof(double)) + sp_size + n;
-	p->msize += (na * sizeof(void*)) + sp_size + n;
-	p->msize += (na * sizeof(uint64_t)) + sp_size + n;
-	p->msize += (na * sizeof(prop_size)) + sp_size +n;
-	p->msize += (na * stor_size) + sp_size + n;
-	p->msize += (na * atom_size) + sp_size + n;
-	p->msize += (na * index_size) + sp_size + n;
-	p->msize += sizeof(pool_t);
-#endif
 	return (void*)p;
 }
 
@@ -140,10 +106,6 @@ void	*vevo_pool_slice_init( size_t node_size )
 	pool_t *p = (pool_t*) malloc(sizeof(pool_t));
 	p->spaces = NULL;
 	p->space = alloc_space( node_size );
-#ifdef STRICT_CHECKING
-	p->msize += node_size;
-	p->msize += sizeof(pool_t);
-#endif
 	return p;	
 }
 

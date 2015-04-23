@@ -17,9 +17,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -148,10 +145,6 @@ int		vj_shm_read( void *vv , uint8_t *dst[4] )
 {
 	vj_shm_t *v         = (vj_shm_t*) vv;
 	vj_shared_data *data = (vj_shared_data*) v->sms;
-#ifdef STRICT_CHECKING
-	assert( v->parent == 0 );
-	assert( v->sms != NULL );
-#endif
 	int res = pthread_rwlock_rdlock( &data->rwlock );
 	if( res == -1 ) {
 	//	veejay_msg(0, "%s",strerror(errno));
@@ -185,9 +178,6 @@ int		vj_shm_write( void *vv, uint8_t *frame[4], int plane_sizes[4] )
 {
 	vj_shm_t *v         = (vj_shm_t*) vv;
 	vj_shared_data *data = (vj_shared_data*) v->sms;
-#ifdef STRICT_CHECKING
-	assert( v->parent == 1 );
-#endif
 
 	//@ call wrlock_wrlock N times before giving up ..
 
@@ -325,14 +315,7 @@ static 	void	failed_init_cleanup( vj_shm_t *v )
 //@ new producer, puts frame in shm
 void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 {
-#ifdef STRICT_CHECKING
-	assert( frame->width > 0 );
-	assert( frame->height > 0 );
-#endif
 	vj_shm_t *v = (vj_shm_t*) vj_calloc(sizeof(vj_shm_t));
-#ifdef STRICT_CHECKING
-	assert( v != NULL );
-#endif	
 	v->parent   = 1;
 
 	if( vj_shm_file_ref( v, homedir ) == -1 ) {

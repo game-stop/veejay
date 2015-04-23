@@ -41,9 +41,6 @@
 #include <string.h>
 #include <pthread.h>
 #include <liblzo/lzo.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #define VJC_OK 0
 #define VJC_NO_MEM 1
 #define VJC_SOCKET 2
@@ -97,33 +94,6 @@ void		vj_client_free(vj_client *v)
 		v = NULL;
 	}
 }
-
-#ifdef STRICT_CHECKING
-static	int	verify_integrity( char *buf, int len ) {
-	if( len < 0 || buf == NULL ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Nothing to send");
-		return 0;
-	}
-	int i;
-	for ( i = 0; i < len; i ++ ) {
-		if( buf[i] == '\0' ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "End of string at pos %d, should have been pos %d",
-					i, len );
-			return 0;
-		}
-
-		if( buf[i] == '\n' || buf[i] == '\r' ) 
-			continue;
-
-		if( !isprint(buf[i]) ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "character '%x' is not alphanumeric at pos %d/%d",
-					buf[i], i, len );
-			return 0;
-		}
-	}	
-	return 1;
-}
-#endif
 
 int	vj_client_window_sizes( int socket_fd, int *r, int *s )
 {
@@ -182,10 +152,6 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 	{
 		if(host == NULL)
 			return error;
-#ifdef STRICT_CHECKING
-		assert(v->fd[0] == NULL );
-		assert(v->fd[1] == NULL );
-#endif
 
 		v->fd[0] = alloc_sock_t();
 		v->fd[1] = alloc_sock_t();
@@ -209,12 +175,6 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		}
 		v->ports[0] = port_id + VJ_CMD_PORT;
 		v->ports[1] = port_id + VJ_STA_PORT;
-#ifdef STRICT_CHECKING
-		veejay_msg( VEEJAY_MSG_DEBUG, "connected CMD port %d (socket %p, type %d)",
-				v->ports[0], v->fd[0], 0 );
-		veejay_msg( VEEJAY_MSG_DEBUG, "connected STATUS port %d (socket %p, type %d)",
-			   v->ports[1], v->fd[1], 1 );	
-#endif
 	}
 	else
 	{
@@ -253,12 +213,7 @@ int	vj_client_link_can_read( vj_client *v, int sock_type ) {
 
 int	vj_client_poll( vj_client *v, int sock_type )
 {
-#ifdef STRICT_CHECKING
-	int n = sock_t_poll( v->fd[sock_type] );
-	return n;
-#else
 	return sock_t_poll( v->fd[sock_type ]);
-#endif
 }
 
 static	long	vj_client_decompress( vj_client *t,uint8_t *in, uint8_t *out, int data_len, int Y, int UV , int header_len,
@@ -487,10 +442,6 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int dstlen )
 			}
 
 			int n = sock_t_recv( v->fd[0],v->space,p[3] );
-#ifdef STRICT_CHECKING
-			if( n > 0 ) assert( n == p[3] );
-			if( p[3] > 0 ) assert( p[3] == (16 + strides[0] + strides[1] + strides[2]) );
-#endif
 
 			if( n <= 0 ) {
 				if( n == -1 ) {

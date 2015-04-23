@@ -41,9 +41,6 @@
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <pthread.h>
 
 
@@ -116,10 +113,6 @@ static int	is_usable_file( filelist_t *filelist, const char *node, const char *f
 
 	struct stat l;
 	veejay_memset(&l,0,sizeof(struct stat));
-#ifdef STRICT_CHECKING
-	assert( filelist != NULL );
-	assert( filelist->num_files >= 0 || filelist->num_files < 1024 );
-#endif
 	if( lstat( node, &l) < 0 )
 		return 0;
 	
@@ -200,9 +193,6 @@ filelist_t *find_media_files( veejay_t *info )
 	char *wd = getcwd( working_dir, sizeof(working_dir));
 
 	if( wd == NULL ) {
-#ifdef STRICT_CHECKING
-		veejay_msg(0, "Strange, current working directory seems to be invalid?");
-#endif
 		return NULL;
 	}
 
@@ -580,9 +570,6 @@ static char * kern_number(char * buf, char * end, long long num, int base, int t
 
 static	int	kern_vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 {
-#ifdef STRICT_CHECKING
-	assert( size > 0 );
-#endif
 	int num,flags,base;
 	char *str, *end, c;
 	const char *s;

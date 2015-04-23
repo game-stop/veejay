@@ -40,14 +40,8 @@
 #include <string.h>
 #include <stdlib.h>
 //extern void *(* veejay_memcpy)(void *to, const void *from, size_t len) ;
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 /*
 static	int	wm_fullscreen(int action, Display *disp, Window *win) {
-#ifdef STRICT_CHECKING
-	assert(action == _NET_WM_STATE_REMOVE || action == _NET_WM_STATE_ADD ||
-			action == _NET_WM_STATE_TOGGLE );
 #endif
 	XEvent xev;
 	xev.xclient.type = ClientMessage;
@@ -248,9 +242,6 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		return 0;
 	}
 
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s" , (fs == 1 ? "Fullscreen": "Windowed"));
-#endif
 //FIXME
 	if( hw_on == 0 )
 	{
@@ -576,12 +567,6 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 {
 	if (!vj_sdl_lock(vjsdl))
 		return 0;
-#ifdef STRICT_CHECKING
-	assert( yuv420[0] != NULL );
-	assert( yuv420[1] != NULL );
-	assert( yuv420[2] != NULL );
-#endif
-
 #ifdef HAVE_SDL_TTF
 	if( veejay_log_to_ringbuffer() ) {
 		vj_sdl_draw_to_buffer( vjsdl->font, vjsdl->width, vjsdl->height );

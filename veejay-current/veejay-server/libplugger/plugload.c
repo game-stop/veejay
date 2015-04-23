@@ -55,9 +55,6 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <libplugger/plugload.h>
 #include <libplugger/freeframe-loader.h>
 #include <libplugger/frei0r-loader.h>
@@ -97,9 +94,6 @@ static	int	select_f( const struct dirent *d )
 int		plug_set_param_from_str( void *plugin , int p, const char *str, void *values )
 {
 	int type = 0;
-#ifdef STRICT_CHECKING
-	assert( plugin != NULL );
-#endif
 	return livido_set_parameter_from_string( plugin, p, str, values );
 }
 
@@ -112,13 +106,7 @@ char		*plug_describe_param( void *plugin, int p )
 static	void* instantiate_plugin( const void *plugin, int w , int h )
 {
 	int type = 0;
-#ifdef STRICT_CHECKING
-	assert( plugin != NULL );
-#endif
 	int error = vevo_property_get( plugin, "HOST_plugin_type", 0, &type);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	if( error != VEVO_NO_ERROR )
 		return NULL;
 
@@ -150,9 +138,6 @@ static	void* instantiate_plugin( const void *plugin, int w , int h )
 
 static	void	deinstantiate_plugin( void *instance )
 {
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_deinit_f	gin = NULL;
 	int error = vevo_property_get( instance, "HOST_plugin_deinit_f", 0, &gin );
 
@@ -220,9 +205,6 @@ static	int	add_to_plugin_list( const char *path )
 				 dlerror() );
 			continue;
 		}
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened plugin '%s' in '%s'", name,path );
-#endif
 		char *bname = basename( fullname );
 		char *basename = strdup( bname );
 		void *plugin = NULL;
@@ -282,14 +264,8 @@ static	int	add_to_plugin_list( const char *path )
 static	void	free_plugin(void *plugin)
 {
 
-#ifdef STRICT_CHECKING
-	assert( plugin != NULL );
-#endif
 	void *handle = NULL;
 	int error = vevo_property_get( plugin, "handle", 0 , &handle );
-#ifdef STRICT_CHECKING
-	assert( error == 0 );
-#endif
 	if( error == VEVO_NO_ERROR )
 		vevo_port_recursive_free( plugin );
 
@@ -547,9 +523,6 @@ int	plug_sys_detect_plugins(void)
 {
 	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * 256 );
 	illegal_plugins_ = vpn( VEVO_ILLEGAL );
-#ifdef STRICT_CHECKING
-	assert( illegal_plugins_ != NULL );
-#endif	
 
 	char *lvd_path = get_livido_plug_path();
 	if( lvd_path != NULL ) {
@@ -612,43 +585,30 @@ int	plug_sys_detect_plugins(void)
 
 void	plug_clone_from_parameters(void *instance, void *fx_values)
 {
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_reverse_clone_parameter_f	grc;
 	int error = vevo_property_get( instance, "HOST_plugin_param_reverse_f", 0, &grc );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
+	if( error != VEVO_NO_ERROR )
+		return;
 	// copy parameters from plugin to fx_values	
 	(*grc)( instance ,0, fx_values );
 }
 
 int	plug_clone_from_output_parameters( void *instance, void *fx_values )
 {
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_reverse_clone_out_parameter_f	grc;
 	int error = vevo_property_get( instance, "HOST_plugin_out_param_reverse_f", 0, &grc );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
+	if( error != VEVO_NO_ERROR )
+		return 0;
 	int n = (*grc)(instance,fx_values);	
 	return n;
 }
 
 void	plug_clone_parameters( void *instance, void *fx_values )
 {
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_clone_parameter_f	gcc;
 	int error = vevo_property_get( instance, "HOST_plugin_param_clone_f", 0, &gcc );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	(*gcc)( instance, 0, fx_values );
+	if( error == VEVO_NO_ERROR )
+		(*gcc)( instance, 0, fx_values );
 }
 
 int	plug_is_frei0r( void *instance )
@@ -662,9 +622,6 @@ int	plug_is_frei0r( void *instance )
 
 void	plug_set_parameter( void *instance, int seq_num,int n_elements,void *value )
 {
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_push_parameter_f	gpp;
 	int error = vevo_property_get( instance, "HOST_plugin_param_f", 0, &gpp );
 	if( error == VEVO_NO_ERROR)
@@ -677,28 +634,16 @@ void 	plug_set_parameters( void *instance, int n_args, void *values )
 }
 void	plug_get_defaults( void *instance, void *fx_values )
 {
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_default_values_f	gdv;
 	int error = vevo_property_get( instance, "HOST_plugin_defaults_f", 0, &gdv );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	(*gdv)( instance, fx_values );
+	if( error == VEVO_NO_ERROR )
+		(*gdv)( instance, fx_values );
 }
 
 void	plug_set_defaults( void *instance, void *fx_values )
 {
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_clone_parameter_f	gcp;	
 	int error = vevo_property_get( instance, "HOST_plugin_param_clone_f", 0, &gcp );
-
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR);
-#endif
 	(*gcp)( instance, 0,fx_values );
 }
 
@@ -784,9 +729,6 @@ char	*plug_describe( int fx_id )
 	error = vevo_property_get( plug, "instance", 0,&instance );
 	
 	error = vevo_property_get( instance, "filters",0,&filter );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	//@ cannot handle multiple filters yet
 	char *maintainer = get_str_vevo( instance, "maintainer");
 	char *version    = get_str_vevo( instance, "version" );
@@ -870,9 +812,6 @@ void	*plug_activate( int fx_id )
 	}
 
 	void *instance = instantiate_plugin( index_map_[fx_id], base_width_,base_height_);
-#ifdef STRICT_CHECKING
-	if( instance ) vevo_port_dump(instance,0);
-#endif
 	if( instance == NULL ) {
 		veejay_msg(0, "Error instantiating plugin.");
 		return NULL;
@@ -890,13 +829,7 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 {
 	void *plugin = index_map_[fx_id];
 	int type = 0;
-#ifdef STRICT_CHECKING
-	assert( plugin != NULL );
-#endif
 	int error = vevo_property_get( plugin, "HOST_plugin_type", 0, &type);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	switch( type )
 	{
 		case VEVO_PLUG_LIVIDO:
@@ -907,9 +840,6 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 		case VEVO_PLUG_FR:
 			break;
 		default:
-#ifdef STRICT_CHECKING
-			assert(0);
-#endif
 			break;
 	}
 
@@ -969,12 +899,6 @@ char	*plug_get_name( int fx_id )
 
 char	*plug_get_osc_format(void *fx_instance, int seq_num)
 {
-/*	void *param_templ = NULL;
-	int error = vevo_property_get( fx_instance, "parent_template",0,&param_templ);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif*/
-	
 	char *required_format = livido_describe_parameter_format_osc( fx_instance,seq_num );
 	return required_format;
 }
@@ -1005,9 +929,6 @@ int	plug_get_num_output_channels( int fx_id )
 	int res = 0;
 	int error = vevo_property_get( index_map_[fx_id], "num_outputs",0,&res);
 
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	return res;
 }
 int	plug_get_num_input_channels( int fx_id )
@@ -1018,9 +939,6 @@ int	plug_get_num_input_channels( int fx_id )
 	int res = 0;
 	int error = vevo_property_get( index_map_[fx_id], "num_inputs",0,&res);
 
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	return res;
 }
 
@@ -1032,9 +950,6 @@ int	plug_get_num_parameters( int fx_id )
 	int res = 0;
 	int error = vevo_property_get( index_map_[fx_id], "num_params",0,&res);
 
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	return res;
 }	
 
@@ -1048,9 +963,6 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 {
 	VJFrame *frame = (VJFrame*) frame_info;
 	
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_push_channel_f	gpu;
 	int error = vevo_property_get( instance, "HOST_plugin_push_f", 0, &gpu );
 	
@@ -1060,15 +972,10 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 
 void	plug_process( void *instance, double timecode )
 {
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	generic_process_f	gpf;
 	int error = vevo_property_get( instance, "HOST_plugin_process_f", 0, &gpf );
-#ifdef STRICT_CHECKING
-	assert( error == 0 );
-#endif
-	(*gpf)( instance, timecode );
+	if( error == VEVO_NO_ERROR )
+		(*gpf)( instance, timecode );
 }
 
 

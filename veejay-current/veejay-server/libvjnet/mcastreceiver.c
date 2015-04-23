@@ -39,9 +39,6 @@
 #include <veejay/vims.h>
 #include "packet.h"
 #include <libyuv/yuvconv.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 typedef struct
 {
@@ -155,9 +152,6 @@ int     mcast_receiver_set_peer( mcast_receiver *v, const char *hostname )
 
 int	mcast_poll( mcast_receiver *v )
 {
-#ifdef STRICT_CHECKING
-	assert( v != NULL );
-#endif
 	fd_set fds;
 	struct timeval tv;
 	memset( &tv, 0, sizeof(tv) );
@@ -205,9 +199,6 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 	{
 		if( q->slot[i]->hdr.usec == hdr.usec ) {
 			d_slot = i;
-#ifdef STRICT_CHECKING
-			assert( q->slot[i]->len == inf.len );
-#endif
 			break;
 		}
 	}
@@ -236,10 +227,6 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 		}
 
 		d_slot = o;
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG, "Dropping frame in slot %d (%d/%d packets)",
-				d_slot, q->slot[d_slot]->count,q->slot[d_slot]->hdr.length );
-#endif		
 		free(q->slot[d_slot]->buf);
 		q->slot[d_slot]->buf = NULL;
 		q->slot[d_slot]->count = 0;
@@ -297,9 +284,6 @@ uint8_t *mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *
 	while( (n = mcast_recv_packet_frame(v) ) )
 	{
 		if( n == 2 ) {
-#ifdef STRICT_CHECKING
-
-#endif
 			break; //@ full frame
 		}
 	}
@@ -327,15 +311,6 @@ uint8_t *mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *
 		}
 	}
 	/*
-#ifdef STRICT_CHECKING
-	//@debug queue
-	for( i = 0; i < PACKET_SLOTS; i ++ ) {
-		packet_buffer_t *p = q->slot[i];
-		veejay_msg(VEEJAY_MSG_DEBUG, "Slot %d: %d bytes, %d/%d queued, rdy=%d, t1=%ld",
-				i, p->len, p->count,p->hdr.length, p->rdy,(long) p->hdr.usec );
-	
-	}
-#endif
 	*/
 	//@ return newest full frame
 	if( full_frame ) {

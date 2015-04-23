@@ -99,9 +99,6 @@
 #define QUEUE_LEN 1
 #include <veejay/vims.h>
 #include <libqrwrap/qrwrapper.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 /*
 #ifdef HAVE_GL
 #include <veejay/gl.h>
@@ -205,26 +202,6 @@ int	veejay_set_yuv_range(veejay_t *info) {
  ******************************************************/
 static void	veejay_reset_el_buffer( veejay_t *info );
 
-#ifdef STRICT_CHECKING
-void veejay_change_state1(veejay_t * info, int new_state)
-{
-    	video_playback_setup *settings =
-		(video_playback_setup *) info->settings;
-
-//	pthread_mutex_lock(&(settings->valid_mutex));
-        settings->state = new_state;
-//	pthread_mutex_unlock(&(settings->valid_mutex));
-}
-
-#define veejay_change_state(a,b) vcs(a,b,__FUNCTION__,__LINE__)
-void vcs(veejay_t *info, int new_state,const char *caller_func,const int caller_line)
-{
-	veejay_msg(VEEJAY_MSG_DEBUG,
-			"Change state to %d by %s:%d",new_state,
-				caller_func,caller_line);
-	veejay_change_state1(info,new_state);
-}
-#else
 void veejay_change_state(veejay_t * info, int new_state)
 {
     	video_playback_setup *settings =
@@ -234,7 +211,7 @@ void veejay_change_state(veejay_t * info, int new_state)
         settings->state = new_state;
 //	pthread_mutex_unlock(&(settings->valid_mutex));
 }
-#endif
+
 void veejay_change_state_save(veejay_t * info, int new_state)
 {
 	if(new_state == LAVPLAY_STATE_STOP )
@@ -629,9 +606,6 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	video_playback_setup *settings = info->settings;
 
 	editlist *E = sample_get_editlist( sample_id );
-#ifdef STRICT_CHECKING
-	assert( E != NULL );
-#endif
 	info->current_edit_list = E;
 	veejay_reset_el_buffer(info);
 
@@ -800,9 +774,6 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 			veejay_stop_playing_sample( info,  info->uc->sample_id );
 		info->uc->playback_mode = new_pm;
 		info->current_edit_list = info->edit_list;
-#ifdef STRICT_CHECKING
-		assert(info->current_edit_list != NULL );
-#endif
 		video_playback_setup *settings = info->settings;
 		settings->min_frame_num = 0;
 		settings->max_frame_num = info->edit_list->total_frames;
@@ -1153,11 +1124,7 @@ void veejay_pipe_write_status(veejay_t * info)
 			(info->uc->sample_id,cache_used,info->seq->active,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
-#ifdef STRICT_CHECKING
-			assert(0);
-#else
 			veejay_change_state( info, LAVPLAY_STATE_STOP );
-#endif	
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
@@ -1782,9 +1749,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using clock_nanosleep timer");
 		break;
     	}    
-#ifdef STRICT_CHECKING
-	assert(info->edit_list != NULL );
-#endif
 
  	if (veejay_init_editlist(info) != 0) 
 	{
@@ -2270,9 +2234,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	switch(info->uc->playback_mode) {
 		case VJ_PLAYBACK_MODE_PLAIN:
 			info->current_edit_list = info->edit_list;
-#ifdef STRICT_CHECKING
-			assert( info->edit_list != NULL );
-#endif
 			video_playback_setup *settings = info->settings;
 			settings->min_frame_num = 0;
 			settings->max_frame_num = info->edit_list->total_frames;
@@ -2453,7 +2414,7 @@ static void veejay_playback_cycle(veejay_t * info)
 #endif
 
 	    if( (stats.tdiff > settings->spvf || info->real_fps > (1000 * settings->spvf)) && info->real_fps && info->audio == AUDIO_PLAY) {
-			veejay_msg(VEEJAY_MSG_WARNING, "Rendering audio/video frame takes too long (measured %ld ms, out of sync by %g). Can't keep pace with audio!", stats.tdiff, info->real_fps);
+			veejay_msg(VEEJAY_MSG_WARNING, "Can't keep pace with audio! Rendering audio/video frame takes too long (measured %-4ld ms, out of sync by %-2.4f seconds)",(float) stats.tdiff, info->real_fps);
 			
 		}
 

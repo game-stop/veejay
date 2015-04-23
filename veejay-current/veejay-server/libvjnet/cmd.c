@@ -28,10 +28,6 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <pthread.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 
 struct host_list {
   struct hostent hostent;
@@ -290,9 +286,6 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 	while( length > 0 ) {
 		n = send( s->sock_fd, buf, length , MSG_NOSIGNAL );
 		if( n == -1 ) {
-#ifdef STRICT_CHECKING
-			veejay_msg(0, "Error sending buffer:%s",strerror(errno));
-#endif
 			return -1;
 		}
 		if( n == 0 ) {
@@ -309,11 +302,6 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 {
 	int n; 
-#ifdef STRICT_CHECKING
-	assert( buf != NULL );
-	assert( len > 0 );
-#endif
-
 	unsigned int length = len;
 	unsigned int done = 0;
 	unsigned char *ptr = buf;
@@ -333,23 +321,13 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 		length -= n; //@ decrement length by bytes send
 		done += n; //@ keep count of bytes done
 	}
-
-#ifdef STRICT_CHECKING
-	assert( length == 0 );
-	assert( done == len );
-#endif
-
 	return done;
-
 }
 
 void			sock_t_close( vj_sock_t *s )
 {
 	if(s)
 	{
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tclosing socket %d", s->sock_fd );
-#endif
 		if( s->sock_fd ) {
 			close(s->sock_fd);
 			s->sock_fd = -1;

@@ -32,9 +32,6 @@
 #include "timedistort.h"
 #include "common.h"
 #include "softblur.h"
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #define PLANES 32
 
 vj_effect *timedistort_init(int w, int h)
@@ -183,10 +180,6 @@ void timedistort_apply( VJFrame *frame, int width, int height, int val)
 	
 	if( n__ == N__ || n__ == 0 )
 		interpolate = 0;
-
-#ifdef STRICT_CHECKING
-	assert( plane >= 0 && plane < PLANES );
-#endif
 
 	//@ process
 	uint8_t *planeTables[4] = { planetableY[plane], planetableU[plane], planetableV[plane], NULL };

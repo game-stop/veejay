@@ -750,12 +750,6 @@ static	float		msy(viewport_t *v, float y)
 
 	float		a = (float) dy / ( v->h / 100.0f );
 	float		s  = (float) v->h / (float) v->ui->sh;
-#ifdef STRICT_CHECKING
-	assert( (v->w > 0) );
-	assert( (v->h > 0 ));
-	assert( (v->ui->sw > 0));
-	assert( (v->ui->sh > 0 ));
-#endif
 
 	return (y/s) + a;
 }
@@ -773,12 +767,6 @@ static	float		msx(viewport_t *v, float x)
 
 	float		a = (float) dx / ( v->w / 100.0f );
 	float		s  = (float) v->w / (float) v->ui->sw;
-#ifdef STRICT_CHECKING
-	assert( (v->w > 0) );
-	assert( (v->h > 0 ));
-	assert( (v->ui->sw > 0));
-	assert( (v->ui->sh > 0 ));
-#endif
 
 	return (x/s) + a;
 }
@@ -796,12 +784,6 @@ static	float		vsx(viewport_t *v, float x)
 
 	float		a = (float) dx / ( v->w / 100.0f );
 	float		s  = (float) v->w / (float) v->ui->sw;
-#ifdef STRICT_CHECKING
-	assert( (v->w > 0) );
-	assert( (v->h > 0 ));
-	assert( (v->ui->sw > 0));
-	assert( (v->ui->sh > 0 ));
-#endif
 	return (x-a)*s;
 }
 static	float		vsy(viewport_t *v, float x)
@@ -818,12 +800,6 @@ static	float		vsy(viewport_t *v, float x)
 	float		a = (float) dy / ( v->h / 100.0f );
 
 	float		s  = (float) v->h / (float) v->ui->sh;
-#ifdef STRICT_CHECKING
-	assert( (v->w > 0) );
-	assert( (v->h > 0 ));
-	assert( (v->ui->sw > 0));
-	assert( (v->ui->sh > 0 ));
-#endif
 	return (x-a)*s;
 }
 
@@ -1644,12 +1620,6 @@ void	viewport_update_from(void *vv, void *bb)
 
 void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih,const char *homedir, int *enable, int *frontback, int mode )
 {
-#ifdef STRICT_CHECKING
-	assert( w > 0 );
-	assert( h > 0 );
-	assert( w0 > 0 );
-	assert( h0 > 0 );
-#endif
 	//@ try to load last saved settings
 	viewport_config_t *vc = viewport_load_settings( homedir,mode );
 	if(vc) {
@@ -1767,10 +1737,6 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 {
 	viewport_t *v = (viewport_t*) vv;
 	if(!v) return NULL;
-#ifdef STRICT_CHECKING
-	assert( new_w > 0 );
-	assert( new_h > 0 );
-#endif
 	viewport_t *q = (viewport_t*) vj_malloc(sizeof(viewport_t));
 	veejay_memcpy(q,v,sizeof(viewport_t));
 
@@ -3109,13 +3075,6 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 	register const	int32_t tx2 = v->ttx2;
 	register const	int32_t	ty1 = v->tty1;
 	register const	int32_t ty2 = v->tty2;
-
-#ifdef STRICT_CHECKING
-	assert(tx1>= 0 );
-	assert(tx2>= 0 );
-	assert(ty1>= 0 );
-	assert(ty2>= 0 );
-#endif
 
 	int x,y;
 	y  = ty1 * w;

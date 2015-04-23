@@ -29,9 +29,6 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <libel/elcache.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 typedef struct
 {
@@ -66,9 +63,6 @@ static	void	cache_claim_slot(cache_t *v, int free_slot, uint8_t *linbuf, long fr
 	data->num  = frame_num;
 	data->fmt  = format;
 	data->buffer = vj_malloc( buf_len );
-#ifdef STRICT_CHECKING
-	assert( v->index[free_slot] != frame_num );
-#endif
 	// clear old buffer
 	if( v->index[free_slot] >= 0 )
 	{
@@ -166,22 +160,12 @@ void	free_cache(void *cache)
 void	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int format)
 {
 	cache_t *v = (cache_t*) cache;
-#ifdef STRICT_CHECKING
-	assert( cache != NULL );
-	assert( linbuf != NULL );
-	assert( buflen > 0 );
-	assert( frame_num >= 0 );
-#else
 	if( buflen <= 0 )
 		return;
-#endif	
 	int slot_num = cache_free_slot( cache );
 	if( slot_num == -1 )
 		slot_num = cache_find_slot( v, frame_num );
 
-#ifdef STRICT_CHECKING
-	assert(slot_num >= 0 );
-#endif
 	cache_claim_slot(v, slot_num, linbuf, frame_num, buflen, format);
 } 
 
@@ -193,15 +177,8 @@ uint8_t *get_cached_frame( void *cache, long frame_num, int *buf_len, int *forma
 		return NULL;
 
 	cache_slot_t *data = v->cache[ slot ];
-#ifdef STRICT_CHECKING
-	assert( data->size > 0 );
-	assert( data->buffer != NULL );
-#endif
 
 	*buf_len 	= data->size;
 	*format		= data->fmt;
-#ifdef STRICT_CHECKING
-	assert( data->num == frame_num );
-#endif
 	return (uint8_t*) data->buffer;
 }

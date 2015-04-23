@@ -390,9 +390,6 @@ static	void*	deal_with_ff( void *handle, char *name )
 	for( p=  0; p < n_params; p ++ )
 	{
 		void *parameter = vpn( VEVO_FF_PARAM_PORT );
-#ifdef STRICT_CHECKING
-		assert( parameter != NULL );
-#endif		
 		int type = q( FF_GETPARAMETERTYPE, (LPVOID) p, 0 ).ivalue;
 		// name, kind, flags, description, min,max,default,transition
 		vevo_property_set( parameter, "type", VEVO_ATOM_TYPE_INT, 1, &type);

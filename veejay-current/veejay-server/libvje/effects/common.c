@@ -25,9 +25,6 @@
 #include <libvje/internal.h>
 #include <libvjmem/vjmem.h>
 #include "common.h"
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 char	**vje_build_param_list( int num, ... )
 {
@@ -41,12 +38,7 @@ char	**vje_build_param_list( int num, ... )
 	int i;
 	for( i = 0; i <num; i ++ ) {
 		tmp = (char*) va_arg( args,char*);
-#ifdef STRICT_CHECKING
-		assert( tmp != NULL );
-#endif
-//		if(tmp==NULL)
-//			continue;
-		list[i] = strdup(tmp);
+		list[i] = (tmp == NULL ? NULL : strdup(tmp));
 	}
 	list[num] = NULL;
 	va_end(args);

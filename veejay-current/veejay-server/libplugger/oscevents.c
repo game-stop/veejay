@@ -36,9 +36,6 @@
 #include <vevosample/uifactory.h>
 #include <lo/lo.h>
 #include <ctype.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 void	osc_sample_edl_paste_at( void *ptr,const char *path, const char *types, void **dargv, void *raw )
 {
@@ -412,9 +409,6 @@ void	osc_veejay_ui_init( void *info,const char *path,  const char *types, void *
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	char *uri = osc_get_uri( raw );
-#ifdef STRICT_CHECKING
-	assert( uri != NULL );
-#endif	
 	veejay_add_client( info,  uri );
 
 	veejay_init_ui( info, uri );

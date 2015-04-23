@@ -42,9 +42,6 @@
 
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #ifdef HAVE_GL
 #include <veejay/gl.h>
 #endif
@@ -141,13 +138,7 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->frame4 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,c->frame1->format );
 
 	c->scaler = yuv_init_swscaler( c->frame1, c->frame2, &sws_templ, 0 );
-#ifdef STRICT_CHECKING
-	assert(c->scaler != NULL );
-#endif
 	c->back_scaler = yuv_init_swscaler( c->frame4, c->frame3, &sws_templ, 0 );
-#ifdef STRICT_CHECKING
-	assert(c->back_scaler!=NULL);
-#endif
 
 	c->back1 = NULL;
 
@@ -257,9 +248,6 @@ void	*composite_load_config( void *compiz, void *vc, int *result )
 		if( c->back1 == NULL ) {
 			c->back1 = composite_clone(c );
 		}
-#ifdef STRICT_CHECKING
-		assert(c->back1 != NULL );
-#endif
 		viewport_update_from(c->vp1, c->back1 );
 		c->Y_only = cm;
 		*result = m;
@@ -281,9 +269,6 @@ int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int
 
 static void	composite_scale( composite_t *c, VJFrame *input, VJFrame *output )
 {
-#ifdef STRICT_CHECKING
-	assert( c->scaler != NULL );
-#endif
 	yuv_convert_and_scale(c->scaler,input,output);
 }
 

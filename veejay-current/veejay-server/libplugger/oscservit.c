@@ -35,9 +35,6 @@ a/. * but WITHOUT ANY WARRANTY; without even the implied warranty of
 #include <vevosample/vevosample.h>
 #include <libvjmem/vjmem.h>
 //@ client side implementation
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 #include <veejay/oscservit.h>
 typedef struct {
@@ -135,18 +132,10 @@ void	veejay_osc_del_methods( void *user_data, void *osc_space,void *vevo_port, v
 	{
 		void *event_port = NULL;
 		error = vevo_property_get( osc_space, keys[i],0,&event_port );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		
 		void *ptr = NULL;
 		error = vevo_property_get( event_port, "userdata",0, &ptr );
 		
-#ifdef STRICT_CHECKING
-		assert(error == VEVO_NO_ERROR );
-		assert( ptr != NULL );
-#endif
-	
 		char *types = get_str_vevo( event_port, "format" );
 		
 		lo_server_thread_del_method( s->st, keys[i], types );
@@ -201,9 +190,6 @@ free(uri);
 		return 0;
 	}
 	int n_elem = strlen(required_format);
-#ifdef STRICT_CHECKING
-	assert( n_elem == argc );
-#endif
 	int k;
 	if( types[0] == 'i' )
 	{
@@ -323,9 +309,6 @@ int	osc_sample_handler( const char *path, const char *types,
 	}
 
 	int n_elem = strlen(required_format);
-#ifdef STRICT_CHECKING
-	assert( n_elem == argc );
-#endif
 	int k;
 	free(required_format);
 
@@ -451,53 +434,32 @@ static int	servit_new_event(
 {
 	veejay_t *info = (veejay_t*) userdata;
 	osc_recv_t *s = (osc_recv_t*) info->osc_server;
-#ifdef STRICT_CHECKING
-	void *p = (void*) vevo_port_new( VEVO_ANONYMOUS_PORT,__FUNCTION__,__LINE__ );
-#else
 	void *p = (void*) vevo_port_new( VEVO_ANONYMOUS_PORT );
-#endif
 	int error;
 	
 	if( func )
 	{
 		error = vevo_property_set( p, "func", VEVO_ATOM_TYPE_VOIDPTR,1,&func );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 	}
 
 	if( fmt == NULL )
 		error = vevo_property_set( p, "format", VEVO_ATOM_TYPE_STRING,0,NULL );
 	else
 		error = vevo_property_set( p, "format", VEVO_ATOM_TYPE_STRING,1, &fmt );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 
 	if( descr == NULL )
 		error = vevo_property_set(p, "description",VEVO_ATOM_TYPE_STRING,0, NULL );
 	else
 		error = vevo_property_set(p, "description", VEVO_ATOM_TYPE_STRING,1, &descr );
 	
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-
 	if( ptemplate )
 	{
 		error = vevo_property_set( p, "parent", VEVO_ATOM_TYPE_VOIDPTR,1,&ptemplate );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
-
 	}
 	
 /*	if( extra_token >= 0)
 	{
 		error = vevo_property_set(p, "ref", VEVO_ATOM_TYPE_INT,1, &extra_token );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 	}*/
 	
 	if( args )
@@ -510,9 +472,6 @@ static int	servit_new_event(
 				char index[10];
 				sprintf(index,"help_%d",i);
 				error = vevo_property_set( p, index, VEVO_ATOM_TYPE_STRING,1,&(args[i]) );
-#ifdef 	STRICT_CHECKING
-				assert( error == VEVO_NO_ERROR );
-#endif
 			}
 		}
 	}
@@ -527,10 +486,6 @@ static int	servit_new_event(
 				1,
 				&pd );
 
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-
 	char *tmp_path = NULL;
 	if( base)
 		tmp_path = osc_create_path( base, key );     
@@ -544,10 +499,6 @@ static int	servit_new_event(
 				   VEVO_ATOM_TYPE_PORTPTR,
 				   1,
 				   &p );
-
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 
 	lo_server_thread_add_method(
 				s->st,

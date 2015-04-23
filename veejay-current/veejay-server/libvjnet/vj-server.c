@@ -33,9 +33,6 @@
 #include <libvjnet/cmd.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #define __INVALID 0
 #define __SENDER 1
 #define __RECEIVER 2
@@ -321,9 +318,6 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 				port_num, vjs->recv_size, vjs->send_size );
 			break;
 		default:
-#ifdef STRICT_CHECKING
-		assert(0);
-#endif
 		break;
 	}
 
@@ -404,12 +398,6 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 {
 	unsigned int total = 0;
 	unsigned int bytes_left = len;
-#ifdef STRICT_CHECKING
-	assert( vje->send_size > 0 );
-	assert( len > 0 );
-	assert( buf != NULL );
-	assert( link_id >= 0 );
-#endif
 	vj_link **Link = (vj_link**) vje->link;
 	
 	if( !Link[link_id]->in_use ) { 
@@ -480,22 +468,9 @@ int	vj_server_link_can_read( vj_server *vje, int link_id)
 static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, int len )
 {
     unsigned int total = 0;
-#ifdef STRICT_CHECKING
-	assert( vje->send_size > 0 );
-	assert( len > 0 );
-	assert( buf != NULL );
-	assert( link_id >= 0 );
-#endif
 
 	vj_link **Link = (vj_link**) vje->link;
-#ifdef STRICT_CHECKING
-	assert( Link[link_id]->in_use == 1 );
-#endif
 	total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len);
-#ifdef STRICT_CHECKING
-	if( total != len )
-		veejay_msg(VEEJAY_MSG_ERROR, "Only sent %d out of %d bytes", total,len);
-#endif
 	if( vje->logfd ) {
 		fprintf(vje->logfd, "sent frame %d of %d bytes to handle %d (link %d) %s\n", total,len, Link[link_id]->handle,link_id,(char*)(inet_ntoa(vje->remote.sin_addr)) );
 		//	printbuf( vje->logfd, buf, len );
@@ -612,9 +587,6 @@ void	vj_server_client_promote( vj_server *vje, int link_id)
 {
 	
 	vj_link **Link= (vj_link**) vje->link; 
-#ifdef STRICT_CHECKING
-	assert( Link[link_id]->in_use == 1 );
-#endif 
 	Link[link_id]->promote = 1;	
 	if( vje->logfd ) {
 		fprintf(vje->logfd, "promote link %d\n", link_id );
@@ -839,9 +811,6 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			{
 				v[num_msg]->msg = strndup( str_ptr, slen );  //@ '600:;'
 				v[num_msg]->len = slen;                      //@ 5
-#ifdef STRICT_CHECKING
-				assert( slen == strlen( v[num_msg]->msg ) );
-#endif
 				num_msg++;
 			}
 	
@@ -898,9 +867,6 @@ int	vj_server_new_connection(vj_server *vje)
 		int addr_len = sizeof(vje->remote);
 		int n = 0;
 		int fd = accept( vje->handle, (struct sockaddr*) &(vje->remote), &addr_len );
-#ifdef STRICT_CHECKING
-		assert( fd != 0 ); //@ grab a beer if fd == FILENO_STDIN
-#endif
 		if(fd == -1)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Error accepting connection: %s",
@@ -1102,9 +1068,6 @@ void vj_server_shutdown(vj_server *vje)
 int	vj_server_link_used( vj_server *vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
-#ifdef STRICT_CHECKING
-	assert( link_id >= 0 && link_id < VJ_MAX_CONNECTIONS );
-#endif
 	return Link[link_id]->in_use;
 /*
 	if( link_id < 0 || link_id >= VJ_MAX_CONNECTIONS )
@@ -1141,16 +1104,7 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 		return NULL; // done
 
 	char *msg = Link[id]->m_queue[index]->msg;
-#ifdef STRICT_CHECKING
-	assert( msg != NULL );
-#endif
 	int len = Link[id]->m_queue[index]->len;
-
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG, "L%2d queue [%4d]/[%d] [%4d] '%s'",
-			id, index, Link[id]->n_queued, len, msg );
-			
-#endif
 
 	index ++;
 	Link[id]->n_retrieved = index;

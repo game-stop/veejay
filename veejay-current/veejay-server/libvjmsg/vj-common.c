@@ -70,12 +70,6 @@ static int _debug_level = 0;
 static int _color_level = 1;
 static int _no_msg = 0;
 
-#ifdef STRICT_CHECKING
-__thread struct timeval _start_time;
-__thread int timerdy = 0;
-__thread int _start_time_offset = 0;
-#endif
-
 #define MAX_LINES 100 
 typedef struct
 {
@@ -95,39 +89,6 @@ typedef struct {
 static	vj_msg_hist	_message_history;
 static	int		_message_his_status = 0;
 */
-
-#ifdef STRICT_CHECKING 	
-
-/* Subtract the `struct timeval' values X and Y,
-   storing the result in RESULT.
-   Return 1 if the difference is negative, otherwise 0.  
-   gnu/docs/glibc/libc_428.html
-   */
-
-static int
-timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y)
-{
-  /* Perform the carry for the later subtraction by updating y. */
-  if (x->tv_usec < y->tv_usec) {
-    int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
-    y->tv_usec -= 1000000 * nsec;
-    y->tv_sec += nsec;
-  }
-  if (x->tv_usec - y->tv_usec > 1000000) {
-    int nsec = (x->tv_usec - y->tv_usec) / 1000000;
-    y->tv_usec += 1000000 * nsec;
-    y->tv_sec -= nsec;
-  }
-
-  /* Compute the time remaining to wait.
-     tv_usec is certainly positive. */
-  result->tv_sec = x->tv_sec - y->tv_sec;
-  result->tv_usec = x->tv_usec - y->tv_usec;
-
-  /* Return 1 if result is negative. */
-  return x->tv_sec < y->tv_sec;
-}
-#endif
 
 #ifdef HAVE_LIBUNWIND
 static void addr2line_unw( unw_word_t addr, char*file, size_t len, int *line )
@@ -515,8 +476,7 @@ void    report_bug(void)
     veejay_msg(VEEJAY_MSG_WARNING, "Send at least veejay's output and include the command(s) you have used to start it.");
 	veejay_msg(VEEJAY_MSG_WARNING, "Also, please consider sending in the recovery files if any have been created.");
 	veejay_msg(VEEJAY_MSG_WARNING, "If you compiled it yourself, please include information about your system.");
-
-#ifdef STRICT_CHECKING
+/*
 	veejay_msg(VEEJAY_MSG_WARNING, "Dumping core file to: core.%d",getpid() );
 	
 	char cmd[128];
@@ -534,8 +494,7 @@ void    report_bug(void)
 		veejay_msg(VEEJAY_MSG_WARNING, "Done!");
 		veejay_msg(VEEJAY_MSG_INFO, "Please bzip2 and upload the coredump somewhere and tell us where to find it!");
 	}
-#endif
-		
+	*/	
 
 }
 

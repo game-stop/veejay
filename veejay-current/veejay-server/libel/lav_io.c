@@ -30,9 +30,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <libel/lav_io.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 //#include <veejay/vj-lib.h>
 #include <libvjmsg/vj-msg.h>
 #ifdef USE_GDK_PIXBUF
@@ -542,9 +539,6 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
    int res, n;
    uint8_t *jpgdata = NULL;
    long jpglen = 0;
-#ifdef STRICT_CHECKING
-   assert( buff != NULL );
-#endif
    video_format = lav_file->format; internal_error = 0; /* for error messages */
 #ifdef SUPPORT_READ_DV2
    if(video_format == 'b')

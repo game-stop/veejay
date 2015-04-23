@@ -50,9 +50,6 @@
 #include <config.h>
 #ifdef HAVE_V4L2
 #include <stdio.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -331,9 +328,6 @@ static	int	v4l2_ffmpeg2v4l2( int pf)
 			return V4L2_PIX_FMT_YUV32;
 
 		default:
-#ifdef STRICT_CHECKING
-			assert( pf >= 0 );
-#endif
 			return V4L2_PIX_FMT_BGR24;
 	}
 	return V4L2_PIX_FMT_BGR24;
@@ -767,9 +761,6 @@ static	int	v4l2_channel_choose( v4l2info *v, const int pref_channel )
 	int other   = -1;
 	for ( i = 0; i < (pref_channel+1); i ++ ) {
 		if( -1 == vioctl( v->fd, VIDIOC_S_INPUT, &i )) {
-#ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Input channel %d does not exist", i);
-#endif
 			if( errno == EINVAL )
 				continue;
 			return 0;
@@ -823,9 +814,6 @@ int	v4l2_poll( void *d , int nfds, int timeout )
 	err = poll( &p, nfds, timeout );
 	if( err == -1 ) {
 		if( errno == EAGAIN || errno == EINTR ) {
-#ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device busy, try again.");
-#endif
 			return 0;
 		}
 	}
@@ -1114,9 +1102,6 @@ v4l2_rw_fallback:
 
 static	double	calc_tc( struct v4l2_timecode *tc, float fps )
 {
-#ifdef STRICT_CHECKING
-	assert( fps > 0.0 );
-#endif
 	return (double) tc->frames / fps;
 }
 
@@ -1988,9 +1973,6 @@ static	void	*v4l2_grabber_thread( void *v )
 				pthread_exit(NULL);
 				return NULL;
 			} else {
-#ifdef STRICT_CHECKING
-				veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: error queuing frame, %d retries left", i->retries );
-#endif
 				i->retries --;
 			}
 		}

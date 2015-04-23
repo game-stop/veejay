@@ -29,9 +29,6 @@
 #include <libvje/vje.h>
 #include <veejay/vims.h>
 #include "packet.h"
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 static void print_error(char *msg)
 {

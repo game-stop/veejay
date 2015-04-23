@@ -24,9 +24,6 @@
 #include <veejay/vj-viewport.h>
 #include <veejay/vjkf.h>
 #include <veejay/vj-shm.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #define VIDEO_PALETTE_YUV420P 15
 #define VIDEO_PALETTE_YUV422P 13
 
@@ -1133,9 +1130,6 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		return -1;
 	}
     last_added_tag = tag->id; 
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG, "Created new tag %d", tag->id );
-#endif
 	this_tag_id++;
 
 #ifdef HAVE_FREETYPE
@@ -1411,9 +1405,6 @@ int	vj_tag_set_composite( void *compiz,int t1, int n )
 		tag->composite = 1;
 		return (vj_tag_update(tag,t1));
 	}
-#ifdef STRICT_CHECKING
-	assert( tag->viewport_config != NULL );
-#endif
 	composite_add_to_config( compiz, tag->viewport_config, n );
 	
 	return (vj_tag_update(tag,t1));
@@ -1930,9 +1921,6 @@ int vj_tag_get_effect_any(int t1, int position) {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag )
 	   return 0;
-#ifdef STRICT_CHECKING
-	assert( position >= 0 && position < SAMPLE_MAX_EFFECTS );
-#endif
 	return tag->effect_chain[position]->effect_id;
 }
 
@@ -1942,9 +1930,6 @@ int vj_tag_chain_malloc(int t1)
     int i=0;
     int e_id = 0; 
     int sum =0;
-#ifdef STRICT_CHECKING
-	assert( tag != NULL );
-#endif
 
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
@@ -1964,9 +1949,6 @@ int vj_tag_chain_malloc(int t1)
 int vj_tag_chain_free(int t1)
 {
     vj_tag *tag = vj_tag_get(t1);
-#ifdef STRICT_CHECKING
-	assert(tag != NULL );
-#endif
     int i=0;
     int e_id = 0; 
     int sum = 0;
@@ -2287,9 +2269,6 @@ int vj_tag_get_all_effect_args(int t1, int position, int *args,
 
 	if( tag->effect_chain[position]->kf_status )
 	{
-#ifdef STRICT_CHECKING
-		assert( tag->effect_chain[position]->kf != NULL );
-#endif
 		for( i =0;i <arg_len; i ++ )
 		{
 			int tmp = 0;
@@ -2424,9 +2403,6 @@ int vj_tag_disable(int t1) {
 
 int vj_tag_enable(int t1) {
 	vj_tag *tag = vj_tag_get(t1);
-#ifdef STRICT_CHECKING
-	assert( tag != NULL );
-#endif
 	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
 		if(tag->capture_type == 1 ) {
@@ -2933,9 +2909,6 @@ static uint8_t	*blackframe_new( int w, int h, int uv_len, uint8_t *Y, uint8_t *U
 	}
 	veejay_memset( buf, 0, sizeof(uint8_t) * 5 * ((w*h)+2*uv_len));
 	tag->blackframe = buf;
-#ifdef STRICT_CHECKING
-	assert( uv_len == ( (w/2) * h ));
-#endif
 	const int chroma=127;
 
 	tag->lf = (double*) vj_malloc(sizeof(double) * (w*h));
@@ -3626,9 +3599,6 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
-#ifdef STRICT_CHECKING
-	assert( tag != NULL );
-#endif
     //if (!tag)
     //return -1;
 
@@ -3982,9 +3952,6 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	char *extra_data = NULL;
 	int col[3] = {0,0,0};
 	int fader_active=0, fader_val=0, fader_dir=0, opacity=0, nframes=0;
-#ifdef STRICT_CHECKING
-	assert( _tag_info != NULL );
-#endif
 
 	xmlNodePtr fx[32];
 	veejay_memset( fx, 0, sizeof(fx));
@@ -4056,9 +4023,6 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 		if(n_id > 0 )
 		{
 			vj_tag *tag = vj_tag_get( n_id );
-#ifdef STRICT_CHECKING
-			assert( tag != NULL );
-#endif
 			tag->id = id;
 			tag->effect_toggle = fx_on;
 			tag->fader_active = fader_active;
@@ -4080,9 +4044,6 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			{
 				char tmp[512];
 				sprintf(tmp, "%s-SUB-s%d.srt", sampleFile, id );
-#ifdef STRICT_CHECKING
-				assert(tag->dict != NULL);
-#endif
 				vj_font_set_dict( font, tag->dict );
 
 				vj_font_load_srt( font, tmp );

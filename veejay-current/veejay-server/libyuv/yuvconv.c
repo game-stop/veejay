@@ -49,10 +49,6 @@
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
  */
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 typedef struct
 {
 	struct SwsContext *sws;
@@ -199,12 +195,6 @@ static	void	verify_CCIR_( int a, int b, char *caller, int line ) {
 		}
 	}
 }
-
-#ifdef STRICT_CHECKING
-#define verify_CCIR( a,b ) verify_CCIR_( a,b,__FUNCTION__,__LINE__ )
-#else
-#define verify_CCIR( a,b ) return
-#endif
 
 int	yuv_use_auto_ccir_jpeg()
 {
@@ -499,11 +489,6 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->data[1] = NULL; f->data[2] = NULL;
 			break;
 		default:
-#ifdef STRICT_CHECKING
-			yuv_pixstr( __FUNCTION__, "fmt", fmt );
-
-			assert(0);
-#endif
 		break;
 	}
 	f->len = w*h;	
@@ -544,16 +529,6 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 
 void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt )
 {
-#ifdef STRICT_CHEdCKING
-	assert( dst_fmt >= 0 && dst_fmt < 32 );
-	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
-		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
-		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
-		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
-		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
-		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 );
-	assert( src->width > 0 );
-#endif
 	uint8_t *dst_planes[3] = { dst, NULL, NULL };
 	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
 			dst_planes, ffmpeg_aclib[ dst_fmt] , src->width,src->height ))
@@ -569,18 +544,6 @@ void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst
 
 void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 {
-#ifdef STRICT_CHECKING
-	assert( dst_fmt >= 0 && dst_fmt < 32 );
-	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
-		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
-		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
-		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
-		src_fmt == PIX_FMT_YUYV422 ||
-		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
-		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 || src_fmt == PIX_FMT_ARGB );
-	assert( src->width > 0 );
-	assert( dst->width > 0 );
-#endif
 	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
 			dst->data, ffmpeg_aclib[ dst_fmt] , dst->width,dst->height ))
 	{
@@ -618,17 +581,6 @@ void	yuv_fx_context_destroy( void *ctx )
 
 void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[3], VJFrame *dst, int src_fmt, int dst_fmt )
 {
-#ifdef STRICT_CHECKING
-/*	assert( dst_fmt >= 0 && dst_fmt < 32 );
-	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
-		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
-		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
-		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA || src_fmt == PIX_FMT_ARGB );*/
-	assert( src_stride[0] > 0 );
-	assert( dst->width > 0 );
-	assert( dst->height > 0 );
-	assert( dst->data[0] != NULL );
-#endif
 	vj_sws *s = (vj_sws*) scaler;
 
 	if(s->sws) {
@@ -1071,9 +1023,6 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 
 	int 	cpu_flags = 0;
 
-#ifdef  STRICT_CHECKING
-	cpu_flags = cpu_flags | SWS_PRINT_INFO;
-#endif
 #ifdef HAVE_ASM_MMX
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
 #endif
@@ -1161,10 +1110,6 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flagss)
 {
 	int 	cpu_flags = 0;
-
-#ifdef  STRICT_CHECKING
-	cpu_flags = cpu_flags | SWS_PRINT_INFO;
-#endif
 
 #ifdef HAVE_ASM_MMX
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;

@@ -31,9 +31,6 @@
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
 #include <libyuv/yuvconv.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 vj_yuv *vj_yuv4mpeg_alloc(int w, int h, float fps, int out_pixel_format)
 {
@@ -201,10 +198,6 @@ int vj_yuv_stream_header_pipe(vj_yuv *yuv4mpeg,VJFrame *frame)
 
 int vj_yuv_stream_start_write(vj_yuv * yuv4mpeg,VJFrame *frame, char *filename, int outchroma)
 {
-#ifdef STRICT_CHECKING
-	assert( filename != NULL );
-	assert( strlen(filename) > 3 );
-#endif
     //if(mkfifo( filename, 0600)!=0) return -1;
     /* if the file exists gamble and simply append,
        if it does not exist write header 

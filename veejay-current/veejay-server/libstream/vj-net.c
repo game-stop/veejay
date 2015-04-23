@@ -37,9 +37,6 @@
 
 #define        RUP8(num)(((num)+8)&~8)
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 typedef struct
 {
 	pthread_mutex_t mutex;
@@ -212,15 +209,6 @@ void	*reader_thread(void *data)
 				}
 				if(unlock(t) != 0 )
 					goto NETTHREADEXIT;
-/*
-#ifdef STRICT_CHECKING	
-				if( vj_client_poll( v, V_CMD ) ) {
-					char bogus[32];
-					while( vj_client_link_can_read(v,V_CMD) ) 
-						vj_client_read( v, bogus, 1 );
-				}
-#endif
-*/
 			}
 		}
 NETTHREADRETRY:
@@ -248,9 +236,6 @@ NETTHREADRETRY:
 	
 			if( success <= 0 )
 			{
-#ifdef STRICT_CHECKING
-				veejay_msg(VEEJAY_MSG_DEBUG, "Tried to connect to %s:%d code=%d", tag->source_name,tag->video_channel,success);
-#endif
 				goto NETTHREADRETRY;
 			}
 			else

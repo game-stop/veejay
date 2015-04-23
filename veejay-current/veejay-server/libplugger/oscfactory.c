@@ -29,9 +29,6 @@ int	describe_plug(void *info, void *fx_instance, void *in_values)
 static  void    sample_notify_parameter( void *sample, void *parameter, void *value )
 {
         char *osc_path = vevo_property_get_string( parameter, "HOST_osc_path" );
-#ifdef STRICT_CHECKING
-        assert( osc_path != NULL );
-#endif
         char *osc_types = vevo_property_get_string( parameter, "HOST_osc_types");
         
         sample_runtime_data *srd = (sample_runtime_data*) sample;

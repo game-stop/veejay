@@ -24,9 +24,6 @@
 #include <libvevo/libvevo.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 #define MAX_INDEX 1024
 
@@ -199,16 +196,7 @@ static vevo_port_t	*_new_event(
 	char param_name[16];
 	char descr_name[255];
 
-#ifdef STRICT_CHECKING
-	assert( name != NULL );
-	assert( function != NULL );
-	assert( vims_id > 0 );
-#endif
-
 	vevo_port_t *p = (void*) vpn( VEVO_EVENT_PORT );
-#ifdef STRICT_CHECKING
-	assert( p != NULL );
-#endif
 	if( format )
 		vevo_property_set( p, "format", VEVO_ATOM_TYPE_STRING, 1, &format );
 	else
@@ -230,10 +218,6 @@ static vevo_port_t	*_new_event(
 
 		sprintf(param_name, "argument_%d", n );
 		const char *arg = va_arg( ap, const char*);
-#ifdef STRICT_CHECKING
-		if(!arg) veejay_msg(VEEJAY_MSG_DEBUG, "\t'%s' %s - %d = '%s' of format %c (%s)",name,param_name, n, arg, format[it],format );
-		assert( arg != NULL );
-#endif
 		char *descr = (char*) strdup( arg );
 		sprintf(descr_name, "help_%d", n );
 		

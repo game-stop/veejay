@@ -24,15 +24,8 @@
 #include <libvjmem/vjmem.h>
 #include "packet.h"
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 void		packet_dump_header( packet_header_t *h)
 {
-#ifdef STRICT_CHECKING
-	assert( h != NULL );
-#endif
 	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %d/%d, Timestamp %x Timeout : %ld",
 		h->flag, h->seq_num,h->length, h->usec,h->timeout );
 }

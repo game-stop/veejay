@@ -32,9 +32,6 @@
 #include <libvevo/libvevo.h>
 
 #include <veejay/oscsend.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 static	void	vevosample_ui_type_shared( void *sample, char *window );
 static	void	vevosample_ui_type_capture( void *sample, const char *window, const char *frame);
@@ -164,14 +161,8 @@ static void		vevosample_ui_construct_fx_contents( void *sample, int entry_id, co
 	slot->window = strdup( window );
 			
 	int error = vevo_property_get( srd->info_port, "primary_key", 0, &id );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	void *filter_template = NULL;
 	error = vevo_property_get( slot->fx_instance, "filter_templ",0 ,&filter_template );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	char *label_str = vevo_property_get_string( filter_template, "name" );
 	char label[128];
 	sprintf( label, "FX slot %d with  \"%s\" ", entry_id, label_str );
@@ -200,37 +191,17 @@ static void		vevosample_ui_construct_fx_contents( void *sample, int entry_id, co
 	{
 		void *parameter = NULL;
 		error = vevo_property_get( slot->fx_instance, "in_parameters", q, &parameter );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		void *parameter_templ = NULL;
 		error = vevo_property_get( parameter, "parent_template",0,&parameter_templ);
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		int kind = 0;
 		error = vevo_property_get( parameter_templ, "HOST_kind",0,&kind );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		char *parameter_name = vevo_property_get_string(parameter_templ, "name" );
-#ifdef STRICT_CHECKING
-		assert( parameter_name != NULL );
-#endif
 		char *osc_path 		= vevo_property_get_string(parameter, "HOST_osc_path" );
-#ifdef STRICT_CHECKING
-		if( !osc_path )
-			veejay_msg(0,"No osc path for '%s' ",parameter_name );
-		assert( osc_path != NULL );
-#endif
 		int ival = 0;
 		double gval = 0.0;
 		int imin = 0, imax = 0;
 		double gmin = 0.0, gmax = 0.0;
 		char *hint = vevo_property_get_string( parameter_templ, "description" );
-#ifdef STRICT_CHECKING
-		assert( hint != NULL );
-#endif
 		switch( kind )
 		{
 			case HOST_PARAM_INDEX:
@@ -257,10 +228,6 @@ static void		vevosample_ui_construct_fx_contents( void *sample, int entry_id, co
 						parameter_name, ival ,osc_path, hint );
 				break;
 			default:
-#ifdef STRICT_CHECKING
-				veejay_msg(0 ,"Parameter types not implemented");
-				assert(0);
-#endif
 				break;
 		}
 		free(hint);
@@ -323,25 +290,13 @@ veejay_msg(0, "UI Factory: There are %d input channels", n );
 	{
 		void *parameter = NULL;
 		error = vevo_property_get( slot->fx_instance, "out_parameters", q, &parameter );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		void *parameter_templ = NULL;
 		error = vevo_property_get( parameter, "parent_template",0,&parameter_templ);
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		int kind = 0;
 		error = vevo_property_get( parameter_templ, "HOST_kind",0,&kind );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		if( kind == HOST_PARAM_NUMBER || kind == HOST_PARAM_SWITCH || kind == HOST_PARAM_INDEX )
 		{
 			char *parameter_name = vevo_property_get_string(parameter_templ, "name" );
-#ifdef STRICT_CHECKING
-			assert( parameter_name != NULL );
-#endif
 			sprintf(fx_frame, "fxb_%d",q );
 			veejay_ui_bundle_add( osc_send, "/create/vframe", "ssssx", window, box_name,fx_frame, parameter_name );
 			char param_id[32];
@@ -418,9 +373,6 @@ void	vevosample_ui_get_input_parameter_list( void *sample, int fx_id, const char
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	fx_slot_t *rel = (fx_slot_t*) sample_get_fx_port_ptr( srd, fx_id);
-#ifdef STRICT_CHECKING
-			assert( rel->fx_instance != NULL );
-#endif
 	void *osc_send = veejay_get_osc_sender(srd->user_data );
 	if(!osc_send)
 		return;
@@ -440,9 +392,6 @@ void	vevosample_ui_get_input_parameter_list( void *sample, int fx_id, const char
 	for( i = 0; i < n ; i++ )
 	{
 		char *pname = _get_in_parameter_name( rel->fx_instance, i );
-#ifdef STRICT_CHECKING
-		assert( pname != NULL );
-#endif
 		veejay_msg(0, "\t added parameter '%s'", pname );
 		veejay_message_add_argument(
 				osc_send, msg, "s", pname );
@@ -463,10 +412,6 @@ void	vevosample_ui_get_bind_list( void *sample, const char *window )
 	
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	fx_slot_t *sl = (fx_slot_t*) sample_get_fx_port_ptr( srd, fx_id);
-#ifdef STRICT_CHECKING
-	assert( sl->fx_instance != NULL );
-	assert( srd->primary_key == dummy );
-#endif
 	void *osc_send = veejay_get_osc_sender(srd->user_data );
 	if(!osc_send)
 		return;
@@ -494,24 +439,15 @@ void	vevosample_ui_get_bind_list( void *sample, const char *window )
 	for( i = 0; items[i] != NULL ; i ++ )
 	{
 		int n[3];
-#ifdef STRICT_CHECKING
-		assert( sscanf( items[i], "bp%d_%d_%d",&n[BIND_OUT_P],&n[BIND_ENTRY],&n[BIND_IN_P] ) == 3 );
-#else
 		sscanf( items[i], "bp%d_%d_%d", &n[BIND_OUT_P],&n[BIND_ENTRY],&n[BIND_IN_P] );
 #endif
 		fx_slot_t *rel = (fx_slot_t*) sample_get_fx_port_ptr( srd, n[BIND_ENTRY]);
-#ifdef STRICT_CHECKING
-		assert( rel->fx_instance != NULL );
-#endif
 
 		if( n[BIND_OUT_P] == p_num && vevo_property_get(sl->bind, items[i],0,NULL) == VEVO_NO_ERROR )
 		{
 			veejay_msg(0, "'%s' is a valid bind",items[i]);
 			void *filter_template = NULL;
 			int error = vevo_property_get( rel->fx_instance, "filter_templ",0 ,&filter_template );
-#ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );
-#endif
 			char *fxname = vevo_property_get_string( filter_template, "name" );
 
 			char *pname = _get_in_parameter_name( rel->fx_instance, n[BIND_IN_P] );
@@ -570,17 +506,11 @@ static	void	vevosample_ui_construct_bind_list( void *sample, int k, int p_num, v
 		int n[3];
 		sscanf( items[i], "bp%d_%d_%d", &n[BIND_OUT_P],&n[BIND_ENTRY],&n[BIND_IN_P] );
 		fx_slot_t *rel = (fx_slot_t*) sample_get_fx_port_ptr( srd, n[BIND_ENTRY]);
-#ifdef STRICT_CHECKING
-		assert( rel->fx_instance != NULL );
-#endif
 
 		if( n[BIND_OUT_P] == p_num && vevo_property_get( slot->bind, items[i],0,NULL) == VEVO_NO_ERROR)
 		{
 			void *filter_template = NULL;
 			int error = vevo_property_get( rel->fx_instance, "filter_templ",0 ,&filter_template );
-#ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );
-#endif
 			char *fxname = vevo_property_get_string( filter_template, "name" );
 
 			char *pname = _get_in_parameter_name( rel->fx_instance, n[BIND_IN_P] );
@@ -611,9 +541,6 @@ void		vevosample_ui_construct_fx_bind_window( void *sample, int k, int p_id )
 	fx_slot_t *sl = sample_get_fx_port_ptr( srd, k);
 	if(!sl->fx_instance)
 		return;
-#ifdef STRICT_CHECKING
-	assert( osc_send != NULL );
-#endif
 
 	int i;
 	char window_title[128];
@@ -621,9 +548,6 @@ void		vevosample_ui_construct_fx_bind_window( void *sample, int k, int p_id )
 	char *pname = _get_out_parameter_name( sl->fx_instance, p_id );
 	void *filter_template = NULL;
 	int error = vevo_property_get( sl->fx_instance, "filter_templ",0 ,&filter_template );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	char *fxname = vevo_property_get_string( filter_template, "name" );
 	char fx_label[128];
 	char owner[64];
@@ -636,9 +560,6 @@ void		vevosample_ui_construct_fx_bind_window( void *sample, int k, int p_id )
 
 	if(!window)
 		return;
-#ifdef STRICT_CHECKING
-	assert( sl->fx_instance != NULL );
-#endif
 	
 	sprintf(fx_frame, "NewBind%d_%d_%d",k,p_id,id );
 	char bindpath[128];
@@ -658,9 +579,6 @@ void		vevosample_ui_construct_fx_bind_window( void *sample, int k, int p_id )
 		{
 			void *ft = NULL;
 			int error = vevo_property_get( slot->fx_instance, "filter_templ",0,&ft );
-#ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR);
-#endif
 			char *plug = vevo_property_get_string( ft, "name" );
 			sprintf(list_item, "FX %d %s", i, plug );
 			free(plug);
@@ -788,9 +706,6 @@ static	void	vevosample_ui_type_capture( void *sample, const char *window, const 
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	int i;
 	char **list = vj_unicap_get_list( srd->data );
-#ifdef STRICT_CHECKING
-	assert( list != NULL );
-#endif
 	double min=0.0;
 	double max=0.0;
 	char format[5];

@@ -48,10 +48,6 @@
 
 extern	int	vj_tag_size();
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 #ifdef HAVE_FREETYPE
 #include <fcntl.h>
 #include <ft2build.h>
@@ -240,9 +236,6 @@ int	vj_font_srt_sequence_exists( void *font, int id )
 	if(!f->dictionary )
 		return 0;
 
-#ifdef STRICT_CHECKING
-	assert( f->dictionary != NULL );
-#endif
 	char *key = make_key(id);
 	void *srt = NULL;
 	int error = vevo_property_get( f->dictionary, key,0,&srt );
@@ -399,9 +392,6 @@ void			vj_font_set_current( void *font , int cur )
 
 static	void		vj_font_del_srt_sequence( vj_font_t *f, int seq_id )
 {
-#ifdef STRICT_CHECKING
-	assert( f->dictionary != NULL );
-#endif
 	if(seq_id == 0 )
 		seq_id = f->auto_number;
 	
@@ -424,9 +414,6 @@ static	void		vj_font_del_srt_sequence( vj_font_t *f, int seq_id )
 
 static void		vj_font_store_srt_sequence( vj_font_t *f, srt_seq_t *s )
 {
-#ifdef STRICT_CHECKING
-	assert( f->dictionary != NULL );
-#endif	
 	void *srt = NULL;
 	int error = vevo_property_get( f->dictionary, s->key, 0, &srt );
 	if( error == VEVO_NO_ERROR )
@@ -642,9 +629,6 @@ void	vj_font_xml_pack( xmlNodePtr node, void *font )
 	char **items = vevo_list_properties ( ff->dictionary );
         if(!items)
                 return;
-#ifdef STRICT_CHECKING
-        assert( ff->dictionary != NULL );
-#endif
 
 	char buf[100];
 	int i;
@@ -717,9 +701,6 @@ int     vj_font_save_srt( void *font , const char *filename )
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot open file '%s' for writing", filename );
 		return 0;
 	}
-#ifdef STRICT_CHECKING
-	assert( ff->dictionary != NULL );
-#endif
 	for( i = 0; items[i] != NULL ; i ++ )
 	{
 		void *srt = NULL;
@@ -761,9 +742,6 @@ char    *vj_font_get_sequence( void *font, int seq )
 		seq = ff->auto_number;
 	char *key = make_key( seq );	
 
-#ifdef STRICT_CHECKING
-	assert( ff->dictionary != NULL );
-#endif
 	if( vevo_property_get( ff->dictionary, key, 0, &srt ) != VEVO_NO_ERROR )
 		return NULL;
 	
@@ -860,9 +838,6 @@ void    vj_font_set_position( void *font, int x, int y )
 
 	char *key = make_key( seq );	
 
-#ifdef STRICT_CHECKING
-	assert( ff->dictionary != NULL );
-#endif
 	srt_seq_t *s = NULL;
 	if( vevo_property_get( ff->dictionary, key, 0, &s ) != VEVO_NO_ERROR )
 	{
@@ -887,9 +862,6 @@ void    vj_font_set_size_and_font( void *font, int f_id, int size )
 
 	char *key = make_key( seq );	
 
-#ifdef STRICT_CHECKING
-	assert( ff->dictionary != NULL );
-#endif
 	srt_seq_t *s = NULL;
 	if( vevo_property_get( ff->dictionary, key, 0, &s ) != VEVO_NO_ERROR )
 	{
@@ -918,9 +890,6 @@ void    vj_font_update_text( void *font, long s1, long s2, int seq, char *text)
 	if(seq == 0 )
 		seq = ff->auto_number;
 	char *key = make_key( seq );
-#ifdef STRICT_CHECKING
-	assert( ff->dictionary != NULL );
-#endif
 	int error = vevo_property_get( ff->dictionary, key, 0, &srt );
 	if( error != VEVO_NO_ERROR )
 	{
@@ -1226,9 +1195,6 @@ void vj_font_set_outline_and_border( void *font, int outline, int border)
 	int seq = ff->auto_number;
 	char *key = make_key( seq );	
 
-#ifdef STRICT_CHECKING
-	assert( ff->dictionary != NULL );
-#endif
 	srt_seq_t *s = NULL;
 	if( vevo_property_get( ff->dictionary, key, 0, &s ) != VEVO_NO_ERROR )
 	{
@@ -1253,9 +1219,6 @@ void vj_font_set_lncolor( void *font, int r, int g, int b, int a)
 
 	char *key = make_key( seq );	
 
-#ifdef STRICT_CHECKING
-	assert( f->dictionary != NULL );
-#endif
 	srt_seq_t *s = NULL;
 	if( vevo_property_get( f->dictionary, key, 0, &s ) != VEVO_NO_ERROR )
 	{
@@ -1282,9 +1245,6 @@ void vj_font_set_bgcolor( void *font, int r, int g, int b,int a)
 
 	char *key = make_key( seq );	
 
-#ifdef STRICT_CHECKING
-	assert( f->dictionary != NULL );
-#endif
 	srt_seq_t *s = NULL;
 	if( vevo_property_get( f->dictionary, key, 0, &s ) != VEVO_NO_ERROR )
 	{
@@ -1311,9 +1271,6 @@ void vj_font_set_fgcolor( void *font, int r, int g, int b, int a)
 
 	char *key = make_key( seq );	
 
-#ifdef STRICT_CHECKING
-	assert( ff->dictionary != NULL );
-#endif
 	srt_seq_t *s = NULL;
 	if( vevo_property_get( ff->dictionary, key, 0, &s ) != VEVO_NO_ERROR )
 	{
@@ -2322,9 +2279,6 @@ void	vj_font_render_osd_status( void *ctx, void *_picture, char *status_str, int
 void vj_font_render(void *ctx, void *_picture, long position)
 {
 	vj_font_t *f = (vj_font_t *) ctx;
-#ifdef STRICT_CHECKING
-	assert( f->dictionary != NULL );
-#endif
 	font_lock( f );
 	int i;
 	for( i = 0; i < f->index_len; i ++ ) {

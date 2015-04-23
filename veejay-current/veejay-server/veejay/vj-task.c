@@ -50,9 +50,6 @@
 #include <libvje/internal.h>
 #include <veejay/vj-task.h>
 #include <libvje/vje.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
  
 //@ job description
 static	vj_task_arg_t *vj_task_args[MAX_WORKERS];

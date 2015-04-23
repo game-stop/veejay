@@ -139,9 +139,6 @@
 #include <libvje/vje.h>
 #include <veejay/vj-task.h>
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #define BUFSIZE 1024
 
 
@@ -328,9 +325,6 @@ char	*veejay_strncpy( char *dest, const char *src, size_t n )
 
 char	*veejay_strncat( char *s1, char *s2, size_t n )
 {
-#ifdef STRICT_CHECKING
-	assert( strlen(s2) == n );
-#endif
 	//@ run forward
 	char *s = s1;
 	while(*s != '\0' )
@@ -1358,12 +1352,6 @@ static	void	vj_frame_copy_job( void *arg ) {
 	int i;
 	vj_task_arg_t *info = (vj_task_arg_t*) arg;
 	for( i = 0; i < 4; i ++ ) {
-#ifdef STRICT_CHECKING
-		if( info->strides[i] > 0 ) {
-			assert( info->output[i] != NULL );
-			assert( info->input[i] != NULL );
-		}
-#endif
 		if( info->strides[i] <= 0 || info->output[i] == NULL || info->output[i] == NULL )
 			continue;
 		veejay_memcpy( info->output[i], info->input[i], info->strides[i] );
@@ -1373,16 +1361,7 @@ static	void	vj_frame_copy_job( void *arg ) {
 static	void	vj_frame_clear_job( void *arg ) {
 	int i;
 	vj_task_arg_t *info = (vj_task_arg_t*) arg;
-#ifdef STRICT_CHECKING
-	assert( task_get_workers() > 0 );
-#endif
 	for( i = 0; i < 4; i ++ ) {
-#ifdef STRICT_CHECKING
-		if( info->strides[i] > 0 ) {
-			assert( info->input[i] != NULL );
-			assert( info->output[i] != NULL );
-		}
-#endif
 		if( info->strides[i] > 0  )
 			veejay_memset( info->input[i], info->iparam, info->strides[i] );
 	}
@@ -1538,12 +1517,6 @@ void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides  )
 {
 	int i;
 	for( i = 0; i < 4; i ++ )  {
-#ifdef STRICT_CHECKING
-		if( strides[i] > 0 ) {
-			assert( input[i] != NULL );
-			assert( output[i] != NULL );
-		}
-#endif
 		if( input[i] != NULL && output[i] != NULL && strides[i] > 0 )
 			veejay_memcpy( output[i],input[i], strides[i] );
 	}

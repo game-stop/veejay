@@ -59,9 +59,6 @@ void		deinit() {
 
 void		init() {
 	char server_port_name[10];
-#ifdef STRICT_CHECKING
-	assert( uri != NULL );
-#endif
 	char *server 	 = veejay_osc_server_get_addr( info->osc_server );
 	int   server_port= veejay_osc_server_get_port( info->osc_server );	
 
@@ -72,9 +69,6 @@ void		init() {
 	void *ui = veejay_new_osc_sender_uri( uri );
 	veejay_send_osc( ui, "/veejay", "sx", server );
 	int error = vevo_property_set( info->clients, uri, VEVO_ATOM_TYPE_VOIDPTR,1,&ui );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 
 }
 
@@ -86,10 +80,6 @@ void	*veejay_get_osc_sender(veejay_t * info )
 	void *sender = NULL;
 	if(!info->current_client)
 		return NULL;
-#ifdef STRICT_CHECKING
-	assert( info->current_client != NULL );
-	assert( info->clients != NULL );
-#endif
 	int error = vevo_property_get( info->clients, info->current_client, 0, &sender );
 	if( error == VEVO_NO_ERROR )
 		return sender;
@@ -111,9 +101,6 @@ void	veejay_init_ui(veejay_t * info , const char *uri)
 	char veejaystr[100];
 	sprintf(veejaystr, "Veejay-NG %s", VERSION );
 	void *sender = veejay_get_osc_sender( info );
-#ifdef STRICT_CHECKING
-	assert( sender != NULL );
-#endif
 
 	veejay_osc_set_window( sender , "MainWindow" );
 

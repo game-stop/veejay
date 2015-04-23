@@ -32,9 +32,6 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include "avilib.h"
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 #define    RUP8(num)(((num)+8)&~8)
 
@@ -3235,11 +3232,6 @@ int AVI_seek_start(avi_t *AVI)
 
 int AVI_set_video_position(avi_t *AVI, long frame)
 {
-#ifdef STRICT_CHECKING
-	assert( AVI->mode != AVI_MODE_WRITE );
-	assert( AVI->video_index );
-	assert( frame >= 0 && frame < AVI->video_frames);
-#endif
    if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
    if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
 //   if (frame < 0 ) frame = 0;
@@ -3258,11 +3250,6 @@ int AVI_set_audio_bitrate(avi_t *AVI, long bitrate)
 
 long AVI_read_frame(avi_t *AVI, char *vidbuf, int *keyframe)
 {
-#ifdef STRICT_CHECKING
-	assert( AVI->mode != AVI_MODE_WRITE );
-	assert( AVI->video_index );
-	assert( AVI->video_pos >= 0 && AVI->video_pos < AVI->video_frames );
-#endif
 //  if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
     long n = AVI->video_index[AVI->video_pos].len;
 
@@ -3408,12 +3395,6 @@ long AVI_read_audio_chunk(avi_t *AVI, char *audbuf)
 
      if (AVI->track[AVI->aptr].audio_posc+1>AVI->track[AVI->aptr].audio_chunks) return -1;
 
-#ifdef STRICT_CHECKING
-	assert( AVI->mode != AVI_MODE_WRITE );
-	assert( AVI->track[AVI->aptr].audio_index );
-	assert( AVI->track[AVI->aptr].audio_posc+1 <= AVI->track[AVI->aptr].audio_chunks );
-#endif
-
    left = AVI->track[AVI->aptr].audio_index[AVI->track[AVI->aptr].audio_posc].len - AVI->track[AVI->aptr].audio_posb;
    
    if (audbuf == NULL) return left;
@@ -3459,9 +3440,6 @@ int AVI_read_data(avi_t *AVI, char *vidbuf, long max_vidbuf,
    char data[8];
  
 //   if(AVI->mode==AVI_MODE_WRITE) return 0;
-#ifdef STRICT_CHECKING
-	assert( AVI->mode != AVI_MODE_WRITE );
-#endif
    while(1)
    {
       /* Read tag and length */

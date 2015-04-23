@@ -24,9 +24,6 @@
 #include <config.h>
 #ifdef HAVE_V4L
 #include <stdio.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <unistd.h>
 #include <fcntl.h>
 #include <linux/videodev.h>
@@ -42,11 +39,7 @@
 
 #define STRBUF_LENGTH 1024
 
-#ifdef STRICT_CHECKING
-static int v4l_debug = 1; /* 1 = print debug message */
-#else
 static int v4l_debug = 0;
-#endif
 extern int errno;
 static int v4lperror_level = V4L_PERROR_ALL;
 

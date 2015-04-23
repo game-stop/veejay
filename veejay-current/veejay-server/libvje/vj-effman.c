@@ -26,9 +26,6 @@
 #include <libvje/vje.h>
 #include <libvje/internal.h>
 #include <libplugger/plugload.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <veejay/vj-task.h>
 extern vj_effect *vj_effects[]; 
 
@@ -48,9 +45,6 @@ void vj_effman_apply_plug_effect(
 
 {
 	int plug_id = entry - MAX_EFFECTS;
-#ifdef STRICT_CHECKING
-	assert( instance != NULL );
-#endif
 	int n 	    = plug_get_num_input_channels( plug_id );
 
 	int i;
@@ -721,9 +715,6 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 	if( !frames || !frames[0] ) return VJE_NO_FRAMES;
 
 	if( !vj_effect_initialized( selector, ptr ) ) {
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG, "FX %d was dropped but is needed to render chain, instantiating...", selector);
-#endif
 		return VJE_NEED_INIT;
 	}
 

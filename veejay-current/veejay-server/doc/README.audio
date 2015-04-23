@@ -7,7 +7,7 @@ Veejay has limited audio support.
 PREPARE
 -------
 
-You need an AVI file with an audio track encoded in PCM WAVE, 44-48Khz, 2 channels (stereo) and 8 or 16 bit per sample.
+You need an AVI file with an audio track encoded in PCM WAVE, 44-48Khz, 2 channels (stereo) (16 bit)
 
 
 RUN

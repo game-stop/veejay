@@ -56,10 +56,6 @@
 #include <libvje/internal.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/effects/opacity.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 #include <libqrwrap/qrwrapper.h>
 
 #define PERFORM_AUDIO_SIZE 16384
@@ -527,9 +523,6 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
 	uint8_t *buf = vj_malloc(sizeof(uint8_t) * frame_len * 3 * 3);
 	mlock( buf, frame_len * 3 * sizeof(uint8_t));
 
-#ifdef STRICT_CHECKING
-	assert ( buf != NULL );
-#endif
 	if(!buf)
 		return 0;
 
@@ -569,9 +562,6 @@ static int	vj_perform_verify_rows(veejay_t *info )
 	int c,v,has_rows = 0;
 	const int w = info->video_output_width;
 	const int h = info->video_output_height;
-#ifdef STRICT_CHECKING
-	long total_size = 0;
-#endif
 	for(c=0; c < SAMPLE_MAX_EFFECTS; c++)
 	{
 	  	v = (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ? 
@@ -580,24 +570,11 @@ static int	vj_perform_verify_rows(veejay_t *info )
 	  	{
 			if(!vj_perform_row_used(c))
 			{
-#ifdef STRICT_CHECKING
-				long size = vj_perform_alloc_row( info, c, w*h);
-				if( size <= 0 )
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate memory for FX entry %d",c);
-					veejay_change_state( info, LAVPLAY_STATE_STOP );
-					return -1;
-				}
-				else {
-					total_size += size;
-				}
-#else
 			    if( vj_perform_alloc_row( info, c, w * h ) <= 0 ) {
 					veejay_msg(0, "Unable to allocate memory for FX entry %d",c );
 					veejay_change_state( info, LAVPLAY_STATE_STOP );
 					return -1;
 				}
-#endif
 			}
 			has_rows ++;
 		}
@@ -607,11 +584,6 @@ static int	vj_perform_verify_rows(veejay_t *info )
 				vj_perform_free_row(c);	
 		}
 	}
-#ifdef STRICT_CHECKING
-	if(total_size > 0) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Total Mb used in FX Chain: %2.2f", (float) (total_size / 1048576.0f ) );
-	}
-#endif
 	return has_rows;
 }
 
@@ -685,10 +657,6 @@ int vj_perform_init(veejay_t * info)
 		if( mlock( primary_buffer[c]->Y, buf_len ) != 0 ) {
 			mlock_success = 0;
 		}
-#ifdef STRICT_CHECKING
-		assert( primary_buffer[c] != NULL );
-		assert( primary_buffer[c]->Y != NULL );
-#endif
 		primary_buffer[c]->Cb = primary_buffer[c]->Y + frame_len;
 		primary_buffer[c]->Cr = primary_buffer[c]->Cb + frame_len;
 
@@ -1125,9 +1093,6 @@ static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_
 		return 0;
 	}
 	uint32_t size1 = ( *p1_len );
-#ifdef STRICT_CHECKING
-	assert(size1>0);
-#endif
 	dstI = dst + 16 + (sizeof(uint8_t) * size1 );
 	
 	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cb, dstI, p2_len, uv_len );
@@ -1138,9 +1103,6 @@ static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_
 	}
 
 	uint32_t size2 = ( *p2_len );
-#ifdef STRICT_CHECKING
-	assert( size2 > 0);
-#endif
 	dstI = dst + 16 + size1 + size2;
 
 	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cr, dstI, p3_len, uv_len );
@@ -1151,10 +1113,6 @@ static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_
 	}	
 
 	uint32_t size3 = ( *p3_len );
-
-#ifdef STRICT_CHECKING
-	assert( size3 > 0 );
-#endif
 
 	long2str( dst,size1);
 	long2str( dst+4, size2 );
@@ -1475,9 +1433,6 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,int chain_ent
 			if(sample_b[2] == 3 )
 				offset = 0;
 		}
-#ifdef STRICT_CHECKING
-		assert( offset >= 0 );
-#endif
 		sample_set_offset(a, chain_entry, offset);
 
 		return (sample_b[0] + offset); //1

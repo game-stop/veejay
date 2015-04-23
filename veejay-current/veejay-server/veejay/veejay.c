@@ -607,16 +607,7 @@ static int check_command_line_options(int argc, char *argv[])
 	    /* These are the old getopt-values (non-long) */
 	default:
 	    sprintf(option, "%c", n);
-#ifdef STRICT_CHECKING
-	    {
-		int tmpn = set_option( option,optarg );
-		if(tmpn)
-			veejay_msg(VEEJAY_MSG_ERROR, "Error setting option '%c'", option );
-		nerr += tmpn;
-	    }
-#else
 	    nerr += set_option(option, optarg);
-#endif	    
 	    break;
 	}
 	
@@ -828,8 +819,5 @@ int main(int argc, char **argv)
 
 	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
 
-#ifdef STRICT_CHECKING
-	vevo_report_stats();
-#endif
 	return 0;
 }

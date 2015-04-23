@@ -68,9 +68,6 @@
 /* Highest possible SDL Key identifier */
 #define MAX_SDL_KEY	(3 * SDLK_LAST) + 1  
 #define MSG_MIN_LEN	  4 /* stripped ';' */
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
 #endif
@@ -376,19 +373,7 @@ if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8
 
 
 /* some macros for commonly used checks */
-
-#ifdef STRICT_CHECKING
-static int SAMPLE_PLAYING( veejay_t *v ) {
-	if( v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
-		return 1;
-	if( v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_SAMPLE )
-		return 1;
-	return 0;
-}
-#else
-
 #define SAMPLE_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) || (v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_SAMPLE) )
-#endif
 #define STREAM_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) || (v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_TAG))
 #define PLAIN_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) || (v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_PLAIN))
 
@@ -807,9 +792,6 @@ int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id )
 
 static	void	constrain_sample( veejay_t *v,int n )
 {
-#ifdef STRICT_CHECKING
-	assert( v->font != NULL );
-#endif
 	vj_font_set_dict(v->font, sample_get_dict(n) );
 	//	v->current_edit_list->video_fps,
 	vj_font_prepare( v->font, sample_get_startFrame(n),
@@ -819,9 +801,6 @@ static	void	constrain_sample( veejay_t *v,int n )
 
 static	void	constrain_stream( veejay_t *v, int n, long hi )
 {
-#ifdef STRICT_CHECKING
-	assert(v->font != NULL );
-#endif
 	vj_font_set_dict(v->font, vj_tag_get_dict(n) );
 	//	v->current_edit_list->video_fps,
 	vj_font_prepare( v->font, 0, vj_tag_get_n_frames(n) );
@@ -1486,22 +1465,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		veejay_msg(VEEJAY_MSG_ERROR, "Error parsing VIMS selector");
 		return 0;
 	}
-#ifdef STRICT_CHECKING
-	char *dbg_msg = vj_event_vevo_get_event_name( net_id );
-	if( dbg_msg == NULL ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "No event knownn by '%d' (%s)", net_id,msg );
-	} else {
-		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS '%s' %s",msg,dbg_msg );
-		free(dbg_msg);
-	}
-#endif
-#ifndef STRICT_CHECKING
-	if( net_id != 412 && net_id != 333)
-#else
 	
-		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: @%ld Parse message '%s'",v->settings->current_frame_num, msg );
-	
-#endif
 	if( net_id <= 0 || net_id >= VIMS_MAX )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "VIMS Selector %d invalid", net_id );
@@ -1978,10 +1942,6 @@ static	int	get_cstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, char *d
 		t   = UTF8toLAT1(tmp);
 		if(!t)
 			return 0;
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG, "Load string property '%s' with value '%s'",
-			cur->name, t);
-#endif
 
 		veejay_strncpy( dst, t, strlen(t) );	
 		free(t);
@@ -2002,10 +1962,6 @@ static	int	get_fstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, float *
 		t   = UTF8toLAT1(tmp);
 		if(!t)
 			return 0;
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG, "Load float property '%s' with value '%s'",
-			cur->name, t);
-#endif
 
 		n = sscanf( t, "%f", &tmp_f );
 		free(t);
@@ -2036,10 +1992,6 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 			veejay_msg(VEEJAY_MSG_ERROR, "Input not in UTF8 format!");
 			return 0;
 		}
-#ifdef STRICT_CHECKING
-		veejay_msg(VEEJAY_MSG_DEBUG, "Load int property '%s' with value '%s'",
-			cur->name, t);
-#endif
 
 		n = sscanf( t, "%d", &tmp_i );
 		free(t);
@@ -3014,9 +2966,6 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 				continue;
 
 			m = vj_event_bundle_get(i);
-#ifdef STRICT_CHECKING
-			assert( m!= NULL);
-#endif
 
 			int bun_len = strlen(m->bundle);
 			if( bun_len <= 0 )
@@ -3034,9 +2983,6 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 		
 			char *name = vj_event_vevo_get_event_name(i);
 			char *form  = vj_event_vevo_get_event_format(i);
-#ifdef STRICT_CHECKING
-			assert( name != NULL );
-#endif
 			int name_len = strlen(name);
 			int form_len = (form ? strlen(form)  : 0);
 #ifdef HAVE_SDL
@@ -3049,10 +2995,6 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 
 				veejay_strncat( buf,tmp,strlen(tmp));
 
-#ifdef STRICT_CHECKING
-				if( tree->arg_len )
-					assert( tree->args != NULL );
-#endif	
 				if(form)
 					veejay_strncat( buf, form, form_len);	
 				if(tree->arg_len)

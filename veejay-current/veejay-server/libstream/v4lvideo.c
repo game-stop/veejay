@@ -42,9 +42,6 @@
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
 #include <pthread.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 typedef struct _normlist
 {
@@ -177,17 +174,6 @@ void *v4lvideo_init( char* file, int channel, int norm, int freq, int dst_w, int
 
 	return v;
 }
-#ifdef STRICT_CHECKING
-static void lock__(v4lvideo_template_t *t, const char *f, int line) {
-	pthread_mutex_lock(&(t->mutex));
-}
-static void unlock__(v4lvideo_template_t *t, const char *f, int line) {
-	pthread_mutex_unlock(&(t->mutex));
-}
-#define lock_(t) lock__(t,__FUNCTION__,__LINE__)
-#define unlock_(t) unlock__(t, __FUNCTION__ ,__LINE__)
-
-#else
 static void lock_(v4lvideo_template_t *t)
 {
         pthread_mutex_lock( &(t->mutex ));
@@ -196,7 +182,6 @@ static void unlock_(v4lvideo_template_t *t)
 {
         pthread_mutex_unlock( &(t->mutex ));
 }
-#endif
 
 int	v4lvideo_templ_get_palette( int p )
 {
@@ -329,9 +314,6 @@ static	int		v4lvideo_fun(v4lvideo_t *v, int w, int h, int palette, int *cap_pale
 	int supported_palette = -1;
 	
 	int is_jpeg[2]	      = {0,0};
-#ifdef STRICT_CHECKING
-	assert( v != NULL );
-#endif	
 	while( palette_descr_[i].id != -1 ) {
 		if(palette_descr_[i].id == VIDEO_PALETTE_JPEG ) {
 			i ++;
@@ -392,9 +374,6 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 	} else {
 		if( fun == VIDEO_PALETTE_JPEG ) {
 			veejay_msg(VEEJAY_MSG_WARNING, "Grabbing JPEG from video device");
-#ifdef STRICT_CHECKING
-			assert( arr[0] == 1 );
-#endif
 			skip = 1;
 			supported_palette = fun;
 			*cap_palette = arr[1];
@@ -424,10 +403,6 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 	v4lprocessing *p = (v4lprocessing*) vj_calloc(sizeof(v4lprocessing));
 	p->src_fmt = get_ffmpeg_palette( supported_palette );
 	p->dst_fmt = get_ffmpeg_palette( palette );
-#ifdef STRICT_CHECKING
-	assert( p->src_fmt != -1 );
-	assert( p->dst_fmt != -1 );
-#endif
 
 	int max_w = v->vd.capability.maxwidth;
 	int min_w = v->vd.capability.minwidth;
@@ -491,9 +466,6 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 
 char	**v4lvideo_templ_get_devices(int *num)
 {
-#ifdef STRICT_CHECKING
-	assert( device_list_ != NULL );
-#endif
 	char **items = (char**) vevo_list_properties( device_list_ );
 	char filename[200];
 	int error = 0;
@@ -517,9 +489,6 @@ char	**v4lvideo_templ_get_devices(int *num)
 	char tmp[1024];
 	for( i = 0; items[i] != NULL ; i ++ ) {
 		error = vevo_property_get(device_list_,items[i],0,NULL);
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif	
 		size_t name_len = vevo_property_element_size( device_list_, items[i], 0 );
 		char   *name    = (char*) vj_calloc(name_len);
 		vevo_property_get( device_list_, items[i], 0, &name );
@@ -548,9 +517,6 @@ void	v4lvideo_templ_init()
 		char *name = v4lgetdevicename( &(v->vd));
 		snprintf(key,sizeof(key), "%d",i);
 		int error = vevo_property_set( device_list_, key, VEVO_ATOM_TYPE_STRING, 1,&name );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
 		veejay_msg(VEEJAY_MSG_DEBUG, "Detected %s as device /dev/video/%d",name,i);
 		device_count_ ++;
 
@@ -664,10 +630,6 @@ static int	__v4lvideo_init( v4lvideo_t *v, char *file, int channel, int norm, in
 	
 	v->native     = v->info->native;
 
-#ifdef STRICT_CHECKING
-	assert(v->info != NULL);
-#endif
-
 	return 1;
 }
 
@@ -732,26 +694,17 @@ int	v4lvideo_grab_check(v4lvideo_t *v, int palette ) {
 	int ret=0;
 	v4lseterrorlevel( V4L_PERROR_NONE );
 	if( v4lvideo_set_grabformat(v, palette ) ) {	
-#ifdef STRICT_CHECKING
-		veejay_msg(0,"%s: wrong palette %s", __FUNCTION__,get_palette_name( palette) );
-#endif
 		ret = -1;
 		goto VIDEOEXIT;
 	}
 
 	if( v4lgrabstart( &(v->vd),0) < 0 ) {
-#ifdef STRICT_CHECKING
-		veejay_msg(0, "%s: Unable to start grabbing.", __FUNCTION__ );
-#endif
 		ret = -1;	
 		goto VIDEOEXIT;
 	}
 	ret = v4lsync( &(v->vd),0);
 	return ret;
 VIDEOEXIT:
-#ifdef STRICT_CHECKING
-	veejay_msg(0, "%s: Bail", __FUNCTION__ );
-#endif
 	v4lseterrorlevel( V4L_PERROR_ALL );
 	return ret;
 }
@@ -779,10 +732,6 @@ static	void	*v4lvideo_grabber_thread( void * vv )
 		veejay_msg(0, "Unable to open capture device '%s' in %dx%d - %s",
 			i->filename, v->video_width,v->video_height,get_palette_name(v->video_palette) );
 		i->error = 1;
-#ifdef STRICT_CHECKING
-		veejay_msg(0,"%s: Giving up, unable to open %s, channel %d, norm %x, %dx%d palette %x",
-			__FUNCTION__, i->filename  , i->channel, i->norm, i->width, i->height, i->palette );
-#endif
 		unlock_(i);
 		pthread_exit(NULL);
 		return NULL;
@@ -909,13 +858,6 @@ int	v4lvideo_grabstart( void *vv )
 static int	__v4lvideo_grabstart( void *vv )
 {
 	v4lvideo_t *v = (v4lvideo_t*) vv;
-#ifdef STRICT_CHECKING
-	void *ptr = (void*) &(v->vd);
-	assert( ptr != NULL );
-	assert( v->video_width > 0 );
-	assert( v->video_height > 0 );
-//	assert( v->info != NULL );
-#endif
 	
 	v->vd.frame = 0;
 	if( v4lgrabstart( &(v->vd), 0 ) < 0 ) {
@@ -970,9 +912,6 @@ int	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8_
 		unlock_(v);
 		return 0;
 	}
-#ifdef STRICT_CHECKING
-	assert( v->v4l != NULL );
-#endif
 	v4lvideo_t *v1 = (v4lvideo_t*) v->v4l;
 	if( v1->has_video ) {
 			uint8_t *src = v->frame_buffer;
@@ -994,9 +933,6 @@ int	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8_
 static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *v2, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV )
 {
 	uint8_t *src  = NULL;
-#ifdef STRICT_CHECKING
-	assert(v1->info != NULL );
-#endif
 	if( v1->native == 1 ) {
 		src = v4lgetaddress(&(v1->vd));
 	/*	lock_(v2);
@@ -1072,9 +1008,6 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 			srcf->data[0] = src;
 			srcf->data[1] = src + srcf->len;
 			srcf->data[2] = src + srcf->len + srcf->uv_len;
-#ifdef STRICT_CHECKING
-			assert(0);
-#endif
 				
 		} else {*/
 			srcf->data[0] = v4lgetaddress(&(v1->vd));

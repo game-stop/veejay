@@ -36,9 +36,6 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 
 char		*get_str_vevo( void *port, const char *key ){
@@ -55,11 +52,6 @@ char		*alloc_str_vevo( void *port, const char *key )
 	if( vevo_property_get( port, key,0,NULL ) != VEVO_NO_ERROR )
 		return NULL;
 
-#ifdef STRICT_CHECKING
-	int at = vevo_property_atom_type( port, key );
-
-	assert( at == VEVO_ATOM_TYPE_STRING || at == VEVO_ATOM_TYPE_UTF8STRING );
-#endif
         ret = (char*) vj_malloc(sizeof(char) * len );
 	return ret;
 }
@@ -140,22 +132,13 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 			for( i= 0; i < num; i ++ )
 			{
 				error = vevo_property_get( port,key,i, &(itmp[i]) );
-#ifdef STRICT_CHECKING
-				assert( error == VEVO_NO_ERROR );
-#endif
 			}
 			error = vevo_property_set( to_port, as_key, type, num, &itmp );
-#ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );
-#endif
 			break;
 		case VEVO_ATOM_TYPE_DOUBLE:
 			for( i = 0; i < num ; i++ )
 			{
 				error = vevo_property_get( port, key, i, &(dtemp[i]));
-#ifdef STRICT_CHECKING
-				assert( error == VEVO_NO_ERROR );
-#endif
 			}
 		//@ FIXME: scale parameter and treat as TYPE_INT
 
@@ -165,9 +148,6 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 
 			error = vevo_property_set( to_port, as_key, VEVO_ATOM_TYPE_INT, num, &itmp );
 		//		error = vevo_property_set( to_port, as_key, type, num, &dtemp );
-#ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );
-#endif
 		//	veejay_msg(0, "\t\tValue is %g ", dtemp[0] );
 			break;
 		//@ FIXME: not supported yet
@@ -179,20 +159,11 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 				if( len > 0 ) continue;
 				stmp[i] = (char*) vj_malloc(sizeof(char) * len );
 				error = vevo_property_get( port, key, i, &(stmp[i]) );
-#ifdef STRICT_CHECKING
-				assert( error == VEVO_NO_ERROR );
-#endif
 			}
 			error = vevo_property_set( to_port, as_key, type, num, &stmp );
-#ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );
-#endif
 			break;*/
 		default:
 			veejay_msg(0, "Internal error. Cannot clone this type of atom");
-#ifdef STRICT_CHECKING
-			assert(0);
-#endif
 			break;
 
 	}
@@ -203,9 +174,6 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 void		clone_prop_vevo2( void *port, void *to_port, const char *key, const char *as_key )
 {
 	int n = vevo_property_atom_type( port ,key);
-#ifdef STRICT_CHECKING
-	assert( n >= 0 );
-#endif
 	int itmp = 0;
 	double dtmp = 0.0;
 	int error = 0;
@@ -214,43 +182,18 @@ void		clone_prop_vevo2( void *port, void *to_port, const char *key, const char *
 	{
 		case VEVO_ATOM_TYPE_INT:
 			error = vevo_property_get( port, key, 0, &itmp );
-#ifdef STRICT_CHECKING
-			assert( error == LIVIDO_NO_ERROR);
-#endif
 			error = vevo_property_set( to_port, as_key, n, 1, &itmp );
-#ifdef STRICT_CHECKING
-			assert( error == LIVIDO_NO_ERROR);
-#endif
 			break;
 		case VEVO_ATOM_TYPE_DOUBLE:
 			error = vevo_property_get( port, key, 0, &dtmp );
-#ifdef STRICT_CHECKING
-			assert( error == LIVIDO_NO_ERROR);
-			assert( to_port != NULL );
-			assert( key != NULL );
-#endif	
 			error = vevo_property_set( to_port, as_key, n, 1, &dtmp );
-#ifdef STRICT_CHECKING
-			assert( error == LIVIDO_NO_ERROR);
-#endif
-
 			break;
 		case VEVO_ATOM_TYPE_BOOL:
 			error = vevo_property_get( port, key, 0, &itmp );
-#ifdef STRICT_CHECKING
-			assert( error == LIVIDO_NO_ERROR);
-#endif
 			error = vevo_property_set( to_port, as_key, n, 1, &itmp );
-#ifdef STRICT_CHECKING
-			assert( error == LIVIDO_NO_ERROR );
-#endif
-
 			break;
 		default:
-#ifdef STRICT_CHECKING
 			veejay_msg(0, "Type %d cannot be cloned",n);
-			assert(  0 );
-#endif
 			break;
 	}
 }

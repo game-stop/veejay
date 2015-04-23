@@ -37,9 +37,6 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include <veejay/vj-OSC.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -239,10 +236,6 @@ static int	osc_has_connection( char *name ) {
 			continue;
 
 		size_t len = vevo_property_element_size( port, "connection", 0 );
-#ifdef STRICT_CHECKING
-		assert( len > 0 );
-#endif
-		
 		char       *con = malloc( sizeof(char) * len );
 		int err   	= vevo_property_get(port, "connection", 0,&con );
 		if( err == VEVO_NO_ERROR ) {
@@ -420,11 +413,6 @@ static	void	osc_iterate_clients()
 	       	int err = vevo_property_get( port, "lo", 0, &clnt );
 		if( err == VEVO_NO_ERROR ) {
 			size_t len = vevo_property_element_size( port, "cmd", 0 );
-#ifdef STRICT_CHECKING
-			assert( len > 0 );
-#endif
-			
-			
 			char       *cmd = malloc( sizeof(char) * len );
 			err = vevo_property_get( port, "cmd", 0, &cmd );
 
@@ -734,10 +722,9 @@ int 	vj_osc_build_cont( vj_osc *o )
 				continue;
 		
 			err = vevo_property_get( o->index, arr[t-1], 0, &attach_id );
-#ifdef STRICT_CHECKING
-			assert( err == VEVO_NO_ERROR );
-#endif
-		
+			if( err != VEVO_NO_ERROR ) {
+				break;
+			}	
 			err = vevo_property_get( o->index, arr[t], 0, &exists );
 			if( err == VEVO_NO_ERROR ) {
 				continue;
@@ -746,10 +733,6 @@ int 	vj_osc_build_cont( vj_osc *o )
 			o->leaves[next_id] = OSCNewContainer( arr[t], o->leaves[attach_id], &(o->cqinfo ));
 			
 			err = vevo_property_set( o->index, arr[t], VEVO_ATOM_TYPE_INT, 1, &next_id );
-#ifdef STRICT_CHECKING
-			assert(err==VEVO_NO_ERROR);
-#endif
-			
 			next_id ++;
 
 			//veejay_msg(0, "Added leave '%s'%d to container '%s'%d", arr[t],next_id-1,arr[t-1],attach_id);
@@ -771,10 +754,6 @@ int 	vj_osc_build_cont( vj_osc *o )
 		int method = containers - 1;
 		
 		err = vevo_property_get( o->index, arr[method-1], 0, &leave_id );
-#ifdef STRICT_CHECKING
-		assert( err == VEVO_NO_ERROR );
-#endif	
-
 #ifdef HAVE_LIBLO
 		if( osc_method_layout[i].vims_id == -2 ) {
 			o->ris.description = strdup( "Setup a OSC sender (Arg 0=host, 1=port)");

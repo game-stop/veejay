@@ -30,10 +30,6 @@
 #include <libvjmsg/vj-msg.h>
 #include "softblur.h"
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
-
 typedef struct
 {
 	uint8_t	*b[3];
@@ -94,12 +90,6 @@ int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *d
 	c->mean[0] = meanY;
 	c->mean[1] = meanU;
 	c->mean[2] = meanV;
-#ifdef STRICT_CHECKING
-	assert ( data != NULL );
-	assert ( meanY > 0 );
-	assert( meanU > 0 );
-	assert( meanV > 0 );
-#endif
 	return 1;
 }
 

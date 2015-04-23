@@ -37,9 +37,6 @@
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #endif
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 /* veejay server stores keyframes 
  *
  *
@@ -134,9 +131,6 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 			buf[2] = 0;
 			buf[3] = 0;
 			k++;
-#ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "No keyframe at position %d", i );
-#endif
 		}*/
 
 		free(key);

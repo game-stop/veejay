@@ -39,9 +39,6 @@
 #define V_BITS 24
 #include <libplugger/freeframe-loader.h>
 #include <libvje/vje.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
 typedef struct
 {
@@ -257,9 +254,6 @@ void	freeframe_plug_retrieve_default_values( void *instance, void *fx_values )
 {
 	void *base = NULL;
 	int error = vevo_property_get( instance, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 
 	plugMainType *q = (plugMainType*) base; 
 
@@ -281,9 +275,6 @@ void	freeframe_plug_retrieve_current_values( void *instance, void *fx_values )
 {
 	void *base = NULL;
 	int error = vevo_property_get( instance, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 
 	plugMainType *q = (plugMainType*) base; 
 
@@ -312,9 +303,6 @@ void	freeframe_reverse_clone_parameter( void *instance, int seq, void *fx_values
 {
 	void *base = NULL;
 	int error = vevo_property_get( instance, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 
 	plugMainType *q = (plugMainType*) base; 
 
@@ -345,10 +333,6 @@ void	freeframe_clone_parameter( void *instance, int seq, void *fx_values )
 	// put fx_values to freeframe
 	void *base = NULL;
 	int error = vevo_property_get( instance, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-	assert(0); //@ this function must be dropped
-#endif
 
 	plugMainType *q = (plugMainType*) base; 
 
@@ -356,9 +340,6 @@ void	freeframe_clone_parameter( void *instance, int seq, void *fx_values )
 	int i;
 	DWORD inp = 0;
 	error = vevo_property_get( instance, "instance", 0, &inp );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	error = vevo_property_get( instance, "num_params",0,&n);
 
 	for( i = 0; i < n; i ++ )
@@ -388,15 +369,8 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 	v.orientation = 1;
 	v.bitDepth = FF_CAP_V_BITS_VIDEO;
 
-#ifdef STRICT_CHECKING
-	assert( v.bitDepth == FF_CAP_32BITVIDEO ); 
-#endif	
-
 	void *base = NULL;
 	int error = vevo_property_get( plugin, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	plugMainType *q = (plugMainType*) base; 
 
 	DWORD instance = q( FF_INSTANTIATE, &v, 0).ivalue;
@@ -508,9 +482,6 @@ void	freeframe_plug_deinit( void *pluginstance )
 {
 	void *base = NULL;
 	int error = vevo_property_get( pluginstance, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	plugMainType *q = (plugMainType*) base; 
 
 	DWORD instance = 0;
@@ -529,9 +500,6 @@ void	freeframe_plug_free( void *plugin )
 	int n = 0;
 	void *base = NULL;
 	int error = vevo_property_get( plugin, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	plugMainType *q = (plugMainType*) base;
 	
 	q( FF_DEINITIALISE, NULL, 0 );
@@ -550,16 +518,8 @@ void	freeframe_push_channel( void *instance, int n,int dir, VJFrame *frame )
 	if(dir == 1){
 		vevo_property_set( instance, "HOST_output", VEVO_ATOM_TYPE_VOIDPTR,1,&frame );
 	} else  {
-#ifdef STRICT_CHECKING
-		assert( freeframe_frame_[n] != NULL );
-		assert(yuv_conv_ != NULL );
-		assert( dir == 0 );
-		assert( n >= 0 && n < 4 );
-#endif
 		yuv_convert_and_scale_rgb( yuv_conv_, frame, freeframe_frame_[ n ] );
-
 	}
-	
 }
 
 
@@ -567,27 +527,16 @@ int	freeframe_plug_process( void *plugin, double timecode )
 {
 	void *base = NULL;
 	int error = vevo_property_get( plugin, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 
 	plugMainType *q = (plugMainType*) base; 
 	DWORD instance = 0;
 	error = vevo_property_get( plugin, "instance",0, &instance );	
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-	assert( instance != 0 );
-#endif
 	
 	q( FF_PROCESSFRAME, freeframe_space_, instance );
 
 	VJFrame *output_frame = NULL;
 	
 	error = vevo_property_get( plugin, "HOST_output", 0,&output_frame );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-	assert( output_frame != NULL );
-#endif
 	
 	//@ output frame in [0]
 	yuv_convert_and_scale_from_rgb( rgb_conv_, freeframe_frame_[0], output_frame );
@@ -620,14 +569,8 @@ void	freeframe_plug_param_f( void *plugin, int seq_no, void *dargs )
 
 	void *base = NULL;
 	error = vevo_property_get( plugin, "base", 0, &base);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	DWORD instance = 0;
 	error = vevo_property_get( plugin, "instance", 0, &instance );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	plugMainType *q = (plugMainType*) base; 
 
 	q( FF_SETPARAMETER, &sps, instance );
