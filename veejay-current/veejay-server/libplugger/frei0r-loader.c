@@ -107,6 +107,7 @@ static struct  {
 	{ "scanline0r",0, 1 },
 	{ "RGB-Parade", 0, 1 },
 	{ "pr0file",0,2 },
+	{ "NDVI filter", 0, 1},
 	{ NULL, 0, 0 },
 };
 
