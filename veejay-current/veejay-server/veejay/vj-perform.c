@@ -758,6 +758,8 @@ static void vj_perform_close_audio() {
 			audio_resample_close( resample_context[i] );
 		if(downsample_context[i])
 			audio_resample_close( downsample_context[i]);
+		resample_context[i] = NULL;
+		downsample_context[i] = NULL;
 	}
 
 #endif
@@ -1275,10 +1277,9 @@ static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 {
 	int n_a = vj_effect_get_num_params(e);
 	int entry = e;
-	int err = 0;
 	int args[16];
-
 	veejay_memset( args, 0 , sizeof(args) );
+	
 	if( playmode == VJ_PLAYBACK_MODE_TAG )
 	{
 		if(!vj_tag_get_all_effect_args(todo_info->ref, c, args, n_a, n_frame ))
@@ -1290,8 +1291,7 @@ static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 			return 1;
 	}
 
-	err = vj_effect_apply( frames, frameinfo, todo_info,entry, args, ptr );
-	return err;
+	return vj_effect_apply( frames, frameinfo, todo_info,entry, args, ptr );
 }
 
 #ifdef HAVE_JACK
@@ -1958,6 +1958,7 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 		{
  			int sub_mode = vj_effect_get_subformat(effect_id);
 			int ef = vj_effect_get_extra_frame(effect_id);
+			int res = 0;
 			if(ef)
 			{
 		    		int sub_id = vj_tag_get_chain_channel(info->uc->sample_id, chain_entry); // what id
@@ -2019,8 +2020,7 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 
 			if(vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 						(int) settings->current_frame_num, 
-						vj_tag_get_plugin(info->uc->sample_id,chain_entry,NULL),info->uc->playback_mode) ==-2) {
-				int res = 0;
+						vj_tag_get_plugin(info->uc->sample_id,chain_entry,NULL),info->uc->playback_mode) == -2) {
 				void *pfx = vj_effect_activate( effect_id, &res );
 				if( res )  {
 					settings->fxrow[chain_entry] = effect_id;
@@ -2772,7 +2772,7 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++) {
 			k = sample_get_chain_channel(info->uc->sample_id, i );
 			tmp = sample_get_chain_source( info->uc->sample_id, i );
-			if( (tmp == 0 && sample_exists(k) || (tmp > 0 && vj_tag_exists(k)) )) {
+			if( (tmp == 0 && sample_exists(k)) || (tmp > 0 && vj_tag_exists(k) )) {
 				pvar_.follow_now[1] = tmp;	
 				pvar_.follow_now[0] = k;
 				break;
@@ -2843,7 +2843,7 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 		for( i = 0; i < SAMPLE_MAX_EFFECTS - 1; i ++ ) {
 			k = vj_tag_get_chain_channel(info->uc->sample_id, i );
 			tmp = vj_tag_get_chain_source( info->uc->sample_id, i );
-			if( (tmp == 0 && sample_exists(k) || (tmp > 0 && vj_tag_exists(k)) )) {
+			if( (tmp == 0 && sample_exists(k)) || (tmp > 0 && vj_tag_exists(k)) ) {
 				pvar_.follow_now[1] = tmp;	
 				pvar_.follow_now[0] = k;
 				break;

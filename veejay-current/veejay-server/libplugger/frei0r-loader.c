@@ -106,6 +106,7 @@ static struct  {
 	{ "Curves", 0, 1 },
 	{ "scanline0r",0, 1 },
 	{ "RGB-Parade", 0, 1 },
+	{ "pr0file",0,2 },
 	{ NULL, 0, 0 },
 };
 
@@ -185,7 +186,8 @@ static inline void *frei0r_plug_get_param( void *parent, int vj_seq_no, int *hin
 {
 	void *param = frei0r_plug_get_parameter_port( parent, vj_seq_no );
 	int type = -1;
-
+	if( param == NULL )
+		return NULL;
 	vevo_property_get( param, "hint", 0, &type );
 	
 	*hint = type;
