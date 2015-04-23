@@ -294,7 +294,6 @@ static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
 
 	key_t key = ftok( path, tries ); //@ whatever 
 	if( key == -1 ) {
-		veejay_msg(0,"ftok returns error: %s", strerror(errno));
 		return 0;
 	}
 
@@ -368,8 +367,8 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	uint8_t *U = Y + (frame->width * frame->height);
 	uint8_t *V = U + ( (frame->width * frame->height)/2);
 	
-	veejay_memset( U, 128, (frame->width*frame->height)/2);
-	veejay_memset( V, 128, (frame->width*frame->height)/2);
+	veejay_memset( U, 128, frame->uv_len);
+	veejay_memset( V, 128, frame->uv_len);
 
 	//@ set up frame info (fixme, incomplete)
 //	vj_shared_data *data = (vj_shared_data*) &(v->sms[0]);
@@ -387,6 +386,8 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Frame data      : %p", data + HEADER_LENGTH );
 	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Static resolution of %d x %d, YUV 4:2:2 planar",
 			data->header[0],data->header[1] );
+	veejay_msg(VEEJAY_MSG_DEBUG,"Shared Resource:  Planes {%d,%d,%d} format %d",
+			data->header[2],data->header[3],data->header[4],data->header[5]);
 
 	int	res	= pthread_rwlockattr_init( &rw_lock_attr );
 	if( res == -1 ) {
