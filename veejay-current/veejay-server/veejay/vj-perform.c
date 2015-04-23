@@ -926,8 +926,7 @@ int vj_perform_audio_start(veejay_t * info)
 		{
 			vj_jack_stop();
 			info->audio = NO_AUDIO;
-			veejay_msg(VEEJAY_MSG_WARNING,"Please run jackd with a sample rate of %ld",
-					el->audio_rate );
+			veejay_msg(VEEJAY_MSG_ERROR,"Please run jackd with a sample rate of %ld",el->audio_rate );
 			return 0;
 		}
 
