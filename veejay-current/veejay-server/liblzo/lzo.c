@@ -26,7 +26,6 @@
 #include <libvjmsg/vj-msg.h>
 #include <liblzo/lzo.h>
 #include <libyuv/yuvconv.h>
-#include <liblzo/lzoconf.h>
 #include <liblzo/minilzo.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>

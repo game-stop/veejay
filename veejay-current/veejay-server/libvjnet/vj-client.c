@@ -45,8 +45,8 @@
 #define VJC_NO_MEM 1
 #define VJC_SOCKET 2
 #define VJC_BAD_HOST 3
-
-#define PACKET_LEN (65535*2)
+#define RUP8(num)(((num)+8)&~8)
+#define PACKET_LEN 4096
 
 extern int get_ffmpeg_pixfmt( int p);
 
@@ -62,6 +62,7 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	v->cur_width = w;
 	v->cur_height = h;
 	v->cur_fmt = get_ffmpeg_pixfmt(f);
+	v->orig_fmt = v->cur_fmt;
 	v->blob = (unsigned char*) vj_calloc(sizeof(unsigned char) * PACKET_LEN ); 
 	if(!v->blob ) {
 		veejay_msg(0, "Memory allocation error.");
@@ -239,52 +240,6 @@ static	uint32_t	getint(uint8_t *in, int len ) {
 	free(word);
 	return (uint32_t) v;
 }
-/*
-#define LIVES_HEADER_LENGTH 1024
-#define SALSAMAN_DATASIZE 3
-#define SALSAMAN_HSIZE 5
-#define SALSAMAN_VSIZE 6
-#define SALSAMAN_SUBSPACE 11
-static int	vj_client_parse_salsaman( vj_client *v,uint8_t *partial_header, int partial_size, int *dst, uint8_t *header )
-{
-	uint8_t header[LIVES_HEADER_LENGTH];
-	memset( header,0,sizeof(LIVES_HEADER_LENGTH ));
-	memcpy( header, partial_header, partial_size );
-
-	uint8_t *header_ptr = header + partial_size;
-
-	//@ read rest of LiVES header
-	int rest = sock_t_recv( v->c[0]->fd, header_ptr, LIVES_HEADER_LENGTH - partial_header );
-
-	//@ values are space seperated
-	gchar **tokens = g_strsplit( header, " ", -1 );
-	if( tokens == NULL  || tokens[0] == NULL ) {
-		if( tokens != NULL ) free(tokens);
-		return 0;
-	}
-	
-	//@ fetch the values into vars
-	dst[0]	= atoi( header[0] );
-	dst[1]	= 0; // 
-
-	dst[2]  = atoi( header[2] ); // flags uint32
-	dst[SALSAMAN_DATASIZE]  = atoi( header[SALSAMAN_DATASIZE] ); // dsize size_t
-
-	dst[4]  = 0;
-
-	dst[5]  = atoi( header[5] ); //@ hsize int
-	dst[6]  = atoi( header[6] ); //@ vsize int
-	dst[7]  = g_strtod( header[7], NULL ); // fps double
-	dst[8]  = atoi( header[8] ); // palette int
-	dst[9]  = atoi( header[9] ); // yuv sampling int
-	dst[10] = atoi( header[10] ); // clamp int
-	dst[11] = atoi( header[11] ); // subspace int
-	dst[12] = atoi( header[12] ); // compression type int
-
-	g_strfreev( tokens );
-	return 1;
-}
-*/
 
 /* packet negotation.
  * read a small portion (44 bytes for veejay, its veejay's full header size) 
@@ -411,15 +366,25 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int dstlen )
 		v->in_height = p[1];
 		v->in_fmt = p[2];
 	
-		if( v->space == NULL || v->in_width != v->orig_width || v->in_height != v->orig_height ) {
-			if( v->space ) free(v->space);
-			v->space = vj_calloc(sizeof(uint8_t) * v->in_width * v->in_height * 4 );
+		if( v->space == NULL || v->in_width != v->orig_width || v->in_height != v->orig_height || v->in_fmt != v->orig_fmt ) {
+			if( v->space ) {
+				free(v->space);
+				v->space = NULL;
+			}
+			if( v->in_width <= 0 || v->in_height <= 0 || v->in_fmt <= 0 ) {
+				veejay_msg(0,"Invalid header values in network packet");
+				return -1;
+			}
+
+			v->space = vj_calloc(sizeof(uint8_t) * RUP8(v->in_width * v->in_height * 4) );
 			if(!v->space) {
 				veejay_msg(0,"Could not allocate memory for network stream.");
 				return -1;
 			}
+
 			v->orig_width = v->in_width;
 			v->orig_height = v->in_height;
+			v->orig_fmt = v->in_fmt;
 		}
 			
 		uv_len = 0;
@@ -437,7 +402,8 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int dstlen )
 					uv_len = y_len / 4;break;
 				default:
 					uv_len = y_len;
-					veejay_msg(VEEJAY_MSG_WARNING, "Unknown data format: %02x, assuming equal plane sizes.", v->in_fmt);
+					veejay_msg(VEEJAY_MSG_ERROR, "Unknown pixel format: %02x", v->in_fmt);
+					return -1;
 					break;
 			}
 

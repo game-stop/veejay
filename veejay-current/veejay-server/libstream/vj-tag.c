@@ -80,6 +80,8 @@ extern int   sufficient_space(int max_size, int nframes);
 extern unsigned char *UTF8toLAT1(unsigned char *in);
 extern int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *data, int len, int uv_len );
 
+#define RUP8(num)(((num)+8)&~8)
+
 typedef struct
 {
 	uint8_t *data;
@@ -355,7 +357,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	
 	if( tag->socket_ready == 0 )
 	{
-		tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * 3);
+		tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( w * h * 3));
 		tag->socket_len = w * h * 3;
 		if(!tag->socket_frame) 
 		{

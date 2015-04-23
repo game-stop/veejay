@@ -327,7 +327,7 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 			t->in_fmt == PIX_FMT_RGB32_1 ) {
 		
 		a = yuv_rgb_template( tag->socket_frame, t->in_w, t->in_w, t->in_fmt );
-		
+	
 	} else {
 		int b_len = t->in_w * t->in_h;
 		int buvlen = b_len;
@@ -342,7 +342,7 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 				buvlen = b_len/2;
 				break;
 		}
-	
+
 		a =yuv_yuv_template( t->buf, t->buf + b_len, t->buf+ b_len+ buvlen,t->in_w,t->in_h, t->in_fmt);
 	}
 
@@ -359,7 +359,8 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 		t->scaler = yuv_init_swscaler( a,b, &sws_templ, yuv_sws_get_cpu_flags() );
 	}
 
-	yuv_convert_and_scale( t->scaler, a,b );
+	if( t->scaler )	
+		yuv_convert_and_scale( t->scaler, a,b );
 	
 	t->have_frame = 0;
 	if(unlock(t)!=0)
@@ -395,8 +396,8 @@ int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
 	int uv_len = len;
 	switch(t->f)
 	{
-		case FMT_420:
-		case FMT_420F:
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
 			uv_len=len/4;
 		break;
 		default:
@@ -410,8 +411,8 @@ int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
 		int buvlen = b_len;
 		switch(t->in_fmt)
 		{
-			case FMT_420:
-			case FMT_420F:
+			case PIX_FMT_YUV420P:
+			case PIX_FMT_YUVJ420P:
 				buvlen = b_len/4;
 				break;
 			default:

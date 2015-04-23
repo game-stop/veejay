@@ -31,6 +31,7 @@ typedef struct
 
 	int orig_width;
 	int orig_height;
+	int orig_fmt;
 
 	uint8_t *space;
 	int mcast;
