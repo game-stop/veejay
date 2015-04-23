@@ -193,9 +193,8 @@ static	int	add_to_plugin_list( const char *path )
 			veejay_msg(VEEJAY_MSG_DEBUG, "'%s' marked as bad", name);
 			continue; 
 		}
-		bzero(fullname , PATH_MAX+1);
 
-		sprintf(fullname, "%s/%s", path,name );
+		snprintf(fullname,sizeof(fullname),"%s/%s", path,name );
 
 		void *handle = dlopen(fullname, RTLD_NOW );
 
@@ -422,7 +421,7 @@ static	int	scan_plugins()
 		return 0;
 	}
 
-	bzero( data, CONFIG_FILE_LEN );
+	veejay_memset( data,0, sizeof(data));
 
 	if( read( fd, data, CONFIG_FILE_LEN ) > 0 )
 	{

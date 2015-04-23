@@ -1790,7 +1790,7 @@ static	char	*vevo_format_inline_property( vevo_port_t *port, int n_elem, int typ
 {
 	char *res = NULL;
 	char token[5];
-	bzero(token,5);
+	memset(token,0,sizeof(token));
 	switch(type)
 	{
 		case VEVO_ATOM_TYPE_INT:
@@ -1840,7 +1840,7 @@ char	*vevo_format_property( vevo_port_t *port, const char *key )
 	if( n_elem <= 0 )
 		n_elem = 1;
 
-	bzero(token,5);
+	memset(token,0,sizeof(token));
 	
 	switch( atom_type )
 	{
@@ -1889,8 +1889,8 @@ char	*vevo_format_kind( vevo_port_t *port, const char *key )
 	char token[5];
 	int	atom_type = vevo_property_atom_type( port, key );
 
-	bzero(token,5);
-	
+	memset(token,0,sizeof(token));
+
 	switch( atom_type )
 	{
 		case VEVO_ATOM_TYPE_INT:
@@ -2040,7 +2040,8 @@ int	vevo_sscanf_property( vevo_port_t *port, const char *s)
 {
 	int done = 0;
 	char key[PROPERTY_KEY_SIZE];
-	bzero(key, PROPERTY_KEY_SIZE );	
+	memset( key,0,sizeof(key));
+
 	const char *value = vevo_split_token_(s, '=', key, PROPERTY_KEY_SIZE );
 	if(value==NULL)
 		return 0;
@@ -2085,12 +2086,12 @@ int	vevo_sscanf_property( vevo_port_t *port, const char *s)
 	while( *fmt != '\0' )
 	{
 		char arg[256];
-		bzero(arg,256);
+		memset(arg,0,sizeof(arg));
 		
 		if( *fmt == 's' )
-			p = vevo_split_token_q( p, ':', arg, 1024 );
+			p = vevo_split_token_q( p, ':', arg, sizeof(arg) );
 		else
-			p = vevo_split_token_( p, ':', arg, 1024 );
+			p = vevo_split_token_( p, ':', arg, sizeof(arg) );
 
 		if( p == NULL )
 			return 0;
@@ -2305,7 +2306,7 @@ char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
 	while( *format && nerr == 0)
 	{
 		char 	tmp[1024];
-		bzero(tmp,256);
+		memset(tmp,0,sizeof(tmp));
 		switch(*format)
 		{
 			case 'd':
@@ -2430,12 +2431,12 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 	while( *fmt != '\0' )
 	{
 		char arg[256];
-		bzero(arg,256);
+		memset(arg,0,sizeof(arg));
 		
 		if( *fmt == 's' )
-			p = vevo_split_token_q( p, ':', arg, 1024 );
+			p = vevo_split_token_q( p, ':', arg, sizeof(arg) );
 		else
-			p = vevo_split_token_( p, ':', arg, 1024 );
+			p = vevo_split_token_( p, ':', arg,sizeof(arg) );
 
 		if( p == NULL )
 		{

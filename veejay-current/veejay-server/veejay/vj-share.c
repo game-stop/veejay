@@ -48,15 +48,14 @@ static vj_client	*vj_share_connect(char *hostname, int port)
 	return c;
 }
 static void vj_flush(vj_client *sayvims,int frames) { 
-        int n = 0;
-        char status[100];
-        bzero(status,100);
+        char status[128];
+        memset(status,0,sizeof(status));
 
         while(frames>0) {
                 if( vj_client_poll(sayvims, V_STATUS ))
                 {
                         char sta_len[6];
-                        bzero(sta_len, 6 );
+                        memset(sta_len,0,sizeof(sta_len));
                         int nb = vj_client_read( sayvims, V_STATUS, sta_len, 5 );
                         if( nb <= 0 )
 				break;
@@ -66,7 +65,7 @@ static void vj_flush(vj_client *sayvims,int frames) {
                                 sscanf( sta_len + 1, "%03d", &bytes );
                                 if(bytes > 0 )
                                 {
-                                        bzero(status, 100);
+                                        memset(status,0,sizeof(status));
                                         int n = vj_client_read(sayvims,V_STATUS,status,bytes);
                                         if( n )
                                         {

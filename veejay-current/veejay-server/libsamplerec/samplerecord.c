@@ -370,8 +370,8 @@ int sample_reset_autosplit(int s1)
 {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
-  bzero( si->encoder_base, 255 );
-  bzero( si->encoder_destination , 255 );
+  veejay_memset( si->encoder_base,0,sizeof(si->encoder_base) );
+  veejay_memset( si->encoder_destination,0,sizeof(si->encoder_destination) );
   si->sequence_num = 0;
   return 1;
 }

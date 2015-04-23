@@ -58,8 +58,7 @@ static	char	*osc_create_path( const char *base, const char *path )
 {
 	int n = strlen(base) + strlen(path) + 2;
 	char *res = (char*) vj_malloc(n);
-	bzero(res,n);
-	sprintf(res,"%s/%s", base,path);
+	snprintf(res,n,"%s/%s", base,path);
 	return res;
 }
 
@@ -67,8 +66,7 @@ static	char	*osc_fx_pair_str( const char *base, const char *key )
 {
 	int n = strlen(base) + strlen(key) + 2;
 	char *res = (char*) vj_malloc(n);
-	bzero(res,n);
-	snprintf( res,n, "%s/%s", base,key);
+	snprintf( res,n,"%s/%s", base,key);
 	return res;
 }
 
@@ -79,9 +77,8 @@ static char	*vevo_str_to_liblo( const char *format )
 	if( n <= 0 )
 		return NULL;
 	
-	char *res = (char*) vj_malloc( n );
+	char *res = (char*) vj_calloc( n );
 	int k = 0;
-	bzero(res,n );
 	while(*format)
 	{
 		if(*format=='d' || *format=='s')

@@ -23,6 +23,7 @@
 
 */
 #include <stdio.h>
+#include <string.h>
 #include "vj-server.h"
 
 int main( int argc, char *argv[] )
@@ -58,7 +59,7 @@ int main( int argc, char *argv[] )
 			if( res > 0 )				
 			{
 				char tmp[4096];
-				bzero(tmp,4096);
+				memset(tmp,0,sizeof(tmp));
 				while( vj_server_retrieve_msg(s,i, tmp ) )
 				{
 					printf("recv [%s]\n", tmp );

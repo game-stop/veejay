@@ -27,6 +27,7 @@
 #include <config.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
 #include <libel/lav_io.h>

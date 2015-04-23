@@ -2054,14 +2054,7 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
-	index_map_[VIMS_LOG]					=	_new_event(
-				NULL,
-				VIMS_LOG,
-				"GUI: Get console output",
-				vj_event_send_log,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
+	
 	index_map_[VIMS_CHAIN_LIST]				=	_new_event(
 				"%d",
 				VIMS_CHAIN_LIST,

@@ -324,6 +324,7 @@ void vj_tag_record_init(int w, int h)
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int type )
 {
+	char tmp[1024];
 	vj_client *v;
 	if( !host  ) {
 		veejay_msg(0, "No hostname given");
@@ -347,9 +348,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 		veejay_msg(0, "Memory allocation error while creating network stream");
 		return 0;
 	}*/
-	char tmp[255];
-	bzero(tmp,255);
-	snprintf(tmp,sizeof(tmp)-1, "%s %d", host, port );
+	snprintf(tmp,sizeof(tmp), "%s %d", host, port );
 	tag->extra = (void*) strdup(tmp);
 
 	int fmt=  vj_tag_input->pix_fmt;
@@ -2822,8 +2821,8 @@ int vj_tag_reset_autosplit(int s1)
 {
   vj_tag *si = vj_tag_get(s1);
   if(!si) return -1;
-  bzero( si->encoder_base, 255 );
-  bzero( si->encoder_destination , 255 );
+  veejay_memset( si->encoder_base, 0,sizeof(si->encoder_base) );
+  veejay_memset( si->encoder_destination,0 , sizeof(si->encoder_destination) );
   si->sequence_num = 0;
   return 1;
 }

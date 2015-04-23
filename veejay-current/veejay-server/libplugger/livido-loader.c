@@ -1008,10 +1008,8 @@ char	*livido_describe_parameter_format( void *instance, int p )
 
 	int n_elems = vevo_property_num_elements( param, "value" );
 
-	char fmt[5];
+	char fmt[3] = { 0,0,0 };
 
-	bzero(fmt,5);
-	
 	switch(kind)
 	{
 		case HOST_PARAM_INDEX:

@@ -1730,10 +1730,6 @@ void vj_event_update_remote(void *ptr)
 		}
 	}
 
-
-	if(!veejay_keep_messages())
-		veejay_reap_messages();
-
 	return;
 }
 
@@ -8741,30 +8737,6 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 		free(print_buf);
 	}
 	SEND_MSG(v, s_print_buf);
-	free(s_print_buf);
-}
-
-void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
-{
-	veejay_t *v = (veejay_t*) ptr;
-	int num_lines = 0;
-	int str_len = 0;
-	char *messages = NULL;
-
-	char *s_print_buf = get_print_buf(0);
-
-	messages = veejay_pop_messages( &num_lines, &str_len );
-
-	if(str_len == 0 || num_lines == 0 )
-		sprintf(s_print_buf, "%06d", 0);
-	else
-		sprintf(s_print_buf, "%06d%s", str_len, messages );
-	if(messages)
-		free(messages);	
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "\tDebug: send log %s", s_print_buf);
-
-	SEND_MSG( v, s_print_buf );
 	free(s_print_buf);
 }
 

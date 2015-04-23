@@ -390,8 +390,6 @@ int veejay_free(veejay_t * info)
 
 	vj_mem_threaded_stop();
 
-	veejay_reap_messages();
-
 	vj_event_stop();
 
      	vj_tag_free();
@@ -2291,7 +2289,6 @@ static void veejay_playback_cycle(veejay_t * info)
 
     while (settings->state != LAVPLAY_STATE_STOP) {
 		int current_speed = settings->current_playback_speed;
-		int gidx = 0;
 	 	tdiff1 = 0.;
    		tdiff2 = 0.;
 
@@ -2321,8 +2318,6 @@ static void veejay_playback_cycle(veejay_t * info)
 		} 
 		while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (QUEUE_LEN-1));
 	
-		int stuck = 0;
-
 		veejay_event_handle(info);
 
 #ifdef HAVE_JACK

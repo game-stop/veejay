@@ -432,7 +432,7 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	else if ( which_vp == 1 ) 
 	{
 		int strides[4] = { input->len, input->len, input->len, 0 };
-		vj_frame_copy( input, c->frame2, strides );
+		vj_frame_copy( input->data, c->frame2->data, strides );
 	}
 	return 1;
 }

@@ -1481,7 +1481,7 @@ void	*vj_font_get_dict(void *font)
 {
 	vj_font_t *f = (vj_font_t*) font;
 	if(f == NULL )
-		return;
+		return NULL;
 	return f->dictionary;
 }
 
