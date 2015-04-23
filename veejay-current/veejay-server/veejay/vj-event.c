@@ -3453,7 +3453,6 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 				if( v->sdl[id] )
 				{
 					vj_sdl_free( v->sdl[id] );
-					free(v->sdl[id]);
 					v->sdl[id] = NULL;
 					v->video_out = 5;
 					vj_sdl_quit();
