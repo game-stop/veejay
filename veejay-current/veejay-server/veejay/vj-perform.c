@@ -2867,7 +2867,6 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 		int num_samples = (info->edit_list->audio_rate / info->edit_list->video_fps);
 		int bps = info->edit_list->audio_bps;
 		veejay_memset( top_audio_buffer, 0, num_samples * bps);
-		vj_jack_continue( settings->current_playback_speed );
 		vj_perform_play_audio( top_audio_buffer, (num_samples * bps ));
 		return 1;
 	}
