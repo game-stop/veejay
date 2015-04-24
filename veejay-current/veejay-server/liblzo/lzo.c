@@ -27,9 +27,6 @@
 #include <liblzo/lzo.h>
 #include <libyuv/yuvconv.h>
 #include <liblzo/minilzo.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 typedef struct
 {
 	lzo_byte *wrkmem;
@@ -66,9 +63,6 @@ void lzo_print_buf( uint8_t *buf, int len )
 	}
 	printf("\n");
 }
-*/
-
-/*
 static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , lzo_uint *out_lenptr, uint8_t *wrkmem)
 {
 	lzo_uint out_len = 0;
@@ -125,8 +119,7 @@ void	*lzo_new( )
 	}
 
 
-
-#ifdef STRICT_CHECKING
+/*
 	uint8_t in[16384];
 	uint8_t out[16834];
 
@@ -139,21 +132,17 @@ void	*lzo_new( )
 	lzo_uint out_len = 0;
 	int lzo_verify_compression_result = lzo_verify_compression( inp, sizeof(in), outp, &out_len, l->wrkmem );
        
-	assert( lzo_verify_compression_result == 1 );
-
 	if( lzo_verify_compression_result == 1 ) {
 		int i;
 		for( i = 0; i < sizeof(in); i ++ ) { 
 			if( in[i] != 1 )  //decompression back into 'in'
 				veejay_msg(VEEJAY_MSG_ERROR, "LZO verify error at byte pos %d.", i );
 	
-			assert( in[i] == 1 );
 		}
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "LZO verified compression algorithms successfully.");
 	}
-#endif
-
+	*/
 
 	veejay_msg(VEEJAY_MSG_DEBUG,"LZO real-time data compression library (v%s, %s) enabled.",
             lzo_version_string(), lzo_version_date());
@@ -184,9 +173,6 @@ long		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size,
 	}
 
 	long res = (long) (*size);
-#ifdef STRICT_CHECKING
-	assert( res > 0 );
-#endif
 
 	return res;
 }
@@ -205,7 +191,7 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 	len[2] = str2ulong( linbuf+8 );
 
 	if(len[0] == 0 && len[1] == 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s", linbuf );
+		veejay_msg(VEEJAY_MSG_ERROR, "Error in MLZO header", linbuf );
 		return -1;
 	}
 

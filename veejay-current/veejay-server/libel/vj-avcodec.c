@@ -447,32 +447,40 @@ static	int	vj_avcodec_lzo( vj_encoder  *av, uint8_t *src[3], uint8_t *dst , int 
 	uint8_t *dstI = dst + (3 * 4);
 	uint32_t s1,s2,s3;
 	uint32_t *size1 = &s1, *size2=&s2,*size3=&s3;
-	int i;
+	int32_t res;
+	int32_t sum = 0;
 
-	i = lzo_compress( av->lzo, src[0], dstI, size1 , av->len);
-	if( i == 0 )
+	res = lzo_compress( av->lzo, src[0], dstI, size1 , av->len);
+	if( res == 0 )
 	{
 		veejay_msg(0,"\tunable to compress Y plane");
 		return 0;
 	}
-	i = lzo_compress( av->lzo, src[1], dstI + s1, size2 , av->uv_len );
-	if( i == 0 )
+
+	long2str( dst, res );
+	sum += res;
+
+	res = lzo_compress( av->lzo, src[1], dstI + sum, size2 , av->uv_len );
+	if( res == 0 )
 	{
 		veejay_msg(0,"\tunable to compress U plane");
 		return 0;
 	}
-	i = lzo_compress( av->lzo, src[2], dstI + (s1 + s2), size3 , av->uv_len );
-	if( i == 0 )
+
+	long2str( dst + 4, res );
+	sum += res;
+
+	res = lzo_compress( av->lzo, src[2], dstI + sum, size3 , av->uv_len );
+	if( res == 0 )
 	{
 		veejay_msg(0,"\tunable to compress V plane");
 		return 0;
 	}
-	
-	long2str( dst, s1 );
-	long2str( dst+4,s2);
-	long2str( dst+8,s3);
 
-	return (s1 + s2 + s3 + 12);
+	sum += res;
+	long2str( dst + 8, res );
+	
+	return (sum + 12);
 }
 static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst, int in_fmt )
 {
