@@ -27,6 +27,6 @@ void	net_thread_remote(void *priv, void *p );
 int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3]);
 int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h);
 void	net_thread_exit(vj_tag *tag);
-void	*net_threader( );
+void	*net_threader(VJFrame *frame);
 
 #endif

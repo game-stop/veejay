@@ -54,6 +54,8 @@ typedef struct
 	int af;
 	uint8_t *buf;
 	void *scaler;
+	VJFrame *a;
+	VJFrame *b;
 } threaded_t;
 
 #define STATE_INACTIVE 0
@@ -103,8 +105,7 @@ void	*reader_thread(void *data)
 	else if ( tag->source_type != VJ_TAG_TYPE_MCAST ) 
 	{
 		veejay_msg(0, "Unable to connect to %s: %d", tag->source_name, tag->video_channel+5);
-		pthread_exit(&(t->thread));
-		return NULL;
+		goto NETTHREADEXIT;
 	}
 
 	unsigned int	optimistic = 1;
@@ -113,23 +114,16 @@ void	*reader_thread(void *data)
 
 	t->buf = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( bufsize ) );
 
+	if(t->buf == NULL ) {
+		veejay_msg(0, "Cannot allocate memory for network i/o buffer");
+		goto NETTHREADEXIT;
+	}
 
 	for( ;; )
 	{
 		int error    = 0;
 		int pollres  = 0;
 		int res      = 0;
-/*
-		if( t->have_frame == 1 ) {
-			net_delay(2,0);
-			int have_frame = 0;
-			lock(v);
-			have_frame = t->have_frame;
-			unlock(v);
-			if( have_frame == 1 )
-				continue;	
-		}
-*/		
 
 		if(!error && tag->source_type == VJ_TAG_TYPE_NET && retrieve == 0) {
 			ret =  vj_client_send( v, V_CMD, buf );
@@ -220,10 +214,9 @@ NETTHREADRETRY:
 			vj_client_free( v);
 			v = vj_client_alloc( t->w, t->h, t->af );
 			if(!v) {
-				free(t->buf);
-				pthread_exit( &(t->thread));
-				return NULL;
+				goto NETTHREADEXIT;
 			}
+
 			v->lzo = lzo_new();
 
 			veejay_msg(VEEJAY_MSG_INFO, " ZZzzzzz ... waiting for Link %s:%d to become ready", tag->source_name, tag->video_channel );
@@ -256,32 +249,47 @@ NETTHREADRETRY:
 
 		if( cur_state == 0 )
 		{
-			vj_client_close(v);
 			veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d was told to exit",tag->source_name,tag->video_channel+5);
-			vj_client_free(v);
-			if( t->scaler )
-				yuv_free_swscaler( t->scaler );
-			free(t->buf);
-			pthread_exit( &(t->thread));
-			return NULL;
+			goto NETTHREADEXIT;
 		}
 	}
 
 NETTHREADEXIT:
-	vj_client_close(v);
-	veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d was aborted",tag->source_name,tag->video_channel+5);
-	vj_client_free(v);
-	if( t->scaler )
-		yuv_free_swscaler( t->scaler );
-	free(t->buf);
+
+	if(t->buf)
+		free(t->buf);
+
+	if(v) {
+	       	vj_client_close(v);
+		vj_client_free(v);
+	}
+
+	veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d has exited",tag->source_name,tag->video_channel+5);
 	pthread_exit( &(t->thread));
 
 	return NULL;
 }
 
+static void	net_thread_free(vj_tag *tag)
+{
+	threaded_t *t = (threaded_t*) tag->priv;
 
+	if( t->scaler )
+		yuv_free_swscaler( t->scaler );
 
-void	*net_threader( )
+	if( t->a )
+		free(t->a);
+	if( t->b )
+		free(t->b);
+
+	t->a = NULL;
+	t->b = NULL;
+	t->scaler = NULL;
+	t->buf = NULL;
+
+}	
+
+void	*net_threader(VJFrame *frame)
 {
 	threaded_t *t = (threaded_t*) vj_calloc(sizeof(threaded_t));
 	return (void*) t;
@@ -294,81 +302,72 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	
 	int have_frame = 0;
 	int state = 0;
+
+	/* frame ready ? */
 	if(lock(t) != 0 )
 		return 0;
 
 	have_frame = t->have_frame;
 	state= t->state;
-	if(unlock(t) != 0)
-		return 0;
 
 	if( state == 0 || have_frame == 0 ) {
-		return 1;
+		unlock(t);
+		return 1; // not active or no frame
 	}
 
 	//@ color space convert frame	
 	int len = t->w * t->h;
 	int uv_len = len;
-	switch(t->f)
-	{
-		case PIX_FMT_YUV420P:
-		case PIX_FMT_YUVJ420P:
-		uv_len=len/4;
-		break;
-		default:
-			uv_len=len/2;
-		break;
-	}
+	int b_len = t->in_w * t->in_h;
+	int buvlen = b_len;
 
-	VJFrame *a = NULL;
-	VJFrame *b = NULL;
 
-	if( t->in_fmt == PIX_FMT_RGB24 || t->in_fmt == PIX_FMT_BGR24 || t->in_fmt == PIX_FMT_RGBA ||
-			t->in_fmt == PIX_FMT_RGB32_1 ) {
-		
-		a = yuv_rgb_template( tag->socket_frame, t->in_w, t->in_w, t->in_fmt );
+
+	if( PIX_FMT_YUV420P == t->f || PIX_FMT_YUVJ420P == t->f )
+	    uvlen = len/4;
+	else
+	    uvlen = len/2;
+
+	if( t->in_fmt == PIX_FMT_RGB24 || t->in_fmt == PIX_FMT_BGR24 || t->in_fmt == PIX_FMT_RGBA || t->in_fmt == PIX_FMT_RGB32_1 ) {
+
+		if(t->a == NULL )
+			t->a = yuv_rgb_template( tag->socket_frame, t->in_w, t->in_w, t->in_fmt );
 	
 	} else {
-		int b_len = t->in_w * t->in_h;
-		int buvlen = b_len;
 	
-		switch(t->in_fmt)
-		{
-			case PIX_FMT_YUV420P:
-			case PIX_FMT_YUVJ420P:
+		if( t->b == NULL ) {
+			if( PIX_FMT_YUV420P == t->in_fmt || PIX_FMT_YUVJ420P == t->in_fmt )
 				buvlen = b_len/4;
-				break;
-			default:
+			else
 				buvlen = b_len/2;
-				break;
-		}
 
-		a =yuv_yuv_template( t->buf, t->buf + b_len, t->buf+ b_len+ buvlen,t->in_w,t->in_h, t->in_fmt);
+			t->a = yuv_yuv_template( t->buf, t->buf + b_len, t->buf+ b_len+ buvlen,t->in_w,t->in_h, t->in_fmt);
+		}
 	}
 
-	b = yuv_yuv_template( buffer[0],buffer[1], buffer[2],t->w,t->h,t->f);
+	if( t->b == NULL ) {
+		t->b = yuv_yuv_template( buffer[0],buffer[1], buffer[2],t->w,t->h,t->f);
+	}
 
-
-	if(lock(t) != 0)
+	if( b_len + buvlen > tag->socket_len ) {
+		veejay_msg(0, "Network client: buffer too small ?!");
+		unlock(t);
 		return 0;
+	}
 
 	if( t->scaler == NULL ) {
 		sws_template sws_templ;
 		memset( &sws_templ, 0, sizeof(sws_template));
 		sws_templ.flags = yuv_which_scaler();
-		t->scaler = yuv_init_swscaler( a,b, &sws_templ, yuv_sws_get_cpu_flags() );
+		t->scaler = yuv_init_swscaler( t->a,t->b, &sws_templ, yuv_sws_get_cpu_flags() );
 	}
 
-	if( t->scaler )	
-		yuv_convert_and_scale( t->scaler, a,b );
+	yuv_convert_and_scale( t->scaler, t->a,t->b );
 	
 	t->have_frame = 0;
 	if(unlock(t)!=0)
 		return 0;
 
-	free(a);
-	free(b);
-	
 	return 1;
 }
 
@@ -379,57 +378,49 @@ int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
 	
 	int have_frame = 0;
 	int state = 0;
+
 	if(lock(t) != 0 )
 		return 0;
+
 	have_frame = t->have_frame;
 	state= t->state;
-	if(unlock(t) != 0 )
-		return 0;
 
 	if( state == 0 || have_frame == 0 ) {
+		unlock(t);
 		return 1;
 	}
 
-
-	//@ color space convert frame	
 	int len = t->w * t->h;
 	int uv_len = len;
-	switch(t->f)
-	{
-		case PIX_FMT_YUV420P:
-		case PIX_FMT_YUVJ420P:
-			uv_len=len/4;
-		break;
-		default:
-			uv_len=len/2;
-		break;
-	}
+	int b_len = t->in_w * t->in_h;
+	int buvlen = b_len;
+
+
+	if( PIX_FMT_YUV420P == t->f || PIX_FMT_YUVJ420P == t->f )
+	    uvlen = len/4;
+	else
+	    uvlen = len/2;
+
 
 	if(t->have_frame )
 	{
-		int b_len = t->in_w * t->in_h;
-		int buvlen = b_len;
-		switch(t->in_fmt)
-		{
-			case PIX_FMT_YUV420P:
-			case PIX_FMT_YUVJ420P:
-				buvlen = b_len/4;
-				break;
-			default:
-				buvlen = b_len/2;
-				break;
+		if( PIX_FMT_YUV420P == t->in_fmt || PIX_FMT_YUVJ420P == t->in_fmt )
+			buvlen = b_len/4;
+		else
+			buvlen = b_len/2;
+
+		if( t->a == NULL ) {
+			t->a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,t->in_w,t->in_h, in_fmt);
+		}
+		if( t->b == NULL ) {
+			t->b = yuv_rgb_template( buffer,w,h,PIX_FMT_RGB24);
 		}
 
-		int tmp_fmt = get_ffmpeg_pixfmt( t->in_fmt );
- 
-		VJFrame *a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,
-						t->in_w,t->in_h, tmp_fmt);
-		VJFrame *b = yuv_rgb_template( buffer,w,h,PIX_FMT_RGB24);
-		yuv_convert_any_ac(a,b, a->format,b->format );
-		free(a);
-		free(b);
+		yuv_convert_any_ac(t->a,t->b, t->a->format,t->b->format );
 	}	
 	
+	unlock(t);
+
 	return 1;
 }
 
@@ -440,7 +431,7 @@ int	net_thread_start(vj_tag *tag, int wid, int height, int pixelformat)
 	int res = 0;
 
 	if(tag->source_type == VJ_TAG_TYPE_MCAST ) {
-		veejay_msg(0, "MCAST: fixme!");
+		veejay_msg(0, "Not in this version");
 		return 0;
 	}
 	
@@ -463,52 +454,10 @@ int	net_thread_start(vj_tag *tag, int wid, int height, int pixelformat)
 			"multicast" : "unicast", tag->source_name,tag->video_channel);
 	}
 	return 1; 
-	/*
-	
-	if( tag->source_type == VJ_TAG_TYPE_MCAST )
-	{
-		char start_mcast[8];
-		
-		int  gs = 0;
-		char *gs_str = getenv( "VEEJAY_MCAST_GREYSCALE" );
-		if( gs_str ) {
-			gs = atoi(gs_str);
-			if(gs < 0 || gs > 1 )
-				gs = 0;
-		}
-		
-		snprintf(start_mcast,sizeof(start_mcast), "%03d:%d;", VIMS_VIDEO_MCAST_START,gs);
-		
-		veejay_msg(VEEJAY_MSG_DEBUG, "Request mcast stream from %s port %d",
-				tag->source_name, tag->video_channel);
-		
-		res = vj_client_send( v, V_CMD, start_mcast );
-		if( res <= 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to send to %s port %d",
-					tag->source_name, tag->video_channel );
-			return 0;
-		}
-		else
-			veejay_msg(VEEJAY_MSG_INFO, "Requested mcast stream from Veejay group %s port %d",
-					tag->source_name, tag->video_channel );	
-	}
-	int p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
-	if( p_err ==0)
-
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new %s threaded stream to veejay host %s port %d",
-			tag->source_type == VJ_TAG_TYPE_MCAST ? 
-			"multicast" : "unicast", tag->source_name,tag->video_channel);
-		return 1;
-	}
-	return 0;		
-*/
 }
 
 void	net_thread_stop(vj_tag *tag)
 {
-	char mcast_stop[6];
 	threaded_t *t = (threaded_t*)tag->priv;
 	int ret = 0;
 	
@@ -519,8 +468,9 @@ void	net_thread_stop(vj_tag *tag)
 
 	pthread_mutex_destroy( &(t->mutex));
 
-	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from Veejay host %s:%d", tag->source_name,
-		tag->video_channel);
+	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from Veejay host %s:%d", tag->source_name,tag->video_channel);
+
+	net_thread_free(tag);
 }
 
 int	net_already_opened(const char *filename, int n, int channel)

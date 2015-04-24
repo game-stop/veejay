@@ -917,7 +917,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	tag->priv = NULL;
 
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
-	    tag->priv = net_threader();
+	    tag->priv = net_threader(_tag_info->effect_frame1);
 
 #ifdef HAVE_V4L
 	palette = v4lvideo_templ_get_palette( pix_fmt );
@@ -1264,7 +1264,8 @@ int vj_tag_del(int id)
 		break;
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
-		net_thread_stop(tag);	
+		net_thread_stop(tag);
+		if(tag->priv) free(tag->priv);	
 		break;
 	case VJ_TAG_TYPE_COLOR:
 		break;
