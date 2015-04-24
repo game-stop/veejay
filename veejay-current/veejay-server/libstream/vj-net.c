@@ -122,7 +122,6 @@ void	*reader_thread(void *data)
 	for( ;; )
 	{
 		int error    = 0;
-		int pollres  = 0;
 		int res      = 0;
 
 		if(!error && tag->source_type == VJ_TAG_TYPE_NET && retrieve == 0) {
@@ -172,7 +171,6 @@ void	*reader_thread(void *data)
 			}
 		}
 	
-		long wait_time = 0;
 	
 		if(!error && (retrieve == 2))
 		{
@@ -298,7 +296,6 @@ void	*net_threader(VJFrame *frame)
 int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 {
 	threaded_t *t = (threaded_t*) tag->priv;
-	const uint8_t *buf = tag->socket_frame;
 	
 	int have_frame = 0;
 	int state = 0;
@@ -317,16 +314,8 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 
 	//@ color space convert frame	
 	int len = t->w * t->h;
-	int uv_len = len;
 	int b_len = t->in_w * t->in_h;
 	int buvlen = b_len;
-
-
-
-	if( PIX_FMT_YUV420P == t->f || PIX_FMT_YUVJ420P == t->f )
-	    uvlen = len/4;
-	else
-	    uvlen = len/2;
 
 	if( t->in_fmt == PIX_FMT_RGB24 || t->in_fmt == PIX_FMT_BGR24 || t->in_fmt == PIX_FMT_RGBA || t->in_fmt == PIX_FMT_RGB32_1 ) {
 
@@ -374,7 +363,6 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
 {
 	threaded_t *t = (threaded_t*) tag->priv;
-	const uint8_t *buf = tag->socket_frame;
 	
 	int have_frame = 0;
 	int state = 0;
@@ -397,9 +385,9 @@ int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
 
 
 	if( PIX_FMT_YUV420P == t->f || PIX_FMT_YUVJ420P == t->f )
-	    uvlen = len/4;
+	    uv_len = len/4;
 	else
-	    uvlen = len/2;
+	    uv_len = len/2;
 
 
 	if(t->have_frame )
@@ -410,7 +398,7 @@ int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
 			buvlen = b_len/2;
 
 		if( t->a == NULL ) {
-			t->a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,t->in_w,t->in_h, in_fmt);
+			t->a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,t->in_w,t->in_h, t->in_fmt);
 		}
 		if( t->b == NULL ) {
 			t->b = yuv_rgb_template( buffer,w,h,PIX_FMT_RGB24);
@@ -427,9 +415,6 @@ int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
 
 int	net_thread_start(vj_tag *tag, int wid, int height, int pixelformat)
 {
-	int success = 0;
-	int res = 0;
-
 	if(tag->source_type == VJ_TAG_TYPE_MCAST ) {
 		veejay_msg(0, "Not in this version");
 		return 0;
@@ -459,7 +444,6 @@ int	net_thread_start(vj_tag *tag, int wid, int height, int pixelformat)
 void	net_thread_stop(vj_tag *tag)
 {
 	threaded_t *t = (threaded_t*)tag->priv;
-	int ret = 0;
 	
 	if(lock(t) == 0 ) {	
 		t->state = 0;
