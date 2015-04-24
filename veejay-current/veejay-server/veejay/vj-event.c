@@ -6766,12 +6766,12 @@ void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
 	int new_sample_id = args[0];
 	if(new_sample_id == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Trying to create new sample from %s",
+		veejay_msg(VEEJAY_MSG_INFO, "Create new sample from %s",
 			str );
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Trying to append %s to current sample",
+		veejay_msg(VEEJAY_MSG_INFO, "Append %s to current sample",
 			str );
 	}
 	new_sample_id = veejay_edit_addmovie_sample(v,str,new_sample_id );

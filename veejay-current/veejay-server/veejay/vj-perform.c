@@ -2857,11 +2857,21 @@ static int play_audio_sample_ = 0;
 #endif
 int vj_perform_queue_audio_frame(veejay_t *info)
 {
-	if( info->audio == NO_AUDIO || !info->current_edit_list->has_audio)
+	if( info->audio == NO_AUDIO )
 		return 1;
 #ifdef HAVE_JACK
 	editlist *el = info->current_edit_list;
 	video_playback_setup *settings = info->settings;
+
+	if( settings->audio_mute || !el->has_audio || settings->current_playback_speed == 0) {
+		int num_samples = (info->edit_list->audio_rate / info->edit_list->video_fps);
+		int bps = info->edit_list->audio_bps;
+		veejay_memset( top_audio_buffer, 0, num_samples * bps);
+		vj_jack_continue( settings->current_playback_speed );
+		vj_perform_play_audio( top_audio_buffer, (num_samples * bps ));
+		return 1;
+	}
+
 	long this_frame = settings->current_frame_num;
 	int num_samples =  (el->audio_rate/el->video_fps);
 	int pred_len = num_samples;
@@ -2870,13 +2880,6 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 	int rs = 0;
 	if (info->audio == AUDIO_PLAY)
   	{
-		if(settings->audio_mute || settings->current_playback_speed == 0 )
-		{
-			veejay_memset( a_buf, 0, num_samples * bps);
-			vj_perform_play_audio( a_buf, (num_samples * bps ));
-			return 1;
-		}
-
 		switch (info->uc->playback_mode)
 		{
 			case VJ_PLAYBACK_MODE_SAMPLE:

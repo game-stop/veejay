@@ -614,7 +614,8 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
 	settings->min_frame_num = 0;
 	settings->max_frame_num = sample_video_length( sample_id );
-
+	settings->first_frame = 1;
+	
 	sample_reset_loopcount( sample_id );
 
 #ifdef HAVE_FREETYPE
@@ -675,7 +676,7 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	info->uc->render_changed = 1;
 	settings->min_frame_num = 1;
 	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
-
+	
 #ifdef HAVE_FREETYPE
 	  if(info->font )
 	  {
@@ -2321,7 +2322,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		veejay_event_handle(info);
 
 #ifdef HAVE_JACK
-		if ( info->audio==AUDIO_PLAY && el->has_audio ) 
+		if ( info->audio==AUDIO_PLAY  ) 
 		{
 			struct timespec audio_tmstmp;
 	   		long int sec=0;
@@ -3356,6 +3357,23 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 
 		return -1;
 	}
+
+	// check audio properties 
+	if( info->edit_list->has_audio && info->audio == AUDIO_PLAY ) {
+		if( sample_edl->audio_rate != info->edit_list->audio_rate ||
+		    sample_edl->audio_chans != info->edit_list->audio_chans ||
+		    sample_edl->audio_bits != info->edit_list->audio_bits ||
+		    sample_edl->audio_bps != info->edit_list->audio_bps ) {
+
+			veejay_msg(VEEJAY_MSG_WARNING, "Silencing this sample (mismatching audio properties)" );
+			sample_edl->has_audio = 0;
+			sample_edl->audio_chans = 0;
+			sample_edl->audio_rate = 0;
+			sample_edl->audio_bps = 0;
+			sample_edl->audio_bits = 0;
+		}
+	}
+
 
 	// the sample is not there yet,create it
 	if(!sample)
