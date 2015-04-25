@@ -2683,9 +2683,12 @@ void	vj_event_set_framerate( void *ptr, const char format[] , va_list ap )
 		veejay_msg(VEEJAY_MSG_WARNING, "Limited new framerate to %2.2f ", new_fps );
 	}
 
-	veejay_set_framerate( v, new_fps );
-
-	veejay_msg(VEEJAY_MSG_INFO, "Playback engine is now playing at %2.2f FPS", new_fps );
+	if( v->audio == AUDIO_PLAY ) {
+		veejay_msg(VEEJAY_MSG_WARNING,"Sorry, can only change framerate when started without audio playback");
+	}else {
+		veejay_set_framerate( v, new_fps );
+		veejay_msg(VEEJAY_MSG_INFO, "Playback engine is now playing at %2.2f FPS", new_fps );
+	}
 }
 
 void	vj_event_sync_correction( void *ptr,const char format[], va_list ap )
@@ -5676,7 +5679,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 	char *end = str;
 	int base = 10;
 	int index = 3; // sample, chain, fx_id
-	while( tmp = strtol( end, &end, base )) {
+	while( (tmp = strtol( end, &end, base ))) {
 		args[index] = (int) tmp;
 		index ++;
 	}
