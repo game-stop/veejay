@@ -504,8 +504,6 @@ JACK_xrun_callback(void *arg)
 {
   jack_driver_t *drv = (jack_driver_t *) arg;
   
-  // JACK_ResetBuffer(drv->deviceID);
-  JACK_SetState(drv->deviceID, PAUSED);
   veejay_msg(1, "xrun detected. You are doing too much");
 
   return 0;
