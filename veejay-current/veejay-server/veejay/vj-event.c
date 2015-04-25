@@ -7760,11 +7760,7 @@ void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( v->audio == NO_AUDIO  )
-	{
-		vj_jack_enable();
-		v->audio = AUDIO_PLAY;
-	}
+	v->settings->audio_mute = 0;
 #endif	
 }
 
@@ -7777,12 +7773,7 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 		veejay_msg(0,"Veejay was started without audio.");
 		return;
 	}
-
-	if( v->audio != NO_AUDIO )
-	{
-		vj_jack_disable();
-		v->audio = NO_AUDIO;
-	}
+	v->settings->audio_mute = 1;
 #endif
 }
 
