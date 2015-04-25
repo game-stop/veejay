@@ -3271,7 +3271,11 @@ long AVI_read_frame(avi_t *AVI, char *vidbuf, int *keyframe)
    }
    else
    {
-	n = mmap_read( AVI->mmap_region, AVI->video_index[ AVI->video_pos].pos, n, vidbuf );
+	if( mmap_read( AVI->mmap_region, AVI->video_index[ AVI->video_pos].pos, n, vidbuf ) != n ) 
+	{
+		AVI_errno = AVI_ERR_READ;
+		return -1;
+	}
    }
    
 
