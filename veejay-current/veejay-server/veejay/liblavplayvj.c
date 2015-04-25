@@ -2325,12 +2325,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		if ( info->audio==AUDIO_PLAY  ) 
 		{
 			struct timespec audio_tmstmp;
-	   		long int sec=0;
-	   		long int usec=0;
-	   		long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
-
-	   		audio_tmstmp.tv_sec = sec;
-	  		audio_tmstmp.tv_nsec = usec;
+	   		long num_audio_bytes_written = vj_jack_get_status( &(audio_tmstmp.tv_sec),&(audio_tmstmp.tv_nsec));
 	   		if( audio_tmstmp.tv_sec ) {
 				tdiff1 = settings->spvf * (stats.nsync - nvcorr) - settings->spas * num_audio_bytes_written;
 				tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_nsec - audio_tmstmp.tv_nsec) * 1.e-9;
@@ -2385,7 +2380,6 @@ static void veejay_playback_cycle(veejay_t * info)
 			settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
 		}
 
-	
 
 	    if( settings->state != LAVPLAY_STATE_PAUSED ) {
 
