@@ -1872,6 +1872,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	if( el->has_audio && vj_perform_init_audio(info) && info->audio == AUDIO_PLAY)	{
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
+	} else {
+		info->audio = NO_AUDIO;
 	}
 
   	veejay_msg(VEEJAY_MSG_INFO, 
@@ -3452,7 +3454,7 @@ int veejay_toggle_audio(veejay_t * info, int audio)
     if( !(el->has_audio) ) {
 	veejay_msg(VEEJAY_MSG_WARNING, 
 		    "Audio playback has not been enabled");
-	info->audio = 0;
+	info->audio = NO_AUDIO;
 	return 0;
     }
 
