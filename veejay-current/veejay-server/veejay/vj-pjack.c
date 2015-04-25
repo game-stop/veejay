@@ -79,8 +79,8 @@ int vj_jack_init(editlist *el)
 	int i = 0;
 	int ret = 0;
 
-	JACK_Init();
-	JACK_SetClientName("veejay");
+//	JACK_Init();
+//	JACK_SetClientName("veejay");
 
 	bits_per_sample = 16;
 	audio_channels = el->audio_chans;
