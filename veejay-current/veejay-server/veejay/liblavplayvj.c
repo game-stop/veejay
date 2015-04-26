@@ -3649,6 +3649,10 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 			tmp_arate = 48000;
 		if( !info->dummy->arate)
 			info->dummy->arate = tmp_arate;
+		if( fps > 0.0f ) {
+			veejay_msg(VEEJAY_MSG_WARNING,"Going to run without audio for user defined frames per second ...");
+			info->audio = NO_AUDIO;
+		}
 	}
 
 	info->settings->output_fps = dfps;
