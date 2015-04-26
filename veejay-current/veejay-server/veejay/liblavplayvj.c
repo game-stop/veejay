@@ -676,7 +676,6 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	info->uc->render_changed = 1;
 	settings->min_frame_num = 1;
 	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
-	
 #ifdef HAVE_FREETYPE
 	  if(info->font )
 	  {
@@ -3594,7 +3593,7 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	info->dummy->height= info->video_output_height;
 	info->dummy->fps = fps;
 
-	if(info->dummy->fps < 0.0f)
+	if(info->dummy->fps <= 0.0f)
 		info->dummy->fps = vj_el_get_default_framerate( override_norm );
 	
 	int dw = 720;
