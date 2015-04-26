@@ -223,7 +223,7 @@ static int vj_perform_tag_is_cached(veejay_t *info, int chain_entry, int tag_id)
 
 	for(c=0; c < CACHE_SIZE; c++)
   	{
-	    if(chain_entry != c && cached_tag_frames[c] == tag_id) 
+	    if(cached_tag_frames[c] == tag_id) 
 	    {
 			if( info->settings->feedback && info->uc->sample_id == tag_id &&
 						info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
@@ -244,17 +244,17 @@ static int vj_perform_sample_is_cached(veejay_t *info,int sample_id, int chain_e
 	if( sample_id == cached_sample_frames[0] ) //FIXME 
 		return 0;
 
-	for(c=0; c < CACHE_SIZE ; c++)
+	for(c=1; c < CACHE_SIZE ; c++)
   	{
-	    if(chain_entry != c && cached_sample_frames[c] == sample_id) 
-		{
-			if( info->settings->feedback && info->uc->sample_id == sample_id  &&
-						info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
-				return -1;
-			}
-			res = c;
-			break;
+	    if(cached_sample_frames[c] == sample_id) 
+	    {
+		if( info->settings->feedback && info->uc->sample_id == sample_id  &&
+					info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
+			return -1;
 		}
+		res = c;
+		break;
+	    }
   	}
 	return res;
 }
