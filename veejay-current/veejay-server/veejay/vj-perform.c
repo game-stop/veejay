@@ -99,6 +99,10 @@ static ycbcr_frame **video_output_buffer = NULL; /* scaled video output */
 static int	video_output_buffer_convert = 0;
 static ycbcr_frame **frame_buffer;	/* chain */
 static ycbcr_frame **primary_buffer;	/* normal */
+static ycbcr_frame *preview_buffer = NULL;
+static int preview_max_w;
+static int preview_max_h;
+
 #define CACHE_TOP 0
 #define CACHE 1
 #define CACHE_SIZE (SAMPLE_MAX_EFFECTS+CACHE)
@@ -667,6 +671,11 @@ int vj_perform_init(veejay_t * info)
 		total_used += buf_len;
 	}
 
+	preview_buffer = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
+	preview_max_w = w * 2;
+	preview_max_h = h * 2;
+
+	preview_buffer->Y = (uint8_t*) vj_calloc( RUP8(preview_max_w * preview_max_h * 3) );
 
     video_output_buffer_convert = 0;
     video_output_buffer =
@@ -903,8 +912,19 @@ void vj_perform_free(veejay_t * info)
 	free(video_output_buffer);
 	free(helper_frame);
 
+    free(preview_buffer->Y);
+	free(preview_buffer);
+
 	if(lzo_)
 		lzo_free(lzo_);
+}
+
+int vj_perform_preview_max_width() {
+		return preview_max_w;
+}
+
+int vj_perform_preview_max_height() {
+		return preview_max_h;
 }
 
 int vj_perform_audio_start(veejay_t * info)
@@ -967,9 +987,10 @@ void vj_perform_get_space_buffer( uint8_t *d[4] )
 	d[1] = primary_buffer[5]->Cb;
 	d[2] = primary_buffer[5]->Cr;
 }
+
 uint8_t *vj_perform_get_preview_buffer()
 {
-	return primary_buffer[6]->Y;
+		return preview_buffer->Y;
 }
 
 void	vj_perform_get_output_frame( uint8_t **frame )

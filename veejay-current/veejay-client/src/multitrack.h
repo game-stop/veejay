@@ -1,9 +1,6 @@
 #ifndef MTRACK_H
 #define MTRACK_H
 
-#define DEFAULT_PREVIEW_WIDTH  (int)(352.0f*0.85f)
-#define DEFAULT_PREVIEW_HEIGHT  (int)(288.0f*0.85f)
-
 void            *multitrack_new(
                 void (*f)(int,char*,int),
                 int (*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
@@ -36,22 +33,22 @@ void   	 	multitrack_sync_simple_cmd2( void *data, int vims, int arg );
 
 void            *multitrack_sync( void * mt );
 
-void               multitrack_configure( void *data, float fps, int video_width, int video_height, int *bw, int *bh );
+void            multitrack_configure( void *data, float fps, int video_width, int video_height, int *bw, int *bh );
 
 
-void               multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img );
+void            multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img );
 
-int                update_multitrack_widgets( void *data, int *array, int track );
+int             update_multitrack_widgets( void *data, int *array, int track );
 
-int                multitrack_locked( void *data);
+int             multitrack_locked( void *data);
 
-void               multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget *img );
+void            multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget *img );
 
-void               multitrack_set_quality( void *data , int quality );
+void            multitrack_set_quality( void *data , int quality );
 
-void       multitrack_sync_start(void *data);
+void       	multitrack_sync_start(void *data);
 
-void	multitrack_sync_simple_cmd( void *data, int vims, int arg );
+void		multitrack_sync_simple_cmd( void *data, int vims, int arg );
 
 void            multitrack_resize( void *m , int w, int h );
 

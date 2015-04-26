@@ -5,6 +5,8 @@
 
 /* multithreaded code, what starts in queue belongs to playback_thread */
 uint8_t *vj_perform_get_preview_buffer();
+int vj_perform_preview_max_width();
+int vj_perform_preview_max_height();
 
 void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
                                 int dst_w, int dst_h );

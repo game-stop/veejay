@@ -8511,29 +8511,29 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	P_A(args,str,format,ap);
 
 	int w=0,h=0;
+	int max_w = vj_perform_preview_max_width();
+	int max_h = vj_perform_preview_max_height();
+		
 	w = args[0]; 
 	h = args[1];
 
-	if( w <= 0 || h <= 0 || w >= 4096 || h >= 4096 )
+	if( w <= 0 || h <= 0 || w >= max_w || h >= max_h )
 	{
-		veejay_msg(0, "Invalid image dimension %dx%d requested",w,h );
+		veejay_msg(0, "Invalid image dimension %dx%d requested (max is %dx%d)",w,h,max_w,max_h );
 		SEND_MSG(v, "0000000" );
 		return;
 	}
 
-	int pixel_format = get_ffmpeg_pixfmt(v->pixel_format);
 	int preview_size = 0;
+	int dstlen = 0;
 	VJFrame frame;
 	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
 	vj_perform_get_primary_frame( v, frame.data );
 	if( v->settings->composite ) {
-		pixel_format = composite_get_top( v->composite, frame.data,
+		frame.format = composite_get_top( v->composite, frame.data,
 						  frame.data,
 						  v->settings->composite );
-		
-		frame.width = v->video_output_width;
-		frame.height = v->video_output_height;
-		switch(pixel_format) {
+		switch(frame.format) {
 			case PIX_FMT_YUV444P:
 			case PIX_FMT_YUVJ444P:
 				frame.uv_width = frame.width;
@@ -8567,23 +8567,26 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 			}
 	}
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
-	if( use_bw_preview_ )
+	if( use_bw_preview_ ) {
 		vj_fastbw_picture_save_to_mem(
 				&frame,
 				w,
 				h,
-				pixel_format );
-	else
+				frame.format );
+
+		dstlen = w * h;
+	}
+	else {
 		vj_fast_picture_save_to_mem(
 				&frame,
 				w,
 				h,
-				pixel_format );
-
-	int dstlen = (use_bw_preview_ ? ( w * h ) : ( ( w * h )/4 ) * 2 + (w * h) );
+				frame.format );
+		dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
+	}
 
 	char header[8];
-	sprintf( header, "%06d%1d", dstlen, use_bw_preview_ );
+	snprintf( header,sizeof(header), "%06d%1d", dstlen, use_bw_preview_ );
 	SEND_DATA(v, header, 7 );
 	SEND_DATA(v, vj_perform_get_preview_buffer(), dstlen );
 }

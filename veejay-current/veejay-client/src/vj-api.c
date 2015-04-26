@@ -298,7 +298,6 @@ static	int	NUM_BANKS =	50;
 static 	int	NUM_SAMPLES_PER_PAGE = 12;
 static	int	NUM_SAMPLES_PER_COL = 6;
 static	int	NUM_SAMPLES_PER_ROW = 2;
-
 static int use_key_snoop = 0;
 
 #define MOD_OFFSET 200
@@ -470,8 +469,6 @@ typedef struct
 	void		*mt;
 	watchdog_t	watch;
 	int		vims_line;
-	int		quality;
-	int		preview_locked;
 	void		*midi;
 	struct timeval	time_last;
 	uint8_t 	*cali_buffer;
@@ -545,8 +542,6 @@ static	GtkListStore	*cali_sourcestore = NULL;
 static  GtkTreeModel    *cali_sourcemodel = NULL;
 
 static int 		num_tracks_ = 2;
-static int		default_preview_width_ = 176;
-static int		default_preview_height_ = 144;
 /* global pointer to the editlist-tree */
 static 	GtkWidget *editlist_tree = NULL;
 static	GtkListStore *editlist_store = NULL;
@@ -714,8 +709,8 @@ static struct
 	{ NULL },
 };
 
-static	int	preview_box_w_ = DEFAULT_PREVIEW_WIDTH;
-static  int	preview_box_h_ = DEFAULT_PREVIEW_HEIGHT;
+static	int	preview_box_w_ = MAX_PREVIEW_WIDTH;
+static  int	preview_box_h_ = MAX_PREVIEW_HEIGHT;
 
 
 static	void		*bankport_ = NULL;
@@ -5688,9 +5683,6 @@ void	get_gd(char *buf, char *suf, const char *filename)
 
 GdkPixbuf	*vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type )
 {
-#ifdef STRICT_CHECKING
-	assert( GDK_IS_PIXBUF(src));
-#endif
 	return gdk_pixbuf_scale_simple( src,dw,dh,inter_type );
 /*
 	GdkPixbuf *res = gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, dw, dh );
@@ -5846,13 +5838,13 @@ int		veejay_update_multitrack( void *data )
 				assert( s->heights[i] > 0 );
 				assert( GDK_IS_PIXBUF( s->img_list[i] ) );
 #endif
-				if( gdk_pixbuf_get_height(s->img_list[i]) >= 255 ||
-				    gdk_pixbuf_get_width(s->img_list[i]) >= 320 ) 
-				gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), s->img_list[i] );
+				if( gdk_pixbuf_get_height(s->img_list[i]) == preview_box_w_ &&
+				    gdk_pixbuf_get_width(s->img_list[i]) == preview_box_h_  )
+					gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), s->img_list[i] );
 				else {
-				GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],DEFAULT_PREVIEW_WIDTH,DEFAULT_PREVIEW_HEIGHT, GDK_INTERP_NEAREST );
-				gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
-				gdk_pixbuf_unref(result);
+					GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],preview_box_w_,preview_box_h_, GDK_INTERP_NEAREST );
+					gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
+					gdk_pixbuf_unref(result);
 
 				}
 				
@@ -6535,9 +6527,8 @@ void	vj_gui_set_debug_level(int level, int preview_p, int pw, int ph )
 
 	vims_verbosity = level;
 	num_tracks_ = preview_p;
-	default_preview_width_ = pw;
-	default_preview_height_ = ph;
 }
+
 int	vj_gui_get_preview_priority(void)
 {
 	return 1;
@@ -7018,8 +7009,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	set_toggle_button( "button_252", vims_verbosity );
 
 
-	int pw = default_preview_width_;
-	int ph = default_preview_height_;
+	int pw = MAX_PREVIEW_WIDTH;
+	int ph = MAX_PREVIEW_HEIGHT;
 	
 	GtkWidget *img_wid = glade_xml_get_widget_( info->main_window, "imageA");
 
@@ -7111,21 +7102,18 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 void	vj_gui_preview(void)
 {
-	gint w = info->el.width;
-	gint h = info->el.height;
+	gint w = 0;
+	gint h = 0;
+	gint tmp_w = info->el.width;
+	gint tmp_h = info->el.height;
 
+	multitrack_get_preview_dimensions( tmp_w,tmp_h, &w, &h );
+	
 	update_spin_value( "priout_width", w );
 	update_spin_value( "priout_height", h );
 
-	if( w > DEFAULT_PREVIEW_WIDTH )
-		w = DEFAULT_PREVIEW_WIDTH;
-	if( h > DEFAULT_PREVIEW_HEIGHT )
-		h = DEFAULT_PREVIEW_HEIGHT;
-
-	update_spin_range( "preview_width", 16, w,
-		(info->run_state == RUN_STATE_REMOTE ? (default_preview_width_==0 ? w/4: default_preview_width_) : w ) ); 
-	update_spin_range( "preview_height", 16, h,
-		(info->run_state == RUN_STATE_REMOTE ? (default_preview_height_ == 0 ? h/4 : default_preview_height_) : h ) );	
+	update_spin_range( "preview_width", 16, w, w);
+	update_spin_range( "preview_height", 16, h, h );
 
 	update_spin_incr( "preview_width", 16, 0 );
 	update_spin_incr( "preview_height", 16, 0 );
@@ -7379,11 +7367,11 @@ gboolean		is_alive( int *do_sync )
 #endif
 			}
 			multrack_audoadd( info->mt, remote, port );
+			multitrack_set_quality( info->mt, 1 );
+			
 			*do_sync = 1;
 			if( user_preview ) {
-			//	info->preview_locked = 1;
 				set_toggle_button( "previewtoggle", 1 );
-			//	info->preview_locked = 0;
 			}
 			veejay_stop_connecting(gui);
 		}

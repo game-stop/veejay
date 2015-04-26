@@ -43,8 +43,6 @@ static int col = 0;
 static int row = 0;
 static int n_tracks = 4;
 static int launcher = 0;
-static int pw = 176;
-static int ph = 144;
 static int preview = 0; // off
 static int use_threads = 0;
 static char midi_file[1024];
@@ -244,7 +242,7 @@ int main(int argc, char *argv[]) {
 
 	find_user_themes(gveejay_theme);
 	
-	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
+	vj_gui_set_debug_level( verbosity , n_tracks,0,0);
 	set_skin( selected_skin );
 
 	default_bank_values( &col, &row );

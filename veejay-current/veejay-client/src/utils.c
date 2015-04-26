@@ -58,14 +58,14 @@ int	status_to_arr( char *status, int *array )
 
 char   *format_time(int pos, double fps)
 {
-	static char temp[256];
+	char temp[256];
         MPEG_timecode_t tc;
 	y4m_ratio_t r = mpeg_conform_framerate(fps);
 	mpeg_timecode(&tc,
 		      pos,
                       mpeg_framerate_code(r),
 		      fps );
-     	sprintf(temp, "%d:%2.2d:%2.2d:%2.2d",tc.h, tc.m, tc.s, tc.f );
+     	snprintf(temp,sizeof(temp),"%d:%2.2d:%2.2d:%2.2d",tc.h, tc.m, tc.s, tc.f );
         return strdup(temp);
 }
 

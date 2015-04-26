@@ -37,15 +37,14 @@
 #define SEQ_BUTTON_CLOSE 0
 #define SEQ_BUTTON_RULE  1
 
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <src/common.h>
 #include <src/utils.h>
 #include <src/gtktimeselection.h>
 #include <src/vj-api.h>
 #include <src/multitrack.h>
 #define __MAX_TRACKS 64
+#define RUP8(num)(num/8*8)
+
 typedef struct
 {
 	GtkWidget *event_box;
@@ -106,15 +105,10 @@ static sequence_view_t *new_sequence_view( void *vp, int num );
 static	void	update_pos( void *data, gint total, gint current );
 static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data);
 
-
 extern GdkPixbuf       *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 extern void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *f, int line );
 
-#ifndef STRICT_CHECKING
 #define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request(a,b,c)
-#else
-#define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request__(a,b,c,__FUNCTION__,__LINE__)
-#endif
 
 int	mt_get_max_tracks()
 {
@@ -134,18 +128,12 @@ static	void	gtk_widget_set_sensitive__( GtkWidget *w, gboolean state, const char
 #ifdef STRICT_CHECKING
 	if( !GTK_IS_WIDGET(w) )
 	 veejay_msg(0, "Invalid widget '%s', %d", f, l );
-	assert( GTK_IS_WIDGET(w) );
 #endif
 	gtk_widget_set_sensitive(w, state );
 }
 
-#ifdef STRICT_CHECKING
-#define gtk_image_set_from_pixbuf_(w,p) gtk_image_set_from_pixbuf__( w,p, __FUNCTION__,__LINE__ );
-#define gtk_widget_set_sensitive_( w,p ) gtk_widget_set_sensitive__( w,p,__FUNCTION__,__LINE__ )
-#else
 #define gtk_image_set_from_pixbuf_(w,p) gtk_image_set_from_pixbuf(w,p)
 #define gtk_widget_set_sensitive_( w,p ) gtk_widget_set_sensitive(w,p)
-#endif
 static	void	status_print(multitracker_t *mt, const char format[], ... )
 {
 	char buf[1024];
@@ -167,6 +155,56 @@ static	GdkPixbuf	*load_logo_image(int dw, int dh )
 	get_gd(path,NULL, "veejay-logo.png");
 	return gdk_pixbuf_new_from_file( path,NULL );
 }
+
+void		multitrack_get_preview_dimensions( int w , int h, int *dst_w, int *dst_h )
+{
+	int tmp_w = w;
+	int tmp_h = h;
+
+	float ratio = (float)tmp_w / (float) tmp_h;
+
+	if( tmp_h > MAX_PREVIEW_HEIGHT ) {
+		tmp_h = MAX_PREVIEW_HEIGHT;
+		tmp_w  = (int) ( (float) tmp_h * ratio );
+	}
+	if( tmp_w > MAX_PREVIEW_WIDTH ) {
+		tmp_w = MAX_PREVIEW_WIDTH;
+		tmp_h = tmp_w / ratio;
+	}
+
+	*dst_w = RUP8(tmp_w);
+	*dst_h = RUP8(tmp_h);
+}
+
+static void	calculate_img_dimension(int w, int h, int *dst_w, int *dst_h, float *result, int max_w, int max_h, int quality) 
+{
+	int tmp_w = w;
+	int tmp_h = h;
+
+	float ratio = (float)tmp_w / (float) tmp_h;
+	*result = ratio;
+
+	if( quality != 1 ) {
+		int qdown = quality;
+		while( (qdown > 0) ) {
+			tmp_h = tmp_h / 2;
+			tmp_w = tmp_w / 2;
+			qdown--;
+		}
+	}
+
+	if( tmp_h > max_h ) {
+		tmp_h = max_h;
+		tmp_w  = (int) ( (float) tmp_h * ratio );
+	} else if( tmp_w > max_w ) {
+		tmp_w = max_w;
+		tmp_h = tmp_w / ratio;
+	}
+
+	*dst_w = RUP8(tmp_w);
+	*dst_h = RUP8(tmp_h);
+}
+
 
 int		multitrack_get_sequence_view_id( void *data )
 {
@@ -395,9 +433,6 @@ static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget 
 static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 {
 	int i;
-#ifdef STRICT_CHECKING
-	assert( p != NULL );
-#endif
 	if( pm == MODE_STREAM || MODE_PLAIN || MODE_SAMPLE )
 	{
 		if(p->num > 0)
@@ -491,13 +526,15 @@ int		update_multitrack_widgets( void *data, int *array, int track )
 
 static	void	sequence_preview_size(multitracker_t *mt, int track_num)
 {
-	float ratio = mt->width / (float)mt->height;
-	int w = 80;
-	int h = ( (int)( (float)w/ratio ))/16*16;
+	float ratio = 0.0f;
+	int tmp_w = 0;
+	int tmp_h = 0;
 
-	if(!gvr_track_configure( mt->preview, track_num,w,h ) )
+	calculate_img_dimension(mt->width,mt->height, &tmp_w, &tmp_h, &ratio, 80, 60,1);
+
+	if(!gvr_track_configure( mt->preview, track_num,tmp_w,tmp_h ) )
 	{
-		veejay_msg(0, "Unable to configure preview %d x %d",w , h );
+		veejay_msg(0, "Unable to configure preview %d x %d",tmp_w,tmp_h );
 	}
 
 }
@@ -794,11 +831,6 @@ void		*multitrack_new(
 		int num_tracks)
 {
 	multitracker_t *mt = NULL;
-#ifdef STRICT_CHECKING
-	assert( max_w > 0 );
-	assert( max_h > 0 );
-	assert( num_tracks > 0 );
-#endif
 
 	MAX_TRACKS	= num_tracks;
 
@@ -808,7 +840,7 @@ void		*multitrack_new(
 	mt->main_window = win; 
 	mt->main_box    = box;
 	mt->status_bar  = msg;
- 	mt->logo = load_logo_image(vj_get_preview_box_w(), vj_get_preview_box_h());
+ 	mt->logo = load_logo_image(0,0);
 	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
 //	gtk_widget_set_size_request(mt->scroll,50+max_w*2, max_h);
@@ -952,74 +984,30 @@ int		multitrack_locked( void *data)
 	return mt->view[mt->master_track]->status_lock;
 }
 
-#define RUP8(num)(num/8*8)
-
 void		multitrack_configure( void *data, float fps, int video_width, int video_height, int *box_w, int *box_h )
 {
 	multitracker_t *mt = (multitracker_t*) data;
 	mt->fps = fps;
-	mt->width = video_width;
-	mt->height = video_height;
-	float r = (float)mt->width / (float) mt->height;
-	mt->aspect_ratio = r;
 
-	if( mt->height > 300 ) {
-		mt->height = DEFAULT_PREVIEW_HEIGHT;
-		mt->width  = (int) ( (float) mt->height * r );
-	}
-	if( mt->width > 360 ) {
-		mt->width = DEFAULT_PREVIEW_WIDTH;
-		mt->height = mt->width / r;
-	}
-
-	mt->width = RUP8(mt->width);
-	mt->height = RUP8(mt->height);
+	calculate_img_dimension(video_width,video_height,&(mt->width),&(mt->height),&(mt->aspect_ratio),vj_get_preview_box_w(),vj_get_preview_box_h(),1);
 
 	*box_w = mt->width;
 	*box_h = mt->height;
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Multitrack %d x %d, %2.2f, ratio %f", mt->width,mt->height,mt->fps,r);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Multitrack %d x %d, %2.2f, ratio %f", mt->width,mt->height,mt->fps,mt->aspect_ratio);
 }
 
 void		multitrack_set_quality( void *data , int quality )
 {
 	multitracker_t *mt = (multitracker_t*) data;
-
+	float ratio = 0.0f;
 	int w = 0;
 	int h = 0;
-	switch( quality )
-	{
-		case 1:
-			w = mt->width;
-			h = (float) w / mt->aspect_ratio;
-			break;	
-		case 0:
-			w = mt->width >> 1;
-			h = (float)w / mt->aspect_ratio;
-			break;
-		case 2:
-			w = mt->width >> 2;
-			h = (float)w/ mt->aspect_ratio;
-			break;
-		case 3:
-			w = mt->width >> 3;
-			h = (float)w / mt->aspect_ratio;
-			break;
-	}
 
-	if( w > 16 && h > 16 )
-	{
-		w = RUP8(w);
-		h = RUP8(h);
-	}
-	else
-	{
-		w = RUP8(mt->width);
-		h = RUP8(mt->height);
-	}
+	calculate_img_dimension(mt->width,mt->height,&w,&h,&ratio,vj_get_preview_box_w(),vj_get_preview_box_h(),quality);
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
-		"Preview image dimensions set to %d x %d",w,h); 
+		"Preview image dimensions changed to %d x %d",w,h); 
 	
 	if(!gvr_track_configure( mt->preview, mt->master_track,w,h ) )
 	{
@@ -1043,6 +1031,8 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 	{
 		gvr_track_toggle_preview( mt->preview, mt->master_track, status );
 		veejay_msg(2, "VeejayGrabber: master preview %s", (status ? "enabled" : "disabled") );
+		if( status == 0 )
+			multitrack_set_logo( data, img );
 	}
 }
 
@@ -1078,10 +1068,11 @@ void		multitrack_bind_track( void *data, int id, int bind_this )
 void		multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img )
 {
 	multitracker_t *mt = (multitracker_t*) data;
+	float ratio = 0.0f;
+	int w = 0;
+	int h = 0;
 
-	float ratio = mt->width / (float) mt->height;
-	int   w = 160;
-	int   h = ((int) (float )w / ratio )/16 *16;
+	calculate_img_dimension(mt->width,mt->height, &w, &h, &ratio, 160, 120,1);
 
 	GdkPixbuf *scaled = vj_gdk_pixbuf_scale_simple( img, w, h, GDK_INTERP_BILINEAR );
 	gtk_image_set_from_pixbuf( GTK_IMAGE(mt->view[track]->area), scaled);

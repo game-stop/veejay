@@ -35,9 +35,9 @@
 #include <veejay/vje.h>
 #include <veejay/yuvconv.h>
 #include <string.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
+
+#define    RUP8(num)(((num)+8)&~8)
+
 extern void reloaded_schedule_restart();
 typedef struct
 {
@@ -66,8 +66,6 @@ typedef struct
 	int	preview;
 	int	width;
 	int	height;
-	int	prevwidth;
-	int	prevheight;
 	int	prevmode;
 	int	need_track_list;
 	unsigned char 	*queue[16];
@@ -107,8 +105,6 @@ static  float   get_ratio(int w, int h)
         return ( (float) w / (float) h);
 }
 
-
-
 void	*gvr_preview_init(int max_tracks, int use_threads)
 {
 	veejay_preview_t *vp = (veejay_preview_t*) vj_calloc(sizeof( veejay_preview_t ));
@@ -131,8 +127,7 @@ static	void	gvr_close_connection( veejay_track_t *v )
 {
    if(v)
    {
-         veejay_msg(VEEJAY_MSG_WARNING, "Stopping VeejayGrabber to %s:%d",
-                      v->hostname,v->port_num );
+         veejay_msg(VEEJAY_MSG_WARNING, "Stopping VeejayGrabber to %s:%d",v->hostname,v->port_num );
          vj_client_close(v->fd);
       	 vj_client_free(v->fd);
 	 if(v->hostname) free(v->hostname);
@@ -349,101 +344,15 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	
 	veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * 32));
 	status_to_arr( v->status_buffer, v->status_tokens );	
-/*
-
-
-	gint n = vj_client_read( v->fd, V_STATUS, status_len, 5 );
-
-	if( n <= 0 && v->is_master )
-		reloaded_schedule_restart();
-
-#ifdef STRICT_CHECKING
-	assert( status_len[0] == 'V' );
-#endif
-
-	if( status_len[0] == 'V' )
-	{
-		gint bytes = 0;
-		sscanf( status_len + 1, "%03d", &bytes );
-		if( bytes > 0 )
-		{
-			veejay_memset( v->status_buffer,0, sizeof(v->status_buffer));
-			n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
-			veejay_msg(0, " --> [%s]", v->status_buffer );
-			if( n <= 0 )
-			{
-				if( n == -1 && v->is_master )
-					reloaded_schedule_restart();
-				veejay_msg(0, "Status message corrupted.");
-				return 0;
-			}
-			int k = -1;
-			while( (k = vj_client_poll( v->fd, V_STATUS )) ) // is there a more recent message?
-			{
-				veejay_msg(0,"More in buffer!");
-				veejay_memset( status_len, 0, sizeof( status_len ) );
-				n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
-				veejay_msg(0, "FLUSH %d [%s]",n,status_len );
-				if( n == -1  && v->is_master )
-					reloaded_schedule_restart();
-				sscanf( status_len+1, "%03d", &bytes );
-				if(bytes > 0 )
-				{
-					n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
-					veejay_msg(0, "FLUSH --> [%s]", v->status_buffer );
-					if( n <= 0 ) {	
-						if( n == -1 && v->is_master )
-							reloaded_schedule_restart();		
-												
-						break;
-					}
-				}
-			}
-			if( k == -1 && v->is_master )
-		
-			reloaded_schedule_restart();
-			veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * 32));
-			status_to_arr( v->status_buffer, v->status_tokens );	
-			return 1;
-		}
-#ifdef STRICT_CHECKING
-		else {
-			assert(0);
-		}
-#endif
-	}
-	else
-	{
-		veejay_msg(0, "FATAL! cannot parse status message.");
-		assert(0);
-		int err = 0;
-
-		while( ( n = vj_client_poll( v->fd, V_STATUS ))) 
-		{
-			char trashcan[100];
-			int k = vj_client_read( v->fd, V_STATUS, trashcan,sizeof(trashcan));
-#ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "Flushing %d bytes '%s'",k,trashcan);
-#endif
-			if( k <= 0 && v->is_master)
-				err = -1;
-		}
-
-		if( n <= 0 && v->is_master )
-			err = -1;
-		
-		if( err == -1)
-			reloaded_schedule_restart();
-	}*/
 	return 1;
 }
 extern int     is_button_toggled(const char *name);
-#define    RUP8(num)(((num)+8)&~8)
 
 static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 {
 	if(!v->have_frame && (v->width <= 0 || v->height <= 0) )
 		return 1;
+
 	gint res = sendvims( v, VIMS_RGB24_IMAGE, "%d %d", v->width,v->height );
 	if( res <= 0 )
 	{
@@ -460,55 +369,34 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 		return res;
 	}
 
-	int expected_len = (v->width * v->height) + (v->width*v->height/2);
+	int expected_len = (v->width * v->height);
+	int srcfmt = PIX_FMT_YUVJ420P; //default
+        if(v->grey_scale) {
+		srcfmt = PIX_FMT_GRAY8;
+	}
+	else {
+		expected_len += (v->width*v->height/4);
+		expected_len += (v->width*v->height/4);
+	}
 
-	if( bw != (v->width * v->height) && bw != expected_len )
+	if( bw != expected_len )
 	{
-//@ try to fallback to a different resolution
 		veejay_msg(VEEJAY_MSG_WARNING, "Corrupted image. Should be %dx%d but have %d bytes %s",
 			v->width,v->height,abs(bw - expected_len),( (bw-expected_len<0)? "too few" : "too many") );
 		v->have_frame = 0;
-#ifdef STRICT_CHECKING
-		assert(0);
-#endif
 		return 0;
 	}
 
 	uint8_t *in = v->data_buffer;
 	uint8_t *out = v->tmp_buffer;
-#ifdef STRICT_CHECKING
-	if( v->grey_scale )
-		assert( bw == (v->width * v->height));
-	else
-		assert( bw == ( (v->width*v->height) + (v->width*v->height)/2 ) );
-#endif
+	
 	v->bw = 0;
-
-	VJFrame *src1 = NULL;
-	if( v->grey_scale == 0 )
-		src1 = yuv_yuv_template( in, in + (v->width * v->height),
-						      in + (v->width * v->height) + (v->width*v->height)/4 ,
-						      v->width,v->height, PIX_FMT_YUV420P );
-	else
-		src1 = yuv_yuv_template( in, in, in, v->width,v->height, PIX_FMT_GRAY8 );
-
 	
-	if( (v->prevwidth != v->width) || (v->prevheight != v->height) || (v->prevmode != v->grey_scale ) ) {
-		v->prevwidth = v->width;
-		v->prevheight = v->height;
-		v->prevmode = v->grey_scale;
-		veejay_memset( in, 0, v->width*v->height);
-		if(!v->grey_scale) {
-			veejay_memset( in + (v->width*v->height), 128, ((v->width*v->height)/4));
-			veejay_memset( in + (v->width*v->height) + ((v->width*v->height)/4),128,((v->width*v->height)/4));
-		}
-	}
-	
-	VJFrame *dst1 = NULL;
+	VJFrame *src1 = yuv_yuv_template( in, in + (v->width * v->height), in + (v->width * v->height) + (v->width*v->height)/4,v->width,v->height, srcfmt );
+	VJFrame *dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_BGR24 );
 
-	dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_BGR24 );
-	
 	yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );	
+
 	v->have_frame = 1;
 
 	free(src1);
@@ -547,6 +435,7 @@ static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 	int n = veejay_get_image_data( vp, v );
        
 	if(n == 0 ) {
+		veejay_msg(0, "No image data %d x %d" , v->width,v->height);
 		//@ settle
 		fail_connection ++;
 		if( fail_connection > 2 ) {
@@ -677,9 +566,9 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 	vt->preview  = is_button_toggled( "previewtoggle" );
 
 	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 256);
-	vt->data_buffer  = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
-	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
-	
+	vt->data_buffer  = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3) );
+	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4) );
+
 	*new_track = track_num;
 
 	vp->tracks[ track_num ] = vt;
@@ -839,12 +728,6 @@ int		gvr_track_configure( void *preview, int track_num, int w, int h )
 		vp->tracks[ track_num ]->height  = h;
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "VeejayGrabber to %s:%d started on Track %d in %dx%d",
-		vp->tracks[ track_num ]->hostname,
-		vp->tracks[ track_num ]->port_num,
-		track_num,
-		w,h);
-
 	vp->track_sync->widths[track_num] = w;
 	vp->track_sync->heights[track_num] = h;
 
@@ -886,18 +769,12 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 	
 	for( i = 0; i < vp->n_tracks; i ++ )
 	{
-		if( vp->tracks[i] && vp->tracks[i]->active && vp->track_sync->widths[i] > 0)
+		if( vp->tracks[i] && vp->tracks[i]->active && vp->track_sync->widths[i] > 0 && vp->tracks[i]->preview)
 		{
-#ifdef STRICT_CHECKING
-			assert( vp->track_sync->widths[i] > 0 );
-			assert( vp->track_sync->heights[i] > 0 );
-#endif
 			veejay_track_t *v = vp->tracks[i];
-//@FIXME HERE
 			list[i] =gdk_pixbuf_new_from_data(vp->tracks[i]->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,	
 				8,vp->tracks[i]->width,vp->tracks[i]->height,
 				  vp->tracks[i]->width*3,NULL,NULL );
-			
 		} 
 	}
 
@@ -1103,8 +980,8 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 			{
 				v->preview = is_button_toggled( "previewtoggle");
 				v->active = 1;
-  				vj_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: connected with %s:%d on Track %d  %d x %d", 
-					v->hostname, v->port_num, track_num, v->width,v->height);
+  				vj_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: %s:%d  track %d@%dx%d preview: %s", 
+					v->hostname, v->port_num, track_num, v->width,v->height, (v->preview ? "yes" : "no"));
 			} 
 		}
 

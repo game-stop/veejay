@@ -2951,25 +2951,13 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
 {
 	single_vims( VIMS_PREVIEW_BW );
-	vj_midi_learning_vims_simple(info->midi,NULL,VIMS_PREVIEW_BW);
+	
+
 }
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-	if(!info->preview_locked)
-	{
-		multitrack_toggle_preview( info->mt, -1, is_button_toggled("previewtoggle"),
-			glade_xml_get_widget(info->main_window, "imageA") );
-	}
-	multitrack_set_quality( info->mt, info->quality );
-	
-/*	multitrack_toggle_preview( info->mt,
-		-1,	
-		1,
-		glade_xml_get_widget(info->main_window,"imageA"));
-       */	//@ enable
-	
-//	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
+	multitrack_toggle_preview( info->mt, -1, is_button_toggled("previewtoggle"),glade_xml_get_widget(info->main_window, "imageA") );
 }
 
 void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
@@ -4005,34 +3993,22 @@ void	on_seqactive_toggled( GtkWidget *w, gpointer data )
 	multi_vims( VIMS_SEQUENCE_STATUS, "%d" , is_button_toggled("seqactive" ) ? 1 : 0 );
 	vj_midi_learning_vims_msg(info->midi,NULL, VIMS_SEQUENCE_STATUS, is_button_toggled("seqactive"));
 }
-void	on_bq_button_clicked( GtkWidget *w, gpointer data )
-{
-	info->quality = 2;
-	multitrack_set_quality( info->mt, 2 );
-	set_toggle_button( "previewtoggle", 1 );
-}
 
-void	on_hqbutton_clicked( GtkWidget *w, gpointer data )
+void	on_hqbutton_clicked( GtkWidget *w, gpointer data ) // 1/1
 {
-	info->quality = 1;
-	multitrack_set_quality( info->mt, 1 );
-	set_toggle_button( "previewtoggle", 1 );
-
-}
-void	on_lqbutton_clicked( GtkWidget *w, gpointer data )
-{
-	info->quality = 0;
 	multitrack_set_quality( info->mt, 0 );
-	set_toggle_button( "previewtoggle", 1 );
-
 }
-void	on_uq_button_clicked( GtkWidget *w, gpointer data )
+void	on_lqbutton_clicked( GtkWidget *w, gpointer data ) // 1/2
 {
-	info->quality = 3;
+	multitrack_set_quality( info->mt, 1 );
+}
+void	on_bq_button_clicked( GtkWidget *w, gpointer data ) // 1/4
+{
+	multitrack_set_quality( info->mt, 2 );
+}
+void	on_uq_button_clicked( GtkWidget *w, gpointer data ) // 1/8
+{
 	multitrack_set_quality( info->mt, 3 );
-	if(!is_button_toggled( "previewtoggle" ))
-		set_toggle_button( "previewtoggle", 1 );
-
 }
 
 void	on_record_vp_clicked( GtkWidget *w, gpointer data )
