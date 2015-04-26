@@ -217,6 +217,10 @@ static int vj_perform_tag_is_cached(veejay_t *info, int chain_entry, int tag_id)
 {
  	int c;
 	int res = -1;
+
+	if( cached_tag_frames[0] == tag_id ) 
+		return 0;
+
 	for(c=0; c < CACHE_SIZE; c++)
   	{
 	    if(chain_entry != c && cached_tag_frames[c] == tag_id) 
@@ -1905,6 +1909,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_COLOR:
 	case VJ_TAG_TYPE_PICTURE:
+	case VJ_TAG_TYPE_GENERATOR:
 
 	centry = vj_perform_tag_is_cached(info,chain_entry, sample_id); // is it cached?
 	//@ not cached

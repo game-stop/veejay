@@ -2118,6 +2118,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 		}
 		if( tag->effect_chain[position]->source_type == 1 && 
 			vj_tag_get_active( tag->effect_chain[position]->channel ) && 
+			tag->effect_chain[position]->channel != t1 &&
 			vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
 			vj_tag_disable( tag->effect_chain[position]->channel );
 		}
@@ -2573,6 +2574,7 @@ int vj_tag_set_chain_channel(int t1, int position, int channel)
 
     if( tag->effect_chain[position]->source_type == 1 && 
 	vj_tag_get_active( tag->effect_chain[position]->channel ) && 
+	tag->effect_chain[position]->channel != t1 &&
 	vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
 	vj_tag_disable( tag->effect_chain[position]->channel );
     }
@@ -2604,6 +2606,7 @@ int vj_tag_set_chain_source(int t1, int position, int source)
 
 	if( tag->effect_chain[position]->source_type == 1 && 
 		vj_tag_get_active( tag->effect_chain[position]->channel ) && 
+		tag->effect_chain[position]->channel != t1 &&
 		vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
 		vj_tag_disable( tag->effect_chain[position]->channel );
 	}
@@ -2710,6 +2713,7 @@ int vj_tag_chain_remove(int t1, int index)
 
 	if( tag->effect_chain[index]->source_type == 1 && 
 		vj_tag_get_active( tag->effect_chain[index]->channel ) && 
+		tag->effect_chain[index]->channel != t1 &&
 		vj_tag_get_type( tag->effect_chain[index]->channel ) == VJ_TAG_TYPE_NET ) {
 		vj_tag_disable( tag->effect_chain[index]->channel );
 	}
