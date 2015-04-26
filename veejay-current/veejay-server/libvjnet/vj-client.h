@@ -34,6 +34,7 @@ typedef struct
 	int orig_fmt;
 
 	uint8_t *space;
+	ssize_t space_len;
 	int mcast;
 	void *lzo;
 	unsigned char *blob;
@@ -55,7 +56,7 @@ void	vj_client_flush( vj_client *v, int delay );
 
 int	vj_client_poll( vj_client *v, int sock_type );
 
-int	vj_client_read_i(vj_client *v, uint8_t *dst, int len );
+uint8_t	*vj_client_read_i(vj_client *v, uint8_t *dst, ssize_t *len, int *ret );
 
 int vj_client_read( vj_client *v, int sock_type, uint8_t *dst, int bytes );
 

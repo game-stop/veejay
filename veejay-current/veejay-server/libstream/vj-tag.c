@@ -1970,6 +1970,12 @@ int vj_tag_chain_free(int t1)
 
 				sum++;
 			}
+			if( tag->effect_chain[i]->source_type == 1 && 
+				vj_tag_get_active( tag->effect_chain[i]->channel ) && 
+				vj_tag_get_type( tag->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+				vj_tag_disable( tag->effect_chain[i]->channel );
+			}
+
 	  	}
 	}  
     return sum;
@@ -2110,6 +2116,12 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 			}
 
 		}
+		if( tag->effect_chain[position]->source_type == 1 && 
+			vj_tag_get_active( tag->effect_chain[position]->channel ) && 
+			vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
+			vj_tag_disable( tag->effect_chain[position]->channel );
+		}
+
     }
 
     if (!vj_effect_initialized(effect_id, tag->effect_chain[position]->fx_instance ))
@@ -2143,7 +2155,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     }
     if (vj_effect_get_extra_frame(effect_id)) {
 	if(tag->effect_chain[position]->source_type < 0)
-	 tag->effect_chain[position]->source_type = tag->source_type;
+	 tag->effect_chain[position]->source_type = 1;
 	if(tag->effect_chain[position]->channel <= 0 )
 	 tag->effect_chain[position]->channel = t1;
     }
@@ -2372,8 +2384,6 @@ int vj_tag_disable(int t1) {
 		if( tag->capture_type == 1 ) {
 			if(v4lvideo_is_active(vj_tag_input->unicap[tag->index] ) )
 				v4lvideo_set_paused( vj_tag_input->unicap[tag->index] , 1 );
-		//	if(v4lvideo_is_active(vj_tag_input->unicap[tag->index] ))
-		//	v4lvideo_grabstop(vj_tag_input->unicap[tag->index]);
 		}
 #elif HAVE_V4L2
 		if(tag->capture_type==1) {
@@ -2560,6 +2570,14 @@ int vj_tag_set_chain_channel(int t1, int position, int channel)
 	return -1;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
+
+    if( tag->effect_chain[position]->source_type == 1 && 
+	vj_tag_get_active( tag->effect_chain[position]->channel ) && 
+	vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
+	vj_tag_disable( tag->effect_chain[position]->channel );
+    }
+
+
     tag->effect_chain[position]->channel = channel;
 
     if (!vj_tag_update(tag,t1))
@@ -2580,12 +2598,19 @@ int vj_tag_set_chain_source(int t1, int position, int source)
 {
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
-	return -1;
+		return -1;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
-	return -1;
+		return -1;
+
+	if( tag->effect_chain[position]->source_type == 1 && 
+		vj_tag_get_active( tag->effect_chain[position]->channel ) && 
+		vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
+		vj_tag_disable( tag->effect_chain[position]->channel );
+	}
+
     tag->effect_chain[position]->source_type = source;
     if (!vj_tag_update(tag,t1))
-	return -1;
+			return -1;
     return 1;
 }
 
@@ -2682,7 +2707,14 @@ int vj_tag_chain_remove(int t1, int index)
 		vpf(tag->effect_chain[index]->kf );
 	
 	tag->effect_chain[index]->kf = vpn(VEVO_ANONYMOUS_PORT);
-    
+
+	if( tag->effect_chain[index]->source_type == 1 && 
+		vj_tag_get_active( tag->effect_chain[index]->channel ) && 
+		vj_tag_get_type( tag->effect_chain[index]->channel ) == VJ_TAG_TYPE_NET ) {
+		vj_tag_disable( tag->effect_chain[index]->channel );
+	}
+
+
     tag->effect_chain[index]->source_type = 1;
     tag->effect_chain[index]->channel     = t1; //set to self
 

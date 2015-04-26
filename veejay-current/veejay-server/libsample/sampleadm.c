@@ -1392,8 +1392,13 @@ int sample_set_chain_channel(int s1, int position, int input)
 				vj_el_setup_cache( new->edit_list ); // setup new cache
 		}
 	 }
+	if( src_type == 1 && 
+		vj_tag_get_active( sample->effect_chain[position]->channel ) &&
+		vj_tag_get_type( sample->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
+		vj_tag_disable( sample->effect_chain[position]->channel );
+	}
 
-	 sample->effect_chain[position]->channel = input;
+	sample->effect_chain[position]->channel = input;
 
     return ( sample_update(sample,s1));
 }
@@ -1534,6 +1539,13 @@ int sample_set_chain_source(int s1, int position, int input)
 	    if(new)
 	  		vj_el_setup_cache( new->edit_list );
 	}
+
+	if( sample->effect_chain[position]->source_type == 1 && 
+			vj_tag_get_active( sample->effect_chain[position]->channel ) &&
+		 	vj_tag_get_type( sample->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET  &&
+			input != 1) {
+			vj_tag_disable( sample->effect_chain[position]->channel );
+		}
 
     sample->effect_chain[position]->source_type = input;
     
@@ -1954,6 +1966,11 @@ int sample_chain_free(int s1)
 			sample->effect_chain[i]->fx_instance = NULL;
 			sum++;
   		}
+		if( sample->effect_chain[i]->source_type == 1 && 
+			vj_tag_get_active( sample->effect_chain[i]->channel ) &&
+		 	vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+			vj_tag_disable( sample->effect_chain[i]->channel );
+		}
 	 }
    }  
     return sum;
@@ -2261,6 +2278,12 @@ int sample_chain_clear(int s1)
 			vj_el_clear_cache(old->edit_list);
 		}
 	}
+	if( sample->effect_chain[i]->source_type == 1 && 
+		vj_tag_get_active( sample->effect_chain[i]->channel ) &&
+	 	vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+		vj_tag_disable( sample->effect_chain[i]->channel );
+	}
+
 	sample->effect_chain[i]->source_type = 0;
 	sample->effect_chain[i]->channel = s1;
 	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
@@ -2374,10 +2397,16 @@ int sample_chain_remove(int s1, int position)
 			vj_el_clear_cache(old->edit_list);
 	}
 
+	if( sample->effect_chain[position]->source_type == 1 && 
+		vj_tag_get_active( sample->effect_chain[position]->channel ) &&
+	 	vj_tag_get_type( sample->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
+		vj_tag_disable( sample->effect_chain[position]->channel );
+	}
+
     sample->effect_chain[position]->source_type = 0;
     sample->effect_chain[position]->channel = 0;
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
-	sample->effect_chain[position]->arg[j] = 0;
+		sample->effect_chain[position]->arg[j] = 0;
 
     return (sample_update(sample,s1));
 }

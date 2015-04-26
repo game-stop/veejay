@@ -403,8 +403,8 @@ void		vj_picture_free()
 
 void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
 {
-	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
-				frame->width,frame->height, frame->format );
+//	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
+//				frame->width,frame->height, frame->format );
 
 	uint8_t *dest[4];	
 	dest[0] = vj_perform_get_preview_buffer();
@@ -427,20 +427,20 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 	{
 		if(pic_scaler_)
 			yuv_free_swscaler( pic_scaler_ );
-		pic_scaler_ = yuv_init_swscaler( src1,dst1, pic_template_, yuv_sws_get_cpu_flags());
+		pic_scaler_ = yuv_init_swscaler( frame,dst1, pic_template_, yuv_sws_get_cpu_flags());
 		update_pic_data( out_w, out_h, dst_fmt );
 	}
 
-	yuv_convert_and_scale( pic_scaler_, src1,dst1);
+	yuv_convert_and_scale( pic_scaler_, frame,dst1);
 
-	free(src1);
+//	free(src1);
 	free(dst1);
 }
 
 void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
 {
-	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
-						frame->width,frame->height, frame->format );
+//	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
+//						frame->width,frame->height, frame->format );
 
 	uint8_t *planes[4]; 
 		
@@ -456,14 +456,14 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 	{
 		if(pic_scaler_)
 			yuv_free_swscaler( pic_scaler_ );
-		pic_scaler_ = yuv_init_swscaler( src1,dst1, pic_template_, yuv_sws_get_cpu_flags());
+		pic_scaler_ = yuv_init_swscaler( frame,dst1, pic_template_, yuv_sws_get_cpu_flags());
 		update_pic_data( out_w, out_h, PIX_FMT_GRAY8 );
 	}
 
 
-	yuv_convert_and_scale( pic_scaler_, src1, dst1);
+	yuv_convert_and_scale( pic_scaler_, frame, dst1);
 
-	free(src1);
+//	free(src1);
 	free(dst1);
 }
 

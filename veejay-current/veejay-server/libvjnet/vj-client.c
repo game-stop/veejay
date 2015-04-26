@@ -69,7 +69,6 @@ vj_client *vj_client_alloc( int w, int h, int f )
 		free(v);
 		return NULL;
 	}
-	v->mcast = 0;
 	return v;
 }
 
@@ -226,7 +225,7 @@ static	long	vj_client_decompress( vj_client *t,uint8_t *in, uint8_t *out, int da
 			out + Y + UV };
 
 
-	long total = lzo_decompress( t->lzo, ( in == NULL ? t->space: in ), data_len, dst, UV,s1,s2,s3 );
+	long total = lzo_decompress( t->lzo, in, data_len, dst, UV,s1,s2,s3 );
 	if( total != (Y+UV+UV) )
 		veejay_msg(0, "Error decompressing: expected %d bytes got %d.", (Y+UV+UV),total);
 
@@ -290,7 +289,7 @@ static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
 }
 
 
-int	vj_client_read_i( vj_client *v, uint8_t *dst, int dstlen )
+uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret )
 {
 	uint8_t line[128];
 	uint32_t p[4] = {0, 0,0,0 };
@@ -305,20 +304,48 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int dstlen )
 	int uv_len = 0;
 	
 	memset( tokens,0,sizeof(tokens));
+	
+	int result = vj_client_packet_negotiate( v, tokens );
+	if( result == 0 ) { 
+	  	veejay_msg(0, "Unable to read frame header.");
+		*ret = -1;
+		return dst;
+	}
+	p[0] = tokens[0]; //w
+	p[1] = tokens[1]; //h
+	p[2] = tokens[2]; //fmt
+	p[3] = tokens[3]; //compr len
+	strides[0] = tokens[4]; // 0
+	strides[1] = tokens[5]; // 1
+	strides[2] = tokens[6]; // 2
+	v->in_width = p[0];
+	v->in_height = p[1];
+	v->in_fmt = p[2];
+	if( p[0] <= 0 || p[1] <= 0 ) {
+		veejay_msg(0, "Invalid values in network frame header");
+		*ret = -1;
+		return dst;
+	}
 
-	if( v->mcast == 1)
-	{
-		uint8_t *in = mcast_recv_frame( v->r, &p[0],&p[1], &p[2], &plen );
-		if( in == NULL )
-			return 0;
+	if( v->space == NULL || v->space_len < p[3] ) {
+		if( v->space ) {
+			free(v->space);
+			v->space = NULL;
+		}
+		v->space_len = RUP8( p[3] );
+		v->space = vj_calloc(sizeof(uint8_t) * v->space_len );
+		if(!v->space) {
+			veejay_msg(0,"Could not allocate memory for network stream.");
+			*ret = -1;
+			return dst;
+		}
+	}
 		
-		v->in_width = p[0];
-		v->in_height = p[1];
-		v->in_fmt = p[2];
+	uv_len = 0;
+	y_len = p[0] * p[1];
 
-		uv_len = 0;
-		y_len = p[0]  * p[1];
-		switch(v->in_fmt )
+	if( p[3] > 0 )  {
+		switch(v->in_fmt ) //@ veejay is sending compressed YUV data, calculate UV size
 		{
 			case PIX_FMT_YUV422P:
 			case PIX_FMT_YUVJ422P:
@@ -328,129 +355,70 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int dstlen )
 			case PIX_FMT_YUVJ420P:
 				uv_len = y_len / 4;break;
 			default:
-				uv_len = y_len; break;
-				veejay_msg(VEEJAY_MSG_WARNING, "Unknown data format: %02x, assuming equal plane sizes.");
+				uv_len = y_len;
+				veejay_msg(VEEJAY_MSG_ERROR, "Unknown pixel format: %02x", v->in_fmt);
+				*ret = -1;
+				return dst;
 				break;
 		}
+		int n = sock_t_recv( v->fd[0],v->space,p[3] );
+		if( n <= 0 ) {
+			if( n == -1 ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
+			} else {
+				veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
+			}
+			*ret = -1;
+			return dst;
+		}
+
+		if( n != p[3] && n > 0 )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, p[3] );	
+			*ret = -1;
+			return dst;
+		}
+
+
+		if( *dstlen < (y_len*3) || dst == NULL ) {
+			dst = realloc( dst, RUP8( y_len * 3) );
+			*dstlen = y_len  * 3;
+		} 
+
+		//@ decompress YUV buffer
+		vj_client_decompress( v, v->space, dst, p[3], y_len, uv_len , 0, strides[0],strides[1],strides[2]);
 		
-		strides[0] = getint( in + 12 + 8, 8 );
-		strides[1] = getint( in + 12 + 16, 8 );
-		strides[2] = getint( in + 12 + 24, 8 );
-
-		if( vj_client_decompress( v,in, dst, plen, y_len, uv_len , plen, strides[0],strides[1],strides[2]) == 0 )
-			return 0;
-
-		if( p[0] != v->cur_width || p[1] != v->cur_height )
-			return 2;
-
-
-		return 1; //@ caller will memcpy it to destination buffer
-	}
-	else 
-	{
-		//@ result returns software package id
-		int result = vj_client_packet_negotiate( v, tokens );
-		if( result == 0 ) { 
-		  	veejay_msg(0, "Unable to read frame header.");
-			return -1;
+		if( v->in_fmt == v->cur_fmt && v->cur_width == p[0] && v->cur_height == p[1] ) {
+			*ret = 1;
+		  	return dst;	
 		}
-		p[0] = tokens[0]; //w
-		p[1] = tokens[1]; //h
-		p[2] = tokens[2]; //fmt
-		p[3] = tokens[3]; //compr len
-		strides[0] = tokens[4]; // 0
-		strides[1] = tokens[5]; // 1
-		strides[2] = tokens[6]; // 2
 
-		v->in_width = p[0];
-		v->in_height = p[1];
-		v->in_fmt = p[2];
-	
-		if( v->space == NULL || v->in_width != v->orig_width || v->in_height != v->orig_height || v->in_fmt != v->orig_fmt ) {
-			if( v->space ) {
-				free(v->space);
-				v->space = NULL;
-			}
-			if( v->in_width <= 0 || v->in_height <= 0 || v->in_fmt <= 0 ) {
-				veejay_msg(0,"Invalid header values in network packet");
-				return -1;
-			}
 
-			v->space = vj_calloc(sizeof(uint8_t) * RUP8(v->in_width * v->in_height * 4) );
-			if(!v->space) {
-				veejay_msg(0,"Could not allocate memory for network stream.");
-				return -1;
-			}
-
-			v->orig_width = v->in_width;
-			v->orig_height = v->in_height;
-			v->orig_fmt = v->in_fmt;
-		}
+		*ret = 2;
+		return dst; //@ caller will scale frame in dst
+	} else {
 			
-		uv_len = 0;
-		y_len = p[0] * p[1];
-
-		if( p[3] > 0 )  {
-			switch(v->in_fmt ) //@ veejay is sending compressed YUV data, calculate UV size
-			{
-				case PIX_FMT_YUV422P:
-				case PIX_FMT_YUVJ422P:
-					uv_len = y_len / 2; 
-					break;
-				case PIX_FMT_YUV420P:
-				case PIX_FMT_YUVJ420P:
-					uv_len = y_len / 4;break;
-				default:
-					uv_len = y_len;
-					veejay_msg(VEEJAY_MSG_ERROR, "Unknown pixel format: %02x", v->in_fmt);
-					return -1;
-					break;
-			}
-
-			int n = sock_t_recv( v->fd[0],v->space,p[3] );
-
-			if( n <= 0 ) {
-				if( n == -1 ) {
-					veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
-				} else {
-					veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
-				}
-				return -1;
-			}
-
-			if( n != p[3] && n > 0 )
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, p[3] );	
-				return -1;
-			}
-			
-			//@ decompress YUV buffer
-			vj_client_decompress( v,v->space, dst, p[3], y_len, uv_len , 0, strides[0],strides[1],strides[2]);
-
-			if( v->in_fmt == v->cur_fmt && v->cur_width == p[0] && v->cur_height == p[1] )
-			       return 1;	
-
-			return 2; //@ caller will scale frame in dst
-		} else {
-		
-			int n = sock_t_recv( v->fd[0], dst, strides[0] + strides[1] + strides[2] );
-			if( n !=  (strides[0] + strides[1] + strides[2] ) )
-			{
-				veejay_msg(0, "Broken video packet");
-				return -1;
-			}
-
-			if( v->in_fmt == v->cur_fmt && v->cur_width == p[0] && v->cur_height == p[1] )
-			       return 1;	
-
-
-			return 2;
-
+		if( *dstlen < (strides[0] + strides[1] + strides[2]) || dst == NULL ) {
+			dst = realloc( dst, RUP8( strides[0]+strides[1]+strides[2]) );
+			*dstlen = strides[0] + strides[1] + strides[2];
 		}
 
-		return 0;
+		int n = sock_t_recv( v->fd[0], dst, strides[0] + strides[1] + strides[2] );
+		if( n !=  (strides[0] + strides[1] + strides[2] ) )
+		{
+			*ret = -1;
+			return dst;
+		}
+
+		if( v->in_fmt == v->cur_fmt && v->cur_width == p[0] && v->cur_height == p[1] ) {
+			*ret = 1;
+		        return dst;
+		}
+
+		*ret = 2;
+		return dst;
 	}
-	return 0;
+	return dst;
 }
 
 

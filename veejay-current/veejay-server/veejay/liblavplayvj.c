@@ -3597,7 +3597,8 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 		info->dummy->fps = vj_el_get_default_framerate( override_norm );
 	
 	int dw = 720;
-	int dh = (override_norm == 'p' ? 576 : 480);
+	int dh = (override_norm == 'p' || override_norm == '\0' ? 576 : 480);
+
 	float dfps = fps;
 	float tmp_fps = 0.0f;
 	long tmp_arate = 0;

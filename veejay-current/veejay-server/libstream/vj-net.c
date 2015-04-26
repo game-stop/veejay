@@ -56,6 +56,7 @@ typedef struct
 	void *scaler;
 	VJFrame *a;
 	VJFrame *b;
+	ssize_t bufsize;
 } threaded_t;
 
 #define STATE_INACTIVE 0
@@ -72,14 +73,13 @@ static int unlock(threaded_t *t)
 }
 
 #define MS_TO_NANO(a) (a *= 1000000)
-static	void	net_delay(long nsec, long sec )
+static	void	net_delay(long ms, long sec )
 {
 	struct timespec ts;
 	ts.tv_sec = sec;
-	ts.tv_nsec = MS_TO_NANO( nsec);
+	ts.tv_nsec = MS_TO_NANO( ms );
 	clock_nanosleep( CLOCK_REALTIME,0, &ts, NULL );
 }
-
 
 void	*reader_thread(void *data)
 {
@@ -110,112 +110,68 @@ void	*reader_thread(void *data)
 
 	unsigned int	optimistic = 1;
 	unsigned int	optimal    = 8;
-	unsigned int    bufsize    = t->w * t->h * 4;
 
-	t->buf = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( bufsize ) );
+	lock(t);
+	t->state = STATE_RUNNING;
+	unlock(t);
 
-	if(t->buf == NULL ) {
-		veejay_msg(0, "Cannot allocate memory for network i/o buffer");
-		goto NETTHREADEXIT;
-	}
-
-	for( ;; )
-	{
+	for( ;; ) {
 		int error    = 0;
 		int res      = 0;
 
-		if(!error && tag->source_type == VJ_TAG_TYPE_NET && retrieve == 0) {
-			ret =  vj_client_send( v, V_CMD, buf );
-			if( ret <= 0 )
-			{
-				veejay_msg(VEEJAY_MSG_DEBUG,
-								"Error sending get frame command to %s:%d",
-								tag->source_name,
-								tag->video_channel );
-
+		int ret = 0;
+	        if( retrieve == 0 && t->have_frame == 0 ) {
+			ret = vj_client_send( v, V_CMD, buf );
+			if( ret <= 0 ) {
 				error = 1;
-			} else {
-				optimistic = optimal;
+			}
+			else {
+				retrieve = 1;
 			}
 		}
 
-		if(!error && tag->source_type == VJ_TAG_TYPE_NET )
-		{
+		if(!error && retrieve == 1 ) {
 			res = vj_client_poll(v, V_CMD );
-			if( res )
-			{
+			if( res ) {	
 				if(vj_client_link_can_read( v, V_CMD ) ) {
 					retrieve = 2;
-					if( optimistic < optimal && optimistic > 1 )
-						optimal = (optimistic + optimal) / 2;
 				}
 			} 
 			else if ( res < 0 ) {
-				veejay_msg(VEEJAY_MSG_DEBUG,
-								"Error polling connection %s:%d",
-								tag->source_name,
-								tag->video_channel );
 				error = 1;
 			} else if ( res == 0 ) {
-				retrieve = 1;
-				net_delay( optimistic ,0); //@ decrease wait time after each try
-				optimistic --;
-				if( optimistic == 0 ) {
-					optimal ++;
-					if(optimal > 20 )
-						optimal = 20; //@ upper bound
-					optimistic = 1;
-				}
-
-				continue; //@ keep waiting after SEND_FRAME until like ;; or error
+				net_delay(10,0);
+				continue;
 			}
 		}
 	
 	
-		if(!error && (retrieve == 2))
-		{
-			if( res )
-			{
-				if(lock(t) != 0 ) //@ lock memory region to write
-					goto NETTHREADEXIT;
-			
-				ret = vj_client_read_i ( v, t->buf,bufsize );
-				if( ret <= 0 )
-				{
-					if( tag->source_type == VJ_TAG_TYPE_NET )
-					{
-						veejay_msg(VEEJAY_MSG_DEBUG,
-								"Error reading video frame from %s:%d",
-								tag->source_name,
-								tag->video_channel );
-						error = 1;
-					}
-				}
-				else
-				{
-					t->in_fmt = v->in_fmt;
-					t->in_w   = v->in_width;
-					t->in_h   = v->in_height;
-					t->have_frame = 1;
-					retrieve = 0;
-				}
-				if(unlock(t) != 0 )
-					goto NETTHREADEXIT;
+		if(!error && retrieve == 2) {
+			lock(t);
+			t->buf = vj_client_read_i( v, t->buf,&(t->bufsize), &ret );
+			if(ret && t->buf) {
+				t->have_frame = 1;
+				t->in_fmt = v->in_fmt;
+				t->in_w   = v->in_width;
+				t->in_h   = v->in_height;
+				retrieve = 0;
 			}
+			if( ret <= 0 || t->buf == NULL ) {
+				if( tag->source_type == VJ_TAG_TYPE_NET )
+				{
+					veejay_msg(VEEJAY_MSG_DEBUG,"Error reading video frame from %s:%d",tag->source_name,tag->video_channel );
+					error = 1;
+				}
+			}
+			unlock(t);
 		}
 NETTHREADRETRY:
+
 		if( error )
 		{
 			int success = 0;
-
-			vj_client_close( v );
-			vj_client_free( v);
-			v = vj_client_alloc( t->w, t->h, t->af );
-			if(!v) {
-				goto NETTHREADEXIT;
-			}
-
-			v->lzo = lzo_new();
+			
+			vj_client_close(v);
 
 			veejay_msg(VEEJAY_MSG_INFO, " ZZzzzzz ... waiting for Link %s:%d to become ready", tag->source_name, tag->video_channel );
 			net_delay( 0, 5 );
@@ -225,6 +181,12 @@ NETTHREADRETRY:
 			else
 				success = vj_client_connect_dat( v, tag->source_name,tag->video_channel );
 	
+			if( t->state == 0 )
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d was told to exit",tag->source_name,tag->video_channel+5);
+				goto NETTHREADEXIT;
+			}
+
 			if( success <= 0 )
 			{
 				goto NETTHREADRETRY;
@@ -238,14 +200,7 @@ NETTHREADRETRY:
 		}
 
 
-		int cur_state = STATE_RUNNING;
-		if(lock(t) != 0 )
-			goto NETTHREADEXIT;
-		cur_state = t->state;
-		if(unlock(t) != 0 )
-			goto NETTHREADEXIT;
-
-		if( cur_state == 0 )
+		if( t->state == 0 )
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d was told to exit",tag->source_name,tag->video_channel+5);
 			goto NETTHREADEXIT;
@@ -256,14 +211,15 @@ NETTHREADEXIT:
 
 	if(t->buf)
 		free(t->buf);
-
+	t->buf = NULL;
 	if(v) {
 	       	vj_client_close(v);
 		vj_client_free(v);
+		v = NULL;
 	}
 
 	veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d has exited",tag->source_name,tag->video_channel+5);
-	pthread_exit( &(t->thread));
+	//pthread_exit( &(t->thread));
 
 	return NULL;
 }
@@ -283,8 +239,6 @@ static void	net_thread_free(vj_tag *tag)
 	t->a = NULL;
 	t->b = NULL;
 	t->scaler = NULL;
-	t->buf = NULL;
-
 }	
 
 void	*net_threader(VJFrame *frame)
@@ -301,13 +255,11 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	int state = 0;
 
 	/* frame ready ? */
-	if(lock(t) != 0 )
-		return 0;
-
+	lock(t);
 	have_frame = t->have_frame;
-	state= t->state;
+	state = t->state;
 
-	if( state == 0 || have_frame == 0 ) {
+	if( state == 0 || have_frame == 0 || t->bufsize == 0 || t->buf == NULL ) {
 		unlock(t);
 		return 1; // not active or no frame
 	}
@@ -316,6 +268,12 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	int len = t->w * t->h;
 	int b_len = t->in_w * t->in_h;
 	int buvlen = b_len;
+
+	if( (b_len*3) > tag->socket_len ) {
+		tag->socket_frame =
+			(uint8_t*) realloc( tag->socket_frame, RUP8(b_len*3) );
+		tag->socket_len = b_len*3;
+	}
 
 	if( t->in_fmt == PIX_FMT_RGB24 || t->in_fmt == PIX_FMT_BGR24 || t->in_fmt == PIX_FMT_RGBA || t->in_fmt == PIX_FMT_RGB32_1 ) {
 
@@ -338,12 +296,7 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 		t->b = yuv_yuv_template( buffer[0],buffer[1], buffer[2],t->w,t->h,t->f);
 	}
 
-	if( b_len + buvlen > tag->socket_len ) {
-		veejay_msg(0, "Network client: buffer too small ?!");
-		unlock(t);
-		return 0;
-	}
-
+	
 	if( t->scaler == NULL ) {
 		sws_template sws_templ;
 		memset( &sws_templ, 0, sizeof(sws_template));
@@ -354,8 +307,7 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	yuv_convert_and_scale( t->scaler, t->a,t->b );
 	
 	t->have_frame = 0;
-	if(unlock(t)!=0)
-		return 0;
+	unlock(t);
 
 	return 1;
 }
@@ -367,12 +319,9 @@ int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
 	int have_frame = 0;
 	int state = 0;
 
-	if(lock(t) != 0 )
-		return 0;
-
+	lock(t);
 	have_frame = t->have_frame;
 	state= t->state;
-
 	if( state == 0 || have_frame == 0 ) {
 		unlock(t);
 		return 1;
@@ -428,7 +377,6 @@ int	net_thread_start(vj_tag *tag, int wid, int height, int pixelformat)
 	t->af = pixelformat;
 	t->f = get_ffmpeg_pixfmt(pixelformat);
 	t->have_frame = 0;
-	t->state = STATE_RUNNING;
 
 	int p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
 	if( p_err ==0)
@@ -445,16 +393,20 @@ void	net_thread_stop(vj_tag *tag)
 {
 	threaded_t *t = (threaded_t*)tag->priv;
 	
-	if(lock(t) == 0 ) {	
-		t->state = 0;
+	lock(t);
+	if( t->state == 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Stream was already stopped");
 		unlock(t);
+		return;
 	}
-
+	t->state = 0;
+	unlock(t);
+	
 	pthread_mutex_destroy( &(t->mutex));
 
-	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from Veejay host %s:%d", tag->source_name,tag->video_channel);
-
 	net_thread_free(tag);
+
+	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from Veejay host %s:%d", tag->source_name,tag->video_channel);
 }
 
 int	net_already_opened(const char *filename, int n, int channel)

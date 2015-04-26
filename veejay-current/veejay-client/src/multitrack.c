@@ -530,8 +530,7 @@ static	void	sequence_preview_size(multitracker_t *mt, int track_num)
 	int tmp_w = 0;
 	int tmp_h = 0;
 
-	calculate_img_dimension(mt->width,mt->height, &tmp_w, &tmp_h, &ratio, 80, 60,1);
-
+	calculate_img_dimension(mt->width,mt->height, &tmp_w, &tmp_h, &ratio, 160, 120,0);
 	if(!gvr_track_configure( mt->preview, track_num,tmp_w,tmp_h ) )
 	{
 		veejay_msg(0, "Unable to configure preview %d x %d",tmp_w,tmp_h );
@@ -1072,7 +1071,7 @@ void		multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img )
 	int w = 0;
 	int h = 0;
 
-	calculate_img_dimension(mt->width,mt->height, &w, &h, &ratio, 160, 120,1);
+	calculate_img_dimension(mt->width,mt->height, &w, &h, &ratio, 160, 120,0);
 
 	GdkPixbuf *scaled = vj_gdk_pixbuf_scale_simple( img, w, h, GDK_INTERP_BILINEAR );
 	gtk_image_set_from_pixbuf( GTK_IMAGE(mt->view[track]->area), scaled);
