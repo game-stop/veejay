@@ -184,7 +184,7 @@ static void	calculate_img_dimension(int w, int h, int *dst_w, int *dst_h, float 
 	float ratio = (float)tmp_w / (float) tmp_h;
 	*result = ratio;
 
-	if( quality != 1 ) {
+	if( quality > 0 ) {
 		int qdown = quality;
 		while( (qdown > 0) ) {
 			tmp_h = tmp_h / 2;
