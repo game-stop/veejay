@@ -232,14 +232,6 @@ static	long	vj_client_decompress( vj_client *t,uint8_t *in, uint8_t *out, int da
 	return total;
 }
 
-static	uint32_t	getint(uint8_t *in, int len ) {
-	char *ptr, *word = strndup( in, len+1 );
-	word[len] = '\0';
-	long v = strtol( word, &ptr, 10 );
-	free(word);
-	return (uint32_t) v;
-}
-
 /* packet negotation.
  * read a small portion (44 bytes for veejay, its veejay's full header size) 
  * and try to identify which software is sending frames
@@ -287,6 +279,111 @@ static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
 
 	return 1;
 }
+
+int	vj_client_read_frame_header( vj_client *v, int *w, int *h, int *fmt, int *compr_len, int *stride1,int *stride2, int *stride3 )
+{
+	uint8_t line[128];
+	uint32_t p[4] = {0, 0,0,0 };
+	uint32_t strides[4] = { 0,0,0,0 };
+
+	int	tokens[16];
+
+	memset( tokens,0,sizeof(tokens));
+
+	int result = vj_client_packet_negotiate( v, tokens );
+	if( result == 0 ) { 
+		return 0;
+	}
+
+	if( tokens[0] <= 0 || tokens[1] <= 0 ) {
+		return 0;
+	}
+
+	*w = tokens[0];
+	*h = tokens[1];
+	*fmt=tokens[2];
+	*compr_len=tokens[3];
+	*stride1=tokens[4];
+	*stride2=tokens[5];
+	*stride3=tokens[6];
+	v->in_width = *w;
+	v->in_height = *h;
+	v->in_fmt = *fmt;
+
+	return 1;
+}
+
+int vj_client_read_frame_data( vj_client *v, int compr_len, int stride1,int stride2, int stride3, uint8_t *dst )
+{
+	int datalen = (compr_len > 0 ? compr_len : stride1+stride2+stride3);
+	if( (compr_len > 0) && ( v->space == NULL || v->space_len < compr_len) ) {
+		if( v->space ) {
+			free(v->space);
+			v->space = NULL;
+		}
+		v->space_len = RUP8( compr_len );
+		v->space = vj_calloc(sizeof(uint8_t) * v->space_len );
+		if(!v->space) {
+			veejay_msg(0,"Could not allocate memory for network stream.");
+			return 0;
+		}
+	}
+
+	if( compr_len > 0 )  {
+		int n = sock_t_recv( v->fd[0],v->space,datalen );
+		if( n <= 0 ) {
+			if( n == -1 ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
+			} else {
+				veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
+			}
+			return 0;
+		}
+
+		if( n != compr_len && n > 0 )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, compr_len );	
+			return 0;
+		}
+
+		return 2;
+	}
+	else {
+		int n = sock_t_recv( v->fd[0], dst, datalen );
+		if( n != (stride1 + stride2 + stride3)  )
+		{
+			return 0;
+		}
+
+		return 1;
+	}
+	return 0;
+}
+
+void vj_client_decompress_frame_data( vj_client *v, uint8_t *dst, int fmt, int w, int h, int compr_len, int stride1, int stride2, int stride3  )
+{
+	int y_len = w * h;
+	int uv_len = 0;
+	switch(fmt) //@ veejay is sending compressed YUV data, calculate UV size
+	{
+		case PIX_FMT_YUV422P:
+		case PIX_FMT_YUVJ422P:
+			uv_len = y_len / 2; 
+			break;
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
+			uv_len = y_len / 4;
+			break;
+		default:
+			uv_len = y_len;
+			break;
+	}
+	
+
+	//@ decompress YUV buffer
+	vj_client_decompress( v, v->space, dst, compr_len, y_len, uv_len ,0, stride1,stride2,stride3);
+}
+
 
 
 uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret )

@@ -147,13 +147,49 @@ void	*reader_thread(void *data)
 	
 	
 		if(!error && retrieve == 2) {
-			lock(t);
-			t->buf = vj_client_read_i( v, t->buf,&(t->bufsize), &ret );
+			int ret = 0;
+			int strides[3] = { 0,0,0};
+			int compr_len = 0;
+
+			if( vj_client_read_frame_header( v, &(t->in_w), &(t->in_h), &(t->in_fmt), &compr_len, &strides[0],&strides[1],&strides[2]) == 0 ) {
+				error = 1;
+			}
+			
+			if(!error) {
+				int need_rlock = 0;
+				if( compr_len <= 0 )
+					need_rlock = 1;
+
+				if( need_rlock ) {
+					lock(t);
+				}
+
+				if( t->bufsize < (t->in_w * t->in_h * 3) || t->buf == NULL ) {
+					t->bufsize = t->in_w * t->in_h * 3;
+					t->buf = (uint8_t*) realloc( t->buf, RUP8(t->bufsize));
+				}
+
+				ret = vj_client_read_frame_data( v, compr_len, strides[0], strides[1], strides[2], t->buf );
+				if( ret == 2 ) {
+					if(!need_rlock) {
+						lock(t);
+						vj_client_decompress_frame_data( v, t->buf, t->in_fmt, t->in_w, t->in_h, compr_len, strides[0],strides[1],strides[2] );
+						unlock(t);
+					}
+				}
+
+				if( need_rlock ) {
+					unlock(t);
+				}
+			}
+
+		//	lock(t);
+			//t->buf = vj_client_read_i( v, t->buf,&(t->bufsize), &ret );
 			if(ret && t->buf) {
 				t->have_frame = 1;
-				t->in_fmt = v->in_fmt;
-				t->in_w   = v->in_width;
-				t->in_h   = v->in_height;
+                    	        t->in_fmt = v->in_fmt;
+                     	        t->in_w   = v->in_width;
+                    	        t->in_h   = v->in_height;
 				retrieve = 0;
 			}
 			if( ret <= 0 || t->buf == NULL ) {
@@ -163,7 +199,7 @@ void	*reader_thread(void *data)
 					error = 1;
 				}
 			}
-			unlock(t);
+		//	unlock(t);
 		}
 NETTHREADRETRY:
 
@@ -259,43 +295,25 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	have_frame = t->have_frame;
 	state = t->state;
 
-	if( state == 0 || have_frame == 0 || t->bufsize == 0 || t->buf == NULL ) {
+	if( state == 0 || t->bufsize == 0 || t->buf == NULL ) {
 		unlock(t);
 		return 1; // not active or no frame
-	}
+	}	// just continue when t->have_frame == 0
 
 	//@ color space convert frame	
-	int len = t->w * t->h;
 	int b_len = t->in_w * t->in_h;
 	int buvlen = b_len;
 
-	if( (b_len*3) > tag->socket_len ) {
-		tag->socket_frame =
-			(uint8_t*) realloc( tag->socket_frame, RUP8(b_len*3) );
-		tag->socket_len = b_len*3;
-	}
-
-	if( t->in_fmt == PIX_FMT_RGB24 || t->in_fmt == PIX_FMT_BGR24 || t->in_fmt == PIX_FMT_RGBA || t->in_fmt == PIX_FMT_RGB32_1 ) {
-
-		if(t->a == NULL )
-			t->a = yuv_rgb_template( tag->socket_frame, t->in_w, t->in_w, t->in_fmt );
+	if( PIX_FMT_YUV420P == t->in_fmt || PIX_FMT_YUVJ420P == t->in_fmt )
+		buvlen = b_len/4;
+	else
+		buvlen = b_len/2;
 	
-	} else {
+	if( t->a == NULL )
+		t->a = yuv_yuv_template( t->buf, t->buf + b_len, t->buf+ b_len+ buvlen,t->in_w,t->in_h, t->in_fmt);
 	
-		if( t->b == NULL ) {
-			if( PIX_FMT_YUV420P == t->in_fmt || PIX_FMT_YUVJ420P == t->in_fmt )
-				buvlen = b_len/4;
-			else
-				buvlen = b_len/2;
-
-			t->a = yuv_yuv_template( t->buf, t->buf + b_len, t->buf+ b_len+ buvlen,t->in_w,t->in_h, t->in_fmt);
-		}
-	}
-
-	if( t->b == NULL ) {
+	if( t->b == NULL ) 
 		t->b = yuv_yuv_template( buffer[0],buffer[1], buffer[2],t->w,t->h,t->f);
-	}
-
 	
 	if( t->scaler == NULL ) {
 		sws_template sws_templ;
@@ -311,56 +329,6 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 
 	return 1;
 }
-
-int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
-{
-	threaded_t *t = (threaded_t*) tag->priv;
-	
-	int have_frame = 0;
-	int state = 0;
-
-	lock(t);
-	have_frame = t->have_frame;
-	state= t->state;
-	if( state == 0 || have_frame == 0 ) {
-		unlock(t);
-		return 1;
-	}
-
-	int len = t->w * t->h;
-	int uv_len = len;
-	int b_len = t->in_w * t->in_h;
-	int buvlen = b_len;
-
-
-	if( PIX_FMT_YUV420P == t->f || PIX_FMT_YUVJ420P == t->f )
-	    uv_len = len/4;
-	else
-	    uv_len = len/2;
-
-
-	if(t->have_frame )
-	{
-		if( PIX_FMT_YUV420P == t->in_fmt || PIX_FMT_YUVJ420P == t->in_fmt )
-			buvlen = b_len/4;
-		else
-			buvlen = b_len/2;
-
-		if( t->a == NULL ) {
-			t->a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,t->in_w,t->in_h, t->in_fmt);
-		}
-		if( t->b == NULL ) {
-			t->b = yuv_rgb_template( buffer,w,h,PIX_FMT_RGB24);
-		}
-
-		yuv_convert_any_ac(t->a,t->b, t->a->format,t->b->format );
-	}	
-	
-	unlock(t);
-
-	return 1;
-}
-
 
 int	net_thread_start(vj_tag *tag, int wid, int height, int pixelformat)
 {

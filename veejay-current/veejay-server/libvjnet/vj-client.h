@@ -78,5 +78,12 @@ int	vj_client_window_sizes( int socket_fd, int *r, int *s );
 
 int vj_client_connect_dat(vj_client *v, char *host, int port_id  );
 
+
+void vj_client_decompress_frame_data( vj_client *v, uint8_t *dst, int fmt, int w, int h, int compr_len, int stride1, int stride2, int stride3  );
+
+int vj_client_read_frame_data( vj_client *v, int compr_len, int stride1,int stride2, int stride3, uint8_t *dst );
+
+int	vj_client_read_frame_header( vj_client *v, int *w, int *h, int *fmt, int *compr_len, int *stride1,int *stride2, int *stride3 );
+
 #endif
 
