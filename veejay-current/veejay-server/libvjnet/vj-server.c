@@ -416,7 +416,6 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 
 	if( !vje->use_mcast)
 	{
-		//@ FIXME: vje->send_size is not used in sock_t_send_fd
 		total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len);
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "sent %d of %d bytes to handle %d (link %d) %s\n", total,len, Link[link_id]->handle,link_id,(char*)(inet_ntoa(vje->remote.sin_addr)) );

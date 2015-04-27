@@ -39,7 +39,7 @@
 #define RIPPLE_DEGREES 360
 #define RIPPLE_VAL 180.0
 
-static double *ripple_table;
+static double *ripple_table = NULL;
 static uint8_t *ripple_data[4] = { NULL,NULL,NULL,NULL };
 static double *ripple_sin;
 static double *ripple_cos;
@@ -49,7 +49,6 @@ static int ripple_ampli = 0;
 static int ripple_attn = 0;
 static int have_calc_data = 0;
 
-// FIXME private
 vj_effect *ripple_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));

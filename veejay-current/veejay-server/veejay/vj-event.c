@@ -424,7 +424,7 @@ else { veejay_msg(VEEJAY_MSG_DEBUG,"arg has size of 0x0");}
 
 
 #define CLAMPVAL(a) { if(a<0)a=0; else if(a >255) a =255; }
-//@ FIXME: implement embedded help
+//@ TODO: implement embedded help
 //@ F1 -> sample playing FX=off -> standard help
 //@ F1 -> sample playing FX=on entry >= 0 <= MAX_E : show help for FX on entry N
 //
@@ -7125,34 +7125,6 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 	} 
 
 }
-void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap )
-{
-	veejay_t *v = (veejay_t*) ptr;
-	int args[2];
-	char *str = NULL;
-	P_A(args,str,format,ap);
-
-	char msg[280];
-	char message[256];
-	
-	if( args[0] == 0 || !v->composite) {
-		snprintf(message,256,"%d %d %d %d %d %d %d %d",
-			0,0,0,0,0,0,0,0);
-		FORMAT_MSG(msg,message);
-		SEND_MSG(v,msg);
-		return;
-	}	
-//FIXME
-//	int *r = viewport_event_get_projection(  composite_get_vp( v->composite ),args[0] );
-	int r[8];
-	memset(r,0,sizeof(r));	
-	snprintf(message,256, "%d %d %d %d %d %d %d %d",
-		r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7] );
-
-	char *err = "0 0 0 0 0 0 0 0";
-	FORMAT_MSG(msg,err);
-	SEND_MSG(v,err);
-}
 
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
 {
@@ -8617,11 +8589,13 @@ void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	)
 		SEND_MSG(v, "00000000"  );
 	}
 	else {
-		char header[128];//FIXME
-		sprintf( header, "%03d%08d%06d%06d%06d%06d",8+6+6+6+6,len, len, 0, v->video_output_width, v->video_output_height );
+		char header[64];
+		snprintf( header,sizeof(header), "%03d%08d%06d%06d%06d%06d",8+6+6+6+6,len, len, 0, v->video_output_width, v->video_output_height );
 		SEND_MSG( v, header );
-
 		int res = vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, buf,len);
+		if(!res) {
+			veejay_msg(0,"Failed to get calibration image");
+		}
 	}
 }
 

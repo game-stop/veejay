@@ -124,7 +124,6 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt, int use_key, int use_mou
     vjsdl->display = NULL;
 	switch(fmt) {
 	 //@ dont use YUVJ here - on blitting it to SDL it will be converted to YUV clamped for YUYJ422
-	//FIXME	
 	case FMT_422F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV422P;break;
 	case FMT_422:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV422P;break;
 	}

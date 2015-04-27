@@ -927,7 +927,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     switch (type) {
 	    case VJ_TAG_TYPE_V4L:
 		sprintf(tag->source_name, "%s", filename );
-//FIXME
+		
 		veejay_msg(VEEJAY_MSG_DEBUG, "V4l: %s",filename);
 
 /*
@@ -1023,7 +1023,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 
 		int foo_arg  = vj_shm_get_id();
 
-		if( extra != 0 ) //@ vj_shm_set_id is a hack FIXME
+		if( extra != 0 ) //@ vj_shm_set_id is a hack 
 			vj_shm_set_id( extra );
 
 		tag->generator = plug_activate(channel);
@@ -3064,7 +3064,7 @@ static	void	whiteframe_new(uint8_t *buf, int w, int h, int uv_len, uint8_t *Y, u
 			mean_of_v += tag->lfv[i];
 		}
 	} else {
-		for(i = 0; i < (w*h); i ++ ) { //@FIXME subtract dark current
+		for(i = 0; i < (w*h); i ++ ) { //@TODO subtract dark current
 			p = Y[i] - bf[i];
 			if( p < 0 ) p = 0;
 			tag->lf[i] = 0.0f + (double)p;
@@ -3128,7 +3128,7 @@ static void	whiteframe_process( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h
 
 	} else {
 		int p;
-		//@ should subtract dark current, FIXME
+		//@ should subtract dark current, TODO
 		for( i = 0; i < (w*h); i ++ ) {
 			p = Y[i] - bf[i];
 			if( p < 0 )

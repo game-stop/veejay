@@ -155,7 +155,7 @@ static void	blob_init_( blob_t *b , int blob_id, int w , int h)
 	b->vx = 0.01;
 	b->vy = 0.01;
 }
-// FIXME private 
+
 int	boids_malloc(int w, int h)
 {
 	int j,i;

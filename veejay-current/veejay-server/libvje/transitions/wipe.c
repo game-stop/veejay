@@ -45,8 +45,6 @@ vj_effect *wipe_init(int w,int h)
     return ve;
 
 }
-// FIXME private
-
 static int g_wipe_width = 0;
 static int g_wipe_height = 0;
 void wipe_apply( VJFrame *frame, VJFrame *frame2,

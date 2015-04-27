@@ -2506,17 +2506,6 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
-	index_map_[ VIMS_PROJ_GET_POINT ]			=	_new_event(
-				"%d",
-				VIMS_PROJ_GET_POINT,
-				"Get viewport points using scale",
-				vj_event_vp_get_points,
-				1,
-				VIMS_ALLOW_ANY,
-				"Grid size",
-				1000,
-				NULL );
-
 	index_map_[ VIMS_FRONTBACK ]				=	_new_event(
 				NULL,
 				VIMS_FRONTBACK,

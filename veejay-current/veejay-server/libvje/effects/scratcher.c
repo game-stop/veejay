@@ -56,8 +56,6 @@ vj_effect *scratcher_init(int w, int h)
 
 }
 
-//FIXME private
-
 void scratcher_free() {
    if(frame[0])
 	  free(frame[0]);

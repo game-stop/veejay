@@ -44,10 +44,10 @@ vj_effect *swirl_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Degrees" );
     return ve;
 }
-// FIXME private
-static double *polar_map;
-static double *fish_angle;
-static int *cached_coords;
+
+static double *polar_map = NULL;
+static double *fish_angle = NULL;
+static int *cached_coords = NULL;
 static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
 
 
@@ -99,6 +99,11 @@ void	swirl_free()
 		free(polar_map);
 	if(fish_angle)
 		free(fish_angle);
+	if(cached_coords)
+		free(cached_coords);
+	polar_map = NULL;
+	fish_angle = NULL;
+	cached_coords = NULL;
 }
 
 

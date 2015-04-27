@@ -33,7 +33,7 @@ static int new_path = 0;
 static int roto_old_p = 0;
 static int roto_old_z = 0;
 static uint8_t *rotobuffer[4] = { NULL,NULL,NULL,NULL };
-// FIXME private
+
 vj_effect *rotozoom_init(int width, int height)
 {
     int i, j;

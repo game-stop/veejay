@@ -885,7 +885,7 @@ void plug_concatenate_all(void *osc, void *msg)
 		}
 	}
 */
-	//@ FIXME OMC
+	//@ TODO OMC
 }
 
 char	*plug_get_name( int fx_id )

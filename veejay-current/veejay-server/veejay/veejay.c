@@ -669,7 +669,7 @@ static void print_license()
 
 static void donothing(int sig)
 {
-	vj_lock(info); //FIXME
+	vj_lock(info);
 	veejay_handle_signal( info, sig );	
 	vj_unlock(info);
 }

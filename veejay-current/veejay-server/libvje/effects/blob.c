@@ -108,7 +108,7 @@ static void	blob_init_( blob_t *b , int w , int h)
 	b->x = (w >> 1) - blob_radius_;
 	b->y = (h >> 1) - blob_radius_;
 }
-// FIXME private 
+
 int	blob_malloc(int w, int h)
 {
 	int j,i;

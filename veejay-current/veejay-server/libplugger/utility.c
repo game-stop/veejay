@@ -140,7 +140,7 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 			{
 				error = vevo_property_get( port, key, i, &(dtemp[i]));
 			}
-		//@ FIXME: scale parameter and treat as TYPE_INT
+		//@ TODO: scale parameter and treat as TYPE_INT
 
 			for( i = 0; i < num; i ++ ) {
 				itmp[i] = (int)( dtemp[i] * 100.0);
@@ -150,7 +150,7 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 		//		error = vevo_property_set( to_port, as_key, type, num, &dtemp );
 		//	veejay_msg(0, "\t\tValue is %g ", dtemp[0] );
 			break;
-		//@ FIXME: not supported yet
+		//@ TODO: not supported yet
 	/*	case VEVO_ATOM_TYPE_STRING:
 			for( i = 0; i < num; i ++)
 			{

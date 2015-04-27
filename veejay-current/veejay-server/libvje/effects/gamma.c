@@ -44,7 +44,6 @@ vj_effect *gamma_init(int w, int h)
     ve->parallel = 1;
 	return ve;
 }
-// FIXME private
 
 inline void gamma_setup(int width, int height,
 			double gamma_value)

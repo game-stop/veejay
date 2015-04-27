@@ -77,7 +77,7 @@ vj_effect *reflection_init(int width,int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "Value 1", "Value 2", "Mode");
     return ve;
 }
-// FIXME private
+
 int reflection_malloc(int width, int height)
 { 
   int i, x, y;

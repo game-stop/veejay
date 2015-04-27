@@ -52,7 +52,6 @@ vj_effect *slice_init(int width,int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "Slices", "Mode");
     return ve;
 }
-//FIXME private
 
 int 	slice_malloc(int width, int height)
 {

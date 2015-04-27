@@ -60,11 +60,8 @@ vj_effect *lumamask_init(int width, int height)
     return ve;
 }
 
-// FIXME: private
-
 static int n__ = 0;
 static int N__ = 0;
-
 
 int lumamask_malloc(int width, int height)
 {

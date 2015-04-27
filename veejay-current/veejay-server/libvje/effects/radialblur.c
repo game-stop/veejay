@@ -46,7 +46,7 @@
 #include <libvjmem/vjmem.h>
 #include "radialblur.h"
 #include "common.h"
-//FIXME: private
+
 static uint8_t *radial_src[4] = { NULL,NULL,NULL,NULL};
 
 vj_effect *radialblur_init(int w,int h)

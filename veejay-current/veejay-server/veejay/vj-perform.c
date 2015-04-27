@@ -73,7 +73,7 @@ typedef struct {
     uint8_t *P1;
     int	     ssm;
     char     padding[12];
-} ycbcr_frame; //@ FIXME: drop this structure and replace for veejay-next 's VJFrame
+} ycbcr_frame; //@ TODO: drop this structure and replace for veejay-next 's VJFrame
 
 typedef struct {
 	int	fader_active;
@@ -241,7 +241,7 @@ static int vj_perform_sample_is_cached(veejay_t *info,int sample_id, int chain_e
 	int c;
 	int res = -1;
 
-	if( sample_id == cached_sample_frames[0] ) //FIXME 
+	if( sample_id == cached_sample_frames[0] )  
 		return 0;
 
 	for(c=1; c < CACHE_SIZE ; c++)
@@ -1958,8 +1958,8 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 			break;
     }
 }
-//@ FIXME: Render all image effects in subchain
-//
+
+//@ TODO: Render all image effects in subchain
 static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 {
 	VJFrame *frames[2];

@@ -52,7 +52,7 @@ vj_effect *sinoids_init(int width, int height)
 }
 static int n__ = 0;
 static int N__= 0;
-//FIXME private
+
 int sinoids_malloc(int width, int height)
 {
 	int i = 0;

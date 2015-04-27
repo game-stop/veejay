@@ -607,7 +607,8 @@ static atom_t *vevo_new_atom(__vevo_port_t * port, int atom_type,
 
     if(atom_type == VEVO_ATOM_TYPE_STRING || atom_type == VEVO_ATOM_TYPE_UTF8STRING )
 	{
-   		atom->value = (atom_size > 0 ?(void*)vj_malloc(atom_size):NULL);//@ FIXME: strings do not come from pool	
+   		atom->value = (atom_size > 0 ?(void*)vj_malloc(atom_size):NULL);
+		//@ TODO: strings do not come from pool	
 	}else
     {	 if(atom_type == VEVO_ATOM_TYPE_DOUBLE ) {
 		 atom->value = (atom_size > 0 ? (void*) vevo_pool_alloc_dbl(double,port->pool ): NULL);
@@ -1721,7 +1722,6 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 	port = NULL;
 }	
 	
-//@ FIXME: method to recursivly iterate a port and all subports to size-up all data, vevo_port_get_total_size()
 
 //! Flatten all ports and return list of ports to be destroyed
 /*!

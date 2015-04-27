@@ -66,7 +66,7 @@ vj_effect *dices_init(int width, int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "Dice size" );
     return ve;
 }
-// FIXME: private
+
 int	dices_malloc(int width, int height)
 {
 	g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height);

@@ -59,7 +59,6 @@ vj_effect *distortion_init(int width, int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "Inc 1" , "Inc2" );
     return ve;
 }
-// FIXME private
 
 void distortion_free() {
    if(plasma_table) free(plasma_table);

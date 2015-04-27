@@ -489,7 +489,7 @@ static	int	init_parameter_port(livido_port_t *ptr, livido_port_t *in_param )
 //			pctrl = livido_plug_parameter_set_number; break;
 //		case HOST_PARAM_SWITCH:
 //			pctrl = livido_plug_parameter_set_bool; break;
-//@ FIXME: these are not yet supported
+//@ TODO: these are not yet supported
 //		case HOST_PARAM_COORD:
 //			pctrl = livido_plug_parameter_set_coord; break;
 //		case HOST_PARAM_COLOR:
@@ -677,7 +677,7 @@ void	livido_plug_free_namespace( void *fx_instance , void *data )
 {
 	void *osc_namespace = NULL;
 	int error = vevo_property_get( fx_instance, "HOST_osc",0,&osc_namespace);
-//@FIXME
+//@TODO OMC
 //	if( error == VEVO_NO_ERROR)
 //		veejay_osc_del_methods( data,osc_namespace,fx_instance, fx_instance );
 }
@@ -751,7 +751,7 @@ int	livido_plug_build_namespace( void *plugin_template , int entry_id, void *fx_
 				i,
 			       	param_templ	);
 		*/
-		//@ FIXME: OMC
+		//@ TODO: OMC
 		free(param_name);
 		free(format);
 		free(descrip);
@@ -1156,7 +1156,7 @@ int	livido_read_plug_configuration(void *filter_template, const char *name)
 	if(!f) { // lets write the plugin's default parameter values to disk
 		int n_params = vevo_property_num_elements( filter_template, "in_parameter_templates" );
 		if( n_params <= 0 ) {
-			return 0; // no defaults to write (for now). vevo serialization not yet complete for full dump FIXME
+			return 0; // no defaults to write (for now). vevo serialization not yet complete for full dump TODO
 		}
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "No configuration file for livido plugin %s", name);

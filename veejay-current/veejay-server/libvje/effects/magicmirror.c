@@ -61,8 +61,6 @@ vj_effect *magicmirror_init(int w, int h)
 	ve->param_description = vje_build_param_list(ve->num_params, "X", "Y", "X","Y" );
     return ve;
 }
-// FIXME private
-
 static int n__ = 0;
 static int N__ = 0;
 int magicmirror_malloc(int w, int h)

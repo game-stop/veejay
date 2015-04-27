@@ -44,7 +44,7 @@
 #include "common.h"
 #include <math.h>
 
-static uint8_t *chrominance;
+static uint8_t *chrominance = NULL;
 
 vj_effect *uvcorrect_init(int w, int h)
 {
@@ -86,8 +86,6 @@ vj_effect *uvcorrect_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_help = 1;
 	ve->has_user = 0;
-// FIXME: private
-    //chrominance = (uint8_t*) vj_calloc (sizeof(uint8_t) * 512 * 256 );
     
     return ve;
 }

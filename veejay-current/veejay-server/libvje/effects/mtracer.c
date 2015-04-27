@@ -49,7 +49,6 @@ vj_effect *mtracer_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Length");
     return ve;
 }
-// FIXME private
 void mtracer_free() {
 	int i;
 	for(i = 0; i < 3; i ++ ) {

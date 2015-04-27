@@ -65,7 +65,7 @@ static int bar_bot_auto = 0;
 static int bar_top_vert = 0;
 
 static int bar_bot_vert = 0;
-// FIXME private
+
 void bar_apply(VJFrame *frame, VJFrame *frame2, int width, int height,int divider, int top_y, int bot_y, int top_x, int bot_x  ) {
 
 	int top_width = width;		   /* frame in frame destination area */

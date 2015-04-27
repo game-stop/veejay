@@ -47,7 +47,6 @@ vj_effect *noiseadd_init(int width , int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Amplification");
     return ve;
 }
-// FIXME private
 
 int noiseadd_malloc(int width, int height)
 {
