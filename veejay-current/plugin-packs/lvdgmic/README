@@ -1,0 +1,57 @@
+
+veejay experiment using G'MIC (GREYC's Magic for Image Computing)
+
+https://gmicol.greyc.fr/
+
+----
+
+RUNNING:
+
+run make in src/ and put the .so files in livido-plugins/ folder
+
+
+
+Files:
+ src/
+     lvdgmic.cc /lvdgmic.hh : c++ class that wraps gmic 
+     lvdgmicglue.c /lvdgmicglue.h: glue so i can call it in c
+     
+     gmic_bokeh.c : Bokeh effect (very slow)
+     gmic_pencilbw.c: Pencil BW (very slow too)
+     gmic_cartoon.c: Cartoon effect (very slow)
+
+
+
+
+
+It is trivial to create your own FX , GMIC has a command style interface so the livido plugin only formats a command message and sends it off:
+
+
+
+
+livido_process_f                process_instance( livido_port_t *my_instance, double timecode ) {
+
+ //livido stuff
+
+        char cmd[256];
+	//format a message, see http://gmic.eu/reference.shtml#subsection15 
+        snprintf(cmd,sizeof(cmd),"-cartoon %d,%d,%d,%f,%f,%d",
+                                        smoothness,sharpening,threshold,(float)thickness/100.0f, (float)color/100.0f, ... );
+
+	// push an in put frame
+        lvdgmic_push( gmic, w, h, 0, A, 0);
+
+	// send command
+        lvdgmic_gmic( gmic, cmd );
+
+	// pull it
+        lvdgmic_pull( gmic, 0, O );
+ 
+}
+
+
+If you change the command of a plugin, keep in mind that you could also update the parameter description port to keep things parametrized
+
+
+GMIC processes internally in RGB float (packed) and there is no optimal conversion for this in veejay. A simple approach would be to parallelize the conversion
+
