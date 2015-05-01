@@ -13,6 +13,8 @@ lvdgmic::~lvdgmic()
 	images.assign(0U);
 }
 
+
+
 void lvdgmic::push( int w, int h, int fmt, unsigned char **data, int n )
 {
 	int n_planes = 1; // Y only for now

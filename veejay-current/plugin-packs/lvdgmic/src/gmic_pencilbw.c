@@ -139,7 +139,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Size" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 200 );
+		livido_set_int_value( port, "max", 500 );
 		livido_set_int_value( port, "default", 30 );
 		livido_set_string_value( port, "description" ,"Size");
 
@@ -150,7 +150,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Amplitude" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 360 );
+		livido_set_int_value( port, "max", 200 );
 		livido_set_int_value( port, "default", 60 );
 		livido_set_string_value( port, "description" ,"Amplitude");
 

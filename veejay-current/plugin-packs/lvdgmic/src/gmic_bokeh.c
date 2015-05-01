@@ -146,8 +146,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Amplitude" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 400 );
-		livido_set_int_value( port, "default", 200 );
+		livido_set_int_value( port, "max", 600 );
+		livido_set_int_value( port, "default", 250 );
 		livido_set_string_value( port, "description" ,"Amplitude");
 
 	
@@ -157,7 +157,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Smoothness" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 255 );
+		livido_set_int_value( port, "max", 20 );
 		livido_set_int_value( port, "default", 2 );
 		livido_set_string_value( port, "description" ,"Smoothness");
 
@@ -169,8 +169,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Density" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0);
-		livido_set_int_value( port, "max", 10000 );
-		livido_set_int_value( port, "default", 20 );
+		livido_set_int_value( port, "max", 500 );
+		livido_set_int_value( port, "default", 50 );
 		livido_set_string_value( port, "description" ,"Density");
 
 		
@@ -180,7 +180,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Bokeh-size" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0);
-		livido_set_int_value( port, "max", 128 );
+		livido_set_int_value( port, "max", 64 );
 		livido_set_int_value( port, "default", 24);
 		livido_set_string_value( port, "description" ,"Bokeh-size");
 
@@ -203,8 +203,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Bokeh-outline-amplitude" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0);
-		livido_set_int_value( port, "max", 100 );
-		livido_set_int_value( port, "default", 1 );
+		livido_set_int_value( port, "max", 10 );
+		livido_set_int_value( port, "default", 2 );
 		livido_set_string_value( port, "description" ,"Bokeh-outline-amplitude");
 
 	in_params[6] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
@@ -213,8 +213,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Bokeh-smoothness" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0);
-		livido_set_int_value( port, "max", 200 );
-		livido_set_int_value( port, "default", 1 );
+		livido_set_int_value( port, "max", 500 );
+		livido_set_int_value( port, "default", 70 );
 		livido_set_string_value( port, "description" ,"Bokeh-smoothness");
 
 

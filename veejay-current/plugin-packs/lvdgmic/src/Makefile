@@ -1,8 +1,8 @@
 CFLAGS=-Wall -g -fPIC
 CCFLAGS=Wall -g -fPIC
-LDFLAGS=-g -Wall -lstdc++ -lgmic
+LDFLAGS=-g -Wall -lstdc++ -lgmic -shared
 
-OBJS=lvdgmic.o lvdgmicglue.o lvd_gmic.o
+OBJS=lvdgmic.o lvdgmicglue.o 
 CARTOON_SO=gmic_cartoon.so
 BOKEY_SO=gmic_bokeh.so
 PENCILBW_SO=gmic_pencilbw.so

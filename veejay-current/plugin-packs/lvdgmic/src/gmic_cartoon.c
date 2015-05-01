@@ -145,7 +145,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Smoothness" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 255 );
+		livido_set_int_value( port, "max", 10 );
 		livido_set_int_value( port, "default", 3 );
 		livido_set_string_value( port, "description" ,"Smoothness");
 
@@ -156,8 +156,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Sharpening" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 255 );
-		livido_set_int_value( port, "default", 150 );
+		livido_set_int_value( port, "max", 400 );
+		livido_set_int_value( port, "default", 200 );
 		livido_set_string_value( port, "description" ,"Sharpening");
 
 
@@ -165,32 +165,32 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	in_params[2] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[2];
 
-		livido_set_string_value(port, "name", "Threshold" );
+		livido_set_string_value(port, "name", "Edge threshold" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0);
-		livido_set_int_value( port, "max", 255 );
+		livido_set_int_value( port, "max", 30);
 		livido_set_int_value( port, "default", 20 );
-		livido_set_string_value( port, "description" ,"Threshold");
+		livido_set_string_value( port, "description" ,"Edge Threshold");
 
 		
 	in_params[3] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[3];
 
-		livido_set_string_value(port, "name", "Thickness" );
+		livido_set_string_value(port, "name", "Edge thickness" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0);
-		livido_set_int_value( port, "max", 400 );
+		livido_set_int_value( port, "max", 100 );
 		livido_set_int_value( port, "default", 25);
-		livido_set_string_value( port, "description" ,"Thickness");
+		livido_set_string_value( port, "description" ,"Edge thickness");
 
 		
 	in_params[4] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[4];
 
-		livido_set_string_value(port, "name", "Color" );
+		livido_set_string_value(port, "name", "Color strength" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0);
-		livido_set_int_value( port, "max", 255 );
+		livido_set_int_value( port, "max", 300 );
 		livido_set_int_value( port, "default", 15 );
 		livido_set_string_value( port, "description" ,"Color");
 
