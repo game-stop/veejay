@@ -77,8 +77,6 @@ static struct {
 	{ "/usr/lib/frei0r-1"},
 	{ "/usr/local/lib64/frei0r-1"},
 	{ "/usr/lib64/frei0r-1"},
-	{ "/usr/local/lib/livido-plugins"},
-	{ "/usr/lib/livido-plugins"},
 	NULL,
 };
 
