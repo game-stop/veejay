@@ -2322,7 +2322,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		} 
 		while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (QUEUE_LEN-1));
 	
-	//	veejay_event_handle(info);
+		//veejay_event_handle(info);
 
 #ifdef HAVE_JACK
 		if ( info->audio==AUDIO_PLAY  ) 
@@ -3655,6 +3655,11 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 			veejay_msg(VEEJAY_MSG_WARNING,"Going to run without audio for user defined frames per second ...");
 			info->audio = NO_AUDIO;
 		}
+	}
+
+	if( dfps <= 0.0 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "No framerate set or detected" );
+		dfps = vj_el_get_default_framerate(info->dummy->norm);
 	}
 
 	info->settings->output_fps = dfps;
