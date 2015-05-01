@@ -2317,10 +2317,12 @@ static void veejay_playback_cycle(veejay_t * info)
 	   		double  dn = ( (double) (d1 - n1) )/10000000.0; // * 1.e7;
 
 	   		stats.tdiff = dn; 
+	
+			veejay_event_handle(info);
 		} 
 		while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (QUEUE_LEN-1));
 	
-		veejay_event_handle(info);
+	//	veejay_event_handle(info);
 
 #ifdef HAVE_JACK
 		if ( info->audio==AUDIO_PLAY  ) 
