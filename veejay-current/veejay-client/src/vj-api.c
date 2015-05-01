@@ -1598,11 +1598,7 @@ void	about_dialog()
 	const gchar *donate =
 {
 	"You can donate cryptocoins!\n"\
-	"Bitcoin: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n"\
-	"Devcoin: 1DtYKQx6kLnCxX5S8atf6b3dD42A2UavvE\n"\
-	"Litecoin: LcccLQCB7DbqGj9u52urRjVi43yYz7WeND\n"\
-	"Feathercoin: 6i4G4C9jEZuL6R7vSspZ6JMAUP2zb6M1Yu\n" 		
-
+	"Bitcoin: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n"
 };
 
 	sprintf(blob, "Veejay - A visual instrument and realtime video sampler for GNU/Linux\n%s\n%s", os_str, donate );
