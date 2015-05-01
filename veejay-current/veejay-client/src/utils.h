@@ -23,9 +23,6 @@ int 	status_to_arr( char *status, int *array );
 char   *format_time( int pos , double fps);
 
 
-#define DEFAULT_PREVIEW_WIDTH  520
-#define DEFAULT_PREVIEW_HEIGHT  300
-
 #define MAX_PREVIEW_WIDTH 520
 #define MAX_PREVIEW_HEIGHT 300
 

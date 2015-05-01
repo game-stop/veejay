@@ -6644,8 +6644,8 @@ void	vj_gui_cb(int state, char *hostname, int port_num)
 
 void	vj_gui_setup_defaults( vj_gui_t *gui )
 {
-	gui->config.w = DEFAULT_PREVIEW_WIDTH;
-	gui->config.h = DEFAULT_PREVIEW_HEIGHT;
+	gui->config.w = MAX_PREVIEW_WIDTH;
+	gui->config.h = MAX_PREVIEW_HEIGHT;
 	gui->config.fps = 25.0;
 	gui->config.sampling = 1;
 	gui->config.pixel_format = 1;

@@ -988,7 +988,7 @@ void		multitrack_configure( void *data, float fps, int video_width, int video_he
 	multitracker_t *mt = (multitracker_t*) data;
 	mt->fps = fps;
 
-	calculate_img_dimension(video_width,video_height,&(mt->width),&(mt->height),&(mt->aspect_ratio),vj_get_preview_box_w(),vj_get_preview_box_h(),1);
+	calculate_img_dimension(video_width,video_height,&(mt->width),&(mt->height),&(mt->aspect_ratio),vj_get_preview_box_w(),vj_get_preview_box_h(),-1);
 
 	*box_w = mt->width;
 	*box_h = mt->height;
