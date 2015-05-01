@@ -1825,16 +1825,24 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 	long	end   = ( s1 ? sample_get_endFrame(s1) : info->settings->max_frame_num );
 
 	if( cur_sfd == 0 ) {
-		p0_frame = nframe;
-		vj_el_get_video_frame( el, p0_frame, p0_buffer );
-		p1_frame = nframe + speed;
-		if(p1_frame < start )
+		if( speed > 0 && nframe == end ){ //@ p0 = last frame
+			p0_frame = end;
+			vj_el_get_video_frame( el, p0_frame, p0_buffer );
 			p1_frame = start;
-		if(p1_frame > end )
-			p1_frame = end;
-
-		if(p0_frame != p1_frame)
 			vj_el_get_video_frame( el, p1_frame, p1_buffer );
+		} else if( speed < 0 && nframe == start)  { //@ p0 = first frame
+			p0_frame = start;
+			vj_el_get_video_frame( el, p0_frame, p0_buffer );
+			p1_frame = end;
+			vj_el_get_video_frame( el, p1_frame, p1_buffer );
+		} else {
+			p0_frame = nframe;
+			vj_el_get_video_frame( el, p0_frame, p0_buffer );
+			p1_frame = nframe + speed;
+			if(p1_frame < start )
+				p1_frame = start;
+			vj_el_get_video_frame( el, p1_frame, p1_buffer );
+		}
 		
 		vj_perform_copy3( p0_buffer, img, info->effect_frame1->len, uv_len );
 
@@ -1850,6 +1858,7 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 			vj_perform_copy3( img, p0_buffer, info->effect_frame1->len,uv_len );
 		}
 	}
+	
 	return 1;
 }
 
