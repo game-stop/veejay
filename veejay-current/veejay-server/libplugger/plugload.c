@@ -562,9 +562,6 @@ int	plug_sys_detect_plugins(void)
 		veejay_msg(VEEJAY_MSG_INFO, "\thttp://www.piksel.org/frei0r");
 		veejay_msg(VEEJAY_MSG_INFO, "\tFound %d frei0r %s",
 			n_fr_ , n_fr_ == 1 ? "plugin" : "plugins" );
-	
-
-		veejay_msg(VEEJAY_MSG_WARNING, "\tPerformance penalty for frei0r and FreeFrame: native -> RGB -> native.");
 	}	
 
 	if( n_lvd_ > 0 ) {
