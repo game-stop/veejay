@@ -1631,7 +1631,7 @@ void	about_dialog()
 		"program_name", "reloaded",   
 		"name", VEEJAY_CODENAME,
 		"version", VERSION,
-		"copyright", "(C) 2004 - 2008 N. Elburg et all.",
+		"copyright", "(C) 2004 - 2015 N. Elburg et all.",
 		"comments", "The graphical interface for Veejay",
 		"website", web,
 		"authors", authors,
