@@ -2127,8 +2127,6 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 
     if (!vj_effect_initialized(effect_id, tag->effect_chain[position]->fx_instance ))
     {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s must be initialized now",
-			vj_effect_get_description(effect_id));
  		int res = 0;
 		tag->effect_chain[position]->fx_instance = vj_effect_activate( effect_id, &res );
 		if(!res) {

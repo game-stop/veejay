@@ -2108,8 +2108,6 @@ int sample_chain_add(int s1, int c, int effect_nr)
 
     if(!vj_effect_initialized(effect_nr, sample->effect_chain[c]->fx_instance) )
     {
-	veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s must be initialized now",
-		vj_effect_get_description(effect_nr));
 	int res = 0;
 	sample->effect_chain[c]->fx_instance = vj_effect_activate( effect_nr, &res );
 	if(!res)
