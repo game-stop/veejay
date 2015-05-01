@@ -1779,7 +1779,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int t
 static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *img[4], uint8_t *p0_buffer[4], uint8_t *p1_buffer[4], int check_sample )
 {
 	int max_sfd = (s1 ? sample_get_framedup( s1 ) : info->sfd );
-
+	
 	if(check_sample && info->settings->feedback == 0) {
 		if(info->uc->sample_id == s1 && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ) {
 
@@ -1791,7 +1791,6 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 			}
 
 			vj_perform_copy2( primary_buffer[7], img,  info->effect_frame1->len, 	(info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len ) );
-
 			return 1;
 		}
 	}
@@ -1803,19 +1802,16 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 			veejay_msg(VEEJAY_MSG_WARNING, "No plain source playing");
 			return 0;
 		} else {
-			veejay_msg(VEEJAY_MSG_WARNING, "Fetching frame %d from plain source",
-				nframe );
+			veejay_msg(VEEJAY_MSG_WARNING, "Fetching frame %d from plain source", nframe );
 			el = info->edit_list;
 		}
 	}
 
-	int cur_sfd = (s1 ? sample_get_framedups(s1 ) : info->settings->simple_frame_dup );
-
 	if( max_sfd <= 1 )
 		return vj_el_get_video_frame( el, nframe, img );
-
-	int speed = info->settings->current_playback_speed;
-	//int loops = (s1 ? sample_get_loopcount(s1) : 0 );
+	
+	int cur_sfd = (s1 ? sample_get_framedups(s1 ) : info->settings->simple_frame_dup );
+	int speed = sample_get_speed(s1);
 	int uv_len = (info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len );
 
 	long p0_frame = 0;
@@ -1825,24 +1821,17 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 	long	end   = ( s1 ? sample_get_endFrame(s1) : info->settings->max_frame_num );
 
 	if( cur_sfd == 0 ) {
-		if( speed > 0 && nframe == end ){ //@ p0 = last frame
-			p0_frame = end;
-			vj_el_get_video_frame( el, p0_frame, p0_buffer );
-			p1_frame = start;
-			vj_el_get_video_frame( el, p1_frame, p1_buffer );
-		} else if( speed < 0 && nframe == start)  { //@ p0 = first frame
-			p0_frame = start;
-			vj_el_get_video_frame( el, p0_frame, p0_buffer );
+		p0_frame = nframe;
+		vj_el_get_video_frame( el, p0_frame, p0_buffer );
+		p1_frame = nframe + speed;
+
+		if( speed > 0 && p1_frame > end )
 			p1_frame = end;
+		else if ( speed < 0 && p1_frame < start )
+			p1_frame = start;
+
+		if( p1_frame != p0_frame )
 			vj_el_get_video_frame( el, p1_frame, p1_buffer );
-		} else {
-			p0_frame = nframe;
-			vj_el_get_video_frame( el, p0_frame, p0_buffer );
-			p1_frame = nframe + speed;
-			if(p1_frame < start )
-				p1_frame = start;
-			vj_el_get_video_frame( el, p1_frame, p1_buffer );
-		}
 		
 		vj_perform_copy3( p0_buffer, img, info->effect_frame1->len, uv_len );
 
@@ -1850,9 +1839,8 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		const uint32_t N = max_sfd;
 		const uint32_t n1 = cur_sfd;
 		const float frac = 1.0f / (float) N * n1;
-		const uint32_t len = info->video_output_width * info->video_output_height;
 
-		vj_frame_slow_threaded( p0_buffer, p1_buffer, img , len, uv_len, frac );
+		vj_frame_slow_threaded( p0_buffer, p1_buffer, img , info->effect_frame1->len, uv_len, frac );
 		
 		if( (n1 + 1 ) == N ) {
 			vj_perform_copy3( img, p0_buffer, info->effect_frame1->len,uv_len );
