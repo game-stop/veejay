@@ -860,7 +860,7 @@ void	plug_print_all()
 	if( x < n ) {
 		veejay_msg(VEEJAY_MSG_INFO, "Loaded %d/%d plugins", x,n );
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "Loaded %d plugins",n);
+	veejay_msg(VEEJAY_MSG_INFO, "Loaded %d plugins in total",n);
 		
 }
 
