@@ -1298,7 +1298,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_RGB_PARAMETER_TYPE]			=	_new_event(
 				"%d",
 				VIMS_RGB_PARAMETER_TYPE,
-				"Change YUV <-> RGB conversion (unadvised)",
+				"Change YUV <-> RGB conversion",
 				vj_event_set_rgb_parameter_type,
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
@@ -1859,7 +1859,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_EDITLIST_ADD_SAMPLE]			=	_new_event(
 				"%d %s",
 				VIMS_EDITLIST_ADD_SAMPLE,
-				"GUI: Append a file to the plain EDL and create a new sample (unadvised!)",
+				"GUI: Append a file to the plain EDL and create a new sample",
 				vj_event_el_add_video_sample,
 				2,
 				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
@@ -1871,7 +1871,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_STREAM_LIST]				=	_new_event(
 				"%d",
 				VIMS_STREAM_LIST,
-				"GUI: Get a list of all streams (unadvised!)",
+				"GUI: Get a list of all streams",
 				vj_event_send_tag_list,
 				1,
 				VIMS_ALLOW_ANY,
@@ -1882,7 +1882,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_TRACK_LIST]				=	_new_event(
 				NULL,
 				VIMS_TRACK_LIST,
-				"GUI: Get a list of all tracks (unadvised!)",
+				"GUI: Get a list of all tracks",
 				vj_event_send_track_list,
 				0,
 				VIMS_ALLOW_ANY,
