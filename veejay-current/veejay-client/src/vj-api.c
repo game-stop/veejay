@@ -6898,8 +6898,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	glade_xml_signal_autoconnect( gui->main_window );
 	GtkWidget *frame = glade_xml_get_widget_( info->main_window, "markerframe" );
 	info->tl = timeline_new();
-	gtk_widget_set_size_request_(frame, 200,14 );
-
 
 	set_tooltip_by_widget(info->tl, tooltips[TOOLTIP_TIMELINE].text );
 

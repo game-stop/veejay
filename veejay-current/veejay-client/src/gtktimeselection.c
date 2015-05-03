@@ -1,6 +1,6 @@
 /* veejay - Linux VeeJay
- * 	     (C) 2002-2008 Niels Elburg <nwelburg@gmail.com> 
- *
+ * 	     (C) 2002-2015 Niels Elburg <nwelburg@gmail.com> 
+ *	     
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -375,11 +375,11 @@ static	void	timeline_init( TimelineSelection *te )
 	te->grab_button = 0;
 	te->has_stepper = TRUE;
 	te->has_selection = FALSE;
-	te->stepper_size = 16; // 8 x 8 pixels
-	te->stepper_draw_size = 12;
+	te->stepper_size = 24; 
+	te->stepper_draw_size = 16;
 	te->stepper_length = 0;
 	te->frame_height = 10;
-	te->font_line = 12;	
+	te->font_line = 18;	
 	te->move_x = 0;
 }	
 
@@ -822,7 +822,6 @@ static gboolean timeline_expose (GtkWidget *widget, GdkEventExpose *event )
 			cairo_set_font_size( cr, 0.2 );
 			cairo_set_source_rgba( cr, v,v,v,0.7 );
 			cairo_fill(cr);	
-
 		}
 
 		cairo_set_source_rgba( cr, v, v, v, 0.3 );
@@ -848,7 +847,7 @@ GtkWidget *timeline_new(void)
 	GtkWidget *widget = GTK_WIDGET( g_object_new( timeline_get_type(), NULL ));
 	TimelineSelection *te = TIMELINE_SELECTION( widget );
 
-	gtk_widget_set_size_request(widget, 200,16 );
+	gtk_widget_set_size_request(widget, 200,24 );
 
 	gtk_widget_set_events( widget,
 			GDK_EXPOSURE_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_POINTER_MOTION_MASK |
