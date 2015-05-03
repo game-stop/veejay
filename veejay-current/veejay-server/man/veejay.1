@@ -65,17 +65,17 @@ Veejay can be used with PD (PureData) by using sendVIMS, a small commandline uti
 .SH OPTIONS
 .TP
 .B \-w/--output-width
-Specify video output width for projection / on screen purposes
+Specify video output width
 .TP
 .B \-h/--output-height
-Specify video output height for projection / on screen purposes
+Specify video output height
 .TP
 .B \-p/--port <num>
 TCP port offset for communication with clients like 'reloaded' , 'sayVIMS' or sendVIMS for PD (default 3490)
 .TP
 .B \-O/--output [012345]
 specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = Open GL (requires ARB fragment shader), 4 = YUV4MPEG, 5 = VLOOPBACK
-options 4 and fire require --output-file 
+options 4 and 5 require --output-file 
 .TP
 .B \-s/--size NxN
 Scaled video dimensions for SDL video output
@@ -96,7 +96,7 @@ verbosity on/off
 timer to use ( none, normal, rtc )
 .TP
 .B \-f/--fps <num>
-Override framerate of video 
+Override framerate of video. Disables audio when used. 
 .TP
 .B \-x/--geometryx <num>
 Geometry x offset for SDL video window
@@ -125,7 +125,7 @@ Dont use colored text.
 Frame cache size in percentage of total system RAM 
 .TP
 .B \-j/--max_cache [0-100]
-Maximum number of samples to cache 
+Maximum number of samples to cache
 .TP
 .B \-B/--features
 Show compiled in options
@@ -170,8 +170,17 @@ a viewport. Use CTRL+v to enable the viewport setup.
 .B \-A/--all
 Start with all capture devices active as streams
 .TP
+.B \-Z/--load-generators <num>
+Load and instantiate all plugins of type generator and start playing <num>
+.TP
 .B \-D/--composite
 Do not start with projection enabled. 
+.TP
+.B \--qrcode-connection-info
+Encode veejay server IP and port number in QR code image
+.TP
+.B \--benchmark NxN
+Benchmark veejay's core functions (multi-thread vs single thread model) using a specific resolution NxN
 .TP
 .SH Environment variables
 .TP
@@ -222,6 +231,9 @@ Specify the default video4linux channel id
 .TP
 .B VEEJAY_SWAP_RGB
 Capture in RGB or BGR (Video4Linux)
+.TP
+.B VEEJAY_MMAP_PER_FILE
+MMap size per loaded video file
 .TP
 .B VEEJAY_RUN_MODE
 Set this to "CLASSIC" if you want to startup in low resolution
