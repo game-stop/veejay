@@ -6552,10 +6552,10 @@ void	default_bank_values(int *col, int *row )
 	NUM_BANKS = (4096 / NUM_SAMPLES_PER_PAGE );
 }
 
-void	set_skin(int skin)
+void	set_skin(int skin, int invert)
 {
 	ui_skin_ = skin;
-	timeline_theme_colors( 1 );
+	timeline_theme_colors( invert );
 }
 
 int	vj_gui_sleep_time( void )

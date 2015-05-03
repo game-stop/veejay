@@ -105,7 +105,7 @@ static int      set_option( const char *name, char *value )
 	}
 	else if( strcmp(name, "t") == 0 || strcmp(name, "no-theme") == 0)
 	{
-		gveejay_theme = 0;
+		gveejay_theme = 1;
 	}
 	else if( strcmp(name, "v") == 0 || strcmp(name, "verbose") == 0)
 	{
@@ -243,7 +243,7 @@ int main(int argc, char *argv[]) {
 	find_user_themes(gveejay_theme);
 	
 	vj_gui_set_debug_level( verbosity , n_tracks,0,0);
-	set_skin( selected_skin );
+	set_skin( selected_skin, gveejay_theme );
 
 	default_bank_values( &col, &row );
 	gui_load_theme();

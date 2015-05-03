@@ -34,7 +34,7 @@ void	vj_gui_set_debug_level(int level, int preview_p, int pw, int ph);
 void   get_gd(char *buf, char *suf, const char *filename);
 void   vj_gui_theme_setup(int default_theme);
 void   vj_gui_set_timeout(int timer);
-void   set_skin(int skin);
+void   set_skin(int skin, int invert);
 void   default_bank_values(int *col, int *row );
 void   vj_gui_style_setup();
 gboolean       gveejay_running();
