@@ -2306,7 +2306,9 @@ static void veejay_playback_cycle(veejay_t * info)
 				goto FINISH;
 	    		}
 
-	   		frame = bs.frame;
+			veejay_event_handle(info);
+	   		
+			frame = bs.frame;
 
 	   		stats.nsync++;
 	   		clock_gettime( CLOCK_REALTIME, &time_now);
@@ -2318,11 +2320,10 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	   		stats.tdiff = dn; 
 	
-			veejay_event_handle(info);
 		} 
 		while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (QUEUE_LEN-1));
 	
-		//veejay_event_handle(info);
+	//	veejay_event_handle(info);
 
 #ifdef HAVE_JACK
 		if ( info->audio==AUDIO_PLAY  ) 
@@ -3595,9 +3596,6 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	info->dummy->height= info->video_output_height;
 	info->dummy->fps = fps;
 
-	if(info->dummy->fps <= 0.0f)
-		info->dummy->fps = vj_el_get_default_framerate( override_norm );
-	
 	int dw = 720;
 	int dh = (override_norm == 'p' || override_norm == '\0' ? 576 : 480);
 
@@ -3643,7 +3641,9 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 		info->dummy->height = dh;
 	if( info->dummy->fps <= 0)
 		info->dummy->fps = dfps;
-
+	if( info->dummy->fps <= 0)	
+		info->dummy->fps = vj_el_get_default_framerate( override_norm );
+	
 	info->dummy->chroma = get_chroma_from_pixfmt( vj_to_pixfmt( info->pixel_format ) );
 
 	if( info->audio ) {
