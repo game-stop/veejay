@@ -423,8 +423,7 @@ void	vj_el_setup_cache( editlist *el )
 		int n_slots = mem_chunk_ / el->max_frame_size;
 		if( el->video_frames > n_slots)
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Not caching this EDL to memory (Cachesize too small)");
-			veejay_msg(VEEJAY_MSG_DEBUG, "You can increase the cache size with the -m commandline parameter");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Too many frames; not caching this EDL to memory. Create shorter samples or increase memory cache size");
 		}
 		else
 		{
@@ -1613,10 +1612,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	el->last_afile = -1;
 	veejay_msg(VEEJAY_MSG_DEBUG, "\tThere are %" PRIu64 " video frames", el->total_frames );
 
-    //el->auto_deinter = auto_deinter;
-    //if(el->video_inter != 0 ) el->auto_deinter = 0;
 	el->auto_deinter = 0;
-
 
 	return el;
 }
@@ -1711,7 +1707,6 @@ void	vj_el_print(editlist *el)
 
 	sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", ttc.h, ttc.m, ttc.s, ttc.f );
 
-
 	veejay_msg(VEEJAY_MSG_INFO, "\tDuration: %s (%2d hours, %2d minutes)(%ld frames)", timecode,ttc.h,ttc.m,el->video_frames);
 }
 
@@ -1745,8 +1740,6 @@ int	vj_el_get_file_entry(editlist *el, long *start_pos, long *end_pos, long entr
 
 	return 1;
 }
-
-
 
 char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 {
