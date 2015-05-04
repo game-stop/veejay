@@ -6,8 +6,11 @@ OBJS=lvdgmic.o lvdgmicglue.o
 CARTOON_SO=gmic_cartoon.so
 BOKEY_SO=gmic_bokeh.so
 PENCILBW_SO=gmic_pencilbw.so
+ARRAYFADE_SO=gmic_arrayfade.so
+PENCILPORTRAIT_SO=gmic_pencilportrait.so
+RODILIUS_SO=gmic_rodilius.so
 
-all: $(CARTOON_SO) $(BOKEY_SO) $(PENCILBW_SO)
+all: $(CARTOON_SO) $(BOKEY_SO) $(PENCILBW_SO) $(ARRAYFADE_SO) $(RODILIUS_SO)
 default:all
 
 %.o: %.cc
@@ -28,7 +31,15 @@ $(PENCILBW_SO): $(OBJS) gmic_pencilbw.o
 	$(CC) $(OBJS) $(LDFLAGS) -o $@
 	$(CC) $(CFLAGS) -shared $^ -lgmic -o $@
 
+$(ARRAYFADE_SO): $(OBJS) gmic_arrayfade.o
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) -shared $^ -lgmic -o $@
+
+$(RODILIUS_SO): $(OBJS) gmic_rodilius.o
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) -shared $^ -lgmic -o $@
+
 
 clean:
-	rm -f $(OBJS)
-	rm -f $(CARTOON_SO) $(BOKEY_SO) $(PENCLIBW_SO)
+	rm -f *.o
+	rm -f $(CARTOON_SO) $(BOKEY_SO) $(PENCLIBW_SO) $(ARRAYFADE_SO) $(RODILIUS_SO)
