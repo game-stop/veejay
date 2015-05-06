@@ -3261,7 +3261,7 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 			editlist *el = veejay_edit_copy_to_new( v, E, args[0],args[1] );
 			if(!el)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cant copy EDL");
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot copy EDL");
 				return;
 			}
 			int start = 0;
@@ -3277,7 +3277,7 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 
 			if(sample_store(skel)==0) 
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d] with EDL", skel->sample_id);
+				veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d]", skel->sample_id);
 				new_id = skel->sample_id;
 			}
 		
@@ -4460,6 +4460,14 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		return;
 	}
 
+	
+	int format_ = _recorder_format;
+	if(format_==-1)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Select a video codec first");
+		return; 
+	}
+
 	veejay_memset(tmp,0,255);
 	veejay_memset(prefix,0,150);
 
@@ -4476,7 +4484,6 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		}
 		else
 		{
-			v->seq->rec_id = v->uc->sample_id;
 			sprintf( prefix, "sequence_");
 		}
 	}
@@ -4484,8 +4491,6 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 	if(!veejay_create_temp_file(prefix, tmp))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create temporary file, Record aborted." );
-		if(v->seq->rec_id && v->seq->active)
-			v->seq->rec_id = 0;
 		return;
 	}
 
@@ -4503,24 +4508,14 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 				args[0] += sample_get_longest( v->seq->samples[i] );
 			}
 		}
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tRecording %d frames", args[0]);
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tRecording %d frames (sequencer is %s)", args[0],
+				(v->seq->active ? "active" : "inactive"));
 	}
 
-	int format_ = _recorder_format;
-	if(format_==-1)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Select a video codec first");
-		if(v->seq->active && v->seq->rec_id )
-			v->seq->rec_id = 0;
-		return; 
-	}
-
+	
 	if(args[0] <= 1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to record less then 2 frames");
-		if(v->seq->active && v->seq->rec_id )
-			v->seq->rec_id = 0;
-
 		return;
 	}
 
@@ -4559,12 +4554,15 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		int start_at = 0;
 		for( i = 0; i < MAX_SEQUENCES; i ++ )
 		{
-			if ( sample_exists( v->seq->samples[i] ))
+			if( sample_exists( v->seq->samples[i] ))
 			{
 				start_at = v->seq->samples[i];
 				break;	
 			}
 		}
+		
+		v->seq->rec_id = v->uc->sample_id;
+
 		if( start_at == v->uc->sample_id )
 			veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
 		else
@@ -4573,6 +4571,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 	else
 	{
 		veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
+		v->seq->rec_id = 0;
 	}
 }
 
@@ -4590,7 +4589,7 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 
 		if( sample_stop_encoder( stop_sample ) == 1 ) 
 		{
-			char avi_file[255];
+			char avi_file[1024];
 			v->settings->sample_record = 0;
 			if( sample_get_encoded_file( stop_sample, avi_file) <= 0 )
 			{
@@ -4609,8 +4608,7 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 				sample_reset_encoder( stop_sample );
 				s->sample_record = 0;	
 				s->sample_record_id = 0;
-				if(v->seq->active && v->seq->rec_id )
-					v->seq->rec_id = 0;
+				v->seq->rec_id = 0;
 				if(s->sample_record_switch) 
 				{
 					s->sample_record_switch = 0;
@@ -4847,8 +4845,13 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
 			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_PLAIN, 0 );
 		}
 	}
+
 	sample_del_all(v->edit_list);
-	veejay_msg(VEEJAY_MSG_INFO, "Deleted all samples (%d remaining)",sample_size());
+	veejay_memset(v->seq->samples, 0, sizeof(int) * MAX_SEQUENCES );
+	v->seq->active = 0;
+	v->seq->size = 0;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Deleted all samples.");
 } 
 
 

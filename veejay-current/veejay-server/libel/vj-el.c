@@ -421,13 +421,9 @@ void	vj_el_setup_cache( editlist *el )
 	if(!el->cache && !never_cache_)
 	{
 		int n_slots = mem_chunk_ / el->max_frame_size;
-		if( el->video_frames > n_slots)
+		if( el->video_frames < n_slots)
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Too many frames; not caching this EDL to memory. Create shorter samples or increase memory cache size");
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "EditList caches at most %d slots (chunk=%d, framesize=%d)", n_slots, mem_chunk_, el->max_frame_size ); 
+			veejay_msg(VEEJAY_MSG_DEBUG, "Good, can load this sample entirely into memory... (%d slots, chunk=%d, framesize=%d)", n_slots, mem_chunk_, el->max_frame_size ); 
 			el->cache = init_cache( n_slots );
 		}
 	}

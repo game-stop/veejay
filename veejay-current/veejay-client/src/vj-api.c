@@ -1590,7 +1590,7 @@ void	about_dialog()
     };
 
 	const gchar *web = {
-		"http://www.veejayhq.net | http://veejay.dyne.org"
+		"http://www.veejayhq.net" 
 	};
 
 	char blob[1024];
@@ -5997,21 +5997,20 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 	if( info->status_tokens[SEQ_ACT] != history[SEQ_ACT] )
 	{
 		info->uc.reload_hint[HINT_SEQ_ACT] = 1;
-	
-		if(info->status_tokens[SEQ_ACT]== 0 )
-			set_toggle_button( "seqactive" , 0 );
-		else
-			set_toggle_button( "seqactive", 1 );
 	}
 	if( info->status_tokens[SEQ_CUR] != history[SEQ_CUR] )
 	{
 		int in = info->status_tokens[SEQ_CUR];
+		if( in ) {
+			set_toggle_button( "seqactive" , 1 );
+		} else {
+			set_toggle_button( "seqactive" , 0 );
+		}
 		if(info->sequence_playing >= 0)
 			indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
 		info->sequence_playing = in;
 		indicate_sequence( TRUE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
 	}
-
 	
 	total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );
 	gint history_frames_ = (pm == MODE_STREAM ? history[SAMPLE_MARKER_END] : history[TOTAL_FRAMES] ); 

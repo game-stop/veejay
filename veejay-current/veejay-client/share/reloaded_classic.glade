@@ -383,6 +383,15 @@
 			      </child>
 
 			      <child>
+				<widget class="GtkImageMenuItem" id="append_samplelist1">
+				  <property name="visible">True</property>
+				  <property name="label" translatable="yes">Append samplelist</property>
+				  <property name="use_underline">True</property>
+				  <signal name="activate" handler="on_button_samplelist_append_clicked" last_modification_time="Wed, 19 Oct 2005 12:21:30 GMT"/>
+				</widget>
+			      </child>
+
+			      <child>
 				<widget class="GtkImageMenuItem" id="load_actionfile1">
 				  <property name="visible">True</property>
 				  <property name="label" translatable="yes">Load actionfile</property>

@@ -280,7 +280,7 @@ static int _new_id()
 
 sample_info *sample_skeleton_new(long startFrame, long endFrame)
 {
-   char tmp_file[32];
+   char tmp_file[128];
    sample_info *si;
    int i, j;
 
@@ -917,7 +917,6 @@ int sample_del(int sample_id)
   	 	avail_num[next_avail_num] = sample_id;
   		next_avail_num++;
    		hash_delete_free(SampleHash, sample_node);
-	    veejay_msg(VEEJAY_MSG_DEBUG, "Deleted sample %d",sample_id );
 
     	return 1;
     }
@@ -2894,13 +2893,18 @@ void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mode )
 
 }
 
-void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq )
+void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_samples )
 {
 	seq_t *s = (seq_t*) seq;
 
 	int i;
 	xmlChar *xmlTemp = NULL;
     	unsigned char *chTemp = NULL;
+
+	int tmp_seq[MAX_SEQUENCES];
+	int tmp_idx = 0;
+
+	veejay_memset( &tmp_seq, 0, sizeof(tmp_seq));  
 
 	while (cur != NULL)
 	{
@@ -2909,8 +2913,10 @@ void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq )
 	    		chTemp = UTF8toLAT1(xmlTemp);
 	    		if (chTemp) {
 				int id = atoi( chTemp );
-				s->samples[ s->size ] = id;
-				s->size ++;
+				if( tmp_idx < MAX_SEQUENCES && id > 0 ) {
+					tmp_seq[ tmp_idx ] = id;
+					tmp_idx ++;
+				}
 				free(chTemp);
 	    		}
 			if( xmlTemp )
@@ -2919,6 +2925,23 @@ void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq )
 		cur = cur->next;
 	}
 
+	if( tmp_idx == 0 )
+		return;
+
+	if( s->size == 0 ) {
+		veejay_memcpy( s->samples, &tmp_seq, tmp_idx * sizeof(int));
+		s->size = tmp_idx;
+		return;
+	} 
+
+	if( (s->size + tmp_idx ) < MAX_SEQUENCES ) {
+		for( i = 0; i < tmp_idx; i ++ ) {
+			s->samples[ s->size + i ] = tmp_seq[ i ] + n_samples;
+		}
+		s->size = s->size + tmp_idx;
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Can't load this sequence, sequence bank is full.");
+	}
 }
 
 /*************************************************************************************************
@@ -2936,19 +2959,17 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
     xmlNodePtr subs = NULL;
 
     if(!sample_read_edl( skel )) {
-        veejay_msg(VEEJAY_MSG_WARNING, "No saved edit decision list '%s' for sample %d", skel->edit_list_file, skel->sample_id );
-	if( el == NULL || ((editlist*)el)->video_frames <= 2 ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Plainmode is dummy !");
-	}
-	veejay_msg(VEEJAY_MSG_WARNING, "Using plainmode to play sample %d", skel->sample_id );
 	skel->edit_list = NULL;
     }
+
     if(!skel->edit_list)
     {
+	veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has inherited EDL from plain mode", skel->sample_id );
     	skel->edit_list = el;
 	skel->soft_edl = 1;
     } else {
 	skel->soft_edl = 0;
+	veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has own EDL (%p)", skel->sample_id, el );
     }
     while (cur != NULL) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
@@ -3341,7 +3362,7 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
 	}
 
         if( !xmlStrcmp( cur->name, (const xmlChar *) "SEQUENCE" )) {
-		LoadSequences( doc, cur->xmlChildrenNode,seq );
+		LoadSequences( doc, cur->xmlChildrenNode,seq, start_at );
 	}
 
 	if( !xmlStrcmp( cur->name, (const xmlChar*) "stream" )) {
@@ -3481,7 +3502,7 @@ void	SaveCurrentPlaying( xmlNodePtr node, int id, int mode )
 
 void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
 {
-    char buffer[100];
+    char buffer[1024];
     xmlNodePtr childnode;
 
     sprintf(buffer, "%d", sample->sample_id);

@@ -471,7 +471,6 @@ int lav_close(lav_file_t *lav_file)
 		case 'b':
 			if( lav_file->dv_fd )
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG,"\tClosing raw dv file");
 				ret = rawdv_close(lav_file->dv_fd);	
 			}
 			break;
@@ -480,7 +479,6 @@ int lav_close(lav_file_t *lav_file)
 		case 'x':
 			if( lav_file->picture )
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG,"\tClosing image file");
 				vj_picture_cleanup( lav_file->picture );
 				ret = 1;
 			}
@@ -490,7 +488,6 @@ int lav_close(lav_file_t *lav_file)
       		case 'q':
 			if( lav_file->qt_fd )
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "\tClosing Quicktime file");
        				ret = quicktime_close( lav_file->qt_fd );
 			}
 		        break;
@@ -498,7 +495,6 @@ int lav_close(lav_file_t *lav_file)
 		default:
 			if( lav_file->avi_fd )
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "\tClosing AVI file");
 				ret = AVI_close(lav_file->avi_fd);
 			}
 			break;

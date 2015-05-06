@@ -1331,7 +1331,16 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 		g_free(filename );
 	}
 }
-
+void	on_button_samplelist_append_clicked(GtkWidget *widget, gpointer user_data)
+{
+	gint erase_all = 0;
+	gchar *filename = dialog_open_file( "Append a samplelist",1);
+	if(filename)
+	{
+		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
+		g_free(filename );
+	}
+}
 void	on_veejay_expander_activate(GtkWidget *exp, gpointer user_data)
 {
 }
