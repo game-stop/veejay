@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 #include <cmath>
 #include <gmic.h>
 #include "lvdgmic.hh"
@@ -6,11 +7,13 @@
 lvdgmic::lvdgmic(int n)
 {
 	images.assign(n);
+	buf = (char*) malloc( sizeof(char) * LGDMIC_CMD_LEN );
 }
 
 lvdgmic::~lvdgmic()
 {
 	images.assign(0U);
+	free(buf);
 }
 
 
@@ -36,7 +39,7 @@ void lvdgmic::gmic_command( char const *str )
 	try {
 		gmic_instance.run( str, images, image_names );
 	} catch(gmic_exception &e) {
-		fprintf(stderr,"%s\n", e.what());
+		fprintf(stderr,"GMIC error: %s\n", e.what());
 	}
 }
 

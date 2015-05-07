@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 #include <gmic.h>
 #include "lvdgmicglue.h"
 #include "lvdgmic.hh"
@@ -31,7 +32,12 @@ void	lvdgmic_pull(Clvdgmic *ptr, int n, uint8_t **data)
 void	lvdgmic_gmic(Clvdgmic *ptr, const char *str)
 {
 	lvdgmic *l = (lvdgmic*) ptr;
+#ifdef SILENT
+	snprintf(l->buf,LGDMIC_CMD_LEN,"-verbose -1 %s", str );
+	l->gmic_command( l->buf );
+#else
 	l->gmic_command( str );
+#endif
 }
 
 }

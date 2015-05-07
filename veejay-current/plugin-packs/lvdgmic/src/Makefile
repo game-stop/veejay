@@ -1,5 +1,5 @@
-CFLAGS=-Wall -g -fPIC
-CCFLAGS=Wall -g -fPIC
+CFLAGS=-Wall -g -fPIC -DSILENT -ftree-vectorize -O3 -march=native
+CCFLAGS=Wall -g -fPIC -DSILENT -ftree-vectorize -O3 -march=native
 LDFLAGS=-g -Wall -lstdc++ -lgmic -shared
 
 OBJS=lvdgmic.o lvdgmicglue.o 

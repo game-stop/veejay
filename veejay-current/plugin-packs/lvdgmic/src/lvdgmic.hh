@@ -1,3 +1,6 @@
+#define LGDMIC_CMD_LEN 1024
+
+
 class lvdgmic
 {
 	private:
@@ -8,6 +11,8 @@ class lvdgmic
 	public:
 		lvdgmic( int n );
 		~lvdgmic();
+
+		char *buf;
 
 		void push( int w, int h, int fmt, unsigned char **data, int n );
 		void gmic_command( char const *str );
