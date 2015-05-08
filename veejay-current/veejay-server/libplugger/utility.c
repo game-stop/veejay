@@ -118,9 +118,8 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 	if( num <= 0 )
 		return;
 	
-	int itmp[8];
-	double dtemp[8];
-	char *stmp[8];
+	int itmp[16]; //FIXME
+	double dtemp[16]; //FIXME
 	
 	int error;
 	void *ptr = NULL;
@@ -151,17 +150,19 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 		//	veejay_msg(0, "\t\tValue is %g ", dtemp[0] );
 			break;
 		//@ TODO: not supported yet
-	/*	case VEVO_ATOM_TYPE_STRING:
-			for( i = 0; i < num; i ++)
+		case VEVO_ATOM_TYPE_STRING:
 			{
-				size_t len = vevo_property_element_size( port,key,i);
-				stmp[i] = NULL;
-				if( len > 0 ) continue;
-				stmp[i] = (char*) vj_malloc(sizeof(char) * len );
-				error = vevo_property_get( port, key, i, &(stmp[i]) );
+				if( num == 1 ) {
+					char *value = vevo_property_get_string(port,key);
+					vevo_property_set( to_port,as_key,type,1,&value );
+					free(value);
+				}
+			        else {
+					veejay_msg(0,"Internal error. Cannot set %d elements of type string",num);
+				}	
+
 			}
-			error = vevo_property_set( to_port, as_key, type, num, &stmp );
-			break;*/
+			break;
 		default:
 			veejay_msg(0, "Internal error. Cannot clone this type of atom");
 			break;

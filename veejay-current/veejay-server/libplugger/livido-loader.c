@@ -457,6 +457,8 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port )
 			ikind = HOST_PARAM_TEXT; 
 			vj_np ++;  
 		}
+		clone_prop_vevo( param, vje_port, "name", "name" );
+
 		vevo_property_set( param, "HOST_kind", VEVO_ATOM_TYPE_INT,1,&ikind );	
 		vevo_property_set( vje_port, "HOST_kind", VEVO_ATOM_TYPE_INT,1,&ikind );
 

@@ -1050,10 +1050,6 @@ vj_effect *plug_get_plugin( int fx_id ) {
 				param_descr[valid_p] = vevo_property_get_string(parameter,"name");
 				if(param_descr[valid_p]==NULL)
 					param_descr[valid_p] = strdup( "Number" );
-		//		veejay rbg parameter is always p01
-		//		if( vevo_property_get( parameter, "rgb_conv", 0, NULL ) == VEVO_NO_ERROR ) {
-		//			vje->rgb_conv = 1;
-		//		}
 				valid_p ++;
 			}
 		}		
