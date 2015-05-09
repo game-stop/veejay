@@ -1,31 +1,39 @@
 
+Veejay's GMIC plugin pack
+-------------------------
+
 veejay experiment using G'MIC (GREYC's Magic for Image Computing)
 
 https://gmicol.greyc.fr/
 
 ----
 
+NOTICE
+
+Most of the GMIC filters are not realtime - For some you can expect frame-rates of 1-5 FPS or even lower at 1280x720
+
+Nevertheless, they are all amazing effectors!
+
+
+NOTICE
+
+Livido is experimental too, as you can see there is only the use of the INDEX parameter
+
+
+----
+
 RUNNING:
 
-run make in src/ and put the .so files in livido-plugins/ folder
+run ./configure, make and make install
 
+run veejay
 
-
-Files:
- src/
-     lvdgmic.cc /lvdgmic.hh : c++ class that wraps gmic 
-     lvdgmicglue.c /lvdgmicglue.h: glue so i can call it in c
-     
-     gmic_bokeh.c : Bokeh effect (very slow)
-     gmic_pencilbw.c: Pencil BW (very slow too)
-     gmic_cartoon.c: Cartoon effect (very slow)
+-----
 
 
 
 
-
-It is trivial to create your own FX , GMIC has a command style interface so the livido plugin only formats a command message and sends it off:
-
+It is trivial to create your own FX , GMIC has a command style interface so the livido plugin only formats a command message and sends it off
 
 
 
@@ -38,13 +46,13 @@ livido_process_f                process_instance( livido_port_t *my_instance, do
         snprintf(cmd,sizeof(cmd),"-cartoon %d,%d,%d,%f,%f,%d",
                                         smoothness,sharpening,threshold,(float)thickness/100.0f, (float)color/100.0f, ... );
 
-	// push an in put frame
+	// push an input frame
         lvdgmic_push( gmic, w, h, 0, A, 0);
 
 	// send command
         lvdgmic_gmic( gmic, cmd );
 
-	// pull it
+	// pull result
         lvdgmic_pull( gmic, 0, O );
  
 }
@@ -52,6 +60,4 @@ livido_process_f                process_instance( livido_port_t *my_instance, do
 
 If you change the command of a plugin, keep in mind that you could also update the parameter description port to keep things parametrized
 
-
-GMIC processes internally in RGB float (packed) and there is no optimal conversion for this in veejay. A simple approach would be to parallelize the conversion
 
