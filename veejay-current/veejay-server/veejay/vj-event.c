@@ -7306,20 +7306,20 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 	       }
 	       composite_set_ui(v->composite, 0 );
 	       v->settings->composite = 1;
-#ifdef HAVE_SDL
-	       if(v->video_out==0 || v->video_out == 2)
-	 	      vj_sdl_grab( v->sdl[0], 0 );
-#endif
+//#ifdef HAVE_SDL
+//	       if(v->video_out==0 || v->video_out == 2)
+//	 	      vj_sdl_grab( v->sdl[0], 0 );
+//#endif
 	}
 	else {
 		composite_set_ui( v->composite, 2 );
 		v->settings->composite = 2;
 		v->use_osd=3;
-#ifdef HAVE_SDL
-		if(v->video_out==0 || v->video_out == 2)
-			vj_sdl_grab( v->sdl[0], 1 );
-#endif
-		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to exit.");
+//#ifdef HAVE_SDL
+//		if(v->video_out==0 || v->video_out == 2)
+//			vj_sdl_grab( v->sdl[0], 1 );
+//#endif
+		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to save and exit.");
 	}
 }
 

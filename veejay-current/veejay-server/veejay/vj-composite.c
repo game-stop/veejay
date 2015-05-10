@@ -316,7 +316,7 @@ int	composite_get_top(void *compiz, uint8_t *current_in[4], uint8_t *out[4], int
 		out[2] = current_in[2];
 		return c->frame1->format;
 	} 
-	return c->frame1->format;
+	return c->frame1->format; 
 }
 
 /* Top frame, blit */

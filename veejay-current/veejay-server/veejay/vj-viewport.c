@@ -475,7 +475,7 @@ char *viewport_get_my_help(void *vv)
 	sprintf(startup_mode, "%s", (v->initial_active==1 ? "Active" :"Inactive"  ));
 	int gw = v->grid_width;
 	int gh = v->grid_height;
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Enable/disable transform\nCTRL + a: %s on startup.\nCTRL + s: Exit this screen.\n%s\n\n",
+	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Exit without saving\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Enable/disable transform\nCTRL + a: %s on startup.\nCTRL + s: Exit this screen.\n%s\n\n",
 			reverse_mode,
 			startup_mode,
 			scroll_mode
@@ -2523,6 +2523,8 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 {
 	viewport_t *v = (viewport_t*) data;
 	if( sx == 0 && sy == 0 && button == 0 )
+		return 0;
+	if( button == 3 && v->user_ui == 0 )
 		return 0;
 
 	int ch = 0;

@@ -403,9 +403,6 @@ void		vj_picture_free()
 
 void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
 {
-//	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
-//				frame->width,frame->height, frame->format );
-
 	uint8_t *dest[4];	
 	dest[0] = vj_perform_get_preview_buffer();
 	dest[1] = dest[0] + (out_w * out_h);
@@ -433,15 +430,11 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 
 	yuv_convert_and_scale( pic_scaler_, frame,dst1);
 
-//	free(src1);
 	free(dst1);
 }
 
 void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
 {
-//	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
-//						frame->width,frame->height, frame->format );
-
 	uint8_t *planes[4]; 
 		
 	planes[0] = vj_perform_get_preview_buffer();
@@ -463,7 +456,6 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 
 	yuv_convert_and_scale( pic_scaler_, frame, dst1);
 
-//	free(src1);
 	free(dst1);
 }
 
