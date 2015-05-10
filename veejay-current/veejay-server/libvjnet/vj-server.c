@@ -721,22 +721,12 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 				}
 			}
 
-			int last_char = slen - 1;
 			int failed = 1;
-			if( last_char > 1 )
-			{
-				if(str_ptr[last_char] == '\n' &&
-					str_ptr[last_char-1] == ';' )
-						failed = 0;
-				else if(str_ptr[last_char] == ';' )
-					failed = 0;
-			
-				if(!failed)
-				{
-					num_msg ++;
-					i += slen + 1;
-				}
-			}
+			if( slen > 0 && str_ptr[slen-1] == ';' )
+				failed = 0;
+
+			i += (slen + 1);
+			num_msg ++;
 
 			if(failed)
 			{
