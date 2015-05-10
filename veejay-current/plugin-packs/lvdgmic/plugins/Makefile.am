@@ -17,7 +17,6 @@ lividoplugin_LTLIBRARIES = gmic_cartoon.la \
 			   gmic_texturizepaper.la \
 			   gmic_vignette.la \
 			   gmic_abstraction.la \
-			   gmic_dices.la \
 			   gmic_whirl.la \
 			   gmic_posteredges.la \
 			   gmic_posterhope.la \
@@ -84,8 +83,8 @@ gmic_vignette_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 gmic_abstraction_la_SOURCES = gmic_abstraction.c
 gmic_abstraction_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
-gmic_dices_la_SOURCES = gmic_dices.c
-gmic_dices_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+#gmic_dices_la_SOURCES = gmic_dices.c
+#gmic_dices_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
 gmic_whirl_la_SOURCES = gmic_whirl.c
 gmic_whirl_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
