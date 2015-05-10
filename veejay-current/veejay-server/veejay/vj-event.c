@@ -8504,44 +8504,6 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	VJFrame frame;
 	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
 	vj_perform_get_primary_frame( v, frame.data );
-	if( v->settings->composite ) {
-		frame.format = composite_get_top( v->composite, frame.data,
-						  frame.data,
-						  v->settings->composite );
-		switch(frame.format) {
-			case PIX_FMT_YUV444P:
-			case PIX_FMT_YUVJ444P:
-				frame.uv_width = frame.width;
-				frame.uv_height= frame.height;
-				frame.ssm = 1;
-				frame.shift_v = 0;
-				frame.shift_h = 0;
-				frame.len = frame.width * frame.height;
-				frame.uv_len = frame.len;
-				break;
-			case PIX_FMT_YUVJ422P:
-			case PIX_FMT_YUV422P:
-				frame.uv_width = frame.width;
-				frame.uv_height= frame.height / 2;
-				frame.ssm = 0;
-				frame.shift_v = 1;
-				frame.shift_h = 0;
-				frame.len = frame.width * frame.height;
-				frame.uv_len = frame.uv_width * frame.uv_height;
-				break;
-			case PIX_FMT_YUV420P:
-			case PIX_FMT_YUVJ420P:
-				frame.uv_width = frame.width / 2;
-				frame.uv_height= frame.height / 2;
-				frame.ssm = 0;
-				frame.shift_v = 1;
-				frame.shift_h = 1;
-				frame.len = frame.width * frame.height;
-				frame.uv_len = frame.uv_width * frame.uv_height;
-				break;
-			}
-	}
-	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ ) {
 		vj_fastbw_picture_save_to_mem(
 				&frame,
