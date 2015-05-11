@@ -158,7 +158,16 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 		return 0;
 	}
 
-	void *port = (is_sample ? sample_get_kf_port( lookup, fx_entry ) : vj_tag_get_kf_port( lookup, fx_entry ));
+	void *port = NULL;
+	if( is_sample ) {
+		port = sample_get_kf_port( lookup, fx_entry );
+		if( port == NULL ) {
+			sample_chain_alloc_kf( lookup, fx_entry );
+			port = sample_get_kf_port(lookup,fx_entry);
+		}
+	} else {
+		port = vj_tag_get_kf_port( lookup, fx_entry );
+	}
 
 	in += (25);
 

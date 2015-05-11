@@ -314,8 +314,6 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->marker_start = 0;
     si->marker_end = 0;
     si->loopcount = 0;
-    si->encoder_base = (char*) vj_calloc(sizeof(char) * 255);
-    si->encoder_destination = (char*) vj_calloc(sizeof(char) * 255);
     si->effect_toggle = 1;
     snprintf(tmp_file,sizeof(tmp_file), "sample_%05d.edl", si->sample_id );
     si->edit_list_file = strdup( tmp_file );
@@ -332,7 +330,6 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 		si->effect_chain[i]->effect_id = -1;
 		si->effect_chain[i]->volume = 50;
 		si->effect_chain[i]->channel = ( sample_size() <= 0 ? si->sample_id : sample_size()-1);
-		si->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
     }
 #ifdef HAVE_FREETYPE
     si->dict = vpn( VEVO_ANONYMOUS_PORT );
@@ -896,8 +893,6 @@ int sample_del(int sample_id)
 			//vj_el_free(si->edit_list);
 			si->edit_list = NULL;
 		}
-	    if(si->encoder_base )
-			free(si->encoder_base );
 	    if(si->encoder_destination )
 			free(si->encoder_destination );
 	   	if(si->edit_list_file)
@@ -1279,7 +1274,7 @@ int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int 
     if (arg_len < 0 || arg_len > SAMPLE_MAX_PARAMETERS)
 	return -1;
 
-    if( sample->effect_chain[position]->kf_status )
+    if( sample->effect_chain[position]->kf )
     {
 	 for( i = 0; i < arg_len; i ++ )
 	 {
@@ -1983,17 +1978,19 @@ int	sample_chain_reset_kf( int s1, int entry )
 	sample->effect_chain[entry]->kf_type = 0;
 	if(sample->effect_chain[entry]->kf)
 	  vpf(sample->effect_chain[entry]->kf );
-	sample->effect_chain[entry]->kf = vpn(VEVO_ANONYMOUS_PORT );
+	sample->effect_chain[entry]->kf = NULL;
 	return 1;
 }
-
+/*
 int	sample_get_kf_tokens( int s1, int entry, int id, int *start, int *end, int *type )
 {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return 0;
+	if( sample->effect_chain[entry]->kf == NULL )
+		return 0;
 	return keyframe_get_tokens( sample->effect_chain[entry]->kf, id, start,end,type );
 }
-
+*/
 void	*sample_get_kf_port( int s1, int entry )
 {
 	sample_info *sample = sample_get(s1);
@@ -2038,6 +2035,8 @@ unsigned char *	sample_chain_get_kfs( int s1, int entry, int parameter_id, int *
         return NULL;
    if( parameter_id < 0 || parameter_id > 9 )
 	return NULL;
+   if( sample->effect_chain[entry]->kf == NULL )
+	   return NULL;
 
    unsigned char *data = keyframe_pack( sample->effect_chain[entry]->kf, parameter_id, entry,len );
    if( data )
@@ -2159,8 +2158,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
     sample->effect_chain[c]->kf_type = 0;
 	if(sample->effect_chain[c]->kf)
 		vpf(sample->effect_chain[c]->kf );
-	sample->effect_chain[c]->kf = vpn(VEVO_ANONYMOUS_PORT );
-
+	sample->effect_chain[c]->kf = NULL;
     sample_update(sample,s1);
 
     return 1;			/* return position on which it was added */
@@ -2264,7 +2262,7 @@ int sample_chain_clear(int s1)
 	sample->effect_chain[i]->a_flag = 0;
 	if( sample->effect_chain[i]->kf )	
 		vpf( sample->effect_chain[i]->kf );
-	sample->effect_chain[i]->kf = vpn(VEVO_ANONYMOUS_PORT);
+	sample->effect_chain[i]->kf = NULL;
 	int src_type = sample->effect_chain[i]->source_type;
 	int id       = sample->effect_chain[i]->channel;
 	if( src_type == 0 && id > 0 )
@@ -2383,7 +2381,7 @@ int sample_chain_remove(int s1, int position)
 
 	if( sample->effect_chain[position]->kf )
 		vpf( sample->effect_chain[position]->kf );
-	sample->effect_chain[position]->kf = vpn( VEVO_ANONYMOUS_PORT );
+	sample->effect_chain[position]->kf = NULL;
 
  	int src_type = sample->effect_chain[position]->source_type;
 	int id       = sample->effect_chain[position]->channel;
@@ -2437,11 +2435,12 @@ int	sample_cached(sample_info *s, int b_sample )
 		return 1;
         return 0;
 }
-void	sample_chain_set_kf( int s1,int i, void *port )
+
+void	sample_chain_alloc_kf( int s1, int entry )
 {
 	sample_info *sample = sample_get(s1);
     	if(!sample) return;
-	sample->effect_chain[i]->kf = port;
+	sample->effect_chain[entry]->kf = vpn( VEVO_ANONYMOUS_PORT );
 }
 
 int	sample_set_editlist(int s1, editlist *edl)
@@ -2825,6 +2824,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
 
 	if(anim)
 	{
+		sample_chain_alloc_kf( dst_sample, chain_index );
 		ParseKeys( doc, anim, skel->effect_chain[ chain_index ]->kf );
 		sample_chain_set_kf_status( dst_sample, chain_index, kf_status );
 		sample_set_kf_type(dst_sample,chain_index,kf_type);
@@ -3450,11 +3450,11 @@ void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
     CreateArguments(childnode, effect->arg,
 		    vj_effect_get_num_params(effect->effect_id));
 
-
-    childnode =
-	xmlNewChild(node,NULL,(const xmlChar*) "ANIM", NULL );
-    CreateKeys( childnode, vj_effect_get_num_params(effect->effect_id), effect->kf );
-    
+    if( effect->kf != NULL ) {
+   	 childnode =
+		xmlNewChild(node,NULL,(const xmlChar*) "ANIM", NULL );
+   	 CreateKeys( childnode, vj_effect_get_num_params(effect->effect_id), effect->kf );
+    }
 }
 
 

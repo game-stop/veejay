@@ -87,17 +87,17 @@ int sample_try_filename(int sample_id, char *filename, int format)
 	sample_info *si= sample_get(sample_id);
 	if(!si) return 0;
 
-	if( filename == NULL )
-		snprintf(si->encoder_base, 255, "Sample_%04d", sample_id);
+	char tmp[32];
+	if( filename  == NULL )
+		snprintf(tmp,32, "Sample_%04d", sample_id );
 	else
-		snprintf(si->encoder_base,255,"%s",filename);
+		snprintf(tmp,32, "%s", filename );
 	
-
 	int i = 0;
-	int len = strlen(si->encoder_base);
+	int len = strlen(tmp);
 	for(i=0; i <len; i ++ ) {
-		if( si->encoder_base[i] == 0x20 )
-			si->encoder_base[i] = '_';
+		if( tmp[i] == 0x20 )
+			tmp[i] = '_';
 	} 
 
 	char ext[5];
@@ -117,7 +117,14 @@ int sample_try_filename(int sample_id, char *filename, int format)
 			sprintf(ext,"avi");
 			break;
 	}
-	sprintf(si->encoder_destination, "%s-%04d.%s", si->encoder_base , si->sequence_num, ext);
+
+	int est_len = len + len + 4 + 1 + 3 + 1 + 1;
+	if(si->encoder_destination) {
+		free(si->encoder_destination);
+		si->encoder_destination = NULL;
+	}
+	si->encoder_destination = (char*) vj_malloc( sizeof(char) * est_len );
+	snprintf( si->encoder_destination, est_len,"%s-%04d.%s", tmp, (int) si->sequence_num, ext);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Recording to [%s]", si->encoder_destination);
 	return 1;	
@@ -131,8 +138,6 @@ static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, i
 	
 	if( cformat == '\0' ) 
 		return -1;
-
-	int sample_id = si->sample_id;
 
 	si->encoder = vj_avcodec_start( frame, format, si->encoder_destination );
 	if(!si->encoder)
@@ -370,8 +375,6 @@ int sample_reset_autosplit(int s1)
 {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
-  veejay_memset( si->encoder_base,0,sizeof(si->encoder_base) );
-  veejay_memset( si->encoder_destination,0,sizeof(si->encoder_destination) );
   si->sequence_num = 0;
   return 1;
 }

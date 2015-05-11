@@ -81,7 +81,7 @@
 #define SAMPLE_RENDER_START 1
 #define SAMPLE_RENDER_STOP 0
 
-#define SAMPLE_MAX_DESCR_LEN 150
+#define SAMPLE_MAX_DESCR_LEN 24
 
 enum {
     SAMPLE_LOAD = 0,
@@ -143,13 +143,11 @@ typedef struct sample_info_t {
     int encoder_active;
     unsigned long sequence_num;
     unsigned long rec_total_bytes;
-    char *encoder_base;
     unsigned long encoder_total_frames;
     char *encoder_destination;
     int encoder_format;
     void *encoder;
-//    lav_file_t *encoder_file;
-	void		*encoder_file;
+    void  *encoder_file;
     long  encoder_frames_to_record;
     long  encoder_frames_recorded;
     long  encoder_total_frames_recorded;
@@ -172,7 +170,7 @@ typedef struct sample_info_t {
     int          composite;
     void	*viewport_config;
     void	*viewport;
-	long	resume_pos;
+    long	resume_pos;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -352,6 +350,8 @@ extern void	*sample_get_composite_view(int s1);
 
 extern	long	sample_get_resume(int s1);
 extern	int		sample_set_resume(int s1, long pos );
+
+extern void	sample_chain_alloc_kf( int s1, int entry );
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);
