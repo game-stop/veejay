@@ -1299,7 +1299,6 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 	int flags = vj_event_vevo_get_flags( net_id );
 	int fmt_offset = 1; 
 	vims_arg_t	vims_arguments[16];
-	memset( vims_arguments, 0, sizeof(vims_arguments) );
 
 	if(!vj_event_verify_args(args , net_id, arglen, np, prefixed, fmt ))
 	{
@@ -1321,7 +1320,7 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 		{
 			vims_arguments[i].value = (void*) &(args[i]);
 		}
-		if( fmt[fmt_offset] == 's' )
+		else if( fmt[fmt_offset] == 's' )
 		{
 			if(str_arg == NULL )
 			{
@@ -1355,6 +1354,11 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 		i++;
 	}
 
+	while( i < 16 ) {
+		vims_arguments[i].value = 0;
+		i++;
+	}
+
 	vj_event_vevo_inline_fire( (void*) v, net_id, 	
 				fmt,
 				vims_arguments[0].value,
@@ -1376,8 +1380,7 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 	fmt_offset = 1;
 	for ( i = 0; i < np ; i ++ )
 	{
-		if( vims_arguments[i].value &&
-			fmt[fmt_offset] == 's' )
+		if( vims_arguments[i].value && fmt[fmt_offset] == 's' )
 			free( vims_arguments[i].value );
 		fmt_offset += 3;
 	}
@@ -1388,14 +1391,9 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 
 static		int	inline_str_to_int(const char *msg, int *val)
 {
-	char longest_num[16];
 	int str_len = 0;
-	if( sscanf( msg , "%d", val ) <= 0 )
+	if( sscanf( msg , "%d%n", val,&str_len ) <= 0 )
 		return 0;
-	veejay_memset(longest_num,0, 16 );
-	sprintf(longest_num, "%d", *val );
-
-	str_len = strlen( longest_num ); 
 	return str_len;
 }
 
