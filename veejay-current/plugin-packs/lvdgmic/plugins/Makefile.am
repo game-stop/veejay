@@ -2,7 +2,7 @@ lividoplugin_LTLIBRARIES = gmic_cartoon.la \
 			   gmic_cracks.la \
 			   gmic_bokeh.la \
 			   gmic_pencilbw.la \
-			   gmic_arrayfade.la \
+#			   gmic_arrayfade.la \
 			   gmic_rodilius.la \
 			   gmic_water.la \
 			   gmic_wave.la \
@@ -23,7 +23,7 @@ lividoplugin_LTLIBRARIES = gmic_cartoon.la \
 			   gmic_kuwahara.la \
 			   gmic_pendrawing.la \
 			   gmic_oldscool8bits.la \
-			   gmic_sponge.la \
+#			   gmic_sponge.la \
 			   gmic_tetris.la
 
 gmic_cartoon_la_SOURCES = gmic_cartoon.c
@@ -38,8 +38,8 @@ gmic_bokeh_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 gmic_pencilbw_la_SOURCES = gmic_pencilbw.c
 gmic_pencilbw_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
-gmic_arrayfade_la_SOURCES = gmic_arrayfade.c
-gmic_arrayfade_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+#gmic_arrayfade_la_SOURCES = gmic_arrayfade.c
+#gmic_arrayfade_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
 gmic_rodilius_la_SOURCES = gmic_rodilius.c
 gmic_rodilius_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
@@ -104,8 +104,8 @@ gmic_pendrawing_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 gmic_oldscool8bits_la_SOURCES = gmic_oldscool8bits.c
 gmic_oldscool8bits_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
-gmic_sponge_la_SOURCES = gmic_sponge.c
-gmic_sponge_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+#gmic_sponge_la_SOURCES = gmic_sponge.c
+#gmic_sponge_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
 gmic_tetris_la_SOURCES = gmic_tetris.c
 gmic_tetris_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
