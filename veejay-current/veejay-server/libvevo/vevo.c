@@ -1178,7 +1178,6 @@ vevo_property_set(vevo_port_t * p,
     return VEVO_NO_ERROR;
 }
 
-
 int
 vevo_property_set_f(vevo_port_t * p,
 		    const char *key,
@@ -1285,8 +1284,66 @@ vevo_property_get(vevo_port_t * p, const char *key, int idx, void *dst)
     return VEVO_ERROR_NOSUCH_PROPERTY;
 }
 
+//! Get a value from a Property
+/*!
+ \param p Port
+ \param key Property name
+ \param idx Index
+ \param dst Destination address
+ \return error code
+ */
 int
-vevo_property_call(vevo_port_t * p, const char *key, void *ctx, int32_t type, int32_t value )
+vv_property_get(vevo_port_t * p, uint64_t hash_key, int idx, void *dst)
+{
+    __vevo_port_t *port = (__vevo_port_t *) p;
+	vevo_property_t *node = NULL;
+	
+	if ((node = prop_node_get(port, hash_key)) != NULL) {
+		return atom_get_value(node->st, idx, dst);
+	}
+
+    return VEVO_ERROR_NOSUCH_PROPERTY;
+}
+
+
+//! Store a value as a new Property or overwrite existing value
+/*!
+ \param p Port
+ \param key Property name
+ \param atom_type Atom type
+ \param num_elements Number of elements
+ \param src Source address
+ \return error code
+ */
+int
+vv_property_set(vevo_port_t * p,
+		    uint64_t hash_key,
+		    int atom_type, int num_elements, void *src)
+{
+    __vevo_port_t *port = (__vevo_port_t *) p;
+    int new = 1;
+    void *node = NULL;
+	vevo_property_t *pnode = NULL;
+	if ((pnode = prop_node_get(port, hash_key)) != NULL) {
+	    vevo_free_storage(port,pnode->st);
+	    new = 0;
+	    node = (void *) pnode;
+	}
+	
+	vevo_storage_t *stor = vevo_new_storage(port);
+    storage_put_atom_value(port, src, num_elements, stor, atom_type);
+
+    if (new) {
+	   	node = (void *) prop_node_append(port, hash_key, stor);
+	} else {
+	    vevo_property_t *current = (vevo_property_t *) node;
+	    current->st = stor;
+	}
+
+    return VEVO_NO_ERROR;
+}
+
+int vevo_property_call(vevo_port_t * p, const char *key, void *ctx, int32_t type, int32_t value )
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
     ukey_t hash_key = hash_key_code(key);
