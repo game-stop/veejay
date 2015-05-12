@@ -322,31 +322,10 @@ char	*veejay_strncpy( char *dest, const char *src, size_t n )
 	return dest;
 }
 
-
 char	*veejay_strncat( char *s1, char *s2, size_t n )
 {
-	//@ run forward
-	char *s = s1;
-	while(*s != '\0' )
-		*s ++;
-	//@ small
-	if( n < 0xff )
-	{
-		s2[n] = '\0';
-		small_memcpy( s, s2, n+1);
-	}
-	else if ( n < 512 ) // bit smaller
-	{	
-		s2[n] = '\0';
-		small_memcpy( s, s2, n+1);
-	} else 
-	{
-		s2[n] = '\0';
-		return veejay_memcpy(s,s2, n+1 );
-	}
-	return s1;
+	return strncat( s1,s2, n);
 }
-
 
 static uint8_t ppmask[16] = { 0,128,128,0, 128,128,0,128, 128,0,128,128,0,128,128, 0 };
 static uint8_t yuyv_mmreg_[_MMREG_SIZE];
