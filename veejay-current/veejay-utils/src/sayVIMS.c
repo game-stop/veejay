@@ -63,7 +63,6 @@ static struct {
 	{ VIMS_STREAM_GET_V4L,3},
 	{ VIMS_CHAIN_GET_ENTRY,3},
 	{ VIMS_VIMS_LIST,5},
-	{ VIMS_LOG,6},
 	{ VIMS_SAMPLE_INFO,8},
 	{ VIMS_SAMPLE_OPTIONS,5},
 	{ VIMS_DEVICE_LIST,6},
@@ -80,6 +79,12 @@ static struct {
 	{ VIMS_GET_SHM,SHM_ID_LEN },
 	{ 0,0 },
 };
+static void vjsend( vj_client *c, int cmd, char *buf )
+{
+	buf[ strcspn(buf,"\n\r") ] = '\0';
+	vj_client_send( c,cmd, buf);
+}
+
 
 static int vimsReplyLength(int vims_id)
 {
@@ -407,7 +412,7 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				vj_client_send( sayvims,V_CMD, msg[i] );
+				vjsend( sayvims,V_CMD, msg[i] );
 			}
 			i++;
 		}
@@ -449,7 +454,7 @@ int main(int argc, char *argv[])
                         }
                         else
                         {
-                                vj_client_send( sayvims, V_CMD, buf );
+                                vjsend( sayvims, V_CMD, buf );
                         }
                 }
 	}
