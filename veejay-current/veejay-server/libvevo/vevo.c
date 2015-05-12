@@ -564,13 +564,18 @@ static int atom_get_value(vevo_storage_t * t, int idx, void *dst)
 
     if( dst == NULL )
 	    return VEVO_NO_ERROR;
-   
-    if( t->atom_type == VEVO_ATOM_TYPE_STRING || t->atom_type == VEVO_ATOM_TYPE_UTF8STRING ) {
+  
+    if( t->atom_type == VEVO_ATOM_TYPE_FUNCPTR )
+	    return VEVO_NO_ERROR;
+
+    if( t->atom_type != VEVO_ATOM_TYPE_STRING ) {
+	    veejay_memcpy(dst,atom->value,atom->size);
+            return VEVO_NO_ERROR;
+    }
+    else {
 	char **ptr = (char **) dst;
 	char *p = *ptr;
 	veejay_memcpy(p, atom->value, atom->size);
-    } else if( t->atom_type != VEVO_ATOM_TYPE_FUNCPTR ) {
-	veejay_memcpy(dst, atom->value, atom->size);
     } 
     
     return VEVO_NO_ERROR;
