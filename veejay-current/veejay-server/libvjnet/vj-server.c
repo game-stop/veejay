@@ -678,39 +678,25 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 
 	while( i < buf_len )
 	{
-		if( !(s[i]=='V' && s[i+4] == 'D') && !(s[i] == 'K') )
-		{	
-			_vj_malfunction( "VIMS (v) Cannot identify message as VIMS message", buf, buf_len, i);
-			return 0;
-		}
-
 		if( s[i] == 'V' )
 		{
-			char tmp_len[4];
-			char net_id[4];
 			char *str_ptr = &s[(i+1)];
-			
-			veejay_strncpy( tmp_len,str_ptr, 3 ); // header length   
-
-			int slen = atoi( tmp_len );
-			
-			i += 4; // advance to message content
-			str_ptr += 4;
-			
-			veejay_strncpy( net_id, str_ptr, 3 );
-			
 			int netid = 0;
-			if( sscanf( net_id, "%03d", &netid ) <= 0 )
-			{
-				_vj_malfunction( "VIMS (v) Corrupt VIMS selector", buf, buf_len, i );
+			int slen = 0;
+
+			if( sscanf( str_ptr, "%3dD%3d:", &slen, &netid ) != 2 ) {
+				_vj_malfunction( "VIMS (v) invalid VIMS message", buf,buf_len, i );
 				return 0;
 			}
 
-			if( netid < 0 && netid > 600 )
-			{
-				_vj_malfunction( "VIMS (v) selector out of range", buf,buf_len, i );
+			if( netid < 0 || netid > 600 ) {
+				_vj_malfunction( "VIMS (v) invalid VIMS command",buf,buf_len,i);
 				return 0;
+
 			}
+
+			str_ptr += 4;
+			i += 4;
 
 			if( vje->use_mcast )
 			{
@@ -721,7 +707,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 				}
 			}
 
-			int failed = 1;
+			int failed = 1; 
 			if( slen > 0 && str_ptr[slen-1] == ';' )
 				failed = 0;
 
@@ -752,7 +738,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			i += 9;
 
 		} else {
-			veejay_msg(0, "parse error.");
+			_vj_malfunction( "VIMS (v) Cannot identify message as VIMS message", buf, buf_len, i);
 			return 0;
 		}
 	}
@@ -769,40 +755,29 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 	vj_message **v = Link[link_id]->m_queue;
 
 	while( i < buf_len ) {
-
-		char tmp_len[32];
-		char net_id[4];
 		int  slen = 0;
 		int	netid = 0;
 
 		char *str_ptr = &s[i];
-		memset( tmp_len, 0, sizeof(tmp_len));
 		
 		if(s[i] == 'V')
 		{
 			str_ptr ++; //@ [V][ ]
 			            //@     ^
 	
-			veejay_strncpy( tmp_len,str_ptr, 3 ); 		// header length   
-			if( sscanf(tmp_len, "%03d", &slen) <= 0 )
-			{
+			if( sscanf( str_ptr,"%3dD%3d", &slen, &netid ) != 2 ) {
 				veejay_msg(0, "Error parsing header in '%s' (%d bytes)", buf, buf_len );
 				return 0;
 			}
-			
-			str_ptr += 4; //@ [V][0][0][5][D][ ]
-			              //@                 ^
-			
-			veejay_strncpy( net_id, str_ptr, 3 );  //@ [V][0][0][5][D][6][0][0][:][;]
-			                                       //@                 ^  ^  ^
-	
-			if( sscanf( net_id, "%03d", &netid ) )
-			{
+
+			str_ptr += 4;
+
+			if(netid > 0 && netid <= 600) {
 				v[num_msg]->msg = strndup( str_ptr, slen );  //@ '600:;'
 				v[num_msg]->len = slen;                      //@ 5
 				num_msg++;
 			}
-	
+
 			if(num_msg >= VJ_MAX_PENDING_MSG )
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "VIMS server queue full - got %d/%d messages.",
@@ -816,19 +791,15 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 		else if (s[i] == 'K' )
 		{
 			str_ptr ++; //@ [K][ ]
-
-			veejay_strncpy( tmp_len, str_ptr, 8 );
-			
-			if( sscanf(tmp_len, "%08d", &slen) <= 0 )
+			if( sscanf(str_ptr, "%08d", &slen ) <= 0 )
 			{
 				veejay_msg(0, "Error parsing KF header in '%s' (%d bytes)", buf, buf_len );
 				return 0;
 			}
 
 			str_ptr += 8;
-			
 			v[num_msg]->msg = (char*) vj_malloc( sizeof(char) * slen );
-			memcpy( v[num_msg]->msg, str_ptr, slen );
+			veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
 			v[num_msg]->len = slen;
 			
 			num_msg++;
@@ -836,8 +807,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			i += ( 9 + slen );
 
 		} else {
-			veejay_msg(0, "VIMS: blob '%s' not recognized. First token must be either 'V' or 'K' followed by packet length.",
-					str_ptr );
+			veejay_msg(0, "VIMS: First token not a VIMS message or KF packet (at [%s])", s );
 			return 0;
 		}
 	}
