@@ -36,7 +36,6 @@ typedef struct
 	int   	height;
 	int   	shiftv;
 	int   	shifth;
-	int	sampling;
 	int	ssm;
 	int	uv_width;
 	int	uv_height;
@@ -51,7 +50,6 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 
 uint8_t	vj_task_available();
 
-void	*vj_task_alloc_internal_buf( unsigned int w );
 void	vj_task_set_float( float f );
 void	vj_task_set_int( int i );
 void	vj_task_set_ptr( void *ptr );
@@ -66,7 +64,6 @@ void	task_stop(unsigned int max_workers);
 void	task_init();
 int	task_num_cpus();
 void	vj_task_set_overlap( int val );
-void	vj_task_set_sampling( int s );
 void	performer_job( uint8_t job_num );
 
 uint8_t	num_threaded_tasks();

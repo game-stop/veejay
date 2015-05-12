@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <sys/statfs.h>
 #include <pthread.h>
+#include <sched.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-misc.h>
@@ -89,6 +90,8 @@ static uint8_t tasks_done[MAX_WORKERS];
 static uint8_t tasks_todo = 0;
 static int exitFlag = 0;
 static struct task running_tasks[MAX_WORKERS];
+static struct sched_param param;
+static int euid = 0;
 
 #define __lock() pthread_mutex_lock(&queue_mutex)
 #define __unlock() pthread_mutex_unlock(&queue_mutex)
@@ -204,6 +207,19 @@ static inline uint8_t	task_get_workers()
 void		task_init()
 {
 	task_reset();
+ 
+	int max_p = sched_get_priority_max( SCHED_FIFO );
+	int min_p = sched_get_priority_min( SCHED_FIFO );
+
+	max_p = (int) ( ((float) max_p) * 0.95f );
+	if( max_p < min_p )
+    		max_p = min_p;
+
+	veejay_memset( &param, 0, sizeof(param));
+	euid = geteuid();
+	if( euid == 0 ) {
+		param.sched_priority =  max_p;
+	} 
 }
 
 int		task_num_cpus()
@@ -213,7 +229,6 @@ int		task_num_cpus()
 
 int		task_start(unsigned int max_workers)
 {
-	struct sched_param param;
 	uint8_t i;
 	if( max_workers >= MAX_WORKERS ) {
 		veejay_msg(0, "Maximum number of threads is %d", MAX_WORKERS );
@@ -221,18 +236,6 @@ int		task_start(unsigned int max_workers)
 	}
 	exitFlag = 0;
 
-    	int max_p = sched_get_priority_max( SCHED_FIFO );
-    	int min_p = sched_get_priority_min( SCHED_FIFO );
-
-    	max_p = (int) ( ((float) max_p) * 0.95f );
-    	if( max_p < min_p )
-	    max_p = min_p;
-	
-	veejay_memset( &param, 0, sizeof(param));
-	int euid = geteuid();
-	if( euid == 0 ) {
-		param.sched_priority =  max_p;
-	}
 	cpu_set_t cpuset;
 	pthread_cond_init( &tasks_completed, NULL );
 	pthread_cond_init( &current_task, NULL );
@@ -301,16 +304,15 @@ void	performer_job( uint8_t n )
 
 	__lock();
 	tasks_todo = n;
-	veejay_memset( tasks_done, 0, sizeof(tasks_done));
 	for( i = 0; i < n; i ++ ) {
 		pjob_t *slot  = job_list[i];
+		tasks_done[i] = 0;
 		task_add( i, slot->job, slot->arg );
 	}
 	pthread_cond_signal( &current_task );
 	__unlock();
 
 	uint8_t stop = 0;
-
 	while(!stop) {
 		uint8_t done = 0;
 		
@@ -364,18 +366,6 @@ uint8_t	vj_task_available()
 	return ( task_get_workers() > 1 ? 1 : 0);
 }
 
-void	*vj_task_alloc_internal_buf( unsigned int size )
-{
-	uint8_t i;
-	uint8_t n = task_get_workers();
-	uint8_t *buffer     =	 (uint8_t*) vj_malloc( size );
-
-	for( i = 0; i < n; i ++ ) {
-		vj_task_args[i]->priv = (void*) (buffer + ( size * i ));
-	}
-	return (void*) buffer;
-}
-
 void	vj_task_set_ptr( void *ptr )
 {
 	uint8_t i;
@@ -398,7 +388,6 @@ void	vj_task_set_from_args( int len, int uv_len )
 		v->strides[2]	 = uv_len / n;
 		v->strides[3]    = 0;
 	}
-
 }
 
 void	vj_task_set_to_frame( VJFrame *in, int i, int job )
@@ -459,37 +448,13 @@ void	vj_task_set_from_frame( VJFrame *in )
 		v->shiftv	= in->shift_v;
 		v->shifth	= in->shift_h;	
 			
-		if( v->sampling ) {		
-			if( v->ssm == 0 ) { //@ super sample to 4:4:4
-				v->out_strides[1] = (v->width * v->height);
-			} else { //@ subsample 4:2:2
-				v->out_strides[1] = (v->uv_width * v->uv_height );
-				v->strides[1]     = (v->width * v->height);
-			}
-			
-			v->out_strides[0] =  0;
-			v->out_strides[2] = v->out_strides[1];
+		if( v->ssm == 1 ) { //@ FX in 4:4:4
+			v->strides[1] = (v->width * v->height );
 			v->strides[2] = v->strides[1];
-			v->strides[0] = 0;			
-		} else {
-		        if( v->ssm == 1 ) { //@ FX in 4:4:4
-				v->strides[1] = (v->width * v->height );
-				v->strides[2] = v->strides[1];
-			}
 		}
+		
 		v->strides[3]   = 0;
 	}	
-}
-
-void	vj_task_set_sampling( int s )
-{
-	uint8_t n = task_get_workers();
-	uint8_t i;
-	
-	for( i = 0; i < n; i ++ ) {
-		vj_task_arg_t *v = vj_task_args[i];
-		v->sampling = s;
-	}
 }
 
 int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func )
@@ -502,16 +467,10 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	unsigned int i,j;
 
 	for ( i = 0; i < n_planes; i ++ ) {
-		if( f[0]->sampling == 1 && i == 0 ){
-			f[0]->input[i] = NULL;
-			f[0]->output[i] = NULL;
-			f[0]->temp[i] = NULL;
-		} else {
-			f[0]->input[i] = buf1[i];
-			f[0]->output[i]= buf2[i];
-			if( buf3 != NULL )
-				f[0]->temp[i]  = buf3[i];
-		}
+		f[0]->input[i] = buf1[i];
+		f[0]->output[i]= buf2[i];
+		if( buf3 != NULL )
+			f[0]->temp[i]  = buf3[i];
 	}
 
 	f[0]->jobnum = 0;
@@ -528,11 +487,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 		for( i = 0; i < n_planes; i ++ ) {
 			if( f[j]->strides[i] == 0 )
 				continue;
-			if( f[j]->sampling ) {
-				f[j]->input[i] = buf1[i] + (f[j]->out_strides[i] * j);
-			} else {
-				f[j]->input[i]  = buf1[i] + (f[j]->strides[i] * j);
-			}
+			f[j]->input[i]  = buf1[i] + (f[j]->strides[i] * j);
 			f[j]->output[i] = buf2[i] + (f[j]->strides[i] * j);
 			if( buf3 != NULL )
 				f[j]->temp[i]   = buf3[i] + (f[j]->strides[i]* j); 
@@ -546,10 +501,6 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	}	
 
 	performer_job( n );
-
-	for( j = 0; j < n; j ++ ) {
-		f[j]->sampling = 0;
-	}
 
 	return 1;
 }
