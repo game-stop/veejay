@@ -1378,16 +1378,17 @@
                                 <property name="use_stock">False</property>
                                 <signal name="activate" handler="on_button_samplelist_open_clicked" swapped="no"/>
                               </widget>
-		      		</child>
-		       		 <child>
-				<widget class="GtkImageMenuItem" id="append_samplelist1">
-				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">Append samplelist</property>
-				  <property name="use_underline">True</property>
-				  <signal name="activate" handler="on_button_samplelist_append_clicked" last_modification_time="Wed, 19 Oct 2005 12:21:30 GMT"/>
-				</widget>
-			      </child>
-
+                            </child>
+                            <child>
+                              <widget class="GtkImageMenuItem" id="append_samplelist1">
+                                <property name="label" translatable="yes">Append samplelist</property>
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="use_underline">True</property>
+                                <property name="use_stock">False</property>
+                                <signal name="activate" handler="on_button_samplelist_append_clicked" swapped="no"/>
+                              </widget>
+                            </child>
                             <child>
                               <widget class="GtkImageMenuItem" id="load_actionfile1">
                                 <property name="label">Load actionfile</property>
@@ -6442,12 +6443,11 @@
                                                             <property name="visible">True</property>
                                                             <property name="can_focus">False</property>
                                                             <property name="xalign">0</property>
-                                                            <property name="label" translatable="yes">00:00:00</property>
-                                                            <property name="width_chars">7</property>
+                                                            <property name="label" translatable="yes">00:00:00:00</property>
                                                             </widget>
                                                             <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">False</property>
+                                                            <property name="expand">True</property>
+                                                            <property name="fill">True</property>
                                                             <property name="position">0</property>
                                                             </packing>
                                                             </child>
@@ -6460,7 +6460,6 @@
                                                             <widget class="GtkAlignment" id="alignment503">
                                                             <property name="visible">True</property>
                                                             <property name="can_focus">False</property>
-                                                            <property name="left_padding">20</property>
                                                             <child>
                                                             <widget class="GtkHBox" id="hbox823">
                                                             <property name="visible">True</property>
@@ -7261,8 +7260,7 @@ YUV (current)
                                       <widget class="GtkLabel" id="label_totframes">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
-                                        <property name="xalign">0</property>
-                                        <property name="label" translatable="yes">00000000000</property>
+                                        <property name="label" translatable="yes">0000000000</property>
                                         <property name="width_chars">12</property>
                                       </widget>
                                       <packing>
@@ -7302,7 +7300,7 @@ YUV (current)
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
                                         <property name="xalign">0</property>
-                                        <property name="label" translatable="yes">000000000</property>
+                                        <property name="label" translatable="yes">000000000000</property>
                                         <property name="width_chars">10</property>
                                       </widget>
                                       <packing>
@@ -12500,6 +12498,24 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
