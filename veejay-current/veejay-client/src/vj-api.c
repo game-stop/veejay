@@ -2582,6 +2582,16 @@ static	void	update_label_str(const char *name, gchar *text)
 	g_free(utf8_text);
 }	
 
+static	void 	label_set_markup(const char *name, gchar *str)
+{
+	GtkWidget *label = glade_xml_get_widget_(
+				info->main_window, name);
+	if(!label)
+		return;
+
+	gtk_label_set_markup( label, str );
+}
+
 static void selection_get_paths(GtkTreeModel *model, GtkTreePath *path,
 				GtkTreeIter *iter, gpointer data)
 {
@@ -5927,13 +5937,13 @@ static	void	set_pm_page_label(int sample_id, int type)
 {
 	gchar ostitle[100];
 	switch(type) {	
-		case 0: snprintf(ostitle, sizeof(ostitle), "Sample %d",sample_id);break;
-		case 1: snprintf(ostitle, sizeof(ostitle), "Stream %d",sample_id);break;
+		case 0: snprintf(ostitle, sizeof(ostitle), "<b>Sample %d</b>",sample_id);break;
+		case 1: snprintf(ostitle, sizeof(ostitle), "<b>Stream %d</b>",sample_id);break;
 		default:
-			snprintf(ostitle,sizeof(ostitle), "Plain");break;
+			snprintf(ostitle,sizeof(ostitle), "<b>Plain</b>");break;
 	}
 	gchar *title = _utf8str(ostitle);
-	update_label_str( "label_current_mode", title);
+	label_set_markup( "label_current_mode", ostitle);
 	update_label_str( "label_currentsource", title );
 	g_free(title);
 }
