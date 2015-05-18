@@ -52,11 +52,10 @@ enum {
     VJ_MACRO_PLAIN_PLAY = 1,
 };
 
-#define MJPEG_MAX_BUF 64
+#define MJPEG_MAX_BUF 2
 #define VJ_AUDIO_BUF_SIZE 16384
 
-
-
+//classic vars
 #define DUMMY_DEFAULT_WIDTH 352
 #define DUMMY_DEFAULT_HEIGHT 288
 #define DUMMY_DEFAULT_FPS 25
@@ -151,12 +150,9 @@ typedef struct {
     long currently_processed_entry;
     struct mjpeg_sync syncinfo[MJPEG_MAX_BUF];	/* synchronization info */
     uint64_t *save_list;	/* for editing purposes */
-    int abuf_len;
     double spas;		/* seconds per audio sample */
     int audio_mute;		/* controls whether to currently play audio or not */
     int state;			/* playing, paused or stoppped */
-    int effect;			/* realtime effect during play */
-    int video_fd;
   //  pthread_t playback_thread;	/* the thread for the whole playback-library */
     int offline_ready;
     int offline_record;
@@ -189,7 +185,7 @@ typedef struct {
 	VJRectangle viewport;
 	vj_rand_player randplayer;
 	void	*export_image;
-	int	links[16];
+	int	links[VJ_MAX_CONNECTIONS]; 
 	int	ncpu;
 	int	vp_rec;
 	int	late[2];
@@ -298,7 +294,6 @@ typedef struct {
     vj_sdl **sdl;		/* array of SDL windows */
 #endif
     vj_yuv *output_stream;	/* output stream for dumping video */
-    vj_yuv *render_stream;
     void *vloopback; // vloopback output
     void *video_out_scaler;
     int render_now;	        /* write RGB */
