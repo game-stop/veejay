@@ -5936,14 +5936,17 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 static	void	set_pm_page_label(int sample_id, int type)
 {
 	gchar ostitle[100];
+	gchar ftitle[100];
 	switch(type) {	
-		case 0: snprintf(ostitle, sizeof(ostitle), "<b>Sample %d</b>",sample_id);break;
-		case 1: snprintf(ostitle, sizeof(ostitle), "<b>Stream %d</b>",sample_id);break;
+		case 0: 
+				snprintf(ostitle, sizeof(ostitle), "Sample %d",sample_id);break;
+		case 1: snprintf(ostitle, sizeof(ostitle), "Stream %d",sample_id);break;
 		default:
-			snprintf(ostitle,sizeof(ostitle), "<b>Plain</b>");break;
+			snprintf(ostitle,sizeof(ostitle), "Plain");break;
 	}
 	gchar *title = _utf8str(ostitle);
-	label_set_markup( "label_current_mode", ostitle);
+	snprintf(ftitle,sizeof(ftitle), "<b>%s</b>", ostitle);
+	label_set_markup( "label_current_mode", ftitle);
 	update_label_str( "label_currentsource", title );
 	g_free(title);
 }
