@@ -518,7 +518,7 @@ int	plug_find_generator_plugins(int *total, int seq )
 
 int	plug_sys_detect_plugins(void)
 {
-	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * 256 );
+	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * 1024 );
 	illegal_plugins_ = vpn( VEVO_ILLEGAL );
 
 	char *lvd_path = get_livido_plug_path();
