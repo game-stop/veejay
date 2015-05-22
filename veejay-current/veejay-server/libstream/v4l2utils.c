@@ -954,6 +954,14 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	v4l2_enum_video_standards( v, norm );
 	v4l2_enum_frame_sizes(v);
 
+	if( v->is_vloopback == 1 && (wid == 0 || hei == 0 ) ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: please set width and height (-w and -h) for video loopback device");
+		free(v);
+		close(fd);
+		return NULL;
+	}
+
+
 	if( v4l2_configure_format( v, host_fmt, wid, hei ) == 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to negotiate pixel format with your capture device.");
 		free(v);
