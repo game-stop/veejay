@@ -811,6 +811,11 @@ int vj_perform_init_audio(veejay_t * info)
 	    audio_buffer[i] = lin_audio_buffer_ + (PERFORM_AUDIO_SIZE * i);
 	}
  
+	/* 
+	 * The simplest way to time stretch the audio is to resample it and then playback the waveform at the original sampling frequency
+	 * This also lowers or raises the pitch, making it just like speeding up or down a tape recording. Perfect!
+	 */
+
 	for( i = 0; i <= MAX_SPEED; i ++ )
 	{
 		int out_rate = (info->edit_list->audio_rate * (i+2));

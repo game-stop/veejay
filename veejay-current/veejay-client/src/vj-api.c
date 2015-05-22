@@ -1599,6 +1599,7 @@ void	about_dialog()
 {
 	"You can donate cryptocoins!\n"\
 	"Bitcoin: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n"
+	"or via PayPal: veejayhq@gmail.com\n"
 };
 
 	sprintf(blob, "Veejay - A visual instrument and realtime video sampler for GNU/Linux\n%s\n%s", os_str, donate );
