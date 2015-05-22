@@ -3579,12 +3579,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	info->effect_frame_info->width = info->video_output_width;
 	info->effect_frame_info->height= info->video_output_height;
 
-	if(info->settings->output_fps > 0.0)
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Overriding Framerate with %2.2f", info->settings->output_fps);
-		info->current_edit_list->video_fps = info->settings->output_fps;
-	}	
-
 	return 1;
 }
 

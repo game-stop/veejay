@@ -508,6 +508,11 @@ void vj_effect_initialize(int width, int height, int full_range)
     {
 	    set_pixel_range( 255, 255,0,0 );
     }
+
+	if( (width % 32) != 0 ) {
+		veejay_msg(VEEJAY_MSG_WARNING,"Video width should be a multiple of 32 for some effects" );
+	}
+
    /* 
     n_ext_plugs_ = plug_detect_plugins();
 
