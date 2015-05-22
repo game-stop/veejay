@@ -490,24 +490,8 @@ void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 	int sample_id = 0;
 	int result_len = 0;
 	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
-
-	gchar *result = recv_vims( 3, &result_len );
-	if( result <= 0||result == NULL )
-	{
-		gveejay_popup_err( "Error" , "Unable to load video file. Please check Veejay's console to find out why.");
-	}
-	else
-	{
-		sscanf( result, "%5d", &sample_id );
-
-		if(sample_id <= 0 )
-			gveejay_popup_err( "Error", "Unable to load video file. Please check Veejay's console to find out why.");
-		else
-			vj_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s", sample_id, filename);
-		g_free(result);
-	}
-	g_free(filename );
 }
+
 void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
 {
 	int frame = _el_ref_start_frame( info->uc.selected_el_entry );
@@ -2589,22 +2573,6 @@ void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
 		int sample_id = 0; // new sample
 		int result_len = 0;
 		multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
-
-		gchar *result = recv_vims( 3, &result_len );
-		if( result <= 0||result == NULL )
-		{
-			gveejay_popup_err( "Error", "Cannot open video file. Please check Veejay's console to find out why");
-		}
-		else
-		{
-			sscanf( result, "%5d", &sample_id );
-			if(sample_id <= 0)
-				gveejay_popup_err( "Error", "Cannot open video file. Please check Veejay's console to find out why");
-			else
-				vj_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s", sample_id, filename);
-			g_free(result);
-		}
-		g_free(filename );
 	}
 }
 

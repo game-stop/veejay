@@ -184,17 +184,17 @@ fi
 
 dnl Check for Veejay
 have_veejay=false
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.49 ],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.50 ],
 	[	
 		AC_SUBST(VEEJAY_CFLAGS)
 		AC_SUBST(VEEJAY_LIBS)
 		have_veejay=true
-		AC_DEFINE(HAVE_VEEJAY,1, [Veejay installed])]
+		AC_DEFINE(HAVE_VEEJAY,1, [Veejay 1.5.50 installed])]
 		,
 		[have_veejay=false])
 
 if test x$have_veejay != xtrue ; then
-   AC_MSG_ERROR([Cannot find veejay 1.5.49 or later])
+   AC_MSG_ERROR([Cannot find veejay 1.5.50 or later])
 fi
 
 have_pixbuf=false
@@ -697,7 +697,7 @@ AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
-AC_MSG_NOTICE([  - Veejay 1.5.28                 : ${have_veejay}])
+AC_MSG_NOTICE([  - Veejay 1.5.50                 : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])

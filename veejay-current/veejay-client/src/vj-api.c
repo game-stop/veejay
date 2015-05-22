@@ -1996,17 +1996,15 @@ static	void	gveejay_error_slot( int mode )
    all VIMS commands that create a new stream or a new sample */
 int		gveejay_new_slot(int mode)
 {
-	int id = 0;
+/*	int id = 0;
 	int result_len = 0;
 	gchar *result = recv_vims( 3, &result_len );
-#ifdef STRICT_CHECKING
-	//@ err
-	assert( result_len >= 0 );
-	assert( result != NULL );
-#endif
+
+	veejay_msg(0 ,"  -> EXPECT NEW SLOT in [%s]" ,result );
+
 	if(result_len <= 0 )
 	{
-		veejay_msg(0, "No reply from veejay-server, but expected new sample/slot identifier");
+		veejay_msg(0, "Maybe you should restart me");
 		return 0;
 	}
 
@@ -2016,12 +2014,11 @@ int		gveejay_new_slot(int mode)
 
 	if( id <= 0 )
 	{
-		veejay_msg(0, "Error creating new sample slot");
 	//	gveejay_error_slot( mode );
 		return 0;
 	}
-
-	return id;
+*/
+	return 1;
 }
 
 void	gveejay_popup_err( const char *type, char *msg )
@@ -4233,6 +4230,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	if( with_reset_slotselection ) {
 		reset_samplebank();
 		}
+	char line[300];
+	char source[255];
+	char descr[255];
 
 	char tmp[5];
 	int slen = 1;
@@ -4259,8 +4259,6 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 			offset += 3;
 			if(len > 0)
 			{
-				char line[300];
-				char descr[255];
 				veejay_memset( line,0,sizeof(line));
 				veejay_memset( descr,0,sizeof(descr));
 				strncpy( line, fxtext + offset, len );
@@ -4327,9 +4325,6 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 			offset += 3;
 			if(len > 0)
 			{
-				char line[300];
-				char source[255];
-				char descr[255];
 				veejay_memset(line,0,sizeof(line));
 				veejay_memset(descr,0,sizeof(descr));
 				strncpy( line, fxtext + offset, len );
@@ -4346,19 +4341,19 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				strncpy( descr, line + 22, values[6] );
 				switch( values[1] )
 				{
-					case STREAM_CALI	:sprintf(source,"calibrate %d",values[0]);
+					case STREAM_CALI	:snprintf(source,sizeof(source),"calibrate %d",values[0]);
 								 break;
-					case STREAM_VIDEO4LINUX :sprintf(source,"capture %d",values[0]);break;
-					case STREAM_WHITE	:sprintf(source,"solid %d",values[0]); 
+					case STREAM_VIDEO4LINUX :snprintf(source,sizeof(source),"capture %d",values[0]);break;
+					case STREAM_WHITE	:snprintf(source,sizeof(source),"solid %d",values[0]); 
 								 break;
-					case STREAM_MCAST	:sprintf(source,"multicast %d",values[0]);break;
-					case STREAM_NETWORK	:sprintf(source,"unicast %d",values[0]);break;
-					case STREAM_YUV4MPEG	:sprintf(source,"y4n %d",values[0]);break;
-					case STREAM_DV1394	:sprintf(source,"dv1394 %d",values[0]);break;
-					case STREAM_PICTURE	:sprintf(source,"image %d",values[0]);break;
-					case STREAM_GENERATOR   :sprintf(source,"Z%d",values[0]);break;
+					case STREAM_MCAST	:snprintf(source,sizeof(source),"multicast %d",values[0]);break;
+					case STREAM_NETWORK	:snprintf(source,sizeof(source),"unicast %d",values[0]);break;
+					case STREAM_YUV4MPEG	:snprintf(source,sizeof(source),"y4m %d",values[0]);break;
+					case STREAM_DV1394	:snprintf(source,sizeof(source),"dv1394 %d",values[0]);break;
+					case STREAM_PICTURE	:snprintf(source,sizeof(source),"image %d",values[0]);break;
+					case STREAM_GENERATOR   :snprintf(source,sizeof(source),"Z%d",values[0]);break;
 					default:
-						sprintf(source,"??? %d", values[0]);	
+						snprintf(source,sizeof(source),"??? %d", values[0]);	
 				}
 				gchar *gsource = _utf8str( descr );
 				gchar *gtype = _utf8str( source );
