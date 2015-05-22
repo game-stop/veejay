@@ -1426,6 +1426,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	char head[5] = { 0,0,0,0,0};
 	int net_id = 0;
 	int np = 0;
+	
 	if( msg == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Dropped empty VIMS message.");
@@ -2325,18 +2326,6 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 			(const xmlChar*) buffer);
 	}
 #endif
-}
-
-static	void	vj_event_send_new_id(veejay_t * v, int new_id)
-{
-	if( vj_server_client_promoted( v->vjs[0], v->uc->current_link ))
-	{
-		char s_print_buf[16];
-		char result[6];
-		sprintf( result, "%05d",new_id );
-		sprintf(s_print_buf, "%03d%s",5, result);	
-		SEND_MSG( v,s_print_buf);
-	}
 }
 
 void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
@@ -3290,8 +3279,6 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 	{
 		p_invalid_mode();
 	}
-
-	vj_event_send_new_id( v, new_id);
 
 }
 
@@ -4806,7 +4793,6 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to delete sample %d",args[0]);
 	}
-	vj_event_send_new_id(  v, deleted_sample );
 }
 
 void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
@@ -4823,7 +4809,6 @@ void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 		if(!new_sample)
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy sample %d.",args[0]);
 	}
-	vj_event_send_new_id( v, new_sample );
 }
 
 void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
@@ -6784,7 +6769,6 @@ void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open %s", str );
 		new_sample_id = 0;
 	}
-	vj_event_send_new_id( v,new_sample_id );
 }
 
 void vj_event_tag_del(void *ptr, const char format[] , va_list ap ) 
@@ -6809,7 +6793,6 @@ void vj_event_tag_del(void *ptr, const char format[] , va_list ap )
 			}
 		}	
 	}
-	vj_event_send_new_id(  v, args[0] );
 }
 
 void vj_event_tag_toggle(void *ptr, const char format[], va_list ap)
@@ -6834,8 +6817,6 @@ void	vj_event_tag_new_generator( void *ptr, const char format[], va_list ap )
 
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR, str, v->nstreams,0,args[0]);
 
-	vj_event_send_new_id ( v, id );
-
 	if( id <= 0 ) {
 		veejay_msg(0,"Error launching plugin '%s'.", str );
 	}
@@ -6851,7 +6832,6 @@ void vj_event_tag_new_picture(void *ptr, const char format[], va_list ap)
 
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_PICTURE, str, v->nstreams,0,0);
 
-	vj_event_send_new_id( v, id );
 	if(id <= 0 )
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Picture stream");
 }
@@ -6868,7 +6848,6 @@ void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 	if(args[0] == -1) args[0] = 63;
 	veejay_msg(VEEJAY_MSG_DEBUG, "Try channel %d", args[0]);
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_DV1394, "/dev/dv1394", v->nstreams,0, args[0]);
-	vj_event_send_new_id( v, id );
 	if( id <= 0)
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new DV1394 stream");
 }
@@ -6940,8 +6919,6 @@ void	vj_event_stream_new_cali( void *ptr, const char format[], va_list ap)
 	if(id > 0 )
 		v->nstreams++;
 
-	vj_event_send_new_id( v, id );
-
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create load calibration file '%s'",str);
 	else	
@@ -6972,7 +6949,6 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 	if(id > 0 )
 		v->nstreams++;
 
-	vj_event_send_new_id( v, id );
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Video4Linux stream ");
 }
@@ -6991,13 +6967,11 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 		if( args[0] == v->uc->port )
 		{	
 			veejay_msg(0, "Try another port number, I am listening on this one.");
-			vj_event_send_new_id(v, 0 );
 			return;
 		}
 	}
 	
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, args[0],0);
-	vj_event_send_new_id( v, id);
 
 	if(id <= 0)
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create unicast stream");
@@ -7013,8 +6987,6 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, args[0],0);
-
-	vj_event_send_new_id( v, id  );
 
 	if( id <= 0)
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new multicast stream");
@@ -7041,7 +7013,6 @@ void vj_event_tag_new_color(void *ptr, const char format[], va_list ap)
 		vj_tag_set_stream_color( id, args[0],args[1],args[2] );
 	}	
 
-	vj_event_send_new_id( v , id );
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new solid color stream");
 
@@ -7055,7 +7026,6 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 	int id  = veejay_create_tag(v, VJ_TAG_TYPE_YUV4MPEG, str, v->nstreams,0,0);
 
-	vj_event_send_new_id( v, id );
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Yuv4mpeg stream");
 }
@@ -9737,14 +9707,12 @@ void	vj_event_connect_shm( void *ptr, const char format[], va_list ap )
 	
 	if( args[0] == v->uc->port ) {
 		veejay_msg(0, "Cannot pull info from myself inside VIMS event!");
-		vj_event_send_new_id( v, -1 );
 		return;
 	}
 
 	int32_t key = vj_share_pull_master( v->shm,"127.0.0.1", args[0] );
 	int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, key,0);
 	
-	vj_event_send_new_id( v, id );
 	
 	if( id <= 0 ) {
 		veejay_msg(0, "Unable to connect to shared resource id %d", key );
