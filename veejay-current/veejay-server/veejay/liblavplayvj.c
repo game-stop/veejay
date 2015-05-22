@@ -957,8 +957,7 @@ static int veejay_screen_update(veejay_t * info )
 	if( info->vloopback )
 	{
 		vj_vloopback_fill_buffer( info->vloopback , frame );		
-		if( vj_vloopback_get_mode( info->vloopback ))
-			vj_vloopback_write_pipe( info->vloopback );
+		vj_vloopback_write_pipe( info->vloopback );
 	}
 
 #ifdef HAVE_JPEG

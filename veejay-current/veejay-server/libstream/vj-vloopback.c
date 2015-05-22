@@ -17,13 +17,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/*
-	Put vloopback back in place
-	Re-used large portions of dc1394_vloopback.c 
-	from Dan Dennedy <dan@dennedy.org>
-
-*/
-
 
 /* Changes:
  * Import patch by Xendarboh xendarboh@gmail.com to write to v4l2vloopback device
@@ -69,7 +62,6 @@ typedef struct
 	int   width;
 	int   height;
 	int   norm;
-        int   mode;		/* PAL or NTSC */
 	int   fd;
 	int   size;		/* size of image out_buf */
 	uint8_t *out_buf;
@@ -103,7 +95,6 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 	}
 
 	v->norm = norm;
-	v->mode = mode;
 	v->width = w;
 	v->height = h;
 
@@ -161,12 +152,6 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 }
 #define    ROUND_UP8(num)(((num)+8)&~8)
 
-int	vj_vloopback_get_mode( void *vloop )
-{
-	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
-	return v->mode;
-}
-
 /* write mode*/
 int	vj_vloopback_start_pipe( void *vloop )
 {
@@ -178,10 +163,6 @@ int	vj_vloopback_start_pipe( void *vloop )
 	int uv_len = (v->width >> v->hshift ) * (v->height >> v->vshift);
 
 	v->size = len + (2 * uv_len);
-
-	if(v->mode != VLOOPBACK_PIPE)
-		veejay_msg(VEEJAY_MSG_ERROR,"Program error");
-
 
 	char *dbg = getenv( "VEEJAY_VLOOPBACK_DEBUG" );
 	if( dbg ) {
@@ -385,214 +366,6 @@ int	vj_vloopback_fill_buffer( void *vloop, uint8_t **frame )
 	return 1;
 }
 
-/*
-int	vj_vloopback_start_mmap( void *vloop )
-{
-	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
-	if(!v)
-	 return 0;
-	
-
-	int len = v->width * v->height ;
-	int hshift = (v->palette == 
-		VIDEO_PALETTE_YUV422P ? 0 : 1 );
-	int uv_len = (v->width >> hshift ) * (v->height >> 1);
-	v->size = len + (2 * uv_len);
-	v->out_buf = (uint8_t*) vj_malloc(
-			sizeof(uint8_t) * v->size * VLOOPBACK_N_BUFS );
-
-	if(!v->out_buf)
-		return 0;
-
-	v->out_map = mmap( 0,  (v->size * VLOOPBACK_N_BUFS), PROT_READ| PROT_WRITE,
-				MAP_SHARED, v->fd , 0 );
-	if( v->out_map == (uint8_t*) -1 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot mmap memory");
-		return 0;
-	}
-	veejay_msg(VEEJAY_MSG_ERROR, "%s", __FUNCTION__ );
-	return 1;
-}
-
-int	vj_vloopback_write_mmap( void *vloop, int frame )
-{
-	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
-	veejay_memcpy( v->out_map + (v->size * frame), v->out_buf, v->size );
-	return 1;
-}
-
-int	vj_vloopback_ioctl( void *vloop, unsigned long int cmd, void *arg )
-{
-	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d / %d",
-				__FUNCTION__, __LINE__ , cmd);
-
-	switch(cmd)
-	{
-		case VIDIOCGCAP:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-			struct video_capability *cap = arg;
-			sprintf( cap->name, "Veejay Digital Sampler");
-			cap->type = VID_TYPE_CAPTURE;
-			cap->channels = 1;
-			cap->audios = 0;
-			cap->maxwidth = v->width;
-			cap->maxheight = v->height;
-			cap->minwidth = v->width;
-			cap->minheight = v->height;
-			break;
-		}
-		case VIDIOCGTUNER:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-
-			struct video_tuner *tuner = arg;
-			sprintf( tuner->name, "Veejay Digital Sampler");
-			tuner->tuner = 0;
-			tuner->rangelow = 0;
-			tuner->rangehigh = 0;
-			tuner->flags = VIDEO_TUNER_PAL | VIDEO_TUNER_NTSC;
-			tuner->mode = (v->norm ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC);
-			tuner->signal = 0;
-			break;
-		}
-		case VIDIOCGCHAN:
-		{
-			struct video_channel *vidchan=arg;
-			vidchan->channel = 0;
-			vidchan->flags = 0;
-			vidchan->tuners = 0;
-			vidchan->type = VIDEO_TYPE_CAMERA;
-			strcpy(vidchan->name, "Veejay Dummy channel");
-			break;
-		}
-		case VIDIOCGPICT:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-
-			struct video_picture *vidpic=arg;
-
-			vidpic->colour = 0xffff;
-			vidpic->hue = 0xffff;
-			vidpic->brightness = 0xffff;
-			vidpic->contrast = 0xffff;
-			vidpic->whiteness = 0xffff;
-			
-			vidpic->palette = v->palette;
-			vidpic->depth = (
-					v->palette == VIDEO_PALETTE_YUV420P ?
-					12 : 16 );
-			break;
-		}
-		case VIDIOCSPICT:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-
-			struct video_picture *vidpic=arg;
-			if(vidpic->palette != v->palette )
-				veejay_msg(VEEJAY_MSG_ERROR,
-				 "requested palette %d, but only using %d now",
-					vidpic->palette, v->palette );
-			return 1;
-		}
-
-		case VIDIOCCAPTURE:
-		{
-				veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-	
-	break;
-		}
-
-		case VIDIOCGWIN:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-
-			struct video_window *vidwin=arg;
-
-			vidwin->x=0;
-			vidwin->y=0;
-			vidwin->width=v->width;
-			vidwin->height=v->height;
-			vidwin->chromakey=0; 
-			vidwin->flags=0;
-			vidwin->samplecount=0;
-			break;
-		}
-		case VIDIOCSWIN:
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot change size ! ");
-			break;
-		}
-
-		case VIDIOCGMBUF:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-
-			struct video_mbuf *vidmbuf=arg;
-			int i;
-			
-			vidmbuf->size = v->size;
-			vidmbuf->frames = VLOOPBACK_N_BUFS;
-
-			for (i=0; i < VLOOPBACK_N_BUFS; i++)
-				vidmbuf->offsets[i] = i * vidmbuf->size;
-			vidmbuf->size *= vidmbuf->frames;
-			break;
-		}
-
-		case VIDIOCMCAPTURE:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-
-			struct video_mmap *vidmmap=arg;
-
-			if ( vidmmap->format != v->palette )
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "capture palette not current palette!");
-				return 1;
-			}
-				
-			if (vidmmap->height != v->height ||
-			    vidmmap->width != v->width) {
-				veejay_msg(VEEJAY_MSG_ERROR, "caputure: invalid size %dx%d\n", vidmmap->width, vidmmap->height );
-				return 1;
-			}
-			break;
-		}
-		case VIDIOCSYNC:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-
-			struct video_mmap *vidmmap=arg;
-			if(!vj_vloopback_write_mmap( vloop, vidmmap->frame ))
-				return 1;
-			break;
-		}
-		default:
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "%s %d",
-				__FUNCTION__, __LINE__ );
-
-			veejay_msg(VEEJAY_MSG_ERROR, "ioctl %ld unhandled\n", cmd & 0xff);
-			break;
-		}
-
-
-	}
-	return 0;
-}
-*/
 void	vj_vloopback_close( void *vloop )
 {
 	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
@@ -606,60 +379,6 @@ void	vj_vloopback_close( void *vloop )
 			close( v->fd );
 		if(v->out_buf)
 			free(v->out_buf);
-/*		if(v->out_map)
-			munmap( v->out_map,
-					v->size * VLOOPBACK_N_BUFS );*/
 		free(v);
 	}
 }	
-
-/*
-void	vj_vloopback_signal_handler( void *vloop, int sig_no )
-{
-	int size,ret;
-	unsigned long int cmd;
-	struct pollfd ufds;
-	char ioctlbuf[1024];
-	
-	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
-
-	if(sig_no != SIGIO )
-		return;
-
-	
-	ufds.fd = v->fd;
-	ufds.events = POLLIN;
-	ufds.revents = 0;
-  
-	poll( &ufds, 1, 10 ); // 10 ms too small ?
-	
-	if( !ufds.revents & POLLIN )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,
-			"Received signal but got negative on poll");
-		return;
-	}
-
-	size = read( v->fd, ioctlbuf, 1024 );
-	if( size >= sizeof( unsigned long int )) 
-	{
-		veejay_memcpy( &cmd, ioctlbuf, sizeof(unsigned long int));
-		if( cmd == 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,
-				"Client closed device");
-			return;
-		}
-		ret = vj_vloopback_ioctl( vloop, cmd, ioctlbuf + sizeof( unsigned long int ));
-		if(ret)
-		{
-			memset( ioctlbuf + sizeof( unsigned long int ), 1024 - sizeof( unsigned long int ),0xff);
-			veejay_msg(VEEJAY_MSG_ERROR,
-				"IOCTL %d unsuccessfull", cmd & 0xff);
-		}
-		ioctl( v->fd, cmd, ioctlbuf + sizeof( unsigned long int ));
-	}
-	return ;
-}
-*/
-
