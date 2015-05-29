@@ -738,7 +738,7 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (a <= pixel_Y_lo_) {
+    if (a < 16) {
 	new_Y = pixel_Y_lo_;
     } else {
 	new_Y = 0xff - (((0xff - b) >> 8) / a);
@@ -828,7 +828,7 @@ uint8_t bl_pix_unfreeze_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (a < pixel_Y_lo_) {
+    if (a < 16) {
 	new_Y = pixel_Y_lo_;
     } else {
 	if(b > pixel_Y_hi_) b = pixel_Y_hi_;
@@ -1011,7 +1011,7 @@ uint8_t bl_pix_selunfreeze_Y(uint8_t y1, uint8_t y2)
     a = y1;
     b = y2;
     if (a > b) {
-	if (b < pixel_Y_lo_) {
+	if (b < 16) {
 	    new_Y = pixel_Y_lo_;
 	} else {
 	    if( a > pixel_Y_hi_ ) a = pixel_Y_hi_;

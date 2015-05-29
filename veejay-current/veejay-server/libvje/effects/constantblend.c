@@ -41,7 +41,7 @@ vj_effect *constantblend_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 31;
-    ve->limits[0][1] = 0;  // scale from 0.0 to 5.0 (only luma)
+    ve->limits[0][1] = 1;  // scale from 0.0 to 5.0 (only luma)
     ve->limits[1][1] = 500;
     ve->limits[0][2] = pixel_Y_lo_;
     ve->limits[1][2] = pixel_Y_hi_;
