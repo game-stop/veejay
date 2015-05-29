@@ -719,7 +719,7 @@ int main(int argc, char **argv)
    	if(info->dump)
  	{
 		veejay_set_colors(0);
-		vj_event_init();
+		vj_event_init(NULL);
 		vj_effect_initialize(720,576,0);
 		vj_osc_allocate(VJ_PORT+2);	
 		vj_event_dump();

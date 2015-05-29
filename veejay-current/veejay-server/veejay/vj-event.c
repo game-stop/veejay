@@ -472,7 +472,7 @@ static struct {
 	{ "'KP+' Up 1 position in FX chain\n"},
 	{ "-/+ Select mix-in source" },
 	{ "/ Toggle between stream and sample source"},
-	NULL
+	{ NULL }
 };
 
 
@@ -765,7 +765,6 @@ void vj_event_unregister_keyb_event(int key_id, int key_mod);
 void    vj_event_format_xml_event( xmlNodePtr node, int event_id );
 //void	vj_event_format_xml_stream( xmlNodePtr node, int stream_id );
 #endif
-void	vj_event_init(void);
 
 int	vj_has_video(veejay_t *v,editlist *el)
 {
@@ -2457,17 +2456,14 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 	int index = offset + symbol;
 	if( keyboard_event_exists( index ))
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG,
-			"Keboard binding %d + %d already exists", modifier, symbol);
 		vj_keyboard_event *ff = get_keyboard_event(index);
-		if(ff && value)
+		if(ff)
 		{
 			if(ff->arguments) free(ff->arguments);
-			ff->arguments = strdup(value);
-			ff->arg_len   = strlen(value);
-			veejay_msg( VEEJAY_MSG_DEBUG,
-			  "Updated arguments of keybinding %d+%d, (VIMS %03d:%s;) ",modifier,symbol, ff->event_id,
-				value);
+			if( value ) ff->arguments = strdup(value);
+			if( value ) ff->arg_len   = strlen(value); else ff->arg_len = 0;
+			ff->event_id = event_id;
+			veejay_msg( VEEJAY_MSG_DEBUG,"Updated keybinding %d + %d to VIMS %03d:%s;",modifier,symbol, ff->event_id, value);
 			return 1;
 		}
 		return 0;
@@ -2481,8 +2477,7 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 			ev->key_symbol = symbol;
 			ev->key_mod = modifier;
 			veejay_msg(VEEJAY_MSG_INFO,
-				"Updated Bundle ID %d with keybinding %d+%d",
-					 ev->event_id, modifier, symbol );
+				"Updated Bundle ID %d with keybinding %d+%d",ev->event_id, modifier, symbol );
 			return 1;
 		}
 	}
@@ -2519,7 +2514,11 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 	{
 		return 0;
 	}
-	
+	hnode_t *old = hash_lookup( keyboard_events, (void*) index );
+	if(old) {
+		hash_delete( keyboard_events, old );
+	}
+
 	hash_insert( keyboard_events, node, (void*) index );
 	
 	return 1;
@@ -2559,6 +2558,39 @@ char *find_keyboard_default(int id)
 	return result;
 }
 
+void	vj_event_load_keyboard_configuration(veejay_t *info)
+{
+	char path[1024];
+	snprintf(path,sizeof(path), "%s/keyboard.cfg", info->homedir);
+	FILE *f = fopen( path,"r" );
+	if(!f) {
+		veejay_msg(VEEJAY_MSG_WARNING,"No user defined keyboard configuration in %s", path );
+		return;
+	}
+
+	char msg[100];
+	int event_id = 0;
+	int key = 0;
+	int mod = 0;
+	int keyb_events = 0;
+	while( (fscanf( f, "%d,%d,%d,\"%[^\"]\"", &event_id,&key,&mod,msg ) ) == 4 ) {
+		if( vj_event_register_keyb_event(
+				event_id,
+				key,
+				mod,
+				msg ) ) {
+			keyb_events++;
+		} else {
+			veejay_msg(VEEJAY_MSG_ERROR,"VIMS event %03d does not exist", event_id );
+		}
+	}
+
+	if( keyb_events > 0 )
+		veejay_msg(VEEJAY_MSG_INFO,"Loaded %d keyboard events from %s", keyb_events, path );
+
+	fclose(f);
+}
+
 void	vj_event_init_keyboard_defaults()
 {
 	int i;
@@ -2583,7 +2615,7 @@ void	vj_event_init_keyboard_defaults()
 }
 #endif
 
-void vj_event_init()
+void vj_event_init(void *ptr)
 {
 	int i;
 #ifdef HAVE_SDL	
@@ -2612,8 +2644,11 @@ void vj_event_init()
 	vj_event_init_network_events();
 #ifdef HAVE_SDL
 	vj_event_init_keyboard_defaults();
+	if(ptr) vj_event_load_keyboard_configuration( (veejay_t*) ptr );
 #endif
 	init_vims_for_macro();
+
+	
 
 }
 
