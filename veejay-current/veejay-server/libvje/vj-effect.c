@@ -389,8 +389,8 @@ void *vj_effect_activate(int effect_id, int *result)
 
 	if( vj_effect_ready[seq] == 1 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s already initialized",
-			vj_effects[seq]->description);
+	//	veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s already initialized",
+		//	vj_effects[seq]->description);
 		*result = 1;
 		return NULL;
 	}
@@ -413,8 +413,8 @@ void *vj_effect_activate(int effect_id, int *result)
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Initialized complex effects %s",
-						vj_effects[seq]->description);
+		//		veejay_msg(VEEJAY_MSG_DEBUG, "Initialized complex effects %s",
+			//			vj_effects[seq]->description);
 				vj_effect_ready[seq] = 1;
 				*result = 1;
 				return NULL;
@@ -428,8 +428,8 @@ void *vj_effect_activate(int effect_id, int *result)
 		}
 		else
 		{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Initialized simple effect %s",
-						vj_effects[seq]->description);
+		//		veejay_msg(VEEJAY_MSG_DEBUG, "Initialized simple effect %s",
+		//				vj_effects[seq]->description);
 				vj_effect_ready[seq]= 1;
 				*result = 1;
 				return NULL;
@@ -453,8 +453,6 @@ int vj_effect_deactivate(int effect_id, void *ptr)
 			return 0;
 		}
 	
-
-	
 	if( seq >= MAX_EFFECTS && seq < (n_ext_plugs_ + MAX_EFFECTS))
 	{
 		if(ptr) 
@@ -473,12 +471,12 @@ int vj_effect_deactivate(int effect_id, void *ptr)
 				}
 				complex_effect_index[index].free( vj_effects[seq]->user_data );
 				vj_effect_ready[seq] = 0;
-				veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated complex effect %s",	vj_effects[seq]->description);
+		//		veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated complex effect %s",	vj_effects[seq]->description);
 				return 1;
 			}
 			simple_effect_index[index].free();
 			vj_effect_ready[seq] = 0;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated simple effect %s", vj_effects[seq]->description);
+		//	veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated simple effect %s", vj_effects[seq]->description);
 			return 1;
 		}
 	}
@@ -513,12 +511,6 @@ void vj_effect_initialize(int width, int height, int full_range)
 		veejay_msg(VEEJAY_MSG_WARNING,"Video width should be a multiple of 32 for some effects" );
 	}
 
-   /* 
-    n_ext_plugs_ = plug_detect_plugins();
-
-    if( n_ext_plugs_  > 0 )
-	plug_init( width,height );
-*/
     for(k=0; k  < MAX_EFFECTS; k++)
 	vj_effects[k] = NULL;
 

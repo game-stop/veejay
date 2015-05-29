@@ -1458,7 +1458,7 @@ char **vevo_list_properties(vevo_port_t * p)
 	if( n <= 0 )
 		return NULL;
 
-    list = (char **) malloc(sizeof(char *) * (n+1) );
+    list = (char **) vj_malloc(sizeof(char *) * (n+1) );
     if (!list)
 		return NULL;
 
@@ -1550,7 +1550,7 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
     unsigned int N = 8;	// null terminated list of keys 2 -> 4 -> 8 -> 16 etc
     int idx = 0;
 
-    vevo_storage_t **list = (vevo_storage_t**)malloc(sizeof(vevo_storage_t*) * N );
+    vevo_storage_t **list = (vevo_storage_t**)vj_malloc(sizeof(vevo_storage_t*) * N );
 
     if( port->table)
     {
@@ -1747,7 +1747,7 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 	if(!item)
 	{
 		vevo_port_free_( port );
-		free(item);
+		port = NULL;
 		return;
 	}
 
@@ -1843,7 +1843,7 @@ static	char	*vevo_property_get_str( vevo_port_t *port, const char *key )
   	size_t len = vevo_property_element_size( port, key,0 );
         char *ret = NULL;
         if(len<=0) return NULL;
-        ret = (char*) malloc(sizeof(char) * len );
+        ret = (char*) vj_malloc(sizeof(char) * len );
         vevo_property_get( port, key, 0, &ret );
         return ret;
 }
@@ -2857,7 +2857,7 @@ int		vevo_property_clone( void *port, void *to_port, const char *key, const char
 		case VEVO_ATOM_TYPE_INT:
 		case VEVO_ATOM_TYPE_BOOL:
 			{
-				int32_t *tmp = (int32_t*) malloc(sizeof(int32_t) * n );
+				int32_t *tmp = (int32_t*) vj_malloc(sizeof(int32_t) * n );
 				for(i = 0; i < n; i ++ ) {
 					if( vevo_property_get( port, key, i, &(tmp[i])) != VEVO_NO_ERROR ) {
 						free(tmp);
@@ -2877,7 +2877,7 @@ int		vevo_property_clone( void *port, void *to_port, const char *key, const char
 			break;
 		case VEVO_ATOM_TYPE_DOUBLE:
 			{
-				double *tmp = (double*) malloc(sizeof(double) * n );
+				double *tmp = (double*) vj_malloc(sizeof(double) * n );
 				for(i = 0; i < n; i ++ ) {
 					if( vevo_property_get( port, key, i, &(tmp[i])) != VEVO_NO_ERROR ) {
 						free(tmp);
@@ -2898,7 +2898,7 @@ int		vevo_property_clone( void *port, void *to_port, const char *key, const char
 			break;
 		case VEVO_ATOM_TYPE_UINT64:
 			{
-				uint64_t *tmp = (uint64_t*) malloc(sizeof(uint64_t) * n );
+				uint64_t *tmp = (uint64_t*) vj_malloc(sizeof(uint64_t) * n );
 				for(i = 0; i < n; i ++ ) {
 					if( vevo_property_get( port, key, i, &(tmp[i])) != VEVO_NO_ERROR ) {
 						free(tmp);

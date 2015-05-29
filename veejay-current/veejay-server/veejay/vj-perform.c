@@ -371,17 +371,8 @@ static	int	vj_perform_try_sequence( veejay_t *info )
 
 static	void	seq_play_sample( veejay_t *info, int n)
 {
-
 	info->seq->current = n;
-
 	int id = info->seq->samples[n];
-
-	if(id)
-	{
-		sample_chain_free( info->uc->sample_id );
-		sample_chain_malloc( id );
-	}
-
 	int which_sample = 0;
 	int offset = sample_get_first_mix_offset( info->uc->sample_id, &which_sample, info->seq->samples[info->seq->current] );
 

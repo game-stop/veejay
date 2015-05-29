@@ -48,7 +48,7 @@ void	vevo_pool_free( void *pool, void *ptr, unsigned int k );
 void	*vevo_pool_init(size_t property_size, size_t stor_size, size_t atom_size, size_t index_size);
 void	vevo_pool_destroy( void *p );
 void	vevo_pool_slice_destroy( void *p );
-void	*vevo_pool_slice_init( size_t node_size );
+//void	*vevo_pool_slice_init( size_t node_size );
 void	*vevo_pool_slice_alloc( void *pool, size_t bs);
 void	vevo_pool_slice_free( void *pool, void *ptr );
 

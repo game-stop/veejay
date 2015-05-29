@@ -96,19 +96,6 @@ void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t
 	return (void*)p;
 }
 
-//! Allocate a new pool with a single space of a fixed size
-/*!
- \param node_size size in bytes of a single block
- \return A new pool with a single space
- */
-void	*vevo_pool_slice_init( size_t node_size )
-{
-	pool_t *p = (pool_t*) malloc(sizeof(pool_t));
-	p->spaces = NULL;
-	p->space = alloc_space( node_size );
-	return p;	
-}
-
 //! Get a pointer to the starting address of an unused block. Pops a round from the magazine and creates a new space if magazine is empty. 
 /*!
  \param p pointer to pool_t structure

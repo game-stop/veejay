@@ -1937,7 +1937,7 @@ int sample_chain_malloc(int s1)
 		if(res)	sum++;
 	}
     } 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Allocated %d effects",sum);
+//    veejay_msg(VEEJAY_MSG_DEBUG, "Allocated %d effects",sum);
     return sum; 
 }
 
@@ -1966,7 +1966,10 @@ int sample_chain_free(int s1)
 			vj_tag_disable( sample->effect_chain[i]->channel );
 		}
 	 }
-   }  
+   } 
+
+// 	veejay_msg(VEEJAY_MSG_DEBUG, "Freed %d effects",sum);
+
     return sum;
 }
 

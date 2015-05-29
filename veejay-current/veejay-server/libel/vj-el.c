@@ -432,8 +432,9 @@ void	vj_el_setup_cache( editlist *el )
 void	vj_el_clear_cache( editlist *el )
 {
 	if( el != NULL ) {
-		if(el->cache)
+		if(el->cache) {
 			reset_cache(el->cache);
+		}
 	}
 }
 

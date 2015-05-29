@@ -1,6 +1,5 @@
 /* veejay - Linux VeeJay - libplugger utility
- *           (C) 2010      Niels Elburg <nwelburg@gmail.com> ported from veejay-ng
- * 	     (C) 2002-2006 Niels Elburg <nwelburg@gmail.com> 
+ *			 (C) 2002-2015 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -42,7 +41,6 @@
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include <stdlib.h>
-//#include <veejay/oscservit.h>
 #include <libplugger/utility.h>
 #include <libplugger/livido-loader.h>
 #include <libsubsample/subsample.h>
@@ -52,8 +50,8 @@
 
 #define IS_RGB_PALETTE( p ) ( p < 512 ? 1 : 0 )
 
-void    livido_dummy_function() {
-
+void    livido_dummy_function()
+{	
 }
    
 static	char	make_valid_char_( const char c )
@@ -145,9 +143,7 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 				
 			}
 		}
-	
 	}
-
 	
 	return 1;
 }
@@ -365,17 +361,16 @@ static	int	livido_scan_out_parameters( void *plugin , void *plugger_port)
 
 	for( n = 0; n < NP; n ++ )
 	{
-		char key[20];
+		char key[16];
 		void *param = NULL;
 
 		if( vevo_property_get( plugin, "out_parameter_templates", n, &param ) != VEVO_NO_ERROR )
 			continue;
 
-		sprintf(key, "p%02d", n );
+		snprintf(key,sizeof(key), "p%02d", n );
 
 		int ikind = 0;
 		char *kind = vevo_property_get_string( param, "kind" );
-		//get_str_vevo( param, "kind" );
 
 		ikind = livido_pname_to_host_kind(kind);
 
@@ -573,8 +568,6 @@ static	int	init_channel_port(livido_port_t *ptr, livido_port_t *in_channel, int 
 	return 1;
 }
 
-//@ w x h as HOST_width, HOST_height
-/* utility function to instantiate a port from a template, only sets parent_template */
 static	int	init_ports_from_template( livido_port_t *filter_instance, livido_port_t *template, int id, const char *name, const char *iname, int w, int h, int host_palette )
 {
 	int num = 0;
@@ -585,27 +578,25 @@ static	int	init_ports_from_template( livido_port_t *filter_instance, livido_port
 	if( error != VEVO_NO_ERROR )
 		return 0;
 	
-        num = livido_property_num_elements( template, name );
+    num = livido_property_num_elements( template, name );
 
-        if(num <= 0)
-                return 0;
+    if(num <= 0)
+		return 0;
 
-        livido_port_t *in_channels[num];
+    livido_port_t *in_channels[num];
 
 	for( i = 0; i < num;  i ++ )
-        {
-                livido_port_t *ptr = NULL;
-                error = livido_property_get( template, name, i, &ptr );
-                in_channels[i] = vpn( id ); //@ is this ever freed?!
-		livido_property_set( in_channels[i], "parent_template",LIVIDO_ATOM_TYPE_PORTPTR,1, &ptr);
+    {
+		livido_port_t *ptr = NULL;
+		error = livido_property_get( template, name, i, &ptr );
+		in_channels[i] = vpn( id ); 
+		livido_property_set( in_channels[i], "parent_template",LIVIDO_ATOM_TYPE_VOIDPTR,1, &ptr);
 		livido_property_soft_reference( in_channels[i], "parent_template" );
-;
 		if( id == LIVIDO_PORT_TYPE_CHANNEL )
 		{
 			if(!init_channel_port( ptr,in_channels[i],w,h))
 			{
-			       veejay_msg(0,
-					       "Unable to intialize output channel %d ",i );
+				   veejay_msg(0,"Unable to intialize output channel %d ",i );
 			       return -1;	
 			}
 		}
@@ -618,12 +609,8 @@ static	int	init_ports_from_template( livido_port_t *filter_instance, livido_port
 			}
 		}
 	}
-
         
 	livido_property_set( filter_instance, iname, LIVIDO_ATOM_TYPE_PORTPTR,num, in_channels );
-
-//	veejay_msg(0, "%s --> %s",__FUNCTION__, name);
-//	livido_property_soft_reference( filter_instance, name );
 
 	return num;
 }
@@ -832,16 +819,13 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 	} 
 
 	if( (*init_f)( (livido_port_t*) filter_instance ) != LIVIDO_NO_ERROR ) {
-		veejay_msg(0, "Error while initializating Livido filter");
+		veejay_msg(0, "Error while initializing Livido filter");
 		livido_port_recursive_free( filter_instance );
 		return NULL;
-		//@ FIXME: leak
 	}
 
 	//@ ok, finish
-	vevo_property_set( filter_instance, "filter_templ", VEVO_ATOM_TYPE_PORTPTR,1, &filter_templ );
-	vevo_property_soft_reference( filter_instance, "filter_templ" );
-
+	vevo_property_set( filter_instance, "filter_templ", VEVO_ATOM_TYPE_VOIDPTR,1, &filter_templ );
 
 	//@ prepare function pointers for plugloader to call
 	generic_process_f	gpf = livido_plug_process;
@@ -920,43 +904,18 @@ void	livido_plug_process( void *instance, double time_code )
 
 void	livido_plug_deinit( void *instance )
 {
-	void *filter_templ = NULL;	
-	int error = vevo_property_get( instance, "filter_templ", 0, &filter_templ );
-	if( error != VEVO_NO_ERROR ) {
-		livido_port_recursive_free( instance );
-		instance = NULL;
-		return;
-	}
-
 	livido_deinit_f deinit;
-	error = vevo_property_get( filter_templ, "HOST_plugin_deinit_func", 0, &deinit );
-	if( error != VEVO_NO_ERROR ) {
-		livido_port_recursive_free( instance );
-		instance = NULL;
-		return;
+	void *filter_templ = NULL;
+	if( vevo_property_get( instance, "filter_templ",0,&filter_templ) == VEVO_NO_ERROR ) {
+		if( vevo_property_get( filter_templ, "deinit_func", 0, &deinit ) == VEVO_NO_ERROR ) {
+				(*deinit)( instance );
+		}
 	}
 
-	if( error == VEVO_NO_ERROR )
-		(*deinit)( instance );
-	
-	int n;
-	int np = vevo_property_num_elements( instance, "in_channels" );
-	
-	for( n = 0; n < np ; n ++ )
-	{
-		void *ic = NULL;
-		int   hs = 0;
-		error = vevo_property_get( instance, "in_channels",n, &ic );
-	}
-
-	void *channel = NULL;
-	int hsampling = 0;
-	error = vevo_property_get( instance, "out_channels", 0, &channel );
-	
 	livido_port_recursive_free( instance );
-	
 	instance = NULL;
 }
+
 //get plugin defaults
 void	livido_plug_retrieve_values( void *instance, void *fx_values )
 {
@@ -971,7 +930,7 @@ void	livido_plug_retrieve_values( void *instance, void *fx_values )
 
 		error = vevo_property_get( param, "parent_template", 0, &param_templ );
 
-		sprintf(vkey, "p%02d", i );
+		snprintf(vkey,sizeof(vkey), "p%02d", i );
 		clone_prop_vevo( param_templ, fx_values, "default", vkey );
 	}
 }
@@ -991,7 +950,7 @@ int	livido_plug_read_output_parameters( void *instance, void *fx_values )
 		void *param_templ = NULL;
 
 		int error = vevo_property_get( instance, "out_parameters", i, &param );
-		sprintf(vkey, "p%02d", i );
+		snprintf(vkey,sizeof(vkey), "p%02d", i );
 		clone_prop_vevo( param, fx_values, "value", vkey);
 
 	}
@@ -1054,7 +1013,7 @@ int	livido_set_parameter_from_string( void *instance, int p, const char *str, vo
 	error = vevo_property_get( param_templ, "HOST_kind",0,&kind );
 	int res = 0;
 	char vkey[64];
-	sprintf(vkey, "p%02d", p );
+	snprintf(vkey,sizeof(vkey), "p%02d", p );
 
 	switch(kind)
 	{
@@ -1091,7 +1050,7 @@ void	livido_reverse_clone_parameter( void *instance, int seq, void *fx_value_por
 		char	vkey[10];
 		void *param = NULL;
 		int error = vevo_property_get( instance, "in_parameters", i, &param);
-		sprintf(vkey, "p%02d", i );
+		snprintf(vkey,sizeof(vkey), "p%02d", i );
 		clone_prop_vevo( param, fx_value_port, vkey, "value"  );
 	}
 }
@@ -1105,12 +1064,9 @@ void	livido_clone_parameter( void *instance, int seq, void *fx_value_port )
 		char	vkey[10];
 		void *param = NULL;
 		int error = vevo_property_get( instance, "in_parameters", i, &param);
-		sprintf(vkey, "p%02d", i );
+		snprintf(vkey,sizeof(vkey), "p%02d", i );
 		clone_prop_vevo( fx_value_port, param,vkey, "value"  );
-	//	clone_prop_vevo( param, fx_value_port, vkey, "value" );
 	}
-
-	
 }
 
 static void	livido_notify_parameter_update( void *instance ,void *param, void *value )
@@ -1205,29 +1161,27 @@ void*	deal_with_livido( void *handle, const char *name )
 	livido_setup_f livido_setup = dlsym( handle, "livido_setup" );
 
 	livido_setup_t setup[] = {
-		{	(void(*)())vj_malloc_ 			},	
-		{	(void(*)())free				},
-		{	(void(*)())veejay_memset		},
-	        {	(void(*)())veejay_memcpy		},
-	        {	(void(*)())vevo_port_new		},
-     		{	(void(*)())vevo_port_free		},
-     	  	{	(void(*)())vevo_property_set		},
-    		{	(void(*)())vevo_property_get		},
+		{	(void(*)())vj_malloc_					},	
+		{	(void(*)())free							},
+		{	(void(*)())veejay_memset				},
+	    {	(void(*)())veejay_memcpy				},
+	    {	(void(*)())vevo_port_new				},
+		{	(void(*)())vevo_port_free				},
+     	{	(void(*)())vevo_property_set			},
+		{	(void(*)())vevo_property_get			},
  		{	(void(*)())vevo_property_num_elements	},
-       		{	(void(*)())vevo_property_atom_type	},
-       		{	(void(*)())vevo_property_element_size	},
-        	{	(void(*)())vevo_list_properties		},
-		{	(void(*)())livido_dummy_function	},
-		{ 	(void(*)())livido_dummy_function 	},
-
-
+       	{	(void(*)())vevo_property_atom_type		},
+       	{	(void(*)())vevo_property_element_size	},
+        {	(void(*)())vevo_list_properties			},
+		{	(void(*)())livido_dummy_function		},
+		{ 	(void(*)())livido_dummy_function		},
 	};
+
 	void *livido_plugin = livido_setup( setup, LIVIDO_API_VERSION );
 	
 	if(!livido_plugin)
 	{
-	//	( port );		//FIXME leak
-
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load livido plugin '%s'",name);
 		return NULL;
 	}
 
@@ -1238,7 +1192,6 @@ void*	deal_with_livido( void *handle, const char *name )
 	void *filter_templ = NULL;
 	if(vevo_property_get( livido_plugin, "filters",0,&filter_templ) != VEVO_NO_ERROR ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Plugin %s does not have a filter template",name );
-		free(plugin_name);
 		return NULL;
 	}
 	
@@ -1271,11 +1224,10 @@ void*	deal_with_livido( void *handle, const char *name )
 	int n_params = livido_scan_parameters( filter_templ, port );
 	int n_oparams = livido_scan_out_parameters( filter_templ, port );
 	
-//@ p%02d is a key with a portptr value. it contains min,max,defaults for each plugin setup()	
 	int n_inputs = livido_property_num_elements( filter_templ, "in_channel_templates" );
 	int n_outputs = livido_property_num_elements( filter_templ, "out_channel_templates" );
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Loading LiVIDO-%d plugin '%s' , %d IP, %d OP" , compiled_as, plugin_name, n_params, n_oparams );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Loading LiVIDO-%d plugin '%s'" , compiled_as, plugin_name);
 	
 	char *clone_name = (char*) vj_malloc( strlen(plugin_name) + 5);
 	sprintf(clone_name, "LVD %s", plugin_name );
@@ -1288,7 +1240,6 @@ void*	deal_with_livido( void *handle, const char *name )
 	vevo_property_set( port, "info", LIVIDO_ATOM_TYPE_PORTPTR,1,&filter_templ );
 	vevo_property_softref( port, "info" );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&livido_signature_);
-
 
 	free(clone_name);
 	free(plugin_name);	

@@ -74,7 +74,7 @@ void bathroom_free() {
 	int i;	
 	for( i = 0; i < 3 ; i ++ ) { 
  		if(bathroom_frame[i])
-			free(bathroom_frame[0]);
+			free(bathroom_frame[i]);
 		bathroom_frame[i] = NULL;
 	}
 }

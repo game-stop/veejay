@@ -150,10 +150,17 @@ long	cache_avail_mb()
 void	free_cache(void *cache)
 {
 	cache_t *v = (cache_t*) cache;	
-	reset_cache( cache );	
-	free(v->cache);
-	free(v->index);
-	free(v);
+	if(v->cache) {
+		free(v->cache);
+		v->cache = NULL;
+	}
+	if(v->index) {
+		free(v->index);
+		v->index = NULL;
+	}
+	if(v) {
+		free(v);
+	}
 	v = NULL;
 }
 

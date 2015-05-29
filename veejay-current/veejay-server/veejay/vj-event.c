@@ -2973,6 +2973,7 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 			int form_len = (form ? strlen(form)  : 0);
 #ifdef HAVE_SDL
 			vims_key_list *tree = vj_event_get_keys( i );
+			vims_key_list *root = tree;
 			while( tree != NULL )
 			{
 				vims_key_list *this = tree;
@@ -2987,19 +2988,21 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 					veejay_strncat( buf, tree->args, tree->arg_len );
 				tree = tree->next;
 			}
-
+			if(root)
+				free(root);
 #endif
-			free(name);
+			if(name)
+				free(name);
+
 			if(form)
 				free(form);
-
 		}
 	}
 
 	int  pack_len = strlen( buf );
 	char header[7];
 	
-	sprintf(header, "%06d", pack_len );
+	snprintf(header, sizeof(header),"%06d", pack_len );
 	
 	SEND_MSG(v, header);
 	SEND_MSG(v,buf);
