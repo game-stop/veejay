@@ -740,6 +740,10 @@ int vj_perform_init(veejay_t * info)
 			( mlock_success ? "is not going to be" : "may be" )
 		); 
 
+	if( info->uc->scene_detection ) {
+		vj_el_auto_detect_scenes( info->edit_list, temp_buffer, w,h, info->uc->scene_detection );
+	}
+
 	return 1;
 }
 

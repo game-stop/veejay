@@ -1374,6 +1374,49 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long
 }
 
 
+int	vj_el_auto_detect_scenes( editlist *el, uint8_t *tmp[4], int w, int h, int dl_threshold )
+{
+	long n1 = 0;
+	long n2 = el->total_frames;
+	long n;
+	int dl = 0;
+	int last_lm = 0;
+	int index = 0;
+	long max = (el->total_frames/2) -1;
+	long prev = 0;
+
+	if( el == NULL || el->is_empty || el->total_frames < 2 )
+		return 0;
+
+	for( n = n1; n < n2; n ++ ) {
+		vj_el_get_video_frame(el, n, tmp );
+		int lm = luminance_mean( tmp, w, h );
+		if( n == 0 ) {
+			dl = 0;
+		}
+		else {
+			dl = abs( lm - last_lm );
+		}
+		last_lm = lm;
+
+		veejay_msg(VEEJAY_MSG_DEBUG,"frame %ld/%ld luminance mean %d, delta %d ", n, n2, lm, dl );
+
+		if( dl > dl_threshold ) {
+
+			if( prev == 0 ) {
+				sample_new_simple(el,0,n);
+				veejay_msg(VEEJAY_MSG_INFO,"sampled frames %ld - %ld", 0,n);
+			} else {
+				sample_new_simple(el,prev,n);
+				veejay_msg(VEEJAY_MSG_INFO,"sampled frames %ld - %ld", prev, n );
+			}
+
+			prev = n;
+			index ++;
+		}	
+	}
+	return index;
+}
 
 editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force,char norm , int out_format, int width, int height)
 {

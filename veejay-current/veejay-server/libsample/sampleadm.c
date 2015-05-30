@@ -337,6 +337,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     return si;
 }
 
+
+
 int sample_store(sample_info * skel)
 {
     hnode_t *sample_node;
@@ -357,6 +359,15 @@ int sample_store(sample_info * skel)
 	hnode_put(sample_node, (void *) skel->sample_id);
     }
     return 0;
+}
+
+void 	sample_new_simple( void *el, long start, long end )
+{
+	sample_info *sample = sample_skeleton_new(start,end);
+	if(sample) {
+		sample->edit_list = el;
+		sample_store(sample);
+	}
 }
 
 /****************************************************************************************************

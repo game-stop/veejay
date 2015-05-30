@@ -294,6 +294,8 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  --qrcode-connection-info\tEncode veejay's external IP and port number into QR code\n" );
 #endif
+	fprintf(stderr,
+		"  -S/--scene-detection <num>\tCreate new samples based on scene detection threshold <num>\n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
@@ -412,8 +414,13 @@ static int set_option(const char *name, char *value)
     } else if (strcmp(name, "size") == 0 || strcmp(name, "s") == 0) {
 	if (sscanf(value, "%dx%d", &info->bes_width, &info->bes_height) !=
 	    2) {
-	    fprintf(stderr,"-S/--size parameter requires NxN argument\n");
+	    fprintf(stderr,"-s/--size parameter requires NxN argument\n");
 	    nerr++;
+	}
+     } else if (strcmp(name,"scene-detection" ) == 0 || strcmp( name,"S") == 0 ) {
+	if ((sscanf(value, "%d", &info->uc->scene_detection )) != 1 ) {
+		fprintf(stderr, "-S/--scene-detection requires threshold argument\n");
+		nerr++;
 	}
      }
 #ifdef HAVE_XINERAMA
@@ -574,6 +581,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"swap-range",0,0,0},
 	{"load-generators",1,0,0},
 	{"qrcode-connection-info",0,0,0},
+	{"scene-detection",1,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -587,12 +595,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:S:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:S:"
 						   )) != EOF)
 #endif
     {

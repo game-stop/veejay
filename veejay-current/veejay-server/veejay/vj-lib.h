@@ -252,6 +252,7 @@ typedef struct {
     int geox;
     int geoy;
     int file_as_sample;
+    int scene_detection;
     int mouse[4];
     char *osd_extra;
 } user_control;

@@ -192,6 +192,7 @@ extern int sample_set_state(int new_state);
 extern int sample_get_state();
 extern sample_info *sample_skeleton_new(long startFrame, long endFrame);
 extern sample_info *sample_get(int sample_id);
+void 	sample_new_simple( void *el, long start, long end );
 extern int sample_store(sample_info * skel);
 extern int sample_is_deleted(int s1);
 extern int sample_exists(int sample_id);
