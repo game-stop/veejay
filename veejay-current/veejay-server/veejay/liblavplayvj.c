@@ -1722,7 +1722,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		y = info->uc->geoy;
 	}
 
-	vj_event_init();
+	vj_event_init((void*)info);
 
 	switch (info->uc->use_timer)
 	{
