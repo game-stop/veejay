@@ -1277,6 +1277,8 @@ int vj_tag_del(int id)
 		break;
     }
   
+	vj_tag_chain_free( tag->id );
+
 	if(tag->encoder_active)
 		vj_tag_stop_encoder( tag->id );	
     if(tag->source_name) 

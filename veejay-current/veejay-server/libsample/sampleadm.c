@@ -887,6 +887,9 @@ int sample_del(int sample_id)
     sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
     if (sample_node) {
 	    int i;
+
+	    sample_chain_free( sample_id );
+
 	    if(si->soft_edl == 0 && si->edit_list != NULL)
  	 	   vj_el_break_cache( si->edit_list ); //@ destroy cache, if any
 
@@ -895,12 +898,12 @@ int sample_del(int sample_id)
 		if( si->effect_chain[i]->kf )
 			vpf( si->effect_chain[i]->kf );
 	    }
-	//@  *sample_eff_chain -> &addr[0]
 	    if( si->effect_chain[0] )
 			free(si->effect_chain[0]);
   
 	    if(si->edit_list)
 		{
+			//FIXME: if edit_list is not shared it can be freed
 			//vj_el_free(si->edit_list);
 			si->edit_list = NULL;
 		}
