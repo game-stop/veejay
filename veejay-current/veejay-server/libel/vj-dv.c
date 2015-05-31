@@ -24,6 +24,7 @@
 #ifdef SUPPORT_READ_DV2
 #include <libdv/dv.h>
 #include <stdint.h>
+#include <libvje/vje.h>
 #include <libel/vj-dv.h>
 #include <libel/vj-avcodec.h>
 #include <libyuv/yuvconv.h> 
