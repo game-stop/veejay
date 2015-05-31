@@ -423,7 +423,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 
                 yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
 
-		if( yuv_use_auto_ccir_jpeg() && fmt == PIX_FMT_YUVJ422F) {
+		if( yuv_use_auto_ccir_jpeg() && fmt == PIX_FMT_YUVJ422) {
 			yuv_scale_pixels_from_ycbcr(
 					Y, 16.0f, 235.0f, width * height);
 			yuv_scale_pixels_from_ycbcr(
