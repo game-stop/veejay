@@ -206,5 +206,5 @@ void chromascratcher_apply(VJFrame *frame,
 	}
 
 
-	chromastore_frame(frame->data, width, height, n, no_reverse);
+	chromastore_frame(frame, width, height, n, no_reverse);
 }

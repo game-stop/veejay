@@ -45,7 +45,7 @@ vj_effect *gamma_init(int w, int h)
 	return ve;
 }
 
-inline void gamma_setup(int width, int height,
+static void gamma_setup(int width, int height,
 			double gamma_value)
 {
     int i;
