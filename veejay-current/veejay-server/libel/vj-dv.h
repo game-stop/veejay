@@ -43,7 +43,7 @@ typedef struct
 
 vj_dv_decoder *vj_dv_decoder_init(int quality,int width, int height, int pixel_format);
 
-vj_dv_encoder *vj_dv_init_encoder(VJFrame *frame, int pixel_format, int isPAL);
+vj_dv_encoder *vj_dv_init_encoder(void *ptr, int pixel_format);
 
 void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf);
 

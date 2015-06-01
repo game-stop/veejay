@@ -70,13 +70,13 @@ vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_
 static	sws_template dv_templ;
 
 /* init the dv encoder and encode buffer */
-vj_dv_encoder *vj_dv_init_encoder(void * edl, int pixel_format, int isPAL)
+vj_dv_encoder *vj_dv_init_encoder(void *ptr, int pixel_format)
 {
-	VJFrame *frame = (VJFrame*) edl;
+	VJFrame *frame = (VJFrame*) ptr;
 	vj_dv_encoder *e = (vj_dv_encoder*) vj_malloc(sizeof(vj_dv_encoder));
 	if(!e) return NULL;
 	e->encoder = dv_encoder_new(0,0,0);
-	e->encoder->isPAL = isPAL;
+	e->encoder->isPAL = (frame->height == 480 ? 0 : 1 );
 	e->encoder->is16x9 = (frame->width / frame->height >= 1.777 ? 1: 0);
 	e->encoder->vlc_encode_passes = 3;
     	e->encoder->static_qno = 0;
@@ -388,7 +388,6 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 		pitches[1] = 0;
 		pitches[2] = 0;
 		int offset = ( d->decoder->sampling == e_dv_sample_411 ? width /4 : width /2) * height;
-		uint8_t *frame[3] = { Y , Cb, Cr };
 		uint8_t *pixels[3] = { d->dv_video, d->dv_video + (width * height),
 	       		d->dv_video + (width * height ) + offset	};
 
@@ -423,7 +422,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 
                 yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
 
-		if( yuv_use_auto_ccir_jpeg() && fmt == PIX_FMT_YUVJ422) {
+		if( yuv_use_auto_ccir_jpeg() && fmt == PIX_FMT_YUVJ422P) {
 			yuv_scale_pixels_from_ycbcr(
 					Y, 16.0f, 235.0f, width * height);
 			yuv_scale_pixels_from_ycbcr(
