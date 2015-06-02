@@ -3253,29 +3253,33 @@ int sample_read_edl( sample_info *sample )
 {
 	char *files[1];
 	int res = 0;
-	files[0] = strdup(sample->edit_list_file);
-	if(sample->edit_list)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cleanup old editlist");
-		vj_el_free(sample->edit_list);
-	}
+	files[0] = sample->edit_list_file;
+
+	void *old = sample->edit_list;
+
+	//EDL is stored in CWD, samplelist file can be anywhere. Cannot always load samplelists due to
+	//    missing EDL files in CWD.
+	veejay_msg(VEEJAY_MSG_DEBUG, "Loading '%s' from current working directory" , files[0] );
+
 	sample->edit_list = vj_el_init_with_args( files,1,
 			__sample_project_settings.flags,
 			__sample_project_settings.deinterlace,
 			__sample_project_settings.force,
 			__sample_project_settings.norm,
 			__sample_project_settings.fmt,
-		        __sample_project_settings.width,
+		    __sample_project_settings.width,
 			__sample_project_settings.height);
 
 	if(sample->edit_list)
 	{
 		res = 1;
 		sample->soft_edl = 0;
+		vj_el_free( old );
 	}
-	if(files[0])
-		free(files[0]);
-
+	else 
+	{
+		sample->edit_list = old;
+	}
 
 	return res;
 }
