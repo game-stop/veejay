@@ -902,15 +902,10 @@ int sample_del(int sample_id)
 	    if( si->effect_chain[0] )
 			free(si->effect_chain[0]);
   
-	    if(si->edit_list)
-		{
-			//FIXME: if edit_list is not shared it can be freed
-			//vj_el_free(si->edit_list);
-			si->edit_list = NULL;
-		}
 	    if(si->encoder_destination )
 			free(si->encoder_destination );
-	   	if(si->edit_list_file)
+	   	
+		if(si->edit_list_file)
 			free( si->edit_list_file );
 #ifdef HAVE_FREETYPE
 	    if( si->dict )
