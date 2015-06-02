@@ -403,6 +403,8 @@ int veejay_free(veejay_t * info)
 		vj_el_free(info->current_edit_list);	
 	}
 
+	vj_el_free(info->edit_list);
+
 	vj_el_deinit();
 
 //	vj_tag_free();
