@@ -261,8 +261,6 @@ further:
 		hei = x->codec_ctx->height;
 	}
 
-	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
-
 #if LIBAVCODEC_BUILD > 5400
 	if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
 #else
@@ -275,6 +273,7 @@ further:
 
 	veejay_memset( &(x->pkt), 0, sizeof(AVPacket));
 	AVFrame *f = avcodec_alloc_frame();
+	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
 
 	int got_picture = 0;
 	while( (av_read_frame(x->avformat_ctx, &(x->pkt)) >= 0 ) ) {
@@ -291,6 +290,7 @@ further:
 		free_av_packet(&(x->pkt)); 
 		avcodec_close( x->codec_ctx );
 		avhelper_close_input_file( x->avformat_ctx );
+		free(x->output);
 		free(x);
 		return NULL;
 	}
@@ -315,6 +315,8 @@ further:
 		free_av_packet(&(x->pkt)); 
 		avcodec_close( x->codec_ctx );
 		avhelper_close_input_file( x->avformat_ctx );
+		free(x->output);
+		free(x->input);
 		free(x);
 		return NULL;
 	}
@@ -328,6 +330,12 @@ void	avhelper_close_decoder( void *ptr )
 	avcodec_close( e->codec_ctx );
 	avhelper_close_input_file( e->avformat_ctx );
 	yuv_free_swscaler( e->scaler );
+	if(e->input)
+		free(e->input);
+	if(e->output)
+		free(e->output);
+	if(e->frame)
+		av_free(e->frame);
 	free(e);
 }
 
