@@ -3274,7 +3274,7 @@ int sample_read_edl( sample_info *sample )
 	{
 		res = 1;
 		sample->soft_edl = 0;
-		vj_el_free( old );
+		if( old ) vj_el_free( old );
 	}
 	else 
 	{
