@@ -133,8 +133,10 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt, int use_key, int use_mou
     VJFrame *src = yuv_yuv_template( NULL,NULL,NULL,vjsdl->width,vjsdl->height, vjsdl->ffmpeg_pixfmt );
     VJFrame *dst = yuv_yuv_template(  NULL,NULL,NULL,vjsdl->width,vjsdl->height,PIX_FMT_YUYV422);
     vjsdl->scaler = yuv_init_swscaler( src,dst, &templ, yuv_sws_get_cpu_flags() );
-    free(src);
-    free(dst);
+
+    vjsdl->src_frame = (void*) src;
+    vjsdl->dst_frame = (void*) dst;
+
     return vjsdl;
 }
 
@@ -572,18 +574,20 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 		vj_sdl_font_logging( vjsdl->font, yuv420, vjsdl->width, vjsdl->height );
 	}
 #endif
-	VJFrame *src = yuv_yuv_template( yuv420[0],yuv420[1],yuv420[2],vjsdl->width,vjsdl->height, vjsdl->ffmpeg_pixfmt );
-	VJFrame *dst = yuv_yuv_template(  vjsdl->yuv_overlay->pixels[0],NULL,NULL,vjsdl->width,vjsdl->height,PIX_FMT_YUYV422);
+	VJFrame *src_frame = (VJFrame*) vjsdl->src_frame;
+	VJFrame *dst_frame = (VJFrame*) vjsdl->dst_frame;
 
-	yuv_convert_and_scale_packed( vjsdl->scaler, src,dst );
+	src_frame->data[0] = yuv420[0];
+	src_frame->data[1] = yuv420[1];
+	src_frame->data[2] = yuv420[2];
+	dst_frame->data[0] = vjsdl->yuv_overlay->pixels[0];
+
+	yuv_convert_and_scale_packed( vjsdl->scaler, vjsdl->src_frame,dst_frame );
 
 	if (!vj_sdl_unlock(vjsdl))
 		return 0;
 
 	SDL_DisplayYUVOverlay(vjsdl->yuv_overlay, &(vjsdl->rectangle));
-
-	free(src);
-	free(dst);
 
 	return 1;
 }
@@ -603,7 +607,10 @@ void vj_sdl_free(vj_sdl * vjsdl)
  	   SDL_FreeYUVOverlay(vjsdl->yuv_overlay);
 	if( vjsdl->scaler )
 	   yuv_free_swscaler(vjsdl->scaler);
-
+	if( vjsdl->src_frame )
+	   free(vjsdl->src_frame );
+	if( vjsdl->dst_frame )
+	   free(vjsdl->dst_frame );
 	free(vjsdl);
 }
 #endif

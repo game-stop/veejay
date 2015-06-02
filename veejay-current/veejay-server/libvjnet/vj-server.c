@@ -597,7 +597,7 @@ void	vj_server_client_promote( vj_server *vje, int link_id)
 int vj_server_poll(vj_server * vje)
 {
 	int status = 0;
-	struct timeval t;
+	struct timeval t = (struct timeval) { 0 };
 	int i;
 
 	if( vje->use_mcast )
@@ -605,8 +605,6 @@ int vj_server_poll(vj_server * vje)
 		vj_proto **proto = (vj_proto**) vje->protocol;
 		return mcast_poll( proto[0]->r );
 	}
-
-	veejay_memset( &t, 0, sizeof(t));
 
 	FD_ZERO( &(vje->fds) );
     	FD_ZERO( &(vje->wds) );

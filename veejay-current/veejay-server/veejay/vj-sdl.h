@@ -49,6 +49,8 @@ typedef struct vj_sdl_t {
     int ffmpeg_pixfmt;
     uint8_t *buf;
     void *font;
+	void *src_frame;
+	void *dst_frame;
 } vj_sdl;
 
 vj_sdl *vj_sdl_allocate(int width, int height, int pixel_format, int k, int m, int s);
