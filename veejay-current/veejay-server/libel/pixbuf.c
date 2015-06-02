@@ -417,7 +417,17 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 			dst_fmt = PIX_FMT_YUVJ420P;
 	}
 
-	VJFrame *dst1 = yuv_yuv_template( dest[0], dest[1], dest[2], out_w, out_h, dst_fmt );
+	VJFrame dst;
+	VJFrame *dst1 = &dst;
+	dst1->data[0] = dest[0];
+	dst1->data[1] = dest[1];
+	dst1->data[2] = dest[2];
+	dst1->width = out_w;
+	dst1->height = out_h;
+	dst1->format = dst_fmt;
+	dst1->stride[0] = out_w;
+	dst1->stride[1] = out_w >> 1;
+	dst1->stride[2] = out_w >> 1;
 	pic_changed_ = pic_has_changed( out_w,out_h, dst_fmt );
 
 	if(pic_changed_ || pic_scaler_ == NULL )
@@ -429,8 +439,6 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 	}
 
 	yuv_convert_and_scale( pic_scaler_, frame,dst1);
-
-	free(dst1);
 }
 
 void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
@@ -442,7 +450,18 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 	planes[2] = planes[1] + (out_w * out_h/4 );
 	planes[3] = NULL;
 
-	VJFrame *dst1 = yuv_yuv_template( planes[0], planes[1], planes[2], out_w , out_h, PIX_FMT_GRAY8 );
+	VJFrame dst;
+	VJFrame *dst1 = &dst;
+	dst1->data[0] = planes[0];
+	dst1->data[1] = planes[1];
+	dst1->data[2] = planes[2];
+	dst1->width = out_w;
+	dst1->height = out_h;
+	dst1->format = PIX_FMT_GRAY8;
+	dst1->stride[0] = out_w;
+	dst1->stride[1] = 0;
+	dst1->stride[2] = 0;
+
 	pic_changed_ = pic_has_changed( out_w,out_h, PIX_FMT_GRAY8 );
 
 	if(pic_changed_ )
@@ -455,7 +474,5 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 
 
 	yuv_convert_and_scale( pic_scaler_, frame, dst1);
-
-	free(dst1);
 }
 
