@@ -23,6 +23,9 @@
 #include <libvjmem/vjmem.h>
 #include "negatechannel.h"
 #include "common.h"
+
+#undef HAVE_ASM_MMX
+
 vj_effect *negatechannel_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -56,92 +59,21 @@ void negatechannel_apply( VJFrame *frame, int width, int height, int chan, int v
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-#ifndef HAVE_ASM_MMX 
     switch( chan ) {
-	case 0:
-    for (i = 0; i < len; i++) {
-	*(Y) = val - *(Y);
-	*(Y)++;
-    }
-	break;
-	case 1:
-
-    for (i = 0; i < uv_len; i++) {
-	*(Cb) = val - *(Cb);
-        *(Cb)++;
-    }
-	break;
-	case 2:
-   for (i = 0; i < uv_len; i++) {
-        *(Cr) = val - *(Cr);
-	*(Cr)++;
-    }
-	break;
+		case 0:
+		 for (i = 0; i < len; i++) {
+			Y[i] = val - Y[i];
+		    }
+		 break;
+		case 1:
+			for (i = 0; i < uv_len; i++) {
+			Cb[i] = val - Cb[i];
+		    }
+		 break;
+		case 2:
+		for (i = 0; i < uv_len; i++) {
+			Cr[i] = val - Cr[i];
+		}
+		 break;
    }
-
-#else
-
-    int left = len % 8;
-    int work=  len >> 3;
-
-    vje_load_mask(val);
-
-    switch( chan ) {
-	case 0:
-    for( i = 0; i < work ; i ++ )
-    {
-	vje_mmx_negate( Y, Y );	
-	Y += 8;
-    }	
-
-    if (left )
-    {
-	for( i = 0; i < left; i ++ )
-	{
-		*(Y) = val - *(Y);
-		*(Y)++;
-	}	
-    }
-	break;
-	case 1:
-
-    work = uv_len >> 3;
-    left = uv_len % 8;
-    for( i = 0; i < work ; i ++ )
-    {
-	vje_mmx_negate( Cb, Cb );
-	Cr += 8;
-    }
-
-    if(left )
-    {
-	for( i = 0; i < left; i ++ )
-	{
-		*(Cb) = val - *(Cb);
-      	 	*(Cb)++;
-	}
-    }
-	break;
-	case 2:
-    work = uv_len >> 3;
-    left = uv_len % 8;
-    for( i = 0; i < work ; i ++ )
-    {
-	vje_mmx_negate( Cr, Cr );
-	Cr += 8;
-    }
-
-    if(left )
-    {
-	for( i = 0; i < left; i ++ )
-	{
-     	  	*(Cr) = val - *(Cr);
-		*(Cr)++;
-	}
-    }
-	break;
- }
-
- do_emms;
-#endif
 }

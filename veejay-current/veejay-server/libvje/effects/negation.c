@@ -23,6 +23,10 @@
 #include <libvjmem/vjmem.h>
 #include "common.h"
 #include "negation.h"
+
+//auto vectorization is better
+#undef HAVE_ASM_MMX
+
 vj_effect *negation_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -54,61 +58,13 @@ void negation_apply( VJFrame *frame, int width, int height, int val)
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-#ifndef HAVE_ASM_MMX
-    for (i = 0; i < len; i++) {
-	*(Y) = val - *(Y);
-	*(Y)++;
-    }
-
-    for (i = 0; i < uv_len; i++) {
-	*(Cb) = val - *(Cb);
-        *(Cb)++;
-        *(Cr) = val - *(Cr);
-	*(Cr)++;
-    }
-#else
-
-    int left = len % 8;
-    int work=  len >> 3;
-
-    vje_load_mask(val);
-
-    for( i = 0; i < work ; i ++ )
-    {
-	vje_mmx_negate( Y, Y );	
-	Y += 8;
-    }	
-
-    if (left )
-    {
-	for( i = 0; i < left; i ++ )
-	{
-		*(Y) = val - *(Y);
-		*(Y)++;
-	}	
-    }
-
-    work = uv_len >> 3;
-    left = uv_len % 8;
-    for( i = 0; i < work ; i ++ )
-    {
-	vje_mmx_negate( Cb, Cb );
-	vje_mmx_negate( Cr, Cr );
-	Cb += 8;
-	Cr += 8;
-    }
-
-    if(left )
-    {
-	for( i = 0; i < left; i ++ )
-	{
-		*(Cb) = val - *(Cb);
-      	 	*(Cb)++;
-     	  	*(Cr) = val - *(Cr);
-		*(Cr)++;
+	for( i = 0; i < len; i ++ ) {
+		Y[i] = val - Y[i];
 	}
-    }
 
-    do_emms;
-#endif
+	for( i = 0; i < uv_len; i ++ ) {
+		Cb[i] = val - Cb[i];
+		Cr[i] = val - Cr[i];
+	}
+
 }
