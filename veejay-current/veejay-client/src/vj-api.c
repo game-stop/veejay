@@ -8271,21 +8271,15 @@ static	void	remove_sample_from_slot()
 			info->selection_slot->sample_id );
 	gint id_len = 0;
 	gint deleted_sample = 0;
-	gchar *deleted_id = recv_vims( 3, &id_len );
-	sscanf( deleted_id, "%d", &deleted_sample );
-	if( deleted_sample )
-	{
-		// decrement history of delete type
-		int *his = info->history_tokens[ (info->status_tokens[PLAY_MODE]) ];
-		
-		his[TOTAL_SLOTS] = his[TOTAL_SLOTS] - 1;
+	// decrement history of delete type
+	int *his = info->history_tokens[ (info->status_tokens[PLAY_MODE]) ];
+	
+	his[TOTAL_SLOTS] = his[TOTAL_SLOTS] - 1;
+	update_sample_slot_data( bank_nr, slot_nr, 0, -1, NULL, NULL); 	 	
 
-		update_sample_slot_data( bank_nr, slot_nr, 0, -1, NULL, NULL); 	 	
-
-		set_selection_of_slot_in_samplebank( FALSE );
-		info->selection_gui_slot = NULL;
-		info->selection_slot = NULL;
-	}
+	set_selection_of_slot_in_samplebank( FALSE );
+	info->selection_gui_slot = NULL;
+	info->selection_slot = NULL;
 }
 
 
