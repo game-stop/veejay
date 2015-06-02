@@ -396,7 +396,12 @@ int veejay_free(veejay_t * info)
    	//vj_el_free(info->edit_list);
    	vj_avcodec_free();
 
+	void *old = info->edit_list;
 	sample_free(info->edit_list);
+
+	if(old != info->current_edit_list ) {
+		vj_el_free(info->current_edit_list);	
+	}
 
 	vj_el_deinit();
 
@@ -407,6 +412,9 @@ int veejay_free(veejay_t * info)
 
 	if( info->settings->composite2 )
 		composite_destroy( info->composite2 );
+	if( info->composite )
+		composite_destroy( info->composite );
+
 	if( info->settings->action_scheduler.state )
 	{
 		if(info->settings->action_scheduler.sl )

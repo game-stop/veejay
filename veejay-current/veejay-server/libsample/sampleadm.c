@@ -366,6 +366,7 @@ void 	sample_new_simple( void *el, long start, long end )
 	sample_info *sample = sample_skeleton_new(start,end);
 	if(sample) {
 		sample->edit_list = el;
+		sample->soft_edl = 1;
 		sample_store(sample);
 	}
 }
@@ -2813,40 +2814,40 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
 
 
     if (effect_id != -1) {
-	int j;
-	if (!sample_chain_add(dst_sample, chain_index, effect_id)) {
-	    veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)\n",
-		    effect_id, chain_index);
-	}
+		int j;
+		if (!sample_chain_add(dst_sample, chain_index, effect_id)) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)\n", effect_id, chain_index);
+		}
+		else {
+			/* load the parameter values */
+			for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
+			    sample_set_effect_arg(dst_sample, chain_index, j, arg[j]);
+			}
+			sample_set_chain_channel(dst_sample, chain_index, channel);
+			sample_set_chain_source(dst_sample, chain_index, source_type);
 
-	/* load the parameter values */
-	for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
-	    sample_set_effect_arg(dst_sample, chain_index, j, arg[j]);
-	}
-	sample_set_chain_channel(dst_sample, chain_index, channel);
-	sample_set_chain_source(dst_sample, chain_index, source_type);
-
-	/* set other parameters */
-	if (a_flag) {
-	    sample_set_chain_audio(dst_sample, chain_index, a_flag);
-	    sample_set_chain_volume(dst_sample, chain_index, volume);
-	}
-
-	sample_set_chain_status(dst_sample, chain_index, e_flag);
-
-	sample_set_offset(dst_sample, chain_index, frame_offset);
-	sample_set_trimmer(dst_sample, chain_index, frame_trimmer);
-
-	sample_info *skel = sample_get(dst_sample);
-
-	if(anim)
-	{
-		sample_chain_alloc_kf( dst_sample, chain_index );
-		ParseKeys( doc, anim, skel->effect_chain[ chain_index ]->kf );
-		sample_chain_set_kf_status( dst_sample, chain_index, kf_status );
-		sample_set_kf_type(dst_sample,chain_index,kf_type);
-	}
-    } 
+			/* set other parameters */
+			if (a_flag) {
+			    sample_set_chain_audio(dst_sample, chain_index, a_flag);
+			    sample_set_chain_volume(dst_sample, chain_index, volume);
+			}
+	
+			if( effect_id != -1 ) {
+				sample_set_chain_status(dst_sample, chain_index, e_flag);
+				sample_set_offset(dst_sample, chain_index, frame_offset);
+				sample_set_trimmer(dst_sample, chain_index, frame_trimmer);
+			}
+		
+			sample_info *skel = sample_get(dst_sample);
+			if(anim)
+			{
+				sample_chain_alloc_kf( dst_sample, chain_index );
+				ParseKeys( doc, anim, skel->effect_chain[ chain_index ]->kf );
+				sample_chain_set_kf_status( dst_sample, chain_index, kf_status );
+				sample_set_kf_type(dst_sample,chain_index,kf_type);
+			}
+		}
+	}	
 
 }
 

@@ -3874,49 +3874,49 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
     }
 
     if (effect_id != -1) {
-	int j;
-	int res = vj_tag_set_effect( dst_sample, chain_index, effect_id );
+		int j;
+		int res = vj_tag_set_effect( dst_sample, chain_index, effect_id );
 
-	if(res < 0 )
-	veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d) to stream %d\n",
-		    effect_id, chain_index, dst_sample);
-	
-
-	/* load the parameter values */
-	for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
-	    vj_tag_set_effect_arg(dst_sample, chain_index, j, arg[j]);
-	}
-	vj_tag_set_chain_channel(dst_sample, chain_index, channel);
-	vj_tag_set_chain_source(dst_sample, chain_index, source_type);
-
-	vj_tag_set_chain_status(dst_sample, chain_index, e_flag);
-
-	vj_tag_set_offset(dst_sample, chain_index, frame_offset);
-	vj_tag_set_trimmer(dst_sample, chain_index, frame_trimmer);
-
-	j = 0;
-	vj_tag *t = vj_tag_get( dst_sample );
-	while (curarg != NULL) 
-	{
-		if(!xmlStrcmp(curarg->name,(const xmlChar*)"ANIM"))
-		{
-			if(t->effect_chain[chain_index]->effect_id > 0)
-			{
-				if(tagParseKeys( doc, curarg->xmlChildrenNode, t->effect_chain[chain_index]->kf))
-				{
-					veejay_msg(VEEJAY_MSG_INFO, "Animating FX %d on entry %d (status=%d)", t->effect_chain[chain_index]->effect_id, j,anim);
-					vj_tag_chain_set_kf_status(dst_sample, chain_index, anim );
-					vj_tag_set_kf_type( dst_sample,chain_index,anim_type);
-				}
-				j++;
-			}
+		if(res < 0 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d) to stream %d\n",
+			    effect_id, chain_index, dst_sample);
 		}
-		curarg = curarg->next;
+		else {
+
+			/* load the parameter values */
+			for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
+			    vj_tag_set_effect_arg(dst_sample, chain_index, j, arg[j]);
+			}
+			vj_tag_set_chain_channel(dst_sample, chain_index, channel);
+			vj_tag_set_chain_source(dst_sample, chain_index, source_type);
+	
+			vj_tag_set_chain_status(dst_sample, chain_index, e_flag);
+	
+			vj_tag_set_offset(dst_sample, chain_index, frame_offset);
+			vj_tag_set_trimmer(dst_sample, chain_index, frame_trimmer);
+	
+			j = 0;
+			vj_tag *t = vj_tag_get( dst_sample );
+			while (curarg != NULL) 
+			{
+					if(!xmlStrcmp(curarg->name,(const xmlChar*)"ANIM"))
+					{
+						if(t->effect_chain[chain_index]->effect_id > 0)
+						{
+							if(tagParseKeys( doc, curarg->xmlChildrenNode, t->effect_chain[chain_index]->kf))
+							{
+								veejay_msg(VEEJAY_MSG_INFO, "Animating FX %d on entry %d (status=%d)", t->effect_chain[chain_index]->effect_id, j,anim);
+								vj_tag_chain_set_kf_status(dst_sample, chain_index, anim );
+								vj_tag_set_kf_type( dst_sample,chain_index,anim_type);
+							}
+							j++;
+						}
+					}
+					curarg = curarg->next;
+			}
+
+		}
 	}
-
-    }
-
-
 
 }
 
