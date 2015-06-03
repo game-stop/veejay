@@ -351,12 +351,12 @@ void		vj_event_vevo_dump(void)
 void		vj_event_vevo_free(void)
 {
 	unsigned int i;
-
-	for( i = 0 ; i < MAX_INDEX  ; i ++ )
-	  if( index_map_[i] ) vpf( index_map_[i] ); 
-	
-	free(index_map_);
-}
+	if( index_map_ ) {
+		for( i = 0 ; i < MAX_INDEX  ; i ++ )
+		  if( index_map_[i] ) vpf( index_map_[i] ); 
+			free(index_map_);
+	}
+}	
 
 void		vj_init_vevo_events(void)
 {	
