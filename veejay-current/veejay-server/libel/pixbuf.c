@@ -395,7 +395,10 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 
 void		vj_picture_free()
 {
-
+	if(pic_scaler_) {
+		yuv_free_swscaler( pic_scaler_ );
+		pic_scaler_ = NULL;
+	}
 }
 
 #define	pic_has_changed(a,b,c) ( (a == pic_data_[0] && b == pic_data_[1] && c == pic_data_[2] ) ? 0: 1)

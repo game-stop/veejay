@@ -1319,6 +1319,7 @@ int
 JACK_Open(int *deviceID, unsigned int bits_per_channel, unsigned long *rate,
           int channels)
 {
+	//FIXME: memory allocated not freed if opening jack fails (ringbuffer etc)
   /* we call through to JACK_OpenEx(), but default the input channels to 0 for better backwards
      compatibility with clients written before recording was available */
   return JACK_OpenEx(deviceID, bits_per_channel,

@@ -32,6 +32,7 @@ int main( int argc, char *argv[] )
 	vj_server *s = vj_server_alloc( 5000, NULL, V_CMD);
 	vj_server *k = vj_server_alloc( 5001, NULL, V_STATUS );
 	int frame = 0;
+	int tmplen = 0;
 
 	veejay_set_debug_level(4);
 
@@ -60,9 +61,9 @@ int main( int argc, char *argv[] )
 			{
 				char tmp[4096];
 				memset(tmp,0,sizeof(tmp));
-				while( vj_server_retrieve_msg(s,i, tmp ) )
+				while( vj_server_retrieve_msg(s,i, tmp, &tmplen ) )
 				{
-					printf("recv [%s]\n", tmp );
+					printf("recv %d [%s]\n", tmplen,tmp );
 				}
 			}
 			}

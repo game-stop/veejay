@@ -44,4 +44,7 @@ extern int has_env_setting( const char *env, const char *value );
 extern char* veejay_msg_ringfetch();
 extern int veejay_log_to_ringbuffer();
 extern void veejay_toggle_osl();
+extern void veejay_init_msg_ring();
+extern void veejay_destroy_msg_ring();
 #endif
+

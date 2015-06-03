@@ -627,7 +627,7 @@ static struct
 	{ NULL,							-1 }
 };
 
-static	 char	**string_tokenize( const char delim, const char *name, int *ntokens ) {
+static	 char	**string_tokenize( const char delim, const char *name, int *ntokens ) { 
 	int n = strlen(name);
 	int i;
 	int n_tokens = 0;
@@ -679,7 +679,7 @@ static	void		free_token( char **arr ) {
 }
 
 
-int 	vj_osc_build_cont( vj_osc *o )
+int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 { 
 	int i;
 
@@ -691,6 +691,7 @@ int 	vj_osc_build_cont( vj_osc *o )
 
 	for( i = 0; osc_method_layout[i].name != NULL ; i ++ ) {
 		int ntokens = 0;
+		//FIXME: arr never freed but should be, leaking memory here
 		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
 		if( arr == NULL || ntokens == 0 ) {
 			continue;
@@ -710,6 +711,7 @@ int 	vj_osc_build_cont( vj_osc *o )
 		int ntokens = 0;
 		int exists = 0;
 		int attach_id = 0;
+		//FIXME: arr never freed but should be, leaking memory here
 		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
 		if( arr == NULL || ntokens == 0 ) {
 			continue;
@@ -742,6 +744,7 @@ int 	vj_osc_build_cont( vj_osc *o )
 
 	for( i = 0; osc_method_layout[i].name != NULL ; i ++ ) {
 		int ntokens = 0;
+		//FIXME: arr never freed but should be, leaking memory here
 		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
 		if( arr == NULL || ntokens == 0 )
 			continue;

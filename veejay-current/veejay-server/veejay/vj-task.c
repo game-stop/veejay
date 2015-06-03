@@ -96,6 +96,26 @@ static int euid = 0;
 #define __lock() pthread_mutex_lock(&queue_mutex)
 #define __unlock() pthread_mutex_unlock(&queue_mutex)
 
+static void		task_allocate()
+{
+	unsigned int i;
+	for( i = 0; i < MAX_WORKERS; i ++ ) {
+		job_list[i] = vj_malloc(sizeof(pjob_t));
+		vj_task_args[i] = vj_malloc(sizeof(vj_task_arg_t));
+		p_thread_args[i] = vj_malloc( sizeof(uint8_t) );
+	}
+}
+
+void		task_destroy()
+{
+	unsigned int i;
+	for( i = 0; i < MAX_WORKERS; i ++ ) {
+		free(job_list[i]);
+		free(vj_task_args[i]);
+		free(p_thread_args[i]);
+	}
+}
+
 static void		task_reset()
 {
 	unsigned int i;
@@ -105,11 +125,8 @@ static void		task_reset()
 	memset( job_list,0,sizeof(pjob_t*) * MAX_WORKERS );
 	memset( &vj_task_args,0,sizeof(vj_task_arg_t*) * MAX_WORKERS );
 	for( i = 0; i < MAX_WORKERS; i ++ ) {
-		job_list[i] = vj_malloc(sizeof(pjob_t));
-		vj_task_args[i] = vj_malloc(sizeof(vj_task_arg_t));
 		memset( job_list[i],0, sizeof(pjob_t));
 		memset( vj_task_args[i],0, sizeof(vj_task_arg_t));
-		p_thread_args[i] = malloc( sizeof(uint8_t) );
 		memset( p_thread_args[i],0, sizeof(uint8_t));
 		memset( &(running_tasks[i]), 0, sizeof(struct task));
 	}
@@ -206,7 +223,7 @@ static inline uint8_t	task_get_workers()
 
 void		task_init()
 {
-	task_reset();
+	task_allocate();
  
 	int max_p = sched_get_priority_max( SCHED_FIFO );
 	int min_p = sched_get_priority_min( SCHED_FIFO );

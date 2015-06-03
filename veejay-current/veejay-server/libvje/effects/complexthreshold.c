@@ -135,7 +135,6 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
     tmp = 1 / kg1;
     one_over_kc = 0xff * 2 * tmp - 0xff;
     kfgy_scale = 0xf * (float) (_y) / kg1;
-    kg = kg1;
 
     /* intialize pointers */
     fg_y = Y2;

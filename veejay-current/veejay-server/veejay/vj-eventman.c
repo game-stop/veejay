@@ -351,19 +351,16 @@ void		vj_event_vevo_dump(void)
 void		vj_event_vevo_free(void)
 {
 	unsigned int i;
-	if( !index_map_)
-		return;
 
 	for( i = 0 ; i < MAX_INDEX  ; i ++ )
-	  if( index_map_[i] ) vpf( index_map_[i] );
+	  if( index_map_[i] ) vpf( index_map_[i] ); 
 	
 	free(index_map_);
 }
 
 void		vj_init_vevo_events(void)
 {	
-	index_map_ = (vevo_port_t*) vj_malloc(sizeof(vevo_port_t*) * MAX_INDEX );
-	veejay_memset( index_map_, 0, sizeof( vevo_port_t *) * MAX_INDEX );
+	index_map_ = (vevo_port_t*) vj_calloc(sizeof(vevo_port_t*) * MAX_INDEX );
 
 	index_map_[VIMS_MACRO] = _new_event(
 				"%d %d",
@@ -2910,6 +2907,7 @@ void		vj_init_vevo_events(void)
 				NULL );
 #endif
 }
+
 
 
 

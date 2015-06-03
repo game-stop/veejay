@@ -238,6 +238,22 @@ void	veejay_init_msg_ring()
 	sem_init( msg_ring->semaphore, 0, 0 );
 }
 
+void	veejay_destroy_msg_ring()
+{
+	if(msg_ring) {
+		int i;
+		for( i = 0; i < MESSAGE_RING_SIZE; i ++ ) {
+			if( msg_ring->dommel[i]) {
+				free(msg_ring->dommel[i]);
+			}
+		}
+		free(msg_ring->dommel);
+		free(msg_ring->semaphore);
+		sem_destroy( msg_ring->semaphore );
+		free(msg_ring);
+	}
+}
+
 static void veejay_msg_ringbuffer( char *line )
 {
 	uint64_t pos = __sync_fetch_and_add( &msg_ring->pos, 1) % MESSAGE_RING_SIZE;

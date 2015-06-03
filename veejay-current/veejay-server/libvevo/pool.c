@@ -195,7 +195,7 @@ void	vevo_pool_slice_destroy( void *p )
 		s = n->next;
 		free( n );
 	}	
-	free( pool->space );
+	//free( pool->space );
 	free( pool );
 	p = NULL;
 }

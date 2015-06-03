@@ -237,8 +237,6 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 }
 
 int veejay_set_framedup(veejay_t *info, int n) {
-	video_playback_setup *settings = (video_playback_setup*) settings;
-
 	switch(info->uc->playback_mode) {
 	  case VJ_PLAYBACK_MODE_PLAIN: 
 			info->sfd = n; 
@@ -390,27 +388,21 @@ int veejay_free(veejay_t * info)
 
 	vj_mem_threaded_stop();
 
-	vj_event_stop();
+	vj_event_destroy();
 
-     	vj_tag_free();
-   	//vj_el_free(info->edit_list);
-   	vj_avcodec_free();
-
-	void *old = info->edit_list;
+	vj_tag_free();
+   	
 	sample_free(info->edit_list);
-
-	if(old != info->current_edit_list ) {
-		vj_el_free(info->current_edit_list);	
-	}
 
 	vj_el_free(info->edit_list);
 
 	vj_el_deinit();
 
-//	vj_tag_free();
+	vj_avcodec_free();
 
 	vj_effect_shutdown();
 
+	task_destroy();
 
 	if( info->settings->composite2 )
 		composite_destroy( info->composite2 );
@@ -3313,7 +3305,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	{
 		if( !sample_usable_edl( id ) )
 		{
-			veejay_msg(0, "Sample %d has no EDL (its a picture!)", id );
+			veejay_msg(0, "Sample %d is a picture ...", id ); //FIXME check if this can be removed
 			return -1;
 		}
 

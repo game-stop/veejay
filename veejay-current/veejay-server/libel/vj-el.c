@@ -1443,7 +1443,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	if(!filename[0] || filename == NULL)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"\tInvalid filename given");
-		vj_el_free(el);
+		free(el);
 		return NULL;	
 	}
 
@@ -1464,14 +1464,15 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		if(stat( filename[nf], &fileinfo)!= 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to access file '%s'",filename[nf] );
-			//vj_el_free(el);
+			vj_el_free(el);
 			return NULL;
 		} 
 			fd = fopen(filename[nf], "r");
 			if (fd <= 0)
 			{
 			   	 veejay_msg(VEEJAY_MSG_ERROR,"Error opening %s:", filename[nf]);
-			 	 vj_el_free(el);
+				 fclose(fd);
+				 vj_el_free(el);
 	 			 return NULL;
 			}
 		
@@ -1485,6 +1486,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 			    	if (line[0] != 'N' && line[0] != 'n' && line[0] != 'P' && line[0] != 'p' && line[0] != 's' && line[0] != 'S')
 				{
 					veejay_msg(VEEJAY_MSG_ERROR,"Edit list second line is not NTSC/PAL/SECAM");
+					fclose(fd);
 					vj_el_free(el);
 					return NULL;
 				}
@@ -1494,7 +1496,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 				}
 				else {
 					el->video_norm = tolower(line[0]);
-			    	}
+			    }
 
 		   	 	/* read third line: Number of files */
 		    		fgets(line, 1024, fd);
@@ -1503,7 +1505,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		   	 	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list contains %d files", num_list_files);
 		   		/* read files */
 
-			    	for (i = 0; i < num_list_files; i++)
+			    for (i = 0; i < num_list_files; i++)
 				{
 					fgets(line, 1024, fd);
 					n = strlen(line);
@@ -1511,6 +1513,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 					if (line[n - 1] != '\n')
 					{
 					    veejay_msg(VEEJAY_MSG_ERROR, "Filename in edit list too long");
+						fclose(fd);
 						vj_el_free(el);
 						return NULL;
 					}
@@ -1522,6 +1525,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	
 					if(index_list[i]< 0)
 					{
+						fclose(fd);
 						vj_el_free(el);
 						return NULL;
 					}
@@ -1530,11 +1534,12 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 					if (el->frame_list==NULL)
 					{
 						veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
+						fclose(fd);
 						vj_el_free(el);
 						return NULL;
 					}
 
-	    				for (i = 0; i < el->num_frames[n]; i++)
+	    			for (i = 0; i < el->num_frames[n]; i++)
 					{
 						el->frame_list[el->video_frames++] = EL_ENTRY(n, i);
 					}
@@ -1553,6 +1558,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 						    if (nl < 0 || nl >= num_list_files)
 							{
 					    		veejay_msg(VEEJAY_MSG_ERROR,"Wrong file number in edit list entry");
+								fclose(fd);
 								vj_el_free(el);
 								return NULL;
 			    			}
@@ -1572,6 +1578,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 				   			if (el->frame_list==NULL)
 							{
 								veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
+								fclose(fd);
 								vj_el_free(el);
 								return NULL;
 							}
@@ -1687,7 +1694,6 @@ void	vj_el_free(editlist *el)
 		}
 	}
 
-
 	if( el->cache ) {
 		free_cache( el->cache );
 		el->cache = NULL;
@@ -1698,7 +1704,6 @@ void	vj_el_free(editlist *el)
 	}
 	
 	free(el);
-
 	el = NULL;
 }
 

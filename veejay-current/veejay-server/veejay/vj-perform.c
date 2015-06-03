@@ -372,7 +372,7 @@ static	int	vj_perform_try_sequence( veejay_t *info )
 static	void	seq_play_sample( veejay_t *info, int n)
 {
 	info->seq->current = n;
-	int id = info->seq->samples[n];
+//	int id = info->seq->samples[n];
 	int which_sample = 0;
 	int offset = sample_get_first_mix_offset( info->uc->sample_id, &which_sample, info->seq->samples[info->seq->current] );
 
@@ -1158,7 +1158,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 {
 	char info_line[128];
 	int compr_ok = 0;
-	uint32_t planes[3];
+	uint32_t planes[3] = {0};
 	int data_len = 44;  
 
 	memset(info_line, 0, sizeof(info_line) );
@@ -2893,7 +2893,6 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 	int pred_len = num_samples;
 	int bps		=   el->audio_bps;
 	uint8_t *a_buf = top_audio_buffer;
-	int rs = 0;
 	if (info->audio == AUDIO_PLAY)
   	{
 		switch (info->uc->playback_mode)
@@ -2906,12 +2905,11 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 					num_samples = pred_len;
 					veejay_memset( a_buf, 0, num_samples * bps );
 				}
-				else
-					rs = 1;
 				break;
 			case VJ_PLAYBACK_MODE_PLAIN:
 				if( el->has_audio )
 				{
+					int rs = 0;
 					if (settings->current_frame_num <= settings->max_frame_num) 
 						num_samples =	vj_el_get_audio_frame(el, this_frame,a_buf );
 					else
@@ -2923,6 +2921,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 					}
 					else
 						rs = 1;
+
 					if( settings->current_playback_speed < 0 && rs )
 						vj_perform_reverse_audio_frame(info,num_samples,a_buf);
 				}
@@ -2936,8 +2935,6 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 						num_samples = pred_len;
 						veejay_memset(a_buf, 0, num_samples * bps );
 					}
-					else
-						rs = 1;
 				}
 				break;
 		}

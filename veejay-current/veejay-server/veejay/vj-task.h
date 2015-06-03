@@ -62,6 +62,7 @@ void	*vj_task_get_internal_buf();
 int	task_start(unsigned int max_workers);
 void	task_stop(unsigned int max_workers);
 void	task_init();
+void	task_destroy();
 int	task_num_cpus();
 void	vj_task_set_overlap( int val );
 void	performer_job( uint8_t job_num );

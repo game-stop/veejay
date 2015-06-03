@@ -310,15 +310,15 @@ static	void	free_plugins()
 	for( i = 0; i < index_ ; i ++ )
 		free_plugin( index_map_[i]);
 
-	vevo_port_recursive_free( illegal_plugins_ );
-	
+	vpf( illegal_plugins_ );
+	freeframe_destroy();
+	frei0r_destroy();
+
 	free( index_map_ );
 	index_ = 0;
 	index_map_ = NULL;
-
-
-	freeframe_destroy();
 }
+
 int plug_get_idx_by_so_name( char *soname )
 {
 	int i;

@@ -131,7 +131,7 @@ static inline void _overlay_text_uv( uint8_t *dst, uint8_t *a, const int len, ui
 
 static	void *_try_font( char *path )
 {
-	void *res = TTF_OpenFontIndex( path, 10, 0 );
+	void *res = TTF_OpenFontIndex( path, 10, 0 ); //FIXME never freed
 	if(!res) {
 		return NULL;
 	}

@@ -827,6 +827,7 @@ int main(int argc, char **argv)
 
 	veejay_busy(info);			
 	veejay_free(info);
+	veejay_destroy_msg_ring();
 
 	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
 

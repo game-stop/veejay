@@ -137,8 +137,9 @@ static	char	*get_print_buf(int size) {
 	char *res = (char*) vj_calloc(sizeof(char) * s );
 	return res;
 }
+#define MAX_MACRO_BANKS 12
 
-static	void	*macro_bank_[12];
+static	void	*macro_bank_[MAX_MACRO_BANKS];
 static	void	*macro_port_ = NULL;
 static  int	current_macro_ = 0;
 static	int	macro_status_ = 0;
@@ -543,7 +544,7 @@ static  void    init_vims_for_macro();
 
 static	void	macro_select( int slot )
 {
-	if( slot >= 0 && slot < 12 )
+	if( slot >= 0 && slot < MAX_MACRO_BANKS )
 	{
 		macro_bank_[ current_macro_ ] = macro_port_;
 		current_macro_ = slot;
@@ -820,33 +821,6 @@ vj_msg_bundle *vj_event_bundle_get(int event_id)
 	return NULL;
 }
 #ifdef HAVE_SDL
-void			del_all_keyb_events()
-{
-	if(!keyboard_events)
-		return;
-
-	if(!hash_isempty( keyboard_events ))
-	{
-		hscan_t scan;
-		hash_scan_begin( &scan, keyboard_events );
-		hnode_t *node;
-		while( ( node = hash_scan_next(&scan)) != NULL )
-		{
-			vj_keyboard_event *ev = NULL;
-			ev = hnode_get( node );
-			if(ev)
-			{
-				if(ev->arguments) free(ev->arguments);
-				if(ev->vims) free(ev->vims);
-			}	
-		}
-		hash_free_nodes( keyboard_events );
-		hash_destroy( keyboard_events );
-	}
-
-	veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
-}
-
 int			del_keyboard_event(int id )
 {
 	hnode_t *node;
@@ -885,6 +859,18 @@ int		keyboard_event_exists(int id)
 	return 0;
 }
 
+void			   destroy_keyboard_event( vj_keyboard_event *ev )
+{
+	if( ev ) {
+		if( ev->vims )
+			free( ev->vims );
+
+		if( ev->arguments )
+			free( ev->arguments );	
+
+		free(ev);
+	}
+}
 
 vj_keyboard_event *new_keyboard_event(
 		int symbol, int modifier, const char *value, int event_id )
@@ -2647,8 +2633,62 @@ void vj_event_init(void *ptr)
 	if(ptr) vj_event_load_keyboard_configuration( (veejay_t*) ptr );
 #endif
 	init_vims_for_macro();
+}
 
+#ifdef HAVE_SDL
+static	void vj_event_destroy_hash( hash_t *h)
+{
+	if(!hash_isempty(h)) {
+		hscan_t s = (hscan_t) {0};
+		hash_scan_begin( &s, h );
+		hnode_t *node = NULL;
+		while((node = hash_scan_next(&s)) != NULL ) {
+			void *ptr = hnode_get(node);
+			if(ptr) destroy_keyboard_event(ptr);
+		}
+		hash_free_nodes( h );
+	}
+	hash_destroy( h );
+}
+#endif
+
+static void vj_event_destroy_bundles( hash_t *h )
+{
+	if(!hash_isempty(h)) {
+		hscan_t s = (hscan_t) {0};
+		hash_scan_begin( &s, h );
+		hnode_t *node = NULL;
+		while((node = hash_scan_next(&s)) != NULL ) {
+			vj_msg_bundle *m = hnode_get(node);
+			if(m) {
+				if( m->bundle )
+				  free(m->bundle);
+				free(m);	
+			}	
+		}
+		hash_free_nodes( h );
+	}
+	hash_destroy( h );
+}
+
+void	vj_event_destroy()
+{
+#ifdef HAVE_SDL
+	if(keyboard_events) vj_event_destroy_hash( keyboard_events );
+#endif
+	if(BundleHash) vj_event_destroy_bundles( BundleHash );
 	
+	vj_picture_free();	
+
+	vj_event_vevo_free();
+
+	int i;
+	for( i = 0; i < MAX_MACRO_BANKS; i ++ )
+	{
+		macro_port_ = macro_bank_[i];
+		if(macro_port_)
+			reset_macro_();
+	}
 
 }
 
@@ -3021,10 +3061,13 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 					veejay_strncat( buf, form, form_len);	
 				if(tree->arg_len)
 					veejay_strncat( buf, tree->args, tree->arg_len );
+				
+				void *ptr = tree;
+
 				tree = tree->next;
+
+				free(ptr);
 			}
-			if(root)
-				free(root);
 #endif
 			if(name)
 				free(name);
@@ -10453,23 +10496,4 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 	}
 }
 
-void	vj_event_stop()
-{
-	// destroy bundlehash, destroy keyboard_events
-#ifdef HAVE_SDL
-	del_all_keyb_events();
-#endif
-
-	vj_picture_free();	
-
-	vj_event_vevo_free();
-
-	int i;
-	for( i = 0; i < 12; i ++ )
-	{
-		macro_port_ = macro_bank_[i];
-		if(macro_port_)
-		reset_macro_();
-	}
-}
 

@@ -137,12 +137,18 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 	if( v->server_type == V_CMD )
 	{
 		proto[0]->s = mcast_new_sender( group_name );
-		if(!proto[0]->s)
+		if(!proto[0]->s) {
+			free(proto);
 			return 0;
+		}
 
 		proto[0]->r = mcast_new_receiver( group_name , port + VJ_CMD_MCAST_IN );
-		if(!proto[0]->r )
+		if(!proto[0]->r ) {
+			free(proto[0]->s);
+			free(proto[0]);
+			free(proto);
 			return 0;
+		}
 
 		v->ports[0] = port + VJ_CMD_MCAST;
 		v->ports[1] = port + VJ_CMD_MCAST_IN;
@@ -154,6 +160,12 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 	if(!link)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Out of memory");
+		if(proto[0]) {
+			if(proto[0]->s) free(proto[0]->s);
+			if(proto[0]->r) free(proto[0]->r);
+			free(proto[0]);
+			free(proto);
+		}
 		return 0;
 	}
 
