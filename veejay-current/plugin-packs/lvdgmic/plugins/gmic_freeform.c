@@ -55,21 +55,22 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	
         lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
 
-	int imageweight =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
-	int patternweight = lvd_extract_param_index( my_instance,"in_parameters", 1 );
-	int patternangle = lvd_extract_param_index(my_instance, "in_parameters",2);
-	int amplitude = lvd_extract_param_index(my_instance, "in_parameters",3);
-	int sharpness = lvd_extract_param_index(my_instance, "in_parameters",4);
-	int anisotropy = lvd_extract_param_index(my_instance, "in_parameters",5);
-	int alpha = lvd_extract_param_index(my_instance, "in_parameters",6);
-	int sigma = lvd_extract_param_index(my_instance, "in_parameters",7);
-	int cutlow = lvd_extract_param_index(my_instance, "in_parameters",8);
-	int cuthigh = lvd_extract_param_index(my_instance, "in_parameters",9);
+	int erode1 =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
+	int erode2 =   lvd_extract_param_index( my_instance,"in_parameters", 1 );
+	int amplitude = lvd_extract_param_index( my_instance,"in_parameters", 2 );
+	int sharpness = lvd_extract_param_index(my_instance, "in_parameters",3);
+	int anisotropy = lvd_extract_param_index(my_instance, "in_parameters",4);
+	int alpha = lvd_extract_param_index(my_instance, "in_parameters",5);
+	int sigma = lvd_extract_param_index(my_instance, "in_parameters",6);
 
-	snprintf(cmd,sizeof(cmd),"-gimp_marble %f,%d,%d,%d,%f,%f,%f,%f,%d,%d",
-		(float) imageweight/10.0f, patternweight, patternangle, amplitude,(float)sharpness/100.0f,
-	  	(float) anisotropy/100.0f, (float) alpha/10.0f, (float) sigma / 10.0f,
-		cutlow, cuthigh	
+	snprintf(cmd,sizeof(cmd),"-erode %d -erode %d -equalize 255 -smooth %f,%f,%f,%f",
+		erode1,
+		erode2,
+		amplitude/100.0f,
+		sharpness/100.0f,
+		anisotropy/100.0f,
+		alpha/100.0f,
+		sigma/100.0f
 		);
 
 	lvdgmic_push( gmic, w, h, palette, A, 0);
@@ -87,7 +88,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	LIVIDO_IMPORT(list);
 
 	livido_port_t *port = NULL;
-	livido_port_t *in_params[11];
+	livido_port_t *in_params[7];
 	livido_port_t *in_chans[3];
 	livido_port_t *out_chans[1];
 	livido_port_t *info = NULL;
@@ -110,8 +111,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	port = filter;
 
 	//@ meta information
-		livido_set_string_value( port, "name", "G'MIC/GREYs Marble");	
-		livido_set_string_value( port, "description", "Apply Marble");
+		livido_set_string_value( port, "name", "G'MIC/GREYs Line Accent");	
+		livido_set_string_value( port, "description", "Apply Line Accent");
 		livido_set_string_value( port, "author", "GREYC's Magic for Image Computing"); 
 		
 		livido_set_int_value( port, "flags", LIVIDO_FILTER_NON_REALTIME);
@@ -141,79 +142,67 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	in_params[0] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[0];
 
-		livido_set_string_value(port, "name", "Image weight" );
+		livido_set_string_value(port, "name", "Erode" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 300 );
-		livido_set_int_value( port, "default", 5 );
-		livido_set_string_value( port, "description" ,"Image weight");
+		livido_set_int_value( port, "max", 30 );
+		livido_set_int_value( port, "default", 10 );
+		livido_set_string_value( port, "description" ,"Erode (pass 1)");
 
 	
 	in_params[1] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[1];
 
-		livido_set_string_value(port, "name", "Pattern weight" );
+		livido_set_string_value(port, "name", "Erode" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
 		livido_set_int_value( port, "max", 30 );
-		livido_set_int_value( port, "default", 1 );
-		livido_set_string_value( port, "description" ,"Pattern weight");
+		livido_set_int_value( port, "default", 3 );
+		livido_set_string_value( port, "description" ,"Erode (pass 2)");
 
 	in_params[2] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[2];
 
-		livido_set_string_value(port, "name", "Pattern angle" );
+		livido_set_string_value(port, "name", "Ampltiude" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 360 );
-		livido_set_int_value( port, "default", 0 );
-		livido_set_string_value( port, "description" ,"Pattern angle");
+		livido_set_int_value( port, "max", 400 );
+		livido_set_int_value( port, "default", 80 );
+		livido_set_string_value( port, "description" ,"Amplitude");
 
 	in_params[3] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[3];
 
-		livido_set_string_value(port, "name", "Amplitude" );
-		livido_set_string_value(port, "kind", "INDEX" );
-		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 1000 );
-		livido_set_int_value( port, "default",0 );
-		livido_set_string_value( port, "description" ,"Amplitude");
-
-	in_params[4] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
-	port = in_params[4];
-
 		livido_set_string_value(port, "name", "Sharpness" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 500 );
-		livido_set_int_value( port, "default",40 );
+		livido_set_int_value( port, "max", 100 );
+		livido_set_int_value( port, "default",0 );
 		livido_set_string_value( port, "description" ,"Sharpness");
 
-	in_params[5] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
-	port = in_params[5];
+	in_params[4] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+	port = in_params[4];
 
 		livido_set_string_value(port, "name", "Anisotropy" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
 		livido_set_int_value( port, "max", 100 );
-		livido_set_int_value( port, "default",60 );
+		livido_set_int_value( port, "default",0 );
 		livido_set_string_value( port, "description" ,"Anisotropy");
 
-
-	in_params[6] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
-	port = in_params[6];
+	in_params[5] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+	port = in_params[5];
 
 		livido_set_string_value(port, "name", "Alpha" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 200 );
-		livido_set_int_value( port, "default",60 );
+		livido_set_int_value( port, "max", 100 );
+		livido_set_int_value( port, "default",100 );
 		livido_set_string_value( port, "description" ,"Alpha");
 
-	
 
-	in_params[7] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
-	port = in_params[7];
+	in_params[6] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+	port = in_params[6];
 
 		livido_set_string_value(port, "name", "Sigma" );
 		livido_set_string_value(port, "kind", "INDEX" );
@@ -223,31 +212,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value( port, "description" ,"Sigma");
 
 
-	in_params[8] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
-	port = in_params[8];
-
-		livido_set_string_value(port, "name", "Cut low" );
-		livido_set_string_value(port, "kind", "INDEX" );
-		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 100 );
-		livido_set_int_value( port, "default",0 );
-		livido_set_string_value( port, "description" ,"Cut low");
-
-
-
-	in_params[9] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
-	port = in_params[9];
-
-		livido_set_string_value(port, "name", "Cut high" );
-		livido_set_string_value(port, "kind", "INDEX" );
-		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max",100 );
-		livido_set_int_value( port, "default",100 );
-		livido_set_string_value( port, "description" ,"Cut high");
-
-
-	//@ setup the nodes
-	livido_set_portptr_array( filter, "in_parameter_templates",10, in_params );
+	livido_set_portptr_array( filter, "in_parameter_templates",7, in_params );
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
         livido_set_portptr_array( filter, "in_channel_templates",1, in_chans );
 

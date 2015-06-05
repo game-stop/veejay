@@ -2,7 +2,6 @@ lividoplugin_LTLIBRARIES = gmic_cartoon.la \
 			   gmic_cracks.la \
 			   gmic_bokeh.la \
 			   gmic_pencilbw.la \
-#			   gmic_arrayfade.la \
 			   gmic_rodilius.la \
 			   gmic_water.la \
 			   gmic_wave.la \
@@ -23,8 +22,16 @@ lividoplugin_LTLIBRARIES = gmic_cartoon.la \
 			   gmic_kuwahara.la \
 			   gmic_pendrawing.la \
 			   gmic_oldscool8bits.la \
-#			   gmic_sponge.la \
-			   gmic_tetris.la
+			   gmic_tetris.la \
+			   gmic_shifttiles.la \
+			   gmic_edges.la \
+			   gmic_ditheredbw.la \
+			   gmic_taquin.la \
+			   gmic_quadratize.la \
+			   gmic_plasma.la \
+			   gmic_curvature.la \
+			   gmic_lightrelief.la \
+			   gmic_sketchbw.la
 
 gmic_cartoon_la_SOURCES = gmic_cartoon.c
 gmic_cartoon_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
@@ -110,6 +117,36 @@ gmic_oldscool8bits_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 gmic_tetris_la_SOURCES = gmic_tetris.c
 gmic_tetris_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
+gmic_shifttiles_la_SOURCES = gmic_shifttiles.c
+gmic_shifttiles_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+gmic_edges_la_SOURCES = gmic_edges.c
+gmic_edges_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+gmic_ditheredbw_la_SOURCES = gmic_ditheredbw.c
+gmic_ditheredbw_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+gmic_taquin_la_SOURCES = gmic_taquin.c
+gmic_taquin_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+gmic_quadratize_la_SOURCES = gmic_quadratize.c
+gmic_quadratize_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+gmic_plasma_la_SOURCES = gmic_plasma.c
+gmic_plasma_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+gmic_curvature_la_SOURCES = gmic_curvature.c
+gmic_curvature_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+#gmic_freeform_la_SOURCES = gmic_freeform.c
+#gmic_freeform_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+gmic_lightrelief_la_SOURCES = gmic_lightrelief.c
+gmic_lightrelief_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+
+#very slow
+#gmic_sketchbw_la_SOURCES = gmic_sketchbw.c
+#gmic_sketchbw_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
 INCLUDES=$(FFMPEG_CFLAGS) -I$(top_srcdir)/liblvdgmic
 AM_CFLAGS=-I@top_srcdir@/include $(OPTCFLAGS) -DSILENT
