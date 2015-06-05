@@ -104,6 +104,12 @@ static void		task_allocate()
 		vj_task_args[i] = vj_malloc(sizeof(vj_task_arg_t));
 		p_thread_args[i] = vj_malloc( sizeof(uint8_t) );
 	}
+
+	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
+	if( n_cpu <= 0 )
+	{
+		n_cpu = 1;
+	}
 }
 
 void		task_destroy()
@@ -129,12 +135,6 @@ static void		task_reset()
 		memset( vj_task_args[i],0, sizeof(vj_task_arg_t));
 		memset( p_thread_args[i],0, sizeof(uint8_t));
 		memset( &(running_tasks[i]), 0, sizeof(struct task));
-	}
-
-	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
-	if( n_cpu <= 0 )
-	{
-		n_cpu = 1;
 	}
 
 	numThreads = 0;
