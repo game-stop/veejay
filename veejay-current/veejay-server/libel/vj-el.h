@@ -155,6 +155,8 @@ float	vj_el_get_default_framerate( int norm );
 
 char	vj_el_get_default_norm( float fps );
 
+long      vj_el_get_mem_size();
+
 int	vj_el_auto_detect_scenes( editlist *el, uint8_t *tmp[4], int w, int h, int dl_threshold );
 
 #endif

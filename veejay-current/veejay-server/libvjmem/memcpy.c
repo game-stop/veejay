@@ -1728,3 +1728,21 @@ void	benchmark_veejay(int w, int h)
 	benchmark_tasks( n_tasks, n_frames,w,h );
 }
 
+void	*vj_hmalloc(size_t sze, const char *name)
+{
+	void *data = vj_malloc( sze );
+	if( data == NULL ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate memory (needed %ld bytes)", (long) sze );
+		return NULL;
+	}
+	int tiedtoram = 1;
+	if( mlock( data,sze ) != 0 )
+		tiedtoram = 0;
+
+	veejay_msg(VEEJAY_MSG_DEBUG,"Using %.2f MB RAM %s (memory %s paged to the swap area)",
+			((float) sze/1048576.0f),
+			name,
+			(tiedtoram ? "is not going to be" : "may be" )
+			);
+	return data;
+}

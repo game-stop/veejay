@@ -32,18 +32,13 @@
 
 enum {
   NO_AUDIO = 0,
-  AUDIO_PLAY = 1,
-  AUDIO_RENDER = 2,
+  AUDIO_PLAY = 1
 };
-
-
-
 
 enum {
     LAVPLAY_STATE_STOP = 0,	/* uninitialized state */
     LAVPLAY_STATE_PAUSED = 1,	/* also known as: speed = 0 */
-    LAVPLAY_STATE_PLAYING = 2,	/* speed != 0 */
-    LAVPLAY_STATE_RENDER_READY = 3, /* render mode */
+    LAVPLAY_STATE_PLAYING = 2	/* speed != 0 */
 };
 
 /* nmacro recorder, 5 lines code for play back of what you changed at navigation */
@@ -115,7 +110,6 @@ typedef struct
 	int	rec_id;
 } sequencer_t;
 
-
 typedef struct {
     pthread_t software_playback_thread;
     pthread_t playback_thread;	
@@ -128,10 +122,8 @@ typedef struct {
     pthread_t signal_thread;
     sigset_t signal_set;
     struct timespec lastframe_completion;	/* software sync variable */
-
     long old_field_len;
     uint64_t save_list_len;		/* for editing purposes */
-
     double spvf;		/* seconds per video frame */
     int usec_per_frame;		/* milliseconds per frame */
     int min_frame_num;		/* the lowest frame to be played back - normally 0 */
@@ -153,7 +145,6 @@ typedef struct {
     double spas;		/* seconds per audio sample */
     int audio_mute;		/* controls whether to currently play audio or not */
     int state;			/* playing, paused or stoppped */
-  //  pthread_t playback_thread;	/* the thread for the whole playback-library */
     int offline_ready;
     int offline_record;
     int offline_tag_id;
@@ -247,7 +238,6 @@ typedef struct {
     int port;
     float rtc_delay;
     int is_server;
-    int render_changed;
     int input_device;
     int geox;
     int geoy;
@@ -255,6 +245,9 @@ typedef struct {
     int scene_detection;
     int mouse[4];
     char *osd_extra;
+    int ram_chain;		/* keep fx chain buffers in RAM (1) or dynamic pattern (0) */
+	int max_cached_mem;
+	int	max_cached_slots;
 } user_control;
 
 typedef struct {
@@ -272,8 +265,6 @@ typedef struct {
     editlist *current_edit_list;
     editlist *edit_list;		/* the playing editlist */
     user_control *uc;		/* user control */
-
-//    v4l_video *vj[4];		/* v4l input */
     void *osc;
     VJFrame *plugin_frame;
     VJFrameInfo *plugin_frame_info; 
@@ -284,8 +275,6 @@ typedef struct {
 #ifdef HAVE_DIRECTFB
     void *dfb;
 #endif
-    //vj_ladspa_instance *vli;
-    //int vli_enabled;
     int video_out;
 #ifdef HAVE_GL
     void	*gl;

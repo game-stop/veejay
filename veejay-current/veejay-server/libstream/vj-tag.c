@@ -3878,7 +3878,7 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 		int res = vj_tag_set_effect( dst_sample, chain_index, effect_id );
 
 		if(res < 0 ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d) to stream %d\n",
+			veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d) to stream %d",
 			    effect_id, chain_index, dst_sample);
 		}
 		else {

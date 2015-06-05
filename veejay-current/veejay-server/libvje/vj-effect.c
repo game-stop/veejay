@@ -176,6 +176,9 @@ int  pixel_U_hi_ = 240;
 int  pixel_Y_lo_ = 16;
 int  pixel_U_lo_ = 16;
 
+static uint8_t *vje_buffer = NULL;
+static ssize_t vje_buflen = 0;
+
 int	get_pixel_range_min_Y() {
 	return pixel_Y_lo_;
 }
@@ -511,8 +514,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 		veejay_msg(VEEJAY_MSG_WARNING,"Video width should be a multiple of 32 for some effects" );
 	}
 
-    for(k=0; k  < MAX_EFFECTS; k++)
-	vj_effects[k] = NULL;
+	veejay_memset( vj_effects, 0, sizeof(vj_effects));
+	veejay_memset( vj_effect_ready,0,sizeof(vj_effect_ready));
 
     vj_effects[0] = dummy_init(width,height);
     vj_effects[1] = overlaymagic_init( width,height );
@@ -683,32 +686,35 @@ void vj_effect_initialize(int width, int height, int full_range)
 
 }
 
+static void vj_effect_free_parameters( vj_effect *v )
+{
+	int i;
+	for( i = 0; i < v->num_params; i ++ ) {
+		if( v->param_description[i] ) 
+			free( v->param_description[i] );
+	}
+	free( v->param_description );
+}
+
 void vj_effect_free(vj_effect *ve) {
-  if(ve->limits[0]) free(ve->limits[0]);
-  if(ve->limits[1]) free(ve->limits[1]);
-  if(ve->defaults) free(ve->defaults);
-  int i = 0;
-/*  if( ve->param_description != NULL ) {
-  	for( i = 0; ve->param_description[i] != NULL; i ++ )
-		  free(ve->param_description[i]);
-  
-   	free(ve->param_description);
-  } */
-	// FIXME cleanup
-   // if(ve->vjed) free(ve->vjed);
-    free(ve);
+  if( ve ) {
+	 if(ve->limits[0]) free(ve->limits[0]);
+	 if(ve->limits[1]) free(ve->limits[1]);
+	 if(ve->defaults) free(ve->defaults);
+     	 if(ve->param_description) vj_effect_free_parameters( ve );
+	 free(ve);
+  }
 }
 
 void vj_effect_shutdown() {
     int i;
     vj_effect_deactivate_all(); 
     for(i=0; i < vj_effect_max_effects(); i++) { 
-	if(vj_effects[i]) {
-	 if( i >= MAX_EFFECTS )
-	  if(vj_effects[i]->description) free(vj_effects[i]->description);
- 	  vj_effect_free(vj_effects[i]);
-
-	}
+		if(vj_effects[i]) {
+			if( i >= MAX_EFFECTS && vj_effects[i]->description) 
+				free(vj_effects[i]->description);
+		  vj_effect_free(vj_effects[i]);
+		}
     }
 
     diff_destroy();
@@ -717,7 +723,6 @@ void vj_effect_shutdown() {
     rotozoom_destroy();
     distortion_destroy();
     cali_destroy();
-
     plug_sys_free();
 }
 
@@ -833,7 +838,7 @@ char *vj_effect_get_param_description(int effect_id, int param_nr)
     int entry;
     entry = vj_effect_real_to_sequence(effect_id);
     if (entry > 0 && param_nr < vj_effects[entry]->num_params)
-	return vj_effects[entry]->param_description[param_nr];
+		return vj_effects[entry]->param_description[param_nr];
     return "Invalid paramater";
 }
 

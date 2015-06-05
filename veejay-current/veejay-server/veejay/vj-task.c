@@ -122,8 +122,8 @@ static void		task_reset()
 
 	memset( &p_threads,0,sizeof(p_threads));
 	memset( &p_tasks,0,sizeof(p_tasks));
-	memset( job_list,0,sizeof(pjob_t*) * MAX_WORKERS );
-	memset( &vj_task_args,0,sizeof(vj_task_arg_t*) * MAX_WORKERS );
+//	memset( job_list,0,sizeof(pjob_t*) * MAX_WORKERS );
+//	memset( &vj_task_args,0,sizeof(vj_task_arg_t*) * MAX_WORKERS );
 	for( i = 0; i < MAX_WORKERS; i ++ ) {
 		memset( job_list[i],0, sizeof(pjob_t));
 		memset( vj_task_args[i],0, sizeof(vj_task_arg_t));

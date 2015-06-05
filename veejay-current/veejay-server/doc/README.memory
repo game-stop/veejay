@@ -1,0 +1,18 @@
+
+STATIC FX CHAIN
+
+Veejay pre-allocates a large buffer (aprox. 180 MB for 1280x720 video) to cache the entire fx_chain.
+If you wish to turn off this option, you can use the -X or --dynamic-fx-chain commandline parameters.
+When dynamic allocation is enabled, each chain entry is allocated and freed on the fly between switching samples.
+Individual FX are always allocated and freed between switching samples.
+
+MEMORY CACHE
+
+Veejay can (optionally) use your RAM to cache video frames from file to memory. By default this option is turned off.
+you can enable it by specifying both the -m and -l commandline parameters. They both expect arguments.
+Enter a percentage of your total phsyical RAM memory to use for -m and divide it equally over -l slots.
+
+These options will allow you to commit the frames from the sample's EDL to memory while playing, so that subsequent loops no longer require disk-access.
+This option should help you increase the audio playback quality when using the FX chain (reducing or elminating stutter)
+
+

@@ -56,7 +56,7 @@ typedef struct
 	void *scaler;
 	VJFrame *a;
 	VJFrame *b;
-	ssize_t bufsize;
+	size_t bufsize;
 } threaded_t;
 
 #define STATE_INACTIVE 0

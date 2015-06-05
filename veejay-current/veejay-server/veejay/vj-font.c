@@ -1096,7 +1096,6 @@ static char 	*select_font( vj_font_t *ec, int id )
 
 static	char	*get_font_name( vj_font_t *f,const char *font, int id )
 {
-	int len = 0;
 	char *string;
 	int platform,encoding,lang;
 	int error;
@@ -1112,7 +1111,6 @@ static	char	*get_font_name( vj_font_t *f,const char *font, int id )
 	}
 	
 	FT_SfntName sn,qn,zn;	
-	FT_SfntName	sname;
 	FT_UInt		snamei,snamec;
 
 	FT_Face face;
@@ -1176,7 +1174,7 @@ static	char	*get_font_name( vj_font_t *f,const char *font, int id )
 		}
 	}
 
-	int i,k;
+	int i;
 
 	for( i=0; i < tlen; i +=2 ) {
 	       fontName[i/2] = string[i+1];
@@ -1294,10 +1292,9 @@ void	vj_font_dictionary_destroy( void *font, void *dict )
 	char **items = vevo_list_properties(dict );
 	if(!items) {
 		vpf(dict);
+		dict = NULL;
 		return;
 	}
-
-	vj_font_t *f = (vj_font_t*) font;
 
 	int i;
 	for( i = 0; items[i] != NULL ; i ++ )
@@ -1312,6 +1309,7 @@ void	vj_font_dictionary_destroy( void *font, void *dict )
 	}
 	free(items);
 	vpf( dict );
+	dict = NULL;
 }
 
 
@@ -1382,7 +1380,7 @@ static int	configure(vj_font_t *f, int size, int font)
 		fallback_font( f );
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Using font %s, size %d (#%d)", f->font, size, font );
+//	veejay_msg(VEEJAY_MSG_DEBUG, "Using font %s, size %d (#%d)", f->font, size, font );
 	veejay_memset( selected_default_font, 0, sizeof(selected_default_font));
 	strncpy( selected_default_font, f->font,strlen(f->font)) ;
 
@@ -2264,7 +2262,6 @@ int	vj_font_norender(void *ctx, long position)
 
 void	vj_font_render_osd_status( void *ctx, void *_picture, char *status_str, int placement )
 {
-	vj_font_t *f = (vj_font_t*) ctx;
 	vj_font_set_osd_text(ctx,status_str);
 	if(placement == 1) {
 		vj_font_text_osd_render( ctx, _picture, 5, 5 );

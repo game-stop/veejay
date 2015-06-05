@@ -4911,6 +4911,8 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
 	}
 
 	sample_del_all(v->edit_list);
+	vj_font_set_dict( v->font, NULL );
+
 	veejay_memset(v->seq->samples, 0, sizeof(int) * MAX_SEQUENCES );
 	v->seq->active = 0;
 	v->seq->size = 0;
@@ -9814,6 +9816,12 @@ void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	)
 		return;
 	}
 
+	void *font = vj_font_get_dict( v->font );
+	if(!font) {
+		SEND_MSG(v, "000000" );
+		return;
+	}
+
 	char **list = vj_font_get_sequences( v->font );
 	int i;
 
@@ -9835,7 +9843,9 @@ void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	)
 		return;
 	}
 
-	str = vj_calloc( len + 20 );
+	for ( i = 0; list[i] != NULL; i ++ ) { }
+
+	str = vj_calloc( len + (i*2) + 6 );
 	char *p = str;
 	sprintf(p, "%06d", len );
 	p += 6;

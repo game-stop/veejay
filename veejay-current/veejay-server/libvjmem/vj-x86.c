@@ -35,7 +35,7 @@ extern void find_best_memset(void);
 extern void yuyv_plane_init();
 extern void benchmark_tasks(int n_tasks, long n_frames, int w, int h);
 extern void init_parallel_tasks(int n_tasks);
-static int MEM_ALIGNMENT_SIZE = 0;
+static int MEM_ALIGNMENT_SIZE = 32;
 static int CACHE_LINE_SIZE = 64;
 
 

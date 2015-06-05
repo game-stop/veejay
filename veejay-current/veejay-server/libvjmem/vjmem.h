@@ -52,4 +52,5 @@ extern void	vj_frame_clear1( uint8_t *input, unsigned int value, int size );
 extern uint8_t	num_threaded_tasks();
 extern void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac );
 extern void	benchmark_veejay(int w, int h);
+extern void	*vj_hmalloc(size_t sze, const char *name);
 #endif

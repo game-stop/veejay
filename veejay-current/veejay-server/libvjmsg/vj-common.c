@@ -82,7 +82,7 @@ typedef struct {
 	sem_t *semaphore;
 	char **dommel;
 	uint64_t pos;
-	ssize_t size;
+	size_t size;
 } message_ring_t;
 
 /*

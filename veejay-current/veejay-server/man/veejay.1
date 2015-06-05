@@ -151,7 +151,7 @@ Specify framerate of dummy video
 .B \-N [01]
 Specify norm of dummy video (0=PAL, 1=NTSC). defaults to PAL
 .TP
-.B \-M/--multicast-osc <address>
+.B \--multicast-osc <address>
 Starts OSC receiver in multicast mode
 .TP
 .B \-T/--multicast-vims <address>
@@ -181,6 +181,9 @@ Encode veejay server IP and port number in QR code image
 .TP
 .B \-S/--scene-detection <threshold>
 Create new samples based on scene detection threshold. 
+.TP
+.B \-M/--dynamic-fx-chain
+Do not keep the fx chain buffers in RAM. Specify this option if you prefer dynamic allocation instead (slower, but no RAM is reserved)
 .TP
 .B \--benchmark NxN
 Benchmark veejay's core functions (multi-thread vs single thread model) using a specific resolution NxN

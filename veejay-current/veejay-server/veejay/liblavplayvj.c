@@ -637,8 +637,6 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
 	 info->sfd = sample_get_framedup(sample_id);
 
-	 info->uc->render_changed = 1; /* different render list */
-    
 	 if( info->settings->sample_restart )
 		 sample_reset_offset( sample_id );	/* reset mixing offsets */
 	
@@ -666,7 +664,6 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 	int	tmp = vj_tag_chain_malloc( stream_id);
 
-	info->uc->render_changed = 1;
 	settings->min_frame_num = 1;
 	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
 #ifdef HAVE_FREETYPE
@@ -1157,10 +1154,6 @@ void veejay_pipe_write_status(veejay_t * info)
 
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
-    if (info->uc->render_changed == 1)
-		info->uc->render_changed = 0;
-
-
 }
 static	char	*veejay_concat_paths(char *path, char *suffix)
 {
@@ -1825,7 +1818,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
 		return -1;
-    	}
+    }
+
+	if( vj_el_get_mem_size() == 0 )
+		prepare_cache_line( info->uc->max_cached_mem,info->uc->max_cached_slots );
+
 	info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
 	if( !info->shm ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize shared resource!");
@@ -2665,6 +2662,14 @@ int	prepare_cache_line(int perc, int n_slots)
 	}
 
 	max_memory -= mmap_memory;
+	max_memory -= (vj_perform_fx_chain_size()/1024);
+
+	if( max_memory <= 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Please enter a larger value for -m");
+		veejay_msg(VEEJAY_MSG_ERROR, "Need a minimum of %ld MB RAM to run if -M is not specified", vj_perform_fx_chain_size()/(1024*1024));
+		veejay_msg(VEEJAY_MSG_ERROR, "Memory frame cache disabled");
+		return 1;
+	}
 
 	if( n_slots <= 0)
 		n_slots = 1;
@@ -2684,10 +2689,9 @@ int	prepare_cache_line(int perc, int n_slots)
 		vj_el_init_chunk( chunk_size );
 	}
 	else {
-		veejay_msg(VEEJAY_MSG_INFO, "Memory cache disabled");
+		veejay_msg(VEEJAY_MSG_INFO, "Memory frame cache disabled");
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "Memory map size per EDL is %2.2f Mb",(float) mmap_memory / 1024.0f);
-
+	veejay_msg(VEEJAY_MSG_INFO, "Memory cache size per EDL is %2.2f Mb",(float) mmap_memory / 1024.0f);
 
 	return 1;
 }
@@ -2763,11 +2767,12 @@ veejay_t *veejay_malloc()
     info->uc->direction = 1;	/* pause */
     info->uc->sample_start = 0;
     info->uc->sample_end = 0;
-    info->net = 1;
+	info->uc->ram_chain = 1; /* enable, keep FX chain buffers in memory (reduces the number of malloc/free of frame buffers) */
+	info->net = 1;
 	info->status_line = (char*) vj_calloc(sizeof(char) * 1500 );
     for( i =0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
-	info->rlinks[i] = -1;
-	info->rmodes[i] = -1;
+		info->rlinks[i] = -1;
+		info->rmodes[i] = -1;
 	}
 
     veejay_memset(info->action_file[0],0,sizeof(info->action_file[0])); 

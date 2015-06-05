@@ -2811,7 +2811,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
     if (effect_id != -1) {
 		int j;
 		if (!sample_chain_add(dst_sample, chain_index, effect_id)) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)\n", effect_id, chain_index);
+			veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)", effect_id, chain_index);
 		}
 		else {
 			/* load the parameter values */

@@ -48,7 +48,6 @@
 #include <veejay/vj-OSC.h>
 #include <build.h>
 extern void	veejay_init_msg_ring(); 
-extern long vj_el_get_mem_size();
 extern void vj_libav_ffmpeg_version();
 static veejay_t *info = NULL;
 static float override_fps = 0.0;
@@ -66,7 +65,7 @@ static int n_slots_ = 0;
 static int max_mem_ = 0;
 static int live =0;
 static int ta = 0;
-static int osl = 0;
+
 static void CompiledWith()
 {
 	veejay_msg(VEEJAY_MSG_INFO,"Compilation flags:");
@@ -296,6 +295,8 @@ static void Usage(char *progname)
 #endif
 	fprintf(stderr,
 		"  -S/--scene-detection <num>\tCreate new samples based on scene detection threshold <num>\n");
+	fprintf(stderr,
+		"  -M/--dynamic-fx-chain\t\tDo not keep FX chain buffers in RAM (default off)\n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
@@ -351,7 +352,7 @@ static int set_option(const char *name, char *value)
 		info->settings->use_vims_mcast = 1;
 		info->settings->vims_group_name = strdup(optarg);
 	}
-	else if (strcmp(name, "multicast-osc") == 0 || strcmp(name, "M") == 0 )
+	else if (strcmp(name, "multicast-osc") == 0 )
 	{
 		check_val(optarg,name);
 		info->settings->use_mcast = 1;
@@ -361,11 +362,13 @@ static int set_option(const char *name, char *value)
 	{
 		n_slots_ = atoi( optarg );
 		if(n_slots_ < 0 ) n_slots_ = 0; else if (n_slots_ > 100) n_slots_ = 100;
+		info->uc->max_cached_slots = n_slots_;
 	}
 	else if (strcmp(name, "memory" ) == 0 || strcmp(name, "m" ) == 0)
 	{
 		max_mem_ =  atoi(optarg);
 		if(max_mem_ < 0 ) max_mem_ = 0; else if (max_mem_ > 100) max_mem_ = 100;
+		info->uc->max_cached_mem = max_mem_;
     } else if (strcmp(name, "synchronization") == 0
 	       || strcmp(name, "c") == 0) {
 	info->sync_correction = atoi(optarg);
@@ -515,6 +518,10 @@ static int set_option(const char *name, char *value)
 	{
 		info->dummy->active = 1; // enable DUMMY MODE
 	}
+    	else if (strcmp(name, "dynamic-fx-chain" ) == 0 || strcmp(name, "M" ) == 0 )
+	{
+		info->uc->ram_chain = 0;
+	}
     	else
 		nerr++;			/* unknown option - error */
 
@@ -582,6 +589,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"load-generators",1,0,0},
 	{"qrcode-connection-info",0,0,0},
 	{"scene-detection",1,0,0},
+	{"dynamic-fx-chain",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -595,12 +603,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:S:",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:nILPVDugvBdibjqeZMS:X:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ:S:"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:nILPVDugvBdibjqeZMS:X:"
 						   )) != EOF)
 #endif
     {
@@ -739,9 +747,6 @@ int main(int argc, char **argv)
 		veejay_free(info);
 		return 0;
 	}
-
-	if( vj_el_get_mem_size() == 0 )
-		prepare_cache_line( max_mem_, n_slots_ );
 
 	veejay_check_homedir( info );
 

@@ -8313,16 +8313,6 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 	sample_slot_t *slot = info->sample_banks[page_num]->slot[slot_num];
 	sample_gui_slot_t *gui_slot = info->sample_banks[page_num]->gui_slot[slot_num];
 
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG, "update slot %d on page %d with (type=%d,id=%d)",
-				slot_num, page_num, sample_type, sample_id );
-	veejay_msg(VEEJAY_MSG_DEBUG, "(#%d,type=%d,%s,%s) change to (#%d,type=%d,%s,%s)",
-			slot->sample_id,slot->sample_type,slot->timecode,slot->title,
-			sample_id,sample_type,timecode,title );
-#endif
-
-
-
 	if(slot->timecode) free(slot->timecode);
 	if(slot->title) free(slot->title);
 	
@@ -8350,9 +8340,7 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 
 		if(sample_id > 0 )
 		{
-			gchar frame_title[8];
-			snprintf(frame_title, sizeof(frame_title)-1, "%s", slot->title );
-			gtk_frame_set_label( GTK_FRAME(gui_slot->frame),frame_title );
+			gtk_frame_set_label( GTK_FRAME(gui_slot->frame),slot->title );
 		}
 		else
 		{

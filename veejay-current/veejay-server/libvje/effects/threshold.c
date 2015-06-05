@@ -83,58 +83,10 @@ static int _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
 			return 1;
 	return 0;
 }
-#ifdef HAVE_ASM_MMX
-static	inline	void	load_binary_map( uint8_t *mask )
-{
-	__asm __volatile(
-		"movq	(%0),	%%mm0\n\t"
-		:: "r" (mask) 
-	);
-}
-
-static		inline	void	map_luma( uint8_t *dst, uint8_t *B )
-//static	inline	void	map_luma( uint8_t *dst, uint8_t *B, uint8_t *mask )
-{
-	__asm __volatile(
-	//	"movq	(%0),	%%mm0\n\t"
-		"movq	(%0),	%%mm1\n\t"
-		"pand	%%mm0,  %%mm1\n\t"
-		"movq	%%mm1,  (%1)\n\t"
-	//	:: "r" (mask), "r" (B), "r" (dst) 
-		:: "r" (B) , "r" (dst)
-	);
-}
-
-static	inline	void	load_chroma( uint8_t val )
-{
-	uint8_t mask[8] = { val,val,val,val, val,val,val,val };
-	uint8_t *m = &mask[0];
-
-	__asm __volatile(
-		"movq	(%0),	%%mm3\n\t # mm3: 128,128,128,128, ..."  
-		:: "r" (m)
-	);
-}
-
-static	inline	void	map_chroma( uint8_t *dst, uint8_t *B )
-{
-	__asm	__volatile(
-		"movq	(%0),	%%mm1\n\t"
-		"pand	%%mm0,   %%mm1\n\t"
-		"pxor	%%mm5,  %%mm5\n\t"
-		"pcmpeqb %%mm1,%%mm5\n\t"
-		"pand	%%mm3,%%mm5\n\t"
-		"paddb	%%mm5,%%mm1\n\t"
-		"movq	%%mm1,  (%1) \n\t"
-		:: "r" (B), "r" (dst)
-	);
-
-}
-#endif
 
 void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse )
 {
-	unsigned int y;
+	unsigned int y,x;
     	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -143,40 +95,10 @@ void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int
 	uint8_t *Cr2=frame2->data[2];
 
 	uint8_t *bmap = binary_img;
-
+	int len = frame->len;
 	softblur_apply( frame, width,height,0 );
 
-	binarify_1src( binary_img,Y,threshold,reverse, width,height);
-
-#ifdef HAVE_ASM_MMX
-	int work = (width*height)>>3;
-	load_chroma( 128 );
-	for( y = 0 ; y < work; y ++ )
-	{
-		load_binary_map( bmap );
-		map_luma(Y , Y2 );
-		map_chroma( Cb, Cb2 );
-		map_chroma( Cr, Cr2 );
-		//@ we could mmx-ify dilation
-		Y  += 8;
-		Y2 += 8;	
-		Cb += 8;
-		Cb2 += 8;
-		Cr += 8;
-		Cr2 +=8;
-		bmap += 8; 
-	}
-
-	do_emms;
-#else
-
-//	veejay_memset( Y, 0, width );
-//	veejay_memset( Cb, 128, width );
-//	veejay_memset( Cr, 128, width );
-
-//	veejay_memset(Y+(len-width),0, width );
-//	veejay_memset(Cb+(len-width),128,width);
-//	veejay_memset(Cr+(len-width),128,width);
+	binarify_1src( binary_img,Y,threshold,0, width,height);
 
 //	len -= width;
 
@@ -223,5 +145,4 @@ void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int
 			}
 		}
 	}
-#endif
 }

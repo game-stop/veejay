@@ -73,7 +73,7 @@ int	vj_perform_get_width( veejay_t *info );
 int	vj_perform_get_height( veejay_t *info );
 
 void	vj_perform_follow_fade(int status);
-
+size_t	vj_perform_fx_chain_size();
 
 void	vj_perform_record_video_frame(veejay_t *info);
 

@@ -479,7 +479,7 @@ vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, float fp
 		d->img->height = height;
 	}
 
-	ssize_t safe_max_frame_size = (max_frame_size < GREMLIN_GUARDIAN) ? 128 * 1024: RUP8(max_frame_size);
+	size_t safe_max_frame_size = (max_frame_size < GREMLIN_GUARDIAN) ? 128 * 1024: RUP8(max_frame_size);
 
 	d->tmp_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * safe_max_frame_size );
         d->fmt = id;
