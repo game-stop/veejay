@@ -1050,7 +1050,7 @@ long lav_frame_size(lav_file_t *lav_file, long frame)
 #endif
 #ifdef USE_GDK_PIXBUF
 	if(video_format == 'x')
-		return 1;
+		return output_scale_width * output_scale_height * 3;
 #endif
 #ifdef HAVE_LIBQUICKTIME
 	if( video_format == 'q' || video_format == 'Q')
