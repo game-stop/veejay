@@ -2928,12 +2928,12 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			
 		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ))
 		{
-			update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START] );
+	//		update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START] );
 			update = 1;
 		}
 		if( (history[SAMPLE_END] != info->status_tokens[SAMPLE_END] ))
 		{
-			update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
+	//		update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
 			update = 1;
 		}
 		
@@ -6183,10 +6183,6 @@ static void	process_reload_hints(int *history, int pm)
 		load_editlist_info();
 		reload_editlist_contents();
 	}
-	update_spin_range(
-	 	"spin_samplestart", 0, info->el.num_frames, info->status_tokens[SAMPLE_START] );
-	update_spin_range(
-		"spin_sampleend", 0, info->el.num_frames , info->status_tokens[SAMPLE_END] );
 
 	if( info->uc.reload_hint[HINT_SLIST] )
 	{
