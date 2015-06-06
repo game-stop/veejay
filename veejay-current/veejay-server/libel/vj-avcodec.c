@@ -72,8 +72,7 @@ char*	vj_avcodec_get_codec_name(int codec_id )
 		default:
 			snprintf(name,sizeof(name), "Unknown"); break;
 	}
-	char *res = strdup(name);
-	return res;
+	return vj_strdup(name);
 }
 
 void			vj_libav_ffmpeg_version()

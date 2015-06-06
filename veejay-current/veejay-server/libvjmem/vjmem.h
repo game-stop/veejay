@@ -29,11 +29,11 @@ extern int 	vj_mem_threaded_init(int w, int h);
 extern void 	vj_mem_threaded_stop(void);
 extern char 	*get_memcpy_descr( void );
 extern void	*vj_malloc_(size_t size);
-extern void 	*vj_calloc_(unsigned int size );
-extern void 	*vj_strict_malloc(unsigned int size, const char *f, int line );
-extern void 	*vj_strict_calloc(unsigned int size, const char *f, int line );
+extern void 	*vj_calloc_(size_t size );
+
 #define vj_malloc(i) vj_malloc_(i)
 #define vj_calloc(i) vj_calloc_(i)
+
 extern void 	fast_memset_dirty(void * to, int val, size_t len);
 extern void 	fast_memset_finish();
 extern void	packed_plane_clear( size_t len, void *to );
@@ -53,4 +53,6 @@ extern uint8_t	num_threaded_tasks();
 extern void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac );
 extern void	benchmark_veejay(int w, int h);
 extern void	*vj_hmalloc(size_t sze, const char *name);
+extern	char	*vj_strdup(const char *s);
+extern	char	*vj_strndup(const char *s, size_t n );
 #endif

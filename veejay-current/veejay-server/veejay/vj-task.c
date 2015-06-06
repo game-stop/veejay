@@ -101,8 +101,8 @@ static void		task_allocate()
 	unsigned int i;
 	for( i = 0; i < MAX_WORKERS; i ++ ) {
 		job_list[i] = vj_malloc(sizeof(pjob_t));
-		vj_task_args[i] = vj_malloc(sizeof(vj_task_arg_t));
-		p_thread_args[i] = vj_malloc( sizeof(uint8_t) );
+		vj_task_args[i] = vj_calloc(sizeof(vj_task_arg_t));
+		p_thread_args[i] = vj_calloc( sizeof(uint8_t) );
 	}
 
 	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
@@ -126,15 +126,13 @@ static void		task_reset()
 {
 	unsigned int i;
 
-	memset( &p_threads,0,sizeof(p_threads));
-	memset( &p_tasks,0,sizeof(p_tasks));
-//	memset( job_list,0,sizeof(pjob_t*) * MAX_WORKERS );
-//	memset( &vj_task_args,0,sizeof(vj_task_arg_t*) * MAX_WORKERS );
+	veejay_memset( &p_threads,0,sizeof(p_threads));
+	veejay_memset( &p_tasks,0,sizeof(p_tasks));
 	for( i = 0; i < MAX_WORKERS; i ++ ) {
-		memset( job_list[i],0, sizeof(pjob_t));
-		memset( vj_task_args[i],0, sizeof(vj_task_arg_t));
-		memset( p_thread_args[i],0, sizeof(uint8_t));
-		memset( &(running_tasks[i]), 0, sizeof(struct task));
+		veejay_memset( job_list[i],0, sizeof(pjob_t));
+		veejay_memset( vj_task_args[i],0, sizeof(vj_task_arg_t));
+		veejay_memset( p_thread_args[i],0, sizeof(uint8_t));
+		veejay_memset( &(running_tasks[i]), 0, sizeof(struct task));
 	}
 
 	numThreads = 0;
@@ -481,13 +479,17 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 		return 0;
 
 	vj_task_arg_t **f = (vj_task_arg_t**) vj_task_args;
-	unsigned int i,j;
+	uint8_t i,j;
 
 	for ( i = 0; i < n_planes; i ++ ) {
 		f[0]->input[i] = buf1[i];
 		f[0]->output[i]= buf2[i];
-		if( buf3 != NULL )
+	}
+
+	if( buf3 != NULL ) {
+		for( i = 0; i < n_planes; i ++ ) {
 			f[0]->temp[i]  = buf3[i];
+		}
 	}
 
 	f[0]->jobnum = 0;
@@ -518,6 +520,10 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	}	
 
 	performer_job( n );
+
+	for( i = 0; i < n; i ++ ) {
+		veejay_memset( f[i], 0, sizeof(vj_task_arg_t));
+	}
 
 	return 1;
 }

@@ -38,7 +38,7 @@ char	**vje_build_param_list( int num, ... )
 	int i;
 	for( i = 0; i <num; i ++ ) {
 		tmp = (char*) va_arg( args,char*);
-		list[i] = (tmp == NULL ? NULL : strdup(tmp));
+		list[i] = (tmp == NULL ? NULL : vj_strdup(tmp));
 	}
 	list[num] = NULL;
 	va_end(args);
@@ -1486,7 +1486,7 @@ inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int
 	}
 	sum+= src[radius*srcStep];
 
-	for(x=0; x<=radius; x++){
+	for(x=0; x<radius; x++){
 		sum+= src[(radius+x)*srcStep] - src[(radius-x)*srcStep];
 		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
 	}

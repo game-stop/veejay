@@ -52,15 +52,15 @@
 static	char	*keyframe_id( int p_id, int n_frame )
 {
 	char tmp[32];
-	sprintf(tmp, "FX%d_%d",p_id,n_frame );
-	return strdup(tmp);
+	snprintf(tmp,sizeof(tmp), "FX%d_%d",p_id,n_frame );
+	return vj_strdup(tmp);
 }
 
 static	char	*extract_( const char *prefix , int p_id )
 {
 	char tmp[100];
-	sprintf(tmp, "%s_p%d",prefix,p_id);
-	return strdup(tmp);
+	snprintf(tmp,sizeof(tmp), "%s_p%d",prefix,p_id);
+	return vj_strdup(tmp);
 }
 
 unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *rlen )

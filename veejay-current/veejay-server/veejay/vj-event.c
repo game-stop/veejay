@@ -343,7 +343,7 @@ int  __done = 0;\
 veejay_msg(VEEJAY_MSG_INFO, "--------------------------------------------------------");\
 for(__done = 0; __len > (__done + 80); __done += 80)\
 {\
-	char *__tmp = strndup( str+__done, 80 );\
+	char *__tmp = vj_strndup( str+__done, 80 );\
 veejay_msg(VEEJAY_MSG_INFO, "[%zu][%s]",strlen(str),__tmp);\
 	if(__tmp) free(__tmp);\
 }\
@@ -518,7 +518,7 @@ char	*get_embedded_help( int fx_mode, int play_mode, int fx_entry, int id )
 
 		int n = vj_effect_get_num_params( fx_id );
 		char *fx_descr = vj_effect_get_description(fx_id);
-		sprintf(msg,"FX slot %d:%s\n", fx_entry, fx_descr );
+		snprintf(msg,sizeof(msg),"FX slot %d:%s\n", fx_entry, fx_descr );
 		char *p   = msg + strlen(msg);
 		int i;
 		for( i = 0; i < n ; i ++ ) { //@ specific FX help
@@ -535,7 +535,7 @@ char	*get_embedded_help( int fx_mode, int play_mode, int fx_entry, int id )
 			strncpy(p, fx_embedded_help[8+i].msg, len );
 			p += len;
 		}
-		return strdup(msg);
+		return vj_strdup(msg);
 	}
 	return NULL;
 }
@@ -682,7 +682,7 @@ static	void	store_macro_(veejay_t *v, char *str, long frame )
 	if( error != VEVO_NO_ERROR )
 	{ // first element
 		macro_block_t *m = vj_calloc( sizeof(macro_block_t));
-		m->msg[0] = strdup(str); 	
+		m->msg[0] = vj_strdup(str); 	
 		m->pending[0] = 1;
 		m->age[0] = macro_current_age_;
 		macro_current_age_++;
@@ -696,7 +696,7 @@ static	void	store_macro_(veejay_t *v, char *str, long frame )
 		{
 			if(c->msg[k] == NULL )	
 			{
-				c->msg[k] = strdup(str);
+				c->msg[k] = vj_strdup(str);
 				c->pending[k] = 1;
 				c->age[k] = macro_current_age_;
 				macro_current_age_ ++;
@@ -908,7 +908,7 @@ vj_keyboard_event *new_keyboard_event(
 	if(value)
 	{
 		ev->arg_len = strlen(value);
-		ev->arguments = strndup( value, ev->arg_len );
+		ev->arguments = vj_strndup( value, ev->arg_len );
 	}
 	else
 	{
@@ -1313,7 +1313,7 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 				if(fmt) free(fmt);
 				return;
 			}
-			vims_arguments[i].value = (void*) strdup( str_arg );
+			vims_arguments[i].value = (void*) vj_strdup( str_arg );
 			if(flags & VIMS_REQUIRE_ALL_PARAMS )
 			{
 				if( strlen((char*)vims_arguments[i].value) <= 0 )
@@ -1400,7 +1400,7 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 		veejay_memset(str,0, sizeof(str) );
 		if(sscanf( msg, "%s", str ) <= 0 )
 			return res;
-		res = strndup( str, 255 ); 	
+		res = vj_strndup( str, 255 ); 	
 	}	
 	return res;
 }
@@ -1521,7 +1521,11 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		char *arg_str = NULL;
 		memset( i_args, 0, sizeof(i_args) );
 
-		arg_str = arguments = strndup( msg + 4 , msg_len - 4 );
+		int n = 4;
+		if( msg[msg_len-4] == ';' )
+			n = 5;
+
+		arg_str = arguments = vj_strndup( msg + 4 , msg_len - n );
 
 		if( arguments == NULL )
 		{
@@ -2140,7 +2144,7 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 	}
 
 	veejay_set_colors( c );
-	v->settings->action_scheduler.sl = strdup( sample_list );
+	v->settings->action_scheduler.sl = vj_strdup( sample_list );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Scheduled '%s' for restart", sample_list );
 		
 	v->settings->action_scheduler.state = 1;
@@ -2446,7 +2450,7 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 		if(ff)
 		{
 			if(ff->arguments) free(ff->arguments);
-			if( value ) ff->arguments = strdup(value);
+			if( value ) ff->arguments = vj_strdup(value);
 			if( value ) ff->arg_len   = strlen(value); else ff->arg_len = 0;
 			ff->event_id = event_id;
 			veejay_msg( VEEJAY_MSG_DEBUG,"Updated keybinding %d + %d to VIMS %03d:%s;",modifier,symbol, ff->event_id, value);
@@ -2537,7 +2541,7 @@ char *find_keyboard_default(int id)
 		if( vj_event_default_sdl_keys[i].event_id == id )
 		{
 			if( vj_event_default_sdl_keys[i].value != NULL )
-				result = strdup( vj_event_default_sdl_keys[i].value );
+				result = vj_strdup( vj_event_default_sdl_keys[i].value );
 			break;
 		}
 	}
@@ -9498,7 +9502,7 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 
 	v->uc->hackme = 1;
-	v->uc->filename = strdup( filename );
+	v->uc->filename = vj_strdup( filename );
 }
 #endif
 #endif

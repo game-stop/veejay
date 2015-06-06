@@ -1247,8 +1247,8 @@ void	veejay_check_homedir(void *arg)
 				"HOME environment variable not set.");
 		return;
 	}
-	sprintf(path, "%s/.veejay", home );
-	info->homedir = strndup( path, 1024 );
+	snprintf(path,sizeof(path), "%s/.veejay", home );
+	info->homedir = vj_strndup( path, 1024 );
 
 	if( veejay_valid_homedir(path) == 0)
 	{

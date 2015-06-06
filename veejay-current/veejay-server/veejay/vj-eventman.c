@@ -193,7 +193,7 @@ static vevo_port_t	*_new_event(
 {
 	int n = 0;
 	int it = 1;
-	char param_name[16];
+	char param_name[32];
 	char descr_name[255];
 
 	vevo_port_t *p = (void*) vpn( VEVO_EVENT_PORT );
@@ -216,10 +216,10 @@ static vevo_port_t	*_new_event(
 		int dd   = 0;
 		char *ds = NULL;
 
-		sprintf(param_name, "argument_%d", n );
+		snprintf(param_name,sizeof(param_name), "argument_%d", n );
 		const char *arg = va_arg( ap, const char*);
-		char *descr = (char*) strdup( arg );
-		sprintf(descr_name, "help_%d", n );
+		char *descr = (char*) vj_strdup( arg );
+		snprintf(descr_name,sizeof(descr_name), "help_%d", n );
 		
 		if (format[it] == 'd')
 		{

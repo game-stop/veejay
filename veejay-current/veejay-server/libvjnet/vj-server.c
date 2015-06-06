@@ -1132,5 +1132,5 @@ char *vj_server_my_ip()
 
 	close(sock);
 
-	return strdup(tmp);
+	return vj_strdup(tmp);
 }

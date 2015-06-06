@@ -299,7 +299,7 @@ static vevo_property_t *prop_node_get(vevo_port_t * p, ukey_t key)
 static port_index_t *port_node_new(__vevo_port_t *port,const char *key, ukey_t hash_key)
 {
 	port_index_t *i = (port_index_t *) vevo_pool_alloc_node(port_index_t, port->pool );
-    i->key = strdup(key);
+    i->key = vj_strdup(key);
     i->hash_code = hash_key;
     i->next = NULL;
     return i;
@@ -1455,7 +1455,7 @@ char **vevo_list_properties(vevo_port_t * p)
     l = (port_index_t *) port->index;
 
     while (l != NULL) {
-        	list[i] = (char *) strdup(l->key);
+       	list[i] = (char *) vj_strdup(l->key);
 		i++;
 		l = l->next;
 	//i++;
@@ -1540,14 +1540,13 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
     unsigned int N = 8;	// null terminated list of keys 2 -> 4 -> 8 -> 16 etc
     int idx = 0;
 
-    vevo_storage_t **list = (vevo_storage_t**)vj_malloc(sizeof(vevo_storage_t*) * N );
+    vevo_storage_t **list = (vevo_storage_t**) malloc(sizeof(vevo_storage_t*) * N ); // realloc does not guarantee same alignment
 
     if( port->table)
     {
 	hnode_t *node = NULL;
-	hscan_t scan;
+	hscan_t scan = (hscan_t) { 0 };
 	vevo_storage_t *s = NULL;	
-	memset(&scan,0,sizeof(hscan_t));
 	hash_scan_begin( &scan,(hash_t*) port->table );
 	while((node=hash_scan_next(&scan)) != NULL)
 	{
@@ -1967,7 +1966,7 @@ char	*vevo_format_kind( vevo_port_t *port, const char *key )
 			break;		
 	}
 	
-	return strdup( token );
+	return vj_strdup( token );
 }
 
 
@@ -2010,7 +2009,7 @@ static char *vevo_scan_token_( const char *s )
 	char *res = NULL;
 	
 	if( ld > 0 && fk )
-		res = strndup( s, ld );
+		res = vj_strndup( s, ld );
 
 	return res;
 }
@@ -2154,7 +2153,7 @@ int	vevo_sscanf_property( vevo_port_t *port, const char *s)
 					n = sscanf( arg, "%lf", &(dbl_val[cur_elem]));
 					break;
 				case 's':
-					str_val[cur_elem] = strdup( arg );
+					str_val[cur_elem] = vj_strdup( arg );
 					n = 1;
 					break;
 				default:
@@ -2228,7 +2227,7 @@ char	**vevo_sprintf_port( vevo_port_t *port )
 		char *buf = vevo_sprintf_property(port, keys[i]);
 		if(buf)
 		{	
-			res[k++] = strdup( buf );
+			res[k++] = vj_strdup( buf );
 			free(buf);
 		}
 		free(keys[i]);
@@ -2253,14 +2252,14 @@ char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key)
 	char val[64];
 	int n = vevo_property_num_elements( port, key );
 	if( n <= 0 ) {
-		return strdup("<empty>");
+		return vj_strdup("<empty>");
 	}
 	
 	int i;
 	int atom = vevo_property_atom_type( port , key );
 
-	memset(tmp,0,sizeof(tmp));
-	memset(val,0,sizeof(val));
+	veejay_memset(tmp,0,sizeof(tmp));
+	veejay_memset(val,0,sizeof(val));
 
 	if(atom == VEVO_ATOM_TYPE_INT || atom == VEVO_ATOM_TYPE_BOOL)
 	{
@@ -2323,7 +2322,7 @@ char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key)
 	{
 		return NULL;
 	}
-	return strdup( tmp );
+	return vj_strdup( tmp );
 }
 
 
@@ -2505,7 +2504,7 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 					n = sscanf( arg, "%lf", &(dbl_val[cur_elem]));
 					break;
 				case 's':
-					str_val[cur_elem] = strdup( arg );
+					str_val[cur_elem] = vj_strdup( arg );
 					n = 1;
 					break;
 				default:
@@ -2710,10 +2709,12 @@ vevo_property_del(vevo_port_t * p,
 char	*vevo_tabs( int lvl ) {
 	char tmp[32];
 	int i;
+	if( lvl > 31 )
+			lvl = 31;
 	for( i = 0; i < lvl; i ++ )
 			tmp[i] = '\t';
 	tmp[lvl] = '\0';
-	return strdup(tmp);
+	return vj_strdup(tmp);
 }
 
 static struct  { //@ FIXME move to specific locations, use a register to register new port types and names

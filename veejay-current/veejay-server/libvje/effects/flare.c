@@ -165,25 +165,25 @@ void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	int a,b;
+	int a=0,b=0;
 
 	for(i=0; i < len; i++)
 	{
 		a = Y[i];
 		b = Y2[i];
-		if ( a < 1 ) a = 1;
+		if ( a < 16 ) a = 16;
 		Y[i] = 255 - (( op_a - b) * (op_a - b)) / a;
 		//Y[i] = CLAMP_Y(c);
 		
 		a = Cb[i];
 		b = Cb2[i];
-		if ( a < 1) a = 1;
+		if ( a < 16) a = 16;
 		Cb[i] = 255 - (( 255 - b) * ( 255 - b )) / a;
 		//Cb[i] = CLAMP_UV(c);
 		
 		a = Cr[i];
 		b = Cr2[i];
-		if ( a < 1 ) a = 1;
+		if ( a < 16 ) a = 16;
 		Cr[i] = 255 - ((255 -b ) * (255 - b)) /a ;
 		//Cr[i] = CLAMP_UV(c);
 	}

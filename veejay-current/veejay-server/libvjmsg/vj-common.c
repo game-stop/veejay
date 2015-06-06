@@ -282,7 +282,7 @@ char	*veejay_msg_ringfetch()
 	if( msg_ring->dommel[pos] == NULL )
 		return NULL;
 
-	line = strdup( msg_ring->dommel[pos]);
+	line = vj_strdup( msg_ring->dommel[pos]);
 	free(msg_ring->dommel[ pos ]);
 	msg_ring->dommel[ pos ] = NULL;
 	pos = (pos + 1) % MESSAGE_RING_SIZE;
@@ -300,7 +300,7 @@ static inline void veejay_msg_prnt(const char *line, const char *format, FILE *o
 		}
 	}
 	else {
-		veejay_msg_ringbuffer( strdup(line) );
+		veejay_msg_ringbuffer( vj_strdup(line) );
 	}
 }
 

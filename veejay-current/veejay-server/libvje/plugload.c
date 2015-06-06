@@ -319,8 +319,8 @@ static	void* 	deal_with_fr( void *handle, char *name)
 		r_params = 8;
 
 	char new_name[512];
-	sprintf(new_name, "Frei0r %s", finfo.name );
-	char *plug_x_name = strdup( new_name );
+	snprintf(new_name,sizeof(new_name), "Frei0r %s", finfo.name );
+	char *plug_x_name = vj_strdup( new_name );
 	vevo_property_set( port, "n_params", VEVO_ATOM_TYPE_INT, 1, &r_params );
 	vevo_property_set( port, "f0r_p", VEVO_ATOM_TYPE_INT,1, &n_params );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plug_x_name );
@@ -360,8 +360,8 @@ static	void*	deal_with_ff( void *handle, char *name )
 	}
 
 	char new_name[512];
-	sprintf(new_name, "FreeFrame %s", pis->pluginName );
-	plugin_name = strdup( new_name );
+	snprintf(new_name,sizeof(new_name), "FreeFrame %s", pis->pluginName );
+	plugin_name = vj_strdup( new_name );
 	if ( (q(FF_INITIALISE, NULL, 0 )).ivalue == FF_FAIL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot call init()");
@@ -854,7 +854,7 @@ vj_effect	*plug_x_get_plugin( int n )
 		for( k = 0; k < vje->num_params;k++ )
 		{
 			char key[20];
-			sprintf(key, "p%d", k );
+			snprintf(key,sizeof(key), "p%d", k );
 			void *parameter = NULL;
 			vevo_property_get( port, key, 0, &parameter );
 			if(parameter)
@@ -862,7 +862,7 @@ vj_effect	*plug_x_get_plugin( int n )
 				vevo_property_get( parameter, "min", 0, &(vje->limits[0][k]));
 				vevo_property_get( parameter, "max", 0, &(vje->limits[1][k]));	
 				vevo_property_get( parameter, "default", 0,&(vje->defaults[k]));
-				param_descr[valid_p] = strdup( "Number" );
+				param_descr[valid_p] = vj_strdup( "Number" );
 				valid_p ++;
 			}
 		}		

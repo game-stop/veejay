@@ -97,8 +97,8 @@ static	void		*lzo_;
 static VJFrame *crop_frame = NULL;
 static ycbcr_frame **video_output_buffer = NULL; /* scaled video output */
 static int	video_output_buffer_convert = 0;
-static ycbcr_frame **frame_buffer;	/* chain */
-static ycbcr_frame **primary_buffer;	/* normal */
+static ycbcr_frame **frame_buffer = NULL;	/* chain */
+static ycbcr_frame **primary_buffer = NULL;	/* normal */
 static ycbcr_frame *preview_buffer = NULL;
 static int preview_max_w;
 static int preview_max_h;
@@ -652,14 +652,13 @@ int vj_perform_init(veejay_t * info)
     record_buffer->Cb = NULL;
     record_buffer->Cr = NULL;
   
-    primary_buffer =
-	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * PRIMARY_FRAMES); 
+    primary_buffer = (ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * PRIMARY_FRAMES); 
     
     const long buf_len = performer_frame_size_ * sizeof(uint8_t);
 	int mlock_success =1 ;
     if(!primary_buffer) return 0;
 
-	for( c = 0; c < 8; c ++ )
+	for( c = 0; c < PRIMARY_FRAMES; c ++ )
 	{
 		primary_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 		primary_buffer[c]->Y = (uint8_t*) vj_malloc(buf_len);
@@ -913,9 +912,11 @@ void vj_perform_free(veejay_t * info)
 
    if(frame_buffer) free(frame_buffer);
 
-	for( c = 0;c < 8; c++ )
+	for( c = 0;c < PRIMARY_FRAMES; c++ )
 	{
-		if(primary_buffer[c]->Y) free(primary_buffer[c]->Y );
+		if(primary_buffer[c]->Y) {
+		       	free(primary_buffer[c]->Y );
+		}
 		free(primary_buffer[c] );
 	}
   	if(primary_buffer) free(primary_buffer);
@@ -3008,9 +3009,8 @@ int	vj_perform_get_height( veejay_t *info )
 static	char	*vj_perform_print_credits( veejay_t *info ) 
 {
 	char text[1024];
-	veejay_memset(text,0,sizeof(text));
 	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s\n%s",VERSION,intro,copyr,license,donateaddr);
-	return strdup(text);
+	return vj_strdup(text);
 }
 
 static	char	*vj_perform_osd_status( veejay_t *info )
@@ -3046,11 +3046,11 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 		}
 		if( status == 0 ) {
 			snprintf(tmp,sizeof(tmp), "Proj");
-			extra = strdup(tmp);
+			extra = vj_strdup(tmp);
 		}
 		else if(status == 1 ) {
 			snprintf(tmp,sizeof(tmp), "Cam");
-			extra = strdup(tmp);
+			extra = vj_strdup(tmp);
 		} 
 	}
 	

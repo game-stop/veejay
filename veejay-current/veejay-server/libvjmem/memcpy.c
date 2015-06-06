@@ -1746,3 +1746,21 @@ void	*vj_hmalloc(size_t sze, const char *name)
 			);
 	return data;
 }
+
+char	*vj_strdup( const char *s )
+{
+	size_t sl  = strlen(s);
+	size_t len = sl + 1;
+	char *ptr  = vj_malloc( len );
+	ptr[sl] = '\0';
+	return ptr ? memcpy( ptr, s, sl ) : NULL;
+}
+
+char	*vj_strndup( const char *s, size_t n )
+{
+	size_t len = n + 1;
+	char *ptr = vj_malloc( len );
+	ptr[n] = '\0';
+	return ptr ? memcpy( ptr,s,n ) : NULL;
+}
+

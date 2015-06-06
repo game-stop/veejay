@@ -160,8 +160,8 @@ static  void	font_unlock( vj_font_t *f )
 static char *make_key(int id)
 {
 	char key[32];
-	sprintf(key,"s%d",id);
-	return strdup(key);
+	snprintf(key,sizeof(key),"s%d",id);
+	return vj_strdup(key);
 }
 
 
@@ -250,17 +250,17 @@ static	char 	*vj_font_pos_to_timecode( vj_font_t *font, long pos )
 	vj_font_t *ff = (vj_font_t*) font;
 	MPEG_timecode_t tc;
         veejay_memset(&tc, 0,sizeof(MPEG_timecode_t));
-       	char tmp[20];
+       	char tmp[32];
 	
         y4m_ratio_t ratio = mpeg_conform_framerate( ff->fps );
         int n = mpeg_framerate_code( ratio );
 
         mpeg_timecode(&tc, pos, n, ff->fps );
 
-        snprintf(tmp, 20, "%2d:%2.2d:%2.2d:%2.2d",
+        snprintf(tmp, sizeof(tmp), "%2d:%2.2d:%2.2d:%2.2d",
                 tc.h, tc.m, tc.s, tc.f );
 
-	return strdup(tmp);
+	return vj_strdup(tmp);
 }
 
 static	long	vj_font_timecode_to_pos( vj_font_t *font, const char *tc )
@@ -351,7 +351,7 @@ static srt_seq_t 	*vj_font_new_srt_sequence( vj_font_t *f,int id,char *text, lon
 	char tmp_key[16];
 	srt_seq_t *s = (srt_seq_t*) vj_calloc(sizeof( srt_seq_t ));
 	s->id   = id;
-	s->text = strdup( text );
+	s->text = vj_strdup( text );
 	s->start   = lo;
 	s->end   = hi;
 	sprintf(tmp_key, "s%d", id );
@@ -371,7 +371,7 @@ static srt_seq_t 	*vj_font_new_srt_sequence( vj_font_t *f,int id,char *text, lon
 	s->outline = 0;
 	s->size  = 40;
 	s->font  = get_default_font(f);
-	s->key  = strdup(tmp_key);
+	s->key  = vj_strdup(tmp_key);
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
 			"New SRT sequence: '%s' starts at position %ld , ends at position %ld",
@@ -758,7 +758,7 @@ char    *vj_font_get_sequence( void *font, int seq )
 	uint8_t fg[3];
 
 	
-	sprintf( tmp, "%05d%09d%09d%02d%s%02d%s%03d%s%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
+	snprintf( tmp,sizeof(tmp), "%05d%09d%09d%02d%s%02d%s%03d%s%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
 			s->id,
 			(int)s->start,
 			(int)s->end,
@@ -790,7 +790,7 @@ char    *vj_font_get_sequence( void *font, int seq )
 	free(tc1);
 	free(tc2);
 	free(key);	
-	return strdup(tmp);
+	return vj_strdup(tmp);
 }
 
 int	vj_font_new_text( void *font, char *text, long lo,long hi, int seq)
@@ -922,7 +922,7 @@ void    vj_font_update_text( void *font, long s1, long s2, int seq, char *text)
 	font_lock( ff );
 	if( s->text )
 		free(s->text);
-	s->text = strdup( text );
+	s->text = vj_strdup( text );
 	s->start = s1;
 	s->end = s2;
 
@@ -955,8 +955,8 @@ char **vj_font_get_sequences( void *font )
 		if( vevo_property_get( f->dictionary, items[i], 0,&s ) == VEVO_NO_ERROR )
 		{
 			char tmp[16];
-			sprintf(tmp, "%d", s->id );
-			res[j] = strdup(tmp);
+			snprintf(tmp,sizeof(tmp),"%d", s->id );
+			res[j] = vj_strdup(tmp);
 			j++;
 		}	
 		free(items[i]);
@@ -983,7 +983,7 @@ char 	**vj_font_get_all_fonts( void *font )
 	
 	char **res = (char**) vj_calloc(sizeof(char*) * (f->font_index +1) );
 	for( i =0; i < f->font_index ;i ++ )
-		res[i] = strdup( f->font_list[i] );
+		res[i] = vj_strdup( f->font_list[i] );
 	return res;
 }
 
@@ -1027,7 +1027,7 @@ static	int	try_deepen( vj_font_t *f , char *path )
 		{
 			if( f->font_index < MAX_FONTS )
 			{
-				char *try_font = strdup(path);
+				char *try_font = vj_strdup(path);
 				if( get_font_name( f,try_font, f->font_index ) ) {
 					f->font_table[f->font_index] = try_font;
 					f->font_index ++;
@@ -1181,7 +1181,7 @@ static	char	*get_font_name( vj_font_t *f,const char *font, int id )
 	}
 	fontName[tlen/2] = '\0';
 
-	f->font_list[id] = strdup( fontName );
+	f->font_list[id] = vj_strdup( fontName );
 
 	return fontName;
 }
@@ -1464,7 +1464,7 @@ void	vj_font_set_osd_text(void *font, char *text )
 	vj_font_t *f = (vj_font_t*) font;
 	if(f->add)	
 		free(f->add);
-	f->add = strdup( text );
+	f->add = vj_strdup( text );
 }
 
 void	vj_font_set_dict( void *font, void *dict )

@@ -75,7 +75,7 @@ char	*veejay_valid_osc_name( const char *in )
 {
 	int n = strlen( in );
 	int k;
-	char *res = strdup( in );
+	char *res = vj_strndup( in, n );
 	for( k = 0; k < n ; k ++ )
 	{
 		res[k] = make_valid_char_( in[k] );
@@ -629,8 +629,8 @@ char	*livido_describe_parameter_format_osc( void *instance, int p )
 	int kind = 0;
 	error = vevo_property_get( param_templ, "HOST_kind",0,&kind );
 	char fmt[5];
-	veejay_memset(fmt,0,sizeof(fmt));
-	
+	fmt[1] = '\0';
+
 	switch(kind)
 	{
 		case HOST_PARAM_INDEX:
@@ -658,7 +658,7 @@ char	*livido_describe_parameter_format_osc( void *instance, int p )
 			break;
 	}
 
-	char *res = strdup( fmt );
+	char *res = vj_strdup( fmt );
 	return res;
 }
 
@@ -969,7 +969,8 @@ char	*livido_describe_parameter_format( void *instance, int p )
 
 	int n_elems = vevo_property_num_elements( param, "value" );
 
-	char fmt[3] = { 0,0,0 };
+	char fmt[2];
+	fmt[1] = '\0';
 
 	switch(kind)
 	{
@@ -996,7 +997,7 @@ char	*livido_describe_parameter_format( void *instance, int p )
 			break;
 	}
 
-	char *res = strdup( fmt );
+	char *res = vj_strdup( fmt );
 	return res;
 }
 

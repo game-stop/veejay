@@ -240,23 +240,12 @@ void *vj_malloc_(size_t size)
 
 	return ptr;
 }
-void	*vj_strict_malloc( unsigned int size, const char *f, int line )
-{	
-	veejay_msg(0, "%d\t\tbytes\t\tin %s:%d",size,f,line);
-	return vj_malloc_( size );
-}
-void	*vj_calloc_( unsigned int size )
-{
-	void *ptr = vj_malloc_( size );
-	if(ptr)
-		veejay_memset( ptr, 0, size );
-	return ptr;	
-}
-void	*vj_strict_calloc( unsigned int size, const char *f, int line )
-{
-	veejay_msg(0, "%d\t\tbytes\t\tin %s:%d", size,f, line );
-	return vj_calloc_(size);
-}
 #define    RUP8(num)(((num)+8)&~8)
 
-
+void	*vj_calloc_( size_t size )
+{
+	void *ptr = vj_malloc_(size);
+	if(ptr)
+		veejay_memset(ptr,0,size);
+	return ptr;
+}

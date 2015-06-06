@@ -203,7 +203,7 @@ static	int	add_to_plugin_list( const char *path )
 			continue;
 		}
 		char *bname = basename( fullname );
-		char *basename = strdup( bname );
+		char *basename = vj_strdup( bname );
 		void *plugin = NULL;
 		veejay_msg(VEEJAY_MSG_DEBUG, "Loading %s",fullname );
 
@@ -379,7 +379,7 @@ static	char	*get_livido_plug_path()
 	char target[1024];
 	char lvdpath[1024];
 	
-	memset(lvdpath,0,sizeof(lvdpath));
+	veejay_memset(lvdpath,0,sizeof(lvdpath));
 
 	int  err = readlink( location, target, sizeof(target) );
 	if( err >= 0 )
@@ -399,7 +399,7 @@ static	char	*get_livido_plug_path()
 	 strncpy(lvdpath, target, n );
  	 strcat( lvdpath, "/lib/livido-plugins" );	 
 
-	 return strdup( lvdpath );
+	 return vj_strdup( lvdpath );
 	}
 	return NULL;
 }
@@ -1049,7 +1049,7 @@ vj_effect *plug_get_plugin( int fx_id ) {
 				vevo_property_get( parameter, "default", 0,&(vje->defaults[k]));
 				param_descr[valid_p] = vevo_property_get_string(parameter,"name");
 				if(param_descr[valid_p]==NULL)
-					param_descr[valid_p] = strdup( "Number" );
+					param_descr[valid_p] = vj_strdup( "Number" );
 				valid_p ++;
 			}
 		}		

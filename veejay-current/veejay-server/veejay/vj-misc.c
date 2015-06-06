@@ -100,10 +100,10 @@ static	char	*relative_path(filelist_t *filelist, const char *node)
 {
 	int len = strlen(filelist->working_dir);
 	if( node + len + 1 ) {
-		char *tmp = strdup( node + len + 1);
+		char *tmp = vj_strdup( node + len + 1);
 		return tmp;
 	}
-	return strdup(node);
+	return vj_strdup(node);
 }
 
 static int	is_usable_file( filelist_t *filelist, const char *node, const char *filename )
@@ -200,7 +200,7 @@ filelist_t *find_media_files( veejay_t *info )
 	fl->files      = (char**) vj_calloc(sizeof(char*) * 1024 ); 
 	fl->max_files  = 1024;
 	fl->num_files  = 0;	
-	fl->working_dir = strdup(working_dir);
+	fl->working_dir = vj_strdup(working_dir);
 
 	int res = find_files( fl, wd );
 

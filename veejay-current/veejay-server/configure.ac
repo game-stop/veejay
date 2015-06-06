@@ -297,7 +297,7 @@ case $host_cpu in
 	if test "x$enable_debug" != "xyes" ; then
 		OP_CFLAGS="-O2"
 		OPTCFLAGS="-O3 -ftree-vectorize"
- 	fi
+	fi
 
 	AC_SUBST(OP_CFLAGS)
 	SUBSAMPLE_CFLAGS=""

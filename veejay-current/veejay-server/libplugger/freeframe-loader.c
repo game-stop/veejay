@@ -140,9 +140,9 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 	}
 
 	char plugname[512];
-	sprintf(plugname, "FreeFrame %s", pis->pluginName  );
+	snprintf(plugname,sizeof(plugname), "FreeFrame %s", pis->pluginName  );
 
-	plugin_name = strdup( plugname ); 
+	plugin_name = vj_strdup( plugname ); 
 	
 	if ( (q(FF_INITIALISE, NULL, 0 )).ivalue == FF_FAIL )
 	{

@@ -541,7 +541,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
 
 	if (preserve_pathname)
-		realname = strdup(filename);
+		realname = vj_strdup(filename);
 	else
 		realname = canonicalize_file_name( filename );
 
@@ -633,7 +633,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	el->lav_fd[n] = elfd;
     	el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
-    	el->video_file_list[n] = strndup(realname, strlen(realname));
+    	el->video_file_list[n] = vj_strndup(realname, strlen(realname));
 	
 	    /* Debug Output */
 	if(n == 0 )
@@ -2033,7 +2033,7 @@ editlist	*vj_el_soft_clone(editlist *el)
 		clone->pixfmt[i] = 0;
 		if( el->lav_fd[i] && el->video_file_list[i])
 		{
-			clone->video_file_list[i] = strdup( el->video_file_list[i] );
+			clone->video_file_list[i] = vj_strdup( el->video_file_list[i] );
 			clone->lav_fd[i] = el->lav_fd[i];
 			clone->num_frames[i] = el->num_frames[i];
 			clone->pixfmt[i] =el->pixfmt[i];

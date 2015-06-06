@@ -335,7 +335,7 @@ static char 	*split_parameter_name( const char *name, const char *vj_name )
 static void 	*init_parameter_port( int min, int max, int def,const char *name, int seq_no, int type )
 {
 	void *parameter = vpn( VEVO_FR_PARAM_PORT );
-	char *dname = strdup(name);
+	char *dname = vj_strdup(name);
 
 	int n = 0;
 	while( dname[n] != '\0' ) {
@@ -561,7 +561,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	char plugin_name[512];
 	snprintf( plugin_name, sizeof(plugin_name) , "frei0r %s", finfo.name ); 
 
-	char *plug_name = strdup( plugin_name );
+	char *plug_name = vj_strdup( plugin_name );
 
 	int extra = 0;
 	int n_inputs = 0;
