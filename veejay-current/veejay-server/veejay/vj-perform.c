@@ -182,6 +182,8 @@ static	void	vj_perform_copy( ycbcr_frame *src, ycbcr_frame *dst, int Y_len, int 
 	uint8_t *input[4] = { src->Y, src->Cb, src->Cr,NULL };
 	uint8_t *output[4] = { dst->Y, dst->Cb, dst->Cr,NULL };
 	int 	strides[4] = { Y_len, UV_len, UV_len,0 };
+veejay_msg(0, "%p,%p,%p   %p,%p,%p  %d,%d,%d" ,
+		input[0],input[1],input[2],output[0],output[1],output[2],strides[0],strides[1],strides[2] );
 	vj_frame_copy(input,output,strides);
 }
 static	void	vj_perform_copy2( ycbcr_frame *src, uint8_t **output, int Y_len, int UV_len )
@@ -578,11 +580,6 @@ static int	vj_perform_verify_rows(veejay_t *info )
 	  	v = (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ? 
 			sample_get_effect_any(info->uc->sample_id,c) : vj_tag_get_effect_any(info->uc->sample_id,c));
 	
-		if( v && fx_chain_buffer ) {
-			has_rows ++;
-			continue;
-		}
-
 		if( v > 0)
 	  	{
 			if( !vj_perform_row_used(c))
