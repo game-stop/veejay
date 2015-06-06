@@ -117,6 +117,8 @@ static uint8_t *audio_render_buffer = NULL;
 static uint8_t *down_sample_buffer = NULL;
 static uint8_t *temp_buffer[4];
 static uint8_t *feedback_buffer[4];
+static uint8_t *pribuf_area = NULL;
+static size_t pribuf_len = 0;
 static uint8_t *socket_buffer = NULL;
 static uint8_t *fx_chain_buffer = NULL;
 static	size_t fx_chain_buflen = 0;
@@ -629,7 +631,6 @@ static void vj_perform_record_buffer_free()
 	if(record_buffer)
 		free(record_buffer);
 }
-static	char ppm_path[1024];
 
 int vj_perform_init(veejay_t * info)
 {
@@ -637,35 +638,35 @@ int vj_perform_init(veejay_t * info)
 	const int w = info->video_output_width;
 	const int h = info->video_output_height;
 
-	const long frame_len = RUP8( (((w*h)+w)/7)*8 );
+	const long frame_len = RUP8( ((w*h)+w+w) );
     unsigned int c;
 	long total_used = 0;
     performer_frame_size_ = frame_len * 3;
 
     // buffer used to store encoded frames (for plain and sample mode)
-    frame_buffer = (ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame*) * SAMPLE_MAX_EFFECTS);
+    frame_buffer = (ycbcr_frame **) vj_calloc(sizeof(ycbcr_frame*) * SAMPLE_MAX_EFFECTS);
     if(!frame_buffer) return 0;
 
-    record_buffer = (ycbcr_frame*) vj_malloc(sizeof(ycbcr_frame) );
+    record_buffer = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame) );
     if(!record_buffer) return 0;
-    record_buffer->Y = NULL;
-    record_buffer->Cb = NULL;
-    record_buffer->Cr = NULL;
-  
-    primary_buffer = (ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * PRIMARY_FRAMES); 
-    
-    const long buf_len = performer_frame_size_ * sizeof(uint8_t);
-	int mlock_success =1 ;
+
+	primary_buffer = (ycbcr_frame **) vj_calloc(sizeof(ycbcr_frame **) * PRIMARY_FRAMES); 
     if(!primary_buffer) return 0;
 
+    size_t buf_len = performer_frame_size_ * sizeof(uint8_t);
+	int mlock_success =1 ;
+
+	pribuf_len = PRIMARY_FRAMES * performer_frame_size_;
+	pribuf_area = vj_hmalloc( pribuf_len, "in primary buffers" );
+	if( !pribuf_area ) {
+		return 0;
+	}
+	
 	for( c = 0; c < PRIMARY_FRAMES; c ++ )
 	{
 		primary_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
-		primary_buffer[c]->Y = (uint8_t*) vj_malloc(buf_len);
-		if( mlock( primary_buffer[c]->Y, buf_len ) != 0 ) {
-			mlock_success = 0;
-		}
-		primary_buffer[c]->Cb = primary_buffer[c]->Y + frame_len;
+		primary_buffer[c]->Y = pribuf_area + (performer_frame_size_ * c);
+		primary_buffer[c]->Cb = primary_buffer[c]->Y  + frame_len;
 		primary_buffer[c]->Cr = primary_buffer[c]->Cb + frame_len;
 
 		veejay_memset( primary_buffer[c]->Y, pixel_Y_lo_,frame_len);
@@ -682,19 +683,14 @@ int vj_perform_init(veejay_t * info)
 	preview_buffer->Y = (uint8_t*) vj_calloc( RUP8(preview_max_w * preview_max_h * 3) );
 
 	video_output_buffer_convert = 0;
-	video_output_buffer = (ycbcr_frame**) vj_malloc(sizeof(ycbcr_frame*) * 2 );
+	video_output_buffer = (ycbcr_frame**) vj_calloc(sizeof(ycbcr_frame*) * 2 );
 
     if(!video_output_buffer)
 		return 0;
 
-    veejay_memset( ppm_path,0,sizeof(ppm_path));
-
     for(c=0; c < 2; c ++ )
 	{
-	    video_output_buffer[c] = (ycbcr_frame*) vj_malloc(sizeof(ycbcr_frame));
-	    video_output_buffer[c]->Y = NULL;
-	    video_output_buffer[c]->Cb = NULL;
-	    video_output_buffer[c]->Cr = NULL; 
+	    video_output_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 	}
 
     sample_record_init(frame_len);
@@ -914,12 +910,11 @@ void vj_perform_free(veejay_t * info)
 
 	for( c = 0;c < PRIMARY_FRAMES; c++ )
 	{
-		if(primary_buffer[c]->Y) {
-		       	free(primary_buffer[c]->Y );
-		}
 		free(primary_buffer[c] );
 	}
+
   	if(primary_buffer) free(primary_buffer);
+	
 
 	if(crop_frame)
 	{
@@ -952,6 +947,11 @@ void vj_perform_free(veejay_t * info)
 	{
 		munlock(fx_chain_buffer, fx_chain_buflen);
 		free(fx_chain_buffer);
+	}
+	if(pribuf_area)
+	{
+		munlock(pribuf_area, pribuf_len);
+		free(pribuf_area);
 	}
 
 	if(lzo_)
