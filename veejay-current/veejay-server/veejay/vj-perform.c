@@ -577,9 +577,15 @@ static int	vj_perform_verify_rows(veejay_t *info )
 	{
 	  	v = (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ? 
 			sample_get_effect_any(info->uc->sample_id,c) : vj_tag_get_effect_any(info->uc->sample_id,c));
+	
+		if( v && fx_chain_buffer ) {
+			has_rows ++;
+			continue;
+		}
+
 		if( v > 0)
 	  	{
-			if(!vj_perform_row_used(c))
+			if( !vj_perform_row_used(c))
 			{
 			    if( vj_perform_alloc_row( info, c, w * h ) <= 0 ) {
 					veejay_msg(0, "Unable to allocate memory for FX entry %d",c );
@@ -668,7 +674,7 @@ int vj_perform_init(veejay_t * info)
 		primary_buffer[c]->Y = pribuf_area + (performer_frame_size_ * c);
 		primary_buffer[c]->Cb = primary_buffer[c]->Y  + frame_len;
 		primary_buffer[c]->Cr = primary_buffer[c]->Cb + frame_len;
-
+	
 		veejay_memset( primary_buffer[c]->Y, pixel_Y_lo_,frame_len);
 		veejay_memset( primary_buffer[c]->Cb,128,frame_len);
 		veejay_memset( primary_buffer[c]->Cr,128,frame_len);
@@ -896,17 +902,20 @@ void vj_perform_free(veejay_t * info)
     if(info->edit_list->has_audio)
 	    vj_perform_close_audio();
 
-    for (c = 0; c < fblen; c++) {
-	if(vj_perform_row_used(c))
-		vj_perform_free_row(c);
-	if(frame_buffer[c])
-	{
-	 	if(frame_buffer[c]->Y) free(frame_buffer[c]->Y);
-		free(frame_buffer[c]);
-	}
+    if( fx_chain_buffer == NULL ) {
+ 	   for (c = 0; c < fblen; c++) {
+		if(vj_perform_row_used(c))
+			vj_perform_free_row(c);
+	   }
     }
 
-   if(frame_buffer) free(frame_buffer);
+    for(c = 0; c < fblen; c ++ )
+	{
+		if(frame_buffer[c])
+			free(frame_buffer[c]);
+	}
+
+   	if(frame_buffer) free(frame_buffer);
 
 	for( c = 0;c < PRIMARY_FRAMES; c++ )
 	{
@@ -1986,22 +1995,21 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 //@ TODO: Render all image effects in subchain
 static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 {
-	VJFrame *frames[2];
-	VJFrameInfo *frameinfo;
-	video_playback_setup *settings = info->settings;
-	frames[0] = info->effect_frame1;
-	frames[1] = info->effect_frame2;
-    frameinfo = info->effect_frame_info;
-    // setup pointers to ycbcr 4:2:0 or 4:2:2 data
-    frames[0]->data[0] = primary_buffer[0]->Y;
-   	frames[0]->data[1] = primary_buffer[0]->Cb;
-    frames[0]->data[2] = primary_buffer[0]->Cr;
-	vjp_kf *setup;
-    	setup = info->effect_info;
-    	setup->ref = info->uc->sample_id;
-
 	if (vj_tag_get_chain_status(info->uc->sample_id, chain_entry))
 	{
+		VJFrame *frames[2];
+		VJFrameInfo *frameinfo;
+		video_playback_setup *settings = info->settings;
+		frames[0] = info->effect_frame1;
+		frames[1] = info->effect_frame2;
+		frameinfo = info->effect_frame_info;
+   		frames[0]->data[0] = primary_buffer[0]->Y;
+   		frames[0]->data[1] = primary_buffer[0]->Cb;
+  		frames[0]->data[2] = primary_buffer[0]->Cr;
+		vjp_kf *setup;
+    		setup = info->effect_info;
+   	 	setup->ref = info->uc->sample_id;
+
 		int effect_id = vj_tag_get_effect_any(info->uc->sample_id, chain_entry); // what effect is enabled
 		if (effect_id > 0)
 		{
@@ -2222,27 +2230,27 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 
 static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 {
-	VJFrame *frames[2];
-	VJFrameInfo *frameinfo;
-	video_playback_setup *settings = info->settings;
-	
-	frames[0] = info->effect_frame1;
-	frames[1] = info->effect_frame2;
-    	
-	frameinfo = info->effect_frame_info;
-	frameinfo->timecode = settings->current_frame_num;
-    	
-	frames[0]->data[0] = primary_buffer[0]->Y;
-   	frames[0]->data[1] = primary_buffer[0]->Cb;
-    	frames[0]->data[2] = primary_buffer[0]->Cr;
-
-	vjp_kf *setup = info->effect_info;
-    	setup->ref = info->uc->sample_id;
-
 	if (sample_get_chain_status(info->uc->sample_id, chain_entry))
 	{
-	    int effect_id =
-		sample_get_effect_any(info->uc->sample_id, chain_entry); // what effect is enabled
+		VJFrame *frames[2];
+		VJFrameInfo *frameinfo;
+		video_playback_setup *settings = info->settings;
+		
+		frames[0] = info->effect_frame1;
+		frames[1] = info->effect_frame2;
+    		
+		frameinfo = info->effect_frame_info;
+		frameinfo->timecode = settings->current_frame_num;
+    	
+		frames[0]->data[0] = primary_buffer[0]->Y;
+   		frames[0]->data[1] = primary_buffer[0]->Cb;
+    		frames[0]->data[2] = primary_buffer[0]->Cr;
+
+		vjp_kf *setup = info->effect_info;
+    		setup->ref = info->uc->sample_id;
+
+		int effect_id =
+			sample_get_effect_any(info->uc->sample_id, chain_entry); // what effect is enabled
 
 		if (effect_id > 0)
 		{
@@ -2353,7 +2361,6 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
     	frames[0]->data[2] = primary_buffer[0]->Cr;
 	if(pvar_.fader_active)
 		vj_perform_pre_chain( info, frames[0] );
-
 
 	for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
 	{

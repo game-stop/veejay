@@ -812,7 +812,7 @@ void* vj_osc_allocate(int port_id) {
 	o->packet = OSCAllocPacketBuffer();
  	
 	if(NetworkStartUDPServer( o->packet, port_id) != TRUE) {
-		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Cannot start OSC/UDP server at port %d ",
+		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Cannot start OSC/UDP server at port %d ",
 				port_id);
 	}
 
