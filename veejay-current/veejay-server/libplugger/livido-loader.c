@@ -591,7 +591,7 @@ static	int	init_ports_from_template( livido_port_t *filter_instance, livido_port
 		error = livido_property_get( template, name, i, &ptr );
 		in_channels[i] = vpn( id ); 
 		livido_property_set( in_channels[i], "parent_template",LIVIDO_ATOM_TYPE_VOIDPTR,1, &ptr);
-		livido_property_soft_reference( in_channels[i], "parent_template" );
+//		livido_property_soft_reference( in_channels[i], "parent_template" );
 		if( id == LIVIDO_PORT_TYPE_CHANNEL )
 		{
 			if(!init_channel_port( ptr,in_channels[i],w,h))
