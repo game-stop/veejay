@@ -365,9 +365,9 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	data->header[4]      = frame->stride[2];
 	data->header[5]      = 513; // format LIVIDO_PALETTE_YUV422P 
 
-	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Starting address: %p", data );
-	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Frame data      : %p", data + HEADER_LENGTH );
-	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Static resolution of %d x %d, YUV 4:2:2 planar",
+	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Starting address: %p", data );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Frame data      : %p", data + HEADER_LENGTH );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Static resolution of %d x %d, YUV 4:2:2 planar",
 			data->header[0],data->header[1] );
 	veejay_msg(VEEJAY_MSG_DEBUG,"Shared Resource:  Planes {%d,%d,%d} format %d",
 			data->header[2],data->header[3],data->header[4],data->header[5]);
@@ -396,9 +396,9 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 		return NULL;
 	}
 
-	veejay_msg( VEEJAY_MSG_INFO, "Shared Memory ID = %d", v->shm_id );
-	veejay_msg( VEEJAY_MSG_INFO, "Your Shared Memory Key = %d   <---- ", v->key );
-	veejay_msg( VEEJAY_MSG_INFO, "Starting Address: %p, Frame starts at: %p, Lock at %p",
+	veejay_msg( VEEJAY_MSG_DEBUG, "Shared Memory ID = %d", v->shm_id );
+	veejay_msg( VEEJAY_MSG_INFO, "(SHM) Shared Memory consumer key is %d", v->key );
+	veejay_msg( VEEJAY_MSG_DEBUG, "Starting Address: %p, Frame starts at: %p, Lock at %p",
 			v->sms, v->sms + HEADER_LENGTH, &(data->rwlock));
 
 
