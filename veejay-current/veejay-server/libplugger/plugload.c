@@ -198,7 +198,7 @@ static	int	add_to_plugin_list( const char *path )
 
 		if(!handle) 
 		{
-			veejay_msg(0,"\tPlugin '%s' error '%s'", fullname,
+			veejay_msg(0,"Plugin '%s' error '%s'", fullname,
 				 dlerror() );
 			continue;
 		}
@@ -546,22 +546,20 @@ int	plug_sys_detect_plugins(void)
 	//@ For every time there is a void* passed as int a gremlin will be happy
 	if( sizeof(long) == 4 ) {
 		if( n_ff_ > 0 ) { 
-			veejay_msg(VEEJAY_MSG_INFO, "\tFreeFrame - cross-platform real-time video effects");
-			veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2002 Marcus Clements www.freeframe.org. All Rights reserved.");
-			veejay_msg(VEEJAY_MSG_INFO, "\thttp://freeframe.sourceforge.net");
-			veejay_msg(VEEJAY_MSG_INFO, "\tFound %d FreeFrame %s",	n_ff_ , n_ff_ == 1 ? "plugin" : "plugins" );
+			veejay_msg(VEEJAY_MSG_INFO, "FreeFrame - cross-platform real-time video effects (http://freeframe.sourceforge.net)");
+			veejay_msg(VEEJAY_MSG_INFO, "            found %d FreeFrame %s",	n_ff_ , n_ff_ == 1 ? "plugin" : "plugins" );
 		}
 	}
 
 	if( n_fr_ > 0 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "\tfrei0r - a minimalistic plugin API for video effects (http://www.piksel.org/frei0r)");
-		veejay_msg(VEEJAY_MSG_INFO, "\t         found %d frei0r %s",
+		veejay_msg(VEEJAY_MSG_INFO, "frei0r - a minimalistic plugin API for video effects (http://www.piksel.org/frei0r)");
+		veejay_msg(VEEJAY_MSG_INFO, "         found %d frei0r %s",
 			n_fr_ , n_fr_ == 1 ? "plugin" : "plugins" );
 	}	
 
 	if( n_lvd_ > 0 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
-		veejay_msg(VEEJAY_MSG_INFO, "\t         found %d Livido %s",
+		veejay_msg(VEEJAY_MSG_INFO, "Livido - (Linux) Video Dynamic Objects" );
+		veejay_msg(VEEJAY_MSG_INFO, "         found %d Livido %s",
 			n_lvd_, n_lvd_ == 1 ? "plugin" :"plugins" );
 	}
 	

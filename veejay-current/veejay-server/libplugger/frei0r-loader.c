@@ -469,7 +469,6 @@ void* 	deal_with_fr( void *handle, char *name)
 	f0r_init_f	f0r_init	= dlsym( handle, "f0r_init" );
 	if( f0r_init == NULL )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': %s", name, dlerror());
 		vpf( port );
 		return NULL;
 	}
@@ -477,7 +476,6 @@ void* 	deal_with_fr( void *handle, char *name)
 	f0r_deinit_f	f0r_deinit	= dlsym( handle, "f0r_deinit" );
 	if( f0r_deinit == NULL )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': %s", name, dlerror());
 		vpf( port );
 		return NULL;
 	}
@@ -485,7 +483,6 @@ void* 	deal_with_fr( void *handle, char *name)
 	f0r_get_plugin_info_f	f0r_info = dlsym( handle, "f0r_get_plugin_info");
 	if( f0r_info == NULL )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': %s", name, dlerror());
 		vpf( port );
 		return NULL;
 	}
@@ -493,7 +490,6 @@ void* 	deal_with_fr( void *handle, char *name)
 	f0r_get_param_info_f	f0r_param= dlsym( handle, "f0r_get_param_info" );
 	if( f0r_param == NULL )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': %s", name, dlerror());
 		vpf( port );
 		return NULL;
 	}
@@ -534,7 +530,7 @@ void* 	deal_with_fr( void *handle, char *name)
 
 	if( (*f0r_init)() == 0)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': ", name);
+		veejay_msg(VEEJAY_MSG_ERROR,"Failed to initialize frei0r plugin '%s': ", name);
 		vpf( port );
 		return NULL;
 	}
@@ -543,7 +539,7 @@ void* 	deal_with_fr( void *handle, char *name)
 
 	if( finfo.frei0r_version != FREI0R_MAJOR_VERSION )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"\tI am using frei0r version %d but plugin requires %d",
+		veejay_msg(VEEJAY_MSG_ERROR,"I am using frei0r version %d but plugin requires %d",
 				FREI0R_MAJOR_VERSION, finfo.frei0r_version );
 		(*f0r_deinit)();	
 		vpf(port);
@@ -551,7 +547,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	}
 
 	if( is_bad_frei0r_plugin( &finfo ) ) { 
-		veejay_msg(VEEJAY_MSG_ERROR, "\tFrei0r %s-%d.%d is blacklisted. Please upgrade this plug-in to a newer version.",
+		veejay_msg(VEEJAY_MSG_ERROR, "Frei0r %s-%d.%d is blacklisted. Please upgrade this plug-in to a newer version.",
 				finfo.name, finfo.major_version, finfo.minor_version);
 		(*f0r_deinit)();
 		vpf(port);

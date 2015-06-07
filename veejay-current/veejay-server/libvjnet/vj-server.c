@@ -322,7 +322,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	switch(vjs->server_type )
 	{
 		case V_STATUS:
-			veejay_msg(VEEJAY_MSG_INFO,"TCP/IP unicast VIMS status socket ready at port %d, (R:%d, S:%d)",
+			veejay_msg(VEEJAY_MSG_INFO,"TCP/IP unicast VIMS status socket ready at port %d (R:%d, S:%d)",
 				port_num, vjs->recv_size, vjs->send_size );
 			break;
 		case V_CMD:
