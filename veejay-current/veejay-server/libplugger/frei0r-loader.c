@@ -593,7 +593,7 @@ void* 	deal_with_fr( void *handle, char *name)
 			return NULL;
 		}
 	} else {
-		veejay_msg(VEEJAY_MSG_ERROR, "Some strange frei0r plugin, would not be able to eat that.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Frei0r plugin '%s' (%s) unsupported type", finfo.name, plugin_name );
 		(*f0r_deinit)();
 		vpf(port);
 		return NULL;

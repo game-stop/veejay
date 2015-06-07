@@ -738,7 +738,9 @@ int main(int argc, char **argv)
 	{
 		veejay_free(info);
 		return 0;
-    	}
+    }
+
+	print_license();
 
 	
    	if(info->dump)
@@ -816,8 +818,6 @@ int main(int argc, char **argv)
 	if(auto_loop)
 		veejay_auto_loop(info);
 
-
-	print_license();
 
 	veejay_init_msg_ring();  // rest of logging to screen
 

@@ -2668,10 +2668,10 @@ int	prepare_cache_line(int perc, int n_slots)
 	max_memory -= mmap_memory;
 	max_memory -= (vj_perform_fx_chain_size()/1024);
 
-	if( max_memory <= 0 ) {
+	if( perc > 0 && max_memory <= 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Please enter a larger value for -m");
 		veejay_msg(VEEJAY_MSG_ERROR, "Need a minimum of %ld MB RAM to run if -M is not specified", vj_perform_fx_chain_size()/(1024*1024));
-		veejay_msg(VEEJAY_MSG_ERROR, "Memory frame cache disabled");
+		veejay_msg(VEEJAY_MSG_WARNING, "Memory frame cache disabled");
 		return 1;
 	}
 
