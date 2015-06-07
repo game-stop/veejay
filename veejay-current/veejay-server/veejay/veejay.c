@@ -77,7 +77,7 @@ static void CompiledWith()
 	    BUILD_MACHINE,
 	    BUILD_DATE );
 
-	fprintf(stdout,"Compilation flags:");
+	fprintf(stdout,"Compilation flags:\n");
 #ifdef ARCH_MIPS
 	fprintf(stdout, "\tCompiled for MIPS\n");
 #endif
