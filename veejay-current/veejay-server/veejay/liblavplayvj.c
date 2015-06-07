@@ -556,8 +556,6 @@ int veejay_init_editlist(veejay_t * info)
     {
  	settings->spas = 0.0;
     }
-    veejay_msg(VEEJAY_MSG_DEBUG, "1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
-
     return 0;
 }
 
@@ -2273,6 +2271,8 @@ static void veejay_playback_cycle(veejay_t * info)
 
     stats.nqueue = QUEUE_LEN;
     settings->spas = 1.0 / (double) el->audio_rate;
+    veejay_msg(VEEJAY_MSG_DEBUG, "Output 1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
+
 
     while (settings->state != LAVPLAY_STATE_STOP) {
 		int current_speed = settings->current_playback_speed;

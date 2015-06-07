@@ -542,9 +542,6 @@ int	plug_sys_detect_plugins(void)
 	}
 
 	(VEEJAY_MSG_INFO, "Veejay plugin system initialized");
-	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
-	//@ display copyright notice in binary form
-
 	//@ the freeframe version we use is not compatible with 64 bit systems. So, lets see if long is size 4
 	//@ For every time there is a void* passed as int a gremlin will be happy
 	if( sizeof(long) == 4 ) {
@@ -557,18 +554,14 @@ int	plug_sys_detect_plugins(void)
 	}
 
 	if( n_fr_ > 0 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "\tfrei0r - a minimalistic plugin API for video effects");
-		veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2004 Georg Seidel, Phillip Promesberger and Martin Bayer (GPL)");
-		veejay_msg(VEEJAY_MSG_INFO, "\thttp://www.piksel.org/frei0r");
-		veejay_msg(VEEJAY_MSG_INFO, "\tFound %d frei0r %s",
+		veejay_msg(VEEJAY_MSG_INFO, "\tfrei0r - a minimalistic plugin API for video effects (http://www.piksel.org/frei0r)");
+		veejay_msg(VEEJAY_MSG_INFO, "\t         found %d frei0r %s",
 			n_fr_ , n_fr_ == 1 ? "plugin" : "plugins" );
 	}	
 
 	if( n_lvd_ > 0 ) {
 		veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
-		veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2005 Niels Elburg, Gabriel 'Salsaman' Finch, Dennis 'Jaromil' Rojo");
-		veejay_msg(VEEJAY_MSG_INFO, "\t                   Daniel Fischer, Martin Bayer, Kentaro Fukuchi and Andraz Tori");
-		veejay_msg(VEEJAY_MSG_INFO, "\tFound %d Livido %s",
+		veejay_msg(VEEJAY_MSG_INFO, "\t         found %d Livido %s",
 			n_lvd_, n_lvd_ == 1 ? "plugin" :"plugins" );
 	}
 	
