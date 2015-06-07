@@ -103,7 +103,7 @@ static void CompiledWith()
 	fprintf(stdout,"\tUsing SSE instruction set\n");
 #endif
 #ifdef HAVE_CMOV
-	fprintf(stdout,"\tUsing CMOV");
+	fprintf(stdout,"\tUsing CMOV\n");
 #endif
 #ifdef HAVE_ASM_SSE2
 	fprintf(stdout,"\tUsing SSE2 instruction set\n");
