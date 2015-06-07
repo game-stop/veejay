@@ -138,7 +138,7 @@
 #include <libyuv/mmx_macros.h>
 #include <libvje/vje.h>
 #include <veejay/vj-task.h>
-
+#include <libavutil/cpu.h>
 #define BUFSIZE 1024
 
 
@@ -152,20 +152,49 @@
 #define CONFUSION_FACTOR 0
 //Feel free to fine-tune the above 2, it might be possible to get some speedup with them :)
 
+#ifdef HAVE_POSIX_TIMERS
+static int64_t _x_gettime(void)
+{
+	struct timespec tm;
+	return (clock_gettime(CLOCK_THREAD_CPUTIME_ID,&tm) == -1 )
+			? times(NULL)
+			: (int64_t) tm.tv_sec * 1e9 + tm.tv_nsec;
+}
+#define rdtsc(x) _x_gettime()
+#elif (defined(ARCH_X86) || defined(ARCH_X86_64)) && defined(HAVE_SYS_TIMES_H)
+static int64_t rdtsc(int cpu_flags)
+{
+	int64_t x;
+	if( cpu_flags & AV_CPU_FLAGS_MMX ) {
+			__asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+			return x;
+	} else {
+			return times(NULL);
+	}
+}
+#else
+static uint64_t rdtsc(int cpu_flags)
+{
+#ifdef HAVE_SYS_TIMES_H
+		struct tms tp;
+		return times(&tp);
+#else
+		return clock();
+#endif
+}
+#endif /* HAVE_SYS_TIMES_H */
+
 #if defined(ARCH_X86) || defined (ARCH_X86_64)
 /* for small memory blocks (<256 bytes) this version is faster */
 #define small_memcpy(to,from,n)\
 {\
-register unsigned long int dummy;\
+register uintptr_t dummy;\
 __asm__ __volatile__(\
   "rep; movsb"\
   :"=&D"(to), "=&S"(from), "=&c"(dummy)\
   :"0" (to), "1" (from),"2" (n)\
   : "memory");\
 }
-
-
-
 
 /* for small memory blocks (<256 bytes) this version is faster */
 #define small_memset(to,val,n)\
@@ -178,15 +207,6 @@ __asm__ __volatile__(\
 	:"memory");\
 }
 
-static inline unsigned long long int rdtsc()
-{
-     struct timeval tv;
-     gettimeofday (&tv, NULL);
-     return (tv.tv_sec * 1000000 + tv.tv_usec);
-//      unsigned long long int x;
-  //    __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
-  //   return x;
-}
 #else
 #define	small_memcpy(to,from,n) memcpy( to,from,n )
 #define small_memset(to,val,n) memset(to,val,n)
@@ -243,17 +263,10 @@ void	yuyv_plane_clear( size_t len, void *to )
 		}
 	}
 }
-static inline unsigned long long int rdtsc()
-{
-     struct timeval tv;
-   
-     gettimeofday (&tv, NULL);
-     return (tv.tv_sec * 1000000 + tv.tv_usec);
-}
 #endif
 
 #if defined(ARCH_X86) || defined (ARCH_X86_64)
-static inline void * __memcpy(void * to, const void * from, size_t n)
+static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 {
      int d0, d1, d2;
      if ( n < 4 ) { 
@@ -270,18 +283,11 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
             "movsb\n"
             "2:"
             : "=&c" (d0), "=&D" (d1), "=&S" (d2)
-            :"0" (n/4), "q" (n),"1" ((long) to),"2" ((long) from)
+            :"0" (n/4), "q" (n),"1" ((uintptr_t) to),"2" ((uintptr_t) from)
             : "memory");
 
      return(to);
 }
-
-#undef _MMREG_SIZE
-#ifdef HAVE_SSE
-#define _MMREG_SIZE 16
-#else
-#define _MMREG_SIZE 64 
-#endif
 
 #ifdef HAVE_ASM_AVX
 #define AVX_MMREG_SIZE 32
@@ -292,6 +298,19 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 #ifdef HAVE_ASM_MMX
 #define MMX_MMREG_SIZE 8
 #endif
+
+#undef _MMREG_SIZE
+#ifdef HAVE_ASM_MMX
+#define _MMREG_SIZE 8
+#endif
+#ifdef HAVE_ASM_SSE
+#define _MMREG_SIZE 16
+#endif
+#ifdef HAVE_ASM_AVX
+#define _MMREG_SIZE 32
+#endif
+
+
 #undef PREFETCH
 #undef EMMS
 
@@ -548,6 +567,97 @@ void	packed_plane_clear( size_t len, void *to )
 	}
 }
 
+#ifdef HAVE_ASM_SSE
+//https://raw.githubusercontent.com/huceke/xine-lib-vaapi/master/src/xine-utils/memcpy.c
+/* SSE note: i tried to move 128 bytes a time instead of 64 but it
+didn't make any measureable difference. i'm using 64 for the sake of
+simplicity. [MF] */
+static void * sse_memcpy(void * to, const void * from, size_t len)
+{
+  void *retval;
+  size_t i;
+  retval = to;
+
+  /* PREFETCH has effect even for MOVSB instruction ;) */
+  __asm__ __volatile__ (
+    "   prefetchnta (%0)\n"
+    "   prefetchnta 32(%0)\n"
+    "   prefetchnta 64(%0)\n"
+    "   prefetchnta 96(%0)\n"
+    "   prefetchnta 128(%0)\n"
+    "   prefetchnta 160(%0)\n"
+    "   prefetchnta 192(%0)\n"
+    "   prefetchnta 224(%0)\n"
+    "   prefetchnta 256(%0)\n"
+    "   prefetchnta 288(%0)\n"
+    : : "r" (from) );
+
+  if(len >= MIN_LEN)
+  {
+    register uintptr_t delta;
+    /* Align destinition to MMREG_SIZE -boundary */
+    delta = ((uintptr_t)to)&(SSE_MMREG_SIZE-1);
+    if(delta)
+    {
+      delta=SSE_MMREG_SIZE-delta;
+      len -= delta;
+      small_memcpy(to, from, delta);
+    }
+    i = len >> 6; /* len/64 */
+    len&=63;
+    if(((uintptr_t)from) & 15)
+      /* if SRC is misaligned */
+      for(; i>0; i--)
+      {
+        __asm__ __volatile__ (
+//        "prefetchnta 320(%0)\n"
+ //      "prefetchnta 352(%0)\n"
+        "movups (%0), %%xmm0\n"
+        "movups 16(%0), %%xmm1\n"
+        "movups 32(%0), %%xmm2\n"
+        "movups 48(%0), %%xmm3\n"
+        "movntps %%xmm0, (%1)\n"
+        "movntps %%xmm1, 16(%1)\n"
+        "movntps %%xmm2, 32(%1)\n"
+        "movntps %%xmm3, 48(%1)\n"
+        :: "r" (from), "r" (to) : "memory");
+        from = ((const unsigned char *)from) + 64;
+        to = ((unsigned char *)to) + 64;
+      }
+    else
+      /*
+         Only if SRC is aligned on 16-byte boundary.
+         It allows to use movaps instead of movups, which required data
+         to be aligned or a general-protection exception (#GP) is generated.
+      */
+      for(; i>0; i--)
+      {
+        __asm__ __volatile__ (
+ //       "prefetchnta 320(%0)\n"
+  //     "prefetchnta 352(%0)\n"
+        "movaps (%0), %%xmm0\n"
+        "movaps 16(%0), %%xmm1\n"
+        "movaps 32(%0), %%xmm2\n"
+        "movaps 48(%0), %%xmm3\n"
+        "movntps %%xmm0, (%1)\n"
+        "movntps %%xmm1, 16(%1)\n"
+        "movntps %%xmm2, 32(%1)\n"
+        "movntps %%xmm3, 48(%1)\n"
+        :: "r" (from), "r" (to) : "memory");
+        from = ((const unsigned char *)from) + 64;
+        to = ((unsigned char *)to) + 64;
+      }
+    /* since movntq is weakly-ordered, a "sfence"
+     * is needed to become ordered again. */
+    __asm__ __volatile__ ("sfence":::"memory");
+  }
+  /*
+   *	Now do the tail of the block
+   */
+  if(len) __memcpy(to, from, len);
+  return retval;
+}
+#endif
 
 #ifdef HAVE_ASM_AVX
 static void * avx_memcpy(void * to, const void * from, size_t len)
@@ -732,8 +842,6 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
     for(; i>0; i--)
     {
       __asm__ __volatile__ (
-      "prefetchnta 320(%0)\n"
-      "prefetchnta 352(%0)\n"
       "movq (%0), %%mm0\n"
       "movq 8(%0), %%mm1\n"
       "movq 16(%0), %%mm2\n"
@@ -845,8 +953,6 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		"movntps %%xmm2, 32(%1)\n"
 		"movntps %%xmm3, 48(%1)\n"
 		:: "r" (f), "r" (t) : "memory");
-	//	f+=64;
-	//	t+=64;
 		f=((const unsigned char *)f)+64;
 		t=((unsigned char *)t)+64;
 
@@ -1177,25 +1283,29 @@ static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
 static struct {
      char                 *name;
      void               *(*function)(void *to, const void *from, size_t len);
-     unsigned long long    time;
+     uint64_t	   time;
+     uint32_t		cpu_require;
 } memcpy_method[] =
 {
      { NULL, NULL, 0},
-     { "glibc memcpy()",            memcpy, 0},
+     { "glibc memcpy()",  (void*) memcpy, 0,0 },
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-     { "linux kernel memcpy()",     linux_kernel_memcpy, 0},
+     { "linux kernel memcpy()", (void*)  linux_kernel_memcpy,0, 0},
 #endif
 #ifdef HAVE_ASM_AVX
-     { "AVX optimized memcpy()", avx_memcpy, 0 },
+     { "AVX optimized memcpy()", (void*) avx_memcpy, 0,AV_CPU_FLAG_AVX },
 #endif
 #ifdef HAVE_ASM_MMX
-     { "MMX optimized memcpy()", mmx_memcpy, 0 },
+     { "MMX optimized memcpy()", (void*) mmx_memcpy, 0,AV_CPU_FLAG_MMX },
 #endif
 #ifdef HAVE_ASM_MMX2
-     { "MMX2 optimized memcpy()", mmx2_memcpy, 0 },
+     { "MMX2 optimized memcpy()", (void*) mmx2_memcpy, 0,AV_CPU_FLAG_MMX2 },
 #endif
-#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
-     { "MMX/MMX2/SSE optimized memcpy()",    fast_memcpy, 0},
+#ifdef HAVE_ASM_SSE
+	 { "SSE optimized memcpy()", (void*) sse_memcpy, 0,AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
+#endif
+#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE ) || defined( HAVE_ASM_MMX2)
+     { "MMX/MMX2/SSE optimized memcpy()", (void*) fast_memcpy, 0,AV_CPU_FLAG_MMX |AV_CPU_FLAG_SSE |AV_CPU_FLAG_MMX2 },
 #endif  
    //  { "aclib optimized ac_memcpy()", (void*) ac_memcpy, 0 },
      { NULL, NULL, 0},
@@ -1204,19 +1314,30 @@ static struct {
 static struct {
      char                 *name;
      void                *(*function)(void *to, uint8_t c, size_t len);
-     unsigned long long    time;
+	 uint64_t	    time;
+     uint32_t		cpu_require;
 } memset_method[] =
 {
-     { NULL, NULL, 0},
-     { "glibc memset()",            (void*)memset, 0},
-#if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_MMX2)
-     { "MMX/MMX2 optimized memset()", (void*)   fast_memset, 0},
+     { NULL, NULL, 0,0},
+     { "glibc memset()",            (void*)memset, 0,0},
+#if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_MMX2) || defined(HAVE_ASM_SSE)
+     { "MMX/MMX2/SSE optimized memset()", (void*)   fast_memset, 0, AV_CPU_FLAG_MMX|AV_CPU_FLAG_SSE|AV_CPU_FLAG_MMX2},
 #endif 
-       { NULL, NULL, 0},
+       { NULL, NULL, 0,0},
 };
 
 
-
+void	memcpy_report()
+{
+	int i;
+	fprintf(stdout,"SIMD benchmark results:\n");
+	for( i = 1; memset_method[i].name; i ++ ) {
+		fprintf(stdout,"\t%8ld : %s\n",(long) memset_method[i].time,  memset_method[i].name );
+	}
+	for( i = 1; memcpy_method[i].name; i ++ ) {
+		fprintf(stdout,"\t%8ld : %s\n",(long) memcpy_method[i].time,  memcpy_method[i].name );
+	}
+}
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
 
@@ -1235,15 +1356,25 @@ char *get_memcpy_descr( void )
 	return res;
 }
 
+char *get_memset_descr ( void )
+{
+	int i = 1;
+	int best = 1;
+	for (i=1; memset_method[i].name; i++)
+	{
+		if( memset_method[i].time <= memset_method[best].time )
+			best = i;	
+     	}
+	char *res = strdup( memset_method[best].name );
+	return res;
+}
+
 void find_best_memcpy()
 {
-     /* save library size on platforms without special memcpy impl. */
-     unsigned long long int t;
+     uint64_t t;
      char *buf1, *buf2;
-     int i, best = 0;
+     int i, best = 0,k;
      int bufsize = 720 * 576 * 3;
-     if( bufsize == 0 )
-	bufsize = BUFSIZE * 2000;
 
      if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
           return;
@@ -1252,6 +1383,8 @@ void find_best_memcpy()
           free( buf1 );
           return;
      }
+
+     int cpu_flags = av_get_cpu_flags();
 	
      memset(buf1,0, bufsize);
      memset(buf2,0, bufsize);
@@ -1260,23 +1393,40 @@ void find_best_memcpy()
      memcpy( buf1, buf2, bufsize);
      memcpy( buf2, buf1, bufsize );
 
-     int c = MAX_WORKERS;
-     int k;
-     for( k = 0; k < c; k ++ ) {
-      for (i=1; memcpy_method[i].name; i++) {
-          t = rdtsc();
+	for( i = 1; memcpy_method[i].name; i ++ ) {
+		
+		t = rdtsc(cpu_flags);
+		if( memcpy_method[i].cpu_require && !(cpu_flags & memcpy_method[i].cpu_require ) ) {
+			memcpy_method[i].time = 0;
+			continue;
+		}
 
-          memcpy_method[i].function( buf1 , buf2 , bufsize );
+		for( k = 0; k < 128; k ++ ) {
+			memcpy_method[i].function( buf1,buf2, bufsize );
+		}
+		t = rdtsc(cpu_flags) - t;
+		memcpy_method[i].time = t;
+	}
 
-          t = rdtsc() - t;
-          memcpy_method[i].time = t;
-          if (best == 0 || t < memcpy_method[best].time)
-               best = i;
-      }
-      if (best) {
-          veejay_memcpy = memcpy_method[best].function;
-      }
-    }
+	for( i = 1; memcpy_method[i].name; i ++ ) {
+		if(best == 0 ) { 
+			best = i;
+		    t = memcpy_method[i].time;	
+			continue;
+		}
+
+		if( memcpy_method[i].time < t ) {
+			t = memcpy_method[i].time;
+			best = i;
+		}
+	}
+
+    if (best) {
+		veejay_memcpy = memcpy_method[best].function;
+    } else {
+		veejay_memcpy = memcpy;
+	}
+    
     free( buf1 );
     free( buf2 );
 }
@@ -1286,42 +1436,47 @@ void find_best_memcpy()
 
 void find_best_memset()
 {
-     /* save library size on platforms without special memcpy impl. */
-     unsigned long long t;
-     char *buf1, *buf2;
-     int i, best = 0;
-
-     if (!(buf1 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) )))
+    uint64_t t;
+    char *buf1, *buf2;
+    int i, best = 0,k;
+	int bufsize = 720 * 576 * 3;
+	int cpu_flags = av_get_cpu_flags();
+	
+     if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
           return;
 
-     if (!(buf2 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) ))) {
+     if (!(buf2 = (char*) malloc( bufsize * sizeof(char) ))) {
           free( buf1 );
           return;
      }
 	
-     for( i = 0; i < (BUFSIZE*2000); i ++ )
-     {
-	     buf1[i] = 0;
-	     buf2[i] = 0;
-     }
+	memset( buf1, 0, bufsize * sizeof(char));
+	memset( buf2, 0, bufsize * sizeof(char));
 
      for (i=1; memset_method[i].name; i++)
      {
-          t = rdtsc();
+		if( memset_method[i].cpu_require && !(cpu_flags & memset_method[i].cpu_require ) ) {
+			memset_method[i].time= 0;
+			continue;
+		}
 
-          memset_method[i].function( buf1 , 0 , 2000 * BUFSIZE );
-
-          t = rdtsc() - t;
+        t = rdtsc(cpu_flags);
+		for( k = 0; k < 128; k ++ ) {
+			memset_method[i].function( buf1 , 0 , bufsize );
+		}
+        t = rdtsc(cpu_flags) - t;
 	  
-          memset_method[i].time = t;
+        memset_method[i].time = t;
 
-          if (best == 0 || t < memset_method[best].time)
-               best = i;
+        if (best == 0 || t < memset_method[best].time)
+        	best = i;
      }
 
      if (best) {
           veejay_memset = memset_method[best].function;
-     }
+     } else {
+		  veejay_memset = memset;
+	 }
 
      free( buf1 );
      free( buf2 );
@@ -1357,19 +1512,6 @@ static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 	vj_task_run( input, input, NULL, strides,3, (performer_job_routine) &vj_frame_clear_job );
 }
 
-
-/*test pattern:
-	int len = job->strides[0];
-	for( i = 0; i < len; i ++ )
-		img[0][i] = 255 - ( 15 * job->id );
-	
-	len = job->strides[1];
-	for( i = 0; i < len; i ++ )
-		{
-		img[1][i] = 128; img[2][i] = 128;
-		}
-*/
-
 static inline void vj_frame_slow1( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
 {
 #ifndef HAVE_ASM_MMX
@@ -1379,40 +1521,36 @@ static inline void vj_frame_slow1( uint8_t *dst, uint8_t *a, uint8_t *b, const i
 	}
 #else
 	uint32_t ialpha = (256 * frac);
-        unsigned int i;
+    unsigned int i;
 
-        ialpha |= ialpha << 16;
+    ialpha |= ialpha << 16;
 
-        __asm __volatile
-                ("\n\t pxor %%mm6, %%mm6"
-                 ::);
+    __asm __volatile
+				("\n\t pxor %%mm6, %%mm6"
+                ::);
 
-        for (i = 0; i < len; i += 4) {
-                __asm __volatile
-                        ("\n\t movd %[alpha], %%mm3"
-                         "\n\t movd %[src2], %%mm0"
-                         "\n\t psllq $32, %%mm3"
-                         "\n\t movd %[alpha], %%mm2"
-                         "\n\t movd %[src1], %%mm1"
-                         "\n\t por %%mm3, %%mm2"
-                         "\n\t punpcklbw %%mm6, %%mm0"  
-                         "\n\t punpcklbw %%mm6, %%mm1"  
-                         "\n\t psubsw %%mm1, %%mm0"     
-                         "\n\t pmullw %%mm2, %%mm0"     
-                         "\n\t psrlw $8, %%mm0"        
-                         "\n\t paddb %%mm1, %%mm0"     
-                         "\n\t packuswb %%mm0, %%mm0\n\t"
-			 "\n\t movd %%mm0, %[dest]\n\t"
-                         : [dest] "=m" (*(dst + i))
-                         : [src1] "m" (*(a + i))
-                         , [src2] "m" (*(b + i))
-                         , [alpha] "m" (ialpha));
-        }
-
-
+	for (i = 0; i < len; i += 4) {
+		__asm __volatile
+			("\n\t movd %[alpha], %%mm3"
+			"\n\t movd %[src2], %%mm0"
+			"\n\t psllq $32, %%mm3"
+			"\n\t movd %[alpha], %%mm2"
+			"\n\t movd %[src1], %%mm1"
+			"\n\t por %%mm3, %%mm2"
+			"\n\t punpcklbw %%mm6, %%mm0"  
+			"\n\t punpcklbw %%mm6, %%mm1"  
+			"\n\t psubsw %%mm1, %%mm0"     
+			"\n\t pmullw %%mm2, %%mm0"     
+			"\n\t psrlw $8, %%mm0"        
+			"\n\t paddb %%mm1, %%mm0"     
+			"\n\t packuswb %%mm0, %%mm0\n\t"
+			"\n\t movd %%mm0, %[dest]\n\t"
+			: [dest] "=m" (*(dst + i))
+			: [src1] "m" (*(a + i))
+			, [src2] "m" (*(b + i))
+			, [alpha] "m" (ialpha));
+	}
 #endif
-
-    	
 }
 
 static void	vj_frame_slow_job( void *arg )
@@ -1524,23 +1662,23 @@ void	vj_frame_clear1( uint8_t *input, unsigned int val, int size )
 
 static unsigned long benchmark_single_slow(long c, int n_tasks, uint8_t **source, uint8_t **dest, int *planes)
 {
-	long k;
-	unsigned long long stats[c];
-	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+	uint64_t k;
+	uint64_t stats[c];
+	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ )	
 	{
-		unsigned long long t = rdtsc();
+		uint64_t t = rdtsc(0);
 		vj_frame_slow_single( source, source, dest, planes[0], planes[1]/2, 0.67f );
-		t = rdtsc() - t;
+		t = rdtsc(0) - t;
 		stats[k] = t;
 	}
 
-	int sum = 0,j;
+	uint64_t sum = 0,j;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
-	unsigned long long best_time = (sum / c );
+	uint64_t best_time = (sum / c );
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
 			(float)(bytes /1048576.0f), (best_time/1000.0f));
@@ -1551,23 +1689,23 @@ static unsigned long benchmark_single_slow(long c, int n_tasks, uint8_t **source
 
 static unsigned long benchmark_threaded_slow(long c, int n_tasks, uint8_t **source, uint8_t **dest, int *planes)
 {
-	long k;
-	unsigned long long stats[c];
-	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+	uint64_t k;
+	uint64_t stats[c];
+	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ )	
 	{
-		unsigned long long t = rdtsc();
+		uint64_t t = rdtsc(0);
 		vj_frame_slow_threaded( source, source, dest, planes[0], planes[1]/2, 0.67f );
-		t = rdtsc() - t;
+		t = rdtsc(0) - t;
 		stats[k] = t;
 	}
 
-	int sum = 0,j;
+	uint64_t sum = 0,j;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
-	unsigned long long best_time = (sum / c );
+	uint64_t best_time = (sum / c );
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
 			(float)(bytes /1048576.0f), (best_time/1000.0f));
@@ -1578,23 +1716,23 @@ static unsigned long benchmark_threaded_slow(long c, int n_tasks, uint8_t **sour
 
 static unsigned long benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest, uint8_t **source, int *planes)
 {
-	long k;
-	unsigned long long stats[c];
-	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+	uint64_t k;
+	uint64_t stats[c];
+	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ )	
 	{
-		unsigned long long t = rdtsc();
+		uint64_t t = rdtsc(0);
 		vj_frame_copyN( source,dest,planes );
-		t = rdtsc() - t;
+		t = rdtsc(0) - t;
 		stats[k] = t;
 	}
 
-	int sum = 0,j;
+	uint64_t sum = 0,j;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
-	unsigned long long best_time = (sum / c );
+	uint64_t best_time = (sum / c );
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
 			(float)(bytes /1048576.0f), (best_time/1000.0f));
@@ -1604,23 +1742,24 @@ static unsigned long benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest
 
 static unsigned long benchmark_single_copy(long c,int dummy, uint8_t **dest, uint8_t **source, int *planes)
 {
-	long k; int j;
-	unsigned long long stats[c];
-	unsigned long long bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+	uint64_t k; int j;
+	uint64_t stats[c];
+	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+
 	for( k = 0; k < c; k ++ ) {
-		unsigned long long t = rdtsc();
+		uint64_t t = rdtsc(0);
 		for( j = 0; j < 4; j ++ ) {
 			veejay_memcpy( dest[j], source[j], planes[j] );
 		}
-		t = rdtsc() - t;
+		t = rdtsc(0) - t;
 		stats[k] = t;
 	}
 
-	int sum = 0;
+	uint64_t sum = 0;
 	for( k = 0; k < c; k ++ ) 
 		sum += stats[k];
 
-	unsigned long long best_time = (sum/c);
+	uint64_t best_time = (sum/c);
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
 			(float)(bytes /1048576.0f), (best_time/1000.0f));
@@ -1633,15 +1772,14 @@ typedef unsigned long (*benchmark_func)(long c, int dummy, uint8_t **dest, uint8
 
 void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, uint8_t **dest, uint8_t **source, int *planes )
 {
-	unsigned long N = 8;
-	unsigned long stats[N];	
-	int i;
-	unsigned long fastest = 0;
+	uint32_t N = 8;
+	uint64_t stats[N];	
+	uint32_t i;
+	uint64_t fastest = 0;
 	float work_size = (planes[0] + planes[1] + planes[2] + planes[3]) / 1048576.0f;
 
-	veejay_msg(VEEJAY_MSG_INFO, "run test '%s' on chunks of %2.2f MB:", str, work_size );
+	veejay_msg(VEEJAY_MSG_INFO, "run test '%s' (%dx) on chunks of %2.2f MB:", str, N, work_size );
 
-	
 	for( i = 0; i < N; i ++ )
 	{
 		stats[i] = f( n_frames, n_tasks, source, dest, planes );
@@ -1649,8 +1787,8 @@ void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, 
 			fastest = stats[i];
 	}
 	
-	unsigned long sum = 0;
-	unsigned long slowest=fastest;
+	uint64_t sum = 0;
+	uint64_t slowest=fastest;
 	for( i = 0; i < N; i ++ )
 	{
 		if( stats[i] < fastest ) {

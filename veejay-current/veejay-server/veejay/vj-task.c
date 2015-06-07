@@ -214,7 +214,7 @@ void		*task_thread(void *data)
 	}
 }
 
-static inline uint8_t	task_get_workers()
+static __inline__ uint8_t	task_get_workers()
 {
 	return numThreads;
 }

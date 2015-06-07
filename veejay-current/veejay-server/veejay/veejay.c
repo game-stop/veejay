@@ -68,77 +68,98 @@ static int ta = 0;
 
 static void CompiledWith()
 {
-	veejay_msg(VEEJAY_MSG_INFO,"Compilation flags:");
+	fprintf(stdout,"This is Veejay %s\n\n", VERSION);
+
+	fprintf(stdout,    
+		"Build for %s/%s arch %s on %s\n",
+	    BUILD_OS,
+	    BUILD_KERNEL,
+	    BUILD_MACHINE,
+	    BUILD_DATE );
+
+	fprintf(stdout,"Compilation flags:");
 #ifdef ARCH_MIPS
-	veejay_msg(VEEJAY_MSG_INFO, "\tCompiled for MIPS");
+	fprintf(stdout, "\tCompiled for MIPS\n");
 #endif
 #ifdef ARCH_PPC
-	veejay_msg(VEEJAY_MSG_INFO, "\tCompiled for PPC");
+	fprintf(stdout, "\tCompiled for PPC\n");
 #endif
 #ifdef ARCH_X86_64
-	veejay_msg(VEEJAY_MSG_INFO, "\tCompiled for X86_64");
+	fprintf(stdout, "\tCompiled for X86_64\n");
 #endif
 #ifdef ARCH_X86
-	veejay_msg(VEEJAY_MSG_INFO, "\tCompiled for X86");
+	fprintf(stdout, "\tCompiled for X86\n");
 #endif
 #ifdef HAVE_DARWIN
-	veejay_msg(VEEJAY_MSG_INFO, "\tCompiled for Darwin");
+	fprintf(stdout, "\tCompiled for Darwin\n");
 #endif
 #ifdef HAVE_PS2
-	veejay_msg(VEEJAY_MSG_INFO, "\tCompiled for Sony Playstation 2 (TM)");
+	fprintf(stdout, "\tCompiled for Sony Playstation 2 (TM)\n");
 #endif
 #ifdef HAVE_ALTIVEC
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Altivec");
+	fprintf(stdout,"\tUsing Altivec\n");
 #endif
 #ifdef HAVE_ASM_SSE
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing SSE instruction set");
+	fprintf(stdout,"\tUsing SSE instruction set\n");
 #endif
 #ifdef HAVE_CMOV
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing CMOV");
+	fprintf(stdout,"\tUsing CMOV");
 #endif
 #ifdef HAVE_ASM_SSE2
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing SSE2 instruction set");
+	fprintf(stdout,"\tUsing SSE2 instruction set\n");
 #endif
 #ifdef HAVE_ASM_MMX
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing MMX instruction set");
+	fprintf(stdout,"\tUsing MMX instruction set\n");
 #endif
 #ifdef HAVE_ASM_MMX2	
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing MMX2 instruction set");
+	fprintf(stdout,"\tUsing MMX2 instruction set\n");
 #endif
 #ifdef HAVE_ASM_3DNOW
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing 3Dnow instruction set");
+	fprintf(stdout,"\tUsing 3Dnow instruction set\n");
 #endif
+#ifdef HAVE_ASM_AVX
+	fprintf(stdout,"\tUsing AVX instruction set\n");
+#endif
+	
+	memcpy_report();
+
+	fprintf(stdout,"Dependencies:\n");
 
 #ifdef USE_GDK_PIXBUF
-	veejay_msg(VEEJAY_MSG_INFO,"\tUse GDK Pixbuf");
+	fprintf(stdout,"\tSupport for GDK image loading\n");
 #endif
-	veejay_msg(VEEJAY_MSG_INFO,"\tUse software scaler");
 #ifdef HAVE_JACK
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Jack audio server");
+	fprintf(stdout,"\tSupport for Jack Audio Connection Kit\n");
 #endif
 #ifdef SUPPORT_READ_DV2
-	veejay_msg(VEEJAY_MSG_INFO,"\tSupport for Digital Video enabled");
+	fprintf(stdout,"\tSupport for Digital Video\n");
+#endif
+#ifdef SUPPORT_READ_DV2
+	fprintf(stdout,"\tSupport for Digital Video\n");
+#endif
+#ifdef HAVE_LIBQUICKTIME
+	fprintf(stdout,"\tSupport for Quicktime Video\n");
 #endif
 #ifdef HAVE_XML2
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing XML library for Gnome");
-#endif
-#ifdef SUPPORT_READ_DV2
-	veejay_msg(VEEJAY_MSG_INFO,"\tSupport for Digital Video enabled");
+	fprintf(stdout,"\tSupport for XML\n");
 #endif
 #ifdef HAVE_SDL
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Simple Direct Media Layer");
+	fprintf(stdout,"\tSupport for Simple Direct Media Layer\n");
+#ifdef HAVE_SDL_TTF
+	fprintf(stdout,"\tSupport for On-Screen logging\n");
+#endif
 #endif
 #ifdef HAVE_JPEG
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing libjpeg");
+	fprintf(stdout,"\tSupport for JPEG\n");
 #endif
 #ifdef HAVE_LIBPTHREAD
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing libpthread");
+	fprintf(stdout,"\tSupport for Multithreading\n");
 #endif
 #ifdef HAVE_V4L
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Video4Linux");
+	fprintf(stdout,"\tSupport for Capture Devices\n");
 #endif
 #ifdef HAVE_V4L2
-	veejay_msg(VEEJAY_MSG_INFO, "\tUsing Video4Linux II");
+	fprintf(stdout, "\tSupport for Capture Devices\n");
 #endif
 	/*
 #ifdef HAVE_GL
@@ -146,10 +167,17 @@ static void CompiledWith()
 #endif
 	*/
 #ifdef HAVE_DIRECTFB
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing DirectFB");
+	fprintf(stdout,"\tSupport for Direct Framebuffer\n");
 #endif
-
-	vj_libav_ffmpeg_version();
+#ifdef HAVE_LIBLO
+	fprintf(stdout,"\tSupport for liblo\n");
+#endif
+#ifdef HAVE_MJPEGTOOLS
+	fprintf(stdout,"\tSupport for the Mjpegtools\n");
+#endif
+#ifdef HAVE_QRCODE
+	fprintf(stdout,"\tSupport for QR code\n");
+#endif
 
 	exit(0);
 }
@@ -163,31 +191,26 @@ static void Usage(char *progname)
 			"  -v/--verbose  \t\tEnable debugging output (default off)\n");
 	fprintf(stderr,
 			"  -n/--no-color     \t\tDo not use colored text\n");
-    fprintf(stderr,
+   	fprintf(stderr,
 	    	"  -u/--dump-events  \t\tDump veejay's documentation to stdout\n");
 	fprintf(stderr,
 			"  -B/--features  \t\tList of compiled features\n");
    	fprintf(stderr,
 			"  -D/--composite \t\tDo not start with camera/projection calibration viewport \n");
-
 	fprintf(stderr,
 	   		"  -p/--port <num>\t\tTCP port to accept/send messages (default: 3490)\n");
 	fprintf(stderr,
 			"  -M/--multicast-osc \t\tmulticast OSC\n");
 	fprintf(stderr,
 			"  -T/--multicast-vims \t\tmulticast VIMS\n");
-	
  	fprintf(stderr,
 			"  -m/--memory <num>\t\tMaximum memory to use for cache (0=disable, default=0 max=100)\n");  
 	fprintf(stderr,
 			"  -j/--max_cache <num>\t\tDivide cache memory over N samples (default=0)\n");
-	
 	fprintf(stderr,
 			"  -Y/--yuv [01]\t\t\tForce YCbCr (defaults to YUV)\n");
-
 	fprintf(stderr,
 	    	"  -t/--timer <num>\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
-
     fprintf(stderr,
 	    	"  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in edit lists\n");
 	fprintf(stderr,
@@ -208,17 +231,12 @@ static void Usage(char *progname)
 	   		"  -l/--sample-file <file name>\tLoad a sample list file (none at default)\n");
 	fprintf(stderr,
 			"  -F/--action-file <file name>\tLoad an action file (none at default)\n");
-
-	
 	fprintf(stderr,
 			"  -g/--clip-as-sample\t\tLoad every video clip as a new sample\n");	
-	
 	fprintf(stderr,
 	    	"  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
-	
 	fprintf(stderr,
 	    	"  -c/--synchronization [01]\tSync correction off/on (default on)\n");
-
     fprintf(stderr,
 	    	"  -O/--output [0..6]\t\tOutput video\n");
 #ifdef HAVE_SDL
@@ -237,24 +255,19 @@ static void Usage(char *progname)
 			"\t\t\t\t3 = Head less (no video output)\n");	
 	fprintf(stderr,
 			"\t\t\t\t4 = Y4M Stream 4:2:0 (requires -o <filename>)\n");
-
 	fprintf(stderr,
 			"\t\t\t\t5 = Vloopback device (requires -o <filename>)\n");
-
 	fprintf(stderr,
 			"\t\t\t\t6 = Y4M Stream 4:2:2 (requires -o <filename>)\n");
-
 	fprintf(stderr,
 			"  -o/--output-file [file]\tWrite to file (for use with Y4M Stream)\n");
 #ifdef HAVE_SDL
-        fprintf(stderr,
+    fprintf(stderr,
 	    "  -s/--size NxN\t\t\tDisplay dimension for video window, use Width x Height\n");
-
 	fprintf(stderr,
 		"  -x/--geometry-x <num> \tTop left x offset for SDL video window\n");
 	fprintf(stderr,
 		"  -y/--geometry-y <num> \tTop left y offset for SDL video window\n");
-
 	fprintf(stderr,
 		"  --no-keyboard\t\t\tdisable keyboard for SDL video window\n");
 	fprintf(stderr,
@@ -264,7 +277,6 @@ static void Usage(char *progname)
 #endif
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with capture device <num> \n");
-
 	fprintf(stderr,
 		"  -d/--dummy	\t\tStart with no video (black frames)\n");
 	fprintf(stderr,
@@ -281,12 +293,10 @@ static void Usage(char *progname)
 	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
 	fprintf(stderr,
 		"  -N/--norm <num>\t\tSet video norm [0=PAL, 1=NTSC, 2=SECAM (defaults to PAL)]\n");
-
 	fprintf(stderr,
 		"  -w/--output-width <num>\tSet output video width (Projection)\n");
 	fprintf(stderr,
 		"  -h/--output-height <num>\tSet output video height (Projection)\n");
-
 	fprintf(stderr,
 		"  --benchmark NxN\t\tveejay benchmark using NxN resolution\n");
 #ifdef HAVE_QRENCODE  
@@ -302,7 +312,6 @@ static void Usage(char *progname)
 }
 
 #define OUT_OF_RANGE(val) ( val < 0 ? 1 : ( val > 100 ? 1 : 0) )
-
 #define OUT_OF_RANGE_ERR(val) if(OUT_OF_RANGE(val)) { fprintf(stderr,"\tValue must be 0-100\n"); exit(1); }
 
 #define check_val(val,msg) {\
@@ -780,6 +789,13 @@ int main(int argc, char **argv)
 		veejay_msg(VEEJAY_MSG_INFO, "Using SIMD %s", mem_func);
 		free(mem_func);
 	}
+	mem_func = get_memset_descr();
+	if(mem_func)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Using SIMD %s", mem_func);
+		free(mem_func);
+	}
+
 	info->use_keyb = use_keyb;
 	info->use_mouse = use_mouse;
 	info->show_cursor = show_cursor;

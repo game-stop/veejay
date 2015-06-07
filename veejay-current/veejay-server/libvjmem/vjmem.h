@@ -28,8 +28,10 @@ extern void 	vj_mem_init(void);
 extern int 	vj_mem_threaded_init(int w, int h);
 extern void 	vj_mem_threaded_stop(void);
 extern char 	*get_memcpy_descr( void );
+extern char	*get_memset_descr( void );
 extern void	*vj_malloc_(size_t size);
 extern void 	*vj_calloc_(size_t size );
+extern void	memcpy_report();
 
 #define vj_malloc(i) vj_malloc_(i)
 #define vj_calloc(i) vj_calloc_(i)

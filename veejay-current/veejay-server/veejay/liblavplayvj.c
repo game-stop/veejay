@@ -2563,16 +2563,20 @@ int vj_server_setup(veejay_t * info)
 {
 	if (info->uc->port == 0)
 		info->uc->port = VJ_PORT;
-	info->vjs[VEEJAY_PORT_CMD] = vj_server_alloc(info->uc->port, NULL, V_CMD);
+
+	size_t recv_len   = (info->edit_list->video_width * info->edit_list->video_height * 3); // max
+	size_t status_len = 4096 * 16; //@ 16x 4kb 
+
+	info->vjs[VEEJAY_PORT_CMD] = vj_server_alloc(info->uc->port, NULL, V_CMD, recv_len);
 	if(!info->vjs[VEEJAY_PORT_CMD])
 		return 0;
 
-	info->vjs[VEEJAY_PORT_STA] = vj_server_alloc(info->uc->port, NULL, V_STATUS);
+	info->vjs[VEEJAY_PORT_STA] = vj_server_alloc(info->uc->port, NULL, V_STATUS, status_len);
 	if(!info->vjs[VEEJAY_PORT_STA])
 		return 0;
 
 	//@ second VIMS control port
-	info->vjs[VEEJAY_PORT_DAT] = vj_server_alloc(info->uc->port + 5, NULL, V_CMD );
+	info->vjs[VEEJAY_PORT_DAT] = vj_server_alloc(info->uc->port + 5, NULL, V_CMD, recv_len);
 	if(!info->vjs[VEEJAY_PORT_DAT])
 		return 0;
 
@@ -2580,7 +2584,7 @@ int vj_server_setup(veejay_t * info)
 	if( info->settings->use_vims_mcast )
 	{
 		info->vjs[VEEJAY_PORT_MAT] =
-			vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD );
+			vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD, recv_len );
 		if(!info->vjs[VEEJAY_PORT_MAT])
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,

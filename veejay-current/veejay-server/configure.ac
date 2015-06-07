@@ -136,8 +136,7 @@ AC_SYS_LARGEFILE
 dnl configure AS and ASFLAGS...
 AM_PROG_AS
 
-AC_CHECK_HEADERS([fenv.h stdint.h inttypes.h sys/types.h alloca.h])
-
+AC_CHECK_HEADERS([fenv.h stdint.h inttypes.h sys/types.h alloca.h sys/time.h sys/times.h])
 dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_STDINT_H])
 dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_INTTYPES_H])
 
@@ -159,6 +158,8 @@ AC_CHECK_SIZEOF([long int])
 AC_CHECK_SIZEOF([size_t])
 AC_CHECK_SIZEOF([float])
 
+AC_SEARCH_LIBS([clock_gettime], [rt],
+	       [AC_DEFINE(HAVE_POSIX_TIMERS,[1],[Set to 1 if clock_gettime and POSIX timers are available])])
 
 
 AC_SUBST(LIBGETOPT_LIB)

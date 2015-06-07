@@ -335,15 +335,21 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 
 	return 1;
 }
-vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
+vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, size_t buflen)
 {
 	vj_server *vjs = (vj_server *) vj_calloc(sizeof(struct vj_server_t));
 	
 	if (!vjs)
 		return NULL;
 
-	vjs->recv_bufsize = RECV_SIZE * 1024; //@ 4 MB receive buffer
+	size_t bl = buflen;
+	if( bl < RECV_SIZE ) {
+		bl = RECV_SIZE;
+	}
+
+	vjs->recv_bufsize = bl;
 	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * vjs->recv_bufsize);
+
 	if(!vjs->recv_buf)
 	{
 		free(vjs);

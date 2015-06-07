@@ -48,7 +48,7 @@ typedef struct vj_server_t {
     int recv_bufsize;
 } vj_server;
 
-vj_server *vj_server_alloc(int port, char *mcast_group_name, int type);
+vj_server *vj_server_alloc(int port, char *mcast_group_name, int type, size_t recv_max_len);
 
 int vj_server_update(vj_server * vje, int link_id);
 
