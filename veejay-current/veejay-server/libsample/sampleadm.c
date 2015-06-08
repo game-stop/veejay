@@ -2520,7 +2520,7 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 		e_s = sample->encoder_total_frames_recorded;
 	}
 
-	veejay_sprintf(str,1024,
+	veejay_sprintf(str,MESSAGE_SIZE,
 		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,

@@ -2739,7 +2739,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 	if (error == 1)
  	{
 		VJFrame dumb;
-		vj_el_init_422_frame( info->current_edit_list, &dumb );
+		veejay_memcpy( &dumb, info->effect_frame1, sizeof(VJFrame));
 
 		dumb.data[0] = frame[0];
 		dumb.data[1] = frame[1];

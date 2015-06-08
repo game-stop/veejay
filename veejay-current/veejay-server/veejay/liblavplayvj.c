@@ -429,16 +429,17 @@ int veejay_free(veejay_t * info)
 	free( info->seq->samples );
 	free( info->seq );
 
-        free(info->status_msg);
-        free(info->status_what);
+    free(info->status_what);
 	free(info->homedir);  
-        free(info->uc);
+    free(info->uc);
+	
 	if(info->cpumask) free(info->cpumask);
 	if(info->mask) free(info->mask);
 	if(info->rlinks) free(info->rlinks);
-        if(info->rmodes) free(info->rmodes );
+    if(info->rmodes) free(info->rmodes );
+	
 	free(settings);
-        free(info);
+    free(info);
     return 1;
 }
 
@@ -1110,7 +1111,7 @@ void veejay_pipe_write_status(veejay_t * info)
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
 		// 26 status symbols
-		snprintf(info->status_what,1024, " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		snprintf(info->status_what,MESSAGE_SIZE, " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1148,7 +1149,8 @@ void veejay_pipe_write_status(veejay_t * info)
     }
     
 	d_len = strlen(info->status_what);
-	snprintf( info->status_line, 1500, "V%03dS%s", d_len, info->status_what );
+	info->status_line_len = d_len + 5;
+	snprintf( info->status_line, MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what );
 
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
@@ -1258,19 +1260,17 @@ void	veejay_check_homedir(void *arg)
 		}
 	}
 
-	sprintf(tmp, "%s/plugins.cfg", path );
+	snprintf(tmp,sizeof(tmp), "%s/plugins.cfg", path );
 	struct statfs ts;
 	if( statfs( tmp, &ts ) != 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING,"No plugins.cfg found (see DOC/HowtoPlugins)");
 	}
-	sprintf(tmp, "%s/viewport.cfg", path);
-	memset( &ts,0,sizeof(struct statfs));
+	snprintf(tmp,sizeof(tmp), "%s/viewport.cfg", path);
 	if( statfs( tmp, &ts ) != 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING,"No viewport.cfg found (start veejay with -D -w -h and press CTRL-V to setup viewport)");
 	}
-
 }
 
 /******************************************************
@@ -1312,12 +1312,12 @@ static void veejay_handle_callbacks(veejay_t *info) {
 	veejay_pipe_write_status( info );
 
 	/* create status message and write to clients */
-	int status_line_len = strlen( info->status_line );
+//	int status_line_len = strlen( info->status_line );
 	int i;
 	for( i = 0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
 		if( !vj_server_link_can_write( info->vjs[VEEJAY_PORT_STA],  i ) ) 
 			continue;
-		int res = vj_server_send( info->vjs[VEEJAY_PORT_STA], i, (uint8_t*)info->status_line, status_line_len);
+		int res = vj_server_send( info->vjs[VEEJAY_PORT_STA], i, (uint8_t*)info->status_line, info->status_line_len);
 		if( res < 0 ) {
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_CMD], i );
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_STA], i );
@@ -1743,17 +1743,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	vj_tag_set_veejay_t(info);
 
 
-#ifdef HAVE_V4L
 	int driver = 1;
-	char *driver_str = getenv("VEEJAY_CAPTURE_DRIVER");
-	if( driver_str != NULL ) {
-		if( strncasecmp( "unicap",driver_str, 6) == 0 )
-			driver = 0;
-	}
-#else
-	int driver = 1;
-#endif
-
 	if (vj_tag_init(info->video_output_width, info->video_output_height, info->pixel_format,driver) != 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing Stream Manager");
 		return -1;
@@ -2723,7 +2713,6 @@ veejay_t *veejay_malloc()
     veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
 
     info->status_what = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE );
-    info->status_msg = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE+5);
 
 	info->uc = (user_control *) vj_calloc(sizeof(user_control));
     if (!(info->uc)) 
@@ -2773,7 +2762,8 @@ veejay_t *veejay_malloc()
     info->uc->sample_end = 0;
 	info->uc->ram_chain = 1; /* enable, keep FX chain buffers in memory (reduces the number of malloc/free of frame buffers) */
 	info->net = 1;
-	info->status_line = (char*) vj_calloc(sizeof(char) * 1500 );
+	info->status_line = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE );
+	info->status_line_len = 0;
     for( i =0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
 		info->rlinks[i] = -1;
 		info->rmodes[i] = -1;

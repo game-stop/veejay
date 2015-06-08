@@ -3640,7 +3640,7 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
     //if (!tag)
     //return -1;
 
-	snprintf(str, 1024,
+	snprintf(str, MESSAGE_SIZE,
 			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			pfps,
 			frame,

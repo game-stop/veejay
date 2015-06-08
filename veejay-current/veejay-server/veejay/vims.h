@@ -292,7 +292,7 @@ enum {
 #define EDIT_COPY		103
 #define EDIT_CROP		104
 #define EDIT_DEL		105
-#define MESSAGE_SIZE		1024	
+#define MESSAGE_SIZE	1024	
 #define EL_MIN_BUF		(65535 * 4)
 #define XMLTAG_BUNDLE_FILE  "ACTIONFILE"
 #define XMLTAG_EVENT_AS_KEY "BUNDLE"

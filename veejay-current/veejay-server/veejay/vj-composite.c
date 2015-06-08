@@ -77,7 +77,6 @@ typedef struct
 //@ round to multiple of 8
 #define    RUP8(num)(((num)+8)&~8)
 
-
 void	*composite_get_vp( void *data )
 {
 	composite_t *c = (composite_t*) data;
@@ -125,7 +124,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->proj_plane[1] = c->proj_plane[0] + RUP8(pw * ph) + RUP8(pw);
 	c->proj_plane[2] = c->proj_plane[1] + RUP8(pw * ph) + RUP8(pw);
 	viewport_set_marker( c->vp1, 1 );
-	
 
 	sws_template sws_templ;
 	veejay_memset(&sws_templ,0,sizeof(sws_template));
@@ -133,7 +131,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 
 	c->frame1 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,get_ffmpeg_pixfmt( pf ));
 	c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, c->frame1->format );
-	//c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, (pf == FMT_422 ? PIX_FMT_YUV444P: PIX_FMT_YUVJ444P ));
 	c->frame3 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw,ph,c->frame1->format );
 	c->frame4 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,c->frame1->format );
 
@@ -381,6 +378,8 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	int vp1_active = viewport_active(c->vp1);
 	
 	if( c->has_mirror_plane ) {
+		// the copy is needed for vj_event_get_image_part
+		// mirror plane is only active when VEEJAY_ORIGINAL_FRAME is set to 1
 		if(c->mirror_row_start == 0 && (c->mirror_row_end == input->height || c->mirror_row_end == 0) ) {
 			int strides[4] = { input->len, input->uv_len, input->uv_len, 0 };
 			vj_frame_copy( input->data, c->mirror_plane, strides );
@@ -424,9 +423,11 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 			input->data[1],
 			input->data[2]
 			);	
+		
 		veejay_memset( c->proj_plane[0], 125, c->proj_width * c->proj_height );	
 		veejay_memset( c->proj_plane[1], 128, c->proj_width* c->proj_height );
 		veejay_memset( c->proj_plane[2], 128, c->proj_width* c->proj_height );
+
 		viewport_draw_interface_color( c->vp1, c->proj_plane );
 	} 
 	else if ( which_vp == 1 ) 

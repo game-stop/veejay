@@ -738,16 +738,16 @@ void vj_effect_dump() {
 	{
 		if(vj_effects[i])
 		{
-			printf("\t%d\t\t\t%s\t\t", vj_effect_get_real_id(i), vj_effects[i]->description);
+			printf("\t%d\t%-32s\n", vj_effect_get_real_id(i), vj_effects[i]->description);
 			if(vj_effects[i]->num_params > 0)
 			{
 				int j=0;
 				for(j=0; j < vj_effects[i]->num_params; j++) {
-					printf("\n\t\t\t%s\t\t\t%d\t%d - %d\n", vj_effects[i]->param_description[j] , j, vj_effects[i]->limits[0][j],vj_effects[i]->limits[1][j]);
+					printf("\t\t\t%-24s\t\t\t%d\t%d - %d\n", vj_effects[i]->param_description[j] , j, vj_effects[i]->limits[0][j],vj_effects[i]->limits[1][j]);
 				}
-			}
-			else
-				printf("\n");
+			}	
+			printf("\n");
+			
 		}
 
 	}

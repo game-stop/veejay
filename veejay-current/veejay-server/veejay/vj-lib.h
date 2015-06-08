@@ -312,6 +312,7 @@ typedef struct {
 	char *status_what;
 	char *status_msg;
 	char *status_line;
+	int status_line_len;
 	char *homedir;
 	void *font;
 	void *osd;
