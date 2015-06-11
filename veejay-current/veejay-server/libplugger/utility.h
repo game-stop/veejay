@@ -1,7 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 /* veejay - Linux VeeJay
- * 	     (C) 2002-2005 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify

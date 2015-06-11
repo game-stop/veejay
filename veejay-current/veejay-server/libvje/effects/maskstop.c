@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2005 Niels Elburg <elburg@looze.net>
+ * Copyright(C)2005 Niels Elburg <nwelburg@gmail.com>
  *
  * vvMaskStop - ported from vvFFPP_basic
  * Copyright(C)2005 Maciek Szczesniak <maciek@visualvinyl.net>
