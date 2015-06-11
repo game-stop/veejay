@@ -49,7 +49,7 @@ vj_effect *magicscratcher_init(int w, int h)
     ve->defaults[2] = 1;
     ve->description = "Magic Overlay Scratcher";
     ve->sub_format = 0;
-    ve->extra_frame = 1;
+    ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Scratch frames", "PingPong");
     return ve;
