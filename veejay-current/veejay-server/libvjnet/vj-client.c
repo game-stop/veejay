@@ -18,17 +18,18 @@
  */
 
 #include <config.h>
-#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/types.h>
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <stdio.h>
 #include <fcntl.h>
-#include <stdio.h>
 #include <libvjnet/vj-client.h>
 #include <veejay/vims.h>
 #include <libvjmsg/vj-msg.h>
@@ -37,8 +38,6 @@
 #include <libvjnet/mcastreceiver.h>
 #include <libvjnet/mcastsender.h>
 #include <libavutil/pixfmt.h>
-#include <stdlib.h>
-#include <string.h>
 #include <pthread.h>
 #include <liblzo/lzo.h>
 #define VJC_OK 0
@@ -282,13 +281,8 @@ static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
 
 int	vj_client_read_frame_header( vj_client *v, int *w, int *h, int *fmt, int *compr_len, int *stride1,int *stride2, int *stride3 )
 {
-	uint8_t line[128];
-	uint32_t p[4] = {0, 0,0,0 };
-	uint32_t strides[4] = { 0,0,0,0 };
-
 	int	tokens[16];
-
-	memset( tokens,0,sizeof(tokens));
+	veejay_memset( tokens,0,sizeof(tokens));
 
 	int result = vj_client_packet_negotiate( v, tokens );
 	if( result == 0 ) { 
@@ -388,15 +382,11 @@ void vj_client_decompress_frame_data( vj_client *v, uint8_t *dst, int fmt, int w
 
 uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret )
 {
-	uint8_t line[128];
 	uint32_t p[4] = {0, 0,0,0 };
 	uint32_t strides[4] = { 0,0,0,0 };
 
 	int	tokens[16];
 
-	int n = 0;
-	int plen = 0;
-	int conv = 1;
 	int y_len = 0;
 	int uv_len = 0;
 	
@@ -537,7 +527,7 @@ int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len) 
 }
 
 int vj_client_send(vj_client *v, int sock_type,unsigned char *buf) {
-	int len = strlen(buf);
+	int len = strlen( (const char*)buf);
 	
 	if( v->mcast ) {
 		sprintf( v->blob, "V%03dD", len );

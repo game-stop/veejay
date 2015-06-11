@@ -220,7 +220,7 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 {
 	int n = 0;
 	if( pass == 0 ) {
-		if(frame->ssm = 1 ) {
+		if(frame->ssm == 1 ) {
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_CHAMBLEND );
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CHAMELEON );
 			if(n > 0 )

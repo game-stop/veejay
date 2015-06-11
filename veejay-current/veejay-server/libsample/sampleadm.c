@@ -949,8 +949,6 @@ void sample_del_all(void *edl)
     int end = sample_size();
     int i;
 
-    editlist *el = NULL;
-	
     void *port = vpn(VEVO_ANONYMOUS_PORT);
 
     for (i = 1; i < end; i++) {
@@ -1430,7 +1428,7 @@ int	sample_stop_playing(int s1, int new_s1)
 		return 0;
 	if (new_s1 && !newsample)
 		return 0;
-	unsigned int i,j;
+	unsigned int i;
 	
 	//@ stop playing, if new_s1
 
@@ -2472,7 +2470,6 @@ int	sample_set_editlist(int s1, editlist *edl)
 
 int sample_apply_loop_dec(int s1, double fps) {
     sample_info *sample = sample_get(s1);
-    int inc = (int) fps;
     if(!sample) return -1;
 /*    if(sample->loop_dec==1) {
 	if( (sample->first_frame + inc) >= sample->last_frame) {

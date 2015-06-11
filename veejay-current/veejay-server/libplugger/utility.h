@@ -19,8 +19,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-char    *get_str_vevo( void *port, const char *key ) __attribute__ ((deprecated ));
-char	*alloc_str_vevo( void *port, const char *key ) __attribute__ ((deprecated));
+char    *get_str_vevo( void *port, const char *key );
 double  *get_dbl_arr_vevo( void *port, const char *key );
 void    clone_prop_vevo( void *port, void *to_port, const char *key, const char *as_key );
 void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer );

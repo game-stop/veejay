@@ -168,7 +168,6 @@ void	veejay_print_backtrace()
 #endif
 void	veejay_backtrace_handler(int n , void *dist, void *x)
 {
-	siginfo_t *ist = (siginfo_t*) dist;
 	switch(n) {
 		case SIGSEGV:
 			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system."); //@ Suggested by Matthijs

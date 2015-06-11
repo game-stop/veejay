@@ -77,7 +77,7 @@ static struct {
 	{ "/usr/lib/frei0r-1"},
 	{ "/usr/local/lib64/frei0r-1"},
 	{ "/usr/lib64/frei0r-1"},
-	NULL,
+	{ NULL },
 };
 
 //forward decl
@@ -541,7 +541,6 @@ int	plug_sys_detect_plugins(void)
 		add_to_plugin_list( plugger_paths[i].path );
 	}
 
-	(VEEJAY_MSG_INFO, "Veejay plugin system initialized");
 	//@ the freeframe version we use is not compatible with 64 bit systems. So, lets see if long is size 4
 	//@ For every time there is a void* passed as int a gremlin will be happy
 	if( sizeof(long) == 4 ) {
@@ -628,8 +627,8 @@ void	plug_get_defaults( void *instance, void *fx_values )
 void	plug_set_defaults( void *instance, void *fx_values )
 {
 	generic_clone_parameter_f	gcp;	
-	int error = vevo_property_get( instance, "HOST_plugin_param_clone_f", 0, &gcp );
-	(*gcp)( instance, 0,fx_values );
+	if( vevo_property_get( instance, "HOST_plugin_param_clone_f", 0, &gcp ) == VEVO_NO_ERROR )
+		(*gcp)( instance, 0,fx_values );
 }
 
 void	plug_deactivate( void *instance )
@@ -814,20 +813,20 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 {
 	void *plugin = index_map_[fx_id];
 	int type = 0;
-	int error = vevo_property_get( plugin, "HOST_plugin_type", 0, &type);
-	switch( type )
-	{
-		case VEVO_PLUG_LIVIDO:
-			livido_plug_build_namespace( plugin, entry_id, fx_instance, data, sample_id, cbf, cb_data );
-			break;
-		case VEVO_PLUG_FF:
-			break;
-		case VEVO_PLUG_FR:
-			break;
-		default:
-			break;
+	if( vevo_property_get( plugin, "HOST_plugin_type", 0, &type) == VEVO_NO_ERROR ) {
+		switch( type )
+		{
+			case VEVO_PLUG_LIVIDO:
+				livido_plug_build_namespace( plugin, entry_id, fx_instance, data, sample_id, cbf, cb_data );
+				break;
+			case VEVO_PLUG_FF:
+				break;
+			case VEVO_PLUG_FR:
+				break;
+			default:
+				break;
+		}
 	}
-
 
 
 }
@@ -933,7 +932,8 @@ int	plug_get_num_parameters( int fx_id )
 		return 0;
 
 	int res = 0;
-	int error = vevo_property_get( index_map_[fx_id], "num_params",0,&res);
+	if( vevo_property_get( index_map_[fx_id], "num_params",0,&res) != VEVO_NO_ERROR )
+		return 0;
 
 	return res;
 }	

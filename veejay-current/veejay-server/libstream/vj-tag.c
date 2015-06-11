@@ -374,10 +374,10 @@ static struct {
 	const char *name;
 } video_norm_[] = 
 {
-	"pal",
-	"ntsc",
-	"auto",
-	NULL
+	{"pal"},
+	{"ntsc"},
+	{"auto"},
+	{NULL}
 };
 
 int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,

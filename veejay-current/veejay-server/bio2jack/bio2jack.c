@@ -502,7 +502,7 @@ ensure_buffer_size(char **buffer, unsigned long *cur_size,
 static int
 JACK_xrun_callback(void *arg)
 {
-  jack_driver_t *drv = (jack_driver_t *) arg;
+// jack_driver_t *drv = (jack_driver_t *) arg;
   
   veejay_msg(1, "xrun detected. You are doing too much");
 

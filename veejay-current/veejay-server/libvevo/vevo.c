@@ -1685,7 +1685,6 @@ int	vevo_special_union_ports( void *port_a, void *port_b )
    
    char **Ea = vevo_list_properties( port_a );
    int i;
-   int error;
    if(!Ea)
 		   return 0;
   

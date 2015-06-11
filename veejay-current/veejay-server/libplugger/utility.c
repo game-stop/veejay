@@ -42,21 +42,6 @@ char		*get_str_vevo( void *port, const char *key ){
 	return vevo_property_get_string(port,key);
 }
 
-char		*alloc_str_vevo( void *port, const char *key )
-{
-        size_t len = vevo_property_element_size( port, key,0 );
-        char *ret = NULL;
-
-	if(len<=0) return NULL;
-
-	if( vevo_property_get( port, key,0,NULL ) != VEVO_NO_ERROR )
-		return NULL;
-
-        ret = (char*) vj_malloc(sizeof(char) * len );
-	return ret;
-}
-
-
 double		*get_dbl_arr_vevo( void *port, const char *key )
 {
 	double *res = NULL;
