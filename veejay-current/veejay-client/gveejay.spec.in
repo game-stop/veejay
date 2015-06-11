@@ -38,7 +38,7 @@ you to record the resulting video directly to disk for immediate playback (video
 
 GVeejayReloaded is the graphical interface for Veejay.
 
-Author: Niels Elburg <nelburg@looze.net>
+Author: Niels Elburg <nwelburg@gmail.com>
 
 Requires: gtk2
 Requires: glib2
