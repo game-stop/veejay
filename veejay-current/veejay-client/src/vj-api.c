@@ -1572,14 +1572,14 @@ static	char *	produce_os_str()
 void	about_dialog()
 {
     const gchar *artists[] = { 
-      "Matthijs v. Henten (glade, pixmaps) <cola@looze.net>", 
+      "Matthijs v. Henten (glade, pixmaps) <matthijs.vanhenten@gmail.com>", 
       "Dursun Koca (V-logo)",
       NULL 
     };
 
     const gchar *authors[] = { 
         "Developed by:",
-	"Matthijs v. Henten <cola@looze.net>",
+	"Matthijs v. Henten <matthijs.vanhenten@gmail.com>",
 	"Dursun Koca",
 	"Niels Elburg <nwelburg@gmail.com>",
 	"\n",
