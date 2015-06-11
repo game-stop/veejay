@@ -1,7 +1,3 @@
-
-#2010: untested against 1.6.0
-
-
 sendVIMS - very simple VeeJay client for pure data
  	     (C) 2002-2004 Niels Elburg <elburg@hio.hen.nl>
 	     (C) 2004 Tom Schouten <doelie@zzz.kotnet.org>
@@ -10,13 +6,11 @@ This is free software covered under the terms of the
 GNU GPL. See the file COPYING for details.
 
 requirements:
-	veejay-1.4.3
-	or latest veejay from SVN (http://veejay.dyne.org)
+	veejay-1.5.50
 
 pre build (optional):
-	copy the vims.h file from veejay-current/veejay/vims.h
-	from veejay's SVN repository
-	The vims.h is taken from veejay 0.8.1
+	copy the vims.h file from veejay-current/veejay-server/veejay/vims.h
+	The vims.h is taken from veejay 1.5.50
 
 	perl parse-vims.pl vims.h
 
