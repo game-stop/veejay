@@ -25,7 +25,6 @@ static int driver = 0;
 static int bits_per_sample = 0;
 static unsigned long audio_rate = 0;
 static int audio_channels = 0;
-static unsigned long v_rate = 0;
 extern void veejay_msg(int type, const char format[], ...);
 
 int vj_jack_initialize()
@@ -75,9 +74,6 @@ static int _vj_jack_start(int *dri)
 
 int vj_jack_init(editlist *el)
 {
-	int err;
-	int v_rate = el->audio_rate;
-	int i = 0;
 	int ret = 0;
 
 //	JACK_Init();

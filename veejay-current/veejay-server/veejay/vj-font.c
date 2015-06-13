@@ -439,7 +439,6 @@ int	vj_font_load_srt( void *font, const char *filename )
 	vj_font_t *ff = (vj_font_t*) font;
 	FILE *f = fopen( filename, "r" );
 	unsigned int len = 0;
-	unsigned int i;
 	if(!f)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load SRT file '%s'",filename );
@@ -754,10 +753,6 @@ char    *vj_font_get_sequence( void *font, int seq )
 	tcl1 = strlen(tc1);
 	tcl2 = strlen(tc2);
 
-	uint8_t bg[3];
-	uint8_t fg[3];
-
-	
 	snprintf( tmp,sizeof(tmp), "%05d%09d%09d%02d%s%02d%s%03d%s%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
 			s->id,
 			(int)s->start,
@@ -1002,7 +997,6 @@ static	int	is_ttf( const char *file )
 
 static	int	try_deepen( vj_font_t *f , char *path )
 {
-	int n = 0;
 	if(!path) return 0;
 
 	struct stat l;
@@ -2197,7 +2191,6 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y )
 //	if( str_w_max == 0 )
 	str_w_max = (x - x1);
 	
-	int bw = str_w_max;
 	int bh = y - y1;
 	if(bh <= 0 )
 		bh = y1	+ f->current_size + 4;

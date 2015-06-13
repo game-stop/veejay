@@ -300,11 +300,10 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #endif
 
 #undef _MMREG_SIZE
-#ifdef HAVE_ASM_MMX
-#define _MMREG_SIZE 8
-#endif
 #ifdef HAVE_ASM_SSE
 #define _MMREG_SIZE 16
+#elif HAVE_ASM_MMX
+#define _MMREG_SIZE 8
 #endif
 #ifdef HAVE_ASM_AVX
 #define _MMREG_SIZE 32
