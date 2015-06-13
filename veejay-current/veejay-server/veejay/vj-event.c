@@ -1116,7 +1116,7 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
 			char atomic_msg[256];
 			int found_end_of_msg = 0;
 			int total_msg_len = strlen(msg);
-			veejay_memset( atomic_msg,0,256 );
+			veejay_memset( atomic_msg,0,sizeof(atomic_msg) );
 			while( (offset+j) < total_msg_len)
 			{
 				if(msg[offset+j] == '}')
@@ -1396,7 +1396,7 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 	}
 	else			
 	{
-		char str[255];
+		char str[256];
 		veejay_memset(str,0, sizeof(str) );
 		if(sscanf( msg, "%s", str ) <= 0 )
 			return res;
@@ -1456,7 +1456,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		return 0;
 	}
 
-	/* verify format */
+	/* verify format 
 	if( msg[3] != 0x3a || msg[msg_len] != ';' )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Syntax error in VIMS message");
@@ -1471,6 +1471,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 			return 0;
 		}
 	}
+	*/
 
 	if ( net_id >= VIMS_BUNDLE_START && net_id < VIMS_BUNDLE_END )
 	{
@@ -1519,7 +1520,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		char *str = NULL;
 		int fmt_offset = 1;
 		char *arg_str = NULL;
-		memset( i_args, 0, sizeof(i_args) );
+		veejay_memset( i_args, 0, sizeof(i_args) );
 
 		int n = 4;
 		if( msg[msg_len-4] == ';' )
@@ -1612,7 +1613,6 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	return 0;
 }
 
-
 void vj_event_update_remote(void *ptr)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -1642,8 +1642,7 @@ void vj_event_update_remote(void *ptr)
 			char *buf = NULL;
 			int len =0;
 			while( ( buf = vj_server_retrieve_msg( v->vjs[VEEJAY_PORT_MAT], 0, buf,&len )) != NULL )
-			{
-		
+			{	
 				vj_event_parse_msg( v, buf,len );
 			}
 		}
@@ -1655,6 +1654,8 @@ void vj_event_update_remote(void *ptr)
 	{	
 		if( vj_server_link_can_read( v->vjs[VEEJAY_PORT_CMD], i ) )
 		{
+			vj_server_init_msg_pool( v->vjs[VEEJAY_PORT_CMD], i ); // ensure pool is ready
+
 			int res = vj_server_update( v->vjs[VEEJAY_PORT_CMD], i );
 			if(res>0)
 			{
@@ -1671,7 +1672,6 @@ void vj_event_update_remote(void *ptr)
 			{
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
-		//		_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
 			}
 		}
 	}
@@ -1688,6 +1688,7 @@ void vj_event_update_remote(void *ptr)
 				int n = 0;
 				int len = 0;
 				char *buf  = NULL;
+				vj_server_init_msg_pool( v->vjs[VEEJAY_PORT_DAT], i ); // ensure pool is ready
 				while( (buf= vj_server_retrieve_msg(v->vjs[VEEJAY_PORT_DAT],i,buf, &len))!= NULL )
 				{
 					vj_event_parse_msg( v, buf,len );
@@ -1696,14 +1697,11 @@ void vj_event_update_remote(void *ptr)
 			} else if( res <= 0 )	
 			{
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
-			//	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
-			//	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
 			}
 		}
 	}
 
 	v->settings->is_dat = 0;
-
 
 	//@ repeat macros
 	if(macro_status_ == 2 && macro_port_ != NULL)
@@ -1724,14 +1722,13 @@ void vj_event_update_remote(void *ptr)
 void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
 {
 	char bundle[4096];
-	veejay_memset(bundle,0,4096);
+	veejay_memset(bundle,0,sizeof(bundle));
 	vj_event_create_effect_bundle(v, bundle, key_num, key_mod );
 }
 
 #ifdef HAVE_SDL
 int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 {
-	
 	SDL_KeyboardEvent *key = &event.key;
 	SDLMod mod = key->keysym.mod;
 	veejay_t *v =  (veejay_t*) ptr;
@@ -1792,124 +1789,8 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	}
 	return 1;
 }
-
 #endif
-#ifdef HAVE_GL
-void vj_event_single_gl_fire(void *ptr , int mod, int key)
-{
-	int vims_mod = 0;
-#ifndef HAVE_SDL
-	return;
-#else
-	switch( key )
-	{
-		case 0xff0d: key = SDLK_RETURN; break;
-		case 0xff1b: key = SDLK_ESCAPE; break;
-		case 0xffbe: key = SDLK_F1; break;
-		case 0xffbf: key = SDLK_F2; break;
-		case 0xffc0: key = SDLK_F3; break;
-		case 0xffc1: key = SDLK_F4; break;
-		case 0xffc2: key = SDLK_F5; break;
-		case 0xffc3: key = SDLK_F6; break;
-		case 0xffc4: key = SDLK_F7; break;
-		case 0xffc5: key = SDLK_F8; break;
-		case 0xffc6: key = SDLK_F9; break;
-		case 0xffc7: key = SDLK_F10; break;
-	  	case 0xffc8: key = SDLK_F11; break;
-		case 0xffc9: key = SDLK_F12; break;
-   		case 0xff63: key = SDLK_INSERT; break;
-		case 0xff50: key = SDLK_HOME; break;
-		case 0xff55: key = SDLK_PAGEUP; break;
-		case 0xff56: key = SDLK_PAGEDOWN; break;
-		case 0xff57: key = SDLK_END; break; 	     
-		case 0xffff: key = SDLK_DELETE;break;
-		case 0xff08: key = SDLK_BACKSPACE;break;
-		case 0xff52: key = SDLK_UP; break;
-		case 0xff53: key = SDLK_RIGHT; break;
-		case 0xff54: key = SDLK_DOWN; break;
-		case 0xff51: key = SDLK_LEFT; break;
-		case 0xffaa: key = SDLK_KP_MULTIPLY; break;
-		case 0xffb0: key = SDLK_KP0; break;
-		case 0xffb1: case 0xff9c: key = SDLK_KP1; break;
-		case 0xffb2: case 0xff99: key = SDLK_KP2; break;
-		case 0xffb3: case 0xff9b: key = SDLK_KP3; break;
-		case 0xffb4: case 0xff96: key = SDLK_KP4; break;
-		case 0xffb5: case 0xff9d: key = SDLK_KP5; break;
-		case 0xffb6: case 0xff98: key = SDLK_KP6; break;
-		case 0xffb7: case 0xff95: key = SDLK_KP7; break;
-		case 0xffb8: case 0xff97: key = SDLK_KP8; break;
-		case 0xffb9: case 0xff9a: key = SDLK_KP9; break;
-		case 0xffab: key = SDLK_KP_PLUS; break;
-		case 0xffad: key = SDLK_KP_MINUS; break;
-		case 0xff8d: key = SDLK_KP_ENTER; break;
-		case 0xffaf: key = SDLK_KP_DIVIDE; break;
-		case 0xff9e: case 0xff9f: key = SDLK_KP_PERIOD; break;
-		case 65507: key = SDLK_s; mod = 2; break;
-		default:
-			if( key > (256+128))
-				veejay_msg(VEEJAY_MSG_DEBUG, "\tUnknown key pressed %x, mod = %d", key, mod );
-			break;
-		     
-	}
 
-	switch( mod )
-	{
-		case 1:
-		case 17:
-			vims_mod = VIMS_MOD_SHIFT; break;
-		case 4:
-		case 20:
-			vims_mod = VIMS_MOD_CTRL; break;
-		case 8:
-		case 24:
-		case 144:
-			vims_mod = VIMS_MOD_ALT; break;
-		default:
-			veejay_msg(VEEJAY_MSG_DEBUG, "\tUnknown modifier pressed %x, mod = %d", key , mod );
-			break;
-
-	}
-	
-
-	int vims_key = key;
-	int index = vims_mod * SDLK_LAST + vims_key;
-
-	vj_keyboard_event *ev = get_keyboard_event( index );
-	if(!ev )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Keyboard event %d unknown", index );
-		return;
-	}
-
-	// event_id is here VIMS list entry!
-	int event_id = ev->vims->list_id;
-
-	if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
-	{
-		vj_msg_bundle *bun = vj_event_bundle_get(event_id );
-		if(!bun)
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Requested BUNDLE %d does not exist", event_id);
-			return;
-		}
-		vj_event_parse_bundle( (veejay_t*) ptr, bun->bundle );
-	}
-	else
-	{
-		char msg[100];
-		if( ev->arg_len > 0 )
-		{
-			sprintf(msg,"%03d:%s;", event_id, ev->arguments );
-		}
-		else
-			sprintf(msg,"%03d:;", event_id );
-		vj_event_parse_msg( (veejay_t*) ptr, msg,strlen(msg) );
-	}
-#endif
-}
-
-
-#endif
 void vj_event_none(void *ptr, const char format[], va_list ap)
 {
 	veejay_msg(VEEJAY_MSG_DEBUG, "No action implemented for requested event");
@@ -2105,7 +1986,7 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 
 	int c = 0;
 	char sample_list[1024];
-	veejay_memset(sample_list,0,1024);
+	veejay_memset(sample_list,0,sizeof(sample_list));
 	// todo: editlist loading ; veejay restart
 
 	while( cur != NULL )
@@ -2157,7 +2038,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 	int event_id = 0;	
 	
 	char msg[4096];
-	veejay_memset(msg,0,4096);
+	veejay_memset(msg,0,sizeof(msg));
 
 	while( cur != NULL )
 	{
@@ -2283,7 +2164,7 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 	int key_id=0;
 	int key_mod=-1;
 
-	veejay_memset( buffer,0, 4096 );
+	veejay_memset( buffer,0, sizeof(buffer) );
 
 	if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END)
 	{ /* its a Bundle !*/
@@ -4538,9 +4419,6 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		return; 
 	}
 
-	veejay_memset(tmp,0,255);
-	veejay_memset(prefix,0,150);
-
 	if( !v->seq->active )
 	{
 		sample_get_description(v->uc->sample_id, prefix );
@@ -6784,7 +6662,6 @@ void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	char str[1024];
-	veejay_memset(str,0,1024);
  	int args[2] = {0,0};
 	P_A(args,str,format,ap);
 	if( STREAM_PLAYING(v) || PLAIN_PLAYING(v) )
@@ -7186,9 +7063,8 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
 {
-	int args[4];
+	int args[4] = { 0,0,0,0 };
 	veejay_t *v = (veejay_t*)ptr;
-	veejay_memset(args,0,sizeof(args)); 
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
@@ -7225,16 +7101,14 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	if(args[0]==0) args[0] = v->uc->sample_id;
 	if(args[0]==-1) args[0] = vj_tag_size()-1;
 
-	char send_msg[33];
-	char message[30];
-	veejay_memset(send_msg, 0,sizeof(send_msg));
+	char send_msg[64];
+	char message[64];
 
 	sprintf( send_msg, "000" );
 
 	if(vj_tag_exists(args[0]))
 	{
-		int values[6];
-		memset(values,0,6*sizeof(int));
+		int values[6] = { 0,0,0,0,0,0 };
 		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],	&values[4]))
 		{
 			sprintf(message, "%05d%05d%05d%05d%05d%05d",
@@ -7473,7 +7347,6 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	int args[2];
 	char str[255]; 
-	veejay_memset(str,0,255);
 	P_A(args,str,format,ap);
 
 	if(v->settings->tag_record || v->settings->offline_record)
@@ -8025,19 +7898,21 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 
 void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_mod )
 {
-	char blob[50 * SAMPLE_MAX_EFFECTS];
 	char prefix[20];
 	int i ,y,j;
 	int num_cmd = 0;
 	int id = v->uc->sample_id;
 	int event_id = 0;
 	int bunlen=0;
-	veejay_memset(prefix,0,20);
-	veejay_memset(blob,0,50*SAMPLE_MAX_EFFECTS );
-   
+
 	if(!SAMPLE_PLAYING(v) && !STREAM_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot take snapshot of Effect Chain");
+		return;
+	}
+
+	char *blob = get_print_buf( 50 * SAMPLE_MAX_EFFECTS );
+	if(!blob) {
 		return;
 	}
 
@@ -8051,7 +7926,8 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 	}
 	if(num_cmd < 0) 
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Effect Chain is empty." );           
+		veejay_msg(VEEJAY_MSG_ERROR, "Effect Chain is empty." );    
+		free(blob);		
 		return;
 	}
 
@@ -8092,6 +7968,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 	if(event_id <= 0 )	
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add more bundles");
+		free(blob);
 		return;
 	}
 
@@ -8099,10 +7976,13 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 	if(!m)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Bundle");
+		free(blob);
 		return;
 	}
 	if(!vj_event_bundle_store(m))
 		veejay_msg(VEEJAY_MSG_ERROR, "Error storing Bundle %d", event_id);
+
+	free(blob);
 }
 
 
@@ -8295,8 +8175,6 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 				vj_tag *tag = vj_tag_get(i);
 				char source_name[255];
 				char cmd[300];
-				veejay_memset(source_name,0,200);veejay_memset(cmd,0,255);
-				veejay_memset(line,0,300);
 				//vj_tag_get_description( i, source_name );
 				vj_tag_get_source_name( i, source_name );
 				sprintf(line,"%05d%02d%03d%03d%03d%03d%03zu%s",
@@ -8702,8 +8580,6 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 				char description[SAMPLE_MAX_DESCR_LEN];
 				int end_frame = sample_get_endFrame(i);
 				int start_frame = sample_get_startFrame(i);
-				veejay_memset(cmd,0, sizeof(cmd));
-
 				/* format of sample:
 				 	00000 : id
 				    000000000 : start    
@@ -8801,7 +8677,6 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 	int error = 1;
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,str,format,ap);
-	veejay_memset(fline,0,255);
 	sprintf(line, "%03d", 0);
 
 	char param[1024];
@@ -8913,8 +8788,6 @@ void	vj_event_send_chain_entry_parameters	( 	void *ptr,	const char format[],	va_
 	char *str = NULL;
 	int error = 1;
 	veejay_t *v = (veejay_t*)ptr;
-
-	veejay_memset(line,0,sizeof(line));
 
 	P_A(args,str,format,ap);
 	sprintf(line, "%03d", 0);
@@ -9251,7 +9124,6 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 		len += vj_effect_get_summary_len( i );
 
 	priv_msg = (char*) malloc(sizeof(char) * (6 + len + 4096));
-	memset(priv_msg, 0, (6+len+100));
 	sprintf(priv_msg, "%06d", len );
 	char line[4096];
 	char fline[4096];
@@ -9386,7 +9258,6 @@ void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
 	
 	int args[2] = {0,0};
 	char s[1024];
-	veejay_memset(s,0, 1024);
 	P_A(args,s,format,ap);
 
 	if(args[0] == 0)
@@ -9471,13 +9342,10 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 {
 	int args[4];
 	char filename[1024];
-	veejay_memset(filename,0,1024);
 	P_A(args, filename, format, ap );
 	veejay_t *v = (veejay_t*) ptr;
 
-	char type[5];
-	veejay_memset(type,0,5); 
-
+	char type[5] = { 0 };
 
 	veejay_get_file_ext( filename, type, sizeof(type));
 
@@ -9497,7 +9365,6 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 {
 	int args[4];
 	char filename[1024];
-	veejay_memset(filename,0,1024);
 	P_A(args, filename, format, ap );
 	veejay_t *v = (veejay_t*) ptr;
 
@@ -9595,9 +9462,6 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 	id = args[0];
 	char options[100];
 	char prefix[4];
-	veejay_memset(prefix,0, 4 );
-	veejay_memset(options, 0,100);
-
 
 	char *s_print_buf = get_print_buf(128);
 
@@ -9737,8 +9601,8 @@ void	vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
 void	vj_event_get_shm( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*)ptr;
-	char tmp[64];
-	memset(tmp,0,sizeof(tmp));
+	char tmp[32];
+	veejay_memset(tmp,0,sizeof(tmp));
 	if(!v->shm) {
 		snprintf(tmp,sizeof(tmp)-1,"%016d",0);
 		SEND_MSG(v, tmp );
@@ -10098,7 +9962,6 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 		return;
 	}
 
-	veejay_memset(text,0,2048);
 	P_A(args,text,format,ap);
 
 	void *dict = select_dict( v, v->uc->sample_id );

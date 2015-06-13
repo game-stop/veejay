@@ -72,6 +72,8 @@ static int video_driver_  = -1; // V4lUtils
 //forward decl
 static int no_v4l2_threads_ = 0;
 
+static void *tag_cache[SAMPLE_MAX_SAMPLES];
+
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 
@@ -173,13 +175,16 @@ static int int_tag_compare(const void *key1, const void *key2)
 vj_tag *vj_tag_get(int id)
 {
     if (id <= 0 || id > this_tag_id) {
-	return NULL;
+		return NULL;
     }
-    hnode_t *tag_node = hash_lookup(TagHash, (void *) id);
-    if (!tag_node) {
-	return NULL;
+	if( tag_cache[ id ] == NULL ) {
+		hnode_t *tag_node = hash_lookup(TagHash, (void *) id);
+		if (!tag_node) {
+			return NULL;
+		}
+		tag_cache[ id ] = hnode_get(tag_node);
 	}
-    return (vj_tag *) hnode_get(tag_node);
+	return (vj_tag*) tag_cache[id];
 }
 
 int vj_tag_put(vj_tag * tag)
@@ -296,14 +301,12 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
    _temp_buffer[1] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
    _temp_buffer[2] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
 		
-
+	memset( tag_cache,0,sizeof(tag_cache));
+	memset( avail_tag, 0, sizeof(avail_tag));
 	_tmp.uv_width = width; 
 	_tmp.uv_height = height/2;
 	_tmp.uv_len = width * (height/2);
 
-    for(i=0; i < SAMPLE_MAX_SAMPLES; i++) {
-	avail_tag[i] = 0;
-    }
 #ifdef HAVE_V4L 
 	v4lvideo_templ_init();
 #endif
@@ -1136,6 +1139,9 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 #ifdef HAVE_FREETYPE
     tag->dict = vpn(VEVO_ANONYMOUS_PORT );
 #endif
+
+	tag_cache[ tag->id ] = (void*) tag;
+
    return (int)(tag->id);
 }
 
@@ -1319,6 +1325,8 @@ int vj_tag_del(int id)
 	tag = NULL;
     avail_tag[ next_avail_tag] = id;
     next_avail_tag++;
+
+	tag_cache[ id ] = NULL;
 
 	return 1;
 }

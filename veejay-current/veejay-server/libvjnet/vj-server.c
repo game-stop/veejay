@@ -51,6 +51,7 @@ typedef struct {
 	vj_message *lin_queue;
 	int n_queued;
 	int n_retrieved;
+	void *pool;
 } vj_link;
 
 typedef struct
@@ -62,6 +63,7 @@ typedef struct
 
 #define VJ_MAX_PENDING_MSG 768
 #define RECV_SIZE (4096) 
+#define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1000)
 static	void	printbuf( FILE *f, uint8_t *buf , int len )
 {
 	int i;
@@ -586,6 +588,12 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 	Link[link_id]->promote = 0;
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
+
+	if( Link[link_id]->pool ) {
+		vj_simple_pool_free( Link[link_id]->pool );
+		Link[link_id]->pool = NULL;
+	}
+
 	return 1;
 }
 
@@ -656,11 +664,12 @@ int	_vj_server_empty_queue(vj_server *vje, int link_id)
 	int i;
 	for( i = 0; i < VJ_MAX_PENDING_MSG; i ++ )
 	{
-		if( v[i]->msg ) 
-			free(v[i]->msg);
 		v[i]->msg = NULL;
 		v[i]->len = 0;
 	}
+
+	vj_simple_pool_reset( Link[link_id]->pool );
+
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
 	
@@ -762,6 +771,14 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 	return num_msg;
 }
 
+void		vj_server_init_msg_pool(vj_server *vje, int link_id )
+{
+	vj_link **Link = (vj_link**) vje->link;
+	if( Link[link_id]->pool == NULL ) {
+		Link[link_id]->pool = vj_simple_pool_init( MSG_POOL_SIZE * sizeof(char) );
+	}
+}
+
 static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 {
 	int i = 0;
@@ -789,9 +806,14 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			str_ptr += 4;
 
 			if(netid > 0 && netid <= 600) {
-				v[num_msg]->msg = strndup( str_ptr, slen );  //@ '600:;'
-				v[num_msg]->len = slen;                      //@ 5
-				num_msg++;
+				v[num_msg]->msg = vj_simple_pool_alloc( Link[link_id]->pool, slen + 1 );
+				if( v[num_msg]->msg ) {
+					//v[num_msg]->msg = strndup( str_ptr, slen );  //@ '600:;'
+					veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
+					v[num_msg]->len = slen;                      //@ 5
+					v[num_msg]->msg[ slen ] = '\0';
+					num_msg++;
+				}
 			}
 
 			if(num_msg >= VJ_MAX_PENDING_MSG )
@@ -1006,12 +1028,12 @@ void vj_server_shutdown(vj_server *vje)
 	{
 		if(Link[i]->in_use) 
 			close(Link[i]->handle);
-		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
-		{
-			if(Link[i]->m_queue[j]->msg )
-				free( Link[i]->m_queue[j]->msg );
+//		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
+//		{
+//			if(Link[i]->m_queue[j]->msg )
+//				free( Link[i]->m_queue[j]->msg );
 			//if(Link[i]->m_queue[j] ) free( Link[i]->m_queue[j] );
-		}
+//		}
 		if( Link[i]->lin_queue)
 			free( Link[i]->lin_queue );
 	

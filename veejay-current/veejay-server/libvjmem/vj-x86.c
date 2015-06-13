@@ -249,3 +249,55 @@ void	*vj_calloc_( size_t size )
 		veejay_memset(ptr,0,size);
 	return ptr;
 }
+
+typedef struct 
+{
+	size_t len;
+	void	*addr;
+	size_t cur;
+} v_simple_pool_t;
+
+void	*vj_simple_pool_init( size_t s )
+{
+	v_simple_pool_t *pool = (v_simple_pool_t*) vj_malloc( sizeof(v_simple_pool_t) );
+	if(!pool)
+		return NULL;
+	void *addr = vj_calloc_( RUP8(s) );
+	if(!addr) {
+		free(pool);
+		return NULL;
+	}
+	pool->addr = addr;
+	pool->cur = 0;
+	pool->len = s;
+	return (void*) pool;
+}
+
+void	*vj_simple_pool_alloc( void *ptr, size_t s )
+{
+	v_simple_pool_t *pool = (v_simple_pool_t*) ptr;
+	if( s > pool->len || (pool->cur + s) > pool->len ) {
+		return NULL;
+	}
+	uint8_t *addr = (uint8_t*) pool->addr + RUP8(pool->cur);
+
+	pool->cur += RUP8(s);
+
+	return (void*) ( addr + pool->cur );
+}
+
+void	vj_simple_pool_reset( void *ptr )
+{
+	v_simple_pool_t *pool = (v_simple_pool_t*) ptr;
+	pool->cur = 0;
+}
+
+void	vj_simple_pool_free( void *ptr )
+{
+	v_simple_pool_t *pool = (v_simple_pool_t*) ptr;
+	if( pool ) { 
+		if( pool->addr )
+			free(pool->addr);
+		free(pool);
+	}
+}

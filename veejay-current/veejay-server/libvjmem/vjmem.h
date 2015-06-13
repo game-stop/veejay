@@ -57,4 +57,8 @@ extern void	benchmark_veejay(int w, int h);
 extern void	*vj_hmalloc(size_t sze, const char *name);
 extern	char	*vj_strdup(const char *s);
 extern	char	*vj_strndup(const char *s, size_t n );
+void	vj_simple_pool_free( void *ptr );
+void	*vj_simple_pool_alloc( void *ptr, size_t s );
+void	*vj_simple_pool_init( size_t s );
+void	vj_simple_pool_reset( void *ptr );
 #endif

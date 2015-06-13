@@ -78,7 +78,7 @@ static hash_t *SampleHash;	/* hash of sample information structs */
 static int avail_num[SAMPLE_MAX_SAMPLES];	/* an array of freed sample id's */
 static void *sample_font_ = NULL;
 static int sampleadm_state = SAMPLE_PEEK;	/* default state */
-
+static void *sample_cache[SAMPLE_MAX_SAMPLES];
 extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp);
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_size();
@@ -334,6 +334,9 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 #ifdef HAVE_FREETYPE
     si->dict = vpn( VEVO_ANONYMOUS_PORT );
 #endif
+
+	sample_cache[ si->sample_id ] = (void*) si;
+
     return si;
 }
 
@@ -381,10 +384,17 @@ void 	sample_new_simple( void *el, long start, long end )
 
 sample_info *sample_get(int sample_id)
 {
-    hnode_t *sample_node = hash_lookup(SampleHash, (void *) sample_id);
-	if(!sample_node)
+	if( sample_id < 0 || sample_id > SAMPLE_MAX_SAMPLES)
 		return NULL;
-	return (sample_info*) hnode_get(sample_node);
+
+	if( sample_cache[sample_id] == NULL ) {
+		hnode_t *sample_node = hash_lookup(SampleHash, (void *) sample_id);
+		if(!sample_node)
+			return NULL;
+		sample_cache[sample_id] = hnode_get(sample_node);
+	}
+
+	return (sample_info*) sample_cache[sample_id];
 }
 
 /****************************************************************************************************
@@ -922,6 +932,8 @@ int sample_del(int sample_id)
   	 	avail_num[next_avail_num] = sample_id;
   		next_avail_num++;
    		hash_delete_free(SampleHash, sample_node);
+
+		sample_cache[ sample_id ] = NULL;
 
     	return 1;
     }

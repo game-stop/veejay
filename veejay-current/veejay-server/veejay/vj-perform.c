@@ -522,18 +522,16 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 
 static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
 {
-	const long frame_len = RUP8( ((plane_len+helper_frame->width)/7)*8 );
-	uint8_t *buf;
-    	if(fx_chain_buffer!=NULL) {
-		buf = fx_chain_buffer + (c * frame_len * 3 * 3);	
-	}
-	else {
-		buf = vj_malloc(sizeof(uint8_t) * frame_len * 3 * 3);
-		mlock( buf, frame_len * 3 * sizeof(uint8_t));
-	}
+	if( fx_chain_buffer )
+		return;
+
+	size_t frame_len = RUP8( ((plane_len+helper_frame->width)/7)*8 );
+	uint8_t *buf = vj_malloc(sizeof(uint8_t) * frame_len * 3 * 3);
 
 	if(!buf)
 		return 0;
+
+	mlock( buf, frame_len * 3 * 3 * sizeof(uint8_t));
 
 	frame_buffer[c]->Y = buf;
 	frame_buffer[c]->Cb = frame_buffer[c]->Y + frame_len;
@@ -545,14 +543,15 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
 
 static void vj_perform_free_row(int c)
 {
-	const long frame_len = RUP8( (((helper_frame->len)+helper_frame->width)/7)*8 );
+	if( fx_chain_buffer )
+		return;
+	
+	size_t frame_len = RUP8( (((helper_frame->len)+helper_frame->width)/7)*8 );
 
 	if(frame_buffer[c]->Y)
 	{
-		if(fx_chain_buffer == NULL ) {
-			munlock( frame_buffer[c]->Y, frame_len * 3 * 3 );
-			free( frame_buffer[c]->Y );
-		}
+		munlock( frame_buffer[c]->Y, frame_len * 3 * 3 * sizeof(uint8_t));
+		free( frame_buffer[c]->Y );
 	}
 	frame_buffer[c]->Y = NULL;
 	frame_buffer[c]->Cb = NULL;
@@ -564,12 +563,14 @@ static void vj_perform_free_row(int c)
 }
 
 #define vj_perform_row_used(c) ( frame_buffer[c]->Y == NULL ? 0 : 1 )
-
 static int	vj_perform_verify_rows(veejay_t *info )
 {
 	if( pvar_.fx_status == 0 )
 		return 0;
 
+	if( fx_chain_buffer )
+		return 1;
+	
 	int c,v,has_rows = 0;
 	const int w = info->video_output_width;
 	const int h = info->video_output_height;
@@ -724,15 +725,6 @@ int vj_perform_init(veejay_t * info)
 	total_used += buf_len; //temp_buffer
 	total_used += buf_len; //feedback_buffer
 
-   	 /* allocate space for frame_buffer pointers */
-   	 for (c = 0; c < SAMPLE_MAX_EFFECTS; c++) {
-		frame_buffer[c] = (ycbcr_frame *) 
-			vj_calloc(sizeof(ycbcr_frame));
-   	     if(!frame_buffer[c]) return 0;
-   	 }
-
-	vj_perform_clear_cache();
-	veejay_memset( frame_info[0],0,SAMPLE_MAX_EFFECTS);
 
 	helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
 	veejay_memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
@@ -753,6 +745,25 @@ int vj_perform_init(veejay_t * info)
 		/*  tmp1 = [ secundary source on entry X ] [ slow motion buffer A ] [ slow motion buffer B ]
 		 */
 	}
+
+   	 /* allocate space for frame_buffer pointers */
+   	 for (c = 0; c < SAMPLE_MAX_EFFECTS; c++) {
+		frame_buffer[c] = (ycbcr_frame *) 
+			vj_calloc(sizeof(ycbcr_frame));
+   	     if(!frame_buffer[c]) return 0;
+
+		 if(fx_chain_buffer != NULL ) {
+				uint8_t *ptr = fx_chain_buffer + (c * frame_len * 3 * 3 );
+				frame_buffer[c]->Y = ptr;
+				frame_buffer[c]->Cb = frame_buffer[c]->Y + frame_len;
+				frame_buffer[c]->Cr = frame_buffer[c]->Cb + frame_len;
+				frame_buffer[c]->P0  = ptr + (frame_len * 3);
+				frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*3);
+		 }
+   	 }
+
+	vj_perform_clear_cache();
+	veejay_memset( frame_info[0],0,SAMPLE_MAX_EFFECTS);
 
 	veejay_msg(VEEJAY_MSG_INFO,
 	 	"Using %.2f MB RAM in performer (memory %s paged to the swap area, %.2f MB pre-allocated for fx-chain)",
@@ -3421,8 +3432,8 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 			cached_sample_frames[0] = info->uc->sample_id;
 
 			if(vj_perform_verify_rows(info))
-		   	 	vj_perform_sample_complete_buffers(info, &is444);
-			
+				vj_perform_sample_complete_buffers(info, &is444);
+
 			cur_out = vj_perform_render_magic( info, info->settings );
 		   	res = 1;
 
@@ -3450,6 +3461,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 			 {
 				if(vj_perform_verify_rows(info))
 					vj_perform_tag_complete_buffers(info, &is444);
+				
 				cur_out = vj_perform_render_magic( info, info->settings );
 			 }
 			 res = 1;	 

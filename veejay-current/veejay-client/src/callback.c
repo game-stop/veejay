@@ -3423,7 +3423,8 @@ void	on_combobox_fonts_changed( GtkWidget *w, gpointer data )
 		return;
 	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
 	gint size = get_nums( "spin_text_size" );
-
+	if( font < 0 || size < 0 )
+		return;
 	multi_vims( VIMS_FONT_SIZE_FONT, "%d %d", font , size );
 }
 void	on_spin_text_size_value_changed( GtkWidget *w, gpointer data )

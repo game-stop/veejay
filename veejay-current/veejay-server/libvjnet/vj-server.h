@@ -79,6 +79,8 @@ void	vj_server_client_promote( vj_server *vje, int link_id);
 
 int	vj_server_link_used(vj_server *vje , int link_id);
 
+void vj_server_init_msg_pool(vj_server *vje, int link_id );
+
 int	vj_server_link_can_write( vj_server *vje, int link_id );
 
 int	vj_server_link_can_read( vj_server *vje, int link_id);
