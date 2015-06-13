@@ -79,46 +79,47 @@ static void CompiledWith()
 
 	fprintf(stdout,"Compilation flags:\n");
 #ifdef ARCH_MIPS
-	fprintf(stdout, "\tCompiled for MIPS\n");
+	fprintf(stdout, "\tMIPS\n");
 #endif
 #ifdef ARCH_PPC
-	fprintf(stdout, "\tCompiled for PPC\n");
+	fprintf(stdout, "\tPPC\n");
 #endif
 #ifdef ARCH_X86_64
-	fprintf(stdout, "\tCompiled for X86_64\n");
+	fprintf(stdout, "\tX86_64\n");
 #endif
 #ifdef ARCH_X86
-	fprintf(stdout, "\tCompiled for X86\n");
+	fprintf(stdout, "\tX86\n");
 #endif
 #ifdef HAVE_DARWIN
-	fprintf(stdout, "\tCompiled for Darwin\n");
+	fprintf(stdout, "\tDarwin\n");
 #endif
 #ifdef HAVE_PS2
-	fprintf(stdout, "\tCompiled for Sony Playstation 2 (TM)\n");
+	fprintf(stdout, "\tSony Playstation 2 (TM)\n");
 #endif
+	fprintf(stdout, "Compiled in support for:\n");
 #ifdef HAVE_ALTIVEC
-	fprintf(stdout,"\tUsing Altivec\n");
+	fprintf(stdout,"\tAltivec\n");
 #endif
 #ifdef HAVE_ASM_SSE
-	fprintf(stdout,"\tUsing SSE instruction set\n");
+	fprintf(stdout,"\tSSE\n");
 #endif
 #ifdef HAVE_CMOV
-	fprintf(stdout,"\tUsing CMOV\n");
+	fprintf(stdout,"\tCMOV\n");
 #endif
 #ifdef HAVE_ASM_SSE2
-	fprintf(stdout,"\tUsing SSE2 instruction set\n");
+	fprintf(stdout,"\tSSE2\n");
 #endif
 #ifdef HAVE_ASM_MMX
-	fprintf(stdout,"\tUsing MMX instruction set\n");
+	fprintf(stdout,"\tMMX\n");
 #endif
 #ifdef HAVE_ASM_MMX2	
-	fprintf(stdout,"\tUsing MMX2 instruction set\n");
+	fprintf(stdout,"\tMMX2\n");
 #endif
 #ifdef HAVE_ASM_3DNOW
-	fprintf(stdout,"\tUsing 3Dnow instruction set\n");
+	fprintf(stdout,"\t3Dnow\n");
 #endif
 #ifdef HAVE_ASM_AVX
-	fprintf(stdout,"\tUsing AVX instruction set\n");
+	fprintf(stdout,"\tAVX\n");
 #endif
 	
 	memcpy_report();

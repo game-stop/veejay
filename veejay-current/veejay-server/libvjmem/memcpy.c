@@ -1414,7 +1414,7 @@ void find_best_memcpy()
 			continue;
 		}
 
-		if( memcpy_method[i].time < t ) {
+		if( memcpy_method[i].time < t && memcpy_method[i].time > 0 ) {
 			t = memcpy_method[i].time;
 			best = i;
 		}

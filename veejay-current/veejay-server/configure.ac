@@ -468,6 +468,20 @@ then
 		have_asm_mmx2=true
 	fi
 
+	dnl check for AVX
+	AC_CACHE_CHECK(for AVX on processor(s), ac_cv_flag_avx, [
+		if grep "^flags.* avx" /proc/cpuinfo > /dev/null; then
+			ac_cv_flag_avx=yes
+		else
+			ac_cv_flag_avx=yes
+		fi
+	])
+
+	if test $ac_cv_flag_avx = yes; then
+		AC_DEFINE(HAVE_ASM_AVX,1,[Compiling in AVX])
+		have_asm_avx=true
+	fi
+
 dnl	ac_cv_flag_avx=yes
 dnl	AC_MSG_CHECKING([for AVX assembler])
 dnl	AC_COMPILE_IFELSE(
