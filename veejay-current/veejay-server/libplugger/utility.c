@@ -107,7 +107,6 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 	double dtemp[16]; //FIXME
 	
 	int error;
-	void *ptr = NULL;
 	
 	switch( type )
 	{
@@ -162,21 +161,20 @@ void		clone_prop_vevo2( void *port, void *to_port, const char *key, const char *
 	int n = vevo_property_atom_type( port ,key);
 	int itmp = 0;
 	double dtmp = 0.0;
-	int error = 0;
 
 	switch(n)
 	{
 		case VEVO_ATOM_TYPE_INT:
-			error = vevo_property_get( port, key, 0, &itmp );
-			error = vevo_property_set( to_port, as_key, n, 1, &itmp );
+			vevo_property_get( port, key, 0, &itmp );
+			vevo_property_set( to_port, as_key, n, 1, &itmp );
 			break;
 		case VEVO_ATOM_TYPE_DOUBLE:
-			error = vevo_property_get( port, key, 0, &dtmp );
-			error = vevo_property_set( to_port, as_key, n, 1, &dtmp );
+			vevo_property_get( port, key, 0, &dtmp );
+			vevo_property_set( to_port, as_key, n, 1, &dtmp );
 			break;
 		case VEVO_ATOM_TYPE_BOOL:
-			error = vevo_property_get( port, key, 0, &itmp );
-			error = vevo_property_set( to_port, as_key, n, 1, &itmp );
+			vevo_property_get( port, key, 0, &itmp );
+			vevo_property_set( to_port, as_key, n, 1, &itmp );
 			break;
 		default:
 			veejay_msg(0, "Type %d cannot be cloned",n);

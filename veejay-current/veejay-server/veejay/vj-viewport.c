@@ -472,10 +472,8 @@ char *viewport_get_my_help(void *vv)
 
 	char tmp[1500];
 	char startup_mode[16];
-	sprintf(startup_mode, "%s", (v->initial_active==1 ? "Active" :"Inactive"  ));
-	int gw = v->grid_width;
-	int gh = v->grid_height;
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Exit without saving\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Enable/disable transform\nCTRL + a: %s on startup.\nCTRL + s: Exit this screen.\n%s\n\n",
+	snprintf(startup_mode,sizeof(startup_mode), "%s", (v->initial_active==1 ? "Active" :"Inactive"  ));
+	snprintf(tmp,sizeof(tmp), "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Exit without saving\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Enable/disable transform\nCTRL + a: %s on startup.\nCTRL + s: Exit this screen.\n%s\n\n",
 			reverse_mode,
 			startup_mode,
 			scroll_mode
@@ -490,8 +488,8 @@ char *viewport_get_my_status(void  *vv)
 	if(!v->user_ui )
 		return NULL;
 
-	float x = v->usermouse[2] / ( v->w / 100.0f );
-	float y = v->usermouse[3] / ( v->h / 100.0f );
+//	float x = v->usermouse[2] / ( v->w / 100.0f );
+//	float y = v->usermouse[3] / ( v->h / 100.0f );
 
 	float tx = vsx(v,v->usermouse[4]);
 	float ty = vsy(v,v->usermouse[5]);
@@ -743,9 +741,7 @@ static	float		msy(viewport_t *v, float y)
 		return y;
 	}
 	ui_t *u = v->ui;
-	int	    cx = v->w / 2;
 	int	    cy = v->h / 2;
-	int	    dx = cx - ( u->sw / 2 );
 	int	    dy = cy - ( u->sh / 2 );
 
 	float		a = (float) dy / ( v->h / 100.0f );
@@ -761,9 +757,7 @@ static	float		msx(viewport_t *v, float x)
 	}
 	ui_t *u = v->ui;
 	int	    cx = v->w / 2;
-	int	    cy = v->h / 2;
 	int	    dx = cx - ( u->sw / 2 );
-	int	    dy = cy - ( u->sh / 2 );
 
 	float		a = (float) dx / ( v->w / 100.0f );
 	float		s  = (float) v->w / (float) v->ui->sw;
@@ -778,9 +772,7 @@ static	float		vsx(viewport_t *v, float x)
 	}
 	ui_t *u = v->ui;
 	int	    cx = v->w / 2;
-	int	    cy = v->h / 2;
 	int	    dx = cx - ( u->sw / 2 );
-	int	    dy = cy - ( u->sh / 2 );
 
 	float		a = (float) dx / ( v->w / 100.0f );
 	float		s  = (float) v->w / (float) v->ui->sw;
@@ -792,9 +784,7 @@ static	float		vsy(viewport_t *v, float x)
 		return x;
 
 	ui_t *u = v->ui;
-	int	    cx = v->w / 2;
 	int	    cy = v->h / 2;
-	int	    dx = cx - ( u->sw / 2 );
 	int	    dy = cy - ( u->sh / 2 );
 
 	float		a = (float) dy / ( v->h / 100.0f );
@@ -825,7 +815,7 @@ static int		viewport_configure(
 
 	v->grid_width = grid_resolution;
 	v->grid_height = grid_resolution * rat;
-	float scale = 1.0f;//v->ui->scale;
+	
 	v->points[X0] = (float) x1 * (float) w / 100.0;
 	v->points[Y0] = (float) y1 * (float) h / 100.0;
 
@@ -924,10 +914,7 @@ static void		viewport_process( viewport_t *p )
 	const int32_t h = p->h;
 	const int32_t X = p->x0;
 	const int32_t Y = p->y0;
-	const int32_t W0 = p->w0;
-	const int32_t H0 = p->h0;
 
-	matrix_t *M = p->M;
 	matrix_t *m = p->m;
 
 	const int len = w * h;
@@ -953,7 +940,6 @@ static void		viewport_process( viewport_t *p )
 	int32_t itx,ity;
 
 	int32_t *map = p->map;
-	register int32_t pos = 0;
 
 	for( y = ty1; y < ty2; y ++ )
 	{
@@ -993,9 +979,6 @@ static void		viewport_process( viewport_t *p )
 
 static	void	viewport_prepare_process( viewport_t *v )
 {
-	const int32_t w = v->w;
-	const int32_t h = v->h;
-
 	const int32_t X = v->x0;
 	const int32_t Y = v->y0;
 
@@ -1037,9 +1020,6 @@ void		viewport_process_dynamic_map( void *data, uint8_t *in[3], uint8_t *out[3],
 	const int32_t h = v->h;
 	const int32_t X = v->x0;
 	const int32_t Y = v->y0;
-	const int32_t W0 = v->w0;
-	const int32_t H0 = v->h0;
-	matrix_t *M = v->M;
 	matrix_t *m = v->m;
 
 	const 	float xinc = m->m[0][0];
@@ -1174,7 +1154,6 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 	const int32_t h = v->h;
 	const int32_t X = v->x0;
 	const int32_t Y = v->y0;
-	matrix_t *M = v->M;
 	matrix_t *m = v->m;
 
 	const 	float xinc = m->m[0][0];
@@ -1466,9 +1445,7 @@ void	*viewport_get_configuration(void *vv )
 {
 
 	viewport_t *v = (viewport_t*) vv;
-	viewport_config_t *o = (viewport_config_t*) vj_calloc(sizeof(viewport_config_t));
-
-
+	viewport_config_t *o = (viewport_config_t*) vj_calloc(sizeof(viewport_config_t)); //FIXME not always freed?
 	o->saved_w = v->saved_w;
 	o->saved_h = v->saved_h;
 	o->reverse = v->user_reverse;
@@ -2434,19 +2411,11 @@ int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int 
 	if(!v->user_ui)
 		return 0;
 
-	int width = v->w;
-	int height = v->h;
 	int point = -1;
 	int i;
 
 	//@ use screen width/height
 	double dist = 100.0;
-	int	    cx = v->w / 2;
-	int	    cy = v->h / 2;
-	int	    dx = cx - ( v->ui->sw / 2 );
-	int	    dy = cy - ( v->ui->sh / 2 );
-	float		scx  = (float) v->w / (float) v->ui->sw;
-	float		scy = (float) v->h / (float) v->ui->sh;
 	int	x = v->usermouse[4];
 	int	y = v->usermouse[5];
 	float p_cpy[9];
@@ -2528,8 +2497,6 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 		return 0;
 
 	int ch = 0;
-	int width = v->w;
-	int height = v->h;
 	int point = -1;
 	int i;
 
@@ -2574,11 +2541,6 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 
 	float tx = vsx(v,v->usermouse[4]);
 	float ty = vsy(v,v->usermouse[5]);
-
-
-	float bx = msx(v,tx);
-	float by = msy(v,ty);
-
 
 	for( i = 0; i < 4 ; i ++ )
 		v->users[ i ]  = 1;
@@ -2666,7 +2628,6 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 		ch = 1;
 	}
 
-	float rat = (v->h/(float)v->w);
 	if( button == 15 ) {
 		v->grid_mode --;
 		if(v->grid_mode < 0 ) 
@@ -2764,18 +2725,12 @@ void		viewport_push_frame(void *data, int w, int h, uint8_t *Y, uint8_t *U, uint
 {
 	viewport_t *v = (viewport_t*) data;
 	ui_t	   *u = v->ui;
-
-	float	    s = u->scale;
-
-	int	    nw = w * s;
-	int	    nh = h * s;
-
 	VJFrame *srci = yuv_yuv_template( Y, U,V, w,h, PIX_FMT_GRAY8 );
-        VJFrame *dsti = yuv_yuv_template( u->buf[0],NULL,NULL,u->sw, u->sh, PIX_FMT_GRAY8); 
+    VJFrame *dsti = yuv_yuv_template( u->buf[0],NULL,NULL,u->sw, u->sh, PIX_FMT_GRAY8); 
   
-        yuv_convert_and_scale( u->scaler, srci,dsti );
-        free(srci);
-        free(dsti);
+    yuv_convert_and_scale( u->scaler, srci,dsti );
+    free(srci);
+    free(dsti);
 }
 
 static void		viewport_translate_frame(void *data, uint8_t *plane ) 
@@ -2785,12 +2740,10 @@ static void		viewport_translate_frame(void *data, uint8_t *plane )
 	int	    cx = v->w / 2;
 	int	    cy = v->h / 2;
 	int	     w = v->w;
-	int	     h = v->h;
 	int	    dx = cx - ( u->sw / 2 );
 	int	    dy = cy - ( u->sh / 2 );
 
 	int 		x,y;
-	int		 j = 0;
 
 	uint8_t		*img = u->buf[0];
 	for( y = 0; y < u->sh; y ++ ) {
@@ -2871,7 +2824,6 @@ static	void	viewport_draw_points(viewport_t *v, int width, int height, uint8_t *
 }
 static	void	viewport_compute_grid( viewport_t *v )
 {
-	int i;
 	int k = 0;
 	int gw = v->w/ v->grid_resolution;
 	int gh = v->h/v->grid_resolution;
@@ -2922,10 +2874,7 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 	int fx4 = (int)( msx(v,v->x4) *wx );
 	int fy4 = (int)( msy(v,v->y4) *wy );
 
-
-
 	const uint8_t p = v->grid_val;
-	const uint8_t uv = 128;
 
 	if(v->grid)
 		switch(v->grid_mode)
@@ -3016,7 +2965,7 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	viewport_t *v = (viewport_t*) vdata;
 	const int len = v->w * v->h;
 	register const int w = v->w;
-	register uint32_t i,j,n;
+	register uint32_t i,n;
 	const int32_t *map = v->map;
 	uint8_t *inY  = img[0];
 	uint8_t *inU  = img[1];
@@ -3067,7 +3016,7 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 	viewport_t *v = (viewport_t*) vdata;
 	const int len = v->w * v->h;
 	register const int w = v->w;
-	register uint32_t i,j,n;
+	register uint32_t i,n;
 	const int32_t *map = v->map;
 	uint8_t *inY  = img[0];
 	uint8_t       *outY = out_img[0];
@@ -3121,7 +3070,6 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 	register const	int32_t	ty1 = v->tty1;
 	register const	int32_t ty2 = v->tty2;
 	register const int w = v->w;
-	register const int h = v->h;
 	register const int uw = v->w >> 1;
 	register uint32_t i,x,y;
 	register int32_t n,m;
@@ -3194,13 +3142,11 @@ void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, in
 	if( v->disable ) 
 		return;
 
-	int len = (width * height);
-
 	if(! v->user_ui )
 	{
 		const int len = v->w * v->h;
 		const int w = v->w;
-		register uint32_t i,j,n,block;
+		register uint32_t i,j,n;
 		const int32_t *map = v->map;
 		uint8_t *inY  = in[0];
 		uint8_t *inU  = in[1];
@@ -3423,7 +3369,6 @@ void 	viewport_save_xml(xmlNodePtr parent,void *vv)
 		NULL );
 
     char buffer[100];
-    xmlNodePtr childnode;
 
     sprintf(buffer, "%f", vc->x1);
     xmlNewChild(node, NULL, (const xmlChar *) "x1",

@@ -953,7 +953,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		"movntps %%xmm2, 32(%1)\n"
 		"movntps %%xmm3, 48(%1)\n"
 		:: "r" (f), "r" (t) : "memory");
-		f=((const unsigned char *)f)+64;
+		f=((unsigned char *)f)+64;
 		t=((unsigned char *)t)+64;
 
 	}
@@ -1475,7 +1475,7 @@ void find_best_memset()
      if (best) {
           veejay_memset = memset_method[best].function;
      } else {
-		  veejay_memset = memset;
+		  veejay_memset = memset_method[1].function;
 	 }
 
      free( buf1 );

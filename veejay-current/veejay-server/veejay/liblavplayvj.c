@@ -2035,7 +2035,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		int plugrdy = 0;
 		for ( i = 0; i < total; i ++ ) {
 			int plugid = world[i];
-			veejay_msg(VEEJAY_MSG_DEBUG, "Plug index %d", plugid );
 			if( vj_tag_new( VJ_TAG_TYPE_GENERATOR, NULL,-1, el, info->pixel_format,
 					plugid, 0, 0 ) > 0 )
 				plugrdy++;

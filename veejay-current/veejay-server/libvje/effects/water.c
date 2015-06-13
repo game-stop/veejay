@@ -503,12 +503,11 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 	if(w->last_fresh_rate != fresh_rate)
 	{
 		w->last_fresh_rate = fresh_rate;
-		//vj_frame_clear1( w->map, 0,(w->map_h*w->map_w*2*sizeof(int)));
 		veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
 	}
 	if(w->lastmode != mode )
 	{
-		vj_frame_clear1( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
+		veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
 		w->have_img = 0;
 		w->lastmode = mode;
 	}

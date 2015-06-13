@@ -38,6 +38,7 @@
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libplugger/portdef.h>
+#include <libplugger/defaults.h>
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include <stdlib.h>
@@ -665,7 +666,7 @@ char	*livido_describe_parameter_format_osc( void *instance, int p )
 void	livido_plug_free_namespace( void *fx_instance , void *data )
 {
 	void *osc_namespace = NULL;
-	int error = vevo_property_get( fx_instance, "HOST_osc",0,&osc_namespace);
+	vevo_property_get( fx_instance, "HOST_osc",0,&osc_namespace);
 //@TODO OMC
 //	if( error == VEVO_NO_ERROR)
 //		veejay_osc_del_methods( data,osc_namespace,fx_instance, fx_instance );
@@ -921,17 +922,17 @@ void	livido_plug_retrieve_values( void *instance, void *fx_values )
 {
 	int vj_np = vevo_property_num_elements( instance, "in_parameters" );
 	int i;
+	char vkey[8];
 	for( i = 0; i < vj_np; i ++ )
 	{
-		char	vkey[10];
 		void *param = NULL;
 		void *param_templ = NULL;
-		int error = vevo_property_get( instance, "in_parameters", i, &param);
-
-		error = vevo_property_get( param, "parent_template", 0, &param_templ );
-
-		snprintf(vkey,sizeof(vkey), "p%02d", i );
-		clone_prop_vevo( param_templ, fx_values, "default", vkey );
+		if(vevo_property_get( instance, "in_parameters", i, &param)==VEVO_NO_ERROR) {
+			if( vevo_property_get( param, "parent_template", 0, &param_templ ) == VEVO_NO_ERROR ) {
+				snprintf(vkey,sizeof(vkey), "p%02d", i );
+				clone_prop_vevo( param_templ, fx_values, "default", vkey );
+			}
+		}
 	}
 }
 
@@ -960,14 +961,15 @@ char	*livido_describe_parameter_format( void *instance, int p )
 {
 	void *param = NULL;
 	void *param_templ = NULL;
-	int error = vevo_property_get( instance, "in_parameters", p, &param );
-	if(error != VEVO_NO_ERROR )
-		return 0;
-	error = vevo_property_get( param, "parent_template",0,&param_templ);
-	int kind = 0;
-	error = vevo_property_get( param_templ, "HOST_kind",0,&kind );
+	if( vevo_property_get( instance, "in_parameters", p, &param ) != VEVO_NO_ERROR )
+		return NULL;
+	if( vevo_property_get( param, "parent_template",0,&param_templ) != VEVO_NO_ERROR )
+		return NULL;
 
-	int n_elems = vevo_property_num_elements( param, "value" );
+	int kind = 0;
+	vevo_property_get( param_templ, "HOST_kind",0,&kind );
+
+//	int n_elems = vevo_property_num_elements( param, "value" );
 
 	char fmt[2];
 	fmt[1] = '\0';
@@ -997,8 +999,7 @@ char	*livido_describe_parameter_format( void *instance, int p )
 			break;
 	}
 
-	char *res = vj_strdup( fmt );
-	return res;
+	return vj_strdup( fmt );
 }
 
 
@@ -1085,14 +1086,12 @@ static void	livido_notify_parameter_update( void *instance ,void *param, void *v
 void	livido_set_parameter( void *instance, int seq, void *value )
 {
 	void *param = NULL;
-	void *param_templ = NULL;
-	int error = vevo_property_get( instance, "in_parameters", seq, &param);
-	if( error == LIVIDO_NO_ERROR )
-	{
+	if( vevo_property_get( instance, "in_parameters", seq, &param) == VEVO_NO_ERROR ) {
 		livido_set_parameter_f pctrl;
-		error = vevo_property_get( param, "HOST_parameter_func", 0, &pctrl );
-		if( (*pctrl)( param, value ) )
-			livido_notify_parameter_update( instance,param, value );
+		if( vevo_property_get( param, "HOST_parameter_func", 0, &pctrl ) == VEVO_NO_ERROR ) {
+			if( (*pctrl)( param, value ) )
+				livido_notify_parameter_update( instance,param, value );
+		}
 	}
 }
 
@@ -1143,7 +1142,7 @@ int	livido_read_plug_configuration(void *filter_template, const char *name)
 		void *templ = livido_get_parameter_template( filter_template, i );
 		if(templ==NULL)
 			break;
-		int n_properties = vevo_sscanf_port( templ, buf ); 
+		vevo_sscanf_port( templ, buf ); 
 		i ++;
 	}
 

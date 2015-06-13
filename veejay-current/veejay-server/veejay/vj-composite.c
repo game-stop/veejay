@@ -72,6 +72,7 @@ typedef struct
 	int has_mirror_plane;
 	int mirror_row_start;
 	int mirror_row_end;
+	int	ownback1;
 } composite_t;
 
 //@ round to multiple of 8
@@ -178,6 +179,12 @@ void	*composite_clone( void *compiz )
 void	composite_set_backing( void *compiz, void *vp )
 {
 	composite_t *c = (composite_t*) compiz;
+	if(c->ownback1) {
+		c->ownback1 = 0;
+		if(c->back1) {
+			viewport_destroy( c->back1 );
+		}	
+	}
 	c->back1 = vp;
 }
 
@@ -188,7 +195,7 @@ void	composite_destroy( void *compiz )
 	{
 		if(c->proj_plane[0]) free(c->proj_plane[0]);
 		if(c->vp1) viewport_destroy( c->vp1 );
-		if(c->back1) viewport_destroy(c->back1);
+		if(c->ownback1 && c->back1) { viewport_destroy(c->back1); c->back1 = NULL; c->ownback1 = 0; }
 		if(c->scaler)	yuv_free_swscaler( c->scaler );	
 		if(c->back_scaler) yuv_free_swscaler(c->back_scaler);
 		if(c->frame1) free(c->frame1);
@@ -244,6 +251,7 @@ void	*composite_load_config( void *compiz, void *vc, int *result )
 	if(res) {
 		if( c->back1 == NULL ) {
 			c->back1 = composite_clone(c );
+			c->ownback1 = 1;
 		}
 		viewport_update_from(c->vp1, c->back1 );
 		c->Y_only = cm;

@@ -91,12 +91,13 @@ static	int	select_f( const struct dirent *d )
 
 int		plug_set_param_from_str( void *plugin , int p, const char *str, void *values )
 {
-	int type = 0;
+	//FIXME other types
 	return livido_set_parameter_from_string( plugin, p, str, values );
 }
 
 char		*plug_describe_param( void *plugin, int p )
 {
+	//FIXME other types
 	return livido_describe_parameter_format( plugin,p );
 }
 
@@ -423,7 +424,6 @@ static	int	scan_plugins()
 
 	if( read( fd, data, CONFIG_FILE_LEN ) > 0 )
 	{
-		int len = strlen(data);
 		char *pch = strtok( data, "\n" );
 		while( pch != NULL )
 		{
