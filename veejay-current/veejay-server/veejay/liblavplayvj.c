@@ -3682,22 +3682,19 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	vj_picture_init( &(info->settings->sws_templ));
 #endif
 
-
-	info->effect_frame1 = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, vj_to_pixfmt(info->pixel_format) );
+	info->effect_frame1 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, vj_to_pixfmt(info->pixel_format) );
 	info->effect_frame1->fps = info->settings->output_fps;
-	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->video_output_width, info->video_output_height, vj_to_pixfmt(info->pixel_format) );
+	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, vj_to_pixfmt(info->pixel_format) );
 	info->effect_frame2->fps = info->settings->output_fps;
 
 	if(num_files == 0)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Trying to start without video");
-		ret = veejay_open_video_files( info, NULL, 0 , force,
-			override_norm );
+		ret = veejay_open_video_files( info, NULL, 0 , force, override_norm );
 	}
 	else
 	{
-		ret = veejay_open_video_files( info, files, num_files, force,
-			override_norm );
+		ret = veejay_open_video_files( info, files, num_files, force, override_norm );
 	}
 
 	return ret;
