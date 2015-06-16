@@ -532,7 +532,7 @@ void	veejay_set_framerate( veejay_t *info , float fps )
    	else
         	settings->spas = 0;*/
 
-        settings->usec_per_frame = vj_el_get_usec_per_frame( info->current_edit_list->video_norm, fps);
+        settings->usec_per_frame = vj_el_get_usec_per_frame(fps);
 }
 
 
@@ -1612,8 +1612,7 @@ static int veejay_mjpeg_set_playback_rate(veejay_t * info, float video_fps, int 
 	(video_playback_setup *) info->settings;
     settings->spvf = 1.0 / video_fps;
 
-
-    settings->usec_per_frame = vj_el_get_usec_per_frame( (info->audio == AUDIO_PLAY ? norm: 'x'), video_fps );
+    settings->usec_per_frame = vj_el_get_usec_per_frame(video_fps);
 
     return 1;
 }

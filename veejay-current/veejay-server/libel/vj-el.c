@@ -270,23 +270,10 @@ float	vj_el_get_default_framerate( int norm )
 	return 30.0f;
 }
 
-int	vj_el_get_usec_per_frame( int norm, float video_fps ) 
+int	vj_el_get_usec_per_frame( float video_fps ) 
 {
-	int norm_usec_per_frame = 0;
-
-	switch (norm) {
-	    case VIDEO_MODE_PAL:
-			norm_usec_per_frame = 1000000 / 25;	/* 25Hz */
-			break;
-	    case VIDEO_MODE_NTSC:
-			norm_usec_per_frame = 1001000 / 30;	/* 30ish Hz */
-			break;
-    	    default:
-	    		norm_usec_per_frame = 1000000 / (long) video_fps;
-	    		break;
-    	}
-
-	return norm_usec_per_frame;
+//			norm_usec_per_frame = 1001000 / 30;	/* 30ish Hz */
+	return (int)(1000000 / video_fps);
 }
 
 int		vj_el_get_decoder_from_fourcc( const char *fourcc )

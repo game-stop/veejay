@@ -149,7 +149,7 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len );
 
 int	vj_el_pixfmt_to_veejay(int pix_fmt );
 
-int	vj_el_get_usec_per_frame( int norm, float video_fps );
+int	vj_el_get_usec_per_frame( float video_fps );
 
 float	vj_el_get_default_framerate( int norm );
 
