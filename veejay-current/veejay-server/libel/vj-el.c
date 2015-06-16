@@ -233,7 +233,7 @@ typedef struct
         AVCodec *codec;
         AVFrame *frame;
         AVCodecContext  *context;
-        uint8_t *tmp_buffer;
+        uint8_t *tmp_buffer; 
         uint8_t *deinterlace_buffer[3];
 	VJFrame *img;
 	int fmt;
@@ -251,7 +251,7 @@ char	vj_el_get_default_norm( float fps )
 		return 'p';
 	if( fps > 23.0f && fps < 24.0f )
 		return 's';
-	if( fps > 29.0f && fps < 30.0f )
+	if( fps > 29.0f && fps <= 30.0f )
 		return 'n';
 	return 'p';
 }
