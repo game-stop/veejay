@@ -345,6 +345,9 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #define is_aligned__(PTR,LEN) \
 	(((uintptr_t)(const void*)(PTR)) % (LEN) == 0 )
 
+static int selected_best_memcpy = 1;
+static int selected_best_memset = 1;
+
 char	*veejay_strncpy( char *dest, const char *src, size_t n )
 {
 	dest[n] = '\0';
@@ -1425,30 +1428,14 @@ void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
 
 void *(* veejay_memset)(void *what, uint8_t val, size_t len ) = 0;
 
-char *get_memcpy_descr( void )
+char *get_memcpy_descr()
 {
-	int i = 1;
-	int best = 1;
-	for (i=1; memcpy_method[i].name; i++)
-	{
-		if( memcpy_method[i].time <= memcpy_method[best].time )
-			best = i;	
-     	}
-	char *res = strdup( memcpy_method[best].name );
-	return res;
+	return strdup( memcpy_method[selected_best_memcpy].name );
 }
 
-char *get_memset_descr ( void )
+char *get_memset_descr()
 {
-	int i = 1;
-	int best = 1;
-	for (i=1; memset_method[i].name; i++)
-	{
-		if( memset_method[i].time <= memset_method[best].time )
-			best = i;	
-     	}
-	char *res = strdup( memset_method[best].name );
-	return res;
+	return strdup( memset_method[selected_best_memset].name );
 }
 
 void find_best_memcpy()
@@ -1503,11 +1490,13 @@ void find_best_memcpy()
 		}
 	}
 
-    if (best) {
+	if (best) {
 		veejay_memcpy = memcpy_method[best].function;
     } else {
 		veejay_memcpy = memcpy;
 	}
+
+	selected_best_memcpy = best;
 
     free( buf1 );
     free( buf2 );
@@ -1557,8 +1546,11 @@ void find_best_memset()
 		  veejay_memset = memset_method[1].function;
 	 }
 
-     free( buf1 );
+	selected_best_memset = best;
+
+	 free( buf1 );
      free( buf2 );
+
 }
 
 static	void	vj_frame_copy_job( void *arg ) {
