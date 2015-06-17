@@ -1091,7 +1091,7 @@ v4l2_rw_fallback:
 		veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: read/write buffer size is %d bytes", v->format.fmt.pix.sizeimage );
 
 		v->buffers[0].length = v->sizeimage;
-		v->buffers[0].start = malloc( v->sizeimage * 2 );
+		v->buffers[0].start = vj_malloc( RUP8( v->sizeimage * 2 ) );
 
 	}	
 
@@ -1335,15 +1335,13 @@ void	v4l2_close( void *d )
 	if( !v->picture )
 	{
 		for ( i = 0; i < N_FRAMES; i ++ ) {
-			for( c = 0; c < 4; c ++ ) {
-				if( v->out_planes[c] )
-					free(v->frames[i]->data[c]);
-			}
-			free(v->frames[i]);
+			if(v->frames[i]->data[0])
+				free(v->frames[i]->data[0]);
+			if(v->frames[i])
+				free(v->frames[i]);
+			v->frames[i] = NULL;
 		}
 	}
-	
-	
 
 	if(v->picture) {
 		free(v->picture->data[0]);
@@ -1351,7 +1349,6 @@ void	v4l2_close( void *d )
 		free(v->picture->data[2]);
 		av_free(v->picture);
 		v->picture = NULL;
-
 	}
 
 	if(v->codec) {
@@ -1853,6 +1850,12 @@ char **v4l2_get_device_list()
 		files[i] = strdup(tmp);
 		veejay_msg(VEEJAY_MSG_DEBUG, "Found '%s'", list[i]);
     }
+
+	for( i = 0; i < n_devices; i ++ ) {
+		if( list[i] )
+			free( list[i] );
+	}
+
 	files[n_devices] = NULL;
 	return files;
 
@@ -1917,19 +1920,27 @@ static	void	*v4l2_grabber_thread( void *v )
 	v4l2->threaded = 1;
 
 	int j,c;
-	int planes[4];
+	int planes[4] = { 0,0,0,0 };
 	yuv_plane_sizes( v4l2->frames[0], &(planes[0]),&(planes[1]),&(planes[2]),&(planes[3]) );
-//@ FIXME:  VEEJAY_V4L2_NO_THREADING=1 and no framebuffer is allocated ...
-
+	
+	//@ FIXME:  VEEJAY_V4L2_NO_THREADING=1 and no framebuffer is allocated ...
+	
 	for( j = 0; j < N_FRAMES; j ++ ) {
+		uint8_t *ptr = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(planes[0] * 4) );
+		if(!ptr) {
+			veejay_msg(0, "v4l2: error allocating memory" );
+			unlock_(v);
+			pthread_exit(NULL);
+			return NULL;
+		}
+
 		for( c = 0; c < 4; c ++ ) {
-			if( planes[c] > 0 ) {
-				v4l2->frames[j]->data[c] = (uint8_t*) vj_malloc(sizeof(uint8_t) * planes[c] );
-				veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: %d: allocated buffer[%d] = %d bytes", j,c,planes[c]);
-			}
+			v4l2->frames[j]->data[c] = ptr + (c * planes[0]);
 		}
 		v4l2->frames_done[j] = 0;
 	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: allocated %d buffers of %d bytes each", N_FRAMES, planes[0]*4);
 
 	for( c = 0; c < 4; c ++ )
 		v4l2->out_planes[c] = planes[c];
@@ -2108,10 +2119,13 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 	
 	//@ wait until thread is ready
 	while(retries) {
+		lock_(i);
 		ready = i->grabbing;
 		if( i->stop ) {
 			ready = i->stop;
 		}
+		unlock_(i);
+
 		if(ready)
 			break;	
 		nanosleep(&req, NULL);
