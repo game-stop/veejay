@@ -32,6 +32,7 @@
 #include <libswscale/swscale.h>
 #include <libyuv/yuvconv.h>
 
+#define     RUP8(num)(((num)+8)&~8)
 vj_yuv *vj_yuv4mpeg_alloc(int w, int h, float fps, int out_pixel_format)
 {
     vj_yuv *yuv4mpeg = (vj_yuv *) vj_calloc(sizeof(vj_yuv));
@@ -60,6 +61,10 @@ void vj_yuv4mpeg_free(vj_yuv *v) {
 		}
 		if(v->buf[0] != NULL )
 			free(v->buf[0]);
+		if(v->src)
+			free(v->src);
+		if(v->dst)
+			free(v->dst);
 		free(v);
 	}
 }
@@ -99,7 +104,7 @@ static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width, int h
     yuv4mpeg->chroma = y4m_si_get_chroma( &(yuv4mpeg->streaminfo) );
 
     if( yuv4mpeg->chroma != Y4M_CHROMA_422 ) {
-		yuv4mpeg->buf[0] = vj_calloc( sizeof(uint8_t) * w * h * 4 );
+		yuv4mpeg->buf[0] = vj_calloc( sizeof(uint8_t) * RUP8( w * h * 4 ) );
 		yuv4mpeg->buf[1] = yuv4mpeg->buf[0] + (w*h);
 		yuv4mpeg->buf[2] = yuv4mpeg->buf[1] + (w*h);
 		yuv4mpeg->buf[3] = yuv4mpeg->buf[2] + (w*h);
@@ -173,6 +178,7 @@ int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, VJFrame *frame, int out_chroma
     sws_tem.flags = yuv_which_scaler();
     
     yuv4mpeg->dst = yuv_yuv_template( NULL,NULL,NULL, frame->width,frame->height, get_pixfmt_from_chroma(out_chroma));
+	yuv4mpeg->src = yuv_yuv_template( NULL,NULL,NULL, yuv4mpeg->width,yuv4mpeg->height, yuv4mpeg->format );
 
     yuv4mpeg->scaler = yuv_init_swscaler( frame, yuv4mpeg->dst, &sws_tem, yuv_sws_get_cpu_flags());
    
@@ -264,9 +270,10 @@ void vj_yuv_stream_stop_write(vj_yuv * yuv4mpeg)
     close(yuv4mpeg->fd);
 
     if( yuv4mpeg->scaler ) {
-	yuv_free_swscaler( yuv4mpeg->scaler );
-	yuv4mpeg->scaler = NULL;
+		yuv_free_swscaler( yuv4mpeg->scaler );
+		yuv4mpeg->scaler = NULL;
     }
+
 }
 
 void vj_yuv_stream_stop_read(vj_yuv * yuv4mpeg)
@@ -276,14 +283,15 @@ void vj_yuv_stream_stop_read(vj_yuv * yuv4mpeg)
     close(yuv4mpeg->fd);
     yuv4mpeg->sar = y4m_sar_UNKNOWN;
     yuv4mpeg->dar = y4m_dar_4_3;
+	
 	if( yuv4mpeg->scaler ) {
-			yuv_free_swscaler( yuv4mpeg->scaler );
-			yuv4mpeg->scaler = NULL;
-		}
+		yuv_free_swscaler( yuv4mpeg->scaler );
+		yuv4mpeg->scaler = NULL;
+	}
 	if( yuv4mpeg->buf[0] ) {
-			free(yuv4mpeg->buf[0]);
-			yuv4mpeg->buf[0] = NULL;
-		}
+		free(yuv4mpeg->buf[0]);
+		yuv4mpeg->buf[0] = NULL;
+	}
 
 }
 
@@ -396,27 +404,28 @@ int vj_yuv_get_frame(vj_yuv * yuv4mpeg, uint8_t *dst[3])
 }
 
 
-int vj_yuv_put_frame(vj_yuv * vjyuv, uint8_t ** src)
+int vj_yuv_put_frame(vj_yuv * vjyuv, uint8_t **src)
 {
 	int i;
-    	if (!vjyuv->fd) {
+   	if (!vjyuv->fd) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid file descriptor for y4m stream");
 		return -1;
 	}
 
-
 	if( vjyuv->scaler ) {
-		VJFrame *srcf = yuv_yuv_template( src[0], src[1], src[2],vjyuv->width,vjyuv->height,vjyuv->format);
+		VJFrame *f = vjyuv->src;
+		f->data[0] = src[0];
+		f->data[1] = src[1];
+		f->data[2] = src[2];
 
-		yuv_convert_and_scale( vjyuv->scaler, srcf, vjyuv->dst );
+		yuv_convert_and_scale( vjyuv->scaler, f, vjyuv->dst );
+
 		i = y4m_write_frame(vjyuv->fd, &(vjyuv->streaminfo),&(vjyuv->frameinfo), vjyuv->dst->data);
-
-		free(srcf);
-	} else {
+	}
+	else {
 		i = y4m_write_frame(vjyuv->fd, &(vjyuv->streaminfo),&(vjyuv->frameinfo), src );
 	}
 	
-
 	if (i != Y4M_OK) {
 		veejay_msg(VEEJAY_MSG_ERROR, "yuv4mpeg: %s", y4m_strerr(i));
 		return -1;

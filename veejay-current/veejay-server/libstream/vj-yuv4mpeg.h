@@ -41,6 +41,7 @@ typedef struct {
     uint8_t *buf[4];
     int  is_jpeg;
     VJFrame *dst;
+	VJFrame *src;
 } vj_yuv;
 
 vj_yuv *vj_yuv4mpeg_alloc(int dst_w, int dst_h,float fps, int out_pix_fmt);
@@ -64,7 +65,7 @@ void vj_yuv_stream_stop_write(vj_yuv * yuv4mpeg);
 
 int vj_yuv_get_frame(vj_yuv *, uint8_t **);
 
-int vj_yuv_put_frame(vj_yuv * vjyuv, uint8_t **);
+int vj_yuv_put_frame(vj_yuv * vjyuv, uint8_t **src);
 
 int vj_yuv_get_aframe(vj_yuv * vjyuv, uint8_t * audio);
 
