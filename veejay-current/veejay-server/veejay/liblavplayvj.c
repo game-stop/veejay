@@ -3571,44 +3571,58 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 
 static void configure_dummy_defaults(veejay_t *info, char override_norm, float fps, char **files, int n_files)
 {
-	info->dummy->width = info->video_output_width;
-	info->dummy->height= info->video_output_height;
-	info->dummy->fps = fps;
+	int default_dw = 720;
+	int default_dh = (override_norm == 'p' || override_norm == '\0' ? 576 : 480);
 
-	int dw = 720;
-	int dh = (override_norm == 'p' || override_norm == '\0' ? 576 : 480);
-
-	float dfps = fps;
-	float tmp_fps = 0.0f;
-	long tmp_arate = 0;
 	if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
-	       dw = (override_norm == 'p' ? 352 : 360 );
-	       dh = dh / 2;
+	       default_dw = (override_norm == 'p' ? 352 : 360 );
+	       default_dh = (override_norm == 'p' || override_norm == '\0' ? 288 : 240);
 	}
 	else {
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_RUN_MODE not set to CLASSIC");
 	}
 
-	if(!info->dummy->active) {
-		if( n_files > 0  && (info->video_output_width <= 0 || info->video_output_height <= 0 )) {
-			vj_el_scan_video_file( files[0], &dw, &dh, &tmp_fps, &tmp_arate );
+	int dw = default_dw;
+	int dh = default_dh;
 
-			info->video_output_width = dw;
-			info->video_output_height = dh;
-		}
-	} else {
+	float dfps = fps;
+	float tmp_fps = 0.0f;
+	long tmp_arate = 0;
+	if( n_files > 0  ) {
+		int in_w = 0, in_h = 0;
+
+		vj_el_scan_video_file( files[0], &in_w, &in_h, &tmp_fps, &tmp_arate );
+
+		if(info->video_output_width<=0)
+			dw = in_w;
+		if(info->video_output_height<=0)
+			dh = in_h;
+		if( dfps <= 0 ) 
+			dfps = tmp_fps;
+			veejay_msg(VEEJAY_MSG_DEBUG, "Video source is %dx%d pixels, %2.2f fps", in_w, in_h, tmp_fps );
+		if( dw == default_dw && in_w > 0 )
+			dw = in_w;
+		if( dh == default_dh && in_h > 0 )
+			dh = in_h;
+	}
+	   
+	if( info->video_output_width <= 0 ) 
 		info->video_output_width = dw;
+	else
+		dw = info->video_output_width;
+
+	if( info->video_output_height <= 0 ) 
 		info->video_output_height = dh;
-	}
-
-	if( tmp_fps > 0.0f && fps <= 0.0f ) {
-		dfps = tmp_fps;
-	}
-
+	else
+		dh = info->video_output_height;
+	
+	
 	if( override_norm != '\0' ) {
 		int selected_norm = veejay_get_norm( override_norm );
 		dfps = vj_el_get_default_framerate( selected_norm );
 		info->dummy->norm = override_norm;
+		if( fps>= 0.0f)
+			veejay_msg(VEEJAY_MSG_WARNING, "Norm setting overrides user defined framerate");
 	} else {
 		info->dummy->norm = vj_el_get_default_norm( dfps );
 	}
@@ -3618,10 +3632,8 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 		info->dummy->width  = dw;
 	if( info->dummy->height <= 0)
 		info->dummy->height = dh;
-	if( info->dummy->fps <= 0)
+	if( info->dummy->fps <= 0.0f)
 		info->dummy->fps = dfps;
-	if( info->dummy->fps <= 0)	
-		info->dummy->fps = vj_el_get_default_framerate( override_norm );
 	
 	info->dummy->chroma = get_chroma_from_pixfmt( vj_to_pixfmt( info->pixel_format ) );
 
@@ -3637,11 +3649,15 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	}
 
 	if( dfps <= 0.0 ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "No framerate set or detected" );
+		veejay_msg(VEEJAY_MSG_WARNING, "No framerate set or detected,derive it from video norm" );
 		dfps = vj_el_get_default_framerate(info->dummy->norm);
 	}
-
+	
+	if( info->dummy->fps <= 0.0f)
+		info->dummy->fps = dfps;
+	
 	info->settings->output_fps = dfps;
+	veejay_msg(VEEJAY_MSG_DEBUG, "Video output is %dx%d pixels, %2.2f fps", info->video_output_width, info->video_output_height, dfps );
 }
 
 int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm, int switch_jpeg)
