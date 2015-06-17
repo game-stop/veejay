@@ -218,8 +218,6 @@ void	*y4m_writer_thread( void *data )
 {
 	vj_yuv *y4m = (vj_yuv*)data;
 
-	veejay_msg(VEEJAY_MSG_INFO,"Started Y4M writer thread" );
-
 	lock(y4m);
 	y4m->state = 1;
 	unlock(y4m);
