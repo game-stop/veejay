@@ -21,6 +21,10 @@
 #include <mjpegtools/mpegconsts.h>
 
 typedef struct {
+	pthread_mutex_t mutex;
+	pthread_t thread;
+	pthread_cond_t task;
+	int state;
     y4m_stream_info_t streaminfo;
     y4m_frame_info_t frameinfo;
     y4m_ratio_t sar;

@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <pthread.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <libstream/vj-yuv4mpeg.h>
@@ -31,6 +32,16 @@
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
 #include <libyuv/yuvconv.h>
+
+static int lock(vj_yuv *t)
+{
+	return pthread_mutex_lock( &(t->mutex ));
+}
+
+static int unlock(vj_yuv *t)
+{
+	return pthread_mutex_unlock( &(t->mutex ));
+}
 
 #define     RUP8(num)(((num)+8)&~8)
 vj_yuv *vj_yuv4mpeg_alloc(int w, int h, float fps, int out_pixel_format)
@@ -66,6 +77,7 @@ void vj_yuv4mpeg_free(vj_yuv *v) {
 		if(v->dst)
 			free(v->dst);
 		free(v);
+
 	}
 }
 
@@ -104,7 +116,7 @@ static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width, int h
     yuv4mpeg->chroma = y4m_si_get_chroma( &(yuv4mpeg->streaminfo) );
 
     if( yuv4mpeg->chroma != Y4M_CHROMA_422 ) {
-		yuv4mpeg->buf[0] = vj_calloc( sizeof(uint8_t) * RUP8( w * h * 4 ) );
+		yuv4mpeg->buf[0] = vj_calloc( sizeof(uint8_t) * RUP8( w * h * 4) );
 		yuv4mpeg->buf[1] = yuv4mpeg->buf[0] + (w*h);
 		yuv4mpeg->buf[2] = yuv4mpeg->buf[1] + (w*h);
 		yuv4mpeg->buf[3] = yuv4mpeg->buf[2] + (w*h);
@@ -202,6 +214,47 @@ int vj_yuv_stream_header_pipe(vj_yuv *yuv4mpeg,VJFrame *frame)
     return 1;	
 }
 
+void	*y4m_writer_thread( void *data )
+{
+	vj_yuv *y4m = (vj_yuv*)data;
+
+	veejay_msg(VEEJAY_MSG_INFO,"Started Y4M writer thread" );
+
+	lock(y4m);
+	y4m->state = 1;
+	unlock(y4m);
+
+	for( ;; ) {
+
+		lock(y4m);
+		if( y4m->state == 0 ) {
+			unlock(y4m);
+			goto Y4MTHREADEXIT;
+		}
+		pthread_cond_wait( &(y4m->task), &(y4m->mutex));
+		unlock(y4m);
+
+		int error = y4m_write_frame(
+				y4m->fd,
+				&(y4m->streaminfo),
+				&(y4m->frameinfo),
+				y4m->dst->data);
+
+		if (error != Y4M_OK) {
+			veejay_msg(VEEJAY_MSG_ERROR, "yuv4mpeg: %s", y4m_strerr(error));
+			goto Y4MTHREADEXIT;
+		}
+		
+		if( y4m->state == 0 ) {
+			goto Y4MTHREADEXIT;
+		}
+	}
+
+Y4MTHREADEXIT:
+	veejay_msg(VEEJAY_MSG_INFO,"Exiting Y4M writer thread" );
+	return NULL;
+}
+
 int vj_yuv_stream_start_write(vj_yuv * yuv4mpeg,VJFrame *frame, char *filename, int outchroma)
 {
     //if(mkfifo( filename, 0600)!=0) return -1;
@@ -260,6 +313,14 @@ int vj_yuv_stream_start_write(vj_yuv * yuv4mpeg,VJFrame *frame, char *filename, 
 
     yuv4mpeg->has_audio = 0;
 
+	pthread_mutex_init( &(yuv4mpeg->mutex), NULL );
+
+	int p_err = pthread_create( &(yuv4mpeg->thread), NULL, y4m_writer_thread, (void*) yuv4mpeg );
+	if( p_err == 0 ) {
+		veejay_msg(VEEJAY_MSG_INFO, "Created new Y4M writer thread" );
+	}
+
+
     return 0;
 }
 
@@ -274,6 +335,17 @@ void vj_yuv_stream_stop_write(vj_yuv * yuv4mpeg)
 		yuv4mpeg->scaler = NULL;
     }
 
+	lock( yuv4mpeg );
+	if( yuv4mpeg->state == 0 ) {
+		unlock(yuv4mpeg);
+		return;
+	}
+
+	yuv4mpeg->state = 0;
+	unlock(yuv4mpeg);
+
+	pthread_mutex_destroy(&(yuv4mpeg->mutex));
+	pthread_cond_destroy(&(yuv4mpeg->task));
 }
 
 void vj_yuv_stream_stop_read(vj_yuv * yuv4mpeg)
@@ -412,24 +484,16 @@ int vj_yuv_put_frame(vj_yuv * vjyuv, uint8_t **src)
 		return -1;
 	}
 
-	if( vjyuv->scaler ) {
-		VJFrame *f = vjyuv->src;
-		f->data[0] = src[0];
-		f->data[1] = src[1];
-		f->data[2] = src[2];
+	VJFrame *f = vjyuv->src;
+	f->data[0] = src[0];
+	f->data[1] = src[1];
+	f->data[2] = src[2];
 
-		yuv_convert_and_scale( vjyuv->scaler, f, vjyuv->dst );
-
-		i = y4m_write_frame(vjyuv->fd, &(vjyuv->streaminfo),&(vjyuv->frameinfo), vjyuv->dst->data);
-	}
-	else {
-		i = y4m_write_frame(vjyuv->fd, &(vjyuv->streaminfo),&(vjyuv->frameinfo), src );
-	}
+	yuv_convert_and_scale( vjyuv->scaler, f, vjyuv->dst );
 	
-	if (i != Y4M_OK) {
-		veejay_msg(VEEJAY_MSG_ERROR, "yuv4mpeg: %s", y4m_strerr(i));
-		return -1;
-	}
+	lock(vjyuv);
+	pthread_cond_signal( &(vjyuv->task) );
+	unlock(vjyuv);
 	
  	return 0;
 }
