@@ -3636,7 +3636,6 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	if( info->dummy->fps <= 0.0f)
 		info->dummy->fps = dfps;
 	
-	info->dummy->norm = default_norm;
 	info->dummy->chroma = get_chroma_from_pixfmt( vj_to_pixfmt( info->pixel_format ) );
 	info->settings->output_fps = dfps;
 	

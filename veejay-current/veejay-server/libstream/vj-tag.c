@@ -429,7 +429,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 				_tag_info->effect_frame1->fps,_tag_info->edit_list->video_norm );
 		} else {
 			vj_tag_input->unicap[stream_nr] = v4l2_thread_new( refname, channel,palette,width,height,
-			_tag_info->effect_frame1->fps,_tag_info->edit_list->video_norm );
+			_tag_info->effect_frame1->fps,_tag_info->dummy->norm );
 		}
 		if( !vj_tag_input->unicap[stream_nr] ) {
 			veejay_msg(0, "Unable to open device %d (%s)",device_num, refname );
