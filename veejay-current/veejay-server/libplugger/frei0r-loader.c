@@ -569,6 +569,7 @@ void* 	deal_with_fr( void *handle, char *name)
 			veejay_msg(VEEJAY_MSG_ERROR, "Supposed to be mixer plugin (2 sources) but no f0r_update2");
 			(*f0r_deinit)();
 			vpf(port);
+			if(plug_name) free(plug_name);
 			return NULL;
 		}
 	} else if ( finfo.plugin_type == F0R_PLUGIN_TYPE_FILTER ) {
@@ -577,6 +578,7 @@ void* 	deal_with_fr( void *handle, char *name)
 			veejay_msg(VEEJAY_MSG_ERROR, "Supposed to be filter plugin (1 input source) but no f0r_update");
 			(*f0r_deinit)();
 			vpf(port);
+			if(plug_name) free(plug_name);
 			return NULL;
 		}
 	} else if ( finfo.plugin_type == F0R_PLUGIN_TYPE_SOURCE ) {
@@ -586,12 +588,14 @@ void* 	deal_with_fr( void *handle, char *name)
 			veejay_msg(VEEJAY_MSG_ERROR, "Supposed to be generator plugin (1 output source) but no f0r_update");
 			(*f0r_deinit)();
 			vpf(port);
+			if(plug_name) free(plug_name);
 			return NULL;
 		}
 	} else {
 		veejay_msg(VEEJAY_MSG_ERROR, "Frei0r plugin '%s' (%s) unsupported type", finfo.name, plugin_name );
 		(*f0r_deinit)();
 		vpf(port);
+		if(plug_name) free(plug_name);
 		return NULL;
 	}
 

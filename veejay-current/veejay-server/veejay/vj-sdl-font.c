@@ -213,6 +213,12 @@ void	vj_sdl_font_free(void *font)
 				    free(f->q->history[i]);
 				f->q->history[i] = NULL;
 			}
+			if(f->q->history)
+				free(f->q->history);
+			if(f->q->width)
+				free(f->q->width);
+			if(f->q->height)
+				free(f->q->height);
 			free(f->q);
 		}
 		free(font);
