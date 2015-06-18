@@ -420,7 +420,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 			veejay_msg(0, "Unable to open device %s", refname );
 			return 0;
 		}
-		sprintf(refname, "%d",channel );
+		snprintf(refname,sizeof(refname) "%d",channel );
 		tag->extra = strdup(refname);
 		veejay_msg(VEEJAY_MSG_DEBUG, "Using V4lutils from EffecTV");
 #elif HAVE_V4L2
@@ -435,7 +435,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 			veejay_msg(0, "Unable to open device %d (%s)",device_num, refname );
 			return 0;
 		}
-		sprintf(refname, "%d", channel );
+		snprintf(refname,sizeof(refname), "%d", channel );
 		tag->extra = strdup(refname);
 #endif
 		return 1;
