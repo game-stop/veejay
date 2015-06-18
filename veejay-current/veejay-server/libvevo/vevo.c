@@ -312,10 +312,8 @@ static port_index_t *port_node_new(__vevo_port_t *port,const char *key, ukey_t h
  */
 static void port_node_free(__vevo_port_t *port,port_index_t * node)
 {
-	free((void*)node->key);
-	node->key=NULL;
+	if(node->key) free((void*)node->key);
 	vevo_pool_free_node( port->pool,(void*)node );
-    node = NULL;
 }
 
 //! Add a mnemonic to the list of key | hash value pairs
@@ -328,7 +326,7 @@ static void port_node_append(vevo_port_t * p, const char *key,ukey_t hash_key)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
     port_index_t *node = port_node_new(p,key, hash_key);
-    port_index_t *next;
+    port_index_t *next = NULL;
     port_index_t *list = port->index;
     if (list == NULL)
 		port->index = node;
@@ -585,7 +583,6 @@ static int atom_get_value(vevo_storage_t * t, int idx, void *dst)
 static size_t vevo_atom_size(int atom_type)
 {
 	return atom_sizes_[atom_type];
-    return 0;
 }
 
 //! Construct a new Atom 
@@ -678,7 +675,7 @@ static atom_t *vevo_put_atom(__vevo_port_t * port, void *dst, int atom_type)
 			veejay_memcpy(atom->value, data, atom_size);
 		}
     } else {
-	    	size_t atom_size = vevo_atom_size(atom_type);
+	    size_t atom_size = vevo_atom_size(atom_type);
 		atom = vevo_new_atom(port, atom_type, atom_size);
 		if (!atom)
 		    return NULL;
@@ -986,8 +983,6 @@ vevo_port_t *vevo_port_new(int port_type)
     else
 	port->table = hash_create(HASHCOUNT_T_MAX, key_compare, int_hash);
 
-  //  vevo_port_finalize (port, port_type );
-
     return (vevo_port_t *) port;
 }
 
@@ -999,7 +994,7 @@ void	vevo_strict_init()
 	atom_sizes_[2] = sizeof(double);
 	atom_sizes_[3] = sizeof(int32_t);
 	atom_sizes_[4] = sizeof(char*);
-//	atom_sizes_[8] = sizeof(gchar*);
+	atom_sizes_[8] = sizeof(char*);
 	atom_sizes_[5] = sizeof(uint64_t);
 	atom_sizes_[65] = sizeof(void*);
 	atom_sizes_[66] = sizeof(vevo_port_t*);
@@ -1020,6 +1015,8 @@ static void vevo_port_free_(vevo_port_t * p)
 		while ((node = hash_scan_next(&scan)) != NULL) {
 		    vevo_storage_t *stor = hnode_get(node);
 		    vevo_free_storage(port,stor);
+			hash_delete( (hash_t*) port->table, node );
+			hnode_destroy( node );
 		}
 		hash_free_nodes((hash_t *) port->table);
 	 }
@@ -1032,13 +1029,15 @@ static void vevo_port_free_(vevo_port_t * p)
 	    vevo_property_t *l = port->list;
 	    vevo_property_t *n;
 	    while (l != NULL) {
-		n = l->next;
-		vevo_free_storage(port,l->st);
-		prop_node_free(port,l);
-		l = n;
+			n = l->next;
+			if(l->st) {
+				vevo_free_storage(port,l->st);
+				prop_node_free(port,l);
+			}
+			l = n;
 	    }
 	    port->list = NULL;
-     }
+    }
 
 	port_index_t *list = port->index;
 	port_index_t *node = list;
@@ -1049,11 +1048,11 @@ static void vevo_port_free_(vevo_port_t * p)
 		node = next;
 	}
 	port->index = NULL;
-     vevo_pool_destroy( port->pool );	
+    vevo_pool_destroy( port->pool );	
      
-     free(port);
+    free(port);
 
-     p = port = NULL;
+    p = port = NULL;
 }
 
 //! Verify if Vevo has allocated a given Port

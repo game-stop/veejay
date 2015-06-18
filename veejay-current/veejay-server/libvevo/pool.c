@@ -81,7 +81,7 @@ int	vevo_pool_size( void *p )
 void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t index_size)
 {
 	unsigned int Msize = Mend + 1;
-	pool_t *p = (pool_t*) vj_malloc(sizeof(pool_t)); //@ FIXME: reachable
+	pool_t *p = (pool_t*) vj_malloc(sizeof(pool_t)); 
 	p->space = NULL;
 	p->spaces = (space_t**) vj_malloc(sizeof(space_t*) * Msize );
 	p->spaces[M4b] = alloc_space( sizeof(int32_t) );
@@ -160,7 +160,7 @@ void	vevo_pool_destroy( void *p )
 	{
 		if( nS[i] == NULL )
 			continue;
-		space_t *n = pool->spaces[i];
+		space_t *n = nS[i];
 		space_t *k = NULL;
 		while( n != NULL )
 		{
@@ -168,14 +168,15 @@ void	vevo_pool_destroy( void *p )
 			free( k->area ); 
 			free( k->mag ); 
 			n = k->next;
-			
 			free( k );
-			k = NULL;
 		}
 	}
 	free( nS );
+	if( pool->space )
+		free(pool->space);
+	
 	free( pool );
-	p = NULL;
+	pool = NULL;
 }
 
 //! Destroy a pool and the space it holds. Frees all used memory

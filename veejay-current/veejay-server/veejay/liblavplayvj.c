@@ -394,7 +394,8 @@ int veejay_free(veejay_t * info)
    	
 	sample_free(info->edit_list);
 
-	vj_el_free(info->edit_list);
+	if( info->plain_editlist )
+		vj_el_free(info->plain_editlist);
 
 	vj_el_deinit();
 
@@ -1771,7 +1772,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	}
 
 
- 	sample_init( (info->video_output_width * info->video_output_height), info->font, el ); 
+ 	sample_init( (info->video_output_width * info->video_output_height), info->font, info->plain_editlist ); 
 
 	sample_set_project( info->pixel_format,
 			    info->auto_deinterlace,
@@ -1875,7 +1876,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		int port = info->uc->port;
 		int new_port = info->uc->port + 1000;
 		instances ++;
-		veejay_msg(VEEJAY_MSG_ERROR,"Port %d in use, trying to start on port %d (%d/%d attempts)", port, new_port , 4 - instances, instances);
+		veejay_msg(VEEJAY_MSG_ERROR,"Port %d -~ %d in use, trying to start on port %d (%d/%d attempts)", port,port+6, new_port , 4 - instances, instances);
 		info->uc->port = new_port;
 	}
 
@@ -2554,27 +2555,32 @@ int vj_server_setup(veejay_t * info)
 	size_t status_len = 4096 * 16; //@ 16x 4kb 
 
 	info->vjs[VEEJAY_PORT_CMD] = vj_server_alloc(info->uc->port, NULL, V_CMD, recv_len);
-	if(!info->vjs[VEEJAY_PORT_CMD])
+	if(!info->vjs[VEEJAY_PORT_CMD]) {
 		return 0;
+	}
 
 	info->vjs[VEEJAY_PORT_STA] = vj_server_alloc(info->uc->port, NULL, V_STATUS, status_len);
 	if(!info->vjs[VEEJAY_PORT_STA])
+	{
+		vj_server_shutdown(info->vjs[VEEJAY_PORT_CMD]);
 		return 0;
-
+	}
 	//@ second VIMS control port
 	info->vjs[VEEJAY_PORT_DAT] = vj_server_alloc(info->uc->port + 5, NULL, V_CMD, recv_len);
-	if(!info->vjs[VEEJAY_PORT_DAT])
+	if(!info->vjs[VEEJAY_PORT_DAT]) {
+		vj_server_shutdown(info->vjs[VEEJAY_PORT_CMD]);
+		vj_server_shutdown(info->vjs[VEEJAY_PORT_STA]);
 		return 0;
+	}
 
 	info->vjs[VEEJAY_PORT_MAT] = NULL;
-	if( info->settings->use_vims_mcast )
+	if( info->settings->use_vims_mcast ) //FIXME mcast
 	{
 		info->vjs[VEEJAY_PORT_MAT] =
 			vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD, recv_len );
 		if(!info->vjs[VEEJAY_PORT_MAT])
 		{
-			veejay_msg(VEEJAY_MSG_ERROR,
-		  		 "Unable to initialize mcast sender");
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize mcast sender");
 			return 0;
 		}
 	}
@@ -2585,11 +2591,12 @@ int vj_server_setup(veejay_t * info)
 
 	info->osc = (void*) vj_osc_allocate(info->uc->port+6);
 
-    	if(!info->osc) 
+    if(!info->osc) 
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,
-		  "Unable to start OSC server at port %d",
-			info->uc->port + 6 );
+		veejay_msg(VEEJAY_MSG_ERROR,  "Unable to start OSC server at port %d", info->uc->port + 6 );
+		vj_server_shutdown(info->vjs[VEEJAY_PORT_CMD]);
+		vj_server_shutdown(info->vjs[VEEJAY_PORT_STA]);
+		vj_server_shutdown(info->vjs[VEEJAY_PORT_DAT]);
 		return 0;
 	}
 
@@ -2601,14 +2608,9 @@ int vj_server_setup(veejay_t * info)
 			info->uc->port + 6 );
 
 	if(vj_osc_setup_addr_space(info->osc) == 0)
-		veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
+		veejay_msg(VEEJAY_MSG_DEBUG, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
 
-    if (info->osc == NULL || info->vjs[VEEJAY_PORT_CMD] == NULL || info->vjs[VEEJAY_PORT_STA] == NULL) 
-	{
-		veejay_msg(0, "Unable to setup basic network I/O. Abort");
-		return 0;
-    	}
-    	info->uc->is_server = 1;
+   	info->uc->is_server = 1;
 
 	return 1;
 }
@@ -3511,7 +3513,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	
 	if( info->dummy->active )
 	{
-		info->edit_list = vj_el_dummy( 0, 
+		info->plain_editlist = vj_el_dummy( 0, 
 				info->auto_deinterlace,
 				info->dummy->chroma,
 				info->dummy->norm,
@@ -3523,7 +3525,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 
 		if( info->dummy->arate )
 		{
-			editlist *el = info->edit_list;
+			editlist *el = info->plain_editlist;
 			el->has_audio = 1;
 			el->audio_rate = info->dummy->arate;
 			el->audio_chans = 2;
@@ -3545,21 +3547,22 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		int tmp_wid = info->video_output_width;
 		int tmp_hei = info->video_output_height;
 
-	    	info->edit_list = 
+	    info->plain_editlist = 
 			vj_el_init_with_args(
 					files,
 					num_files,
 					info->preserve_pathnames,
 					info->auto_deinterlace,
-				       	force,
+				    force,
 					override_norm,
 					info->pixel_format, tmp_wid, tmp_hei);
-		if(!info->edit_list ) 
+		if(!info->plain_editlist ) 
 			return 0;
-	}
-
+	}	
+	info->edit_list = info->plain_editlist;
 	//@ set current
 	info->current_edit_list = info->edit_list;
+
 	info->effect_frame_info->width = info->video_output_width;
 	info->effect_frame_info->height= info->video_output_height;
 

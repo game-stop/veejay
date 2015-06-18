@@ -1587,7 +1587,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		     		n = open_video_file(filename[nf], el, flags, deinterlace,force,norm, av_pixfmt, width, height);
 				if(n >= 0 )
 				{
-			       		el->frame_list = (uint64_t *) realloc(el->frame_list, (el->video_frames + el->num_frames[n]) * sizeof(uint64_t));
+			       		el->frame_list = (uint64_t *) realloc(el->frame_list, (RUP8(el->video_frames + el->num_frames[n])) * sizeof(uint64_t));
 					if (el->frame_list==NULL)
 					{
 						veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");

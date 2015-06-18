@@ -264,7 +264,8 @@ typedef struct {
     int load_action_file;
     editlist *current_edit_list;
     editlist *edit_list;		/* the playing editlist */
-    user_control *uc;		/* user control */
+    editlist *plain_editlist;	/* editlist loaded from command line */
+	user_control *uc;		/* user control */
     void *osc;
     VJFrame *plugin_frame;
     VJFrameInfo *plugin_frame_info; 
