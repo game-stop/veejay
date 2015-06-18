@@ -2411,6 +2411,8 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	   
 	   if(AVI->anum > AVI_MAX_TRACKS) {
 	     fprintf(stderr, "error - only %d audio tracks supported\n", AVI_MAX_TRACKS);
+		 if( AVI->idx )
+			 free(AVI->idx);
 	     return(-1);
 	   }
 	   
@@ -2431,6 +2433,8 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
          }
          else if (strncasecmp (hdrl_data+i,"iavs",4) ==0 && ! auds_strh_seen) {
 	     fprintf(stderr, "AVILIB: error - DV AVI Type 1 no supported\n");
+		 if( AVI->idx )
+			 free(AVI->idx);
 	     return (-1);
 	 }
          else

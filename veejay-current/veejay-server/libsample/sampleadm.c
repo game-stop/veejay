@@ -79,6 +79,8 @@ static int avail_num[SAMPLE_MAX_SAMPLES];	/* an array of freed sample id's */
 static void *sample_font_ = NULL;
 static int sampleadm_state = SAMPLE_PEEK;	/* default state */
 static void *sample_cache[SAMPLE_MAX_SAMPLES];
+static editlist *plain_editlist=NULL; 
+
 extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp);
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_size();
@@ -143,6 +145,37 @@ static int int_compare(const void *key1, const void *key2)
 #endif
 }
 
+static void sample_close_edl(int s1, editlist *el)
+{
+	/* check if another sample has same EDL */
+	if( el != NULL ) {
+		    int end = sample_size() + 1;
+			int same = 0;
+			int i;
+
+			if( el == plain_editlist ) {
+				same = 1;
+			}
+
+			if( same == 0 ) {
+				for (i = 1; i < end; i++) {
+					if (!sample_exists(i) || s1 == i)
+						continue;
+
+					sample_info *b = sample_get(i);
+					if( b->edit_list == el ) {
+						same = 1;
+						break;
+					}
+				}
+			}
+
+			if( same == 0 ) {
+				vj_el_free(el);
+			}
+	}
+}
+
 int sample_update(sample_info *sample, int s1) {
 /*  if(s1 <= 0 || s1 >= SAMPLE_MAX_SAMPLES) return 0;
   if(sample) {
@@ -196,7 +229,7 @@ void	*sample_get_dict( int sample_id )
  * call before using any other function as sample_skeleton_new
  *
  ****************************************************************************************************/
-void sample_init(int len, void *font)
+void sample_init(int len, void *font, editlist *pedl)
 {
     if (!initialized) {
 	int i;
@@ -212,6 +245,7 @@ void sample_init(int len, void *font)
     }
 
     sample_font_ = font;
+	plain_editlist = pedl;
 }
 
 void	sample_free(void *edl)
@@ -220,17 +254,6 @@ void	sample_free(void *edl)
 		return;
 	
 	sample_del_all(edl);
-/*
-	hscan_t scan;
-	hash_scan_begin( &scan, (hash_t*) SampleHash );
-	hnode_t *node;
-	while( (node = hash_scan_next(&scan)) != NULL )
-	{
-		sample_info *info = (sample_info*) node;
-		sample_del( info->sample_id);
-	}
-	hash_free_nodes( SampleHash );
-	hash_destroy( SampleHash );*/
 }
 
 int sample_set_state(int new_state)
@@ -893,7 +916,7 @@ int sample_del(int sample_id)
     sample_info *si;
     si = sample_get(sample_id);
     if (!si)
-	return 0;
+		return 0;
 
     sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
     if (sample_node) {
@@ -925,15 +948,20 @@ int sample_del(int sample_id)
 			viewport_destroy(si->viewport);
 			si->viewport = NULL;
 		}
-	    
-		free(si);
 
-		  /* store freed sample_id */
+		if(si->edit_list) {
+				/* check if another sample has same EDL */
+				sample_close_edl( sample_id, si->edit_list );
+		}
+
+		/* store freed sample_id */
   	 	avail_num[next_avail_num] = sample_id;
   		next_avail_num++;
    		hash_delete_free(SampleHash, sample_node);
 
 		sample_cache[ sample_id ] = NULL;
+	
+		free(si);
 
     	return 1;
     }
@@ -941,55 +969,24 @@ int sample_del(int sample_id)
     return 0;
 }
 
-static void sample_free_el(void *port) {
-	int i;
-	char **keys = vevo_list_properties(port);
- 	if(keys) {
-		for( i = 0; keys[i] != NULL; i ++ ) {
-			void *el = NULL;
-			if(vevo_property_get(port, keys[i], 0, &el ) == VEVO_NO_ERROR ) {
-				vj_el_free( (editlist*) el );
-			}
-			free(keys[i]);
-		}
-		free(keys);
-	}
-}
-
 void sample_del_all(void *edl)
 {
-    int end = sample_size();
+    int end = sample_size() + 1;
     int i;
 
-    void *port = vpn(VEVO_ANONYMOUS_PORT);
-
     for (i = 1; i < end; i++) {
-		if (sample_exists(i)) {
-			sample_chain_clear(i);
-    			sample_info *si = sample_get(i);
-			if(si->edit_list && edl != si->edit_list) {
-				char key[32];
-				snprintf(key,sizeof(key), "p%p", si->edit_list );
-				if( vevo_property_get( port, key, 0, NULL ) == VEVO_ERROR_NOSUCH_PROPERTY ) {
-					vevo_property_set( port, key, VEVO_ATOM_TYPE_VOIDPTR,1,&(si->edit_list));
-				}
-			}
-
-			sample_del(i);
-		}
-     }
-
-     sample_free_el( port );
-
-     vpf(port);
-
-
-	memset( avail_num, 0, sizeof(int) * SAMPLE_MAX_SAMPLES );
+		if (!sample_exists(i))
+			continue;
+	
+		sample_chain_clear(i);
+		sample_del(i);
+	}
+     
+	veejay_memset( avail_num, 0, sizeof(int) * SAMPLE_MAX_SAMPLES );
 	next_avail_num = 0;
 	this_sample_id = 0;
 
 	hash_free_nodes( SampleHash );
-
 }
 
 /****************************************************************************************************
@@ -3256,15 +3253,16 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
  ****************************************************************************************************/
 int sample_read_edl( sample_info *sample )
 {
-	char *files[1];
+	char *files[1] = {0};
 	int res = 0;
+
 	files[0] = sample->edit_list_file;
 
 	void *old = sample->edit_list;
 
 	//EDL is stored in CWD, samplelist file can be anywhere. Cannot always load samplelists due to
 	//    missing EDL files in CWD.
-	veejay_msg(VEEJAY_MSG_DEBUG, "Loading '%s' from current working directory" , files[0] );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Loading '%s' from video sample from current working directory" , files[0] );
 
 	sample->edit_list = vj_el_init_with_args( files,1,
 			__sample_project_settings.flags,
@@ -3279,7 +3277,10 @@ int sample_read_edl( sample_info *sample )
 	{
 		res = 1;
 		sample->soft_edl = 0;
-		if( old ) vj_el_free( old );
+
+		if( old ) {
+			sample_close_edl( sample->sample_id, old );
+		}
 	}
 	else 
 	{

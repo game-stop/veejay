@@ -1007,8 +1007,8 @@ static int veejay_screen_update(veejay_t * info )
 #endif
 	    		vj_perform_get_primary_frame_420p(info,c_frame);
 	    		if (vj_dfb_update_yuv_overlay(info->dfb, c_frame) != 0)
-			{
-				return 0;
+				{
+					return 0;
 	    		}
 #endif
 			 break;
@@ -1018,7 +1018,6 @@ static int veejay_screen_update(veejay_t * info )
 			if( vj_yuv_put_frame( info->y4m, frame ) == -1 ) {
 				veejay_msg(0, "Failed to write a frame!");
 				veejay_change_state(info,LAVPLAY_STATE_STOP);
-
 				return 0;
 			}
 			break;
@@ -1772,7 +1771,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	}
 
 
- 	sample_init( (info->video_output_width * info->video_output_height), info->font ); 
+ 	sample_init( (info->video_output_width * info->video_output_height), info->font, el ); 
 
 	sample_set_project( info->pixel_format,
 			    info->auto_deinterlace,

@@ -577,12 +577,12 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	el->ctx[n] = avhelper_get_decoder( filename, out_format, width, height );
 
-
-
 	if( el->ctx[n] == NULL ) {
 		pixfmt = test_video_frame( el, n, elfd, el_pixel_format_ );
 		if( pixfmt == -1 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine video format" );
+			lav_close(elfd);
+			if(realname) free(realname);
 			return -1;
 		}
 		el->pixfmt[n] = pixfmt;
@@ -607,7 +607,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if( !(_fc == CHROMA422 || _fc == CHROMA420 || _fc == CHROMA444 || _fc == CHROMAUNKNOWN || _fc == CHROMA411 || _fc == CHROMA422F || _fc == CHROMA420F))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Input file %s is not in a valid format (%d)",filename,_fc);
-	    	if(realname) free(realname);
+	   	if(realname) free(realname);
 		lav_close( elfd );
 		return -1;
 

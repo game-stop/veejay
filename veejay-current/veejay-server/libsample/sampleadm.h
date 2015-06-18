@@ -181,7 +181,7 @@ extern int sample_chain_malloc(int sample_id);
 extern int sample_chain_free(int sample_id);
 extern int sample_size();
 extern int sample_verify();
-extern void sample_init(int len, void *font);
+extern void sample_init(int len, void *font, editlist *el);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
 extern int sample_readFromFile(char *, void *vp, void *ptr, void *font, void *el, int *id, int *mode);

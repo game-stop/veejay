@@ -155,7 +155,9 @@ static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *g
 	veejay_memset( &pkt, 0, sizeof(AVPacket));
 	pkt.data = data;
 	pkt.size = pktsize;
-	return avcodec_decode_video2( avctx, picture, got_picture, &pkt );
+	int ret = avcodec_decode_video2( avctx, picture, got_picture, &pkt );
+	free_av_packet(&pkt); 
+	return ret;
 }
 #endif
 static void avhelper_close_input_file( AVFormatContext *s ) {
@@ -267,6 +269,7 @@ further:
 	if ( avcodec_open( x->codec_ctx, x->codec ) < 0 ) 
 #endif
 	{
+		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
 	}
@@ -304,9 +307,10 @@ further:
 	x->input = yuv_yuv_template( NULL,NULL,NULL, x->codec_ctx->width,x->codec_ctx->height, x->pixfmt );
 
 	sws_template sws_tem;
-        veejay_memset(&sws_tem, 0,sizeof(sws_template));
-        sws_tem.flags = yuv_which_scaler();
-        x->scaler = yuv_init_swscaler( x->input,x->output, &sws_tem, yuv_sws_get_cpu_flags());
+    veejay_memset(&sws_tem, 0,sizeof(sws_template));
+    sws_tem.flags = yuv_which_scaler();
+    x->scaler = yuv_init_swscaler( x->input,x->output, &sws_tem, yuv_sws_get_cpu_flags());
+	
 	if( x->scaler == NULL ) {
 		veejay_msg(VEEJAY_MSG_ERROR,"FFmpeg: Failed to get scaler context for %dx%d in %d to %dx%d in %d",
 				x->codec_ctx->width,x->codec_ctx->height, x->pixfmt,
@@ -320,7 +324,7 @@ further:
 		free(x);
 		return NULL;
 	}
-
+	
 	return (void*) x;
 }
 
