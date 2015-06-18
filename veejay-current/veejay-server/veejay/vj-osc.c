@@ -744,7 +744,9 @@ int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 
 	for( i = 0; osc_method_layout[i].name != NULL ; i ++ ) {
 		int ntokens = 0;
-		//FIXME: arr never freed but should be, leaking memory here
+		/*
+		 * arr is never freed; the OSCNewMethod copies the pointer to elements in arr
+		 */
 		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
 		if( arr == NULL || ntokens == 0 )
 			continue;

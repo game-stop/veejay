@@ -433,7 +433,7 @@ int veejay_free(veejay_t * info)
     free(info->status_what);
 	free(info->homedir);  
     free(info->uc);
-	
+	free(info->status_line);	
 	if(info->cpumask) free(info->cpumask);
 	if(info->mask) free(info->mask);
 	if(info->rlinks) free(info->rlinks);
@@ -3510,7 +3510,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		info->dummy->active = 1;
 	}
-	
+
 	if( info->dummy->active )
 	{
 		info->plain_editlist = vj_el_dummy( 0, 
