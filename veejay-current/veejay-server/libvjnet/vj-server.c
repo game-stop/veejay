@@ -33,6 +33,8 @@
 #include <libvjnet/cmd.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#define RUP8(num)(((num)+8)&~8)
+
 #define __INVALID 0
 #define __SENDER 1
 #define __RECEIVER 2
@@ -62,7 +64,7 @@ typedef struct
 } vj_proto;
 
 #define VJ_MAX_PENDING_MSG 768
-#define RECV_SIZE (4096) 
+#define RECV_SIZE RUP8(4096) 
 #define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1000)
 static	void	printbuf( FILE *f, uint8_t *buf , int len )
 {
@@ -191,9 +193,6 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 
 		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
 		{
-		/*	link[i]->m_queue[j] = (vj_message*) vj_malloc(sizeof(vj_message));
-			link[i]->m_queue[j]->len = 0;
-			link[i]->m_queue[j]->msg = NULL;*/
 			link[i]->m_queue[j] = &(link[i]->lin_queue[j]);
 		}
 		link[i]->n_queued = 0;
@@ -344,7 +343,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 	if (!vjs)
 		return NULL;
 
-	size_t bl = buflen;
+	size_t bl = RUP8(buflen);
 	if( bl < RECV_SIZE ) {
 		bl = RECV_SIZE;
 	}
@@ -394,20 +393,21 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_LOG_NET_IO=logfile not set");
 	}
 
-	/* setup peer to peer socket */
-	if( mcast_group_name == NULL )
-	{
-		vjs->use_mcast = 0;
-		if ( _vj_server_classic( vjs,port_offset ) )
-			return vjs;
-	}
- 	else
+	if( mcast_group_name != NULL )
 	{	/* setup multicast socket */
 		vjs->use_mcast = 1;
 		if ( _vj_server_multicast(vjs, mcast_group_name, port_offset) )
 			return vjs;
 	}
-	  
+	
+	/* setup peer to peer socket */
+	vjs->use_mcast = 0;
+	if ( _vj_server_classic( vjs,port_offset ) )
+		return vjs;
+
+	free( vjs->recv_buf );
+	free( vjs );
+
  	return NULL;
 }
 
@@ -836,7 +836,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			}
 
 			str_ptr += 8;
-			v[num_msg]->msg = (char*) vj_malloc( sizeof(char) * slen );
+			v[num_msg]->msg = (char*) vj_malloc( sizeof(char) * RUP8(slen) );
 			veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
 			v[num_msg]->len = slen;
 			
@@ -1028,18 +1028,12 @@ void vj_server_shutdown(vj_server *vje)
 	{
 		if(Link[i]->in_use) 
 			close(Link[i]->handle);
-//		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
-//		{
-//			if(Link[i]->m_queue[j]->msg )
-//				free( Link[i]->m_queue[j]->msg );
-			//if(Link[i]->m_queue[j] ) free( Link[i]->m_queue[j] );
-//		}
 		if( Link[i]->lin_queue)
 			free( Link[i]->lin_queue );
-	
-		if( Link[i]->m_queue ) free( Link[i]->m_queue );
+		if( Link[i]->m_queue )
+			free( Link[i]->m_queue );
 		if( Link[i] ) free( Link[i] );
-    	}
+   	}
 
 	if(!vje->use_mcast)	
 	{
@@ -1058,8 +1052,8 @@ void vj_server_shutdown(vj_server *vje)
 	if( vje->recv_buf )
 		free(vje->recv_buf);
 
-	free(Link);
-	if(vje) free(vje);
+	free(vje->link);
+	free(vje);
 }
 
 int	vj_server_link_used( vj_server *vje, int link_id)
