@@ -260,8 +260,9 @@ float	vj_el_get_default_framerate( int norm )
 {
 	switch( norm ) {
 		case VIDEO_MODE_PAL:
-		case VIDEO_MODE_SECAM:
 			return 25.0f;
+		case VIDEO_MODE_SECAM:
+			return 23.976f;
 		case VIDEO_MODE_NTSC:
 			return 29.97f;
 		default:

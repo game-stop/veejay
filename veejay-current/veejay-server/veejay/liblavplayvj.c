@@ -1602,7 +1602,6 @@ static int veejay_get_norm( char n )
 	if( n == 'n' )
 		return VIDEO_MODE_NTSC;
 
-	veejay_msg(VEEJAY_MSG_WARNING, "Unknown video norm! Use PAL, SECAM or NTSC");
 	return VIDEO_MODE_PAL;
 }
 
@@ -2605,7 +2604,7 @@ int vj_server_setup(veejay_t * info)
 	if(vj_osc_setup_addr_space(info->osc) == 0)
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
 
-    	if (info->osc == NULL || info->vjs[VEEJAY_PORT_CMD] == NULL || info->vjs[VEEJAY_PORT_STA] == NULL) 
+    if (info->osc == NULL || info->vjs[VEEJAY_PORT_CMD] == NULL || info->vjs[VEEJAY_PORT_STA] == NULL) 
 	{
 		veejay_msg(0, "Unable to setup basic network I/O. Abort");
 		return 0;
@@ -3572,22 +3571,22 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 static void configure_dummy_defaults(veejay_t *info, char override_norm, float fps, char **files, int n_files)
 {
 	int default_dw = 720;
-	int default_dh = (override_norm == 'p' || override_norm == '\0' ? 576 : 480);
-
+	int default_dh = (override_norm == 'n' ? 480 : 576);
+	int default_norm = (override_norm == '\0' ? VIDEO_MODE_PAL : veejay_get_norm( override_norm ) );
+	float default_fps = vj_el_get_default_framerate(default_norm);
+	
 	if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
-	       default_dw = (override_norm == 'p' ? 352 : 360 );
-	       default_dh = (override_norm == 'p' || override_norm == '\0' ? 288 : 240);
-	}
-	else {
-		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_RUN_MODE not set to CLASSIC");
+	       default_dw = (default_norm == VIDEO_MODE_PAL || default_norm == VIDEO_MODE_SECAM ? 352 : 360 );
+	       default_dh = (default_norm == VIDEO_MODE_PAL || default_norm == VIDEO_MODE_SECAM ? 288 : 240 );
 	}
 
 	int dw = default_dw;
 	int dh = default_dh;
 
-	float dfps = fps;
+	float dfps = (fps <= 0.0f ? default_fps : fps );
 	float tmp_fps = 0.0f;
 	long tmp_arate = 0;
+
 	if( n_files > 0  ) {
 		int in_w = 0, in_h = 0;
 
@@ -3597,13 +3596,19 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 			dw = in_w;
 		if(info->video_output_height<=0)
 			dh = in_h;
-		if( dfps <= 0 ) 
+		if( tmp_fps > 0.0f && ( dfps <= 0 || dfps == default_fps) ) 
 			dfps = tmp_fps;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Video source is %dx%d pixels, %2.2f fps", in_w, in_h, tmp_fps );
+
 		if( dw == default_dw && in_w > 0 )
 			dw = in_w;
 		if( dh == default_dh && in_h > 0 )
 			dh = in_h;
+
+		default_norm = (override_norm == '\0' ? veejay_get_norm(vj_el_get_default_norm(tmp_fps)) : veejay_get_norm(override_norm));
+
+		veejay_msg(VEEJAY_MSG_DEBUG, "Video source is: %dx%d %2.2f fps norm %d",in_w,in_h,tmp_fps, default_norm);
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Dummy source is: %dx%d %2.2f fps norm %d",dw,dh,dfps, default_norm );
 	}
 	   
 	if( info->video_output_width <= 0 ) 
@@ -3618,11 +3623,7 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	
 	
 	if( override_norm != '\0' ) {
-		int selected_norm = veejay_get_norm( override_norm );
-		dfps = vj_el_get_default_framerate( selected_norm );
 		info->dummy->norm = override_norm;
-		if( fps>= 0.0f)
-			veejay_msg(VEEJAY_MSG_WARNING, "Norm setting overrides user defined framerate");
 	} else {
 		info->dummy->norm = vj_el_get_default_norm( dfps );
 	}
@@ -3635,28 +3636,28 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	if( info->dummy->fps <= 0.0f)
 		info->dummy->fps = dfps;
 	
+	info->dummy->norm = default_norm;
 	info->dummy->chroma = get_chroma_from_pixfmt( vj_to_pixfmt( info->pixel_format ) );
-
+	info->settings->output_fps = dfps;
+	
 	if( info->audio ) {
-		if( tmp_arate == 0 ) 
+
+		if( tmp_arate > 0 && info->audio == AUDIO_PLAY ) {
+			/* just warn if user customizes framerate */
+			veejay_msg(VEEJAY_MSG_WARNING, "Going to run with user specified FPS. This will affect audio playback");
+		}
+
+		if( tmp_arate == 0 && info->audio == AUDIO_PLAY ) 
 			tmp_arate = 48000;
-		if( !info->dummy->arate)
+
+		if( info->dummy->arate <= 0)
 			info->dummy->arate = tmp_arate;
+
 		if( fps > 0.0f ) {
-			veejay_msg(VEEJAY_MSG_WARNING,"Going to run without audio for user defined frames per second ...");
-			info->audio = NO_AUDIO;
+			veejay_msg(VEEJAY_MSG_WARNING,"Going to run with audio but user defined frames per second ...");
 		}
 	}
 
-	if( dfps <= 0.0 ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "No framerate set or detected,derive it from video norm" );
-		dfps = vj_el_get_default_framerate(info->dummy->norm);
-	}
-	
-	if( info->dummy->fps <= 0.0f)
-		info->dummy->fps = dfps;
-	
-	info->settings->output_fps = dfps;
 	veejay_msg(VEEJAY_MSG_DEBUG, "Video output is %dx%d pixels, %2.2f fps", info->video_output_width, info->video_output_height, dfps );
 }
 
