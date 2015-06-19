@@ -206,6 +206,7 @@ void	vj_sdl_font_free(void *font)
 {
 	vj_sdl_font_t *f = (vj_sdl_font_t*) font;
 	if( font ) {
+		TTF_CloseFont( f->font );
 		if( f->q ) {
 			int i;
 			for( i = 0; i < MAX_LINES; i ++ ) {
