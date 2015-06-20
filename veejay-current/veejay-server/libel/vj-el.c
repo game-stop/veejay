@@ -301,7 +301,10 @@ static void	_el_free_decoder( vj_decoder *d )
 
 		if(d->img)
 			free(d->img);
-	
+
+		if( d->lzo_decoder )
+			lzo_free(d->lzo_decoder);
+
 		free(d);
 	}
 	d = NULL;

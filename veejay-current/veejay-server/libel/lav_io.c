@@ -475,22 +475,17 @@ int lav_close(lav_file_t *lav_file)
 			}
 			break;
 #endif
-#ifdef USE_GDK_PIXBUF
 		case 'x':
-			if( lav_file->picture )
-			{
-				vj_picture_cleanup( lav_file->picture );
-				ret = 1;
-			}
+			vj_picture_cleanup( lav_file->picture );
+			ret = 1;
 			break;
-#endif
 #ifdef HAVE_LIBQUICKTIME
-      		case 'q':
+      	case 'q':
 			if( lav_file->qt_fd )
 			{
        				ret = quicktime_close( lav_file->qt_fd );
 			}
-		        break;
+		    break;
 #endif			
 		default:
 			if( lav_file->avi_fd )
@@ -500,11 +495,11 @@ int lav_close(lav_file_t *lav_file)
 			break;
 	}
 
-        if(lav_file) free(lav_file);
+    if(lav_file) free(lav_file);
     
 	lav_file = NULL;
 
-    	return ret;
+    return ret;
 }
 
 long	lav_bytes_remain( lav_file_t *lav_file )
@@ -1243,7 +1238,7 @@ int lav_filetype(lav_file_t *lav_file)
 lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 {
    int n;
-   char *video_comp = NULL;
+   char *video_comp = NULL; //FIXME
    unsigned char *frame = NULL; 
    long len;
    int jpg_height, jpg_width, ncomps, hf[3], vf[3];
