@@ -598,6 +598,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to load empty video files");
 		if(realname) free(realname);
 		lav_close(elfd);
+		if( el->ctx[n] ) avhelper_close_decoder( el->ctx[n] );
 		return -1;
 	}
 
@@ -609,6 +610,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		veejay_msg(VEEJAY_MSG_ERROR,"Input file %s is not in a valid format (%d)",filename,_fc);
 	   	if(realname) free(realname);
 		lav_close( elfd );
+		if( el->ctx[n] ) avhelper_close_decoder( el->ctx[n] );
 		return -1;
 
 	}
@@ -782,6 +784,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	    if(el->video_file_list[n]) 
 		free(el->video_file_list[n]);
 	    el->video_file_list[n] = NULL;
+		if( el->ctx[n] ) avhelper_close_decoder( el->ctx[n] );
 	    return -1;
         }
     }
@@ -798,6 +801,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		if(el->video_file_list[n]) 
 			free(el->video_file_list[n]);
 		el->video_file_list[n] = NULL;
+		if( el->ctx[n] ) avhelper_close_decoder( el->ctx[n] );
+
 		return -1;
 	}
 
@@ -815,6 +820,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			if( el->video_file_list[n]) 
 				free(el->video_file_list[n]);
 			el->video_file_list[n] = NULL;
+			if( el->ctx[n] ) avhelper_close_decoder( el->ctx[n] );
+
 			return -1;
 		}
 	}
@@ -1357,7 +1364,7 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long
 		}
 		
 	}
-
+	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Using video settings from first loaded video %s: %dx%d@%2.2f", filename,*dw,*dh,*dfps);
 }
 
