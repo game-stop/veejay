@@ -3570,7 +3570,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 }
 
 
-static void configure_dummy_defaults(veejay_t *info, char override_norm, float fps, char **files, int n_files)
+static int configure_dummy_defaults(veejay_t *info, char override_norm, float fps, char **files, int n_files)
 {
 	int default_dw = 720;
 	int default_dh = (override_norm == 'n' ? 480 : 576);
@@ -3593,6 +3593,11 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 		int in_w = 0, in_h = 0;
 
 		vj_el_scan_video_file( files[0], &in_w, &in_h, &tmp_fps, &tmp_arate );
+
+		if( in_w <= 0 || in_h <= 0 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine video properties" );
+			return 0;
+		}
 
 		if(info->video_output_width<=0)
 			dw = in_w;
@@ -3660,6 +3665,7 @@ static void configure_dummy_defaults(veejay_t *info, char override_norm, float f
 	}
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Video output is %dx%d pixels, %2.2f fps", info->video_output_width, info->video_output_height, dfps );
+	return 1;
 }
 
 int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm, int switch_jpeg)
@@ -3692,7 +3698,8 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	else
 		veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
 
-	configure_dummy_defaults(info,override_norm, ofps,files,num_files);
+	if(!configure_dummy_defaults(info,override_norm, ofps,files,num_files))
+		return 0;
 
 	vj_el_init( info->pixel_format, switch_jpeg, info->dummy->width,info->dummy->height, info->dummy->fps );
 #ifdef USE_GDK_PIXBUF
