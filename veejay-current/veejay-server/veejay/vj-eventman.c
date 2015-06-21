@@ -48,17 +48,17 @@ static	void		dump_event_stderr(vevo_port_t *event)
  	int  vims_id = 0;
 	char *param = NULL;
 	int i;
-	char key[10];
+	char key[16];
 
 	size_t len = vevo_property_element_size(event, "format", 0 );
 	if(len > 0 )
 	{
-		fmt = malloc(sizeof(char) * len);
+		fmt = vj_malloc(sizeof(char) * len);
 		vevo_property_get( event, "format", 0, &fmt );
 	}
-	name = malloc(sizeof(char) * vevo_property_element_size( event, "description", 0 ));
+
+	name = vj_malloc(sizeof(char) * vevo_property_element_size( event, "description", 0 ));
 	vevo_property_get( event, "description", 0, &name );
-	
 	vevo_property_get( event, "arguments", 0, &n_arg );
 	vevo_property_get( event, "vims_id", 0, &vims_id );
 
@@ -68,11 +68,11 @@ static	void		dump_event_stderr(vevo_port_t *event)
 	
 	for( i = 0; i < n_arg; i ++ )
 	{
-		sprintf(key, "help_%d", i );
+		snprintf(key,sizeof(key), "help_%d", i );
 		size_t len2 = vevo_property_element_size( event, key, 0 );
 		if(len2 > 0 )
 		{
-			param = malloc(sizeof(char) * len2 );
+			param = vj_malloc(sizeof(char) * len2 );
 			vevo_property_get( event, key, 0, &param );
 			veejay_msg(VEEJAY_MSG_INFO,"\t\tArgument %d is %s", i, param );
 			free(param);
@@ -81,7 +81,6 @@ static	void		dump_event_stderr(vevo_port_t *event)
 	
 	if(fmt) free(fmt);
 	free(name);
-	
 }
 
 int	vj_event_vevo_list_size(void)
@@ -112,7 +111,7 @@ char	*vj_event_vevo_help_vims( int id, int n )
 	size_t len = vevo_property_element_size( index_map_[id], key, 0  );
 	if(len > 0 )
 	{
-		help = (char*) malloc(sizeof(char) * len );
+		help = (char*) vj_malloc(sizeof(char) * len );
 		vevo_property_get( index_map_[id], key, 0, &help );
 	}
 	return help;
@@ -121,9 +120,8 @@ char	*vj_event_vevo_help_vims( int id, int n )
 char	*vj_event_vevo_list_serialize(void)
 {
 	int len = vj_event_vevo_list_size() + 5;
-	char *res = (char*) malloc(sizeof(char) * len + 100 );
+	char *res = (char*) vj_calloc(sizeof(char) * len + 100 );
 	int i;
-	memset( res, 0, len );
 	sprintf(res, "%05d", len  - 5);
 	for ( i = 0; i < MAX_INDEX ;i ++ )
 	{
@@ -133,8 +131,8 @@ char	*vj_event_vevo_list_serialize(void)
 			char *format= vj_event_vevo_get_event_format( i ); 
 			int name_len = (name == NULL ?  0: strlen( name ));
 			int fmt_len  = (format == NULL? 0: strlen( format ));
-			char tmp[13];
-			sprintf( tmp, "%04d%02d%03d%03d",
+			char tmp[16];
+			snprintf( tmp,sizeof(tmp),"%04d%02d%03d%03d",
 				i, vj_event_vevo_get_num_args(i), fmt_len, name_len );
 			veejay_strncat( res, tmp, 12 );
 			if( format != NULL )
@@ -154,15 +152,17 @@ void	vj_event_vevo_inline_fire(void *super, int vims_id, const char *format, ...
 	va_list ap;
 	va_start( ap, format );
 	void *func = NULL;
-	vevo_property_get( index_map_[vims_id], "function", 0, &func );
-	vevo_event f = (vevo_event) func;
-	f( super, format, ap );
+	if( vevo_property_get( index_map_[vims_id], "function", 0, &func ) == VEVO_NO_ERROR )
+	{
+		vevo_event f = (vevo_event) func;
+		f( super, format, ap );
+	}
 	va_end( ap );
 }
 
 void		vj_event_vevo_inline_fire_default( void *super, int vims_id, const char *format )
 {
-	char key[10];
+	char key[16];
 	int i = 0;
 	int n = 0;
 	int dval[4] = {0,0,0,0};
@@ -175,7 +175,7 @@ void		vj_event_vevo_inline_fire_default( void *super, int vims_id, const char *f
 	// dangerous, dval != atom_type, i != n defaults
 	while( i < n )
 	{
-		sprintf(key, "argument_%d", i );
+		snprintf(key,sizeof(key), "argument_%d", i );
 		vevo_property_get( index_map_[vims_id], key, 0, &dval[i] );
 		i++;
 	}
@@ -267,7 +267,7 @@ char	*vj_event_vevo_get_event_name( int id )
 	size_t len = vevo_property_element_size( index_map_[id], "description", 0  );
 	if(len > 0 )
 	{
-		descr = (char*) malloc(sizeof(char) * len );
+		descr = (char*) vj_malloc(sizeof(char) * len );
 		vevo_property_get( index_map_[id], "description", 0, &descr );
 	}
 	return descr;
@@ -280,7 +280,7 @@ char	*vj_event_vevo_get_event_format( int id )
 	size_t len = vevo_property_element_size( index_map_[id], "format", 0 );
 	if(len > 0 )
 	{
-		fmt = (char*) malloc(sizeof(char) * len );
+		fmt = (char*) vj_malloc(sizeof(char) * len );
 		vevo_property_get( index_map_[id], "format", 0, &fmt );
 	}
 	return fmt;
@@ -299,8 +299,8 @@ int	vj_event_vevo_get_default_value(int id, int p)
 	int n =0;
 	if(!index_map_[id])
 		return 0;
-	char key[15];
-	sprintf(key, "argument_%d",p);
+	char key[16];
+	snprintf(key,sizeof(key), "argument_%d",p);
 	vevo_property_get(index_map_[id], key, 0, &n );
 	return n;
 }
@@ -352,15 +352,16 @@ void		vj_event_vevo_free(void)
 {
 	unsigned int i;
 	if( index_map_ ) {
-		for( i = 0 ; i < MAX_INDEX  ; i ++ )
-		  if( index_map_[i] ) vpf( index_map_[i] ); 
-			free(index_map_);
+		for( i = 0 ; i < MAX_INDEX  ; i ++ ) {
+		  if( index_map_[i] ) vpf( index_map_[i] );
+		} 
+		free(index_map_);
 	}
 }	
 
 void		vj_init_vevo_events(void)
 {	
-	index_map_ = (vevo_port_t*) vj_calloc(sizeof(vevo_port_t*) * MAX_INDEX );
+	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * MAX_INDEX );
 
 	index_map_[VIMS_MACRO] = _new_event(
 				"%d %d",

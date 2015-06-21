@@ -187,6 +187,7 @@ void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width,
 	}
 
 #if LIBAVCODEC_BUILD > 5400
+	/* avformat_find_stream_info leaks memory */
 	err = avformat_find_stream_info( x->avformat_ctx, NULL );
 #else
 	err = av_find_stream_info( x->avformat_ctx );
@@ -280,24 +281,22 @@ further:
 	while( (av_read_frame(x->avformat_ctx, &(x->pkt)) >= 0 ) ) {
 		avcodec_decode_video( x->codec_ctx,f,&got_picture, x->pkt.data, x->pkt.size );
 
+		free_av_packet( &(x->pkt) );
 		if( got_picture ) {
 			break;
 		}
 	}
-	
+
+	av_free(f);
+
 	if(!got_picture) {
 		veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: Unable to get whole picture from %s", filename );
-		av_free(f);
-		free_av_packet(&(x->pkt)); 
 		avcodec_close( x->codec_ctx );
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x->output);
 		free(x);
 		return NULL;
 	}
-
-	free_av_packet(&(x->pkt)); 
-	av_free(f);
 
 	x->pixfmt = x->codec_ctx->pix_fmt;
 	x->codec_id = x->codec_ctx->codec_id;
@@ -314,7 +313,6 @@ further:
 				x->codec_ctx->width,x->codec_ctx->height, x->pixfmt,
 				wid,hei,dst_pixfmt);
 		av_free(f);
-		free_av_packet(&(x->pkt)); 
 		avcodec_close( x->codec_ctx );
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x->output);

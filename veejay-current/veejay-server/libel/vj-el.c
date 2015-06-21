@@ -1120,8 +1120,6 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 		return -1;
 	} 
 
-	el->decoders[n] = (void*) d;
-
 	res = lav_read_frame( lav, d->tmp_buffer);
 
 	if( res <= 0 )
@@ -1130,7 +1128,8 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 		_el_free_decoder( d );
 		return -1;
 	}
-	
+
+
 	int got_picture = 0;
 	int ret = -1;
 	switch( decoder_id )
@@ -1169,10 +1168,14 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 
 			break;
 		default:
+			_el_free_decoder( d );
+			return -1;
 			break;	
-
 	}
 
+	el->decoders[n] = (void*) d;
+
+	
 	return ret;  
 }
 
