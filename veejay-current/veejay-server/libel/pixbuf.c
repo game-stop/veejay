@@ -74,6 +74,7 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 #ifdef USE_GDK_PIXBUF
 	GdkPixbuf *image =
 		gdk_pixbuf_new_from_file( filename, NULL );
+
 	if(!image)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load image '%s'", filename);
@@ -111,7 +112,7 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	if(pic->scaler == NULL) {
 		sws_template tmpl;
 		tmpl.flags = 1;
-		pic->scaler = yuv_init_cached_swscaler( pic->scaler, src,dst, &tmpl, yuv_sws_get_cpu_flags());
+		pic->scaler = yuv_init_swscaler( src,dst, &tmpl, yuv_sws_get_cpu_flags());
 	}
 
 	yuv_convert_any3( pic->scaler, src, src->stride, dst, src->format, dst->format );
@@ -140,7 +141,7 @@ void	vj_picture_cleanup( void *pic )
 		if(picture->space)
 			free(picture->space);
 		if(picture->scaler)
-			free(picture->scaler);
+			yuv_free_swscaler(picture->scaler);
 
 		if( picture )
 			free(picture);		
