@@ -155,9 +155,7 @@ static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *g
 	veejay_memset( &pkt, 0, sizeof(AVPacket));
 	pkt.data = data;
 	pkt.size = pktsize;
-	int ret = avcodec_decode_video2( avctx, picture, got_picture, &pkt );
-	free_av_packet(&pkt); 
-	return ret;
+	return avcodec_decode_video2( avctx, picture, got_picture, &pkt );
 }
 #endif
 static void avhelper_close_input_file( AVFormatContext *s ) {
