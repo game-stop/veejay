@@ -1906,18 +1906,24 @@ int AVI_close(avi_t *AVI)
    close(AVI->fdes);
    if(AVI->idx) free(AVI->idx);
    if(AVI->video_index) free(AVI->video_index);
-   if(AVI->video_superindex && AVI->video_superindex->stdindex) {
-       for (j = 0; j < NR_IXNN_CHUNKS; j++) {
-	   if (AVI->video_superindex->stdindex[j]) {
-	       if (AVI->video_superindex->stdindex[j]->aIndex) {
-		   free(AVI->video_superindex->stdindex[j]->aIndex);
-	       }
-	       free(AVI->video_superindex->stdindex[j]);
+   if(AVI->video_superindex) {
+ 
+	   if( AVI->video_superindex->stdindex ) {
+		  for (j = 0; j < NR_IXNN_CHUNKS; j++) {
+			    if (AVI->video_superindex->stdindex[j]) {
+			        if (AVI->video_superindex->stdindex[j]->aIndex) {
+					   free(AVI->video_superindex->stdindex[j]->aIndex);
+					}
+					free(AVI->video_superindex->stdindex[j]);
+				}
+			}
+	   
+			free(AVI->video_superindex->stdindex);
 	   }
-       }
-       if(AVI->video_superindex->stdindex) free(AVI->video_superindex->stdindex);
-       if(AVI->video_superindex->aIndex) free(AVI->video_superindex->aIndex);
-       free(AVI->video_superindex);
+
+	   if(AVI->video_superindex->aIndex) free(AVI->video_superindex->aIndex);
+	   
+	   free(AVI->video_superindex);
    }
 
    for (j=0; j<AVI->anum; j++) 
