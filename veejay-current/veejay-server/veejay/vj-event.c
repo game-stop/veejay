@@ -1715,8 +1715,6 @@ void vj_event_update_remote(void *ptr)
 				vj_event_parse_msg(v,macro_msg, strlen(macro_msg));
 		}
 	}
-
-	return;
 }
 
 void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)

@@ -278,15 +278,20 @@ further:
 	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
 
 	int got_picture = 0;
-	while( (av_read_frame(x->avformat_ctx, &(x->pkt)) >= 0 ) ) {
-		avcodec_decode_video( x->codec_ctx,f,&got_picture, x->pkt.data, x->pkt.size );
-
-		free_av_packet( &(x->pkt) );
-		if( got_picture ) {
+	while(1) {
+	    int ret = av_read_frame(x->avformat_ctx, &(x->pkt));
+		if( ret < 0 )
 			break;
-		}
-	}
 
+		if ( x->pkt.stream_index == vi ) {
+			avcodec_decode_video( x->codec_ctx,f,&got_picture, x->pkt.data, x->pkt.size );
+		}
+				
+		av_free_packet( &(x->pkt) );	
+
+		if( got_picture )
+			break;
+	}
 	av_free(f);
 
 	if(!got_picture) {

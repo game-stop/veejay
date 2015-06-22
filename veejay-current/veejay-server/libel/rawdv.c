@@ -288,7 +288,7 @@ int	rawdv_compressor(dv_t *dv)
 
 char 	*rawdv_video_compressor(dv_t *dv)
 {
-	char *res = "dvsd\0";
+	char res[5] = "dvsd\0";
 	return res;
 }
 

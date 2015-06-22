@@ -1026,8 +1026,10 @@ void vj_server_shutdown(vj_server *vje)
     
 	for(i=0; i < k; i++)
 	{
-		if(Link[i]->in_use) 
+		if( Link[i]->in_use) 
 			close(Link[i]->handle);
+		if( Link[i]->pool)
+			vj_simple_pool_free( Link[i]->pool );
 		if( Link[i]->lin_queue)
 			free( Link[i]->lin_queue );
 		if( Link[i]->m_queue )

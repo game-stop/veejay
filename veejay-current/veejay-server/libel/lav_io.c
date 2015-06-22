@@ -1238,7 +1238,8 @@ int lav_filetype(lav_file_t *lav_file)
 lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 {
    int n;
-   char *video_comp = NULL; //FIXME
+   static char pict[5] = "PICT\0";
+   char *video_comp = NULL;
    unsigned char *frame = NULL; 
    long len;
    int jpg_height, jpg_width, ncomps, hf[3], vf[3];
@@ -1432,7 +1433,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 				lav_fd->format = 'x';
 				lav_fd->has_audio = 0;
 				lav_fd->bogus_len = (int) output_fps;
-				video_comp = strdup( "PICT" );
+				video_comp = pict;
 				ret = 1;
 				alt = 1;
 				veejay_msg(VEEJAY_MSG_DEBUG,"\tLoaded image file");
@@ -1666,7 +1667,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		if ( lav_set_video_position(lav_fd,0) ) goto ERREXIT;
 		if( scan_jpeg(frame, len, 1) ) { ierr=ERROR_JPEG; goto ERREXIT; }
 
-		/* We have to look to the JPEG SOF marker for further information
+		// We have to look to the JPEG SOF marker for further information
     	  The SOF marker has the following format:
 
 		FF
