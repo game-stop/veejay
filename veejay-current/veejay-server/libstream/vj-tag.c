@@ -135,7 +135,8 @@ void	vj_tag_free(void)
 	if( vj_tag_input)
 		free(vj_tag_input);
 
-	hash_destroy( TagHash );
+	if( TagHash )
+		hash_destroy( TagHash );
 }
 
 
@@ -1343,7 +1344,8 @@ void vj_tag_close_all() {
 	}
    }
 	
-   hash_free_nodes( TagHash );
+   if( TagHash )
+	   hash_free_nodes( TagHash );
 }
 
 int	vj_tag_get_n_frames(int t1)
