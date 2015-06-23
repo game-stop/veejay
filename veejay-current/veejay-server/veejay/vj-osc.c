@@ -842,7 +842,6 @@ int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 		next_addr ++;
 	}
 
-	veejay_msg(0, "OSC: %d", next_addr );
 	o->n_addr = next_addr;
 
 	return 1;
