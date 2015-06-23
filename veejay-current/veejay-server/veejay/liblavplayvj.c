@@ -441,6 +441,7 @@ int veejay_free(veejay_t * info)
 	
 	free(settings);
     free(info);
+
     return 1;
 }
 
@@ -1891,7 +1892,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	if( my_ip != NULL ) {
 		char outfile[1024];
 		char connectionStr[1024];
-		snprintf( connectionStr, sizeof(connectionStr),"%s:%d",my_ip, info->uc->port );
+		if( info->qrcode == 1 ) {
+			snprintf( connectionStr, sizeof(connectionStr),"%s:%d",my_ip, info->uc->port );
+		} else {
+			snprintf( connectionStr, sizeof(connectionStr),"%s", my_ip);
+		}
 		snprintf( outfile, sizeof(outfile), "%s/QR-%d.png",info->homedir, info->uc->port );
 		if(info->qrcode ==1 )
 			free(my_ip);
