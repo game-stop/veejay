@@ -106,6 +106,12 @@ int register_conversion(ImageFormat srcfmt, ImageFormat destfmt,
     return 1;
 }
 
+void	ac_destroy()
+{
+	if( n_conversions > 0 )
+		free(conversions);
+}
+
 /*************************************************************************/
 
 /*

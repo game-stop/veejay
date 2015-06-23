@@ -80,6 +80,8 @@ extern void ac_rescale(const uint8_t *src1, const uint8_t *src2,
                        uint8_t *dest, int bytes,
                        uint32_t weight1, uint32_t weight2);
 
+extern void ac_destroy();
+
 /* Image format manipulation is available in aclib/imgconvert.h */
 
 /*************************************************************************/

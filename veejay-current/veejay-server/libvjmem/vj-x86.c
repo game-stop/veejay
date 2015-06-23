@@ -154,6 +154,11 @@ void vj_mem_init(void)
 	task_init();
 }
 
+void	vj_mem_destroy()
+{
+	ac_destroy();
+}
+
 int	vj_mem_threaded_init(int w, int h)
 {
 	int n_cpus = task_num_cpus();
