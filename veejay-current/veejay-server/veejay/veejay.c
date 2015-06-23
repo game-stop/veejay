@@ -261,7 +261,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 			"\t\t\t\t6 = Y4M Stream 4:2:2 (requires -o <filename>)\n");
 	fprintf(stderr,
-			"  -o/--output-file [file]\tWrite to file (for use with Y4M Stream)\n");
+			"  -o/--output-file [file]\tWrite to file (for use with -O/--output)\n");
 #ifdef HAVE_SDL
     fprintf(stderr,
 	    "  -s/--size NxN\t\t\tDisplay dimension for video window, use Width x Height\n");
