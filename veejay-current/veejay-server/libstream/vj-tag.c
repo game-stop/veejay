@@ -135,6 +135,7 @@ void	vj_tag_free(void)
 	if( vj_tag_input)
 		free(vj_tag_input);
 
+	hash_destroy( TagHash );
 }
 
 
@@ -191,18 +192,16 @@ int vj_tag_put(vj_tag * tag)
 {
     hnode_t *tag_node;
     if (!tag)
-	return 0;
+		return 0;
     tag_node = hnode_create(tag);
     if (!tag_node)
-	return 0;
+		return 0;
 
 
     if (!vj_tag_exists(tag->id)) {
-	hash_insert(TagHash, tag_node, (void *) tag->id);
+		hash_insert(TagHash, tag_node, (void *) tag->id);
     } else {
-	hnode_put(tag_node, (void *) tag->id);
-	hnode_destroy(tag_node);
-
+		hnode_put(tag_node, (void *) tag->id);
     }
     return 1;
 }
@@ -1205,7 +1204,7 @@ int vj_tag_del(int id)
     tag = vj_tag_get(id);
     if(!tag)
 	return 0;
-#ifdef HAVE_TRUETYPE
+#ifdef HAVE_FREETYPE
 	vj_font_dictionary_destroy(_tag_info->font ,tag->dict);
 #endif
     
@@ -1319,6 +1318,7 @@ int vj_tag_del(int id)
 	if(tag_node)
 	{
 	    hash_delete(TagHash, tag_node);
+		hnode_destroy(tag_node);
 	}
     
 	free(tag);
@@ -1332,7 +1332,7 @@ int vj_tag_del(int id)
 }
 
 void vj_tag_close_all() {
-   int n=vj_tag_size()-1;
+   int n=vj_tag_size();
    int i;
    vj_tag *tag;
 
@@ -1342,7 +1342,8 @@ void vj_tag_close_all() {
     	if(vj_tag_del(i)) veejay_msg(VEEJAY_MSG_DEBUG, "Deleted stream %d", i);
 	}
    }
-  
+	
+   hash_free_nodes( TagHash );
 }
 
 int	vj_tag_get_n_frames(int t1)

@@ -254,6 +254,8 @@ void	sample_free(void *edl)
 		return;
 	
 	sample_del_all(edl);
+
+	hash_destroy( SampleHash );
 }
 
 int sample_set_state(int new_state)
