@@ -50,6 +50,7 @@ typedef struct
 	int	  real_h;
 	int	  fmt;
 	void	*scaler;
+	uint8_t *pixels;
 } vj_pixbuf_t;
 
 
@@ -75,6 +76,9 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	GdkPixbuf *image =
 		gdk_pixbuf_new_from_file( filename, NULL );
 
+	size_t pixbuf_size = gdk_pixbuf_get_byte_length( image );
+	int hmin = 0;
+
 	if(!image)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load image '%s'", filename);
@@ -87,13 +91,20 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	if( gdk_pixbuf_get_has_alpha( image ))
 		img_fmt = PIX_FMT_RGBA;
 
+	if( pic->pixels == NULL ) {
+		pic->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(pixbuf_size+15) );
+		}
+
+	veejay_memcpy( pic->pixels, (uint8_t*) gdk_pixbuf_get_pixels( image ), pixbuf_size );
+
 	VJFrame *dst = yuv_yuv_template( dY, dU, dV, dst_w, dst_h, dst_fmt );
 	VJFrame *src = yuv_rgb_template(
-			(uint8_t*) gdk_pixbuf_get_pixels( image ),
+				   pic->pixels,
 				   gdk_pixbuf_get_width(  image ),
 				   gdk_pixbuf_get_height( image ),
 				   img_fmt // PIX_FMT_RGB24
 			);
+
 	int stride = gdk_pixbuf_get_rowstride(image);
 
 	if( stride != src->stride[0] )
@@ -142,7 +153,8 @@ void	vj_picture_cleanup( void *pic )
 			free(picture->space);
 		if(picture->scaler)
 			yuv_free_swscaler(picture->scaler);
-
+		if(picture->pixels)
+			free(picture->pixels);
 		if( picture )
 			free(picture);		
 	}
