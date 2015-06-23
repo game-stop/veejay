@@ -110,13 +110,6 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	if( stride != src->stride[0] )
 		src->stride[0] = stride;
 
-	veejay_msg(VEEJAY_MSG_DEBUG,"Image '%s': %dx%d, format %x to %dx%d, format %x",
-			filename,src->width,src->height,img_fmt,dst->width,dst->height,dst->format );
-	if( !(dst->width%2) || !(dst->height%2) ) {
-		veejay_msg(VEEJAY_MSG_WARNING,"Image output dimensions not a multiple of 2, result may be corrupt");
-		veejay_msg(VEEJAY_MSG_WARNING,"You should set -w and -h to a multiple of 2,4,8 or 16" );
-	}
-
 	veejay_msg(VEEJAY_MSG_DEBUG,"Image is %dx%d (src=%d, stride=%d, dstfmt=%d), scaling to %dx%d",
 				src->width,src->height,img_fmt, stride,dst_fmt,dst->width,dst->height );
 
