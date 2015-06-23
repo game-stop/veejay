@@ -717,10 +717,11 @@ int main(int argc, char **argv)
 {
 	video_playback_setup *settings;
 	 
-    	sigset_t allsignals;
-    	struct sigaction action;
+   	sigset_t allsignals;
+   	struct sigaction action;
 	struct timespec req;
 	int i;
+	int main_ret = 0;
 	fflush(stdout);
 
 	vj_mem_init();
@@ -759,15 +760,14 @@ int main(int argc, char **argv)
 			fprintf(stdout, "\n\n\tExample for bash:\n\t\t\t$ export VEEJAY_AUTO_SCALE_PIXEL=1\n");
 
 
-		veejay_free(info);
-		return 0;
+		goto VEEJAY_MAIN_EXIT;
 	}
 
 	veejay_check_homedir( info );
 
 	sigsegfault_handler();
 
-    	sigemptyset(&(settings->signal_set));
+   	sigemptyset(&(settings->signal_set));
 	sigaddset(&(settings->signal_set), SIGINT);
 	sigaddset(&(settings->signal_set), SIGPIPE);
 	sigaddset(&(settings->signal_set), SIGILL);
@@ -816,7 +816,8 @@ int main(int argc, char **argv)
 	    ta	)< 0)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
-		return 0;
+		main_ret = 1;
+		goto VEEJAY_MAIN_EXIT;
 	}
 
 	if(auto_loop)
@@ -828,8 +829,8 @@ int main(int argc, char **argv)
     	if(!veejay_main(info))
 	{
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
-		veejay_free(info);
-		return 1;
+		main_ret = 1;
+		goto VEEJAY_MAIN_EXIT;
 	}
 
 	
@@ -850,11 +851,14 @@ int main(int argc, char **argv)
 			break;
 	}
 
+	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
+
+
+VEEJAY_MAIN_EXIT:
 	veejay_busy(info);			
 	veejay_free(info);
 	veejay_destroy_msg_ring();
+	vj_mem_destroy();
 
-	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
-
-	return 0;
+	return main_ret;
 }
