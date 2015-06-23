@@ -1722,7 +1722,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			veejay_msg(VEEJAY_MSG_WARNING, "Not timing audio/video");
 		break;
     		default:
-			veejay_msg(VEEJAY_MSG_DEBUG, "Using clock_nanosleep timer");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using high-resolution clock to time audio/video");
 		break;
     	}    
 

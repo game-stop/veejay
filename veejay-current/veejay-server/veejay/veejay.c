@@ -211,7 +211,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 			"  -Y/--yuv [01]\t\t\tForce YCbCr (defaults to YUV)\n");
 	fprintf(stderr,
-	    	"  -t/--timer <num>\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
+	    	"  -t/--timer <num>\t\tSpecify timer to use (0=none, 1=default timer) (default=1) \n");
     fprintf(stderr,
 	    	"  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in edit lists\n");
 	fprintf(stderr,
@@ -352,8 +352,8 @@ static int set_option(const char *name, char *value)
 		info->qrcode = 1;
     } else if (strcmp(name, "timer") == 0 || strcmp(name, "t") == 0) {
 	info->uc->use_timer = atoi(optarg);
-	if (info->uc->use_timer < 0 || info->uc->use_timer > 2) {
-	    printf("Valid timers:\n\t0=none\n\t2=normal\n\t1=rtc\n");
+	if (info->uc->use_timer < 0 || info->uc->use_timer > 1) {
+	    fprintf(stderr, "Valid timers:\n\t0=none\n\t1=default timer\n");
 	    nerr++;
 	}
 	} else if (strcmp(name, "multicast-vims") == 0 || strcmp(name,"T")==0)
