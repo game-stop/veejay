@@ -160,8 +160,7 @@ Boolean OSCInitReceive(struct OSCReceiveMemoryTuner *t) {
     globals.lastTimeTag = OSCTT_Immediately();
     globals.timePassed = TRUE;
 
-    if (InitPackets(t->receiveBufferSize, SizeOfNetworkReturnAddress(),
-		    t->numReceiveBuffers) == FALSE) return FALSE;
+    if (InitPackets(t->receiveBufferSize, SizeOfNetworkReturnAddress(),t->numReceiveBuffers) == FALSE) return FALSE;
     if (InitQueuedData(t->numQueuedObjects) == FALSE) return FALSE;
     if (InitCallbackListNodes(t->numCallbackListNodes, t->InitTimeMemoryAllocator)
 	 == FALSE) return FALSE;
@@ -174,7 +173,8 @@ Boolean OSCInitReceive(struct OSCReceiveMemoryTuner *t) {
    Managing packet data structures
  **************************************************/
 
-static struct OSCPacketBuffer_struct *freePackets;
+static struct OSCPacketBuffer_struct *freePackets = 0;
+static struct OSCPacketBuffer_struct *safePtrFreePackets = 0;
 
 #ifdef DEBUG_PACKET_MEM
 static void PrintPacketFreeList(void) {
@@ -220,8 +220,10 @@ static Boolean InitPackets(int receiveBufferSize, int clientAddrSize, int numRec
 
 	allPackets[i].nextFree = &(allPackets[i+1]);
     }
+
     allPackets[numReceiveBuffers-1].nextFree = ((struct OSCPacketBuffer_struct *) 0);
     freePackets = allPackets;
+	safePtrFreePackets = allPackets;
 
     return TRUE;
 }
@@ -295,7 +297,7 @@ void OSCFreePacket(OSCPacketBuffer p) {
    making the messages take effect.
  **************************************************/
 
-static queuedData *freeQDList;
+static queuedData *freeQDList = NULL;
 
 #ifdef DEBUG_QD_MEM
 static void PrintQDFreeList(void) {
@@ -310,6 +312,38 @@ static void PrintQDFreeList(void) {
     printf("\n");
 }
 #endif
+
+void	OSCDestroyDataQueues(int numReceiveBuffers)
+{
+	int i;
+	if( freeQDList ) {
+		free(freeQDList );
+		freeQDList = 0;
+	}
+
+	
+
+	for (i = 0; i < numReceiveBuffers; ++i) {
+		
+		if( safePtrFreePackets[i].returnAddr ) 
+			free( safePtrFreePackets[i].returnAddr );
+
+		if( safePtrFreePackets[i].buf )
+		   free( safePtrFreePackets[i].buf );
+	}
+
+
+	if( safePtrFreePackets ) {
+		free( safePtrFreePackets );
+		safePtrFreePackets = 0;
+	}
+
+	if( globals.TheQueue ) {
+		free( globals.TheQueue );
+		globals.TheQueue = 0;
+	}
+
+}
 
 static Boolean InitQueuedData(int numQueuedObjects) {
     int i;

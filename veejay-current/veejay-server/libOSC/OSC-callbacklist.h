@@ -46,4 +46,5 @@ callbackList AllocCallbackListNode(methodCallback callback, void *context,
 
 void FreeCallbackListNode(callbackList);
 
+void	OSCDestroyCallbackListNodes();
 

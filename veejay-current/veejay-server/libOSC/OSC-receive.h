@@ -210,6 +210,8 @@ void	GoMultiCast(const char *groupname);
 
 int		IsMultiCast( char *dst);
 
+void	OSCDestroyDataQueues(int nReceiveBuffers);
+
 /**************************************************
    How to use this stuff
  **************************************************/

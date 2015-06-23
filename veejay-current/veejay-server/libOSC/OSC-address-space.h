@@ -361,4 +361,5 @@ main() {
 }
 
 */
-		 
+void OSCDestroyAddressSpace();
+

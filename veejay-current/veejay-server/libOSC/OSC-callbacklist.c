@@ -38,15 +38,15 @@ The OpenSound Control WWW page is
 */
 
 
-
+#include <stdlib.h>
 #include <libOSC/OSC-common.h>
 #include <libOSC/OSC-timetag.h>
 #include <libOSC/OSC-address-space.h>
 #include <libOSC/OSC-dispatch.h>
 #include <libOSC/OSC-callbacklist.h>
 
-static callbackList allNodes;
-static callbackList freeNodes;
+static callbackList allNodes = NULL;
+static callbackList freeNodes = NULL;
 
 /* Call this before you call anything else */
 Boolean InitCallbackListNodes(int numNodes, void *(*InitTimeMalloc)(int numBytes)) {
@@ -85,6 +85,11 @@ callbackList AllocCallbackListNode(methodCallback callback, void *context,
     return result;
 }
     
+void	OSCDestroyCallbackListNodes()
+{
+	if( allNodes )
+		free( allNodes );
+}
 
 void FreeCallbackListNode(callbackList cb) {
 #ifdef DEBUG_CBL

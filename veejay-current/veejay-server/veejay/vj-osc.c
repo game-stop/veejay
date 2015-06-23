@@ -61,11 +61,19 @@ static vevo_port_t **osc_clients = NULL;
 #include <libvevo/vevo.h>
 #include <libvevo/libvevo.h>
 
+#define NUM_RECEIVE_BUFFERS 100
+
 typedef struct osc_arg_t {
     int a;
     int b;
     int c;
 } osc_arg;
+
+typedef struct osc_tokens_t {
+	char **addr;
+	int	 n_addr;
+	char *descr; /* keep track of all pointers */
+} osc_tokens;
 
 typedef struct vj_osc_t {
   struct OSCAddressSpaceMemoryTuner t;
@@ -82,6 +90,8 @@ typedef struct vj_osc_t {
   osc_arg *osc_args;
   void	*index;
   void	*clients;
+  osc_tokens **addr;
+  int	 n_addr;
 } vj_osc;
 
 
@@ -94,6 +104,7 @@ extern char *vj_event_vevo_get_event_name( int id );
 #define OPUSH(p) { _old_p_mode = osc_info->uc->playback_mode; osc_info->uc->playback_mode = p; } 
 #define OPOP()  { osc_info->uc->playback_mode = _old_p_mode; } 
 
+static	void		free_token( char **arr );
 
 void vj_osc_set_veejay_t(veejay_t *t);
 
@@ -213,11 +224,33 @@ void vj_osc_free(void *d)
 {
 	if(!d) return;
 	vj_osc *c = (vj_osc*) d;
-	void *addr = OSCPacketBufferGetClientAddr(c->packet );
-	if(addr)
-		free(addr);
-	//if(c->osc_args) free(c->osc_args);
-	if(c->leaves) free(c->leaves);
+
+//	void *addr = OSCPacketBufferGetClientAddr(c->packet );
+//	if(addr)
+//		free(addr);
+	
+	OSCDestroyCallbackListNodes();
+	OSCDestroyDataQueues(NUM_RECEIVE_BUFFERS);
+	OSCDestroyAddressSpace();
+
+	int i;
+	for ( i = 0; i < c->n_addr; i ++ ) {
+			osc_tokens *ot = c->addr[i];
+			if(ot == NULL)
+				continue;
+			if( ot->addr ) {
+				free_token( ot->addr );
+			}
+			if( ot->descr ) {
+				free(ot->descr);
+			}
+			free(ot);
+	}
+	free(c->addr);
+	
+
+	if(c->leaves) 
+		free(c->leaves);
 	if(c->index) 
 		vevo_port_recursive_free( c->index );
 	if(c) free(c);
@@ -672,12 +705,13 @@ static	void		free_token( char **arr ) {
 	int i = 0;
 	for( i = 0; arr[i] != NULL ; i ++ ) {
 		free(arr[i]);
-		arr[i] = NULL;
 	}
 	free(arr);
 	arr = NULL;
 }
 
+
+#define MAX_ADDR 1024
 
 int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 { 
@@ -689,9 +723,17 @@ int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 	int err = 0;
 	int t = 0;
 
-	for( i = 0; osc_method_layout[i].name != NULL ; i ++ ) {
+	int len = 1;
+	while ( osc_method_layout[len].name != NULL )
+		len ++;
+		
+	o->addr = (osc_tokens**) vj_calloc (sizeof(osc_tokens*) * MAX_ADDR );
+	o->n_addr = 0;
+
+	int next_addr = 0;
+
+	for( i = 0; osc_method_layout[i].name != NULL && next_addr < MAX_ADDR; i ++ ) {
 		int ntokens = 0;
-		//FIXME: arr never freed but should be, leaking memory here
 		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
 		if( arr == NULL || ntokens == 0 ) {
 			continue;
@@ -703,20 +745,30 @@ int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 			continue;
 		}
 		o->leaves[next_id] = OSCNewContainer( arr[0], o->container, &(o->cqinfo) );
+	
+		o->addr[next_addr] = vj_calloc(sizeof(osc_tokens));
+		o->addr[next_addr]->n_addr = ntokens;
+		o->addr[next_addr]->addr = arr;
+		
 		err = vevo_property_set(o->index, arr[0], VEVO_ATOM_TYPE_INT , 1, &next_id);
 		next_id ++;
+		next_addr ++;
 	}
 
-	for( i = 0; osc_method_layout[i].name != NULL ; i ++ ) {
+	for( i = 0; osc_method_layout[i].name != NULL && next_addr < MAX_ADDR ; i ++ ) {
 		int ntokens = 0;
 		int exists = 0;
 		int attach_id = 0;
-		//FIXME: arr never freed but should be, leaking memory here
 		char **arr = string_tokenize( '/', osc_method_layout[i].name, &ntokens);
 		if( arr == NULL || ntokens == 0 ) {
 			continue;
 		}
 		int containers = ntokens - 1;
+
+		o->addr[next_addr] = vj_calloc(sizeof(osc_tokens));
+		o->addr[next_addr]->n_addr = ntokens;
+		o->addr[next_addr]->addr = arr;
+		
 
 		for( t = 1; t < containers; t ++ ) {
 			int is_method = (t == (containers-1)) ? 1: 0;
@@ -739,10 +791,13 @@ int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 
 			//veejay_msg(0, "Added leave '%s'%d to container '%s'%d", arr[t],next_id-1,arr[t-1],attach_id);
 		}
-	}	
+
+		next_addr ++;
+
+		}	
 
 
-	for( i = 0; osc_method_layout[i].name != NULL ; i ++ ) {
+	for( i = 0; osc_method_layout[i].name != NULL && next_id < MAX_ADDR; i ++ ) {
 		int ntokens = 0;
 		/*
 		 * arr is never freed; the OSCNewMethod copies the pointer to elements in arr
@@ -755,9 +810,13 @@ int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 			free_token(arr);
 			continue;
 		}
-
+		
 		int method = containers - 1;
 		
+		o->addr[next_addr] = vj_calloc(sizeof(osc_tokens));
+		o->addr[next_addr]->n_addr = ntokens;
+		o->addr[next_addr]->addr = arr;
+
 		err = vevo_property_get( o->index, arr[method-1], 0, &leave_id );
 #ifdef HAVE_LIBLO
 		if( osc_method_layout[i].vims_id == -2 ) {
@@ -777,7 +836,14 @@ int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 		OSCNewMethod( arr[ method ], o->leaves[  leave_id ], osc_vims_method, &(osc_method_layout[i].vims_id),&(o->ris));
 
 #endif
+
+		o->addr[next_addr]->descr = o->ris.description;
+
+		next_addr ++;
 	}
+
+	veejay_msg(0, "OSC: %d", next_addr );
+	o->n_addr = next_addr;
 
 	return 1;
 }
@@ -798,7 +864,7 @@ void* vj_osc_allocate(int port_id) {
 	o->rt.InitTimeMemoryAllocator = _vj_osc_time_malloc;
 	o->rt.RealTimeMemoryAllocator = _vj_osc_rt_malloc;
 	o->rt.receiveBufferSize = 1024;
-	o->rt.numReceiveBuffers = 100;
+	o->rt.numReceiveBuffers = NUM_RECEIVE_BUFFERS;
 	o->rt.numQueuedObjects = 100;
 	o->rt.numCallbackListNodes = 300;
 	o->leaves = (OSCcontainer*) vj_malloc(sizeof(OSCcontainer) * 300);
@@ -863,11 +929,11 @@ void vj_osc_dump()
  
 /* dump the OSC address space to screen */
 int vj_osc_setup_addr_space(void *d) {
-	char addr[100];
+	char addr[255];
 	vj_osc *o = (vj_osc*) d;
 	//struct OSCMethodQueryResponseInfoStruct qri;
 
-	if(OSCGetAddressString( addr, 100, o->container ) == FALSE) {
+	if(OSCGetAddressString( addr, 255, o->container ) == FALSE) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get address space of OSC");
 		return -1;
 	}

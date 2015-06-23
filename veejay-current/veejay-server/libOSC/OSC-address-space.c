@@ -32,6 +32,7 @@ The OpenSound Control WWW page is
   Matt Wright, 3/16/98
 */
 #include <config.h>
+#include <stdlib.h>
 #include <libOSC/OSC-common.h>
 #include <libOSC/OSC-timetag.h>
 #include <libOSC/OSC-address-space.h>
@@ -66,9 +67,11 @@ struct OSCMethodStruct {
 
 /* Globals */
 static Boolean Initialized = FALSE;
-static OSCcontainer OSCTopLevelContainer;
-static OSCcontainer freeContainers;   /* Linked list via next field. */
-static OSCMethod freeMethods;         /* Linked list via next field. */
+static OSCcontainer OSCTopLevelContainer = 0;
+static OSCcontainer freeContainers = 0;   /* Linked list via next field. */
+static OSCcontainer safePtrFreeContainers = 0; 
+static OSCMethod freeMethods = 0;         /* Linked list via next field. */
+static OSCMethod safePtrFreeMethods = 0;
 static void *(*RealTimeMemoryAllocator)(int numBytes);
 
 
@@ -105,6 +108,18 @@ static void MakeFreeMethodsList(int n) {
     freeMethods[n-1].next = 0;
 }
 
+void	OSCDestroyAddressSpace()
+{
+	if( safePtrFreeContainers != 0) { 
+		free( safePtrFreeContainers );
+		safePtrFreeContainers = 0;
+	}
+	if( safePtrFreeMethods != 0 ) {
+		free( safePtrFreeMethods );
+		safePtrFreeMethods = 0;
+	}
+}
+
 OSCcontainer OSCInitAddressSpace(struct OSCAddressSpaceMemoryTuner *t) {
     int bytesNeeded;
 
@@ -116,8 +131,10 @@ OSCcontainer OSCInitAddressSpace(struct OSCAddressSpaceMemoryTuner *t) {
 
     bytesNeeded = (1 + t->initNumContainers) * sizeof(*freeContainers);
     freeContainers = (OSCcontainer) (*(t->InitTimeMemoryAllocator))(bytesNeeded);
-    if (freeContainers == 0) {
-	fatal_error("OSCInitAddressSpace: couldn't allocate %d bytes for %d containers",
+	safePtrFreeContainers = freeContainers;
+
+	if (freeContainers == 0) {
+		fatal_error("OSCInitAddressSpace: couldn't allocate %d bytes for %d containers",
 		    bytesNeeded, t->initNumContainers);
     }
 
@@ -130,6 +147,9 @@ OSCcontainer OSCInitAddressSpace(struct OSCAddressSpaceMemoryTuner *t) {
         fatal_error("OSCInitAddressSpace: couldn't allocate %d bytes for %d methods",
 		    bytesNeeded, t->initNumMethods);
     }
+
+	safePtrFreeMethods = freeMethods;
+
     MakeFreeMethodsList(t->initNumMethods);
 
     /* Initialize the top-level container */
@@ -179,8 +199,8 @@ static OSCMethod AllocMethod(void) {
 
     if (freeMethods != 0) {
         result = freeMethods;
-	freeMethods = freeMethods->next;
-	return result;
+		freeMethods = freeMethods->next;
+		return result;
     }
 
     OSCWarning("Out of memory for methods; trying to allocate more in real time");
