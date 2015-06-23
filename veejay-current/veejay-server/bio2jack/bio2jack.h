@@ -106,6 +106,7 @@ int  JACK_SetAllVolume(int deviceID, unsigned int volume); /* returns 0 on succe
 int  JACK_SetVolumeForChannel(int deviceID, unsigned int channel, unsigned int volume);
 void JACK_GetVolumeForChannel(int deviceID, unsigned int channel, unsigned int *volume);
 
+void JACK_FreeClientName();
 
 unsigned long JACK_GetOutputBytesPerSecond(int deviceID); /* bytes_per_output_frame * sample_rate */
 unsigned long JACK_GetInputBytesPerSecond(int deviceID);  /* bytes_per_input_frame * sample_rate */

@@ -2486,6 +2486,16 @@ JACK_SetClientName(char *name)
   }
 }
 
+void
+JACK_FreeClientName()
+{
+	if( client_name ) {
+		free(client_name);
+		client_name = NULL;
+	}
+}
+
+
 long JACK_OutputStatus(int deviceID,long *sec, long *usec)
 {
   	jack_driver_t *this = &outDev[deviceID];
