@@ -38,12 +38,11 @@ static int _vj_jack_start(int *dri)
 	int err = JACK_Open(dri, bits_per_sample,&audio_rate,audio_channels);
 	if(err == ERR_RATE_MISMATCH)
 	{
-		veejay_msg(1,
-			"(Jackd) Sample rate mismatch (Retrying)");
+		veejay_msg(1, "(Jackd) Sample rate mismatch (Retrying)");
 
-		err = JACK_Open(dri, bits_per_sample,&audio_rate,
-			audio_channels);
+		JACK_Close( *dri );
 
+		err = JACK_Open(dri, bits_per_sample,&audio_rate, audio_channels);
 	}
 
 	if(err != ERR_SUCCESS)
@@ -64,7 +63,8 @@ static int _vj_jack_start(int *dri)
 			   veejay_msg(0, "Unable to find jack port");
 			   break;
 		}
-	
+		
+		JACK_Close( *dri );
 //		veejay_msg(0, "To run veejay without audio, use -a0");
 		return 0;
 	}
