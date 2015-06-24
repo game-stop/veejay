@@ -628,33 +628,34 @@ static atom_t *vevo_new_atom(__vevo_port_t * port, int atom_type,
  */
 static void vevo_free_atom(__vevo_port_t *port,atom_t * atom)
 {
-    if (atom) {
-	if(atom->value)
-		switch( atom->type )
-		{
-			case VEVO_ATOM_TYPE_VOIDPTR:
-			case VEVO_ATOM_TYPE_PORTPTR:
-				vevo_pool_free_ptr( port->pool, atom->value );
-				break;
-			case VEVO_ATOM_TYPE_INT:
-			case VEVO_ATOM_TYPE_BOOL:
-				vevo_pool_free_int( port->pool, atom->value );
-				break;
-			case VEVO_ATOM_TYPE_DOUBLE:
-				vevo_pool_free_dbl( port->pool,atom->value );
-				break;
-			case VEVO_ATOM_TYPE_UINT64:
-				vevo_pool_free_64b( port->pool,atom->value );
-				break;
-			case VEVO_ATOM_TYPE_STRING:
-			case VEVO_ATOM_TYPE_UTF8STRING:
-				free( atom->value );
-				break;
+	if (atom) {
+		if(atom->value) {
+			switch( atom->type )
+			{
+				case VEVO_ATOM_TYPE_VOIDPTR:
+				case VEVO_ATOM_TYPE_PORTPTR:
+					vevo_pool_free_ptr( port->pool, atom->value );
+					break;
+				case VEVO_ATOM_TYPE_INT:
+				case VEVO_ATOM_TYPE_BOOL:
+					vevo_pool_free_int( port->pool, atom->value );
+					break;
+				case VEVO_ATOM_TYPE_DOUBLE:
+					vevo_pool_free_dbl( port->pool,atom->value );
+					break;
+				case VEVO_ATOM_TYPE_UINT64:
+					vevo_pool_free_64b( port->pool,atom->value );
+					break;
+				case VEVO_ATOM_TYPE_STRING:
+				case VEVO_ATOM_TYPE_UTF8STRING:
+					free( atom->value );
+					break;
+			}
+			atom->value = NULL;
 		}
-		atom->value = NULL;
 		vevo_pool_free_atom( port->pool, atom );
-    }
-    atom = NULL;
+		atom = NULL;
+	}
 }
 
 //! Copy a value from address into a new Atom
@@ -979,9 +980,9 @@ vevo_port_t *vevo_port_new(int port_type)
     port->pool =  vevo_pool_init( sizeof(vevo_property_t),sizeof( vevo_storage_t ), sizeof( atom_t ) , sizeof( port_index_t ) );
 /* If the port type is a Livido port this or that */
     if ( (port_type >= 1 && port_type <= 50) || port_type < 0)
-	port->list = NULL;
+		port->list = NULL;
     else
-	port->table = hash_create(HASHCOUNT_T_MAX, key_compare, int_hash);
+		port->table = hash_create(HASHCOUNT_T_MAX, key_compare, int_hash);
 
     return (vevo_port_t *) port;
 }
