@@ -285,6 +285,7 @@ further:
 
 		if ( x->pkt.stream_index == vi ) {
 			avcodec_decode_video( x->codec_ctx,f,&got_picture, x->pkt.data, x->pkt.size );
+			av_frame_unref( f );
 		}
 				
 		av_free_packet( &(x->pkt) );	
@@ -352,6 +353,7 @@ int	avhelper_decode_video( void *ptr, uint8_t *data, int len, uint8_t *dst[3] )
 	int result = avcodec_decode_video( e->codec_ctx, e->frame, &got_picture, data, len );
 
 	if(!got_picture || result <= 0) {
+		av_frame_unref( e->frame );
 		return 0;
 	}
 
@@ -365,6 +367,8 @@ int	avhelper_decode_video( void *ptr, uint8_t *data, int len, uint8_t *dst[3] )
 	e->output->data[2] = dst[2];
 
 	yuv_convert_any3( e->scaler, e->input, e->frame->linesize, e->output, e->input->format, e->pixfmt );
-	
+
+	av_frame_unref( e->frame );
+
 	return 1;
 }
