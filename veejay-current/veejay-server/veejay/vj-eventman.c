@@ -691,33 +691,6 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
-	index_map_[VIMS_SAMPLE_SET_MARKER_START]		=	_new_event(
-				"%d %d",
-				VIMS_SAMPLE_SET_MARKER_START,
-				"Set in point on sample",
-				vj_event_sample_set_marker_start,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
-				SAMPLE_ID_HELP,
-				0,
-				"Position",
-				0,
-				NULL );
-
-	index_map_[VIMS_SAMPLE_SET_MARKER_END]			=	_new_event(
-				"%d %d",
-				VIMS_SAMPLE_SET_MARKER_END,
-				"Set out point on sample",
-				vj_event_sample_set_marker_end,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
-				SAMPLE_ID_HELP,
-				0,
-				"Position",
-				0,
-				NULL ); 
-
-	
 	index_map_[VIMS_FXLIST_INC]	=	_new_event(
 				"%d",
 				VIMS_FXLIST_INC,
