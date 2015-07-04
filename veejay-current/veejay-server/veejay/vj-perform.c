@@ -523,7 +523,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
 {
 	if( fx_chain_buffer )
-		return;
+		return 1;
 
 	size_t frame_len = RUP8( ((plane_len+helper_frame->width)/7)*8 );
 	uint8_t *buf = vj_malloc(sizeof(uint8_t) * frame_len * 3 * 3);
