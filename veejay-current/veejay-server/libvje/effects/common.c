@@ -1474,7 +1474,7 @@ double	m_get_polar_y( double r, double a)
 }
 
 //copied from xine
-inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep){
+void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep){
 	int x;
 	const int length= radius*2 + 1;
 	const int inv= ((1<<16) + length/2)/length;
@@ -1503,7 +1503,7 @@ inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int
 }
 
 //copied from xine
-inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep){
+void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep){
 	uint8_t temp[2][4096];
 	uint8_t *a= temp[0], *b=temp[1];
 	
