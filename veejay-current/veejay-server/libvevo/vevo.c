@@ -2716,38 +2716,6 @@ char	*vevo_tabs( int lvl ) {
 	return vj_strdup(tmp);
 }
 
-static struct  { //@ FIXME move to specific locations, use a register to register new port types and names
-	int id;
-	char *name;
-
-} port_types[] = 
-{
-	{ 1, "Livido Plugin Info" },
-	{ 2, "Livido Filter Class" },
-	{ 3, "Livido Instance" },
-	{ 4, "Livido Channel Template" },
-	{ 5, "Livido Parameter Template" },
-	{ 6, "Livido Channel" },
-	{ 7, "Livido Parameter" },
-	{ 8, "Livido GUI" },
-	{10, "FreeFrame Port" },
-	{11, "FreeFrame Parameter" },
-	{20, "Frei0r Port"},
-	{21, "Frei0r Parameter"},
-	{30, "VEVO Livido Port"},
-	{31, "VEVO Livido Parameter Port"},
-	{100,"VEVO Illegal List"},
-	{321,"VEVO Event Port"},
-	{32, "VEVO Veejay FX"},
-	{40, "VEVO Cache"},
-	{1040, "VEVO Port Reference"},
-	{2035, "VEVO Sample Port"},
-	{2036, "VEVO Sample Bank Port"},
-	{33,   "VEVO Veejay FX Instance"},
-	{-1,   "VEVO Anonymous Port"},
-	{0,	   NULL }
-};
-
 void	vevo_port_dump( void *p, int lvl )
 {
 	char **keys = vevo_list_properties(p);
