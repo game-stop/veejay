@@ -131,6 +131,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/time.h>
+#include <sys/times.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
