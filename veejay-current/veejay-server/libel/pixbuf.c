@@ -268,15 +268,6 @@ int	vj_picture_probe( const char *filename )
 }
 
 /* image saving */
-#ifdef USE_GDK_PIXBUF
-static	void	add_if_writeable( GdkPixbufFormat *data, GSList **list)
-{
-	if( gdk_pixbuf_format_is_writable( data ))
-		*list = g_slist_prepend( *list, data );
-	gchar *name = gdk_pixbuf_format_get_name( data );
-	if(name) g_free(name);
-} 
-#endif
 char	*vj_picture_get_filename( void *pic )
 {
 	vj_pixbuf_out_t *p = (vj_pixbuf_out_t*) pic;
