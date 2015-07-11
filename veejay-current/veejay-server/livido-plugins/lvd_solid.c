@@ -61,8 +61,8 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	//@ get parameter values
 	int		r =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
-	int		g =  lvd_extract_param_index( my_instance,"in_parameters", 1 );
-	int		b =  lvd_extract_param_index( my_instance,"in_parameters", 2 );
+	int		b =  lvd_extract_param_index( my_instance,"in_parameters", 1 );
+	int		g =  lvd_extract_param_index( my_instance,"in_parameters", 2 );
 
 	uint8_t y,u,v;
 
