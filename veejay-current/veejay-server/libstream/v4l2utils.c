@@ -570,7 +570,7 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 		free(v->picture->data[1]);
 		free(v->picture->data[2]);
 		free(v->picture);
-		avcodec_free_context( &v->c );
+		avhelper_free_context( &v->c );
 		//av_free(v->c);
 		return 0;
 	}
@@ -1356,7 +1356,7 @@ void	v4l2_close( void *d )
 		avcodec_close(v->c);
 #else
 		avcodec_close(v->codec);
-		avcodec_free_context( &v->c );
+		avhelper_free_context( &v->c );
 		//if(v->c) free(v->c);
 #endif
 	}
