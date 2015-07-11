@@ -82,6 +82,7 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libel/av.h>
+#include <libel/avhelper.h>
 #define        RUP8(num)(((num)+8)&~8)
 
 //#include <pthread.h>
