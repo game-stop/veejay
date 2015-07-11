@@ -318,6 +318,7 @@ void	vj_tag_get_by_type( int type, char *descr );
 int	vj_tag_get_width();
 int	vj_tag_get_height();
 int	vj_tag_get_uvlen();
+void  vj_tag_cali_prepare( int t1 , int pos, int cali_tag);
 void	vj_tag_cali_prepare_now(int a, int b);
 int	vj_tag_chain_set_kfs( int s1, int len, unsigned char *data );
 unsigned char *	vj_tag_chain_get_kfs( int s1, int entry, int parameter_id, int *len );
