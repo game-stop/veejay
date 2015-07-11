@@ -971,7 +971,7 @@ char	*livido_describe_parameter_format( void *instance, int p )
 
 //	int n_elems = vevo_property_num_elements( param, "value" );
 
-	char fmt[2];
+	char fmt[4];
 	fmt[1] = '\0';
 
 	switch(kind)
@@ -988,11 +988,13 @@ char	*livido_describe_parameter_format( void *instance, int p )
 		case HOST_PARAM_COORD:
 			fmt[0] = 'g';
 			fmt[1] = 'g';
+			fmt[2] = '\0';
 			break;
 		case HOST_PARAM_COLOR:
 			fmt[0] = 'g';
 			fmt[1] = 'g';
 			fmt[2] = 'g';
+			fmt[3] = '\0'; 
 			break;
 		case HOST_PARAM_TEXT:
 			fmt[0] = 's';
