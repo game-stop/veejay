@@ -204,6 +204,7 @@ typedef struct
         int codec_id;
 } el_decoder_t;
 
+extern void sample_new_simple( void *el, long start, long end );
 
 static void vj_el_av_close_input_file( AVFormatContext *s ) {
 #if LIBAVCODEC_BUILD > 5400
