@@ -43,6 +43,8 @@ extern int  pixel_U_lo_;
 #define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
 #define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
 
+extern void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int val, int len );
+
 extern void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 
 extern void veejay_msg(int type, const char format[], ...);

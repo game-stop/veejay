@@ -622,5 +622,7 @@ extern int bgsubtract_prepare(uint8_t *map[4], int w, int h);
 extern int contourextract_prepare(uint8_t *map[4], int w, int h);
 extern int chameleonblend_prepare( uint8_t *bg[4],int w, int h );
 
+extern void average_blend_applyN( VJFrame *frame, VJFrame *frame2, int width,  int height, int average_blend);
 
+extern void average_blend_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int average_blend);
 #endif
