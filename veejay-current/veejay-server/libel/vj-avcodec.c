@@ -35,6 +35,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libel/av.h>
+#include <libel/avhelper.h>
 
 //from gst-ffmpeg, round up a number
 #define GEN_MASK(x) ((1<<(x))-1)
@@ -214,9 +215,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 #endif
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open codec '%s'" , descr );
-			//if(e->context) free(e->context);
-			avcodec_free_context( &(e->context) );
-			
+			avhelper_free_context( &(e->context) );
 			if(e) free(e);
 			if(descr) free(descr);
 			return NULL;
@@ -249,8 +248,7 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 		if(av->context)
 		{
 			avcodec_close( av->context );
-			avcodec_free_context( &av->context );
-			av->context = NULL;
+			avhelper_free_context( &(av->context) );
 		}
 		if(av->data[0])
 			free(av->data[0]);

@@ -82,117 +82,7 @@ static struct
 };
 
 
-static struct
-{
-        const char *name;
-        int  id;
-} _supported_codecs[] = 
-{
-	{ "vj20", CODEC_ID_YUV420F	},
-	{ "vj22", CODEC_ID_YUV422F	},
-        { "mjpg" ,CODEC_ID_MJPEG 	},
-	{ "mjpb", CODEC_ID_MJPEGB	},
-        { "i420", CODEC_ID_YUV420	},
-        { "i422", CODEC_ID_YUV422	},
-	{ "dmb1", CODEC_ID_MJPEG	},
-	{ "dmb1", CODEC_ID_MJPEG	},
-	{ "jpeg", CODEC_ID_MJPEG	},
-	{ "jpeg", CODEC_ID_MJPEG	},
-	{ "mjpa", CODEC_ID_MJPEG	},
-	{ "jfif", CODEC_ID_MJPEG	},
-	{ "jfif", CODEC_ID_MJPEG	},
-	{ "png", CODEC_ID_PNG		},
-	{ "mpng", CODEC_ID_PNG		},
-#if LIBAVCODEC_BUILD > 4680
-	{ "sp5x", CODEC_ID_SP5X		}, 
-#endif
-	{ "jpgl", CODEC_ID_MJPEG 	},
-	{ "jpgl", CODEC_ID_MJPEG	},
-	{ "dvsd", CODEC_ID_DVVIDEO	},
-	{ "ijpg", CODEC_ID_MJPEG	},
-	{ "dvcp", CODEC_ID_DVVIDEO	},
-	{ "dv",	CODEC_ID_DVVIDEO	},
-	{ "dvhd", CODEC_ID_DVVIDEO	},
-	{ "dvp", CODEC_ID_DVVIDEO	},
-	{ "yuv", CODEC_ID_YUV420	},
-	{ "iyuv", CODEC_ID_YUV420	},
-	{ "i420", CODEC_ID_YUV420	},
-	{ "yv16", CODEC_ID_YUV422	},
-	{ "yv12", CODEC_ID_YUV420	},
-	{ "mlzo", CODEC_ID_YUVLZO	},
-	{ "pict", 0xffff		}, 
-	{ "hfyu", CODEC_ID_HUFFYUV	},
-	{ "cyuv", CODEC_ID_CYUV		},
-	{ "svq1", CODEC_ID_SVQ1		},
-	{ "svq3", CODEC_ID_SVQ3		},
-	{ "rpza", CODEC_ID_RPZA		},
-	{ NULL  , 0,			},
-};
-
-static struct
-{
-	const char *name;
-	int id;
-} _supported_fourcc[] =
-{
-	{ "vj20", CODEC_ID_YUV420F },
-	{ "vj22", CODEC_ID_YUV422F },
-	{ "yv12", CODEC_ID_YUV420 },
-	{ "mjpg",	CODEC_ID_MJPEG	},
-	{ "mjpb",	CODEC_ID_MJPEGB },
-	{ "dmb1",	CODEC_ID_MJPEG	},
-	{ "jpeg",	CODEC_ID_MJPEG	},
-	{ "mjpa",	CODEC_ID_MJPEG  },
-	{ "jfif",	CODEC_ID_MJPEG  },
-	{ "png",	CODEC_ID_PNG	},
-	{ "mpng",	CODEC_ID_PNG	},
-#if LIBAVCODEC_BUILD > 4680
-	{ "sp5x",   	CODEC_ID_SP5X },
-#endif
-	{ "jpgl",	CODEC_ID_MJPEG  },
-	{ "dvsd",	CODEC_ID_DVVIDEO},
-	{ "dv",		CODEC_ID_DVVIDEO},
-	{ "dvhd",	CODEC_ID_DVVIDEO},
-	{ "dvp",	CODEC_ID_DVVIDEO},
-	{ "yuv",	CODEC_ID_YUV420 },
-	{ "iyuv",	CODEC_ID_YUV420 },
-	{ "i420",	CODEC_ID_YUV420 },
-	{ "mlzo",	CODEC_ID_YUVLZO },
-	{ "yv16",	CODEC_ID_YUV422 },
-	{ "pict",	0xffff	}, /* invalid fourcc */
-	{ "hfyu",	CODEC_ID_HUFFYUV},
-	{ "msvc",	CODEC_ID_HUFFYUV },
-	{ "cyuv",	CODEC_ID_CYUV   },
-	{ "svq1",	CODEC_ID_SVQ1	},
-	{ "svq3",	CODEC_ID_SVQ3	},
-	{ "rpza",	CODEC_ID_RPZA	},
-	{ NULL, 0 }
-};
-
 static	long mmap_size = 0;
-static struct {
-        int i;
-        char *s;
-} pixfmtstr[] = {
-{       -1    ,         "Unknown/Invalid"},
-{	PIX_FMT_YUV420P, "YUVPIX_FMT_YUV420P"},
-{       PIX_FMT_YUV422P, "4:2:2 planar, Y-Cb-Cr ( 422P )"},
-{       PIX_FMT_YUVJ420P, "4:2:0 planar, Y-U-V (420P JPEG)"},
-{       PIX_FMT_YUVJ422P, "4:2:2 planar, Y-U-V (422P JPEG)"},
-{       PIX_FMT_RGB24,    "RGB 24 bit"},
-{       PIX_FMT_BGR24,    "BGR 24 bit"},
-{       PIX_FMT_YUV444P,  "YUV 4:4:4 planar, Y-Cb-Cr (444P)"},
-{       PIX_FMT_YUVJ444P, "YUV 4:4:4 planar, Y-U-V (444P JPEG)"},
-{       PIX_FMT_RGB32,    "RGB 32 bit"},
-{       PIX_FMT_BGR32,    "BGR 32 bit"},
-{       PIX_FMT_GRAY8,    "Greyscale"},
-{       PIX_FMT_RGB32_1,  "RGB 32 bit LE"},
-{	PIX_FMT_0RGB,	  "RGB packed 0RGB"},
-{	PIX_FMT_0BGR,	  "BGR packed 0BGR"},
-{	PIX_FMT_BGR0,	  "BGR packed BGR0"},
-{	PIX_FMT_RGB0,	  "RGB packed RGB0"},
-{       0       ,         NULL}
-};
 
 typedef struct
 {
@@ -205,24 +95,6 @@ typedef struct
 } el_decoder_t;
 
 extern void sample_new_simple( void *el, long start, long end );
-
-static void vj_el_av_close_input_file( AVFormatContext *s ) {
-#if LIBAVCODEC_BUILD > 5400
-	avformat_close_input(&s);
-#else
-	av_close_input_file(s);
-#endif
-}
-
-static const    char    *el_pixfmt_str(int i)
-{
-        int j;
-        for( j = 0; pixfmtstr[j].s != NULL ; j ++ ) {
-                if( i == pixfmtstr[j].i )
-                        return pixfmtstr[j].s;
-        }
-        return pixfmtstr[0].s;
-}
 
 void	vj_el_set_mmap_size( long size )
 {
@@ -311,16 +183,6 @@ static void	_el_free_decoder( vj_decoder *d )
 	d = NULL;
 }
 #define LARGE_NUM (256*256*256*64)
-
-#if LIBAVCODEC_BUILD > 5400
-static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *got_picture, uint8_t *data, int pktsize ) {
-	AVPacket pkt;
-	veejay_memset( &pkt, 0, sizeof(AVPacket));
-	pkt.data = data;
-	pkt.size = pktsize;
-	return avcodec_decode_video2( avctx, picture, got_picture, &pkt );
-}
-#endif
 
 static int el_pixel_format_org = 1;
 static int el_pixel_format_ = 1;
@@ -1131,7 +993,6 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 	}
 
 
-	int got_picture = 0;
 	int ret = -1;
 	switch( decoder_id )
 	{
@@ -1384,7 +1245,6 @@ int	vj_el_auto_detect_scenes( editlist *el, uint8_t *tmp[4], int w, int h, int d
 	int dl = 0;
 	int last_lm = 0;
 	int index = 0;
-	long max = (el->total_frames/2) -1;
 	long prev = 0;
 
 	if( el == NULL || el->is_empty || el->total_frames < 2 )

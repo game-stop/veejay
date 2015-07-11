@@ -40,4 +40,8 @@ int	avhelper_decode_video( void *ptr, uint8_t *data, int len, uint8_t *dst[3] );
 
 void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height );
 
+void	avhelper_free_context(AVCodecContext **avctx);
+
+void	avhelper_frame_unref(AVFrame *ptr);
+
 #endif

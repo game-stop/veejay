@@ -28,6 +28,9 @@ extern int avcodec_encode_video(AVCodecContext *avctx, uint8_t *buf, int buf_siz
 
 extern int avcodec_encode_video2(AVCodecContext *avctx, AVPacket *avpkt,const AVFrame *frame, int *got_packet_ptr) __attribute__((weak));
 
+extern void avcodec_free_context(AVCodecContext **avctx) __attribute__((weak));
+
+extern void av_frame_unref(AVFrame *ptr) __attribute((weak));
 
 
 #if FF_VJE_BACKPORT

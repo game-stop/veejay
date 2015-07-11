@@ -134,21 +134,6 @@ void	*avhelper_get_codec( void *ptr )
 	return e->codec;
 }
 
-static void       free_av_packet( AVPacket *pkt )
-{
-   if( pkt ) {
-#if (LIBAVFORMAT_VERSION_MAJOR <= 53)
-   //      av_destruct_packet(pkt);
-#else
-   //      if( pkt->destruct )
-   //              pkt->destruct(pkt);
-#endif
-           pkt->data = NULL;
-           pkt->size = 0;
-   }
-   pkt = NULL;
-}
-
 #if LIBAVCODEC_BUILD > 5400
 static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *got_picture, uint8_t *data, int pktsize ) {
 	AVPacket pkt;
@@ -158,6 +143,25 @@ static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *g
 	return avcodec_decode_video2( avctx, picture, got_picture, &pkt );
 }
 #endif
+
+void avhelper_frame_unref(AVFrame *ptr)
+{
+#if LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40
+	av_frame_unref( ptr );
+#endif
+}
+
+void avhelper_free_context(AVCodecContext **avctx)
+{
+#if LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40
+	avcodec_free_context( avctx );
+#else
+	if( avctx )
+		free( avctx );
+	avctx = NULL;
+#endif
+}
+
 static void avhelper_close_input_file( AVFormatContext *s ) {
 #if LIBAVCODEC_BUILD > 5400
 	avformat_close_input(&s);
@@ -285,7 +289,7 @@ further:
 
 		if ( x->pkt.stream_index == vi ) {
 			avcodec_decode_video( x->codec_ctx,f,&got_picture, x->pkt.data, x->pkt.size );
-			av_frame_unref( f );
+			avhelper_frame_unref( f );
 		}
 				
 		av_free_packet( &(x->pkt) );	
@@ -353,7 +357,7 @@ int	avhelper_decode_video( void *ptr, uint8_t *data, int len, uint8_t *dst[3] )
 	int result = avcodec_decode_video( e->codec_ctx, e->frame, &got_picture, data, len );
 
 	if(!got_picture || result <= 0) {
-		av_frame_unref( e->frame );
+		avhelper_frame_unref( e->frame );
 		return 0;
 	}
 
@@ -368,7 +372,7 @@ int	avhelper_decode_video( void *ptr, uint8_t *data, int len, uint8_t *dst[3] )
 
 	yuv_convert_any3( e->scaler, e->input, e->frame->linesize, e->output, e->input->format, e->pixfmt );
 
-	av_frame_unref( e->frame );
+	avhelper_frame_unref( e->frame );
 
 	return 1;
 }
