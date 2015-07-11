@@ -245,7 +245,6 @@ void	*composite_load_config( void *compiz, void *vc, int *result )
 	int cm = viewport_get_color_mode_from_config(vc);
 	int  m = viewport_get_composite_mode_from_config(vc);
 	
-	void *view = NULL;
 	int res = viewport_reconfigure_from_config( c->vp1, vc );
 	//@ push to back1 too!
 	if(res) {
@@ -270,11 +269,6 @@ int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int
 		return 1;
 	}
 	return 0;
-}
-
-static void	composite_scale( composite_t *c, VJFrame *input, VJFrame *output )
-{
-	yuv_convert_and_scale(c->scaler,input,output);
 }
 
 int	composite_get_original_frame(void *compiz, uint8_t *current_in[4], uint8_t *out[4], int which_vp, int row_start, int row_end )
@@ -329,8 +323,6 @@ void	composite_blit_yuyv( void *compiz, uint8_t *in[4], uint8_t *yuyv, int which
 {
 	composite_t *c = (composite_t*) compiz;
 	int vp1_active = viewport_active(c->vp1);
-
-	int blit_back = c->has_back;
 
 	c->has_back   = 0;
 
