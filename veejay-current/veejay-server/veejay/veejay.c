@@ -817,7 +817,7 @@ int main(int argc, char **argv)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
 		main_ret = 1;
-		goto VEEJAY_MAIN_EXIT;
+		return main_ret;
 	}
 
 	if(auto_loop)
@@ -826,7 +826,7 @@ int main(int argc, char **argv)
 
 	veejay_init_msg_ring();  // rest of logging to screen
 
-    	if(!veejay_main(info))
+   	if(!veejay_main(info))
 	{
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
 		main_ret = 1;
