@@ -1290,13 +1290,16 @@ void veejay_handle_signal(void *arg, int sig)
 	}
 	else 
 	{
-		if( sig == SIGPIPE || sig == SIGSEGV || sig == SIGBUS || sig == SIGPWR || sig == SIGABRT || sig == SIGFPE )
+		if( sig == SIGSEGV || sig == SIGBUS || sig == SIGPWR || sig == SIGABRT || sig == SIGFPE )
 		{
 			if(info->homedir)
 				veejay_change_state_save(info,LAVPLAY_STATE_STOP);
 			else
 				veejay_change_state( info, LAVPLAY_STATE_STOP );
 			signal( sig, SIG_DFL );
+		}
+		else if( sig == SIGPIPE ) {
+			veejay_change_state( info, LAVPLAY_STATE_STOP );
 		}
 	}
 }
