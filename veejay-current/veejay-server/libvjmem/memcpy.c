@@ -1198,8 +1198,8 @@ void fast_memset_dirty(void * to, int val, size_t len)
   	if(len >= MIN_LEN)
 	{
 	  register unsigned long int delta;
-          delta = ((unsigned long int)to)&(AC_MMREG_SIZE-1);
-          if(delta)
+      delta = ((unsigned long int)to)&(AC_MMREG_SIZE-1);
+      if(delta)
 	  {
 	    delta=AC_MMREG_SIZE-delta;
 	    len -= delta;
