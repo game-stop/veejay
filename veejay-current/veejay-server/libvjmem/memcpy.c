@@ -1267,7 +1267,8 @@ void fast_memset_dirty(void * to, int val, size_t len)
 void *fast_memset(void * to, int val, size_t len)
 {
 	fast_memset_dirty( to, val , len );
-	fast_memset_finish();
+	if(len >= MINLEN)
+		fast_memset_finish();
 }
 
 static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
