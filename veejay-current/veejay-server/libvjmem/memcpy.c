@@ -1156,13 +1156,13 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 			}
 #endif /* Have SSE */
 
-#if HAVE_ASM_MMX2
+#ifdef HAVE_ASM_MMX2
         /* since movntq is weakly-ordered, a "sfence"
 		 * is needed to become ordered again. */
 		__asm__ volatile ("sfence":::"memory");
 #endif
 
-#if !HAVE_ASM_SSE
+#ifndef HAVE_ASM_SSE
 		/* enables to use FPU */
 		__asm__ volatile (EMMS:::"memory");
 #endif
@@ -1178,13 +1178,13 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 void fast_memset_finish()
 {
 #ifdef HAVE_ASM_MMX2
-                /* since movntq is weakly-ordered, a "sfence"
- *                  * is needed to become ordered again. */
-                __asm__ __volatile__ ("sfence":::"memory");
+	/* since movntq is weakly-ordered, a "sfence"
+	 * is needed to become ordered again. */
+	__asm__ __volatile__ ("sfence":::"memory");
 #endif
-#ifdef HAVE_ASM_MMX
-                /* enables to use FPU */
-                __asm__ __volatile__ (EMMS:::"memory");
+#ifndef HAVE_ASM_SSE
+    /* enables to use FPU */
+    __asm__ __volatile__ (EMMS:::"memory");
 #endif
 
 }
@@ -1194,7 +1194,8 @@ void fast_memset_dirty(void * to, int val, size_t len)
 	size_t i;
 	unsigned char mm_reg[AC_MMREG_SIZE], *pmm_reg;
 	unsigned char *t = to;
-        if(len >= MIN_LEN)
+    
+  	if(len >= MIN_LEN)
 	{
 	  register unsigned long int delta;
           delta = ((unsigned long int)to)&(AC_MMREG_SIZE-1);
@@ -1253,15 +1254,6 @@ void fast_memset_dirty(void * to, int val, size_t len)
 		t+=128;
 	}
 #endif /* Have SSE */
-//#ifdef HAVE_ASM_MMX2
-//              /* since movntq is weakly-ordered, a "sfence"
-//		 * is needed to become ordered again. */
-//		__asm__ __volatile__ ("sfence":::"memory");
-//#endif
-//#ifndef HAVE_ASM_SSE
-//		/* enables to use FPU */
-//		__asm__ __volatile__ (EMMS:::"memory");
-//#endif
 	}
 	/*
 	 *	Now do the tail of the block
@@ -1271,91 +1263,12 @@ void fast_memset_dirty(void * to, int val, size_t len)
 
 
 
-#if defined (HAVE_ASM_MMX) 
 /* Fast memory set. See comments for fast_memcpy */
 void *fast_memset(void * to, int val, size_t len)
 {
-	void *retval;
-	size_t i;
-	unsigned char mm_reg[AC_MMREG_SIZE], *pmm_reg;
-	unsigned char *t = to;
-  	retval = to;
-//	veejay_msg(0, "clear %d bytes in %p",len,val);
-        if(len >= MIN_LEN)
-	{
-	  register unsigned long int delta;
-          delta = ((unsigned long int)to)&(AC_MMREG_SIZE-1);
-          if(delta)
-	  {
-	    delta=AC_MMREG_SIZE-delta;
-	    len -= delta;
-	    small_memset(t, val, delta);
-	  }
-	  i = len >> 7; /* len/128 */
-	  len&=127;
-	  pmm_reg = mm_reg;
-	  small_memset(pmm_reg,val,sizeof(mm_reg));
-/*#ifdef HAVE_ASM_SSE 
- //Only P3 (may be Cyrix3) 
-	__asm__ __volatile__(
-		"movups (%0), %%xmm0\n"
-		:: "r"(mm_reg):"memory");
-	for(; i>0; i--)
-	{
-		__asm__ __volatile__ (
-		"movntps %%xmm0, (%0)\n"
-		"movntps %%xmm0, 16(%0)\n"
-		"movntps %%xmm0, 32(%0)\n"
-		"movntps %%xmm0, 48(%0)\n"
-		"movntps %%xmm0, 64(%0)\n"
-		"movntps %%xmm0, 80(%0)\n"
-		"movntps %%xmm0, 96(%0)\n"
-		"movntps %%xmm0, 112(%0)\n"
-		:: "r" (t) : "memory");
-		t+=128;
-	}
-#else
-*/
-	__asm__ __volatile__(
-		"movq (%0), %%mm0\n"
-		:: "r"(mm_reg):"memory");
-	for(; i>0; i--)
-	{
-		__asm__ __volatile__ (
-		MOVNTQ" %%mm0, (%0)\n"
-		MOVNTQ" %%mm0, 8(%0)\n"
-		MOVNTQ" %%mm0, 16(%0)\n"
-		MOVNTQ" %%mm0, 24(%0)\n"
-		MOVNTQ" %%mm0, 32(%0)\n"
-		MOVNTQ" %%mm0, 40(%0)\n"
-		MOVNTQ" %%mm0, 48(%0)\n"
-		MOVNTQ" %%mm0, 56(%0)\n"
-		MOVNTQ" %%mm0, 64(%0)\n"
-		MOVNTQ" %%mm0, 72(%0)\n"
-		MOVNTQ" %%mm0, 80(%0)\n"
-		MOVNTQ" %%mm0, 88(%0)\n"
-		MOVNTQ" %%mm0, 96(%0)\n"
-		MOVNTQ" %%mm0, 104(%0)\n"
-		MOVNTQ" %%mm0, 112(%0)\n"
-		MOVNTQ" %%mm0, 120(%0)\n"
-		:: "r" (t) : "memory");
-		t+=128;
-	}
-#ifdef HAVE_ASM_MMX2
-        /* since movntq is weakly-ordered, a "sfence"
-	 * is needed to become ordered again. */
-	__asm__ __volatile__ ("sfence":::"memory");
-	/* enables to use FPU */
-	__asm__ __volatile__ (EMMS:::"memory");
-#endif
-	}
-	/*
-	 *	Now do the tail of the block
-	 */
-	if(len) small_memset(t, val, len);
-	return retval;
+	fast_memset_dirty( to, val , len );
+	fast_memset_finish();
 }
-#endif
 
 static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
      return __memcpy(to,from,len);
