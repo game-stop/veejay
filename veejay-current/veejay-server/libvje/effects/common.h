@@ -49,8 +49,10 @@ extern void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 
 extern void veejay_msg(int type, const char format[], ...);
 
-#ifdef HAVE_ASM_MMX
-#define do_emms          __asm__ __volatile__ ( "emms":::"memory" )
+#ifdef HAVE_ASM_3DNOW
+#define do_emms			__asm__ __volatile__( "femms" :::"memory" )
+#else
+#define do_emms         __asm__ __volatile__ ( "emms":::"memory" )
 #endif
 
 #ifndef ARCH_X86
