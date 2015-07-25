@@ -476,7 +476,6 @@ int vj_yuv_get_frame(vj_yuv * yuv4mpeg, uint8_t *dst[3])
 
 int vj_yuv_put_frame(vj_yuv * vjyuv, uint8_t **src)
 {
-	int i;
    	if (!vjyuv->fd) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid file descriptor for y4m stream");
 		return -1;
