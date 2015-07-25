@@ -102,38 +102,35 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 	
 	if( num <= 0 )
 		return;
+
+	int itmp[32]; 
+	double dtemp[32]; 
 	
-	int itmp[16]; //FIXME
-	double dtemp[16]; //FIXME
-	
-	int error;
-	
+	if( num > 31 ) { 
+		num = 31;
+	}
+
 	switch( type )
 	{
 		case VEVO_ATOM_TYPE_INT:
 		case VEVO_ATOM_TYPE_BOOL:
 			for( i= 0; i < num; i ++ )
 			{
-				error = vevo_property_get( port,key,i, &(itmp[i]) );
+				vevo_property_get( port,key,i, &(itmp[i]) );
 			}
-			error = vevo_property_set( to_port, as_key, type, num, &itmp );
+			vevo_property_set( to_port, as_key, type, num, &itmp );
 			break;
 		case VEVO_ATOM_TYPE_DOUBLE:
 			for( i = 0; i < num ; i++ )
 			{
-				error = vevo_property_get( port, key, i, &(dtemp[i]));
+				vevo_property_get( port, key, i, &(dtemp[i]));
 			}
-		//@ TODO: scale parameter and treat as TYPE_INT
-
 			for( i = 0; i < num; i ++ ) {
 				itmp[i] = (int)( dtemp[i] * 100.0);
 			}
 
-			error = vevo_property_set( to_port, as_key, VEVO_ATOM_TYPE_INT, num, &itmp );
-		//		error = vevo_property_set( to_port, as_key, type, num, &dtemp );
-		//	veejay_msg(0, "\t\tValue is %g ", dtemp[0] );
+			vevo_property_set( to_port, as_key, VEVO_ATOM_TYPE_INT, num, &itmp );
 			break;
-		//@ TODO: not supported yet
 		case VEVO_ATOM_TYPE_STRING:
 			{
 				if( num == 1 ) {
@@ -141,7 +138,7 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 					vevo_property_set( to_port,as_key,type,1,&value );
 					free(value);
 				}
-			        else {
+			    else {
 					veejay_msg(0,"Internal error. Cannot set %d elements of type string",num);
 				}	
 
