@@ -102,7 +102,7 @@ char		*plug_describe_param( void *plugin, int p )
 }
 
 
-static	void* instantiate_plugin( const void *plugin, int w , int h )
+static	void* instantiate_plugin( void *plugin, int w , int h )
 {
 	int type = 0;
 	int error = vevo_property_get( plugin, "HOST_plugin_type", 0, &type);
@@ -704,20 +704,23 @@ char	*plug_describe( int fx_id )
 	char key[64];
 	int i;
 	int len = 0;
-	int error = 0;
 
-	error = vevo_property_get( plug, "num_inputs", 0, &ci );
-	error = vevo_property_get( plug, "num_params", 0, &pi );
-	error = vevo_property_get( plug, "num_out_params",0,&po );
-	error = vevo_property_get( plug, "num_outputs",0,&co );
-	error = vevo_property_get( plug, "instance", 0,&instance );
+	vevo_property_get( plug, "num_inputs", 0, &ci );
+	vevo_property_get( plug, "num_params", 0, &pi );
+	vevo_property_get( plug, "num_out_params",0,&po );
+	vevo_property_get( plug, "num_outputs",0,&co );
+
+	if( vevo_property_get( plug, "instance", 0,&instance ) != VEVO_NO_ERROR )
+		return NULL;
 	
-	error = vevo_property_get( instance, "filters",0,&filter );
+	if( vevo_property_get( instance, "filters",0,&filter ) != VEVO_NO_ERROR )
+		return NULL;
+
 	//@ cannot handle multiple filters yet
 	char *maintainer = get_str_vevo( instance, "maintainer");
 	char *version    = get_str_vevo( instance, "version" );
 	char *description = get_str_vevo( filter, "description" );
-	char *name	 = get_str_vevo(  filter, "name");
+	char *name		 = get_str_vevo(  filter, "name");
 	char *author     = get_str_vevo(  filter, "author" );
 	char *license    = get_str_vevo(  filter, "license" );
 	char **in_params = NULL;
@@ -911,8 +914,7 @@ int	plug_get_num_output_channels( int fx_id )
 		return 0;
 
 	int res = 0;
-	int error = vevo_property_get( index_map_[fx_id], "num_outputs",0,&res);
-
+	vevo_property_get( index_map_[fx_id], "num_outputs",0,&res);
 	return res;
 }
 int	plug_get_num_input_channels( int fx_id )
@@ -921,8 +923,7 @@ int	plug_get_num_input_channels( int fx_id )
 		return 0;
 
 	int res = 0;
-	int error = vevo_property_get( index_map_[fx_id], "num_inputs",0,&res);
-
+	vevo_property_get( index_map_[fx_id], "num_inputs",0,&res);
 	return res;
 }
 
