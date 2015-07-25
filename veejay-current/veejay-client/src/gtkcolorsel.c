@@ -720,7 +720,7 @@ get_current_colors (GtkColorSelection *colorsel)
 
   settings = gtk_widget_get_settings (GTK_WIDGET (colorsel));
   g_object_get (settings,
-		"gtk-color-palette", &palette,
+		"gtk-color-selection-palette", &palette,
 		NULL);
   
   if (!gtk_color_selection_palette_from_string (palette, &colors, &n_colors))
@@ -1589,16 +1589,16 @@ make_label_spinbutton (GtkColorSelection *colorsel,
   
   if (channel_type == COLORSEL_HUE)
     {
-      adjust = GTK_ADJUSTMENT (gtk_adjustment_new (0.0, 0.0, 360.0, 1.0, 1.0, 1.0));
+      adjust = GTK_ADJUSTMENT (gtk_adjustment_new (0.0, 0.0, 360.0, 1.0, 1.0, 0.0));
     }
   else if (channel_type == COLORSEL_SATURATION ||
 	   channel_type == COLORSEL_VALUE)
     {
-      adjust = GTK_ADJUSTMENT (gtk_adjustment_new (0.0, 0.0, 100.0, 1.0, 1.0, 1.0));
+      adjust = GTK_ADJUSTMENT (gtk_adjustment_new (0.0, 0.0, 100.0, 1.0, 1.0, 0.0));
     }
   else
     {
-      adjust = GTK_ADJUSTMENT (gtk_adjustment_new (0.0, 0.0, 255.0, 1.0, 1.0, 1.0));
+      adjust = GTK_ADJUSTMENT (gtk_adjustment_new (0.0, 0.0, 255.0, 1.0, 1.0, 0.0));
     }
   g_object_set_data (G_OBJECT (adjust), "COLORSEL", colorsel);
   *spinbutton = gtk_spin_button_new (adjust, 10.0, 0);
@@ -1769,7 +1769,7 @@ default_change_palette_func (GdkScreen	    *screen,
   str = gtk_color_selection_palette_to_string (colors, n_colors);
 
   gtk_settings_set_string_property (gtk_settings_get_for_screen (screen),
-                                    "gtk-color-palette",
+                                    "gtk-color-selection-palette",
                                     str,
                                     "gtk_color_selection_palette_to_string");
 
@@ -1865,7 +1865,7 @@ gtk_color_selection_class_init (GtkColorSelectionClass *klass)
 		  g_cclosure_marshal_VOID__VOID,
 		  G_TYPE_NONE, 0);
 
-  gtk_settings_install_property (g_param_spec_string ("gtk-color-palette",
+  gtk_settings_install_property (g_param_spec_string ("gtk-color-selection-palette",
                                                       P_("Custom palette"),
                                                       P_("Palette to use in the color selector"),
                                                       default_colors,
@@ -2113,7 +2113,7 @@ gtk_color_selection_realize (GtkWidget *widget)
   GtkSettings *settings = gtk_widget_get_settings (widget);
 
   priv->settings_connection =  g_signal_connect (settings,
-						 "notify::gtk-color-palette",
+						 "notify::gtk-color-selection-palette",
 						 G_CALLBACK (palette_change_notify_instance),
 						 widget);
   update_palette (colorsel);
@@ -2803,7 +2803,7 @@ gtk_color_selection_palette_to_string (const GdkColor *colors,
  * Installs a global function to be called whenever the user tries to
  * modify the palette in a color selection. This function should save
  * the new palette contents, and update the GtkSettings property
- * "gtk-color-palette" so all GtkColorSelection widgets will be modified.
+ * "gtk-color-selection-palette" so all GtkColorSelection widgets will be modified.
  *
  * Return value: the previous change palette hook (that was replaced).
  *
@@ -2831,7 +2831,7 @@ gtk_color_selection_set_change_palette_hook (GtkColorSelectionChangePaletteFunc 
  * Installs a global function to be called whenever the user tries to
  * modify the palette in a color selection. This function should save
  * the new palette contents, and update the GtkSettings property
- * "gtk-color-palette" so all GtkColorSelection widgets will be modified.
+ * "gtk-color-selection-palette" so all GtkColorSelection widgets will be modified.
  * 
  * Return value: the previous change palette hook (that was replaced).
  *
