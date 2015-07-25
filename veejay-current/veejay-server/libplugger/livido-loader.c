@@ -768,7 +768,7 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 {
 	void *plug_info = NULL;
 	void *filter_templ = NULL;
-	int flags =0;
+	
 	if( vevo_property_get( plugin, "instance", 0, &plug_info) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Not a Livido plugin");
 		return NULL;
@@ -777,25 +777,25 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 		veejay_msg(0, "Not a Livido filter");
 	}
 	void *filter_instance = vpn( LIVIDO_PORT_TYPE_FILTER_INSTANCE );
-	int num_in_channels = init_ports_from_template(
+	init_ports_from_template(
 			filter_instance, filter_templ,
 			LIVIDO_PORT_TYPE_CHANNEL,
 			"in_channel_templates", "in_channels",
 			w,h, 0);
 
-	int num_out_channels = init_ports_from_template( 
+	init_ports_from_template( 
 			filter_instance, filter_templ,
 			LIVIDO_PORT_TYPE_CHANNEL,
 			"out_channel_templates", "out_channels",
 			w,h, 0 );
 	
-	int num_in_params = init_ports_from_template( 
+	init_ports_from_template( 
 			filter_instance, filter_templ,
 			LIVIDO_PORT_TYPE_PARAMETER,
 			"in_parameter_templates", "in_parameters",
 			w,h, 0 );
 
-	int num_out_params = init_ports_from_template(
+	init_ports_from_template(
 			filter_instance, filter_templ,
 			LIVIDO_PORT_TYPE_PARAMETER,
 			"out_parameter_templates", "out_parameters",
@@ -854,7 +854,6 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 
 static void	livido_push_channel_local( void *instance,const char *key, int n, VJFrame *frame ) // in_channels / out_channels
 {
-	int error;
 	configure_channel( instance, key, n, frame );
 }
 
@@ -946,11 +945,12 @@ int	livido_plug_read_output_parameters( void *instance, void *fx_values )
 
 	for( i = 0; i < np ; i ++ )
 	{
-		char	vkey[10];
+		char	vkey[8];
 		void *param = NULL;
-		void *param_templ = NULL;
 
-		int error = vevo_property_get( instance, "out_parameters", i, &param );
+		if( vevo_property_get( instance, "out_parameters", i, &param ) != VEVO_NO_ERROR )
+			continue;
+
 		snprintf(vkey,sizeof(vkey), "p%02d", i );
 		clone_prop_vevo( param, fx_values, "value", vkey);
 
@@ -1051,9 +1051,10 @@ void	livido_reverse_clone_parameter( void *instance, int seq, void *fx_value_por
 
 	for( i = 0; i < vj_np; i ++ )
 	{
-		char	vkey[10];
+		char	vkey[8];
 		void *param = NULL;
-		int error = vevo_property_get( instance, "in_parameters", i, &param);
+		if( vevo_property_get( instance, "in_parameters", i, &param) != VEVO_NO_ERROR )
+			continue;
 		snprintf(vkey,sizeof(vkey), "p%02d", i );
 		clone_prop_vevo( param, fx_value_port, vkey, "value"  );
 	}
@@ -1065,9 +1066,10 @@ void	livido_clone_parameter( void *instance, int seq, void *fx_value_port )
 	int i;
 	for( i = 0; i < vj_np; i ++ )
 	{
-		char	vkey[10];
+		char	vkey[8];
 		void *param = NULL;
-		int error = vevo_property_get( instance, "in_parameters", i, &param);
+		if( vevo_property_get( instance, "in_parameters", i, &param) != VEVO_NO_ERROR )
+			continue;
 		snprintf(vkey,sizeof(vkey), "p%02d", i );
 		clone_prop_vevo( fx_value_port, param,vkey, "value"  );
 	}
