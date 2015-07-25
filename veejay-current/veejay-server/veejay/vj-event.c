@@ -429,8 +429,8 @@ else { veejay_msg(VEEJAY_MSG_DEBUG,"arg has size of 0x0");}
 //@ F1 -> sample playing FX=off -> standard help
 //@ F1 -> sample playing FX=on entry >= 0 <= MAX_E : show help for FX on entry N
 //
-//
-static	struct {
+/*
+static struct {
 	const char *msg;
 } embedded_help[] = {
 	{ "'[' Set starting position of sample\n" },
@@ -454,7 +454,7 @@ static	struct {
 	{ "ENTER Add selected FX to current FX slot\n"},
 	
 	{ NULL }
-};
+}; */
 
 static struct {
 	const char *msg;
@@ -476,7 +476,7 @@ static struct {
 	{ NULL }
 };
 
-
+/*
 static char	*get_arr_embedded_help(char *ehelp[])
 {
 	int i;
@@ -498,13 +498,13 @@ static char	*get_arr_embedded_help(char *ehelp[])
 	}
 	return msg;
 }
-
+*/
 char	*get_embedded_help( int fx_mode, int play_mode, int fx_entry, int id )
 {
 	char msg[16384];
 	if( play_mode == VJ_PLAYBACK_MODE_PLAIN || ( play_mode == VJ_PLAYBACK_MODE_SAMPLE && fx_mode == 0 ) )
 	{
-		return get_arr_embedded_help( embedded_help );
+		return NULL; // return get_arr_embedded_help( embedded_help ); FIXME someday
 	} else {
 		veejay_memset(msg,0,sizeof(msg));
 		int fx_id = 0;
@@ -719,8 +719,13 @@ static hash_val_t int_bundle_hash(const void *key)
 
 static int int_bundle_compare(const void *key1,const void *key2)
 {
-	return ((int)key1 < (int) key2 ? -1 : 
-		((int) key1 > (int) key2 ? +1 : 0));
+#ifdef ARCH_X86_64
+	return ((uint64_t) key1 < (uint64_t) key2 ? -1 :
+			((uint64_t) key1 < (uint64_t) key2 ? 1: 0 ));
+#else
+	return ((uint32_t)key1 < (uint32_t) key2 ? -1 : 
+		((uint32_t) key1 > (uint32_t) key2 ? +1 : 0));
+#endif
 }
 
 typedef struct {
@@ -783,7 +788,13 @@ int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id )
 	if(bundle) {
 		hnode_t *n = hnode_create(bundle);
 		if(!n) return 0;
-		hnode_put( n, (void*) bundle_id);
+#ifdef ARCH_X86_64
+		uint64_t tid = (uint64_t) bundle_id;
+#else
+		uint32_t tid = (uint32_t) bundle_id;
+#endif
+
+		hnode_put( n, (void*) tid);
 		hnode_destroy(n);
 		return 1;
 	}
@@ -809,7 +820,13 @@ static	void	constrain_stream( veejay_t *v, int n, long hi )
 vj_msg_bundle *vj_event_bundle_get(int event_id)
 {
 	vj_msg_bundle *m;
-	hnode_t *n = hash_lookup(BundleHash, (void*) event_id);
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) event_id;
+#else
+	uint32_t tid = (uint32_t) event_id;
+#endif
+
+	hnode_t *n = hash_lookup(BundleHash, (void*) tid);
 	if(n) 
 	{
 		m = (vj_msg_bundle*) hnode_get(n);
@@ -827,10 +844,15 @@ int			del_keyboard_event(int id )
 	vj_keyboard_event *ev = get_keyboard_event( id );
 
 	keyboard_event_map_[ id ] = NULL;
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) id;
+#else
+	uint32_t tid = (uint32_t) id;
+#endif
 
 	if(ev == NULL)
 		return 0;
-	node = hash_lookup( keyboard_events, (void*) id );
+	node = hash_lookup( keyboard_events, (void*) tid );
 	if(!node)
 		return 0;
 	if(ev->arguments)
@@ -844,7 +866,13 @@ int			del_keyboard_event(int id )
 
 vj_keyboard_event	*get_keyboard_event(int id )
 {
-	hnode_t *node = hash_lookup( keyboard_events, (void*) id );
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) id;
+#else
+	uint32_t tid = (uint32_t) id;
+#endif
+
+	hnode_t *node = hash_lookup( keyboard_events, (void*) tid );
 	if(node)
 		return ((vj_keyboard_event*) hnode_get( node ));
 	return NULL;
@@ -852,7 +880,13 @@ vj_keyboard_event	*get_keyboard_event(int id )
 
 int		keyboard_event_exists(int id)
 {
-	hnode_t *node = hash_lookup( keyboard_events, (void*) id );
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) id;
+#else
+	uint32_t tid = (uint32_t) id;
+#endif
+
+	hnode_t *node = hash_lookup( keyboard_events, (void*) tid );
 	if(node)
 		if( hnode_get(node) != NULL )
 			return 1;
@@ -944,7 +978,13 @@ vj_keyboard_event *new_keyboard_event(
 
 int vj_event_bundle_exists(int event_id)
 {
-	hnode_t *n = hash_lookup( BundleHash, (void*) event_id );
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) event_id;
+#else
+	uint32_t tid = (uint32_t) event_id;
+#endif
+
+	hnode_t *n = hash_lookup( BundleHash,(void*) tid );
 	if(!n)
 		return 0;
 	return ( vj_event_bundle_get(event_id) == NULL ? 0 : 1);
@@ -967,13 +1007,18 @@ int vj_event_bundle_store( vj_msg_bundle *m )
 	if(!m) return 0;
 	n = hnode_create(m);
 	if(!n) return 0;
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) m->event_id;
+#else
+	uint32_t tid = (uint32_t) m->event_id;
+#endif
 	if(!vj_event_bundle_exists(m->event_id))
 	{
-		hash_insert( BundleHash, n, (void*) m->event_id);
+		hash_insert( BundleHash, n, (void*) tid);
 	}
 	else
 	{
-		hnode_put( n, (void*) m->event_id);
+		hnode_put( n, (void*) tid);
 		hnode_destroy( n );
 	}
 
@@ -991,8 +1036,13 @@ int vj_event_bundle_del( int event_id )
 	hnode_t *n;
 	vj_msg_bundle *m = vj_event_bundle_get( event_id );
 	if(!m) return -1;
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) event_id;
+#else
+	uint32_t tid = (uint32_t) event_id;
+#endif
 
-	n = hash_lookup( BundleHash, (void*) event_id );
+	n = hash_lookup( BundleHash, (void*) tid );
 	if(!n)
 		return -1;
 
@@ -1068,7 +1118,7 @@ void	vj_event_parse_kf( veejay_t *v, char *msg, int len )
 	}
 	else if (STREAM_PLAYING(v))
 	{
-		if(vj_tag_chain_set_kfs(v->uc->sample_id,len,msg ) == -1)
+		if(vj_tag_chain_set_kfs(v->uc->sample_id,len,(unsigned char*)msg ) == -1)
 			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Invalid key frame blob [%s]",msg);
 	}
 	else
@@ -1587,7 +1637,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 			fmt_offset += 3;
 
 			if( *arguments == 0x20 )	
-			   *arguments ++;
+			   arguments += 1;
 		}
 
 		i ++;
@@ -1622,7 +1672,7 @@ void vj_event_update_remote(void *ptr)
 	int p2 = vj_server_poll( v->vjs[VEEJAY_PORT_STA] );
 	int p3 = vj_server_poll( v->vjs[VEEJAY_PORT_DAT] );
 
-	int has_n=0, has_b=0;
+	int has_n=0;
 
 	if( p1  )
 	has_n += vj_server_new_connection(v->vjs[VEEJAY_PORT_CMD]);
@@ -1843,7 +1893,7 @@ static	int	get_fstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, float *
 static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *dst )
 {
 	xmlChar *tmp = NULL;
-	unsigned char *t = NULL;
+	char *t = NULL;
 	int tmp_i = 0;
 	int n = 0;
 	if(! xmlStrcmp( cur->name, what ))
@@ -2200,14 +2250,13 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	char file_name[512];
-	char live_set[512];
 	int args[2] = {0,0};
 	int i;
 	//veejay_t *v = (veejay_t*) ptr;
 	xmlDocPtr doc;
 	xmlNodePtr rootnode,childnode;	
 	P_A(args,file_name,format,ap);
-	doc = xmlNewDoc( "1.0" );
+	doc = xmlNewDoc( (const xmlChar*) "1.0" );
 	rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) XML_CONFIG_FILE,NULL);
 	xmlDocSetRootElement( doc, rootnode );
 
@@ -2383,12 +2432,19 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 	{
 		return 0;
 	}
-	hnode_t *old = hash_lookup( keyboard_events, (void*) index );
+
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) index;
+#else
+	uint32_t tid = (uint32_t) index;
+#endif
+
+	hnode_t *old = hash_lookup( keyboard_events, (void*) tid );
 	if(old) {
 		hash_delete( keyboard_events, old );
 	}
 
-	hash_insert( keyboard_events, node, (void*) index );
+	hash_insert( keyboard_events, node, (void*) tid );
 	
 	return 1;
 }
@@ -2831,7 +2887,7 @@ void vj_event_effect_set_bg(void *ptr, const char format[], va_list ap)
 void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	unsigned int i,len=0;
+	unsigned int len=0;
 	char message[256];
 	char *blob = NULL;
 	char line[512];
@@ -2896,11 +2952,8 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	vj_msg_bundle *m;
 	int i;
-	const int token_len = 20;
 	char tmp[4096];
 	char *buf = vj_calloc( 65535 );
-
-	int rc  = 0;
 
 	for( i = 0; i <= 600 ; i ++ )
 	{
@@ -2931,10 +2984,8 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 			int form_len = (form ? strlen(form)  : 0);
 #ifdef HAVE_SDL
 			vims_key_list *tree = vj_event_get_keys( i );
-			vims_key_list *root = tree;
 			while( tree != NULL )
 			{
-				vims_key_list *this = tree;
 				snprintf(tmp, sizeof(tmp)-1, "%04d%03d%03d%04d%s%03d%03d",
 					i, tree->key_symbol, tree->key_mod, name_len, name, form_len, tree->arg_len );
 
@@ -3182,7 +3233,6 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 
 void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 {
-	int new_id = 0;
 	veejay_t *v = (veejay_t*) ptr;
 	if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v)) 
 	{
@@ -3229,7 +3279,6 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 			if(sample_store(skel)==0) 
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d]", skel->sample_id);
-				new_id = skel->sample_id;
 			}
 		
 		}
@@ -3483,7 +3532,6 @@ void	vj_event_render_depth( void *ptr, const char format[] , va_list ap )
 
 void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 {
-	veejay_t *v = (veejay_t*) ptr;
 }
 
 void vj_event_play_reverse(void *ptr,const char format[],va_list ap) 
@@ -4758,7 +4806,6 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 
 void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 {
-	veejay_t *v = (veejay_t*) ptr;
 	int args[1];
 	char *s = NULL;
 	int new_sample =0;
@@ -5544,10 +5591,6 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
         char str[4096];
         P_A(args,str,format,ap);    
-	long int tmp = 0;
-	char *end = str;
-	int base = 10;
-	int index = 3; // sample, chain, fx_id
 	int value = 0;
 
 	if( sscanf( str, "%d" , &value ) != 1 ) {
@@ -5580,7 +5623,7 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 
 			if(sample_set_effect_arg(args[0],args[1],args[2],(int) val )==-1)	
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",args[2],(int)v,vj_effect_get_description(effect));
+				veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",args[2],(int)val,vj_effect_get_description(effect));
 			}
 			v->uc->chain_changed = 1;
 		}
@@ -5609,7 +5652,7 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 
 			if(vj_tag_set_effect_arg(args[0],args[1],args[2],(int) val)==-1)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",args[2],(int)v,vj_effect_get_description(effect));
+				veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",args[2],(int)val,vj_effect_get_description(effect));
 			}
 			v->uc->chain_changed = 1;
 		}
@@ -7041,7 +7084,6 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 	}
 
 	if ( args[1] == 1 ) {
-		int old = v->settings->composite;
 		int mode = v->settings->composite;
 		if( mode == 0 ) {
 			if( SAMPLE_PLAYING(v) ) {
@@ -8032,20 +8074,19 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 
 		);
 
-	int first = 0;
-    	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
 		y = sample_get_effect_any(id, i);
 		if (y != -1)
 		{
 		
 			char tmp[256] = { 0 };
-	    		for (j = 0; j < vj_effect_get_num_params(y); j++)
+	    	for (j = 0; j < vj_effect_get_num_params(y); j++)
 			{
 				char small[32];
 				value = sample_get_effect_arg(id, i, j);
 				
-				snprintf(small, sizeof(small), "P%d = %d ",j, value );
+				snprintf(small, sizeof(small), "P%d = %ld ",j, value );
 				strcat( tmp, small );
 			}
 
@@ -8430,7 +8471,6 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 		return;
 	}
 
-	int preview_size = 0;
 	int dstlen = 0;
 	VJFrame frame;
 	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
