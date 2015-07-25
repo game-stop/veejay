@@ -332,10 +332,6 @@ void	vj_picture_init( void *templ )
 {
 	if(!__initialized)
 	{
-		// cool stuff
-#ifdef USE_GDK_PIXBUF
-		g_type_init();
-#endif
 		__initialized = 1;
 	}
 
