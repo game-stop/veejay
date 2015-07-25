@@ -51,6 +51,7 @@ The OpenSound Control WWW page is
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <sys/types.h>

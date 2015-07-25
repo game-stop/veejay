@@ -40,18 +40,8 @@ The OpenSound Control WWW page is
 #include <libOSC/OSC-timetag.h>
 #include <libOSC/OSC-priority-queue.h>
 #include <stdint.h>
-#include <sys/time.h>
-#define PRINT_PRIORITY_QUEUE
-
-#ifdef DEBUG_OSC_PRIORITY_QUEUE
-#define PRINT_PRIORITY_QUEUE
-#endif
-
-#if defined(PRINT_PRIORITY_QUEUE) || defined(DEBUG_OSC_PRIORITY_QUEUE)
-
 #include <stdio.h>
-void OSCQueuePrint(OSCQueue q);
-#endif
+#include <sys/time.h>
 
 #define CAPACITY 1000
 
@@ -73,9 +63,6 @@ OSCQueue OSCNewQueue(int maxItems, void *(*InitTimeMalloc)(int numBytes)) {
 
     result->n = 0;
 
-#ifdef DEBUG_OSC_PRIORITY_QUEUE
-    OSCQueuePrint(result);
-#endif
     return result;
 }
 
@@ -84,10 +71,6 @@ int OSCQueueInsert(OSCQueue q, OSCSchedulableObject new) {
 
     q->list[q->n] = new;
     ++(q->n);
-#ifdef DEBUG_OSC_PRIORITY_QUEUE
-    printf("OSCQueueInsert: just inserted %p\n", new);
-    OSCQueuePrint(q);
-#endif
     return TRUE;
 }
 
@@ -102,10 +85,6 @@ OSCTimeTag OSCQueueEarliestTimeTag(OSCQueue q) {
 	}
     }
 
-#ifdef DEBUG_OSC_PRIORITY_QUEUE
-    printf("OSCQueueEarliestTimeTag: about to return %llx\n", smallest);
-    OSCQueuePrint(q);
-#endif
     return smallest;
 }
 
@@ -128,11 +107,6 @@ OSCSchedulableObject OSCQueueRemoveEarliest(OSCQueue q) {
 			return NULL;
 		}
 
-#ifdef DEBUG_OSC_PRIORITY_QUEUE
-    printf("OSCQueueRemoveEarliest: begin\n");
-    OSCQueuePrint(q);
-#endif
-
     smallestIndex = 0;
     for (i = 1; i < q->n; ++i) {
         if (OSCTT_Compare(q->list[smallestIndex]->timetag, q->list[i]->timetag) > 0) {
@@ -144,27 +118,8 @@ OSCSchedulableObject OSCQueueRemoveEarliest(OSCQueue q) {
 
     RemoveElement(smallestIndex, q);
 
-#ifdef DEBUG_OSC_PRIORITY_QUEUE
-    printf("OSCQueueRemoveEarliest: done\n");
-    OSCQueuePrint(q);
-#endif
     return result;
 }
-
-#ifdef PRINT_PRIORITY_QUEUE
-
-void OSCQueuePrint(OSCQueue q) {
-    int i;
-    printf("OSC Priority queue at %p has %d elements:\n", q, q->n);
-
-    for (i = 0; i < q->n; ++i) {
-	printf("   list[%2d] is %p, timetag = %llx\n", i, q->list[i], q->list[i]->timetag);
-    }
-    printf("\n\n");
-}
-
-#endif
-
 
 void OSCQueueScanStart(OSCQueue q) {
     q->scanIndex = 0;

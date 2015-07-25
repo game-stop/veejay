@@ -17,7 +17,7 @@ typedef int int4;   /* 4 byte int */
 typedef struct NetworkReturnAddressStruct_t {
     struct sockaddr_in  cl_addr; /* client information */
     struct sockaddr_in  my_addr; /* us */
-    int clilen;
+    unsigned int clilen;
     int sockfd;
     fd_set readfds;
     struct timeval tv;

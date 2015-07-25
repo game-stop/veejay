@@ -2,6 +2,6 @@
 
 struct NetworkReturnAddressStruct {
     struct sockaddr_in  cl_addr;
-    int clilen;
+    unsigned int clilen;
     int sockfd;
 };
