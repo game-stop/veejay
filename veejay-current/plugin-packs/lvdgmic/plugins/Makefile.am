@@ -30,8 +30,7 @@ lividoplugin_LTLIBRARIES = gmic_cartoon.la \
 			   gmic_quadratize.la \
 			   gmic_plasma.la \
 			   gmic_curvature.la \
-			   gmic_lightrelief.la \
-			   gmic_sketchbw.la
+			   gmic_lightrelief.la 
 
 gmic_cartoon_la_SOURCES = gmic_cartoon.c
 gmic_cartoon_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
