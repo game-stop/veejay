@@ -85,9 +85,8 @@ void	*reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
 	threaded_t *t = tag->priv;
-	int ret = 0;
+	
 	char buf[16];
-
 	snprintf(buf,sizeof(buf)-1, "%03d:;", VIMS_GET_FRAME);
 
 	int retrieve = 0;
@@ -108,9 +107,6 @@ void	*reader_thread(void *data)
 		goto NETTHREADEXIT;
 	}
 
-	unsigned int	optimistic = 1;
-	unsigned int	optimal    = 8;
-
 	lock(t);
 	t->state = STATE_RUNNING;
 	unlock(t);
@@ -121,7 +117,7 @@ void	*reader_thread(void *data)
 
 		int ret = 0;
 	        if( retrieve == 0 && t->have_frame == 0 ) {
-			ret = vj_client_send( v, V_CMD, buf );
+			ret = vj_client_send( v, V_CMD,(unsigned char*) buf );
 			if( ret <= 0 ) {
 				error = 1;
 			}
@@ -287,14 +283,11 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 {
 	threaded_t *t = (threaded_t*) tag->priv;
 	
-	int have_frame = 0;
 	int state = 0;
 
 	/* frame ready ? */
 	lock(t);
-	have_frame = t->have_frame;
 	state = t->state;
-
 	if( state == 0 || t->bufsize == 0 || t->buf == NULL ) {
 		unlock(t);
 		return 1; // not active or no frame
