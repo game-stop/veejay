@@ -1259,7 +1259,7 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 		pkt.data = src;
 	    pkt.size = length;
 
-	    res = avcodec_decode_video2( 
+	    avcodec_decode_video2( 
 						v->c, 
 						v->picture, 
 						&got_picture,
