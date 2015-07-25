@@ -89,7 +89,7 @@ int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);
 int		_vj_server_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, int priority );
 int		_vj_server_empty_queue(vj_server *vje, int link_id);
-
+/*
 static		int geo_stat_ = 0;
 
 static void		vj_server_geo_stats_(char *request)
@@ -110,7 +110,6 @@ static void		vj_server_geo_stats_(char *request)
 
 void	vj_server_geo_stats()
 {
-/*
 	// Inactive
 	char request[128];
 	snprintf(request,sizeof(request),"GET /veejay-15 HTTP/1.1\nHost: www.veejayhq.net\nReferrer: http://");
@@ -120,8 +119,13 @@ void	vj_server_geo_stats()
 	
 	//@ knock home
 	snprintf(request,sizeof(request),"GET /veejay-%s HTTP/1.1\nHost: c0ntrol.dyndns.org\n",VERSION );
-	vj_server_geo_stats_(request);*/
+	vj_server_geo_stats_(request);
 
+}
+*/
+
+void	vj_server_geo_stats()
+{
 }
 
 void		vj_server_set_mcast_mode( vj_server *v , int mode )
@@ -256,7 +260,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	{
 		veejay_msg(0, "Cannot set send buffer size: %s", strerror(errno));
 	}
-	int tmp = sizeof(int);
+	unsigned int tmp = sizeof(int);
 	if( getsockopt( vjs->handle, SOL_SOCKET, SO_SNDBUF,(unsigned char*) &(vjs->send_size), &tmp) == -1 )
 	{
 		veejay_msg(0, "Cannot read socket buffer size: %s", strerror(errno));
@@ -861,7 +865,7 @@ int	vj_server_new_connection(vj_server *vje)
 {
 	if( FD_ISSET( vje->handle, &(vje->fds) ) )
 	{
-		int addr_len = sizeof(vje->remote);
+		unsigned int addr_len = sizeof(vje->remote);
 		int n = 0;
 		int fd = accept( vje->handle, (struct sockaddr*) &(vje->remote), &addr_len );
 		if(fd == -1)
@@ -923,7 +927,7 @@ int	vj_server_update( vj_server *vje, int id )
 	if(!vje->use_mcast) {
 
 		int max = vje->recv_bufsize;
-		int bytes_left = 1;
+		
 		char *ptr = vje->recv_buf;
 		
 		n = recv( sock_fd, ptr, 1, 0 );
@@ -959,7 +963,7 @@ readmore_lbl:
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "received %d bytes from handle %d (link %d)\n", 
 					bytes_received,Link[id]->handle,id );
-			printbuf( vje->logfd, vje->recv_buf, bytes_received );
+			printbuf( vje->logfd, (uint8_t*) vje->recv_buf, bytes_received );
 		}
 		
 	}
@@ -990,7 +994,7 @@ readmore_lbl:
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid VIMS instruction '%s'", msg_buf );
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "no valid messages in buffer!\n" );
-			printbuf( vje->logfd, msg_buf, bytes_left );
+			printbuf( vje->logfd, (uint8_t*)msg_buf, bytes_left );
 		}
 		return -1; //@ close client now
 	}
@@ -1014,7 +1018,7 @@ readmore_lbl:
 
 void vj_server_shutdown(vj_server *vje)
 {
-	int j,i;
+	int i;
 	vj_link **Link = (vj_link**) vje->link;
 	int k = VJ_MAX_CONNECTIONS;
 

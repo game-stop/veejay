@@ -41,11 +41,11 @@ typedef struct vj_server_t {
     int  ports[2];
     void	**protocol;
     char	*recv_buf;
-    int	send_size;
-    int	recv_size;
+    unsigned int	send_size;
+    unsigned int	recv_size;
     int mcast_gray;
     FILE *logfd; 
-    int recv_bufsize;
+    unsigned int recv_bufsize;
 } vj_server;
 
 vj_server *vj_server_alloc(int port, char *mcast_group_name, int type, size_t recv_max_len);
