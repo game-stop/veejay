@@ -96,7 +96,7 @@ void		vj_client_free(vj_client *v)
 
 int	vj_client_window_sizes( int socket_fd, int *r, int *s )
 {
-	int tmp = sizeof(int);
+	unsigned int tmp = sizeof(int);
 	if( getsockopt( socket_fd, SOL_SOCKET, SO_SNDBUF,(unsigned char*) s, &tmp) == -1 ) {
 		veejay_msg(0, "Cannot read socket buffer size: %s", strerror(errno));
 		return 0;
@@ -255,7 +255,7 @@ static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
 		return -1;
 	}
 
-	int n = sscanf( line, "%04d%04d%04d%08d%08d%08d%08d", 
+	int n = sscanf( (char*) line, "%04d%04d%04d%08d%08d%08d%08d", 
 			&tokens[0],
 			&tokens[1],
 			&tokens[2],
@@ -530,12 +530,12 @@ int vj_client_send(vj_client *v, int sock_type,unsigned char *buf) {
 	int len = strlen( (const char*)buf);
 	
 	if( v->mcast ) {
-		sprintf( v->blob, "V%03dD", len );
+		sprintf( (char*) v->blob, "V%03dD", len );
 		memcpy( v->blob + 5, buf, len );
 		return mcast_send( v->s, (void*) v->blob, len + 5, v->ports[sock_type ] );
 	}
 
-	sprintf( v->blob, "V%03dD", len );
+	sprintf( (char*) v->blob, "V%03dD", len );
 	memcpy( v->blob + 5, buf, len );
 
 	return sock_t_send( v->fd[ sock_type ], v->blob, len + 5 );
