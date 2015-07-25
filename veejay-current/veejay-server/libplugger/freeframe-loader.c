@@ -47,8 +47,6 @@ typedef struct
 	uint8_t *rgb;
 } ff_frame_t;
 
-static int bug_workarround1 = 0;
-
 /** \defgroup freeframe FreeFrame Host
  *
  * Provides a host implementation for FreeFrame plugins, see http://freeframe.sourceforge.net
@@ -140,6 +138,7 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 	}
 
 	char plugname[512];
+	char key[32];
 	snprintf(plugname,sizeof(plugname), "FreeFrame %s", pis->pluginName  );
 
 	plugin_name = vj_strdup( plugname ); 
@@ -184,8 +183,7 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 	int p;
 	for( p=  0; p < n_params; p ++ )
 	{
-		int randp = 0;
-		int type = q( FF_GETPARAMETERTYPE, (LPVOID) p, 0 ).ivalue;
+		unsigned int type = q( FF_GETPARAMETERTYPE, (LPVOID) p, 0 ).ivalue;
 		char *pname = q( FF_GETPARAMETERNAME, (LPVOID) p, 0 ).svalue;
 
 		plugMainUnion v = q(FF_GETPARAMETERDEFAULT, (LPVOID) p, 0 );
@@ -240,8 +238,7 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 		vevo_property_set( parameter, "max", VEVO_ATOM_TYPE_INT,1, &max );
 		vevo_property_set( parameter, "default",VEVO_ATOM_TYPE_INT,1,&dvalue);
 		vevo_property_set( parameter, "HOST_kind", VEVO_ATOM_TYPE_INT,1,&kind );
-		char key[20];	
-		snprintf(key,20, "p%02d", p );
+		snprintf(key,sizeof(key), "p%02d", p );
 		vevo_property_set( port, key, VEVO_ATOM_TYPE_VOIDPTR, 1, &parameter );
 	}
 
@@ -253,14 +250,16 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 void	freeframe_plug_retrieve_default_values( void *instance, void *fx_values )
 {
 	void *base = NULL;
-	int error = vevo_property_get( instance, "base", 0, &base);
+	if( vevo_property_get( instance, "base", 0, &base) != VEVO_NO_ERROR )
+		return;
 
 	plugMainType *q = (plugMainType*) base; 
 
 	int n = 0;
 	int i;
 	
-	error = vevo_property_get( instance, "num_params",0,&n);
+	if( vevo_property_get( instance, "num_params",0,&n) != VEVO_NO_ERROR )
+		return;
 
 	for( i = 0; i < n; i ++ )
 	{
@@ -273,27 +272,21 @@ void	freeframe_plug_retrieve_default_values( void *instance, void *fx_values )
 
 void	freeframe_plug_retrieve_current_values( void *instance, void *fx_values )
 {
-	void *base = NULL;
-	int error = vevo_property_get( instance, "base", 0, &base);
-
-	plugMainType *q = (plugMainType*) base; 
-
 	int n = 0;
 	int i;
 	
-	error = vevo_property_get( instance, "num_params",0,&n);
+	if( vevo_property_get( instance, "num_params",0,&n) != VEVO_NO_ERROR )
+		return;
 
 	for( i = 0; i < n; i ++ )
 	{
 		char vkey[16];
 		sprintf(vkey, "p%02d",i);
 		void *param = NULL;
-		error = vevo_property_get( instance ,vkey,0,&param );
-		if( error != VEVO_NO_ERROR )
+		if( vevo_property_get( instance ,vkey,0,&param ) != VEVO_NO_ERROR)
 			continue;
 		double ivalue = 0.0;
-		error = vevo_property_get( param,"value",0,&ivalue);
-		if( error != VEVO_NO_ERROR )
+		if( vevo_property_get( param,"value",0,&ivalue) != VEVO_NO_ERROR )
 			continue;
 		vevo_property_set( fx_values, vkey, VEVO_ATOM_TYPE_DOUBLE,1, &ivalue );
 	}
@@ -301,26 +294,21 @@ void	freeframe_plug_retrieve_current_values( void *instance, void *fx_values )
 
 void	freeframe_reverse_clone_parameter( void *instance, int seq, void *fx_values )
 {
-	void *base = NULL;
-	int error = vevo_property_get( instance, "base", 0, &base);
-
-	plugMainType *q = (plugMainType*) base; 
-
 	int n = 0;
 	int i;
-	error = vevo_property_get( instance, "num_params",0,&n);
+	
+	if( vevo_property_get( instance, "num_params",0,&n) != VEVO_NO_ERROR )
+		return;
 
 	for( i = 0; i < n; i ++ )
 	{
 		char vkey[16];
 		sprintf(vkey, "p%02d",i);
 		void *param = NULL;
-		error = vevo_property_get( instance ,vkey,0,&param );
-		if( error != VEVO_NO_ERROR )
+		if( vevo_property_get( instance ,vkey,0,&param ) != VEVO_NO_ERROR )
 			continue;
 		double ivalue = 0.0;
-		error = vevo_property_get( param,"value",0,&ivalue);
-		if( error != VEVO_NO_ERROR )
+		if( vevo_property_get( param,"value",0,&ivalue) != VEVO_NO_ERROR )
 			continue;
 		vevo_property_set( fx_values, vkey, VEVO_ATOM_TYPE_DOUBLE,1, &ivalue );
 	}
@@ -332,20 +320,24 @@ void	freeframe_clone_parameter( void *instance, int seq, void *fx_values )
 {
 	// put fx_values to freeframe
 	void *base = NULL;
-	int error = vevo_property_get( instance, "base", 0, &base);
+	if( vevo_property_get( instance, "base", 0, &base) != VEVO_NO_ERROR )
+		return;
 
 	plugMainType *q = (plugMainType*) base; 
 
 	int n = 0;
 	int i;
 	DWORD inp = 0;
-	error = vevo_property_get( instance, "instance", 0, &inp );
-	error = vevo_property_get( instance, "num_params",0,&n);
+	if( vevo_property_get( instance, "instance", 0, &inp ) != VEVO_NO_ERROR )
+		return;
+
+	if( vevo_property_get( instance, "num_params",0,&n) != VEVO_NO_ERROR )
+		return;
 
 	for( i = 0; i < n; i ++ )
 	{
 		char key[64];
-		sprintf(key, "p%02d",i);
+		sprintf(key,"p%02d",i);
 	
 		double   		value = 0.0;
 		SetParameterStruct	v;
@@ -370,14 +362,16 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 	v.bitDepth = FF_CAP_V_BITS_VIDEO;
 
 	void *base = NULL;
-	int error = vevo_property_get( plugin, "base", 0, &base);
+	if( vevo_property_get( plugin, "base", 0, &base) != VEVO_NO_ERROR )
+		return 0;
+
 	plugMainType *q = (plugMainType*) base; 
 
 	DWORD instance = q( FF_INSTANTIATE, &v, 0).ivalue;
 	if( instance == FF_FAIL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize plugin");
-		return 0;
+		return NULL;
 	}
 
 	pluginstance = vpn( VEVO_ANONYMOUS_PORT );
@@ -386,15 +380,15 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 	vevo_property_set( pluginstance, "instance", VEVO_ATOM_TYPE_INT, 1, &instance );
 
 	int num_channels = 0;
-	int i;
+	
 	vevo_property_get( plugin, "num_inputs", 0, &num_channels );
 
 	if( num_channels > 4 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "too many input channels: %d", num_channels);
-		return 0;
+		return NULL;
 	}
 
-	generic_process_f	gpf = freeframe_plug_process;
+	generic_process_f	gpf = (generic_process_f) freeframe_plug_process;
 	vevo_property_set( pluginstance,
 			"HOST_plugin_process_f",
 			VEVO_ATOM_TYPE_VOIDPTR,
@@ -440,7 +434,7 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 	vevo_property_set( pluginstance, "HOST_plugin_param_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gpp);
 
 	int n_params = 0;
-	error = vevo_property_get( plugin, "num_params",0,&n_params );
+	vevo_property_get( plugin, "num_params",0,&n_params );
 
 	if( n_params > 0 ) {
 		int p;
@@ -448,20 +442,18 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 		{
 			void *parameter = NULL;
 			char key[20];	
-			snprintf(key,20, "p%02d", p );
+			sprintf(key,"p%02d", p );
 		
-			error = vevo_property_get( plugin, key, 0, &parameter );
-			if( error != VEVO_NO_ERROR )
+			if( vevo_property_get( plugin, key, 0, &parameter ) != VEVO_NO_ERROR)
 				continue;
 
-			//this returns garbage:
 			//float value = (float)q( FF_GETPARAMETERDEFAULT, (LPVOID) p, 0).fvalue;
 				
 			float value = 0.00f + (float) ( 1.0 * (rand()/(RAND_MAX+1.0f)));
 			double dval = (double) value;
 
-			error = vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_DOUBLE,1,&dval);
-	
+			vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_DOUBLE,1,&dval);
+
 			SetParameterStruct sps;
 			sps.index = p;
 			sps.value  = value;
@@ -481,14 +473,14 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 void	freeframe_plug_deinit( void *pluginstance )
 {
 	void *base = NULL;
-	int error = vevo_property_get( pluginstance, "base", 0, &base);
+	if( vevo_property_get( pluginstance, "base", 0, &base) != VEVO_NO_ERROR )
+		return;
+
 	plugMainType *q = (plugMainType*) base; 
 
 	DWORD instance = 0;
-	error = vevo_property_get( pluginstance, "instance", 0, &instance );
-	if( error != VEVO_NO_ERROR ) {
+	if( vevo_property_get( pluginstance, "instance", 0, &instance ) != VEVO_NO_ERROR )
 		return;
-	}
 
 	q( FF_DEINSTANTIATE, NULL, instance );
 
@@ -497,9 +489,11 @@ void	freeframe_plug_deinit( void *pluginstance )
 
 void	freeframe_plug_free( void *plugin )
 {
-	int n = 0;
+	
 	void *base = NULL;
-	int error = vevo_property_get( plugin, "base", 0, &base);
+	if( vevo_property_get( plugin, "base", 0, &base) != VEVO_NO_ERROR )
+		return;
+
 	plugMainType *q = (plugMainType*) base;
 	
 	q( FF_DEINITIALISE, NULL, 0 );
@@ -508,11 +502,6 @@ void	freeframe_plug_free( void *plugin )
 
 void	freeframe_push_channel( void *instance, int n,int dir, VJFrame *frame )
 {
-	char inkey[10];
-	int i;
-	void *chan = NULL;
-	int error;
-
 	freeframe_init( frame );
 
 	if(dir == 1){
@@ -526,17 +515,20 @@ void	freeframe_push_channel( void *instance, int n,int dir, VJFrame *frame )
 int	freeframe_plug_process( void *plugin, double timecode )
 {
 	void *base = NULL;
-	int error = vevo_property_get( plugin, "base", 0, &base);
+	if( vevo_property_get( plugin, "base", 0, &base) != VEVO_NO_ERROR )
+		return 0;
 
 	plugMainType *q = (plugMainType*) base; 
 	DWORD instance = 0;
-	error = vevo_property_get( plugin, "instance",0, &instance );	
+	if( vevo_property_get( plugin, "instance",0, &instance ) != VEVO_NO_ERROR )
+		return 0;
 	
 	q( FF_PROCESSFRAME, freeframe_space_, instance );
 
 	VJFrame *output_frame = NULL;
 	
-	error = vevo_property_get( plugin, "HOST_output", 0,&output_frame );
+	if( vevo_property_get( plugin, "HOST_output", 0,&output_frame ) != VEVO_NO_ERROR )
+		return 0;
 	
 	//@ output frame in [0]
 	yuv_convert_and_scale_from_rgb( rgb_conv_, freeframe_frame_[0], output_frame );
@@ -568,9 +560,13 @@ void	freeframe_plug_param_f( void *plugin, int seq_no, void *dargs )
 	sps.value  = v;
 
 	void *base = NULL;
-	error = vevo_property_get( plugin, "base", 0, &base);
+	if( vevo_property_get( plugin, "base", 0, &base) != VEVO_NO_ERROR )
+		return;
+
 	DWORD instance = 0;
-	error = vevo_property_get( plugin, "instance", 0, &instance );
+	if( vevo_property_get( plugin, "instance", 0, &instance ) != VEVO_NO_ERROR )
+		return;
+
 	plugMainType *q = (plugMainType*) base; 
 
 	q( FF_SETPARAMETER, &sps, instance );
@@ -585,16 +581,17 @@ static void 		freeframe_copy_parameters( void *srcPort, void *dst, int n_params 
 		void *src = NULL;
 		char pname[32];
 		sprintf(pname, "p%02d", p );
-		int err   = vevo_property_get( srcPort, pname, 0, &src );		
-		if( err != 0 )
+		if( vevo_property_get( srcPort, pname, 0, &src ) != VEVO_NO_ERROR )	
 			continue;
+
 		char **keys = vevo_list_properties(src);
 		if( keys == NULL )
 			continue;
+		
 		void *dport = vpn( VEVO_ANONYMOUS_PORT );
 		int i;
 		for( i = 0; keys[i] != NULL ; i ++ ) {
-			err = vevo_property_clone( src, dport, keys[i] ,keys[i] );
+			vevo_property_clone( src, dport, keys[i] ,keys[i] );
 			free(keys[i]);	
 		}	
 		free(keys);
