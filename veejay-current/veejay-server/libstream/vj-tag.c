@@ -79,7 +79,7 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 
 extern void dummy_rgb_apply(VJFrame *frame, int width, int height, int r, int g, int b);
 extern int   sufficient_space(int max_size, int nframes);
-extern unsigned char *UTF8toLAT1(unsigned char *in);
+extern char *UTF8toLAT1(unsigned char *in);
 extern int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *data, int len, int uv_len );
 
 #define RUP8(num)(((num)+8)&~8)
@@ -168,10 +168,15 @@ static hash_val_t int_tag_hash(const void *key)
 
 static int int_tag_compare(const void *key1, const void *key2)
 {
-    return ((int) key1 < (int) key2 ? -1 :
-	    ((int) key1 > (int) key2 ? +1 : 0)
+#ifdef ARCH_X86_64
+	return ((uint64_t)key1 < (uint64_t) key2 ? -1 :
+			((uint64_t)key1 < (uint64_t) key2 ? 1 : 0 )
 	);
-
+#else
+    return ((uint32_t) key1 < (uint32_t) key2 ? -1 :
+			((uint32_t) key1 > (uint32_t) key2 ? 1 : 0)
+	);
+#endif
 }
 
 vj_tag *vj_tag_get(int id)
@@ -179,8 +184,14 @@ vj_tag *vj_tag_get(int id)
     if (id <= 0 || id > this_tag_id) {
 		return NULL;
     }
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) id;
+#else
+	uint32_t tid = (uint32_t) id;
+#endif
+
 	if( tag_cache[ id ] == NULL ) {
-		hnode_t *tag_node = hash_lookup(TagHash, (void *) id);
+		hnode_t *tag_node = hash_lookup(TagHash, (void *) tid);
 		if (!tag_node) {
 			return NULL;
 		}
@@ -197,26 +208,18 @@ int vj_tag_put(vj_tag * tag)
     tag_node = hnode_create(tag);
     if (!tag_node)
 		return 0;
-
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) tag->id;
+#else
+	uint32_t tid = (uint32_t) tag->id;
+#endif
 
     if (!vj_tag_exists(tag->id)) {
-		hash_insert(TagHash, tag_node, (void *) tag->id);
+		hash_insert(TagHash, tag_node, (void *) tid);
     } else {
-		hnode_put(tag_node, (void *) tag->id);
+		hnode_put(tag_node, (void *) tid);
     }
     return 1;
-}
-
-static int vj_tag_update(vj_tag *tag, int id) {
- /* if(tag) {
-    hnode_t *tag_node = hnode_create(tag);
-    if(!tag_node) return -1;
-    hnode_put(tag_node, (void*) id);
-    hnode_destroy(tag_node);
-    return 1;
-  }
-  return -1;*/
-  return 1;
 }
 
 int	vj_tag_num_devices()
@@ -231,7 +234,6 @@ int	vj_tag_num_devices()
 char *vj_tag_scan_devices( void )
 {
 	const char *default_str = "000000";
-	int num = 0;
 	int i;
 	int len = 0;
 	char **device_list = NULL;
@@ -275,7 +277,6 @@ int	vj_tag_get_uvlen() {
 
 int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 {
-    int i;
     TagHash = hash_create(HASHCOUNT_T_MAX, int_tag_compare, int_tag_hash);
     if (!TagHash || width <= 0 || height <= 0)
 	return -1;
@@ -330,7 +331,6 @@ void vj_tag_record_init(int w, int h)
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int type )
 {
 	char tmp[1024];
-	vj_client *v;
 	if( !host  ) {
 		veejay_msg(0, "No hostname given");
 		return 0;
@@ -356,8 +356,6 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	snprintf(tmp,sizeof(tmp), "%s %d", host, port );
 	tag->extra = (void*) strdup(tmp);
 
-	int fmt=  vj_tag_input->pix_fmt;
-	
 	if( tag->socket_ready == 0 )
 	{
 		tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( w * h * 3));
@@ -372,7 +370,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 
 	return 1;
 }
-
+#ifdef HAVE_V4L
 static struct {
 	const char *name;
 } video_norm_[] = 
@@ -382,20 +380,20 @@ static struct {
 	{"auto"},
 	{NULL}
 };
+#endif
 
 int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,
 		    char norm, int palette,int pixfmt, int freq, int channel, int has_composite, int driver)
 {
 	char refname[100];
-	const char *selected_video_norm = video_norm_[2].name;
-  
 	if (stream_nr < 0 || stream_nr > vj_tag_num_devices())
 	{
 		return 0;
 	}
 	
 	snprintf(refname,sizeof(refname), "/dev/video%d",device_num ); // freq->device_num
-	
+#ifdef HAVE_V4L
+	const char *selected_video_norm = video_norm_[2].name
 	switch(norm) {
 		case 'P':
 		case 'p':
@@ -405,6 +403,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		default:
 			break;//auto
 	}
+#endif
 	
 	tag->capture_type = driver;
 	veejay_msg(VEEJAY_MSG_INFO, "Open capture device with %s",
@@ -447,7 +446,6 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 #ifdef USE_GDK_PIXBUF
 int _vj_tag_new_picture( vj_tag *tag, int stream_nr, int width, int height, float fps)
 {
-	int stop = 0;
 	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
 	vj_picture *p =	NULL;
 
@@ -752,7 +750,7 @@ int	vj_tag_set_stream_layout( int t1, int stream_id_g, int screen_no_b, int valu
 			value = 7;
 		tag->color_r = value;
 	}
-	return (vj_tag_update(tag,t1));
+	return 1;
 }
 
 int	vj_tag_set_stream_color(int t1, int r, int g, int b)
@@ -774,7 +772,7 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
 		plug_set_parameter( tag->generator, 2,1,&b );
 	}
 
-    return (vj_tag_update(tag,t1));
+    return 1;
 }
 
 int	vj_tag_get_composite(int t1)
@@ -827,8 +825,6 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     int h = _tag_info->effect_frame1->height;
     float fps = _tag_info->effect_frame1->fps;
 
-    char sourcename[255];
- 
     vj_tag *tag;
   
     if( this_tag_id == 0)
@@ -858,7 +854,11 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		veejay_msg(0, "Memory allocation error");
 		return -1;
 	}
-
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) id;
+#else
+	uint32_t tid = (uint32_t) id;
+#endif
      /* see if we can reclaim some id */
     for(i=0; i <= next_avail_tag; i++) {
 		if(avail_tag[i] != 0) {
@@ -871,7 +871,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		  }
 		  id = avail_tag[i];
 		  avail_tag[i] = 0;
-		  hash_insert(TagHash, tag_node, (void *) id);
+		  hash_insert(TagHash, tag_node, (void *) tid);
 		  break;
         }
     }
@@ -1010,7 +1010,6 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	}
 
 	if(channel >= 0 || filename != NULL)  {
-		char *plugname = NULL;
 		if( filename != NULL ) {
 			channel = plug_get_idx_by_so_name( filename );
 			if( channel == -1 ) {
@@ -1189,7 +1188,6 @@ int	vj_tag_verify_delete(int id, int type )
 				{
 					s->effect_chain[j]->channel = i;
 					s->effect_chain[j]->source_type = 1;
-					vj_tag_update( s, i );
 				}
 			}
 		}
@@ -1313,8 +1311,12 @@ int vj_tag_del(int id)
 
 	if(tag->viewport)
 		viewport_destroy(tag->viewport);
-
-   	tag_node = hash_lookup(TagHash, (void *) tag->id);
+#ifdef ARCH_X86_64
+	uint64_t tid = (uint64_t) tag->id;
+#else
+	uint32_t tid = (uint32_t) tag->id;
+#endif
+   	tag_node = hash_lookup(TagHash, (void *) tid);
 
 	if(tag_node)
 	{
@@ -1362,7 +1364,7 @@ int	vj_tag_set_n_frames( int t1, int n )
     if (!tag)
 	return -1;
   tag->n_frames = n;
-  return ( vj_tag_update(tag, t1)); 
+  return 1;
 }
 
 int	vj_tag_load_composite_config( void *compiz, int t1 )
@@ -1378,7 +1380,6 @@ int	vj_tag_load_composite_config( void *compiz, int t1 )
 
 	tag->composite = val;
 	tag->viewport  = temp;
-	vj_tag_update(tag,t1);
 	return tag->composite; 
 }
 
@@ -1394,7 +1395,6 @@ void	vj_tag_reload_config( void *compiz, int t1, int mode )
 			tag->viewport_config = composite_get_config( compiz, mode );
 		}
 		tag->composite = mode;
-		vj_tag_update(tag, t1);
 	}
 }
 void	*vj_tag_get_composite_view( int t1 )
@@ -1408,7 +1408,7 @@ int	vj_tag_set_composite_view( int t1, void *vp )
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
 	tag->viewport = vp;
-	return (vj_tag_update(tag,t1));
+	return 1;
 }
 
 int	vj_tag_set_composite( void *compiz,int t1, int n )
@@ -1418,11 +1418,11 @@ int	vj_tag_set_composite( void *compiz,int t1, int n )
 	tag->composite = n;
 	if( tag->viewport_config == NULL ) {
 		tag->composite = 1;
-		return (vj_tag_update(tag,t1));
+		return 1;
 	}
 	composite_add_to_config( compiz, tag->viewport_config, n );
 	
-	return (vj_tag_update(tag,t1));
+	return 1;
 }
 
 int vj_tag_get_effect(int t1, int position)
@@ -1466,7 +1466,7 @@ int	vj_tag_set_description(int t1, char *description)
 		snprintf( tag->descr, TAG_MAX_DESCR_LEN, "%s","Untitled"); 
 	else
 		snprintf( tag->descr, TAG_MAX_DESCR_LEN, "%s", description );
-	return ( vj_tag_update(tag, t1)) ;
+	return 1;
 }
 
 int	vj_tag_get_description( int t1, char *description )
@@ -1484,7 +1484,7 @@ int vj_tag_set_manual_fader(int t1, int value )
   tag->fader_active = 2;
   tag->fader_inc = 0.0;
   tag->fader_val = (float)value;
-  return (vj_tag_update(tag,t1));
+  return 1;
 }
 
 float vj_tag_get_fader_inc(int t1) {
@@ -1499,14 +1499,14 @@ int vj_tag_reset_fader(int t1) {
   tag->fader_active = 0;
   tag->fader_inc = 0.0;
   tag->fader_val = 0.0;
-  return (vj_tag_update(tag,t1));
+  return 1;
 }
 
 int vj_tag_set_fader_val(int t1, float val) {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
   tag->fader_val = val;
-  return ( vj_tag_update(tag,t1));
+  return 1;
 }
 
 int vj_tag_get_fader_active(int t1) {
@@ -1527,7 +1527,6 @@ int vj_tag_apply_fader_inc(int t1) {
   tag->fader_val += tag->fader_inc;
   if(tag->fader_val > 255.0 ) tag->fader_val = 255.0;
   if(tag->fader_val < 0.0) tag->fader_val = 0.0;
-  vj_tag_update(tag,t1);
   if(tag->fader_direction) return tag->fader_val;
   return (255-tag->fader_val);
 }
@@ -1547,7 +1546,7 @@ int vj_tag_set_fader_active(int t1, int nframes , int direction) {
   tag->fader_inc *= direction;
   if(tag->effect_toggle == 0 )
 	tag->effect_toggle = 1;
-  return ( vj_tag_update(tag, t1));
+  return 1;
 }
 
 int vj_tag_stop_encoder(int t1) {
@@ -1565,7 +1564,7 @@ int vj_tag_stop_encoder(int t1) {
   	tag->encoder = NULL;
 	tag->encoder_file = NULL; 
  	tag->encoder_active = 0;
-	return (vj_tag_update(tag,t1));
+	return 1;
    }
 
    return 0;
@@ -1654,7 +1653,6 @@ int	vj_tag_try_filename(int t1, char *filename, int format)
 static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 {
 	char cformat = vj_avcodec_find_lav( format );
-	int sample_id = tag->id;
 	
 	tag->encoder =  vj_avcodec_start( _tag_info->effect_frame1, format, tag->encoder_destination );
 	if(!tag->encoder)
@@ -2021,7 +2019,7 @@ void	vj_tag_set_kf_type(int s1, int entry, int type )
 {
    vj_tag *tag = vj_tag_get(s1);
    if (!tag)
-	return 0;
+	return;
    tag->effect_chain[entry]->kf_type = type;
 }
 
@@ -2178,8 +2176,6 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 		vpf(tag->effect_chain[position]->kf );
 	tag->effect_chain[position]->kf = vpn(VEVO_ANONYMOUS_PORT );
 
-    if (!vj_tag_update(tag,t1))
-		return 0;
     return 1;
 }
 
@@ -2249,8 +2245,6 @@ int vj_tag_set_chain_status(int t1, int position, int status)
     if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     tag->effect_chain[position]->e_flag = status;
-    if (!vj_tag_update(tag,t1))
-	return -1;
     return 1;
 }
 
@@ -2272,8 +2266,6 @@ int vj_tag_set_trimmer(int t1, int position, int trim)
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     tag->effect_chain[position]->frame_trimmer = trim;
-    if (!vj_tag_update(tag,t1))
-	return -1;
     return 1;
 }
 
@@ -2338,8 +2330,6 @@ int vj_tag_set_effect_arg(int t1, int position, int argnr, int value)
 	return -1;
 
     tag->effect_chain[position]->arg[argnr] = value;
-    if (!vj_tag_update(tag,t1))
-	return -1;
     return 1;
 }
 
@@ -2365,8 +2355,6 @@ int vj_tag_set_logical_index(int t1, int stream_nr)
     if (!tag)
 	return -1;
     tag->index = stream_nr;
-    if (!vj_tag_update(tag,t1))
-	return -1;
     return 1;
 }
 
@@ -2421,7 +2409,6 @@ int vj_tag_disable(int t1) {
 	}
 #endif
 	tag->active = 0;
-	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
 }
 
@@ -2452,7 +2439,6 @@ int vj_tag_enable(int t1) {
 			}
 #endif
 		}
-		vj_tag_update(tag,t1);
 		return 1;
 	}
 	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
@@ -2481,7 +2467,6 @@ int vj_tag_enable(int t1) {
 #endif
 	tag->active = 1;
 
-	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
 }
 
@@ -2491,8 +2476,6 @@ int vj_tag_set_depth(int t1, int depth)
     if (!tag)
 	return -1;
     tag->depth = depth;
-    if (!vj_tag_update(tag,t1))
-	return -1;
     return 1;
 }
 
@@ -2561,9 +2544,6 @@ int vj_tag_set_active(int t1, int active)
 	break;
     }
 
-    if (!vj_tag_update(tag,t1))
-	return -1;
-
     return 1;
 }
 
@@ -2593,8 +2573,6 @@ int vj_tag_set_chain_channel(int t1, int position, int channel)
 
     tag->effect_chain[position]->channel = channel;
 
-    if (!vj_tag_update(tag,t1))
-	return -1;
     return 1;
 }
 
@@ -2623,8 +2601,6 @@ int vj_tag_set_chain_source(int t1, int position, int source)
 	}
 
     tag->effect_chain[position]->source_type = source;
-    if (!vj_tag_update(tag,t1))
-			return -1;
     return 1;
 }
 
@@ -2669,9 +2645,8 @@ int vj_tag_set_effect_status(int t1, int status)
 	if(status==1 || status==0) 
 	{
 		tag->effect_toggle = status;
-		return ( vj_tag_update(tag,t1));
 	}
-	return -1;
+	return 1;
 }
 
 int vj_tag_set_selected_entry(int t1, int position) 
@@ -2680,7 +2655,7 @@ int vj_tag_set_selected_entry(int t1, int position)
 	if(!tag) return -1;
 	if(position < 0 || position >= SAMPLE_MAX_EFFECTS) return -1;
 	tag->selected_entry = position;
-	return (vj_tag_update(tag,t1));
+	return 1;
 }
 
 static int vj_tag_chain_can_delete(vj_tag *tag, int reserved, int effect_id)
@@ -2701,7 +2676,6 @@ static int vj_tag_chain_can_delete(vj_tag *tag, int reserved, int effect_id)
 
 int vj_tag_chain_remove(int t1, int index)
 {
-    int i;
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 		return -1;
@@ -2737,8 +2711,6 @@ int vj_tag_chain_remove(int t1, int index)
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
 		tag->effect_chain[index]->arg[j] = 0;
 
-    if (!vj_tag_update(tag,t1))
-		return -1;
     return 1;
 }
 
@@ -2839,8 +2811,6 @@ int vj_tag_set_offset(int t1, int chain_entry, int frame_offset)
 	frame_offset = 0;
 
     tag->effect_chain[chain_entry]->frame_offset = frame_offset;
-    if (!vj_tag_update(tag,t1))
-	return 0;
     return 1;
 }
 
@@ -3172,7 +3142,6 @@ static	void	master_lightframe(int w,int h, int uv_len, vj_tag *tag)
 	uint8_t *bv = bu + uv_len;
 	
 	int len = w*h;
-	int v;
 	
 	double  *sY = tag->lf;
 	double  *sU = tag->lfu;
@@ -3219,7 +3188,6 @@ static	void	master_blackframe(int w, int h, int uv_len, vj_tag *tag )
 	uint8_t *bu = bf + (w*h);
 	uint8_t *bv = bu + uv_len;
 	int len = w*h;
-	int v;
 	double  *sY = tag->bf;
 	double  *sU = tag->bfu;
 	double  *sV = tag->bfv;
@@ -3269,9 +3237,7 @@ static	void	master_flatframe(int w, int h, int uv_len,vj_tag *tag )
 	uint8_t *su = my + (w*h);
 	uint8_t *sv = mu + uv_len;
 
-	int min_Y = get_pixel_range_min_Y();
 	const int chroma = 127;	
-	double p,d;
 	double sum = 0;
 	double sum_u=0,sum_v=0;
 
@@ -3304,15 +3270,11 @@ static void	blackframe_subtract( vj_tag *tag, uint8_t *Y, uint8_t *U, uint8_t *V
 {
 	int i;
 	uint8_t *bf = cali_get(tag, CALI_DARK,w*h,uv_len);
-	uint8_t *u = bf + (w*h);
-	uint8_t *v = u + uv_len;
-
 	uint8_t *wy = cali_get(tag, CALI_FLAT,w*h,uv_len);
 	uint8_t *wu = wy + (w*h);
 	uint8_t *wv = wu + uv_len;
 	uint8_t *bu = bf + (w*h);
 	uint8_t *bv = bu + uv_len;
-	int min_Y = get_pixel_range_min_Y();
 	const int chroma = 127;	
 
 	int d=0;
@@ -3652,7 +3614,7 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
     //return -1;
 
 	snprintf(str, MESSAGE_SIZE,
-			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			"%d %d %d %d %d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			pfps,
 			frame,
 			mode,
@@ -3686,7 +3648,7 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 static void tagParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
 {
     xmlChar *xmlTemp = NULL;
-    unsigned char *chTemp = NULL;
+    char *chTemp = NULL;
     int argIndex = 0;
     if (cur == NULL)
 	return;
@@ -3732,32 +3694,24 @@ static	int	tagParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
 static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 {
     xmlChar *xmlTemp = NULL;
-    unsigned char *chTemp = NULL;
+    char *chTemp = NULL;
     int effect_id = -1;
     int arg[SAMPLE_MAX_PARAMETERS];
-    int i;
     int source_type = 0;
     int channel = 0;
     int frame_trimmer = 0;
     int frame_offset = 0;
     int e_flag = 0;
-    int volume = 0;
     int anim= 0;
     int anim_type = 0;
-    int a_flag = 0;
     int chain_index = 0;
+	int a_flag = 0;
+	int volume = 0;
 
-    for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
-	arg[i] = 0;
-    }
+	veejay_memset( arg, 0, sizeof(arg));
 
     if (cur == NULL)
-	return;
-
-  //  int k = 0;
- //   void *ports[8];
-   // veejay_memset( ports,0,sizeof(ports));
-
+		return;
 
     xmlNodePtr curarg = cur;
 
@@ -3857,8 +3811,8 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		a_flag = atoi(chTemp);
-		free(chTemp);
+			a_flag = atoi(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	
@@ -3985,17 +3939,12 @@ static	char *tag_get_char_xml( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *key
 {
 	xmlChar *xmlTemp = xmlNodeListGetString( doc, cur->xmlChildrenNode,1);
 	char *chTemp = UTF8toLAT1( xmlTemp );
-	int res = 0;
 	if(xmlTemp) xmlFree(xmlTemp);
 	return chTemp;
 }
 
 void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp)
 {
-
-    xmlChar *xmlTemp = NULL;
-    unsigned char *chTemp = NULL;
-
 	int fx_on=0, id=0, source_id=0, source_type=0;
 	char *source_file = NULL;
 	char *extra_data = NULL;
@@ -4014,34 +3963,34 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	while (cur != NULL)
 	{
 		if( !xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_SAMPLEID ))
-			id = tag_get_int_xml(doc,cur,XMLTAG_SAMPLEID );
+			id = tag_get_int_xml(doc,cur,(const xmlChar*) XMLTAG_SAMPLEID );
 		if( !xmlStrcmp(cur->name, (const xmlChar*) "source_id" ) )
-			source_id = tag_get_int_xml(doc,cur,"source_id" );
+			source_id = tag_get_int_xml(doc,cur,(const xmlChar*) "source_id" );
 		if( !xmlStrcmp(cur->name, (const xmlChar*) "source_type" ) )
-			source_type = tag_get_int_xml(doc,cur,"source_type" );
+			source_type = tag_get_int_xml(doc,cur,(const xmlChar*) "source_type" );
 		if( !xmlStrcmp(cur->name, (const xmlChar*) "source_file" ) )
-			source_file = tag_get_char_xml(doc,cur, "source_file");
+			source_file = tag_get_char_xml(doc,cur,(const xmlChar*) "source_file");
 		if( !xmlStrcmp(cur->name, (const xmlChar*) "extra_data" ))
-			extra_data = tag_get_char_xml(doc,cur, "extra_data");
+			extra_data = tag_get_char_xml(doc,cur, (const xmlChar*)"extra_data");
 
 		if(! xmlStrcmp(cur->name, (const xmlChar*) "red" ) )
-			col[0] = tag_get_int_xml( doc,cur, "red" );
+			col[0] = tag_get_int_xml( doc,cur, (const xmlChar*)"red" );
 		if(! xmlStrcmp(cur->name, (const xmlChar*) "green" ) )
-			col[1] = tag_get_int_xml( doc, cur, "green" );
+			col[1] = tag_get_int_xml( doc, cur, (const xmlChar*)"green" );
 		if(! xmlStrcmp(cur->name, (const xmlChar*) "blue" ))
-			col[2] = tag_get_int_xml( doc, cur, "blue" );
+			col[2] = tag_get_int_xml( doc, cur, (const xmlChar*) "blue" );
 		if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CHAIN_ENABLED))
-			fx_on = tag_get_int_xml(doc,cur, XMLTAG_CHAIN_ENABLED );
+			fx_on = tag_get_int_xml(doc,cur, (const xmlChar*) XMLTAG_CHAIN_ENABLED );
 		if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_ACTIVE)) 
-			fader_active = tag_get_int_xml(doc,cur, XMLTAG_FADER_ACTIVE);
+			fader_active = tag_get_int_xml(doc,cur, (const xmlChar*) XMLTAG_FADER_ACTIVE);
 		if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_VAL)) 
-			fader_val = tag_get_int_xml( doc,cur,XMLTAG_FADER_VAL );
+			fader_val = tag_get_int_xml( doc,cur, (const xmlChar*) XMLTAG_FADER_VAL );
 		if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_DIRECTION)) 
-			fader_dir = tag_get_int_xml( doc, cur, XMLTAG_FADER_DIRECTION );
+			fader_dir = tag_get_int_xml( doc, cur, (const xmlChar*) XMLTAG_FADER_DIRECTION );
 		if (!xmlStrcmp(cur->name,(const xmlChar*) "opacity" ) )
-			opacity   = tag_get_int_xml( doc, cur, "opacity");
+			opacity   = tag_get_int_xml( doc, cur, (const xmlChar*) "opacity");
 		if (!xmlStrcmp(cur->name,(const xmlChar*) "nframes" ) )
-			nframes   = tag_get_int_xml(doc, cur, "nframes" );
+			nframes   = tag_get_int_xml(doc, cur, (const xmlChar*) "nframes" );
 
 		if (!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" ))
 			subs = cur->xmlChildrenNode;
@@ -4080,7 +4029,6 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			tag->opacity = opacity;
 			tag->nframes = nframes;
 			tag->viewport_config = viewport_config;
-			vj_tag_update( tag, id );
 		
 			switch( source_type )
 			{

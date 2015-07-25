@@ -341,7 +341,7 @@ extern int	sample_load_composite_config( void *compiz, int s1 );
 extern int sample_stop_playing(int s1, int new_s1);
 extern int sample_start_playing(int s1, int no_cache);
 extern int sample_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
-extern unsigned char *UTF8toLAT1(unsigned char *in);
+extern char *UTF8toLAT1(unsigned char *in);
 extern int sample_read_edl( sample_info *sample );
 
 extern int     sample_max_video_length(int s1);
@@ -365,7 +365,6 @@ extern void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int 
 extern void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at);
 extern void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg );
 extern void ParseKEys(xmlDocPtr doc, xmlNodePtr cur, void *port);
-extern unsigned char *UTF8toLAT1(unsigned char *in);
 #endif
 void	sample_reload_config(void *compiz, int s1, int mode );
 

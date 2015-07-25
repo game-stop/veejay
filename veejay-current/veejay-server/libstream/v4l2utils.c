@@ -434,8 +434,6 @@ static int	v4l2_enum_video_standards( v4l2info *v, char norm )
 static	void	v4l2_enum_frame_sizes( v4l2info *v )
 {
 	struct v4l2_fmtdesc fmtdesc;
-	struct v4l2_frmsizeenum fmtsize;
-	struct v4l2_frmivalenum frmival;
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: discovering supported video formats");
 
@@ -579,10 +577,8 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 	return 1;
 }
 
-static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int hei, uint32_t *candidate, uint32_t *dw, uint32_t *dh)
+static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int hei, int *candidate, int *dw, int *dh)
 {
-	struct v4l2_format format;
-	
 	int native_pixel_format = v4l2_ffmpeg2v4l2( host_fmt );
 
 	char *greycap = getenv( "VEEJAY_V4L2_GREYSCALE_ONLY" );
@@ -688,9 +684,9 @@ static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
 {
 	struct v4l2_format format;
 
-	uint32_t cap_pf = 0;
-	uint32_t src_wid = 0;
-	uint32_t src_hei = 0;
+	int cap_pf = 0;
+	int src_wid = 0;
+	int src_hei = 0;
 
 	memset( &format, 0, sizeof(format));
 	
@@ -708,8 +704,8 @@ static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
 
 	if( res == 1 ) {
 		v->format.fmt.pix.pixelformat = cap_pf;
-		v->format.fmt.pix.width = src_wid;
-		v->format.fmt.pix.height = src_hei;	
+		v->format.fmt.pix.width = (uint32_t) src_wid;
+		v->format.fmt.pix.height = (uint32_t) src_hei;	
 
 		v->info = yuv_yuv_template( NULL,NULL,NULL,src_wid, src_hei, v4l2_pixelformat2ffmpeg( cap_pf ) );
 
@@ -755,8 +751,6 @@ VJFrame	*v4l2_get_dst( void *vv, uint8_t *Y, uint8_t *U, uint8_t *V ) {
 
 static	int	v4l2_channel_choose( v4l2info *v, const int pref_channel )
 {
-	int chan = pref_channel;
-	int n    = 0;
 	int i;
 	int	pref_ok = 0;
 	int other   = -1;
@@ -915,7 +909,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			v->capability.driver );
 	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Capture card: %s",
 			v->capability.card );
-	if( strncasecmp( v->capability.card, "Dummy" , 5 ) == 0 ) {
+	if( strncasecmp( (char*) v->capability.card, "Dummy" , 5 ) == 0 ) {
 		v->is_vloopback = 1;
 		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: This is a dummy device.");
 	}
@@ -1109,11 +1103,6 @@ v4l2_rw_fallback:
 	return v;
 }
 
-static	double	calc_tc( struct v4l2_timecode *tc, float fps )
-{
-	return (double) tc->frames / fps;
-}
-
 static	int	v4l2_pull_frame_intern( v4l2info *v )
 { //@ fixme more functions no pasta
 	void *src = NULL;
@@ -1160,9 +1149,9 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 		AVPacket pkt;
 		memset( &pkt, 0, sizeof(AVPacket));
 		pkt.data = src;
-	       	pkt.size = length;
+	    pkt.size = length;
 
-	      	int res = avcodec_decode_video2( 
+	    avcodec_decode_video2( 
 						v->c, 
 						v->picture, 
 						&got_picture,
@@ -1268,9 +1257,9 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 		AVPacket pkt;
 		memset( &pkt, 0, sizeof(AVPacket));
 		pkt.data = src;
-	       	pkt.size = length;
+	    pkt.size = length;
 
-	      	int res = avcodec_decode_video2( 
+	    res = avcodec_decode_video2( 
 						v->c, 
 						v->picture, 
 						&got_picture,
@@ -1332,7 +1321,6 @@ void	v4l2_close( void *d )
 	if( v->scaler )
 		yuv_free_swscaler( v->scaler );
 	
-	int c;
 	if( !v->picture )
 	{
 		for ( i = 0; i < N_FRAMES; i ++ ) {
@@ -2054,7 +2042,6 @@ int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst )
 	
 		lock_(i);
 		//@ block until a buffer is captured
-			int n;
 			while( v->frames_done[v->frame_ready] < 1 ) {
 				veejay_msg(VEEJAY_MSG_DEBUG, "waiting for frame %d to become ready",
 						v->frame_ready );

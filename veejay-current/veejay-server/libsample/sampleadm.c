@@ -137,11 +137,11 @@ static hash_val_t int_hash(const void *key)
 static int int_compare(const void *key1, const void *key2)
 {
 #ifdef ARCH_X86_64
-	return ((int64_t) key1 < (int64_t) key2 ? -1 :
-		((int64_t) key1 < (int64_t) key2 ? + 1 : 0 ));
+	return ((uint64_t) key1 < (uint64_t) key2 ? -1 :
+		((uint64_t) key1 < (uint64_t) key2 ? + 1 : 0 ));
 #else
-    return ((int32_t) key1 < (int32_t) key2 ? -1 :
-	    ((int32_t) key1 > (int32_t) key2 ? +1 : 0));
+    return ((uint32_t) key1 < (uint32_t) key2 ? -1 :
+	    ((uint32_t) key1 > (uint32_t) key2 ? +1 : 0));
 #endif
 }
 
@@ -174,18 +174,6 @@ static void sample_close_edl(int s1, editlist *el)
 				vj_el_free(el);
 			}
 	}
-}
-
-int sample_update(sample_info *sample, int s1) {
-/*  if(s1 <= 0 || s1 >= SAMPLE_MAX_SAMPLES) return 0;
-  if(sample) {
-    hnode_t *sample_node = hnode_create(sample);
-    hnode_put(sample_node, (void*) s1);
-    hnode_destroy(sample_node);
-    return 1;
-  }
-  return 0;*/
-		 return 1;
 }
 
 /* Evil code for edl saving/restoring */
@@ -307,7 +295,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 {
    char tmp_file[128];
    sample_info *si;
-   int i, j;
+   int i;
 
    if (!initialized) {
     	return NULL;
@@ -380,11 +368,16 @@ int sample_store(sample_info * skel)
 	{
 		skel->play_length = vj_el_bogus_length( skel->edit_list, 0 );
 	}
+#ifdef ARCH_X86_64
+	uint64_t sid = (uint64_t) skel->sample_id;
+#else
+	uint32_t sid = (uint32_t) skel->sample_id;
+#endif
 
     if (!sample_exists(skel->sample_id)) {
-	hash_insert(SampleHash, sample_node, (void *) skel->sample_id);
+		hash_insert(SampleHash, sample_node, (const void*) sid);
     } else {
-	hnode_put(sample_node, (void *) skel->sample_id);
+		hnode_put(sample_node, (void *) sid);
     }
     return 0;
 }
@@ -411,9 +404,15 @@ sample_info *sample_get(int sample_id)
 {
 	if( sample_id < 0 || sample_id > SAMPLE_MAX_SAMPLES)
 		return NULL;
+#ifdef ARCH_X86_64
+	uint64_t sid = (uint64_t) sample_id;
+#else
+	uint32_t sid = (uint32_t) sample_id;
+#endif
 
 	if( sample_cache[sample_id] == NULL ) {
-		hnode_t *sample_node = hash_lookup(SampleHash, (void *) sample_id);
+		
+		hnode_t *sample_node = hash_lookup(SampleHash, (const void *) sid);
 		if(!sample_node)
 			return NULL;
 		sample_cache[sample_id] = hnode_get(sample_node);
@@ -435,8 +434,13 @@ int sample_exists(int sample_id) {
 	
 	hnode_t *sample_node;
 	if (!sample_id) return 0;
-	
-	sample_node = hash_lookup(SampleHash, (void*) sample_id);
+#ifdef ARCH_X86_64
+	uint64_t sid = (uint64_t) sample_id;
+#else
+	uint32_t sid = (uint32_t) sample_id;
+#endif
+
+	sample_node = hash_lookup(SampleHash, (void*) sid);
 	if (!sample_node) {
 		return 0;
 	}
@@ -646,7 +650,7 @@ int sample_entry_set_is_rendering(int s1, int position, int value) {
     if( position >= SAMPLE_MAX_EFFECTS || position < 0) return -1;
 
     si->effect_chain[position]->is_rendering = value;
-    return ( sample_update( si,s1 ));
+    return 1;
 }
 
 
@@ -670,7 +674,7 @@ int sample_update_offset(int s1, int n_frame)
 			si->offset);
 		 si->offset = len;
 	}
-	return ( sample_update(si,s1));
+	return 1;
 }	
 
 int sample_set_manual_fader( int s1, int value)
@@ -684,8 +688,8 @@ int sample_set_manual_fader( int s1, int value)
 
   /* inconsistency check */
   if(si->effect_toggle == 0) si->effect_toggle = 1;
-  return (sample_update(si,s1));
 
+  return 1;
 }
 
 int sample_set_fader_active( int s1, int nframes, int direction ) {
@@ -707,7 +711,7 @@ int sample_set_fader_active( int s1, int nframes, int direction ) {
 	{
 	si->effect_toggle = 1;
 	}
-  return (sample_update(si,s1));
+  return 1;
 }
 
 
@@ -717,7 +721,7 @@ int sample_reset_fader(int s1) {
   si->fader_active = 0;
   si->fader_val = 0;
   si->fader_inc = 0;
-  return (sample_update(si,s1));
+  return 1;
 }
 
 int sample_get_fader_active(int s1) {
@@ -748,7 +752,7 @@ int sample_set_fader_val(int s1, float val) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_val = val;
-  return (sample_update(si,s1));
+  return 1;
 }
 
 int sample_apply_fader_inc(int s1) {
@@ -757,7 +761,6 @@ int sample_apply_fader_inc(int s1) {
   si->fader_val += si->fader_inc;
   if(si->fader_val > 255.0 ) si->fader_val = 255.0;
   if(si->fader_val < 0.0 ) si->fader_val = 0.0;
-  sample_update(si,s1);
   return (int) (si->fader_val+0.5);
 }
 
@@ -767,7 +770,7 @@ int sample_set_fader_inc(int s1, float inc) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_inc = inc;
-  return (sample_update(si,s1));
+  return 1;
 }
 
 int sample_marker_clear(int sample_id) {
@@ -778,7 +781,7 @@ int sample_marker_clear(int sample_id) {
     si->marker_end   = 0;
     veejay_msg(VEEJAY_MSG_INFO, "Marker cleared (%d - %d) - (speed=%d)",
 	si->marker_start, si->marker_end, si->speed);
-    return ( sample_update(si,sample_id));
+    return 1;
 }
 
 int sample_set_marker_start(int sample_id, int marker)
@@ -796,7 +799,7 @@ int sample_set_marker_start(int sample_id, int marker)
 	{
 		si->marker_start = marker;
 	}
-    return ( sample_update(si,sample_id));
+    return 1;
 }
 
 int sample_set_marker(int sample_id, int start, int end)
@@ -816,7 +819,7 @@ int sample_set_marker(int sample_id, int start, int end)
     si->marker_start	= start;
     si->marker_end	= end;
     
-    return ( sample_update( si , sample_id ) );	
+    return 1;
 }
 
 int sample_set_marker_end(int sample_id, int marker)
@@ -837,7 +840,7 @@ int sample_set_marker_end(int sample_id, int marker)
 		si->marker_end 		= marker;
 	}
 	
-    return (sample_update(si,sample_id));
+    return 1;
 }
 
 int sample_set_description(int sample_id, char *description)
@@ -850,7 +853,7 @@ int sample_set_description(int sample_id, char *description)
     } else {
 	snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "%s", description);
     }
-    return ( sample_update(si, sample_id)==1 ? 0 : 1);
+    return 1;
 }
 
 int sample_get_description(int sample_id, char *description)
@@ -904,7 +907,6 @@ int sample_verify_delete( int sample_id, int sample_type )
 				{
 					s->effect_chain[j]->channel = i;
 					s->effect_chain[j]->source_type = 0;
-					sample_update( s, i );
 				}
 			}
 		}
@@ -919,8 +921,13 @@ int sample_del(int sample_id)
     si = sample_get(sample_id);
     if (!si)
 		return 0;
+#ifdef ARCH_X86_64
+	uint64_t sid = (uint64_t) sample_id;
+#else
+	uint32_t sid = (uint32_t) sample_id;
+#endif
 
-    sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
+    sample_node = hash_lookup(SampleHash, (void *) sid);
     if (sample_node) {
 	    int i;
 
@@ -1199,7 +1206,6 @@ int sample_set_chain_status(int s1, int position, int status)
     if (!sample)
 	return -1;
     sample->effect_chain[position]->e_flag = status;
-    sample_update(sample,s1);
     return 1;
 }
 
@@ -1355,7 +1361,7 @@ int sample_set_effect_arg(int s1, int position, int argnr, int value)
     if (argnr < 0 || argnr > SAMPLE_MAX_PARAMETERS)
 	return -1;
     sample->effect_chain[position]->arg[argnr] = value;
-    return ( sample_update(sample,s1));
+    return 1;
 }
 
 int sample_set_selected_entry(int s1, int position) 
@@ -1364,7 +1370,7 @@ int sample_set_selected_entry(int s1, int position)
 	if(!sample) return -1;
 	if(position< 0 || position >= SAMPLE_MAX_EFFECTS) return -1;
 	sample->selected_entry = position;
-	return (sample_update(sample,s1));
+	return 1;
 }
 
 int sample_set_effect_status(int s1, int status)
@@ -1374,7 +1380,7 @@ int sample_set_effect_status(int s1, int status)
 	if(status == 1 || status == 0 )
 	{
 		sample->effect_toggle = status;
-		return ( sample_update(sample,s1));
+		return 1;
 	}
 	return -1;
 }
@@ -1413,7 +1419,7 @@ int sample_set_chain_channel(int s1, int position, int input)
 
 	sample->effect_chain[position]->channel = input;
 
-    return ( sample_update(sample,s1));
+    return 1;
 }
 
 static	int sample_sample_used(sample_info *a, int b )
@@ -1562,7 +1568,7 @@ int sample_set_chain_source(int s1, int position, int input)
 
     sample->effect_chain[position]->source_type = input;
     
-	return (sample_update(sample,s1));
+	return 1;
 }
 
 
@@ -1579,7 +1585,6 @@ int	sample_load_composite_config( void *compiz, int s1 )
 	
 	sample->composite = val;
 	sample->viewport  = temp;
-	sample_update(sample,s1);
 	return sample->composite;
 }
 
@@ -1594,7 +1599,7 @@ int	sample_set_composite_view(int s1, void *vp)
 	sample_info *sample = sample_get(s1);
 	if(!sample) return -1;
 	sample->viewport = vp;
-	return (sample_update(sample,s1));
+	return 1;
 }
 
 int	sample_set_composite(void *compiz, int s1, int composite)
@@ -1604,11 +1609,11 @@ int	sample_set_composite(void *compiz, int s1, int composite)
 	sample->composite = composite;
 	if(sample->viewport_config == NULL) { 
 		sample->composite = 1; 
-		return sample_update(sample,s1);
+		return 1;
 	}
 	composite_add_to_config( compiz, sample->viewport_config, composite );
 
-	return ( sample_update(sample,s1));
+	return 1;
 }
 
 int	sample_get_composite(int s1)
@@ -1660,13 +1665,13 @@ int sample_set_speed(int s1, int speed)
     if( speed < -(len))
 	return -1;
     sample->speed = speed;
-    return ( sample_update(sample,s1));
+    return 1;
 }
 int sample_set_framedups(int s1, int n) {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return -1;
 	sample->dups = n;
-	return ( sample_update(sample,s1));
+	return 1;
 }
 
 
@@ -1674,7 +1679,7 @@ int sample_set_framedup(int s1, int n) {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return -1;
 	sample->dup = n;
-	return ( sample_update(sample,s1));
+	return 1;
 }
 
 int sample_get_chain_channel(int s1, int position)
@@ -1729,20 +1734,20 @@ int sample_set_looptype(int s1, int looptype)
     if(!sample) return -1;
 
     if (looptype == 3 || looptype == 0 || looptype == 1 || looptype == 2) {
-	sample->looptype = looptype;
-	return ( sample_update(sample,s1));
+		sample->looptype = looptype;
+		return 1;
     }
-    return -1;
+    return 0;
 }
 
 int sample_set_playmode(int s1, int playmode)
 {
     sample_info *sample = sample_get(s1);
     if (!sample)
-	return -1;
+		return -1;
 
     sample->playmode = playmode;
-    return ( sample_update(sample,s1));
+    return 1;
 }
 
 
@@ -1775,7 +1780,7 @@ int sample_set_startframe(int s1, long frame_num)
 		sample->resume_pos = frame_num;
 	
 
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 int	sample_usable_edl( int s1 )
@@ -1837,7 +1842,7 @@ int sample_set_endframe(int s1, long frame_num)
 	if( vj_el_set_bogus_length( sample->edit_list, 0, new_len ) )
 	{
 		sample->play_length = new_len;
-		return (sample_update(sample,s1));
+		return 1;
 	}
 	return 0;
     }
@@ -1850,7 +1855,7 @@ int sample_set_endframe(int s1, long frame_num)
 	if( sample->resume_pos > frame_num )
 		sample->resume_pos = frame_num;
 
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 int sample_get_next(int s1)
@@ -1866,7 +1871,7 @@ int sample_set_loops(int s1, int nr_of_loops)
     if (!sample)
 	return -1;
     sample->max_loops = nr_of_loops;
-    return (sample_update(sample,s1));
+    return 1;
 }
 int sample_set_loops2(int s1, int nr_of_loops)
 {
@@ -1874,7 +1879,7 @@ int sample_set_loops2(int s1, int nr_of_loops)
     if (!sample)
 	return -1;
     sample->max_loops2 = nr_of_loops;
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 int sample_get_sub_audio(int s1)
@@ -1893,7 +1898,7 @@ int sample_set_sub_audio(int s1, int audio)
     if (audio < 0 && audio > 1)
 	return -1;
     sample->sub_audio = audio;
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 int sample_get_audio_volume(int s1)
@@ -1913,7 +1918,7 @@ int sample_set_audio_volume(int s1, int volume)
     if (volume > 100)
 	volume = 100;
     sample->audio_volume = volume;
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 
@@ -1927,7 +1932,7 @@ int sample_set_next(int s1, int next_sample_id)
        checks in parameter set in libveejayvj.c
      */
     sample->next_sample_id = next_sample_id;
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 /****************************************************************************************************
@@ -2075,7 +2080,7 @@ int	sample_chain_set_kfs( int s1, int len, char *data )
 	return 0;
 
    int entry = 0;
-   if(!keyframe_unpack( data, len, &entry,s1,1 ))
+   if(!keyframe_unpack( (unsigned char*) data, len, &entry,s1,1 ))
    {
 	veejay_msg(0, "Unable to unpack keyframe packet");
 	return -1;
@@ -2181,7 +2186,6 @@ int sample_chain_add(int s1, int c, int effect_nr)
 	if(sample->effect_chain[c]->kf)
 		vpf(sample->effect_chain[c]->kf );
 	sample->effect_chain[c]->kf = NULL;
-    sample_update(sample,s1);
 
     return 1;			/* return position on which it was added */
 }
@@ -2195,7 +2199,7 @@ int sample_reset_offset(int s1)
 	{
 		sample->effect_chain[i]->frame_offset = 0;
 	}
-	return ( sample_update(sample,s1));
+	return 1;
 }
 
 int sample_set_offset(int s1, int chain_entry, int frame_offset)
@@ -2206,7 +2210,7 @@ int sample_set_offset(int s1, int chain_entry, int frame_offset)
     /* set to zero if frame_offset is greater than sample length */
     //if(frame_offset > (sample->last_frame - sample->first_frame)) frame_offset=0;
     sample->effect_chain[chain_entry]->frame_offset = frame_offset;
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 int sample_set_trimmer(int s1, int chain_entry, int trimmer)
@@ -2222,7 +2226,7 @@ int sample_set_trimmer(int s1, int chain_entry, int trimmer)
     if (trimmer < 0 ) trimmer = 0;
     sample->effect_chain[chain_entry]->frame_trimmer = trimmer;
 
-    return (sample_update(sample,s1));
+    return 1;
 }
 int sample_set_chain_audio(int s1, int chain_entry, int val)
 {
@@ -2232,7 +2236,7 @@ int sample_set_chain_audio(int s1, int chain_entry, int val)
     if (chain_entry < 0 || chain_entry >= SAMPLE_MAX_PARAMETERS)
 	return -1;
     sample->effect_chain[chain_entry]->a_flag = val;
-    return ( sample_update(sample,s1));
+    return 1;
 }
 
 int sample_set_chain_volume(int s1, int chain_entry, int volume)
@@ -2246,7 +2250,7 @@ int sample_set_chain_volume(int s1, int chain_entry, int volume)
     if (volume > 100)
 	volume = 0;
     sample->effect_chain[chain_entry]->volume = volume;
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 
@@ -2307,7 +2311,7 @@ int sample_chain_clear(int s1)
 	    sample->effect_chain[i]->arg[j] = 0;
     }
 
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 
@@ -2425,14 +2429,14 @@ int sample_chain_remove(int s1, int position)
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
 		sample->effect_chain[position]->arg[j] = 0;
 
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 int sample_set_loop_dec(int s1, int active) {
     sample_info *sample = sample_get(s1);
     if(!sample) return -1;
     sample->loop_dec = active;
-    return (sample_update(sample,s1));
+    return 1;
 }
 
 int sample_get_loop_dec(int s1) {
@@ -2476,7 +2480,7 @@ int	sample_set_editlist(int s1, editlist *edl)
 	}
 	sample->edit_list = edl;
 	sample->soft_edl = 1;
-	return (sample_update(sample,s1));
+	return 1;
 }
 
 int sample_apply_loop_dec(int s1, double fps) {
@@ -2571,33 +2575,28 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
  * convert an UTF8 string to ISO LATIN 1 string 
  *
  ****************************************************************************************************/
-unsigned char *UTF8toLAT1(unsigned char *in)
+char *UTF8toLAT1(unsigned char *in)
 {
-    int in_size, out_size;
-    unsigned char *out;
-
     if (in == NULL)
-	return (NULL);
+		return NULL;
 
-    out_size = in_size = (int) strlen(in) + 1;
-    out = malloc((size_t) out_size);
+	int in_size = strlen( (char*) in ) + 1;
+	int out_size = in_size;
+    unsigned char *out = malloc((size_t) out_size);
 
     if (out == NULL) {
-	return (NULL);
+		return NULL;
     }
 
     if (UTF8Toisolat1(out, &out_size, in, &in_size) != 0)
 	{
-		//veejay_msg(VEEJAY_MSG_ERROR, "Cannot convert '%s'", in );
-		//free(out);
-		//return (NULL);
-		strncpy( out, in, out_size );
+		veejay_memcpy( out, in, out_size );
     }
 
     out = realloc(out, out_size + 1);
     out[out_size] = 0;		/*null terminating out */
 
-    return (out);
+    return (char*) out;
 }
 
 /*************************************************************************************************
@@ -2610,7 +2609,7 @@ unsigned char *UTF8toLAT1(unsigned char *in)
 void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
 {
     xmlChar *xmlTemp = NULL;
-    unsigned char *chTemp = NULL;
+    char *chTemp = NULL;
     int argIndex = 0;
     if (cur == NULL)
 	return;
@@ -2661,7 +2660,7 @@ static void	ParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
 void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
 {
     xmlChar *xmlTemp = NULL;
-    unsigned char *chTemp = NULL;
+    char *chTemp = NULL;
     int effect_id = -1;
     int arg[SAMPLE_MAX_PARAMETERS];
     int i;
@@ -2882,7 +2881,7 @@ void	ParseCalibration( xmlDocPtr doc, xmlNodePtr cur, sample_info *skel , void *
 
 void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mode )
 {
-	unsigned char *chTemp = NULL;
+	char *chTemp = NULL;
 	unsigned char *xmlTemp = NULL;
         while (cur != NULL)
         {
@@ -2920,7 +2919,7 @@ void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_samples )
 
 	int i;
 	xmlChar *xmlTemp = NULL;
-    	unsigned char *chTemp = NULL;
+	char *chTemp = NULL;
 
 	int tmp_seq[MAX_SEQUENCES];
 	int tmp_idx = 0;
@@ -2976,7 +2975,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 {
 
     xmlChar *xmlTemp = NULL;
-    unsigned char *chTemp = NULL;
+    char *chTemp = NULL;
     xmlNodePtr subs = NULL;
 
     if(!sample_read_edl( skel )) {
@@ -3673,19 +3672,19 @@ void	sample_reload_config(void *compiz, int s1, int mode )
 			sample->viewport_config = composite_get_config(compiz,mode);
 		}	
 		sample->composite = mode;
-		sample_update(sample,s1);
 	}
 }
 
 int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id, int mode)
 {
     int i;
-	char *encoding = "UTF-8";	
+	char *encoding = "UTF-8";
+	xmlChar *version = xmlCharStrdup("1.0");	
     sample_info *next_sample;
     xmlDocPtr doc;
     xmlNodePtr rootnode, childnode;
 
-    doc = xmlNewDoc("1.0");
+    doc = xmlNewDoc(version);
     rootnode =
 	xmlNewDocNode(doc, NULL, (const xmlChar *) XMLTAG_SAMPLES, NULL);
     xmlDocSetRootElement(doc, rootnode);
@@ -3728,6 +3727,7 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
 
     xmlSaveFormatFileEnc( sampleFile, doc, encoding, 1 );
     xmlFreeDoc(doc);
+	xmlFree(version);
 
     return 1;
 }
