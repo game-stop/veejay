@@ -88,7 +88,7 @@ typedef struct _avistdindex_entry {
 
 // Standard index 
 typedef struct _avistdindex_chunk {
-    char           fcc[4];                 // ix##
+    unsigned char fcc[4];                 // ix##
     uint32_t  dwSize;                 // size of this chunk
     uint16_t wLongsPerEntry;         // must be sizeof(aIndex[0])/sizeof(DWORD)
     uint8_t  bIndexSubType;          // must be 0
@@ -224,7 +224,7 @@ typedef struct
   off_t  v_codech_off;      /* absolut offset of video codec (strh) info */ 
   off_t  v_codecf_off;      /* absolut offset of video codec (strf) info */ 
   
-  uint8_t (*idx)[16]; /* index entries (AVI idx1 tag) */
+  unsigned char (*idx)[16]; /* index entries (AVI idx1 tag) */
 
   video_index_entry *video_index;
   avisuperindex_chunk *video_superindex;  /* index of indices */
@@ -325,10 +325,10 @@ typedef struct
 avi_t* AVI_open_output_file(char * filename);
 void AVI_set_video(avi_t *AVI, int width, int height, double fps, char *compressor);
 int AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format);
-int  AVI_write_frame(avi_t *AVI, char *data, long bytes);
+int  AVI_write_frame(avi_t *AVI, unsigned char *data, long bytes);
 int  AVI_dup_frame(avi_t *AVI);
-int  AVI_write_audio(avi_t *AVI, char *data, long bytes);
-int  AVI_append_audio(avi_t *AVI, char *data, long bytes);
+int  AVI_write_audio(avi_t *AVI, unsigned char *data, long bytes);
+int  AVI_append_audio(avi_t *AVI, unsigned char *data, long bytes);
 long AVI_bytes_remain(avi_t *AVI);
 int  AVI_close(avi_t *AVI);
 long AVI_bytes_written(avi_t *AVI);
@@ -362,7 +362,7 @@ long AVI_audio_size(avi_t *AVI, long frame);
 int  AVI_seek_start(avi_t *AVI);
 int  AVI_set_video_position(avi_t *AVI, long frame);
 long AVI_get_video_position(avi_t *AVI, long frame);
-long AVI_read_frame(avi_t *AVI, char *vidbuf, int *keyframe);
+long AVI_read_frame(avi_t *AVI, unsigned char *vidbuf, int *keyframe);
 
 int  AVI_set_audio_position(avi_t *AVI, long byte);
 int  AVI_set_audio_bitrate(avi_t *AVI, long bitrate);
@@ -370,16 +370,16 @@ int  AVI_set_audio_bitrate(avi_t *AVI, long bitrate);
 long AVI_get_audio_position_index(avi_t *AVI);
 int  AVI_set_audio_position_index(avi_t *AVI, long indexpos);
 
-long AVI_read_audio(avi_t *AVI, char *audbuf, long bytes);
-long AVI_read_audio_chunk(avi_t *AVI, char *audbuf);
+long AVI_read_audio(avi_t *AVI, unsigned char *audbuf, long bytes);
+long AVI_read_audio_chunk(avi_t *AVI, unsigned char *audbuf);
 
 long AVI_audio_codech_offset(avi_t *AVI);
 long AVI_audio_codecf_offset(avi_t *AVI);
 long AVI_video_codech_offset(avi_t *AVI);
 long AVI_video_codecf_offset(avi_t *AVI);
 
-int  AVI_read_data(avi_t *AVI, char *vidbuf, long max_vidbuf,
-                               char *audbuf, long max_audbuf,
+int  AVI_read_data(avi_t *AVI, unsigned char *vidbuf, long max_vidbuf,
+                               unsigned char *audbuf, long max_audbuf,
                                long *len);
 
 void AVI_print_error(char *str);

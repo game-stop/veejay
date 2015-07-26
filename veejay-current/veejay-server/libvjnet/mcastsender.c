@@ -162,7 +162,6 @@ static	uint32_t	stamp_make( mcast_sender *v )
 int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,  
 				uint8_t *buf, int total_len, long ms,int port_num, int mode)
 {
-	int n_chunks = total_len / CHUNK_SIZE;
 	int i;
 	packet_header_t header = packet_construct_header( 1 );
 	frame_info_t	info;

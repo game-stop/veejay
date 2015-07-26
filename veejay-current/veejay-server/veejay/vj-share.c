@@ -48,21 +48,21 @@ static vj_client	*vj_share_connect(char *hostname, int port)
 	return c;
 }
 static void vj_flush(vj_client *sayvims,int frames) { 
-        char status[128];
+        unsigned char status[128];
         memset(status,0,sizeof(status));
 
         while(frames>0) {
                 if( vj_client_poll(sayvims, V_STATUS ))
                 {
-                        char sta_len[6];
+                        uint8_t sta_len[6];
                         memset(sta_len,0,sizeof(sta_len));
                         int nb = vj_client_read( sayvims, V_STATUS, sta_len, 5 );
                         if( nb <= 0 )
-				break;
-			if(sta_len[0] == 'V' )
+							break;
+						if(sta_len[0] == 'V' )
                         {
                                 int bytes = 0;
-                                sscanf( sta_len + 1, "%03d", &bytes );
+                                sscanf( (char*) sta_len + 1, "%03d", &bytes );
                                 if(bytes > 0 )
                                 {
                                         memset(status,0,sizeof(status));
@@ -71,19 +71,17 @@ static void vj_flush(vj_client *sayvims,int frames) {
                                         {
                                                 frames -- ;
                                         }
-					if( n<= 0)
-				    	   break;
-                                }
+										if( n<= 0)
+											break;
+								}
                         }
                 }
         }
 }
 
-
-
 int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 {
-	char tmp[64];
+	unsigned char tmp[64];
 	vj_client *c = vj_share_connect( master_host, master_port );
 	if(!c) {
 		veejay_msg(0, "Error connecting to %s:%d",master_host, master_port );
@@ -92,7 +90,7 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 
 	memset(tmp,0,sizeof(tmp));
 
-	vj_client_send( c, V_CMD, "425:0;" ); 
+	vj_client_send( c, V_CMD, (unsigned char*)"425:0;" ); 
 	
 	vj_client_read( c, V_CMD, tmp, 16 ); //@ get SHM id from
 
@@ -100,12 +98,12 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 
 //	int32_t key = atoi(tmp);
 
-	int32_t	key = strtol( tmp, (char**) NULL, 10);
+	int32_t	key = strtol( (char*)tmp, (char**) NULL, 10);
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Veejay sister at port %d says shared resoure ID is %d",master_port,key);
 
 
-	vj_client_send( c, V_CMD, "025:1;" ); //@ master starts writing frames to shm
+	vj_client_send( c, V_CMD, (unsigned char*) "025:1;" ); //@ master starts writing frames to shm
 
 	vj_shm_set_id( key ); //@ temporary store
 

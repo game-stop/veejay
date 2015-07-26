@@ -156,9 +156,6 @@ static	int	lvd_uv_plane_len( int palette, int w, int h )
 			return (w*h);
 			break;
 		default:
-#ifdef STRICT_CHECKING
-			assert(0);
-#endif
 			break;
 
 	}
@@ -185,9 +182,6 @@ static	int	lvd_uv_dimensions( int palette, int w, int h, int *uw, int *uh )
 			return 1;
 			break;
 		default:
-#ifdef STRICT_CHECKING
-			assert(0);
-#endif
 			break;
 
 	}
@@ -199,18 +193,11 @@ static	double	lvd_extract_param_number( livido_port_t *instance, const char *pna
 {
 	double pn = 0.0;
 	livido_port_t *c = NULL;
-	int error = livido_property_get( instance, pname,n, &c );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( livido_property_get( instance, pname,n, &c ) != LIVIDO_NO_ERROR )
+		return pn;
 
-	error = livido_property_get( c, "value", 0, &pn );
-	if( error != LIVIDO_NO_ERROR ) {
-		printf(" --> %s idx %d invalid\n", pname, n );
-	}
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( livido_property_get( c, "value", 0, &pn ) != LIVIDO_NO_ERROR )
+		return pn;
 	return pn;	
 }
 
@@ -219,18 +206,12 @@ static	int	lvd_extract_param_index( livido_port_t *instance, const char *pname, 
 {
 	int pn = 0;
 	livido_port_t *c = NULL;
-	int error = livido_property_get( instance, pname,n, &c );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( livido_property_get( instance, pname,n, &c ) != LIVIDO_NO_ERROR )
+		return 0;
 
-	error = livido_property_get( c, "value", 0, &pn );
-#ifdef STRICT_CHECKING
-	if( error != LIVIDO_NO_ERROR ) {
-		printf(" --> %s idx %d invalid: %d\n", pname, n,error );
-	} 
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( livido_property_get( c, "value", 0, &pn ) != LIVIDO_NO_ERROR )
+		return 0;
+	
 	return pn;	
 }
 
@@ -238,46 +219,28 @@ static	int	lvd_extract_param_boolean( livido_port_t *instance, const char *pname
 {
 	int pn = 0;
 	livido_port_t *c = NULL;
-	int error = livido_property_get( instance, pname,n, &c );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( livido_property_get( instance, pname,n, &c ) != LIVIDO_NO_ERROR )
+		return pn;
 
-	error = livido_property_get( c, "value", 0, &pn );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( livido_property_get( c, "value", 0, &pn ) != LIVIDO_NO_ERROR )
+		return pn;
 	return pn;	
 }
 static	void	lvd_set_param_number( livido_port_t *instance, const char *pname,int id, double num )
 {
 	livido_port_t *c = NULL;
-	int error = livido_property_get( instance, pname,id, &c );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
-	error = livido_property_set( c, "value",LIVIDO_ATOM_TYPE_DOUBLE, 1, &num );
-	
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( livido_property_get( instance, pname,id, &c ) != LIVIDO_NO_ERROR )
+		return;
+	livido_property_set( c, "value",LIVIDO_ATOM_TYPE_DOUBLE, 1, &num );
 }
 
 static	void	lvd_extract_dimensions( livido_port_t *instance,const char *name, int *w, int *h )
 {
 	livido_port_t *channel = NULL;
-	int error = livido_property_get( instance, name, 0, &channel );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
-	error = livido_property_get( channel, "width", 0, w );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
-	error = livido_property_get( channel, "height",0, h );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( livido_property_get( instance, name, 0, &channel ) != LIVIDO_NO_ERROR )
+		return;
+	livido_property_get( channel, "width", 0, w );
+	livido_property_get( channel, "height",0, h );
 }
 
 static	int	lvd_extract_channel_values( livido_port_t *instance,
@@ -290,27 +253,16 @@ static	int	lvd_extract_channel_values( livido_port_t *instance,
 {
 	livido_port_t	*c = NULL;
 	int error = livido_property_get( instance, pname,n, &c );
+	if( error != LIVIDO_NO_ERROR )
+		return error;
+
 	error = livido_property_get( c, "width", 0,w );
-#ifdef STRICT_CHECKING
-	if(error!=LIVIDO_NO_ERROR) printf("%s: width not found\n",__FUNCTION__);
-	assert( error == LIVIDO_NO_ERROR );
-#endif
 	if( error != LIVIDO_NO_ERROR )
 		return error;
 	error = livido_property_get( c, "height",0,h );
-#ifdef STRICT_CHECKING
-	if(error!=LIVIDO_NO_ERROR) printf("%s: height not found\n",__FUNCTION__);
-	
-	assert( error == LIVIDO_NO_ERROR );
-#endif
 	if( error != LIVIDO_NO_ERROR )
 		return error;
 	error = livido_property_get( c, "current_palette",0, palette );
-#ifdef STRICT_CHECKING
-	if(error!=LIVIDO_NO_ERROR) printf("%s: current_palette not found\n",__FUNCTION__);
-	
-	assert( error == LIVIDO_NO_ERROR );
-#endif
 	if( error != LIVIDO_NO_ERROR )
 		return error;
 
@@ -318,11 +270,6 @@ static	int	lvd_extract_channel_values( livido_port_t *instance,
 	for( i = 0; i <4 ; i ++ )
 	{
 		error = livido_property_get( c, "pixel_data", i, &(pixel_data[i]));
-#ifdef STRICT_CHECKING
-		if( error != LIVIDO_NO_ERROR )
-			printf("%s: pixel_data[%d] not set in %s %d\n",__FUNCTION__,i,pname,n);
-		assert( error == LIVIDO_NO_ERROR );
-#endif
 		if( error != LIVIDO_NO_ERROR )
 			return error;
 	}

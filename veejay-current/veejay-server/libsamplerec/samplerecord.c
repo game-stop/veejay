@@ -133,7 +133,6 @@ int sample_try_filename(int sample_id, char *filename, int format)
 
 static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, int format, long nframes)
 {
-	char descr[100];
 	char cformat = vj_avcodec_find_lav( format );
 	
 	if( cformat == '\0' ) 

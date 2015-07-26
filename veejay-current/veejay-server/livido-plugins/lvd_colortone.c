@@ -31,7 +31,6 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
 {
 	int len =0;
-	int i = 0;
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
 	uint8_t *O[4]= {NULL,NULL,NULL,NULL};
 

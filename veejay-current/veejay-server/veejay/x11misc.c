@@ -50,8 +50,6 @@ void	x11_misc_init()
 
 void	x11_disable_screensaver( void *display )
 {
-	Display *d = (Display*) display;
-
 //	XGetScreenSaver( d, &screen_saver_[0], &screen_saver_[1],
 //			&screen_saver_[2], &screen_saver_[3] );
 
@@ -72,8 +70,6 @@ void	x11_disable_screensaver( void *display )
 
 void	x11_enable_screensaver( void *display )
 {
-	Display *d = (Display*) display;
-
 	if( screen_saver_[0] )
 	{
 	//	XSetScreenSaver( d, screen_saver_[0],screen_saver_[1],
@@ -94,7 +90,6 @@ void	x11_misc_set_border( void *display, void *window, int status )
 	
 }
 
-static	int	xinerama_screen_ = -1;
 static	int	xinerama_x_ = 0;
 static	int	xinerama_y_ = 0;
 static  int	xinerama_user_selected_ = 0;
@@ -104,7 +99,6 @@ static	int	screen_h_ = 0;
 void	x11_move( void *display, void *window )
 {
 	Display *d = (Display*) display;
-	Window  *w = (Window*) window;
 #ifdef HAVE_XINERAMA
 	if( XineramaIsActive( d ) )
 	{

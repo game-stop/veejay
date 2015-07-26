@@ -114,8 +114,8 @@ typedef struct {
 	int        baseline;
 	int use_kerning;
 	int current_size;
-	char	**font_table;
-	char    **font_list;
+	unsigned char	**font_table;
+	unsigned char    **font_list;
 	int	auto_number;
 	int	font_index;
 	long		index_len;
@@ -131,19 +131,18 @@ typedef struct {
 } vj_font_t;
 
 static int	configure(vj_font_t *f, int size, int font);
-static char 	*make_key(int id);
-static char 	*vj_font_pos_to_timecode( vj_font_t *font, long pos );
+static char *make_key(int id);
+static char *vj_font_pos_to_timecode( vj_font_t *font, long pos );
 static long	vj_font_timecode_to_pos( vj_font_t *font, const char *tc );
-static srt_seq_t	*vj_font_new_srt_sequence(vj_font_t *font, int id,char *text, long lo, long hi );
+static srt_seq_t	*vj_font_new_srt_sequence(vj_font_t *font, int id,unsigned char *text, long lo, long hi );
 static void	vj_font_del_srt_sequence( vj_font_t *f, int seq_id );
 static void	vj_font_store_srt_sequence( vj_font_t *f, srt_seq_t *s );
-static int      find_fonts(vj_font_t *ec, char *path);
-static char 	*select_font( vj_font_t *ec, int id );
-static  void    vj_font_substract_timecodes( vj_font_t *font, const char *tc_srt, long *lo, long *hi );
-static char     *vj_font_split_strd( const char *str );
-static char     *vj_font_split_str( const char *str );
-
-static	char	*get_font_name( vj_font_t *f,const char *font, int id );
+static int find_fonts(vj_font_t *ec, char *path);
+static unsigned char *select_font( vj_font_t *ec, int id );
+static void vj_font_substract_timecodes( vj_font_t *font, unsigned char *tc_srt, long *lo, long *hi );
+static unsigned char *vj_font_split_strd( unsigned char *str );
+static unsigned char *vj_font_split_str( unsigned char *str );
+static	unsigned char *get_font_name( vj_font_t *f,unsigned char *font, int id );
 static	int	get_default_font( vj_font_t *f );
 
 static  char	selected_default_font[1024];
@@ -279,23 +278,21 @@ static	long	vj_font_timecode_to_pos( vj_font_t *font, const char *tc )
 	return res;
 }
 
-static	void	vj_font_substract_timecodes( vj_font_t *font, const char *tc_srt, long *lo, long *hi )
+static	void	vj_font_substract_timecodes( vj_font_t *font, unsigned char *tc_srt, long *lo, long *hi )
 {
-	char tc1[20];
-	char tc2[20];
-	veejay_memset(tc1,0,sizeof(tc1));
-	veejay_memset(tc2,0,sizeof(tc2));
+	char tc1[20] = { 0 };
+	char tc2[20] = { 0 };
 
-	sscanf( tc_srt, "%s %*s %s", tc1,tc2 );
+	sscanf( (char*) tc_srt, "%s %*s %s", tc1,tc2 );
 
 	*lo = vj_font_timecode_to_pos( font, tc1 );
 	*hi = vj_font_timecode_to_pos( font, tc2 );
 }
 
-static char	*vj_font_split_strd( const char *str )
+static unsigned char	*vj_font_split_strd( unsigned char *str )
 {
-	const char *p = str;
-	char  *res    = NULL;
+	const unsigned char *p = str;
+	unsigned char  *res    = NULL;
 	int   i = 0;
 	while( *p != '\0' && *p != '\n' )
 	{
@@ -320,14 +317,14 @@ static char	*vj_font_split_strd( const char *str )
 	if( i <= 0 )
 		return NULL;
 	
-	res = strndup( str, i );
+	res = (unsigned char*) strndup( (char*)str, i );
 	return res;
 }
 
-static char	*vj_font_split_str( const char *str )
+static unsigned char	*vj_font_split_str( unsigned char *str )
 {
-	const char *p = str;
-	char  *res    = NULL;
+	const unsigned char *p = str;
+	unsigned char  *res    = NULL;
 	int   i = 0;
 	while( *p != '\0' && *p != '\n' )
 	{
@@ -342,16 +339,16 @@ static char	*vj_font_split_str( const char *str )
 	if( i <= 0 )
 		return NULL;
 	
-	res = strndup( str, i );
+	res = (unsigned char*) strndup( (char*)str, i );
 	return res;
 }
 
-static srt_seq_t 	*vj_font_new_srt_sequence( vj_font_t *f,int id,char *text, long lo, long hi )
+static srt_seq_t 	*vj_font_new_srt_sequence( vj_font_t *f,int id,unsigned char *text, long lo, long hi )
 {
 	char tmp_key[16];
 	srt_seq_t *s = (srt_seq_t*) vj_calloc(sizeof( srt_seq_t ));
 	s->id   = id;
-	s->text = vj_strdup( text );
+	s->text = vj_strdup( (const char*)text );
 	s->start   = lo;
 	s->end   = hi;
 	sprintf(tmp_key, "s%d", id );
@@ -460,51 +457,51 @@ int	vj_font_load_srt( void *font, const char *filename )
 	fclose( f );
 
 	//parse the file
-	uint8_t *str = ff->fd_buf;
+	unsigned char *str = ff->fd_buf;
 	int offset   = 0;
 
 
 	font_lock( ff );
 	while( offset < len )
 	{	
-		char *line = vj_font_split_str( str );
+		unsigned char *line = vj_font_split_str( str );
 		if(!line)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to parse sequence ID in srt file");
 			font_unlock( ff );
 			return 0;
 		}
-		int   n  = strlen( line );
+		int   n  = strlen( (char*)line );
 
 		offset += n;
 		str += n;
 		
-		char *timecode = vj_font_split_str( str );
+		unsigned char *timecode = vj_font_split_str( str );
 		if(!timecode)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to parse timecode in srt file");
 			font_unlock(ff);
 			return 0;
 		}
-		n = strlen( timecode );
+		n = strlen( (char*)timecode );
 
 		offset += n;
 		str +=  n;
 
-		char *text = vj_font_split_strd ( str );
+		unsigned char *text = vj_font_split_strd ( str );
 		if(!text)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to parse subtitle text in srt file");
 			font_unlock(ff);
 			return 0;
 		}
-		n = strlen ( text );
+		n = strlen ( (char*) text );
 
 		offset += n;
 		str += n;
 
 		long lo=0,hi=0;
-		int seq_id = atoi( line );
+		int seq_id = atoi( (char*)line );
 
 		vj_font_substract_timecodes( ff, timecode, &lo, &hi );
 
@@ -788,7 +785,7 @@ char    *vj_font_get_sequence( void *font, int seq )
 	return vj_strdup(tmp);
 }
 
-int	vj_font_new_text( void *font, char *text, long lo,long hi, int seq)
+int	vj_font_new_text( void *font, unsigned char *text, long lo,long hi, int seq)
 {
 	vj_font_t *ff = (vj_font_t*) font;
 	if( lo == hi )
@@ -978,7 +975,7 @@ char 	**vj_font_get_all_fonts( void *font )
 	
 	char **res = (char**) vj_calloc(sizeof(char*) * (f->font_index +1) );
 	for( i =0; i < f->font_index ;i ++ )
-		res[i] = vj_strdup( f->font_list[i] );
+		res[i] = vj_strdup( (char*) f->font_list[i] );
 	return res;
 }
 
@@ -1021,7 +1018,7 @@ static	int	try_deepen( vj_font_t *f , char *path )
 		{
 			if( f->font_index < MAX_FONTS )
 			{
-				char *try_font = vj_strdup(path);
+				unsigned char *try_font = (unsigned char*) vj_strdup(path);
 				if( get_font_name( f,try_font, f->font_index ) ) {
 					f->font_table[f->font_index] = try_font;
 					f->font_index ++;
@@ -1079,7 +1076,7 @@ static int	find_fonts(vj_font_t *ec, char *path)
 }
 
 
-static char 	*select_font( vj_font_t *ec, int id )
+static unsigned char 	*select_font( vj_font_t *ec, int id )
 {
 	if( id < 0 || id >= ec->font_index )
 		return NULL;
@@ -1088,9 +1085,9 @@ static char 	*select_font( vj_font_t *ec, int id )
 }
 
 
-static	char	*get_font_name( vj_font_t *f,const char *font, int id )
+static	unsigned char	*get_font_name( vj_font_t *f,unsigned char *font, int id )
 {
-	char *string;
+	unsigned char *string;
 	int platform,encoding,lang;
 	int error;
 
@@ -1108,7 +1105,7 @@ static	char	*get_font_name( vj_font_t *f,const char *font, int id )
 	FT_UInt		snamei,snamec;
 
 	FT_Face face;
-	if ( (error = FT_New_Face( f->library, font, 0, &face )) != 0)
+	if ( (error = FT_New_Face( f->library, (char*)font, 0, &face )) != 0)
 	{
 		return 0;
 	}
@@ -1175,9 +1172,9 @@ static	char	*get_font_name( vj_font_t *f,const char *font, int id )
 	}
 	fontName[tlen/2] = '\0';
 
-	f->font_list[id] = vj_strdup( fontName );
+	f->font_list[id] = (unsigned char*) vj_strdup( fontName );
 
-	return fontName;
+	return (unsigned char*)fontName;
 }
 
 void vj_font_set_outline_and_border( void *font, int outline, int border)
@@ -1376,7 +1373,7 @@ static int	configure(vj_font_t *f, int size, int font)
 
 //	veejay_msg(VEEJAY_MSG_DEBUG, "Using font %s, size %d (#%d)", f->font, size, font );
 	veejay_memset( selected_default_font, 0, sizeof(selected_default_font));
-	strncpy( selected_default_font, f->font,strlen(f->font)) ;
+	strncpy( selected_default_font, (char*)f->font,strlen((char*)f->font)) ;
 
 	if( f->face )
 	{
@@ -1389,7 +1386,7 @@ static int	configure(vj_font_t *f, int size, int font)
 		FT_Done_Face( f->face );
 	}
 
-	if ( (error = FT_New_Face( f->library, f->font, 0, &(f->face) )) != 0)
+	if ( (error = FT_New_Face( f->library, (char*)f->font, 0, &(f->face) )) != 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Cannot load face: %s (error #%d)\n ", f->font, error);
 		return 0;
@@ -1501,7 +1498,7 @@ static	int	get_default_font( vj_font_t *f )
 		{	
 			if( f->font_list[i])
 			{
-				if( strcasecmp( default_fonts[j].name, f->font_list[i] ) == 0 )
+				if( strcasecmp( default_fonts[j].name, (char*) f->font_list[i] ) == 0 )
 				{
 					veejay_msg(VEEJAY_MSG_DEBUG,"Using default font '%s'", default_fonts[j].name );
 					return i;
@@ -1545,8 +1542,8 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 
 	f->fps  = fps;
 	f->index = NULL;
-	f->font_table = (char**) vj_calloc(sizeof(char*) * MAX_FONTS );
-	f->font_list = (char**) vj_calloc(sizeof(char*) * MAX_FONTS);
+	f->font_table = (unsigned char**) vj_calloc(sizeof(unsigned char*) * MAX_FONTS );
+	f->font_list = (unsigned char**) vj_calloc(sizeof(unsigned char*) * MAX_FONTS);
 	f->font_index =0;
 	f->plain = vpn( VEVO_ANONYMOUS_PORT );
 
@@ -1642,8 +1639,8 @@ void	*vj_font_single_init( int w, int h, float fps,char *path )
 
 	f->fps  = fps;
 	f->index = NULL;
-	f->font_table = (char**) vj_calloc(sizeof(char*) * MAX_FONTS );
-	f->font_list = (char**) vj_calloc(sizeof(char*) * MAX_FONTS);
+	f->font_table = (unsigned char**) vj_calloc(sizeof(unsigned char*) * MAX_FONTS );
+	f->font_list = (unsigned char**) vj_calloc(sizeof(unsigned char*) * MAX_FONTS);
 	f->font_index =0;
 	f->plain = vpn( VEVO_ANONYMOUS_PORT );
 
@@ -2136,7 +2133,7 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y )
 	y1 = y;	
 
 	unsigned int str_wi = 0;
-	unsigned char *text = f->add;
+	unsigned char *text = (unsigned char*) f->add;
 
 	for (i=0; i < size; i++)
 	{

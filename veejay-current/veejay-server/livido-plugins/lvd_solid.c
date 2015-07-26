@@ -43,8 +43,6 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
 {
 	int len =0;
-	int i = 0;
-	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
 	uint8_t *O[4]= {NULL,NULL,NULL,NULL};
 
 	int palette;
@@ -82,7 +80,6 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 	livido_port_t *port = NULL;
 	livido_port_t *in_params[3];
-	livido_port_t *in_chans[3];
 	livido_port_t *out_chans[1];
 	livido_port_t *info = NULL;
 	livido_port_t *filter = NULL;

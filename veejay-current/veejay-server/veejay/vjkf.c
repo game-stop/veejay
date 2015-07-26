@@ -66,7 +66,7 @@ static	char	*extract_( const char *prefix , int p_id )
 unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *rlen )
 {
 	int i,k=0;
-	char *result = NULL;
+	unsigned char *result = NULL;
 
 
 	int start = 0, end = 0, type =0;
@@ -99,7 +99,7 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 
 	result = vj_calloc( (len*4) + 64 );
 
-	sprintf(result,"key%02d%02d%08d%08d%02d", entry_id,parameter_id,start, end, type );
+	sprintf( (char*) result,"key%02d%02d%08d%08d%02d", entry_id,parameter_id,start, end, type );
 
 	unsigned char *out = result + 25;
 
@@ -150,7 +150,7 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	int parameter_id = 0;
 	int start = 0, end = 0, type = 0;
 	int fx_entry = 0;
-	int n = sscanf( in, "key%2d%2d%8d%8d%2d", &fx_entry,&parameter_id, &start, &end,&type );
+	int n = sscanf( (char*) in, "key%2d%2d%8d%8d%2d", &fx_entry,&parameter_id, &start, &end,&type );
 	
 	if(n != 5 )
 	{
@@ -233,9 +233,7 @@ int		keyframe_get_tokens( void *port, int parameter_id, int *start, int *end, in
 
 int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 {
-	int i,k=0;
-	unsigned char *result = NULL;
-	int n_items = 0;
+	int i;
 
 	int start = 0, end = 0, type = 0;
 
@@ -260,13 +258,13 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 			return 0;
 	}
 
-	char xmlbuf[100];
+	unsigned char xmlbuf[100];
 
-	snprintf(xmlbuf, 100,"%d", start );
+	snprintf((char*)xmlbuf, 100,"%d", start );
 	xmlNewChild(node, NULL, (const xmlChar*) k_s, xmlbuf );
-	snprintf(xmlbuf, 100,"%d", end );
+	snprintf((char*)xmlbuf, 100,"%d", end );
 	xmlNewChild(node, NULL, (const xmlChar*) k_e, xmlbuf );
-	snprintf(xmlbuf, 100,"%d", type );
+	snprintf((char*)xmlbuf, 100,"%d", type );
 	xmlNewChild(node, NULL, (const xmlChar*) k_t, xmlbuf );
 
 	for( i = start; i < end; i ++ )
@@ -276,7 +274,7 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 
 		if(vevo_property_get(port, key, 0, &value )==VEVO_NO_ERROR)
 		{
-			sprintf(xmlbuf, "%d %d", parameter_id,value );
+			sprintf((char*)xmlbuf, "%d %d", parameter_id,value );
 			xmlNewChild(node, NULL, (const xmlChar*) "value", xmlbuf);	
 		}
 		free(key);
@@ -319,13 +317,9 @@ static	 int	get_xml_2int( xmlDocPtr doc, xmlNodePtr node, int *second )
 
 int		keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port )
 {
-	int i;
-	int n_frames;	
-	int parameter_id = 0;
 	int start = 0 , end = 0, type = 0;
 	int frame = 0;
 	int nodes = 0;
-	int res = 0;
 	if(!node)
 		return 0;
 
@@ -334,18 +328,18 @@ int		keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port )
 		if( !xmlStrncmp(node->name, (const xmlChar*) "start",4 ))
 		{
 			start = get_xml_int( doc, node );
-			vevo_property_set( port, node->name, VEVO_ATOM_TYPE_INT,1,&start);
+			vevo_property_set( port, (char*) node->name, VEVO_ATOM_TYPE_INT,1,&start);
 			nodes ++;
 		}
 		else if ( !xmlStrncmp(node->name, (const xmlChar*) "end",3 ))
 		{
 			end = get_xml_int( doc, node );
-			vevo_property_set(port, node->name, VEVO_ATOM_TYPE_INT,1,&end);
+			vevo_property_set(port, (char*)node->name, VEVO_ATOM_TYPE_INT,1,&end);
 		}
 		else if ( !xmlStrncmp(node->name, (const xmlChar*) "type",4 ))
 		{	
 			type = get_xml_int(doc,node);
-			vevo_property_set(port,node->name, VEVO_ATOM_TYPE_INT,1,&type);
+			vevo_property_set(port,(char*)node->name, VEVO_ATOM_TYPE_INT,1,&type);
 		}
 		else if ( !xmlStrcmp(node->name, (const xmlChar*) "value" ))
 		{

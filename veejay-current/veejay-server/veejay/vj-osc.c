@@ -483,7 +483,7 @@ static 	void osc_vims_method(void *context, int arglen, const void *vargs, OSCTi
 static struct
 {
 	const char	*name;
-	const int	vims_id;
+	int	vims_id;
 } osc_method_layout[] = 
 {
 	{ "fxlist/inc"						, VIMS_FXLIST_INC },
@@ -852,7 +852,7 @@ int 	vj_osc_build_cont( vj_osc *o ) //FIXME never freed
 void* vj_osc_allocate(int port_id) {
 	void *res;
 	char tmp[200];
-	int i;
+	
 	vj_osc *o = (vj_osc*)vj_malloc(sizeof(vj_osc));
 #ifdef HAVE_LIBLO
 	osc_clients = (vevo_port_t*) vj_malloc(sizeof(vevo_port_t*) * 32);
@@ -943,10 +943,6 @@ int vj_osc_setup_addr_space(void *d) {
 
 /* get a packet */
 int vj_osc_get_packet(void *d) {
-   //OSCTimeTag tag;
-   struct timeval tv;
-   tv.tv_sec=0;
-   tv.tv_usec = 0;
 	vj_osc *o = (vj_osc*) d;
 #ifdef HAVE_LIBLO
 	osc_iterate_clients();

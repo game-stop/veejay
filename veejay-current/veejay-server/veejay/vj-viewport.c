@@ -3115,7 +3115,7 @@ void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *ou
 	register const	int32_t	ty1 = v->tty1;
 	register const	int32_t ty2 = v->tty2;
 	register const int w = v->w;
-	register uint32_t n,i,x,y,m;
+	register uint32_t n,i,x,y;
 
 	// clear the yuyv plane (black)
 	y  = ty1 * w;
@@ -3308,7 +3308,7 @@ static	void	flxml( xmlDocPtr doc, xmlNodePtr cur, float *dst , const xmlChar *na
     xmlChar *xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode,1);
     unsigned char *chTemp = UTF8toLAT1(xmlTemp);
     if (chTemp) {
-	 *dst = (float) atof(chTemp);
+	 *dst = (float) atof( (char*)chTemp);
 	 free(chTemp);
     }
     free(xmlTemp);
@@ -3319,7 +3319,7 @@ static	void	ixml( xmlDocPtr doc, xmlNodePtr cur, int *dst , const xmlChar *name)
     xmlChar *xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode,1);
     unsigned char *chTemp = UTF8toLAT1(xmlTemp);
     if (chTemp) {
-	 *dst = (int) atoi(chTemp);
+	 *dst = (int) atoi( (char*)chTemp);
 	 free(chTemp);
     }
     free(xmlTemp);
@@ -3333,27 +3333,27 @@ void	*viewport_load_xml(xmlDocPtr doc, xmlNodePtr cur, void *vv )
 	viewport_config_t *c = (viewport_config_t*) vj_calloc(sizeof(viewport_config_t));
 	//effectIndex++;
 	while( cur != NULL ) {
-		flxml( doc,cur,&(c->x1),"x1" );
-		flxml( doc,cur,&(c->x2),"x2" );
-		flxml( doc,cur,&(c->y1),"y1" );
-		flxml( doc,cur,&(c->y2),"y2" );
-		flxml( doc,cur,&(c->x3),"x3" );
-		flxml( doc,cur,&(c->x4),"x4" );
-		flxml( doc,cur,&(c->y3),"y3" );
-		flxml( doc,cur,&(c->y4),"y4" );
-		ixml( doc,cur,&(c->x0),"x0" );
-		ixml( doc,cur,&(c->w0),"w0" );
-		ixml( doc,cur,&(c->y0),"y0" );
-		ixml( doc,cur,&(c->h0),"h0" );
-		ixml( doc,cur,&(c->saved_w),"saved_w" );
-		ixml( doc,cur,&(c->saved_h),"saved_h" );
-		ixml( doc,cur,&(c->reverse),"reverse" );
-		ixml( doc,cur,&(c->grid_color),"grid_color" );
-		ixml( doc,cur,&(c->grid_resolution),"grid_resolution" );
-		ixml( doc,cur,&(c->composite_mode), "compositemode");
-		ixml( doc,cur,&(c->colormode), "colormode");	
-		ixml( doc,cur,&(c->marker_size), "markersize");
-		ixml( doc,cur,&(c->grid_mode), "gridmode");
+		flxml( doc,cur,&(c->x1),(const xmlChar*) "x1" );
+		flxml( doc,cur,&(c->x2),(const xmlChar*)"x2" );
+		flxml( doc,cur,&(c->y1),(const xmlChar*)"y1" );
+		flxml( doc,cur,&(c->y2),(const xmlChar*)"y2" );
+		flxml( doc,cur,&(c->x3),(const xmlChar*)"x3" );
+		flxml( doc,cur,&(c->x4),(const xmlChar*)"x4" );
+		flxml( doc,cur,&(c->y3),(const xmlChar*)"y3" );
+		flxml( doc,cur,&(c->y4),(const xmlChar*)"y4" );
+		ixml( doc,cur,&(c->x0),(const xmlChar*)"x0" );
+		ixml( doc,cur,&(c->w0),(const xmlChar*)"w0" );
+		ixml( doc,cur,&(c->y0),(const xmlChar*)"y0" );
+		ixml( doc,cur,&(c->h0),(const xmlChar*)"h0" );
+		ixml( doc,cur,&(c->saved_w),(const xmlChar*)"saved_w" );
+		ixml( doc,cur,&(c->saved_h),(const xmlChar*)"saved_h" );
+		ixml( doc,cur,&(c->reverse),(const xmlChar*)"reverse" );
+		ixml( doc,cur,&(c->grid_color),(const xmlChar*)"grid_color" );
+		ixml( doc,cur,&(c->grid_resolution),(const xmlChar*)"grid_resolution" );
+		ixml( doc,cur,&(c->composite_mode),(const xmlChar*) "compositemode");
+		ixml( doc,cur,&(c->colormode),(const xmlChar*) "colormode");	
+		ixml( doc,cur,&(c->marker_size),(const xmlChar*) "markersize");
+		ixml( doc,cur,&(c->grid_mode),(const xmlChar*) "gridmode");
 		cur = cur->next;
 	}
 	return (void*) c;

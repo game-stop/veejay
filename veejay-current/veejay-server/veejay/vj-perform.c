@@ -1749,8 +1749,6 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 
 static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int type, int chain_entry )
 {				/* second sample */
-    int width = info->video_output_width;
-    int height = info->video_output_height;
     int error = 1;
     int nframe;
     int len = 0;
@@ -1923,8 +1921,6 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t 
 static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 			       int chain_entry)
 {				/* second sample */
-    int width = info->video_output_width;
-    int height = info->video_output_height;
     int error = 1;
     int nframe;
     int len;

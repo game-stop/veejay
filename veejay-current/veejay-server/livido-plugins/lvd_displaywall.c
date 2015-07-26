@@ -146,7 +146,6 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
 {
 	int len =0;
-	int i = 0;
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
 	uint8_t *O[4]= {NULL,NULL,NULL,NULL};
 
@@ -158,17 +157,16 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	if( error != LIVIDO_NO_ERROR )
 		return LIVIDO_ERROR_HARDWARE; 
 
-        lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
+    lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
 
-	int uv_len = lvd_uv_plane_len( palette,w,h );
 	len = w * h;
 
 	int		scale =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
 	int		mode  =  lvd_extract_param_index( my_instance,"in_parameters", 1 );
-	int		speed =  lvd_extract_param_index( my_instance,"in_parameters", 2 );
 	int		shift = 1;
-        if( palette == LIVIDO_PALETTE_YUV444P )
-                shift = 0;
+
+	if( palette == LIVIDO_PALETTE_YUV444P )
+	    shift = 0;
 
 	displaywall_t *wall = NULL;
 	livido_property_get( my_instance, "PLUGIN_private", 0, &wall );
@@ -205,7 +203,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	LIVIDO_IMPORT(list);
 
 	livido_port_t *port = NULL;
-	livido_port_t *in_params[6];
+	livido_port_t *in_params[2];
 	livido_port_t *in_chans[3];
 	livido_port_t *out_chans[1];
 	livido_port_t *info = NULL;
@@ -278,21 +276,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Mode");
 
-
-	
-	in_params[2] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
-	port = in_params[2];
-
-		livido_set_string_value(port, "name", "Speed" );
-		livido_set_string_value(port, "kind", "INDEX" );
-		livido_set_int_value( port, "min", -1 );
-		livido_set_int_value( port, "max", 1 );
-		livido_set_int_value( port, "default", 1 );
-		livido_set_string_value( port, "description" ,"Speed");
-
-
 	//@ setup the nodes
-	livido_set_portptr_array( filter, "in_parameter_templates",3, in_params );
+	livido_set_portptr_array( filter, "in_parameter_templates",2, in_params );
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
         livido_set_portptr_array( filter, "in_channel_templates",1, in_chans );
 

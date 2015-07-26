@@ -106,7 +106,6 @@ static inline void stroboscope(
 static inline void fading_stroboscope( uint8_t *O, uint8_t *A, uint8_t *B, uint8_t *Op, const int len )
 {
 	unsigned int i;
-	uint8_t p;
 	for( i = 0; i < len; i ++ )
 	{
 		O[i] = ( ( 0xff - Op[i]) * A[i] + (Op[i]) * B[i] ) >> 8;
@@ -124,7 +123,6 @@ static inline void fading_stroboscopeUV(
 		const int feather,
 		const int shift )
 {
-	const int len = (w*h);
 	const int uv_len = (w*h) >> shift;
 	unsigned int i;
 	
@@ -154,7 +152,6 @@ static inline void fading_stroboscopeUV(
 livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
 {
 	int len =0;
-	int i = 0;
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
 	uint8_t *O[4]= {NULL,NULL,NULL,NULL};
 

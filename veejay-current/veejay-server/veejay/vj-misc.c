@@ -536,7 +536,7 @@ int	sufficient_space(int max_size, int nframes)
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 static char * kern_number(char * buf, char * end, long long num, int base, int type)
 {
-	char c,sign=0,tmp[66];
+	char sign=0,tmp[66];
 	static const char small_digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 	int i=0;
 	const char *digits = small_digits;
@@ -571,8 +571,7 @@ static char * kern_number(char * buf, char * end, long long num, int base, int t
 static	int	kern_vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 {
 	int num,flags,base;
-	char *str, *end, c;
-	const char *s;
+	char *str, *end;
 	str = buf;
 	end = buf + size - 1;
 

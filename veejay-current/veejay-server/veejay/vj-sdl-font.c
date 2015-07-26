@@ -232,7 +232,6 @@ void*	vj_sdl_draw_log_line( void *f, uint8_t r, uint8_t g, uint8_t b, uint8_t a,
 {
 	vj_sdl_font_t *font = (vj_sdl_font_t*) f;
 	SDL_Color col = {r,g,b,a};
-	SDL_Color bgcol = {0,0,0,0};
 	SDL_Surface *text_surface = TTF_RenderText_Solid( font->font, line, col );
 	return text_surface;
 }

@@ -77,7 +77,6 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 		gdk_pixbuf_new_from_file( filename, NULL );
 
 	size_t pixbuf_size = gdk_pixbuf_get_byte_length( image );
-	int hmin = 0;
 
 	if(!image)
 	{
