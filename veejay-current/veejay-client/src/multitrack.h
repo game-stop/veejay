@@ -36,6 +36,8 @@ void            *multitrack_sync( void * mt );
 void            multitrack_configure( void *data, float fps, int video_width, int video_height, int *bw, int *bh );
 
 
+void           multitrack_get_preview_dimensions( int w , int h, int *dst_w, int *dst_h );
+
 void            multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img );
 
 int             update_multitrack_widgets( void *data, int *array, int track );

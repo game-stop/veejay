@@ -30,7 +30,7 @@ typedef struct
 } sync_info;
 
 void		*gvr_preview_init(int max_tracks, int use_thread);
-int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *track_num );
+int		gvr_track_connect( void *preview, char *hostname, int port_num, int *track_num );
 void		gvr_track_disconnect( void *preview, int track_num );
 int		gvr_track_configure( void *preview, int track_num, int w, int h);
 int		gvr_track_toggle_preview( void *preview, int track_num, int status );

@@ -310,11 +310,6 @@ gchar		*gdkkey_by_id( int gdk_key )
 	return NULL;
 }
 
-static	void	key_func(gboolean pressed, guint16 unicode, guint16 keymod)
-{
-
-
-}
 /*
 Key snooper functions are called before normal event delivery.
 They can be used to implement custom key event handling.

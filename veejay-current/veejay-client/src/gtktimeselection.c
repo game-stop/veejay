@@ -119,7 +119,7 @@ static void get_property( GObject *object,
 	guint id, GValue *value , GParamSpec *pspec );
 
 static	void	set_property	(GObject *object,
-	guint id, GValue * value, GParamSpec *pspec);
+	guint id, const GValue * value, GParamSpec *pspec);
 
 static gboolean event_press (GtkWidget *widget, GdkEventButton *bev, gpointer user_data);
 
@@ -148,7 +148,7 @@ struct _TimelineSelectionClass
 	void	(*cleared) (TimelineSelection *te);
 };
 static	void	set_property	(GObject *object,
-	guint id, GValue *value, GParamSpec *pspec)
+	guint id, const GValue *value, GParamSpec *pspec)
 {
 	TimelineSelection *te = TIMELINE_SELECTION(object);
 	switch(id)
@@ -533,17 +533,16 @@ static gboolean
 event_scroll (GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
 {
 	TimelineSelection *te = TIMELINE_SELECTION (widget);
-	gdouble width = (gdouble) widget->allocation.width;
 	gint x,y;
 	GdkModifierType state;
 	gdk_window_get_pointer( ev->window, &x,&y,&state );
 
 	if( ev->direction == GDK_SCROLL_UP ) {
-		gdouble cur_pos = timeline_get_pos(widget);
+		gdouble cur_pos = timeline_get_pos(te);
 		timeline_set_pos( widget, cur_pos + 1 );
 	}
 	else if(ev->direction == GDK_SCROLL_DOWN ) {
-		gdouble cur_pos = timeline_get_pos(widget);
+		gdouble cur_pos = timeline_get_pos(te);
 		timeline_set_pos( widget, cur_pos - 1 );
 	}
 

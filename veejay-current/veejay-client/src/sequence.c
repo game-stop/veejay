@@ -39,6 +39,8 @@
 #define    RUP8(num)(((num)+8)&~8)
 
 extern void reloaded_schedule_restart();
+extern void    vj_msg(int type, const char format[], ...);
+
 typedef struct
 {
 	uint8_t *image_data[16];
@@ -68,7 +70,7 @@ typedef struct
 	int	height;
 	int	prevmode;
 	int	need_track_list;
-	unsigned char 	*queue[16];
+	char 	*queue[16];
 	int	n_queued;
 	int	bw;
 	int	is_master;
@@ -87,28 +89,19 @@ typedef struct
 #endif
 } veejay_preview_t;
 
-static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... );
-static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *buffer );
-static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v );
-static	int	track_find(  veejay_preview_t *vp );
-static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v );
-static int	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v );
-static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at );
-static	int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v );
-
-static	GStaticRecMutex	mutex_ = G_STATIC_REC_MUTEX_INIT;
-
-void		gvr_veejay_grabber_step( void *data );
-
-static  float   get_ratio(int w, int h)
-{
-        return ( (float) w / (float) h);
-}
+static int sendvims( veejay_track_t *v, int vims_id, const char format[], ... );
+static int recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *buffer );
+static int veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v );
+static int track_find(  veejay_preview_t *vp );
+static int veejay_process_status( veejay_preview_t *vp, veejay_track_t *v );
+static int gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v );
+static int track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at );
+static int gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v );
+void gvr_veejay_grabber_step( void *data );
 
 void	*gvr_preview_init(int max_tracks, int use_threads)
 {
 	veejay_preview_t *vp = (veejay_preview_t*) vj_calloc(sizeof( veejay_preview_t ));
-	GError *err = NULL;
 	//vp->mutex = g_mutex_new();
 	vp->tracks = (veejay_track_t**) vj_calloc(sizeof( veejay_track_t*) * max_tracks );
 	vp->track_sync = (track_sync_t*) vj_calloc(sizeof( track_sync_t ));
@@ -149,7 +142,7 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 	if( format == NULL )
 	{
 		g_snprintf( block, sizeof(block)-1, "%03d:;", vims_id );
-		n = vj_client_send( v->fd, V_CMD, block );
+		n = vj_client_send( v->fd, V_CMD, (unsigned char*) block );
 		if( n <= 0 ) {
 			if( n == -1 && v->is_master )	
 				reloaded_schedule_restart();
@@ -163,7 +156,7 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 	g_snprintf( block,sizeof(block)-1, "%03d:%s;", vims_id, tmp );
 	va_end( args );
 	
-	n = vj_client_send( v->fd, V_CMD, block );
+	n = vj_client_send( v->fd, V_CMD,(unsigned char*) block );
 	if( n <= 0 ) {
 		if( n == -1 && v->is_master )
 			reloaded_schedule_restart();
@@ -237,7 +230,7 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
 	int tmp_len = slen + 1;
 	unsigned char *tmp = vj_calloc( tmp_len );
  
-	sprintf(message, "%03d:;", VIMS_TRACK_LIST );
+	sprintf( (char*) message, "%03d:;", VIMS_TRACK_LIST );
 	int ret = vj_client_send( v->fd, V_CMD, message );
 	if( ret <= 0)
 	{	
@@ -321,7 +314,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 			break;
 		}
 		
-		if( sscanf( status_len+1, "%03d", &bytes ) != 1 ) {
+		if( sscanf( (char*) status_len+1, "%03d", &bytes ) != 1 ) {
 			veejay_msg(0, "Invalid status message.");
 			bytes = 0;
 			reloaded_schedule_restart();
@@ -343,7 +336,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		reloaded_schedule_restart();
 	
 	veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * 32));
-	status_to_arr( v->status_buffer, v->status_tokens );	
+	status_to_arr( (char*) v->status_buffer, v->status_tokens );	
 	return 1;
 }
 extern int     is_button_toggled(const char *name);
@@ -535,7 +528,7 @@ int		gvr_track_already_open( void *preview, const char *hostname,
 	return 0;
 }
 
-int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *new_track )
+int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_track )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	int track_num = track_find( vp );
@@ -771,7 +764,6 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 	{
 		if( vp->tracks[i] && vp->tracks[i]->active && vp->track_sync->widths[i] > 0 && vp->tracks[i]->preview)
 		{
-			veejay_track_t *v = vp->tracks[i];
 			list[i] =gdk_pixbuf_new_from_data(vp->tracks[i]->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,	
 				8,vp->tracks[i]->width,vp->tracks[i]->height,
 				  vp->tracks[i]->width*3,NULL,NULL );
@@ -808,7 +800,7 @@ static int	**gvr_grab_stati( void *preview )
 static int	*gvr_grab_widths( void *preview )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	int *list = (int**) vj_calloc( sizeof(int) * vp->n_tracks );
+	int *list = (int*) vj_calloc( sizeof(int) * vp->n_tracks );
 	if(!list)
 		return NULL;
 
@@ -822,7 +814,7 @@ static int	*gvr_grab_widths( void *preview )
 static int	*gvr_grab_heights( void *preview )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	int *list = (GdkPixbuf**) vj_calloc( sizeof(int) * vp->n_tracks );
+	int *list = (int*) vj_calloc( sizeof(int) * vp->n_tracks );
 	if(!list)
 		return NULL;
 
@@ -857,13 +849,13 @@ static	void	gvr_parse_track_list( veejay_preview_t *vp, veejay_track_t *v, unsig
 	int items = 0;
 	unsigned char *ptr = tmp;
 
-	unsigned char **z = vj_calloc( sizeof( unsigned char * ) * vp->n_tracks );
+	char **z = vj_calloc( sizeof( char * ) * vp->n_tracks );
 
 	while( i < len )
 	{
 		int k = 0;
-		unsigned char k_str[4];
-		strncpy( (char*) k_str,(char*) ptr, 3 );
+		char k_str[4];
+		strncpy( k_str,(char*) ptr, 3 );
 		if( k > 0 )
 		{
 			ptr += 3;
@@ -925,7 +917,7 @@ static	void	gvr_parse_queue( veejay_track_t *v )
 
 	for( i = 0; i < v->n_queued ; i ++ )
 	{
-		if( vj_client_send( v->fd, V_CMD, v->queue[i] ) == -1  &&
+		if( vj_client_send( v->fd, V_CMD, (unsigned char*) v->queue[i] ) == -1  &&
 			v->is_master )
 			reloaded_schedule_restart();
 		free( v->queue[i] );
@@ -989,21 +981,12 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 
 	return score;
 }
-#define MS_TO_NANO(a) (a *= 1000000)
-static  void    net_delay(long nsec )
-{
-        struct timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = MS_TO_NANO( nsec);
-        nanosleep( &ts, NULL );
-}
 
 void		gvr_veejay_grabber_step( void *data )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) data;
 	int i;
 
-	int ac    = 1;
 	int try_picture = 0;
 
 	for( i = 0; i < vp->n_tracks ; i ++ )

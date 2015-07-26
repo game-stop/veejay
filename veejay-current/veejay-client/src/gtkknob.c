@@ -221,7 +221,6 @@ void gtk_knob_set_adjustment(GtkKnob *knob, GtkAdjustment *adjustment) {
 }
 
 static void gtk_knob_realize(GtkWidget *widget) {
-  GtkKnob *knob;
   GdkWindowAttr attributes;
   gint attributes_mask;
 
@@ -229,7 +228,6 @@ static void gtk_knob_realize(GtkWidget *widget) {
   g_return_if_fail(GTK_IS_KNOB(widget));
 
   GTK_WIDGET_SET_FLAGS(widget, GTK_REALIZED);
-  knob = GTK_KNOB(widget);
 
   attributes.x = widget->allocation.x;
   attributes.y = widget->allocation.y;
@@ -262,14 +260,11 @@ static void gtk_knob_size_request (GtkWidget *widget, GtkRequisition *requisitio
 }
 
 static void gtk_knob_size_allocate (GtkWidget *widget, GtkAllocation *allocation) {
-  GtkKnob *knob;
-
   g_return_if_fail(widget != NULL);
   g_return_if_fail(GTK_IS_KNOB(widget));
   g_return_if_fail(allocation != NULL);
 
   widget->allocation = *allocation;
-  knob = GTK_KNOB(widget);
 
   if (GTK_WIDGET_REALIZED(widget)) {
     gdk_window_move_resize(widget->window,

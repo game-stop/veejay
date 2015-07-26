@@ -60,7 +60,6 @@ static	void	cell_toggled_callback( GtkCellRenderer *cell, gchar *path_string, gp
 	gtk_tree_model_get( model, &iter,0, &data, -1 );
 
 	int id_data = -1; // invalid
-	char junk[32];
 	if(sscanf( data, "%d", &id_data ) == 1 )
 	{
 		if( gtk_cell_renderer_toggle_get_active( GTK_CELL_RENDERER_TOGGLE( cell) ) )
@@ -96,7 +95,7 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 		if(id != i)
 		{
 			char name[12];
-			sprintf(name,"%d", i);
+			snprintf(name,sizeof(name),"%d", i);
 			gchar *uname = _utf8str( name );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set(
@@ -171,7 +170,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 		if( i != track_id )
 		{
 			char str[16];
-			sprintf(str,"%d",i);
+			snprintf(str,sizeof(str),"%d",i);
 			gchar *ustr = _utf8str( str );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set( store, &iter,

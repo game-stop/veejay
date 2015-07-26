@@ -114,26 +114,8 @@ int	mt_get_max_tracks()
 {
 	return  __MAX_TRACKS;
 }
-
-
-
-static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
-{
-	gtk_image_set_from_pixbuf(w, p);
-}
-
-
-static	void	gtk_widget_set_sensitive__( GtkWidget *w, gboolean state, const char *f, int l )
-{
-#ifdef STRICT_CHECKING
-	if( !GTK_IS_WIDGET(w) )
-	 veejay_msg(0, "Invalid widget '%s', %d", f, l );
-#endif
-	gtk_widget_set_sensitive(w, state );
-}
-
-#define gtk_image_set_from_pixbuf_(w,p) gtk_image_set_from_pixbuf(w,p)
 #define gtk_widget_set_sensitive_( w,p ) gtk_widget_set_sensitive(w,p)
+#define gtk_image_set_from_pixbuf_(w,p) gtk_image_set_from_pixbuf(w,p)
 static	void	status_print(multitracker_t *mt, const char format[], ... )
 {
 	char buf[1024];
@@ -349,9 +331,9 @@ static	void	update_pos( void *user_data, gint total, gint current )
    	gtk_adjustment_set_value(
                 GTK_ADJUSTMENT(GTK_RANGE(v->timeline_)->adjustment), 1.0 / (gdouble) total * current );     
 
-	gchar *now = format_time( current , mt->fps);
+	char *now = format_time( current , mt->fps);
 	gtk_label_set_text( GTK_LABEL(v->labels_[0]), now );
-	g_free(now);
+	free(now);
 }
 
 static	void	update_speed( void *user_data, gint speed )
@@ -809,12 +791,6 @@ static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len,
 	return res;
 }
 
-void		multitrack_resize( void *m , int w, int h )
-{
-	multitracker_t *mt = (multitracker_t*) m;
-//	gtk_widget_set_size_request( mt->scroll, w, h );
-}
-	
 void		*multitrack_new(
 		void (*f)(int,char*,int),
 		int (*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),

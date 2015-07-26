@@ -265,26 +265,26 @@ void	on_button_fadedur_value_changed(GtkWidget *widget, gpointer user_data)
 void	on_button_fadeout_clicked(GtkWidget *w, gpointer user_data)
 {
 	gint num = (gint)get_numd( "button_fadedur");
-	gchar *timenow = format_time( num, info->el.fps );
+	char *timenow = format_time( num, info->el.fps );
 	multi_vims( VIMS_CHAIN_FADE_OUT, "0 %d", num );
 	vj_midi_learning_vims_complex( info->midi, "button_fadedur", VIMS_CHAIN_FADE_OUT, 0,2 );
 	vj_msg(VEEJAY_MSG_INFO, "Fade out duration %s (frames %d)",
 		timenow,
 		num );
-	if(timenow) g_free(timenow);
+	if(timenow) free(timenow);
 }
 
 void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 {
 	gint num = (gint)get_numd( "button_fadedur");
-	gchar *timenow = format_time( num, info->el.fps );
+	char *timenow = format_time( num, info->el.fps );
 	multi_vims( VIMS_CHAIN_FADE_IN, "0 %d", num );
 	vj_midi_learning_vims_complex( info->midi, "button_fadedur", VIMS_CHAIN_FADE_IN, 0,2 );
 	
 	vj_msg(VEEJAY_MSG_INFO, "Fade in duration %s (frames %d)",
 		timenow,
 		num );
-	if(timenow) g_free(timenow);
+	if(timenow) free(timenow);
 
 }
 
@@ -327,9 +327,9 @@ void	on_button_el_selstart_value_changed(GtkWidget *w, gpointer user_data)
 	info->selection[0] = get_nums("button_el_selstart");
 	if( info->selection[0] > info->selection[1])
 		update_spin_value( "button_el_selend", info->selection[0]);
-	gchar *text = format_time( info->selection[0], info->el.fps );
+	char *text = format_time( info->selection[0], info->el.fps );
 	update_label_str( "label_el_startpos", text);
-	g_free(text);
+	free(text);
 	el_selection_update();
 }
 
@@ -338,9 +338,9 @@ void	on_button_el_selend_value_changed(GtkWidget *w, gpointer user_data)
 	info->selection[1] = get_nums( "button_el_selend" );
 	if(info->selection[1] < info->selection[0])
 		update_spin_value( "button_el_selstart", info->selection[1]);
-	gchar *text = format_time( info->selection[1], info->el.fps);
+	char *text = format_time( info->selection[1], info->el.fps);
 	update_label_str( "label_el_endpos", text);
-	g_free(text);
+	free(text);
 	el_selection_update();
 }
 
@@ -360,12 +360,12 @@ void	on_button_el_cut_clicked(GtkWidget *w, gpointer *user_data)
 	if(verify_selection())
 	{	multi_vims( VIMS_EDITLIST_CUT, "%d %d",
 			info->selection[0], info->selection[1]);
-		gchar *time1 = format_time( info->selection[0], info->el.fps );
-		gchar *time2 = format_time( info->selection[1], info->el.fps );
+		char *time1 = format_time( info->selection[0], info->el.fps );
+		char *time2 = format_time( info->selection[1], info->el.fps );
 		vj_msg(VEEJAY_MSG_INFO, "Cut %s - %s from EditList to buffer",
 			time1, time2 );
-		g_free(time1);
-		g_free(time2);
+		free(time1);
+		free(time2);
 		info->uc.reload_hint[HINT_EL] = 1;
 	}
 }
@@ -375,12 +375,12 @@ void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_DEL, "%d %d",
 			info->selection[0], info->selection[1]);
-		gchar *time1 = format_time( info->selection[0],info->el.fps );
-		gchar *time2 = format_time( info->selection[1],info->el.fps );
+		char *time1 = format_time( info->selection[0],info->el.fps );
+		char *time2 = format_time( info->selection[1],info->el.fps );
 		vj_msg(VEEJAY_MSG_INFO, "Delete %s - %s from EditList",
 			time1, time2 );
-		g_free(time1);
-		g_free(time2);
+		free(time1);
+		free(time2);
 		update_spin_value( "button_el_selstart", 0 );
 		update_spin_value( "button_el_selend", 0);
 	}
@@ -391,14 +391,14 @@ void	on_button_el_crop_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_CROP, "%d %d",
 			info->selection[0], info->selection[1]);
-		gchar *total = format_time( info->status_tokens[TOTAL_FRAMES],info->el.fps );
-		gchar *time2 = format_time( info->selection[1],info->el.fps );
-		gchar *time1 = format_time( info->selection[0],info->el.fps );
+		char *total = format_time( info->status_tokens[TOTAL_FRAMES],info->el.fps );
+		char *time2 = format_time( info->selection[1],info->el.fps );
+		char *time1 = format_time( info->selection[0],info->el.fps );
 		vj_msg(VEEJAY_MSG_INFO, "Delete 00:00:00 - %s and %s - %s from EditList",
 			time1, time2, total );
-		g_free(time1);
-		g_free(time2);
-		g_free(total);
+		free(time1);
+		free(time2);
+		free(total);
 
 	}
 }
@@ -408,12 +408,12 @@ void	on_button_el_copy_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_COPY, "%d %d",
 			info->selection[0], info->selection[1] );
-		gchar *time1 = format_time( info->selection[0],info->el.fps );
-		gchar *time2 = format_time( info->selection[1],info->el.fps );
+		char *time1 = format_time( info->selection[0],info->el.fps );
+		char *time2 = format_time( info->selection[1],info->el.fps );
 		vj_msg(VEEJAY_MSG_INFO, "Copy %s - %s to buffer",
 			time1,time2);
-		g_free(time1);
-		g_free(time2);
+		free(time1);
+		free(time2);
 	}
 }
 
@@ -437,10 +437,10 @@ void	on_button_el_pasteat_clicked(GtkWidget *w, gpointer *user_data)
 	info->selection[2] = val;
 	multi_vims( VIMS_EDITLIST_PASTE_AT, "%d",
 		info->selection[2]);
-	gchar *time1 = format_time( info->selection[2],info->el.fps );
+	char *time1 = format_time( info->selection[2],info->el.fps );
 	vj_msg(VEEJAY_MSG_INFO, "Paste contents from buffer to frame %d (timecode %s)",
 		info->selection[2], time1);
-	g_free(time1);
+	free(time1);
 	info->uc.reload_hint[HINT_EL] = 1;
 
 }
@@ -486,9 +486,8 @@ void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 	if( !filename )
 		return;
 	
-	int sample_id = 0;
-	int result_len = 0;
 	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
+	g_free(filename);
 }
 
 void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
@@ -497,12 +496,12 @@ void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
 	int first_frame = frame;
 	int last_frame = _el_ref_end_frame( info->uc.selected_el_entry );
 	multi_vims( VIMS_EDITLIST_DEL, "%d %d", first_frame, last_frame );
-	gchar *time1 = format_time( first_frame,info->el.fps );
-	gchar *time2 = format_time( last_frame,info->el.fps );
+	char *time1 = format_time( first_frame,info->el.fps );
+	char *time2 = format_time( last_frame,info->el.fps );
 	vj_msg(VEEJAY_MSG_INFO, "Delete %s - %s",
 		time1,time2);
-	g_free(time1);
-	g_free(time2);
+	free(time1);
+	free(time2);
 } 
 void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 {
@@ -850,11 +849,11 @@ void	on_spin_samplestart_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		gchar *time1 = format_time(value,info->el.fps);
+		char *time1 = format_time(value,info->el.fps);
 		multi_vims(VIMS_SAMPLE_SET_START, "%d %d",0, value );
 		vj_msg(VEEJAY_MSG_INFO, "Set sample's starting position to %d (timecode %s)",
 			value, time1);
-		g_free(time1);
+		free(time1);
 	}
 }
 
@@ -863,12 +862,12 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		gchar *time1 = format_time(value,info->el.fps);
+		char *time1 = format_time(value,info->el.fps);
 		
 		multi_vims(VIMS_SAMPLE_SET_END, "%d %d", 0, value );
 		vj_msg(VEEJAY_MSG_INFO, "Set sample's ending position to %d (timecode %s)",
 			value, time1);
-		g_free(time1);
+		free(time1);
 
 	}
 }
@@ -1055,13 +1054,13 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		autoplay );
 	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_STREAM_REC_START, nframes, autoplay );
 
-	gchar *time1 = format_time( nframes,info->el.fps );
+	char *time1 = format_time( nframes,info->el.fps );
 	if(format)
 		vj_msg(VEEJAY_MSG_INFO, "Record in %s,  duration: %s",format, time1); 
 	else
 		vj_msg(VEEJAY_MSG_INFO, "Recording in default format (MJPEG) , duration: %s", time1);
 
-	g_free(time1);
+	free(time1);
 	g_free(format);	
 }
 
@@ -1075,9 +1074,9 @@ void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 void	on_spin_streamduration_value_changed(GtkWidget *widget , gpointer user_data)
 {
 	gint n_frames = get_nums( "spin_streamduration" );
-	gchar *time = format_time(n_frames,info->el.fps);
+	char *time = format_time(n_frames,info->el.fps);
 	update_label_str( "label_streamrecord_duration", time );
-	g_free(time);
+	free(time);
 }
 void 	on_new_shm_stream_clicked(GtkWidget *wid, gpointer data)
 {
@@ -1153,13 +1152,13 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 
 	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SAMPLE_REC_START, n_frames, autoplay );
 
-	gchar *time1 = format_time(n_frames,info->el.fps);
+	char *time1 = format_time(n_frames,info->el.fps);
 	if( autoplay ) {
 		vj_msg(VEEJAY_MSG_INFO, "Recording %s from current sample, autoplaying	 new sample when finished.",time1);
 	} else {
 		vj_msg(VEEJAY_MSG_INFO,"Recording %s from current sample",time1);
 	}
-	g_free(time1);
+	free(time1);
 	g_free(format);	
 }
 
@@ -1188,9 +1187,9 @@ void	on_spin_sampleduration_value_changed(GtkWidget *widget , gpointer user_data
 		n_frames *= get_nums( "spin_sampleduration" );
 	else
 		n_frames = get_nums( "spin_sampleduration" );
-	gchar *time = format_time( n_frames,info->el.fps );
+	char *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
-	g_free(time);
+	free(time);
 }
 
 void	on_sample_mulloop_clicked(GtkWidget *w, gpointer user_data)
@@ -1198,17 +1197,17 @@ void	on_sample_mulloop_clicked(GtkWidget *w, gpointer user_data)
 	gint n_frames = sample_calctime();
 	if( is_button_toggled( "sample_mulloop" ))
 		n_frames *= get_nums( "spin_sampleduration");
-	gchar *time = format_time( n_frames,info->el.fps );
+	char *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
-	g_free(time);
+	free(time);
 }
 
 void	on_sample_mulframes_clicked(GtkWidget *w, gpointer user_data)
 {
 	gint n_frames = get_nums( "spin_sampleduration" );
-	gchar *time = format_time( n_frames,info->el.fps );
+	char *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
-	g_free(time);
+	free(time);
 }
 
 void	on_spin_mudplay_value_changed(GtkWidget *widget, gpointer user_data)
@@ -1289,9 +1288,9 @@ void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
 	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0 );
-	gchar *dur = format_time( 0,info->el.fps );
+	char *dur = format_time( 0,info->el.fps );
 	update_label_str( "label_markerduration", dur );
-	g_free(dur);
+	free(dur);
 }
 
 
@@ -1300,7 +1299,6 @@ void	on_check_audio_mute_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gint erase_all = 0;
 	if(info->status_tokens[TOTAL_SLOTS] > 0 )
 	{
 		vj_msg(VEEJAY_MSG_WARNING, "Any existing samples will be deleted.");
@@ -1316,7 +1314,6 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_samplelist_append_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gint erase_all = 0;
 	gchar *filename = dialog_open_file( "Append a samplelist",1);
 	if(filename)
 	{
@@ -1374,10 +1371,10 @@ void	on_button_el_paste_clicked(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_EDITLIST_PASTE_AT, "%d",
 		info->status_tokens[FRAME_NUM] );
-	gchar *time1 = format_time( info->status_tokens[FRAME_NUM],info->el.fps );
+	char *time1 = format_time( info->status_tokens[FRAME_NUM],info->el.fps );
 	vj_msg(VEEJAY_MSG_INFO, "Paste contents of buffer at Frame %d (Tiemcode %s)",
 		info->status_tokens[FRAME_NUM], time1);
-	g_free(time1);
+	free(time1);
 }
 void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -1576,6 +1573,8 @@ void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 		config_file_status = 1;	
 		vj_msg(VEEJAY_MSG_INFO, "You can launch Veejay now");
 	}
+
+	g_free(filename);
 }
 
 void	on_button_saveconfigfile_clicked(GtkWidget *widget, gpointer user_data)
@@ -1920,8 +1919,10 @@ void	on_load_calibration1_activate( GtkMenuItem     *menuitem,
 	{
 		multi_vims( VIMS_STREAM_NEW_CALI, "%s", filename );
 		vj_msg(VEEJAY_MSG_INFO ,"Loaded calibration file %s",filename);
+		g_free(filename);
+	
+		gveejay_new_slot(MODE_STREAM);
 	}
-	gveejay_new_slot(MODE_STREAM);
 }
 
 void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
@@ -2015,7 +2016,7 @@ void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
 	reset_cali_images(2, "image_flatframe");
 
 	GtkWidget *tb = glade_xml_get_widget_( info->main_window, "cali_take_button");
-	gtk_button_set_label( tb, "Take Black Frames");
+	gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
 
 	disable_widget( "cali_save_button" );
 
@@ -2204,10 +2205,10 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	snprintf(header,sizeof(header), "K%08dkey%02d%02d%08d%08d%02d",msg_len,i,j,start,end,type );
 	
-	char *buf = (char*) vj_calloc( sizeof(char) * msg_len + 9 );
-	strncpy( buf, header, sizeof(header));
+	unsigned char *buf = (unsigned char*) vj_calloc( sizeof(unsigned char) * msg_len + 9 );
+	strncpy( (char*) buf, header, sizeof(header));
 	
-	char *ptr = buf + sizeof(header);
+	unsigned char *ptr = buf + sizeof(header);
 	int k;
 	for( k = 0 ; k < length ; k++ ) {
 		int pval = (int) ( (float) min + ( data[k] * ((float) max) ));
@@ -2533,9 +2534,9 @@ void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 		if(pos2 > pos1 )
 		{
 			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,(gint) pos1, (gint) pos2 );
-			gchar *dur = format_time( pos2 - pos1,info->el.fps );
+			char *dur = format_time( pos2 - pos1,info->el.fps );
 			update_label_str( "label_markerduration", dur );
-			g_free(dur);
+			free(dur);
 		}
 		else
 			vj_msg(VEEJAY_MSG_INFO, "Set Out point after In point !");
@@ -2555,9 +2556,9 @@ void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 		if(pos1 < pos2 )
 		{
 			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0, (gint) pos1, (gint) pos2 );
-			gchar *dur = format_time( pos2 - pos1,info->el.fps );
+			char *dur = format_time( pos2 - pos1,info->el.fps );
 			update_label_str( "label_markerduration", dur );
-			g_free(dur);
+			free(dur);
 		}
 		else
 			vj_msg(VEEJAY_MSG_INFO,"Set In Point before Out Point !");
@@ -2569,9 +2570,8 @@ void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *filename = dialog_open_file( "Add videofile as new sample",0 );
 	if(filename)
 	{
-		int sample_id = 0; // new sample
-		int result_len = 0;
 		multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
+		g_free(filename);
 	}
 }
 
@@ -2839,20 +2839,20 @@ void	on_quit_veejay1_activate( GtkWidget *w, gpointer user_data)
 void	on_curve_spinend_value_changed(GtkWidget *w, gpointer user_data)
 {
 	int end_pos = get_nums( "curve_spinend" );
-	gchar *end_time = format_time(
+	char *end_time = format_time(
 			end_pos,info->el.fps );
 	update_label_str( "curve_endtime", end_time );
-	g_free(end_time);
+	free(end_time);
 }
 
 void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
 {
 	int start_pos = get_nums( "curve_spinstart" );
 
-	gchar *start_time = format_time(
+	char *start_time = format_time(
 			start_pos,info->el.fps );
 	update_label_str( "curve_endtime", start_time );
-	g_free(start_time);
+	free(start_time);
 }
 
 void	on_veejayevent_enter_notify_event(GtkWidget *w, gpointer user_data)
@@ -3134,7 +3134,7 @@ on_spin_samplebank_select_value_changed
 		page = max_page;
 		gtk_spin_button_set_value(spinbutton,page);
 	}
-        gtk_notebook_set_current_page_(GTK_WIDGET(samplebank), page);        
+        gtk_notebook_set_current_page_(samplebank, page);        
 }
 void
 on_button_samplebank_prev_clicked      (GtkButton       *button,
@@ -3229,7 +3229,6 @@ static	gint	srt_load_subtitle(int sid)
 
 	clear_textview_buffer( "textview_text" );
 	int s1=0,s2=0;
-	int n = 0;
 	if(text && len > 0 )
 	{
 		sscanf( text,"%5d%9d%9d%2d", &seq_id ,&s1,&s2,&tc1l );
@@ -3238,12 +3237,9 @@ static	gint	srt_load_subtitle(int sid)
 		strncpy( tc2, text+7+18+tc1l + 2, tc2l );
 		sscanf( text+7+18+tc1l+2+tc2l, "%3d", &tlen );
 		strncpy( tmp, text + 7 + 18 + tc1l + 2 + tc2l + 3, tlen );
-		n = sscanf( text+7+18 + tc1l+2+tc2l+3+tlen,"%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
+		sscanf( text+7+18 + tc1l+2+tc2l+3+tlen,"%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
 			&x,&y, &font, &size, &bg[0],&bg[1],&bg[2],&fg[0],&fg[1],&fg[2],&use_bg,&outline,&ln[0],&ln[1],
 			&ln[2],&bg[3],&fg[3],&ln[3] );
-#ifdef STRICT_CHECKING
-		assert( n == 18 );
-#endif
 	}
 
 	srt_locked_ = 1;
@@ -4049,8 +4045,10 @@ void	on_midievent_toggled( GtkWidget *w, gpointer data )
 void	on_load_midi_layout1_activate( GtkWidget *w , gpointer data )
 {
 	gchar *filename = dialog_open_file( "Select MIDI configuration file to load",0);
-	if( filename )
+	if( filename ) {
 		vj_midi_load( info->midi, filename );
+		g_free(filename);
+	}
 }
 void	on_save_midi_layout1_activate( GtkWidget *w, gpointer data )
 {
