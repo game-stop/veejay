@@ -7131,7 +7131,6 @@ void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
 
 }
 
-// 159, 164 for white
 void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7141,8 +7140,8 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	if(args[0]==0) args[0] = v->uc->sample_id;
 	if(args[0]==-1) args[0] = vj_tag_size()-1;
 
-	char send_msg[64];
-	char message[64];
+	char send_msg[128];
+	char message[128];
 
 	sprintf( send_msg, "000" );
 
@@ -7151,7 +7150,7 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 		int values[6] = { 0,0,0,0,0,0 };
 		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],	&values[4]))
 		{
-			sprintf(message, "%05d%05d%05d%05d%05d%05d",
+			snprintf(message,sizeof(message), "%05d%05d%05d%05d%05d%05d",
 				values[0],values[1],values[2],values[3],values[4],values[5] );
 			FORMAT_MSG(send_msg, message);
 		}

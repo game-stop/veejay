@@ -1923,7 +1923,6 @@ int	vj_tag_get_v4l_properties(int t1,
 		*color	    = v4l2_get_saturation( vj_tag_input->unicap[tag->index] );
 		*white     =  v4l2_get_temperature( vj_tag_input->unicap[tag->index] );
 #endif
-
 		return 0;
 	}
 
