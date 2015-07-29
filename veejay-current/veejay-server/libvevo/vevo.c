@@ -237,10 +237,9 @@ static void prop_node_free(__vevo_port_t *port,vevo_property_t * p)
  \param key hash value
  \param t vevo_storage_t
  */
-static vevo_property_t *prop_node_append(vevo_port_t * p, ukey_t key,
+static vevo_property_t *prop_node_append(__vevo_port_t *port, ukey_t key,
 					   vevo_storage_t * t)
 {
-    __vevo_port_t *port = (__vevo_port_t *) p;
     vevo_property_t *node = prop_node_new(port,key, t);
     vevo_property_t *next;
     vevo_property_t *list = port->list;
@@ -264,9 +263,8 @@ static vevo_property_t *prop_node_append(vevo_port_t * p, ukey_t key,
  \param port
  \param key hash value
  */
-static vevo_property_t *prop_node_get(vevo_port_t * p, ukey_t key)
+static vevo_property_t *prop_node_get(__vevo_port_t *port, ukey_t key)
 {
-    __vevo_port_t *port = (__vevo_port_t *) p;
     vevo_property_t *l = port->list;
     while (l != NULL) {
 	if (key == l->key)
@@ -665,7 +663,7 @@ storage_put_atom_value(__vevo_port_t * port, void *src, int n,
 	   	 atom_store__(value);
 		} else {
 		    if (d->atom_type == VEVO_ATOM_TYPE_INT|| d->atom_type == VEVO_ATOM_TYPE_BOOL) {
-				int32_t *value = (int *) src;
+				int32_t *value = (int32_t *) src;
 				atom_store__(value);
 	  	  } else if(d->atom_type == VEVO_ATOM_TYPE_UINT64) {
 		  	  uint64_t *value = (uint64_t*) src;
