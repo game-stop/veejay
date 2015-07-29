@@ -2272,33 +2272,36 @@ void vj_font_render(void *ctx, void *_picture, long position)
 		srt_seq_t *s = f->index[i];	
 		if(!s)
 			continue;
-		if(s->start <= position && s->end >= position )
-		{
-			int   old_font = f->current_font;
-			int   old_size = f->current_size;
+	
+		if( position < s->start || position > s->end )
+			continue;
 
-			if( old_font != s->font || old_size != s->size )
-				if(!configure( f, s->size, s->font ))
-					if(!configure( f, old_size, old_font ))
-						break;
+		int   old_font = f->current_font;
+		int   old_size = f->current_size;
+
+		if( old_font != s->font || old_size != s->size )
+			if(!configure( f, s->size, s->font ))
+				if(!configure( f, old_size, old_font ))
+					break;
+		
+		f->x = s->x;
+		f->y = s->y;
+		f->bg = s->use_bg;
+		f->outline = s->outline;
+		
+		if(f->outline)
+			_rgb2yuv( s->ln[0],s->ln[1],s->ln[2], f->lncolor[0],f->lncolor[1],f->lncolor[2]);	
+
+		_rgb2yuv( s->fg[0],s->fg[1],s->fg[2], f->fgcolor[0],f->fgcolor[1],f->fgcolor[2] );
+		if(f->bg)
+			_rgb2yuv( s->bg[0],s->bg[1],s->bg[2], f->bgcolor[0],f->bgcolor[1],f->bgcolor[2] );
+
+		f->alpha[0] = s->alpha[0];
+		f->alpha[1] = s->alpha[1];
+		f->alpha[2] = s->alpha[2];
 			
-			f->x = s->x;
-			f->y = s->y;
-			f->bg = s->use_bg;
-			f->outline = s->outline;
-			
-			if(f->outline)
-				_rgb2yuv( s->ln[0],s->ln[1],s->ln[2], f->lncolor[0],f->lncolor[1],f->lncolor[2]);	
+		vj_font_text_render( f,s, _picture );
 
-			_rgb2yuv( s->fg[0],s->fg[1],s->fg[2], f->fgcolor[0],f->fgcolor[1],f->fgcolor[2] );
-			if(f->bg)
-				_rgb2yuv( s->bg[0],s->bg[1],s->bg[2], f->bgcolor[0],f->bgcolor[1],f->bgcolor[2] );
-
-			memcpy( f->alpha, s->alpha, sizeof(s->alpha) );
-			
-			vj_font_text_render( f,s, _picture );
-
-		}
 	}	
 
 	font_unlock(f);
