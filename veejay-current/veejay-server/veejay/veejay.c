@@ -760,7 +760,7 @@ int main(int argc, char **argv)
 			fprintf(stdout, "\n\n\tExample for bash:\n\t\t\t$ export VEEJAY_AUTO_SCALE_PIXEL=1\n");
 
 
-		goto VEEJAY_MAIN_EXIT;
+		return 0;
 	}
 
 	veejay_check_homedir( info );
