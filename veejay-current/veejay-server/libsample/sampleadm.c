@@ -2513,8 +2513,8 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	sample_info *sample;
 	sample = sample_get(s1);
 
-    	if (!sample)
-    	{
+    if (!sample)
+    {
 		return -1;
 	}
 	int e_a, e_d, e_s;
@@ -2532,38 +2532,35 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 		e_s = sample->encoder_total_frames_recorded;
 	}
 
-	veejay_sprintf(str,MESSAGE_SIZE,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-		pfps,
-		frame,
-		mode,
-		s1,
-		sample->effect_toggle,
-		sample->first_frame,
-		sample->last_frame,
-		sample->speed,
-		sample->looptype,
-		e_a,
-		e_d,
-		e_s,
-		sample_size(),
-		sample->marker_start,
-		sample->marker_end,
-		sample->selected_entry,
-		total_slots,
-		cache,
-		curfps,
-		lo,
-		hi,
-		sa,
-		ca,
-		(int)( sample->fader_val ),
-		sample->dup,
-		macro);
-		
-		
- 
-   return 0;
+	char *ptr = str;
+	ptr = vj_sprintf( ptr, pfps ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, frame ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, mode ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, s1 ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->effect_toggle ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->first_frame ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->last_frame ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->speed ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->looptype ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, e_a); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, e_d ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, e_s ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample_size() ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->marker_start ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->marker_end ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->selected_entry ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, total_slots ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, cache ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, curfps ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, lo ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, hi ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sa ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, ca ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, (int) sample->fader_val ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->dup ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, macro );
+
+	return 0;
 }
 
 

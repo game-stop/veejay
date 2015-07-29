@@ -3609,37 +3609,35 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
-    //if (!tag)
-    //return -1;
 
-	snprintf(str, MESSAGE_SIZE,
-			"%d %d %d %d %d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-			pfps,
-			frame,
-			mode,
-			tag_id,
-			tag->effect_toggle,
-			tag->color_r, // no start, but color
-			tag->color_g, // no end,
-			tag->color_b, // no speed,
-			0, // no looping
-			tag->encoder_active,
-			tag->encoder_frames_to_record,
-			tag->encoder_total_frames_recorded,
-			vj_tag_size()-1,
-			tag->source_type, // no markers
-			tag->n_frames, // no markers
-			tag->selected_entry, 
-			ts,
-			cache,
-			curfps,
-			lo,
-			hi,
-			sa,
-			ca,
-			(int)(tag->fader_val),
-			0,
-			macro);
+	char *ptr = str;
+	ptr = vj_sprintf( ptr, pfps ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, frame ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, mode ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag_id ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->effect_toggle ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->color_r ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->color_g ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->color_b ); *ptr++ = ' ';
+	*ptr++ = '0'; *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->encoder_active ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->encoder_frames_to_record ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->encoder_total_frames_recorded ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, vj_tag_size() - 1 ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->source_type ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->n_frames ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->selected_entry ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, ts ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, cache ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, curfps ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, (int) lo ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, (int) hi ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sa ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, ca ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, (int) tag->fader_val ); *ptr++ = ' ';
+	*ptr++ = '0'; *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, macro );
+
     return 0;
 }
 

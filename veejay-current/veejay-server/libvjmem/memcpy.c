@@ -1889,3 +1889,15 @@ char	*vj_strndup( const char *s, size_t n )
 	return ptr ? memcpy( ptr,s,n ) : NULL;
 }
 
+
+char	*vj_sprintf( char *dst, int value )
+{
+	char number[16];
+	int n;
+	snprintf(number,sizeof(number),"%d", value);
+	n = strlen( number );
+	*dst = '\0';
+	strcat( dst, number );
+	return dst + n;
+}
+

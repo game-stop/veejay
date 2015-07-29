@@ -1090,19 +1090,19 @@ void veejay_pipe_write_status(veejay_t * info)
     int total_slots = sample_size()-1;
     int tags = vj_tag_true_size() -1;
 	int cache_used = 0;
+	int mstatus = vj_event_macro_status();
+	int curfps  = (int) ( 100.0f / settings->spvf );
+	
 	if(tags>0)
 		total_slots+=tags;
-
-   int mstatus = vj_event_macro_status();
-   int curfps  = (int) ( 100.0f / settings->spvf );
-
-    switch (info->uc->playback_mode) {
+    
+	switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
-		cache_used = sample_cache_used(0);
+			cache_used = sample_cache_used(0);
 
-		if( info->settings->randplayer.mode ==
-			RANDMODE_SAMPLE)
+		if( info->settings->randplayer.mode == RANDMODE_SAMPLE)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
+
 		if( sample_chain_sprint_status
 			(info->uc->sample_id,cache_used,info->seq->size,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
 		{
@@ -1112,33 +1112,36 @@ void veejay_pipe_write_status(veejay_t * info)
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
 		// 26 status symbols
-		snprintf(info->status_what,MESSAGE_SIZE, " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-			info->real_fps,
-			settings->current_frame_num,
-			info->uc->playback_mode,
-			0,
-			0,
-			settings->min_frame_num,
-			settings->max_frame_num,
-			settings->current_playback_speed,
-			0, 
-			0,
-			0,
-			0,
-			0,
-			0,
-			0,	
-			0,
-			total_slots,
-			cache_used,
-		      	curfps,
-			settings->cycle_count[0],
-			settings->cycle_count[1],
-			0,
-		        0,
-			0,
-			0,
-			mstatus);
+			{
+				char *ptr = info->status_what;
+				*ptr++ = ' ';
+				ptr = vj_sprintf( ptr, info->real_fps ); *ptr++= ' ';
+				ptr = vj_sprintf( ptr, settings->current_frame_num ); *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, info->uc->playback_mode ); *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, settings->min_frame_num ); *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, settings->max_frame_num ); *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, settings->current_playback_speed ); *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, total_slots ); *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, cache_used ); *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, curfps ); *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, settings->cycle_count[0] ); *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, settings->cycle_count[1] ); *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, mstatus );
+			}
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
 		if( vj_tag_sprint_status( info->uc->sample_id,cache_used,info->seq->size,info->seq->current, info->real_fps,
