@@ -1140,18 +1140,19 @@ int	livido_read_plug_configuration(void *filter_template, const char *name)
 
 	/* if the file exists, write back the properties defined in it */
  	//only in_paramter_templates for now...
-	i = 0;
-	char buf[256];
-	while( (fgets( buf, sizeof(buf), f )) != NULL ) {
-		void *templ = livido_get_parameter_template( filter_template, i );
-		if(templ==NULL)
-			break;
-		vevo_sscanf_port( templ, buf ); 
-		i ++;
+	if( f ) {
+		i = 0;
+		char buf[256];
+		while( (fgets( buf, sizeof(buf), f )) != NULL ) {
+			void *templ = livido_get_parameter_template( filter_template, i );
+			if(templ==NULL)
+				break;
+			vevo_sscanf_port( templ, buf ); 
+			i ++;
+		}
+	
+		fclose(f);
 	}
-
-	fclose(f);
-
 	return 0;
 }
 
