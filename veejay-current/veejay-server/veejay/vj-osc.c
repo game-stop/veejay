@@ -856,6 +856,7 @@ void* vj_osc_allocate(int port_id) {
 	vj_osc *o = (vj_osc*)vj_malloc(sizeof(vj_osc));
 #ifdef HAVE_LIBLO
 	osc_clients = (vevo_port_t*) vj_malloc(sizeof(vevo_port_t*) * 32);
+	int i;
 	for( i = 0; i < 32 ;i ++ )
 		osc_clients[i] = NULL;
 #endif
