@@ -194,7 +194,6 @@ restart_poll:
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to get status");
 			return 0;
 		}
-                s.active_frame, s.first_clear_frame,
 
 		v->avail = s.n_clear_frames;
 		v->index = s.first_clear_frame;
