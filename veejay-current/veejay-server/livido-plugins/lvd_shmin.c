@@ -89,13 +89,13 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 		int fd = open( path, O_RDWR );
 		if(fd <= 0) {
 			printf("no env var VEEJAY_SHMID set and no file '%s' found!\n",path );
-			return LIVIDO_ERROR_HARDWARE;
+			return LIVIDO_ERROR_ENVIRONMENT
 		}
 		char buf[256];
 		livido_memset(buf,0,sizeof(buf));
 		read( fd, buf, 256 );
 		if(sscanf(buf, "master: %d", &shm_id ) != 1 )
-			return LIVIDO_ERROR_HARDWARE;
+			return LIVIDO_ERROR_ENVIRONMENT;
 		close(fd);
 	} 
 	else if( env_id != NULL ) {
@@ -105,7 +105,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	int r = shmget( shm_id, 0, 0400 );
 	if( r == -1 ) {
 		printf("error: %s for shm_id %d\n", strerror(errno),shm_id);
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_ENVIRONMENT;
 	}
 
 	char *ptr = (char*) shmat( r, NULL , 0 );
@@ -113,21 +113,20 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	vj_shared_data *data = (vj_shared_data*) &(ptr[0]);
 
 	if( data == (char*) (-1) ) {
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 
 	int dst_w = 0;
 	int dst_h = 0;
   
-   	lvd_extract_dimensions( my_instance, "out_channels", &dst_w, &dst_h );
-    
+   	if( lvd_extract_dimensions( my_instance, "out_channels", &dst_w, &dst_h ) != LIVIDO_NO_ERROR ) {
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
+	}
 
 	//@ read format and dimensions from shared memory
 	int lvd_shm_palette = data->header[5]; //@ read livido palette format 
 	int	lvd_shm_width	= data->header[0]; //@ read width of frame in shm
 	int lvd_shm_height  = data->header[1]; //@ ... height ...
-
-	
 	int cpu_flags		= 0;
 	cpu_flags		    = cpu_flags | SWS_FAST_BILINEAR;
 
@@ -156,12 +155,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 							  PIX_FMT_YUVJ422P or PIX_FMT_YUV422P
 
 							*/
-							
 							( fullrange == 1 ? PIX_FMT_YUVJ422P :  PIX_FMT_YUV422P ), 
-							
-							
-							
-							// assume ldv_shmin is used in veejay, produce YUV 4:2:2 planar
 							cpu_flags,
 							NULL,
 							NULL,
@@ -220,24 +214,25 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	//@ get output channel details
 	int error	  = lvd_extract_channel_values( my_instance, "out_channels", 0, &w,&h, O,&palette );
 	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_HARDWARE; //@ error codes in livido flanky
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS; //@ error codes in livido flanky
 
 	int uv_len = lvd_uv_plane_len( palette,w,h );
 
     char  *addr = NULL; 
 	error = livido_property_get( my_instance, "PLUGIN_private", 0, &addr );
+	if( error != LIVIDO_NO_ERROR ) 
+		return LIVIDO_ERROR_INTERNAL;
 
 	struct SwsContext *sws = NULL;
 	error = livido_property_get( my_instance, "PLUGIN_scaler", 0, &sws );
+	if( error != LIVIDO_NO_ERROR ) 
+		return LIVIDO_ERROR_INTERNAL;
 
 	vj_shared_data *v =(vj_shared_data*) &(addr[0]);
-
-	if( error != LIVIDO_NO_ERROR ) 
-		return LIVIDO_ERROR_HARDWARE;
 	
 	int res = pthread_rwlock_rdlock( &v->rwlock );
 	if( res == -1 ) {
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 
 	uint8_t *start_addr = addr + 4096; //v->memptr
@@ -274,15 +269,9 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	sws_scale( sws, (const uint8_t *const *)in, strides,0, srcH,(uint8_t * const*) O, dst_strides );
 
-	/*
-	livido_memcpy( O[0], y, len );
-	livido_memcpy( O[1], u, uv_len );
-	livido_memcpy( O[2], v1, uv_len );
-	*/
-
 	res = pthread_rwlock_unlock( &v->rwlock );
 	if( res == -1 ) {
-		return LIVIDO_ERROR_HARDWARE; //@ fix this in livido asap 
+		return LIVIDO_ERROR_RESOURCE; 
 	}
 
 

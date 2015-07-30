@@ -149,7 +149,7 @@ static inline void fading_stroboscopeUV(
 	}
 }
 
-livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
+int		process_instance( livido_port_t *my_instance, double timecode )
 {
 	int len =0;
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
@@ -169,10 +169,15 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	error = livido_property_get( my_instance, "PLUGIN_private", 0, &ptr );
 	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_INTERNAL;
 
-	lvd_extract_channel_values( my_instance, "out_channels", 0, &w, &h, O, &palette );
-	lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
+	error = lvd_extract_channel_values( my_instance, "out_channels", 0, &w, &h, O, &palette );
+	if( error != LIVIDO_NO_ERROR )
+		return LIVIDO_ERROR_INTERNAL;
+
+	error = lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
+	if( error != LIVIDO_NO_ERROR )
+		return LIVIDO_ERROR_INTERNAL;
 
 	len = w * h;
 
@@ -235,7 +240,6 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 }
 
 livido_port_t	*livido_setup(livido_setup_t list[], int version)
-
 {
 	LIVIDO_IMPORT(list);
 

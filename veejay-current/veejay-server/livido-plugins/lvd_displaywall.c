@@ -56,7 +56,7 @@ static void displaywall_initVec(displaywall_t *wall, int w, int h)
 	}
 }
 
-static int displaywall_tick( displaywall_t *wall, int video_width, int video_height )
+static void displaywall_tick( displaywall_t *wall, int video_width, int video_height )
 {
 	wall->speed += wall->speedi;
 	if(wall->speed < 0) wall->speed = 0;
@@ -143,9 +143,8 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 }
 
 
-livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
+int		process_instance( livido_port_t *my_instance, double timecode )
 {
-	int len =0;
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
 	uint8_t *O[4]= {NULL,NULL,NULL,NULL};
 
@@ -155,11 +154,11 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	
 	int error	  = lvd_extract_channel_values( my_instance, "out_channels", 0, &w,&h, O,&palette );
 	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_HARDWARE; 
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
 
-    lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
-
-	len = w * h;
+    error = lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
+	if( error != LIVIDO_NO_ERROR )
+		return LIVIDO_ERROR_NO_INPUT_CHANNELS;
 
 	int		scale =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
 	int		mode  =  lvd_extract_param_index( my_instance,"in_parameters", 1 );

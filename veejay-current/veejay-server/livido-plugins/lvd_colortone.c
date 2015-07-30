@@ -28,7 +28,7 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 }
 
 
-livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
+int	process_instance( livido_port_t *my_instance, double timecode )
 {
 	int len =0;
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
@@ -40,10 +40,12 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	
 	int error	  = lvd_extract_channel_values( my_instance, "out_channels", 0, &w,&h, O,&palette );
 	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_HARDWARE; 
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
 
-        lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
-
+    error = lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
+	if( error != LIVIDO_NO_ERROR )
+		return LIVIDO_ERROR_NO_INPUT_CHANNELS;
+	
 	int uv_len = lvd_uv_plane_len( palette,w,h );
 	len = w * h;
 
@@ -51,8 +53,9 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	int		green  =  lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int		blue   =  lvd_extract_param_index( my_instance,"in_parameters", 2 );
 	int		shift = 1;
-        if( palette == LIVIDO_PALETTE_YUV444P )
-                shift = 0;
+    
+	if( palette == LIVIDO_PALETTE_YUV444P )
+		shift = 0;
 	
 	if( O[0] != A[0] ) {
 		livido_memcpy( A[0], O[0], len );

@@ -1,8 +1,5 @@
-livido plugin example very beta
 
-lvd_solid.c implements same functionality as dummy stream
+Livido
 
-tag type 'solid' / dummy mode will try to load this plugin
-if plugin.cfg contains path to .so object
 
 

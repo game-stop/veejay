@@ -135,7 +135,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 		char *homedir = getenv("HOME");
 		if(!homedir) {
 			printf("HOME not set!\n");
-			return LIVIDO_ERROR_HARDWARE;
+			return LIVIDO_ERROR_ENVIRONMENT;
 		}
 		snprintf( path, sizeof(path)-1, "%s/.veejay", homedir );
 
@@ -143,7 +143,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	}
 
 	if(!vj_shm_file_ref( v, plugin_dir ) ) {
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 
 	int w = 0, h = 0;
@@ -160,13 +160,13 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	v->shm_id = shmget( v->key, shm_size, IPC_CREAT | 0666 );
 	if( v->shm_id == -1 ) {
 		failed_init_cleanup(v);
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	  }	
 
 	v->sms 	  = shmat( v->shm_id, NULL, 0 );
 	if( v->sms == NULL || v->sms == (char*) (-1) ) {
 		failed_init_cleanup(v);
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 
 	pthread_rwlockattr_t rw_lock_attr;
@@ -189,20 +189,20 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	int res = pthread_rwlockattr_init( &rw_lock_attr );
 	if( res == -1 ) {
 		failed_init_cleanup(v);
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 
 	res	    = pthread_rwlockattr_setpshared( &rw_lock_attr, PTHREAD_PROCESS_SHARED );
 	if( res == -1 ) {
 		printf("cant use PTHREAD_PROCESS_SHARED: %s",strerror(errno));
 		failed_init_cleanup(v);
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 	
 	res		= pthread_rwlock_init( &data->rwlock, &rw_lock_attr );
 	if( res == -1 ) {
 		failed_init_cleanup(v);
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
   	livido_property_set( my_instance , "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR, 1, &v );
 
@@ -241,7 +241,7 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
+int		process_instance( livido_port_t *my_instance, double timecode )
 {
 	int len =0;
 	int i = 0;
@@ -255,7 +255,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	//@ get output channel details
 	int error	  = lvd_extract_channel_values( my_instance, "in_channels", 0, &w,&h, I,&palette );
 	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_HARDWARE; //@ error codes in livido flanky
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS; //@ error codes in livido flanky
 
 	int uv_len = lvd_uv_plane_len( palette,w,h );
 	len = w * h;
@@ -263,14 +263,14 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	shared_video_t *v = NULL;
 	error = livido_property_get( my_instance, "PLUGIN_private", 0, &v );
 	if( error != LIVIDO_NO_ERROR ) 
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_INTERNAL;
 
 	char	*addr = (char*)v->sms;
 	vj_shared_data *data = (vj_shared_data*) v->sms;
 	
 	int res = pthread_rwlock_wrlock( &data->rwlock );
 	if( res == -1 ) {
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 
 	uint8_t *ptr = addr + 4096; 
@@ -282,7 +282,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		printf("shared resource in %d x %d, your frame in %d x %d\n",
 				data->header[0],data->header[1],w,h);
 		pthread_rwlock_unlock( &data->rwlock );
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 	livido_memcpy( y, I[0], len );
 	livido_memcpy( u, I[1], uv_len );
@@ -290,7 +290,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	res = pthread_rwlock_unlock( &data->rwlock );
 	if( res == -1 ) {
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_RESOURCE;
 	}
 
 	return LIVIDO_NO_ERROR;
