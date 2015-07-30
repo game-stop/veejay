@@ -63,9 +63,11 @@ typedef struct
 	int type;
 } vj_proto;
 
-#define VJ_MAX_PENDING_MSG 768
+/* Message buffer is 4 MB per client per frame tick, this should be large enough to hold most KF packets
+ */
+#define VJ_MAX_PENDING_MSG 4096
 #define RECV_SIZE RUP8(4096) 
-#define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1000)
+#define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1024)
 static	void	printbuf( FILE *f, uint8_t *buf , int len )
 {
 	int i;
@@ -840,12 +842,15 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			}
 
 			str_ptr += 8;
-			v[num_msg]->msg = (char*) vj_malloc( sizeof(char) * RUP8(slen) );
-			veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
-			v[num_msg]->len = slen;
-			
-			num_msg++;
-
+			v[num_msg]->msg = vj_simple_pool_alloc( Link[link_id]->pool, slen );
+			if(v[num_msg]->msg) {
+				veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
+				v[num_msg]->len = slen;
+				num_msg++;
+			}
+			else {
+				veejay_msg(0, "Not enough message space for this KF packet. (drop)" );
+			}	
 			i += ( 9 + slen );
 
 		} else {
