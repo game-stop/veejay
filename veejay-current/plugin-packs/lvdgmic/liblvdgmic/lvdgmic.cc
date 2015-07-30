@@ -29,10 +29,9 @@ void lvdgmic::push( int w, int h, int fmt, unsigned char **data, int n )
 	img.assign(w,h, 1, n_planes );
 
 	/* convert data in src to float */
-	float *in = img._data;
-	unsigned char *src = data[0];
 	unsigned int len = images._data[n]._width * images._data[n]._height * images._data[n]._depth;
-	unsigned int i,j;
+	unsigned int i;
+	int j;
 
 	for( j = 0; j < n_planes; j ++ ) {
 		float *in = img._data + (j * len);
@@ -54,11 +53,11 @@ void lvdgmic::gmic_command( char const *str )
 	}
 }
 
-void	lvdgmic::pull(int n, unsigned char **frame)
+void lvdgmic::pull(int n, unsigned char **frame)
 {
-	unsigned int i,j;
+	unsigned int i;
 	unsigned int len = images._data[n]._width * images._data[n]._height * images._data[n]._depth;
-
+	int j;
 	int n_planes = get_n_planes(format);
 
 	for( j = 0; j < n_planes; j ++ ) {
