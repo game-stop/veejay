@@ -1523,7 +1523,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
   {
 #ifdef HAVE_JACK_PORT_GET_LATENCY_RANGE
 	jack_latency_range_t r;
-	jack_port_get_latency_range( drv->output_port[0], JackCaptureLatency, &r );
+	jack_port_get_latency_range( drv->input_port[0], JackCaptureLatency, &r );
 	periods += r.max;
 #else
 
@@ -2445,7 +2445,7 @@ JACK_GetJackInputLatency(int deviceID)
   if(drv->client && drv->num_input_channels) {
 #ifdef HAVE_JACK_PORT_GET_LATENCY_RANGE
 	jack_latency_range_t r;
-	jack_port_get_latency_range( drv->output_port[0], JackCaptureLatency, &r );
+	jack_port_get_latency_range( drv->input_port[0], JackCaptureLatency, &r );
 	return_val = r.max;
 #else
     return_val = jack_port_get_total_latency(drv->client, drv->input_port[0]);
