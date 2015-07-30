@@ -705,10 +705,11 @@ static void donothing(int sig)
 
 static void	sigsegfault_handler(void) {
 	struct sigaction sigst;
-	sigst.sa_sigaction = veejay_backtrace_handler;
 	sigemptyset(&sigst.sa_mask);
 	sigaddset(&sigst.sa_mask, SIGSEGV );
 	sigst.sa_flags = SA_SIGINFO | SA_ONESHOT;
+	sigst.sa_sigaction = veejay_backtrace_handler;
+
 	if( sigaction(SIGSEGV, &sigst, NULL) == - 1) 
 		veejay_msg(0,"sigaction");
 }
