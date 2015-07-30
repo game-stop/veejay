@@ -199,118 +199,118 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 } vj_event_default_sdl_keys[] = {
 
 	{ 0,0,0,NULL },
-	{ VIMS_PROJ_INC,			SDLK_LEFT,		VIMS_MOD_CTRL, "-1 0" 	},
-	{ VIMS_PROJ_INC,			SDLK_RIGHT,		VIMS_MOD_CTRL, "1 0"	},
-	{ VIMS_PROJ_INC,			SDLK_UP,		VIMS_MOD_CTRL, "0 -1" 	},
-	{ VIMS_PROJ_INC,			SDLK_DOWN,		VIMS_MOD_CTRL, "0 1"	},
+	{ VIMS_PROJ_INC,				SDLK_LEFT,		VIMS_MOD_CTRL, "-1 0" 	},
+	{ VIMS_PROJ_INC,				SDLK_RIGHT,		VIMS_MOD_CTRL, "1 0"	},
+	{ VIMS_PROJ_INC,				SDLK_UP,		VIMS_MOD_CTRL, "0 -1" 	},
+	{ VIMS_PROJ_INC,				SDLK_DOWN,		VIMS_MOD_CTRL, "0 1"	},
 
 
-	{ VIMS_EFFECT_SET_BG,			SDLK_b,		VIMS_MOD_ALT,	NULL	},
-	{ VIMS_VIDEO_PLAY_FORWARD,		SDLK_KP6,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_PLAY_BACKWARD,		SDLK_KP4, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_PLAY_STOP,			SDLK_KP5, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_SKIP_FRAME,		SDLK_KP9, 	VIMS_MOD_NONE,	"1"	},
-	{ VIMS_VIDEO_PREV_FRAME,		SDLK_KP7, 	VIMS_MOD_NONE,	"1"	},
-	{ VIMS_VIDEO_SKIP_SECOND,		SDLK_KP8, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_PREV_SECOND,		SDLK_KP2, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_GOTO_START,		SDLK_KP1, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_GOTO_END,			SDLK_KP3, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_a,		VIMS_MOD_NONE,	"1"	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_s,		VIMS_MOD_NONE,	"2"	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_d,		VIMS_MOD_NONE,	"3"	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_f,		VIMS_MOD_NONE,	"4"	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_g,		VIMS_MOD_NONE,	"5"	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_h,		VIMS_MOD_NONE,	"6"	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_j,		VIMS_MOD_NONE,	"7"	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_k,		VIMS_MOD_NONE,	"8"	},
-	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_l,		VIMS_MOD_NONE,	"9"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_a,		VIMS_MOD_ALT,	"1"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_s,		VIMS_MOD_ALT,	"2"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_d,		VIMS_MOD_ALT,	"3"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_e,		VIMS_MOD_ALT,	"4"	},	
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_f,		VIMS_MOD_ALT,	"5"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_g,		VIMS_MOD_ALT,	"6"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_h,		VIMS_MOD_ALT,	"7"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_j,		VIMS_MOD_ALT,	"8"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_k,		VIMS_MOD_ALT,	"9"	},
-	{ VIMS_VIDEO_SET_SLOW,			SDLK_l,		VIMS_MOD_ALT,	"10"	},
+	{ VIMS_EFFECT_SET_BG,			SDLK_b,			VIMS_MOD_ALT,	NULL	},
+	{ VIMS_VIDEO_PLAY_FORWARD,		SDLK_KP6,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_VIDEO_PLAY_BACKWARD,		SDLK_KP4,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_VIDEO_PLAY_STOP,			SDLK_KP5,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_VIDEO_SKIP_FRAME,		SDLK_KP9,		VIMS_MOD_NONE,	"1"	},
+	{ VIMS_VIDEO_PREV_FRAME,		SDLK_KP7,		VIMS_MOD_NONE,	"1"	},
+	{ VIMS_VIDEO_SKIP_SECOND,		SDLK_KP8,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_VIDEO_PREV_SECOND,		SDLK_KP2,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_VIDEO_GOTO_START,		SDLK_KP1,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_VIDEO_GOTO_END,			SDLK_KP3,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_a,			VIMS_MOD_NONE,	"1"	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_s,			VIMS_MOD_NONE,	"2"	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_d,			VIMS_MOD_NONE,	"3"	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_f,			VIMS_MOD_NONE,	"4"	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_g,			VIMS_MOD_NONE,	"5"	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_h,			VIMS_MOD_NONE,	"6"	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_j,			VIMS_MOD_NONE,	"7"	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_k,			VIMS_MOD_NONE,	"8"	},
+	{ VIMS_VIDEO_SET_SPEEDK,		SDLK_l,			VIMS_MOD_NONE,	"9"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_a,			VIMS_MOD_ALT,	"1"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_s,			VIMS_MOD_ALT,	"2"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_d,			VIMS_MOD_ALT,	"3"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_e,			VIMS_MOD_ALT,	"4"	},	
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_f,			VIMS_MOD_ALT,	"5"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_g,			VIMS_MOD_ALT,	"6"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_h,			VIMS_MOD_ALT,	"7"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_j,			VIMS_MOD_ALT,	"8"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_k,			VIMS_MOD_ALT,	"9"	},
+	{ VIMS_VIDEO_SET_SLOW,			SDLK_l,			VIMS_MOD_ALT,	"10"	},
 #ifdef HAVE_SDL
-	{ VIMS_FULLSCREEN,			SDLK_f,		VIMS_MOD_CTRL,	NULL	},
-#endif
+	{ VIMS_FULLSCREEN,				SDLK_f,			VIMS_MOD_CTRL,	NULL	},
+#endif	
 	{ VIMS_CHAIN_ENTRY_DOWN,		SDLK_KP_MINUS,	VIMS_MOD_NONE,	"1"	},
 	{ VIMS_CHAIN_ENTRY_UP,			SDLK_KP_PLUS,	VIMS_MOD_NONE,	"1"	},
-	{ VIMS_CHAIN_ENTRY_CHANNEL_INC,		SDLK_EQUALS,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_CHAIN_ENTRY_CHANNEL_DEC,		SDLK_MINUS,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_CHAIN_ENTRY_SOURCE_TOGGLE,	SDLK_SLASH,	VIMS_MOD_NONE,	NULL	}, // stream/sample
+	{ VIMS_CHAIN_ENTRY_CHANNEL_INC,	SDLK_EQUALS,	VIMS_MOD_NONE,	NULL	},
+	{ VIMS_CHAIN_ENTRY_CHANNEL_DEC,	SDLK_MINUS,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_CHAIN_ENTRY_SOURCE_TOGGLE,SDLK_SLASH,	VIMS_MOD_NONE,	NULL	}, // stream/sample
 	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_PAGEUP,	VIMS_MOD_NONE,	"0 1"	},
 	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_KP_PERIOD,	VIMS_MOD_NONE,	"1 1"	},
 	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_PERIOD,	VIMS_MOD_NONE,	"2 1"	},
-	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_w,		VIMS_MOD_NONE,	"3 1"	},
-	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_r,		VIMS_MOD_NONE,	"4 1"	},
-	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_y,		VIMS_MOD_NONE,	"5 1"	},
-	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_i,		VIMS_MOD_NONE,	"6 1"	},
-	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_p,		VIMS_MOD_NONE,	"7 1"	},
+	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_w,			VIMS_MOD_NONE,	"3 1"	},
+	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_r,			VIMS_MOD_NONE,	"4 1"	},
+	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_y,			VIMS_MOD_NONE,	"5 1"	},
+	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_i,			VIMS_MOD_NONE,	"6 1"	},
+	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_p,			VIMS_MOD_NONE,	"7 1"	},
 	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_PAGEDOWN,	VIMS_MOD_NONE,	"0 -1"	},
-	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_KP0,	VIMS_MOD_NONE,	"1 -1"	},
-	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_COMMA,	VIMS_MOD_NONE,	"2 -1"	},
-	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_q,		VIMS_MOD_NONE,	"3 -1"	},
-	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_e,		VIMS_MOD_NONE,	"4 -1"	},
-	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_t,		VIMS_MOD_NONE,	"5 -1"	},
-	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_u,		VIMS_MOD_NONE,	"6 -1"	},
-	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_o,		VIMS_MOD_NONE,	"7 -1"	},
-	{ VIMS_OSD,				SDLK_o,		VIMS_MOD_CTRL,  NULL	},
-	{ VIMS_COPYRIGHT,			SDLK_c,		VIMS_MOD_CTRL,  NULL	},
-	{ VIMS_COMPOSITE,			SDLK_i,		VIMS_MOD_CTRL,  NULL    },
-	{ VIMS_OSD_EXTRA,			SDLK_h,		VIMS_MOD_CTRL,	NULL	},
-	{ VIMS_PROJ_STACK,			SDLK_v,		VIMS_MOD_CTRL,	"1 0"	},
-	{ VIMS_PROJ_STACK,			SDLK_p,		VIMS_MOD_CTRL,	"0 1"	},
-	{ VIMS_PROJ_TOGGLE,			SDLK_a,		VIMS_MOD_CTRL,  NULL	},
-	{ VIMS_FRONTBACK,			SDLK_s,		VIMS_MOD_CTRL,  NULL	},
-	{ VIMS_RENDER_DEPTH,			SDLK_d,		VIMS_MOD_CTRL,  "2"	},
-	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
-	{ VIMS_SELECT_BANK,			SDLK_2,		VIMS_MOD_NONE,	"2"	},
-	{ VIMS_SELECT_BANK,			SDLK_3,		VIMS_MOD_NONE,	"3"	},
-	{ VIMS_SELECT_BANK,			SDLK_4,		VIMS_MOD_NONE,	"4"	},
-	{ VIMS_SELECT_BANK,			SDLK_5,		VIMS_MOD_NONE,	"5"	},
-	{ VIMS_SELECT_BANK,			SDLK_6,		VIMS_MOD_NONE,	"6"	},
-	{ VIMS_SELECT_BANK,			SDLK_7,		VIMS_MOD_NONE,	"7"	},
-	{ VIMS_SELECT_BANK,			SDLK_8,		VIMS_MOD_NONE,	"8"	},
-	{ VIMS_SELECT_BANK,			SDLK_9,		VIMS_MOD_NONE,	"9"	},
-	{ VIMS_SELECT_ID,			SDLK_F1,	VIMS_MOD_NONE,	"1"	},
-	{ VIMS_SELECT_ID,			SDLK_F2,	VIMS_MOD_NONE,	"2"	},
-	{ VIMS_SELECT_ID,			SDLK_F3,	VIMS_MOD_NONE,	"3"	},
-	{ VIMS_SELECT_ID,			SDLK_F4,	VIMS_MOD_NONE,	"4"	},
-	{ VIMS_SELECT_ID,			SDLK_F5,	VIMS_MOD_NONE,	"5"	},
-	{ VIMS_SELECT_ID,			SDLK_F6,	VIMS_MOD_NONE,	"6"	},
-	{ VIMS_SELECT_ID,			SDLK_F7,	VIMS_MOD_NONE,	"7"	},
-	{ VIMS_SELECT_ID,			SDLK_F8,	VIMS_MOD_NONE,	"8"	},
-	{ VIMS_SELECT_ID,			SDLK_F9,	VIMS_MOD_NONE,	"9"	},
-	{ VIMS_SELECT_ID,			SDLK_F10,	VIMS_MOD_NONE,	"10"	},
-	{ VIMS_SELECT_ID,			SDLK_F11, 	VIMS_MOD_NONE,	"11"	},
-	{ VIMS_SELECT_ID,			SDLK_F12,	VIMS_MOD_NONE,	"12"	},
+	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_KP0,		VIMS_MOD_NONE,	"1 -1"	},
+	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_COMMA,		VIMS_MOD_NONE,	"2 -1"	},
+	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_q,			VIMS_MOD_NONE,	"3 -1"	},
+	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_e,			VIMS_MOD_NONE,	"4 -1"	},
+	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_t,			VIMS_MOD_NONE,	"5 -1"	},
+	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_u,			VIMS_MOD_NONE,	"6 -1"	},
+	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_o,			VIMS_MOD_NONE,	"7 -1"	},
+	{ VIMS_OSD,						SDLK_o,			VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_COPYRIGHT,				SDLK_c,			VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_COMPOSITE,				SDLK_i,			VIMS_MOD_CTRL,  NULL    },
+	{ VIMS_OSD_EXTRA,				SDLK_h,			VIMS_MOD_CTRL,	NULL	},
+	{ VIMS_PROJ_STACK,				SDLK_v,			VIMS_MOD_CTRL,	"1 0"	},
+	{ VIMS_PROJ_STACK,				SDLK_p,			VIMS_MOD_CTRL,	"0 1"	},
+	{ VIMS_PROJ_TOGGLE,				SDLK_a,			VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_FRONTBACK,				SDLK_s,			VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_RENDER_DEPTH,			SDLK_d,			VIMS_MOD_CTRL,  "2"	},
+	{ VIMS_SELECT_BANK,				SDLK_1,			VIMS_MOD_NONE,	"1"	},
+	{ VIMS_SELECT_BANK,				SDLK_2,			VIMS_MOD_NONE,	"2"	},
+	{ VIMS_SELECT_BANK,				SDLK_3,			VIMS_MOD_NONE,	"3"	},
+	{ VIMS_SELECT_BANK,				SDLK_4,			VIMS_MOD_NONE,	"4"	},
+	{ VIMS_SELECT_BANK,				SDLK_5,			VIMS_MOD_NONE,	"5"	},
+	{ VIMS_SELECT_BANK,				SDLK_6,			VIMS_MOD_NONE,	"6"	},
+	{ VIMS_SELECT_BANK,				SDLK_7,			VIMS_MOD_NONE,	"7"	},
+	{ VIMS_SELECT_BANK,				SDLK_8,			VIMS_MOD_NONE,	"8"	},
+	{ VIMS_SELECT_BANK,				SDLK_9,			VIMS_MOD_NONE,	"9"	},
+	{ VIMS_SELECT_ID,				SDLK_F1,		VIMS_MOD_NONE,	"1"	},
+	{ VIMS_SELECT_ID,				SDLK_F2,		VIMS_MOD_NONE,	"2"	},
+	{ VIMS_SELECT_ID,				SDLK_F3,		VIMS_MOD_NONE,	"3"	},
+	{ VIMS_SELECT_ID,				SDLK_F4,		VIMS_MOD_NONE,	"4"	},
+	{ VIMS_SELECT_ID,				SDLK_F5,		VIMS_MOD_NONE,	"5"	},
+	{ VIMS_SELECT_ID,				SDLK_F6,		VIMS_MOD_NONE,	"6"	},
+	{ VIMS_SELECT_ID,				SDLK_F7,		VIMS_MOD_NONE,	"7"	},
+	{ VIMS_SELECT_ID,				SDLK_F8,		VIMS_MOD_NONE,	"8"	},
+	{ VIMS_SELECT_ID,				SDLK_F9,		VIMS_MOD_NONE,	"9"	},
+	{ VIMS_SELECT_ID,				SDLK_F10,		VIMS_MOD_NONE,	"10"	},
+	{ VIMS_SELECT_ID,				SDLK_F11,		VIMS_MOD_NONE,	"11"	},
+	{ VIMS_SELECT_ID,				SDLK_F12,		VIMS_MOD_NONE,	"12"	},
 	{ VIMS_SET_PLAIN_MODE,			SDLK_KP_DIVIDE,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_REC_AUTO_START,			SDLK_e,		VIMS_MOD_CTRL,	"100"	},
-	{ VIMS_REC_STOP,			SDLK_t,		VIMS_MOD_CTRL,	NULL	},
-	{ VIMS_REC_START,			SDLK_r,		VIMS_MOD_CTRL,	NULL	},
-	{ VIMS_CHAIN_TOGGLE,			SDLK_END,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_CHAIN_ENTRY_SET_STATE,		SDLK_END,	VIMS_MOD_ALT,	NULL	},	
+	{ VIMS_REC_AUTO_START,			SDLK_e,			VIMS_MOD_CTRL,	"100"	},
+	{ VIMS_REC_STOP,				SDLK_t,			VIMS_MOD_CTRL,	NULL	},
+	{ VIMS_REC_START,				SDLK_r,			VIMS_MOD_CTRL,	NULL	},
+	{ VIMS_CHAIN_TOGGLE,			SDLK_END,		VIMS_MOD_NONE,	NULL	},
+	{ VIMS_CHAIN_ENTRY_SET_STATE,	SDLK_END,		VIMS_MOD_ALT,	NULL	},	
 	{ VIMS_CHAIN_ENTRY_CLEAR,		SDLK_DELETE,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_FXLIST_INC,			SDLK_UP,	VIMS_MOD_NONE,	"1"	},
-	{ VIMS_FXLIST_DEC,			SDLK_DOWN,	VIMS_MOD_NONE,	"1"	},
-	{ VIMS_FXLIST_ADD,			SDLK_RETURN,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_SET_SAMPLE_START,			SDLK_LEFTBRACKET,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_SET_SAMPLE_END,			SDLK_RIGHTBRACKET,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_SAMPLE_SET_MARKER_START,		SDLK_LEFTBRACKET,	VIMS_MOD_ALT,	NULL	},
-	{ VIMS_SAMPLE_SET_MARKER_END,		SDLK_RIGHTBRACKET,	VIMS_MOD_ALT,	NULL	},
-	{ VIMS_SAMPLE_TOGGLE_LOOP,		SDLK_KP_MULTIPLY,	VIMS_MOD_NONE,NULL	},
-	{ VIMS_SWITCH_SAMPLE_STREAM,		SDLK_ESCAPE,		VIMS_MOD_NONE, NULL	},
-	{ VIMS_PRINT_INFO,			SDLK_HOME,		VIMS_MOD_NONE, NULL	},
-	{ VIMS_OSL,				SDLK_HOME,		VIMS_MOD_CTRL, NULL	},
-	{ VIMS_SAMPLE_CLEAR_MARKER,		SDLK_BACKSPACE,		VIMS_MOD_NONE, NULL },
-	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_NONE, "2 1"	},
-	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_SHIFT,  "1 1"	},
-	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_CTRL, "0 0"	},
-	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_CAPSLOCK, "3 1"},
+	{ VIMS_FXLIST_INC,				SDLK_UP,		VIMS_MOD_NONE,	"1"	},
+	{ VIMS_FXLIST_DEC,				SDLK_DOWN,		VIMS_MOD_NONE,	"1"	},
+	{ VIMS_FXLIST_ADD,				SDLK_RETURN,	VIMS_MOD_NONE,	NULL	},
+	{ VIMS_SET_SAMPLE_START,		SDLK_LEFTBRACKET,VIMS_MOD_NONE,	NULL	},
+	{ VIMS_SET_SAMPLE_END,			SDLK_RIGHTBRACKET,VIMS_MOD_NONE,	NULL	},
+	{ VIMS_SAMPLE_SET_MARKER_START,	SDLK_LEFTBRACKET,VIMS_MOD_ALT,	NULL	},
+	{ VIMS_SAMPLE_SET_MARKER_END,	SDLK_RIGHTBRACKET,VIMS_MOD_ALT,	NULL	},
+	{ VIMS_SAMPLE_TOGGLE_LOOP,		SDLK_KP_MULTIPLY,VIMS_MOD_NONE,NULL	},
+	{ VIMS_SWITCH_SAMPLE_STREAM,	SDLK_ESCAPE,	VIMS_MOD_NONE, NULL	},
+	{ VIMS_PRINT_INFO,				SDLK_HOME,		VIMS_MOD_NONE, NULL	},
+	{ VIMS_OSL,						SDLK_HOME,		VIMS_MOD_CTRL, NULL	},
+	{ VIMS_SAMPLE_CLEAR_MARKER,		SDLK_BACKSPACE,	VIMS_MOD_NONE, NULL },
+	{ VIMS_MACRO,					SDLK_SPACE,		VIMS_MOD_NONE, "2 1"	},
+	{ VIMS_MACRO,					SDLK_SPACE,		VIMS_MOD_SHIFT,  "1 1"	},
+	{ VIMS_MACRO,					SDLK_SPACE,		VIMS_MOD_CTRL, "0 0"	},
+	{ VIMS_MACRO,					SDLK_SPACE,		VIMS_MOD_CAPSLOCK, "3 1"},
 	{ VIMS_MACRO_SELECT,			SDLK_F1,		VIMS_MOD_CTRL, "0"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F2,		VIMS_MOD_CTRL, "1"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F3,		VIMS_MOD_CTRL, "2"	},
@@ -407,15 +407,6 @@ __z++ ;\
  }\
 }
 
-/* P_A16: Parse 16 integer arguments. This macro is used in 1 function */
-#define P_A16(a,c,d)\
-{\
-int __z = 0;\
-while(*c) { \
-if(__z > 15 )  break; \
-switch(*c++) { case 'd': a[__z] = va_arg(d, int); __z++ ; break; }\
-}}\
-
 
 #define DUMP_ARG(a)\
 if(sizeof(a)>0){\
@@ -506,7 +497,6 @@ char	*get_embedded_help( int fx_mode, int play_mode, int fx_entry, int id )
 	{
 		return NULL; // return get_arr_embedded_help( embedded_help ); FIXME someday
 	} else {
-		veejay_memset(msg,0,sizeof(msg));
 		int fx_id = 0;
 		if( play_mode == VJ_PLAYBACK_MODE_TAG  ) {
 			fx_id = vj_tag_get_effect_any(id,fx_entry);
@@ -1131,11 +1121,10 @@ void	vj_event_parse_kf( veejay_t *v, char *msg, int len )
 /* parse a message received from network */
 void vj_event_parse_bundle(veejay_t *v, char *msg )
 {
-
+	char atomic_msg[256];
 	int num_msg = 0;
 	int offset = 3;
 	int i = 0;
-	
 	
 	if ( msg[offset] == ':' )
 	{
@@ -1159,14 +1148,15 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
 			return;
 		}	
 
-		offset+=1;	/* skip # */
+		offset += 1;	/* skip # */
 
-		for( i = 1; i <= num_msg ; i ++ ) /* iterate through message bundle and invoke parse_msg */
+		for( i = 1; i <= num_msg ; i ++ )
 		{				
-			char atomic_msg[256];
 			int found_end_of_msg = 0;
 			int total_msg_len = strlen(msg);
-			veejay_memset( atomic_msg,0,sizeof(atomic_msg) );
+
+			veejay_memset( atomic_msg, 0 , sizeof(atomic_msg) ); /* clear */
+
 			while( (offset+j) < total_msg_len)
 			{
 				if(msg[offset+j] == '}')
@@ -1194,7 +1184,6 @@ void vj_event_dump()
 	vj_event_vevo_dump();
 	
 	vj_osc_dump();
-
 }
 
 typedef struct {
@@ -1437,7 +1426,7 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 	char *res = NULL;	
 	int len = strlen(msg);
 	if( len <= 0 )
-		return res;
+		return NULL;
 
 	if( (flags & VIMS_LONG_PARAMS) ) /* copy rest of message */
 	{
@@ -1447,9 +1436,8 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 	else			
 	{
 		char str[256];
-		veejay_memset(str,0, sizeof(str) );
-		if(sscanf( msg, "%s", str ) <= 0 )
-			return res;
+		if(sscanf( msg, "%256s", str ) <= 0 )
+			return NULL;
 		res = vj_strndup( str, 255 ); 	
 	}	
 	return res;
@@ -1458,7 +1446,6 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 {
 	veejay_t *v = (veejay_t*)ptr;
-	char head[5] = { 0,0,0,0,0};
 	int net_id = 0;
 	int np = 0;
 	
@@ -1475,16 +1462,14 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 
 	}
 	
-	veejay_memcpy(head,msg,4);
-
-	if( strncasecmp( head, "bun", 3 ) == 0 )
+	if( strncasecmp( msg, "BUN", 3 ) == 0 )
 	{
 		veejay_chomp_str( msg, &msg_len );
 		vj_event_parse_bundle( v, msg );
 		return 1;
 	}
 
-	if( strncasecmp( head, "key", 3 ) == 0 )
+	if( strncasecmp( msg, "KEY", 3 ) == 0 )
 	{
 		vj_event_parse_kf( v, msg, msg_len );
 		return 1;
@@ -1494,7 +1479,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	msg_len --;
 
 	/* try to scan VIMS id */
-	if ( sscanf( head, "%03d", &net_id ) != 1 )
+	if ( sscanf( msg, "%03d", &net_id ) != 1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Error parsing VIMS selector");
 		return 0;
@@ -1505,23 +1490,6 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		veejay_msg(VEEJAY_MSG_ERROR, "VIMS Selector %d invalid", net_id );
 		return 0;
 	}
-
-	/* verify format 
-	if( msg[3] != 0x3a || msg[msg_len] != ';' )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Syntax error in VIMS message");
-		if( msg[3] != 0x3a )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "\tExpected ':' after VIMS selector");
-			return 0;
-		}
-		if( msg[msg_len] != ';' )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "\tExpected ';' to terminate VIMS message");	
-			return 0;
-		}
-	}
-	*/
 
 	if ( net_id >= VIMS_BUNDLE_START && net_id < VIMS_BUNDLE_END )
 	{
@@ -1541,11 +1509,12 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		v->rmodes[ v->uc->current_link ] = -1000;
 	}
 */
+	int i_args[16];
+
 	np = vj_event_vevo_get_num_args( net_id );
 		
 	if ( msg_len <= MSG_MIN_LEN )
 	{
-		int i_args[16];
 		int i = 0;
 		while(  i < np  )
 		{
@@ -1566,12 +1535,9 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		char *fmt = vj_event_vevo_get_event_format( net_id );
 		int flags = vj_event_vevo_get_flags( net_id );
 		int i = 0;
-		int i_args[16];
 		char *str = NULL;
 		int fmt_offset = 1;
 		char *arg_str = NULL;
-		veejay_memset( i_args, 0, sizeof(i_args) );
-
 		int n = 4;
 		if( msg[msg_len-4] == ';' )
 			n = 5;
@@ -1650,8 +1616,8 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 			if( valid_for_macro(net_id))
 				store_macro_( v,msg, v->settings->current_frame_num );
 		}
+
 		vj_event_fire_net_event( v, net_id, str, i_args, i, 0 );
-		
 
 		if(fmt) free(fmt);
 		if(arg_str) free(arg_str);
@@ -1770,7 +1736,6 @@ void vj_event_update_remote(void *ptr)
 void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
 {
 	char bundle[4096];
-	veejay_memset(bundle,0,sizeof(bundle));
 	vj_event_create_effect_bundle(v, bundle, key_num, key_mod );
 }
 
@@ -2035,7 +2000,7 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 	int c = 0;
 	char sample_list[1024];
 	veejay_memset(sample_list,0,sizeof(sample_list));
-	// todo: editlist loading ; veejay restart
+	// FIXME editlist loading ; veejay restart
 
 	while( cur != NULL )
 	{
@@ -4063,7 +4028,6 @@ void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
 	sample_get_chain_source(v->uc->sample_id, entry);
 	int cha = sample_get_chain_channel( v->uc->sample_id, entry );
 
-//	if( src == VJ_TAG_TYPE_NONE ) {
 	int pos = sample_get_offset( cha,entry );
 			
 	pos += args[2];
@@ -4071,9 +4035,6 @@ void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
 	sample_set_offset( cha,entry, pos );
 
 	veejay_msg(VEEJAY_MSG_INFO, "Changed frame position to %d for sample %d on FX entry %d (only)", pos,cha,entry );
-		
-//	}
-
 }
 
 void	vj_event_sample_skip_frame(void	*ptr, const char format[], va_list ap)
@@ -4456,7 +4417,6 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		p_invalid_mode();
 		return;
 	}
-
 	
 	int format_ = _recorder_format;
 	if(format_==-1)
@@ -4622,7 +4582,6 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 	}
 }
 
-
 void vj_event_sample_set_num_loops(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t *)ptr;
@@ -4652,12 +4611,10 @@ void vj_event_sample_set_num_loops(void *ptr, const char format[], va_list ap)
 	}
 }
 
-
 void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[4];
-	//video_playback_setup *s = v->settings;
 	char *str = NULL;
 	int s_start;
 	int s_end;
@@ -4847,8 +4804,6 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
 	veejay_msg(VEEJAY_MSG_INFO, "Deleted all samples.");
 } 
 
-
-
 void vj_event_chain_enable(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -4866,7 +4821,6 @@ void vj_event_chain_enable(void *ptr, const char format[], va_list ap)
 			p_invalid_mode();
 	}
 	veejay_msg(VEEJAY_MSG_INFO, "Enabled effect chain");
-	
 }
 
 void	vj_event_stream_set_length( void *ptr, const char format[], va_list ap)
@@ -4878,14 +4832,14 @@ void	vj_event_stream_set_length( void *ptr, const char format[], va_list ap)
 
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] > 0 && args[0] < 999999 )
+		if(args[0] > 0 && args[0] < 2160000 ) //fictious length is maximum 1 day
 		{
 			vj_tag_set_n_frames(v->uc->sample_id, args[0]);
 			v->settings->max_frame_num = args[0];
 			constrain_stream( v, v->uc->sample_id, (long) args[0]);
 		}
 		else
-		  veejay_msg(VEEJAY_MSG_ERROR, "Ficticious length must be 0 - 999999");
+		  veejay_msg(VEEJAY_MSG_ERROR, "Ficticious length must be 0 - 2160000");
 	}
 	else
 		p_invalid_mode();
@@ -5039,7 +4993,6 @@ void vj_event_sample_chain_disable(void *ptr, const char format[], va_list ap)
 		vj_tag_set_effect_status(args[0], 0);
 		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on stream %d is disabled",args[0]);
 	}
-	
 }
 
 
@@ -5199,7 +5152,6 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 		else
 			p_no_tag(args[0]);
 	}
-
 }
 
 void	vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
@@ -5252,7 +5204,6 @@ void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 				vj_tag_get_fader_val(args[0]));
 		}
 	}
-
 }
 
 void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
@@ -5293,14 +5244,14 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 			}
 		}
 	}
-
 }
 
 void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[2];
-	char *str = NULL; P_A(args,str,format,ap);
+	char *str = NULL; 
+	P_A(args,str,format,ap);
 
 	if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
 	{
@@ -5327,8 +5278,6 @@ void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 		}
 	}
 }
-
-
 
 void vj_event_chain_clear(void *ptr, const char format[], va_list ap)
 {
@@ -5372,15 +5321,14 @@ void vj_event_chain_clear(void *ptr, const char format[], va_list ap)
 		}
 		v->uc->chain_changed = 1;
 	}
-
-
 }
 
 void vj_event_chain_entry_del(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[2];
-	char *str = NULL; P_A(args,str,format,ap);
+	char *str = NULL;
+	P_A(args,str,format,ap);
 
 	if(SAMPLE_PLAYING(v)) 
 	{
@@ -5438,7 +5386,8 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[3];
-	char *str = NULL; P_A(args,str,format,ap);
+	char *str = NULL;
+	P_A(args,str,format,ap);
 
 	if(SAMPLE_PLAYING(v)) 
 	{
@@ -5555,6 +5504,7 @@ void vj_event_entry_up(void *ptr, const char format[], va_list ap)
 
 	}
 }
+
 void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5584,16 +5534,20 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 			c, vj_effect_get_description(effect_id));
 	}
 }
+
 void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap)
 {
 	int args[SAMPLE_MAX_PARAMETERS];
-	veejay_t *v = (veejay_t*)ptr;
-	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
-        char str[4096];
-        P_A(args,str,format,ap);    
+	char str[4096];
 	int value = 0;
+	veejay_t *v = (veejay_t*)ptr;
 
-	if( sscanf( str, "%d" , &value ) != 1 ) {
+	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
+
+	P_A(args,str,format,ap);    
+
+	if( sscanf( str, "%d" , &value ) != 1 )
+	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid value." );
 		return;
 	}
@@ -5627,7 +5581,8 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 			}
 			v->uc->chain_changed = 1;
 		}
-	} else if( STREAM_PLAYING(v)) 
+	}
+   	else if( STREAM_PLAYING(v)) 
 	{
 		if(args[0] == 0) args[0] = v->uc->sample_id;
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
@@ -5662,15 +5617,17 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 
 void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 {
-	int args[SAMPLE_MAX_PARAMETERS];
-	veejay_t *v = (veejay_t*)ptr;
-	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
-        char str[4096];
-        P_A(args,str,format,ap);    
 	long int tmp = 0;
-	char *end = str;
 	int base = 10;
 	int index = 3; // sample, chain, fx_id
+	int args[SAMPLE_MAX_PARAMETERS];
+	char str[1024]; //FIXME string parameters
+	char *end = str;
+	veejay_t *v = (veejay_t*)ptr;
+	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
+   
+   	P_A(args,str,format,ap);
+
 	while( (tmp = strtol( end, &end, base ))) {
 		args[index] = (int) tmp;
 		index ++;
@@ -5683,7 +5640,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds: %d", args[1]);
 			return;
 		}
 
@@ -5701,7 +5658,6 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				{
 					if(vj_effect_valid_value(real_id,i,args[(i+args_offset)]) )
 					{
-
 				 		if(sample_set_effect_arg(args[0],args[1],i,args[(i+args_offset)] )==-1)	
 						{
 							veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",
@@ -5720,7 +5676,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds %d", args[1]);
 			return;
 		}
 
@@ -5756,7 +5712,6 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 			}
 		}
 	}
-
 }
 
 void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
@@ -5803,7 +5758,6 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		{
 			veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
 		}
-
 	} 
 
 	if(STREAM_PLAYING(v))
@@ -7979,7 +7933,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 			int effect_id = y;
 			if(effect_id != -1)
 			{
-				char bundle[200];
+				char bundle[512];
 				int np = vj_effect_get_num_params(y);
 				sprintf(bundle, "%03d:0 %d %d", VIMS_CHAIN_ENTRY_SET_PRESET,i, effect_id );
 		    		for (j = 0; j < np; j++)
@@ -7995,8 +7949,9 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 						veejay_strncat( bundle, svalue, strlen(svalue));
 					}
 				}
-				veejay_strncpy( blob+bunlen, bundle,strlen(bundle));
-				bunlen += strlen(bundle);
+				int blen = strlen(bundle);
+				veejay_strncpy( blob+bunlen, bundle,blen);
+				bunlen += blen;
 			}
 		}
  	}
@@ -8007,19 +7962,18 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 	if(event_id <= 0 )	
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add more bundles");
-		free(blob);
-		return;
 	}
-
-	vj_msg_bundle *m = vj_event_bundle_new( buf, event_id);
-	if(!m)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Bundle");
-		free(blob);
-		return;
+	else {
+		vj_msg_bundle *m = vj_event_bundle_new( buf, event_id);
+		if(!m)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Bundle");
+		}
+		else {
+			if(!vj_event_bundle_store(m))
+				veejay_msg(VEEJAY_MSG_ERROR, "Error storing Bundle %d", event_id);
+		}
 	}
-	if(!vj_event_bundle_store(m))
-		veejay_msg(VEEJAY_MSG_ERROR, "Error storing Bundle %d", event_id);
 
 	free(blob);
 }
@@ -9086,7 +9040,6 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	
 	int i = 0;
 	int ok = 0;
 	for( i = 0; i < 8; i ++ ) {
@@ -9175,8 +9128,6 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v,priv_msg);
 	free(priv_msg);
 }
-
-
 
 int vj_event_load_bundles(char *bundle_file)
 {
@@ -9639,7 +9590,6 @@ void	vj_event_get_shm( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*)ptr;
 	char tmp[32];
-	veejay_memset(tmp,0,sizeof(tmp));
 	if(!v->shm) {
 		snprintf(tmp,sizeof(tmp)-1,"%016d",0);
 		SEND_MSG(v, tmp );
@@ -10018,8 +9968,6 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 			text[k] = 0x20;
 	}
 		
-
-
 	if( args[3] < 0 || args[4] < 0 ||
 			args[3] >= v->video_output_width ||
 			args[4] >= v->video_output_height )
@@ -10031,11 +9979,11 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 
 	vj_font_set_dict( v->font, dict );
 
-	int id = vj_font_new_text( v->font, text, (long) args[1], (long)args[2], args[0] );
+	int id = vj_font_new_text( v->font, (unsigned char*) text, (long) args[1], (long)args[2], args[0] );
 	
 	vj_font_set_position( v->font, args[3] ,args[4] );
 
-	char newslot[50];
+	char newslot[16];
 	sprintf(newslot, "%05d%05d",5, id );
 	SEND_MSG(v,newslot);	
 }
@@ -10053,14 +10001,12 @@ void	vj_event_upd_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 		return;
 	}
 
-        void *dict = select_dict( v, v->uc->sample_id );
-        if(!dict)
-        {
-                return;
-        }
-
-	vj_font_set_dict( v->font, dict );
-	vj_font_update_text( v->font, (long) args[1], (long) args[2], args[0], text );
+    void *dict = select_dict( v, v->uc->sample_id );
+    if(dict)
+    {
+		vj_font_set_dict( v->font, dict );
+		vj_font_update_text( v->font, (long) args[1], (long) args[2], args[0], text );
+	}
 }
 
 void	vj_event_del_subtitle(	void *ptr,	const char format[],	va_list	ap	)
@@ -10076,16 +10022,12 @@ void	vj_event_del_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 	}
 
 
-        void *dict = select_dict( v, v->uc->sample_id );
-        if(!dict)
-        {
-                return;
-        }
-
-	vj_font_set_dict( v->font, dict );
-
-	vj_font_del_text( v->font, args[0] );
-
+    void *dict = select_dict( v, v->uc->sample_id );
+    if(dict)
+    {
+		vj_font_set_dict( v->font, dict );
+		vj_font_del_text( v->font, args[0] );
+	}
 }
 
 void	vj_event_font_set_position(	void *ptr,	const char format[],	va_list	ap	)
@@ -10100,15 +10042,14 @@ void	vj_event_font_set_position(	void *ptr,	const char format[],	va_list	ap	)
 		return;
 	}
 
-        void *dict = select_dict( v, v->uc->sample_id );
-        if(!dict)
-        {
-                return;
-        }
-	vj_font_set_dict( v->font, dict );
-
-	vj_font_set_position( v->font, args[0] ,args[1] );
+    void *dict = select_dict( v, v->uc->sample_id );
+    if(dict)
+    {
+		vj_font_set_dict( v->font, dict );
+		vj_font_set_position( v->font, args[0] ,args[1] );
+	}
 }
+
 void	vj_event_font_set_color(	void *ptr,	const char format[],	va_list	ap	)
 {
 	int args[6];
@@ -10122,35 +10063,28 @@ void	vj_event_font_set_color(	void *ptr,	const char format[],	va_list	ap	)
 	}
 
 	void *dict = select_dict( v, v->uc->sample_id );
-        if(!dict)
-        {
-                return;
-        }
+    if(dict)
+    {
         vj_font_set_dict( v->font, dict );
 
-
-	switch( args[4] )
-	{
-		case 0:
-			vj_font_set_outline_and_border(
-				v->font, args[0],args[1]  );
-			                //outline, //use_bg
+		switch( args[4] )
+		{
+			case 0:
+				vj_font_set_outline_and_border(v->font, args[0],args[1]  );
+				break;
+			case 1:
+				vj_font_set_fgcolor( v->font,args[0],args[1],args[2],args[3] );
+				break;
+			case 2:
+				vj_font_set_bgcolor( v->font,args[0],args[1],args[2],args[3] );
+				break;
+			case 3:
+				vj_font_set_lncolor( v->font,args[0],args[1],args[2],args[3] );
 			break;
-		case 1:
-			vj_font_set_fgcolor( v->font,
-					args[0],args[1],args[2],args[3] );
-			break;
-		case 2:
-			vj_font_set_bgcolor( v->font,
-					args[0],args[1],args[2],args[3] );
-			break;
-		case 3:
-			vj_font_set_lncolor( v->font,
-					args[0],args[1],args[2],args[3] );
-			break;
-		default:
-			veejay_msg(0, "Invalid mode. Use 0=outline/border 1=FG,2=BG,3=LN" );
-			break;
+			default:
+				veejay_msg(0, "Invalid mode. Use 0=outline/border 1=FG,2=BG,3=LN" );
+				break;
+		}
 	}
 }
 void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap	)
@@ -10166,13 +10100,11 @@ void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap
 	}
  
 	void *dict = select_dict( v, v->uc->sample_id );
-        if(!dict)
-        {
-                return;
-        }
+    if(dict)
+    {
         vj_font_set_dict( v->font, dict );
-
-	vj_font_set_size_and_font(v->font, args[0],args[1]);
+		vj_font_set_size_and_font(v->font, args[0],args[1]);
+	}
 }
 #endif
 
@@ -10297,7 +10229,6 @@ void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list a
 	}
 	
 	char *s_print_buf = get_print_buf( 32  + (MAX_SEQUENCES*4));
-
 	sprintf(s_print_buf, "%06d%04d%04d%04d",
 			( 12 + (4*MAX_SEQUENCES)),
 			v->seq->current,MAX_SEQUENCES, v->seq->active );
