@@ -860,16 +860,21 @@ JACK_OpenDevice(jack_driver_t * drv)
           drv->deviceID, drv->clientCtr++);
 
   /* try to become a client of the JACK server */
-  TRACE("client name '%s'\n", our_client_name);
-  /*
+  TRACE("client name '%s'\n", our_client_name); 
+#ifndef HAVE_JACK2
     if((drv->client = jack_client_new(our_client_name)) == 0)
-*/
+#else
   if( (drv->client = jack_client_open( our_client_name, JackNullOption | JackNoStartServer, NULL ) ) == 0 )
+#endif
   {
     /* try once more */
     TRACE("trying once more to jack_client_new");
-    if((drv->client = jack_client_new(our_client_name)) == 0)
-    {
+#ifndef HAVE_JACK2
+	if((drv->client = jack_client_new(our_client_name)) == 0)
+#else
+	if( (drv->client = jack_client_open( our_client_name, JackNullOption, NULL )) == 0)
+#endif
+	{
       ERR("jack server not running?");
       free(our_client_name);
       return ERR_OPENING_JACK;
@@ -1502,16 +1507,29 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
   /* FIXME: maybe we should keep different latency values for input vs output? */
   if(drv->num_output_channels > 0)
   {
+#ifdef HAVE_JACK_PORT_GET_LATENCY_RANGE
+	jack_latency_range_t r;
+	jack_port_get_latency_range( drv->output_port[0], JackCaptureLatency, &r );
+	periods += r.max;
+#else
     periods = jack_port_get_total_latency(drv->client,
                                           drv->output_port[0]) / periodSize;
-    drv->latencyMS = periodSize * periods * 1000 / (drv->jack_sample_rate *
+#endif
+	drv->latencyMS = periodSize * periods * 1000 / (drv->jack_sample_rate *
                                                     (drv->bits_per_channel / 8 *
                                                      drv->num_output_channels));
   }
   else if(drv->num_input_channels > 0)
   {
+#ifdef HAVE_JACK_PORT_GET_LATENCY_RANGE
+	jack_latency_range_t r;
+	jack_port_get_latency_range( drv->output_port[0], JackCaptureLatency, &r );
+	periods += r.max;
+#else
+
     periods = jack_port_get_total_latency(drv->client,
                                           drv->input_port[0]) / periodSize;
+#endif
     drv->latencyMS =
       periodSize * periods * 1000 / (drv->jack_sample_rate *
                                      (drv->bits_per_channel / 8 *
@@ -2402,9 +2420,15 @@ JACK_GetJackOutputLatency(int deviceID)
   jack_driver_t *drv = getDriver(deviceID);
   long return_val = 0;
 
-  if(drv->client && drv->num_output_channels)
-    return_val = jack_port_get_total_latency(drv->client, drv->output_port[0]);
-
+  if(drv->client && drv->num_output_channels) {
+#ifdef HAVE_JACK_PORT_GET_LATENCY_RANGE
+	jack_latency_range_t r;
+	jack_port_get_latency_range( drv->output_port[0], JackCaptureLatency, &r );
+	return_val = r.max;
+#else
+ 	return_val = jack_port_get_total_latency(drv->client, drv->output_port[0]);
+#endif
+  }
   TRACE("got latency of %ld frames\n", return_val);
 
   releaseDriver(drv);
@@ -2418,9 +2442,15 @@ JACK_GetJackInputLatency(int deviceID)
   jack_driver_t *drv = getDriver(deviceID);
   long return_val = 0;
 
-  if(drv->client && drv->num_input_channels)
+  if(drv->client && drv->num_input_channels) {
+#ifdef HAVE_JACK_PORT_GET_LATENCY_RANGE
+	jack_latency_range_t r;
+	jack_port_get_latency_range( drv->output_port[0], JackCaptureLatency, &r );
+	return_val = r.max;
+#else
     return_val = jack_port_get_total_latency(drv->client, drv->input_port[0]);
-
+#endif
+  }
   TRACE("got latency of %ld frames\n", return_val);
 
   releaseDriver(drv);

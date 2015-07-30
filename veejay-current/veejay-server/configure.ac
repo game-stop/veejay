@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.53],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.54],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
@@ -924,8 +924,13 @@ if test x$with_jack != xno ; then
   if test x$have_jack = xtrue ; then
   	AC_SUBST(JACK_LIBS)
    	AC_SUBST(JACK_CFLAGS)
-    	AC_DEFINE(HAVE_JACK,1,[Compiling in Jack])
-  fi
+    AC_SEARCH_LIBS(jack_port_get_latency_range,jack,
+              [AC_DEFINE(HAVE_JACK_PORT_GET_LATENCY_RANGE, 1, [jack_port_get_latency_range present in libjack])],
+              [])
+	AC_DEFINE(HAVE_JACK,1,[Compiling in Jack])
+	AC_SEARCH_LIBS(jack_client_open,jack,
+			  [AC_DEFINE(HAVE_JACK2,1,[newer jack versions])],[])
+	fi
 fi
 
 dnl ********************************************************************
