@@ -37,8 +37,7 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-
-livido_process_f		process_instance( livido_port_t *my_instance, double timecode )
+int		process_instance( livido_port_t *my_instance, double timecode )
 {
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
 	uint8_t *O[4]= {NULL,NULL,NULL,NULL};
@@ -49,7 +48,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	
 	int error	  = lvd_extract_channel_values( my_instance, "out_channels", 0, &w,&h, O,&palette );
 	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_HARDWARE; 
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
 	Clvdgmic *gmic = NULL;
 	livido_property_get( my_instance, "PLUGIN_private",0, &gmic);
 	

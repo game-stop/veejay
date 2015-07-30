@@ -48,16 +48,18 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	
 	int error	  = lvd_extract_channel_values( my_instance, "out_channels", 0, &w,&h, O,&palette );
 	if( error != LIVIDO_NO_ERROR )
-		return LIVIDO_ERROR_HARDWARE; 
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS; 
 	Clvdgmic *gmic = NULL;
 	livido_property_get( my_instance, "PLUGIN_private",0, &gmic);
 	
-        lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
+    error = lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
+	if( error != LIVIDO_NO_ERROR )
+		return LIVIDO_ERROR_NO_INPUT_CHANNELS;
 
-	int		x_tiles    =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
-	int		y_tiles  =  lvd_extract_param_index( my_instance,"in_parameters", 1 );
-	int		x_offset   =  lvd_extract_param_index( my_instance,"in_parameters", 2 );
-	int		y_offset =  lvd_extract_param_index( my_instance,"in_parameters", 3 );
+	int		x_tiles = lvd_extract_param_index( my_instance,"in_parameters", 0 );
+	int		y_tiles = lvd_extract_param_index( my_instance,"in_parameters", 1 );
+	int		x_offset = lvd_extract_param_index( my_instance,"in_parameters", 2 );
+	int		y_offset = lvd_extract_param_index( my_instance,"in_parameters", 3 );
 	int		fade_start = lvd_extract_param_index( my_instance,"in_parameters", 4 );
 	int		fade_end = lvd_extract_param_index( my_instance,"in_parameters", 5 );
 	int		mirror = lvd_extract_param_index( my_instance,"in_parameters", 6 );

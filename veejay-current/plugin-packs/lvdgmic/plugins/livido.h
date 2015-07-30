@@ -10,7 +10,8 @@
 		
 
 	  Revised by Niels, 2010 ( 101 )
-                        2011 ( 102 )	  
+                        2011 ( 102 )
+						2015 ( 103 )		
  
    LiViDO is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -54,7 +55,7 @@ LIVIDO_BEGIN_DECLS
 #ifdef IS_LIVIDO_PLUGIN
 typedef void livido_port_t;
 #endif
-#define LIVIDO_API_VERSION 102
+#define LIVIDO_API_VERSION 103
 #define LIVIDO_PALETTE_RGB888 1
 #define LIVIDO_PALETTE_RGB24 1
 #define LIVIDO_PALETTE_BGR888 2
@@ -93,21 +94,26 @@ typedef void livido_port_t;
 #define LIVIDO_PALETTE_A16 1028
 #define LIVIDO_PALETTE_AFLOAT 1027
 
-//@ do we want openmp?
-
+/**
+ *Plugin is not realtime capable
+ */
 #define LIVIDO_FILTER_NON_REALTIME    (1<<0)
+/**
+ *Plugin processes inplace
+ */
 #define LIVIDO_FILTER_CAN_DO_INPLACE  (1<<1)
+/**
+ *Plugin keeps internal state
+ */
 #define LIVIDO_FILTER_NON_STATELESS   (1<<2)
-#define LIVIDO_FILTER_IS_CONVERTOR    (1<<3)
-#define LIVIDO_CHANNEL_CHANGE_UNADVISED (1<<0)
-#define LIVIDO_CHANNEL_PALETTE_UNADVISED (1<<1)
-#define LIVIDO_PARAMETER_CHANGE_UNADVISED (1<<0)
-#define LIVIDO_PROPERTY_READONLY (1<<0)
+/**
+ *Plugin is parallelizable (host is allowed to run it in parallel)
+ */
+#define LIVIDO_FILTER_IS_PARALLELIZABLE (1<<4)
 
-#define LIVIDO_INTERLACE_NONE            0
-#define LIVIDO_INTERLACE_TOPFIRST        1
-#define LIVIDO_INTERLACE_BOTTOMFIRST     2
-#define LIVIDO_INTERLACE_PROGRESSIVE     3
+/**
+ * Error messages 
+ */
 #define LIVIDO_NO_ERROR 0
 #define LIVIDO_ERROR_MEMORY_ALLOCATION 1
 #define LIVIDO_ERROR_PROPERTY_READONLY 2
@@ -116,8 +122,18 @@ typedef void livido_port_t;
 #define LIVIDO_ERROR_WRONG_ATOM_TYPE 5
 #define LIVIDO_ERROR_TOO_MANY_INSTANCES 6
 #define LIVIDO_ERROR_HARDWARE 7
-#define LIVIDO_ERROR_PORT 8 //@ error in port
+#define LIVIDO_ERROR_PORT 8
+#define LIVIDO_ERROR_NO_OUTPUT_CHANNELS 9
+#define LIVIDO_ERROR_NO_INPUT_CHANNELS 10
+#define LIVIDO_ERROR_NO_INPUT_PARAMETERS 11
+#define LIVIDO_ERROR_NO_OUTPUT_PARAMETERS 12
+#define LIVIDO_ERROR_ENVIRONMENT 13
+#define LIVIDO_ERROR_RESOURCE 14
+#define LIVIDO_ERROR_INTERNAL 15
 
+/**
+ * Primitives
+ */
 #define LIVIDO_ATOM_TYPE_INT 1
 #define LIVIDO_ATOM_TYPE_DOUBLE 2
 #define LIVIDO_ATOM_TYPE_BOOLEAN 3
@@ -125,6 +141,9 @@ typedef void livido_port_t;
 #define LIVIDO_ATOM_TYPE_VOIDPTR 65
 #define LIVIDO_ATOM_TYPE_PORTPTR 66
 
+/**
+ * Port types
+ */
 #define LIVIDO_PORT_TYPE_PLUGIN_INFO 1
 #define LIVIDO_PORT_TYPE_FILTER_CLASS 2
 #define LIVIDO_PORT_TYPE_FILTER_INSTANCE 3
@@ -134,15 +153,9 @@ typedef void livido_port_t;
 #define LIVIDO_PORT_TYPE_PARAMETER 7
 #define LIVIDO_PORT_TYPE_GUI 8
 
-//#define FUNCSTRUCT
-/*
-	Uncomment the #define above and recompile all
- */
-
 typedef int (*livido_init_f) (livido_port_t * filter_instance);
 typedef int (*livido_process_f) (livido_port_t * filter_instance,double timestamp);
 typedef int (*livido_deinit_f) (livido_port_t * filter_instance);
-
 
 typedef void *(*livido_malloc_f) (size_t size);
 typedef void (*livido_free_f) (void *ptr);
@@ -159,15 +172,9 @@ typedef char **(*livido_list_properties_f) (livido_port_t *);
 typedef int (*livido_keyframe_get_f)(livido_port_t *port, long pos, int dir );
 typedef int (*livido_keyframe_put_f)(livido_port_t *port, long pos, int dir );
 
-//@ what about openmp
-//@ automatic top/bottom half processing, using 2 threads.
-//@ maybe with preprocessor directives
-//typedef int (*livido_set_max_threads)(livido_port_t *port, int max );
-
 typedef struct
 {
 	void (*f)();
-//	void *f;
 } livido_setup_t;
 
 typedef livido_port_t *(*livido_setup_f) (const livido_setup_t list[], int );
@@ -185,28 +192,27 @@ static void *(*livido_malloc) (size_t size) = 0;\
 static void (*livido_free) (void *ptr) = 0;\
 static void *(*livido_memset) (void *s, int c, size_t n) = 0;\
 static void *(*livido_memcpy) (void *dest, const void *src, size_t n) = 0;\
-static	int (*livido_keyframe_get)(livido_port_t *port, long pos, int dir) = 0;\
-static  int (*livido_keyframe_put)(livido_port_t *port, long pos, int dir) = 0; \
+static int (*livido_keyframe_get)(livido_port_t *port, long pos, int dir) = 0;\
+static int (*livido_keyframe_put)(livido_port_t *port, long pos, int dir) = 0; \
 
-/* Using void* to pass base address of function, needs explicit typecast and host
-   must match ordering */
+/* Using void* to pass base address of function, needs explicit typecast and host must match ordering */
 #define	LIVIDO_IMPORT(list) \
 {\
-	livido_malloc		= (livido_malloc_f) list[0].f;\
-	livido_free			= (livido_free_f) list[1].f;\
-	livido_memset		= (livido_memset_f) list[2].f;\
-	livido_memcpy		= (livido_memcpy_f) list[3].f;\
-	livido_port_new		= (livido_port_new_f) list[4].f;\
-	livido_port_free	= (livido_port_free_f) list[5].f;\
-	livido_property_set = (livido_property_set_f) list[6].f;\
-	livido_property_get	= (livido_property_get_f) list[7].f;\
-	livido_property_num_elements = (livido_property_num_elements_f) list[8].f;\
-	livido_property_atom_type = (livido_property_atom_type_f) list[9].f;\
-	livido_property_element_size = (livido_property_element_size_f) list[10].f;\
-	livido_list_properties = (livido_list_properties_f) list[11].f;\
-	livido_keyframe_get    = (livido_keyframe_get_f) list[12].f;\
-	livido_keyframe_put    = (livido_keyframe_put_f) list[13].f;\
+	livido_malloc					= (livido_malloc_f) list[0].f;\
+	livido_free						= (livido_free_f) list[1].f;\
+	livido_memset					= (livido_memset_f) list[2].f;\
+	livido_memcpy					= (livido_memcpy_f) list[3].f;\
+	livido_port_new					= (livido_port_new_f) list[4].f;\
+	livido_port_free				= (livido_port_free_f) list[5].f;\
+	livido_property_set				= (livido_property_set_f) list[6].f;\
+	livido_property_get				= (livido_property_get_f) list[7].f;\
+	livido_property_num_elements	= (livido_property_num_elements_f) list[8].f;\
+	livido_property_atom_type		= (livido_property_atom_type_f) list[9].f;\
+	livido_property_element_size	= (livido_property_element_size_f) list[10].f;\
+	livido_list_properties			= (livido_list_properties_f) list[11].f;\
+	livido_keyframe_get				= (livido_keyframe_get_f) list[12].f;\
+	livido_keyframe_put				= (livido_keyframe_put_f) list[13].f;\
 }
 
 LIVIDO_END_DECLS
-#endif				// #ifndef __LIVIDO_H_
+#endif// #ifndef __LIVIDO_H_
