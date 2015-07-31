@@ -89,7 +89,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 		int fd = open( path, O_RDWR );
 		if(fd <= 0) {
 			printf("no env var VEEJAY_SHMID set and no file '%s' found!\n",path );
-			return LIVIDO_ERROR_ENVIRONMENT
+			return LIVIDO_ERROR_ENVIRONMENT;
 		}
 		char buf[256];
 		livido_memset(buf,0,sizeof(buf));
