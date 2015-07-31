@@ -81,7 +81,6 @@ static GList *get_anim_list( char *name ) {
 
 void free_anim_list( GList *anim_list )
 {
-    // g_list_foreach( anim_list, gdk_pixbuf_unref );
 }
 
 
@@ -173,7 +172,7 @@ static void gtk_knob_destroy(GtkObject *object) {
   }
 
   if (knob->pixbuf) {
-    gdk_pixbuf_unref(knob->pixbuf);
+    g_object_unref(knob->pixbuf);
     knob->pixbuf = NULL;
   }
 

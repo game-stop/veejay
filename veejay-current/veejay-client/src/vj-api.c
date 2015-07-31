@@ -3951,7 +3951,7 @@ void	reset_cali_images( int type, char *wid_name )
 				info->main_window, wid_name );
 
 	if( pix_trashcan[type] != NULL ) {
-		gdk_pixbuf_unref( pix_trashcan[type] );
+		g_object_unref( pix_trashcan[type] );
 		pix_trashcan[type] = NULL;
 	}
 	if( ref_trashcan[type] != NULL  ) {
@@ -4031,7 +4031,7 @@ int	get_and_draw_frame(int type, char *wid_name)
 		ref_trashcan[type]=NULL;
 	}
 	if( pix_trashcan[type] != NULL ) {
-		gdk_pixbuf_unref( pix_trashcan[type] );
+		g_object_unref( pix_trashcan[type] );
 		pix_trashcan[type] = NULL;
 	}
 
@@ -5800,7 +5800,7 @@ int		veejay_update_multitrack( void *data )
 				else {
 					GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],preview_box_w_,preview_box_h_, GDK_INTERP_NEAREST );
 					gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
-					gdk_pixbuf_unref(result);
+					g_object_unref(result);
 
 				}
 				
@@ -5811,7 +5811,7 @@ int		veejay_update_multitrack( void *data )
 			if(deckpage == crappy_design[ui_skin_].page)
 				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
 
-			gdk_pixbuf_unref( s->img_list[i] );
+			g_object_unref( s->img_list[i] );
 		} else {
 			if( i == s->master ) {
 				multitrack_set_logo( gui->mt, maintrack );
@@ -6555,7 +6555,7 @@ int	vj_img_cb(GdkPixbuf *img )
 			slot->pixbuf = vj_gdk_pixbuf_scale_simple(img,
 				info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
 			gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
-			gdk_pixbuf_unref( slot->pixbuf );
+			g_object_unref( slot->pixbuf );
 		}
 
 	}
@@ -6573,9 +6573,7 @@ int	vj_img_cb(GdkPixbuf *img )
 				GDK_INTERP_NEAREST ); 
 
 			gtk_image_set_from_pixbuf_( GTK_IMAGE( g->image ), g->pixbuf_ref );
-
-			gdk_pixbuf_unref( g->pixbuf_ref );
-
+			g_object_unref( g->pixbuf_ref );
 		}
 	}
 
@@ -7456,12 +7454,11 @@ void	reset_samplebank(void)
 				{		
 					if(slot->title) free(slot->title);
 					if(slot->timecode) free(slot->timecode);
-					if(slot->pixbuf) gdk_pixbuf_unref( slot->pixbuf );
+		//			if(slot->pixbuf) g_object_unref( slot->pixbuf );
 					slot->title = NULL;
 					slot->timecode = NULL;
 					slot->sample_id = 0;
 					slot->sample_type = 0;
-					slot->pixbuf = NULL;
 				}
 				update_sample_slot_data( i,j, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
 			}
@@ -7493,7 +7490,7 @@ void	free_samplebank(void)
 				sample_gui_slot_t *gslot = info->sample_banks[i]->gui_slot[j];
 				if(slot->title) free(slot->title);
 				if(slot->timecode) free(slot->timecode);
-				if(slot->pixbuf) gdk_pixbuf_unref(slot->pixbuf);
+	//			if(slot->pixbuf) g_object_unref(slot->pixbuf);
 	//			if(slot->rawdata) free(slot->rawdata);
 				free(slot);
 				free(gslot);
@@ -8199,11 +8196,11 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 
 	if( sample_id == 0 )
 	{
-		if(slot->pixbuf)
+/*		if(slot->pixbuf)
 		{
-			gdk_pixbuf_unref( slot->pixbuf );
+			g_object_unref( slot->pixbuf );
 			slot->pixbuf = NULL;
-		}
+		} */
 	}
 }
 

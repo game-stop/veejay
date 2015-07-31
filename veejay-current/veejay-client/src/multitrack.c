@@ -1052,7 +1052,7 @@ void		multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img )
 	GdkPixbuf *scaled = vj_gdk_pixbuf_scale_simple( img, w, h, GDK_INTERP_BILINEAR );
 	gtk_image_set_from_pixbuf( GTK_IMAGE(mt->view[track]->area), scaled);
 
-	gdk_pixbuf_unref( scaled );
+	g_object_unref( scaled );
 }
 
 
