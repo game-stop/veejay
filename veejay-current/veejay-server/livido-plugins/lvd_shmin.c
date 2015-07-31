@@ -119,9 +119,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	int dst_w = 0;
 	int dst_h = 0;
   
-   	if( lvd_extract_dimensions( my_instance, "out_channels", &dst_w, &dst_h ) != LIVIDO_NO_ERROR ) {
-		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
-	}
+   	lvd_extract_dimensions( my_instance, "out_channels", &dst_w, &dst_h );
 
 	//@ read format and dimensions from shared memory
 	int lvd_shm_palette = data->header[5]; //@ read livido palette format 
