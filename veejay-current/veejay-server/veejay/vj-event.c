@@ -1697,6 +1697,8 @@ void vj_event_update_remote(void *ptr)
 	{	
 		if( vj_server_link_can_read( v->vjs[VEEJAY_PORT_DAT], i ) )
 		{
+			vj_server_init_msg_pool( v->vjs[VEEJAY_PORT_DAT], i ); // ensure pool is ready
+				
 			int res = vj_server_update( v->vjs[VEEJAY_PORT_DAT], i );
 			if(res>0)
 			{
@@ -1704,7 +1706,6 @@ void vj_event_update_remote(void *ptr)
 				int n = 0;
 				int len = 0;
 				char *buf  = NULL;
-				vj_server_init_msg_pool( v->vjs[VEEJAY_PORT_DAT], i ); // ensure pool is ready
 				while( (buf= vj_server_retrieve_msg(v->vjs[VEEJAY_PORT_DAT],i,buf, &len))!= NULL )
 				{
 					vj_event_parse_msg( v, buf,len );
