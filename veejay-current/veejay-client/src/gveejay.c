@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-     /*   while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:m:g:")) != EOF )
+		while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:m:g:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
         if( optind > argc )
                 err ++;
 
-        if( err ) usage(argv[0]);*/
+        if( err ) usage(argv[0]);
 /*
 	if( !g_thread_supported() )
 	{
@@ -233,8 +233,8 @@ int main(int argc, char *argv[]) {
         }*/
 
 
-
-	gtk_init( &argc, &argv );
+	gtk_init( NULL,NULL );
+//	gtk_init( &argc, &argv );
 	glade_init();
 	
 //	g_mem_set_vtable( glib_mem_profiler_table );
