@@ -113,7 +113,7 @@ void *_vj_osc_rt_malloc(int num_bytes);
 int	vj_osc_attach_methods( vj_osc *o );
 int 	vj_osc_build_cont( vj_osc *o );
 
-#ifdef ARCH_X86
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 /* convert a big endian 32 bit string to an int for internal use */
 static int toInt(const char* b) {
    return (( (int) b[3] ) & 0xff ) + ((((int) b[2]) & 0xff) << 8) + ((((int) b[1]) & 0xff) << 16) +
