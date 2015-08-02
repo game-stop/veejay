@@ -28,6 +28,7 @@
 #include <aclib/imgconvert.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
+#include <libavutil/pixfmt.h>
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
 #include <libavcodec/avcodec.h>
