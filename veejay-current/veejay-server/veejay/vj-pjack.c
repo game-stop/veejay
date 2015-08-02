@@ -127,7 +127,6 @@ int	vj_jack_continue(int speed)
 
 int	vj_jack_stop()
 {
-
 	JACK_Reset( driver );
 
 	if(JACK_Close(driver))
@@ -156,7 +155,11 @@ int	vj_jack_c_play(void *data, int len, int entry)
 
 int	vj_jack_play(void *data, int len)
 {
-	return  JACK_Write(driver,data,len);
+	int res = JACK_Write( driver, data, len );
+	if( res == 0 && JACK_GetState(driver) == PLAYING ) {
+		vj_jack_disable();
+	}
+	return res;
 }
 
 int	vj_jack_set_volume(int volume)

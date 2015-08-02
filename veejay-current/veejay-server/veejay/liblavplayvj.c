@@ -2187,11 +2187,13 @@ static void veejay_playback_cycle(veejay_t * info)
     editlist *el = info->edit_list;
     struct mjpeg_sync bs;
     struct timespec time_now;
+	struct timespec time_last;
     double tdiff1=0.0, tdiff2=0.0;
     int first_free, skipv, skipa, skipi, nvcorr,frame;
     long ts, te;
     int n;
-
+	const int spvf_c = (const int) (1000 * settings->spvf);
+	int pace_warning = 0;
     veejay_set_instance( info );
     stats.tdiff = 0.0;
     stats.num_corrs_a = 0;
@@ -2349,7 +2351,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		   			stats.tdiff += settings->spvf;
 			}
 	    }
-	   
+	  	
 	    frame  = n % QUEUE_LEN;
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
@@ -2389,10 +2391,24 @@ static void veejay_playback_cycle(veejay_t * info)
 #else
 	    info->real_fps = 0;
 #endif
+		//@ add pace correction
+		if( info->audio == AUDIO_PLAY ){
+			info->real_fps += settings->pace_correction;
+		}
 
-	    if( (stats.tdiff > settings->spvf || info->real_fps > (1000 * settings->spvf)) && info->real_fps && info->audio == AUDIO_PLAY) {
-			veejay_msg(VEEJAY_MSG_WARNING, "Can't keep pace with audio! Rendering audio/video frame takes too long (measured %-4ld ms, out of sync by %-2.4f seconds)",(float) stats.tdiff, info->real_fps);
-			
+	    if( (fabs(stats.tdiff) > settings->spvf || info->real_fps > spvf_c) && info->real_fps && info->audio == AUDIO_PLAY) {
+			if( pace_warning == 0 ) {
+				veejay_msg(VEEJAY_MSG_WARNING, "Can't keep pace with audio! Rendering audio/video frame takes too long (measured %-4ld ms, out of sync by %-2.4f ms)",info->real_fps,
+					(spvf_c - info->real_fps));
+				pace_warning = (pace_warning + 1) % spvf_c;
+			}
+			if(!settings->auto_mute)
+				settings->auto_mute = 1;
+		} else {
+			if( info->audio == AUDIO_PLAY && settings->auto_mute ) {
+				veejay_msg(VEEJAY_MSG_WARNING, "Back in pace with audio, audio is now unmuted." );
+				settings->auto_mute = 0;
+			}
 		}
 
 		if( skipv ) { 

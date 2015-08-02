@@ -40,7 +40,7 @@
 /* set to 1 to enable debug messages */
 #define DEBUG_OUTPUT            1
 
-#define DEFAULT_RB_SIZE         8192
+#define DEFAULT_RB_SIZE         2048
 
 #define OUTFILE stderr
 
@@ -496,11 +496,11 @@ JACK_callback(nframes_t nframes, void *arg)
          the rest of the space with zero bytes so at least there is silence */
       if(jackFramesAvailable)
       {
-        DEBUG("buffer underrun of %ld frames", jackFramesAvailable);
-    /*    for(i = 0; i < drv->num_output_channels; i++)
+        DEBUG("buffer underrun of %ld frames", jackFramesAvailable);		
+  	    for(i = 0; i < drv->num_output_channels; i++)
           sample_silence_float(out_buffer[i] +
                                (nframes - jackFramesAvailable),
-                               jackFramesAvailable); */
+                               jackFramesAvailable);
       }
 
       /* apply volume and demux */
@@ -559,23 +559,16 @@ JACK_callback(nframes_t nframes, void *arg)
             nframes, drv->num_input_channels);
       }
 
-        long write_space = jack_ringbuffer_write_space(drv->pRecPtr);
-        /* if there isn't enough room, make some.  sure this discards data, but when dealing with input sources
-           it seems like it's better to throw away old data than new */
+   /*     long write_space = jack_ringbuffer_write_space(drv->pRecPtr);
         if(write_space < jack_bytes)
         {
-          /* the ringbuffer is designed such that only one thread should ever access each pointer.
-             since calling read_advance here will be touching the read pointer which is also accessed
-             by JACK_Read, we need to lock the mutex first for safety */
-            /* double check the write space after we've gained the lock, just
-               in case JACK_Read was being called before we gained it */
             write_space = jack_ringbuffer_write_space(drv->pRecPtr);
             if(write_space < jack_bytes)
             {
              ERR("buffer overrun of %ld bytes", jack_bytes - write_space);
              jack_ringbuffer_read_advance(drv->pRecPtr, jack_bytes - write_space);
             }
-        }
+        }*/
 
         jack_ringbuffer_write(drv->pRecPtr, drv->callback_buffer1,
                               jack_bytes);
@@ -1129,7 +1122,7 @@ JACK_Reset(int deviceID)
  * open the audio device for writing to
  *
  * deviceID is set to the opened device
- * if client is non-zero and in_use is FALSE then just set in_use to TRUE
+ * if client is non-zero and in_use is FALSE then just set in_use to TRU
  *
  * return value is zero upon success, non-zero upon failure 
  *
@@ -1423,7 +1416,6 @@ JACK_Write(int deviceID, unsigned char *data, unsigned long bytes)
   /* handle the case where the user calls this routine with 0 bytes */
   if(bytes == 0 || frames_free < 1)
   {
-    DEBUG("no room left");
     return 0;                   /* indicate that we couldn't write any bytes */
   }
 

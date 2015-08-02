@@ -236,6 +236,8 @@ static void Usage(char *progname)
 			"  -g/--clip-as-sample\t\tLoad every video clip as a new sample\n");	
 	fprintf(stderr,
 	    	"  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
+    fprintf(stderr,
+			"     --pace-correction [ms]\tAudio pace correction offset in milliseconds\n");
 	fprintf(stderr,
 	    	"  -c/--synchronization [01]\tSync correction off/on (default on)\n");
     fprintf(stderr,
@@ -339,6 +341,12 @@ static int set_option(const char *name, char *value)
 	 veejay_set_colors(0);
     } else if (strcmp(name, "audio") == 0 || strcmp(name, "a") == 0) {
 	info->audio = atoi(optarg);
+	} else if (strcmp(name, "pace-correction") == 0 ) {
+	info->settings->pace_correction = atoi( optarg);
+		if( info->settings->pace_correction < 0 ) {
+			fprintf(stderr, "Audio pace correction must be a positive value\n");
+			nerr++;
+		}
     } else if ( strcmp(name, "A" ) == 0 || strcmp(name, "capture-device" ) == 0 ) {
 	live = atoi(optarg);
     } else if ( strcmp(name, "Z" ) == 0 || strcmp(name, "load-generators" ) == 0 ) {
@@ -600,6 +608,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"qrcode-connection-info",0,0,0},
 	{"scene-detection",1,0,0},
 	{"dynamic-fx-chain",0,0,0},
+	{"pace-correction",1,0,0},
 	{0, 0, 0, 0}
     };
 #endif

@@ -196,6 +196,8 @@ typedef struct {
 	int hold_pos;
 	int	hold_resume;
 	int hold_status;
+    int auto_mute;
+	int pace_correction;
 } video_playback_setup;
 
 typedef struct {

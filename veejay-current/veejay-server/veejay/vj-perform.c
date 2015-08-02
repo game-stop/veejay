@@ -110,6 +110,7 @@ static int cached_tag_frames[CACHE_SIZE];	/* cache a frame into the buffer only 
 static int cached_sample_frames[CACHE_SIZE];
 static int frame_info[64][SAMPLE_MAX_EFFECTS];	/* array holding frame lengths  */
 static uint8_t *audio_buffer[SAMPLE_MAX_EFFECTS];	/* the audio buffer */
+static uint8_t *audio_silence_ = NULL;
 static uint8_t *lin_audio_buffer_ = NULL;
 static uint8_t *top_audio_buffer = NULL;
 static uint8_t *audio_rec_buffer = NULL;
@@ -197,9 +198,15 @@ static	void	vj_perform_copy3( uint8_t **input, uint8_t **output, int Y_len, int 
 }
 
 #ifdef HAVE_JACK
-static inline void vj_perform_play_audio( uint8_t *source, int len )
+static inline void vj_perform_play_audio( video_playback_setup *settings, uint8_t *source, int len )
 {
-	vj_jack_play( source, len );
+	// if auto mute is enabled, play muted data 
+	// audio_silence_ is allocated once and played in-place of, thus recording chain is not affected by auto-mute
+	if( settings->auto_mute ) {
+		vj_jack_play( audio_silence_, len );
+	} else {
+		vj_jack_play( source, len );
+	}
 }
 #endif
 
@@ -788,6 +795,8 @@ size_t	vj_perform_fx_chain_size()
 static void vj_perform_close_audio() {
 	if( lin_audio_buffer_ )
 		free(lin_audio_buffer_ );
+	if( audio_silence_ )
+		free(audio_silence_);
 	veejay_memset( audio_buffer, 0, sizeof(uint8_t*) * SAMPLE_MAX_EFFECTS );
 
 #ifdef HAVE_JACK
@@ -843,6 +852,10 @@ int vj_perform_init_audio(veejay_t * info)
 	    audio_buffer[i] = lin_audio_buffer_ + (PERFORM_AUDIO_SIZE * i);
 	}
  
+	audio_silence_ = (uint8_t*) vj_calloc( sizeof(uint8_t) * PERFORM_AUDIO_SIZE * SAMPLE_MAX_EFFECTS );
+	if(!audio_silence_)
+		return 0;
+
 	/* 
 	 * The simplest way to time stretch the audio is to resample it and then playback the waveform at the original sampling frequency
 	 * This also lowers or raises the pitch, making it just like speeding up or down a tape recording. Perfect!
@@ -2926,7 +2939,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 		int num_samples = (info->edit_list->audio_rate / info->edit_list->video_fps);
 		int bps = info->edit_list->audio_bps;
 		veejay_memset( top_audio_buffer, 0, num_samples * bps);
-		vj_perform_play_audio( top_audio_buffer, (num_samples * bps ));
+		vj_perform_play_audio( settings, top_audio_buffer, (num_samples * bps ));
 		return 1;
 	}
 
@@ -2982,7 +2995,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 		}
 		vj_jack_continue( settings->current_playback_speed );
 		
-		vj_perform_play_audio( a_buf, (num_samples * bps ));
+		vj_perform_play_audio( settings, a_buf, (num_samples * bps ));
 
      }	
 #endif
