@@ -40,7 +40,7 @@
 /* set to 1 to enable debug messages */
 #define DEBUG_OUTPUT            1
 
-#define DEFAULT_RB_SIZE         2048
+#define DEFAULT_RB_SIZE         4096
 
 #define OUTFILE stderr
 
