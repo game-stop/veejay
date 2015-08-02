@@ -2400,8 +2400,8 @@ static void veejay_playback_cycle(veejay_t * info)
 			if( pace_warning == 0 ) {
 				veejay_msg(VEEJAY_MSG_WARNING, "Can't keep pace with audio! Rendering audio/video frame takes too long (measured %-4ld ms, out of sync by %-2.4f ms)",info->real_fps,
 					(spvf_c - info->real_fps));
-				pace_warning = (pace_warning + 1) % spvf_c;
 			}
+			pace_warning = (pace_warning + 1) % spvf_c;
 			if(!settings->auto_mute)
 				settings->auto_mute = 1;
 		} else {
