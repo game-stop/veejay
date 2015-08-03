@@ -2472,7 +2472,6 @@ vevo_property_del(vevo_port_t * p,
  // 	if( port->index == NULL )
 //			return VEVO_NO_ERROR;
 
-	veejay_msg(0, "%s: %s", __FUNCTION__, key );
 	//@ find cached hash key in index
 
     port_index_t *head = port->index;
