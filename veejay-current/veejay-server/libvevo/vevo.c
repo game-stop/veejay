@@ -227,7 +227,8 @@ static void prop_node_free(__vevo_port_t *port,vevo_property_t * p)
 {
     if (p) {
        //free(p);
-       vevo_pool_free_property( port->pool, p );
+		p->key = 0;
+ 		vevo_pool_free_property( port->pool, p );
     }
     p = NULL;
 }
@@ -267,9 +268,9 @@ static vevo_property_t *prop_node_get(__vevo_port_t *port, ukey_t key)
 {
     vevo_property_t *l = port->list;
     while (l != NULL) {
-	if (key == l->key)
-	    return l;
-	l = l->next;
+		if (key == l->key)
+		    return l;
+		l = l->next;
     }
     return NULL;
 }
@@ -494,12 +495,12 @@ static int atom_get_value(vevo_storage_t * t, int idx, void *dst)
 
     if( t->atom_type != VEVO_ATOM_TYPE_STRING ) {
 	    veejay_memcpy(dst,atom->value,atom->size);
-            return VEVO_NO_ERROR;
+        return VEVO_NO_ERROR;
     }
     else {
-	char **ptr = (char **) dst;
-	char *p = *ptr;
-	veejay_memcpy(p, atom->value, atom->size);
+		char **ptr = (char **) dst;
+		char *p = *ptr;
+		veejay_memcpy(p, atom->value, atom->size);
     } 
     
     return VEVO_NO_ERROR;
@@ -721,20 +722,18 @@ static vevo_storage_t *vevo_new_storage( __vevo_port_t *port)
 static void vevo_free_storage(__vevo_port_t *port,vevo_storage_t * t)
 {
     if (t) {
-	if (t->num_elements > 1) {
-	    int i;
-	    for (i = 0; i < t->num_elements; i++)
-	    {
-	    	    vevo_free_atom(port,t->elements.array[i]);
-	    }
-	    free(t->elements.array);
-	}
-	if (t->num_elements <= 1)
-	{
-		vevo_free_atom(port,t->elements.atom);
-
-        }
-//	free(t);
+		if (t->num_elements > 1) {
+		    int i;
+		    for (i = 0; i < t->num_elements; i++)
+		    {
+		    	    vevo_free_atom(port,t->elements.array[i]);
+		    }
+		    free(t->elements.array);
+		}
+		if (t->num_elements <= 1)
+		{
+			vevo_free_atom(port,t->elements.atom);
+		}
 		vevo_pool_free_storage( port->pool, t );
     }
     t = NULL;
@@ -2470,59 +2469,71 @@ vevo_property_del(vevo_port_t * p,
 	//@ find value in hash and release from pool
 
     ukey_t hash_key = hash_key_code(key);
-    if (!port->table) {
-		vevo_property_t *pnode = NULL;
-		if ((pnode = prop_node_get(port, hash_key)) != NULL) {
-		    vevo_free_storage(port,pnode->st);
-		    prop_node_free(port,pnode);
-		}
-  	} else {
-		hnode_t *old_node = NULL;
-		if ((old_node = property_exists(port, hash_key)) != NULL) {
-	   		 vevo_storage_t *oldstor = (vevo_storage_t *) hnode_get(old_node);
-	   	 	 vevo_free_storage(port,oldstor);
-	   		 hash_delete((hash_t *) port->table, old_node);
-	   	     hnode_destroy(old_node);
-		}
-    }
+ // 	if( port->index == NULL )
+//			return VEVO_NO_ERROR;
 
-	if( port->index == NULL )
-			return VEVO_NO_ERROR;
-
+	veejay_msg(0, "%s: %s", __FUNCTION__, key );
 	//@ find cached hash key in index
 
-    port_index_t *list = port->index;
-    port_index_t *node = list;
-    port_index_t *prev = NULL;
-    
-	do 
-    {
-		ukey_t idxkey = hash_key_code( node->key );
-		if( idxkey == hash_key ) {
-			//node at beginning of list?
-			if( node == list ) {
-				port->index = NULL;
-				if( node->next != NULL )
-						port->index = node->next;
-				
-				port_node_free(port, node);
-				return VEVO_NO_ERROR;
-			}
-			else if ( node != list && node->next != NULL && prev != NULL ) { 
-				prev->next = node->next; //@ fix pointer of previous next to current next
-				port_node_free(port, node );
-				return VEVO_NO_ERROR;
-			}
-			else if ( node->next == NULL && node != list && prev != NULL ) {
-				//at the end
-				prev->next = NULL; //@ fix pointer of previous to new end of list
-				port_node_free( port, node );
-				return VEVO_NO_ERROR;
+    port_index_t *head = port->index;
+    port_index_t *tmp = head;
+	port_index_t *prev = NULL;
+
+	while( tmp != NULL ) {
+		ukey_t idxkey = hash_key_code( tmp->key );
+		if( idxkey == hash_key )
+			break;
+		
+		prev = tmp;
+		tmp = tmp->next;
+	}
+
+	if( tmp != NULL ) {
+		if( tmp->hash_code == hash_key ) {
+			if( prev ) 
+				prev->next = tmp->next;
+			else 
+				port->index = tmp->next;
+		
+			port_node_free(port, tmp );
+		}
+	}
+
+    if(port->list) {
+		vevo_property_t *tmp = port->list;
+		vevo_property_t *prev = NULL;
+		vevo_property_t *head = port->list;
+		while (tmp != NULL) {
+			if( tmp->key == hash_key )
+				break;
+			prev = tmp;
+			tmp = tmp->next;
+		}
+		if( tmp != NULL ) {
+			if( tmp->key == hash_key ) {
+				if( prev )
+					prev->next = tmp->next;
+				else 
+					port->list = tmp->next;
+
+				tmp->key = 0;
+
+				if(!port->table) {
+					vevo_free_storage( port, tmp->st );
+					prop_node_free( port, tmp );
+				}
+				else {
+					hnode_t *old_node = NULL;
+					if ((old_node = property_exists(port, hash_key)) != NULL) {
+						vevo_storage_t *oldstor = (vevo_storage_t *) hnode_get(old_node);
+						vevo_free_storage(port,oldstor);
+						hash_delete((hash_t *) port->table, old_node);
+						hnode_destroy(old_node);
+					}
+				}
 			}
 		}
-		prev = node;
-		node = node->next;
-    } while( node != NULL );
+	}
 
     return VEVO_ERROR_NOSUCH_PROPERTY;
 }
