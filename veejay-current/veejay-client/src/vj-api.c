@@ -1593,6 +1593,7 @@ void	about_dialog()
 	"Contributions by:",
 	"Thomas Reinhold <stan@jf-chemnitz.de>",
 	"Toni <oc2pus@arcor.de>",
+	"d/j/a/y <d.j.a.y@free.fr>",
       	NULL 
     };
 
