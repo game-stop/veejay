@@ -144,6 +144,50 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 	return result;
 }
 
+void	keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is_sample )
+{
+	int start = 0;
+	int end = 0;
+	int type = 0;
+	int i;
+
+	void *port = NULL;
+
+	if( is_sample ) {
+		port = sample_get_kf_port( lookup, fx_entry );
+	} else {
+		port = vj_tag_get_kf_port( lookup, fx_entry );
+	}
+
+	if( port == NULL ) {
+		veejay_msg(0, "FX Entry %d does not have animated parameters", fx_entry );
+		return;
+	}
+
+	char *k_s = extract_ ( "start", parameter_id );
+	char *k_e = extract_ ( "end", parameter_id );
+	char *k_t = extract_ ( "type", parameter_id );
+	
+	vevo_property_get( port, k_s, 0, &start );
+	vevo_property_get( port, k_e,   0, &end );
+	vevo_property_get( port, k_t,   0,&type );
+
+	for(i = start ; i <= end; i ++ )
+	{
+		char *key = keyframe_id( parameter_id, i );
+		vevo_property_del( port, key );
+		free(key);
+	}
+
+	vevo_property_del( port, k_s );
+	vevo_property_del( port, k_e );
+	vevo_property_del( port, k_t );
+
+	free(k_s);
+	free(k_e);
+	free(k_t);
+}
+
 int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is_sample )
 {
 	int i;
@@ -210,12 +254,12 @@ int		keyframe_get_tokens( void *port, int parameter_id, int *start, int *end, in
 			free(k_s); free(k_e); free(k_t);
 			return 0;
 	}
-	if( vevo_property_get( port, "end",   0, end ) != VEVO_NO_ERROR )
+	if( vevo_property_get( port, k_e,   0, end ) != VEVO_NO_ERROR )
 	{
 			free(k_s); free(k_e); free(k_t);
 			return 0;
 	}
-	if( vevo_property_get( port, "type",   0, type ) != VEVO_NO_ERROR )
+	if( vevo_property_get( port, k_t,   0, type ) != VEVO_NO_ERROR )
 	{
 		free(k_s); free(k_e); free(k_t);
 		return 0;

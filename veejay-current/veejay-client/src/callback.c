@@ -2190,6 +2190,12 @@ void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
 	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SYNC_CORRECTION, status );
 }
 
+void	on_curve_clear_parameter_clicked( GtkWidget *widget, gpointer user_data ) 
+{
+	multi_vims( VIMS_SAMPLE_KF_CLEAR, "%d %d", info->uc.selected_chain_entry, info->uc.selected_parameter_id  );
+	info->uc.reload_hint[HINT_KF] = 1;
+}
+
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 {
 	int i = info->uc.selected_chain_entry;

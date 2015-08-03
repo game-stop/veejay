@@ -287,6 +287,7 @@ void	vj_event_set_framerate( void *ptr, const char format[], va_list ap );
 void	vj_event_sync_correction( void *ptr,const char format[], va_list ap );
 void	vj_event_get_keyframes( void *ptr, 	const char format[],	va_list ap	);
 void	vj_event_set_kf_status( void *ptr,	const char format[], 	va_list ap	);
+void	vj_event_del_keyframes( void *ptr, const char format[], va_list ap );
 void	vj_event_reset_kf( void *ptr,	const char format[], va_list ap);
 void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list ap );
 void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list ap );

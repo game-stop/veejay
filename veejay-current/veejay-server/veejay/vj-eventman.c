@@ -682,6 +682,20 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[VIMS_SAMPLE_KF_CLEAR]		=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_KF_CLEAR,
+				"Clear Animted FX parameter",
+				vj_event_del_keyframes,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Entry ID",
+				0,
+				"Parameter ID",
+				0,
+				NULL );
+
+
 	index_map_[VIMS_SET_SAMPLE_END] 		=	_new_event(
 				NULL,
 				VIMS_SET_SAMPLE_END,

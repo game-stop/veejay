@@ -9985,7 +9985,22 @@ void	vj_event_reset_kf( void *ptr,	const char format[], 	va_list ap	)
 	{
 		vj_tag_chain_reset_kf( v->uc->sample_id, args[0] );
 	}
+}
 
+void	vj_event_del_keyframes( void *ptr, const char format[], va_list ap )
+{
+	int args[3];
+	veejay_t *v = (veejay_t*)ptr;
+
+	P_A(args,NULL,format,ap);
+
+	if(SAMPLE_PLAYING(v))
+	{
+		keyframe_clear_entry( v->uc->sample_id, args[0], args[1], 1 );
+	}
+	else if (STREAM_PLAYING(v)) {
+		keyframe_clear_entry( v->uc->sample_id, args[0], args[1], 0 );
+	}
 }
 
 static	void	*select_dict( veejay_t *v , int n )

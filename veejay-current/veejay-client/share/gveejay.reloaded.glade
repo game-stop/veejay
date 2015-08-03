@@ -3773,7 +3773,7 @@
                                           <widget class="GtkImage" id="image532">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="pixbuf">icon_clear.png</property>
+                                            <property name="pixbuf">icon_clearall.png</property>
                                           </widget>
                                         </child>
                                       </widget>
@@ -3782,7 +3782,29 @@
                                         <property name="fill">True</property>
                                         <property name="position">2</property>
                                       </packing>
-                                    </child>
+								  </child>
+								  <child>
+                                      <widget class="GtkButton" id="curve_clear_parameter">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="tooltip" translatable="yes">Clear selected parameter</property>
+                                        <signal name="clicked" handler="on_curve_clear_parameter_clicked" />
+                                        <child>
+                                          <widget class="GtkImage" id="image2521">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="pixbuf">icon_clear.png</property>
+                                          </widget>
+                                        </child>
+                                      </widget>
+                                      <packing>
+                                        <property name="expand">True</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">3</property>
+                                      </packing>
+								  </child>
+
                                   </widget>
                                   <packing>
                                     <property name="expand">True</property>
