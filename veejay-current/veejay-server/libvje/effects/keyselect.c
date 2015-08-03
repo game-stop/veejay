@@ -95,7 +95,9 @@ uint8_t blend_func4(uint8_t a, uint8_t b) {
 
 uint8_t blend_func5(uint8_t a, uint8_t b) {
 	uint8_t val;
-	uint8_t c = 256 - b;
+	uint8_t c = 0xff - b;
+	if( c == 0 )
+		return CLAMP_Y(b);
 	val = b / c;
 	return CLAMP_Y(val);
 }
