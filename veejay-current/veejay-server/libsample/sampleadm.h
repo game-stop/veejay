@@ -171,6 +171,7 @@ typedef struct sample_info_t {
     void	*viewport_config;
     void	*viewport;
     long	resume_pos;
+	int		subrender;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -209,6 +210,8 @@ extern int sample_set_marker(int s1, int start, int end);
 extern int sample_get_longest(int sample_id);
 extern int sample_get_playmode(int s1);
 extern int sample_set_playmode(int s1, int playmode);
+extern int sample_get_subrender(int s1);
+extern void sample_set_subrender(int s1, int status);
 extern int sample_get_loops(int s1);
 extern int sample_get_loops2(int s1);
 extern int sample_get_next(int s1);

@@ -129,6 +129,7 @@ typedef struct {
     double *lfv;
     int cali_duration;
 	void	*generator;
+	int	subrender;
 } vj_tag;
 
 #define V4L_BLACKFRAME 1
@@ -170,6 +171,8 @@ int 	vj_tag_get_effect(int t1, int position);
 
 void	*vj_tag_get_plugin( int t1, int position, void *ptr );
 
+int		vj_tag_get_subrender(int t1);
+void	vj_tag_set_subrender(int t1, int status);
 
 int 	vj_tag_size();
 

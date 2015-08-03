@@ -2554,6 +2554,22 @@ int vj_tag_get_active(int t1)
     return tag->active;
 }
 
+int	vj_tag_get_subrender(int t1)
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag)
+		return -1;
+	return tag->subrender;
+}
+
+void	vj_tag_set_subrender(int t1, int status)
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag)
+		return;
+	tag->subrender = status;
+}
+
 int vj_tag_set_chain_channel(int t1, int position, int channel)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -3947,7 +3963,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	char *extra_data = NULL;
 	int col[3] = {0,0,0};
 	int fader_active=0, fader_val=0, fader_dir=0, opacity=0, nframes=0;
-
+	int subrender = 0;
 	xmlNodePtr fx[32];
 	veejay_memset( fx, 0, sizeof(fx));
 	int k = 0;
@@ -3994,6 +4010,8 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 
 		if (!xmlStrcmp(cur->name, (const xmlChar*) "calibration" ))
 			cali = cur->xmlChildrenNode;
+		if (!xmlStrcmp(cur->name, (const xmlChar*) "subrender" ))
+			subrender = tag_get_int_xml(doc,cur,(const xmlChar*) "subrender" );
 
 		if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTS)) {
 			fx[k] = cur->xmlChildrenNode;
@@ -4180,6 +4198,9 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
 
 	sprintf(buffer, "%s", tag->source_name );
 	xmlNewChild(node,NULL,(const xmlChar*) "source_file", (const xmlChar*) buffer );
+
+	sprintf(buffer, "%d" ,tag->subrender);
+	xmlNewChild(node,NULL,(const xmlChar*) "subrender", (const xmlChar*) buffer );
 
 	if(tag->extra )
 	{

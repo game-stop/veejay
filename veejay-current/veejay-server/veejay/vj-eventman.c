@@ -2439,6 +2439,18 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[ VIMS_SUB_RENDER ] 		=	_new_event(
+				"%d",
+				VIMS_SUB_RENDER,
+				"Render image effects on mixing source",
+				vj_event_sub_render,
+				1,
+				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+
+
 
 	index_map_[ VIMS_CONTINUOUS_PLAY ] 		=	_new_event(
 				"%d",

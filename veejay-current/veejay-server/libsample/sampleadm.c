@@ -1882,12 +1882,27 @@ int sample_set_loops2(int s1, int nr_of_loops)
     return 1;
 }
 
+int	sample_get_subrender(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample)
+		return 0;
+	return sample->subrender;
+}
+
+void sample_set_subrender(int s1, int status )
+{
+	sample_info *sample = sample_get(s1);
+	if(sample)
+		sample->subrender = status;
+}	
+
 int sample_get_sub_audio(int s1)
 {
     sample_info *sample;
     sample = sample_get(s1);
     if (!sample)
-	return -1;
+		return -1;
     return sample->sub_audio;
 }
 
@@ -3095,6 +3110,17 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
+	
+	if (!xmlStrcmp(cur->name, (const xmlChar *) "subrender")) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		sample_set_subrender(skel->sample_id, atoi(chTemp));
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
+
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_MAXLOOPS)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
@@ -3603,6 +3629,10 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
 	sprintf(buffer,"%d",sample->selected_entry);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_LASTENTRY,
 		(const xmlChar *)buffer);
+
+    sprintf(buffer, "%d", sample->subrender ); 
+    xmlNewChild(node, NULL, (const xmlChar*) "subrender",
+		(const xmlChar*) buffer );
 
     vj_font_xml_pack( node, font );
 

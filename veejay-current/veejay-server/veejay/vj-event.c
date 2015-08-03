@@ -276,6 +276,17 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_SELECT_BANK,				SDLK_7,			VIMS_MOD_NONE,	"7"	},
 	{ VIMS_SELECT_BANK,				SDLK_8,			VIMS_MOD_NONE,	"8"	},
 	{ VIMS_SELECT_BANK,				SDLK_9,			VIMS_MOD_NONE,	"9"	},
+//@ FIXME test this
+	{ VIMS_SELECT_BANK,				SDLK_1,			VIMS_MOD_SHIFT,	"1"	},
+	{ VIMS_SELECT_BANK,				SDLK_2,			VIMS_MOD_SHIFT,	"2"	},
+	{ VIMS_SELECT_BANK,				SDLK_3,			VIMS_MOD_SHIFT,	"3"	},
+	{ VIMS_SELECT_BANK,				SDLK_4,			VIMS_MOD_SHIFT,	"4"	},
+	{ VIMS_SELECT_BANK,				SDLK_5,			VIMS_MOD_SHIFT,	"5"	},
+	{ VIMS_SELECT_BANK,				SDLK_6,			VIMS_MOD_SHIFT,	"6"	},
+	{ VIMS_SELECT_BANK,				SDLK_7,			VIMS_MOD_SHIFT,	"7"	},
+	{ VIMS_SELECT_BANK,				SDLK_8,			VIMS_MOD_SHIFT,	"8"	},
+	{ VIMS_SELECT_BANK,				SDLK_9,			VIMS_MOD_SHIFT,	"9"	},
+
 	{ VIMS_SELECT_ID,				SDLK_F1,		VIMS_MOD_NONE,	"1"	},
 	{ VIMS_SELECT_ID,				SDLK_F2,		VIMS_MOD_NONE,	"2"	},
 	{ VIMS_SELECT_ID,				SDLK_F3,		VIMS_MOD_NONE,	"3"	},
@@ -2764,6 +2775,55 @@ void	vj_event_play_norestart( void *ptr, const char format[], va_list ap )
 			(v->settings->sample_restart == 0 ? "enabled" : "disabled"));
 
 }
+
+void	vj_event_sub_render( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
+
+	if( SAMPLE_PLAYING(v)) {
+		if(args[0] == -1)
+			args[0] = sample_size() - 1;
+
+		if( args[0] == 0) 
+			args[0] = v->uc->sample_id;
+
+		int cur = sample_get_subrender(args[0]);
+		if( cur == 0 ) {
+			cur = 1;
+		}
+		else {
+			cur = 0;
+		}
+
+		sample_set_subrender(args[0], cur);
+
+		veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing sources",
+				( sample_get_subrender(args[0]) == 1 ? "Enabled" : "Disabled" ));
+	} 
+	if( STREAM_PLAYING(v)) {
+
+		if( args[0] == 0 )
+			args[0] = v->uc->sample_id;
+
+		if(args[0] == -1)
+			args[0] = vj_tag_size()-1;
+
+		int cur = vj_tag_get_subrender(args[0]);
+		if( cur == 0 ) {
+			cur = 1;
+		}
+		else {
+			cur = 0;
+		}
+
+		vj_tag_set_subrender(args[0], cur);
+		veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing sources",
+				( vj_tag_get_subrender(args[0]) == 1 ? "Enabled" : "Disabled" ));
+	}
+}	
 
 void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap) 
 {

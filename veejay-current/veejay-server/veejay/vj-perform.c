@@ -2043,12 +2043,16 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 
 					int done   = 0;
 					int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
-					if(do_ssm >= 0 ) {
-						if( (frames[1]->ssm == 0 && do_ssm == 0) || (frames[1]->ssm == 1 && do_ssm == 1 ) || (frames[1]->ssm == 0 && do_ssm == 1 )) {
+					int	subrender = vj_tag_get_subrender( info->uc->sample_id );
+
+					if( subrender ) {
+
+					//			if(do_ssm >= 0 ) {
+		//				if( (frames[1]->ssm == 0 && do_ssm == 0) || (frames[1]->ssm == 1 && do_ssm == 1 ) || (frames[1]->ssm == 0 && do_ssm == 1 )) {
 							//@ call render now
 							frames[1]->ssm = vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
 							done = 1;
-						}
+		//				}
 					}
 
 
@@ -2165,13 +2169,15 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 						if( ef ) continue;
 						if( sm ) {
 						   if( !ssm ) {
-							chroma_supersample( settings->sample_mode,F[0],F[0]->data );
+							if(a.ssm == 0 )
+								chroma_supersample( settings->sample_mode,F[0],F[0]->data );
 							F[0]->ssm = 1;
 							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 1;
 							}
 						} else if ( ssm ) {
-							chroma_subsample( settings->sample_mode,F[0],F[0]->data);
+							if(a.ssm == 1 ) 
+								chroma_subsample( settings->sample_mode,F[0],F[0]->data);
 							F[0]->ssm = 0;
 							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 0;
@@ -2287,13 +2293,16 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 				
 				int done   = 0;
 				int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
-				if(do_ssm >= 0 ) {
-					if( (frames[1]->ssm == 0 && do_ssm == 0) || (frames[1]->ssm == 1 && do_ssm == 1 )
-							|| (frames[1]->ssm == 0 && do_ssm == 1 )) {
+				int	subrender = sample_get_subrender( info->uc->sample_id );
+
+				if( subrender ) {
+		//		if(do_ssm >= 0 ) {
+		//			if( (frames[1]->ssm == 0 && do_ssm == 0) || (frames[1]->ssm == 1 && do_ssm == 1 )
+		///					|| (frames[1]->ssm == 0 && do_ssm == 1 )) {
 						//@ call render now
 						frames[1]->ssm = vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
 						done = 1;
-					}
+		//			}
 				}
 
 				if( chain_entry >= 1) {
@@ -2322,7 +2331,7 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 				if(!done && do_ssm >= 0) {
 					if( (do_ssm == 1 && frames[1]->ssm == 1) || (do_ssm == 0 && frames[1]->ssm == 0) ) {
 						vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
-
+					//FIXME possible dead code
 					}
 				}
 			}
