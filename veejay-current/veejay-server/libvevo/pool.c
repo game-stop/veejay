@@ -26,7 +26,7 @@ typedef struct
 {
 	unsigned char *area;		/*!< Pointer to memory space containing ROUNDS_PER_MAG objects */
 	unsigned char **mag;		/*!< A magazine is a ROUNDS_PER_MAG-element array of pointers to objects */
-	int	rounds;		/*!< Available rounds*/
+	unsigned int	rounds;		/*!< Available rounds*/
 	void	*next;		/*!< Pointer to next space */
 } space_t;
 
@@ -144,7 +144,7 @@ void	vevo_pool_free( void *p, void *ptr, unsigned int k )
 			l = l->next;
 		}
 	}
-	mag[ space->rounds++ ] = ptr;
+	mag[  space->rounds++ ] = ptr;
 }
 
 //! Destroy a pool and all spaces. Frees all used memory
