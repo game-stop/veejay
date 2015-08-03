@@ -108,7 +108,7 @@ static struct
 	{ 0,NULL, 0 }
 };
 
-#define MAX_SLOW 10
+#define MAX_SLOW 25 
 
 static struct
 {
