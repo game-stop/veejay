@@ -1,3 +1,4 @@
+
 /* Gveejay Reloaded - graphical interface for VeeJay
  * 	     (C) 2002-2004 Niels Elburg <nwelburg@gmail.com> 
  *  with contributions by  Thomas Rheinhold (2005)
@@ -128,6 +129,8 @@ enum {
 	TOOLTIP_SAMPLESLOT = 2,
 	TOOLTIP_SRTSELECT = 3
 };
+
+#define FX_PARAMETER_DEFAULT_NAME "<none>"
 
 enum
 {
@@ -1167,7 +1170,7 @@ char *_effect_get_param_description(int effect_id, int param)
 				return ec->param_description[param];
 		}
 	}
-	return "<none>";  
+	return FX_PARAMETER_DEFAULT_NAME;
 }
 
 
@@ -1185,7 +1188,7 @@ char *_effect_get_description(int effect_id)
 				return ec->description;
 		}
 	}
-	return "<none>";  
+	return FX_PARAMETER_DEFAULT_NAME;
 }
 
 el_constr *_el_entry_new( int pos, char *file, int nf , char *fourcc)
@@ -2163,38 +2166,33 @@ static	int	get_slider_val(const char *name)
 	return ((gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value); 
 }
 
-static	void	vj_kf_select_parameter(int num)
-{
-	sample_slot_t *s = info->selected_slot;
-	if(!s) return;
-
-	info->uc.selected_parameter_id = num;
-
-	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
-
-	reset_curve( curve );
-
-	update_curve_accessibility("curve");
-	update_curve_widget("curve");
-
-	char name[20];	
-	sprintf(name, "P%d", info->uc.selected_parameter_id);
-	update_label_str( "curve_parameter", name );
-}
-
 static	void	vj_kf_refresh()
 {
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
 
-
 	reset_curve( curve );
 
 	update_curve_accessibility("curve");
 	update_curve_widget("curve");
-	char name[20];	
-	sprintf(name, "P%d", info->uc.selected_parameter_id);
-	update_label_str( "curve_parameter", name );
+	int	*entry_tokens = &(info->uc.entry_tokens[0]);
 
+	gchar *name = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],info->uc.selected_parameter_id));
+	update_label_str( "curve_parameter", name );
+	g_free(name);
+}
+
+static	void	vj_kf_select_parameter(int num)
+{
+	sample_slot_t *s = info->selected_slot;
+	if(!s) 
+	{
+		update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
+		return;
+	}
+
+	info->uc.selected_parameter_id = num;
+
+	vj_kf_refresh();
 }
 
 static  void	update_curve_widget(const char *name)
@@ -3511,7 +3509,9 @@ static	gint load_parameter_info()
 		int nl = get_nums("stream_length") + 1 ;
 		update_spin_range( "curve_spinstart", 0, nl, p[ENTRY_KF_START] );
 		update_spin_range( "curve_spinend", 0,nl, p[ENTRY_KF_END] );
-	}	
+	}
+
+	update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
 
 	switch( p[ENTRY_KF_TYPE] )
 	{
