@@ -838,6 +838,9 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 		g_free(filename );
 	}
 }
+static char samplelist_name[1024];
+static int  has_samplelist_name = 0;
+
 void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 {
 	gchar *filename = dialog_save_file( "Save samplelist");
@@ -845,9 +848,31 @@ void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename );
 		vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
+		strncpy( samplelist_name, filename,strlen(filename));
+		has_samplelist_name = 1;
 		g_free(filename);
 	}
 }
+
+void	on_button_samplelist_qsave_clicked(GtkWidget *widget, gpointer user_data)
+{
+	if( has_samplelist_name == 0 ) {
+		gchar *filename = dialog_save_file( "Save samplelist");
+		if(filename)
+		{
+			multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename );
+			vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
+			strncpy( samplelist_name, filename, strlen(filename));
+			g_free(filename);
+			has_samplelist_name = 1;
+		}
+	}
+	else {
+		multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s" , samplelist_name );
+		vj_msg(VEEJAY_MSG_INFO, "Quick saved samples to %s" , samplelist_name );
+	}
+}
+
 
 void	on_spin_samplestart_value_changed(GtkWidget *widget, gpointer user_data)
 {
