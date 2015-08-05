@@ -35,6 +35,7 @@ extern void report_bug();
 extern void veejay_msg(int type, const char format[], ...);
 extern int veejay_is_colored();
 extern void veejay_set_debug_level(int level);
+extern int veejay_get_debug_level();
 extern void veejay_set_colors(int level);
 extern void veejay_silent();
 extern int veejay_is_silent();

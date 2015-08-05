@@ -137,21 +137,38 @@ static	char	*get_print_buf(int size) {
 	char *res = (char*) vj_calloc(sizeof(char) * s );
 	return res;
 }
+/**
+ * MACRO|keystrokes|VIMS macro
+ *
+ * macro banks are selected by [CTRL] + [F1...F12] (or via VIMS 34)
+ *
+ * depending on macro_status, we are:
+ * 0 : stopped
+ * 1 : recording VIMS events
+ * 2 : playing VIMS events
+ *
+ * the messages are indexed by frame_position and slow_multiplier
+ * MAX_MACROS messages can be stored per keyframe
+ *
+ * the playback resumes from where you have started the macro recorder
+ * the reset function clears all macro banks
+ *
+ * TODO clear selected macro slot instead of clear all 
+ * TODO play all macro banks simultaneously (instead of playing only selected bank)
+ * TODO play macro once (instead of looping)
+ * TODO reloaded select macro bank / macro tabbed page | VIMS getters/setters etc 
+ * TODO once macro is done, FX configuration is not restored
+*/
 #define MAX_MACRO_BANKS 12
 
-static	void	*macro_bank_[MAX_MACRO_BANKS];
-static	void	*macro_port_ = NULL;
+static	void *macro_bank_[MAX_MACRO_BANKS];
+static	void *macro_port_ = NULL;
 static  int	current_macro_ = 0;
 static	int	macro_status_ = 0;
-
 static	int	macro_line_[3] = {-1 ,0,0};
-static  int	macro_current_age_ = 0;
-static  int	macro_expected_age_ = 0;
-#define MAX_MACROS 8
+#define MAX_MACROS 16
 typedef struct {
 	char *msg[MAX_MACROS];
-	int   pending[MAX_MACROS];
-	int   age[MAX_MACROS];
 } macro_block_t;
 
 int	vj_event_macro_status(void)
@@ -159,10 +176,10 @@ int	vj_event_macro_status(void)
 	return macro_status_;
 }
 
-static	char	*retrieve_macro_(veejay_t *v, long frame, int idx );
+static	char	*retrieve_macro_(veejay_t *v,int idx, char *key );
 static	void	store_macro_( veejay_t *v,char *str, long frame );
 static	void	reset_macro_(void);
-static	void	replay_macro_(void);
+static	void	display_replay_macro_(void);
 
 extern void	veejay_pipe_write_status(veejay_t *info);
 extern int	_vj_server_del_client(vj_server * vje, int link_id);
@@ -547,31 +564,24 @@ static	void	macro_select( int slot )
 {
 	if( slot >= 0 && slot < MAX_MACRO_BANKS )
 	{
-		macro_bank_[ current_macro_ ] = macro_port_;
-		current_macro_ = slot;
-		macro_port_    = macro_bank_[ current_macro_ ];
-		if( !macro_port_ )
-		{
-			if( macro_status_ == 1 )
-			{
-				veejay_msg(VEEJAY_MSG_INFO,
-					"Continuing recording keystrokes in slot %d", current_macro_);
-				macro_bank_[ current_macro_ ] =
-					vpn(VEVO_ANONYMOUS_PORT );
-				macro_port_ = macro_bank_[ current_macro_ ];
-			}
-			else if (macro_status_ == 2 )
-			{
-				veejay_msg(VEEJAY_MSG_INFO,
-					"No keystrokes found in slot %d", current_macro_);
+		void *oldptr = macro_bank_[ current_macro_ ];
+		int  old     = current_macro_;
+
+		if(macro_bank_[slot] == NULL ) {
+			macro_bank_[slot] = vpn( VEVO_ANONYMOUS_PORT );
+			if(!macro_bank_[slot]) {
+				veejay_msg(0,"Unable to get port for macro slot %d", slot );
+				slot = old;
+				macro_bank_[old] = oldptr;
 			}
 		}
-		macro_current_age_ = 0;
-		macro_expected_age_ = 0;
+		
+		current_macro_ = slot;
+		macro_port_ = macro_bank_[slot];
 	}
 }
 
-static	void	replay_macro_(void)
+static	void	display_replay_macro_(void)
 {
 	int i,k;
 	char **items;
@@ -591,13 +601,15 @@ static	void	replay_macro_(void)
 				macro_block_t *m = (macro_block_t*) mb;
 				for( i = 0; i < MAX_MACROS; i ++ )
 				{
-					if(m->msg[i]) { m->pending[i] = 1; strokes ++; }
+					if(m->msg[i]) { 
+						veejay_msg(VEEJAY_MSG_DEBUG,"\tVIMS [%s] at macro %s",m->msg[i],items[k]);
+						strokes ++;
+					}
 				}
 			}
 			free(items[k]);	
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Replay %d keystrokes in macro slot %d!", strokes,
-			current_macro_ );
+		veejay_msg(VEEJAY_MSG_INFO, "Replay %d VIMS messages in macro bank %d!", strokes,current_macro_ );
 		free(items);
 	}
 }
@@ -626,7 +638,7 @@ static	void	reset_macro_(void)
 			}
 			free(items[k]);	
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Cleared %d keystrokes from macro slot %d",
+		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro recorder cleared %d VIMS messages from bank %d",
 				strokes, current_macro_ );
 		free(items);
 	}
@@ -635,30 +647,15 @@ static	void	reset_macro_(void)
 	macro_port_ = NULL;
 }
 
-static	char	*retrieve_macro_(veejay_t *v, long frame, int idx )
+static	char	*retrieve_macro_(veejay_t *v, int idx, char *key )
 {
 	void *mb = NULL;
-	char key[16];
-
-	int s = 0;
-	if( SAMPLE_PLAYING(v))
-		s = sample_get_framedups( v->uc->sample_id );
-	else if ( PLAIN_PLAYING(v))
-		s = v->settings->simple_frame_dup;
-
-	snprintf(key,16,"%08ld%02d", frame,s );
-
 	int error = vevo_property_get( macro_port_, key, 0, &mb );
 	if( error == VEVO_NO_ERROR )
 	{
-		if( idx == MAX_MACROS )
-			return NULL;
-
 		macro_block_t *m = (macro_block_t*) mb;
-		if( m->msg[idx ] && m->pending[idx] == 1 && m->age[idx] == macro_expected_age_)
+		if( m->msg[idx ])
 		{
-			m->pending[idx] = 0;
-			macro_expected_age_ ++;
 			return m->msg[idx];
 		}
 	}
@@ -676,7 +673,6 @@ static	void	store_macro_(veejay_t *v, char *str, long frame )
 	else if ( PLAIN_PLAYING(v))
 		s = v->settings->simple_frame_dup;
 
-
 	snprintf(key,16,"%08ld%02d", frame,s );
 
 	int error = vevo_property_get( macro_port_, key, 0, &mb );
@@ -684,9 +680,6 @@ static	void	store_macro_(veejay_t *v, char *str, long frame )
 	{ // first element
 		macro_block_t *m = vj_calloc( sizeof(macro_block_t));
 		m->msg[0] = vj_strdup(str); 	
-		m->pending[0] = 1;
-		m->age[0] = macro_current_age_;
-		macro_current_age_++;
 		vevo_property_set( macro_port_, key, VEVO_ATOM_TYPE_VOIDPTR,1,&m );
 	}
 	else
@@ -698,17 +691,11 @@ static	void	store_macro_(veejay_t *v, char *str, long frame )
 			if(c->msg[k] == NULL )	
 			{
 				c->msg[k] = vj_strdup(str);
-				c->pending[k] = 1;
-				c->age[k] = macro_current_age_;
-				macro_current_age_ ++;
 				return;
 			}
 		}
-		veejay_msg(VEEJAY_MSG_ERROR, "Slot for frame %ld is full (keystroke recorder)",frame );
+		veejay_msg(VEEJAY_MSG_ERROR, "VIMS Macro recorder reached buffer limit at frame %ld",frame );
 	}
-
-	veejay_msg(0, "key = %s, '%s' %ld", key,str,frame);
-	
 }
 
 
@@ -1731,14 +1718,23 @@ void vj_event_update_remote(void *ptr)
 
 	v->settings->is_dat = 0;
 
-	//@ repeat macros
 	if(macro_status_ == 2 && macro_port_ != NULL)
 	{
 		int n_macro = 0;
+		int s = 0;
 		char *macro_msg = NULL;
+		char key[32];
+
+		if( SAMPLE_PLAYING(v))
+			s = sample_get_framedups( v->uc->sample_id );
+		else if ( PLAIN_PLAYING(v))
+			s = v->settings->simple_frame_dup;
+
+		snprintf(key,sizeof(key),"%08d%02d", v->settings->current_frame_num,s );
+
 		for( n_macro = 0; n_macro < MAX_MACROS ; n_macro ++ )
 		{
-			macro_msg = retrieve_macro_( v, v->settings->current_frame_num, n_macro );
+			macro_msg = retrieve_macro_( v, n_macro,key );
 			if(macro_msg)
 				vj_event_parse_msg(v,macro_msg, strlen(macro_msg));
 		}
@@ -7878,7 +7874,7 @@ void	vj_event_select_macro( void *ptr, const char format[], va_list ap )
 	char *str = NULL;
 	P_A( args, str, format, ap );
 	macro_select( args[0] );
-	veejay_msg(VEEJAY_MSG_INFO, "Changed macro slot to %d", current_macro_ );
+	veejay_msg(VEEJAY_MSG_INFO, "Changed VIMS macro slot to %d", current_macro_ );
 }
 
 void vj_event_select_bank(void *ptr, const char format[], va_list ap) 
@@ -10356,58 +10352,53 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 	{
 		reset_macro_();
 		macro_status_ = 0;
-		macro_current_age_ = 0;
-		macro_expected_age_ = 0;
 		args[0] = 0;
 		macro_line_[0] = -1;
 		macro_line_[1] = 0;
 		macro_line_[2] = 0;
-		veejay_msg(VEEJAY_MSG_INFO, "Cleared all recorded keystrokes");
+		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro reset");
 	}
 	if( args[0] == 0 )
 	{
 		if( macro_port_ )
 		{
-			macro_status_ = 0; //@ stop
-			veejay_msg(VEEJAY_MSG_INFO, "Stopped macro recorder");
+			macro_status_ = 0;
+			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro recorder stopped");
 		}
 	} else if (args[0] == 1 )
 	{
 		reset_macro_();
 		macro_port_ = vpn(VEVO_ANONYMOUS_PORT);
 		macro_bank_[ current_macro_ ] = macro_port_;
-		veejay_msg(VEEJAY_MSG_INFO , "Recording keystrokes!");
 		macro_status_ = 1; 
 		macro_line_[0] = v->settings->current_frame_num;
 		macro_line_[1] = v->uc->playback_mode;
 		macro_line_[2] = v->uc->sample_id;
-		macro_current_age_ =0;
+
+		veejay_msg(VEEJAY_MSG_INFO , "VIMS Macro recorder started (replay at %x | frame %ld, id %d | bank %d)",
+				macro_line_[1], macro_line_[0], macro_line_[2], current_macro_);
+
 	} 
 	else if (args[0] == 2)
 	{
 		if( macro_status_ == 0 && macro_port_ )
 		{
 			macro_status_ = 2;
-			veejay_msg(VEEJAY_MSG_INFO, "Resume playing keystrokes");
-		} else if( macro_line_[0] >= 0 && macro_port_ != NULL)
+			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro resuming playback from bank %d", current_macro_);
+		}
+		else if( macro_line_[0] >= 0 && macro_port_ != NULL)
 		{
-		/*	if( macro_status_ == 1 )
-			{ //@ store current speed and direction 
-				char last[100];
-				snprintf(last,100, "%03d:%d;",
-					VIMS_VIDEO_SET_SPEED, v->settings->current_playback_speed );
-				store_macro_( v, last, v->settings->current_frame_num );
-			}*/
 			macro_status_ = 2;
-			veejay_msg(VEEJAY_MSG_INFO, "Replay all keystrokes!");
+			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro playback (%x| frame %ld, id %d)",
+					macro_line_[1], macro_line_[0], macro_line_[2]);
 			veejay_change_playback_mode( v, macro_line_[1],macro_line_[2] );
 			veejay_set_frame( v, macro_line_[0] );
-			macro_expected_age_ = 0;
-			replay_macro_();
+			if( veejay_get_debug_level() )
+				display_replay_macro_();
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "No keystrokes to playback!");
+			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro has nothing to playback");
 			veejay_msg(VEEJAY_MSG_INFO, "Use CAPS-LOCK modifier to jump to next or previous sample."); 
 		}
 	}

@@ -189,6 +189,11 @@ void	veejay_backtrace_handler(int n , void *dist, void *x)
 	exit(EX_SOFTWARE);
 }
 
+int	veejay_get_debug_level()
+{
+	return _debug_level;
+}
+
 void veejay_set_debug_level(int level)
 {
 	if(level)
