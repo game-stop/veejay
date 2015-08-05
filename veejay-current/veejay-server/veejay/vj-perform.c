@@ -87,6 +87,7 @@ typedef struct {
 	char	padding[12];
 } varcache_t;
 
+
 #define	RUP8(num)(((num)+8)&~8)
 static long performer_frame_size_ = 0;
 
@@ -1364,7 +1365,7 @@ static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 {
 	int n_a = vj_effect_get_num_params(e);
 	int entry = e;
-	int args[16];
+	int args[SAMPLE_MAX_PARAMETERS];
 	veejay_memset( args, 0 , sizeof(args) );
 	
 	if( playmode == VJ_PLAYBACK_MODE_TAG )
