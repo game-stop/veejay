@@ -2148,59 +2148,63 @@ int sample_chain_add(int s1, int c, int effect_nr)
 
     if(!vj_effect_initialized(effect_nr, sample->effect_chain[c]->fx_instance) )
     {
-	int res = 0;
-	sample->effect_chain[c]->fx_instance = vj_effect_activate( effect_nr, &res );
-	if(!res)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot activate %d", effect_nr);
-		//@ clear
-		sample->effect_chain[c]->effect_id = -1;
-		sample->effect_chain[c]->e_flag = 1;
-		int i;
-		for( i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ )
-			sample->effect_chain[c]->arg[i] = 0;
+		int res = 0;
+		sample->effect_chain[c]->fx_instance = vj_effect_activate( effect_nr, &res );
+		if(!res)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot activate %d", effect_nr);
+			//@ clear
+			sample->effect_chain[c]->effect_id = -1;
+			sample->effect_chain[c]->e_flag = 1;
+			int i;
+			for( i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ )
+				sample->effect_chain[c]->arg[i] = 0;
+	
+			sample->effect_chain[c]->frame_trimmer = 0;
+			return 0;
+		}
+    }
 
-		sample->effect_chain[c]->frame_trimmer = 0;
-		return 0;
-	}
+    effect_params = vj_effect_get_num_params(effect_nr);
+	if( sample->effect_chain[c]->effect_id != effect_nr ) {
+		if( effect_params > 0 ) {
+			/* there are parameters, set default values */
+			for (i = 0; i < effect_params; i++)
+		    {
+			    int val = vj_effect_get_default(effect_nr, i);
+			    sample->effect_chain[c]->arg[i] = val;
+			}
+		}
+		/* effect enabled standard */
+		sample->effect_chain[c]->e_flag = 1;
+		//clear fx anim
+		sample->effect_chain[c]->kf_status = 0;
+		sample->effect_chain[c]->kf_type = 0;
+		if(sample->effect_chain[c]->kf)
+			vpf(sample->effect_chain[c]->kf );
+		sample->effect_chain[c]->kf = NULL;
     }
 
     sample->effect_chain[c]->effect_id = effect_nr;
-    sample->effect_chain[c]->e_flag = 1;	/* effect enabled standard */
-    effect_params = vj_effect_get_num_params(effect_nr);
-    if (effect_params > 0)
-    {
-	/* there are parameters, set default values */
-	for (i = 0; i < effect_params; i++)
-        {
-	    int val = vj_effect_get_default(effect_nr, i);
-	    sample->effect_chain[c]->arg[i] = val;
-	}
-    }
+
     if (vj_effect_get_extra_frame(effect_nr))
-   {
-    //sample->effect_chain[c]->frame_offset = 0;
-    sample->effect_chain[c]->frame_trimmer = 0;
+    {
+		//sample->effect_chain[c]->frame_offset = 0;
+		sample->effect_chain[c]->frame_trimmer = 0;
 
-    if(s1 > 1)
-	 s1 = s1 - 1;
-    if(!sample_exists(s1)) s1 = s1 + 1;
+		if(s1 > 1)
+			s1 = s1 - 1;
+		if(!sample_exists(s1)) s1 = s1 + 1;
 
-	if(sample->effect_chain[c]->channel <= 0)
-		sample->effect_chain[c]->channel = sample_size()-1; // follow newest
-    if(sample->effect_chain[c]->source_type < 0)
-		sample->effect_chain[c]->source_type = 0;
+		if(sample->effect_chain[c]->channel <= 0)
+			sample->effect_chain[c]->channel = sample_size()-1; // follow newest
+		if(sample->effect_chain[c]->source_type < 0)
+			sample->effect_chain[c]->source_type = 0;
 
         veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with sample %d",
 			vj_effect_get_description(sample->effect_chain[c]->effect_id),c,sample->effect_chain[c]->channel);
     }
 
-    //clear fx anim
-    sample->effect_chain[c]->kf_status = 0;
-    sample->effect_chain[c]->kf_type = 0;
-	if(sample->effect_chain[c]->kf)
-		vpf(sample->effect_chain[c]->kf );
-	sample->effect_chain[c]->kf = NULL;
 
     return 1;			/* return position on which it was added */
 }

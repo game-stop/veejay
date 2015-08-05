@@ -2152,28 +2152,30 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 		}
     }
 
-    tag->effect_chain[position]->effect_id = effect_id;
-    tag->effect_chain[position]->e_flag = 1; 
-    params = vj_effect_get_num_params(effect_id);
-    if (params > 0) {
-	for (i = 0; i < params; i++) {
-	    int val = 0;
-	    val = vj_effect_get_default(effect_id, i);
-	    tag->effect_chain[position]->arg[i] = val;
+	if( tag->effect_chain[position]->effect_id != effect_id )
+	{
+		params = vj_effect_get_num_params(effect_id);
+		for (i = 0; i < params; i++) {
+			tag->effect_chain[position]->arg[i] = vj_effect_get_default(effect_id, i);
+		}
+		tag->effect_chain[position]->e_flag = 1; 
+			tag->effect_chain[position]->kf_status = 0;
+		tag->effect_chain[position]->kf_type = 0;
+		if(tag->effect_chain[position]->kf)
+			vpf(tag->effect_chain[position]->kf );
+		// tag does not have chain_alloc_kf
+		tag->effect_chain[position]->kf = vpn(VEVO_ANONYMOUS_PORT );
 	}
-    }
-    if (vj_effect_get_extra_frame(effect_id)) {
-	if(tag->effect_chain[position]->source_type < 0)
-	 tag->effect_chain[position]->source_type = 1;
-	if(tag->effect_chain[position]->channel <= 0 )
-	 tag->effect_chain[position]->channel = t1;
-    }
 
-	tag->effect_chain[position]->kf_status = 0;
-	tag->effect_chain[position]->kf_type = 0;
-	if(tag->effect_chain[position]->kf)
-		vpf(tag->effect_chain[position]->kf );
-	tag->effect_chain[position]->kf = vpn(VEVO_ANONYMOUS_PORT );
+    tag->effect_chain[position]->effect_id = effect_id;
+    
+
+	if (vj_effect_get_extra_frame(effect_id)) {
+		if(tag->effect_chain[position]->source_type < 0)
+		 tag->effect_chain[position]->source_type = 1;
+		if(tag->effect_chain[position]->channel <= 0 )
+		 tag->effect_chain[position]->channel = t1;
+    }
 
     return 1;
 }
@@ -3621,7 +3623,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 
 
 //int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
-int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int frame, int mode,int ts,int curfps, uint32_t lo, uint32_t hi, int macro, char *str )
+int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int curfps, uint32_t lo, uint32_t hi, int macro, char *str )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
