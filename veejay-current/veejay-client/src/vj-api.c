@@ -2236,10 +2236,9 @@ static  void	update_curve_widget(const char *name)
 		else
 		{
 			lo = 0;
-			hi = get_nums("stream_length");
+			hi = info->status_tokens[SAMPLE_MARKER_END]; 
 		}
 	}
-	
 	update_spin_range( "curve_spinstart", lo, hi, lo );
 	update_spin_range( "curve_spinend", lo, hi, hi );
 
@@ -3507,7 +3506,7 @@ static	gint load_parameter_info()
 	}
 	else
 	{
-		int nl = get_nums("stream_length") + 1 ;
+		int nl = info->status_tokens[SAMPLE_MARKER_END];
 		update_spin_range( "curve_spinstart", 0, nl, p[ENTRY_KF_START] );
 		update_spin_range( "curve_spinend", 0,nl, p[ENTRY_KF_END] );
 	}
@@ -5975,7 +5974,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 		info->sequence_playing = in;
 		indicate_sequence( TRUE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
 	}
-	
+
 	total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );
 	gint history_frames_ = (pm == MODE_STREAM ? history[SAMPLE_MARKER_END] : history[TOTAL_FRAMES] ); 
 	gint current_frame_ = info->status_tokens[FRAME_NUM];
