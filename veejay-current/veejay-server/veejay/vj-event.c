@@ -7413,7 +7413,11 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
+	int old_format = _recorder_format;
 
+	veejay_msg(VEEJAY_MSG_DEBUG,"Current recording format is %s",
+		vj_avcodec_get_encoder_name( old_format ));
+		
 	for( i = 0; recorder_formats[i].name != NULL ; i ++ ) {
 		if(strncasecmp( str, recorder_formats[i].name, strlen(recorder_formats[i].name) ) == 0 ) {
 			_recorder_format = recorder_formats[i].id;
@@ -7430,13 +7434,17 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 
 	if(strncasecmp(str,"dvvideo",7)==0||strncasecmp(str,"dvsd",4)==0)
 	{
-		if(vj_el_is_dv(v->current_edit_list)) {
+		if(vj_el_is_dv(v->current_edit_list))
+		{
 			_recorder_format = ENCODER_DVVIDEO;
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Not working in a valid DV resolution");
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot set DVVideo format (invalid DV resolution)");
+			_recorder_format = old_format;
 		}
+
+		veejay_msg(VEEJAY_MSG_INFO, "Selected recording format %s" , vj_avcodec_get_encoder_name(old_format));
 		return;
 	}
 
@@ -7446,15 +7454,15 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		if( vj_el_is_dv( v->current_edit_list ))
 		{
 			_recorder_format = ENCODER_QUICKTIME_DV;
-			veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in QT DV format");
 		}
-		else
-			veejay_msg(VEEJAY_MSG_ERROR, "Not working in valid DV resolution");
+		else 
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot set Quicktime-DV format (invalid DV resolution)");
+			_recorder_format = old_format;
+		}
 	}
 #endif
-
-	veejay_msg(VEEJAY_MSG_INFO,
-			"Recording in %s" , vj_avcodec_get_encoder_name( _recorder_format ) );
+	veejay_msg(VEEJAY_MSG_INFO, "Selected recording format %s" , vj_avcodec_get_encoder_name(old_format));
 }
 
 static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
