@@ -52,30 +52,22 @@ veejay -p 4490 my-movie-B.avi
 reloaded
 ```
 
-## Building plugins
+## Building/Configuring plugins
 
 Plugins enable additional video effects from various external sources.
-to build plugins:
+to build plugins.
 
-```bash
-cd veejay-sever/livido-plugins
-./RUNME.sh /tmp/plugins
-```
-
- Install the plugins in your home-dir:
-
-```bash
-mkdir ~/.veejay    * or start veejay 
-echo "/tmp/plugins" >> ~/.veejay/plugins.cfg
-```
-
-install GMIC, 
+GMIC plugins:
 
 ```bash
 cd plugin-packs/lvdgmic
 ./autogen.sh
 ./configure && make 
 ```
+
+Veejay looks in a few common locations to find plugins. You can list more locations in $HOME/.veejay/plugins.cfg
+
+You can change the default parameter values by editing the files in $HOME/.veejay/frei0r/ and $HOME/.veejay/livido/
 
 ## Alternative build targets
 
