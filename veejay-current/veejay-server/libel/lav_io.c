@@ -1483,33 +1483,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 	}
 #endif
    
-
-	if(	strncasecmp(video_comp, "div3",4)==0 ||
-		strncasecmp(video_comp, "mp43",4)==0 ||
-  		strncasecmp(video_comp, "mp42",4)==0 )
-	{
-		lav_fd->MJPG_chroma = CHROMA420;
-		lav_fd->interlacing = LAV_NOT_INTERLACED;
-		veejay_msg(VEEJAY_MSG_WARNING, "Playing MS MPEG4v3 DivX Video. (Every frame should be an intra frame)" );
-		return lav_fd;
-	} 
-
-	if(	strncasecmp(video_comp,"mp4v",4 )==0 ||
-		strncasecmp(video_comp,"fmp4",4 )==0 ||
-		strncasecmp(video_comp,"divx",4 ) == 0 ||
-		strncasecmp(video_comp,"xvid",4 ) == 0 ||
-		strncasecmp(video_comp,"dxsd",4 ) == 0 ||
-		strncasecmp(video_comp,"mp4s",4 ) == 0 ||
-		strncasecmp(video_comp,"m4s2",4 ) == 0 )
-	{
-		lav_fd->format = 'D';
-		lav_fd->MJPG_chroma = CHROMA420;
-		lav_fd->interlacing = LAV_NOT_INTERLACED;
-		veejay_msg(VEEJAY_MSG_WARNING, "Playing MPEG4 Video (Every frame should be an intra frame)");
-		return lav_fd;
-	}
-		
-    	if (	strncasecmp(video_comp,"iyuv",4)==0 ||
+    if ( strncasecmp(video_comp,"iyuv",4)==0 ||
 		strncasecmp(video_comp,"yv12",4)==0 ||
 		strncasecmp(video_comp,"i420",4)==0)
 	{
@@ -1519,7 +1493,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		return lav_fd;
 	}
 
-	if(strncasecmp(video_comp,"vj22",4)==0)
+	if(strncasecmp(video_comp,"vj22",4)==0 || strncasecmp(video_comp, "y42b",4) == 0)
 	{
 		lav_fd->MJPG_chroma = CHROMA422F;
 		lav_fd->format = 'V';
@@ -1534,7 +1508,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		return lav_fd; 
 	}
 
-    	if (	strncasecmp(video_comp,"yv16",4)==0 ||
+    if (strncasecmp(video_comp,"yv16",4)==0 ||
 		strncasecmp(video_comp,"i422",4)==0 ||
 		strncasecmp(video_comp,"hfyu",4)==0)
 	{
@@ -1544,16 +1518,6 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		return lav_fd; 
 	}
 
-	if( 	strncasecmp(video_comp, "avc1", 4 ) == 0 ||
-		strncasecmp(video_comp, "h264", 4 ) == 0 ||
-		strncasecmp(video_comp, "x264", 4 ) == 0 ||
-		strncasecmp(video_comp, "davc", 4 ) == 0 )
-	{
-		lav_fd->MJPG_chroma = CHROMA420;
-		lav_fd->interlacing = LAV_NOT_INTERLACED;
-		return lav_fd;
-	}
-
 	if(	strncasecmp( video_comp, "mlzo", 4 ) == 0 )
 	{
 		lav_fd->MJPG_chroma = CHROMA422;
@@ -1561,12 +1525,12 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		return lav_fd;
 	}
 	
-	if (	strncasecmp(video_comp,"dvsd",4)==0 ||
+	if (strncasecmp(video_comp,"dvsd",4)==0 ||
 		strncasecmp(video_comp,"dvcp",4) ==0 ||
 		strncasecmp(video_comp,"dxsd",4) == 0 ||
-		strncasecmp(video_comp, "dvp",3) == 0 ||
-		strncasecmp(video_comp, "dvhd",4) == 0 ||
-		strncasecmp(video_comp, "dv",2 ) == 0)
+		strncasecmp(video_comp,"dvp",3) == 0 ||
+		strncasecmp(video_comp,"dvhd",4) == 0 ||
+		strncasecmp(video_comp,"dv",2 ) == 0)
 	{ 
 		int gw = lav_video_height( lav_fd );
 		if( gw == 480 )
@@ -1596,14 +1560,14 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		return lav_fd;
 	}
 	
-	if (	strncasecmp(video_comp,"mjpg", 4) == 0 ||
+	if (strncasecmp(video_comp,"mjpg", 4) == 0 ||
 		strncasecmp(video_comp,"mjpa", 4) == 0 ||
 		strncasecmp(video_comp,"jpeg", 4) == 0 ||
 		strncasecmp(video_comp,"mjpb" ,4) == 0 ||
 		strncasecmp(video_comp,"sp5x", 4) == 0 ||
 		strncasecmp(video_comp,"jpgl", 4) == 0 ||
-		strncasecmp(video_comp , "jfif", 4 ) == 0 ||
-		strncasecmp(video_comp, "dmb1", 4)==0 )
+		strncasecmp(video_comp,"jfif", 4 ) == 0 ||
+		strncasecmp(video_comp,"dmb1", 4)==0 )
 	{
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->interlacing = LAV_INTER_UNKNOWN;

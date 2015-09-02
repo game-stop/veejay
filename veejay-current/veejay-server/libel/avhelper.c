@@ -77,6 +77,7 @@ static struct
 	{ "svq1", CODEC_ID_SVQ1		},
 	{ "svq3", CODEC_ID_SVQ3		},
 	{ "rpza", CODEC_ID_RPZA		},
+	{ "y42b", CODEC_ID_YUV422F   },
 	{ NULL  , 0,			},
 };
 
