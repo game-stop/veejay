@@ -34,14 +34,15 @@ open CONFIG, ">Makefile.defs";
 sub config {print CONFIG shift; print CONFIG "\n";}
 
 
-config "CC = $var{CC}" ;
-config "PREFIX = $var{prefix}" ;
+config "CC = $var{CC}";
+config "PREFIX = $var{prefix}";
 
+$common_flags = '-fPIC';
 if ($var{debug} eq "yes"){
-    config "DEBUG_CFLAGS = -g -Wall -Werror -W -Wstrict-prototypes -Wno-unused -Wno-parentheses -Wno-switch -g";
+    config "DEBUG_CFLAGS = ${common_flags} -g -Wall -Werror -W -Wstrict-prototypes -Wno-unused -Wno-parentheses -Wno-switch -g";
 }
 else {
-    config "OPTI_CFLAGS = -O3 -fomit-frame-pointer -ffast-math -funroll-loops";
+    config "OPTI_CFLAGS = ${common_flags} -O3 -fomit-frame-pointer -ffast-math -funroll-loops";
 }
 
 
