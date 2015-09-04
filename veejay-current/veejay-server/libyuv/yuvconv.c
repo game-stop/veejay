@@ -84,16 +84,10 @@ static struct {
 {	PIX_FMT_RGB32_1,	"PIX_FMT_RGB32_1"},
 {	PIX_FMT_YUYV422,	"PIX_FMT_YUYV422"},
 {	PIX_FMT_UYVY422,	"PIX_FMT_UYVY422"},
-/* packed rgb  8:8:8:0,
- * exists in avutil 54.27.100
- * but not in 52.3.0
- */
-#if LIBAVUTL_VERSION_MAJOR > 52
-{	PIX_FMT_0BGR,		"PIX_FMT_0BGR"},
-{	PIX_FMT_0RGB,		"PIX_FMT_0RBB"},
-{	PIX_FMT_BGR0,		"PIX_FMT_BGR0"},
-{	PIX_FMT_RGB0,		"PIX_FMT_RGB0"},
-#endif
+{	PIX_FMT_RGBA,		"PIX_FMT_RGBA"},
+{	PIX_FMT_BGRA,		"PIX_FMT_BGRA"},
+{	PIX_FMT_ARGB,		"PIX_FMT_ARGB"},
+{	PIX_FMT_ABGR,		"PIX_FMT_ABGR"},
 {	0	,		NULL}
 
 };
@@ -351,13 +345,9 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 	put( PIX_FMT_BGR24,   IMG_RGB24 );
 	put( PIX_FMT_RGB32,   IMG_RGBA32 );
 	put( PIX_FMT_RGBA,    IMG_RGBA32 );
-#if LIBAVUTIL_VERSION_MAJOR > 52 
-	put( PIX_FMT_0BGR,	IMG_ABGR32 );
-	put( PIX_FMT_BGR0,	IMG_BGRA32 );
-	put( PIX_FMT_RGB0,	IMG_RGBA32 );
-	put( PIX_FMT_0RGB,	IMG_ARGB32 );
-#endif
+	put( PIX_FMT_BGRA,    IMG_BGRA32 );
 	put( PIX_FMT_ARGB,    IMG_ARGB32 );
+	put( PIX_FMT_ABGR,    IMG_ABGR32 );
 	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
 	put( PIX_FMT_YUYV422, IMG_YUY2);
 	put( PIX_FMT_GRAY8,   IMG_Y8 );
@@ -403,12 +393,9 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 			*p4 = 0;
 			break;
 		case PIX_FMT_RGBA:
-#if LIBAVUTIL_VERSION_MAJOR > 52 
-		case PIX_FMT_RGB0:
-		case PIX_FMT_BGR0:
-		case PIX_FMT_0BGR:
-		case PIX_FMT_0RGB:
-#endif
+		case PIX_FMT_BGRA:
+		case PIX_FMT_ARGB:
+		case PIX_FMT_ABGR:
 			if( p1 != NULL )
 				*p1 = src->len * 4;
 			*p2 = 0;
@@ -491,12 +478,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			break;
 		case PIX_FMT_BGR32:
 		case PIX_FMT_RGB32:
-#if LIBAVUTIL_VERSION_MAJOR > 52 
-		case PIX_FMT_RGB0:
-		case PIX_FMT_BGR0:
-		case PIX_FMT_0BGR:
-		case PIX_FMT_0RGB:
-#endif
+		case PIX_FMT_ARGB:
+		case PIX_FMT_ABGR:
 			f->stride[0] = w * 4;
 			f->uv_width = 0; f->uv_height = 0;
 			f->data[1] = NULL; f->data[2] = NULL;
@@ -1316,13 +1299,14 @@ void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
 	int n = 3;
-#if LIBAVUTIL_VERSION_MAJOR > 52 
-	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB || src->format == PIX_FMT_BGR32 || src->format == PIX_FMT_RGB32 ||
-	    src->format == PIX_FMT_BGR0 || src->format == PIX_FMT_0BGR || src->format == PIX_FMT_RGB0 || src->format == PIX_FMT_0RGB )
-#else
-	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB || src->format == PIX_FMT_BGR32 || src->format == PIX_FMT_RGB32 )
-#endif
+	if( src->format == PIX_FMT_RGBA ||
+		src->format == PIX_FMT_BGRA ||
+		src->format == PIX_FMT_ARGB ||
+		src->format == PIX_FMT_ABGR ||
+		src->format == PIX_FMT_BGR32 ||
+		src->format == PIX_FMT_RGB32 )
 		n = 4;
+	
 	const int src_stride[3] = { src->width*n,0,0};
 	const int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
 
@@ -1333,14 +1317,13 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
 	int n = 3;
-#if LIBAVUTIL_VERSION_MAJOR > 52 
-	if( dst->format == PIX_FMT_RGBA || dst->format == PIX_FMT_BGRA || dst->format == PIX_FMT_ARGB ||
-	 dst->format == PIX_FMT_RGB32 || dst->format == PIX_FMT_BGR32 || dst->format == PIX_FMT_BGR0 || dst->format == PIX_FMT_0BGR || 
-	 dst->format == PIX_FMT_RGB0 || dst->format == PIX_FMT_0RGB  )
-#else
-	if( dst->format == PIX_FMT_RGBA || dst->format == PIX_FMT_BGRA || dst->format == PIX_FMT_ARGB ||
-	 dst->format == PIX_FMT_RGB32 || dst->format == PIX_FMT_BGR32 ) 
-#endif
+
+	if( dst->format == PIX_FMT_RGBA ||
+		dst->format == PIX_FMT_BGRA ||
+		dst->format == PIX_FMT_ARGB ||
+		dst->format == PIX_FMT_ABGR ||
+		dst->format == PIX_FMT_RGB32 ||
+		dst->format == PIX_FMT_BGR32 ) 
 		n = 4;
 
 	const int src_stride[3] = { src->width,src->uv_width,src->uv_width };
