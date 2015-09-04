@@ -62,7 +62,7 @@ typedef struct
 } vj_sws;
 
 static	int		    sws_context_flags_ = 0;
-static  int		    ffmpeg_aclib[64];
+static  int		    ffmpeg_aclib[AV_PIX_FMT_NB];
 
 #define	put(a,b)	ffmpeg_aclib[a] = b
 
