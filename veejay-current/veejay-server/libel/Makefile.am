@@ -2,19 +2,19 @@
 
 MAINTAINERCLEANFILES = Makefile.in
 
-INCLUDES =	-I$(top_srcdir) \
-	 	-I$(includedir) \
-	 	-I$(top_srcdir)/vjmem \
-		-I$(top_srcdir)/vjmsg 
+AM_CPPFLAGS =	-I$(top_srcdir) \
+			 	-I$(includedir) \
+	 			-I$(top_srcdir)/vjmem \
+				-I$(top_srcdir)/vjmsg 
 
 
 if HAVE_MJPEGTOOLS
-INCLUDES +=
+AM_CPPFLAGS +=
 else
-INCLUDES += -I$(top_srcdir)/mjpegtools
+AM_CPPFLAGS += -I$(top_srcdir)/mjpegtools
 endif
 
-INCLUDES += $(FFMPEG_CFLAGS) $(PIXBUF_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(MJPEGTOOLS_CFLAGS)
+AM_CPPFLAGS += $(FFMPEG_CFLAGS) $(PIXBUF_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(MJPEGTOOLS_CFLAGS)
  
 VJEL_LIB_FILE = libel.la
 noinst_LTLIBRARIES = $(VJEL_LIB_FILE)

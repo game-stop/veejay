@@ -1,17 +1,17 @@
 # Makefile for veejay
 MAINTAINERCLEANFILES = Makefile.in
-INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
-		-I$(top_srcdir)/vjmsg \
-		-I$(top_srcdir)/libvjnet/ \
-		-I$(top_srcdir)/libhash 
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
+              -I$(top_srcdir)/vjmsg \
+              -I$(top_srcdir)/libvjnet/ \
+              -I$(top_srcdir)/libhash 
 
 if HAVE_MJPEGTOOLS
-INCLUDES +=
+AM_CPPFLAGS +=
 else
-INCLUDES += -I$(top_srcdir)/mjpegtools 
+AM_CPPFLAGS += -I$(top_srcdir)/mjpegtools 
 endif
 
-INCLUDES += $(XML2_CFLAGS) $(FFMPEG_CFLAGS) $(PTHREAD_CFLAGS) $(MJPEGTOOLS_CFLAGS)
+AM_CPPFLAGS += $(XML2_CFLAGS) $(FFMPEG_CFLAGS) $(PTHREAD_CFLAGS) $(MJPEGTOOLS_CFLAGS)
 
 STREAM_LIB_FILE = libstream.la
 noinst_LTLIBRARIES = $(STREAM_LIB_FILE)

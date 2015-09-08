@@ -4,7 +4,7 @@ EXTRA_DIST= ac.h ac_internal.h imgconvert.h img_internal.h img_x86_common.h
 
 AM_CPPFLAGS = \
         $(PTHREAD_CFLAGS) \
-        -I$(top_srcdir)
+        -I$(top_srcdir)/thirdparty
 
 noinst_LTLIBRARIES = libac.la
 

@@ -1,16 +1,17 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES = Makefile.in
-INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
-		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" 
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+              -DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" 
 
 if HAVE_MJPEGTOOLS
-INCLUDES +=
+AM_CPPFLAGS +=
 else
-INCLUDES += -I$(top_srcdir)/mjpegtools 
+AM_CPPFLAGS += -I$(top_srcdir)/mjpegtools 
 endif
 
-INCLUDES += -I /usr/X11R6/include -I$(top_srcdir)/libOSC \
+AM_CPPFLAGS += -I /usr/X11R6/include \
+		-I$(top_srcdir)/thirdparty \
 		-I$(top_srcdir)/libhash \
 		-I$(top_srcdir)/libvje \
 		-I$(top_srcdir)/libplugger \
@@ -45,7 +46,7 @@ libveejay_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 		       -release $(LT_RELEASE) -no-undefined -export-dynamic $(DEBUGLIBS)
 
 
-libveejay_la_LIBADD = 	-L$(top_builddir)/libOSC  -lOSC \
+libveejay_la_LIBADD = \
 			-L$(top_builddir)/libhash  -lhash \
 			-L$(top_builddir)/liblzo  -lvjlzo \
 			-L$(top_builddir)/bio2jack -lbio2jack4vj \
@@ -57,12 +58,13 @@ libveejay_la_LIBADD = 	-L$(top_builddir)/libOSC  -lOSC \
 			-L$(top_builddir)/libvjnet -lvjnet \
 			-L$(top_builddir)/libel -lel \
 			-L$(top_builddir)/libstream -lstream \
-			-L$(top_builddir)/aclib -lac \
 			-L$(top_builddir)/libsubsample -lsubsample \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libqrwrap -lqrwrap \
-			-L$(top_builddir)/libvevo -lvevo 
+			-L$(top_builddir)/libvevo -lvevo \
+			-L$(top_builddir)/thirdparty/libOSC  -lOSC \
+			-L$(top_builddir)/thirdparty/aclib -lac
 
 if !HAVE_MJPEGTOOLS
 libveejay_la_LIBADD+=-L$(top_builddir)/mjpegtools -lmjpegutils

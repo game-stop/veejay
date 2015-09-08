@@ -8,9 +8,9 @@ lvd_colortone_la_SOURCES = lvd_colortone.c
 lvd_displaywall_la_SOURCES = lvd_displaywall.c
 lvd_stroboscope_la_SOURCES = lvd_stroboscope.c
 
-INCLUDES=$(FFMPEG_CFLAGS)
-AM_CFLAGS=-I@top_srcdir@/include 
-AM_LDFLAGS=-module -avoid-version -lm -export-dynamic
+AM_CPPFLAGS = $(FFMPEG_CFLAGS)
+AM_CFLAGS = -I@top_srcdir@/include 
+AM_LDFLAGS = -module -avoid-version -lm -export-dynamic
 AM_LIBTOOLFLAGS = --tag=disable-static
 
 lividoplugindir = @libdir@/livido-plugins

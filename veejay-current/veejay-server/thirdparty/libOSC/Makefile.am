@@ -1,4 +1,5 @@
-INCLUDES = -I$(top_srcdir)/libOSC -I$(includedir)
+AM_CPPFLAGS = -I$(includedir) -I$(top_srcdir)/thirdparty
+
 OSC_LIB_FILE = libOSC.la 
 noinst_LTLIBRARIES = $(OSC_LIB_FILE)
 libOSC_la_SOURCES = OSC-address-space.c \

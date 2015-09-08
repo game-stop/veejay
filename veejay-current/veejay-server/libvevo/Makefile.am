@@ -1,5 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
-INCLUDES = 	$(GLIB_CFLAGS) -I$(top_srcdir)/libvevo -I$(includedir) -I$(top_srcdir)/libhash -I$(top_srcdir)/libvjmem -I$(top_srcdir)/libvjmsg 
+AM_CPPFLAGS = $(GLIB_CFLAGS) -I$(top_srcdir)/libvevo -I$(includedir) -I$(top_srcdir)/libhash -I$(top_srcdir)/libvjmem -I$(top_srcdir)/libvjmsg 
 
 VEVO_LIB_FILE = libvevo.la
 pkginclude_HEADERS = libvevo.h lowlevel.h pool.h vevo.h
