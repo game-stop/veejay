@@ -1,5 +1,8 @@
 # Makefile for memory managment / platform specific optimizations
-AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/thirdparty -I$(top_builddir)/libvjmsg
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+              -I$(top_srcdir)/thirdparty \
+              -I$(top_builddir)/libvjmsg
+
 AM_CFLAGS = $(OPTCFLAGS)
 
 VJMEM_LIB_FILE = libvjmem.la

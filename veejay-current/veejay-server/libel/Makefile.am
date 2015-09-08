@@ -2,16 +2,16 @@
 
 MAINTAINERCLEANFILES = Makefile.in
 
-AM_CPPFLAGS =	-I$(top_srcdir) \
-			 	-I$(includedir) \
-	 			-I$(top_srcdir)/vjmem \
-				-I$(top_srcdir)/vjmsg 
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+              -I$(top_srcdir)/thirdparty \
+              -I$(top_srcdir)/vjmem \
+              -I$(top_srcdir)/vjmsg 
 
 
 if HAVE_MJPEGTOOLS
 AM_CPPFLAGS +=
 else
-AM_CPPFLAGS += -I$(top_srcdir)/mjpegtools
+AM_CPPFLAGS += -I$(top_srcdir)/thirdparty/mjpegtools
 endif
 
 AM_CPPFLAGS += $(FFMPEG_CFLAGS) $(PIXBUF_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(MJPEGTOOLS_CFLAGS)

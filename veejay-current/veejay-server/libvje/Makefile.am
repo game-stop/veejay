@@ -1,7 +1,13 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES=Makefile.in
-AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg $(FFMPEG_CFLAGS) $(GLIB_CFLAGS)   
+
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+              -I$(top_srcdir)/vjmem \
+              -I$(top_srcdir)/vjmsg
+
+AM_CPPFLAGS += $(FFMPEG_CFLAGS) $(GLIB_CFLAGS)
+
 AM_CFLAGS = $(OPTCFLAGS) $(FREEFRAME_CFLAGS)
 
 pkginclude_HEADERS=vje.h

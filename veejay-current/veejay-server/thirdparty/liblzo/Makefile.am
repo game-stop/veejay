@@ -1,7 +1,9 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES = Makefile.in
-AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+              -I$(top_srcdir)/thirdparty \
+              -I$(top_srcdir)/vjmem \
               -I$(top_srcdir)/vjmsg
 
 VJLZO_LIB_FILE = libvjlzo.la

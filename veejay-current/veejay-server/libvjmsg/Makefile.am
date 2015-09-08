@@ -1,7 +1,8 @@
 # Makefile for  logging/messages 
+
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir)
 if !HAVE_MJPEGTOOLS
-AM_CPPFLAGS += -I$(top_srcdir)/mjpegtools
+AM_CPPFLAGS += -I$(top_srcdir)/thirdparty/mjpegtools
 endif
 AM_CPPFLAGS += $(MJPEGTOOLS_CFLAGS)
 AM_CPPFLAGS += $(LIBUNWIND_CFLAGS)

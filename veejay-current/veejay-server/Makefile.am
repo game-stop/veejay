@@ -1,14 +1,8 @@
 # Process with automake to produce Makefile.in
 
-if HAVE_MJPEGTOOLS
-SUBDIRS = 
-else
-SUBDIRS = mjpegtools 
-endif
-
-SUBDIRS += thirdparty
-SUBDIRS += libhash libvjmsg libvjmem libqrwrap 
-SUBDIRS += bio2jack libvevo liblzo libvje libplugger libsample libvjnet libsubsample libyuv libel libstream libsamplerec
+SUBDIRS = thirdparty
+SUBDIRS += libvjmsg libvjmem libqrwrap 
+SUBDIRS += libvevo libvje libplugger libsample libvjnet libsubsample libyuv libel libstream libsamplerec
 SUBDIRS += veejay 
 SUBDIRS += livido-plugins
 SUBDIRS += man

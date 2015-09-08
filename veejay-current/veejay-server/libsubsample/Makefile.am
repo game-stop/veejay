@@ -1,7 +1,12 @@
 # Makefile for veejay
 AM_CFLAGS=$(SUBSAMPLE_CFLAGS)
 MAINTAINERCLEANFILES = Makefile.in
-AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg -I$(top_srcdir)/libyuv 
+
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+              -I$(top_srcdir)/vjmem \
+              -I$(top_srcdir)/vjmsg \
+              -I$(top_srcdir)/libyuv
+
 SUBSAMPLE_LIB_FILE = libsubsample.la
 pkginclude_HEADERS=subsample.h
 EXTRA_DIST = subsample.h  

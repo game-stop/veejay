@@ -1139,17 +1139,18 @@ dnl
 AC_CONFIG_FILES([Makefile])
 
 if test "$have_mjpegtools" = "false" ; then
-	AC_CONFIG_FILES([mjpegtools/Makefile])
+	AC_CONFIG_FILES([thirdparty/mjpegtools/Makefile])
 fi
 
 AC_CONFIG_FILES([
 thirdparty/Makefile
-thirdparty/libOSC/Makefile
 thirdparty/aclib/Makefile
-libhash/Makefile
+thirdparty/bio2jack/Makefile
+thirdparty/libhash/Makefile
+thirdparty/liblzo/Makefile
+thirdparty/libOSC/Makefile
 libvjmsg/Makefile
 libvevo/Makefile
-liblzo/Makefile
 libvjmem/Makefile
 libvje/Makefile
 libplugger/Makefile
@@ -1161,7 +1162,6 @@ libyuv/Makefile
 libel/Makefile
 libstream/Makefile
 libsamplerec/Makefile
-bio2jack/Makefile
 veejay/Makefile
 man/Makefile
 livido-plugins/Makefile
