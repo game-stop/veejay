@@ -1,6 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
-INCLUDES = 	-I$(top_srcdir)/libplugger -I$(includedir) -I$(top_srcdir)/libhash -I$(top_srcdir)/libvevo ${FFMPEG_CFLAGS} 
+AM_CPPFLAGS = -I$(top_srcdir)/libplugger -I$(includedir) \
+              -I$(top_srcdir)/thirdparty \
+              -I$(top_srcdir)/libvevo	               
 
+AM_CPPFLAGS += ${FFMPEG_CFLAGS}
 
 LIBVJPLUG_LIB_FILE = libvjplug.la
 noinst_LTLIBRARIES = $(LIBVJPLUG_LIB_FILE)

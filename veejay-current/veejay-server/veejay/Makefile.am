@@ -1,17 +1,15 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES = Makefile.in
-INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
-		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" 
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+              -DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" 
 
-if HAVE_MJPEGTOOLS
-INCLUDES +=
-else
-INCLUDES += -I$(top_srcdir)/mjpegtools 
+if !HAVE_MJPEGTOOLS
+AM_CPPFLAGS += -I$(top_srcdir)/thirdparty/mjpegtools
 endif
 
-INCLUDES += -I /usr/X11R6/include -I$(top_srcdir)/libOSC \
-		-I$(top_srcdir)/libhash \
+AM_CPPFLAGS += -I /usr/X11R6/include \
+		-I$(top_srcdir)/thirdparty \
 		-I$(top_srcdir)/libvje \
 		-I$(top_srcdir)/libplugger \
 		-I$(top_srcdir)/libvjmem \
@@ -23,9 +21,7 @@ INCLUDES += -I /usr/X11R6/include -I$(top_srcdir)/libOSC \
 		-I$(top_scrdir)/libyuv \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
-		-I$(top_srcdir)/liblzo \
 		-I$(top_srcdir)/libqrwrap \
-		-I$(top_srcdir)/bio2jack \
 		$(FFMPEG_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) $(MJPEGTOOLS_CFLAGS) \
 		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) $(LIBLO_CFLAGS) \
 		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) $(LIBUNWIND_CFLAGS) $(PTHREAD_CFLAGS) $(LIBQRENCODE_CFLAGS)
@@ -45,10 +41,12 @@ libveejay_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 		       -release $(LT_RELEASE) -no-undefined -export-dynamic $(DEBUGLIBS)
 
 
-libveejay_la_LIBADD = 	-L$(top_builddir)/libOSC  -lOSC \
-			-L$(top_builddir)/libhash  -lhash \
-			-L$(top_builddir)/liblzo  -lvjlzo \
-			-L$(top_builddir)/bio2jack -lbio2jack4vj \
+libveejay_la_LIBADD = \
+			-L$(top_builddir)/thirdparty/aclib -lac \
+			-L$(top_builddir)/thirdparty/bio2jack -lbio2jack4vj \
+			-L$(top_builddir)/thirdparty/libhash  -lhash \
+			-L$(top_builddir)/thirdparty/liblzo  -lvjlzo \
+			-L$(top_builddir)/thirdparty/libOSC  -lOSC \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem -lvjmem \
 			-L$(top_builddir)/libvje -lvje \
@@ -57,15 +55,14 @@ libveejay_la_LIBADD = 	-L$(top_builddir)/libOSC  -lOSC \
 			-L$(top_builddir)/libvjnet -lvjnet \
 			-L$(top_builddir)/libel -lel \
 			-L$(top_builddir)/libstream -lstream \
-			-L$(top_builddir)/aclib -lac \
 			-L$(top_builddir)/libsubsample -lsubsample \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libqrwrap -lqrwrap \
-			-L$(top_builddir)/libvevo -lvevo 
+			-L$(top_builddir)/libvevo -lvevo
 
 if !HAVE_MJPEGTOOLS
-libveejay_la_LIBADD+=-L$(top_builddir)/mjpegtools -lmjpegutils
+libveejay_la_LIBADD+=-L$(top_builddir)/thirdparty/mjpegtools -lmjpegutils
 endif
 
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(SDL_TTF_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \

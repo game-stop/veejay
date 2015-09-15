@@ -15,7 +15,8 @@ dnl AX_CONFIG_PREFIXED_HEADER([veejay-config.h], [VEEJAY], [config.h])
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE([1.7])
+
+AM_INIT_AUTOMAKE([subdir-objects])
 AM_MAINTAINER_MODE
 
 AC_DEFINE(VEEJAY,1,[Building Veejay])
@@ -1138,16 +1139,18 @@ dnl
 AC_CONFIG_FILES([Makefile])
 
 if test "$have_mjpegtools" = "false" ; then
-	AC_CONFIG_FILES([mjpegtools/Makefile])
+	AC_CONFIG_FILES([thirdparty/mjpegtools/Makefile])
 fi
 
 AC_CONFIG_FILES([
-aclib/Makefile
-libOSC/Makefile
-libhash/Makefile
+thirdparty/Makefile
+thirdparty/aclib/Makefile
+thirdparty/bio2jack/Makefile
+thirdparty/libhash/Makefile
+thirdparty/liblzo/Makefile
+thirdparty/libOSC/Makefile
 libvjmsg/Makefile
 libvevo/Makefile
-liblzo/Makefile
 libvjmem/Makefile
 libvje/Makefile
 libplugger/Makefile
@@ -1159,7 +1162,6 @@ libyuv/Makefile
 libel/Makefile
 libstream/Makefile
 libsamplerec/Makefile
-bio2jack/Makefile
 veejay/Makefile
 man/Makefile
 livido-plugins/Makefile

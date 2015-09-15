@@ -1,13 +1,16 @@
 # Makefile for veejay
 
-INCLUDES = -I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg -I$(top_srcdir)/libhash 
+AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+              -I$(top_srcdir)/thirdparty \
+              -I$(top_srcdir)/vjmem \
+              -I$(top_srcdir)/vjmsg
 if HAVE_MJPEGTOOLS
-INCLUDES +=
+AM_CPPFLAGS +=
 else
-INCLUDES += -I$(top_srcdir)/mjpegtools
+AM_CPPFLAGS += -I$(top_srcdir)/thirdparty/mjpegtools
 endif
 
-INCLUDES += $(FFMPEG_CFLAGS) $(XML2_CFLAGS) $(MJPEGTOOLS_CFLAGS)
+AM_CPPFLAGS += $(FFMPEG_CFLAGS) $(XML2_CFLAGS) $(MJPEGTOOLS_CFLAGS)
 
 SAMPLE_LIB_FILE = libsample.la
 noinst_LTLIBRARIES = $(SAMPLE_LIB_FILE)
