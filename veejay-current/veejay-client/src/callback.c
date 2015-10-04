@@ -1,5 +1,5 @@
 /* gveejay - Linux VeeJay - GVeejay GTK+-2/Glade User Interface
- *           (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
+ *           (C) 2002-2015 Niels Elburg <nwelburg@gmail.com> 
  *           (C)      2006 Matthijs van Henten <matthijs.vanhenten@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -542,7 +542,7 @@ void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d",
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w))
 		);
-		vj_midi_learning_vims_spin( info->midi, "fx_entry", VIMS_CHAIN_SET_ENTRY );
+		vj_midi_learning_vims_spin( info->midi, "button_fx_entry", VIMS_CHAIN_SET_ENTRY );
 	}  	
 }
 
@@ -2907,7 +2907,7 @@ void 	on_spin_framedelay_value_changed(GtkWidget *w, gpointer user_data)
 
 	multi_vims(VIMS_VIDEO_SET_SLOW, "%d", get_nums("spin_framedelay"));
 
-	vj_midi_learning_vims_spin( info->midi, "framedelay", VIMS_VIDEO_SET_SLOW );
+	vj_midi_learning_vims_spin( info->midi, "spin_framedelay", VIMS_VIDEO_SET_SLOW );
 }
 
 void	on_mixing_effects_toggled(GtkWidget *w, gpointer user_data)
