@@ -1156,10 +1156,10 @@ int vj_tag_is_deleted(int id) {
 
 int vj_tag_exists(int id)
 {
-    if (!id)
-	return 0;
-    if (!vj_tag_get(id))
-	return 0;
+    if (id <= 0)
+		return 0;
+	if (!vj_tag_get(id))
+		return 0;
     return 1;
 }
 
