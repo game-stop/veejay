@@ -129,11 +129,11 @@ static ycbcr_frame *record_buffer = NULL;	// needed for recording invisible stre
 static VJFrame *helper_frame = NULL;
 static int vj_perform_record_buffer_init();
 static void vj_perform_record_buffer_free();
-#ifdef HAVE_JACK
+#ifdef HAVE_LIBRESAMPLE
 static ReSampleContext *resample_context[(MAX_SPEED+1)];
 static ReSampleContext *downsample_context[(MAX_SPEED+1)];
-static int last_rate_[2] = { 0, 0 };
 #endif
+static int last_rate_[2] = { 0, 0 };
 static const char *intro = 
 	"A visual instrument for GNU/Linux\n";
 static const char *license =
@@ -805,16 +805,17 @@ static void vj_perform_close_audio() {
 	if(audio_rec_buffer) free(audio_rec_buffer);
 	if(audio_render_buffer) free( audio_render_buffer );
 	if(down_sample_buffer) free( down_sample_buffer );
-	
 	int i;
 	for(i=0; i <= MAX_SPEED; i ++)
 	{
+#ifdef HAVE_LIBRESAMPLE
 		if(resample_context[i])
 			audio_resample_close( resample_context[i] );
 		if(downsample_context[i])
 			audio_resample_close( downsample_context[i]);
 		resample_context[i] = NULL;
 		downsample_context[i] = NULL;
+#endif
 	}
 
 #endif
@@ -866,7 +867,7 @@ int vj_perform_init_audio(veejay_t * info)
 	{
 		int out_rate = (info->edit_list->audio_rate * (i+2));
 		int down_rate = (info->edit_list->audio_rate / (i+2));
-
+#ifdef HAVE_LIBRESAMPLE
 		resample_context[i] = av_audio_resample_init(
 					info->edit_list->audio_chans,
 					info->edit_list->audio_chans, 
@@ -901,6 +902,7 @@ int vj_perform_init_audio(veejay_t * info)
 			veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize audio downsampler for dup %d",i);
 			return 0;
 		}
+#endif
 	}
 	
 	return 1;
@@ -1700,7 +1702,11 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 				//@ clip sc into range, there isn't a resampler for every speed
 				if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED;
 
+#ifdef HAVE_LIBRESAMPLE
 				n_samples = audio_resample( resample_context[sc],(short*) audio_buf, (short*) sambuf, n_samples );
+#else
+				n_samples = 0;
+#endif
 			}
 		} else if( speed == 0 ) {
 			n_samples = len = pred_len;
@@ -1736,10 +1742,13 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 			int sc = max_sfd - 2;
 			
 			if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED; 
+#ifdef HAVE_LIBRESAMPLE
 			// @ resample buffer
 			n_samples = audio_resample( downsample_context[ sc ], 
 					(short*) down_sample_buffer,(short*) audio_buf, n_samples  );
-
+#else
+			n_samples = 0;
+#endif
 			*sampled_down = n_samples / max_sfd;
 			val = n_samples / max_sfd;
 			n_samples = val;

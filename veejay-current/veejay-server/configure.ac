@@ -108,6 +108,9 @@ AC_ARG_WITH(jpeg-mmx,
 AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
 
+AC_ARG_WITH(libresample,
+            AC_HELP_STRING([--without-libresample], [Do not use libresample.]),
+            [], [with_libresample=yes])
 
 user_specified_target="generic"
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
@@ -819,6 +822,15 @@ if test x$have_pixbuf != xtrue ; then
 fi
 
 
+dnl FIXME check for libdv see issue 12
+have_libresample=true
+if test x$with_libresample != xno ; then
+ have_libresample=false
+fi
+
+if test x$have_libresample != xtrue ; then
+ AC_DEFINE(HAVE_LIBRESAMPLE,1,[use libresample])
+fi
 
 dnl *********************************************************************
 dnl Check for libdv
@@ -1211,10 +1223,10 @@ fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
-AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
-AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
-AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
-AC_MSG_NOTICE([  - FFmpeg avutil		     : ${have_avutil} ])
+AC_MSG_NOTICE([  - FFmpeg/AV AVFormat               : ${have_avformat} ])
+AC_MSG_NOTICE([  - FFmpeg/AV AVCodec                : ${have_avcodec} ])
+AC_MSG_NOTICE([  - FFmpeg/AV Swscaler               : ${have_swscale} ])
+AC_MSG_NOTICE([  - FFmpeg/AV avutil		     : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 AC_MSG_NOTICE([  - SDL on-screen-logging         : ${have_sdl_ttf}])
 
