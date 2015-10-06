@@ -3,6 +3,7 @@ AM_CFLAGS=$(SUBSAMPLE_CFLAGS)
 MAINTAINERCLEANFILES = Makefile.in
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
+	      -I$(top_srcdir)/thirdparty \
               -I$(top_srcdir)/vjmem \
               -I$(top_srcdir)/vjmsg \
               -I$(top_srcdir)/libyuv
