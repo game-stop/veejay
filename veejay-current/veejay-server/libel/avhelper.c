@@ -32,6 +32,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libel/avhelper.h>
+#include <libel/av.h>
 
 static struct
 {
