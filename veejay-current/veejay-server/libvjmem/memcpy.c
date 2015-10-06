@@ -1264,7 +1264,7 @@ void fast_memset_dirty(void * to, int val, size_t len)
 
 
 /* Fast memory set. See comments for fast_memcpy */
-void *fast_memset(void * to, int val, size_t len)
+void fast_memset(void * to, int val, size_t len)
 {
 	fast_memset_dirty( to, val , len );
 	if(len >= MIN_LEN)
