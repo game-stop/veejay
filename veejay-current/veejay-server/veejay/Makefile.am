@@ -1,5 +1,5 @@
 # Makefile for veejay
-
+AM_CFLAGS = $(OP_CFLAGS)
 MAINTAINERCLEANFILES = Makefile.in
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" 

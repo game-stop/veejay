@@ -60,8 +60,9 @@ Configure options:
 ------------------
 
  --enable-debug	                 : Builds veejay for debugging purposes (disables optimization)
- --with-arch-target=<cpu_type>   : Builds veejay for a "generic" or a specific architecture.
-                                   See gcc's 'Intel 386 and AMD x86-64 Options' for -march
+
+ --with-arch-target=auto         : Builds veejay for the current cpu-type. The resulting binary may not run on another computer.
+
 
 Compilation:
 ------------

@@ -1,9 +1,7 @@
 #!/bin/sh
 
-# simple script that tests if march=native works
-# override auto detection with <cpu_type> as argument 1
-# generic | native | core2 | etc
-# see gcc list of cpu types for march option
+# simple script that detects march setting for this computer
+# only for gcc
 
 if test x"$CC" = x; then
 	CC=gcc
@@ -49,21 +47,10 @@ cat > conftest.c << EOF
 int main(void) { return 0; }
 EOF
 
-arch=native
-do_cc -march=native
+arch=`$CC -march=native -Q --help=target|grep -- '-march='|cut -f3`
+do_cc -march=$arch
 if test $? -ne 0; then
-	if do_cc -march=generic; then
-		arch=generic
-	else
-		arch=
-	fi
-else
-	arch=native
-fi
-	  
-do_cc -march=$target
-if test $? -eq 0; then
-	arch=$target
+	arch=
 fi
 
 echo "-march=$arch"

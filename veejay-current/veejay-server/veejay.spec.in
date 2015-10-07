@@ -78,7 +78,6 @@ Requires: libxml2 >= 2.5.4
 CFLAGS="$RPM_OPT_FLAGS" \
 CXXFLAGS="$RPM_OPT_FLAGS" \
 ./configure \
-	--with-arch-target=generic \
 	--prefix=%{prefix} \
 	--mandir=%{_mandir} \
 	--with-arch-target=generic

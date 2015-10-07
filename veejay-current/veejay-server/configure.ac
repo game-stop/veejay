@@ -39,7 +39,6 @@ AC_CONFIG_MACRO_DIR([m4])
 dnl kill CFLAGS
 CFLAGS=""
 dnl enable auto vectorization for libvjmem, libvje and libyuv
-OPTCFLAGS="" 
 
 AC_ARG_ENABLE(strict,
 		AC_HELP_STRING([--enable-strict],
@@ -112,11 +111,10 @@ AC_ARG_WITH(libresample,
             AC_HELP_STRING([--without-libresample], [Do not use libresample.]),
             [], [with_libresample=yes])
 
-user_specified_target="generic"
-AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
-					 [Set a specific sub-architecture (defaults to native)]),
-		[ user_specified_target="$withval" ] )
-
+arch_target="generic"
+AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic or auto],
+					[Build a generic binary or auto-detect current cpu type]),
+					[ arch_target="$withval"])
 
 AC_GNU_SOURCE
 
@@ -223,7 +221,6 @@ debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
  debugCFLAGS="-g"
  CFLAGS="$CFLAGS $debugCFLAGS"
- OPTCFLAGS="$OPTCFLAGS $debugCFLAGS"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -289,6 +286,7 @@ have_ppccpu=false
 have_ps2=false
 
 OP_CFLAGS=""
+VJE_CFLAGS=""
 SUBSAMPLE_CFLAGS=""
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
@@ -301,12 +299,9 @@ case $host_cpu in
 
 	if test "x$enable_debug" != "xyes" ; then
 		OP_CFLAGS="-O2"
-		OPTCFLAGS="-O3 -ftree-vectorize"
+		SUBSAMPLE_CFLAGS=""
+		VJE_CFLAGS="-O3 -ftree-vectorize"
 	fi
-
-	AC_SUBST(OP_CFLAGS)
-	SUBSAMPLE_CFLAGS=""
-	CFLAGS="$CFLAGS $OP_CFLAGS"
     ;;
   x86_64*|k8-*)
     	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
@@ -314,13 +309,11 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
-		OP_CFLAGS="-O2"
-		OPTCFLAGS="-O3 -m64 -ftree-vectorize -fPIC -DPIC"
- 	fi
-
-	AC_SUBST(OP_CFLAGS)
-	SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
-	CFLAGS="$CFLAGS -m64 -fPIC -DPIC $OP_CFLAGS"
+		OP_CFLAGS="-O2 -m64 -fPIC -DPIC"
+		VJE_CFLAGS="-O3 -ftree-vectorize -m64 -fPIC -DPIC"
+		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+	fi
+	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
@@ -546,12 +539,6 @@ EOF
 
 fi
 
-if test ! -r $srcdir/cpuinfo.sh; then
-       AC_MSG_ERROR([cpuinfo.sh script not found - do a cvs update])
-fi
-
-
-
 if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 	if test x$host_alias != x; then
 		dnl Cross compiling
@@ -562,32 +549,16 @@ if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 			AC_MSG_RESULT($ARCHFLAGS)
 		fi
 	else
-		AC_MSG_CHECKING(sub-architecture settings)
-		chmod +x $srcdir/cpuinfo.sh
-       		ARCHFLAGS=`$srcdir/cpuinfo.sh $user_specified_target`
+		AC_MSG_CHECKING(sub-architecture settings ...)
+		
+		if test "$arch_target" = "auto"; then
+			ARCHFLAGS=`$srcdir/cpuinfo.sh`
+		else
+       			ARCHFLAGS="-mtune=generic"
+		fi
 		AC_MSG_RESULT($ARCHFLAGS)
   	fi
 fi
-
-
-if test x$have_x86cpu = xtrue;
-then
-	if test "x$enable_debug" != "xyes" ;
-	then
-		if test x$ac_cv_flag_sse = xyes; then
-			CFLAGS="$CFLAGS -msse -mfpmath=sse"
-			OPTCFLAGS="$OPTCFLAGS -msse -mfpmath=sse"
-	
-		fi
-
-		if test x$ac_cv_flag_sse2 = xyes; then
-			CFLAGS="$CFLAGS -msse2 -mfpmath=sse"
-			OPTCFLAGS="$OPTCFLAGS -msse2 -mfpmath=sse"
-		fi
-	fi	
-fi
-
-
 
 AC_MSG_RESULT($CFLAGS)
 
@@ -1076,10 +1047,12 @@ dnl We do this last as it can screw up library detection etc...
 CFLAGS="$ARCHFLAGS $CFLAGS"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
 SUBSAMPLE_CFLAGS="$ARCHFLAGS $SUBSAMPLE_CFLAGS"
-OPTCFLAGS="$ARCHFLAGS $OPTCFLAGS"
+VJE_CFLAGS="$ARCHFLAGS $VJE_CFLAGS"
 
+AC_SUBST(OP_CFLAGS)
+AC_SUBST(VJE_CFLAGS)
 AC_SUBST(SUBSAMPLE_CFLAGS)
-AC_SUBST(OPTCFLAGS)
+
 
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
@@ -1116,7 +1089,7 @@ if test "x$cflags_set" != "xyes" ; then
 fi
 
 if test "x$enable_debug" != "xyes" ; then
-	CFLAGS="$CFLAGS -fno-stack-protector"
+   CFLAGS="$CFLAGS -fno-stack-protector"
 fi
 
 if test x"$with_extra_cflags" != "x"; then
@@ -1187,7 +1160,9 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Veejay ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
-AC_MSG_NOTICE([   FX library flags: $OPTCFLAGS])
+AC_MSG_NOTICE([         libvje: $VJE_CFLAGS])
+AC_MSG_NOTICE([   libsubsample: $SUBSAMPLE_CFLAGS])
+AC_MSG_NOTICE([   architecture: $arch_target])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])
@@ -1223,10 +1198,10 @@ fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
-AC_MSG_NOTICE([  - FFmpeg/AV AVFormat               : ${have_avformat} ])
-AC_MSG_NOTICE([  - FFmpeg/AV AVCodec                : ${have_avcodec} ])
-AC_MSG_NOTICE([  - FFmpeg/AV Swscaler               : ${have_swscale} ])
-AC_MSG_NOTICE([  - FFmpeg/AV avutil		     : ${have_avutil} ])
+AC_MSG_NOTICE([  - FFmpeg/AV AVFormat            : ${have_avformat} ])
+AC_MSG_NOTICE([  - FFmpeg/AV AVCodec             : ${have_avcodec} ])
+AC_MSG_NOTICE([  - FFmpeg/AV Swscaler            : ${have_swscale} ])
+AC_MSG_NOTICE([  - FFmpeg/AV AVUtil              : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 AC_MSG_NOTICE([  - SDL on-screen-logging         : ${have_sdl_ttf}])
 

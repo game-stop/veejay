@@ -1,5 +1,5 @@
 # Makefile for veejay
-
+AM_CFLAGS = $(OP_CFLAGS)
 MAINTAINERCLEANFILES = Makefile.in
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
@@ -9,8 +9,6 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -I$(top_srcdir)/libpostproc
 
 AM_CPPFLAGS += $(FFMPEG_CFLAGS)
-
-AM_CFLAGS = $(OPTCFLAGS)
 
 YUV_LIB_FILE = libyuv.la
 pkginclude_HEADERS=yuvconv.h

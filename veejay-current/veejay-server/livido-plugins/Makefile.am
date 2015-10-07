@@ -9,7 +9,7 @@ lvd_displaywall_la_SOURCES = lvd_displaywall.c
 lvd_stroboscope_la_SOURCES = lvd_stroboscope.c
 
 AM_CPPFLAGS = $(FFMPEG_CFLAGS)
-AM_CFLAGS = -I@top_srcdir@/include 
+AM_CFLAGS = -I@top_srcdir@/include $(OP_CFLAGS)
 AM_LDFLAGS = -module -avoid-version -lm -export-dynamic
 AM_LIBTOOLFLAGS = --tag=disable-static
 

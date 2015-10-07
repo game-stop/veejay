@@ -3,7 +3,9 @@ AM_CPPFLAGS = -I$(top_srcdir)/libplugger -I$(includedir) \
               -I$(top_srcdir)/thirdparty \
               -I$(top_srcdir)/libvevo	               
 
-AM_CPPFLAGS += ${FFMPEG_CFLAGS}
+AM_CPPFLAGS += ${FFMPEG_CFLAGS} 
+
+AM_CFLAGS = $(OP_CFLAGS) $(FREEFRAME_CFLAGS)
 
 LIBVJPLUG_LIB_FILE = libvjplug.la
 noinst_LTLIBRARIES = $(LIBVJPLUG_LIB_FILE)

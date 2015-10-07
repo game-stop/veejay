@@ -1,5 +1,5 @@
 # Makefile for libvjnet
-
+AM_CFLAGS=$(OP_CFLAGS)
 MAINTAINERCLEANFILES = Makefile.in
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -I$(top_srcdir)/thirdparty \

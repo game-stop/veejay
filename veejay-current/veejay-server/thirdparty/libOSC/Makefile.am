@@ -1,3 +1,5 @@
+AM_CFLAGS = $(OP_CFLAGS)
+
 AM_CPPFLAGS = -I$(includedir) -I$(top_srcdir)/thirdparty
 
 OSC_LIB_FILE = libOSC.la 

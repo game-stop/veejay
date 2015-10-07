@@ -1,4 +1,5 @@
 # Makefile for veejay
+AM_CFLAGS = $(OP_CFLAGS)
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -I$(top_srcdir)/thirdparty \

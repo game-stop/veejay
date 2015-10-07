@@ -1,4 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
+AM_CFLAGS = $(OP_CFLAGS)
 
 AM_CPPFLAGS = -I$(top_srcdir)/libvevo -I$(includedir) \
               -I$(top_srcdir)/thirdparty \
