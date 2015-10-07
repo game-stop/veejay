@@ -74,14 +74,7 @@ Veejay looks in a few common locations to find plugins. You can list more locati
 
 You can change the default parameter values by editing the files in $HOME/.veejay/frei0r/ and $HOME/.veejay/livido/
 
-## Alternative build targets
-
-Veejay has been optimized for various architectures.
-
-to build for a specific target:
-
-     ./configure --with-arch-target=generic|core2|k6|native|i686
-
+## Debugging
 
 if you want to debug veejay-server (or if you want to submit a meaningful backtrace), build with:
 
