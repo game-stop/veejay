@@ -551,6 +551,8 @@ if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 	else
 		AC_MSG_CHECKING(sub-architecture settings ...)
 		
+		chmod +x $srcdir/cpuinfo.sh
+
 		if test "$arch_target" = "auto"; then
 			ARCHFLAGS=`$srcdir/cpuinfo.sh`
 		else
