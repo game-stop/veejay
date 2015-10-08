@@ -59,9 +59,13 @@ If echo is silent, you must set the PKG_CONFIG_PATH to point to the directory co
 Configure options:
 ------------------
 
- --enable-debug	                 : Builds veejay for debugging purposes (disables optimization)
+ --enable-debug	                 
 
- --with-arch-target=auto         : Builds veejay for the current cpu-type. The resulting binary may not run on another computer.
+Builds veejay for debugging purposes (disables optimization)
+
+ --with-arch-target=generic
+
+Build veejay for generic x86 cpu-type. If the default is used (auto), the resulting binary may not run on another computer.
 
 
 Compilation:

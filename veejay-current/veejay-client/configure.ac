@@ -57,9 +57,9 @@ AC_ARG_WITH(pixbuf,
             AC_HELP_STRING([--without-pixbuf], [Do not use GDK pixbuf]),
             [], [with_pixbuf=yes])
 
-arch_target="generic"
+arch_target="auto"
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic or auto],
-					[Build a generic binary or auto-detect current cpu type]),
+					[Build a generic binary or auto-detect current cpu type (defaults to auto-detect)]),
 					[ arch_target="$withval"])
 
 AC_GNU_SOURCE

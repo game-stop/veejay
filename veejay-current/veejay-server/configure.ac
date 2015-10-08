@@ -111,9 +111,9 @@ AC_ARG_WITH(libresample,
             AC_HELP_STRING([--without-libresample], [Do not use libresample.]),
             [], [with_libresample=yes])
 
-arch_target="generic"
+arch_target="auto"
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic or auto],
-					[Build a generic binary or auto-detect current cpu type]),
+					[Build a generic binary or auto-detect current cpu type (defaults to auto-detect)]),
 					[ arch_target="$withval"])
 
 AC_GNU_SOURCE
