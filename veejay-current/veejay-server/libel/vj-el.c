@@ -1218,7 +1218,11 @@ void	vj_el_scan_video_file( char *filename,  int *dw, int *dh, float *dfps, long
 		AVCodecContext *c = avhelper_get_codec_ctx( tmp );
 		*dw = c->width;
 		*dh = c->height;
-		*dfps = (float) c->time_base.den / c->time_base.num;
+		if( c->time_base.num > 0 ) {
+			*dfps = (float) c->time_base.den / c->time_base.num;
+		} else {
+			veejay_msg(VEEJAY_MSG_WARNING,"Unable to detect frame rate in %s", filename );
+		}
 		*arate = c->sample_rate;
 		avhelper_close_decoder(tmp);
 	} else {
