@@ -57,10 +57,10 @@ AC_ARG_WITH(pixbuf,
             AC_HELP_STRING([--without-pixbuf], [Do not use GDK pixbuf]),
             [], [with_pixbuf=yes])
 
-user_specified_target=
-AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
-                                         [Set a specific sub-architecture (defaults to native)]),
-                [ user_specified_target="$withval" ])
+arch_target="generic"
+AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic or auto],
+					[Build a generic binary or auto-detect current cpu type]),
+					[ arch_target="$withval"])
 
 AC_GNU_SOURCE
 
@@ -284,7 +284,6 @@ have_ppccpu=false
 have_ps2=false
 
 OP_CFLAGS=""
-YUVCFLAGS="-fif-conversion"
 
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
@@ -296,11 +295,8 @@ case $host_cpu in
 	PROGRAM_NOPIC="-fno-PIC"
 
 	if test "x$enable_debug" != "xyes" ; then
-		OP_CFLAGS="-O3"
+		OP_CFLAGS="-O2"
  	fi
-
-	AC_SUBST(OP_CFLAGS)
-	AC_SUBST(YUVCFLAGS)
 
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in
@@ -317,6 +313,10 @@ case $host_cpu in
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
+	if test "x$enable_debug" != "xyes" ; then
+		OP_CFLAGS="-O2"
+ 	fi
+
 	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
@@ -520,11 +520,18 @@ if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 			AC_MSG_RESULT($ARCHFLAGS)
 		fi
 	else
-		AC_MSG_CHECKING(sub-architecture settings)
+  		AC_MSG_CHECKING(sub-architecture settings ...)
+		
 		chmod +x $srcdir/cpuinfo.sh
-		ARCHFLAGS=`$srcdir/cpuinfo.sh $user_specified_target`
+
+		if test "$arch_target" = "auto"; then
+			ARCHFLAGS=`$srcdir/cpuinfo.sh`
+		else
+       			ARCHFLAGS="-mtune=generic"
+		fi
 		AC_MSG_RESULT($ARCHFLAGS)
-  	fi
+
+	fi
 fi
 
 
@@ -582,6 +589,7 @@ dnl We do this last as it can screw up library detection etc...
 CFLAGS="$ARCHFLAGS $CFLAGS"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
 
+AC_SUBST(OP_CFLAGS)
 
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
@@ -662,7 +670,6 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ GVeejayReloaded ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
-AC_MSG_NOTICE([                 $YUVCFLAGS])
 AC_MSG_NOTICE([			$OP_CFLAGS])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
