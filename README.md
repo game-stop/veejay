@@ -28,7 +28,7 @@ For each package, run the confgure and make:
 
 If you want to build against libav-11 or later, you have to disable the resampler using `./configure --without-libresample` (this disables pitching up and down the audio) as veejay has not transitioned yet to the new API
 
-If you want veejay to be optimized for the current cpu-type, you can pass `--with-arch-target=auto` to configure. By default, it targets generic x86
+If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. If you don't now what cpu veejay will be running on , pass `--with-arch-target=auto` to configure.
 
 
 Before running veejay, be sure to add/link some TrueType fonts in 
