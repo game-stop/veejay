@@ -20,6 +20,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <veejay/vjmem.h>
 #include <veejay/vims.h>
 #include <veejay/vj-client.h>
