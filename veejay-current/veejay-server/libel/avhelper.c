@@ -30,7 +30,9 @@
 #include <libyuv/yuvconv.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
+#include <libavcodec/version.h>
 #include <libavformat/avformat.h>
+#include <libavformat/version.h>
 #include <libel/avhelper.h>
 #include <libel/av.h>
 
@@ -146,14 +148,14 @@ static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *g
 
 void avhelper_frame_unref(AVFrame *ptr)
 {
-#if LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40
+#if (LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40) || (LIBAVCODEC_VERSION_MAJOR == 56 && LIBAVCODEC_VERSION_MINOR > 0)
 	av_frame_unref( ptr );
 #endif
 }
 
 void avhelper_free_context(AVCodecContext **avctx)
 {
-#if LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40
+#if (LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40) || (LIBAVCODEC_VERSION_MAJOR == 56 && LIBAVCODEC_VERSION_MINOR > 0)
 	avcodec_free_context( avctx );
 #else
 	if( avctx )
