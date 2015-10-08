@@ -166,7 +166,7 @@ Please join our mailing list on http://groups.google.com/group/veejay-discussion
 
 ## Bug Reporting
 
-Please use the ticket system on http://veejay.dyne.org
+Please use the ticket system on https://github.com/c0ntrol/veejay/issues or simply write a mail to the veejay-discussion group!
 
 ENJOY! And let us know about your performances/installations with veejay! 
 
