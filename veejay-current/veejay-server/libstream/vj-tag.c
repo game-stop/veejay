@@ -279,34 +279,42 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 {
     TagHash = hash_create(HASHCOUNT_T_MAX, int_tag_compare, int_tag_hash);
     if (!TagHash || width <= 0 || height <= 0)
-	return -1;
-    vj_tag_input = (vj_tag_data *) vj_malloc(sizeof(vj_tag_data));
-    if (vj_tag_input == NULL) {
-	veejay_msg(VEEJAY_MSG_ERROR,
-		   "Error Allocating Memory for stream data\n");
-	return -1;
+		return -1;
+	
+	vj_tag_input = (vj_tag_data *) vj_malloc(sizeof(vj_tag_data));
+
+	if (vj_tag_input == NULL) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Error Allocating Memory for stream data\n");
+		return -1;
     }
-    this_tag_id = 0;
-    vj_tag_input->width = width;
-    vj_tag_input->height = height;
+
+	int format = get_ffmpeg_pixfmt(pix_fmt);
+
+	VJFrame *tmp = yuv_yuv_template( NULL,NULL,NULL, width,height, format );
+	if( tmp == NULL ) {
+		return -1;
+	}
+
+	vj_tag_input->width = tmp->width;
+    vj_tag_input->height = tmp->height;
     vj_tag_input->depth = 3;
-    vj_tag_input->pix_fmt = pix_fmt;
+    vj_tag_input->pix_fmt = pix_fmt; 
+
     video_driver_ = video_driver;
     video_driver_ = 1;
 
-    vj_tag_input->uv_len = (width*height) / 2;
+    vj_tag_input->uv_len = tmp->uv_len;
 
-    memset( &_tmp, 0, sizeof(VJFrame));
-    _tmp.len = width * height;
-   _temp_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
-   _temp_buffer[1] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
-   _temp_buffer[2] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
-		
-	memset( tag_cache,0,sizeof(tag_cache));
-	memset( avail_tag, 0, sizeof(avail_tag));
-	_tmp.uv_width = width; 
-	_tmp.uv_height = height/2;
-	_tmp.uv_len = width * (height/2);
+    veejay_memset( &_tmp, 0, sizeof(VJFrame));
+    
+	veejay_memcpy( &_tmp, tmp, sizeof(VJFrame));
+	
+   _temp_buffer[0] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
+   _temp_buffer[1] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
+   _temp_buffer[2] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
+
+	veejay_memset( tag_cache,0,sizeof(tag_cache));
+	veejay_memset( avail_tag, 0, sizeof(avail_tag));
 
 #ifdef HAVE_V4L 
 	v4lvideo_templ_init();
@@ -320,6 +328,7 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_V4L2_NO_THREADING=[0|1] not set");
 	}
 
+	free(tmp);
 
     return 0;
 }
