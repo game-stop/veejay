@@ -3007,6 +3007,9 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	skel->soft_edl = 0;
 	veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has own EDL (%p)", skel->sample_id, el );
     }
+
+	int marker_start = 0, marker_end = 0;
+
     while (cur != NULL) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
@@ -3227,7 +3230,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_marker_start(skel->sample_id, atoi(chTemp));
+			marker_start = atoi(chTemp);
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -3236,7 +3239,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_marker_end(skel->sample_id, atoi(chTemp));
+			marker_end = atoi(chTemp);
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -3263,6 +3266,19 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 
 	cur = cur->next;
     }
+
+	if( marker_end != marker_start || marker_end != 0 )
+	{
+		//check if marker is sane
+		if( marker_start > marker_end && skel->speed == 0 ) {
+			int tmp = marker_start;
+			marker_start = marker_end;
+			marker_end = tmp;
+		}
+
+		sample_set_marker( skel->sample_id, marker_start, marker_end );
+	}
+
   //  if(!sample_read_edl( skel ))
 //	veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
 
