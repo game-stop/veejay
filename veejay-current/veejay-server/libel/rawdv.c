@@ -30,7 +30,7 @@
 #include <libdv/dv.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
-
+#include <libel/av.h>
 #include <errno.h>
 #define	DV_PAL_SIZE 144000
 #define DV_NTSC_SIZE 120000
