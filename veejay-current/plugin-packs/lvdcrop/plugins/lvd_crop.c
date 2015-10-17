@@ -147,9 +147,12 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	if( !lvd_crop_plane( crop->buf[2], A[2], left, right, top, bottom, w, h ) )
 		return LIVIDO_NO_ERROR;
 
-	crop->sws = sws_getContext(crop->w,crop->h,PIX_FMT_YUV444P,w,h,PIX_FMT_YUV444P,crop->flags,NULL,NULL,NULL);
-	if( crop->sws == NULL )
-		return LIVIDO_ERROR_INTERNAL;
+
+	if( crop->sws == NULL ) {
+		crop->sws = sws_getContext(crop->w,crop->h,PIX_FMT_YUV444P,w,h,PIX_FMT_YUV444P,crop->flags,NULL,NULL,NULL);
+		if( crop->sws == NULL )
+			return LIVIDO_ERROR_INTERNAL;
+	}
 
 	sws_scale(crop->sws,(const uint8_t * const *)crop->buf,crop_strides,0,crop->h,(uint8_t * const *) O,dst_strides);
 
