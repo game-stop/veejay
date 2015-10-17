@@ -12,10 +12,10 @@ While playing, you can record the resulting video directly to disk (video sampli
 
 Veejay is divided into multiple packages:
 
-1. [veejay-server](./veejay/veejay-current/veejay-server)
-1. [veejay-client](./veejay/veejay-current/veejay-client)
-1. [veejay-utils](./veejay/veejay-current/veejay-utils)
-1. [plugin-packs](./veejay/veejay-current/plugin-packs)
+1. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server)
+1. [veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client)
+1. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
+1. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
 
 For each package, run the confgure and make:
 
