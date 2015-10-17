@@ -5,7 +5,7 @@ veejay - a visual (video) instrument and video sampler for GNU/Linux
 .B veejay [options] Videofile1 [Videofile2 ... VideofileN]
 .SH DESCRIPTION
 .B veejay
-Veejay is a visual instrument and realtime video sampler. It allos you
+Veejay is a visual instrument and realtime video sampler. It allows you
 to "play" the video like you would play a Piano.
 While playing, you can record the resulting video directly to disk (video sampling). Veejay keeps audio in sync and pitches when needed through trickplay (slow , faster, reverse, loop ) and delivered to JACK for possible further processing.
 
@@ -386,7 +386,7 @@ Set frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
 .B [1..9]
 Set sample range 0-12, 12-24, 24-36 etc.
 .TP
-.B ALT + [1..9]
+.B [ALT] + [1..9]
 Set channel ID 1-9, depending on sample range
 .TP
 .B [F1..F12]
@@ -518,7 +518,7 @@ Decrease parameter 7 of selected effect
 .B [i]
 Increase parameter 7 of selected effect
 .TP
-.B SHIFT + spacebar
+.B [SHIFT] + [Spacebar]
 Start keystroke recorder. The keystroke recorder
 records most of the received VIMS messages and plays them
 back in order and on the position you have pressed them.
@@ -526,52 +526,52 @@ Instead of using the keyboard, you can also use 'Reloaded',
 and record the buttons pressed. However, some VIMS messages
 are excluded from the keystroke recorder for safety reasons. 
 .TP
-.B spacebar
+.B [Spacebar]
 (re)play recorded VIMS messages. The keystroke recorder
 will jump to the starting position and replay all
 recorded VIMS messages. 
 .TP
-.B CTRL + spacebar
+.B [CTRL] + [Spacebar]
 Clear recorded keystrokes. This clears all VIMS messages
 in the current selected macro slot.
 .TP
-.B spacebar (CAPS-LOCK on)
+.B [Spacebar] (CAPS-LOCK on)
 Plays the next sample in queue (in playing direction)
 .TP
-.B CTRL + [ F1 - F12 ]
+.B [CTRL] + [ F1 - F12 ]
 Select a slot to record keystrokes to (default=0)
 Use this if you want to record multiple keystrokes. You
 can switch slots while in keystroke playback.
 .TP
-.B ALT + B 
+.B [ALT] + [b]
 Take a snapshot of a video frame and put it in a seperate
 buffer (used by some effects like Difference Overlay)
 .TP
-.B CTRL + s
+.B [CTRL] + [s]
 Show/hide interactive camera/projector calibration setup
 .TP
-.B CTRL + p
+.B [CTRL] + [p]
 Focus on front (primary output) or back (secundary input) projection
 .TP
-.B CTRL + i
+.B [CTRL] + [i]
 Toggle current playing sample/stream as input source to be transformed
 .TP
-.B CTRL + v
+.B [CTRL] + [v]
 Toggle grayscale/color mode for unicap streams
 .TP
-.B CTRL + h
+.B [CTRL] + [h]
 Toggle OSD help for camera/projector setup
 .TP
-.B CTRL + o
+.B [CTRL] + [o]
 Toggle OSD help for general status messages and mouse coordinates
 .TP
-.B CTRL + d
+.B [CTRL] + [d]
 Toggle rendering of single source FX on underlying samples
 .TP
-.B CTRL + r
+.B [CTRL] + [r]
 Start recording
 .TP
-.B CTRL + t
+.B [CTRL] + [t]
 Stop recording
 .TP
 .SH REFERENCES
