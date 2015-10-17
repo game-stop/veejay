@@ -239,6 +239,22 @@ int	livido_plug_parameter_get_range_dbl( void *fx_instance,const char *key, int 
 		*dkind = HOST_PARAM_INDEX;
 		return VEVO_NO_ERROR;
 	}
+	else if(kind == HOST_PARAM_WIDTH )
+	{
+		error = vevo_property_get( parameter_templ, "max", 0, &(irange[1]) );
+		*min = 0.0;
+		*max = (double) irange[1];
+		*dkind = HOST_PARAM_WIDTH;   
+		return VEVO_NO_ERROR;	
+	}
+	else if(kind == HOST_PARAM_HEIGHT )
+	{
+		error = vevo_property_get( parameter_templ, "max", 0, &(irange[1]) );
+		*min = 0.0;
+		*max = (double) irange[1];
+		*dkind = HOST_PARAM_HEIGHT;
+		return VEVO_NO_ERROR;
+	}
 		
 	return 1;
 }
@@ -349,6 +365,12 @@ static	int	livido_pname_to_host_kind( const char *str )
 	else if(strcasecmp(str, "TEXT") == 0 ) {
 		return HOST_PARAM_TEXT;
 	}
+	else if(strcasecmp(str, "WIDTH") == 0 ) {
+		return HOST_PARAM_WIDTH;
+	}
+	else if(strcasecmp(str,"HEIGHT") == 0 ) {
+		return HOST_PARAM_HEIGHT;
+	}
 	return 0;
 }
 
@@ -384,7 +406,7 @@ static	int	livido_scan_out_parameters( void *plugin , void *plugger_port)
 	return NP;
 }
 
-static	int	livido_scan_parameters( void *plugin, void *plugger_port )
+static	int	livido_scan_parameters( void *plugin, void *plugger_port, int w, int h )
 {
 	int n = 0;
 	int vj_np = 0;
@@ -423,6 +445,27 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port )
 			clone_prop_vevo( param, vje_port, "default", "default" );
 			clone_prop_vevo( param, vje_port, "min", "min" );
 			clone_prop_vevo( param, vje_port, "max", "max" );
+		} else if( strcasecmp(kind, "WIDTH") == 0 ) {
+			ikind = HOST_PARAM_WIDTH; vj_np++;
+			clone_prop_vevo( param, vje_port, "default", "value" );
+			clone_prop_vevo( param, vje_port, "default", "default" );
+			tmp[0] = 0;
+			tmp[1] = w;
+			vevo_property_set( param, "min", VEVO_ATOM_TYPE_INT,1,&tmp[0] );
+			vevo_property_set( param, "max",VEVO_ATOM_TYPE_INT,1,&tmp[1] );
+			clone_prop_vevo( param, vje_port, "min", "min" );
+			clone_prop_vevo( param, vje_port, "max", "max" );
+
+		} else if( strcasecmp(kind, "HEIGHT") == 0 ) {
+			ikind = HOST_PARAM_HEIGHT; vj_np++;
+			clone_prop_vevo( param, vje_port, "default", "value" );
+			clone_prop_vevo( param, vje_port, "default", "default" );
+			tmp[0] = 0;
+			tmp[1] = h;
+			vevo_property_set( param, "min", VEVO_ATOM_TYPE_INT,1,&tmp[0] );
+			vevo_property_set( param, "max",VEVO_ATOM_TYPE_INT,1,&tmp[1] );
+			clone_prop_vevo( param, vje_port, "min", "min" );
+			clone_prop_vevo( param, vje_port, "max", "max" );
 		} else if (strcasecmp(kind, "SWITCH") == 0 ) {
 			ikind = HOST_PARAM_SWITCH; vj_np ++;
 			clone_prop_vevo( param, vje_port, "default", "value" );
@@ -459,8 +502,8 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port )
 		vevo_property_set( vje_port, "HOST_kind", VEVO_ATOM_TYPE_INT,1,&ikind );
 
 		free(kind);	
-
 	}
+
 	return vj_np;
 }
 
@@ -480,6 +523,8 @@ static	int	init_parameter_port(livido_port_t *ptr, livido_port_t *in_param )
 	{
 		case HOST_PARAM_INDEX:
 		case HOST_PARAM_NUMBER:
+		case HOST_PARAM_WIDTH:
+		case HOST_PARAM_HEIGHT:
 		case HOST_PARAM_SWITCH:
 			pctrl = livido_plug_parameter_set_index; 
 			break;
@@ -634,6 +679,8 @@ char	*livido_describe_parameter_format_osc( void *instance, int p )
 
 	switch(kind)
 	{
+		case HOST_PARAM_WIDTH:
+		case HOST_PARAM_HEIGHT:
 		case HOST_PARAM_INDEX:
 			fmt[0] = 'i';
 			break;
@@ -976,6 +1023,8 @@ char	*livido_describe_parameter_format( void *instance, int p )
 
 	switch(kind)
 	{
+		case HOST_PARAM_WIDTH:
+		case HOST_PARAM_HEIGHT:
 		case HOST_PARAM_INDEX:
 			fmt[0] = 'd';
 			break;
@@ -1021,6 +1070,8 @@ int	livido_set_parameter_from_string( void *instance, int p, const char *str, vo
 
 	switch(kind)
 	{
+		case HOST_PARAM_HEIGHT:
+		case HOST_PARAM_WIDTH:
 		case HOST_PARAM_INDEX:
 			res = vevo_property_from_string( fx_values,str, vkey,1, VEVO_ATOM_TYPE_INT );
 			break;
@@ -1158,7 +1209,7 @@ int	livido_read_plug_configuration(void *filter_template, const char *name)
 
 
 
-void*	deal_with_livido( void *handle, const char *name )
+void*	deal_with_livido( void *handle, const char *name, int w, int h )
 {
 	void *port = vpn( VEVO_LIVIDO_PORT );
 	char *plugin_name = NULL;
@@ -1226,7 +1277,7 @@ void*	deal_with_livido( void *handle, const char *name )
 	livido_read_plug_configuration( filter_templ, name );
 
 
-	int n_params = livido_scan_parameters( filter_templ, port );
+	int n_params = livido_scan_parameters( filter_templ, port, w, h );
 	int n_oparams = livido_scan_out_parameters( filter_templ, port );
 	
 	int n_inputs = livido_property_num_elements( filter_templ, "in_channel_templates" );

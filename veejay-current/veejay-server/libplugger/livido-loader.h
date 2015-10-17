@@ -22,7 +22,7 @@
 
 int		lvd_livido_palette( int v );
 
-void	*deal_with_livido(void *handle, const char *name);
+void	*deal_with_livido(void *handle, const char *name, int w, int h);
 
 void	*livido_plug_init( void *plugin, int w, int h, int pixfmt );
 

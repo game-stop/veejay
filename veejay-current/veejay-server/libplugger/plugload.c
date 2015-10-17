@@ -230,7 +230,7 @@ static	int	add_to_plugin_list( const char *path )
 			else
 				dlclose( handle );
 		} else if(dlsym( handle, "livido_setup" )) {
-			plugin = deal_with_livido( handle , name );
+			plugin = deal_with_livido( handle , name, base_width_, base_height_ );
 			if( plugin )
 			{
 				index_map_[index_] = plugin;

@@ -25,4 +25,6 @@
 #define HOST_PARAM_COORD	3
 #define HOST_PARAM_COLOR	4	
 #define	HOST_PARAM_TEXT		5
+#define HOST_PARAM_WIDTH	7
+#define HOST_PARAM_HEIGHT	8
 #endif
