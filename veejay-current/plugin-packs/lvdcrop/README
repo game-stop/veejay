@@ -1,0 +1,14 @@
+
+Veejay's crop
+-------------------------
+
+RUNNING:
+
+run the autogen.sh scrypt in the suorce folder,
+then run ./configure, make and make install
+
+run veejay
+
+-----
+
+
