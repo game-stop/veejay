@@ -75,7 +75,7 @@ static int	lvd_crop_plane( uint8_t *D, uint8_t *S, int left, int right, int top,
 	int dst_width = ( w - left - right);
 	int	y		   = h - top - bottom + 1;
 
-	if( dst_width < 1 || h < 1 )
+	if( dst_width < 1 || y < 1)
 		return 0;
 
 	uint8_t *src = S;
@@ -87,7 +87,7 @@ static int	lvd_crop_plane( uint8_t *D, uint8_t *S, int left, int right, int top,
 		src += w;
 	}
 
-	return 0;
+	return 1;
 }
 
 int		process_instance( livido_port_t *my_instance, double timecode )
