@@ -6369,7 +6369,8 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 		int val = sample_get_effect_arg(v->uc->sample_id,c,args[0]);
 		if ( vj_effect_is_valid( effect  ) )
 		{
-
+			char *effect_descr = vj_effect_get_description(effect);
+			char *effect_param_descr = vj_effect_get_param_description(effect,args[0]);
 			int tval = val + args[1];
 			if( tval > vj_effect_get_max_limit( effect,args[0] ) )
 				tval = vj_effect_get_min_limit( effect,args[0]);
@@ -6378,7 +6379,7 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 					tval = vj_effect_get_max_limit( effect,args[0] );
 			if(sample_set_effect_arg( v->uc->sample_id, c,args[0],tval)!=-1 )
 			{
-				veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],tval);
+				veejay_msg(VEEJAY_MSG_INFO,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval);
 			}
 		}
 	}
@@ -6389,6 +6390,8 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 		int effect = vj_tag_get_effect_any(v->uc->sample_id, c);
 		int val = vj_tag_get_effect_arg(v->uc->sample_id, c, args[0]);
 
+		char *effect_descr = vj_effect_get_description(effect);
+		char *effect_param_descr = vj_effect_get_param_description(effect,args[0]);
 		int tval = val + args[1];
 
 		if( tval > vj_effect_get_max_limit( effect,args[0] ))
@@ -6397,10 +6400,9 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 			if( tval < vj_effect_get_min_limit( effect,args[0] ))
 				tval = vj_effect_get_max_limit( effect,args[0] );
 
-	
 		if(vj_tag_set_effect_arg(v->uc->sample_id, c, args[0], tval) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0], tval );
+			veejay_msg(VEEJAY_MSG_INFO,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval );
 		}
 	}
 }
