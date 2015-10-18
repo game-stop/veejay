@@ -3506,7 +3506,7 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
 		else
 		{
 			veejay_set_speed(v, v->settings->previous_playback_speed );
-			veejay_msg(VEEJAY_MSG_INFO,"Video is playing");
+			veejay_msg(VEEJAY_MSG_INFO,"Video is playing (resumed at speed %d)", v->settings->previous_playback_speed);
 		}
 	}
 	else
