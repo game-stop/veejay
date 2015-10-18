@@ -245,6 +245,7 @@ void chameleon_apply( VJFrame *frame, int width, int height, int mode)
 	source.data[0] = tmpimage[0];
 	source.data[1] = tmpimage[1];
 	source.data[2] = tmpimage[2];
+	source.len = len;
 
 	uint32_t activity = 0;
 	int auto_switch = 0;
