@@ -649,6 +649,9 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	
 	 veejay_sample_resume_at( info, sample_id );
 
+	 if( speed != 0 )
+		 settings->previous_playback_speed = speed;
+
      veejay_set_speed(info, speed);
  	 
 	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, Loop=%d)",
@@ -809,8 +812,8 @@ void veejay_set_sample(veejay_t * info, int sampleid)
    	if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
 	{
 		veejay_start_playing_stream(info,sampleid );
-    	}
-    	else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+    }
+    else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
 		if( info->uc->sample_id == sampleid )
 		{
@@ -1869,8 +1872,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		settings->action_scheduler.state = 0;
 	}
 
-	settings->previous_playback_speed = 1;
-
 	int instances = 0;
 	char *title = NULL;
 
@@ -2209,6 +2210,8 @@ static void veejay_playback_cycle(veejay_t * info)
 	}
 
 	veejay_set_speed(info,1);
+
+	settings->previous_playback_speed = 1;
 
 	switch(info->uc->playback_mode)
 	{
