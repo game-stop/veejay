@@ -111,52 +111,53 @@ typedef struct
 } sequencer_t;
 
 typedef struct {
-    pthread_t software_playback_thread;
-    pthread_t playback_thread;	
-    pthread_attr_t playback_attr;
-    pthread_t geo_stat;
-    pthread_mutex_t valid_mutex;
-    pthread_cond_t buffer_filled[MJPEG_MAX_BUF];
-    pthread_cond_t buffer_done[MJPEG_MAX_BUF];
-    pthread_mutex_t syncinfo_mutex;
-    pthread_t signal_thread;
-    sigset_t signal_set;
-    struct timespec lastframe_completion;	/* software sync variable */
-    long old_field_len;
-    uint64_t save_list_len;		/* for editing purposes */
-    double spvf;		/* seconds per video frame */
-    int usec_per_frame;		/* milliseconds per frame */
-    int min_frame_num;		/* the lowest frame to be played back - normally 0 */
-    int max_frame_num;		/* the latest frame to be played back - normally num_frames - 1 */
-    int current_frame_num;	/* the current frame */
-    int current_playback_speed;	/* current playback speed */
-    int currently_processed_frame;	/* changes constantly */
-    int currently_synced_frame;	/* changes constantly */
-    int first_frame;		/* software sync variable */
-    int valid[MJPEG_MAX_BUF];	/* num of frames to be played */
-    long buffer_entry[MJPEG_MAX_BUF];
-    int render_entry;
-    int render_list;
-    int last_rendered_frame;
-    long rendered_frames;
-    long currently_processed_entry;
-    struct mjpeg_sync syncinfo[MJPEG_MAX_BUF];	/* synchronization info */
-    uint64_t *save_list;	/* for editing purposes */
-    double spas;		/* seconds per audio sample */
-    int audio_mute;		/* controls whether to currently play audio or not */
-    int state;			/* playing, paused or stoppped */
-    int offline_ready;
-    int offline_record;
-    int offline_tag_id;
-    int offline_created_sample;
-    int sample_record;
-    int sample_record_id;
-    int sample_record_switch;
-    int full_screen;
-    int tag_record_switch;
-    int tag_record;
-    int dct_method;
-    subsample_mode_t sample_mode;
+	pthread_t software_playback_thread;
+	pthread_t playback_thread;
+	pthread_attr_t playback_attr;
+	pthread_t geo_stat;
+	pthread_mutex_t valid_mutex;
+	pthread_cond_t buffer_filled[MJPEG_MAX_BUF];
+	pthread_cond_t buffer_done[MJPEG_MAX_BUF];
+	pthread_mutex_t syncinfo_mutex;
+	pthread_t signal_thread;
+	sigset_t signal_set;
+	struct timespec lastframe_completion;	/* software sync variable */
+	long old_field_len;
+	uint64_t save_list_len;		/* for editing purposes */
+	double spvf;		/* seconds per video frame */
+	int usec_per_frame;		/* milliseconds per frame */
+	int min_frame_num;		/* the lowest frame to be played back - normally 0 */
+	int max_frame_num;		/* the latest frame to be played back - normally num_frames - 1 */
+	int current_frame_num;	/* the current frame */
+	int current_playback_speed;	/* current playback speed */
+	int previous_playback_speed;	/* previous playback speed */
+	int currently_processed_frame;	/* changes constantly */
+	int currently_synced_frame;	/* changes constantly */
+	int first_frame;		/* software sync variable */
+	int valid[MJPEG_MAX_BUF];	/* num of frames to be played */
+	long buffer_entry[MJPEG_MAX_BUF];
+	int render_entry;
+	int render_list;
+	int last_rendered_frame;
+	long rendered_frames;
+	long currently_processed_entry;
+	struct mjpeg_sync syncinfo[MJPEG_MAX_BUF];	/* synchronization info */
+	uint64_t *save_list;	/* for editing purposes */
+	double spas;		/* seconds per audio sample */
+	int audio_mute;		/* controls whether to currently play audio or not */
+	int state;			/* playing, paused or stoppped */
+	int offline_ready;
+	int offline_record;
+	int offline_tag_id;
+	int offline_created_sample;
+	int sample_record;
+	int sample_record_id;
+	int sample_record_switch;
+	int full_screen;
+	int tag_record_switch;
+	int tag_record;
+	int dct_method;
+	subsample_mode_t sample_mode;
 	int unicast_link_id;
 	int unicast_frame_sender;
 	int is_dat;
@@ -196,7 +197,7 @@ typedef struct {
 	int hold_pos;
 	int	hold_resume;
 	int hold_status;
-    int auto_mute;
+	int auto_mute;
 	int pace_correction;
 } video_playback_setup;
 

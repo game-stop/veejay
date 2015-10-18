@@ -3497,8 +3497,17 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
 	if(!STREAM_PLAYING(v))
 	{
 		int speed = v->settings->current_playback_speed;
-		veejay_set_speed(v, (speed == 0 ? 1 : 0  ));
-		veejay_msg(VEEJAY_MSG_INFO,"Video is %s", (speed==0 ? "paused" : "playing"));
+		if(speed != 0)
+		{
+			v->settings->previous_playback_speed = speed;
+			veejay_set_speed(v, 0 );
+			veejay_msg(VEEJAY_MSG_INFO,"Video is paused");
+		}
+		else
+		{
+			veejay_set_speed(v, v->settings->previous_playback_speed );
+			veejay_msg(VEEJAY_MSG_INFO,"Video is playing");
+		}
 	}
 	else
 	{

@@ -1866,8 +1866,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	if( settings->action_scheduler.state )
 	{
-		settings->action_scheduler.state = 0; 
+		settings->action_scheduler.state = 0;
 	}
+
+	settings->previous_playback_speed = 1;
 
 	int instances = 0;
 	char *title = NULL;
