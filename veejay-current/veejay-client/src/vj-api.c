@@ -5463,8 +5463,8 @@ static int	select_f(const struct dirent *d )
 
 static void set_default_theme()
 {
-	sprintf( theme_path, "%s", RELOADED_DATADIR);
-	sprintf( theme_file, "%s/gveejay.rc", RELOADED_DATADIR );
+	snprintf( theme_path,sizeof(theme_path), "%s", RELOADED_DATADIR);
+	snprintf( theme_file,sizeof(theme_file), "%s/gveejay.rc", RELOADED_DATADIR );
 	use_default_theme_ = 1;
 }
 
@@ -5478,8 +5478,6 @@ void	find_user_themes(int theme)
 	veejay_memset( theme_file, 0, sizeof(theme_file));
 
 	theme_settings = gtk_settings_get_default();
-//	snprintf( glade_path, sizeof(glade_path), "%s/gveejay.reloaded.glade",RELOADED_DATADIR);
-
 
 	if(!home)
 	{
@@ -5512,24 +5510,12 @@ void	find_user_themes(int theme)
 		return;
 	}
 
-	veejay_memset(data,0,sizeof(data));
 	veejay_memset(location,0,sizeof(location));
-	char *dst = location;
 
-	if( read( sloppy, data, sizeof(data) ) > 0 )
-	{
-		int str_len = strlen( data );
-		int i;
-		for( i = 0; i < str_len ; i ++ )
-		{
-			if( data[i] == '\0' || data[i] == '\n' ) break;
-			*dst = data[i];
-			(*dst)++;
-		}
-	}
-
-	if( sloppy )	
-		close( sloppy );
+	if( read( sloppy, location, sizeof(location) ) <= 0 )
+		strcat( location, "Default" );
+	
+	close( sloppy );
 
 	if( strcmp( location, "Default" ) == 0 )	
 	{
@@ -5541,8 +5527,8 @@ void	find_user_themes(int theme)
 		snprintf(theme_path, sizeof(theme_path), "%s/.veejay/theme/%s", home, location );
 		snprintf(theme_file, sizeof(theme_file), "%s/gveejay.rc", theme_path );
 		use_default_theme_ = 0;
-		veejay_msg(VEEJAY_MSG_INFO, "\tRC-style '%s'", theme_file );
-		veejay_msg(VEEJAY_MSG_INFO, "\tTheme location: '%s'", theme_path);
+		veejay_msg(VEEJAY_MSG_INFO, "RC-style '%s'", theme_file );
+		veejay_msg(VEEJAY_MSG_INFO, "Theme location: '%s'", theme_path);
 	}
 
 	struct dirent **files = NULL;
@@ -5603,10 +5589,7 @@ void	find_user_themes(int theme)
 
 	theme_list[ k ] = strdup("Default");
 	for( k = 0; theme_list[k] != NULL ; k ++ )
-		veejay_msg(VEEJAY_MSG_INFO, "Added Theme #%d %s", k, theme_list[k]);
-//	veejay_msg(VEEJAY_MSG_INFO, "Loading %s", theme_file );
-
-
+		veejay_msg(VEEJAY_MSG_DEBUG, "Added Theme #%d %s", k, theme_list[k]);
 }
 
 void	gui_load_theme()
@@ -6496,6 +6479,7 @@ void	default_bank_values(int *col, int *row )
 		nsc = 5;
 		nsy = 4;
 	}
+
 	if( *col == 0 && *row == 0 )
 	{
 		NUM_SAMPLES_PER_COL = nsc;
@@ -6508,6 +6492,8 @@ void	default_bank_values(int *col, int *row )
 	}
 	NUM_SAMPLES_PER_PAGE = NUM_SAMPLES_PER_COL * NUM_SAMPLES_PER_ROW;
 	NUM_BANKS = (4096 / NUM_SAMPLES_PER_PAGE );
+
+	veejay_msg(VEEJAY_MSG_INFO, "Sample bank layout is %d rows by %d columns", NUM_SAMPLES_PER_ROW,NUM_SAMPLES_PER_COL );
 }
 
 void	set_skin(int skin, int invert)

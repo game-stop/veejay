@@ -211,33 +211,23 @@ int main(int argc, char *argv[]) {
 
 	clone_args( argv, argc );
 
+	gtk_init( &argc, &argv );
+
 	// default host to connect to
-	sprintf(hostname, "127.0.0.1");
+	snprintf(hostname,sizeof(hostname), "127.0.0.1");
 
-		while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:m:g:")) != EOF )
-        {
-                sprintf(option, "%c", n );
-                err += set_option( option, optarg);
-                if(err) usage(argv[0]);
-        }
-        if( optind > argc )
-                err ++;
+	while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:m:g:")) != EOF )
+    {
+		sprintf(option, "%c", n );
+		err += set_option( option, optarg);
+		if(err) usage(argv[0]);
+    }
+    if( optind > argc )
+		err ++;
 
-        if( err ) usage(argv[0]);
-/*
-	if( !g_thread_supported() )
-	{
-	    veejay_msg(2, "Initializing GDK threads");
-	     g_thread_init(NULL);
-	     gdk_threads_init();                   // Called to initialize internal mutex "gdk_threads_mutex".
-        }*/
+    if( err ) usage(argv[0]);
 
-
-	gtk_init( NULL,NULL );
-//	gtk_init( &argc, &argv );
 	glade_init();
-	
-//	g_mem_set_vtable( glib_mem_profiler_table );
 	
 	vj_mem_init();
 
