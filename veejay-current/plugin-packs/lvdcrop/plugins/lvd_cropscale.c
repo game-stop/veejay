@@ -16,9 +16,11 @@ LIVIDO_PLUGIN
 #define RUP8(num)(((num)+8)&~8)
 
 #include <libavutil/cpu.h>
+#include <libswscale/swscale.h>
 
 typedef struct
 {
+	struct SwsContext *sws;
 	uint8_t *buf[4];
 	int w;
 	int h;
@@ -36,6 +38,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	c->buf[0]     = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8(w * h * 4));
 	c->buf[1]     = c->buf[0] + RUP8(w*h);
 	c->buf[2]     = c->buf[1] + RUP8(w*h);
+	c->flags	  = SWS_FAST_BILINEAR;
 
 	c->w		  = -1;
 	c->h		  = -1; 
@@ -56,6 +59,10 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 			free(crop->buf[0]);
 		}
 		
+		if( crop->sws ) {
+			sws_freeContext( crop->sws );
+		}
+
 		free(crop);
 		crop = NULL;
 	}		
@@ -101,6 +108,27 @@ static int	lvd_zcrop_plane( uint8_t *D, uint8_t *S, int left, int right, int top
 	return 1;
 }
 
+
+static int	lvd_crop_plane( uint8_t *D, uint8_t *S, int left, int right, int top, int bottom, int w, int h )
+{
+	int dst_width = ( w - left - right);
+	int	y		   = h - top - bottom + 1;
+
+	if( dst_width < 1 || y < 1)
+		return 0;
+
+	uint8_t *src = S;
+	uint8_t *dst = D;
+
+	while( --y ) {
+		livido_memcpy( dst, src, dst_width);
+		dst += dst_width;
+		src += w;
+	}
+
+	return 1;
+}
+
 int		process_instance( livido_port_t *my_instance, double timecode )
 {
 	uint8_t *A[4] = {NULL,NULL,NULL,NULL};
@@ -128,6 +156,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int	right = lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int	top = lvd_extract_param_index( my_instance, "in_parameters", 2 );
 	int	bottom = lvd_extract_param_index( my_instance, "in_parameters", 3);
+	int scale = lvd_extract_param_index( my_instance, "in_parameters", 4);
 
 	int tmp_w = ( w - left - right);
 	int tmp_h = h - top - bottom;
@@ -138,6 +167,10 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 		tmp_h = 0;
 
 	if( tmp_w != crop->w || tmp_h != crop->h ) {
+		if( crop->sws ) {
+			sws_freeContext( crop->sws );
+			crop->sws = NULL;
+		}
 		crop->w = tmp_w;
 		crop->h = tmp_h;
 	}
@@ -145,14 +178,22 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int crop_strides[4] = { crop->w, crop->w, crop->w, 0 };
 	int dst_strides[4]  = { w, w, w, 0 }; 
 
-	if( !lvd_zcrop_plane( O[0], A[0], left, right, top, bottom, w, h, 0 ) )
+	if( !lvd_crop_plane( crop->buf[0], A[0], left, right, top, bottom, w, h ) )
 		return LIVIDO_NO_ERROR;
 
-	if( !lvd_zcrop_plane( O[1], A[1], left, right, top, bottom, w, h, 128 ) )
+	if( !lvd_crop_plane( crop->buf[1], A[1], left, right, top, bottom, w, h ) )
 		return LIVIDO_NO_ERROR;
 
-	if( !lvd_zcrop_plane( O[2], A[2], left, right, top, bottom, w, h, 128 ) )
+	if( !lvd_crop_plane( crop->buf[2], A[2], left, right, top, bottom, w, h ) )
 		return LIVIDO_NO_ERROR;
+
+	if( crop->sws == NULL ) {
+		crop->sws = sws_getContext(crop->w,crop->h,PIX_FMT_YUV444P,w,h,PIX_FMT_YUV444P,crop->flags,NULL,NULL,NULL);
+		if( crop->sws == NULL )
+			return LIVIDO_ERROR_INTERNAL;
+	}
+
+	sws_scale(crop->sws,(const uint8_t * const *)crop->buf,crop_strides,0,crop->h,(uint8_t * const *) O,dst_strides);
 
 	return LIVIDO_NO_ERROR;
 }
@@ -186,8 +227,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	port = filter;
 
 	//@ meta information
-		livido_set_string_value( port, "name", "Crop");	
-		livido_set_string_value( port, "description", "Absolute crop");
+		livido_set_string_value( port, "name", "Crop and scale");	
+		livido_set_string_value( port, "description", "Crop and scale");
 		livido_set_string_value( port, "author", "Niels"); 
 		
 		livido_set_int_value( port, "flags", 0);
