@@ -447,25 +447,38 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port, int w, int 
 			clone_prop_vevo( param, vje_port, "max", "max" );
 		} else if( strcasecmp(kind, "WIDTH") == 0 ) {
 			ikind = HOST_PARAM_WIDTH; vj_np++;
-			clone_prop_vevo( param, vje_port, "default", "value" );
-			clone_prop_vevo( param, vje_port, "default", "default" );
 			tmp[0] = 0;
 			tmp[1] = w;
-			vevo_property_set( param, "min", VEVO_ATOM_TYPE_INT,1,&tmp[0] );
-			vevo_property_set( param, "max",VEVO_ATOM_TYPE_INT,1,&tmp[1] );
-			clone_prop_vevo( param, vje_port, "min", "min" );
-			clone_prop_vevo( param, vje_port, "max", "max" );
+			vevo_property_set( vje_port, "min", VEVO_ATOM_TYPE_INT,1,&tmp[0] );
+			vevo_property_set( vje_port, "max",VEVO_ATOM_TYPE_INT,1,&tmp[1] );
+			int err = vevo_property_get( param,"default", 0, &tmp[2]);
+			if( err ) {
+				vevo_property_set( vje_port, "default", VEVO_ATOM_TYPE_INT,1,&tmp[1]);
+			} else {
+				vevo_property_set( vje_port, "default", VEVO_ATOM_TYPE_INT,1,&tmp[2]);
+			}
+			clone_prop_vevo( vje_port, vje_port, "default", "value" );
+			clone_prop_vevo( vje_port, param, "max", "max" );
+			clone_prop_vevo( vje_port, param, "min", "min" );
+			clone_prop_vevo( vje_port, param, "default" ,"default" );
 
 		} else if( strcasecmp(kind, "HEIGHT") == 0 ) {
 			ikind = HOST_PARAM_HEIGHT; vj_np++;
-			clone_prop_vevo( param, vje_port, "default", "value" );
-			clone_prop_vevo( param, vje_port, "default", "default" );
 			tmp[0] = 0;
 			tmp[1] = h;
-			vevo_property_set( param, "min", VEVO_ATOM_TYPE_INT,1,&tmp[0] );
-			vevo_property_set( param, "max",VEVO_ATOM_TYPE_INT,1,&tmp[1] );
-			clone_prop_vevo( param, vje_port, "min", "min" );
-			clone_prop_vevo( param, vje_port, "max", "max" );
+			vevo_property_set( vje_port, "min", VEVO_ATOM_TYPE_INT,1,&tmp[0] );
+			vevo_property_set( vje_port, "max",VEVO_ATOM_TYPE_INT,1,&tmp[1] );
+			int err = vevo_property_get( param, "default", 0, &tmp[2] );
+			if( err )  {
+				vevo_property_set( vje_port, "default", VEVO_ATOM_TYPE_INT,1,&tmp[1]);
+			} else {
+				vevo_property_set( vje_port, "default", VEVO_ATOM_TYPE_INT,1,&tmp[2]);
+			}
+			clone_prop_vevo( vje_port, vje_port, "default", "value" );
+			clone_prop_vevo( vje_port, param, "max", "max" );
+			clone_prop_vevo( vje_port, param, "min", "min" );
+			clone_prop_vevo( vje_port, param, "default" ,"default" );
+
 		} else if (strcasecmp(kind, "SWITCH") == 0 ) {
 			ikind = HOST_PARAM_SWITCH; vj_np ++;
 			clone_prop_vevo( param, vje_port, "default", "value" );
@@ -1185,8 +1198,10 @@ int	livido_read_plug_configuration(void *filter_template, const char *name)
 					continue;
 				
 				char *str = vevo_sprintf_property( templ, "default" );
-				fprintf( f, "%s\n", str );
-				free(str);
+				if( str ) {
+					fprintf( f, "%s\n", str );
+					free(str);
+				}
 			}
 			fclose(f);
 			return 1;
