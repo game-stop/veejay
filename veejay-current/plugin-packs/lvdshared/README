@@ -1,14 +1,10 @@
 
-Veejay's crop
--------------------------
+Livido shared memory plugins
+----------------------------
 
-RUNNING:
+INSTALLING:
 
 run the autogen.sh script in the source folder,
 then run ./configure, make and make install
-
-run veejay
-
------
 
 
