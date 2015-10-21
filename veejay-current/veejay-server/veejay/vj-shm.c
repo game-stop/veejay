@@ -147,26 +147,20 @@ int		vj_shm_read( void *vv , uint8_t *dst[4] )
 	vj_shared_data *data = (vj_shared_data*) v->sms;
 	int res = pthread_rwlock_rdlock( &data->rwlock );
 	if( res == -1 ) {
-	//	veejay_msg(0, "%s",strerror(errno));
-		return -1;
+		veejay_msg(0, "%s",strerror(errno));
+		return 0;
 	}
 	uint8_t *ptr = ( (uint8_t*) v->sms ) + HEADER_LENGTH;
 	
 	int len = data->header[0] * data->header[1]; //@ 
-	int uv_len = len / 2;
-
-	uint8_t *in[4] = { ptr, ptr + len, ptr + len + uv_len,NULL };
-	int strides[4]    = { len, uv_len, uv_len,0 };
+	uint8_t *in[4] = { ptr, ptr + len, ptr + len + len,NULL };
+	int strides[4]    = { len, len, len,0 };
 	vj_frame_copy( in, dst, strides );
 
-//	veejay_memcpy( dst[0], ptr, len );
-//	veejay_memcpy( dst[1], ptr + len, uv_len );
-//	veejay_memcpy( dst[2], ptr + len + uv_len, uv_len );
-	
 	res = pthread_rwlock_unlock( &data->rwlock );
 	if( res == -1 ) {
-	//	veejay_msg(0, "%s",strerror(errno));
-		return -1;
+		veejay_msg(0, "%s",strerror(errno));
+		return 0;
 	}
 
 	return 0;
@@ -207,29 +201,29 @@ int		vj_shm_write( void *vv, uint8_t *frame[4], int plane_sizes[4] )
 
 	return 0;
 }
-/*
-void	*vj_shm_new_slave(int shm_id)
-{ 
-	int rc = 0;
 
-	if( shm_id <= 0 ) {
-		char *env_id = getenv( "VEEJAY_SHMID" );
-		if( env_id == NULL ) {
-			veejay_msg(0, "Failed to get SHMID, set VEEJAY_SHMID");
-			return NULL;
-		}
-		shm_id = atoi( env_id );
+void	vj_shm_free_slave(void *slave)
+{
+	vj_shm_t *v = (vj_shm_t*) slave;
+
+	if( shmdt( v->sms ) ) {
+		veejay_msg(0, "Error detaching from shared resource" );
 	}
 
+	free(v);
+}
+
+void	*vj_shm_new_slave(int shm_id)
+{ 
 	veejay_msg(VEEJAY_MSG_INFO, "Trying SHM_ID %d", shm_id );
 
-	int r = shmget( shm_id, 0, 0666 );
+	int r = shmget( shm_id, 0, 0400 );
 	if( r == -1 ) {
 		veejay_msg(0, "SHM ID '%d' gives error: %s", shm_id, strerror(errno));
 		return NULL;
 	}
 
-	void *ptr = shmat( r, NULL, 0 );
+	char *ptr = shmat( r, NULL, 0 );
 
 	if( ptr == (char*) (-1) ) {
 		veejay_msg(0, "failed to attach to shared memory %d", shm_id );
@@ -239,7 +233,13 @@ void	*vj_shm_new_slave(int shm_id)
 
 	vj_shm_t *v = (vj_shm_t*) vj_calloc(sizeof( vj_shm_t*));
 	v->sms = ptr;
-	//vj_shared_data *data = (vj_shared_data*) &(ptr[0]);
+	vj_shared_data *data = (vj_shared_data*) &(ptr[0]);
+
+	int palette = data->header[5];
+	int width   = data->header[0];
+	int height  = data->header[1];
+
+	veejay_msg(0, "SHM IN: %d, %d, %d", palette, width,height);
 
 
 	v->shm_id = shm_id;
@@ -247,7 +247,7 @@ void	*vj_shm_new_slave(int shm_id)
 	veejay_msg(VEEJAY_MSG_INFO, "Attached to shared memory segment %d", shm_id );
 
 	return v;
-}*/
+}
 
 static	int		vj_shm_file_ref_use_this( char *path ) {
 	struct stat inf;
@@ -271,8 +271,7 @@ static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
 	}
 
 	if(tries == 0xff) {
-		veejay_msg(0, "Run out of veejay_shm_out files, cat the files and ipcs/ipcrm any shared memory resources left over by previous processes");
-		veejay_msg(0, " --> %s", homedir );
+		veejay_msg(0,"Ran out of veejay_shm_out files, please remove them from %s", homedir);
 		return 0;
 	}
 
@@ -282,7 +281,7 @@ static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
 		return 0;
 	}
 
-	key_t key = ftok( path, tries ); //@ whatever 
+	key_t key = ftok( path, 128 );
 	if( key == -1 ) {
 		return 0;
 	}
@@ -293,7 +292,7 @@ static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
 	v->key = key;
 	v->file = strdup( path );
 	
-	veejay_msg(VEEJAY_MSG_DEBUG, " --> %s ", path );
+	veejay_msg(VEEJAY_MSG_DEBUG, "SHM resource file written to %s ", path );
 
 	return 1;
 }

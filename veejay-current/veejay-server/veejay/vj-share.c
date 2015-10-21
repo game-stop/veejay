@@ -2,7 +2,7 @@
 /*
  * Linux VeeJay
  *
- * Copyright(C)2002-2011 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -81,7 +81,7 @@ static void vj_flush(vj_client *sayvims,int frames) {
 
 int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 {
-	unsigned char tmp[64];
+	char tmp[64];
 	vj_client *c = vj_share_connect( master_host, master_port );
 	if(!c) {
 		veejay_msg(0, "Error connecting to %s:%d",master_host, master_port );
@@ -92,7 +92,7 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 
 	vj_client_send( c, V_CMD, (unsigned char*)"425:0;" ); 
 	
-	vj_client_read( c, V_CMD, tmp, 16 ); //@ get SHM id from
+	vj_client_read( c, V_CMD, (unsigned char*) tmp, 16 ); //@ get SHM id from
 
 	vj_flush(c,1);
 
@@ -115,4 +115,94 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 	return key;
 }
 
+int	vj_share_get_info( char *host, int port, int *width, int *height, int *format, int *key, int screen_id )
+{
+	char tmp[128];
+	vj_client *c = vj_share_connect( host, port );
+	if(!c) {
+		veejay_msg(0, "Error connecting to %s:%d",host,port );
+		return 0;
+	}
+
+	snprintf(tmp,sizeof(tmp),"%03d:%d;", VIMS_GET_SHM_EXT, screen_id );
+	vj_client_send( c, V_CMD, (unsigned char*) tmp );
+
+	memset(tmp,0,sizeof(tmp));
+	vj_client_read( c, V_CMD, (unsigned char*) tmp, 3 ); //@ get SHM id from
+
+	int msg_len = 0;
+	if( sscanf( tmp, "%d", &msg_len ) ) {
+
+		vj_client_read( c, V_CMD, (unsigned char*) tmp, msg_len );
+
+		sscanf( tmp, "%d %d %d %d",
+				width,height,format,key );
+	}
+	vj_client_close( c );
+
+	vj_client_free( c );
+
+	return 1;
+}
+
+
+int	vj_share_start_slave( char *host, int port, int shm_id)
+{
+	char tmp[64];
+	vj_client *c = vj_share_connect( host,port );
+	if(!c) {
+		veejay_msg(0, "Error connecting to %s:%d",host, port );
+		return 0;
+	}
+
+	snprintf( tmp,sizeof(tmp), "%03d:%d;", VIMS_SPLIT_CONNECT_SHM, shm_id );
+
+	vj_client_send( c, V_CMD, (unsigned char*) tmp ); 
+
+	vj_client_close( c );
+
+	vj_client_free( c );
+
+	return 1;
+}
+
+int	vj_share_start_net( char *host, int port, char *master_host, int master_port)
+{
+	char tmp[64];
+	vj_client *c = vj_share_connect( host,port );
+	if(!c) {
+		veejay_msg(0, "Error connecting to %s:%d",host, port );
+		return 0;
+	}
+
+	snprintf( tmp,sizeof(tmp), "%03d:%d %s;",VIMS_STREAM_NEW_UNICAST,master_port, master_host );
+
+	vj_client_send( c, V_CMD, (unsigned char*) tmp ); 
+
+	vj_client_close( c );
+
+	vj_client_free( c );
+
+	return 1;
+}
+
+int	vj_share_play_last( char *host, int port )
+{
+	char tmp[64];
+	vj_client *c = vj_share_connect( host,port );
+	if(!c) {
+		veejay_msg(0, "Error connecting to %s:%d",host, port );
+		return 0;
+	}
+
+	snprintf( tmp,sizeof(tmp), "%03d:-1;",VIMS_STREAM_SELECT );
+
+	vj_client_send( c, V_CMD, (unsigned char*) tmp ); 
+
+	vj_client_close( c );
+
+	vj_client_free( c );
+
+	return 1;
+}
 

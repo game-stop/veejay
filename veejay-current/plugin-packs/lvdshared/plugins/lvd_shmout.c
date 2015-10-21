@@ -48,7 +48,7 @@ how to setup:
 #include <string.h>
 #include <errno.h>
 #include <pthread.h>
-#include 	"../libplugger/specs/livido.h"
+#include 	"livido.h"
 LIVIDO_PLUGIN
 #include	"utils.h"
 #include	"livido-utils.c"

@@ -2133,7 +2133,7 @@ void		vj_init_vevo_events(void)
 #ifdef USE_SWSCALER
 	index_map_[VIMS_RGB24_IMAGE]				=	_new_event(
 				"%d %d",	
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_RGB24_IMAGE,
 				"GUI: Get preview image (raw RGB24)",
 				vj_event_get_scaled_image,
 				2,
@@ -2143,12 +2143,11 @@ void		vj_init_vevo_events(void)
 				"Height",
 				0,
 				NULL );
-
 #else
 #ifdef USE_GDK_PIXBUF
 		index_map_[VIMS_RGB24_IMAGE]				=	_new_event(
 				"%d %d",	
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_RGB24_IMAGE,
 				"GUI: Get preview image (raw RGB24)",
 				vj_event_get_scaled_image,
 				2,
@@ -2193,6 +2192,23 @@ void		vj_init_vevo_events(void)
 				NULL );
 #endif
 #endif
+	index_map_[VIMS_GET_SAMPLE_IMAGE]				=	_new_event(
+				"%d %d %d %d",	
+				VIMS_GET_SAMPLE_IMAGE,
+				"GUI: Get preview image from sample (raw RGB24)",
+				vj_event_get_sample_image,
+				4,
+				VIMS_ALLOW_ANY,
+				"ID",
+				0,
+				"Type",
+				0,
+				"Width",
+				0,
+				"Height",
+				0,
+				NULL );
+
 	index_map_[VIMS_CHAIN_TOGGLE_ALL]			=	_new_event(
 				"%d",
 				VIMS_CHAIN_TOGGLE_ALL,
@@ -2445,12 +2461,14 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY ,
 				NULL );
 	index_map_[VIMS_GET_FRAME]			=	_new_event(
-				NULL,
+				"%d",
 				VIMS_GET_FRAME,
 				"TCP: Send a frame to a connected veejay client",
 				vj_event_send_frame,
-				0,
+				1,
 				VIMS_ALLOW_ANY,
+				"Screen ID",
+				-1,
 				NULL );
 
 	index_map_[ VIMS_SUB_RENDER ] 		=	_new_event(
@@ -2882,7 +2900,7 @@ void		vj_init_vevo_events(void)
 				0,
 				"greyscale",
 				0,
-				NULL );	
+				NULL );
 
 	index_map_[ VIMS_SHM_WRITER ]			=	_new_event(
 				"%d",
@@ -2905,6 +2923,28 @@ void		vj_init_vevo_events(void)
 				"Not used yet",
 				0,
 				NULL );
+	index_map_[ VIMS_GET_SHM_EXT ] 				= _new_event(
+				"%d",
+				VIMS_GET_SHM_EXT,
+				"Write back veejay shared resource info",
+				vj_event_send_shm_info,
+				1,
+				VIMS_ALLOW_ANY,
+				"Screen ID",
+				0,
+				NULL );
+
+	index_map_[ VIMS_SPLIT_CONNECT_SHM ] 				= _new_event(
+				"%d",
+				VIMS_SPLIT_CONNECT_SHM,
+				"Display splitted screen resource",
+				vj_event_connect_split_shm,
+				1,
+				VIMS_ALLOW_ANY,
+				"Key",
+				0,
+				NULL );
+
 #endif
 }
 

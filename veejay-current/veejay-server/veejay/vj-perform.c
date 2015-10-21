@@ -57,6 +57,8 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/effects/opacity.h>
 #include <libqrwrap/qrwrapper.h>
+#include <veejay/vj-split.h>
+#include <libresample/resample.h>
 
 #define PERFORM_AUDIO_SIZE 16384
 
@@ -124,15 +126,13 @@ static size_t pribuf_len = 0;
 static uint8_t *socket_buffer = NULL;
 static uint8_t *fx_chain_buffer = NULL;
 static	size_t fx_chain_buflen = 0;
-static int		sbic = 0;
 static ycbcr_frame *record_buffer = NULL;	// needed for recording invisible streams
 static VJFrame *helper_frame = NULL;
 static int vj_perform_record_buffer_init();
 static void vj_perform_record_buffer_free();
-#ifdef HAVE_LIBRESAMPLE
-static ReSampleContext *resample_context[(MAX_SPEED+1)];
-static ReSampleContext *downsample_context[(MAX_SPEED+1)];
-#endif
+static void *resample_context[(MAX_SPEED+1)];
+static void *downsample_context[(MAX_SPEED+1)];
+
 static int last_rate_[2] = { 0, 0 };
 static const char *intro = 
 	"A visual instrument for GNU/Linux\n";
@@ -808,14 +808,12 @@ static void vj_perform_close_audio() {
 	int i;
 	for(i=0; i <= MAX_SPEED; i ++)
 	{
-#ifdef HAVE_LIBRESAMPLE
 		if(resample_context[i])
-			audio_resample_close( resample_context[i] );
+			vj_audio_resample_close( resample_context[i] );
 		if(downsample_context[i])
-			audio_resample_close( downsample_context[i]);
+			vj_audio_resample_close( downsample_context[i]);
 		resample_context[i] = NULL;
 		downsample_context[i] = NULL;
-#endif
 	}
 
 #endif
@@ -867,42 +865,40 @@ int vj_perform_init_audio(veejay_t * info)
 	{
 		int out_rate = (info->edit_list->audio_rate * (i+2));
 		int down_rate = (info->edit_list->audio_rate / (i+2));
-#ifdef HAVE_LIBRESAMPLE
-		resample_context[i] = av_audio_resample_init(
+		resample_context[i] = vj_av_audio_resample_init(
 					info->edit_list->audio_chans,
 					info->edit_list->audio_chans, 
 					info->edit_list->audio_rate,
 					out_rate,
 					SAMPLE_FMT_S16,
 					SAMPLE_FMT_S16,
+					2,
 					MAX_SPEED,
-					MAX_SPEED,
-					0,
-					0.8
+					1,
+					1.0
 					);
 		if(!resample_context[i])
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize audio upsampler for speed %d", i);
 			return 0;
 		}
-		downsample_context[i] = av_audio_resample_init(
+		downsample_context[i] = vj_av_audio_resample_init(
 					info->edit_list->audio_chans,
 					info->edit_list->audio_chans,
 					info->edit_list->audio_rate,
 					down_rate,
 					SAMPLE_FMT_S16,
 					SAMPLE_FMT_S16,
+					2,
 					MAX_SPEED,
-					MAX_SPEED,
-					0,
-					0.8 );
+					1,
+					1.0 );
        
 		if(!downsample_context[i])
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize audio downsampler for dup %d",i);
 			return 0;
 		}
-#endif
 	}
 	
 	return 1;
@@ -1164,10 +1160,10 @@ static void long2str(uint8_t *dst, uint32_t n)
    dst[3] = (n>>24)&0xff;
 }
 
-static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_t *p1_len, uint32_t *p2_len, uint32_t *p3_len)
+static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_t *p1_len, uint32_t *p2_len, uint32_t *p3_len, VJFrame *frame)
 {
-	const int len = info->effect_frame1->width * info->effect_frame1->height;
-	const int uv_len = info->effect_frame1->uv_len;
+	const int len = frame->len;
+	const int uv_len = frame->uv_len;
 	uint8_t *dstI = dst + 16;
 
 	if(lzo_ == NULL ) {
@@ -1178,7 +1174,7 @@ static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_
 		}
 	}
 
-	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, p1_len, len );
+	int i = lzo_compress( lzo_ , frame->data[0], dstI, p1_len, len );
 	if( i == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress Y plane");
@@ -1187,7 +1183,7 @@ static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_
 	uint32_t size1 = ( *p1_len );
 	dstI = dst + 16 + (sizeof(uint8_t) * size1 );
 	
-	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cb, dstI, p2_len, uv_len );
+	i = lzo_compress( lzo_, frame->data[1], dstI, p2_len, uv_len );
 	if( i == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress U plane");
@@ -1197,7 +1193,7 @@ static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_
 	uint32_t size2 = ( *p2_len );
 	dstI = dst + 16 + size1 + size2;
 
-	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cr, dstI, p3_len, uv_len );
+	i = lzo_compress( lzo_, frame->data[2], dstI, p3_len, uv_len );
 	if( i == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress V plane");
@@ -1216,89 +1212,134 @@ static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_
 
 void	vj_perform_done_s2( veejay_t *info ) {
 
-	sbic = 0;
 	info->settings->unicast_frame_sender = 0;
+}
+
+static int vj_perform_compress_primary_frame_s2(veejay_t *info,VJFrame *frame )
+{
+	char info_line[128];
+	int data_len = 44;  
+	int sp_w = frame->width;
+	int sp_h = frame->height;
+	int sp_uvlen = frame->uv_len;
+	int sp_len = frame->len;
+	int sp_format = frame->format;
+	uint32_t planes[4] = { 0 };
+
+	if(socket_buffer == NULL ) {
+		socket_buffer = vj_malloc(RUP8(data_len + (frame->len * 4 )));
+		if(socket_buffer == NULL) {
+			return 0;
+		}
+	}
+	veejay_memset(info_line, 0, sizeof(info_line) );
+	uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * data_len );
+
+	int compr_ok = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2], frame);
+	int total = planes[0] + planes[1] + planes[2] + 16;
+	if( compr_ok == 0 ) {
+		planes[0] = sp_len;
+		planes[1] = sp_uvlen;
+		planes[2] = planes[1];
+		total = 0;
+	}
+	
+	/* peer to peer connection */
+	sprintf(info_line,
+		"%04d%04d%04d%08d%08d%08d%08d", 
+		sp_w,
+		sp_h,
+		sp_format,
+		total,
+		planes[0],
+		planes[1],
+		planes[2] );
+
+	veejay_memcpy( socket_buffer, info_line, 44 );
+	
+	if( compr_ok == 0 )
+	{
+		if(!info->splitter) {
+			veejay_memcpy( socket_buffer + 44 , frame->data[0], sp_len);
+			veejay_memcpy( socket_buffer + 44 + sp_len,frame->data[1], sp_uvlen );
+			veejay_memcpy( socket_buffer + 44 + sp_len + sp_uvlen,frame->data[2],sp_uvlen );
+		}
+		else
+		{
+			veejay_memcpy( socket_buffer + 44, frame->data[0], sp_len + sp_uvlen + sp_uvlen);
+		}	
+		data_len += 16 + sp_len + sp_uvlen + sp_uvlen;
+			
+	} 
+	else {
+		data_len += 16 + planes[0] + planes[1] + planes[2];
+	}
+	
+	return data_len;
 }
 
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_link_id)
 {
-	char info_line[128];
-	int compr_ok = 0;
-	uint32_t planes[3] = {0};
-	int data_len = 44;  
-
-	memset(info_line, 0, sizeof(info_line) );
-
-	if(socket_buffer == NULL )
-		socket_buffer = vj_malloc( 
-					RUP8( info->effect_frame1->width * info->effect_frame1->height * 3 )
-					);
-
-	uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * data_len );
-
-	if( sbic == 0 ) {
-		compr_ok = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2]);
-		int total = planes[0] + planes[1] + planes[2] + 16;
-		if( compr_ok == 0 ) {
-			planes[0] = info->effect_frame1->width * info->effect_frame1->height;
-			planes[1] = info->effect_frame1->uv_len;
-			planes[2] = planes[1];
-			veejay_msg(VEEJAY_MSG_WARNING, "Failed to compress frame, sending raw planes: [%d,%d,%d]",
-					planes[0],planes[1],planes[2] );
-			total = 0;
-		}
-		sbic = 1;
-		/* peer to peer connection */
-		sprintf(info_line,
-			"%04d%04d%04d%08d%08d%08d%08d", 
-			info->effect_frame1->width,
-			info->effect_frame1->
-			height,info->effect_frame1->format,
-			total,
-			planes[0],
-			planes[1],
-			planes[2] );
-
-		veejay_memcpy( socket_buffer, info_line, 44 );
-		if( compr_ok == 0 )
-		{
-			veejay_memcpy( socket_buffer + 44 ,  primary_buffer[info->out_buf]->Y, info->effect_frame1->len );
-			veejay_memcpy( socket_buffer + 44 + info->effect_frame1->len,
-							     primary_buffer[info->out_buf]->Cb, info->effect_frame1->uv_len );
-			veejay_memcpy( socket_buffer + 44 + info->effect_frame1->len + info->effect_frame1->uv_len,
-							     primary_buffer[info->out_buf]->Cr, info->effect_frame1->uv_len );
-			data_len += 16 + info->effect_frame1->len + (info->effect_frame1->uv_len * 2);
-		} else {
-			data_len += 16 + planes[0] + planes[1] + planes[2];
-		}
-	}
-
-	int id = (mcast ? 2: 3);
-	int __socket_len = data_len;
 	int i;
+	
+	if( info->splitter ) {
+		for ( i = 0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
+			if( info->rlinks[i] >= 0 ) {
+				int link_id = info->rlinks[i];
+				if( link_id == -1 )
+					continue;
 
-	if(!mcast) 
-	{
-		for( i = 0; i < 8 ; i++ ) {
-			if( info->rlinks[i] != -1 ) {
-				if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, __socket_len,
-						info->effect_frame1, info->real_fps )<=0)
-				{
-					_vj_server_del_client( info->vjs[id], info->rlinks[i] );
+				int screen_id = info->splitted_screens[ i ];
+				if( screen_id < 0 )
+					continue;
+
+				VJFrame *frame = vj_split_get_screen( info->splitter, screen_id );
+				int data_len = vj_perform_compress_primary_frame_s2( info, frame );
+
+				if( vj_server_send_frame( info->vjs[3], link_id, socket_buffer,data_len, frame, info->real_fps ) <= 0 ) {
+					_vj_server_del_client( info->vjs[3], link_id );
 				}
-				info->rlinks[i] = -1;
-			}	
-		}
-	}
-	else
-	{		
-		if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, __socket_len,
-					info->effect_frame1, info->real_fps )<=0)
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame.");
-		}
-	}
 
+				info->rlinks[i] = -1;
+				info->splitted_screens[i] = -1;
+			}
+		}
+	}
+	else {
+		VJFrame fxframe;
+		veejay_memcpy(&fxframe, info->effect_frame1, sizeof(VJFrame));
+
+		VJFrame *frame = &fxframe;
+		fxframe.data[0] = primary_buffer[info->out_buf]->Y;
+		fxframe.data[1] = primary_buffer[info->out_buf]->Cb;
+		fxframe.data[2] = primary_buffer[info->out_buf]->Cr;
+
+		int	data_len = vj_perform_compress_primary_frame_s2( info,frame );
+
+		int id = (mcast ? 2: 3);
+
+		if(!mcast) 
+		{
+			for( i = 0; i < VJ_MAX_CONNECTIONS; i++ ) {
+				if( info->rlinks[i] != -1 ) {
+					if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, data_len,
+							frame, info->real_fps )<=0)
+					{
+							_vj_server_del_client( info->vjs[id], info->rlinks[i] );
+					}
+					info->rlinks[i] = -1;
+				}	
+			}
+		}
+		else
+		{		
+			if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, data_len,
+						frame, info->real_fps )<=0)
+			{
+				veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame.");
+			}
+		}
+	}
 
 	return 1;
 }
@@ -1702,11 +1743,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 				//@ clip sc into range, there isn't a resampler for every speed
 				if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED;
 
-#ifdef HAVE_LIBRESAMPLE
-				n_samples = audio_resample( resample_context[sc],(short*) audio_buf, (short*) sambuf, n_samples );
-#else
-				n_samples = 0;
-#endif
+				n_samples = vj_audio_resample( resample_context[sc],(short*) audio_buf, (short*) sambuf, n_samples );
 			}
 		} else if( speed == 0 ) {
 			n_samples = len = pred_len;
@@ -1742,13 +1779,9 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 			int sc = max_sfd - 2;
 			
 			if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED; 
-#ifdef HAVE_LIBRESAMPLE
 			// @ resample buffer
-			n_samples = audio_resample( downsample_context[ sc ], 
+			n_samples = vj_audio_resample( downsample_context[ sc ], 
 					(short*) down_sample_buffer,(short*) audio_buf, n_samples  );
-#else
-			n_samples = 0;
-#endif
 			*sampled_down = n_samples / max_sfd;
 			val = n_samples / max_sfd;
 			n_samples = val;
@@ -3265,15 +3298,26 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	if( settings->composite  ) {
 		VJFrame out;
 		veejay_memcpy( &out, info->effect_frame1, sizeof(VJFrame));
+		int curfmt = out.format;
 		if( out.ssm ) 
+		{
 			out.format = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
-			
+		}
+		
+
 		if(!frame->ssm) {
           	  chroma_supersample(settings->sample_mode,frame,pri );
           	  frame->ssm = 1;
-        	}
+			  frame->uv_len = frame->len;
+			  frame->format = out.format;
+        }
 
 		composite_process(info->composite,&out,info->effect_frame1,settings->composite,frame->format); 
+
+		if( settings->splitscreen ) {
+			composite_process_divert(info->composite,out.data,frame, info->splitter, settings->composite );
+		}
+
 		// draw font/qr in transformed image
 		if(osd_text ) {
 			VJFrame *tst = composite_get_draw_buffer( info->composite );
@@ -3286,8 +3330,22 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				free(tst);
 			}
 		} 
+
+		if( frame->ssm ) {
+			frame->uv_len = frame->uv_width * frame->uv_height;
+			frame->format = curfmt;
+		}
 	} 
 	else {
+
+		if(settings->splitscreen ) {
+			if(!frame->ssm) {
+	     	  chroma_supersample(settings->sample_mode,frame,pri );
+				  frame->ssm = 1;
+	       	}
+			vj_split_process( info->splitter, frame );
+		}
+
 		if( osd_text ) 
 			vj_font_render_osd_status(info->osd,frame,osd_text,placement);
 		if(more_text)
@@ -3298,6 +3356,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			qrbitcoin_draw( frame, info->homedir, frame->height/4,frame->height/4, frame->format );
 		}
 	}
+
 	if( osd_text)
 		free(osd_text);
 	if( more_text)	

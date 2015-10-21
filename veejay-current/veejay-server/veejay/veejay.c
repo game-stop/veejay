@@ -310,6 +310,8 @@ static void Usage(char *progname)
 		"  -S/--scene-detection <num>\tCreate new samples based on scene detection threshold <num>\n");
 	fprintf(stderr,
 		"  -M/--dynamic-fx-chain\t\tDo not keep FX chain buffers in RAM (default off)\n");
+	fprintf(stderr,
+		"    /--split-screen\t\tLoad split screen configuration\n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
@@ -536,11 +538,15 @@ static int set_option(const char *name, char *value)
 	{
 		info->dummy->active = 1; // enable DUMMY MODE
 	}
-    	else if (strcmp(name, "dynamic-fx-chain" ) == 0 || strcmp(name, "M" ) == 0 )
+    else if (strcmp(name, "dynamic-fx-chain" ) == 0 || strcmp(name, "M" ) == 0 )
 	{
 		info->uc->ram_chain = 0;
 	}
-    	else
+	else if (strcmp(name, "split-screen" ) == 0 )
+	{
+		info->settings->splitscreen = 1;
+	}
+    else
 		nerr++;			/* unknown option - error */
 
     return nerr;
@@ -609,6 +615,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"scene-detection",1,0,0},
 	{"dynamic-fx-chain",0,0,0},
 	{"pace-correction",1,0,0},
+	{"split-screen",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -763,7 +770,7 @@ int main(int argc, char **argv)
 		vj_osc_allocate(VJ_PORT+2);	
 		vj_event_dump();
 		vj_effect_dump();
-			fprintf(stdout, "Environment variables:\n\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tinterval of key pressed to repeat while pressed down.\n\tVEEJAY_PLAYBACK_CACHE\t\tSample cache size in MB\n\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\n\tVEEJAY_SCREEN_GEOMETRY\t\tSpecifiy a geometry for veejay to position the video window.\n\tVEEJAY_SCREEN_SIZE\t\tSize of video window, defaults to full screen size.\n\tVEEJAY_RUN_MODE\t\t\tRun in \"classic\" (352x288 Dummy) or default (720x576). \n");
+			fprintf(stdout, "Environment variables:\n\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tinterval of key pressed to repeat while pressed down.\n\tVEEJAY_PLAYBACK_CACHE\t\tSample cache size in MB\n\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\n\tVEEJAY_DESKTOP_GEOMETRY\t\tSpecifiy a geometry for veejay to position the video window.\n\tVEEJAY_VIDEO_POSITION\t\tPosition of video window\n\tVEEJAY_VIDEO_SIZE\t\tSize of video window, defaults to full screen size.\n\tVEEJAY_RUN_MODE\t\t\tRun in \"classic\" (352x288 Dummy) or default (720x576). \n");
 			fprintf(stdout,"\tVEEJAY_V4L2_NO_THREADING\tSet to 1 to query frame in main-loop\n");
 			fprintf(stdout,"\tVEEJAY_MULTITHREAD_TASKS\tSet the number of parallel tasks (multithreading) to use (default is equal to the number of cpu-cores)\n");
 			fprintf(stdout,"\tVEEJAY_PAUSE_EVERYTHING\t\tIf set to 1, video is paused but rendering continues. If set to 0, rendering pauses as well\n");

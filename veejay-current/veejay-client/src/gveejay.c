@@ -42,11 +42,13 @@ static int gveejay_theme = 0; // set to 1 to load with the default reloaded them
 static	int verbosity = 0;
 static int col = 0;
 static int row = 0;
-static int n_tracks = 4;
+static int n_tracks = 7;
 static int launcher = 0;
 static int preview = 0; // off
 static int use_threads = 0;
 static char midi_file[1024];
+static int beta = 0;
+static int auto_connect = 0;
 static int geom_[2] = { -1 , -1};
 static struct
 {
@@ -75,6 +77,8 @@ static void usage(char *progname)
 	printf( "-V\t\tShow version, data directory and exit.\n");
 	printf( "-m <file>\tMIDI configuration file.\n");
     printf( "-g\t\t<X,Y>\tWindow position on screen.\n");
+	printf( "-b\t\tEnable beta features.\n");
+	printf( "-a\t\tAuto-connect to local running veejays.\n");
 	printf( "\n\n");
         exit(-1);
 }
@@ -100,7 +104,7 @@ static int      set_option( const char *name, char *value )
 	}
 	else if (strcmp(name, "X") == 0 )
 	{
-		n_tracks = atoi(optarg); 
+		n_tracks = 1 + atoi(optarg); 
 		if( n_tracks < 1 || n_tracks > mt_get_max_tracks() )
 			n_tracks = 1;
 	}
@@ -149,9 +153,15 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
-        else
-	        err++;
-        return err;
+	else if (strcmp(name,"b") == 0 || strcmp(name, "beta" ) == 0 ) {
+		beta = 1;
+	}
+	else if (strcmp(name,"a") == 0 ) {
+		auto_connect = 1;
+	}
+    else
+	      err++;
+    return err;
 }
 static volatile gulong g_trap_free_size = 0;
 static struct timeval time_last_;
@@ -216,7 +226,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	snprintf(hostname,sizeof(hostname), "127.0.0.1");
 
-	while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:m:g:")) != EOF )
+	while( ( n = getopt( argc, argv, "s:h:p:tabnvHfX:P:Vl:T:m:g:")) != EOF )
     {
 		sprintf(option, "%c", n );
 		err += set_option( option, optarg);
@@ -243,7 +253,7 @@ int main(int argc, char *argv[]) {
 
 	register_signals();
 		
-	vj_gui_init( skins[selected_skin].file, launcher, hostname, port_num, use_threads, load_midi, midi_file );
+	vj_gui_init( skins[selected_skin].file, launcher, hostname, port_num, use_threads, load_midi, midi_file,beta,auto_connect);
 	vj_gui_style_setup();
 
 

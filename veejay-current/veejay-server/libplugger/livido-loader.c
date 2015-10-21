@@ -863,12 +863,16 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 	{
 		shmid = vj_shm_get_id(); //@ put in HOST value
 		vevo_property_set( filter_instance,"HOST_shmid", VEVO_ATOM_TYPE_INT,1,&shmid );
-		veejay_msg( VEEJAY_MSG_INFO, "Told plugin my Shared Memory ID");
+		veejay_msg( VEEJAY_MSG_INFO, "Hooking up plugin to shared resource %d", shmid);
 	} 
 
 	if( (*init_f)( (livido_port_t*) filter_instance ) != LIVIDO_NO_ERROR ) {
-		veejay_msg(0, "Error while initializing Livido filter");
 		livido_port_recursive_free( filter_instance );
+		
+		char *plugin_name =  get_str_vevo( filter_templ, "name" );
+		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize LiViDO plugin '%s'", plugin_name);
+	    if(plugin_name)
+			free(plugin_name);	   
 		return NULL;
 	}
 
@@ -1263,6 +1267,7 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 
 	if( compiled_as < LIVIDO_API_VERSION ) {
 		veejay_msg(VEEJAY_MSG_WARNING,  "I am using a newer LiViDO API. Overwrite your livido.h from libplugger/specs/livido.h and recompile your plugins.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Plugin %s was compiled for LiViDO-%d, current is %d", plugin_name,compiled_as, LIVIDO_API_VERSION );
 		free(plugin_name);
 		return NULL;
 	}

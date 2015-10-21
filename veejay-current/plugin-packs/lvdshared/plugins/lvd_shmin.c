@@ -40,7 +40,7 @@
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
 
-#include 	"../libplugger/specs/livido.h"
+#include 	"livido.h"
 LIVIDO_PLUGIN
 #include	"utils.h"
 #include	"livido-utils.c"
@@ -63,6 +63,8 @@ static	inline int	lvd_to_ffmpeg( int lvd, int fr ) {
 			return PIX_FMT_RGB24;
 		case LIVIDO_PALETTE_RGBA32:
 			return PIX_FMT_RGBA;
+		case LIVIDO_PALETTE_YUV444P:
+			return PIX_FMT_YUV444P;
 		default:
 			if( fr ) 
 				return PIX_FMT_YUVJ422P;
@@ -88,7 +90,6 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 		snprintf(path,sizeof(path)-1, "%s/.veejay/veejay.shm", home );
 		int fd = open( path, O_RDWR );
 		if(fd <= 0) {
-			printf("no env var VEEJAY_SHMID set and no file '%s' found!\n",path );
 			return LIVIDO_ERROR_ENVIRONMENT;
 		}
 		char buf[256];
@@ -263,6 +264,12 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		strides[2] = strides[1];
 		in[1] = in[0] + ( srcW * srcH );
 		in[2] = in[1] + ( (srcW>>1) * srcH);
+	} else if ( srcFormat == PIX_FMT_YUV444P || srcFormat == PIX_FMT_YUVJ444P ) {
+		strides[0] = srcW;
+		strides[1] = srcW;
+		strides[2] = srcW;
+		in[1] = in[0] + (srcW * srcH);
+		in[2] = in[1] + (srcW * srcH);
 	}
 
 	sws_scale( sws, (const uint8_t *const *)in, strides,0, srcH,(uint8_t * const*) O, dst_strides );
@@ -271,7 +278,6 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	if( res == -1 ) {
 		return LIVIDO_ERROR_RESOURCE; 
 	}
-
 
 	return LIVIDO_NO_ERROR;
 }

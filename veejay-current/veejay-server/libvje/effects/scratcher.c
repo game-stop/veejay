@@ -88,9 +88,6 @@ void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 {
 	int uv_len = src->uv_len;
 	int strides[4] = { (w * h), uv_len, uv_len , 0 };
-	uint8_t *Y = src->data[0];
-	uint8_t *Cb= src->data[1];
-	uint8_t *Cr= src->data[2];
 
 	uint8_t *dest[4] = {
 		frame[0] + (w*h*nframe),
@@ -132,7 +129,6 @@ void scratcher_apply(VJFrame *src,
 {
 
     unsigned int len = src->len;
-    unsigned int op1 = (opacity > 255) ? 255 : opacity;
     int offset = len * nframe;
     int uv_len = src->uv_len;
     int uv_offset = uv_len * nframe;

@@ -81,13 +81,20 @@ static	void	net_delay(long ms, long sec )
 	clock_nanosleep( CLOCK_REALTIME,0, &ts, NULL );
 }
 
+static int my_screen_id = -1;
+void  net_set_screen_id(int id)
+{
+	my_screen_id = id;
+	veejay_msg(VEEJAY_MSG_DEBUG,"Network stream bound to screen %d", id );
+}
+
 void	*reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
 	threaded_t *t = tag->priv;
 	
 	char buf[16];
-	snprintf(buf,sizeof(buf)-1, "%03d:;", VIMS_GET_FRAME);
+	snprintf(buf,sizeof(buf)-1, "%03d:%d;", VIMS_GET_FRAME, my_screen_id);
 
 	int retrieve = 0;
 	int success  = 0;
@@ -299,9 +306,13 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 
 	if( PIX_FMT_YUV420P == t->in_fmt || PIX_FMT_YUVJ420P == t->in_fmt )
 		buvlen = b_len/4;
-	else
+	else if ( PIX_FMT_YUV444P == t->in_fmt || PIX_FMT_YUVJ444P == t->in_fmt ) {
+		buvlen = b_len;
+	}
+	else {
 		buvlen = b_len/2;
-	
+	}
+
 	if( t->a == NULL )
 		t->a = yuv_yuv_template( t->buf, t->buf + b_len, t->buf+ b_len+ buvlen,t->in_w,t->in_h, t->in_fmt);
 	

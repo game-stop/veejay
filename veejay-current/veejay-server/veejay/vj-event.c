@@ -72,9 +72,12 @@
 #include <veejay/vj-font.h>
 #endif
 
+#include <libstream/vj-net.h>
+
 static int use_bw_preview_ = 0;
 static int _last_known_num_args = 0;
 static hash_t *BundleHash = NULL;
+static uint8_t *sample_image_buffer = NULL;
 
 static int vj_event_valid_mode(int mode) {
 	switch(mode) {
@@ -2589,7 +2592,10 @@ void	vj_event_destroy()
 	if(keyboard_events) vj_event_destroy_hash( keyboard_events );
 #endif
 	if(BundleHash) vj_event_destroy_bundles( BundleHash );
-	
+
+	if(sample_image_buffer)
+		free(sample_image_buffer);
+
 	vj_picture_free();	
 
 	vj_event_vevo_free();
@@ -9059,6 +9065,38 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v, s_print_buf);
 	free(s_print_buf);
 }
+void	vj_event_send_shm_info( void *ptr, const char format[], va_list ap)
+{
+	int args[1] = { -1 };
+	char *str = NULL;
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,str,format,ap);
+
+	net_set_screen_id( args[0] );
+
+	char *msg = get_print_buf(128);
+	snprintf( msg, 128, 
+		   "%d %d %d %d",
+			v->video_output_width,
+			v->video_output_height,
+			v->pixel_format,
+			vj_shm_get_my_id( v->shm ) );
+	
+	int  msg_len = strlen(msg);
+	char *tmp = get_print_buf(1 + msg_len + 3);
+
+	sprintf( tmp, "%03zu%s",msg_len, msg );
+					
+	SEND_MSG(v,tmp);
+	free(msg);
+	free(tmp);
+	
+	if( args[0] >= 0 ) {
+		veejay_msg(VEEJAY_MSG_INFO, "Binding this instance to screen %d of remote",
+				args[0]);
+	}
+}
+
 
 void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_list ap	)
 {
@@ -9122,23 +9160,23 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	int i = 0;
-	int ok = 0;
-	for( i = 0; i < 8; i ++ ) {
-		if( v->uc->current_link == v->rlinks[i] ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Someone grabbed two beers at once!");
-		}
-		if( v->rlinks[i] == -1 ) {
-			v->rlinks[i] = v->uc->current_link; //@ queue. used in vj_perform_send_primary_frame_s2
-			ok = 1;
-			break; 
-		}
+	int args[1] = { -1 };
+	char *str = NULL;
+
+	if( v->splitter ) {
+		P_A(args,str,format,ap);
 	}
 
-	if( !ok ) {
-		veejay_msg(0, "No more video stream connections allowed, limited to 8");	
-		SEND_MSG(v,"00000000000000000000"); 
-		return;
+	int i = 0;
+	
+	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ ) {
+		if( v->rlinks[i] == -1 ) {
+			v->rlinks[i] = v->uc->current_link;
+			if( v->splitter ) {
+				v->splitted_screens[ i ] = args[0];
+			}
+			break;
+		}
 	}
 
 	if (!v->settings->is_dat )
@@ -9733,11 +9771,34 @@ void	vj_event_connect_shm( void *ptr, const char format[], va_list ap )
 	int32_t key = vj_share_pull_master( v->shm,"127.0.0.1", args[0] );
 	int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, key,0);
 	
+	if( id <= 0 ) {
+		veejay_msg(0, "Unable to connect to shared resource id %d", key );
+	}
+}
+
+void	vj_event_connect_split_shm( void *ptr, const char format[], va_list ap )
+{
+		veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+	
+	int32_t key = args[0];
+	int safe_key = vj_shm_get_id();
+
+	vj_shm_set_id( key );
+
+	veejay_msg(VEEJAY_MSG_INFO,"Shared memory resource %x (%d)", key,key);
+
+	int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, 0, key);
+	
+	vj_shm_set_id( safe_key );
 	
 	if( id <= 0 ) {
 		veejay_msg(0, "Unable to connect to shared resource id %d", key );
 	}
 
+	veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG ,id);
 }
 
 #ifdef HAVE_FREETYPE
@@ -10431,6 +10492,108 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 	{
 		vj_event_sample_next( v , NULL, NULL );
 	}
+}
+
+void	vj_event_get_sample_image		(	void *ptr,	const char format[],	va_list	ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[4];
+	char *str = NULL;
+	
+	P_A(args,str,format,ap);
+
+	int max_w = vj_perform_preview_max_width();
+	int max_h = vj_perform_preview_max_height();
+		
+	int w = args[2]; 
+	int h = args[3];
+
+	int type = args[1];
+
+	if(args[0] == -1 && type == 0)
+		args[0] = sample_size() - 1;
+	else if (args[0] == -1 && type != 0 ) 
+		args[0] = vj_tag_size() - 1;
+
+	if( args[0] == 0) 
+		args[0] = v->uc->sample_id;
+
+	int id = args[0];
+
+	int startFrame = (type == 0 ? 0 : -1);
+
+	if( w <= 0 || h <= 0 || w >= max_w || h >= max_h )
+	{
+		veejay_msg(0, "Invalid image dimension %dx%d requested (max is %dx%d)",w,h,max_w,max_h );
+		SEND_MSG(v, "000000000000" );
+		return;
+	}
+
+	int dstlen = 0;
+	
+	editlist *el = ( type == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_editlist(id) : v->edit_list );
+	if( el == NULL && type == VJ_PLAYBACK_MODE_SAMPLE ) {
+		veejay_msg(0, "No such sample %d", id );
+		SEND_MSG(v, "000000000000" );
+		return;
+	}
+
+	uint8_t *img[4] = { 0 };
+	if( sample_image_buffer == NULL ) {
+		sample_image_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * v->video_output_width * v->video_output_height * 4);
+	}
+	if( sample_image_buffer == NULL ) {
+		veejay_msg(0, "Not enough memory", id );
+		SEND_MSG(v, "000000000000" );
+		return;
+	}
+
+	img[0] = sample_image_buffer;
+	img[1] = img[0] + v->video_output_width * v->video_output_height;
+	img[2] = img[1] + v->video_output_width * v->video_output_height;
+
+	if( startFrame >= 0 ) {
+		int ret = vj_el_get_video_frame( el, startFrame, img );
+		if( ret == 0 ) {
+			veejay_msg(VEEJAY_MSG_WARNING,"Unable to decode frame 1");
+			SEND_MSG(v, "000000000000" );
+			return;
+		}
+	}
+	else {
+		//FIXME preview from streamed video
+		SEND_MSG(v, "000000000000" );
+		return;
+	}
+
+	VJFrame *frame = yuv_yuv_template( img[0],img[1],img[2], v->video_output_width, v->video_output_height,
+			get_ffmpeg_pixfmt( v->pixel_format ));
+
+	if( use_bw_preview_ ) {
+		vj_fastbw_picture_save_to_mem(
+				frame,
+				w,
+				h,
+				frame->format );
+
+		dstlen = w * h;
+	}
+	else {
+		vj_fast_picture_save_to_mem(
+				frame,
+				w,
+				h,
+				frame->format );
+		dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
+	}
+
+	char header[16];
+	snprintf( header,sizeof(header), "%06d%04d%2d", dstlen, args[0],args[1] );
+	SEND_DATA(v, header, 12 );
+	SEND_DATA(v, vj_perform_get_preview_buffer(), dstlen );
+
+	free(frame);
+
 }
 
 

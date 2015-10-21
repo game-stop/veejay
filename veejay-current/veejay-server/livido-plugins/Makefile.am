@@ -1,7 +1,7 @@
 lividoplugin_LTLIBRARIES = lvd_solid.la \
 			   lvd_colortone.la \
 			   lvd_displaywall.la \
-			   lvd_stroboscope.la
+			   lvd_stroboscope.la 
 
 lvd_solid_la_SOURCES = lvd_solid.c
 lvd_colortone_la_SOURCES = lvd_colortone.c

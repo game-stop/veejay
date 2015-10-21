@@ -95,20 +95,28 @@ typedef struct
 	int  	  ph;
 } multitracker_t;
 
-static volatile int	MAX_TRACKS = 2;
-static	void		*parent__ = NULL;
+static int	MAX_TRACKS = 8; /* MASTER (current) + Track 1 to 6 */
+static void		*parent__ = NULL;
 
-static	int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, int *port_num);
-static	void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
-static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
+static char	*mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *error);
+static void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
+static void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
 static sequence_view_t *new_sequence_view( void *vp, int num );
-static	void	update_pos( void *data, gint total, gint current );
-static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data);
+static void	update_pos( void *data, gint total, gint current );
+static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data);
 
 extern GdkPixbuf       *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 extern void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *f, int line );
 
 #define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request(a,b,c)
+
+int mt_set_max_tracks(int mt)
+{
+	if( mt < 0 || mt > __MAX_TRACKS)
+		return 0;
+	MAX_TRACKS = mt;
+	return 1;
+}
 
 int	mt_get_max_tracks()
 {
@@ -737,7 +745,7 @@ void		*multitrack_sync( void * mt )
 	return (void*)s;
 }
 
-static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, int *port_num)
+static char *mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *error)
 {
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( 
 				"Connect to a Veejay",
@@ -780,15 +788,18 @@ static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len,
 
 	if( res == GTK_RESPONSE_ACCEPT )
 	{
-		const gchar *host = gtk_entry_get_text( GTK_ENTRY( text_entry ) );
+		const char *host = gtk_entry_get_text( GTK_ENTRY( text_entry ) );
 		gint   port = gtk_spin_button_get_value( GTK_SPIN_BUTTON(num_entry ));
-		strncpy( hostname, host, len );
 		*port_num = port;
+		*error    = 0;
+		return strdup(host);
 	}
 
 	gtk_widget_destroy( dialog );
 
-	return res;
+	*error = res;
+	*port_num = 0;
+	return NULL;
 }
 
 void		*multitrack_new(
@@ -802,14 +813,9 @@ void		*multitrack_new(
 		gint max_h,
 		GtkWidget *main_preview_area,
 		void *infog,
-		int threads,
-		int num_tracks)
+		int threads)
 {
-	multitracker_t *mt = NULL;
-
-	MAX_TRACKS	= num_tracks;
-
-	mt 		= (multitracker_t*) vj_calloc(sizeof(multitracker_t));
+	multitracker_t *mt = (multitracker_t*) vj_calloc(sizeof(multitracker_t));
 	mt->view 	= (sequence_view_t**) vj_calloc(sizeof(sequence_view_t*) * MAX_TRACKS );
 	mt->preview	= NULL;
 	mt->main_window = win; 
@@ -852,28 +858,29 @@ int		multitrack_add_track( void *data )
 {
 	multitracker_t *mt = (multitracker_t*) data;
 	int res = 0;
-	char *hostname = vj_calloc( 100 );
-	int   port_num = 0;
+	int port_num = 0;
+	int error = 0;
 
-	if( mt_new_connection_dialog( mt, hostname, 100, &port_num ) == GTK_RESPONSE_ACCEPT )
+	char *hostname = mt_new_connection_dialog( mt,&port_num,&error );
+	if( error || hostname == NULL ) {
+		return res;
+	}
+
+	int track = 0;
+
+	if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
 	{
-		int track = 0;
-
-		if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
-		{
-			status_print( mt, "Connection established with veejay runnning on %s port %d",
-				hostname, port_num );	
-			if( gveejay_user_preview() )
-				gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mt->view[track]->toggle), TRUE );
-			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
-			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
-			
-			res = 1;
-		}
-		else
-		{
-			status_print( mt, "Unable to open connection with %s : %d", hostname, port_num );
-		}
+		status_print( mt, "Connection established with veejay runnning on %s port %d", hostname, port_num );	
+		if( gveejay_user_preview() )
+			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mt->view[track]->toggle), TRUE );
+		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
+		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
+		
+		res = 1;
+	}
+	else
+	{
+		status_print( mt, "Unable to open connection with %s : %d", hostname, port_num );
 	}
 
 	free( hostname );

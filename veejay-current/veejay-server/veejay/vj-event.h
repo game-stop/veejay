@@ -309,5 +309,7 @@ void	vj_event_cali_write_file( void *ptr, const char format[], va_list ap );
 void	vj_event_stream_new_cali( void *ptr, const char format[], va_list ap );
 void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	);
 void	vj_event_sub_render( void *ptr, const char format[], va_list ap );
-
+void	vj_event_send_shm_info( void *ptr, const char format[], va_list ap);
+void	vj_event_connect_split_shm( void *ptr, const char format[], va_list ap );
+void	vj_event_get_sample_image(void *ptr,const char format[],va_list	ap	);
 #endif

@@ -35,7 +35,7 @@ lib_LTLIBRARIES = $(VEEJAY_LIB_FILE)
 libveejay_la_SOURCES =  jpegutils.c vj-misc.c vj-task.c \
 			vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-perform.c \
 			x11misc.c vj-shm.c vj-sdl.c vj-sdl-font.c vj-dfb.c vj-viewport.c vj-composite.c \
-			vj-font.c vj-pjack.c vj-share.c liblavplayvj.c 
+			vj-font.c vj-pjack.c vj-share.c vj-split.c liblavplayvj.c 
 
 libveejay_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 		       -release $(LT_RELEASE) -no-undefined -export-dynamic $(DEBUGLIBS)
@@ -47,6 +47,7 @@ libveejay_la_LIBADD = \
 			-L$(top_builddir)/thirdparty/libhash  -lhash \
 			-L$(top_builddir)/thirdparty/liblzo  -lvjlzo \
 			-L$(top_builddir)/thirdparty/libOSC  -lOSC \
+			-L$(top_builddir)/thirdparty/libresample -lresample \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem -lvjmem \
 			-L$(top_builddir)/libvje -lvje \
@@ -84,7 +85,7 @@ veejay_headers = vims.h jpegutils.h vevo.h vj-composite.h vj-jack.h \
                  vj-OSC.h vj-viewport.h lav_common.h vims.h vj-dfb.h \
                  vjkf.h vj-perform.h vj-viewport-xml.h libveejay.h \
                  vj-audio.h vj-event.h vj-lib.h vj-plug.h x11misc.h \
-                 veejay.h vj-bjack.h vj-font.h vj-misc.h vj-sdl.h vj-task.h
+                 veejay.h vj-bjack.h vj-font.h vj-misc.h vj-sdl.h vj-task.h vj-split.h
 
 veejay_SOURCES	= veejay.c ${veejay_headers} 
 veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@

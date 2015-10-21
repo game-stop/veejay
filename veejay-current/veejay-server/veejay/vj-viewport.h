@@ -63,6 +63,6 @@ int	viewport_get_initial_active( void *vv );
 char 	*viewport_get_my_help(void *vv);
 int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int inc_x, int inc_y);
 void    viewport_save_settings( void *v, int frontback );
-
+void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] );
 #endif
 

@@ -199,14 +199,12 @@ static	int	add_to_plugin_list( const char *path )
 
 		if(!handle) 
 		{
-			veejay_msg(0,"Plugin '%s' error '%s'", fullname,
-				 dlerror() );
+			veejay_msg(0,"Plugin '%s' error '%s'", fullname, dlerror() );
 			continue;
 		}
 		char *bname = basename( fullname );
 		char *basename = vj_strdup( bname );
 		void *plugin = NULL;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Loading %s",fullname );
 
 		if(dlsym( handle, "plugMain" ) && sizeof(long) == 4)
 		{
@@ -241,7 +239,7 @@ static	int	add_to_plugin_list( const char *path )
 				dlclose(handle);
 		} else{
 			dlclose(handle);
-			veejay_msg(VEEJAY_MSG_DEBUG, "%s is not compatible.", fullname );
+			veejay_msg(VEEJAY_MSG_DEBUG, "Incompatible plugin %s skipped", fullname );
 		}
 
 		if( plugin ) {
@@ -545,21 +543,16 @@ int	plug_sys_detect_plugins(void)
 	//@ For every time there is a void* passed as int a gremlin will be happy
 	if( sizeof(long) == 4 ) {
 		if( n_ff_ > 0 ) { 
-			veejay_msg(VEEJAY_MSG_INFO, "FreeFrame - cross-platform real-time video effects (http://freeframe.sourceforge.net)");
-			veejay_msg(VEEJAY_MSG_INFO, "            found %d FreeFrame %s",	n_ff_ , n_ff_ == 1 ? "plugin" : "plugins" );
+			veejay_msg(VEEJAY_MSG_INFO, "FreeFrame - %d plugins # cross-platform real-time video effects (http://freeframe.sourceforge.net)", n_ff_);
 		}
 	}
 
 	if( n_fr_ > 0 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "frei0r - a minimalistic plugin API for video effects (http://www.piksel.org/frei0r)");
-		veejay_msg(VEEJAY_MSG_INFO, "         found %d frei0r %s",
-			n_fr_ , n_fr_ == 1 ? "plugin" : "plugins" );
+		veejay_msg(VEEJAY_MSG_INFO, "frei0r - %d plugins # a minimalistic plugin API for video effects (http://www.piksel.org/frei0r)", n_fr_);
 	}	
 
 	if( n_lvd_ > 0 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "Livido - (Linux) Video Dynamic Objects" );
-		veejay_msg(VEEJAY_MSG_INFO, "         found %d Livido %s",
-			n_lvd_, n_lvd_ == 1 ? "plugin" :"plugins" );
+		veejay_msg(VEEJAY_MSG_INFO, "Livido - %d plugins # (Linux) Video Dynamic Objects",n_lvd_ );
 	}
 	
 	plug_print_all();
@@ -800,7 +793,9 @@ void	*plug_activate( int fx_id )
 
 	void *instance = instantiate_plugin( index_map_[fx_id], base_width_,base_height_);
 	if( instance == NULL ) {
-		veejay_msg(0, "Error instantiating plugin.");
+		char *plugname = plug_get_name( fx_id );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Instantiating plugin '%s' failed due to an error", plugname);
+		if(plugname) free(plugname);
 		return NULL;
 	}
 	return instance;
@@ -839,7 +834,7 @@ void	plug_print_all()
 {
 	int n;
 	int x=0;
-	for(n = 0; n < index_ ; n ++ )
+	/*for(n = 0; n < index_ ; n ++ )
 	{
 		char *fx_name = plug_get_name(n);
 		if(fx_name)
@@ -851,9 +846,12 @@ void	plug_print_all()
 	}
 
 	if( x < n ) {
-		veejay_msg(VEEJAY_MSG_INFO, "Loaded %d/%d plugins", x,n );
+		veejay_msg(VEEJAY_DEBUG_INFO, "Loaded %d/%d plugins", x,n );
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "Loaded %d plugins in total",n);
+	*/
+
+	veejay_msg(VEEJAY_MSG_INFO, "FX engine ready. Loaded %d plugins and %d built-ins (%d in total)",
+			n,vj_effect_max_effects(),vj_effect_max_effects()+n);
 		
 }
 

@@ -39,7 +39,7 @@
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #endif
-
+#include <veejay/vj-split.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
 #ifdef HAVE_GL
@@ -140,13 +140,11 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 
 	c->back1 = NULL;
 
-	veejay_msg(VEEJAY_MSG_INFO, "Configuring projection:");
-	veejay_msg(VEEJAY_MSG_INFO, "\tSoftware scaler  : %s", yuv_get_scaler_name(zoom_type) );
-	veejay_msg(VEEJAY_MSG_INFO, "\tVideo resolution : %dx%d", iw,ih );
-	veejay_msg(VEEJAY_MSG_INFO, "\tScreen resolution: %dx%d", pw,ph );
-	veejay_msg(VEEJAY_MSG_INFO, "\tStatus           : %s",
-		(vp1_enabled ? "Active":"Inactive"));
-	veejay_msg(VEEJAY_MSG_INFO, "Press Middle-Mouse button to activate setup.");
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tSoftware scaler  : %s", yuv_get_scaler_name(zoom_type) );
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tVideo resolution : %dx%d", iw,ih );
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tScreen resolution: %dx%d", pw,ph );
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tStatus           : %s",(vp1_enabled ? "Active":"Inactive"));
+
 	*vp1_e = (vp1_enabled ? 1 : 2);
 
 	char *gf_instr = getenv( "VEEJAY_ORIGINAL_FRAME" );
@@ -172,7 +170,6 @@ void	*composite_clone( void *compiz )
 	if(!c) return NULL;
 	void *v = viewport_clone(c->vp1,c->img_width,c->img_height);
 	viewport_reconfigure(v);
-
 	return v;
 }
 
@@ -227,6 +224,7 @@ void	composite_set_ui(void *compiz, int status )
 
 	viewport_set_ui( c->vp1, status );
 }
+
 
 void	composite_add_to_config( void *compiz, void *vc, int which_vp )
 {
@@ -345,7 +343,24 @@ void	composite_blit_yuyv( void *compiz, uint8_t *in[4], uint8_t *yuyv, int which
 		viewport_produce_full_img_yuyv( c->vp1,c->proj_plane,yuyv);
 		return;
 	}
+}
 
+void	composite_process_divert( void *compiz,uint8_t *in[4], VJFrame *out, void *splitter, int which_vp )
+{
+	composite_t *c = (composite_t*) compiz;
+	int vp1_active = viewport_active(c->vp1);
+
+	if( vp1_active && which_vp == 2 ) {
+		vj_split_process( splitter, out );
+	}
+	else if( which_vp == 2 ) {
+		viewport_produce_full_img(c->vp1,c->proj_plane,out->data);
+		vj_split_process( splitter, out );
+	}
+	else if ( which_vp == 1 && !vp1_active ) {
+		viewport_produce_full_img(c->vp1,c->proj_plane,out->data);
+		vj_split_process( splitter, out );
+	}
 }
 
 //@OBSOLETE

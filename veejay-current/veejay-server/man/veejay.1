@@ -225,11 +225,14 @@ Delay key repeat in ms
 .B VEEJAY_FULLSCREEN 
 Fullscreen (1) or windowed (0) mode
 .TP
-.B VEEJAY_SCREEN_GEOMETRY
-Specifiy a geometry for veejay to position the video window. Use this feature to specificy where a video window appears in TwinView or One Big Desktop
+.B VEEJAY_DESKTOP_GEOMETRY
+Specifiy the desktop geometry for veejay to position the video window. Use this feature to specificy where a video window appears in TwinView or One Big Desktop
 .TP
-.B VEEJAY_SCREEN_SIZE
-Specifiy the size of the video window.
+.B VEEJAY_VIDEO_SIZE
+Specifiy the size of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
+.TP
+.B VEEJAY_VIDEO_POSITION
+Specificy the position of the video window (inside VEEJAY_DESKTOP_GEOMETRY)
 .TP
 .B VEEJAY_DEFAULT_CHANNEL
 Specify the default video4linux channel id
@@ -244,10 +247,10 @@ MMap size per loaded video file
 Set this to "CLASSIC" if you want to startup in low resolution
 .B Examples
 .TP
-.B VEEJAY_SCREEN_GEOMETRY=2624x1024+1600x0
-The video window will be displayed on the second screen, first screen is 1600 pixels wide. Specify this and VEEJAY_SCREEN_SIZE to create a borderless video window for use on one of your monitors in TwinView or One Big Desktop mode.
+.B VEEJAY_DESKTOP_GEOMETRY=2624x1024+1600x0
+The video window will be displayed on the second screen, first screen is 1600 pixels wide. Specify this and VEEJAY_VIDEO_SIZE to create a borderless video window for use on one of your monitors in TwinView or One Big Desktop mode.
 .TP
-.B VEEJAY_SCREEN_SIZE=1024x768
+.B VEEJAY_VIDEO_SIZE=1024x768
 The second screen is 1024x768, the video window will appear fullscreen 
 .TP
 .B VEEJAY_DEFAULT_CHANNEL

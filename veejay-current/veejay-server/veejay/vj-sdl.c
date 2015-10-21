@@ -68,7 +68,7 @@ static	int	wm_fullscreen(int action, Display *disp, Window *win) {
 	return 1;
 }
 */
-static void vj_sdl_move( vj_sdl *vjsdl , int scaled_width, int scaled_height, int x, int y )
+static void vj_sdl_move( vj_sdl *vjsdl , int display_wid, int display_hei, int scaled_width, int scaled_height, int x, int y )
 {
 	//@ sw_scale_width is misleading ; it lets SDL use the BES 
 	if (scaled_width)
@@ -76,25 +76,23 @@ static void vj_sdl_move( vj_sdl *vjsdl , int scaled_width, int scaled_height, in
 	if (scaled_height)
 		vjsdl->sw_scale_height = scaled_height;
 
-	int my_bpp = SDL_VideoModeOK( vjsdl->sw_scale_width, vjsdl->sw_scale_height,24,	
-				vjsdl->flags[1] );
+	int my_bpp = SDL_VideoModeOK( display_wid, display_hei,24, vjsdl->flags[1] );
 	if(!my_bpp)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Requested depth not supported");
 		return;
 	}
 
-	vjsdl->screen = SDL_SetVideoMode( vjsdl->sw_scale_width, vjsdl->sw_scale_height,my_bpp,
-				vjsdl->flags[1]);
+	vjsdl->screen = SDL_SetVideoMode( display_wid, display_hei,my_bpp,vjsdl->flags[1]);
 
-	vjsdl->rectangle.x = 0;
-	vjsdl->rectangle.y = 0;
+	vjsdl->rectangle.x = x;
+	vjsdl->rectangle.y = y;
 	vjsdl->rectangle.w = scaled_width;
 	vjsdl->rectangle.h = scaled_height;
 
 
-	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d",
-			vjsdl->sw_scale_width,vjsdl->sw_scale_height);
+	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d (%dx%d+%dx%d)", display_wid, display_hei,
+			scaled_width,scaled_height,x,y);
 }
 
 vj_sdl *vj_sdl_allocate(int width, int height, int fmt, int use_key, int use_mouse, int show_cursor)
@@ -221,14 +219,18 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	int manual_positioning = 0;
 	/* setup with no window, scale to some wxh+0x0 on fs
 	 */
-	char *veejay_screen_geom = getenv( "VEEJAY_SCREEN_GEOMETRY" );
-	char *veejay_screen_size  = getenv( "VEEJAY_SCREEN_SIZE" );
-	if( veejay_screen_geom && veejay_screen_size ) {
+	char *veejay_screen_geom = getenv( "VEEJAY_DESKTOP_GEOMETRY" );
+	char *veejay_screen_size  = getenv( "VEEJAY_VIDEO_SIZE" );
+	char *veejay_screen_pos = getenv( "VEEJAY_VIDEO_POSITION");
+
+	/* FIXME: check if changes are ok for BigDesktop configurations */
+
+	if( veejay_screen_geom && veejay_screen_size && veejay_screen_pos ) {
 		extra_flags = extra_flags | SDL_NOFRAME;
 		manual_positioning = 1;
 	} else {
 		extra_fs_flags = SDL_FULLSCREEN;
-		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_SCREEN_GEOMETRY and VEEJAY_SCREEN_SIZE not set");
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_VIDEO_POSITION, VEEJAY_DESKTOP_GEOMETRY and VEEJAY_VIDEO_SIZE not set");
 	}
 #ifdef HAVE_SDL_TTF
 	vjsdl->font = vj_sdl_font_init();
@@ -402,19 +404,21 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 			int use_geom = 0;
 			int use_size = 0;
 			int offset_x=0,offset_y=0;
+			int pos_x=0,pos_y=0;
 			if( veejay_screen_geom )
 			if( sscanf( veejay_screen_geom, "%dx%d+%dx%d",&new_w,&new_h,&new_x,&new_y) == 4 ) 
 				use_geom = 1;
 
-			if( veejay_screen_size )
-			if( sscanf( veejay_screen_size,"%dx%d",&vid_w,&vid_h) == 2 ) 
-				use_size = 1;
+			if( veejay_screen_size ) {
+				if( sscanf( veejay_screen_size,"%dx%d",&vid_w,&vid_h) == 2 ) 
+					use_size = 1;
+			}
 
 			if( veejay_screen_size && !use_size ) {
 				veejay_msg(VEEJAY_MSG_ERROR,
-						"Invalid syntax for VEEJAY_SCREEN_SIZE, use \"<N>x<N>\"");
+						"Invalid syntax for VEEJAY_VIDEO_SIZE, use \"<N>x<N>\"");
 				veejay_msg(VEEJAY_MSG_ERROR,
-						" for example: VEEJAY_SCREEN_SIZE=1024x768");
+						" for example: VEEJAY_VIDEO_SIZE=1024x768");
 			}
 
 			if(!use_size) {
@@ -425,38 +429,42 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 			}
 			if( veejay_screen_geom && !use_geom) {
 				veejay_msg(VEEJAY_MSG_ERROR,
-						"Invalid syntax for VEEJAY_SCREEN_GEOMETRY, use\"<Width>x<Height>+<Offset X>x<Offset Y>\"");
+						"Invalid syntax for VEEJAY_DESKTOP_GEOMETRY, use\"<Width>x<Height>+<Offset X>x<Offset Y>\"");
 				veejay_msg(VEEJAY_MSG_ERROR,
-						" for example: VEEJAY_SCREEN_GEOMETRY=2624x1024+1600+0 for TwinView/One Big Desktop");
+						" for example: VEEJAY_DESKTOP_GEOMETRY=2624x1024+1600+0 for TwinView/One Big Desktop");
 				veejay_msg(VEEJAY_MSG_ERROR,
-						"              VEEJAY_SCREEN_GEOMETRY=0x0+0+0 for Single Screen Desktops");
+						"              VEEJAY_DESKTOP_GEOMETRY=0x0+0+0 for Single Screen Desktops");
 			}
 
+			if( veejay_screen_pos ) {
+				if( sscanf( veejay_screen_pos, "%dx%d", &pos_x, &pos_y ) != 2 ) {
+					veejay_msg(VEEJAY_MSG_ERROR, "Invalid syntax for VEEJAY_VIDEO_POSITION, use \"<N>x<N>\"");
+				}
+			}
+
+			int display_wid = new_w; //DisplayWidth( vjsdl->display, screen );
+			int display_hei = new_h; //DisplayHeight( vjsdl->display, screen );
 
 			if( fs == 1 ) {
-				scaled_width = DisplayWidth( vjsdl->display,screen);
-				scaled_height= DisplayHeight( vjsdl->display,screen);
-			/*	if( use_geom ) {
-					scaled_width = new_w;
-					scaled_height = new_h;
-				}*/
+				scaled_width = display_wid;
+				scaled_height= display_hei;
 			}
+
 			if( use_geom ) {
 				offset_x = new_x;
 				offset_y = new_y;
-				veejay_msg(VEEJAY_MSG_DEBUG, "VEEJAY_SCREEN_GEOMETRY: %dx%d+%dx%d", new_w,new_h,new_x,new_y);
+				veejay_msg(VEEJAY_MSG_DEBUG, "VEEJAY_DESKTOP_GEOMETRY: %dx%d+%dx%d", new_w,new_h,new_x,new_y);
 			}
 
 			if( use_size ) {
 				scaled_width = vid_w;
 				scaled_height = vid_h;
-				veejay_msg(VEEJAY_MSG_DEBUG, "VEEJAY_SCREEN_SIZE: %dx%d", vid_w,vid_h);
+				veejay_msg(VEEJAY_MSG_DEBUG, "VEEJAY_VIDEO_SIZE: %dx%d", vid_w,vid_h);
 			}
 
 			veejay_msg(VEEJAY_MSG_INFO, "Size of video window: %dx%d", scaled_width,scaled_height);
 			veejay_msg(VEEJAY_MSG_INFO, "Position            : %dx%d", new_x, new_y );
-			veejay_msg(VEEJAY_MSG_INFO, "Display size        : %dx%d", DisplayWidth(vjsdl->display,screen),
-										   DisplayHeight(vjsdl->display,screen));
+			veejay_msg(VEEJAY_MSG_INFO, "Display size        : %dx%d", display_wid,display_hei);
 			
 			if( wminfo.subsystem == SDL_SYSWM_X11 )
 			{
@@ -476,26 +484,20 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 				wminfo.info.x11.unlock_func();
 				if(children) free(children);
 			}
-			vj_sdl_move( vjsdl, scaled_width,scaled_height,new_x,new_y );
+			vj_sdl_move( vjsdl, display_wid, display_hei, scaled_width,scaled_height,pos_x,pos_y );
 		}
 	}
 
-    	SDL_WM_SetCaption(caption, NULL);
+    SDL_WM_SetCaption(caption, NULL);
 
 	if (!vj_sdl_unlock(vjsdl))
 		return 0;
 
-
-    	/*
-       	we can draw something on the raw surface.
-     	*/
-
-    	if(show)
+   	if(show)
 	{
-    		SDL_UpdateRect(vjsdl->screen, 0, 0, vjsdl->rectangle.w,
-			vjsdl->rectangle.h);
+    	SDL_UpdateRect(vjsdl->screen, 0, 0, vjsdl->rectangle.w,
+		vjsdl->rectangle.h);
 	}
-
 
 	vjsdl->fs = fs;
 

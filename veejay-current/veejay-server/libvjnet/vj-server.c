@@ -63,6 +63,8 @@ typedef struct
 	int type;
 } vj_proto;
 
+static int default_timeout_sec = 10;
+
 /* Message buffer is 4 MB per client per frame tick, this should be large enough to hold most KF packets
  */
 #define VJ_MAX_PENDING_MSG 4096
@@ -295,6 +297,20 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		return 0;
 	}
 
+	struct timeval timeout;
+	timeout.tv_sec = default_timeout_sec;
+	timeout.tv_usec = 0;
+
+	if( setsockopt( vjs->handle, SOL_SOCKET, SO_RCVTIMEO, (char*) &timeout, sizeof(timeout) ) == -1)
+	{
+		veejay_msg(0, "Cannot set receive timeout");
+	}
+
+	if( setsockopt( vjs->handle, SOL_SOCKET, SO_SNDTIMEO, (char*) &timeout, sizeof(timeout) ) == -1)
+	{
+		veejay_msg(0,"Cannot set send timeout");
+	}
+
 	link = (vj_link **) vj_malloc(sizeof(vj_link *) * VJ_MAX_CONNECTIONS);
 	if(!link)
 	{
@@ -397,6 +413,18 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 		}
 	} else {
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_LOG_NET_IO=logfile not set");
+	}
+
+	char *timeout = getenv("VEEJAY_NET_TIMEOUT");
+	if(timeout != NULL ) {
+		default_timeout_sec = atoi(timeout);
+		if( default_timeout_sec < 0 || default_timeout_sec > 65535 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "env VEEJAY_NET_TIMEOUT value must be between 0 and 65535" );
+			default_timeout_sec = 10;
+		}
+	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG,"env VEEJAY_NET_TIMEOUT=seconds not set");
 	}
 
 	if( mcast_group_name != NULL )

@@ -102,14 +102,14 @@ void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
     uint8_t a1, a2;
     unsigned int op0, op1;
     uint8_t Y, Cb, Cr;
-    unsigned int soft0, soft1;
+ //   unsigned int soft0, soft1;
     unsigned int t2, t3;
     uint8_t p1, p2;
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
 
-    soft0 = 255 / distance;
-    soft1 = 255 - soft0;
+//    soft0 = 255 / distance;
+//    soft1 = 255 - soft0;
 
     t2 = threshold - distance;	// 0 - 4
     t3 = threshold2 + distance;	// 3 + 4
@@ -222,13 +222,13 @@ void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
     uint8_t a1, a2;
     unsigned int op0, op1;
     uint8_t Y, Cb, Cr;
-    unsigned int soft0, soft1;
+//    unsigned int soft0, soft1;
     unsigned int t2, t3;
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
 
-    soft0 = 255 / distance;
-    soft1 = 255 - soft0;
+//    soft0 = 255 / distance;
+//    soft1 = 255 - soft0;
 
     t2 = threshold - distance;
     t3 = threshold2 + distance;

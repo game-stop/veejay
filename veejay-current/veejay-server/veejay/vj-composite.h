@@ -36,6 +36,7 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 
 void	composite_blit_ycbcr( void *compiz,uint8_t *in[4], int which_vp, void *gl );
 
+void	composite_process_divert( void *compiz, uint8_t *in[4], VJFrame *out, void *splitter, int setting );
 
 void	composite_blit_yuyv( void *compiz,uint8_t *in[4], uint8_t *yuyv, int which_vp );
 

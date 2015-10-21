@@ -91,6 +91,7 @@
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-OSC.h>
 #include <veejay/vj-task.h>
+#include <veejay/vj-split.h>
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
 #ifdef HAVE_SDL_TTF
@@ -444,7 +445,7 @@ int veejay_free(veejay_t * info)
 	if(info->mask) free(info->mask);
 	if(info->rlinks) free(info->rlinks);
     if(info->rmodes) free(info->rmodes );
-	
+	if(info->splitted_screens) free(info->splitted_screens);
 	free(settings);
     free(info);
 
@@ -956,6 +957,11 @@ static int veejay_screen_update(veejay_t * info )
 		vj_vloopback_write_pipe( info->vloopback );
 	}
 
+	if( info->splitter ) {
+		vj_split_render( info->splitter );
+	}
+
+
 #ifdef HAVE_JPEG
 #ifdef USE_GDK_PIXBUF 
         if (info->uc->hackme == 1)
@@ -1277,12 +1283,13 @@ void	veejay_check_homedir(void *arg)
 	struct statfs ts;
 	if( statfs( tmp, &ts ) != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING,"No plugins.cfg found (see DOC/HowtoPlugins)");
+		veejay_msg(VEEJAY_MSG_WARNING,"No plugin configuration file found in [%s] (see DOC/HowtoPlugins)",tmp);
 	}
 	snprintf(tmp,sizeof(tmp), "%s/viewport.cfg", path);
 	if( statfs( tmp, &ts ) != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING,"No viewport.cfg found (start veejay with -D -w -h and press CTRL-V to setup viewport)");
+		veejay_msg(VEEJAY_MSG_WARNING,"No projection mapping file found in [%s]", tmp);
+	    veejay_msg(VEEJAY_MSG_WARNING,"Press CTRL-s to setup then CTRL-h for help. Press CTRL-s again to exit, CTRL-p to switch");
 	}
 }
 
@@ -1763,6 +1770,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
 	}
 
+	if(info->settings->splitscreen) {
+		char split_cfg[1024];
+		snprintf(split_cfg,sizeof(split_cfg),"%s/splitscreen.cfg", info->homedir );
+
+		vj_split_set_master( info->uc->port );
+		
+		info->splitter = vj_split_new_from_file( split_cfg, info->video_output_width,info->video_output_height, PIX_FMT_YUV444P );
+	}
 
 	if(info->settings->composite)
 	{
@@ -1852,8 +1867,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->audio = NO_AUDIO;
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO,
-	           "Initialized %d Image- and Video Effects", vj_effect_max_effects());
 	vj_effect_initialize( info->video_output_width,info->video_output_height,full_range);
 
 	if(info->dump)
@@ -2184,7 +2197,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	editlist *el = info->edit_list;
 	struct mjpeg_sync bs;
 	struct timespec time_now;
-	struct timespec time_last;
 	double tdiff1=0.0, tdiff2=0.0;
 	int first_free, skipv, skipa, skipi, nvcorr,frame;
 	long ts, te;
@@ -2530,11 +2542,30 @@ static	void *veejay_playback_thread(void *data)
     }
 
     if(info->osc) vj_osc_free(info->osc);
-      
+
+	if( info->shm ) {
+		vj_shm_stop(info->shm);
+		vj_shm_free(info->shm);
+	}
+	if( info->splitter ) {
+		vj_split_free(info->splitter);
+	}
+
+    if( info->y4m ) {
+	    vj_yuv_stream_stop_write( info->y4m );
+	    vj_yuv4mpeg_free(info->y4m );
+	    info->y4m = NULL;
+	}
+
+	if( info->vloopback ) {
+		vj_vloopback_close( info->vloopback );
+		info->vloopback = NULL;
+
+	}
+	
 #ifdef HAVE_SDL
     for ( i = 0; i < MAX_SDL_OUT ; i ++ )
-	if( info->sdl[i] )
-	{
+	if( info->sdl[i] ) {
 #ifndef X_DISPLAY_MISSING
 		 if(info->sdl[i]->display)
 			 x11_enable_screensaver( info->sdl[i]->display);
@@ -2545,22 +2576,12 @@ static	void *veejay_playback_thread(void *data)
 	vj_sdl_quit();
 #endif
 #ifdef HAVE_DIRECTFB
-    if( info->dfb )
-	{
+    if( info->dfb ) {
 		vj_dfb_free(info->dfb);
 		free(info->dfb);
 	}
 #endif
-    if( info->y4m ) {
-	    vj_yuv_stream_stop_write( info->y4m );
-	    vj_yuv4mpeg_free(info->y4m );
-	    info->y4m = NULL;
-	   }
-	if( info->vloopback ) {
-		vj_vloopback_close( info->vloopback );
-		info->vloopback = NULL;
 
-	}
 /*
 #ifdef HAVE_GL
 #ifndef X_DISPLAY_MISSING
@@ -2573,16 +2594,10 @@ static	void *veejay_playback_thread(void *data)
 #endif
 */
 
-
 #ifdef HAVE_FREETYPE
 	vj_font_destroy( info->font );
 	vj_font_destroy( info->osd );
 #endif
-
-	if( info->shm ) {
-		vj_shm_stop(info->shm);
-		vj_shm_free(info->shm);
-	}
 
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     vj_perform_free(info);
@@ -2798,9 +2813,10 @@ veejay_t *veejay_malloc()
     info->no_bezerk = 1;
     info->nstreams = 1;
     info->stream_outformat = -1;
-    info->rlinks = (int*) vj_calloc(sizeof(int) * VJ_MAX_CONNECTIONS );
-    info->rmodes = (int*) vj_calloc(sizeof(int) * VJ_MAX_CONNECTIONS );
-    info->settings->currently_processed_entry = -1;
+    info->rlinks = (int*) vj_malloc(sizeof(int) * VJ_MAX_CONNECTIONS );
+    info->rmodes = (int*) vj_malloc(sizeof(int) * VJ_MAX_CONNECTIONS );
+	info->splitted_screens = (int*) vj_malloc( sizeof(int) * VJ_MAX_CONNECTIONS );
+   	info->settings->currently_processed_entry = -1;
     info->settings->first_frame = 1;
     info->settings->state = LAVPLAY_STATE_PLAYING;
     info->settings->composite = 1;
@@ -2817,6 +2833,7 @@ veejay_t *veejay_malloc()
     for( i =0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
 		info->rlinks[i] = -1;
 		info->rmodes[i] = -1;
+		info->splitted_screens[i] = -1;
 	}
 
     veejay_memset(info->action_file[0],0,sizeof(info->action_file[0])); 

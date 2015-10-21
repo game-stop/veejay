@@ -1847,7 +1847,14 @@ gtk_color_selection_class_init (GtkColorSelectionClass *klass)
 						      P_("The current opacity value (0 fully transparent, 65535 fully opaque)"),
 						      0, 65535, 65535,
 						      G_PARAM_READABLE | G_PARAM_WRITABLE));
-  
+ 
+
+  gtk_settings_install_property (g_param_spec_string ("gtk-color-selection-palette",
+                                                      P_("Custom palette"),
+                                                      P_("Palette to use in the color selector"),
+                                                      default_colors,
+                                                      G_PARAM_READWRITE));
+
   color_selection_signals[COLOR_CHANGED] =
     g_signal_new ("color_changed",
 		  G_OBJECT_CLASS_TYPE (object_class),
@@ -1857,11 +1864,6 @@ gtk_color_selection_class_init (GtkColorSelectionClass *klass)
 		  g_cclosure_marshal_VOID__VOID,
 		  G_TYPE_NONE, 0);
 
-  gtk_settings_install_property (g_param_spec_string ("gtk-color-selection-palette",
-                                                      P_("Custom palette"),
-                                                      P_("Palette to use in the color selector"),
-                                                      default_colors,
-                                                      G_PARAM_READWRITE));
 }
 
 /* widget functions */

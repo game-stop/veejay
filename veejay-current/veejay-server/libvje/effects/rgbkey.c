@@ -219,7 +219,7 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
     uint8_t *Y2 = frame2->data[0];
-	int8_t *Cb2= frame2->data[1];
+	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
 	uint8_t	iy,iu,iv;
 

@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.57],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.58],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=57
+VEEJAY_MICRO_VERSION=58
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -106,10 +106,6 @@ AC_ARG_WITH(jpeg-mmx,
 
 AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
-
-AC_ARG_WITH(libresample,
-            AC_HELP_STRING([--without-libresample], [Do not use libresample.]),
-            [], [with_libresample=yes])
 
 arch_target="auto"
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic or auto],
@@ -794,17 +790,6 @@ if test x$have_pixbuf != xtrue ; then
 	AC_MSG_ERROR([Cannot find the gtk-2.0-dev / gdk pixbuf library.])
 fi
 
-
-dnl FIXME check for libdv see issue 12
-have_libresample=true
-if test x$with_libresample != xno ; then
- have_libresample=false
-fi
-
-if test x$have_libresample != xtrue ; then
- AC_DEFINE(HAVE_LIBRESAMPLE,1,[use libresample])
-fi
-
 dnl *********************************************************************
 dnl Check for libdv
 dnl   (creates LIBDV_CFLAGS, LIBDV_LIBS; defines HAVE_LIBDV)
@@ -1136,6 +1121,7 @@ thirdparty/bio2jack/Makefile
 thirdparty/libhash/Makefile
 thirdparty/liblzo/Makefile
 thirdparty/libOSC/Makefile
+thirdparty/libresample/Makefile
 libvjmsg/Makefile
 libvevo/Makefile
 libvjmem/Makefile

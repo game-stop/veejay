@@ -71,23 +71,18 @@ void complexsync_free() {
 
 void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int val)
 {
-
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
 	int region = width * val;
-
-	int strides[4] = { region, region, region, 0 };
 	int planes[4] = { len, len, len, 0 };
 	
-	int i;
-
 	vj_frame_copy( frame->data, c_outofsync_buffer, planes );
 	vj_frame_copy( frame2->data, frame->data, planes );
 
-        if( (len - region) > 0)
+    if( (len - region) > 0)
 	{
 		uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
 		int dst_strides[4] = { len - region, len - region, len - region,0 };

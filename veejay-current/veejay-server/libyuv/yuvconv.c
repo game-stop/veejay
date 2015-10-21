@@ -1094,11 +1094,7 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 		if(s)free(s);
 		return NULL;
 	}	
-	else 
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "sws context: %dx%d in %d -> %dx%d in %d",
-			src->width,src->height,src->format, dst->width,dst->height,dst->format );
-	}
+	
 	return ((void*)s);
 
 }

@@ -38,7 +38,7 @@ vj_effect *photoplay_init(int w, int h)
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 3; // mode
     ve->defaults[0] = 2;
-    ve->defaults[1] = 1;
+    ve->defaults[1] = 2; // higher value takes less cpu 
     ve->defaults[2] = 1;  
     ve->description = "Photoplay (timestretched mosaic)";
     ve->sub_format = 1;
@@ -154,10 +154,10 @@ static void	take_photo( uint8_t *plane, uint8_t *dst_plane, int w, int h, int in
 				}
 			}
 			// still problem here!
-			if(sum > 0)
+		//	if(sum > 0)
 			  dst_plane[(dst_y*box_width)+dst_x] = sum / (step_y*step_x);
-			else
-			  dst_plane[(dst_y*box_width)+dst_x] = pixel_Y_lo_;
+		//	else
+		//	  dst_plane[(dst_y*box_width)+dst_x] = pixel_Y_lo_;
 
 			dst_x++;
 		}

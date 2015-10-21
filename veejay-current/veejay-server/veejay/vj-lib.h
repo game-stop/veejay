@@ -199,6 +199,7 @@ typedef struct {
 	int hold_status;
 	int auto_mute;
 	int pace_correction;
+	int	splitscreen;
 } video_playback_setup;
 
 typedef struct {
@@ -326,6 +327,7 @@ typedef struct {
 	void	*viewport;
 	void	*composite;
 	void	*composite2;
+	void	*splitter;
 	int	 use_vp;
 	int	 use_proj;
 	int	frontback;
@@ -336,6 +338,7 @@ typedef struct {
 	int	sz;
 	int	audio_running;
 	int	*rlinks;
+	int *splitted_screens;
 	int	*rmodes;
 	int pause_render;
 	void	*shm;

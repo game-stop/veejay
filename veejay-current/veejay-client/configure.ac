@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([reloaded],[1.5.57],[nwelburg@gmail.com])
+AC_INIT([reloaded],[1.5.58],[nwelburg@gmail.com])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 RELOADED_MAJOR_VERSION=1
 RELOADED_MINOR_VERSION=5
-RELOADED_MICRO_VERSION=57
+RELOADED_MICRO_VERSION=58
 RELOADED_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 RELOADED_CODENAME="Reloaded - build $RELOADED_MAJOR_VERSION $RELOADED_MINOR_VERSION $RELOADED_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -634,10 +634,6 @@ if test x"$with_extra_cflags" != "x"; then
    CXXFLAGS="$CXXFLAGS $with_extra_cflags"
 fi
 
-reloaded_datadir="${datarootdir}/reloaded"
-AC_SUBST(reloaded_datadir)
-sh gveejay-paths.sh > gveejay-paths.h
-
 glib_modules="glib-2.0 >= 2.4"
 PKG_CHECK_MODULES(GLIB, [$glib_modules])
 AC_SUBST(GLIB_CFLAGS)
@@ -653,6 +649,8 @@ PKG_CHECK_MODULES(GLADE, [$libglade_modules])
 AC_SUBST(GLADE_CFLAGS)
 AC_SUBST(GLADE_LIBS)
 
+reloaded_datadir="${datarootdir}/reloaded"
+AC_SUBST(reloaded_datadir)
 
 dnl **********************************************************************
 dnl Output a Makefile or two and the lib/header descriptor script
@@ -663,6 +661,8 @@ src/Makefile
 gveejay-paths.sh
 ])
 AC_OUTPUT
+
+sh gveejay-paths.sh > gveejay-paths.h
 
 AC_DEFINE(VERSION, ${VERSION})
 

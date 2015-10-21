@@ -88,10 +88,6 @@ void chromascratcher_free() {
 void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 {
 	int strides[4] = { (w * h), (w*h), (w*h) , 0 };
-	uint8_t *Y = src->data[0];
-	uint8_t *Cb= src->data[1];
-	uint8_t *Cr= src->data[2];
-
 	uint8_t *dest[4] = {
 		cframe[0] + (w*h*cnframe),
 		cframe[1] + (w*h*cnframe),

@@ -136,7 +136,7 @@ typedef struct
 	int32_t tx1,tx2,ty1,ty2;
 	int32_t ttx1,ttx2,tty1,tty2;
 	int	mode;
-	int32_t 	*buf;
+//	int32_t 	*buf;
 	void *sender;
 	uint32_t	seq_id;
 	ui_t	*ui;
@@ -1289,7 +1289,7 @@ void			viewport_destroy( void *data )
 		if( v->map ) free( v->map );
 		if( v->help ) free( v->help );
 		if( v->homedir) free(v->homedir);
-		if( v->buf ) free(v->buf);
+//		if( v->buf ) free(v->buf);
 		if( v->ui ) {
 			if( v->ui->scaler ) 
 				yuv_free_swscaler(v->ui->scaler);
@@ -1458,9 +1458,9 @@ void	*viewport_get_configuration(void *vv )
 	o->h0   = v->h0;
 	o->x1   = v->x1;
 	o->x2   = v->x2;
-        o->x3   = v->x3;
-        o->x4   = v->x4;
-        o->y1   = v->y1;
+    o->x3   = v->x3;
+    o->x4   = v->x4;
+    o->y1   = v->y1;
 	o->y2   = v->y2;
 	o->y3   = v->y3;
   	o->y4   = v->y4;
@@ -1607,13 +1607,10 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 		vc->y0 = vc->y0 * sy;
 		vc->w0 = vc->w0 * sx;
 		vc->h0 = vc->h0 * sy;
-		veejay_msg(VEEJAY_MSG_INFO,"\tQuad    : %dx%d+%dx%d",vc->x0,vc->y0,vc->w0,vc->h0 );
-	} else {
-		veejay_msg(VEEJAY_MSG_WARNING, "No or invalid viewport configuration file in %s", homedir );
-		veejay_msg(VEEJAY_MSG_WARNING, "Using default values");
-		veejay_msg(VEEJAY_MSG_INFO,"\tBacking  : %dx%d",w,h);
-		veejay_msg(VEEJAY_MSG_INFO,"\tRectangle: %dx%d+%dx%d",x0,y0,w0,h0);
-	}
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tQuad    : %dx%d+%dx%d",vc->x0,vc->y0,vc->w0,vc->h0 );
+	} 
+	veejay_msg(VEEJAY_MSG_DEBUG,"\tBacking  : %dx%d",w,h);
+	veejay_msg(VEEJAY_MSG_DEBUG,"\tRectangle: %dx%d+%dx%d",x0,y0,w0,h0);
 
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
 	v->usermouse[0] = 0.0;
@@ -1639,7 +1636,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	{
 		res = viewport_configure (v, 29.0, 28.0,
 					     70.0, 30.0,
-					70.0, 66.0,
+						70.0, 66.0,
 						30.0, 69.0,
 
 					     x0,y0,w0,h0,
@@ -1701,7 +1698,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	// calculate initial view
 	viewport_process( v );
 
-	v->buf = vj_calloc( sizeof(int32_t) * 50000 );
+//	v->buf = vj_calloc( sizeof(int32_t) * 50000 );
 	free(vc);
 	
 	if(v->grid_resolution > 0)
@@ -1775,7 +1772,7 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 
 	viewport_process( q );
 
-	q->buf = vj_calloc( sizeof(int32_t) * 50000 );
+//	q->buf = vj_calloc( sizeof(int32_t) * 50000 );
 	veejay_msg(VEEJAY_MSG_INFO,"\tConfiguring input:");
 	veejay_msg(VEEJAY_MSG_INFO, "\tPoints   :\t(1) %fx%f (2) %fx%f", q->x1,q->y1,q->x2,q->y2);
 	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", q->x2,q->y2,q->x3,q->y3);
@@ -1806,7 +1803,6 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 	FILE *fd = fopen( path, "r" );
 	if(!fd)
 	{
-		veejay_msg(0, "Unable to open file %s",path);
 		free(vc);
 		return NULL;
 	}
@@ -1815,7 +1811,6 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 		
 	if( len <= 0 )
 	{
-		veejay_msg(0, "%s is empty", path);
 		free(vc);
 		return NULL;
 	}
@@ -1854,14 +1849,14 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 
 	if( n != 21 )
 	{
-		veejay_msg(0, "Unable to read %s (file is %d bytes)",path, len );
+		veejay_msg(VEEJAY_MSG_ERROR, "Parse error in %s",path );
 		free(vc);
 		free(buf);
 		return NULL;
 	}
 
 	free(buf);
-	veejay_msg(VEEJAY_MSG_INFO, "Projection configuration:");
+	veejay_msg(VEEJAY_MSG_INFO, "Projection mapping configuration [%s]", path);
 	veejay_msg(VEEJAY_MSG_INFO, "\tBehaviour:\t%s", (vc->reverse ? "Forward" : "Projection") );
 	veejay_msg(VEEJAY_MSG_INFO, "\tPoints     :\t(1) %fx%f (2) %fx%f", vc->x1,vc->y1,vc->x2,vc->y2);
 	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", vc->x2,vc->y2,vc->x3,vc->y3);
@@ -1904,7 +1899,7 @@ void	viewport_save_settings( void *ptr, int frontback )
 			v->saved_h,
 			v->marker_size,
 			v->grid_mode,
-	      		v->initial_active );
+	      	v->initial_active );
 
 	int res = fwrite( content, strlen(content), 1, fd );
 
@@ -2751,9 +2746,7 @@ static void		viewport_translate_frame(void *data, uint8_t *plane )
 			plane[ (dy + y ) * w + dx + x ] = img[ y * u->sw + x ];
 		}
 	}
-	
 }
-
 
 static	void	viewport_draw_marker(viewport_t *v, int x, int y, int w, int h, uint8_t *plane )
 {
@@ -2959,35 +2952,29 @@ void	viewport_draw_interface_color( void *vdata, uint8_t *img[3] )
 	viewport_draw_col( v, img[0],img[1],img[2] );
 }
 
-
 void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] )
 {
 	viewport_t *v = (viewport_t*) vdata;
-	const int len = v->w * v->h;
-	register const int w = v->w;
-	register uint32_t i,n;
+	const int w = v->w;
+	uint32_t i,n;
 	const int32_t *map = v->map;
-	uint8_t *inY  = img[0];
-	uint8_t *inU  = img[1];
-	uint8_t *inV  = img[2];
+	const uint8_t *inY  = (const uint8_t*) img[0];
+	const uint8_t *inU  = (const uint8_t*)img[1];
+	const uint8_t *inV  = (const uint8_t*)img[2];
 	uint8_t       *outY = out_img[0];
 	uint8_t	      *outU = out_img[1];
-        uint8_t	      *outV = out_img[2];
-	inY[len+1] = 0;
-	inU[len+1] = 128;
-	inV[len+1] = 128;
+    uint8_t	      *outV = out_img[2];
 
-	register const	int32_t	tx1 = v->ttx1;
-	register const	int32_t tx2 = v->ttx2;
-	register const	int32_t	ty1 = v->tty1;
-	register const	int32_t ty2 = v->tty2;
-	int x,y;
+	const int32_t tx1 = v->ttx1;
+	const int32_t tx2 = v->ttx2;
+	const int32_t ty1 = v->tty1;
+	const int32_t ty2 = v->tty2;
 
-	y  = ty1 * w;
-		
-	vj_frame_clear1( outY,0,len);
-	vj_frame_clear1( outU,128,len);
-	vj_frame_clear1( outV,128,len);
+	int x;
+	int y  = ty1 * w;
+
+	vj_frame_clear1( out_img[0], 0, v->w * v->h );
+	vj_frame_clear1( out_img[1], 128, v->w * v->h * 2 );
 
 	for( y = ty1; y < ty2; y ++ )
 	{
@@ -3000,8 +2987,6 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 			outV[i] = inV[n];
 		}
 	}
-	y = (v->h - ty2 ) * w;
-	x = ty2 * w;
 }
 
 void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3], int Yonly)
@@ -3010,8 +2995,6 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 		viewport_produce_full_img( vdata, img, out_img );
 		return;
 	}
-
-
 
 	viewport_t *v = (viewport_t*) vdata;
 	const int len = v->w * v->h;
@@ -3029,7 +3012,8 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 
 	int x,y;
 	y  = ty1 * w;
-	veejay_memset( outY,0,len);
+
+	vj_frame_clear1( outY,0,len);
 
 	for( y = ty1; y < ty2; y ++ )
 	{
@@ -3044,56 +3028,47 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 	x = ty2 * w;
 }
 
-#define pack_yuyv_4pixel( y0,u0,y1,v0 ) (\
-		( (int) y0 ) & 0xff ) +\
-                ( (((int) (u0>>1) ) & 0xff) << 8) +\
-                ( ((((int) y1) & 0xff) << 16 )) +\
-                ( ((((int) (v0>>1)) & 0xff) << 24 ))
-
-#define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 ) (\
-		( (int) y0 ) & 0xff ) +\
-                ( (((int) ((u0+u1)>>1) ) & 0xff) << 8) +\
-                ( ((((int) y1) & 0xff) << 16 )) +\
-                ( ((((int) ((v0+v1)>>1)) & 0xff) << 24 ))
+#define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 )\
+   		( y0 ) +\
+        ( ((u0+u1)>>1)<< 8) +\
+        ( (y1 << 16 )) +\
+        ( ((v0+v1)>>1)<< 24 )
 
 void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_img )
 {
 	viewport_t *v = (viewport_t*) vdata;
-	const int len = v->w * v->h;
 	const int32_t *map = v->map;
-	register uint8_t *inY  = img[0];
-	register uint8_t *inU  = img[1];
-	register uint8_t *inV  = img[2];
-	register uint32_t	*plane_yuyv = (uint32_t*)out_img;
-	register const	int32_t	tx1 = v->ttx1;
-	register const	int32_t tx2 = v->ttx2;
-	register const	int32_t	ty1 = v->tty1;
-	register const	int32_t ty2 = v->tty2;
-	register const int w = v->w;
-	register const int uw = v->w >> 1;
-	register uint32_t i,x,y;
-	register int32_t n,m;
+	const uint8_t *inY  = (const uint8_t*) img[0];
+	const uint8_t *inU  = (const uint8_t*) img[1];
+	const uint8_t *inV  = (const uint8_t*) img[2];
+	const int32_t tx1 = v->ttx1;
+	const int32_t tx2 = v->ttx2;
+	const int32_t ty1 = v->tty1;
+	const int32_t ty2 = v->tty2;
+	const int w = v->w;
+	const int uw = v->w >> 1;
+	
+	uint32_t *plane_yuyv = (uint32_t*)out_img;
+	uint32_t i,x,y;
+	int32_t n,m;
 
-	inY[len+1] = 0;		// "out of range" pixel value 
-	inU[len+1] = 128;
-	inV[len+1] = 128;
+	img[0][v->w * v->h +1] = 0;		// "out of range" pixel value 
+	img[1][v->w * v->h +1] = 128;
+	img[2][v->w * v->h+1] = 128;
 
-	yuyv_plane_clear( len*2, plane_yuyv); 
+	yuyv_plane_clear( v->w * v->h * 2, plane_yuyv); 
 
 	for( y = ty1 ; y < ty2; y ++ )
 	{
 		for( x = tx1; x < tx2; x += 2 )
-		{ // 4 YUYV pixels out, 8 Y in,  16 UV in
+		{ // 2 YUYV pixels out, 2 Y in, 4 UV in
 			i = y * w ;
 			n = map[ i + x ];
 			m = map[ i + x + 1];
 
-			plane_yuyv[y * uw + ( (x+1)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
-								 inY[m], inV[n], inV[m] );
-
+			plane_yuyv[y * uw + ( (x+1)>>1)] = pack_yuyv_pixel( inY[n],inU[n],inU[m],inY[m],inV[n],inV[m] );
 		}
 	}
-
 }
 
 void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *out_img )
@@ -3151,9 +3126,9 @@ void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, in
 		uint8_t *inY  = in[0];
 		uint8_t *inU  = in[1];
 		uint8_t *inV  = in[2];
-		uint8_t       *outY = out[0];
-		uint8_t	      *outU = out[1];
-	        uint8_t	      *outV = out[2];
+		uint8_t *outY = out[0];
+		uint8_t	*outU = out[1];
+	    uint8_t	*outV = out[2];
 
 		inY[len+1] = 0;
 		inU[len+1] = 128;

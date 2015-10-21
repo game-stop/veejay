@@ -1,0 +1,14 @@
+
+Veejay's crop
+-------------------------
+
+RUNNING:
+
+run the autogen.sh script in the source folder,
+then run ./configure, make and make install
+
+run veejay
+
+-----
+
+

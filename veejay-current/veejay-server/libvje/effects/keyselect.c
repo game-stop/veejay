@@ -141,9 +141,8 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int i_angle, int r, int g,
 		   int b, int mode, int i_noise)
 {
-
-   uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y;
+	uint8_t *fg_y, *fg_cb, *fg_cr;
+    uint8_t *bg_y, *bg_cb, *bg_cr;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
     int kfgy_scale, kg;
     int cb, cr;
@@ -157,8 +156,7 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
     uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
+	
 	int	iy=pixel_Y_lo_,iu=128,iv=128;
 	_rgb2yuv( r,g,b, iy,iu,iv );
 	_y = (float) iy;
@@ -185,7 +183,9 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
     fg_cb = Cb;
     fg_cr = Cr;
 	/* 2005: swap these !! */
-    bg_y = Y2;
+    bg_y = frame2->data[0];
+    bg_cb = frame2->data[1];
+    bg_cr = frame2->data[2];
 
     for (pos = (width * height); pos != 0; pos--) {
 	short xx, yy;
@@ -226,10 +226,14 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 
 	    val = (yy * yy) + (kg * kg);
 	    if (val < (noise_level * noise_level)) {
-		kbg = 255;
+			kbg = 255;
 	    }
-	    val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    Y[pos] = blend_pixel( val, fg_y[pos] );
+	    
+		val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
+	    
+		Y[pos] = blend_pixel( val, fg_y[pos] );
+		Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
+		Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
 	}
     }
 

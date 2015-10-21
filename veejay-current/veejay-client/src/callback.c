@@ -2607,6 +2607,7 @@ void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
 	if(filename)
 	{
 		multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
+
 		g_free(filename);
 	}
 }
