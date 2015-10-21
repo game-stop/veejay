@@ -17,7 +17,7 @@ Veejay is divided into multiple packages:
 1. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
 1. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
 
-For each package, run the confgure and make:
+For each package, run confgure and make:
 
 
 ```bash
