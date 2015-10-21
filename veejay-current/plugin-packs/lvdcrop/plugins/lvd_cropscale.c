@@ -261,8 +261,6 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Left" );
 		livido_set_string_value(port, "kind", "WIDTH" );
-		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 0 );
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Left");
 
@@ -272,8 +270,6 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Right" );
 		livido_set_string_value(port, "kind", "WIDTH" );
-		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 0 );
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Right");
 
@@ -282,8 +278,6 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Top" );
 		livido_set_string_value(port, "kind", "HEIGHT" );
-		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 0 );
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Top");
 
@@ -293,8 +287,6 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Bottom" );
 		livido_set_string_value(port, "kind", "HEIGHT" );
-		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 0 );
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Bottom");
 
