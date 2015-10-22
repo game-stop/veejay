@@ -160,7 +160,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "min", 0);
 		livido_set_int_value( port, "max", 255 );
 		livido_set_int_value( port, "default", 20 );
-		livido_set_string_value( port, "description" ,"Speed");
+		livido_set_string_value( port, "description" ,"Color Blue");
 
 
 	//@ setup the nodes
