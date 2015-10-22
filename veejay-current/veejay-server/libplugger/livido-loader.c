@@ -1308,12 +1308,15 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 	char *clone_name = (char*) vj_malloc( strlen(plugin_name) + 5);
 	sprintf(clone_name, "LVD %s", plugin_name );
 
+	int mixer = (n_inputs == 2 && n_outputs == 1 ) ? 1: 0;
+
 	vevo_property_set( port, "num_params", VEVO_ATOM_TYPE_INT, 1, &n_params );
 	vevo_property_set( port, "num_out_params", VEVO_ATOM_TYPE_INT,1,&n_oparams );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &clone_name );
 	vevo_property_set( port, "num_inputs", VEVO_ATOM_TYPE_INT,1, &n_inputs);
 	vevo_property_set( port, "num_outputs",VEVO_ATOM_TYPE_INT,1, &n_outputs);
 	vevo_property_set( port, "info", LIVIDO_ATOM_TYPE_PORTPTR,1,&filter_templ );
+	vevo_property_set( port, "mixer", VEVO_ATOM_TYPE_INT,1, &mixer );
 	vevo_property_softref( port, "info" );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&livido_signature_);
 

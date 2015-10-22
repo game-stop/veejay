@@ -674,31 +674,26 @@ static void	vj_effman_apply_job( void *arg )
 {
 	vj_task_arg_t *v = (vj_task_arg_t*) arg;
 
-	int entry	 = v->iparams[11];
+	int entry	 = v->iparams[0];
 	int selector	 = v->iparam;
 	vjp_kf *kf	 = v->ptr;
 	VJFrame frame;
 	VJFrame frame2;
 		
 	vj_task_set_to_frame( &frame, 0, v->jobnum );
-
 	VJFrame *frames[2];
 
 	frames[0] = &frame;
 	frames[1] = &frame2;
 
-//f( v->overlap ) {
-//frame.data[3] = v->overlaprow;
-//
-
 	if( selector > 200 )	
 	{
 		vj_task_set_to_frame( &frame2, 1, v->jobnum);
-		vj_effman_apply_video_effect(frames,kf, v->iparams, entry,selector);
+		vj_effman_apply_video_effect(frames,kf, v->iparams + 1, entry,selector);
 	}
 	else
 	{
-		vj_effman_apply_image_effect( frames,kf,v->iparams,entry, selector);
+		vj_effman_apply_image_effect( frames,kf,v->iparams + 1,entry, selector);
 	}	
 
 }
@@ -707,10 +702,6 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 {
 	int entry = vj_effect_real_to_sequence( selector );
 	int n_a   = vj_effect_get_num_params( selector );
-
-	if( n_a > 10 )  {
-		n_a = 10;
-	}
 
 	if( !frames || !frames[0] ) return VJE_NO_FRAMES;
 
@@ -727,11 +718,11 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 		if( vj_task_available() && isP > 0 ) {
 			vj_task_set_from_frame( frames[0] );
 			vj_task_set_int( selector );
-			vj_task_set_param( entry, 11 ); // 10 + 1
+			vj_task_set_param( entry, 0 );
 			vj_task_set_ptr( (void*) kf );
 			int i;
 			for ( i = 0; i < n_a; i ++ )
-				vj_task_set_param( arguments[i], i );
+				vj_task_set_param( arguments[i], i + 1 );
 			
 			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 3, (performer_job_routine) &vj_effman_apply_job );
 		} 

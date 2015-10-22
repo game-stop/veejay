@@ -276,4 +276,7 @@ static	int	lvd_extract_channel_values( livido_port_t *instance,
 	return LIVIDO_NO_ERROR;
 }
 
+
+#define CLAMP( v, min, max ) ( v < min ? min :  (v > max ? max :v ))
+
 #endif
