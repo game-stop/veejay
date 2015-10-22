@@ -1928,7 +1928,9 @@ int sample_get_audio_volume(int s1)
 int sample_set_audio_volume(int s1, int volume)
 {
     sample_info *sample = sample_get(s1);
-    if (volume < 0)
+	if(sample == NULL)
+		return -1;
+	if (volume < 0)
 	volume = 0;
     if (volume > 100)
 	volume = 100;
@@ -3000,23 +3002,26 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 
     if(!skel->edit_list)
     {
-	veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has inherited EDL from plain mode", skel->sample_id );
-    	skel->edit_list = el;
-	skel->soft_edl = 1;
-    } else {
-	skel->soft_edl = 0;
-	veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has own EDL (%p)", skel->sample_id, el );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has inherited EDL from plain mode", skel->sample_id );
+	  	skel->edit_list = el;
+		skel->soft_edl = 1;
+	} else {
+		skel->soft_edl = 0;
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has own EDL (%p)", skel->sample_id, el );
     }
 
 	int marker_start = 0, marker_end = 0;
 
     while (cur != NULL) {
+
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		skel->sample_id = ( atoi(chTemp) ) + start_at;
-		free(chTemp);
+			skel->sample_id = ( atoi(chTemp) ) + start_at;
+			sample_store(skel);
+
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3051,12 +3056,12 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 		}
 		if(xmlTemp) xmlFree(xmlTemp);
 	}
-	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEDESCR)) {
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEDESCR) && start_at == 0) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		snprintf(skel->descr, SAMPLE_MAX_DESCR_LEN,"%s", chTemp);
-		free(chTemp);
+			snprintf(skel->descr, SAMPLE_MAX_DESCR_LEN,"%s", chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3065,8 +3070,8 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_startframe(skel->sample_id, atol(chTemp));
-		free(chTemp);
+			skel->first_frame = atol(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3074,8 +3079,8 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_audio_volume(skel->sample_id, atoi(chTemp));
-		free(chTemp);
+			skel->audio_volume = atoi(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 
@@ -3084,8 +3089,8 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_endframe(skel->sample_id, atol(chTemp));
-		free(chTemp);
+			skel->first_frame = atol(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3093,7 +3098,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_speed(skel->sample_id, atoi(chTemp));
+			skel->speed = atoi(chTemp);
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -3103,7 +3108,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 		chTemp = UTF8toLAT1(xmlTemp);
 		if(chTemp)
 		{
-			sample_set_framedup(skel->sample_id, atoi(chTemp));
+			skel->dup = atoi(chTemp);
 			free(chTemp);
 		}
 		if(xmlTemp) xmlFree(xmlTemp);
@@ -3112,8 +3117,8 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_looptype(skel->sample_id, atoi(chTemp));
-		free(chTemp);
+			skel->looptype = atoi(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3122,8 +3127,8 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_subrender(skel->sample_id, atoi(chTemp));
-		free(chTemp);
+			skel->subrender = atoi(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3132,8 +3137,8 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_loops(skel->sample_id, atoi(chTemp));
-		free(chTemp);
+			skel->max_loops = atoi(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3141,8 +3146,8 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_next(skel->sample_id, atoi(chTemp));
-		free(chTemp);
+			skel->next_sample_id = atoi(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3150,8 +3155,8 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_depth(skel->sample_id, atoi(chTemp));
-		free(chTemp);
+			skel->depth = atoi(chTemp);
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3159,7 +3164,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sample_set_playmode(skel->sample_id, atoi(chTemp));
+			skel->playmode = atoi(chTemp);
 	        free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -3169,7 +3174,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 		chTemp = UTF8toLAT1(xmlTemp);
 		if(chTemp) {
 			skel->fader_active = atoi(chTemp);
-		        free(chTemp);
+		    free(chTemp);
 		}
 		if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -3246,25 +3251,23 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 
 	}
 
-	if(!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" ))
-	{
-		subs = cur->xmlChildrenNode;
-	//	vj_font_xml_unpack( doc, cur->xmlChildrenNode, font );
-	}
+		if(!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" ))
+		{
+			subs = cur->xmlChildrenNode;
+		//	vj_font_xml_unpack( doc, cur->xmlChildrenNode, font );
+		}
 
-	ParseEffects(doc, cur->xmlChildrenNode, skel, start_at);
+		ParseEffects(doc, cur->xmlChildrenNode, skel, start_at);
 
-	if( !xmlStrcmp( cur->name, (const xmlChar*) "calibration" ) ) {
-		ParseCalibration( doc, cur->xmlChildrenNode, skel ,vp);
-	}
+		if( !xmlStrcmp( cur->name, (const xmlChar*) "calibration" ) ) {
+			ParseCalibration( doc, cur->xmlChildrenNode, skel ,vp);
+		}
 
+		// xmlTemp and chTemp should be freed after use
+		xmlTemp = NULL;
+		chTemp = NULL;
 
-
-	// xmlTemp and chTemp should be freed after use
-	xmlTemp = NULL;
-	chTemp = NULL;
-
-	cur = cur->next;
+		cur = cur->next;
     }
 
 	if( marker_end != marker_start || marker_end != 0 )
@@ -3276,13 +3279,9 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 			marker_end = tmp;
 		}
 
-		sample_set_marker( skel->sample_id, marker_start, marker_end );
+		skel->marker_start = marker_start;
+		skel->marker_end = marker_end;
 	}
-
-  //  if(!sample_read_edl( skel ))
-//	veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
-
-
 
     return subs;
 }
@@ -3387,13 +3386,11 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
      */
 
     int start_at = sample_size()-1;
-    if( start_at != 0 )
-	veejay_msg(VEEJAY_MSG_INFO, "Merging %s into current samplelist, auto number starts at %d", sampleFile, start_at );
-    if( vj_tag_size()-1 > 0 )
-	veejay_msg(VEEJAY_MSG_INFO, "Existing streams will be deleted (samplelist overrides active streams)");
-
 	if( start_at <= 0 )
 		start_at = 0;
+
+	if( start_at != 0 )
+		veejay_msg(VEEJAY_MSG_INFO, "Merging %s into current samplelist, auto number starts at %d", sampleFile, start_at );
 
     cur = xmlDocGetRootElement(doc);
     if (cur == NULL) {
@@ -3413,9 +3410,10 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
     while (cur != NULL) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLE)) {
 	    skel = sample_skeleton_new(0, 1);
-	    sample_store(skel);
-	    if (skel != NULL) {
-		void *d = vj_font_get_dict(font);
+		if( skel == NULL )
+			continue;
+
+	   	void *d = vj_font_get_dict(font);
 
 		xmlNodePtr subs = ParseSample( doc, cur->xmlChildrenNode, skel, el, font, start_at ,vp );	
 		if(subs)
@@ -3425,9 +3423,8 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
 		}
 	
 		vj_font_set_dict(font,d);
-
-	    }
 	}
+
 	if( !xmlStrcmp( cur->name, (const xmlChar*) "CURRENT" )) {
 		LoadCurrentPlaying( doc, cur->xmlChildrenNode, id, mode );
 	}
