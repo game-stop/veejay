@@ -832,9 +832,12 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		if(erase_all)
 		{
+			info->uc.expected_slots = 0;
+			info->uc.reload_hint[HINT_SLIST] = 2; /* with bank reset */
 			single_vims( VIMS_SAMPLE_DEL_ALL ); 
 		}
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
+
 		g_free(filename );
 	}
 }
@@ -1339,6 +1342,9 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		single_vims( VIMS_SAMPLE_DEL_ALL ); 
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
+
+		info->uc.reload_hint[HINT_SLIST] = 2;
+		info->uc.expected_slots = 0;
 		g_free(filename );
 	}
 }
@@ -2101,6 +2107,9 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 			{
 				single_vims( VIMS_SAMPLE_DEL_ALL );
 				multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename);
+
+				info->uc.reload_hint[HINT_SLIST] = 2;
+				info->uc.expected_slots = 0;
 				g_free(filename);
 			}
 			break;

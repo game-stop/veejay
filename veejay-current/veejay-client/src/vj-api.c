@@ -6043,7 +6043,12 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 		history[TOTAL_SLOTS] 
 			|| info->status_tokens[TOTAL_SLOTS] != info->uc.expected_slots )
 	{
-		info->uc.reload_hint[HINT_SLIST] = 1;
+	
+		if( info->status_tokens[TOTAL_SLOTS] <= 0 ||
+			info->uc.expected_slots > info->status_tokens[TOTAL_SLOTS] )
+			info->uc.reload_hint[HINT_SLIST] = 2;
+		else
+			info->uc.reload_hint[HINT_SLIST] = 1;
 	}
 
 	if( info->status_tokens[SEQ_ACT] != history[SEQ_ACT] )
@@ -6229,7 +6234,7 @@ static void	process_reload_hints(int *history, int pm)
 
 	if( info->uc.reload_hint[HINT_SLIST] )
 	{
-		load_samplelist_info(FALSE);
+		load_samplelist_info( (info->uc.reload_hint[HINT_SLIST] == 2 ? TRUE : FALSE) );
 		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
 	}
 
@@ -7558,11 +7563,12 @@ void	reset_samplebank(void)
 				{		
 					if(slot->title) free(slot->title);
 					if(slot->timecode) free(slot->timecode);
-		//			if(slot->pixbuf) g_object_unref( slot->pixbuf );
+					if(slot->pixbuf) g_object_unref( slot->pixbuf );
 					slot->title = NULL;
 					slot->timecode = NULL;
 					slot->sample_id = 0;
 					slot->sample_type = 0;
+					slot->pixbuf = NULL;
 				}
 				update_sample_slot_data( i,j, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
 			}
@@ -7594,7 +7600,7 @@ void	free_samplebank(void)
 				sample_gui_slot_t *gslot = info->sample_banks[i]->gui_slot[j];
 				if(slot->title) free(slot->title);
 				if(slot->timecode) free(slot->timecode);
-	//			if(slot->pixbuf) g_object_unref(slot->pixbuf);
+				if(slot->pixbuf) g_object_unref(slot->pixbuf);
 	//			if(slot->rawdata) free(slot->rawdata);
 				free(slot);
 				free(gslot);
@@ -8304,11 +8310,11 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 
 	if( sample_id == 0 )
 	{
-/*		if(slot->pixbuf)
+		if(slot->pixbuf)
 		{
 			g_object_unref( slot->pixbuf );
 			slot->pixbuf = NULL;
-		} */
+		} 
 	}
 }
 
@@ -8321,6 +8327,4 @@ void	veejay_bind_track( int id, int bind_this )
 {
 	multitrack_bind_track(info->mt, id, bind_this );
 	info->uc.reload_hint[HINT_SLIST]  =1;
-
- 
 }
