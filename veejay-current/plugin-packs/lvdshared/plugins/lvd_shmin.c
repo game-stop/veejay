@@ -333,7 +333,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	port = out_chans[0];
 	
 	    livido_set_string_value( port, "name", "Output Channel");
-		livido_set_int_array( port, "palette_list", 2, palettes0);
+		livido_set_int_array( port, "palette_list", 4, palettes0);
 		livido_set_int_value( port, "flags", 0);
 	
 
