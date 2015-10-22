@@ -997,7 +997,7 @@ void sample_del_all(void *edl)
 		sample_del(i);
 	}
      
-	veejay_memset( avail_num, 0, sizeof(int) * SAMPLE_MAX_SAMPLES );
+	veejay_memset( avail_num, 0, sizeof(avail_num) );
 	next_avail_num = 0;
 	this_sample_id = 0;
 
