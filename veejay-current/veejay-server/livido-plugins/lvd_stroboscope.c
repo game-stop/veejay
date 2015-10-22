@@ -228,8 +228,8 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 		}
 
 		livido_memcpy( ptr->planes[0], O[0], len );
-		livido_memcpy( ptr->planes[1], O[1], len );
-		livido_memcpy( ptr->planes[2], O[2], len );	
+		livido_memcpy( ptr->planes[1], O[1], uv_len );
+		livido_memcpy( ptr->planes[2], O[2], uv_len );	
 	}
 
 	if( ptr->current > duration ) {
@@ -274,20 +274,21 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	
 	int palettes0[] = {
 	    LIVIDO_PALETTE_YUV422P,
-            0
+		LIVIDO_PALETTE_YUV444P,
+        0
 	};
 	
 	out_chans[0] = livido_port_new( LIVIDO_PORT_TYPE_CHANNEL_TEMPLATE );
 	port = out_chans[0];
 	
 	livido_set_string_value( port, "name", "Output Channel");
-	livido_set_int_array( port, "palette_list", 2, palettes0);
+	livido_set_int_array( port, "palette_list", 3, palettes0);
 	livido_set_int_value( port, "flags", 0);
 
 	in_chans[0] = livido_port_new( LIVIDO_PORT_TYPE_CHANNEL_TEMPLATE );
 	port = in_chans[0];
 	livido_set_string_value( port, "name", "Input Channel");
-	livido_set_int_array( port, "palette_list", 2, palettes0);
+	livido_set_int_array( port, "palette_list", 3, palettes0);
 	livido_set_int_value( port, "flags", 0);
 
 	in_params[0] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
