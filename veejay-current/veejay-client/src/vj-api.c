@@ -532,9 +532,12 @@ enum
 typedef struct 
 {
 	const char *text;
-} slider_name_t;
+} widget_name_t;
 
-static slider_name_t *slider_names_ = NULL;
+static widget_name_t *slider_names_ = NULL;
+static widget_name_t *param_incs_ = NULL;
+static widget_name_t *param_decs_ = NULL;
+static widget_name_t *param_kfs_ = NULL;
 
 #define MAX_PATH_LEN 1024
 #define VEEJAY_MSG_OUTPUT	4
@@ -6211,7 +6214,6 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 //	info->uc.playmode = pm;
 }	
 
-
 static void	process_reload_hints(int *history, int pm)
 {
 	int	*entry_tokens = &(info->uc.entry_tokens[0]);
@@ -6278,8 +6280,6 @@ static void	process_reload_hints(int *history, int pm)
 	info->parameter_lock = 1;
 	if(info->uc.reload_hint[HINT_ENTRY] == 1 && pm != MODE_PLAIN)
 	{
-		char slider_name[10];
-		char button_name[10];
 		gint np = 0;
 		gint i;
 		/* update effect description */
@@ -6303,24 +6303,21 @@ static void	process_reload_hints(int *history, int pm)
 			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
 			for( i = 0; i < np ; i ++ )
 			{
-				sprintf(slider_name, "slider_p%d",i);
-				enable_widget( slider_name );
-				sprintf(button_name, "inc_p%d", i);
-				enable_widget( button_name );
-				sprintf(button_name, "dec_p%d", i );
+				enable_widget( slider_names_[i].text );
+				enable_widget( param_incs_[i].text );
+				enable_widget( param_decs_[i].text );
+				enable_widget( param_kfs_[i].text );
 
 				gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
-				gtk_widget_set_tooltip_text(	glade_xml_get_widget_(info->main_window, slider_name), tt1 );
-				enable_widget( button_name );
+				gtk_widget_set_tooltip_text(glade_xml_get_widget_(info->main_window, slider_names_[i].text), tt1 );
+				
 				gint min,max,value;
 				value = entry_tokens[ENTRY_PARAMSET + i];
 				if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
 				{
-					update_slider_range( slider_name,min,max, value, 0);
+					update_slider_range( slider_names_[i].text,min,max, value, 0);
 				}
-				sprintf(button_name, "kf_p%d", i );
-				enable_widget( button_name );
-				set_tooltip( button_name, tt1 );
+				set_tooltip( param_kfs_[i].text, tt1 );
 				g_free(tt1);
 			}
 			
@@ -6329,18 +6326,15 @@ static void	process_reload_hints(int *history, int pm)
 
 		for( i = np; i < MAX_UI_PARAMETERS; i ++ )
 		{
-			sprintf(slider_name, "slider_p%d",i);
 			gint min = 0, max = 1, value = 0;
-			update_slider_range( slider_name, min,max, value, 0 );
-			disable_widget( slider_name );
-			sprintf( button_name, "inc_p%d", i);
-			disable_widget( button_name );
-			sprintf( button_name, "dec_p%d", i);
-			disable_widget( button_name );
-			sprintf( button_name, "kf_p%d", i );
-			set_tooltip( button_name, NULL );
-			disable_widget( button_name );
-			gtk_widget_set_tooltip_text( glade_xml_get_widget_(info->main_window, slider_name), NULL );
+			update_slider_range( slider_names_[i].text, min,max, value, 0 );
+			disable_widget( slider_names_[i].text );
+			disable_widget( param_incs_[i].text );
+			disable_widget( param_decs_[i].text );
+			set_tooltip( param_kfs_[i].text, NULL );
+			disable_widget( param_kfs_[i].text );
+			gtk_widget_set_tooltip_text( glade_xml_get_widget_(info->main_window, slider_names_[i].text), NULL );
+			update_slider_range( slider_names_[i].text, min,max, value, 0 );
 		}
 		GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
 				info->main_window, "tree_chain") ));
@@ -6875,10 +6869,23 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 		gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * (STATUS_TOKENS+1));
 	}
 
-	slider_names_ = (slider_name_t*) vj_calloc(sizeof(slider_name_t) * MAX_UI_PARAMETERS );
+	slider_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+	param_incs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+	param_decs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+	param_kfs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+
 	for( i = 0; i < MAX_UI_PARAMETERS; i ++ ) {
-		snprintf(text,sizeof(text)," slider_p%d" , i );
+		snprintf(text,sizeof(text),"slider_p%d" , i );
 		slider_names_[i].text = strdup( text );
+		
+		snprintf(text,sizeof(text),"inc_p%d", i );
+		param_incs_[i].text = strdup( text );
+
+		snprintf(text,sizeof(text), "dec_p%d", i );
+		param_incs_[i].text = strdup( text );
+
+		snprintf(text,sizeof(text), "kf_p%d", i );		
+		param_kfs_[i].text = strdup( text );
 	}
 
 	gui->uc.reload_force_avoid = FALSE;
@@ -7074,12 +7081,10 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	if( load_midi )
 			vj_midi_load(info->midi,midi_file);
 
-	char slider_name[16];
 	for( i = 0 ; i < MAX_UI_PARAMETERS; i ++ ) {
-		snprintf(slider_name,sizeof(slider_name), "slider_p%d",i);
-		GtkWidget *slider = glade_xml_get_widget( info->main_window, slider_name );
+		GtkWidget *slider = glade_xml_get_widget( info->main_window, slider_names_[i].text );
 		g_signal_connect( GTK_OBJECT(slider), "scroll-event", G_CALLBACK(slider_scroll_event), (gpointer) castIntToGpointer(i) );
-		update_slider_range( slider_name, 0,1,0,0);
+		update_slider_range( slider_names_[i].text, 0,1,0,0);
 	}
 
 	g_signal_connect( GTK_OBJECT( glade_xml_get_widget(info->main_window, "speed_slider") ), "scroll-event",
