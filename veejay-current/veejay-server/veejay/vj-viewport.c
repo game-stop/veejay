@@ -1305,6 +1305,8 @@ void			viewport_destroy( void *data )
 
 static	int		viewport_update_perspective( viewport_t *v, float *values )
 {
+	v->disable = 0;
+
 	int res = viewport_configure (v, v->x1, v->y1,
 					 v->x2, v->y2,
 					 v->x3, v->y3,
@@ -1328,12 +1330,11 @@ static	int		viewport_update_perspective( viewport_t *v, float *values )
 				v->x0, v->y0, v->w0, v->h0,v->w,v->h, v->user_reverse, v->grid_val,v->grid_resolution ));
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to configure the viewport");
-			veejay_msg(VEEJAY_MSG_ERROR, "If you are using a preset-configuration, see ~/.veejay/viewport.cfg");
+			veejay_msg(VEEJAY_MSG_ERROR, "If you are using a preset-configuration, remove or fix ~/.veejay/viewport.cfg");
 			v->disable = 1;
 			return res;
 		}
 	}
-
 
 	// Clear map
 	const int len = v->w * v->h;
@@ -1341,7 +1342,6 @@ static	int		viewport_update_perspective( viewport_t *v, float *values )
 	for( k = 0 ; k < len ; k ++ )
 		v->map[k] = len+1;
 	
-	v->disable = 0;
 
 	// Update map
 	viewport_process( v );
@@ -1495,7 +1495,7 @@ int	viewport_reconfigure_from_config(void *vv, void *vc)
 	int k;
 	for( k = 0 ; k < len ; k ++ )
 		v->map[k] = len+1;
-	
+
 	v->disable = 0;
 
 	// try to initialize the new settings
@@ -1547,10 +1547,12 @@ int	viewport_reconfigure_from_config(void *vv, void *vc)
 }
 void	viewport_update_from(void *vv, void *bb)
 {
+	if( vv == NULL || bb == NULL )
+		return;
+
 	viewport_t *v = (viewport_t*) vv;
 	viewport_t *b = (viewport_t*) bb;
 
-	if(!v || !b) return;
 	float p[9];
 	
 	p[0] = b->x1;
@@ -1589,9 +1591,10 @@ void	viewport_update_from(void *vv, void *bb)
 		veejay_msg(VEEJAY_MSG_DEBUG, "Configured input %dx%d to (1)=%fx%f\t(2)=%fx%f\t(3)=%fx%f\t(4)=%fx%f\t%dx%d+%dx%d",
 			b->w,b->h,b->x1,b->y1,b->x2,b->y2,b->x3,b->y3,b->x4,b->y4,b->x0,b->y0,b->w0,b->h0);
 	}
-	else
-		veejay_msg(VEEJAY_MSG_DEBUG,"Failed to configure input."); 
-
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG,"Failed to apply projection calibration. Press CTRL-s to configure this sample or press CTRL-p to disable."); 
+		b->disable = 1;
+	}
 
 }
 
@@ -1630,6 +1633,8 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	v->h = h;		
 	v->marker_size = 4;
 	v->homedir = strdup(homedir);
+	v->disable = 0;
+	
 	int res;
 
 	if( vc == NULL )
@@ -1737,6 +1742,7 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	q->ui->scale  = 1.0f;
 	q->ui->scaler = viewport_init_swscaler(q->ui,new_w,new_h);
 	q->homedir = strdup(v->homedir);
+	q->disable = 0;
 
 	int	res = viewport_configure( q, 	q->x1, q->y1,
 					     	q->x2, q->y2,
@@ -1778,7 +1784,8 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", q->x2,q->y2,q->x3,q->y3);
 	veejay_msg(VEEJAY_MSG_INFO, "\tQuad     :\t%dx%d+%dx%d", q->x0,q->y0,q->w0,q->h0 );
 	veejay_msg(VEEJAY_MSG_INFO, "\tDimension:\t%dx%d",q->w,q->h);
-    	return (void*) q;
+    
+	return (void*) q;
 }
 
 
@@ -3213,7 +3220,7 @@ void *viewport_fx_init_map( int wid, int hei, int x1, int y1,
 	}
 
 
-    	return (void*)v;
+    return (void*)v;
 }
 
 int	viewport_get_mode( void *vv ) {
@@ -3274,7 +3281,7 @@ void *viewport_fx_init(int type, int wid, int hei, int x, int y, int zoom, int d
 	}
 
 
-    	return (void*)v;
+   	return (void*)v;
 }
 
 
