@@ -110,7 +110,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	entry->vecy = (int *)livido_malloc(sizeof(int) * video_area);
 	if(entry->vecx == NULL || entry->vecy == NULL) {
 		free(entry);
-		return NULL;
+		return LIVIDO_ERROR_MEMORY_ALLOCATION;
 	}
 
 	entry->scale = 3;
