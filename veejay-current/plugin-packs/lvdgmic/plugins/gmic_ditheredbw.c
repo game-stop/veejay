@@ -119,7 +119,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
         in_chans[0] = livido_port_new( LIVIDO_PORT_TYPE_CHANNEL_TEMPLATE );
         port = in_chans[0];
   		livido_set_string_value( port, "name", "Input Channel");
-       		livido_set_int_array( port, "palette_list", 4, palettes0);
+       		livido_set_int_array( port, "palette_list", 3, palettes0);
        		livido_set_int_value( port, "flags", 0);
 	
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
