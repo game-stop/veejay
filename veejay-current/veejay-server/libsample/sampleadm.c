@@ -2996,18 +2996,21 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
     char *chTemp = NULL;
     xmlNodePtr subs = NULL;
 
-    if(!sample_read_edl( skel )) {
-	skel->edit_list = NULL;
+    if(!sample_read_edl( skel ))
+	{
+		skel->edit_list = NULL;
     }
 
     if(!skel->edit_list)
     {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has inherited EDL from plain mode", skel->sample_id );
+		veejay_msg(VEEJAY_MSG_INFO, "Sample %d is using EDL from plain mode", skel->sample_id );
 	  	skel->edit_list = el;
 		skel->soft_edl = 1;
-	} else {
+	}
+	else
+	{
 		skel->soft_edl = 0;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has own EDL (%p)", skel->sample_id, el );
+		veejay_msg(VEEJAY_MSG_INFO, "Sample %d has its own EDL", skel->sample_id, el );
     }
 
 	int marker_start = 0, marker_end = 0;
@@ -3305,7 +3308,7 @@ int sample_read_edl( sample_info *sample )
 
 	//EDL is stored in CWD, samplelist file can be anywhere. Cannot always load samplelists due to
 	//    missing EDL files in CWD.
-	veejay_msg(VEEJAY_MSG_DEBUG, "Loading '%s' from video sample from current working directory" , files[0] );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Loading '%s' from current working directory" , files[0] );
 
 	sample->edit_list = vj_el_init_with_args( files,1,
 			__sample_project_settings.flags,
@@ -3328,6 +3331,7 @@ int sample_read_edl( sample_info *sample )
 	else 
 	{
 		sample->edit_list = old;
+		veejay_msg(VEEJAY_MSG_ERROR, "Error loading '%s' from current working directory", files[0] );
 	}
 
 	return res;
