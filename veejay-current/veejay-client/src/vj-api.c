@@ -5376,8 +5376,6 @@ static	void	load_editlist_info()
 	update_label_i( "label_el_achans", values[7], 0);
 	update_label_i( "label_el_abits", values[5], 0);
 
-	info->el.ratio = (float)info->el.width / (float) info->el.height;
-
 	if( values[4] == 0 )
 	{
 		disable_widget( "button_5_4" );
@@ -6572,7 +6570,9 @@ void	vj_gui_set_debug_level(int level, int n_tracks, int pw, int ph )
 
 	vims_verbosity = level;
 
-	mt_set_max_tracks(n_tracks);
+	if( !mt_set_max_tracks(n_tracks) ) {
+		mt_set_max_tracks(5);
+	}
 }
 
 int	vj_gui_get_preview_priority(void)
@@ -6584,6 +6584,7 @@ void	default_bank_values(int *col, int *row )
 {
 	int nsc = 2;
 	int nsy = 6;
+
 	if( ui_skin_ == 1 ) {
 		nsc = 5;
 		nsy = 4;
@@ -6596,8 +6597,8 @@ void	default_bank_values(int *col, int *row )
 	}
 	else
 	{
-		NUM_SAMPLES_PER_ROW = *col;
-		NUM_SAMPLES_PER_COL = *row;
+		NUM_SAMPLES_PER_ROW = *row;
+		NUM_SAMPLES_PER_COL = *col;
 	}
 	NUM_SAMPLES_PER_PAGE = NUM_SAMPLES_PER_COL * NUM_SAMPLES_PER_ROW;
 	NUM_BANKS = (4096 / NUM_SAMPLES_PER_PAGE );
@@ -6787,17 +6788,15 @@ void	vj_gui_wipe()
 
 }
 
-GtkWidget	*new_bank_pad(GtkWidget *box, int type)
+GtkWidget	*new_bank_pad(GtkWidget *box)
 {
 	GtkWidget *pad = info->sample_bank_pad = gtk_notebook_new();
 	gtk_notebook_set_tab_pos( GTK_NOTEBOOK(pad), GTK_POS_BOTTOM );
 	gtk_notebook_set_show_tabs( GTK_NOTEBOOK(pad ), FALSE );
 	gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(pad), TRUE, TRUE, 0);
 
-	if( type == 0 )  {
-		setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW, pad, &(info->image_dimensions[0]),
-				&(info->image_dimensions[1]) );
-	}
+//	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW, pad, &(info->image_dimensions[0]),&(info->image_dimensions[1]) );
+	
 
 	return pad;
 }
@@ -6936,7 +6935,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 			NULL );
 
     	GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
-	info->sample_bank_pad = new_bank_pad( box,0 );
+	info->sample_bank_pad = new_bank_pad( box );
 
 	//QuickSelect slots
 	create_ref_slots( 10 );
@@ -7612,48 +7611,38 @@ void	free_samplebank(void)
 #define RUP8(num)(((num)+8)&~8)
 
 
-//@ OK
 void setup_samplebank(gint num_cols, gint num_rows, GtkWidget *pad, int *idx, int *idy)
 {
 	GdkRectangle result;
-	if(info->el.width <= 0 || info->el.height <= 0 ) {
-		*idx = 0;
-		*idy = 0;
-		return;
+	widget_get_rect_in_screen(
+		pad,
+		&result
+	);
+
+	gint image_width = result.width / num_rows;
+	gint image_height = result.height / num_cols;
+
+	if( image_width > 64 && image_height > 64 ) {
+		image_width -= 16; /* some spacing between slot border and image */
+		image_height -= 16;
+	}
+
+	float ratio = (float) info->el.height / (float) info->el.width;
+
+	float w,h;
+	if( ratio <= 1.0f ) {
+		h = ratio * image_width;
+		w = image_width;
 	}
 	else {
-		widget_get_rect_in_screen(
-			pad,
-			&result
-		);
-
-		result.width -= ( num_rows * 16);	
-		result.height -= ( num_cols * 16);
-		
-		gint image_width = result.width / num_rows;
-		gint image_height = result.height / num_cols;
-
-		float ratio = (float) info->el.height / (float) info->el.width;
-	
-		//	ratio = (float) info->el.width / (float) info->el.height;
-
-		gfloat w = 0.0f;
-		gfloat h = 0.0f;
-
-		if( info->el.width > info->el.height ) {
-			w = image_width;
-			h = image_width * ratio;
-		}
-		else {
-			w = image_height * ratio;
-			h = image_height;
-		}
-
-		*idx = (int)w;
-		*idy = (int)h;
-
+		h = image_height;
+		w = image_width / ratio;
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "Sample bank image dimensions: %dx%d", *idx,*idy);
+	
+	*idx = (int)w;
+	*idy = (int)h;
+	
+	veejay_msg(VEEJAY_MSG_DEBUG, "Sample bank [%dx%d] image dimensions %dx%d -> %dx%d %2.2f",result.width,result.height,image_width,image_height, *idx,*idy, ratio);
 }
 
 /* --------------------------------------------------------------------------------------------------------------------------
