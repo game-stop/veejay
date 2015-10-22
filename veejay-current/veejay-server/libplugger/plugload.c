@@ -851,7 +851,7 @@ void	plug_print_all()
 	*/
 
 	veejay_msg(VEEJAY_MSG_INFO, "FX engine ready. Loaded %d plugins and %d built-ins (%d in total)",
-			n,vj_effect_max_effects(),vj_effect_max_effects()+n);
+			index_,vj_effect_max_effects(),vj_effect_max_effects()+index_);
 		
 }
 
