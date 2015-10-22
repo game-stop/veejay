@@ -145,6 +145,13 @@ static int int_compare(const void *key1, const void *key2)
 #endif
 }
 
+static char *sample_default_edl_name(int s1)
+{
+	char tmp_file[1024];
+	snprintf(tmp_file,sizeof(tmp_file), "sample_%05d.edl", s1 );
+	return strdup( tmp_file );
+}
+
 static void sample_close_edl(int s1, editlist *el)
 {
 	/* check if another sample has same EDL */
@@ -328,8 +335,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->marker_end = 0;
     si->loopcount = 0;
     si->effect_toggle = 1;
-    snprintf(tmp_file,sizeof(tmp_file), "sample_%05d.edl", si->sample_id );
-    si->edit_list_file = strdup( tmp_file );
+    si->edit_list_file = sample_default_edl_name(si->sample_id);
 
     sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
 
@@ -2996,24 +3002,9 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
     char *chTemp = NULL;
     xmlNodePtr subs = NULL;
 
-    if(!sample_read_edl( skel ))
-	{
-		skel->edit_list = NULL;
-    }
+	int original_id = 0;
 
-    if(!skel->edit_list)
-    {
-		veejay_msg(VEEJAY_MSG_INFO, "Sample %d is using EDL from plain mode", skel->sample_id );
-	  	skel->edit_list = el;
-		skel->soft_edl = 1;
-	}
-	else
-	{
-		skel->soft_edl = 0;
-		veejay_msg(VEEJAY_MSG_INFO, "Sample %d has its own EDL", skel->sample_id, el );
-    }
-
-	int marker_start = 0, marker_end = 0;
+   	int marker_start = 0, marker_end = 0;
 
     while (cur != NULL) {
 
@@ -3021,9 +3012,9 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-			skel->sample_id = ( atoi(chTemp) ) + start_at;
+			original_id = atoi(chTemp);
+			skel->sample_id = original_id + start_at;
 			sample_store(skel);
-
 			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -3042,8 +3033,36 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		skel->edit_list_file = strdup(chTemp);
-		free(chTemp);
+			skel->edit_list_file = strdup(chTemp);
+			
+			if( start_at > 0 ) {
+				free(skel->edit_list_file);
+				skel->edit_list_file = sample_default_edl_name( original_id );
+			}
+			
+			if(!sample_read_edl( skel ))
+			{
+				skel->edit_list = NULL;
+			}
+
+		    if(!skel->edit_list)
+		    {
+				veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d is using EDL from plain mode", skel->sample_id );
+				skel->edit_list = el;
+				skel->soft_edl = 1;
+			}
+			else
+			{
+				skel->soft_edl = 0;
+				if( start_at == 0 ) {
+					veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d has its own EDL", skel->sample_id, el );
+				}
+				else {
+					veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d is using Sample's %d EDL", skel->sample_id, original_id );
+				}
+			}
+
+			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
