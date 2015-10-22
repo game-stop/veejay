@@ -228,8 +228,8 @@ void sample_init(int len, void *font, editlist *pedl)
 {
     if (!initialized) {
 	int i;
-	for (i = 0; i < SAMPLE_MAX_SAMPLES; i++)
-	    avail_num[i] = 0;
+	veejay_memset(avail_num, 0, sizeof(avail_num));    
+	
 	this_sample_id = 1;	/* do not start with zero */
 	if (!
 	    (SampleHash =
@@ -1525,16 +1525,6 @@ int	sample_start_playing(int s1, int no_cache)
     	}
 
 	return 1;
-}
-
-int sample_is_deleted(int s1)
-{
-    int i;
-    for (i = 0; i < next_avail_num; i++) {
-	if (avail_num[i] == s1)
-	    return 1;
-    }
-    return 0;
 }
 
 int sample_set_chain_source(int s1, int position, int input)
@@ -3605,9 +3595,9 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
 
 	if(sample->edit_list_file)
 	{
-    		sprintf(buffer, "%s", sample->edit_list_file);
-     		xmlNewChild(node, NULL, (const xmlChar*) XMLTAG_EDIT_LIST_FILE,
-			(const xmlChar*) buffer );
+    	sprintf(buffer, "%s", sample->edit_list_file);
+		xmlNewChild(node, NULL, (const xmlChar*) XMLTAG_EDIT_LIST_FILE,
+		(const xmlChar*) buffer );
 	}
 
     sprintf(buffer, "%s", sample->descr);
