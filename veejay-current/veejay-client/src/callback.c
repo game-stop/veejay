@@ -3071,87 +3071,154 @@ void	on_colorselection_color_changed( GtkWidget *w, gpointer user_data)
 {
 }
 static 
-gchar *get_clipboard_fx_buffer()
+gchar *get_clipboard_fx_parameter_buffer(int *mixing_src, int *mixing_cha, int *enabled, int *fx_id)
 {
+	char rest[1024];
 	int	len = 0;
-	int	p[16];
+	int tmp[8];
 	int 	i;
-	for(i=0; i <16;i++)
-		p[i] = 0;	
-	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
-		info->uc.selected_chain_entry );
+	int n_params = 0;
+	int fid = 0;
+
+	veejay_memset( rest,0,sizeof(rest));
+
+	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0,info->uc.selected_chain_entry );
 
 	gchar *answer = recv_vims(3,&len);
 	if(len <= 0 || answer == NULL )
 	{
 		gveejay_popup_err( "Error", "Nothing in FX clipboard");
-	
 		if(answer) g_free(answer);
 		return NULL;
 	}
 
-	i = sscanf( answer, "%d %d %d %d %d %d %d %d %d %d %d",
-			&p[0], //fx id
-			&p[1], //2 video
-			&p[2], //n params
-			&p[3], //p0
-			&p[4], //p1
-			&p[5], //p2
-			&p[6], //p3
-			&p[7],//p4
-			&p[8],//p5
-			&p[9],//p6
-			&p[10] //p7
-			);	
-	
-	char preset[512];
-	sprintf(preset, "%d", p[0]);
-	for(i=0;  i < p[2] ;i++)
-	{
-		char tmp[10];
-		sprintf(tmp, " %d", p[3+i] );
-		strcat( preset,tmp);
+	i = sscanf( answer, "%d %d %d %d %d %d %d %d %d %d %d %1024[0-9 ]",
+			&fid, //fx id
+			&tmp[0], //is video
+			&n_params, //num params
+			&tmp[0], //kf_type
+			&tmp[0], //0
+			&tmp[0], //0
+			&tmp[0], //kf_status
+			&tmp[1], //source
+			&tmp[2], //channel
+			&tmp[3], //fx enabled
+			&tmp[0], //dummy
+			rest
+	);	
+
+	if( i != 12 ) {
+		return NULL;
 	}
-	g_free(answer);
-	return strdup(preset);
+
+	*mixing_src = tmp[1];
+	*mixing_cha = tmp[2];
+	*enabled = tmp[3];
+	*fx_id = fid;
+
+	return strdup(rest);
 }	 
 
-static	gchar* last_fx_buf = NULL;
+typedef struct
+{
+	char *parameters;
+	int	 fx_id;
+	int	 src;
+	int	 cha;
+	int	 enabled;
+} clipboard_t;
+
+static clipboard_t	*get_new_clipboard()
+{
+	clipboard_t *c = (clipboard_t*) vj_calloc( sizeof(clipboard_t) );
+	
+	c->parameters = get_clipboard_fx_parameter_buffer( &(c->src), &(c->cha), &(c->enabled), &(c->fx_id) );
+	if( c->parameters == NULL ) {
+		free(c);
+		return NULL;
+	}
+	return c;
+}
+
+static void			del_clipboard(clipboard_t *c)
+{
+	if(c) {
+		if(c->parameters)
+			free(c->parameters);
+		free(c);
+	}
+	c = NULL;
+}
+
+static clipboard_t *last_clipboard = NULL;
+
+static void			do_clipboard(clipboard_t *c, int id, int entry_id)
+{
+	char msg[1024];
+	snprintf( msg, sizeof(msg), "%03d:%d %d %d %s;",
+			VIMS_CHAIN_ENTRY_SET_PRESET,
+			id,
+			entry_id,
+			c->fx_id,
+			c->parameters
+			);
+
+	msg_vims(msg);
+
+	snprintf( msg, sizeof(msg), "%03d:%d %d;",
+			( c->enabled ? 1 : 0 ),
+		    id,
+			entry_id
+			);
+	msg_vims(msg);
+
+	if( last_clipboard->cha > 0 ) {
+		snprintf( msg, sizeof(msg), "%03d:%d %d %d %d;",
+			VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+			id,
+			entry_id,
+			c->src,
+			c->cha
+			);
+		msg_vims(msg);
+	}
+}
+
 void	on_button_fx_cut_clicked( GtkWidget *w, gpointer user_data)
 {
-	if(last_fx_buf)
-		free(last_fx_buf);
+	if(last_clipboard)
+		del_clipboard( last_clipboard );
 	
-	last_fx_buf = get_clipboard_fx_buffer();
+	last_clipboard = get_new_clipboard();
 
 	on_button_fx_del_clicked( NULL,NULL );
 }
 
 void	on_button_fx_paste_clicked( GtkWidget *w, gpointer user_data)
 {
-	int i = info->uc.selected_chain_entry;
 	sample_slot_t *s = info->selected_slot;
 
-	if( last_fx_buf && s)
-	{
-		char msg[256];
-		sprintf( msg, "%03d:%d %d %s;",
-			VIMS_CHAIN_ENTRY_SET_PRESET,
-			s->sample_id,
-			i,
-			last_fx_buf );
-		msg_vims(msg);
-		info->uc.reload_hint[HINT_ENTRY]=1;
+	if( last_clipboard == NULL ) {
+		vj_msg(VEEJAY_MSG_INFO, "Nothing in FX clipboard");
+		return;
 	}
 	
+	if( s == NULL ) {
+		vj_msg(VEEJAY_MSG_INFO, "No FX entry selected");
+		return;
+	}
+
+	do_clipboard( last_clipboard, s->sample_id, info->uc.selected_chain_entry );
 	
-}	
+	info->uc.reload_hint[HINT_ENTRY]=1;
+}
+
 void	on_button_fx_copy_clicked(GtkWidget *w, gpointer user_data)
 {
-	if(last_fx_buf)
-		free(last_fx_buf);
-	
-	last_fx_buf = get_clipboard_fx_buffer();
+	if(last_clipboard)
+		del_clipboard(last_clipboard);
+
+	last_clipboard = get_new_clipboard();
 }
 void	on_copy1_activate( GtkWidget *w, gpointer user_data)
 {

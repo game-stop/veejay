@@ -3982,7 +3982,22 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
                                     <property name="n_columns">8</property>
-                                    <child>
+								    <child>
+                                      <widget class="GtkRadioButton" id="kf_p8">
+                                        <property name="label" translatable="yes">8</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="use_underline">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">kf_p0</property>
+                                      </widget>
+                                      <packing>
+                                        <property name="x_options"/>
+                                        <property name="y_options"/>
+                                      </packing>
+                                    </child>  
+									<child>
                                       <widget class="GtkRadioButton" id="kf_p9">
                                         <property name="label" translatable="yes">9</property>
                                         <property name="visible">True</property>
@@ -4108,21 +4123,7 @@
                                         <property name="y_options"/>
                                       </packing>
                                     </child>
-                                    <child>
-                                      <widget class="GtkRadioButton" id="kf_p8">
-                                        <property name="label" translatable="yes">8</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
-                                      </widget>
-                                      <packing>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
+                              
                                   </widget>
                                   <packing>
                                     <property name="expand">True</property>
