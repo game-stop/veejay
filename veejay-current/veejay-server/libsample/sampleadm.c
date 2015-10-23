@@ -3101,7 +3101,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-			skel->first_frame = atol(chTemp);
+			skel->last_frame = atol(chTemp);
 			free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
