@@ -665,9 +665,6 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 	GtkWidget *widget = glade_xml_get_widget( m , name );
 	if(!widget)
 	{
-#ifdef STRICT_CHECKING
-		veejay_msg(0,"Missing widget: %s %s ",__FUNCTION__,name);
-#endif
 		return NULL;
 	}
 #ifdef STRICT_CHECKING
@@ -6309,7 +6306,7 @@ static void	process_reload_hints(int *history, int pm)
 				enable_widget( param_kfs_[i].text );
 
 				gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
-				gtk_widget_set_tooltip_text(glade_xml_get_widget_(info->main_window, slider_names_[i].text), tt1 );
+				set_tooltip( slider_names_[i].text, tt1 );
 				
 				gint min,max,value;
 				value = entry_tokens[ENTRY_PARAMSET + i];
@@ -6331,9 +6328,9 @@ static void	process_reload_hints(int *history, int pm)
 			disable_widget( slider_names_[i].text );
 			disable_widget( param_incs_[i].text );
 			disable_widget( param_decs_[i].text );
-			set_tooltip( param_kfs_[i].text, NULL );
 			disable_widget( param_kfs_[i].text );
-			gtk_widget_set_tooltip_text( glade_xml_get_widget_(info->main_window, slider_names_[i].text), NULL );
+			set_tooltip( param_kfs_[i].text, NULL );
+			set_tooltip( slider_names_[i].text, NULL );
 			update_slider_range( slider_names_[i].text, min,max, value, 0 );
 		}
 		GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
@@ -6882,7 +6879,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 		param_incs_[i].text = strdup( text );
 
 		snprintf(text,sizeof(text), "dec_p%d", i );
-		param_incs_[i].text = strdup( text );
+		param_decs_[i].text = strdup( text );
 
 		snprintf(text,sizeof(text), "kf_p%d", i );		
 		param_kfs_[i].text = strdup( text );
