@@ -67,19 +67,21 @@ static void usage(char *progname)
         printf( "where options are:\n");
         printf( "-h\t\tVeejay host to connect to (defaults to localhost) \n");         
         printf( "-p\t\tVeejay port to connect to (defaults to 3490) \n");
-	printf( "-t\t\tLoad gveejay's classic GTK theme\n");
-	printf( "-n\t\tDont use colored text\n");
-	printf( "-v\t\tBe extra verbose (usefull for debugging)\n");
-	printf( "-s\t\tSet bank resolution (row X columns)\n");
-	printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
+		printf( "-t\t\tLoad gveejay's classic GTK theme\n");
+		printf( "-n\t\tDont use colored text\n");
+		printf( "-v\t\tBe extra verbose (usefull for debugging)\n");
+		printf( "-s\t\tSet bank resolution (row X columns)\n");
+		printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
         printf( "-X\t\tSet number of tracks\n");
-	printf( "-l\t\tChoose layout (0=large screen, 1=small screens)\n");
-	printf( "-V\t\tShow version, data directory and exit.\n");
-	printf( "-m <file>\tMIDI configuration file.\n");
-    printf( "-g\t\t<X,Y>\tWindow position on screen.\n");
-	printf( "-b\t\tEnable beta features.\n");
-	printf( "-a\t\tAuto-connect to local running veejays.\n");
-	printf( "\n\n");
+		printf( "-l\t\tChoose layout (0=large screen, 1=small screens)\n");
+		printf( "-V\t\tShow version, data directory and exit.\n");
+		printf( "-m <file>\tMIDI configuration file.\n");
+		printf( "-g\t\t<X,Y>\tWindow position on screen.\n");
+		printf( "-b\t\tEnable beta features.\n");
+		printf( "-a\t\tAuto-connect to local running veejays.\n");
+		printf(" -L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
+		
+		printf( "\n\n");
         exit(-1);
 }
 static int      set_option( const char *name, char *value )
@@ -159,6 +161,9 @@ static int      set_option( const char *name, char *value )
 	else if (strcmp(name,"a") == 0 ) {
 		auto_connect = 1;
 	}
+	else if( strcmp(name,"L") == 0 ) {
+		set_disable_sample_image(1);
+	}
     else
 	      err++;
     return err;
@@ -226,7 +231,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	snprintf(hostname,sizeof(hostname), "127.0.0.1");
 
-	while( ( n = getopt( argc, argv, "s:h:p:tabnvHfX:P:Vl:T:m:g:")) != EOF )
+	while( ( n = getopt( argc, argv, "s:h:p:tabnvLHfX:P:Vl:T:m:g:")) != EOF )
     {
 		sprintf(option, "%c", n );
 		err += set_option( option, optarg);

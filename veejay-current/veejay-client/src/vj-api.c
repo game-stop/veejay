@@ -660,6 +660,13 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterp
 
 void reset_cali_images( int type, char *wid_name );
 
+int disable_sample_image = 0;
+
+void	set_disable_sample_image(int status)
+{
+	disable_sample_image = status;
+}
+
 GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 {
 	GtkWidget *widget = glade_xml_get_widget( m , name );
@@ -4364,7 +4371,8 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 						free_slot(tmp_slot);	
 						n_slots ++;		
 
-						veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
+						if( !disable_sample_image ) 
+							veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
 			
 					}
 					else
