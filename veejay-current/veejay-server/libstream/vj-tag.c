@@ -21,7 +21,6 @@
 #include <libstream/vj-tag.h>
 #include <libhash/hash.h>
 #include <libvje/vje.h>
-#include <veejay/vj-viewport.h>
 #include <veejay/vjkf.h>
 #include <veejay/vj-shm.h>
 #define VIDEO_PALETTE_YUV420P 15
@@ -58,7 +57,6 @@
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
 #endif
-#include <veejay/vj-viewport-xml.h>
 
 #include <libplugger/plugload.h>
 static veejay_t *_tag_info = NULL;
@@ -423,7 +421,6 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 			v4lvideo_templ_get_norm( selected_video_norm ),
 			freq,
 			width, height, palette );
-		v4lvideo_set_composite_status(  vj_tag_input->unicap[stream_nr] ,has_composite );
 		if( vj_tag_input->unicap[stream_nr] == NULL ) {
 			veejay_msg(0, "Unable to open device %s", refname );
 			return 0;
@@ -784,13 +781,6 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
     return 1;
 }
 
-int	vj_tag_get_composite(int t1)
-{	
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return 0;
-	return tag->composite;
-}
-
 int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -804,22 +794,6 @@ int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
     *b = tag->color_b;
 
 	return 1;
-}
-
-int	vj_tag_composite(int t1)
-{
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return 0;
-	if(tag->source_type != VJ_TAG_TYPE_V4L )
-		return 0;
-	if(tag->capture_type==1) {
-#ifdef HAVE_V4L
-		return v4lvideo_get_composite_status( vj_tag_input->unicap[tag->index]);
-#elif HAVE_V4L2
-		return v4l2_get_composite_status( vj_tag_input->unicap[tag->index] );
-#endif
-	}
-	return 0;
 }
 
 // for network, filename /channel is passed as host/port num
@@ -1317,8 +1291,6 @@ int vj_tag_del(int id)
 		tag->socket_frame = NULL;
 	}
 
-	if(tag->viewport)
-		viewport_destroy(tag->viewport);
 #ifdef ARCH_X86_64
 	uint64_t tid = (uint64_t) tag->id;
 #else
@@ -1373,64 +1345,6 @@ int	vj_tag_set_n_frames( int t1, int n )
 	return -1;
   tag->n_frames = n;
   return 1;
-}
-
-int	vj_tag_load_composite_config( void *compiz, int t1 )
-{
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag)
-		return -1;
-
-	int val = 0;
-	void *temp = composite_load_config( compiz, tag->viewport_config, &val );
-	if(temp == NULL || val == -1 )
-		return 0;
-
-	tag->composite = val;
-	tag->viewport  = temp;
-	return tag->composite; 
-}
-
-void	vj_tag_reload_config( void *compiz, int t1, int mode )
-{
-	vj_tag *tag = vj_tag_get(t1);
-	if(tag) {
-		if(tag->viewport_config) {
-			free(tag->viewport_config);
-			tag->viewport_config = NULL;
-		}
-		if(!tag->viewport_config) {
-			tag->viewport_config = composite_get_config( compiz, mode );
-		}
-		tag->composite = mode;
-	}
-}
-void	*vj_tag_get_composite_view( int t1 )
-{
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return NULL;
-	return tag->viewport;
-}
-int	vj_tag_set_composite_view( int t1, void *vp )
-{
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return -1;
-	tag->viewport = vp;
-	return 1;
-}
-
-int	vj_tag_set_composite( void *compiz,int t1, int n )
-{
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return -1;
-	tag->composite = n;
-	if( tag->viewport_config == NULL ) {
-		tag->composite = 1;
-		return 1;
-	}
-	composite_add_to_config( compiz, tag->viewport_config, n );
-	
-	return 1;
 }
 
 int vj_tag_get_effect(int t1, int position)
@@ -3930,10 +3844,6 @@ static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream)
 
 void	tagParseCalibration( xmlDocPtr doc, xmlNodePtr cur, int dst_sample , void *vp)
 {
-	vj_tag *t = vj_tag_get( dst_sample );
-	void *tmp = viewport_load_xml( doc, cur, vp );
-	if( tmp ) 
-		t->viewport_config = tmp;
 }
 
 /*************************************************************************************************
@@ -3981,7 +3891,6 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	xmlNodePtr subs = NULL;
 	xmlNodePtr cali = NULL;
 	void *d = vj_font_get_dict( font );
-	void *viewport_config = NULL;
 
 	while (cur != NULL)
 	{
@@ -4053,7 +3962,6 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			tag->fader_direction = fader_dir;
 			tag->opacity = opacity;
 			tag->nframes = nframes;
-			tag->viewport_config = viewport_config;
 		
 			switch( source_type )
 			{
@@ -4231,8 +4139,6 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
 	xmlNewChild( node, NULL, (const xmlChar*) "opacity", (const xmlChar*) buffer );
 
 	vj_font_xml_pack( node, font );
-
-	viewport_save_xml( node, tag->viewport_config );
 
  	xmlNodePtr childnode =
 		xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTS, NULL);

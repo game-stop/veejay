@@ -98,7 +98,6 @@ typedef struct {
 	int		max_height;
 	int		min_width;
 	int		min_height;
-	int		composite;
 	sws_template	sws_templ;
 	void		*scaler;
 	v4lprocessing	*info;
@@ -119,7 +118,6 @@ typedef struct {
 	int	norm;
 	int	channel;
 	int	frequency;
-	int	composite;
 	void	*v4l;
 	pthread_mutex_t mutex;
 	pthread_t	thread;
@@ -1138,15 +1136,4 @@ int	v4lvideo_change_channel( void *vvv, int channel )
 	return ret;
 }
 
-void	v4lvideo_set_composite_status( void *vv, int status )
-{
-	v4lvideo_template_t *v = (v4lvideo_template_t*) vv;
-	v->composite = status;
-}
-
-int	v4lvideo_get_composite_status( void *vv)
-{
-	v4lvideo_template_t *v = (v4lvideo_template_t*) vv;
-	return v->composite;
-}
 #endif

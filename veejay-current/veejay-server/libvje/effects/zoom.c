@@ -64,7 +64,7 @@ int	zoom_malloc(int width, int height)
 {
 	int i;
 	for( i = 0; i < 3; i ++ ) {	
-		zoom_private_[i] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height));
+		zoom_private_[i] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height+width));
 		if(!zoom_private_[i])
 			return 0;
 	}
@@ -90,7 +90,7 @@ void zoom_apply( VJFrame *frame, int width, int height, int x, int y, int factor
 	{
 		if( zoom_vp_ )
 			viewport_destroy( zoom_vp_ );
-		zoom_vp_ = viewport_fx_init( VP_QUADZOOM, width,height,x,y,factor, dir );
+		zoom_vp_ = viewport_fx_zoom_init( VP_QUADZOOM, width,height,x,y,factor, dir );
 		if(!zoom_vp_ )
 			return;
 		zoom_[0] = x; zoom_[1] = y; zoom_[2] = factor; zoom_[3] = dir;

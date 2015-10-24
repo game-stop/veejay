@@ -168,6 +168,7 @@
 #include "effects/cali.h"
 #include "effects/bgsubtract.h"
 #include "effects/average-blend.h"
+#include "effects/perspective.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -258,6 +259,7 @@ static struct
 {	waterrippletv_malloc,		waterrippletv_free,	VJ_IMAGE_EFFECT_RIPPLETV	},
 {	bgsubtract_malloc,		bgsubtract_free,	VJ_IMAGE_EFFECT_BGSUBTRACT	},
 {	slicer_malloc,			slicer_free,		VJ_VIDEO_EFFECT_SLICER		},
+{	perspective_malloc,		perspective_free,	VJ_IMAGE_EFFECT_PERSPECTIVE },
 {	NULL			,	NULL			,0				},
 };
 
@@ -658,6 +660,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 89 ]= radcor_init(width,height);
 	vj_effects[i + 90 ]= cali_init(width,height);
 	vj_effects[i + 91 ] = medianfilter_init(width,height);
+	vj_effects[i + 92 ] = perspective_init(width,height);
 
 	max_width = width;
 	max_height = height;

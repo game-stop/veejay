@@ -113,7 +113,6 @@ typedef struct
 	int		planes[4];
 	int		out_planes[4];
 	int		rw;
-	int		composite;
 	int		is_jpeg;
 	int		sizeimage;
 	VJFrame		*frames[N_FRAMES];
@@ -1380,17 +1379,6 @@ void	v4l2_set_input_channel( void *d, int num )
 	ioctl( v->fd, VIDIOC_S_INPUT, &num );
 }
 
-void	v4l2_set_composite_status( void *d, int status)
-{
-	v4l2info *v = (v4l2info*) d;
-	v->composite = status;
-}
-
-int		v4l2_get_composite_status( void *d )
-{
-	v4l2info *v = (v4l2info*) d;
-	return v->composite;
-}
 // brightness
 void	v4l2_set_brightness( void *d, int32_t value ) {
 	v4l2_set_control( d, V4L2_CID_BRIGHTNESS, value );

@@ -3111,22 +3111,6 @@ static	char	*vj_perform_osd_status( veejay_t *info )
                 tc.h, tc.m, tc.s, tc.f );
 
 	char *extra = NULL;
-	if( info->composite ) {
-		int status = -1;
-		if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ) {
-			status = sample_get_composite( info->uc->sample_id );
-		} else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
-			status = vj_tag_get_composite( info->uc->sample_id );
-		}
-		if( status == 0 ) {
-			snprintf(tmp,sizeof(tmp), "Proj");
-			extra = vj_strdup(tmp);
-		}
-		else if(status == 1 ) {
-			snprintf(tmp,sizeof(tmp), "Cam");
-			extra = vj_strdup(tmp);
-		} 
-	}
 	
 	switch(info->uc->playback_mode) {
 		case VJ_PLAYBACK_MODE_SAMPLE:
@@ -3251,27 +3235,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 		//@ focus on projection screen
 		if(composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
-			vj_perform_get_width(info), vj_perform_get_height(info)) ) {
-			//@ save config to playing sample/stream
-			if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
-				void *cur = vj_tag_get_composite_view(info->uc->sample_id);
-				if(cur == NULL )
-				{
-					cur = composite_clone(info->composite);
-					vj_tag_set_composite_view(info->uc->sample_id, cur );
-				}
-				composite_set_backing(info->composite,cur);
-				vj_tag_reload_config( info->composite,info->uc->sample_id, 1);
-
-			} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
-				void *cur = sample_get_composite_view(info->uc->sample_id);
-				if(cur==NULL) {
-					cur = composite_clone(info->composite);
-					sample_set_composite_view(info->uc->sample_id,cur);
-				}
-				composite_set_backing(info->composite,cur);
-				sample_reload_config( info->composite,info->uc->sample_id, 1 );
-			}
+			vj_perform_get_width(info), vj_perform_get_height(info),info->homedir,info->uc->playback_mode,info->uc->sample_id ) ) {
 #ifdef HAVE_SDL
 			if( info->video_out == 0 ) {
 				//@ release focus

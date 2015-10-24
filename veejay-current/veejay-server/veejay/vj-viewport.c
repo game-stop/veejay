@@ -35,13 +35,12 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
-#include <libxml/xmlmemory.h>
-#include <libxml/parser.h>
-#include <veejay/vj-viewport-xml.h>
 #include <libvje/effects/opacity.h>
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include <libvjmem/vjmem.h>
+#include <veejay/vj-viewport-cfg.h>
+#include <veejay/vj-viewport.h>
 #include <math.h>
 #include <assert.h>
 #define X0 0
@@ -132,7 +131,6 @@ typedef struct
 	char *help;
 	uint8_t  grid_val;
 	int	parameters[8];
-	char    *homedir;
 	int32_t tx1,tx2,ty1,ty2;
 	int32_t ttx1,ttx2,tty1,tty2;
 	int	mode;
@@ -184,7 +182,7 @@ static matrix_t		*viewport_matrix(void);
 static void		viewport_find_transform( float *coord, matrix_t *M );
 void 		viewport_line (uint8_t *plane,int x1, int y1, int x2, int y2, int w, int h, uint8_t col);
 static void		draw_point( uint8_t *plane, int x, int y, int w, int h, int size, int col );
-static viewport_config_t *viewport_load_settings( const char *dir, int mode );
+static viewport_config_t *viewport_load_settings( char *dir );
 static	void		viewport_prepare_process( viewport_t *v );
 static	void	viewport_compute_grid( viewport_t *v );
 
@@ -1049,6 +1047,11 @@ void		viewport_process_dynamic_map( void *data, uint8_t *in[3], uint8_t *out[3],
 	float ttx,tty;
 	int32_t x,y;
 	int32_t itx,ity;
+
+	outY[ w * h + 1 ] = 0;
+	outU[ w * h + 1 ] = 128;
+	outV[ w * h + 1 ] = 128;
+
 /*
 #if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
 
@@ -1288,8 +1291,6 @@ void			viewport_destroy( void *data )
 		if( v->T ) free( v->T );
 		if( v->map ) free( v->map );
 		if( v->help ) free( v->help );
-		if( v->homedir) free(v->homedir);
-//		if( v->buf ) free(v->buf);
 		if( v->ui ) {
 			if( v->ui->scaler ) 
 				yuv_free_swscaler(v->ui->scaler);
@@ -1441,8 +1442,16 @@ void	viewport_set_initial_active( void *vv, int status )
 	v->initial_active = status;
 }
 
-void	*viewport_get_configuration(void *vv )
+void	empireoftheclouds()
 {
+}
+
+void	*viewport_get_configuration(void *vv, char *filename )
+{
+	viewport_config_t *vc = viewport_load_settings( filename );
+	if(vc) {
+		return vc;
+	} 
 
 	viewport_t *v = (viewport_t*) vv;
 	viewport_config_t *o = (viewport_config_t*) vj_calloc(sizeof(viewport_config_t)); //FIXME not always freed?
@@ -1470,12 +1479,15 @@ void	*viewport_get_configuration(void *vv )
 	return o;
 }
 
-int	viewport_reconfigure_from_config(void *vv, void *vc)
+int	viewport_reconfigure_from_config(void *vv, void *config, char *filename)
 {
 	viewport_t *v = (viewport_t*) vv;
-	viewport_config_t *c = (viewport_config_t*) vc;
-	viewport_config_t *o = viewport_get_configuration(vv );
+	viewport_config_t *c = (viewport_config_t*) config;
+	viewport_config_t *o = viewport_get_configuration(vv, filename);
 
+	veejay_msg(0,"Configuration saved %dx%d, have %dx%d",
+			c->saved_w, c->saved_h,v->saved_w,v->saved_h );
+/*
 	if( c->saved_w != v->saved_w || c->saved_h != v->saved_h ) {
 		float sx=1.0f;
 		float sy=1.0f;	
@@ -1487,8 +1499,10 @@ int	viewport_reconfigure_from_config(void *vv, void *vc)
 		o->y0 = c->y0 * sy;
 		o->w0 = c->w0 * sx;
 		o->h0 = c->h0 * sy;
-	}
 
+		veejay_msg(VEEJAY_MSG_WARNING, "Correcting geometry for current setup");
+	}
+*/
 
 	// Clear map
 	const int len = v->w * v->h;
@@ -1538,7 +1552,7 @@ int	viewport_reconfigure_from_config(void *vv, void *vc)
 		v->user_ui = 0;
 		viewport_process( v );
 		veejay_msg(VEEJAY_MSG_DEBUG, 
-		"Reconfigured calibration for %dx%d to (1)=%fx%f\t(2)=%fx%f\t(3)=%fx%f\t(4)=%fx%f\t%dx%d+%dx%d",
+		"Reconfigured calibration for %dx%d to (1)=%fx%f\t(2)=%fx%f\t(3)=%fx%f\t(4)=%fx%f\t%fx%f+%fx%f",
 			v->w,v->h,v->x1,v->y1,v->x2,v->y2,v->x3,v->y3,v->x4,v->y4,v->x0,v->y0,v->w0,v->h0);
 
 	}
@@ -1598,10 +1612,10 @@ void	viewport_update_from(void *vv, void *bb)
 
 }
 
-void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih,const char *homedir, int *enable, int *frontback, int mode )
+void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih,char *filename, int *enable, int *frontback, int mode )
 {
 	//@ try to load last saved settings
-	viewport_config_t *vc = viewport_load_settings( homedir,mode );
+	viewport_config_t *vc = viewport_load_settings( filename );
 	if(vc) {
 		float sx = (float) w / (float) vc->saved_w;
 		float sy = (float) h / (float) vc->saved_h;
@@ -1632,7 +1646,6 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	v->w = w;
 	v->h = h;		
 	v->marker_size = 4;
-	v->homedir = strdup(homedir);
 	v->disable = 0;
 	
 	int res;
@@ -1683,7 +1696,6 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	if(! res )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid point locations");
-		free(v->homedir);
 		free(v->ui->buf[0]);
 		free(v->ui);
 		free(v);
@@ -1693,12 +1705,20 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 
 	// Allocate memory for map
 	v->map = (int32_t*) vj_calloc(sizeof(int32_t) * RUP8(v->w * v->h + (v->w*2)) );
+	if(!v->map) {
+		free(v->ui->buf[0]);
+		free(v->ui);
+		free(v);
+		free(vc);
+		veejay_msg(VEEJAY_MSG_ERROR, "Memory allocation error");
+		return NULL;
+	}
 
 	const int len = v->w * v->h;
 	const int eln = len + ( v->w * 2 );
 	int k;
-	for( k = len ; k < eln ; k ++ )
-		v->map[k] = len+1;
+
+	veejay_memset( v->map, len+1, eln );
 
 	// calculate initial view
 	viewport_process( v );
@@ -1741,7 +1761,6 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	q->ui->buf[0] = vj_calloc(sizeof(uint8_t) * RUP8(new_w * new_h) );
 	q->ui->scale  = 1.0f;
 	q->ui->scaler = viewport_init_swscaler(q->ui,new_w,new_h);
-	q->homedir = strdup(v->homedir);
 	q->disable = 0;
 
 	int	res = viewport_configure( q, 	q->x1, q->y1,
@@ -1760,7 +1779,6 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	if(! res )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid point locations");
-		free(q->homedir);
 		free(q->ui->buf[0]);
 		free(q->ui);
 		free(q);
@@ -1768,7 +1786,7 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	}
 
 	// Allocate memory for map
-	q->map = (int32_t*) vj_calloc(sizeof(int32_t) * RUP8(q->w * q->h + (q->w*2)) );
+	q->map = (int32_t*) vj_malloc(sizeof(int32_t) * RUP8(q->w * q->h + (q->w*2)) );
 
 	const int len = q->w * q->h;
 	const int eln = len + ( q->w * 2 );
@@ -1801,23 +1819,26 @@ char	*viewport_get_help(void *data)
 	return v->help;
 }
 
-static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
+
+
+static	viewport_config_t 	*viewport_load_settings( char *path )
 {
 	viewport_config_t *vc = vj_calloc(sizeof(viewport_config_t));
 
-	char path[1024];
-	sprintf(path, "%s/viewport.cfg", dir);
 	FILE *fd = fopen( path, "r" );
 	if(!fd)
 	{
 		free(vc);
+		veejay_msg(VEEJAY_MSG_WARNING, "No such file %s", path);
 		return NULL;
 	}
+
 	fseek(fd,0,SEEK_END );
 	unsigned int len = ftell( fd );
 		
 	if( len <= 0 )
 	{
+		veejay_msg(VEEJAY_MSG_WARNING, "File %s is empty",path);
 		free(vc);
 		return NULL;
 	}
@@ -1874,11 +1895,9 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 	return vc;
 }
 
-void	viewport_save_settings( void *ptr, int frontback )
+void	viewport_save_settings( void *ptr, int frontback, char *path )
 {
 	viewport_t *v = (viewport_t *) ptr;
-	char path[1024];
-	sprintf(path, "%s/viewport.cfg", v->homedir );
 
 	FILE *fd = fopen( path, "wb" );
 
@@ -1915,7 +1934,7 @@ void	viewport_save_settings( void *ptr, int frontback )
 
 	fclose( fd );
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Saved viewport settings to %s", path);
+	veejay_msg(VEEJAY_MSG_INFO, "Saved viewport settings to %s. Press CTRL-p to enable/disable", path);
 }
 /*
 static int	viewport_locate_marker( viewport_t *v, uint8_t *img, float fx, float fy , float *dx, float *dy )
@@ -2490,7 +2509,7 @@ int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int 
 	return 1;
 }
 
-int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height )
+int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height, char *homedir, int mode, int id )
 {
 	viewport_t *v = (viewport_t*) data;
 	if( sx == 0 && sy == 0 && button == 0 )
@@ -2591,7 +2610,20 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 
 		if( v->user_ui == 0 )
 		{
-			viewport_save_settings(v, frontback);
+			char filename[1024];
+			switch(mode) {
+				case 1:
+					snprintf(filename,sizeof(filename), "%s/viewport-stream-%d.cfg", homedir,id );
+					break;
+				case 0:
+					snprintf(filename,sizeof(filename), "%s/viewport-sample-%d.cfg", homedir,id );
+					break;
+				default:
+					snprintf(filename,sizeof(filename),"%s/viewport.cfg", homedir);
+					break;
+			}
+
+			viewport_save_settings(v, frontback, filename);
 		}
 	}
 
@@ -3182,21 +3214,21 @@ void viewport_render_dynamic( void *vdata, uint8_t *in[3], uint8_t *out[3],int w
 }
 
 void *viewport_fx_init_map( int wid, int hei, int x1, int y1,  
-		int x2, int y2, int x3, int y3, int x4, int y4)
+		int x2, int y2, int x3, int y3, int x4, int y4, int reverse)
 {
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
 
 	float fracx = (float) wid / 100.0f;
 	float fracy = (float) hei / 100.0f;
 
-	v->x1 = x1 / fracx;
-	v->y1 = y1 / fracy;
-	v->x2 = x2 / fracx;
-	v->y2 = y2 / fracy;
-	v->x3 = x3 / fracx;
-	v->y3 = y3 / fracy;
-	v->x4 = x4 / fracx;
-	v->y4 = y4 / fracy;
+	v->x1 = x1;
+	v->y1 = y1;
+	v->x2 = x2;
+	v->y2 = y2;
+	v->x3 = x3;
+	v->y3 = y3;
+	v->x4 = x4;
+	v->y4 = y4;
 
 	int res = viewport_configure (v, 
 			v->x1, v->y1,
@@ -3206,7 +3238,7 @@ void *viewport_fx_init_map( int wid, int hei, int x1, int y1,
 			0,0,
 			wid,hei,
 			wid,hei,
-			0,
+			reverse,
 			0xff,
 			32 );
 
@@ -3228,10 +3260,9 @@ int	viewport_get_mode( void *vv ) {
 	return v->user_ui;
 }
 
-void *viewport_fx_init(int type, int wid, int hei, int x, int y, int zoom, int dir)
+void *viewport_fx_zoom_init(int type, int wid, int hei, int x, int y, int zoom, int dir)
 {
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
-
 	float fracx = (float) wid;
 	float fracy = (float) hei;
 
@@ -3285,141 +3316,4 @@ void *viewport_fx_init(int type, int wid, int hei, int x, int y, int zoom, int d
 }
 
 
-static	void	flxml( xmlDocPtr doc, xmlNodePtr cur, float *dst , const xmlChar *name) {
-   if(!xmlStrcmp(cur->name, name ) ) {
-    xmlChar *xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode,1);
-    unsigned char *chTemp = UTF8toLAT1(xmlTemp);
-    if (chTemp) {
-	 *dst = (float) atof( (char*)chTemp);
-	 free(chTemp);
-    }
-    free(xmlTemp);
-  }
-}
-static	void	ixml( xmlDocPtr doc, xmlNodePtr cur, int *dst , const xmlChar *name) {
-   if(!xmlStrcmp(cur->name, name ) ) {
-    xmlChar *xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode,1);
-    unsigned char *chTemp = UTF8toLAT1(xmlTemp);
-    if (chTemp) {
-	 *dst = (int) atoi( (char*)chTemp);
-	 free(chTemp);
-    }
-    free(xmlTemp);
-  }
-}
-void	*viewport_load_xml(xmlDocPtr doc, xmlNodePtr cur, void *vv )
-{
-	viewport_t *vc = (viewport_t*) vv;
-	if(!vc || !cur) return NULL;
 
-	viewport_config_t *c = (viewport_config_t*) vj_calloc(sizeof(viewport_config_t));
-	//effectIndex++;
-	while( cur != NULL ) {
-		flxml( doc,cur,&(c->x1),(const xmlChar*) "x1" );
-		flxml( doc,cur,&(c->x2),(const xmlChar*)"x2" );
-		flxml( doc,cur,&(c->y1),(const xmlChar*)"y1" );
-		flxml( doc,cur,&(c->y2),(const xmlChar*)"y2" );
-		flxml( doc,cur,&(c->x3),(const xmlChar*)"x3" );
-		flxml( doc,cur,&(c->x4),(const xmlChar*)"x4" );
-		flxml( doc,cur,&(c->y3),(const xmlChar*)"y3" );
-		flxml( doc,cur,&(c->y4),(const xmlChar*)"y4" );
-		ixml( doc,cur,&(c->x0),(const xmlChar*)"x0" );
-		ixml( doc,cur,&(c->w0),(const xmlChar*)"w0" );
-		ixml( doc,cur,&(c->y0),(const xmlChar*)"y0" );
-		ixml( doc,cur,&(c->h0),(const xmlChar*)"h0" );
-		ixml( doc,cur,&(c->saved_w),(const xmlChar*)"saved_w" );
-		ixml( doc,cur,&(c->saved_h),(const xmlChar*)"saved_h" );
-		ixml( doc,cur,&(c->reverse),(const xmlChar*)"reverse" );
-		ixml( doc,cur,&(c->grid_color),(const xmlChar*)"grid_color" );
-		ixml( doc,cur,&(c->grid_resolution),(const xmlChar*)"grid_resolution" );
-		ixml( doc,cur,&(c->composite_mode),(const xmlChar*) "compositemode");
-		ixml( doc,cur,&(c->colormode),(const xmlChar*) "colormode");	
-		ixml( doc,cur,&(c->marker_size),(const xmlChar*) "markersize");
-		ixml( doc,cur,&(c->grid_mode),(const xmlChar*) "gridmode");
-		cur = cur->next;
-	}
-	return (void*) c;
-}
-
-void 	viewport_save_xml(xmlNodePtr parent,void *vv)
-{
-	viewport_config_t *vc = (viewport_config_t*) vv;
-	if(!vc) return;
-
-    xmlNodePtr node = xmlNewChild(parent, NULL,
-		(const xmlChar*) "calibration", 
-		NULL );
-
-    char buffer[100];
-
-    sprintf(buffer, "%f", vc->x1);
-    xmlNewChild(node, NULL, (const xmlChar *) "x1",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%f", vc->y1);
-    xmlNewChild(node, NULL, (const xmlChar *) "y1",
-		(const xmlChar *) buffer);
-  
-    sprintf(buffer, "%f", vc->x2);
-    xmlNewChild(node, NULL, (const xmlChar *) "x2",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%f", vc->y2);
-    xmlNewChild(node, NULL, (const xmlChar *) "y2",
-		(const xmlChar *) buffer);
-
-    sprintf(buffer, "%f", vc->x3);
-    xmlNewChild(node, NULL, (const xmlChar *) "x3",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%f", vc->y3);
-    xmlNewChild(node, NULL, (const xmlChar *) "y3",
-		(const xmlChar *) buffer);
- 
-   sprintf(buffer, "%f", vc->x4);
-    xmlNewChild(node, NULL, (const xmlChar *) "x4",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%f", vc->y4);
-    xmlNewChild(node, NULL, (const xmlChar *) "y4",
-		(const xmlChar *) buffer);
-
-   sprintf(buffer, "%d", vc->saved_w);
-    xmlNewChild(node, NULL, (const xmlChar *) "saved_w",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->saved_h);
-    xmlNewChild(node, NULL, (const xmlChar *) "saved_h",
-		(const xmlChar *) buffer);
-
-    sprintf(buffer, "%d", vc->reverse);
-    xmlNewChild(node, NULL, (const xmlChar *) "reverse",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->grid_color);
-    xmlNewChild(node, NULL, (const xmlChar *) "grid_color",
-		(const xmlChar *) buffer);
-
-    sprintf(buffer, "%d", vc->grid_resolution);
-    xmlNewChild(node, NULL, (const xmlChar *) "grid_resolution",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->x0);
-    xmlNewChild(node, NULL, (const xmlChar *) "x0",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->y0);
-    xmlNewChild(node, NULL, (const xmlChar *) "y0",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->w0);
-    xmlNewChild(node, NULL, (const xmlChar *) "w0",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->h0);
-    xmlNewChild(node, NULL, (const xmlChar *) "h0",
-		(const xmlChar *) buffer);
-
-    sprintf(buffer, "%d", vc->colormode);
-    xmlNewChild(node, NULL, (const xmlChar *) "colormode",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->composite_mode);
-    xmlNewChild(node, NULL, (const xmlChar *) "compositemode",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->marker_size);
-    xmlNewChild(node, NULL, (const xmlChar *) "markersize",
-		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", vc->grid_mode);
-    xmlNewChild(node, NULL, (const xmlChar *) "gridmode",
-		(const xmlChar *) buffer);
-}

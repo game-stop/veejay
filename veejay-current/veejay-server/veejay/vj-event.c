@@ -7095,8 +7095,8 @@ void	vj_event_vp_proj_toggle(void *ptr, const char format[],va_list ap )
 		return;
 	}
 
-	int mode = !composite_get_status(v->composite2);
-	composite_set_status( v->composite2, mode );
+	int mode = !composite_get_status(v->composite);
+	composite_set_status( v->composite, mode );
 
 	veejay_msg(VEEJAY_MSG_INFO, "Projection transform is now %s on startup.",(mode==0? "inactive" : "active"));
 }
@@ -7120,11 +7120,6 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 	if ( args[1] == 1 ) {
 		int mode = v->settings->composite;
 		if( mode == 0 ) {
-			if( SAMPLE_PLAYING(v) ) {
-				sample_set_composite( v->composite, v->uc->sample_id, 1 );
-			} else if (STREAM_PLAYING(v) ) {
-				vj_tag_set_composite( v->composite, v->uc->sample_id, 1 );
-			}
 			v->settings->composite = 1;
 		} else if ( mode == 1 ) {
 			v->settings->composite = 0;
@@ -7132,7 +7127,6 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 			v->settings->composite = 1;
 		}
 	} 
-
 }
 
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
@@ -7284,43 +7278,15 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 	}
 
 	if( v->settings->composite == 2 && composite_get_ui( v->composite ) ) {
-//		if(v->use_osd==3) 
-//			v->use_osd = 0;
-//		v->settings->composite = 2;
-		if(STREAM_PLAYING(v)) {
-			void *cur = vj_tag_get_composite_view(v->uc->sample_id);
-			if(cur == NULL ) {
-				cur = (void*)composite_clone(v->composite);
-				vj_tag_set_composite_view(v->uc->sample_id,cur);
-			}
-			vj_tag_reload_config(v->composite,v->uc->sample_id,v->settings->composite );
-			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to stream %d",v->uc->sample_id);
-		} else if (SAMPLE_PLAYING(v)) {
-			void *cur = sample_get_composite_view( v->uc->sample_id );
-			if( cur == NULL ) {
-				cur = composite_clone(v->composite);
-				sample_set_composite_view(v->uc->sample_id, cur );
-			}
-                       	sample_reload_config( v->composite,v->uc->sample_id, v->settings->composite);
-			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to sample %d",v->uc->sample_id );
-               } else {
-			//FIXME plain mode restore
-	       }
-	       composite_set_ui(v->composite, 0 );
-	       v->settings->composite = 1;
-//#ifdef HAVE_SDL
-//	       if(v->video_out==0 || v->video_out == 2)
-//	 	      vj_sdl_grab( v->sdl[0], 0 );
-//#endif
+		if(v->use_osd==3) 
+			v->use_osd = 0;
+	     composite_set_ui(v->composite, 0 );
+	     v->settings->composite = 0;
 	}
 	else {
 		composite_set_ui( v->composite, 2 );
 		v->settings->composite = 2;
 		v->use_osd=3;
-//#ifdef HAVE_SDL
-//		if(v->video_out==0 || v->video_out == 2)
-//			vj_sdl_grab( v->sdl[0], 1 );
-//#endif
 		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to save and exit.");
 	}
 }
@@ -7943,9 +7909,6 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 		id, vj_tag_size()-1, description,
 		(vj_tag_get_active(id) == 1 ? "is active" : "is not active"));
 
-	if( vj_tag_get_composite( id ) ) 
-		veejay_msg(VEEJAY_MSG_INFO, "This tag is transformed when used as secundary input.");
-
 	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
 		y = vj_tag_get_effect_any(id, i);
@@ -8096,9 +8059,6 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 		sampletitle,id,sample_size()-1,timecode,len, (long)v->settings->current_frame_num,
 		curtime);
 	
-	if( sample_get_composite( id ) )
-		veejay_msg(VEEJAY_MSG_INFO, "This sample will be transformed when used as secundary input.");
-
 	if(sample_encoder_active(v->uc->sample_id))
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "REC %09d\t[timecode: %s | %8ld ]",
@@ -9085,7 +9045,7 @@ void	vj_event_send_shm_info( void *ptr, const char format[], va_list ap)
 	int  msg_len = strlen(msg);
 	char *tmp = get_print_buf(1 + msg_len + 3);
 
-	sprintf( tmp, "%03zu%s",msg_len, msg );
+	sprintf( tmp, "%03d%s",msg_len, msg );
 					
 	SEND_MSG(v,tmp);
 	free(msg);

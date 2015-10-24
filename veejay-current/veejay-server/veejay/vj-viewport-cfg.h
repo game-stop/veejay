@@ -45,10 +45,8 @@ typedef struct
 	int	initial_active;
 } viewport_config_t;
 
-void 	viewport_save_xml(xmlNodePtr parent,void *vv);
-void	*viewport_load_xml(xmlDocPtr doc, xmlNodePtr cur, void *vv );
 extern void	composite_add_to_config( void *compiz, void *vc, int which_vp );
-extern void	*composite_load_config( void *compiz, void *vc, int *result );
-
-void	*composite_get_config(void *compiz, int which_vp );
+extern void	*composite_load_config( void *compiz, void *vc, void *backing, int *result );
+extern void *composite_get_config( void *compiz );
+extern void *composite_clone( void *compiz );
 #endif

@@ -167,9 +167,6 @@ typedef struct sample_info_t {
     int		soft_edl;
     void	*dict;
     void	*kf;
-    int          composite;
-    void	*viewport_config;
-    void	*viewport;
     long	resume_pos;
 	int		subrender;
 } sample_info;
@@ -221,8 +218,6 @@ extern int sample_set_speed(int s1, int speed);
 extern void sample_loopcount(int s1);
 extern void sample_reset_loopcount(int s1);
 extern int sample_get_loopcount(int s1);
-extern int sample_set_composite(void *compiz,int s1, int composite);
-extern int sample_get_composite(int s1);
 extern int sample_set_framedup(int s1, int n);
 extern int sample_get_framedup(int s1);
 extern int sample_set_framedups(int s1, int n);
@@ -340,7 +335,6 @@ extern int	sample_usable_edl( int s1 );
 
 extern int sample_cache_used( int s1 );
 extern void        sample_free(void *edl);
-extern int	sample_load_composite_config( void *compiz, int s1 );
 extern int sample_stop_playing(int s1, int new_s1);
 extern int sample_start_playing(int s1, int no_cache);
 extern int sample_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
@@ -348,9 +342,6 @@ extern char *UTF8toLAT1(unsigned char *in);
 extern int sample_read_edl( sample_info *sample );
 
 extern int     sample_max_video_length(int s1);
-
-extern	int	sample_set_composite_view(int s1, void *vp );
-extern void	*sample_get_composite_view(int s1);
 
 extern	long	sample_get_resume(int s1);
 extern	int		sample_set_resume(int s1, long pos );

@@ -59,10 +59,5 @@ void	v4lvideo_set_white(void *vv, int x );
 
 int	v4lvideo_change_channel( void *vv, int channel );
 
-// veejay specific
-void	v4lvideo_set_composite_status( void *vv, int status );
-int	v4lvideo_get_composite_status( void *vv );
-
-
 #endif
 

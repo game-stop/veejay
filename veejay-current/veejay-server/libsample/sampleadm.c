@@ -49,8 +49,6 @@
 #include <assert.h>
 #include <libel/elcache.h>
 #include <veejay/vj-misc.h>
-#include <veejay/vj-viewport-xml.h>
-#include <veejay/vj-viewport.h>
 #include <veejay/vj-misc.h>
 #include <libstream/vj-tag.h>
 //#define KAZLIB_OPAQUE_DEBUG 1
@@ -959,11 +957,6 @@ int sample_del(int sample_id)
 	    if( si->dict )
 			vj_font_dictionary_destroy( sample_font_,si->dict );
 #endif
-		if(si->viewport) {	
-			viewport_destroy(si->viewport);
-			si->viewport = NULL;
-		}
-
 		if(si->edit_list) {
 				/* check if another sample has same EDL */
 				sample_close_edl( sample_id, si->edit_list );
@@ -1567,57 +1560,6 @@ int sample_set_chain_source(int s1, int position, int input)
 	return 1;
 }
 
-
-int	sample_load_composite_config( void *compiz, int s1 )
-{
-	sample_info *sample = sample_get(s1);
-	if(!sample) return -1;
-
-	int val = 0;
-	void *temp = composite_load_config( compiz, sample->viewport_config , &val );
-	if( temp == NULL || val == -1 ) {
-		return 0;
-	}
-	
-	sample->composite = val;
-	sample->viewport  = temp;
-	return sample->composite;
-}
-
-void		*sample_get_composite_view(int s1)
-{
-	sample_info *sample = sample_get(s1);
-	if(!sample) return NULL;
-	return sample->viewport;
-}
-int	sample_set_composite_view(int s1, void *vp)
-{
-	sample_info *sample = sample_get(s1);
-	if(!sample) return -1;
-	sample->viewport = vp;
-	return 1;
-}
-
-int	sample_set_composite(void *compiz, int s1, int composite)
-{
-	sample_info *sample = sample_get(s1);
-	if(!sample) return -1;
-	sample->composite = composite;
-	if(sample->viewport_config == NULL) { 
-		sample->composite = 1; 
-		return 1;
-	}
-	composite_add_to_config( compiz, sample->viewport_config, composite );
-
-	return 1;
-}
-
-int	sample_get_composite(int s1)
-{
-	sample_info *sample = sample_get(s1);
-	if(!sample) return 0;
-	return sample->composite;	
-}
 /****************************************************************************************************
  *
  * sample_set_speed
@@ -2888,9 +2830,6 @@ void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_a
 }
 void	ParseCalibration( xmlDocPtr doc, xmlNodePtr cur, sample_info *skel , void *vp)
 {
-	void *tmp = viewport_load_xml( doc, cur, vp );
-	if( tmp ) 
-		skel->viewport_config = tmp;
 }
 
 void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mode )
@@ -3716,22 +3655,6 @@ void	WriteSubtitles( sample_info *next_sample, void *font, char *file )
 	vj_font_set_dict( font, d );
 }
 
-void	sample_reload_config(void *compiz, int s1, int mode )
-{
-	sample_info *sample = sample_get(s1);
-	if(sample) {
-		if(sample->viewport_config) {
-			free(sample->viewport_config);
-			sample->viewport_config = NULL;
-		}
-		if(!sample->viewport_config) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Calibrated sample %d",s1);
-			sample->viewport_config = composite_get_config(compiz,mode);
-		}	
-		sample->composite = mode;
-	}
-}
-
 int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id, int mode)
 {
     int i;
@@ -3770,7 +3693,6 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
 
 	    CreateSample(childnode, next_sample, font);
 	
-	    viewport_save_xml( childnode, next_sample->viewport_config );
 	}
     }
 

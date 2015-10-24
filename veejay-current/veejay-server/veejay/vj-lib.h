@@ -169,7 +169,6 @@ typedef struct {
 	char *vims_group_name;
 	int zoom;
 	int composite;
-	int composite2;
 	sws_template sws_templ;
 	vj_schedule_t action_scheduler;
 	float	output_fps;

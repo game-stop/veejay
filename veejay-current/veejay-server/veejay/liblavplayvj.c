@@ -412,8 +412,6 @@ int veejay_free(veejay_t * info)
 
 	task_destroy();
 
-	if( info->settings->composite2 )
-		composite_destroy( info->composite2 );
 	if( info->composite )
 		composite_destroy( info->composite );
 
@@ -586,6 +584,7 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 	sample_chain_free( info->uc->sample_id );
 	sample_set_framedups(info->uc->sample_id,0);
 	sample_set_resume(info->uc->sample_id, info->settings->current_frame_num );
+
 	return 1;
 }
 static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
@@ -631,15 +630,29 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
 	}
 #endif
-	if(info->composite )
+/*	if(info->composite )
 	{
-		int has_cfg = sample_load_composite_config( info->composite , sample_id );
-		if( has_cfg && info->settings->composite == 1 ) {
-			void *cur = sample_get_composite_view(sample_id);
-			if( cur ) composite_set_backing(info->composite,cur);
+		void *cur = sample_get_composite_view(sample_id);
+		if( cur == NULL ) {
+			composite_set_file_mode( info->composite, info->homedir, info->uc->playback_mode,sample_id);
+			if( sample_load_composite_config( info->composite, sample_id ) ) {
+				veejay_msg(VEEJAY_MSG_WARNING, "Sample %d has composite view %p", sample_id, sample_get_composite_view(sample_id) );
+			}
+		}
+		else {
+			composite_set_backing( info->composite, cur );
+		}
+
+		switch(composite_has_back(info->composite)) {
+			case 2:
+				settings->composite = composite_restore_config(info->composite);
+				break;
+			default:
+				settings->composite = 0;
+				break;
 		}
 	}
-
+*/
 	 info->uc->sample_id = sample_id;
 	 info->last_sample_id = sample_id;
 
@@ -691,14 +704,29 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	info->last_tag_id = stream_id;
 	info->uc->sample_id = stream_id;
 
-  	if(info->composite )
+/*  	if(info->composite )
 	{
-		int has_cfg = vj_tag_load_composite_config( info->composite , stream_id );
-		if( has_cfg && info->settings->composite == 1 ) {
-			void *cur = vj_tag_get_composite_view(stream_id);
-			if( cur ) composite_set_backing(info->composite,cur);
+		void *cur = vj_tag_get_composite_view(stream_id);
+		if(cur == NULL) {
+			composite_set_file_mode( info->composite, info->homedir, info->uc->playback_mode,stream_id);
+			if( vj_tag_load_composite_config( info->composite , stream_id ) ) {
+				veejay_msg(VEEJAY_MSG_WARNING, "Stream %d has composite view %p", stream_id,vj_tag_get_composite_view(stream_id) );
+			}
 		}
-	}
+		else {
+			composite_set_backing( info->composite, cur );
+		}
+
+
+		switch(composite_has_back(info->composite)) {
+			case 2:
+				settings->composite = composite_restore_config(info->composite);
+				break;
+			default:
+				settings->composite = 0;
+				break;
+		}
+	}*/
 
 	veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp, settings->max_frame_num );
 
@@ -776,8 +804,13 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		video_playback_setup *settings = info->settings;
 		settings->min_frame_num = 0;
 		settings->max_frame_num = info->edit_list->total_frames;
-		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %ld - %ld", (long)settings->min_frame_num,  (long)settings->max_frame_num );
 
+	/*	if(info->composite) {
+			composite_set_file_mode( info->composite, info->homedir, new_pm, 0);
+			composite_restore_config( info->composite );
+		}
+		*/
+		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %ld - %ld", (long)settings->min_frame_num,  (long)settings->max_frame_num );
 	}
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
 	{
@@ -1838,19 +1871,22 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	if( info->settings->composite )
 	{
+		char path[1024];
+		snprintf(path,sizeof(path),"%s/viewport.cfg", info->homedir);
 		int comp_mode = info->settings->composite;
+
 		info->composite = composite_init( info->video_output_width, info->video_output_height,
 		                                 info->video_output_width, info->video_output_height,
-		                                 info->homedir,
+		                                 path,
 		                                 info->settings->sample_mode,
 		                                 yuv_which_scaler(),
 		                                 info->pixel_format,
 		                                 &comp_mode);
+
 		if(!info->composite) {
 			return -1;
 		}
-
-		info->composite2 = info->composite; // save ptr, composite
+		composite_set_file_mode( info->composite, info->homedir, info->uc->playback_mode,info->uc->sample_id);
 
 		info->settings->zoom = 0;
 		info->settings->composite = ( comp_mode == 1 ? 1: 0);

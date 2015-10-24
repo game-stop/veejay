@@ -50,7 +50,6 @@ typedef struct
 	uint8_t *proj_plane[4];
 	uint8_t *mirror_plane[4];
 	void *vp1;
-	void *back1;
 	void *scaler;
 	void *back_scaler;
 	VJFrame	*frame1;
@@ -62,9 +61,6 @@ typedef struct
 	int pf;
 	int use_back;
 	int Y_only;
-	int run;
-	int back_run;
-	int has_back;
 	int proj_width;			/* projection (output) */
 	int proj_height;
 	int img_width;			/* image (input) */
@@ -72,7 +68,7 @@ typedef struct
 	int has_mirror_plane;
 	int mirror_row_start;
 	int mirror_row_end;
-	int	ownback1;
+	char tmp_path[1024];
 } composite_t;
 
 //@ round to multiple of 8
@@ -84,19 +80,24 @@ void	*composite_get_vp( void *data )
 	return c->vp1;
 }
 
+void	composite_set_file_mode(void *data, const char *homedir, int mode, int id)
+{
+	composite_t *c = (composite_t*) data;
+	switch(mode) {
+		case 2: snprintf(c->tmp_path,sizeof(c->tmp_path),"%s/viewport.cfg", homedir ); break;
+		case 1: snprintf(c->tmp_path,sizeof(c->tmp_path),"%s/viewport-stream-%d", homedir,id );break;
+		default:snprintf(c->tmp_path,sizeof(c->tmp_path),"%s/viewport-sample-%d.cfg", homedir,id );break; 
+	}
+	veejay_msg(VEEJAY_MSG_DEBUG, "Save/load from File [%s]",c->tmp_path );
+}
+
 int	composite_get_ui(void *data )
 {
 	composite_t *c = (composite_t*) data;
 	return viewport_get_mode(c->vp1);
 }
 
-int	composite_has_back(void *data)
-{
-	composite_t *c = (composite_t*) data;
-	return c->has_back;
-}
-
-void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf, int *vp1_e )
+void	*composite_init( int pw, int ph, int iw, int ih, char *homedir, int sample_mode, int zoom_type, int pf, int *vp1_e )
 {
 	composite_t *c = (composite_t*) vj_calloc(sizeof(composite_t));
 	int	vp1_frontback = 0;	
@@ -138,8 +139,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->scaler = yuv_init_swscaler( c->frame1, c->frame2, &sws_templ, 0 );
 	c->back_scaler = yuv_init_swscaler( c->frame4, c->frame3, &sws_templ, 0 );
 
-	c->back1 = NULL;
-
 	veejay_msg(VEEJAY_MSG_DEBUG, "\tSoftware scaler  : %s", yuv_get_scaler_name(zoom_type) );
 	veejay_msg(VEEJAY_MSG_DEBUG, "\tVideo resolution : %dx%d", iw,ih );
 	veejay_msg(VEEJAY_MSG_DEBUG, "\tScreen resolution: %dx%d", pw,ph );
@@ -169,20 +168,11 @@ void	*composite_clone( void *compiz )
 	composite_t *c = (composite_t*) compiz;
 	if(!c) return NULL;
 	void *v = viewport_clone(c->vp1,c->img_width,c->img_height);
-	viewport_reconfigure(v);
-	return v;
-}
+//	viewport_reconfigure(v);
+	
+	veejay_msg(VEEJAY_MSG_WARNING, "Cloned new backing %p", v);
 
-void	composite_set_backing( void *compiz, void *vp )
-{
-	composite_t *c = (composite_t*) compiz;
-	if(c->ownback1) {
-		c->ownback1 = 0;
-		if(c->back1) {
-			viewport_destroy( c->back1 );
-		}	
-	}
-	c->back1 = vp;
+	return v;
 }
 
 void	composite_destroy( void *compiz )
@@ -192,7 +182,6 @@ void	composite_destroy( void *compiz )
 	{
 		if(c->proj_plane[0]) free(c->proj_plane[0]);
 		if(c->vp1) viewport_destroy( c->vp1 );
-		if(c->ownback1 && c->back1) { viewport_destroy(c->back1); c->back1 = NULL; c->ownback1 = 0; }
 		if(c->scaler)	yuv_free_swscaler( c->scaler );	
 		if(c->back_scaler) yuv_free_swscaler(c->back_scaler);
 		if(c->frame1) free(c->frame1);
@@ -214,8 +203,6 @@ void	composite_set_status(void *compiz, int mode)
 {
 	composite_t *c = (composite_t*) compiz; 
 	viewport_set_initial_active( c->vp1, mode );
-
-	viewport_save_settings( c->vp1, 1 );
 }
 
 void	composite_set_ui(void *compiz, int status )
@@ -232,38 +219,10 @@ void	composite_add_to_config( void *compiz, void *vc, int which_vp )
 	viewport_set_composite( vc, which_vp, c->Y_only );
 }
 
-void	*composite_load_config( void *compiz, void *vc, int *result )
-{
-	if( vc == NULL ) {
-		*result = -1;
-		return NULL;
-	}
-
-	composite_t *c = (composite_t*) compiz; 
-	int cm = viewport_get_color_mode_from_config(vc);
-	int  m = viewport_get_composite_mode_from_config(vc);
-	
-	int res = viewport_reconfigure_from_config( c->vp1, vc );
-	//@ push to back1 too!
-	if(res) {
-		if( c->back1 == NULL ) {
-			c->back1 = composite_clone(c );
-			c->ownback1 = 1;
-		}
-		viewport_update_from(c->vp1, c->back1 );
-		c->Y_only = cm;
-		*result = m;
-		return (void*)c->back1;
-	}
-	return NULL;
-}
-
-int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
+int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y, char *homedir, int mode, int id )
 {
 	composite_t *c = (composite_t*) compiz; 
-	if(viewport_external_mouse( c->vp1, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y )) {
-		if(c->back1) 
-			viewport_update_from(c->vp1, c->back1 );
+	if(viewport_external_mouse( c->vp1, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y, homedir, mode, id )) {
 		return 1;
 	}
 	return 0;
@@ -322,8 +281,6 @@ void	composite_blit_yuyv( void *compiz, uint8_t *in[4], uint8_t *yuyv, int which
 	composite_t *c = (composite_t*) compiz;
 	int vp1_active = viewport_active(c->vp1);
 
-	c->has_back   = 0;
-
 	if( which_vp == 2 && vp1_active ) {
 		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
 		return;
@@ -371,13 +328,10 @@ void	composite_blit_ycbcr( void *compiz,
 {
 }
 
-
-void	*composite_get_config(void *compiz, int which_vp )
+void	*composite_get_config(void *compiz)
 {
 	composite_t *c = (composite_t*) compiz;
-	void *config = viewport_get_configuration( c->vp1 );
-	viewport_set_composite( config, which_vp, c->Y_only );
-	return config;
+	return viewport_get_configuration( c->vp1, c->tmp_path );
 }
 
 /* Top frame */
@@ -385,11 +339,6 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 {
 	composite_t *c = (composite_t*) compiz;
 	
-	if(c->run == 0 ) {
-		viewport_reconfigure(c->vp1);
-		c->run=1;
-	}
-
 	int vp1_active = viewport_active(c->vp1);
 	
 	if( c->has_mirror_plane ) {

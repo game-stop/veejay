@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2008 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -40,23 +40,22 @@ void	composite_process_divert( void *compiz, uint8_t *in[4], VJFrame *out, void 
 
 void	composite_blit_yuyv( void *compiz,uint8_t *in[4], uint8_t *yuyv, int which_vp );
 
-int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y );
+int	composite_event( void *compiz, uint8_t *in[4], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y, char *homedir, int mode, int id );
+
+void	*composite_get_config(void *compiz);
 
 void	composite_destroy( void *compiz );
 
-void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf, int *vp1_enabled );
-
-void	composite_set_backing( void *compiz, void *vp );
+void	*composite_init( int pw, int ph, int iw, int ih, char *homedir, int sample_mode, int zoom_type, int pf, int *vp1_enabled );
 
 void	*composite_clone( void *compiz );
+
+void	composite_set_file_mode(void *data, const char *homedir, int mode, int id);
 
 void	*composite_get_vp( void *data );
 void	composite_set_ui(void *compiz, int status );
 int	composite_get_ui(void *compiz );
-//@ load config after loading to activate viewport setup
-//@ add to config before saving
-void	*composite_load_config( void *compiz, void *vc, int *result );
 void	composite_add_to_config( void *compiz, void *vc, int which_vp );
-int	composite_get_status(void *compiz );
+int		composite_get_status(void *compiz );
 void	composite_set_status(void *compiz, int mode);
 #endif

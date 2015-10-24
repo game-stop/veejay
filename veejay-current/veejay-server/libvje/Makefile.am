@@ -44,7 +44,8 @@ EXTRA_DIST += effects/autoeq.h effects/crosspixel.h effects/mask.h effects/rawva
 		      effects/complexthreshold.h effects/lumamask.h effects/radialblur.h effects/waterrippletv.h \
 		      effects/constantblend.h effects/magicmirror.h effects/radioactive.h effects/whiteframe.h \
 		      effects/contourextract.h effects/magicoverlays.h effects/raster.h effects/widthmirror.h \
-		      effects/contrast.h effects/magicscratcher.h effects/rawman.h effects/zoom.h effects/iris.h effects/cali.h effects/median.h effects/average-blend.h
+		      effects/contrast.h effects/magicscratcher.h effects/rawman.h effects/zoom.h effects/iris.h \
+			  effects/cali.h effects/median.h effects/average-blend.h effects/perspective.h
 
 EXTRA_DIST += specs/FreeFrame.h specs/frei0r.h
 
@@ -61,7 +62,7 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			ctmf/ctmf.c \
 			effects/diff.c effects/fibdownscale.c effects/killchroma.c \
 			effects/lumamagick.c effects/autoeq.c effects/colorhis.c \
-		        effects/mirrors.c effects/colormap.c effects/negatechannel.c effects/negation.c \
+		    effects/mirrors.c effects/colormap.c effects/negatechannel.c effects/negation.c \
 			effects/overclock.c effects/dissolve.c effects/opacity.c effects/iris.c effects/posterize.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
@@ -85,12 +86,12 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/complexthreshold.c effects/complexinvert.c effects/complexsync.c \
 			effects/isolate.c transitions/vbar.c transitions/3bar.c effects/enhancemask.c effects/noiseadd.c \
 			effects/contrast.c effects/motionblur.c effects/sinoids.c effects/average.c effects/slicer.c \
-		        effects/ripple.c effects/waterrippletv.c effects/water.c effects/noisepencil.c effects/bathroom.c effects/slice.c \
+		    effects/ripple.c effects/waterrippletv.c effects/water.c effects/noisepencil.c effects/bathroom.c effects/slice.c \
 			effects/crosspixel.c effects/diffmap.c effects/threshold.c effects/morphology.c effects/colmorphology.c \
 			effects/ghost.c effects/blob.c effects/radcor.c effects/boids.c effects/nervous.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
 			effects/contourextract.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
-			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c effects/median.c effects/average-blend.c
+			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c effects/median.c effects/average-blend.c effects/perspective.c
 
 

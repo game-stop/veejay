@@ -216,11 +216,12 @@ enum {
 	VJ_IMAGE_EFFECT_LENSCORRECTION  = 	189,
 	VJ_IMAGE_EFFECT_CALI		=	190,
 	VJ_IMAGE_EFFECT_MEDIANFILTER	=	191,
+	VJ_IMAGE_EFFECT_PERSPECTIVE = 192,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 192
+#define VJ_IMAGE_EFFECT_MAX 193
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 248
@@ -481,6 +482,8 @@ extern void bathroom_apply(VJFrame *frame, int width, int height, int mode, int 
 extern void slice_apply(VJFrame *frame, int width, int height, int val, int reinit);
 
 extern void zoom_apply(VJFrame *frame, int w, int h , int xo, int yo, int f, int dir);
+
+extern void perspective_apply( VJFrame *frame, int width, int height, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse);
 
 extern void deinterlace_apply(VJFrame *frame, int w, int h, int val);
 

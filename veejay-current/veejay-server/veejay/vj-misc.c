@@ -41,6 +41,8 @@
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
+#include <libxml/xmlmemory.h>
+#include <libxml/parser.h>
 #include <pthread.h>
 
 
@@ -644,3 +646,25 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... )
 }
 #endif
 
+void xml2flt( xmlDocPtr doc, xmlNodePtr cur, float *dst , const xmlChar *name) {
+   if(!xmlStrcmp(cur->name, name ) ) {
+    xmlChar *xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode,1);
+    unsigned char *chTemp = UTF8toLAT1(xmlTemp);
+    if (chTemp) {
+	 *dst = (float) atof( (char*)chTemp);
+	 free(chTemp);
+    }
+    free(xmlTemp);
+  }
+}
+void	xml2int( xmlDocPtr doc, xmlNodePtr cur, int *dst , const xmlChar *name) {
+   if(!xmlStrcmp(cur->name, name ) ) {
+    xmlChar *xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode,1);
+    unsigned char *chTemp = UTF8toLAT1(xmlTemp);
+    if (chTemp) {
+	 *dst = (int) atoi( (char*)chTemp);
+	 free(chTemp);
+    }
+    free(xmlTemp);
+  }
+}
