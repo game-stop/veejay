@@ -40,6 +40,6 @@ vj_effect *mixtoalpha_init(int w, int h)
 
 void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height)
 {
-	veejay_memcpy(  a, Y, len );
+	veejay_memcpy(frame->data[3], frame2->data[0], frame->len );
 }
 
