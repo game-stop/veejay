@@ -412,6 +412,18 @@ void vj_effman_apply_image_effect(
 	 case VJ_IMAGE_EFFECT_PERSPECTIVE:
 		perspective_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6],arg[7],arg[8] );
 		break;
+	case VJ_IMAGE_EFFECT_ALPHAFILL:
+		alphafill_apply( frames[0], frames[0]->width,frames[0]->height, arg[0] );
+		break;
+	case VJ_IMAGE_EFFECT_ALPHA2IMG:
+		alpha2img_apply( frames[0], frames[0]->width,frames[0]->height );
+		break;
+	case VJ_IMAGE_EFFECT_TOALPHA:
+		toalpha_apply( frames[0], frames[0]->width,frames[0]->height );
+		break;
+	case VJ_IMAGE_EFFECT_ALPHAFLATTEN:
+		alphaflatten_apply(frames[0],frames[0]->width,frames[0]->height);
+		break;
     }
 }
 
@@ -634,9 +646,9 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	average_blend_apply(frames[0], frames[1], frames[0]->width,
 		      frames[0]->height, arg[0]);
 	break;
-
-   
-      default:
+	case VJ_VIDEO_EFFECT_MIXTOALPHA:
+		mixtoalpha_apply( frames[0],frames[1], frames[0]->width,frames[0]->height);
+    default:
 	break;
     }
 
@@ -727,7 +739,7 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 			for ( i = 0; i < n_a; i ++ )
 				vj_task_set_param( arguments[i], i + 1 );
 			
-			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 3, (performer_job_routine) &vj_effman_apply_job );
+			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 4, (performer_job_routine) &vj_effman_apply_job );
 		} 
 		else {
 			

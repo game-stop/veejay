@@ -37,7 +37,7 @@ vj_effect *simplemask_init(int w, int h )
     ve->limits[1][1] = 1;
     ve->defaults[0] = 128;
     ve->defaults[1] = 0;
-    ve->description = "Simple Mask (black and white)";
+    ve->description = "Binary Threshold Mask";
     ve->sub_format = 1;
     ve->extra_frame = 1;
 	ve->has_user =0;

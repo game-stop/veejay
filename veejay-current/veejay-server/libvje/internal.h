@@ -120,6 +120,7 @@ enum {
 	VJ_VIDEO_EFFECT_RIPPLETV = 245,
 	VJ_VIDEO_EFFECT_SLICER = 246,
 	VJ_VIDEO_EFFECT_AVERAGEBLEND = 247,
+	VJ_VIDEO_EFFECT_MIXTOALPHA = 248,
 	
 };
 
@@ -217,14 +218,18 @@ enum {
 	VJ_IMAGE_EFFECT_CALI		=	190,
 	VJ_IMAGE_EFFECT_MEDIANFILTER	=	191,
 	VJ_IMAGE_EFFECT_PERSPECTIVE = 192,
+	VJ_IMAGE_EFFECT_ALPHAFILL = 193,
+	VJ_IMAGE_EFFECT_ALPHA2IMG = 194,
+	VJ_IMAGE_EFFECT_TOALPHA = 195,
+	VJ_IMAGE_EFFECT_ALPHAFLATTEN = 196,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 193
+#define VJ_IMAGE_EFFECT_MAX 197
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 248
+#define VJ_VIDEO_EFFECT_MAX 249
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -628,4 +633,11 @@ extern int chameleonblend_prepare( uint8_t *bg[4],int w, int h );
 extern void average_blend_applyN( VJFrame *frame, VJFrame *frame2, int width,  int height, int average_blend);
 
 extern void average_blend_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int average_blend);
+
+extern void toalpha_apply( VJFrame *frame, int width, int height);
+extern void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
+extern void alpha2img_apply( VJFrame *frame, int width, int height);
+extern void alphafill_apply( VJFrame *frame, int width, int height, int val);
+extern void alphaflatten_apply( VJFrame *frame, int width, int height);
+
 #endif

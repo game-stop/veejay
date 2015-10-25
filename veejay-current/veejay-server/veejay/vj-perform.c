@@ -181,15 +181,15 @@ extern int  pixel_Y_lo_;
 
 static	void	vj_perform_copy( ycbcr_frame *src, ycbcr_frame *dst, int Y_len, int UV_len )
 {
-	uint8_t *input[4] = { src->Y, src->Cb, src->Cr,NULL };
-	uint8_t *output[4] = { dst->Y, dst->Cb, dst->Cr,NULL };
-	int 	strides[4] = { Y_len, UV_len, UV_len,0 };
+	uint8_t *input[4] = { src->Y, src->Cb, src->Cr,src->alpha };
+	uint8_t *output[4] = { dst->Y, dst->Cb, dst->Cr,dst->alpha };
+	int 	strides[4] = { Y_len, UV_len, UV_len, Y_len };
 	vj_frame_copy(input,output,strides);
 }
 static	void	vj_perform_copy2( ycbcr_frame *src, uint8_t **output, int Y_len, int UV_len )
 {
-	uint8_t *input[4] = { src->Y, src->Cb, src->Cr,NULL };
-	int 	strides[4] = { Y_len, UV_len, UV_len,0 };
+	uint8_t *input[4] = { src->Y, src->Cb, src->Cr, src->alpha };
+	int 	strides[4] = { Y_len, UV_len, UV_len, Y_len };
 	vj_frame_copy(input,output,strides);
 }
 static	void	vj_perform_copy3( uint8_t **input, uint8_t **output, int Y_len, int UV_len )
@@ -651,7 +651,7 @@ int vj_perform_init(veejay_t * info)
 	const long frame_len = RUP8( ((w*h)+w+w) );
     unsigned int c;
 	long total_used = 0;
-    performer_frame_size_ = frame_len * 3;
+    performer_frame_size_ = frame_len * 4;
 
     // buffer used to store encoded frames (for plain and sample mode)
     frame_buffer = (ycbcr_frame **) vj_calloc(sizeof(ycbcr_frame*) * SAMPLE_MAX_EFFECTS);
@@ -678,11 +678,12 @@ int vj_perform_init(veejay_t * info)
 		primary_buffer[c]->Y = pribuf_area + (performer_frame_size_ * c);
 		primary_buffer[c]->Cb = primary_buffer[c]->Y  + frame_len;
 		primary_buffer[c]->Cr = primary_buffer[c]->Cb + frame_len;
-	
+		primary_buffer[c]->alpha = primary_buffer[c]->Cr + frame_len;
+
 		veejay_memset( primary_buffer[c]->Y, pixel_Y_lo_,frame_len);
 		veejay_memset( primary_buffer[c]->Cb,128,frame_len);
 		veejay_memset( primary_buffer[c]->Cr,128,frame_len);
-
+		veejay_memset( primary_buffer[c]->alpha,0,frame_len);
 		total_used += buf_len;
 	}
 
@@ -712,16 +713,20 @@ int vj_perform_init(veejay_t * info)
 	}
 	temp_buffer[1] = temp_buffer[0] + frame_len;
 	temp_buffer[2] = temp_buffer[1] + frame_len;
+	temp_buffer[3] = temp_buffer[2] + frame_len;
+
     if(mlock( temp_buffer[0], buf_len ) != 0 )
 		mlock_success = 0;
 
 	veejay_memset( temp_buffer[0], pixel_Y_lo_,frame_len);
 	veejay_memset( temp_buffer[1],128,frame_len);
 	veejay_memset( temp_buffer[2],128,frame_len);
+	veejay_memset( temp_buffer[3],0,frame_len);
 
 	feedback_buffer[0] = (uint8_t*) vj_malloc( buf_len );
 	feedback_buffer[1] = feedback_buffer[0] + frame_len;
 	feedback_buffer[2] = feedback_buffer[1] + frame_len;
+	feedback_buffer[3] = feedback_buffer[2] + frame_len;
 
 	if(mlock( feedback_buffer[c], buf_len )!=0)
 		mlock_success = 0;
@@ -729,6 +734,7 @@ int vj_perform_init(veejay_t * info)
 	veejay_memset( feedback_buffer[0], pixel_Y_lo_,frame_len);
 	veejay_memset( feedback_buffer[1],128,frame_len);
 	veejay_memset( feedback_buffer[2],128,frame_len);
+	veejay_memset( feedback_buffer[3],0,frame_len);
 
 	total_used += buf_len; //temp_buffer
 	total_used += buf_len; //feedback_buffer
@@ -742,7 +748,7 @@ int vj_perform_init(veejay_t * info)
 	size_t tmp1 = 0;
 	if( info->uc->ram_chain ) {
 		//allocate fx_chain_buffer
-		tmp1 = buf_len * 3 * sizeof(uint8_t) * SAMPLE_MAX_EFFECTS;
+		tmp1 = buf_len * 4 * sizeof(uint8_t) * SAMPLE_MAX_EFFECTS;
 		fx_chain_buffer = vj_hmalloc( tmp1, "in fx chain buffers" );
 		if(fx_chain_buffer == NULL ) {
 			veejay_msg(VEEJAY_MSG_WARNING,"Unable to allocate sufficient memory to keep all FX chain buffers in RAM");
@@ -761,12 +767,14 @@ int vj_perform_init(veejay_t * info)
    	     if(!frame_buffer[c]) return 0;
 
 		 if(fx_chain_buffer != NULL ) {
-				uint8_t *ptr = fx_chain_buffer + (c * frame_len * 3 * 3 );
+				uint8_t *ptr = fx_chain_buffer + (c * frame_len * 4 * 3);
 				frame_buffer[c]->Y = ptr;
 				frame_buffer[c]->Cb = frame_buffer[c]->Y + frame_len;
 				frame_buffer[c]->Cr = frame_buffer[c]->Cb + frame_len;
-				frame_buffer[c]->P0  = ptr + (frame_len * 3);
-				frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*3);
+				frame_buffer[c]->alpha = frame_buffer[c]->Cr + frame_len;
+
+				frame_buffer[c]->P0  = ptr + (frame_len * 4);
+				frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*4);
 		 }
    	 }
 
@@ -1813,7 +1821,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int t
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
 		frame_buffer[chain_entry]->Cr,
-   		NULL };
+   		frame_buffer[chain_entry]->alpha };
 
     switch (type)
     {		
@@ -1974,8 +1982,7 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t 
 }
 
 
-static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
-			       int chain_entry)
+static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type, int chain_entry)
 {				/* second sample */
     int error = 1;
     int nframe;
@@ -1988,7 +1995,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
 		frame_buffer[chain_entry]->Cr,
-   		NULL };
+   		frame_buffer[chain_entry]->alpha };
 
     switch (type)
     {
@@ -2064,6 +2071,8 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
    		frames[0]->data[0] = primary_buffer[0]->Y;
    		frames[0]->data[1] = primary_buffer[0]->Cb;
   		frames[0]->data[2] = primary_buffer[0]->Cr;
+		frames[0]->data[3] = primary_buffer[0]->alpha;
+
 		vjp_kf *setup;
     		setup = info->effect_info;
    	 	setup->ref = info->uc->sample_id;
@@ -2082,7 +2091,8 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 					vj_perform_apply_secundary_tag(info,sub_id,source,chain_entry ); // get it
 			 		frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 			frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
-		    			frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
+		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
+					frames[1]->data[2] = frame_buffer[chain_entry]->alpha;
 
 					int done   = 0;
 					int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
@@ -2183,6 +2193,7 @@ static	int	vj_perform_preprocess_has_ssm( veejay_t *info, int id, int mode)
 	return -1;		
 }
 
+
 static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int current_ssm,int chain_entry, VJFrame **frames, VJFrameInfo *frameinfo )
 {
 	int n;
@@ -2203,13 +2214,21 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 		case VJ_PLAYBACK_MODE_SAMPLE:	
 			setup = info->effect_info;
 			setup->ref    = id;	
-			for( n=0; n < 3; n ++ ) {
+			for( n=0; n < SAMPLE_MAX_EFFECTS-1; n ++ ) { 
 				if( sample_get_chain_status(id, n ) ) {
 					int fx_id = sample_get_effect_any(id,n );
 					if( fx_id > 0 ) {
 						int sm = vj_effect_get_subformat(fx_id);
 						int ef = vj_effect_get_extra_frame(fx_id);
-						if( ef ) continue;
+						if( ef ) {
+							int sub_id = sample_get_chain_channel(id,n);
+							int src = sample_get_chain_source(id,n);
+							vj_perform_apply_secundary(info,sub_id,src,n+1);
+							F[1]->data[0] = frame_buffer[n+1]->Y;
+							F[1]->data[1] = frame_buffer[n+1]->Cb;
+							F[1]->data[2] = frame_buffer[n+1]->Cr;
+							F[1]->data[3] = frame_buffer[n+1]->alpha;
+						}
 						if( sm ) {
 						   if( !ssm ) {
 							if(a.ssm == 0 )
@@ -2217,14 +2236,23 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 							F[0]->ssm = 1;
 							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 1;
+							if( ef && b.ssm == 0 ) 
+								chroma_supersample( settings->sample_mode,F[1],F[1]->data );
+							F[1]->ssm = 1;
+							frame_buffer[n+1]->ssm = 1;
 							}
 						} else if ( ssm ) {
 							if(a.ssm == 1 ) 
 								chroma_subsample( settings->sample_mode,F[0],F[0]->data);
 							F[0]->ssm = 0;
-							frame_buffer[chain_entry]->ssm = 1;
+							frame_buffer[chain_entry]->ssm = 0; 
 							ssm = 0;
-							}	
+							if(b.ssm == 1)
+								chroma_subsample( settings->sample_mode,F[1],F[1]->data);
+							F[1]->ssm = 0;
+							frame_buffer[n+1]->ssm = 0;
+							ssm = 0;
+						}	
 						
 						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,
 								       sample_get_plugin(id,n,NULL),mode	)==-2) {
@@ -2247,27 +2275,48 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 		case VJ_PLAYBACK_MODE_TAG:
 			setup = info->effect_info;
 			setup->ref    = id;	
-			for( n=0; n < 3; n ++ ) {
+			for( n=0; n < SAMPLE_MAX_EFFECTS; n ++ ) {
 				if( vj_tag_get_chain_status(id, n ) ) {
 					int fx_id = vj_tag_get_effect_any(id,n );
 					if( fx_id > 0 ) {
 						int sm = vj_effect_get_subformat(fx_id);
 						int ef = vj_effect_get_extra_frame(fx_id);
-						if( ef ) continue;
+						if( ef ) {
+							int sub_id = vj_tag_get_chain_channel(id,n);
+							int src = vj_tag_get_chain_source(id,n);
+							vj_perform_apply_secundary(info,sub_id,src,n+1);
+							F[1]->data[0] = frame_buffer[n+1]->Y;
+							F[1]->data[1] = frame_buffer[n+1]->Cb;
+							F[1]->data[2] = frame_buffer[n+1]->Cr;
+							F[1]->data[3] = frame_buffer[n+1]->alpha;
+						}
 						if( sm ) {
   						 if( !ssm ) {
-							chroma_supersample( settings->sample_mode,F[0],F[0]->data );
+							if(!a.ssm)
+								chroma_supersample( settings->sample_mode,F[0],F[0]->data );
 							F[0]->ssm = 1;
 							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 1;
+						 
+							if(ef) {
+								chroma_supersample( settings->sample_mode,F[1],F[1]->data);
 							}
+							F[1]->ssm=1;
+							frame_buffer[n+1]->ssm=1;
+						 }	
 						} else if ( ssm ) {
-							chroma_subsample( settings->sample_mode,F[0],F[0]->data);
+							if( a.ssm ) {
+								chroma_subsample( settings->sample_mode,F[0],F[0]->data);
+							}
 							F[0]->ssm = 0;
-							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 0;
-							}	
-
+							if( b.ssm ) {
+								chroma_subsample( settings->sample_mode,F[1],F[1]->data);
+							}
+							F[1]->ssm = 0;
+							ssm = 0;
+							frame_buffer[n+1]->ssm = 0;
+							frame_buffer[chain_entry]->ssm = 0;
 							// logic to super/sub sample
 						}
 						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,
@@ -2282,9 +2331,9 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 								}
 							}
 						}
-
 					}
-				}	
+				}
+			}	
 			break;
 	}
 	info->effect_info->ref = cur_id;
@@ -2308,8 +2357,9 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
     	
 		frames[0]->data[0] = primary_buffer[0]->Y;
    		frames[0]->data[1] = primary_buffer[0]->Cb;
-    		frames[0]->data[2] = primary_buffer[0]->Cr;
-
+   		frames[0]->data[2] = primary_buffer[0]->Cr;
+		frames[0]->data[3] = primary_buffer[0]->alpha;
+	
 		vjp_kf *setup = info->effect_info;
     		setup->ref = info->uc->sample_id;
 
@@ -2332,8 +2382,9 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
-		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-				
+		    	frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
+				frames[1]->data[3] = frame_buffer[chain_entry]->alpha;
+
 				int done   = 0;
 				int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
 				int	subrender = sample_get_subrender( info->uc->sample_id );
@@ -2422,10 +2473,12 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
 
 	frames[0] = info->effect_frame1;
 	frames[1] = info->effect_frame2;
-    	setup->ref = info->uc->sample_id;
-    	frames[0]->data[0] = primary_buffer[0]->Y;
+    setup->ref = info->uc->sample_id;
+    frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
-    	frames[0]->data[2] = primary_buffer[0]->Cr;
+    frames[0]->data[2] = primary_buffer[0]->Cr;
+	frames[0]->data[3] = primary_buffer[0]->alpha;
+
 	if(pvar_.fader_active)
 		vj_perform_pre_chain( info, frames[0] );
 
@@ -2448,6 +2501,7 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
 	frames[0]->data[0] = primary_buffer[0]->Y;
 	frames[0]->data[1] = primary_buffer[0]->Cb;
 	frames[0]->data[2] = primary_buffer[0]->Cr;
+	frames[0]->data[3] = primary_buffer[0]->alpha;
 
 	if( pvar_.fader_active )
 		vj_perform_pre_chain( info, frames[0] );
@@ -2468,19 +2522,19 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 	frame[0] = primary_buffer[0]->Y;
 	frame[1] = primary_buffer[0]->Cb;
 	frame[2] = primary_buffer[0]->Cr;
-	frame[3] = NULL;
+	frame[3] = primary_buffer[0]->alpha;
 
 	uint8_t *p0_buffer[4] = {
 		primary_buffer[7]->Y,
 		primary_buffer[7]->Cb,
 		primary_buffer[7]->Cr,
-       		NULL	};
+		primary_buffer[7]->alpha };
 
 	uint8_t *p1_buffer[4]= {
 		primary_buffer[4]->Y,
 		primary_buffer[4]->Cb,
 		primary_buffer[4]->Cr,
-       		NULL	};
+		primary_buffer[4]->alpha };
 
 	if( info->settings->feedback && info->settings->feedback_stage > 1 ) {
 		vj_perform_copy3( feedback_buffer, frame, info->effect_frame1->len, info->effect_frame1->uv_len );
@@ -2786,7 +2840,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
     frame[0] = primary_buffer[0]->Y;
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
-
+	
 	if( info->settings->feedback && info->settings->feedback_stage > 1 ) {
 		vj_perform_copy3( feedback_buffer, frame, info->effect_frame1->len, info->effect_frame1->uv_len );
 		return 1;
@@ -3192,9 +3246,10 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 static	void 	vj_perform_finish_chain( veejay_t *info )
 {
 	VJFrame *frame = info->effect_frame1;
-    	frame->data[0] = primary_buffer[0]->Y;
+    frame->data[0] = primary_buffer[0]->Y;
    	frame->data[1] = primary_buffer[0]->Cb;
-    	frame->data[2] = primary_buffer[0]->Cr;
+    frame->data[2] = primary_buffer[0]->Cr;
+	frame->data[3] = primary_buffer[0]->alpha;
 
 	int result = 0;
 
@@ -3226,7 +3281,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	pri[0] = primary_buffer[destination]->Y;
 	pri[1] = primary_buffer[destination]->Cb;
 	pri[2] = primary_buffer[destination]->Cr;
-	pri[3] = NULL;
+	pri[3] = primary_buffer[destination]->alpha;
+
 	if( settings->composite  )
 	{ //@ scales in software
 		if( settings->ca ) {
@@ -3357,9 +3413,9 @@ static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settin
 {
 	VJFrame	*frame = info->effect_frame1;
 
-    	frame->data[0] = primary_buffer[0]->Y;
+   	frame->data[0] = primary_buffer[0]->Y;
    	frame->data[1] = primary_buffer[0]->Cb;
-    	frame->data[2] = primary_buffer[0]->Cr;
+   	frame->data[2] = primary_buffer[0]->Cr;
 
 #ifdef HAVE_FREETYPE
 	int n = vj_font_norender( info->font, settings->current_frame_num );

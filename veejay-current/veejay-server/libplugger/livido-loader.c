@@ -122,7 +122,7 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 	if( vevo_property_get( instance, name, channel_id, &channel ) != VEVO_NO_ERROR )
 		return 0;
 	vevo_property_set( channel  , "fps"	, LIVIDO_ATOM_TYPE_DOUBLE,1, &(frame->fps));
-	int	rowstrides[4] = { frame->width, frame->uv_width, frame->uv_width, 0 };
+	int	rowstrides[4] = { frame->width, frame->uv_width, frame->uv_width, frame->stride[3] };
 	vevo_property_set( channel  , "rowstrides", LIVIDO_ATOM_TYPE_INT,4, &rowstrides );
 	vevo_property_set( channel  , "timecode", LIVIDO_ATOM_TYPE_DOUBLE,1, &(frame->timecode));
 
@@ -139,7 +139,9 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 		if( current_palette != pref_palette_ ) {
 			switch( current_palette ) {
 				case LIVIDO_PALETTE_YUV444P:
-					chroma_supersample ( SSM_422_444, frame, frame->data );
+				case LIVIDO_PALETTE_YUVA8888:
+					if( pref_palette_ == LIVIDO_PALETTE_YUV422P )
+						chroma_supersample ( SSM_422_444, frame, frame->data );
 					break;
 				
 			}
@@ -577,15 +579,28 @@ static	int	match_palette(livido_port_t *ptr, int palette )
 
 static	int	find_cheap_palette(livido_port_t *c, livido_port_t *ptr , int w)
 {
-	int palette = LIVIDO_PALETTE_YUV444P;
+	int palette = LIVIDO_PALETTE_YUV422P;
 	if( match_palette(ptr,palette ))
 	{
-		vevo_property_set( c, "current_palette", LIVIDO_ATOM_TYPE_INT,
-				1, &palette );
+		vevo_property_set( c, "current_palette", LIVIDO_ATOM_TYPE_INT,1, &palette );
 		return 1;
 	}
 	else {
-		veejay_msg(0, "Oops, can handle palette %x :%s",palette,__FUNCTION__);
+		palette = LIVIDO_PALETTE_YUV444P;
+		if( match_palette(ptr,palette ))
+		{
+			vevo_property_set( c, "current_palette", LIVIDO_ATOM_TYPE_INT,1, &palette );
+			return 1;
+		}
+		else 
+		{
+			palette = LIVIDO_PALETTE_YUVA8888;
+			if( match_palette(ptr,palette ))
+			{
+				vevo_property_set( c, "current_palette", LIVIDO_ATOM_TYPE_INT,1, &palette );
+				return 1;
+			}
+		}
 	}
 	return 0;
 }
@@ -824,7 +839,7 @@ void	*livido_get_name_space( void *instance )
 }
 
 /* initialize a plugin */
-void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
+void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_)
 {
 	void *plug_info = NULL;
 	void *filter_templ = NULL;
@@ -864,7 +879,7 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 	//@ call livido init
 	livido_init_f init_f;
 	vevo_property_get( filter_templ, "init_func", 0, &init_f );
-	int fullrange = ( base_fmt_ == PIX_FMT_YUVJ422P ? 1: 0 );
+	int fullrange = ( org_fmt_ == PIX_FMT_YUVJ422P ? 1: 0 );
 	vevo_property_set( filter_instance, 
 					"HOST_fullrange",
 					VEVO_ATOM_TYPE_INT,
@@ -949,6 +964,7 @@ void	livido_plug_process( void *instance, double time_code )
 	vevo_property_get( channel, "current_palette", 0, &current_palette );
 	if( current_palette != pref_palette_ ) {
 		switch( current_palette ) {
+			case LIVIDO_PALETTE_YUVA8888: 
 			case LIVIDO_PALETTE_YUV444P: {
 				VJFrame frame; VJFrame *f = &frame;
 				vevo_property_get( channel, "width", 0, &(f->width));
@@ -957,7 +973,8 @@ void	livido_plug_process( void *instance, double time_code )
 				for( i = 0; i < 3; i ++ ) {
 					vevo_property_get( channel, "pixel_data", i, &(f->data[i]));
 				}
-				chroma_subsample( SSM_422_444, f, f->data );
+				if( pref_palette_ == LIVIDO_PALETTE_YUV422P )
+					chroma_subsample( SSM_422_444, f, f->data );
 			}
 			break;
 			
@@ -1326,12 +1343,28 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 	return port;
 }
 
-void	livido_set_pref_palette( int pref_palette )
-{
-	pref_palette_ffmpeg_ = pref_palette;
-	pref_palette_        = LIVIDO_PALETTE_YUV422P;
+
+static int		host_to_palette( int pref_palette )
+{	
+	switch(pref_palette) {
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVA420P:
+		case PIX_FMT_YUVJ420P:
+			return LIVIDO_PALETTE_YUV420P;
+		case PIX_FMT_YUV422P:
+		case PIX_FMT_YUVJ422P:
+		case PIX_FMT_YUVA422P:
+			return LIVIDO_PALETTE_YUV422P;
+		default:
+			return LIVIDO_PALETTE_YUVA8888;
+	}
+	return LIVIDO_PALETTE_YUV422P;
 }
 
-void	livido_exit( void )
+
+void	livido_set_pref_palette( int pref_palette )
 {
+	pref_palette_ffmpeg_= pref_palette;
+	pref_palette_		= host_to_palette(pref_palette);
 }
+

@@ -30,6 +30,8 @@ int pixfmt_to_vj(int pixfmt);
 int pixfmt_is_full_range(int pixfmt);
 int vj_is_full_range(int fmt);
 
+int			yuv_to_alpha_fmt(int fmt);
+
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);
 // yuv 4:2:2 packet to yuv 4:2:2 planar
@@ -141,5 +143,6 @@ void yuv444_yvu444_1plane(
 		const int height,
 		uint8_t *dst_buffer);
 
+void	verify_CCIR_auto(int a, int b, VJFrame *dst );
 int	yuv_which_scaler();
 #endif

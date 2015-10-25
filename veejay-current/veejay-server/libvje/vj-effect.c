@@ -169,6 +169,11 @@
 #include "effects/bgsubtract.h"
 #include "effects/average-blend.h"
 #include "effects/perspective.h"
+#include "effects/alphafill.h"
+#include "effects/alpha2img.h"
+#include "effects/toalpha.h"
+#include "effects/mixtoalpha.h"
+#include "effects/alphaflatten.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -568,7 +573,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[46] = slicer_init(width,height);
 	vj_effects[47] = average_blend_init(width,height);
 	vj_effects[44] = iris_init(width,height);
-    vj_effects[48] = dummy_init(width,height);
+	vj_effects[48] = mixtoalpha_init(width,height);
+    vj_effects[49] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -661,11 +667,14 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 90 ]= cali_init(width,height);
 	vj_effects[i + 91 ] = medianfilter_init(width,height);
 	vj_effects[i + 92 ] = perspective_init(width,height);
-
+	vj_effects[i + 93 ] = alphafill_init(width,height);
+	vj_effects[i + 94 ] = alpha2img_init(width,height);
+	vj_effects[i + 95 ] = toalpha_init(width,height);
+	vj_effects[i + 96 ] = alphaflatten_init(width,height);
 	max_width = width;
 	max_height = height;
 
-        for(i=0; i  < MAX_EFFECTS; i++)
+    for(i=0; i  < MAX_EFFECTS; i++)
 	{
 		if(vj_effects[i])
 		{

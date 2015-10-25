@@ -772,18 +772,19 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 		bufx   += (w*h*4);
 	}
 
-	fr->out        = yuv_yuv_template(bufx, bufx+(w*h), bufx+(w*h*2), w,h,pf );
-	
+	fr->out          = yuv_yuv_template(bufx, bufx+(w*h), bufx+(w*h*2), w,h,pf );
+	fr->out->data[3] = bufx + (fr->out->len + fr->out->uv_len + fr->out->uv_len);
+
 	if( n_in == 0 ) {
 		fr->in[0] = yuv_rgb_template( fr->buf, w, h, frfmt );
 	}
 
 	if( out_scaler__ == NULL ) {
-		out_scaler__	= yuv_init_swscaler( fr->in[0], 	fr->out, 	&templ, yuv_sws_get_cpu_flags()); // rgb -> yuv
+		out_scaler__	= yuv_init_swscaler( fr->in[0],fr->out,&templ,yuv_sws_get_cpu_flags()); // rgb -> yuv
 	}
 
 	if( n_in > 0 && in_scaler__ == NULL) { 
-		in_scaler__  = yuv_init_swscaler( fr->out,	fr->in[0], 	&templ, yuv_sws_get_cpu_flags());  // yuv -> rgb
+		in_scaler__  = yuv_init_swscaler( fr->out,fr->in[0],&templ,yuv_sws_get_cpu_flags());  // yuv -> rgb
 	}
 
 	void *frptr    = (void*) fr;

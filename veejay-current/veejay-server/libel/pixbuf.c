@@ -70,7 +70,7 @@ extern int	get_ffmpeg_pixfmt(int id);
 extern uint8_t *vj_perform_get_preview_buffer();
 
 static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, int dst_h, int dst_fmt,
-			uint8_t *dY, uint8_t *dU, uint8_t *dV )
+			uint8_t *dY, uint8_t *dU, uint8_t *dV, uint8_t *dA )
 {
 #ifdef USE_GDK_PIXBUF
 	GdkPixbuf *image =
@@ -87,21 +87,40 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	/* convert image to veejay frame in proper dimensions, free image */
 
 	int img_fmt = PIX_FMT_RGB24;
-	if( gdk_pixbuf_get_has_alpha( image ))
-		img_fmt = PIX_FMT_RGBA;
 
 	if( pic->pixels == NULL ) {
 		pic->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(pixbuf_size+15) );
-		}
+	}
 
 	veejay_memcpy( pic->pixels, (uint8_t*) gdk_pixbuf_get_pixels( image ), pixbuf_size );
+	
+	int tmp_dstfmt = dst_fmt;
 
-	VJFrame *dst = yuv_yuv_template( dY, dU, dV, dst_w, dst_h, dst_fmt );
+	if( gdk_pixbuf_get_has_alpha( image )) {
+		img_fmt = PIX_FMT_RGBA;
+		switch(dst_fmt) {
+			case PIX_FMT_YUV420P:
+			case PIX_FMT_YUVJ420P:
+				tmp_dstfmt = PIX_FMT_YUVA420P;
+				break;
+			case PIX_FMT_YUVJ422P:
+			case PIX_FMT_YUV422P:
+				tmp_dstfmt = PIX_FMT_YUVA422P;
+			break;
+		}
+	}		
+
+	VJFrame *dst = yuv_yuv_template( dY, dU, dV, dst_w, dst_h, tmp_dstfmt );
+
+	if( dst->format == PIX_FMT_YUVA422P || dst->format == PIX_FMT_YUVA420P ) {
+		dst->data[3] = dA;
+	}
+
 	VJFrame *src = yuv_rgb_template(
 				   pic->pixels,
 				   gdk_pixbuf_get_width(  image ),
 				   gdk_pixbuf_get_height( image ),
-				   img_fmt // PIX_FMT_RGB24
+				   img_fmt
 			);
 
 	int stride = gdk_pixbuf_get_rowstride(image);
@@ -119,7 +138,9 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	}
 
 	yuv_convert_any3( pic->scaler, src, src->stride, dst, src->format, dst->format );
-	
+
+	verify_CCIR_auto( dst->format, dst_fmt, dst );
+
 	g_object_unref( image ); 
 	
 	free(src);
@@ -222,7 +243,7 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			break;
 	}
 
-	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * (4 * len));
+	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(4 * len));
 	if(!pic->space) {
 		free(pic->filename);
 		free(pic);
@@ -237,7 +258,9 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			v_outf,
 			pic->space,
 			pic->space + len,
-			pic->space + len + ulen );
+			pic->space + len + ulen,
+		    pic->space + len + ulen + ulen);
+
 	if(!pic->img) {
 		free(pic->space);
 		free(pic->filename);

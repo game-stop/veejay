@@ -114,13 +114,13 @@ static	void* instantiate_plugin( void *plugin, int w , int h )
 	switch( type )
 	{
 		case VEVO_PLUG_LIVIDO:
-			instance = livido_plug_init( plugin,w,h, base_fmt_ );
+			instance = livido_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_), base_fmt_ );
 			break;
 		case VEVO_PLUG_FF:
 			instance = freeframe_plug_init( plugin,w,h);
 			break;
 		case VEVO_PLUG_FR:
-			instance = frei0r_plug_init( plugin,w,h,base_fmt_ );
+			instance = frei0r_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_) );
 			break;
 		default:
 			veejay_msg(0, "Plugin type not supported.");
@@ -940,7 +940,7 @@ int	plug_get_num_parameters( int fx_id )
 void	plug_sys_set_palette( int pref_palette )
 {
 	base_fmt_ = pref_palette;
-	livido_set_pref_palette( base_fmt_ );
+	livido_set_pref_palette( yuv_to_alpha_fmt(base_fmt_) );
 }
 
 void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )

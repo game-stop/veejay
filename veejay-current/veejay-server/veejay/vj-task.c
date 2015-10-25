@@ -401,7 +401,7 @@ void	vj_task_set_from_args( int len, int uv_len )
 		v->strides[0]	 = len / n;
 		v->strides[1]	 = uv_len / n;
 		v->strides[2]	 = uv_len / n;
-		v->strides[3]    = 0;
+		v->strides[3]    = len / n;
 	}
 }
 
@@ -431,16 +431,19 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 			in->data[0]=first->input[0];
 			in->data[1]=first->input[1];
 			in->data[2]=first->input[2];
+			in->data[3]=first->input[3];
 			break;
 		case 1:
 			in->data[0]=first->output[0];
 			in->data[1]=first->output[1];
 			in->data[2]=first->output[2];
+			in->data[3]=first->output[3];
 			break;
 		case 2:
 			in->data[0]=first->temp[0];
 			in->data[1]=first->temp[1];
 			in->data[2]=first->temp[2];
+			in->data[3]=first->temp[3];
 			break;	
 	}
 }
@@ -460,6 +463,7 @@ void	vj_task_set_from_frame( VJFrame *in )
 		v->uv_height 	= in->uv_height / n;
 		v->strides[1]	= v->uv_width * v->uv_height; 
 		v->strides[2]	= v->strides[1];
+		v->strides[3]   = v->strides[0];
 		v->shiftv	= in->shift_v;
 		v->shifth	= in->shift_h;	
 			
@@ -467,8 +471,6 @@ void	vj_task_set_from_frame( VJFrame *in )
 			v->strides[1] = (v->width * v->height );
 			v->strides[2] = v->strides[1];
 		}
-		
-		v->strides[3]   = 0;
 	}	
 }
 

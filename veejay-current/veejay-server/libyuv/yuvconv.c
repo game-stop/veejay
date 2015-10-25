@@ -44,7 +44,7 @@
 #define Y4M_CHROMA_MONO        6  /* luma plane only                      */
 #define Y4M_CHROMA_444ALPHA    7  /* 4:4:4 with an alpha channel          */
 
-
+#define ru4(num)  (((num)+3)&~3)
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -88,6 +88,8 @@ static struct {
 {	PIX_FMT_BGRA,		"PIX_FMT_BGRA"},
 {	PIX_FMT_ARGB,		"PIX_FMT_ARGB"},
 {	PIX_FMT_ABGR,		"PIX_FMT_ABGR"},
+{	PIX_FMT_YUVA422P,	"PIX_FMT_YUVA422P"},
+{	PIX_FMT_YUVA444P,	"PIX_FMT_YUVA444P"},
 {	0	,		NULL}
 
 };
@@ -107,7 +109,9 @@ static	float	jpeg_to_CCIR_tableY[256];
 static  float	CCIR_to_jpeg_tableY[256];
 static	float	jpeg_to_CCIR_tableUV[256];
 static  float	CCIR_to_jpeg_tableUV[256];
-#define round1(x) ( (int32_t)( (x>0) ? (x) + 0.5 : (x)  - 0.5 ))
+//#define round1(x) ( (int32_t)( (x>0) ? (x) + 0.5 : (x)  - 0.5 ))
+#define round1(x) ( (int32_t)( (x>0) ? (x) : (x) ))
+
 #define _CLAMP(a,min,max) ( round1(a) < min ? min : ( round1(a) > max ? max : round1(a) ))
 
 static struct {
@@ -118,6 +122,8 @@ static struct {
 	{ PIX_FMT_YUYV422 },
 	{ PIX_FMT_YUV422P },
 	{ PIX_FMT_YUV444P },
+	{ PIX_FMT_YUVA420P},
+	{ PIX_FMT_YUVA422P},
 	{ -1 }
 };
 static struct {
@@ -147,7 +153,7 @@ static int	is_JPEG(int a) {
 	return 0;
 }
 
-static	void	verify_CCIR_auto(int a, int b, VJFrame *dst )
+void	verify_CCIR_auto(int a, int b, VJFrame *dst )
 {
 	int a_is_CCIR = is_CCIR(a);
 	int a_is_JPEG = is_JPEG(a);
@@ -323,7 +329,7 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 	for( i = 0; i < 256 ; i ++ ) {
 		jpeg_to_CCIR_tableY[i] = _CLAMP( (float)i * s + 16.0f , 16.0f, 235.0f );
 		jpeg_to_CCIR_tableUV[i]= _CLAMP( (float)i * u + 16.0f , 16.0f, 240.0f );
-		CCIR_to_jpeg_tableY[i] = _CLAMP( (float)i * c - 16.0f ,  0.0f, 255.0f );
+		CCIR_to_jpeg_tableY[i] = _CLAMP( (float)i * c - 16.0f - 2.0f ,  0.0f, 255.0f );
 		CCIR_to_jpeg_tableUV[i]= _CLAMP( (float)i * d - 16.0f ,  0.0f, 255.0f );
 	}
 
@@ -421,6 +427,22 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 	}
 }
 
+int			yuv_to_alpha_fmt(int fmt)
+{
+	switch(fmt) {
+		case PIX_FMT_YUV422P:
+		case PIX_FMT_YUVJ422P:
+			return PIX_FMT_YUVA422P;
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
+			return PIX_FMT_YUVA420P;
+		case PIX_FMT_YUV444P:
+		case PIX_FMT_YUVJ444P:
+			return PIX_FMT_YUVA444P;
+	}
+	return fmt;
+}
+
 
 VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt )
 {
@@ -432,7 +454,6 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 	f->data[3] = NULL;
 	f->width   = w;
 	f->height  = h;
-
 	switch(fmt)
 	{
 		case PIX_FMT_YUV422P:
@@ -450,12 +471,26 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = f->stride[0]>>1;
 			break;
+		case PIX_FMT_YUVA422P:
+			f->uv_width = w>>1;
+			f->uv_height=f->height>>1;
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = f->stride[0]>>1;
+			f->stride[3] = w;
+			break;
 		case PIX_FMT_YUV444P:
 		case PIX_FMT_YUVJ444P:
 			f->uv_width = w;
 			f->uv_height=f->height;
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = f->stride[0];
+			break;
+		case PIX_FMT_YUVA444P:
+			f->uv_width = w;
+			f->uv_height=f->height;
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = f->stride[0];
+			f->stride[3] = w;
 			break;
 		case PIX_FMT_GRAY8:
 			f->uv_width = 0;
@@ -503,7 +538,6 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 	f->data[3] = NULL;
 	f->width   = w;
 	f->height  = h;
-
 	switch( fmt )
 	{
 		case PIX_FMT_RGB24:
@@ -519,9 +553,6 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 
 	return f;
 }
-
-#define ru4(num)  (((num)+3)&~3)
-
 
 void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt )
 {
@@ -575,14 +606,13 @@ void	yuv_fx_context_destroy( void *ctx )
 }
 
 
-void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[3], VJFrame *dst, int src_fmt, int dst_fmt )
+void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[4], VJFrame *dst, int src_fmt, int dst_fmt )
 {
 	vj_sws *s = (vj_sws*) scaler;
 
 	if(s->sws) {
-		int dst_stride[3] = { ru4(dst->width),ru4(dst->uv_width),ru4(dst->uv_width) };
+		int dst_stride[4] = { ru4(dst->stride[0]),ru4(dst->stride[1]),ru4(dst->stride[2]), ru4(dst->stride[3]) };
 		sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride);
-	
 	}
 }	
 
@@ -1303,8 +1333,8 @@ void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 		src->format == PIX_FMT_RGB32 )
 		n = 4;
 	
-	const int src_stride[3] = { src->width*n,0,0};
-	const int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
+	const int src_stride[4] = { src->width*n,0,0,0};
+	const int dst_stride[4] = { dst->width,dst->uv_width,dst->uv_width,dst->stride[3] };
 
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height, (uint8_t * const*)dst->data, dst_stride );
 }
@@ -1322,8 +1352,8 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 		dst->format == PIX_FMT_BGR32 ) 
 		n = 4;
 
-	const int src_stride[3] = { src->width,src->uv_width,src->uv_width };
-	const int dst_stride[3] = { dst->width*n,0,0 };
+	const int src_stride[4] = { src->width,src->uv_width,src->uv_width,src->stride[3] };
+	const int dst_stride[4] = { dst->width*n,0,0,0 };
 
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride );
 }

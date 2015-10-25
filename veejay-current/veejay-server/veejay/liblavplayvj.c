@@ -1853,6 +1853,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	veejay_msg(VEEJAY_MSG_DEBUG, "               Y=%d bytes, UV=%d bytes",
 	           info->effect_frame1->len,
 	           info->effect_frame1->uv_len );
+	veejay_msg(VEEJAY_MSG_DEBUG, "               full range=%d",
+			full_range );
 
 	if(!vj_perform_init(info))
 	{

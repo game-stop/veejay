@@ -628,17 +628,23 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		veejay_msg(VEEJAY_MSG_ERROR, "File %s: Cannot play %d Hz audio. Use at least 44100 Hz or start with -a0", filename, el->audio_rate);
 		nerr++;
 	    }
-            else {
-	    if (el->audio_chans != lav_audio_channels(el->lav_fd[n]) ||
-		el->audio_bits != lav_audio_bits(el->lav_fd[n]) ||
-		el->audio_rate != lav_audio_rate(el->lav_fd[n])) {
-		veejay_msg(VEEJAY_MSG_ERROR,"File %s: Mismatched audio properties: %d channels , %d bit %ld Hz",
+        else {
+		    if (el->audio_chans != lav_audio_channels(el->lav_fd[n]) ||
+			el->audio_bits != lav_audio_bits(el->lav_fd[n]) ||
+			el->audio_rate != lav_audio_rate(el->lav_fd[n])) {
+
+			int err_level = VEEJAY_MSG_ERROR;
+			if( lav_audio_rate(el->lav_fd[n]) == 0 )
+				err_level = VEEJAY_MSG_WARNING;
+
+			veejay_msg(err_level,"File %s: Mismatched audio properties: %d channels , %d bit %ld Hz",
 			   filename, lav_audio_channels(el->lav_fd[n]),
 			   lav_audio_bits(el->lav_fd[n]),
 			   lav_audio_rate(el->lav_fd[n]) );
-		nerr++;
-	    }
-            }
+			   if( err_level == VEEJAY_MSG_ERROR )
+				   nerr++;
+			}
+        }
 	}
 
 
@@ -862,7 +868,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 	int inter = 0;
 	uint8_t *in[3] = { NULL,NULL,NULL };
 	int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len ,0};
-	uint8_t *dataplanes[3] = { data , data + el_out_->len, data + el_out_->len + el_out_->uv_len };
+	uint8_t *dataplanes[4] = { data , data + el_out_->len, data + el_out_->len + el_out_->uv_len,0 };
 	switch( decoder_id )
 	{
 		case CODEC_ID_YUV420:
