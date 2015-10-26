@@ -36,7 +36,7 @@ Before running veejay, be sure to add/link some TrueType fonts in
 ## Usage
 
 Running veejay is a much too large topic to cover in this readme. Various
-pointers have been bundled with the sources in [veejay/veejay-current/veejay-server/doc](./veejay/veejay-current/veejay-server/doc)
+pointers have been bundled with the sources in [veejay/veejay-current/veejay-server/doc](./veejay-current/veejay-server/doc)
 
 Articles covering various aspects of "how to veejay" can be found on [veejayhq.net](http://veejayhq.net)
 
