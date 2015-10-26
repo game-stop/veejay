@@ -10637,7 +10637,7 @@ YUV (current)</property>
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="receives_default">False</property>
-                                                <property name="tooltip" translatable="yes">Enable/Disable rendering of image effects on mixing sources</property>
+                                                <property name="tooltip" translatable="yes">Toggle rendering of FX chain on mixing sources</property>
                                                 <signal name="clicked" handler="toggle_subrender_clicked" />
                                                 <child>
                                                   <widget class="GtkImage" id="image591">
