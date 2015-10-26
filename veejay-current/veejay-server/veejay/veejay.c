@@ -554,6 +554,7 @@ static int set_option(const char *name, char *value)
 
 static int check_command_line_options(int argc, char *argv[])
 {
+	int stop = 0;
     int nerr, n, option_index = 0;
     char option[2];
 #ifdef HAVE_GETOPT_LONG

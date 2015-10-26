@@ -3613,11 +3613,6 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 // open_video_files is called BEFORE init
 static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force , char override_norm)
 {
-	if(num_files<=0 || files == NULL)
-	{
-		info->dummy->active = 1;
-	}
-
 	if( info->dummy->active )
 	{
 		info->plain_editlist = vj_el_dummy( 0, 
@@ -3820,7 +3815,8 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 
 	if(num_files == 0)
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Trying to start without video");
+		if(!info->dummy->active)
+			info->dummy->active = 1; /* auto enable dummy mode if not already enabled */
 		ret = veejay_open_video_files( info, NULL, 0 , force, override_norm );
 	}
 	else
