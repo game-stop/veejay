@@ -120,6 +120,7 @@ static uint8_t *audio_rec_buffer = NULL;
 static uint8_t *audio_render_buffer = NULL;
 static uint8_t *down_sample_buffer = NULL;
 static uint8_t *temp_buffer[4];
+static uint8_t *subrender_buffer[4];
 static uint8_t *feedback_buffer[4];
 static uint8_t *pribuf_area = NULL;
 static size_t pribuf_len = 0;
@@ -161,8 +162,8 @@ static int vj_perform_tag_fill_buffer(veejay_t * info);
 static void vj_perform_clear_cache(void);
 static int vj_perform_increase_tag_frame(veejay_t * info, long num);
 static int vj_perform_increase_plain_frame(veejay_t * info, long num);
-static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,int type, int chain_entry);
-static void vj_perform_apply_secundary(veejay_t * info, int sample_id,int type, int chain_entry);
+static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,int type, int chain_entry, uint8_t *fb[4], int subrender);
+static void vj_perform_apply_secundary(veejay_t * info, int sample_id,int type, int chain_entry, uint8_t *fb[4], int subrender);
 static int vj_perform_tag_complete_buffers(veejay_t * info, int *h);
 static int vj_perform_increase_sample_frame(veejay_t * info, long num);
 static int vj_perform_sample_complete_buffers(veejay_t * info, int *h);
@@ -714,14 +715,25 @@ int vj_perform_init(veejay_t * info)
 	temp_buffer[1] = temp_buffer[0] + frame_len;
 	temp_buffer[2] = temp_buffer[1] + frame_len;
 	temp_buffer[3] = temp_buffer[2] + frame_len;
-
     if(mlock( temp_buffer[0], buf_len ) != 0 )
 		mlock_success = 0;
 
-	veejay_memset( temp_buffer[0], pixel_Y_lo_,frame_len);
-	veejay_memset( temp_buffer[1],128,frame_len);
-	veejay_memset( temp_buffer[2],128,frame_len);
-	veejay_memset( temp_buffer[3],0,frame_len);
+	subrender_buffer[0] = (uint8_t*) vj_malloc( buf_len );
+	if(!subrender_buffer[0]) {
+		return 0;
+	}
+	subrender_buffer[1] = subrender_buffer[0] + frame_len;
+	subrender_buffer[2] = subrender_buffer[1] + frame_len;
+	subrender_buffer[3] = subrender_buffer[2] + frame_len;
+
+
+    if(mlock( subrender_buffer[0], buf_len ) != 0 )
+		mlock_success = 0;
+
+	veejay_memset( subrender_buffer[0], pixel_Y_lo_,frame_len);
+	veejay_memset( subrender_buffer[1],128,frame_len);
+	veejay_memset( subrender_buffer[2],128,frame_len);
+	veejay_memset( subrender_buffer[3],0,frame_len);
 
 	feedback_buffer[0] = (uint8_t*) vj_malloc( buf_len );
 	feedback_buffer[1] = feedback_buffer[0] + frame_len;
@@ -738,7 +750,7 @@ int vj_perform_init(veejay_t * info)
 
 	total_used += buf_len; //temp_buffer
 	total_used += buf_len; //feedback_buffer
-
+	total_used += buf_len; //subrender_buffer
 
 	helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
 	veejay_memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
@@ -959,6 +971,7 @@ void vj_perform_free(veejay_t * info)
 	}
 
    if(temp_buffer[0]) free(temp_buffer[0]);
+   if(subrender_buffer[0]) free(subrender_buffer[0]);
    if(feedback_buffer[0]) free(feedback_buffer[0]);
    vj_perform_record_buffer_free();
 
@@ -1811,17 +1824,17 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 #endif
 }
 
-static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int type, int chain_entry )
+static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int type, int chain_entry, uint8_t *fb[4], int subrender )
 {				/* second sample */
     int error = 1;
     int nframe;
     int len = 0;
     int centry = -1;
-    uint8_t *fb[4] = {
+  /*  uint8_t *fb[4] = {
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
 		frame_buffer[chain_entry]->Cr,
-   		frame_buffer[chain_entry]->alpha };
+   		frame_buffer[chain_entry]->alpha }; */
 
     switch (type)
     {		
@@ -1833,10 +1846,11 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int t
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_PICTURE:
 	case VJ_TAG_TYPE_COLOR:
-	
-	centry = vj_perform_tag_is_cached(info,chain_entry, sample_id);
 
-	if (centry == -1)
+	if(!subrender)	
+		centry = vj_perform_tag_is_cached(info,chain_entry, sample_id);
+
+	if (centry == -1 || subrender)
 	{
 		if(! vj_tag_get_active( sample_id ) )
 		{
@@ -1859,14 +1873,15 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int t
 		vj_perform_use_cached_ycbcr_frame(info, centry, chain_entry);
 	    	error = 0;
 	}
-	if(!error)
+	if(!error && !subrender)
 		cached_tag_frames[1 + chain_entry ] = sample_id;	
-	break;
+		break;
 	
    case VJ_TAG_TYPE_NONE:
 	    nframe = vj_perform_get_subframe_tag(info, sample_id, chain_entry); // get exact frame number to decode
- 	    centry = vj_perform_sample_is_cached(info,sample_id, chain_entry);
-        if(centry == -1 || info->no_caching)
+ 	    if(!subrender)
+			centry = vj_perform_sample_is_cached(info,sample_id, chain_entry);
+        if(centry == -1 || info->no_caching|| subrender )
 	    {
 			len = vj_perform_get_frame_fx( info, sample_id, nframe, fb, frame_buffer[chain_entry]->P0, frame_buffer[chain_entry]->P1 );	
 		    if(len > 0 )
@@ -1878,7 +1893,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int t
 			cached_sample_frames[ 1 + chain_entry ] = sample_id;
 			error = 0;
 	    }
-	    if(!error)
+	    if(!error && !subrender)
 	  	 cached_sample_frames[chain_entry+1] = sample_id;
 
 	   break;
@@ -1982,7 +1997,7 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t 
 }
 
 
-static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type, int chain_entry)
+static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type, int chain_entry, uint8_t *fb[4], int subrender)
 {				/* second sample */
     int error = 1;
     int nframe;
@@ -1990,13 +2005,13 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 
     int res = 1;
     int centry = -1;
-
+/*
     uint8_t *fb[4] = {
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
 		frame_buffer[chain_entry]->Cr,
    		frame_buffer[chain_entry]->alpha };
-
+*/
     switch (type)
     {
 	case VJ_TAG_TYPE_YUV4MPEG:	
@@ -2009,9 +2024,10 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	case VJ_TAG_TYPE_PICTURE:
 	case VJ_TAG_TYPE_GENERATOR:
 
-	centry = vj_perform_tag_is_cached(info,chain_entry, sample_id); // is it cached?
+	if( !subrender )
+		centry = vj_perform_tag_is_cached(info,chain_entry, sample_id); // is it cached?
 	//@ not cached
-	if (centry == -1 )
+	if (centry == -1 || subrender)
 	{
 		if(! vj_tag_get_active( sample_id ) )
 		{
@@ -2034,13 +2050,14 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	    vj_perform_use_cached_ycbcr_frame(info,centry, chain_entry);
 	    error = 0;
 	}
-	if(!error )
+	if(!error && !subrender)
 		cached_tag_frames[1 + chain_entry ] = sample_id;	
 	break;
     case VJ_TAG_TYPE_NONE:
 	    	nframe = vj_perform_get_subframe(info, sample_id, chain_entry); // get exact frame number to decode
- 	  	centry = vj_perform_sample_is_cached(info,sample_id, chain_entry);
-	    	if(centry == -1 || info->no_caching) {
+			if(!subrender)
+				centry = vj_perform_sample_is_cached(info,sample_id, chain_entry);
+	    	if(centry == -1 || info->no_caching||subrender) {
 				len = vj_perform_get_frame_fx( info, sample_id, nframe, fb, frame_buffer[chain_entry]->P0, frame_buffer[chain_entry]->P1 );	
 			    if(len > 0 )
 				    error = 0;
@@ -2051,13 +2068,12 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 				cached_sample_frames[ 1 + chain_entry ] = sample_id;
 				error = 0;
 			}	
-			if(!error)
+			if(!error && !subrender)
 				cached_sample_frames[chain_entry+1] = sample_id;
 			break;
     }
 }
 
-//@ TODO: Render all image effects in subchain
 static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 {
 	if (vj_tag_get_chain_status(info->uc->sample_id, chain_entry))
@@ -2087,12 +2103,12 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 			{
 		    		int sub_id = vj_tag_get_chain_channel(info->uc->sample_id, chain_entry); // what id
 		    		int source = vj_tag_get_chain_source(info->uc->sample_id,chain_entry); // what source type chain_entry);
-		    		
-					vj_perform_apply_secundary_tag(info,sub_id,source,chain_entry ); // get it
-			 		frames[1]->data[0] = frame_buffer[chain_entry]->Y;
+		    		frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 			frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-					frames[1]->data[2] = frame_buffer[chain_entry]->alpha;
+					frames[1]->data[3] = frame_buffer[chain_entry]->alpha;
+
+					vj_perform_apply_secundary_tag(info,sub_id,source,chain_entry,frames[1]->data,0 ); // get it
 
 					int done   = 0;
 					int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
@@ -2223,11 +2239,12 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 						if( ef ) {
 							int sub_id = sample_get_chain_channel(id,n);
 							int src = sample_get_chain_source(id,n);
-							vj_perform_apply_secundary(info,sub_id,src,n+1);
-							F[1]->data[0] = frame_buffer[n+1]->Y;
-							F[1]->data[1] = frame_buffer[n+1]->Cb;
-							F[1]->data[2] = frame_buffer[n+1]->Cr;
-							F[1]->data[3] = frame_buffer[n+1]->alpha;
+							F[1]->data[0] = subrender_buffer[0];
+							F[1]->data[1] = subrender_buffer[1];
+							F[1]->data[2] = subrender_buffer[2];
+							F[1]->data[3] = subrender_buffer[3];
+
+							vj_perform_apply_secundary(info,sub_id,src,n,F[1]->data,1);
 						}
 						if( sm ) {
 						   if( !ssm ) {
@@ -2284,11 +2301,13 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 						if( ef ) {
 							int sub_id = vj_tag_get_chain_channel(id,n);
 							int src = vj_tag_get_chain_source(id,n);
-							vj_perform_apply_secundary(info,sub_id,src,n+1);
-							F[1]->data[0] = frame_buffer[n+1]->Y;
-							F[1]->data[1] = frame_buffer[n+1]->Cb;
-							F[1]->data[2] = frame_buffer[n+1]->Cr;
-							F[1]->data[3] = frame_buffer[n+1]->alpha;
+							F[1]->data[0] = subrender_buffer[0];
+							F[1]->data[1] = subrender_buffer[1];
+							F[1]->data[2] = subrender_buffer[2];
+							F[1]->data[3] = subrender_buffer[3];
+
+
+							vj_perform_apply_secundary(info,sub_id,src,n, F[1]->data,1);
 						}
 						if( sm ) {
   						 if( !ssm ) {
@@ -2372,18 +2391,19 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			int ef = vj_effect_get_extra_frame(effect_id);
 			if(ef)
 			{
-		    		int sub_id =
+		   		int sub_id =
 					sample_get_chain_channel(info->uc->sample_id,
 						 chain_entry); // what id
-		    		int source =
+		   		int source =
 					sample_get_chain_source(info->uc->sample_id, // what source type
 						chain_entry);
-				vj_perform_apply_secundary(info,sub_id,source,chain_entry); // get it
-
-			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
+				
+				frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    	frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
 				frames[1]->data[3] = frame_buffer[chain_entry]->alpha;
+
+				vj_perform_apply_secundary(info,sub_id,source,chain_entry, frames[1]->data,0); // get it
 
 				int done   = 0;
 				int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
