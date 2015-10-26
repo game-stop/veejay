@@ -24,25 +24,50 @@
 #include "common.h"
 #include "toalpha.h"
 
+static int __lookup_table[256];
+
 vj_effect *toalpha_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 0;
+    ve->num_params = 1;
     ve->description = "Alpha: New from Image";
     ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;
+
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);     /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 1;
+    ve->defaults[0] = !yuv_use_auto_ccir_jpeg();
+    ve->param_description = vje_build_param_list( ve->num_params, "Scale Luminance to range 0-255 (1=on)" );
+	
+	__init_lookup_table( __lookup_table, 256, 16.0f, 235.0f, 0, 255 ); 
+
+	int i;
+	for( i = 0; i < 256; i ++ )
+	printf(" %d -> %d\n",i, __lookup_table[i] );
+
     return ve;
 }
 
 
-void toalpha_apply( VJFrame *frame, int width, int height)
+void toalpha_apply( VJFrame *frame, int width, int height, int mode)
 {
-    int len = frame->len;
-
-    uint8_t *Y = frame->data[0];
+	int len = frame->len;
 	uint8_t *a = frame->data[3];
-
-	veejay_memcpy( a, Y, len );
+	uint8_t *Y = frame->data[0];
+		
+	if( mode == 0 ) {
+		veejay_memcpy(a, Y, len );
+	}
+	else {
+		int i;
+		for( i = 0; i < len; i ++ ) 
+		{
+			a[i] = __lookup_table[ Y[i] ];
+		}
+	}
 }

@@ -634,8 +634,8 @@ extern void average_blend_applyN( VJFrame *frame, VJFrame *frame2, int width,  i
 
 extern void average_blend_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int average_blend);
 
-extern void toalpha_apply( VJFrame *frame, int width, int height);
-extern void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
+extern void toalpha_apply( VJFrame *frame, int width, int height, int mode);
+extern void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode);
 extern void alpha2img_apply( VJFrame *frame, int width, int height);
 extern void alphafill_apply( VJFrame *frame, int width, int height, int val);
 extern void alphaflatten_apply( VJFrame *frame, int width, int height);

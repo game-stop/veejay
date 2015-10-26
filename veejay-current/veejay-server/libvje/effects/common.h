@@ -191,6 +191,16 @@ enum
  if( rgb_parameter_conversion_type_ == OLD_RGB )\
 	COLOR_rgb2yuv(r,g,b,y,u,v)\
 }	
+#define round1(x) ( (int32_t)( (x>0) ? (x) : (x) ))
+#define _CLAMP(a,min,max) ( round1(a) < min ? min : ( round1(a) > max ? max : round1(a) ))
+
+
+#define	__init_lookup_table( T,Tsize, b_min, b_max, min, max ) \
+	float __c = ((float) (Tsize-1)) / ( (float) b_max - (float) b_min );\
+	int __i;\
+	for( __i = 0; __i < Tsize; __i ++ ) {\
+		T[__i] = _CLAMP( (float) __i * __c - (float) b_min, min,max );\
+	}\
 
 typedef uint8_t (*pix_func_Y) (uint8_t y1, uint8_t y2);
 typedef uint8_t (*pix_func_C) (uint8_t y1, uint8_t y2);

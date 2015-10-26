@@ -24,22 +24,49 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include <math.h>
+#include "common.h"
 #include "mixtoalpha.h"
+
+static int __lookup_table[256];
 
 vj_effect *mixtoalpha_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 0;
+    ve->num_params = 1;
     ve->description = "Alpha: New from Mixing source";
     ve->sub_format = 0;
     ve->extra_frame = 1;
 	ve->parallel = 1;
 	ve->has_user = 0;
+
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);     /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 1;
+    ve->defaults[0] = !yuv_use_auto_ccir_jpeg();
+    ve->param_description = vje_build_param_list( ve->num_params, "Scale Luminance to range 0-255 (1=on)" );
+
+	__init_lookup_table( __lookup_table,256, 16.0f, 235.0f, 0, 255 ); 
+
     return ve;
 }
 
-void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height)
+void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode)
 {
-	veejay_memcpy(frame->data[3], frame2->data[0], frame->len );
+	int len = frame->len;
+	uint8_t *a = frame->data[3];
+	uint8_t *Y = frame2->data[0];
+		
+	if( mode == 0 ) {
+		veejay_memcpy(a, Y, len );
+	}
+	else {
+		int i;
+		for( i = 0; i < len; i ++ ) 
+		{
+			a[i] = __lookup_table[ Y[i] ];
+		}
+	}
 }
 

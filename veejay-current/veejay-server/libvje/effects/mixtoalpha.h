@@ -25,6 +25,6 @@
 #include <stdint.h>
 
 vj_effect *mixtoalpha_init(int w, int h);
-void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
+void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode);
 
 #endif

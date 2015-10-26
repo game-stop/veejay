@@ -110,9 +110,7 @@ static	float	jpeg_to_CCIR_tableY[256];
 static  float	CCIR_to_jpeg_tableY[256];
 static	float	jpeg_to_CCIR_tableUV[256];
 static  float	CCIR_to_jpeg_tableUV[256];
-//#define round1(x) ( (int32_t)( (x>0) ? (x) + 0.5 : (x)  - 0.5 ))
-#define round1(x) ( (int32_t)( (x>0) ? (x) : (x) ))
-
+#define round1(x) ( (int32_t)( (x>0) ? (x) + 0.5 : (x)  - 0.5 ))
 #define _CLAMP(a,min,max) ( round1(a) < min ? min : ( round1(a) > max ? max : round1(a) ))
 
 static struct {
@@ -330,7 +328,7 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 	for( i = 0; i < 256 ; i ++ ) {
 		jpeg_to_CCIR_tableY[i] = _CLAMP( (float)i * s + 16.0f , 16.0f, 235.0f );
 		jpeg_to_CCIR_tableUV[i]= _CLAMP( (float)i * u + 16.0f , 16.0f, 240.0f );
-		CCIR_to_jpeg_tableY[i] = _CLAMP( (float)i * c - 16.0f - 2.0f ,  0.0f, 255.0f );
+		CCIR_to_jpeg_tableY[i] = _CLAMP( (float)i * c - 16.0f ,  0.0f, 255.0f );
 		CCIR_to_jpeg_tableUV[i]= _CLAMP( (float)i * d - 16.0f ,  0.0f, 255.0f );
 	}
 

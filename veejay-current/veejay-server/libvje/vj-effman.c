@@ -419,7 +419,7 @@ void vj_effman_apply_image_effect(
 		alpha2img_apply( frames[0], frames[0]->width,frames[0]->height );
 		break;
 	case VJ_IMAGE_EFFECT_TOALPHA:
-		toalpha_apply( frames[0], frames[0]->width,frames[0]->height );
+		toalpha_apply( frames[0], frames[0]->width,frames[0]->height, arg[0] );
 		break;
 	case VJ_IMAGE_EFFECT_ALPHAFLATTEN:
 		alphaflatten_apply(frames[0],frames[0]->width,frames[0]->height);
@@ -647,7 +647,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 		      frames[0]->height, arg[0]);
 	break;
 	case VJ_VIDEO_EFFECT_MIXTOALPHA:
-		mixtoalpha_apply( frames[0],frames[1], frames[0]->width,frames[0]->height);
+		mixtoalpha_apply( frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0]);
     default:
 	break;
     }
