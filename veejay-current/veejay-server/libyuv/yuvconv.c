@@ -34,6 +34,7 @@
 #include <libavcodec/avcodec.h>
 #include <veejay/vj-task.h>
 #include <libyuv/mmx_macros.h>
+#include <libel/avcommon.h>
 
 #define Y4M_CHROMA_420JPEG     0  /* 4:2:0, H/V centered, for JPEG/MPEG-1 */
 #define Y4M_CHROMA_420MPEG2    1  /* 4:2:0, H cosited, for MPEG-2         */

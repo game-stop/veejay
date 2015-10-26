@@ -28,13 +28,13 @@
 #endif
 #include <libvje/vje.h>
 #include <libvje/effects/common.h>
-#include <libyuv/yuvconv.h>
 #include <libel/pixbuf.h>
 #include <veejay/vims.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
 #include <libyuv/yuvconv.h>
+#include <libel/avcommon.h>
 #define    RUP8(num)(((num)+8)&~8)
 
 typedef struct

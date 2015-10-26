@@ -29,6 +29,7 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <stdlib.h>
 #include <libhash/hash.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
@@ -41,10 +42,10 @@
 #include <libplugger/defaults.h>
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
-#include <stdlib.h>
 #include <libplugger/utility.h>
 #include <libplugger/livido-loader.h>
 #include <libsubsample/subsample.h>
+#include <libel/avcommon.h>
 #include <veejay/vj-shm.h>
 #include <veejay/vims.h>
 #define LIVIDO_COPY 1
