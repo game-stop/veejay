@@ -46,7 +46,8 @@ EXTRA_DIST += effects/autoeq.h effects/crosspixel.h effects/mask.h effects/rawva
 		      effects/contourextract.h effects/magicoverlays.h effects/raster.h effects/widthmirror.h \
 		      effects/contrast.h effects/magicscratcher.h effects/rawman.h effects/zoom.h effects/iris.h \
 			  effects/cali.h effects/median.h effects/average-blend.h effects/perspective.h \
-			  effects/toalpha.h effects/mixtoalpha.h effects/alpha2img.h effects/alphafill.h effects/alphaflatten.h
+			  effects/toalpha.h effects/mixtoalpha.h effects/alpha2img.h effects/alphafill.h effects/alphaflatten.h \
+			  effects/magicalphaoverlays.h
 
 EXTRA_DIST += specs/FreeFrame.h specs/frei0r.h
 
@@ -94,6 +95,7 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
 			effects/contourextract.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
 			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c effects/median.c effects/average-blend.c effects/perspective.c \
-			effects/toalpha.c effects/mixtoalpha.c effects/alpha2img.c effects/alphafill.c effects/alphaflatten.c
+			effects/toalpha.c effects/mixtoalpha.c effects/alpha2img.c effects/alphafill.c effects/alphaflatten.c \
+			effects/magicalphaoverlays.c
 
 

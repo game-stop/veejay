@@ -180,22 +180,22 @@ static void vj_perform_reverse_audio_frame(veejay_t * info, int len, uint8_t *bu
 
 extern int  pixel_Y_lo_;
 
-static	void	vj_perform_copy( ycbcr_frame *src, ycbcr_frame *dst, int Y_len, int UV_len )
+static	void	vj_perform_copy( ycbcr_frame *src, ycbcr_frame *dst, int Y_len, int UV_len, int alpha_len )
 {
 	uint8_t *input[4] = { src->Y, src->Cb, src->Cr,src->alpha };
 	uint8_t *output[4] = { dst->Y, dst->Cb, dst->Cr,dst->alpha };
-	int 	strides[4] = { Y_len, UV_len, UV_len, Y_len };
+	int 	strides[4] = { Y_len, UV_len, UV_len, alpha_len };
 	vj_frame_copy(input,output,strides);
 }
-static	void	vj_perform_copy2( ycbcr_frame *src, uint8_t **output, int Y_len, int UV_len )
+static	void	vj_perform_copy2( ycbcr_frame *src, uint8_t **output, int Y_len, int UV_len, int alpha_len )
 {
 	uint8_t *input[4] = { src->Y, src->Cb, src->Cr, src->alpha };
-	int 	strides[4] = { Y_len, UV_len, UV_len, Y_len };
+	int 	strides[4] = { Y_len, UV_len, UV_len, alpha_len };
 	vj_frame_copy(input,output,strides);
 }
-static	void	vj_perform_copy3( uint8_t **input, uint8_t **output, int Y_len, int UV_len )
+static	void	vj_perform_copy3( uint8_t **input, uint8_t **output, int Y_len, int UV_len, int alpha_len )
 {
-	int 	strides[4] = { Y_len, UV_len, UV_len,0 };
+	int 	strides[4] = { Y_len, UV_len, UV_len, alpha_len };
 	vj_frame_copy(input,output,strides);
 }
 
@@ -1470,15 +1470,14 @@ static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int ch
 	{
 		int len2 = ( info->effect_frame1->ssm == 1 ? len1 : 
 			     info->effect_frame1->uv_len );
-		vj_perform_copy( primary_buffer[0], frame_buffer[chain_entry], len1, len2 );
+		vj_perform_copy( primary_buffer[0], frame_buffer[chain_entry], len1, len2, info->effect_frame1->stride[3] * info->effect_frame1->height );
 		frame_buffer[chain_entry]->ssm = info->effect_frame1->ssm;
 	}
 	else
 	{
 		int c = centry - 1;
 		int len2 = ( frame_buffer[c]->ssm == 1 ? len1 : info->effect_frame2->uv_len );
-
-		vj_perform_copy( primary_buffer[c], frame_buffer[chain_entry], len1, len2 );
+		vj_perform_copy( primary_buffer[c], frame_buffer[chain_entry], len1, len2,info->effect_frame1->stride[3] * info->effect_frame1->height );
 		frame_buffer[chain_entry]->ssm = frame_buffer[c]->ssm;
    	 }
 }
@@ -1910,12 +1909,18 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 
 			if( max_sfd <= 1 ) {
 				
-				vj_perform_copy2( primary_buffer[0], img, info->effect_frame1->len, 	(info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len ) );
+				vj_perform_copy2( primary_buffer[0], img, info->effect_frame1->len,
+						(info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len ), 
+						info->effect_frame1->stride[3] * info->effect_frame1->height 
+						);
 				
 				return 1;
 			}
 
-			vj_perform_copy2( primary_buffer[7], img,  info->effect_frame1->len, 	(info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len ) );
+			vj_perform_copy2( primary_buffer[7], img,
+						info->effect_frame1->len,(info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len ),
+						info->effect_frame1->stride[3] * info->effect_frame1->height    
+						);
 			return 1;
 		}
 	}
@@ -1958,7 +1963,7 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		if( p1_frame != p0_frame )
 			vj_el_get_video_frame( el, p1_frame, p1_buffer );
 		
-		vj_perform_copy3( p0_buffer, img, info->effect_frame1->len, uv_len );
+		vj_perform_copy3( p0_buffer, img, info->effect_frame1->len, uv_len,info->effect_frame1->stride[3] * info->effect_frame1->height  );
 
 	} else {
 		const uint32_t N = max_sfd;
@@ -1968,7 +1973,7 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		vj_frame_slow_threaded( p0_buffer, p1_buffer, img , info->effect_frame1->len, uv_len, frac );
 		
 		if( (n1 + 1 ) == N ) {
-			vj_perform_copy3( img, p0_buffer, info->effect_frame1->len,uv_len );
+			vj_perform_copy3( img, p0_buffer, info->effect_frame1->len,uv_len,info->effect_frame1->stride[3] * info->effect_frame1->height  );
 		}
 	}
 	
@@ -2378,7 +2383,7 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
    		frames[0]->data[1] = primary_buffer[0]->Cb;
    		frames[0]->data[2] = primary_buffer[0]->Cr;
 		frames[0]->data[3] = primary_buffer[0]->alpha;
-	
+
 		vjp_kf *setup = info->effect_info;
     		setup->ref = info->uc->sample_id;
 
@@ -2412,7 +2417,7 @@ static void	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 				if( subrender ) {
 		//		if(do_ssm >= 0 ) {
 		//			if( (frames[1]->ssm == 0 && do_ssm == 0) || (frames[1]->ssm == 1 && do_ssm == 1 )
-		///					|| (frames[1]->ssm == 0 && do_ssm == 1 )) {
+		//					|| (frames[1]->ssm == 0 && do_ssm == 1 )) {
 						//@ call render now
 						frames[1]->ssm = vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
 						done = 1;
@@ -2557,7 +2562,8 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 		primary_buffer[4]->alpha };
 
 	if( info->settings->feedback && info->settings->feedback_stage > 1 ) {
-		vj_perform_copy3( feedback_buffer, frame, info->effect_frame1->len, info->effect_frame1->uv_len );
+		int 	strides[4] = { info->effect_frame1->len, info->effect_frame1->uv_len, info->effect_frame1->uv_len, info->effect_frame1->stride[3] * info->effect_frame1->height };
+		vj_frame_copy(feedback_buffer,frame,strides);
 		return;
 	}
 
@@ -2862,7 +2868,8 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
     frame[2] = primary_buffer[0]->Cr;
 	
 	if( info->settings->feedback && info->settings->feedback_stage > 1 ) {
-		vj_perform_copy3( feedback_buffer, frame, info->effect_frame1->len, info->effect_frame1->uv_len );
+		int 	strides[4] = { info->effect_frame1->len, info->effect_frame1->uv_len, info->effect_frame1->uv_len, info->effect_frame1->stride[3] * info->effect_frame1->height };
+		vj_frame_copy(feedback_buffer,frame,strides);
 		return 1;
 	}
     
@@ -2898,7 +2905,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame)
 {
-	vj_perform_copy3( frame->data, temp_buffer, frame->len, frame->uv_len );
+	vj_perform_copy3( frame->data, temp_buffer, frame->len, frame->uv_len,frame->stride[3] * frame->height  );
 }
 
 static	inline	void	vj_perform_supersample_chain( veejay_t *info, VJFrame *frame )
@@ -3427,6 +3434,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	
 	if( frame2->data[0] == frame->data[0] )
 		frame->ssm = 0;
+
+
 }
 
 static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settings )
@@ -3602,7 +3611,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 	if( info->settings->feedback && info->settings->feedback_stage > 0 ) 
 	{
 		int idx = info->out_buf;
-		vj_perform_copy2( primary_buffer[idx], feedback_buffer, info->effect_frame1->len, info->effect_frame1->uv_len );
+		vj_perform_copy2( primary_buffer[idx], feedback_buffer, info->effect_frame1->len, info->effect_frame1->uv_len,info->effect_frame1->stride[3] * info->effect_frame1->height  );
 
 		info->settings->feedback_stage = 2;
 	}

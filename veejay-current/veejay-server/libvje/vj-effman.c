@@ -649,6 +649,8 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	case VJ_VIDEO_EFFECT_MIXTOALPHA:
 		mixtoalpha_apply( frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0]);
     default:
+	case VJ_VIDEO_EFFECT_MAGICALPHA:
+		overlayalphamagic_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
     }
 

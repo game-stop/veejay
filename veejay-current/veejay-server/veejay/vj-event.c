@@ -9729,7 +9729,7 @@ void	vj_event_connect_shm( void *ptr, const char format[], va_list ap )
 	}
 
 	int32_t key = vj_share_pull_master( v->shm,"127.0.0.1", args[0] );
-	int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, key,0);
+	int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, 0, key);
 	
 	if( id <= 0 ) {
 		veejay_msg(0, "Unable to connect to shared resource id %d", key );

@@ -387,7 +387,35 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 			if(p4 != NULL) {
 				*p4 = 0;
 			}
-			
+			break;
+		case PIX_FMT_YUVA420P:
+		case PIX_FMT_YUVA422P:
+			if(p1 != NULL) {
+				*p1 = src->len;
+			}
+			if(p2 != NULL) {
+				*p2 = src->uv_len;
+			}
+			if(p3 != NULL) {
+				*p3 = src->uv_len;
+			}
+			if(p4 != NULL) {
+				*p4 = src->len;
+			}
+			break;
+		case PIX_FMT_YUVA444P:
+			if(p1 != NULL) {
+				*p1 = src->len;
+			}
+			if(p2 != NULL) {
+				*p2 = src->len;
+			}
+			if(p3 != NULL) {
+				*p3 = src->len;
+			}
+			if(p4 != NULL) {
+				*p4 = src->len;
+			}
 			break;
 		case PIX_FMT_RGB24:
 		case PIX_FMT_BGR24:
@@ -461,21 +489,16 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->uv_height= f->height;		
 			f->stride[0] = w;
 			f->stride[1] = w>>1;
-			f->stride[2] = w>>1;	
-			break;
-		case PIX_FMT_YUV420P:
-		case PIX_FMT_YUVJ420P:
-			f->uv_width = w>>1;
-			f->uv_height=f->height>>1;
-			f->stride[0] = w;
-			f->stride[1] = f->stride[2] = f->stride[0]>>1;
+			f->stride[2] = w>>1;
+			f->shift_h = 1;
 			break;
 		case PIX_FMT_YUVA422P:
 			f->uv_width = w>>1;
-			f->uv_height=f->height>>1;
+			f->uv_height=f->height;
 			f->stride[0] = w;
-			f->stride[1] = f->stride[2] = f->stride[0]>>1;
+			f->stride[1] = f->stride[2] = w>>1;
 			f->stride[3] = w;
+			f->shift_h = 1;
 			break;
 		case PIX_FMT_YUV444P:
 		case PIX_FMT_YUVJ444P:
@@ -491,16 +514,30 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[1] = f->stride[2] = f->stride[0];
 			f->stride[3] = w;
 			break;
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
+			f->uv_width = w>>1;
+			f->uv_height=f->height>>1;
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = f->stride[0]>>1;
+			f->shift_v = 1;
+			f->shift_h = 1;
+			break;
+		case PIX_FMT_YUVA420P:
+			f->uv_width = w>>1;
+			f->uv_height=f->height>>1;
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = f->stride[0]>>1;
+			f->stride[3] = f->stride[0];
+			f->shift_v = 1;
+			f->shift_h = 1;
+			break;
 		case PIX_FMT_GRAY8:
-			f->uv_width = 0;
-			f->uv_height = 0;
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = 0;
 			break;
 		case PIX_FMT_YUYV422:
 		case PIX_FMT_UYVY422:
-			f->uv_width = 0;
-			f->uv_height = 0;
 			f->stride[0] = w * 2;
 			f->stride[1] = f->stride[2] = 0;
 			break;

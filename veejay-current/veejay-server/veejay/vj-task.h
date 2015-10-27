@@ -30,16 +30,18 @@ typedef struct
 	uint8_t *input[4];
 	uint8_t *output[4];
 	uint8_t *temp[4];
-	void	*priv;
-	void   	*ptr;
-	int   	width;
-	int   	height;
-	int   	shiftv;
-	int   	shifth;
+	void *priv;
+	void *ptr;
+	int width;
+	int height;
+	int shiftv;
+	int shifth;
 	int	ssm;
 	int	uv_width;
 	int	uv_height;
-	int	jobnum;    
+	int	jobnum; 
+	int format;
+	int row_strides[4];	
 	float 	fparam;
 	int	iparam;  
 	int	iparams[12]; // fx parameters + entry

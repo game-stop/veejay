@@ -174,6 +174,7 @@
 #include "effects/toalpha.h"
 #include "effects/mixtoalpha.h"
 #include "effects/alphaflatten.h"
+#include "effects/magicalphaoverlays.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -574,7 +575,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[47] = average_blend_init(width,height);
 	vj_effects[44] = iris_init(width,height);
 	vj_effects[48] = mixtoalpha_init(width,height);
-    vj_effects[49] = dummy_init(width,height);
+	vj_effects[49] = overlayalphamagic_init(width,height);
+    vj_effects[50] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);

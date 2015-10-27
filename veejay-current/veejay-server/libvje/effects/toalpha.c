@@ -30,7 +30,7 @@ vj_effect *toalpha_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
-    ve->description = "Alpha: New from Image";
+    ve->description = "Alpha: Set from Image";
     ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->parallel = 1;
@@ -45,10 +45,6 @@ vj_effect *toalpha_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Scale Luminance to range 0-255 (1=on)" );
 	
 	__init_lookup_table( __lookup_table, 256, 16.0f, 235.0f, 0, 255 ); 
-
-	int i;
-	for( i = 0; i < 256; i ++ )
-	printf(" %d -> %d\n",i, __lookup_table[i] );
 
     return ve;
 }

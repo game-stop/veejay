@@ -401,8 +401,9 @@ void	vj_task_set_from_args( int len, int uv_len )
 		v->strides[0]	 = len / n;
 		v->strides[1]	 = uv_len / n;
 		v->strides[2]	 = uv_len / n;
-		v->strides[3]    = len / n;
+		v->strides[3]    = 0; 
 	}
+	//FIXME alpha
 }
 
 void	vj_task_set_to_frame( VJFrame *in, int i, int job )
@@ -426,6 +427,11 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 	}
 	in->len     = first->width * first->height;
 
+	in->stride[0] = first->row_strides[0];
+	in->stride[1] = first->row_strides[1];
+	in->stride[2] = first->row_strides[2];
+	in->stride[3] = first->row_strides[3];
+
 	switch( i ) {
 		case 0:
 			in->data[0]=first->input[0];
@@ -446,6 +452,8 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 			in->data[3]=first->temp[3];
 			break;	
 	}
+
+	in->format = first->format;
 }
 
 void	vj_task_set_from_frame( VJFrame *in )
@@ -455,19 +463,23 @@ void	vj_task_set_from_frame( VJFrame *in )
 
 	for( i = 0; i < n; i ++ ) {
 		vj_task_arg_t *v= vj_task_args[i];
-		v->ssm		= in->ssm;
-		v->width	= in->width;
-		v->height	= in->height / n;
+		v->ssm			= in->ssm;
+		v->width		= in->width;
+		v->height		= in->height / n;
 		v->strides[0]	= (v->width * v->height);
-		v->uv_width	= in->uv_width;
+		v->uv_width		= in->uv_width;
 		v->uv_height 	= in->uv_height / n;
 		v->strides[1]	= v->uv_width * v->uv_height; 
 		v->strides[2]	= v->strides[1];
-		v->strides[3]   = v->strides[0];
-		v->shiftv	= in->shift_v;
-		v->shifth	= in->shift_h;	
-			
-		if( v->ssm == 1 ) { //@ FX in 4:4:4
+		v->strides[3]   = (in->stride[3] == 0 ? 0 : v->strides[0]);
+		v->shiftv	    = in->shift_v;
+		v->shifth	    = in->shift_h;	
+		v->row_strides[0] = in->stride[0]; /* original value */
+		v->row_strides[1] = in->stride[1];
+		v->row_strides[2] = in->stride[2];
+		v->row_strides[3] = in->stride[3];
+		v->format		  = in->format;
+		if( v->ssm == 1 ) { 
 			v->strides[1] = (v->width * v->height );
 			v->strides[2] = v->strides[1];
 		}
@@ -511,7 +523,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 			f[j]->input[i]  = buf1[i] + (f[j]->strides[i] * j);
 			f[j]->output[i] = buf2[i] + (f[j]->strides[i] * j);
 			if( buf3 != NULL )
-				f[j]->temp[i]   = buf3[i] + (f[j]->strides[i]* j); 
+				f[j]->temp[i] = buf3[i] + (f[j]->strides[i]* j); 
 			f[j]->jobnum = j;
 		}	
 	}

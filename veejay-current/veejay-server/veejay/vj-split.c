@@ -336,7 +336,7 @@ static int vj_split_allocate_screen( void *ptr, int screen_id, int wid, int hei,
 		return 0;
 	}
 	
-	box->data = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(dst->len*3));
+	box->data = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(dst->len*4));
 
 	dst->data[0] = box->data;
 	dst->data[1] = box->data + dst->len;
@@ -576,6 +576,7 @@ static void vj_split_copy_region( VJFrame *src, VJFrame *dst, v_screen_t *box )
 						 src->width, src->height );
 	vj_split_copy_plane( dst->data[2], src->data[2], box->left, box->right, box->top, box->bottom,
 						 src->width, src->height ); 
+	//FIXME alpha channel support
 }
 
 /**
@@ -608,6 +609,7 @@ static int vj_split_push_shm( v_screen_t *screen, VJFrame *frame)
 	veejay_memcpy( Y, frame->data[0], frame->len );
 	veejay_memcpy( U, frame->data[1], frame->len );
 	veejay_memcpy( V, frame->data[2], frame->len );
+	//FIXME alpha channel support
 
 	res = pthread_rwlock_unlock( &(data->rwlock));
 	if( res == -1 ) {
@@ -655,7 +657,7 @@ void vj_split_render( void *ptr )
 		VJFrame *dst = x->frames[i];
 			
 		if( x->screens[i]->shm ) {
-			if( vj_split_push_shm( x->screens[i], dst ) == 0 ) {
+			if( vj_split_push_shm( x->screens[i], dst ) == 0 ) { //FIXME alpha channel support in vj-shm
 				vj_split_free_screen( ptr, i );
 			}
 		}

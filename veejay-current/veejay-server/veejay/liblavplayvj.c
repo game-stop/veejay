@@ -977,6 +977,7 @@ static int veejay_screen_update(veejay_t * info )
 #endif
 	if( info->shm && vj_shm_get_status(info->shm) == 1 )
 	{
+		//FIXME: add alpha channel support to vj-shm.c, impacts vj-split and lvd_shm*.so
 		int plane_sizes[4] = { info->effect_frame1->len, info->effect_frame1->uv_len,
 		   		info->effect_frame1->uv_len,0 };	
 		if( vj_shm_write(info->shm, frame,plane_sizes) == -1 ) {
@@ -3808,9 +3809,9 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	vj_picture_init( &(info->settings->sws_templ));
 #endif
 
-	info->effect_frame1 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, vj_to_pixfmt(info->pixel_format) );
+	info->effect_frame1 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame1->fps = info->settings->output_fps;
-	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, vj_to_pixfmt(info->pixel_format) );
+	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame2->fps = info->settings->output_fps;
 
 	if(num_files == 0)

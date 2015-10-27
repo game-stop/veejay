@@ -22,7 +22,7 @@
 
 #define FX_LIMIT	1024
 
-#define MAX_EFFECTS 146
+#define MAX_EFFECTS 147
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)
@@ -49,7 +49,6 @@ typedef struct VJFrame_t
 	int 	width;
 	int	height;
 	int	ssm;
-	int	alpha;
 	int	stride[4];
 	int	stand; //ccir/jpeg
 	float	fps;

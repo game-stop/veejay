@@ -121,6 +121,7 @@ enum {
 	VJ_VIDEO_EFFECT_SLICER = 246,
 	VJ_VIDEO_EFFECT_AVERAGEBLEND = 247,
 	VJ_VIDEO_EFFECT_MIXTOALPHA = 248,
+	VJ_VIDEO_EFFECT_MAGICALPHA = 249,
 	
 };
 
@@ -229,7 +230,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 197
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 249
+#define VJ_VIDEO_EFFECT_MAX 250
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -639,5 +640,5 @@ extern void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int hei
 extern void alpha2img_apply( VJFrame *frame, int width, int height);
 extern void alphafill_apply( VJFrame *frame, int width, int height, int val);
 extern void alphaflatten_apply( VJFrame *frame, int width, int height);
-
+extern void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int n, int visible);
 #endif
