@@ -3561,9 +3561,9 @@ void	vj_event_render_depth( void *ptr, const char format[] , va_list ap )
 		v->settings->fxdepth = status;
 	}
 	if( v->settings->fxdepth == 1 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "Rendering chain entries 1 - 3 of all underlying samples and streams.");
+		veejay_msg(VEEJAY_MSG_INFO, "Rendering FX chain on mixing inputs");
 	} else {
-		veejay_msg(VEEJAY_MSG_INFO, "Skipping all FX on all underlying samples and streams.");
+		veejay_msg(VEEJAY_MSG_INFO, "Not rendering FX chain on mixing inputs");
 	}
 }
 
