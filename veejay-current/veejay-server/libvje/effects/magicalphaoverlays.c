@@ -65,7 +65,7 @@ void _overlayalphamagic_adddistorted(VJFrame *frame, VJFrame *frame2,int width, 
 		a = A[i];
 		b = A2[i];
 		c = a + b;
-		A[i] = CLAMP_A(c);
+		A[i] = CLAMP_Y(c);
     }
 
 }
@@ -83,7 +83,7 @@ void _overlayalphamagic_add_distorted(VJFrame *frame, VJFrame *frame2,int width,
     for (i = 0; i < len; i++) {
 		y1 = A[i];
 		y2 = A2[i];
-		A[i] = CLAMP_A(y1 + y2);
+		A[i] = CLAMP_Y(y1 + y2);
     }
 
 }
@@ -100,7 +100,7 @@ void _overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2,int width, 
 		y1 = A[i];
 		y2 = A2[i];
 		y1 -= y2;
-		A[i] = CLAMP_A(y1);
+		A[i] = CLAMP_Y(y1);
     }
 }
 
@@ -169,7 +169,7 @@ void _overlayalphamagic_additive(VJFrame *frame, VJFrame *frame2,int width, int 
     int a;
 	while(len--) { 
 		a = A[len] + (2 * A2[len]) - 255;
-		A[len] = CLAMP_A(a);
+		A[len] = CLAMP_Y(a);
 	}
 }
 
@@ -183,7 +183,7 @@ void _overlayalphamagic_substractive(VJFrame *frame, VJFrame *frame2,int width, 
     uint8_t *A2 = frame2->data[3];
 
     for (i = 0; i < len; i++) 
-		A[i] = CLAMP_A( A[i] - A2[i] );
+		A[i] = CLAMP_Y( A[i] - A2[i] );
 }
 
 void _overlayalphamagic_softburn(VJFrame *frame, VJFrame *frame2,int width, int height)
@@ -228,7 +228,7 @@ void _overlayalphamagic_inverseburn(VJFrame *frame, VJFrame *frame2,int width, i
 	    c = 0;
 	else
 	    c = 255 - (((255 - b) >> 8) / a);
-		A[i] = CLAMP_A(c);
+		A[i] = CLAMP_Y(c);
     }
 }
 
@@ -330,7 +330,7 @@ void _overlayalphamagic_exclusive(VJFrame *frame, VJFrame *frame2,int width, int
     int c;
     for (i = 0; i < len; i++) {
 		c = A[i] + (2 * A2[i]) - 255;
-		A[i] = CLAMP_A(c - (( A[i] * A2[i] ) >> 8 ));	
+		A[i] = CLAMP_Y(c - (( A[i] * A2[i] ) >> 8 ));	
     }
 }
 
@@ -347,7 +347,7 @@ void _overlayalphamagic_basecolor(VJFrame *frame, VJFrame *frame2,int width, int
 		b = A2[i];
 		c = a * b >> 8;
 		d = c + a * ((255 - (((255 - a) * (255 - b)) >> 8) - c) >> 8);	//8
-		A[i] = CLAMP_A(d);
+		A[i] = CLAMP_Y(d);
     }
 }
 
@@ -363,7 +363,7 @@ void _overlayalphamagic_freeze(VJFrame *frame, VJFrame *frame2, int width,int he
 		a = A[i];
 		b = A2[i];
 		if ( b > 0 )
-			A[i] = CLAMP_A(255 - ((( 255 - a) * ( 255 - a )) / b));
+			A[i] = CLAMP_Y(255 - ((( 255 - a) * ( 255 - a )) / b));
 	 }
 }
 
@@ -379,7 +379,7 @@ void _overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2,int width, int 
 		a = A[i];
 		b = A2[i];
 		if( a > 0 )
-			A[i] = CLAMP_A( 255 - ((( 255 - b ) * ( 255 - b )) / a));
+			A[i] = CLAMP_Y( 255 - ((( 255 - b ) * ( 255 - b )) / a));
     }
 }
 
@@ -415,7 +415,7 @@ void _overlayalphamagic_relativeaddlum(VJFrame *frame, VJFrame *frame2,int width
 		c = a >> 1;
 		b = A2[i];
 		d = b >> 1;
-		A[i] = CLAMP_A(c + d);
+		A[i] = CLAMP_Y(c + d);
     }
 }
 
@@ -568,7 +568,7 @@ void _overlayalphamagic_addtest(VJFrame *frame, VJFrame *frame2, int width,int h
 		a = A[i];
 		b = A2[i];
 		c = a + ((2 * b) - 255)>>1;
-		A[i] = CLAMP_A(c);
+		A[i] = CLAMP_Y(c);
     }
 }
 void _overlayalphamagic_addtest2(VJFrame *frame, VJFrame *frame2,int width, int height)
@@ -583,7 +583,7 @@ void _overlayalphamagic_addtest2(VJFrame *frame, VJFrame *frame2,int width, int 
 		a = A[i];
 		b = A2[i];
 		c = a + (2 * b) - 255;
-		A[i] = CLAMP_A(c);
+		A[i] = CLAMP_Y(c);
     }
 
 
@@ -655,7 +655,7 @@ void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,int heig
     case VJ_EFFECT_BLEND_SUBSTRACTIVE:
 	_overlayalphamagic_substractive(frame, frame2, width, height);
 	break;
-    case VJ_EFFECT_BLEND_MULTIPLA:
+    case VJ_EFFECT_BLEND_MULTIPLY:
 	_overlayalphamagic_multiply(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_DIVIDE:
