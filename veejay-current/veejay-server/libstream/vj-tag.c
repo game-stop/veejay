@@ -901,7 +901,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->color_b = 0;
     tag->opacity = 0;
 	tag->priv = NULL;
-//	tag->subrender = 1; FIXME
+	tag->subrender = 1;
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
 	    tag->priv = net_threader(_tag_info->effect_frame1);
 
@@ -1347,15 +1347,23 @@ int	vj_tag_set_n_frames( int t1, int n )
   return 1;
 }
 
+sample_eff_chain	*vj_tag_get_effect_chain(int t1, int position)
+{
+	vj_tag * tag = vj_tag_get(t1);
+	if(tag == NULL)
+		return NULL;
+	return tag->effect_chain[position];
+}
+
 int vj_tag_get_effect(int t1, int position)
 {
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
-	return -1;
-    if (position >= SAMPLE_MAX_EFFECTS)
-	return -1;
+		return -1;
+	if (position >= SAMPLE_MAX_EFFECTS)
+		return -1;
     if (tag->effect_chain[position]->e_flag == 0)
-	return -1;
+		return -1;
     return tag->effect_chain[position]->effect_id;
 }
 void *vj_tag_get_plugin(int t1, int position, void *instance)

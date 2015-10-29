@@ -333,7 +333,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->marker_end = 0;
     si->loopcount = 0;
     si->effect_toggle = 1;
-//	si->subrender = 1; FIXME
+	si->subrender = 1;
     si->edit_list_file = sample_default_edl_name(si->sample_id);
 
     sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
@@ -996,6 +996,13 @@ void sample_del_all(void *edl)
 	this_sample_id = 0;
 
 	hash_free_nodes( SampleHash );
+}
+sample_eff_chain *sample_get_effect_chain(int s1, int position)
+{
+	sample_info *sample = sample_get(s1);
+	if(sample == NULL)
+		return NULL;
+	return sample->effect_chain[position];
 }
 
 /****************************************************************************************************

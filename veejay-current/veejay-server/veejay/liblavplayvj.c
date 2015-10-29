@@ -2813,7 +2813,9 @@ veejay_t *veejay_malloc()
     if (!(info->settings)) 
 		return NULL;
     info->settings->sample_restart = 1; //@ default to on
-    veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
+	info->settings->fxdepth = 1; //@ default to on (VEEJAY_CLASSIC env turns it off)
+	
+	veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
     veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
 
     info->status_what = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE );
@@ -3683,6 +3685,7 @@ static int configure_dummy_defaults(veejay_t *info, char override_norm, float fp
 	if( has_env_setting( "VEEJAY_RUN_MODE", "CLASSIC" ) ) {
 	       default_dw = (default_norm == VIDEO_MODE_PAL || default_norm == VIDEO_MODE_SECAM ? 352 : 360 );
 	       default_dh = (default_norm == VIDEO_MODE_PAL || default_norm == VIDEO_MODE_SECAM ? 288 : 240 );
+		   info->settings->fxdepth = 0;
 	}
 
 	int dw = default_dw;

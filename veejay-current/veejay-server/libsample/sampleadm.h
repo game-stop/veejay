@@ -348,6 +348,8 @@ extern	int		sample_set_resume(int s1, long pos );
 
 extern void	sample_chain_alloc_kf( int s1, int entry );
 
+extern sample_eff_chain *sample_get_effect_chain(int s1, int position);
+
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);
 extern void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects);
