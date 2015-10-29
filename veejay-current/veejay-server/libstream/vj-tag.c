@@ -901,7 +901,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->color_b = 0;
     tag->opacity = 0;
 	tag->priv = NULL;
-	tag->subrender = 1;
+//	tag->subrender = 1; FIXME
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
 	    tag->priv = net_threader(_tag_info->effect_frame1);
 

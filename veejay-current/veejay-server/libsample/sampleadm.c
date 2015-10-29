@@ -333,7 +333,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->marker_end = 0;
     si->loopcount = 0;
     si->effect_toggle = 1;
-	si->subrender = 1;
+//	si->subrender = 1; FIXME
     si->edit_list_file = sample_default_edl_name(si->sample_id);
 
     sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
