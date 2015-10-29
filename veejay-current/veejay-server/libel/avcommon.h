@@ -9,5 +9,8 @@
 #ifndef PIX_FMT_YUVA422P
 #define PIX_FMT_YUVA422P AV_PIX_FMT_YUVA422P
 #endif
+#ifndef PIX_FMT_YUVA444P
+#define PIX_FMT_YUVA444P AV_PIX_FMT_YUVA444P
+#endif
 #endif
 #endif
