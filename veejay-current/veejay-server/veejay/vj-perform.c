@@ -75,6 +75,7 @@ typedef struct {
     uint8_t *P1;
     int	     ssm;
     char     padding[12];
+	int		 fx_id;
 } ycbcr_frame; //@ TODO: drop this structure and replace for veejay-next 's VJFrame
 
 typedef struct {
@@ -2233,13 +2234,14 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 	veejay_memset(&setup,0,sizeof(vjp_kf));
 	setup.ref = id;	
 
+	sample_eff_chain **chain = NULL;
+
 	switch( mode ) {
 		case VJ_PLAYBACK_MODE_SAMPLE:	
-
+			chain = sample_get_effect_chain( id );
 			for( n=0; n < SAMPLE_MAX_EFFECTS-1; n ++ ) {
-				sample_eff_chain *fx_entry = sample_get_effect_chain(id,n);
-
-				if( fx_entry == NULL || fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
+				sample_eff_chain *fx_entry = chain[n];
+				if( fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
 					continue;
 
 				int fx_id = fx_entry->effect_id;
@@ -2284,11 +2286,10 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 			}
 			break;
 		case VJ_PLAYBACK_MODE_TAG:
-
+			chain = vj_tag_get_effect_chain( id );
 			for( n=0; n < SAMPLE_MAX_EFFECTS; n ++ ) {
-				
-				sample_eff_chain *fx_entry = vj_tag_get_effect_chain( id, n );
-				if( fx_entry == NULL || fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
+				sample_eff_chain *fx_entry = chain[n];
+				if( fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
 					continue;
 				
 				int fx_id = fx_entry->effect_id;
@@ -2403,6 +2404,9 @@ static void	vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
 	}
 }
 
+
+static int clear_framebuffer__ = 0;
+
 static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
 {
 	int chain_entry;
@@ -2421,13 +2425,29 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
 	if(pvar_.fader_active)
 		vj_perform_pre_chain( info, frames[0] );
 
+	sample_eff_chain **chain = sample_get_effect_chain( info->uc->sample_id );
+	for( chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry ++ ) {
+		if( chain[chain_entry]->clear ) {
+			clear_framebuffer__ = 1;
+			if( frames[0]->stride[3] > 0 )
+				veejay_memset( frame_buffer[chain_entry]->alpha, 0, frames[0]->stride[3] * frames[0]->height );
+			chain[chain_entry]->clear = 0;
+		}
+	}
+
+	if(clear_framebuffer__ == 1)
+	{
+		if( frames[0]->stride[3] > 0 )
+			veejay_memset( frames[0]->data[3], 0, frames[0]->stride[3] * frames[0]->height );
+		clear_framebuffer__ = 0;
+	}
 
 	int subrender = sample_get_subrender(info->uc->sample_id);
 
 	for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
 	{
-		sample_eff_chain *fx_entry = sample_get_effect_chain( info->uc->sample_id, chain_entry );
-		if(fx_entry == NULL || fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
+		sample_eff_chain *fx_entry = chain[chain_entry];
+		if(fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
 			continue;
 
 		vj_perform_render_chain_entry(info, fx_entry, chain_entry, frames, subrender);
@@ -2455,16 +2475,33 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
 	if( pvar_.fader_active )
 		vj_perform_pre_chain( info, frames[0] );
 
+	sample_eff_chain **chain = vj_tag_get_effect_chain( info->uc->sample_id );
+	for( chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry ++ ) {
+		if( chain[chain_entry]->clear ) {
+			clear_framebuffer__ = 1;
+			if( frames[0]->stride[3] > 0 )
+				veejay_memset( frame_buffer[chain_entry]->alpha, 0, frames[0]->stride[3] * frames[0]->height );
+			chain[chain_entry]->clear = 0;
+		}
+	}
+
+	if(clear_framebuffer__ == 1)
+	{
+		if( frames[0]->stride[3] > 0 )
+			veejay_memset( frames[0]->data[3], 0, frames[0]->stride[3] * frames[0]->height );
+		clear_framebuffer__ = 0;
+	}
+
 	int subrender = vj_tag_get_subrender( info->uc->sample_id );
-					
 	for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
 	{
-		sample_eff_chain *fx_entry = vj_tag_get_effect_chain( info->uc->sample_id, chain_entry );
-		if(fx_entry==NULL || fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
+		sample_eff_chain *fx_entry = chain[chain_entry];
+		if(fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
 			continue;
 
 		vj_perform_tag_render_chain_entry( info, fx_entry, chain_entry, frames, subrender);
 	}
+
 	*hint444 = frames[0]->ssm;
 	
 	return 1;
@@ -3120,7 +3157,6 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 	}
 	MPEG_timecode_t tc;
 	char timecode[64];
-	char tmp[64];
 	char buf[256];
 	veejay_memset(&tc,0,sizeof(MPEG_timecode_t));
         y4m_ratio_t ratio = mpeg_conform_framerate( (double)info->current_edit_list->video_fps );

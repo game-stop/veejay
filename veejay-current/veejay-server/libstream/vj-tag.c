@@ -1347,12 +1347,12 @@ int	vj_tag_set_n_frames( int t1, int n )
   return 1;
 }
 
-sample_eff_chain	*vj_tag_get_effect_chain(int t1, int position)
+sample_eff_chain	**vj_tag_get_effect_chain(int t1)
 {
 	vj_tag * tag = vj_tag_get(t1);
 	if(tag == NULL)
 		return NULL;
-	return tag->effect_chain[position];
+	return tag->effect_chain;
 }
 
 int vj_tag_get_effect(int t1, int position)
@@ -1904,6 +1904,7 @@ int vj_tag_chain_free(int t1)
 			{
 				vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance);
 				tag->effect_chain[i]->fx_instance = NULL;
+				tag->effect_chain[i]->clear = 1;
 				if(tag->effect_chain[i]->kf)
 					vpf(tag->effect_chain[i]->kf );
 				tag->effect_chain[i]->kf = vpn(VEVO_ANONYMOUS_PORT );
@@ -2049,10 +2050,12 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 					if( frm == 1 ) {
 						vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
 						tag->effect_chain[position]->fx_instance = NULL;
+						tag->effect_chain[position]->clear = 1;
 					}
 			} else {
 					vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
 					tag->effect_chain[position]->fx_instance = NULL;
+					tag->effect_chain[position]->clear = 1;
 			}
 
 		}
@@ -2632,6 +2635,7 @@ int vj_tag_chain_remove(int t1, int index)
 		{
 			vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance );
 			tag->effect_chain[index]->fx_instance = NULL;
+			tag->effect_chain[index]->clear = 1;
 		}
     }
 

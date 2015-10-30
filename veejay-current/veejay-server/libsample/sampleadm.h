@@ -108,6 +108,7 @@ typedef struct sample_eff_t {
     int kf_status;	        /* use keyframed values */
     int kf_type;		/* store type used */
     void *fx_instance;		/* lib plugger instance */
+	int clear;
 } sample_eff_chain;
 
 
@@ -348,7 +349,7 @@ extern	int		sample_set_resume(int s1, long pos );
 
 extern void	sample_chain_alloc_kf( int s1, int entry );
 
-extern sample_eff_chain *sample_get_effect_chain(int s1, int position);
+extern sample_eff_chain **sample_get_effect_chain(int s1);
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);

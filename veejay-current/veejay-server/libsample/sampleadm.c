@@ -997,12 +997,12 @@ void sample_del_all(void *edl)
 
 	hash_free_nodes( SampleHash );
 }
-sample_eff_chain *sample_get_effect_chain(int s1, int position)
+sample_eff_chain **sample_get_effect_chain(int s1)
 {
 	sample_info *sample = sample_get(s1);
 	if(sample == NULL)
 		return NULL;
-	return sample->effect_chain[position];
+	return sample->effect_chain;
 }
 
 /****************************************************************************************************
@@ -1945,6 +1945,7 @@ int sample_chain_free(int s1)
 		{
 			vj_effect_deactivate(e_id, sample->effect_chain[i]->fx_instance);
 			sample->effect_chain[i]->fx_instance = NULL;
+			sample->effect_chain[i]->clear = 1;
 			sum++;
   		}
 		if( sample->effect_chain[i]->source_type == 1 && 
@@ -2084,10 +2085,12 @@ int sample_chain_add(int s1, int c, int effect_nr)
 			if( frm == 1 ) {
 				vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
 				sample->effect_chain[c]->fx_instance = NULL;
+				sample->effect_chain[c]->clear = 1;
 			}
 		} else {
 			vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
 			sample->effect_chain[c]->fx_instance = NULL;
+			sample->effect_chain[c]->clear = 1;
 		}
 	}
 	
@@ -2245,6 +2248,7 @@ int sample_chain_clear(int s1)
 		if(vj_effect_initialized( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance )) {
 			vj_effect_deactivate( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance ); 
 			sample->effect_chain[i]->fx_instance = NULL;
+			sample->effect_chain[i]->clear = 1;
 		}
 		
 	}
@@ -2364,6 +2368,7 @@ int sample_chain_remove(int s1, int position)
 	if(vj_effect_initialized( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance ) && _sample_can_free( sample, position, sample->effect_chain[position]->effect_id) ) { 
 		vj_effect_deactivate( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance);    
 		sample->effect_chain[position]->fx_instance = NULL;
+		sample->effect_chain[position]->clear = 1;
 	}
     }
     sample->effect_chain[position]->effect_id = -1;

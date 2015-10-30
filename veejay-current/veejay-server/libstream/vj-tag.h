@@ -169,7 +169,7 @@ int	vj_tag_verify_delete(int id, int type );
 /* return -1 if there is no effect or if it is disabled, otherwise a positive value */
 int 	vj_tag_get_effect(int t1, int position);
 
-sample_eff_chain *vj_tag_get_effect_chain(int t1, int position);
+sample_eff_chain **vj_tag_get_effect_chain(int t1);
 
 void	*vj_tag_get_plugin( int t1, int position, void *ptr );
 
