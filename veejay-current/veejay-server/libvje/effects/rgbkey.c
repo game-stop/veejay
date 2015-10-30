@@ -191,7 +191,7 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
 	    if (val < (noise_level * noise_level)) {
 			kbg = 255;
 			Y[pos] = bg_y[pos];
-			Cb[pos] = br_cb[pos];
+			Cb[pos] = bg_cb[pos];
 			Cr[pos] = bg_cr[pos];
 	    }
 		else {

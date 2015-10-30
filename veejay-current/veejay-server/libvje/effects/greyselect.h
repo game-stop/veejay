@@ -27,6 +27,6 @@
 vj_effect *greyselect_init();
 void greyselect_apply( VJFrame *frame, int width,
 		  int height, int i_angle, 
-		  int red, int green, int blue);
+		  int red, int green, int blue, int swap);
 void greyselect_free();
 #endif

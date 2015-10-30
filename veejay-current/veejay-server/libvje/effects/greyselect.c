@@ -28,7 +28,7 @@ vj_effect *greyselect_init(int w, int h)
 {
     vj_effect *ve;
     ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    ve->num_params = 5;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -36,6 +36,7 @@ vj_effect *greyselect_init(int w, int h)
     ve->defaults[1] = 255;	/* r */
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 0;	/* b */
+	ve->defaults[4] = 0;	/* swap */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 9000;
 
@@ -47,20 +48,24 @@ vj_effect *greyselect_init(int w, int h)
 
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
+
+	ve->limits[0][4] = 0;
+	ve->limits[1][4] = 1;
+
 	ve->has_user = 0;
     ve->parallel = 1;
 	ve->description = "Grayscale by Color Key (RGB)";
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-	ve->param_description = vje_build_param_list(ve->num_params,"Angle","Red","Green","Blue");
+	ve->param_description = vje_build_param_list(ve->num_params,"Angle","Red","Green","Blue", "Swap");
 
     return ve;
 }
 
 void greyselect_apply( VJFrame *frame, int width,
 		   int height, int i_angle, int r, int g,
-		   int b)
+		   int b, int swap)
 {
 
     uint8_t *fg_cb, *fg_cr;
@@ -91,24 +96,39 @@ void greyselect_apply( VJFrame *frame, int width,
 	
     tmp = 1 / kg1;
     one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = 0xf * (float) (_y) / kg1;
+    kfgy_scale = (int)(15.0f * (float) (_y) / kg1);
     kg = kg1;
 
     /* intialize pointers */
     fg_cb = Cb;
     fg_cr = Cr;
 
-    for (pos = (width * height); pos != 0; pos--) {
-	short xx, yy;
-	xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-	yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-	val = (xx * accept_angle_tg) >> 4;
+	if( swap == 0 ) {
+		for (pos = (width * height); pos != 0; pos--) {
+			short xx, yy;
+			xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
+			yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
+			val = (xx * accept_angle_tg) >> 4;
 
-	if (abs(yy) > val) {
-		Cb[pos]=128;
-		Cr[pos]=128;
+			if (abs(yy) > val) {
+				Cb[pos]=128;
+				Cr[pos]=128;
+			}
+		}
 	}
-    }
+	else {
+		for (pos = (width * height); pos != 0; pos--) {
+			short xx, yy;
+			xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
+			yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
+			val = (xx * accept_angle_tg) >> 4;
+
+			if (abs(yy) <= val) {
+				Cb[pos]=128;
+				Cr[pos]=128;
+			}
+		}
+	}
 }
 
 void greyselect_free(){}
