@@ -751,7 +751,9 @@ int	vj_el_get_file_fourcc(editlist *el, int num, char *fourcc)
 int	vj_el_bogus_length( editlist *el, long nframe )
 {
 	uint64_t n = 0;
-	
+	if(! el)
+		return 0;
+
 	if( !el->has_video || el->is_empty )
 		return 0;
 
