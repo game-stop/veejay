@@ -92,10 +92,11 @@ void isolate_apply( VJFrame *frame, int width,
     cb = 255 * (aa / tmp);
     cr = 255 * (bb / tmp);
     kg1 = tmp;
+   
     /* obtain coordinate system for cb / cr */
-    accept_angle_tg = 0xf * tan(M_PI * angle / 180.0);
-    accept_angle_ctg = 0xf / tan(M_PI * angle / 180.0);
-    
+    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
+    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
+ 
     tmp = 1 / kg1;
     one_over_kc = 0xff * 2 * tmp - 0xff;
     kfgy_scale = 0xf * (float) (_y) / kg1;

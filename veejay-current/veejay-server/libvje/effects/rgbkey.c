@@ -129,8 +129,8 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
     kg1 = tmp;
 
     /* obtain coordinate system for cb / cr */
-    accept_angle_tg = 0xf * tan(M_PI * angle / 180.0f);
-    accept_angle_ctg = 0xf / tan(M_PI * angle / 180.0f);
+    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
+    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
 
     tmp = 1 / kg1;
     one_over_kc = 0xff * 2 * tmp - 0xff;

@@ -36,7 +36,7 @@ vj_effect *chromapalette_init(int w, int h)
 	//angle,r,g,b,cbc,crc
 
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 900;
+    ve->limits[1][0] = 4500;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
@@ -50,7 +50,7 @@ vj_effect *chromapalette_init(int w, int h)
     ve->limits[0][5] = 0;
     ve->limits[1][5] = 255;	
 
-    ve->defaults[0] = 319;//angle
+    ve->defaults[0] = 3190;//angle
     ve->defaults[1] = 255;   //r
     ve->defaults[2] = 0;   //g
     ve->defaults[3] = 0; //b
@@ -87,27 +87,11 @@ static inline int _chroma_key( uint8_t fg_cb, uint8_t fg_cr, uint8_t cb, uint8_t
 	// see rgbkey.c 
 	short xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
 	short yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
-	int val;
+	int val = (xx * angle) >> 4;
 
-	if (xx < -128) {
-	    xx = -128;
-	}
-	else
-	if (xx > 127) {
-	    xx = 127;
-	}
-
-	if (yy < -128) {
-	    yy = -128;
-	}
-	else
-	if (yy > 127) {
-	    yy = 127;
-	}
-
-	val = (xx * angle) >> 4;
-
-	if( abs(yy) < val ) return 1;
+	if( abs(yy) < val ) 
+		return 1;
+	
 	return 0;
 }
 
@@ -132,11 +116,10 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 	const float bb = (const float) v;
 
     float tmp = sqrt(((aa * aa) + (bb * bb)));
-    const int colorKeycb = 127 * (aa / tmp);
-    const int colorKeycr = 127 * (bb / tmp);
-	float angle_f = (angle*0.1);
-    const int accept_angle = 0xf * tan(M_PI * angle_f / 180.0);
-
+    const int colorKeycb = 0xff * (aa / tmp);
+    const int colorKeycr = 0xff * (bb / tmp);
+	float angle_f = (angle*0.01f);
+    const int accept_angle = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
 	/*
 
 				chrominance is defined as the difference between a color and a reference value luminance
