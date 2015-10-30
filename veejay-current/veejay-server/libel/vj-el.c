@@ -1296,7 +1296,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 {
 	editlist *el = vj_calloc(sizeof(editlist));
 	FILE *fd;
-	char line[1024];
 	uint64_t index_list[MAX_EDIT_LIST_FILES];
 	int	num_list_files;
 	long i,nf=0;
@@ -1306,8 +1305,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	uint64_t n =0;
 	
 	int av_pixfmt = get_ffmpeg_pixfmt( out_format );
-	
-	veejay_memset(line,0,sizeof(line));
 	
 	if(!el) return NULL;
 
@@ -1341,25 +1338,35 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 			vj_el_free(el);
 			return NULL;
 		} 
-			fd = fopen(filename[nf], "r");
-			if (fd <= 0)
-			{
-			   	 veejay_msg(VEEJAY_MSG_ERROR,"Error opening %s:", filename[nf]);
-				 fclose(fd);
-				 vj_el_free(el);
-	 			 return NULL;
-			}
+	
+		char line[1024];
+		veejay_memset(line,0,sizeof(line));
+		fd = fopen(filename[nf], "r");
+		if (fd == NULL)
+		{
+		   	 veejay_msg(VEEJAY_MSG_DEBUG,"Error opening %s:", filename[nf]);
+			 fclose(fd);
+			 vj_el_free(el);
+			 return NULL;
+		}
 		
-			fgets(line, 1024, fd);
-			if (strcmp(line, "LAV Edit List\n") == 0)
-			{
-				   	/* Ok, it is a edit list */
-			    	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list %s opened", filename[nf]);
-			    	/* Read second line: Video norm */
-			    	fgets(line, 1024, fd);
-			    	if (line[0] != 'N' && line[0] != 'n' && line[0] != 'P' && line[0] != 'p' && line[0] != 's' && line[0] != 'S')
+		if( fgets(line, 1024, fd) == NULL )
+		{
+			fclose(fd);
+			veejay_msg(VEEJAY_MSG_DEBUG,"Error opening %s:", filename[nf]);
+			vj_el_free(el);
+	 		return NULL;
+		}
+
+		if (strcmp(line, "LAV Edit List\n") == 0)
+		{
+			   	/* Ok, it is a edit list */
+		    	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list %s opened", filename[nf]);
+		    	/* Read second line: Video norm */
+		    	fgets(line, 1024, fd);
+		    	if (line[0] != 'N' && line[0] != 'n' && line[0] != 'P' && line[0] != 'p' && line[0] != 's' && line[0] != 'S')
 				{
-					veejay_msg(VEEJAY_MSG_ERROR,"Edit list second line is not NTSC/PAL/SECAM");
+					veejay_msg(VEEJAY_MSG_DEBUG,"Edit list second line is not NTSC/PAL/SECAM");
 					fclose(fd);
 					vj_el_free(el);
 					return NULL;
@@ -1373,8 +1380,20 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 			    }
 
 		   	 	/* read third line: Number of files */
-		    		fgets(line, 1024, fd);
-		    		sscanf(line, "%d", &num_list_files);
+		    	if( fgets(line, 1024, fd) == NULL ) {
+					veejay_msg(VEEJAY_MSG_DEBUG, "Third line: cannot read number of files");
+					fclose(fd);
+					vj_el_free(el);
+					return NULL;
+
+				}
+		    	
+				if( sscanf(line, "%d", &num_list_files) != 1 ) {
+					veejay_msg(VEEJAY_MSG_DEBUG, "Parse error");
+					fclose(fd);
+					vj_el_free(el);
+					return NULL;
+				}
 
 		   	 	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list contains %d files", num_list_files);
 		   		/* read files */
@@ -1417,7 +1436,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 					{
 						el->frame_list[el->video_frames++] = EL_ENTRY(n, i);
 					}
-
 
 		   		 }
 	
