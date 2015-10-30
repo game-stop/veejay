@@ -116,9 +116,9 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 	const float bb = (const float) v;
 
     float tmp = sqrt(((aa * aa) + (bb * bb)));
-    const int colorKeycb = 0xff * (aa / tmp);
-    const int colorKeycr = 0xff * (bb / tmp);
-	float angle_f = (angle*0.01f);
+    const int colorKeycb = 127 * (aa / tmp);
+    const int colorKeycr = 127 * (bb / tmp);
+	float angle_f = ((float)angle*0.01f);
     const int accept_angle = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
 	/*
 
