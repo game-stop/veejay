@@ -190,11 +190,15 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
 	    val = (yy * yy) + (kg * kg);
 	    if (val < (noise_level * noise_level)) {
 			kbg = 255;
+			Y[pos] = bg_y[pos];
+			Cb[pos] = br_cb[pos];
+			Cr[pos] = bg_cr[pos];
 	    }
-
-	    Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	    Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
+		else {
+			Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
+			Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
+			Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
+			}
 	}
     }
 }
@@ -232,9 +236,10 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
     cr = 255 * (bb / tmp);
     kg1 = tmp;
 
-    /* obtain coordinate system for cb / cr */
-    accept_angle_tg = 0xf * tan(M_PI * angle / 180.0);
-    accept_angle_ctg = 0xf / tan(M_PI * angle / 180.0);
+	/* obtain coordinate system for cb / cr */
+    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
+    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
+
 
     tmp = 1 / kg1;
     one_over_kc = 0xff * 2 * tmp - 0xff;
