@@ -47,12 +47,10 @@ vj_effect *colormap_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
+	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Red","Green","Blue" );
     return ve;
 }
-
-static uint8_t u_[256];
-static uint8_t v_[256];
 
 void colormap_apply( VJFrame *frame, int width, int height, int r, int g, int b)
 {
@@ -62,27 +60,17 @@ void colormap_apply( VJFrame *frame, int width, int height, int r, int g, int b)
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 	int dummy = 0;
-	for(i = 1; i < 256; i ++ )
+	uint8_t u_[256];
+	uint8_t v_[256];
+
+	for(i = 1; i < 257; i ++ )
 	{
 		COLOR_rgb2yuv( (r % i),(g % i),(b % i), dummy, u_[i-1],v_[i-1]);
-
 	}
     
-    
-/*    for (i = 0; i < len; i++) {
-	*(Y) = val - *(Y);
-	*(Y)++;
-    }*/
-
-    for (i = 0; i < len; i++) {
-//	*(Cb) = val - *(Cb);
-  //      *(Cb)++;
-    //    *(Cr) = val - *(Cr);
-//	*(Cr)++;
-	*(Cb) = u_[ (*Y) ];
-	*(Cr) = v_[ (*Y) ];	
-	*(Cb)++;
-	*(Cr)++;
-	*(Y)++;
-    }
+    for (i = 0; i < len; i++)
+	{
+		Cb[i] = u_[ Y[i] ];
+		Cr[i] = v_[ Y[i] ];
+	}
 }
