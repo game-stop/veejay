@@ -36,7 +36,7 @@ vj_effect *isolate_init(int w, int h)
     ve->defaults[1] = 0;	/* r */
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 255;	/* b */
-    ve->defaults[4] = 150;	/* white transparency */
+    ve->defaults[4] = 150;	/* white value */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 9000;
 
@@ -53,7 +53,7 @@ vj_effect *isolate_init(int w, int h)
     ve->limits[1][4] = 255;
 	ve->has_user = 0;
 	ve->parallel = 1;
-	ve->description = "Isolate Color (RGB)";
+	ve->description = "Isolate by Color Key";
     ve->extra_frame = 0;
     ve->sub_format = 1;
 	ve->rgb_conv = 1;
@@ -71,7 +71,7 @@ void isolate_apply( VJFrame *frame, int width,
     uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
+    int kg;
     int cb, cr;
     float kg1, tmp, aa = 255, bb = 255, _y = 0;
     float angle = (float) i_angle / 100.0f;
@@ -99,7 +99,6 @@ void isolate_apply( VJFrame *frame, int width,
  
     tmp = 1 / kg1;
     one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = 0xf * (float) (_y) / kg1;
     kg = kg1;
 
     /* intialize pointers */
@@ -112,21 +111,21 @@ void isolate_apply( VJFrame *frame, int width,
     bg_cr = Cr;
 
     for (pos = (width * height); pos != 0; pos--) {
-	short xx, yy;
-	xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-	yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-	val = (xx * accept_angle_tg) >> 4;
+		short xx, yy;
+		xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
+		yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
+		val = (xx * accept_angle_tg) >> 4;
 
-	if (abs(yy) > val) {
-		Y[pos]=pixel_Y_lo_;
-		Cb[pos]=128;
-		Cr[pos]=128;
-	}
-	else {
-		Y[pos] = (op0 * Y[pos] + (op1 * pixel_Y_lo_)) / 255;
-		Cb[pos] = (op0 * Cb[pos] + (op1 * 128)) / 255;
-		Cr[pos] = (op0 * Cr[pos] + (op1 * 128)) / 255;
-	}
+		if (abs(yy) >= val) {
+			Y[pos]=opacity;
+			Cb[pos]=128;
+			Cr[pos]=128;
+		}
+		else {
+			Y[pos] = pixel_Y_lo_;
+			Cb[pos] = 128;
+			Cr[pos] = 128;
+		}
     }
 }
 
