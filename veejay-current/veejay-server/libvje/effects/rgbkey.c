@@ -56,7 +56,7 @@ vj_effect *rgbkey_init(int w,int h)
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 255;	/* b */
     ve->defaults[4] = 1;	/* type */
-    ve->defaults[5] = 3500;	/* noise */
+    ve->defaults[5] = 1200;	/* noise */
 
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 9000;
@@ -73,7 +73,7 @@ vj_effect *rgbkey_init(int w,int h)
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 1;	/* total noise suppression off */
 
-    ve->limits[0][5] = 1;
+    ve->limits[0][5] = 0;
     ve->limits[1][5] = 5500;
 
 	ve->param_description = vje_build_param_list(ve->num_params, "Angle", "Red", "Green", "Blue", "Mode", "Noise suppression");
