@@ -3483,15 +3483,13 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	}
 
 	if (info->uc->take_bg==1)
-    	{
-        	vj_perform_take_bg(info,frame,1);
-        	info->uc->take_bg = 0;
-    	} 
+   	{
+       	vj_perform_take_bg(info,frame,1);
+       	info->uc->take_bg = 0;
+   	} 
 	
 	if( frame2->data[0] == frame->data[0] )
 		frame->ssm = 0;
-
-
 }
 
 static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settings )
@@ -3527,31 +3525,10 @@ static	void	vj_perform_record_frame( veejay_t *info )
 	if( info->seq->active && info->seq->rec_id && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE  )		
 		which_sample = info->seq->rec_id;
 
-	if(frame->ssm == 1)
-	{ 
-		video_playback_setup *settings = info->settings;
-		uint8_t *dst[3] = { NULL, primary_buffer[3]->Cb,
-					  primary_buffer[3]->Cr };
-		chroma_subsample_cp( settings->sample_mode, frame,  frame->data,dst );
-		uint8_t *chroma[2] = { primary_buffer[0]->Cb, primary_buffer[0]->Cr };
-		primary_buffer[0]->Cb = dst[1];
-		primary_buffer[0]->Cr = dst[2];
-
-		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
-			vj_perform_record_tag_frame(info);
-		else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
-			vj_perform_record_sample_frame(info, which_sample );
-
-		primary_buffer[0]->Cb = chroma[0];
-		primary_buffer[0]->Cr = chroma[1];
-	}
-	else
-	{
-		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
-			vj_perform_record_tag_frame(info);
-		else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
-			vj_perform_record_sample_frame(info, which_sample );
-	}
+	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
+		vj_perform_record_tag_frame(info);
+	else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+		vj_perform_record_sample_frame(info, which_sample );
 }
 
 static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings )
