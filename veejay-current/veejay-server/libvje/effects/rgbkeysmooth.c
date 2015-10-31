@@ -35,7 +35,7 @@ vj_effect *rgbkeysmooth_init(int w,int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 4500;	/* angle */
+    ve->defaults[0] = 1200;	/* angle */
     ve->defaults[1] = 0;	/* r */
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 255;	/* b */
