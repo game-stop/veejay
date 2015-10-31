@@ -2223,11 +2223,16 @@ int vj_tag_get_all_effect_args(int t1, int position, int *args,
 	{
 		for( i =0;i <arg_len; i ++ )
 		{
-			int tmp = 0;
-			if(!get_keyframe_value( tag->effect_chain[position]->kf, n_frame, i ,&tmp ) )
-				args[i] = tag->effect_chain[position]->arg[i];
+			if( tag->effect_chain[position]->kf_status) {
+				int tmp = 0;
+				if(!get_keyframe_value( tag->effect_chain[position]->kf, n_frame, i ,&tmp ) )
+					args[i] = tag->effect_chain[position]->arg[i];
+				else {
+					args[i] = tmp;
+				}
+			}
 			else {
-				args[i] = tmp;
+				args[i] = tag->effect_chain[position]->arg[i];
 			}
 		}
 	}

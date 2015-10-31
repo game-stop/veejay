@@ -1310,12 +1310,17 @@ int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int 
     {
 	 for( i = 0; i < arg_len; i ++ )
 	 {
-		int tmp = 0;
-		if(!get_keyframe_value( sample->effect_chain[position]->kf, n_frame, i, &tmp ) ) {
-			args[i] = sample->effect_chain[position]->arg[i];
+		if( sample->effect_chain[position]->kf_status ) {
+			int tmp = 0;
+			if(!get_keyframe_value( sample->effect_chain[position]->kf, n_frame, i, &tmp ) ) {
+				args[i] = sample->effect_chain[position]->arg[i];
+			}
+			else {
+				args[i] = tmp;
+			}
 		}
 		else {
-			args[i] = tmp;
+			args[i] = sample->effect_chain[position]->arg[i];
 		}
 	 }
     }
