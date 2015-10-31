@@ -869,8 +869,8 @@
                                                 <property name="label" translatable="yes">Average</property>
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-												<property name="has_default">True</property>
-												<property name="can_default">True</property>
+                                                <property name="can_default">True</property>
+                                                <property name="has_default">True</property>
                                                 <property name="receives_default">False</property>
                                                 <property name="use_underline">True</property>
                                                 <property name="active">True</property>
@@ -3666,7 +3666,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <child>
-                              <widget class="GtkHBox" id="hbox849">
+                              <widget class="GtkHBox" id="fxanimcontrols">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <child>
@@ -3782,8 +3782,8 @@
                                         <property name="fill">True</property>
                                         <property name="position">2</property>
                                       </packing>
-								  </child>
-								  <child>
+                                    </child>
+                                    <child>
                                       <widget class="GtkButton" id="curve_clear_parameter">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
@@ -3791,7 +3791,7 @@
                                         <property name="tooltip" translatable="yes">Clear selected parameter</property>
                                         <signal name="clicked" handler="on_curve_clear_parameter_clicked" />
                                         <child>
-                                          <widget class="GtkImage" id="image2521">
+                                          <widget class="GtkImage" id="image17">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
                                             <property name="pixbuf">icon_clear.png</property>
@@ -3803,8 +3803,7 @@
                                         <property name="fill">True</property>
                                         <property name="position">3</property>
                                       </packing>
-								  </child>
-
+                                    </child>
                                   </widget>
                                   <packing>
                                     <property name="expand">True</property>
@@ -3827,109 +3826,20 @@
                                   <widget class="GtkTable" id="table88">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
-                                    <property name="n_columns">8</property>
+                                    <property name="n_columns">9</property>
                                     <child>
-                                      <widget class="GtkRadioButton" id="kf_p0">
-                                        <property name="label" translatable="yes">0</property>
+                                      <widget class="GtkRadioButton" id="kf_none">
+                                        <property name="label" translatable="yes">None</property>
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
                                         <property name="receives_default">False</property>
+                                        <property name="relief">half</property>
                                         <property name="use_underline">True</property>
-                                        <property name="active">True</property>
+                                        <property name="yalign">0.47999998927116394</property>
                                         <property name="draw_indicator">True</property>
-                                        <signal name="toggled" handler="on_kf_p0_toggled" />
+                                        <signal name="toggled" handler="on_kf_none_toggled" />
                                       </widget>
                                       <packing>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <widget class="GtkRadioButton" id="kf_p2">
-                                        <property name="label" translatable="yes">2</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
-                                        <signal name="toggled" handler="on_kf_p2_toggled" />
-                                      </widget>
-                                      <packing>
-                                        <property name="left_attach">2</property>
-                                        <property name="right_attach">3</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <widget class="GtkRadioButton" id="kf_p3">
-                                        <property name="label" translatable="yes">3</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
-                                        <signal name="toggled" handler="on_kf_p3_toggled" />
-                                      </widget>
-                                      <packing>
-                                        <property name="left_attach">3</property>
-                                        <property name="right_attach">4</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <widget class="GtkRadioButton" id="kf_p4">
-                                        <property name="label" translatable="yes">4</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
-                                        <signal name="toggled" handler="on_kf_p4_toggled" />
-                                      </widget>
-                                      <packing>
-                                        <property name="left_attach">4</property>
-                                        <property name="right_attach">5</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <widget class="GtkRadioButton" id="kf_p5">
-                                        <property name="label" translatable="yes">5</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
-                                        <signal name="toggled" handler="on_kf_p5_toggled" />
-                                      </widget>
-                                      <packing>
-                                        <property name="left_attach">5</property>
-                                        <property name="right_attach">6</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <widget class="GtkRadioButton" id="kf_p6">
-                                        <property name="label" translatable="yes">6</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
-                                        <signal name="toggled" handler="on_kf_p6_toggled" />
-                                      </widget>
-                                      <packing>
-                                        <property name="left_attach">6</property>
-                                        <property name="right_attach">7</property>
                                         <property name="x_options"/>
                                         <property name="y_options"/>
                                       </packing>
@@ -3942,12 +3852,102 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="toggled" handler="on_kf_p7_toggled" />
+                                      </widget>
+                                      <packing>
+                                        <property name="left_attach">8</property>
+                                        <property name="right_attach">9</property>
+                                        <property name="x_options"/>
+                                        <property name="y_options"/>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <widget class="GtkRadioButton" id="kf_p6">
+                                        <property name="label" translatable="yes">6</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="use_underline">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">kf_none</property>
+                                        <signal name="toggled" handler="on_kf_p6_toggled" />
                                       </widget>
                                       <packing>
                                         <property name="left_attach">7</property>
                                         <property name="right_attach">8</property>
+                                        <property name="x_options"/>
+                                        <property name="y_options"/>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <widget class="GtkRadioButton" id="kf_p5">
+                                        <property name="label" translatable="yes">5</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="use_underline">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">kf_none</property>
+                                        <signal name="toggled" handler="on_kf_p5_toggled" />
+                                      </widget>
+                                      <packing>
+                                        <property name="left_attach">6</property>
+                                        <property name="right_attach">7</property>
+                                        <property name="x_options"/>
+                                        <property name="y_options"/>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <widget class="GtkRadioButton" id="kf_p4">
+                                        <property name="label" translatable="yes">4</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="use_underline">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">kf_none</property>
+                                        <signal name="toggled" handler="on_kf_p4_toggled" />
+                                      </widget>
+                                      <packing>
+                                        <property name="left_attach">5</property>
+                                        <property name="right_attach">6</property>
+                                        <property name="x_options"/>
+                                        <property name="y_options"/>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <widget class="GtkRadioButton" id="kf_p3">
+                                        <property name="label" translatable="yes">3</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="use_underline">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">kf_none</property>
+                                        <signal name="toggled" handler="on_kf_p3_toggled" />
+                                      </widget>
+                                      <packing>
+                                        <property name="left_attach">4</property>
+                                        <property name="right_attach">5</property>
+                                        <property name="x_options"/>
+                                        <property name="y_options"/>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <widget class="GtkRadioButton" id="kf_p2">
+                                        <property name="label" translatable="yes">2</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="use_underline">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">kf_none</property>
+                                        <signal name="toggled" handler="on_kf_p2_toggled" />
+                                      </widget>
+                                      <packing>
+                                        <property name="left_attach">3</property>
+                                        <property name="right_attach">4</property>
                                         <property name="x_options"/>
                                         <property name="y_options"/>
                                       </packing>
@@ -3960,8 +3960,26 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="toggled" handler="on_kf_p1_toggled" />
+                                      </widget>
+                                      <packing>
+                                        <property name="left_attach">2</property>
+                                        <property name="right_attach">3</property>
+                                        <property name="x_options"/>
+                                        <property name="y_options"/>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <widget class="GtkRadioButton" id="kf_p0">
+                                        <property name="label" translatable="yes">0</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="use_underline">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">kf_none</property>
+                                        <signal name="toggled" handler="on_kf_p0_toggled" />
                                       </widget>
                                       <packing>
                                         <property name="left_attach">1</property>
@@ -3982,7 +4000,10 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
                                     <property name="n_columns">8</property>
-								    <child>
+                                    <child>
+                                      <placeholder/>
+                                    </child>
+                                    <child>
                                       <widget class="GtkRadioButton" id="kf_p8">
                                         <property name="label" translatable="yes">8</property>
                                         <property name="visible">True</property>
@@ -3990,14 +4011,14 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                       </widget>
                                       <packing>
                                         <property name="x_options"/>
                                         <property name="y_options"/>
                                       </packing>
-                                    </child>  
-									<child>
+                                    </child>
+                                    <child>
                                       <widget class="GtkRadioButton" id="kf_p9">
                                         <property name="label" translatable="yes">9</property>
                                         <property name="visible">True</property>
@@ -4005,7 +4026,7 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="group_changed" handler="on_kf_p9_toggled" />
                                       </widget>
                                       <packing>
@@ -4023,7 +4044,7 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="group_changed" handler="on_kf_p10_toggled" />
                                       </widget>
                                       <packing>
@@ -4041,7 +4062,7 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="group_changed" handler="on_kf_p11_toggled" />
                                       </widget>
                                       <packing>
@@ -4059,7 +4080,7 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="group_changed" handler="on_kf_p12_toggled" />
                                       </widget>
                                       <packing>
@@ -4077,7 +4098,7 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="group_changed" handler="on_kf_p13_toggled" />
                                       </widget>
                                       <packing>
@@ -4095,7 +4116,7 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="group_changed" handler="on_kf_p14_toggled" />
                                       </widget>
                                       <packing>
@@ -4113,17 +4134,16 @@
                                         <property name="receives_default">False</property>
                                         <property name="use_underline">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <property name="group">kf_p0</property>
+                                        <property name="group">kf_none</property>
                                         <signal name="group_changed" handler="on_kf_p15_toggled" />
                                       </widget>
                                       <packing>
-                                        <property name="left_attach">1</property>
-                                        <property name="right_attach">2</property>
+                                        <property name="left_attach">8</property>
+                                        <property name="right_attach">9</property>
                                         <property name="x_options"/>
                                         <property name="y_options"/>
                                       </packing>
                                     </child>
-                              
                                   </widget>
                                   <packing>
                                     <property name="expand">True</property>
@@ -8325,8 +8345,8 @@ YUV (current)</property>
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <property name="has_palette">True</property>
-								<property name="has_opacity_control">True</property>
-								<property name="current_color">#000000000000</property>
+                                <property name="has_opacity_control">True</property>
+                                <property name="current_color">#000000000000</property>
                                 <signal name="color_changed" handler="on_colorselection_color_changed" />
                               </widget>
                               <packing>
@@ -8866,7 +8886,7 @@ YUV (current)</property>
               </widget>
               <packing>
                 <property name="expand">True</property>
-				<property name="fill">True</property>
+                <property name="fill">True</property>
                 <property name="position">0</property>
               </packing>
             </child>
@@ -10611,6 +10631,27 @@ YUV (current)</property>
                                               </packing>
                                             </child>
                                             <child>
+                                              <widget class="GtkButton" id="toggle_subrender">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="receives_default">False</property>
+                                                <property name="tooltip" translatable="yes">Toggle rendering of FX chain on mixing sources</property>
+                                                <signal name="clicked" handler="toggle_subrender_clicked" />
+                                                <child>
+                                                  <widget class="GtkImage" id="image18">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">False</property>
+                                                    <property name="pixbuf">icon_render.png</property>
+                                                  </widget>
+                                                </child>
+                                              </widget>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">6</property>
+                                              </packing>
+                                            </child>
+                                            <child>
                                               <widget class="GtkButton" id="button_fx_clearchain">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
@@ -10630,27 +10671,6 @@ YUV (current)</property>
                                                 <property name="fill">False</property>
                                                 <property name="padding">60</property>
                                                 <property name="position">7</property>
-                                              </packing>
-										  </child>
-										  <child>
-                                              <widget class="GtkButton" id="toggle_subrender">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="receives_default">False</property>
-                                                <property name="tooltip" translatable="yes">Toggle rendering of FX chain on mixing sources</property>
-                                                <signal name="clicked" handler="toggle_subrender_clicked" />
-                                                <child>
-                                                  <widget class="GtkImage" id="image591">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">False</property>
-                                                    <property name="pixbuf">icon_render.png</property>
-                                                  </widget>
-                                                </child>
-                                              </widget>
-                                              <packing>
-                                                <property name="expand">False</property>
-                                                <property name="fill">False</property>
-                                                <property name="position">6</property>
                                               </packing>
                                             </child>
                                           </widget>
@@ -12544,6 +12564,24 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>

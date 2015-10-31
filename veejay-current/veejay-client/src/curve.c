@@ -24,9 +24,6 @@
 #include <src/vj-api.h>
 #include <stdlib.h>
 #include "curve.h"
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 void	get_points_from_curve( GtkWidget *curve, int len, float *vec )
 {
 	gtk_curve_get_vector( GTK_CURVE(curve), len, vec );
@@ -53,13 +50,9 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	int len = end - start;
 	int i;
 	int min = 0, max = 0;
-#ifdef STRICT_CHECKING
-	assert( fx_entry == entry );
-#endif
 
 	if(n != 5 || len <= 0 )	
 	{
-		veejay_msg(0, "Error parsing FX Anim KF header");
 		return -1;
 	}
 
@@ -77,8 +70,6 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
 		float top = 1.0 / (float) max;
 		float val = ( (float)value * top );
-
-		veejay_msg(4, "Load FX Anim position %d, value %f", i, val );
 
 		vec[k] = val;
 		k++;

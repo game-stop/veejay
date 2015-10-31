@@ -164,9 +164,9 @@ enum
 	ENTRY_ISVIDEO = 1,
 	ENTRY_NUM_PARAMETERS = 2,
 	ENTRY_KF_TYPE = 3,
-	ENTRY_KF_STATUS = 4,
-	ENTRY_KF_START = 5,
-	ENTRY_KF_END = 6,
+	ENTRY_KF_START = 4,
+	ENTRY_KF_END = 5,
+	ENTRY_KF_STATUS = 6,
 	ENTRY_SOURCE = 7,
 	ENTRY_CHANNEL = 8,
 	ENTRY_VIDEO_ENABLED = 9,
@@ -185,8 +185,8 @@ enum
 	ENTRY_P12 = 22,
 	ENTRY_P13 = 23,
 	ENTRY_P14 = 24,
-	ENTRY_P15 = 25,
-	ENTRY_LAST = 26
+	ENTRY_P15 = 26,
+	ENTRY_LAST = 27
 };
 
 #define ENTRY_PARAMSET ENTRY_P0
@@ -571,7 +571,7 @@ void	msg_vims(char *message);
 static  void    multi_vims(int id, const char format[],...);
 static  void 	single_vims(int id);
 static	gdouble	get_numd(const char *name);
-static void	vj_kf_select_parameter(int id);
+static  void	vj_kf_select_parameter(int id);
 static  int     get_nums(const char *name);
 static  gchar   *get_text(const char *name);
 static	void	put_text(const char *name, char *text);
@@ -658,6 +658,9 @@ static	void set_textview_buffer(const char *name, gchar *utf8text);
 void	interrupt_cb();
 int	get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf	*vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
+static	void	vj_kf_refresh();
+static	void	vj_kf_reset();
+static	int		vj_kf_is_displayed();
 
 void reset_cali_images( int type, char *wid_name );
 
@@ -682,18 +685,12 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 }
 void		gtk_notebook_set_current_page__( GtkWidget *w, gint num, const char *f, int line )
 {
-#ifdef STRICT_CHECKING
-	veejay_msg(0, "%s: %d from %s:%d", __FUNCTION__, num,f,line);
-#endif
 	gtk_notebook_set_current_page( GTK_NOTEBOOK(w), num );
 }
 
 
 void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *f, int line )
 {
-#ifdef STRICT_CHECKING
-//	veejay_msg(0, "%s: %dx%d from %s:%d", __FUNCTION__, iw,h,f,line);
-#endif
 	gtk_widget_set_size_request(w, iw, h );
 }
 
@@ -2295,19 +2292,35 @@ static	int	get_slider_val(const char *name)
 	return ((gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value); 
 }
 
-static	void	vj_kf_refresh()
+static void		vj_kf_reset()
 {
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
 
 	reset_curve( curve );
+	set_toggle_button( "curve_toggleentry", 0 );
+	update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
+}
 
-	update_curve_accessibility("curve");
-	update_curve_widget("curve");
+static	int		vj_kf_is_displayed()
+{
+	GtkWidget *ww = glade_xml_get_widget_( info->main_window, crappy_design[ui_skin_].name );
+	int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
+	if(deckpage == 1)
+		return 1;
+	return 0;
+}
+
+static	void	vj_kf_refresh()
+{
 	int	*entry_tokens = &(info->uc.entry_tokens[0]);
-
-	gchar *name = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],info->uc.selected_parameter_id));
-	update_label_str( "curve_parameter", name );
-	g_free(name);
+	if( entry_tokens[ENTRY_FXID] > 0 ) {
+		enable_widget( "frame_fxtree3" );
+	}
+	else {
+		set_toggle_button( "curve_toggleentry", 0 );
+		disable_widget( "frame_fxtree3" );
+		vj_kf_reset();
+	}
 }
 
 static	void	vj_kf_select_parameter(int num)
@@ -2318,10 +2331,18 @@ static	void	vj_kf_select_parameter(int num)
 		update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
 		return;
 	}
+	int	*entry_tokens = &(info->uc.entry_tokens[0]);
 
 	info->uc.selected_parameter_id = num;
 
-	vj_kf_refresh();
+	gchar *name = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],info->uc.selected_parameter_id));
+	update_label_str( "curve_parameter", name );
+	g_free(name);
+	set_toggle_button( "curve_toggleentry", entry_tokens[ENTRY_KF_STATUS]); 
+
+	reset_curve( glade_xml_get_widget_(info->main_window, "curve"));
+	
+	update_curve_widget("curve");
 }
 
 static  void	update_curve_widget(const char *name)
@@ -2334,6 +2355,7 @@ static  void	update_curve_widget(const char *name)
 	int blen = 0;
 	int lo = 0, hi = 0, curve_type=0;
 	int p = -1;
+
 	multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
 
 	unsigned char *blob = (unsigned char*) recv_vims( 8, &blen );
@@ -2342,9 +2364,6 @@ static  void	update_curve_widget(const char *name)
 		p = set_points_in_curve_ext( curve, blob,id,i, &lo,&hi, &curve_type );
 		if( p >= 0 )
 		{
-			char but[25];
-			sprintf(but, "kf_p%d", p);
-			set_toggle_button( but, 1 );
 			info->uc.selected_parameter_id = p;
 			switch( curve_type ) {
 				case GTK_CURVE_TYPE_SPLINE: set_toggle_button( "curve_typespline", 1 );break;
@@ -2826,9 +2845,8 @@ static  GdkPixbuf	*update_pixmap_kf( int status )
 {
 	char path[MAX_PATH_LEN];
 	char filename[MAX_PATH_LEN];
-	veejay_memset( filename, 0,sizeof(filename));
 
-	sprintf(filename, "fx_entry_%s.png", ( status == 1 ? "on" : "off" ));
+	snprintf(filename,sizeof(filename), "fx_entry_%s.png", ( status == 1 ? "on" : "off" ));
 	get_gd(path,NULL, filename);
 		
 	GError *error = NULL;
@@ -2841,9 +2859,8 @@ static  GdkPixbuf	*update_pixmap_entry( int status )
 {
 	char path[MAX_PATH_LEN];
 	char filename[MAX_PATH_LEN];
-	veejay_memset( filename,0,sizeof(filename));
 
-	sprintf(filename, "fx_entry_%s.png", ( status == 1 ? "on" : "off" ));
+	snprintf(filename,sizeof(filename), "fx_entry_%s.png", ( status == 1 ? "on" : "off" ));
 	get_gd(path,NULL, filename);
 
 	GError *error = NULL;
@@ -2885,9 +2902,8 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 				snprintf(tmp,sizeof(tmp),"%s"," ");
 			}
 			gchar *mixing = _utf8str(tmp);
-			int on = gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED];
 			GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
-			GdkPixbuf *kf_toggle = update_pixmap_kf( on );
+			GdkPixbuf *kf_toggle = update_pixmap_kf( gui->uc.entry_tokens[ENTRY_KF_STATUS] );
 			gtk_list_store_set( GTK_LIST_STORE(model),iter,
 				FXC_ID, entry,
 				FXC_FXID, descr,
@@ -2930,16 +2946,18 @@ static	void	update_record_tab(int pm)
 	}
 }
 
+
 static void	update_current_slot(int *history, int pm, int last_pm)
 {
 	gint update = 0;
+	gint fx_anim = 0;
 
 	if( pm != last_pm || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
 	{
 		int k;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
 		info->uc.reload_hint[HINT_CHAIN] = 1;
-		info->uc.reload_hint[HINT_KF] = 1;
+		
 		update = 1;
 		update_record_tab( pm );
 
@@ -2973,8 +2991,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		put_text( "entry_samplename", "" );
 		set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
 
-		//HERE
-
+		fx_anim = 1;
 	}
 	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
 		info->uc.reload_hint[HINT_ENTRY] == 1 )
@@ -2984,7 +3001,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			info->uc.selected_chain_entry = 0;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
 		load_parameter_info();
-		info->uc.reload_hint[HINT_KF]  = 1;
+		fx_anim = 1;
 	}
 
 	/* Actions for stream */
@@ -3006,7 +3023,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		char *time = format_time( info->status_frame,(double)info->el.fps );
 		update_label_str( "label_curtime", time );
 		free(time); 
-
+		fx_anim = 1;
 		update_label_str( "playhint", "Streaming");
 	}
 
@@ -3014,6 +3031,9 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm) && pm == MODE_SAMPLE )
 	{
 		int marker_go = 0;
+		
+		fx_anim = 1;
+
 		/* Update marker bounds */
 		if( (history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START]) )
 		{
@@ -3147,7 +3167,6 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			update_spin_range( "spin_text_start", 0, n_frames ,0);
 			update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
-			info->uc.reload_hint[HINT_KF] = 1;
 		}
 	}
 
@@ -3159,6 +3178,10 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		update_slider_value( "manualopacity", val,0 );
 	}
 
+	if( fx_anim ) {
+		set_toggle_button("kf_none",1);
+		reset_curve(glade_xml_get_widget(info->main_window, "curve"));
+	}
 }
 
 
@@ -3458,7 +3481,6 @@ on_dev_edited (GtkCellRendererText *celltext,
                 g_warning("in %s: problem converting string '%s' into float.\n", __FUNCTION__, new_text);
 
         gtk_list_store_set(GTK_LIST_STORE(model), &iter, V4L_SPINBOX, newval, -1);
-	
 }
 
 
@@ -3634,7 +3656,7 @@ static	gint load_parameter_info()
 		disable_widget( "rgbkey");
 		info->uc.selected_rgbkey = 0;
 	}	 
-		
+
 	set_toggle_button( "curve_toggleentry", p[ENTRY_KF_STATUS] );
 
 	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
@@ -3675,7 +3697,6 @@ static	void	load_effectchain_info()
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 	GtkListStore *store;
 	gchar toggle[4];
-	gchar kf_toggle[4];
 	guint arr[6];	
 	GtkTreeIter iter;
 	gint offset=0;
@@ -3708,17 +3729,16 @@ static	void	load_effectchain_info()
 
 	while( offset < fxlen )
 	{
-		veejay_memset(toggle,0,sizeof(toggle));
-		veejay_memset(kf_toggle,0,sizeof(kf_toggle));
-		veejay_memset(arr,0,sizeof(arr));
 		char line[12];
+		veejay_memset(arr,0,sizeof(arr));
 		veejay_memset(line,0,sizeof(line));
+		
 		strncpy( line, fxtext + offset, 8 );
 		sscanf( line, "%02d%03d%1d%1d%1d",
 			&arr[0],&arr[1],&arr[2],&arr[3],&arr[4]);
 
 		char *name = _effect_get_description( arr[1] );
-		sprintf(toggle,"%s",arr[3] == 1 ? "on" : "off" );
+		snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
 
 		while( last_index < arr[0] )
 		{
@@ -3740,21 +3760,20 @@ static	void	load_effectchain_info()
 			}
 			gchar *mixing = _utf8str(tmp);
 
-			int on = info->uc.entry_tokens[ENTRY_VIDEO_ENABLED];
 			gtk_list_store_append( store, &iter );
-			GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
-			GdkPixbuf *kf_toggle = update_pixmap_kf( on );
+			GdkPixbuf *toggle = update_pixmap_entry( info->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
+			GdkPixbuf *kf_togglepf = update_pixmap_kf( info->uc.entry_tokens[ENTRY_KF_STATUS] );
 			gtk_list_store_set( store, &iter,
 				FXC_ID, arr[0],
 				FXC_FXID, utf8_name,
 				FXC_FXSTATUS, toggle,
-				FXC_KF, kf_toggle,
+				FXC_KF, kf_togglepf,
 			    FXC_MIXING,mixing,	-1 );
 			last_index ++;
 			g_free(utf8_name);
 			g_free(mixing);
 			g_object_unref( toggle );
-			g_object_unref( kf_toggle );
+			g_object_unref( kf_togglepf );
 		}
 		offset += 8;
 	}
@@ -6057,7 +6076,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 
 	if( pm != MODE_PLAIN ) {
         GtkWidget *ww = glade_xml_get_widget_( info->main_window, crappy_design[ui_skin_].name );
-        int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
+		int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( ww ));
 		if(deckpage != 1) {		
 			if( (reload_entry_tick_ % ((int)info->el.fps/2))==0) {
 				info->uc.reload_hint[HINT_ENTRY] = 1;	

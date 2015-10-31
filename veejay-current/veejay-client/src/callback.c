@@ -585,7 +585,8 @@ info->parameter_lock = 0;\
 
 #define kf_changed( arg_num ) \
 {\
-if(!info->status_lock && arg_num != info->uc.selected_parameter_id)\
+enable_widget("fxanimcontrols");\
+if(arg_num != info->uc.selected_parameter_id)\
 {\
 vj_kf_select_parameter(arg_num);\
 }\
@@ -2201,14 +2202,22 @@ void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
 
 void	on_curve_clear_parameter_clicked( GtkWidget *widget, gpointer user_data ) 
 {
+	if( info->uc.selected_parameter_id == -1 )
+		return;
 	multi_vims( VIMS_SAMPLE_KF_CLEAR, "%d %d", info->uc.selected_chain_entry, info->uc.selected_parameter_id  );
-	info->uc.reload_hint[HINT_KF] = 1;
+	reset_curve(  glade_xml_get_widget_(info->main_window, "curve") );
 }
 
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 {
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
+
+	if( j == -1 ) {
+		vj_msg(VEEJAY_MSG_INFO,"No parameter selected for animation");
+		return;
+	}
+
 	int id = info->uc.entry_tokens[ENTRY_FXID];
 
 	int end = get_nums( "curve_spinend" );
@@ -2272,6 +2281,9 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 				
 	free(buf);
 	free(data);
+
+
+	 info->uc.reload_hint[HINT_KF] = 1;
 }
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
@@ -2280,8 +2292,8 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 	if( id < 0 )
 		id = 0;
 	int i = info->uc.selected_chain_entry;
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-	reset_curve( curve ); 
+//	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+	vj_kf_refresh(); 
 
 	multi_vims( VIMS_SAMPLE_KF_RESET, "%d", i );
 }
@@ -2331,19 +2343,16 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 
 void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
-	int k = is_button_toggled( "curve_toggleentry" );
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
-					info->main_window, "tree_chain") ));
-
-	gtk_tree_model_foreach(
-			model,
-			chain_update_row, (gpointer*) info );
-
-	info->uc.reload_hint[HINT_ENTRY] = 1;
 	if(info->status_lock)
 		return;
 
 	int i = info->uc.selected_chain_entry;
+	if( i == -1 ) {
+		vj_msg(VEEJAY_MSG_INFO,"No parameter selected for animation");
+		return;
+	}
+
+	int k = is_button_toggled( "curve_toggleentry" );
 	int type = 0;
 	if(  is_button_toggled("curve_typespline")) {
 		type = 1;
@@ -2356,108 +2365,82 @@ void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d", i, k,type );
 }
 
-void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_none_toggled( GtkWidget widget, gpointer user_data)
 {
+	info->uc.selected_parameter_id = -1;
+	
+	disable_widget( "fxanimcontrols" );
+
 	if(info->status_lock)
 		return;
+
+	vj_kf_reset();	
+}
+
+void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
+{
 	if(is_button_toggled("kf_p0"))
 		kf_changed( 0 );
 }
 void	on_kf_p1_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
-	if( is_button_toggled("kf_p1"))
+	if( is_button_toggled("kf_p1")) 
 		kf_changed( 1 );
 }
 void	on_kf_p2_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p2"))
 		kf_changed( 2 );
 }
 void	on_kf_p3_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p3"))
 		kf_changed( 3 );
 }
 void	on_kf_p4_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p4"))
 		kf_changed( 4 );
 }
 void	on_kf_p5_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p5"))
 		kf_changed( 5 );
 }
 void	on_kf_p6_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p6"))
 		kf_changed( 6 );
 }
 void	on_kf_p7_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p7"))
 		kf_changed( 7 );
 }
 void	on_kf_p8_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p8"))
 		kf_changed( 8 );
 }
 void	on_kf_p9_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p9"))
 		kf_changed( 9 );
 }
 void	on_kf_p10_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p10"))
 		kf_changed( 10 );
 }
 
 void	on_kf_p11_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p11"))
 		kf_changed( 11 );
 }
 
 void	on_kf_p12_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p12"))
 		kf_changed( 12 );
 }
@@ -2465,9 +2448,6 @@ void	on_kf_p12_toggled( GtkWidget *widget, gpointer user_data)
 
 void	on_kf_p13_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p13"))
 		kf_changed( 13 );
 }
@@ -2475,18 +2455,12 @@ void	on_kf_p13_toggled( GtkWidget *widget, gpointer user_data)
 
 void	on_kf_p14_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p14"))
 		kf_changed( 14 );
 }
 
 void	on_kf_p15_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("kf_p15"))
 		kf_changed( 15 );
 }
