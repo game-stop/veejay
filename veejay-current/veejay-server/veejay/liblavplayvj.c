@@ -2821,7 +2821,8 @@ veejay_t *veejay_malloc()
     info->status_what = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE );
 
 	info->uc = (user_control *) vj_calloc(sizeof(user_control));
-    if (!(info->uc)) 
+	info->uc->drawsize = 4;
+	if (!(info->uc)) 
 		return NULL;
 
     info->effect_frame_info = (VJFrameInfo*) vj_calloc(sizeof(VJFrameInfo));

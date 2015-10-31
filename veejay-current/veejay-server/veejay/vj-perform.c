@@ -2837,15 +2837,21 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 static int vj_perform_tag_fill_buffer(veejay_t * info)
 {
     int error = 1;
-    uint8_t *frame[3];
+    uint8_t *frame[4];
     int type = pvar_.type;
     int active = pvar_.active;
     frame[0] = primary_buffer[0]->Y;
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
-	
+	frame[3] = primary_buffer[0]->alpha;
+
 	if( info->settings->feedback && info->settings->feedback_stage > 1 ) {
-		int 	strides[4] = { info->effect_frame1->len, info->effect_frame1->uv_len, info->effect_frame1->uv_len, info->effect_frame1->stride[3] * info->effect_frame1->height };
+		int 	strides[4] = { 
+			info->effect_frame1->len,
+			info->effect_frame1->uv_len,
+			info->effect_frame1->uv_len,
+			0,
+		};
 		vj_frame_copy(feedback_buffer,frame,strides);
 		return 1;
 	}
@@ -2874,7 +2880,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 		dumb.data[0] = frame[0];
 		dumb.data[1] = frame[1];
 		dumb.data[2] = frame[2];
-
+		dumb.data[3] = frame[3];
 		dummy_apply(&dumb,info->video_output_width,info->video_output_height,VJ_EFFECT_COLOR_BLACK );
   	}
  	 return 1;      	
@@ -3292,7 +3298,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		if( settings->ca ) {
 			settings->ca = 0;
 		}
-
 		//@ focus on projection screen
 		if(composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
 			vj_perform_get_width(info), vj_perform_get_height(info),info->homedir,info->uc->playback_mode,info->uc->sample_id ) ) {
@@ -3388,9 +3393,83 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 
 	if (info->uc->take_bg==1)
-    	{
-        	info->uc->take_bg = vj_perform_take_bg(info,frame,0);
-    	} 
+    {
+       	info->uc->take_bg = vj_perform_take_bg(info,frame,0);
+    } 
+
+	if(!settings->composite && info->uc->mouse[0] > 0 && info->uc->mouse[1] > 0) 
+	{
+		if( info->uc->mouse[2] == 1 ) {
+			uint8_t a,y,u,v,r,g,b;
+
+			y = pri[0][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
+			if( frame->ssm == 1 ) {
+				u = pri[1][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
+				v = pri[2][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
+			}
+			else {
+				u = pri[1][ info->uc->mouse[1] * frame->uv_width + (info->uc->mouse[0]>>1) ];
+				v = pri[2][ info->uc->mouse[1] * frame->uv_width + (info->uc->mouse[0]>>1) ];
+			}
+		
+			a = pri[0][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
+			//@ just one for now
+			r = y + (1.370705f * ( v- 128 ));
+			g = y - (0.698001f * ( v - 128)) - (0.337633 * (u-128));
+			b = y + (1.732446f * ( u - 128 ));
+
+			if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+				int pos = sample_get_selected_entry(info->uc->sample_id);
+				int fx_id = sample_get_effect( info->uc->sample_id,pos);
+				if( vj_effect_has_rgbkey( fx_id ) ) {
+					sample_set_effect_arg( info->uc->sample_id, pos, 1, r );
+					sample_set_effect_arg( info->uc->sample_id, pos, 2, g );
+					sample_set_effect_arg( info->uc->sample_id, pos, 3, b );
+					veejay_msg(VEEJAY_MSG_INFO,"Selected RGB color #%02x%02x%02x",r,g,b);
+				}
+			}
+			else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
+				int pos = vj_tag_get_selected_entry(info->uc->sample_id);
+				int fx_id = vj_tag_get_effect( info->uc->sample_id, pos );
+				if( vj_effect_has_rgbkey( fx_id ) ) {
+					vj_tag_set_effect_arg( info->uc->sample_id,pos,1,r);
+					vj_tag_set_effect_arg( info->uc->sample_id,pos,2,g);
+					vj_tag_set_effect_arg( info->uc->sample_id,pos,3,b);	
+					veejay_msg(VEEJAY_MSG_INFO,"Selected RGB color #%02x%02x%02x",r,g,b);
+				}
+			}
+		}
+
+		if( info->uc->mouse[2] == 2 ) {
+			info->uc->drawmode = !info->uc->drawmode;
+		}
+
+		if( info->uc->mouse[2] == 0 && info->uc->drawmode ) {
+			int x1 = info->uc->mouse[0] - info->uc->drawsize;
+			int y1 = info->uc->mouse[1] - info->uc->drawsize;
+			int x2 = info->uc->mouse[0] + info->uc->drawsize;
+			int y2 = info->uc->mouse[1] + info->uc->drawsize;
+	
+			if( x1 < 0 ) x1 = 0; else if ( x1 > frame->width ) x1 = frame->width;
+			if( y1 < 0 ) y1 = 0; else if ( y1 > frame->height ) y1 = frame->height;
+			if( x2 < 0 ) x2 = 0; else if ( x2 > frame->width ) x2 = frame->width;
+			if( y2 < 0 ) y2 = 0; else if ( y2 > frame->height ) y2 = frame->height;
+	
+			unsigned int i,j;
+			for( j = x1; j < x2 ; j ++ )
+				pri[0][ y1 * frame->width + j ] = 0xff - pri[0][y1 * frame->width + j];
+	
+			for( i = y1; i < y2; i ++ ) 
+			{
+				pri[0][ i * frame->width + x1 ] = 0xff - pri[0][i * frame->width + x1];
+				pri[0][ i * frame->width + x2 ] = 0xff - pri[0][i * frame->width + x2];
+			}
+
+			for( j = x1; j < x2 ; j ++ )
+				pri[0][ y2 * frame->width + j ] = 0xff - pri[0][y2*frame->width+j];
+		}
+	}
+	
 
 	if( frame->ssm == 1 )
 	{

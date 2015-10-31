@@ -251,6 +251,8 @@ typedef struct {
     int ram_chain;		/* keep fx chain buffers in RAM (1) or dynamic pattern (0) */
 	int max_cached_mem;
 	int	max_cached_slots;
+	int drawmode;
+	int drawsize;
 } user_control;
 
 typedef struct {
