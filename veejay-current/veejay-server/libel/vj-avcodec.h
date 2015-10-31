@@ -53,6 +53,7 @@ typedef struct
 	int encoder_id;
 	int width;
 	int height;
+	int format;
 	uint8_t *data[4];
 	void *lzo;
 	int	shift_y;
