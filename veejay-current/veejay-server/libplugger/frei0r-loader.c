@@ -101,7 +101,7 @@ static struct  {
 	int	major;
 	int	minor;
 } frei0r_black_list[] = { /* plugins that crash in f0r_update() */
-	{ "Scale0Tilt", 0, 1 }, 
+//	{ "Scale0Tilt", 0, 1 }, 
 	{ "opencvfacedetect", 0, 1 }, /* default initialization fails */ 
 	{ "Curves", 0, 1 },
 	{ "scanline0r",0, 1 },
@@ -829,7 +829,6 @@ int	frei0r_process_frame_f( void *plugin )
 		return 0;
 	
 	VJFrame *dst = fr->last;
-
 	int n_inputs = 0;
 	err = vevo_property_get(plugin, "num_inputs", 0, &n_inputs );
 	if( err != VEVO_NO_ERROR ) {
