@@ -741,8 +741,6 @@ int	lav_bogus_video_length( lav_file_t *lav_file )
 	return 0;
 }
 
-
-
 long lav_video_frames(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
@@ -754,7 +752,7 @@ long lav_video_frames(lav_file_t *lav_file)
 #endif
 #ifdef USE_GDK_PIXBUF
 	case 'x':
-		return 2;//lav_file->bogus_len;
+		return lav_file->bogus_len;
 #endif
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
