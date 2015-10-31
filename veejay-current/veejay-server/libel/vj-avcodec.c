@@ -201,9 +201,6 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		e->context->prediction_method = 0;
 		e->context->dct_algo = FF_DCT_AUTO; 
 		e->context->pix_fmt = get_ffmpeg_pixfmt( out_pixel_format );
-		if( id == CODEC_ID_MJPEG ) 
-			e->context->pix_fmt = ( out_pixel_format == FMT_422F ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
-
 		pf = e->context->pix_fmt;
 
 	
@@ -238,7 +235,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	e->len = frame->len;
 	e->uv_len = frame->uv_len;
 	e->out_fmt = pixfmt_to_vj( pf );
-	
+	e->format = pf;
 	return e;
 }
 void		vj_avcodec_close_encoder( vj_encoder *av )
@@ -614,7 +611,7 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	pict.data[0] = src[0];
 	pict.data[1] = src[1];
 	pict.data[2] = src[2];
-
+	pict.format  = av->format;
 	stride = ROUND_UP_4( av->width );
 	w2 = DIV_ROUND_UP_X(av->width, av->shift_x);
 	stride2 = ROUND_UP_4( w2 );
