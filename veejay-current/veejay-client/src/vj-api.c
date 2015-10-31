@@ -2878,7 +2878,7 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 			gchar *descr = _utf8str( _effect_get_description( effect_id ));
 			char  tmp[128];
 			if( _effect_get_mix( effect_id ) ) {
-				snprintf(tmp,sizeof(tmp),"%s %d", (gui->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "S" : "T" ),
+				snprintf(tmp,sizeof(tmp),"%s %d", (gui->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T " ),
 					gui->uc.entry_tokens[ENTRY_CHANNEL]);
 			}
 			else {
@@ -3732,7 +3732,7 @@ static	void	load_effectchain_info()
 			gchar *utf8_name = _utf8str( name );
 			char  tmp[128];
 			if( _effect_get_mix( arr[0] ) ) {
-				snprintf(tmp,sizeof(tmp),"%s %d", (info->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample" : "T " ),
+				snprintf(tmp,sizeof(tmp),"%s %d", (info->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T " ),
 					info->uc.entry_tokens[ENTRY_CHANNEL]);
 			}
 			else {
@@ -6056,9 +6056,13 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 	}
 
 	if( pm != MODE_PLAIN ) {
-		if( (reload_entry_tick_ % ((int)info->el.fps/2))==0) {
-			info->uc.reload_hint[HINT_ENTRY] = 1;	
-		}
+        GtkWidget *ww = glade_xml_get_widget_( info->main_window, crappy_design[ui_skin_].name );
+        int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
+		if(deckpage != 1) {		
+			if( (reload_entry_tick_ % ((int)info->el.fps/2))==0) {
+				info->uc.reload_hint[HINT_ENTRY] = 1;	
+			}
+		}	
 		reload_entry_tick_++;
 	}
 
