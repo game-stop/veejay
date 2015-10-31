@@ -55,6 +55,8 @@ vj_effect *fadecolorrgb_init(int w,int h)
     ve->description = "Transition Fade to Color by RGB";
 	ve->has_user = 0;
     ve->extra_frame = 0;
+	ve->rgb_conv = 1;
+	ve->parallel = 1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Red","Green", "Blue", "Mode", "Frame length");
     return ve;
 }
@@ -71,20 +73,18 @@ void colorfadergb_apply( VJFrame *frame, int width, int height,
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-
     colorY = ((0.257 * r) + (0.504 * g) + (0.098 * b) + 16);
     colorCb = ((0.439 * r) - (0.368 * g) - (0.071 * b) + 128);
     colorCr = (-(0.148 * r) - (0.291 * g) + (0.439 * b) + 128);
-
 
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
 
     for (i = 0; i < len; i++)
-	Y[i] = (op0 * Y[i] + op1 * colorY) / 255;
+		Y[i] = (op0 * Y[i] + op1 * colorY) >> 8;
     for (i = 0; i < uv_len; i++) {
-	Cb[i] = (op0 * Cb[i] + op1 * colorCb) / 255;
-	Cr[i] = (op0 * Cr[i] + op1 * colorCr) / 255;
+		Cb[i] = (op0 * Cb[i] + op1 * colorCb) >> 8;
+		Cr[i] = (op0 * Cr[i] + op1 * colorCr) >> 8;
     }
 }
 void fadecolorrgb_free(){}
