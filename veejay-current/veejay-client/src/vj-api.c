@@ -6007,6 +6007,7 @@ static	void	set_pm_page_label(int sample_id, int type)
 	g_free(title);
 }
 
+static int reload_entry_tick_=0;
 static void 	update_globalinfo(int *history, int pm, int last_pm)
 {
 	int i;
@@ -6026,6 +6027,13 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 				set_toggle_button( "macrostop",1); break;
 		}
 		
+	}
+
+	if( pm != MODE_PLAIN ) {
+		if( (reload_entry_tick_ % ((int)info->el.fps/2))==0) {
+			info->uc.reload_hint[HINT_ENTRY] = 1;	
+		}
+		reload_entry_tick_++;
 	}
 
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm )
