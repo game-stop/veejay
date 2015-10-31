@@ -507,6 +507,7 @@ enum
 	FXC_FXID = 1,
 	FXC_FXSTATUS = 2,
 	FXC_KF =3, 
+	FXC_MIXING =4,
 	FXC_N_COLS,
 };
 
@@ -2875,6 +2876,15 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 		else
 		{
 			gchar *descr = _utf8str( _effect_get_description( effect_id ));
+			char  tmp[128];
+			if( _effect_get_mix( effect_id ) ) {
+				snprintf(tmp,sizeof(tmp),"%s %d", (gui->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "S" : "T" ),
+					gui->uc.entry_tokens[ENTRY_CHANNEL]);
+			}
+			else {
+				snprintf(tmp,sizeof(tmp),"%s"," ");
+			}
+			gchar *mixing = _utf8str(tmp);
 			int on = gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED];
 			GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
 			GdkPixbuf *kf_toggle = update_pixmap_kf( on );
@@ -2882,8 +2892,11 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 				FXC_ID, entry,
 				FXC_FXID, descr,
 				FXC_FXSTATUS, toggle,
-				FXC_KF, kf_toggle, -1 );
+				FXC_KF, kf_toggle,
+				FXC_MIXING, mixing,
+				-1 );
 			g_free(descr);
+			g_free(mixing);
 			g_object_unref( kf_toggle );
 			g_object_unref( toggle );
 		}
@@ -3536,7 +3549,7 @@ static void 	setup_server_files(void)
 static void	setup_effectchain_info( void )
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
-	GtkListStore *store = gtk_list_store_new( 4, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF );
+	GtkListStore *store = gtk_list_store_new( 5, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING );
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
 
@@ -3544,11 +3557,12 @@ static void	setup_effectchain_info( void )
 	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",0 ); //FIXME
 	setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run"); // todo: could be checkbox!!
 	setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // parameter interpolation on/off per entry
-  	GtkTreeSelection *selection; 
+  	setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
+	GtkTreeSelection *selection; 
 
 	tree = glade_xml_get_widget_( info->main_window, "tree_chain");
   	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-    	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE); 
+    gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE); 
    	gtk_tree_selection_set_select_function(selection, view_entry_selection_func, NULL, NULL);
 }
 
@@ -3716,6 +3730,16 @@ static	void	load_effectchain_info()
 		if( last_index == arr[0])
 		{
 			gchar *utf8_name = _utf8str( name );
+			char  tmp[128];
+			if( _effect_get_mix( arr[0] ) ) {
+				snprintf(tmp,sizeof(tmp),"%s %d", (info->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample" : "T " ),
+					info->uc.entry_tokens[ENTRY_CHANNEL]);
+			}
+			else {
+				snprintf(tmp,sizeof(tmp),"%s"," ");
+			}
+			gchar *mixing = _utf8str(tmp);
+
 			int on = info->uc.entry_tokens[ENTRY_VIDEO_ENABLED];
 			gtk_list_store_append( store, &iter );
 			GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
@@ -3724,9 +3748,11 @@ static	void	load_effectchain_info()
 				FXC_ID, arr[0],
 				FXC_FXID, utf8_name,
 				FXC_FXSTATUS, toggle,
-				FXC_KF, kf_toggle, -1 );
+				FXC_KF, kf_toggle,
+			    FXC_MIXING,mixing,	-1 );
 			last_index ++;
 			g_free(utf8_name);
+			g_free(mixing);
 			g_object_unref( toggle );
 			g_object_unref( kf_toggle );
 		}
