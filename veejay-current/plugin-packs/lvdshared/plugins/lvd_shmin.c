@@ -39,7 +39,6 @@
 #include <string.h>
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
-
 #include 	"livido.h"
 LIVIDO_PLUGIN
 #include	"utils.h"
@@ -64,6 +63,8 @@ static	inline int	lvd_to_ffmpeg( int lvd, int fr ) {
 		case LIVIDO_PALETTE_RGBA32:
 			return PIX_FMT_RGBA;
 		case LIVIDO_PALETTE_YUV444P:
+			if(fr)
+				return PIX_FMT_YUVJ444P;
 			return PIX_FMT_YUV444P;
 		default:
 			if( fr ) 
@@ -217,7 +218,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	int uv_len = lvd_uv_plane_len( palette,w,h );
 
-    char  *addr = NULL; 
+    unsigned char  *addr = NULL; 
 	error = livido_property_get( my_instance, "PLUGIN_private", 0, &addr );
 	if( error != LIVIDO_NO_ERROR ) 
 		return LIVIDO_ERROR_INTERNAL;
@@ -237,8 +238,8 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	uint8_t *start_addr = addr + 4096; //v->memptr
 
 	int fullrange = 0;
-	error = livido_property_get( my_instance, "HOST_fullrange",0,&fullrange );
-
+	livido_property_get( my_instance, "HOST_fullrange",0,&fullrange);
+	
 	int srcFormat = lvd_to_ffmpeg( v->header[5], fullrange );
 	int srcW      = v->header[0];
 	int srcH	  = v->header[1];
