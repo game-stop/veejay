@@ -48,7 +48,7 @@ vj_effect *magicscratcher_init(int w, int h)
     ve->defaults[1] = 7;
     ve->defaults[2] = 1;
     ve->description = "Magic Overlay Scratcher";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Scratch frames", "PingPong");
@@ -163,8 +163,8 @@ void magicscratcher_apply(VJFrame *frame,
 		Y[x] = func_y( mframe[offset + x], Y[x]);
     }
     
-    veejay_memset( Cb, 128, frame->uv_len);
-    veejay_memset( Cr, 128, frame->uv_len);
+    veejay_memset( Cb, 128, (frame->ssm ? frame->len : frame->uv_len));
+    veejay_memset( Cr, 128, (frame->ssm ? frame->len : frame->uv_len));
 
     m_rerun = m_frame;
 
