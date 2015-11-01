@@ -39,7 +39,7 @@ vj_effect *bwselect_init(int w, int h)
     ve->limits[1][1] = 255;
 
     ve->description = "Black and White by Threshold";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user =0 ;
 	ve->param_description = vje_build_param_list( ve->num_params, "Min threshold", "Max threshold" );
@@ -48,7 +48,7 @@ vj_effect *bwselect_init(int w, int h)
 
 void bwselect_apply(VJFrame *frame, int width, int height, int min_threshold, int max_threshold) {
 	int r,c;
-        const int len = frame->len;
+    const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -64,8 +64,8 @@ void bwselect_apply(VJFrame *frame, int width, int height, int min_threshold, in
 			}
 		}
 	}
-	veejay_memset(Cb, 128, frame->uv_len);
-	veejay_memset(Cr, 128, frame->uv_len);
+	veejay_memset(Cb, 128, (frame->ssm ? frame->len : frame->uv_len));
+	veejay_memset(Cr, 128, (frame->ssm ? frame->len : frame->uv_len));
 }
 
 void bwselect_free(){}

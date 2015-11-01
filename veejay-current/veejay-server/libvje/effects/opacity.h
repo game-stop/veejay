@@ -24,7 +24,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *opacity_init();
+vj_effect *opacity_init(int w, int h);
 void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int opacity);
 

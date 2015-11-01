@@ -29,7 +29,7 @@ vj_effect *alpha2img_init(int w, int h)
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 0;
     ve->description = "Alpha: Show alpha as greyscale";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;
@@ -39,16 +39,12 @@ vj_effect *alpha2img_init(int w, int h)
 
 void alpha2img_apply( VJFrame *frame, int width, int height)
 {
-    int i;
-    int len = frame->len;
-    int uv_len = frame->uv_len;
-
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 	uint8_t *a = frame->data[3];
 
-	veejay_memcpy(  Y, a, len );
-	veejay_memset(  Cb,128, uv_len );
-	veejay_memset(  Cr,128, uv_len );
+	veejay_memcpy(  Y, a, frame->len );
+	veejay_memset(  Cb,128, (frame->ssm ? frame->len : frame->uv_len) );
+	veejay_memset(  Cr,128, (frame->ssm ? frame->len : frame->uv_len) );
 }

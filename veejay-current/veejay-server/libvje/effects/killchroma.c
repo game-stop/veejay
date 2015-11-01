@@ -34,7 +34,7 @@ vj_effect *killchroma_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 2;
     ve->defaults[0] = 0;
@@ -51,12 +51,12 @@ void killchroma_apply(VJFrame *frame, int width, int height, int n)
 {
 	if(n==0)
 	{
-		veejay_memset( frame->data[1], 128, frame->uv_len );
-		veejay_memset( frame->data[2], 128, frame->uv_len );
+		veejay_memset( frame->data[1], 128, (frame->ssm ? frame->len : frame->uv_len) );
+		veejay_memset( frame->data[2], 128, (frame->ssm ? frame->len : frame->uv_len) );
 	}
 	else
 	{
-		veejay_memset( frame->data[n], 128, frame->uv_len );
+		veejay_memset( frame->data[n], 128, (frame->ssm ? frame->len : frame->uv_len ) );
 	}
 }
 void killchroma_free(){}

@@ -36,7 +36,7 @@ vj_effect *alphafill_init(int w, int h)
     ve->limits[1][0] = 255;
     ve->defaults[0] = 255;
     ve->description = "Alpha: Fill Alpha channel";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;

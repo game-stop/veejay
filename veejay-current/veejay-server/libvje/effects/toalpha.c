@@ -31,7 +31,7 @@ vj_effect *toalpha_init(int w, int h)
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
     ve->description = "Alpha: Set from Image";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;

@@ -40,7 +40,7 @@ vj_effect *overlaymagic_init(int w, int h)
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 1; // clear chroma or keep
     ve->extra_frame = 1;
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->has_user = 0;
     ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Keep or clear color" );
@@ -781,8 +781,8 @@ void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int width,
 
     }
     if(clearchroma) {
-	veejay_memset( frame->data[1], 128, frame->uv_len );
-	veejay_memset( frame->data[2], 128, frame->uv_len );
+	veejay_memset( frame->data[1], 128, (frame->ssm ? frame->len : frame->uv_len) );
+	veejay_memset( frame->data[2], 128, (frame->ssm ? frame->len : frame->uv_len) );
     }
 }
 
