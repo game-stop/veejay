@@ -2145,12 +2145,12 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, sample_eff_chain *
  	int sub_mode = vj_effect_get_subformat(effect_id);
 	int ef = vj_effect_get_extra_frame(effect_id);
 
-	if( sub_mode && frames[0]->ssm == 0 )
+	if( sub_mode > 0 && frames[0]->ssm == 0 )
 	{
 		chroma_supersample(settings->sample_mode,frames[0],frames[0]->data );
 		frames[0]->ssm = 1;
 	}
-	else if(!sub_mode && frames[0]->ssm == 1)
+	else if(sub_mode==0 && frames[0]->ssm == 1)
    	{
     	chroma_subsample(settings->sample_mode,frames[0],frames[0]->data);
     	frames[0]->ssm = 0;
@@ -2166,12 +2166,12 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, sample_eff_chain *
 			frames[1]->ssm = vj_perform_preprocess_secundary( info,fx_entry->channel,fx_entry->source_type,sub_mode,chain_entry, frames, frameinfo );
 		}
 
-		if(sub_mode && frames[1]->ssm == 0)
+		if(sub_mode > 0 && frames[1]->ssm == 0)
 		{
 			chroma_supersample(settings->sample_mode,frames[1],frames[1]->data );
 			frames[1]->ssm = 1;
 		}
-		else if (!sub_mode && frames[1]->ssm == 1 )
+		else if (sub_mode == 0 && frames[1]->ssm == 1 )
 		{
 			chroma_subsample( settings->sample_mode,frames[1],frames[1]->data );
 			frames[1]->ssm = 0;
@@ -2251,7 +2251,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 				if( ef ) {
 					subframes[1]->ssm = vj_perform_apply_secundary(info,id,fx_entry->channel,fx_entry->source_type,n,subframes[0],subframes[1],p0_ref, p1_ref, 1);
 				}	
-				if( sm ) {
+				if( sm > 0) {
 					if(subframes[0]->ssm == 0 ) {
 						chroma_supersample( settings->sample_mode,subframes[0],subframes[0]->data );
 						subframes[0]->ssm = 1;
@@ -2261,7 +2261,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 						subframes[1]->ssm = 1;
 					}
 				} 
-				else {
+				else if( sm == 0 ) {
 					if(subframes[0]->ssm == 1 ) {
 						chroma_subsample( settings->sample_mode,subframes[0],subframes[0]->data);
 						subframes[0]->ssm = 0;
@@ -2300,7 +2300,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 					subframes[1]->ssm = vj_perform_apply_secundary_tag(info,fx_entry->channel,fx_entry->source_type,n,subframes[0],subframes[1],p0_ref,p1_ref,1);
 				}
 				
-				if( sm ) {
+				if( sm > 0 ) {
 					if(subframes[0]->ssm==0) {
 						chroma_supersample( settings->sample_mode,subframes[0],subframes[0]->data );
 						subframes[0]->ssm = 1;
@@ -2309,7 +2309,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 						chroma_supersample( settings->sample_mode,subframes[1],subframes[1]->data);
 						subframes[1]->ssm=1;
 					}
-				} else {
+				} else if( sm == 0 ) {
 					if( subframes[0]->ssm ) {
 						chroma_subsample( settings->sample_mode,subframes[0],subframes[0]->data);
 						subframes[0]->ssm = 0;
@@ -2357,12 +2357,12 @@ static void	vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
  	int sub_mode = vj_effect_get_subformat(effect_id);
 	int ef = vj_effect_get_extra_frame(effect_id);
 
-	if( sub_mode && frames[0]->ssm == 0)
+	if( sub_mode > 0 && frames[0]->ssm == 0)
 	{
 		chroma_supersample( settings->sample_mode,frames[0],frames[0]->data );
 		frames[0]->ssm = 1;
 	}
-	else if(!sub_mode && frames[0]->ssm == 1)
+	else if(sub_mode == 0 && frames[0]->ssm == 1)
 	{
 		chroma_subsample(settings->sample_mode,frames[0],frames[0]->data );
 		frames[0]->ssm = 0;
@@ -2377,12 +2377,12 @@ static void	vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
 			frames[1]->ssm = vj_perform_preprocess_secundary( info, fx_entry->channel,fx_entry->source_type,sub_mode,chain_entry, frames, frameinfo );
 		}
 	
-		if(frames[1]->ssm == 0 && sub_mode)
+		if(frames[1]->ssm == 0 && sub_mode > 0)
 		{
 			chroma_supersample( settings->sample_mode,frames[1],frames[1]->data );
 			frames[1]->ssm = 1;
 		}
-		else if(frames[1]->ssm == 1 && !sub_mode )
+		else if(frames[1]->ssm == 1 && sub_mode == 0 )
 		{	
 			chroma_subsample( settings->sample_mode,frames[1],frames[1]->data );
 			frames[1]->ssm = 0;
