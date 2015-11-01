@@ -63,6 +63,39 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
+static int	lvd_zcrop_plane_z( uint8_t *D, int left, int right, int top, int bottom, int w, int h, uint8_t B )
+{
+	int x,y;
+	uint8_t *dst = D;
+	
+	for( y = 0; y < top; y ++ ) {
+		livido_memset( dst, B, w );
+		dst += w;
+	}
+
+	for( y = top; y < bottom; y ++ ) {
+		for( x = 0; x < left; x ++ ) {
+			*(dst++) = B;
+		}
+
+		for( x = left; x < right; x++ ) {
+			*(dst++) = 0xff;
+		}
+
+		for( x = right; x < w; x ++ ) {
+			*(dst++) = B;
+		}
+	}
+
+	for( y = bottom; y < h; y ++ ) {
+		livido_memset( dst,B, w );
+		dst += w;
+	}
+
+	return 1;
+}
+
+
 static int	lvd_zcrop_plane( uint8_t *D, uint8_t *S, int left, int right, int top, int bottom, int w, int h, uint8_t B )
 {
 	int x,y;
@@ -128,7 +161,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int	right = lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int	top = lvd_extract_param_index( my_instance, "in_parameters", 2 );
 	int	bottom = lvd_extract_param_index( my_instance, "in_parameters", 3);
-	int alpha = lvd_extract_param_switch( my_instance, "in_parameters",4 );
+	int alpha = lvd_extract_param_index( my_instance, "in_parameters",4 );
 
 	int tmp_w = ( w - left - right);
 	int tmp_h = h - top - bottom;
@@ -153,7 +186,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 		return LIVIDO_NO_ERROR;
 
 	if( alpha ) {
-		if( !lvd_zcrop_plane( O[3], A[0], left, right, top, bottom, w, h, 0 ) )
+		if( !lvd_zcrop_plane_z( O[3], left, right, top, bottom, w, h, 0 ) )
 			return LIVIDO_NO_ERROR;
 
 	}
@@ -256,9 +289,11 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	port = in_params[4];
 
 		livido_set_string_value(port, "name", "Alpha" );
-		livido_set_string_value(port, "kind", "SWITCH" );
+		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_string_value( port, "description" ,"Alpha");
-
+        livido_set_int_value( port, "min", 0 );
+        livido_set_int_value( port, "max", 1 );
+        livido_set_int_value( port, "default", 1 );
 
 	//@ setup the nodes
 	livido_set_portptr_array( filter, "in_parameter_templates",5, in_params );
