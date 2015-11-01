@@ -122,6 +122,7 @@ enum {
 	VJ_VIDEO_EFFECT_AVERAGEBLEND = 247,
 	VJ_VIDEO_EFFECT_MIXTOALPHA = 248,
 	VJ_VIDEO_EFFECT_MAGICALPHA = 249,
+	VJ_VIDEO_EFFECT_TRAVELMATTE = 250,
 	
 };
 
@@ -223,14 +224,15 @@ enum {
 	VJ_IMAGE_EFFECT_ALPHA2IMG = 194,
 	VJ_IMAGE_EFFECT_TOALPHA = 195,
 	VJ_IMAGE_EFFECT_ALPHAFLATTEN = 196,
+	VJ_IMAGE_EFFECT_ALPHAFEATHERMASK = 197,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 197
+#define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 250
+#define VJ_VIDEO_EFFECT_MAX 251
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -641,4 +643,6 @@ extern void alpha2img_apply( VJFrame *frame, int width, int height);
 extern void alphafill_apply( VJFrame *frame, int width, int height, int val);
 extern void alphaflatten_apply( VJFrame *frame, int width, int height);
 extern void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int n, int visible);
+extern void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode);
+extern void feathermask_apply( VJFrame *frame, int width, int height );
 #endif

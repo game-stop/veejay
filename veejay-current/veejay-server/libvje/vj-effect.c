@@ -175,6 +175,8 @@
 #include "effects/mixtoalpha.h"
 #include "effects/alphaflatten.h"
 #include "effects/magicalphaoverlays.h"
+#include "effects/travelmatte.h"
+#include "effects/feathermask.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -266,6 +268,7 @@ static struct
 {	bgsubtract_malloc,		bgsubtract_free,	VJ_IMAGE_EFFECT_BGSUBTRACT	},
 {	slicer_malloc,			slicer_free,		VJ_VIDEO_EFFECT_SLICER		},
 {	perspective_malloc,		perspective_free,	VJ_IMAGE_EFFECT_PERSPECTIVE },
+{	feathermask_malloc,		feathermask_free,	VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
 {	NULL			,	NULL			,0				},
 };
 
@@ -576,7 +579,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[44] = iris_init(width,height);
 	vj_effects[48] = mixtoalpha_init(width,height);
 	vj_effects[49] = overlayalphamagic_init(width,height);
-    vj_effects[50] = dummy_init(width,height);
+	vj_effects[50] = travelmatte_init(width,height);
+    vj_effects[51] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -673,6 +677,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 94 ] = alpha2img_init(width,height);
 	vj_effects[i + 95 ] = toalpha_init(width,height);
 	vj_effects[i + 96 ] = alphaflatten_init(width,height);
+	vj_effects[i + 97 ] = feathermask_init(width,height);
 	max_width = width;
 	max_height = height;
 
