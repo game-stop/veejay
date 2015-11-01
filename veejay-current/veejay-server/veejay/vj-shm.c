@@ -346,8 +346,8 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	veejay_memset( v->sms, 0, size );
 
 	uint8_t *Y = v->sms + HEADER_LENGTH;
-	uint8_t *U = Y + (frame->width * frame->height);
-	uint8_t *V = U + ( (frame->width * frame->height)/2);
+	uint8_t *U = Y + frame->len;
+	uint8_t *V = U + frame->uv_len;
 	
 	veejay_memset( U, 128, frame->uv_len);
 	veejay_memset( V, 128, frame->uv_len);
