@@ -128,6 +128,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int	right = lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int	top = lvd_extract_param_index( my_instance, "in_parameters", 2 );
 	int	bottom = lvd_extract_param_index( my_instance, "in_parameters", 3);
+	int alpha = lvd_extract_param_switch( my_instance, "in_parameters",4 );
 
 	int tmp_w = ( w - left - right);
 	int tmp_h = h - top - bottom;
@@ -142,9 +143,6 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 		crop->h = tmp_h;
 	}
 
-	int crop_strides[4] = { crop->w, crop->w, crop->w, 0 };
-	int dst_strides[4]  = { w, w, w, 0 }; 
-
 	if( !lvd_zcrop_plane( O[0], A[0], left, right, top, bottom, w, h, 0 ) )
 		return LIVIDO_NO_ERROR;
 
@@ -153,6 +151,12 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 	if( !lvd_zcrop_plane( O[2], A[2], left, right, top, bottom, w, h, 128 ) )
 		return LIVIDO_NO_ERROR;
+
+	if( alpha ) {
+		if( !lvd_zcrop_plane( O[3], A[0], left, right, top, bottom, w, h, 0 ) )
+			return LIVIDO_NO_ERROR;
+
+	}
 
 	return LIVIDO_NO_ERROR;
 }
@@ -163,7 +167,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	LIVIDO_IMPORT(list);
 
 	livido_port_t *port = NULL;
-	livido_port_t *in_params[4];
+	livido_port_t *in_params[5];
 	livido_port_t *in_chans[3];
 	livido_port_t *out_chans[1];
 	livido_port_t *info = NULL;
@@ -248,8 +252,16 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "kind", "HEIGHT" );
 		livido_set_string_value( port, "description" ,"Bottom");
 
+	in_params[4] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+	port = in_params[4];
+
+		livido_set_string_value(port, "name", "Alpha" );
+		livido_set_string_value(port, "kind", "SWITCH" );
+		livido_set_string_value( port, "description" ,"Alpha");
+
+
 	//@ setup the nodes
-	livido_set_portptr_array( filter, "in_parameter_templates",4, in_params );
+	livido_set_portptr_array( filter, "in_parameter_templates",5, in_params );
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
         livido_set_portptr_array( filter, "in_channel_templates",1, in_chans );
 
