@@ -2144,7 +2144,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 					veejay_msg(0, "Unable to start from file, Abort");
 					return -1;
 				}
-				sample_info *skel = sample_skeleton_new( 0, info->edit_list->total_frames );
+			
+				sample_info *skel = sample_skeleton_new( 0, end - start );
 				if(skel)
 				{
 					skel->edit_list = sample_el;
