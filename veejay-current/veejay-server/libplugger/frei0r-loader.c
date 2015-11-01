@@ -363,7 +363,7 @@ static void 	*init_parameter_port( int min, int max, int def,const char *name, i
 static void store_parameter_port( void *port, int seq_no, void *parameter_port )
 {
 	char key[20];	
-	snprintf(key,20, "p%02d", seq_no );
+	snprintf(key,sizeof(key), "p%02d", seq_no );
 	vevo_property_set( port, key, VEVO_ATOM_TYPE_PORTPTR, 1, &parameter_port );
 }
 
@@ -815,12 +815,7 @@ int	frei0r_process_frame_f( void *plugin )
 		return 0;
 	}
 
-	f0r_update_f base;
-	vevo_property_get( parent, "process", 0, &base );
 	f0r_instance_t instance;
-	f0r_update2_f base2;
-	vevo_property_get( parent, "process_mix", 0, &base2 );
-
 	vevo_property_get( plugin, "frei0r",0, &instance );		
 	
 	fr0_conv_t *fr = NULL;
@@ -828,7 +823,6 @@ int	frei0r_process_frame_f( void *plugin )
 	if( err != VEVO_NO_ERROR )
 		return 0;
 	
-	VJFrame *dst = fr->last;
 	int n_inputs = 0;
 	err = vevo_property_get(plugin, "num_inputs", 0, &n_inputs );
 	if( err != VEVO_NO_ERROR ) {
@@ -842,26 +836,28 @@ int	frei0r_process_frame_f( void *plugin )
 	}
 
 	if( n_inputs == 0 && n_outputs == 1 ) {
+		f0r_update_f base;
+		vevo_property_get( parent, "process", 0, &base );
+	
+		(*base)( instance, rand(), (const uint32_t*) fr->buf, (uint32_t*) fr->in[0]->data[0] );
 		
-		(*base)( instance, rand(), (const uint32_t*) fr->buf, (uint32_t*) fr->buf );
+		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[0], fr->last );
 		
-		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[0], dst );
-		
-		return 1;
-
 	} else if( n_inputs == 1 ) {
-
+		f0r_update_f base;
+		vevo_property_get( parent, "process", 0, &base );
+	
 		(*base)( instance, rand(), (const uint32_t*) fr->in[0]->data[0], (uint32_t*) fr->in[1]->data[0] );
 	
-		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[1], dst );
+		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[1], fr->last );
 
 	} else if ( n_inputs == 2 ) {
-
+		f0r_update2_f base2;
+		vevo_property_get( parent, "process_mix", 0, &base2 );
 		
 		(*base2)( instance, rand(), (const uint32_t*) fr->in[0]->data[0],(const uint32_t*) fr->in[1]->data[0],NULL, (uint32_t*) fr->in[2]->data[0] );
 
-		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[2], dst );
-
+		yuv_convert_and_scale_from_rgb( out_scaler__, fr->in[2], fr->last );
 	}
 
 	return 1;

@@ -1858,7 +1858,7 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int ty
 		
 		  	if (vj_tag_get_active(sample_id) == 1 )
 			{	
-				int res = vj_tag_get_frame(sample_id, dst->data, audio_buffer[chain_entry]);
+				int res = vj_tag_get_frame(sample_id, dst,audio_buffer[chain_entry]);
 				if(res==1)	{
 			  		error = 0;
 					ssm = dst->ssm;
@@ -2077,7 +2077,7 @@ static int vj_perform_apply_secundary(veejay_t * info, int this_sample_id, int s
 		
 				if (vj_tag_get_active(sample_id) == 1)
 				{ 
-					res = vj_tag_get_frame(sample_id, dst->data,  audio_buffer[chain_entry]);
+					res = vj_tag_get_frame(sample_id, dst,audio_buffer[chain_entry]);
 					if(res) {
 						error = 0; 
 						ssm = dst->ssm;
@@ -2584,7 +2584,7 @@ static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
 
 	if(info->settings->offline_record)
 	{
-		if (!vj_tag_get_frame(sample_id, frame, NULL))
+		if (!vj_tag_get_frame(sample_id, info->effect_frame1, NULL))
 	   	{
 			return 0;//skip and dont care
 		}
@@ -2789,6 +2789,12 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 		frame[3] = NULL;
 	}
 
+	info->effect_frame1->data[0] = frame[0];
+	info->effect_frame1->data[1] = frame[1];
+	info->effect_frame1->data[2] = frame[2];
+	info->effect_frame1->data[3] = frame[3];
+
+
 	if(available_diskspace())
 		res = vj_perform_render_tag_frame(info, frame);
 
@@ -2845,6 +2851,11 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
     frame[2] = primary_buffer[0]->Cr;
 	frame[3] = primary_buffer[0]->alpha;
 
+	info->effect_frame1->data[0] = frame[0];
+	info->effect_frame1->data[1] = frame[1];
+	info->effect_frame1->data[2] = frame[2];
+	info->effect_frame1->data[3] = frame[3];
+
 	if( info->settings->feedback && info->settings->feedback_stage > 1 ) {
 		int 	strides[4] = { 
 			info->effect_frame1->len,
@@ -2864,7 +2875,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
     else
     {
 
-	if (vj_tag_get_frame(info->uc->sample_id, frame, NULL))
+	if (vj_tag_get_frame(info->uc->sample_id, info->effect_frame1,NULL))
 	{
 	    error = 0;
 	    cached_tag_frames[0] = info->uc->sample_id;

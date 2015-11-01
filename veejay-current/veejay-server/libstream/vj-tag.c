@@ -3354,17 +3354,18 @@ int vj_tag_drop_blackframe(int t1)
 
 
 
-int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
+int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 {
     vj_tag *tag = vj_tag_get(t1);
     if(!tag)
 	    return -1;
 
-    const int width = vj_tag_input->width;
-    const int height = vj_tag_input->height;
-    const int uv_len = vj_tag_input->uv_len;
-    const int len = (width * height);
+    const int width = dst->width;
+    const int height = dst->height;
+    const int uv_len = dst->uv_len;
+    const int len = dst->len;
 
+	uint8_t **buffer = dst->data;
     
 	switch (tag->source_type)
 	{
@@ -3524,32 +3525,16 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		break;
 #endif
 	case VJ_TAG_TYPE_GENERATOR:
-		_tmp.len     = len;
-		_tmp.uv_len  = uv_len;
-		_tmp.data[0] = buffer[0];
-		_tmp.data[1] = buffer[1];
-		_tmp.data[2] = buffer[2];
-		_tmp.width   = width;
-		_tmp.height  = height;
-		_tmp.format  = PIX_FMT_YUVJ422P;
 		if( tag->generator ) {
-			plug_push_frame( tag->generator, 1, 0, &_tmp );
+			plug_push_frame( tag->generator, 1, 0, dst );
 			plug_set_parameter( tag->generator, 0,1,&(tag->color_r) );
 			plug_set_parameter( tag->generator, 1,1,&(tag->color_g) );
 			plug_set_parameter( tag->generator, 2,1,&(tag->color_b) );
-			plug_process( tag->generator, -1.0 );
+			plug_process( tag->generator, -1.0 ); 
 		}
 		break;
 	case VJ_TAG_TYPE_COLOR:
-		_tmp.len     = len;
-		_tmp.uv_len  = uv_len;
-		_tmp.data[0] = buffer[0];
-		_tmp.data[1] = buffer[1];
-		_tmp.data[2] = buffer[2];
-		_tmp.width   = width;
-		_tmp.height  = height;
-		_tmp.format  = PIX_FMT_YUVJ422P;
-		dummy_rgb_apply( &_tmp, width, height, tag->color_r,tag->color_g,tag->color_b );
+		dummy_rgb_apply( dst, width, height, tag->color_r,tag->color_g,tag->color_b );
 		break;
 
     case VJ_TAG_TYPE_NONE:
