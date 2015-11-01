@@ -1782,20 +1782,20 @@ int sample_set_endframe(int s1, long frame_num)
 
     if(sample->play_length)
     {
-	int new_len = ( frame_num - sample->first_frame );
-	if( new_len <= 1 )
-		new_len = 1;
-	sample->last_frame = sample->first_frame + new_len;
+		int new_len = ( frame_num - sample->first_frame );
+		if( new_len <= 1 )
+			new_len = 1;
+		sample->last_frame = sample->first_frame + new_len;
 
-	if( sample->resume_pos > frame_num )
-		sample->resume_pos = frame_num;
-
-	if( vj_el_set_bogus_length( sample->edit_list, 0, new_len ) )
-	{
-		sample->play_length = new_len;
-		return 1;
-	}
-	return 0;
+		if( sample->resume_pos > frame_num )
+			sample->resume_pos = frame_num;
+	
+		if( vj_el_set_bogus_length( sample->edit_list, 0, new_len ) )
+		{
+			sample->play_length = new_len;
+			return 1;
+		}
+		return 0;
     }
 
     if(sample->edit_list)
