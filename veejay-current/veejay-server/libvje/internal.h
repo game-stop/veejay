@@ -448,7 +448,7 @@ extern void greyselect_apply(VJFrame *frame, int w, int h, int angle, int r, int
 extern void isolate_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b,
 int opacity);
 
-extern void bwselect_apply(VJFrame *frame, int w, int h, int a , int b);
+extern void bwselect_apply(VJFrame *frame, int w, int h, int a , int b, int c, int g);
 
 extern void complexinvert_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int i_noise);
 

@@ -350,7 +350,7 @@ void vj_effman_apply_image_effect(
 			arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_BWSELECT:
-	bwselect_apply(frames[0], frames[0]->width, frames[0]->height, arg[0], arg[1]);
+	bwselect_apply(frames[0], frames[0]->width, frames[0]->height, arg[0], arg[1], arg[2], arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_GREYSELECT:
 	greyselect_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
