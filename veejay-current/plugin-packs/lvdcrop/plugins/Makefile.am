@@ -1,11 +1,18 @@
 lividoplugin_LTLIBRARIES = lvd_crop.la lvd_cropscale.la 
 
+if HAVE_GAVL
+lividoplugin_LTLIBRARIES += lvd_scale0tilt.la
+endif
+
 lvd_crop_la_SOURCES = lvd_crop.c
 lvd_cropscale_la_SOURCES = lvd_cropscale.c
+if HAVE_GAVL
+lvd_scale0tilt_la_SOURCES = lvd_scale0tilt.c
+endif
 
-INCLUDES=$(FFMPEG_CFLAGS) -I$(top_srcdir)/lvdcrop
+INCLUDES=$(FFMPEG_CFLAGS) $(GAVL_CFLAGS) -I$(top_srcdir)/lvdcrop
 AM_CFLAGS=-I@top_srcdir@/include $(OPTCFLAGS) -DSILENT
-AM_LDFLAGS=-module -avoid-version -lm -export-dynamic -lstdc++ -DDYNAMIC -rdynamic $(FFMPEG_LIBS)
+AM_LDFLAGS=-module -avoid-version -lm -export-dynamic -lstdc++ -DDYNAMIC -rdynamic $(FFMPEG_LIBS) $(GAVL_LIBS)
 AM_LIBTOOLFLAGS = --tag=disable-static
 
 lividoplugindir = @libdir@/livido-plugins

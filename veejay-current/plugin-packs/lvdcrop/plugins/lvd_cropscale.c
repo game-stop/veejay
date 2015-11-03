@@ -66,6 +66,7 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 		free(crop);
 		crop = NULL;
 	}		
+    livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR, 0, NULL );
 
 	return LIVIDO_NO_ERROR;
 }
@@ -227,8 +228,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	port = filter;
 
 	//@ meta information
-		livido_set_string_value( port, "name", "Crop and scale");	
-		livido_set_string_value( port, "description", "Crop and scale");
+		livido_set_string_value( port, "name", "Crop and Stretch");	
+		livido_set_string_value( port, "description", "Crop and stretch to video size");
 		livido_set_string_value( port, "author", "Niels"); 
 		
 		livido_set_int_value( port, "flags", 0);

@@ -118,8 +118,17 @@ then
 	AC_DEFINE( BASE64_AVUTIL,1,[Use avutil base64])
 fi
 
+
+have_gavl=false
+PKG_CHECK_MODULES(GAVL, [gavl >= 0.2.3], have_gavl=true,have_gavl=false)
+AM_CONDITIONAL(HAVE_GAVL, test x$have_gavl = xtrue)
+
 AC_SUBST(LIBAVUTIL_CFLAGS)
 AC_SUBST(LIBAVUTIL_LIBS)
+
+AC_SUBST(HAVE_GAVL)
+AC_SUBST(GAVL_CFLAGS)
+AC_SUBST(GAVL_LIBS)
 
 AC_SUBST(LIBGETOPT_LIB)
 
@@ -348,4 +357,8 @@ AC_MSG_NOTICE([  - FFmpeg/AV Swscaler            : ${have_swscale} ])
 AC_MSG_NOTICE([  - FFmpeg/AV AVUtil              : ${have_avutil} ])
 if test "$have_linux" = "true" ; then
 AC_MSG_NOTICE([   Platform: Linux])
+fi
+AC_MSG_NOTICE([  - GAVL                          : ${have_gavl} ])
+if test "x$have_gavl" = "false" ; then
+AC_MSG_NOTICE([    Get gavl from http://gmerlin.sourceforge.net])
 fi
