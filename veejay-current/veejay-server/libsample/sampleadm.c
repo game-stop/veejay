@@ -1421,8 +1421,9 @@ int sample_set_chain_channel(int s1, int position, int input)
 	    	
 		    if(new)
 				vj_el_setup_cache( new->edit_list ); // setup new cache
+			
 		}
-	 }
+	}
 	if( src_type == 1 && 
 		vj_tag_get_active( sample->effect_chain[position]->channel ) &&
 		vj_tag_get_type( sample->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
@@ -1430,6 +1431,7 @@ int sample_set_chain_channel(int s1, int position, int input)
 	}
 
 	sample->effect_chain[position]->channel = input;
+	sample->effect_chain[position]->clear = 1;
 
     return 1;
 }
@@ -1569,6 +1571,7 @@ int sample_set_chain_source(int s1, int position, int input)
 		}
 
     sample->effect_chain[position]->source_type = input;
+	sample->effect_chain[position]->clear = 1;
     
 	return 1;
 }
