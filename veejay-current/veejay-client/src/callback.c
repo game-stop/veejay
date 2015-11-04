@@ -3140,7 +3140,7 @@ static void			do_clipboard(clipboard_t *c, int id, int entry_id)
 	msg_vims(msg);
 
 	snprintf( msg, sizeof(msg), "%03d:%d %d;",
-			( c->enabled ? 1 : 0 ),
+			( c->enabled ? VIMS_CHAIN_ENTRY_SET_VIDEO_ON : VIMS_CHAIN_ENTRY_SET_VIDEO_OFF ),
 		    id,
 			entry_id
 			);
