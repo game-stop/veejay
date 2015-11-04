@@ -111,6 +111,8 @@ static struct
 
 #define MAX_SLOW 25 
 
+static int beta__ = 0;
+
 static struct
 {
 	const char *text;
@@ -4504,7 +4506,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 					{				
 						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],1, gtype,gsource );
 						add_sample_to_sample_banks(bank_page, tmp_slot );											     n_slots ++;
-						free_slot(tmp_slot);	
+						free_slot(tmp_slot);
 					}
 					else
 					{
@@ -6420,7 +6422,7 @@ static void	process_reload_hints(int *history, int pm)
 	if ( info->uc.reload_hint[HINT_KF]  )
 		vj_kf_refresh();
 	
-	if( info->uc.reload_hint[HINT_HISTORY] )
+	if( beta__ && info->uc.reload_hint[HINT_HISTORY] )
 		reload_srt();
 	
 	veejay_memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));	
@@ -7143,6 +7145,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 		GtkWidget *srtpad = gtk_notebook_get_nth_page(GTK_NOTEBOOK(ww),4);
 		gtk_widget_hide(srtpad);
 	}
+
+	beta__ = beta;
 
 	update_spin_range( "spin_framedelay", 1, MAX_SLOW, 0);
 	update_spin_range( "spin_samplespeed", -25,25,1);
