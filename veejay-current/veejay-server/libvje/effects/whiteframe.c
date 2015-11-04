@@ -29,7 +29,7 @@ vj_effect *whiteframe_init(int w,int h)
     ve->defaults = NULL;	/* default values */
     ve->limits[0] = NULL;	/* min */
     ve->limits[1] = NULL;	/* max */
-    ve->description = "Replace Pure White";;
+    ve->description = "Replace Pure White (MG)";
     ve->extra_frame = 1;
     ve->sub_format = 0;
 	ve->has_user = 0;
