@@ -2212,6 +2212,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 	top.data[1] = F[1]->data[1];
 	top.data[2] = F[1]->data[2];
 	top.data[3] = F[1]->data[3];
+	top.ssm     = F[1]->ssm;
 
 	veejay_memcpy(&sub, F[0], sizeof(VJFrame));
 	sub.data[0] = subrender_buffer[0];
@@ -2251,6 +2252,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 				if( ef ) {
 					subframes[1]->ssm = vj_perform_apply_secundary(info,id,fx_entry->channel,fx_entry->source_type,n,subframes[0],subframes[1],p0_ref, p1_ref, 1);
 				}	
+
 				if( sm > 0) {
 					if(subframes[0]->ssm == 0 ) {
 						chroma_supersample( settings->sample_mode,subframes[0],subframes[0]->data );
@@ -2271,7 +2273,6 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 						subframes[1]->ssm = 0;
 					}
 				}	
-
 				if(vj_perform_apply_first(info,&setup,subframes,frameinfo,fx_id,n,(int) settings->current_frame_num,fx_entry->fx_instance, mode ) == -2 ) {
 					int res = 0;
 					void *pfx = vj_effect_activate( fx_id, &res );
@@ -2334,7 +2335,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 			break;
 	}
 
-	return subframes[1]->ssm;
+	return top.ssm;
 }
 
 static void	vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_entry, int chain_entry, VJFrame *frames[2], int subrender)
@@ -2373,11 +2374,12 @@ static void	vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
 	if(ef)
 	{
 		frames[1]->ssm = vj_perform_apply_secundary(info,info->uc->sample_id,fx_entry->channel,fx_entry->source_type,chain_entry,frames[0],frames[1],frame_buffer[chain_entry]->P0, frame_buffer[chain_entry]->P1, 0);
+		
 		if( subrender && settings->fxdepth) {
 			frames[1]->ssm = vj_perform_preprocess_secundary( info, fx_entry->channel,fx_entry->source_type,sub_mode,chain_entry, frames, frameinfo );
 		}
 	
-		if(frames[1]->ssm == 0 && sub_mode > 0)
+		if(frames[1]->ssm == 0 && sub_mode == 1)
 		{
 			chroma_supersample( settings->sample_mode,frames[1],frames[1]->data );
 			frames[1]->ssm = 1;
