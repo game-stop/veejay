@@ -678,6 +678,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 95 ] = toalpha_init(width,height);
 	vj_effects[i + 96 ] = alphaflatten_init(width,height);
 	vj_effects[i + 97 ] = feathermask_init(width,height);
+	vj_effects[i + 98 ] = alphaselect_init(width,height);
 	max_width = width;
 	max_height = height;
 
