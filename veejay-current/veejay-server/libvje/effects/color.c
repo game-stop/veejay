@@ -38,7 +38,7 @@ vj_effect *color_init(int w, int h)
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->description = "Color Enhance";
 	ve->param_description = vje_build_param_list( ve->num_params, "Intensity Y", "Intensity U", "Intensity V" ); 
 	ve->has_user = 0;
@@ -67,7 +67,7 @@ void color_apply(VJFrame *frame, int width, int height,
 
 	int p1,p2,q1,q2;
 
-	const int uv_len = frame->uv_len;
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 

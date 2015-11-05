@@ -58,7 +58,7 @@ void raster_apply(VJFrame *frame, int w, int h, int v )
 	{
 		for(x=0; x < w; x++)
 		{
-			Y[y*w+x] = ((x%v>1)? ((y%v>1) ? Y[y*w+x]: 235):235);
+			Y[y*w+x] = ((x%v>1)? ((y%v>1) ? Y[y*w+x]: pixel_Y_hi_):pixel_Y_hi_);
 		}
 	}
 	w= frame->uv_width;

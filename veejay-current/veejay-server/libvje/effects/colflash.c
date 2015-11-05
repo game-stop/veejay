@@ -49,7 +49,7 @@ vj_effect *colflash_init(int w, int h)
     ve->defaults[3] = 0;
     ve->defaults[4] = 3; //delay
     ve->description = "Color Flash";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->rgb_conv = 1;
@@ -64,7 +64,7 @@ static int delay_ = 0;
 void colflash_apply( VJFrame *frame, int width, int height, int f,int r, int g, int b, int d)
 {
 	unsigned int len =  frame->len;
-	unsigned int uv_len = frame->uv_len;
+	unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];

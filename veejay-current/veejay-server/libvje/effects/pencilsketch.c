@@ -47,7 +47,7 @@ vj_effect *pencilsketch_init(int w, int h)
 	ve->param_description = vje_build_param_list(ve->num_params, "Blend Mode", "Min Threshold", "Max Treshold", "Mask" );
     ve->description = "Pencil Sketch (8)";   
     ve->extra_frame = 0;
-    ve->sub_format = 0;
+    ve->sub_format = -1;
 	ve->has_user = 0;
 	ve->parallel = 1;    
 	return ve;
@@ -160,7 +160,7 @@ void pencilsketch_apply(
 {
 	unsigned int i;
 	int len = frame->len;
-	int uv_len = frame->uv_len;
+	const unsigned int uv_len = (frame->ssm ?frame->len : frame->uv_len);
 	int m,d;
 	uint8_t y,yb;
   	uint8_t *Y = frame->data[0];

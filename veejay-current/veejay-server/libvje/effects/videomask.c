@@ -35,7 +35,7 @@ vj_effect *videomask_init(int w,int h)
     ve->limits[1][0] = 255;
     ve->defaults[0] = 150; /* threshold */
     ve->description = "Luminance Map";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Threshold");
@@ -48,7 +48,7 @@ void videomask_apply(VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int videomask)
 {
     unsigned int i, op0, op1;
-    const int len = frame->len;
+    const int len = (frame->ssm ? frame->len : frame->uv_len);
 	const int uv_len = frame->uv_len;
     const uint8_t pure_white_y  = pixel_Y_hi_;
     const uint8_t pure_white_c  = pixel_U_hi_;

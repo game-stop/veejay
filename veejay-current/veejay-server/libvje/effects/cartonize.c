@@ -43,7 +43,7 @@ vj_effect *cartonize_init(int w, int h)
 	ve->defaults[2] = 0;
 
     ve->description = "Cartoon";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->parallel = 1;
@@ -55,16 +55,16 @@ void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int
 {
     unsigned int i;
     int len = (width * height);
-    int uv_len = frame->uv_len;
+    int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t tmp;	
 	int		p;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-	const int	base = (const int) b1;
+	const int base = (const int) b1;
 	int	ubase= (const int) b2 - 128;
-	int 	vbase= (const int) b3 - 128;
+	int vbase= (const int) b3 - 128;
 	// ubase/vbase cannot be 0
 	if(ubase==0) ubase=1;
 	if(vbase==0) vbase=1;

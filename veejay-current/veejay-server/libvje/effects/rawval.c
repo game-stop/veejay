@@ -44,7 +44,7 @@ vj_effect *rawval_init(int w,int h)
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
 	ve->parallel = 1;
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->description = "Raw Chroma Pixel Replacement";
 	ve->has_user = 0;
     ve->extra_frame = 0;
@@ -59,18 +59,15 @@ void rawval_apply( VJFrame *frame, int width, int height,
 		  const int new_color_cb, const int new_color_cr)
 {
     unsigned int i;
-	int uv_len = frame->uv_len;
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-	if( frame->ssm )
-		uv_len = frame->len;
-
     for (i = 0; i < uv_len; i++) {
-	if (Cb[i] >= new_color_cb)
-	    Cb[i] = color_cb;
-	if (Cr[i] >= new_color_cr)
-	    Cr[i] = color_cr;
+		if (Cb[i] >= new_color_cb)
+		    Cb[i] = color_cb;
+		if (Cr[i] >= new_color_cr)
+		    Cr[i] = color_cr;
     }
 }
 void rawval_free(){}

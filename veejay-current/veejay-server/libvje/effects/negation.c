@@ -39,7 +39,7 @@ vj_effect *negation_init(int w, int h)
     ve->limits[1][0] = 255;
     ve->defaults[0] = 255;
     ve->description = "Negation";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;
@@ -51,8 +51,8 @@ vj_effect *negation_init(int w, int h)
 void negation_apply( VJFrame *frame, int width, int height, int val)
 {
     int i;
-    int len = (width * height);
-    int uv_len = frame->uv_len;
+    const unsigned int len = frame->len;
+    const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len );
 
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];

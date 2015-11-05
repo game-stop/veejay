@@ -44,7 +44,7 @@ vj_effect *morphology_init(int w, int h)
 	ve->defaults[1] = 0;
 	ve->defaults[2] = 0;
     ve->description = "Morphology (experimental)";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params,"Threshold", "Operator", "Repeat");
@@ -102,7 +102,7 @@ void morphology_apply( VJFrame *frame, int width, int height, int threshold, int
     unsigned int i,x,y;
     int len = (width * height);
 	int t=0;
-    int uv_len = frame->uv_len;
+    const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
     uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

@@ -38,7 +38,7 @@ vj_effect *chromium_init(int w, int h)
     ve->defaults[0] = 0;
     ve->description = "Chromium";
    	ve->parallel = 1;
-	ve->sub_format = 0;
+	ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
@@ -47,7 +47,7 @@ vj_effect *chromium_init(int w, int h)
 
 void chromium_apply(VJFrame *frame, int width, int height, int m )
 {
-	const int len = frame->uv_len;
+	const int len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 

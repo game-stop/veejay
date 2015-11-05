@@ -45,7 +45,7 @@ vj_effect *tripplicity_init(int w, int h)
     ve->defaults[2] = 150;
 
     ve->description = "Normal Overlay (per Channel)";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
  	ve->parallel = 1;
@@ -61,7 +61,7 @@ void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int width,
 {
     unsigned int i;
     const unsigned int len =  frame->len;
-    const unsigned int uv_len = frame->uv_len;
+    const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];

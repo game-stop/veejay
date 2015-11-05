@@ -43,7 +43,7 @@ vj_effect *contrast_init(int w, int h)
 	ve->description = "Contrast";
 	ve->has_user = 0;
     ve->extra_frame = 0;
-    ve->sub_format = 0;
+    ve->sub_format = -1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Intensity 1", "Intensity 2" );
     return ve;
 }
@@ -53,7 +53,7 @@ void contrast_cb_apply(VJFrame *frame, int width,int height, int *s) {
 	unsigned int r;
 	register int cb;
 	register int cr;
-	const int uv_len = frame->uv_len;
+	const unsigned int uv_len = (frame->ssm ? frame->len: frame->uv_len);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 

@@ -35,7 +35,7 @@ vj_effect *emboss_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 9;
     ve->description = "Various Weird Effects";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params,"Mode" );

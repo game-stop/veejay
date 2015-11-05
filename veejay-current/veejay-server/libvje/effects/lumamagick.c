@@ -47,7 +47,7 @@ vj_effect *lumamagick_init(int width, int height)
     ve->limits[1][1] = 200;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 200;
-   ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Opacity A", "Opacity B" );
@@ -62,7 +62,7 @@ void _lumamagick_adddistorted(VJFrame *frame, VJFrame *frame2,
 {
     unsigned int i;
     const unsigned int len = frame->len;
-    const unsigned int uv_len = frame->uv_len;
+    const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -102,8 +102,8 @@ void _lumamagick_add_distorted(VJFrame *frame, VJFrame *frame2,
     const double opacity_a = op_a * 0.01;
     const double opacity_b = op_b * 0.01;
     const unsigned int len = frame->len;
-    const unsigned int uv_len = frame->uv_len;
-  	uint8_t *Y = frame->data[0];
+    const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
     uint8_t *Y2 = frame2->data[0];
@@ -143,8 +143,8 @@ void _lumamagick_subdistorted(VJFrame *frame, VJFrame *frame2,
     const double opacity_a = op_a * 0.01;
     const double opacity_b = op_b * 0.01;
     const unsigned int len = frame->len;
-    const unsigned int uv_len = frame->uv_len;
-  	uint8_t *Y = frame->data[0];
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
     uint8_t *Y2 = frame2->data[0];
@@ -178,7 +178,7 @@ void _lumamagick_sub_distorted(VJFrame *frame, VJFrame *frame2,
     const double opacity_b = op_b * 0.01;
     uint8_t y1, y2, cb, cr, y3, cs;
     const unsigned int len = frame->len;
-    const unsigned int uv_len = frame->uv_len;
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -597,7 +597,8 @@ void _lumamagick_relativeadd(VJFrame *frame, VJFrame *frame2,
     const double opacity_a = op_a * 0.01;
     const double opacity_b = op_b * 0.01;
     const unsigned int len = frame->len;
-    const unsigned int uv_len = frame->uv_len;
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -635,7 +636,7 @@ void _lumamagick_relativesub(VJFrame *frame, VJFrame *frame2,
     const double opacity_a = op_a * 0.01;
     const double opacity_b = op_b * 0.01;
     const unsigned int len = frame->len;
-    const unsigned int uv_len = frame->uv_len;
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -789,7 +790,7 @@ void _lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int width,
     const double opacity_a = op_a * 0.01;
     const double opacity_b = op_b * 0.01;
     const unsigned int len = frame->len;
-    const unsigned int uv_len = frame->uv_len;
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -841,6 +842,7 @@ void _lumamagick_addtest4(VJFrame *frame, VJFrame *frame2, int width,
 
 }
 
+/*
 void _lumamagick_selectmin(VJFrame *frame, VJFrame *frame2, int width,
 			   int height, int op_a, int op_b)
 {
@@ -875,6 +877,7 @@ void _lumamagick_selectmin(VJFrame *frame, VJFrame *frame2, int width,
 	}
     }
 }
+*/
  
 void _lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int op_a, int op_b)
@@ -884,7 +887,7 @@ void _lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int width,
     const double opacity_a = op_a * 0.01;
     const double opacity_b = op_b * 0.01;
     const unsigned int len = frame->len;
-    const unsigned int uv_len = frame->uv_len;
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
