@@ -38,7 +38,7 @@ vj_effect *dither_init(int w, int h)
     ve->limits[1][1] = 1;
 
     ve->description = "Matrix Dithering";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 
@@ -47,31 +47,34 @@ vj_effect *dither_init(int w, int h)
     return ve;
 }
 
-void dither_apply(VJFrame *frame, int width, int height, int size,
-		  int random_on)
+static last_size = 0;
+void dither_apply(VJFrame *frame, int width, int height, int size, int random_on)
 {
     long int w_, h_;
     long int dith[size][size];
     long int i, j, d, v, l, m;
     uint8_t *Y = frame->data[0];
+	uint8_t *U = frame->data[1];
+	uint8_t *V = frame->data[2];
 
-    for (l = 0; l < size; l++) {
-	for (m = 0; m < size; m++) {
-	    dith[l][m] =
-		1 + (int) ((double) size * rand() / (RAND_MAX + 1.0));
+	if( last_size != size || random_on ) {
+	  for (l = 0; l < size; l++) {
+		for (m = 0; m < size; m++) {
+			dith[l][m] =
+				1 + (int) ((double) size * rand() / (RAND_MAX + 1.0));
+		}
+	  }
+	  last_size = size;
 	}
-    }
 
     for (h_ = 0; h_ < height; h_++) {
-	j = h_ % size;
-	for (w_ = 0; w_ < width; w_++) {
-	    i = w_ % size;
-	    d = dith[i][j] << 4;
-	    /* Luminance , dither image. Do
-	       this for U and V too, see what happens hehe */
-	    v = ((long) Y[((h_ * width) + w_)] + d);
-	    Y[(h_ * width) + w_] = (uint8_t) ((v >> 7) << 7);
-	}
+		j = h_ % size;
+		for (w_ = 0; w_ < width; w_++) {
+			i = w_ % size;
+			d = dith[i][j] << 4;
+			v = ((long) Y[((h_ * width) + w_)] + d);
+			Y[(h_ * width) + w_] = (uint8_t) ((v >> 7) << 7);
+		}
     }
 }
 void dither_free(){}
