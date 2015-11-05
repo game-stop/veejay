@@ -1,0 +1,69 @@
+
+Veejay has some support for alpha channel compositing
+
+In general, you will need to add an alpha channel to your playing sample or stream by using one of the "Alpha:" filters in veejay
+
+Then, the alpha channel will be combined by FX that can deal with Alpha. Some of such effects have a mode parameter "Alpha" that functions like an on/off switch but others require an alpha channel to work. 
+
+By default, the alpha channel is set to 0 (completely invisible) so such effects will always result in a black screen if you have not added an alpha channel
+
+
+
+
+The 'Select by Color Key' operator
+-----------------------------------
+Use this filter to create an alpha channel from the foreground object.
+The filter requires an existing alpha channel to decide which pixel from source B to composite in. Pixels with an alpha of 0 are skipped.
+Using the parameters R,G,B and Angle you can select which pixels belong to the background and key them out, leaving a mask of the foreground object.
+
+
+
+Luma Key
+--------
+
+Luma Key in Mode 3 will not composite-in pixels from source B if its alpha channel value is 0
+
+
+
+Black and White Mask by Threshold
+---------------------------------
+
+This filter creates a black/white image from a minimum and maximum threshold value. You can set a mode parameter so that the render result is written as an Alpha channel
+
+
+
+LVD Scale0Tilt / Crop,Scale,Tilt
+---------------------------------
+
+This filter is a port of the frei0r filter "scale0tilt.so"
+You can use it to crop,scale, tilt an image from source B over source A
+If the Alpha paramater is set to 1, the final result will be an opaque pixel with the transparency of each pixel determined by the alpha channel values
+
+
+Flatten Image
+-------------
+
+Use this to multiply the alpha channel against a black background
+
+
+Alpha Fill
+----------
+
+Solid value fill of the alpha channel, 0 - 255
+
+
+Set from Image / Mixing source
+------------------------------
+
+Use the luminance channel of the image as a new Alpha channel
+
+
+You can use the FX switch parameter to scale the values to full range (0-255) if needed.
+If you have no result in the Alpha channel, flip this parameter.
+
+
+Alpha to Greyscale
+-------------------
+
+Use this FX to display the alpha channel as a greyscale image.
+
