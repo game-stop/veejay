@@ -102,13 +102,12 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
 
 ### Editing
 
- * 132 built-in FX , many unique and original FX filters 
- * 41 Livido filters
- * FX chain (20 slots)
+ * 150 built-in FX , many unique and original FX filters 
+ * 60 Livido filters
+ * FX chain (20 slots) with Alpha Channels
  * All FX parameters can be animated.
  * Mix up to two layers per FX slot
  * Non destructive edit decision lists (cut/copy/paste/crop video)
- * Simple text editor 
  * Sample editor
  * Sequence editor
  * Live disk recorder (sampling)
@@ -133,11 +132,12 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
 ### Output
 
  * Audio trough Jack (low latency audio server) (8)
- * SDL and OpenGL video
- * Headless
+ * SDL video
+ * Headless (no output)
  * YUV4MPEG streaming
+ * V4L2 loopback devices
  * Network streaming (unicast and multicast)
- * Preview rendering
+ * Image grabbing
 
 ### Interaction
 
@@ -145,19 +145,22 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
  * VIMS (tcp/ip) 
  * OSC (udp)
  * PureData trough sendVIMS external
+ * MIDI 
 
 ### Viewing
 
  * Full screen or windowed mode
  * Perspective and foward projection (9)
+ * Twinview/BigDesktop
+ * Split-screen video wall
  
 
 ### Additional
 
- * Support for FreeFrame plugins (only for 32 bit systems!)
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
-
+ * Support for FreeFrame plugins (only for 32 bit systems!)
+ * 
 ## Contact / Feedback & HELP
 
 Please join our mailing list on http://groups.google.com/group/veejay-discussion
