@@ -32,7 +32,7 @@ vj_effect *overlaymagic_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 7;
+    ve->defaults[0] = 1;
     ve->defaults[1] = 0;
     ve->description = "Overlay Magic";
     ve->limits[0][0] = 1;
