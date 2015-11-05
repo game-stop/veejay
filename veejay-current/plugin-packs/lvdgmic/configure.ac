@@ -90,6 +90,15 @@ AM_PROG_AS
 
 AC_CHECK_HEADERS([fenv.h stdint.h inttypes.h sys/types.h alloca.h])
 
+AC_LANG_PUSH([C++])
+AC_CHECK_HEADER([gmic.h], have_gmic=true,have_gmic=false)
+AC_LANG_POP([C++])
+
+if test x$have_gmic = xfalse;
+then
+	AC_MSG_ERROR([gmic.h not found - please install gmic])
+fi
+
 dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_STDINT_H])
 dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_INTTYPES_H])
 
