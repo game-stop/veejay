@@ -2900,22 +2900,28 @@ void 	on_spin_framedelay_value_changed(GtkWidget *w, gpointer user_data)
 	vj_midi_learning_vims_spin( info->midi, "spin_framedelay", VIMS_VIDEO_SET_SLOW );
 }
 
+void	on_alpha_effects_toggled(GtkWidget *w, gpointer user_data)
+{
+	 GtkWidget *n = glade_xml_get_widget_( info->main_window, "effectspanel" );
+	 gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+     if(page != 2)
+		gtk_notebook_set_page(GTK_NOTEBOOK(n), 2);
+}
+
 void	on_mixing_effects_toggled(GtkWidget *w, gpointer user_data)
 {
 	 GtkWidget *n = glade_xml_get_widget_( info->main_window, "effectspanel" );
 	 gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-         if(page == 1)
-		gtk_notebook_prev_page( GTK_NOTEBOOK(n) );
-       
+	 if(page != 0 )
+		 gtk_notebook_set_page(GTK_NOTEBOOK(n), 0 );
 }
 
 void	on_image_effects_toggled(GtkWidget *w, gpointer user_data)
 {
 	 GtkWidget *n = glade_xml_get_widget_( info->main_window, "effectspanel" );
 	 gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-         if(page == 0)
-		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
-
+	 if(page != 1)
+		 gtk_notebook_set_page(GTK_NOTEBOOK(n),1);
 }
 
 void	on_console1_activate(GtkWidget *w, gpointer user_data)

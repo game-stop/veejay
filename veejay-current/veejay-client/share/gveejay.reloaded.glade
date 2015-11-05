@@ -3424,6 +3424,23 @@
                                             <property name="position">1</property>
                                           </packing>
                                         </child>
+                                        <child>
+                                          <widget class="GtkRadioButton" id="alpha_effects">
+                                            <property name="label" translatable="yes">Alpha</property>
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="receives_default">False</property>
+                                            <property name="use_underline">True</property>
+                                            <property name="draw_indicator">True</property>
+                                            <property name="group">mixing_effects</property>
+                                            <signal name="toggled" handler="on_alpha_effects_toggled" />
+                                          </widget>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
                                       </widget>
                                       <packing>
                                         <property name="expand">False</property>
@@ -3488,6 +3505,36 @@
                                           </widget>
                                           <packing>
                                             <property name="position">1</property>
+                                            <property name="tab_fill">False</property>
+                                            <property name="type">tab</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <widget class="GtkScrolledWindow" id="scrolledwindow1">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="hscrollbar_policy">automatic</property>
+                                            <property name="vscrollbar_policy">automatic</property>
+                                            <child>
+                                              <widget class="GtkTreeView" id="tree_alphalist">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                              </widget>
+                                            </child>
+                                          </widget>
+                                          <packing>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <widget class="GtkLabel" id="label9alpha">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="label" translatable="yes">alpha effects</property>
+                                            <property name="angle">270</property>
+                                          </widget>
+                                          <packing>
+                                            <property name="position">2</property>
                                             <property name="tab_fill">False</property>
                                             <property name="type">tab</property>
                                           </packing>
@@ -11552,7 +11599,7 @@ YUV (current)</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
                                     <property name="tooltip" translatable="yes">Save Samplelist</property>
-                                    <signal name="button-press-event" handler="on_button_samplelist_qsave_clicked" />
+                                    <signal name="button_press_event" handler="on_button_samplelist_qsave_clicked" />
                                     <child>
                                       <widget class="GtkAlignment" id="alignment55">
                                         <property name="visible">True</property>
@@ -12564,6 +12611,24 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>

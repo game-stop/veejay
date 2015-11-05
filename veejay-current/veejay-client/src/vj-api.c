@@ -3823,34 +3823,7 @@ gboolean
 
     return TRUE; /* allow selection state to change */
   }
-void
-on_effectmixlist_row_activated(GtkTreeView *treeview,
-		GtkTreePath *path,
-		GtkTreeViewColumn *col,
-		gpointer user_data)
-{
-	GtkTreeModel *model;
-	GtkTreeIter iter;
-	model = gtk_tree_view_get_model(treeview);
-	if(gtk_tree_model_get_iter(model,&iter,path))
-	{
-		gint gid =0;
-		gchar *name = NULL;
-		gtk_tree_model_get(model,&iter, FX_STRING, &name, -1); // FX_ID
 
-		if(vevo_property_get( fx_list_, name, 0,&gid ) == 0 )
-		{
-			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
-				0, info->uc.selected_chain_entry,gid );
-			info->uc.reload_hint[HINT_ENTRY] = 1;
-			
-			char trip[100];
-			snprintf(trip,sizeof(trip), "%03d:%d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid );
-			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
-		}
-		g_free(name);
-	}
-}
 void
 on_effectlist_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -3950,18 +3923,19 @@ sort_vims_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
 void	setup_effectlist_info()
 {
 	int i;
-	GtkWidget *trees[2];
+	GtkWidget *trees[3];
 	trees[0] = glade_xml_get_widget_( info->main_window, "tree_effectlist");
 	trees[1] = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
-	GtkListStore *stores[2];
-	stores[0] = gtk_list_store_new( 1, G_TYPE_STRING );
-	stores[1] = gtk_list_store_new( 1, G_TYPE_STRING );
+	trees[2] = glade_xml_get_widget_( info->main_window, "tree_alphalist" );
 
+	GtkListStore *stores[3];
 
 	fx_list_ = (vevo_port_t*) vpn( 200 );
 
-	for(i = 0; i < 2; i ++ )
+	for(i = 0; i < 3; i ++ )
 	{
+		stores[i] = gtk_list_store_new( 1, G_TYPE_STRING );
+
 		GtkTreeSortable *sortable = GTK_TREE_SORTABLE(stores[i]);
 		gtk_tree_sortable_set_sort_func(
 			sortable, FX_STRING, sort_iter_compare_func,
@@ -3981,20 +3955,15 @@ void	setup_effectlist_info()
 
 	setup_tree_text_column( "tree_effectmixlist", FX_STRING, "Effect",0 );
 
-	g_signal_connect( trees[0], "row-activated",
-		(GCallback) on_effectlist_row_activated, NULL );
+	setup_tree_text_column( "tree_alphalist", FX_STRING, "Alpha",0);
 
-	g_signal_connect( trees[1] ,"row-activated",
-		(GCallback) on_effectmixlist_row_activated, NULL );
-
-	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(trees[0]));
+	for(i = 0; i < 3;  i ++ )
+	{
+		g_signal_connect( trees[i],"row-activated", (GCallback) on_effectlist_row_activated, NULL );
+		GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(trees[i]));
     	gtk_tree_selection_set_select_function(selection, view_fx_selection_func, NULL, NULL);
     	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-	
-	selection = gtk_tree_view_get_selection( GTK_TREE_VIEW(trees[1] ));
-	gtk_tree_selection_set_select_function( selection, view_fx_selection_func, NULL,NULL );
-	gtk_tree_selection_set_mode( selection, GTK_SELECTION_SINGLE );
-
+	}
 }
 
 
@@ -4229,23 +4198,31 @@ void	load_effectlist_info()
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
 	GtkWidget *tree2 = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
-	GtkListStore *store,*store2;
+	GtkWidget *tree3 = glade_xml_get_widget_( info->main_window, "tree_alphalist");
+	GtkListStore *store,*store2,*store3;
 	char line[4096];
 
 	GtkTreeIter iter;
 	gint i,offset=0;
-	
-	
 	gint fxlen = 0;
 	single_vims( VIMS_EFFECT_LIST );
 	gchar *fxtext = recv_vims(6,&fxlen);
+	
 	_effect_reset();
- 	reset_tree( "tree_effectlist");
+ 	
+	reset_tree( "tree_effectlist");
+	reset_tree( "tree_effectmixlist" );
+	reset_tree( "tree_alphalist" );
+
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	store = GTK_LIST_STORE(model);
 
 	GtkTreeModel *model2 = gtk_tree_view_get_model( GTK_TREE_VIEW(tree2));
 	store2 = GTK_LIST_STORE(model2);
+
+	GtkTreeModel *model3 = gtk_tree_view_get_model( GTK_TREE_VIEW(tree3));
+	store3 = GTK_LIST_STORE(model3);
+
 	while( offset < fxlen )
 	{
 		char tmp_len[4];
@@ -4272,19 +4249,30 @@ void	load_effectlist_info()
 		gchar *name = _utf8str( _effect_get_description( ec->id ) );
 		if( name != NULL)
 		{
-			if( _effect_get_mix(ec->id) > 0 )
-			{
-				gtk_list_store_append( store2, &iter );
-				gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
-				vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
+			if( strncasecmp( "alpha:" , ec->description, 6 ) == 0 ) {
+				gtk_list_store_append( store3, &iter );
+				int len = strlen( ec->description );
+				char *newName = vj_calloc( len );
+				veejay_memcpy(newName,ec->description+6, len-6 );
+				gtk_list_store_set( store3,&iter, FX_STRING, newName, -1 );
+				vevo_property_set( fx_list_, newName, LIVIDO_ATOM_TYPE_INT,1,&(ec->id));
+				free(newName);
 			}
-			else
+			else 
 			{
-				gtk_list_store_append( store, &iter );
-				gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
-				vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
+				if( _effect_get_mix(ec->id) > 0 )
+				{
+					gtk_list_store_append( store2, &iter );
+					gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
+					vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
+				}
+				else
+				{
+					gtk_list_store_append( store, &iter );
+					gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
+					vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
+				}
 			}
-
 		}
 		g_free(name);
 	}
@@ -4292,6 +4280,7 @@ void	load_effectlist_info()
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(store2));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(store3));
 	free(fxtext);
 }
 
