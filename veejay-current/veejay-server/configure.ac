@@ -565,7 +565,7 @@ AC_SUBST(MJPEGTOOLS_CFLAGS)
 AC_SUBST(MJPGETOOLS_LIBS)
 
 PKG_CHECK_MODULES(LIBPNG, [libpng], have_libpng=true,have_libpng=false)
-PKG_CHECK_MODULES(LIBQRENCODE,[libqrencode >= 3.4.4], have_qrencode=true,have_qrencode=false)
+PKG_CHECK_MODULES(LIBQRENCODE,[libqrencode >= 3.4.2], have_qrencode=true,have_qrencode=false)
 if test x$have_qrencode = xfalse;
 then
 	AC_MSG_WARN([libqrencode is not present])
