@@ -858,8 +858,13 @@ void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void	on_button_samplelist_qsave_clicked(GtkWidget *widget, gpointer user_data)
+gboolean	on_button_samplelist_qsave_clicked(GtkWidget *widget, GdkEvent *event, gpointer user_data)
 {
+	//save as if shift click
+	if(event && ((GdkEventButton *) event)->state & GDK_SHIFT_MASK) {
+		has_samplelist_name = 0;
+	}
+
 	if( has_samplelist_name == 0 ) {
 		gchar *filename = dialog_save_file( "Save samplelist");
 		if(filename)
@@ -875,6 +880,7 @@ void	on_button_samplelist_qsave_clicked(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s" , samplelist_name );
 		vj_msg(VEEJAY_MSG_INFO, "Quick saved samples to %s" , samplelist_name );
 	}
+	return TRUE;
 }
 
 
