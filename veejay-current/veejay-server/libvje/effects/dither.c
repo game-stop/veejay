@@ -33,7 +33,7 @@ vj_effect *dither_init(int w, int h)
     ve->defaults[1] = 0;
 
     ve->limits[0][0] = 2;
-    ve->limits[1][0] = 255;
+    ve->limits[1][0] = w;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 1;
 
@@ -61,7 +61,7 @@ void dither_apply(VJFrame *frame, int width, int height, int size, int random_on
 	  for (l = 0; l < size; l++) {
 		for (m = 0; m < size; m++) {
 			dith[l][m] =
-				1 + (int) ((double) size * rand() / (RAND_MAX + 1.0));
+				(int) ((double) (size) * rand() / (RAND_MAX + 1.0));
 		}
 	  }
 	  last_size = size;
