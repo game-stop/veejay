@@ -177,6 +177,9 @@
 #include "effects/magicalphaoverlays.h"
 #include "effects/travelmatte.h"
 #include "effects/feathermask.h"
+#include "effects/alphaselect.h"
+#include "effects/alphaselect2.h"
+#include "effects/alphablend.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -580,7 +583,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[48] = mixtoalpha_init(width,height);
 	vj_effects[49] = overlayalphamagic_init(width,height);
 	vj_effects[50] = travelmatte_init(width,height);
-    vj_effects[51] = dummy_init(width,height);
+	vj_effects[51] = alphablend_init(width,height);
+    vj_effects[52] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -679,6 +683,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 96 ] = alphaflatten_init(width,height);
 	vj_effects[i + 97 ] = feathermask_init(width,height);
 	vj_effects[i + 98 ] = alphaselect_init(width,height);
+	vj_effects[i + 99 ] = alphaselect2_init(width,height);
 	max_width = width;
 	max_height = height;
 
@@ -784,7 +789,7 @@ int vj_effect_real_to_sequence(int effect_id)
     }
     else
     {
-	if (effect_id > VJ_IMAGE_EFFECT_MIN && effect_id < VJ_IMAGE_EFFECT_MAX) {
+	if (effect_id > VJ_IMAGE_EFFECT_MIN && effect_id <= VJ_IMAGE_EFFECT_MAX) {
 		effect_id -= VJ_IMAGE_EFFECT_MIN;
 		effect_id += VJ_VIDEO_COUNT;
 		return effect_id;
@@ -1038,26 +1043,6 @@ int	vj_effect_has_cb(int effect_id)
 	return 0;
 }
 
-int vj_effect_get_min_i()
-{
-	return VJ_IMAGE_EFFECT_MIN;
-}
-
-int vj_effect_get_max_i()
-{
-	return VJ_IMAGE_EFFECT_MAX;
-}	
-
-int vj_effect_get_min_v()
-{
-	return VJ_VIDEO_EFFECT_MIN;
-}
-
-int vj_effect_get_max_v()
-{
-	return VJ_VIDEO_EFFECT_MAX;
-}
-
 int	vj_effect_has_rgbkey(int effect_id)
 {
    int entry;
@@ -1074,7 +1059,7 @@ int vj_effect_is_valid(int effect_id)
 {
 	if( effect_id >= VJ_EXT_EFFECT && effect_id < VJ_EXT_EFFECT + n_ext_plugs_)
 		return 1;
-	if( effect_id > VJ_IMAGE_EFFECT_MIN && effect_id < VJ_IMAGE_EFFECT_MAX )
+	if( effect_id > VJ_IMAGE_EFFECT_MIN && effect_id <= VJ_IMAGE_EFFECT_MAX )
 		return 1;
 	if( effect_id > VJ_VIDEO_EFFECT_MIN && effect_id < VJ_VIDEO_EFFECT_MAX )
 		return 1;

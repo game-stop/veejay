@@ -430,6 +430,9 @@ void vj_effman_apply_image_effect(
 	case VJ_IMAGE_EFFECT_ALPHASELECT:
 		alphaselect_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 		break;
+	case VJ_IMAGE_EFFECT_ALPHASELECT2:
+		alphaselect2_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
+		break;
     }
 }
 
@@ -502,7 +505,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	break;
       case VJ_VIDEO_EFFECT_RGBKEY:
 	rgbkey_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
-		     arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]);
+		     arg[0], arg[1], arg[2], arg[3], arg[4], arg[5],arg[6]);
 	break;
       case VJ_VIDEO_EFFECT_KEYSELECT:
 	keyselect_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,
@@ -660,6 +663,9 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	break;
 	case VJ_VIDEO_EFFECT_TRAVELMATTE:
 		travelmatte_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0]);
+		break;
+	case VJ_VIDEO_EFFECT_ALPHABLEND:
+		alphablend_apply(frames[0],frames[1],frames[0]->width,frames[0]->height);
 		break;
     }
 

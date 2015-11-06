@@ -1,7 +1,7 @@
-/* 
+/*
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,12 +18,13 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef RGBKEY_H
-#define RGBKEY_H
+#ifndef ALPHABLEND_H
+#define ALPHABLEND_H
+#include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
-#include <libvje/vje.h>
-vj_effect *rgbkey_init();
-void rgbkey_scan_fg(uint8_t * src2[3], int *r, int *g, int *b);
-void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tola, int r, int g,int b, int tolb, int show, int alpha);
+
+vj_effect *alphablend_init(int w, int h);
+void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
+
 #endif

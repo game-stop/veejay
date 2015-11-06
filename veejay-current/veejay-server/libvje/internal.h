@@ -123,7 +123,7 @@ enum {
 	VJ_VIDEO_EFFECT_MIXTOALPHA = 248,
 	VJ_VIDEO_EFFECT_MAGICALPHA = 249,
 	VJ_VIDEO_EFFECT_TRAVELMATTE = 250,
-	
+	VJ_VIDEO_EFFECT_ALPHABLEND = 251,	
 };
 
 enum {
@@ -226,6 +226,7 @@ enum {
 	VJ_IMAGE_EFFECT_ALPHAFLATTEN = 196,
 	VJ_IMAGE_EFFECT_ALPHAFEATHERMASK = 197,
 	VJ_IMAGE_EFFECT_ALPHASELECT = 198,
+	VJ_IMAGE_EFFECT_ALPHASELECT2 = 199,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
@@ -233,7 +234,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 251
+#define VJ_VIDEO_EFFECT_MAX 252
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -378,7 +379,7 @@ extern void coloradjust_apply( VJFrame *frame, int width, int height,
 
 extern void rgbkey_apply( VJFrame *frame, VJFrame *frame2, int width,
 			 int height, int i_angle, int i_noise,
-			 int r, int g, int b, int sup);
+			 int r, int g, int b, int sup, int alpha);
 
 extern void gamma_apply( VJFrame *frame,
 			int width, int height, int val);
@@ -647,4 +648,6 @@ extern void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,i
 extern void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode);
 extern void feathermask_apply( VJFrame *frame, int width, int height );
 extern void alphaselect_apply( VJFrame *frame, int width,int height, int i_angle, int r, int g,int b, int swap);
+void alphaselect2_apply( VJFrame *frame, int width,int height, int tola, int r, int g,int b, int tolb, int show, int alpha);
+void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
 #endif

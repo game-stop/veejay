@@ -22,7 +22,7 @@
 
 #define FX_LIMIT	1024
 
-#define MAX_EFFECTS 150
+#define MAX_EFFECTS 152
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)
@@ -46,7 +46,7 @@ typedef struct VJFrame_t
 	int	shift_v;
 	int	shift_h;
 	int	format;
-	int 	width;
+	int	width;
 	int	height;
 	int	ssm;
 	int	stride[4];
@@ -102,8 +102,8 @@ typedef struct vj_effect_instance_t {
 	float	*farr;
 } vj_fx_instance;
 
-extern int	get_pixel_range_min_Y();
-extern int	get_pixel_range_min_UV();
+extern int get_pixel_range_min_Y();
+extern int get_pixel_range_min_UV();
 extern void vj_effect_initialize(int width, int height, int range);
 extern void vj_effect_shutdown();
 extern int vj_effect_max_effects();
@@ -126,16 +126,12 @@ extern int vj_effect_get_summary_len(int entry);
 extern void *vj_effect_activate(int e, int *retcode);
 extern int vj_effect_deactivate(int e, void *ptr);
 extern int vj_effect_initialized(int e, void *ptr);
-extern int vj_effect_get_min_i();
-extern int vj_effect_get_max_i();
-extern int vj_effect_get_min_v();
-extern int vj_effect_get_max_v();
 extern int vj_effect_get_by_name(char *name);
-extern int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments, void *ptr);
-extern int	vj_effect_prepare( VJFrame *frame, int selector);
-extern	void	vj_effect_dump(void);
-extern int	rgb_parameter_conversion_type_;
-extern	int	vj_effect_is_plugin( int fx_id );
+extern int vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments, void *ptr);
+extern int vj_effect_prepare( VJFrame *frame, int selector);
+extern void vj_effect_dump(void);
+extern int rgb_parameter_conversion_type_;
+extern int vj_effect_is_plugin( int fx_id );
 extern void	*vj_effect_get_data( int seq_id );
 extern int vj_effect_is_parallel(int effect_id);
 #endif

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,41 +25,28 @@
 #include <math.h>
 #include "common.h"
 
-/* 
-
-	This effect is based on this small project:
-
-	http://www.cs.utah.edu/~michael/chroma/
-
-	The algorithm decides which pixels belong to resp. foreground 
-        or background. Other effects that make use of this same algorithm are
-
-	Complex Invert, Complex Negation, Complex Saturation, Smooth RGB Key 
-	Isolate by Color ,  Complex Threshold and Blend by Color Key, 
-*/
-
 /*
-	(march,2005) fixed flaw (signed vs. unsigned) in algorithm
-	             use selectable rgb -> yuv formula,
+ * originally from http://gc-films.com/chromakey.html
  */
 
 vj_effect *rgbkey_init(int w,int h)
 {
     vj_effect *ve;
     ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
+    ve->num_params = 7;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 4500;	/* angle , 45 degrees*/
+    ve->defaults[0] = 15;	/* tolerance near */
     ve->defaults[1] = 0;	/* r */
-    ve->defaults[2] = 0;	/* g */
-    ve->defaults[3] = 255;	/* b */
-    ve->defaults[4] = 1;	/* type */
-    ve->defaults[5] = 1200;	/* noise */
+    ve->defaults[2] = 255;	/* g */
+    ve->defaults[3] = 0;	/* b */
+    ve->defaults[4] = 1;	/* tolerance far */
+    ve->defaults[5] = 1;	/* show selection */
+	ve->defaults[6] = 0;    /* use alpha */
 
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 9000;
+    ve->limits[1][0] = 255;
 
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
@@ -71,12 +58,15 @@ vj_effect *rgbkey_init(int w,int h)
     ve->limits[1][3] = 255;
 
     ve->limits[0][4] = 0;
-    ve->limits[1][4] = 1;	/* total noise suppression off */
+    ve->limits[1][4] = 255;
 
     ve->limits[0][5] = 0;
-    ve->limits[1][5] = 5500;
+    ve->limits[1][5] = 1;
 
-	ve->param_description = vje_build_param_list(ve->num_params, "Angle", "Red", "Green", "Blue", "Mode", "Noise suppression");
+    ve->limits[0][6] = 0;
+    ve->limits[1][6] = 4; /* logical alpha operator */
+
+	ve->param_description = vje_build_param_list(ve->num_params, "Tolerance Near", "Red", "Green", "Blue", "Tolerance Far", "Show FG", "Alpa operator");
 	ve->has_user = 0;
     ve->description = "Chroma Key (RGB)";
     ve->extra_frame = 1;
@@ -85,250 +75,137 @@ vj_effect *rgbkey_init(int w,int h)
     ve->parallel = 1;
 	return ve;
 }
-/*
-void rgbkey_scan_fg(uint8_t * src2[3], int *r, int *g, int *b)
+
+static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, int dA, int dB )
 {
-    *r = (int) (+(1.0 * Y2[0]) + (0 * Cb2[0]) +
-		(1.402 * Cr2[0]));
-    *g = (int) (+(1.0 * Y2[0]) - (0.344136 * Cb2[0]) +
-		(-0.714136 * Cr2[0]));
-    *b = (int) (+(1.0 * Y2[0]) + (1.772 * Cb2[0]) +
-		(0 * Cr2[0]));
-}
-*/
-void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int i_angle, int r, int g,
-		   int b, int i_noise)
-{
-
-    uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
-    uint8_t cb, cr;
-    int kbg, x1, y1;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
-    float angle = (float) i_angle / 100.0f;
-    float noise_level = (i_noise / 100.0f);
-    unsigned int pos;
-    uint8_t val, tmp1;
-    uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-	uint8_t	iy,iu,iv;
-	_rgb2yuv( r,g,b, iy,iu,iv );
-	_y = (float) iy;
-	aa = (float) iu;
-	bb = (float) iv;
-    tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 0xff * (aa / tmp);
-    cr = 0xff * (bb / tmp);
-    kg1 = tmp;
-
-    /* obtain coordinate system for cb / cr */
-    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
-
-    tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = 0xf * (float) (_y) / kg1;
-    kg = kg1;
-
-    /* intialize pointers */
-    fg_y = Y;
-    fg_cb = Cb;
-    fg_cr = Cr;
-	/* 2005: swap these !! */
-    bg_y = Y2;
-    bg_cb = Cb2;
-    bg_cr = Cr2;
-
-    for (pos = (width * height); pos != 0; pos--) {
-	short xx, yy;
-	/* convert foreground to xz coordinates where x direction is
-	   defined by key color */
-
-	xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-	yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-
-	/* accept angle should not be > 90 degrees 
-	   reasonable results between 10 and 80 degrees.
-	 */
-
-	val = (xx * accept_angle_tg) >> 4;
-	if (abs(yy) < val) {
-	    /* compute fg, suppress fg in xz according to kfg 
-	*/
-	    val = (yy * accept_angle_ctg) >> 4;
-
-	    x1 = abs(val);
-	    y1 = yy;
-	    tmp1 = xx - x1;
-
-	    kbg = (tmp1 * one_over_kc) >> 1;
-	    if (kbg < 0)
-			kbg = 0;
-	    if (kbg > 255)
-			kbg = 255;
-
-	    val = (tmp1 * kfgy_scale) >> 4;
-	    if( val > 255 )
-			val = 255;
-
-	    val = fg_y[pos] - val;
-
-	    Y[pos] = val;
-
-	    // convert suppressed fg back to cbcr 
-	    Cb[pos] = ((x1 * cb) - (y1 * cr)) >> 7;
-	    Cr[pos] = ((x1 * cr) - (y1 * cb)) >> 7;
-
-	    // deal with noise 
-	    val = (yy * yy) + (kg * kg);
-	    if (val < (noise_level * noise_level)) {
-			kbg = 255;
-			Y[pos] = bg_y[pos];
-			Cb[pos] = bg_cb[pos];
-			Cr[pos] = bg_cr[pos];
-	    }
-		else {
-			Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-			Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-			Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-			}
-	}
-    }
+		double tmp = 0.0; 
+		fast_sqrt( tmp, (Cbk - Cb) * (Cbk-Cb) + (Crk - Cr) * (Crk - Cr) );
+		if( tmp < dA ) { /* near color key == bg */
+			return 0.0;
+		}
+		if( tmp < dB ) { /* middle region */
+			return (tmp - dA)/(dB - dA); /* distance to key color */
+		}
+		return 1.0; /* far from color key == fg */
 }
 
-void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int i_angle,int r, int g,
-		   int b, int i_noise)
-{
 
-    uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
-    uint8_t cb, cr;
-    int kbg, x1, y1;
-    float kg1, tmp, aa = 255.0, bb = 255.0, _y = 0;
-    float angle = (float) i_angle / 100.0f;
-    float noise_level = (i_noise / 100.0f);
-    unsigned int pos;
-    uint8_t val, tmp1;
-    uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
+
+void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tola, int r, int g,int b, int tolb, int show, int alpha)
+{
+	unsigned int pos;
+	uint8_t *Y = frame->data[0];
+	uint8_t *Cb = frame->data[1];
+	uint8_t *Cr = frame->data[2];
+	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-	uint8_t	iy,iu,iv;
+	uint8_t *B = frame2->data[3];
+	uint8_t *A = frame->data[3];
+	int cb,cr,iy,iu,iv;
+	_rgb2yuv(r,g,b,iy,iu,iv);
 
-	_rgb2yuv( r,g,b, iy,iu,iv );
-	_y = (float) iy;
-	aa = (float) iu;
-	bb = (float) iv;
-    tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 255 * (aa / tmp);
-    cr = 255 * (bb / tmp);
-    kg1 = tmp;
-
-	/* obtain coordinate system for cb / cr */
-    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
-
-
-    tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = 0xf * (float) (_y) / kg1;
-    kg = kg1;
-
-    /* intialize pointers */
-    fg_y = Y;
-    fg_cb = Cb;
-    fg_cr = Cr;
-
-    bg_y = Y2;
-    bg_cb = Cb2;
-    bg_cr = Cr2;
-
-    int len = frame->len;
-
-    for (pos = 0; pos < len; pos++) {
-	short xx, yy;
-	/* convert foreground to xz coordinates where x direction is
-	   defined by key color */
-
-	xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-	yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-
-	/* accept angle should not be > 90 degrees 
-	   reasonable results between 10 and 80 degrees.
-	 */
-
-	val = (xx * accept_angle_tg) >> 4;
-	if (abs(yy) < val) {
-	    /* compute fg, suppress fg in xz according to kfg */
-
-	    val = (yy * accept_angle_ctg) >> 4;
-
-	    x1 = abs(val);
-	    y1 = yy;
-	    tmp1 = xx - x1;
-
-	    kbg = (tmp1 * one_over_kc) >> 1;
-	    if (kbg < 0)
-		kbg = 0;
-	    if (kbg > 255)
-		kbg = 255;
-
-	    val = (tmp1 * kfgy_scale) >> 4;
-	    val = fg_y[pos] - val;
-
-	    Y[pos] = val;
-
-	    /* convert suppressed fg back to cbcr */
-
-	    Cb[pos] = ((x1 * cb) - (y1 * cr)) >> 7;
-	    Cr[pos] = ((x1 * cr) - (y1 * cb)) >> 7;
-
-	    /* deal with noise */
-
-	    val = (yy * yy) + (kg * kg);
-	    if (val < (noise_level * noise_level)) {
-			Y[pos] = 0; Cb[pos] = 128; Cr[pos] = 128;
-			//kbg = 0xff;
-	    } else {
-
-	 	   Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	  	  Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	  	  Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
+	if( alpha == 0 ) {
+		for (pos = (width * height); pos != 0; pos--) {
+			double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+			uint8_t op1 = (d * 255);
+			if( op1 == 0 ) {
+				Y[pos] = Y2[pos];
+				Cb[pos] = Cb2[pos];
+				Cr[pos] = Cr2[pos];
+			}
+			else {
+				uint8_t op0 = op1;
+				op1 = 255 - op1;
+				Y[pos] = ( (op0 * Y[pos]) + (op1 * Y2[pos])) >> 8;;
+				Cb[pos] = ( (op0 * Cb[pos]) + (op1 * Cb2[pos]))>> 8;
+				Cr[pos] = ( (op0 * Cr[pos]) + (op1 * Cr2[pos]))>>8;
+			}
 		}
 	}
-    }
+	else {
+		switch(alpha) {
+			case 1:
+				for (pos = (width * height); pos != 0; pos--) {
+					if( A[pos] == 0 )
+						continue;
+					double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+					uint8_t op1 = (d * 255);
+					if( op1 == 0 ) {
+						Y[pos] = Y2[pos];
+						Cb[pos] = Cb2[pos];
+						Cr[pos] = Cr2[pos];
+					}
+					else {
+						uint8_t op0 = op1;
+						op1 = 255 - op1;
+						Y[pos] = ( (op0 * Y[pos]) + (op1 * Y2[pos])) >> 8;;
+						Cb[pos] = ( (op0 * Cb[pos]) + (op1 * Cb2[pos]))>> 8;
+						Cr[pos] = ( (op0 * Cr[pos]) + (op1 * Cr2[pos]))>>8;
+					}
+				}
+				break;
+			case 2:
+				for (pos = (width * height); pos != 0; pos--) {
+					if( A[pos] == 0 && B[pos] == 0)
+						continue;
+					double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+					uint8_t op1 = (d * 255);
+					if( op1 == 0 ) {
+						Y[pos] = Y2[pos];
+						Cb[pos] = Cb2[pos];
+						Cr[pos] = Cr2[pos];
+					}
+					else {
+						uint8_t op0 = op1;
+						op1 = 255 - op1;
+						Y[pos] = ( (op0 * Y[pos]) + (op1 * Y2[pos])) >> 8;;
+						Cb[pos] = ( (op0 * Cb[pos]) + (op1 * Cb2[pos]))>> 8;
+						Cr[pos] = ( (op0 * Cr[pos]) + (op1 * Cr2[pos]))>>8;
+					}
+				}
+				break;
+			case 3:
+				for (pos = (width * height); pos != 0; pos--) {
+					if( A[pos] == 0 || B[pos] == 0)
+						continue;
+					double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+					uint8_t op1 = (d * 255);
+					if( op1 == 0 ) {
+						Y[pos] = Y2[pos];
+						Cb[pos] = Cb2[pos];
+						Cr[pos] = Cr2[pos];
+					}
+					else {
+						uint8_t op0 = op1;
+						op1 = 255 - op1;
+						Y[pos] = ( (op0 * Y[pos]) + (op1 * Y2[pos])) >> 8;;
+						Cb[pos] = ( (op0 * Cb[pos]) + (op1 * Cb2[pos]))>> 8;
+						Cr[pos] = ( (op0 * Cr[pos]) + (op1 * Cr2[pos]))>>8;
+					}
+				}
+				break;
+			case 4:
+				for (pos = (width * height); pos != 0; pos--) {
+					if( B[pos] == 0 )
+						continue;
+					double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+					uint8_t op1 = (d * 255);
+					if( op1 == 0 ) {
+						Y[pos] = Y2[pos];
+						Cb[pos] = Cb2[pos];
+						Cr[pos] = Cr2[pos];
+					}
+					else {
+						uint8_t op0 = op1;
+						op1 = 255 - op1;
+						Y[pos] = ( (op0 * Y[pos]) + (op1 * Y2[pos])) >> 8;;
+						Cb[pos] = ( (op0 * Cb[pos]) + (op1 * Cb2[pos]))>> 8;
+						Cr[pos] = ( (op0 * Cr[pos]) + (op1 * Cr2[pos]))>>8;
+					}
+				}
+				break;
+		}
+	}
+
 }
-
- /* this is the same as rgbkey_apply1, but here we have total noise suppression 
-  */
-
-void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,
-		  int height, int i_angle, int red, int green,
-		  int blue, int type, int i_noise)
-{
-
-    switch (type) {
-    case 0:
-	rgbkey_apply1(frame, frame2, width, height, i_angle, red,
-		      green, blue, i_noise);
-	break;
-    case 1:
-	rgbkey_apply2(frame, frame2, width, height, i_angle, red,
-		      green, blue, i_noise);
-	break;
-    }
-
-}
-void rgbkey_free(){}

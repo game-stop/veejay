@@ -74,18 +74,15 @@ void lumakey_simple_alpha(uint8_t *yuv1[4], uint8_t *yuv2[4], int width,
 
 	    a1 = yuv1[0][x + y];
 	    a2 = yuv2[0][x + y];
-	    /*
-	       if  ( a1 >= threshold && a1 <= threshold2) {
-	       Y = (op0 * a1 + op1 * a2 )/255;
-	       Cb = (op0 * yuv1[1][x+y] + op1 * yuv2[1][x+y])/255;
-	       Cr =(op0 * yuv1[2][x+y] + op1 * yuv2[2][x+y])/255;
-
-	       }
-	     */
-	    if (a1 >= threshold && a1 <= threshold2) {
-			Y = ((op0 * a1) + (op1 * a2)) >> 8;
-			Cb = ((op0 * yuv1[1][x + y]) + (op1 * yuv2[1][x + y])) >> 8;
-			Cr = ((op0 * yuv1[2][x + y]) + (op1 * yuv2[2][x + y])) >> 8;
+	    
+		if (a1 >= threshold && a1 <= threshold2) {
+			alpha = ((op0 * yuv1[3][x+y]) + (op1 * yuv2[3][x+y]) )>> 8;
+			unsigned int aA = 255 - alpha;
+			unsigned int aB = alpha;
+			
+			Y = ((aA * a1) + (aB * a2)) >> 8;
+			Cb = ((aA * yuv1[1][x + y]) + (aB * yuv2[1][x + y])) >> 8;
+			Cr = ((aA * yuv1[2][x + y]) + (aB * yuv2[2][x + y])) >> 8;
 			yuv1[0][x + y] = Y; 	// < 16 ? 16 : Y > 235 ? 235 : Y;
 			yuv1[1][x + y] = Cb; 	//  < 16 ? 16 : Cb > 240 ? 240 : Cb;
 			yuv1[2][x + y] = Cr; 	//  < 16 ? 16 : Cr > 240 ? 240 : Cr;
