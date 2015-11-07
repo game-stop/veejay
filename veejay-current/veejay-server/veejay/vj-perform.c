@@ -99,6 +99,8 @@ extern int pixel_Y_lo_;
 static	varcache_t	pvar_;
 static	void		*lzo_;
 static VJFrame *crop_frame = NULL;
+static VJFrame *rgba_frame[2] = { NULL };
+static VJFrame *yuva_frame[2] = { NULL };
 static ycbcr_frame **video_output_buffer = NULL; /* scaled video output */
 static int	video_output_buffer_convert = 0;
 static ycbcr_frame **frame_buffer = NULL;	/* chain */
@@ -123,6 +125,9 @@ static uint8_t *down_sample_buffer = NULL;
 static uint8_t *temp_buffer[4];
 static uint8_t *subrender_buffer[4];
 static uint8_t *feedback_buffer[4];
+static uint8_t *rgba_buffer[2];
+static void *rgba2yuv_scaler = NULL;
+static void *yuv2rgba_scaler = NULL;
 static uint8_t *pribuf_area = NULL;
 static size_t pribuf_len = 0;
 static uint8_t *socket_buffer = NULL;
@@ -704,6 +709,18 @@ int vj_perform_init(veejay_t * info)
     if(mlock( temp_buffer[0], buf_len ) != 0 )
 		mlock_success = 0;
 
+	rgba_buffer[0] = (uint8_t*) vj_malloc( buf_len * 2 );
+	if(!rgba_buffer[0] ) {
+		return 0;
+	}
+
+	rgba_buffer[1] = rgba_buffer[0] + buf_len;
+
+	if( mlock( rgba_buffer[0], buf_len * 2 ) != 0 )
+		mlock_success = 0;
+
+	veejay_memset( rgba_buffer[0], 0, buf_len * 2 );
+
 	subrender_buffer[0] = (uint8_t*) vj_malloc( buf_len * 3 ); //frame, p0, p1
 	if(!subrender_buffer[0]) {
 		return 0;
@@ -737,6 +754,7 @@ int vj_perform_init(veejay_t * info)
 	total_used += buf_len; //temp_buffer
 	total_used += buf_len; //feedback_buffer
 	total_used += (buf_len * 3); //subrender_buffer
+	total_used += (buf_len * 2); //rgb conversion buffer
 
 	helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
 	veejay_memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
@@ -778,6 +796,26 @@ int vj_perform_init(veejay_t * info)
 
 	vj_perform_clear_cache();
 	veejay_memset( frame_info[0],0,SAMPLE_MAX_EFFECTS);
+
+	sws_template templ;
+	veejay_memset(&templ,0,sizeof(sws_template));
+	templ.flags = yuv_which_scaler();
+
+	rgba_frame[0] = yuv_rgb_template( rgba_buffer[0], w, h, PIX_FMT_RGBA );
+	rgba_frame[1] = yuv_rgb_template( rgba_buffer[1], w, h, PIX_FMT_RGBA );
+	yuva_frame[0] = yuv_yuv_template( NULL, NULL, NULL, w,h,PIX_FMT_YUVA444P );
+	yuva_frame[1] = yuv_yuv_template( NULL, NULL, NULL, w,h,PIX_FMT_YUVA444P );
+	
+	yuv2rgba_scaler = yuv_init_swscaler( yuva_frame[0], rgba_frame[0], &templ, yuv_sws_get_cpu_flags() );
+	if(yuv2rgba_scaler == NULL )
+		return 0;
+
+	rgba2yuv_scaler = yuv_init_swscaler( rgba_frame[1], yuva_frame[0], &templ, yuv_sws_get_cpu_flags());
+	if(rgba2yuv_scaler == NULL )
+		return 0;
+
+	rgba_frame[0]->data[0] = rgba_buffer[0];
+	rgba_frame[1]->data[0] = rgba_buffer[1];
 
 	veejay_msg(VEEJAY_MSG_INFO,
 	 	"Using %.2f MB RAM in performer (memory %s paged to the swap area, %.2f MB pre-allocated for fx-chain)",
@@ -959,6 +997,8 @@ void vj_perform_free(veejay_t * info)
    if(temp_buffer[0]) free(temp_buffer[0]);
    if(subrender_buffer[0]) free(subrender_buffer[0]);
    if(feedback_buffer[0]) free(feedback_buffer[0]);
+   if(rgba_buffer[0]) free(rgba_buffer[0]);
+	
    vj_perform_record_buffer_free();
 
 	for( c = 0 ; c < 2 ; c ++ )
@@ -990,6 +1030,13 @@ void vj_perform_free(veejay_t * info)
 
 	if(lzo_)
 		lzo_free(lzo_);
+
+	yuv_free_swscaler( rgba2yuv_scaler );
+	yuv_free_swscaler( yuv2rgba_scaler );
+
+	free(rgba_frame[0]);
+	free(rgba_frame[1]);
+
 }
 
 int vj_perform_preview_max_width() {
@@ -1413,9 +1460,12 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 	VJFrame **frames, VJFrameInfo *frameinfo, int e , int c, int n_frame, void *ptr, int playmode)
 {
-	int n_a = vj_effect_get_num_params(e);
-	int entry = e;
 	int args[SAMPLE_MAX_PARAMETERS];
+	int n_a = 0;
+	int is_mixer = 0;
+	int rgb = vj_effect_get_info( e, &is_mixer, &n_a );
+	int entry = e;
+	
 	veejay_memset( args, 0 , sizeof(args) );
 	
 	if( playmode == VJ_PLAYBACK_MODE_TAG )
@@ -1429,7 +1479,34 @@ static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 			return 1;
 	}
 
-	return vj_effect_apply( frames, frameinfo, todo_info,entry, args, ptr );
+	if( rgb ) {
+
+		yuva_frame[0]->data[0] = frames[0]->data[0];
+		yuva_frame[0]->data[1] = frames[0]->data[1];
+		yuva_frame[0]->data[2] = frames[0]->data[2];
+		yuva_frame[0]->data[3] = frames[0]->data[3];
+
+		yuv_convert_and_scale_rgb( yuv2rgba_scaler, yuva_frame[0], rgba_frame[0] );
+		if(is_mixer) {
+			yuva_frame[1]->data[0] = frames[1]->data[0];
+			yuva_frame[1]->data[1] = frames[1]->data[1];
+			yuva_frame[1]->data[2] = frames[1]->data[2];
+			yuva_frame[1]->data[3] = frames[1]->data[3];
+
+			yuv_convert_and_scale_rgb( yuv2rgba_scaler, yuva_frame[1], rgba_frame[1] );	
+		}
+
+		int res = vj_effect_apply( rgba_frame, frameinfo, todo_info,entry, args, ptr );
+	
+		if(res == 0) {
+			if( rgb )  {
+				yuv_convert_and_scale_from_rgb( rgba2yuv_scaler, rgba_frame[0],yuva_frame[0] );
+			}
+		}
+		return res;
+	}
+	
+	return vj_effect_apply( frames,frameinfo, todo_info,entry,args, ptr );
 }
 
 #ifdef HAVE_JACK

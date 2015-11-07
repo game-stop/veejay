@@ -586,6 +586,7 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 	}
 	f->stride[1] = 0;
 	f->stride[2] = 0;
+	f->len = w * h;
 
 	return f;
 }
