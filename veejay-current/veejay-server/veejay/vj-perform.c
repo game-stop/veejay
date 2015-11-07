@@ -41,6 +41,7 @@
 #include <veejay/libveejay.h>
 #include <libsamplerec/samplerecord.h>
 #include <libel/pixbuf.h>
+#include <libel/avcommon.h>
 #include <veejay/vj-misc.h>
 #include <veejay/vj-task.h>
 #include <liblzo/lzo.h>
