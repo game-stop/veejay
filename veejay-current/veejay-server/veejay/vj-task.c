@@ -49,6 +49,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvje/internal.h>
+#include <libavutil/pixfmt.h>
 #include <veejay/vj-task.h>
 #include <libvje/vje.h>
  
@@ -461,27 +462,53 @@ void	vj_task_set_from_frame( VJFrame *in )
 	uint8_t n = task_get_workers();
 	uint8_t i;
 
-	for( i = 0; i < n; i ++ ) {
-		vj_task_arg_t *v= vj_task_args[i];
-		v->ssm			= in->ssm;
-		v->width		= in->width;
-		v->height		= in->height / n;
-		v->strides[0]	= (v->width * v->height);
-		v->uv_width		= in->uv_width;
-		v->uv_height 	= in->uv_height / n;
-		v->strides[1]	= v->uv_width * v->uv_height; 
-		v->strides[2]	= v->strides[1];
-		v->strides[3]   = (in->stride[3] == 0 ? 0 : v->strides[0]);
-		v->shiftv	    = in->shift_v;
-		v->shifth	    = in->shift_h;	
-		v->row_strides[0] = in->stride[0]; /* original value */
-		v->row_strides[1] = in->stride[1];
-		v->row_strides[2] = in->stride[2];
-		v->row_strides[3] = in->stride[3];
-		v->format		  = in->format;
-		if( v->ssm == 1 ) { 
-			v->strides[1] = (v->width * v->height );
-			v->strides[2] = v->strides[1];
+	if( in->format == PIX_FMT_RGBA ) 
+	{
+		for( i = 0; i < n; i ++ ) {
+			vj_task_arg_t *v= vj_task_args[i];
+			v->ssm			= in->ssm;
+			v->width		= in->width;
+			v->height		= in->height / n;
+			v->strides[0]	= (v->width * v->height * 4);
+			v->uv_width		= 0;
+			v->uv_height 	= 0;
+			v->strides[1]	= 0; 
+			v->strides[2]	= 0;
+			v->strides[3]   = 0;
+			v->shiftv	    = 0;
+			v->shifth	    = 0;	
+			v->row_strides[0] = in->stride[0]; /* original value */
+			v->row_strides[1] = in->stride[1];
+			v->row_strides[2] = in->stride[2];
+			v->row_strides[3] = in->stride[3];
+			v->format		  = in->format;
+			v->ssm            = 0;
+		}
+	}
+	else
+	{
+		for( i = 0; i < n; i ++ ) {
+			vj_task_arg_t *v= vj_task_args[i];
+			v->ssm			= in->ssm;
+			v->width		= in->width;
+			v->height		= in->height / n;
+			v->strides[0]	= (v->width * v->height);
+			v->uv_width		= in->uv_width;
+			v->uv_height 	= in->uv_height / n;
+			v->strides[1]	= v->uv_width * v->uv_height; 
+			v->strides[2]	= v->strides[1];
+			v->strides[3]   = (in->stride[3] == 0 ? 0 : v->strides[0]);
+			v->shiftv	    = in->shift_v;
+			v->shifth	    = in->shift_h;	
+			v->row_strides[0] = in->stride[0]; /* original value */
+			v->row_strides[1] = in->stride[1];
+			v->row_strides[2] = in->stride[2];
+			v->row_strides[3] = in->stride[3];
+			v->format		  = in->format;
+			if( v->ssm == 1 ) { 
+				v->strides[1] = (v->width * v->height );
+				v->strides[2] = v->strides[1];
+			}
 		}
 	}	
 }
