@@ -50,7 +50,7 @@ vj_effect *porterduff_init(int w,int h)
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->rgb_conv = 0;
-    ve->parallel = 0;
+    ve->parallel = 1;
 	ve->rgba_only = 1;
 	return ve;
 } 
