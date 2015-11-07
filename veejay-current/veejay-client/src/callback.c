@@ -3053,9 +3053,6 @@ void	on_new_source1_activate( GtkWidget *w , gpointer data )
 void	on_add_file1_activate(GtkWidget *w, gpointer user_data)
 {
 }
-void	on_colorselection_color_changed( GtkWidget *w, gpointer user_data)
-{
-}
 static 
 gchar *get_clipboard_fx_parameter_buffer(int *mixing_src, int *mixing_cha, int *enabled, int *fx_id)
 {

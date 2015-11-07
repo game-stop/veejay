@@ -8394,7 +8394,6 @@ YUV (current)</property>
                                 <property name="has_palette">True</property>
                                 <property name="has_opacity_control">True</property>
                                 <property name="current_color">#000000000000</property>
-                                <signal name="color_changed" handler="on_colorselection_color_changed" />
                               </widget>
                               <packing>
                                 <property name="position">1</property>
