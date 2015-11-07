@@ -181,6 +181,8 @@
 #include "effects/alphaselect2.h"
 #include "effects/alphablend.h"
 #include "effects/porterduff.h"
+#include "effects/pixelate.h"
+#include "effects/alphanegate.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 

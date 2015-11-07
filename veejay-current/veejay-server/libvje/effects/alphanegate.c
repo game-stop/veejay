@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,62 +17,41 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+#include <config.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <libvjmem/vjmem.h>
-#include "dither.h"
-vj_effect *dither_init(int w, int h)
+#include "common.h"
+#include "alphanegate.h"
+
+vj_effect *alphanegate_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 1;
+
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 2;
-    ve->defaults[1] = 0;
-
-    ve->limits[0][0] = 2;
-    ve->limits[1][0] = w;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 1;
-
-    ve->description = "Matrix Dithering";
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 255;
+    ve->defaults[0] = 255;
+    ve->description = "Alpha: Negation";
     ve->sub_format = -1;
     ve->extra_frame = 0;
+    ve->parallel = 1;
 	ve->has_user = 0;
-
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
-
+    ve->param_description = vje_build_param_list( ve->num_params, "Value" );
     return ve;
 }
 
-static last_size = 0;
-void dither_apply(VJFrame *frame, int width, int height, int size, int random_on)
+
+void alphanegate_apply( VJFrame *frame, int width, int height, int val)
 {
-    long int w_, h_;
-    long int dith[size][size];
-    long int i, j, d, v, l, m;
-    uint8_t *Y = frame->data[0];
+    const unsigned int len = frame->len;
+    uint8_t *A = frame->data[0];
+	unsigned int i;
 
-	if( last_size != size || random_on ) {
-	  for (l = 0; l < size; l++) {
-		for (m = 0; m < size; m++) {
-			dith[l][m] =
-				(int) ((double) (size) * rand() / (RAND_MAX + 1.0));
-		}
-	  }
-	  last_size = size;
+	for( i = 0; i < len; i ++ ) {
+		A[i] = val - A[i];
 	}
-
-    for (h_ = 0; h_ < height; h_++) {
-		j = h_ % size;
-		for (w_ = 0; w_ < width; w_++) {
-			i = w_ % size;
-			d = dith[i][j] << 4;
-			v = ((long) Y[((h_ * width) + w_)] + d);
-			Y[(h_ * width) + w_] = (uint8_t) ((v >> 7) << 7);
-		}
-    }
 }
-void dither_free(){}

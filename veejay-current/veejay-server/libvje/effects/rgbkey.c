@@ -102,7 +102,7 @@ void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tol
 	uint8_t *Cr2= frame2->data[2];
 	uint8_t *B = frame2->data[3];
 	uint8_t *A = frame->data[3];
-	int cb,cr,iy,iu,iv;
+	int iy,iu,iv;
 	_rgb2yuv(r,g,b,iy,iu,iv);
 
 	if( alpha == 0 ) {

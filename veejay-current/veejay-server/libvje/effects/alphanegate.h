@@ -18,12 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef ALPHASELECT2_H
-#define ALPHASELECT2_H
+#ifndef ALPHANEGATE_H
+#define ALPHANEGATE_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *alphaselect2_init();
-void alphaselect2_apply( VJFrame *frame, int width,int height,int tola,int red,int green,int blue, int tolb, int show, int use_alpha);
+vj_effect *alphanegate_init(int w, int h);
+void alphanegate_apply( VJFrame *frame, int width, int height, int val);
 #endif

@@ -55,7 +55,7 @@ vj_effect *porterduff_init(int w,int h)
 	return ve;
 } 
 
-static void porterduff_dst( uint32_t *A, uint32_t *B, int n_pixels)
+static void porterduff_dst( uint8_t *A, uint8_t *B, int n_pixels)
 {
 	int i,j;
 	uint8_t *aA = A;
@@ -292,7 +292,8 @@ static void subtract( uint8_t *A, uint8_t *B, int n_pixels )
 		bB += 4;
 	}
 }
-
+/* 
+ * FIXME: test
 static void screen( uint8_t *A, uint8_t *B, int n_pixels )
 {
 	int i,j;
@@ -333,6 +334,7 @@ static void difference( uint8_t *A, uint8_t *B, int n_pixels )
 		bB += 4;
 	}
 }
+*/
 
 static void divide( uint8_t *A, uint8_t *B, int n_pixels )
 {
@@ -354,13 +356,10 @@ static void divide( uint8_t *A, uint8_t *B, int n_pixels )
 
 void porterduff_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int mode)
 {
-	uint32_t *A = (uint32_t*) frame->data[0];
-	uint32_t *B = (uint32_t*) frame2->data[0];
-
 	switch( mode )  
 	{
 		case 0:
-			porterduff_dst( A,B,frame->len );
+			porterduff_dst( frame->data[0],frame2->data[0],frame->len );
 			break;
 		case 1:
 			porterduff_atop( frame->data[0],frame2->data[0], frame->len );
@@ -372,7 +371,7 @@ void porterduff_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int
 			porterduff_dst_over( frame->data[0],frame2->data[0],frame->len );
 			break;
 		case 4:
-			porterduff_dst_over( frame->data[0],frame2->data[0],frame->len );
+			porterduff_dst_out( frame->data[0],frame2->data[0],frame->len );
 			break;
 		case 5:
 			porterduff_src_over( frame->data[0],frame2->data[0],frame->len );
