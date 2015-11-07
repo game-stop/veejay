@@ -158,9 +158,15 @@ void avhelper_free_context(AVCodecContext **avctx)
 #if (LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40) || (LIBAVCODEC_VERSION_MAJOR == 56 && LIBAVCODEC_VERSION_MINOR > 0)
 	avcodec_free_context( avctx );
 #else
+//@ libav
+#if (LIBAVCODEC_VERSION_MAJOR == 56 && LIBAVCODEC_VERSION_MICRO == 0)
+//	if( avctx )
+//		av_free( avctx );
+#else
 	if( avctx )
-		free( avctx );
+		free(avctx);
 	avctx = NULL;
+#endif
 #endif
 }
 
