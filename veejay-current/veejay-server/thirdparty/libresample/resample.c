@@ -65,6 +65,13 @@ struct ReSampleContext {
 
 };
 
+static void *resample_realloc_array(void *ptr, size_t nmemb, size_t size)
+{
+	if(!size || nmemb >= INT_MAX / size )
+		return NULL;
+	return av_realloc( ptr, nmemb * size );
+}
+
 /* n1: number of samples */
 static void stereo_to_mono(short *output, short *input, int n1)
 {
@@ -408,7 +415,7 @@ int vj_audio_resample(void *ptr, short *output, short *input, int nb_samples)
         nb_samples1 = vj_av_resample(s->resample_context, buftmp3[i], bufin[i],
                                   &consumed, nb_samples, lenout, is_last);
         s->temp_len = nb_samples - consumed;
-        s->temp[i] = av_realloc_array(s->temp[i], s->temp_len, sizeof(short));
+        s->temp[i] = resample_realloc_array(s->temp[i], s->temp_len, sizeof(short));
         memcpy(s->temp[i], bufin[i] + consumed, s->temp_len * sizeof(short));
     }
 
