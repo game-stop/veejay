@@ -8393,7 +8393,6 @@ YUV (current)</property>
                                 <property name="can_focus">False</property>
                                 <property name="has_palette">True</property>
                                 <property name="has_opacity_control">True</property>
-                                <property name="current_color">#000000000000</property>
                               </widget>
                               <packing>
                                 <property name="position">1</property>
