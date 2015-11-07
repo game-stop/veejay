@@ -102,7 +102,7 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
 
 ### Editing
 
- * 150 built-in FX , many unique and original FX filters 
+ * 152 built-in FX , many unique and original FX filters 
  * 60 Livido filters
  * FX chain (20 slots) with Alpha Channels
  * All FX parameters can be animated.
