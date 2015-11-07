@@ -28,5 +28,5 @@
 vj_effect *fisheye_init(int w, int h);
 int fisheye_malloc(int w, int h);
 void fisheye_free();
-void fisheye_apply(VJFrame *frame, int width, int height, int val );
+void fisheye_apply(VJFrame *frame, int width, int height, int val, int alpha );
 #endif

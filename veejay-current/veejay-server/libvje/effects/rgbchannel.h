@@ -26,6 +26,4 @@
 
 vj_effect *rgbchannel_init(int w, int h);
 void rgbchannel_apply( VJFrame *frame, int width, int height, int r, int g, int b);
-int rgbchannel_malloc(int w, int h );
-void rgbchannel_free();
 #endif

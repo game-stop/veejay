@@ -261,7 +261,6 @@ static struct
 {	videoplay_malloc,		videoplay_free,		VJ_VIDEO_EFFECT_VIDEOPLAY	},
 {	videowall_malloc,		videowall_free,		VJ_VIDEO_EFFECT_VIDEOWALL	},
 {	flare_malloc,			flare_free,		VJ_IMAGE_EFFECT_FLARE		},
-{	rgbchannel_malloc,		rgbchannel_free,	VJ_IMAGE_EFFECT_RGBCHANNEL	},
 {	timedistort_malloc,		timedistort_free,	VJ_IMAGE_EFFECT_TIMEDISTORT	},
 {	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
 {	chameleonblend_malloc,		chameleonblend_free,	VJ_VIDEO_EFFECT_CHAMBLEND	},
@@ -587,6 +586,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[51] = alphablend_init(width,height);
 	vj_effects[52] = porterduff_init(width,height);
     vj_effects[53] = dummy_init(width,height);
+	vj_effects[i + 0] = pixelate_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -791,7 +791,7 @@ int vj_effect_real_to_sequence(int effect_id)
     }
     else
     {
-	if (effect_id > VJ_IMAGE_EFFECT_MIN && effect_id <= VJ_IMAGE_EFFECT_MAX) {
+	if (effect_id >= VJ_IMAGE_EFFECT_MIN && effect_id <= VJ_IMAGE_EFFECT_MAX) {
 		effect_id -= VJ_IMAGE_EFFECT_MIN;
 		effect_id += VJ_VIDEO_COUNT;
 		return effect_id;
@@ -1073,7 +1073,7 @@ int vj_effect_is_valid(int effect_id)
 {
 	if( effect_id >= VJ_EXT_EFFECT && effect_id < VJ_EXT_EFFECT + n_ext_plugs_)
 		return 1;
-	if( effect_id > VJ_IMAGE_EFFECT_MIN && effect_id <= VJ_IMAGE_EFFECT_MAX )
+	if( effect_id >= VJ_IMAGE_EFFECT_MIN && effect_id <= VJ_IMAGE_EFFECT_MAX )
 		return 1;
 	if( effect_id > VJ_VIDEO_EFFECT_MIN && effect_id < VJ_VIDEO_EFFECT_MAX )
 		return 1;

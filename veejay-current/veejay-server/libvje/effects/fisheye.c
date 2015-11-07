@@ -29,19 +29,22 @@
 vj_effect *fisheye_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
+    ve->num_params = 2;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = -1000;
     ve->limits[1][0] = 1000;
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] = 1;
     ve->defaults[0] = 1;
+	ve->defaults[1] = 0;
     ve->description = "Fish Eye";
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Curve" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Curve", "Mask to Alpha" );
     return ve;
 }
 
@@ -113,7 +116,7 @@ static double __fisheye_i(double r, double v, double e)
 
 
 
-void fisheye_apply(VJFrame *frame, int w, int h, int v )
+void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha )
 {
 	int i;
 	double (*pf)(double a, double b, double c);
@@ -178,20 +181,37 @@ void fisheye_apply(VJFrame *frame, int w, int h, int v )
 	veejay_memcpy(buf[1], Cb,(w*h));
 	veejay_memcpy(buf[2], Cr,(w*h));
 
-	for(i=0; i < len; i++)
+	if( alpha == 0 ) {
+		for(i=0; i < len; i++)
+		{
+			if(cached_coords[i] == -1)
+			{
+				Y[i] = pixel_Y_lo_;		
+				Cb[i] = 128;
+				Cr[i] = 128;
+			}
+			else
+			{
+				Y[i] = buf[0][ cached_coords[i] ];
+				Cb[i] = buf[1][ cached_coords[i] ];
+				Cr[i] = buf[2][ cached_coords[i] ];
+			}
+		}
+	}
+	else 
 	{
-		if(cached_coords[i] == -1)
+		uint8_t *A = frame->data[3];
+		for(i=0; i < len; i++)
 		{
-			Y[i] = pixel_Y_lo_;		
-			Cb[i] = 128;
-			Cr[i] = 128;
+			if(cached_coords[i] == -1)
+			{
+				A[i] = 0;
+			}
+			else
+			{
+				A[i] = buf[0][ cached_coords[i] ];
+			}
 		}
-		else
-		{
 
-			Y[i] = buf[0][ cached_coords[i] ];
-			Cb[i] = buf[1][ cached_coords[i] ];
-			Cr[i] = buf[2][ cached_coords[i] ];
-		}
 	}
 }

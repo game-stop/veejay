@@ -221,7 +221,7 @@ void vj_effman_apply_image_effect(
 	radialblur_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
     case VJ_IMAGE_EFFECT_FISHEYE:
-	fisheye_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+	fisheye_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_PIXELSMEAR:
 	smear_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1]);
@@ -374,7 +374,7 @@ void vj_effman_apply_image_effect(
 	ripple_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_BGSUBTRACT:
-	bgsubtract_apply( frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
+	bgsubtract_apply( frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_BATHROOM:
 	bathroom_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
@@ -433,7 +433,10 @@ void vj_effman_apply_image_effect(
 	case VJ_IMAGE_EFFECT_ALPHASELECT2:
 		alphaselect2_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
 		break;
-    }
+	 case VJ_IMAGE_EFFECT_PIXELATE:
+		pixelate_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+		break;
+   }
 }
 
 void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg, int entry, int e) {
@@ -745,6 +748,8 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 
 	if( selector >= 500 ) {
 		vj_effman_apply_plug_effect( frames, frameinfo, kf, arguments,n_a, entry, selector, ptr );
+
+		return VJE_SUCCESS;
 	}
 	else
 	{
@@ -759,16 +764,16 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 				vj_task_set_param( arguments[i], i + 1 );
 			
 			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 4, (performer_job_routine) &vj_effman_apply_job );
+		
+			return VJE_SUCCESS;
 		} 
-		else {
-			
-			if( selector > 200 )	
-				vj_effman_apply_video_effect(frames,kf,arguments, entry,selector);
-			else
-				vj_effman_apply_image_effect( frames,kf, arguments,entry, selector);
-	
-		}
 	}
+
+	if( selector > 200 )	
+		vj_effman_apply_video_effect(frames,kf,arguments, entry,selector);
+	else
+		vj_effman_apply_image_effect( frames,kf, arguments,entry, selector);
+	
 	return VJE_SUCCESS;
 }
 

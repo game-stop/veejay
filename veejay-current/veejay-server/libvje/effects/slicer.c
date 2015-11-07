@@ -110,6 +110,8 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Y2= frame2->data[0];
 	uint8_t *Cb2=frame2->data[1];
 	uint8_t *Cr2=frame2->data[2];
+	uint8_t *aA = frame->data[3];
+	uint8_t *aB = frame2->data[3];
 	int dx,dy;
 
 	srand( val1 * val2 );
@@ -119,21 +121,24 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
   	for(y=0; y < height; y++){ 
  	   for(x=0; x < width; x++) {
         	dx = x + slice_xshift[y]; 
-		dy = y + slice_yshift[x];
-		p = dy * width + dx;
-		q = y * width + x;
-		if( p >= 0 && p < len ) {
-               	 Y[q] = Y2[p];
-               	 Cb[q] = Cb2[p];
-                 Cr[q] = Cr2[p];
-		} else {
-		  Y[q] = pixel_Y_lo_;
-		  Cb[q] = 128;
-		  Cr[q] = 128;
-		}
-            }
-        }
+			dy = y + slice_yshift[x];
+			p = dy * width + dx;
+			q = y * width + x;
+			if( p >= 0 && p < len ) {
+				Y[q] = Y2[p];
+				Cb[q] = Cb2[p];
+				Cr[q] = Cr2[p];
+				aA[q] = aB[p];
+			}
+			else {
+				Y[q] = pixel_Y_lo_;
+				Cb[q] = 128;
+				Cr[q] = 128;
+				aA[q] = 0;
+			}
+       }
   }
+}
 
 void slicer_free()
 {

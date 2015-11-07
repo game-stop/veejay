@@ -55,11 +55,12 @@ vj_effect *slice_init(int width,int height)
 
 int 	slice_malloc(int width, int height)
 {
-    slice_frame[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height * 3));
+    slice_frame[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height * 4));
     if(!slice_frame[0])
 	    return 0;
-    slice_frame[1] = slice_frame[0] + (width * height);
-    slice_frame[2] = slice_frame[1] + (width * height);
+    slice_frame[1] = slice_frame[0] + RUP8(width * height);
+    slice_frame[2] = slice_frame[1] + RUP8(width * height);
+	slice_frame[3] = slice_frame[2] + RUP8(width * height);
     slice_xshift = (int*) vj_malloc(sizeof(int) * height);
     if(!slice_xshift) return 0;
     slice_yshift = (int*) vj_malloc(sizeof(int) * width);
@@ -77,6 +78,7 @@ void slice_free() {
  slice_frame[0] = NULL;
  slice_frame[1] = NULL;
  slice_frame[2] = NULL;
+ slice_frame[3] = NULL;
  if(slice_xshift)
 	 free(slice_xshift);
  if(slice_yshift)
@@ -115,7 +117,7 @@ void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
   uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-	
+	uint8_t *A = frame->data[3];	
 
 	int interpolate = 1;
 	int tmp1 = val;
@@ -146,17 +148,19 @@ void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
 
   if(tmp2==1) slice_recalc(width,height,tmp1);
 
-  int strides[4] = { len, len, len, 0 };
+  int strides[4] = { len, len, len, len };
   vj_frame_copy( frame->data, slice_frame, strides );  
 
   for(y=0; y < height; y++){ 
-    for(x=0; x < width; x++) {
-	dx = x + slice_xshift[y] ; dy = y + slice_yshift[x];
-	if(dx < width && dy < height && dx >= 0 && dy >= 0) {
-		Y[(y*width)+x] = slice_frame[0][(dy*width)+dx];
-		Cb[(y*width)+x] = slice_frame[1][(dy*width)+dx];
-		Cr[(y*width)+x] = slice_frame[2][(dy*width)+dx];
-	}
+	 for(x=0; x < width; x++) {
+		dx = x + slice_xshift[y] ; dy = y + slice_yshift[x];
+		if(dx < width && dy < height && dx >= 0 && dy >= 0)
+		{
+			Y[(y*width)+x] = slice_frame[0][(dy*width)+dx];
+			Cb[(y*width)+x] = slice_frame[1][(dy*width)+dx];
+			Cr[(y*width)+x] = slice_frame[2][(dy*width)+dx];
+			A[(y*width)+x] = slice_frame[3][(dy*width)+dx];
+		}
      }
   }
 

@@ -31,7 +31,7 @@ static uint8_t *static_bg = NULL;
 vj_effect *bgsubtract_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -39,14 +39,19 @@ vj_effect *bgsubtract_init(int width, int height)
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 0;	/* mode */
     ve->limits[1][1] = 1;
+	ve->limits[0][2] = 0;	/* alpha */
+    ve->limits[1][2] = 1;
+
     ve->defaults[0] = 45;
     ve->defaults[1] = 0;
+	ve->defaults[2] = 0;
+
     ve->description = "Substract background (static, requires bg mask)";
     ve->extra_frame = 0;
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->has_user = 1;
     ve->user_data = NULL;
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode");
+	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "To Alpha");
     return ve;
 }
 
@@ -88,7 +93,7 @@ int bgsubtract_prepare(uint8_t *map[4], int width, int height)
 	return 1;
 }
 
-void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int mode )
+void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int mode, int alpha )
 {
 	VJFrame tmp;
 	veejay_memset( &tmp, 0, sizeof(VJFrame));
@@ -99,15 +104,23 @@ void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int m
 	//@ 3x3 blur
 	softblur_apply( &tmp, width,height,0);
 
-	if ( mode == 0 ) {
-		binarify( frame->data[0], static_bg,frame->data[0], threshold, 0, width*height );
-	} else if ( mode == 1 ) {
-		binarify( frame->data[0], static_bg, frame->data[0], threshold, 1,width*height );
-	}
-
-	veejay_memset( frame->data[1], 128, frame->uv_len );
-	veejay_memset( frame->data[2], 128, frame->uv_len );
+	if( alpha == 0 ) {
+		if ( mode == 0 ) {
+			binarify( frame->data[0], static_bg,frame->data[0], threshold, 0, width*height );
+		} else if ( mode == 1 ) {
+			binarify( frame->data[0], static_bg, frame->data[0], threshold, 1,width*height );
+		}
 	
+		veejay_memset( frame->data[1], 128, frame->uv_len );
+		veejay_memset( frame->data[2], 128, frame->uv_len );
+	}
+	else {
+		if ( mode == 0 ) {
+			binarify( frame->data[0], static_bg,frame->data[3], threshold, 0, width*height );
+		} else if ( mode == 1 ) {
+			binarify( frame->data[0], static_bg, frame->data[3], threshold, 1,width*height );
+		}
+	}
 }
 
 

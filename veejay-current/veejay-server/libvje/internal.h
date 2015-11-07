@@ -129,7 +129,8 @@ enum {
 
 enum {
     /* image effects */
-    VJ_IMAGE_EFFECT_MIRROR = 101,
+    VJ_IMAGE_EFFECT_PIXELATE = 100,
+	VJ_IMAGE_EFFECT_MIRROR = 101,
     VJ_IMAGE_EFFECT_MIRRORS = 102,
     VJ_IMAGE_EFFECT_WIDTHMIRROR = 103,
     VJ_IMAGE_EFFECT_FLIP = 104,
@@ -237,7 +238,7 @@ enum {
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 253
 
-#define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
+#define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN + 1)
 
 #define	VJ_EXT_EFFECT	500
 
@@ -519,7 +520,7 @@ extern void smear_apply(VJFrame *frame, int w, int h, int n, int m);
 
 extern void raster_apply(VJFrame *frame, int w, int h, int v );
 
-extern void fisheye_apply(VJFrame *frame, int w, int h, int v );
+extern void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha );
 
 extern void swirl_apply(VJFrame *frame, int w, int h , int v );
 
@@ -540,7 +541,7 @@ extern void overclock_apply(VJFrame *frame, int w, int h, int val, int r);
 
 extern int bgsubstract_prepare(void *user, uint8_t *map[4], int width, int height);
 
-extern void bgsubstract_apply(VJFrame *frame,int width, int height, int mode, int threshold );
+extern void bgsubstract_apply(VJFrame *frame,int width, int height, int mode, int threshold, int alpha );
 
 extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
 
@@ -628,11 +629,8 @@ extern void waterrippletv_apply(VJFrame *frame, int width, int height, int fresh
 
 extern void radcor_apply( VJFrame *frame, int width, int height, int a, int b, int c);
 
-extern void bgsubtract_apply(VJFrame *frame,int width,int height,int mode, int threshold);
-
 extern int motionmap_prepare( uint8_t *map[4], int w, int h );
 extern int chameleon_prepare( uint8_t *bg[4], int w, int h );
-extern int bgsubtract_prepare(uint8_t *map[4], int w, int h); 
 extern int contourextract_prepare(uint8_t *map[4], int w, int h);
 extern int chameleonblend_prepare( uint8_t *bg[4],int w, int h );
 

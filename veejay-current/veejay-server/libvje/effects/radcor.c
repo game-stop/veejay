@@ -94,6 +94,7 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+	uint8_t *A = frame->data[3];
 	pixel_t csum,c;
 	int aa = 1;
 	int nx = width;
@@ -102,13 +103,14 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 	int nyout = ny;
 
 	//@ copy source image to internal buffer 
-	uint8_t *dest[4] = { badbuf, badbuf + len, badbuf + len + len,NULL };
-	int strides[4] = { len, len, len, 0 };
+	uint8_t *dest[4] = { badbuf, badbuf + len, badbuf + len + len, badbuf + len + len + len };
+	int strides[4] = { len, len, len, len };
 	vj_frame_copy( frame->data, dest, strides );
 
 	uint8_t *Yi = badbuf;
 	uint8_t *Cbi = badbuf + len;
 	uint8_t *Cri = badbuf + len + len;
+	uint8_t *Ai = badbuf + len + len + len;
 
 	double alphax = alpaX / (double) 1000.0;
 	double alphay = alpaY / (double) 1000.0;
@@ -122,6 +124,7 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 	vj_frame_clear1( Y, 0, len );
 	vj_frame_clear1( Cb, 128, len );
 	vj_frame_clear1( Cr, 128, len );
+	vj_frame_clear1( A, 0, len );
 
 	int update_map = 0;
 
@@ -170,6 +173,7 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 			Y[ i * width + j ] = Yi[ Map[i * width + j] ];
 			Cb[ i * width + j ] = Cbi[ Map[i * width + j] ];
 			Cr[ i * width + j ] = Cri[ Map[i * width + j] ];
+			A[i * width + j ] = Ai[ Map[i * width + j] ];
 		}
 	}
 

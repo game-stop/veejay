@@ -49,7 +49,7 @@ vj_effect *nervous_init(int w, int h)
     ve->limits[1][0] = N_MAX;
     ve->defaults[0] = N_MAX;
     ve->description = "Nervous";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Buffer length");
@@ -58,17 +58,20 @@ vj_effect *nervous_init(int w, int h)
 
 int	nervous_malloc(int w, int h )
 {
-	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * N_MAX * 3));
-	if(!nervous_buf[0]) return 0;
-
-	nervous_buf[1] = nervous_buf[0] + (w*h*N_MAX);
-	nervous_buf[2] = nervous_buf[1] + (w*h*N_MAX);
+	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * N_MAX * 4));
+	if(!nervous_buf[0]) {
+		return 0;
+	}
+	nervous_buf[1] = nervous_buf[0] + RUP8(w*h*N_MAX);
+	nervous_buf[2] = nervous_buf[1] + RUP8(w*h*N_MAX);
+	nervous_buf[3] = nervous_buf[2] + RUP8(w*h*N_MAX);
 	frames_elapsed = 0;
 
 	vj_frame_clear1( nervous_buf[0], 0, (w*h) * N_MAX );
 	vj_frame_clear1( nervous_buf[1], 128, (w*h) * N_MAX );
 	vj_frame_clear1( nervous_buf[2], 128, (w*h) * N_MAX );
-	
+	vj_frame_clear1( nervous_buf[3], 0, (w*h) * N_MAX );
+
 	return 1;
 }
 
@@ -85,13 +88,13 @@ void	nervous_free(void)
 void nervous_apply( VJFrame *frame, int width, int height, int delay)
 {
     int len = (width * height);
-    int uv_len = frame->uv_len;
+    int uv_len = (frame->ssm == 1 ? frame->len : frame->uv_len);
 	uint8_t *NY = nervous_buf[0] + (len * frames_elapsed );
 	uint8_t *NCb= nervous_buf[1] + (uv_len * frames_elapsed );
 	uint8_t *NCr= nervous_buf[2] + (uv_len * frames_elapsed );
-
-	uint8_t *dest[4] = { NY, NCb, NCr, NULL };
-	int strides[4] = { len, uv_len,uv_len, 0 };
+	uint8_t *NA = nervous_buf[3] + (len * frames_elapsed);
+	uint8_t *dest[4] = { NY, NCb, NCr, NA };
+	int strides[4] = { len, uv_len,uv_len, len };
 	// copy original into nervous buf	
 	vj_frame_copy( frame->data, dest, strides );
 
@@ -103,11 +106,12 @@ void nervous_apply( VJFrame *frame, int width, int height, int delay)
 		uint8_t *sY = nervous_buf[0] + (len * index);
 		uint8_t *sCb = nervous_buf[1] + (uv_len * index);
 		uint8_t *sCr = nervous_buf[2] + (uv_len * index);
+		uint8_t *sA = nervous_buf[3] + (len * index);
 		// copy it to dst
 		dest[0] = sY;
 		dest[1] = sCb;
 		dest[2] = sCr;
-
+		dest[3] = sA;
 		vj_frame_copy( dest, frame->data, strides );
 	}
 

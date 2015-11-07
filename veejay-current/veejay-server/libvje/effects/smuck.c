@@ -36,10 +36,10 @@ vj_effect *smuck_init(int w,int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 1;
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 14;
+    ve->limits[1][0] = 18;
 
     ve->description = "SmuckTV (EffectTV)";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode");
@@ -60,8 +60,8 @@ void smuck_apply( VJFrame *frame, VJFrame *frame2, int width,
 {
     unsigned int yd, xd, x, y;
 	// different table ...
-    const unsigned int smuck[15] =
-	{ 30, 60, 58, 59, 57, 56, 55, 54, 53, 89, 90, 88, 87, 86, 85 };
+    const unsigned int smuck[18] =
+	{ 12, 21, 30, 60, 58, 59, 57, 56, 55, 54, 53, 89, 90, 88, 87, 86, 85, 114 };
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
     for (y = 0; y < height; y++) {

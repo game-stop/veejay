@@ -49,69 +49,25 @@ vj_effect *rgbchannel_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
+	ve->rgba_only = 1;
+	ve->parallel = 1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Red", "Green", "Blue");
     return ve;
 }
 
-static uint8_t *rgb_ = NULL;
-static	VJFrame *rgb_frame_ = NULL;
-static void *convert_yuv = NULL;
-static void *convert_rgb = NULL;
-int	rgbchannel_malloc( int w, int h )
-{
-	if(!rgb_)
-		rgb_ = vj_malloc( sizeof(uint8_t) * w * h * 3 );
-	if(!rgb_)
-		return 0;
-	if(!rgb_frame_)
-		rgb_frame_ = yuv_rgb_template( rgb_, w, h , PIX_FMT_RGB24 );
-	return 1;
-}
-
-void	rgbchannel_free( )
-{
-	if(rgb_)
-		free(rgb_);
-	if(rgb_frame_)
-		free(rgb_frame_);
-	rgb_frame_ = NULL;
-	rgb_ = NULL;
-
-	if(convert_rgb)
-		yuv_fx_context_destroy( convert_rgb );
-	if(convert_yuv)
-		yuv_fx_context_destroy( convert_yuv );
-	convert_rgb = NULL;
-	convert_yuv = NULL;
-}
-
 void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb)
 {
-	unsigned int x,y,i;
-
-	VJFrame *tmp = yuv_yuv_template( frame->data[0],
-					 frame->data[1],
-					 frame->data[2],
-					 width, height, PIX_FMT_YUV444P );
-
-//	yuv_convert_any_ac( tmp, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
-
-	if(!convert_yuv )
-		convert_yuv = yuv_fx_context_create( tmp, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
-	if(!convert_rgb )
-		convert_rgb = yuv_fx_context_create( rgb_frame_,tmp, PIX_FMT_RGB24, PIX_FMT_YUV444P );
-
-	yuv_fx_context_process( convert_yuv, tmp, rgb_frame_ );
-
-	int row_stride = width * 3;
+	int row_stride = width * 4;
+	int x,y;
+	uint8_t *rgba = frame->data[0];
 
 	if(chr)
 	{
 		for( y = 0; y < height; y ++ )
 		{
-			for( x = 0; x < row_stride; x += 3 )
+			for( x = 0; x < row_stride; x += 4 )
 			{
-				rgb_[ y * row_stride + x ] = 0;
+				rgba[ y * row_stride + x ] = 0;
 			}
 		}
 	}
@@ -119,9 +75,9 @@ void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg ,
 	{
 		for( y = 0; y < height; y ++ )
 		{
-			for( x = 1; x < row_stride-1; x += 3 )
+			for( x = 1; x < row_stride-1; x += 4 )
 			{
-				rgb_[ y * row_stride + x ] = 0;
+				rgba[ y * row_stride + x ] = 0;
 			}
 		}
 	}
@@ -129,17 +85,11 @@ void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg ,
 	{
 		for( y = 0; y < height; y ++ )
 		{
-			for( x = 2; x < row_stride-2; x += 3 )
+			for( x = 2; x < row_stride-2; x += 4 )
 			{
-				rgb_[ y * row_stride + x ] = 0;
+				rgba[ y * row_stride + x ] = 0;
 			}
 		}
 	}
-
-//	yuv_convert_any_ac( rgb_frame_, tmp, PIX_FMT_RGB24, PIX_FMT_YUV444P );
-
-	yuv_fx_context_process( convert_rgb, rgb_frame_, tmp );
-
-	free(tmp);
 
 }
