@@ -123,7 +123,8 @@ enum {
 	VJ_VIDEO_EFFECT_MIXTOALPHA = 248,
 	VJ_VIDEO_EFFECT_MAGICALPHA = 249,
 	VJ_VIDEO_EFFECT_TRAVELMATTE = 250,
-	VJ_VIDEO_EFFECT_ALPHABLEND = 251,	
+	VJ_VIDEO_EFFECT_ALPHABLEND = 251,
+	VJ_VIDEO_EFFECT_PORTERDUFF = 252,	
 };
 
 enum {
@@ -234,7 +235,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 252
+#define VJ_VIDEO_EFFECT_MAX 253
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -553,7 +554,7 @@ extern void		blob_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, in
 
 extern void		boids_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, int p3, int p4, int p5, int p6, int p7
 );
-
+extern void		porterduff_apply( VJFrame *frame, VJFrame *frame2, int w, int h, int mode);
 
 extern void		ghost_apply(VJFrame *frame, int w, int h, int o );
 extern void		neighbours_apply( VJFrame *frame, int width, int height, int brush_size, int level, int mode);

@@ -667,8 +667,10 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	case VJ_VIDEO_EFFECT_ALPHABLEND:
 		alphablend_apply(frames[0],frames[1],frames[0]->width,frames[0]->height);
 		break;
-    }
-
+	case VJ_VIDEO_EFFECT_PORTERDUFF:
+		porterduff_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0]);
+		break;
+	}
 }
 
 int vj_effect_prepare( VJFrame *frame, int selector)

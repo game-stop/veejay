@@ -180,6 +180,7 @@
 #include "effects/alphaselect.h"
 #include "effects/alphaselect2.h"
 #include "effects/alphablend.h"
+#include "effects/porterduff.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -584,7 +585,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[49] = overlayalphamagic_init(width,height);
 	vj_effects[50] = travelmatte_init(width,height);
 	vj_effects[51] = alphablend_init(width,height);
-    vj_effects[52] = dummy_init(width,height);
+	vj_effects[52] = porterduff_init(width,height);
+    vj_effects[53] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -919,6 +921,18 @@ int vj_effect_get_max_limit(int effect_id, int param_nr)
 	&& param_nr < vj_effects[entry]->num_params)
 	return vj_effects[entry]->limits[1][param_nr];
     return 0;
+}
+
+int	vj_effect_get_info( int effect_id, int *is_mixer, int *n_params )
+{
+	int entry;
+	entry = vj_effect_real_to_sequence( effect_id );
+	if( entry > 0 ) {
+		*is_mixer = vj_effects[entry]->extra_frame;
+		*n_params = vj_effects[entry]->num_params;
+		return vj_effects[entry]->rgba_only;
+	}
+	return 0;
 }
 
 int vj_effect_get_extra_frame(int effect_id)

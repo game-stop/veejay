@@ -22,7 +22,7 @@
 
 #define FX_LIMIT	1024
 
-#define MAX_EFFECTS 152
+#define MAX_EFFECTS 153
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)
@@ -91,6 +91,7 @@ typedef struct vj_effect_t {
     void *user_data;		
     char padding[4];
     int parallel;
+	int rgba_only;
 } vj_effect;
 
 typedef struct vj_effect_instance_t {
@@ -134,4 +135,5 @@ extern int rgb_parameter_conversion_type_;
 extern int vj_effect_is_plugin( int fx_id );
 extern void	*vj_effect_get_data( int seq_id );
 extern int vj_effect_is_parallel(int effect_id);
+extern int vj_effect_get_info( int effect_id, int *is_mixer, int *n_params );
 #endif
