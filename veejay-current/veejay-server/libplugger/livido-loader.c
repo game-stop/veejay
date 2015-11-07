@@ -425,7 +425,7 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port, int w, int 
 
 		if( vevo_property_get( plugin, "in_parameter_templates", n, &param ) != VEVO_NO_ERROR )
 			continue;
-		sprintf(key, "p%02d", n );
+		snprintf(key,sizeof(key),"p%02d", n );
 
 		int ikind = 0;
 		char *kind = get_str_vevo( param, "kind" );
@@ -464,7 +464,6 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port, int w, int 
 			clone_prop_vevo( vje_port, param, "max", "max" );
 			clone_prop_vevo( vje_port, param, "min", "min" );
 			clone_prop_vevo( vje_port, param, "default" ,"default" );
-
 		} else if( strcasecmp(kind, "HEIGHT") == 0 ) {
 			ikind = HOST_PARAM_HEIGHT; vj_np++;
 			tmp[0] = 0;
@@ -481,7 +480,6 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port, int w, int 
 			clone_prop_vevo( vje_port, param, "max", "max" );
 			clone_prop_vevo( vje_port, param, "min", "min" );
 			clone_prop_vevo( vje_port, param, "default" ,"default" );
-
 		} else if (strcasecmp(kind, "SWITCH") == 0 ) {
 			ikind = HOST_PARAM_SWITCH; vj_np ++;
 			clone_prop_vevo( param, vje_port, "default", "value" );
@@ -664,6 +662,7 @@ static	int	init_ports_from_template( livido_port_t *filter_instance, livido_port
     {
 		livido_port_t *ptr = NULL;
 		error = livido_property_get( template, name, i, &ptr );
+	
 		in_channels[i] = vpn( id ); 
 		livido_property_set( in_channels[i], "parent_template",LIVIDO_ATOM_TYPE_VOIDPTR,1, &ptr);
 //		livido_property_soft_reference( in_channels[i], "parent_template" );
@@ -1219,6 +1218,9 @@ int	livido_read_plug_configuration(void *filter_template, const char *name)
 				if( str ) {
 					fprintf( f, "%s\n", str );
 					free(str);
+				}
+				else {
+					fprintf( f, "default=DYNAMIC:\n" );
 				}
 			}
 			fclose(f);
