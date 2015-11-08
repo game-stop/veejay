@@ -2515,7 +2515,7 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
 		}
 	}
 
-	if(clear_framebuffer__ == 1)
+	if(clear_framebuffer__ == 1 || info->settings->clear_alpha == 1)
 	{
 		if( frames[0]->stride[3] > 0 )
 			veejay_memset( frames[0]->data[3], 0, frames[0]->stride[3] * frames[0]->height );

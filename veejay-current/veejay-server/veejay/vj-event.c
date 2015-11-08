@@ -10585,3 +10585,20 @@ void	vj_event_get_sample_image		(	void *ptr,	const char format[],	va_list	ap	)
 }
 
 
+void vj_event_alpha_composite(void *ptr, const char format[], va_list ap) 
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[4];
+	char *str = NULL;
+	
+	P_A(args,str,format,ap);
+
+	if( args[0] == 0 ) {
+		v->settings->clear_alpha = 0;
+		veejay_msg(VEEJAY_MSG_INFO,"Enabled alpha channel leak (no clear)");
+	} else if (args[0] == 1 ) {
+		v->settings->clear_alpha = 1;
+		veejay_msg(VEEJAY_MSG_INFO,"New alpha mask every frame (clearing)");
+	}
+}
+

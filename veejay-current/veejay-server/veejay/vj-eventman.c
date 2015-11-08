@@ -2483,6 +2483,17 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 
+	index_map_[VIMS_ALPHA_COMPOSITE]				=	_new_event(
+				"%d",
+				VIMS_BEZERK,	
+				"Enable or disable alpha channel clear every frame period",
+				vj_event_alpha_composite,
+				1,
+				VIMS_ALLOW_ANY,
+				"0=on 1=off",
+				0,
+				NULL );
+
 
 	index_map_[ VIMS_CONTINUOUS_PLAY ] 		=	_new_event(
 				"%d",

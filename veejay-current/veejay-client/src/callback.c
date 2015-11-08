@@ -4156,4 +4156,12 @@ void	on_save_midi_layout1_activate( GtkWidget *w, gpointer data )
 void on_clear_midi_layout1_activate( GtkWidget *w, gpointer data )
 {
 	vj_midi_reset(info->midi);
-}	
+}
+
+
+void	on_alphacomposite_toggled(GtkWidget *widget, gpointer user_data)
+{	
+	multi_vims( VIMS_ALPHA_COMPOSITE,"%d", is_button_toggled( "alphacomposite" )); 
+}
+
+

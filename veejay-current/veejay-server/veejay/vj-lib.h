@@ -199,6 +199,7 @@ typedef struct {
 	int auto_mute;
 	int pace_correction;
 	int	splitscreen;
+	int clear_alpha;
 } video_playback_setup;
 
 typedef struct {
