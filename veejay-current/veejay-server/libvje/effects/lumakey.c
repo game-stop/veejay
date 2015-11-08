@@ -39,7 +39,7 @@ vj_effect *lumakey_init(int width, int height)
     ve->limits[0][3] = 1;	/* distance */
     ve->limits[1][3] = width;
     ve->limits[0][4] = 0;	/* type */
-    ve->limits[1][4] = 3;
+    ve->limits[1][4] = 2;
     ve->defaults[0] = 255;
     ve->defaults[1] = 150;
     ve->defaults[2] = 200;
@@ -53,45 +53,6 @@ vj_effect *lumakey_init(int width, int height)
 
     return ve;
 }
-
-
-void lumakey_simple_alpha(uint8_t *yuv1[4], uint8_t *yuv2[4], int width,
-		    int height, int threshold, int threshold2, int opacity)
-{
-
-    unsigned int x, y, len = width * height;
-    uint8_t a1, a2;
-    unsigned int op0, op1;
-    uint8_t Y, Cb, Cr, alpha;
-    op1 = (opacity > 255) ? 255 : opacity;
-    op0 = 255 - op1;
-
-    for (y = 0; y < len; y += width) {
-	  for (x = 0; x < width; x++) {
-		alpha = yuv2[3][x + y];
-		if( alpha == 0 ) // simply skip when alpha = 0
-			continue;
-
-	    a1 = yuv1[0][x + y];
-	    a2 = yuv2[0][x + y];
-	    
-		if (a1 >= threshold && a1 <= threshold2) {
-			alpha = ((op0 * yuv1[3][x+y]) + (op1 * yuv2[3][x+y]) )>> 8;
-			unsigned int aA = 255 - alpha;
-			unsigned int aB = alpha;
-			
-			Y = ((aA * a1) + (aB * a2)) >> 8;
-			Cb = ((aA * yuv1[1][x + y]) + (aB * yuv2[1][x + y])) >> 8;
-			Cr = ((aA * yuv1[2][x + y]) + (aB * yuv2[2][x + y])) >> 8;
-			yuv1[0][x + y] = Y; 	// < 16 ? 16 : Y > 235 ? 235 : Y;
-			yuv1[1][x + y] = Cb; 	//  < 16 ? 16 : Cb > 240 ? 240 : Cb;
-			yuv1[2][x + y] = Cr; 	//  < 16 ? 16 : Cr > 240 ? 240 : Cr;
-			yuv1[3][x + y] = alpha; // simply overwrite
-		}
-	  }
-    }
-}
-
 
 void lumakey_simple(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 		    int height, int threshold, int threshold2, int opacity)
@@ -357,10 +318,6 @@ void lumakey_apply( VJFrame *frame, VJFrame *frame2, int width,
 		case 2:
 			lumakey_smooth(frame->data, frame2->data, width, height, threshold, threshold2,feather, d);
 			break;
-		case 3:
-			lumakey_simple_alpha(frame->data, frame2->data, width, height, threshold, threshold2,feather);
-			break;
     }
 
 }
-void lumakey_free(){}

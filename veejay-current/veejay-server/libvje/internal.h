@@ -30,7 +30,7 @@
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 253
+#define VJ_VIDEO_EFFECT_MAX 254
 
 #define VJ_PLUGIN 500
 
@@ -135,7 +135,8 @@ enum {
 	VJ_VIDEO_EFFECT_MAGICALPHA = 249,
 	VJ_VIDEO_EFFECT_TRAVELMATTE = 250,
 	VJ_VIDEO_EFFECT_ALPHABLEND = 251,
-	VJ_VIDEO_EFFECT_PORTERDUFF = 252,	
+	VJ_VIDEO_EFFECT_PORTERDUFF = 252,
+	VJ_VIDEO_EFFECT_LUMAKEYALPHA = 253,	
 };
 
 enum {
@@ -653,6 +654,7 @@ extern void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,i
 extern void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode);
 extern void feathermask_apply( VJFrame *frame, int width, int height );
 extern void alphaselect_apply( VJFrame *frame, int width,int height, int i_angle, int r, int g,int b, int swap);
-void alphaselect2_apply( VJFrame *frame, int width,int height, int tola, int r, int g,int b, int tolb, int show, int alpha);
-void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
+extern void alphaselect2_apply( VJFrame *frame, int width,int height, int tola, int r, int g,int b, int tolb, int show, int alpha);
+extern void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
+extern void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int opacity );
 #endif

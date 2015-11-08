@@ -556,6 +556,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_VIDEO_EFFECT_TRAVELMATTE]			= travelmatte_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_ALPHABLEND]			= alphablend_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_PORTERDUFF]			= porterduff_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_LUMAKEYALPHA]		= lumakeyalpha_init(width,height);
 
     vj_effects[VJ_IMAGE_EFFECT_DUMMY]				= dummy_init(width,height);
 	

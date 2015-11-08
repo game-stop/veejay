@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,14 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef LUMAKEY_H
-#define LUMAKEY_H
+#ifndef LUMAKEYA_H
+#define LUMAKEYA_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *lumakey_init();
-void lumakey_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int type, int threshold, int threshold2,
-		   int feather, int d);
+vj_effect *lumakeyalpha_init(int w, int h);
+void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int opacity );
 #endif
