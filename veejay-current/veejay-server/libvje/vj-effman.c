@@ -279,7 +279,7 @@ void vj_effman_apply_image_effect(
 		timedistort_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_LENSCORRECTION:
-		radcor_apply( frames[0], frames[0]->width,frames[0]->height, arg[0],arg[1] ,arg[2]);
+		radcor_apply( frames[0], frames[0]->width,frames[0]->height, arg[0],arg[1] ,arg[2],arg[3]);
 		break;
      case VJ_IMAGE_EFFECT_NEGATION:
 	negation_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
@@ -484,13 +484,13 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	overlaymagic_apply(frames[0], frames[1], frames[0]->width,frames[0]->height, arg[0],arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_SLICER:
-		slicer_apply(frames[0],frames[1], frames[0]->width, frames[0]->height, arg[0],arg[1] );
+		slicer_apply(frames[0],frames[1], frames[0]->width, frames[0]->height, arg[0],arg[1],arg[2] );
 		break;
       case VJ_VIDEO_EFFECT_MASK:
 	simplemask_apply(frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0], arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_LUMAMASK:
-	lumamask_apply(frames[0], frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
+	lumamask_apply(frames[0], frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 	break;
 	case VJ_VIDEO_EFFECT_DISSOLVE:
 	dissolve_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0]);break; 
@@ -678,6 +678,12 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 		break;
 	case VJ_VIDEO_EFFECT_LUMAKEYALPHA:
 		lumakeyalpha_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1]);
+		break;
+	case VJ_VIDEO_EFFECT_CHROMAMAGICKALPHA:
+		chromamagickalpha_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1]);
+		break;
+	case VJ_VIDEO_EFFECT_MAGICOVERLAYALPHA:
+		overlaymagicalpha_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 		break;
 	}
 }

@@ -39,7 +39,7 @@ static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
 vj_effect *lumamask_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
+    ve->num_params = 4;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -49,6 +49,9 @@ vj_effect *lumamask_init(int width, int height)
     ve->limits[1][1] = height;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
+	ve->limits[0][3] = 0;
+    ve->limits[1][3] = 1;
+
     ve->defaults[0] = width/20; 
     ve->defaults[1] = height/10;
     ve->defaults[2] = 0; // border
@@ -56,7 +59,7 @@ vj_effect *lumamask_init(int width, int height)
     ve->sub_format = 1;
     ve->extra_frame = 1;
   	ve->has_user = 0; 
-	ve->param_description = vje_build_param_list(ve->num_params, "X displacement", "Y displacement", "Mode" );
+	ve->param_description = vje_build_param_list(ve->num_params, "X displacement", "Y displacement", "Mode", "Update Alpha" );
     return ve;
 }
 
@@ -65,22 +68,24 @@ static int N__ = 0;
 
 int lumamask_malloc(int width, int height)
 {
-   buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * width * height * 3);
+   buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * width * height * 4);
    if(!buf[0]) return 0;
 
    veejay_memset( buf[0], 0, width * height );
-
    buf[1] = buf[0] + (width *height);
    veejay_memset( buf[1], 128, width * height );
    buf[2] = buf[1] + (width *height);
    veejay_memset( buf[2], 128, width * height );
+   buf[3] = buf[2] + (width *height);
+   veejay_memset( buf[3], 0, width * height );
+
    n__ = 0;
    N__ = 0;   
    return 1;
 }
 
 void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int v_scale, int h_scale, int border )
+		   int height, int v_scale, int h_scale, int border, int alpha )
 {
 	unsigned int x,y;
 	int dx,dy,nx,ny;
@@ -111,12 +116,15 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
-
-	int strides[4] = { width * height, width * height, width * height ,0};
+	uint8_t *aA = frame->data[3];
+	uint8_t *aB = frame2->data[3];
+	int strides[4] = { width * height, width * height, width * height ,( alpha ? width * height : 0 )};
 	vj_frame_copy( frame->data, buf, strides );
 
-	if( border )
+	if( alpha == 0 )
 	{
+  	  if( border )
+	  {
 		for(y=0; y < height; y++)
 		{
 			for(x=0; x < width ; x++)
@@ -131,24 +139,23 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 				nx = x + dx;
 				ny = y + dy;
 
-
 				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
-        	                {
-                	 		Y[y*width+x] = 16;
-                       	 		Cb[y*width+x] = 128;
-                         	      	Cr[y*width+x] = 128;
-                        	}
-                       		else
-                       		{
-                        	        Y[y*width+x] = Y2[ny * width + nx];
-                       	        	Cb[y*width+x] = Cb2[ny * width + nx];
-                       	        	Cr[y*width+x] = Cr2[ny * width + nx];
-                       		}
+        	    {
+                	Y[y*width+x] = 16;
+                	Cb[y*width+x] = 128;
+                   	Cr[y*width+x] = 128;
+                }
+                else
+                {
+                    Y[y*width+x] = Y2[ny * width + nx];
+                   	Cb[y*width+x] = Cb2[ny * width + nx];
+                   	Cr[y*width+x] = Cr2[ny * width + nx];
+                }
 			}
 		}
-	}
-	else
-	{
+	  }
+	  else
+	  {
 		for(y=0; y < height; y++)
 		{
 			for(x=0; x < width ; x++)
@@ -162,27 +169,89 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 					nx += width;
 				while( ny < 0 )
 					ny += height;
-				//if( ny >= height ) ny = height - 1;
-				//if( nx > width ) nx = width;	
-
-				//Y[y*width+x] = Y2[ny * width + nx];
-                                //Cb[y*width+x] = Cb2[ny * width + nx];
-                                //Cr[y*width+x] = Cr2[ny * width + nx];
 				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
-        	                {
-                	 		Y[y*width+x] = 16;
-                       	 		Cb[y*width+x] = 128;
-                         	      	Cr[y*width+x] = 128;
-                        	}
-                       		else
-                       		{
-                        	        Y[y*width+x] = Y2[ny * width + nx];
-                       	        	Cb[y*width+x] = Cb2[ny * width + nx];
-                       	        	Cr[y*width+x] = Cr2[ny * width + nx];
-                       		}
-
+        	    {
+					Y[y*width+x] = 16;
+                    Cb[y*width+x] = 128;
+                    Cr[y*width+x] = 128;
+                }
+                else
+				{
+					Y[y*width+x] = Y2[ny * width + nx];
+                    Cb[y*width+x] = Cb2[ny * width + nx];
+                    Cr[y*width+x] = Cr2[ny * width + nx];
+                }
 			}
 		}
+	  }
+	}
+	else /* write alpha */
+	{
+  	  if( border )
+	  {
+		for(y=0; y < height; y++)
+		{
+			for(x=0; x < width ; x++)
+			{
+				// calculate new location of pixel
+				tmp = Y2[(y*width+x)] - 128;
+				// new x offset 
+				dx = w_ratio * tmp;
+				// new y offset 
+				dy = h_ratio * tmp;
+				// new pixel coordinates
+				nx = x + dx;
+				ny = y + dy;
+
+				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
+        	    {
+                	Y[y*width+x] = 16;
+                	Cb[y*width+x] = 128;
+                   	Cr[y*width+x] = 128;
+					aA[y*width+x] = 0;
+                }
+                else
+                {
+                    Y[y*width+x] = Y2[ny * width + nx];
+                   	Cb[y*width+x] = Cb2[ny * width + nx];
+                   	Cr[y*width+x] = Cr2[ny * width + nx];
+					aA[y*width+x] = aB[ny * width + nx];
+                }
+			}
+		}
+	  }
+	  else
+	   {
+		for(y=0; y < height; y++)
+		{
+			for(x=0; x < width ; x++)
+			{
+				tmp = Y2[(y*width+x)] - 128;
+				dx = w_ratio * tmp;
+				dy = h_ratio * tmp;
+				nx = x + dx;
+				ny = y + dy;
+				while( nx < 0 )
+					nx += width;
+				while( ny < 0 )
+					ny += height;
+				if( nx < 0 || ny < 0 || nx >= width || ny >= height )
+        	    {
+					Y[y*width+x] = 16;
+                    Cb[y*width+x] = 128;
+                    Cr[y*width+x] = 128;
+					aA[y*width+x] = 0;
+                }
+                else
+				{
+					Y[y*width+x] = Y2[ny * width + nx];
+                    Cb[y*width+x] = Cb2[ny * width + nx];
+                    Cr[y*width+x] = Cr2[ny * width + nx];
+					aA[y*width+x] = aB[ny*width+nx];
+                }
+			}
+		}
+	  }
 	}
 
 	if( interpolate )

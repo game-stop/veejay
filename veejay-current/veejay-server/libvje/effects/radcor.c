@@ -42,24 +42,27 @@ vj_effect *radcor_init(int w, int h)
     ve->limits[1][1] = 1000;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] = 1;
     ve->defaults[0] = 10;
     ve->defaults[1] = 40;
     ve->defaults[2] = 0;
+	ve->defaults[3] = 0;
     ve->description = "Lens correction";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Alpha X", "Alpha Y", "Direction");
+	ve->param_description = vje_build_param_list( ve->num_params, "Alpha X", "Alpha Y", "Direction", "Update Alpha");
     return ve;
 }
 
 static uint8_t *badbuf = NULL;
 static uint32_t *Map = NULL;
-static int map_upd[3] = {0,0,0};
+static int map_upd[4] = {0,0,0,0};
 
 int	radcor_malloc( int width, int height )
 {
-	badbuf = (uint8_t*) vj_malloc( RUP8( width * height * 3 * sizeof(uint8_t)));
+	badbuf = (uint8_t*) vj_malloc( RUP8( width * height * 4 * sizeof(uint8_t)));
 	if(!badbuf)
 		return 0;
 	Map    = (uint32_t*) vj_malloc( RUP8(width * height * sizeof(uint32_t)));
@@ -85,7 +88,7 @@ typedef struct
 } pixel_t;
 
 
-void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, int dir)
+void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, int dir, int alpha)
 {
 	int i,j;
 	int len = (width * height);
@@ -104,7 +107,7 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 
 	//@ copy source image to internal buffer 
 	uint8_t *dest[4] = { badbuf, badbuf + len, badbuf + len + len, badbuf + len + len + len };
-	int strides[4] = { len, len, len, len };
+	int strides[4] = { len, len, len, (alpha == 0 ? 0 : len) };
 	vj_frame_copy( frame->data, dest, strides );
 
 	uint8_t *Yi = badbuf;
@@ -124,7 +127,8 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 	vj_frame_clear1( Y, 0, len );
 	vj_frame_clear1( Cb, 128, len );
 	vj_frame_clear1( Cr, 128, len );
-	vj_frame_clear1( A, 0, len );
+	if( alpha )
+		vj_frame_clear1( A, 0, len );
 
 	int update_map = 0;
 
@@ -160,12 +164,9 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 
 			}
 		}
-
 	}
 
-
 	// process
-
 	for( i = 0; i < height; i ++ )
 	{
 		for( j = 0; j < width ; j ++ )
@@ -173,6 +174,11 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 			Y[ i * width + j ] = Yi[ Map[i * width + j] ];
 			Cb[ i * width + j ] = Cbi[ Map[i * width + j] ];
 			Cr[ i * width + j ] = Cri[ Map[i * width + j] ];
+		}
+	}
+
+	if( alpha) {
+		for( i = 0; i < len; i ++ ) {
 			A[i * width + j ] = Ai[ Map[i * width + j] ];
 		}
 	}

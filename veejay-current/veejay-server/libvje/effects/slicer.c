@@ -80,7 +80,7 @@ int     slicer_malloc(int width, int height)
 vj_effect *slicer_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -88,19 +88,22 @@ vj_effect *slicer_init(int w, int h)
     ve->limits[1][0] = w;
     ve->limits[0][1] = 1;
     ve->limits[1][1] = h;
+	ve->limits[0][2] = 0;
+	ve->limits[1][2] = 1;
     ve->defaults[0] = 16;
     ve->defaults[1] = 16;
+	ve->defaults[2] = 0;
     ve->description = "Slicer";
     ve->sub_format = 1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "A", "b"); 
+	ve->param_description = vje_build_param_list( ve->num_params, "Width", "Height", "Mode"); 
     return ve;
 }
 
 
 void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int val1, int val2)
+		   int height, int val1, int val2, int mode)
 {
 	int x,y,p,q;
 	const unsigned int len = (width * height);
@@ -118,26 +121,44 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
 
 	recalc( width, height, Y2, val1 ,val2 );
 
-  	for(y=0; y < height; y++){ 
- 	   for(x=0; x < width; x++) {
-        	dx = x + slice_xshift[y]; 
-			dy = y + slice_yshift[x];
-			p = dy * width + dx;
-			q = y * width + x;
-			if( p >= 0 && p < len ) {
-				Y[q] = Y2[p];
-				Cb[q] = Cb2[p];
-				Cr[q] = Cr2[p];
-				aA[q] = aB[p];
+	if( mode == 0 ) {
+	  	for(y=0; y < height; y++){ 
+		   for(x=0; x < width; x++) {
+		     	dx = x + slice_xshift[y]; 
+				dy = y + slice_yshift[x];
+				p = dy * width + dx;
+				q = y * width + x;
+				if( p >= 0 && p < len ) {
+					Y[q] = Y2[p];
+					Cb[q] = Cb2[p];
+					Cr[q] = Cr2[p];
+					aA[q] = aB[p];
+				}
+				else {
+					Y[q] = pixel_Y_lo_;
+					Cb[q] = 128;
+					Cr[q] = 128;
+					aA[q] = 0;
+				}
 			}
-			else {
-				Y[q] = pixel_Y_lo_;
-				Cb[q] = 128;
-				Cr[q] = 128;
-				aA[q] = 0;
+		}
+	}
+	else {
+		for(y=0; y < height; y++){ 
+		   for(x=0; x < width; x++) {
+		     	dx = x + slice_xshift[y]; 
+				dy = y + slice_yshift[x];
+				p = dy * width + dx;
+				q = y * width + x;
+				if( p >= 0 && p < len ) {
+					Y[q] = Y2[p];
+					Cb[q] = Cb2[p];
+					Cr[q] = Cr2[p];
+					aA[q] = aB[p];
+				}
 			}
-       }
-  }
+		}
+	}
 }
 
 void slicer_free()

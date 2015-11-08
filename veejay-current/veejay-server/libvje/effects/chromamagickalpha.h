@@ -1,7 +1,7 @@
-/*
+/* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,15 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef SLICER_H
-#define SLICER_H
+#ifndef CHROMAMAGICKALPHA_H
+#define CHROMAMAGICKALPHA_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *slicer_init();
-void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int slice_width, int slice_direction, int mode);
-int	slicer_malloc (int w, int h );
-void slicer_free();
+vj_effect *chromamagickalpha_init();
+void chromamagickalpha_apply(VJFrame *frame, VJFrame *frame2 , int width,int height, int type, int op0);
 #endif

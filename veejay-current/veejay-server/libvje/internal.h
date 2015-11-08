@@ -30,7 +30,7 @@
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 254
+#define VJ_VIDEO_EFFECT_MAX 256
 
 #define VJ_PLUGIN 500
 
@@ -137,6 +137,8 @@ enum {
 	VJ_VIDEO_EFFECT_ALPHABLEND = 251,
 	VJ_VIDEO_EFFECT_PORTERDUFF = 252,
 	VJ_VIDEO_EFFECT_LUMAKEYALPHA = 253,	
+	VJ_VIDEO_EFFECT_CHROMAMAGICKALPHA = 254,
+	VJ_VIDEO_EFFECT_MAGICOVERLAYALPHA = 255,
 };
 
 enum {
@@ -369,7 +371,7 @@ extern void lumakey_apply(VJFrame *frame, VJFrame *frame2, int width,
 extern void pointfade_apply(VJFrame *frame, VJFrame *frame2,
 			    int width, int height, int pointsize,
 			    int opacity);
-extern	void	slicer_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int a, int b );
+extern	void	slicer_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int a, int b, int mode );
 
 extern void transcarot_apply(VJFrame *frame, VJFrame *frame2,
 			     int width, int height, int point_size, int dy,
@@ -521,7 +523,7 @@ extern void pixelate_apply(VJFrame *frame, int w, int h, int v );
 
 extern void magicmirror_apply(VJFrame *frame, int w, int h, int x, int y, int d, int n );
 
-extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int n, int m, int border);
+extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int n, int m, int border, int alpha);
 
 extern void smear_apply(VJFrame *frame, int w, int h, int n, int m);
 
@@ -546,9 +548,9 @@ extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int opa
 
 extern void overclock_apply(VJFrame *frame, int w, int h, int val, int r);
 
-extern int bgsubstract_prepare(void *user, uint8_t *map[4], int width, int height);
+extern int bgsubtract_prepare(uint8_t *map[4], int w, int h);
 
-extern void bgsubstract_apply(VJFrame *frame,int width, int height, int mode, int threshold, int alpha );
+extern void bgsubtract_apply(VJFrame *frame,int width, int height, int mode, int threshold, int alpha );
 
 extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
 
@@ -634,7 +636,7 @@ extern void cali_apply(void *d , VJFrame *frame,
 
 extern void waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, int loopnum, int decay);
 
-extern void radcor_apply( VJFrame *frame, int width, int height, int a, int b, int c);
+extern void radcor_apply( VJFrame *frame, int width, int height, int a, int b, int c, int alpha);
 
 extern int motionmap_prepare( uint8_t *map[4], int w, int h );
 extern int chameleon_prepare( uint8_t *bg[4], int w, int h );
@@ -657,4 +659,7 @@ extern void alphaselect_apply( VJFrame *frame, int width,int height, int i_angle
 extern void alphaselect2_apply( VJFrame *frame, int width,int height, int tola, int r, int g,int b, int tolb, int show, int alpha);
 extern void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
 extern void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int opacity );
+extern void chromamagickalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int opacity );
+extern void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int mode );
+extern void alphanegate_apply( VJFrame *frame, int width, int height, int value );
 #endif
