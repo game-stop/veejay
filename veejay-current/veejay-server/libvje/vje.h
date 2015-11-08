@@ -22,7 +22,7 @@
 
 #define FX_LIMIT	1024
 
-#define MAX_EFFECTS 154
+#define MAX_EFFECTS		155
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)
@@ -103,8 +103,8 @@ typedef struct vj_effect_instance_t {
 	float	*farr;
 } vj_fx_instance;
 
-extern int get_pixel_range_min_Y();
-extern int get_pixel_range_min_UV();
+extern unsigned int get_pixel_range_min_Y();
+extern unsigned int get_pixel_range_min_UV();
 extern void vj_effect_initialize(int width, int height, int range);
 extern void vj_effect_shutdown();
 extern int vj_effect_max_effects();

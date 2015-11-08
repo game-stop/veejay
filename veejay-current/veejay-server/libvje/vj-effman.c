@@ -44,7 +44,7 @@ void vj_effman_apply_plug_effect(
 	void *instance)
 
 {
-	int plug_id = entry - MAX_EFFECTS;
+	int plug_id = entry - VJ_PLUGIN;
 	int n 	    = plug_get_num_input_channels( plug_id );
 
 	int i;
@@ -436,6 +436,9 @@ void vj_effman_apply_image_effect(
 	 case VJ_IMAGE_EFFECT_PIXELATE:
 		pixelate_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 		break;
+	case VJ_IMAGE_EFFECT_ALPHANEGATE:
+		alphanegate_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+		break;
    }
 }
 
@@ -585,7 +588,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 			   todo_info->tmp[0], arg[1], arg[2], arg[3]);
 	break;
       case VJ_VIDEO_EFFECT_FADECOLOR:
-	if (arg[3] == 0) {
+	if (arg[3] == 0)  {
 	    if (todo_info->tmp[0] >= 255)
 		todo_info->tmp[0] = arg[0];
 	    todo_info->tmp[0] += (arg[0] / arg[2]);
@@ -679,7 +682,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 int vj_effect_prepare( VJFrame *frame, int selector)
 {
 	int fx_id = vj_effect_real_to_sequence( selector );
-	if( fx_id < 0 || fx_id > MAX_EFFECTS )
+	if( fx_id < 0 )
 		return 0;
 
 	switch( selector ) {
@@ -723,7 +726,7 @@ static void	vj_effman_apply_job( void *arg )
 	frames[0] = &frame;
 	frames[1] = &frame2;
 
-	if( selector > 200 )	
+	if( selector > VJ_VIDEO_EFFECT_MIN )	
 	{
 		vj_task_set_to_frame( &frame2, 1, v->jobnum);
 		vj_effman_apply_video_effect(frames,kf, v->iparams + 1, entry,selector);
@@ -746,7 +749,7 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 		return VJE_NEED_INIT;
 	}
 
-	if( selector >= 500 ) {
+	if( selector >= VJ_PLUGIN ) {
 		vj_effman_apply_plug_effect( frames, frameinfo, kf, arguments,n_a, entry, selector, ptr );
 
 		return VJE_SUCCESS;
@@ -769,7 +772,7 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 		} 
 	}
 
-	if( selector > 200 )	
+	if( selector > VJ_VIDEO_EFFECT_MIN )	
 		vj_effman_apply_video_effect(frames,kf,arguments, entry,selector);
 	else
 		vj_effman_apply_image_effect( frames,kf, arguments,entry, selector);

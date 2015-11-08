@@ -48,7 +48,7 @@ vj_effect *alphanegate_init(int w, int h)
 void alphanegate_apply( VJFrame *frame, int width, int height, int val)
 {
     const unsigned int len = frame->len;
-    uint8_t *A = frame->data[0];
+    uint8_t *A = frame->data[3];
 	unsigned int i;
 
 	for( i = 0; i < len; i ++ ) {

@@ -183,21 +183,19 @@
 #include "effects/porterduff.h"
 #include "effects/pixelate.h"
 #include "effects/alphanegate.h"
+#include "effects/bgsubtract.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
-int  pixel_Y_hi_ = 235;
-int  pixel_U_hi_ = 240;
-int  pixel_Y_lo_ = 16;
-int  pixel_U_lo_ = 16;
+unsigned int  pixel_Y_hi_ = 235;
+unsigned int  pixel_U_hi_ = 240;
+unsigned int  pixel_Y_lo_ = 16;
+unsigned int  pixel_U_lo_ = 16;
 
-static uint8_t *vje_buffer = NULL;
-static ssize_t vje_buflen = 0;
-
-int	get_pixel_range_min_Y() {
+unsigned int	get_pixel_range_min_Y() {
 	return pixel_Y_lo_;
 }
-int	get_pixel_range_min_UV() {
+unsigned int	get_pixel_range_min_UV() {
 	return pixel_U_lo_;
 }
 
@@ -215,13 +213,13 @@ static struct
 	void	(*free)(void);
 	int effect_id;
 } simple_effect_index[] = {
-{ 	bathroom_malloc		,	bathroom_free		,VJ_IMAGE_EFFECT_BATHROOM	},
-{ 	chromascratcher_malloc	,	chromascratcher_free	,VJ_IMAGE_EFFECT_CHROMASCRATCHER},
+{ 	bathroom_malloc,		bathroom_free		,VJ_IMAGE_EFFECT_BATHROOM	},
+{ 	chromascratcher_malloc,	chromascratcher_free,VJ_IMAGE_EFFECT_CHROMASCRATCHER},
 {	complexsync_malloc	,	complexsync_free	,VJ_VIDEO_EFFECT_COMPLEXSYNC	},
-{	dices_malloc	 	,	dices_free		,VJ_IMAGE_EFFECT_DICES		},
-{	colorhis_malloc,		colorhis_free,		VJ_IMAGE_EFFECT_COLORHIS	},
-{	autoeq_malloc,			autoeq_free		,VJ_IMAGE_EFFECT_AUTOEQ		},
-{	magicscratcher_malloc	,	magicscratcher_free	,VJ_IMAGE_EFFECT_MAGICSCRATCHER	},
+{	dices_malloc	 	,	dices_free			,VJ_IMAGE_EFFECT_DICES		},
+{	colorhis_malloc,		colorhis_free		,VJ_IMAGE_EFFECT_COLORHIS	},
+{	autoeq_malloc,			autoeq_free			,VJ_IMAGE_EFFECT_AUTOEQ		},
+{	magicscratcher_malloc,	magicscratcher_free	,VJ_IMAGE_EFFECT_MAGICSCRATCHER	},
 {	lumamask_malloc		,	lumamask_free		,VJ_VIDEO_EFFECT_LUMAMASK	},
 {	motionblur_malloc	, 	motionblur_free		,VJ_IMAGE_EFFECT_MOTIONBLUR	},
 { 	magicmirror_malloc	,	magicmirror_free	,VJ_IMAGE_EFFECT_MAGICMIRROR	},
@@ -229,29 +227,29 @@ static struct
 {	noiseadd_malloc		,	noiseadd_free		,VJ_IMAGE_EFFECT_NOISEADD	},
 {	noisepencil_malloc	,	noisepencil_free	,VJ_IMAGE_EFFECT_NOISEPENCIL	},
 {	reflection_malloc	,	reflection_free		,VJ_IMAGE_EFFECT_REFLECTION	},
-{	ripple_malloc		,	ripple_free		,VJ_IMAGE_EFFECT_RIPPLE		},
+{	ripple_malloc		,	ripple_free			,VJ_IMAGE_EFFECT_RIPPLE		},
 {	rotozoom_malloc		,	rotozoom_free		,VJ_IMAGE_EFFECT_ROTOZOOM	},
 {	scratcher_malloc	,	scratcher_free		,VJ_IMAGE_EFFECT_SCRATCHER	},
 {	sinoids_malloc		,	sinoids_free		,VJ_IMAGE_EFFECT_SINOIDS	},
-{	slice_malloc		,	slice_free		,VJ_IMAGE_EFFECT_SLICE		},
-{	split_malloc		,	split_free		,VJ_VIDEO_EFFECT_SPLIT		},
-{	tracer_malloc		,	tracer_free		,VJ_VIDEO_EFFECT_TRACER		},
-{	zoom_malloc		,	zoom_free		,VJ_IMAGE_EFFECT_ZOOM		},
+{	slice_malloc		,	slice_free			,VJ_IMAGE_EFFECT_SLICE		},
+{	split_malloc		,	split_free			,VJ_VIDEO_EFFECT_SPLIT		},
+{	tracer_malloc		,	tracer_free			,VJ_VIDEO_EFFECT_TRACER		},
+{	zoom_malloc			,	zoom_free			,VJ_IMAGE_EFFECT_ZOOM		},
 {	crosspixel_malloc	,	crosspixel_free		,VJ_IMAGE_EFFECT_CROSSPIXEL	},
 {	fisheye_malloc,			fisheye_free		,VJ_IMAGE_EFFECT_FISHEYE	},
-{	swirl_malloc		,	swirl_free		,VJ_IMAGE_EFFECT_SWIRL		},
-{       radialblur_malloc,		radialblur_free,	 VJ_IMAGE_EFFECT_RADIALBLUR	},
+{	swirl_malloc		,	swirl_free			,VJ_IMAGE_EFFECT_SWIRL		},
+{   radialblur_malloc,		radialblur_free,	 VJ_IMAGE_EFFECT_RADIALBLUR	},
 {	uvcorrect_malloc,		uvcorrect_free,		VJ_IMAGE_EFFECT_UVCORRECT	},
 {	overclock_malloc, 		overclock_free,		VJ_IMAGE_EFFECT_OVERCLOCK	},
 {	nervous_malloc,			nervous_free,		VJ_IMAGE_EFFECT_NERVOUS		},
 {	morphology_malloc,		morphology_free,	VJ_IMAGE_EFFECT_MORPHOLOGY	},
-{	differencemap_malloc,		differencemap_free,	VJ_VIDEO_EFFECT_EXTDIFF		},
+{	differencemap_malloc,	differencemap_free,	VJ_VIDEO_EFFECT_EXTDIFF		},
 {	threshold_malloc,		threshold_free,		VJ_VIDEO_EFFECT_EXTTHRESHOLD	},
 {	motionmap_malloc,		motionmap_free,		VJ_IMAGE_EFFECT_MOTIONMAP	},
-{	colmorphology_malloc,		colmorphology_free,	VJ_IMAGE_EFFECT_COLMORPH	},
-{	blob_malloc,			blob_free,		VJ_IMAGE_EFFECT_VIDBLOB 	},
-{	boids_malloc,			boids_free,		VJ_IMAGE_EFFECT_VIDBOIDS 	},
-{	ghost_malloc,			ghost_free,		VJ_IMAGE_EFFECT_GHOST		},
+{	colmorphology_malloc,	colmorphology_free,	VJ_IMAGE_EFFECT_COLMORPH	},
+{	blob_malloc,			blob_free,			VJ_IMAGE_EFFECT_VIDBLOB 	},
+{	boids_malloc,			boids_free,			VJ_IMAGE_EFFECT_VIDBOIDS 	},
+{	ghost_malloc,			ghost_free,			VJ_IMAGE_EFFECT_GHOST		},
 {	neighbours_malloc,		neighbours_free,	VJ_IMAGE_EFFECT_NEIGHBOUR	},
 {	neighbours2_malloc,		neighbours2_free,	VJ_IMAGE_EFFECT_NEIGHBOUR2	},
 {	neighbours3_malloc,		neighbours3_free,	VJ_IMAGE_EFFECT_NEIGHBOUR3	},
@@ -262,14 +260,14 @@ static struct
 {	photoplay_malloc,		photoplay_free,		VJ_IMAGE_EFFECT_PHOTOPLAY	},
 {	videoplay_malloc,		videoplay_free,		VJ_VIDEO_EFFECT_VIDEOPLAY	},
 {	videowall_malloc,		videowall_free,		VJ_VIDEO_EFFECT_VIDEOWALL	},
-{	flare_malloc,			flare_free,		VJ_IMAGE_EFFECT_FLARE		},
+{	flare_malloc,			flare_free,			VJ_IMAGE_EFFECT_FLARE		},
 {	timedistort_malloc,		timedistort_free,	VJ_IMAGE_EFFECT_TIMEDISTORT	},
 {	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
-{	chameleonblend_malloc,		chameleonblend_free,	VJ_VIDEO_EFFECT_CHAMBLEND	},
+{	chameleonblend_malloc,	chameleonblend_free,VJ_VIDEO_EFFECT_CHAMBLEND	},
 {	baltantv_malloc,		baltantv_free,		VJ_IMAGE_EFFECT_BALTANTV	},
 {	radcor_malloc,			radcor_free,		VJ_IMAGE_EFFECT_LENSCORRECTION	},
-{	radioactivetv_malloc,		radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
-{	waterrippletv_malloc,		waterrippletv_free,	VJ_IMAGE_EFFECT_RIPPLETV	},
+{	radioactivetv_malloc,	radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
+{	waterrippletv_malloc,	waterrippletv_free,	VJ_IMAGE_EFFECT_RIPPLETV	},
 {	bgsubtract_malloc,		bgsubtract_free,	VJ_IMAGE_EFFECT_BGSUBTRACT	},
 {	slicer_malloc,			slicer_free,		VJ_VIDEO_EFFECT_SLICER		},
 {	perspective_malloc,		perspective_free,	VJ_IMAGE_EFFECT_PERSPECTIVE },
@@ -326,8 +324,6 @@ static int _get_complex_effect( int effect_id)
 
 static int _no_mem_required(int effect_id)
 {
-	if( effect_id >= VJ_EXT_EFFECT )
-		return 0;
 	if( _get_simple_effect(effect_id) == -1 && _get_complex_effect(effect_id) == -1 )
 		return 1;
 	return 0;
@@ -335,10 +331,8 @@ static int _no_mem_required(int effect_id)
 
 int	vj_effect_is_plugin( int effect_id )
 {
-	int seq = vj_effect_real_to_sequence(effect_id);
-	if(seq >= MAX_EFFECTS && seq < (MAX_EFFECTS + n_ext_plugs_)) {
+	if( effect_id >= VJ_PLUGIN && effect_id <= (VJ_PLUGIN + n_ext_plugs_ ))
 		return 1;
-	}
 	return 0;
 }
 
@@ -348,35 +342,32 @@ int vj_effect_initialized(int effect_id, void *instance_ptr )
 	int seq = vj_effect_real_to_sequence(effect_id);
 	if( seq < 0 )
 		return 0;
-	
-	if( seq >= MAX_EFFECTS && seq < (MAX_EFFECTS + n_ext_plugs_)) {
-		//@ is plugin
-		if( instance_ptr == NULL ) {
+
+	if( effect_id >= VJ_PLUGIN )
+	{
+		if( instance_ptr == NULL )
 			return 0;
-		}
 		return 1;
-	} else if( seq < MAX_EFFECTS ) { //@ veejay internal FX
-		if( _no_mem_required(effect_id) || vj_effect_ready[seq] == 1 ) {
-			return 1;
-		}
 	}
+	else if ( _no_mem_required( effect_id ) || vj_effect_ready[ effect_id ] == 1 )
+		return 1;
+
 	return 0;
 }
 
 static void 	*vj_effect_activate_ext( int fx_id, int *result )
 {
-	if( fx_id > (MAX_EFFECTS + n_ext_plugs_) ) {
+	int plug_id = fx_id - VJ_PLUGIN;
+	if( plug_id < 0)
 		return NULL;
-	}
 	
-	void *plug = plug_activate( fx_id - MAX_EFFECTS );
+	void *plug = plug_activate( plug_id );
 	if(plug)
 	{
 		*result = 1;
 		return plug;
 	} 
 	*result = 0;
-	
 	return NULL;
 }
 
@@ -389,27 +380,20 @@ int vj_effect_is_parallel(int effect_id)
 void *vj_effect_activate(int effect_id, int *result)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
-
-	if( seq < 0 || seq > (MAX_EFFECTS + n_ext_plugs_ )) {
+	if( seq < 0  ) {
 		*result = 0;
 		return NULL;
 	}
 
-	// activate some plugin instance
-	if(seq >= MAX_EFFECTS && seq < (MAX_EFFECTS + n_ext_plugs_)) {
-		return vj_effect_activate_ext(seq, result);
+	if( effect_id >= VJ_PLUGIN ) {
+		return vj_effect_activate_ext( seq, result );
 	}
-
-
-	if( _no_mem_required(effect_id) ) {
+	else if ( _no_mem_required(effect_id) ) {
 		*result = 1;
 		return NULL;
 	}
-
-	if( vj_effect_ready[seq] == 1 )
+	else if( vj_effect_ready[seq] == 1 )
 	{
-	//	veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s already initialized",
-		//	vj_effects[seq]->description);
 		*result = 1;
 		return NULL;
 	}
@@ -432,13 +416,10 @@ void *vj_effect_activate(int effect_id, int *result)
 			}
 			else
 			{
-		//		veejay_msg(VEEJAY_MSG_DEBUG, "Initialized complex effects %s",
-			//			vj_effects[seq]->description);
 				vj_effect_ready[seq] = 1;
 				*result = 1;
 				return NULL;
 			}
-			//perhaps it is a complex effect
 		}
 		if(!simple_effect_index[index].mem_init( max_width, max_height ))
 		{
@@ -447,8 +428,6 @@ void *vj_effect_activate(int effect_id, int *result)
 		}
 		else
 		{
-		//		veejay_msg(VEEJAY_MSG_DEBUG, "Initialized simple effect %s",
-		//				vj_effects[seq]->description);
 				vj_effect_ready[seq]= 1;
 				*result = 1;
 				return NULL;
@@ -467,37 +446,30 @@ int vj_effect_deactivate(int effect_id, void *ptr)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
 
-	if(seq < 0 || seq >= MAX_EFFECTS)
-		if( seq > n_ext_plugs_ + MAX_EFFECTS) { 
-			return 0;
-		}
+	if(seq < 0 )
+		return 0;
 	
-	if( seq >= MAX_EFFECTS && seq < (n_ext_plugs_ + MAX_EFFECTS))
-	{
+	if( seq >= VJ_PLUGIN ) {
 		if(ptr) 
 		{
 			plug_deactivate( ptr );
 			return 1;
 		}
-	} else if ( seq < MAX_EFFECTS ) {
-		if( vj_effect_ready[seq] == 1 ) {
-			int index = _get_simple_effect(effect_id);
-			if(index==-1) {
-				index = _get_complex_effect(effect_id);
-				if(index == -1)
-				{
-					return 0;
-				}
-				complex_effect_index[index].free( vj_effects[seq]->user_data );
-				vj_effect_ready[seq] = 0;
-		//		veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated complex effect %s",	vj_effects[seq]->description);
-				return 1;
+	} else if( vj_effect_ready[seq] == 1 ) {
+		int index = _get_simple_effect(effect_id);
+		if(index==-1) {
+			index = _get_complex_effect(effect_id);
+			if(index == -1)
+			{
+				return 0;
 			}
-			simple_effect_index[index].free();
+			complex_effect_index[index].free( vj_effects[seq]->user_data );
 			vj_effect_ready[seq] = 0;
-		//	veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated simple effect %s", vj_effects[seq]->description);
 			return 1;
 		}
+		simple_effect_index[index].free();
+		vj_effect_ready[seq] = 0;
+		return 1;
 	}
 
 	return 0;
@@ -506,13 +478,11 @@ int vj_effect_deactivate(int effect_id, void *ptr)
 void vj_effect_deactivate_all()
 {
 	int i;
-	for(i = 0 ; i < MAX_EFFECTS + n_ext_plugs_; i++)
+	for(i = 0 ; i < FX_LIMIT; i ++ )
 	{
-		int effect_id = vj_effect_get_real_id( i );
-		if( effect_id > 100)
-		{
-			vj_effect_deactivate( effect_id, NULL );
-		}
+		if( vj_effects[ i ] == NULL )
+			continue;
+		vj_effect_deactivate( i, NULL );
 	}	
 }
 
@@ -533,185 +503,177 @@ void vj_effect_initialize(int width, int height, int full_range)
 	veejay_memset( vj_effects, 0, sizeof(vj_effects));
 	veejay_memset( vj_effect_ready,0,sizeof(vj_effect_ready));
 
-    vj_effects[0] = dummy_init(width,height);
-    vj_effects[1] = overlaymagic_init( width,height );
-    vj_effects[2] = lumamagick_init( width,height );
-    vj_effects[3] = diff_init(width, height);
-    vj_effects[4] = opacity_init( width,height );
-    vj_effects[5] = lumakey_init(width, height);
-    vj_effects[6] = rgbkey_init( width,height );
-    vj_effects[7] = chromamagick_init( width,height );
-    vj_effects[8] = lumablend_init( width,height );
-    vj_effects[9] = split_init(width,height);
-    vj_effects[10] = borders_init(width,height);
-    vj_effects[11] = frameborder_init(width,height);
-    vj_effects[12] = slidingdoor_init(width, height);
-    vj_effects[13] = transop_init(width, height);
-    vj_effects[14] = transcarot_init(width, height);
-    vj_effects[15] = transline_init(width, height);
-    vj_effects[16] = transblend_init(width, height);
-    vj_effects[17] = fadecolor_init(width,height);
-    vj_effects[18] = fadecolorrgb_init(width,height);
-    vj_effects[19] = whiteframe_init(width,height);
-    vj_effects[20] = simplemask_init(width,height);
-    vj_effects[21] = opacitythreshold_init(width,height);
-    vj_effects[22] = opacityadv_init(width,height);
-    vj_effects[23] = rgbkeysmooth_init(width,height);
-    vj_effects[24] = wipe_init(width,height);
-    vj_effects[25] = tracer_init(width, height);
-    vj_effects[26] = mtracer_init(width, height);
-    vj_effects[27] = dupmagic_init(width,height);
-    vj_effects[28] = keyselect_init(width,height);
-    vj_effects[29] = complexthreshold_init(width,height);
-    vj_effects[30] = complexsync_init(width,height);
-    vj_effects[31] = bar_init(width,height);
-    vj_effects[32] = vbar_init(width,height);
-    vj_effects[33] = lumamask_init(width,height);
-    vj_effects[34] = binaryoverlay_init(width,height);
-    vj_effects[35] = dissolve_init(width,height);
-    vj_effects[36] = tripplicity_init(width,height);
-    vj_effects[37] = videoplay_init(width,height);
-    vj_effects[38] = videowall_init(width,height);
-    vj_effects[39] = threshold_init(width,height);
-	vj_effects[40] = differencemap_init(width,height);
-	vj_effects[41] = picinpic_init(width,height);
-	vj_effects[42] = chameleonblend_init(width,height);
-	vj_effects[43] = radioactivetv_init(width,height);
-//	vj_effects[44] = texmap_init( width,height);
-	vj_effects[45] = water_init(width,height);
-	vj_effects[46] = slicer_init(width,height);
-	vj_effects[47] = average_blend_init(width,height);
-	vj_effects[44] = iris_init(width,height);
-	vj_effects[48] = mixtoalpha_init(width,height);
-	vj_effects[49] = overlayalphamagic_init(width,height);
-	vj_effects[50] = travelmatte_init(width,height);
-	vj_effects[51] = alphablend_init(width,height);
-	vj_effects[52] = porterduff_init(width,height);
-    vj_effects[53] = dummy_init(width,height);
-	vj_effects[i + 0] = pixelate_init(width,height);
-    vj_effects[i + 1] = mirrors2_init(width,height);
-    vj_effects[i + 2] = mirrors_init(width,height);
-    vj_effects[i + 3] = widthmirror_init(width,height);
-    vj_effects[i + 4] = flip_init(width,height);
-    vj_effects[i + 5] = posterize_init(width,height);
-    vj_effects[i + 6] = negation_init(width,height);
-    vj_effects[i + 7] = solarize_init(width,height);
-    vj_effects[i + 8] = coloradjust_init(width,height);
-    vj_effects[i + 9] = gamma_init(width,height);
-    vj_effects[i + 10] = softblur_init(width,height);
-    vj_effects[i + 11] = revtv_init(width, height);
-    vj_effects[i + 12] = dices_init(width, height);
-    vj_effects[i + 13] = smuck_init(width,height);
-    vj_effects[i + 14] = killchroma_init(width,height);
-    vj_effects[i + 15] = emboss_init(width,height);
-    vj_effects[i + 16] = dither_init(width,height);
-    vj_effects[i + 17] = rawman_init(width,height);
-    vj_effects[i + 18] = rawval_init(width,height);
-    vj_effects[i + 19] = transform_init(width,height);
-    vj_effects[i + 20] = fibdownscale_init(width,height);
-    vj_effects[i + 21] = reflection_init( width,height );
-    vj_effects[i + 22] = rotozoom_init(width, height);
-    vj_effects[i + 23] = colorshift_init(width,height);
-    vj_effects[i + 24] = scratcher_init(width, height);
-    vj_effects[i + 25] = magicscratcher_init(width, height);
-    vj_effects[i + 26] = chromascratcher_init(width, height);
-    vj_effects[i + 27] = distortion_init(width, height);
-    vj_effects[i + 28] = greyselect_init(width,height);
-    vj_effects[i + 29] = bwselect_init(width,height);
-    vj_effects[i + 30] = complexinvert_init(width,height);
-    vj_effects[i + 31] = complexsaturation_init(width,height);
-    vj_effects[i + 32] = isolate_init(width,height);
-    vj_effects[i + 33] = enhancemask_init(width,height);
-    vj_effects[i + 34] = noiseadd_init(width,height);
-    vj_effects[i + 35] = contrast_init(width,height);
-    vj_effects[i + 36] = motionblur_init(width,height);
-    vj_effects[i + 37] = sinoids_init(width,height);
-    vj_effects[i + 38] = average_init(width,height);
-    vj_effects[i + 39] = ripple_init(width,height);
-    vj_effects[i + 40] = bathroom_init(width,height);
-    vj_effects[i + 41] = slice_init(width,height);
-    vj_effects[i + 42] = zoom_init(width, height);
-    vj_effects[i + 44] = deinterlace_init(width,height);
-    vj_effects[i + 45] = crosspixel_init(width,height);
-    vj_effects[i + 46] = color_init(width,height);
-    vj_effects[i + 47] = diffimg_init(width,height);
-    vj_effects[i + 48] = noisepencil_init(width,height);  	
-    vj_effects[i + 43] = pencilsketch_init(width,height);
-    vj_effects[i + 50] = bgsubtract_init(width,height);
-    vj_effects[i + 51] = magicmirror_init(width,height);
-    vj_effects[i + 52] = smear_init(width,height);
-    vj_effects[i + 53] = raster_init(width,height);
-    vj_effects[i + 54] = fisheye_init(width,height);
-    vj_effects[i + 55] = swirl_init(width,height);
-    vj_effects[i + 56] = radialblur_init(width,height);
-    vj_effects[i + 57] = chromium_init(width,height);
-    vj_effects[i + 58] = chromapalette_init(width,height);
-    vj_effects[i + 59] = uvcorrect_init(width,height);
-    vj_effects[i + 60] = overclock_init(width,height);
-	vj_effects[i + 61] = cartonize_init(width,height);
-	vj_effects[i + 62] = nervous_init(width,height);
-	vj_effects[i + 63] = morphology_init(width,height);
-	vj_effects[i + 64] = blob_init(width,height);
-	vj_effects[i + 65] = boids_init(width,height);
-	vj_effects[i + 66] = ghost_init(width,height);
-	vj_effects[i + 67] = neighbours_init(width,height);		
-	vj_effects[i + 68] = neighbours2_init(width,height);
-	vj_effects[i + 69] = neighbours3_init(width,height);
-	vj_effects[i + 70] = neighbours4_init(width,height);
-	vj_effects[i + 71] = neighbours5_init(width,height);
-	vj_effects[i + 72] = cutstop_init(width,height);
-	vj_effects[i + 73] = maskstop_init(width,height);
-	vj_effects[i + 74] = photoplay_init(width,height);
-	vj_effects[i + 75] = flare_init(width,height );
-	vj_effects[i + 76] = constantblend_init(width,height);
-	vj_effects[i + 77] = colormap_init(width,height);
-	vj_effects[i + 78] = negatechannel_init(width,height);
-	vj_effects[i + 79] = colmorphology_init(width,height);
-	vj_effects[i + 80] = colflash_init(width,height);
-	vj_effects[i + 81] = rgbchannel_init(width,height);
-	vj_effects[i + 82] = autoeq_init(width,height);
-	vj_effects[i + 83] = colorhis_init(width,height);
-	vj_effects[i + 84] = motionmap_init(width,height);
-	vj_effects[i + 85] = timedistort_init(width,height);
-	vj_effects[i + 86] = chameleon_init(width,height);
-	vj_effects[i + 87] = baltantv_init(width,height);
-	vj_effects[i + 88] = contourextract_init(width,height);
-	vj_effects[i + 49] = waterrippletv_init(width,height);
-	vj_effects[i + 89 ]= radcor_init(width,height);
-	vj_effects[i + 90 ]= cali_init(width,height);
-	vj_effects[i + 91 ] = medianfilter_init(width,height);
-	vj_effects[i + 92 ] = perspective_init(width,height);
-	vj_effects[i + 93 ] = alphafill_init(width,height);
-	vj_effects[i + 94 ] = alpha2img_init(width,height);
-	vj_effects[i + 95 ] = toalpha_init(width,height);
-	vj_effects[i + 96 ] = alphaflatten_init(width,height);
-	vj_effects[i + 97 ] = feathermask_init(width,height);
-	vj_effects[i + 98 ] = alphaselect_init(width,height);
-	vj_effects[i + 99 ] = alphaselect2_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_DUMMY]				= dummy_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_OVERLAYMAGIC]		= overlaymagic_init( width,height );
+    vj_effects[VJ_VIDEO_EFFECT_LUMAMAGICK]			= lumamagick_init( width,height );
+    vj_effects[VJ_VIDEO_EFFECT_DIFF]				= diff_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_OPACITY]				= opacity_init( width,height );
+    vj_effects[VJ_VIDEO_EFFECT_LUMAKEY]				= lumakey_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_RGBKEY]				= rgbkey_init( width,height );
+    vj_effects[VJ_VIDEO_EFFECT_CHROMAMAGICK]		= chromamagick_init( width,height );
+    vj_effects[VJ_VIDEO_EFFECT_LUMABLEND]			= lumablend_init( width,height );
+    vj_effects[VJ_VIDEO_EFFECT_SPLIT]				= split_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_BORDERS]				= borders_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_FRAMEBORDER]			= frameborder_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_SLIDINGDOOR]			= slidingdoor_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_TRANSOP]				= transop_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_CAROT]				= transcarot_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_LINE]				= transline_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_TRANSBLEND]			= transblend_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_FADECOLOR]			= fadecolor_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_FADECOLORRGB]		= fadecolorrgb_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_WHITEFRAME]			= whiteframe_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_MASK]				= simplemask_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_THRESHOLDSMOOTH]		= opacitythreshold_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_THRESHOLD]			= opacityadv_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_RGBKEYSMOOTH]		= rgbkeysmooth_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_WIPE]				= wipe_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_TRACER]				= tracer_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_MTRACER]				= mtracer_init(width, height);
+    vj_effects[VJ_VIDEO_EFFECT_DUPMAGIC]			= dupmagic_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_KEYSELECT]			= keyselect_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_COMPLEXTHRESHOLD]	= complexthreshold_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_COMPLEXSYNC]			= complexsync_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_3BAR]				= bar_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_VBAR]				= vbar_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_LUMAMASK]			= lumamask_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_BINARYOVERLAY]		= binaryoverlay_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_DISSOLVE]			= dissolve_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_TRIPPLICITY]			= tripplicity_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_VIDEOPLAY]			= videoplay_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_VIDEOWALL]			= videowall_init(width,height);
+    vj_effects[VJ_VIDEO_EFFECT_EXTTHRESHOLD]		= threshold_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_EXTDIFF]				= differencemap_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_PICINPIC]			= picinpic_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_CHAMBLEND]			= chameleonblend_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_RADIOACTIVE]			= radioactivetv_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_RIPPLETV]			= water_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_SLICER]				= slicer_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_AVERAGEBLEND]		= average_blend_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_IRIS]				= iris_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_MIXTOALPHA]			= mixtoalpha_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_MAGICALPHA]			= overlayalphamagic_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_TRAVELMATTE]			= travelmatte_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_ALPHABLEND]			= alphablend_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_PORTERDUFF]			= porterduff_init(width,height);
+
+    vj_effects[VJ_IMAGE_EFFECT_DUMMY]				= dummy_init(width,height);
+	
+	vj_effects[VJ_IMAGE_EFFECT_PIXELATE]			= pixelate_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_MIRROR]				= mirrors2_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_MIRRORS]				= mirrors_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_WIDTHMIRROR]			= widthmirror_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_FLIP]				= flip_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_POSTERIZE]			= posterize_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_NEGATION]			= negation_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_SOLARIZE]			= solarize_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_COLORADJUST]			= coloradjust_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_GAMMA]				= gamma_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_SOFTBLUR]			= softblur_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_REVTV]				= revtv_init(width, height);
+    vj_effects[VJ_IMAGE_EFFECT_DICES]				= dices_init(width, height);
+    vj_effects[VJ_IMAGE_EFFECT_SMUCK]				= smuck_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_KILLCHROMA]			= killchroma_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_EMBOSS]				= emboss_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_DITHER]				= dither_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_RAWMAN]				= rawman_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_RAWVAL]				= rawval_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_TRANSFORM]			= transform_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_FIBDOWNSCALE]		= fibdownscale_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_REFLECTION]			= reflection_init( width,height );
+    vj_effects[VJ_IMAGE_EFFECT_ROTOZOOM]			= rotozoom_init(width, height);
+    vj_effects[VJ_IMAGE_EFFECT_COLORSHIFT]			= colorshift_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_SCRATCHER]			= scratcher_init(width, height);
+    vj_effects[VJ_IMAGE_EFFECT_MAGICSCRATCHER]		= magicscratcher_init(width, height);
+    vj_effects[VJ_IMAGE_EFFECT_CHROMASCRATCHER]		= chromascratcher_init(width, height);
+    vj_effects[VJ_IMAGE_EFFECT_DISTORTION]			= distortion_init(width, height);
+    vj_effects[VJ_IMAGE_EFFECT_GREYSELECT]			= greyselect_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_BWSELECT]			= bwselect_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_COMPLEXINVERT]		= complexinvert_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_COMPLEXSATURATE]		= complexsaturation_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_ISOLATE]				= isolate_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_ENHANCEMASK]			= enhancemask_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_NOISEADD]			= noiseadd_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_CONTRAST]			= contrast_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_MOTIONBLUR]			= motionblur_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_SINOIDS]				= sinoids_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_AVERAGE]				= average_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_RIPPLETV]			= ripple_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_BATHROOM]			= bathroom_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_SLICE]				= slice_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_ZOOM]				= zoom_init(width, height);
+    vj_effects[VJ_IMAGE_EFFECT_DEINTERLACE]			= deinterlace_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_CROSSPIXEL]			= crosspixel_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_COLORTEST]			= color_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_DIFF]				= diffimg_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_NOISEPENCIL]			= noisepencil_init(width,height);  	
+    vj_effects[VJ_IMAGE_EFFECT_PENCILSKETCH]		= pencilsketch_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_BGSUBTRACT]			= bgsubtract_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_MAGICMIRROR]			= magicmirror_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_PIXELSMEAR]			= smear_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_RASTER]				= raster_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_FISHEYE]				= fisheye_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_SWIRL]				= swirl_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_RADIALBLUR]			= radialblur_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_CHROMIUM]			= chromium_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_CHROMAPALETTE]		= chromapalette_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_UVCORRECT]			= uvcorrect_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_OVERCLOCK]			= overclock_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_CARTONIZE]			= cartonize_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_NERVOUS]				= nervous_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_MORPHOLOGY]			= morphology_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_VIDBLOB]				= blob_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_VIDBOIDS]			= boids_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_GHOST]				= ghost_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_NEIGHBOUR]			= neighbours_init(width,height);		
+	vj_effects[VJ_IMAGE_EFFECT_NEIGHBOUR2]			= neighbours2_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_NEIGHBOUR3]			= neighbours3_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_NEIGHBOUR4]			= neighbours4_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_NEIGHBOUR5]			= neighbours5_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_CUTSTOP]				= cutstop_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_MASKSTOP]			= maskstop_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_PHOTOPLAY]			= photoplay_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_FLARE]				= flare_init(width,height );
+	vj_effects[VJ_IMAGE_EFFECT_CONSTANTBLEND]		= constantblend_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_COLORMAP]			= colormap_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_NEGATECHANNEL]		= negatechannel_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_COLMORPH]			= colmorphology_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_COLFLASH]			= colflash_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_RGBCHANNEL]			= rgbchannel_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_AUTOEQ]				= autoeq_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_COLORHIS]			= colorhis_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_MOTIONMAP]			= motionmap_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_TIMEDISTORT]			= timedistort_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_CHAMELEON]			= chameleon_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_BALTANTV]			= baltantv_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_CONTOUR]				= contourextract_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_RIPPLETV]			= waterrippletv_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_LENSCORRECTION ]		= radcor_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_CALI]				= cali_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_MEDIANFILTER]		= medianfilter_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_PERSPECTIVE]			= perspective_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_ALPHAFILL]			= alphafill_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_ALPHA2IMG]			= alpha2img_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_TOALPHA]				= toalpha_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_ALPHAFLATTEN]		= alphaflatten_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_ALPHAFEATHERMASK]	= feathermask_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_ALPHASELECT]			= alphaselect_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_ALPHASELECT2]		= alphaselect2_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_ALPHANEGATE]			= alphanegate_init(width,height);
+
 	max_width = width;
 	max_height = height;
-
-    for(i=0; i  < MAX_EFFECTS; i++)
-	{
-		if(vj_effects[i])
-		{
-			if(i!=3) vj_effects[i]->static_bg = 0;
-			vj_effects[i]->has_help = 0; 
-			if(vj_effects[i]->rgb_conv != 1)
-				vj_effects[i]->rgb_conv = 0;
-		}
-	}
 
 	plug_sys_init( (full_range == 0 ? PIX_FMT_YUV422P : PIX_FMT_YUVJ422P ),width,height );
 
 	n_ext_plugs_ = plug_sys_detect_plugins();
 
 	int p = 0;
-	int p_stop = MAX_EFFECTS + n_ext_plugs_;
+	int p_stop = VJ_PLUGIN + n_ext_plugs_;
 
 
-	for( p = MAX_EFFECTS; p < p_stop; p ++ )
-		vj_effects[p] = plug_get_plugin( (p-MAX_EFFECTS) );
+	for( p = VJ_PLUGIN; p < p_stop; p ++ )
+		vj_effects[p] = plug_get_plugin( p - VJ_PLUGIN );
 
 }
 
@@ -735,12 +697,17 @@ void vj_effect_free(vj_effect *ve) {
   }
 }
 
+int	vj_effect_max_effects()
+{
+	return FX_LIMIT;
+}
+
 void vj_effect_shutdown() {
     int i;
     vj_effect_deactivate_all(); 
-    for(i=0; i < vj_effect_max_effects(); i++) { 
+    for(i=0; i < FX_LIMIT; i++) { 
 		if(vj_effects[i]) {
-			if( i >= MAX_EFFECTS && vj_effects[i]->description) 
+			if(vj_effects[i]->description) 
 				free(vj_effects[i]->description);
 		  vj_effect_free(vj_effects[i]);
 		}
@@ -763,7 +730,7 @@ void vj_effect_dump() {
 	veejay_msg(VEEJAY_MSG_INFO, "Use the channel/source commands to select another sample/stream");
 	veejay_msg(VEEJAY_MSG_INFO, "to mix with.");
 	veejay_msg(VEEJAY_MSG_INFO, "\n [effect num] [effect name] [arg 0 , min/max ] [ arg 1, min/max ] ...");
-	for(i=0; i < vj_effect_max_effects(); i++) 
+	for(i=0; i < FX_LIMIT; i++) 
 	{
 		if(vj_effects[i])
 		{
@@ -785,54 +752,22 @@ void vj_effect_dump() {
 /* figure out the position in the array, returns index of vj_effects array given an effect ID */
 int vj_effect_real_to_sequence(int effect_id)
 {
-    if( effect_id >= VJ_EXT_EFFECT )
-    {
-	effect_id -= VJ_EXT_EFFECT;
-	effect_id += MAX_EFFECTS;
-	return effect_id;
-    }
-    else
-    {
-	if (effect_id >= VJ_IMAGE_EFFECT_MIN && effect_id <= VJ_IMAGE_EFFECT_MAX) {
-		effect_id -= VJ_IMAGE_EFFECT_MIN;
-		effect_id += VJ_VIDEO_COUNT;
+	if( effect_id <= 0 || effect_id >= FX_LIMIT )
+		return -1;
+
+	if( vj_effects[effect_id] )
 		return effect_id;
-	} else if (effect_id > VJ_VIDEO_EFFECT_MIN &&
-	       effect_id < VJ_VIDEO_EFFECT_MAX) {
-			effect_id -= VJ_VIDEO_EFFECT_MIN;
-			return effect_id;
-    		}
-    }
-    return -1;
+
+	return -1;
 }
 
 
 int vj_effect_get_real_id(int effect_id)
 {
-	if (effect_id > 0 && effect_id < VJ_VIDEO_COUNT)
-	{	/* video effect */
-		effect_id += VJ_VIDEO_EFFECT_MIN;
-		return effect_id;
-	}
-	else
-	{
-		if (effect_id >= VJ_VIDEO_COUNT && effect_id < MAX_EFFECTS)
-		{	/* image effect */
-			effect_id -= VJ_VIDEO_COUNT;	/* substract video count */
-			effect_id += VJ_IMAGE_EFFECT_MIN;
-			return effect_id;
-    		}
-    		else 
-		{
-			if( effect_id >= MAX_EFFECTS && effect_id <= vj_effect_max_effects())
-			{
-				effect_id -= MAX_EFFECTS;
-				effect_id += VJ_EXT_EFFECT;
-				return effect_id;
-			}
-		}
-	}
-	return 0;
+	if( effect_id < 0 || effect_id >= FX_LIMIT )
+		return 0;
+
+	return effect_id;
 }
 
 int	vj_effect_get_by_name(char *name)
@@ -840,15 +775,14 @@ int	vj_effect_get_by_name(char *name)
 	int i;
 	if(!name) return 0;
 
-	for ( i = 0; i < vj_effect_max_effects(); i ++ )
+	for ( i = 0; i < FX_LIMIT; i ++ )
 	{
 		if( vj_effects[i]->description )
 		{
 			if(strcasecmp(name, vj_effects[i]->description ) == 0 )
-			  return (int) vj_effect_get_real_id( i );
+			  return (int) i;
 		}
 	}
-
 	return 0;
 }
 
@@ -856,8 +790,8 @@ int	vj_effect_get_by_name(char *name)
 char *vj_effect_get_description(int effect_id)
 {				/* 115 */
     int entry = vj_effect_real_to_sequence(effect_id);
-    if (entry > 0)
-	return vj_effects[entry]->description;
+    if (entry >= 0)
+		return vj_effects[entry]->description;
 
     return "<none>";
 }
@@ -866,7 +800,7 @@ char *vj_effect_get_param_description(int effect_id, int param_nr)
 {
     int entry;
     entry = vj_effect_real_to_sequence(effect_id);
-    if (entry > 0 && param_nr < vj_effects[entry]->num_params)
+    if (entry >= 0 && param_nr < vj_effects[entry]->num_params)
 		return vj_effects[entry]->param_description[param_nr];
     return "Invalid paramater";
 }
@@ -877,8 +811,8 @@ int vj_effect_get_num_params(int effect_id)
     int entry;
     if(effect_id<0) return 0;
     entry = vj_effect_real_to_sequence(effect_id);
-    if (entry > 0)
-	return vj_effects[entry]->num_params;
+    if (entry >= 0)
+		return vj_effects[entry]->num_params;
     return 0;
 }
 
@@ -887,8 +821,8 @@ int vj_effect_get_static_bg(int effect_id)
 	int entry;
 	if(effect_id < 0) return 0;
 	entry = vj_effect_real_to_sequence(effect_id);
-	if(entry>0)
-	  return vj_effects[entry]->static_bg;
+	if(entry>=0)
+		return vj_effects[entry]->static_bg;
  	return 0; 
 }
 
@@ -897,9 +831,8 @@ int vj_effect_get_default(int effect_id, int param_nr)
 {
     int entry;
     entry = vj_effect_real_to_sequence(effect_id);
-    if (entry > 0 && param_nr >= 0
-	&& param_nr < vj_effects[entry]->num_params)
-	return vj_effects[entry]->defaults[param_nr];
+    if (entry >= 0 && param_nr >= 0 && param_nr < vj_effects[entry]->num_params)
+		return vj_effects[entry]->defaults[param_nr];
     return 0;
 }
 
@@ -908,9 +841,8 @@ int vj_effect_get_min_limit(int effect_id, int param_nr)
 {
     int entry;
     entry = vj_effect_real_to_sequence(effect_id);
-    if (entry > 0 && param_nr >= 0
-	&& param_nr < vj_effects[entry]->num_params)
-	return vj_effects[entry]->limits[0][param_nr];
+    if (entry >= 0 && param_nr >= 0	&& param_nr < vj_effects[entry]->num_params)
+		return vj_effects[entry]->limits[0][param_nr];
     return 0;
 }
 
@@ -919,9 +851,8 @@ int vj_effect_get_max_limit(int effect_id, int param_nr)
 {
     int entry;
     entry = vj_effect_real_to_sequence(effect_id);
-    if (entry > 0 && param_nr >= 0
-	&& param_nr < vj_effects[entry]->num_params)
-	return vj_effects[entry]->limits[1][param_nr];
+    if (entry >= 0 && param_nr >= 0 && param_nr < vj_effects[entry]->num_params)
+		return vj_effects[entry]->limits[1][param_nr];
     return 0;
 }
 
@@ -929,7 +860,7 @@ int	vj_effect_get_info( int effect_id, int *is_mixer, int *n_params )
 {
 	int entry;
 	entry = vj_effect_real_to_sequence( effect_id );
-	if( entry > 0 ) {
+	if( entry >= 0 ) {
 		*is_mixer = vj_effects[entry]->extra_frame;
 		*n_params = vj_effects[entry]->num_params;
 		return vj_effects[entry]->rgba_only;
@@ -941,8 +872,8 @@ int vj_effect_get_extra_frame(int effect_id)
 {
     int entry;
     entry = vj_effect_real_to_sequence(effect_id);
-    if (entry > 0)
-	return vj_effects[entry]->extra_frame;
+    if (entry >= 0)
+		return vj_effects[entry]->extra_frame;
     return 0;
 }
 
@@ -978,12 +909,12 @@ int vj_effect_get_summary_len(int entry)
 
 int vj_effect_get_summary(int entry, char *dst)
 {
+	if(!vj_effects[entry])
+		return 0;
+
 	int p = vj_effects[entry]->num_params;
 	int i;		
 	char tmp[4096];
-
-	if(!vj_effects[entry])
-		return 0;
 
 	sprintf(dst,"%03zu%s%03d%1d%1d%02d",
 		strlen( vj_effects[entry]->description),
@@ -1009,17 +940,12 @@ int vj_effect_get_summary(int entry, char *dst)
 	return 1;
 }
 
-int	vj_effect_max_effects()
-{
-	return MAX_EFFECTS + n_ext_plugs_;
-}
-
 int vj_effect_get_subformat(int effect_id)
 {
     int entry;
     entry = vj_effect_real_to_sequence(effect_id);
     if (entry >= 0)
-	return vj_effects[entry]->sub_format;
+		return vj_effects[entry]->sub_format;
     return 0;
 }
 
@@ -1053,32 +979,27 @@ int	vj_effect_has_cb(int effect_id)
 {
 	int entry = vj_effect_real_to_sequence( effect_id );
 	if(entry < 0) return 0;
-	if( (vj_effects[entry]->has_user == 1 ) &&
-		(vj_is_complex_effect(effect_id) == 1 ) )
+	if( (vj_effects[entry]->has_user == 1 ) && (vj_is_complex_effect(effect_id) == 1 ) )
 		return 1;
 	return 0;
 }
 
 int	vj_effect_has_rgbkey(int effect_id)
 {
-   int entry;
-   entry = vj_effect_real_to_sequence(effect_id);
-   if (entry >= 0)
+	int entry;
+	entry = vj_effect_real_to_sequence(effect_id);
+	if (entry >= 0)
 	{
 		return ( vj_effects[entry]->rgb_conv);
 
 	}	
-   return 0;
+	return 0;
 }
 
 int vj_effect_is_valid(int effect_id)
 {
-	if( effect_id >= VJ_EXT_EFFECT && effect_id < VJ_EXT_EFFECT + n_ext_plugs_)
-		return 1;
-	if( effect_id >= VJ_IMAGE_EFFECT_MIN && effect_id <= VJ_IMAGE_EFFECT_MAX )
-		return 1;
-	if( effect_id > VJ_VIDEO_EFFECT_MIN && effect_id < VJ_VIDEO_EFFECT_MAX )
-		return 1;
-	return 0;
+	if( effect_id < 0 || effect_id > FX_LIMIT )
+		return 0;
+	return (vj_effects[effect_id] == NULL ? 0 : 1);
 }
 

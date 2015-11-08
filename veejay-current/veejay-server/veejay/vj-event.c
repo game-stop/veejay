@@ -7730,7 +7730,7 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 #endif
 }
 
-
+#define VJ_IMAGE_EFFECT_MIN 100
 void vj_event_effect_inc(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7743,8 +7743,20 @@ void vj_event_effect_inc(void *ptr, const char format[], va_list ap)
 		p_invalid_mode();
 		return;
 	}
+
 	v->uc->key_effect += args[0];
-	if(v->uc->key_effect >= vj_effect_max_effects()) v->uc->key_effect = 1;
+
+	int limit = vj_effect_max_effects();
+
+	if(v->uc->key_effect >= limit )
+		v->uc->key_effect = VJ_IMAGE_EFFECT_MIN;
+
+	while( !vj_effect_is_valid( v->uc->key_effect ) )
+	{
+		v->uc->key_effect += args[0];
+		if(v->uc->key_effect > limit )
+			v->uc->key_effect = VJ_IMAGE_EFFECT_MIN;
+	}
 
 	real_id = vj_effect_get_real_id(v->uc->key_effect);
 
@@ -7753,6 +7765,7 @@ void vj_event_effect_inc(void *ptr, const char format[], va_list ap)
 		vj_effect_get_description(real_id),
 		real_id);
 }
+
 
 void vj_event_effect_dec(void *ptr, const char format[], va_list ap)
 {
@@ -7770,6 +7783,22 @@ void vj_event_effect_dec(void *ptr, const char format[], va_list ap)
 	v->uc->key_effect -= args[0];
 	if(v->uc->key_effect <= 0) v->uc->key_effect = vj_effect_max_effects()-1;
 	
+
+	int limit = vj_effect_max_effects();
+
+	if(v->uc->key_effect >= limit )
+		v->uc->key_effect = VJ_IMAGE_EFFECT_MIN;
+	if(v->uc->key_effect < VJ_IMAGE_EFFECT_MIN )
+		v->uc->key_effect = limit -1;
+
+	while( !vj_effect_is_valid( v->uc->key_effect ) )
+	{
+		v->uc->key_effect -= args[0];
+		if(v->uc->key_effect < VJ_IMAGE_EFFECT_MIN )
+			v->uc->key_effect = limit-1;
+	}
+
+
 	real_id = vj_effect_get_real_id(v->uc->key_effect);
 	veejay_msg(VEEJAY_MSG_INFO, "Selected %s Effect %s (%d)",
 		(vj_effect_get_extra_frame(real_id) == 1 ? "Video" : "Image"), 
@@ -9190,14 +9219,14 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 
 	int n_fx = vj_effect_max_effects();
 
-	for( i = 1; i < n_fx; i ++ )
+	for( i = 0; i < n_fx; i ++ )
 		len += vj_effect_get_summary_len( i );
 
 	priv_msg = (char*) malloc(sizeof(char) * (6 + len + 4096));
 	sprintf(priv_msg, "%06d", len );
 	char line[4096];
 	char fline[4096];
-	for(i=1; i < n_fx; i++)
+	for(i=0; i < n_fx; i++)
 	{
 		if(vj_effect_get_summary(i,line))
 		{
@@ -10521,10 +10550,9 @@ void	vj_event_get_sample_image		(	void *ptr,	const char format[],	va_list	ap	)
 		}
 	}
 	else {
-		//FIXME preview from streamed video
 		SEND_MSG(v, "000000000000" );
 		return;
-	}
+	}	
 
 	VJFrame *frame = yuv_yuv_template( img[0],img[1],img[2], v->video_output_width, v->video_output_height,
 			get_ffmpeg_pixfmt( v->pixel_format ));
