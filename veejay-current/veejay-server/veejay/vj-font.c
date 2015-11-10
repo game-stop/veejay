@@ -51,8 +51,8 @@ extern	int	vj_tag_size();
 #ifdef HAVE_FREETYPE
 #include <fcntl.h>
 #include <ft2build.h>
-#include FT_FTSNAMES_H
-#include FT_TTNAMEID_H
+#include FT_SFNT_NAMES_H
+#include FT_TRUETYPE_IDS_H
 #include FT_FREETYPE_H
 #include FT_GLYPH_H
 

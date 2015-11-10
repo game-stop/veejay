@@ -955,8 +955,6 @@ if test x$have_freetype2 != xtrue; then
 		done
 		AC_DEFINE(HAVE_FREETYPE,1,[compiling with freetype])
 		FTPATHTOKENS=${FT_CFLAGS##*/}
-		AC_DEFINE_UNQUOTED(FT_FTSNAMES_H,"$FTPATHTOKENS/ftsnames.h",[location of ftsnames.h (freetype)])
-		AC_DEFINE_UNQUOTED(FT_TTNAMEID_H,"$FTPATHTOKENS/ttnameid.h",[location of ttnameid.h (freetype)])
 		AC_SUBST(FT_LIBS)
 		AC_SUBST(FT_LDFLAGS)
 		AC_SUBST(FT_CFLAGS)
