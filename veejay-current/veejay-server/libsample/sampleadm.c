@@ -489,7 +489,8 @@ int sample_copy(int sample_id)
 		veejay_memcpy( copy->effect_chain[i], org->effect_chain[i], sizeof( sample_eff_chain ) );
 	}
 
-	copy->sample_id = _new_id(); 
+	copy->sample_id = _new_id();
+	snprintf(copy->descr,SAMPLE_MAX_DESCR_LEN, "Sample %4d", si->sample_id);
 
 	if(org->edit_list)
 	{
