@@ -490,7 +490,7 @@ int sample_copy(int sample_id)
 	}
 
 	copy->sample_id = _new_id();
-	snprintf(copy->descr,SAMPLE_MAX_DESCR_LEN, "Sample %4d", si->sample_id);
+	snprintf(copy->descr,SAMPLE_MAX_DESCR_LEN, "Sample %4d", copy->sample_id);
 
 	if(org->edit_list)
 	{
