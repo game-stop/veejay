@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -30,6 +30,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <libvjmem/vjmem.h>
 #include "dices.h"
 
@@ -58,13 +59,26 @@ vj_effect *dices_init(int width, int height)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 4;
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 5;
-    ve->description = "Dices (EffectTV)";
+    ve->limits[1][0] = 32;
+	ve->description = "Dices (EffectTV)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Dice size" );
-    return ve;
+   
+	/* find parameter limit */	
+	int near = (width < height ? width: height);
+	int next = pow(2, floor(log2(near)));
+	int limit = 1;
+	int iter = 1;
+	while(limit < next) {
+		limit = limit * 2;
+		iter ++;
+	}
+
+	ve->limits[1][0] = iter - 1;	
+
+	return ve;
 }
 
 int	dices_malloc(int width, int height)
@@ -106,8 +120,8 @@ void dice_create_map(int w, int h)
 	}
     }
 	}
-//	fprintf(stderr, "created map of %d, %d did %d in dicemap, total is %d\n",
-//		w,h,i,(w*h));
+	fprintf(stderr, "created map of %d, %d did %d in dicemap, total is %d\n",
+		w,h,i,(w*h));
 }
 
 void dices_apply( void* data, VJFrame *frame, int width, int height,
@@ -120,11 +134,9 @@ void dices_apply( void* data, VJFrame *frame, int width, int height,
 	uint8_t *Cr = frame->data[2];
 
     if (cube_bits != g_cube_bits) {
-	g_cube_bits = cube_bits;
-	dice_create_map(width, height);
+		g_cube_bits = cube_bits;
+		dice_create_map(width, height);
     }
-    //printf("g_cube_bits = %d, g_cube_size= %d range = %d, %d\n", g_cube_bits, g_cube_size, g_map_width,g_map_height);
-
 
     for (map_y = 0; map_y < g_map_height; map_y++) {
 	for (map_x = 0; map_x < g_map_width; map_x++) {
