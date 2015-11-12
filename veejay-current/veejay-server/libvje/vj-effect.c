@@ -275,6 +275,7 @@ static struct
 {	slicer_malloc,			slicer_free,		VJ_VIDEO_EFFECT_SLICER		},
 {	perspective_malloc,		perspective_free,	VJ_IMAGE_EFFECT_PERSPECTIVE },
 {	feathermask_malloc,		feathermask_free,	VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
+{	average_malloc,			average_free,		VJ_IMAGE_EFFECT_AVERAGE },
 {	NULL			,	NULL			,0				},
 };
 

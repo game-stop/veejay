@@ -494,7 +494,7 @@ extern void bar_apply(VJFrame *frame, VJFrame *frame2,
 extern void vbar_apply(VJFrame *frame, VJFrame *frame2,
 	int w, int h, int d, int x1, int x2, int t1, int t2);
 
-extern void average_apply(VJFrame *frame, int w, int h, int val);
+extern void average_apply(VJFrame *frame, int w, int h, int val, int mode);
 
 extern void ripple_apply(VJFrame *frame, int width, int height, int waves, int ampli,int atten);
 

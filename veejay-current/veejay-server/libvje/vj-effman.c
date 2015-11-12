@@ -368,7 +368,7 @@ void vj_effman_apply_image_effect(
 	sinoids_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_AVERAGE:
-	average_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+	average_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_RIPPLE:
 	ripple_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);

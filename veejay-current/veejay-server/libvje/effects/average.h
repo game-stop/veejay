@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,6 +25,8 @@
 #include <stdint.h>
 
 vj_effect *average_init();
-void average_apply(VJFrame *src, int width, int height, int val);
+void average_apply(VJFrame *src, int width, int height, int sum, int mode);
+void average_free();
+int	average_malloc(int width, int height);
 void average_free();
 #endif
