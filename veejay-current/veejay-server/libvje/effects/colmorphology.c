@@ -39,17 +39,18 @@ vj_effect *colmorphology_init(int w, int h)
 	ve->limits[0][1] = 0; // morpology operator (dilate,erode, ... )
 	ve->limits[1][1] = 8;
 	ve->limits[0][2] = 0;
-	ve->limits[1][2] = 1; // passes
+	ve->limits[1][2] = 1; // type
 	
     ve->defaults[0] = 140;
-    ve->defaults[1] = 0;
+    ve->defaults[1] = 1;
     ve->defaults[2] = 0;
 
     ve->description = "Colored Morphology";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold","Operator mode","Repeat");
+	ve->parallel = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Threshold","Kernel", "Dilate or Erode");
     return ve;
 }
 
@@ -70,7 +71,7 @@ void		colmorphology_free(void)
 	binary_img = NULL;
 }
 
-static uint8_t _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
+static inline uint8_t _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
 {
 	register int x;
 	/* consider all background pixels (0) in input image */	
@@ -81,7 +82,7 @@ static uint8_t _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
 }
 
 
-static uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
+static inline uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
 {
 	register int x;
 	/* consider all background pixels (0) in input image */	
@@ -91,19 +92,10 @@ static uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
 	return pixel_Y_hi_;
 }
 
-static morph_func	_morphology_function(int i)
-{
-	if( i == 0 )
-		return _dilate_kernel3x3;
-	return _erode_kernel3x3;
-}
-
-
 void colmorphology_apply( VJFrame *frame, int width, int height, int threshold, int type, int passes )
 {
 	unsigned int i,x,y;
-	int len = (width * height);
-	int t=0;
+	unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -118,29 +110,46 @@ void colmorphology_apply( VJFrame *frame, int width, int height, int threshold, 
 		 { 0,0,0, 0,0,0, 1,1,1 }
 		};
 
-	morph_func	p = _morphology_function(passes);
-
 	for( i = 0; i < len; i ++ )
 	{
 		binary_img[i] = (  Y[i] < threshold ? 0: 0xff );
-		t++;
 	}
 
 	len -= width;
 
 	/* compute dilation of binary image with kernel */
-	for(y = width; y < len; y += width  )
-	{	
-		for(x = 1; x < width-1; x ++)
+
+	if( passes == 0 ) {
+		for(y = width; y < len; y += width  )
 		{	
-			if(binary_img[x+y] == 0)
-			{
-				uint8_t mt[9] = {
-					binary_img[x-1+y-width], binary_img[x+y-width], binary_img[x+1+y-width],
-					binary_img[x-1+y], 	binary_img[x+y]	    , binary_img[x+1+y],
-					binary_img[x-1+y+width], binary_img[x+y+width], binary_img[x+1+y+width]
-					};
-				Y[x+y] = p( kernels[type], mt );
+			for(x = 1; x < width-1; x ++)
+			{	
+				if(binary_img[x+y] == 0)
+				{
+					uint8_t mt[9] = {
+						binary_img[x-1+y-width], binary_img[x+y-width], binary_img[x+1+y-width],
+						binary_img[x-1+y], 	binary_img[x+y]	    , binary_img[x+1+y],
+						binary_img[x-1+y+width], binary_img[x+y+width], binary_img[x+1+y+width]
+							};
+					Y[x+y] = _dilate_kernel3x3(kernels[type], mt);
+				}
+			}
+		}
+	}
+	else {
+		for(y = width; y < len; y += width  )
+		{	
+			for(x = 1; x < width-1; x ++)
+			{	
+				if(binary_img[x+y] == 0)
+				{
+					uint8_t mt[9] = {
+						binary_img[x-1+y-width], binary_img[x+y-width], binary_img[x+1+y-width],
+						binary_img[x-1+y], 	binary_img[x+y]	    , binary_img[x+1+y],
+						binary_img[x-1+y+width], binary_img[x+y+width], binary_img[x+1+y+width]
+							};
+					Y[x+y] = _erode_kernel3x3( kernels[type], mt );
+				}
 			}
 		}
 	}
