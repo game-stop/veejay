@@ -24,7 +24,7 @@ Livido is experimental too, as you can see there is only the use of the INDEX pa
 
 RUNNING:
 
-run the autogen.sh scrypt in the suorce folder,
+run the autogen.sh script in the suorce folder,
 then run ./configure, make and make install
 
 run veejay
