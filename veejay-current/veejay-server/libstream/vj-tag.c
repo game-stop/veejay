@@ -58,6 +58,8 @@
 #include <veejay/vj-font.h>
 #endif
 
+#define SOURCE_NAME_LEN 255
+
 #include <libplugger/plugload.h>
 static veejay_t *_tag_info = NULL;
 static hash_t *TagHash = NULL;
@@ -765,8 +767,7 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
     if(!tag)
 	return 0;
 	
-	veejay_msg(VEEJAY_MSG_DEBUG,"Set stream %d color %d,%d,%d",t1,
-		r,g, b );
+	veejay_msg(VEEJAY_MSG_DEBUG,"Set stream %d color %d,%d,%d",t1, r,g, b );
  
     tag->color_r = r;
     tag->color_g = g;
@@ -797,8 +798,7 @@ int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
 }
 
 // for network, filename /channel is passed as host/port num
-int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
-	        int pix_fmt, int channel , int extra , int has_composite)
+int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_fmt, int channel , int extra , int has_composite)
 {
     int i, j;
     int palette;
@@ -831,9 +831,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		return -1; 
 	}
 
-    tag->source_name = (char *) vj_calloc(sizeof(char) * 255);
+    tag->source_name = (char *) vj_calloc(sizeof(char) * SOURCE_NAME_LEN);
 	if (!tag->source_name)
 	{
+		free(tag);
 		veejay_msg(0, "Memory allocation error");
 		return -1;
 	}
@@ -850,6 +851,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
    		  if (!tag_node)
 		  {
 			veejay_msg(0, "Unable to find available ID");
+			free(tag->source_name);
+			free(tag);
 			return -1;
 		  }
 		  id = avail_tag[i];
@@ -912,16 +915,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 #endif
     switch (type) {
 	    case VJ_TAG_TYPE_V4L:
-		sprintf(tag->source_name, "%s", filename );
+			snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
 		
-		veejay_msg(VEEJAY_MSG_DEBUG, "V4l: %s",filename);
-
-/*
-int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,
-		    char norm, int palette,int pixfmt, int freq, int channel, int has_composite)
-
-*/
-		if (!_vj_tag_new_unicap( tag,
+			if (!_vj_tag_new_unicap( tag,
 					 stream_nr,w,h,
 					 extra, // device num
 					 el->video_norm,
@@ -931,57 +927,71 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 					 channel,
 					 has_composite,
 					 video_driver_ ))
-		{
-			veejay_msg(0, "Unable to open capture stream '%dx%d' (norm=%c,format=%x,device=%d,channel=%d)",
-				w,h,el->video_norm, pix_fmt, extra,channel );
-			return -1;
-		}
-		break;
-	case VJ_TAG_TYPE_MCAST:
-	case VJ_TAG_TYPE_NET:
-		sprintf(tag->source_name, "%s", filename );
-		if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette,type) != 1 )
-			return -1;
+			{
+				veejay_msg(0, "Unable to open capture stream '%dx%d' (norm=%c,format=%x,device=%d,channel=%d)", w,h,el->video_norm, pix_fmt, extra,channel );
+				free(tag->source_name);
+				free(tag);
+				return -1;
+			}
+			break;
+		case VJ_TAG_TYPE_MCAST:
+		case VJ_TAG_TYPE_NET:
+			snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
+			if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette,type) != 1 ) {
+				free(tag->source_name);
+				free(tag);
+				return -1;
+			}
 	break;
     case VJ_TAG_TYPE_DV1394:
 #ifdef SUPPORT_READ_DV2
-	sprintf(tag->source_name, "/dev/dv1394/%d", channel);
+	snprintf(tag->source_name, SOURCE_NAME_LEN,"dv1394 %d", channel);
 	if( _vj_tag_new_dv1394( tag, stream_nr,channel,1,el ) == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394");
+		veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394 %d", channel);
+		free(tag->source_name);
+		free(tag);
 		return -1;
 	}
 	tag->active = 1;
 	break;
 #else
 	veejay_msg(VEEJAY_MSG_DEBUG, "libdv not enabled at compile time");
+	free(tag->source_name);
+	free(tag);
 	return -1;
 #endif
 #ifdef USE_GDK_PIXBUF
 	case VJ_TAG_TYPE_PICTURE:
-	sprintf(tag->source_name, "%s", filename);
-	if( _vj_tag_new_picture(tag, stream_nr, w, h, fps) != 1 )
+	snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename);
+	if( _vj_tag_new_picture(tag, stream_nr, w, h, fps) != 1 ) {
+		free(tag->source_name);
+		free(tag);
 		return -1;
+	}
 	break;
 #endif
     case VJ_TAG_TYPE_CALI:
-	sprintf(tag->source_name,"%s",filename);
-	if(_vj_tag_new_cali( tag,stream_nr,w,h) != 1 ) 
+	snprintf(tag->source_name,SOURCE_NAME_LEN,"%s",filename);
+	if(_vj_tag_new_cali( tag,stream_nr,w,h) != 1 ) {
+		free(tag->source_name);
+		free(tag);
 		return -1;
+	}
 	break;
     case VJ_TAG_TYPE_YUV4MPEG:
-	sprintf(tag->source_name, "%s", filename);
+	snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename);
 	if (_vj_tag_new_yuv4mpeg(tag, stream_nr, w,h,fps) != 1)
 	{
-	    if(tag->source_name) free(tag->source_name);
-	    if(tag) free(tag);
+		free(tag->source_name);
+	    free(tag);
 	    return -1;
 	}
 	tag->active = 1;
 	break;
 	case VJ_TAG_TYPE_GENERATOR:
 
-	sprintf(tag->source_name, "[GEN]" );
+	snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
 
 	if( channel == -1 && filename == NULL ) {
 		int total = 0;
@@ -1037,8 +1047,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 
 	case VJ_TAG_TYPE_COLOR:
 
-	sprintf(tag->source_name, "[%d,%d,%d]",
-		tag->color_r,tag->color_g,tag->color_b );
+	snprintf(tag->source_name, SOURCE_NAME_LEN, "[solid %d]", tag->id );
 /*	
 	if( channel == -1 ) {
 		int total = 0;
@@ -1082,8 +1091,10 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	break;
 
     default:
-	veejay_msg(0, "Stream type %d invalid", type );
-	return -1;
+		veejay_msg(0, "Stream type %d invalid", type );
+		free(tag->source_name);
+		free(tag);
+		return -1;
     }
 
 	vj_tag_get_by_type( tag->source_type, tag->descr);
@@ -1111,7 +1122,9 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
     }
     if (!vj_tag_put(tag))	
 	{
-		veejay_msg(0, "Unable to store stream");
+		veejay_msg(0, "Unable to store stream %d - Internal Error", tag->id);
+		free(tag->source_name);
+		free(tag);
 		return -1;
 	}
     last_added_tag = tag->id; 

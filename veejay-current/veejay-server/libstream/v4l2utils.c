@@ -1879,6 +1879,7 @@ static	void	*v4l2_grabber_thread( void *v )
 
 	if(!v4l2_verify_file( i->file ) ) {
 		i->stop = 1;
+		unlock_(v);
 		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Not a device file: %s" , i->file );
 		pthread_exit(NULL);
 		return NULL;
@@ -1886,6 +1887,7 @@ static	void	*v4l2_grabber_thread( void *v )
 
 	v4l2info *v4l2 = v4l2open( i->file, i->channel, i->host_fmt, i->wid, i->hei, i->fps, i->norm );
 	if( v4l2 == NULL ) {
+		i->stop = 1;
 		veejay_msg(0, "v4l2: error opening v4l2 device '%s'",i->file );
 		unlock_(v);
 		pthread_exit(NULL);
@@ -1905,6 +1907,7 @@ static	void	*v4l2_grabber_thread( void *v )
 	for( j = 0; j < N_FRAMES; j ++ ) {
 		uint8_t *ptr = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(planes[0] * 4) );
 		if(!ptr) {
+			i->stop = 1;
 			veejay_msg(0, "v4l2: error allocating memory" );
 			unlock_(v);
 			pthread_exit(NULL);
