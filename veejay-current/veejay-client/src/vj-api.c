@@ -3030,7 +3030,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	}
 
 	/* Actions for sample */
-	if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm) && pm == MODE_SAMPLE )
+	if( pm == MODE_SAMPLE )
 	{
 		int marker_go = 0;
 		
@@ -3081,18 +3081,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			}
 			update = 1;
 		}
-			
-		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ))
-		{
-	//		update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START] );
-			update = 1;
-		}
-		if( (history[SAMPLE_END] != info->status_tokens[SAMPLE_END] ))
-		{
-	//		update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
-			update = 1;
-		}
-		
+
 		if( marker_go )
 		{
 			info->uc.reload_hint[HINT_MARKER] = 1;	
@@ -3141,6 +3130,15 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		{
 			update_spin_value( "spin_framedelay", info->status_tokens[FRAME_DUP]);
 			update_slider_value("slow_slider", info->status_tokens[FRAME_DUP],0);
+		}
+
+		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ))
+		{
+			update = 1;
+		}
+		if( (history[SAMPLE_END] != info->status_tokens[SAMPLE_END] ))
+		{
+			update = 1;
 		}
 
 

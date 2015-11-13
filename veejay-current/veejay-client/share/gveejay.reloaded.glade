@@ -10750,7 +10750,7 @@ YUV (current)</property>
                                               <widget class="GtkSpinButton" id="button_fadedur">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip" translatable="yes">FX Chain Fade duration in frames</property>
+                                                <property name="tooltip" translatable="yes">FX Chain fade duration in frames</property>
                                                 <property name="primary_icon_activatable">False</property>
                                                 <property name="secondary_icon_activatable">False</property>
                                                 <property name="primary_icon_sensitive">True</property>
