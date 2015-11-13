@@ -991,7 +991,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 	break;
 	case VJ_TAG_TYPE_GENERATOR:
 
-	snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
+	snprintf(tag->source_name,SOURCE_NAME_LEN, "[GEN %d]", channel);
 
 	if( channel == -1 && filename == NULL ) {
 		int total = 0;
