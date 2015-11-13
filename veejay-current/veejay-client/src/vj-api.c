@@ -3132,11 +3132,12 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			update_slider_value("slow_slider", info->status_tokens[FRAME_DUP],0);
 		}
 
-		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ))
+		/* veejay keeps sample limits , dont use update_spin_range for spin_samplestart and spin_sampleend */
+		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] || get_nums("spin_samplestart") != info->status_tokens[SAMPLE_START]))
 		{
 			update = 1;
 		}
-		if( (history[SAMPLE_END] != info->status_tokens[SAMPLE_END] ))
+		if( (history[SAMPLE_END] != info->status_tokens[SAMPLE_END] || get_nums("spin_sampleend") != info->status_tokens[SAMPLE_END]) ) 
 		{
 			update = 1;
 		}
