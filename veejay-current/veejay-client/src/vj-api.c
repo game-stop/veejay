@@ -6145,7 +6145,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 			update_spin_value( "stream_length", info->status_tokens[SAMPLE_MARKER_END] );
 			update_label_str( "stream_length_label", time );
 		}
-		update_spin_range("button_fadedur", 0, total_frames_, 0 );
+		update_spin_range("button_fadedur", 0, total_frames_, ( total_frames_ > 25 ? 25 : total_frames_-1 ) );
 		update_label_i( "label_totframes", total_frames_, 1 );
 		update_label_str( "label_samplelength",time);
 		if( pm == MODE_PLAIN )
