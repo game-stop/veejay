@@ -345,8 +345,7 @@ void boids_apply(VJFrame *frame,
 	int s,i,j,k;
 	const double M1 = ( (m1==0? 0.0 : m1/100.0) );
 	const double M2 = ( (m2==0? 0.0 : m2/100.0) );
-	const double M3 = ( (m3==0? 0.0 : m3/100.0) );
-	
+	const double M3 = ( (m3==0? 0.0 : m3/1000.0) );
 	blob_func f = blob_render();
 
 	blob_type_ = shape;
