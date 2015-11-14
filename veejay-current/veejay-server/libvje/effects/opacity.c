@@ -54,7 +54,7 @@ vj_effect *opacity_init(int w, int h)
     ve->limits[1][0] = 255;
     ve->defaults[0] = 150;
     ve->description = "Normal Overlay";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 1;
 	ve->parallel = 1;
 	ve->has_user = 0;
@@ -117,8 +117,8 @@ static void opacity_apply1( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int opacity)
 {
 	int y = blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame->len, opacity );
-	int u = blend_plane( frame->data[1], frame->data[1], frame2->data[1], frame->uv_len, opacity );
-	int v = blend_plane( frame->data[2], frame->data[2], frame2->data[2], frame->uv_len, opacity );
+	int u = blend_plane( frame->data[1], frame->data[1], frame2->data[1], (frame->ssm ? frame->len : frame->uv_len), opacity );
+	int v = blend_plane( frame->data[2], frame->data[2], frame2->data[2], (frame->ssm ? frame->len : frame->uv_len), opacity );
 #ifdef HAVE_ASM_MMX
 	do_emms;
 #endif

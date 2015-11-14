@@ -664,7 +664,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_IMAGE_EFFECT_TOALPHA]				= toalpha_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_ALPHAFLATTEN]		= alphaflatten_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_ALPHAFEATHERMASK]	= feathermask_init(width,height);
-	vj_effects[VJ_IMAGE_EFFECT_ALPHASELECT]			= alphaselect_init(width,height);
+//	vj_effects[VJ_IMAGE_EFFECT_ALPHASELECT]			= alphaselect_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_ALPHASELECT2]		= alphaselect2_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_ALPHANEGATE]			= alphanegate_init(width,height);
 

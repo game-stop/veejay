@@ -35,7 +35,7 @@ vj_effect *alphanegate_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->defaults[0] = 255;
-    ve->description = "Alpha: Negation";
+    ve->description = "Alpha: Negate Alpha Channel";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 1;

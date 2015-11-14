@@ -41,7 +41,7 @@ vj_effect *chromamagickalpha_init(int w, int h)
     ve->defaults[0] = 7;
     ve->defaults[1] = 150;
 	ve->parallel = 1;
-    ve->description = "Alpha: Chroma Magic composite (A or B)";
+    ve->description = "Alpha: Chroma Magic Matte";
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 25;
     ve->limits[0][1] = 0;

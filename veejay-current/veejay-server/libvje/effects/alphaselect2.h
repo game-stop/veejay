@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *alphaselect2_init();
-void alphaselect2_apply( VJFrame *frame, int width,int height,int tola,int red,int green,int blue, int tolb, int show, int use_alpha);
+void alphaselect2_apply( VJFrame *frame, int width,int height,int tola,int red,int green,int blue, int tolb,int use_alpha);
 #endif

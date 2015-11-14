@@ -36,7 +36,7 @@ vj_effect *lumakeyalpha_init(int width, int height)
     ve->limits[1][1] = 255;
     ve->defaults[0] = 0;
     ve->defaults[1] = 150;
-    ve->description = "Alpha: Luma Key composite";
+    ve->description = "Alpha: Luma Key Matte";
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->parallel = 1;
@@ -46,11 +46,14 @@ vj_effect *lumakeyalpha_init(int width, int height)
     return ve;
 }
 
+
 void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int type, int opacity )
 {
 	unsigned int i, len = width * height;
     unsigned int op1 = (opacity > 255) ? 255 : opacity;
     unsigned int op0 = 255 - op1;
+
+	unsigned int x,y;
 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
@@ -63,107 +66,86 @@ void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, 
 
 	switch( type ) {
 		case 0:
-			for( i = 0; i < len; i ++ ) { /* skip alpha-IN 0 */
+			for( i = 0; i < len; i ++ ) {
+				if( aB[i] == 0 ) 
+					continue;
+
+				Y[i] = FEATHER( Y[i],op0,aB[i],Y2[i],op1 );
+				Cb[i]= FEATHER(Cb[i],op0,aB[i],Cb2[i],op1 );
+				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );	
+			}	
+			break;
+		case 1:							
+			for( i = 0; i < len; i ++ ) {
 				if( aA[i] == 0 )
 					continue;
 
-				Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
-				Cb[i]= (op0 * Cb[i] + op1 * Cb2[i])>> 8;
-				Cr[i]= (op0 * Cr[i] + op1 * Cr2[i])>> 8;
+				Y[i] = FEATHER( Y[i],op0,aB[i],Y2[i],op1 );
+				Cb[i]= FEATHER(Cb[i],op0,aB[i],Cb2[i],op1 );
+				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );	
 			}
 			break;
-		case 1:							/* skip alpha-IN 1 */
-			for( i = 0; i < len; i ++ ) {
-				if( aB[i] == 0 )
-					continue;
-
-				Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
-				Cb[i]= (op0 * Cb[i] + op1 * Cb2[i])>> 8;
-				Cr[i]= (op0 * Cr[i] + op1 * Cr2[i])>> 8;
-			}
-			break;
-		case 2:							/* skip alpa-IN 0 or alpha-IN 1 */
+		case 2:							
 			for( i = 0; i < len; i ++ ) {
 				if( aB[i] == 0 || aA[i] == 0 )
 					continue;
 
-				Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
-				Cb[i]= (op0 * Cb[i] + op1 * Cb2[i])>> 8;
-				Cr[i]= (op0 * Cr[i] + op1 * Cr2[i])>> 8;
+				Y[i] = FEATHER( Y[i],op0,aB[i],Y2[i],op1 );
+				Cb[i]= FEATHER(Cb[i],op0,aB[i],Cb2[i],op1 );
+				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );	
 			}
 			break;
-		case 3:							/* skip if both */
+		case 3:							
 			for( i = 0; i < len; i ++ ) {
 				if( aB[i] == 0 && aA[i] == 0 )
 					continue;
 
-				Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
-				Cb[i]= (op0 * Cb[i] + op1 * Cb2[i])>> 8;
-				Cr[i]= (op0 * Cr[i] + op1 * Cr2[i])>> 8;
+				Y[i] = FEATHER( Y[i],op0,aB[i],Y2[i],op1 );
+				Cb[i]= FEATHER(Cb[i],op0,aB[i],Cb2[i],op1 );
+				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );	
 			}
 			break;
+		case 4:
+			for( i = 0; i < len; i ++ ) {
+				if( aB[i] == 0 ) 
+					continue;
 
-		case 4:  /* transparent */
+				Y[i] = FEATHER( Y[i],op0,aA[i],Y2[i],op1 );
+				Cb[i]= FEATHER(Cb[i],op0,aA[i],Cb2[i],op1 );
+				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );
+			}	
+			break;
+		case 5:						
 			for( i = 0; i < len; i ++ ) {
 				if( aA[i] == 0 )
 					continue;
-				uint8_t ab = (op0 * aB[i] + op1 * aA[i])>> 8;
-				uint8_t aa = 0xff - ab;
 
-				Y[i] = (aa * Y[i] + ab * Y2[i]) >> 8;
-				Cb[i]= (aa * Cb[i] + ab * Y2[i])>> 8;
-				Cr[i]= (aa * Cr[i] + ab * Y2[i])>> 8;
+				Y[i] = FEATHER( Y[i],op0,aA[i],Y2[i],op1 );
+				Cb[i]= FEATHER(Cb[i],op0,aA[i],Cb2[i],op1 );
+				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );	
 			}
 			break;
-		case 5:
+		case 6:	
 			for( i = 0; i < len; i ++ ) {
-				if( aB[i] == 0 )
+				if( aB[i] == 0 || aA[i] == 0 )
 					continue;
-				uint8_t ab = (op0 * aB[i] + op1 * aA[i])>> 8;
-				uint8_t aa = 0xff - ab;
 
-				Y[i] = (aa * Y[i] + ab * Y2[i]) >> 8;
-				Cb[i]= (aa * Cb[i] + ab * Y2[i])>> 8;
-				Cr[i]= (aa * Cr[i] + ab * Y2[i])>> 8;
+				Y[i] = FEATHER( Y[i],op0,aA[i],Y2[i],op1 );
+				Cb[i]= FEATHER(Cb[i],op0,aA[i],Cb2[i],op1 );
+				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );	
 			}
 			break;
-		case 6:
+		case 7:	
 			for( i = 0; i < len; i ++ ) {
-				if( aA[i] == 0 || aB[i] == 0 )
+				if( aB[i] == 0 && aA[i] == 0 )
 					continue;
-				uint8_t ab = (op0 * aB[i] + op1 * aA[i])>> 8;
-				uint8_t aa = 0xff - ab;
 
-				Y[i] = (aa * Y[i] + ab * Y2[i]) >> 8;
-				Cb[i]= (aa * Cb[i] + ab * Y2[i])>> 8;
-				Cr[i]= (aa * Cr[i] + ab * Y2[i])>> 8;
+				Y[i] = FEATHER( Y[i],op0,aA[i],Y2[i],op1 );
+				Cb[i]= FEATHER(Cb[i],op0,aA[i],Cb2[i],op1 );
+				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );	
 			}
 			break;
-		case 7:
-			for( i = 0; i < len; i ++ ) {
-				if( aA[i] == 0 && aB[i] == 0 )
-					continue;
-				uint8_t ab = (op0 * aB[i] + op1 * aA[i])>> 8;
-				uint8_t aa = 0xff - ab;
-
-				Y[i] = (aa * Y[i] + ab * Y2[i]) >> 8;
-				Cb[i]= (aa * Cb[i] + ab * Y2[i])>> 8;
-				Cr[i]= (aa * Cr[i] + ab * Y2[i])>> 8;
-			}
-			break;
-		case 8: // write back
-			for( i = 0; i < len; i ++ ) {
-				if( aA[i] == 0 || aB[i] == 0 )
-					continue;
-				uint8_t ab = (op0 * aB[i] + op1 * aA[i])>> 8;
-				uint8_t aa = 0xff - ab;
-
-				Y[i] = (aa * Y[i] + ab * Y2[i]) >> 8;
-				Cb[i]= (aa * Cb[i] + ab * Y2[i])>> 8;
-				Cr[i]= (aa * Cr[i] + ab * Y2[i])>> 8;
-				aA[i]= aa;
-			}
-			break;
+		
 		default:
 			break;
 	}

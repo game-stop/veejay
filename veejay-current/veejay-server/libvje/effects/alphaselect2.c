@@ -33,7 +33,7 @@ vj_effect *alphaselect2_init(int w, int h)
 {
     vj_effect *ve;
     ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 7;
+    ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -42,8 +42,7 @@ vj_effect *alphaselect2_init(int w, int h)
     ve->defaults[2] = 255;	/* g */
     ve->defaults[3] = 0;	/* b */
 	ve->defaults[4] = 15;	/* tolerance far */
-	ve->defaults[5] = 1;	/* show alpha */
-	ve->defaults[6] = 0;    /* use existing alpha */
+	ve->defaults[5] = 0;    /* alpha operator */
 
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 255;
@@ -61,24 +60,18 @@ vj_effect *alphaselect2_init(int w, int h)
 	ve->limits[1][4] = 255;
 
 	ve->limits[0][5] = 0;
-	ve->limits[1][5] = 1;
-
-	ve->limits[0][6] = 0;
-	ve->limits[1][6] = 1;
+	ve->limits[1][5] = 2;
 
 	ve->has_user = 0;
     ve->parallel = 1;
-	ve->description = "Alpha: Select by chroma key";
+	ve->description = "Alpha: Set by color key";
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-	ve->param_description = vje_build_param_list(ve->num_params,"Tolerance Near","Red","Green","Blue", "Tolerance Far", "Show Mask", "Use Alpha-IN");
+	ve->param_description = vje_build_param_list(ve->num_params,"Tolerance Near","Red","Green","Blue", "Tolerance Far", "Alpha Operator");
 
     return ve;
 }
-
-
-
 
 static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, int dA, int dB )
 {
@@ -93,12 +86,12 @@ static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, i
 		return 1.0; /* far from color key == fg */
 }
 
-
 void alphaselect2_apply( VJFrame *frame, int width,
 		   int height, int tola, int r, int g,
-		   int b, int tolb, int show, int alpha)
+		   int b, int tolb,int alpha)
 {
     unsigned int pos;
+	const unsigned int len = width * height;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -106,15 +99,32 @@ void alphaselect2_apply( VJFrame *frame, int width,
 	int cb,cr,iy,iu,iv;
 	_rgb2yuv(r,g,b,iy,iu,iv);
 
-	if( show ) {
-		if( alpha ) {
-			for (pos = (width * height); pos != 0; pos--) {
-				if(A[pos] == 0)
-					continue;
+	if(alpha == 0 ) {
+		for (pos = len; pos != 0; pos--) {
+			double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+			uint8_t alpha = (uint8_t) (d * 255.0);
+			if( alpha < 0xff ) {
+				Cb[pos] = 128;
+				Cr[pos] = 128;
+			}
+			else if (alpha == 0) {
+				Cb[pos] = 128;
+				Cr[pos] = 128;
+				Y[pos] = pixel_Y_lo_;
+			}
+			A[pos] = alpha;
+		}
+		return;
+	}
+	
+	switch(alpha)
+	{
+		case 1:
+			for (pos = len; pos != 0; pos--) {
 				double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
 				A[pos] = (uint8_t) (d * 255.0);
-				if( A[pos] < 255 ) {
-					Y[pos] = Y[pos] * d;
+				if( A[pos] < 0xff ) {
+					Y[pos] = A[pos];
 					Cb[pos] = 128;
 					Cr[pos] = 128;
 				}
@@ -124,44 +134,33 @@ void alphaselect2_apply( VJFrame *frame, int width,
 					Y[pos] = pixel_Y_lo_;
 				}
 			}
-		}
-		else
-		{
-			for (pos = (width * height); pos != 0; pos--) {
-				double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
-				A[pos] = (uint8_t) (d * 255.0);
-				if( A[pos] < 255 ) {
-					Y[pos] = Y[pos] * d;
-					Cb[pos] = 128;
-					Cr[pos] = 128;
-				}
-				else if (A[pos] == 0) {
-					Cb[pos] = 128;
-					Cr[pos] = 128;
-					Y[pos] = pixel_Y_lo_;
-				}
-			/*	A[pos] = (uint8_t) (d * 255.0);
-				Y[pos] = (d * 255);
-				Cb[pos] = 128;
-				Cr[pos] = 128; */
-			}
-		}
-	}
-	else {
-		if( alpha ) {
-			for (pos = (width * height); pos != 0; pos--) {
-				if( A[pos] == 0 )
+			break;
+		case 2:
+			for (pos = len; pos != 0; pos--) {
+				if(A[pos] == 0 )
 					continue;
-				double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
-				A[pos] = (uint8_t) (d * 255.0);
+				if(A[pos] == 0xff) {
+					Y[pos] = 0xff;
+					Cb[pos] = 128;
+					Cr[pos] = 128;
+				}
+				else {
+					double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+					A[pos] = (uint8_t) (d * 255.0);
+					if( A[pos] < 0xff ) {
+						Y[pos] = A[pos];
+						Cb[pos] = 128;
+						Cr[pos] = 128;
+					}
+					else if( A[pos] == 0) {
+						Cb[pos] = 128;
+						Cr[pos] = 128;
+						Y[pos] = pixel_Y_lo_;
+					}
+				}
 			}
-		}
-		else {
-			for (pos = (width * height); pos != 0; pos--) {
-				double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
-				A[pos] = (uint8_t) (d * 255.0);
-			}
-		}
+			break;
+
 	}
 }
 

@@ -34,7 +34,7 @@ vj_effect *overlaymagicalpha_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 1;
     ve->defaults[1] = 0;
-    ve->description = "Alpha: Overlay Magic composite";
+    ve->description = "Alpha: Overlay Magic Matte";
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 33;
     ve->limits[0][1] = 0;

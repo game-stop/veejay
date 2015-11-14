@@ -64,7 +64,7 @@ vj_effect *alphaselect_init(int w, int h)
 
 	ve->has_user = 0;
     ve->parallel = 1;
-	ve->description = "Alpha: Select by color key";
+	ve->description = "Alpha: Set by color key";
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
@@ -131,7 +131,7 @@ void alphaselect_apply( VJFrame *frame, int width,
 				Cb[pos] = 128;
 				Cr[pos] = 128;
 			} else {
-				A[pos] = 0xff;
+				A[pos] = val;
 			}
 		}
 	}
@@ -151,7 +151,7 @@ void alphaselect_apply( VJFrame *frame, int width,
 				Cr[pos] = 128;
 			}
 			else {
-				A[pos] = 0xff;
+				A[pos] = val;
 			}
 		}
 	}
