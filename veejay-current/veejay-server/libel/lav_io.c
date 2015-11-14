@@ -1243,7 +1243,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
    int jpg_height, jpg_width, ncomps, hf[3], vf[3];
    int ierr;
 
-   lav_file_t *lav_fd = (lav_file_t*) vj_malloc(sizeof(lav_file_t));
+   lav_file_t *lav_fd = (lav_file_t*) vj_calloc(sizeof(lav_file_t));
 
    if(lav_fd==0) { internal_error=ERROR_MALLOC; return 0; }
 
@@ -1287,21 +1287,36 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		return NULL;
 	}
 
-
-	lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
-
-	if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
-   	{
-	   	veejay_msg(VEEJAY_MSG_ERROR, "Empty AVI file");
-		if(lav_fd) free(lav_fd);
-		return NULL;
-   	}
-	else if ( lav_fd->avi_fd && AVI_errno == 0 )
-   	{
-		veejay_msg(VEEJAY_MSG_DEBUG,
+#ifdef USE_GDK_PIXBUF
+	lav_fd->picture = vj_picture_open( (const char*) filename,
+		output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
+	if(lav_fd->picture)
+	{
+		lav_fd->format = 'x';
+		lav_fd->bogus_len = (int) output_fps;
+		video_comp = pict;
+		ret = 1;
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tLoaded image file");
+		return lav_fd;
+	}
+#endif
+	else
+	{
+		lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
+		
+		if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
+		{
+		   	veejay_msg(VEEJAY_MSG_ERROR, "Empty AVI file");
+			if(lav_fd) free(lav_fd);
+			return NULL;
+	   	}
+		else if ( lav_fd->avi_fd && AVI_errno == 0 )
+	   	{
+			veejay_msg(VEEJAY_MSG_DEBUG,
 				"\tFile is AVI" );
-		ret =1;
-   	}
+			ret =1;
+		}
+	}
    
 	int alt = 0;
 	
@@ -1317,11 +1332,11 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to read FOURCC from AVI");
 	       		if(lav_fd) free(lav_fd);
-	       		return 0;
+	       		return NULL;
 		}
 		veejay_msg(VEEJAY_MSG_DEBUG, "\tFOURCC is %s", video_comp );
    	}
-   	else if( AVI_errno==AVI_ERR_NO_AVI || !lav_fd->avi_fd)
+   	else if( AVI_errno==AVI_ERR_NO_AVI || (!lav_fd->avi_fd && !ret) )
    	{
 #ifdef HAVE_LIBQUICKTIME
 		if(quicktime_check_sig(filename))
@@ -1334,7 +1349,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		    	{
 				veejay_msg(VEEJAY_MSG_ERROR, "Unable to open quicktime file");
 			   	free(lav_fd);
-	    			return 0;
+	    			return NULL;
 	    		}
 			else
 				veejay_msg(VEEJAY_MSG_DEBUG, "\tOpening Quicktime file");
@@ -1349,7 +1364,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 				veejay_msg(VEEJAY_MSG_ERROR, "At least one video track required");
 	     			lav_close(lav_fd);
 	     			internal_error = ERROR_FORMAT;
-	     			return 0;
+	     			return NULL;
 	     		}
 			/*
  			* If the quicktime file has the sample aspect atom then use it to set
@@ -1421,30 +1436,13 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 				veejay_msg(VEEJAY_MSG_DEBUG, "\tNot a raw dv file");
 		}
 #endif
-		#ifdef USE_GDK_PIXBUF
-		if(!alt)
-		{
-			lav_fd->picture = vj_picture_open( (const char*) filename,
-				output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
-			if(lav_fd->picture)
-			{
-				lav_fd->format = 'x';
-				lav_fd->has_audio = 0;
-				lav_fd->bogus_len = (int) output_fps;
-				video_comp = pict;
-				ret = 1;
-				alt = 1;
-				veejay_msg(VEEJAY_MSG_DEBUG,"\tLoaded image file");
-			}
-		}
-#endif
    	}
 
 	if(ret == 0 || video_comp == NULL || alt == 0)
 	{
 		free(lav_fd);
 		internal_error = ERROR_FORMAT;
-		return 0;
+		return NULL;
 	}
 	
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;

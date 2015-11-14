@@ -440,13 +440,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		return -1;
 	}
 
-
-	el->ctx[n] = avhelper_get_decoder( filename, out_format, width, height );
+	if( !elfd->picture )
+		el->ctx[n] = avhelper_get_decoder( filename, out_format, width, height );
 
 	if( el->ctx[n] == NULL ) {
 		pixfmt = test_video_frame( el, n, elfd, el_pixel_format_ );
 		if( pixfmt == -1 ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine video format" );
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine format of %s", filename );
 			lav_close(elfd);
 			if(realname) free(realname);
 			return -1;
