@@ -47,7 +47,6 @@ vj_effect *radcor_init(int w, int h)
     ve->defaults[0] = 10;
     ve->defaults[1] = 40;
     ve->defaults[2] = 0;
-	ve->defaults[3] = 0;
     ve->description = "Lens correction";
     ve->sub_format = 1;
     ve->extra_frame = 0;
