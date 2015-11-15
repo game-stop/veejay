@@ -170,7 +170,6 @@ static void interleave(short *output, short **input, int channels, int samples)
 {
     int i,j;
     for (i = 0; i < samples; i++) {
-		int j;
 		for (j = 0; j < channels; j++) {
             *output++ = *input[j]++;
         }
