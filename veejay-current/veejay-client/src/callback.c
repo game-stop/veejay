@@ -4162,4 +4162,13 @@ void	on_alphacomposite_toggled(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_ALPHA_COMPOSITE,"%d", is_button_toggled( "alphacomposite" )); 
 }
 
+void	on_button_vloop_stop_clicked(GtkWidget *widget, gpointer user_data)
+{
+	single_vims( VIMS_VLOOPBACK_STOP );
+}
+
+void	on_button_vloop_start_clicked(GtkWidget *widget, gpointer user_data)
+{
+	multi_vims( VIMS_VLOOPBACK_START, "%d", get_nums( "spin_vloop" ) );
+}
 
