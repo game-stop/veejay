@@ -3140,6 +3140,10 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			update = 1;
 		}
 
+		if( (history[SUBRENDER] != info->status_tokens[SUBRENDER] || is_button_toggled( "toggle_subrender") != info->status_tokens[SUBRENDER]) )
+		{
+			set_toggle_button( "toggle_subrender", 1 );
+		}
 
 		if(update)
 		{
