@@ -2501,7 +2501,6 @@ vevo_property_del(vevo_port_t * p,
     if(port->list) {
 		vevo_property_t *tmp = port->list;
 		vevo_property_t *prev = NULL;
-		vevo_property_t *head = port->list;
 		while (tmp != NULL) {
 			if( tmp->key == hash_key )
 				break;
