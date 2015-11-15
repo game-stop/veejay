@@ -10671,30 +10671,6 @@ YUV (current)</property>
                                                 <property name="position">4</property>
                                               </packing>
                                             </child>
-<!-- there is no corresponding event in veejay for this -->
-<!--
-                                            <child>
-                                              <widget class="GtkToggleButton" id="curve_toggleglobal">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="receives_default">False</property>
-                                                <property name="tooltip" translatable="yes">Enable/Disable all keyframes</property>
-                                                <signal name="toggled" handler="on_curve_toggleglobal_toggled" />
-                                                <child>
-                                                  <widget class="GtkImage" id="image591">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">False</property>
-                                                    <property name="pixbuf">icon_keyframe.png</property>
-                                                  </widget>
-                                                </child>
-                                              </widget>
-                                              <packing>
-                                                <property name="expand">False</property>
-                                                <property name="fill">False</property>
-                                                <property name="position">5</property>
-                                              </packing>
-                                            </child>
--->
                                             <child>
                                               <widget class="GtkToggleButton" id="toggle_subrender">
                                                 <property name="visible">True</property>

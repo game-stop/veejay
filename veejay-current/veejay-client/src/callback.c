@@ -2470,11 +2470,7 @@ void	on_kf_p15_toggled( GtkWidget *widget, gpointer user_data)
 	if( is_button_toggled("kf_p15"))
 		kf_changed( 15 );
 }
-/* Enable/Disable all keyframes : there is no correspoding event for this
-void	on_curve_toggleglobal_toggled(GtkWidget *widget, gpointer user_data)
-{
-}
-*/
+
 void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "videobook" );
