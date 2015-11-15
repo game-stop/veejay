@@ -2539,7 +2539,8 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	ptr = vj_sprintf( ptr, ca ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, (int) sample->fader_val ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, sample->dup ); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, macro );
+	ptr = vj_sprintf( ptr, macro ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->subrender ); 
 
 	return 0;
 }

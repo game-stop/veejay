@@ -46,6 +46,7 @@
 #define CHAIN_FADE      23
 #define FRAME_DUP	24
 #define	MACRO		25
+#define SUBRENDER	26
 #define CURRENT_ENTRY	15
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0

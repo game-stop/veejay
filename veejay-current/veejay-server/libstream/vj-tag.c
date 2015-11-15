@@ -3591,7 +3591,8 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 	ptr = vj_sprintf( ptr, ca ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, (int) tag->fader_val ); *ptr++ = ' ';
 	*ptr++ = '0'; *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, macro );
+	ptr = vj_sprintf( ptr, macro ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->subrender);
 
     return 0;
 }
