@@ -125,9 +125,9 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void	toggle_subrender_clicked(GtkWidget *widget, gpointer user_data)
-{	
-	multi_vims( VIMS_SUB_RENDER,"%d",0); 
+void	on_subrender_toggled(GtkWidget *widget, gpointer user_data)
+{
+	multi_vims( VIMS_SUB_RENDER,"%d",0);
 }
 
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
@@ -2471,9 +2471,6 @@ void	on_kf_p15_toggled( GtkWidget *widget, gpointer user_data)
 		kf_changed( 15 );
 }
 
-void	on_curve_toggleglobal_toggled(GtkWidget *widget, gpointer user_data)
-{
-}
 void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "videobook" );
