@@ -3034,8 +3034,6 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	{
 		int marker_go = 0;
 		
-		fx_anim = 1;
-
 		/* Update marker bounds */
 		if( (history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START]) )
 		{
