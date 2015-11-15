@@ -10671,6 +10671,8 @@ YUV (current)</property>
                                                 <property name="position">4</property>
                                               </packing>
                                             </child>
+<!-- there is no corresponding event in veejay for this -->
+<!--
                                             <child>
                                               <widget class="GtkToggleButton" id="curve_toggleglobal">
                                                 <property name="visible">True</property>
@@ -10692,6 +10694,7 @@ YUV (current)</property>
                                                 <property name="position">5</property>
                                               </packing>
                                             </child>
+-->
                                             <child>
                                               <widget class="GtkToggleButton" id="toggle_subrender">
                                                 <property name="visible">True</property>
