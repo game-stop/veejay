@@ -4370,7 +4370,8 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 
 	if( with_reset_slotselection ) {
 		reset_samplebank();
-		}
+	}
+
 	char line[300];
 	char source[255];
 	char descr[255];
@@ -6109,8 +6110,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 			|| info->status_tokens[TOTAL_SLOTS] != info->uc.expected_slots )
 	{
 	
-		if( info->status_tokens[TOTAL_SLOTS] <= 0 ||
-			info->uc.expected_slots > info->status_tokens[TOTAL_SLOTS] )
+		if( info->status_tokens[TOTAL_SLOTS] <= 0 || info->uc.expected_slots != info->status_tokens[TOTAL_SLOTS] )
 			info->uc.reload_hint[HINT_SLIST] = 2;
 		else
 			info->uc.reload_hint[HINT_SLIST] = 1;
@@ -6298,7 +6298,7 @@ static void	process_reload_hints(int *history, int pm)
 
 	if( info->uc.reload_hint[HINT_SLIST] )
 	{
-		load_samplelist_info( (info->uc.reload_hint[HINT_SLIST] == 2 ? TRUE : FALSE) );
+		load_samplelist_info( (info->uc.reload_hint[HINT_SLIST] == 2  ? TRUE: FALSE) );
 		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
 	}
 
@@ -7624,7 +7624,6 @@ void	reset_samplebank(void)
 	{
 		if(info->sample_banks[i])
 		{
-			/* clear memory in use */
 			for(j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
 			{
 				sample_slot_t *slot = info->sample_banks[i]->slot[j];
@@ -7645,7 +7644,7 @@ void	reset_samplebank(void)
 				update_sample_slot_data( i,j, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
 			}
 		}
-	}
+	} 
 }
 		
 void	free_samplebank(void)
@@ -8311,6 +8310,10 @@ static	void	remove_sample_from_slot()
 	his[TOTAL_SLOTS] = his[TOTAL_SLOTS] - 1;
 	update_sample_slot_data( bank_nr, slot_nr, 0, -1, NULL, NULL); 	 	
 
+	sample_gui_slot_t *gui_slot = info->sample_banks[bank_nr]->gui_slot[slot_nr];
+	if(gui_slot)
+		gtk_image_clear( GTK_IMAGE( gui_slot->image)  );
+
 	set_selection_of_slot_in_samplebank( FALSE );
 	info->selection_gui_slot = NULL;
 	info->selection_slot = NULL;
@@ -8347,38 +8350,38 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 	sample_slot_t *slot = info->sample_banks[page_num]->slot[slot_num];
 	sample_gui_slot_t *gui_slot = info->sample_banks[page_num]->gui_slot[slot_num];
 
-	if(slot->timecode) free(slot->timecode);
-	if(slot->title) free(slot->title);
+	if(slot->timecode) { free(slot->timecode); slot->timecode = NULL; }
+	if(slot->title) { free(slot->title); slot->title = NULL; }
 	
-    	slot->sample_id = sample_id;
-    	slot->sample_type = sample_type;
-	slot->timecode = timecode == NULL ? strdup("") : strdup( timecode );
-	slot->title = title == NULL ? strdup("") : strdup( title );
+  	slot->sample_id = sample_id;
+   	slot->sample_type = sample_type;
+
+	slot->timecode = timecode == NULL ? NULL : strdup( timecode );
+	slot->title = title == NULL ? NULL : strdup( title );
 
 	if( sample_id )
 	{
 		char sample_key[32];
-		sprintf(sample_key, "S%04d%02d", sample_id, sample_type );
+		snprintf(sample_key,sizeof(sample_key), "S%04d%02d", sample_id, sample_type );
 		vevo_property_set( bankport_, sample_key, VEVO_ATOM_TYPE_VOIDPTR,1, &slot );
-		sprintf(sample_key, "G%04d%02d", sample_id, sample_type );
+		snprintf(sample_key,sizeof(sample_key), "G%04d%02d", sample_id, sample_type );
 		vevo_property_set( bankport_, sample_key, VEVO_ATOM_TYPE_VOIDPTR,1,&gui_slot);
 		add_sample_to_effect_sources_list(sample_id, sample_type, title, timecode);
 	}
 
 	if(gui_slot)
 	{
-		if(gui_slot->title)
-			gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
-		if(gui_slot->timecode)
-			gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
-
 		if(sample_id > 0 )
 		{
 			gtk_frame_set_label( GTK_FRAME(gui_slot->frame),slot->title );
+			gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
+			gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
 		}
 		else
 		{
-			gtk_frame_set_label(GTK_FRAME(gui_slot->frame), NULL );
+			gtk_frame_set_label(GTK_FRAME(gui_slot->frame), "" );
+			gtk_label_set_text( GTK_LABEL(gui_slot->timecode), "" );
+			gtk_label_set_text( GTK_LABEL(gui_slot->title), "" );
 		}
 	}
 
