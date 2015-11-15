@@ -47,7 +47,7 @@ vj_effect *dither_init(int w, int h)
     return ve;
 }
 
-static last_size = 0;
+static int last_size = 0;
 void dither_apply(VJFrame *frame, int width, int height, int size, int random_on)
 {
     long int w_, h_;

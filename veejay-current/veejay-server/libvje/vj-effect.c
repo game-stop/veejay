@@ -492,9 +492,6 @@ void vj_effect_deactivate_all()
 
 void vj_effect_initialize(int width, int height, int full_range)
 {
-    int i = VJ_VIDEO_COUNT;
-    int k;
-
     if( full_range )
     {
 	    set_pixel_range( 255, 255,0,0 );

@@ -1508,7 +1508,6 @@ void	binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, i
 
 void	binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
 {
-	int i;
 	if(!reverse)
 	{
 		vje_diff_plane( bg, src, bm, threshold,len );
