@@ -122,10 +122,8 @@ static void update_scaler( scale0tilt_instance_t* inst )
 	gavl_video_options_t* options = gavl_video_scaler_get_options( inst->video_scaler );
 
 	gavl_video_format_t format_dst;
-
-	livido_memset(&inst->format_src, 0, sizeof(inst->format_src));
+	
 	livido_memset(&format_dst, 0, sizeof(format_dst));
-
 	format_dst.frame_width  = inst->w;
 	format_dst.frame_height = inst->h;
 	format_dst.image_width  = inst->w;
@@ -133,14 +131,6 @@ static void update_scaler( scale0tilt_instance_t* inst )
 	format_dst.pixel_width = 1;
 	format_dst.pixel_height = 1;
 	format_dst.pixelformat = GAVL_YUVJ_444_P;
-	
-	inst->format_src.frame_width  = inst->w;
-	inst->format_src.frame_height = inst->h;
-	inst->format_src.image_width  = inst->w;
-	inst->format_src.image_height = inst->h;
-	inst->format_src.pixel_width = 1;
-	inst->format_src.pixel_height = 1;
-	inst->format_src.pixelformat = GAVL_YUVJ_444_P;
 
 	gavl_rectangle_f_t src_rect;
 	gavl_rectangle_i_t dst_rect;
@@ -166,10 +156,22 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	lvd_extract_dimensions( my_instance, "out_channels", &width, &height );
 
 	scale0tilt_instance_t* inst = (scale0tilt_instance_t*)livido_malloc(sizeof(scale0tilt_instance_t));
+
+	livido_memset( inst, 0, sizeof(scale0tilt_instance_t) );
+
 	inst->w = width;
 	inst->h = height;
 	inst->sx = 1.0;
 	inst->sy = 1.0;
+	
+	inst->format_src.frame_width  = inst->w;
+	inst->format_src.frame_height = inst->h;
+	inst->format_src.image_width  = inst->w;
+	inst->format_src.image_height = inst->h;
+	inst->format_src.pixel_width = 1;
+	inst->format_src.pixel_height = 1;
+	inst->format_src.pixelformat = GAVL_YUVJ_444_P;
+
 	inst->video_scaler = gavl_video_scaler_create();
 	inst->frame_src = gavl_video_frame_create( NULL );
 	inst->frame_dst = gavl_video_frame_create( NULL );
@@ -431,6 +433,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Right" );
 		livido_set_string_value(port, "kind", "WIDTH" );
+		livido_set_int_value(port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Right");
 
 	in_params[2] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
@@ -448,6 +451,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Bottom" );
 		livido_set_string_value(port, "kind", "HEIGHT" );
+		livido_set_int_value(port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Bottom");
 
 	in_params[4] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
@@ -456,6 +460,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Scale X" );
 		livido_set_string_value(port, "kind", "WIDTH" );
 		livido_set_string_value( port, "description" ,"Scale X");
+		livido_set_int_value(port, "default", 0 );
 
 	in_params[5] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[5];
@@ -463,6 +468,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Scale Y" );
 		livido_set_string_value(port, "kind", "HEIGHT" );
 		livido_set_string_value( port, "description" ,"Scale X");
+		livido_set_int_value(port, "default", 0 );
 
 	in_params[6] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[6];
@@ -470,6 +476,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Tilt X" );
 		livido_set_string_value(port, "kind", "WIDTH" );
 		livido_set_string_value( port, "description" ,"Scale X");
+		livido_set_int_value(port, "default", 0 );
 
 	in_params[7] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[7];
@@ -477,6 +484,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Tilt Y" );
 		livido_set_string_value(port, "kind", "HEIGHT" );
 		livido_set_string_value( port, "description" ,"Scale X");
+		livido_set_int_value(port, "default", 0 );
 
 	in_params[8] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[8];
@@ -486,7 +494,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value( port, "description" ,"Alpha");
 		livido_set_int_value(port, "min", 0);
 		livido_set_int_value(port, "max", 1);
-		livido_set_int_value(port, "default",1);
+		livido_set_int_value(port, "default",0);
 
 
 	//@ setup the nodes
