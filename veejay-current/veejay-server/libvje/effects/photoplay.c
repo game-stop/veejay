@@ -36,7 +36,7 @@ vj_effect *photoplay_init(int w, int h)
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 250; // waterfall
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 3; // mode
+    ve->limits[1][2] = get_matrix_func_n(); // mode
     ve->defaults[0] = 2;
     ve->defaults[1] = 2; // higher value takes less cpu 
     ve->defaults[2] = 1;  
@@ -216,15 +216,13 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 	}
 
 
-
-	for ( i = 0; i < num_photos; i ++ )
+	for( i = 0; i < num_photos; i ++ ) 
 	{
 		matrix_t m = matrix_placement(i, size,width,height );
-		put_photo( dstY, photo_list[i]->data[0],width,height,i, m);
-		put_photo( dstU, photo_list[i]->data[1],width,height,i, m);
-		put_photo( dstV, photo_list[i]->data[2],width,height,i, m);
+		put_photo( dstY, photo_list[i]->data[0],width,height,i,m);
+		put_photo( dstU, photo_list[i]->data[1],width,height,i,m);
+		put_photo( dstV, photo_list[i]->data[2],width,height,i,m);
 	}
-
 
 	if(frame_delay == delay)
 		frame_counter ++;

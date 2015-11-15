@@ -37,7 +37,7 @@ vj_effect *videoplay_init(int w, int h)
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 250; // waterfall
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 3; // mode
+    ve->limits[1][2] = get_matrix_func_n(); // mode
     ve->defaults[0] = 2;
     ve->defaults[1] = 1;
     ve->defaults[2] = 1;  

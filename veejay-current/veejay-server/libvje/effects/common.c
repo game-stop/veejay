@@ -98,17 +98,71 @@ matrix_t matrix_placementD(int photoindex, int size, int w , int h)
 	return m;
 }
 
+matrix_t matrix_placementE(int photoindex, int size, int w , int h)
+{
+	matrix_t m;
+	int n = size*size-1;
+	m.w = ((photoindex) % size) * (w/size);
+	m.h = ((n-photoindex) / size) * (h/size);
+	return m;
+}
+
+matrix_t matrix_placementF(int photoindex, int size, int w , int h)
+{
+	matrix_t m;
+	int n = size*size-1;
+	m.w = ((n-photoindex) / size) * (w/size);
+	m.h = ((photoindex) % size) * (h/size);
+	return m;
+}
+matrix_t matrix_placementG(int photoindex, int size, int w , int h)
+{
+	matrix_t m;
+	int n = size*size-1;
+	m.w = ((n-photoindex) % size) * (w/size);
+	m.h = ((photoindex) / size) * (h/size);
+	return m;
+}
+
+matrix_t matrix_placementH(int photoindex, int size, int w , int h)
+{
+	matrix_t m;
+	int n = size*size-1;
+	m.w = ((photoindex) / size) * (w/size);
+	m.h = ((n-photoindex) % size) * (h/size);
+	return m;
+}
+
+
 matrix_f	get_matrix_func(int type)
 {
-	if(type==0)
+	switch(type) {
+		case 0:
 		return &matrix_placementA;
-	if(type==1)
+		case 1:
 		return &matrix_placementB;
-	if(type==2)
+		case 2:
 		return &matrix_placementC;
+		case 3:
+		return &matrix_placementD;
+		case 4:
+		return &matrix_placementE;
+		case 5:
+		return &matrix_placementF;
+		case 6:
+		return &matrix_placementG;
+		case 7:
+		return &matrix_placementH;
+		default:
+		break;
+	}
 	return &matrix_placementD;		
 }
 
+int			get_matrix_func_n()
+{
+	return 7;
+}
 
 int power_of(int size)
 {
