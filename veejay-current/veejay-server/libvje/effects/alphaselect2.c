@@ -37,11 +37,11 @@ vj_effect *alphaselect2_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 15;	/* tolerance near */
+    ve->defaults[0] = 15;	/* acceptance radius */
     ve->defaults[1] = 0;	/* r */
     ve->defaults[2] = 255;	/* g */
     ve->defaults[3] = 0;	/* b */
-	ve->defaults[4] = 15;	/* tolerance far */
+	ve->defaults[4] = 15;	/* smooth */
 	ve->defaults[5] = 0;    /* alpha operator */
 
     ve->limits[0][0] = 1;
@@ -68,7 +68,7 @@ vj_effect *alphaselect2_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-	ve->param_description = vje_build_param_list(ve->num_params,"Tolerance Near","Red","Green","Blue", "Tolerance Far", "Alpha Operator");
+	ve->param_description = vje_build_param_list(ve->num_params, "Accept","Red","Green","Blue", "Smooth", "Alpha Operator");
 
     return ve;
 }
