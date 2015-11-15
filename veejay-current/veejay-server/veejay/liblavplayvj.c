@@ -3478,7 +3478,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		{
 			sample->edit_list = sample_edl;
 			sample_store(sample);
-			sample->speed = info->settings->current_playback_speed;
+		//	sample->speed = info->settings->current_playback_speed;
 			veejay_msg(VEEJAY_MSG_INFO,"Created new sample %d from file %s",sample->sample_id,	files[0]);
 		}
 		else {
