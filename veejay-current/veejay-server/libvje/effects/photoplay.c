@@ -36,7 +36,7 @@ vj_effect *photoplay_init(int w, int h)
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 250; // waterfall
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = get_matrix_func_n(); // mode
+    ve->limits[1][2] = 1 + get_matrix_func_n(); // mode
     ve->defaults[0] = 2;
     ve->defaults[1] = 2; // higher value takes less cpu 
     ve->defaults[2] = 1;  
@@ -49,10 +49,11 @@ vj_effect *photoplay_init(int w, int h)
 }
 
 static picture_t **photo_list = NULL;
-static int	   num_photos = 0;
-static int	  frame_counter = 0;
-static int	  frame_delay = 0;
-
+static int	num_photos = 0;
+static int	frame_counter = 0;
+static int	frame_delay = 0;
+static int	*rt = NULL;
+	
 static	int prepare_filmstrip(int film_length, int w, int h)
 {
 	int i,j;
@@ -63,10 +64,15 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 	if(!photo_list)
 		return 0;
 
+	rt = (int*) vj_calloc(sizeof(int) * film_length );
+	if(!rt)
+		return 0;
+
 	num_photos = film_length;
 
 	uint8_t val = 0;
 //	int inc = num_photos % 255;
+
 
 	for ( i = 0; i < num_photos; i ++ )
 	{
@@ -108,9 +114,12 @@ static void destroy_filmstrip(void)
 		}
 		free(photo_list);
 	}
+	if(rt)
+		free(rt);
 	photo_list = NULL;
 	num_photos = 0;
 	frame_counter = 0;
+	rt = NULL;
 }
 
 
@@ -191,8 +200,6 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 	uint8_t *dstU = frame->data[1];
 	uint8_t *dstV = frame->data[2];
 
-	matrix_f matrix_placement = get_matrix_func(mode);
-
 	if( (size*size) != num_photos || num_photos == 0 )
 	{
 		destroy_filmstrip();
@@ -201,6 +208,12 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 			return;
 		}
 		frame_delay = 0;
+
+		for( i = 0; i < num_photos; i ++ )
+			rt[i] = i;
+
+		if( mode == 0 )
+			fx_shuffle_int_array( rt, num_photos );
 	}
 
 	if( frame_delay )
@@ -216,9 +229,17 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 	}
 
 
+	matrix_f matrix_placement;
+	if( mode == 0 ) {
+		matrix_placement = get_matrix_func(0); // !important in random mode
+	}
+	else {
+		matrix_placement = get_matrix_func(mode-1);
+	}
+
 	for( i = 0; i < num_photos; i ++ ) 
 	{
-		matrix_t m = matrix_placement(i, size,width,height );
+		matrix_t m = matrix_placement( rt[i], size,width,height );
 		put_photo( dstY, photo_list[i]->data[0],width,height,i,m);
 		put_photo( dstU, photo_list[i]->data[1],width,height,i,m);
 		put_photo( dstV, photo_list[i]->data[2],width,height,i,m);

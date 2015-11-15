@@ -233,6 +233,7 @@ matrix_t matrix_placementA(int photoindex, int size, int w , int h);
 matrix_t matrix_placementB(int photoindex, int size, int w , int h);
 matrix_f	get_matrix_func(int type);
 int			get_matrix_func_n();
+void		fx_shuffle_int_array( int *A, unsigned int n );
 
 int power_of(int size);
 int max_power(int w);

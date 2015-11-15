@@ -164,6 +164,17 @@ int			get_matrix_func_n()
 	return 7;
 }
 
+void		fx_shuffle_int_array( int *A, unsigned int n )
+{
+	size_t i;
+	for( i = 0; i < n; i ++ ) {
+		size_t j = i + rand() / (RAND_MAX / ( n - i ) + 1 );
+		int t = A[j];
+		A[j] = A[i];
+		A[i] = t;
+	}
+}
+
 int power_of(int size)
 {
 	int power = 1;
