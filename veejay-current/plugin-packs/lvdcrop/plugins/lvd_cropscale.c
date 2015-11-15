@@ -229,7 +229,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 	//@ meta information
 		livido_set_string_value( port, "name", "Crop and Stretch");	
-		livido_set_string_value( port, "description", "Crop and stretch to video size");
+		livido_set_string_value( port, "description", "Crop, then stretch to video size");
 		livido_set_string_value( port, "author", "Niels"); 
 		
 		livido_set_int_value( port, "flags", 0);
