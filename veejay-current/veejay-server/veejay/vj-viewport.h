@@ -22,6 +22,7 @@
 
 /* Viewport component for FX */
 #define	VP_QUADZOOM 1
+void		viewport_process_dynamic_alpha( void *data, uint8_t *in[4], uint8_t *out[4] );
 void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] );
 void		viewport_process_dynamic_map( void *data, uint8_t *in[3], uint8_t *out[3], uint32_t *map, int feather );
 void *viewport_fx_init_map( int wid, int hei, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse);

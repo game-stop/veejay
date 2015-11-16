@@ -502,7 +502,7 @@ extern void bathroom_apply(VJFrame *frame, int width, int height, int mode, int 
 
 extern void slice_apply(VJFrame *frame, int width, int height, int val, int reinit);
 
-extern void zoom_apply(VJFrame *frame, int w, int h , int xo, int yo, int f, int dir);
+extern void zoom_apply(VJFrame *frame, int w, int h , int xo, int yo, int f, int dir, int alpha);
 
 extern void perspective_apply( VJFrame *frame, int width, int height, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse);
 
