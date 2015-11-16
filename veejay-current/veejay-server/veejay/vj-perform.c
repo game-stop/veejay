@@ -1557,9 +1557,15 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
 
     int offset = sample_get_offset(a, chain_entry);	
     int len_b;
+
 	if(sample_get_short_info(b,&sample_b[0],&sample_b[1],&sample_b[2],&sample_b[3])!=0) return -1;
 
 	if(sample_get_short_info(a,&sample_a[0],&sample_a[1],&sample_a[2],&sample_a[3])!=0) return -1;
+
+	if( info->settings->current_playback_speed == 0 ) 
+	{
+		return sample_b[0] + offset;
+	}
 
 	len_b = sample_b[1] - sample_b[0];
 
@@ -1661,7 +1667,12 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
     int len;
     
 	if(sample_get_short_info(sub_sample,&sample[0],&sample[1],&sample[2],&sample[3])!=0) return -1;
-
+	
+	if( info->settings->current_playback_speed == 0 ) 
+	{
+		return sample[0] + offset;
+	}
+	
 	len = sample[1] - sample[0];
 	int max_sfd = sample_get_framedup( sub_sample );
 	int cur_sfd = sample_get_framedups( sub_sample );
