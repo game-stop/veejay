@@ -4207,9 +4207,9 @@ void	load_effectlist_info()
 	gint fxlen = 0;
 	single_vims( VIMS_EFFECT_LIST );
 	gchar *fxtext = recv_vims(6,&fxlen);
-	
+
 	_effect_reset();
- 	
+
 	reset_tree( "tree_effectlist");
 	reset_tree( "tree_effectmixlist" );
 	reset_tree( "tree_alphalist" );
@@ -4243,12 +4243,13 @@ void	load_effectlist_info()
 
 	fxlen = g_list_length( info->effect_info );
 	for( i = 0; i < fxlen; i ++)
-	{	
+	{
 
 		effect_constr *ec = g_list_nth_data( info->effect_info, i );
 		gchar *name = _utf8str( _effect_get_description( ec->id ) );
 		if( name != NULL)
 		{
+			// tree_alphalist
 			if( strncasecmp( "alpha:" , ec->description, 6 ) == 0 ) {
 				gtk_list_store_append( store3, &iter );
 				int len = strlen( ec->description );
@@ -4260,6 +4261,7 @@ void	load_effectlist_info()
 			}
 			else 
 			{
+				// tree_effectmixlist
 				if( _effect_get_mix(ec->id) > 0 )
 				{
 					gtk_list_store_append( store2, &iter );
@@ -4268,6 +4270,7 @@ void	load_effectlist_info()
 				}
 				else
 				{
+					// tree_effectlist
 					gtk_list_store_append( store, &iter );
 					gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
 					vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
@@ -4309,7 +4312,7 @@ static	void	select_slot( int pm )
 			info->selected_slot=  info->sample_banks[bank_page]->slot[poke_slot];
 			info->selected_gui_slot= info->sample_banks[bank_page]->gui_slot[poke_slot];*/
 
-		}	
+		}
 	}
 	else {
 		set_activation_of_slot_in_samplebank(FALSE);
