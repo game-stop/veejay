@@ -7,6 +7,7 @@ Veejay is a visual instrument and real-time video sampler.
 It allows you to "play" the video like you would play a piano.
 While playing, you can record the resulting video directly to disk (video sampling).
 
+[//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
 
 ## Installation
 
@@ -78,6 +79,7 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
 
      ./configure --enable-debug
 
+[//]: # ( comment : END installation section duplicated in /veejay-server/doc/Instalation)
 
 
 ## FEATURE OVERVIEW
