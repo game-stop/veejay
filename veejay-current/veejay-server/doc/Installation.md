@@ -1,3 +1,6 @@
+
++[//]: # ( comment : installation section duplicated from /README.md)
+
 ## Installation
 
 Veejay is divided into multiple packages:
