@@ -21,7 +21,7 @@ By default, the alpha channel is set to 0 (completely invisible) so such effects
 
 
 
-The 'Select by Color Key' operator
+The 'Set by Color Key' operator
 -----------------------------------
 Use this filter to create an alpha channel from the foreground object.
 The filter requires an existing alpha channel to decide which pixel from source B to composite in. Pixels with an alpha of 0 are skipped.
