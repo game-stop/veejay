@@ -1,5 +1,5 @@
 
-+[//]: # ( comment : installation section duplicated from /README.md)
+[//]: # ( comment : installation section duplicated from /README.md)
 
 ## Installation
 
