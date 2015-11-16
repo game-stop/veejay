@@ -7,6 +7,7 @@
 * [HowtoVeejay-PureData.html](./HowtoVeejay-PureData.html)
 * [HowtoVideoCodecs.txt](./HowtoVideoCodecs.txt)
 * [INSTALL](./INSTALL)
+* [Installation](./Installation.md)
 * [NET.txt](./NET.txt)
 * [README.alpha](./README.alpha)
 * [README.android](./README.android)
