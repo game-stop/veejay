@@ -2035,7 +2035,7 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, VJFrame *
 	if( vj_perform_get_feedback_frame(info, src,dst, check_sample, s1) )
 		return 1;
 
-	int max_sfd = (s1 ? sample_get_framedup( s1 ) : info->sfd );
+	int max_sfd = ( s1 ? sample_get_framedup(s1) : info->sfd );
 	editlist *el = ( s1 ? sample_get_editlist(s1) : info->edit_list);
 	if( el == NULL ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "Selected mixing source and ID does not exist, Use / to toggle mixing type!" );
@@ -2057,9 +2057,9 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, VJFrame *
 	}
 
 	int cur_sfd = (s1 ? sample_get_framedups(s1 ) : info->settings->simple_frame_dup );
-	int speed = sample_get_speed(s1);
+	int speed = (s1 ? sample_get_speed(s1) : info->settings->current_playback_speed);
 	int uv_len = (dst->ssm == 1 ? dst->len : dst->uv_len );
-
+	
 	long p0_frame = 0;
 	long p1_frame = 0;
 
