@@ -1,3 +1,14 @@
+ ______     __         ______   __  __     ______    
+/\  __ \   /\ \       /\  == \ /\ \_\ \   /\  __ \   
+\ \  __ \  \ \ \____  \ \  _-/ \ \  __ \  \ \  __ \  
+ \ \_\ \_\  \ \_____\  \ \_\    \ \_\ \_\  \ \_\ \_\ 
+  \/_/\/_/   \/_____/   \/_/     \/_/\/_/   \/_/\/_/ 
+ ______     __  __     ______     __   __     __   __     ______     __        
+/\  ___\   /\ \_\ \   /\  __ \   /\ "-.\ \   /\ "-.\ \   /\  ___\   /\ \       
+\ \ \____  \ \  __ \  \ \  __ \  \ \ \-.  \  \ \ \-.  \  \ \  __\   \ \ \____  
+ \ \_____\  \ \_\ \_\  \ \_\ \_\  \ \_\\"\_\  \ \_\\"\_\  \ \_____\  \ \_____\ 
+  \/_____/   \/_/\/_/   \/_/\/_/   \/_/ \/_/   \/_/ \/_/   \/_____/   \/_____/ 
+                                                                     in veejay
 
 Veejay has some support for alpha channel compositing
 
@@ -10,7 +21,7 @@ By default, the alpha channel is set to 0 (completely invisible) so such effects
 
 
 
-The 'Select by Color Key' operator
+The 'Set by Color Key' operator
 -----------------------------------
 Use this filter to create an alpha channel from the foreground object.
 The filter requires an existing alpha channel to decide which pixel from source B to composite in. Pixels with an alpha of 0 are skipped.
