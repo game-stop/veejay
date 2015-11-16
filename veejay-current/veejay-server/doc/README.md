@@ -8,6 +8,7 @@
 * [HowtoVideoCodecs.txt](./HowtoVideoCodecs.txt)
 * [INSTALL](./INSTALL)
 * [NET.txt](./NET.txt)
+* [README.alpha](./README.alpha)
 * [README.android](./README.android)
 * [README.audio](./README.audio)
 * [README.memory](./README.memory)
