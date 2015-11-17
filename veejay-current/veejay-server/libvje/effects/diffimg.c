@@ -46,11 +46,9 @@ vj_effect *diffimg_init(int width, int height)
     ve->extra_frame = 0;
     ve->sub_format = -1;
 	ve->has_user = 0;
-	ve->parallel = 1;
+	ve->parallel = 0;
     return ve;
 }
-
-
 
 void diffimg_apply(
 	    VJFrame *frame,
@@ -76,7 +74,6 @@ void diffimg_apply(
 	for(i=0; i < len; i++)
 	{
 		y = Y[i];
-		if( y < 16 ) y = 16; else if (y > pixel_Y_hi_) y = pixel_Y_hi_;
 		yb = y;
 		if(y >= threshold_min && y <= threshold_max)
 		{
@@ -91,4 +88,3 @@ void diffimg_apply(
 		}
 	}
 }
-void diffimg_free(){}
