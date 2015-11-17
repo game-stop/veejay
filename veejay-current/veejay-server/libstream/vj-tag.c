@@ -135,8 +135,10 @@ void	vj_tag_free(void)
 	if( vj_tag_input)
 		free(vj_tag_input);
 
-	if( TagHash )
+	if( TagHash ) {
 		hash_destroy( TagHash );
+		TagHash = NULL;
+	}
 }
 
 
@@ -181,7 +183,7 @@ static int int_tag_compare(const void *key1, const void *key2)
 
 vj_tag *vj_tag_get(int id)
 {
-    if (id <= 0 || id > this_tag_id) {
+    if (id <= 0 || id > this_tag_id || TagHash == NULL) {
 		return NULL;
     }
 #ifdef ARCH_X86_64
@@ -1339,8 +1341,10 @@ void vj_tag_close_all() {
 	}
    }
 	
-   if( TagHash )
+   if( TagHash ) {
 	   hash_free_nodes( TagHash );
+	   TagHash = NULL;
+   }
 }
 
 int	vj_tag_get_n_frames(int t1)
