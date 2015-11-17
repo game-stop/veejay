@@ -2006,28 +2006,7 @@ int	is_current_track(char *host, int port )
    all VIMS commands that create a new stream or a new sample */
 int		gveejay_new_slot(int mode)
 {
-/*	int id = 0;
-	int result_len = 0;
-	gchar *result = recv_vims( 3, &result_len );
-
-	veejay_msg(0 ,"  -> EXPECT NEW SLOT in [%s]" ,result );
-
-	if(result_len <= 0 )
-	{
-		veejay_msg(0, "Maybe you should restart me");
-		return 0;
-	}
-
-	sscanf( result, "%d", &id );
-
-	free(result);
-
-	if( id <= 0 )
-	{
-	//	gveejay_error_slot( mode );
-		return 0;
-	}
-*/
+	info->uc.expected_slots ++;
 	return 1;
 }
 
