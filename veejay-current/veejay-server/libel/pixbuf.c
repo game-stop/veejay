@@ -205,20 +205,17 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 	vj_pixbuf_t *pic = NULL;
 	if(filename == NULL )
 	{
-		veejay_msg(0, "No image filename given");
 		return NULL;
 	}
 
 	if(v_outw <= 0 || v_outh <= 0 )
 	{
-		veejay_msg(0, "No image dimensions setup");
 		return NULL;
 	}
 
 	pic = (vj_pixbuf_t*)  vj_calloc(sizeof(vj_pixbuf_t));
 	if(!pic) 
 	{
-		veejay_msg(0, "Memory allocation error in %s", __FUNCTION__ );
 		return NULL;
 	}
 	pic->filename = strdup( filename );
