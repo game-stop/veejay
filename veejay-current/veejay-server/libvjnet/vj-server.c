@@ -1008,10 +1008,10 @@ readmore_lbl:
 
 	if( bytes_received <= 0 ) {
 		if( bytes_received == -1 ) {
-			veejay_msg(0, "Networking error with socket %d: %s",sock_fd,strerror(errno));
+			veejay_msg(VEEJAY_MSG_DEBUG, "Networking error with socket %d: %s",sock_fd,strerror(errno));
 		}
 		if( bytes_received == 0 ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "Link %d closed connection, terminating client connection.",id);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Link %d closed connection, terminating client connection.",id);
 		}
 		return -1; // close client now
 	}
