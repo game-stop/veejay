@@ -1722,8 +1722,7 @@ void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->selection_slot)
 	{
-		multi_vims( VIMS_SAMPLE_COPY , "%d",
-			info->selected_slot->sample_id );
+		multi_vims( VIMS_SAMPLE_COPY , "%d", info->selection_slot->sample_id );
 		gveejay_new_slot(MODE_SAMPLE);
 	}
 }
