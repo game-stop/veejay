@@ -82,7 +82,10 @@ static struct {
 };
 static void vjsend( vj_client *c, int cmd, char *buf )
 {
-	buf[ strcspn(buf,"\n\r") ] = '\0';
+	size_t index = strcspn(buf,"\n\r");
+	if (index) {
+		buf[ index ] = '\0';
+	}
 	vj_client_send( c,cmd, buf);
 }
 
@@ -213,8 +216,7 @@ static int processLine(FILE *infile, FILE *outfile, char *tmp, char *buffer, int
 		} else {
 			int vims_id = 0;
 			int mustRead = vimsMustReadReply( tmp, &vims_id );
-
-			vj_client_send( sayvims, V_CMD, tmp );
+			vjsend( sayvims, V_CMD, tmp );
 
 			if( mustRead ) {
 				if( vims_id == VIMS_GET_SHM ) {
