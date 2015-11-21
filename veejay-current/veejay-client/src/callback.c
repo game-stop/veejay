@@ -1720,11 +1720,16 @@ free(test);
 
 void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if(info->selection_slot)
+	if(info->selection_slot )
 	{
-		multi_vims( VIMS_SAMPLE_COPY , "%d", (info->selection_slot == NULL ? info->selection_slot->sample_id : info->selection_slot->sample_id) );
-		gveejay_new_slot(MODE_SAMPLE);
+		multi_vims( VIMS_SAMPLE_COPY, "%d", info->selection_slot->sample_id );
 	}
+	else if (info->selected_slot )
+	{
+		multi_vims( VIMS_SAMPLE_COPY, "%d", info->selected_slot->sample_id );
+	}
+
+	gveejay_new_slot(MODE_SAMPLE);
 }
 
 void	on_check_priout_fullscreen_clicked(
