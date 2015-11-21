@@ -162,7 +162,7 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
  * Support for FreeFrame plugins (only for 32 bit systems!)
- * 
+
 ## Contact / Feedback & HELP
 
 Please join our mailing list on http://groups.google.com/group/veejay-discussion
