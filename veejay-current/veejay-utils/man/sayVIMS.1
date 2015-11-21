@@ -30,10 +30,10 @@ Start with colored text (geek feature)
 
 .SH USEFULL EXAMPLES
 .TP
-.B sayVIMS -h localhost -p 3490 "255:;"
-Start sayVIMS and connect to veejay (and tell veejay to quit)
+.B sayVIMS -h localhost -p 3490 \*(lq017:;\*(lq
+Start sayVIMS and connect to veejay (and tell veejay go to sample starting position)
 .TP
-.B sayVIMS -g 224.0.0.50 -p 5000 "255:;"
+.B sayVIMS -g 224.0.0.50 -p 5000 \*(lq017:;\*(lq
 Ditto, for multicast.
 .TP
 .SH Message Format
@@ -43,7 +43,7 @@ A message is described as
 For example:
 .B 099:1 0;
 .TP
-The selector is a 3 digit number identifying some atomic function in veejay. The colon is used to indicate the start of the list of arguments. The semicolon denotes the end of message.
+The selector is a 3 digit number identifying some atomic function in veejay ("veejay -u|less" to list all events). The colon is used to indicate the start of the list of arguments. The semicolon denotes the end of message.
 .TP
 .SH Passing arguments
 Each of veejay's functions except an ordered argument list ; depending on the 
