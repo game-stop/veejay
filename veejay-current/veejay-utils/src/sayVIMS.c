@@ -42,6 +42,7 @@ static int single_msg = 0;
 static int dump = 0;
 static int verbose = 0;
 static int base64_encode = 0;
+static int help = 0;
 
 #ifdef BASE64_AVUTIL
 #include <libavutil/base64.h>
@@ -279,6 +280,7 @@ static void Usage(char *progname)
 	fprintf(stderr, " -d\t\tDump status to stdout\n");
 	fprintf(stderr, " -b\t\tBase64 encode binary data\n");
 	fprintf(stderr, " -v\t\tVerbose\n");
+	fprintf(stderr, " -?\t\tPrint this help\n");
 	fprintf(stderr, "Exit interactive mode by typing 'quit'\n");
 	fprintf(stderr, "Messages to send to veejay must be wrapped in quotes\n");
 	fprintf(stderr, "You can send multiple messages by seperating them with a whitespace\n");
@@ -330,6 +332,9 @@ static int set_option(const char *name, char *value)
 		fprintf(stderr, "compiled without base64 support\n");
 		err++;
 #endif
+	}else if(strcmp(name,"?") == 0)
+	{
+		help = 1;
 	}
 	else err++;
 
@@ -368,13 +373,13 @@ int main(int argc, char *argv[])
 	veejay_set_debug_level(verbose);
 
 	// parse commandline parameters
-	while( ( n = getopt(argc,argv, "h:g:p:midbv")) != EOF)
+	while( ( n = getopt(argc,argv, "h:g:p:midbv?")) != EOF)
 	{
 		sprintf(option,"%c",n);
 		err += set_option( option,optarg);
 	}
 
-	if( err  || optind > argc)
+	if(help || err  || optind > argc)
 	{
 		Usage( argv[0] );
 		return -1;
