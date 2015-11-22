@@ -29,13 +29,13 @@
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 
-// this FX combines 4 FX
+extern int yuv_sws_get_cpu_flags();
 
 vj_effect *rgbkey_init(int w,int h)
 {
     vj_effect *ve;
     ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 7;
+    ve->num_params = 8;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -46,6 +46,7 @@ vj_effect *rgbkey_init(int w,int h)
     ve->defaults[4] = 1;	/* tolerance far */
 	ve->defaults[5] = 0;	/* level min */
 	ve->defaults[6] = 0xff; /* level max */
+	ve->defaults[7] = 0;    /* alpha-in operator */
 
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 255;
@@ -68,8 +69,13 @@ vj_effect *rgbkey_init(int w,int h)
     ve->limits[0][6] = 0;
     ve->limits[1][6] = 255; 
 
+    ve->limits[0][7] = 0;
+    ve->limits[1][7] = 4; 
+
+
+
 	ve->param_description = vje_build_param_list(ve->num_params, 
-			"Tolerance Near", "Red", "Green", "Blue", "Tolerance Far","Level Min", "Level Max");
+			"Tolerance Near", "Red", "Green", "Blue", "Tolerance Far","Level Min", "Level Max", "Alpha-IN operator");
 
 	ve->has_user = 0;
     ve->description = "Chroma Key (RGB)";
@@ -184,7 +190,7 @@ static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, d
 		return 1.0; /* far from color key == fg */
 }
 
-void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tola, int r, int g,int b, int tolb, int min, int max)
+void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tola, int r, int g,int b, int tolb, int min, int max, int operator)
 {
 	unsigned int pos;
 	uint8_t *Y = frame->data[0];
@@ -194,6 +200,7 @@ void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tol
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
 	uint8_t *A = frame->data[3];
+	uint8_t *B = frame2->data[3];
 	const unsigned int len = frame->len;  
 	int iy,iu,iv;
 	uint8_t *T = temp[0];	
@@ -207,8 +214,41 @@ void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tol
 
 	/* euclidean distance between key color and chroma */
 	// introduces spill 
-	for (pos = len; pos != 0; pos--) {
-		T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
+	switch( operator ) {
+		case 0:	
+			//ignore alpha-in
+			for (pos = len; pos != 0; pos--) {
+				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
+			}
+			break;
+		case 1:
+			for (pos = len; pos != 0; pos--) {
+				if(A[pos] == 0)
+					continue;
+				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
+			}
+			break;
+		case 2:
+			for (pos = len; pos != 0; pos--) {
+				if(A[pos] == 0 || B[pos] == 0)
+					continue;
+				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
+			}
+			break;
+		case 3:
+			for (pos = len; pos != 0; pos--) {
+				if(A[pos] == 0 && B[pos] == 0)
+					continue;
+				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
+			}
+			break;
+		case 4:
+			for (pos = len; pos != 0; pos--) {
+				if(B[pos] == 0)
+					continue;
+				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
+			}
+			break;
 	}
 
 	/* choke matte */
