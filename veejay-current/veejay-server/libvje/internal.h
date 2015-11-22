@@ -244,6 +244,8 @@ enum {
 	VJ_IMAGE_EFFECT_ALPHASELECT = 198,
 	VJ_IMAGE_EFFECT_ALPHASELECT2 = 199,
 	VJ_IMAGE_EFFECT_ALPHANEGATE = 99,
+	VJ_IMAGE_EFFECT_CHOKEMATTE = 98,
+	VJ_IMAGE_EFFECT_LEVELCORRECTION = 97,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
@@ -390,7 +392,7 @@ extern void coloradjust_apply( VJFrame *frame, int width, int height,
 
 extern void rgbkey_apply( VJFrame *frame, VJFrame *frame2, int width,
 			 int height, int i_angle, int i_noise,
-			 int r, int g, int b, int sup, int alpha);
+			 int r, int g, int b, int min, int max);
 
 extern void gamma_apply( VJFrame *frame,
 			int width, int height, int val);
@@ -662,4 +664,7 @@ extern void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int 
 extern void chromamagickalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int opacity );
 extern void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int mode );
 extern void alphanegate_apply( VJFrame *frame, int width, int height, int value );
+extern void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality );
+extern void levelcorrection_apply(VJFrame *frame, int min, int max);
+
 #endif

@@ -45,7 +45,7 @@ vj_effect *alphaselect2_init(int w, int h)
 	ve->defaults[5] = 0;    /* alpha operator */
 
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 255;
+    ve->limits[1][0] = 2550;
 
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
@@ -57,7 +57,7 @@ vj_effect *alphaselect2_init(int w, int h)
     ve->limits[1][3] = 255;
 
 	ve->limits[0][4] = 0;
-	ve->limits[1][4] = 255;
+	ve->limits[1][4] = 2550;
 
 	ve->limits[0][5] = 0;
 	ve->limits[1][5] = 2;
@@ -73,7 +73,7 @@ vj_effect *alphaselect2_init(int w, int h)
     return ve;
 }
 
-static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, int dA, int dB )
+static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, const double dA, const double dB )
 {
 		double tmp = 0.0; 
 		fast_sqrt( tmp, (Cbk - Cb) * (Cbk-Cb) + (Crk - Cr) * (Crk - Cr) );
@@ -99,9 +99,12 @@ void alphaselect2_apply( VJFrame *frame, int width,
 	int cb,cr,iy,iu,iv;
 	_rgb2yuv(r,g,b,iy,iu,iv);
 
+	const double dtola = tola * 0.1f;
+	const double dtolb = tolb * 0.1f;
+
 	if(alpha == 0 ) {
 		for (pos = len; pos != 0; pos--) {
-			double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+			double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
 			uint8_t alpha = (uint8_t) (d * 255.0);
 			if( alpha < 0xff ) {
 				Cb[pos] = 128;
@@ -121,7 +124,7 @@ void alphaselect2_apply( VJFrame *frame, int width,
 	{
 		case 1:
 			for (pos = len; pos != 0; pos--) {
-				double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
 				A[pos] = (uint8_t) (d * 255.0);
 				if( A[pos] < 0xff ) {
 					Y[pos] = A[pos];
@@ -145,7 +148,7 @@ void alphaselect2_apply( VJFrame *frame, int width,
 					Cr[pos] = 128;
 				}
 				else {
-					double d = color_distance( Cb[pos],Cr[pos],iu,iv,tola,tolb );
+					double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
 					A[pos] = (uint8_t) (d * 255.0);
 					if( A[pos] < 0xff ) {
 						Y[pos] = A[pos];

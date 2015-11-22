@@ -165,9 +165,9 @@ static	void	mmx_blur(uint8_t *buffer, int width, int height)
 			 "\n\t packuswb %%mm6, %%mm0"
 			 "\n\t movd %%mm0, %[buf]"
 			 :: [buf] "m" (*(buf + i))
-			 , [add1] "m" (*(buf + i - width))
-			 , [add2] "m" (*(buf + i - width + 1))
-			 , [add3] "m" (*(buf + i - width - 1))
+			 , [add1] "m" (*(buf + i + width))
+			 , [add2] "m" (*(buf + i + 1))
+			 , [add3] "m" (*(buf + i + width - 1))
 		);//	 : "mm0", "mm1", "mm2", "mm3", "mm6");
 	}
 

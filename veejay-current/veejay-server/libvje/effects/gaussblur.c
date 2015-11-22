@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2015 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "rgbkey.h"
+#include "gaussblur.h"
 #include <stdlib.h>
 #include <math.h>
 #include "common.h"
@@ -29,61 +29,45 @@
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 
-// this FX combines 4 FX
-
-vj_effect *rgbkey_init(int w,int h)
+vj_effect *gaussblur_init(int w,int h)
 {
     vj_effect *ve;
     ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 7;
+    ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 15;	/* tolerance near */
-    ve->defaults[1] = 0;	/* r */
-    ve->defaults[2] = 255;	/* g */
-    ve->defaults[3] = 0;	/* b */
-    ve->defaults[4] = 1;	/* tolerance far */
-	ve->defaults[5] = 0;	/* level min */
-	ve->defaults[6] = 0xff; /* level max */
+
+    ve->defaults[0] = 100;	/* Radius */
+    ve->defaults[1] = 100;	/* Strength */
+    ve->defaults[2] = 300;	/* Quality */
 
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 255;
+    ve->limits[1][0] = 500;
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+    ve->limits[0][1] = -100;
+    ve->limits[1][1] = 100;
 
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
-
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
-
-    ve->limits[0][4] = 0;
-    ve->limits[1][4] = 255;
-
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = 255;
-
-    ve->limits[0][6] = 0;
-    ve->limits[1][6] = 255; 
+    ve->limits[1][2] = 300;
 
 	ve->param_description = vje_build_param_list(ve->num_params, 
-			"Tolerance Near", "Red", "Green", "Blue", "Tolerance Far","Level Min", "Level Max");
+			"Radius", "Strength", "Quality" );
 
 	ve->has_user = 0;
-    ve->description = "Chroma Key (RGB)";
-    ve->extra_frame = 1;
-    ve->sub_format = 1;
-	ve->rgb_conv = 1;
+    ve->description = "Alpha: Choke Matte";
+    ve->extra_frame = 0;
+    ve->sub_format = -1;
+	ve->rgb_conv = 0;
     ve->parallel = 0;
 	return ve;
 }
 
+extern int yuv_sws_get_cpu_flags();
+
 typedef struct {
     float              radius;
     float              strength;
-    int                threshold;
     float              quality;
     struct SwsContext *filter_context;
 } FilterParam;
@@ -115,33 +99,29 @@ static int alloc_sws_context(FilterParam *f, int width, int height, unsigned int
     return 1;
 }
 
-static uint8_t *temp[2];
+static uint8_t *temp = NULL;
 static FilterParam *gaussfilter = NULL;
-static uint8_t __lookup_table[256];
+static int last_radius = 0;
+static int last_strength = 0;
+static int last_quality = 0;
 
-int	rgbkey_malloc(int w, int h)
+int	gaussblur_malloc(int w, int h)
 {
 	gaussfilter = (FilterParam*) vj_calloc(sizeof(FilterParam));
-	gaussfilter->radius = 1.3f;
-	gaussfilter->strength = 1.0f;
-	gaussfilter->quality = 3.0f;
-
-	if(!alloc_sws_context( gaussfilter,w,h,yuv_sws_get_cpu_flags() ) )
+	temp = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h));
+	if(temp == NULL)
 		return 0;
-	
-	temp[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h*2));
-	if(temp[0] == NULL)
-		return 0;
-	temp[1] = temp[0] + RUP8(w*h);	
+	last_radius = 0;
+	last_strength = 0;
+	last_quality = 0;
 	return 1;
 }
 
-void	rgbkey_free()
+void gaussblur_free()
 {
-	if(temp[0]) {
-		free(temp[0]);
-		temp[0] = NULL;
-		temp[1] = NULL;
+	if(temp) {
+		free(temp);
+		temp = NULL;
 	}
 
 	if( gaussfilter->filter_context ) {
@@ -153,6 +133,18 @@ void	rgbkey_free()
 		free(gaussfilter);
 		gaussfilter = NULL;
 	}
+}
+
+static int	 gaussfilter_init(int w, int h, int radius, int strength, int quality)
+{
+	gaussfilter->radius = (float) radius * 0.01f;
+	gaussfilter->strength = (float) strength * 0.01f;
+	gaussfilter->quality = (float) quality * 0.01f;
+
+	if(!alloc_sws_context( gaussfilter,w,h,yuv_sws_get_cpu_flags() ) )
+		return 0;
+
+	return 1;
 }
 
 static void gaussblur(uint8_t *dst, const int dst_linesize,const uint8_t *src, const int src_linesize,
@@ -167,64 +159,27 @@ static void gaussblur(uint8_t *dst, const int dst_linesize,const uint8_t *src, c
               0, h, dst_array, dst_linesize_array);
 }
 
-/*
- * originally from http://gc-films.com/chromakey.html
- */
-static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, double dA, double dB )
-{
-		double tmp = 0.0; 
-		fast_sqrt( tmp, (Cbk - Cb) * (Cbk-Cb) + (Crk - Cr) * (Crk - Cr) );
-
-		if( tmp < dA ) { /* near color key == bg */
-			return 0.0; /* near */
-		}
-		if( tmp < dB ) { /* middle region */
-			return (tmp - dA)/(dB - dA); /* distance to key color */
-		}
-		return 1.0; /* far from color key == fg */
-}
-
-void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tola, int r, int g,int b, int tolb, int min, int max)
+void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality )
 {
 	unsigned int pos;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
 	uint8_t *A = frame->data[3];
 	const unsigned int len = frame->len;  
-	int iy,iu,iv;
-	uint8_t *T = temp[0];	
-	uint8_t op0,op1;
 
-	double dtola = (double) tola + 0.5f;
-	double dtolb = (double) tolb + 0.5f;
+	if( last_radius != radius || last_strength != strength || last_quality != quality )
+	{
+		if( gaussfilter->filter_context ) {
+			sws_freeContext( gaussfilter->filter_context );
+		}
+		if( gaussfilter_init( frame->width,frame->height, radius, strength, quality ) == 0 )
+			return;
 
-	/* get key color */
-	_rgb2yuv(r,g,b,iy,iu,iv);
-
-	/* euclidean distance between key color and chroma */
-	// introduces spill 
-	for (pos = len; pos != 0; pos--) {
-		T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
+		last_radius = radius;
+		last_strength = strength;
+		last_quality = quality;
 	}
 
-	/* choke matte */
-	// reduces detail
-	gaussblur( A, width, temp[0], width, width,height,gaussfilter->filter_context );
 
-	/* level correction table */
-	__init_lookup_table( __lookup_table, 256, (float)min, (float)max, 0, 0xff ); 
-
-	/* composite bg onto fg */
-	for( pos = 0; pos < len; pos ++ ) {
-		op0     = __lookup_table[A[pos]];
-		op1     = 0xff - op0;
-		Y[pos]  = ((op0 * Y[pos]) + (op1 * Y2[pos]))>> 8;
-	    Cb[pos] = ((op0 * Cb[pos]) + (op1 * Cb2[pos]))>> 8;
-		Cr[pos] = ((op0 * Cr[pos]) + (op1 * Cr2[pos]))>>8;
-	}
+	veejay_memcpy( temp, A, len );
+	gaussblur( A, frame->width, temp, frame->width, frame->width,frame->height,gaussfilter->filter_context );
 
 }

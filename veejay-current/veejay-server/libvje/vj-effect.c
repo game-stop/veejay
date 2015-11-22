@@ -86,6 +86,7 @@
 #include "effects/opacitythreshold.h"
 #include "effects/opacityadv.h"
 #include "effects/iris.h"
+#include "effects/rgbkey.h"
 #include "effects/rgbkeysmooth.h"
 #include "effects/magicscratcher.h"
 #include "effects/chromascratcher.h"
@@ -187,6 +188,8 @@
 #include "effects/chromamagickalpha.h"
 #include "effects/magicoverlaysalpha.h"
 #include "effects/lumakeyalpha.h"
+#include "effects/gaussblur.h"
+#include "effects/levelcorrection.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -276,6 +279,8 @@ static struct
 {	perspective_malloc,		perspective_free,	VJ_IMAGE_EFFECT_PERSPECTIVE },
 {	feathermask_malloc,		feathermask_free,	VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
 {	average_malloc,			average_free,		VJ_IMAGE_EFFECT_AVERAGE },
+{	rgbkey_malloc,			rgbkey_free,		VJ_VIDEO_EFFECT_RGBKEY },
+{	gaussblur_malloc,		gaussblur_free,		VJ_IMAGE_EFFECT_CHOKEMATTE },
 {	NULL			,	NULL			,0				},
 };
 
@@ -664,6 +669,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 //	vj_effects[VJ_IMAGE_EFFECT_ALPHASELECT]			= alphaselect_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_ALPHASELECT2]		= alphaselect2_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_ALPHANEGATE]			= alphanegate_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_CHOKEMATTE]			= gaussblur_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_LEVELCORRECTION]		= levelcorrection_init(width,height);
 
 	max_width = width;
 	max_height = height;
