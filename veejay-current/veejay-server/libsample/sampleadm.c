@@ -96,7 +96,7 @@ typedef struct
  *
  * sample_size
  *
- * returns current sample_id pointer. size is actually this_sample_id - next_avail_num,
+ * \return current sample_id pointer. size is actually this_sample_id - next_avail_num,
  * but people tend to use size as in length.
  *
  ****************************************************************************************************/
@@ -113,7 +113,9 @@ int sample_verify() {
 
 /****************************************************************************************************
  *
- * int_hash
+ * int_hash (key )
+ * \param key TODO
+ * \return
  *
  * internal usage. returns hash_val_t for key
  *
@@ -127,7 +129,10 @@ static hash_val_t int_hash(const void *key)
 
 /****************************************************************************************************
  *
- * int_compare
+ * int_compare (key1, key2)
+ * \param key1 TODO
+ * \param key2
+ * \return
  *
  * internal usage. compares keys for hash.
  *
@@ -143,6 +148,15 @@ static int int_compare(const void *key1, const void *key2)
 #endif
 }
 
+/****************************************************************************************************
+ *
+ * sample_default_edl_name (int )
+ * \param s1 numeric Index of the sample to create the name with
+ * \return a chararacter pointer do sample name (caller must free)
+ *
+ * create a sample edl filename based on sample index.
+ *
+ ****************************************************************************************************/
 static char *sample_default_edl_name(int s1)
 {
 	char tmp_file[1024];
@@ -218,6 +232,9 @@ void	*sample_get_dict( int sample_id )
 /****************************************************************************************************
  *
  * sample_init()
+ * \param len TODO
+ * \param font
+ * \param pedl
  *
  * call before using any other function as sample_skeleton_new
  *
@@ -265,14 +282,6 @@ int sample_get_state()
     return sampleadm_state;
 }
 
-/****************************************************************************************************
- *
- * sample_skeleton_new(long , long)
- *
- * create a new sample, give start and end of new sample. returns sample info block.
- *
- ****************************************************************************************************/
-
 static int _new_id()
 {
   /* perhaps we can reclaim a sample id */
@@ -296,6 +305,15 @@ static int _new_id()
 	return id;
 }
 
+/****************************************************************************************************
+ *
+ * sample_skeleton_new(long , long)
+ * \param startFrame TODO
+ * \param endFrame
+ *
+ * create a new sample, give start and end of new sample. returns sample info block.
+ *
+ ****************************************************************************************************/
 sample_info *sample_skeleton_new(long startFrame, long endFrame)
 {
    char tmp_file[128];
@@ -400,11 +418,10 @@ void 	sample_new_simple( void *el, long start, long end )
 /****************************************************************************************************
  *
  * sample_get(int sample_id)
- *
- * returns sample information struct or NULL on error.
+ * \param sample_id TODO
+ * \return sample information struct or NULL on error.
  *
  ****************************************************************************************************/
-
 sample_info *sample_get(int sample_id)
 {
 	if( sample_id < 0 || sample_id > SAMPLE_MAX_SAMPLES)
@@ -2949,7 +2966,6 @@ void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_samples )
  ****************************************************************************************************/
 xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *el, void  *font, int start_at, void *vp )
 {
-
     xmlChar *xmlTemp = NULL;
     char *chTemp = NULL;
     xmlNodePtr subs = NULL;
@@ -2959,7 +2975,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
    	int marker_start = 0, marker_end = 0;
 
     while (cur != NULL) {
-
+//TODO use of #DEFINE for parser commons PARSESAMPLE_START() PARSESAMPLE_END()
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
