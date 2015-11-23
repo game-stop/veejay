@@ -1,5 +1,5 @@
 /* sendVIMS - very simple client for VeeJay
- * 	     (C) 2002-2004 Niels Elburg <elburg@hio.hen.nl> 
+ * 	     (C) 2002-2015 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -32,12 +32,11 @@
 #include <veejay/vj-client.h>
 #include <veejay/vjmem.h>
 #include <veejay/vj-msg.h>
-static int   interactive = 0;
-static int   port_num = 3490;
-static char  *group_name = NULL;
-static char  *host_name = NULL;
+static int interactive = 0;
+static int port_num = 3490;
+static char *group_name = NULL;
+static char *host_name = NULL;
 static vj_client *sayvims = NULL;
-static int fd_in = 0; // stdin
 static int single_msg = 0;
 static int dump = 0;
 static int verbose = 0;
@@ -53,12 +52,12 @@ static int help = 0;
 /* add 4xx VIMS series, read back data from blocking socket */
 static struct {
 	int vims;
-	int hdr; //FIXME insert header lengths
+	int hdr; // make header lengths consistent one day ...
 } vims_replies[] = {
-        { VIMS_VIDEO_INFORMATION,3 }, 
+    { VIMS_VIDEO_INFORMATION,3 }, 
 	{ VIMS_EFFECT_LIST,6 },            
 	{ VIMS_EDITLIST_LIST,6 },    
-        { VIMS_BUNDLE_LIST,6 },          
+    { VIMS_BUNDLE_LIST,6 },          
 	{ VIMS_STREAM_LIST,5 },
 	{ VIMS_SAMPLE_LIST, 8},
 	{ VIMS_STREAM_GET_V4L,3},
@@ -80,15 +79,75 @@ static struct {
 	{ VIMS_GET_SHM,SHM_ID_LEN },
 	{ 0,0 },
 };
-static void vjsend( vj_client *c, int cmd, char *buf )
+
+static vj_client	*sayvims_connect(void)
 {
-	size_t index = strcspn(buf,"\n\r");
+	vj_client *client = vj_client_alloc( 0,0,0 );
+	if(!client)
+	{
+		return NULL;
+	}
+
+	if(host_name == NULL)
+		host_name = strdup( "localhost" );
+
+	if(!vj_client_connect( client, host_name,group_name, port_num ))
+	{
+		fprintf(stderr,"Unable to connect to %s:%d\n", host_name, port_num );
+		return NULL;
+	}
+	
+	return client;
+}
+
+static	void reconnect(void)
+{
+	if( sayvims ) {
+		vj_client_close(sayvims);
+		vj_client_free(sayvims);
+	}
+
+	sayvims = sayvims_connect();
+	if( sayvims == NULL ) {
+		fprintf(stderr, "Unable to make a connection with %s:%d\n", host_name, port_num);
+		exit(1);
+	}
+	
+//	fprintf(stdout, "Connected to %s:%d\n", host_name,port_num);
+}
+
+static int vjsend( int cmd, unsigned char *buf )
+{
+	/* bad-check if connection is still up */
+	int foobar = vj_client_poll(sayvims, V_CMD );
+	if( foobar && vj_client_link_can_read(sayvims, V_CMD) ) {
+		unsigned char dummy[8];
+		/* read one byte will fail if connection is closed */
+		/* nb: only vims query messages write something to V_CMD (vims 400-499)*/
+		int res = vj_client_read(sayvims, V_CMD, dummy, 1);
+		if( res <= 0 ) { 
+			reconnect();
+		}
+	}
+
+	/* strip newline */
+	size_t index = strcspn( (char*) buf,"\n\r");
 	if (index) {
 		buf[ index ] = '\0';
 	}
-	vj_client_send( c,cmd, buf);
-}
+	
+	if( index == 0 )
+		return 1;
 
+	/* send buffer */
+	int result = vj_client_send( sayvims,cmd, buf);
+    if( result <= 0) {
+		fprintf(stderr, "Unable to send message '%s'\n", buf );
+		return 0;
+	}
+
+	return 1;
+}
 
 static int vimsReplyLength(int vims_id)
 {
@@ -101,7 +160,7 @@ static int vimsReplyLength(int vims_id)
 	return 0;
 }
 
-static char *vimsReply(int expectedLen, int *actualWritten)
+static unsigned char *vimsReply(int expectedLen, int *actualWritten)
 {
 	if( expectedLen <= 0 )
 		return NULL;
@@ -111,7 +170,7 @@ static char *vimsReply(int expectedLen, int *actualWritten)
 
 	memset( header, 0, sizeof(header) );
 
-	int result = vj_client_read( sayvims, V_CMD, header, expectedLen );
+	int result = vj_client_read( sayvims, V_CMD, (unsigned char*) header, expectedLen );
 	if( result == -1 ) {
 		return NULL;
 	}
@@ -121,11 +180,11 @@ static char *vimsReply(int expectedLen, int *actualWritten)
 		return NULL;
 	}
 
-	char *data = NULL;
+	unsigned char *data = NULL;
 	if( result <= 0 || dataLen <= 0 || expectedLen <= 0 )
 		return data;
 
-	data = (char*) malloc( sizeof(char) * (dataLen + 1));
+	data = (unsigned char*) vj_calloc( sizeof(unsigned char) * (dataLen + 1));
 	*actualWritten = vj_client_read( sayvims, V_CMD, data, dataLen );
 	if( *actualWritten == -1 ) {
 		return NULL;
@@ -133,10 +192,9 @@ static char *vimsReply(int expectedLen, int *actualWritten)
 	return data;
 }
 
-static char *vimsAnswer(int len)
+static unsigned char *vimsAnswer(int len)
 {
-	char *tmp = (char*) malloc( sizeof(char) * (len+1));
-	memset(tmp,0,len+1);
+	unsigned char *tmp = (unsigned char*) vj_calloc( sizeof(unsigned char) * (len+1));
 	int result = vj_client_read( sayvims, V_CMD, tmp, len );
 	if( result == -1 ) {
 		free(tmp);
@@ -160,81 +218,91 @@ static int vimsMustReadReply(char *msg, int *vims_event_id)
 }
 
 /* count played frames (delay) */
-static void vj_flush(int frames) { 
+static int vj_flush(int frames) { 
 	
-	char status[100];
-	bzero(status,100);
+	char status[255];
+	memset(status,0,sizeof(status));
 
 	while(frames>0) {
 		if( vj_client_poll(sayvims, V_STATUS ))
 		{
 			char sta_len[6];
-			bzero(sta_len, 6 );
-			int nb = vj_client_read( sayvims, V_STATUS, sta_len, 5 );
+			memset( sta_len,0,sizeof(sta_len));
+			int nb = vj_client_read( sayvims, V_STATUS, (unsigned char*) sta_len, 5 );
+			if( nb <= 0 )
+				return 0;
+
 			if(sta_len[0] == 'V' )
 			{
 				int bytes = 0;
 				sscanf( sta_len + 1, "%03d", &bytes );
 				if(bytes > 0 )
 				{
-					bzero(status, 100);
-					int n = vj_client_read(sayvims,V_STATUS,status,bytes);
+					memset( status,0, sizeof(status));
+					int n = vj_client_read(sayvims,V_STATUS,(unsigned char*) status,bytes);
 					if( n )
 					{
 						if(dump) fprintf(stdout , "%s\n", status );
 						frames -- ;
-					}
-					if(n == -1)
+					} 
+					else if(n == -1)
 					{
 						fprintf(stderr, "Error reading status from Veejay\n");	
-						exit(0);
+						return 0;
 					}
 				}
 			}
 		}
 	}
+	return 1;
 }
 
-static int processLine(FILE *infile, FILE *outfile, char *tmp, char *buffer, int len, int buf_len)
+static int processLine(FILE *infile, FILE *outfile, char *tmp, size_t len)
 {
-	int n_lines = 0;
 	int line_len = 0;
 		
 	memset( tmp, 0, len + 1 );
 		
 	line_len = getline( &tmp, &len, infile );
+
 	if( line_len > 0 ) {
-//		fprintf(stderr, "%s\n",tmp); 
+		tmp[line_len] = '\0';
+
 		if( strncmp( "quit", tmp,4 ) == 0 ) {
 			return -1;
 		}
+
 		if( tmp[0] == '+' ) {
 			int wait_frames_ = 1;
-			if( sscanf( tmp + 1, "%d" , &wait_frames_ ) ) {
-				vj_flush( wait_frames_ );
+			if( sscanf( tmp + 1, "%d" , &wait_frames_ ) == 1 ) {
+				if( vj_flush( wait_frames_ ) == 0)
+					return 0;
 			} 
 		} else {
 			int vims_id = 0;
 			int mustRead = vimsMustReadReply( tmp, &vims_id );
-			vjsend( sayvims, V_CMD, tmp );
+
+			if( vjsend( V_CMD, (unsigned char*) tmp ) == 0 ) {
+				return 0;
+			}
 
 			if( mustRead ) {
 				if( vims_id == VIMS_GET_SHM ) {
-					char *data = vimsAnswer( SHM_ID_LEN );
+					unsigned char *data = vimsAnswer( SHM_ID_LEN );
 					if( data != NULL ) {
-						fwrite( data, sizeof(char), SHM_ID_LEN, outfile);
+						fwrite( data, sizeof(unsigned char), SHM_ID_LEN, outfile);
 						free(data);
 					}
 				} else if ( vims_id == VIMS_GET_IMAGE ) {
 					int headerLength = vimsReplyLength( vims_id );
 					int dataLength = 0;
-					char *data = vimsReply( headerLength, &dataLength);
+					unsigned char *data = vimsReply( headerLength, &dataLength);
 					char *out = NULL;
 					if( data != NULL ) {
 						if( base64_encode ) {
 #ifdef BASE64_AVUTIL
 							int len = AV_BASE64_SIZE( dataLength );
-							out = (char*) malloc( sizeof(char) * len );
+							out = (char*) vj_calloc( sizeof(char) * len );
 							char *b64str = av_base64_encode( out, len, data, dataLength );
 							if( b64str != NULL ) {
 								fwrite( b64str, sizeof(char), len, outfile);
@@ -251,9 +319,9 @@ static int processLine(FILE *infile, FILE *outfile, char *tmp, char *buffer, int
 				} else {
 					int headerLength = vimsReplyLength( vims_id );
 					int dataLength = 0;
-					char *data = vimsReply( headerLength, &dataLength);
+					unsigned char *data = vimsReply( headerLength, &dataLength);
 					if( data != NULL ) {
-						fwrite( data, sizeof(char), dataLength, outfile);
+						fwrite( data, sizeof(unsigned char), dataLength, outfile);
 						free(data);
 					}
 					
@@ -263,10 +331,10 @@ static int processLine(FILE *infile, FILE *outfile, char *tmp, char *buffer, int
 
 		}
 	} else if (line_len < 0) {
-		return -1; // exit
+		return 0; // exit
 	}
 
-	return 0; //wait for more input 
+	return 1; //wait for more input 
 }
 
 
@@ -283,7 +351,7 @@ static void Usage(char *progname)
 	fprintf(stderr, " -b\t\tBase64 encode binary data\n");
 	fprintf(stderr, " -v\t\tVerbose\n");
 	fprintf(stderr, " -?\t\tPrint this help\n");
-	fprintf(stderr, "Exit interactive mode by typing 'quit'\n");
+	fprintf(stderr, "\nExit interactive mode by typing 'quit'\n");
 	fprintf(stderr, "Messages to send to veejay must be wrapped in quotes\n");
 	fprintf(stderr, "You can send multiple messages by seperating them with a whitespace\n");
 	fprintf(stderr, "Example: %s \"600:;\"\n",progname);
@@ -331,10 +399,11 @@ static int set_option(const char *name, char *value)
 #ifdef BASE64_AVUTIL
 		base64_encode = 1;
 #else
-		fprintf(stderr, "compiled without base64 support\n");
+		fprintf(stderr, "Compiled without base64 support\n");
 		err++;
 #endif
-	}else if(strcmp(name,"?") == 0)
+	}
+	else if(strcmp(name,"?") == 0)
 	{
 		help = 1;
 	}
@@ -343,34 +412,12 @@ static int set_option(const char *name, char *value)
 	return err;
 }
 
-vj_client	*sayvims_connect(void)
-{
-	vj_client *client = vj_client_alloc( 0,0,0 );
-	if(!client)
-	{
-		fprintf(stderr, "Memory allocation error\n");
-		return NULL;
-	}
-
-	if(host_name == NULL)
-		host_name = strdup( "localhost" );
-
-	if(!vj_client_connect( client, host_name,group_name, port_num ))
-	{
-		fprintf(stderr,"Unable to connect to %s:%d\n", host_name, port_num );
-		return NULL;
-	}
-	
-	return client;
-}
-
 int main(int argc, char *argv[])
 {
-       	int i;
+	int i = 0;
 	int n = 0;
 	char option[2];
 	int err = 0;
-	FILE *infile;
 
 	veejay_set_debug_level(verbose);
 
@@ -389,18 +436,16 @@ int main(int argc, char *argv[])
 
 	vj_mem_init();
 
-	sayvims = sayvims_connect();
+	reconnect();
 
 	if(!sayvims) {
-		fprintf(stderr, "error connecting.\n");
 		return -1;
 	}
 
-	if(single_msg)
+	if(single_msg)  /* single message send */
 	{
 		char **msg = argv + optind;
 		int  nmsg  = argc - optind;
-		i=0;
 		while( i < nmsg )
 		{
 			if(msg[i][0] == '+')
@@ -413,62 +458,71 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					fprintf(stderr, "Fatal: error parsing %s\n", tmp );
-					return -1;
+					fprintf(stderr, "Unable to parse wait period '%s'\n", tmp );
+					goto end_program;
 				}
 			}
 			else
 			{
-				vjsend( sayvims,V_CMD, msg[i] );
+				if( vjsend( V_CMD, (unsigned char*)msg[i] ) == 0 )
+				{
+					goto end_program;
+				}
 			}
+
 			i++;
 		}
-	}
-	else if(interactive) 
-	{
-		int  len = 512;
-		char *tmp = (char*) malloc( len + 1 ); // max line length
-		char *buffer = (char*) malloc( 512 * 1024 ); // just a "large" buffer, 512 kb
-		int buf_len = 512 * 1024;
 
+		vj_flush(1);
+	}
+	else if(interactive) /* interactive mode, reconnect on error */
+	{
+		const unsigned int len = 1024;
+		fprintf(stdout, "veejay sayVIMS %s\n",VERSION);
+		fprintf(stdout, "\ttype 'quit' to exit\n");
+		fprintf(stdout, "\ttype 'veejay -u' to see a list of veejay commands\n");
 		for( ;; ) {
-			if( processLine(stdin,stdout, tmp, buffer, len, buf_len) == -1 )
+			fprintf(stdout, "> " );
+		
+			char *tmp = (char*) vj_calloc( len + 1 ); // max line length
+			int result = processLine(stdin,stdout, tmp, len);
+			if( result == -1 ) {
+				fprintf(stderr, "User requested session end, bye!\n");
 				break;
+			}
+			free(tmp);
+		}
+	}
+	else
+	{	
+		/* interactive silent mode if no parameters given (pipe through) */
+		int fd_in = 0;
+		FILE *instd = fdopen(fd_in,"r");
+		if(instd == NULL ) {
+			fprintf(stderr, "Cannot read from STDIN\n");
+			return 1;
 		}
 
-		free(tmp);
-		free(buffer);
-	}
-	else {
-        	/* read from stdin*/
-                infile = fdopen( fd_in, "r" );
-                if(!infile)
-                {
-                        fprintf(stderr, "Cannot read from STDIN\n");
-                        return 1;
-                }       
-                char buf[128];
-                while( fgets(buf, sizeof(buf), infile) )
-                {
-                        if( buf[0] == '+' )
-                        {
-                                int wait_ = 1;
-                
-                                if(sscanf( buf+1, "%d", &wait_ ) )
-                                {
-                                        vj_flush( wait_ );
-                                }
-                        }
-                        else
-                        {
-                                vjsend( sayvims, V_CMD, buf );
-                        }
-                }
+		char buf[1024];
+		while( fgets( buf, sizeof(buf), instd ) ) {
+			if( buf[0] == '+' ) {
+				int wait_ = 1;
+				if( sscanf( buf+1,"%d",&wait_)==1) {
+					vj_flush(wait_);
+				}
+			}
+			else {
+				vjsend( V_CMD, (unsigned char*)buf );
+			}
+		}
+
+		vj_flush(1);
 	}
 
-	vj_flush(1);
+end_program:
 	vj_client_close(sayvims);
 	vj_client_free(sayvims);
+	free(host_name);
 
-        return 0;
+    return 0;
 } 
