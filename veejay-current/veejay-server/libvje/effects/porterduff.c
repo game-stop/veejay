@@ -41,7 +41,7 @@ vj_effect *porterduff_init(int w,int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 0;	/* operator */
-    ve->limits[0][0] = 1;
+    ve->limits[0][0] = 0;
     ve->limits[1][0] = 13;
 
 	ve->param_description = vje_build_param_list(ve->num_params, "Operator");
@@ -52,6 +52,11 @@ vj_effect *porterduff_init(int w,int h)
 	ve->rgb_conv = 0;
     ve->parallel = 1;
 	ve->rgba_only = 1;
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, 0, ve->limits[1][0], 
+		"Dest", "Dest Atop", "Dest In", "Dest Over", "Dest Out", "Src Over", "Src Atop", "Src In", "Src Out", "SVG Multiply", "XOR", "ADD", "SUBTRACT", "DIVIDE" );
+
 	return ve;
 } 
 
@@ -401,5 +406,4 @@ void porterduff_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int
 			divide(frame->data[0],frame2->data[0],frame->len);
 			break;
 	}
-
 }

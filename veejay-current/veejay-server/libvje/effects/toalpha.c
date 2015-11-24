@@ -46,6 +46,10 @@ vj_effect *toalpha_init(int w, int h)
 	
 	__init_lookup_table( __lookup_table, 256, 16.0f, 235.0f, 0, 255 ); 
 
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, 0, ve->limits[1][0], "Verbatim", "Full range" );
+
     return ve;
 }
 

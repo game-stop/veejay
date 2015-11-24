@@ -50,6 +50,11 @@ vj_effect *lumakey_init(int width, int height)
     ve->sub_format = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Feather", "Min Threshold","Max Threshold","Distance", "Mode" );
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, 4, ve->limits[1][4], "Simple", "White", "Smooth" );
+
+
 
     return ve;
 }

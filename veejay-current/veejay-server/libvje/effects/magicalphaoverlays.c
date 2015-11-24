@@ -35,8 +35,8 @@ vj_effect *overlayalphamagic_init(int w, int h)
     ve->defaults[0] = 7;
     ve->defaults[0] = 0;
     ve->description = "Alpha: Overlay Magic alpha channels";
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 33;
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 32;
 
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 1; // Toggle visibility
@@ -46,7 +46,18 @@ vj_effect *overlayalphamagic_init(int w, int h)
     ve->has_user = 0;
     ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Operator", "Show Alpha" );
-    return ve;
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, 0, ve->limits[1][0],
+		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
+		"Difference","Difference Negate","Exclusive","Base","Freeze",
+		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",
+		"Relative Luma Add", "Relative Luma Subtract", "Min Subselect", "Max Subselect",
+		"Add Subselect", "Add Average", "Experimental 1","Experimental 2", "Experimental 3",
+		"Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add", "Distorted Subtract", "Experimental 4", "Negation Divide");
+
+	return ve;
 }
 
 /* rename methods in lumamagick and chromamagick */
@@ -739,10 +750,10 @@ void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,int heig
     case VJ_EFFECT_BLEND_SUBDISTORT:
 	_overlayalphamagic_subdistorted(frame, frame2, width, height);
 	break;
-    case 32:
+	case VJ_EFFECT_BLEND_ADDTEST5:
 	_overlayalphamagic_try(frame, frame2, width, height);
 	break;
-    case 33:
+    case VJ_EFFECT_BLEND_NEGDIV:
  	_overlayalphamagic_divide(frame,frame2,width,height);
 	break;
 

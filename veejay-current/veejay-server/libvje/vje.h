@@ -72,11 +72,16 @@ typedef struct VJFrameInfo_t
 	uint8_t inverse;
 } VJFrameInfo;
 
+typedef struct {
+	char **description;
+} vj_value_hint_t;
+
 typedef struct vj_effect_t {
 
     char *description;			
     int num_params;			
-    char **param_description;	
+    char **param_description;
+	vj_value_hint_t **hints;
     int *defaults;			
     int *flags;		
     int *limits[2];		

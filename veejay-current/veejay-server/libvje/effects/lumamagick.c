@@ -36,13 +36,13 @@ vj_effect *lumamagick_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     //ve->param_description = (char**)vj_calloc(sizeof(char)* ve->num_params);
-    ve->defaults[0] = 1;
+    ve->defaults[0] = 0;
     ve->defaults[1] = 100;
     ve->defaults[2] = 100;
     ve->parallel = 1;
 	ve->description = "Luma Magick";
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 39;
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 30;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 200;
     ve->limits[0][2] = 0;
@@ -51,7 +51,19 @@ vj_effect *lumamagick_init(int width, int height)
     ve->extra_frame = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Opacity A", "Opacity B" );
-    return ve;
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, 0, ve->limits[1][0],
+		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
+		"Difference","Difference Negate","Exclusive","Base","Freeze",
+		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",
+		"Relative Luma Add", "Relative Luma Subtract", "Min Subselect", "Max Subselect",
+		"Add Subselect", "Add Average", "Experimental 1","Experimental 2", "Experimental 3",
+		"Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add", "Distorted Subtract" );
+
+
+
+	return ve;
 }
 
 /* 33 = illumination . it increases or decreases light intensity and associate color pixel*/

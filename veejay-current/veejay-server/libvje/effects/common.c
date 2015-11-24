@@ -44,6 +44,36 @@ char	**vje_build_param_list( int num, ... )
 	va_end(args);
 	return list;
 }
+
+void vje_build_value_hint_list( vj_value_hint_t **hints, int num, int limit, ... )
+{
+	va_list args;
+	char *tmp = NULL;
+	
+	vj_value_hint_t *hint = hints[num];
+
+	hint->description = (char**) vj_malloc(sizeof(char*) * (limit+1) );
+
+	va_start( args, num );
+
+	int i;
+	for( i = 0; i <= limit; i ++ ) {
+		tmp = (char*) va_arg( args,char*);
+		hint->description[i] = (tmp == NULL ? NULL : vj_strdup(tmp));
+	}
+	va_end(args);
+}
+
+vj_value_hint_t **vje_init_value_hint_list(int n_params)
+{
+	vj_value_hint_t **hints = (vj_value_hint_t**) vj_calloc(sizeof(vj_value_hint_t**) * n_params );
+	int i;
+	for( i = 0; i < n_params; i ++ ) {
+		hints[i] = (vj_value_hint_t*) vj_calloc(sizeof(vj_value_hint_t));
+	}
+	return hints;
+}
+
 static inline void linearBlend(unsigned char *src, int stride)
 {
   int x;

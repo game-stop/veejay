@@ -47,7 +47,15 @@ vj_effect *average_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Number of frames to average", "Mode");
-    return ve;
+ 
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, 1, ve->limits[1][1], "Running Average", "Average" );
+
+
+
+ 	return ve;
 }
 
 int	average_malloc(int width, int height)

@@ -31,7 +31,7 @@ vj_effect *lumakeyalpha_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;	/* type */
-    ve->limits[1][0] = 8;
+    ve->limits[1][0] = 7;
     ve->limits[0][1] = 0;	/* opacity */
     ve->limits[1][1] = 255;
     ve->defaults[0] = 0;

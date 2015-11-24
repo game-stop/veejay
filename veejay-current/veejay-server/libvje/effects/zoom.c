@@ -57,6 +57,12 @@ vj_effect *zoom_init(int width , int height)
     ve->extra_frame = 0;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Width", "Height", "Factor", "Mode", "Update Alpha" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, 3, ve->limits[1][3], "Forward", "Reverse" );
+
+
     return ve;
 }
 static int zoom_[4] = { 0,0,0,0 };

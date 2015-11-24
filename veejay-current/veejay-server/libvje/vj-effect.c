@@ -894,6 +894,29 @@ int vj_effect_get_help(int entry)
 	return 0;
 }
 
+
+static int	vj_effect_get_hints_length( vj_effect *fx, int p, int limit )
+{
+	if( fx->hints == NULL )
+		return 0;
+
+	if( fx->hints[p] == NULL )
+		return 0;
+
+	if( fx->hints[p]->description == NULL )
+		return 0;
+
+	int len = 0;
+	int i;
+	
+	for( i = 0; i <= limit; i ++ ) {
+		len += strlen(fx->hints[p]->description[i]);
+		len += 3;
+	}
+
+	return len;
+}
+
 int vj_effect_get_summary_len(int entry)
 {
 	if( !vj_effects[entry] )
@@ -911,7 +934,10 @@ int vj_effect_get_summary_len(int entry)
 	int i;
 	for( i = 0; i < p; i ++ )
 		len += (strlen(vj_effects[entry]->param_description[i])+3);
-	
+
+	for( i = 0; i < p; i ++ ) {
+		len += vj_effect_get_hints_length( vj_effects[entry], i, vj_effects[entry]->limits[1][i] ) + 3;	
+	}
 
 	return len;
 }
@@ -922,7 +948,7 @@ int vj_effect_get_summary(int entry, char *dst)
 		return 0;
 
 	int p = vj_effects[entry]->num_params;
-	int i;		
+	int i,j;		
 	char tmp[4096];
 
 	sprintf(dst,"%03zu%s%03d%1d%1d%02d",
@@ -946,6 +972,30 @@ int vj_effect_get_summary(int entry, char *dst)
 		);
 		strncat( dst, tmp,strlen(tmp) );
 	}
+
+	for(i=0; i < p; i ++ )
+	{
+		int limit = vj_effects[entry]->limits[1][i];
+		int vlen = vj_effect_get_hints_length( vj_effects[entry], i, limit );
+		
+		snprintf(tmp,sizeof(tmp),
+				"%03d",
+				vlen );
+		
+		strncat( dst, tmp, strlen(tmp) );
+		
+		if( vlen == 0 )
+			continue;
+
+		for( j = 0; j <= limit; j ++ ) {
+			snprintf(tmp,sizeof(tmp),
+				"%03d%s",
+				strlen( vj_effects[entry]->hints[i]->description[j] ),
+				vj_effects[entry]->hints[i]->description[j] );
+			strncat( dst,tmp,strlen(tmp));
+		}
+	}
+
 	return 1;
 }
 

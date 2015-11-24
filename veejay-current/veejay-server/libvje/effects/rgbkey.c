@@ -72,10 +72,10 @@ vj_effect *rgbkey_init(int w,int h)
     ve->limits[0][7] = 0;
     ve->limits[1][7] = 4; 
 
-
-
 	ve->param_description = vje_build_param_list(ve->num_params, 
 			"Tolerance Near", "Red", "Green", "Blue", "Tolerance Far","Level Min", "Level Max", "Alpha-IN operator");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	ve->has_user = 0;
     ve->description = "Chroma Key (RGB)";
@@ -83,6 +83,9 @@ vj_effect *rgbkey_init(int w,int h)
     ve->sub_format = 1;
 	ve->rgb_conv = 1;
     ve->parallel = 0;
+
+	vje_build_value_hint_list( ve->hints, 7, ve->limits[1][7], "Ignore Alpha-IN", "Alpha-IN A", "Alpha-IN A or B", "Alpha-In A and B", "Alpha-IN B" );
+
 	return ve;
 }
 
