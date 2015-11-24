@@ -133,6 +133,7 @@ enum {
 };
 
 #define FX_PARAMETER_DEFAULT_NAME "<none>"
+#define FX_PARAMETER_VALUE_DEFAULT_HINT ""
 
 enum
 {
@@ -619,8 +620,7 @@ static gchar	*recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1)
 static  GdkPixbuf *	update_pixmap_kf( int status );
 static  GdkPixbuf *	update_pixmap_entry( int status );
 static gboolean
-chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
-             gpointer data);
+chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,gpointer data);
 int	resize_primary_ratio_y();
 int	resize_primary_ratio_x();
 static	void	update_rgbkey();
@@ -1082,11 +1082,16 @@ typedef struct
 } el_constr;
 
 typedef struct {
+	char **description;
+} value_hint;
+
+typedef struct {
 	int defaults[SAMPLE_MAX_PARAMETERS];
 	int min[SAMPLE_MAX_PARAMETERS];
 	int max[SAMPLE_MAX_PARAMETERS];
 	char description[150];
 	char *param_description[SAMPLE_MAX_PARAMETERS];
+	value_hint *hints[SAMPLE_MAX_PARAMETERS];
 	int  id;
 	int  is_video;
 	int num_arg;
@@ -1198,6 +1203,27 @@ char *_effect_get_description(int effect_id)
 		}
 	}
 	return FX_PARAMETER_DEFAULT_NAME;
+}
+
+char *_effect_get_hint(int effect_id, int p, int v)
+{
+	int n = g_list_length( info->effect_info );
+	int i;
+	for(i = 0;i <= n ; i++)
+	{	
+		effect_constr *ec = g_list_nth_data(info->effect_info, i);
+		if(ec == NULL)
+			continue;
+
+		if(effect_id == ec->id )
+		{
+			if( ec->hints[p] == NULL)
+				break;
+
+			return ec->hints[p]->description[v];
+		}
+	}
+	return FX_PARAMETER_VALUE_DEFAULT_HINT;
 }
 
 el_constr *_el_entry_new( int pos, char *file, int nf , char *fourcc)
@@ -1347,7 +1373,7 @@ effect_constr* _effect_new( char *effect_line )
 {
 	effect_constr *ec;
 	int descr_len = 0;
-	int p;
+	int p,q;
 	char len[4];
 	//char line[100];
 	int offset = 0;
@@ -1379,6 +1405,39 @@ effect_constr* _effect_new( char *effect_line )
 		offset += 3;
 		offset += len;
 		offset+=18; 
+	}
+	
+	for(p=0; p < ec->num_arg; p++)
+	{
+		int len = 0;
+		int hint_len = 0;
+		int n = sscanf( effect_line + offset, "%03d", &hint_len );
+		if( n <= 0 ) {
+			veejay_msg(0,"Parse error in FX list hints");
+			break;
+		}
+		
+		offset += 3;
+			
+		if(hint_len == 0)
+			continue;
+			
+		ec->hints[p] = (value_hint*) vj_calloc(sizeof(value_hint));
+		ec->hints[p]->description = (char**) vj_malloc(sizeof(char*) * ec->max[p] );
+		for(q = 0; q <= ec->max[p]; q ++ ) {
+			int value_hint = 0;
+			n = sscanf( effect_line + offset, "%03d", &value_hint );
+			if( n != 1) {
+				veejay_msg(0,"Parse error in FX list value hint");
+				break;
+			}
+
+			offset += 3;
+
+			ec->hints[p]->description[q] = (char*) vj_calloc(sizeof(char) * value_hint + 1 );
+			strncpy( ec->hints[p]->description[q], effect_line + offset, value_hint );
+			offset += value_hint;
+		}
 	}
 
 	return ec;
@@ -2982,6 +3041,8 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			info->uc.selected_chain_entry = 0;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
 		load_parameter_info();
+		if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] )
+			update_label_str( "value_friendlyname",FX_PARAMETER_VALUE_DEFAULT_HINT );
 		fx_anim = 1;
 	}
 
@@ -3687,6 +3748,7 @@ static	void	load_effectchain_info()
 	gchar *fxtext = recv_vims(3,&fxlen);
 
 	reset_tree( "tree_chain" );
+	update_label_str( "value_friendlyname",FX_PARAMETER_VALUE_DEFAULT_HINT );
 
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	store = GTK_LIST_STORE(model);
@@ -3827,7 +3889,8 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 			char trip[100];
 			snprintf(trip,sizeof(trip), "%03d:%d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid );
 			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
-
+			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
+	
 		}
 		g_free(name);
 	}
@@ -6335,6 +6398,7 @@ static void	process_reload_hints(int *history, int pm)
 			disable_widget( "frame_fxtree4" );
 			disable_widget( "tree_sources");
 			disable_widget( "rgbkey");
+			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 		}
 		else
 		{
@@ -6383,9 +6447,7 @@ static void	process_reload_hints(int *history, int pm)
 		GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
 				info->main_window, "tree_chain") ));
 
-  		gtk_tree_model_foreach(
-                       	model,
-			chain_update_row, (gpointer*) info );
+  		gtk_tree_model_foreach( model, chain_update_row, (gpointer*) info );
 	}
 	info->parameter_lock = 0;
 
@@ -7252,7 +7314,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	sleep(1); //@ give it some time to settle ( at least 1 frame period )
 
 	info->status_lock = 1;
-	
+	info->parameter_lock = 1;
+
 	single_vims( VIMS_PROMOTION );
 	
 	load_editlist_info();
@@ -7282,6 +7345,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	update_label_i( "label_portx",port_num,0);
 
 	info->status_lock = 0;
+	info->parameter_lock = 0;
 
 	multitrack_configure( info->mt,
 			      info->el.fps, info->el.width, info->el.height, &preview_box_w_, &preview_box_h_ );

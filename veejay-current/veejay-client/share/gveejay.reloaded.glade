@@ -1600,9 +1600,6 @@
                                   </packing>
                                 </child>
                                 <child>
-                                  <placeholder/>
-                                </child>
-                                <child>
                                   <widget class="GtkSpinButton" id="button_fx_entry">
                                     <property name="width_request">36</property>
                                     <property name="visible">True</property>
@@ -1618,7 +1615,7 @@
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">True</property>
-                                    <property name="position">2</property>
+                                    <property name="position">1</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -1630,6 +1627,19 @@
                                     <property name="secondary_icon_activatable">False</property>
                                     <property name="primary_icon_sensitive">True</property>
                                     <property name="secondary_icon_sensitive">True</property>
+                                  </widget>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <widget class="GtkLabel" id="value_friendlyname">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="xalign">0.1</property>
+                                    <property name="width_chars">20</property>
                                   </widget>
                                   <packing>
                                     <property name="expand">True</property>
@@ -12604,6 +12614,18 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
