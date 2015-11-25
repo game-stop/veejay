@@ -53,7 +53,7 @@ vj_effect *lumamagick_init(int width, int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Opacity A", "Opacity B" );
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, 0, ve->limits[1][0],
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
 		"Difference","Difference Negate","Exclusive","Base","Freeze",
 		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",

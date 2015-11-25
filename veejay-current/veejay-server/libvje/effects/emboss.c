@@ -39,6 +39,14 @@ vj_effect *emboss_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params,"Mode" );
+
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+			"Blurry Dark", "Xtreme Emboss", "Lines White Balance", "Gray Emboss",
+		   "Aggressive Emboss", "Dark Emboss", "Grayish Emboss", "Edged", "Emboss Expi", "Another Expi"	);
+
     return ve;
 }
 

@@ -21,8 +21,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "lumablend.h"
+#include <libvje/vje.h>
 #include <veejay/vj-task.h>
+#include "common.h"
+#include "lumablend.h"
 
 vj_effect *lumablend_init(int w, int h)
 {
@@ -52,6 +54,11 @@ vj_effect *lumablend_init(int w, int h)
     ve->parallel = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Threshold A", "Threshold B", "Opacity" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		   "Inclusive", "Exclusive","Blurred" );	
 
     return ve;
 }

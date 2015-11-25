@@ -45,7 +45,7 @@ char	**vje_build_param_list( int num, ... )
 	return list;
 }
 
-void vje_build_value_hint_list( vj_value_hint_t **hints, int num, int limit, ... )
+void vje_build_value_hint_list( vj_value_hint_t **hints, int limit, int num, ... )
 {
 	va_list args;
 	char *tmp = NULL;

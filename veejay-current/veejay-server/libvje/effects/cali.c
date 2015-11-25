@@ -61,16 +61,12 @@ vj_effect *cali_init(int width, int height)
 
     ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Subtract Dark Current Only" );
 
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, "Dark Frame", "Light Frame", "Calibrated Frame", "Normal" );
+
     return ve;
 }
-
-
-
-void	cali_destroy(void)
-{
-	
-}
-
 
 #define ru8(num)(((num)+8)&~8)
 

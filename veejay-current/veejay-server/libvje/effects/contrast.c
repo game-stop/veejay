@@ -46,6 +46,12 @@ vj_effect *contrast_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = -1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Luma", "Chroma" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+			"Luma Only", "Chroma Only" ,"All Channels" );
+
     return ve;
 }
 

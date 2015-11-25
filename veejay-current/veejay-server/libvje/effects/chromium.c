@@ -42,6 +42,13 @@ vj_effect *chromium_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Chroma Blue", "Chroma Red", "Chroma Red and Blue", "Chroma Swap"
+	);	
+
     return ve;
 }
 

@@ -43,6 +43,12 @@ vj_effect *killchroma_init(int w, int h)
     ve->extra_frame = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode" );
 	ve->parallel = 1;
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		   "All Channels", "Chroma Blue", "Chroma Red" );
+
     return ve;
 }
 
@@ -59,4 +65,3 @@ void killchroma_apply(VJFrame *frame, int width, int height, int n)
 		veejay_memset( frame->data[n], 128, (frame->ssm ? frame->len : frame->uv_len ) );
 	}
 }
-void killchroma_free(){}

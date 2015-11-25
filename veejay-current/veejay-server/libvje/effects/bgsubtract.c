@@ -52,6 +52,12 @@ vj_effect *bgsubtract_init(int width, int height)
     ve->has_user = 1;
     ve->user_data = NULL;
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "To Alpha");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,"Preview", "Inverted preview", "Normal" );
+
+
     return ve;
 }
 

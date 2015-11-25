@@ -52,14 +52,20 @@ vj_effect *colorhis_init(int w, int h)
     ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->has_user = 0;
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Red Channel", "Green Channel", "Blue Channel", "All Channels"
+	);	
     return ve;
 }
 
 static void	*histogram_ = NULL;
-static	VJFrame *rgb_frame_ = NULL;
-static uint8_t  *rgb_ = NULL;
-static	void	*convert_yuv = NULL;
-static  void 	*convert_rgb = NULL;
+static VJFrame *rgb_frame_ = NULL;
+static uint8_t *rgb_ = NULL;
+static void *convert_yuv = NULL;
+static void *convert_rgb = NULL;
 
 int	colorhis_malloc(int w, int h)
 {
@@ -69,8 +75,11 @@ int	colorhis_malloc(int w, int h)
 		free(rgb_);
 	histogram_ = veejay_histogram_new();
 	rgb_ = vj_malloc(sizeof(uint8_t) * w * h * 3 );
+	if(rgb_ == NULL )
+		return 0;
 	rgb_frame_ = yuv_rgb_template( rgb_, w, h, PIX_FMT_RGB24 );
-
+	if(rgb_frame_ == NULL)
+		return 0;
 
 	return 1;
 }
@@ -94,7 +103,6 @@ void	colorhis_free()
 
 	convert_rgb = NULL;
 	convert_yuv = NULL;
-
 }
 
 
@@ -106,8 +114,6 @@ void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, in
 		convert_yuv = yuv_fx_context_create( frame, rgb_frame_, src_fmt, PIX_FMT_RGB24 );
 
 	yuv_fx_context_process( convert_yuv, frame, rgb_frame_ );
-
-	//yuv_convert_any_ac( frame, rgb_frame_, src_fmt, PIX_FMT_RGB24 );
 
 	if( val == 0 )
 	{
@@ -121,8 +127,6 @@ void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, in
 		if(!convert_rgb )
 			convert_rgb = yuv_fx_context_create( rgb_frame_, frame, PIX_FMT_RGB24, src_fmt );
 		yuv_fx_context_process( convert_rgb, rgb_frame_, frame );
-	
-//		yuv_convert_any_ac( rgb_frame_, frame, PIX_FMT_RGB24, src_fmt );
 	}	
 }
 

@@ -727,7 +727,6 @@ void vj_effect_shutdown() {
 //    contourextract_destroy();
     rotozoom_destroy();
     distortion_destroy();
-    cali_destroy();
     plug_sys_free();
 }
 
@@ -989,7 +988,7 @@ int vj_effect_get_summary(int entry, char *dst)
 
 		for( j = 0; j <= limit; j ++ ) {
 			snprintf(tmp,sizeof(tmp),
-				"%03d%s",
+				"%03zu%s",
 				strlen( vj_effects[entry]->hints[i]->description[j] ),
 				vj_effects[entry]->hints[i]->description[j] );
 			strncat( dst,tmp,strlen(tmp));

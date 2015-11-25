@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "noiseadd.h"
+#include "common.h"
 
 static uint8_t *Yb_frame;
 
@@ -45,6 +46,13 @@ vj_effect *noiseadd_init(int width , int height)
     ve->sub_format = -1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Amplification");
+
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"1x3 Mask", "3x3 Mask" ,"3x3 Inverted Mask" );
+
     return ve;
 }
 

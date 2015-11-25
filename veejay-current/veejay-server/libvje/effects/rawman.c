@@ -20,8 +20,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
+#include "common.h"
 #include "rawman.h"
-#include <stdlib.h>
 vj_effect *rawman_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -42,6 +42,12 @@ vj_effect *rawman_init(int w,int h)
 	ve->has_user = 0;
     ve->extra_frame = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
+		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight");
+
     return ve;
 }
 

@@ -1388,6 +1388,7 @@ effect_constr* _effect_new( char *effect_line )
 
 	ec = vj_calloc( sizeof(effect_constr));
 	strncpy( ec->description, effect_line+3, descr_len );
+
 	sscanf(effect_line+(descr_len+3), "%03d%1d%1d%02d", &(ec->id),&(ec->is_video),&(ec->has_rgb), &(ec->num_arg));
 	offset = descr_len + 10;
 	for(p=0; p < ec->num_arg; p++)
@@ -1423,7 +1424,7 @@ effect_constr* _effect_new( char *effect_line )
 			continue;
 			
 		ec->hints[p] = (value_hint*) vj_calloc(sizeof(value_hint));
-		ec->hints[p]->description = (char**) vj_malloc(sizeof(char*) * ec->max[p] );
+		ec->hints[p]->description = (char**) vj_calloc(sizeof(char*) * (ec->max[p]+1) );
 		for(q = 0; q <= ec->max[p]; q ++ ) {
 			int value_hint = 0;
 			n = sscanf( effect_line + offset, "%03d", &value_hint );
@@ -4277,6 +4278,7 @@ void	load_effectlist_info()
 			effect_constr *ec;
 			veejay_memset( line,0,sizeof(line));
 			strncpy( line, fxtext + offset, len );
+			
 			ec = _effect_new(line);
 			if(ec) info->effect_info = g_list_append( info->effect_info, ec );
 		}

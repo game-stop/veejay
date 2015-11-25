@@ -44,7 +44,7 @@ vj_effect *chromascratcher_init(int w, int h)
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 25;
+    ve->limits[1][2] = 26;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
 
@@ -56,9 +56,20 @@ vj_effect *chromascratcher_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user =0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Value", "Length", "Pingpong" );
+	ve->param_description = vje_build_param_list(ve->num_params, "Length", "Value", "Mode", "Pingpong" );
 
-      return ve;
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, 
+		"Add Subselect Luma", "Select Min", "Select Max", "Select Difference",
+		"Select Difference Negate", "Add Luma", "Select Unfreeze", "Exclusive",
+		"Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
+		"Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
+		"Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
+		"Darken", "Lighten", "Modulo Add" 
+	);
+    
+	return ve;
 }
 
 int	chromascratcher_malloc(int w, int h)

@@ -49,7 +49,7 @@ vj_effect *overlayalphamagic_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, 0, ve->limits[1][0],
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
 		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
 		"Difference","Difference Negate","Exclusive","Base","Freeze",
 		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",
@@ -87,7 +87,6 @@ void _overlayalphamagic_add_distorted(VJFrame *frame, VJFrame *frame2,int width,
     unsigned int i;
     uint8_t y1, y2;
     unsigned int len = width * height;
-    int uv_len = frame->uv_len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 

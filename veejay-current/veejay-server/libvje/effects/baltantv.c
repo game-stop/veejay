@@ -47,6 +47,13 @@ vj_effect *baltantv_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Stride", "Mode" );
+
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1, "Decaying", "Normal" );
+
+
     return ve;
 }
 

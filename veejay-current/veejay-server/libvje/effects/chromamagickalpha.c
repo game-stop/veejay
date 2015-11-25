@@ -51,7 +51,18 @@ vj_effect *chromamagickalpha_init(int w, int h)
     ve->sub_format = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
-    return ve;
+    
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, 
+		"Add Subselect Luma", "Select Min", "Select Max", "Select Difference",
+		"Select Difference Negate", "Add Luma", "Select Unfreeze", "Exclusive",
+		"Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
+		"Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
+		"Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
+		"Darken", "Lighten", "Modulo Add" 
+	);
+	return ve;
 }
 
 void chromamagicalpha_selectmin(VJFrame *frame, VJFrame *frame2, int width,

@@ -28,8 +28,8 @@
 #include "common.h"
 
 /* blend by blurred mask.
-	derived from radial blur and chromamagick effect.
-
+   derived from radial blur and chromamagick effect.
+   FIXME: add remaining blend modes from chromamagick effect
  */
 
 vj_effect *flare_init(int w, int h)
@@ -53,6 +53,12 @@ vj_effect *flare_init(int w, int h)
 	ve->sub_format = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params , "Mode", "Opacity", "Radius" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints,ve->limits[1][0],0, "Simple", "Exclusive", "Additive", "Unfreeze",
+		   "Darken", "Lighten" );
+
 	return ve;
 }
 
@@ -282,13 +288,16 @@ void flare_apply(VJFrame *A,
 	{
 		for( y = 0; y < height; y ++ ) 
 			blur2( A->data[plane] + (y * width),
-				      B.data[plane] + (y * width),
+				   B.data[plane] + (y * width),
 					width,
 					radius,
 					2,
 					1,	
 					1 );
+	}
 
+	for( plane = 0; plane <2; plane ++ )
+	{
 		for( x = 0; x < width; x ++ )
 			blur2( A->data[plane] + x ,
 				B.data[plane] + x,
@@ -302,21 +311,21 @@ void flare_apply(VJFrame *A,
 	/* overlay original on top of blurred image */
 	switch( type )
 	{
-    		case 1:
+    	case 1:
 			flare_exclusive(A,&B,width,height,op_a);
-		break;
+			break;
 		case  2:
 			flare_additive(A,&B,width,height,op_a);	
-		break;
+			break;
 		case  3:
 			flare_unfreeze(A,&B,width,height,op_a);
-		break;
+			break;
 		case  4:
 			flare_darken(A,&B,width,height,op_a);
-		break;
+			break;
 		case 5:
 			flare_lighten( A, &B, width, height, op_a );
-		break;
+			break;
 
 		default:
 			flare_simple( A, &B, width,height, op_a );

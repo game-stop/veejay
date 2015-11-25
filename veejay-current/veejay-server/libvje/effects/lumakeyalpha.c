@@ -43,6 +43,12 @@ vj_effect *lumakeyalpha_init(int width, int height)
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Selector Mode", "Opacity" );
 
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
+		"Alpha-IN (premul B)", "Alpha-IN A (premul B)", "Alpha-IN A or B (premul B)", "Alpha-IN A and B (premul B)",
+		"Alpha-IN B (premul A)","Alpha-IN A (premul A)", "Alpha-IN A or B (premul A)", "Alpha-IN A and B (premul B)" );
+
     return ve;
 }
 

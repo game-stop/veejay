@@ -46,7 +46,7 @@ vj_effect *overlaymagicalpha_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Keep or clear chroma" );
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, 0, ve->limits[1][0],
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
 		"Difference","Difference Negate","Exclusive","Base","Freeze",
 		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",
@@ -92,7 +92,6 @@ void _overlaymagicalpha_add_distorted(VJFrame *frame, VJFrame *frame2,
     unsigned int i;
     uint8_t y1, y2;
     unsigned int len = width * height;
-    int uv_len = frame->uv_len;
     uint8_t *Y = frame->data[0];
     uint8_t *Y2 = frame2->data[0];
 	uint8_t *aA = frame->data[3];

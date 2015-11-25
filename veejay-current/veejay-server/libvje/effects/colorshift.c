@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "colorshift.h"
+#include "common.h"
 
 vj_effect *colorshift_init(int w, int h)
 {
@@ -43,6 +44,15 @@ vj_effect *colorshift_init(int w, int h)
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
 	ve->parallel = 1;
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Luma (OR)", "Chroma Blue (OR)", "Chroma Red (OR)", "Chroma Blue and Red (OR)",
+		"All Channels (OR)", "All Channels (AND)", "Luma (AND)", "Chroma Blue (AND)",
+		"Chroma Red (AND)", "Chroma Blue and Red (AND)"
+	);	
+
     return ve;
 }
 
@@ -217,4 +227,3 @@ void colorshift_apply(VJFrame *frame, int width, int height, int type,
 	break;
     }
 }
-void colorshift_free(){}

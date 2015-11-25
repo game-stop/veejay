@@ -54,7 +54,7 @@ vj_effect *porterduff_init(int w,int h)
 	ve->rgba_only = 1;
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, 0, ve->limits[1][0], 
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, 
 		"Dest", "Dest Atop", "Dest In", "Dest Over", "Dest Out", "Src Over", "Src Atop", "Src In", "Src Out", "SVG Multiply", "XOR", "ADD", "SUBTRACT", "DIVIDE" );
 
 	return ve;

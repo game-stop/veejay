@@ -60,7 +60,7 @@ vj_effect *zoom_init(int width , int height)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, 3, ve->limits[1][3], "Forward", "Reverse" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3, "Forward", "Reverse" );
 
 
     return ve;

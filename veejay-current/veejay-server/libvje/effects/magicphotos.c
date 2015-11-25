@@ -43,6 +43,13 @@ vj_effect *photoplay_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Photos", "Waterfall", "Mode" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2,
+			"Random", "LR TB", "LB TR", "BL TR", "BR TL", "LB RT", "TL BR", "TL RB", "BL RT" ); // FIXME naming or can we use arrow symbols?
+
+
     return ve;
 }
 
@@ -200,7 +207,6 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 		}
 	}
 
-
 	if(frame_counter < num_photos)
 	{
 		for( i = 0; i < 3 ; i ++ )
@@ -221,7 +227,6 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 		put_photo( dstU, photo_list[i]->data[1],width,height,i, m);
 		put_photo( dstV, photo_list[i]->data[2],width,height,i, m);
 	}
-
 
 	frame_counter ++;
 }

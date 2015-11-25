@@ -40,6 +40,14 @@ vj_effect *binaryoverlay_init(int w, int h)
     ve->sub_format = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,"Not A and not B",
+		   "Not A or not B", "Not A xor not B", "A and not B", "A or not B",
+	   "A xor not B", "A and not B", "A or not B", "A or B" , "A and B", "A xor B"   );
+
+
     return ve;
 }
 
@@ -315,4 +323,3 @@ void binaryoverlay_apply( VJFrame *frame, VJFrame *frame2, int w, int h, int mod
 	}
 }
 
-void binaryoverlay_free() {}

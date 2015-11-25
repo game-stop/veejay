@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "dither.h"
+#include "common.h"
+
 vj_effect *dither_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -42,9 +44,13 @@ vj_effect *dither_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Value", "Mode" );
+    
+	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-    return ve;
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1, "Static", "Random" );
+	
+	return ve;
 }
 
 static int last_size = 0;
@@ -75,4 +81,3 @@ void dither_apply(VJFrame *frame, int width, int height, int size, int random_on
 		}
     }
 }
-void dither_free(){}

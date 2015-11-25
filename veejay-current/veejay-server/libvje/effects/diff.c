@@ -66,8 +66,11 @@ vj_effect *diff_init(int width, int height)
     ve->has_user = 1;
     ve->user_data = NULL;
 
-
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show mask/image", "Thinning" );
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, 
+		"Show Difference", "Show Distance Map", "Normal" );
 
     return ve;
 }

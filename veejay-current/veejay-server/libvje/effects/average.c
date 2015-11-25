@@ -51,7 +51,7 @@ vj_effect *average_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, 1, ve->limits[1][1], "Running Average", "Average" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1, "Running Average", "Average" );
 
 
 

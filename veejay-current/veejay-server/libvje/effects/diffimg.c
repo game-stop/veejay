@@ -30,7 +30,7 @@ vj_effect *diffimg_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->defaults[0] = 6;/* type */
+    ve->defaults[0] = 6;	/* type */
     ve->defaults[1] = 15;	/* min */
     ve->defaults[2] = 240;	/* max */
 
@@ -47,6 +47,7 @@ vj_effect *diffimg_init(int width, int height)
     ve->sub_format = -1;
 	ve->has_user = 0;
 	ve->parallel = 0;
+
     return ve;
 }
 

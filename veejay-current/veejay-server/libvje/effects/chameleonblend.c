@@ -46,6 +46,10 @@ vj_effect *chameleonblend_init(int w, int h)
     ve->extra_frame = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Mode (Appear,Dissapear)" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,"Appearing", "Dissapearing" );
     return ve;
 }
 
@@ -53,12 +57,12 @@ static int last_mode_  = -1;
 static int N__ = 0;
 static int n__ = 0;
 
-static	int	has_bg = 0;
-static int32_t	*sum = NULL;
-static uint8_t		*timebuffer = NULL;
-static uint8_t		*tmpimage[4] = { NULL,NULL,NULL, NULL};
-static	int	plane = 0;
-static uint8_t		*bgimage[4] = { NULL,NULL,NULL, NULL};
+static int has_bg = 0;
+static int32_t *sum = NULL;
+static uint8_t *timebuffer = NULL;
+static uint8_t *tmpimage[4] = { NULL,NULL,NULL, NULL};
+static int plane = 0;
+static uint8_t *bgimage[4] = { NULL,NULL,NULL, NULL};
 
 #define PLANES_DEPTH 6
 #define	PLANES (1<< PLANES_DEPTH)
@@ -150,15 +154,17 @@ static void drawAppearing(VJFrame *src, VJFrame *dest)
 	uint8_t *U1 = dest->data[1];
 	uint8_t *V1 = dest->data[2];
 
-        s = sum;
+    s = sum;
 	uint8_t a,b,c;
-        for(i=0; i<video_area; i++) {
-                Y = lum[i];
-                *s -= *p;
-                *s += Y;
-                *p = Y;
-                Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
-                if(Y>255) Y = 255;
+    
+	for(i=0; i<video_area; i++) {
+		Y = lum[i];
+        *s -= *p;
+        *s += Y;
+        *p = Y;
+        Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
+        if(Y>255) Y = 255;
+		
 		a = lum[i];
 		b = u0[i]; 
 		c = v0[i];
@@ -168,19 +174,19 @@ static void drawAppearing(VJFrame *src, VJFrame *dest)
 		U1[i] = b;
 		c += (( qv[i] - c ) * Y )>>8;
 		V1[i] = c;
-                p++;
-                s++;
-        }
-        plane++;
-        plane = plane & (PLANES-1);
+        p++;
+        s++;
+    }
+    plane++;
+    plane = plane & (PLANES-1);
 }
 
 
 static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 {
-        int i;
-        unsigned int Y;
-        uint8_t *p, *qu, *qv, *qy;
+    unsigned int i;
+    unsigned int Y;
+    uint8_t *p, *qu, *qv, *qy;
 	int32_t *s;
 	const int video_area = src->len;
 
@@ -191,11 +197,11 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 	uint8_t *u0  = src->data[1];
 	uint8_t *v0  = src->data[2];
 
-        p = timebuffer + (plane * video_area);
-        qy = bgimage[0];
-	qu= bgimage[1];
-	qv= bgimage[2];
-        s = sum;
+    p = timebuffer + (plane * video_area);
+    qy = bgimage[0];
+	qu = bgimage[1];
+	qv = bgimage[2];
+    s = sum;
 
 	uint8_t a,b,c,A,B,C;
 

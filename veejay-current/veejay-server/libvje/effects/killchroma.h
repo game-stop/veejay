@@ -25,8 +25,5 @@
 #include <stdint.h>
 
 vj_effect *killchroma_init();
-
 void killchroma_apply( VJFrame *v, int width, int height, int n);
-
-void killchroma_free();
 #endif

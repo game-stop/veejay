@@ -84,7 +84,7 @@ vj_effect *rgbkey_init(int w,int h)
 	ve->rgb_conv = 1;
     ve->parallel = 0;
 
-	vje_build_value_hint_list( ve->hints, 7, ve->limits[1][7], "Ignore Alpha-IN", "Alpha-IN A", "Alpha-IN A or B", "Alpha-In A and B", "Alpha-IN B" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][7],7, "Ignore Alpha-IN", "Alpha-IN A", "Alpha-IN A or B", "Alpha-In A and B", "Alpha-IN B" );
 
 	return ve;
 }
