@@ -1543,7 +1543,7 @@ static inline void vj_frame_slow1( uint8_t *dst, uint8_t *a, uint8_t *b, const i
 static void	vj_frame_slow_job( void *arg )
 {
 	vj_task_arg_t *job = (vj_task_arg_t*) arg;
-	int i,j;
+	unsigned int i;
 	uint8_t **img = job->output;
 	uint8_t **p0_buffer = job->input;
 	uint8_t **p1_buffer = job->temp;
@@ -1661,7 +1661,7 @@ static unsigned long benchmark_single_slow(long c, int n_tasks, uint8_t **source
 		stats[k] = t;
 	}
 
-	uint64_t sum = 0,j;
+	uint64_t sum = 0;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
@@ -1688,7 +1688,7 @@ static unsigned long benchmark_threaded_slow(long c, int n_tasks, uint8_t **sour
 		stats[k] = t;
 	}
 
-	uint64_t sum = 0,j;
+	uint64_t sum = 0;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
@@ -1715,7 +1715,7 @@ static unsigned long benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest
 		stats[k] = t;
 	}
 
-	uint64_t sum = 0,j;
+	uint64_t sum = 0;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
@@ -1799,7 +1799,6 @@ void benchmark_tasks(int n_tasks, long n_frames, int w, int h)
 	uint8_t *dst = (uint8_t*) vj_malloc(sizeof(uint8_t) * total );
 
 	int planes[4] = { len, uv_len, uv_len , 0 };
-	int i;
 	uint8_t *source[4] = { src, src + len, src + len + uv_len, NULL };
 	uint8_t *dest[4] = { dst,dst + len, dst + len + uv_len, NULL};
 
