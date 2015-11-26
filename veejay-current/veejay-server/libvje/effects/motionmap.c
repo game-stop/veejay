@@ -150,7 +150,6 @@ void		motionmap_free(void)
 
 static	void	update_bgmask( uint8_t *dst,uint8_t *in, uint8_t *src, int len, int threshold )
 {
-	int i;
 	vje_diff_plane( in, src, dst, threshold, len );
 }
 
@@ -274,7 +273,7 @@ static int stop_capture_ = 0;
 static int reaction_ready_ = 0;
 void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int reverse, int draw, int history, int capbuf )
 {
-	unsigned int i,y;
+	unsigned int i;
 	int len = (width * height);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

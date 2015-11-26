@@ -292,7 +292,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 			break;
 		case 2:
 			for( y = 0; y < len; y ++ ){
-				diff[y] = ( prev[y] >> 1 ) + lum[y] >> 1;
+				diff[y] = ( prev[y] >> 1 ) + (lum[y] >> 1);
 				if( diff[y] < threshold )
 					diff[y] = 0;
 				prev[y] = lum[y];

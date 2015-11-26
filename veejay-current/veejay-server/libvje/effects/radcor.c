@@ -97,8 +97,6 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	uint8_t *A = frame->data[3];
-	pixel_t csum,c;
-	int aa = 1;
 	int nx = width;
 	int ny = height;
 	int nxout = nx;

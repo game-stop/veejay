@@ -100,8 +100,7 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
     uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
-
+    int kfgy_scale;
     int cb, cr;
     int kbg, x1, y1;
     float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;

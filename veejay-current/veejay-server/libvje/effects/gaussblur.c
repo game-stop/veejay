@@ -161,7 +161,6 @@ static void gaussblur(uint8_t *dst, const int dst_linesize,const uint8_t *src, c
 
 void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality )
 {
-	unsigned int pos;
 	uint8_t *A = frame->data[3];
 	const unsigned int len = frame->len;  
 

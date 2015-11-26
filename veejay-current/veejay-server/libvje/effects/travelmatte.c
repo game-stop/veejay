@@ -57,7 +57,6 @@ void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int width, int height, 
 	uint8_t *o0 = frame->data[0];
 	uint8_t *o1 = frame->data[1];
 	uint8_t *o2 = frame->data[2];
-	uint8_t *dA = frame->data[3];
 
 	uint8_t *b0 = frame2->data[0];
 	uint8_t *b1 = frame2->data[1];

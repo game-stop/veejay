@@ -70,10 +70,6 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 
 	num_photos = film_length;
 
-	uint8_t val = 0;
-//	int inc = num_photos % 255;
-
-
 	for ( i = 0; i < num_photos; i ++ )
 	{
 		photo_list[i] = vj_malloc(sizeof(picture_t));
@@ -88,7 +84,6 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 				return 0;
 			veejay_memset(photo_list[i]->data[j], (j==0 ? pixel_Y_lo_ : 128), picture_width *picture_height );
 		}
-	//	val+= inc;
 	}
 	frame_counter = 0;
 

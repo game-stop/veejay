@@ -96,7 +96,7 @@ void alphaselect2_apply( VJFrame *frame, int width,
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	uint8_t *A  = frame->data[3];
-	int cb,cr,iy,iu,iv;
+	int iy,iu,iv;
 	_rgb2yuv(r,g,b,iy,iu,iv);
 
 	const double dtola = tola * 0.1f;

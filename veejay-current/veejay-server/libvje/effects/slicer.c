@@ -30,10 +30,9 @@ static int *slice_yshift = NULL;
 
 static	void recalc(int w, int h , uint8_t *Yinp, int v1, int v2 )
 {
-  int x,y,dx,dy,r,p;
-  int l = w * h;
-  int valx = v1;//(w / 100.0) * v1;
-  int valy = v2;//(h / 100.0) * v1;
+  int x,y,dx,dy,r;
+  int valx = v1;
+  int valy = v2;
   for(x = dx = 0; x < w; x++) 
   {
 	if(dx==0)
@@ -55,7 +54,7 @@ static	void recalc(int w, int h , uint8_t *Yinp, int v1, int v2 )
 	{ 
 		uint8_t *Yin = Yinp + (y * w);
 		r = (rand() & valy)-((valy>>1)+1); 
-		dy = ( 8 + Yin[x] & ((valy>>1)-1) );
+		dy = 8 + ( Yin[x] & ((valy>>1)-1) );
 	} 
 	else 
 	{ 

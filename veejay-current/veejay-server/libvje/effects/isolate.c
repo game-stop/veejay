@@ -68,18 +68,13 @@ void isolate_apply( VJFrame *frame, int width,
 		   int b, int opacity)
 {
 
-    uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kg;
+	int8_t *fg_cb, *fg_cr;
+    int accept_angle_tg, accept_angle_ctg;
     int cb, cr;
     float kg1, tmp, aa = 255, bb = 255, _y = 0;
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     uint8_t val;
-    unsigned int op1 = (opacity > 255) ? 255: opacity;
-    unsigned int op0 = 255 - op1;
-
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -98,17 +93,10 @@ void isolate_apply( VJFrame *frame, int width,
     accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
  
     tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kg = kg1;
 
     /* intialize pointers */
-    fg_y = Y;
     fg_cb = Cb;
     fg_cr = Cr;
-
-    bg_y = Y;
-    bg_cb = Cb;
-    bg_cr = Cr;
 
     for (pos = (width * height); pos != 0; pos--) {
 		short xx, yy;

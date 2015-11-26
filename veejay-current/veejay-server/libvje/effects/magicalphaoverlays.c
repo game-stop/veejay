@@ -577,7 +577,7 @@ void _overlayalphamagic_addtest(VJFrame *frame, VJFrame *frame2, int width,int h
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
-		c = a + ((2 * b) - 255)>>1;
+		c = (a + ((2 * b) - 255))>>1;
 		A[i] = CLAMP_Y(c);
     }
 }

@@ -342,7 +342,7 @@ void boids_apply(VJFrame *frame,
 	uint8_t *srcY = frame->data[0];
 	uint8_t *srcCb= frame->data[1];
 	uint8_t *srcCr= frame->data[2];
-	int s,i,j,k;
+	int s,i,k;
 	const double M1 = ( (m1==0? 0.0 : m1/100.0) );
 	const double M2 = ( (m2==0? 0.0 : m2/100.0) );
 	const double M3 = ( (m3==0? 0.0 : m3/1000.0) );

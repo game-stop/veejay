@@ -103,8 +103,6 @@ void maskstop_apply( VJFrame *frame, int width, int height, int negmask, int swa
 	uint8_t *Udest  = frame->data[1];
 	uint8_t *Vdest  = frame->data[2];
 	
-	float val, valN;
-	
 	frq_frame = frq_frame + framefreq;
 	frq_mask = frq_mask + maskfreq;
 	

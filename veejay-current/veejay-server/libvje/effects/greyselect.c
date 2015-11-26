@@ -69,14 +69,12 @@ void greyselect_apply( VJFrame *frame, int width,
 {
 
     uint8_t *fg_cb, *fg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
+    int accept_angle_tg, accept_angle_ctg;
     int cb, cr;
     float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     uint8_t val;
-	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	int iy,iu,iv;
@@ -95,9 +93,6 @@ void greyselect_apply( VJFrame *frame, int width,
     accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
 	
     tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = (int)(15.0f * (float) (_y) / kg1);
-    kg = kg1;
 
     /* intialize pointers */
     fg_cb = Cb;

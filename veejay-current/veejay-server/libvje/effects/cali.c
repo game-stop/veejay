@@ -92,10 +92,9 @@ int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *d
 
 int cali_malloc(void **d, int width, int height)
 {
-	cali_data *my;
 	*d = (void*) vj_calloc(sizeof(cali_data));
-	my = (cali_data*) *d;
-	
+	if(*d==NULL)
+		return 0;
 	return 1;
 }
 

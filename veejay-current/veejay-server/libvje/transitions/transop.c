@@ -67,7 +67,6 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
 		   int width, int height, int opacity)
 {
 	int x, y;
-	unsigned int op0, op1;
   
 	uint8_t *dY = frame->data[0];
 	uint8_t *dCb = frame->data[1];
@@ -75,9 +74,6 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
 	uint8_t *sY = frame2->data[0];
 	uint8_t *sCb = frame2->data[1];
 	uint8_t *sCr = frame2->data[2];
-
-	op1 = (opacity > 255) ? 255 : opacity;
-	op0 = 255 - op1;
 
 	int view_width = twidth;
 	int view_height = theight;

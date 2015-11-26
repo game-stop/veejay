@@ -215,10 +215,6 @@ static void put_photo( uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h,
 	}
 }
 
-static	void	scale_photo(uint8_t *dst_plane, uint8_t *src_plane, int dst_w, int dst_h)
-{
-}
-
 void videowall_apply( VJFrame *frameA, VJFrame *frameB, int width, int height, int a,int b, int c, int d )
 {
 	unsigned int i;

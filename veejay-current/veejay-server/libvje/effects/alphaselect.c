@@ -77,10 +77,8 @@ void alphaselect_apply( VJFrame *frame, int width,
 		   int height, int i_angle, int r, int g,
 		   int b, int swap)
 {
-
-    uint8_t *fg_cb, *fg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
+    int8_t *fg_cb, *fg_cr;
+    int accept_angle_tg;
     int cb, cr;
     float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
     float angle = (float) i_angle / 100.0f;
@@ -104,12 +102,8 @@ void alphaselect_apply( VJFrame *frame, int width,
    
     /* obtain coordinate system for cb / cr */
     accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
 	
     tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = (int)(15.0f * (float) (_y) / kg1);
-    kg = kg1;
 
     /* intialize pointers */
     fg_cb = Cb;

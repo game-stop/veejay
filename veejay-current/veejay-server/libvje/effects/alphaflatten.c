@@ -39,19 +39,13 @@ vj_effect *alphaflatten_init(int w, int h)
 
 void alphaflatten_apply( VJFrame *frame, int width, int height)
 {
-    int i;
-    int len = frame->len;
-    int uv_len = frame->uv_len;
-
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-	uint8_t *a = frame->data[3];
+    unsigned int i;
+    const unsigned int len = frame->len;
 
 	uint8_t *o0 = frame->data[0];
 	uint8_t *o1 = frame->data[1];
 	uint8_t *o2 = frame->data[2];
-	uint8_t *dA = frame->data[3];
+	uint8_t *oA = frame->data[3];
 	uint8_t *a0 = frame->data[0];
 	uint8_t *a1 = frame->data[1];
 	uint8_t *a2 = frame->data[2];
@@ -64,7 +58,6 @@ void alphaflatten_apply( VJFrame *frame, int width, int height)
 		o0[i] = (op0 * a0[i]) >> 8;
 		o1[i] = (op0 * a1[i] + op1 * 128) >> 8;
 		o2[i] = (op0 * a2[i] + op1 * 128)>>8;
-
-		dA = 0;	
+		oA[i] = 0;
 	}
 }

@@ -140,7 +140,7 @@ static void _binary_not_and_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	}
 	for(i=0; i < uv_len; i++)
 	{
-		Cb[i] = 128 + (Cb[i]-128 & ~(Cb2[i]));
+		Cb[i] = 128 + ( (Cb[i]-128) & ~(Cb2[i]));
 		Cr[i] = 128 + (Cr[i] & ~(Cr2[i]));
 	}
 }
@@ -162,8 +162,8 @@ static void _binary_not_xor_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	}
 	for(i=0; i < uv_len; i++)
 	{
-		Cb[i] = 128 +  ( Cb[i]-128 ^ ~(Cb2[i]-128 ));
-		Cr[i] = 128 +  ( Cr[i]-128 ^ ~(Cr2[i]-128));
+		Cb[i] = 128 + ( (Cb[i]-128) ^ ~(Cb2[i]-128));
+		Cr[i] = 128 + ( (Cr[i]-128) ^ ~(Cr2[i]-128));
 	}
 }
 
@@ -185,8 +185,8 @@ static void _binary_not_or_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	}
 	for(i=0; i < uv_len; i++)
 	{
-		Cb[i] = 128 + ( Cb[i]-128 | ~(Cb2[i]-128));
-		Cr[i] = 128 + ( Cr[i]-128 | ~(Cr2[i]-128));
+		Cb[i] = 128 + ( (Cb[i]-128) | ~(Cb2[i]-128));
+		Cr[i] = 128 + ( (Cr[i]-128) | ~(Cr2[i]-128));
 	}
 }
 static void _binary_not_and_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
@@ -207,8 +207,8 @@ static void _binary_not_and_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	}
 	for(i=0; i < uv_len; i++)
 	{
-		Cb[i] = 128 + ( ~(Cb[i]-128) & Cb2[i]-128);
-		Cr[i] = 128 + ( ~(Cr[i]-128) & Cr2[i]-128);
+		Cb[i] = 128 + ( ~(Cb[i]-128) & (Cb2[i]-128));
+		Cr[i] = 128 + ( ~(Cr[i]-128) & (Cr2[i]-128));
 	}
 }
 static void _binary_not_xor_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
@@ -229,8 +229,8 @@ static void _binary_not_xor_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	}
 	for(i=0; i < uv_len; i++)
 	{
-		Cb[i] = 128 + ( ~(Cb[i]-128) ^ Cb2[i]-128);
-		Cr[i] = 128 + (~(Cr[i]-128) ^ Cr2[i]-128);
+		Cb[i] = 128 + ( ~(Cb[i]-128) ^ (Cb2[i]-128));
+		Cr[i] = 128 + (~(Cr[i]-128) ^ (Cr2[i]-128));
 	}
 }
 
@@ -252,8 +252,8 @@ static void _binary_not_or_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	}
 	for(i=0; i < uv_len; i++)
 	{
-		Cb[i] = 128 + ( ~(Cb[i]-128) | Cb2[i]-128);
-		Cr[i] = 128 + ( ~(Cr[i]-128) | Cr2[i]-128);
+		Cb[i] = 128 + ( ~(Cb[i]-128) | (Cb2[i]-128));
+		Cr[i] = 128 + ( ~(Cr[i]-128) | (Cr2[i]-128));
 	}
 }
 

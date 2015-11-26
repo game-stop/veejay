@@ -141,7 +141,7 @@ static inline pixel_t evaluate_pixel_bc(
 	unsigned int 	brightness;		/* scaled brightnes */
 	int 		peak_value = 0;
 	int 		peak_index = 0;
-	int		i,j;
+	unsigned int		i;
 	const int 	max_ = (int) ( 0xff * intensity );
 	int		dx,dy;
 
@@ -218,7 +218,7 @@ static inline uint8_t evaluate_pixel_b(
 	unsigned int 	brightness;		/* scaled brightnes */
 	int 		peak_value = 0;
 	int 		peak_index = 0;
-	int		i,j;
+	unsigned int i;
 	int 		x0 = x - brush_size;
 	int 		x1 = x + brush_size;
 	int 		y0 = y - brush_size;

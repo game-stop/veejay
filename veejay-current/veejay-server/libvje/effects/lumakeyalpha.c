@@ -59,8 +59,6 @@ void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, 
     unsigned int op1 = (opacity > 255) ? 255 : opacity;
     unsigned int op0 = 255 - op1;
 
-	unsigned int x,y;
-
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *aA = frame->data[3];

@@ -78,7 +78,6 @@ vj_effect *picinpic_init(int width, int height)
 
 int	picinpic_malloc(void **d, int w, int h)
 {
-	int i;
 	pic_t *my;
 	*d = (void*) vj_calloc(sizeof(pic_t));
 	my = (pic_t*) *d;

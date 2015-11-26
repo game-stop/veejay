@@ -78,29 +78,17 @@ void		differencemap_free(void)
 #define MAX(a,b) ( (a)>(b) ? (a) : (b) )
 #endif
 
-static int _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
-{
-	register int x;
-	/* consider all background pixels (0) in input image */	
-	for(x = 0; x < 9; x ++ )
-		if((kernel[x] * img[x]) > 0 )
-			return 1;
-	return 0;
-}
-
 void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse,
 		int show )
 {
-	unsigned int i,x,y;
+	unsigned int x,y;
 	int len = (width * height);
-    	uint8_t *Y = frame->data[0];
+   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2=frame2->data[1];
 	uint8_t *Cr2=frame2->data[2];
-
-	const uint8_t kernel[9] = { 1,1,1, 1,1,1, 1,1,1 };
 
 //	morph_func	p = _dilate_kernel3x3;
 	uint8_t *previous_img = binary_img + len;
