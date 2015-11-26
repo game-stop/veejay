@@ -1142,6 +1142,9 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 	if( full_chroma_interpolation_ ) 
 		cpu_flags = cpu_flags |  SWS_FULL_CHR_H_INT;
 
+	s->src_filter = sws_getDefaultFilter( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1 );
+	s->dst_filter = sws_getDefaultFilter( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1 );
+
 	s->sws = sws_getContext(
 			src->width,
 			src->height,
@@ -1238,6 +1241,9 @@ static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, 
 			s->sws = NULL;
 		}
 	}
+
+	s->src_filter = sws_getDefaultFilter( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1 );
+	s->dst_filter = sws_getDefaultFilter( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1 );
 
 	if( s->sws == NULL ) {
 		s->sws = sws_getContext(
