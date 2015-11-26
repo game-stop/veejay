@@ -23,6 +23,7 @@
 #include <libvjmem/vjmem.h>
 #include <math.h>
 #include "neighbours5.h"
+#include "common.h"
 
 vj_effect *neighbours5_init(int w, int h)
 {
@@ -45,9 +46,13 @@ vj_effect *neighbours5_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Stroke size", "Smoothness", "Mode (Luma/Chroma)" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Stroke size", "Smoothness", "Mode" );
 
-    return ve;
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "Luma Only", "Luma and Chroma" );
+    
+	return ve;
 }
 
 static	int pixel_histogram[256];

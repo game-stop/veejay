@@ -24,7 +24,7 @@
 #include "common.h"
 
 extern int vj_task_available();
- 
+ 	 
 vj_effect *pencilsketch_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -44,12 +44,18 @@ vj_effect *pencilsketch_init(int w, int h)
     ve->limits[0][2] = 0;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
-	ve->param_description = vje_build_param_list(ve->num_params, "Blend Mode", "Min Threshold", "Max Treshold", "Mask" );
-    ve->description = "Pencil Sketch (8)";   
+	ve->param_description = vje_build_param_list(ve->num_params, "Sketch Mode", "Min Threshold", "Max Treshold", "Mask" );
+    ve->description = "Pencil Sketch";   
     ve->extra_frame = 0;
     ve->sub_format = -1;
 	ve->has_user = 0;
-	ve->parallel = 1;    
+	ve->parallel = 1;   
+
+    ve->hints = vje_init_value_hint_list( ve->num_params );
+
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Absolute", "Minimum", "Maximum", "Light", "Nothing","Division","Dianegative", "Chromatic","Fallthrough"  );
+
 	return ve;
 }
 
@@ -131,10 +137,8 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	/* get a pointer to a pixel function */
 	_pcf	_get_pcf(int type)
 	{
-	
 		switch(type)
 		{
-	 
 		 case 0: return &_pcf_dneg;
 	 	 case 3: return &_pcf_lghtn;
 	 	 case 1: return &_pcf_min;
@@ -159,7 +163,7 @@ void pencilsketch_apply(
 		)
 {
 	unsigned int i;
-	int len = frame->len;
+	unsigned int len = frame->len;
 	const unsigned int uv_len = (frame->ssm ?frame->len : frame->uv_len);
 	int m,d;
 	uint8_t y,yb;
@@ -238,7 +242,6 @@ void pencilsketch_apply(
 
 
 	}
-	/* data in I420 or YV12 */
 
 	if(type != 7) /* all b/w sketches */
 	{
@@ -254,4 +257,3 @@ void pencilsketch_apply(
 		}
 	}
 }
-void pencilsketch_free(){}

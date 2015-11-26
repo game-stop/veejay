@@ -22,6 +22,7 @@
 #include <libvjmem/vjmem.h>
 #include "dupmagic.h"
 #include "magicoverlays.h"
+#include "common.h"
 
 vj_effect *dupmagic_init(int w, int h)
 {
@@ -32,14 +33,21 @@ vj_effect *dupmagic_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 5;
     ve->description = "Strong Luma Overlay";
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 13;
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 12;
     ve->extra_frame = 1;
 	ve->parallel = 1;    
 	ve->sub_format = -1;
 	ve->has_user = 0;
 	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Softburn", "Additive",
+	   "Multiply", "Divide", "Lighten", "Difference Negate", "Freeze", "Unfreeze", "Relative Add",
+	   "Relative Add Luma",	"Max Select", "Min Select", "Experimental"   );
+
     return ve;
 }
 
@@ -107,7 +115,7 @@ void dupmagic_apply(VJFrame *frame, VJFrame *frame2, int width,
 	_overlaymagic_addtest2(frame2, frame2, width, height);
 	_overlaymagic_addtest2(frame, frame2, width, height);
 	break;
-    case 13:
+    default:
 	_overlaymagic_softburn(frame, frame, width, height);
 	_overlaymagic_softburn(frame2, frame2, width, height);
 	_overlaymagic_softburn(frame, frame2, width, height);

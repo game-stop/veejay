@@ -44,7 +44,7 @@ vj_effect *chromascratcher_init(int w, int h)
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 26;
+    ve->limits[1][2] = 29;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
 
@@ -60,7 +60,8 @@ vj_effect *chromascratcher_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, 
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2,
+		"Appearing", "Dissapearing","Appearing suppressed", "Dissappearing suppressed",	
 		"Add Subselect Luma", "Select Min", "Select Max", "Select Difference",
 		"Select Difference Negate", "Add Luma", "Select Unfreeze", "Exclusive",
 		"Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
@@ -136,7 +137,7 @@ void chromascratcher_apply(VJFrame *frame,
 			   int width, int height, int mode, int opacity,
 			   int n, int no_reverse)
 {
-    int i;
+    unsigned int i;
     const int len = frame->len;
     const unsigned int op_a = (opacity > 255) ? 255 : opacity;
     const unsigned int op_b = 255 - op_a;
@@ -209,9 +210,7 @@ void chromascratcher_apply(VJFrame *frame,
 		break;
     
 		}
-
 	}
-
 
 	chromastore_frame(frame, width, height, n, no_reverse);
 }

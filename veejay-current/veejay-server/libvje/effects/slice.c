@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -42,14 +42,16 @@ vj_effect *slice_init(int width,int height)
     ve->limits[0][0] = 2;
     ve->limits[1][0] = 128;
     ve->limits[0][1] = 0;
-    ve->limits[1][1] = 1;
+    ve->limits[1][1] = 8 * 30;
     ve->defaults[0] = 63;
     ve->defaults[1] = 0;
     ve->description = "Slice Window";
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user =0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Slices", "Mode");
+	ve->motion = 1;
+	ve->param_description = vje_build_param_list( ve->num_params, "Slices", "Slice Period");
+
     return ve;
 }
 
@@ -110,6 +112,8 @@ void slice_recalc(int width, int height, int val) {
   }
 }
 
+int frame_periods = 0;
+int current_period = 0;
 
 void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
   unsigned int x,y,dx,dy;
@@ -123,6 +127,12 @@ void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
 	int tmp1 = val;
 	int tmp2 = re_init;
 	int motion = 0;
+
+	if( frame_periods != re_init ) {
+		frame_periods = re_init;
+		current_period = frame_periods;
+	}
+
 	if( motionmap_active())
 	{
 		motionmap_scale_to( 128,1, 2, 0, &tmp1, &tmp2, &n__ , &N__ );
@@ -146,7 +156,19 @@ void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
 	if( n__ == N__ || n__ == 0 )
 		interpolate = 0;
 
-  if(tmp2==1) slice_recalc(width,height,tmp1);
+  if( motionmap_active() ) {
+	 if(tmp2==1) slice_recalc(width,height,tmp1);
+  }
+  else {
+		current_period --;
+	  
+		if (current_period == 0 ) {
+			slice_recalc(width,height,tmp1);
+		}
+		if( current_period <= 0 ) {
+			current_period = frame_periods;
+		}
+  }
 
   int strides[4] = { len, len, len, len };
   vj_frame_copy( frame->data, slice_frame, strides );  

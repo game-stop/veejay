@@ -40,7 +40,7 @@ vj_effect *constantblend_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 31;
+    ve->limits[1][0] = 32;
     ve->limits[0][1] = 1;  // scale from 0.0 to 5.0 (only luma)
     ve->limits[1][1] = 500;
     ve->limits[0][2] = pixel_Y_lo_;
@@ -54,6 +54,17 @@ vj_effect *constantblend_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Threshold", "Constant" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
+		"Difference","Difference Negate","Exclusive","Base","Freeze",
+		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",
+		"Relative Luma Add", "Relative Luma Subtract", "Min Subselect", "Max Subselect",
+		"Add Subselect", "Add Average", "Experimental 1","Experimental 2", "Experimental 3",
+		"Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add", "Distorted Subtract", "Experimental 4", "Negation Divide");
+
     return ve;
 }
 

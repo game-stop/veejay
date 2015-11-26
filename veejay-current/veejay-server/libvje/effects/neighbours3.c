@@ -24,6 +24,7 @@
 #include <libvjmem/vjmem.h>
 #include <math.h>
 #include "neighbours3.h"
+#include "common.h"
 
 vj_effect *neighbours3_init(int w, int h)
 {
@@ -46,7 +47,11 @@ vj_effect *neighbours3_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Line size", "Smoothness", "Mode (Luma/Chroma)" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Line size", "Smoothness", "Mode" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "Luma Only", "Luma and Chroma" );
 
     return ve;
 }

@@ -53,7 +53,7 @@ vj_effect *magicmirror_init(int w, int h)
     ve->limits[1][2] = 100;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 100;
-
+	ve->motion = 1;
     ve->sub_format = 1;
     ve->description = "Magic Mirror Surface";
 	ve->has_user =0;

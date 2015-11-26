@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "noisepencil.h"
+#include "common.h"
 
 static uint8_t *Yb_frame = NULL;
 
@@ -39,7 +40,7 @@ vj_effect *noisepencil_init(int width , int height)
     ve->defaults[3] = 110;
   
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 3;
+    ve->limits[1][0] = 4;
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 10000;
     ve->limits[0][2] = 0;
@@ -48,11 +49,17 @@ vj_effect *noisepencil_init(int width , int height)
     ve->limits[1][3] = 255;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Amplification", "Min Threshold", "Max Threshold");
     ve->description = "Noise Pencil";
-
     ve->extra_frame = 0;
     ve->sub_format = 0;
 	ve->has_user = 0;
-    return ve;
+    
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "1x3 NonZero", "3x3 NonZero","3x3 Invert", "3x3 Add", "1x3 All" );
+    
+
+	
+	return ve;
 }
 
 int  noisepencil_malloc(int width,int height)
@@ -253,6 +260,56 @@ void noisepencil_4_apply(uint8_t *src[3], int width, int height, int coeef, int 
 
 }
 
+
+void noisepencil_5_apply(uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
+
+    int r, c;
+    double k = (coeef/1000.0);
+    int len = (width*height)-width;
+    uint8_t tmp;
+    for ( r = 0 ; r < width ; r++)
+	{
+		Yb_frame[r] = ( src[0][r + width] + src[0][r] ) >> 1;
+		if( Yb_frame[r] <min_t || Yb_frame[r] > max_t) {
+			Yb_frame[r] = 0;
+		}
+	}
+
+    for (r = width; r < len; r += width) {
+	for (c = 1; c < width-1; c++) {
+		tmp = (src[0][r - width + c - 1] +
+				  src[0][r - width + c] +
+				  src[0][r - width + c + 1] +
+				  src[0][r + width + c - 1] +
+				  src[0][r + width + c] +
+				  src[0][r + width + c + 1] +
+				  src[0][r + c] +
+				  src[0][r + c + 1] +
+				  src[0][r + c - 1]  
+		    ) / 9;
+
+		if( min_t >= tmp && tmp <= max_t)
+		{
+			Yb_frame[c + r] = tmp;
+		}
+		else 
+		{
+			Yb_frame[c + r] = 0;
+		}
+
+	}
+    }
+
+    for(c=0; c < len; c++) {
+	  /* get higher signal frequencies and*/	
+	  /* multiply result with coeffcient to get d*/
+	  src[0][c] = (src[0][c] - Yb_frame[c]) * k;
+	}
+
+}
+
+
+
 /* with min_t -> max_t select the threshold to 'noise ' */
 void noisepencil_apply(VJFrame *frame, int width, int height, int type, int coeef, int min_t,
 	int max_t) {
@@ -266,5 +323,7 @@ void noisepencil_apply(VJFrame *frame, int width, int height, int type, int coee
 		noisepencil_3_apply(frame->data,width,height,coeef,min_t,max_t);	break;
 		case 3:
 		noisepencil_4_apply(frame->data,width,height,coeef,min_t,max_t);	break;
+		case 4:
+		noisepencil_5_apply(frame->data,width,height,coeef,min_t,max_t);	break;
 	}
 }

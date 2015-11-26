@@ -62,6 +62,13 @@ vj_effect *radioactivetv_init(int w, int h)
     ve->extra_frame = 1;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Zoom ratio", "Strength", "Difference Threshold" );
+
+	
+    ve->hints = vje_init_value_hint_list( ve->num_params );
+
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+			"Average", "Normal", "Strobe", "Spill (greyscale)", "Flood (greyscale)", "Frontal (greyscale)", "Low (greyscale)" ); 
+
     return ve;
 }
 

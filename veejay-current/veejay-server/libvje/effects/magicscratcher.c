@@ -52,8 +52,12 @@ vj_effect *magicscratcher_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Scratch frames", "PingPong");
-	
-	//FIXME parameter mode refactor
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Additive", "Multiply", "Experimental IV", "Luma Subtract", "Luma Additive",
+		"Difference", "Basecolor", "Exclusive", "Difference Negate", "None" );
 
     return ve;
 }
@@ -116,42 +120,42 @@ void magicscratcher_apply(VJFrame *frame,
 
     switch (mode) {
 	//case 0: mode = 5; break;
+    case 0:
+		mode = 22;
+		break;
     case 1:
-	mode = 22;
-	break;
-    case 2:
-	mode = 25;
-	break;
+		mode = 25;
+		break;
 	//case 3: mode = 30; break;
     case 3:
-	mode = 24;
-	break;
+		mode = 24;
+		break;
 	//case 5: mode = 21; break;
 	//case 6: mode = 20; break;
 	//case 7: mode = 19; break;
 	//case 8: mode = 18; break;
+    case 2:
+		mode = 17;
+		break;
     case 4:
-	mode = 17;
-	break;
-    case 5:
-	mode = 16;
-	break;
+		mode = 16;
+		break;
 	//case 11: mode = 14; break;
 	//case 12: mode = 12; break;
 	//case 13: mode = 11; break;
     case 6:
-	mode = 9;
-	break;
+		mode = 9;
+		break;
     case 7:
-	mode = 8;
-	break;
+		mode = 8;
+		break;
     case 8:
-	mode = 7;
-	break;
-    case 9:
-	mode = 6;
-	break;
-    }
+		mode = 7;
+		break;
+    case 5:
+		mode = 6;
+		break;
+	}
 
     func_y = get_pix_func_Y((const int) mode);
 

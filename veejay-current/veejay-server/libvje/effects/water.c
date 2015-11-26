@@ -28,13 +28,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "rippletv.h"
-#include "softblur.h"
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include "common.h"
+#include "rippletv.h"
+#include "softblur.h"
 
 typedef struct {
 	uint8_t *ripple_data[4];
@@ -130,9 +130,16 @@ vj_effect *water_init(int width, int height)
     ve->extra_frame = 1;
     ve->has_user = 1;
     ve->user_data = NULL;
+	ve->motion = 1;
 
 	ve->param_description= vje_build_param_list(ve->num_params, "Refresh Frequency",
 			"Wavespeed", "Decay", "Mode", "Threshold (motion)");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3, 
+			"Raindrops", "Motion detect I (preview)", "Water ripples", "Motion detect II (preview)",
+		    "Drops and Ripples", "Motion detect III (preview)", "Decaying Motion"	);
 
     return ve;
 }

@@ -21,12 +21,12 @@
 /* distortion effects */
 #include <stdio.h>
 #include <stdint.h>
-#include "rotozoom.h"
 #include <stdlib.h>
 #include <math.h>
+#include "rotozoom.h"
+#include "common.h"
 
-
-static  int *test_roto[9];
+static int *test_roto[9];
 static int *test_roto2[9];
 static int new_zpath = 0;
 static int new_path = 0;
@@ -54,7 +54,7 @@ vj_effect *rotozoom_init(int width, int height)
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
     ve->limits[0][3] = 0;
-    ve->limits[1][3] = 3;
+    ve->limits[1][3] = 1;
     ve->description = "Rotozoom";
     ve->sub_format = 1;
     ve->extra_frame = 0;
@@ -119,6 +119,12 @@ vj_effect *rotozoom_init(int width, int height)
 	test_roto[8][i] = c * 4096.0;
 	test_roto2[8][i] = c * 4096.0;
     }
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Normal", "Rotozoom II",
+		   "Rotozoom III", "Rotozoom IV", "Rotozoom V", "Rotozoom VI", "Rotozoom VII", "Rotozoom VIII", "Rotozoom IX");
+
 
     return ve;
 }
@@ -188,8 +194,6 @@ void draw_tile(int stepx, int stepy, int zoom, int w, int h,
 void rotozoom2_apply(VJFrame *frame, uint8_t *data[3], int width,
 		     int height, int n, int p, int z)
 {
-
-
     draw_tile(test_roto[n][p],
 	      test_roto[n][(p + 128) & 0xFF],
 	      test_roto2[n][z], width, height, frame->data, data);

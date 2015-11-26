@@ -51,12 +51,12 @@ vj_effect *lumamask_init(int width, int height)
     ve->limits[1][2] = 1;
 	ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
-
     ve->defaults[0] = width/20; 
     ve->defaults[1] = height/10;
     ve->defaults[2] = 0; // border
     ve->description = "Displacement Map";
-    ve->sub_format = 1;
+    ve->motion = 1;
+	ve->sub_format = 1;
     ve->extra_frame = 1;
   	ve->has_user = 0; 
 	ve->param_description = vje_build_param_list(ve->num_params, "X displacement", "Y displacement", "Mode", "Update Alpha" );

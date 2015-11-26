@@ -97,6 +97,7 @@ typedef struct vj_effect_t {
     char padding[4];
     int parallel;
 	int rgba_only;
+	int motion;
 } vj_effect;
 
 typedef struct vj_effect_instance_t {

@@ -45,6 +45,7 @@ vj_effect *chameleonblend_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
+	ve->motion = 1;
     ve->param_description = vje_build_param_list( ve->num_params, "Mode (Appear,Dissapear)" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );

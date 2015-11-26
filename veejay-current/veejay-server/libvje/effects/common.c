@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -741,6 +741,8 @@ pix_func_Y get_pix_func_Y(const int pix_type)
 	return &bl_pix_relneg_Y;
     if (pix_type == VJ_EFFECT_BLEND_ADDTEST4)
 	return &bl_pix_test3_Y;
+	if( pix_type == VJ_EFFECT_BLEND_SUBSTRACTIVE)
+	return &bl_pix_subtract_Y;
     /*
        if(pix_type == VJ_EFFECT_BLEND_SELECTMIN) return &bl_pix_minsel_Y;
        if(pix_type == VJ_EFFECT_BLEND_SELECTMAX) return &bl_pix_maxsel_Y;   
@@ -1189,7 +1191,10 @@ uint8_t bl_pix_sub_distorted_C(uint8_t y1, uint8_t y2)
     new_C -= y2;
     return new_C;
 }
-
+uint8_t bl_pix_subtract_Y( uint8_t y1, uint8_t y2 )
+{
+	return CLAMP_Y( y1 - y2 );
+}
 
 uint8_t bl_pix_test3_Y(uint8_t y1, uint8_t y2)
 {

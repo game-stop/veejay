@@ -47,7 +47,13 @@ vj_effect *sinoids_init(int width, int height)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
+	ve->motion = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Sinoids");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Inplace", "On Copy" );
+
     return ve;
 }
 static int n__ = 0;
