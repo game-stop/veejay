@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -22,8 +22,8 @@
 /*
   shift pixels in row/column to get a 'bathroom' window look. Use the parameters
   to set the distance and mode
-
  */
+
 #include <config.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,24 +36,36 @@ static uint8_t *bathroom_frame[4] = { NULL,NULL,NULL,NULL };
 vj_effect *bathroom_init(int width,int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 4;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
+    ve->limits[1][0] = 3;
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 64;
-    ve->defaults[0] = 1;
+	ve->limits[0][2] = 0;
+	ve->limits[1][2] = width;
+	ve->limits[0][3] = 0;
+	ve->limits[1][3] = width;
+    ve->defaults[0] = 1; 
     ve->defaults[1] = 32;
+	ve->defaults[2] = 0;
+	ve->defaults[3] = width;
     ve->description = "Bathroom Window";
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->motion = 1;
-	ve->param_description = vje_build_param_list( ve->num_params, "Horizontal or Vertical", "Value" );
-    return ve;
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Distance","X start position", "X end position" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Horizontal", "Vertical", "Horizontal (Alpha)", "Vertical (Alpha)" );
+
+
+	return ve;
 }
 
 static int n__ = 0;
@@ -61,28 +73,29 @@ static int N__ = 0;
 int bathroom_malloc(int width, int height)
 {
 	int i;
-	for( i = 0; i < 3; i ++ ) {
-   	 bathroom_frame[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height));
+   	bathroom_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height * 4));
+	if(!bathroom_frame[0])
+		return 0;
+	bathroom_frame[1] = bathroom_frame[0] + RUP8(width*height);
+	bathroom_frame[2] = bathroom_frame[1] + RUP8(width*height);
+	bathroom_frame[3] = bathroom_frame[2] + RUP8(width*height);
 
-   	 if(!bathroom_frame[i]) return 0;
-  	}
 	n__ = 0;
 	N__ = 0;
     return 1;
 }
 
 void bathroom_free() {
-	int i;	
-	for( i = 0; i < 3 ; i ++ ) { 
- 		if(bathroom_frame[i])
-			free(bathroom_frame[i]);
+	int i;
+	if(bathroom_frame[0])
+		free(bathroom_frame[0]);	
+	for( i = 0; i < 4; i ++ ) { 
 		bathroom_frame[i] = NULL;
 	}
 }
 
-void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)
+void bathroom_verti_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
 {
-    unsigned int i;
     const unsigned int len = frame->len;
     unsigned int y_val = val;
     unsigned int x,y;
@@ -90,28 +103,54 @@ void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 	int strides[4] = { len, len, len, 0 };
+	int i;
 	vj_frame_copy( frame->data, bathroom_frame, strides );
 
     if( y_val <= 0 )
-	y_val = 1;
+		y_val = 1;
 
     for(y=0; y < height;y++) {
-     for(x=0; x <width; x++) {
+     for(x=x0; x < x1; x++) {
 	i = (x + (x % y_val) - (y_val>>1)) + (y*width);
-	if(i < 0) i = 0;
-	if(i >= len) i = len-1;
+	if( i < 0 ) i = 0; else if ( i > len ) i = len;
 	Y[y*width+x] = bathroom_frame[0][i];
 	Cb[y*width+x] = bathroom_frame[1][i];
 	Cr[y*width+x] = bathroom_frame[2][i];
      }
     }
-	
 }
 
-
-void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
+void	bathroom_alpha_verti_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
 {
-    unsigned int i;
+    const unsigned int len = frame->len;
+    unsigned int y_val = val;
+    unsigned int x,y;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+	uint8_t *A = frame->data[3];
+	int strides[4] = { len, len, len, len };
+	int i;
+	vj_frame_copy( frame->data, bathroom_frame, strides );
+
+    if( y_val <= 0 )
+		y_val = 1;
+
+    for(y=0; y < height;y++) {
+     for(x=x0; x < x1; x++) {
+		i = (x + (x % y_val) - (y_val>>1)) + (y*width);
+		if( i < 0 ) i = 0; else if ( i > len ) i = len;
+
+		Y[y*width+x] = bathroom_frame[0][i];
+		Cb[y*width+x] = bathroom_frame[1][i];
+		Cr[y*width+x] = bathroom_frame[2][i];
+		A[y*width+x] = bathroom_frame[3][i];
+     }
+    }
+}
+
+void bathroom_hori_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+{
     unsigned int len = (width * height);
     unsigned int y_val = val;
     uint8_t *Y = frame->data[0];
@@ -119,25 +158,51 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
     uint8_t *Cr = frame->data[2];
 
     unsigned int x,y;
+	int i;
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, bathroom_frame, strides );
 
     for(y=0; y < height;y++) {
-     for(x=0; x <width; x++) {
-	i = ((y*width) + (y % y_val) - (y_val>>1)) + x;
-	//while(i < 0) i += width;
+     for(x=x0; x < x1; x++) {
+		i = ((y*width) + (y % y_val) - (y_val>>1)) + x;
+		if( i < 0 ) i = 0; else if ( i > len ) i = len;
 
-	if( i < 0 ) i = 0; else if ( i >= len ) i = (len-1);
-
-	Y[(y*width)+x] = bathroom_frame[0][i];
-	Cb[(y*width)+x] = bathroom_frame[1][i];
-	Cr[(y*width)+x] = bathroom_frame[2][i];
+		Y[(y*width)+x] = bathroom_frame[0][i];
+		Cb[(y*width)+x] = bathroom_frame[1][i];
+		Cr[(y*width)+x] = bathroom_frame[2][i];
      }
     }
-
 }
 
-void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val) {
+void bathroom_alpha_hori_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+{
+    unsigned int len = (width * height);
+    unsigned int y_val = val;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+	uint8_t *A = frame->data[3];
+	
+    unsigned int x,y;
+	int strides[4] = { len, len, len, len };
+	int i;
+	vj_frame_copy( frame->data, bathroom_frame, strides );
+
+    for(y=0; y < height;y++) {
+     for(x=x0; x < x1; x++) {
+		i = ((y*width) + (y % y_val) - (y_val>>1)) + x;
+		if( i < 0 ) i = 0; else if ( i > len ) i = len;
+
+		Y[(y*width)+x] = bathroom_frame[0][i];
+		Cb[(y*width)+x] = bathroom_frame[1][i];
+		Cr[(y*width)+x] = bathroom_frame[2][i];
+		A[(y*width)+x] = bathroom_frame[3][i];
+     }
+    }
+}
+
+
+void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val, int x0, int x1) {
 
 	int interpolate = 1;
  	int tmp1 = val;
@@ -158,8 +223,10 @@ void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val) {
 
 	switch(mode)
 	{
-	   case 1: bathroom_hori_apply(frame,width,height,tmp1); break;
-	   case 0: bathroom_verti_apply(frame,width,height,tmp1); break;
+		case 1: bathroom_hori_apply(frame,width,height,tmp1,x0,x1); break;
+		case 0: bathroom_verti_apply(frame,width,height,tmp1,x0,x1); break;
+		case 2: bathroom_alpha_hori_apply(frame,width,height,tmp1,x0,x1); break;
+		case 3: bathroom_alpha_verti_apply(frame,width,height,tmp1,x0,x1); break;
   	}
 
 	if( interpolate )

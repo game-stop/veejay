@@ -290,39 +290,22 @@ enum {
 	VJ_EFFECT_BLEND_NEGDIV = 32,
 
 };
-extern void tripplicity_apply(VJFrame *frame1,VJFrame *frame2, int w, int h,
-		int a, int b, int c );
-
-extern void dices_apply(void * data, VJFrame *frame, int width,
-			int height, int cube_bits);
-extern void dither_apply( VJFrame *frame, int width, int height, int size,
-			 int n);
+extern void tripplicity_apply(VJFrame *frame1,VJFrame *frame2, int w, int h, int a, int b, int c );
+extern void dices_apply(void * data, VJFrame *frame, int width, int height, int cube_bits);
+extern void dither_apply( VJFrame *frame, int width, int height, int size, int n);
 extern void emboss_apply( VJFrame *frame, int width, int height, int n);
-extern void fibdownscale_apply(VJFrame *frame, VJFrame *frame2,
-			       int width, int height, int n);
-extern void _fibdownscale_apply(VJFrame *frame, VJFrame *frame2,
-				int width, int height);
-extern void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2,
-				int width, int height);
+extern void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int n);
+extern void _fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width, int height);
+extern void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width, int height);
 extern void flip_apply( VJFrame *frame, int width, int height, int n);
-extern void killchroma_apply(VJFrame *frame, int width, int height,
-			     int n);
-extern void lumamagic_apply(VJFrame *frame, VJFrame *frame2,
-			    int width, int height, int n, int op_a, int op_b
-			    );
-extern void overlaymagic_apply(VJFrame *frame, VJFrame *frame2,
-			       int width, int height, int n, int m);
-extern void mirrors_apply( VJFrame *frame, int width, int height,
-			  int type, int factor);
-extern void mirrors2_apply( VJFrame *frame, int width, int height,
-			   int type);
-extern void negation_apply( VJFrame *frame, int width, int height,
-			   int val);
-extern void medianfilter_apply( VJFrame *frame, int width, int height,
-			   int val);
-
-extern void negatechannel_apply( VJFrame *frame, int width, int height,
-			  int chan, int val);
+extern void killchroma_apply(VJFrame *frame, int width, int height,int n);
+extern void lumamagic_apply(VJFrame *frame, VJFrame *frame2,int width, int height, int n, int op_a, int op_b );
+extern void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int n, int m);
+extern void mirrors_apply( VJFrame *frame, int width, int height,int type, int factor);
+extern void mirrors2_apply( VJFrame *frame, int width, int height,int type);
+extern void negation_apply( VJFrame *frame, int width, int height,int val);
+extern void medianfilter_apply( VJFrame *frame, int width, int height,int val);
+extern void negatechannel_apply( VJFrame *frame, int width, int height,int chan, int val);
 
 extern void colormap_apply( VJFrame *frame, int width, int height,
 			   int r, int g, int b);
@@ -502,7 +485,7 @@ extern void average_apply(VJFrame *frame, int w, int h, int val, int mode);
 
 extern void ripple_apply(VJFrame *frame, int width, int height, int waves, int ampli,int atten);
 
-extern void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val);
+extern void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val, int x0, int x1);
 
 extern void slice_apply(VJFrame *frame, int width, int height, int val, int reinit);
 

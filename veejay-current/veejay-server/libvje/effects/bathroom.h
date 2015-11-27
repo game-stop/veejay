@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,5 +27,5 @@
 vj_effect *bathroom_init(int w, int h);
 int bathroom_malloc(int w, int h);
 void bathroom_free();
-void bathroom_apply(VJFrame *Frame, int width, int height,int mode, int val);
+void bathroom_apply(VJFrame *Frame, int width, int height,int mode, int val, int x0, int x1);
 #endif
