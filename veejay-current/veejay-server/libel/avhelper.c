@@ -61,6 +61,7 @@ static struct
 #endif
 	{ "jpgl", CODEC_ID_MJPEG 	},
 	{ "jpgl", CODEC_ID_MJPEG	},
+	{ "ljpg", CODEC_ID_LJPEG	},
 	{ "dvsd", CODEC_ID_DVVIDEO	},
 	{ "dvcp", CODEC_ID_DVVIDEO	},
 	{ "dv",	CODEC_ID_DVVIDEO	},
