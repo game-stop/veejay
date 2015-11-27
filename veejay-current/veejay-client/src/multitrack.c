@@ -650,7 +650,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	GtkWidget *scroll = gtk_scrolled_window_new(NULL,NULL);
 	gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW(scroll), GTK_SHADOW_ETCHED_IN );
-	gtk_widget_set_size_request_(scroll,30,70);
+	gtk_widget_set_size_request_(scroll,30,140);
 	gtk_container_set_border_width(GTK_CONTAINER(scroll),0);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scroll),GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC );
 	GtkWidget *vvvbox = gtk_hbox_new(FALSE,0);
