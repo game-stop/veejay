@@ -528,8 +528,6 @@ long	lav_bytes_remain( lav_file_t *lav_file )
 int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 {
    int res, n;
-   uint8_t *jpgdata = NULL;
-   long jpglen = 0;
    video_format = lav_file->format; internal_error = 0; /* for error messages */
 #ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
@@ -538,90 +536,10 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
    /* For interlaced video insert the apropriate APPn markers */
 #ifdef USE_GDK_PIXBUF
     if(video_format == 'x')
-	return -1;//picture
+		return -1;//picture
 #endif
-   if(lav_file->interlacing!=LAV_NOT_INTERLACED)
-   {
-	switch( lav_file->format )
-	{
-		case 'a':
-		case 'A':			
-         	   jpgdata = buff;
-        	   jpglen  = size;
-
-      	      /* Loop over both fields */
-
-          	  for(n=0;n<2;n++)
-         	  {
-          		/* For first field scan entire field, for second field
-        	          scan the JPEG header, put in AVI1 + polarity.
-        	          Be generous on errors */
-
-       		        res = scan_jpeg(jpgdata, size, n);
-       	       		 if (res)
-			 {
-				 internal_error=ERROR_JPEG;
-				 return -1;
-			 }
-
-         	      if(!jpeg_app0_offset) continue;
-
-         	      /* APP0 marker should be at least 14+2 bytes */
-         	      if(get_int2(jpgdata+jpeg_app0_offset+2) < 16 ) continue;
-
-			jpgdata[jpeg_app0_offset+4] = 'A';
-			jpgdata[jpeg_app0_offset+5] = 'V';
-			jpgdata[jpeg_app0_offset+6] = 'I';
-			jpgdata[jpeg_app0_offset+7] = '1';
-			jpgdata[jpeg_app0_offset+8] = lav_file->format=='a' ? n+1 : 2-n;
-
-	               /* Update pointer and len for second field */
-	               jpgdata += jpeg_padded_len;
-	               jpglen  -= jpeg_padded_len;
-		}
-		break;
-#ifdef HAVE_LIBQUICKTIME
-         case 'q':
-	 case 'Q':
-
-            jpgdata = buff;
-            jpglen  = size;
-
-            /* Loop over both fields */
-
-            for(n=0;n<2;n++)
-            {
-               /* Scan the entire JPEG field data - APP1 marker MUST be present */
-               res = scan_jpeg(jpgdata,jpglen,0);
-               if(res || !jpeg_app1_offset) { internal_error=ERROR_JPEG; return -1; }
-
-               /* Length of APP1 marker must be at least 40 + 2 bytes */
-               if ( get_int2(jpgdata+jpeg_app1_offset+2) < 42)
-               { internal_error=ERROR_JPEG; return -1; }
-
-               /* Fill in data */
-               put_int4(jpgdata+jpeg_app1_offset+ 4,0);
-               put_int4(jpgdata+jpeg_app1_offset+ 8,QUICKTIME_MJPG_TAG);
-               put_int4(jpgdata+jpeg_app1_offset+12,jpeg_field_size);
-               put_int4(jpgdata+jpeg_app1_offset+16,jpeg_padded_len);
-               put_int4(jpgdata+jpeg_app1_offset+20,n==0?jpeg_padded_len:0);
-               put_int4(jpgdata+jpeg_app1_offset+24,jpeg_quant_offset);
-               put_int4(jpgdata+jpeg_app1_offset+28,jpeg_huffman_offset);
-               put_int4(jpgdata+jpeg_app1_offset+32,jpeg_image_offset);
-               put_int4(jpgdata+jpeg_app1_offset+36,jpeg_scan_offset);
-               put_int4(jpgdata+jpeg_app1_offset+40,jpeg_data_offset);
-
-               /* Update pointer and len for second field */
-               jpgdata += jpeg_padded_len;
-               jpglen  -= jpeg_padded_len;
-            }
-            break;
-#endif
-	
-	}
-   }
-   res = 0; /* Silence gcc */
-   for(n=0;n<count;n++)
+   
+	for(n=0;n<count;n++)
    {
 	  switch(lav_file->format)
 	  {
@@ -636,19 +554,18 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 		case 'L':	
 		case 'l':
 		case 'd':
-      if(n==0)
-      {
-	     res = AVI_write_frame( lav_file->avi_fd, buff, size );
-      }	
-      else
-      {     
-	res = AVI_dup_frame( lav_file->avi_fd );
-	}
-	break;
+			if(n==0) {
+				res = AVI_write_frame( lav_file->avi_fd, buff, size );
+			}	
+			else
+			{     
+				res = AVI_dup_frame( lav_file->avi_fd );
+			}
+		break;
 		
 #ifdef HAVE_LIBQUICKTIME
-         case 'q':
-	case 'Q':
+      case 'q':
+	  case 'Q':
             res = quicktime_write_frame( lav_file->qt_fd, buff, size, 0 );
             break;
 #endif
@@ -1240,7 +1157,6 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
    char *video_comp = NULL;
    unsigned char *frame = NULL; 
    long len;
-   int jpg_height, jpg_width, ncomps, hf[3], vf[3];
    int ierr;
 
    lav_file_t *lav_fd = (lav_file_t*) vj_calloc(sizeof(lav_file_t));
@@ -1560,6 +1476,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		strncasecmp(video_comp,"mjpa", 4) == 0 ||
 		strncasecmp(video_comp,"jpeg", 4) == 0 ||
 		strncasecmp(video_comp,"mjpb" ,4) == 0 ||
+		strncasecmp(video_comp,"ljpg", 4) == 0 ||
 		strncasecmp(video_comp,"sp5x", 4) == 0 ||
 		strncasecmp(video_comp,"jpgl", 4) == 0 ||
 		strncasecmp(video_comp,"jfif", 4 ) == 0 ||
@@ -1568,194 +1485,12 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->interlacing = LAV_INTER_UNKNOWN;
 		lav_fd->is_MJPG = 1;
-	
-		/* Make some checks on the video source, we read the first frame for that */
-
-		ierr  = 0;
-		frame = NULL;
-
-
-		int rolls = 5; // try to survive loading broken AVI
-		int pos   = 0;
-		int success = 0;
-		while( pos < rolls ) {
-			if( frame != NULL ) {
-				free(frame);
-				frame = NULL;
-			}	
-
-			if( lav_set_video_position(lav_fd, pos ) ) {
-				pos++;
-				continue;
-			}
-			if( (len = lav_frame_size(lav_fd, pos )) <= 0 ) {
-				pos++;
-				continue;
-			}
-			
-			if( (frame = (unsigned char*) malloc(len)) == 0 ) {
-			       ierr = ERROR_MALLOC;
-			       break;
-			}
-	 		if( (lav_read_frame( lav_fd, frame ) <= 0 ) ) {
-				pos ++;
-				if( frame ) { free(frame);frame=NULL;}
-				continue;
-			}
-			if( scan_jpeg(frame,len,1) ) {
-				ierr = ERROR_JPEG;
-				if( frame ) { free(frame);frame=NULL;}
-				break;
-			}
-
-			success = 1;
-			break;
-		}
-
-		if(!success) {
-			goto ERREXIT;
-		} else {
-			lav_set_video_position( lav_fd, pos );
-		}
-
-	/*	if ( lav_set_video_position(lav_fd,0) ) goto ERREXIT;
-		if ( (len = lav_frame_size(lav_fd,0)) <=0 ) goto ERREXIT;
-		if ( (frame = (unsigned char*) malloc(len)) == 0 ) { ierr=ERROR_MALLOC; goto ERREXIT; }
-
-		if ( lav_read_frame(lav_fd,frame) <= 0 ) goto ERREXIT;
-	
-		if ( lav_set_video_position(lav_fd,0) ) goto ERREXIT;
-		if( scan_jpeg(frame, len, 1) ) { ierr=ERROR_JPEG; goto ERREXIT; }
-
-		// We have to look to the JPEG SOF marker for further information
-    	  The SOF marker has the following format:
-
-		FF
-		C0
-		len_hi
-		len_lo
-		data_precision
-		height_hi
-		height_lo
-		width_hi
-		width_lo
-		num_components
-
-		And then 3 bytes for each component:
-
-		Component id
-		H, V sampling factors (as nibbles)
-		Quantization table number
-	    */
-
-	   /* Check if the JPEG has the special 4:2:2 format needed for
-    	  some HW JPEG decompressors (the Iomega Buz, for example) */
-
-	   ncomps = frame[jpeg_image_offset + 9];
-	   if(ncomps==3)
-   	   {
-	    for(n=0;n<3;n++)
-   		{
-   	     hf[n] = frame[jpeg_image_offset + 10 + 3*n + 1]>>4;
-         vf[n] = frame[jpeg_image_offset + 10 + 3*n + 1]&0xf;
-        }
-
-	  /* Identify chroma sub-sampling format only 420 and 422 supported
-	   at present...*/
-	  
-
-		if( hf[0] == 2*hf[1] && hf[0] == 2*hf[2] )
-		{
-		 if( vf[0] == vf[1] && vf[0] == vf[2] )
-		 {
-			 lav_fd->MJPG_chroma = CHROMA422;
-		 }
-		 else if( vf[0] == 2*vf[1] && vf[0] == 2*vf[2] )
-			{
-			 lav_fd->MJPG_chroma = CHROMA420;
-			}
-		 	else		
-			{	 lav_fd->MJPG_chroma = CHROMAUNKNOWN;
-			}
-	  	}
-	  	else
-		{
-		  lav_fd->MJPG_chroma = CHROMAUNKNOWN;
-		}
-   	    } // ncomps
-	   /* Check if video is interlaced */
-
-	   /* height and width are encoded in the JPEG SOF marker at offsets 5 and 7 */
-
-	   jpg_height = get_int2(frame + jpeg_image_offset + 5);
-	   jpg_width  = get_int2(frame + jpeg_image_offset + 7);
-
-	/*   if( strncasecmp( frame + 6, "LAVC", 4 ) == 0 ) {
-		   int pf = detect_pixel_format_with_ffmpeg( filename );
-		   switch(pf) {
-			case PIX_FMT_YUV422P: lav_fd->MJPG_chroma = CHROMA422;break;
-			case PIX_FMT_YUVJ422P:lav_fd->MJPG_chroma = CHROMA422F;break;
-			case PIX_FMT_YUV420P: lav_fd->MJPG_chroma = CHROMA420;break;
-			case PIX_FMT_YUVJ420P: lav_fd->MJPG_chroma = CHROMA420F;break;
-			case PIX_FMT_YUV444P: lav_fd->MJPG_chroma = CHROMA444;break;
-			default:
-			    pf = -1;
-			    break;
-	           }
-		   if( pf >= 0 ) {
-	          	 lav_fd->interlacing = LAV_NOT_INTERLACED;
-			 if(frame) free(frame);
-		  	 return lav_fd;
-		   }
-	   } */
-
-	   /* check height */
-	
-	   if( jpg_height == lav_video_height(lav_fd))
-  	 	{
-   		   lav_fd->interlacing = LAV_NOT_INTERLACED;
-		}
-		else if ( jpg_height == lav_video_height(lav_fd)/2 )
-		{
-	
- 	     /* Video is interlaced */
-		  if(lav_fd->format == 'a')
-		  {
-            /* Check the APP0 Marker, if present */
-
-            if(jpeg_app0_offset && 
-               get_int2(frame + jpeg_app0_offset + 2) >= 5 &&
-               strncasecmp((char*)(frame + jpeg_app0_offset + 4),"AVI1",4)==0 )
-            {
-                if (frame[jpeg_app0_offset+8]==1)
-				{
-                   lav_fd->interlacing = LAV_INTER_TOP_FIRST;
-				}
-	         	else
-				{
-                   lav_fd->interlacing = LAV_INTER_BOTTOM_FIRST;
-				}
-            }
-            else
-            {
-               /* There is no default, it really depends on the
-                  application which produced the AVI */
-               lav_fd->interlacing = LAV_INTER_UNKNOWN;
-            }
-            lav_fd->format = lav_fd->interlacing == LAV_INTER_BOTTOM_FIRST ? 'A' : 'a';
-      	}  // end of interlaced
-   	   }
-       else
-   		{
-      		ierr=ERROR_JPEG;
-      		goto ERREXIT;
-   		}
-    
-   		if(frame) free(frame);
-
+		if ( lav_set_video_position(lav_fd,0) < 0 ) goto ERREXIT;
+		lav_fd->MJPG_chroma = CHROMAUNKNOWN;
+        lav_fd->interlacing = LAV_INTER_UNKNOWN;
    		return lav_fd;
 	}
-
+	
 	ierr = ERROR_FORMAT;
 	veejay_msg(VEEJAY_MSG_ERROR, "Unrecognized format '%s'", video_comp);
 
