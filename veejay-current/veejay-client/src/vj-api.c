@@ -3857,8 +3857,10 @@ gboolean
       {
 		int value = 0;
 		vevo_property_get( fx_list_, name, 0, &value );
-		if(value) info->uc.selected_effect_id = value;
-      }
+		if(value) {
+			info->uc.selected_effect_id = value;
+		}
+	  }
       g_free(name);
 
     }
@@ -3891,7 +3893,7 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 			snprintf(trip,sizeof(trip), "%03d:%d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid );
 			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
 			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
-	
+			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
 		g_free(name);
 	}
