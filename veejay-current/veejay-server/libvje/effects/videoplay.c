@@ -37,15 +37,28 @@ vj_effect *videoplay_init(int w, int h)
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 250; // waterfall
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = get_matrix_func_n(); // mode
+    ve->limits[1][2] = 1 + get_matrix_func_n(); // mode
     ve->defaults[0] = 2;
     ve->defaults[1] = 1;
-    ve->defaults[2] = 1;  
+    ve->defaults[2] = 2;  
     ve->description = "Videoplay (timestretched mosaic)";
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Photos", "Waterfall", "Mode");
+	
+	ve->hints = vje_init_value_hint_list (ve->num_params);
+	vje_build_value_hint_list (ve->hints, ve->limits[1][2],2,
+	                           "Random",								//0
+	                           "TopLeft to BottomRight : Horizontal",	//1
+	                           "TopLeft to BottomRight : Vertical",		//2
+	                           "BottomRight to TopLeft : Horizontal",	//3
+	                           "BottomRight to TopLeft : Vertical",		//4
+	                           "BottomLeft to TopRight : Horizontal",	//5
+	                           "TopRight to BottomLeft : Vertical",		//6
+	                           "TopRight to BottomLeft : Horizontal",	//7
+	                           "BottomLeft to TopRight : Vertical");	//8
+
     return ve;
 }
 
@@ -53,6 +66,7 @@ static picture_t **video_list = NULL;
 static int	   num_videos = 0;
 static int	  frame_counter = 0;
 static int	  frame_delay = 0;
+static int	*rt = NULL;
 
 static	int prepare_filmstrip(int film_length, int w, int h)
 {
@@ -62,6 +76,9 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 
 	video_list = (picture_t**) vj_calloc(sizeof(picture_t*) * (film_length + 1) );
 	if(!video_list)
+		return 0;
+	rt = (int*) vj_calloc(sizeof(int) * film_length );
+	if(!rt) 
 		return 0;
 
 	num_videos = film_length;
@@ -109,9 +126,12 @@ static void destroy_filmstrip(void)
 		}
 		free(video_list);
 	}
+	if( rt ) 
+		free(rt);
 	video_list = NULL;
 	num_videos = 0;
 	frame_counter = 0;
+	rt = NULL;
 }
 
 
@@ -192,8 +212,6 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int width, int height, int siz
 	uint8_t *dstU = frame->data[1];
 	uint8_t *dstV = frame->data[2];
 
-	matrix_f matrix_placement = get_matrix_func(mode);
-
 	if( (size*size) != num_videos || num_videos == 0 )
 	{
 		destroy_filmstrip();
@@ -202,6 +220,10 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int width, int height, int siz
 			return;
 		}
 		frame_delay = delay;
+
+		if( mode == 0 )
+			fx_shuffle_int_array( rt, num_videos );
+
 	}
 
 	if( frame_delay )
@@ -245,6 +267,14 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int width, int height, int siz
 		}
 	}
 	
+	matrix_f matrix_placement;
+	if( mode == 0 ) {
+		matrix_placement = get_matrix_func(0); // !important in random mode
+	}
+	else {
+		matrix_placement = get_matrix_func(mode-1);
+	}
+
 	for ( i = 0; i < num_videos; i ++ )
 	{
 		matrix_t m = matrix_placement(i, size,width,height );
