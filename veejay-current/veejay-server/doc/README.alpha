@@ -12,13 +12,26 @@
 
 Veejay has some support for alpha channel compositing
 
+
 In general, you will need to add an alpha channel to your playing sample or stream by using one of the "Alpha:" filters in veejay
 
-Then, the alpha channel will be combined by FX that can deal with Alpha. Some of such effects have a mode parameter "Alpha" that functions like an on/off switch but others require an alpha channel to work. 
+Then, the alpha channel will be combined used FX that can deal with Alpha. Some effects have a mode parameter "Alpha" that functions like an on/off switch but others require an alpha channel to work.
 
-By default, the alpha channel is set to 0 (completely invisible) so such effects will always result in a black screen if you have not added an alpha channel
+By default, the alpha channel is set to 0 (completely invisible) so such effects will always result in a black screen if you have not added an alpha channel.
 
 
+In Reloaded, you can toggle the white button next to 'Alpha Clear' to switch between 0 (completely invisible) and 255 (completely visible)
+
+Also, you can toggle the alpha-button to set the fade method to alpha blending in the (manual) chain fader
+
+The chain fader fades the original (unchanged) image to the image that is rendered by the FX chain, either with an opacity value or by using alpha channel information 
+
+Everything related to alpha compositing is in development and feedback is ofcourse welcome
+
+
+
+List of Alpha: FX
+==================
 
 
 The 'Set by Color Key' operator
@@ -32,7 +45,6 @@ The 'Select by Chroma Key' operator
 -----------------------------------
 Use this filter to create an alpha channel from the foreground object.
 The filter may use an existing alpha channel to decide which pixel from source B to composite in. Pixels with an alpha of 0 are skipped optionally.
-
 
 
 Luma Key
@@ -89,4 +101,10 @@ Alpha to Greyscale
 -------------------
 
 Use this FX to display the alpha channel as a greyscale image.
+
+
+Transition Map
+--------------
+
+Use this FX to blend over time using a greyscale image as an opacity map
 
