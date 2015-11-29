@@ -45,6 +45,18 @@ vj_effect *photoplay_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Photos", "Waterfall", "Mode");
+
+	ve->hints = vje_init_value_hint_list (ve->num_params);
+	vje_build_value_hint_list (ve->hints, ve->limits[1][2],2,
+	                           "Random",								//0
+	                           "TopLeft to BottomRight : Horizontal",	//1
+	                           "TopLeft to BottomRight : Vertical",		//2
+	                           "BottomRight to TopLeft : Horizontal",	//3
+	                           "BottomRight to TopLeft : Vertical",		//4
+	                           "BottomLeft to TopRight : Horizontal",	//5
+	                           "TopRight to BottomLeft : Vertical",		//6
+	                           "TopRight to BottomLeft : Horizontal",	//7
+	                           "BottomLeft to TopRight : Vertical");	//8
     return ve;
 }
 
