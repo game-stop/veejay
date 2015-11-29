@@ -26,6 +26,8 @@ Also, you can toggle the alpha-button to set the fade method to alpha blending i
 
 The chain fader fades the original (unchanged) image to the image that is rendered by the FX chain, either with an opacity value or by using alpha channel information 
 
+The chain fader is located next to the FX chain (the vertical slider).
+
 Everything related to alpha compositing is in development and feedback is ofcourse welcome
 
 
