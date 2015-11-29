@@ -111,13 +111,37 @@ static struct  {
 	{ NULL, 0, 0 },
 };
 
+static inline int frei0r_param_get_double(f0r_get_param_value_f q,void *plugin, int seq_no)
+{
+	double d = 0.0;
+	(*q)( plugin, (void**) &d, seq_no );
+
+	return (int) d;
+}
+
 static inline int frei0r_param_set_double(f0r_set_param_value_f q,void *plugin, int seq_no,int offset, int *args )
 {
-	double value = (double) args[offset] / 100.0f;
+	double value = (double) args[offset];
 	f0r_param_t *fparam = (f0r_param_t*) &value;
 	(*q)( plugin, fparam, seq_no );
 
 	return 1;
+}
+
+static inline int frei0r_param_get_bool(f0r_get_param_value_f q, void *plugin, int seq_no)
+{
+	double b;
+	f0r_param_t param;
+	(*q)( plugin, (void **) &b, seq_no );
+	if( b!= 0.0 && b!=1. ) {
+		b = 0.0;
+	}
+	if(b <= 0.5 )
+		b = 0.0;
+	else
+		b = 1.0;
+
+	return (int) b;
 }
 
 static inline int frei0r_param_set_bool(f0r_set_param_value_f q,void *plugin, int seq_no, int offset, int *args )
@@ -128,17 +152,63 @@ static inline int frei0r_param_set_bool(f0r_set_param_value_f q,void *plugin, in
 
 	return 1;
 }
+static inline int frei0r_param_get_position(f0r_get_param_value_f q, void *plugin, int seq_no, int *x, int *y, int w, int h)
+{
+	f0r_param_position_t param;
+	param.x = 0.0;
+	param.y = 0.0;
+
+	(*q)( plugin, (void **) &param, seq_no );
+	
+	if( param.x < 0.0 ) param.x = 0.0;
+	if( param.x > 1.0 ) param.x = 1.0;
+
+	if( param.y < 0.0 ) param.y = 0.0;
+	if( param.y > 1.0 ) param.y = 1.0;
+
+	*x = (w * param.x);
+	*y = (h * param.y);
+
+	return 1;
+}
+
 static inline int frei0r_param_set_position(f0r_set_param_value_f q,void *plugin, int seq_no,int offset, int *args, int width, int height )
 {
 	f0r_param_position_t pos;
 	f0r_param_t *fparam = NULL;
-	pos.x =( ( (float) width / 100.0f) * args[offset] );
-	pos.y =( ( (float) height / 100.0f) * args[offset+1] );
+
+	pos.x = (args[offset] / width );
+	pos.y = (args[offset+1] / height);
+
 	fparam = (f0r_param_t*) &pos;
 	(*q)( plugin, fparam, seq_no );
 
 	return 2;
 }
+
+static inline int frei0r_param_get_color( f0r_get_param_value_f q,void *plugin, int seq_no, int *r, int *g, int *b )
+{
+	f0r_param_color_t param;
+	param.r = 0.0;
+	param.g = 0.0;
+	param.b = 0.0;
+
+	(*q)( plugin, (void**) &param, seq_no );
+
+	if( param.r < 0. ) param.r = 0.0;
+	if( param.r > 1.0 ) param.r = 1.0;
+	if( param.g < 0. ) param.g = 0.0;
+	if( param.g > 1.0 ) param.g = 1.0;
+	if( param.b < 0. ) param.b = 0.0;
+	if( param.b > 1.0 ) param.b = 1.0;
+
+	*r = 255 * param.r;
+	*g = 255 * param.g;
+	*b = 255 * param.b;
+
+	return 1;
+}
+
 static inline int frei0r_param_set_color(f0r_set_param_value_f q,void *plugin, int seq_no,int offset, int *args)
 {
 	f0r_param_color_t col;
@@ -146,6 +216,7 @@ static inline int frei0r_param_set_color(f0r_set_param_value_f q,void *plugin, i
 	col.r = ( args[offset] / 255.0f);
 	col.g = ( args[offset+1] / 255.0f);
 	col.b = ( args[offset+2] / 255.0f);
+
 	fparam = (f0r_param_t*) &col;
 	(*q)( plugin, fparam, seq_no );
 	
@@ -268,15 +339,104 @@ void	frei0r_plug_param_f( void *port, int num_args, int *args )
 	}
 }
 
-int	frei0r_get_param_f( void *port, void *dst )
+int frei0r_get_params_f( void *port, int *args )
 {
-	void *instance = NULL;
-	int err = vevo_property_get(port, "frei0r",0,&instance );
-	if( err != VEVO_NO_ERROR )
+
+	void *plugin = NULL;
+	int err	     = vevo_property_get(port, "frei0r",0,&plugin);
+	if( err != VEVO_NO_ERROR ) {
 		return 0;
+	}
+
+	void *parent = NULL;
+	err 	     = vevo_property_get(port, "parent",0,&parent);
+	if( err != VEVO_NO_ERROR)  {
+		return 0;
+	}
 
 	int np = 0;
-	err = vevo_property_get(port, "num_params",0,&np);
+	err = vevo_property_get( parent, "fre_params",0,&np);
+	if( np == 0 ) {
+		return 0; //@ plug accepts no params but set param is called anyway 
+	}
+
+	int width = 1;
+	int height = 1;
+
+	int i;
+	int vj_seq_no = 0;
+	char key[20];
+
+	f0r_get_param_value_f q = NULL;
+	err = vevo_property_get( parent, "get_params", 0, &q);
+	if( err || q == NULL )
+		return 0;
+
+	for( i = 0;i < np; i ++ ) {
+		int hint = 0;
+		void *param = frei0r_plug_get_param(parent, i, &hint );
+
+		int seq_no = 0;
+		vevo_property_get( param, "seqno", 0, &seq_no );
+		
+		switch( hint ) {
+			case F0R_PARAM_BOOL: 
+				args[vj_seq_no] = frei0r_param_get_bool(q,plugin, seq_no);
+				vj_seq_no ++;
+				break;
+			case F0R_PARAM_DOUBLE:
+				args[vj_seq_no] = frei0r_param_get_double(q,plugin, seq_no);
+				vj_seq_no++;	
+
+				break;
+			case F0R_PARAM_POSITION: 
+				vevo_property_get( port, "HOST_plugin_width", 0, &width );
+				vevo_property_get( port, "HOST_plugin_height", 0, &height );
+				frei0r_param_get_position(q,plugin,seq_no,&(args[vj_seq_no]), &(args[vj_seq_no+1]), width,height);
+				vj_seq_no += 2;
+				break;
+			case F0R_PARAM_COLOR:
+				frei0r_param_get_color(q,plugin,seq_no,&(args[vj_seq_no]), &(args[vj_seq_no+1]), &(args[vj_seq_no+2]));
+				vj_seq_no += 3;	
+				break;
+		}
+	}
+
+	return vj_seq_no;
+}
+
+int	frei0r_get_param_count( void *port)
+{	
+	void *plugin = NULL;
+	int err	     = vevo_property_get(port, "frei0r",0,&plugin);
+	if( err != VEVO_NO_ERROR ) {
+		return 0;
+	}
+
+	void *parent = NULL;
+	err 	     = vevo_property_get(port, "parent",0,&parent);
+	if( err != VEVO_NO_ERROR)  {
+		return 0;
+	}
+
+	int np = 0;
+	err = vevo_property_get(parent, "num_params",0,&np);
+	if( err != VEVO_NO_ERROR || np == 0 )
+		return 0;
+
+	return np;
+}
+
+int	frei0r_get_param_f( void *port, void *dst )
+{
+	void *parent = NULL;
+	int err      = vevo_property_get(port, "parent",0,&parent);
+	if( err != VEVO_NO_ERROR)  {
+		return 0;
+	}
+
+	int np = 0;
+	err = vevo_property_get(parent, "num_params",0,&np);
 	if( err != VEVO_NO_ERROR || np == 0 )
 		return 0;
 
@@ -295,14 +455,8 @@ int	frei0r_get_param_f( void *port, void *dst )
 
 int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 {
-	void *instance = NULL;
-	int  err = vevo_property_get(plugin, "frei0r",0,&instance );
-	if( err != VEVO_NO_ERROR )
-		return 0;
-
-
 	fr0_conv_t *fr = NULL;
-	err = vevo_property_get(plugin, "HOST_conv",0,&fr);
+	int err = vevo_property_get(plugin, "HOST_conv",0,&fr);
 	if( err != VEVO_NO_ERROR )
 		return 0;
 
@@ -641,6 +795,7 @@ void* 	deal_with_fr( void *handle, char *name)
 
 
 	vevo_property_set( port, "num_params", VEVO_ATOM_TYPE_INT, 1, &r_params );
+	vevo_property_set( port, "fre_params", VEVO_ATOM_TYPE_INT, 1, &n_params );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plug_name );
 	vevo_property_set( port, "mixer", VEVO_ATOM_TYPE_INT,1, &extra );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&frei0r_signature_);

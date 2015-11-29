@@ -158,18 +158,15 @@ pd_msg_t *pd_msg_new(char *msg){
     int s[27]; 
     int n = 0;
 	
-    /* get 26 ints */
-    n = sscanf(body, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+    /* get 27 ints */
+    n = sscanf(body, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		s+0, s+1, s+2, s+3,
 		s+4, s+5, s+6, s+7,
 		s+8, s+9, s+10, s+11,
 		s+12,s+13,s+14, s+15,
 		s+16,s+17,s+18, s+19,
 		s+20,s+21,s+22, s+23,
-	       	s+24,s+25, s+26);
-
-    if( n != 27 )
-	    goto error;
+	   	s+24,s+25, s+26, s + 27);
 
     /* create msg */
     size_t est = n * sizeof(float) + sizeof(pd_msg_t); //@ malloc(sizeof(*m)) not ok
@@ -182,7 +179,8 @@ pd_msg_t *pd_msg_new(char *msg){
   error:
     if( m )
     	msg_free(m);
-    post("Parsed only %d out of %d status outlets", n,26 );
+
+    post("Parsed %d status outlets", n);
     return 0;
 
 }

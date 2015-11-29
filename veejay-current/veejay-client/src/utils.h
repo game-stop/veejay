@@ -21,6 +21,7 @@
 #define GVRUTILS
 int 	status_to_arr( char *status, int *array );
 char   *format_time( int pos , double fps);
+void	generator_to_arr( char *line, int *array);
 
 
 #define MAX_PREVIEW_WIDTH 520

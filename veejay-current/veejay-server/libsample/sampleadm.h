@@ -67,6 +67,7 @@
 #define XMLTAG_EFFECTPOS   "position"
 #define XMLTAG_FADER_ACTIVE "chain_fade"
 #define XMLTAG_FADER_VAL    "chain_fade_value"
+#define XMLTAG_FADE_METHOD  "chain_fade_method"
 #define XMLTAG_FADER_INC    "chain_fade_increment"
 #define XMLTAG_FADER_DIRECTION "chain_direction"
 #define XMLTAG_LASTENTRY    "current_entry"
@@ -141,6 +142,7 @@ typedef struct sample_info_t {
     int fader_direction;
     float fader_val;
     float fader_inc;
+	int fade_method;
     int encoder_active;
     unsigned long sequence_num;
     unsigned long rec_total_bytes;
@@ -303,12 +305,12 @@ extern int sample_get_loop_dec(int s1);
 extern int sample_set_loop_dec(int s1, int active);
 extern int sample_apply_loop_dec(int s1, double fps); 
 
-extern int	sample_set_manual_fader(int s1, int value );
+extern int	sample_set_manual_fader(int s1, int value, int method );
 extern int sample_apply_fader_inc(int s1);
 extern int sample_set_fader_active(int s1, int nframes, int direction);
 extern int sample_set_fader_val(int s1, float val);
 extern int sample_get_fader_active(int s1);
-extern float sample_get_fader_val(int s1);
+extern float sample_get_fader_val(int s1, int *method);
 extern float sample_get_fader_inc(int s1);
 extern int sample_get_fader_direction(int s1);
 extern int sample_reset_fader(int t1);

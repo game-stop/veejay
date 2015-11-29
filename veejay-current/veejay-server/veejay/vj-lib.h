@@ -200,6 +200,7 @@ typedef struct {
 	int pace_correction;
 	int	splitscreen;
 	int clear_alpha;
+	int alpha_value;
 } video_playback_setup;
 
 typedef struct {

@@ -101,6 +101,7 @@ typedef struct {
     int fader_direction;
     float fader_val;
     float fader_inc;
+	int fade_method;
     int selected_entry;	
     int effect_toggle;
     int socket_ready;
@@ -130,6 +131,7 @@ typedef struct {
     int cali_duration;
 	void	*generator;
 	int	subrender;
+	int		genargs[16];
 } vj_tag;
 
 #define V4L_BLACKFRAME 1
@@ -141,7 +143,7 @@ int	vj_tag_set_composite(void *compiz,int id, int n);
 int	vj_tag_get_composite(int t1);
 int 	vj_tag_chain_malloc(int e);
 int 	vj_tag_chain_free(int e);
-int	vj_tag_get_v4l_properties(int t1,int *brightness, int *contrast, int *hue,int *color, int *white );
+int	vj_tag_get_v4l_properties(int t1, int *arr );
 int 	vj_tag_init(int w, int h, int pix_fmt, int driver);
 int	vj_tag_get_n_frames(int t1);
 int	vj_tag_set_n_frames(int t1, int n_frames);
@@ -264,6 +266,9 @@ int 	vj_tag_disable(int t1);
 int		vj_tag_sprint_status(int tag_id, int cache,int sa, int ca, int r, int f, int m, int t,int curfps, uint32_t lo, uint32_t hi, int macro,char *str );
 
 uint8_t		*vj_tag_get_cali_buffer(int t1, int type, int *total, int *len, int *uvlen);
+int	vj_tag_generator_set_arg(int t1, int *values);
+int vj_tag_generator_get_args(int t1, int *args, int *n_args, int *fx_id);
+
 int 	vj_tag_stop_encoder(int t1);
 int 	vj_tag_set_brightness(int t1, int value);
 int 	vj_tag_set_contrast(int t1, int value);
@@ -272,8 +277,8 @@ int 	vj_tag_set_hue(int t1, int value);
 int	vj_tag_set_white(int t1, int value);
 int	vj_tag_set_saturation(int t1, int value);
 void 	vj_tag_set_veejay_t(void *info);
-
-int 	vj_tag_set_manual_fader(int t1, int value );
+int	vj_tag_v4l_set_control( int t1, uint32_t id, int value );
+int 	vj_tag_set_manual_fader(int t1, int value, int method );
 
 int 	vj_tag_get_fader_direction(int t1);
 int 	vj_tag_set_fader_active(int t1, int nframes, int direction);
@@ -282,7 +287,7 @@ int 	vj_tag_set_fade_to_sample(int t1, int s1);
 int 	vj_tag_set_fader_val(int t1, float val);
 int 	vj_tag_apply_fader_inc(int t1);
 int 	vj_tag_get_fader_active(int t1);
-float 	vj_tag_get_fader_val(int t1);
+float 	vj_tag_get_fader_val(int t1, int *method);
 float 	vj_tag_get_fader_inc(int t1);
 int 	vj_tag_reset_fader(int t1);
 

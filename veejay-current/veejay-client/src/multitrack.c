@@ -325,7 +325,7 @@ static	void	seq_opacity( GtkWidget *w, gpointer data)
 
 	gdouble value = GTK_ADJUSTMENT( GTK_RANGE(w)->adjustment )->value;
 	gint opacity = (gint)( value * 255.0);
-	gvr_queue_mmvims( mt->preview, v->num ,VIMS_CHAIN_MANUAL_FADE, 0, opacity );
+	gvr_queue_mmmvims( mt->preview, v->num ,VIMS_CHAIN_MANUAL_FADE, 0, opacity, 0 );
 }
 
 

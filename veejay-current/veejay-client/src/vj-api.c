@@ -219,7 +219,8 @@ enum
 	HINT_KF = 13,
 	HINT_SEQ_ACT = 14,
 	HINT_SEQ_CUR = 15,
-	NUM_HINTS = 16
+	HINT_GENERATOR =16,
+	NUM_HINTS = 17
 };
 
 enum
@@ -542,9 +543,13 @@ static widget_name_t *slider_names_ = NULL;
 static widget_name_t *param_incs_ = NULL;
 static widget_name_t *param_decs_ = NULL;
 static widget_name_t *param_kfs_ = NULL;
+static widget_name_t *gen_names_ = NULL;
+static widget_name_t *gen_incs_ = NULL;
+static widget_name_t *gen_decs_ = NULL;
 
 #define MAX_PATH_LEN 1024
 #define VEEJAY_MSG_OUTPUT	4
+#define GENERATOR_PARAMS 11
 
 static	vj_gui_t	*info = NULL;
 void	reloaded_restart();
@@ -597,9 +602,13 @@ static	void	reload_editlist_contents();
 static  void    load_effectchain_info();
 static  void    load_effectlist_info();
 static	void	load_sequence_list();
+static	void	load_generator_info();
 static  void    load_samplelist_info(gboolean with_reset_slotselection);
 static  void    load_editlist_info();
 static	void	set_pm_page_label(int sample_id, int type);
+static  void	notebook_set_page(const char *name, int page);
+static	void	hide_widget(const char *name);
+static  void	show_widget(const char *name);
 #ifndef STRICT_CHECKING
 static	void	disable_widget_( const char *name );
 static	void	enable_widget_(const char *name );
@@ -720,17 +729,61 @@ enum {
 static struct
 {
 	const char *name;
+} capt_label_set[] = {
+ {	"label333" }, //brightness
+ {	"label334" }, //contrast
+ {	"label336" }, //hue
+ {	"label777" }, //saturation
+ {	"label29" },  //temperature
+ {	"label337"}, //gamma
+ {	"label25" }, //sharpness
+ {	"label20" }, //gain
+ {	"label21" }, //red balance
+ {	"label22" }, //blue balance
+ {	"label23" }, //green balance
+ {	"label20" }, //gain
+ {	"label26" }, //bl_compensate
+ {	"label34" }, //whiteness
+ {	"label33" }, //blacklevel
+ {	"label31" }, //exposure
+ {	"label24" }, //autowhitebalance
+ {	"label27" }, //autogain
+ {	"label28" }, //autohue
+ {	"label30" }, //fliph
+ {	"label32" }, //flipv
+ {	NULL },
+};
+
+static struct
+{
+	const char *name;
 } capt_card_set[] = 
 {
-	{ "v4l_expander" },
 	{ "v4l_brightness" },
 	{ "v4l_contrast" },
 	{ "v4l_hue"  },
 	{ "v4l_saturation" },
-	{ "v4l_color" },
-	{ "v4l_white" },
+	{ "v4l_temperature"},
+	{ "v4l_gamma" },
+	{ "v4l_sharpness" },
+	{ "v4l_gain" },
+	{ "v4l_redbalance" },
+	{ "v4l_bluebalance" },
+	{ "v4l_greenbalance" },
+	{ "v4l_gain" },
+	{ "v4l_backlightcompensation"},
+	{ "v4l_whiteness"},
+	{ "v4l_black_level" },
+	{ "v4l_exposure" },
+	{ "check_autowhitebalance"},
+	{ "check_autogain" },
+	{ "check_autohue" },
+	{ "check_flip" },
+	{ "check_flipv"},
 	{ NULL },
 };
+#define CAPT_CARD_SLIDERS 16
+#define CAPT_CARD_BOOLS	   5
 
 static	int	preview_box_w_ = MAX_PREVIEW_WIDTH;
 static  int	preview_box_h_ = MAX_PREVIEW_HEIGHT;
@@ -1410,7 +1463,6 @@ effect_constr* _effect_new( char *effect_line )
 	
 	for(p=0; p < ec->num_arg; p++)
 	{
-		int len = 0;
 		int hint_len = 0;
 		int n = sscanf( effect_line + offset, "%03d", &hint_len );
 		if( n <= 0 ) {
@@ -2110,7 +2162,7 @@ int	veejay_get_sample_image(int id, int type, int wid, int hei)
 		return 0;
 	}
 
-	uint8_t *in = data;
+	uint8_t *in = (uint8_t*)data;
 	uint8_t *out = data_buffer;
 	
 	VJFrame *src1 = yuv_yuv_template( in, in + (wid * hei), in + (wid * hei) + (wid*hei)/4,wid,hei,PIX_FMT_YUV420P );
@@ -2168,8 +2220,6 @@ int	veejay_get_sample_image(int id, int type, int wid, int hei)
 
 	return bw;
 }
-
-
 
 #include "callback.c"
 enum
@@ -2868,15 +2918,6 @@ static	void	update_rgbkey_from_slider()
 	}
 }
 
-static	void	v4l_expander_toggle(int mode)
-{
-	// we can set the expanded of the ABC expander
-	GtkWidget *exp = glade_xml_get_widget_(
-			info->main_window, "v4l_expander");
-	GtkExpander *e = GTK_EXPANDER(exp);
-	gtk_expander_set_expanded( e ,(mode==0 ? FALSE : TRUE) );
-}
-
 int		update_gveejay()
 {
 	return vj_midi_handle_events( info->midi );
@@ -3002,31 +3043,47 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		update = 1;
 		update_record_tab( pm );
 
-		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE ||
-		 	info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR )
-		{
-			enable_widget( "colorselection" );
-		}
-		else
-		{
-			disable_widget( "colorselection" );
-		}
-
 		if( info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
 		{
 			info->uc.reload_hint[HINT_V4L] = 1;
-			for(k = 1; capt_card_set[k].name != NULL; k ++ )
-				enable_widget( capt_card_set[k].name );
-			v4l_expander_toggle(1);
+			for(k = 0; capt_card_set[k].name != NULL; k ++ ) {
+				show_widget( capt_card_set[k].name );
+				show_widget( capt_label_set[k].name );
+			}
 		}
 		else
-		{ /* not v4l, disable capt card */
-			for(k = 1; capt_card_set[k].name != NULL ; k ++ )
-				disable_widget( capt_card_set[k].name );
-
-			v4l_expander_toggle(0);
+		{ 
+			for(k = 0; capt_card_set[k].name != NULL ; k ++ ) {
+				hide_widget( capt_card_set[k].name );
+				hide_widget( capt_label_set[k].name );
+			}
 		}
-
+		
+		switch(info->status_tokens[STREAM_TYPE]) {
+			case STREAM_GENERATOR:
+					show_widget("frame_fxtree1");
+					enable_widget("frame_fxtree1");
+					hide_widget("notebook16");
+					break;
+			case STREAM_WHITE:
+					hide_widget("frame_fxtree1");
+					disable_widget("frame_fxtree1");
+					show_widget("notebook16");
+					notebook_set_page("notebook16",1 );
+					break;
+			case STREAM_VIDEO4LINUX:
+					hide_widget("frame_fxtree1");
+					disable_widget("frame_fxtree1");
+					show_widget("notebook16");
+					notebook_set_page("notebook16",0 );
+					break;
+			default:
+					hide_widget( "frame_fxtree1");
+					disable_widget("frame_fxtree1");
+					hide_widget( "notebook16");
+					break;
+		}
+		
 		info->uc.reload_hint[HINT_HISTORY] = 1;
 
 		put_text( "entry_samplename", "" );
@@ -3051,8 +3108,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )
 	{
 		/* Is a solid color stream */	
-		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE  ||
-			info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR)
+		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
 		{
 			if( ( history[STREAM_COL_R] != info->status_tokens[STREAM_COL_R] ) ||
 			    ( history[STREAM_COL_G] != info->status_tokens[STREAM_COL_G] ) ||
@@ -3061,6 +3117,11 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 				info->uc.reload_hint[HINT_RGBSOLID] = 1;
 			 }
 
+		}
+
+		if( info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR )
+		{
+			info->uc.reload_hint[HINT_GENERATOR] = 1;
 		}
 
 		char *time = format_time( info->status_frame,(double)info->el.fps );
@@ -3183,7 +3244,14 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 
 		if( (history[SUBRENDER] != info->status_tokens[SUBRENDER] || is_button_toggled( "toggle_subrender") != info->status_tokens[SUBRENDER]) )
 		{
-			set_toggle_button( "toggle_subrender", 1 );
+			set_toggle_button( "toggle_subrender", info->status_tokens[SUBRENDER] );
+		}
+
+		int mapta = (info->status_tokens[FADE_METHOD] ?  1: 0 );
+
+		if( is_button_toggled( "toggle_fademethod") != mapta)
+		{
+			set_toggle_button( "toggle_fademethod", mapta );
 		}
 
 		if(update)
@@ -3635,22 +3703,50 @@ static void	setup_effectchain_info( void )
 
 static	void	load_v4l_info()
 {
-	int values[6] = { 0 };
+	int values[21];
 	int len = 0;
+	veejay_memset(values,0,sizeof(values));
+
 	multi_vims( VIMS_STREAM_GET_V4L, "%d", (info->selected_slot == NULL ? 0 : info->selected_slot->sample_id ));
 	gchar *answer = recv_vims(3, &len);
 	if(len > 0 && answer )
 	{
-		int res = sscanf( answer, "%05d%05d%05d%05d%05d%05d", 
-			&values[0],&values[1],&values[2],&values[3],&values[4],&values[5]);
-		if(res == 6)
+		int res = sscanf( answer, "%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d", 
+			&values[0],&values[1],&values[2],&values[3],&values[4],&values[5],
+			&values[6],&values[7],&values[8],&values[9],&values[10],&values[11],
+			&values[12],&values[13],&values[14],&values[15],&values[16],&values[17],&values[18],&values[19],&values[20]);
+		if(res < 25 )
 		{
-			int i;
-			for(i = 1; i < 7; i ++ )
-			{
-				update_slider_gvalue( capt_card_set[i].name, (gdouble)values[i-1]/65535.0 );
-			}	
+			free(answer);
+			return;
 		}	
+
+		int i;
+		int n = CAPT_CARD_SLIDERS;
+		for(i = 0; i < n; i ++ )
+		{
+			if( values[i] < 0 ) {
+				hide_widget( capt_card_set[i].name );
+				hide_widget( capt_label_set[i].name );
+			}
+			else {
+				show_widget( capt_card_set[i].name );
+				show_widget( capt_label_set[i].name);
+				update_slider_gvalue( capt_card_set[i].name, (gdouble)values[i]/65535.0 );
+			}
+		}	
+		n += CAPT_CARD_BOOLS;
+		for( ; i < n; i ++ ) {
+			if( values[i] < 0 ) {
+				hide_widget( capt_card_set[i].name );
+				hide_widget( capt_label_set[i].name );
+			}
+			else {
+				show_widget( capt_card_set[i].name );
+				show_widget( capt_label_set[i].name);
+				set_toggle_button( capt_card_set[i].name, values[i] );
+			}
+		}
 		free(answer);
 	}
 }
@@ -3732,7 +3828,50 @@ static	gint load_parameter_info()
 
 	return 1;
 }	  
+static void		load_generator_info()
+{
+	int args[GENERATOR_PARAMS+1];
+	gint fxlen = 0;
+	multi_vims( VIMS_GET_STREAM_ARGS,"%d",0 );
+	gchar *fxtext = recv_vims(3,&fxlen);
+	
+	veejay_memset(args,0,sizeof(args));
+	generator_to_arr(fxtext, args);
 
+	int np = _effect_get_np( args[0] );
+	int i;
+	
+	for( i = 0; i < np ; i ++ )
+	{
+		enable_widget( gen_names_[i].text );
+		enable_widget( gen_incs_[i].text );
+		enable_widget( gen_decs_[i].text );
+
+		gchar *tt1 = _utf8str(_effect_get_param_description( args[0],i));
+		set_tooltip( gen_names_[i].text, tt1 );
+				
+		gint min=0,max=0,value = 0;
+		value = args[1 + i];
+	
+		if( _effect_get_minmax( args[0], &min,&max, i )) {
+			update_slider_range( gen_names_[i].text,min,max, value, 0);
+		}
+		g_free(tt1);
+	}
+
+	for( i = np; i < GENERATOR_PARAMS; i ++ )
+	{
+		gint min = 0, max = 1, value = 0;
+		update_slider_range( gen_names_[i].text, min,max, value, 0 );
+		disable_widget( gen_names_[i].text );
+		disable_widget( gen_incs_[i].text );
+		disable_widget( gen_decs_[i].text );
+		set_tooltip( gen_names_[i].text, NULL );
+		update_slider_range( gen_names_[i].text, min,max, value, 0 );
+	}
+
+	free(fxtext);
+}
 
 // load effect chain
 static	void	load_effectchain_info()
@@ -4549,7 +4688,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 					}
 					else
 					{
-					update_sample_slot_data( bank_page, poke_slot, values[0],1,gsource,gtype);
+						update_sample_slot_data( bank_page, poke_slot, values[0],1,gsource,gtype);
 					}
 				}
 				g_free(gsource);
@@ -4561,6 +4700,10 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	}
 
 	if(fxtext) free(fxtext);
+
+	select_slot( info->status_tokens[PLAY_MODE] );
+
+
 }
 
 gboolean
@@ -5490,7 +5633,36 @@ static	void	load_editlist_info()
 	free(res);
 }
 
+static void notebook_set_page(const char *name, int page)
+{
+	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
+	if(!w) {
+		veejay_msg(0, "Widget '%s' not found",name);
+		return;
+	}
+	gtk_notebook_set_page( GTK_NOTEBOOK(w),	page );
+}
 
+static void hide_widget(const char *name)
+{
+	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
+	if(!w) {
+		veejay_msg(0, "Widget '%s' not found",name);
+		return;
+	}
+	gtk_widget_hide(w);
+}
+
+
+static void show_widget(const char *name)
+{
+	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
+	if(!w) {
+		veejay_msg(0, "Widget '%s' not found",name);
+		return;
+	}
+	gtk_widget_show(w);
+}
 
 #ifndef STRICT_CHECKING
 static	void	disable_widget_(const char *name)
@@ -5678,7 +5850,6 @@ static void set_default_theme()
 void	find_user_themes(int theme)
 {
 	char *home = getenv("HOME");
-	char data[1024];
 	char location[1024];
 	char path[1024];
 	veejay_memset( theme_path, 0, sizeof(theme_path));
@@ -6122,7 +6293,13 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 			if( (reload_entry_tick_ % ((int)info->el.fps/2))==0) {
 				info->uc.reload_hint[HINT_ENTRY] = 1;	
 			}
-		}	
+			if( deckpage == 5 && info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR){
+				if( (reload_entry_tick_ % ((int)info->el.fps/2))==0) {
+					info->uc.reload_hint[HINT_GENERATOR] = 1;	
+				}
+			}
+		}
+			
 		reload_entry_tick_++;
 	}
 
@@ -6454,6 +6631,11 @@ static void	process_reload_hints(int *history, int pm)
   		gtk_tree_model_foreach( model, chain_update_row, (gpointer*) info );
 	}
 	info->parameter_lock = 0;
+
+	if( info->uc.reload_hint[HINT_GENERATOR]) 
+	{
+		load_generator_info();
+	}
 
 	/* Curve needs update (start/end changed, effect id changed */
 	if ( info->uc.reload_hint[HINT_KF]  )
@@ -6984,6 +7166,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	param_incs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
 	param_decs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
 	param_kfs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+	gen_decs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+	gen_incs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+	gen_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
 
 	for( i = 0; i < MAX_UI_PARAMETERS; i ++ ) {
 		snprintf(text,sizeof(text),"slider_p%d" , i );
@@ -6997,6 +7182,17 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 		snprintf(text,sizeof(text), "kf_p%d", i );		
 		param_kfs_[i].text = strdup( text );
+	}
+
+	for( i = 0; i < GENERATOR_PARAMS; i ++ ) {	
+		snprintf(text,sizeof(text), "slider_g%d",i);
+		gen_names_[i].text = strdup( text );
+
+		snprintf(text,sizeof(text), "dec_g%d", i);
+		gen_decs_[i].text = strdup(text);
+
+		snprintf(text,sizeof(text), "inc_g%d", i );
+		gen_incs_[i].text = strdup(text);
 	}
 
 	gui->uc.reload_force_avoid = FALSE;

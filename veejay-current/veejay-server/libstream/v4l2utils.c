@@ -175,6 +175,37 @@ static struct {
 	{ 0, 			"Unknown"   }
 };
 
+static	struct
+{
+	uint32_t id;
+	const char *key;
+	const int  atom;
+	void (*set_func)(void *ctx, int32_t value);
+	int32_t (*get_func)(void *ctx);
+} property_list[] = {
+ {	V4L2_CID_BRIGHTNESS,		"brightness",	VEVO_ATOM_TYPE_INT, v4l2_set_brightness, 	v4l2_get_brightness },
+ {	V4L2_CID_CONTRAST,			"contrast",		VEVO_ATOM_TYPE_INT, v4l2_set_contrast,	 	v4l2_get_contrast },
+ {	V4L2_CID_SATURATION,		"saturation",	VEVO_ATOM_TYPE_INT, v4l2_set_saturation, 	v4l2_get_saturation },
+ {	V4L2_CID_HUE,				"hue",			VEVO_ATOM_TYPE_INT, v4l2_set_hue,			v4l2_get_hue },
+ {	V4L2_CID_GAIN,				"gain",			VEVO_ATOM_TYPE_INT,	v4l2_set_gain,			v4l2_get_gain },
+ {	V4L2_CID_GAMMA,				"gamma",		VEVO_ATOM_TYPE_INT, v4l2_set_gamma,			v4l2_get_gamma },
+ {	V4L2_CID_BLACK_LEVEL,		"black_level",	VEVO_ATOM_TYPE_INT,	v4l2_set_black_level,	v4l2_get_black_level},
+ {  V4L2_CID_WHITENESS,			"whiteness",	VEVO_ATOM_TYPE_INT, v4l2_set_whiteness,		v4l2_get_whiteness },
+ {	V4L2_CID_VFLIP,				"flipv",		VEVO_ATOM_TYPE_BOOL, v4l2_set_vflip,		v4l2_get_vflip},
+ {	V4L2_CID_RED_BALANCE,		"red_balance",	VEVO_ATOM_TYPE_INT, v4l2_set_red_balance, 	v4l2_get_red_balance },
+// {  V4L2_CID_GREEN_BALANCE,		"green_balance",VEVO_ATOM_TYPE_INT, v4l2_set_green_balance,	v4l2_get_green_balance },
+ {	V4L2_CID_AUTO_WHITE_BALANCE,"auto_white",	VEVO_ATOM_TYPE_BOOL, v4l2_set_auto_white_balance, v4l2_get_auto_white_balance },
+ {	V4L2_CID_BLUE_BALANCE,		"blue_balance",	VEVO_ATOM_TYPE_INT, v4l2_set_blue_balance, 	v4l2_get_blue_balance },
+ {	V4L2_CID_SHARPNESS,			"sharpness",	VEVO_ATOM_TYPE_INT, v4l2_set_sharpness, 	v4l2_get_sharpness },
+ {	V4L2_CID_BACKLIGHT_COMPENSATION,"bl_compensate",	VEVO_ATOM_TYPE_INT, v4l2_set_backlight_compensation, v4l2_get_backlight_compensation },
+ {	V4L2_CID_AUTOGAIN,			"auto_gain",	VEVO_ATOM_TYPE_BOOL, v4l2_set_autogain, 	v4l2_get_autogain },
+ {	V4L2_CID_HUE_AUTO,			"auto_hue",		VEVO_ATOM_TYPE_BOOL, v4l2_set_hue_auto, 	v4l2_get_hue_auto },
+ {	V4L2_CID_WHITE_BALANCE_TEMPERATURE, "temperature", VEVO_ATOM_TYPE_INT, v4l2_set_temperature, v4l2_get_temperature },
+ {	V4L2_CID_HFLIP,				"fliph",		VEVO_ATOM_TYPE_BOOL, v4l2_set_hflip, 		v4l2_get_hflip },
+ {	V4L2_CID_EXPOSURE,			"exposure",		VEVO_ATOM_TYPE_INT,  v4l2_set_exposure,		v4l2_get_exposure },
+ {	V4L2_CID_BASE,				NULL,			-1 }
+};
+
 static	const	char	*v4l2_get_std(int std) {
 	unsigned int i;
 	for(i=0; v4l2_video_standards[i].std != 0 ; i ++ ) {
@@ -1098,6 +1129,21 @@ v4l2_rw_fallback:
 	v->frame_ready = 0;
 	v->frameidx = 0;
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Supported controls:");
+	for( i = 0; property_list[i].key != NULL; i ++ ) {
+		struct v4l2_queryctrl queryctrl;
+		struct v4l2_control control;
+
+		veejay_memset(&queryctrl, 0,sizeof(queryctrl));
+		veejay_memset(&control,0,sizeof(control));
+	
+		queryctrl.id = property_list[i].id;
+
+		if( vioctl( v->fd, VIDIOC_QUERYCTRL, &queryctrl) == -1) 
+			continue;
+
+		veejay_msg(VEEJAY_MSG_DEBUG, "\t%s", property_list[i].key );
+	}
 
 	return v;
 }
@@ -1428,6 +1474,14 @@ void	v4l2_set_red_balance( void *d,int32_t value ) {
 int32_t v4l2_get_red_balance( void *d ) {
 	return v4l2_get_control( d, V4L2_CID_RED_BALANCE );
 }
+// green balance does not exist
+void	v4l2_set_green_balance( void *d,int32_t value ) {
+//	v4l2_set_control( d, V4L2_CID_GREEN_BALANCE, value );
+}
+int32_t v4l2_get_green_balance( void *d ) {
+//	return v4l2_get_control( d, V4L2_CID_GREEN_BALANCE );
+	return -1;
+}
 
 // auto white balance
 void	v4l2_set_auto_white_balance( void *d, int32_t value ) {
@@ -1494,33 +1548,40 @@ void	v4l2_set_exposure( void *d ,int32_t value )
 int32_t v4l2_get_exposure( void *d ) {
 	return v4l2_get_control( d, V4L2_CID_EXPOSURE );
 }
-
-static	struct
+void	v4l2_set_black_level( void *d ,int32_t value )
 {
-	uint32_t id;
-	const char *key;
-	const int  atom;
-	void (*set_func)(void *ctx, int32_t value);
-	int32_t (*get_func)(void *ctx);
-} property_list[] = {
- {	V4L2_CID_BRIGHTNESS,		"brightness",	VEVO_ATOM_TYPE_INT, v4l2_set_brightness, 	v4l2_get_brightness },
- {	V4L2_CID_CONTRAST,			"contrast",		VEVO_ATOM_TYPE_INT, v4l2_set_contrast,	 	v4l2_get_contrast },
- {	V4L2_CID_SATURATION,		"saturation",	VEVO_ATOM_TYPE_INT, v4l2_set_saturation, 	v4l2_get_saturation },
- {	V4L2_CID_HUE,				"hue",			VEVO_ATOM_TYPE_INT, v4l2_set_hue,			v4l2_get_hue },
- {	V4L2_CID_GAIN,				"gain",			VEVO_ATOM_TYPE_INT,	v4l2_set_gain,			v4l2_get_gain },
- {	V4L2_CID_GAMMA,				"gamma",		VEVO_ATOM_TYPE_INT, v4l2_set_gamma,			v4l2_get_gamma },
- {	V4L2_CID_RED_BALANCE,		"red_balance",	VEVO_ATOM_TYPE_INT, v4l2_set_red_balance, 	v4l2_get_red_balance },
- {	V4L2_CID_AUTO_WHITE_BALANCE,"auto_white",	VEVO_ATOM_TYPE_BOOL, v4l2_set_auto_white_balance, v4l2_get_auto_white_balance },
- {	V4L2_CID_BLUE_BALANCE,		"blue_balance",	VEVO_ATOM_TYPE_INT, v4l2_set_blue_balance, 	v4l2_get_blue_balance },
- {	V4L2_CID_SHARPNESS,			"sharpness",	VEVO_ATOM_TYPE_INT, v4l2_set_sharpness, 	v4l2_get_sharpness },
- {	V4L2_CID_BACKLIGHT_COMPENSATION,"bl_compensate",	VEVO_ATOM_TYPE_INT, v4l2_set_backlight_compensation, v4l2_get_backlight_compensation },
- {	V4L2_CID_AUTOGAIN,			"auto_gain",	VEVO_ATOM_TYPE_BOOL, v4l2_set_autogain, 	v4l2_get_autogain },
- {	V4L2_CID_HUE_AUTO,			"auto_hue",		VEVO_ATOM_TYPE_BOOL, v4l2_set_hue_auto, 	v4l2_get_hue_auto },
- {	V4L2_CID_WHITE_BALANCE_TEMPERATURE, "temperature", VEVO_ATOM_TYPE_INT, v4l2_set_temperature, v4l2_get_temperature },
- {	V4L2_CID_HFLIP,				"fliph",		VEVO_ATOM_TYPE_BOOL, v4l2_set_hflip, 		v4l2_get_hflip },
- {	V4L2_CID_EXPOSURE,			"exposure",		VEVO_ATOM_TYPE_INT,  v4l2_set_exposure,		v4l2_get_exposure },
- {	V4L2_CID_BASE,				NULL,			-1 }
-};
+	v4l2_set_control( d, V4L2_CID_BLACK_LEVEL, value );
+} 
+
+int32_t v4l2_get_black_level( void *d ) {
+	return v4l2_get_control( d, V4L2_CID_BLACK_LEVEL );
+}
+void	v4l2_set_whiteness(void *d, int32_t value) {
+	v4l2_set_control( d, V4L2_CID_WHITENESS, value );
+}
+
+int32_t v4l2_get_whiteness(void *d) {
+	return v4l2_get_control( d, V4L2_CID_WHITENESS);
+}
+void	v4l2_set_vflip(void *d, int32_t value) {
+	v4l2_set_control( d, V4L2_CID_VFLIP, value );
+}
+
+int32_t v4l2_get_vflip(void *d) {
+	return v4l2_get_control( d, V4L2_CID_VFLIP);
+}
+
+
+
+uint32_t				v4l2_get_property_id( const char *name )
+{
+		int i;
+		for( i = 0; property_list[i].key != NULL; i ++ ) {
+			if(strncasecmp( property_list[i].key, name, strlen(property_list[i].key) ) == 0 )
+				return property_list[i].id;
+		}
+		return 0;
+}
 
 const char* 			v4l2_get_property_name( const int id ) {
 	int i;
@@ -1599,22 +1660,32 @@ int32_t	v4l2_get_control( void *d, int32_t type )
 
 	if( -1 == vioctl( v->fd, VIDIOC_QUERYCTRL, &queryctrl)) {
 		if( errno != EINVAL ) {
-			return 0;
+			return -1;
 		}
+		return -1;
 	} else if ( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED ) {
 		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %x not supported",type );
-		return 0;
+		return -1;
 	} else {
 		control.id = type;
 		if( -1 == vioctl( v->fd, VIDIOC_G_CTRL, &control )) {
 			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: error getting property %x reason: %s", type, strerror(errno) );
+			return -1;
 		}
 	}
+
+	float range0 = (queryctrl.maximum - queryctrl.minimum);
+	float range1 = 1.0f;
+	int32_t oldval = control.value;
+	float weight = (( control.value - queryctrl.minimum ) * range1) / range0;
+
+	control.value = (int) (weight * 65535);
+
 	return control.value;
 }
 
 
-void	v4l2_set_control( void *d, int32_t type,  int32_t value )
+void	v4l2_set_control( void *d, uint32_t type,  int32_t value )
 {
 	v4l2info *v = (v4l2info*) d;
 	struct v4l2_queryctrl queryctrl;
@@ -1627,30 +1698,41 @@ void	v4l2_set_control( void *d, int32_t type,  int32_t value )
 		if( errno != EINVAL ) {
 				return;
 		} else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: property type %x not supported",type );
+			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: property type %s not supported",v4l2_get_property_name(type) );
 		}
 	} else if ( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED ) {
-		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %x not supported (disabld)",type );
+		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %s not supported (disabld)",v4l2_get_property_name(type) );
 	} else {
-		memset( &control,0,sizeof(control));
+		memset(&control,0,sizeof(control));
 		control.id = type;
-		control.value = value;
-		if (value > 0 ) {
-			float s1 = value / 65535.0f;
-			int32_t s2 = queryctrl.maximum * s1;
-			control.value = s2;
-		}
-
 		if( value == -1 ) {
-			veejay_msg(VEEJAY_MSG_INFO,"v4l2: changed property type %d to default value %d", type, queryctrl.default_value );
+			veejay_msg(VEEJAY_MSG_INFO,"v4l2: changed property type %s to default value %d", v4l2_get_property_name(type), queryctrl.default_value );
 			control.value = queryctrl.default_value;
 		}
-		if( -1 == vioctl( v->fd, VIDIOC_S_CTRL, &control )) {
-			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: error setting property %x to %d, reason: %s", type, control.value,strerror(errno) );
-		} else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: changed property type %d to value %d", type, control.value );
+		else {
+			float range0 = 65535.0f;
+			float range1 = ( (float) queryctrl.maximum - queryctrl.minimum );
+			float weight = (( value * range1) / range0) + queryctrl.minimum;
+
+			control.value = (int) weight;
 		}
-	}
+
+		if( vioctl( v->fd, VIDIOC_S_CTRL, &control ) == -1)
+	   	{
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: error setting property %s to %d, reason: %s", v4l2_get_property_name(type), control.value,strerror(errno) );
+		}
+
+/*
+		control.id = type;
+		control.value = 0;
+		if( -1 == vioctl( v->fd, VIDIOC_G_CTRL, &control )) {
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: error getting property %x reason: %s", type, strerror(errno) );
+		}
+		else {
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: property %s is now %d", v4l2_get_property_name(type), control.value );	
+		}
+*/
+	} 
 }
 
 

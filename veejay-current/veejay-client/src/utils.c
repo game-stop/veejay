@@ -28,7 +28,7 @@
 
 int	status_to_arr( char *status, int *array )
 {
-	int n = sscanf(status, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+	int n = sscanf(status, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		array + 0,
 		array + 1,
 		array + 2,
@@ -55,8 +55,32 @@ int	status_to_arr( char *status, int *array )
 		array + 23,
 		array + 24,
 		array + 25,
-		array + 26	);
+		array + 26,
+		array + 27,
+		array + 28	);
+
 	return n;
+}
+
+void	generator_to_arr( char *line, int *array)
+{
+	char *p = line;
+	int i = 0;
+	while(*p) {
+		char *end = NULL;
+		array[i] = strtol(p, &end, 10 );
+		if( end == p)
+			break;
+
+		while(*end == ' ') {
+			*end++;
+			if(*end == NULL)
+				break;
+		}
+
+		p = end;
+		i++;
+	}
 }
 
 

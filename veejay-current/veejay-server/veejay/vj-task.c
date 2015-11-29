@@ -459,7 +459,7 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 
 void	vj_task_set_from_frame( VJFrame *in )
 {
-	uint8_t n = task_get_workers();
+	const uint8_t n = task_get_workers();
 	uint8_t i;
 
 	if( in->format == PIX_FMT_RGBA ) 
@@ -506,7 +506,7 @@ void	vj_task_set_from_frame( VJFrame *in )
 			v->row_strides[3] = in->stride[3];
 			v->format		  = in->format;
 			if( v->ssm == 1 ) { 
-				v->strides[1] = (v->width * v->height );
+				v->strides[1] = v->strides[0];
 				v->strides[2] = v->strides[1];
 			}
 		}
@@ -515,7 +515,7 @@ void	vj_task_set_from_frame( VJFrame *in )
 
 int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func )
 {
-	uint8_t n = task_get_workers();
+	const uint8_t n = task_get_workers();
 	if( n <= 1 )
 		return 0;
 
@@ -554,7 +554,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 			f[j]->jobnum = j;
 		}	
 	}
-	
+
 	for( i = 0; i < n; i ++ ) {
 		job_list[i]->job = func;
 		job_list[i]->arg = f[i];

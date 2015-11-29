@@ -294,6 +294,17 @@ void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 
 }
 
+void	on_toggle_fademethod_toggled(GtkWidget *w, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+	
+	GtkWidget *op = glade_xml_get_widget(info->main_window, "manualopacity");
+	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(op)->adjustment)->value;
+	
+	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d %d", (int)(val), is_button_toggled("toggle_fademethod"));
+}
+
 void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 {
 	if(info->status_lock)
@@ -301,20 +312,9 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
 	
-	if( is_button_toggled( "loglinear" ))
-	{
-		double v = val;
-		if( v > 0.0 )
-			v = 255.0/v;
-		if( v > 0.0 )
-			v = log( val / 0.01 ) / log( 1.0 / 0.01 );
-		val = 255.0 * v;	
-	}
-
-	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d",
-		(int)(val));
+	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d %d", (int)(val), is_button_toggled("toggle_fademethod"));
 	
-	vj_midi_learning_vims_complex( info->midi, "loglinear", VIMS_CHAIN_FADE_IN, 0,1 );
+	vj_midi_learning_vims_complex( info->midi, "manualopacity", VIMS_CHAIN_FADE_IN, 0,1 );
 	
 	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val ); 
 }
@@ -596,6 +596,68 @@ if(arg_num != info->uc.selected_parameter_id)\
 vj_kf_select_parameter(arg_num);\
 }\
 }
+static void gen_changed( int num, int value )
+{
+	int i;
+	int values[16];
+
+	if(!info->status_lock && !info->parameter_lock)
+	{
+		info->parameter_lock = 1;
+
+		for( i = 0; gen_names_[i].text != NULL; i ++ ) {
+			if( num == i ) {
+				values[num] = value;
+			}
+			else {
+				GtkWidget *w = glade_xml_get_widget( info->main_window, gen_names_[i].text );
+				values[i] = (gint) GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
+			}
+		}
+
+		char line[255];
+		snprintf(line,sizeof(line), "%d:0 %d %d %d %d %d %d %d %d %d %d;",
+				VIMS_STREAM_SET_ARG,
+				values[0],values[1],values[2],values[3],values[4],values[5],
+				values[6],values[7],values[8],values[9]);
+		msg_vims(line);
+
+		info->parameter_lock = 0;
+	}
+
+}
+
+static void genv_changed( int num, int value, const char *selected )
+{
+	int i;
+	int values[16];
+
+	if(!info->status_lock && !info->parameter_lock)
+	{
+		info->parameter_lock = 1;
+
+		for( i = 0; gen_names_[i].text != NULL; i ++ ) {
+			GtkWidget *w = glade_xml_get_widget( info->main_window, gen_names_[i].text );
+
+			if( num == i ) {
+				update_slider_value( gen_names_[i].text, (get_slider_val(gen_names_[i].text) + value), 0 );\
+				values[i] = (gint) GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
+			}
+			else {
+				values[i] = (gint) GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
+			}
+		}
+
+		char line[255];
+		snprintf(line,sizeof(line), "%d:0 %d %d %d %d %d %d %d %d %d %d;",
+				VIMS_STREAM_SET_ARG,
+				values[0],values[1],values[2],values[3],values[4],values[5],
+				values[6],values[7],values[8],values[9]);
+		msg_vims(line);
+		
+		info->parameter_lock = 0;
+	}
+}
 
 void	on_slider_p0_value_changed(GtkWidget *w, gpointer user_data)
 {
@@ -663,6 +725,7 @@ void	on_slider_p15_value_changed(GtkWidget *w, gpointer user_data)
 {
 	slider_changed( 15, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
+
 void	on_inc_p0_clicked(GtkWidget *w, gpointer user_data)
 {
 	param_changed( 0, 1 , "slider_p0" );
@@ -795,6 +858,147 @@ void	on_dec_p15_clicked(GtkWidget *w, gpointer user_data)
 {
 	param_changed( 15, -1, "slider_p15");
 }
+
+void	slider_g0_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g1_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 1, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g2_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 2, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g3_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 3, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g4_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 4, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g5_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 5, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g6_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 6, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g7_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 7, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+
+void	slider_g8_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 8, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g9_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 9, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+void	slider_g10_value_changed(GtkWidget *w, gpointer user_data)
+{
+	gen_changed( 10, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
+
+void	on_inc_g0_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(0, 1 , "slider_g0" );
+}
+void	on_dec_g0_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(0, -1, "slider_g0");
+}
+
+void	on_inc_g1_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(1, 1 , "slider_g1" );
+}
+void	on_dec_g1_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(1, -1, "slider_g1");
+}
+
+void	on_inc_g2_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(2, 1 , "slider_g2" );
+}
+void	on_dec_g2_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(2, -1, "slider_g2");
+}
+void	on_inc_g3_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(3, 1 , "slider_g3" );
+}
+void	on_dec_g3_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(3, -1, "slider_g3");
+}
+void	on_inc_g4_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(4, 1 , "slider_g4" );
+}
+void	on_dec_g4_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(4, -1, "slider_g4");
+}
+void	on_inc_g5_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(5, 1 , "slider_g5" );
+}
+void	on_dec_g5_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(5, -1, "slider_g5");
+}
+void	on_inc_g6_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(6, 1 , "slider_g6" );
+}
+void	on_dec_g6_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(6, -1, "slider_g6");
+}
+void	on_inc_g7_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(7, 1 , "slider_g7" );
+}
+void	on_dec_g7_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(7, -1, "slider_g7");
+}
+void	on_inc_g8_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(8, 1 , "slider_g8" );
+}
+void	on_dec_g8_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(8, -1, "slider_g8");
+}
+void	on_inc_g9_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(9, 1 , "slider_g9" );
+}
+void	on_dec_g9_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(9, -1, "slider_g9");
+}
+void	on_inc_g10_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(10, 1 , "slider_g9" );
+}
+void	on_dec_g10_clicked(GtkWidget *w, gpointer user_data)
+{
+	genv_changed(10, -1, "slider_g9");
+}
+
+
+
+
 
 void	on_button_stoplaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -994,7 +1198,7 @@ void	on_v4l_hue_value_changed(GtkWidget *widget, gpointer user_data)
 	}
 }	
 
-void	on_v4l_white_value_changed(GtkWidget *widget, gpointer user_data)
+void	on_v4l_gamma_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
@@ -1031,6 +1235,115 @@ void	on_v4l_saturation_value_changed(GtkWidget *widget, gpointer user_data)
 
 	}
 }
+
+/* no midi support yet for the following v4l controls (FIXME) */
+void	on_v4l_gain_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d gain", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_redbalance_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d red_balance", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_bluebalance_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d blue_balance", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_greenbalance_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d green_balance", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_sharpness_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d sharpness", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_backlightcompensation_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d bl_compensate", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_temperature_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d temperature", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_exposure_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d exposure", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_whiteness_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d whiteness", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_v4l_black_level_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d black_level", info->selected_slot->sample_id,(int)(GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) ); 
+	}
+}
+void	on_check_autogain_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d auto_gain", info->selected_slot->sample_id,is_button_toggled("check_autogain"));
+	}
+}
+void	on_check_autohue_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d auto_hue", info->selected_slot->sample_id,is_button_toggled("check_autohue"));
+	}
+}
+void	on_check_flip_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d fliph", info->selected_slot->sample_id,is_button_toggled("check_flip"));
+	}
+}
+void	on_check_flipv_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d flipv", info->selected_slot->sample_id,is_button_toggled("check_flipv"));
+	}
+}
+void	on_check_autowhitebalance_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d auto_white", info->selected_slot->sample_id,is_button_toggled("autowhitebalance"));
+	}
+}
+
+
 #ifndef HAVE_GTK2_6
 static gchar	*my_gtk_combo_box_get_active_text(GtkComboBox *combo )
 {
@@ -2914,6 +3227,21 @@ void	on_alpha_effects_toggled(GtkWidget *w, gpointer user_data)
 		gtk_notebook_set_page(GTK_NOTEBOOK(n), 2);
 }
 
+void	on_toggle_alpha255_toggled(GtkWidget *w, gpointer user_data)
+{
+	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", is_button_toggled( "alphacomposite"), is_button_toggled("toggle_alpha255") ? 255: 0 ); 
+}
+
+void	on_alphacomposite_toggled(GtkWidget *widget, gpointer user_data)
+{	
+	int alpha_value = 0;
+	if (is_button_toggled( "toggle_alpha255"))
+		alpha_value = 255;
+
+	multi_vims( VIMS_ALPHA_COMPOSITE,"%d %d", is_button_toggled( "alphacomposite" ), alpha_value ); 
+}
+
+
 void	on_mixing_effects_toggled(GtkWidget *w, gpointer user_data)
 {
 	 GtkWidget *n = glade_xml_get_widget_( info->main_window, "effectspanel" );
@@ -4162,12 +4490,6 @@ void	on_save_midi_layout1_activate( GtkWidget *w, gpointer data )
 void on_clear_midi_layout1_activate( GtkWidget *w, gpointer data )
 {
 	vj_midi_reset(info->midi);
-}
-
-
-void	on_alphacomposite_toggled(GtkWidget *widget, gpointer user_data)
-{	
-	multi_vims( VIMS_ALPHA_COMPOSITE,"%d", is_button_toggled( "alphacomposite" )); 
 }
 
 void	on_button_vloop_stop_clicked(GtkWidget *widget, gpointer user_data)

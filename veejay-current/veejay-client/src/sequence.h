@@ -40,6 +40,7 @@ int		gvr_get_stream_id( void  *data, int id );
 void		gvr_set_master( void *preview, int master_track );
 //format and queue vims messages from extern
 
+void		gvr_queue_mmmvims( void *preview, int track_id, int vims_id, int val1,int val2, int val3 );
 void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int val2 );
 void		gvr_queue_mvims( void *preview, int track_id, int vims_id, int val );
 void		gvr_queue_vims( void *preview, int track_id, int vims_id );

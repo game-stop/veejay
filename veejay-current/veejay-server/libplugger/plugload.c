@@ -609,6 +609,11 @@ void 	plug_set_parameters( void *instance, int n_args, void *values )
 {
 	frei0r_plug_param_f( instance, n_args, (int*) values );
 }
+void	plug_get_parameters( void *instance, int *args, int *n_args)
+{
+	*n_args = frei0r_get_params_f( instance, args );
+}
+
 void	plug_get_defaults( void *instance, void *fx_values )
 {
 	generic_default_values_f	gdv;

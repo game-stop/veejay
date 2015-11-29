@@ -57,6 +57,7 @@
 #include <libvje/internal.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/effects/opacity.h>
+#include <libvje/effects/masktransition.h>
 #include <libqrwrap/qrwrapper.h>
 #include <veejay/vj-split.h>
 #include <libresample/resample.h>
@@ -2529,7 +2530,7 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
 	if(clear_framebuffer__ == 1 || info->settings->clear_alpha == 1)
 	{
 		if( frames[0]->stride[3] > 0 )
-			veejay_memset( frames[0]->data[3], 0, frames[0]->stride[3] * frames[0]->height );
+			veejay_memset( frames[0]->data[3], info->settings->alpha_value, frames[0]->stride[3] * frames[0]->height );
 		clear_framebuffer__ = 0;
 	}
 
@@ -2576,10 +2577,10 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
 		}
 	}
 
-	if(clear_framebuffer__ == 1)
+	if(clear_framebuffer__ == 1 || info->settings->clear_alpha == 1)
 	{
 		if( frames[0]->stride[3] > 0 )
-			veejay_memset( frames[0]->data[3], 0, frames[0]->stride[3] * frames[0]->height );
+			veejay_memset( frames[0]->data[3], info->settings->alpha_value, frames[0]->stride[3] * frames[0]->height );
 		clear_framebuffer__ = 0;
 	}
 
@@ -2990,16 +2991,27 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame)
 {
-	vj_perform_copy3( frame->data, temp_buffer, frame->len, frame->uv_len,frame->stride[3] * frame->height  );
+	vj_perform_copy3( frame->data, temp_buffer, frame->len, (frame->ssm ? frame->len : frame->uv_len),frame->stride[3] * frame->height  );
 }
 
 static	inline	void	vj_perform_supersample_chain( veejay_t *info, VJFrame *frame )
 {
+	//temp_buffer contains state of frame before entering render chain 
 	chroma_supersample(
 		info->settings->sample_mode,
 		frame,
 		temp_buffer );
-	frame->ssm = 1;
+
+	//but top source is conditional
+	if( frame->ssm == 0 ) {
+		chroma_supersample(
+			info->settings->sample_mode,
+			frame,
+			frame->data );
+
+		frame->ssm = 1;
+	}
+	info->effect_frame1->ssm = frame->ssm;
 }
 
 
@@ -3009,22 +3021,21 @@ void	vj_perform_follow_fade(int status) {
 
 static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 {
-	unsigned int opacity; 
+	int opacity; 
 	int mode   = pvar_.fader_active;
 	int follow = 0;
+	int fade_method = 0;
 
-	if( frame->ssm )
-		vj_perform_supersample_chain( info, frame );
-	
+	vj_perform_supersample_chain( info, frame );
+
  	if(mode == 2 ) // manual fade
-		opacity = (int) sample_get_fader_val(info->uc->sample_id);
+		opacity = (int) sample_get_fader_val(info->uc->sample_id, &fade_method);
 	else	// fade in/fade out
-	    	opacity = (int) sample_apply_fader_inc(info->uc->sample_id);
+	    opacity = (int) sample_apply_fader_inc(info->uc->sample_id);
 
 	if(mode != 2)
 	{
 	    int dir =sample_get_fader_direction(info->uc->sample_id);
-
 		if((dir<0) &&(opacity == 0))
 		{
 			sample_set_effect_status(info->uc->sample_id, 1);
@@ -3033,7 +3044,7 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 		 	  follow = 1;
 			}
 
-	      		veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto Fade Out done");
+	      	veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto Fade Out done");
 		}
 		if((dir>0) && (opacity==255))
 		{
@@ -3052,7 +3063,14 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 
 	int len2 = ( frame->ssm == 1 ? helper_frame->len : helper_frame->uv_len );
 
-	opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+	switch( fade_method ) {
+		case 1:
+			alpha_transition_apply( frame, temp_buffer,opacity );
+			break;
+		default:
+			opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+			break;
+	}
 
 	if( follow ) {
 		//@ find first to jump to
@@ -3067,7 +3085,6 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 				break;
 			}
 		}
-		
 	}
 
 	return follow;
@@ -3076,17 +3093,17 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 
 static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 {
-	unsigned int opacity; 
+	int opacity; 
 	int mode = pvar_.fader_active;
 	int follow = 0;
+	int fade_method = 0;
 
-	if( !frame->ssm )
-		vj_perform_supersample_chain( info, frame );
+	vj_perform_supersample_chain( info, frame );
 
 	if(mode == 2)
-		opacity = (int) vj_tag_get_fader_val(info->uc->sample_id);
+		opacity = (int) vj_tag_get_fader_val(info->uc->sample_id, &fade_method);
 	else
-     		opacity = (int) vj_tag_apply_fader_inc(info->uc->sample_id);
+    	opacity = (int) vj_tag_apply_fader_inc(info->uc->sample_id);
 
 	if( opacity == 0 ) {
 		if( pvar_.follow_fade ) {
@@ -3117,16 +3134,23 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 			veejay_msg(VEEJAY_MSG_DEBUG, "Stream Chain Auto Fade done");
 		}
     	} else if(mode){
-		if( pvar_.follow_fade ) {
-		   follow = 1;
+			if( pvar_.follow_fade ) {
+			 follow = 1;
 		}
 	}
 
-	int len2 = ( frame->ssm == 1 ? helper_frame->len : helper_frame->uv_len );
-	opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+	int len2 = ( frame->ssm == 1 ? frame->len : frame->uv_len );
+
+	switch( fade_method ) {
+		case 1:
+			alpha_transition_apply( frame, temp_buffer,opacity );
+			break;
+		default:
+			opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+			break;
+	}
 
 	if( follow ) {
-		//@ find first to jump to
 		int i;
 		int tmp=0,k;
 		for( i = 0; i < SAMPLE_MAX_EFFECTS - 1; i ++ ) {
@@ -3140,7 +3164,6 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 		}
 	}
 	return follow;
-
 }
 #ifdef HAVE_JACK
 static int play_audio_sample_ = 0;
@@ -3354,26 +3377,28 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 	}
 }
 
-static	void 	vj_perform_finish_chain( veejay_t *info )
+static	void 	vj_perform_finish_chain( veejay_t *info, int is444 )
 {
-	VJFrame *frame = info->effect_frame1;
+	VJFrame frame;
+    veejay_memcpy(&frame,info->effect_frame1,sizeof(VJFrame));
 
-    frame->data[0] = primary_buffer[0]->Y;
-   	frame->data[1] = primary_buffer[0]->Cb;
-    frame->data[2] = primary_buffer[0]->Cr;
-	frame->data[3] = primary_buffer[0]->alpha;
+    frame.data[0] = primary_buffer[0]->Y;
+   	frame.data[1] = primary_buffer[0]->Cb;
+    frame.data[2] = primary_buffer[0]->Cr;
+	frame.data[3] = primary_buffer[0]->alpha;
+	frame.ssm     = is444;
 
 	int result = 0;
 
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
 		if( pvar_.fader_active )
-			result = vj_perform_post_chain_tag(info,frame);
+			result = vj_perform_post_chain_tag(info,&frame);
 	}
 	else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
 	{
 		if( pvar_.fader_active)
-			result = vj_perform_post_chain_sample(info,frame);
+			result = vj_perform_post_chain_sample(info,&frame);
 	}
 
 	if( result ) {
@@ -3434,7 +3459,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		{
 			out.format = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
 		}
-		
 
 		if(!frame->ssm) {
           	  chroma_supersample(settings->sample_mode,frame,pri );
@@ -3633,10 +3657,10 @@ static	void	vj_perform_record_frame( veejay_t *info )
 		vj_perform_record_sample_frame(info, which_sample );
 }
 
-static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings )
+static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings, int is444 )
 {
 	int deep = 0;
-	vj_perform_finish_chain( info );
+	vj_perform_finish_chain( info, is444 );
 
 	vj_perform_render_font( info, settings);
 	//@ record frame 
@@ -3705,7 +3729,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 			if(vj_perform_verify_rows(info))
 				vj_perform_sample_complete_buffers(info, &is444);
 
-			cur_out = vj_perform_render_magic( info, info->settings );
+			cur_out = vj_perform_render_magic( info, info->settings,is444 );
 		   	res = 1;
 
      			 break;
@@ -3714,7 +3738,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 			   vj_perform_plain_fill_buffer(info);
 
-			   cur_out = vj_perform_render_magic( info, info->settings );
+			   cur_out = vj_perform_render_magic( info, info->settings,0 );
 			   res = 1;
  		    break;
 		case VJ_PLAYBACK_MODE_TAG:
@@ -3733,7 +3757,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 				if(vj_perform_verify_rows(info))
 					vj_perform_tag_complete_buffers(info, &is444);
 				
-				cur_out = vj_perform_render_magic( info, info->settings );
+				cur_out = vj_perform_render_magic( info, info->settings, is444 );
 			 }
 			 res = 1;	 
 		   	 break;

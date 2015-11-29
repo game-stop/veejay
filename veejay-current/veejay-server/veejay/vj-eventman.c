@@ -1306,6 +1306,20 @@ void		vj_init_vevo_events(void)
 				"Blue",
 				0,
 				NULL );
+
+	index_map_[VIMS_STREAM_SET_ARG]				=	_new_event(
+				"%d %s",
+				VIMS_STREAM_SET_ARG,
+				"Change generator parameters",
+				vj_event_set_stream_arg,
+				2,
+				VIMS_LONG_PARAMS,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"space separated value string",
+				NULL,
+				NULL );	
+
 	index_map_[VIMS_STREAM_NEW_UNICAST]			=	_new_event(
 				"%d %s",
 				VIMS_STREAM_NEW_UNICAST,
@@ -1441,7 +1455,7 @@ void		vj_init_vevo_events(void)
 				VIMS_LONG_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
-				"Chain Index (-1=current",
+				"Chain Index (-1=current)",
 				-1,
 				"Effect ID",
 				0,
@@ -1643,15 +1657,17 @@ void		vj_init_vevo_events(void)
 
 
 	index_map_[VIMS_CHAIN_MANUAL_FADE]			=	_new_event(
-				"%d %d",
+				"%d %d %d",
 				VIMS_CHAIN_MANUAL_FADE,
 				"Set opacity of Effect Chain",
 				vj_event_manual_chain_fade,
-				2,
+				3,
 				VIMS_REQUIRE_ALL_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
 				"Opacity value [0-255]",
+				0,
+				"Fade method (0=opacity,1=alpha)",
 				0,
 				NULL );
 	index_map_[VIMS_CHAIN_SET_ENTRY]			=	_new_event(
@@ -2061,6 +2077,17 @@ void		vj_init_vevo_events(void)
 				SAMPLE_STREAM_ID_HELP,
 				NULL );
 
+	index_map_[VIMS_GET_STREAM_ARGS]			=	_new_event(
+				"%d",
+				VIMS_GET_STREAM_ARGS,
+				"GUI: Get generator parameters",
+				vj_event_send_stream_args,
+				1,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				NULL );
+
 	index_map_[VIMS_CHAIN_GET_ENTRY]			=	_new_event(
 				"%d %d",
 				VIMS_CHAIN_GET_ENTRY,
@@ -2266,6 +2293,21 @@ void		vj_init_vevo_events(void)
 				0,
 				"Value 0-65535",	
 				0,
+				NULL );
+
+	index_map_[VIMS_STREAM_SET_V4LCTRL]		=	_new_event(
+				"%d %d %s",
+				VIMS_STREAM_SET_V4LCTRL,
+				"Set v4l property [brightness,contrast,saturation,hue,gain,gamma,red_balance,blue_balance,green_balance,auto_white,sharpness,bl_compensate,auto_gain,auto_hue,temperature,fliph,exposure]",
+				vj_event_v4l_set_property,
+				3,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Value",
+				0,
+				"Name",
+				NULL,
 				NULL );
 
 	index_map_[VIMS_STREAM_SET_HUE]			=	_new_event(
@@ -2484,13 +2526,15 @@ void		vj_init_vevo_events(void)
 
 
 	index_map_[VIMS_ALPHA_COMPOSITE]				=	_new_event(
-				"%d",
+				"%d %d",
 				VIMS_BEZERK,	
 				"Enable or disable alpha channel clear every frame period",
 				vj_event_alpha_composite,
-				1,
+				2,
 				VIMS_ALLOW_ANY,
 				"0=on 1=off",
+				0,
+				"Default value",
 				0,
 				NULL );
 

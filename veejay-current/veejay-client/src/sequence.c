@@ -573,7 +573,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 
 static	void	gvr_single_queue_vims( veejay_track_t *v, int vims_id )
 {
-	char message[10];
+	char message[16];
 
 	sprintf(message, "%03d:;", vims_id );
 
@@ -586,7 +586,7 @@ static	void	gvr_single_queue_vims( veejay_track_t *v, int vims_id )
 
 static void	gvr_multi_queue_vims( veejay_track_t *v, int vims_id, int val )
 {
-	char message[10];
+	char message[16];
 
 	sprintf(message, "%03d:%d;", vims_id,val );
 
@@ -608,10 +608,22 @@ static	void	gvr_multivx_queue_vims( veejay_track_t *v, int vims_id, int val1,uns
 		v->n_queued ++;
 	}
 }
+static	void	gvr_multivvv_queue_vims( veejay_track_t *v, int vims_id, int val1,int val2, int val3 )
+{
+	char message[16];
+
+	sprintf(message, "%03d:%d %d %d;", vims_id,val1,val2, val3 );
+
+	if( v->n_queued < 16 )
+	{
+		v->queue[ v->n_queued ] = strdup( message );
+		v->n_queued ++;
+	}
+}
 
 static	void	gvr_multiv_queue_vims( veejay_track_t *v, int vims_id, int val1,int val2 )
 {
-	char message[10];
+	char message[16];
 
 	sprintf(message, "%03d:%d %d;", vims_id,val1,val2 );
 
@@ -698,6 +710,22 @@ void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int v
 	{
 		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
 			gvr_multiv_queue_vims( vp->tracks[track_id], vims_id,val1,val2 );
+	}
+}void		gvr_queue_mmmvims( void *preview, int track_id, int vims_id, int val1,int val2, int val3 )
+{
+	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	int i;
+
+	if( track_id == -1 )
+	{
+		for( i = 0; i < vp->n_tracks; i ++ )
+			if( vp->tracks[i] && vp->tracks[i]->active )
+				gvr_multivvv_queue_vims( vp->tracks[i], vims_id,val1,val2,val3);
+	}
+	else
+	{
+		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
+			gvr_multivvv_queue_vims( vp->tracks[track_id], vims_id,val1,val2,val3 );
 	}
 }
 

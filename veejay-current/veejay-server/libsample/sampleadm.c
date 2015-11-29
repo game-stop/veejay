@@ -351,6 +351,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->marker_end = 0;
     si->loopcount = 0;
     si->effect_toggle = 1;
+	si->fade_method = 0;
 	si->subrender = 1;
     si->edit_list_file = sample_default_edl_name(si->sample_id);
 
@@ -700,7 +701,7 @@ int sample_update_offset(int s1, int n_frame)
 	return 1;
 }	
 
-int sample_set_manual_fader( int s1, int value)
+int sample_set_manual_fader( int s1, int value, int method)
 {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
@@ -708,9 +709,10 @@ int sample_set_manual_fader( int s1, int value)
   si->fader_val = (float) value;
   si->fader_inc = 0.0;
   si->fader_direction = 0.0;
-
+  si->fade_method = method;
   /* inconsistency check */
-  if(si->effect_toggle == 0) si->effect_toggle = 1;
+  if(si->effect_toggle == 0) 
+	  si->effect_toggle = 1;
 
   return 1;
 }
@@ -753,9 +755,10 @@ int sample_get_fader_active(int s1) {
   return (si->fader_active);
 }
 
-float sample_get_fader_val(int s1) {
+float sample_get_fader_val(int s1, int *method) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
+  *method = si->fade_method;
   return (si->fader_val);
 }
 
@@ -2557,8 +2560,8 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	ptr = vj_sprintf( ptr, (int) sample->fader_val ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, sample->dup ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, macro ); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, sample->subrender ); 
-
+	ptr = vj_sprintf( ptr, sample->subrender ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->fade_method );
 	return 0;
 }
 
@@ -3168,6 +3171,16 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 		}
 		if(xmlTemp) xmlFree(xmlTemp);
 	}
+	if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) {
+		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+		chTemp = UTF8toLAT1(xmlTemp);
+		if(chTemp) {
+			skel->fade_method = atoi(chTemp);
+		    free(chTemp);
+		}
+		if(xmlTemp) xmlFree(xmlTemp);
+	}
+
 	if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_VAL)) {
 		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
 		chTemp = UTF8toLAT1(xmlTemp);
@@ -3621,9 +3634,11 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
     sprintf(buffer, "%d", sample->marker_end);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_MARKEREND,
 		(const xmlChar *) buffer);
-
 	sprintf(buffer,"%d",sample->fader_active);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADER_ACTIVE,
+		(const xmlChar *) buffer);
+	sprintf(buffer,"%d",sample->fade_method);
+	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADE_METHOD,
 		(const xmlChar *) buffer);
 	sprintf(buffer,"%f",sample->fader_inc);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADER_INC,
@@ -3637,19 +3652,15 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
 	sprintf(buffer,"%d",sample->selected_entry);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_LASTENTRY,
 		(const xmlChar *)buffer);
-
     sprintf(buffer, "%d", sample->subrender ); 
     xmlNewChild(node, NULL, (const xmlChar*) "subrender",
 		(const xmlChar*) buffer );
 
     vj_font_xml_pack( node, font );
 
-
     childnode =
 	xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTS, NULL);
-
     CreateEffects(childnode, sample->effect_chain);
-
 } 
 
 /****************************************************************************************************

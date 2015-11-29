@@ -50,6 +50,7 @@ void vj_event_update_remote(void *ptr);
 void	vj_event_promote_me			(	void *ptr,	const char format[], 	va_list ap	);
 void	vj_event_dump(void);
 void	vj_event_set_stream_color		(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_set_stream_arg			(	void *ptr,	const char format[],	va_list ap  );
 void 	vj_event_chain_arg_inc			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_chain_arg_set			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_disable			(	void *ptr, 	const char format[], 	va_list ap	);
@@ -194,6 +195,7 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_frame			(	void *ptr,	const char fomrat[],	va_list ap 	);
 void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_send_stream_args		(   void *ptr,	const char format[],	va_list ap );
 void 	vj_event_sample_new			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_do_bundled_msg			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_bundled_msg_del		(	void *ptr, 	const char format[], 	va_list ap	);
@@ -236,7 +238,7 @@ void	vj_event_tag_set_descr		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_vimslist		(	void *ptr,	const char format[],	va_list ap	);	
 void	vj_event_send_devicelist	(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_bundles	(void *ptr, const char format[], va_list ap);
-
+void	vj_event_v4l_set_property( void *ptr, const char format[], va_list ap );
 void	vj_event_mcast_start(	void *ptr,	const char format[], va_list ap);
 
 void	vj_event_mcast_stop( void *ptr,		const char format[], va_list ap);

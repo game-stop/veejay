@@ -19,7 +19,7 @@
 #ifndef GVRCOMMON_H
 #define GVRCOMMON_H
 #define STATUS_BYTES 	150
-#define STATUS_TOKENS 	26 //@ previous 23
+#define STATUS_TOKENS 	32 
 #define VEEJAY_CODENAME VERSION
 /* Status bytes */
 
@@ -47,6 +47,7 @@
 #define FRAME_DUP	24
 #define	MACRO		25
 #define SUBRENDER	26
+#define FADE_METHOD	27
 #define CURRENT_ENTRY	15
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0

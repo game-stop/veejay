@@ -77,6 +77,7 @@ static struct {
 	{ VIMS_GET_IMAGE,8},
 	{ VIMS_CHAIN_GET_PARAMETERS,4},
 	{ VIMS_GET_SHM,SHM_ID_LEN },
+	{ VIMS_GET_STREAM_ARGS, 3 },
 	{ 0,0 },
 };
 

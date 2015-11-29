@@ -77,6 +77,8 @@ static void *tag_cache[SAMPLE_MAX_SAMPLES];
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 
+
+extern int  frei0r_get_param_count( void *port);
 extern void dummy_rgb_apply(VJFrame *frame, int width, int height, int r, int g, int b);
 extern int   sufficient_space(int max_size, int nframes);
 extern char *UTF8toLAT1(unsigned char *in);
@@ -763,6 +765,40 @@ int	vj_tag_set_stream_layout( int t1, int stream_id_g, int screen_no_b, int valu
 	return 1;
 }
 
+int	vj_tag_generator_set_arg(int t1, int *values)
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag)
+		return 0;
+	if(tag->generator) {
+		int i;
+		for( i = 0; i < 16; i ++ ) {
+			tag->genargs[i] = values[i];
+		}
+		return 1;
+	}
+	return 0;
+}
+
+int vj_tag_generator_get_args(int t1, int *args, int *n_args, int *fx_id)
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag)
+		return 0;
+	if(tag->generator) {
+		vevo_property_get(tag->generator, "HOST_id", 0, fx_id );
+		int i;
+		int n = vj_effect_get_num_params( *fx_id );
+		for( i = 0; i < n; i ++ ) {
+			args[i] = tag->genargs[i];
+		}
+		*n_args = n;
+
+		return 1;
+	}
+	return 0;
+}
+
 int	vj_tag_set_stream_color(int t1, int r, int g, int b)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -774,13 +810,13 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
     tag->color_r = r;
     tag->color_g = g;
     tag->color_b = b;
-
+/*
 	if( tag->generator ) {
 		plug_set_parameter( tag->generator, 0,1,&r );
 		plug_set_parameter( tag->generator, 1,1,&g );
 		plug_set_parameter( tag->generator, 2,1,&b );
 	}
-
+*/
     return 1;
 }
 
@@ -893,6 +929,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->source = 0;
     tag->fader_active = 0;
     tag->fader_val = 0.0;
+	tag->fade_method = 0;
     tag->fader_inc = 0.0;
     tag->fader_direction = 0;
     tag->selected_entry = 0;
@@ -1024,7 +1061,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 			vj_shm_set_id( extra );
 
 		tag->generator = plug_activate(channel);
-		
+
+		int vj_plug_id = 500 + channel;	
+		vevo_property_set(tag->generator, "HOST_id",VEVO_ATOM_TYPE_INT, 1, &vj_plug_id );
+
 		if(tag->generator != NULL) {
 			vj_shm_set_id( foo_arg );
 
@@ -1398,9 +1438,10 @@ void *vj_tag_get_plugin(int t1, int position, void *instance)
 }
 
 
-float vj_tag_get_fader_val(int t1) {
+float vj_tag_get_fader_val(int t1, int *method) {
    vj_tag *tag = vj_tag_get(t1);
    if(!tag) return -1;
+   *method = tag->fade_method;
    return ( tag->fader_val );
 }
 
@@ -1424,13 +1465,14 @@ int	vj_tag_get_description( int t1, char *description )
 	return 1;
 }
 
-int vj_tag_set_manual_fader(int t1, int value )
+int vj_tag_set_manual_fader(int t1, int value, int method )
 {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
   tag->fader_active = 2;
   tag->fader_inc = 0.0;
   tag->fader_val = (float)value;
+  tag->fade_method = method;
   return 1;
 }
 
@@ -1776,7 +1818,7 @@ int vj_tag_set_white(int t1, int value)
 #ifdef HAVE_V4L
 			v4lvideo_set_white( vj_tag_input->unicap[tag->index],value );
 #elif HAVE_V4L2
-			v4l2_set_temperature( vj_tag_input->unicap[tag->index],value);
+			v4l2_set_gamma( vj_tag_input->unicap[tag->index],value);
 #endif
 		}				
 	}
@@ -1838,7 +1880,7 @@ int vj_tag_set_color(int t1, int value)
 #ifdef HAVE_V4L
 			v4lvideo_set_colour( vj_tag_input->unicap[tag->index], value );
 #elif HAVE_V4L2
-			v4l2_set_contrast( vj_tag_input->unicap[tag->index],value);
+			return -1;
 #endif
 		}
 	}
@@ -1846,34 +1888,66 @@ int vj_tag_set_color(int t1, int value)
 }
 
 
-int	vj_tag_get_v4l_properties(int t1,
-		int *brightness, int *contrast, int *hue, int *color, int *white )
+int	vj_tag_get_v4l_properties(int t1, int *values )
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
 	if(tag->source_type!=VJ_TAG_TYPE_V4L)
 	{
-		return -1;
+		return 0;
 	}
-
+	
 	if(tag->capture_type == 1 ) {
 #ifdef HAVE_V4L
-		*brightness = v4lvideo_get_brightness(  vj_tag_input->unicap[tag->index] );
-		*contrast  = v4lvideo_get_contrast( vj_tag_input->unicap[tag->index] );
-		*hue	    = v4lvideo_get_hue( vj_tag_input->unicap[tag->index] );
-		*color	    = v4lvideo_get_colour( vj_tag_input->unicap[tag->index] );
-		*white     =  v4lvideo_get_white( vj_tag_input->unicap[tag->index] );
+		int i;
+		for( i = 0; i < 21; i ++ )
+			values[i] = -1;
+
+		values[0]  = v4lvideo_get_brightness(  vj_tag_input->unicap[tag->index] );
+		values[1]  = v4lvideo_get_contrast( vj_tag_input->unicap[tag->index] );
+		values[2]  = v4lvideo_get_hue( vj_tag_input->unicap[tag->index] );
+		values[3]  = v4lvideo_get_colour( vj_tag_input->unicap[tag->index] );
+		values[13]  = v4lvideo_get_white( vj_tag_input->unicap[tag->index] );
 #elif HAVE_V4L2
-		*brightness = v4l2_get_brightness(  vj_tag_input->unicap[tag->index] );
-		*contrast  = v4l2_get_contrast( vj_tag_input->unicap[tag->index] );
-		*hue	    = v4l2_get_hue( vj_tag_input->unicap[tag->index] );
-		*color	    = v4l2_get_saturation( vj_tag_input->unicap[tag->index] );
-		*white     =  v4l2_get_temperature( vj_tag_input->unicap[tag->index] );
+		values[0] = v4l2_get_brightness(  vj_tag_input->unicap[tag->index] );
+		values[1] = v4l2_get_contrast( vj_tag_input->unicap[tag->index] );
+		values[2] = v4l2_get_hue( vj_tag_input->unicap[tag->index] );
+		values[3] = v4l2_get_saturation( vj_tag_input->unicap[tag->index] );
+		values[4] = v4l2_get_temperature( vj_tag_input->unicap[tag->index] );
 #endif
-		return 0;
+		values[5] = v4l2_get_gamma( vj_tag_input->unicap[tag->index] );
+		values[6] = v4l2_get_sharpness( vj_tag_input->unicap[tag->index] );
+		values[7] = v4l2_get_gain( vj_tag_input->unicap[tag->index] );
+		values[8] = v4l2_get_red_balance( vj_tag_input->unicap[tag->index] );
+		values[9] = v4l2_get_blue_balance( vj_tag_input->unicap[tag->index] );
+		values[10]= -1;
+		values[11]= v4l2_get_gain(vj_tag_input->unicap[tag->index]);
+		values[12]=	v4l2_get_backlight_compensation( vj_tag_input->unicap[tag->index] );
+		values[13]= v4l2_get_whiteness( vj_tag_input->unicap[tag->index] );
+		values[14]= v4l2_get_black_level( vj_tag_input->unicap[tag->index]);
+		values[15]= v4l2_get_exposure(vj_tag_input->unicap[tag->index] );
+	    values[16]= v4l2_get_auto_white_balance( vj_tag_input->unicap[tag->index] );
+		values[17]= v4l2_get_autogain( vj_tag_input->unicap[tag->index] );
+		values[18]= v4l2_get_hue_auto(vj_tag_input->unicap[tag->index] );
+		values[19]= v4l2_get_hflip(vj_tag_input->unicap[tag->index] );
+		values[20]= v4l2_get_vflip(vj_tag_input->unicap[tag->index]);	
+		return 1;
 	}
 
 	return 0;
+}
+
+int	vj_tag_v4l_set_control( int t1, uint32_t id, int value )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(tag == NULL)
+		return 0;
+	if(tag->source_type != VJ_TAG_TYPE_V4L )
+		return 0;
+
+	v4l2_set_control( vj_tag_input->unicap[tag->index], id, value );
+
+	return 1;	
 }
 
 int vj_tag_get_effect_any(int t1, int position) {
@@ -3369,8 +3443,6 @@ int vj_tag_drop_blackframe(int t1)
     return 1;
 }
 
-
-
 int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -3544,9 +3616,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
 			plug_push_frame( tag->generator, 1, 0, dst );
-			plug_set_parameter( tag->generator, 0,1,&(tag->color_r) );
-			plug_set_parameter( tag->generator, 1,1,&(tag->color_g) );
-			plug_set_parameter( tag->generator, 2,1,&(tag->color_b) );
+			plug_set_parameters( tag->generator, frei0r_get_param_count(tag->generator),tag->genargs );
 			plug_process( tag->generator, -1.0 ); 
 		}
 		break;
@@ -3596,7 +3666,8 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 	ptr = vj_sprintf( ptr, (int) tag->fader_val ); *ptr++ = ' ';
 	*ptr++ = '0'; *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, macro ); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, tag->subrender);
+	ptr = vj_sprintf( ptr, tag->subrender); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->fade_method); 
 
     return 0;
 }
@@ -3902,7 +3973,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	char *source_file = NULL;
 	char *extra_data = NULL;
 	int col[3] = {0,0,0};
-	int fader_active=0, fader_val=0, fader_dir=0, opacity=0, nframes=0;
+	int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,opacity=0, nframes=0;
 	int subrender = 0;
 	xmlNodePtr fx[32];
 	veejay_memset( fx, 0, sizeof(fx));
@@ -3937,6 +4008,9 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			fader_active = tag_get_int_xml(doc,cur, (const xmlChar*) XMLTAG_FADER_ACTIVE);
 		if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_VAL)) 
 			fader_val = tag_get_int_xml( doc,cur, (const xmlChar*) XMLTAG_FADER_VAL );
+		if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) 
+			fade_method = tag_get_int_xml( doc,cur, (const xmlChar*) XMLTAG_FADE_METHOD );
+
 		if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_DIRECTION)) 
 			fader_dir = tag_get_int_xml( doc, cur, (const xmlChar*) XMLTAG_FADER_DIRECTION );
 		if (!xmlStrcmp(cur->name,(const xmlChar*) "opacity" ) )
@@ -3979,6 +4053,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			tag->effect_toggle = fx_on;
 			tag->fader_active = fader_active;
 			tag->fader_val = fader_val;
+			tag->fade_method = fade_method;
 			tag->fader_direction = fader_dir;
 			tag->opacity = opacity;
 			tag->nframes = nframes;

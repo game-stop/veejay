@@ -1160,7 +1160,7 @@ void veejay_pipe_write_status(veejay_t * info)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		// 26 status symbols
+		// 28 status symbols
 			{
 				char *ptr = info->status_what;
 				*ptr++ = ' ';
@@ -1190,6 +1190,8 @@ void veejay_pipe_write_status(veejay_t * info)
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				ptr = vj_sprintf( ptr, mstatus );
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
 			}
 		break;
     	case VJ_PLAYBACK_MODE_TAG:

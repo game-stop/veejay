@@ -74,6 +74,10 @@
 
 #include <libstream/vj-net.h>
 
+#ifdef HAVE_V4L2
+#include <libstream/v4l2utils.h>
+#endif
+
 static int use_bw_preview_ = 0;
 static int _last_known_num_args = 0;
 static hash_t *BundleHash = NULL;
@@ -5240,7 +5244,7 @@ void	vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
 void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	int args[2];
+	int args[3];
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
@@ -5254,26 +5258,23 @@ void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR,"Invalid opacity range %d use [0-255] ", args[1]);
 		return;
 	}
+
 	args[1] = 255 - args[1];
 
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
-		if( sample_set_manual_fader( args[0], args[1] ) )
+		if( sample_set_manual_fader( args[0], args[1],args[2] ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Set chain opacity to %f",
-				sample_get_fader_val( args[0] ));
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error setting chain opacity of sample %d to %d", args[0],args[1]);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Set chain fader %d with parameter %f",args[2],
+				sample_get_fader_val( args[0], &(args[2]) ));
 		}
 	}
 	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
 	{
-		if( vj_tag_set_manual_fader( args[0], args[1] ) )
+		if( vj_tag_set_manual_fader( args[0], args[1],args[2] ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Set chain opacity to %f",
-				vj_tag_get_fader_val(args[0]));
+			veejay_msg(VEEJAY_MSG_DEBUG, "Set chain fader %d with parameter %f", args[2],
+				vj_tag_get_fader_val(args[0],&(args[2]) ));
 		}
 	}
 }
@@ -7080,7 +7081,7 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 	{
 		if(vj_tag_set_brightness(args[0],args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Set brightness to %d",args[1]);
+			veejay_msg(VEEJAY_MSG_DEBUG,"Set brightness to %d",args[1]);
 		}
 	}
 	
@@ -7175,11 +7176,13 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 
 	if(vj_tag_exists(args[0]))
 	{
-		int values[6] = { 0,0,0,0,0,0 };
-		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],	&values[4]))
+		int values[21];
+		veejay_memset(values,0,sizeof(values));
+		if(vj_tag_get_v4l_properties( args[0], values )) 
 		{
-			snprintf(message,sizeof(message), "%05d%05d%05d%05d%05d%05d",
-				values[0],values[1],values[2],values[3],values[4],values[5] );
+			snprintf(message,sizeof(message), "%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d",
+				values[0],values[1],values[2],values[3],values[4],values[5],values[6],values[7],values[8],values[9],
+				values[10],values[11],values[12],values[13],values[14],values[15],values[16],values[17],values[18],values[19],values[20]	);
 			FORMAT_MSG(send_msg, message);
 		}
 	}
@@ -7199,7 +7202,7 @@ void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 	{
 		if(vj_tag_set_contrast(args[0],args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Set contrast to %d",args[1]);
+			veejay_msg(VEEJAY_MSG_DEBUG,"Set contrast to %d",args[1]);
 		}
 	}
 }
@@ -7216,7 +7219,7 @@ void vj_event_v4l_set_white(void *ptr, const char format[], va_list ap)
 	{
 		if(vj_tag_set_white(args[0],args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Set whiteness to %d",args[1]);
+			veejay_msg(VEEJAY_MSG_DEBUG,"Set whiteness to %d",args[1]);
 		}
 	}
 
@@ -7231,10 +7234,19 @@ void vj_event_v4l_set_saturation(void *ptr, const char format[], va_list ap)
 	if(args[0]==-1)args[0] = vj_tag_size()-1;
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
-veejay_msg(0, "broken");
+#ifdef HAVE_V4L2 
+		uint32_t v4l_ctrl_id = v4l2_get_property_id( "saturation" );
+		if(v4l_ctrl_id == 0 ) {
+			veejay_msg(0,"Invalid v4l2 property name '%s'",str );
+			return;
+		}
+		if(!vj_tag_v4l_set_control( args[0], v4l_ctrl_id, args[1] ) ) {
+			veejay_msg(VEEJAY_MSG_DEBUG,"Not a valid video4linux device: %d", args[0] );
+		}		
+#endif
 	}
-
 }
+
 void vj_event_v4l_set_color(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7247,11 +7259,36 @@ void vj_event_v4l_set_color(void *ptr, const char format[], va_list ap)
 	{
 		if(vj_tag_set_color(args[0],args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Set color to %d",args[1]);
+			veejay_msg(VEEJAY_MSG_DEBUG,"Set color to %d",args[1]);
 		}
 	}
 
 }
+
+void vj_event_v4l_set_property( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char str[255];
+#ifdef HAVE_V4L2 
+   	P_A(args,str,format,ap);
+	if(args[0] == 0) args[0] = v->uc->sample_id;
+	if(args[0] == -1) args[0] = vj_tag_size()-1;
+	
+	uint32_t v4l_ctrl_id = v4l2_get_property_id( str );
+	if(v4l_ctrl_id == 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG,"Invalid v4l2 property name '%s'",str );
+		return;
+	}
+	if(!vj_tag_v4l_set_control( args[0], v4l_ctrl_id, args[1] ) ) {
+		veejay_msg(VEEJAY_MSG_DEBUG,"Not a valid video4linux device: %d", args[0] );
+	}		
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG,"Set %s to %d", str, args[1] );
+	}
+#endif
+}
+
 void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7264,11 +7301,11 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	{
 		if(vj_tag_set_hue(args[0],args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Set hue to %d",args[1]);
+			veejay_msg(VEEJAY_MSG_DEBUG,"Set hue to %d",args[1]);
 		}
 	}
-
 }
+
 void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -8713,7 +8750,7 @@ void	vj_event_send_sample_stack		(	void *ptr,	const char format[],	va_list ap )
 	{
 		if(args[0] == 0) 
 			args[0] = v->uc->sample_id;
-
+	
 		for(i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
 			fx_id = vj_tag_get_effect_any( args[0], i );
 			if( fx_id <= 0 )
@@ -8734,6 +8771,53 @@ void	vj_event_send_sample_stack		(	void *ptr,	const char format[],	va_list ap )
 	FORMAT_MSG( message, buffer );
 	SEND_MSG(   v, message );
 
+}
+
+void	vj_event_send_stream_args		(	void *ptr, const char format[],		va_list ap )
+{
+
+	char fline[100];
+	char line[1000];
+	int args[4];
+	char *str = NULL;
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,str,format,ap);
+
+	const char *dummy = "000";
+
+	if(STREAM_PLAYING(v)) 
+	{
+		if( args[0] == 0 )
+			args[0] = v->uc->sample_id;
+		else if (args[0] == -1 )
+			args[0] = vj_tag_size()-1;
+
+		if( vj_tag_get_type(args[0]) == VJ_TAG_TYPE_GENERATOR ) {
+			int tagargs[SAMPLE_MAX_PARAMETERS];
+			int n_args = 0;
+			int id = 0;
+			veejay_memset( tagargs, 0, sizeof(tagargs));
+			vj_tag_generator_get_args( args[0], tagargs, &n_args, &id );
+
+			char *ptr = &line[0];
+
+			ptr = vj_sprintf( ptr, id ); *ptr ++ = ' ';
+
+			int n = n_args;
+			int i;
+			for( i = 0; i < n; i ++ ) {
+				ptr = vj_sprintf( ptr, tagargs[i] ); *ptr ++ = ' ';
+			}
+
+			ptr = vj_sprintf( ptr, tagargs[n] );
+
+			FORMAT_MSG(fline,line);
+			SEND_MSG(v, fline);
+			return;
+		}
+	}
+
+	SEND_MSG(v, dummy);
 }
 
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
@@ -9406,6 +9490,39 @@ void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
 	}
 }
 
+void	vj_event_set_stream_arg( void *ptr, const char format[], va_list ap)
+{
+	long int tmp = 0;
+	int base = 10;
+	int index = 1; 
+	int args[1 + SAMPLE_MAX_PARAMETERS];
+	char str[1024]; 
+	char *end = str;
+	veejay_t *v = (veejay_t*)ptr;
+	veejay_memset(args,0,sizeof(args));
+   
+   	P_A(args,str,format,ap);
+
+	while( (tmp = strtol( end, &end, base ))) {
+		args[index] = (int) tmp;
+		index ++;
+	}
+
+	int *n_args = &args[1];
+	if( args[0] == 0 ) 
+		args[0] = v->uc->sample_id;
+	else if (args[0] == -1 )
+		args[0] = vj_tag_size()-1;
+
+	if(STREAM_PLAYING(v)) 
+	{
+		if( vj_tag_get_type(args[0]) == VJ_TAG_TYPE_GENERATOR ) {
+			vj_tag_generator_set_arg( args[0], n_args );
+		}
+	}
+
+}
+
 void	vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
 {
 	int args[4];
@@ -9419,8 +9536,7 @@ void	vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
 		if(args[0] == -1) args[0] = vj_tag_size()-1;
 	}
 	// allow changing of color while playing plain/sample
-	if(vj_tag_exists(args[0]) &&
-		(vj_tag_get_type(args[0]) == VJ_TAG_TYPE_COLOR || vj_tag_get_type(args[0]) == VJ_TAG_TYPE_GENERATOR ))
+	if(vj_tag_exists(args[0]) && vj_tag_get_type(args[0]) == VJ_TAG_TYPE_COLOR )
 	{
 		CLAMPVAL( args[1] );
 		CLAMPVAL( args[2] );
@@ -9561,105 +9677,93 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 	char prefix[4];
 
 	char *s_print_buf = get_print_buf(128);
+	int values[21];
 
 	switch(args[1])
-	    {
+	{
 	    case VJ_PLAYBACK_MODE_SAMPLE: 
-		if(sample_exists(id))
+			if(sample_exists(id))
 		    {
-		    /* For gathering sample-infos use the sample_info_t-structure that is defined in /libsample/sampleadm.h */
-		    sample_info *si = sample_get(id);
+				/* For gathering sample-infos use the sample_info_t-structure that is defined in /libsample/sampleadm.h */
+				sample_info *si = sample_get(id);
 	        	if (si)
 		        {
-		        int start = si->first_frame;
-		        int end   = si->last_frame;
-		        int speed = si->speed;
-    		        int loop = si->looptype;
-		        int marker_start = si->marker_start;
-		        int marker_end = si->marker_end;
-		        int effects_on = si->effect_toggle;
-
-			sprintf( options,
-		        "%06d%06d%03d%02d%06d%06d%01d",
-	    	    	     start,
-		             end,
-			     speed,
-			     loop,
-			     marker_start,
-			     marker_end,
-			     effects_on);
-			failed = 0;
-
-			sprintf(prefix, "%02d", 0 );
-
-			}	
+			       int start = si->first_frame;
+			        int end   = si->last_frame;
+			        int speed = si->speed;
+	 		        int loop = si->looptype;
+			        int marker_start = si->marker_start;
+			        int marker_end = si->marker_end;
+			        int effects_on = si->effect_toggle;
+	
+					snprintf( options,sizeof(options),"%06d%06d%03d%02d%06d%06d%01d",start,end,speed,loop,marker_start,marker_end,effects_on);
+					failed = 0;
+					snprintf(prefix,sizeof(prefix), "%02d", 0 );
+				}	
 		    }
-		break;
+			break;
 	    case VJ_PLAYBACK_MODE_TAG:		
-		if(vj_tag_exists(id)) 
+			if(vj_tag_exists(id)) 
 		    {
 		    /* For gathering further informations of the stream first decide which type of stream it is 
 		       the types are definded in libstream/vj-tag.h and uses then the structure that is definded in 
 		       libstream/vj-tag.h as well as some functions that are defined there */
-		    vj_tag *si = vj_tag_get(id);
-		    int stream_type = si->source_type;
-		    
-			sprintf(prefix, "%02d", stream_type );
-
-		    if (stream_type == VJ_TAG_TYPE_COLOR)
-			{
-			int col[3] = {0,0,0};
-			col[0] = si->color_r;
-			col[1] = si->color_g;
-			col[2] = si->color_b;
-			
-			sprintf( options,
-		        "%03d%03d%03d",
-			    col[0],
-			    col[1],
-			    col[2]
-			    );
-			failed = 0;
-			}
+				vj_tag *si = vj_tag_get(id);
+				int stream_type = si->source_type;
+				snprintf(prefix,sizeof(prefix), "%02d", stream_type );
+				if (stream_type == VJ_TAG_TYPE_COLOR)
+				{
+					int col[3] = {0,0,0};
+					col[0] = si->color_r;
+					col[1] = si->color_g;
+					col[2] = si->color_b;
+				
+					snprintf( options,sizeof(options),"%03d%03d%03d",col[0],col[1],col[2]);
+					failed = 0;
+				}
 		    /* this part of returning v4l-properties is here implemented again ('cause there is
 		     * actually a VIMS-command to get these values) to get all necessary stream-infos at 
 		     * once so only ONE VIMS-command is needed */
-		    else if (stream_type == VJ_TAG_TYPE_V4L)
-			{
-			int brightness=0;
-			int hue = 0;
-			int contrast = 0;
-			int color = 0;
-			int white = 0;
-			int sat = 0;
-			int effects_on = 0;
+				else if (stream_type == VJ_TAG_TYPE_V4L)
+				{
+					vj_tag_get_v4l_properties(id,values);
 			
-			vj_tag_get_v4l_properties(id,&brightness,&hue,&contrast, &color, &white );			
-			effects_on = si->effect_toggle;
-			
-			sprintf( options,
-		        "%05d%05d%05d%05d%05d%05d%01d",
-			    brightness,
-			    hue,
-			    sat,
-			    contrast,
-			    color,
-			    white,
-			    effects_on);
-			failed = 0;
-			}
-		    else	
-			{
-			int effects_on = si->effect_toggle;
-			sprintf( options,
-		        "%01d",
-			    effects_on);
-			failed = 0;
-			}
+					snprintf( options,sizeof(options),
+				        "%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d%05d",
+						values[0],
+						values[1],
+						values[2],
+						values[3],
+						values[4],
+						values[5],
+						values[6],
+						values[7],
+						values[8],
+						values[9],
+						values[10],
+						values[11],
+						values[12],
+						values[13],
+						values[14],
+						values[15],
+						values[16],
+						values[17],
+						values[18],
+						values[19],
+						values[20]
+						);
+					failed = 0;
+				}
+				else	
+				{
+					int effects_on = si->effect_toggle;
+					snprintf( options,sizeof(options), "%01d",effects_on);
+					failed = 0;
+				}
 		    }
-		break;
+			break;
 	    default:
-		break;		
+			break;		
 	    }	
 
 	if(failed)
@@ -10595,10 +10699,16 @@ void vj_event_alpha_composite(void *ptr, const char format[], va_list ap)
 
 	if( args[0] == 0 ) {
 		v->settings->clear_alpha = 0;
+		v->settings->alpha_value = args[1];
 		veejay_msg(VEEJAY_MSG_INFO,"Enabled alpha channel leak (no clear)");
 	} else if (args[0] == 1 ) {
 		v->settings->clear_alpha = 1;
-		veejay_msg(VEEJAY_MSG_INFO,"New alpha mask every frame (clearing)");
+		v->settings->alpha_value = args[1];
+		if(v->settings->alpha_value < 0 )
+			v->settings->alpha_value = 0;
+		else if (v->settings->alpha_value > 255 )
+			v->settings->alpha_value = 255;
+		veejay_msg(VEEJAY_MSG_INFO,"New alpha mask every frame (default alpha value is %d)", v->settings->alpha_value);
 	}
 }
 

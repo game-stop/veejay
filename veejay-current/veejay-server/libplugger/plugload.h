@@ -56,4 +56,6 @@ void	*plug_get_by_so_name( char *soname );
 int	plug_get_idx_by_name( char *name);
 int 	plug_get_idx_by_so_name( char *soname );
 int	plug_is_frei0r( void *instance );
+void plug_get_parameters( void *instance, int *args, int *n_args);
+
 #endif
