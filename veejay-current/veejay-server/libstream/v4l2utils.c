@@ -599,8 +599,8 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 		free(v->picture->data[1]);
 		free(v->picture->data[2]);
 		free(v->picture);
-		avhelper_free_context( &v->c );
-		//av_free(v->c);
+		//avhelper_free_context( &v->c );
+		av_free(v->c);
 		return 0;
 	}
 
@@ -1385,21 +1385,20 @@ void	v4l2_close( void *d )
 		v->picture = NULL;
 	}
 
-	if(v->codec) {
-#if LIBAVCODEC_BUILD > 5400
-		avcodec_close(v->c);
-#else
-		avcodec_close(v->codec);
-		avhelper_free_context( &v->c );
-		//if(v->c) free(v->c);
-#endif
+	if(v->c) {
+		av_free( v->c );
+		v->c = NULL;
 	}
 
-	if( v->host_frame )
+	if( v->host_frame ) {
 		free(v->host_frame );
+		v->host_frame = NULL;
+	}
 
-	if( v->buffers )
+	if( v->buffers ) {
 		free(v->buffers);
+		v->host_frame = NULL;
+	}
 
 	free(v);
 }
@@ -1990,6 +1989,7 @@ static	void	*v4l2_grabber_thread( void *v )
 		uint8_t *ptr = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(planes[0] * 4) );
 		if(!ptr) {
 			i->stop = 1;
+			v4l2_close( v4l2 );
 			veejay_msg(0, "v4l2: error allocating memory" );
 			unlock_(v);
 			pthread_exit(NULL);
@@ -2007,8 +2007,7 @@ static	void	*v4l2_grabber_thread( void *v )
 	for( c = 0; c < 4; c ++ )
 		v4l2->out_planes[c] = planes[c];
 
-	veejay_msg(VEEJAY_MSG_INFO, "v4l2: capture format: %d x %d (%x)",
-			v4l2->info->width,v4l2->info->height, v4l2->info->format  );
+	veejay_msg(VEEJAY_MSG_INFO, "v4l2: capture format: %d x %d (%x)",v4l2->info->width,v4l2->info->height, v4l2->info->format  );
 	
 	i->grabbing = 1;
 	i->retries  = max_retries;
@@ -2049,10 +2048,8 @@ static	void	*v4l2_grabber_thread( void *v )
 		if( err == -1 ) {
 			if( i->retries < 0 ) {
 				veejay_msg(0,"v4l2: giving up on this device, too many errors.");
-				i->stop = 1;	
-				v4l2_close( v4l2 );
-				pthread_exit(NULL);
-				return NULL;
+				goto v4l2_grabber_exit;
+
 			} else {
 				i->retries --;
 			}
@@ -2060,11 +2057,18 @@ static	void	*v4l2_grabber_thread( void *v )
 
 		if( i->stop ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Closing video capture device");
-			v4l2_close(v4l2);
-			pthread_exit(NULL);
-			return NULL;
+			goto v4l2_grabber_exit;
 		}
 	}
+
+v4l2_grabber_exit:
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Cleanup grabber thread" );
+	v4l2_close( v4l2 );
+
+	i->stop = 1;	
+	
+	return NULL;
 }
 
 int	v4l2_thread_start( v4l2_thread_info *i ) 
@@ -2194,10 +2198,13 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 	}
 
 	if( i->stop ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Grabber thread was told to exit.");
+		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Grabber thread was told to exit.");
 		pthread_mutex_destroy(&(i->mutex));
 		pthread_cond_destroy(&(i->cond));
+		free(i);
+		return NULL;
 	}
+
 	return i->v4l2;
 }
 #endif
