@@ -285,7 +285,7 @@ int 	vj_tag_set_fader_active(int t1, int nframes, int direction);
 int 	vj_tag_set_fade_to_tag(int t1, int t2);
 int 	vj_tag_set_fade_to_sample(int t1, int s1);
 int 	vj_tag_set_fader_val(int t1, float val);
-int 	vj_tag_apply_fader_inc(int t1);
+int 	vj_tag_apply_fader_inc(int t1, int method);
 int 	vj_tag_get_fader_active(int t1);
 float 	vj_tag_get_fader_val(int t1, int *method);
 float 	vj_tag_get_fader_inc(int t1);

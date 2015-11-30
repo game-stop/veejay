@@ -727,7 +727,6 @@ void vj_effect_shutdown() {
     //texmap_destroy();
 //    contourextract_destroy();
     rotozoom_destroy();
-    distortion_destroy();
     plug_sys_free();
 }
 

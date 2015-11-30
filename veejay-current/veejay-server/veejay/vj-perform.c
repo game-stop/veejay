@@ -3031,7 +3031,7 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
  	if(mode == 2 ) // manual fade
 		opacity = (int) sample_get_fader_val(info->uc->sample_id, &fade_method);
 	else	// fade in/fade out
-	    opacity = (int) sample_apply_fader_inc(info->uc->sample_id);
+	    opacity = (int) sample_apply_fader_inc(info->uc->sample_id, &fade_method);
 
 	if(mode != 2)
 	{
@@ -3103,7 +3103,7 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 	if(mode == 2)
 		opacity = (int) vj_tag_get_fader_val(info->uc->sample_id, &fade_method);
 	else
-    	opacity = (int) vj_tag_apply_fader_inc(info->uc->sample_id);
+    	opacity = (int) vj_tag_apply_fader_inc(info->uc->sample_id, &fade_method);
 
 	if( opacity == 0 ) {
 		if( pvar_.follow_fade ) {

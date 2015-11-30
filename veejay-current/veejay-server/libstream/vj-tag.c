@@ -1061,6 +1061,12 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 			vj_shm_set_id( extra );
 
 		tag->generator = plug_activate(channel);
+		if( tag->generator == NULL ) {
+			veejay_msg(0, "Unable to load selected generator");
+			free(tag->source_name);
+			free(tag);
+			return -1;
+		}
 
 		int vj_plug_id = 500 + channel;	
 		vevo_property_set(tag->generator, "HOST_id",VEVO_ATOM_TYPE_INT, 1, &vj_plug_id );
@@ -1510,10 +1516,11 @@ int vj_tag_get_fader_direction(int t1) {
    return (tag->fader_direction);
 }
 
-int vj_tag_apply_fader_inc(int t1) {
+int vj_tag_apply_fader_inc(int t1, int fade_method) {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
   tag->fader_val += tag->fader_inc;
+  tag->fade_method = fade_method;
   if(tag->fader_val > 255.0 ) tag->fader_val = 255.0;
   if(tag->fader_val < 0.0) tag->fader_val = 0.0;
   if(tag->fader_direction) return tag->fader_val;

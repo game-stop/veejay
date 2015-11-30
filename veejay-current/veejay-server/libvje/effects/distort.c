@@ -27,7 +27,7 @@
 #include "distort.h"
 #include "widthmirror.h"
 
-static int *plasma_table = NULL;
+static int plasma_table[512];
 static int plasma_pos1 = 0;
 static int plasma_pos2 = 0;
 
@@ -36,10 +36,9 @@ vj_effect *distortion_init(int width, int height)
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     int i;
     float rad;
-    plasma_table = (int *) vj_calloc(sizeof(int) * 512);
     for (i = 0; i < 512; i++) {
-	rad = ((float) i * 0.703125) * 0.0174532;
-	plasma_table[i] = sin(rad) * (1024);
+		rad = ((float) i * 0.703125f) * 0.0174532f;
+		plasma_table[i] = sin(rad) * (1024);
     }
 
     ve->num_params = 2;
@@ -53,21 +52,11 @@ vj_effect *distortion_init(int width, int height)
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 8;
     ve->description = "Distortion";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Inc 1" , "Inc2" );
     return ve;
-}
-
-void distortion_free() {
-   if(plasma_table) free(plasma_table);
-}
-
-void	distortion_destroy()
-{
-	if(plasma_table)
-		free( plasma_table );
 }
 
 /* the distortion effect comes originally from the demo effects collection,
@@ -84,83 +73,81 @@ void distortion_apply(VJFrame *frame, int width, int height,
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-	const int uv_width = frame->uv_width;
-	const int uv_height = frame->uv_height;	
+	int uv_width = frame->uv_width;
+	int uv_height = frame->uv_height;	
     unsigned int yi;
+	if( frame->ssm ) {
+		uv_width = width;
+		uv_height = height;
+	}
 
     uint8_t p, cb, cr;
 
     for (i = 0; i < height; ++i) {
-	tpos1 = plasma_pos1 + inc_val1;
-	tpos2 = plasma_pos2 + inc_val2;
+		tpos1 = plasma_pos1 + inc_val1;
+		tpos2 = plasma_pos2 + inc_val2;
 
-	tpos3 &= z;
-	tpos4 &= z;
+		tpos3 &= z;
+		tpos4 &= z;
 
-	for (j = 0; j < width; ++j) {
-	    tpos1 &= z;
-	    tpos2 &= z;
-	    x = plasma_table[tpos1] + plasma_table[tpos2] +
-		plasma_table[tpos3] + plasma_table[tpos4];
-
-	    index = 128 + (x >> 4);
-
-	    /* image = index */
-	    Y[(i * width) + j] = Y[index];
-
-	    tpos1 += inc_val1;
-	    tpos2 += inc_val2;
-	}
-	tpos4 += 3;
-	tpos3 += 1;
+		for (j = 0; j < width; ++j) {
+		    tpos1 &= z;
+		    tpos2 &= z;
+		    x = plasma_table[tpos1] + plasma_table[tpos2] +
+			plasma_table[tpos3] + plasma_table[tpos4];
+	
+		    index = (x >> 4);
+	
+		    Y[(i * width) + j] = Y[index];
+	
+		    tpos1 += inc_val1;
+		    tpos2 += inc_val2;
+		}
+		tpos4 += 3;
+		tpos3 += 1;
     }
 
-
-
     for (i = 0; i < uv_height; ++i) {
-	tpos1 = plasma_pos1 + inc_val1;
-	tpos2 = plasma_pos2 + inc_val2;
+		tpos1 = plasma_pos1 + inc_val1;
+		tpos2 = plasma_pos2 + inc_val2;
 
-	tpos3 &= z;
-	tpos4 &= z;
+		tpos3 &= z;
+		tpos4 &= z;
 
-	for (j = 0; j < uv_width; ++j) {
-	    tpos1 &= z;
-	    tpos2 &= z;
-	    x = plasma_table[tpos1] + plasma_table[tpos2] +
-		plasma_table[tpos3] + plasma_table[tpos4];
+		for (j = 0; j < uv_width; ++j) {
+		    tpos1 &= z;
+		    tpos2 &= z;
+		    x = plasma_table[tpos1] + plasma_table[tpos2] +
+			plasma_table[tpos3] + plasma_table[tpos4];
 
-	    index = 128 + (x >> 4);
-
-	    /* image = index */
-	    Cb[(j * uv_width) + i] = Cb[index];
-	    Cr[(j * uv_width) + i] = Cr[index];
-	    tpos1 += inc_val1;
-	    tpos2 += inc_val2;
-	}
-	tpos4 += 3;
-	tpos3 += 1;
+		    index = (x >> 4);
+	
+		    Cb[(j * uv_width) + i] = Cb[index];
+		    Cr[(j * uv_width) + i] = Cr[index];
+		    tpos1 += inc_val1;
+		    tpos2 += inc_val2;
+		}
+		tpos4 += 3;
+		tpos3 += 1;
     }
 
     plasma_pos1 += 9;
     plasma_pos2 += 8;
 
     for (y = 0; y < height; y++) {
-	yi = y * width;
-	for (x = 0; x < width; x++) {
-	    p =Y[yi + x];
-	    Y[yi + (width - x - 1)] = p;
-	}
+		yi = y * width;
+		for (x = 0; x < width; x++) {
+		    p =Y[yi + x];
+		    Y[yi + (width - x - 1)] = p;
+		}
+	 }
+	 for (y = 0; y < uv_height; y++) {
+		yi = y * uv_width;
+		for (x = 0; x < uv_width; x++) {
+			cb = Cb[yi + x];
+			cr = Cr[yi + x];
+		    Cb[yi + uv_width - x - 1] = cb;
+		    Cr[yi + uv_width - x - 1] = cr;
+		}
     }
-    for (y = 0; y < uv_height; y++) {
-	yi = y * uv_width;
-	for (x = 0; x < uv_width; x++) {
-	    cb = Cb[yi + x];
-	    cr = Cr[yi + x];
-	    Cb[yi + uv_width - x - 1] = cb;
-	    Cr[yi + uv_width - x - 1] = cr;
-	}
-    }
-
 }
-void distort_free(){}

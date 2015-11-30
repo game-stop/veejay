@@ -306,7 +306,7 @@ extern int sample_set_loop_dec(int s1, int active);
 extern int sample_apply_loop_dec(int s1, double fps); 
 
 extern int	sample_set_manual_fader(int s1, int value, int method );
-extern int sample_apply_fader_inc(int s1);
+extern int sample_apply_fader_inc(int s1, int method);
 extern int sample_set_fader_active(int s1, int nframes, int direction);
 extern int sample_set_fader_val(int s1, float val);
 extern int sample_get_fader_active(int s1);

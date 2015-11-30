@@ -4927,14 +4927,14 @@ void vj_event_chain_disable(void *ptr, const char format[], va_list ap)
 	if(SAMPLE_PLAYING(v) )
 	{
 		sample_set_effect_status(v->uc->sample_id, 0);
-		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Sample %d is disabled",v->uc->sample_id);
+		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on sample %d is disabled",v->uc->sample_id);
 	}
 	else
 	{
 		if(STREAM_PLAYING(v) )
 		{
 			vj_tag_set_effect_status(v->uc->sample_id, 0);
-			veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Stream %d is enabled",v->uc->sample_id);
+			veejay_msg(VEEJAY_MSG_INFO, "Effect chain on stream %d is enabled",v->uc->sample_id);
 		}
 		else
 			p_invalid_mode();

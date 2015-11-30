@@ -781,10 +781,11 @@ int sample_set_fader_val(int s1, float val) {
   return 1;
 }
 
-int sample_apply_fader_inc(int s1) {
+int sample_apply_fader_inc(int s1, int method) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_val += si->fader_inc;
+  si->fade_method = method;
   if(si->fader_val > 255.0 ) si->fader_val = 255.0;
   if(si->fader_val < 0.0 ) si->fader_val = 0.0;
   return (int) (si->fader_val+0.5);
