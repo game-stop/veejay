@@ -3026,29 +3026,43 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 	int follow = 0;
 	int fade_method = 0;
 
-	vj_perform_supersample_chain( info, frame );
-
  	if(mode == 2 ) // manual fade
 		opacity = (int) sample_get_fader_val(info->uc->sample_id, &fade_method);
 	else	// fade in/fade out
 	    opacity = (int) sample_apply_fader_inc(info->uc->sample_id, &fade_method);
+	
+	int len2 = ( frame->ssm == 1 ? frame->len : frame->uv_len );
+
+	switch( fade_method ) {
+		case 1:
+			vj_perform_supersample_chain( info, frame );
+			alpha_transition_apply( frame, temp_buffer,opacity );
+			break;
+		default:
+			if( opacity > 0 ) {
+				vj_perform_supersample_chain( info, frame );
+				opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+			}
+			break;
+	}
 
 	if(mode != 2)
 	{
 	    int dir =sample_get_fader_direction(info->uc->sample_id);
 		if((dir<0) &&(opacity == 0))
 		{
-			sample_set_effect_status(info->uc->sample_id, 1);
-     			sample_reset_fader(info->uc->sample_id);
+			if( fade_method == 0 )
+				sample_set_effect_status(info->uc->sample_id, 1);
+     		sample_reset_fader(info->uc->sample_id);
 			if( pvar_.follow_fade ) {
 		 	  follow = 1;
 			}
-
 	      	veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto Fade Out done");
 		}
 		if((dir>0) && (opacity==255))
 		{
-			sample_set_effect_status(info->uc->sample_id,0);
+			if( fade_method == 0 )
+				sample_set_effect_status(info->uc->sample_id,0);
 			sample_reset_fader(info->uc->sample_id);
 			veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto fade In done");
 			if( pvar_.follow_fade ) {
@@ -3056,20 +3070,9 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 			}
 		}
     	} else if(mode) {
-		if( pvar_.follow_fade ) {
+			if( pvar_.follow_fade ) {
 		 	  follow = 1;
 		}
-	}
-
-	int len2 = ( frame->ssm == 1 ? helper_frame->len : helper_frame->uv_len );
-
-	switch( fade_method ) {
-		case 1:
-			alpha_transition_apply( frame, temp_buffer,opacity );
-			break;
-		default:
-			opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
-			break;
 	}
 
 	if( follow ) {
@@ -3093,16 +3096,14 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 
 static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 {
-	int opacity; 
+	int opacity = 0; //@off 
 	int mode = pvar_.fader_active;
 	int follow = 0;
 	int fade_method = 0;
 
-	vj_perform_supersample_chain( info, frame );
-
 	if(mode == 2)
 		opacity = (int) vj_tag_get_fader_val(info->uc->sample_id, &fade_method);
-	else
+	else if( mode )
     	opacity = (int) vj_tag_apply_fader_inc(info->uc->sample_id, &fade_method);
 
 	if( opacity == 0 ) {
@@ -3111,22 +3112,39 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 		}
 	}
 
+	int len2 = ( frame->ssm == 1 ? frame->len : frame->uv_len );
+
+	switch( fade_method ) {
+		case 1:
+			vj_perform_supersample_chain( info, frame );
+			alpha_transition_apply( frame, temp_buffer,opacity );
+			break;
+		default:
+			if( opacity > 0 ) {
+				vj_perform_supersample_chain( info, frame );
+				opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+			}
+			break;
+	}
+
 	if(mode != 2)
 	{
- 		int dir = vj_tag_get_fader_direction(info->uc->sample_id);
+		int dir = vj_tag_get_fader_direction(info->uc->sample_id);
+
 		if((dir < 0) && (opacity == 0))
 		{
-			vj_tag_set_effect_status(info->uc->sample_id,1);
+			if( fade_method == 0 )
+				vj_tag_set_effect_status(info->uc->sample_id,1);
 			vj_tag_reset_fader(info->uc->sample_id);
 			if( pvar_.follow_fade ) {
 			   follow = 1;
 			}
-
 			veejay_msg(VEEJAY_MSG_DEBUG, "Stream Chain Auto Fade done");
 		}
 		if((dir > 0) && (opacity == 255))
 		{
-			vj_tag_set_effect_status(info->uc->sample_id,0);
+			if( fade_method == 0 )
+				vj_tag_set_effect_status(info->uc->sample_id,0);
 			vj_tag_reset_fader(info->uc->sample_id);
 			if( pvar_.follow_fade ) {
 			   follow = 1;
@@ -3137,17 +3155,6 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 			if( pvar_.follow_fade ) {
 			 follow = 1;
 		}
-	}
-
-	int len2 = ( frame->ssm == 1 ? frame->len : frame->uv_len );
-
-	switch( fade_method ) {
-		case 1:
-			alpha_transition_apply( frame, temp_buffer,opacity );
-			break;
-		default:
-			opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
-			break;
 	}
 
 	if( follow ) {
@@ -3392,13 +3399,11 @@ static	void 	vj_perform_finish_chain( veejay_t *info, int is444 )
 
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
-		if( pvar_.fader_active )
-			result = vj_perform_post_chain_tag(info,&frame);
+		result = vj_perform_post_chain_tag(info,&frame);
 	}
 	else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
 	{
-		if( pvar_.fader_active)
-			result = vj_perform_post_chain_sample(info,&frame);
+		result = vj_perform_post_chain_sample(info,&frame);
 	}
 
 	if( result ) {

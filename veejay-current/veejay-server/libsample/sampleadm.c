@@ -708,9 +708,7 @@ int sample_set_manual_fader( int s1, int value, int method)
   si->fader_active = 2;
   si->fader_val = (float) value;
   si->fader_inc = 0.0;
-  si->fader_direction = 0.0;
   si->fade_method = method;
-  /* inconsistency check */
   if(si->effect_toggle == 0) 
 	  si->effect_toggle = 1;
 
@@ -733,9 +731,9 @@ int sample_set_fader_active( int s1, int nframes, int direction ) {
   si->fader_inc *= si->fader_direction;
   /* inconsistency check */
   if(si->effect_toggle == 0)
-	{
+  {
 	si->effect_toggle = 1;
-	}
+  }
   return 1;
 }
 
@@ -744,7 +742,6 @@ int sample_reset_fader(int s1) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_active = 0;
-  si->fader_val = 0;
   si->fader_inc = 0;
   return 1;
 }
@@ -788,10 +785,9 @@ int sample_apply_fader_inc(int s1, int *method) {
   *method = si->fade_method;
   if(si->fader_val > 255.0 ) si->fader_val = 255.0;
   if(si->fader_val < 0.0 ) si->fader_val = 0.0;
-  return (int) (si->fader_val+0.5);
+  if(si->fader_direction) return si->fader_val;
+  return (255-si->fader_val);
 }
-
-
 
 int sample_set_fader_inc(int s1, float inc) {
   sample_info *si = sample_get(s1);

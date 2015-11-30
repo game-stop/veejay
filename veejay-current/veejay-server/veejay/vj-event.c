@@ -5255,11 +5255,15 @@ void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 
 	if( args[1] < 0 || args[1] > 255)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Invalid opacity range %d use [0-255] ", args[1]);
-		return;
+		veejay_msg(VEEJAY_MSG_DEBUG,"Invalid opacity range %d use [0-255] ", args[1]);
+		//clamp values
+		if(args[1] < 0)
+			args[1] = 0;
+		if(args[1] > 255)
+			args[1] = 255;
 	}
 
-	args[1] = 255 - args[1];
+	args[1] = args[1];
 
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{

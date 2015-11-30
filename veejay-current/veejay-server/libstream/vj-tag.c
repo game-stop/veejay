@@ -1479,6 +1479,8 @@ int vj_tag_set_manual_fader(int t1, int value, int method )
   tag->fader_inc = 0.0;
   tag->fader_val = (float)value;
   tag->fade_method = method;
+  if(tag->effect_toggle == 0) 
+	  tag->effect_toggle = 1;
   return 1;
 }
 
@@ -1493,7 +1495,6 @@ int vj_tag_reset_fader(int t1) {
   if(!tag) return -1;
   tag->fader_active = 0;
   tag->fader_inc = 0.0;
-  tag->fader_val = 0.0;
   return 1;
 }
 
@@ -1536,7 +1537,6 @@ int vj_tag_set_fader_active(int t1, int nframes , int direction) {
 	tag->fader_val = 255.0;
   else
 	tag->fader_val = 0.0;
-  tag->fader_val = 0.0;
   tag->fader_inc = (float) (255.0 / (float)nframes );
   tag->fader_direction = direction;
   tag->fader_inc *= direction;

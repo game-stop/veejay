@@ -301,8 +301,10 @@ void	on_toggle_fademethod_toggled(GtkWidget *w, gpointer user_data)
 	
 	GtkWidget *op = glade_xml_get_widget(info->main_window, "manualopacity");
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(op)->adjustment)->value;
-	
-	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d %d", (int)(val), is_button_toggled("toggle_fademethod"));
+	int mode  = is_button_toggled("toggle_fademethod");
+	int value = ( mode == 1 ? 0xff - (int) val : (int) val );
+
+	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d %d", value, mode );
 }
 
 void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
@@ -311,8 +313,10 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 		return;
 
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-	
-	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d %d", (int)(val), is_button_toggled("toggle_fademethod"));
+	int mode  = is_button_toggled("toggle_fademethod");
+	int value = ( mode == 1 ? 0xff - (int) val : (int) val );
+
+	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d %d", value,mode );
 	
 	vj_midi_learning_vims_complex( info->midi, "manualopacity", VIMS_CHAIN_FADE_IN, 0,1 );
 	
