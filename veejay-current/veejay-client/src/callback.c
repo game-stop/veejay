@@ -1591,7 +1591,7 @@ void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
 		int vims_id = VIMS_STREAM_CHAIN_DISABLE;
 		if( is_button_toggled( "check_streamfx"))
 			vims_id = VIMS_STREAM_CHAIN_ENABLE;
-		multi_vims( VIMS_STREAM_CHAIN_DISABLE, "%d", 0 );	
+		multi_vims( vims_id, "%d", 0 );	
 		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
 	}
 }
