@@ -1516,11 +1516,11 @@ int vj_tag_get_fader_direction(int t1) {
    return (tag->fader_direction);
 }
 
-int vj_tag_apply_fader_inc(int t1, int fade_method) {
+int vj_tag_apply_fader_inc(int t1, int *method) {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
   tag->fader_val += tag->fader_inc;
-  tag->fade_method = fade_method;
+  *method = tag->fade_method;
   if(tag->fader_val > 255.0 ) tag->fader_val = 255.0;
   if(tag->fader_val < 0.0) tag->fader_val = 0.0;
   if(tag->fader_direction) return tag->fader_val;

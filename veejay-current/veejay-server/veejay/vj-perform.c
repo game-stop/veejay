@@ -3526,7 +3526,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	if(!settings->composite && info->uc->mouse[0] > 0 && info->uc->mouse[1] > 0) 
 	{
 		if( info->uc->mouse[2] == 1 ) {
-			uint8_t a,y,u,v,r,g,b;
+			uint8_t y,u,v,r,g,b;
 
 			y = pri[0][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
 			if( frame->ssm == 1 ) {
@@ -3538,7 +3538,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				v = pri[2][ info->uc->mouse[1] * frame->uv_width + (info->uc->mouse[0]>>1) ];
 			}
 		
-			a = pri[0][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
+			//a = pri[0][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
 			//@ just one for now
 			r = y + (1.370705f * ( v- 128 ));
 			g = y - (0.698001f * ( v - 128)) - (0.337633 * (u-128));
@@ -3646,7 +3646,6 @@ static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settin
 
 static	void	vj_perform_record_frame( veejay_t *info )
 {
-	VJFrame	*frame = info->effect_frame1;
 	int which_sample = info->uc->sample_id;
 	if( info->seq->active && info->seq->rec_id && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE  )		
 		which_sample = info->seq->rec_id;
