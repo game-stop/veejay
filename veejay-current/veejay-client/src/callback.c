@@ -1343,7 +1343,7 @@ void	on_check_autowhitebalance_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d auto_white", info->selected_slot->sample_id,is_button_toggled("autowhitebalance"));
+		multi_vims( VIMS_STREAM_SET_V4LCTRL, "%d %d auto_white", info->selected_slot->sample_id,is_button_toggled("chekc_autowhitebalance"));
 	}
 }
 
