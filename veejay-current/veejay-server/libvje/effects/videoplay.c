@@ -227,6 +227,9 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int width, int height, int siz
 	}
 
 	if( mode == 0 && last_mode != mode ) {
+		for( i = 0; i < num_videos; i ++ )
+			rt[i] = i;
+
 		fx_shuffle_int_array( rt, num_videos );
 		last_mode = 0;
 	}
