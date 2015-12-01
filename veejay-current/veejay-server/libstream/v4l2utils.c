@@ -1962,7 +1962,6 @@ static	void	*v4l2_grabber_thread( void *v )
 		i->stop = 1;
 		unlock_(v);
 		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Not a device file: %s" , i->file );
-		pthread_exit(NULL);
 		return NULL;
 	}
 
@@ -1971,7 +1970,6 @@ static	void	*v4l2_grabber_thread( void *v )
 		i->stop = 1;
 		veejay_msg(0, "v4l2: error opening v4l2 device '%s'",i->file );
 		unlock_(v);
-		pthread_exit(NULL);
 		return NULL;
 	}
 
@@ -1992,7 +1990,6 @@ static	void	*v4l2_grabber_thread( void *v )
 			v4l2_close( v4l2 );
 			veejay_msg(0, "v4l2: error allocating memory" );
 			unlock_(v);
-			pthread_exit(NULL);
 			return NULL;
 		}
 

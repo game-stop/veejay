@@ -785,7 +785,7 @@ int sample_apply_fader_inc(int s1, int *method) {
   *method = si->fade_method;
   if(si->fader_val > 255.0 ) si->fader_val = 255.0;
   if(si->fader_val < 0.0 ) si->fader_val = 0.0;
-  if(si->fader_direction) return si->fader_val;
+  if(si->fader_direction >= 0) return si->fader_val;
   return (255-si->fader_val);
 }
 

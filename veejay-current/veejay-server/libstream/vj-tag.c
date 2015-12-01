@@ -1245,7 +1245,7 @@ int vj_tag_del(int id)
     int i;
     tag = vj_tag_get(id);
     if(!tag)
-	return 0;
+		return 0;
 #ifdef HAVE_FREETYPE
 	vj_font_dictionary_destroy(_tag_info->font ,tag->dict);
 #endif
@@ -1524,7 +1524,7 @@ int vj_tag_apply_fader_inc(int t1, int *method) {
   *method = tag->fade_method;
   if(tag->fader_val > 255.0 ) tag->fader_val = 255.0;
   if(tag->fader_val < 0.0) tag->fader_val = 0.0;
-  if(tag->fader_direction) return tag->fader_val;
+  if(tag->fader_direction >= 0) return tag->fader_val;
   return (255-tag->fader_val);
 }
 
@@ -2778,15 +2778,6 @@ void vj_tag_get_source_name(int t1, char *dst)
 	vj_tag_get_description( tag->source_type, dst );
     }
 }
-
-void vj_tag_get_method_filename(int t1, char *dst)
-{
-    vj_tag *tag = vj_tag_get(t1);
-    if (tag) {
-	if(tag->method_filename != NULL) sprintf(dst, "%s", tag->method_filename);
-    }
-}
-
 
 void	vj_tag_get_by_type(int type, char *description )
 {
@@ -4048,10 +4039,31 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 		if( source_type == VJ_TAG_TYPE_V4L && extra_data )	
 			sscanf( extra_data, "%d",&zer );	
 
-		vj_tag_del( id );
+		//vj_tag_del( id );
+	
+		int n_id = id;
 
-		int n_id = vj_tag_new( source_type, source_file, _tag_info->nstreams,_tag_info->current_edit_list,
+		vj_tag *cur_tag = vj_tag_get( id );
+		int identity = 0;
+		if( cur_tag ) {
+			char *cur_src_file = cur_tag->method_filename;
+			int   type = cur_tag->source_type;
+			if(cur_src_file && source_file) {
+				if(strncasecmp(cur_tag->method_filename, source_file,strlen(cur_tag->method_filename)) == 0 && type == source_type) {
+					identity = 1;
+				}
+			}
+		}
+
+		if(!identity) {
+			if(cur_tag)
+				vj_tag_del(id);
+		
+
+			n_id = vj_tag_new( source_type, source_file, _tag_info->nstreams,_tag_info->current_edit_list,
 				_tag_info->pixel_format, source_id,zer, _tag_info->settings->composite );
+
+		}
 
 		if(n_id > 0 )
 		{
