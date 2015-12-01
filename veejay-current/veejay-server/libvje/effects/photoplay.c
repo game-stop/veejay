@@ -23,8 +23,6 @@
 #include "photoplay.h"
 #include "common.h"
 
-static int	previous_photoplay_mode = -1;
-
 vj_effect *photoplay_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -41,7 +39,7 @@ vj_effect *photoplay_init(int w, int h)
     ve->limits[1][2] = 1 + get_matrix_func_n(); // mode
     ve->defaults[0] = 2;
     ve->defaults[1] = 2; // higher value takes less cpu 
-    ve->defaults[2] = previous_photoplay_mode = 1;
+    ve->defaults[2] = 1;
     ve->description = "Photoplay (timestretched mosaic)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
@@ -67,7 +65,8 @@ static int	num_photos = 0;
 static int	frame_counter = 0;
 static int	frame_delay = 0;
 static int	*rt = NULL;
-	
+static int	last_mode = -1;	
+
 static	int prepare_filmstrip(int film_length, int w, int h)
 {
 	int i,j;
@@ -209,7 +208,7 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 	uint8_t *dstU = frame->data[1];
 	uint8_t *dstV = frame->data[2];
 
-	if( (size*size) != num_photos || num_photos == 0 )
+	if( (size*size) != num_photos || num_photos == 0)
 	{
 		destroy_filmstrip();
 		if(!prepare_filmstrip(size*size, width,height))
@@ -220,20 +219,11 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 
 		for( i = 0; i < num_photos; i ++ )
 			rt[i] = i;
-
-		if( mode == 0 )
-			fx_shuffle_int_array( rt, num_photos );
 	}
 
-	if (previous_photoplay_mode != mode)
-	{
-		for( i = 0; i < num_photos; i ++ )
-			rt[i] = i;
-
-		if( mode == 0 )
-			fx_shuffle_int_array( rt, num_photos );
-
-		previous_photoplay_mode = mode;
+	if( mode == 0 && last_mode != mode) {
+		fx_shuffle_int_array( rt, num_photos );
+		last_mode = mode;
 	}
 
 	if( frame_delay )
