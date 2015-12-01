@@ -2311,6 +2311,14 @@ static void veejay_playback_cycle(veejay_t * info)
 		}
 	}
 
+	stats.nqueue = QUEUE_LEN;
+	settings->spas = 1.0 / (double) el->audio_rate;
+	veejay_msg(VEEJAY_MSG_DEBUG, "Output 1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
+
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Output dimensions: %dx%d, backend scaler: %dx%d",
+	           info->video_output_width,info->video_output_height,info->bes_width,info->bes_height );
+
 
 	vj_perform_queue_video_frame(info,0);
 	vj_perform_queue_audio_frame(info);
@@ -2320,16 +2328,9 @@ static void veejay_playback_cycle(veejay_t * info)
 		return;
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Output dimensions: %dx%d, backend scaler: %dx%d",
-	           info->video_output_width,info->video_output_height,info->bes_width,info->bes_height );
-
 	for(n = 0; n < QUEUE_LEN ; n ++ ) {
 		veejay_mjpeg_queue_buf(info, n,1 );
 	}
-
-	stats.nqueue = QUEUE_LEN;
-	settings->spas = 1.0 / (double) el->audio_rate;
-	veejay_msg(VEEJAY_MSG_DEBUG, "Output 1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
 
 
 	while (settings->state != LAVPLAY_STATE_STOP)
