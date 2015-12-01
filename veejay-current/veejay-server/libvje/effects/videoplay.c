@@ -67,6 +67,7 @@ static int	   num_videos = 0;
 static int	  frame_counter = 0;
 static int	  frame_delay = 0;
 static int	*rt = NULL;
+static int last_mode = -1;
 
 static	int prepare_filmstrip(int film_length, int w, int h)
 {
@@ -220,10 +221,14 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int width, int height, int siz
 			return;
 		}
 		frame_delay = delay;
+		
+		for( i = 0; i < num_videos; i ++ )
+			rt[i] = i;
+	}
 
-		if( mode == 0 )
-			fx_shuffle_int_array( rt, num_videos );
-
+	if( mode == 0 && last_mode != mode ) {
+		fx_shuffle_int_array( rt, num_videos );
+		last_mode = 0;
 	}
 
 	if( frame_delay )
