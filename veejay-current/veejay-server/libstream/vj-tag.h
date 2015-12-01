@@ -336,7 +336,7 @@ int	vj_tag_get_kf_status(int t1, int entry, int *type);
 void	vj_tag_set_kf_type(int t1, int entry, int type );
 int	vj_tag_chain_set_kf_status( int s1, int entry, int status );
 int	vj_tag_chain_reset_kf( int s1, int entry );
-int     vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active );
+int     vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active, int *method );
 int vj_tag_true_size();
 void    *vj_tag_get_kf_port( int s1, int entry );
 

@@ -5299,26 +5299,18 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
-		if( sample_set_fader_active( args[0], args[1],-1 ) )
+		if( sample_set_fader_active( args[0], args[1],1 ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade In from sample to full effect chain in %d frames. Per frame %2.4f",
 				args[1], sample_get_fader_inc(args[0]));
-			if(sample_get_effect_status(args[0]==0))
-			{
-				sample_set_effect_status(args[0], -1);
-			}
 		}
 	}
 	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
 	{
-		if( vj_tag_set_fader_active( args[0], args[1],-1 ) )
+		if( vj_tag_set_fader_active( args[0], args[1],1 ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO,"Chain Fade In from stream to full effect chain in %d frames. Per frame %2.4f",
 				args[1], sample_get_fader_inc(args[0]));
-			if(vj_tag_get_effect_status(args[0]==0))
-			{
-				vj_tag_set_effect_status(args[0],-1);
-			}
 		}
 	}
 }
@@ -5340,7 +5332,7 @@ void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
-		if( sample_set_fader_active( args[0], args[1],1 ) )
+		if( sample_set_fader_active( args[0], args[1],-1 ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade Out from sample to full effect chain in %d frames. Per frame %2.2f",
 				args[1], sample_get_fader_inc(args[0]));
@@ -5348,7 +5340,7 @@ void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 	}
 	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
 	{
-		if( vj_tag_set_fader_active( args[0], args[1],1 ) )
+		if( vj_tag_set_fader_active( args[0], args[1],-1 ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO,"Chain Fade Out from stream to full effect chain in %d frames. Per frame %2.2f",
 				args[1], sample_get_fader_inc(args[0]));

@@ -82,6 +82,8 @@ typedef struct {
 
 typedef struct {
 	int	fader_active;
+	int fade_method;
+	int fade_value;
 	int	follow_fade;
 	int	follow_now[2];
 	int	follow_run;
@@ -2514,7 +2516,7 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
     frames[0]->data[2] = primary_buffer[0]->Cr;
 	frames[0]->data[3] = primary_buffer[0]->alpha;
 
-	if(pvar_.fader_active)
+	if(pvar_.fader_active || pvar_.fade_method || (pvar_.fade_method == 0 && pvar_.fade_value > 0))
 		vj_perform_pre_chain( info, frames[0] );
 
 	sample_eff_chain **chain = sample_get_effect_chain( info->uc->sample_id );
@@ -2564,7 +2566,7 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
 	frames[0]->data[2] = primary_buffer[0]->Cr;
 	frames[0]->data[3] = primary_buffer[0]->alpha;
 
-	if( pvar_.fader_active )
+	if( pvar_.fader_active || pvar_.fade_method || (pvar_.fade_method == 0 && pvar_.fade_value >0))
 		vj_perform_pre_chain( info, frames[0] );
 
 	sample_eff_chain **chain = vj_tag_get_effect_chain( info->uc->sample_id );
@@ -3030,8 +3032,8 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 		opacity = (int) sample_get_fader_val(info->uc->sample_id, &fade_method);
 	else	// fade in/fade out
 	    opacity = (int) sample_apply_fader_inc(info->uc->sample_id, &fade_method);
-	
-	int len2 = ( frame->ssm == 1 ? frame->len : frame->uv_len );
+
+	pvar_.fade_value = opacity;
 
 	switch( fade_method ) {
 		case 1:
@@ -3041,7 +3043,7 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 		default:
 			if( opacity > 0 ) {
 				vj_perform_supersample_chain( info, frame );
-				opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+				opacity_blend_apply( frame->data ,temp_buffer,frame->len,(frame->ssm ? frame->len: frame->uv_len), opacity );
 			}
 			break;
 	}
@@ -3061,8 +3063,6 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 		}
 		if((dir>0) && (opacity==255))
 		{
-			if( fade_method == 0 )
-				sample_set_effect_status(info->uc->sample_id,0);
 			sample_reset_fader(info->uc->sample_id);
 			veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto fade In done");
 			if( pvar_.follow_fade ) {
@@ -3106,13 +3106,13 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 	else if( mode )
     	opacity = (int) vj_tag_apply_fader_inc(info->uc->sample_id, &fade_method);
 
+	pvar_.fade_value = opacity;
+
 	if( opacity == 0 ) {
 		if( pvar_.follow_fade ) {
 		   follow = 1;
 		}
 	}
-
-	int len2 = ( frame->ssm == 1 ? frame->len : frame->uv_len );
 
 	switch( fade_method ) {
 		case 1:
@@ -3122,7 +3122,7 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 		default:
 			if( opacity > 0 ) {
 				vj_perform_supersample_chain( info, frame );
-				opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+				opacity_blend_apply( frame->data ,temp_buffer,frame->len, (frame->ssm ? frame->len : frame->uv_len), opacity );
 			}
 			break;
 	}
@@ -3143,8 +3143,6 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 		}
 		if((dir > 0) && (opacity == 255))
 		{
-			if( fade_method == 0 )
-				vj_tag_set_effect_status(info->uc->sample_id,0);
 			vj_tag_reset_fader(info->uc->sample_id);
 			if( pvar_.follow_fade ) {
 			   follow = 1;
@@ -3697,8 +3695,12 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 	int res = 0;
 	int i = 0;
 	int safe_ff = pvar_.follow_fade;
+	int safe_fv = pvar_.fade_value;
+
 	veejay_memset( &pvar_, 0, sizeof(varcache_t));
+	
 	pvar_.follow_fade = safe_ff;
+	pvar_.fade_value = safe_fv;
 
 	if(settings->offline_record)	
 		vj_perform_record_tag_frame(info);
@@ -3716,12 +3718,13 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 	{
 		case VJ_PLAYBACK_MODE_SAMPLE:
 
-			sample_var( info->uc->sample_id, &(pvar_.type),
+			sample_var( info->uc->sample_id,
+						&(pvar_.type),
 					    &(pvar_.fader_active),
 					    &(pvar_.fx_status),
 					    &(pvar_.enc_active),
-					    &(pvar_.active)
-				  );
+					    &(pvar_.active),
+						&(pvar_.fade_method));
 
 			if( info->seq->active && info->seq->rec_id )
 				pvar_.enc_active = 1;
@@ -3752,7 +3755,8 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 					    &(pvar_.fader_active),
 					    &(pvar_.fx_status),
 					    &(pvar_.enc_active),
-					    &(pvar_.active)
+					    &(pvar_.active),
+						&(pvar_.fade_method)
 					    
 					    );
 

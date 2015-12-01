@@ -768,6 +768,8 @@ float sample_get_fader_inc(int s1) {
 int sample_get_fader_direction(int s1) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
+  if(si->fader_active == 0)
+	  return 0; // no direction
   return si->fader_direction;
 }
 
@@ -785,8 +787,9 @@ int sample_apply_fader_inc(int s1, int *method) {
   *method = si->fade_method;
   if(si->fader_val > 255.0 ) si->fader_val = 255.0;
   if(si->fader_val < 0.0 ) si->fader_val = 0.0;
-  if(si->fader_direction >= 0) return si->fader_val;
-  return (255-si->fader_val);
+//  if(si->fader_direction >= 0) return si->fader_val;
+//  return (255-si->fader_val);
+	return si->fader_val;
 }
 
 int sample_set_fader_inc(int s1, float inc) {
@@ -1270,15 +1273,16 @@ int sample_get_effect_status(int s1)
 	return 0;
 }
 
-int	sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active )
+int	sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active, int *method )
 {
 	sample_info *si = sample_get(s1);
 	if(!si) return 0;
 	*type  = 0;
-    	*fader = si->fader_active;
+    *fader = si->fader_active;
 	*fx    = si->effect_toggle;
 	*rec   = si->encoder_active;
 	*active= 1;
+	*method = si->fade_method;
 	return 1;
 }
 

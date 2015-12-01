@@ -1514,6 +1514,8 @@ int vj_tag_get_fader_active(int t1) {
 int vj_tag_get_fader_direction(int t1) {
    vj_tag *tag = vj_tag_get(t1);
    if(!tag) return -1;
+   if( tag->fader_active == 0 )
+	   return 0; // no direction
    return (tag->fader_direction);
 }
 
@@ -1524,8 +1526,7 @@ int vj_tag_apply_fader_inc(int t1, int *method) {
   *method = tag->fade_method;
   if(tag->fader_val > 255.0 ) tag->fader_val = 255.0;
   if(tag->fader_val < 0.0) tag->fader_val = 0.0;
-  if(tag->fader_direction >= 0) return tag->fader_val;
-  return (255-tag->fader_val);
+  return tag->fader_val;
 }
 
 int vj_tag_set_fader_active(int t1, int nframes , int direction) {
@@ -2906,7 +2907,7 @@ int vj_tag_encoder_active(int s1)
 	return si->encoder_active;
 }
 
-int	vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active )
+int	vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active, int *method )
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return 0;
@@ -2915,6 +2916,7 @@ int	vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *a
 	*rec_sta = tag->encoder_active;
 	*type = tag->source_type;
 	*active = tag->active;
+	*method = tag->fade_method;
 	return 1;
 }
 

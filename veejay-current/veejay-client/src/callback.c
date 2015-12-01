@@ -273,7 +273,7 @@ void	on_button_fadeout_clicked(GtkWidget *w, gpointer user_data)
 	gint num = (gint)get_numd( "button_fadedur");
 	char *timenow = format_time( num, info->el.fps );
 	multi_vims( VIMS_CHAIN_FADE_OUT, "0 %d", num );
-	vj_midi_learning_vims_complex( info->midi, "button_fadedur", VIMS_CHAIN_FADE_OUT, 0,2 );
+	vj_midi_learning_vims_complex( info->midi, "button_fadedur",VIMS_CHAIN_FADE_OUT, 0,2 );
 	vj_msg(VEEJAY_MSG_INFO, "Fade out duration %s (frames %d)",
 		timenow,
 		num );
@@ -285,7 +285,7 @@ void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 	gint num = (gint)get_numd( "button_fadedur");
 	char *timenow = format_time( num, info->el.fps );
 	multi_vims( VIMS_CHAIN_FADE_IN, "0 %d", num );
-	vj_midi_learning_vims_complex( info->midi, "button_fadedur", VIMS_CHAIN_FADE_IN, 0,2 );
+	vj_midi_learning_vims_complex( info->midi, "button_fadedur",VIMS_CHAIN_FADE_IN, 0,2 );
 	
 	vj_msg(VEEJAY_MSG_INFO, "Fade in duration %s (frames %d)",
 		timenow,

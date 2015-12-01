@@ -329,7 +329,7 @@ extern int     sample_get_el_position( int sample_id, int *start, int *end );
 
 extern	void	*sample_get_dict( int sample_id );
 
-extern int sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active );
+extern int sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active, int *method );
 
 extern void        sample_set_project(int fmt, int deinterlace, int flags, int force, char norm, int w, int h );
 
