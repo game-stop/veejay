@@ -515,7 +515,7 @@ extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int n, 
 
 extern void smear_apply(VJFrame *frame, int w, int h, int n, int m);
 
-extern void raster_apply(VJFrame *frame, int w, int h, int v );
+extern void raster_apply(VJFrame *frame, int w, int h, int v, int mode);
 
 extern void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha );
 

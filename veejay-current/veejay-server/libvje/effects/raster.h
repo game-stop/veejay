@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *raster_init(int w, int h);
-void raster_apply( VJFrame *frame, int width, int height, int val);
+void raster_apply( VJFrame *frame, int width, int height, int val, int mode);
 #endif

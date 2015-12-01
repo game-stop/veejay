@@ -28,37 +28,46 @@
 vj_effect *raster_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
+    ve->num_params = 2;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 4;
     ve->limits[1][0] = h/4;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 1;
     ve->defaults[0] = 4;
-    ve->description = "Grid";
+    ve->defaults[1] = 1;
+	ve->description = "Grid";
     ve->sub_format = 0;
     ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Grid size");
+	ve->param_description = vje_build_param_list( ve->num_params, "Grid size", "Mode");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,"Black", "White" );
+
     return ve;
 }
 
-void raster_apply(VJFrame *frame, int w, int h, int v )
+void raster_apply(VJFrame *frame, int w, int h, int val, int mode)
 {
 	int x,y;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-	if(v == 0 )
-	  return; 
+	if(val == 0 )
+	  return;
+
+	uint8_t pixel_color = mode ? pixel_Y_hi_ : pixel_Y_lo_;
 
 	for(y=0; y < h; y++)
 	{
 		for(x=0; x < w; x++)
 		{
-			Y[y*w+x] = ((x%v>1)? ((y%v>1) ? Y[y*w+x]: pixel_Y_hi_):pixel_Y_hi_);
+			Y[y*w+x] = ((x%val>1)? ((y%val>1) ? Y[y*w+x]: pixel_color):pixel_color);
 		}
 	}
 	w= frame->uv_width;
@@ -68,8 +77,8 @@ void raster_apply(VJFrame *frame, int w, int h, int v )
 	{
 		for(x=0; x < w; x++)
 		{
-			Cb[y*w+x] = ((x%v>1)? ((y%v>1) ? Cb[y*w+x]:128):128);
-			Cr[y*w+x] = ((x%v>1)? ((y%v>1) ? Cr[y*w+x]:128):128);
+			Cb[y*w+x] = ((x%val>1)? ((y%val>1) ? Cb[y*w+x]:128):128);
+			Cr[y*w+x] = ((x%val>1)? ((y%val>1) ? Cr[y*w+x]:128):128);
 		}
 	}
 /*

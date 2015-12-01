@@ -25,129 +25,145 @@
 vj_effect *flip_init(int w, int h)
 {
 
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 0;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 1;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->defaults[0] = 0;
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 1;
 
-    ve->description = "Flip Frame";
-    ve->sub_format = 0;
-    ve->extra_frame = 0;
+	ve->description = "Flip Frame";
+	ve->sub_format = 0;
+	ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "H or V");
-    return ve;
+
+	ve->hints = vje_init_value_hint_list (ve->num_params);
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Flip Horizontal", "Flip Vertical"
+	);
+
+	return ve;
 }
 
 void flip_apply(VJFrame *frame, int width, int height, int n)
 {
-    if (n == 0)
-	_flip_y_yuvdata(frame, width, height);
-    if (n == 1)
-	_flip_x_yuvdata(frame, width, height);
+	if (n == 0)
+		_flip_y_yuvdata(frame, width, height);
+	if (n == 1)
+		_flip_x_yuvdata(frame, width, height);
 }
 
-
+/**********************************************************************************************
+ * flips the image verticaly, derived from SDLcam-0.7.0 (flip_y.c)
+ * added uv routine to cope with Cb and Cr data
+ *
+ * \param frame         Pointer to the actual VJFrame to flip
+ * \param width         Image width, in pixels.
+ * \param height        Image height, in pixels.
+ **********************************************************************************************/
 void _flip_x_yuvdata(VJFrame *frame, int width, int height)
 {
-    unsigned int y = height, x;
-    unsigned int pos = 0;
+	unsigned int y = height, x;
+	unsigned int pos = 0;
 	int w2 = width >> 1;
-    uint8_t temp;
-    const unsigned int uv_width = frame->uv_width;
-    unsigned int uy = frame->uv_height;
-    unsigned int uw2 = w2 >> frame->shift_h;
- 	uint8_t *Y = frame->data[0];
+	uint8_t temp;
+	const unsigned int uv_width = frame->uv_width;
+	unsigned int uy = frame->uv_height;
+	unsigned int uw2 = w2 >> frame->shift_h;
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-    /* Luminance */
-    do {
-	x = w2;
+	/* Luminance */
 	do {
-	    temp = Y[pos + x];
-	    Y[pos + x] = Y[pos + width - x];
-	    Y[pos + width - x] = temp;
-	} while (--x);
-	pos += width;
+		x = w2;
+		do {
+			temp = Y[pos + x];
+			Y[pos + x] = Y[pos + width - x];
+			Y[pos + width - x] = temp;
+		} while (--x);
+		pos += width;
 
-    } while (--y);
+	} while (--y);
 
-    pos = 0;
+	pos = 0;
 
-    do {
-	x = uw2;
+	/* Chrominance */
 	do {
-	    temp = Cb[pos + x];
-	    Cb[pos + x] = Cb[pos + uv_width - x];
-	    Cb[pos + uv_width - x] = temp;
-	    temp = Cr[pos + x];
-	    Cr[pos + x] = Cr[pos + uv_width - x];
-	    Cr[pos + uv_width - x] = temp;
+		x = uw2;
+		do {
+			temp = Cb[pos + x];
+			Cb[pos + x] = Cb[pos + uv_width - x];
+			Cb[pos + uv_width - x] = temp;
+			temp = Cr[pos + x];
+			Cr[pos + x] = Cr[pos + uv_width - x];
+			Cr[pos + uv_width - x] = temp;
 
-	} while (--x);
-	pos += uv_width;
+		} while (--x);
+		pos += uv_width;
 
-    } while (--uy);
+	} while (--uy);
 
 }
 
 /**********************************************************************************************
- * flip_y_yuvdata
  * flips the image horizontal, derived from SDLcam-0.7.0 (flip_y.c)
- * added uv routine to cope with Cb and Cr data 
+ * added uv routine to cope with Cb and Cr data
+ *
+ * \param frame         Pointer to the actual VJFrame to flip
+ * \param width         Image width, in pixels.
+ * \param height        Image height, in pixels.
  **********************************************************************************************/
 /* fixme: put all chroma supersample subsample routines elsewhere to be smart */
 void _flip_y_yuvdata(VJFrame *frame, int width, int height)
 {
-    unsigned int x, pos_a = 0, pos_b;
-    uint8_t temp;
-    unsigned int w1 = width - 1;
-    unsigned int y = height >> 1;
-    unsigned int uy = y >> frame->shift_v;
-    const unsigned int uv_height = frame->uv_height;
-    const unsigned int uv_width = frame->uv_width;
-    const unsigned int uw1 = width >> frame->shift_h;
- 	uint8_t *Y = frame->data[0];
+	unsigned int x, pos_a = 0, pos_b;
+	uint8_t temp;
+	unsigned int w1 = width - 1;
+	unsigned int y = height >> 1;
+	unsigned int uy = y >> frame->shift_v;
+	const unsigned int uv_height = frame->uv_height;
+	const unsigned int uv_width = frame->uv_width;
+	const unsigned int uw1 = width >> frame->shift_h;
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-    /* Luminance */
-    pos_b = (height - 1) * width;
-    do {
+	/* Luminance */
+	pos_b = (height - 1) * width;
+	do {
 		x = w1;
 		do {
-		    temp = Y[pos_a + x];
-		    Y[pos_a + x] = Y[pos_b + x];
-		    Y[pos_b + x] = temp;
+			temp = Y[pos_a + x];
+			Y[pos_a + x] = Y[pos_b + x];
+			Y[pos_b + x] = temp;
 		} while (--x);
 		pos_a += width;
 		pos_b -= width;
-    } while (--y);
+	} while (--y);
 
 	/* Chrominance */
-    pos_a = 0;
-    pos_b = (uv_height - 1) * uv_width;
-    do {
+	pos_a = 0;
+	pos_b = (uv_height - 1) * uv_width;
+	do {
 		x = uw1;
 		do {
-		    temp = Cb[pos_a + x];
-		    Cb[pos_a + x] = Cb[pos_b + x];
-		    Cb[pos_b + x] = temp;
-	
-		    temp = Cr[pos_a + x];
-		    Cr[pos_a + x] = Cr[pos_b + x];
-		    Cr[pos_b + x] = temp;
+			temp = Cb[pos_a + x];
+			Cb[pos_a + x] = Cb[pos_b + x];
+			Cb[pos_b + x] = temp;
+
+			temp = Cr[pos_a + x];
+			Cr[pos_a + x] = Cr[pos_b + x];
+			Cr[pos_b + x] = temp;
 	
 		} while (--x);
 		pos_a += uv_width;
 		pos_b -= uv_width;
-    } while (--uy);
-
-
+	} while (--uy);
 }
+
 void flip_free(){}
