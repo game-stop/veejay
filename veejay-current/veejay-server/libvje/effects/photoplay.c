@@ -222,6 +222,9 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 	}
 
 	if( mode == 0 && last_mode != mode) {
+		for( i = 0; i < num_photos; i ++ )
+			rt[i] = i;
+
 		fx_shuffle_int_array( rt, num_photos );
 		last_mode = mode;
 	}
