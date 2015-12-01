@@ -2013,6 +2013,11 @@ static	void	*v4l2_grabber_thread( void *v )
 	while( 1 ) {
 		int err = (v4l2->rw);
 	
+		if( i->stop ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Closing video capture device");
+			goto v4l2_grabber_exit;
+		}
+
 		lock_(i);
 		if( v4l2->pause_capture ) {
 			if( v4l2->rw == 0 ) {
@@ -2028,7 +2033,8 @@ static	void	*v4l2_grabber_thread( void *v )
 			v4l2->pause_capture = 0; 
 		}
 		unlock_(i);
-		
+	
+	
 		if( ( !v4l2->is_streaming && v4l2->rw == 0 ) || ( v4l2->rw == 1 && v4l2->pause_read ) ) {
 			nanosleep(&req, NULL);
 			continue;
@@ -2052,10 +2058,6 @@ static	void	*v4l2_grabber_thread( void *v )
 			}
 		}
 
-		if( i->stop ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Closing video capture device");
-			goto v4l2_grabber_exit;
-		}
 	}
 
 v4l2_grabber_exit:
@@ -2115,6 +2117,10 @@ int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst )
 	int	status = 0;
 	
 		lock_(i);
+			if(i->stop) {
+				unlock_(i);
+				return status;
+			}
 		//@ block until a buffer is captured
 			while( v->frames_done[v->frame_ready] < 1 ) {
 				veejay_msg(VEEJAY_MSG_DEBUG, "waiting for frame %d to become ready",
