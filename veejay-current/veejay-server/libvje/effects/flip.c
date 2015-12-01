@@ -40,7 +40,14 @@ vj_effect *flip_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "H or V");
-    return ve;
+
+	ve->hints = vje_init_value_hint_list (ve->num_params);
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+		"Flip Horizontal", "Flip Vertical"
+	);
+
+
+	return ve;
 }
 
 void flip_apply(VJFrame *frame, int width, int height, int n)
