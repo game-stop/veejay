@@ -70,6 +70,8 @@ vj_effect *alphaselect2_init(int w, int h)
     ve->rgb_conv = 1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Accept","Red","Green","Blue", "Smooth", "Alpha Operator");
 
+	ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_OUT;
+
     return ve;
 }
 

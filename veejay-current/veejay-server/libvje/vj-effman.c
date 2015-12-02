@@ -422,7 +422,7 @@ void vj_effman_apply_image_effect(
 		toalpha_apply( frames[0], frames[0]->width,frames[0]->height, arg[0] );
 		break;
 	case VJ_IMAGE_EFFECT_ALPHAFLATTEN:
-		alphaflatten_apply(frames[0],frames[0]->width,frames[0]->height);
+		alphaflatten_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_ALPHAFEATHERMASK:
 		feathermask_apply(frames[0], frames[0]->width, frames[0]->height );
@@ -443,7 +443,10 @@ void vj_effman_apply_image_effect(
 		gaussblur_apply(frames[0], arg[0],arg[1],arg[2] );
 		break;
 	case VJ_IMAGE_EFFECT_LEVELCORRECTION:
-		levelcorrection_apply(frames[0],arg[0],arg[1]);
+		levelcorrection_apply(frames[0],arg[0],arg[1],arg[2],arg[3]);
+		break;
+	case VJ_IMAGE_EFFECT_ALPHADAMPEN:
+		alphadampen_apply(frames[0], arg[0] );
 		break;
    }
 }

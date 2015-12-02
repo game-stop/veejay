@@ -46,6 +46,8 @@ vj_effect *overlaymagicalpha_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Keep or clear chroma" );
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
+	ve->alpha = FLAG_ALPHA_IN_BLEND | FLAG_ALPHA_SRC_A | FLAG_ALPHA_SRC_B;
+
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
 		"Difference","Difference Negate","Exclusive","Base","Freeze",
@@ -59,7 +61,7 @@ vj_effect *overlaymagicalpha_init(int w, int h)
 	return ve;
 }
 
-/* rename methods in lumamagick and chromamagick */
+/* fixme */
 
 
 void _overlaymagicalpha_adddistorted(VJFrame *frame, VJFrame *frame2,

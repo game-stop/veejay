@@ -33,6 +33,7 @@ vj_effect *alpha2img_init(int w, int h)
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;
+	ve->alpha = FLAG_ALPHA_SRC_A;
     return ve;
 }
 

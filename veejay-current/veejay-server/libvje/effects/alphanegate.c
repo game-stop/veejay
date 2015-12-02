@@ -40,7 +40,11 @@ vj_effect *alphanegate_init(int w, int h)
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;
+
     ve->param_description = vje_build_param_list( ve->num_params, "Value" );
+
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
+
     return ve;
 }
 

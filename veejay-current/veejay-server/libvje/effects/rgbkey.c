@@ -72,6 +72,8 @@ vj_effect *rgbkey_init(int w,int h)
     ve->limits[0][7] = 0;
     ve->limits[1][7] = 4; 
 
+	ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_SRC_B | FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_IN_OPERATOR;
+
 	ve->param_description = vje_build_param_list(ve->num_params, 
 			"Tolerance Near", "Red", "Green", "Blue", "Tolerance Far","Level Min", "Level Max", "Alpha-IN operator");
 
@@ -84,7 +86,9 @@ vj_effect *rgbkey_init(int w,int h)
 	ve->rgb_conv = 1;
     ve->parallel = 0;
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][7],7, "Ignore Alpha-IN", "Alpha-IN A", "Alpha-IN A or B", "Alpha-In A and B", "Alpha-IN B" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][7],7, 
+			
+			"Ignore Alpha-IN", "Alpha-IN A", "Alpha-IN B", "Alpha-IN A or B", "Alpha-In A and B" );
 
 	return ve;
 }
@@ -218,34 +222,34 @@ void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tol
 	/* euclidean distance between key color and chroma */
 	// introduces spill 
 	switch( operator ) {
-		case 0:	
+		case ALPHA_IGNORE:	
 			//ignore alpha-in
 			for (pos = len; pos != 0; pos--) {
 				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
 			}
 			break;
-		case 1:
+		case ALPHA_IN_A:
 			for (pos = len; pos != 0; pos--) {
 				if(A[pos] == 0)
 					continue;
 				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
 			}
 			break;
-		case 2:
+		case ALPHA_IN_A_OR_B:
 			for (pos = len; pos != 0; pos--) {
 				if(A[pos] == 0 || B[pos] == 0)
 					continue;
 				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
 			}
 			break;
-		case 3:
+		case ALPHA_IN_A_AND_B:
 			for (pos = len; pos != 0; pos--) {
 				if(A[pos] == 0 && B[pos] == 0)
 					continue;
 				T[pos] = (uint8_t)( 255.0 * color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb ) );
 			}
 			break;
-		case 4:
+		case ALPHA_IN_B:
 			for (pos = len; pos != 0; pos--) {
 				if(B[pos] == 0)
 					continue;

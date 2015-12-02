@@ -57,6 +57,7 @@ vj_effect *bgsubtract_init(int width, int height)
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,"Preview", "Inverted preview", "Normal" );
 
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
     return ve;
 }

@@ -57,6 +57,6 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/magicalphaoverlays.c effects/travelmatte.c effects/feathermask.c effects/alphaselect.c \
 		   effects/alphaselect2.c effects/alphablend.c effects/porterduff.c effects/alphanegate.c effects/lumakeyalpha.c \
 	   		effects/chromamagickalpha.c	effects/magicoverlaysalpha.c effects/gaussblur.c effects/levelcorrection.c \
-		   effects/masktransition.c	
+		   effects/masktransition.c effects/alphadampen.c	
 
 

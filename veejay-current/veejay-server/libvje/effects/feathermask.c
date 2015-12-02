@@ -34,6 +34,7 @@ vj_effect *feathermask_init(int w,int h)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->parallel = 0;
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
     return ve;
 }
 

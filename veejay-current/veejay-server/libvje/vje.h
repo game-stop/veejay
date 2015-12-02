@@ -22,7 +22,7 @@
 
 #define FX_LIMIT	1024
 
-#define MAX_EFFECTS		160
+#define MAX_EFFECTS		161
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)
@@ -76,6 +76,15 @@ typedef struct {
 	char **description;
 } vj_value_hint_t;
 
+#define FLAG_ALPHA_NONE (1 << 0) /* no alpha */
+#define FLAG_ALPHA_SRC_A (1 << 1) /* alpha-in A */
+#define FLAG_ALPHA_SRC_B (1 << 2) /* alpha-in B */
+#define FLAG_ALPHA_OUT (1 << 3) /* writes alpha */
+#define FLAG_ALPHA_OPTIONAL (1<<4) /* parameter driven */
+#define FLAG_ALPHA_IN_OPERATOR (1<<5) /* logical operator */
+#define FLAG_ALPHA_IN_BLEND (1<<6) /* blend operator */
+
+
 typedef struct vj_effect_t {
 
     char *description;			
@@ -98,6 +107,7 @@ typedef struct vj_effect_t {
     int parallel;
 	int rgba_only;
 	int motion;
+	int alpha;
 } vj_effect;
 
 typedef struct vj_effect_instance_t {

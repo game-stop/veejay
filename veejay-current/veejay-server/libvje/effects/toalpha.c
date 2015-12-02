@@ -43,7 +43,9 @@ vj_effect *toalpha_init(int w, int h)
     ve->limits[1][0] = 1;
     ve->defaults[0] = !yuv_use_auto_ccir_jpeg();
     ve->param_description = vje_build_param_list( ve->num_params, "Scale Luminance to range 0-255 (1=on)" );
-	
+
+	ve->alpha = FLAG_ALPHA_OUT;
+
 	__init_lookup_table( __lookup_table, 256, 16.0f, 235.0f, 0, 255 ); 
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );

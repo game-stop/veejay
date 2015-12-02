@@ -34,6 +34,18 @@
 #define func_multiply(a,b) ( (a * b) >> 8 )
 #define func_additive(a,b) ( a + (2 * b) - 235 )
 #define func_substractive(a,b) ( a + (b - 235) )
+
+#define ALPHA_IGNORE_STR "Ignore Alpha-IN"
+#define ALPHA_IGNORE 0
+#define ALPHA_IN_A_STR "Alpha-IN A"
+#define ALPHA_IN_A 1
+#define ALPHA_IN_B_STR "Alpha-IN B"
+#define ALPHA_IN_B 2
+#define ALPHA_IN_A_OR_B_STR "Alpha-IN A or B"
+#define ALPHA_IN_A_OR_B 3
+#define ALPHA_IN_A_AND_B_STR "Alpha-IN A and B"
+#define ALPHA_IN_A_AND_B 4
+
 #define    RUP8(num)(((num)+8)&~8)
 
 extern int  pixel_Y_hi_;

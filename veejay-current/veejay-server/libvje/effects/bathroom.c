@@ -58,6 +58,9 @@ vj_effect *bathroom_init(int width,int height)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->motion = 1;
+
+	ve->alpha = FLAG_ALPHA_SRC_A| FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
+
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Distance","X start position", "X end position" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );

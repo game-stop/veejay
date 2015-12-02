@@ -56,6 +56,9 @@ vj_effect *zoom_init(int width , int height)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
+	
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
+
 	ve->param_description = vje_build_param_list( ve->num_params, "Width", "Height", "Factor", "Mode", "Update Alpha" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );

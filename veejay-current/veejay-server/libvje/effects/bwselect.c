@@ -53,8 +53,10 @@ vj_effect *bwselect_init(int w, int h)
     ve->extra_frame = 0;
 	ve->has_user =0;
 	ve->parallel = 1;
+	
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
-	ve->param_description = vje_build_param_list( ve->num_params, "Min Threshold", "Max Threshold", "Gamma", "Alpha" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Min Threshold", "Max Threshold", "Gamma", "To Alpha" );
     return ve;
 }
 

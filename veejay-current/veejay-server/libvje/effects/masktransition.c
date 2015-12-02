@@ -43,7 +43,9 @@ vj_effect *masktransition_init(int width, int height)
 	ve->sub_format = 1;
     ve->extra_frame = 1;
   	ve->has_user = 0; 
-	ve->parallel = 1;
+	ve->parallel = 0;
+	ve->alpha = FLAG_ALPHA_SRC_A;
+		 
 	ve->param_description = vje_build_param_list(ve->num_params, "Time Index", "Smooth" );
     return ve;
 }
@@ -89,7 +91,7 @@ static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr,
 			lookup[i] = 0xff * ( (double) (time_index - i ) / dur );
 	}
 
-	uint8_t *AA = (uint8_t*) vj_malloc( RUP8(w) );
+	uint8_t AA[ RUP8(w) ];
 
 	for( i = 0; i < len; i += w )
 	{
@@ -110,9 +112,8 @@ static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr,
 		Cr[i]= ((op0 * Cr[i])+ (op1 * Cr2[i]))>> 8; 
 */
 	}
-
-	free(AA);
 }
+
 static void alpha_transition_apply_job( void *arg )
 {
 	vj_task_arg_t *t = (vj_task_arg_t*) arg;
@@ -124,26 +125,27 @@ static void alpha_transition_apply_job( void *arg )
 			t->strides[0],
 			t->width,
 			t->iparam,
-			256
+			255
 		);
 }
 
-
+/* fixme */
 void	alpha_transition_apply( VJFrame *frame, uint8_t *B[4], int time_index )
 {
-	if(vj_task_available() ) {
+/*	if(vj_task_available() ) {
 		vj_task_set_from_frame( frame );
 		vj_task_set_int( time_index );
 		vj_task_run( frame->data, B, NULL, NULL, 4, (performer_job_routine) &alpha_transition_apply_job );
 	} else { 
+*/
 		VJFrame Bframe;
 		veejay_memcpy(&Bframe,frame,sizeof(VJFrame));
 		Bframe.data[0] = B[0];
 		Bframe.data[1] = B[1];
 		Bframe.data[2] = B[2];
 		Bframe.data[3] = B[3];
-		masktransition_apply( frame, &Bframe,frame->width,frame->height,time_index,256 );
-	}
+		masktransition_apply( frame, &Bframe,frame->width,frame->height,time_index,255 );
+//	}
 }
 
 

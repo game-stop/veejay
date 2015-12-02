@@ -247,6 +247,7 @@ enum {
 	VJ_IMAGE_EFFECT_ALPHANEGATE = 99,
 	VJ_IMAGE_EFFECT_CHOKEMATTE = 98,
 	VJ_IMAGE_EFFECT_LEVELCORRECTION = 97,
+	VJ_IMAGE_EFFECT_ALPHADAMPEN = 96,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
@@ -639,7 +640,7 @@ extern void toalpha_apply( VJFrame *frame, int width, int height, int mode);
 extern void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode);
 extern void alpha2img_apply( VJFrame *frame, int width, int height);
 extern void alphafill_apply( VJFrame *frame, int width, int height, int val);
-extern void alphaflatten_apply( VJFrame *frame, int width, int height);
+extern void alphaflatten_apply( VJFrame *frame, int width, int height, int mode);
 extern void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int n, int visible);
 extern void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode);
 extern void feathermask_apply( VJFrame *frame, int width, int height );
@@ -651,6 +652,7 @@ extern void chromamagickalpha_apply( VJFrame *frame, VJFrame *frame2, int width,
 extern void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int mode );
 extern void alphanegate_apply( VJFrame *frame, int width, int height, int value );
 extern void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality );
-extern void levelcorrection_apply(VJFrame *frame, int min, int max);
-extern void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int time_index, int duration  );
+extern void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin, int bmax);
+extern void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int time_index, int duration);
+extern void alphadampen_apply( VJFrame *frame, int b1);
 #endif

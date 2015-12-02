@@ -35,12 +35,13 @@ vj_effect *alphafill_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->defaults[0] = 255;
-    ve->description = "Alpha: Fill Alpha channel";
+    ve->description = "Alpha: Fill Alpha channel by value";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Alpha" );
+	ve->alpha = FLAG_ALPHA_OUT;
+    ve->param_description = vje_build_param_list( ve->num_params, "Alpha Value" );
     return ve;
 }
 

@@ -64,10 +64,13 @@ vj_effect *alphaselect_init(int w, int h)
 
 	ve->has_user = 0;
     ve->parallel = 1;
-	ve->description = "Alpha: Set by color key";
+	ve->description = "Alpha: Set by chroma key";
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
+
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_SRC_A;
+
 	ve->param_description = vje_build_param_list(ve->num_params,"Angle","Red","Green","Blue", "Invert", "To Alpha");
 
     return ve;

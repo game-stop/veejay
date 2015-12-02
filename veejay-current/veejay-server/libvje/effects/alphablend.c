@@ -35,12 +35,13 @@ vj_effect *alphablend_init(int w, int h)
     ve->extra_frame = 1;
 	ve->parallel = 1;
 	ve->has_user = 0;
+	ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_SRC_B;
     return ve;
 }
 
-static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, uint8_t *aA, int size )
+static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, uint8_t *aA, size_t size )
 {
-    unsigned int i;
+    size_t i;
 	for( i = 0; i < size; i ++ )
 	{
 		unsigned int op0 = aA[i];
@@ -52,7 +53,7 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, uint8_t *aA
 
 void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height)
 {
-	int uv_len = (frame->ssm ? frame->len : frame->uv_len );
+	size_t uv_len = (frame->ssm ? frame->len : frame->uv_len );
 	blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame2->data[3], frame->len );
 	blend_plane( frame->data[1], frame->data[1], frame2->data[1], frame2->data[3], uv_len );
 	blend_plane( frame->data[2], frame->data[2], frame2->data[2], frame2->data[3], uv_len );

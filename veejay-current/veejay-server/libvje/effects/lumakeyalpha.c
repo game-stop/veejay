@@ -45,6 +45,8 @@ vj_effect *lumakeyalpha_init(int width, int height)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
+	ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_SRC_B;
+
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
 		"Alpha-IN (premul B)", "Alpha-IN A (premul B)", "Alpha-IN A or B (premul B)", "Alpha-IN A and B (premul B)",
 		"Alpha-IN B (premul A)","Alpha-IN A (premul A)", "Alpha-IN A or B (premul A)", "Alpha-IN A and B (premul B)" );
@@ -52,6 +54,7 @@ vj_effect *lumakeyalpha_init(int width, int height)
     return ve;
 }
 
+/* fixme */
 
 void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int type, int opacity )
 {

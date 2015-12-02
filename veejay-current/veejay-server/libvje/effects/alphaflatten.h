@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *alphaflatten_init(int w, int h);
-void alphaflatten_apply( VJFrame *frame, int width, int height);
+void alphaflatten_apply( VJFrame *frame, int width, int height, int mode);
 #endif

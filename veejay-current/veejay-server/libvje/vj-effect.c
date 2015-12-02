@@ -190,6 +190,8 @@
 #include "effects/lumakeyalpha.h"
 #include "effects/gaussblur.h"
 #include "effects/levelcorrection.h"
+#include "effects/alphadampen.h"
+#include "effects/masktransition.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -672,6 +674,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_IMAGE_EFFECT_ALPHANEGATE]			= alphanegate_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_CHOKEMATTE]			= gaussblur_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_LEVELCORRECTION]		= levelcorrection_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_ALPHADAMPEN]			= alphadampen_init(width,height);
 
 	max_width = width;
 	max_height = height;

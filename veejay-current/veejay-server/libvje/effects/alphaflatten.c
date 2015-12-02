@@ -33,11 +33,23 @@ vj_effect *alphaflatten_init(int w, int h)
     ve->extra_frame = 0;
     ve->parallel = 1;
 	ve->has_user = 0;
-    return ve;
+	ve->num_params = 1;
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+	ve->defaults = 	(int *) vj_calloc(sizeof(int) * ve->num_params);     /* default values */
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 1;
+	ve->defaults[0] = 0;
+
+	ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OUT;
+    
+	ve->param_description = vje_build_param_list( ve->num_params, "Clear Alpha" );
+	
+	return ve;
 }
 
 
-void alphaflatten_apply( VJFrame *frame, int width, int height)
+void alphaflatten_apply( VJFrame *frame, int width, int height, int mode)
 {
     unsigned int i;
     const unsigned int len = frame->len;
@@ -58,6 +70,11 @@ void alphaflatten_apply( VJFrame *frame, int width, int height)
 		o0[i] = (op0 * a0[i]) >> 8;
 		o1[i] = (op0 * a1[i] + op1 * 128) >> 8;
 		o2[i] = (op0 * a2[i] + op1 * 128)>>8;
-		oA[i] = 0;
 	}
+
+	if( mode ) {
+		veejay_memset( oA, 0, len );
+	}
+
+
 }
