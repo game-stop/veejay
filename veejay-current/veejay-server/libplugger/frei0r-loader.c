@@ -121,7 +121,7 @@ static inline int frei0r_param_get_double(f0r_get_param_value_f q,void *plugin, 
 
 static inline int frei0r_param_set_double(f0r_set_param_value_f q,void *plugin, int seq_no,int offset, int *args )
 {
-	double value = (double) args[offset];
+	double value = (double) args[offset] / 100.0;
 	f0r_param_t *fparam = (f0r_param_t*) &value;
 	(*q)( plugin, fparam, seq_no );
 
