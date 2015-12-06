@@ -136,21 +136,21 @@ static void opacity_apply1( VJFrame *frame, VJFrame *frame2, int width,
 static void	opacity_apply_job( void *arg )
 {
 	vj_task_arg_t *t = (vj_task_arg_t*) arg;
-	//@ output holds secondunary source here, this in inplace.
-	int y = blend_plane( t->input[0], t->input[0], t->output[0], t->strides[0], t->iparam );
-	int u = blend_plane( t->input[1], t->input[1], t->output[1], t->strides[1], t->iparam );
-	int v = blend_plane( t->input[2], t->input[2], t->output[2], t->strides[2], t->iparam );
+	//@ inplace
+	int y = blend_plane( t->input[0], t->input[0], t->output[0], t->strides[0], t->iparams[0] );
+	int u = blend_plane( t->input[1], t->input[1], t->output[1], t->strides[1], t->iparams[0] );
+	int v = blend_plane( t->input[2], t->input[2], t->output[2], t->strides[2], t->iparams[0] );
 #ifdef HAVE_ASM_MMX
 	do_emms;
 #endif
 	if( y>0) while (y--)
-		t->input[0][y] = ((t->iparam * (t->input[0][y] - t->output[0][y])) >> 8 ) + t->input[0][y];
+		t->input[0][y] = ((t->iparams[0] * (t->input[0][y] - t->output[0][y])) >> 8 ) + t->input[0][y];
 
 	if( u>0) while( u-- )
-		t->input[1][u] = ((t->iparam * (t->input[1][u] - t->output[1][u])) >> 8 ) + t->input[1][u];
+		t->input[1][u] = ((t->iparams[0] * (t->input[1][u] - t->output[1][u])) >> 8 ) + t->input[1][u];
 
 	if(v>0)	 while( v-- )
-		t->input[2][v] = ((t->iparam * (t->input[2][v] - t->output[2][v])) >> 8 ) + t->input[2][v];
+		t->input[2][v] = ((t->iparams[0] * (t->input[2][v] - t->output[2][v])) >> 8 ) + t->input[2][v];
 
 }
 
@@ -165,7 +165,7 @@ void opacity_applyN( VJFrame *frame, VJFrame *frame2, int width,
 {
 	if( vj_task_available() ) {
 		vj_task_set_from_frame( frame );
-		vj_task_set_int( opacity );
+		vj_task_set_param( opacity,0 );
 		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, (performer_job_routine) &opacity_apply_job );
 	} else {
 		opacity_apply1( frame,frame2,width,height,opacity );
@@ -194,7 +194,7 @@ void	opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_le
 {
 	if( vj_task_available() ) {
 		vj_task_set_from_args( len,uv_len );
-		vj_task_set_int( opacity );
+		vj_task_set_param( opacity,0 );
 		vj_task_run( src1, src2, NULL, NULL, 3, (performer_job_routine) &opacity_apply_job );
 	} else {
 		opacity_blend_apply1( src1,src2,len,uv_len,opacity );

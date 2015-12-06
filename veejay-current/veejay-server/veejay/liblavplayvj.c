@@ -1136,12 +1136,12 @@ void veejay_pipe_write_status(veejay_t * info)
     video_playback_setup *settings = (video_playback_setup *) info->settings;
     int d_len = 0;
     int pm = info->uc->playback_mode;
-    int total_slots = sample_size()-1;
+    int n_samples = sample_size()-1;
     int tags = vj_tag_true_size() -1;
 	int cache_used = 0;
 	int mstatus = vj_event_macro_status();
 	int curfps  = (int) ( 100.0f / settings->spvf );
-	
+	int total_slots = n_samples;
 	if(tags>0)
 		total_slots+=tags;
     
@@ -1153,14 +1153,14 @@ void veejay_pipe_write_status(veejay_t * info)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 
 		if( sample_chain_sprint_status
-			(info->uc->sample_id,cache_used,info->seq->size,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
+			(info->uc->sample_id, tags,cache_used,info->seq->size,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
 			veejay_change_state( info, LAVPLAY_STATE_STOP );
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		// 28 status symbols
+		// 30 status symbols
 			{
 				char *ptr = info->status_what;
 				*ptr++ = ' ';
@@ -1176,7 +1176,7 @@ void veejay_pipe_write_status(veejay_t * info)
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
-				*ptr++ = '0'; *ptr++ = ' ';
+				ptr = vj_sprintf( ptr, n_samples ); *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
@@ -1188,21 +1188,24 @@ void veejay_pipe_write_status(veejay_t * info)
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
-				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = info->sfd; *ptr++ = ' ';
 				ptr = vj_sprintf( ptr, mstatus );
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				*ptr++ = '0'; *ptr++ = ' ';
+				ptr = vj_sprintf(ptr, tags); *ptr++ = ' ';
 			}
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
-		if( vj_tag_sprint_status( info->uc->sample_id,cache_used,info->seq->size,info->seq->current, info->real_fps,
+		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,info->seq->current, info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode,total_slots,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 		}
 		break;
     }
-    
+   
 	d_len = strlen(info->status_what);
 	info->status_line_len = d_len + 5;
 	snprintf( info->status_line, MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what );

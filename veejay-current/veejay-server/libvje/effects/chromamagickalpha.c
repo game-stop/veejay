@@ -54,6 +54,10 @@ vj_effect *chromamagickalpha_init(int w, int h)
     
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A | FLAG_ALPHA_SRC_B;
+
+	/*fixme */
+
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, 
 		"Add Subselect Luma", "Select Min", "Select Max", "Select Difference",
 		"Select Difference Negate", "Add Luma", "Select Unfreeze", "Exclusive",

@@ -45,10 +45,12 @@ vj_effect *overlayalphamagic_init(int w, int h)
     ve->sub_format = -1;
     ve->has_user = 0;
     ve->parallel = 1;
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A | FLAG_ALPHA_SRC_B | FLAG_ALPHA_IN_BLEND;
+	
 	ve->param_description = vje_build_param_list( ve->num_params, "Operator", "Show Alpha" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
-
+	
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
 		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
 		"Difference","Difference Negate","Exclusive","Base","Freeze",
@@ -758,9 +760,9 @@ void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,int heig
 
     }
     if(visible) {
-	veejay_memcpy( frame->data[0], frame->data[3], frame->len );
-	veejay_memset( frame->data[1], 128, frame->uv_len );
-	veejay_memset( frame->data[2], 128, frame->uv_len );
+		veejay_memcpy( frame->data[0], frame->data[3], frame->len );
+		veejay_memset( frame->data[1], 128, frame->uv_len );
+		veejay_memset( frame->data[2], 128, frame->uv_len );
     }
 }
 

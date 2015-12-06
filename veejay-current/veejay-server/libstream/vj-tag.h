@@ -102,6 +102,8 @@ typedef struct {
     float fader_val;
     float fader_inc;
 	int fade_method;
+	int fade_entry;
+	int fade_alpha;
     int selected_entry;	
     int effect_toggle;
     int socket_ready;
@@ -263,7 +265,7 @@ int 	vj_tag_enable(int t1);
 
 int 	vj_tag_disable(int t1);
 
-int		vj_tag_sprint_status(int tag_id, int cache,int sa, int ca, int r, int f, int m, int t,int curfps, uint32_t lo, uint32_t hi, int macro,char *str );
+int		vj_tag_sprint_status(int tag_id, int tags,int cache,int sa, int ca, int r, int f, int m, int t,int curfps, uint32_t lo, uint32_t hi, int macro,char *str );
 
 uint8_t		*vj_tag_get_cali_buffer(int t1, int type, int *total, int *len, int *uvlen);
 int	vj_tag_generator_set_arg(int t1, int *values);
@@ -278,16 +280,19 @@ int	vj_tag_set_white(int t1, int value);
 int	vj_tag_set_saturation(int t1, int value);
 void 	vj_tag_set_veejay_t(void *info);
 int	vj_tag_v4l_set_control( int t1, uint32_t id, int value );
-int 	vj_tag_set_manual_fader(int t1, int value, int method );
-
+int 	vj_tag_set_manual_fader(int t1, int value );
+int		vj_tag_get_fade_entry(int t1);
+int		vj_tag_get_fade_method(int t1);
+void	vj_tag_set_fade_entry(int t1, int entry);
+void	vj_tag_set_fade_method(int t1, int method);
 int 	vj_tag_get_fader_direction(int t1);
 int 	vj_tag_set_fader_active(int t1, int nframes, int direction);
 int 	vj_tag_set_fade_to_tag(int t1, int t2);
 int 	vj_tag_set_fade_to_sample(int t1, int s1);
 int 	vj_tag_set_fader_val(int t1, float val);
-int 	vj_tag_apply_fader_inc(int t1, int *method);
+int 	vj_tag_apply_fader_inc(int t1);
 int 	vj_tag_get_fader_active(int t1);
-float 	vj_tag_get_fader_val(int t1, int *method);
+float 	vj_tag_get_fader_val(int t1);
 float 	vj_tag_get_fader_inc(int t1);
 int 	vj_tag_reset_fader(int t1);
 
@@ -336,7 +341,7 @@ int	vj_tag_get_kf_status(int t1, int entry, int *type);
 void	vj_tag_set_kf_type(int t1, int entry, int type );
 int	vj_tag_chain_set_kf_status( int s1, int entry, int status );
 int	vj_tag_chain_reset_kf( int s1, int entry );
-int     vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active, int *method );
+int     vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active, int *method, int *entry, int *alpha );
 int vj_tag_true_size();
 void    *vj_tag_get_kf_port( int s1, int entry );
 

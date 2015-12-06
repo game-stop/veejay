@@ -426,7 +426,7 @@ typedef struct
 {
 	GladeXML *main_window;
 	vj_client	*client;
-	int		status_tokens[32]; 	/* current status tokens */
+	int		status_tokens[STATUS_TOKENS]; 	/* current status tokens */
 	int		*history_tokens[4];		/* list last known status tokens */
 	int		status_passed;
 	int		status_lock;
@@ -2971,6 +2971,11 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 		if( effect_id <= 0 )
 		{
 			gtk_list_store_set( GTK_LIST_STORE(model),iter, FXC_ID, entry, -1 );
+			disable_widget( "fx_m1" );
+			disable_widget( "fx_m2" );
+			disable_widget( "fx_m3" );
+			disable_widget( "fx_m4" );
+			disable_widget( "fx_mnone" );
 		}
 		else
 		{
@@ -2979,10 +2984,15 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 			if( _effect_get_mix( effect_id ) ) {
 				snprintf(tmp,sizeof(tmp),"%s %d", (gui->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T " ),
 					gui->uc.entry_tokens[ENTRY_CHANNEL]);
+				enable_widget( "fx_m4" );
+				enable_widget( "fx_m3" );
 			}
 			else {
 				snprintf(tmp,sizeof(tmp),"%s"," ");
+				disable_widget( "fx_m4" );
+				disable_widget( "fx_m3" );
 			}
+
 			gchar *mixing = _utf8str(tmp);
 			GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
 			GdkPixbuf *kf_toggle = update_pixmap_kf( gui->uc.entry_tokens[ENTRY_KF_STATUS] );
@@ -2997,6 +3007,15 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 			g_free(mixing);
 			g_object_unref( kf_toggle );
 			g_object_unref( toggle );
+
+			enable_widget( "fx_m1" );
+			enable_widget( "fx_m2" );
+			enable_widget( "fx_mnone" );
+
+	/*		if( gui->uc.entry_tokens[FADE_METHOD] <= 1 ||
+				gui->uc.entry_tokens[FADE_ENTRY] != info->uc.selected_chain_entry )
+					set_toggle_button( "fx_mnone",1 ); */
+
 		}
 	}
 
@@ -3247,11 +3266,25 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			set_toggle_button( "toggle_subrender", info->status_tokens[SUBRENDER] );
 		}
 
-		int mapta = (info->status_tokens[FADE_METHOD] ?  1: 0 );
-
-		if( is_button_toggled( "toggle_fademethod") != mapta)
+		if( history[FADE_ALPHA] != info->status_tokens[FADE_ALPHA] || info->status_tokens[FADE_ALPHA] != is_button_toggled( "toggle_fademethod" ))
 		{
-			set_toggle_button( "toggle_fademethod", mapta );
+			set_toggle_button( "toggle_fademethod", info->status_tokens[FADE_ALPHA]);
+		}
+
+		if( info->status_tokens[FADE_ENTRY] >= 0 ) {
+			if( info->status_tokens[FADE_METHOD] == 0 && !is_button_toggled( "fx_mnone" )) {
+				set_toggle_button( "fx_mmone", 1 );
+			} else if (info->status_tokens[FADE_METHOD] == 1 && !is_button_toggled( "fx_m1" )) {
+				set_toggle_button( "fx_m1",1 );
+			} else if (info->status_tokens[FADE_METHOD] == 2 && !is_button_toggled( "fx_m2" )) {
+				set_toggle_button( "fx_m2",1 );
+			} else if (info->status_tokens[FADE_METHOD] == 3 && !is_button_toggled( "fx_m3" )) {
+			   set_toggle_button( "fx_m3",1);
+			} else if (info->status_tokens[FADE_METHOD] == 4 && !is_button_toggled( "fx_m4" )) {
+			   set_toggle_button( "fx_m4",1);
+			} 
+		} else {
+			set_toggle_button( "fx_mnone", 1 );
 		}
 
 		if(update)
@@ -3479,9 +3512,10 @@ gboolean
       gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
       if (!path_currently_selected && name != info->uc.selected_chain_entry)
       {
-	multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
-	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY, info->uc.selected_chain_entry );
-      }
+		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
+		update_label_i( "label_fxentry", name, 0 );
+		vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY, info->uc.selected_chain_entry );
+	  }
     }
 
     return TRUE; /* allow selection state to change */
@@ -4564,7 +4598,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	char source[255];
 	char descr[255];
 
-	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );
+	int load_from = (info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[ SAMPLE_INV_COUNT ] : info->status_tokens[ SAMPLE_COUNT ] );
+
+	multi_vims( VIMS_SAMPLE_LIST,"%d", (with_reset_slotselection ? 0 : load_from) );
 	gint fxlen = 0;
 
 	gchar *fxtext = recv_vims(8,&fxlen);
@@ -4626,7 +4662,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	if( fxtext ) free(fxtext);
 	fxlen = 0;
 
-	multi_vims( VIMS_STREAM_LIST,"%d",0 );
+	load_from = (info->status_tokens[PLAY_MODE] == MODE_STREAM ? info->status_tokens[ SAMPLE_COUNT ] : info->status_tokens[ SAMPLE_INV_COUNT ] );
+
+	multi_vims( VIMS_STREAM_LIST,"%d",(with_reset_slotselection ? 0 : load_from) );
 	fxtext = recv_vims(5, &fxlen);
 	if( fxlen > 0 && fxtext != NULL)
 	{
@@ -6089,10 +6127,9 @@ int		gveejay_time_to_sync( void *ptr )
 
 // skin 0: notebook18, page 3
 // skin 1: vjdeck , page 2
-int		veejay_update_multitrack( void *data )
+int		veejay_update_multitrack( void *ptr )
 {
-	vj_gui_t *gui = (vj_gui_t*) data;
-	sync_info *s = multitrack_sync( gui->mt );
+	sync_info *s = multitrack_sync( info->mt );
 
 	if( s->status_list[s->master] == NULL ) {
 		info->watch.w_state = STATE_STOPPED;
@@ -6109,11 +6146,13 @@ int		veejay_update_multitrack( void *data )
 #endif
 
 	int tmp = 0;
-	for ( i = 0; i < 32; i ++ )
+
+	for ( i = 0; i < STATUS_TOKENS; i ++ )
 	{	
 		tmp += s->status_list[s->master][i];
 		info->status_tokens[i] = s->status_list[s->master][i];
 	}
+
 	if( tmp == 0 )
 	{
 		free(s->status_list);
@@ -6125,10 +6164,11 @@ int		veejay_update_multitrack( void *data )
 	}
 
 	info->status_lock = 1;
-	info->uc.playmode = gui->status_tokens[ PLAY_MODE ];
+	info->uc.playmode = info->status_tokens[ PLAY_MODE ];
 	update_gui();
-	info->prev_mode = gui->status_tokens[ PLAY_MODE ];
-	gui->status_lock = 0;
+	info->prev_mode = info->status_tokens[ PLAY_MODE ];
+	info->status_lock = 0;
+
 	int pm = info->status_tokens[PLAY_MODE];
 #ifdef STRICT_CHECKING
 	assert( pm >= 0 && pm < 4 );
@@ -6137,7 +6177,7 @@ int		veejay_update_multitrack( void *data )
 
 	for( i = 0; i < STATUS_TOKENS; i ++ )
 		history[i] = info->status_tokens[i];
-
+	
 	for( i = 0; i < s->tracks ; i ++ )
 	{
 		if( s->status_list[i] )
@@ -6171,13 +6211,13 @@ int		veejay_update_multitrack( void *data )
 			} 
 			
 			if(deckpage == crappy_design[ui_skin_].page)
-				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
+				multitrack_update_sequence_image( info->mt, i, s->img_list[i] );
 
 			if( s->img_list[i] )
 				g_object_unref( s->img_list[i] );
 		} else {
 			if( i == s->master ) {
-				multitrack_set_logo( gui->mt, maintrack );
+				multitrack_set_logo( info->mt, maintrack );
 			}
 		}
 	}
@@ -6291,7 +6331,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 		int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( ww ));
 		if(deckpage != 1) {		
 			if( (reload_entry_tick_ % ((int)info->el.fps/2))==0) {
-				info->uc.reload_hint[HINT_ENTRY] = 1;	
+				info->uc.reload_hint[HINT_ENTRY] = 1;
 			}
 			if( deckpage == 5 && info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR){
 				if( (reload_entry_tick_ % ((int)info->el.fps/2))==0) {
@@ -6336,7 +6376,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 			|| info->status_tokens[TOTAL_SLOTS] != info->uc.expected_slots )
 	{
 	
-		if( info->status_tokens[TOTAL_SLOTS] <= 0 || info->uc.expected_slots != info->status_tokens[TOTAL_SLOTS] )
+		if( info->status_tokens[TOTAL_SLOTS] <= 0 || info->uc.expected_slots == 0 )
 			info->uc.reload_hint[HINT_SLIST] = 2;
 		else
 			info->uc.reload_hint[HINT_SLIST] = 1;

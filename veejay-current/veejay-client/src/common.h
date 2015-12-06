@@ -20,6 +20,7 @@
 #define GVRCOMMON_H
 #define STATUS_BYTES 	150
 #define STATUS_TOKENS 	32 
+#define STATUS_LENGTH	512
 #define VEEJAY_CODENAME VERSION
 /* Status bytes */
 
@@ -31,6 +32,7 @@
 #define SAMPLE_END	6
 #define SAMPLE_SPEED	7
 #define SAMPLE_LOOP	8
+#define SAMPLE_COUNT 12
 #define SAMPLE_MARKER_START   13
 #define STREAM_TYPE	13
 #define SAMPLE_MARKER_END     14
@@ -48,6 +50,9 @@
 #define	MACRO		25
 #define SUBRENDER	26
 #define FADE_METHOD	27
+#define FADE_ENTRY 28
+#define FADE_ALPHA 29
+#define SAMPLE_INV_COUNT	30
 #define CURRENT_ENTRY	15
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0

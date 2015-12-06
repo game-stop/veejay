@@ -79,7 +79,6 @@ static pthread_cond_t current_task;
 struct task *tasks_ = NULL;
 struct task *tail_task_= NULL;
 static pthread_t p_threads[MAX_WORKERS];
-static uint8_t *p_thread_args[MAX_WORKERS];
 static pthread_attr_t p_attr[MAX_WORKERS];
 static	pjob_t *job_list[MAX_WORKERS];
 static uint8_t p_tasks[MAX_WORKERS];
@@ -88,14 +87,26 @@ static int n_cpu = 1;
 static uint8_t numThreads = 0;
 static uint8_t total_tasks = 0;
 static uint8_t tasks_done[MAX_WORKERS];
-static uint8_t tasks_todo = 0;
 static int exitFlag = 0;
 static struct task running_tasks[MAX_WORKERS];
 static struct sched_param param;
 static int euid = 0;
+static uint8_t	task_get_workers();
 
 #define __lock() pthread_mutex_lock(&queue_mutex)
 #define __unlock() pthread_mutex_unlock(&queue_mutex)
+
+
+static inline uint8_t task_is_work_done( )
+{
+	const uint8_t n = task_get_workers();
+	uint8_t i;
+	uint8_t done = 0;
+	for( i = 0; i < n; i ++ ) {
+		done += tasks_done[i];
+	}
+	return (done == n ? 1 : 0);
+}
 
 static void		task_allocate()
 {
@@ -103,7 +114,6 @@ static void		task_allocate()
 	for( i = 0; i < MAX_WORKERS; i ++ ) {
 		job_list[i] = vj_malloc(sizeof(pjob_t));
 		vj_task_args[i] = vj_calloc(sizeof(vj_task_arg_t));
-		p_thread_args[i] = vj_calloc( sizeof(uint8_t) );
 	}
 
 	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
@@ -119,7 +129,6 @@ void		task_destroy()
 	for( i = 0; i < MAX_WORKERS; i ++ ) {
 		free(job_list[i]);
 		free(vj_task_args[i]);
-		free(p_thread_args[i]);
 	}
 }
 
@@ -132,7 +141,6 @@ static void		task_reset()
 	for( i = 0; i < MAX_WORKERS; i ++ ) {
 		veejay_memset( job_list[i],0, sizeof(pjob_t));
 		veejay_memset( vj_task_args[i],0, sizeof(vj_task_arg_t));
-		veejay_memset( p_thread_args[i],0, sizeof(uint8_t));
 		veejay_memset( &(running_tasks[i]), 0, sizeof(struct task));
 	}
 
@@ -178,20 +186,18 @@ struct	task	*task_get()
 
 void		task_run( struct task *task, void *data, uint8_t id)
 {
-	if( task )
-	{
-		(*task->handler)(data);
+	(*task->handler)(data);
 
-		__lock();		
-		tasks_done[id] ++; 
+	__lock();		
+	tasks_done[id] ++; 
+	if( task_is_work_done() ) {
 		pthread_cond_signal( &tasks_completed );
-		__unlock();
 	}
+	__unlock();
 }
 
 void		*task_thread(void *data)
 {
-	const uint8_t id = (const uint8_t) *((uint8_t *) data);
 	for( ;; ) 
 	{
 		struct task *t = NULL;
@@ -210,12 +216,12 @@ void		*task_thread(void *data)
 		__unlock();
 	
 		if( t ) {
-			task_run( t, t->data, id );
+			task_run( t, t->data, t->task_id );
 		}
 	}
 }
 
-static __inline__ uint8_t	task_get_workers()
+static uint8_t	task_get_workers()
 {
 	return numThreads;
 }
@@ -273,9 +279,8 @@ int		task_start(unsigned int max_workers)
 				veejay_msg(0,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
 		}
 
-		*p_thread_args[i] = i;
 
-		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, p_thread_args[i] ) )
+		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, NULL ) )
 		{
 			veejay_msg(0, "%s: error starting thread %d/%d", __FUNCTION__,i,max_workers );
 			memset( &p_threads[i], 0, sizeof(pthread_t) );
@@ -319,38 +324,23 @@ void	performer_job( uint8_t n )
 	uint8_t i;
 
 	__lock();
-	tasks_todo = n;
 	for( i = 0; i < n; i ++ ) {
 		pjob_t *slot  = job_list[i];
 		tasks_done[i] = 0;
 		task_add( i, slot->job, slot->arg );
 	}
-	pthread_cond_signal( &current_task );
+	pthread_cond_broadcast( &current_task );
 	__unlock();
 
 	uint8_t stop = 0;
 	while(!stop) {
-		uint8_t done = 0;
-		
 		__lock();
-
-		for( i = 0 ; i < tasks_todo; i ++ ) {
-			done += tasks_done[i];
-		}
-
-		if( done < tasks_todo ) {
-			done = 0;
+		if( !task_is_work_done() ) {
 			pthread_cond_wait( &tasks_completed, &queue_mutex );
-			for( i = 0 ; i < tasks_todo; i ++ ) {
-				done += tasks_done[i];
-			}
 		}
-		
-		if( done == tasks_todo )
-		{
+		if( task_is_work_done() ) {
 			stop = 1;
 		}
-
 		__unlock();
 	}
 }
@@ -362,13 +352,6 @@ void	vj_task_set_float( float f ){
 		vj_task_args[i]->fparam = f;
 }
 
-void	vj_task_set_int( int val ){
-	uint8_t i;
-	uint8_t n = task_get_workers();
-
-	for( i = 0; i < n; i ++ )
-		vj_task_args[i]->iparam = val;
-}
 void	vj_task_set_param( int val , int idx ){
 	uint8_t i;
 	uint8_t n = task_get_workers();
@@ -404,7 +387,6 @@ void	vj_task_set_from_args( int len, int uv_len )
 		v->strides[2]	 = uv_len / n;
 		v->strides[3]    = 0; 
 	}
-	//FIXME alpha
 }
 
 void	vj_task_set_to_frame( VJFrame *in, int i, int job )
@@ -413,9 +395,11 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 	in->width = first->width;
 	in->height= first->height;
 	in->ssm   = first->ssm;
+	in->len     = first->width * first->height;
+
 	if( first->ssm ) {
 		in->uv_width = first->width;
-		in->uv_height= first->uv_height;
+		in->uv_height= first->height;
 		in->uv_len   = (in->width * in->height);
 		in->shift_v  = 0;
 		in->shift_h  = 0;
@@ -426,12 +410,20 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 		in->shift_h = first->shifth;
 		in->uv_len  = first->uv_width * first->uv_height;
 	}
-	in->len     = first->width * first->height;
 
-	in->stride[0] = first->row_strides[0];
-	in->stride[1] = first->row_strides[1];
-	in->stride[2] = first->row_strides[2];
-	in->stride[3] = first->row_strides[3];
+	if( first->format == PIX_FMT_RGBA ) {
+		in->stride[0] = in->width * 4;
+		in->stride[1] = 0;
+		in->stride[2] = 0;
+		in->stride[3] = 0;
+	}
+	else {
+		in->stride[0] = first->width;
+		in->stride[1] = first->uv_width;
+		in->stride[2] = first->uv_width;
+		in->stride[3] = (first->strides[3] > 0 ? first->width : 0);
+	}
+
 
 	switch( i ) {
 		case 0:
@@ -477,10 +469,6 @@ void	vj_task_set_from_frame( VJFrame *in )
 			v->strides[3]   = 0;
 			v->shiftv	    = 0;
 			v->shifth	    = 0;	
-			v->row_strides[0] = in->stride[0]; /* original value */
-			v->row_strides[1] = in->stride[1];
-			v->row_strides[2] = in->stride[2];
-			v->row_strides[3] = in->stride[3];
 			v->format		  = in->format;
 			v->ssm            = 0;
 		}
@@ -500,10 +488,6 @@ void	vj_task_set_from_frame( VJFrame *in )
 			v->strides[3]   = (in->stride[3] == 0 ? 0 : v->strides[0]);
 			v->shiftv	    = in->shift_v;
 			v->shifth	    = in->shift_h;	
-			v->row_strides[0] = in->stride[0]; /* original value */
-			v->row_strides[1] = in->stride[1];
-			v->row_strides[2] = in->stride[2];
-			v->row_strides[3] = in->stride[3];
 			v->format		  = in->format;
 			if( v->ssm == 1 ) { 
 				v->strides[1] = v->strides[0];
@@ -564,7 +548,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 
 	for( i = 0; i < n; i ++ ) {
 		veejay_memset( f[i], 0, sizeof(vj_task_arg_t));
-	}
+	} 
 
 	return 1;
 }

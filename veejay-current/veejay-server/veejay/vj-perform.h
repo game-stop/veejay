@@ -45,8 +45,6 @@ int vj_perform_queue_audio_frame(veejay_t * info);
 
 int vj_perform_queue_video_frame(veejay_t * info, int skip);
 
-void vj_perform_clear_frame_info();
-
 void vj_perform_record_stop(veejay_t *info);
 
 void vj_perform_record_sample_frame(veejay_t *info, int sample); 

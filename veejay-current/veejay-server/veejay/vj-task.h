@@ -26,7 +26,6 @@ typedef void *(*performer_job_routine)(void(*)(void*));
 typedef struct
 {
 	int	strides[4];
-	int	out_strides[4];
 	uint8_t *input[4];
 	uint8_t *output[4];
 	uint8_t *temp[4];
@@ -41,10 +40,9 @@ typedef struct
 	int	uv_height;
 	int	jobnum; 
 	int format;
-	int row_strides[4];	
 	float 	fparam;
 	int	iparam;  
-	int	iparams[12]; // fx parameters + entry
+	int	iparams[32];
 } vj_task_arg_t;
 
 
@@ -53,7 +51,6 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 uint8_t	vj_task_available();
 
 void	vj_task_set_float( float f );
-void	vj_task_set_int( int i );
 void	vj_task_set_ptr( void *ptr );
 void	vj_task_set_to_frame( VJFrame *frame, int pos, int job );
 void	vj_task_set_from_frame( VJFrame *frame );

@@ -221,7 +221,7 @@ static int vimsMustReadReply(char *msg, int *vims_event_id)
 /* count played frames (delay) */
 static int vj_flush(int frames) { 
 	
-	char status[255];
+	char status[512];
 	memset(status,0,sizeof(status));
 
 	while(frames>0) {

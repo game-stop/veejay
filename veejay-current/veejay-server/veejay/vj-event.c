@@ -4467,7 +4467,7 @@ void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
 	int id = 0;
 	int mode = 0;
 	
-	if( sample_readFromFile( str, v->composite,v->seq, v->font, v->edit_list, &id, &mode ) ) 
+	if( sample_readFromFile( str, v->composite,v->seq, v->font, v->edit_list,&id, &mode ) ) 
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list from file '%s'", str);
 	}
@@ -5267,19 +5267,80 @@ void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
-		if( sample_set_manual_fader( args[0], args[1],args[2] ) )
+		if( sample_set_manual_fader( args[0], args[1] ) )
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Set chain fader %d with parameter %f",args[2],
-				sample_get_fader_val( args[0], &(args[2]) ));
+			veejay_msg(VEEJAY_MSG_DEBUG, "Set chain fader opacity %f",sample_get_fader_val( args[0]));
 		}
 	}
 	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
 	{
-		if( vj_tag_set_manual_fader( args[0], args[1],args[2] ) )
+		if( vj_tag_set_manual_fader( args[0], args[1] ) )
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Set chain fader %d with parameter %f", args[2],
-				vj_tag_get_fader_val(args[0],&(args[2]) ));
+			veejay_msg(VEEJAY_MSG_DEBUG, "Set chain fader opacity %f",vj_tag_get_fader_val(args[0]));
 		}
+	}
+}
+
+void	vj_event_chain_fade_alpha(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	char *str = NULL; P_A(args,str,format,ap);
+
+	if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
+	{
+		args[0] = v->uc->sample_id;
+	}
+
+	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
+	{
+		sample_set_fade_alpha( args[0], args[1] );
+	}
+	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
+	{
+		vj_tag_set_fade_alpha( args[0], args[1] );
+	}
+}
+
+void	vj_event_chain_fade_method(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	char *str = NULL; P_A(args,str,format,ap);
+
+	if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
+	{
+		args[0] = v->uc->sample_id;
+	}
+
+	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
+	{
+		sample_set_fade_method( args[0], args[1] );
+	}
+	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
+	{
+		vj_tag_set_fade_method( args[0], args[1] );
+	}
+}
+
+void	vj_event_chain_fade_entry(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	char *str = NULL; P_A(args,str,format,ap);
+
+	if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
+	{
+		args[0] = v->uc->sample_id;
+	}
+
+	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
+	{
+		sample_set_fade_entry( args[0], args[1] );
+	}
+	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
+	{
+		vj_tag_set_fade_entry( args[0], args[1] );
 	}
 }
 
@@ -5327,7 +5388,7 @@ void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 		args[0] = v->uc->sample_id;
 	}
 
-	if( args[1] == 0 )
+	if( args[1] == 0 ) //@backward
 		args[1] = -1;
 
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
@@ -8261,8 +8322,9 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	int i,n;
 	char *s_print_buf = get_print_buf(0);
 	sprintf(s_print_buf, "%05d",0);
-
-	//if(args[0]>0) start_from_tag = args[0];
+	int start_from_tag = 1;
+	if(args[0]>0) 
+		start_from_tag = args[0];
 
 	n = vj_tag_size()-1;
 	if (n >= 1 )
@@ -8270,16 +8332,15 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 		char line[300];
 		char *print_buf = get_print_buf(SEND_BUF);
 
-		for(i=0; i <= n; i++)
+		for(i=start_from_tag; i <= n; i++)
 		{
 			if(vj_tag_exists(i) &&!vj_tag_is_deleted(i))
 			{	
 				vj_tag *tag = vj_tag_get(i);
 				char source_name[255];
 				char cmd[300];
-				//vj_tag_get_description( i, source_name );
 				vj_tag_get_source_name( i, source_name );
-				sprintf(line,"%05d%02d%03d%03d%03d%03d%03zu%s",
+				snprintf(line,sizeof(line),"%05d%02d%03d%03d%03d%03d%03zu%s",
 					i,
 					vj_tag_get_type(i),
 					tag->color_r,
@@ -8289,7 +8350,7 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 					strlen(source_name),
 					source_name
 				);
-				sprintf(cmd, "%03zu%s",strlen(line),line);
+				snprintf(cmd,sizeof(cmd), "%03zu%s",strlen(line),line);
 				APPEND_MSG(print_buf,cmd); 
 			}
 		}

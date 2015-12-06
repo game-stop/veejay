@@ -27,12 +27,10 @@
 #include "common.h"
 #include "mixtoalpha.h"
 
-static int __lookup_table[256];
-
 vj_effect *mixtoalpha_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
+    ve->num_params = 2;
     ve->description = "Alpha: Set from Mixing source";
     ve->sub_format = -1;
     ve->extra_frame = 1;
@@ -44,34 +42,43 @@ vj_effect *mixtoalpha_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 1;
-    ve->defaults[0] = !yuv_use_auto_ccir_jpeg();
-    ve->param_description = vje_build_param_list( ve->num_params, "Scale Luminance to range 0-255 (1=on)" );
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] =1;
+    ve->defaults[0] = 0;
+	ve->defaults[1] = !yuv_use_auto_ccir_jpeg();
+    ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Scale to full range" );
 
 	ve->alpha = FLAG_ALPHA_OUT;
 
-	__init_lookup_table( __lookup_table,256, 16.0f, 235.0f, 0, 255 ); 
-
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, "Verbatim", "Full range" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0],0, "Copy Luminance from B", "Copy Alpha from B"	);
 
     return ve;
 }
 
-void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode)
+void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode, int scale)
 {
 	int len = frame->len;
 	uint8_t *a = frame->data[3];
-	uint8_t *Y = frame2->data[0];
-		
+	const uint8_t *Y = frame2->data[0];
+	uint8_t __lookup_table[256];
+	__init_lookup_table( __lookup_table,256, 16.0f, 235.0f, 0, 255 ); 
+
+	const uint8_t *T = (const uint8_t*) __lookup_table;
+	
 	if( mode == 0 ) {
 		veejay_memcpy(a, Y, len );
 	}
-	else {
+	else if (mode == 1) {
+		veejay_memcpy(a, frame2->data[3], len );
+	}
+
+	if( scale ) {	
 		int i;
-		for( i = 0; i < len; i ++ ) 
+		for( i = 0; i < len; i ++ )
 		{
-			a[i] = __lookup_table[ Y[i] ];
+			a[i] = T[ a[i] ];
 		}
 	}
 }

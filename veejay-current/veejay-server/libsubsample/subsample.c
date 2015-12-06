@@ -616,7 +616,7 @@ static void	chroma_subsample_task( void *ptr )
 {
 	vj_task_arg_t *f = (vj_task_arg_t*) ptr;
 
-	switch (f->iparam) {
+	switch (f->iparams[0]) {
 		case SSM_420_JPEG_BOX:
 		case SSM_420_JPEG_TR: 
 			ss_444_to_420jpeg(f->input[1], f->width, f->height);
@@ -643,7 +643,7 @@ static void chroma_supersample_task( void *ptr )
 {
 	vj_task_arg_t *f = (vj_task_arg_t*) ptr; 
 
-	switch (f->iparam) {
+	switch (f->iparams[0]) {
 	 case SSM_420_JPEG_BOX:
       		ss_420jpeg_to_444(f->input[1], f->width, f->height);
    	 	ss_420jpeg_to_444(f->input[2], f->width, f->height);

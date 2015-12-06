@@ -56,7 +56,7 @@ char *get_gveejay_dir();
 int	gveejay_restart();
 int	gveejay_update();
 int update_gveejay();
-int veejay_update_multitrack( void *data );
+int veejay_update_multitrack();
 void veejay_sleep( void *ui );
 int gveejay_time_to_sync( void *ptr );
 void gui_load_theme();

@@ -930,6 +930,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->fader_active = 0;
     tag->fader_val = 0.0;
 	tag->fade_method = 0;
+	tag->fade_alpha = 0;
+	tag->fade_entry = -1;
     tag->fader_inc = 0.0;
     tag->fader_direction = 0;
     tag->selected_entry = 0;
@@ -1444,11 +1446,29 @@ void *vj_tag_get_plugin(int t1, int position, void *instance)
 }
 
 
-float vj_tag_get_fader_val(int t1, int *method) {
+float vj_tag_get_fader_val(int t1) {
    vj_tag *tag = vj_tag_get(t1);
    if(!tag) return -1;
-   *method = tag->fade_method;
-   return ( tag->fader_val );
+   return tag->fader_val;
+}
+void vj_tag_set_fade_method(int t1, int method)
+{
+	vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return;
+	tag->fade_method = method;
+}
+void vj_tag_set_fade_alpha(int t1, int alpha)
+{
+	vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return;
+	tag->fade_alpha = alpha;
+}
+
+void vj_tag_set_fade_entry(int t1, int entry)
+{
+	vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return;
+	tag->fade_entry = entry;
 }
 
 
@@ -1470,15 +1490,20 @@ int	vj_tag_get_description( int t1, char *description )
 	snprintf( description ,TAG_MAX_DESCR_LEN, "%s", tag->descr );
 	return 1;
 }
+int	vj_tag_get_fade_alpha( int t1, int alpha)
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return 0;
+	return tag->fade_alpha;
+}
 
-int vj_tag_set_manual_fader(int t1, int value, int method )
+int vj_tag_set_manual_fader(int t1, int value )
 {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
   tag->fader_active = 2;
   tag->fader_inc = 0.0;
   tag->fader_val = (float)value;
-  tag->fade_method = method;
   if(tag->effect_toggle == 0) 
 	  tag->effect_toggle = 1;
   return 1;
@@ -1510,7 +1535,17 @@ int vj_tag_get_fader_active(int t1) {
    if(!tag) return -1;
    return (tag->fader_active);
 }
+int vj_tag_get_fade_entry(int t1) {
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return -1;
+	return tag->fade_entry;
+}
 
+int vj_tag_get_fade_method(int t1) {
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return -1;
+	return tag->fade_method;
+}
 int vj_tag_get_fader_direction(int t1) {
    vj_tag *tag = vj_tag_get(t1);
    if(!tag) return -1;
@@ -1519,14 +1554,13 @@ int vj_tag_get_fader_direction(int t1) {
    return (tag->fader_direction);
 }
 
-int vj_tag_apply_fader_inc(int t1, int *method) {
+int vj_tag_apply_fader_inc(int t1) {
   vj_tag *tag = vj_tag_get(t1);
   if(!tag) return -1;
   tag->fader_val += tag->fader_inc;
-  *method = tag->fade_method;
-  if(tag->fader_val > 255.0 ) tag->fader_val = 255.0;
-  if(tag->fader_val < 0.0) tag->fader_val = 0.0;
-  return tag->fader_val;
+  if(tag->fader_val > 255.0f ) tag->fader_val = 255.0f;
+  if(tag->fader_val < 0.0f) tag->fader_val = 0.0f;
+  return (int) tag->fader_val;
 }
 
 int vj_tag_set_fader_active(int t1, int nframes , int direction) {
@@ -1535,10 +1569,10 @@ int vj_tag_set_fader_active(int t1, int nframes , int direction) {
   if(nframes <= 0) return -1;
   tag->fader_active = 1;
   if(direction<0)
-	tag->fader_val = 255.0;
+	tag->fader_val = 255.0f;
   else
-	tag->fader_val = 0.0;
-  tag->fader_inc = (float) (255.0 / (float)nframes );
+	tag->fader_val = 0.0f;
+  tag->fader_inc = (float) (255.0f / (float)nframes );
   tag->fader_direction = direction;
   tag->fader_inc *= direction;
   if(tag->effect_toggle == 0 )
@@ -2017,7 +2051,8 @@ int vj_tag_chain_free(int t1)
 			}
 
 	  	}
-	}  
+	} 
+
     return sum;
 }
 
@@ -2138,25 +2173,25 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 		if(vj_effect_initialized( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance ))
 		{
 			if(!vj_effect_is_plugin( tag->effect_chain[position]->effect_id )) {
-					int i = 0;
-					int frm = 1;
-					for( i =0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
-							if( i == position )
-									continue;
-							if( tag->effect_chain[i]->effect_id == effect_id )
-									frm = 0;
-					}
-					if( frm == 1 ) {
-						vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
-						tag->effect_chain[position]->fx_instance = NULL;
-						tag->effect_chain[position]->clear = 1;
-					}
-			} else {
+				int i = 0;
+				int frm = 1;
+				for( i =0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+					if( i == position )
+						continue;
+					if( tag->effect_chain[i]->effect_id == effect_id )
+						frm = 0;
+				}
+				if( frm == 1 ) {
 					vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
 					tag->effect_chain[position]->fx_instance = NULL;
 					tag->effect_chain[position]->clear = 1;
+				}
+			} 
+			else {
+				vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+				tag->effect_chain[position]->fx_instance = NULL;
+				tag->effect_chain[position]->clear = 1;
 			}
-
 		}
 		if( tag->effect_chain[position]->source_type == 1 && 
 			vj_tag_get_active( tag->effect_chain[position]->channel ) && 
@@ -2164,7 +2199,6 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 			vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
 			vj_tag_disable( tag->effect_chain[position]->channel );
 		}
-
     }
 
     if (!vj_effect_initialized(effect_id, tag->effect_chain[position]->fx_instance ))
@@ -2180,6 +2214,8 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 				tag->effect_chain[position]->arg[i] = 0;
 
 			tag->effect_chain[position]->frame_trimmer = 0;
+			if( position == tag->fade_entry )
+				tag->fade_entry = -1;
 			return 0;
 		}
     }
@@ -2200,16 +2236,24 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 	}
 
     tag->effect_chain[position]->effect_id = effect_id;
-    
 
-	if (vj_effect_get_extra_frame(effect_id)) {
+	if (vj_effect_get_extra_frame(effect_id))
+	{
 		if(tag->effect_chain[position]->source_type < 0)
 		 tag->effect_chain[position]->source_type = 1;
 		if(tag->effect_chain[position]->channel <= 0 )
 		 tag->effect_chain[position]->channel = t1;
     }
-
-    return 1;
+	else 
+	{
+		if( position == tag->fade_entry) { 
+			if( tag->fade_method == 4 ) 
+				tag->fade_method = 2; /* auto switch */
+			else if(tag->fade_method == 3 ) 
+				tag->fade_method = 1;
+		}
+	}
+	return 1;
 }
 
 int	vj_tag_has_cali_fx( int t1 ) {
@@ -2766,6 +2810,9 @@ int vj_tag_chain_remove(int t1, int index)
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
 		tag->effect_chain[index]->arg[j] = 0;
 
+	if( index == tag->fade_entry )
+		tag->fade_entry = -1;
+
     return 1;
 }
 
@@ -2907,7 +2954,7 @@ int vj_tag_encoder_active(int s1)
 	return si->encoder_active;
 }
 
-int	vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active, int *method )
+int	vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active, int *method, int *entry, int *alpha )
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return 0;
@@ -2917,6 +2964,8 @@ int	vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *a
 	*type = tag->source_type;
 	*active = tag->active;
 	*method = tag->fade_method;
+	*entry = tag->fade_entry;
+	*alpha = tag->fade_alpha;
 	return 1;
 }
 
@@ -3634,7 +3683,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 
 
 //int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
-int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int curfps, uint32_t lo, uint32_t hi, int macro, char *str )
+int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int curfps, uint32_t lo, uint32_t hi, int macro, char *str )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
@@ -3667,8 +3716,10 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 	*ptr++ = '0'; *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, macro ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->subrender); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, tag->fade_method); 
-
+	ptr = vj_sprintf( ptr, tag->fade_method); *ptr++ = ' '; 
+	ptr = vj_sprintf( ptr, tag->fade_entry ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tag->fade_alpha ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, samples );
     return 0;
 }
 
@@ -3973,7 +4024,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	char *source_file = NULL;
 	char *extra_data = NULL;
 	int col[3] = {0,0,0};
-	int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,opacity=0, nframes=0;
+	int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,fade_alpha = 0,fade_entry = -1,opacity=0, nframes=0;
 	int subrender = 0;
 	xmlNodePtr fx[32];
 	veejay_memset( fx, 0, sizeof(fx));
@@ -4010,7 +4061,10 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			fader_val = tag_get_int_xml( doc,cur, (const xmlChar*) XMLTAG_FADER_VAL );
 		if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) 
 			fade_method = tag_get_int_xml( doc,cur, (const xmlChar*) XMLTAG_FADE_METHOD );
-
+		if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ALPHA)) 
+			fade_alpha = tag_get_int_xml( doc,cur, (const xmlChar*) XMLTAG_FADE_ALPHA );
+		if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_METHOD)) 
+			fade_entry = tag_get_int_xml( doc,cur, (const xmlChar*) XMLTAG_FADE_ENTRY );
 		if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_DIRECTION)) 
 			fader_dir = tag_get_int_xml( doc, cur, (const xmlChar*) XMLTAG_FADER_DIRECTION );
 		if (!xmlStrcmp(cur->name,(const xmlChar*) "opacity" ) )
@@ -4075,6 +4129,8 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			tag->fader_active = fader_active;
 			tag->fader_val = fader_val;
 			tag->fade_method = fade_method;
+			tag->fade_alpha = fade_alpha;
+			tag->fade_entry = fade_entry;
 			tag->fader_direction = fader_dir;
 			tag->opacity = opacity;
 			tag->nframes = nframes;

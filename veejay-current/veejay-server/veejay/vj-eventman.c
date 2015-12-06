@@ -1655,21 +1655,58 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[VIMS_CHAIN_FADE_ENTRY]			=	_new_event(
+				"%d %d",
+				VIMS_CHAIN_FADE_ENTRY,
+				"Chain mixer source selection (-1=original frame)",
+				vj_event_chain_fade_entry,
+				2,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Chain Entry",
+				-1,
+				NULL );
+
+	index_map_[VIMS_CHAIN_FADE_METHOD]			=	_new_event(
+				"%d %d",
+				VIMS_CHAIN_FADE_ENTRY,
+				"Chain mixer method",
+				vj_event_chain_fade_method,
+				2,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Fade method",
+				-1,
+				NULL );
+
+	index_map_[VIMS_CHAIN_FADE_ALPHA]			=	_new_event(
+				"%d %d",
+				VIMS_CHAIN_FADE_ALPHA,
+				"Chain alpha toggle",
+				vj_event_chain_fade_alpha,
+				2,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Alpha enabled (1) or disabled (0)",
+				0,
+				NULL );
 
 	index_map_[VIMS_CHAIN_MANUAL_FADE]			=	_new_event(
-				"%d %d %d",
+				"%d %d",
 				VIMS_CHAIN_MANUAL_FADE,
 				"Set opacity of Effect Chain",
 				vj_event_manual_chain_fade,
-				3,
+				2,
 				VIMS_REQUIRE_ALL_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
 				"Opacity value [0-255]",
 				0,
-				"Fade method (0=opacity,1=alpha)",
-				0,
-				NULL );
+				NULL);
+
 	index_map_[VIMS_CHAIN_SET_ENTRY]			=	_new_event(
 				"%d",
 				VIMS_CHAIN_SET_ENTRY,

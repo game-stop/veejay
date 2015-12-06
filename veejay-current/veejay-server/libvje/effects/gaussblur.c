@@ -60,6 +60,9 @@ vj_effect *gaussblur_init(int w,int h)
     ve->sub_format = -1;
 	ve->rgb_conv = 0;
     ve->parallel = 0;
+
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
+
 	return ve;
 }
 

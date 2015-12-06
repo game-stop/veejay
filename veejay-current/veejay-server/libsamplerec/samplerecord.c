@@ -87,11 +87,12 @@ int sample_try_filename(int sample_id, char *filename, int format)
 	sample_info *si= sample_get(sample_id);
 	if(!si) return 0;
 
-	char tmp[32];
+	char tmp[1024];
+
 	if( filename  == NULL )
-		snprintf(tmp,32, "Sample_%04d", sample_id );
+		snprintf(tmp,sizeof(tmp), "Sample_%04d", sample_id );
 	else
-		snprintf(tmp,32, "%s", filename );
+		snprintf(tmp,sizeof(tmp), "%s", filename );
 	
 	int i = 0;
 	int len = strlen(tmp);

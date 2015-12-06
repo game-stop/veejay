@@ -352,6 +352,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->loopcount = 0;
     si->effect_toggle = 1;
 	si->fade_method = 0;
+	si->fade_alpha = 0;
+	si->fade_entry = -1;
 	si->subrender = 1;
     si->edit_list_file = sample_default_edl_name(si->sample_id);
 
@@ -701,14 +703,13 @@ int sample_update_offset(int s1, int n_frame)
 	return 1;
 }	
 
-int sample_set_manual_fader( int s1, int value, int method)
+int sample_set_manual_fader( int s1, int value)
 {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_active = 2;
   si->fader_val = (float) value;
   si->fader_inc = 0.0;
-  si->fade_method = method;
   if(si->effect_toggle == 0) 
 	  si->effect_toggle = 1;
 
@@ -722,11 +723,11 @@ int sample_set_fader_active( int s1, int nframes, int direction ) {
   si->fader_active = 1;
 
   if(direction<0)
-	si->fader_val = 255.0;
+	si->fader_val = 255.0f;
   else
-	si->fader_val = 0.0;
+	si->fader_val = 0.0f;
 
-  si->fader_inc = (float) (255.0 / (float) nframes);
+  si->fader_inc = (float) (255.0f / (float) nframes);
   si->fader_direction = direction;
   si->fader_inc *= si->fader_direction;
   /* inconsistency check */
@@ -736,7 +737,39 @@ int sample_set_fader_active( int s1, int nframes, int direction ) {
   }
   return 1;
 }
+int sample_get_fade_alpha(int s1)
+{
+	sample_info *si = sample_get(s1);
+	if(!si) return -1;
+	return si->fade_alpha;
+}
 
+int sample_get_fade_entry(int s1)
+{
+	sample_info *si = sample_get(s1);
+	if(!si) return -1;
+	return si->fade_entry;
+}
+
+void sample_set_fade_entry(int s1, int entry)
+{
+	sample_info *si = sample_get(s1);
+	if(!si) return;
+	si->fade_entry = entry;
+}
+
+void sample_set_fade_method(int s1, int method)
+{
+	sample_info *si = sample_get(s1);
+	if(!si) return;
+	si->fade_method = method;
+}
+void sample_set_fade_alpha(int s1, int alpha)
+{
+	sample_info *si = sample_get(s1);
+	if(!si) return;
+	si->fade_alpha = alpha;
+}
 
 int sample_reset_fader(int s1) {
   sample_info *si = sample_get(s1);
@@ -747,16 +780,21 @@ int sample_reset_fader(int s1) {
 }
 
 int sample_get_fader_active(int s1) {
-  sample_info *si = sample_get(s1);
-  if(!si) return -1;
-  return (si->fader_active);
+	sample_info *si = sample_get(s1);
+	if(!si) return -1;
+	return (si->fader_active);
 }
 
-float sample_get_fader_val(int s1, int *method) {
+int sample_get_fade_method(int s1) {
+	sample_info *si = sample_get(s1);
+	if(!si) return -1;
+	return si->fade_method;
+}
+
+float sample_get_fader_val(int s1) {
   sample_info *si = sample_get(s1);
   if(!si) return -1;
-  *method = si->fade_method;
-  return (si->fader_val);
+  return si->fader_val;
 }
 
 float sample_get_fader_inc(int s1) {
@@ -780,16 +818,13 @@ int sample_set_fader_val(int s1, float val) {
   return 1;
 }
 
-int sample_apply_fader_inc(int s1, int *method) {
-  sample_info *si = sample_get(s1);
-  if(!si) return -1;
-  si->fader_val += si->fader_inc;
-  *method = si->fade_method;
-  if(si->fader_val > 255.0 ) si->fader_val = 255.0;
-  if(si->fader_val < 0.0 ) si->fader_val = 0.0;
-//  if(si->fader_direction >= 0) return si->fader_val;
-//  return (255-si->fader_val);
-	return si->fader_val;
+int sample_apply_fader_inc(int s1) {
+	sample_info *si = sample_get(s1);
+	if(!si) return -1;
+	si->fader_val += si->fader_inc;
+	if(si->fader_val > 255.0f ) si->fader_val = 255.0f;
+	if(si->fader_val < 0.0f ) si->fader_val = 0.0f;
+	return (int) si->fader_val;
 }
 
 int sample_set_fader_inc(int s1, float inc) {
@@ -1273,7 +1308,7 @@ int sample_get_effect_status(int s1)
 	return 0;
 }
 
-int	sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active, int *method )
+int	sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active, int *method, int *entry, int *alpha )
 {
 	sample_info *si = sample_get(s1);
 	if(!si) return 0;
@@ -1283,6 +1318,8 @@ int	sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active, i
 	*rec   = si->encoder_active;
 	*active= 1;
 	*method = si->fade_method;
+	*entry = si->fade_entry;
+	*alpha = si->fade_alpha;
 	return 1;
 }
 
@@ -1965,28 +2002,26 @@ int sample_chain_free(int s1)
     int e_id = 0; 
     int sum = 0;
     if (!sample)
-	return -1;
-    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-	e_id = sample->effect_chain[i]->effect_id;
-	if(e_id!=-1)
+		return -1;
+	for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		if(vj_effect_initialized(e_id, sample->effect_chain[i]->fx_instance))
+		e_id = sample->effect_chain[i]->effect_id;
+		if(e_id!=-1)
 		{
-			vj_effect_deactivate(e_id, sample->effect_chain[i]->fx_instance);
-			sample->effect_chain[i]->fx_instance = NULL;
-			sample->effect_chain[i]->clear = 1;
-			sum++;
-  		}
-		if( sample->effect_chain[i]->source_type == 1 && 
-			vj_tag_get_active( sample->effect_chain[i]->channel ) &&
-		 	vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
-			vj_tag_disable( sample->effect_chain[i]->channel );
+			if(vj_effect_initialized(e_id, sample->effect_chain[i]->fx_instance))
+			{
+				vj_effect_deactivate(e_id, sample->effect_chain[i]->fx_instance);
+				sample->effect_chain[i]->fx_instance = NULL;
+				sample->effect_chain[i]->clear = 1;
+				sum++;
+			}
+			if( sample->effect_chain[i]->source_type == 1 && 
+				vj_tag_get_active( sample->effect_chain[i]->channel ) &&
+			 	vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+					vj_tag_disable( sample->effect_chain[i]->channel );
+			}
 		}
-	 }
-   } 
-
-// 	veejay_msg(VEEJAY_MSG_DEBUG, "Freed %d effects",sum);
+	}
 
     return sum;
 }
@@ -2098,34 +2133,32 @@ int sample_chain_add(int s1, int c, int effect_nr)
 
     if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
     {
-	//verify if the effect should be discarded
-	if(vj_effect_initialized( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance )  ) 
-	{
-		if(!vj_effect_is_plugin( sample->effect_chain[c]->effect_id ) ) {
-			int i  = 0;
-			int frm = 1;
+		//verify if the effect should be discarded
+		if(vj_effect_initialized( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance )  ) 
+		{
+			if(!vj_effect_is_plugin( sample->effect_chain[c]->effect_id ) ) {
+				int i  = 0;
+				int frm = 1;
+				
+				for( i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
+					if( i == c )
+						continue;
+				 	if( sample->effect_chain[i]->effect_id == effect_nr )
+			 			frm = 0;
+				}
 			
-			for( i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
-			        if( i == c )
-			       		continue;
-			 	if( sample->effect_chain[i]->effect_id == effect_nr )
-		 			frm = 0;
-			}
-			
-			if( frm == 1 ) {
+				if( frm == 1 ) {
+					vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
+					sample->effect_chain[c]->fx_instance = NULL;
+					sample->effect_chain[c]->clear = 1;
+				}
+			} else {
 				vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
 				sample->effect_chain[c]->fx_instance = NULL;
 				sample->effect_chain[c]->clear = 1;
 			}
-		} else {
-			vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
-			sample->effect_chain[c]->fx_instance = NULL;
-			sample->effect_chain[c]->clear = 1;
 		}
-	}
-	
     }
-
 
     if(!vj_effect_initialized(effect_nr, sample->effect_chain[c]->fx_instance) )
     {
@@ -2142,6 +2175,8 @@ int sample_chain_add(int s1, int c, int effect_nr)
 				sample->effect_chain[c]->arg[i] = 0;
 	
 			sample->effect_chain[c]->frame_trimmer = 0;
+			if( c == sample->fade_entry )
+				sample->fade_entry = -1;
 			return 0;
 		}
     }
@@ -2184,9 +2219,17 @@ int sample_chain_add(int s1, int c, int effect_nr)
 
         veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with sample %d",
 			vj_effect_get_description(sample->effect_chain[c]->effect_id),c,sample->effect_chain[c]->channel);
-    }
 
-
+	}
+	else
+	{
+		if( c == sample->fade_entry ) {
+			if( sample->fade_method == 4 )
+				sample->fade_method = 2; /* auto switch */
+			else if (sample->fade_method == 3 )
+				sample->fade_method = 1;
+		}
+	}
     return 1;			/* return position on which it was added */
 }
 
@@ -2270,47 +2313,52 @@ int sample_chain_clear(int s1)
     sample_info *sample = sample_get(s1);
 
     if (!sample)
-	return -1;
-    /* the effect chain is gonna be empty! */
-    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
-	if(sample->effect_chain[i]->effect_id != -1)
+		return -1;
+    
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		if(vj_effect_initialized( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance )) {
-			vj_effect_deactivate( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance ); 
-			sample->effect_chain[i]->fx_instance = NULL;
-			sample->effect_chain[i]->clear = 1;
-		}
-		
-	}
-	sample->effect_chain[i]->effect_id = -1;
-	sample->effect_chain[i]->frame_offset = 0;
-	sample->effect_chain[i]->frame_trimmer = 0;
-	sample->effect_chain[i]->volume = 0;
-	sample->effect_chain[i]->a_flag = 0;
-	if( sample->effect_chain[i]->kf )	
-		vpf( sample->effect_chain[i]->kf );
-	sample->effect_chain[i]->kf = NULL;
-	int src_type = sample->effect_chain[i]->source_type;
-	int id       = sample->effect_chain[i]->channel;
-	if( src_type == 0 && id > 0 )
-	{
-		sample_info *old = sample_get( id );
-		if(old && old->edit_list)
+		if(sample->effect_chain[i]->effect_id != -1)
 		{
-			vj_el_clear_cache(old->edit_list);
+			if(vj_effect_initialized( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance )) {
+				vj_effect_deactivate( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance ); 
+				sample->effect_chain[i]->fx_instance = NULL;
+				sample->effect_chain[i]->clear = 1;
+			}
+		
 		}
-	}
-	if( sample->effect_chain[i]->source_type == 1 && 
-		vj_tag_get_active( sample->effect_chain[i]->channel ) &&
-	 	vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
-		vj_tag_disable( sample->effect_chain[i]->channel );
+
+		sample->effect_chain[i]->effect_id = -1;
+		sample->effect_chain[i]->frame_offset = 0;
+		sample->effect_chain[i]->frame_trimmer = 0;
+		sample->effect_chain[i]->volume = 0;
+		sample->effect_chain[i]->a_flag = 0;
+		if( sample->effect_chain[i]->kf )	
+			vpf( sample->effect_chain[i]->kf );
+		sample->effect_chain[i]->kf = NULL;
+	
+		int src_type = sample->effect_chain[i]->source_type;
+		int id       = sample->effect_chain[i]->channel;
+		if( src_type == 0 && id > 0 )
+		{
+			sample_info *old = sample_get( id );
+			if(old && old->edit_list)
+			{
+				vj_el_clear_cache(old->edit_list);
+			}
+		}
+		if( sample->effect_chain[i]->source_type == 1 && 
+			vj_tag_get_active( sample->effect_chain[i]->channel ) &&
+		 	vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+			vj_tag_disable( sample->effect_chain[i]->channel );
+		}
+
+		sample->effect_chain[i]->source_type = 0;
+		sample->effect_chain[i]->channel = s1;
+		for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
+		    sample->effect_chain[i]->arg[j] = 0;
 	}
 
-	sample->effect_chain[i]->source_type = 0;
-	sample->effect_chain[i]->channel = s1;
-	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
-	    sample->effect_chain[i]->arg[j] = 0;
-    }
+	sample->fade_entry = -1;
 
     return 1;
 }
@@ -2390,16 +2438,16 @@ int sample_chain_remove(int s1, int position)
     sample_info *sample;
     sample = sample_get(s1);
     if (!sample)
-	return -1;
+		return -1;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
-	return -1;
+		return -1;
     if(sample->effect_chain[position]->effect_id != -1)
     {
-	if(vj_effect_initialized( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance ) && _sample_can_free( sample, position, sample->effect_chain[position]->effect_id) ) { 
-		vj_effect_deactivate( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance);    
-		sample->effect_chain[position]->fx_instance = NULL;
-		sample->effect_chain[position]->clear = 1;
-	}
+		if(vj_effect_initialized( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance ) && _sample_can_free( sample, position, sample->effect_chain[position]->effect_id) ) { 
+			vj_effect_deactivate( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance);    
+			sample->effect_chain[position]->fx_instance = NULL;
+			sample->effect_chain[position]->clear = 1;
+		}
     }
     sample->effect_chain[position]->effect_id = -1;
     sample->effect_chain[position]->frame_offset = 0;
@@ -2430,6 +2478,9 @@ int sample_chain_remove(int s1, int position)
     sample->effect_chain[position]->channel = 0;
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
 		sample->effect_chain[position]->arg[j] = 0;
+
+	if( position == sample->fade_entry )
+		sample->fade_entry = -1;
 
     return 1;
 }
@@ -2510,7 +2561,7 @@ int sample_apply_loop_dec(int s1, double fps) {
 /* print sample status information into an allocated string str*/
 //int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
 //			       int frame)
-int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, uint32_t lo, uint32_t hi,int macro,char *str )
+int	sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, uint32_t lo, uint32_t hi,int macro,char *str )
 {
 	sample_info *sample;
 	sample = sample_get(s1);
@@ -2562,7 +2613,10 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	ptr = vj_sprintf( ptr, sample->dup ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, macro ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, sample->subrender ); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, sample->fade_method );
+	ptr = vj_sprintf( ptr, sample->fade_method ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->fade_entry ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, sample->fade_alpha );*ptr++ = ' ';
+	ptr = vj_sprintf( ptr, tags );
 	return 0;
 }
 
@@ -3181,7 +3235,24 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 		}
 		if(xmlTemp) xmlFree(xmlTemp);
 	}
-
+	if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ALPHA)) {
+		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+		chTemp = UTF8toLAT1(xmlTemp);
+		if(chTemp) {
+			skel->fade_alpha = atoi(chTemp);
+		    free(chTemp);
+		}
+		if(xmlTemp) xmlFree(xmlTemp);
+	}
+	if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADE_ENTRY)) {
+		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+		chTemp = UTF8toLAT1(xmlTemp);
+		if(chTemp) {
+			skel->fade_entry = atoi(chTemp);
+		    free(chTemp);
+		}
+		if(xmlTemp) xmlFree(xmlTemp);
+	}
 	if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_VAL)) {
 		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
 		chTemp = UTF8toLAT1(xmlTemp);
@@ -3640,6 +3711,12 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
 		(const xmlChar *) buffer);
 	sprintf(buffer,"%d",sample->fade_method);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADE_METHOD,
+		(const xmlChar *) buffer);
+	sprintf(buffer,"%d",sample->fade_alpha);
+	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADE_ALPHA,
+		(const xmlChar *) buffer);
+	sprintf(buffer,"%d",sample->fade_entry);
+	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADE_ENTRY,
 		(const xmlChar *) buffer);
 	sprintf(buffer,"%f",sample->fader_inc);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADER_INC,

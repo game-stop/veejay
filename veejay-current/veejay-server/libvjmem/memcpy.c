@@ -1484,7 +1484,7 @@ static	void	vj_frame_clear_job( void *arg ) {
 	vj_task_arg_t *info = (vj_task_arg_t*) arg;
 	for( i = 0; i < 4; i ++ ) {
 		if( info->strides[i] > 0  )
-			veejay_memset( info->input[i], info->iparam, info->strides[i] );
+			veejay_memset( info->input[i], info->iparams[0], info->strides[i] );
 	}
 }
 
@@ -1495,7 +1495,7 @@ static void	vj_frame_copyN( uint8_t **input, uint8_t **output, int *strides )
 
 static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 {
-	vj_task_set_int( val );
+	vj_task_set_param( val,0 );
 	vj_task_run( input, input, NULL, strides,3, (performer_job_routine) &vj_frame_clear_job );
 }
 
@@ -1896,7 +1896,7 @@ char	*vj_sprintf( char *dst, int value )
 	snprintf(number,sizeof(number),"%d", value);
 	n = strlen( number );
 	*dst = '\0';
-	strcat( dst, number );
+	strncat( dst, number, n );
 	return dst + n;
 }
 

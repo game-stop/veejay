@@ -36,6 +36,7 @@
 #include <veejay/vje.h>
 #include <veejay/yuvconv.h>
 #include <string.h>
+#include "common.h"
 
 #define    RUP8(num)(((num)+8)&~8)
 
@@ -62,7 +63,7 @@ typedef struct
 	uint8_t *status_buffer;		
 	int	 track_list[16];
 	int	 track_items;			//shared
-	int	 status_tokens[32];	//shared
+	int	 status_tokens[STATUS_TOKENS];	//shared
 	int   	 active;
 	int 	have_frame;
 	int	grey_scale;
@@ -108,7 +109,7 @@ void	*gvr_preview_init(int max_tracks, int use_threads)
 	vp->track_sync = (track_sync_t*) vj_calloc(sizeof( track_sync_t ));
 	int i;
 	for( i = 0; i < max_tracks; i++ )
-		vp->track_sync->status_tokens[i] = (int*) vj_calloc(sizeof(int) * 32);
+		vp->track_sync->status_tokens[i] = (int*) vj_calloc(sizeof(int) * STATUS_TOKENS);
 
 	vp->n_tracks = max_tracks;
 
@@ -121,16 +122,16 @@ static	void	gvr_close_connection( veejay_track_t *v )
 {
    if(v)
    {
-         veejay_msg(VEEJAY_MSG_WARNING, "Stopping VeejayGrabber to %s:%d",v->hostname,v->port_num );
-         vj_client_close(v->fd);
-      	 vj_client_free(v->fd);
-	 if(v->hostname) free(v->hostname);
-         if(v->status_buffer) free(v->status_buffer);
-         if(v->data_buffer) free(v->data_buffer);
-	 if(v->tmp_buffer) free(v->tmp_buffer);
+        veejay_msg(VEEJAY_MSG_WARNING, "Stopping VeejayGrabber to %s:%d",v->hostname,v->port_num );
+        vj_client_close(v->fd);
+      	vj_client_free(v->fd);
+		if(v->hostname) free(v->hostname);
+        if(v->status_buffer) free(v->status_buffer);
+        if(v->data_buffer) free(v->data_buffer);
+		if(v->tmp_buffer) free(v->tmp_buffer);
  
          free(v);
-	 v= NULL;
+		v= NULL;
    }
 }
 
@@ -227,11 +228,19 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 
 static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_written )
 {
-	unsigned char message[10];
+	unsigned char message[8];
 	int tmp_len = slen + 1;
+	unsigned char *result = NULL;
 	unsigned char *tmp = vj_calloc( tmp_len );
- 
-	sprintf( (char*) message, "%03d:;", VIMS_TRACK_LIST );
+	if( tmp == NULL ) 
+	{
+		if( v->is_master ) {
+			reloaded_schedule_restart();
+		}
+		return NULL;
+	}
+	
+	snprintf( (char*) message,sizeof(message), "%03d:;", VIMS_TRACK_LIST );
 	int ret = vj_client_send( v->fd, V_CMD, message );
 	if( ret <= 0)
 	{	
@@ -241,46 +250,57 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
 		return NULL;
 	}	
 
-        ret = vj_client_read( v->fd, V_CMD, tmp, slen );
+    ret = vj_client_read( v->fd, V_CMD, tmp, slen );
 	if( ret <= 0 )
 	{
-
 		if( ret == -1 && v->is_master )
 			reloaded_schedule_restart();
 		free(tmp);
 		return NULL;
 	}
 
-        int len = 0;
-        sscanf( (char*) tmp, "%d", &len );
-        unsigned char *result = NULL;
-
-        if( len <= 0 || slen <= 0)
-        {
+    int len = 0;
+    if( sscanf( (char*) tmp, "%d", &len ) != 1 )
+	{
+		if(v->is_master)
+			reloaded_schedule_restart();
 		free(tmp);
-	        return result;
+		return result;
+	}
+    
+	if( len <= 0 || slen <= 0)
+    {
+		free(tmp);
+	    return result;
 	}
 
-        result = (unsigned char*) vj_calloc(sizeof( unsigned char) * (len + 1) );
-        int bytes_left = len;
-        *bytes_written = 0;
+    result = (unsigned char*) vj_calloc(sizeof( unsigned char) * (len + 1) );
+	if( result == NULL ) {
+		if(v->is_master)
+			reloaded_schedule_restart();
+		free(tmp);
+		return result;
+	}
 
-        while( bytes_left > 0)
-        {
-                int n = vj_client_read( v->fd, V_CMD, result + (*bytes_written), bytes_left );
-                if( n <= 0 )
+    int bytes_left = len;
+    *bytes_written = 0;
+
+    while( bytes_left > 0)
+    {
+		int n = vj_client_read( v->fd, V_CMD, result + (*bytes_written), bytes_left );
+        if( n <= 0 )
   		{
 			if( n == -1 && v->is_master )
 				reloaded_schedule_restart();	
                         bytes_left = 0;
 			break;
-                }
-                if( n > 0 )
-                {
-                        *bytes_written +=n;
-                        bytes_left -= n;
-                }
         }
+        if( n > 0 )
+        {
+			*bytes_written +=n;
+			bytes_left -= n;
+        }
+    }
 	free(tmp);
 
 	if( bytes_left ) {
@@ -288,7 +308,7 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
 		return NULL;
 	}	
 
-        return result;
+    return result;
 }
 
 
@@ -296,7 +316,6 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
 
 	unsigned char status_len[6];
-	veejay_memset( status_len, 0, sizeof(status_len) );
 	int k = -1;
 	int n = 0;
 	while( (k = vj_client_poll( v->fd, V_STATUS )) ) // is there a more recent message?
@@ -324,6 +343,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 
 		if(bytes > 0 )
 		{
+			veejay_memset( v->status_buffer,0, STATUS_LENGTH );
 			n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
 			if( n <= 0 ) {	
 				if( n == -1 && v->is_master )
@@ -336,7 +356,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	if( k == -1 && v->is_master )
 		reloaded_schedule_restart();
 	
-	veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * 32));
+	veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * STATUS_TOKENS));
 	status_to_arr( (char*) v->status_buffer, v->status_tokens );	
 	return 1;
 }
@@ -559,7 +579,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	vt->fd       = fd;
 	vt->preview  = is_button_toggled( "previewtoggle" );
 
-	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 256);
+	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * STATUS_LENGTH);
 	vt->data_buffer  = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3) );
 	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4) );
 
@@ -804,9 +824,9 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 
 static	int	*int_dup( int *status )
 {
-	int *res = (int*) vj_calloc( sizeof(int) * 32 );
+	int *res = (int*) vj_calloc( sizeof(int) * STATUS_TOKENS );
 	int i;
-	for(i =0; i < 32 ; i ++ )
+	for(i =0; i < STATUS_TOKENS ; i ++ )
 		res[i] = status[i];
 	return res;
 }
@@ -989,7 +1009,7 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 					track_num );
 				vj_client_free(v->fd);
 				if(v->hostname) free(v->hostname);
-       				if(v->status_buffer) free(v->status_buffer);
+       			if(v->status_buffer) free(v->status_buffer);
 				if(v->data_buffer) free(v->data_buffer);
 				if(v->tmp_buffer) free(v->tmp_buffer);
 				vp->tracks[track_num] = NULL;			

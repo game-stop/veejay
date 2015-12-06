@@ -68,6 +68,8 @@
 #define XMLTAG_FADER_ACTIVE "chain_fade"
 #define XMLTAG_FADER_VAL    "chain_fade_value"
 #define XMLTAG_FADE_METHOD  "chain_fade_method"
+#define XMLTAG_FADE_ALPHA   "chain_fade_alpha"
+#define XMLTAG_FADE_ENTRY	"chain_fade_entry"
 #define XMLTAG_FADER_INC    "chain_fade_increment"
 #define XMLTAG_FADER_DIRECTION "chain_direction"
 #define XMLTAG_LASTENTRY    "current_entry"
@@ -143,7 +145,9 @@ typedef struct sample_info_t {
     float fader_val;
     float fader_inc;
 	int fade_method;
-    int encoder_active;
+	int fade_alpha;
+    int fade_entry;
+	int encoder_active;
     unsigned long sequence_num;
     unsigned long rec_total_bytes;
     unsigned long encoder_total_frames;
@@ -291,7 +295,7 @@ extern int sample_set_chain_channel(int s1, int position, int channel);
 
 //int sample_chain_replace(int s1, int position, int effect_id);
 
-extern int sample_chain_sprint_status(int s1,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s ); 
+extern int sample_chain_sprint_status(int s1,int tags,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s ); 
 
 extern int sample_set_render_entry(int s1, int entry);
 extern int sample_get_render_entry(int s1);
@@ -305,17 +309,20 @@ extern int sample_get_loop_dec(int s1);
 extern int sample_set_loop_dec(int s1, int active);
 extern int sample_apply_loop_dec(int s1, double fps); 
 
-extern int	sample_set_manual_fader(int s1, int value, int method );
-extern int sample_apply_fader_inc(int s1, int *method);
+extern int	sample_set_manual_fader(int s1, int value );
+extern int sample_apply_fader_inc(int s1);
 extern int sample_set_fader_active(int s1, int nframes, int direction);
 extern int sample_set_fader_val(int s1, float val);
 extern int sample_get_fader_active(int s1);
-extern float sample_get_fader_val(int s1, int *method);
+extern float sample_get_fader_val(int s1);
 extern float sample_get_fader_inc(int s1);
 extern int sample_get_fader_direction(int s1);
 extern int sample_reset_fader(int t1);
-
+extern int sample_get_fade_entry(int t1);
+extern void sample_set_fade_entry(int t1, int entry);
+extern void sample_set_fade_method(int t1, int method );
 extern int sample_reset_offset(int s1);
+extern int sample_get_fade_method(int t1);
 
 extern int sample_get_effect_status(int s1);
 extern int sample_get_selected_entry(int s1);
@@ -329,7 +336,7 @@ extern int     sample_get_el_position( int sample_id, int *start, int *end );
 
 extern	void	*sample_get_dict( int sample_id );
 
-extern int sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active, int *method );
+extern int sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active, int *method, int *entry, int *alpha );
 
 extern void        sample_set_project(int fmt, int deinterlace, int flags, int force, char norm, int w, int h );
 

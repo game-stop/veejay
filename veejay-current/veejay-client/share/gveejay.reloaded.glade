@@ -1160,8 +1160,8 @@
     </child>
   </widget>
   <widget class="GtkWindow" id="gveejay_window">
-    <property name="width_request">1024</property>
-    <property name="height_request">720</property>
+    <property name="width_request">1100</property>
+    <property name="height_request">740</property>
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Reloaded</property>
     <property name="icon">veejay-icon.png</property>
@@ -10839,6 +10839,12 @@ YUV (current)</property>
                                             <property name="position">2</property>
                                           </packing>
                                         </child>
+                                        <child>
+                                          <placeholder/>
+                                        </child>
+                                        <child>
+                                          <placeholder/>
+                                        </child>
                                       </widget>
                                       <packing>
                                         <property name="expand">True</property>
@@ -12242,7 +12248,7 @@ YUV (current)</property>
                                                       <packing>
                                                         <property name="expand">False</property>
                                                         <property name="fill">False</property>
-                                                        <property name="position">6</property>
+                                                        <property name="position">5</property>
                                                       </packing>
                                                     </child>
                                                     <child>
@@ -12264,8 +12270,45 @@ YUV (current)</property>
                                                       <packing>
                                                         <property name="expand">False</property>
                                                         <property name="fill">False</property>
-                                                        <property name="padding">60</property>
-                                                        <property name="position">7</property>
+                                                        <property name="padding">20</property>
+                                                        <property name="position">6</property>
+                                                      </packing>
+                                                    </child>
+                                                    <child>
+                                                      <placeholder/>
+                                                    </child>
+                                                    <child>
+                                                      <placeholder/>
+                                                    </child>
+                                                    <child>
+                                                      <placeholder/>
+                                                    </child>
+                                                    <child>
+                                                      <placeholder/>
+                                                    </child>
+                                                    <child>
+                                                      <widget class="GtkLabel" id="label36">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="label" translatable="yes">FX entry</property>
+                                                      </widget>
+                                                      <packing>
+                                                        <property name="expand">True</property>
+                                                        <property name="fill">True</property>
+                                                        <property name="position">11</property>
+                                                      </packing>
+                                                    </child>
+                                                    <child>
+                                                      <widget class="GtkLabel" id="label_fxentry">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="label" translatable="yes">1</property>
+                                                      </widget>
+                                                      <packing>
+                                                        <property name="expand">True</property>
+                                                        <property name="fill">True</property>
+                                                        <property name="padding">4</property>
+                                                        <property name="position">12</property>
                                                       </packing>
                                                     </child>
                                                   </widget>
@@ -12280,6 +12323,137 @@ YUV (current)</property>
                                                 <property name="expand">True</property>
                                                 <property name="fill">True</property>
                                                 <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <widget class="GtkVBox" id="vbox32">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <child>
+                                                  <widget class="GtkRadioButton" id="fx_mnone">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <property name="receives_default">False</property>
+                                                    <property name="has_tooltip">True</property>
+                                                    <property name="tooltip" translatable="yes">From original source to completed FX chain</property>
+                                                    <property name="draw_indicator">True</property>
+                                                    <property name="group">fx_m1</property>
+                                                    <signal name="toggled" handler="on_fx_mnone_toggled" />
+                                                    <child>
+                                                      <widget class="GtkImage" id="image47">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="pixbuf">icon_fxmnone.png</property>
+                                                      </widget>
+                                                    </child>
+                                                  </widget>
+                                                  <packing>
+                                                    <property name="expand">False</property>
+                                                    <property name="fill">False</property>
+                                                    <property name="position">0</property>
+                                                  </packing>
+                                                </child>
+                                                <child>
+                                                  <widget class="GtkRadioButton" id="fx_m1">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <property name="receives_default">False</property>
+                                                    <property name="has_tooltip">True</property>
+                                                    <property name="tooltip" translatable="yes">From selected FX entry (before FX) to completed FX chain</property>
+                                                    <property name="relief">half</property>
+                                                    <property name="draw_indicator">True</property>
+                                                    <signal name="toggled" handler="on_fx_m1_toggled" />
+                                                    <child>
+                                                      <widget class="GtkImage" id="image44">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="pixbuf">icon_fxm1.png</property>
+                                                      </widget>
+                                                    </child>
+                                                  </widget>
+                                                  <packing>
+                                                    <property name="expand">False</property>
+                                                    <property name="fill">False</property>
+                                                    <property name="position">1</property>
+                                                  </packing>
+                                                </child>
+                                                <child>
+                                                  <widget class="GtkRadioButton" id="fx_m2">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <property name="receives_default">False</property>
+                                                    <property name="has_tooltip">True</property>
+                                                    <property name="tooltip" translatable="yes">From selected FX entry (after FX) to completed FX chain</property>
+                                                    <property name="draw_indicator">True</property>
+                                                    <property name="group">fx_m1</property>
+                                                    <signal name="toggled" handler="on_fx_m2_toggled" />
+                                                    <child>
+                                                      <widget class="GtkImage" id="image45">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="pixbuf">icon_fxm2.png</property>
+                                                      </widget>
+                                                    </child>
+                                                  </widget>
+                                                  <packing>
+                                                    <property name="expand">False</property>
+                                                    <property name="fill">False</property>
+                                                    <property name="position">2</property>
+                                                  </packing>
+                                                </child>
+                                                <child>
+                                                  <widget class="GtkRadioButton" id="fx_m3">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <property name="receives_default">False</property>
+                                                    <property name="has_tooltip">True</property>
+                                                    <property name="tooltip" translatable="yes">From mixing source of selected FX entry (before FX) to completed FX chain</property>
+                                                    <property name="draw_indicator">True</property>
+                                                    <property name="group">fx_m1</property>
+                                                    <signal name="toggled" handler="on_fx_m3_toggled" />
+                                                    <child>
+                                                      <widget class="GtkImage" id="image46">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="pixbuf">icon_fxm4.png</property>
+                                                      </widget>
+                                                    </child>
+                                                  </widget>
+                                                  <packing>
+                                                    <property name="expand">False</property>
+                                                    <property name="fill">False</property>
+                                                    <property name="position">3</property>
+                                                  </packing>
+                                                </child>
+                                                <child>
+                                                  <widget class="GtkRadioButton" id="fx_m4">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <property name="receives_default">False</property>
+                                                    <property name="has_tooltip">True</property>
+                                                    <property name="tooltip" translatable="yes">From mixing source of selected FX entry (after FX) to completed FX chain</property>
+                                                    <property name="draw_indicator">True</property>
+                                                    <property name="group">fx_m1</property>
+                                                    <signal name="toggled" handler="on_fx_m4_toggled" />
+                                                    <child>
+                                                      <widget class="GtkImage" id="image49">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="pixbuf">icon_fxm3.png</property>
+                                                      </widget>
+                                                    </child>
+                                                  </widget>
+                                                  <packing>
+                                                    <property name="expand">False</property>
+                                                    <property name="fill">False</property>
+                                                    <property name="position">4</property>
+                                                  </packing>
+                                                </child>
+                                              </widget>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">True</property>
+                                                <property name="position">1</property>
                                               </packing>
                                             </child>
                                             <child>
@@ -12298,7 +12472,8 @@ YUV (current)</property>
                                                           <widget class="GtkButton" id="button_fadein">
                                                             <property name="visible">True</property>
                                                             <property name="can_focus">True</property>
-                                                            <property name="receives_default">False</property>
+                                                            <property name="receives_default">True</property>
+                                                            <property name="has_tooltip">True</property>
                                                             <property name="tooltip" translatable="yes">Fade in FX Chain</property>
                                                             <signal name="clicked" handler="on_button_fadein_clicked" />
                                                             <child>
@@ -12312,6 +12487,7 @@ YUV (current)</property>
                                                           <packing>
                                                             <property name="expand">False</property>
                                                             <property name="fill">False</property>
+                                                            <property name="padding">4</property>
                                                             <property name="position">0</property>
                                                           </packing>
                                                         </child>
@@ -12319,7 +12495,8 @@ YUV (current)</property>
                                                           <widget class="GtkButton" id="button_fadeout">
                                                             <property name="visible">True</property>
                                                             <property name="can_focus">True</property>
-                                                            <property name="receives_default">False</property>
+                                                            <property name="receives_default">True</property>
+                                                            <property name="has_tooltip">True</property>
                                                             <property name="tooltip" translatable="yes">Fade Out FX Chain</property>
                                                             <signal name="clicked" handler="on_button_fadeout_clicked" />
                                                             <child>
@@ -12353,6 +12530,7 @@ YUV (current)</property>
                                                           <packing>
                                                             <property name="expand">False</property>
                                                             <property name="fill">False</property>
+                                                            <property name="padding">4</property>
                                                             <property name="position">1</property>
                                                           </packing>
                                                         </child>
@@ -12360,7 +12538,6 @@ YUV (current)</property>
                                                       <packing>
                                                         <property name="expand">False</property>
                                                         <property name="fill">False</property>
-                                                        <property name="padding">6</property>
                                                         <property name="position">0</property>
                                                       </packing>
                                                     </child>
@@ -12395,6 +12572,7 @@ YUV (current)</property>
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">True</property>
                                                     <property name="receives_default">False</property>
+                                                    <property name="has_tooltip">True</property>
                                                     <property name="tooltip" translatable="yes">Switch to sample #B after completing fade.</property>
                                                     <property name="draw_indicator">True</property>
                                                     <signal name="toggled" handler="on_fx_followfade_toggled" />
@@ -12413,19 +12591,75 @@ YUV (current)</property>
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <widget class="GtkSpinButton" id="button_fadedur">
+                                                  <widget class="GtkHBox" id="hbox28">
                                                     <property name="visible">True</property>
-                                                    <property name="can_focus">True</property>
-                                                    <property name="has_tooltip">True</property>
-                                                    <property name="tooltip" translatable="yes">FX Chain fade duration in frames</property>
-                                                    <property name="invisible_char">●</property>
-                                                    <property name="primary_icon_activatable">False</property>
-                                                    <property name="secondary_icon_activatable">False</property>
-                                                    <property name="primary_icon_sensitive">True</property>
-                                                    <property name="secondary_icon_sensitive">True</property>
-                                                    <property name="adjustment">1 0 1 0.050000000745099998 0 0</property>
-                                                    <property name="climb_rate">1</property>
-                                                    <signal name="value_changed" handler="on_button_fadedur_value_changed" />
+                                                    <property name="can_focus">False</property>
+                                                    <child>
+                                                      <widget class="GtkSpinButton" id="button_fadedur">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">True</property>
+                                                        <property name="has_tooltip">True</property>
+                                                        <property name="tooltip" translatable="yes">FX Chain fade duration in frames</property>
+                                                        <property name="invisible_char">●</property>
+                                                        <property name="invisible_char_set">True</property>
+                                                        <property name="primary_icon_activatable">False</property>
+                                                        <property name="secondary_icon_activatable">False</property>
+                                                        <property name="primary_icon_sensitive">True</property>
+                                                        <property name="secondary_icon_sensitive">True</property>
+                                                        <property name="adjustment">1 0 1 0.050000000745099998 0 0</property>
+                                                        <property name="climb_rate">1</property>
+                                                        <signal name="value_changed" handler="on_button_fadedur_value_changed" />
+                                                      </widget>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">True</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                    <child>
+                                                      <widget class="GtkButton" id="button_return">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">True</property>
+                                                        <property name="receives_default">True</property>
+                                                        <property name="has_tooltip">True</property>
+                                                        <property name="tooltip" translatable="yes">Return to previous sample</property>
+                                                        <property name="xalign">0</property>
+                                                        <property name="yalign">0</property>
+                                                        <signal name="clicked" handler="on_button_return_clicked" />
+                                                        <child>
+                                                          <widget class="GtkAlignment" id="alignment24">
+                                                            <property name="visible">True</property>
+                                                            <property name="can_focus">False</property>
+                                                            <property name="xscale">0</property>
+                                                            <property name="yscale">0</property>
+                                                            <child>
+                                                            <widget class="GtkHBox" id="hbox29">
+                                                            <property name="visible">True</property>
+                                                            <property name="can_focus">False</property>
+                                                            <property name="spacing">2</property>
+                                                            <child>
+                                                            <widget class="GtkImage" id="image43">
+                                                            <property name="visible">True</property>
+                                                            <property name="can_focus">False</property>
+                                                            <property name="pixbuf">icon_return.png</property>
+                                                            </widget>
+                                                            <packing>
+                                                            <property name="expand">False</property>
+                                                            <property name="fill">False</property>
+                                                            <property name="position">0</property>
+                                                            </packing>
+                                                            </child>
+                                                            </widget>
+                                                            </child>
+                                                          </widget>
+                                                        </child>
+                                                      </widget>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">1</property>
+                                                      </packing>
+                                                    </child>
                                                   </widget>
                                                   <packing>
                                                     <property name="expand">False</property>
@@ -12437,7 +12671,7 @@ YUV (current)</property>
                                               <packing>
                                                 <property name="expand">False</property>
                                                 <property name="fill">True</property>
-                                                <property name="position">1</property>
+                                                <property name="position">2</property>
                                               </packing>
                                             </child>
                                           </widget>
@@ -12448,9 +12682,6 @@ YUV (current)</property>
                                         <property name="fill">True</property>
                                         <property name="position">0</property>
                                       </packing>
-                                    </child>
-                                    <child>
-                                      <placeholder/>
                                     </child>
                                   </widget>
                                   <packing>
@@ -14299,6 +14530,108 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>

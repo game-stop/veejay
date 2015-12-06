@@ -671,8 +671,8 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 		      frames[0]->height, arg[0]);
 	break;
 	case VJ_VIDEO_EFFECT_MIXTOALPHA:
-		mixtoalpha_apply( frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0]);
-    default:
+		mixtoalpha_apply( frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1]);
+	break;
 	case VJ_VIDEO_EFFECT_MAGICALPHA:
 		overlayalphamagic_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
@@ -735,8 +735,12 @@ static void	vj_effman_apply_job( void *arg )
 {
 	vj_task_arg_t *v = (vj_task_arg_t*) arg;
 
+
 	int entry	 = v->iparams[0];
-	int selector	 = v->iparam;
+	int selector = v->iparams[1];
+
+	int *parameters = &(v->iparams[2]);
+
 	vjp_kf *kf	 = v->ptr;
 	VJFrame frame;
 	VJFrame frame2;
@@ -750,11 +754,11 @@ static void	vj_effman_apply_job( void *arg )
 	if( selector > VJ_VIDEO_EFFECT_MIN )	
 	{
 		vj_task_set_to_frame( &frame2, 1, v->jobnum);
-		vj_effman_apply_video_effect(frames,kf, v->iparams + 1, entry,selector);
+		vj_effman_apply_video_effect(frames,kf,parameters, entry,selector);
 	}
 	else
 	{
-		vj_effman_apply_image_effect( frames,kf,v->iparams + 1,entry, selector);
+		vj_effman_apply_image_effect(frames,kf,parameters, entry, selector);
 	}	
 
 }
@@ -780,12 +784,12 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 		int isP = vj_effect_is_parallel(selector);
 		if( vj_task_available() && isP > 0 ) {
 			vj_task_set_from_frame( frames[0] );
-			vj_task_set_int( selector );
 			vj_task_set_param( entry, 0 );
+			vj_task_set_param( selector, 1);
 			vj_task_set_ptr( (void*) kf );
 			int i;
 			for ( i = 0; i < n_a; i ++ )
-				vj_task_set_param( arguments[i], i + 1 );
+				vj_task_set_param( arguments[i], (i + 2) );
 			
 			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 4, (performer_job_routine) &vj_effman_apply_job );
 		

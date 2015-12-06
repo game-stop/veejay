@@ -43,14 +43,14 @@ vj_effect *masktransition_init(int width, int height)
 	ve->sub_format = 1;
     ve->extra_frame = 1;
   	ve->has_user = 0; 
-	ve->parallel = 0;
+	ve->parallel = 1;
 	ve->alpha = FLAG_ALPHA_SRC_A;
 		 
 	ve->param_description = vje_build_param_list(ve->num_params, "Time Index", "Smooth" );
     return ve;
 }
 
-static void alpha_blend(uint8_t *Y,
+static inline void alpha_blend(uint8_t *Y,
 						const uint8_t *Y2,
 						const uint8_t *AA,
 						size_t w)
@@ -65,7 +65,7 @@ static void alpha_blend(uint8_t *Y,
 
 static inline void expand_lookup_table( uint8_t *AA, const uint8_t *lookup, const uint8_t *aA, const size_t w )
 {
-	size_t j;		
+	size_t j;
 	for( j = 0; j < w; j ++ )
 	{
 		AA[j] = lookup[ aA[j] ];
@@ -73,11 +73,13 @@ static inline void expand_lookup_table( uint8_t *AA, const uint8_t *lookup, cons
 }
 
 
-static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr,
+static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_t *a0,
 									const uint8_t *Y2, const uint8_t *Cb2, const uint8_t *Cr2,
-									const uint8_t *aA, const size_t len, const size_t w, unsigned int time_index, const unsigned int dur )
+									const uint8_t *a1, const size_t len, const size_t w, unsigned int time_index, const unsigned int dur, const int alpha_select )
 {
 	uint8_t lookup[256];
+	const uint8_t *T  = (const uint8_t*) lookup;
+	const uint8_t *aA = (alpha_select == 0 ? a0 : a1);
 	size_t i;
 
 	/* precalc lookup table for vectorization */
@@ -96,70 +98,63 @@ static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr,
 	for( i = 0; i < len; i += w )
 	{
 		/* unroll the lookup table so we can vectorize */
-		expand_lookup_table( AA, lookup, aA + i, w );
+		expand_lookup_table( AA, T, aA + i, w );
 
 		alpha_blend( Y + i, Y2 + i, AA, w );
 		alpha_blend( Cb+ i, Cb2+ i, AA, w );
 		alpha_blend( Cr+ i, Cr2+ i, AA, w );
-
-/*	c equivalent:		
- 
- 		op0 = lookup[ aA[i] ];
-		op1 = 0xff - op0;
-
-		Y[i] = ((op0 * Y[i]) + (op1 * Y2[i])) >> 8;
-		Cb[i]= ((op0 * Cb[i])+ (op1 * Cb2[i]))>> 8;
-		Cr[i]= ((op0 * Cr[i])+ (op1 * Cr2[i]))>> 8; 
-*/
 	}
 }
+
+#define SMOOTH_DEFAULT 256
+#define USE_FROM_A	   0
+#define USE_FROM_B	   1
 
 static void alpha_transition_apply_job( void *arg )
 {
 	vj_task_arg_t *t = (vj_task_arg_t*) arg;
-
 	alpha_blend_transition(
-			t->input[0],t->input[1],t->input[2],
-			t->output[0],t->output[1],t->output[2],
-			t->input[3],
-			t->strides[0],
-			t->width,
-			t->iparam,
-			255
-		);
+		t->input[0],t->input[1],t->input[2], t->input[3],
+		t->output[0],t->output[1],t->output[2], t->output[3],
+		t->strides[0],
+		t->width,
+		t->iparams[0],
+		SMOOTH_DEFAULT,
+		USE_FROM_A
+	);
 }
 
-/* fixme */
 void	alpha_transition_apply( VJFrame *frame, uint8_t *B[4], int time_index )
 {
-/*	if(vj_task_available() ) {
+	if(vj_task_available() ) {
 		vj_task_set_from_frame( frame );
-		vj_task_set_int( time_index );
+		vj_task_set_param( time_index,0 );
 		vj_task_run( frame->data, B, NULL, NULL, 4, (performer_job_routine) &alpha_transition_apply_job );
 	} else { 
-*/
-		VJFrame Bframe;
-		veejay_memcpy(&Bframe,frame,sizeof(VJFrame));
-		Bframe.data[0] = B[0];
-		Bframe.data[1] = B[1];
-		Bframe.data[2] = B[2];
-		Bframe.data[3] = B[3];
-		masktransition_apply( frame, &Bframe,frame->width,frame->height,time_index,255 );
-//	}
+		alpha_blend_transition(
+			frame->data[0],frame->data[1],frame->data[2], frame->data[3],
+			B[0],B[1],B[2],B[3],
+			frame->len,
+			frame->width,
+			time_index,
+			SMOOTH_DEFAULT,
+		    USE_FROM_A
+		);
+	}
 }
-
 
 void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int time_index, int duration  )
 {
 	alpha_blend_transition(
-			frame->data[0],frame->data[1],frame->data[2],
-			frame2->data[0],frame2->data[1],frame2->data[2],
-			frame->data[3],
-			frame->len,
-			frame->width,
-			time_index,
-			duration + 1 );
+		frame->data[0],frame->data[1],frame->data[2],frame->data[3],
+		frame2->data[0],frame2->data[1],frame2->data[2],frame->data[3],
+		frame->len,
+		frame->width,
+		time_index,
+		duration + 1,
+	    USE_FROM_A
+	);
 }
 
 /*
