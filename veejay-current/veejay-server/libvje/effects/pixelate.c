@@ -28,6 +28,9 @@ static uint8_t values[2048];
 vj_effect *pixelate_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+
+	veejay_memset( values, 0, sizeof(values) );
+
     int i;
     int nvalues=0;
 
