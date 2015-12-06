@@ -1188,7 +1188,7 @@ void veejay_pipe_write_status(veejay_t * info)
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
-				*ptr++ = info->sfd; *ptr++ = ' ';
+				ptr = vj_sprintf( info->sfd); *ptr++ = ' ';
 				ptr = vj_sprintf( ptr, mstatus );
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
