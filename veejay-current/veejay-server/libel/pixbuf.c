@@ -127,9 +127,6 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	if( stride != src->stride[0] )
 		src->stride[0] = stride;
 
-	veejay_msg(VEEJAY_MSG_DEBUG,"Image is %dx%d (src=%d, stride=%d, dstfmt=%d), scaling to %dx%d",
-				src->width,src->height,img_fmt, stride,dst_fmt,dst->width,dst->height );
-
 	if(pic->scaler == NULL) {
 		sws_template tmpl;
 		tmpl.flags = 1;
@@ -293,8 +290,7 @@ char	*vj_picture_get_filename( void *pic )
 	return p->filename;
 }
 
-void *	vj_picture_prepare_save(
-	const char *filename, char *type, int out_w, int out_h)
+void *	vj_picture_prepare_save(const char *filename, char *type, int out_w, int out_h)
 {
 #ifdef USE_GDK_PIXBUF
 	if(!type || !filename )
@@ -423,16 +419,13 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 	dest[2] = dest[1] + (out_w * out_h)/4; //@ destination is yuv 4:2:0
 	dest[3] = NULL;
 
-	int dst_fmt = PIX_FMT_YUV420P;
-	switch( frame->format ) {
-		case PIX_FMT_YUVJ420P:
-		case PIX_FMT_YUVJ422P:
-		case PIX_FMT_YUVJ444P:
-			dst_fmt = PIX_FMT_YUVJ420P;
-	}
+	int dst_fmt = PIX_FMT_YUVJ420P;
 
 	VJFrame dst;
 	VJFrame *dst1 = &dst;
+	
+	veejay_memset(dst1,0,sizeof(VJFrame));
+	
 	dst1->data[0] = dest[0];
 	dst1->data[1] = dest[1];
 	dst1->data[2] = dest[2];
@@ -442,6 +435,11 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 	dst1->stride[0] = out_w;
 	dst1->stride[1] = out_w >> 1;
 	dst1->stride[2] = out_w >> 1;
+	dst1->shift_v = 1;
+	dst1->shift_h = 1;
+	dst1->uv_len = (out_w * out_h)/4;
+	dst1->len = (out_w * out_h);
+
 	pic_changed_ = pic_has_changed( out_w,out_h, dst_fmt );
 
 	if(pic_changed_ || pic_scaler_ == NULL )
@@ -466,6 +464,9 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 
 	VJFrame dst;
 	VJFrame *dst1 = &dst;
+
+	veejay_memset(dst1,0,sizeof(VJFrame));
+
 	dst1->data[0] = planes[0];
 	dst1->data[1] = planes[1];
 	dst1->data[2] = planes[2];
@@ -473,8 +474,7 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 	dst1->height = out_h;
 	dst1->format = PIX_FMT_GRAY8;
 	dst1->stride[0] = out_w;
-	dst1->stride[1] = 0;
-	dst1->stride[2] = 0;
+	dst1->len = (out_w * out_h);
 
 	pic_changed_ = pic_has_changed( out_w,out_h, PIX_FMT_GRAY8 );
 
@@ -485,7 +485,6 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 		pic_scaler_ = yuv_init_swscaler( frame,dst1, pic_template_, yuv_sws_get_cpu_flags());
 		update_pic_data( out_w, out_h, PIX_FMT_GRAY8 );
 	}
-
 
 	yuv_convert_and_scale( pic_scaler_, frame, dst1);
 }

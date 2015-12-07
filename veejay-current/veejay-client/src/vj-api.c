@@ -3056,8 +3056,6 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	if( pm != last_pm || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
 	{
 		int k;
-		info->uc.reload_hint[HINT_ENTRY] = 1;
-		info->uc.reload_hint[HINT_CHAIN] = 1;
 		
 		update = 1;
 		update_record_tab( pm );
@@ -3104,6 +3102,8 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		}
 		
 		info->uc.reload_hint[HINT_HISTORY] = 1;
+		info->uc.reload_hint[HINT_CHAIN] = 1;
+		info->uc.reload_hint[HINT_ENTRY] = 1;
 
 		put_text( "entry_samplename", "" );
 		set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
@@ -6175,8 +6175,7 @@ int		veejay_update_multitrack( void *ptr )
 #endif
 	int *history = info->history_tokens[pm];
 
-	for( i = 0; i < STATUS_TOKENS; i ++ )
-		history[i] = info->status_tokens[i];
+	veejay_memcpy( history, info->status_tokens, sizeof(int) * STATUS_TOKENS );
 	
 	for( i = 0; i < s->tracks ; i ++ )
 	{
@@ -6205,7 +6204,6 @@ int		veejay_update_multitrack( void *ptr )
 						g_object_unref(result);
 					}
 				}
-				
 
 				vj_img_cb( s->img_list[i] );
 			} 
@@ -6345,12 +6343,8 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm )
 	{
-		// slot changed
-		if( pm == MODE_SAMPLE || pm == MODE_STREAM )
-		{
-			info->uc.reload_hint[HINT_ENTRY] = 1;	
-			info->uc.reload_hint[HINT_CHAIN] = 1;
-		}
+		info->uc.reload_hint[HINT_ENTRY] = 1;	
+		info->uc.reload_hint[HINT_CHAIN] = 1;
 
 		if( pm != MODE_STREAM )
 			info->uc.reload_hint[HINT_EL] = 1;
@@ -6364,7 +6358,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 
 		select_slot( info->status_tokens[PLAY_MODE] );
 
-		
+				
 #ifdef STRICT_CHECKING
 		if( pm != MODE_PLAIN )
 		assert( info->selected_slot != NULL );
@@ -6599,11 +6593,10 @@ static void	process_reload_hints(int *history, int pm)
 					info->status_tokens[SAMPLE_FX]);
 		}
 	}
-	if( info->uc.reload_hint[HINT_CHAIN] == 1 && pm != MODE_PLAIN)
+	if( info->uc.reload_hint[HINT_CHAIN] == 1 )
 	{
 		load_effectchain_info(); 
 	}
-
 
 	info->parameter_lock = 1;
 	if(info->uc.reload_hint[HINT_ENTRY] == 1 && pm != MODE_PLAIN)
@@ -6649,7 +6642,6 @@ static void	process_reload_hints(int *history, int pm)
 				set_tooltip( param_kfs_[i].text, tt1 );
 				g_free(tt1);
 			}
-			
 		}
 		update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);	
 
@@ -6960,16 +6952,14 @@ int	vj_gui_sleep_time( void )
 int	vj_img_cb(GdkPixbuf *img )
 {
 	int i;
-	if( !info->selected_slot || !info->selected_gui_slot )
-	{
-//DM
+	if( !info->selected_slot || !info->selected_gui_slot ) {
 		return 0;
 	}
+
 	int sample_id = info->status_tokens[ CURRENT_ID ];
 	int sample_type = info->status_tokens[ PLAY_MODE ]; 
 	
-	if( info->selected_slot->sample_type != sample_type || info->selected_slot->sample_id !=
-			sample_id ) {
+	if( info->selected_slot->sample_type != sample_type || info->selected_slot->sample_id != sample_id ) {
 		return 0;
 	}
 	if( sample_type == MODE_SAMPLE || sample_type == MODE_STREAM )
@@ -6987,7 +6977,6 @@ int	vj_img_cb(GdkPixbuf *img )
 				slot->pixbuf = NULL;
 			}
 		}
-
 	}
 
 	for( i = 0; i < info->sequence_view->envelope_size; i ++ )

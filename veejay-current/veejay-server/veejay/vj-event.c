@@ -8659,8 +8659,6 @@ void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	)
 	}
 }
 
-
-
 void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap )
 {
 	if( use_bw_preview_ )
@@ -8721,6 +8719,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 	int args[2];
 	int start_from_sample = 1;
 	char cmd[512];
+	char line[512];
 	char *str = NULL;
 	int i,n;
 	P_A(args,str,format,ap);
@@ -8733,7 +8732,6 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 	n = sample_size();
 	if( n > 1 )
 	{
-		char line[400];
 		char *print_buf = get_print_buf(SEND_BUF);
 		for(i=start_from_sample; i <= n; i++)
 		{
@@ -8750,7 +8748,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 				*/
 				sample_get_description( i, description );
 				
-				sprintf(cmd,"%05d%09d%09d%03zu%s",
+				snprintf(cmd,sizeof(cmd),"%05d%09d%09d%03zu%s",
 					i,
 					start_frame,	
 					end_frame,

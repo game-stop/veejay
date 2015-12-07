@@ -295,7 +295,7 @@ int 	vj_tag_get_fader_active(int t1);
 float 	vj_tag_get_fader_val(int t1);
 float 	vj_tag_get_fader_inc(int t1);
 int 	vj_tag_reset_fader(int t1);
-
+void	vj_tag_set_fade_alpha(int t1, int alpha);
 int 	vj_tag_get_effect_status(int s1);
 int 	vj_tag_get_selected_entry(int s1);
 

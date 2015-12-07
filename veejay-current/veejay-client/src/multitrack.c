@@ -423,12 +423,11 @@ static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget 
 static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 {
 	int i;
-	if( pm == MODE_STREAM || MODE_PLAIN || MODE_SAMPLE )
+	if( pm == MODE_STREAM || pm == MODE_PLAIN || pm == MODE_SAMPLE )
 	{
 		if(p->num > 0)
 			gtk_widget_set_sensitive_( GTK_WIDGET( p->toggle ), TRUE );
 		gtk_widget_set_sensitive_( GTK_WIDGET( p->panel ), TRUE );
-
 	}
 
 	if( pm == MODE_STREAM )
@@ -456,7 +455,6 @@ static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 			{
 				gtk_widget_set_sensitive_( GTK_WIDGET( p->buttons[i] ), TRUE );
 			}
-
 		}
 		if( pm == MODE_SAMPLE )
 			gtk_widget_set_sensitive_( GTK_WIDGET( p->sliders_[1] ), TRUE );

@@ -129,8 +129,7 @@ static	void	gvr_close_connection( veejay_track_t *v )
         if(v->status_buffer) free(v->status_buffer);
         if(v->data_buffer) free(v->data_buffer);
 		if(v->tmp_buffer) free(v->tmp_buffer);
- 
-         free(v);
+        free(v);
 		v= NULL;
    }
 }
@@ -385,7 +384,8 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 
 	int expected_len = (v->width * v->height);
 	int srcfmt = PIX_FMT_YUVJ420P; //default
-        if(v->grey_scale) {
+    
+	if(v->grey_scale) {
 		srcfmt = PIX_FMT_GRAY8;
 	}
 	else {
@@ -402,12 +402,11 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 
 	uint8_t *in = v->data_buffer;
-	uint8_t *out = v->tmp_buffer;
 	
 	v->bw = 0;
 	
 	VJFrame *src1 = yuv_yuv_template( in, in + (v->width * v->height), in + (v->width * v->height) + (v->width*v->height)/4,v->width,v->height, srcfmt );
-	VJFrame *dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_BGR24 );
+	VJFrame *dst1 = yuv_rgb_template( v->tmp_buffer, v->width,v->height, PIX_FMT_BGR24 );
 
 	yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );	
 
@@ -577,11 +576,24 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	vt->port_num  = port_num;
 	vt->active   = 1;
 	vt->fd       = fd;
-	vt->preview  = is_button_toggled( "previewtoggle" );
 
 	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * STATUS_LENGTH);
-	vt->data_buffer  = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3) );
-	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4) );
+	if(vt->status_buffer == NULL ) {
+		vj_client_free( fd );
+		return 0;
+	}
+
+	vt->data_buffer = (uint8_t*) vj_calloc( RUP8( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3) );
+	if(vt->data_buffer == NULL ) {
+		vj_client_free( fd );
+		return 0;
+	}
+
+	vt->tmp_buffer = (uint8_t*) vj_calloc( RUP8( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4) );
+	if(vt->tmp_buffer == NULL ) {
+		vj_client_free( fd );
+		return 0;
+	}
 
 	*new_track = track_num;
 
@@ -761,13 +773,17 @@ void		gvr_track_disconnect( void *preview, int track_num )
 
 }
 
-int		gvr_track_configure( void *preview, int track_num, int w, int h )
+int		gvr_track_configure( void *preview, int track_num, int wid, int hei )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
+
+	int w = (wid > MAX_PREVIEW_WIDTH ? MAX_PREVIEW_WIDTH : wid );
+	int h = (hei > MAX_PREVIEW_HEIGHT ? MAX_PREVIEW_HEIGHT : hei );
+
 	if( vp->tracks[track_num] )
 	{
-		vp->tracks[ track_num ]->width   = w;
-		vp->tracks[ track_num ]->height  = h;
+		vp->tracks[ track_num ]->width  = w;
+		vp->tracks[ track_num ]->height = h;
 	}
 
 	vp->track_sync->widths[track_num] = w;
@@ -790,15 +806,15 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	vp->tracks[ track_num ]->preview = status;
 
-	vj_msg(VEEJAY_MSG_INFO, "VeejayGrabber to %s:%d on Track %d %s",
+	vj_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on Track %d %s",
+		vp->tracks[ track_num ]->width,
+		vp->tracks[ track_num ]->height,
 		vp->tracks[ track_num ]->hostname,
 		vp->tracks[ track_num ]->port_num,
 		track_num,
-		(status ? "starts loading images" : "stops loading images") );
+		(status ? "enabled" : "disabled") );
 	return status;
 }
-
-
 
 static GdkPixbuf	**gvr_grab_images(void *preview)
 {
@@ -811,7 +827,8 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 	
 	for( i = 0; i < vp->n_tracks; i ++ )
 	{
-		if( vp->tracks[i] && vp->tracks[i]->active && vp->track_sync->widths[i] > 0 && vp->tracks[i]->preview)
+		if( vp->tracks[i] && vp->tracks[i]->active && vp->track_sync->widths[i] > 0 && vp->tracks[i]->preview &&
+			vp->tracks[i]->tmp_buffer != NULL )
 		{
 			list[i] =gdk_pixbuf_new_from_data(vp->tracks[i]->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,	
 				8,vp->tracks[i]->width,vp->tracks[i]->height,
@@ -993,39 +1010,39 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 		score ++;
 	}
 
-	if( v->preview )
+	v->preview = is_button_toggled( "previewtoggle" );
+
+	if( gvr_preview_process_image( vp,v ))
+		score++;
+	else
 	{
-		if( gvr_preview_process_image( vp,v ))
-			score++;
+		vj_client_close(v->fd);
+    	int ok = vj_client_connect( v->fd, v->hostname, NULL, v->port_num );
+		if( ok <= 0 )
+		{
+			veejay_msg(0, "VeejayGrabber: Unable to reconnect to %s, Destroying Track %d",
+				(v->hostname ? v->hostname : "<unknown>"),
+				track_num );
+			vj_client_free(v->fd);
+			if(v->hostname) free(v->hostname);
+     		if(v->status_buffer) free(v->status_buffer);
+			if(v->data_buffer) free(v->data_buffer);
+			if(v->tmp_buffer) free(v->tmp_buffer);
+			v->data_buffer = NULL;
+			v->tmp_buffer = NULL;
+			vp->tracks[track_num] = NULL;			
+			
+			if(  v->is_master )
+				reloaded_schedule_restart();
+			free(v);
+		}
 		else
 		{
-		        v->preview = 0;
-			vj_client_close(v->fd);
-    		 	int ok = vj_client_connect( v->fd, v->hostname, NULL, v->port_num );
-			if( ok <= 0 )
-			{
-				veejay_msg(0, "VeejayGrabber: Unable to reconnect to %s, Destroying Track %d",
-					(v->hostname ? v->hostname : "<unknown>"),
-					track_num );
-				vj_client_free(v->fd);
-				if(v->hostname) free(v->hostname);
-       			if(v->status_buffer) free(v->status_buffer);
-				if(v->data_buffer) free(v->data_buffer);
-				if(v->tmp_buffer) free(v->tmp_buffer);
-				vp->tracks[track_num] = NULL;			
-				if(  v->is_master )
-					reloaded_schedule_restart();
-				free(v);
-			}
-			else
-			{
-				v->preview = is_button_toggled( "previewtoggle");
-				v->active = 1;
-  				vj_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: %s:%d  track %d@%dx%d preview: %s", 
-					v->hostname, v->port_num, track_num, v->width,v->height, (v->preview ? "yes" : "no"));
-			} 
-		}
-
+			v->preview = is_button_toggled( "previewtoggle");
+			v->active = 1;
+  			vj_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: %s:%d  track %d@%dx%d preview: %s", 
+				v->hostname, v->port_num, track_num, v->width,v->height, (v->preview ? "yes" : "no"));
+		} 
 	}
 
 	return score;
@@ -1049,13 +1066,12 @@ void		gvr_veejay_grabber_step( void *data )
 		}
 	}
 
-	long ttw = 0;
 	for( i = 0; i < vp->n_tracks ; i ++ )
 	{
 		if( vp->tracks[i] && vp->tracks[i]->active) 
 		{
 			if( vp->tracks[i] )
-				ttw += gvr_veejay( vp, vp->tracks[i],i );	
+				gvr_veejay( vp, vp->tracks[i],i );	
 		}
 	}
 

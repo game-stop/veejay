@@ -108,9 +108,9 @@ void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 
 	if (!cnreverse) {
 		vj_frame_copy( src->data, dest, strides ); 
-    	} else {
+    } else {
 		vj_frame_copy( dest, src->data, strides );
-    	}
+   	}
 
 	if (cnreverse)
 		cnframe--;

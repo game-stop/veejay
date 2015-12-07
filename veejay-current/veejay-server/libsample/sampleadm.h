@@ -323,7 +323,7 @@ extern void sample_set_fade_entry(int t1, int entry);
 extern void sample_set_fade_method(int t1, int method );
 extern int sample_reset_offset(int s1);
 extern int sample_get_fade_method(int t1);
-
+extern void sample_set_fade_alpha(int t1, int alpha);
 extern int sample_get_effect_status(int s1);
 extern int sample_get_selected_entry(int s1);
 

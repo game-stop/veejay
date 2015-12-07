@@ -63,6 +63,8 @@
 #include <libresample/resample.h>
 
 #define PERFORM_AUDIO_SIZE 16384
+#define PSLOW_A 3
+#define PSLOW_B 4
 
 #ifndef SAMPLE_FMT_S16
 #define SAMPLE_FMT_S16 AV_SAMPLE_FMT_S16
@@ -99,8 +101,8 @@ static long performer_frame_size_ = 0;
 
 extern int pixel_Y_lo_;
 
-static	varcache_t	pvar_;
-static	void		*lzo_;
+static varcache_t pvar_;
+static void	*lzo_;
 static VJFrame *crop_frame = NULL;
 static VJFrame *rgba_frame[2] = { NULL };
 static VJFrame *yuva_frame[2] = { NULL };
@@ -631,7 +633,7 @@ static void vj_perform_record_buffer_free()
 
 int vj_perform_init(veejay_t * info)
 {
-	#define PRIMARY_FRAMES 8
+	#define PRIMARY_FRAMES 5
 	const int w = info->video_output_width;
 	const int h = info->video_output_height;
 
@@ -1031,15 +1033,14 @@ void vj_perform_free(veejay_t * info)
 
 	free(rgba_frame[0]);
 	free(rgba_frame[1]);
-
 }
 
 int vj_perform_preview_max_width() {
-		return preview_max_w;
+	return preview_max_w;
 }
 
 int vj_perform_preview_max_height() {
-		return preview_max_h;
+	return preview_max_h;
 }
 
 int vj_perform_audio_start(veejay_t * info)
@@ -1079,9 +1080,9 @@ void vj_perform_audio_stop(veejay_t * info)
 {
     if (info->edit_list->has_audio) {
 #ifdef HAVE_JACK
-	vj_jack_stop();
+		vj_jack_stop();
 #endif
-	info->audio = NO_AUDIO;
+		info->audio = NO_AUDIO;
     }
 }
 
@@ -1092,20 +1093,9 @@ void vj_perform_get_primary_frame(veejay_t * info, uint8_t ** frame)
     frame[2] = primary_buffer[info->out_buf]->Cr;
 }
 
-uint8_t	*vj_perform_get_a_work_buffer( )
-{
-	return primary_buffer[4]->Y;
-}
-void vj_perform_get_space_buffer( uint8_t *d[4] )
-{
-        d[0] = primary_buffer[5]->Y;
-	d[1] = primary_buffer[5]->Cb;
-	d[2] = primary_buffer[5]->Cr;
-}
-
 uint8_t *vj_perform_get_preview_buffer()
 {
-		return preview_buffer->Y;
+	return preview_buffer->Y;
 }
 
 void	vj_perform_get_output_frame( uint8_t **frame )
@@ -1534,12 +1524,11 @@ static int vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, VJFrame
 	{
 		int c = centry - 1;
 		int len2 = ( frame_buffer[c]->ssm == 1 ? len1 : info->effect_frame2->uv_len );
-		vj_perform_copy( primary_buffer[c], frame_buffer[chain_entry], len1, len2,info->effect_frame1->stride[3] * info->effect_frame1->height );
+		vj_perform_copy( frame_buffer[c], frame_buffer[chain_entry], len1, len2,info->effect_frame1->stride[3] * info->effect_frame1->height );
 		frame_buffer[chain_entry]->ssm = frame_buffer[c]->ssm;
    	 }
 	return frame_buffer[chain_entry]->ssm;
 }
-
 
 static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_sample,int chain_entry)
 
@@ -2009,10 +1998,10 @@ static	int	vj_perform_get_feedback_frame(veejay_t *info, VJFrame *src, VJFrame *
 			}
 
 			uint8_t *pri7[4] = {
-				primary_buffer[7]->Y,
-				primary_buffer[7]->Cb,
-				primary_buffer[7]->Cr,
-				primary_buffer[7]->alpha
+				primary_buffer[4]->Y,
+				primary_buffer[4]->Cb,
+				primary_buffer[4]->Cr,
+				primary_buffer[4]->alpha
 			};
 
 			vj_frame_copy( pri7, dst->data, strides );
@@ -2636,27 +2625,26 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 	frame.data[2] = primary_buffer[0]->Cr;
 	frame.data[3] = primary_buffer[0]->alpha;
 
-	uint8_t *p0_buffer[4] = {
-		primary_buffer[7]->Y,
-		primary_buffer[7]->Cb,
-		primary_buffer[7]->Cr,
-		primary_buffer[7]->alpha };
+	uint8_t *p0_buffer[PSLOW_B] = {
+		primary_buffer[PSLOW_B]->Y,
+		primary_buffer[PSLOW_B]->Cb,
+		primary_buffer[PSLOW_B]->Cr,
+		primary_buffer[PSLOW_B]->alpha };
 
 	uint8_t *p1_buffer[4]= {
-		primary_buffer[4]->Y,
-		primary_buffer[4]->Cb,
-		primary_buffer[4]->Cr,
-		primary_buffer[4]->alpha };
+		primary_buffer[PSLOW_A]->Y,
+		primary_buffer[PSLOW_A]->Cb,
+		primary_buffer[PSLOW_A]->Cr,
+		primary_buffer[PSLOW_A]->alpha };
 
 	if( info->settings->feedback && info->settings->feedback_stage > 1 )
 	{
-		int 	strides[4] = { 
+		int strides[4] = { 
 			frame.len,
 			(frame.ssm == 1 ? frame.len : frame.uv_len ),
 			(frame.ssm == 1 ? frame.len : frame.uv_len ),
 			frame.stride[3] * frame.height
 		};
-
 		vj_frame_copy(feedback_buffer,frame.data,strides);
 		return;
 	}
@@ -3881,7 +3869,6 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 
 	return 0;
 }
-
 
 static int track_dup = 0;
 void	vj_perform_randomize(veejay_t *info)
