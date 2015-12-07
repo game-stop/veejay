@@ -10,7 +10,7 @@ While playing, you can record the resulting video directly to disk (video sampli
 
 You can cluster to allow a number of machines to work together over the network (uncompressed streaming, veejay chaining) And much more...
 
-The engine is historically based upon mjpegtools's lavplay and processes all video in YUV planar It performs at its best, currently with MJPEG AVI (through ffmpeg) or one of veejay's internal formats. Veejay is built upon a servent architecture.
+The engine is historically based upon mjpegtools's lavplay and processes all video in YUV planar It performs at its best, currently with MJPEG AVI (through ffmpeg/libav) or one of veejay's internal formats. Veejay is built upon a servent architecture.
 
 ###Thin Clients to Veejay:
 * __Reloaded__
