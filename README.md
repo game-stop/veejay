@@ -1,11 +1,24 @@
-Veejay
-======
+![Veejay!](http://veejayhq.net/img/header.png)
+
+##Veejay Is A Visual Instrument
 
 *a 'visual' instrument and realtime video sampler*
 
-Veejay is a visual instrument and real-time video sampler.
 It allows you to "play" the video like you would play a piano.
-While playing, you can record the resulting video directly to disk (video sampling).
+
+While playing, you can record the resulting video directly to disk (video sampling), all effects are realtime and optimized for use on modern processors, Veejay likes the sound of your video's as much as their images: sound is kept in sync ( pitched when needed - trickplay) and delivered to JACK for possible further processing.
+
+You can cluster to allow a number of machines to work together over the network (uncompressed streaming, veejay chaining) And much more...
+
+The engine is historically based upon mjpegtools's lavplay and processes all video in YUV planar It performs at its best, currently with MJPEG AVI (through ffmpeg) or one of veejay's internal formats. Veejay is built upon a servent architecture.
+
+###Thin Clients to Veejay:
+* __Reloaded__
+    A GUI developed in GLADE/GTK
+* __sayVIMS__
+    A PureData object allowing direct communications with the server
+* __sendVIMS__
+    A console based utility for quick'n'dirty scripting
 
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
 
