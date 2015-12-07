@@ -121,6 +121,8 @@ void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 		if (no_reverse == 0) {
 		    cnreverse = 1;
 		    cnframe = n - 1;
+			if(cnframe < 0 )
+				cnframe = 0;
 		} else {
 		    cnframe = 0;
 		}

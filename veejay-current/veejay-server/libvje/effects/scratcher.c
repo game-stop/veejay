@@ -112,6 +112,8 @@ void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 		if (no_reverse == 0) {
 		    nreverse = 1;
 		    nframe = n - 1;
+			if(nframe < 0)
+				nframe = 0;
 		} else {
 		    nframe = 0;
 		}

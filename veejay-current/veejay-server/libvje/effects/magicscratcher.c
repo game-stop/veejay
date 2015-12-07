@@ -91,6 +91,8 @@ void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
 	if (no_reverse == 0) {
 	    m_reverse = 1;
 	    m_frame = n - 1;
+		if(m_frame < 0 )
+			m_frame = 0;
 	} else {
 	    m_frame = 0;
 	}
