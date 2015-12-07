@@ -20,6 +20,19 @@ The engine is historically based upon mjpegtools's lavplay and processes all vid
 * __sendVIMS__
     A console based utility for quick'n'dirty scripting
 
+---
+```
+                 _             _                            _   
+                (_)           | |                          | |  
+ __   _____  ___ _  __ _ _   _| |__   __ _       _ __   ___| |_ 
+ \ \ / / _ \/ _ | |/ _` | | | | '_ \ / _` |     | '_ \ / _ | __|
+  \ V |  __|  __| | (_| | |_| | | | | (_| |  _  | | | |  __| |_ 
+   \_/ \___|\___| |\__,_|\__, |_| |_|\__, | (_) |_| |_|\___|\__|
+               _/ |       __/ |         | |                     
+              |__/       |___/          |_|                                      http://veejayhq.net
+```
+---
+
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
 
 ## Installation
