@@ -3316,12 +3316,12 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	}
 
 
-/*	if( pm == MODE_SAMPLE|| pm == MODE_STREAM )
+	if( pm == MODE_SAMPLE|| pm == MODE_STREAM )
 	if( history[CHAIN_FADE] != info->status_tokens[CHAIN_FADE] )
 	{
 		double val = (double) info->status_tokens[CHAIN_FADE];	
 		update_slider_value( "manualopacity", val,0 );
-	} */
+	}
 
 	if( fx_anim ) {
 		set_toggle_button("kf_none",1);
