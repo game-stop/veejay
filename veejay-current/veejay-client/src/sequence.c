@@ -445,6 +445,9 @@ static int fail_connection	 = 0;
 static int continue_anyway       = 0;
 static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 {
+	if( v->preview == 0 )
+		return 1;
+
 	int n = veejay_get_image_data( vp, v );
        
 	if(n == 0 ) {
