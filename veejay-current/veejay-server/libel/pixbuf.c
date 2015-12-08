@@ -338,7 +338,7 @@ static	void	vj_picture_out_cleanup( vj_pixbuf_out_t *pic )
 }
 
 static	void	*pic_scaler_ = NULL;
-static   int	 pic_data_[3] = { 0,0,0};
+static   int	 pic_data_[3] = { 0,0,0,0};
 static   int	 pic_changed_ = 0;
 static	sws_template	*pic_template_ = NULL;
 
@@ -351,6 +351,8 @@ void	vj_picture_init( void *templ )
 
 	pic_template_ = (sws_template*) templ;
 	pic_template_->flags = yuv_which_scaler();
+	pic_changed_ = 1;
+	pic_scaler_ = NULL;
 }
 
 int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
@@ -411,21 +413,28 @@ void		vj_picture_free()
 #define	pic_has_changed(a,b,c) ( (a == pic_data_[0] && b == pic_data_[1] && c == pic_data_[2] ) ? 0: 1)
 #define update_pic_data(a,b,c) { pic_data_[0] = a; pic_data_[1] = b; pic_data_[2] = c;}
 
+uint8_t val = 0;
 void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
 {
-	uint8_t *dest[4];	
-	dest[0] = vj_perform_get_preview_buffer();
-	dest[1] = dest[0] + (out_w * out_h);
-	dest[2] = dest[1] + (out_w * out_h)/4; //@ destination is yuv 4:2:0
-	dest[3] = NULL;
-
 	int dst_fmt = PIX_FMT_YUVJ420P;
+	uint8_t *dest[4];	
+	VJFrame src;
+	VJFrame *src1 = &src;
 
 	VJFrame dst;
 	VJFrame *dst1 = &dst;
+
+	dest[0] = vj_perform_get_preview_buffer();
+	dest[1] = dest[0] + (out_w * out_h);
+	dest[2] = dest[1] + (out_w * out_h)/4;
+	dest[3] = NULL;
 	
 	veejay_memset(dst1,0,sizeof(VJFrame));
-	
+	veejay_memcpy( src1, frame,sizeof(VJFrame));
+
+	src1->format = (frame->ssm == 1 ? PIX_FMT_YUVJ444P : PIX_FMT_YUVJ422P );
+	src1->stride[3] = 0;
+
 	dst1->data[0] = dest[0];
 	dst1->data[1] = dest[1];
 	dst1->data[2] = dest[2];
@@ -446,26 +455,31 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 	{
 		if(pic_scaler_)
 			yuv_free_swscaler( pic_scaler_ );
-		pic_scaler_ = yuv_init_swscaler( frame,dst1, pic_template_, yuv_sws_get_cpu_flags());
+		pic_scaler_ = yuv_init_swscaler( src1,dst1, pic_template_, yuv_sws_get_cpu_flags());
 		update_pic_data( out_w, out_h, dst_fmt );
 	}
 
-	yuv_convert_and_scale( pic_scaler_, frame,dst1);
+	yuv_convert_and_scale( pic_scaler_, src1,dst1);
 }
 
 void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
 {
 	uint8_t *planes[4]; 
-		
+	VJFrame dst;
+	VJFrame *dst1 = &dst;
+	VJFrame src;
+	VJFrame *src1 = &src;
+	
 	planes[0] = vj_perform_get_preview_buffer();
 	planes[1] = planes[0] + (out_w * out_h );
 	planes[2] = planes[1] + (out_w * out_h/4 );
 	planes[3] = NULL;
 
-	VJFrame dst;
-	VJFrame *dst1 = &dst;
-
 	veejay_memset(dst1,0,sizeof(VJFrame));
+	veejay_memcpy( src1, frame,sizeof(VJFrame));
+
+	src1->format = (frame->ssm == 1 ? PIX_FMT_YUVJ444P : PIX_FMT_YUVJ422P );
+	src1->stride[3] = 0;
 
 	dst1->data[0] = planes[0];
 	dst1->data[1] = planes[1];
@@ -482,10 +496,10 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 	{
 		if(pic_scaler_)
 			yuv_free_swscaler( pic_scaler_ );
-		pic_scaler_ = yuv_init_swscaler( frame,dst1, pic_template_, yuv_sws_get_cpu_flags());
+		pic_scaler_ = yuv_init_swscaler( src1,dst1, pic_template_, yuv_sws_get_cpu_flags());
 		update_pic_data( out_w, out_h, PIX_FMT_GRAY8 );
 	}
 
-	yuv_convert_and_scale( pic_scaler_, frame, dst1);
+	yuv_convert_and_scale( pic_scaler_, src1, dst1);
 }
 
