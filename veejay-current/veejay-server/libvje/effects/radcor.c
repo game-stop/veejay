@@ -179,7 +179,7 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 
 	if( alpha) {
 		for( i = 0; i < len; i ++ ) {
-			A[i * width + j ] = Ai[ Map[i * width + j] ];
+			A[i] = Ai[ Map[i] ];
 		}
 	}
 

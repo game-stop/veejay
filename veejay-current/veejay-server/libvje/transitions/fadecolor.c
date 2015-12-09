@@ -58,7 +58,7 @@ void colorfade_apply(VJFrame *frame, int width, int height, int opacity,
     unsigned int i, op0, op1;
     unsigned int len = width * height;
     uint8_t colorCb = 128, colorCr = 128;
-    uint8_t colorY;
+    uint8_t colorY=0;
     const int uv_len = frame->uv_len;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];

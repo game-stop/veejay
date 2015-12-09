@@ -84,9 +84,6 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 
 	num_videos = film_length;
 
-	uint8_t val = 0;
-//	int inc = num_videos % 255;
-
 	for ( i = 0; i < num_videos; i ++ )
 	{
 		video_list[i] = vj_calloc(sizeof(picture_t));
@@ -101,7 +98,6 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 				return 0;
 			veejay_memset(video_list[i]->data[j], (j==0 ? pixel_Y_lo_ : 128), picture_width *picture_height );
 		}
-	//	val+= inc;
 	}
 	frame_counter = 0;
 

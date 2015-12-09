@@ -131,7 +131,6 @@ static inline int frei0r_param_set_double(f0r_set_param_value_f q,void *plugin, 
 static inline int frei0r_param_get_bool(f0r_get_param_value_f q, void *plugin, int seq_no)
 {
 	double b;
-	f0r_param_t param;
 	(*q)( plugin, (void **) &b, seq_no );
 	if( b!= 0.0 && b!=1. ) {
 		b = 0.0;

@@ -106,7 +106,7 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 	uint8_t *Cr = frame->data[2];
 	uint8_t U;
 	uint8_t V;
-	int	y,u,v;
+	int	y=0,u=128,v=128;
  	const float cb_mul = 0.492;
 	const float cr_mul = 0.877;
 	

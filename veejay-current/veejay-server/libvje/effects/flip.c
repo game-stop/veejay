@@ -20,8 +20,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
+#include "common.h"
 #include "flip.h"
-#include <stdlib.h>
 vj_effect *flip_init(int w, int h)
 {
 

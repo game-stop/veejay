@@ -75,7 +75,6 @@ static int n__ = 0;
 static int N__ = 0;
 int bathroom_malloc(int width, int height)
 {
-	int i;
    	bathroom_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height * 4));
 	if(!bathroom_frame[0])
 		return 0;

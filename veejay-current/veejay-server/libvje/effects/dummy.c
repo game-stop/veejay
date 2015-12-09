@@ -66,9 +66,9 @@ void dummy_apply( VJFrame *frame, int width, int height, int color)
 
 void dummy_rgb_apply( VJFrame *frame, int width, int height, int r,int g, int b)
 {
-    	const int len = frame->len;
+   	const int len = frame->len;
 	const int uv_len = frame->uv_len;
-	int colorCb, colorCr, colorY;
+	int colorCb=128, colorCr=128, colorY=0;
 
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

@@ -837,8 +837,6 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 
 void	plug_print_all()
 {
-	int n;
-	int x=0;
 	/*for(n = 0; n < index_ ; n ++ )
 	{
 		char *fx_name = plug_get_name(n);

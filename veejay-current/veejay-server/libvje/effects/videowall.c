@@ -60,7 +60,6 @@ vj_effect *videowall_init(int w, int h)
 static picture_t **photo_list = NULL;
 static int	   num_photos = 0;
 static int	  frame_counter = 0;
-static int	  frame_delay = 0;
 static int	  *offset_table_x = NULL;
 static int	  *offset_table_y = NULL;
 

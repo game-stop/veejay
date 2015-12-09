@@ -80,7 +80,7 @@ void alphaselect_apply( VJFrame *frame, int width,
 		   int height, int i_angle, int r, int g,
 		   int b, int swap)
 {
-    int8_t *fg_cb, *fg_cr;
+    uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
     int cb, cr;
     float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
@@ -91,7 +91,7 @@ void alphaselect_apply( VJFrame *frame, int width,
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	uint8_t *A  = frame->data[3];
-	int iy,iu,iv;
+	int iy=0,iu=128,iv=128;
 	
 	_rgb2yuv(r,g,b,iy,iu,iv);
 	_y = (float) iy;

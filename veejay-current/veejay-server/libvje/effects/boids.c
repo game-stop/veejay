@@ -160,7 +160,6 @@ static void	blob_init_( blob_t *b , int blob_id, int w , int h)
 int	boids_malloc(int w, int h)
 {
 	int j,i;
-	double frac;
 	int dist_sqrt;
 
 	if(blob_radius_ <= 0)
@@ -190,7 +189,6 @@ int	boids_malloc(int w, int h)
 			dist_sqrt = i * i + j * j;
 			if( dist_sqrt < blob_sradius_ )
 			{
-				frac = (double) (sqrt(dist_sqrt)) / (double) blob_sradius_;
 				blob_[i + blob_radius_][j + blob_radius_] = 0xff;
 			}
 			else

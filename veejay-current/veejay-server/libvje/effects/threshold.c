@@ -94,7 +94,6 @@ void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int
 	uint8_t *Cb2=frame2->data[1];
 	uint8_t *Cr2=frame2->data[2];
 
-	uint8_t *bmap = binary_img;
 	int len = frame->len;
 	softblur_apply( frame, width,height,0 );
 
