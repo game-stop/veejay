@@ -23,15 +23,18 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <sched.h>
+
 #include <gtk/gtk.h>
 #include <glib.h>
 #include <glade/glade.h>
+
 #include <veejay/vevo.h>
 #include <veejay/vjmem.h>
 #include <veejay/vj-msg.h>
 #include <veejay/libvevo.h>
 #include <src/vj-api.h>
-#include <sched.h>
+
 
 static int selected_skin = 0;
 extern int	mt_get_max_tracks();

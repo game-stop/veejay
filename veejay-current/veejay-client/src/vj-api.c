@@ -27,6 +27,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sysexits.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <stdarg.h>
@@ -4586,12 +4587,12 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 {
 	gint offset=0;	
 	int n_slots = 0;
-	reset_tree( "tree_sources" );
 	if( cali_onoff == 1 )
 		reset_tree( "cali_sourcetree");
 
 	if( with_reset_slotselection ) {
 		reset_samplebank();
+		reset_tree( "tree_sources" );
 	}
 
 	char line[300];
@@ -4599,6 +4600,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	char descr[255];
 
 	int load_from = (info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[ SAMPLE_INV_COUNT ] : info->status_tokens[ SAMPLE_COUNT ] );
+	if( load_from < 0 ) {
+		load_from = 0;
+	}
 
 	multi_vims( VIMS_SAMPLE_LIST,"%d", (with_reset_slotselection ? 0 : load_from) );
 	gint fxlen = 0;
@@ -4636,12 +4640,13 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 					{
 						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,int_id,0, title,timecode );
 						add_sample_to_sample_banks(bank_page, tmp_slot );					
+						add_sample_to_effect_sources_list( int_id,0, title, timecode);
+
 						free_slot(tmp_slot);	
 						n_slots ++;		
 
 						if( !disable_sample_image ) 
 							veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
-			
 					}
 					else
 					{
@@ -4663,6 +4668,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	fxlen = 0;
 
 	load_from = (info->status_tokens[PLAY_MODE] == MODE_STREAM ? info->status_tokens[ SAMPLE_COUNT ] : info->status_tokens[ SAMPLE_INV_COUNT ] );
+	if( load_from < 0 ) {
+		load_from = 0;
+	}
 
 	multi_vims( VIMS_STREAM_LIST,"%d",(with_reset_slotselection ? 0 : load_from) );
 	fxtext = recv_vims(5, &fxlen);
@@ -4694,19 +4702,17 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				strncpy( descr, line + 22, values[6] );
 				switch( values[1] )
 				{
-					case STREAM_CALI	:snprintf(source,sizeof(source),"calibrate %d",values[0]);
-								 break;
-					case STREAM_VIDEO4LINUX :snprintf(source,sizeof(source),"capture %d",values[0]);break;
-					case STREAM_WHITE	:snprintf(source,sizeof(source),"solid %d",values[0]); 
-								 break;
-					case STREAM_MCAST	:snprintf(source,sizeof(source),"multicast %d",values[0]);break;
-					case STREAM_NETWORK	:snprintf(source,sizeof(source),"unicast %d",values[0]);break;
-					case STREAM_YUV4MPEG	:snprintf(source,sizeof(source),"y4m %d",values[0]);break;
-					case STREAM_DV1394	:snprintf(source,sizeof(source),"dv1394 %d",values[0]);break;
-					case STREAM_PICTURE	:snprintf(source,sizeof(source),"image %d",values[0]);break;
-					case STREAM_GENERATOR   :snprintf(source,sizeof(source),"Z%d",values[0]);break;
+					case STREAM_CALI: snprintf(source,sizeof(source),"calibrate %d",values[0]);break;
+					case STREAM_VIDEO4LINUX: snprintf(source,sizeof(source),"capture %d",values[0]);break;
+					case STREAM_WHITE: snprintf(source,sizeof(source),"solid %d",values[0]);break;
+					case STREAM_MCAST: snprintf(source,sizeof(source),"multicast %d",values[0]);break;
+					case STREAM_NETWORK: snprintf(source,sizeof(source),"unicast %d",values[0]);break;
+					case STREAM_YUV4MPEG: snprintf(source,sizeof(source),"y4m %d",values[0]);break;
+					case STREAM_DV1394: snprintf(source,sizeof(source),"dv1394 %d",values[0]);break;
+					case STREAM_PICTURE: snprintf(source,sizeof(source),"image %d",values[0]);break;
+					case STREAM_GENERATOR: snprintf(source,sizeof(source),"Z%d",values[0]);break;
 					default:
-						snprintf(source,sizeof(source),"??? %d", values[0]);	
+						snprintf(source,sizeof(source),"??? %d", values[0]); break;	
 				}
 				gchar *gsource = _utf8str( descr );
 				gchar *gtype = _utf8str( source );
@@ -4721,7 +4727,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 					if( info->sample_banks[bank_page]->slot[poke_slot] <= 0 )
 					{				
 						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],1, gtype,gsource );
-						add_sample_to_sample_banks(bank_page, tmp_slot );											     n_slots ++;
+						add_sample_to_sample_banks(bank_page, tmp_slot );
+				   		add_sample_to_effect_sources_list( values[0], values[1],gsource,gtype);
+						n_slots ++;
 						free_slot(tmp_slot);
 					}
 					else
@@ -4740,8 +4748,6 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	if(fxtext) free(fxtext);
 
 	select_slot( info->status_tokens[PLAY_MODE] );
-
-
 }
 
 gboolean
@@ -7077,6 +7083,29 @@ static void reloaded_sighandler(int x)
 		exit(0);
 	}
 }
+static void	veejay_backtrace_handler(int n , siginfo_t *si, void *ptr)
+{
+	switch(n) {
+		case SIGSEGV:
+			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system."); //@ Suggested by Matthijs
+			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge."); //@
+			veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision..."); //@
+
+			veejay_print_backtrace();
+			break;
+		default:
+			veejay_print_backtrace();
+			break;
+	}
+
+	//@ Bye
+	veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");
+
+	report_bug();
+
+	exit(EX_SOFTWARE);
+}
+
 static void	sigsegfault_handler(void) {
 	struct sigaction sigst;
 	sigst.sa_sigaction = veejay_backtrace_handler;
@@ -8604,14 +8633,16 @@ static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, 
 	GtkTreeIter iter;	
 
 	if (type == STREAM_NO_STREAM) 
-		sprintf( id_string, "S[%4d] %s", id, title);    
-	else sprintf( id_string, "T[%4d]", id);
+		snprintf( id_string,sizeof(id_string), "S[%4d] %s", id, title);    
+	else
+		snprintf( id_string,sizeof(id_string), "T[%4d]", id);
 
 	gtk_list_store_append( effect_sources_store, &iter );
 	gtk_list_store_set( effect_sources_store, &iter, SL_ID, id_string, SL_DESCR, title, SL_TIMECODE , timecode,-1 );
 
 	GtkTreeIter iter2;
-	if(type == 1 && strncmp("bogus",title, 7)==0) {
+	if(type == STREAM_NO_STREAM)
+	{
 		gtk_list_store_append( cali_sourcestore,&iter2);
 		gtk_list_store_set( cali_sourcestore,&iter2,SL_ID, id_string,SL_DESCR,title,SL_TIMECODE,timecode,-1);
 	}
@@ -8641,7 +8672,6 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 		vevo_property_set( bankport_, sample_key, VEVO_ATOM_TYPE_VOIDPTR,1, &slot );
 		snprintf(sample_key,sizeof(sample_key), "G%04d%02d", sample_id, sample_type );
 		vevo_property_set( bankport_, sample_key, VEVO_ATOM_TYPE_VOIDPTR,1,&gui_slot);
-		add_sample_to_effect_sources_list(sample_id, sample_type, title, timecode);
 	}
 
 	if(gui_slot)
