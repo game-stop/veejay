@@ -2,9 +2,9 @@
 
 ##Veejay Is A Visual Instrument
 
-*a 'visual' instrument and realtime video sampler*
+*a 'visual' instrument and realtime video sampler (for live video improvisation)*
 
-It allows you to "play" the video like you would play a piano.
+It allows you to "play" the video like you would play a piano
 
 While playing, you can record the resulting video directly to disk (video sampling), all effects are realtime and optimized for use on modern processors, Veejay likes the sound of your video's as much as their images: sound is kept in sync ( pitched when needed - trickplay) and delivered to JACK for possible further processing.
 
@@ -12,7 +12,7 @@ You can cluster to allow a number of machines to work together over the network 
 
 The engine is historically based upon mjpegtools's lavplay and processes all video in YUV planar It performs at its best, currently with MJPEG AVI (through ffmpeg/libav) or one of veejay's internal formats. Veejay is built upon a servent architecture.
 
-###Thin Clients to Veejay:
+###Veejay Applications:
 * __Reloaded__
     A GUI developed in GLADE/GTK
 * __sayVIMS__
@@ -20,32 +20,18 @@ The engine is historically based upon mjpegtools's lavplay and processes all vid
 * __sendVIMS__
     A console based utility for quick'n'dirty scripting
 
----
-```
-                 _             _                            _   
-                (_)           | |                          | |  
- __   _____  ___ _  __ _ _   _| |__   __ _       _ __   ___| |_ 
- \ \ / / _ \/ _ | |/ _` | | | | '_ \ / _` |     | '_ \ / _ | __|
-  \ V |  __|  __| | (_| | |_| | | | | (_| |  _  | | | |  __| |_ 
-   \_/ \___|\___| |\__,_|\__, |_| |_|\__, | (_) |_| |_|\___|\__|
-               _/ |       __/ |         | |                     
-              |__/       |___/          |_|                                      http://veejayhq.net
-```
----
-
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
 
 ## Installation
 
-Veejay is divided into multiple packages:
+Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
 1. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server)
-1. [veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client)
-1. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
-1. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
+2. [veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client)
+3. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
+4. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
 
 For each package, run confgure and make:
-
 
 ```bash
  ./autogen.sh
@@ -56,7 +42,7 @@ For each package, run confgure and make:
 If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. If you don't now what cpu veejay will be running on , pass `--with-arch-target=auto` to configure.
 
 
-Before running veejay, be sure to add/link some TrueType fonts in 
+Before running veejay, be sure to add or link some TrueType fonts in 
 
     $HOME/.veejay/fonts
 
@@ -84,18 +70,25 @@ reloaded
 
 ## Building/Configuring plugins
 
-Plugins enable additional video effects from various external sources.
-to build plugins.
+There are several plugin-packs available for veejay: https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs 
 
-GMIC plugins:
+* lvdcrop ; a couple of crop filters and a port of frei0r's scale0tilt 
+* lvdshared ; a couple of plugins that implement a producer/consumer mechanism for shared video resources
+* lvdgmic ; a couple of GMIC based filters, although slow in processing they are quite amazing
 
+To compile and install a plugin-pack:
 ```bash
 cd plugin-packs/lvdgmic
 ./autogen.sh
 ./configure && make 
 ```
 
-Veejay looks in a few common locations to find plugins. You can list more locations in $HOME/.veejay/plugins.cfg
+Veejay looks in a few common locations to find plugins:
+* /usr/local/lib/frei0r-1
+* /usr/lib/frei0r-1
+* /usr/lib64/frei0r-1
+
+You can list more locations in $HOME/.veejay/plugins.cfg
 
 You can change the default parameter values by editing the files in $HOME/.veejay/frei0r/ and $HOME/.veejay/livido/
 
@@ -117,7 +110,7 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
  * Soft realtime (3)
  * Frame accurate (4)
  * Loop based editing (5)
- * Native YUV processing
+ * Native YUV(A) processing
  * Crash recovery
 
 ### Media
@@ -130,7 +123,7 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
 
 ### Editing
 
- * 159 built-in FX , many unique and original FX filters 
+ * 161 built-in FX , many unique and original FX filters 
  * 60 Livido filters
  * FX chain (20 slots) with Alpha Channels
  * All FX parameters can be animated.
@@ -198,4 +191,18 @@ Please join our mailing list on http://groups.google.com/group/veejay-discussion
 Please use the ticket system on https://github.com/c0ntrol/veejay/issues or simply write a mail to the veejay-discussion group!
 
 ENJOY! And let us know about your performances/installations with veejay! 
+
+---
+```
+                 _             _                            _   
+                (_)           | |                          | |  
+ __   _____  ___ _  __ _ _   _| |__   __ _       _ __   ___| |_ 
+ \ \ / / _ \/ _ | |/ _` | | | | '_ \ / _` |     | '_ \ / _ | __|
+  \ V |  __|  __| | (_| | |_| | | | | (_| |  _  | | | |  __| |_ 
+   \_/ \___|\___| |\__,_|\__, |_| |_|\__, | (_) |_| |_|\___|\__|
+               _/ |       __/ |         | |                     
+              |__/       |___/          |_|                                      http://veejayhq.net
+```
+---
+
 

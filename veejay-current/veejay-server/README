@@ -78,7 +78,7 @@ General
  # Soft realtime (3)
  # Frame accurate (4)
  # Loop based editing (5)
- # Native YUV processing
+ # Native YUV(A) processing
  # Crash recovery
 
 Media
@@ -91,13 +91,12 @@ Media
 
 Editing
 -------
- # 132 built-in FX , many unique and original FX filters 
- # 41 Livido filters
- # FX chain (20 slots)
+ # 161 built-in FX , many unique and original FX filters 
+ # 60 Livido filters
+ # FX chain (20 slots) with Alpha Channels
  # All FX parameters can be animated.
  # Mix up to two layers per FX slot
  # Non destructive edit decision lists (cut/copy/paste/crop video)
- # Simple text editor 
  # Sample editor
  # Sequence editor
  # Live disk recorder (sampling)
@@ -124,11 +123,12 @@ Trickplay
 Output
 ------
  # Audio trough Jack (low latency audio server) (8)
- # SDL and OpenGL video
+ # SDL video
  # Headless
  # YUV4MPEG streaming
- # Network streaming (unicast and multicast)
- # Preview rendering
+ # V4L2 loopback devices
+ # Network streaming
+ # Image grabbing
 
 Interaction
 -----------
@@ -141,13 +141,15 @@ Viewing
 -------
  # Full screen or windowed mode
  # Perspective and foward projection (9)
+ # Twinview/BigDesktop
+ # Split-screen video wall
  
 
 Additional
 ----------
- # Support for FreeFrame plugins (only for 32 bit systems!)
  # Support for Frei0r plugins
  # Support for LiVIDO plugins
+ # Support for FreeFrame plugins (only for 32 bit systems!)
 
 
 
