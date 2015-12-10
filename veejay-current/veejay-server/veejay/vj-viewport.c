@@ -1855,7 +1855,6 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 
 	const int len = v->w * v->h;
 	const int eln = len + ( v->w * 2 );
-	int k;
 
 	veejay_memset( v->map, len+1, eln );
 
@@ -1868,7 +1867,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	if(v->grid_resolution > 0)
 		viewport_compute_grid(v);
 
-    	return (void*)v;
+   	return (void*)v;
 }
 
 void *viewport_clone(void *vv, int new_w, int new_h )
@@ -3357,9 +3356,6 @@ void *viewport_fx_init_map( int wid, int hei, int x1, int y1,
 {
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
 
-	float fracx = (float) wid / 100.0f;
-	float fracy = (float) hei / 100.0f;
-
 	v->x1 = x1;
 	v->y1 = y1;
 	v->x2 = x2;
@@ -3389,7 +3385,6 @@ void *viewport_fx_init_map( int wid, int hei, int x1, int y1,
 		viewport_destroy( v );
 		return NULL;
 	}
-
 
     return (void*)v;
 }

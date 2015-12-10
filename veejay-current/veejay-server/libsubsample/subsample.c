@@ -63,10 +63,6 @@ const char *ssm_description[SSM_COUNT] = {
 #endif
 };
 
-// forward decl
-void ss_420_to_422(uint8_t *buffer, int width, int height);
-void ss_422_to_420(uint8_t *buffer, int width, int height);
-
 /*************************************************************************
  * Chroma Subsampling
  *************************************************************************/
@@ -411,19 +407,6 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 #endif
 }
 
-
-void ss_420_to_422(uint8_t *buffer, int width, int height)
-{
-
-	//todo, 1x2 super sampling (box)
-}
-
-void ss_422_to_420(uint8_t *buffer, int width, int height )
-{
-
-	//todo 2x1 down sampling (box)
-}
-
 static inline void downsample2x1( const uint8_t *src, uint8_t *dst, const int width )
 {
 	unsigned int x;
@@ -470,7 +453,7 @@ static inline void downsample32x16( const uint8_t *src, uint8_t *dst, const int 
 static void ss_444_to_422_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
 {
 	const unsigned int dst_stride = width >> 1;
-	int x,y;
+	int y;
 #ifdef HAVE_ASM_MMX
 	const unsigned int left = dst_stride % 8;
 	subsample_load_mask16to8();
@@ -514,11 +497,11 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 	}
 #else
 	const int mmx_stride = stride >> 3;
-	int left = (mmx_stride % 16);
+	int left = (mmx_stride % 16); /* FIXME */
 	for( y = height -1 ; y > 0; y -- ) {
 		uint8_t *src = buffer + (y* stride);
 		uint8_t *dst = buffer + (y* width);
-		unsigned int x1 = 0,x2=0;	
+		unsigned int x1 = 0;	
 		for( x = 0; x < stride; x += 16, x1 += 32 ) {
 			subsample_up_1x16to1x32( &src[x], &dst[x1] );
 		}
@@ -547,11 +530,11 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 	}
 #else
 	const int mmx_stride = stride >> 3;
-	int left = (mmx_stride % 16);
+	int left = (mmx_stride % 16);  /* FIXME */
+	int x1 = 0;
 	for( y = height -1 ; y > 0; y -- ) {
 		uint8_t *src = in + (y* stride);
 		uint8_t *dst = out + (y* width);
-		unsigned int x1 = 0,x2=0;	
 		for( x = 0; x < stride; x += 16, x1 += 32 ) {
 			subsample_up_1x16to1x32(&src[x], &dst[x1] );
 		}
@@ -625,18 +608,13 @@ static void	chroma_subsample_task( void *ptr )
 		case SSM_420_MPEG2:
 			ss_444_to_420mpeg2(f->input[1], f->width, f->height);
 			ss_444_to_420mpeg2(f->input[2], f->width, f->height);
-		break;
+			break;
 		case SSM_422_444:
 	   	 	ss_444_to_422_cp(f->output[1],f->input[1],f->width,f->height);
 		    	ss_444_to_422_cp(f->output[2],f->input[2],f->width,f->height);
     		break;
-		case SSM_420_422:
-    			ss_422_to_420(f->input[1],f->width,f->height);
-   			ss_422_to_420(f->input[2],f->width,f->height);
-   		break;
 		default:
-		break;
-
+			break;
 	}
 }
 static void chroma_supersample_task( void *ptr )
@@ -644,26 +622,21 @@ static void chroma_supersample_task( void *ptr )
 	vj_task_arg_t *f = (vj_task_arg_t*) ptr; 
 
 	switch (f->iparams[0]) {
-	 case SSM_420_JPEG_BOX:
-      		ss_420jpeg_to_444(f->input[1], f->width, f->height);
-   	 	ss_420jpeg_to_444(f->input[2], f->width, f->height);
-    		break;
- 	 case SSM_420_JPEG_TR:
-   		tr_420jpeg_to_444(f->priv,f->input[1], f->width, f->height);
-   		tr_420jpeg_to_444(f->priv,f->input[2], f->width, f->height);
-   		break;
-  	 case SSM_422_444:
-		tr_422_to_444t(f->input[1],f->output[1],f->width,f->height);
-   		tr_422_to_444t(f->input[2],f->output[2],f->width,f->height);
-    		break;
-  	case SSM_420_422:
-  		ss_420_to_422( f->input[1], f->width, f->height );
-    		ss_420_to_422( f->input[2], f->width, f->height );
-    		break;
-  	default:
-   	 	break;
-  }
-
+		case SSM_420_JPEG_BOX:
+			ss_420jpeg_to_444(f->input[1], f->width, f->height);
+			ss_420jpeg_to_444(f->input[2], f->width, f->height);
+			break;
+		case SSM_420_JPEG_TR:
+			tr_420jpeg_to_444(f->priv,f->input[1], f->width, f->height);
+			tr_420jpeg_to_444(f->priv,f->input[2], f->width, f->height);
+			break;
+	  	 case SSM_422_444:
+			tr_422_to_444t(f->input[1],f->output[1],f->width,f->height);
+			tr_422_to_444t(f->input[2],f->output[2],f->width,f->height);
+		 	break;
+		default:
+	   	 	break;
+	}
 }
 
 void chroma_subsample_cp(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[], uint8_t *dcbcr[])
@@ -701,10 +674,6 @@ void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
 		    ss_444_to_422_cp(ycbcr[1],ycbcr[1],frame->width,frame->height);
 		    ss_444_to_422_cp(ycbcr[2],ycbcr[2],frame->width,frame->height);
     		break;
-		case SSM_420_422:
-			ss_422_to_420(ycbcr[1],frame->width,frame->height);
-			ss_422_to_420(ycbcr[2],frame->width,frame->height);
-			break;
 		default:
 		break;
   	}
@@ -731,10 +700,6 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 		case SSM_422_444:
  			tr_422_to_444(ycbcr[1],frame->width,frame->height);
  			tr_422_to_444(ycbcr[2],frame->width,frame->height);
-    		break;
- 		case SSM_420_422:
-    			ss_420_to_422( ycbcr[1], frame->width, frame->height );
-    			ss_420_to_422( ycbcr[2], frame->width, frame->height );
     		break;
   		default:
    		break;

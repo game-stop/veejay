@@ -3784,8 +3784,6 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
     int anim= 0;
     int anim_type = 0;
     int chain_index = 0;
-	int a_flag = 0;
-	int volume = 0;
 
 	veejay_memset( arg, 0, sizeof(arg));
 
@@ -3885,31 +3883,9 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 	
 	}
 
-	if (!xmlStrcmp
-	    (cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOFLAG)) {
-	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
-	    chTemp = UTF8toLAT1(xmlTemp);
-	    if (chTemp) {
-			a_flag = atoi(chTemp);
-			free(chTemp);
-	    }
-	    if(xmlTemp) xmlFree(xmlTemp);
-	
-	}
-
-	if (!xmlStrcmp
-	    (cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOVOLUME)) {
-	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
-	    chTemp = UTF8toLAT1(xmlTemp);
-	    if (chTemp) {
-		volume = atoi(chTemp);
-		free(chTemp);
-	    }
-	    if(xmlTemp) xmlFree(xmlTemp);
-	}
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENTS)) {
-		    tagParseArguments(doc, cur->xmlChildrenNode, arg );
-		}
+	    tagParseArguments(doc, cur->xmlChildrenNode, arg );
+	}
 
 	// xmlTemp and chTemp should be freed after use
 	xmlTemp = NULL;
@@ -4025,11 +4001,10 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	char *extra_data = NULL;
 	int col[3] = {0,0,0};
 	int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,fade_alpha = 0,fade_entry = -1,opacity=0, nframes=0;
-	int subrender = 0;
 	xmlNodePtr fx[32];
 	veejay_memset( fx, 0, sizeof(fx));
 	int k = 0;
-
+	int subrender = 0;
 	xmlNodePtr subs = NULL;
 	xmlNodePtr cali = NULL;
 	void *d = vj_font_get_dict( font );
@@ -4134,7 +4109,8 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			tag->fader_direction = fader_dir;
 			tag->opacity = opacity;
 			tag->nframes = nframes;
-		
+			tag->subrender = subrender;
+
 			switch( source_type )
 			{
 				case VJ_TAG_TYPE_COLOR:

@@ -239,23 +239,23 @@ void	*sample_get_dict( int sample_id )
  * call before using any other function as sample_skeleton_new
  *
  ****************************************************************************************************/
-void sample_init(int len, void *font, editlist *pedl)
+int sample_init(int len, void *font, editlist *pedl)
 {
     if (!initialized) {
-	int i;
-	veejay_memset(avail_num, 0, sizeof(avail_num));    
-	
-	this_sample_id = 1;	/* do not start with zero */
-	if (!
-	    (SampleHash =
-	     hash_create(HASHCOUNT_T_MAX, int_compare, int_hash))) {
-	}
-	initialized = 1;
-	veejay_memset( &__sample_project_settings,0,sizeof(sample_setting));
+		veejay_memset(avail_num, 0, sizeof(avail_num));    
+		this_sample_id = 1;	/* do not start with zero */
+		SampleHash = hash_create(HASHCOUNT_T_MAX, int_compare, int_hash);
+		if(!SampleHash) {
+			return 0;
+		}
+		initialized = 1;
+		veejay_memset( &__sample_project_settings,0,sizeof(sample_setting));
     }
 
     sample_font_ = font;
 	plain_editlist = pedl;
+
+	return 1;
 }
 
 void	sample_free(void *edl)
@@ -316,7 +316,6 @@ static int _new_id()
  ****************************************************************************************************/
 sample_info *sample_skeleton_new(long startFrame, long endFrame)
 {
-   char tmp_file[128];
    sample_info *si;
    int i;
 

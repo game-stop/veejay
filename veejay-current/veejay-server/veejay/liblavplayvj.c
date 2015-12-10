@@ -1832,7 +1832,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
 	}
 
-	sample_init( (info->video_output_width * info->video_output_height), info->font, info->plain_editlist ); 
+	if(!sample_init( (info->video_output_width * info->video_output_height), info->font, info->plain_editlist ) ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Internal error while initializing sample administrator");
+		return -1;
+	}
 
 	sample_set_project(info->pixel_format,
 	                   info->auto_deinterlace,

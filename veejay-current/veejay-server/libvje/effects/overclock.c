@@ -78,7 +78,7 @@ static inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstSt
 }
 
 //copied from xine
-static inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep){
+static void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep){
 	uint8_t temp[2][4096];
 	uint8_t *a= temp[0], *b=temp[1];
 	

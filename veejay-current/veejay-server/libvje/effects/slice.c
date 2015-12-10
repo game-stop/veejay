@@ -97,7 +97,7 @@ void slice_recalc(int width, int height, int val) {
     if(dx==0)
 	{ 
 		r = ((rand() & val))-((val>>1)+1); 
-		dx = 8 + (rand() & ((val>>1))-1);
+		dx = 8 + (rand() & ((val>>1)-1));
 	}
 	else
 	{
@@ -107,7 +107,7 @@ void slice_recalc(int width, int height, int val) {
   }
  
   for(y=dy=0; y < height; y++) {
-   if(dy==0) { r = (rand() & val)-((val>>1)+1); dy = 8 + rand() & ((val>>1)-1); } else dy--;
+   if(dy==0) { r = (rand() & val)-((val>>1)+1); dy = 8 + (rand() & ((val>>1)-1)); } else dy--;
    slice_xshift[y] = r;
   }
 }

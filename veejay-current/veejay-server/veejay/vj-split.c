@@ -549,11 +549,11 @@ static void vj_split_copy_plane_mmx( uint8_t *D, uint8_t *S, int left, int right
 
 static void vj_split_copy_plane( uint8_t *D, uint8_t *S, int left, int right, int top, int bottom, int w, int h )
 {
+#ifndef HAVE_ASM_MMX
 	int y = top;
 	int dh = bottom;
-	int x = 0;
 	int nxt = 0;
-#ifndef HAVE_ASM_MMX
+	int x = 0;
 	for( y = top; y < dh; y ++ ) {
 		for( x = left; x < right; x ++ ) {
 			D[nxt] = S[ y * w + x];

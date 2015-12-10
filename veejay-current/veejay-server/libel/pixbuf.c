@@ -338,7 +338,7 @@ static	void	vj_picture_out_cleanup( vj_pixbuf_out_t *pic )
 }
 
 static	void	*pic_scaler_ = NULL;
-static   int	 pic_data_[3] = { 0,0,0,0};
+static   int	 pic_data_[3] = { 0,0,0};
 static   int	 pic_changed_ = 0;
 static	sws_template	*pic_template_ = NULL;
 

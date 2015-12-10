@@ -47,7 +47,6 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <mjpeg_logging.h>
-#include <sysexits.h>
 #ifdef HAVE_LIBUNWIND
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
@@ -166,28 +165,6 @@ void	veejay_print_backtrace()
 
 }
 #endif
-void	veejay_backtrace_handler(int n , void *dist, void *x)
-{
-	switch(n) {
-		case SIGSEGV:
-			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system."); //@ Suggested by Matthijs
-			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge."); //@
-			veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision..."); //@
-
-			veejay_print_backtrace();
-			break;
-		default:
-			veejay_print_backtrace();
-			break;
-	}
-
-	//@ Bye
-	veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");
-
-	report_bug();
-
-	exit(EX_SOFTWARE);
-}
 
 int	veejay_get_debug_level()
 {

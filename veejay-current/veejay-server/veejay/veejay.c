@@ -21,6 +21,7 @@
 #define VJ_PROMPT "$> "
 #include <stdio.h>
 #include <stdint.h>
+#include <sysexits.h>
 #include <libvjmem/vjmem.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -554,7 +555,6 @@ static int set_option(const char *name, char *value)
 
 static int check_command_line_options(int argc, char *argv[])
 {
-	int stop = 0;
     int nerr, n, option_index = 0;
     char option[2];
 #ifdef HAVE_GETOPT_LONG
@@ -720,12 +720,35 @@ static void donothing(int sig)
 	vj_unlock(info);
 }
 
+static void	veejay_backtrace_handler(int n , siginfo_t *si, void *ptr)
+{
+	switch(n) {
+		case SIGSEGV:
+			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system."); //@ Suggested by Matthijs
+			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge."); //@
+			veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision..."); //@
+
+			veejay_print_backtrace();
+			break;
+		default:
+			veejay_print_backtrace();
+			break;
+	}
+
+	//@ Bye
+	veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");
+
+	report_bug();
+
+	exit(EX_SOFTWARE);
+}
+
 static void	sigsegfault_handler(void) {
 	struct sigaction sigst;
 	sigemptyset(&sigst.sa_mask);
 	sigaddset(&sigst.sa_mask, SIGSEGV );
 	sigst.sa_flags = SA_SIGINFO | SA_ONESHOT;
-	sigst.sa_sigaction = veejay_backtrace_handler;
+	sigst.sa_sigaction = &veejay_backtrace_handler;
 
 	if( sigaction(SIGSEGV, &sigst, NULL) == - 1) 
 		veejay_msg(0,"sigaction");

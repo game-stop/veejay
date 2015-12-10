@@ -55,7 +55,6 @@ vj_effect *colormap_init(int w, int h)
 void colormap_apply( VJFrame *frame, int width, int height, int r, int g, int b)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
     const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len );
 	uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];

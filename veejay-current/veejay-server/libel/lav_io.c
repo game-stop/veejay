@@ -58,18 +58,6 @@ static int  internal_error=0;
 #define ERROR_FORMAT    3
 #define ERROR_NOAUDIO   4
 
-static unsigned long jpeg_field_size     = 0;
-static unsigned long jpeg_quant_offset   = 0;
-static unsigned long jpeg_huffman_offset = 0;
-static unsigned long jpeg_image_offset   = 0;
-static unsigned long jpeg_scan_offset    = 0;
-static unsigned long jpeg_data_offset    = 0;
-static unsigned long jpeg_padded_len     = 0;
-static unsigned long jpeg_app0_offset    = 0;
-static unsigned long jpeg_app1_offset    = 0;
-
-uint16_t reorder_16(uint16_t todo, int big_endian);
-
 #ifdef USE_GDK_PIXBUF
 static int 		output_scale_width = 0;
 static int		output_scale_height = 0;
@@ -98,158 +86,7 @@ void	lav_set_project(int w, int h, float f, int fmt)
 #define M_DQT   0xDB
 #define M_APP0  0xE0
 #define M_APP1  0xE1
-
-
-#ifdef HAVE_LIBQUICKTIME
-/*
-   put_int4:
-   Put a 4 byte integer value into a character array as big endian number
-*/
-
-static void put_int4(unsigned char *buf, int val)
-{
-	buf[0] = (val >> 24);
-	buf[1] = (val >> 16);
-	buf[2] = (val >> 8 );
-	buf[3] = (val      );
-}
-#endif
-
-//#ifdef SUPPORT_READ_DV2
-//static int check_DV2_input(lav_file_t *lav_fd);
-//#endif
-
 #define TMP_EXTENSION ".tmp"
-
-/*
-   get_int2:
-   get a 2 byte integer value from a character array as big endian number
- */
-
-static int get_int2(unsigned char *buff)
-{
-   return (buff[0]*256 + buff[1]);
-}
-
-/*
-   scan_jpeg:
-   Scan jpeg data for markers, needed for Quicktime MJPA format
-   and partly for AVI files.
-   Taken mostly from Adam Williams' quicktime library
- */
-
-static int scan_jpeg(unsigned char * jpegdata, long jpeglen, int header_only)
-{
-   int  marker, length;
-   long p;
-
-   jpeg_field_size     = 0;
-   jpeg_quant_offset   = 0;
-   jpeg_huffman_offset = 0;
-   jpeg_image_offset   = 0;
-   jpeg_scan_offset    = 0;
-   jpeg_data_offset    = 0;
-   jpeg_padded_len     = 0;
-   jpeg_app0_offset    = 0;
-   jpeg_app1_offset    = 0;
-
-   /* The initial marker must be SOI */
-
-   if (jpegdata[0] != 0xFF || jpegdata[1] != M_SOI) return -1;
-
-   /* p is the pointer within the jpeg data */
-
-   p = 2;
-
-   /* scan through the jpeg data */
-
-   while(p<jpeglen)
-   {
-      /* get next marker */
-
-      /* Find 0xFF byte; skip any non-FFs */
-      while(jpegdata[p] != 0xFF)
-      {
-         p++;
-         if(p>=jpeglen) return -1;
-      }
-
-      /* Get marker code byte, swallowing any duplicate FF bytes */
-      while(jpegdata[p] == 0xFF)
-      {
-         p++;
-         if(p>=jpeglen) return -1;
-      }
-
-      marker = jpegdata[p++];
-
-      if(p<=jpeglen-2)
-         length = get_int2(jpegdata+p);
-      else
-         length = 0;
-
-      /* We found a marker - check it */
-
-      if(marker == M_EOI) { jpeg_field_size = p; break; }
-
-      switch(marker)
-      {
-         case M_SOF0:
-         case M_SOF1:
-            jpeg_image_offset = p-2;
-            break;
-         case M_DQT:
-            if(jpeg_quant_offset==0) jpeg_quant_offset = p-2;
-            break;
-         case M_DHT:
-            if(jpeg_huffman_offset==0) jpeg_huffman_offset = p-2;
-            break;
-         case M_SOS:
-            jpeg_scan_offset = p-2;
-            jpeg_data_offset = p+length;
-            if(header_only) return 0; /* we are done with the headers */
-            break;
-         case M_APP0:
-            if(jpeg_app0_offset==0) jpeg_app0_offset = p-2;
-            break;
-         case M_APP1:
-            if(jpeg_app1_offset==0) jpeg_app1_offset = p-2;
-            break;
-      }
-
-      /* The pseudo marker as well as the markers M_TEM (0x01)
-         and M_RST0 ... M_RST7 (0xd0 ... 0xd7) have no paramters.
-         M_SOI and M_EOI also have no parameters, but we should
-         never come here in that case */
-
-      if(marker == 0 || marker == 1 || (marker >= 0xd0 && marker <= 0xd7))
-         continue;
-
-      /* skip length bytes */
-
-      if(p+length<=jpeglen)
-         p += length;
-      else
-         return -1;
-   }
-
-   /* We are through parsing the jpeg data, we should have seen M_EOI */
-
-   if(!jpeg_field_size) return -1;
-
-   /* Check for trailing garbage until jpeglen is reached or a new
-      M_SOI is seen */
-
-   while(p<jpeglen)
-   {
-      if(p<jpeglen-1 && jpegdata[p]==0xFF && jpegdata[p+1]==M_SOI) break;
-      p++;
-   }
-
-   jpeg_padded_len = p;
-   return 0;
-
-}
 
 /* The query routines about the format */
 
@@ -527,7 +364,7 @@ long	lav_bytes_remain( lav_file_t *lav_file )
 
 int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 {
-   int res, n;
+   int res=0, n;
    video_format = lav_file->format; internal_error = 0; /* for error messages */
 #ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
@@ -1152,11 +989,9 @@ int lav_filetype(lav_file_t *lav_file)
 
 lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 {
-   int n;
    static char pict[5] = "PICT\0";
    char *video_comp = NULL;
    unsigned char *frame = NULL; 
-   long len;
    int ierr;
 
    lav_file_t *lav_fd = (lav_file_t*) vj_calloc(sizeof(lav_file_t));
@@ -1502,22 +1337,6 @@ ERREXIT:
    return 0;
 }
 
-/* Get size of first field of for a data array containing
-   (possibly) two jpeg fields */
-
-int lav_get_field_size(uint8_t * jpegdata, long jpeglen)
-{
-   int res;
-
-   res = scan_jpeg(jpegdata,jpeglen,0);
-   if(res<0) return jpeglen; /* Better than nothing */
-
-   /* we return jpeg_padded len since this routine is used
-      for field exchange where alignment might be important */
-
-   return jpeg_padded_len;
-}
-
 const char *lav_strerror(void)
 {
    static char error_string[1024];
@@ -1650,24 +1469,6 @@ int lav_fileno(lav_file_t *lav_file)
    return res;
 }
 
-/* We need this to reorder the 32 bit values for big endian systems */
-uint32_t reorder_32(uint32_t todo, int big_endian)
-{
-  unsigned char b0, b1, b2, b3;
-  unsigned long reversed; 
-
-  if( big_endian )
-    {
-    b0 = (todo & 0x000000FF);
-    b1 = (todo & 0x0000FF00) >> 8;
-    b2 = (todo & 0x00FF0000) >> 16;
-    b3 = (todo & 0xFF000000) >> 24;
-
-    reversed = (b0 << 24) + (b1 << 16) + (b2 << 8) +b3;
-    return reversed;
-    }
-  return todo;
-}
 int lav_detect_endian (void)
 {
     unsigned int fred;
@@ -1683,9 +1484,6 @@ int lav_detect_endian (void)
   else
       return -1;
 }
-
-
-
 
 
 

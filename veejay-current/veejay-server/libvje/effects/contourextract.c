@@ -206,11 +206,6 @@ int contourextract_prepare(uint8_t *map[4], int width, int height)
 	return 1;
 }
 
-static	void	contourextract_centroid()
-{
-	
-}
-
 static int bg_frame_ = 0;
 
 void contourextract_apply(void *ed, VJFrame *frame,int width, int height, 
@@ -231,7 +226,6 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	
 	float sx = (float) width / (float) dw_;
 	float sy = (float) height / (float) dh_;
-	float sw = (float) sqrt( sx * sy );
 	
 	veejay_memset( cx,0,sizeof(cx));
 	veejay_memset( cy,0,sizeof(cy));
@@ -258,8 +252,6 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 		return;
 	}
 
-	int packets = 0;
-	
 	//@ clear distance transform map
 	veejay_memset( dt_map, 0 , len * sizeof(uint32_t) );
 
@@ -315,8 +307,6 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 			int y2 = ny + size_y;
 			int n_points = 0;
 			int center = 0;
-			int dx1 = 0,dy1=0;
-	
 
 			if( x1 < 0 ) x1 = 0; else if ( x1 > width ) x1 = width;
 			if( x2 < 0 ) x2 = 0; else if ( x2 > width ) x2 = width;
@@ -332,8 +322,6 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 					if( dt_map[ (k * width + j) ] > center )
 					{
 						center = dt_map[ (k* width +j) ];
-						dx1 = j;
-						dy1 = k;
 					}
 					if( dt_map[ (k * width + j) ] == feather )
 					{

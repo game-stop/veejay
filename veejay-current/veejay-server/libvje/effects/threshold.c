@@ -74,16 +74,6 @@ void		threshold_free(void)
 #define MAX(a,b) ( (a)>(b) ? (a) : (b) )
 #endif
 
-static int _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
-{
-	register int x;
-	/* consider all background pixels (0) in input image */	
-	for(x = 0; x < 9; x ++ )
-		if((kernel[x] * img[x]) > 0 )
-			return 1;
-	return 0;
-}
-
 void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse )
 {
 	unsigned int y,x;

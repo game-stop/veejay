@@ -49,7 +49,7 @@ void	v4l2_get_controls( void *d, void *port );
 int32_t v4l2_get_control( void *d, int32_t type );
 int		v4l2_set_roi( void *d, int w, int h, int x, int y );
 int		v4l2_reset_roi( void *d );
-int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d);
+int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d, int *w, int *h, double *aspect);
 int		v4l2_num_devices();
 char	**v4l2_get_device_list();
 int		v4l2_get_composite_status( void *d );

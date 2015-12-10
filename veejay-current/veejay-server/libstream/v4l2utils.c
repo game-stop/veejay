@@ -42,11 +42,6 @@
 *
 */
 
-
-//@ FIXME: not all drivers implement TRY_FMT
-//@ FIXME: find maximum width/height: start with large and TRY_FMT
-//@ TODO:  add support for tuner (set frequency)
-//
 #include <config.h>
 #ifdef HAVE_V4L2
 #include <stdio.h>
@@ -1675,7 +1670,6 @@ int32_t	v4l2_get_control( void *d, int32_t type )
 
 	float range0 = (queryctrl.maximum - queryctrl.minimum);
 	float range1 = 1.0f;
-	int32_t oldval = control.value;
 	float weight = (( control.value - queryctrl.minimum ) * range1) / range0;
 
 	control.value = (int) (weight * 65535);
@@ -1787,7 +1781,7 @@ int		v4l2_reset_roi( void *d )
 	return 1;
 }
 
-int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d)
+int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d, int *dwidth, int *dheight, double *daspect)
 {
 	v4l2info *v = (v4l2info*)d;
 	struct v4l2_cropcap cropcap;
@@ -1795,7 +1789,6 @@ int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d)
 	struct v4l2_format format;
 	double hscale, vscale;
 	double aspect;
-	int dwidth, dheight;
 
 	memset (&cropcap, 0, sizeof (cropcap));
 	cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -1822,14 +1815,14 @@ int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d)
 	vscale = format.fmt.pix.height / (double) crop.c.height;
 
 	aspect = cropcap.pixelaspect.numerator / (double) cropcap.pixelaspect.denominator;
-	aspect = aspect * hscale / vscale;
+	*daspect = aspect * hscale / vscale;
 
 	/* Devices following ITU-R BT.601 do not capture
    	   square pixels. For playback on a computer monitor
    	   we should scale the images to this size. */
 
-	dwidth = format.fmt.pix.width / aspect;
-	dheight = format.fmt.pix.height;
+	*dwidth = format.fmt.pix.width / aspect;
+	*dheight = format.fmt.pix.height;
 
 	return 1;
 }

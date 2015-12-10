@@ -364,7 +364,6 @@ int frei0r_get_params_f( void *port, int *args )
 
 	int i;
 	int vj_seq_no = 0;
-	char key[20];
 
 	f0r_get_param_value_f q = NULL;
 	err = vevo_property_get( parent, "get_params", 0, &q);
