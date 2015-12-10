@@ -73,10 +73,13 @@ static	int	base_fmt_ = -1;
 static struct {
 	const char *path;
 } plugger_paths[] = {
+#ifdef ARCH_X86
 	{ "/usr/local/lib/frei0r-1" },
 	{ "/usr/lib/frei0r-1"},
+#else
 	{ "/usr/local/lib64/frei0r-1"},
 	{ "/usr/lib64/frei0r-1"},
+#endif
 	{ NULL },
 };
 
