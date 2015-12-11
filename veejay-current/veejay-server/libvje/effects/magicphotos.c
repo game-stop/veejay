@@ -46,8 +46,16 @@ vj_effect *photoplay_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2,
-			"Random", "LR TB", "LB TR", "BL TR", "BR TL", "LB RT", "TL BR", "TL RB", "BL RT" ); // FIXME naming or can we use arrow symbols?
+	vje_build_value_hint_list (ve->hints, ve->limits[1][2],2,
+	                           "Random",								//0
+	                           "TopLeft to BottomRight : Horizontal",	//1
+	                           "TopLeft to BottomRight : Vertical",		//2
+	                           "BottomRight to TopLeft : Horizontal",	//3
+	                           "BottomRight to TopLeft : Vertical",		//4
+	                           "BottomLeft to TopRight : Horizontal",	//5
+	                           "TopRight to BottomLeft : Vertical",		//6
+	                           "TopRight to BottomLeft : Horizontal",	//7
+	                           "BottomLeft to TopRight : Vertical");	//8
 
 
     return ve;
