@@ -1399,17 +1399,17 @@ int	vj_tag_get_n_frames(int t1)
 {
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
-	return -1;
+		return 0;
     return tag->n_frames;	
 }
 
 int	vj_tag_set_n_frames( int t1, int n )
 {
-  vj_tag *tag = vj_tag_get(t1);
-    if (!tag)
-	return -1;
-  tag->n_frames = n;
-  return 1;
+	vj_tag *tag = vj_tag_get(t1);
+	if (!tag)
+		return 0;
+	tag->n_frames = n;
+	return 1;
 }
 
 sample_eff_chain	**vj_tag_get_effect_chain(int t1)
@@ -4279,7 +4279,7 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
 	sprintf(buffer, "%d", tag->color_b );
 	xmlNewChild(node,NULL,(const xmlChar*) "blue", (const xmlChar*) buffer );
 	
-    	sprintf(buffer, "%d", tag->nframes );
+    sprintf(buffer, "%d", tag->nframes );
 	xmlNewChild(node, NULL, (const xmlChar*) "nframes", (const xmlChar*) buffer );
 
 	sprintf(buffer, "%d", tag->opacity );

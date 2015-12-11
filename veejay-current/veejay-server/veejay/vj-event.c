@@ -8795,7 +8795,7 @@ void	vj_event_send_sample_stack		(	void *ptr,	const char format[],	va_list ap )
 			if( source == 0 )
 				sample_len= sample_video_length( channel );
 			else 
-				sample_len = 50; //@TODO, implement stream handling
+				sample_len = vj_tag_get_n_frames( channel );
 			snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d", i, channel, source, offset, sample_len );
 			strncat( buffer, line, strlen(line));
 		}
@@ -8814,7 +8814,7 @@ void	vj_event_send_sample_stack		(	void *ptr,	const char format[],	va_list ap )
 			if( source == 0 )
 				sample_len= sample_video_length( channel );
 			else 
-				sample_len = 50; //@TODO, implement stream handling
+				sample_len = vj_tag_get_n_frames( channel );
 
 			snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d",i,channel,source, offset, sample_len );
 			strncat( buffer, line, strlen(line));
