@@ -205,7 +205,6 @@ static void init_destination(j_compress_ptr cinfo)
 
 static boolean empty_output_buffer(j_compress_ptr cinfo)
 {
-    /*FIXME: */
     veejay_msg(0,"Given jpeg buffer was too small!");
     ERREXIT(cinfo, JERR_BUFFER_SIZE);	/* shouldn't be FILE_WRITE but BUFFER_OVERRUN! */
     return TRUE;
@@ -1111,7 +1110,6 @@ int encode_jpeg_raw(unsigned char *jpeg_data, int len, int quality,int dct_metho
 	(void) jpeg_finish_compress(&cinfo);
     }
 
-    /* FIXME */
     i = len - cinfo.dest->free_in_buffer;
 
     jpeg_destroy_compress(&cinfo);

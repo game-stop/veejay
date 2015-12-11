@@ -300,7 +300,6 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_SELECT_BANK,				SDLK_7,			VIMS_MOD_NONE,	"7"	},
 	{ VIMS_SELECT_BANK,				SDLK_8,			VIMS_MOD_NONE,	"8"	},
 	{ VIMS_SELECT_BANK,				SDLK_9,			VIMS_MOD_NONE,	"9"	},
-//@ FIXME test this
 	{ VIMS_SELECT_BANK,				SDLK_1,			VIMS_MOD_SHIFT,	"1"	},
 	{ VIMS_SELECT_BANK,				SDLK_2,			VIMS_MOD_SHIFT,	"2"	},
 	{ VIMS_SELECT_BANK,				SDLK_3,			VIMS_MOD_SHIFT,	"3"	},
@@ -310,7 +309,6 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_SELECT_BANK,				SDLK_7,			VIMS_MOD_SHIFT,	"7"	},
 	{ VIMS_SELECT_BANK,				SDLK_8,			VIMS_MOD_SHIFT,	"8"	},
 	{ VIMS_SELECT_BANK,				SDLK_9,			VIMS_MOD_SHIFT,	"9"	},
-
 	{ VIMS_SELECT_ID,				SDLK_F1,		VIMS_MOD_NONE,	"1"	},
 	{ VIMS_SELECT_ID,				SDLK_F2,		VIMS_MOD_NONE,	"2"	},
 	{ VIMS_SELECT_ID,				SDLK_F3,		VIMS_MOD_NONE,	"3"	},
@@ -530,7 +528,7 @@ char	*get_embedded_help( int fx_mode, int play_mode, int fx_entry, int id )
 	char msg[16384];
 	if( play_mode == VJ_PLAYBACK_MODE_PLAIN || ( play_mode == VJ_PLAYBACK_MODE_SAMPLE && fx_mode == 0 ) )
 	{
-		return NULL; // return get_arr_embedded_help( embedded_help ); FIXME someday
+		return NULL; 
 	} else {
 		int fx_id = 0;
 		if( play_mode == VJ_PLAYBACK_MODE_TAG  ) {
@@ -5751,7 +5749,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 	int base = 10;
 	int index = 3; // sample, chain, fx_id
 	int args[SAMPLE_MAX_PARAMETERS];
-	char str[1024]; //FIXME string parameters
+	char str[1024]; 
 	char *end = str;
 	veejay_t *v = (veejay_t*)ptr;
 	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
