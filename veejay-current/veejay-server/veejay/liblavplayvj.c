@@ -674,7 +674,7 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	 return 1;
 }
 
-static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
+static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 {
 	video_playback_setup *settings = info->settings;
 	
@@ -687,7 +687,8 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	vj_tag_set_active( stream_id, 1 );
 
 	int	tmp = vj_tag_chain_malloc( stream_id);
-
+	if( settings->current_playback_speed == 0 )
+		settings->current_playback_speed = 1;
 	settings->min_frame_num = 1;
 	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
 #ifdef HAVE_FREETYPE
@@ -703,30 +704,6 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 #endif
 	info->last_tag_id = stream_id;
 	info->uc->sample_id = stream_id;
-
-/*  	if(info->composite )
-	{
-		void *cur = vj_tag_get_composite_view(stream_id);
-		if(cur == NULL) {
-			composite_set_file_mode( info->composite, info->homedir, info->uc->playback_mode,stream_id);
-			if( vj_tag_load_composite_config( info->composite , stream_id ) ) {
-				veejay_msg(VEEJAY_MSG_WARNING, "Stream %d has composite view %p", stream_id,vj_tag_get_composite_view(stream_id) );
-			}
-		}
-		else {
-			composite_set_backing( info->composite, cur );
-		}
-
-
-		switch(composite_has_back(info->composite)) {
-			case 2:
-				settings->composite = composite_restore_config(info->composite);
-				break;
-			default:
-				settings->composite = 0;
-				break;
-		}
-	}*/
 
 	veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp, settings->max_frame_num );
 
