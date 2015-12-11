@@ -165,9 +165,9 @@ extern void veejay_msg(int type, const char format[], ...);
 static inline int myround(float n) 
 {
   if (n >= 0) 
-    return (int)(n + 0.5);
+    return (int)(n + 0.5f);
   else
-    return (int)(n - 0.5);
+    return (int)(n - 0.5f);
 }
 /* End colorspace.c */	
 
