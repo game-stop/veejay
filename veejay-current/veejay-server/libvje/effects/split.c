@@ -19,7 +19,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "split.h"
-static uint8_t *split_fixme[4] = { NULL,NULL,NULL, NULL };
+#include "common.h"
+static uint8_t *split_buf[4] = { NULL,NULL,NULL, NULL };
+
 vj_effect *split_init(int width,int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -43,22 +45,22 @@ vj_effect *split_init(int width,int height)
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Switch");
     return ve;
 }
+
 int	split_malloc(int width, int height)
 {
-  split_fixme[0] = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height + 1);
-  if(!split_fixme[0]) return 0;
-    split_fixme[1] = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height );
-  if(!split_fixme[1]) return 0; 
-   split_fixme[2] = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height);
-  if(!split_fixme[2]) return 0;
-   return 1;
-
+	split_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( width + (width*height*3) ));
+	if(!split_buf[0])
+		return 0;
+	split_buf[1] = split_buf[0] + RUP8(width*height);
+	split_buf[2] = split_buf[1] + RUP8(width*height);
+	return 1;
 }
 
 void split_free() {
-  if(split_fixme[0]) free(split_fixme[0]);
-  if(split_fixme[1]) free(split_fixme[1]);
-  if(split_fixme[2]) free(split_fixme[2]);
+	if(split_buf[0]) free(split_buf[0]);
+	split_buf[0] = NULL;
+	split_buf[1] = NULL;
+	split_buf[2] = NULL;
 }
 
 void split_fib_downscale(VJFrame *frame, int width, int height)
@@ -141,7 +143,7 @@ void dosquarefib(VJFrame *frame, int width, int height)
 		for (x = 0; x < width; x++) {
 		    i++;
 		    f = (i + 1) + (i - 1);
-		    split_fixme[0][y + x] = Y[f];
+		    split_buf[0][y + x] = Y[f];
 		}
     }
     i = 0;
@@ -150,9 +152,9 @@ void dosquarefib(VJFrame *frame, int width, int height)
 	    i++;
 	    f = (i + 1) + (i - 1);
             if(f > muv_len) break;		 
-	 //   split_fixme[0][y + x] = Y[f];
-	    split_fixme[1][y + x] = Cb[f];
-	    split_fixme[2][y + x] = Cr[f];
+	 //   split_buf[0][y + x] = Y[f];
+	    split_buf[1][y + x] = Cb[f];
+	    split_buf[2][y + x] = Cr[f];
 	}
     }
 
@@ -162,9 +164,9 @@ void dosquarefib(VJFrame *frame, int width, int height)
 	for (x = 0; x < width; x++) {
 	    i++;
 	    f = (i + 1) + (i - 1);
-	    split_fixme[0][y + x] = split_fixme[0][f];
-	  //  split_fixme[0][y + x] = split_fixme[1][f];
-	  //  split_fixme[0][y + x] = split_fixme[2][f];
+	    split_buf[0][y + x] = split_buf[0][f];
+	  //  split_buf[0][y + x] = split_buf[1][f];
+	  //  split_buf[0][y + x] = split_buf[2][f];
 	}
     }
     uv_len = uv_len >> 1;
@@ -174,8 +176,8 @@ void dosquarefib(VJFrame *frame, int width, int height)
 	    i++;
 	    f = (i + 1) + (i - 1);
 	    if(f > muv_len) break;
-	    split_fixme[1][y + x] = split_fixme[1][f];
-	    split_fixme[2][y + x] = split_fixme[2][f];
+	    split_buf[1][y + x] = split_buf[1][f];
+	    split_buf[2][y + x] = split_buf[2][f];
 	}
     }
 
@@ -185,7 +187,7 @@ void dosquarefib(VJFrame *frame, int width, int height)
 	y2 = y * width;
 	for (i = 0; i < 4; i++)
 	    for (x = 0; x < w3; x++) {
-		Y[y2 + x + (i * w3)] = split_fixme[0][y1 + x];
+		Y[y2 + x + (i * w3)] = split_buf[0][y1 + x];
 	    }
     }
     for (y = 0; y < uv_height; y++) {
@@ -193,7 +195,7 @@ void dosquarefib(VJFrame *frame, int width, int height)
 	y2 = y * uv_width;
 	for (i = 0; i < 4; i++)
 	    for (x = 0; x < u_w3; x++) {
-		Y[y2 + x + (i * u_w3)] = split_fixme[0][y1 + x];
+		Y[y2 + x + (i * u_w3)] = split_buf[0][y1 + x];
 	    }
     }
 
@@ -203,7 +205,7 @@ void split_push_downscale_uh(VJFrame *frame, int width, int height)
 {
 	unsigned int len = frame->len/2;
 	int	strides[4] = { len,len,len ,0};
-	vj_frame_copy( frame->data, split_fixme,strides );
+	vj_frame_copy( frame->data, split_buf,strides );
 
 }
 void split_push_downscale_lh(VJFrame *frame, int width, int height)
@@ -225,7 +227,7 @@ void split_push_downscale_lh(VJFrame *frame, int width, int height)
 		y2 = j * width;
 		y1 = y * width;
 		for (x = 0; x < width; x++) {
-		    split_fixme[0][y2 + x] = Y[y1 + x];
+		    split_buf[0][y2 + x] = Y[y1 + x];
 		}
     }
 
@@ -235,14 +237,14 @@ void split_push_downscale_lh(VJFrame *frame, int width, int height)
 	y2 = j * uv_width;
 	y1 = y * uv_width;
 	for (x = 0; x < uv_width; x++) {
-	    split_fixme[1][y2 + x] = Cb[y1 + x];
-	    split_fixme[2][y2 + x] = Cr[y1 + x];
+	    split_buf[1][y2 + x] = Cb[y1 + x];
+	    split_buf[2][y2 + x] = Cr[y1 + x];
 	}
     }
 
 	int strides[4] = { hlen, uv_hlen, uv_hlen,0 };
 	uint8_t *input[4] = { Y + hlen, Cb + uv_hlen, Cr + uv_hlen, NULL };
-	vj_frame_copy( split_fixme, input, strides );
+	vj_frame_copy( split_buf, input, strides );
 }
 
 void split_push_vscale_left(VJFrame *frame, int width, int height)
@@ -262,7 +264,7 @@ void split_push_vscale_left(VJFrame *frame, int width, int height)
 		y1 = y * width;
 		for (x = 0; x < wlen; x++)
 		{
-	   	  split_fixme[0][y1 + x] = Y[y1 + (x << 1)];
+	   	  split_buf[0][y1 + x] = Y[y1 + (x << 1)];
 		}
     }
 
@@ -271,8 +273,8 @@ void split_push_vscale_left(VJFrame *frame, int width, int height)
 		y1 = y * uv_width;
 		for (x = 0; x < uv_wlen; x++)
 		{
-		    split_fixme[1][y1 + x] = Cb[y1 + (x << 1)];
-		    split_fixme[2][y1 + x] = Cr[y1 + (x << 1)];
+		    split_buf[1][y1 + x] = Cb[y1 + (x << 1)];
+		    split_buf[2][y1 + x] = Cr[y1 + (x << 1)];
 		}
     }
 
@@ -282,15 +284,15 @@ void split_push_vscale_left(VJFrame *frame, int width, int height)
 		y1 = y * width;
 		for (x = 0; x < wlen; x++)
 		{
-	   	 Y[y1 + x] = split_fixme[0][y1 + x];
+	   	 Y[y1 + x] = split_buf[0][y1 + x];
 		}
     }
 
     for (y = 0; y < uv_height; y++) {
 	y1 = y * uv_width;
 	for (x = 0; x < uv_wlen; x++) {
-	    Cb[y1 + x] = split_fixme[1][y1 + x];
-	    Cr[y1 + x] = split_fixme[2][y1 + x];
+	    Cb[y1 + x] = split_buf[1][y1 + x];
+	    Cr[y1 + x] = split_buf[2][y1 + x];
 	}
     }
 
@@ -309,41 +311,34 @@ void split_push_vscale_right(VJFrame *frame, int width, int height)
 
 
     for (y = 0; y < height; y++) {
-	y1 = y * width;
-	for (x = 0; x < wlen; x++) {
-	    split_fixme[0][y1 + x] = Y[y1 + (x * 2)];
-//	    split_fixme[1][y1 + x] = Cb[y1 + (x * 2)];
-//	    split_fixme[2][y1 + x] = Cr[y1 + (x * 2)];
+		y1 = y * width;
+		for (x = 0; x < wlen; x++) {
+		    split_buf[0][y1 + x] = Y[y1 + (x * 2)];
+		}
 	}
-    }
-    for (y = 0; y < uv_height; y++) {
-	y1 = y * uv_width;
-	for (x = 0; x < uv_wlen; x++) {
-//	    split_fixme[0][y1 + x] = Y[y1 + (x * 2)];
-	    split_fixme[1][y1 + x] = Cb[y1 + (x * 2)];
-	    split_fixme[2][y1 + x] = Cr[y1 + (x * 2)];
-	}
+	
+	for (y = 0; y < uv_height; y++) {
+		y1 = y * uv_width;
+		for (x = 0; x < uv_wlen; x++) {
+		    split_buf[1][y1 + x] = Cb[y1 + (x * 2)];
+		    split_buf[2][y1 + x] = Cr[y1 + (x * 2)];
+		}
     }
 
     for (y = 0; y < height; y++) {
-	y1 = y * width;
-	for (x = 0; x < wlen; x++) {
-	    Y[y1 + x + wlen] = split_fixme[0][y1 + x];
-//	    Cb[y1 + x + wlen] = split_fixme[1][y1 + x];
-//	    Cr[y1 + x + wlen] = split_fixme[2][y1 + x];
-	}
+		y1 = y * width;
+		for (x = 0; x < wlen; x++) {
+		    Y[y1 + x + wlen] = split_buf[0][y1 + x];
+		}
     }
     for (y = 0; y < uv_height; y++) {
-	y1 = y * uv_width;
-	for (x = 0; x < uv_wlen; x++) {
-//	    Y[y1 + x + wlen] = split_fixme[0][y1 + x];
-	    Cb[y1 + x + uv_wlen] = split_fixme[1][y1 + x];
-	    Cr[y1 + x + uv_wlen] = split_fixme[2][y1 + x];
-	}
+		y1 = y * uv_width;
+		for (x = 0; x < uv_wlen; x++) {
+		    Cb[y1 + x + uv_wlen] = split_buf[1][y1 + x];
+		    Cr[y1 + x + uv_wlen] = split_buf[2][y1 + x];
+		}
     }
-
 }
-
 
 
 void split_corner_framedata_ul(VJFrame *frame, VJFrame *frame2,

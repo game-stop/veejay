@@ -42,6 +42,7 @@ vj_effect *flip_init(int w, int h)
 	ve->param_description = vje_build_param_list(ve->num_params, "H or V");
 
 	ve->hints = vje_init_value_hint_list (ve->num_params);
+
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Flip Horizontal", "Flip Vertical"
 	);
@@ -118,7 +119,6 @@ void _flip_x_yuvdata(VJFrame *frame, int width, int height)
  * \param width         Image width, in pixels.
  * \param height        Image height, in pixels.
  **********************************************************************************************/
-/* fixme: put all chroma supersample subsample routines elsewhere to be smart */
 void _flip_y_yuvdata(VJFrame *frame, int width, int height)
 {
 	unsigned int x, pos_a = 0, pos_b;
@@ -166,4 +166,3 @@ void _flip_y_yuvdata(VJFrame *frame, int width, int height)
 	} while (--uy);
 }
 
-void flip_free(){}

@@ -45,14 +45,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
-#include "reflection.h"
 #include <math.h>
+#include "reflection.h"
+#include "common.h"
 
 static short reflect_aSin[2048];
 static int reflection_map[2048][256];
 static int sin_index = 0;
 static int sin_index2 = 20;
-static uint8_t *reflection_buffer;
+static uint8_t *reflection_buffer = NULL;
 
 vj_effect *reflection_init(int width,int height)
 {
@@ -98,7 +99,7 @@ int reflection_malloc(int width, int height)
 	    reflection_map[x][y] = (int) zz;
 	}
     }
-    reflection_buffer = (uint8_t *) vj_malloc(sizeof(uint8_t) * width + 1);	/* fixme */
+    reflection_buffer = (uint8_t *) vj_malloc(sizeof(uint8_t) * RUP8(width) );
     if(!reflection_buffer) return 0;
 
     return 1;
