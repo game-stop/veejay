@@ -23,6 +23,7 @@
 #include <math.h>
 #include "magicmirror.h"
 #include "common.h"
+
 // if d or n changes, tables need to be calculated
 static uint8_t *magicmirrorbuf[4] = { NULL,NULL,NULL,NULL };
 static double *funhouse_x = NULL;
@@ -30,7 +31,8 @@ static double *funhouse_y = NULL;
 static unsigned int *cache_x = NULL;
 static unsigned int *cache_y = NULL;
 static unsigned int last[2] = {0,0};
-//static uint8_t *p0_frame_ = NULL;
+static int n__ = 0;
+static int N__ = 0;
 
 vj_effect *magicmirror_init(int w, int h)
 {
@@ -61,16 +63,14 @@ vj_effect *magicmirror_init(int w, int h)
 	ve->param_description = vje_build_param_list(ve->num_params, "X", "Y", "X","Y" );
     return ve;
 }
-static int n__ = 0;
-static int N__ = 0;
+
 int magicmirror_malloc(int w, int h)
 {
 	int i ;
-	for( i = 0; i < 3 ;i ++ ) {
-		magicmirrorbuf[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(w*h));
-		if(!magicmirrorbuf[i])
-			return 0;
-	}
+
+	magicmirrorbuf[i] = (uint8_t*) vj_malloc(sizeof(uint8_t)*RUP8(w*h));
+	if(!magicmirrorbuf[i])
+		return 0;
 	
 	funhouse_x = (double*)vj_calloc(sizeof(double) * w );
 	if(!funhouse_x) return 0;
@@ -83,8 +83,6 @@ int magicmirror_malloc(int w, int h)
 
 	cache_y = (unsigned int*)vj_calloc(sizeof(unsigned int)*h);
 	if(!cache_y) return 0;
-	veejay_memset(cache_x,0,w);
-	veejay_memset(cache_y,0,h);
 
 	n__ =0;
 	N__ =0;

@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include <math.h>
+#include "common.h"
 #include "distort.h"
 #include "widthmirror.h"
 
@@ -38,50 +39,68 @@ vj_effect *distortion_init(int width, int height)
     float rad;
     for (i = 0; i < 512; i++) {
 		rad = ((float) i * 0.703125f) * 0.0174532f;
-		plasma_table[i] = sin(rad) * (1024);
+		plasma_table[i] = myround( sinf(rad) * 1024.0f );
     }
 
-    ve->num_params = 2;
+    ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 5;
     ve->defaults[1] = 3;
+	ve->defaults[2] = 3;
+	ve->defaults[3] = 1;
+	ve->defaults[4] = 9;
+	ve->defaults[5] = 8;
+
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 8;
+    ve->limits[1][0] = 0xff;
     ve->limits[0][1] = 0;
-    ve->limits[1][1] = 8;
-    ve->description = "Distortion";
-    ve->sub_format = -1;
+    ve->limits[1][1] = 0xff;
+	ve->limits[0][2] = 0;
+	ve->limits[1][2] = 0xff;
+	ve->limits[0][3] = 0;
+	ve->limits[1][3] = 0xff;
+	ve->limits[0][4] = 0;
+	ve->limits[1][4] = 0xff;
+	ve->limits[0][5] = 0;
+	ve->limits[1][5] = 0xff;
+
+    ve->description = "Distortion (Plasma)";
+    ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Inc 1" , "Inc2" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Increment 1" , "Increment 2",
+			"Increment 3", "Increment 4", "Increment 5", "Increment 6"	);
+
     return ve;
 }
 
 /* the distortion effect comes originally from the demo effects collection,
    it is the plasma effect */
 
-void distortion_apply(VJFrame *frame, int width, int height,
-		      int inc_val1, int inc_val2)
+void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, int inc_val4, int inc_val5, int inc_val6 )
 {
 
-    unsigned int x, y, i, j;
+    unsigned int x, y, i, j,yi;
     uint8_t index;
     int tpos1 = 0, tpos2 = 0, tpos3 = 0, tpos4 = 0;
     int z = 511;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+    uint8_t p, cb, cr;
+
 	int uv_width = frame->uv_width;
 	int uv_height = frame->uv_height;	
-    unsigned int yi;
+	
+	const int height = (const int) frame->height;
+	const int width = (const int) frame->width;
+
 	if( frame->ssm ) {
 		uv_width = width;
 		uv_height = height;
 	}
-
-    uint8_t p, cb, cr;
 
     for (i = 0; i < height; ++i) {
 		tpos1 = plasma_pos1 + inc_val1;
@@ -94,7 +113,7 @@ void distortion_apply(VJFrame *frame, int width, int height,
 		    tpos1 &= z;
 		    tpos2 &= z;
 		    x = plasma_table[tpos1] + plasma_table[tpos2] +
-			plasma_table[tpos3] + plasma_table[tpos4];
+				plasma_table[tpos3] + plasma_table[tpos4];
 	
 		    index = (x >> 4);
 	
@@ -103,10 +122,13 @@ void distortion_apply(VJFrame *frame, int width, int height,
 		    tpos1 += inc_val1;
 		    tpos2 += inc_val2;
 		}
-		tpos4 += 3;
-		tpos3 += 1;
+		tpos4 += inc_val4;
+		tpos3 += inc_val3;
     }
 
+	tpos3 = 0;
+	tpos4 = 0;
+	
     for (i = 0; i < uv_height; ++i) {
 		tpos1 = plasma_pos1 + inc_val1;
 		tpos2 = plasma_pos2 + inc_val2;
@@ -118,7 +140,7 @@ void distortion_apply(VJFrame *frame, int width, int height,
 		    tpos1 &= z;
 		    tpos2 &= z;
 		    x = plasma_table[tpos1] + plasma_table[tpos2] +
-			plasma_table[tpos3] + plasma_table[tpos4];
+				plasma_table[tpos3] + plasma_table[tpos4];
 
 		    index = (x >> 4);
 	
@@ -127,17 +149,17 @@ void distortion_apply(VJFrame *frame, int width, int height,
 		    tpos1 += inc_val1;
 		    tpos2 += inc_val2;
 		}
-		tpos4 += 3;
-		tpos3 += 1;
+		tpos4 += inc_val4;
+		tpos3 += inc_val3;
     }
 
-    plasma_pos1 += 9;
-    plasma_pos2 += 8;
+    plasma_pos1 += inc_val5;
+    plasma_pos2 += inc_val6;
 
     for (y = 0; y < height; y++) {
 		yi = y * width;
 		for (x = 0; x < width; x++) {
-		    p =Y[yi + x];
+		    p = Y[yi + x];
 		    Y[yi + (width - x - 1)] = p;
 		}
 	 }

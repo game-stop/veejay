@@ -24,8 +24,6 @@
 #include "negatechannel.h"
 #include "common.h"
 
-#undef HAVE_ASM_MMX
-
 vj_effect *negatechannel_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -45,7 +43,12 @@ vj_effect *negatechannel_init(int w, int h)
 	ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Y=0, Cb=1, Cr=2", "Value" );
+    ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Luminance" ,"Chroma Blue", "Chroma Red" );
+
     return ve;
 }
 

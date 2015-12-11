@@ -25,6 +25,6 @@
 #include <stdint.h>
 
 vj_effect *distortion_init(int w, int h);
-void distortion_apply( VJFrame *frame, int width, int height, int n,int type);
+void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, int inc_val4, int inc_val5, int inc_val6 );
 void distort_free();
 #endif

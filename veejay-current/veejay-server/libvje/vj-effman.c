@@ -170,8 +170,7 @@ void vj_effman_apply_image_effect(
 	solarize_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_DISTORTION:
-	distortion_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
-			 arg[1]);
+	distortion_apply(frames[0], arg[0],arg[1],arg[2],arg[3],arg[4],arg[5] );
 	break;
      case VJ_IMAGE_EFFECT_GAMMA:
 	gamma_apply(

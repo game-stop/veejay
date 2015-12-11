@@ -425,8 +425,7 @@ extern void colorshift_apply(VJFrame *frame, int width, int height,
 			     int type, int param);
 extern void reflection_apply(VJFrame *frame, int w, int h, int n1,
 			     int n2, int n3);
-extern void distortion_apply(VJFrame *frame, int w, int h, int p1,
-			     int p2);
+extern void distortion_apply(VJFrame *frame, int i1, int i2, int i3, int i4, int i5, int i6 );
 extern void magicscratcher_apply(VJFrame *frame, int w, int h, int mode,
 				 int nframes, int r);
 extern void wipe_apply(VJFrame *frame, VJFrame *frame2, int w, int h,
