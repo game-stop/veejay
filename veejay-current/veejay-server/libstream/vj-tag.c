@@ -2017,7 +2017,6 @@ int vj_tag_chain_malloc(int t1)
 				   sum ++;
 		}
 	}
-    veejay_msg(VEEJAY_MSG_DEBUG, "Allocated %d effects",sum);
 	return sum; 
 }
 
