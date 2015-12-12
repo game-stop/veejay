@@ -30,7 +30,7 @@
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 257
+#define VJ_VIDEO_EFFECT_MAX 258
 
 #define VJ_PLUGIN 500
 
@@ -140,6 +140,7 @@ enum {
 	VJ_VIDEO_EFFECT_CHROMAMAGICKALPHA = 254,
 	VJ_VIDEO_EFFECT_MAGICOVERLAYALPHA = 255,
 	VJ_VIDEO_EFFECT_MASKTRANSITION = 256,
+	VJ_VIDEO_EFFECT_PASSTHROUGH = 257,
 };
 
 enum {
@@ -654,4 +655,5 @@ extern void gaussblur_apply(VJFrame *frame, int radius, int strength, int qualit
 extern void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin, int bmax);
 extern void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int time_index, int duration);
 extern void alphadampen_apply( VJFrame *frame, int b1);
+extern void passthrough_apply( VJFrame *frame, VJFrame *frame2);
 #endif
