@@ -3090,16 +3090,28 @@ static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 	}
 
 	if( follow ) {
-		//@ find first to jump to
-		int i,k;
-		int tmp = 0;	
-		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++) {
-			k = sample_get_chain_channel(info->uc->sample_id, i );
-			tmp = sample_get_chain_source( info->uc->sample_id, i );
-			if( (tmp == 0 && sample_exists(k)) || (tmp > 0 && vj_tag_exists(k) )) {
-				pvar_.follow_now[1] = tmp;	
+		if( pvar_.fade_entry == -1 ) {
+			//@ follow first channel B in chain
+			int i,k;
+			int tmp = 0;	
+			for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++) {
+				k = sample_get_chain_channel(info->uc->sample_id, i );
+				tmp = sample_get_chain_source( info->uc->sample_id, i );
+				if( (tmp == 0 && sample_exists(k)) || (tmp > 0 && vj_tag_exists(k) )) {
+					pvar_.follow_now[1] = tmp;	
+					pvar_.follow_now[0] = k;
+					break;
+				}
+			}
+		}
+		else {
+			//@ follow channel B in chain from seleted entry 
+			int tmp = 0;
+			int k = sample_get_chain_channel(info->uc->sample_id, pvar_.fade_entry );
+			tmp = sample_get_chain_source(info->uc->sample_id, pvar_.fade_entry );
+			if( (tmp == 0 && sample_exists(k)) || (tmp > 0 && vj_tag_exists(k))) {
+				pvar_.follow_now[1] = tmp;
 				pvar_.follow_now[0] = k;
-				break;
 			}
 		}
 	}
