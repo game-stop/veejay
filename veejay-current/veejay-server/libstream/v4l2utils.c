@@ -1647,18 +1647,15 @@ int32_t	v4l2_get_control( void *d, int32_t type )
 	struct v4l2_queryctrl queryctrl;
 	struct v4l2_control control;
 
-	memset(&queryctrl, 0,sizeof(queryctrl));
-	memset( &control,0,sizeof(control));
+	veejay_memset(&queryctrl, 0,sizeof(queryctrl));
+	veejay_memset( &control,0,sizeof(control));
 	
 	queryctrl.id = type;
 
-	if( -1 == vioctl( v->fd, VIDIOC_QUERYCTRL, &queryctrl)) {
-		if( errno != EINVAL ) {
-			return -1;
-		}
+	if( vioctl( v->fd, VIDIOC_QUERYCTRL, &queryctrl) == -1 ) {
 		return -1;
 	} else if ( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED ) {
-		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %x not supported",type );
+		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %x disabled",type );
 		return -1;
 	} else {
 		control.id = type;

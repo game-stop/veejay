@@ -1,57 +1,85 @@
-Debugging veejay
+#Debugging veejay
 ----------------
 
-There are various ways to submit useful bug-reports
-
-Basically, send as much logging as possible, 
+Please report any issues here: https://github.com/c0ntrol/veejay/issues
 
 
-=== VERBOSIVE CONSOLE LOGGING ===
+## Redirecting veejay's console output
 
-1) Run veejay with the verbose flag:
+You can run veejay with the -v commandline flag, telling it to be more
+verbosive:
 
+<pre>
 $ veejay -v -n > /tmp/logfile
+</pre>
 
-To watch it:
+You can watch the console logging using tail:
 
+<pre>
 $ tail -f /tmp/logfile
+</pre>
 
-=== NETWORK EVENT LOG ===
+## Network event logging
 
-2) If it crashes in combination with reloaded or another external, enable all network logging:
+You can log all network related events to /tmp/veejay.net.log (file
+destination cannot be changed)
 
+<pre>
 $ export VEEJAY_LOG_NET_IO=on
 
-$ veejay -v -n -> /tmp/console.logfile
+$ veejay -v
+</pre>
 
-=== POST CRASH ===
+## Crash Recovery
 
-3) When it has crashed, there are files in your $HOME/.veejay/recovery directory
+If veejay crahes, it will write your samplelist and edit descision files to
+$HOME/.veejay/recovery.
 
-The files come in pairs, an editlist and a samplelist with veejays pid number.
 The recovery files can be loaded with:
 
+<pre>
 $ veejay /path/to/recovery_editlist_p???.edl -l /path/to/recovery_samplelist_p???.sl
+</pre>
 
 
+## Useful backtraces
 
-=== DIGGING DEEPER ===
 
-From the source:
-----------------
+A useful backtrace not only contains symbols but also lists the linenumber and
+name of the source file
 
-1) Run configure --enable-debug
+To enable debugging symbols to be build in you must do a clean build and pass
+the --enable-debug flag to configure.
 
-2) Run veejay in gdb
 
+<pre>
+$ ./configure --enable-debug
+$ (make clean)
+$ make -j12 && make install
+</pre>
+
+
+You can attach a debugger to veejay, or you can load veejay in the debugger:
+
+<pre>
+$ ps -aef |grep veejay
+$ gdb -p $PID
+</pre>
+
+<pre>
 $ gdb /path/to/veejay
 ...
 $ bt
+</pre>
 
-3) Run veejay with valgrind
+Alternatively, you can use valgrind to look for memory leaks, threading
+problems, etc:
+
+<pre>
 
 $ valgrind --leak-check=yes --leak-resolution=high --log-file=/tmp/valgrind.veejay.log /path/to/veejay -n -v ...
 
 $ valgrind --tool=helgrind /path/to/veejay -n -v
 
+</pre>
 

@@ -54,8 +54,6 @@ vj_effect *lumakeyalpha_init(int width, int height)
     return ve;
 }
 
-/* fixme */
-
 void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int type, int opacity )
 {
 	unsigned int i, len = width * height;

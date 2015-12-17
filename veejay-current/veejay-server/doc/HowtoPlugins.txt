@@ -1,6 +1,12 @@
- ¶
+# Plugins
 
-First, you need to create a file to tell veejay where to find plugins.
+By default, veejay looks in the following commmon locations to find plugins:
+- /usr/local/lib
+- /usr/lib/
+- /usr/local/lib64
+- /usr/lib64
+
+Alternatively, you can create a file to tell veejay where to find plugins.
 
  $ mkdir ~/.veejay
  $ vi ~/.veejay/plugins

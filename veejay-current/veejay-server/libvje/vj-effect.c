@@ -193,6 +193,7 @@
 #include "effects/alphadampen.h"
 #include "effects/masktransition.h"
 #include "effects/passthrough.h"
+#include "effects/alphatransition.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -570,6 +571,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_VIDEO_EFFECT_MAGICOVERLAYALPHA]   = overlaymagicalpha_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_MASKTRANSITION]		= masktransition_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_PASSTHROUGH]			= passthrough_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_ALPHATRANSITION]		= alphatransition_init(width,height);
 
     vj_effects[VJ_IMAGE_EFFECT_DUMMY]				= dummy_init(width,height);
 	

@@ -1035,6 +1035,7 @@ static	void	set_tooltip(const char *name, const char *text)
 	}
 	gtk_widget_set_tooltip_text(	w,text );
 }
+
 void	on_devicelist_row_activated(GtkTreeView *treeview, 
 		GtkTreePath *path,
 		GtkTreeViewColumn *col,
@@ -2976,7 +2977,6 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 			disable_widget( "fx_m2" );
 			disable_widget( "fx_m3" );
 			disable_widget( "fx_m4" );
-			disable_widget( "fx_mnone" );
 		}
 		else
 		{
@@ -3011,7 +3011,6 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 
 			enable_widget( "fx_m1" );
 			enable_widget( "fx_m2" );
-			enable_widget( "fx_mnone" );
 
 	/*		if( gui->uc.entry_tokens[FADE_METHOD] <= 1 ||
 				gui->uc.entry_tokens[FADE_ENTRY] != info->uc.selected_chain_entry )
@@ -3740,7 +3739,8 @@ static	void	load_v4l_info()
 {
 	int values[21];
 	int len = 0;
-	veejay_memset(values,0,sizeof(values));
+
+	veejay_memset(values,-1,sizeof(values));
 
 	multi_vims( VIMS_STREAM_GET_V4L, "%d", (info->selected_slot == NULL ? 0 : info->selected_slot->sample_id ));
 	gchar *answer = recv_vims(3, &len);
@@ -3750,7 +3750,7 @@ static	void	load_v4l_info()
 			&values[0],&values[1],&values[2],&values[3],&values[4],&values[5],
 			&values[6],&values[7],&values[8],&values[9],&values[10],&values[11],
 			&values[12],&values[13],&values[14],&values[15],&values[16],&values[17],&values[18],&values[19],&values[20]);
-		if(res < 25 )
+		if(res < 21 )
 		{
 			free(answer);
 			return;
@@ -3790,7 +3790,7 @@ static	gint load_parameter_info()
 {
 	int	*p = &(info->uc.entry_tokens[0]);
 	int	len = 0;
-	int 	i = 0;
+	int i = 0;
 
 	veejay_memset( p, 0, sizeof(info->uc.entry_tokens));
 		
