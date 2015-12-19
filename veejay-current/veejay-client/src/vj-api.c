@@ -4724,7 +4724,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
        
 				if(bank_page >= 0)
 				{			
-					if( info->sample_banks[bank_page]->slot[poke_slot] <= 0 )
+					if( info->sample_banks[bank_page]->slot[poke_slot]->sample_id <= 0 )
 					{				
 						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],1, gtype,gsource );
 						add_sample_to_sample_banks(bank_page, tmp_slot );
@@ -4734,7 +4734,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 					}
 					else
 					{
-						update_sample_slot_data( bank_page, poke_slot, values[0],1,gsource,gtype);
+						update_sample_slot_data( bank_page, poke_slot, values[0],values[1],gsource,gtype);
 					}
 				}
 				g_free(gsource);
