@@ -535,8 +535,8 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 			f[j]->output[i] = buf2[i] + (f[j]->strides[i] * j);
 			if( buf3 != NULL )
 				f[j]->temp[i] = buf3[i] + (f[j]->strides[i]* j); 
-			f[j]->jobnum = j;
-		}	
+		}
+		f[j]->jobnum = j;
 	}
 
 	for( i = 0; i < n; i ++ ) {
@@ -545,20 +545,11 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	}	
 
 	performer_job( n );
-
+/*
 	for( i = 0; i < n; i ++ ) {
 		veejay_memset( f[i], 0, sizeof(vj_task_arg_t));
 	} 
-
+*/
 	return 1;
-}
-
-void	vj_task_free_internal_buf()
-{
-	uint8_t n = task_get_workers();
-	uint8_t i;
-	
-	for( i = 0; i < n; i ++ )
-		vj_task_args[0]->priv = NULL;
 }
 

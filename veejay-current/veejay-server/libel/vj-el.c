@@ -519,7 +519,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		 if( deinter == 1 && (lav_video_interlacing(el->lav_fd[n]) != LAV_NOT_INTERLACED))
 			el->auto_deinter = 1;
 
- 	   	veejay_msg(VEEJAY_MSG_DEBUG,"\tInterlacing:      %s", int_msg);
 		veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames/sec:       %f", lav_frame_rate(el->lav_fd[n]));
 		veejay_msg(VEEJAY_MSG_DEBUG,"\tSampling format:  %s", _chroma_str[ lav_video_MJPG_chroma(el->lav_fd[n])].name);
 		veejay_msg(VEEJAY_MSG_DEBUG,"\tVideo compressor: %s",lav_video_compressor(el->lav_fd[n]));
@@ -603,16 +602,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		    if( require_same_resolution )
 		    	nerr++;
 		}
-	if (el->video_inter != lav_video_interlacing(el->lav_fd[n])) {
-	    if(force)
-	    veejay_msg(VEEJAY_MSG_WARNING,"File %s: Interlacing is %d should be %d",
-			filename, lav_video_interlacing(el->lav_fd[n]),
-			el->video_inter);
-		else
-		veejay_msg(VEEJAY_MSG_ERROR, "File %s: Interlacing is %d should be %d",
-			filename, lav_video_interlacing(el->lav_fd[n]),
-			el->video_inter);
-	}
+
 	/* give a warning on different fps instead of error , this is better 
 	   for live performances */
 	if (fabs(el->video_fps - lav_frame_rate(el->lav_fd[n])) >
