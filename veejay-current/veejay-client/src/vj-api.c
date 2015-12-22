@@ -3513,8 +3513,11 @@ gboolean
       if (!path_currently_selected && name != info->uc.selected_chain_entry)
       {
 		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
+		if( !is_button_toggled( "fx_mnone" )) {
+			multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d",0, name );
+		}
 		update_label_i( "label_fxentry", name, 0 );
-		vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY, info->uc.selected_chain_entry );
+		vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY,name );
 	  }
     }
 
