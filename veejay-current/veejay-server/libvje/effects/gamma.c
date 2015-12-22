@@ -22,9 +22,9 @@
 #include <libvjmem/vjmem.h>
 #include "gamma.h"
 #include <math.h>
-static int gamma_flag = 0;
 
-static uint8_t table[256];
+static __thread int gamma_flag = 0;
+static __thread uint8_t table[256];
 
 vj_effect *gamma_init(int w, int h)
 {
@@ -52,10 +52,10 @@ static void gamma_setup(int width, int height,
     double val;
 
     for (i = 0; i < 256; i++) {
-	val = i / 256.0;
-	val = pow(val, gamma_value);
-	val = 256.0 * val;
-	table[i] = val;
+		val = i / 256.0;
+		val = pow(val, gamma_value);
+		val = 256.0 * val;
+		table[i] = val;
     }
 }
 
@@ -64,12 +64,13 @@ void gamma_apply(VJFrame *frame, int width,
 {
     unsigned int i, len = frame->len;
 	uint8_t *Y = frame->data[0];
-    /* gamma correction YCbCr, only on luminance not on chroma */
-    if (gamma_value != gamma_flag)
-	gamma_setup(width, height, (double) (gamma_value / 100.0));
+    
+    if (gamma_value != gamma_flag) {
+		gamma_setup(width, height, (double) (gamma_value / 100.0));
+		gamma_flag = gamma_value;
+	}
 
     for (i = 0; i < len; i++) {
 		Y[i] = (uint8_t) table[Y[i]];
     }
 }
-void gamma_free(){}

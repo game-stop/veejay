@@ -447,6 +447,9 @@ void vj_effman_apply_image_effect(
 	case VJ_IMAGE_EFFECT_ALPHADAMPEN:
 		alphadampen_apply(frames[0], arg[0] );
 		break;
+	case VJ_IMAGE_EFFECT_RANDNOISE:
+		randnoise_apply( frames[0], arg[0],arg[1] );
+		break;
    }
 }
 

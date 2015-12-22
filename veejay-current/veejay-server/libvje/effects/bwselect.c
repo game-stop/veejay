@@ -60,8 +60,8 @@ vj_effect *bwselect_init(int w, int h)
     return ve;
 }
 
-static int last_gamma = 0;
-static uint8_t table[256];
+static __thread int last_gamma = 0;
+static __thread uint8_t table[256];
 
 static void gamma_setup(int width, int height, double gamma_value)
 {

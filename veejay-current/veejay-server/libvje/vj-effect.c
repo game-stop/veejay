@@ -194,6 +194,7 @@
 #include "effects/masktransition.h"
 #include "effects/passthrough.h"
 #include "effects/alphatransition.h"
+#include "effects/randnoise.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
@@ -679,6 +680,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_IMAGE_EFFECT_CHOKEMATTE]			= gaussblur_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_LEVELCORRECTION]		= levelcorrection_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_ALPHADAMPEN]			= alphadampen_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_RANDNOISE]			= randnoise_init(width,height);
 
 	max_width = width;
 	max_height = height;

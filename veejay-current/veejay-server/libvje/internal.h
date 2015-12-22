@@ -26,7 +26,7 @@
 #define VJE_SUCCESS 0
 #include <libvje/vje.h>
 
-#define VJ_IMAGE_EFFECT_MIN 100
+#define VJ_IMAGE_EFFECT_MIN 95
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -250,6 +250,7 @@ enum {
 	VJ_IMAGE_EFFECT_CHOKEMATTE = 98,
 	VJ_IMAGE_EFFECT_LEVELCORRECTION = 97,
 	VJ_IMAGE_EFFECT_ALPHADAMPEN = 96,
+	VJ_IMAGE_EFFECT_RANDNOISE = 95,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
@@ -612,7 +613,7 @@ extern void	chameleonblend_apply( VJFrame *frame, VJFrame *source, int w, int h,
 
 extern void	baltantv_apply (VJFrame *frame, int w, int h , int stride, int mode );
 
-extern	void	radioactivetv_apply( VJFrame *a, VJFrame *b,int w, int h, int mode, int t, int sn, int threhold);
+extern void	radioactivetv_apply( VJFrame *a, VJFrame *b,int w, int h, int mode, int t, int sn, int threhold);
 
 extern void nervous_apply(VJFrame *Frame, int width, int height,int delay);
 
@@ -658,5 +659,5 @@ extern void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,int
 extern void alphadampen_apply( VJFrame *frame, int b1);
 extern void passthrough_apply( VJFrame *frame, VJFrame *frame2);
 extern void alphatransition_apply( VJFrame *frame, VJFrame *frame2, int time_index, int duration, int direction, int threshold);
-
+extern void randnoise_apply( VJFrame *frame, int min, int max);
 #endif

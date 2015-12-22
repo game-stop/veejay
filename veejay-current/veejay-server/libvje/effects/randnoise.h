@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2015 Niels Elburg <elburg@hio.hen.nl>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,12 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef GAMMA_H
-#define GAMMA_H
+#ifndef NEGATION_H
+#define NEGATION_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *gamma_init();
-void gamma_apply(VJFrame *frame, int width,int height, int gamma_val);
+vj_effect *randnoise_init(int w, int h);
+void randnoise_apply( VJFrame *frame, int min, int max);
 #endif
