@@ -17,9 +17,7 @@
 	 2) $HOME/.veejay/veejay.shm that lists the shmid...
  
 
-	
-	note: no frame format negotation yet
-
+	this plugin reads HOST_format (in ffmpeg pixfmt format) from port during initialization to negotiate pixel format
 
  *
  */
@@ -66,6 +64,12 @@ static	inline int	lvd_to_ffmpeg( int lvd, int fr ) {
 			if(fr)
 				return PIX_FMT_YUVJ444P;
 			return PIX_FMT_YUV444P;
+		case LIVIDO_PALETTE_YUVA8888:
+			if(fr)
+				return PIX_FMT_YUVJ444P;
+			return PIX_FMT_YUVA444P;
+		case LIVIDO_PALETTE_YUVA422:
+			return PIX_FMT_YUVA422P;
 		default:
 			if( fr ) 
 				return PIX_FMT_YUVJ422P;
@@ -130,18 +134,15 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	int cpu_flags		= 0;
 	cpu_flags		    = cpu_flags | SWS_FAST_BILINEAR;
 
-//@ uncomment this to enable some runtime optimizations
-
-//  cpu_flags			= cpu_flags | SWS_CPU_CAPS_MMX;
-//  cpu_flags		    = cpu_flags | SWS_CPU_CAPS_SSE;
-
-
 //@ intialize ffmpeg's libswscale context
 
 	int fullrange = 0;
 	
 	livido_property_get( my_instance, "HOST_fullrange",0,&fullrange);
 
+	int hostformat = (fullrange == 1 ? PIX_FMT_YUVJ422P: PIX_FMT_YUV422P );
+
+	livido_property_get( my_instance, "HOST_format", 0, &hostformat );
 
 	struct	SwsContext	*sws = NULL;
 
@@ -151,11 +152,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 							lvd_to_ffmpeg( lvd_shm_palette, fullrange ),
 							dst_w,
 							dst_h,
-							/*
-							  PIX_FMT_YUVJ422P or PIX_FMT_YUV422P
-
-							*/
-							( fullrange == 1 ? PIX_FMT_YUVJ422P :  PIX_FMT_YUV422P ), 
+							hostformat,
 							cpu_flags,
 							NULL,
 							NULL,
@@ -259,18 +256,30 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		NULL,
 		NULL };
 
-	if( srcFormat == PIX_FMT_YUVJ422P || srcFormat == PIX_FMT_YUV422P ) {
+	if( srcFormat == PIX_FMT_YUVJ422P || srcFormat == PIX_FMT_YUV422P || srcFormat == PIX_FMT_YUVA422P ) {
 		strides[0] = srcW;
 		strides[1] = strides[0] >> 1;
 		strides[2] = strides[1];
 		in[1] = in[0] + ( srcW * srcH );
 		in[2] = in[1] + ( (srcW>>1) * srcH);
-	} else if ( srcFormat == PIX_FMT_YUV444P || srcFormat == PIX_FMT_YUVJ444P ) {
+	} else if ( srcFormat == PIX_FMT_YUV444P || srcFormat == PIX_FMT_YUVJ444P || srcFormat == PIX_FMT_YUVA444P ) {
 		strides[0] = srcW;
 		strides[1] = srcW;
 		strides[2] = srcW;
 		in[1] = in[0] + (srcW * srcH);
 		in[2] = in[1] + (srcW * srcH);
+	} 
+
+	if( srcFormat == PIX_FMT_YUVA422P || srcFormat == PIX_FMT_YUVA444P ) {
+		strides[3] = strides[0];
+		dst_strides[3] = dst_strides[0];
+	}
+
+	if( srcFormat == PIX_FMT_YUVA422P ) {
+		in[3] = in[2] + (srcW>>1) * srcH;
+	}
+	if( srcFormat == PIX_FMT_YUVA444P ) {
+		in[3] = in[2] + (srcW * srcH);
 	}
 
 	sws_scale( sws, (const uint8_t *const *)in, strides,0, srcH,(uint8_t * const*) O, dst_strides );

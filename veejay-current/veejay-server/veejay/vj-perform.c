@@ -1086,11 +1086,12 @@ void vj_perform_audio_stop(veejay_t * info)
     }
 }
 
-void vj_perform_get_primary_frame(veejay_t * info, uint8_t ** frame)
+void vj_perform_get_primary_frame(veejay_t * info, uint8_t **frame)
 {
     frame[0] = primary_buffer[info->out_buf]->Y;
     frame[1] = primary_buffer[info->out_buf]->Cb;
     frame[2] = primary_buffer[info->out_buf]->Cr;
+	frame[3] = primary_buffer[info->out_buf]->alpha;
 }
 
 uint8_t *vj_perform_get_preview_buffer()
@@ -1098,17 +1099,10 @@ uint8_t *vj_perform_get_preview_buffer()
 	return preview_buffer->Y;
 }
 
-void	vj_perform_get_output_frame( uint8_t **frame )
-{
-	frame[0] = video_output_buffer[0]->Y;
-	frame[1] = video_output_buffer[0]->Cb;
-	frame[2] = video_output_buffer[0]->Cr;
-}
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h)
 {
 	*w = info->video_output_width - info->settings->viewport.left - info->settings->viewport.right;
 	*h = info->video_output_height - info->settings->viewport.top - info->settings->viewport.bottom;
-
 }
 
 int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )

@@ -886,6 +886,12 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_)
 					1,
 					&fullrange );
 
+	vevo_property_set( filter_instance,
+					"HOST_format",
+					VEVO_ATOM_TYPE_INT,
+					1,
+					&base_fmt_);
+
 	int shmid = 0;
 	if( vevo_property_get( filter_templ, "HOST_shmid", 0,&shmid ) == VEVO_NO_ERROR )
 	{
@@ -1301,10 +1307,7 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 	}
 
 	if( compiled_as < LIVIDO_API_VERSION ) {
-		veejay_msg(VEEJAY_MSG_WARNING,  "I am using a newer LiViDO API. Overwrite your livido.h from libplugger/specs/livido.h and recompile your plugins.");
-		veejay_msg(VEEJAY_MSG_ERROR, "Plugin %s was compiled for LiViDO-%d, current is %d", plugin_name,compiled_as, LIVIDO_API_VERSION );
-		free(plugin_name);
-		return NULL;
+		veejay_msg(VEEJAY_MSG_DEBUG, "Plugin '%s' was compiled for LIVIDO API %d", plugin_name, compiled_as );
 	}
 
 	if( compiled_as > LIVIDO_API_VERSION ) {
@@ -1313,9 +1316,7 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 		return NULL;
 	}
 
-	
 	livido_read_plug_configuration( filter_templ, name );
-
 
 	int n_params = livido_scan_parameters( filter_templ, port, w, h );
 	int n_oparams = livido_scan_out_parameters( filter_templ, port );

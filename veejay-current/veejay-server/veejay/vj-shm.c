@@ -36,6 +36,9 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <libvevo/vevo.h>
+#include <libavutil/pixfmt.h>
+#include <libavutil/avutil.h>
+#include <libplugger/specs/livido.h>
 
 #define HEADER_LENGTH 4096
 #ifndef PATH_MAX
@@ -50,6 +53,7 @@ typedef struct {
 	key_t key;
 	char *file;
 	int status;
+	int alpha;
 } vj_shm_t;
 
 
@@ -185,13 +189,13 @@ int		vj_shm_write( void *vv, uint8_t *frame[4], int plane_sizes[4] )
 	
 	uint8_t *dst[4] = { ptr, ptr + plane_sizes[0], ptr + plane_sizes[0] + plane_sizes[1], NULL };
 	plane_sizes[3] = 0;
+
+	if( v->alpha ) {
+		dst[3] = ptr + plane_sizes[0] + plane_sizes[1] + plane_sizes[2];
+		plane_sizes[3] = plane_sizes[0];
+	}
+
 	vj_frame_copy( frame, dst, plane_sizes );
-
-
-//	veejay_memcpy( ptr , frame[0], plane_sizes[0] );
-//	veejay_memcpy( ptr + plane_sizes[0], frame[1], plane_sizes[1] );
-//	veejay_memcpy( ptr + plane_sizes[0] +
-//					plane_sizes[1], frame[2], plane_sizes[2] );
 
 	res = pthread_rwlock_unlock( &data->rwlock );
 	if( res == -1 ) {
@@ -311,6 +315,21 @@ static 	void	failed_init_cleanup( vj_shm_t *v )
 	free(v);
 }
 
+static	int	ffmpeg_to_lvd(int fmt)
+{
+	int res;
+	switch(fmt) {
+		case PIX_FMT_YUVA422P: res = LIVIDO_PALETTE_YUVA422; break;
+		case PIX_FMT_YUVA444P: res = LIVIDO_PALETTE_YUVA8888; break;
+		case PIX_FMT_YUVJ422P: case PIX_FMT_YUV422P: res = LIVIDO_PALETTE_YUV422P; break;
+		case PIX_FMT_YUVJ444P: case PIX_FMT_YUV444P: res = LIVIDO_PALETTE_YUV444P; break;
+		default:
+			res = LIVIDO_PALETTE_YUV422P;
+			break;
+	}
+	return res;
+}
+
 //@ new producer, puts frame in shm
 void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 {
@@ -352,9 +371,6 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	veejay_memset( U, 128, frame->uv_len);
 	veejay_memset( V, 128, frame->uv_len);
 
-	//@ set up frame info (fixme, incomplete)
-//	vj_shared_data *data = (vj_shared_data*) &(v->sms[0]);
-
 	vj_shared_data *data = (vj_shared_data*) v->sms;
 	data->resource_id    = v->shm_id;
 	data->header[0]      = frame->width;
@@ -362,14 +378,21 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	data->header[2]      = frame->stride[0];
 	data->header[3]      = frame->stride[1];
 	data->header[4]      = frame->stride[2];
-	data->header[5]      = 513; // format LIVIDO_PALETTE_YUV422P 
+	data->header[5]      = ffmpeg_to_lvd( frame->format );
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Starting address: %p", data );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Frame data      : %p", data + HEADER_LENGTH );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Static resolution of %d x %d, YUV 4:2:2 planar",
 			data->header[0],data->header[1] );
-	veejay_msg(VEEJAY_MSG_DEBUG,"Shared Resource:  Planes {%d,%d,%d} format %d",
+	veejay_msg(VEEJAY_MSG_DEBUG,"Shared Resource:  Planes {%d,%d,%d,X} LVD pixel format %d",
 			data->header[2],data->header[3],data->header[4],data->header[5]);
+
+	v->alpha = ( data->header[5] == LIVIDO_PALETTE_YUVA8888 ? 1 :
+				 (data->header[5] == LIVIDO_PALETTE_YUVA422 ? 1 : 0) );
+
+	if(v->alpha) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource: includes alpha channel information");
+	}
 
 	int	res	= pthread_rwlockattr_init( &rw_lock_attr );
 	if( res == -1 ) {

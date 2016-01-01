@@ -913,7 +913,7 @@ void veejay_stop_sampling(veejay_t * info)
  ******************************************************/
 static int veejay_screen_update(veejay_t * info )
 {
-	uint8_t *frame[3];
+	uint8_t *frame[4];
 #ifdef HAVE_DIRECTFB
 	uint8_t *c_frame[3];
 #endif
