@@ -26,6 +26,7 @@
 #include <libvje/vje.h>
 #include <libvje/internal.h>
 #include <libavutil/pixfmt.h>
+#include <libel/avcommon.h>
 #include "effects/fibdownscale.h"
 #include "effects/magicoverlays.h"
 #include "effects/negation.h"

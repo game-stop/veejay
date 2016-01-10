@@ -12,5 +12,87 @@
 #ifndef PIX_FMT_YUVA444P
 #define PIX_FMT_YUVA444P AV_PIX_FMT_YUVA444P
 #endif
+#ifndef PIX_FMT_YUVA420P
+#define PIX_FMT_YUVA420P AV_PIX_FMT_YUVA420P
+#endif
+#ifndef PIX_FMT_YUV422P
+#define PIX_FMT_YUV422P AV_PIX_FMT_YUV422P
+#endif
+#ifndef PIX_FMT_YUVJ422P
+#define PIX_FMT_YUVJ422P AV_PIX_FMT_YUVJ422P
+#endif
+#ifndef PIX_FMT_YUV420P
+#define PIX_FMT_YUV420P AV_PIX_FMT_YUV420P
+#endif
+#ifndef PIX_FMT_YUVJ420P
+#define PIX_FMT_YUVJ420P AV_PIX_FMT_YUVJ420P
+#endif
+#ifndef PIX_FMT_YUV444P
+#define PIX_FMT_YUV444P AV_PIX_FMT_YUV444P
+#endif
+#ifndef PIX_FMT_RGB24
+#define PIX_FMT_RGB24 AV_PIX_FMT_RGB24
+#endif
+#ifndef PIX_FMT_YUVJ444P
+#define PIX_FMT_YUVJ444P AV_PIX_FMT_YUVJ444P
+#endif
+#ifndef PIX_FMT_YUVJ422P
+#define PIX_FMT_YUVJ422P AV_PIX_FMT_YUVJ422P
+#endif
+#ifndef PIX_FMT_RGB32
+#define PIX_FMT_RGB32 AV_PIX_FMT_RGB32
+#endif
+#ifndef PIX_FMT_BGR32
+#define PIX_FMT_BGR32 AV_PIX_FMT_BGR32
+#endif
+#ifndef PIX_FMT_RGBA
+#define PIX_FMT_RGBA AV_PIX_FMT_RGBA
+#endif
+#ifndef PIX_FMT_BGRA
+#define PIX_FMT_BGRA AV_PIX_FMT_BGRA
+#endif
+#ifndef PIX_FMT_BGR24
+#define PIX_FMT_BGR24 AV_PIX_FMT_BGR24
+#endif
+#ifndef PIX_FMT_GRAY8
+#define PIX_FMT_GRAY8 AV_PIX_FMT_GRAY8
+#endif
+#ifndef PIX_FMT_RB32_1
+#define PIX_FMT_RGB32_1 AV_PIX_FMT_RGB32_1
+#endif
+#ifndef PIX_FMT_YUYV422
+#define PIX_FMT_YUYV422 AV_PIX_FMT_YUYV422
+#endif
+#ifndef PIX_FMT_UYVY422
+#define PIX_FMT_UYVY422 AV_PIX_FMT_UYVY422
+#endif
+#ifndef PIX_FMT_ARGB
+#define PIX_FMT_ARGB AV_PIX_FMT_ARGB
+#endif
+#ifndef PIX_FMT_ABGR
+#define PIX_FMT_ABGR AV_PIX_FMT_ABGR
+#endif
+#ifndef PIX_FMT_YUV411P
+#define PIX_FMT_YUV411P AV_PIX_FMT_YUV411P
+#endif
+/* these have been removed but lets keep backwards compat */
+#ifndef SWS_CPU_CAPS_MMX 
+#define SWS_CPU_CAPS_MMX 0x80000000
+#endif
+#ifndef SWS_CPU_CAPS_MMXEXT
+#define SWS_CPU_CAPS_MMXEXT 0x2000000
+#endif
+#ifndef SWS_CPU_CAPS_MMX2
+#define SWS_CPU_CAPS_MMX2 0x2000000
+#endif
+#ifndef SWS_CPU_CAPS_3DNOW
+#define SWS_CPU_CAPS_3DNOW 0x20000000
+#endif
+#ifndef SWS_CPU_CAPS_ALTIVEC
+#define SWS_CPU_CAPS_ALTIVEC 0x1000000
+#endif
+#ifndef SWS_CPU_CAPS_SSE2
+#define SWS_CPU_CAPS_SSE2 0x02000000
+#endif
 #endif
 #endif

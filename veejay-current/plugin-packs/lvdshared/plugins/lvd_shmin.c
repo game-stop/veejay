@@ -41,6 +41,7 @@
 LIVIDO_PLUGIN
 #include	"utils.h"
 #include	"livido-utils.c"
+#include	"avcommon.h"
 
 typedef struct
 {

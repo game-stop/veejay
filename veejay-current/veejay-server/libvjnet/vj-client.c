@@ -40,6 +40,7 @@
 #include <libavutil/pixfmt.h>
 #include <pthread.h>
 #include <liblzo/lzo.h>
+#include <libel/avcommon.h>
 #define VJC_OK 0
 #define VJC_NO_MEM 1
 #define VJC_SOCKET 2

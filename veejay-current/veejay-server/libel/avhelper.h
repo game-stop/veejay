@@ -26,6 +26,8 @@
 #define CODEC_ID_YUV420F 996
 #define CODEC_ID_YUVLZO 900
 
+void	*avhelper_alloc_frame();
+
 int 	avhelper_get_codec_by_id(int id);
 
 int	avhelper_get_codec_by_name( const char *compr );

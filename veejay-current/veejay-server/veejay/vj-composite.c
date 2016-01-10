@@ -45,6 +45,8 @@
 #ifdef HAVE_GL
 #include <veejay/gl.h>
 #endif
+#include <libel/avcommon.h>
+
 typedef struct
 {
 	uint8_t *proj_plane[4];

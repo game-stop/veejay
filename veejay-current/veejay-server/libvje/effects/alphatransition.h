@@ -18,12 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef MASKTRANSITION_H
-#define MASKTRANSITION_H
+#ifndef ALPHATRANSITION_H
+#define ALPHATRANSITION_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-void masktransition_apply( VJFrame *frame, VJFrame *frame2, int index, int duration, int dir, int threshold);
-vj_effect *masktransition_init(int w, int h);
+void alphatransition_apply( VJFrame *frame, VJFrame *frame2, int index, int duration, int dir, int threshold);
+vj_effect *alphatransition_init(int w, int h);
 #endif

@@ -281,7 +281,7 @@ further:
 	}
 
 	veejay_memset( &(x->pkt), 0, sizeof(AVPacket));
-	AVFrame *f = avcodec_alloc_frame();
+	AVFrame *f = avhelper_alloc_frame();
 	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
 
 	int got_picture = 0;
@@ -313,7 +313,7 @@ further:
 
 	x->pixfmt = x->codec_ctx->pix_fmt;
 	x->codec_id = x->codec_ctx->codec_id;
-	x->frame = avcodec_alloc_frame();
+	x->frame = avhelper_alloc_frame();
 	x->input = yuv_yuv_template( NULL,NULL,NULL, x->codec_ctx->width,x->codec_ctx->height, x->pixfmt );
 
 	sws_template sws_tem;
@@ -335,6 +335,19 @@ further:
 	}
 	
 	return (void*) x;
+}
+
+#define LIBAVUTIL_VERSION_CHECK( a, b, c, d, e ) \
+    ( (LIBAVUTIL_VERSION_MICRO <  100 && LIBAVUTIL_VERSION_INT >= AV_VERSION_INT( a, b, c ) ) || \
+      (LIBAVUTIL_VERSION_MICRO >= 100 && LIBAVUTIL_VERSION_INT >= AV_VERSION_INT( a, d, e ) ) )
+
+void	*avhelper_alloc_frame()
+{
+#if LIBAVUTIL_VERSION_CHECK(55,20,0,13,100)
+	return av_frame_alloc();
+#else
+	return avcodec_alloc_frame();
+#endif
 }
 
 void	avhelper_close_decoder( void *ptr ) 

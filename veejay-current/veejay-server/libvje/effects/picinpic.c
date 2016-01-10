@@ -29,6 +29,7 @@
 #include "picinpic.h"
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
+#include <libel/avcommon.h>
 #include "common.h" 
 extern void    vj_get_yuv444_template(VJFrame *src, int w, int h);
 typedef struct

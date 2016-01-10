@@ -40,8 +40,9 @@
 #include <stdio.h>
 #include <libplugger/portdef.h>
 #include <libplugger/defaults.h>
-
 #include <libplugger/specs/frei0r.h>
+#include <libel/avcommon.h>
+
 #define    RUP8(num)(((num)+8)&~8)
 #define _VJ_MAX_PARAMS 32
 

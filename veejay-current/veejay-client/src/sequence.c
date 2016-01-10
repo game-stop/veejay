@@ -25,6 +25,7 @@
 #include <veejay/vims.h>
 #include <veejay/vj-client.h>
 #include <veejay/vj-msg.h>
+#include <veejay/avcommon.h>
 #include <glib.h>
 #include <gdk/gdk.h>
 #include <sys/time.h>

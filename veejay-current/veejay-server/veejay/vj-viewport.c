@@ -42,7 +42,8 @@
 #include <veejay/vj-viewport-cfg.h>
 #include <veejay/vj-viewport.h>
 #include <math.h>
-#include <assert.h>
+#include <libel/avcommon.h>
+
 #define X0 0
 #define Y0 1
 #define X1 2

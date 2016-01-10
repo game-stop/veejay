@@ -44,6 +44,7 @@
 #include <veejay/vims.h>
 #include <liblzo/lzo.h>
 #include <libvjmem/vjmem.h>
+#include <libel/avcommon.h>
 #define QUICKTIME_MJPG_TAG 0x6d6a7067
 extern int vj_el_get_decoder_from_fourcc( const char *fourcc );
 extern int get_ffmpeg_pixfmt(int p);

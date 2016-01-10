@@ -1442,7 +1442,7 @@ int	yuv_sws_get_cpu_flags(void)
 
 	return cpu_flags;
 }
-
+/*
 void	yuv_deinterlace(
 		uint8_t *data[3],
 		const int width,
@@ -1491,7 +1491,7 @@ void 	rgb_deinterlace(
 	q.linesize[2] = 0;
 	avpicture_deinterlace( &p,&q, out_pix_fmt, width, height );
 }
-
+*/
 
 static struct
 {	

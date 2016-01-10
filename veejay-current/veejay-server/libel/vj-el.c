@@ -36,6 +36,7 @@
 #include <libel/vj-avcodec.h>
 #include <libel/elcache.h>
 #include <libel/pixbuf.h>
+#include <libel/avcommon.h>
 #include <limits.h>
 #include <mjpegtools/mpegconsts.h>
 #include <mjpegtools/mpegtimecode.h>
@@ -327,7 +328,7 @@ vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, float fp
         {
 		d->codec = avhelper_get_codec(ctx);
 		d->context = avhelper_get_codec_ctx(ctx);
-		d->frame = avcodec_alloc_frame();
+		d->frame = avhelper_alloc_frame();
 		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
 		d->img->width = width;
 		d->img->height = height;

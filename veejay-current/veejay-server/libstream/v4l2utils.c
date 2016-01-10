@@ -78,6 +78,7 @@
 #include <libavcodec/avcodec.h>
 #include <libel/av.h>
 #include <libel/avhelper.h>
+#include <libel/avcommon.h>
 #define        RUP8(num)(((num)+8)&~8)
 
 //#include <pthread.h>
@@ -573,7 +574,7 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 #endif
 	v->c->width= wid;
 	v->c->height= hei;
-	v->picture = avcodec_alloc_frame();
+	v->picture = avhelper_alloc_frame();
 	v->picture->width = wid;
 	v->picture->height = hei;
 	v->picture->data[0] = vj_malloc( sizeof(uint8_t) * RUP8(wid * hei + wid));

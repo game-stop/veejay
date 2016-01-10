@@ -83,6 +83,7 @@
 #include <veejay/vj-lib.h>
 #include <libel/vj-avcodec.h>
 #include <libel/pixbuf.h>
+#include <libel/avcommon.h>
 #ifdef HAVE_JACK
 #include <veejay/vj-jack.h>
 #endif

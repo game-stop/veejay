@@ -43,6 +43,8 @@
 #include <veejay/vj-client.h>
 #include <veejay/vj-msg.h>
 #include <veejay/vims.h>
+#include <veejay/avcommon.h>
+#include <veejay/vevo.h>
 #include <src/vj-api.h>
 #include <fcntl.h>
 #include "mpegconsts.h"
@@ -72,7 +74,6 @@
 #include <libavutil/pixfmt.h>
 #include <veejay/vevo.h>
 #include <veejay/libvevo.h>
-#include <veejay/vevo.h>
 #include <src/vmidi.h>
 //if gtk2_6 is not defined, 2.4 is assumed.
 #ifdef GTK_CHECK_VERSION
@@ -4479,7 +4480,7 @@ void	load_effectlist_info()
 				char *newName = vj_calloc( len );
 				veejay_memcpy(newName,ec->description+6, len-6 );
 				gtk_list_store_set( store3,&iter, FX_STRING, newName, -1 );
-				vevo_property_set( fx_list_, newName, LIVIDO_ATOM_TYPE_INT,1,&(ec->id));
+				vevo_property_set( fx_list_, newName, VEVO_ATOM_TYPE_INT,1,&(ec->id));
 				free(newName);
 			}
 			else 
@@ -4489,14 +4490,14 @@ void	load_effectlist_info()
 				{
 					gtk_list_store_append( store2, &iter );
 					gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
-					vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
+					vevo_property_set( fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
 				}
 				else
 				{
 					// tree_effectlist
 					gtk_list_store_append( store, &iter );
 					gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
-					vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
+					vevo_property_set( fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
 				}
 			}
 		}

@@ -25,6 +25,7 @@
 #include <libavutil/pixfmt.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
+#include <libel/avcommon.h>
 #include "common.h"
 vj_effect *colorhis_init(int w, int h)
 {

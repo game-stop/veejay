@@ -52,7 +52,8 @@
 #include <libavutil/pixfmt.h>
 #include <veejay/vj-task.h>
 #include <libvje/vje.h>
- 
+#include <libel/avcommon.h>
+
 //@ job description
 static	vj_task_arg_t *vj_task_args[MAX_WORKERS];
 

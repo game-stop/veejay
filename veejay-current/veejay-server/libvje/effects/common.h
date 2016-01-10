@@ -72,7 +72,7 @@ extern void veejay_msg(int type, const char format[], ...);
 #define do_emms         __asm__ __volatile__ ( "emms":::"memory" )
 #endif
 
-#ifndef ARCH_X86
+#ifndef ARCH_X86_64
 # define sin_cos(si, co, x)     si = sin(x); co = cos(x)
 # define fast_sqrt( res,x ) res = sqrt(x) 
 # define fast_sin(res,x ) res = sin(x)
@@ -343,7 +343,6 @@ void veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output)
 void veejay_distance_transform8( uint8_t *plane, int w, int h, uint32_t *output);
 
 uint8_t veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M, uint32_t *XX, uint32_t *YY,uint32_t *xsize, uint32_t *ysize, int blob);
-
 
 void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len );
 void binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, int w, int h );

@@ -34,6 +34,7 @@
 #include <liblzo/lzo.h>
 #include <time.h>
 #include <libyuv/yuvconv.h>
+#include <libel/avcommon.h>
 
 #define        RUP8(num)(((num)+8)&~8)
 

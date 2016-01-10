@@ -39,7 +39,7 @@
 #include <libavutil/pixfmt.h>
 #include <libavutil/avutil.h>
 #include <libplugger/specs/livido.h>
-
+#include <libel/avcommon.h>
 #define HEADER_LENGTH 4096
 #ifndef PATH_MAX
 #define PATH_MAX 1024

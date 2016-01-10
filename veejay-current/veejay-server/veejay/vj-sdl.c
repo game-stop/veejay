@@ -37,6 +37,7 @@
 #include <libel/vj-avcodec.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/libveejay.h>
+#include <libel/avcommon.h>
 #include <string.h>
 #include <stdlib.h>
 //extern void *(* veejay_memcpy)(void *to, const void *from, size_t len) ;

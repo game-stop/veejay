@@ -18,8 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef NEGATION_H
-#define NEGATION_H
+#ifndef RANDNOISE_H
+#define RANDNOISE_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
