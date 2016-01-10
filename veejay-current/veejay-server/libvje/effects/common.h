@@ -72,7 +72,7 @@ extern void veejay_msg(int type, const char format[], ...);
 #define do_emms         __asm__ __volatile__ ( "emms":::"memory" )
 #endif
 
-#ifndef ARCH_X86_64
+#ifndef ARCH_X86
 # define sin_cos(si, co, x)     si = sin(x); co = cos(x)
 # define fast_sqrt( res,x ) res = sqrt(x) 
 # define fast_sin(res,x ) res = sin(x)
@@ -81,11 +81,11 @@ extern void veejay_msg(int type, const char format[], ...);
 # define fast_exp(res,x ) res = exp(x)
 #else
 # define sin_cos(si, co, x)     asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
-# define fast_sqrt(res,x) 	asm ("fsqrt" : "=t" (res) : "0" (x)) 
-# define fast_sin(res,x)	asm ("fsin" : "=t" (res) : "0" (x))
-# define fast_cos(res,x)	asm ("fcos" : "=t" (res) : "0" (x))
-# define fast_abs(res,x)	asm ("fabs" : "=t" (res) : "0" (x))
-# define fast_exp(res,x)	asm ("fexp" : "=t" (res) : "0" (x))
+# define fast_sqrt(res__,x) 	asm ("fsqrt" : "=t" (res__) : "0" (x)) 
+# define fast_sin(res__,x)	asm ("fsin" : "=t" (res__) : "0" (x))
+# define fast_cos(res__,x)	asm ("fcos" : "=t" (res__) : "0" (x))
+# define fast_abs(res__,x)	asm ("fabs" : "=t" (res__) : "0" (x))
+# define fast_exp(res__,x)	asm ("fexp" : "=t" (res__) : "0" (x))
 #endif
 
 #define Y_Red 		( 0.29900)
