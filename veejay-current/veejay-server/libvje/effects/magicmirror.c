@@ -66,8 +66,6 @@ vj_effect *magicmirror_init(int w, int h)
 
 int magicmirror_malloc(int w, int h)
 {
-	int i ;
-
 	magicmirrorbuf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*RUP8(w*h*3));
 	if(!magicmirrorbuf[i])
 		return 0;
