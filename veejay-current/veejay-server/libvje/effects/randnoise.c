@@ -61,15 +61,11 @@ void randnoise_apply( VJFrame *frame, int min, int max)
 {
     int i;
     const unsigned int len = frame->len;
-
     uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-
 	unsigned long t;
 
-	for( i = 0; i < len; i ++ ) {
-
+	for( i = 0; i < len; i ++ )
+	{
 		//xor shift
 		x ^= x << 16;
 		x ^= x >> 5;
