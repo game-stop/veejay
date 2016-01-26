@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #include <veejay/vjmem.h>
 #include <veejay/vims.h>
 #include <veejay/vj-client.h>
@@ -32,8 +34,6 @@
 #include <veejay/libvevo.h>
 #include <src/sequence.h>
 #include <src/utils.h>
-#include <libavutil/avutil.h>
-#include <libavutil/pixfmt.h>
 #include <veejay/vje.h>
 #include <veejay/yuvconv.h>
 #include <string.h>
