@@ -33,6 +33,8 @@
 #include <stdarg.h>
 #include <glib.h>
 #include <errno.h>
+#include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #include <glade/glade.h>
 #include <gtk/gtk.h>
 #include <string.h>
@@ -70,8 +72,6 @@
 #include <src/utils.h>
 #include <src/sequence.h>
 #include <veejay/yuvconv.h>
-#include <libavutil/avutil.h>
-#include <libavutil/pixfmt.h>
 #include <veejay/vevo.h>
 #include <veejay/libvevo.h>
 #include <src/vmidi.h>
