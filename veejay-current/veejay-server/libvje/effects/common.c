@@ -1222,25 +1222,6 @@ uint8_t bl_pix_test3_C(uint8_t y1, uint8_t y2)
     return new_C;
 }
 
-void _4byte_copy( uint8_t *src, uint8_t *dst, int width,int height, int x_start, int y_start)
-{
-	unsigned int x = 0, y = 0;
-	int *in,*out;
-
-	width = width >> 2;
-	
-	for(y = y_start; y < height; y++ )
-	{
-		out = (int*) &dst[y*width];
-		in = (int*) &src[y*width];
-		for(x=x_start;x < width; x++)
-		{
-			out[x] =(((in[x] >> 24) & 0xff)) + (((in[x] >> 16) & 0xff) << 8)  + (((in[x] >> 8) & 0xff) << 16) + (((in[x]) & 0xff) << 24);
-		}
-	}
-
-}
-
 int bl_pix_get_color_y(int color_num)
 {
     switch (color_num) {

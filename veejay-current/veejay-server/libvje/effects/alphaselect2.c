@@ -88,12 +88,11 @@ static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, c
 		return 1.0; /* far from color key == fg */
 }
 
-void alphaselect2_apply( VJFrame *frame, int width,
-		   int height, int tola, int r, int g,
+void alphaselect2_apply( VJFrame *frame,int tola, int r, int g,
 		   int b, int tolb,int alpha)
 {
     unsigned int pos;
-	const unsigned int len = width * height;
+	const unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

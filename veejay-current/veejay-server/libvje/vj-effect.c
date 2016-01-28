@@ -69,7 +69,7 @@
 #include "effects/diff.h"
 #include "effects/bgsubtract.h"
 //#include "effects/texmap.h"
-//#include "effects/contourextract.h"
+#include "effects/contourextract.h"
 #include "effects/autoeq.h"
 #include "effects/colorhis.h"
 #include "effects/diffimg.h"
@@ -300,7 +300,7 @@ static struct
 {
 	{	diff_malloc,		diff_free,			VJ_VIDEO_EFFECT_DIFF },
 //	{	texmap_malloc,		texmap_free,			VJ_VIDEO_EFFECT_TEXMAP },
-//	{	contourextract_malloc,  contourextract_free,		VJ_IMAGE_EFFECT_CONTOUR },
+	{	contourextract_malloc,  contourextract_free,		VJ_IMAGE_EFFECT_CONTOUR },
 	{	cali_malloc,		cali_free,			VJ_IMAGE_EFFECT_CALI },
 	{	picinpic_malloc,	picinpic_free,			VJ_VIDEO_EFFECT_PICINPIC },
 	{	water_malloc,		water_free,			VJ_VIDEO_EFFECT_RIPPLETV },
@@ -664,7 +664,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_IMAGE_EFFECT_TIMEDISTORT]			= timedistort_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_CHAMELEON]			= chameleon_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_BALTANTV]			= baltantv_init(width,height);
-//	vj_effects[VJ_IMAGE_EFFECT_CONTOUR]				= contourextract_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_CONTOUR]				= contourextract_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_RIPPLETV]			= waterrippletv_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_LENSCORRECTION ]		= radcor_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_CALI]				= cali_init(width,height);
@@ -735,7 +735,7 @@ void vj_effect_shutdown() {
 
     diff_destroy();
     //texmap_destroy();
-//    contourextract_destroy();
+    contourextract_destroy();
     rotozoom_destroy();
     plug_sys_free();
 }

@@ -1,7 +1,8 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ *             2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -223,40 +224,23 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	uint32_t cy[256];
 	uint32_t xsize[256];
 	uint32_t ysize[256];
-	
+	uint32_t blobs[255];
+
 	float sx = (float) width / (float) dw_;
 	float sy = (float) height / (float) dh_;
 	
 	veejay_memset( cx,0,sizeof(cx));
 	veejay_memset( cy,0,sizeof(cy));
-	
 	veejay_memset( xsize,0,sizeof(xsize));
 	veejay_memset( ysize,0,sizeof(ysize));
-	
+	veejay_memset( blobs, 0, sizeof(blobs) );
+
 	contourextract_data *ud = (contourextract_data*) ed;
-
-	if( take_bg != take_bg_ )
-	{	
-		vj_frame_copy1( frame->data[0], static_bg, frame->len );
-		take_bg_ = take_bg;
-		bg_frame_ ++;
-		return;
-	}
-	if( bg_frame_ > 0 && bg_frame_ < 4 )
-	{
-		for( i = 0 ; i < len ; i ++ )
-		{
-			static_bg[i] = (static_bg[i] + Y[i] ) >> 1;
-		}
-		bg_frame_ ++;
-		return;
-	}
-
+	
 	//@ clear distance transform map
 	veejay_memset( dt_map, 0 , len * sizeof(uint32_t) );
 
-	//@ todo: optimize with mmx
-	binarify( ud->bitmap,static_bg, frame->data[0], threshold, reverse,len );
+	binarify_1src( ud->bitmap, frame->data[0], threshold, reverse, width, height );
 
 	if(mode==1)
 	{
@@ -273,14 +257,10 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	to_shrink_.data[0] = ud->bitmap;
 	shrinked_.data[0] = ud->current;
 
-	uint32_t blobs[255];
-
-	veejay_memset( blobs, 0, sizeof(blobs) );
-
 	yuv_convert_and_scale_grey( shrink_, &to_shrink_, &shrinked_ );
 
-	uint32_t labels = veejay_component_labeling_8(dw_,dh_, shrinked_.data[0], blobs, cx,cy,xsize,ysize,
-			min_blob_weight);
+	uint32_t labels = 
+		veejay_component_labeling_8(dw_,dh_, shrinked_.data[0], blobs, cx,cy,xsize,ysize,min_blob_weight);
 
 	veejay_memset( Y, 0, len );
 	veejay_memset( Cb , 128, uv_len);
@@ -293,6 +273,8 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	
 	
 	//@ Iterate over blob's bounding boxes and extract contours
+	//@ use snippet below to get center of blob --> parameter extraction TODO
+	/*
 	for( i = 1; i <= labels; i ++ )
 	{
 		if( blobs[i] > 0 )
@@ -339,6 +321,7 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 			}
 		}
 	}
+	*/
 
 }
 

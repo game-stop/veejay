@@ -393,9 +393,9 @@ void vj_effman_apply_image_effect(
 	case VJ_IMAGE_EFFECT_MOTIONMAP:
 	motionmap_apply( frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
-//	case VJ_IMAGE_EFFECT_CONTOUR:
-//	contourextract_apply( vj_effects[entry]->user_data, frames[0],
-//			frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
+	case VJ_IMAGE_EFFECT_CONTOUR:
+	contourextract_apply( vj_effects[entry]->user_data, frames[0],
+			frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
 	break;
      case VJ_IMAGE_EFFECT_SLICE:
 	if(arg[2] > 0) { 
@@ -430,7 +430,7 @@ void vj_effman_apply_image_effect(
 		alphaselect_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 		break;
 	case VJ_IMAGE_EFFECT_ALPHASELECT2:
-		alphaselect2_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
+		alphaselect2_apply(frames[0],arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 		break;
 	 case VJ_IMAGE_EFFECT_PIXELATE:
 		pixelate_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
@@ -718,9 +718,9 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 		case VJ_IMAGE_EFFECT_BGSUBTRACT:
 			return bgsubtract_prepare( frame->data, frame->width,frame->height );
 			break;	
-//		case 	VJ_IMAGE_EFFECT_CONTOUR:
-//			return contourextract_prepare(frame->data,frame->width,frame->height );
-//			break;
+		case 	VJ_IMAGE_EFFECT_CONTOUR:
+			return contourextract_prepare(frame->data,frame->width,frame->height );
+			break;
 		case	VJ_VIDEO_EFFECT_DIFF:
 			if( !vj_effect_has_cb(selector))
 				return 0;
