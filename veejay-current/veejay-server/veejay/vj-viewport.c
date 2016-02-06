@@ -67,8 +67,9 @@
 #define round1(x) ( (int32_t)( (x>0) ? (x) + 0.5 : (x)  - 0.5 ))
 #define min4(a,b,c,d) MIN(MIN(MIN(a,b),c),d)
 #define max4(a,b,c,d) MAX(MAX(MAX(a,b),c),d)
-
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 #include <xmmintrin.h>
+#endif
 
 #define GRID_STEP 1
 #define GRID_START 44

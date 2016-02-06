@@ -17,8 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
-
+#ifndef VJE_COMMON
+#define VJE_COMMON
 #include <config.h>
 #include <stdarg.h>
 #include <string.h>
@@ -350,6 +350,7 @@ void binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse,
 void vje_load_mask(uint8_t val);
 void vje_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len );
 void vje_mmx_negate( uint8_t *dst, uint8_t *in );
+#endif
 void vje_build_value_hint_list( vj_value_hint_t **hints, int num, int limit, ... );
 vj_value_hint_t **vje_init_value_hint_list(int n_params);
 #endif

@@ -328,6 +328,20 @@ if test x"$with_extra_cflags" != "x"; then
    CFLAGS="$CFLAGS $with_extra_cflags"
    CXXFLAGS="$CXXFLAGS $with_extra_cflags"
 fi
+dnl Check for Veejay
+have_veejay=false
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.50 ],
+	[	
+		AC_SUBST(VEEJAY_CFLAGS)
+		AC_SUBST(VEEJAY_LIBS)
+		have_veejay=true
+		AC_DEFINE(HAVE_VEEJAY,1, [Veejay 1.5.50 installed])]
+		,
+		[have_veejay=false])
+
+if test x$have_veejay != xtrue ; then
+   AC_MSG_ERROR([Cannot find veejay 1.5.50 or later])
+fi
 
 AC_CONFIG_FILES([
 Makefile
@@ -346,6 +360,7 @@ AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([  - FFmpeg/AV Swscaler            : ${have_swscale} ])
 AC_MSG_NOTICE([  - FFmpeg/AV AVUtil              : ${have_avutil} ])
+AC_MSG_NOTICE([  - Veejay                        : ${have_veejay} ])
 if test "$have_linux" = "true" ; then
 AC_MSG_NOTICE([   Platform: Linux])
 fi

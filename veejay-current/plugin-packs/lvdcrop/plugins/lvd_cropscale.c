@@ -13,13 +13,12 @@
 LIVIDO_PLUGIN
 #include	"utils.h"
 #include	"livido-utils.c"
-#include	"avcommon.h"
 
 #define RUP8(num)(((num)+8)&~8)
 
 #include <libavutil/cpu.h>
 #include <libswscale/swscale.h>
-
+#include <veejay/avcommon.h>
 typedef struct
 {
 	struct SwsContext *sws;

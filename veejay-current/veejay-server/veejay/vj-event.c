@@ -187,6 +187,7 @@ static	char	*retrieve_macro_(veejay_t *v,int idx, char *key );
 static	void	store_macro_( veejay_t *v,char *str, long frame );
 static	void	reset_macro_(void);
 static	void	display_replay_macro_(void);
+static void vj_event_sample_next1( veejay_t *v );
 
 extern void	veejay_pipe_write_status(veejay_t *info);
 extern int	_vj_server_del_client(vj_server * vje, int link_id);
@@ -10412,9 +10413,8 @@ void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap
 }
 #endif
 
-void	vj_event_sample_next( void *ptr, const char format[], va_list ap)
+static void vj_event_sample_next1( veejay_t *v )
 {
-	veejay_t *v = (veejay_t*) ptr;
 	if( v->seq->active ){
 		int s = (v->settings->current_playback_speed < 0 ? -1 : 1 );
 		int p = v->seq->current + s;
@@ -10459,6 +10459,12 @@ void	vj_event_sample_next( void *ptr, const char format[], va_list ap)
 			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, n );	
 		}
 	}
+}
+
+void	vj_event_sample_next( void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	vj_event_sample_next1( v );
 }
 
 
@@ -10636,7 +10642,7 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 	}
 	else if ( args[0] == 3 )
 	{
-		vj_event_sample_next( v , NULL, NULL );
+		vj_event_sample_next1( v );
 	}
 }
 

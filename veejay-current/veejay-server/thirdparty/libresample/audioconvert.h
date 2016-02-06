@@ -32,7 +32,6 @@
 
 #include <libavutil/cpu.h>
 #include <libavcodec/avcodec.h>
-#include <libavutil/channel_layout.h>
 
 struct AVAudioConvert;
 typedef struct AVAudioConvert AVAudioConvert;

@@ -154,6 +154,9 @@
 #define CONFUSION_FACTOR 0
 //Feel free to fine-tune the above 2, it might be possible to get some speedup with them :)
 
+static int selected_best_memcpy = 1;
+static int selected_best_memset = 1;
+
 #ifdef HAVE_POSIX_TIMERS
 static int64_t _x_gettime(void)
 {
@@ -249,7 +252,7 @@ void	yuyv_plane_clear( size_t len, void *to )
 		uint8_t * t    = (uint8_t*) to;
 		uint8_t *in[4] = { t, NULL,NULL,NULL };
 		int 	strides[4] = { len, 0,0,0 };
-		vj_task_run( in, in, NULL, NULL, 1, &yuyv_plane_clear_job );
+		vj_task_run( in, in, NULL, NULL, 1, (performer_job_routine) &yuyv_plane_clear_job );
 	}
 	else {
 		uint8_t *t = (uint8_t*) to;
@@ -347,8 +350,6 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #define is_aligned__(PTR,LEN) \
 	(((uintptr_t)(const void*)(PTR)) % (LEN) == 0 )
 
-static int selected_best_memcpy = 1;
-static int selected_best_memset = 1;
 
 char	*veejay_strncpy( char *dest, const char *src, size_t n )
 {

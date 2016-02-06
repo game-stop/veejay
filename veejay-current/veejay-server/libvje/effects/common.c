@@ -1490,7 +1490,7 @@ void	binarify_1src( uint8_t *dst, uint8_t *src, uint8_t v, int reverse,int w, in
 
 
 #else
-void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len )
+void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len )
 {	
 	unsigned int i;
 	for( i = 0; i < len; i ++ ) {
@@ -1498,7 +1498,7 @@ void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len )
 	}	
 }
 
-void 	vj_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len )
+void 	vje_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len )
 {
 	unsigned int i;
 	for( i = 0; i < len; i++ ) {
