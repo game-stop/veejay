@@ -1,0 +1,55 @@
+
+ODROID XU3 
+==========
+product: http://www.hardkernel.com/main/products/prdt_info.php?g_code=G140448267127
+distro : Ubuntu 12.04.5
+uname  : Linux odroid02 3.10.82 #1 SMP PREEMPT Wed Sep 2 19:59:44 BRT 2015 armv7l armv7l armv7l GNU/Linux
+gcc    : 4.6.3-1ubuntu5
+
+
+Prerequisites
+=============
+
+Remove libav:
+$ apt-get remove libavcodec53 libavformat53
+$ apt-get remove libswscale2 
+$ apt-get remove libavutil51
+$ apt-get remove libavutil-dev libavcodec-dev libavformat-dev libswscale-dev
+  
+Get a recent ffmpeg:
+
+    ffmpeg-2.8.6 
+
+Build ffmpeg:
+
+$ ./configure --enable-shared --enable-nonfree --enable-neon --prefix=/usr
+$ make -j8
+$ sudo make install
+
+
+Configuring veejay
+==================
+
+Before running configure, you should set your CFLAGS. 
+
+The system I used fails to detect the architecture:
+
+~/veejay/veejay-current/veejay-server$ ./cpuinfo.sh 
+*** glibc detected *** gcc: double free or corruption (top): 0x00053f10 ***
+Aborted
+-march=
+
+These are my CFLAGS:
+
+export CFLAGS="-O3 -march=armv7 -mfloat-abi=hard -mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad" 
+
+Next, run configure, make and make install:
+
+$ sh autogen.sh
+$ ./configure
+$ make -j8
+$ sudo make install
+
+Do the same for veejay-client, veejay-utils and the pluginpacks
+
+
