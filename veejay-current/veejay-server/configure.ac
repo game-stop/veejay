@@ -37,6 +37,7 @@ AC_CONFIG_MACRO_DIR([m4])
 
 
 dnl kill CFLAGS
+USER_CFLAGS="$CFLAGS"
 CFLAGS=""
 dnl enable auto vectorization for libvjmem, libvje and libyuv
 
@@ -349,6 +350,14 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	;;
   *)
     AC_MSG_RESULT([unknown])
+
+	if test "x$enable_debug" != "xyes" ; then
+		OP_CFLAGS="$USER_CFLAGS"
+		SUBSAMPLE_CFLAGS="$USER_CFLAGS"
+		VJE_CFLAGS="$USER_CFLAGS"
+		CFLAGS="$USER_CFLAGS"
+	fi
+
     ;;
 esac
 
