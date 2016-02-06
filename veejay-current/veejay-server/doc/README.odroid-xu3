@@ -1,7 +1,7 @@
 
 ODROID XU4
 ==========
-product: http://www.hardkernel.com/main/products/prdt_info.php?g_code=G140448267127
+product: http://www.hardkernel.com/main/products/prdt_info.php
 distro : Ubuntu 12.04.5
 uname  : Linux odroid02 3.10.82 #1 SMP PREEMPT Wed Sep 2 19:59:44 BRT 2015 armv7l armv7l armv7l GNU/Linux
 gcc    : 4.6.3-1ubuntu5
