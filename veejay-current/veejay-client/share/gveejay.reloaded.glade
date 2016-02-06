@@ -12641,7 +12641,7 @@ YUV (current)</property>
                                                             <widget class="GtkImage" id="image43">
                                                             <property name="visible">True</property>
                                                             <property name="can_focus">False</property>
-                                                            <property name="pixbuf">icon_return.png</property>
+                                                            <property name="pixbuf">icon_bounce.png</property>
                                                             </widget>
                                                             <packing>
                                                             <property name="expand">False</property>

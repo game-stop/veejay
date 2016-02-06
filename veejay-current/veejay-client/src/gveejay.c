@@ -229,6 +229,10 @@ int main(int argc, char *argv[]) {
 
 	clone_args( argv, argc );
 
+#if !GLIB_CHECK_VERSION(2,36,0)
+	g_type_init();
+#endif
+
 	gtk_init( &argc, &argv );
 
 	// default host to connect to

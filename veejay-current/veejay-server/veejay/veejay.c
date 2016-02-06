@@ -48,6 +48,9 @@
 #include <unistd.h>
 #include <veejay/vj-OSC.h>
 #include <build.h>
+#include <glib-2.0/glib.h>
+#include <glib-2.0/glib-object.h>
+
 extern void	veejay_init_msg_ring(); 
 extern void vj_libav_ffmpeg_version();
 static veejay_t *info = NULL;
@@ -764,6 +767,10 @@ int main(int argc, char **argv)
 	int i;
 	int main_ret = 0;
 	fflush(stdout);
+
+#if !GLIB_CHECK_VERSION(2,36,0)
+	g_type_init();
+#endif
 
 	vj_mem_init();
 
