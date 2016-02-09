@@ -15,9 +15,9 @@ The engine is historically based upon mjpegtools's lavplay and processes all vid
 ###Veejay Applications:
 * __Reloaded__
     A GUI developed in GLADE/GTK
-* __sayVIMS__
-    A PureData object allowing direct communications with the server
 * __sendVIMS__
+    A PureData object allowing direct communications with the server
+* __sayVIMS__
     A console based utility for quick'n'dirty scripting
 
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
