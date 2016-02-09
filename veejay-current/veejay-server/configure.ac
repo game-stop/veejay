@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.58],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.59],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=58
+VEEJAY_MICRO_VERSION=59
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -60,9 +60,9 @@ AC_ARG_ENABLE(compile-warnings,
 AC_ARG_ENABLE(warnings_as_errors,   
               AC_HELP_STRING([--enable-warnings_as_errors],
                              [Compiler warnings are errors.]))
-AC_ARG_ENABLE(simd-accel,
-              AC_HELP_STRING([--enable-simd-accel],
-                             [use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
+AC_ARG_ENABLE(neon,
+		AC_HELP_STRING([--enable-neon],
+				[enable NEON support (for ARM)]))
 
 AC_ARG_WITH(extra-cflags,
             AC_HELP_STRING([--with-extra-cflags=flags],
@@ -285,6 +285,24 @@ have_ps2=false
 OP_CFLAGS=""
 VJE_CFLAGS=""
 SUBSAMPLE_CFLAGS=""
+
+dnl There is a bug in gcc 4.6.3 causing cpu detection script to fail
+dnl if --enable-neon is set, set CFLAGS for arm7
+dnl FIXME proper ARM capability detection
+AC_MSG_CHECKING(whether to compile in neon support)
+if test "x$enable_neon" = "xyes" ; then
+	AC_MSG_RESULT([yes])
+	AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
+	USER_CFLAGS="-mfpu=neon -march=armv7 -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
+	if test "x$enable_debug" != "xyes" ; then
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
+	else
+		USER_CFLAGS="$USER_CFLAGS -g -Wall"
+	fi
+else
+	AC_MSG_RESULT([no])
+fi
+
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
@@ -348,15 +366,14 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	fi
 
 	;;
+
   *)
     AC_MSG_RESULT([unknown])
 
-	if test "x$enable_debug" != "xyes" ; then
-		OP_CFLAGS="$USER_CFLAGS"
-		SUBSAMPLE_CFLAGS="$USER_CFLAGS"
-		VJE_CFLAGS="$USER_CFLAGS"
-		CFLAGS="$USER_CFLAGS"
-	fi
+	OP_CFLAGS="$USER_CFLAGS"
+	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
+	VJE_CFLAGS="$USER_CFLAGS"
+	CFLAGS="$USER_CFLAGS"
 
     ;;
 esac

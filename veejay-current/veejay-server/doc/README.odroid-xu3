@@ -20,6 +20,12 @@ Get a recent ffmpeg:
 
     ffmpeg-2.8.6 
 
+Review your CFLAGS:
+$ echo $CFLAGS
+
+And change/set accordingly:
+$ export CFLAGS="-mfpu=neon -march=armv7 -ftree-vectorize -mvectorize-with-neon-quad -O3"
+
 Build ffmpeg:
 
 $ ./configure --enable-shared --enable-nonfree --enable-neon --prefix=/usr
@@ -30,26 +36,35 @@ $ sudo make install
 Configuring veejay
 ==================
 
-Before running configure, you should set your CFLAGS. 
-
-The system I used fails to detect the architecture:
+WARNING: The system I used fails to detect the architecture:
+========
 
 ~/veejay/veejay-current/veejay-server$ ./cpuinfo.sh 
 *** glibc detected *** gcc: double free or corruption (top): 0x00053f10 ***
 Aborted
 -march=
 
-These are my CFLAGS:
+Relevant line from configure output: 
+> checking Architecture... unknown
 
-export CFLAGS="-O3 -march=armv7 -mfloat-abi=hard -mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad" 
+You can workarround this issue by giving the '--enable-neon' configure option. This will force the CFLAGS for ARM
+If you have set your own CFLAGS, they will be added to the default CFLAGS. You should clear your CFLAGS and use '--with-extra-cflags' if you wish to add additional compiler flags. 
+
+If you do not specify the '--enable-neon' option, you should set your own CFLAGS in order to have an optimized build:
+
+$ export CFLAGS="-DHAVE_ARM_NEON=1 -mfpu=neon -march=armv7 -ftree-vectorize -mvectorize-with-neon-quad -O3"
 
 Next, run configure, make and make install:
 
 $ sh autogen.sh
-$ ./configure
+$ ./configure --enable-neon
 $ make -j8
 $ sudo make install
 
-Do the same for veejay-client, veejay-utils and the pluginpacks
+When you run veejay, you can see if NEON optimizations are built-in:
+> I: Using SIMD NEON optimized memcpy()
 
 
+TLDR:
+
+$ ./configure --enable-neon
