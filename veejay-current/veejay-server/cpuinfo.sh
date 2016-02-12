@@ -50,8 +50,18 @@ EOF
 arch=`$CC -march=native -Q --help=target|grep -- '-march='|cut -f3`
 do_cc -march=$arch
 if test $? -ne 0; then
-	arch=
+	# gcc failed, lets try -dumpmachine and test specifically for arm
+	# since we know that 'gcc -march=native -Q --help=target` fails on gcc 4.6.3
+	machine=`$CC -dumpmachine`
+	cpu=`echo $machine |cut -d '-' -f1`
+	case $cpu in
+		arm)
+			arch=`cat /proc/cpuinfo|grep 'model name'|head -n1|cut -d ':' -f2 |cut -d ' ' -f2 | tr '[:upper:]' '[:lower:]'`	
+		;;
+	esac
+
 fi
 
-echo "-march=$arch"
+rm -rf veejay.arch
+echo "-march=$arch" > veejay.arch
 
