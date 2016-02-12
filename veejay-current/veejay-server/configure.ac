@@ -354,7 +354,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	fi
 
 	;;
-   arm*)
+   arm|armv7l)
 	AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	have_arm=true
 	AC_MSG_RESULT(arm)
@@ -381,7 +381,7 @@ dnl ARM architecture detect NEON and set CFLAGS
 if test x$have_arm = xtrue
 then
 	AC_CACHE_CHECK(for NEON on processor(s), ac_cv_flag_neon, [
-		if grep "^flags.* neon" /proc/cpuinfo > /dev/null; then
+		if grep "^Features.* neon" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_neon=yes
 		else
 			ac_cv_flag_neon=no
@@ -584,27 +584,26 @@ EOF
     fi
 fi
 
-if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
-	if test x$host_alias != x; then
-		dnl Cross compiling
-		AC_MSG_CHECKING(sub-architecture settings)
-		if test x$have_x86cpu = xtrue; then
-			host_mod_cpu=`echo $host_cpu|tr _ -`
-			ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
-			AC_MSG_RESULT($ARCHFLAGS)
-		fi
-	else
-		AC_MSG_CHECKING(sub-architecture settings)
-		
-		chmod +x $srcdir/cpuinfo.sh
-
-		if test "$arch_target" = "auto"; then
-			ARCHFLAGS=`$srcdir/cpuinfo.sh`
-		else
-       		ARCHFLAGS="-mtune=generic"
-		fi
+if test x$host_alias != x; then
+	dnl Cross compiling
+	AC_MSG_CHECKING(sub-architecture settings)
+	if test x$have_x86cpu = xtrue; then
+		host_mod_cpu=`echo $host_cpu|tr _ -`
+		ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
 		AC_MSG_RESULT($ARCHFLAGS)
-  	fi
+	fi
+else
+	AC_MSG_CHECKING(sub-architecture settings)
+	
+	chmod +x $srcdir/cpuinfo.sh
+
+	if test "$arch_target" = "auto"; then
+		TMP=`$srcdir/cpuinfo.sh`
+		ARCHFLAGS=`cat veejay.arch`
+	else
+       		ARCHFLAGS="-mtune=generic"
+	fi
+		AC_MSG_RESULT($ARCHFLAGS)
 fi
 
 have_mjpegtools=false
