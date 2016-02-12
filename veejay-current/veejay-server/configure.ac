@@ -60,10 +60,6 @@ AC_ARG_ENABLE(compile-warnings,
 AC_ARG_ENABLE(warnings_as_errors,   
               AC_HELP_STRING([--enable-warnings_as_errors],
                              [Compiler warnings are errors.]))
-AC_ARG_ENABLE(neon,
-		AC_HELP_STRING([--enable-neon],
-				[enable NEON support (for ARM)]))
-
 AC_ARG_WITH(extra-cflags,
             AC_HELP_STRING([--with-extra-cflags=flags],
                            [Options to be added to CFLAGS (optional)]))
@@ -281,27 +277,11 @@ have_altivec=false
 have_mips=false
 have_ppccpu=false
 have_ps2=false
+have_arm=false
 
 OP_CFLAGS=""
 VJE_CFLAGS=""
 SUBSAMPLE_CFLAGS=""
-
-dnl There is a bug in gcc 4.6.3 causing cpu detection script to fail
-dnl if --enable-neon is set, set CFLAGS for arm7
-dnl FIXME proper ARM capability detection
-AC_MSG_CHECKING(whether to compile in neon support)
-if test "x$enable_neon" = "xyes" ; then
-	AC_MSG_RESULT([yes])
-	AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
-	USER_CFLAGS="-mfpu=neon -march=armv7 -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
-	if test "x$enable_debug" != "xyes" ; then
-		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
-	else
-		USER_CFLAGS="$USER_CFLAGS -g -Wall"
-	fi
-else
-	AC_MSG_RESULT([no])
-fi
 
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
@@ -317,6 +297,8 @@ case $host_cpu in
 		SUBSAMPLE_CFLAGS=""
 		VJE_CFLAGS="-O3 -ftree-vectorize"
 	fi
+
+	AC_MSG_RESULT([x86])
     ;;
   x86_64*|k8-*)
     	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
@@ -329,6 +311,8 @@ case $host_cpu in
 		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
 	fi
 	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
+
+	AC_MSG_RESULT([x86_64])
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
@@ -345,12 +329,13 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
    		PROGRAM_NOPIC=""
       		;;
     	esac
+
+	AC_MSG_RESULT([powerpc])
     ;;
    mips | mipsel)
 	AC_DEFINE(ARCH_MIPS,1,[Compiling for MIPS CPU])
 	AC_DEFINE(HAVE_MIPS,1,[Compiling for MIPS CPU])
 	have_mips=true
-	AC_MSG_CHECKING([if we are compiling on playstation2 hardware])
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
 		[[#include <linux/ps2/dev.h>
 		  #include <linux/ps2/gs.h>
@@ -358,6 +343,9 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 		[have_ps2=true],
 		[have_ps2=false])
 
+	AC_MSG_RESULT([mips])
+
+	AC_MSG_CHECKING([if we are compiling on playstation2 hardware])
 	if test x$have_ps2 = xtrue ; then
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_PS2,1,[Compile for playstation2])
@@ -366,20 +354,59 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	fi
 
 	;;
+   arm*)
+	AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	have_arm=true
+	AC_MSG_RESULT(arm)
+	;;
 
   *)
-    AC_MSG_RESULT([unknown])
 
-	OP_CFLAGS="$USER_CFLAGS"
-	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
-	VJE_CFLAGS="$USER_CFLAGS"
-	CFLAGS="$USER_CFLAGS"
+dnl If you get here, you can change AC_MSG_ERROR to AC_MSG_RESULT
+dnl and uncomment setting the CFLAGS below to have it compile anyway on your system
+	AC_MSG_ERROR([unknown])
+
+dnl	OP_CFLAGS="$USER_CFLAGS"
+dnl	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
+dnl	VJE_CFLAGS="$USER_CFLAGS"
+dnl	CFLAGS="$USER_CFLAGS"
 
     ;;
 esac
 
 CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 
+
+dnl ARM architecture detect NEON and set CFLAGS
+if test x$have_arm = xtrue
+then
+	AC_CACHE_CHECK(for NEON on processor(s), ac_cv_flag_neon, [
+		if grep "^flags.* neon" /proc/cpuinfo > /dev/null; then
+			ac_cv_flag_neon=yes
+		else
+			ac_cv_flag_neon=no
+		fi
+	])
+	AC_MSG_RESULT($ac_cv_flag_neon)	
+
+	if test $ac_cv_flag_neon = yes ; then
+		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
+		USER_CFLAGS="-mfpu=neon -march=armv7 -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
+	else
+		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
+	fi
+	
+	if test "x$enable_debug" != "xyes" ; then
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
+	else
+		USER_CFLAGS="$USER_CFLAGS -g -Wall"
+	fi
+
+	OP_CFLAGS="$USER_CFLAGS"
+	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
+	VJE_CFLAGS="$USER_CFLAGS"
+	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+fi
 
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 
@@ -418,8 +445,6 @@ then
 		have_asm_sse=true
 	fi
 
-
-	dnl check for sse2
 	AC_CACHE_CHECK(for SSE2 on processor(s), ac_cv_flag_sse2, [
 		if grep "^flags.* sse2" /proc/cpuinfo > /dev/null; then
  			ac_cv_flag_sse2=yes
@@ -441,7 +466,6 @@ then
 			ac_cv_flag_3dnow=no
 		fi
 	])
-
 
 	if test $ac_cv_flag_3dnow = yes; then
 		AC_MSG_CHECKING([if your CPU understands 3DNOW femms])
@@ -545,7 +569,8 @@ EOF
       ALTIVEC_CFLAGS="-DHAVE_ALTIVEC_H=1 -maltivec -mabi=altivec"
     fi
     rm -f conftest*;
-  
+ 
+    AC_MSG_CHECKING([if your system supports altivec]) 
     if test x$have_altivec = xtrue
     then
       # add -O3 flag
@@ -557,8 +582,6 @@ EOF
     else
       AC_MSG_RESULT(no)
     fi
-
-
 fi
 
 if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
@@ -571,20 +594,18 @@ if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 			AC_MSG_RESULT($ARCHFLAGS)
 		fi
 	else
-		AC_MSG_CHECKING(sub-architecture settings ...)
+		AC_MSG_CHECKING(sub-architecture settings)
 		
 		chmod +x $srcdir/cpuinfo.sh
 
 		if test "$arch_target" = "auto"; then
 			ARCHFLAGS=`$srcdir/cpuinfo.sh`
 		else
-       			ARCHFLAGS="-mtune=generic"
+       		ARCHFLAGS="-mtune=generic"
 		fi
 		AC_MSG_RESULT($ARCHFLAGS)
   	fi
 fi
-
-AC_MSG_RESULT($CFLAGS)
 
 have_mjpegtools=false
 AC_SUBST(MJPEGTOOLS_CFLAGS)
@@ -642,11 +663,8 @@ FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCA
 AC_SUBST(FFMPEG_CFLAGS)
 AC_SUBST(FFMPEG_LIBS)
 
-
 FREEFRAME_CFLAGS="-freg-struct-return -Wno-unknown-pragmas -DLINUX"
 AC_SUBST(FREEFRAME_CFLAGS)
-
-
 AC_SUBST(LIBM_LIBS)
 
 dnl ********************************************************************
@@ -665,7 +683,6 @@ else
 fi
 AC_SUBST(HAVE_X)
 AM_CONDITIONAL(HAVE_X, test "x$HAVE_X" = "xyes")
-
 
 dnl the check doesnt work on ubuntu, so just fake it.
 RT_LIBS="-lrt"
@@ -686,12 +703,12 @@ AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
 	   use_xinerama=no,
 	   [#include <X11/Xlib.h>])],
 	   use_xinerama=no, -lXext)
-AC_MSG_CHECKING( for Xinerama support on XFree86 )
+AC_MSG_CHECKING(for Xinerama support on XFree86)
 AC_MSG_RESULT($use_xinerama)	
 
-
+AC_MSG_CHECKING(for video4linux support)
 AC_MSG_RESULT( $with_v4l )
-
+AC_MSG_CHECKING(for video4linux II support)
 AC_MSG_RESULT( $with_v4l2 )
 
 if test x$with_v4l2 != xno ; then
@@ -724,8 +741,6 @@ if test x$with_v4l != xno ; then
           fi
 fi
 
-
-
 dnl *********************************************************************
 dnl Check for the pthread lib
 dnl
@@ -747,10 +762,8 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
  have_dl_dlopen=true
 fi
 
-
 dnl
 dnl Check if we want to link with libjpeg (used for making a screenshot)
-
 have_jpeg=false
 if test x$with_jpeg != xno ; then
 
@@ -834,6 +847,9 @@ if test x$with_libdv != xno ; then
                     [have_libdv=false])
 fi
 
+dnl *********************************************************************
+dnl Check for libquicktime
+dnl *********************************************************************
 have_libquicktime=false
 if test x$with_libquicktime != xno ; then
   PKG_CHECK_MODULES(LIBQUICKTIME, [libquicktime >= 1.0.0],
@@ -880,6 +896,9 @@ fi
 AC_DEFINE(HAVE_SDL,1,[SDL library is installed])
 fi
 
+dnl *********************************************************************
+dnl Check for SDL_ttf
+dnl *********************************************************************
 have_sdl_ttf=false
 if test x$with_sdl != xno ; then
 	PKG_CHECK_MODULES( SDL_TTF, SDL_ttf <= 2.0.11, have_sdl_ttf=true,have_sdl_ttf=false)
@@ -891,6 +910,9 @@ if test x$with_sdl != xno ; then
 fi
 
 
+dnl *********************************************************************
+dnl Check for Liblo
+dnl *********************************************************************
 have_liblo=false
 PKG_CHECK_MODULES( LIBLO, liblo >= 0.26,have_liblo=true,have_liblo=false)
 if test x$have_liblo = xfalse ; then
@@ -961,7 +983,6 @@ if test x$have_xml2 != xtrue ; then
 	AC_MSG_ERROR([Cannot find the The XML C library for gnome])
 fi
 
-
 have_freetype=false
 have_freetype2=false
 dnl PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
@@ -996,8 +1017,6 @@ if test x$have_freetype2 != xtrue; then
 		AC_MSG_ERROR([Cannot find the freetype-config program])
 	fi
 fi
-
-
 
 AC_MSG_CHECKING(if libunwind is installed)
 have_unwind=false
@@ -1070,7 +1089,6 @@ AC_SUBST(OP_CFLAGS)
 AC_SUBST(VJE_CFLAGS)
 AC_SUBST(SUBSAMPLE_CFLAGS)
 
-
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
 fi
@@ -1131,8 +1149,6 @@ fi
 chmod +x $srcdir/buildinfo.sh
 
 $srcdir/buildinfo.sh
-
-
 
 dnl **********************************************************************
 dnl Output a Makefile or two and the lib/header descriptor script
@@ -1198,6 +1214,11 @@ fi
 if test "$have_ppccpu" = "true" ; then
 AC_MSG_NOTICE([   ppc])
 AC_MSG_NOTICE([    AltiVec enabled     : ${have_altivec}])
+fi
+
+if test "$have_arm" = "true" ; then
+AC_MSG_NOTICE([   arm])
+AC_MSG_NOTICE([    NEON    enabled     : ${ac_cv_flag_neon}])
 fi
 
 if test "$have_mips" = "true" ; then
