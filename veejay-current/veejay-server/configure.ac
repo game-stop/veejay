@@ -391,7 +391,7 @@ then
 
 	if test $ac_cv_flag_neon = yes ; then
 		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
-		USER_CFLAGS="-mfpu=neon -march=armv7 -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
+		USER_CFLAGS="-mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
 	else
 		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
 	fi
