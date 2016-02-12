@@ -36,28 +36,8 @@ $ sudo make install
 Configuring veejay
 ==================
 
-WARNING: The system I used fails to detect the architecture:
-========
-
-~/veejay/veejay-current/veejay-server$ ./cpuinfo.sh 
-*** glibc detected *** gcc: double free or corruption (top): 0x00053f10 ***
-Aborted
--march=
-
-Relevant line from configure output: 
-> checking Architecture... unknown
-
-You can workarround this issue by giving the '--enable-neon' configure option. This will force the CFLAGS for ARM
-If you have set your own CFLAGS, they will be added to the default CFLAGS. You should clear your CFLAGS and use '--with-extra-cflags' if you wish to add additional compiler flags. 
-
-If you do not specify the '--enable-neon' option, you should set your own CFLAGS in order to have an optimized build:
-
-$ export CFLAGS="-DHAVE_ARM_NEON=1 -mfpu=neon -march=armv7 -ftree-vectorize -mvectorize-with-neon-quad -O3"
-
-Next, run configure, make and make install:
-
 $ sh autogen.sh
-$ ./configure --enable-neon
+$ ./configure 
 $ make -j8
 $ sudo make install
 
@@ -65,6 +45,3 @@ When you run veejay, you can see if NEON optimizations are built-in:
 > I: Using SIMD NEON optimized memcpy()
 
 
-TLDR:
-
-$ ./configure --enable-neon
