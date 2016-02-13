@@ -183,10 +183,6 @@ int	vj_mem_threaded_init(int w, int h)
 			num_tasks = n_cpus;
 			if( num_tasks < 1 )
 				num_tasks = 1;
-
-			if( num_tasks > 1 )
-				veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer.", num_tasks, n_cpus-1 );
-
 		}
 		
 	}

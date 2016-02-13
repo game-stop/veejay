@@ -376,6 +376,27 @@ esac
 
 CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 
+if test x$host_alias != x; then
+	dnl Cross compiling
+	AC_MSG_CHECKING(sub-architecture settings)
+	if test x$have_x86cpu = xtrue; then
+		host_mod_cpu=`echo $host_cpu|tr _ -`
+		ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
+		AC_MSG_RESULT($ARCHFLAGS)
+	fi
+else
+	AC_MSG_CHECKING(sub-architecture settings)
+	
+	chmod +x $srcdir/cpuinfo.sh
+
+	if test "$arch_target" = "auto"; then
+		TMP=`$srcdir/cpuinfo.sh`
+		ARCHFLAGS=`cat veejay.arch`
+	else
+       		ARCHFLAGS="-mtune=generic"
+	fi
+		AC_MSG_RESULT($ARCHFLAGS)
+fi
 
 dnl ARM architecture detect NEON and set CFLAGS
 if test x$have_arm = xtrue
@@ -392,8 +413,11 @@ then
 	if test $ac_cv_flag_neon = yes ; then
 		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
 		USER_CFLAGS="-mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
+		FASTARM_CFLAGS="$ARCHFLAGS -Wa,-march=armv7-a -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
+
 	else
 		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
+		FASTARM_CFLAGS="$ARCHFLAGS -Wa, -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
 	fi
 	
 	if test "x$enable_debug" != "xyes" ; then
@@ -406,6 +430,8 @@ then
 	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
 	VJE_CFLAGS="$USER_CFLAGS"
 	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+
+	AC_SUBST(FASTARM_CFLAGS)
 fi
 
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
@@ -582,28 +608,6 @@ EOF
     else
       AC_MSG_RESULT(no)
     fi
-fi
-
-if test x$host_alias != x; then
-	dnl Cross compiling
-	AC_MSG_CHECKING(sub-architecture settings)
-	if test x$have_x86cpu = xtrue; then
-		host_mod_cpu=`echo $host_cpu|tr _ -`
-		ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
-		AC_MSG_RESULT($ARCHFLAGS)
-	fi
-else
-	AC_MSG_CHECKING(sub-architecture settings)
-	
-	chmod +x $srcdir/cpuinfo.sh
-
-	if test "$arch_target" = "auto"; then
-		TMP=`$srcdir/cpuinfo.sh`
-		ARCHFLAGS=`cat veejay.arch`
-	else
-       		ARCHFLAGS="-mtune=generic"
-	fi
-		AC_MSG_RESULT($ARCHFLAGS)
 fi
 
 have_mjpegtools=false
@@ -1074,6 +1078,7 @@ AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE2, test x$have_freetype2 = xtrue)
 AM_CONDITIONAL(HAVE_MJPEGTOOLS, test x$have_mjpegtools = xtrue )
+AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -1161,6 +1166,7 @@ fi
 
 AC_CONFIG_FILES([
 thirdparty/Makefile
+thirdparty/fastarm/Makefile
 thirdparty/aclib/Makefile
 thirdparty/bio2jack/Makefile
 thirdparty/libhash/Makefile

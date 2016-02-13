@@ -66,6 +66,10 @@ if !HAVE_MJPEGTOOLS
 libveejay_la_LIBADD+=-L$(top_builddir)/thirdparty/mjpegtools -lmjpegutils
 endif
 
+if HAVE_ARM
+libveejay_la_LIBADD+=-L$(top_builddir)/thirdparty/fastarm -lfastarm
+endif
+
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(SDL_TTF_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
 			$(XML2_LIBS) $(JPEG_LIBS) $(LIBLO_LIBS) $(LIBUNWIND_LIBS) $(GLIB_LIBS) \
 		 	$(FFMPEG_LIBS) $(XINERAMA_LIBS) $(MJPEGTOOLS_LIBS) $(LIBPNG_LIBS) \

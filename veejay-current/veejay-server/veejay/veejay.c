@@ -788,7 +788,7 @@ int main(int argc, char **argv)
 	{
 		veejay_free(info);
 		return 0;
-    }
+ 	}
 
 	print_license();
 

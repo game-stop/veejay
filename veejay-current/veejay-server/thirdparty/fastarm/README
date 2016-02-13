@@ -1,0 +1,97 @@
+fastarm
+
+This toolkit contains a set of fast memcpy/memset variants for ARM
+platforms. They either use the standard register file, or optionally
+NEON instructions,
+
+Several basic families of variants are provided; the current ones are
+the "new memcpy" variants which are the default for memcpy replacement,
+which generally do not overfetch beyond the source region and can be
+configured to use unaligned memory access for small sizes, or to use
+strictly aligned memory access. This family can also be configured to
+include a fast path for smaller sizes (this is the default), disabling
+this results in smaller code size at the expense of worse performance
+for small sizes. NEON optimized versions, which are generally faster
+with reduced code size, are also provided.
+
+To compile the benchmark program, run 'make'. This will compile in a
+plethora of variants with different preload strategies, block sizes,
+alignment etc.
+
+A benchmark program to compare various memcpy variants is provided. Try
+something like "./benchmark --memcpy ad --all". (Use --memcpy al on the
+Raspberry Pi platform).
+
+To compile a memcpy replacement library, set PLATFORM to one of the
+values described at the beginning of the Makefile. This selects the
+cache line size to use and whether to use NEON versions.
+
+Optionally disable Thumb2 mode compilation by commenting out the THUMBFLAGS
+definition. It must be disabled on the Raspberry Pi.
+
+Then run:
+
+    sudo make install_memcpy_replacement
+
+The replacement memcpy/memset shared library will be installed into
+/usr/lib/arm-linux-gnueabihf/ as libfastarm.so.
+
+To enable the use of the replacement memcpy in applications, create or edit
+the file /etc/ld.so.preload so that it contains the line:
+
+    /usr/lib/arm-linux-gnueabihf/libfastarm.so
+
+On the RPi platform, references to libcofi_rpi.so should be commented out
+or deleted. The new memcpy should now be activated for newly launched
+programs. To be sure, reboot or run:
+
+    sudo ldconfig
+
+To revert to the default optimized memcpy on the RPi platform,
+edit /etc/ld.so.preload so that it contains the line:
+
+    /usr/lib/arm-linux-gnueabihf/libcofi_rpi.so
+
+instead of the one using libfastarm.so.
+
+Note on cache line size:
+
+Although assuming a preload line size 64 bytes is a little faster on several
+Cortex platforms for small to moderate sizes, when accessing DRAM
+with larger sizes assuming 32 byte preloads seems to be faster. On earlier
+Cortex A9 models, 32 byte preloads are required for good performance in all
+cases.
+
+Notes on performance with and without NEON:
+
+For NEON-based memcpy, a significant benefit is seen on the tested Cortex A8
+platform for unaligned copies in cache memory and for aligned and unaligned
+copies in DRAM. Performance for aligned copies in cache memory is relatively
+similar to the optimized non-NEON function.
+
+Results in MB/s on a Cortex A8, with Thumb2 mode enabled, of
+standard libc (Debian unstable), armv7 and NEON optimized memcpy
+variants with line size of 32 bytes:
+
+		libc	armv7	NEON
+test 0		522	549	567
+test 1		329	377	378
+test 2		434	430	513
+test 28		351	361	458
+test 29		246	248	358
+test 43		467	512	581
+
+Test 0 in the benchmark program tests word-aligned requests with
+sizes that are a power of 2 up to 4096 bytes distributed according
+to a power law.
+Test 1 in the benchmark program tests word-aligned requests with
+sizes up to 1024 that are a multiple of 4, distributed according
+to a power law.
+Test 2 in the benchmark program tests unaligned requests with sizes
+up to 1023 bytes.
+Test 28 in the benchmark program tests word aligned requests in DRAM
+with sizes up to 1024 bytes.
+Test 29 in the benchmark program tests word aligned requests in DRAM
+with sizes up to 256 bytes.
+Test 43 in the benchmark program tests page aligned requests in DRAM
+of size 4096 (copying a memory page).

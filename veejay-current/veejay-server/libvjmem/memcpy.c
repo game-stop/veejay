@@ -141,6 +141,10 @@
 #include <libvje/vje.h>
 #include <veejay/vj-task.h>
 #include <libavutil/cpu.h>
+#ifdef HAVE_ARM
+#include <fastarm/new_arm.h>
+#endif
+
 #define BUFSIZE 1024
 
 
@@ -157,37 +161,12 @@
 static int selected_best_memcpy = 1;
 static int selected_best_memset = 1;
 
-#ifdef HAVE_POSIX_TIMERS
-static int64_t _x_gettime(void)
+static double get_time()
 {
-	struct timespec tm;
-	return (clock_gettime(CLOCK_THREAD_CPUTIME_ID,&tm) == -1 )
-			? times(NULL)
-			: (int64_t) tm.tv_sec * 1e9 + tm.tv_nsec;
+	struct timespec ts;
+	clock_gettime( CLOCK_REALTIME, &ts );
+	return (double) ts.tv_sec + (double) ts.tv_nsec / 1000000000.0;
 }
-#define rdtsc(x) _x_gettime()
-#elif (defined(ARCH_X86) || defined(ARCH_X86_64)) && defined(HAVE_SYS_TIMES_H)
-static int64_t rdtsc(int cpu_flags)
-{
-	int64_t x;
-	if( cpu_flags & AV_CPU_FLAGS_MMX ) {
-			__asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
-			return x;
-	} else {
-			return times(NULL);
-	}
-}
-#else
-static uint64_t rdtsc(int cpu_flags)
-{
-#ifdef HAVE_SYS_TIMES_H
-		struct tms tp;
-		return times(&tp);
-#else
-		return clock();
-#endif
-}
-#endif /* HAVE_SYS_TIMES_H */
 
 #if defined(ARCH_X86) || defined (ARCH_X86_64)
 /* for small memory blocks (<256 bytes) this version is faster */
@@ -251,7 +230,6 @@ void	yuyv_plane_clear( size_t len, void *to )
 	if( vj_task_available() ) {
 		uint8_t * t    = (uint8_t*) to;
 		uint8_t *in[4] = { t, NULL,NULL,NULL };
-		int 	strides[4] = { len, 0,0,0 };
 		vj_task_run( in, in, NULL, NULL, 1, (performer_job_routine) &yuyv_plane_clear_job );
 	}
 	else {
@@ -1349,10 +1327,10 @@ static void *memcpy_neon( void *to, const void *from, size_t n )
 
 
 static struct {
-     char                 *name;
-     void               *(*function)(void *to, const void *from, size_t len);
-     uint64_t	   time;
-     uint32_t		cpu_require;
+     char	*name;
+     void	*(*function)(void *to, const void *from, size_t len);
+     double	t;
+     uint32_t cpu_require;
 } memcpy_method[] =
 {
      { NULL, NULL, 0},
@@ -1383,22 +1361,43 @@ static struct {
 #ifdef HAVE_ARM_NEON
 	{ "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_NEON },
 #endif
+#ifdef HAVE_ARM
+	{ "new mempcy for cortex with line size of 32, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_32_preload_192,0,0 },
+	{ "new memcpy for cortex with line size of 64, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>" ,(void*) memcpy_new_line_size_64_preload_192, 0, 0 },
+    { "new memcpy for cortex with line size of 64, preload offset of 192, aligned access (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_64_preload_192_aligned_access, 0, 0 },
+	{ "new memcpy for cortex with line size of 32, preload offset of 192, align 32", (void*) memcpy_new_line_size_32_preload_192_align_32,0,0},
+	{ "new memcpy for cortex with line size of 32, preload offset of 96", (void*) memcpy_new_line_size_32_preload_96,0,0},
+	{ "new memcpy for cortex with line size of 32, preload offset of 96, aligned access", (void*) memcpy_new_line_size_32_preload_96_aligned_access,0,0},
+#endif
+#ifdef HAVE_ARM_NEON
+	{ "new memcpy for cortex using NEON with line size of 32, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_neon_line_size_32,0,AV_CPU_FLAG_NEON},
+	{ "new memcpy for cortex using NEON with line size of 64, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_neon_line_size_64,0,AV_CPU_FLAG_NEON},
+	{ "new mempcy for cortex using NEON with line size of 32, automatic prefetcher (C) Harm Hanemaaijer <fgenfb@yayhoo.com>", (void*) memcpy_new_neon_line_size_32_auto,0,AV_CPU_FLAG_NEON},
+#endif
      { NULL, NULL, 0},
 };
 
 static struct {
-     char                 *name;
-     void                *(*function)(void *to, uint8_t c, size_t len);
-	 uint64_t	    time;
-     uint32_t		cpu_require;
+	char            *name;
+	void            *(*function)(void *to, uint8_t c, size_t len);
+	uint32_t		cpu_require;
+	double			t;
 } memset_method[] =
 {
-     { NULL, NULL, 0,0},
-     { "glibc memset()",            (void*)memset, 0,0},
+	{ NULL, NULL, 0,0},
+	{ "glibc memset()",(void*)memset,0,0},
 #if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_MMX2) || defined(HAVE_ASM_SSE)
-     { "MMX/MMX2/SSE optimized memset()", (void*)   fast_memset, 0, AV_CPU_FLAG_MMX|AV_CPU_FLAG_SSE|AV_CPU_FLAG_MMX2},
+	{ "MMX/MMX2/SSE optimized memset()", (void*) fast_memset,0,AV_CPU_FLAG_MMX|AV_CPU_FLAG_SSE|AV_CPU_FLAG_MMX2 },
 #endif 
-       { NULL, NULL, 0,0},
+#ifdef HAVE_ARM_NEON
+	{ "memset_neon (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_neon,0, AV_CPU_FLAG_NEON },
+#endif
+#ifdef HAVE_ARM
+	{ "memset align 0 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_0,0,0 },
+	{ "memset align 8 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_8,0,0 },
+	{ "memset align 32 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_32,0,0 },
+#endif
+	{ NULL, NULL, 0, 0},
 };
 
 
@@ -1407,10 +1406,10 @@ void	memcpy_report()
 	int i;
 	fprintf(stdout,"SIMD benchmark results:\n");
 	for( i = 1; memset_method[i].name; i ++ ) {
-		fprintf(stdout,"\t%8ld : %s\n",(long) memset_method[i].time,  memset_method[i].name );
+		fprintf(stdout,"\t%g : %s\n",memset_method[i].t,  memset_method[i].name );
 	}
 	for( i = 1; memcpy_method[i].name; i ++ ) {
-		fprintf(stdout,"\t%8ld : %s\n",(long) memcpy_method[i].time,  memcpy_method[i].name );
+		fprintf(stdout,"\t%g : %s\n",memcpy_method[i].t,  memcpy_method[i].name );
 	}
 }
 
@@ -1430,7 +1429,7 @@ char *get_memset_descr()
 
 void find_best_memcpy()
 {
-     uint64_t t;
+     double t;
      char *buf1, *buf2;
      int i, best = 0,k;
      int bufsize = 720 * 576 * 3;
@@ -1445,6 +1444,8 @@ void find_best_memcpy()
 
      int cpu_flags = av_get_cpu_flags();
 	
+	veejay_msg(VEEJAY_MSG_DEBUG, "Finding best memcpy ..." );	
+
      memset(buf1,0, bufsize);
      memset(buf2,0, bufsize);
 
@@ -1454,28 +1455,28 @@ void find_best_memcpy()
 
 	for( i = 1; memcpy_method[i].name; i ++ ) {
 		
-		t = rdtsc(cpu_flags);
+		t = get_time();
 		if( memcpy_method[i].cpu_require && !(cpu_flags & memcpy_method[i].cpu_require ) ) {
-			memcpy_method[i].time = 0;
+			memcpy_method[i].t = 0.0;
 			continue;
 		}
 
 		for( k = 0; k < 128; k ++ ) {
 			memcpy_method[i].function( buf1,buf2, bufsize );
 		}
-		t = rdtsc(cpu_flags) - t;
-		memcpy_method[i].time = t;
+		t = get_time() - t;
+		memcpy_method[i].t = t;
 	}
 
 	for( i = 1; memcpy_method[i].name; i ++ ) {
 		if(best == 0 ) { 
 			best = i;
-		    t = memcpy_method[i].time;	
+		    t = memcpy_method[i].t;	
 			continue;
 		}
 
-		if( memcpy_method[i].time < t && memcpy_method[i].time > 0 ) {
-			t = memcpy_method[i].time;
+		if( memcpy_method[i].t < t && memcpy_method[i].t > 0 ) {
+			t = memcpy_method[i].t;
 			best = i;
 		}
 	}
@@ -1494,53 +1495,55 @@ void find_best_memcpy()
 
 void find_best_memset()
 {
-    uint64_t t;
-    char *buf1, *buf2;
-    int i, best = 0,k;
+	double t;
+	char *buf1, *buf2;
+	int i, best = 0,k;
 	int bufsize = 720 * 576 * 3;
 	int cpu_flags = av_get_cpu_flags();
 	
-     if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
-          return;
+	if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
+        	return;
 
-     if (!(buf2 = (char*) malloc( bufsize * sizeof(char) ))) {
-          free( buf1 );
-          return;
-     }
-	
+	if (!(buf2 = (char*) malloc( bufsize * sizeof(char) ))) {
+		free( buf1 );
+		return;
+	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Finding best memset..." );
+
 	memset( buf1, 0, bufsize * sizeof(char));
 	memset( buf2, 0, bufsize * sizeof(char));
 
-     for (i=1; memset_method[i].name; i++)
-     {
+	for (i=1; memset_method[i].name; i++)
+	{
 		if( memset_method[i].cpu_require && !(cpu_flags & memset_method[i].cpu_require ) ) {
-			memset_method[i].time= 0;
+			memset_method[i].t= 0;
 			continue;
-		}
+	}
 
-        t = rdtsc(cpu_flags);
-		for( k = 0; k < 128; k ++ ) {
-			memset_method[i].function( buf1 , 0 , bufsize );
-		}
-        t = rdtsc(cpu_flags) - t;
-	  
-        memset_method[i].time = t;
+	t = get_time();
+	for( k = 0; k < 128; k ++ ) {
+		memset_method[i].function( buf1 , 0 , bufsize );
+	}
+	t = get_time() - t;
+ 
+	memset_method[i].t = t;
 
-        if (best == 0 || t < memset_method[best].time)
-        	best = i;
-     }
+	if (best == 0 || t < memset_method[best].t)
+		best = i;
+	}	
 
-     if (best) {
-          veejay_memset = memset_method[best].function;
-     } else {
-		  veejay_memset = memset_method[1].function;
-	 }
+	if (best) {
+		veejay_memset = memset_method[best].function;
+	} 
+	else {
+	  veejay_memset = memset_method[1].function;
+	}
 
 	selected_best_memset = best;
 
-	 free( buf1 );
-     free( buf2 );
-
+	free( buf1 );
+	free( buf2 );
 }
 
 static	void	vj_frame_copy_job( void *arg ) {
@@ -1721,122 +1724,118 @@ void	vj_frame_clear1( uint8_t *input, unsigned int val, int size )
 	vj_frame_clear( in, strides, val );
 }
 
-static unsigned long benchmark_single_slow(long c, int n_tasks, uint8_t **source, uint8_t **dest, int *planes)
+static double benchmark_single_slow(long c, int n_tasks, uint8_t **source, uint8_t **dest, int *planes)
 {
-	uint64_t k;
-	uint64_t stats[c];
+	int k;
+	double stats[c];
 	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ )	
 	{
-		uint64_t t = rdtsc(0);
+		double t = get_time();
 		vj_frame_slow_single( source, source, dest, planes[0], planes[1]/2, 0.67f );
-		t = rdtsc(0) - t;
+		t = get_time() - t;
 		stats[k] = t;
 	}
 
-	uint64_t sum = 0;
+	double sum = 0.0;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
-	uint64_t best_time = (sum / c );
+	double best_time = (sum / c );
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
-			(float)(bytes /1048576.0f), (best_time/1000.0f));
+	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %g",(float)((bytes*c) /1048576.0f), best_time);
 
 	return best_time;
 }
 
 
-static unsigned long benchmark_threaded_slow(long c, int n_tasks, uint8_t **source, uint8_t **dest, int *planes)
+static double benchmark_threaded_slow(long c, int n_tasks, uint8_t **source, uint8_t **dest, int *planes)
 {
-	uint64_t k;
-	uint64_t stats[c];
+	int k;
+	double stats[c];
 	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ )	
 	{
-		uint64_t t = rdtsc(0);
+		uint64_t t = get_time();
 		vj_frame_slow_threaded( source, source, dest, planes[0], planes[1]/2, 0.67f );
-		t = rdtsc(0) - t;
+		t = get_time() - t;
 		stats[k] = t;
 	}
 
-	uint64_t sum = 0;
+	double sum = 0.0;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
-	uint64_t best_time = (sum / c );
+	double best_time = (sum / c );
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
-			(float)(bytes /1048576.0f), (best_time/1000.0f));
+	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %g",(float)((bytes*c) /1048576.0f), best_time);
 
 	return best_time;
 }
 
 
-static unsigned long benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest, uint8_t **source, int *planes)
+static double benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest, uint8_t **source, int *planes)
 {
-	uint64_t k;
-	uint64_t stats[c];
+	int k;
+	double stats[c];
 	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ )	
 	{
-		uint64_t t = rdtsc(0);
+		double t = get_time();
 		vj_frame_copyN( source,dest,planes );
-		t = rdtsc(0) - t;
+		t = get_time() - t;
 		stats[k] = t;
 	}
 
-	uint64_t sum = 0;
+	double sum = 0.0;
 	for( k = 0; k < c ;k ++ )
 		sum += stats[k];
 
-	uint64_t best_time = (sum / c );
+	double best_time = (sum / c );
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
-			(float)(bytes /1048576.0f), (best_time/1000.0f));
+	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %g",(float)((bytes*c) /1048576.0f), best_time);
 
 	return best_time;
 }
 
-static unsigned long benchmark_single_copy(long c,int dummy, uint8_t **dest, uint8_t **source, int *planes)
+static double benchmark_single_copy(long c,int dummy, uint8_t **dest, uint8_t **source, int *planes)
 {
-	uint64_t k; int j;
-	uint64_t stats[c];
+	int k; int j;
+	double stats[c];
 	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ ) {
-		uint64_t t = rdtsc(0);
+		double t = get_time();
 		for( j = 0; j < 4; j ++ ) {
 			veejay_memcpy( dest[j], source[j], planes[j] );
 		}
-		t = rdtsc(0) - t;
+		t = get_time() - t;
 		stats[k] = t;
 	}
 
-	uint64_t sum = 0;
+	double sum = 0.0;
 	for( k = 0; k < c; k ++ ) 
 		sum += stats[k];
 
-	uint64_t best_time = (sum/c);
+	double best_time = (sum/c);
 	
-	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %2.2f ms",
-			(float)(bytes /1048576.0f), (best_time/1000.0f));
+	veejay_msg(VEEJAY_MSG_DEBUG, "%.2f MB data in %g",(float)((bytes*c) /1048576.0f), best_time);
 
 	return best_time;
 }
 
-typedef unsigned long (*benchmark_func)(long c, int dummy, uint8_t **dest, uint8_t **source, int *planes);
+typedef double (*benchmark_func)(long c, int dummy, uint8_t **dest, uint8_t **source, int *planes);
 
 
 void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, uint8_t **dest, uint8_t **source, int *planes )
 {
-	uint32_t N = 8;
-	uint64_t stats[N];	
+	int N = 8;
+	double stats[N];	
 	uint32_t i;
-	uint64_t fastest = 0;
+	double fastest = 0.0;
 	float work_size = (planes[0] + planes[1] + planes[2] + planes[3]) / 1048576.0f;
 
 	veejay_msg(VEEJAY_MSG_INFO, "run test '%s' (%dx) on chunks of %2.2f MB:", str, N, work_size );
@@ -1848,8 +1847,8 @@ void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, 
 			fastest = stats[i];
 	}
 	
-	uint64_t sum = 0;
-	uint64_t slowest=fastest;
+	double sum = 0.0;
+	double slowest=fastest;
 	for( i = 0; i < N; i ++ )
 	{
 		if( stats[i] < fastest ) {
@@ -1860,8 +1859,7 @@ void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, 
 
 	float average = (sum / N);
 
-	veejay_msg(VEEJAY_MSG_INFO, "run done: best score for %s is %2.4f ms, worst is %2.4f ms, average is %2.4f ms", 
-		str, fastest/1000.0f, slowest/1000.0f, average/1000.0f );
+	veejay_msg(VEEJAY_MSG_INFO, "run done: best score for %s is %g, worst is %g, average is %g",str, fastest, slowest, average );
 }
 
 void benchmark_tasks(int n_tasks, long n_frames, int w, int h)
@@ -1914,16 +1912,19 @@ void	benchmark_veejay(int w, int h)
 	if( h < 64)
 		h = 64;
 
+	veejay_msg(VEEJAY_MSG_INFO, "Starting benchmark %dx%d YUVP 4:2:2 (100 frames)", w,h);
+
 	int n_tasks = task_num_cpus();
-	init_parallel_tasks( n_tasks );
 	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
 	if( str2 ) {
 		n_tasks = atoi(str2);
 	}
-	
-	int n_frames = 100;
-	veejay_msg(VEEJAY_MSG_INFO, "Benchmark %dx%d YUVP 4:2:2 (%d frames)", w,h,n_frames);
-	benchmark_tasks( n_tasks, n_frames,w,h );
+
+	veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_MULTITHREAD_TASKS=%d", n_tasks );
+
+	init_parallel_tasks( n_tasks );
+
+	benchmark_tasks( n_tasks,100,w,h );
 }
 
 void	*vj_hmalloc(size_t sze, const char *name)
