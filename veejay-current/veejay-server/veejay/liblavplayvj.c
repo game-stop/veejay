@@ -56,6 +56,7 @@
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
 #include <time.h>
+#include <math.h>
 #include "jpegutils.h"
 #include "vj-event.h"
 #ifndef X_DISPLAY_MISSING
