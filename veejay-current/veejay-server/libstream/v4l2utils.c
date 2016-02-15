@@ -1224,8 +1224,8 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 		v->frames_done[v->frameidx] = 1;
 		v->frame_ready = v->frameidx;
 		v->frameidx = (v->frameidx + 1) % N_FRAMES;
+		signal_(v->video_info);
 	unlock_(v->video_info);
-	signal_(v->video_info);
 
 	if(!v->rw) {
 		if( -1 == vioctl( v->fd, VIDIOC_QBUF, &(v->buffer))) {
