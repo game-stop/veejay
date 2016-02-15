@@ -47,7 +47,7 @@ cat > conftest.c << EOF
 int main(void) { return 0; }
 EOF
 
-arch=`$CC -march=native -Q --help=target|grep -- '-march='|cut -f3`
+arch=`$CC -march=native -Q --help=target|grep -- '-march='|cut -f3|head -n1`
 do_cc -march=$arch
 if test $? -ne 0; then
 	# gcc failed, lets try -dumpmachine and test specifically for arm
