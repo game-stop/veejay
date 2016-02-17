@@ -282,6 +282,7 @@ have_altivec=false
 have_mips=false
 have_ppccpu=false
 have_ps2=false
+have_arm=false
 
 OP_CFLAGS=""
 
@@ -355,6 +356,11 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	fi
 
 	;;
+   arm|armv7l)
+	AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	have_arm=true
+	AC_MSG_RESULT(arm)
+	;;
   *)
     AC_MSG_RESULT([unknown])
     ;;
@@ -367,6 +373,36 @@ dnl programs such as yuvdenoise and y4mspatialfilter can use this flag by
 dnl simply adding programname_CFLAGS=@PROGRAM_NOPIC@ to the Makefile.am
 
 AC_SUBST(PROGRAM_NOPIC)
+
+dnl ARM architecture detect NEON and set CFLAGS
+if test x$have_arm = xtrue
+then
+	AC_CACHE_CHECK(for NEON on processor(s), ac_cv_flag_neon, [
+		if grep "^Features.* neon" /proc/cpuinfo > /dev/null; then
+			ac_cv_flag_neon=yes
+		else
+			ac_cv_flag_neon=no
+		fi
+	])
+	AC_MSG_RESULT($ac_cv_flag_neon)	
+
+	if test $ac_cv_flag_neon = yes ; then
+		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
+		USER_CFLAGS="-mfpu=neon $USER_CFLAGS"
+
+	else
+		USER_CFLAGS="-march=native $USER_CFLAGS"
+	fi
+	
+	if test "x$enable_debug" != "xyes" ; then
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
+	else
+		USER_CFLAGS="$USER_CFLAGS -g -Wall"
+	fi
+
+	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+fi
+
 
 if test x$have_x86cpu = xtrue
 then
@@ -693,6 +729,12 @@ if test "$have_mips" = "true" ; then
 AC_MSG_NOTICE([   mips])
 AC_MSG_NOTICE([    PS/2 enabled        : ${have_ps2}])
 fi
+
+if test "$have_arm" = "true" ; then
+AC_MSG_NOTICE([   arm])
+AC_MSG_NOTICE([    NEON    enabled     : ${ac_cv_flag_neon}])
+fi
+
 AC_MSG_NOTICE([])
 if test "$have_linux" = "true" ; then
 AC_MSG_NOTICE([   Platform: Linux])
