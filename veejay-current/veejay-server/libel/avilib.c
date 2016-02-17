@@ -2816,6 +2816,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 
 	 while (k < nvi) {
 
+
 	    AVI->video_index[k].pos = offset + str2ulong(en); en += 4;
 	    AVI->video_index[k].len = str2ulong_len(en);
 	    AVI->video_index[k].key = str2ulong_key(en); en += 4;
@@ -2987,10 +2988,10 @@ multiple_riff:
 	     AVI->video_index[nvi].pos = lseek(AVI->fdes,0,SEEK_CUR);
 	     AVI->video_index[nvi].len = n;
 
-	     /*
+	    /* 
 	     fprintf(stderr, "Frame %ld pos %lld len %lld key %ld\n",
 		     nvi, AVI->video_index[nvi].pos,  AVI->video_index[nvi].len, (long)AVI->video_index[nvi].key);
-		     */
+		*/		     
 	     nvi++;
 	     lseek(AVI->fdes,PAD_EVEN(n),SEEK_CUR);
 	 } 
@@ -3077,6 +3078,12 @@ multiple_riff:
        AVI->video_index[nvi].key = str2ulong(AVI->idx[i]+ 4);
        AVI->video_index[nvi].pos = str2ulong(AVI->idx[i]+ 8)+ioff;
        AVI->video_index[nvi].len = str2ulong(AVI->idx[i]+12);
+
+       if(AVI->video_index[nvi].len == 0) {
+		  veejay_msg(VEEJAY_MSG_WARNING, "Frame %d is not a full frame (its length is %d)!",
+			nvi, AVI->video_index[nvi].len );
+		}
+
        nvi++;
      }
      
