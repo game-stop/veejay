@@ -435,6 +435,13 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 			*p3 = 0;
 			*p4 = 0;
 			break;
+		case PIX_FMT_YUYV422:
+			if( p1 != NULL )
+				*p1 = src->len * 2;
+			*p2 = 0;
+			*p3 = 0;
+			*p4 = 0;
+			break;
 		default:	
 			if(p1 != NULL) {
 				*p1 = src->len;

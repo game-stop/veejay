@@ -325,7 +325,7 @@ int	v4l2_pixelformat2ffmpeg( int pf )
 			break;
 		}
 
-	return PIX_FMT_BGR24;
+	return 0;
 }
 
 static	int	v4l2_ffmpeg2v4l2( int pf)
@@ -537,7 +537,8 @@ static	int	v4l2_tryout_pixel_format( v4l2info *v, int pf, int w, int h, int *src
 	if( vioctl( v->fd, VIDIOC_S_FMT, &format ) == -1 ) {
 		return 0;
 	}
-	
+
+	memset( &format, 0, sizeof(format));
 	if( -1 == vioctl( v->fd, VIDIOC_G_FMT, &format) ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: VIDIOC_G_FMT failed with %s", strerror(errno));
 		return 0;
@@ -606,8 +607,11 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int hei, int *candidate, int *dw, int *dh)
 {
 	int native_pixel_format = v4l2_ffmpeg2v4l2( host_fmt );
+	int prefer_jpeg = 0;
+	int supported = 0;
 
 	char *greycap = getenv( "VEEJAY_V4L2_GREYSCALE_ONLY" );
+	char *mjpegcap = getenv( "VEEJAY_V4L2_PREFER_JPEG" );
 
 	//@ does user want grey scale capture
 	if( greycap ) {
@@ -627,14 +631,53 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG,"env VEEJAY_V4L2_GREYSCALE_ONLY=[0|1] not set");
 	}
+
+	if( mjpegcap ) {
+		int val = atoi( mjpegcap );
+		if( val == 1 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: user prefers to capture in (M)JPEG" );
+			prefer_jpeg = val;
+		}
+	}
 	
+	if( prefer_jpeg ) {
+		//@ try to set JPEG/MJPEG format first
+		supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_JPEG, wid,hei,dw,dh,candidate );
+		if( supported ) {
+			veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Capture device supports JPEG format" );
+			if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
+				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
+			return 0;
+			}
+			return 1;
+		}
+
+		supported     = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_MJPEG, wid, hei,dw,dh,candidate );
+		if( supported ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports MJPEG format");
+			if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
+				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
+				return 0;
+			}
+			return 1;
+		}
+	} //@ otherwise, continue with normal preference of formats
+
 	//@ does capture card support our native format
-	int supported = v4l2_tryout_pixel_format( v, native_pixel_format, wid, hei,dw,dh,candidate );
+	supported = v4l2_tryout_pixel_format( v, native_pixel_format, wid, hei,dw,dh,candidate );
 	if( supported ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports native format" );
 		return 1;
 	}
 
+	//@ does capture device support YUYV or UYVU
+	supported     = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_YUYV, wid, hei,dw,dh,candidate );
+	if( supported ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports YUY2" );
+		return 1;
+	}
+
+	//@does capture device support JPEG/MJPG
 	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_JPEG, wid,hei,dw,dh,candidate );
 	if( supported ) {
 		veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Capture device supports JPEG format" );
@@ -642,8 +685,6 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
 			return 0;
 		}
-
-		*candidate = V4L2_PIX_FMT_JPEG;
 		return 1;
 	}
 
@@ -654,19 +695,10 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
 			return 0;
 		}
-		*candidate = V4L2_PIX_FMT_MJPEG;
-		return 1;
-	}
-	
-
-	//@ does capture support YUYV or UYVU
-	supported     = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_YUYV, wid, hei,dw,dh,candidate );
-	if( supported ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports YUY2" );
 		return 1;
 	}
 
-	//@ or RGB 24/32
+	//@ does capture device support RGB 24/32
 	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_RGB24, wid, hei ,dw,dh,candidate);
 	if( supported ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports RGB 24 bit" );
@@ -680,6 +712,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		return 1;
 	}
 
+	//@ does capture device support YUV 4:2:0
 	supported      = v4l2_tryout_pixel_format( v, V4L2_PIX_FMT_YUV420, wid, hei,dw,dh,candidate );
 	if( supported ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports YUV420");
@@ -696,12 +729,11 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		if( supported ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports %x", supported );
 			*candidate = supported;
-
 			return 1;
 		}
 	}
 
-	veejay_msg(VEEJAY_MSG_ERROR, "v4l2: No supported pixel format found!");
+	veejay_msg(VEEJAY_MSG_ERROR, "v4l2: No supported pixel format found");
 
 	return 0;
 }
