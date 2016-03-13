@@ -120,7 +120,7 @@ static	uint8_t	*cali_get(vj_tag *tag, int type, int len, int uv_len ) {
 	return NULL;
 }
 
-static uint8_t *_temp_buffer[3]={NULL,NULL,NULL};
+static uint8_t *_temp_buffer[4]={NULL,NULL,NULL,NULL};
 static VJFrame _tmp;
 void	vj_tag_free(void)
 {
@@ -316,7 +316,6 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
    _temp_buffer[0] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
    _temp_buffer[1] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
    _temp_buffer[2] = (uint8_t*) vj_calloc(sizeof(uint8_t)* tmp->len);
-
 	veejay_memset( tag_cache,0,sizeof(tag_cache));
 	veejay_memset( avail_tag, 0, sizeof(avail_tag));
 
@@ -3502,6 +3501,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
     const int uv_len = dst->uv_len;
     const int len = dst->len;
 
+	int res = 0;
 	uint8_t **buffer = dst->data;
     
 	switch (tag->source_type)
@@ -3645,14 +3645,25 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 		return 1;
 		break;
 	case VJ_TAG_TYPE_YUV4MPEG:
-		if(vj_yuv_get_frame(vj_tag_input->stream[tag->index], _temp_buffer) != 0)
+		//@ vj-yuv4mpeg should be refactored; _temp_buffer only used when not scaling and source is in 4:2:0
+		if( vj_yuv_get_frame_info( vj_tag_input->stream[ tag->index ] ) ) {
+			res = vj_yuv_get_frame(vj_tag_input->stream[tag->index],buffer);
+		}
+		else {
+			res = vj_yuv_get_frame(vj_tag_input->stream[tag->index], _temp_buffer);
+		}
+
+		if( res == -1 )
 		{
 			vj_tag_set_active(t1,0);
 			return -1;
 		}
-		
-		yuv420to422planar( _temp_buffer, buffer, width,height );
-		veejay_memcpy( buffer[0],_temp_buffer[0],width * height );
+
+		if( res == 0 ) {
+			//@ convert to 4:2:2
+			yuv420to422planar( _temp_buffer, buffer, width,height );
+			veejay_memcpy( buffer[0],_temp_buffer[0],width * height );
+		}
 		return 1;
 		
 		break;

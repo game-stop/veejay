@@ -383,6 +383,13 @@ static	int	vj_yuv_restart(vj_yuv *yuv4mpeg )
 	return 0;
 }
 
+int vj_yuv_get_frame_info(vj_yuv *yuv4mpeg)
+{
+	if( yuv4mpeg->chroma != Y4M_CHROMA_422 ) 
+		return 1;
+	return 0;
+}
+
 int vj_yuv_get_frame(vj_yuv * yuv4mpeg, uint8_t *dst[3])
 {
     int i;
@@ -427,7 +434,7 @@ int vj_yuv_get_frame(vj_yuv * yuv4mpeg, uint8_t *dst[3])
 		return 0;
 	}
 // not 422
-    	if( yuv4mpeg->chroma != Y4M_CHROMA_422 ) {
+   	if( yuv4mpeg->chroma != Y4M_CHROMA_422 ) {
 	  	i = y4m_read_frame(yuv4mpeg->fd, &(yuv4mpeg->streaminfo),&(yuv4mpeg->frameinfo), yuv4mpeg->buf);
   	  	if( i != Y4M_OK ) {
 			if( i == Y4M_ERR_EOF ) {
@@ -452,14 +459,14 @@ int vj_yuv_get_frame(vj_yuv * yuv4mpeg, uint8_t *dst[3])
 		VJFrame *dstf = yuv_yuv_template( dst[0],dst[1],dst[2], yuv4mpeg->width,yuv4mpeg->height, yuv4mpeg->format );
 
 		if(!yuv4mpeg->scaler) {
-				sws_template sws_tem;
-				memset(&sws_tem, 0,sizeof(sws_template));
-				sws_tem.flags = yuv_which_scaler();
-				yuv4mpeg->scaler = yuv_init_swscaler( srcf,dstf, &sws_tem, yuv_sws_get_cpu_flags());
-				if(!yuv4mpeg->scaler) {
-						free(srcf); free(dstf); 
-						return -1;
-				}
+			sws_template sws_tem;
+			memset(&sws_tem, 0,sizeof(sws_template));
+			sws_tem.flags = yuv_which_scaler();
+			yuv4mpeg->scaler = yuv_init_swscaler( srcf,dstf, &sws_tem, yuv_sws_get_cpu_flags());
+			if(!yuv4mpeg->scaler) {
+				free(srcf); free(dstf); 
+				return -1;
+			}
 		}
 
 		yuv_convert_and_scale( yuv4mpeg->scaler, srcf, dstf );
@@ -467,7 +474,7 @@ int vj_yuv_get_frame(vj_yuv * yuv4mpeg, uint8_t *dst[3])
 		free(srcf);
 		free(dstf);
 
-		return 0;
+		return 1;
 	}
 
     return -1;
