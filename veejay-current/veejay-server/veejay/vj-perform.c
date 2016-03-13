@@ -154,9 +154,6 @@ static const char *license =
 static const char *copyr =
 	"(C) 2002-2015 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
 
-static const char *donateaddr = 
-	"Veejay's BTC donation address: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ\n";
-
 #define MLIMIT(var, low, high) \
 if((var) < (low)) { var = (low); } \
 if((var) > (high)) { var = (high); }
@@ -168,7 +165,7 @@ static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame);
 static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame);
 static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame);
 static void seq_play_sample( veejay_t *info, int n);
-static void vj_perform_plain_fill_buffer(veejay_t * info);
+static void vj_perform_plain_fill_buffer(veejay_t * info, int *result);
 static int vj_perform_tag_fill_buffer(veejay_t * info);
 static void vj_perform_clear_cache(void);
 static int vj_perform_increase_tag_frame(veejay_t * info, long num);
@@ -2608,7 +2605,7 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
 	return 1;
 }
 
-static void vj_perform_plain_fill_buffer(veejay_t * info)
+static void vj_perform_plain_fill_buffer(veejay_t * info, int *ret)
 {
 	video_playback_setup *settings = (video_playback_setup*)  info->settings;
 
@@ -2643,19 +2640,12 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 		return;
 	}
 
-	int ret = 0;
-
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
-		ret = vj_perform_get_frame_(info, info->uc->sample_id, settings->current_frame_num,&frame,&frame, p0_buffer,p1_buffer,0 );
+		*ret = vj_perform_get_frame_(info, info->uc->sample_id, settings->current_frame_num,&frame,&frame, p0_buffer,p1_buffer,0 );
 	} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN ) {
-		ret = vj_perform_get_frame_(info, 0, settings->current_frame_num,&frame,&frame, p0_buffer, p1_buffer,0 );
+		*ret = vj_perform_get_frame_(info, 0, settings->current_frame_num,&frame,&frame, p0_buffer, p1_buffer,0 );
 
-	}
-
-	if(ret <= 0)
-	{
-		veejay_msg(0, "Unable to queue video frame %d", settings->current_frame_num );
 	}
 }
 static int rec_audio_sample_ = 0;
@@ -3298,7 +3288,7 @@ int	vj_perform_get_height( veejay_t *info )
 static	char	*vj_perform_print_credits( veejay_t *info ) 
 {
 	char text[1024];
-	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s\n%s",VERSION,intro,copyr,license,donateaddr);
+	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s\n",VERSION,intro,copyr,license);
 	return vj_strdup(text);
 }
 
@@ -3753,25 +3743,24 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 			if( info->seq->active && info->seq->rec_id )
 				pvar_.enc_active = 1;
 			
-			vj_perform_plain_fill_buffer(info);
-				 
-			cached_sample_frames[0] = info->uc->sample_id;
+			vj_perform_plain_fill_buffer(info, &res);
+			if( res > 0 ) {	 
+				cached_sample_frames[0] = info->uc->sample_id;
 
-			if(vj_perform_verify_rows(info))
-				vj_perform_sample_complete_buffers(info, &is444);
+				if(vj_perform_verify_rows(info))
+					vj_perform_sample_complete_buffers(info, &is444);
 
-			cur_out = vj_perform_render_magic( info, info->settings,is444 );
-		   	res = 1;
-
+				cur_out = vj_perform_render_magic( info, info->settings,is444 );
+			}
      		break;
 		    
 		case VJ_PLAYBACK_MODE_PLAIN:
 
-			   vj_perform_plain_fill_buffer(info);
-
-			   cur_out = vj_perform_render_magic( info, info->settings,0 );
-			   res = 1;
- 		    break;
+			vj_perform_plain_fill_buffer(info, &res);
+			if( res > 0 ) {
+				cur_out = vj_perform_render_magic( info, info->settings,0 );
+			}
+ 			break;
 		case VJ_PLAYBACK_MODE_TAG:
 
 			vj_tag_var( info->uc->sample_id,

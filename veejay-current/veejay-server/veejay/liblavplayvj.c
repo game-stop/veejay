@@ -2226,6 +2226,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	struct timespec time_now;
 	double tdiff1=0.0, tdiff2=0.0;
 	int first_free, skipv, skipa, skipi, nvcorr,frame;
+	int frame_ok = 0;
 	long ts, te;
 	int n;
 	const int spvf_c = (const int) (1000 * settings->spvf);
@@ -2435,9 +2436,9 @@ static void veejay_playback_cycle(veejay_t * info)
 				if (!skipa)
 					vj_perform_queue_audio_frame(info);
 
-				if (!skipv)
-					vj_perform_queue_video_frame(info,skipi);
-
+				if (!skipv) {
+					frame_ok = vj_perform_queue_video_frame(info,skipi);
+				}
 				if(!skipi)
 					vj_perform_queue_frame(info,skipi);
 
@@ -2475,12 +2476,16 @@ static void veejay_playback_cycle(veejay_t * info)
 				}
 			}
 
-			if( skipv )
+			if( skipv || frame_ok == 0 )
 			{
+				if(!frame_ok) {
+					veejay_msg(VEEJAY_MSG_WARNING, "Unable to queue video frame %ld", 
+							settings->current_frame_num );
+				}
 				continue;
 			}
 
-			veejay_mjpeg_queue_buf(info,frame, 1 );
+			veejay_mjpeg_queue_buf(info,frame,1);
 	
 			stats.nqueue ++;
 			n++;
@@ -2686,7 +2691,7 @@ int vj_server_setup(veejay_t * info)
 
 	info->osc = (void*) vj_osc_allocate(info->uc->port+6);
 
-    if(!info->osc) 
+	if(!info->osc) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,  "Unable to start OSC server at port %d", info->uc->port + 6 );
 		vj_server_shutdown(info->vjs[VEEJAY_PORT_CMD]);
