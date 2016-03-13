@@ -226,9 +226,10 @@ int get_chroma_from_pixfmt(int pixfmt) {
 }
 
 int get_pixfmt_from_chroma(int chroma) {
-	int src_fmt;
+	int src_fmt = 0;
 	switch( chroma ) {
-		case Y4M_CHROMA_420JPEG: src_fmt = PIX_FMT_YUVJ420P; break;
+		case Y4M_CHROMA_420JPEG: 
+				src_fmt = PIX_FMT_YUVJ420P; break;
 		case Y4M_CHROMA_420MPEG2:
 		case Y4M_CHROMA_420PALDV:
 				src_fmt = PIX_FMT_YUV420P; break;
@@ -241,7 +242,6 @@ int get_pixfmt_from_chroma(int chroma) {
 		case Y4M_CHROMA_MONO:
 				src_fmt = PIX_FMT_GRAY8; break;
 		default:
-				src_fmt = -1;
 		break;
 	}
 	return src_fmt;
