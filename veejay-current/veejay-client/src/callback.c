@@ -2166,43 +2166,24 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Open new input stream",3 );
+	gchar *filename = dialog_open_file( "Select Action File",2 );
 	if(filename)
 	{
 		put_text( "inputstream_filename", filename );
 		g_free(filename);
 	}
 }
-/*
-void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
-{
-	gint use_y4m = is_button_toggled( "inputstream_filey4m" );
-	gint use_ffmpeg = is_button_toggled( "inputstream_fileffmpeg");
-	gint use_pic = is_button_toggled( "inputstream_filepixbuf");
-	
 
-	gchar *file = get_text( "inputstream_filename" );	
-	gint br = 0;
-	gint bw = 0;
-	gchar *filename = g_locale_from_utf8( file, -1, &br , &bw, NULL );
-	if( br == 0 || bw == 0 )
-	{
-		error_dialog("Error", "Please enter a filename");
+void	on_y4m_new_clicked(GtkWidget *w, gpointer user_data)
+{
+	gchar *filename = dialog_open_file( "Select YUV4MPEG input (fifo) file",3);
+	if(!filename)
 		return;
-	}
-	if(use_y4m)
-			multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
-	if(use_ffmpeg)
-		multi_vims( VIMS_STREAM_NEW_AVFORMAT, "%s", filename );
-#ifdef USE_GDK_PIXBUF
-	if(use_pic)
-		multi_vims( VIMS_STREAM_NEW_PICTURE, "%s", filename);
-#endif
+
+	multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
 	
 	gveejay_new_slot(MODE_STREAM);
-
-	if(filename) g_free( filename );
-}*/
+}
 
 void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 {

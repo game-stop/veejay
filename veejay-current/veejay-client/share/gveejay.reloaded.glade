@@ -1245,6 +1245,16 @@
                                 <property name="use_stock">False</property>
                                 <signal name="activate" handler="on_streamnew_clicked" />
                               </widget>
+														</child>
+			                      <child>
+                              <widget class="GtkImageMenuItem" id="new_y4m_source">
+                                <property name="label">_New Yuv4Mpeg </property>
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="use_underline">True</property>
+                                <property name="use_stock">False</property>
+                                <signal name="activate" handler="on_y4m_new_clicked" />
+                              </widget>
                             </child>
                             <child>
                               <widget class="GtkImageMenuItem" id="new_color1">

@@ -1605,7 +1605,10 @@ static void add_file_filters(GtkWidget *dialog, int type )
 	}
 	if(type == 3 )
 	{
-		//ffmpeg 
+		filter = gtk_file_filter_new();
+	       	gtk_file_filter_set_name( filter, "YUV4MPEG files (*.yuv)");
+		gtk_file_filter_add_pattern( filter, "*.yuv" );
+		gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);	
 	}
 
 	filter = gtk_file_filter_new();
