@@ -44,12 +44,12 @@ typedef struct {
     void *scaler;
     uint8_t *buf[4];
     int  is_jpeg;
+    int  dr;
     VJFrame *dst;
-	VJFrame *src;
+    VJFrame *src;
 } vj_yuv;
 
 vj_yuv *vj_yuv4mpeg_alloc(int dst_w, int dst_h,float fps, int out_pix_fmt);
-
 
 uint8_t *vj_yuv_get_buf( void *v );
 

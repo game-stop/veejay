@@ -217,6 +217,9 @@ int get_chroma_from_pixfmt(int pixfmt) {
 		case PIX_FMT_YUVJ422P: chroma = Y4M_CHROMA_422; break; 
 		case PIX_FMT_YUVJ444P: chroma = Y4M_CHROMA_444; break;
 		case PIX_FMT_YUV411P: chroma = Y4M_CHROMA_411; break;
+		case PIX_FMT_YUVA420P: chroma = Y4M_CHROMA_420JPEG; break;
+		case PIX_FMT_YUVA422P: chroma = Y4M_CHROMA_422; break;
+		case PIX_FMT_YUVA444P: chroma = Y4M_CHROMA_444; break;
 		case PIX_FMT_GRAY8: chroma = PIX_FMT_GRAY8; break;
 		default:
 			chroma = Y4M_CHROMA_444;

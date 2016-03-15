@@ -3645,27 +3645,13 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 		return 1;
 		break;
 	case VJ_TAG_TYPE_YUV4MPEG:
-		//@ vj-yuv4mpeg should be refactored; _temp_buffer only used when not scaling and source is in 4:2:0
-		if( vj_yuv_get_frame_info( vj_tag_input->stream[ tag->index ] ) ) {
-			res = vj_yuv_get_frame(vj_tag_input->stream[tag->index],buffer);
-		}
-		else {
-			res = vj_yuv_get_frame(vj_tag_input->stream[tag->index], _temp_buffer);
-		}
-
+		res = vj_yuv_get_frame(vj_tag_input->stream[tag->index],buffer);
 		if( res == -1 )
 		{
 			vj_tag_set_active(t1,0);
 			return -1;
 		}
-
-		if( res == 0 ) {
-			//@ convert to 4:2:2
-			yuv420to422planar( _temp_buffer, buffer, width,height );
-			veejay_memcpy( buffer[0],_temp_buffer[0],width * height );
-		}
 		return 1;
-		
 		break;
 #ifdef SUPPORT_READ_DV2
 	case VJ_TAG_TYPE_DV1394:
