@@ -49,7 +49,6 @@
 #include <libvjmsg/vj-msg.h>
 #include <libel/pixbuf.h>
 #include <libqrwrap/vlogo.h>
-#include <libqrwrap/bitcoin.h>
 
 static int	qrcode_open(const char *filename, const char *data, const int len);
 
@@ -201,7 +200,6 @@ static int	qrcode_open(const char *filename, const char *picture, const int pict
 }
 
 static void *pic_ = NULL;
-static void *bitcoin_ = NULL;
 
 void	qrwrap_draw( VJFrame *out, int port_num, const char *homedir, int qr_w, int qr_h, int qr_fmt )
 {
@@ -236,53 +234,10 @@ void	qrwrap_draw( VJFrame *out, int port_num, const char *homedir, int qr_w, int
 	
 }
 
-void	qrbitcoin_draw( VJFrame *out, const char *homedir,int qr_w, int qr_h, int qr_fmt )
-{
-	if( bitcoin_ == NULL ) {
-		char qrfile[1024];
-		snprintf(qrfile,sizeof(qrfile),"%s/veejay_bitcoin.png", homedir );
-		if( qrcode_open( qrfile, veejay_bitcoin, veejay_bitcoin_length ) ) {
-			bitcoin_ = vj_picture_open( qrfile, qr_w, qr_h, qr_fmt );
-		}
-	}
-
-	VJFrame *qr = vj_picture_get( bitcoin_ );
-	if( qr ) {
-		int offset_x = out->width - qr->width - 10;
-		int offset_y = out->height - qr->height - 10;
-		int x,y;
-		int w = out->width;
-		uint8_t *Y = out->data[0];
-		uint8_t *U = out->data[1];
-		uint8_t *V = out->data[2];
-		const uint8_t *qY = qr->data[0];
-		
-		if( offset_y < 0 )
-			offset_y = 0;
-		if( offset_x < 0 )
-			offset_x = 0;
-
-		for(y = 0; y < qr->height; y ++ ) {
-			for( x = 0; x < qr->width; x ++ ) {
-				Y[ ((y+offset_y) * w + x + offset_x) ] = qY[ (y*qr->width+x) ];
-				U[ ((y+offset_y) * w + x + offset_x) ] = 128; 
-				V[ ((y+offset_y) * w + x + offset_x) ] = 128; 
-			}
-		}
-	}
-
-}
-
-
-
-
 void	qrwrap_free()
 {
 	if( pic_ != NULL ) {
 		vj_picture_cleanup( pic_ );
-	}
-	if( bitcoin_ != NULL ) {
-		vj_picture_cleanup( bitcoin_ );
 	}
 }
 

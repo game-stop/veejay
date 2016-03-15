@@ -3522,7 +3522,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		if(info->use_osd == 2 ){
 			/* draw qr picture if present */
 			qrwrap_draw( frame, info->uc->port, info->homedir, frame->height/4,frame->height/4, frame->format );
-			qrbitcoin_draw( frame, info->homedir, frame->height/4,frame->height/4, frame->format );
 		}
 	}
 
