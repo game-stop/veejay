@@ -19,24 +19,25 @@ performances and/or video installations.
 
 .TP
 .SH Supported video codecs/formats
-.TP
 
 .TP
-MJPEG AVI / Quicktime 
+MJPEG AVI / Quicktime (fourcc: mjpg,mjpb,mjpa,jfif)
 .TP
-Lossless JPEG AVI
+Lossless JPEG AVI (fourcc: ljpg)
 .TP
-MJPEG-b AVI / Quicktime
-.TP
-Quasar DV codec (NTSC/PAL) AVI / Quicktime
+Quasar DV codec (NTSC/PAL) AVI / Quicktime (fourcc: dv,dvhd,dvp,dvcp)
 .TP
 YUV4MPEG (chroma 4:2:0 jpeg/mpeg2, chroma 4:2:2) AVI / Y4M
 .TP
-RAW YUV 4:2:2 planar JPEG/JFIF (sample range 0-255,8 bit, 3 planes)
+Motion PNG (fourcc: mpng, png)
+.TP
+RAW YUV 4:2:2 planar JPEG/JFIF (sample range 0-255,8 bit, 3 planes) (fourcc: vj22,vj20)
 .TP
 RAW YUV 4:2:2 planar  Rec. 601 (Y’CbCr) (sample range 16-235 Y, 16-240 UV, 8 bit, 3 planes)
 .TP
-MLZO (YUV 4:2:2 planar compressed with OberHumer's LZO real-time data compression library)
+MLZO (YUV 4:2:2 planar compressed with OberHumer's LZO real-time data compression library) (fourcc: mlzo)
+.TP
+FFmpeg RAW format
 .TP
 .SH Supported video containers
 AVI , QuickTime, DVVideo
@@ -598,7 +599,7 @@ http://veejay.sourceforge.net
 http://veejayhq.net
 .TP
 .SH BUGS
-see BUGS in the source package
+see https://github.com/c0ntrol/veejay/issues
 .SH AUTHOR
 This man page was written by Niels Elburg.
 If you have questions, remarks or you just want to
