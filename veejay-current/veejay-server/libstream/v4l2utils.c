@@ -1648,7 +1648,7 @@ void	v4l2_get_controls( void *d, void *port )
 		queryctrl.id = ctrl_id;
 
 		if( 0 == vioctl( v->fd, VIDIOC_QUERYCTRL, &queryctrl ) ) {
-			if( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED )
+			if( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED || queryctrl.flags & V4L2_CTRL_FLAG_INACTIVE )
 				continue;
 
 			int id = find_property_id( queryctrl.id );
@@ -1687,7 +1687,7 @@ int32_t	v4l2_get_control( void *d, int32_t type )
 
 	if( vioctl( v->fd, VIDIOC_QUERYCTRL, &queryctrl) == -1 ) {
 		return -1;
-	} else if ( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED ) {
+	} else if ( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED || queryctrl.flags & V4L2_CTRL_FLAG_INACTIVE ) {
 		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %x disabled",type );
 		return -1;
 	} else {
@@ -1723,7 +1723,7 @@ void	v4l2_set_control( void *d, uint32_t type,  int32_t value )
 		} else {
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: property type %s not supported",v4l2_get_property_name(type) );
 		}
-	} else if ( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED ) {
+	} else if ( queryctrl.flags & V4L2_CTRL_FLAG_DISABLED || queryctrl.flags & V4L2_CTRL_FLAG_INACTIVE ) {
 		veejay_msg( VEEJAY_MSG_DEBUG, "v4l2: property type %s not supported (disabld)",v4l2_get_property_name(type) );
 	} else {
 		memset(&control,0,sizeof(control));
