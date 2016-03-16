@@ -1427,11 +1427,56 @@ char *get_memset_descr()
 	return strdup( memset_method[selected_best_memset].name );
 }
 
+static int set_user_selected_memcpy()
+{
+	char *mm = getenv( "VEEJAY_MEMCPY_METHOD" );
+	if( mm ) {
+		int i;
+		for( i = 1; memcpy_method[i].name; i ++ ) {
+			if( strcasecmp( memcpy_method[i].name, mm ) == 0 ) {
+				veejay_msg(VEEJAY_MSG_INFO, "Using user selected memcpy method '%s'",
+							memcpy_method[i].name );
+				return i;
+			}
+		}
+		veejay_msg(VEEJAY_MSG_ERROR, "No valid memcpy method selected, please use one of the following:");
+		for( i = 1; memcpy_method[i].name; i ++ ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "\t\"%s\"", memcpy_method[i].name);
+		}
+		veejay_msg(VEEJAY_MSG_ERROR, "Using memcpy method '%s'", memcpy_method[1].name );
+	}
+	return 0;
+}
+static int set_user_selected_memset()
+{
+	char *mm = getenv( "VEEJAY_MEMSET_METHOD" );
+	if( mm ) {
+		int i;
+		for( i = 1; memset_method[i].name; i ++ ) {
+			if( strcasecmp( memset_method[i].name, mm ) == 0 ) {
+				veejay_msg(VEEJAY_MSG_INFO, "Using user selected memset method '%s'",
+							memset_method[i].name );
+				return i;
+			}
+		}
+		veejay_msg(VEEJAY_MSG_ERROR, "No valid memset method selected, please use one of the following:");
+		for( i = 1; memset_method[i].name; i ++ ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "\t\"%s\"", memset_method[i].name);
+		}
+		veejay_msg(VEEJAY_MSG_ERROR, "Using memset method '%s'", memset_method[1].name );
+	}
+	return 0;
+}
+
 void find_best_memcpy()
 {
+	int best = set_user_selected_memcpy();
+	if( best > 0 )
+		goto set_best_memcpy_method;
+
      double t;
      char *buf1, *buf2;
-     int i, best = 0,k;
+     int i, k;
      int bufsize = 720 * 576 * 4;
 
      if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
@@ -1481,6 +1526,10 @@ void find_best_memcpy()
 		}
 	}
 
+    free( buf1 );
+    free( buf2 );
+
+set_best_memcpy_method:
 	if (best) {
 		veejay_memcpy = memcpy_method[best].function;
     } else {
@@ -1488,16 +1537,18 @@ void find_best_memcpy()
 	}
 
 	selected_best_memcpy = best;
-
-    free( buf1 );
-    free( buf2 );
 }
 
 void find_best_memset()
 {
+	int best = set_user_selected_memset();
+	if( best > 0 )
+		goto set_best_memset_method;
+
+
 	double t;
 	char *buf1, *buf2;
-	int i, best = 0,k;
+	int i, k;
 	int bufsize = 720 * 576 * 4;
 	int cpu_flags = av_get_cpu_flags();
 	
@@ -1533,6 +1584,10 @@ void find_best_memset()
 		best = i;
 	}	
 
+	free( buf1 );
+	free( buf2 );
+
+set_best_memset_method:
 	if (best) {
 		veejay_memset = memset_method[best].function;
 	} 
@@ -1541,9 +1596,6 @@ void find_best_memset()
 	}
 
 	selected_best_memset = best;
-
-	free( buf1 );
-	free( buf2 );
 }
 
 static	void	vj_frame_copy_job( void *arg ) {
