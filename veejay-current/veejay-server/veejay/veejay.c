@@ -710,9 +710,6 @@ static void print_license()
 	    "The license must be included in the (source) package (COPYING)");
 
 	veejay_msg(VEEJAY_MSG_INFO,
-        "Veejay's BTC donation address: 1PUNRsv8vDt1upTx9tTpY5sH8mHW1DTrKJ");
-
-	veejay_msg(VEEJAY_MSG_INFO,
 		"Veejay's PayPal donation address: veejayhq@gmail.com" );
 }
 
