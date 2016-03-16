@@ -1432,7 +1432,7 @@ void find_best_memcpy()
      double t;
      char *buf1, *buf2;
      int i, best = 0,k;
-     int bufsize = 720 * 576 * 3;
+     int bufsize = 720 * 576 * 4;
 
      if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
           return;
@@ -1455,12 +1455,12 @@ void find_best_memcpy()
 
 	for( i = 1; memcpy_method[i].name; i ++ ) {
 		
-		t = get_time();
 		if( memcpy_method[i].cpu_require && !(cpu_flags & memcpy_method[i].cpu_require ) ) {
 			memcpy_method[i].t = 0.0;
 			continue;
 		}
 
+		t = get_time();
 		for( k = 0; k < 128; k ++ ) {
 			memcpy_method[i].function( buf1,buf2, bufsize );
 		}
@@ -1498,7 +1498,7 @@ void find_best_memset()
 	double t;
 	char *buf1, *buf2;
 	int i, best = 0,k;
-	int bufsize = 720 * 576 * 3;
+	int bufsize = 720 * 576 * 4;
 	int cpu_flags = av_get_cpu_flags();
 	
 	if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
