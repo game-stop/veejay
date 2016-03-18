@@ -1389,34 +1389,6 @@ void     vje_load_mask(uint8_t val)
                 :: "r" (m) );
 }
 
-void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int val, int len )
-{
-	unsigned int i;
-  	uint8_t mask[8] = { val,val,val,val,  val,val,val,val };
-        uint8_t *m    = (uint8_t*)&mask;
-        
-        __asm __volatile(
-                "movq   (%0),   %%mm7\n\t"
-                :: "r" (m) );
-
-
-	for( i = len; i > 8; i -= 8 ) {
-		__asm __volatile(
-			"\n\t movq %[srcA], %%mm0"
-			"\n\t movq %[srcB], %%mm1"
-			"\n\t psubusb %%mm1,%%mm0" 
-			"\n\t psubusb %%mm2,%%mm1" 
-			"\n\t psubusb %%mm1,%%mm0" 
-			"\n\t psubusb %%mm7,%%mm0" 
-			"\n\t movq %%mm0, %[dest]"
-			: [dest] "=m" (*(O + i))
-			: [srcA] "m" (*(A + i ))
-			, [srcB] "m" (*(B + i )));
-	}
-	
-	do_emms;	
-}
-
 void     vje_mmx_negate( uint8_t *dst, uint8_t *in )
 {
         __asm __volatile(
@@ -1490,14 +1462,6 @@ void	binarify_1src( uint8_t *dst, uint8_t *src, uint8_t v, int reverse,int w, in
 
 
 #else
-void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len )
-{	
-	unsigned int i;
-	for( i = 0; i < len; i ++ ) {
-		O[i] = ( abs( A[i] - B[i] ) > threshold ? 0xff : 0 );
-	}	
-}
-
 void 	vje_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len )
 {
 	unsigned int i;
@@ -1521,6 +1485,14 @@ void	binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, i
 
 
 #endif
+
+void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len )
+{	
+	unsigned int i;
+	for( i = 0; i < len; i ++ ) {
+		O[i] = ( abs( B[i] - A[i] ) > threshold ? 0xff : 0 );
+	}	
+}
 
 void	binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
 {
