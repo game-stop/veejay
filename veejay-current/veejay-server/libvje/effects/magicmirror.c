@@ -30,7 +30,7 @@ static double *funhouse_x = NULL;
 static double *funhouse_y = NULL;
 static unsigned int *cache_x = NULL;
 static unsigned int *cache_y = NULL;
-static unsigned int last[2] = {0,0};
+static unsigned int last[4] = {0,0,20,20};
 static int n__ = 0;
 static int N__ = 0;
 
@@ -112,6 +112,7 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 	double c1 = (double)vx;
 	double c2 = (double)vy;
 	int motion = 0;
+	int interpolate = 1;
 	if( motionmap_active())
 	{
 		motionmap_scale_to( 100,100,0,0, &d, &n, &n__, &N__ );
@@ -123,6 +124,9 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 		N__ = 0;
 	}
 
+	if( N__ == n__ || n__ == 0 )
+		interpolate = 0;
+
 	double c3 = (double)d * 0.001;
 	unsigned int dx,dy,x,y,p,q,len=w*h;
 	double c4 = (double)n * 0.001;
@@ -130,40 +134,44 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-	int interpolate = 1;
 
-	if( n__ == N__ || n__ == 0)
-		interpolate = 0;
-
-	if( d != last[1] )
-	{
+	if( d != last[1] ) {
 		changed = 1; last[1] =d;
 	}
-	if( n != last[0] )
-	{
+	if( n != last[0] ) {
 		changed = 1; last[0] = n;
 	}
 
+	if( vx != last[2] ) {
+		changed = 1; last[2] = vx;
+	}
+	if( vy != last[3] ) {
+		changed = 1; last[3] = vy;
+	} 
+
 	if(changed==1)
-	{	// degrees x or y changed, need new sin
+	{	
+		// degrees x or y changed, need new sin
 		for(x=0; x < w ; x++)
 		{
 			double res;
 			fast_sin(res,(double)(c3*x));
 			funhouse_x[x] = res;
-			//funhouse_x[x] = sin(c3 * x);  
 		}
 		for(y=0; y < h; y++)
 		{
 			double res;
 			fast_sin(res,(double)(c4*y));
 			funhouse_y[y] = res;
-			//funhouse_y[y] = sin(c4 * y);
 		}
 	}
 
-	int strides[4] = { len,len,len, 0 };
-	vj_frame_copy( frame->data, magicmirrorbuf, strides );
+//	int strides[4] = { len,len,len, 0 };
+//	vj_frame_copy( frame->data, magicmirrorbuf, strides );
+
+	veejay_memcpy( magicmirrorbuf[0], frame->data[0], len );
+	veejay_memcpy( magicmirrorbuf[1], frame->data[1], len );
+	veejay_memcpy( magicmirrorbuf[2], frame->data[2], len );
 
 	for(x=0; x < w; x++)
 	{

@@ -391,7 +391,7 @@ void vj_effman_apply_image_effect(
 	 deinterlace_apply( frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	 break;
 	case VJ_IMAGE_EFFECT_MOTIONMAP:
-	motionmap_apply( frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	motionmap_apply( frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 	break;
 	case VJ_IMAGE_EFFECT_CONTOUR:
 	contourextract_apply( vj_effects[entry]->user_data, frames[0],

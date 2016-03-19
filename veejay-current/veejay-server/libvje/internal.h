@@ -585,7 +585,7 @@ extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
 
 extern void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse );
 
-extern void	motionmap_apply( VJFrame *frame, int w, int h, int threshold, int reverse, int draw, int his, int op );
+extern void	motionmap_apply( VJFrame *frame, int w, int h, int threshold, int reverse, int draw, int his, int op, int ip );
 
 extern void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb);
 
