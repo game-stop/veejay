@@ -275,8 +275,8 @@ void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *i
 	uint8_t p1,p2;
 
 #ifndef NO_AUTOVECTORIZATION
-	uint8_t *I1 = __builtin_assume_aligned( pI1, 16 );
-	uint8_t *I2 = __builtin_assume_aligned( pI2, 16 );
+	uint8_t *I1 = pI1;
+	uint8_t *I2 = pI2;
 
 	for( i = 0; i < len; i ++ ) 
 	{
