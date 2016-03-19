@@ -27,17 +27,11 @@
 	 p4 = Decay
 */
 
-/* REVIEW / FIXME ?:
- 
-   This filter detects the amount of motion in a frame. It keeps an internal
-   buffer to average (smoothen) the acitivity levels over N frames 
-   At each step in N , a new value is linearly interpolated which is later 
-   pulled by other FX to override their parameter values.
-   To compensate for jumpy video, the frames n+1 to N are linearly interpolated
-   from frame n+0 to frame N automatically.
-
-
+/*
+ * This FX relies on gcc's auto vectorization.
+ * To use the plain C version, define NO_AUTOVECTORIZATION
  */
+
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -88,6 +82,7 @@ static int32_t histogram_[HIS_LEN];
 
 static uint8_t *bg_image = NULL;
 static uint8_t *binary_img = NULL;
+static uint8_t *diff_img = NULL;
 static uint8_t *prev_img = NULL;
 static uint8_t *interpolate_buf = NULL;
 
@@ -98,6 +93,7 @@ static int current_decay = HIS_DEFAULT;
 static uint32_t	key1_ = 0, key2_ = 0, keyv_ = 0, keyp_ = 0;
 static int have_bg = 0;
 static int running = 0;
+static int is_initialized = 0;
 
 int		motionmap_malloc(int w, int h )
 {
@@ -105,7 +101,8 @@ int		motionmap_malloc(int w, int h )
 	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h)); 
 	prev_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h));
 	interpolate_buf = vj_malloc( sizeof(uint8_t) * RUP8(w*h*3));
-	
+	diff_img = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h*2));
+
 	veejay_msg(2, "This is 'Motion Mapping'");
 	veejay_msg(2, "This FX calculates motion energy activity levels over a period of time to scale FX parameters");
 	veejay_msg(2, "Add any of the following to the FX chain (if not already present)");
@@ -114,6 +111,9 @@ int		motionmap_malloc(int w, int h )
 	veejay_memset( histogram_, 0, sizeof(int32_t) * HIS_LEN );
 	nframe_ = 0;
 	running = 0;
+
+	is_initialized ++;
+
 	return 1;
 }
 
@@ -127,6 +127,11 @@ void		motionmap_free(void)
 		free(binary_img);
 	if( prev_img )
 		free(prev_img);
+	if( diff_img )
+		free(diff_img);
+
+	if( is_initialized > 0 )
+		is_initialized --;
 
 	have_bg = 0;
 	interpolate_buf = NULL;
@@ -197,12 +202,25 @@ void	motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n )
     uint8_t *__restrict__ V0 = cur->data[2];
     const uint8_t *__restrict__ V1 = prev->data[2];
 
-    for ( i = 0; i < len ; i ++ )
-    {
+#ifndef NO_AUTOVECTORIZATION
+    for ( i = 0; i < len ; i ++ ) {
+    	Y0[i] = Y1[i] + ( frac * (Y0[i] - Y1[i]));
+	}
+
+	for( i = 0; i < len; i ++ ) {
+        U0[i] = U1[i] + ( frac * (U0[i] - U1[i]));
+	}
+	
+  	for( i = 0; i < len; i ++ ) {	
+		V0[i] = V1[i] + ( frac * (V0[i] - V1[i]));
+    }
+#else
+ 	for ( i = 0; i < len ; i ++ ) {
     	Y0[i] = Y1[i] + ( frac * (Y0[i] - Y1[i]));
         U0[i] = U1[i] + ( frac * (U0[i] - U1[i]));
-        V0[i] = V1[i] + ( frac * (V0[i] - V1[i]));
+		V0[i] = V1[i] + ( frac * (V0[i] - V1[i]));
     }
+#endif
 }
 
 void	motionmap_store_frame( VJFrame *fx )
@@ -243,19 +261,47 @@ static int32_t motionmap_activity_level( uint8_t *I, int width, int height )
 	const unsigned int len = (width * height);
 	int32_t level = 0;
 	int r,c;
-    for (r = 0; r < len; r += width) {
+   	for (r = 0; r < len; r += width) {
 		for ( c = 0; c < width; c ++ ) {
-			if( I[r + c] > 0 )
-					level ++;
+			level += I[r + c];
 		}
 	}
-	return level;
+	return (level>>8);
 }
 
-void motionmap_find_diff( uint8_t *bg, uint8_t *prev_img, uint8_t *img, const int len, const int threshold )
+void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *img, uint8_t *pI1, uint8_t *pI2, uint8_t *bDst, const int len, const int threshold )
 {
 	unsigned int i;
 	uint8_t p1,p2;
+
+#ifndef NO_AUTOVECTORIZATION
+	uint8_t *I1 = __builtin_assume_aligned( pI1, 16 );
+	uint8_t *I2 = __builtin_assume_aligned( pI2, 16 );
+
+	for( i = 0; i < len; i ++ ) 
+	{
+		I1[i] = abs( bg[i] - img[i] );
+		if( I1[i] < threshold )
+			I1[i] = 0;
+		else
+			I1[i] = 0xff;
+
+		I2[i] = abs( bg[i] - prev_img[i] );
+		if( I2[i] < threshold )
+			I2[i] = 0; 
+		else
+			I2[i] = 0xff;
+
+		I1[i] = abs( I1[i] - I2[i] );
+		I2[i] = bDst[i] >> 1;
+	}
+
+	for( i = 0; i < len; i ++ ) 
+	{
+		bDst[i] = I1[i] + I2[i];
+		prev_img[i] = img[i];
+	}
+#else
 	for( i = 0; i < len; i ++ ) 
 	{
 		uint8_t q1 = 0, q2 = 0;
@@ -270,56 +316,39 @@ void motionmap_find_diff( uint8_t *bg, uint8_t *prev_img, uint8_t *img, const in
 		}
 
 		if( (!q1 && q2) || (!q2 && q1) ) {
-			binary_img[i] = 0xff;
+			bDst[i] = 0xff;
 		}
 		else {
-			binary_img[i] = (binary_img[i] >> 1); //@ decay
+			bDst[i] = (bDst[i] >> 1); //@ decay
 		}
 
-		prev_img[i] = img[i];
+		prev_img[i] = img[i]; 
 	}
+#endif
 }
 
 void motionmap_find_diff_job( void *arg )
 {
 	vj_task_arg_t *t = (vj_task_arg_t*) arg;
 
-	uint8_t *t_bg = t->input[0];
-	uint8_t *t_img = t->input[1];
+	const uint8_t *t_bg = t->input[0];
+	const uint8_t *t_img = t->input[1];
 	uint8_t *t_prev_img = t->input[2];
 	uint8_t *t_binary_img = t->output[0];
+	uint8_t *t_diff1 = t->output[1];
+	uint8_t *t_diff2 = t->output[2];
 
 	const int len = t->strides[0];
 	const int threshold = t->iparams[0];
 
-	unsigned int i;
-	uint8_t p1,p2;
-	for( i = 0; i < len; i ++ ) 
-	{
-		uint8_t q1 = 0, q2 = 0;
-		p1 = abs( t_bg[i] - t_img[i] );
-		if( p1 > threshold ) {
-			q1 = 1;
-		}
-
-		p2 = abs( t_bg[i] - t_prev_img[i] );
-		if( p2 > threshold ) {
-			q2 = 1;
-		}
-
-		if( (!q1 && q2) || (!q2 && q1) ) {
-			t_binary_img[i] = 0xff;
-		}
-		else {
-			t_binary_img[i] = (t_binary_img[i] >> 1); //@ decay in 7 frames
-		}
-
-		t_prev_img[i] = t_img[i];
-	}
+	motionmap_calc_diff( t_bg, t_prev_img, t_img,t_diff1,t_diff2, t_binary_img, len, threshold );
 }
 
 int	motionmap_prepare( uint8_t *map[4], int width, int height )
 {
+	if(!is_initialized)
+			return 0;
+
 	vj_frame_copy1( map[0], bg_image, width * height );
 	motionmap_blur( bg_image, width,height );
 	veejay_memcpy( prev_img, bg_image, width * height );
@@ -342,35 +371,35 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		return;
 	}
 
-	/* run difference algorithm over multiple threads */
+	// run difference algorithm over multiple threads
 	if( vj_task_available() ) {
 		VJFrame task;
-		task.stride[0] = len;		   /* plane length */
+		task.stride[0] = len;		   // plane length 
 		task.stride[1] = len;
 		task.stride[2] = len;
 		task.stride[3] = 0;
-		task.data[0] = bg_image;       /* plane 0 = background image */
-		task.data[1] = frame->data[0]; /* plane 1 = luminance channel */
-		task.data[2] = prev_img;       /* plane 2 = luminance channel of previous frame */
+		task.data[0] = bg_image;       // plane 0 = background image 
+		task.data[1] = frame->data[0]; // plane 1 = luminance channel 
+		task.data[2] = prev_img;       // plane 2 = luminance channel of previous frame
 		task.data[3] = NULL;
-		task.ssm = 1;                  /* all planes are the same size */
-		task.format = frame->format;   /* not important, but cannot be 0 */
+		task.ssm = 1;                  // all planes are the same size 
+		task.format = frame->format;   // not important, but cannot be 0
 		task.shift_v = 0;
 		task.shift_h = 0;
-		task.uv_width = 0;
-		task.uv_height = 0;
-		task.width = width;            /* dimensions */
+		task.uv_width = width;
+		task.uv_height = height;
+		task.width = width;            // dimension
 		task.height = height;
 
-		uint8_t *dst[4] = { binary_img, binary_img, binary_img, NULL };
+		uint8_t *dst[4] = { binary_img, diff_img, diff_img + RUP8(len), NULL };
 
 		vj_task_set_from_frame( &task );
 		vj_task_set_param( threshold, 0 );
 
 		vj_task_run( task.data, dst, NULL,NULL,3, (performer_job_routine) &motionmap_find_diff_job );
 	}
-	else {
-		motionmap_find_diff( bg_image, prev_img, frame->data[0], len, threshold );
+	else { 
+		motionmap_calc_diff( (const uint8_t*) bg_image, prev_img, (const uint8_t*) frame->data[0], diff_img, diff_img + RUP8(len), binary_img, len, threshold );
 	}
 
 	if( draw )
@@ -387,7 +416,7 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 	int32_t min = INT_MAX;
 
 	current_his_len = history;
-	current_decay   = decay;
+	current_decay = decay;
 
 	histogram_[ (nframe_%current_his_len) ] = activity_level;
 
