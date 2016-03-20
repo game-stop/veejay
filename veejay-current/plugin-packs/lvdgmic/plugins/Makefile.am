@@ -149,7 +149,7 @@ gmic_lightrelief_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
 INCLUDES=$(FFMPEG_CFLAGS) -I$(top_srcdir)/liblvdgmic
 AM_CFLAGS=-I@top_srcdir@/include $(OPTCFLAGS) -DSILENT
-AM_LDFLAGS=-module -avoid-version -lm -export-dynamic -lgmic -lstdc++ -DDYNAMIC -rdynamic
+AM_LDFLAGS=-module -avoid-version -lm -export-dynamic -lgmic -lstdc++ -DDYNAMIC -rdynamic 
 AM_LIBTOOLFLAGS = --tag=disable-static
 
 lividoplugindir = @libdir@/livido-plugins

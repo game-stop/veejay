@@ -15,7 +15,7 @@ dnl AX_CONFIG_PREFIXED_HEADER([veejay-config.h], [VEEJAY], [config.h])
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE([1.7])
+AM_INIT_AUTOMAKE([subdir-objects])
 AM_MAINTAINER_MODE
 
 AC_DEFINE(VEEJAYUTIL,1,[Building Livido GMIC filters])
@@ -51,13 +51,13 @@ AC_ARG_ENABLE(compile-warnings,
 AC_ARG_ENABLE(warnings_as_errors,   
               AC_HELP_STRING([--enable-warnings_as_errors],
                              [Compiler warnings are errors.]))
-AC_ARG_ENABLE(simd-accel,
-              AC_HELP_STRING([--enable-simd-accel],
-                             [use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
 AC_ARG_WITH(extra-cflags,
             AC_HELP_STRING([--with-extra-cflags=flags],
                            [Options to be added to CFLAGS (optional)]))
-
+arch_target="auto"
+AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic or auto],
+					[Build a generic binary or auto-detect current cpu type (defaults to auto-detect)]),
+					[ arch_target="$withval"])
 
 user_specified_target=
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
@@ -165,6 +165,160 @@ case $host in
 	LIBM_LIBS=""
 	;;
 esac
+
+
+
+have_asm_nasm=false
+have_asm_mmx=false
+have_asm_sse=false
+have_asm_sse2=false
+have_asm_mmx2=false
+have_asm_3dnow=false
+have_cmov=false
+have_x86cpu=false
+have_x86_64cpu=false
+have_altivec=false
+have_mips=false
+have_ppccpu=false
+have_ps2=false
+have_arm=false
+
+OP_CFLAGS=""
+
+AC_MSG_CHECKING([Architecture])
+case $host_cpu in
+	i[[3-7]]86)
+	AC_DEFINE(HAVE_X86CPU,1, [Compiling for x86 architecture CPU])
+	AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
+	have_x86cpu=true
+
+	PROGRAM_NOPIC="-fno-PIC"
+	OP_CFLAGS="-O3 -ftree-vectorize -ffast-math -m32 -fPIC -DPIC"
+
+	AC_MSG_RESULT([x86])
+    ;;
+  x86_64*|k8-*)
+    	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
+    	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
+    	have_x86cpu=true
+    	have_x86_64cpu=true
+	CFLAGS="$CFLAGS -O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
+
+	AC_MSG_RESULT([x86_64])
+    ;;
+  powerpc | powerpc64)
+	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
+	AC_DEFINE(ARCH_PPC,1,[Compiling for PowerPC])
+	have_ppccpu=true
+
+	case $host in
+	      *-apple-darwin*)
+		PROGRAM_NOPIC="-mdynamic-no-pic" # dynamic-no-pic is an Apple gcc option
+dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
+
+	        ;;
+     		 *)
+   		PROGRAM_NOPIC=""
+      		;;
+    	esac
+
+	AC_MSG_RESULT([powerpc])
+    ;;
+   mips | mipsel)
+	AC_DEFINE(ARCH_MIPS,1,[Compiling for MIPS CPU])
+	AC_DEFINE(HAVE_MIPS,1,[Compiling for MIPS CPU])
+	have_mips=true
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
+		[[#include <linux/ps2/dev.h>
+		  #include <linux/ps2/gs.h>
+                ]])],
+		[have_ps2=true],
+		[have_ps2=false])
+
+	AC_MSG_RESULT([mips])
+
+	AC_MSG_CHECKING([if we are compiling on playstation2 hardware])
+	if test x$have_ps2 = xtrue ; then
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_PS2,1,[Compile for playstation2])
+	else
+		AC_MSG_RESULT(no)
+	fi
+
+	;;
+   arm|armv7l)
+	AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	have_arm=true
+	AC_MSG_RESULT(arm)
+	;;
+
+  *)
+
+dnl If you get here, you can change AC_MSG_ERROR to AC_MSG_RESULT
+dnl and uncomment setting the CFLAGS below to have it compile anyway on your system
+	AC_MSG_ERROR([unknown])
+
+dnl	CFLAGS="$USER_CFLAGS"
+
+    ;;
+esac
+
+CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+
+if test x$host_alias != x; then
+	dnl Cross compiling
+	AC_MSG_CHECKING(sub-architecture settings)
+	if test x$have_x86cpu = xtrue; then
+		host_mod_cpu=`echo $host_cpu|tr _ -`
+		ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
+		AC_MSG_RESULT($ARCHFLAGS)
+	fi
+else
+	AC_MSG_CHECKING(sub-architecture settings)
+	
+	chmod +x $srcdir/cpuinfo.sh
+
+	if test "$arch_target" = "auto"; then
+		TMP=`$srcdir/cpuinfo.sh`
+		ARCHFLAGS=`cat veejay.arch`
+	else
+       		ARCHFLAGS="-mtune=generic"
+	fi
+		AC_MSG_RESULT($ARCHFLAGS)
+fi
+
+dnl ARM architecture detect NEON and set CFLAGS
+if test x$have_arm = xtrue
+then
+	AC_CACHE_CHECK(for NEON on processor(s), ac_cv_flag_neon, [
+		if grep "^Features.* neon" /proc/cpuinfo > /dev/null; then
+			ac_cv_flag_neon=yes
+		else
+			ac_cv_flag_neon=no
+		fi
+	])
+	AC_MSG_RESULT($ac_cv_flag_neon)	
+
+	if test $ac_cv_flag_neon = yes ; then
+		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
+		USER_CFLAGS="-mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
+		FASTARM_CFLAGS="$ARCHFLAGS -Wa,-march=armv7-a -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
+
+	else
+		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
+		FASTARM_CFLAGS="$ARCHFLAGS -Wa, -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
+	fi
+	
+	if test "x$enable_debug" != "xyes" ; then
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
+	else
+		USER_CFLAGS="$USER_CFLAGS -g -Wall"
+	fi
+
+	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+
+	AC_SUBST(FASTARM_CFLAGS)
+fi
 
 
 dnl ====== check for PKG_CONFIG_PATH
@@ -334,6 +488,17 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([])
+if test "$have_arm" = "true" ; then
+AC_MSG_NOTICE([   arm])
+AC_MSG_NOTICE([    NEON    enabled     : ${ac_cv_flag_neon}])
+fi
+
+if test "$have_mips" = "true" ; then
+AC_MSG_NOTICE([   mips])
+AC_MSG_NOTICE([    PS/2 enabled        : ${have_ps2}])
+fi
 AC_MSG_NOTICE([])
 if test "$have_linux" = "true" ; then
 AC_MSG_NOTICE([   Platform: Linux])
