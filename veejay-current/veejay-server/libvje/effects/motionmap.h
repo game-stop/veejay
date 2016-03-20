@@ -25,8 +25,14 @@
 #include <stdint.h>
 
 vj_effect *motionmap_init(int w, int h);
-void motionmap_apply( VJFrame *frame, int width, int height, int t, int n, int draw, int histo, int op, int ip);
+void motionmap_apply( VJFrame *frame, int width, int height, int t, int n, int draw, int histo, int op, int ip, int la);
 int	motionmap_malloc(int w,int h);
 void	motionmap_free(void);
-int		motionmap_prepare( uint8_t *map[4], int w, int h );
+int	motionmap_prepare( uint8_t *map[4], int w, int h );
+int	motionmap_active();
+int	motionmap_is_locked();
+uint8_t	*motionmap_interpolate_buffer();
+uint8_t *motionmap_bgmap();
+void	motionmap_store_frame( VJFrame *fx );
+void	motionmap_interpolate_frame( VJFrame *fx, int N, int n );
 #endif

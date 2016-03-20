@@ -512,7 +512,7 @@ extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int thres
 
 extern void pixelate_apply(VJFrame *frame, int w, int h, int v );
 
-extern void magicmirror_apply(VJFrame *frame, int w, int h, int x, int y, int d, int n );
+extern void magicmirror_apply(VJFrame *frame, int w, int h, int x, int y, int d, int n, int alpha );
 
 extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int n, int m, int border, int alpha);
 
@@ -539,7 +539,9 @@ extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int opa
 
 extern void overclock_apply(VJFrame *frame, int w, int h, int val, int r);
 
-extern int bgsubtract_prepare(uint8_t *map[4], int w, int h);
+uint8_t *bgsubtract_get_bg_frame(unsigned int plane);
+
+extern int bgsubtract_prepare(VJFrame *frame);
 
 extern void bgsubtract_apply(VJFrame *frame,int width, int height, int mode, int threshold, int alpha );
 
@@ -585,7 +587,7 @@ extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
 
 extern void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse );
 
-extern void	motionmap_apply( VJFrame *frame, int w, int h, int threshold, int reverse, int draw, int his, int op, int ip );
+extern void	motionmap_apply( VJFrame *frame, int w, int h, int threshold, int reverse, int draw, int his, int op, int ip, int la );
 
 extern void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb);
 

@@ -1490,7 +1490,11 @@ void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len 
 {	
 	unsigned int i;
 	for( i = 0; i < len; i ++ ) {
-		O[i] = ( abs( B[i] - A[i] ) > threshold ? 0xff : 0 );
+		O[i] = abs( A[i] - B[i] );
+		if( O[i] < threshold )
+			O[i] = 0;
+		else
+			O[i] = 0xff;
 	}	
 }
 

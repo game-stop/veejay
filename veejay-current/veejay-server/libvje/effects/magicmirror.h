@@ -27,7 +27,6 @@
 
 vj_effect *magicmirror_init(int w, int h);
 int magicmirror_malloc(int w, int h);
-void magicmirror_apply( VJFrame *frame, int width, int height, int a, int b,
-		  int na, int nb);
+void magicmirror_apply( VJFrame *frame, int width, int height, int a, int b, int na, int nb, int alpha);
 void magicmirror_free();
 #endif

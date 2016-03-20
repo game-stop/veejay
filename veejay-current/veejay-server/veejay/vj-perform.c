@@ -2645,8 +2645,13 @@ static void vj_perform_plain_fill_buffer(veejay_t * info, int *ret)
 		*ret = vj_perform_get_frame_(info, info->uc->sample_id, settings->current_frame_num,&frame,&frame, p0_buffer,p1_buffer,0 );
 	} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN ) {
 		*ret = vj_perform_get_frame_(info, 0, settings->current_frame_num,&frame,&frame, p0_buffer, p1_buffer,0 );
-
 	}
+
+	if(info->uc->take_bg==1 )
+   	{
+		info->uc->take_bg = vj_perform_take_bg(info,&frame);
+   	} 
+
 }
 static int rec_audio_sample_ = 0;
 static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[4], int sample)
@@ -2958,19 +2963,17 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
     
     if(!active)
     {
-	if (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE ) 
-		vj_tag_enable( info->uc->sample_id );	
-    }
+		if (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE ) 
+			vj_tag_enable( info->uc->sample_id );	
+	}
     else
     {
-
-	if (vj_tag_get_frame(info->uc->sample_id, info->effect_frame1,NULL))
-	{
-	    error = 0;
-	    cached_tag_frames[0] = info->uc->sample_id;
-   	}
-
-   }         
+		if (vj_tag_get_frame(info->uc->sample_id, info->effect_frame1,NULL))
+		{
+				error = 0;
+				cached_tag_frames[0] = info->uc->sample_id;
+		}
+	}         
 
 	if (error == 1)
  	{
@@ -2983,7 +2986,13 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 		dumb.data[3] = frame[3];
 		dummy_apply(&dumb,info->video_output_width,info->video_output_height,VJ_EFFECT_COLOR_BLACK );
   	}
- 	 return 1;      	
+
+	if(info->uc->take_bg==1 )
+   	{
+		info->uc->take_bg = vj_perform_take_bg(info,info->effect_frame1);
+   	} 
+
+	return 1;      	
 }
 
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame)
@@ -3531,11 +3540,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		free(more_text);
 
 
-	if (info->uc->take_bg==1)
-    {
-       	info->uc->take_bg = vj_perform_take_bg(info,frame,0);
-    } 
-
 	if(!settings->composite && info->uc->mouse[0] > 0 && info->uc->mouse[1] > 0) 
 	{
 		if( info->uc->mouse[2] == 1 ) {
@@ -3609,7 +3613,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		}
 	}
 	
-
 	if( frame->ssm == 1 )
 	{
 		chroma_subsample(settings->sample_mode,frame,pri);
@@ -3621,12 +3624,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		frame2->ssm=0;
 	}
 
-	if (info->uc->take_bg==1)
-   	{
-       	vj_perform_take_bg(info,frame,1);
-       	info->uc->take_bg = 0;
-   	} 
-	
 	if( frame2->data[0] == frame->data[0] )
 		frame->ssm = 0;
 }

@@ -26,110 +26,125 @@
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-msg.h>
 #include "softblur.h"
-static uint8_t *static_bg = NULL;
+#include <libsubsample/subsample.h>
+
+static uint8_t *static_bg__ = NULL;
+static uint8_t *bg_frame__[4] = { NULL,NULL,NULL,NULL };
+static int bg_ssm = 0;
 
 vj_effect *bgsubtract_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;	/* threshold */
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;	/* mode */
-    ve->limits[1][1] = 1;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 3;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->limits[0][0] = 0;	/* threshold */
+	ve->limits[1][0] = 255;
+	ve->limits[0][1] = 0;	/* mode */
+	ve->limits[1][1] = 1;
 	ve->limits[0][2] = 0;	/* alpha */
-    ve->limits[1][2] = 1;
+	ve->limits[1][2] = 1;
 
-    ve->defaults[0] = 45;
-    ve->defaults[1] = 0;
+	ve->defaults[0] = 45;
+	ve->defaults[1] = 1;
 	ve->defaults[2] = 0;
 
-    ve->description = "Substract background (static, requires bg mask)";
-    ve->extra_frame = 0;
-    ve->sub_format = -1;
-    ve->has_user = 1;
-    ve->user_data = NULL;
+	ve->description = "Subtract background";
+	ve->extra_frame = 0;
+	ve->sub_format = -1;
+	ve->has_user = 1;
+	ve->user_data = NULL;
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "To Alpha");
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,"Preview", "Inverted preview", "Normal" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,"Show Difference", "Show Static BG" );
 
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
-    return ve;
+	return ve;
 }
 
-#define rup8(num)(((num)+8)&~8)
 int bgsubtract_malloc(int width, int height)
 {
-	if(static_bg == NULL)	
-		static_bg = (uint8_t*) vj_calloc( rup8( width + width * height * sizeof(uint8_t)) );
+	if(static_bg__ == NULL){
+		static_bg__ = (uint8_t*) vj_malloc( RUP8(width*height)*4);
+		bg_frame__[0] = static_bg__;
+		bg_frame__[1] = bg_frame__[0] + RUP8(width*height);
+		bg_frame__[2] = bg_frame__[1] + RUP8(width*height);
+		bg_frame__[3] = bg_frame__[2] + RUP8(width*height);
+	}
+
 	return 1;
 }
 
 void bgsubtract_free()
 {
-	if( static_bg )
-		free(static_bg );
-	static_bg = NULL;
+	if( static_bg__ ) {
+		free(static_bg__ );
+
+		bg_frame__[0] = NULL;
+		bg_frame__[1] = NULL;
+		bg_frame__[2] = NULL;
+		bg_frame__[3] = NULL;
+		static_bg__ = NULL;
+	}
 }
 
-int bgsubtract_prepare(uint8_t *map[4], int width, int height)
+int bgsubtract_prepare(VJFrame *frame)
 {
-	if(!static_bg )
+	if(!static_bg__ )
 	{
 		return 0;
 	}
 	
 	//@ copy the iamge
-	veejay_memcpy( static_bg, map[0], (width*height));
+	veejay_memcpy( bg_frame__[0], frame->data[0], frame->len );
+	if( frame->ssm ) {
+		veejay_memcpy( bg_frame__[1], frame->data[1], frame->len );
+		veejay_memcpy( bg_frame__[2], frame->data[2], frame->len );
+	}
+	else {
+		// if data is subsampled, super sample it now 
+		veejay_memcpy( bg_frame__[1], frame->data[1], frame->uv_len );
+		veejay_memcpy( bg_frame__[2], frame->data[2], frame->uv_len );
+		chroma_supersample( SSM_422_444, frame, bg_frame__ );
+	}
+
+	bg_ssm = 1;
 	
-	VJFrame tmp;
-	veejay_memset( &tmp, 0, sizeof(VJFrame));
-	tmp.data[0] = static_bg;
-	tmp.width = width;
-	tmp.height = height;
-
-	//@ 3x3 blur
-	softblur_apply( &tmp, width,height,0);
-
-	veejay_msg(2, "Substract background: Snapped background frame");
+	veejay_msg(2, "Subtract background: Snapped background frame");
 	return 1;
+}
+
+uint8_t* bgsubtract_get_bg_frame(unsigned int plane)
+{
+	return bg_frame__[ plane ];
 }
 
 void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int mode, int alpha )
 {
-	VJFrame tmp;
-	veejay_memset( &tmp, 0, sizeof(VJFrame));
-	tmp.data[0] = frame->data[0];
-	tmp.width = width;
-	tmp.height = height;
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
 
-	//@ 3x3 blur
-	softblur_apply( &tmp, width,height,0);
+	if( mode ) {
+		veejay_memcpy( frame->data[0], bg_frame__[0], frame->len );
+		if( frame->ssm ) {
+			veejay_memcpy( frame->data[1], bg_frame__[1], frame->len );
+			veejay_memcpy( frame->data[2], bg_frame__[2], frame->len );
+		} else { /* if chain is still subsampled, copy only greyscale image */
+			veejay_memset( frame->data[1], 128, frame->uv_len );
+			veejay_memset( frame->data[2], 128, frame->uv_len );
+		}	
+		return;
+	}
 
 	if( alpha == 0 ) {
-		if ( mode == 0 ) {
-			binarify( frame->data[0], static_bg,frame->data[0], threshold, 0, width*height );
-		} else if ( mode == 1 ) {
-			binarify( frame->data[0], static_bg, frame->data[0], threshold, 1,width*height );
-		}
-	
-		veejay_memset( frame->data[1], 128, frame->uv_len );
-		veejay_memset( frame->data[2], 128, frame->uv_len );
+		veejay_memset( frame->data[1], 128, uv_len );
+		veejay_memset( frame->data[2], 128, uv_len );
+		vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[0], threshold, frame->len );
 	}
 	else {
-		if ( mode == 0 ) {
-			binarify( frame->data[0], static_bg,frame->data[3], threshold, 0, width*height );
-		} else if ( mode == 1 ) {
-			binarify( frame->data[0], static_bg, frame->data[3], threshold, 1,width*height );
-		}
+		vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[3], threshold, frame->len );
 	}
 }
-
-
-
-

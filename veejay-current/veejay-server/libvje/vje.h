@@ -133,6 +133,7 @@ extern int vj_effect_initialized(int e, void *ptr);
 extern int vj_effect_get_by_name(char *name);
 extern int vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments, void *ptr);
 extern int vj_effect_prepare( VJFrame *frame, int selector);
+extern uint8_t *vj_effect_get_bg( int selector, unsigned int plane );
 extern void vj_effect_dump(void);
 extern int rgb_parameter_conversion_type_;
 extern int vj_effect_is_plugin( int fx_id );

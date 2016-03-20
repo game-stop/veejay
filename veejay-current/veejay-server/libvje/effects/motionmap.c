@@ -32,6 +32,16 @@
  * To use the plain C version, define NO_AUTOVECTORIZATION
  */
 
+/* TODO:
+ *
+ *
+ * create mask of foreground object (aproximate IR)
+ * put mask into alpha-channel
+ * apply secundary effect on alpha-channel
+ * apply secundary effect on whole frame, using alpha channel
+ *
+ */
+
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -49,7 +59,7 @@
 vj_effect *motionmap_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
+    ve->num_params = 7;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -66,19 +76,28 @@ vj_effect *motionmap_init(int w, int h)
     ve->limits[1][3] = HIS_LEN;
     ve->limits[0][5] = 0;
     ve->limits[1][5] = 1;
+    ve->limits[0][6] = 0;
+    ve->limits[1][6] = 3;
     ve->defaults[0] = 40;
     ve->defaults[1] = 1000;
     ve->defaults[2] = 1;
     ve->defaults[3] = HIS_DEFAULT;
     ve->defaults[4] = HIS_DEFAULT;
     ve->defaults[5] = 0;
+    ve->defaults[6] = 0;
     ve->description = "Motion Mapping";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->n_out = 2;
-	ve->param_description = vje_build_param_list( ve->num_params, 
-			"Difference Threshold", "Maximum Motion Energy","Draw Motion Map","History in frames" ,"Decay", "Interpolate frames");
+//    ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
+    ve->param_description = vje_build_param_list( ve->num_params, 
+			"Difference Threshold", "Maximum Motion Energy","Draw Motion Map","History in frames" ,"Decay", "Interpolate frames", "Activity Mode");
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][6], 6, "Normal", "Local Max", "Global Max", "Hold Last" );
+
     return ve;
 }
 
@@ -91,6 +110,7 @@ static uint8_t *prev_img = NULL;
 static uint8_t *interpolate_buf = NULL;
 
 static int32_t max = 0;
+static int32_t global_max = 0;
 static uint32_t nframe_ =0;
 static int current_his_len = HIS_DEFAULT;
 static int current_decay = HIS_DEFAULT;
@@ -100,6 +120,7 @@ static int running = 0;
 static int is_initialized = 0;
 static int do_interpolation = 0;
 static int stored_frame = 0;
+static int scale_lock = 0;
 
 int		motionmap_malloc(int w, int h )
 {
@@ -148,6 +169,9 @@ void		motionmap_free(void)
 	do_interpolation = 0;
 	keyv_ = 0;
 	keyp_ = 0;
+	scale_lock = 0;
+	global_max = 0;
+	stored_frame = 0;
 	binary_img = NULL;
 	prev_img = NULL;
 }
@@ -167,6 +191,11 @@ int	motionmap_active()
 	return running;
 }
 
+int motionmap_is_locked()
+{
+	return scale_lock;
+}
+
 uint32_t	motionmap_activity()
 {
 	return keyv_;
@@ -174,24 +203,24 @@ uint32_t	motionmap_activity()
 
 void	motionmap_scale_to( int p1max, int p2max, int p1min, int p2min, int *p1val, int *p2val, int *pos, int *len )
 {
-	if( max == 0 )
+	if( global_max == 0 || scale_lock )
 		return;
 
-	if( keyv_ > max )
+	if( keyv_ > global_max )
 	{
-		keyv_ = max;
+		keyv_ = global_max;
 	}
 
 	int n  = (nframe_ % current_decay) + 1;
 	float q = 1.0f / (float) current_decay * n;
 	float diff = (float) keyv_ - (float) keyp_ ;
 	float pu = keyp_ + (q * diff);
-	float m  = (float) max;
+	float m  = (float) global_max;
 
 	if( pu > m )
 		pu = m;
 
-	float w = 1.0 / max;
+	float w = 1.0 / global_max;
 	float pw = w * pu;
 
 	*p1val = p1min + (int) ((p1max-p1min) * pw);
@@ -290,7 +319,6 @@ void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *i
 	unsigned int i;
 	uint8_t p1,p2;
 
-#ifndef NO_AUTOVECTORIZATION
 	uint8_t *I1 = pI1;
 	uint8_t *I2 = pI2;
 
@@ -308,6 +336,7 @@ void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *i
 		else
 			I2[i] = 0xff;
 
+//		A[i]  = I1[i];
 		I1[i] = abs( I1[i] - I2[i] );
 		I2[i] = bDst[i] >> 1;
 	}
@@ -317,30 +346,6 @@ void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *i
 		bDst[i] = I1[i] + I2[i];
 		prev_img[i] = img[i];
 	}
-#else
-	for( i = 0; i < len; i ++ ) 
-	{
-		uint8_t q1 = 0, q2 = 0;
-		p1 = abs( bg[i] - img[i] );
-		if( p1 > threshold ) {
-			q1 = 1;
-		}
-
-		p2 = abs( bg[i] - prev_img[i] );
-		if( p2 > threshold ) {
-			q2 = 1;
-		}
-
-		if( (!q1 && q2) || (!q2 && q1) ) {
-			bDst[i] = 0xff;
-		}
-		else {
-			bDst[i] = (bDst[i] >> 1); //@ decay
-		}
-
-		prev_img[i] = img[i]; 
-	}
-#endif
 }
 
 void motionmap_find_diff_job( void *arg )
@@ -350,6 +355,7 @@ void motionmap_find_diff_job( void *arg )
 	const uint8_t *t_bg = t->input[0];
 	const uint8_t *t_img = t->input[1];
 	uint8_t *t_prev_img = t->input[2];
+//	uint8_t *t_alpha = t->input[3];
 	uint8_t *t_binary_img = t->output[0];
 	uint8_t *t_diff1 = t->output[1];
 	uint8_t *t_diff2 = t->output[2];
@@ -357,7 +363,8 @@ void motionmap_find_diff_job( void *arg )
 	const int len = t->strides[0];
 	const int threshold = t->iparams[0];
 
-	motionmap_calc_diff( t_bg, t_prev_img, t_img,t_diff1,t_diff2, t_binary_img, len, threshold );
+//	motionmap_calc_diff( t_bg, t_prev_img, t_img,t_diff1,t_diff2, t_binary_img,t_alpha, len, threshold );
+	motionmap_calc_diff( t_bg, t_prev_img, t_img,t_diff1,t_diff2, t_binary_img,len, threshold );
 }
 
 int	motionmap_prepare( uint8_t *map[4], int width, int height )
@@ -374,16 +381,20 @@ int	motionmap_prepare( uint8_t *map[4], int width, int height )
 	running = 0;
 	stored_frame = 0;
 	do_interpolation = 0;
+	scale_lock = 0;
 	veejay_msg(2, "Motion Mapping: Snapped background frame");
 	return 1;
 }
+static int32_t global_act = 0;
 
-void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int limit, int draw, int history, int decay, int interpol )
+void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int limit, int draw, int history, int decay, int interpol, int last_act_level )
 {
 	unsigned int i;
 	const unsigned int len = (width * height);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+//	uint8_t *alpha = frame->data[3];
+
 	if(!have_bg) {
 		veejay_msg(VEEJAY_MSG_ERROR,"Motion Mapping: Snap the background frame with VIMS 339 or mask button in reloaded");
 		return;
@@ -395,10 +406,12 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		task.stride[0] = len; // plane length 
 		task.stride[1] = len;
 		task.stride[2] = len;
+	//	task.stride[3] = len;
 		task.stride[3] = 0;
 		task.data[0] = bg_image; // plane 0 = background image 
 		task.data[1] = frame->data[0]; // plane 1 = luminance channel 
 		task.data[2] = prev_img; // plane 2 = luminance channel of previous frame
+	//	task.data[3] = alpha;
 		task.data[3] = NULL;
 		task.ssm = 1; // all planes are the same size 
 		task.format = frame->format; // not important, but cannot be 0
@@ -409,15 +422,19 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		task.width = width; // dimensions
 		task.height = height;
 
+	//	uint8_t *dst[4] = { binary_img, diff_img, diff_img + RUP8(len), alpha };
 		uint8_t *dst[4] = { binary_img, diff_img, diff_img + RUP8(len), NULL };
+
 
 		vj_task_set_from_frame( &task );
 		vj_task_set_param( threshold, 0 );
 
-		vj_task_run( task.data, dst, NULL,NULL,3, (performer_job_routine) &motionmap_find_diff_job );
+		vj_task_run( task.data, dst, NULL,NULL,4, (performer_job_routine) &motionmap_find_diff_job );
 	}
 	else { 
+	//	motionmap_calc_diff( (const uint8_t*) bg_image, prev_img, (const uint8_t*) frame->data[0], diff_img, diff_img + RUP8(len), binary_img, alpha, len, threshold );
 		motionmap_calc_diff( (const uint8_t*) bg_image, prev_img, (const uint8_t*) frame->data[0], diff_img, diff_img + RUP8(len), binary_img, len, threshold );
+
 	}
 
 	if( draw )
@@ -427,12 +444,15 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		vj_frame_copy1( binary_img, frame->data[0], len );
 		running = 0;
 		stored_frame = 0;
+		scale_lock = 0;
 		return;
 	}
 
 	int32_t activity_level = motionmap_activity_level( binary_img, width, height );
 	int32_t avg_actlvl = 0;
 	int32_t min = INT_MAX;
+	int32_t local_max = 0;
+
 
 	current_his_len = history;
 	current_decay = decay;
@@ -444,21 +464,55 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		avg_actlvl += histogram_[i];
 		if(histogram_[i] > max ) max = histogram_[i];
 		if(histogram_[i] < min ) min = histogram_[i];
+		if(histogram_[i] > local_max) local_max = histogram_[i];
 	}	
 
 	avg_actlvl = avg_actlvl / current_his_len;
-
-	if( avg_actlvl < limit ) 
+	if( avg_actlvl < limit ) { 
 		avg_actlvl = 0;
+	}
 
 	nframe_ ++;
 
-	if( (nframe_ % current_his_len)==0 )
-	{
-		key1_ = min;
-		key2_ = max;
-		keyp_ = keyv_;
-		keyv_ = avg_actlvl;
+	switch( last_act_level ) {
+		case 0:
+			if( (nframe_ % current_his_len)==0 )
+			{
+				key1_ = min;
+				key2_ = max;
+				keyp_ = keyv_;
+				keyv_ = avg_actlvl;
+				global_max = max;
+			}
+			break;
+		case 1:
+			key1_ = min;
+			key2_ = max;
+			keyv_ = local_max;
+			global_max = local_max;
+			break;
+		case 2:
+			key1_ = min;
+			key2_ = max;
+			keyp_ = keyv_;
+			keyv_ = avg_actlvl;
+			global_max = max;
+			break;
+		case 3:
+			if( (nframe_ % current_his_len)==0 )
+			{
+				key1_ = min;
+				key2_ = max;
+				keyp_ = keyv_;
+				keyv_ = avg_actlvl;
+				global_max = max;
+			}
+			
+			if( avg_actlvl == 0 )
+				scale_lock = 1;
+			else 
+				scale_lock = 0;
+			break;
 	}
 
 	running = 1;

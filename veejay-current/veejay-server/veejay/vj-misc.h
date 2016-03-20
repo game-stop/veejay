@@ -53,7 +53,7 @@ long	vj_get_relative_time(void);
 void	vj_stamp_clear();
 unsigned int vj_stamp();
 
-int	vj_perform_take_bg( veejay_t *info, VJFrame *src, int pass);
+int	vj_perform_take_bg( veejay_t *info, VJFrame *src);
 
 int	veejay_create_temp_file(const char *prefix, char *dst);
 

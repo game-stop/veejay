@@ -208,7 +208,7 @@ void vj_effman_apply_image_effect(
 		      arg[1]);
 	break;
 	case VJ_IMAGE_EFFECT_MAGICMIRROR:
-	magicmirror_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
+	magicmirror_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
     case  VJ_IMAGE_EFFECT_RASTER:
 	raster_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
@@ -391,7 +391,7 @@ void vj_effman_apply_image_effect(
 	 deinterlace_apply( frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	 break;
 	case VJ_IMAGE_EFFECT_MOTIONMAP:
-	motionmap_apply( frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
+	motionmap_apply( frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
 	break;
 	case VJ_IMAGE_EFFECT_CONTOUR:
 	contourextract_apply( vj_effects[entry]->user_data, frames[0],
@@ -708,6 +708,18 @@ void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg,
 	}
 }
 
+uint8_t* vj_effect_get_bg( int selector, unsigned int plane )
+{
+	switch( selector ) {
+		case VJ_IMAGE_EFFECT_BGSUBTRACT:
+			return bgsubtract_get_bg_frame( plane );
+			break;
+		default:
+			break;
+	}
+	return NULL;
+}
+
 int vj_effect_prepare( VJFrame *frame, int selector)
 {
 	int fx_id = vj_effect_real_to_sequence( selector );
@@ -716,7 +728,7 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 
 	switch( selector ) {
 		case VJ_IMAGE_EFFECT_BGSUBTRACT:
-			return bgsubtract_prepare( frame->data, frame->width,frame->height );
+			return bgsubtract_prepare( frame );
 			break;	
 		case 	VJ_IMAGE_EFFECT_CONTOUR:
 			return contourextract_prepare(frame->data,frame->width,frame->height );
