@@ -114,6 +114,7 @@ typedef struct
 	VJFrame		*frames[N_FRAMES];
 	VJFrame		*host_frame;
 	int		frames_done[N_FRAMES];
+	uint8_t 	*data_ptrs[N_FRAMES];
 	int		frameidx;
 	int		frame_ready;
 	int		is_streaming;
@@ -1394,15 +1395,12 @@ void	v4l2_close( void *d )
 	if( v->scaler )
 		yuv_free_swscaler( v->scaler );
 	
-	if( !v->picture )
-	{
-		for ( i = 0; i < N_FRAMES; i ++ ) {
-			if(v->frames[i]->data[0])
-				free(v->frames[i]->data[0]);
-			if(v->frames[i])
-				free(v->frames[i]);
-			v->frames[i] = NULL;
-		}
+	for ( i = 0; i < N_FRAMES; i ++ ) {
+		if(v->frames[i])
+			free(v->frames[i]);
+		v->frames[i] = NULL;
+		if(v->data_ptrs[i])
+		       free(v->data_ptrs[i]);
 	}
 
 	if(v->picture) {
@@ -2020,6 +2018,7 @@ static	void	*v4l2_grabber_thread( void *v )
 			v4l2->frames[j]->data[c] = ptr + (c * planes[0]);
 		}
 		v4l2->frames_done[j] = 0;
+		v4l2->data_ptrs[j] = ptr;
 	}
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: allocated %d buffers of %d bytes each", N_FRAMES, planes[0]*4);
