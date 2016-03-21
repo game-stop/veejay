@@ -1107,8 +1107,8 @@ if test "x$enable_compile_warnings" != "xno" ; then
      *) warnCFLAGS="-Wall -Wunused " ;;
     esac
   if test "x$enable_compile_warnings" = "xyes" ; then
-    warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wundef -Wshadow -Wbad-function-cast -Wconversion -Wpadded -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual -Wall"
-    warnCXXFLAGS="$warnCXXFLAGS -Wmissing-prototypes  -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
+    warnCFLAGS="$warnCFLAGS -Wundef -Wshadow -Wbad-function-cast -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wall"
+    warnCXXFLAGS="$warnCXXFLAGS -Wpointer-arith -Wcast-align -Wwrite-strings "
   fi
   if test "x$enable_warnings_as_errors" = "xyes" ; then
     warnCFLAGS="$warnCFLAGS -Werror"
@@ -1120,8 +1120,14 @@ fi
 if test "x$cflags_set" != "xyes" ; then
   if test "x$enable_debug" = "xyes" ; then
   	CFLAGS="$debugCFLAGS $warnCFLAGS $CFLAGS"
+	VJE_CFLAGS="$debugCFLAGS $warnCFLAGS $VJE_CFLAGS"
+	OP_CFLAGS="$debugCFLAGS $warnCFLAGS $OP_CFLAGS"
+	SUBSAMPLE_CFLAGS="$debugCFLAGS $warnCFLAGS $SUBSAMPLE_CFLAGS"
   else
  	CFLAGS="$CFLAGS $warnCFLAGS"
+	VJE_CFLAGS="$debugCFLAGS $VJE_CFLAGS"
+	OP_CFLAGS="$debugCFLAGS $OP_CFLAGS"
+	SUBSAMPLE_CFLAGS="$debugCFLAGS $SUBSAMPLE_CFLAGS"
   fi
   CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
   cflags_set=yes
