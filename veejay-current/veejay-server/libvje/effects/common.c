@@ -52,7 +52,7 @@ void vje_build_value_hint_list( vj_value_hint_t **hints, int limit, int num, ...
 	
 	vj_value_hint_t *hint = hints[num];
 
-	hint->description = (char**) vj_malloc(sizeof(char*) * (limit+1) );
+	hint->description = (char**) vj_calloc(sizeof(char*) * (limit+1) );
 
 	va_start( args, num );
 
@@ -61,6 +61,7 @@ void vje_build_value_hint_list( vj_value_hint_t **hints, int limit, int num, ...
 		tmp = (char*) va_arg( args,char*);
 		hint->description[i] = (tmp == NULL ? NULL : vj_strdup(tmp));
 	}
+	hint->limit = limit;
 	va_end(args);
 }
 
@@ -1534,7 +1535,7 @@ void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcSte
 	int x;
 	const int length= radius*2 + 1;
 	const int inv= ((1<<16) + length/2)/length;
-
+	const int R = (radius - 1);
 	int sum= 0;
 
 	for(x=0; x<radius; x++){
@@ -1548,12 +1549,12 @@ void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcSte
 	}
 
 	for(; x<w-radius; x++){
-		sum+= src[(radius+x)*srcStep] - src[(x-radius-1)*srcStep];
+		sum+= src[(radius+x)*srcStep] - src[(x-R)*srcStep];
 		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
 	}
 
 	for(; x<w; x++){
-		sum+= src[(2*w-radius-x-1)*srcStep] - src[(x-radius-1)*srcStep];
+		sum+= src[(2*w-radius-x-1)*srcStep] - src[(x-R)*srcStep];
 		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
 	}
 }

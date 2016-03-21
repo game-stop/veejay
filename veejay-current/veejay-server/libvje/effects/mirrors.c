@@ -47,7 +47,7 @@ vj_effect *mirrors_init(int width,int height)
     return ve;
 }
 
-void _mirrors_v( uint8_t *yuv[3], int width, int height, int factor, int swap)
+static void _mirrors_v( uint8_t *yuv[3], int width, int height, int factor, int swap)
 {
 	const int len = width * height;
 	int r,c;
@@ -87,7 +87,8 @@ void _mirrors_v( uint8_t *yuv[3], int width, int height, int factor, int swap)
 		}
 	}
 }
-void _mirrors_h( uint8_t *yuv[3], int width, int height, int factor, int swap)
+
+static void _mirrors_h( uint8_t *yuv[3], int width, int height, int factor, int swap)
 {
 	int line_height = height / ( factor + 1);
 

@@ -26,32 +26,28 @@
 #include "common.h"
 vj_effect *emboss_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 8;
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 9;
-    ve->description = "Various Weird Effects";
-    ve->sub_format = -1;
-    ve->extra_frame = 0;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 1;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->defaults[0] = 8;
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 9;
+	ve->description = "Various Weird Effects";
+	ve->sub_format = -1;
+	ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params,"Mode" );
-
-
 	ve->hints = vje_init_value_hint_list( ve->num_params );
-
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 			"Blurry Dark", "Xtreme Emboss", "Lines White Balance", "Gray Emboss",
 		   "Aggressive Emboss", "Dark Emboss", "Grayish Emboss", "Edged", "Emboss Expi", "Another Expi"	);
-
-    return ve;
+	return ve;
 }
 
 
-void simpleedge_framedata(VJFrame *frame, int width, int height)
+static void simpleedge_framedata(VJFrame *frame, int width, int height)
 {
     unsigned int x, y;
     uint8_t a1, a2, a3, b1, b2, b3, c1, c2;
@@ -80,7 +76,7 @@ void simpleedge_framedata(VJFrame *frame, int width, int height)
  * xtreme_emboss: looks a bit like emboss, but with dark colours and distorted edges
  *
  **********************************************************************************************/
-void xtreme_emboss_framedata(VJFrame *frame, int width, int height)
+static void xtreme_emboss_framedata(VJFrame *frame, int width, int height)
 {
     unsigned int r, c;
     uint8_t *Y = frame->data[0];
@@ -100,7 +96,7 @@ void xtreme_emboss_framedata(VJFrame *frame, int width, int height)
     }
 }
 
-void another_try_edge(VJFrame *frame, int w, int h) {
+static void another_try_edge(VJFrame *frame, int w, int h) {
   uint8_t p;
   const unsigned int len=(w*h)-w;
   unsigned int r,c;
@@ -123,7 +119,7 @@ void another_try_edge(VJFrame *frame, int w, int h) {
  * lines_white_balanced_framedata: it looks cool, just try it. 
  *
  **********************************************************************************************/
-void lines_white_balance_framedata(VJFrame *frame, int width, int height)
+static void lines_white_balance_framedata(VJFrame *frame, int width, int height)
 {
     unsigned int r, c;
     const unsigned int len = (width * height) - width;
@@ -145,7 +141,7 @@ void lines_white_balance_framedata(VJFrame *frame, int width, int height)
     }
 }
 
-void emboss_test_framedata(VJFrame *frame, int width, int height)
+static void emboss_test_framedata(VJFrame *frame, int width, int height)
 {
     int a, b, c;
     int i;
@@ -164,7 +160,7 @@ void emboss_test_framedata(VJFrame *frame, int width, int height)
  * gray_emboss_framedata: similar as white_emboss_framedata, but image is more grayish
  *
  **********************************************************************************************/
-void gray_emboss_framedata(VJFrame *frame, int width, int height)
+static void gray_emboss_framedata(VJFrame *frame, int width, int height)
 {
     int r, c;
     uint8_t val;
@@ -191,7 +187,7 @@ void gray_emboss_framedata(VJFrame *frame, int width, int height)
  * aggressive_emboss_framedata: much like the above two, but more aggressive.
  *
  **********************************************************************************************/
-void aggressive_emboss_framedata(VJFrame *frame, int width, int height)
+static void aggressive_emboss_framedata(VJFrame *frame, int width, int height)
 {
     int r, c;
     uint8_t val;
@@ -219,7 +215,7 @@ void aggressive_emboss_framedata(VJFrame *frame, int width, int height)
  * dark_emboss_framedata: like the above, but much less light.
  *
  **********************************************************************************************/
-void dark_emboss_framedata(VJFrame *frame, int width, int height)
+static void dark_emboss_framedata(VJFrame *frame, int width, int height)
 {
     int r, c;
 	uint8_t *Y = frame->data[0];
@@ -244,7 +240,7 @@ void dark_emboss_framedata(VJFrame *frame, int width, int height)
  * grayish_mood_framedata: less light, more gray, only overal colour changes.
  * Name probably does not reflect resulting effects.
  **********************************************************************************************/
-void grayish_mood_framedata(VJFrame *frame, int width, int height)
+static void grayish_mood_framedata(VJFrame *frame, int width, int height)
 {
     int r, c;
 	uint8_t *Y = frame->data[0];
@@ -271,7 +267,7 @@ void grayish_mood_framedata(VJFrame *frame, int width, int height)
  * 
  **********************************************************************************************/
 
-void blur_dark_framedata(VJFrame *frame, int width, int height)
+static void blur_dark_framedata(VJFrame *frame, int width, int height)
 {
     int r, c;
     int len = (width*height) - width;

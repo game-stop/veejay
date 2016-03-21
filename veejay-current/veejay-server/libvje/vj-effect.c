@@ -706,16 +706,35 @@ static void vj_effect_free_parameters( vj_effect *v )
 		if( v->param_description[i] ) 
 			free( v->param_description[i] );
 	}
+	if( v->hints ) {
+		for( i = 0; i < v->num_params; i ++ ) {
+			if( v->hints[i]) {
+				vj_value_hint_t *h = v->hints[i];
+				if( h->limit > 0 ) {
+					int k;
+					for( k = 0; k <= h->limit; k ++ ) {
+						if(h->description[k])
+							free(h->description[k] );
+					}
+					free(h->description);
+				}
+				free(h);
+			}
+		}
+		free(v->hints);
+	}
+
 	free( v->param_description );
 }
 
 void vj_effect_free(vj_effect *ve) {
   if( ve ) {
-	 if(ve->limits[0]) free(ve->limits[0]);
-	 if(ve->limits[1]) free(ve->limits[1]);
-	 if(ve->defaults) free(ve->defaults);
-     if(ve->param_description) vj_effect_free_parameters( ve );
-	 free(ve);
+	if(ve->limits[0]) free(ve->limits[0]);
+	if(ve->limits[1]) free(ve->limits[1]);
+	if(ve->defaults) free(ve->defaults);
+    if(ve->param_description) vj_effect_free_parameters( ve );
+	 
+	free(ve);
   }
 }
 

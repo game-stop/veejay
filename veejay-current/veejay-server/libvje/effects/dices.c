@@ -97,7 +97,7 @@ void dices_free() {
 
 unsigned int dices_fastrand_val;
 /* effectv's rand val */
-unsigned int dices_fastrand()
+static unsigned int dices_fastrand()
 {
     return (dices_fastrand_val = dices_fastrand_val * 1103515245 + 12345);
 }

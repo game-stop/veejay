@@ -42,7 +42,7 @@ vj_effect *lumamagick_init(int width, int height)
     ve->parallel = 1;
 	ve->description = "Luma Magick";
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 30;
+    ve->limits[1][0] = VJ_NUM_BLEND_EFFECTS;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 200;
     ve->limits[0][2] = 0;
@@ -58,8 +58,9 @@ vj_effect *lumamagick_init(int width, int height)
 		"Difference","Difference Negate","Exclusive","Base","Freeze",
 		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",
 		"Relative Luma Add", "Relative Luma Subtract", "Min Subselect", "Max Subselect",
-		"Add Subselect", "Add Average", "Experimental 1","Experimental 2", "Experimental 3",
-		"Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add", "Distorted Subtract" );
+		"Add Subselect", "Add Average", "Experimental 2","Experimental 3", "Experimental 4",
+		"Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add", "Distorted Subtract",
+	    "Experimental 5", "Negate Difference", "Add Luma", "Experimental 6", "Experimental 7");
 
 
 
@@ -69,7 +70,7 @@ vj_effect *lumamagick_init(int width, int height)
 /* 33 = illumination . it increases or decreases light intensity and associate color pixel*/
 
 
-void _lumamagick_adddistorted(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_adddistorted(VJFrame *frame, VJFrame *frame2,
 			      int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -105,7 +106,7 @@ void _lumamagick_adddistorted(VJFrame *frame, VJFrame *frame2,
 }
 
 /*FIXME : overlay magic add distorted */
-void _lumamagick_add_distorted(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_add_distorted(VJFrame *frame, VJFrame *frame2,
 			       int width, int height, int op_a, int op_b)
 {
 
@@ -147,7 +148,7 @@ void _lumamagick_add_distorted(VJFrame *frame, VJFrame *frame2,
 
 }
 
-void _lumamagick_subdistorted(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_subdistorted(VJFrame *frame, VJFrame *frame2,
 			      int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -181,7 +182,7 @@ void _lumamagick_subdistorted(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_sub_distorted(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_sub_distorted(VJFrame *frame, VJFrame *frame2,
 			       int width, int height, int op_a, int op_b)
 {
 
@@ -223,7 +224,7 @@ void _lumamagick_sub_distorted(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_multiply(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_multiply(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -242,26 +243,46 @@ void _lumamagick_multiply(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_divide(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_divide(VJFrame *frame, VJFrame *frame2, int width,
 			int height, int op_a, int op_b)
 {
-    unsigned int i;
-    const unsigned int len = width * height;
-    int b, c;
-    const double opacity_a = op_a * 0.01;
-    const double opacity_b = op_b * 0.01;
-  	uint8_t *Y = frame->data[0];
-    uint8_t *Y2 = frame2->data[0];
+	unsigned int i;
+	const unsigned int len = width * height;
+	int b, c;
+	const double opacity_a = op_a * 0.01;
+	const double opacity_b = op_b * 0.01;
+	uint8_t *Y = frame->data[0];
+	uint8_t *Y2 = frame2->data[0];
 
-    for (i = 0; i < len; i++) {
-	b = (Y[i] * opacity_a) * (Y[i] * opacity_a);
-	c = 0xff - (Y2[i] * opacity_b);
-	if (c > pixel_Y_lo_)
-	    Y[i] = b/c;
-    }
+    	for (i = 0; i < len; i++) {
+		b = (Y[i] * opacity_a) * (Y[i] * opacity_a);
+		c = 0xff - (Y2[i] * opacity_b);
+		if (c > pixel_Y_lo_)
+			Y[i] = b/c;
+    	}
 }
 
-void _lumamagick_additive(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_negdiv(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a ,int op_b )
+{
+	unsigned int i;
+	unsigned int len = width * height;
+	uint8_t *Y = frame->data[0];
+	uint8_t *Y2 = frame2->data[0];
+	int b, c;
+	const double opacity_a = op_a * 0.01;
+	const double opacity_b = op_b * 0.01;
+
+	for (i = 0; i < len; i++) {
+		b = (Y[i] * opacity_a) * (Y[i] * opacity_a);
+		c = 0xff - (Y2[i] * opacity_b);
+		if (c > pixel_Y_lo_)
+			Y[i] = b/c;
+		else
+			Y[i] = c;	
+    	}
+}
+
+static void _lumamagick_additive(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -278,7 +299,7 @@ void _lumamagick_additive(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_substractive(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_substractive(VJFrame *frame, VJFrame *frame2,
 			      int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -295,7 +316,7 @@ void _lumamagick_substractive(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_softburn(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_softburn(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -324,7 +345,7 @@ void _lumamagick_softburn(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_inverseburn(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_inverseburn(VJFrame *frame, VJFrame *frame2,
 			     int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -347,7 +368,7 @@ void _lumamagick_inverseburn(VJFrame *frame, VJFrame *frame2,
 }
 
 
-void _lumamagick_colordodge(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_colordodge(VJFrame *frame, VJFrame *frame2,
 			    int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -373,7 +394,7 @@ void _lumamagick_colordodge(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_mulsub(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_mulsub(VJFrame *frame, VJFrame *frame2, int width,
 			int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -394,7 +415,7 @@ void _lumamagick_mulsub(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_lighten(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_lighten(VJFrame *frame, VJFrame *frame2, int width,
 			 int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -416,7 +437,7 @@ void _lumamagick_lighten(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_difference(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_difference(VJFrame *frame, VJFrame *frame2,
 			    int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -434,7 +455,7 @@ void _lumamagick_difference(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_diffnegate(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_diffnegate(VJFrame *frame, VJFrame *frame2,
 			    int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -452,7 +473,7 @@ void _lumamagick_diffnegate(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_exclusive(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_exclusive(VJFrame *frame, VJFrame *frame2, int width,
 			   int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -473,7 +494,7 @@ void _lumamagick_exclusive(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_basecolor(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_basecolor(VJFrame *frame, VJFrame *frame2, int width,
 			   int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -493,7 +514,7 @@ void _lumamagick_basecolor(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_freeze(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_freeze(VJFrame *frame, VJFrame *frame2, int width,
 			int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -517,7 +538,7 @@ void _lumamagick_freeze(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_unfreeze(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_unfreeze(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -541,7 +562,7 @@ void _lumamagick_unfreeze(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_hardlight(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_hardlight(VJFrame *frame, VJFrame *frame2, int width,
 			   int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -564,7 +585,8 @@ void _lumamagick_hardlight(VJFrame *frame, VJFrame *frame2, int width,
 	Y[i] = c;
     }
 }
-void _lumamagick_relativeaddlum(VJFrame *frame, VJFrame *frame2,
+
+static void _lumamagick_relativeaddlum(VJFrame *frame, VJFrame *frame2,
 				int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -583,7 +605,7 @@ void _lumamagick_relativeaddlum(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_relativesublum(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_relativesublum(VJFrame *frame, VJFrame *frame2,
 				int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -601,7 +623,7 @@ void _lumamagick_relativesublum(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_relativeadd(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_relativeadd(VJFrame *frame, VJFrame *frame2,
 			     int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -640,7 +662,7 @@ void _lumamagick_relativeadd(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_relativesub(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_relativesub(VJFrame *frame, VJFrame *frame2,
 			     int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -671,7 +693,8 @@ void _lumamagick_relativesub(VJFrame *frame, VJFrame *frame2,
     }
 
 }
-void _lumamagick_minsubselect(VJFrame *frame, VJFrame *frame2,
+
+static void _lumamagick_minsubselect(VJFrame *frame, VJFrame *frame2,
 			      int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -692,7 +715,7 @@ void _lumamagick_minsubselect(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _lumamagick_maxsubselect(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_maxsubselect(VJFrame *frame, VJFrame *frame2,
 			      int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -715,7 +738,7 @@ void _lumamagick_maxsubselect(VJFrame *frame, VJFrame *frame2,
 
 
 
-void _lumamagick_addsubselect(VJFrame *frame, VJFrame *frame2,
+static void _lumamagick_addsubselect(VJFrame *frame, VJFrame *frame2,
 			      int width, int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -738,7 +761,7 @@ void _lumamagick_addsubselect(VJFrame *frame, VJFrame *frame2,
 }
 
 
-void _lumamagick_maxselect(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_maxselect(VJFrame *frame, VJFrame *frame2, int width,
 			   int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -757,7 +780,7 @@ void _lumamagick_maxselect(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_minselect(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_minselect(VJFrame *frame, VJFrame *frame2, int width,
 			   int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -776,7 +799,7 @@ void _lumamagick_minselect(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _lumamagick_addtest(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_addtest(VJFrame *frame, VJFrame *frame2, int width,
 			 int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -794,7 +817,8 @@ void _lumamagick_addtest(VJFrame *frame, VJFrame *frame2, int width,
 	Y[i] = CLAMP_Y(c);
     }
 }
-void _lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int width,
+
+static void _lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -830,7 +854,8 @@ void _lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int width,
     }
 
 }
-void _lumamagick_addtest4(VJFrame *frame, VJFrame *frame2, int width,
+
+static void _lumamagick_addtest4(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -891,7 +916,7 @@ void _lumamagick_selectmin(VJFrame *frame, VJFrame *frame2, int width,
 }
 */
  
-void _lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -948,7 +973,7 @@ void _lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int width,
 }
 
 
-void _lumamagick_addlum(VJFrame *frame, VJFrame *frame2, int width,
+static void _lumamagick_addlum(VJFrame *frame, VJFrame *frame2, int width,
 			int height, int op_a, int op_b)
 {
     unsigned int i;
@@ -1065,6 +1090,24 @@ void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int width,
 	break;
     case VJ_EFFECT_BLEND_ADDTEST3:
 	_lumamagick_addtest4(frame, frame2, width, height, op_a, op_b);
+	break;
+	case VJ_EFFECT_BLEND_ADDTEST6:
+	_lumamagick_adddistorted(frame,frame2,width,height,op_a,op_b);
+	break;
+	case VJ_EFFECT_BLEND_ADDTEST7:
+	_lumamagick_subdistorted(frame,frame2,width,height,op_a,op_b);
+	break;
+	case VJ_EFFECT_BLEND_FREEZE:
+	_lumamagick_freeze(frame,frame2,width,height,op_a,op_b);
+	break;
+	case VJ_EFFECT_BLEND_UNFREEZE:
+	_lumamagick_unfreeze(frame,frame2,width,height,op_a,op_b);
+	break;
+	case VJ_EFFECT_BLEND_ADDLUM:
+	_lumamagick_addlum(frame,frame2,width,height,op_a,op_b);
+	break;
+	case VJ_EFFECT_BLEND_NEGDIV:
+	_lumamagick_negdiv(frame,frame2,width,height,op_a,op_b);
 	break;
     }
 }

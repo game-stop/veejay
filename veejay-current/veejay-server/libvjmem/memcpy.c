@@ -290,7 +290,7 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #endif
 
 #undef HAVE_ONLY_MMX1
-#if HAVE_MMX && !HAVE_MMX2 && !HAVE_AMD3DNOW && !HAVE_SSE
+#if HAVE_ASM_MMX && !HAVE_ASM_MMX2 && !HAVE_ASM_3DNOW && !HAVE_ASM_SSE
 /*  means: mmx v.1. Note: Since we added alignment of destinition it speedups
     of memory copying on PentMMX, Celeron-1 and P2 upto 12% versus
     standard (non MMX-optimized) version.
@@ -361,7 +361,7 @@ void	yuyv_plane_init()
 static void	yuyv_plane_clear_job( void *arg )
 {
 	vj_task_arg_t *v = (vj_task_arg_t*) arg;
-	int len = v->strides[0];
+	unsigned int len = v->strides[0];
 	uint8_t *t = v->input[0];
 	unsigned int i;
 	
@@ -1025,7 +1025,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		{
 			__asm__ volatile (
 #ifndef HAVE_ONLY_MMX1
-	        PREFETCH" 320(%0)\n"
+			PREFETCH" 320(%0)\n"
 #endif
 			"movq (%0), %%mm0\n"
 			"movq 8(%0), %%mm1\n"
@@ -1806,11 +1806,11 @@ static double benchmark_threaded_slow(long c, int n_tasks, uint8_t **source, uin
 {
 	int k;
 	double stats[c];
-	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+	int bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ )	
 	{
-		uint64_t t = get_time();
+		double t = get_time();
 		vj_frame_slow_threaded( source, source, dest, planes[0], planes[1]/2, 0.67f );
 		t = get_time() - t;
 		stats[k] = t;
@@ -1832,7 +1832,7 @@ static double benchmark_threaded_copy(long c, int n_tasks, uint8_t **dest, uint8
 {
 	int k;
 	double stats[c];
-	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+	int bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ )	
 	{
@@ -1857,7 +1857,7 @@ static double benchmark_single_copy(long c,int dummy, uint8_t **dest, uint8_t **
 {
 	int k; int j;
 	double stats[c];
-	uint64_t bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
+	int bytes = ( planes[0] + planes[1] + planes[2] + planes[3] );
 
 	for( k = 0; k < c; k ++ ) {
 		double t = get_time();
@@ -1909,16 +1909,16 @@ void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, 
 		sum += stats[i];
 	}
 
-	float average = (sum / N);
+	double average = (sum / N);
 
 	veejay_msg(VEEJAY_MSG_INFO, "run done: best score for %s is %g, worst is %g, average is %g",str, fastest, slowest, average );
 }
 
-void benchmark_tasks(int n_tasks, long n_frames, int w, int h)
+void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
 {
-	unsigned int len = w * h;
-	unsigned int uv_len = (w/2) * h;
-	unsigned int total = len + uv_len + uv_len;
+	int len = w * h;
+	int uv_len = (w/2) * h;
+	int total = len + uv_len + uv_len;
 	uint8_t *src = (uint8_t*) vj_malloc(sizeof(uint8_t) * total );
 	uint8_t *dst = (uint8_t*) vj_malloc(sizeof(uint8_t) * total );
 

@@ -154,7 +154,7 @@ void 	veejay_print_backtrace()
 void	veejay_print_backtrace()
 {
 	void *space[100];
-	size_t i,s;
+	int i,s;
 	char **strings;
 
 	s = backtrace( space, 100 );

@@ -1442,7 +1442,7 @@ static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 	int rgb = vj_effect_get_info( e, &is_mixer, &n_a );
 	int entry = e;
 	
-//	veejay_memset( args, 0 , sizeof(args) );
+	veejay_memset( args, 0 , sizeof(args) );
 	
 	if( playmode == VJ_PLAYBACK_MODE_TAG )
 	{

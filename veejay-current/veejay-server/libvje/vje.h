@@ -72,6 +72,7 @@ typedef struct VJFrameInfo_t
 
 typedef struct {
 	char **description;
+	int limit;
 } vj_value_hint_t;
 
 #define FLAG_ALPHA_NONE (1 << 0) /* no alpha */
@@ -83,24 +84,23 @@ typedef struct {
 #define FLAG_ALPHA_IN_BLEND (1<<6) /* blend operator */
 
 typedef struct vj_effect_t {
-    char *description;			
-    int num_params;			
-    char **param_description;
+	char *description;			
+	int num_params;			
+	char **param_description;
 	vj_value_hint_t **hints;
-    int *defaults;			
-    int *flags;		
-    int *limits[2];		
-    int extra_frame;		
-    int sub_format;		
-    int has_user;		
-    int static_bg;
-    int has_help;
-    int rgb_conv;
-    int n_out;
-    int instance;
-    void *user_data;		
-    char padding[4];
-    int parallel;
+	int *defaults;			
+	int *limits[2];		
+	int extra_frame;		
+	int sub_format;		
+	int has_user;		
+	int static_bg;
+	int has_help;
+	int rgb_conv;
+	int n_out;
+	int instance;
+	void *user_data;		
+	char padding[4];
+	int parallel;
 	int rgba_only;
 	int motion;
 	int alpha;

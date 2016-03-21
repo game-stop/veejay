@@ -58,7 +58,7 @@ static int nframe = 0;
 
 int		differencemap_malloc(int w, int h )
 {
-	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h*2) );
+	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h*2) + RUP8(w*2) );
 	nframe = 0;
 	if(!binary_img) return 0;
 	return 1;

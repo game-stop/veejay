@@ -26,29 +26,28 @@
 
 vj_effect *fibdownscale_init(int w, int h)
 {
-
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-    ve->description = "Fibonacci Downscaler";
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 0;
-    ve->defaults[1] = 1;
-    ve->limits[0][0] = 0;
-    ve->limits[0][1] = 1;
-    ve->limits[1][0] = 1;
-    ve->limits[1][1] = 8;
-    ve->sub_format = -1;
-    ve->extra_frame = 0;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 2;
+	ve->description = "Fibonacci Downscaler";
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->defaults[0] = 0;
+	ve->defaults[1] = 1;
+	ve->limits[0][0] = 0;
+	ve->limits[0][1] = 1;
+	ve->limits[1][0] = 1;
+	ve->limits[1][1] = 8;
+	ve->sub_format = -1;
+	ve->extra_frame = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Fib" );
-    ve->has_user = 0;
+	ve->has_user = 0;
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints,ve->limits[0][1],0, "Down", "Rectangle" );
 
-    return ve;
+	return ve;
 }
 
 void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width,
@@ -64,8 +63,8 @@ void _fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
     unsigned i, f1;
-    unsigned int len = frame->len / 2;
-    unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len) / 2;
+    unsigned int len = frame->len >> 1;
+    unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len) >> 1;
 
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -99,8 +98,8 @@ void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
     unsigned int i, f1;
-	const uint32_t len = frame->len /2;
-	const uint32_t uv_len = (frame->ssm ? frame->len: frame->uv_len)/2;
+	const uint32_t len = frame->len>>1;
+	const uint32_t uv_len = (frame->ssm ? frame->len: frame->uv_len)>>1;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

@@ -56,7 +56,7 @@ vj_effect *timedistort_init(int w, int h)
 
 static int n__ = 0;
 static int N__ = 0;
-static	uint8_t	*nonmap = NULL;
+static uint8_t	*nonmap = NULL;
 static uint8_t *planes[4] = { NULL, NULL, NULL, NULL };
 static uint8_t *planetableY[PLANES];
 static uint8_t *planetableU[PLANES];
@@ -72,7 +72,7 @@ int 	timedistort_malloc( int w, int h )
 {	
 	unsigned int i;
 	if(nonmap) timedistort_free();
-	nonmap = vj_malloc( RUP8(w + 2 * w * h) * sizeof(uint8_t));
+	nonmap = vj_calloc( RUP8(w + 2 * w * h) * sizeof(uint8_t));
 	if(!nonmap)
 		return 0;
 

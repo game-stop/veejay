@@ -34,6 +34,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	hb->planes[0] = hb->buffer;
 	hb->planes[1] = hb->planes[0] + RUP8(w*h);
 	hb->planes[2] = hb->planes[1] + RUP8(w*h);
+	hb->current   = 0;
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &hb);
 
 	return LIVIDO_NO_ERROR;

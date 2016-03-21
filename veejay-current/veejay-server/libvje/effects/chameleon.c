@@ -92,7 +92,7 @@ int	chameleon_malloc(int w, int h)
 {
 	int i;
 	for( i = 0; i < 3; i ++ ) {
-		bgimage[i] = vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
+		bgimage[i] = vj_malloc(sizeof(uint8_t) * RUP8(w * h) + RUP8(w*2) );
 		tmpimage[i] = vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
 	}
 	vj_frame_clear1( bgimage[0], pixel_Y_lo_, RUP8(w*h));
@@ -285,6 +285,4 @@ void chameleon_apply( VJFrame *frame, int width, int height, int mode)
 		drawDisappearing( &source, frame );
 	else
 		drawAppearing( &source, frame );
-	
-
 }

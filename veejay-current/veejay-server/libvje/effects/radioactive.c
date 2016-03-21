@@ -84,7 +84,7 @@ static  int	buf_area = 0;
 static  int	buf_margin_left = 0;
 static  int	buf_margin_right = 0;
 static	int	first_frame=0;
-static	int	last_mode=0;
+static	int	last_mode=-1;
 static	float	ratio_ = 0.95;
 
 #define VIDEO_HWIDTH (buf_width/2)
@@ -207,7 +207,7 @@ int	radioactivetv_malloc(int w, int h)
 	setTable();
 
 	first_frame = 0;
-	last_mode  = 0;
+	last_mode   = -1;
 	ratio_	    = 0.95;
 	return 1;
 }
@@ -266,6 +266,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 //@ mode changed, reset
 		veejay_memset( blurzoombuf, 0, 2*buf_area);
 		veejay_memset( diff, 0, len );
+		veejay_memset( prev, 0, len );
 		last_mode = mode;
 	}
 

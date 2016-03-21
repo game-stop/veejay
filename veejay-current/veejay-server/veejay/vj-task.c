@@ -84,7 +84,7 @@ static pthread_attr_t p_attr[MAX_WORKERS];
 static	pjob_t *job_list[MAX_WORKERS];
 static uint8_t p_tasks[MAX_WORKERS];
 static pjob_t *job_list[MAX_WORKERS];
-static int n_cpu = 1;
+static unsigned int n_cpu = 1;
 static uint8_t numThreads = 0;
 static uint8_t total_tasks = 0;
 static uint8_t tasks_done[MAX_WORKERS];
@@ -117,11 +117,11 @@ static void		task_allocate()
 		vj_task_args[i] = vj_calloc(sizeof(vj_task_arg_t));
 	}
 
-	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
-	if( n_cpu <= 0 )
-	{
+	long ret = sysconf( _SC_NPROCESSORS_ONLN );
+	if( ret <= 0)
 		n_cpu = 1;
-	}
+	else 
+		n_cpu = (unsigned int) n_cpu;
 }
 
 void		task_destroy()
@@ -245,7 +245,7 @@ void		task_init()
 	} 
 }
 
-int		task_num_cpus()
+unsigned int	task_num_cpus()
 {
 	return n_cpu;
 }

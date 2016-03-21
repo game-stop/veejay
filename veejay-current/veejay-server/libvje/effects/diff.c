@@ -88,20 +88,18 @@ void	diff_destroy(void)
 	
 }
 
-#define ru8(num)(((num)+8)&~8)
-
 int diff_malloc(void **d, int width, int height)
 {
 	diff_data *my;
 	*d = (void*) vj_calloc(sizeof(diff_data));
 	my = (diff_data*) *d;
-	my->data = (uint8_t*) vj_calloc( ru8(sizeof(uint8_t) * width * height + width) );
+	my->data = (uint8_t*) vj_calloc( RUP8(sizeof(uint8_t) * width * height + width) );
 //	my->current = my->data + (width*height);
 
 	if(static_bg == NULL)	
-		static_bg = (uint8_t*) vj_calloc( ru8( width + width * height * sizeof(uint8_t)) );
+		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height ) + RUP8(width * 2));
 	if(dt_map == NULL )
-		dt_map = (uint32_t*) vj_calloc( ru8(width * height * sizeof(uint32_t) + width ) );
+		dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * RUP8(width * height) + RUP8(width * 2));
 	return 1;
 }
 

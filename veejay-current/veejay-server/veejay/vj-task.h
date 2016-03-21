@@ -25,7 +25,7 @@ typedef void *(*performer_job_routine)(void(*)(void*));
 
 typedef struct
 {
-	int	strides[4];
+	int strides[4];
 	uint8_t *input[4];
 	uint8_t *output[4];
 	uint8_t *temp[4];
@@ -35,14 +35,14 @@ typedef struct
 	int height;
 	int shiftv;
 	int shifth;
-	int	ssm;
-	int	uv_width;
-	int	uv_height;
-	int	jobnum; 
+	int ssm;
+	int uv_width;
+	int uv_height;
+	int jobnum; 
 	int format;
-	float 	fparam;
-	int	iparam;  
-	int	iparams[32];
+	float fparam;
+	int iparam;  
+	int iparams[32];
 } vj_task_arg_t;
 
 int		vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func );
@@ -53,11 +53,11 @@ void	vj_task_set_to_frame( VJFrame *frame, int pos, int job );
 void	vj_task_set_from_frame( VJFrame *frame );
 void	vj_task_set_from_args( int len, int uv_len );
 void	vj_task_set_param( int v, int idx );
-int		task_start(unsigned int max_workers);
+int	task_start(unsigned int max_workers);
 void	task_stop(unsigned int max_workers);
 void	task_init();
 void	task_destroy();
-int		task_num_cpus();
+unsigned int task_num_cpus();
 void	vj_task_set_overlap( int val );
 void	performer_job( uint8_t job_num );
 uint8_t	num_threaded_tasks();

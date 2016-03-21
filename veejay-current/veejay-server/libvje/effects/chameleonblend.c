@@ -92,7 +92,7 @@ int	chameleonblend_malloc(int w, int h)
 {
 	int i;
 	for( i = 0; i < 3 ; i ++ ) {
-		bgimage[i] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(w*h));
+		bgimage[i] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(w*h) + RUP8(w));
 		tmpimage[i] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(w*h));
 	}
 
@@ -185,9 +185,9 @@ static void drawAppearing(VJFrame *src, VJFrame *dest)
 
 static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 {
-    unsigned int i;
-    unsigned int Y;
-    uint8_t *p, *qu, *qv, *qy;
+	unsigned int i;
+	unsigned int Y;
+	uint8_t *p, *qu, *qv, *qy;
 	int32_t *s;
 	const int video_area = src->len;
 
@@ -198,11 +198,11 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 	uint8_t *u0  = src->data[1];
 	uint8_t *v0  = src->data[2];
 
-    p = timebuffer + (plane * video_area);
-    qy = bgimage[0];
+	p = timebuffer + (plane * video_area);
+	qy = bgimage[0];
 	qu = bgimage[1];
 	qv = bgimage[2];
-    s = sum;
+	s = sum;
 
 	uint8_t a,b,c,A,B,C;
 

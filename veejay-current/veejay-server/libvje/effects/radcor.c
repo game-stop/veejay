@@ -107,7 +107,10 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 
 	//@ copy source image to internal buffer 
 	uint8_t *dest[4] = { badbuf, badbuf + len, badbuf + len + len, badbuf + len + len + len };
-	int strides[4] = { len, len, len, (alpha == 0 ? 0 : len) };
+	int strides[4] = { len, len, len, 0 };
+	if( alpha ) 
+		strides[3] = len;
+	
 	vj_frame_copy( frame->data, dest, strides );
 
 	uint8_t *Yi = badbuf;

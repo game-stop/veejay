@@ -105,7 +105,6 @@ void	contourextract_destroy(void)
 	
 }
 
-#define ru8(num)(((num)+8)&~8)
 static int	nearest_div(int val )
 {
 	int r = val % 8;
@@ -122,13 +121,13 @@ int contourextract_malloc(void **d, int width, int height)
 	dw_ = nearest_div( width / 8  );
 	dh_ = nearest_div( height / 8 );
 
-	my->current = (uint8_t*) vj_calloc( ru8( sizeof(uint8_t) * dw_ * dh_ * 3 ) );
-	my->bitmap = (uint8_t*) vj_calloc( ru8(sizeof(uint8_t) * width * height ));
+	my->current = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( dw_ * dh_ * 3 ));
+	my->bitmap = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height ));
 	
 	if(static_bg == NULL)	
-		static_bg = (uint8_t*) vj_calloc( ru8( width + width * height * sizeof(uint8_t)) );
+		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height) + RUP8(width*2));
 	if(dt_map == NULL )
-		dt_map = (uint32_t*) vj_calloc( ru8(width * height * sizeof(uint32_t) + width ) );
+		dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * RUP8( width * height ));
 
 	veejay_memset( &template_, 0, sizeof(sws_template) );
 	veejay_memset( proj_, 0, sizeof(proj_) );

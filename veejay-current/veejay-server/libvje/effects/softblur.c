@@ -44,7 +44,7 @@ vj_effect *softblur_init(int w,int h)
     return ve;
 }
 
-void softblur1_apply( VJFrame *frame, int width, int height)
+static void softblur1_apply( VJFrame *frame, int width, int height)
 {
     int r, c;
     int len = (width * height);
@@ -61,7 +61,7 @@ void softblur1_apply( VJFrame *frame, int width, int height)
 
 }
 
-void softblur3_apply(VJFrame *frame, int width, int height ) {
+static void softblur3_apply(VJFrame *frame, int width, int height ) {
 	int r,c;
 	uint8_t *Y = frame->data[0];
 	const int len = frame->len;
@@ -146,7 +146,7 @@ static	void	mmx_blur(uint8_t *buffer, int width, int height)
 		//	 : "mm0", "mm1", "mm2", "mm3", "mm6");
 	}
 
-	len = (width*height)-4;
+	len = (width*height);
 
 	for (i = len; i > scrsh; i -= 4) {
 		__asm __volatile

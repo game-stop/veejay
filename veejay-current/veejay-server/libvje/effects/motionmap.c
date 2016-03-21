@@ -317,7 +317,6 @@ static int32_t motionmap_activity_level( uint8_t *I, int width, int height )
 void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *img, uint8_t *pI1, uint8_t *pI2, uint8_t *bDst, const int len, const int threshold )
 {
 	unsigned int i;
-	uint8_t p1,p2;
 
 	uint8_t *I1 = pI1;
 	uint8_t *I2 = pI2;
@@ -348,7 +347,7 @@ void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *i
 	}
 }
 
-void motionmap_find_diff_job( void *arg )
+static void motionmap_find_diff_job( void *arg )
 {
 	vj_task_arg_t *t = (vj_task_arg_t*) arg;
 
@@ -385,7 +384,6 @@ int	motionmap_prepare( uint8_t *map[4], int width, int height )
 	veejay_msg(2, "Motion Mapping: Snapped background frame");
 	return 1;
 }
-static int32_t global_act = 0;
 
 void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int limit, int draw, int history, int decay, int interpol, int last_act_level )
 {

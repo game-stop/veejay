@@ -63,7 +63,7 @@ void split_free() {
 	split_buf[2] = NULL;
 }
 
-void split_fib_downscale(VJFrame *frame, int width, int height)
+static void split_fib_downscale(VJFrame *frame, int width, int height)
 {
     unsigned int i, len = frame->len/2;
     unsigned int f;
@@ -101,7 +101,8 @@ void split_fib_downscale(VJFrame *frame, int width, int height)
     }
 
 }
-void split_fib_downscaleb(VJFrame *frame, int width, int height)
+
+static void split_fib_downscaleb(VJFrame *frame, int width, int height)
 {
     unsigned int len = frame->len / 2;
     unsigned int uv_len = frame->uv_len /2;
@@ -121,7 +122,7 @@ void split_fib_downscaleb(VJFrame *frame, int width, int height)
     vj_frame_copy( frame->data, output, strides );
 }
 
-void dosquarefib(VJFrame *frame, int width, int height)
+static void dosquarefib(VJFrame *frame, int width, int height)
 {
     unsigned int i, len = frame->len / 2;
     unsigned int f;
@@ -201,14 +202,15 @@ void dosquarefib(VJFrame *frame, int width, int height)
 
 }
 
-void split_push_downscale_uh(VJFrame *frame, int width, int height)
+static void split_push_downscale_uh(VJFrame *frame, int width, int height)
 {
 	unsigned int len = frame->len/2;
 	int	strides[4] = { len,len,len ,0};
 	vj_frame_copy( frame->data, split_buf,strides );
 
 }
-void split_push_downscale_lh(VJFrame *frame, int width, int height)
+
+static void split_push_downscale_lh(VJFrame *frame, int width, int height)
 {
 
     unsigned int x, y, y1, y2, j = 0;
@@ -247,7 +249,7 @@ void split_push_downscale_lh(VJFrame *frame, int width, int height)
 	vj_frame_copy( split_buf, input, strides );
 }
 
-void split_push_vscale_left(VJFrame *frame, int width, int height)
+static void split_push_vscale_left(VJFrame *frame, int width, int height)
 {
     unsigned int x, y, y1;
 
@@ -298,7 +300,8 @@ void split_push_vscale_left(VJFrame *frame, int width, int height)
 
 
 }
-void split_push_vscale_right(VJFrame *frame, int width, int height)
+
+static void split_push_vscale_right(VJFrame *frame, int width, int height)
 {
     unsigned int x, y, y1;
     unsigned int wlen = width >> 1;
@@ -340,8 +343,7 @@ void split_push_vscale_right(VJFrame *frame, int width, int height)
     }
 }
 
-
-void split_corner_framedata_ul(VJFrame *frame, VJFrame *frame2,
+static void split_corner_framedata_ul(VJFrame *frame, VJFrame *frame2,
 			     int width, int height)
 {
     unsigned int w_len = width / 2;
@@ -374,7 +376,8 @@ void split_corner_framedata_ul(VJFrame *frame, VJFrame *frame2,
 
 
 }
-void split_corner_framedata_ur(VJFrame *frame, VJFrame *frame2,
+
+static void split_corner_framedata_ur(VJFrame *frame, VJFrame *frame2,
 			     int width, int height)
 {
     unsigned int w_len = width / 2;
@@ -411,7 +414,8 @@ void split_corner_framedata_ur(VJFrame *frame, VJFrame *frame2,
     }
 
 }
-void split_corner_framedata_dl(VJFrame *frame, VJFrame *frame2,
+
+static void split_corner_framedata_dl(VJFrame *frame, VJFrame *frame2,
 			     int width, int height)
 {
     unsigned int w_len = width / 2;
@@ -449,7 +453,7 @@ void split_corner_framedata_dl(VJFrame *frame, VJFrame *frame2,
 } 
 
 
-void split_corner_framedata_dr(VJFrame *frame, VJFrame *frame2,
+static void split_corner_framedata_dr(VJFrame *frame, VJFrame *frame2,
 			     int width, int height)
 {
     unsigned int w_len = width / 2;
@@ -486,8 +490,7 @@ void split_corner_framedata_dr(VJFrame *frame, VJFrame *frame2,
 
 }
 
-
-void split_v_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
+static void split_v_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
 
@@ -519,7 +522,8 @@ void split_v_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
     }
 
 }
-void split_v_second_half(VJFrame *frame, VJFrame *frame2, int width,
+
+static void split_v_second_half(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
     unsigned int r, c;
@@ -552,7 +556,7 @@ void split_v_second_half(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void split_v_first_half(VJFrame *frame, VJFrame *frame2, int width,
+static void split_v_first_half(VJFrame *frame, VJFrame *frame2, int width,
 			int height)
 {
     unsigned int r, c;
@@ -586,7 +590,7 @@ void split_v_first_half(VJFrame *frame, VJFrame *frame2, int width,
 
 }
 
-void split_v_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
+static void split_v_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			  int height)
 {
     unsigned int r, c;
@@ -621,7 +625,7 @@ void split_v_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 
 }
 
-void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
+static void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
 			int height)
 {
    	const int len = frame->len / 2;
@@ -630,7 +634,8 @@ void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
 
 	vj_frame_copy( frame2->data, frame->data, strides );    
 }
-void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
+
+static void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
 	const unsigned int len = frame->len / 2;
@@ -638,7 +643,8 @@ void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
 	int strides[4] = { len, uv_len, uv_len, 0 };
 	vj_frame_copy( frame2->data,frame->data, strides );
 }
-void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
+
+static void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
 	const unsigned int len = frame->len / 2;
@@ -647,7 +653,7 @@ void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 	vj_frame_copy( frame2->data, frame->data, strides );
 }
 
-void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
+static void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			  int height)
 {
 	const unsigned int len = frame->len / 2;

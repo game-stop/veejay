@@ -35,7 +35,7 @@ static void average(const uint8_t *src1, const uint8_t *src2,
 {
     int i;
     for (i = 0; i < bytes; i++)
-        dest[i] = (src1[i]+src2[i]+1) / 2;
+        dest[i] = (src1[i]+src2[i]+1) >> 1;
 }
 
 /*************************************************************************/
