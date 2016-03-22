@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -51,7 +51,7 @@ vj_effect *transline_init(int width, int height)
     return ve;
 }
 
-void transline1_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
+static void transline1_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 		      int height, int distance, int line_width)
 {
     unsigned int uv_width = width >> 1;
@@ -91,9 +91,7 @@ void transline1_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 
 }
 
-
-
-void transline2_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
+static void transline2_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 		      int height, int distance, int line_width,
 		      int opacity)
 {

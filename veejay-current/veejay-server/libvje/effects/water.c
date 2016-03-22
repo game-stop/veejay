@@ -80,7 +80,7 @@ static int bgIsSet = 0;
  *          You should use high-order bits.
  */
 
-unsigned int wfastrand(water_t *w)
+static unsigned int wfastrand(water_t *w)
 {
 	return (w->wfastrand_val=w->wfastrand_val*1103515245+12345);
 }

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -84,7 +84,7 @@ int scratcher_malloc(int w, int h)
 }
 
 
-void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
+static void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 {
 	int uv_len = src->uv_len;
 	int strides[4] = { (w * h), uv_len, uv_len , 0 };

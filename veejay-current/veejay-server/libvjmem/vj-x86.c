@@ -111,7 +111,7 @@ int	get_cache_line_size()
 }
 
 
-void mymemset_generic(void * s, char c,size_t count)
+static void mymemset_generic(void * s, char c,size_t count)
 {
 int d0, d1;
 __asm__ __volatile__(

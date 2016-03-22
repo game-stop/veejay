@@ -1,7 +1,7 @@
 /*
  * VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -67,7 +67,7 @@ vj_effect *chromamagick_init(int w, int h)
 	return ve;
 }
 
-void chromamagic_selectmin(VJFrame *frame, VJFrame *frame2, int width,
+static void chromamagic_selectmin(VJFrame *frame, VJFrame *frame2, int width,
 			   int height, int op_a)
 {
     unsigned int i;
@@ -92,7 +92,7 @@ void chromamagic_selectmin(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void chromamagic_addsubselectlum(VJFrame *frame, VJFrame *frame2,
+static void chromamagic_addsubselectlum(VJFrame *frame, VJFrame *frame2,
 				 int width, int height, int op_a)
 {
     unsigned int i;
@@ -126,8 +126,7 @@ void chromamagic_addsubselectlum(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-
-void chromamagic_selectmax(VJFrame *frame, VJFrame *frame2, int width,
+static void chromamagic_selectmax(VJFrame *frame, VJFrame *frame2, int width,
 			   int height, int op_a)
 {
     unsigned int i;
@@ -151,7 +150,7 @@ void chromamagic_selectmax(VJFrame *frame, VJFrame *frame2, int width,
 	}
     }
 }
-void chromamagic_selectdiff(VJFrame *frame, VJFrame *frame2,
+static void chromamagic_selectdiff(VJFrame *frame, VJFrame *frame2,
 			    int width, int height, int op_a)
 {
     unsigned int i;
@@ -176,7 +175,7 @@ void chromamagic_selectdiff(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void chromamagic_diffreplace(VJFrame *frame, VJFrame *frame2, int width, int height, int threshold)
+static void chromamagic_diffreplace(VJFrame *frame, VJFrame *frame2, int width, int height, int threshold)
 {
 	/* op_a = threshold */
 	const int len = frame->len;
@@ -217,7 +216,7 @@ void chromamagic_diffreplace(VJFrame *frame, VJFrame *frame2, int width, int hei
 	}
 }
 
-void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2,
+static void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2,
 			       int width, int height, int op_a)
 {
     unsigned int i;
@@ -242,7 +241,7 @@ void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void chromamagic_selectunfreeze(VJFrame *frame, VJFrame *frame2,
+static void chromamagic_selectunfreeze(VJFrame *frame, VJFrame *frame2,
 				int width, int height, int op_a)
 {
     unsigned int i;
@@ -268,7 +267,7 @@ void chromamagic_selectunfreeze(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int width,
+static void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int width,
 			int height, int op_a)
 {
     unsigned int i;
@@ -292,7 +291,7 @@ void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
+static void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
     unsigned int i;
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
@@ -325,7 +324,7 @@ void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int heigh
 
 }
 
-void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
+static void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
 
 	unsigned int i;
 	const int len = frame->len;
@@ -363,7 +362,7 @@ void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int heig
 	}
 }
 
-void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int width,
+static void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int width,
 		int height, int op_a) {
 
 	unsigned int i;
@@ -396,7 +395,7 @@ void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int width,
 
 }
 
-void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2,
+static void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2,
 			     int width, int height, int op_a)
 {
     unsigned int i;
@@ -434,8 +433,7 @@ void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-
-void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
+static void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -482,7 +480,7 @@ void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 
 }
 
-void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
+static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -515,7 +513,7 @@ void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op
 }
 
 
-void chromamagic_hardlight( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
+static void chromamagic_hardlight( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -555,8 +553,7 @@ void chromamagic_hardlight( VJFrame *frame, VJFrame *frame2, int w, int h, int o
 	}
 }
 
-
-void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int w, int h,int op_a ) {
+static void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int w, int h,int op_a ) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -589,8 +586,7 @@ void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int w, int h,int op_
 	}
 }
 
-
-void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
+static void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -621,7 +617,7 @@ void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a 
 	}
 }
 
-void chromamagic_substract(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
+static void chromamagic_substract(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -653,8 +649,7 @@ void chromamagic_substract(VJFrame *frame, VJFrame *frame2, int w, int h, int op
 
 }
 
-
-void chromamagic_add(VJFrame *frame, VJFrame *frame2, int width,
+static void chromamagic_add(VJFrame *frame, VJFrame *frame2, int width,
 		int height, int op_a) {
 
 	unsigned int i;
@@ -686,7 +681,7 @@ void chromamagic_add(VJFrame *frame, VJFrame *frame2, int width,
 	}
 }
 
-void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
+static void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -714,7 +709,7 @@ void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 	}
 }
 
-void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
+static void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -747,7 +742,7 @@ void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int w, int h, int o
 }
 
 /* not really softlight but still cool */
-void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2,
+static void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2,
 			int width,int height, int op_a) {
 
 	unsigned int i;
@@ -784,8 +779,7 @@ void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2,
 	}
 }
 
-void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int w, int h,
-		int op_a) {
+static void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int w, int h,int op_a) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -820,8 +814,7 @@ void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int w, int h,
 	}	
 }
 
-
-void chromamagic_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagic_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 {
 
 	unsigned int i;
@@ -847,7 +840,7 @@ void chromamagic_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 	}
 }
 
-void chromamagic_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagic_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 {
 
 	unsigned int i;
@@ -873,8 +866,7 @@ void chromamagic_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a
 	}
 }
 
-
-void chromamagic_reflect(VJFrame *frame, VJFrame *frame2,
+static void chromamagic_reflect(VJFrame *frame, VJFrame *frame2,
 		int width,int height, int op_a) {
 
 	unsigned int i;
@@ -918,8 +910,7 @@ void chromamagic_reflect(VJFrame *frame, VJFrame *frame2,
 	}
 }
 
-
-void chromamagic_modadd(VJFrame *frame, VJFrame *frame2, int width,
+static void chromamagic_modadd(VJFrame *frame, VJFrame *frame2, int width,
 			int height, int op_a)
 {
     unsigned int i;

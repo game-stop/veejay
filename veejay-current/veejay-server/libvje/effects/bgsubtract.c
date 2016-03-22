@@ -110,10 +110,9 @@ int bgsubtract_prepare(VJFrame *frame)
 		veejay_memcpy( bg_frame__[1], frame->data[1], frame->uv_len );
 		veejay_memcpy( bg_frame__[2], frame->data[2], frame->uv_len );
 		chroma_supersample( SSM_422_444, frame, bg_frame__ );
+		bg_ssm = 1;
 	}
 
-	bg_ssm = 1;
-	
 	veejay_msg(2, "Subtract background: Snapped background frame");
 	return 1;
 }
@@ -129,10 +128,10 @@ void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int m
 
 	if( mode ) {
 		veejay_memcpy( frame->data[0], bg_frame__[0], frame->len );
-		if( frame->ssm ) {
+		if( bg_ssm ) {
 			veejay_memcpy( frame->data[1], bg_frame__[1], frame->len );
 			veejay_memcpy( frame->data[2], bg_frame__[2], frame->len );
-		} else { /* if chain is still subsampled, copy only greyscale image */
+		} else { /* subsampling does not match */
 			veejay_memset( frame->data[1], 128, frame->uv_len );
 			veejay_memset( frame->data[2], 128, frame->uv_len );
 		}	

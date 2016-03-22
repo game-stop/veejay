@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
  *
  * vvCutStop - ported from vvFFPP_basic
  * Copyright(C)2005 Maciek Szczesniak <maciek@visualvinyl.net>
@@ -22,10 +22,12 @@
 */
 #include <config.h>
 #include <stdlib.h>
-#include "common.h"
-#include "split.h"
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <libvjmem/vjmem.h>
+#include <libvje/vje.h>
+#include "common.h"
+#include "cutstop.h"
 
 static uint8_t *vvcutstop_buffer[4] = { NULL,NULL,NULL,NULL };
 static unsigned int frq_cnt = 0;

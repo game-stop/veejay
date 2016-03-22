@@ -169,7 +169,7 @@ static void	task_add(uint8_t task_no, performer_job_routine fp , void *data)
 	total_tasks ++;
 }
 
-struct	task	*task_get()
+static struct	task	*task_get()
 {
 	struct task *t = NULL;
 	if( total_tasks > 0  ) {
@@ -185,7 +185,7 @@ struct	task	*task_get()
 	return t;
 }
 
-void		task_run( struct task *task, void *data, uint8_t id)
+static void	task_run( struct task *task, void *data, uint8_t id)
 {
 	(*task->handler)(data);
 
@@ -197,7 +197,7 @@ void		task_run( struct task *task, void *data, uint8_t id)
 	__unlock();
 }
 
-void		*task_thread(void *data)
+static void	*task_thread(void *data)
 {
 	for( ;; ) 
 	{

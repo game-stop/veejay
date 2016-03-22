@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "rgbkey.h"
+#include "keyselect.h"
 #include <math.h>
 #include "common.h"
 
@@ -66,13 +66,13 @@ vj_effect *keyselect_init(int w, int h)
 }
 
 typedef uint8_t(*blend_func)(uint8_t y1, uint8_t y2);
-blend_func get_blend_func(const int mode);
+static blend_func get_blend_func(const int mode);
 
-uint8_t blend_func1(uint8_t a, uint8_t b) {
+static uint8_t blend_func1(uint8_t a, uint8_t b) {
 	return (uint8_t)  255 - (abs(255-a-b));
 }
 
-uint8_t blend_func2(uint8_t a, uint8_t b) {
+static uint8_t blend_func2(uint8_t a, uint8_t b) {
 	uint8_t val;
 	if( a == 0 )
 	  a = 0xff;
@@ -80,12 +80,12 @@ uint8_t blend_func2(uint8_t a, uint8_t b) {
 	return CLAMP_Y(val);
 }
 
-uint8_t blend_func3(uint8_t a , uint8_t b) {
+static uint8_t blend_func3(uint8_t a , uint8_t b) {
 	return (uint8_t) (a * b)>>8;
 }
 
 
-uint8_t blend_func4(uint8_t a, uint8_t b) {
+static uint8_t blend_func4(uint8_t a, uint8_t b) {
 	uint8_t c = 0xff - b;
 	if( c == 0 )
 		return CLAMP_Y(c);
@@ -93,7 +93,7 @@ uint8_t blend_func4(uint8_t a, uint8_t b) {
 	return CLAMP_Y( (a*a)/c  );
 }
 
-uint8_t blend_func5(uint8_t a, uint8_t b) {
+static uint8_t blend_func5(uint8_t a, uint8_t b) {
 	uint8_t val;
 	uint8_t c = 0xff - b;
 	if( c == 0 )
@@ -102,25 +102,23 @@ uint8_t blend_func5(uint8_t a, uint8_t b) {
 	return CLAMP_Y(val);
 }
 
-uint8_t blend_func6(uint8_t a, uint8_t b) {
+static uint8_t blend_func6(uint8_t a, uint8_t b) {
 	uint8_t val = a + (2 * (b)) - 255;
 	return CLAMP_Y(val);
 }
 
-uint8_t blend_func7(uint8_t a, uint8_t b) {
+static uint8_t blend_func7(uint8_t a, uint8_t b) {
 	return (uint8_t) ( a + ( b - 255) );
 }
 
-uint8_t blend_func8(uint8_t a, uint8_t b) {
+static uint8_t blend_func8(uint8_t a, uint8_t b) {
 	int c;
 	if(b < 128) c = (a * b) >> 7;
 	else c = 255 - ((255-b)*(255-a)>>7);
 	return CLAMP_Y(c);
 }
 
-
-
-blend_func get_blend_func(const int mode) {
+static blend_func get_blend_func(const int mode) {
 	switch(mode) {
 		case 0: return &blend_func1;
 		case 1: return &blend_func2;
@@ -240,4 +238,3 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 
 }
 
-void keyselect_free(){}

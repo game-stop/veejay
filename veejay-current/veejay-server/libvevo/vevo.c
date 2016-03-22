@@ -828,7 +828,7 @@ static	int	vevo_storage_size( vevo_storage_t *stor ) {
     return msize;
 }
 
-int vevo_property_atom_size(vevo_port_t * p, const char *key)
+static int vevo_property_atom_size(vevo_port_t * p, const char *key)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
     ukey_t hash_key = hash_key_code(key);
@@ -838,7 +838,8 @@ int vevo_property_atom_size(vevo_port_t * p, const char *key)
 		if ((node = prop_node_get(port, hash_key)) != NULL) {
 			return vevo_storage_size( node->st );
     	} 
-		else {
+	}
+	else {
 		hnode_t *node = NULL;
 		if ((node = property_exists(port, hash_key)) != NULL) {
 			    vevo_storage_t *stor = (vevo_storage_t *) hnode_get(node);
@@ -846,8 +847,6 @@ int vevo_property_atom_size(vevo_port_t * p, const char *key)
 				return vevo_storage_size( stor );
 		    }
     	}
-
-		}
 	}
     return -1;
 }
@@ -2499,26 +2498,26 @@ vevo_property_del(vevo_port_t * p,
 	}
 
     if(port->list) {
-		vevo_property_t *tmp = port->list;
-		vevo_property_t *prev = NULL;
-		while (tmp != NULL) {
-			if( tmp->key == hash_key )
+		vevo_property_t *node = port->list;
+		vevo_property_t *pnode = NULL;
+		while (node != NULL) {
+			if( node->key == hash_key )
 				break;
-			prev = tmp;
-			tmp = tmp->next;
+			pnode = node;
+			node = node->next;
 		}
-		if( tmp != NULL ) {
-			if( tmp->key == hash_key ) {
-				if( prev )
-					prev->next = tmp->next;
+		if( node != NULL ) {
+			if( node->key == hash_key ) {
+				if( pnode )
+					pnode->next = node->next;
 				else 
-					port->list = tmp->next;
+					port->list = node->next;
 
-				tmp->key = 0;
+				node->key = 0;
 
 				if(!port->table) {
-					vevo_free_storage( port, tmp->st );
-					prop_node_free( port, tmp );
+					vevo_free_storage( port, node->st );
+					prop_node_free( port, node );
 				}
 				else {
 					hnode_t *old_node = NULL;
@@ -2536,7 +2535,7 @@ vevo_property_del(vevo_port_t * p,
     return VEVO_ERROR_NOSUCH_PROPERTY;
 }
 
-char	*vevo_tabs( int lvl ) {
+static char	*vevo_tabs( int lvl ) {
 	char tmp[32];
 	int i;
 	if( lvl > 31 )
@@ -2562,7 +2561,7 @@ void	vevo_port_dump( void *p, int lvl )
 	int err = 0;
 
 	char *tabs = NULL;
-    if( lvl > 0 )
+	if( lvl > 0 )
 		tabs = vevo_tabs( lvl );
 
 	veejay_msg( VEEJAY_MSG_DEBUG, "%s%p", (tabs == NULL ? "/" : tabs ), p );

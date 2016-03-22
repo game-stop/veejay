@@ -95,13 +95,6 @@ void dices_free() {
    g_dicemap  = NULL;
 }
 
-unsigned int dices_fastrand_val;
-/* effectv's rand val */
-static unsigned int dices_fastrand()
-{
-    return (dices_fastrand_val = dices_fastrand_val * 1103515245 + 12345);
-}
-
 void dice_create_map(int w, int h)
 {
     int k,x, y, i = 0;

@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "magicoverlays.h"
+#include "magicoverlaysalpha.h"
 #include <libvje/internal.h>
 #include "common.h"  
 #include <veejay/vj-task.h>
@@ -61,10 +61,7 @@ vj_effect *overlaymagicalpha_init(int w, int h)
 	return ve;
 }
 
-/* fixme */
-
-
-void _overlaymagicalpha_adddistorted(VJFrame *frame, VJFrame *frame2,
+static void _overlaymagicalpha_adddistorted(VJFrame *frame, VJFrame *frame2,
 				int width, int height)
 {
     unsigned int i;
@@ -87,7 +84,7 @@ void _overlaymagicalpha_adddistorted(VJFrame *frame, VJFrame *frame2,
 
 }
 
-void _overlaymagicalpha_add_distorted(VJFrame *frame, VJFrame *frame2,
+static void _overlaymagicalpha_add_distorted(VJFrame *frame, VJFrame *frame2,
 				 int width, int height)
 {
 
@@ -109,7 +106,7 @@ void _overlaymagicalpha_add_distorted(VJFrame *frame, VJFrame *frame2,
 
 }
 
-void _overlaymagicalpha_subdistorted(VJFrame *frame, VJFrame *frame2,
+static void _overlaymagicalpha_subdistorted(VJFrame *frame, VJFrame *frame2,
 				int width, int height)
 {
     unsigned int i;
@@ -129,7 +126,7 @@ void _overlaymagicalpha_subdistorted(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_sub_distorted(VJFrame *frame, VJFrame *frame2,
+static void _overlaymagicalpha_sub_distorted(VJFrame *frame, VJFrame *frame2,
 				 int width, int height)
 {
 
@@ -150,7 +147,7 @@ void _overlaymagicalpha_sub_distorted(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_multiply(VJFrame *frame, VJFrame *frame2,
+static void _overlaymagicalpha_multiply(VJFrame *frame, VJFrame *frame2,
 			    int width, int height)
 {
     unsigned int i;
@@ -166,8 +163,8 @@ void _overlaymagicalpha_multiply(VJFrame *frame, VJFrame *frame2,
 		Y[i] = (Y[i] * Y2[i]) >> 8;
 	}
 }
-void _overlaymagicalpha_simpledivide(VJFrame *frame, VJFrame *frame2, int width,
-			  int height)
+
+static void _overlaymagicalpha_simpledivide(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -185,7 +182,7 @@ void _overlaymagicalpha_simpledivide(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _overlaymagicalpha_divide(VJFrame *frame, VJFrame *frame2, int width,
+static void _overlaymagicalpha_divide(VJFrame *frame, VJFrame *frame2, int width,
 			  int height)
 {
     unsigned int i;
@@ -209,8 +206,7 @@ void _overlaymagicalpha_divide(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _overlaymagicalpha_additive(VJFrame *frame, VJFrame *frame2,
-			    int width, int height)
+static void _overlaymagicalpha_additive(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     
     unsigned int len = width * height;
@@ -229,9 +225,7 @@ void _overlaymagicalpha_additive(VJFrame *frame, VJFrame *frame2,
 	}
 }
 
-
-void _overlaymagicalpha_substractive(VJFrame *frame, VJFrame *frame2,
-				int width, int height)
+static void _overlaymagicalpha_substractive(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -248,8 +242,7 @@ void _overlaymagicalpha_substractive(VJFrame *frame, VJFrame *frame2,
 	}
 }
 
-void _overlaymagicalpha_softburn(VJFrame *frame, VJFrame *frame2,
-			    int width, int height)
+static void _overlaymagicalpha_softburn(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -281,8 +274,7 @@ void _overlaymagicalpha_softburn(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_inverseburn(VJFrame *frame, VJFrame *frame2,
-			       int width, int height)
+static void _overlaymagicalpha_inverseburn(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -306,9 +298,7 @@ void _overlaymagicalpha_inverseburn(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-
-void _overlaymagicalpha_colordodge(VJFrame *frame, VJFrame *frame2,
-			      int width, int height)
+static void _overlaymagicalpha_colordodge(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -335,8 +325,7 @@ void _overlaymagicalpha_colordodge(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_mulsub(VJFrame *frame, VJFrame *frame2, int width,
-			  int height)
+static void _overlaymagicalpha_mulsub(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -356,8 +345,7 @@ void _overlaymagicalpha_mulsub(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _overlaymagicalpha_lighten(VJFrame *frame, VJFrame *frame2, int width,
-			   int height)
+static void _overlaymagicalpha_lighten(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -381,8 +369,7 @@ void _overlaymagicalpha_lighten(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void _overlaymagicalpha_difference(VJFrame *frame, VJFrame *frame2,
-			      int width, int height)
+static void _overlaymagicalpha_difference(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -402,8 +389,7 @@ void _overlaymagicalpha_difference(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_diffnegate(VJFrame *frame, VJFrame *frame2,
-			      int width, int height)
+static void _overlaymagicalpha_diffnegate(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -423,8 +409,7 @@ void _overlaymagicalpha_diffnegate(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_exclusive(VJFrame *frame, VJFrame *frame2,
-			     int width, int height)
+static void _overlaymagicalpha_exclusive(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -443,8 +428,7 @@ void _overlaymagicalpha_exclusive(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_basecolor(VJFrame *frame, VJFrame *frame2,
-			     int width, int height)
+static void _overlaymagicalpha_basecolor(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     int a, b, c, d;
@@ -465,8 +449,7 @@ void _overlaymagicalpha_basecolor(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_freeze(VJFrame *frame, VJFrame *frame2, int width,
-			  int height)
+static void _overlaymagicalpha_freeze(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -487,8 +470,7 @@ void _overlaymagicalpha_freeze(VJFrame *frame, VJFrame *frame2, int width,
 	}
 }
 
-void _overlaymagicalpha_unfreeze(VJFrame *frame, VJFrame *frame2,
-			    int width, int height)
+static void _overlaymagicalpha_unfreeze(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -509,8 +491,7 @@ void _overlaymagicalpha_unfreeze(VJFrame *frame, VJFrame *frame2,
 	}
 }
 
-void _overlaymagicalpha_hardlight(VJFrame *frame, VJFrame *frame2,
-			     int width, int height)
+static void _overlaymagicalpha_hardlight(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -534,8 +515,8 @@ void _overlaymagicalpha_hardlight(VJFrame *frame, VJFrame *frame2,
 		Y[i] = c;
     }
 }
-void _overlaymagicalpha_relativeaddlum(VJFrame *frame, VJFrame *frame2,
-				  int width, int height)
+
+static void _overlaymagicalpha_relativeaddlum(VJFrame *frame, VJFrame *frame2, int width, int height)
 {
     unsigned int i;
     int a, b, c, d;
@@ -557,8 +538,7 @@ void _overlaymagicalpha_relativeaddlum(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_relativesublum(VJFrame *frame, VJFrame *frame2,
-				  int width, int height)
+static void _overlaymagicalpha_relativesublum(VJFrame *frame, VJFrame *frame2, int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -578,8 +558,7 @@ void _overlaymagicalpha_relativesublum(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_relativeadd(VJFrame *frame, VJFrame *frame2,
-			       int width, int height)
+static void _overlaymagicalpha_relativeadd(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -601,8 +580,7 @@ void _overlaymagicalpha_relativeadd(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_relativesub(VJFrame *frame, VJFrame *frame2,
-			       int width, int height)
+static void _overlaymagicalpha_relativesub(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -622,8 +600,8 @@ void _overlaymagicalpha_relativesub(VJFrame *frame, VJFrame *frame2,
     }
 
 }
-void _overlaymagicalpha_minsubselect(VJFrame *frame, VJFrame *frame2,
-				int width, int height)
+
+static void _overlaymagicalpha_minsubselect(VJFrame *frame, VJFrame *frame2, int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -646,8 +624,7 @@ void _overlaymagicalpha_minsubselect(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_maxsubselect(VJFrame *frame, VJFrame *frame2,
-				int width, int height)
+static void _overlaymagicalpha_maxsubselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -670,10 +647,7 @@ void _overlaymagicalpha_maxsubselect(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-
-
-void _overlaymagicalpha_addsubselect(VJFrame *frame, VJFrame *frame2,
-				int width, int height)
+static void _overlaymagicalpha_addsubselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -697,9 +671,7 @@ void _overlaymagicalpha_addsubselect(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-
-void _overlaymagicalpha_maxselect(VJFrame *frame, VJFrame *frame2,
-			     int width, int height)
+static void _overlaymagicalpha_maxselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -720,8 +692,7 @@ void _overlaymagicalpha_maxselect(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_minselect(VJFrame *frame, VJFrame *frame2,
-			     int width, int height)
+static void _overlaymagicalpha_minselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -742,8 +713,7 @@ void _overlaymagicalpha_minselect(VJFrame *frame, VJFrame *frame2,
 	}
 }
 
-void _overlaymagicalpha_addtest(VJFrame *frame, VJFrame *frame2, int width,
-			   int height)
+static void _overlaymagicalpha_addtest(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -763,8 +733,8 @@ void _overlaymagicalpha_addtest(VJFrame *frame, VJFrame *frame2, int width,
 		Y[i] = CLAMP_Y(c);
     }
 }
-void _overlaymagicalpha_addtest2(VJFrame *frame, VJFrame *frame2,
-			    int width, int height)
+
+static void _overlaymagicalpha_addtest2(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -785,8 +755,7 @@ void _overlaymagicalpha_addtest2(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-void _overlaymagicalpha_addtest4(VJFrame *frame, VJFrame *frame2,
-			    int width, int height)
+static void _overlaymagicalpha_addtest4(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -811,8 +780,8 @@ void _overlaymagicalpha_addtest4(VJFrame *frame, VJFrame *frame2,
 
 }
 
-void _overlaymagicalpha_try
-    (VJFrame *frame, VJFrame *frame2, int width, int height) {
+static void _overlaymagicalpha_try(VJFrame *frame, VJFrame *frame2, int width, int height)
+{
     unsigned int i;
     unsigned int len = width * height;
     int a, b, p, q;

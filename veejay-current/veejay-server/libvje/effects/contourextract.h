@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,8 +27,7 @@
 vj_effect *contourextract_init(int width, int height);
 void contourextract_free(void *d);
 int contourextract_malloc(void **c, int w, int h);
-int contourextract_prepare(uint8_t *map[4], int w, int h); 
-void contourextract_apply(void *d , VJFrame *frame,int width, int height, 
-		int th, int reverse, int show, int feather, int blob);
+int contourextract_prepare(uint8_t *map[4], int w, int h);
+void contourextract_apply(void *ed, VJFrame *frame,int width, int height, int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight);
 void	contourextract_destroy();
 #endif

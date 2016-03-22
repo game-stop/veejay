@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -74,7 +74,7 @@ void noisepencil_free() {
   Yb_frame = NULL;
 }
 
-void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
+static void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
 
     int r, c;
     double k = (coeef/100.0);
@@ -115,7 +115,8 @@ void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coeef, int 
 	}
 
 }
-void noisepencil_2_apply(uint8_t *src[3], int width, int height, int coeef , int min_t, int max_t) {
+
+static void noisepencil_2_apply(uint8_t *src[3], int width, int height, int coeef , int min_t, int max_t) {
 
     int r, c;
     double k = (coeef/1000.0);
@@ -163,7 +164,7 @@ void noisepencil_2_apply(uint8_t *src[3], int width, int height, int coeef , int
 
 }
 
-void noisepencil_3_apply(uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
+static void noisepencil_3_apply(uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
 
     int r, c;
     double k = (coeef/1000.0);
@@ -210,7 +211,7 @@ void noisepencil_3_apply(uint8_t *src[3], int width, int height, int coeef, int 
 
 }
 
-void noisepencil_4_apply(uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
+static void noisepencil_4_apply(uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
 
     int r, c;
     double k = (coeef/1000.0);
@@ -260,8 +261,7 @@ void noisepencil_4_apply(uint8_t *src[3], int width, int height, int coeef, int 
 
 }
 
-
-void noisepencil_5_apply(uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
+static void noisepencil_5_apply(uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
 
     int r, c;
     double k = (coeef/1000.0);

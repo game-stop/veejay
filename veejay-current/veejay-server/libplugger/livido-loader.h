@@ -74,4 +74,11 @@ int	livido_plug_parameter_get_range_dbl( void *fx_instance,const char *key, int 
 int     livido_set_parameter_from_string( void *instance, int p, const char *str, void *fx_values );
 int	livido_plug_get_number_parameter_as_dbl( void *fx_instance,const char *key, int k, double *res );
 int	livido_plug_get_index_parameter_as_dbl( void *fx_instance, const char *key,int k, double *res );
+int	livido_plug_parameter_set_text( void *parameter, void *value );
+int	livido_plug_parameter_set_number( void *parameter, void *value );
+int	livido_plug_parameter_set_index( void *parameter, void *value);
+int	livido_plug_parameter_set_bool( void *parameter, void *value );
+int	livido_plug_parameter_set_color( void *parameter,void *value );
+int	livido_plug_parameter_set_coord( void *parameter, void *value );
+
 #endif

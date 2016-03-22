@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -43,7 +43,7 @@ vj_effect *mirrors2_init(int w, int h)
 
 
 
-void mirror_multi_dr(uint8_t * yuv[3], int width, int height)
+static void mirror_multi_dr(uint8_t * yuv[3], int width, int height)
 {
 
     unsigned int x, y;
@@ -72,7 +72,7 @@ void mirror_multi_dr(uint8_t * yuv[3], int width, int height)
     }
 }
 
-void mirror_multi_u(uint8_t * yuv[3], int width, int height)
+static void mirror_multi_u(uint8_t * yuv[3], int width, int height)
 {
     unsigned int x, y;
 
@@ -95,7 +95,7 @@ void mirror_multi_u(uint8_t * yuv[3], int width, int height)
     }
 }
 
-void mirror_multi_d(uint8_t * yuv[3], int width, int height)
+static void mirror_multi_d(uint8_t * yuv[3], int width, int height)
 {
     unsigned int x, y;
     unsigned int yi1 = 0;
@@ -118,7 +118,7 @@ void mirror_multi_d(uint8_t * yuv[3], int width, int height)
     }
 }
 
-void mirror_multi_l(uint8_t * yuv[3], int width, int height)
+static void mirror_multi_l(uint8_t * yuv[3], int width, int height)
 {
     unsigned int x, y;
 
@@ -138,12 +138,10 @@ void mirror_multi_l(uint8_t * yuv[3], int width, int height)
     }
 }
 
-void mirror_multi_r(uint8_t * yuv[3], int width, int height)
+static void mirror_multi_r(uint8_t * yuv[3], int width, int height)
 {
     unsigned int x, y;
-
     unsigned int yi;
-
     uint8_t p, cb, cr;
 
     for (y = 0; y < height; y++) {
@@ -159,7 +157,7 @@ void mirror_multi_r(uint8_t * yuv[3], int width, int height)
     }
 }
 
-void mirror_multi_ur(uint8_t * yuv[3], int width, int height)
+static void mirror_multi_ur(uint8_t * yuv[3], int width, int height)
 {
     unsigned int x, y;
 

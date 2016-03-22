@@ -61,4 +61,3 @@ void wipe_apply( VJFrame *frame, VJFrame *frame2,
 	g_wipe_height = 0;
     }
 }
-void wipe_free(){}

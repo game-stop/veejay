@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "common.h"
-#include "rgbkey.h"
+#include "rgbkeysmooth.h"
 
 
 vj_effect *rgbkeysmooth_init(int w,int h)

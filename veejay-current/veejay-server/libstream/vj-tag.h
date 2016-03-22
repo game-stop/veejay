@@ -281,8 +281,8 @@ int	vj_tag_set_saturation(int t1, int value);
 void 	vj_tag_set_veejay_t(void *info);
 int	vj_tag_v4l_set_control( int t1, uint32_t id, int value );
 int 	vj_tag_set_manual_fader(int t1, int value );
-int		vj_tag_get_fade_entry(int t1);
-int		vj_tag_get_fade_method(int t1);
+int	vj_tag_get_fade_entry(int t1);
+int	vj_tag_get_fade_method(int t1);
 void	vj_tag_set_fade_entry(int t1, int entry);
 void	vj_tag_set_fade_method(int t1, int method);
 int 	vj_tag_get_fader_direction(int t1);
@@ -296,6 +296,7 @@ float 	vj_tag_get_fader_val(int t1);
 float 	vj_tag_get_fader_inc(int t1);
 int 	vj_tag_reset_fader(int t1);
 void	vj_tag_set_fade_alpha(int t1, int alpha);
+int	vj_tag_get_fade_alpha( int t1, int alpha);
 int 	vj_tag_get_effect_status(int s1);
 int 	vj_tag_get_selected_entry(int s1);
 

@@ -51,6 +51,7 @@ void	vevo_pool_slice_destroy( void *p );
 //void	*vevo_pool_slice_init( size_t node_size );
 void	*vevo_pool_slice_alloc( void *pool, size_t bs);
 void	vevo_pool_slice_free( void *pool, void *ptr );
+int	vevo_pool_size( void *p );
 
 #define vevo_pool_alloc_property(type,pool) vevo_pool_alloc(pool,sizeof(type),Mprop )
 #define	vevo_pool_alloc_storage(type,pool) vevo_pool_alloc( pool, sizeof(type),Mstor )

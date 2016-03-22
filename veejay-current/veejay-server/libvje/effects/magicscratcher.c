@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -75,7 +75,7 @@ void magicscratcher_free() {
   m_rerun = 0;
 }
 
-void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
+static void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
 {
     if (!m_reverse) {
 		veejay_memcpy(mframe + (w * h * m_frame), yuv1[0], (w * h));

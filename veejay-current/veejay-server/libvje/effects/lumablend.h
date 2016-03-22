@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -28,6 +28,4 @@ vj_effect *lumablend_init();
 void lumablend_apply( VJFrame *frame, VJFrame *frame2, int width,
 		     int height, int threhold1, int threshold2,
 		     int opacity, int type);
-
-void lumablend_free();
 #endif

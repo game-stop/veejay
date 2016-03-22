@@ -1,6 +1,5 @@
 #ifndef CUTSTOP_H
 #define CUTSTOP_H
-#include <libvje/vje.h>
 void cutstop_free() ;
 
 vj_effect *cutstop_init(int width , int height);

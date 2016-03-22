@@ -20,14 +20,15 @@
 #include <stdint.h>
 #include <config.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "diff.h"
-#include "common.h"
 #include <stdlib.h>
 #include <math.h>
+#include <libvjmem/vjmem.h>
 #include <libavutil/avutil.h>
+#include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-msg.h>
+#include "common.h"
+#include "cali.h"
 #include "softblur.h"
 
 typedef struct

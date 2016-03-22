@@ -89,7 +89,7 @@ void  net_set_screen_id(int id)
 	veejay_msg(VEEJAY_MSG_DEBUG,"Network stream bound to screen %d", id );
 }
 
-void	*reader_thread(void *data)
+static void	*reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
 	threaded_t *t = tag->priv;
@@ -151,7 +151,6 @@ void	*reader_thread(void *data)
 	
 	
 		if(!error && retrieve == 2) {
-			int ret = 0;
 			int strides[3] = { 0,0,0};
 			int compr_len = 0;
 
@@ -209,8 +208,6 @@ NETTHREADRETRY:
 
 		if( error )
 		{
-			int success = 0;
-			
 			vj_client_close(v);
 
 			veejay_msg(VEEJAY_MSG_INFO, " ZZzzzzz ... waiting for Link %s:%d to become ready", tag->source_name, tag->video_channel );

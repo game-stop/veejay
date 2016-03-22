@@ -35,27 +35,26 @@ static uint8_t *bathroom_frame[4] = { NULL,NULL,NULL,NULL };
 
 vj_effect *bathroom_init(int width,int height)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
-
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 3;
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 64;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 4;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 3;
+	ve->limits[0][1] = 1;
+	ve->limits[1][1] = 64;
 	ve->limits[0][2] = 0;
 	ve->limits[1][2] = width;
 	ve->limits[0][3] = 0;
 	ve->limits[1][3] = width;
-    ve->defaults[0] = 1; 
-    ve->defaults[1] = 32;
+	ve->defaults[0] = 1; 
+	ve->defaults[1] = 32;
 	ve->defaults[2] = 0;
 	ve->defaults[3] = width;
-    ve->description = "Bathroom Window";
-    ve->sub_format = 1;
-    ve->extra_frame = 0;
+	ve->description = "Bathroom Window";
+	ve->sub_format = 1;
+	ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->motion = 1;
 
@@ -96,7 +95,7 @@ void bathroom_free() {
 	}
 }
 
-void bathroom_verti_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+static void bathroom_verti_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
 {
     const unsigned int len = frame->len;
     unsigned int y_val = val;
@@ -122,7 +121,7 @@ void bathroom_verti_apply(VJFrame *frame, int width, int height, int val, int x0
     }
 }
 
-void	bathroom_alpha_verti_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+static void	bathroom_alpha_verti_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
 {
     const unsigned int len = frame->len;
     unsigned int y_val = val;
@@ -151,7 +150,7 @@ void	bathroom_alpha_verti_apply(VJFrame *frame, int width, int height, int val, 
     }
 }
 
-void bathroom_hori_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+static void bathroom_hori_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
 {
     unsigned int len = (width * height);
     unsigned int y_val = val;
@@ -176,7 +175,7 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val, int x0,
     }
 }
 
-void bathroom_alpha_hori_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+static void bathroom_alpha_hori_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
 {
     unsigned int len = (width * height);
     unsigned int y_val = val;

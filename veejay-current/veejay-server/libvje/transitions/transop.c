@@ -110,8 +110,4 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
 
 		}
 	}
-	
-
 }
-
-void transop_free(){}

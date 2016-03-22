@@ -1201,7 +1201,7 @@ static	void	*livido_get_parameter_template(void *plugin, unsigned int pos )
 	return param_templ;	
 }
 
-int	livido_read_plug_configuration(void *filter_template, const char *name)
+static int	livido_read_plug_configuration(void *filter_template, const char *name)
 {
 	FILE *f = plug_open_config( "livido", name, "r",0 );
 	unsigned int i;	

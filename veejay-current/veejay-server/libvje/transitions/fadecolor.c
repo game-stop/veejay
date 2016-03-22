@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -122,4 +122,3 @@ void colorfade_apply(VJFrame *frame, int width, int height, int opacity,
 	Cr[i] = (op0 * Cr[i] + op1 * colorCr) >> 8;
     }
 }
-void fadecolor_free(){}

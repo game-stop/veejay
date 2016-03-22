@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,7 +20,7 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "scratcher.h"
+#include "tracer.h"
 #include "common.h"
 
 static uint8_t *trace_buffer[4] = { NULL,NULL,NULL,NULL};

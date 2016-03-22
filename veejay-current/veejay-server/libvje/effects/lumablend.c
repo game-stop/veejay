@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -64,7 +64,7 @@ vj_effect *lumablend_init(int w, int h)
 }
 
 
-void opacity_by_threshold(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
+static void opacity_by_threshold(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 			  int height, int threshold, int threshold2,
 			  int opacity)
 {
@@ -92,8 +92,7 @@ void opacity_by_threshold(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 
 }
 
-
-void opacity_by_threshold_(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
+static void opacity_by_threshold_(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 			   int height, int threshold, int threshold2,
 			   int opacity)
 {
@@ -119,9 +118,7 @@ void opacity_by_threshold_(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
     }
 }
 
-
-
-void opacity_by_threshold_blur(uint8_t * yuv1[3], uint8_t * yuv2[3],
+static void opacity_by_threshold_blur(uint8_t * yuv1[3], uint8_t * yuv2[3],
 			       int width, int height, int threshold,
 			       int threshold2, int opacity)
 {
@@ -219,4 +216,3 @@ void lumablend_apply(VJFrame *frame, VJFrame *frame2, int width,
     }
 
 }
-void lumablend_free(){}

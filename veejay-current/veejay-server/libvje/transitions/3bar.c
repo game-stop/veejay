@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -114,4 +114,3 @@ void bar_apply(VJFrame *frame, VJFrame *frame2, int width, int height,int divide
 	bar_top_vert += top_x;
 	bar_bot_vert += bot_x;
 }
-void bar_free(){}

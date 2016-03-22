@@ -305,18 +305,3 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	return (long)sum;
 }
 
-
-long		lzo_decompress2( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst )
-{
-	lzo_uint len = linbuf_len;
-	lzot *l = (lzot*) lzo;
-	lzo_uint result_len = 0;
-
-	const lzo_bytep src = (lzo_bytep) linbuf;
-	int r = lzo1x_decompress( src, len, dst, &result_len, l->wrkmem );
-	
-	if( r != LZO_E_OK )
-		return 0;
-	return (long)result_len;
-}
-

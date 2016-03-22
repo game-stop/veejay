@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -142,7 +142,6 @@ void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha )
 		const unsigned int R = h/2;
 		const double coeef = R / log(curve * R + 1);
 		/* pre calculate */
-		unsigned int i;  
 		int px,py;
 		double r,a,co,si;
 		const int w2 = w/2;

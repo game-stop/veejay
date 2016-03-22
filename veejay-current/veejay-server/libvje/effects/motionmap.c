@@ -314,7 +314,7 @@ static int32_t motionmap_activity_level( uint8_t *I, int width, int height )
 	return (level>>8);
 }
 
-void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *img, uint8_t *pI1, uint8_t *pI2, uint8_t *bDst, const int len, const int threshold )
+static void motionmap_calc_diff( const uint8_t *bg, uint8_t *pimg, const uint8_t *img, uint8_t *pI1, uint8_t *pI2, uint8_t *bDst, const int len, const int threshold )
 {
 	unsigned int i;
 
@@ -329,7 +329,7 @@ void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *i
 		else
 			I1[i] = 0xff;
 
-		I2[i] = abs( bg[i] - prev_img[i] );
+		I2[i] = abs( bg[i] - pimg[i] );
 		if( I2[i] < threshold )
 			I2[i] = 0; 
 		else
@@ -343,7 +343,7 @@ void motionmap_calc_diff( const uint8_t *bg, uint8_t *prev_img, const uint8_t *i
 	for( i = 0; i < len; i ++ ) 
 	{
 		bDst[i] = I1[i] + I2[i];
-		prev_img[i] = img[i];
+		pimg[i] = img[i];
 	}
 }
 

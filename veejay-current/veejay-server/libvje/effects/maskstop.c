@@ -22,10 +22,11 @@
  */
 #include <config.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <libvjmem/vjmem.h>
+#include <libvje/vje.h>
 #include "common.h"
-#include "split.h"
-#include <stdlib.h>
-#include <stdio.h>
+#include "maskstop.h"
 
 static uint8_t *vvmaskstop_buffer[6];
 static unsigned int frq_frame;

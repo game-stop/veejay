@@ -135,7 +135,7 @@ static inline pixel_t evaluate_pixel_bc(
 		const uint8_t *image,		/* image data */
 		const uint8_t *image_cb,
 		const uint8_t *image_cr,
-		const relpoint_t *points	/* relative coordinate map */
+		const relpoint_t *pts	/* relative coordinate map */
 )
 {
 	unsigned int 	brightness;		/* scaled brightnes */
@@ -162,8 +162,8 @@ static inline pixel_t evaluate_pixel_bc(
 	/* loop over perimter of circle (!) */
 	for( i = 0; i < brush_size; i ++)
 	{
-		dx = points[i].x + x;
-		dy = points[i].y + y;
+		dx = pts[i].x + x;
+		dy = pts[i].y + y;
 		if(dx < 0) dx = 0; else if (dx >= w) dx = w-1;
 		if(dy < 0) dy = 0; else if (dy >= h) dy = h-1;
 
@@ -212,7 +212,7 @@ static inline uint8_t evaluate_pixel_b(
 		const int h,			/* height of image */
 		const uint8_t *premul,		/* map data */
 		const uint8_t *image,		/* image data */
-		const relpoint_t *points	/* relative coordinate map*/
+		const relpoint_t *pts	/* relative coordinate map*/
 )
 {
 	unsigned int 	brightness;		/* scaled brightnes */
@@ -240,8 +240,8 @@ static inline uint8_t evaluate_pixel_b(
 	// points in circle
 	for( i = 0; i < brush_size; i ++)
 	{
-		dx = points[i].x + x;
-		dy = points[i].y + y;
+		dx = pts[i].x + x;
+		dy = pts[i].y + y;
 		if(dx < 0) dx = 0; else if (dx > w) dx = w;
 		if(dy < 0) dy = 0; else if (dy >= h) dy = h-1;
 

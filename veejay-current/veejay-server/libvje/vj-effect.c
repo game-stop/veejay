@@ -196,13 +196,14 @@
 #include "effects/passthrough.h"
 #include "effects/alphatransition.h"
 #include "effects/randnoise.h"
+#include "effects/common.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
 
-unsigned int  pixel_Y_hi_ = 235;
-unsigned int  pixel_U_hi_ = 240;
-unsigned int  pixel_Y_lo_ = 16;
-unsigned int  pixel_U_lo_ = 16;
+uint8_t  pixel_Y_hi_ = 235;
+uint8_t  pixel_U_hi_ = 240;
+uint8_t  pixel_Y_lo_ = 16;
+uint8_t  pixel_U_lo_ = 16;
 
 unsigned int	get_pixel_range_min_Y() {
 	return pixel_Y_lo_;
@@ -490,7 +491,7 @@ int vj_effect_deactivate(int effect_id, void *ptr)
 	return 0;
 }
 
-void vj_effect_deactivate_all()
+static void vj_effect_deactivate_all()
 {
 	int i;
 	for(i = 0 ; i < FX_LIMIT; i ++ )
@@ -727,7 +728,7 @@ static void vj_effect_free_parameters( vj_effect *v )
 	free( v->param_description );
 }
 
-void vj_effect_free(vj_effect *ve) {
+static void vj_effect_free(vj_effect *ve) {
   if( ve ) {
 	if(ve->limits[0]) free(ve->limits[0]);
 	if(ve->limits[1]) free(ve->limits[1]);
@@ -913,15 +914,6 @@ int vj_effect_get_extra_frame(int effect_id)
 		return vj_effects[entry]->extra_frame;
     return 0;
 }
-
-int vj_effect_get_help(int entry)
-{
-	if(!vj_effects[entry])
-		return 0;
-	
-	return 0;
-}
-
 
 static int	vj_effect_get_hints_length( vj_effect *fx, int p, int limit )
 {

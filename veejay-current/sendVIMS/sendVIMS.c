@@ -1,5 +1,5 @@
 /* sendVIMS - very simple client for VeeJay
- * 	     (C) 2002-2004 Niels Elburg <elburg@hio.hen.nl>
+ * 	     (C) 2002-2004 Niels Elburg <nwelburg@gmail.com>
  *
  * puredata module by Tom Schouten <doelie@zzz.kotnet.org>
  *

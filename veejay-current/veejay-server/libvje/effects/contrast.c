@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -56,7 +56,7 @@ vj_effect *contrast_init(int w, int h)
 }
 
 /* also from yuvdenoise */
-void contrast_cb_apply(VJFrame *frame, int width,int height, int *s) {
+static void contrast_cb_apply(VJFrame *frame, int width,int height, int *s) {
 	unsigned int r;
 	register int cb;
 	register int cr;
@@ -82,7 +82,7 @@ void contrast_cb_apply(VJFrame *frame, int width,int height, int *s) {
 	}
 }
 
-void contrast_y_apply(VJFrame *frame, int width, int height, int *s) {
+static void contrast_y_apply(VJFrame *frame, int width, int height, int *s) {
    unsigned int r;
    register int m;
 	const int len = frame->len;

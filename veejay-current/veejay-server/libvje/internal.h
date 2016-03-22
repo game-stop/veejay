@@ -405,9 +405,9 @@ extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2,
 extern void texmap_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 
 		       int mode, int threshold, int c , int feather, int blob);
-extern void contourextract_apply(void *dd, VJFrame *frame,
-		       int width, int height, 
-		       int mode, int threshold, int c , int feather, int blob);
+
+extern void contourextract_apply(void *ed, VJFrame *frame,int width, int height, 
+		int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight);
 
 extern void diff_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 

@@ -169,7 +169,8 @@ static void zoom(void)
 		}
 	}
 }
-void blurzoomcore(void)
+
+static void blurzoomcore(void)
 {
 	kentaro_blur();
 	zoom();

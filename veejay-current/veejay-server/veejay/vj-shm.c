@@ -40,6 +40,7 @@
 #include <libavutil/avutil.h>
 #include <libplugger/specs/livido.h>
 #include <libel/avcommon.h>
+#include <veejay/vj-shm.h>
 #define HEADER_LENGTH 4096
 #ifndef PATH_MAX
 #define PATH_MAX 1024
@@ -363,8 +364,9 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 
 	pthread_rwlockattr_t	rw_lock_attr;
 	veejay_memset( v->sms, 0, size );
-
-	uint8_t *Y = v->sms + HEADER_LENGTH;
+	uint8_t *sms_addr = (const uint8_t*) v->sms;
+		
+	uint8_t *Y = sms_addr + HEADER_LENGTH;
 	uint8_t *U = Y + frame->len;
 	uint8_t *V = U + frame->uv_len;
 	
@@ -421,7 +423,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	veejay_msg( VEEJAY_MSG_DEBUG, "Shared Memory ID = %d", v->shm_id );
 	veejay_msg( VEEJAY_MSG_INFO, "(SHM) Shared Memory consumer key is %d", v->key );
 	veejay_msg( VEEJAY_MSG_DEBUG, "Starting Address: %p, Frame starts at: %p, Lock at %p",
-			v->sms, v->sms + HEADER_LENGTH, &(data->rwlock));
+			v->sms, sms_addr + HEADER_LENGTH, &(data->rwlock));
 
 
 	simply_my_shmid = v->key;

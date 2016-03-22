@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -97,7 +97,7 @@ void chromascratcher_free() {
    cframe[2] = NULL;
 }
 
-void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
+static void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 {
 	int strides[4] = { (w * h), (w*h), (w*h) , 0 };
 	uint8_t *dest[4] = {

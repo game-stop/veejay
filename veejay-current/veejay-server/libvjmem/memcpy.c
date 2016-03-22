@@ -311,7 +311,7 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #endif
 
 #undef MOVNTQ
-#if HAVE_MMX2
+#if HAVE_ASM_MMX2
 #define MOVNTQ "movntq"
 #else
 #define MOVNTQ "movq"
@@ -1943,7 +1943,6 @@ void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
 	free(src);
 	free(dst);
 }
-
 
 void	init_parallel_tasks(int n_tasks) 
 {

@@ -27,7 +27,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "rippletv.h"
+#include "waterrippletv.h"
 #include <stdlib.h>
 #include <math.h>
 #include "common.h"

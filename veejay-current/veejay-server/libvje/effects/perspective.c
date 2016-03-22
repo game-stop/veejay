@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,6 +24,8 @@
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include "common.h"
+#include "perspective.h"
+
 vj_effect *perspective_init(int width , int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -70,7 +70,7 @@ vj_effect *complexthreshold_init(int w, int h)
 }
 
 /* this method decides whether or not a pixel from the fg will be accepted for keying */
-int accept_tpixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
+static int accept_tpixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
 		 int accept_angle_tg)
 {
     short xx, yy;

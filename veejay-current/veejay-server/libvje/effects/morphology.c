@@ -89,7 +89,7 @@ static uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
 	return pixel_Y_hi_;
 }
 
-morph_func	_morphology_function(int i)
+static morph_func	_morphology_function(int i)
 {
 	if( i == 0 )
 		return _dilate_kernel3x3;

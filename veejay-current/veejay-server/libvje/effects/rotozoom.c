@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -164,7 +164,7 @@ void rotozoom_free() {
 /* rotozoomer, from the demo effects collection, works in supersampled YCbCr space.
    printf("Retro Rotozoom Effect - B. Ellacott, W.P. van Paassen - 2002\n");
  */
-void draw_tile(int stepx, int stepy, int zoom, int w, int h,
+static void draw_tile(int stepx, int stepy, int zoom, int w, int h,
 	       uint8_t * src1[3], uint8_t * src2[3])
 {
 
@@ -191,7 +191,7 @@ void draw_tile(int stepx, int stepy, int zoom, int w, int h,
     }
 }
 
-void rotozoom2_apply(VJFrame *frame, uint8_t *data[3], int width,
+static void rotozoom2_apply(VJFrame *frame, uint8_t *data[3], int width,
 		     int height, int n, int p, int z)
 {
     draw_tile(test_roto[n][p],
@@ -199,7 +199,7 @@ void rotozoom2_apply(VJFrame *frame, uint8_t *data[3], int width,
 	      test_roto2[n][z], width, height, frame->data, data);
 }
 
-void rotozoom1_apply(VJFrame *frame, uint8_t *data[3], int w, int h,
+static void rotozoom1_apply(VJFrame *frame, uint8_t *data[3], int w, int h,
 		     int n, int p, int z)
 {
 

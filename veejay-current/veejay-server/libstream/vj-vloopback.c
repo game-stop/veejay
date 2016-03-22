@@ -46,12 +46,14 @@
 #endif
 #ifdef HAVE_V4L2
 #include <linux/videodev2.h>
+#include <libstream/v4l2utils.h>
 #endif
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
 #include <libavutil/pixfmt.h>
 #include <libel/avcommon.h>
+#include <libstream/vj-vloopback.h>
 #define VLOOPBACK_MMAP 0 	// commented out
 #define VLOOPBACK_PIPE 1
 #define VLOOPBACK_N_BUFS 2

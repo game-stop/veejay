@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -66,20 +66,6 @@ vj_effect *chromapalette_init(int w, int h)
 	ve->rgb_conv = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Angle", "Red","Green","Blue", "Chroma Blue","Chroma Red" );
     return ve;
-}
-
-void	chromapalette_help() 
-{
-/*	veejay_msg(1,  "Chrominance Palette");
-	veejay_msg(1,  "Select a color and set a new chroma value for the entire selection");
-	veejay_msg(1,  "one or both of the parameters p4 and p5");
-	veejay_msg(1,  "p0 = Accept angle");
-	veejay_msg(1,  "p1 = Red");
-	veejay_msg(1,  "p2 = Green");
-	veejay_msg(1,  "p3 = Blue");
-	veejay_msg(1,  "p4 = New chroma Blue value");
-	veejay_msg(1,  "p5 = New chroma Red value"); 
-*/
 }
 
 static inline int _chroma_key( uint8_t fg_cb, uint8_t fg_cr, uint8_t cb, uint8_t cr, int angle)

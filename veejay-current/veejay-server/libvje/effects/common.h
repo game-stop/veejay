@@ -48,10 +48,10 @@
 
 #define    RUP8(num)(((num)+8)&~8)
 
-extern int  pixel_Y_hi_;
-extern int  pixel_U_hi_;
-extern int  pixel_Y_lo_;
-extern int  pixel_U_lo_;
+extern uint8_t pixel_Y_hi_;
+extern uint8_t pixel_U_hi_;
+extern uint8_t pixel_Y_lo_;
+extern uint8_t pixel_U_lo_;
 #define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
 #define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
 
@@ -241,11 +241,19 @@ typedef struct
 } matrix_t;
 
 typedef	matrix_t (*matrix_f)(int i, int s, int w, int h);
+
 matrix_t matrix_placementA(int photoindex, int size, int w , int h);
 matrix_t matrix_placementB(int photoindex, int size, int w , int h);
-matrix_f	get_matrix_func(int type);
-int			get_matrix_func_n();
-void		fx_shuffle_int_array( int *A, unsigned int n );
+matrix_t matrix_placementC(int photoindex, int size, int w , int h);
+matrix_t matrix_placementD(int photoindex, int size, int w , int h);
+matrix_t matrix_placementE(int photoindex, int size, int w , int h);
+matrix_t matrix_placementF(int photoindex, int size, int w , int h);
+matrix_t matrix_placementG(int photoindex, int size, int w , int h);
+matrix_t matrix_placementH(int photoindex, int size, int w , int h);
+
+matrix_f get_matrix_func(int type);
+int get_matrix_func_n();
+void fx_shuffle_int_array( int *A, unsigned int n );
 
 int power_of(int size);
 int max_power(int w);
@@ -316,6 +324,18 @@ double m_get_radius(int x, int y);
 double m_get_angle(int x, int y);
 double m_get_polar_x(double r, double a);
 double m_get_polar_y(double r, double a);
+uint8_t _pf_dneg(uint8_t a, uint8_t b);
+uint8_t _pf_lghtn(uint8_t a, uint8_t b);
+uint8_t _pf_dneg2(uint8_t a,uint8_t b);
+uint8_t _pf_min(uint8_t a, uint8_t b);
+uint8_t _pf_max(uint8_t a,uint8_t b);
+uint8_t _pf_pq(uint8_t a,uint8_t b);
+uint8_t _pf_none(uint8_t a, uint8_t b);
+int calculate_luma_value(uint8_t *Y, int w , int h);
+int calculate_cbcr_value(uint8_t *Cb,uint8_t *Cr, int w, int h);
+uint32_t veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M);
+int i_cmp( const void *a, const void *b );
+int compare_l8( const void *a, const void *b );
 void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
 void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
 extern void viewport_destroy(void *v);

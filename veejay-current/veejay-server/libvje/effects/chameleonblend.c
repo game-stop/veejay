@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "softblur.h"
-#include "chameleon.h"
+#include "chameleonblend.h"
 #include "common.h"
 
 vj_effect *chameleonblend_init(int w, int h)

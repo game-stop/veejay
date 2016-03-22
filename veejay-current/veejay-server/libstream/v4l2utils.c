@@ -1052,7 +1052,6 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 
 		v->buffers = (bufs*) calloc( v->reqbuf.count, sizeof(*v->buffers));
 
-		int i;
 		for( i = 0; i < v->reqbuf.count; i ++ ) {
 			memset( &(v->buffer), 0, sizeof(v->buffer));
 			v->buffer.type 	= v->reqbuf.type;

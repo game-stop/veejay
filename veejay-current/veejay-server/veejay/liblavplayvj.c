@@ -2257,7 +2257,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	{
 		case VJ_PLAYBACK_MODE_PLAIN:
 			info->current_edit_list = info->edit_list;
-			video_playback_setup *settings = info->settings;
 			settings->min_frame_num = 0;
 			settings->max_frame_num = info->edit_list->total_frames;
 			veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
@@ -2788,7 +2787,7 @@ int	prepare_cache_line(int perc, int n_slots)
 	return 1;
 }
 
-int smp_check()
+static int smp_check()
 {
 	return get_nprocs();
 }

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -58,8 +58,7 @@ vj_effect *colorshift_init(int w, int h)
 
 
 /* bitwise and test */
-
-void softmask2_apply(VJFrame *frame, int width, int height, int paramt)
+static void softmask2_apply(VJFrame *frame, int width, int height, int paramt)
 {
     const unsigned int len = frame->len;
     unsigned int x;
@@ -68,7 +67,7 @@ void softmask2_apply(VJFrame *frame, int width, int height, int paramt)
 		Y[x] &= paramt;
 }
 
-void softmask2_applycb(VJFrame *frame, int width, int height,
+static void softmask2_applycb(VJFrame *frame, int width, int height,
 		       int paramt)
 {
     const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
@@ -78,7 +77,7 @@ void softmask2_applycb(VJFrame *frame, int width, int height,
 		Cb[x] &= paramt;
 }
 
-void softmask2_applycr(VJFrame *frame, int width, int height,
+static void softmask2_applycr(VJFrame *frame, int width, int height,
 		       int paramt)
 {
 	uint8_t *Cr = frame->data[2];
@@ -88,7 +87,7 @@ void softmask2_applycr(VJFrame *frame, int width, int height,
 		Cr[x] &= paramt;
 }
 
-void softmask2_applycbcr(VJFrame *frame, int width, int height,
+static void softmask2_applycbcr(VJFrame *frame, int width, int height,
 			 int paramt)
 {
 	const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
@@ -101,7 +100,7 @@ void softmask2_applycbcr(VJFrame *frame, int width, int height,
     }
 }
 
-void softmask2_applyycbcr(VJFrame *frame, int width, int height,
+static void softmask2_applyycbcr(VJFrame *frame, int width, int height,
 			  int paramt)
 {
     const unsigned int len = frame->len;
@@ -122,7 +121,7 @@ void softmask2_applyycbcr(VJFrame *frame, int width, int height,
     }
 }
 
-void softmask_apply(VJFrame *frame, int width, int height, int paramt)
+static void softmask_apply(VJFrame *frame, int width, int height, int paramt)
 {
     const unsigned int len = frame->len;
     unsigned int x;
@@ -134,7 +133,7 @@ void softmask_apply(VJFrame *frame, int width, int height, int paramt)
 }
 
 
-void softmask_applycb(VJFrame *frame, int width, int height, int paramt)
+static void softmask_applycb(VJFrame *frame, int width, int height, int paramt)
 {
 	const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb = frame->data[1];
@@ -145,7 +144,7 @@ void softmask_applycb(VJFrame *frame, int width, int height, int paramt)
 }
 
 
-void softmask_applycr(VJFrame *frame, int width, int height, int paramt)
+static void softmask_applycr(VJFrame *frame, int width, int height, int paramt)
 {
 	const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cr = frame->data[2];
@@ -156,7 +155,7 @@ void softmask_applycr(VJFrame *frame, int width, int height, int paramt)
 }
 
 
-void softmask_applycbcr(VJFrame *frame, int width, int height,
+static void softmask_applycbcr(VJFrame *frame, int width, int height,
 			int paramt)
 {
     const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
@@ -171,10 +170,10 @@ void softmask_applycbcr(VJFrame *frame, int width, int height,
     }
 }
 
-void softmask_applyycbcr(VJFrame *frame, int width, int height,
+static void softmask_applyycbcr(VJFrame *frame, int width, int height,
 			 int paramt)
 {
-    const int len =  frame->len;
+	const int len =  frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

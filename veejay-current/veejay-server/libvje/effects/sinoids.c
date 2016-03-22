@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -93,7 +93,7 @@ void sinoids_free() {
 	
 }
 
-void sinoids_recalc(int width, int z) {
+static void sinoids_recalc(int width, int z) {
 	int i=0;
 	double zoom = ( (double)z / 10.0);
 	for(i=0; i < width; i++ ) {

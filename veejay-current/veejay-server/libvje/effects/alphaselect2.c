@@ -25,9 +25,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "rgbkey.h"
 #include <math.h>
 #include "common.h"
+#include "alphaselect2.h"
 
 vj_effect *alphaselect2_init(int w, int h)
 {
@@ -106,17 +106,17 @@ void alphaselect2_apply( VJFrame *frame,int tola, int r, int g,
 	if(alpha == 0 ) {
 		for (pos = len; pos != 0; pos--) {
 			double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
-			uint8_t alpha = (uint8_t) (d * 255.0);
-			if( alpha < 0xff ) {
+			uint8_t av = (uint8_t) (d * 255.0);
+			if( av < 0xff ) {
 				Cb[pos] = 128;
 				Cr[pos] = 128;
 			}
-			else if (alpha == 0) {
+			else if (av == 0) {
 				Cb[pos] = 128;
 				Cr[pos] = 128;
 				Y[pos] = pixel_Y_lo_;
 			}
-			A[pos] = alpha;
+			A[pos] = av;
 		}
 		return;
 	}

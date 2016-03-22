@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -59,7 +59,7 @@ vj_effect *lumakey_init(int width, int height)
     return ve;
 }
 
-void lumakey_simple(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
+static void lumakey_simple(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 		    int height, int threshold, int threshold2, int opacity)
 {
 
@@ -95,8 +95,7 @@ void lumakey_simple(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
     }
 }
 
-
-void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
+static void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 		    int height, int threshold, int threshold2, int opacity,
 		    int distance)
 {
@@ -216,7 +215,7 @@ void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 
 }
 
-void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
+static void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 			  int height, int threshold, int threshold2,
 			  int opacity, int distance)
 {
@@ -303,8 +302,6 @@ void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	}
     }
 }
-
-
 
 void lumakey_apply( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int type, int threshold, int threshold2,

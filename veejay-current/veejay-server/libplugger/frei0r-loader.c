@@ -41,6 +41,7 @@
 #include <libplugger/portdef.h>
 #include <libplugger/defaults.h>
 #include <libplugger/specs/frei0r.h>
+#include <libplugger/frei0r-loader.h>
 #include <libel/avcommon.h>
 
 #define    RUP8(num)(((num)+8)&~8)

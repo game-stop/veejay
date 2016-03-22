@@ -1,7 +1,7 @@
 /*
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -135,7 +135,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	}
 
 	/* get a pointer to a pixel function */
-	_pcf	_get_pcf(int type)
+	static _pcf	_get_pcf(int type)
 	{
 		switch(type)
 		{
@@ -172,7 +172,7 @@ void pencilsketch_apply(
 	uint8_t *Cr= frame->data[2];
 
  	/* get a pointer to a pixel blend function */
-	_pcf _pff =  (_pcf) _get_pf(type);
+	_pcf _pff =  (_pcf) _get_pcf(type);
 	_pcbcr _pcbcrff = &_pcbcr_color;
 
 	if(mode == 1 ) {

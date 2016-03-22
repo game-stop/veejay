@@ -20,8 +20,7 @@
  */
 
 /*
-	veejay plugin loader
-        *	library to wrap up all kinds of "plugin standards"
+	veejay plugin loader, library that wraps up all kinds of "plugin standards"
  */
 void	plug_sys_free(void);
 void	plug_sys_init( int fmt, int w, int h );
@@ -43,11 +42,9 @@ void	plug_set_parameter( void *instance, int seq_num, int n_elements,void *value
 void	plug_set_parameters( void *instance, int n_arg, void *darg );
 int	plug_clone_from_output_parameters( void *instance, void *fx_values );
 char	*plug_get_osc_format(void *fx_instance, int p);
-//@ see generic_osc_cb_f in defs.h
-void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id, int sample_id,
-	       void(*cb)(void *ud, void *p, void *v), void *cb_data	);
+void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id, int sample_id, void(*cb)(void *ud, void *p, void *v), void *cb_data);
 char 	*plug_get_osc_path_parameter(void *instance, int k);
-int *plug_find_all_generator_plugins( int *total );
+int 	*plug_find_all_generator_plugins( int *total );
 void	plug_clear_namespace( void *fx_instance, void *data );
 int	plug_find_generator_plugins(int *total, int seq );
 void	*plug_get( int fd_id );
@@ -56,6 +53,17 @@ void	*plug_get_by_so_name( char *soname );
 int	plug_get_idx_by_name( char *name);
 int 	plug_get_idx_by_so_name( char *soname );
 int	plug_is_frei0r( void *instance );
-void plug_get_parameters( void *instance, int *args, int *n_args);
-
+void	plug_get_parameters( void *instance, int *args, int *n_args);
+char	*plug_describe_param( void *plugin, int p );
+char	*list_plugins();
+void    plug_clone_from_parameters(void *instance, void *fx_values);
+void	plug_clone_parameters( void *instance, void *fx_values );
+void	plug_set_defaults( void *instance, void *fx_values );
+char	*plug_describe( int fx_id );
+void 	plug_concatenate_all(void *osc, void *msg);
+void	*plug_get_name_space( void *instance );
+int	plug_parameter_get_range_dbl( void *fx_instance,const char *key, int k, double *min, double *max , int *kind );
+int 	plug_get_index_parameter_as_dbl( void *fx_instance,const char *key, int k , double *res);
+int	plug_get_number_parameter_as_dbl( void *fx_instance, const char *key, int k , double *res);
+int	plug_get_coord_parameter_as_dbl( void *fx_instance,const char *key, int k, double *res_x, double *res_y );
 #endif

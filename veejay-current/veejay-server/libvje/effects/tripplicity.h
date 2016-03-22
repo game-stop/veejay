@@ -1,7 +1,7 @@
 /*
  * Linux VeeJay
  *
- * Copyright(C)2005 Niels Elburg <nelburg@hio.hen.nl>
+ * Copyright(C)2005 Niels Elburg <nnwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License

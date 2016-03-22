@@ -85,7 +85,7 @@ void	flare_free(void)
 	}
 }
 
-void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
+static void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
 
 	unsigned int i;
 	const int len = frame->len;
@@ -127,7 +127,7 @@ void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int
     	}
 }
 
-void flare_additive(VJFrame *frame, VJFrame *frame2, int width,
+static void flare_additive(VJFrame *frame, VJFrame *frame2, int width,
 		int height, int op_a) {
 
 	unsigned int i;
@@ -161,7 +161,7 @@ void flare_additive(VJFrame *frame, VJFrame *frame2, int width,
 	}
 }
 
-void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
+static void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -195,8 +195,7 @@ void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 	}
 }
 
-
-void flare_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void flare_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 {
 
 	unsigned int i;
@@ -222,7 +221,7 @@ void flare_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 	}
 }
 
-void	flare_simple( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a )
+static void	flare_simple( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a )
 {
 	unsigned int i;
  	unsigned int len = w* h;
@@ -239,7 +238,7 @@ void	flare_simple( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a )
 
 }
 
-void flare_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void flare_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 {
 
 	unsigned int i;
@@ -264,7 +263,6 @@ void flare_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 		} 
 	}
 }
-
 
 void flare_apply(VJFrame *A, 
 			int width, int height, int type, int op_a, int radius)

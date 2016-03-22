@@ -47,12 +47,12 @@ const char* v4l2_get_property_name( const int id );
 uint32_t v4l2_get_property_id( const char *name );
 void	v4l2_get_controls( void *d, void *port );
 int32_t v4l2_get_control( void *d, int32_t type );
-int		v4l2_set_roi( void *d, int w, int h, int x, int y );
-int		v4l2_reset_roi( void *d );
-int		v4l2_get_currentscaling_factor_and_pixel_aspect(void *d, int *w, int *h, double *aspect);
-int		v4l2_num_devices();
+int	v4l2_set_roi( void *d, int w, int h, int x, int y );
+int	v4l2_reset_roi( void *d );
+int	v4l2_get_currentscaling_factor_and_pixel_aspect(void *d, int *w, int *h, double *aspect);
+int	v4l2_num_devices();
 char	**v4l2_get_device_list();
-int		v4l2_get_composite_status( void *d );
+int	v4l2_get_composite_status( void *d );
 void	v4l2_set_composite_status( void *d, int status);
 void	v4l2_set_input_channel( void *d, int num );
 void	v4l2_set_brightness( void *d, int32_t value );
@@ -105,5 +105,7 @@ void	*v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 v4l2_thread_info *v4l2_thread_info_get( void *vv);
 void	v4l2_set_status( void *d , int status);
 void	v4l2_thread_set_status( v4l2_thread_info *i, int status );
+int v4l2_pixelformat2ffmpeg(int pf);
+
 #endif
 

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl> / <nwelburg@gmail.com>
+ * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -2136,7 +2136,6 @@ int sample_chain_add(int s1, int c, int effect_nr)
 		if(vj_effect_initialized( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance )  ) 
 		{
 			if(!vj_effect_is_plugin( sample->effect_chain[c]->effect_id ) ) {
-				int i  = 0;
 				int frm = 1;
 				
 				for( i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
@@ -2169,7 +2168,6 @@ int sample_chain_add(int s1, int c, int effect_nr)
 			//@ clear
 			sample->effect_chain[c]->effect_id = -1;
 			sample->effect_chain[c]->e_flag = 1;
-			int i;
 			for( i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ )
 				sample->effect_chain[c]->arg[i] = 0;
 	
@@ -2925,11 +2923,11 @@ void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_a
 	cur = cur->next;
     }
 }
-void	ParseCalibration( xmlDocPtr doc, xmlNodePtr cur, sample_info *skel , void *vp)
+static void	ParseCalibration( xmlDocPtr doc, xmlNodePtr cur, sample_info *skel , void *vp)
 {
 }
 
-void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mode )
+static void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mode )
 {
 	char *chTemp = NULL;
 	unsigned char *xmlTemp = NULL;
@@ -2963,7 +2961,7 @@ void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mode )
 
 }
 
-void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_samples )
+static void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_samples )
 {
 	seq_t *s = (seq_t*) seq;
 
@@ -3617,7 +3615,7 @@ void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects)
     
 }
 
-void	SaveSequences( xmlNodePtr node, void *seq )
+static void	SaveSequences( xmlNodePtr node, void *seq )
 {
     char buffer[100];
     int i = 0;
@@ -3631,7 +3629,7 @@ void	SaveSequences( xmlNodePtr node, void *seq )
 		
 }
 
-void	SaveCurrentPlaying( xmlNodePtr node, int id, int mode )
+static void	SaveCurrentPlaying( xmlNodePtr node, int id, int mode )
 {
 	char buffer[100];
 	sprintf(buffer, "%d", id );
@@ -3767,7 +3765,7 @@ static	int sample_write_edl(sample_info *sample)
 	return 0;
 }
 
-void	WriteSubtitles( sample_info *next_sample, void *font, char *file )
+static void	WriteSubtitles( sample_info *next_sample, void *font, char *file )
 {
 	char tmp[512];
 

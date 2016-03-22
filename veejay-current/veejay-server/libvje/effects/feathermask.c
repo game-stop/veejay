@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -53,7 +53,8 @@ void feathermask_free()
 		mask = NULL;
 	}
 }
-void feathermask1_apply( VJFrame *frame, uint8_t *alpha, int width, int height)
+
+static void feathermask1_apply( VJFrame *frame, uint8_t *alpha, int width, int height)
 {
     int r, c;
     int len = (width * height) - width;

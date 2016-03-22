@@ -3027,11 +3027,11 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 				if(tree->arg_len)
 					veejay_strncat( buf, tree->args, tree->arg_len );
 				
-				void *ptr = tree;
+				void *tree_ptr = tree;
 
 				tree = tree->next;
 
-				free(ptr);
+				free(tree_ptr);
 			}
 #endif
 			if(name)
@@ -3789,8 +3789,8 @@ void vj_event_dec_frame(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *) ptr;
 	int args[1];
-	char *s = NULL;
-	P_A( args,s,format, ap );
+	char *str = NULL;
+	P_A( args,str,format, ap );
 	if(!STREAM_PLAYING(v))
 	{
 		video_playback_setup *s = v->settings;
@@ -3807,8 +3807,8 @@ void vj_event_prev_second(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;	
 	int args[1];
-	char *s = NULL;
-	P_A( args,s,format, ap );
+	char *str = NULL;
+	P_A( args,str,format, ap );
 	if(!STREAM_PLAYING(v))
 	{
 		video_playback_setup *s = v->settings;
@@ -7444,7 +7444,7 @@ void	vj_event_toggle_osd_extra( void *ptr, const char format[], va_list ap )
 }
 
 static struct {
-	char *name;
+	const char *name;
 	int   id;
 } recorder_formats[] = {
 	{ "mlzo", ENCODER_LZO },
@@ -7709,7 +7709,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 	{
 		char tmp[255];
 		
-		int format = _recorder_format;
+		int rec_format = _recorder_format;
 		char prefix[40];
 		sprintf(prefix, "stream-%02d", args[0]);
 
@@ -7719,13 +7719,13 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 			return;
 		}
 
-		if(format==-1)
+		if(rec_format==-1)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Set a destination format first");
 			return;
 		}
 	
-		if( vj_tag_init_encoder( args[0], tmp, format,		
+		if( vj_tag_init_encoder( args[0], tmp, rec_format,		
 			args[1]) ) 
 		{
 			video_playback_setup *s = v->settings;
@@ -7798,8 +7798,8 @@ void vj_event_output_y4m_stop(void *ptr, const char format[], va_list ap)
 
 void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 {
-	veejay_t *v = (veejay_t*)ptr;
 #ifdef HAVE_JACK
+	veejay_t *v = (veejay_t*)ptr;
 	if (!v->audio_running )
 	{
 		veejay_msg(0,"Veejay was started without audio.");
@@ -8055,8 +8055,8 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 
 			if (vj_effect_get_extra_frame(y) == 1)
 			{
-				int source = vj_tag_get_chain_source(id, i);
-				veejay_msg(VEEJAY_MSG_INFO, "Mixing with %s %d",(source == VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),vj_tag_get_chain_channel(id,i));
+				int source_type = vj_tag_get_chain_source(id, i);
+				veejay_msg(VEEJAY_MSG_INFO, "Mixing with %s %d",(source_type == VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),vj_tag_get_chain_channel(id,i));
 	    		}
 		}
     	}
@@ -8853,17 +8853,17 @@ void	vj_event_send_stream_args		(	void *ptr, const char format[],		va_list ap )
 			veejay_memset( tagargs, 0, sizeof(tagargs));
 			vj_tag_generator_get_args( args[0], tagargs, &n_args, &id );
 
-			char *ptr = &line[0];
+			char *line_ptr = &line[0];
 
-			ptr = vj_sprintf( ptr, id ); *ptr ++ = ' ';
+			line_ptr = vj_sprintf( line_ptr, id ); *line_ptr ++ = ' ';
 
 			int n = n_args;
 			int i;
 			for( i = 0; i < n; i ++ ) {
-				ptr = vj_sprintf( ptr, tagargs[i] ); *ptr ++ = ' ';
+				line_ptr = vj_sprintf( line_ptr, tagargs[i] ); *line_ptr ++ = ' ';
 			}
 
-			ptr = vj_sprintf( ptr, tagargs[n] );
+			line_ptr = vj_sprintf( line_ptr, tagargs[n] );
 
 			FORMAT_MSG(fline,line);
 			SEND_MSG(v, fline);

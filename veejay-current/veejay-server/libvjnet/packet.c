@@ -63,25 +63,28 @@ packet_header_t		packet_get_header(const void *data)
 
 int			packet_get_data(packet_header_t *h, const void *data, uint8_t *plane )
 {
+	const char *addr = (const char*) data;
 	size_t len = sizeof(packet_header_t);
 	len += sizeof( frame_info_t );
-	veejay_memcpy( plane , data + len, CHUNK_SIZE );
+	veejay_memcpy( plane , addr + len, CHUNK_SIZE );
 	return 1;
 }
 
 int			packet_get_info(frame_info_t *i, const void *data )
 {
-	veejay_memcpy(i, data + sizeof(packet_header_t), sizeof(frame_info_t));
+	const char *dst = (const char*) data;
+	veejay_memcpy(i, dst + sizeof(packet_header_t), sizeof(frame_info_t));
 	return 1;
 }
 
 int			packet_put_padded_data(packet_header_t *h, frame_info_t *i , void *payload, const uint8_t *plane, int bytes )
 {
+	const char *dst = (const char*) payload;
 	size_t len = sizeof( packet_header_t );
-	veejay_memcpy( payload, h , len );
-	veejay_memcpy( payload + len, i , sizeof( frame_info_t ));
+	veejay_memcpy( dst, h , len );
+	veejay_memcpy( dst + len, i , sizeof( frame_info_t ));
 	len += sizeof(frame_info_t );
-	veejay_memcpy( payload + len, plane, bytes );
+	veejay_memcpy( dst + len, plane, bytes );
 	return (len + bytes);
 }
 int			packet_put_data(packet_header_t *h, frame_info_t *i , void *payload, const uint8_t *plane )

@@ -891,9 +891,9 @@ static int		viewport_configure(
 	}
 	else
 	{
-		matrix_t *tmp = viewport_matrix();
-		matrix_t *im = viewport_invert_matrix( m, tmp );
-		free(tmp);
+		matrix_t *mtmp = viewport_matrix();
+		matrix_t *im = viewport_invert_matrix( m, mtmp );
+		free(mtmp);
 		if(!im)
 		{
 			free(m);
@@ -1581,10 +1581,6 @@ void	viewport_set_initial_active( void *vv, int status )
 {
 	viewport_t *v = (viewport_t*) vv;
 	v->initial_active = status;
-}
-
-void	empireoftheclouds()
-{
 }
 
 void	*viewport_get_configuration(void *vv, char *filename )

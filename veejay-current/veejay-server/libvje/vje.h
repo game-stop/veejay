@@ -84,7 +84,7 @@ typedef struct {
 #define FLAG_ALPHA_IN_BLEND (1<<6) /* blend operator */
 
 typedef struct vj_effect_t {
-	char *description;			
+	const char *description;			
 	int num_params;			
 	char **param_description;
 	vj_value_hint_t **hints;
@@ -140,4 +140,5 @@ extern int vj_effect_is_plugin( int fx_id );
 extern void	*vj_effect_get_data( int seq_id );
 extern int vj_effect_is_parallel(int effect_id);
 extern int vj_effect_get_info( int effect_id, int *is_mixer, int *n_params );
+extern int vj_effect_get_static_bg(int effect_id);
 #endif

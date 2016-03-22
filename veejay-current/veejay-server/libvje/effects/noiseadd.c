@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -69,7 +69,7 @@ void noiseadd_free() {
   Yb_frame = NULL;
 }
 
-void noiseblur1x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
+static void noiseblur1x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
 
     int r, c;
     double k = (coeef/100.0);
@@ -94,7 +94,8 @@ void noiseblur1x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) 
 	}
 
 }
-void noiseblur3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
+
+static void noiseblur3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
 
     int r, c;
     const double k = (coeef/1000.0);
@@ -127,7 +128,7 @@ void noiseblur3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) 
 
 }
 
-void noiseneg3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
+static void noiseneg3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
 
     int r, c;
     const double k = (coeef/1000.0);
@@ -160,7 +161,7 @@ void noiseneg3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
 
 }
 
-void noiseadd3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
+static void noiseadd3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
 
     int r, c;
     const double k = (coeef/1000.0);
@@ -192,7 +193,6 @@ void noiseadd3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
 	}
 
 }
-
 
 void noiseadd_apply( VJFrame *frame, int width, int height, int type, int coeef) {
 

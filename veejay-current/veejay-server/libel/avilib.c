@@ -2520,7 +2520,6 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
       }
       else if(strncasecmp((char*)hdrl_data+i,"indx",4) == 0) {
 	 unsigned char *a;
-	 int j;
 
 	 if(lasttag == 1) // V I D E O
 	 { 
@@ -2765,7 +2764,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
    // read extended index chunks
    if (AVI->is_opendml) {
       uint64_t offset = 0;
-      int hdrl_len = 4+4+2+1+1+4+4+8+4;
+      hdrl_len = 4+4+2+1+1+4+4+8+4;
       unsigned char *en, *chunk_start;
       int k = 0, audtr = 0;
       uint32_t nrEntries = 0;

@@ -85,6 +85,8 @@ typedef UINT32 uint32_t;
 #define MAX(a,b) ((a) < (b) ? (b) : (a))
 #endif
 
+#include <ctmf/ctmf.h>
+
 /**
  * This structure represents a two-tier histogram. The first tier (known as the
  * "coarse" level) is 4 bit wide and the second tier (known as the "fine" level)

@@ -31,7 +31,7 @@ typedef void vevo_port_t;
 #endif
 
 
-int		vevo_property_num_elements( vevo_port_t *p, const char *key);
+int	vevo_property_num_elements( vevo_port_t *p, const char *key);
 
 int 	vevo_property_atom_type( vevo_port_t *p, const char *key);
 
@@ -39,10 +39,10 @@ size_t 	vevo_property_element_size( vevo_port_t * p, const char *key, const int 
 
 #ifdef STRICT_CHECKING
 vevo_port_t *vevo_port_new( int port_type, const char *func,const int line_no );
-void		 vevo_port_free( vevo_port_t *port, const char *func, const int line_no );
+void	vevo_port_free( vevo_port_t *port, const char *func, const int line_no );
 #else
 vevo_port_t *vevo_port_new(int port_type);
-void		 vevo_port_free( vevo_port_t *port );
+void	vevo_port_free( vevo_port_t *port );
 #endif
 
 #ifdef STRICT_CHECKING
@@ -120,6 +120,12 @@ int	vevo_property_softref( void *port, const char *key );
 int	vevo_port_get_total_size( vevo_port_t *port );
 
 char	**vevo_property_get_string_arr( vevo_port_t *p, const char *key );
+
+int	vv_property_get(vevo_port_t * p, uint64_t hash_key, int idx, void *dst);
+
+int	vv_property_set(vevo_port_t * p, uint64_t hash_key, int atom_type, int num_elements, void *src );
+
+int	vevo_num_properties(vevo_port_t * p);
 
 #define VEVO_ATOM_TYPE_FUNCPTR	11
 #define	VEVO_ATOM_TYPE_VOIDPTR	65

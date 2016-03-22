@@ -195,7 +195,7 @@ int vj_yuv_stream_header_pipe(vj_yuv *yuv4mpeg,VJFrame *frame)
     return 0;	
 }
 
-void	*y4m_writer_thread( void *data )
+static void	*y4m_writer_thread( void *data )
 {
 	vj_yuv *y4m = (vj_yuv*)data;
 

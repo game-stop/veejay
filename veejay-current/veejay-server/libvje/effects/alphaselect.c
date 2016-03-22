@@ -25,36 +25,36 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "rgbkey.h"
 #include <math.h>
 #include "common.h"
+#include "alphaselect.h"
 
 vj_effect *alphaselect_init(int w, int h)
 {
-    vj_effect *ve;
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 4500;	/* angle */
-    ve->defaults[1] = 255;	/* r */
-    ve->defaults[2] = 0;	/* g */
-    ve->defaults[3] = 0;	/* b */
+	vj_effect *ve;
+	ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 6;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->defaults[0] = 4500;	/* angle */
+	ve->defaults[1] = 255;	/* r */
+	ve->defaults[2] = 0;	/* g */
+	ve->defaults[3] = 0;	/* b */
 	ve->defaults[4] = 0;	/* swap */
 	ve->defaults[5] = 0;	/* to alpha */
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 9000;
+	ve->limits[0][0] = 1;
+	ve->limits[1][0] = 9000;
 
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 255;
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] = 255;
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 255;
+	ve->limits[0][2] = 0;
+	ve->limits[1][2] = 255;
 
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 255;
+	ve->limits[0][3] = 0;
+	ve->limits[1][3] = 255;
 
 	ve->limits[0][4] = 0;
 	ve->limits[1][4] = 1;
@@ -63,17 +63,17 @@ vj_effect *alphaselect_init(int w, int h)
 	ve->limits[1][5] = 1;
 
 	ve->has_user = 0;
-    ve->parallel = 1;
+	ve->parallel = 1;
 	ve->description = "Alpha: Set by chroma key";
-    ve->extra_frame = 0;
-    ve->sub_format = 1;
-    ve->rgb_conv = 1;
+	ve->extra_frame = 0;
+	ve->sub_format = 1;
+	ve->rgb_conv = 1;
 
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_SRC_A;
 
 	ve->param_description = vje_build_param_list(ve->num_params,"Angle","Red","Green","Blue", "Invert", "To Alpha");
 
-    return ve;
+	return ve;
 }
 
 void alphaselect_apply( VJFrame *frame, int width,

@@ -49,7 +49,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <libel/pixbuf.h>
 #include <libqrwrap/vlogo.h>
-
+#include <libqrwrap/qrwrapper.h>
 static int	qrcode_open(const char *filename, const char *data, const int len);
 
 #ifdef HAVE_QRENCODE

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -124,7 +124,6 @@ void swirl_apply(VJFrame *frame, int w, int h, int v)
              //const double coeef = R / log(curve * R + 1);
                 //const double coeef = R / log( curve * R + 2);
              /* pre calculate */
-                unsigned int i;  
                 int px,py;
                 double r,a;
 		double si,co;	

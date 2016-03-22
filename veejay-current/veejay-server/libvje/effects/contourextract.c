@@ -20,18 +20,17 @@
  */
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "diff.h"
-#include "common.h"
-#include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
+#include <libvjmem/vjmem.h>
+#include <libvje/vje.h>
 #include <libavutil/avutil.h>
-#include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-msg.h>
 #include <libyuv/yuvconv.h>
-
+#include "common.h"
 #include "softblur.h"
+#include "diff.h"
+#include "contourextract.h"
+
 static uint8_t *static_bg = NULL;
 static int take_bg_ = 0;
 static uint32_t *dt_map = NULL;

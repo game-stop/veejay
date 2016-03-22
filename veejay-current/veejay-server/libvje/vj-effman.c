@@ -33,7 +33,7 @@ extern vj_effect *vj_effects[];
 #define VEVO_PLUG_FF            0x00ff
 #define VEVO_PLUG_FR            0xffbb
 
-void vj_effman_apply_plug_effect(
+static void vj_effman_apply_plug_effect(
 	VJFrame **frames,
 	VJFrameInfo *frameinfo,
 	vjp_kf *todo_info,
@@ -70,7 +70,7 @@ void vj_effman_apply_plug_effect(
 	plug_process( instance, (double) frameinfo->timecode );
 }
 
-void vj_effman_apply_image_effect(
+static void vj_effman_apply_image_effect(
 	VJFrame **frames,
 	vjp_kf *todo_info,
 	int *arg,
@@ -395,7 +395,7 @@ void vj_effman_apply_image_effect(
 	break;
 	case VJ_IMAGE_EFFECT_CONTOUR:
 	contourextract_apply( vj_effects[entry]->user_data, frames[0],
-			frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
+			frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5] );	
 	break;
      case VJ_IMAGE_EFFECT_SLICE:
 	if(arg[2] > 0) { 
@@ -453,7 +453,7 @@ void vj_effman_apply_image_effect(
    }
 }
 
-void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg, int entry, int e) {
+static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg, int entry, int e) {
 
     switch(e) {
 	case VJ_VIDEO_EFFECT_CHAMBLEND:

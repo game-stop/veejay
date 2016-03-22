@@ -394,7 +394,7 @@ static struct {
 };
 #endif
 
-int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,
+static int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,
 		    char norm, int palette,int pixfmt, int freq, int channel, int has_composite, int driver)
 {
 	char refname[100];
@@ -455,7 +455,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 }
 
 #ifdef USE_GDK_PIXBUF
-int _vj_tag_new_picture( vj_tag *tag, int stream_nr, int width, int height, float fps)
+static int _vj_tag_new_picture( vj_tag *tag, int stream_nr, int width, int height, float fps)
 {
 	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
 	vj_picture *p =	NULL;
@@ -658,7 +658,7 @@ CALIREADERR:
 	return 0;
 }
 
-int	_vj_tag_new_cali( vj_tag *tag, int stream_nr, int w, int h )
+static int	_vj_tag_new_cali( vj_tag *tag, int stream_nr, int w, int h )
 {
 	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
 	
@@ -1302,10 +1302,10 @@ int vj_tag_del(int id)
 #endif
 	case VJ_TAG_TYPE_CALI:
 		{
-		cali_tag_t *pic = (cali_tag_t*) vj_tag_input->cali[tag->index];
-		if(pic) {
-			if(pic->lf) free(pic->data);
-			free(pic);
+		cali_tag_t *calpic = (cali_tag_t*) vj_tag_input->cali[tag->index];
+		if(calpic) {
+			if(calpic->lf) free(calpic->data);
+			free(calpic);
 		}
 		vj_tag_input->cali[tag->index] = NULL;
 		}
@@ -2171,7 +2171,6 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 		if(vj_effect_initialized( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance ))
 		{
 			if(!vj_effect_is_plugin( tag->effect_chain[position]->effect_id )) {
-				int i = 0;
 				int frm = 1;
 				for( i =0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
 					if( i == position )
@@ -2207,7 +2206,6 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot activate FX %d", effect_id );
 			tag->effect_chain[position]->effect_id = -1;
 			tag->effect_chain[position]->e_flag = 1;
-			int i;
 			for( i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) 
 				tag->effect_chain[position]->arg[i] = 0;
 
@@ -3125,7 +3123,6 @@ static	void	whiteframe_new(uint8_t *buf, int w, int h, int uv_len, uint8_t *Y, u
 		ctmf( Y, ptr, w,h,w,w,median_radius,1,512*1024);
 		ctmf( U, ptr + (w*h),w/2,h,w/2,w/2,median_radius,1,512*1024);
 		ctmf( V, ptr + (w*h)+uv_len,w/2,h,w/2,w/2,median_radius,1,512*1024);
-		int i;
 		for(i = 0; i < (w*h); i ++ ) {
 			tag->lf[i] = 0.0f + (double) ptr[i] - bf[i];
 			mean_of_y += tag->lf[i];
@@ -3508,7 +3505,6 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 	{
 	case VJ_TAG_TYPE_V4L:
 		if( tag->capture_type == 1 ) {
-			int res = 0;
 #ifdef HAVE_V4L
 			res = v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
 #endif

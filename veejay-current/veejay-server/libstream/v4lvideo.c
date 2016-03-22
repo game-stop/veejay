@@ -36,7 +36,6 @@
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
-#include <libstream/frequencies.h>
 #include <time.h>
 #include <string.h>
 #include <libavutil/avutil.h>

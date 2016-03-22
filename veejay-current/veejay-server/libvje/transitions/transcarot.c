@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -57,7 +57,8 @@ vj_effect *transcarot_init(int width, int height)
     ve->extra_frame = 1;
     return ve;
 }
-void transcarot1_apply( VJFrame *frame, VJFrame *frame2, int width,
+
+static void transcarot1_apply( VJFrame *frame, VJFrame *frame2, int width,
 		       int height, int point_size, int dy, int dye,
 		       int row_start, int opacity)
 {
@@ -142,7 +143,7 @@ void transcarot1_apply( VJFrame *frame, VJFrame *frame2, int width,
 }
 
 /* carot transistion. like translate, but different form and with mirroring */
-void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int width,
+static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int width,
 		       int height, int point_size, int dy, int dye,
 		       int row_start, int opacity)
 {
@@ -269,4 +270,3 @@ void transcarot_apply( VJFrame *frame, VJFrame *frame2, int width,
 	transcarot2_apply(frame, frame2, width, height, p, dy, dye, row,
 			  opacity);
 }
-void transcarot_free(){}

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -101,20 +101,6 @@ void	uvcorrect_free()
 {
 	if(chrominance) free(chrominance);
 	chrominance= NULL;
-}
-
-void	uvcorrect_help() 
-{
-	/*veejay_msg(1,  "UV Correct (portion of yuvcorrect by Xavier Biquard");
-	veejay_msg(1,  "Select a color and set a new chroma value for the entire selection");
-	veejay_msg(1,  "one or both of the parameters p4 and p5");
-	veejay_msg(1,  "p0 = UV rotation angle");
-	veejay_msg(1,  "p1 = U rotate center");
-	veejay_msg(1,  "p2 = V rotate center");
-	veejay_msg(1,  "p3 = U factor");
-	veejay_msg(1,  "p4 = V factor");
-	veejay_msg(1,  "p5 = UV min");
-	veejay_msg(1,  "p6 = UV max"); */
 }
 
 static inline void _chrominance_treatment(uint8_t *u,uint8_t *v, const int len)
