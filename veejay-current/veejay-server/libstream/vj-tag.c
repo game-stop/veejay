@@ -44,10 +44,6 @@
 #include <libvje/internal.h>
 #include <libvje/ctmf/ctmf.h>
 #include <libstream/vj-net.h>
-#ifdef HAVE_V4L
-#include <linux/videodev.h>
-#include <libstream/v4lvideo.h>
-#endif
 #include <pthread.h>
 #ifdef HAVE_V4L2
 #include <libstream/v4l2utils.h>
@@ -228,10 +224,10 @@ int vj_tag_put(vj_tag * tag)
 
 int	vj_tag_num_devices()
 {
-#ifdef HAVE_V4L
-	return v4lvideo_templ_num_devices();
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 	return v4l2_num_devices();
+#else
+	return 0;
 #endif
 }
 
@@ -241,9 +237,7 @@ char *vj_tag_scan_devices( void )
 	int i;
 	int len = 0;
 	char **device_list = NULL;
-#ifdef HAVE_V4L
-	device_list = v4lvideo_templ_get_devices(&num);
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 	device_list = v4l2_get_device_list();
 #endif
 	if(device_list==NULL)
@@ -319,10 +313,6 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 	veejay_memset( tag_cache,0,sizeof(tag_cache));
 	veejay_memset( avail_tag, 0, sizeof(avail_tag));
 
-#ifdef HAVE_V4L 
-	v4lvideo_templ_init();
-#endif
-
 	char *v4l2threading = getenv( "VEEJAY_V4L2_NO_THREADING" );
 	if( v4l2threading ) {
 		no_v4l2_threads_ = atoi(v4l2threading);
@@ -382,17 +372,6 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 
 	return 1;
 }
-#ifdef HAVE_V4L
-static struct {
-	const char *name;
-} video_norm_[] = 
-{
-	{"pal"},
-	{"ntsc"},
-	{"auto"},
-	{NULL}
-};
-#endif
 
 static int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,
 		    char norm, int palette,int pixfmt, int freq, int channel, int has_composite, int driver)
@@ -404,36 +383,11 @@ static int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int heigh
 	}
 	
 	snprintf(refname,sizeof(refname), "/dev/video%d",device_num ); // freq->device_num
-#ifdef HAVE_V4L
-	const char *selected_video_norm = video_norm_[2].name
-	switch(norm) {
-		case 'P':
-		case 'p':
-			selected_video_norm = video_norm_[0].name; break;
-		case 'n': case 'N':	
-			selected_video_norm = video_norm_[1].name; break;
-		default:
-			break;//auto
-	}
-#endif
-	
 	tag->capture_type = driver;
 	veejay_msg(VEEJAY_MSG_INFO, "Open capture device with %s",
 	  ( driver == 1 ? "v4l[x]"  : "Unicap" ) );
 	if( tag->capture_type == 1 )  {
-#ifdef HAVE_V4L
-   		vj_tag_input->unicap[stream_nr] = v4lvideo_init( refname, channel, 
-			v4lvideo_templ_get_norm( selected_video_norm ),
-			freq,
-			width, height, palette );
-		if( vj_tag_input->unicap[stream_nr] == NULL ) {
-			veejay_msg(0, "Unable to open device %s", refname );
-			return 0;
-		}
-		snprintf(refname,sizeof(refname) "%d",channel );
-		tag->extra = strdup(refname);
-		veejay_msg(VEEJAY_MSG_DEBUG, "Using V4lutils from EffecTV");
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 		if(  no_v4l2_threads_ ) {
 			vj_tag_input->unicap[stream_nr] = v4l2open( refname, channel, palette,width,height,
 				_tag_info->dummy->fps,_tag_info->dummy->norm );
@@ -447,6 +401,8 @@ static int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int heigh
 		}
 		snprintf(refname,sizeof(refname), "%d", channel );
 		tag->extra = strdup(refname);
+#else
+		veejay_msg(0,"No support for video capture built-in");
 #endif
 		return 1;
 	} 
@@ -948,9 +904,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
 	    tag->priv = net_threader(_tag_info->effect_frame1);
 
-#ifdef HAVE_V4L
-	palette = v4lvideo_templ_get_palette( pix_fmt );
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 	palette = get_ffmpeg_pixfmt( pix_fmt );
 #endif
     switch (type) {
@@ -1260,12 +1214,10 @@ int vj_tag_del(int id)
 		if(tag->capture_type==1) { 
 #ifdef HAVE_V4L2
 			if( no_v4l2_threads_ ) {
-				v4l2_close( vj_tag_input->unicap[tag->index]);
+			v4l2_close( vj_tag_input->unicap[tag->index]);
 			} else {
 				v4l2_thread_stop( v4l2_thread_info_get(vj_tag_input->unicap[tag->index]));
 			}
-#elif HAVE_V4L2
-			v4lvideo_destroy( vj_tag_input->unicap[tag->index] );
 #endif
 		}
 		if(tag->blackframe)free(tag->blackframe);
@@ -1837,8 +1789,6 @@ int vj_tag_set_brightness(int t1, int value)
 		if(tag->capture_type==1) {
 #ifdef HAVE_V4L2
 			v4l2_set_brightness( vj_tag_input->unicap[tag->index],value);
-#elif HAVE_V4L
-			v4lvideo_set_brightness( vj_tag_input->unicap[tag->index], value );
 #endif
 		}
 	}
@@ -1856,9 +1806,7 @@ int vj_tag_set_white(int t1, int value)
 	else
 	{
 		if(tag->capture_type==1) {
-#ifdef HAVE_V4L
-			v4lvideo_set_white( vj_tag_input->unicap[tag->index],value );
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 			v4l2_set_gamma( vj_tag_input->unicap[tag->index],value);
 #endif
 		}				
@@ -1876,9 +1824,7 @@ int vj_tag_set_hue(int t1, int value)
 		return -1;
 	}
 	if( tag->capture_type==1) {
-#ifdef HAVE_V4L
-		v4lvideo_set_hue( vj_tag_input->unicap[tag->index], value ); 
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 		v4l2_set_hue( vj_tag_input->unicap[tag->index],value ); 	
 #endif
 	}
@@ -1896,9 +1842,7 @@ int vj_tag_set_contrast(int t1,int value)
 	else
 	{
 		if(tag->capture_type==1) {
-#ifdef HAVE_V4L
-			v4lvideo_set_contrast( vj_tag_input->unicap[tag->index], value );
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 			v4l2_set_contrast( vj_tag_input->unicap[tag->index], value );
 #endif
 		}
@@ -1918,11 +1862,10 @@ int vj_tag_set_color(int t1, int value)
 	else
 	{
 		if(tag->capture_type==1) {
-#ifdef HAVE_V4L
-			v4lvideo_set_colour( vj_tag_input->unicap[tag->index], value );
-#elif HAVE_V4L2
-			return -1;
+#ifdef HAVE_V4L2
+			v4l2_set_whiteness( vj_tag_input->unicap[tag->index], value );
 #endif
+			return -1;
 		}
 	}
 	return 1;
@@ -1939,23 +1882,12 @@ int	vj_tag_get_v4l_properties(int t1, int *values )
 	}
 	
 	if(tag->capture_type == 1 ) {
-#ifdef HAVE_V4L
-		int i;
-		for( i = 0; i < 21; i ++ )
-			values[i] = -1;
-
-		values[0]  = v4lvideo_get_brightness(  vj_tag_input->unicap[tag->index] );
-		values[1]  = v4lvideo_get_contrast( vj_tag_input->unicap[tag->index] );
-		values[2]  = v4lvideo_get_hue( vj_tag_input->unicap[tag->index] );
-		values[3]  = v4lvideo_get_colour( vj_tag_input->unicap[tag->index] );
-		values[13]  = v4lvideo_get_white( vj_tag_input->unicap[tag->index] );
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 		values[0] = v4l2_get_brightness(  vj_tag_input->unicap[tag->index] );
 		values[1] = v4l2_get_contrast( vj_tag_input->unicap[tag->index] );
 		values[2] = v4l2_get_hue( vj_tag_input->unicap[tag->index] );
 		values[3] = v4l2_get_saturation( vj_tag_input->unicap[tag->index] );
 		values[4] = v4l2_get_temperature( vj_tag_input->unicap[tag->index] );
-#endif
 		values[5] = v4l2_get_gamma( vj_tag_input->unicap[tag->index] );
 		values[6] = v4l2_get_sharpness( vj_tag_input->unicap[tag->index] );
 		values[7] = v4l2_get_gain( vj_tag_input->unicap[tag->index] );
@@ -1967,12 +1899,13 @@ int	vj_tag_get_v4l_properties(int t1, int *values )
 		values[13]= v4l2_get_whiteness( vj_tag_input->unicap[tag->index] );
 		values[14]= v4l2_get_black_level( vj_tag_input->unicap[tag->index]);
 		values[15]= v4l2_get_exposure(vj_tag_input->unicap[tag->index] );
-	    values[16]= v4l2_get_auto_white_balance( vj_tag_input->unicap[tag->index] );
+	    	values[16]= v4l2_get_auto_white_balance( vj_tag_input->unicap[tag->index] );
 		values[17]= v4l2_get_autogain( vj_tag_input->unicap[tag->index] );
 		values[18]= v4l2_get_hue_auto(vj_tag_input->unicap[tag->index] );
 		values[19]= v4l2_get_hflip(vj_tag_input->unicap[tag->index] );
 		values[20]= v4l2_get_vflip(vj_tag_input->unicap[tag->index]);	
 		return 1;
+#endif
 	}
 
 	return 0;
@@ -2458,12 +2391,7 @@ int vj_tag_disable(int t1) {
 	}
 	if(tag->source_type == VJ_TAG_TYPE_V4L )
 	{
-#ifdef HAVE_V4L
-		if( tag->capture_type == 1 ) {
-			if(v4lvideo_is_active(vj_tag_input->unicap[tag->index] ) )
-				v4lvideo_set_paused( vj_tag_input->unicap[tag->index] , 1 );
-		}
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 		if(tag->capture_type==1) {
 			if( no_v4l2_threads_ ) {
 				v4l2_set_status( vj_tag_input->unicap[tag->index],1);
@@ -2472,7 +2400,6 @@ int vj_tag_disable(int t1) {
 			}
 		}
 #endif
-
 	}
 
 #ifdef USE_GDK_PIXBUF
@@ -2495,21 +2422,7 @@ int vj_tag_enable(int t1) {
 	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
 		if(tag->capture_type == 1 ) {
-#ifdef HAVE_V4L
-			if(!v4lvideo_is_active(  vj_tag_input->unicap[tag->index] ) ) {
-				if(v4lvideo_grabstart(  vj_tag_input->unicap[tag->index] ) == 0 )
-				{
-					tag->active = 1;
-					veejay_msg(VEEJAY_MSG_INFO,"Started continues capturing");
-				} else {
-					veejay_msg(VEEJAY_MSG_ERROR, "Failed to start grabbing.");
-				}
-			} else {
-				if(v4lvideo_is_paused( vj_tag_input->unicap[tag->index] ) )
-					v4lvideo_set_paused( vj_tag_input->unicap[tag->index],0);
-				tag->active = 1;
-			}
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 			if( no_v4l2_threads_ ) {
 				v4l2_set_status( vj_tag_input->unicap[tag->index],1);
 			} else {
@@ -2572,26 +2485,7 @@ int vj_tag_set_active(int t1, int active)
 	   case VJ_TAG_TYPE_V4L:
 
 		if(tag->capture_type == 1 ) {
-#ifdef HAVE_V4L
-			if(active) {
-			     if( !v4lvideo_is_active( vj_tag_input->unicap[tag->index] ) ) {
-					if(v4lvideo_grabstart( vj_tag_input->unicap[tag->index] ) < 0 ) {
-						active = 1;
-						veejay_msg(VEEJAY_MSG_INFO, "Started grabbing ");
-					} else {
-						veejay_msg(VEEJAY_MSG_ERROR, "Unable to start grabbing.");
-						active = 0;
-					}
-			     } else {
-				if( v4lvideo_is_paused( vj_tag_input->unicap[tag->index] )  )
-					v4lvideo_set_paused( vj_tag_input->unicap[tag->index], 0 );
-				}
-			}
-			else {
-				if( !v4lvideo_is_paused( vj_tag_input->unicap[tag->index] )  )
-					v4lvideo_set_paused( vj_tag_input->unicap[tag->index], 1 );
-			}
-#elif HAVE_V4L2
+#ifdef HAVE_V4L2
 			if( no_v4l2_threads_ ) {
 				v4l2_set_status( vj_tag_input->unicap[tag->index],1);
 
@@ -3505,10 +3399,6 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 	{
 	case VJ_TAG_TYPE_V4L:
 		if( tag->capture_type == 1 ) {
-#ifdef HAVE_V4L
-			res = v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
-#endif
-
 #ifdef HAVE_V4L2
 			if( no_v4l2_threads_ ) {
 			 res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]) );

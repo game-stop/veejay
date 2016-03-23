@@ -160,9 +160,6 @@ static void CompiledWith()
 #ifdef HAVE_LIBPTHREAD
 	fprintf(stdout,"\tSupport for Multithreading\n");
 #endif
-#ifdef HAVE_V4L
-	fprintf(stdout,"\tSupport for Capture Devices\n");
-#endif
 #ifdef HAVE_V4L2
 	fprintf(stdout, "\tSupport for Capture Devices\n");
 #endif

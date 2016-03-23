@@ -140,7 +140,7 @@ static void	veejay_schedule_fifo( veejay_t *info, int pid );
 #include <veejay/vj-dfb.h>
 #endif
 
-#ifdef HAVE_V4L
+#ifdef HAVE_V4L2
 #include <libstream/vj-vloopback.h>
 #endif
 

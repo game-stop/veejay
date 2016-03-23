@@ -173,7 +173,6 @@ dnl	[])
 dnl *********************************************************************
 dnl Test whether we're linux or not. If so, define HAVE_V4L and build the
 dnl video4linux/hardware dependent tools. Else, undefine HAVE_V4L
-have_v4l=false
 have_v4l2=false
 have_linux=false
 have_darwin=false
@@ -241,17 +240,6 @@ if test "x$enable_portleak" = "xyes"; then
 else
  AC_MSG_RESULT([no])
 fi
-
-if test "x$with_v4l2" != "xno" ; then
-	with_v4l=no
-fi
-
-
-if test "x$enable_v4l1" = "xyes" ; then
-	 with_v4l2=no
-	 with_v4l=yes
-fi
-
 
 dnl ********************************************************************
 dnl Test for MMX support if an IA32 platform.  If on a PPC then look for
@@ -709,8 +697,6 @@ AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
 AC_MSG_CHECKING(for Xinerama support on XFree86)
 AC_MSG_RESULT($use_xinerama)	
 
-AC_MSG_CHECKING(for video4linux support)
-AC_MSG_RESULT( $with_v4l )
 AC_MSG_CHECKING(for video4linux II support)
 AC_MSG_RESULT( $with_v4l2 )
 
@@ -722,25 +708,10 @@ if test x$with_v4l2 != xno ; then
 	  if test x$with_v4l2 != xno; then
                    AC_DEFINE(HAVE_V4L2, 1,
 		             [Building for Linux - using the video4linux2 API])
-				   have_v4l=false
 				   with_v4l=no
 			fi
 			],
                   [AC_MSG_ERROR([videodev2.h not found - please install the linux kernel headers or try configure with --enable-v4l1])])
-          fi
-fi
-
-if test x$with_v4l != xno ; then
-  if test x$have_linux != xfalse ; then
-
-	  AC_CHECK_HEADER(linux/videodev.h,
-                  [have_v4l=true
-	  if test x$with_v4l != xno; then
-                   AC_DEFINE(HAVE_V4L, 1,
-		             [Building for Linux - using the video4linux API])
-			fi
-			],
-                  [AC_MSG_ERROR([videodev.h not found - please install the linux kernel headers])])
           fi
 fi
 
@@ -1070,7 +1041,6 @@ AM_CONDITIONAL(HAVE_XML2, test x$have_xml2 = xtrue)
 AM_CONDITIONAL(HAVE_JACK, test x$have_jack = xtrue)
 AM_CONDITIONAL(HAVE_DIRECTFB, test x$have_directfb = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
-AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
 AM_CONDITIONAL(HAVE_V4L2, test x$have_V4l2 = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
@@ -1278,7 +1248,6 @@ AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
-AC_MSG_NOTICE([  - V4L1 (obsolete)               : ${have_v4l}])
 AC_MSG_NOTICE([  - libunwind                     : ${have_unwind}])
 AC_MSG_NOTICE([  - QR code support (libqrencode) : ${have_qrencode}])
 

@@ -41,9 +41,6 @@
 #include <errno.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#ifdef HAVE_V4L
-#include <linux/videodev.h>
-#endif
 #ifdef HAVE_V4L2
 #include <linux/videodev2.h>
 #include <libstream/v4l2utils.h>
@@ -104,9 +101,6 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 	switch(pixel_format) {
 		case FMT_420:
 		case FMT_420F:
-#ifdef HAVE_V4L
-			v->palette = VIDEO_PALETTE_YUV420P; 
-#endif
 #ifdef HAVE_V4L2
 			v->palette = V4L2_PIX_FMT_YUV420;
 #endif
@@ -116,9 +110,6 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 			break;
 		case FMT_422:
 		case FMT_422F:
-#ifdef HAVE_V4L
-			v->palette = VIDEO_PALETTE_YUV422P;
-#endif
 #ifdef HAVE_V4L2
 			v->palette = V4L2_PIX_FMT_YUV422P;
 #endif
@@ -126,9 +117,6 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using V4L2_PIX_FMT_YUV422P");
 			break;
 		default:
-#ifdef HAVE_V4L
-			v->palette = VIDEO_PALETTE_PLANAR; 
-#endif
 #ifdef HAVE_V4L2
 			v->palette = V4L2_PIX_FMT_BGR24;
 #endif
@@ -176,48 +164,6 @@ int	vj_vloopback_start_pipe( void *vloop )
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_LOOPBACK_DEBUG=[0|1] not set");
 	}
 
-#ifdef HAVE_V4L
-	struct video_capability caps;
-	struct video_window	win;
-	struct video_picture 	pic;
-
-	memset( &win , 0 , sizeof(struct video_window));
-	memset( &caps, 0 , sizeof(struct video_capability));
-	memset( &pic, 0, sizeof(struct video_picture));
-	
-
-	/* the out_palette defines what format ! */
-
-	/* get capabilities */
-	if( ioctl( v->fd, VIDIOCGCAP, &caps ) < 0 )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Cant get video capabilities: %s", strerror(errno));
-		return 0;
-	}
-	/* get picture */
-	if( ioctl( v->fd, VIDIOCGPICT, &pic ) < 0 )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Cant get video picture: %s", strerror(errno));
-		return 0;
-	}
-	/* set palette */
-	pic.palette = v->palette;
-	if( ioctl( v->fd, VIDIOCSPICT, &pic ) < 0 )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Cant set video picture (palette %d)",v->palette);
-		return 0;
-	}
-	/* set window */
-	win.width  = v->width;
-	win.height = v->height;
-	if( ioctl( v->fd, VIDIOCSWIN, &win ) < 0 )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG ,"Cant set video window %d x %d",
-			v->width,v->height );
-		return 0;
-	}
-
-#endif
 #ifdef HAVE_V4L2
 	struct v4l2_capability caps;
 	struct v4l2_format format;
