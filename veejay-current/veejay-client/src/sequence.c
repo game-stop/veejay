@@ -177,14 +177,14 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	{
 		if( n == -1 && v->is_master)
 			reloaded_schedule_restart();
-		veejay_msg(0,"Reading header of %d bytes: %d", header_len,n );
+		veejay_msg(VEEJAY_MSG_ERROR,"Reading header of %d bytes: %d", header_len,n );
 		free(tmp);
 		return n;
 	}
 
 	if( sscanf( (char*)tmp, "%6d%1d", &len,&(v->grey_scale) )<=0)
 	{
-		veejay_msg(0, "Can't parse header (datastream polluted)");
+		veejay_msg(VEEJAY_MSG_ERROR, "Can't parse header (datastream polluted)");
 		free(tmp);
 		return 0;
 	}
@@ -192,7 +192,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	if( len <= 0 )
 	{
 		free(tmp);
-		veejay_msg(0, "Frame is empty");
+		veejay_msg(VEEJAY_MSG_ERROR, "Frame is empty");
 		return 0;
 	}
 	
@@ -209,7 +209,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		{
 			if( n == -1 && v->is_master )
 				reloaded_schedule_restart();
-			veejay_msg(0, "Received %d out of %d bytes", bw,len);
+			veejay_msg(VEEJAY_MSG_ERROR, "Received %d out of %d bytes", bw,len);
 			free(tmp);
 			*payload = 0;
 			return n;
@@ -335,7 +335,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		}
 		
 		if( sscanf( (char*) status_len+1, "%03d", &bytes ) != 1 ) {
-			veejay_msg(0, "Invalid status message.");
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status message.");
 			bytes = 0;
 			reloaded_schedule_restart();
 			break;
@@ -452,7 +452,7 @@ static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 	int n = veejay_get_image_data( vp, v );
        
 	if(n == 0 ) {
-		veejay_msg(0, "No image data %d x %d" , v->width,v->height);
+		veejay_msg(VEEJAY_MSG_ERROR, "No image data %d x %d" , v->width,v->height);
 		//@ settle
 		fail_connection ++;
 		if( fail_connection > 2 ) {
@@ -1024,7 +1024,7 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
     	int ok = vj_client_connect( v->fd, v->hostname, NULL, v->port_num );
 		if( ok <= 0 )
 		{
-			veejay_msg(0, "VeejayGrabber: Unable to reconnect to %s, Destroying Track %d",
+			veejay_msg(VEEJAY_MSG_ERROR, "VeejayGrabber: Unable to reconnect to %s, Destroying Track %d",
 				(v->hostname ? v->hostname : "<unknown>"),
 				track_num );
 			vj_client_free(v->fd);

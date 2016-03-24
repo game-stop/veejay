@@ -982,7 +982,7 @@ static void scan_devices( const char *name)
 		name_len = atoi( tmp );
 		if(name_len <=  0 )
 		{
-			veejay_msg(0, "Reading name of capture device: '%s'",ptr+offset );
+			veejay_msg(VEEJAY_MSG_ERROR, "Reading name of capture device: '%s'",ptr+offset );
 			return;
 		}
 		name = strndup( ptr + offset, name_len );
@@ -994,7 +994,7 @@ static void scan_devices( const char *name)
 		loc_len = atoi( tmp );
 		if( loc_len <= 0 )
 		{
-			veejay_msg(0, "Reading location of capture device");
+			veejay_msg(VEEJAY_MSG_ERROR, "Reading location of capture device");
 			return;
 		}
 		loca = strndup( ptr + offset, loc_len );
@@ -1032,7 +1032,7 @@ static void set_tooltip(const char *name, const char *text)
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w) {
 #ifdef STRICT_CHECKING
-		veejay_msg(0, "Widget '%s' not found",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
 #endif
 		return;
 	}
@@ -1447,7 +1447,7 @@ effect_constr* _effect_new( char *effect_line )
 			&(ec->min[p]), &(ec->max[p]),&(ec->defaults[p]),&len );
 		if( n <= 0 )
 		{
-			veejay_msg(0,"Parse error in FX list" );
+			veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX list" );
 			break;
 		}
 		ec->param_description[p] = (char*) vj_calloc(sizeof(char) * (len+1) );
@@ -1463,7 +1463,7 @@ effect_constr* _effect_new( char *effect_line )
 		int n = sscanf( effect_line + offset, "%03d", &hint_len );
 		if( n <= 0 )
 		{
-			veejay_msg(0,"Parse error in FX list hints");
+			veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX list hints");
 			break;
 		}
 
@@ -1479,7 +1479,7 @@ effect_constr* _effect_new( char *effect_line )
 			int value_hint = 0;
 			n = sscanf( effect_line + offset, "%03d", &value_hint );
 			if( n != 1) {
-				veejay_msg(0,"Parse error in FX list value hint");
+				veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX list value hint");
 				break;
 			}
 
@@ -2506,7 +2506,7 @@ static int get_nums(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name);
 	if(!w) {
-		veejay_msg(0, "No such widget (spin): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (spin): '%s'",name);
 		return 0;
 	}
 	return (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( w ) );
@@ -2528,7 +2528,7 @@ static void clear_textview_buffer(const char *name)
 {
 	GtkWidget *view = glade_xml_get_widget_( info->main_window, name );
 	if(!view) {
-		veejay_msg(0, "No such widget (textview): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (textview): '%s'",name);
 		return;
 	}
 	if(view)
@@ -2546,7 +2546,7 @@ static gchar *get_textview_buffer(const char *name)
 {
 	GtkWidget *view = glade_xml_get_widget_( info->main_window,name );
 	if(!view) {
-		veejay_msg(0, "No such widget (textview): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (textview): '%s'",name);
 		return NULL;
 	}
 	if(view)
@@ -2567,7 +2567,7 @@ static void set_textview_buffer(const char *name, gchar *utf8text)
 {
 	GtkWidget *view = glade_xml_get_widget_( info->main_window, name );
 	if(!view) {
-		veejay_msg(0, "No such widget (textview): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (textview): '%s'",name);
 		return;
 	}
 	if(view)
@@ -2582,7 +2582,7 @@ static gchar *get_text(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
 	if(!w) {
-		veejay_msg(0, "No such widget (text): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (text): '%s'",name);
 		return NULL;
 	}
 	return (gchar*) gtk_entry_get_text( GTK_ENTRY(w));
@@ -2592,7 +2592,7 @@ static void put_text(const char *name, char *text)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
 	if(!w) {
-		veejay_msg(0, "No such widget (text): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (text): '%s'",name);
 		return;
 	}
 	if(w)
@@ -2607,7 +2607,7 @@ int is_button_toggled(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name);
 	if(!w) {
-		veejay_msg(0, "No such widget (togglebutton): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (togglebutton): '%s'",name);
 		return 0;
 	}
 
@@ -2619,7 +2619,7 @@ static void set_toggle_button(const char *name, int status)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
 	if(!w) {
-		veejay_msg(0, "No such widget (togglebutton): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (togglebutton): '%s'",name);
 		return;
 	}
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), (status==1 ? TRUE: FALSE));
@@ -2631,7 +2631,7 @@ static void update_slider_gvalue(const char *name, gdouble value)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w) {
-		veejay_msg(0, "No such widget (slider): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (slider): '%s'",name);
 		return;
 	}
 	gtk_adjustment_set_value( GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), value );
@@ -2642,7 +2642,7 @@ static void update_slider_value(const char *name, gint value, gint scale)
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w)
 	{
-		veejay_msg(0, "No such widget (slider): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (slider): '%s'",name);
 		return;
 	}
 	gdouble gvalue;
@@ -2693,7 +2693,7 @@ static void update_spin_incr( const char *name, gdouble step, gdouble page )
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w) {
-		veejay_msg(0, "No such widget (spin): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (spin): '%s'",name);
 		return;
 	}
 #ifdef STRICT_CHECKING
@@ -2706,7 +2706,7 @@ static void update_spin_range(const char *name, gint min, gint max, gint val)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w) {
-		veejay_msg(0, "No such widget (spin): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (spin): '%s'",name);
 		return;
 	}
 
@@ -2734,7 +2734,7 @@ static void update_spin_value(const char *name, gint value )
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
 	if(!w) {
-		veejay_msg(0, "No such widget (spin): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (spin): '%s'",name);
 		return;
 	}
 #ifdef STRICT_CHECKING
@@ -2748,7 +2748,7 @@ static void update_slider_range(const char *name, gint min, gint max, gint value
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w) {
-		veejay_msg(0, "No such widget (slider): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (slider): '%s'",name);
 		return;
 	}
 	GtkRange *range = GTK_RANGE(w);
@@ -2774,7 +2774,7 @@ static void update_label_i(const char *name, int num, int prefix)
 	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
 	if(!label) {
-		veejay_msg(0, "No such widget (label): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (label): '%s'",name);
 		return;
 	}
 	char str[20];
@@ -2792,7 +2792,7 @@ static void update_label_f(const char *name, float val )
 	GtkWidget *label = glade_xml_get_widget_( info->main_window, name);
 	if(!label)
 	{
-		veejay_msg(0, "No such widget (label): '%s'",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No such widget (label): '%s'",name);
 		return;
 	}
 	char value[10];
@@ -2808,7 +2808,7 @@ static void update_label_str(const char *name, gchar *text)
 	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
 #ifdef STRICT_CHECKING
-	if(!label) veejay_msg(0, "No such widget (label): '%s'",name);
+	if(!label) veejay_msg(VEEJAY_MSG_ERROR, "No such widget (label): '%s'",name);
 	assert( label != NULL );
 #else
 	if(!label ||!text) return;
@@ -3468,7 +3468,7 @@ void reportbug ()
 					NULL,
 					NULL );
 	if( !ret ) {
-		veejay_msg(0, "Error executing bug report tool");
+		veejay_msg(VEEJAY_MSG_ERROR, "Error executing bug report tool");
 		return;
 	}
 
@@ -3544,7 +3544,7 @@ gboolean cali_sources_selection_func (GtkTreeSelection *selection,
 
 		if( info->uc.cali_stage != 0 )
 		{
-			veejay_msg(0, "%d", info->uc.cali_stage);
+			veejay_msg(VEEJAY_MSG_ERROR, "%d", info->uc.cali_stage);
 			return TRUE;
 		}
 
@@ -3811,7 +3811,7 @@ static gint load_parameter_info()
 	char *ptr;
 	char *token = strtok_r( answer," ", &ptr );
 	if(!token) {
-		veejay_msg(0,"Invalid reply from %d", VIMS_CHAIN_GET_ENTRY );
+		veejay_msg(VEEJAY_MSG_ERROR,"Invalid reply from %d", VIMS_CHAIN_GET_ENTRY );
 		return 0;
 	}
 	p[i] = atoi(token);
@@ -4235,7 +4235,7 @@ int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_
 	int bank_page = find_bank_by_sample( sample_id, sample_type, &poke_slot );
 
 	if(bank_page == -1) {
-		veejay_msg(0, "No slot found for (%d,%d)",sample_id,sample_type);
+		veejay_msg(VEEJAY_MSG_ERROR, "No slot found for (%d,%d)",sample_id,sample_type);
 		return 0;
 	}
 
@@ -4320,7 +4320,7 @@ int get_and_draw_frame(int type, char *wid_name)
 {
 	GtkWidget *dstImage = glade_xml_get_widget( info->main_window, wid_name );
 	if(dstImage == 0 ) {
-		veejay_msg(0, "No widget '%s'",wid_name);
+		veejay_msg(VEEJAY_MSG_ERROR, "No widget '%s'",wid_name);
 		return 0;
 	}
 
@@ -4342,7 +4342,7 @@ int get_and_draw_frame(int type, char *wid_name)
 	int tlen = 0;
 	if( sscanf(buf,"%08d%06d%06d%06d%06d",&tlen, &len, &uvlen,&w,&h) != 5 ) {
 		free(buf);
-		veejay_msg(0,"Error reading calibration data header" );
+		veejay_msg(VEEJAY_MSG_ERROR,"Error reading calibration data header" );
 		return 0;
 	}
 
@@ -4354,7 +4354,7 @@ int get_and_draw_frame(int type, char *wid_name)
 		free(out);
 		free(srcbuf);
 		free(buf);
-		veejay_msg(0, "Error while receiving calibration image.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while receiving calibration image.");
 		return 0;
 	}
 
@@ -5687,7 +5687,7 @@ static void notebook_set_page(const char *name, int page)
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w)
 	{
-		veejay_msg(0, "Widget '%s' not found",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
 		return;
 	}
 	gtk_notebook_set_page( GTK_NOTEBOOK(w),	page );
@@ -5697,7 +5697,7 @@ static void hide_widget(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w) {
-		veejay_msg(0, "Widget '%s' not found",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
 		return;
 	}
 	gtk_widget_hide(w);
@@ -5708,7 +5708,7 @@ static void show_widget(const char *name)
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w)
 	{
-		veejay_msg(0, "Widget '%s' not found",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
 		return;
 	}
 	gtk_widget_show(w);
@@ -5720,7 +5720,7 @@ static void disable_widget_(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w) {
-		veejay_msg(0, "Widget '%s' not found",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
 		return;
 	}
 	gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
@@ -5731,7 +5731,7 @@ static void enable_widget_(const char *name)
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w)
 	{
-		veejay_msg(0, "Widget '%s' not found",name);
+		veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
 		return;
 	}
 	gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
@@ -5742,7 +5742,7 @@ static void disable_widget_(const char *name, const char *s, int line)
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w)
 	{
-		veejay_msg(0, "Widget '%s' not found, caller is %s:%d",name,s,line);
+		veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found, caller is %s:%d",name,s,line);
 		return;
 	}
 	gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
@@ -5753,7 +5753,7 @@ static void enable_widget_(const char *name, const char *s, int line)
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w)
 	{
-		veejay_msg(0, "Widget '%s' not found, caller is %s:%d",name,s,line);
+		veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found, caller is %s:%d",name,s,line);
 		return;
 	}
 	gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
@@ -5976,7 +5976,7 @@ void find_user_themes(int theme)
 	int n_files = scandir( theme_dir, &files, select_f, alphasort );
 	if( n_files <= 0 )
 	{
-		veejay_msg(0, "No themes found in %s", theme_dir );
+		veejay_msg(VEEJAY_MSG_ERROR, "No themes found in %s", theme_dir );
 		return;
 	}
 
@@ -6072,7 +6072,7 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterp
 	VJFrame *src1 = yuv_rgb_template( src_in, src_w, src_h, PIX_FMT_BGR24 );
 	VJFrame *dst1 = yuv_rgb_template( res_out, dst_w, dst_h, PIX_FMT_BGR24 );
 
-	veejay_msg(0, "%s: %dx%d -> %dx%d", __FUNCTION__, src_w,src_h,dst_w,dst_h );
+	veejay_msg(VEEJAY_MSG_ERROR, "%s: %dx%d -> %dx%d", __FUNCTION__, src_w,src_h,dst_w,dst_h );
 
 	yuv_convert_any_ac( src1,dst1, src1->format, dst1->format );
 
@@ -6127,7 +6127,7 @@ int gveejay_time_to_sync( void *ptr )
 			return 0;
 		}
 
-//veejay_msg(0 , "%d", (uspf - usec - 1000000 / 100 ) * 1000);
+//veejay_msg(VEEJAY_MSG_ERROR , "%d", (uspf - usec - 1000000 / 100 ) * 1000);
 		nsecsleep.tv_nsec = 3200000;
 //		nsecsleep.tv_nsec =(uspf - usec - 1000000 / 100 ) * 1000;
 		nsecsleep.tv_sec = 0;
@@ -6551,10 +6551,10 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 						default:
 							update_label_str( "current_step_label","Image calibrated. You may need to adjust brightness.");
 							gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
-							veejay_msg(0, "Warning, mem leak if not reset first.");
+							veejay_msg(VEEJAY_MSG_ERROR, "Warning, mem leak if not reset first.");
 							break;
 					}
-					veejay_msg(0, "Label update for case %d", info->uc.cali_stage);
+					veejay_msg(VEEJAY_MSG_ERROR, "Label update for case %d", info->uc.cali_stage);
 
 					if(info->uc.cali_stage >= 2 )
 					{
@@ -7138,7 +7138,7 @@ static void sigsegfault_handler(void) {
 	sigaddset(&sigst.sa_mask, SIGSEGV );
 	sigst.sa_flags = SA_SIGINFO | SA_ONESHOT;
 	if( sigaction(SIGSEGV, &sigst, NULL) == - 1 )
-		veejay_msg(0,"%s", strerror(errno));
+		veejay_msg(VEEJAY_MSG_ERROR,"%s", strerror(errno));
 }
 
 void register_signals()
@@ -7294,7 +7294,7 @@ void vj_gui_init(char *glade_file,
 	if(gui->main_window == NULL)
 	{
 		free(gui);
-		veejay_msg( 0, "Cannot find '%s'", glade_path );
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot find '%s'", glade_path );
 		return;
 	}
 	info = gui;
@@ -7566,7 +7566,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	if(!hostname && !group_name )
 	{
-		veejay_msg(0,"Invalid host/group name given");
+		veejay_msg(VEEJAY_MSG_ERROR,"Invalid host/group name given");
 		return 0;
 	}
 

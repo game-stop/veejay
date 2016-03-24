@@ -1010,7 +1010,7 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 	if(track_id == -1 )
 	{
 		gvr_track_toggle_preview( mt->preview, mt->master_track, status );
-		veejay_msg(2, "VeejayGrabber: master preview %s", (status ? "enabled" : "disabled") );
+		veejay_msg(VEEJAY_MSG_INFO, "VeejayGrabber: master preview %s", (status ? "enabled" : "disabled") );
 		if( status == 0 )
 			multitrack_set_logo( data, img );
 	}
