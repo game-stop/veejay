@@ -28,6 +28,6 @@ vj_effect *bgsubtract_init(int width, int height);
 void bgsubtract_free();
 int bgsubtract_malloc(int w, int h);
 int bgsubtract_prepare(VJFrame *frame); 
-void bgsubtract_apply(VJFrame *frame,int width,int height,int mode, int threshold, int to_alpha);
+void bgsubtract_apply(VJFrame *frame,int width,int height,int threshold, int method, int enabled, int to_alpha);
 uint8_t *bgsubtract_get_bg_frame(unsigned int plane);
 #endif

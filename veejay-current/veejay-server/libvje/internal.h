@@ -548,7 +548,7 @@ uint8_t *bgsubtract_get_bg_frame(unsigned int plane);
 
 extern int bgsubtract_prepare(VJFrame *frame);
 
-extern void bgsubtract_apply(VJFrame *frame,int width, int height, int mode, int threshold, int alpha );
+extern void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int method, int enabled, int alpha );
 
 extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
 

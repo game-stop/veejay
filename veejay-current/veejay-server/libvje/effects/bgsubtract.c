@@ -31,35 +31,42 @@
 static uint8_t *static_bg__ = NULL;
 static uint8_t *bg_frame__[4] = { NULL,NULL,NULL,NULL };
 static int bg_ssm = 0;
+static unsigned int bg_n = 0;
 
 vj_effect *bgsubtract_init(int width, int height)
 {
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 3;
+	ve->num_params = 4;
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	ve->limits[0][0] = 0;	/* threshold */
 	ve->limits[1][0] = 255;
 	ve->limits[0][1] = 0;	/* mode */
-	ve->limits[1][1] = 1;
-	ve->limits[0][2] = 0;	/* alpha */
+	ve->limits[1][1] = 2;
+	ve->limits[0][2] = 0;	/* enable/disable */
 	ve->limits[1][2] = 1;
+	ve->limits[0][3] = 0;   /* alpha */
+	ve->limits[1][3] = 1;
 
 	ve->defaults[0] = 45;
-	ve->defaults[1] = 1;
+	ve->defaults[1] = 0;
 	ve->defaults[2] = 0;
+	ve->defaults[3] = 0;
 
 	ve->description = "Subtract background";
 	ve->extra_frame = 0;
 	ve->sub_format = -1;
 	ve->has_user = 1;
 	ve->user_data = NULL;
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "To Alpha");
+	ve->sub_format = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "BG Method","Enable", "To Alpha");
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,"Show Difference", "Show Static BG" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,"Static BG","CMA BG","Average BG" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2,"Generate/Show BG","Subtract Background" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3,"Create Mask","Create Alpha Mask" );
 
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
@@ -89,6 +96,7 @@ void bgsubtract_free()
 		bg_frame__[2] = NULL;
 		bg_frame__[3] = NULL;
 		static_bg__ = NULL;
+		bg_ssm = 0;
 	}
 }
 
@@ -104,46 +112,86 @@ int bgsubtract_prepare(VJFrame *frame)
 	if( frame->ssm ) {
 		veejay_memcpy( bg_frame__[1], frame->data[1], frame->len );
 		veejay_memcpy( bg_frame__[2], frame->data[2], frame->len );
+		bg_ssm = 1;
 	}
 	else {
-		// if data is subsampled, super sample it now 
+		// if data is not subsampled, upsample chroma planes now 
 		veejay_memcpy( bg_frame__[1], frame->data[1], frame->uv_len );
 		veejay_memcpy( bg_frame__[2], frame->data[2], frame->uv_len );
 		chroma_supersample( SSM_422_444, frame, bg_frame__ );
 		bg_ssm = 1;
 	}
 
-	veejay_msg(2, "Subtract background: Snapped background frame");
+	bg_n = 0;
+
+	veejay_msg(2, "Subtract background: Snapped background frame (4:4:4 = %d)", bg_ssm);
 	return 1;
 }
 
+/* always returns chroma planes in 4:4:4 */
 uint8_t* bgsubtract_get_bg_frame(unsigned int plane)
 {
 	return bg_frame__[ plane ];
 }
 
-void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int mode, int alpha )
+static void bgsubtract_cma_frame( const int len, uint8_t *I, uint8_t *O )
+{
+	int i;
+	for( i = 0; i < len; i ++ )
+	{
+		O[i] = ((I[i] + (bg_n * O[i])) / (bg_n+1)); 
+	}
+}
+static void bgsubtract_avg_frame( const int len, uint8_t *I, uint8_t *O)
+{
+	int i;
+	for( i = 0; i < len; i ++ )
+	{
+		O[i] = (O[i] + I[i]) >> 1;
+	}
+}
+
+static void bgsubtract_show_bg( VJFrame *frame )
+{
+	veejay_memcpy( frame->data[0], bg_frame__[0], frame->len );
+	if( bg_ssm && frame->ssm ) {
+		veejay_memcpy( frame->data[1], bg_frame__[1], frame->len );
+		veejay_memcpy( frame->data[2], bg_frame__[2], frame->len );
+	} else { /* subsampling does not match */
+		veejay_memset( frame->data[1], 128, frame->uv_len );
+		veejay_memset( frame->data[2], 128, frame->uv_len );
+	}	
+}
+
+void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int method, int enabled, int alpha )
 {
 	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
-
-	if( mode ) {
-		veejay_memcpy( frame->data[0], bg_frame__[0], frame->len );
-		if( bg_ssm ) {
-			veejay_memcpy( frame->data[1], bg_frame__[1], frame->len );
-			veejay_memcpy( frame->data[2], bg_frame__[2], frame->len );
-		} else { /* subsampling does not match */
-			veejay_memset( frame->data[1], 128, frame->uv_len );
-			veejay_memset( frame->data[2], 128, frame->uv_len );
-		}	
-		return;
-	}
-
-	if( alpha == 0 ) {
-		veejay_memset( frame->data[1], 128, uv_len );
-		veejay_memset( frame->data[2], 128, uv_len );
-		vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[0], threshold, frame->len );
+	if( enabled == 0 ) {
+		switch( method ) {
+			case 0:
+				bgsubtract_show_bg( frame );
+				break;
+			case 1:
+				bgsubtract_cma_frame( frame->len, frame->data[0], bg_frame__[0] );
+				bgsubtract_show_bg( frame );
+				bg_n ++;
+				break;
+			case 2:
+				bgsubtract_avg_frame( frame->len, frame->data[0], bg_frame__[0] );
+				bgsubtract_show_bg( frame );
+				break;	
+			default:
+			break;
+		}
 	}
 	else {
-		vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[3], threshold, frame->len );
+		if( alpha == 0 ) {
+			veejay_memset( frame->data[1], 128, uv_len );
+			veejay_memset( frame->data[2], 128, uv_len );
+			vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[0], threshold, frame->len );
+		}
+		else {
+			vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[3], threshold, frame->len );
+		}
 	}
 }
