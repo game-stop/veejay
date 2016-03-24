@@ -762,7 +762,7 @@ static char *mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *er
 	gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );
 	gtk_window_set_resizable( GTK_WINDOW( dialog ), FALSE );
 
-	gint   base = 3490;
+	gint   base = DEFAULT_PORT_NUM;
 
 	gint   p = (1000 * (mt->selected)) + base;
 

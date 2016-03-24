@@ -39,7 +39,7 @@
 static int selected_skin = 0;
 extern int	mt_get_max_tracks();
 static int load_midi = 0;
-static int port_num	= 3490;
+static int port_num	= DEFAULT_PORT_NUM;
 static char hostname[255];
 static int gveejay_theme = 0; // set to 1 to load with the default reloaded theme 
 static	int verbosity = 0;
@@ -69,7 +69,7 @@ static void usage(char *progname)
         printf( "Usage: %s <options>\n",progname);
         printf( "where options are:\n");
         printf( "-h\t\tVeejay host to connect to (defaults to localhost) \n");         
-        printf( "-p\t\tVeejay port to connect to (defaults to 3490) \n");
+        printf( "-p\t\tVeejay port to connect to (defaults to %d) \n", DEFAULT_PORT_NUM);
 		printf( "-t\t\tLoad gveejay's classic GTK theme\n");
 		printf( "-n\t\tDont use colored text\n");
 		printf( "-v\t\tBe extra verbose (usefull for debugging)\n");

@@ -19,6 +19,9 @@
  
 #ifndef VJAPI_H
 #define VJAPI_H
+
+#define DEFAULT_PORT_NUM 3490
+
 int	veejay_tick();
 void *get_ui_info();
 void vj_gui_set_geom(int x, int y);
