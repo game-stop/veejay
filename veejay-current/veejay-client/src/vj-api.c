@@ -665,7 +665,7 @@ void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
 static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
 static void update_curve_widget(const char *name);
-static void update_curve_accessibility(const char *name);
+/* not used */ /* static void update_curve_accessibility(const char *name); */
 static void reset_tree(const char *name);
 static void reload_srt();
 static void reload_fontlist();
@@ -676,7 +676,7 @@ int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 static void vj_kf_refresh();
 static void vj_kf_reset();
-static int vj_kf_is_displayed();
+/* not used */ /* static int vj_kf_is_displayed(); */
 
 void reset_cali_images( int type, char *wid_name );
 
@@ -2390,6 +2390,7 @@ static void vj_kf_reset()
 	update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
 }
 
+/* not used
 static int vj_kf_is_displayed()
 {
 	GtkWidget *ww = glade_xml_get_widget_( info->main_window, crappy_design[ui_skin_].name );
@@ -2398,6 +2399,7 @@ static int vj_kf_is_displayed()
 		return 1;
 	return 0;
 }
+*/
 
 static void vj_kf_refresh()
 {
@@ -2487,6 +2489,7 @@ static void update_curve_widget(const char *name)
 	if(blob)	free(blob);
 }
 
+/* Not used
 static void update_curve_accessibility(const char *name)
 {
 	sample_slot_t *s = info->selected_slot;
@@ -2501,6 +2504,7 @@ static void update_curve_accessibility(const char *name)
 		enable_widget( "frame_fxtree3" );
 	}
 }
+*/
 
 static int get_nums(const char *name)
 {
@@ -3482,7 +3486,7 @@ void reportbug ()
 	snprintf(URL , sizeof(URL),
 	         "firefox \"http://groups.google.com/group/veejay-discussion/post?hl=%s\"",l );
 
-	printf(URL);
+	puts(URL);
 	system(URL);
 }
 
