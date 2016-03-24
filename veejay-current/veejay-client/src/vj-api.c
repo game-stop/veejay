@@ -7401,7 +7401,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 			use_threads);
 
 	if( auto_connect ) {
-		for( i = 4490; i < 9999; i+= 1000 ) {
+		for( i = 3490; i < 9999; i+= 1000 ) {
 			multrack_audoadd( gui->mt, "localhost", i);
 		}
 	}
