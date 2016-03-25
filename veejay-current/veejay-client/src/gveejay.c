@@ -35,14 +35,13 @@
 #include <veejay/libvevo.h>
 #include <src/vj-api.h>
 
-
 static int selected_skin = 0;
-extern int	mt_get_max_tracks();
+extern int mt_get_max_tracks();
 static int load_midi = 0;
-static int port_num	= 3490;
+static int port_num	= DEFAULT_PORT_NUM;
 static char hostname[255];
 static int gveejay_theme = 0; // set to 1 to load with the default reloaded theme 
-static	int verbosity = 0;
+static int verbosity = 0;
 static int col = 0;
 static int row = 0;
 static int n_tracks = 7;
@@ -59,47 +58,48 @@ static struct
 } skins[] = {
  {	"gveejay.reloaded.glade" },
  {	"reloaded_classic.glade" },
- {	NULL 	}
+ {	NULL }
 };
 
-extern void	reloaded_launcher( char *h, int p );
+extern void reloaded_launcher( char *h, int p );
 
 static void usage(char *progname)
 {
-        printf( "Usage: %s <options>\n",progname);
-        printf( "where options are:\n");
-        printf( "-h\t\tVeejay host to connect to (defaults to localhost) \n");         
-        printf( "-p\t\tVeejay port to connect to (defaults to 3490) \n");
-		printf( "-t\t\tLoad gveejay's classic GTK theme\n");
-		printf( "-n\t\tDont use colored text\n");
-		printf( "-v\t\tBe extra verbose (usefull for debugging)\n");
-		printf( "-s\t\tSet bank resolution (row X columns)\n");
-		printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
-        printf( "-X\t\tSet number of tracks\n");
-		printf( "-l\t\tChoose layout (0=large screen, 1=small screens)\n");
-		printf( "-V\t\tShow version, data directory and exit.\n");
-		printf( "-m <file>\tMIDI configuration file.\n");
-		printf( "-g\t\t<X,Y>\tWindow position on screen.\n");
-		printf( "-b\t\tEnable beta features.\n");
-		printf( "-a\t\tAuto-connect to local running veejays.\n");
-		printf(" -L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
-		
-		printf( "\n\n");
-        exit(-1);
+	printf( "Usage: %s <options>\n",progname);
+	printf( "where options are:\n");
+	printf( "-h\t\tVeejay host to connect to (defaults to localhost) \n");
+	printf( "-p\t\tVeejay port to connect to (defaults to %d) \n", DEFAULT_PORT_NUM);
+	printf( "-t\t\tLoad gveejay's classic GTK theme\n");
+	printf( "-n\t\tDont use colored text\n");
+	printf( "-v\t\tBe extra verbose (usefull for debugging)\n");
+	printf( "-s\t\tSet bank resolution (row X columns)\n");
+	printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
+	printf( "-X\t\tSet number of tracks\n");
+	printf( "-l\t\tChoose layout (0=large screen, 1=small screens)\n");
+	printf( "-V\t\tShow version, data directory and exit.\n");
+	printf( "-m <file>\tMIDI configuration file.\n");
+	printf( "-g\t\t<X,Y>\tWindow position on screen.\n");
+	printf( "-b\t\tEnable beta features.\n");
+	printf( "-a\t\tAuto-connect to local running veejays.\n");
+	printf( "-L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
+
+	printf( "\n\n");
+	exit(-1);
 }
-static int      set_option( const char *name, char *value )
+
+static int set_option( const char *name, char *value )
 {
-        int err = 0;
-        if( strcmp(name, "h") == 0 || strcmp(name, "hostname") == 0 )
-        {
-                strcpy( hostname, optarg );
+	int err = 0;
+	if( strcmp(name, "h") == 0 || strcmp(name, "hostname") == 0 )
+	{
+		strcpy( hostname, optarg );
 		launcher ++;
-        }
-        else if( strcmp(name, "p") == 0 || strcmp(name ,"port") == 0 )
-        {
-                if(sscanf( optarg, "%d", &port_num ))
-			launcher++;
-        } 
+	}
+	else if( strcmp(name, "p") == 0 || strcmp(name ,"port") == 0 )
+	{
+		if(sscanf( optarg, "%d", &port_num ))
+		launcher++;
+	}
 	else if (strcmp(name, "l" ) == 0 ) {
 		selected_skin = atoi( optarg);
 	}
@@ -158,39 +158,45 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
-	else if (strcmp(name,"b") == 0 || strcmp(name, "beta" ) == 0 ) {
+	else if (strcmp(name,"b") == 0 || strcmp(name, "beta" ) == 0 )
+	{
 		beta = 1;
 	}
-	else if (strcmp(name,"a") == 0 ) {
+	else if (strcmp(name,"a") == 0 )
+	{
 		auto_connect = 1;
 	}
-	else if( strcmp(name,"L") == 0 ) {
+	else if( strcmp(name,"L") == 0 )
+	{
 		set_disable_sample_image(1);
 	}
-    else
-	      err++;
-    return err;
+	else
+		err++;
+	return err;
 }
+
 static volatile gulong g_trap_free_size = 0;
 static struct timeval time_last_;
 
 static char **cargv = NULL;
 
-
-gboolean	gveejay_idle(gpointer data)
+gboolean gveejay_idle(gpointer data)
 {
 	if(gveejay_running())
 	{
 		int sync = 0;
-		if( is_alive(&sync) == FALSE ) {
+		if( is_alive(&sync) == FALSE )
+		{
 			return FALSE;
 		} 
-		if( sync ) {
+		if( sync )
+		{
 			if( gveejay_time_to_sync( get_ui_info() ) )
 			{
 				veejay_update_multitrack( get_ui_info() );
 			}
-		} else {
+		} else
+		{
 		//	gveejay_sleep( get_ui_info() );
 		}
 
@@ -208,7 +214,7 @@ gboolean	gveejay_idle(gpointer data)
 }
 
 static	void	clone_args( char *argv[], int argc )
-{	
+{
 	int i = 0;
 	if( argc <= 0 )
 		return;
@@ -217,15 +223,15 @@ static	void	clone_args( char *argv[], int argc )
 	memset( cargv, 0, sizeof(char*) * (argc+1));
 	for( i = 0; i < argc ; i ++ )
 		cargv[i] = strdup( argv[i] );
-
 }
 
-int main(int argc, char *argv[]) {
-        char option[2];
-        int n;
-        int err=0;
+int main(int argc, char *argv[])
+{
+	char option[2];
+	int n;
+	int err=0;
 
-        if(!argc) usage(argv[0]);
+	if(!argc) usage(argv[0]);
 
 	clone_args( argv, argc );
 
@@ -239,24 +245,24 @@ int main(int argc, char *argv[]) {
 	snprintf(hostname,sizeof(hostname), "127.0.0.1");
 
 	while( ( n = getopt( argc, argv, "s:h:p:tabnvLHfX:P:Vl:T:m:g:")) != EOF )
-    {
+	{
 		sprintf(option, "%c", n );
 		err += set_option( option, optarg);
 		if(err) usage(argv[0]);
-    }
-    if( optind > argc )
+	}
+	if( optind > argc )
 		err ++;
 
-    if( err ) usage(argv[0]);
+	if( err ) usage(argv[0]);
 
 	glade_init();
-	
+
 	vj_mem_init();
 
 	vevo_strict_init();
 
 	find_user_themes(gveejay_theme);
-	
+
 	vj_gui_set_debug_level( verbosity , n_tracks,0,0);
 	set_skin( selected_skin, gveejay_theme );
 
@@ -264,10 +270,9 @@ int main(int argc, char *argv[]) {
 	gui_load_theme();
 
 	register_signals();
-		
+
 	vj_gui_init( skins[selected_skin].file, launcher, hostname, port_num, use_threads, load_midi, midi_file,beta,auto_connect);
 	vj_gui_style_setup();
-
 
 	if( preview )
 	{
@@ -282,18 +287,15 @@ int main(int argc, char *argv[]) {
 
 	memset( &time_last_, 0, sizeof(struct timeval));
 
-	while(gveejay_running()) {
+	while(gveejay_running())
+	{
 		if(gveejay_idle(NULL)==FALSE)
 			break;
-		while( gtk_events_pending()  ) 
+		while( gtk_events_pending()  )
 			gtk_main_iteration();
-
 	}
 
 	veejay_msg(VEEJAY_MSG_INFO, "See you!");
 
-
-	return 0;  
+	return 0;
 }
-
-

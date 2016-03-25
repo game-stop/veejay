@@ -19,48 +19,60 @@
  
 #ifndef VJAPI_H
 #define VJAPI_H
-int	veejay_tick();
+
+#define DEFAULT_PORT_NUM 3490
+
+int veejay_tick();
+void veejay_preview(int p);
+int veejay_update_multitrack();
+void veejay_sleep( void *ui );
+
 void *get_ui_info();
-void vj_gui_set_geom(int x, int y);
+char *get_glade_path();
+char *get_gveejay_dir();
+int get_total_frames();
+void get_gd(char *buf, char *suf, const char *filename);
+
+void set_disable_sample_image(int status);
+void set_skin(int skin, int invert);
+
+void default_bank_values(int *col, int *row );
+gboolean is_alive( int *sync );
+
+int _effect_get_minmax( int effect_id, int *min, int *max, int index );
+void find_user_themes();
+void register_signals();
+int is_button_toggled(const char *name);
+gchar *_utf8str( const char *c_str );
+void gui_load_theme();
+
+void vj_gui_cb(int state, char *hostname, int port_num);
 void vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int threads,int load_midi, char *midi_file, int beta, int auto_connect);
-int	vj_gui_reconnect( char *host, char *group, int port);
+int vj_gui_reconnect( char *host, char *group, int port);
 void vj_gui_free();
-void vj_fork_or_connect_veejay();
 void vj_gui_wipe();
 void vj_gui_enable(void);
 void vj_gui_disable(void);
 void vj_gui_disconnect(void);
+int vj_get_preview_box_w();
+int vj_get_preview_box_h();
+void vj_gui_set_geom(int x, int y);
 void vj_gui_set_debug_level(int level, int preview_p, int pw, int ph);
-void get_gd(char *buf, char *suf, const char *filename);
-void vj_gui_theme_setup(int default_theme);
 void vj_gui_set_timeout(int timer);
-void set_skin(int skin, int invert);
-void default_bank_values(int *col, int *row );
-void vj_gui_style_setup();
-gboolean gveejay_running();
-gboolean is_alive( int *sync );
 int vj_gui_sleep_time( void );
-int get_total_frames();
-int vj_img_cb(GdkPixbuf *img );
-int	vj_get_preview_box_w();
-int	vj_get_preview_box_h();
-int _effect_get_minmax( int effect_id, int *min, int *max, int index );
-void vj_gui_cb(int state, char *hostname, int port_num);
-void veejay_preview(int p);	
-int is_button_toggled(const char *name);	
-gchar *_utf8str( const char *c_str );
-void find_user_themes();
-int	gveejay_user_preview();
-char *get_glade_path();
-char *get_gveejay_dir();
-int	gveejay_restart();
-int	gveejay_update();
-int update_gveejay();
-int veejay_update_multitrack();
-void veejay_sleep( void *ui );
-int gveejay_time_to_sync( void *ptr );
-void gui_load_theme();
-void register_signals();
-void gveejay_preview(int p);
+void vj_gui_style_setup();
+void vj_gui_theme_setup(int default_theme);
 
-#endif 
+int vj_img_cb(GdkPixbuf *img );
+void vj_fork_or_connect_veejay();
+
+gboolean gveejay_running();
+int gveejay_user_preview();
+void gveejay_preview(int p);
+int gveejay_restart();
+int gveejay_update();
+int gveejay_new_slot(int mode);
+int gveejay_time_to_sync( void *ptr );
+int update_gveejay();
+
+#endif

@@ -762,7 +762,7 @@ static char *mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *er
 	gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );
 	gtk_window_set_resizable( GTK_WINDOW( dialog ), FALSE );
 
-	gint   base = 3490;
+	gint   base = DEFAULT_PORT_NUM;
 
 	gint   p = (1000 * (mt->selected)) + base;
 
@@ -1010,7 +1010,7 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 	if(track_id == -1 )
 	{
 		gvr_track_toggle_preview( mt->preview, mt->master_track, status );
-		veejay_msg(2, "VeejayGrabber: master preview %s", (status ? "enabled" : "disabled") );
+		veejay_msg(VEEJAY_MSG_INFO, "VeejayGrabber: master preview %s", (status ? "enabled" : "disabled") );
 		if( status == 0 )
 			multitrack_set_logo( data, img );
 	}

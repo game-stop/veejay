@@ -7,7 +7,11 @@ Veejay has limited audio support.
 PREPARE
 -------
 
-You need an AVI file with an audio track encoded in PCM WAVE, 44-48Khz, 2 channels (stereo) (16 bit)
+You need an AVI file with an audio track encoded in signed PCM WAVE, 44-48Khz, 2 channels (stereo) (16 bit)
+
+For example with ffmpeg/avconv you can use the "PCM signed 16-bit little-endian" codec named "pcm_s16le"
+
+# avconv myvideo.mp4 -q:v 1 -vcodec mjpeg -acodec pcm_s16le -s 1024x576 myvideo.avi
 
 
 RUN
@@ -15,10 +19,11 @@ RUN
 
 Veejay only has support for jackd1 (the old jack)
 
-Start jackd prior to starting veejay:
+Start jackd prior to starting veejay :
 
 # jackd -d alsa -P
 
+Nota : jack audio server must be configurated with the same sampling rate has the video has been encoded with.
 
 Now, start veejay:
 
@@ -28,6 +33,8 @@ Use the -m commandline option to allow veejay to cache video frames when samplin
 allowing for smoother audio playback (especially when used in combination of speed/pitch changes) 
 
 The -m commandline option is further explained in docs/HowtoCache.txt
+
+Nota : The video you start veejay with must contains a sound stream, else the jack transport is not started ... even if -a option
 
 AUDIO PLAYBACK PROBLEMS
 -----------------------

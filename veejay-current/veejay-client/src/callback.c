@@ -359,7 +359,7 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 		return;
 
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-	int mode = is_button_toggled("toggle_fademethod");
+/*	int mode = */is_button_toggled("toggle_fademethod");
 //	int value = ( mode == 1 ? 0xff - (int) val : (int) val );
 	int value = (int) val;
 
