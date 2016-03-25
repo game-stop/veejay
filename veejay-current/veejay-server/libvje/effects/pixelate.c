@@ -27,34 +27,35 @@ static uint8_t values[2048];
 
 vj_effect *pixelate_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
 	veejay_memset( values, 0, sizeof(values) );
 
-    int i;
-    int nvalues=0;
+	int i;
+	int nvalues=0;
 
-    for(i=0; i < width; i++)
-    {
+	for(i=0; i < width; i++)
+	{
 		values[nvalues] = 1 + i;
 		nvalues++; 
-    }
+	}
 
-    ve->num_params = 1;
+	ve->num_params = 1;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = nvalues-2;
-    ve->defaults[0] = 8;
-    ve->description = "Pixelate";
-    ve->sub_format = -1;
-    ve->extra_frame = 0;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->limits[0][0] = 1;
+	ve->limits[1][0] = nvalues-2;
+	ve->defaults[0] = 8;
+	ve->description = "Pixelate";
+	ve->sub_format = -1;
+	ve->extra_frame = 0;
 	ve->has_user =0;
 	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Pixels");
-    return ve;
+	
+	return ve;
 }
 
 void pixelate_apply( VJFrame *frame, int w, int h , int vv )
@@ -63,24 +64,27 @@ void pixelate_apply( VJFrame *frame, int w, int h , int vv )
 	unsigned int len = frame->len;
   	const unsigned int v = values[vv];
 	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
-    const unsigned int u_v = v >> (frame->ssm ? frame->shift_h: 1 );
-    uint8_t *Y = frame->data[0];
+	unsigned int u_v = v >> (frame->ssm ? frame->shift_h: 1 );
+	if( u_v == 0 )
+		u_v = 1;
+	
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
 	for (i = 0; i < len; i+=v) {
-	   for(j=0; j < v; j++)
+		for(j=0; j < v; j++)
 		{
-		Y[i+j] = Y[i];
-	    }
-    }
+			Y[i+j] = Y[i];
+	    	}
+	}
 
 	for (i = 0; i < uv_len; i+=u_v) {
-	   for(j=0; j < u_v; j++)
+		for(j=0; j < u_v; j++)
 		{
-		Cb[i+j] = Cb[i];
-		Cr[i+j] = Cr[i];
-	    }
+			Cb[i+j] = Cb[i];
+			Cr[i+j] = Cr[i];
+		}
    	}
 }
 
