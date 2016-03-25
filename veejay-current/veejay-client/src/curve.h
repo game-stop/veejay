@@ -25,7 +25,7 @@
 #define MAX_CHAIN_LEN	20
 
 
-int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *ct);
+int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *ct, int *status);
 void	set_points_in_curve( int type, GtkWidget *curve);
 void	reset_curve( GtkWidget *curve );
 void	get_points_from_curve( GtkWidget *curve, int len, float *v );

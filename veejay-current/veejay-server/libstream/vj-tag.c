@@ -2019,12 +2019,12 @@ void	vj_tag_set_kf_type(int s1, int entry, int type )
 }
 
 
-int	vj_tag_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type)
+int	vj_tag_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type, int *status)
 {
   vj_tag *tag = vj_tag_get(s1);
    if (!tag)
 	return 0;
-   return keyframe_get_tokens( tag->effect_chain[entry]->kf,id, start,end,type);
+   return keyframe_get_tokens( tag->effect_chain[entry]->kf,id, start,end,type,status);
 }
 
 

@@ -23,15 +23,19 @@
 #define VJKF_H
 unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *rlen );
 
-int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int tag );
+int keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int tag );
 
-int		keyframe_get_tokens( void *port, int parameter_id, int *start, int *end, int *type );
+int keyframe_get_tokens( void *port, int parameter_id, int *start, int *end, int *type, int *status );
 
-void	keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is_sample );
+void keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is_sample );
 
-int 	keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  );
+int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  );
 
-int		keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port );
+int keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port );
 
-int	get_keyframe_value(void *port, int n_frame, int parameter_id, int *result );
+int get_keyframe_value(void *port, int n_frame, int parameter_id, int *result );
+
+int keyframe_get_param_status( int lookup, int fx_entry, int parameter_id, int is_sample );
+
+void keyframe_set_param_status( int lookup, int fx_entry, int parameter_id, int status, int is_sample );
 #endif

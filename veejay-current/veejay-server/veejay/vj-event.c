@@ -7812,8 +7812,8 @@ void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 
 void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 {
-	veejay_t *v = (veejay_t *)ptr;
 #ifdef HAVE_JACK
+	veejay_t *v = (veejay_t *)ptr;
 	if (!v->audio_running )
 	{
 		veejay_msg(0,"Veejay was started without audio.");
@@ -10178,6 +10178,31 @@ void	vj_event_get_keyframes( void *ptr, 	const char format[],	va_list ap	)
 
 	}	
 	SEND_MSG( v, "00000000" );
+}
+
+void	vj_event_set_kf_status_param( void *ptr, const char format[], va_list ap)
+{
+	int args[4];
+	veejay_t *v = (veejay_t*)ptr;
+
+	P_A(args,NULL,format,ap);
+
+	if(args[0] == -1 && SAMPLE_PLAYING(v))
+		args[0] = sample_size() - 1;
+	else if (args[0] == -1 && STREAM_PLAYING(v) ) 
+		args[0] = vj_tag_size() - 1;
+
+	if( args[0] == 0) 
+		args[0] = v->uc->sample_id;
+
+	if(SAMPLE_PLAYING(v))
+	{
+		keyframe_set_param_status( args[0], args[1], args[2], args[3], 1 );
+	}
+	else if (STREAM_PLAYING(v))
+	{
+		keyframe_set_param_status( args[0], args[1], args[2], args[3], 0 );
+	}
 }
 
 void	vj_event_set_kf_status( void *ptr,	const char format[], 	va_list ap	)

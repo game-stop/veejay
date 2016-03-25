@@ -2387,6 +2387,7 @@ static void vj_kf_reset()
 
 	reset_curve( curve );
 	set_toggle_button( "curve_toggleentry", 0 );
+	set_toggle_button( "curve_toggleentry_param", 0);
 	update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
 }
 
@@ -2409,6 +2410,7 @@ static void vj_kf_refresh()
 	}
 	else {
 		set_toggle_button( "curve_toggleentry", 0 );
+		set_toggle_button( "curve_toggleentry_param", 0 );
 		disable_widget( "frame_fxtree3" );
 		vj_kf_reset();
 	}
@@ -2446,13 +2448,14 @@ static void update_curve_widget(const char *name)
 	int blen = 0;
 	int lo = 0, hi = 0, curve_type=0;
 	int p = -1;
+	int status = 0;
 
 	multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
 
 	unsigned char *blob = (unsigned char*) recv_vims( 8, &blen );
 	if( blob && blen > 0 )
 	{
-		p = set_points_in_curve_ext( curve, blob,id,i, &lo,&hi, &curve_type );
+		p = set_points_in_curve_ext( curve, blob,id,i, &lo,&hi, &curve_type,&status );
 		if( p >= 0 )
 		{
 			info->uc.selected_parameter_id = p;
@@ -2467,6 +2470,7 @@ static void update_curve_widget(const char *name)
 				default: set_toggle_button( "curve_typelinear", 1 );
 					break;
 			}
+			set_toggle_button( "curve_toggleentry_param", status );
 		}
 	}
 

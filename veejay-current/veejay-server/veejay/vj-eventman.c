@@ -645,6 +645,23 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[VIMS_SAMPLE_KF_STATUS_PARAM]		=	_new_event(
+				"%d %d %d %d",
+				VIMS_SAMPLE_KF_STATUS_PARAM,
+				"Change KF parameter status for entry X",
+				vj_event_set_kf_status_param,
+				4,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				"Entry ID",
+				0,
+				"Parameter ID",
+				0,
+				"Status",
+				0,
+				NULL );
+
 	index_map_[VIMS_SAMPLE_KF_STATUS]		=	_new_event(
 				"%d %d %d",
 				VIMS_SAMPLE_KF_STATUS,

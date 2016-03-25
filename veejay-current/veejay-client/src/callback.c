@@ -2581,7 +2581,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	int end = get_nums( "curve_spinend" );
 	int start = get_nums( "curve_spinstart" );
-
+	int status = is_button_toggled( "curve_toggleentry_param" );
 	const int length = end - start + 1;
 
 
@@ -2612,16 +2612,18 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	get_points_from_curve( curve, length, data );
 
-	char header[34];
+	char header[37];
 	
-	int msg_len = 25 + (4*length); /*K00000000 */
+	int msg_len = 27 + (4*length); /*K00000000 */
 
-	snprintf(header,sizeof(header), "K%08dkey%02d%02d%08d%08d%02d",msg_len,i,j,start,end,type );
+	snprintf(header,sizeof(header), "K%08dkey%02d%02d%08d%08d%02d%02d",msg_len,i,j,start,end,type,status );
 	
+	int hdr_len = strlen(header);
+
 	unsigned char *buf = (unsigned char*) vj_calloc( sizeof(unsigned char) * msg_len + 9 );
-	strncpy( (char*) buf, header, sizeof(header));
+	strncpy( (char*) buf, header, hdr_len);
 	
-	unsigned char *ptr = buf + sizeof(header);
+	unsigned char *ptr = buf + hdr_len;
 	int k;
 	for( k = 0 ; k < length ; k++ ) {
 		int pval = (int) ( (float) min + ( data[k] * ((float) max) ));
@@ -2699,8 +2701,30 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 	}
 
 }
+void	on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
 
-void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
+	int i = info->uc.selected_chain_entry;
+	if( i == -1 ) {
+		vj_msg(VEEJAY_MSG_INFO,"No FX entry selected for animation");
+		return;
+	}
+
+	int j = info->uc.selected_parameter_id;
+	if( j == -1) {
+		vj_msg(VEEJAY_MSG_INFO,"No FX anim parameter selected");
+		return;
+	}
+	int k = is_button_toggled( "curve_toggleentry_param" );
+
+	multi_vims( VIMS_SAMPLE_KF_STATUS_PARAM, "0 %d %d %d", i, j,k );
+
+	vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), i );
+}
+
+void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;

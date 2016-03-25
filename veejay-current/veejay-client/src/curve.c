@@ -41,17 +41,17 @@ void	set_points_in_curve( int type, GtkWidget *curve)
 }
 
 
-int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *curve_type)
+int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *curve_type, int *status)
 {
 	int parameter_id = 0;
 	int start = 0, end =0,type=0;
 	int entry  = 0;
-	int n = sscanf( (char*) blob, "key%2d%2d%8d%8d%2d", &entry, &parameter_id, &start, &end,&type );
+	int n = sscanf( (char*) blob, "key%2d%2d%8d%8d%2d%2d", &entry, &parameter_id, &start, &end,&type,status );
 	int len = end - start;
 	int i;
 	int min = 0, max = 0;
 
-	if(n != 5 || len <= 0 )	
+	if(n != 6 || len <= 0 )	
 	{
 		return -1;
 	}
@@ -59,7 +59,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	_effect_get_minmax(id, &min, &max, parameter_id );
 
 	unsigned int k = 0;
-	unsigned char *in = blob + 25;
+	unsigned char *in = blob + 27;
 	float	*vec = (float*) vj_calloc(sizeof(float) * len );
 	for(i = start ; i < end; i ++ )
 	{
