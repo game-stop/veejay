@@ -12,12 +12,12 @@ Veejay supports the AVI and the Quicktime container , with the following codecs:
 
 Quicktime:
 
-    * mpjeg,mjpa,jpeg,dmb1
+    * mpjeg,mjpa,jpeg,dmb1,mpng,png
     * dvsd, dv, dvcp, dvhd 
 
 AVI
 
-    * mjpeg, mjpa,jpeg,jfif,dmb1
+    * mjpeg, mjpa,jpeg,jfif,dmb1,mpng,png
     * dvsd, dv, dvcp, dvhd
     * i420, i422, yv16, hfyu 
 
@@ -25,17 +25,11 @@ Raw DV
 
     * PAL / NTSC dvsd 
 
-Veejay can only deal with video files that consists entirely out of whole images (only I-frames). The codecs below will only work if all frames are I-frames. Otherwise, veejay will abort with an error message.
+Veejay can only deal with video files that consists entirely out of whole images (only I-frames). 
 
-AVI / Quicktime:
+Which codec to use ¶
 
-    * xvid, mp4v,divx,dxsd,mp4s,m4s2
-    * div3,mp43,mp42,mpg4
-    * avc1,h264,x264,davc,svq1,svq3,avc1 
-
-Wich codec to use ¶
-
-MotionJPEG ( mjpeg) is the veejay codec of choice for most applications, it gives you a good tradeof between compression, quality and compatibility. If you want speed, use AVI yv16 or i420 while recording to new samples.
+MotionJPEG (mjpeg) is the veejay codec of choice for most applications, it gives you a good tradeof between compression, quality and compatibility. If you want speed, use AVI yv16 or i420 while recording to new samples.
 
 Tools that support MJPEG:
 
@@ -50,18 +44,25 @@ Wich resolutions to use ¶
 
 Veejay can do:
 
-    * high definition (use MLZO/YUV avi)
-    * pal: 720x576 (recommended to use MLZO/YUV avi)
+    * high definition 
+    * pal: 720x576 
     * ntsc: 720x480
-    * 1/4 pal: 360x288 (any)
-    * 1/4 ntsc: 360x240  (any)
+    * 1/4 pal: 360x288 
+    * 1/4 ntsc: 360x240 
 
 If you load multiple video files on the commandline, make sure that all files have the same resolution and audio properties.
+
 How to convert ¶
 
-Veejay can convert dv video to mjpeg for you, however, I prefer to use mplayer for this, wich has more flexibility.
+You can use FFMpeg:
 
-From "anything" mplayer can play to mjpeg, use:
+$ ffmpeg -i input-file -vcodec mjpeg -pix_fmt yuvj422p -q:v 0 output-file.avi
+
+Optionally add PCM 16bit audio, 44.1/48.0 Khz, 2 channels, 8 bits per channel
+
+ffmpeg -i input-file -vcodec mjpeg -s 128x128 -pix_fmt yuvj422p -acodec pcm_s16le -ar 44100 -ac 2 output-file.avi
+
+Or, you can use mplayer:
 
  $ mencoder -ovc lavc -oac pcm -lavcopts vcodec=mjpeg -o <outputfile> <inputfile>
 
