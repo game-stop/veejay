@@ -23,7 +23,7 @@ Start jackd prior to starting veejay :
 
 # jackd -d alsa -P
 
-Nota : jack audio server must be configurated with the same sampling rate has the video has been encoded with.
+Note : jack audio server must be configured with the same sampling rate as the loaded video file.
 
 Now, start veejay:
 
