@@ -22,12 +22,12 @@ UDP multicast frame sender      : + 3 (input stream multicast/other applications
 UDP multicast for sending commands: + 4 (sayVIMS -g)
 
 
-How to activate:
+How to customize:
 
-1. veejay movie1.avi
+1. veejay movie1.avi (starts on default port 3490)
 2. veejay movie2.avi -p 5000
 
-(Both movie clips must have identical properties!!)
+If there is already a veejay running, the next instance will start at DEFAULT_PORT + 1000
 
 veejay 2 makes a connection with veejay 1
 
