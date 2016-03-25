@@ -34,6 +34,8 @@ allowing for smoother audio playback (especially when used in combination of spe
 
 The -m commandline option is further explained in docs/HowtoCache.txt
 
+Nota : The video you start veejay with must contains a sound stream, else the jack transport is not started ... even if -a option
+
 AUDIO PLAYBACK PROBLEMS
 -----------------------
 
