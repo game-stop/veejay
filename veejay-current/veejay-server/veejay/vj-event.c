@@ -10672,7 +10672,11 @@ void vj_event_alpha_composite(void *ptr, const char format[], va_list ap)
 	if( args[0] == 0 ) {
 		v->settings->clear_alpha = 0;
 		v->settings->alpha_value = args[1];
-		veejay_msg(VEEJAY_MSG_INFO,"Enabled alpha channel leak (no clear)");
+		if(v->settings->alpha_value < 0 )
+			v->settings->alpha_value = 0;
+		else if (v->settings->alpha_value > 255 )
+			v->settings->alpha_value = 255;
+		veejay_msg(VEEJAY_MSG_INFO,"Enabled alpha channel leaking (no clear)");
 	} else if (args[0] == 1 ) {
 		v->settings->clear_alpha = 1;
 		v->settings->alpha_value = args[1];

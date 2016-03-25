@@ -2497,10 +2497,10 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
 
 	frames[0] = info->effect_frame1;
 	frames[1] = info->effect_frame2;
-    setup->ref = info->uc->sample_id;
-    frames[0]->data[0] = primary_buffer[0]->Y;
+	setup->ref = info->uc->sample_id;
+	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
-    frames[0]->data[2] = primary_buffer[0]->Cr;
+	frames[0]->data[2] = primary_buffer[0]->Cr;
 	frames[0]->data[3] = primary_buffer[0]->alpha;
 	
 	sample_eff_chain **chain = sample_get_effect_chain( info->uc->sample_id );
@@ -2515,9 +2515,8 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
 
 	if(clear_framebuffer__ == 1 || info->settings->clear_alpha == 1)
 	{
-		if( frames[0]->stride[3] > 0 ) {
+		if( frames[0]->stride[3] > 0 ) 
 			veejay_memset( frames[0]->data[3], info->settings->alpha_value, frames[0]->stride[3] * frames[0]->height );
-		}
 		clear_framebuffer__ = 0;
 	}
 
@@ -3394,11 +3393,11 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 static	void 	vj_perform_finish_chain( veejay_t *info, int is444 )
 {
 	VJFrame frame;
-    veejay_memcpy(&frame,info->effect_frame1,sizeof(VJFrame));
+	veejay_memcpy(&frame,info->effect_frame1,sizeof(VJFrame));
 
-    frame.data[0] = primary_buffer[0]->Y;
+	frame.data[0] = primary_buffer[0]->Y;
    	frame.data[1] = primary_buffer[0]->Cb;
-    frame.data[2] = primary_buffer[0]->Cr;
+	frame.data[2] = primary_buffer[0]->Cr;
 	frame.data[3] = primary_buffer[0]->alpha;
 	frame.ssm     = is444;
 
