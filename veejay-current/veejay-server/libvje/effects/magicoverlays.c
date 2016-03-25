@@ -797,4 +797,3 @@ void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int width,
 }
 
 
-void overlaymagic_free(){}

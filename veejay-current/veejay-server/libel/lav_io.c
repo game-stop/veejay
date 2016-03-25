@@ -614,54 +614,6 @@ int lav_video_MJPG_chroma(lav_file_t *lav_file)
 	return lav_file->MJPG_chroma;
 }
 
-int	lav_is_yuv_planar( int pix_fmt )
-{
-	switch(pix_fmt){
-		case PIX_FMT_YUVJ420P:
-		case PIX_FMT_YUVJ422P:
-		case PIX_FMT_YUVJ444P:
-		case PIX_FMT_YUV420P:
-		case PIX_FMT_YUV422P:
-		case PIX_FMT_YUV444P:
-			return 1;
-	}
-	return 0;
-}
-
-int lav_video_cmodel( lav_file_t *lav_file)
-{
-	switch(lav_file->MJPG_chroma)
-	{
-		case CHROMA411:
-			return PIX_FMT_YUV411P;
-		case CHROMA420:
-			return PIX_FMT_YUV420P;
-		case CHROMA422:
-			return PIX_FMT_YUV422P;
-		case CHROMA420F:
-			return PIX_FMT_YUVJ420P;
-		case CHROMA422F:
-			return PIX_FMT_YUVJ422P;
-		case CHROMA444:
-			return PIX_FMT_YUV444P;
-		default:
-			return -1;
-	}
-
-	return -1;
-}
-
-int	lav_video_is_qt( lav_file_t *lav_file)
-{
-#ifdef HAVE_LIBQUICK_TIME
-	if( lav_file->qt_fd)
-		return 1;
-#endif
-	return 0;
-}
-
-		
-
 int lav_video_compressor_type(lav_file_t *lav_file)
 {
 #ifdef SUPPORT_READ_DV2

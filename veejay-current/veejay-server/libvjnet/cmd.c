@@ -48,7 +48,7 @@ static void create_ghbn_key() {
   pthread_key_create(&ghbn_key, ghbn_cleanup);
 }
 
-struct hostent *sock_gethostbyname(const char *name) {
+static struct hostent *sock_gethostbyname(const char *name) {
 	struct hostent *result;
 	int local_errno;
 
@@ -252,12 +252,13 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 	int bytes_left = len;
 	int n;
 	int bytes_done = 0;
+	char *addr = (char*) dst;
 
 	while( bytes_left > 0 )
 	{	
 sock_t_recv_lbl:		
 		//@ setup socket with SO_RCVTIMEO
-		n = recv( s->sock_fd, dst + bytes_done, bytes_left, MSG_WAITALL );
+		n = recv( s->sock_fd, addr + bytes_done, bytes_left, MSG_WAITALL );
 		if ( n <= 0 ) {
 			if( n == -1 ) {
 				if( errno == EAGAIN ) { 

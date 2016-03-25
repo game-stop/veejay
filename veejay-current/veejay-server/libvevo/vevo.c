@@ -2776,13 +2776,13 @@ void	vevo_dom_dump( void *p, FILE *file )
 		fclose(file);	
 }*/
 
-
+/*
 int	vevo_write_xml( vevo_port_t *root, const char *destination, char *hiearchy[] )
 {
 	char **properties = vevo_list_properties( root );
 	if( properties == NULL )
 		return 0;
-/*	xmlNodePtr childnode;
+	xmlNodePtr childnode;
 	xmlDocPtr doc = xmlNewDoc( "1.0" );
 	xmlNodePtr rootnode =
 		xmlNewDocNode( doc, NULL , (const xmlChar*) hiearchy[0], NULL );
@@ -2804,9 +2804,8 @@ int	vevo_write_xml( vevo_port_t *root, const char *destination, char *hiearchy[]
 	}
 
 	xmlNodePtr childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) "timeline", NULL );
-*/
 
 	return 1;	
 
-}
+} */
 

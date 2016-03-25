@@ -52,7 +52,7 @@
 
 #define IS_RGB_PALETTE( p ) ( p < 512 ? 1 : 0 )
 
-void    livido_dummy_function()
+static void    livido_dummy_function()
 {	
 }
    
@@ -945,7 +945,7 @@ static void	livido_push_channel_local( void *instance,const char *key, int n, VJ
 void	livido_push_channel( void *instance,int n,int dir, VJFrame *frame ) // in_channels / out_channels
 {
 
-	char *key = (dir == 0 ? "in_channels" : "out_channels" );
+	const char *key = (dir == 0 ? "in_channels" : "out_channels" );
 	livido_push_channel_local(instance, key, n, frame );
 }
 

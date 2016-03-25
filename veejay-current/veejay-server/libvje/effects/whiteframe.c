@@ -72,4 +72,3 @@ void whiteframe_apply( VJFrame *frame, VJFrame *frame2, int width,
 		}
     }
 }
-void whitereplace_free(){}

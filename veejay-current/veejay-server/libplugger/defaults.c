@@ -31,7 +31,7 @@
 #define PATH_MAX 1024
 #endif
 
-FILE	*plug_open_config(const char *basedir, const char *filename, char *mode, int chkdir )
+FILE	*plug_open_config(const char *basedir, const char *filename, const char *mode, int chkdir )
 {
 	char path[PATH_MAX];
 	char *home = getenv( "HOME" );

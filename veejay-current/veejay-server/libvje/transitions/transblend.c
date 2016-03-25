@@ -108,6 +108,4 @@ void transblend_apply( VJFrame *frame, VJFrame *frame2, int width,
 	    Cr[p] = func_c( Cr[p], Cr2[q]);
 	}
     }
-
 }
-void transblend_free(){}

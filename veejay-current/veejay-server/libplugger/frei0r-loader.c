@@ -42,6 +42,7 @@
 #include <libplugger/defaults.h>
 #include <libplugger/specs/frei0r.h>
 #include <libplugger/frei0r-loader.h>
+#include <libplugger/defaults.h>
 #include <libel/avcommon.h>
 
 #define    RUP8(num)(((num)+8)&~8)
@@ -585,7 +586,7 @@ static int is_bad_frei0r_plugin( f0r_plugin_info_t *info )
 	return 0;
 }
 
-void	frei0r_read_plug_configuration(void *plugin, const char *name)
+static void	frei0r_read_plug_configuration(void *plugin, const char *name)
 {
 	FILE *f = plug_open_config( "frei0r", name, "r",0 );
 	if(!f) {
@@ -620,15 +621,15 @@ void	frei0r_read_plug_configuration(void *plugin, const char *name)
 void* 	deal_with_fr( void *handle, char *name)
 {
 	void *port = vpn( VEVO_FR_PORT );
-	f0r_init_f	f0r_init	= dlsym( handle, "f0r_init" );
-	if( f0r_init == NULL )
+	f0r_init_f	f0r_init_func	= dlsym( handle, "f0r_init" );
+	if( f0r_init_func == NULL )
 	{
 		vpf( port );
 		return NULL;
 	}
 
-	f0r_deinit_f	f0r_deinit	= dlsym( handle, "f0r_deinit" );
-	if( f0r_deinit == NULL )
+	f0r_deinit_f	f0r_deinit_func	= dlsym( handle, "f0r_deinit" );
+	if( f0r_deinit_func == NULL )
 	{
 		vpf( port );
 		return NULL;
@@ -656,8 +657,8 @@ void* 	deal_with_fr( void *handle, char *name)
 	void	*get_params	= dlsym( handle, "f0r_get_param_value" );
 
 	vevo_property_set( port, "handle", VEVO_ATOM_TYPE_VOIDPTR,1, &handle );
-	vevo_property_set( port, "init", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_init );
-	vevo_property_set( port, "deinit", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_deinit );
+	vevo_property_set( port, "init", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_init_func );
+	vevo_property_set( port, "deinit", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_deinit_func );
 	vevo_property_set( port, "info", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_info );
 	
 	vevo_property_set( port, "parameters", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_param );
@@ -682,7 +683,7 @@ void* 	deal_with_fr( void *handle, char *name)
 
 	memset( &finfo,0,sizeof(f0r_plugin_info_t));
 
-	if( (*f0r_init)() == 0)
+	if( (*f0r_init_func)() == 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Failed to initialize frei0r plugin '%s': ", name);
 		vpf( port );
@@ -695,7 +696,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"I am using frei0r version %d but plugin requires %d",
 				FREI0R_MAJOR_VERSION, finfo.frei0r_version );
-		(*f0r_deinit)();	
+		(*f0r_deinit_func)();	
 		vpf(port);
 		return NULL;	
 	}
@@ -703,7 +704,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	if( is_bad_frei0r_plugin( &finfo ) ) { 
 		veejay_msg(VEEJAY_MSG_ERROR, "Frei0r %s-%d.%d is blacklisted. Please upgrade this plug-in to a newer version.",
 				finfo.name, finfo.major_version, finfo.minor_version);
-		(*f0r_deinit)();
+		(*f0r_deinit_func)();
 		vpf(port);
 		return NULL;
 	}
@@ -721,7 +722,7 @@ void* 	deal_with_fr( void *handle, char *name)
 		n_inputs = 2;
 		if( processm == NULL ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Supposed to be mixer plugin (2 sources) but no f0r_update2");
-			(*f0r_deinit)();
+			(*f0r_deinit_func)();
 			vpf(port);
 			if(plug_name) free(plug_name);
 			return NULL;
@@ -730,7 +731,7 @@ void* 	deal_with_fr( void *handle, char *name)
 		n_inputs = 1;
 		if( processf == NULL ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Supposed to be filter plugin (1 input source) but no f0r_update");
-			(*f0r_deinit)();
+			(*f0r_deinit_func)();
 			vpf(port);
 			if(plug_name) free(plug_name);
 			return NULL;
@@ -740,14 +741,14 @@ void* 	deal_with_fr( void *handle, char *name)
 		n_outputs = 1;
 		if( processf == NULL ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Supposed to be generator plugin (1 output source) but no f0r_update");
-			(*f0r_deinit)();
+			(*f0r_deinit_func)();
 			vpf(port);
 			if(plug_name) free(plug_name);
 			return NULL;
 		}
 	} else {
 		veejay_msg(VEEJAY_MSG_ERROR, "Frei0r plugin '%s' (%s) unsupported type", finfo.name, plugin_name );
-		(*f0r_deinit)();
+		(*f0r_deinit_func)();
 		vpf(port);
 		if(plug_name) free(plug_name);
 		return NULL;
@@ -758,7 +759,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	if( (finfo.plugin_type == F0R_PLUGIN_TYPE_FILTER && processf == NULL) ||
 	     (finfo.plugin_type == F0R_PLUGIN_TYPE_MIXER2 && processm == NULL) ) {
 		veejay_msg(0, "Frei0r plugin %s behaves badly",name);
-		(*f0r_deinit)();
+		(*f0r_deinit_func)();
 		vpf(port);
 		return NULL;
 	}

@@ -20,9 +20,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
-#include "transblend.h"
 #include <libvje/effects/common.h>
 #include <stdlib.h>
+#include "slidingdoor.h"
 
 vj_effect *slidingdoor_init(int width, int height)
 {
@@ -91,4 +91,3 @@ void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int width,
 		frame->shift_v );*/
 
 }
-void slidingdoor_free(){}

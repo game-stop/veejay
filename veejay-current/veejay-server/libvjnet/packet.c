@@ -79,7 +79,7 @@ int			packet_get_info(frame_info_t *i, const void *data )
 
 int			packet_put_padded_data(packet_header_t *h, frame_info_t *i , void *payload, const uint8_t *plane, int bytes )
 {
-	const char *dst = (const char*) payload;
+	char *dst = (char*) payload;
 	size_t len = sizeof( packet_header_t );
 	veejay_memcpy( dst, h , len );
 	veejay_memcpy( dst + len, i , sizeof( frame_info_t ));
@@ -90,10 +90,11 @@ int			packet_put_padded_data(packet_header_t *h, frame_info_t *i , void *payload
 int			packet_put_data(packet_header_t *h, frame_info_t *i , void *payload, const uint8_t *plane )
 {
 	size_t len = sizeof( packet_header_t );
-	veejay_memcpy( payload, h , len );
-	veejay_memcpy( payload + len, i , sizeof( frame_info_t ));
+	char *dst = (char*) payload;
+	veejay_memcpy( dst, h , len );
+	veejay_memcpy( dst + len, i , sizeof( frame_info_t ));
 	len += sizeof(frame_info_t );
-	veejay_memcpy( payload + len, plane, CHUNK_SIZE );
+	veejay_memcpy( dst + len, plane, CHUNK_SIZE );
 	return 1;
 }
 

@@ -454,115 +454,6 @@ else { veejay_msg(VEEJAY_MSG_DEBUG,"arg has size of 0x0");}
 //@ F1 -> sample playing FX=off -> standard help
 //@ F1 -> sample playing FX=on entry >= 0 <= MAX_E : show help for FX on entry N
 //
-/*
-static struct {
-	const char *msg;
-} embedded_help[] = {
-	{ "'[' Set starting position of sample\n" },
-	{ "']' Set ending position and create new sample\n"},
-	{ "'F1-F12' Play sample (Bank * 12) + Fx\n"},
-	{ "'0-9' Select Bank 0-12\n"},
-	{ "'KP/' Toggle between plain and sample mode\n"},
-	{ "'A...L' Speed\n"},
-	{ "'A...L' + ALT Slow motion\n"},
-	{ "'KP8' Forward 1 second\n"},
-	{ "'KP2' Back 1 second\n"},
-	{ "'KP5' Pause playback\n"},
-	{ "'KP4' Play backward\n"}, 
-	{ "'KP6' Play forward\n"},
-	{ "'KP7' Back one frame\n"},
-	{ "'KP9' Forward one frame\n"},
-	{ "'KP1' Goto starting position\n"},
-	{ "'KP3' Goto ending position\n"},
-	{ "'KP*' Change sample looping\n"},
-	{ "Cursor Up/Down Select FX from FX list\n"},
-	{ "ENTER Add selected FX to current FX slot\n"},
-	
-	{ NULL }
-}; */
-
-static struct {
-	const char *msg;
-} fx_embedded_help[] = {
-	{ "'PgUp/PgDn' Inc/Dec FX parameter 0 "},
-	{ "'KP Ins/Del' Inc/Dec FX parameter 1 "},
-	{ "',/.' Inc/Dec FX parameter 2 "},
-	{ "'q/w' Inc/Dec FX parameter 3 "},
-	{ "'e/r' Inc/Dec FX parameter 4 "},
-	{ "'t/y' Inc/Dec FX parameter 5 "},
-	{ "'u/i' Inc/Dec FX parameter 6 "},
-	{ "'o/p' Inc/Dec FX parameter 7 "},
-	{"'\nEND' Toggle FX Chain\n"},
-	{"'Delete' Clear current FX slot\n"},
-	{ "'KP-' Down 1 position in FX chain\n"},
-	{ "'KP+' Up 1 position in FX chain\n"},
-	{ "-/+ Select mix-in source" },
-	{ "/ Toggle between stream and sample source"},
-	{ NULL }
-};
-
-/*
-static char	*get_arr_embedded_help(char *ehelp[])
-{
-	int i;
-	int len = 0;
-	for( i = 0; ehelp[i] != NULL ; i ++ ) {
-		len += strlen(ehelp[i]) + 1;
-	}
-	if( len <= 0 )
-		return NULL;
-	char *msg = (char*) vj_calloc(sizeof(char) * len );
-	if( msg == NULL )
-		return NULL;
-	char *p = msg;
-	int   x = 0;
-	for( i = 0; ehelp[i] != NULL; i ++ ) {
-		x = strlen(ehelp[i]);
-		strncpy(p,ehelp[i],x);
-		p += x;
-	}
-	return msg;
-}
-*/
-char	*get_embedded_help( int fx_mode, int play_mode, int fx_entry, int id )
-{
-	char msg[16384];
-	if( play_mode == VJ_PLAYBACK_MODE_PLAIN || ( play_mode == VJ_PLAYBACK_MODE_SAMPLE && fx_mode == 0 ) )
-	{
-		return NULL; 
-	} else {
-		int fx_id = 0;
-		if( play_mode == VJ_PLAYBACK_MODE_TAG  ) {
-			fx_id = vj_tag_get_effect_any(id,fx_entry);
-		} else if( play_mode == VJ_PLAYBACK_MODE_SAMPLE ) {
-			fx_id = sample_get_effect_any(id,fx_entry);
-		}
-		if( fx_id <= 0 ) 
-			return NULL;
-
-		int n = vj_effect_get_num_params( fx_id );
-		char *fx_descr = vj_effect_get_description(fx_id);
-		snprintf(msg,sizeof(msg),"FX slot %d:%s\n", fx_entry, fx_descr );
-		char *p   = msg + strlen(msg);
-		int i;
-		for( i = 0; i < n ; i ++ ) { //@ specific FX help
-			char name[128];
-			char *descr = vj_effect_get_param_description(fx_id,i );
-			snprintf(name,sizeof(name)-1,"%s'%s'\n",fx_embedded_help[i].msg,descr );
-			int len = strlen(name);
-			strncpy(p, name, len );
-			p += len;
-			//free(descr);
-		}
-		for( i = 0; fx_embedded_help[8+i].msg != NULL; i ++ ) {
-			int len = strlen(fx_embedded_help[8+i].msg);
-			strncpy(p, fx_embedded_help[8+i].msg, len );
-			p += len;
-		}
-		return vj_strdup(msg);
-	}
-	return NULL;
-}
 
 static  void    init_vims_for_macro();
 
@@ -887,7 +778,7 @@ int		keyboard_event_exists(int id)
 	return 0;
 }
 
-void			   destroy_keyboard_event( vj_keyboard_event *ev )
+static void destroy_keyboard_event( vj_keyboard_event *ev )
 {
 	if( ev ) {
 		if( ev->vims )
@@ -1100,10 +991,8 @@ void vj_event_trigger_function(void *ptr, vj_event f, int max_args, const char *
 	va_end(ap);
 }
 
-
-
 /* parse a keyframe packet */
-void	vj_event_parse_kf( veejay_t *v, char *msg, int len )
+static void	vj_event_parse_kf( veejay_t *v, char *msg, int len )
 {
 	if(SAMPLE_PLAYING(v))
 	{
@@ -1967,8 +1856,7 @@ veejay_strncpy(buf,var,strlen(var));\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );}\
 }
 
-
-void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
+static void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 {
 	char *buf = (char*) vj_calloc(sizeof(char) * 4000 );
 	int c = veejay_is_colored();
@@ -2006,7 +1894,7 @@ void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 	free(buf);
 }
 
-void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
+static void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 {
 	if( veejay_get_state(v) != LAVPLAY_STATE_STOP)
 		return;
@@ -2428,7 +2316,7 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 	return 1;
 }
 #endif
-void	vj_event_init_network_events()
+static void	vj_event_init_network_events()
 {
 	int i;
 	int net_id = 0;
@@ -2462,7 +2350,7 @@ char *find_keyboard_default(int id)
 	return result;
 }
 
-void	vj_event_load_keyboard_configuration(veejay_t *info)
+static void	vj_event_load_keyboard_configuration(veejay_t *info)
 {
 	char path[1024];
 	snprintf(path,sizeof(path), "%s/keyboard.cfg", info->homedir);
@@ -2495,7 +2383,7 @@ void	vj_event_load_keyboard_configuration(veejay_t *info)
 	fclose(f);
 }
 
-void	vj_event_init_keyboard_defaults()
+static void	vj_event_init_keyboard_defaults()
 {
 	int i;
 	int keyb_events = 0;
@@ -3771,8 +3659,8 @@ void vj_event_inc_frame(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[1];
-	char *s = NULL;
-	P_A( args,s,format, ap );
+	char *str = NULL;
+	P_A( args,str,format, ap );
 	if(!STREAM_PLAYING(v))
 	{
 		video_playback_setup *s = v->settings;
@@ -6441,8 +6329,8 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 		int val = sample_get_effect_arg(v->uc->sample_id,c,args[0]);
 		if ( vj_effect_is_valid( effect  ) )
 		{
-			char *effect_descr = vj_effect_get_description(effect);
-			char *effect_param_descr = vj_effect_get_param_description(effect,args[0]);
+			const char *effect_descr = vj_effect_get_description(effect);
+			const char *effect_param_descr = vj_effect_get_param_description(effect,args[0]);
 			int tval = val + args[1];
 			if( tval > vj_effect_get_max_limit( effect,args[0] ) )
 				tval = vj_effect_get_min_limit( effect,args[0]);
@@ -6462,8 +6350,8 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 		int effect = vj_tag_get_effect_any(v->uc->sample_id, c);
 		int val = vj_tag_get_effect_arg(v->uc->sample_id, c, args[0]);
 
-		char *effect_descr = vj_effect_get_description(effect);
-		char *effect_param_descr = vj_effect_get_param_description(effect,args[0]);
+		const char *effect_descr = vj_effect_get_description(effect);
+		const char *effect_param_descr = vj_effect_get_param_description(effect,args[0]);
 		int tval = val + args[1];
 
 		if( tval > vj_effect_get_max_limit( effect,args[0] ))
@@ -6499,8 +6387,8 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 		if(sample_exists(args[0]))
 		{
 			int effect = sample_get_effect_any( args[0], args[1] );
-			char *effect_descr = vj_effect_get_description(effect);
-			char *effect_param_descr = vj_effect_get_param_description(effect,args[2]);
+			const char *effect_descr = vj_effect_get_description(effect);
+			const char *effect_param_descr = vj_effect_get_param_description(effect,args[2]);
 			if( vj_effect_valid_value(effect,args[2],args[3]) )
 			{
 				if(sample_set_effect_arg( args[0], args[1], args[2], args[3])) {
@@ -6528,8 +6416,8 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 		if(vj_tag_exists(args[0]))
 		{
 			int effect = vj_tag_get_effect_any(args[0],args[1] );
-			char *effect_descr = vj_effect_get_description(effect);
-			char *effect_param_descr = vj_effect_get_param_description(effect,args[2]);
+			const char *effect_descr = vj_effect_get_description(effect);
+			const char *effect_param_descr = vj_effect_get_param_description(effect,args[2]);
 			if ( vj_effect_valid_value( effect,args[2],args[3] ) )
 			{
 				if(vj_tag_set_effect_arg(args[0],args[1],args[2],args[3])) {

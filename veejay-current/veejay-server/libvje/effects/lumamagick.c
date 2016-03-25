@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <libvje/internal.h>
 #include <libvjmem/vjmem.h>
-#include "magicoverlays.h"
+#include "lumamagick.h"
 #include "common.h"
 /* 04/01/03: added transparency parameters for frame a and frame b in each function */
 

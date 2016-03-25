@@ -159,4 +159,6 @@ long      vj_el_get_mem_size();
 
 int	vj_el_auto_detect_scenes( editlist *el, uint8_t *tmp[4], int w, int h, int dl_threshold );
 
+int vj_el_get_decoder_from_fourcc( const char *fourcc );
+
 #endif

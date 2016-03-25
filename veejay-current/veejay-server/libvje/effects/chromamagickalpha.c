@@ -893,7 +893,7 @@ static void chromamagicalpha_softlightmode(VJFrame *frame,VJFrame *frame2,int wi
 	}
 }
 
-void chromamagicalpha_dodge(VJFrame *frame, VJFrame *frame2, int w, int h,
+static void chromamagicalpha_dodge(VJFrame *frame, VJFrame *frame2, int w, int h,
 		int op_a) {
 	unsigned int i;
 	const int len = frame->len;

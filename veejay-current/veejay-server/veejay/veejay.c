@@ -844,6 +844,12 @@ int main(int argc, char **argv)
 		free(mem_func);
 	}
 
+	veejay_msg(VEEJAY_MSG_INFO,
+		"CPU cache line size: %d bytes", cpu_cache_size());
+
+	veejay_msg(VEEJAY_MSG_INFO,
+		"Memory page size: %d bytes",mem_align_size());
+
 	info->use_keyb = use_keyb;
 	info->use_mouse = use_mouse;
 	info->show_cursor = show_cursor;

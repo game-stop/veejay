@@ -825,7 +825,7 @@ int	vj_effect_get_by_name(char *name)
 }
 
 /* returns the description of an effect */
-char *vj_effect_get_description(int effect_id)
+const char *vj_effect_get_description(int effect_id)
 {				/* 115 */
     int entry = vj_effect_real_to_sequence(effect_id);
     if (entry >= 0)
@@ -834,7 +834,7 @@ char *vj_effect_get_description(int effect_id)
     return "<none>";
 }
 
-char *vj_effect_get_param_description(int effect_id, int param_nr)
+const char *vj_effect_get_param_description(int effect_id, int param_nr)
 {
     int entry;
     entry = vj_effect_real_to_sequence(effect_id);

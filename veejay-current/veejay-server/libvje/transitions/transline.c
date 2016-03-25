@@ -155,4 +155,3 @@ void transline_apply( VJFrame *frame, VJFrame *frame2, int width,
 	transline2_apply(frame->data, frame2->data, width, height, distance, line_width,
 			 opacity);
 }
-void transline_free(){}

@@ -102,26 +102,8 @@
 #define QUEUE_LEN 1
 #include <veejay/vims.h>
 #include <libqrwrap/qrwrapper.h>
-/*
-#ifdef HAVE_GL
-#include <veejay/gl.h>
-#endif
-*/
 #include <sched.h>
 #include <veejay/vj-shm.h>
-
-static	veejay_t	*veejay_instance_ = NULL;
-static	int		best_performance_ = 0;
-
-void	veejay_set_instance( veejay_t *info )
-{
-	veejay_instance_ = info;
-}
-
-
-static void	veejay_schedule_fifo( veejay_t *info, int pid );
-
-//#include <videodev_mjpeg.h>
 #include <pthread.h>
 #include <signal.h>
 #ifdef HAVE_SDL
@@ -152,7 +134,6 @@ static void	veejay_schedule_fifo( veejay_t *info, int pid );
 #include <libel/vj-el.h>
 #define VALUE_NOT_FILLED -10000
 
-
 extern void vj_osc_set_veejay_t(veejay_t *t);
 extern void GoMultiCast(const char *groupname);
 extern void set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
@@ -160,20 +141,23 @@ extern void set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 #ifdef HAVE_SDL
 extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 #endif
-static int	total_mem_mb_ = 0;
-static int 	chunk_size_ = 0;
-static int	n_cache_slots_ = 0;
-int	get_num_slots(void)
+
+static	veejay_t	*veejay_instance_ = NULL;
+static	int		best_performance_ = 0;
+
+void	veejay_set_instance( veejay_t *info )
 {
-	return n_cache_slots_;
+	veejay_instance_ = info;
 }
+
+
+static void	veejay_schedule_fifo( veejay_t *info, int pid );
+
+static int	total_mem_mb_ = 0;
+static int	n_cache_slots_ = 0;
 int	get_total_mem(void)
 {
 	return total_mem_mb_;
-}
-int	get_chunk_size(void)
-{
-	return chunk_size_;
 }
 
 int veejay_get_state(veejay_t *info) {
@@ -878,7 +862,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
  *
  * return value: 1 on succes, 0 on error
  ******************************************************/
-
+/*
 int veejay_stop(veejay_t * info)
 {
     video_playback_setup *settings =
@@ -890,11 +874,11 @@ int veejay_stop(veejay_t * info)
 	}
     }
 
-    /*pthread_cancel( settings->playback_thread ); */
  	veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for playback_thread ...");
  	pthread_join(settings->playback_thread, NULL);
     return 1;
 }
+*/
 
 /* stop playing a sample, continue with video */
 void veejay_stop_sampling(veejay_t * info)
@@ -1110,7 +1094,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
     settings->syncinfo[settings->currently_processed_frame].timestamp = settings->lastframe_completion;
 }
 
-void veejay_pipe_write_status(veejay_t * info)
+static void veejay_pipe_write_status(veejay_t * info)
 {
     video_playback_setup *settings = (video_playback_setup *) info->settings;
     int d_len = 0;
@@ -1192,7 +1176,7 @@ void veejay_pipe_write_status(veejay_t * info)
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
 }
-static	char	*veejay_concat_paths(char *path, char *suffix)
+static	char	*veejay_concat_paths(char *path, const char *suffix)
 {
 	int n = strlen(path) + strlen(suffix) + 2;
 	char *str = vj_calloc( n * sizeof(char));
@@ -1930,7 +1914,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		return -1;
 	}
 
-	char *my_ip = (info->qrcode == 1 ? vj_server_my_ip() : "http://veejayhq.net/contributing/" );
+	char *my_ip = (info->qrcode == 1 ? vj_server_my_ip() : (char*) "http://veejayhq.net/contributing/" );
 	if( my_ip != NULL ) {
 		char outfile[1024];
 		char connectionStr[1024];
@@ -2148,7 +2132,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		int dummy_id;
 		/* Use dummy mode, action file could have specified something */
 		if( vj_tag_size()-1 <= 0 )
-			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, el,info->pixel_format,-1,0,0);
+			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, (char*) "Solid", -1, el,info->pixel_format,-1,0,0);
 		else
 			dummy_id = vj_tag_size()-1;
 		
@@ -2767,7 +2751,6 @@ int	prepare_cache_line(int perc, int n_slots)
 
 	int chunk_size = (int) (max_memory <= 0 ? 0: max_memory / n_slots ); 
 
-	chunk_size_ = chunk_size;
 	n_cache_slots_ = n_slots;
 
 	vj_el_set_mmap_size( mmap_memory );	
@@ -3714,10 +3697,8 @@ static int configure_dummy_defaults(veejay_t *info, char override_norm, float fp
 		default_norm = (override_norm == '\0' ? veejay_get_norm(vj_el_get_default_norm(tmp_fps)) : veejay_get_norm(override_norm));
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Video source is: %dx%d %2.2f fps norm %d",in_w,in_h,tmp_fps, default_norm);
-	} else {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Dummy source is: %dx%d %2.2f fps norm %d",dw,dh,dfps, default_norm );
-	}
-	   
+	} 
+
 	if( info->video_output_width <= 0 ) 
 		info->video_output_width = dw;
 	else
@@ -3745,7 +3726,12 @@ static int configure_dummy_defaults(veejay_t *info, char override_norm, float fp
 	
 	info->dummy->chroma = get_chroma_from_pixfmt( vj_to_pixfmt( info->pixel_format ) );
 	info->settings->output_fps = dfps;
-	
+
+	if( n_files <= 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Dummy source is: %dx%d %2.2f fps norm %d",dw,dh,dfps, info->dummy->norm );
+	}
+
+
 	if( info->audio ) {
 
 		if( tmp_arate > 0 && info->audio == AUDIO_PLAY ) {

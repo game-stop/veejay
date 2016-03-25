@@ -79,7 +79,7 @@ static void vj_flush(vj_client *sayvims,int frames) {
         }
 }
 
-int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
+int32_t			vj_share_pull_master( void *shm, const char *master_host, int master_port )
 {
 	char tmp[64];
 	vj_client *c = vj_share_connect( master_host, master_port );

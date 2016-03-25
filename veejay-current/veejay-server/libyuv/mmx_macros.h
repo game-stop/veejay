@@ -9,7 +9,7 @@
 #undef SFENCE
 #undef MIN_LEN
 
-#if HAVE_ASM_3DNOW
+#ifdef HAVE_ASM_3DNOW
 #define PREFETCH  "prefetch"
 #elif HAVE_ASM_MMX2
 #define PREFETCH "prefetchnta"

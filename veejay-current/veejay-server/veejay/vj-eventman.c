@@ -83,7 +83,7 @@ static	void		dump_event_stderr(vevo_port_t *event)
 	free(name);
 }
 
-int	vj_event_vevo_list_size(void)
+static int	vj_event_vevo_list_size(void)
 {
 	int i;	
 	int len =0;

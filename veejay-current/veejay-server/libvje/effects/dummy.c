@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <libvje/vje.h>
 #include <libvje/effects/common.h>
+#include "dummy.h"
 
 vj_effect *dummy_init(int w, int h)
 {

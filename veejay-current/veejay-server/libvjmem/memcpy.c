@@ -1240,16 +1240,6 @@ void fast_memset_dirty(void * to, int val, size_t len)
 	if(len) small_memset(t, val, len);
 }
 
-
-
-/* Fast memory set. See comments for fast_memcpy */
-void fast_memset(void * to, int val, size_t len)
-{
-	fast_memset_dirty( to, val , len );
-	if(len >= MIN_LEN)
-		fast_memset_finish();
-}
-
 static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
      return __memcpy(to,from,len);
 }
@@ -1325,11 +1315,20 @@ static void *memcpy_neon( void *to, const void *from, size_t n )
 }
 #endif
 
+/* Fast memory set. See comments for fast_memcpy */
+static void fast_memset(void * to, int val, size_t len)
+{
+	fast_memset_dirty( to, val , len );
+	if(len >= MIN_LEN)
+		fast_memset_finish();
+}
+
+
 
 static struct {
-     char	*name;
-     void	*(*function)(void *to, const void *from, size_t len);
-     double	t;
+     const char	*name;
+     void *(*function)(void *to, const void *from, size_t len);
+     double t;
      uint32_t cpu_require;
 } memcpy_method[] =
 {
@@ -1378,10 +1377,10 @@ static struct {
 };
 
 static struct {
-	char            *name;
-	void            *(*function)(void *to, uint8_t c, size_t len);
-	uint32_t		cpu_require;
-	double			t;
+	const char *name;
+	void *(*function)(void *to, uint8_t c, size_t len);
+	uint32_t cpu_require;
+	double t;
 } memset_method[] =
 {
 	{ NULL, NULL, 0,0},
@@ -1689,7 +1688,7 @@ static void	vj_frame_slow_job( void *arg )
 
 }
 
-void	vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
+static void	vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
 	vj_frame_slow1(img[0],p0_buffer[0],p1_buffer[0],len,frac );	
 	vj_frame_slow1(img[1],p0_buffer[1],p1_buffer[1],uv_len,frac );	
@@ -1735,7 +1734,7 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 
 }
 
-void	vj_frame_simple_clear(  uint8_t **input, int *strides, int v )
+static void	vj_frame_simple_clear(  uint8_t **input, int *strides, int v )
 {
 	int i;
 	for( i = 0; i < 4; i ++ ) {
@@ -1746,7 +1745,7 @@ void	vj_frame_simple_clear(  uint8_t **input, int *strides, int v )
 }
 
 
-void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides  )
+static void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides  )
 {
 	int i;
 	for( i = 0; i < 4; i ++ )  {
@@ -1881,8 +1880,7 @@ static double benchmark_single_copy(long c,int dummy, uint8_t **dest, uint8_t **
 
 typedef double (*benchmark_func)(long c, int dummy, uint8_t **dest, uint8_t **source, int *planes);
 
-
-void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, uint8_t **dest, uint8_t **source, int *planes )
+static void run_benchmark_test(int n_tasks, benchmark_func f, const char *str, int n_frames, uint8_t **dest, uint8_t **source, int *planes )
 {
 	int N = 8;
 	double stats[N];	
@@ -1914,7 +1912,7 @@ void run_benchmark_test(int n_tasks, benchmark_func f, char *str, int n_frames, 
 	veejay_msg(VEEJAY_MSG_INFO, "run done: best score for %s is %g, worst is %g, average is %g",str, fastest, slowest, average );
 }
 
-void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
+static void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
 {
 	int len = w * h;
 	int uv_len = (w/2) * h;

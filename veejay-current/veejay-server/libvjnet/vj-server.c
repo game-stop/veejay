@@ -1099,28 +1099,7 @@ int	vj_server_link_used( vj_server *vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
 	return Link[link_id]->in_use;
-/*
-	if( link_id < 0 || link_id >= VJ_MAX_CONNECTIONS )
-		return 0;
-   	if (Link[link_id]->in_use)
-		return 1;
-	return 0;*/
 }
-
-
-int	vj_server_min_bufsize( vj_server *vje, int id )
-{
-	vj_link **Link = (vj_link**) vje->link;
-   	if (!Link[id]->in_use)
-		return 0;
-
-	int index = Link[id]->n_retrieved;
-	if( index >= Link[id]->n_queued )
-		return 0; // done
-
-	return Link[id]->m_queue[index]->len;
-}
-
 
 char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 {
@@ -1153,8 +1132,8 @@ char *vj_server_my_ip()
 		return NULL;
 	}
 
-	char *target = "8.8.8.8"; //google public dns
-	char *port = "53";
+	const char *target = "8.8.8.8"; //google public dns
+	const char *port = "53";
 
 	veejay_memset(&h,0,sizeof(h));
 	h.ai_family = AF_INET;

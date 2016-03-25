@@ -39,10 +39,13 @@ static int MEM_ALIGNMENT_SIZE = 32;
 static int CACHE_LINE_SIZE = 64;
 
 
-#ifdef ARCH_X86
-int has_cpuid(void)
+static int has_cpuid(void)
 {
-        int a, c;
+#ifdef ARCH_X86_64
+	return 1;
+#endif
+#ifdef ARCH_X86
+	int a, c;
 
 // code from libavcodec:
     __asm__ __volatile__ (
@@ -67,11 +70,12 @@ int has_cpuid(void)
                           );
 
         return (a!=c);
+#endif
+	return 0;
 }
 
 // copied from Mplayer (want to have cache line size detection ;) )
-void
-do_cpuid(unsigned int ax, unsigned int *p)
+static void do_cpuid(unsigned int ax, unsigned int *p)
 {
 // code from libavcodec:
     __asm __volatile
@@ -83,7 +87,7 @@ do_cpuid(unsigned int ax, unsigned int *p)
          : "0" (ax));
 }
 
-int	get_cache_line_size()
+static int	get_cache_line_size()
 {
 	unsigned int regs[4];
 	unsigned int regs2[4];
@@ -110,7 +114,7 @@ int	get_cache_line_size()
 	return ret;
 }
 
-
+#ifdef ARCH_X86
 static void mymemset_generic(void * s, char c,size_t count)
 {
 int d0, d1;
@@ -123,7 +127,7 @@ __asm__ __volatile__(
 }
 
 #else 
-void mymemset_generic(void *s, char c, size_t cc )
+static void mymemset_generic(void *s, char c, size_t cc )
 {
 	memset(s,c,cc);
 } 
@@ -132,6 +136,11 @@ void mymemset_generic(void *s, char c, size_t cc )
 int	cpu_cache_size()
 {
 	return CACHE_LINE_SIZE;
+}
+
+int	mem_align_size()
+{
+	return MEM_ALIGNMENT_SIZE;
 }
 
 void vj_mem_init(void)
@@ -143,8 +152,12 @@ void vj_mem_init(void)
 #ifdef ARCH_X86 
 	CACHE_LINE_SIZE = get_cache_line_size();
 #endif
+#ifdef ARCH_X86_64
+	CACHE_LINE_SIZE = get_cache_line_size();
+#endif
 	if(MEM_ALIGNMENT_SIZE == 0)
 		MEM_ALIGNMENT_SIZE = getpagesize();
+	
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
 #endif

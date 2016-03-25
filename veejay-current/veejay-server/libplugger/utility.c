@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
+#include <libplugger/utility.h>
 
 char		*get_str_vevo( void *port, const char *key ){
 	return vevo_property_get_string(port,key);
@@ -151,32 +151,4 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 	}
 
 }
-
-
-void		clone_prop_vevo2( void *port, void *to_port, const char *key, const char *as_key )
-{
-	int n = vevo_property_atom_type( port ,key);
-	int itmp = 0;
-	double dtmp = 0.0;
-
-	switch(n)
-	{
-		case VEVO_ATOM_TYPE_INT:
-			vevo_property_get( port, key, 0, &itmp );
-			vevo_property_set( to_port, as_key, n, 1, &itmp );
-			break;
-		case VEVO_ATOM_TYPE_DOUBLE:
-			vevo_property_get( port, key, 0, &dtmp );
-			vevo_property_set( to_port, as_key, n, 1, &dtmp );
-			break;
-		case VEVO_ATOM_TYPE_BOOL:
-			vevo_property_get( port, key, 0, &itmp );
-			vevo_property_set( to_port, as_key, n, 1, &itmp );
-			break;
-		default:
-			veejay_msg(0, "Type %d cannot be cloned",n);
-			break;
-	}
-}
-
 

@@ -48,7 +48,7 @@
 
 static int out_pixel_format = FMT_422F; 
 
-char*	vj_avcodec_get_codec_name(int codec_id )
+static char*	vj_avcodec_get_codec_name(int codec_id )
 {
 	char name[64];
 	switch(codec_id)

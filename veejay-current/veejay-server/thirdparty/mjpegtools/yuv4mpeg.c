@@ -118,14 +118,14 @@ ssize_t y4m_write_cb(y4m_cb_writer_t * fd, const void *buf, size_t len)
 /* Functions to use the callback interface from plain filedescriptors */
 
 /* read len bytes from fd into buf */
-ssize_t y4m_read_fd(void * data, void *buf, size_t len)
+static ssize_t y4m_read_fd(void * data, void *buf, size_t len)
   {
   int * f = (int*)data;
   return y4m_read(*f, buf, len);
   }
 
 /* write len bytes from fd into buf */
-ssize_t y4m_write_fd(void * data, const void *buf, size_t len)
+static ssize_t y4m_write_fd(void * data, const void *buf, size_t len)
   {
   int * f = (int*)data;
   return y4m_write(*f, buf, len);

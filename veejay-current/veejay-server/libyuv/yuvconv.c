@@ -69,7 +69,7 @@ static  int		    ffmpeg_aclib[AV_PIX_FMT_NB];
 
 static struct {
 	int i;
-	char *s;
+	const char *s;
 } pixstr[] = {
 	{PIX_FMT_YUV420P, "PIX_FMT_YUV420P"},
 {	PIX_FMT_YUV422P, "PIX_FMT_YUV422P"},
@@ -95,8 +95,8 @@ static struct {
 
 };
 
-void	yuv_pixstr( const char *s, char *s2, int fmt ) {
-	char *str = NULL;
+static void	yuv_pixstr( const char *s, const char *s2, int fmt ) {
+	const char *str = NULL;
 	int i;
 	for( i = 0; pixstr[i].s != NULL ; i ++ )
 		if( fmt == pixstr[i].i ) str = pixstr[i].s;

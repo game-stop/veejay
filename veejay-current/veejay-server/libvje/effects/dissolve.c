@@ -80,4 +80,3 @@ void dissolve_apply(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-void dissolve_free(){}

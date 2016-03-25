@@ -383,7 +383,7 @@ int  AVI_read_data(avi_t *AVI, unsigned char *vidbuf, long max_vidbuf,
                                long *len);
 
 void AVI_print_error(char *str);
-char *AVI_strerror(void);
+const char *AVI_strerror(void);
 char *AVI_syserror(void);
 
 int AVI_scan(char *name);

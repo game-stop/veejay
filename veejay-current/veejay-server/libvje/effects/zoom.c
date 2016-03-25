@@ -24,6 +24,8 @@
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include "common.h"
+#include "zoom.h"
+
 vj_effect *zoom_init(int width , int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));

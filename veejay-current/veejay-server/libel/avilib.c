@@ -2653,7 +2653,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
    if(!AVI->track[0].a_chans) AVI->track[0].audio_strn = 99;
 
    { 
-     int i=0;
+     i=0;
      for(j=0; j<AVI->anum+1; ++j) {
        if (j == AVI->video_strn) continue;
        AVI->track[i].audio_tag[0] = j/10 + '0';
@@ -3501,7 +3501,7 @@ int AVI_read_data(avi_t *AVI, unsigned char *vidbuf, long max_vidbuf,
 
 /* AVI_print_error: Print most recent error (similar to perror) */
 
-char *(avi_errors[]) =
+const char *(avi_errors[]) =
 {
   /*  0 */ "avilib - No Error",
   /*  1 */ "avilib - AVI file size limit reached",
@@ -3544,7 +3544,7 @@ void AVI_print_error(char *str)
    }
 }
 
-char *AVI_strerror(void)
+const char *AVI_strerror(void)
 {
    int aerrno;
 
@@ -3557,7 +3557,7 @@ char *AVI_strerror(void)
       AVI_errno == AVI_ERR_CLOSE )
    {
       snprintf(error_string, sizeof(error_string), "%s - %s",avi_errors[aerrno],strerror(errno));
-      return error_string;
+      return (const char*) error_string;
    }
    else
    {

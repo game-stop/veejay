@@ -36,13 +36,14 @@ extern void init_parallel_tasks(int n_tasks);
 
 #define vj_malloc(i) vj_malloc_(i)
 #define vj_calloc(i) vj_calloc_(i)
-
+extern void find_best_memset();
+extern void find_best_memcpy();
 extern void fast_memset_dirty(void * to, int val, size_t len);
 extern void fast_memset_finish();
 extern void packed_plane_clear( size_t len, void *to );
 extern void yuyv_plane_clear( size_t len, void *to );
 extern int cpu_cache_size();
-extern int get_cache_line_size();
+extern int mem_align_size();
 extern char *veejay_strncat( char *s1, char *s2, size_t n );
 extern char *veejay_strncpy( char *s1, const char *s2, size_t n );
 extern void yuyv_plane_init();

@@ -52,24 +52,22 @@ vj_effect *coloradjust_init(int w, int h)
 }
 
 /* these methods were derived from yuv-subtitler */
-inline uint8_t ccolor_adjust_u(double dcolor, double dsaturation)
+static inline uint8_t ccolor_adjust_u(double dcolor, double dsaturation)
 {
     return (sin(dcolor) * dsaturation) + 128;
 }
-inline uint8_t ccolor_adjust_v(double dcolor, double dsaturation)
+static inline uint8_t ccolor_adjust_v(double dcolor, double dsaturation)
 {
     return (cos(dcolor) * dsaturation) + 128;
 }
-
-
-inline double ccolor_sqrt(double u, double v)
+static inline double ccolor_sqrt(double u, double v)
 {
 //    return sqrt((u * u) + (v * v));
      double r;
      fast_sqrt( r,(u*u)+(v*v));
      return r;
 }
-inline double ccolor_sine(int u, double dsaturation)
+static inline double ccolor_sine(int u, double dsaturation)
 {
     return asin((u / dsaturation));
 }

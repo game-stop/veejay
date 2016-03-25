@@ -496,7 +496,7 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 		}
 	}
 #else
-	const int mmx_stride = stride >> 3;
+//	const int mmx_stride = stride >> 3;
 //	int left = (mmx_stride % 16); /* FIXME */
 	for( y = height -1 ; y > 0; y -- ) {
 		uint8_t *src = buffer + (y* stride);
@@ -529,7 +529,7 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 		}
 	}
 #else
-	const int mmx_stride = stride >> 3;
+//	const int mmx_stride = stride >> 3;
 //	int left = (mmx_stride % 16);  /* FIXME */
 	int x1 = 0;
 	for( y = height -1 ; y > 0; y -- ) {

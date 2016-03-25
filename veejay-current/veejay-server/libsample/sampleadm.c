@@ -3406,33 +3406,7 @@ int sample_read_edl( sample_info *sample )
 	return res;
 }
 
-int	is_samplelist(char *filename)
-{
-	xmlDocPtr doc;
-	xmlNodePtr cur;
-   	doc = xmlParseFile(filename);
-   	if (doc == NULL) 
-		return (0);
-    	
-    	cur = xmlDocGetRootElement(doc);
-    	if (cur == NULL)
-	{
-		xmlFreeDoc(doc);
-		return (0);
-	}
-
-    	if (xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLES))
-	{
-		xmlFreeDoc(doc);
-		return (0);
-    	}
-
-   	xmlFreeDoc(doc);
-
-	return 1;
-}
-
-void	LoadSubtitles( sample_info *skel, char *file, void *font )
+static void	LoadSubtitles( sample_info *skel, char *file, void *font )
 {
 	char tmp[512];
 
@@ -3783,7 +3757,7 @@ static void	WriteSubtitles( sample_info *next_sample, void *font, char *file )
 int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id, int mode)
 {
     int i;
-	char *encoding = "UTF-8";
+	const char *encoding = "UTF-8";
 	xmlChar *version = xmlCharStrdup("1.0");	
     sample_info *next_sample;
     xmlDocPtr doc;

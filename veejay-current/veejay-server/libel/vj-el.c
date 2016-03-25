@@ -306,7 +306,7 @@ int	vj_el_cache_size()
 #define GREMLIN_GUARDIAN (128*1024)-1
 #endif
 
-vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, float fps, int pixel_format, int out_fmt, long max_frame_size)
+static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, float fps, int pixel_format, int out_fmt, long max_frame_size)
 {
         vj_decoder *d = (vj_decoder*) vj_calloc(sizeof(vj_decoder));
         if(!d)
@@ -359,10 +359,6 @@ int	get_ffmpeg_pixfmt( int pf )
 		
 	}
 	return PIX_FMT_YUV422P;
-}
-int       get_ffmpeg_shift_size(int fmt)
-{
-	return 0;
 }
 
 static long get_max_frame_size( lav_file_t *fd )
@@ -500,24 +496,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	    veejay_msg(VEEJAY_MSG_DEBUG,"\tWidth:           %d", lav_video_width(el->lav_fd[n]));
 	    veejay_msg(VEEJAY_MSG_DEBUG,"\tHeight:          %d", lav_video_height(el->lav_fd[n]));
     	
-		const char *int_msg;
-		switch (lav_video_interlacing(el->lav_fd[n]))
-		{
-			case LAV_NOT_INTERLACED:
-			    int_msg = "Not interlaced";
-			    break;
-			case LAV_INTER_TOP_FIRST:
-			    int_msg = "Top field first";
-			    break;
-			case LAV_INTER_BOTTOM_FIRST:
-			    int_msg = "Bottom field first";
-			    break;
-			default:
-			    int_msg = "Unknown!";
-			    break;
-		}
-
-		 if( deinter == 1 && (lav_video_interlacing(el->lav_fd[n]) != LAV_NOT_INTERLACED))
+		if( deinter == 1 && (lav_video_interlacing(el->lav_fd[n]) != LAV_NOT_INTERLACED))
 			el->auto_deinter = 1;
 
 		veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames/sec:       %f", lav_frame_rate(el->lav_fd[n]));
@@ -1636,16 +1615,6 @@ void	vj_el_print(editlist *el)
 	sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", ttc.h, ttc.m, ttc.s, ttc.f );
 
 	veejay_msg(VEEJAY_MSG_INFO, "\tDuration: %s (%2d hours, %2d minutes)(%ld frames)", timecode,ttc.h,ttc.m,el->video_frames);
-}
-
-MPEG_timecode_t get_timecode(editlist *el, long num_frames)
-{
-	MPEG_timecode_t tc;
-	veejay_memset(&tc,0,sizeof(tc));
-	mpeg_timecode(&tc, num_frames,
-			mpeg_framerate_code( mpeg_conform_framerate( el->video_fps )),
-			el->video_fps );
-	return tc;
 }
 
 int	vj_el_get_file_entry(editlist *el, long *start_pos, long *end_pos, long entry )

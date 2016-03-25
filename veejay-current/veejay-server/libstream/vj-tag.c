@@ -3842,7 +3842,7 @@ static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream)
     }
 }
 
-void	tagParseCalibration( xmlDocPtr doc, xmlNodePtr cur, int dst_sample , void *vp)
+static void	tagParseCalibration( xmlDocPtr doc, xmlNodePtr cur, int dst_sample , void *vp)
 {
 }
 

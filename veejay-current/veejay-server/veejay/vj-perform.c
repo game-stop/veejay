@@ -1407,17 +1407,6 @@ void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, i
 	}
 }
 
-int	vj_perform_is_ready(veejay_t *info)
-{
-	if( info->settings->zoom )
-	{
-		if( video_output_buffer[0]->Y == NULL ) return 0;
-		if( video_output_buffer[0]->Cb == NULL ) return 0;
-		if( video_output_buffer[0]->Cr == NULL ) return 0;
-	}
-	return 1;
-}
-
 void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )   
 {
 	uint8_t *pframe[3];
