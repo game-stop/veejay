@@ -242,13 +242,13 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 				case 2: 
 					{
 						//@ try get a bg from somwhere
-						uint8_t *bgY = vj_effect_get_bg( VJ_IMAGE_EFFECT_BGSUBTRACT, 0 );
-						uint8_t *bgCb= vj_effect_get_bg( VJ_IMAGE_EFFECT_BGSUBTRACT, 1 );
-						uint8_t *bgCr= vj_effect_get_bg( VJ_IMAGE_EFFECT_BGSUBTRACT, 2 );
+						uint8_t *bgY = vj_effect_get_bg( 0, 0 );
+						uint8_t *bgCb= vj_effect_get_bg( 0, 1 );
+						uint8_t *bgCr= vj_effect_get_bg( 0, 2 );
 
 						if( bgY == NULL || bgCb == NULL || bgCr == NULL ) {
-								veejay_msg(0,"This mode requires 'Subtract background' FX");
-								break;
+							veejay_msg(0,"This mode requires 'Subtract background' FX");
+							break;
 						}
 						for(y=1; y < h-1; y++)
 						{

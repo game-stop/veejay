@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,14 +18,16 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef MORPHOLOGY_H
-#define MORPHOLOGY_H
+#ifndef BGSUBTRACTGAUSS_H
+#define BGSUBTRACTGAUSS_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *morphology_init(int w, int h);
-void morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
-int morphology_malloc(int w, int h);
-void morphology_free(void);
+vj_effect *bgsubtractgauss_init(int width, int height);
+void bgsubtractgauss_free();
+int bgsubtractgauss_malloc(int w, int h);
+int bgsubtractgauss_prepare(VJFrame *frame); 
+void bgsubtractgauss_apply(VJFrame *frame, int alpha, int threshold,int noise, int mode, int period, int morph);
+uint8_t *bgsubtractgauss_get_bg_frame(unsigned int plane);
 #endif

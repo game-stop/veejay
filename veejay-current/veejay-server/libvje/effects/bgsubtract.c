@@ -47,26 +47,28 @@ vj_effect *bgsubtract_init(int width, int height)
 	ve->limits[0][2] = 0;	/* enable/disable */
 	ve->limits[1][2] = 1;
 	ve->limits[0][3] = 0;   /* alpha */
-	ve->limits[1][3] = 1;
+	ve->limits[1][3] = 2;
 
 	ve->defaults[0] = 45;
 	ve->defaults[1] = 0;
 	ve->defaults[2] = 0;
 	ve->defaults[3] = 0;
 
-	ve->description = "Subtract background";
+	ve->description = "Subtract Background";
 	ve->extra_frame = 0;
 	ve->sub_format = -1;
 	ve->has_user = 1;
 	ve->user_data = NULL;
 	ve->sub_format = 0;
+	ve->parallel = 1;
+
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "BG Method","Enable", "To Alpha");
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,"Static BG","CMA BG","Average BG" );
 	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2,"Generate/Show BG","Subtract Background" );
-	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3,"Create Mask","Create Alpha Mask" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3,"Create Mask","Create Alpha Mask", "Do Nothing" );
 
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
@@ -131,6 +133,8 @@ int bgsubtract_prepare(VJFrame *frame)
 /* always returns chroma planes in 4:4:4 */
 uint8_t* bgsubtract_get_bg_frame(unsigned int plane)
 {
+	if( static_bg__ == NULL )
+		return NULL;
 	return bg_frame__[ plane ];
 }
 

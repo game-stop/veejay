@@ -26,7 +26,7 @@
 #define VJE_SUCCESS 0
 #include <libvje/vje.h>
 
-#define VJ_IMAGE_EFFECT_MIN 95
+#define VJ_IMAGE_EFFECT_MIN 94
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -251,6 +251,7 @@ enum {
 	VJ_IMAGE_EFFECT_LEVELCORRECTION = 97,
 	VJ_IMAGE_EFFECT_ALPHADAMPEN = 96,
 	VJ_IMAGE_EFFECT_RANDNOISE = 95,
+	VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS = 94,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
@@ -550,11 +551,17 @@ extern int bgsubtract_prepare(VJFrame *frame);
 
 extern void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int method, int enabled, int alpha );
 
+extern uint8_t* bgsubtractgauss_get_bg_frame(unsigned int plane);
+
+extern int bgsubtractgauss_prepare(VJFrame *frame);
+
+extern void bgsubtractgauss_apply(VJFrame *frame,int alpha, int threshold,int noise, int mode, int period, int morph );
+
 extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
 
 extern void	cartonize_apply( VJFrame *frame, int w, int h, int b1, int b2, int b3 );
 
-extern void 	morphology_apply( VJFrame *frame, int w, int h, int t, int v, int p);
+extern void 	morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
 
 extern void 	colmorphology_apply( VJFrame *frame, int w, int h, int t, int v, int p);
 

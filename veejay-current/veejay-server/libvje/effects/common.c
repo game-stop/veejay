@@ -1730,16 +1730,6 @@ void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
 	build_histogram( h, f );
 }
 
-#ifndef MIN
-#define MIN(a,b) ( (a)>(b) ? (b) : (a) )
-#endif
-#define min4(a,b,c,d) MIN(MIN(MIN(a,b),c),d)
-#define min5(a,b,c,d,e) MIN(MIN(MIN(MIN(a,b),c),d),e)
-
-#ifndef MAX
-#define MAX(a,b) ( (a)>(b) ? (a) : (b) )
-#endif
-
 #define max4(a,b,c,d) MAX(MAX(MAX(a,b),c),d)
 
 void	veejay_distance_transform8( uint8_t *plane, int w, int h, uint32_t *output)

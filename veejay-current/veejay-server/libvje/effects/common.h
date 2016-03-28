@@ -47,8 +47,19 @@
 #define ALPHA_IN_A_AND_B 4
 
 #define    RUP8(num)(((num)+8)&~8)
+
 #define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
 #define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
+
+#ifndef MIN
+#define MIN(a,b) ( (a)>(b) ? (b) : (a) )
+#endif
+#define min4(a,b,c,d) MIN(MIN(MIN(a,b),c),d)
+#define min5(a,b,c,d,e) MIN(MIN(MIN(MIN(a,b),c),d),e)
+
+#ifndef MAX
+#define MAX(a,b) ( (a)>(b) ? (a) : (b) )
+#endif
 
 extern uint8_t pixel_Y_hi_;
 extern uint8_t pixel_U_hi_;

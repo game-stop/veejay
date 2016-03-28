@@ -68,6 +68,7 @@
 #include "transitions/vbar.h"
 #include "effects/diff.h"
 #include "effects/bgsubtract.h"
+#include "effects/bgsubtractgauss.h"
 //#include "effects/texmap.h"
 #include "effects/contourextract.h"
 #include "effects/autoeq.h"
@@ -168,7 +169,6 @@
 #include "effects/diffmap.h"
 #include "effects/picinpic.h"
 #include "effects/cali.h"
-#include "effects/bgsubtract.h"
 #include "effects/average-blend.h"
 #include "effects/perspective.h"
 #include "effects/alphafill.h"
@@ -185,7 +185,6 @@
 #include "effects/porterduff.h"
 #include "effects/pixelate.h"
 #include "effects/alphanegate.h"
-#include "effects/bgsubtract.h"
 #include "effects/chromamagickalpha.h"
 #include "effects/magicoverlaysalpha.h"
 #include "effects/lumakeyalpha.h"
@@ -282,6 +281,7 @@ static struct
 {	radioactivetv_malloc,	radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
 {	waterrippletv_malloc,	waterrippletv_free,	VJ_IMAGE_EFFECT_RIPPLETV	},
 {	bgsubtract_malloc,		bgsubtract_free,	VJ_IMAGE_EFFECT_BGSUBTRACT	},
+{	bgsubtractgauss_malloc,		bgsubtractgauss_free,	VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS	},
 {	slicer_malloc,			slicer_free,		VJ_VIDEO_EFFECT_SLICER		},
 {	perspective_malloc,		perspective_free,	VJ_IMAGE_EFFECT_PERSPECTIVE },
 {	feathermask_malloc,		feathermask_free,	VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
@@ -628,6 +628,7 @@ void vj_effect_initialize(int width, int height, int full_range)
     vj_effects[VJ_IMAGE_EFFECT_NOISEPENCIL]			= noisepencil_init(width,height);  	
     vj_effects[VJ_IMAGE_EFFECT_PENCILSKETCH]		= pencilsketch_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_BGSUBTRACT]			= bgsubtract_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS]			= bgsubtractgauss_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_MAGICMIRROR]			= magicmirror_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_PIXELSMEAR]			= smear_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_RASTER]				= raster_init(width,height);

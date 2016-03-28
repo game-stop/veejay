@@ -228,6 +228,7 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
 	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
 	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
 	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
+	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS );
 	vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
 	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
 	return 0;

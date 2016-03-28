@@ -250,8 +250,7 @@ static void vj_effman_apply_image_effect(
 		ghost_apply( frames[0], frames[0]->width,frames[0]->height,arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_MORPHOLOGY:
-		morphology_apply( frames[0], frames[0]->width,frames[0]->height,
-			arg[0],arg[1],arg[2] );
+		morphology_apply( frames[0], arg[0],arg[1],arg[2],arg[3] );
 		break;
 	case VJ_IMAGE_EFFECT_COLMORPH:
 		colmorphology_apply( frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2]);
@@ -374,6 +373,9 @@ static void vj_effman_apply_image_effect(
 	break;
      case VJ_IMAGE_EFFECT_BGSUBTRACT:
 	bgsubtract_apply( frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
+	break;
+	case VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS:
+	bgsubtractgauss_apply( frames[0],arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 	break;
      case VJ_IMAGE_EFFECT_BATHROOM:
 	bathroom_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
@@ -714,7 +716,16 @@ uint8_t* vj_effect_get_bg( int selector, unsigned int plane )
 		case VJ_IMAGE_EFFECT_BGSUBTRACT:
 			return bgsubtract_get_bg_frame( plane );
 			break;
+		case VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS:
+			return bgsubtractgauss_get_bg_frame( plane );
+			break;
 		default:
+			{
+				uint8_t *tmp = bgsubtract_get_bg_frame(plane);
+				if( tmp == NULL )
+					tmp = bgsubtractgauss_get_bg_frame(plane);
+				return tmp;
+			}
 			break;
 	}
 	return NULL;
@@ -727,6 +738,9 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 		return 0;
 
 	switch( selector ) {
+		case VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS:
+			return bgsubtractgauss_prepare( frame );
+			break;
 		case VJ_IMAGE_EFFECT_BGSUBTRACT:
 			return bgsubtract_prepare( frame );
 			break;	
