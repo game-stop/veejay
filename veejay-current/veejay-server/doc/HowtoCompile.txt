@@ -23,6 +23,7 @@ Optional:
 * liblo
 * DirectFB for secundary head (TVOut)
 * Jack for audio playback
+* G'MIC - GREYC's Magic for Image Computing
 
 
 ## Generic build instructions
@@ -83,6 +84,10 @@ If echo is silent, you must set the PKG_CONFIG_PATH to point to the directory co
 7. *optional* continue with building the plugin-packs
 <pre>
   $ cd plugin-packs/lvdgmic
+  $ sh autogen.sh
+  $ ./configure
+  $ make && sudo make install
+  $ cd plugin-packs/lvdcrop
   $ sh autogen.sh
   $ ./configure
   $ make && sudo make install
