@@ -32,6 +32,7 @@
  */
 
 /* Standard C includes */
+#include <config.h>
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
@@ -49,10 +50,10 @@ typedef UINT32 uint32_t;
 #endif
 
 /* Intrinsic declarations */
-#if defined(__SSE2__) || defined(__MMX__)
-#if defined(__SSE2__)
+#if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_MMX)
+#if defined(HAVE_ASM_SSE2)
 #include <emmintrin.h>
-#elif defined(__MMX__)
+#elif defined(HAVE_ASM_MMX)
 #include <mmintrin.h>
 #endif
 #if defined(__GNUC__)
@@ -60,7 +61,7 @@ typedef UINT32 uint32_t;
 #elif defined(_MSC_VER)
 #include <malloc.h>
 #endif
-#elif defined(__ALTIVEC__)
+#elif defined(HAVE_ASM_ALTIVEC)
 #include <altivec.h>
 #endif
 
@@ -119,13 +120,13 @@ typedef struct align(16)
  * Adds histograms \a x and \a y and stores the result in \a y. Makes use of
  * SSE2, MMX or Altivec, if available.
  */
-#if defined(__SSE2__)
+#if defined(HAVE_ASM_SSE2)
 static inline void histogram_add( const uint16_t x[16], uint16_t y[16] )
 {
     *(__m128i*) &y[0] = _mm_add_epi16( *(__m128i*) &y[0], *(__m128i*) &x[0] );
     *(__m128i*) &y[8] = _mm_add_epi16( *(__m128i*) &y[8], *(__m128i*) &x[8] );
 }
-#elif defined(__MMX__)
+#elif defined(HAVE_ASM_MMX)
 static inline void histogram_add( const uint16_t x[16], uint16_t y[16] )
 {
     *(__m64*) &y[0]  = _mm_add_pi16( *(__m64*) &y[0],  *(__m64*) &x[0]  );
@@ -133,7 +134,7 @@ static inline void histogram_add( const uint16_t x[16], uint16_t y[16] )
     *(__m64*) &y[8]  = _mm_add_pi16( *(__m64*) &y[8],  *(__m64*) &x[8]  );
     *(__m64*) &y[12] = _mm_add_pi16( *(__m64*) &y[12], *(__m64*) &x[12] );
 }
-#elif defined(__ALTIVEC__)
+#elif defined(HAVE_ASM_ALTIVEC)
 static inline void histogram_add( const uint16_t x[16], uint16_t y[16] )
 {
     *(vector unsigned short*) &y[0] = vec_add( *(vector unsigned short*) &y[0], *(vector unsigned short*) &x[0] );
@@ -153,13 +154,13 @@ static inline void histogram_add( const uint16_t x[16], uint16_t y[16] )
  * Subtracts histogram \a x from \a y and stores the result in \a y. Makes use
  * of SSE2, MMX or Altivec, if available.
  */
-#if defined(__SSE2__)
+#if defined(HAVE_ASM_SSE2)
 static inline void histogram_sub( const uint16_t x[16], uint16_t y[16] )
 {
     *(__m128i*) &y[0] = _mm_sub_epi16( *(__m128i*) &y[0], *(__m128i*) &x[0] );
     *(__m128i*) &y[8] = _mm_sub_epi16( *(__m128i*) &y[8], *(__m128i*) &x[8] );
 }
-#elif defined(__MMX__)
+#elif defined(HAVE_ASM_MMX)
 static inline void histogram_sub( const uint16_t x[16], uint16_t y[16] )
 {
     *(__m64*) &y[0]  = _mm_sub_pi16( *(__m64*) &y[0],  *(__m64*) &x[0]  );
@@ -167,7 +168,7 @@ static inline void histogram_sub( const uint16_t x[16], uint16_t y[16] )
     *(__m64*) &y[8]  = _mm_sub_pi16( *(__m64*) &y[8],  *(__m64*) &x[8]  );
     *(__m64*) &y[12] = _mm_sub_pi16( *(__m64*) &y[12], *(__m64*) &x[12] );
 }
-#elif defined(__ALTIVEC__)
+#elif defined(HAVE_ASM_ALTIVEC)
 static inline void histogram_sub( const uint16_t x[16], uint16_t y[16] )
 {
     *(vector unsigned short*) &y[0] = vec_sub( *(vector unsigned short*) &y[0], *(vector unsigned short*) &x[0] );
@@ -216,7 +217,7 @@ static void ctmf_helper(
     assert( dst_step != 0 );
 
     /* SSE2 and MMX need aligned memory, provided by _mm_malloc(). */
-#if defined(__SSE2__) || defined(__MMX__)
+#if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_MMX)
     h_coarse = (uint16_t*) _mm_malloc(  1 * 16 * n * cn * sizeof(uint16_t), 16 );
     h_fine   = (uint16_t*) _mm_malloc( 16 * 16 * n * cn * sizeof(uint16_t), 16 );
     memset( h_coarse, 0,  1 * 16 * n * cn * sizeof(uint16_t) );
@@ -330,7 +331,7 @@ static void ctmf_helper(
         }
     }
 
-#if defined(__SSE2__) || defined(__MMX__)
+#if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_MMX)
     _mm_empty();
     _mm_free(h_coarse);
     _mm_free(h_fine);
