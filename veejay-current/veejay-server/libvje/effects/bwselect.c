@@ -153,5 +153,3 @@ void bwselect_apply(VJFrame *frame, int width, int height, int min_threshold, in
 		}
 	}
 }
-
-void bwselect_free(){}

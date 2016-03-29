@@ -26,5 +26,4 @@
 
 vj_effect *bwselect_init();
 void bwselect_apply(VJFrame *frame, int width, int height, int min_threshold,int max_threshold, int mode, int gamma);
-void bwselect_free();
 #endif
