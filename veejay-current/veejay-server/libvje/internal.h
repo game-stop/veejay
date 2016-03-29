@@ -26,7 +26,7 @@
 #define VJE_SUCCESS 0
 #include <libvje/vje.h>
 
-#define VJ_IMAGE_EFFECT_MIN 94
+#define VJ_IMAGE_EFFECT_MIN 93
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -252,6 +252,7 @@ enum {
 	VJ_IMAGE_EFFECT_ALPHADAMPEN = 96,
 	VJ_IMAGE_EFFECT_RANDNOISE = 95,
 	VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS = 94,
+	VJ_IMAGE_EFFECT_BWOTSU = 93,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
@@ -459,6 +460,8 @@ extern void isolate_apply(VJFrame *frame, int w, int h, int angle, int r, int g,
 int opacity);
 
 extern void bwselect_apply(VJFrame *frame, int w, int h, int a , int b, int c, int g);
+
+extern void bwotsu_apply(VJFrame *frame, int mode, int skew,int invert);
 
 extern void complexinvert_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int i_noise);
 

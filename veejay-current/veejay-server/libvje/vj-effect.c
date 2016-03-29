@@ -99,6 +99,7 @@
 #include "effects/keyselect.h"
 #include "effects/greyselect.h"
 #include "effects/bwselect.h"
+#include "effects/bwotsu.h"
 #include "effects/complexinvert.h"
 #include "effects/complexthreshold.h"
 #include "effects/complexsaturate.h"
@@ -608,6 +609,7 @@ void vj_effect_initialize(int width, int height, int full_range)
     vj_effects[VJ_IMAGE_EFFECT_DISTORTION]			= distortion_init(width, height);
     vj_effects[VJ_IMAGE_EFFECT_GREYSELECT]			= greyselect_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_BWSELECT]			= bwselect_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_BWOTSU]				= bwotsu_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_COMPLEXINVERT]		= complexinvert_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_COMPLEXSATURATE]		= complexsaturation_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_ISOLATE]				= isolate_init(width,height);
