@@ -80,7 +80,7 @@ static void usage(char *progname)
 	printf( "-m <file>\tMIDI configuration file.\n");
 	printf( "-g\t\t<X,Y>\tWindow position on screen.\n");
 	printf( "-b\t\tEnable beta features.\n");
-	printf( "-a\t\tAuto-connect multi-tracker to local running veejays.\n");
+	printf( "-a\t\tAuto-connect to local running veejays.\n");
 	printf( "-L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
 
 	printf( "\n\n");
