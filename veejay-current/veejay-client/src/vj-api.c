@@ -7427,11 +7427,19 @@ void vj_gui_init(char *glade_file,
 	                         (void*) gui,
 	                         use_threads);
 
+	veejay_memset( &info->watch, 0, sizeof(watchdog_t));
+	info->watch.state = STATE_WAIT_FOR_USER; //
+
 	if( auto_connect )
 	{
 		for( i = DEFAULT_PORT_NUM; i < 9999; i+= 1000 )
 		{
-			multrack_audoadd( gui->mt, "localhost", i);
+			if (multrack_audoadd( gui->mt, "localhost", i) != -1)
+			{
+				update_spin_value( "button_portnum", i );
+				info->watch.state = STATE_CONNECT;
+				break;
+			}
 		}
 	}
 
@@ -7459,8 +7467,6 @@ void vj_gui_init(char *glade_file,
 		gtk_widget_show( root_menu );
 
 	}
-	veejay_memset( &info->watch, 0, sizeof(watchdog_t));
-	info->watch.state = STATE_WAIT_FOR_USER; //
 	veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));
 	info->midi =  vj_midi_new( info->main_window );
 	gettimeofday( &(info->time_last) , 0 );
