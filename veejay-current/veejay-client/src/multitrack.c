@@ -1097,12 +1097,6 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		
 		vj_gui_enable();
 	}
-	
-	if( event->type == GDK_BUTTON_PRESS )
-	{
-		mt->selected = v->num;
-	}
-
 	return FALSE;
 }
 
