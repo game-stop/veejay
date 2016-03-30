@@ -1071,6 +1071,7 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		if( !gvr_track_test( mt->preview , v->num ) )
 			return FALSE;
 
+		int last_selected = mt->selected;
 		mt->selected = v->num;
 		
 		vj_gui_disable();		
@@ -1094,6 +1095,9 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		}
 		veejay_msg(VEEJAY_MSG_INFO, "Set master to track %d", mt->master_track );
 		mt->master_track = v->num;
+		if( last_selected >= 0 && last_selected < MAX_TRACKS )
+			gtk_widget_set_state (mt->view[last_selected]->event_box, GTK_STATE_NORMAL);
+		gtk_widget_set_state (w, GTK_STATE_SELECTED);
 		
 		vj_gui_enable();
 	}
