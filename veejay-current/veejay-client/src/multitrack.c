@@ -1060,8 +1060,16 @@ void		multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img )
 	g_object_unref( scaled );
 }
 
-
-static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data)
+/*! \brief Multi track sequence view button_press_event callback.
+ *
+ *  \sa new_sequence_view
+ *
+ *  \param w A pointer of calling widget
+ *  \param event A pointer of the current event
+ *  \param user_data A pointer of the current \c sequence_view_t
+ *  \return Always \c FALSE to propagate the event.
+ */
+static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data )
 {
 	sequence_view_t *v = (sequence_view_t*) user_data;
 	multitracker_t *mt = v->backlink;
@@ -1072,9 +1080,8 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 			return FALSE;
 
 		mt->selected = v->num;
-		
-		vj_gui_disable();		
-	
+		vj_gui_disable();
+
 		// hostname, port_num from gvr
 		char *host = gvr_track_get_hostname( mt->preview, v->num );
 		int   port = gvr_track_get_portnum ( mt->preview, v->num );
@@ -1086,7 +1093,7 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		}
 
 		vj_gui_cb( 0, host, port );
- 		
+
 		gvr_set_master( mt->preview, v->num );
 		if(!gvr_track_configure( mt->preview, v->num, mt->pw,mt->ph) )
 		{
@@ -1094,13 +1101,8 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		}
 		veejay_msg(VEEJAY_MSG_INFO, "Set master to track %d", mt->master_track );
 		mt->master_track = v->num;
-		
+
 		vj_gui_enable();
 	}
 	return FALSE;
 }
-
-
-
-
-
