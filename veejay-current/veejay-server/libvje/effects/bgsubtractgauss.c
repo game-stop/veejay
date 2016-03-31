@@ -70,7 +70,6 @@ vj_effect *bgsubtractgauss_init(int width, int height)
 	ve->sub_format = -1;
 	ve->has_user = 1;
 	ve->user_data = NULL;
-	ve->sub_format = 0;
 	ve->parallel = 1;
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Alpha Max", "Threshold", "Noise Level", "Mode", "Frame Period", "Morphology Level");
