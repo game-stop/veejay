@@ -1079,6 +1079,7 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		if( !gvr_track_test( mt->preview , v->num ) )
 			return FALSE;
 
+		int last_selected = mt->selected;
 		mt->selected = v->num;
 		vj_gui_disable();
 
