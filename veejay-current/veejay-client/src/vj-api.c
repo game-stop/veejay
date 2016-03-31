@@ -7430,15 +7430,17 @@ void vj_gui_init(char *glade_file,
 	veejay_memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_WAIT_FOR_USER; //
 
+	//connect client at first available server
+	//and try to connect multitrack to all existing server
 	if( auto_connect )
 	{
 		for( i = DEFAULT_PORT_NUM; i < 9999; i+= 1000 )
 		{
-			if (multrack_audoadd( gui->mt, "localhost", i) != -1)
+			if (multrack_audoadd( gui->mt, "localhost", i) != -1 && auto_connect)
 			{
 				update_spin_value( "button_portnum", i );
 				info->watch.state = STATE_CONNECT;
-				break;
+				auto_connect = 0;
 			}
 		}
 	}
