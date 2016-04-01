@@ -7307,6 +7307,19 @@ void vj_gui_init(char *glade_file,
 	}
 	info = gui;
 
+	//set "connection" button has default in veejay connection dialog
+	gtk_entry_set_activates_default(GTK_ENTRY(glade_xml_get_widget_( info->main_window,
+	                                                                "entry_hostname" )),
+	                                TRUE);
+	gtk_entry_set_activates_default(GTK_ENTRY(glade_xml_get_widget_( info->main_window,
+	                                                                "button_portnum" )),
+	                                TRUE);
+	GtkWidget *vj_button = glade_xml_get_widget_( info->main_window, "button_veejay" );
+	gtk_widget_set_can_default(vj_button,TRUE);
+	GtkWidget *connection_dial = glade_xml_get_widget_( info->main_window,
+	                                                   "veejay_connection");
+	gtk_window_set_default(GTK_WINDOW(connection_dial), vj_button);
+
 	glade_xml_signal_autoconnect( gui->main_window );
 	GtkWidget *frame = glade_xml_get_widget_( info->main_window, "markerframe" );
 	info->tl = timeline_new();
