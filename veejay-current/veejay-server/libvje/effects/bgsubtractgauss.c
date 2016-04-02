@@ -29,14 +29,17 @@
 #include "bgsubtractgauss.h"
 #include "common.h"
 
+static uint8_t instance = 0;
 static uint8_t *static_bg__ = NULL;
+static uint8_t *fg_frame__ = NULL;
 static uint8_t *static_bg_frame__[4] = { NULL,NULL,NULL,NULL };
 static double *pMu = NULL;
 static double *pVar = NULL;
 static uint32_t bg_n = 0;
 static double pNoise = 0.0;
 static uint8_t *morph_frame__ = NULL;
-static uint8_t *fg_frame__ = NULL;
+static uint8_t *mean = NULL;
+static int auto_hist = 1;
 
 vj_effect *bgsubtractgauss_init(int width, int height)
 {
@@ -71,6 +74,9 @@ vj_effect *bgsubtractgauss_init(int width, int height)
 	ve->has_user = 1;
 	ve->user_data = NULL;
 	ve->parallel = 1;
+	ve->global = 1; /* this FX is not freed when switching between samples */
+	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
+
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Alpha Max", "Threshold", "Noise Level", "Mode", "Frame Period", "Morphology Level");
 	ve->hints = vje_init_value_hint_list( ve->num_params );
@@ -86,6 +92,11 @@ vj_effect *bgsubtractgauss_init(int width, int height)
 					"No Erosion/Dilation of FG",
 					"Erode/Dilate FG" );
 
+	const char *hist = getenv( "VEEJAY_BG_AUTO_HISTOGRAM_EQ" );
+	if( hist ) {
+		auto_hist = atoi( hist );
+	}
+
 	return ve;
 }
 
@@ -99,10 +110,17 @@ static void bg_init( double noise, const int len )
 	pNoise = noise;
 }
 
+int bgsubtractgauss_instances()
+{
+	return instance;
+}
+
 int bgsubtractgauss_malloc(int width, int height)
 {
 	if(static_bg__ == NULL){
 		static_bg__ = (uint8_t*) vj_malloc( RUP8(width*height*4));
+		if(!static_bg__ )
+			return 0;
 		static_bg_frame__[0] = static_bg__;
 		static_bg_frame__[1] = static_bg_frame__[0] + RUP8(width*height);
 		static_bg_frame__[2] = static_bg_frame__[1] + RUP8(width*height);
@@ -113,23 +131,64 @@ int bgsubtractgauss_malloc(int width, int height)
 	}
 
 	if( fg_frame__ == NULL ) {
-		fg_frame__ = (uint8_t*) vj_calloc( RUP8(width*height) );
+		fg_frame__ = (uint8_t*) vj_calloc( RUP8(width*height*2) );
+		if(!fg_frame__ ) {
+			free(static_bg__);static_bg__ = NULL;
+			return 0;
+		}
 	}
 
 	if( morph_frame__ == NULL ) {
 		morph_frame__ = (uint8_t*) vj_calloc( RUP8(width*height));
+		if(!morph_frame__) {
+			free(static_bg__);static_bg__ = NULL;
+			free(fg_frame__);fg_frame__ = NULL;
+			return 0;
+		}
 	}
 
 	if( pMu == NULL ) {
 		pMu = (double*) vj_malloc( RUP8(sizeof(double) * width * height ));
+		if( pMu == NULL ) {
+			free(static_bg__); static_bg__ = NULL;
+			free(fg_frame__); fg_frame__ = NULL;
+			free(morph_frame__); morph_frame__ = NULL;
+			return 0;
+		}
 	}
 
 	if( pVar == NULL ) {
 		pVar = (double*) vj_malloc( RUP8(sizeof(double) * width * height ));
+		if( pVar == NULL ) {
+			free(static_bg__); static_bg__ = NULL;
+			free(fg_frame__); fg_frame__ = NULL;
+			free(morph_frame__); morph_frame__ = NULL;
+			free(pMu); pMu = NULL;
+			return 0;
+		}
+
 		bg_init( 50.0, width * height );
 	}
 
+	if( mean == NULL ) {
+		mean =  (uint8_t*) vj_calloc( RUP8(width*height) );
+		if( mean == NULL ) {
+			free(static_bg__); static_bg__ = NULL;
+			free(fg_frame__); fg_frame__ = NULL;
+			free(morph_frame__); morph_frame__ = NULL;
+			free(pMu); pMu = NULL;
+			free(pVar); pVar = NULL;
+			return 0;
+		}
+	}
+
+	veejay_msg( VEEJAY_MSG_INFO,
+			"You can enable/disable the histogram equalizer by setting env var VEEJAY_BG_AUTO_HISTOGRAM_EQ" );
+	veejay_msg( VEEJAY_MSG_INFO,
+			"Histogram equalization is %s", (auto_hist ? "enabled" : "disabled" ));
+
 	bg_n = 0;
+	instance = 1;
 
 	return 1;
 }
@@ -138,7 +197,6 @@ void bgsubtractgauss_free()
 {
 	if( static_bg__ ) {
 		free(static_bg__ );
-
 		static_bg_frame__[0] = NULL;
 		static_bg_frame__[1] = NULL;
 		static_bg_frame__[2] = NULL;
@@ -165,6 +223,13 @@ void bgsubtractgauss_free()
 		free(pMu);
 		pMu = NULL;
 	}
+
+	if( mean ) {
+		free(mean);
+		mean = NULL;
+	}
+
+	instance = 0;
 }
 
 int bgsubtractgauss_prepare(VJFrame *frame)
@@ -202,6 +267,8 @@ uint8_t* bgsubtractgauss_get_bg_frame(unsigned int plane)
 static void bgsubtractgauss_show_bg( VJFrame *frame )
 {
 	veejay_memcpy( frame->data[0], static_bg_frame__[0], frame->len );
+	veejay_memset( frame->data[1], 128, frame->uv_len );
+	veejay_memset( frame->data[2], 128, frame->uv_len );
 }
 
 static void bgsubtractgauss_show_fg( VJFrame *frame )
@@ -214,21 +281,52 @@ static void bgsubtractgauss_show_fg( VJFrame *frame )
 static void bg_subtract( VJFrame *frame, double threshold, uint8_t *A )
 {
 	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	int i;
+	const uint8_t *Y = frame->data[0];
+	unsigned int i;
+
+	vje_mean_filter( Y, mean, frame->width, frame->height );
+
 	for( i = 0; i < len; i ++ )
 	{
-		double dY = ((double) Y[i]) - pMu[i];
+		double dY = ((double) mean[i]) - pMu[i];
 		double d2 = (dY * dY) / pVar[i];
 
 		A[i]      = (d2 < threshold ? 0: 0xff);
 	}
 }
 
+static void show_pMu( VJFrame *frame )
+{
+	const int len = frame->len;
+	uint8_t *Y = frame->data[0];
+	unsigned int i;
+
+	for( i = 0; i < len; i ++ )
+	{
+		Y[i] = (uint8_t) pMu[i];
+	}
+	veejay_memset( frame->data[1], 128, frame->uv_len);
+	veejay_memset( frame->data[2], 128, frame->uv_len);
+}
+
+static void show_pVar( VJFrame *frame )
+{
+	const int len = frame->len;
+	uint8_t *Y = frame->data[0];
+	unsigned int i;
+
+	for( i = 0; i < len; i ++ )
+	{
+		Y[i] = (uint8_t) pVar[i];
+	}
+	veejay_memset( frame->data[1], 128, frame->uv_len);
+	veejay_memset( frame->data[2], 128, frame->uv_len);
+}
+
 static void fg_erode( uint8_t *I, const int w, const int h, uint8_t *O )
 {
 	unsigned int x,y;
-	const int len = w * h;
+	const int len = (w * h) - w;
 	const int aw = w - 1;
 
 	for( y = w; y < len; y += w )
@@ -260,7 +358,7 @@ static void fg_erode( uint8_t *I, const int w, const int h, uint8_t *O )
 static void fg_dilate( uint8_t *I, const int w, const int h, uint8_t *O )
 {
 	unsigned int x,y;
-	const int len = w * h;
+	const int len = (w * h) - w;
 	const int aw = w - 1;
 
 	for( y = w; y < len; y += w )
@@ -301,9 +399,12 @@ static void bg_update( VJFrame *frame, double threshold, double alpha, double no
 	uint8_t *bg = static_bg_frame__[0];
 	unsigned int i;
 
+	/* mean filter on BG */
+	vje_mean_filter( Y, mean, frame->width, frame->height );
+
 	for( i = 0; i < len; i ++ )
 	{
-		double src = (double) Y[i];
+		double src = (double) mean[i];
 		double d   = (src - pMu[i]) * (src - pMu[i]) - pVar[i];
 
 		pMu[i]  += (alpha * (src - pMu[i]));
@@ -328,6 +429,9 @@ void bgsubtractgauss_apply(VJFrame *frame, int alpha_max, int threshold, int noi
 	double g_noise = ( (double) noise ) / 10.0;
 	double g_threshold = ( (double) threshold) / 100.0;
 
+	if( auto_hist )
+		vje_histogram_auto_eq( frame );
+
 	switch( mode )
 	{
 		case 0:
@@ -337,8 +441,7 @@ void bgsubtractgauss_apply(VJFrame *frame, int alpha_max, int threshold, int noi
 			break;
 		case 1:
 			/* show foreground, no update of bg */
-			bg_subtract( frame, g_threshold, fg_frame__ ); 
-
+			bg_subtract( frame, g_threshold,fg_frame__ ); 
 			if( morphology ) {
 				bgsubtractgauss_morph( frame, fg_frame__, fg_frame__ );
 			}	
@@ -346,20 +449,20 @@ void bgsubtractgauss_apply(VJFrame *frame, int alpha_max, int threshold, int noi
 			bgsubtractgauss_show_fg( frame );
 			break;
 		case 2:
-			/* fill alpha channel with foreground, no update of bg */
-			bg_subtract( frame, g_threshold, frame->data[3] );
+			// fill alpha channel with foreground, no update of bg 
+			bg_subtract( frame, g_threshold,frame->data[3] );
 			if( morphology ) {
 				bgsubtractgauss_morph( frame, frame->data[3], frame->data[3] );
 			}
 
 			break;
 		case 3:
-			/* show foreground, update bg every period frames*/
+			// show foreground, update bg every period frames
+			bg_subtract( frame, g_threshold,fg_frame__ );
 			if( (bg_n % period) == 0 ) {
 				bg_update( frame, g_threshold, g_alphaMax, g_noise );
 			}
 
-			bg_subtract( frame, g_threshold, fg_frame__ );
 
 			if( morphology ) {
 				bgsubtractgauss_morph( frame, fg_frame__, fg_frame__ );
@@ -370,12 +473,11 @@ void bgsubtractgauss_apply(VJFrame *frame, int alpha_max, int threshold, int noi
 			bg_n ++;
 			break;
 		case 4:
-			/* fill alpha channel with foreground, update bg every period frames */
+			// fill alpha channel with foreground, update bg every period frames 
+			bg_subtract( frame, g_threshold,frame->data[3] );
 			if( (bg_n % period) == 0 ) {
 				bg_update( frame, g_threshold, g_alphaMax, g_noise );
 			}
-
-			bg_subtract( frame, g_threshold, frame->data[3] );
 
 			if( morphology ) {
 				bgsubtractgauss_morph( frame, frame->data[3], frame->data[3] );

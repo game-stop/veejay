@@ -39,7 +39,7 @@ vj_effect *autoeq_init(int w, int h)
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
 
-    ve->defaults[0] = 0; // y only, v only, u only, all
+    ve->defaults[0] = 0; // show histogram
     ve->defaults[1] = 200; // intensity
     ve->defaults[2] = 132; // strength
 
@@ -47,7 +47,11 @@ vj_effect *autoeq_init(int w, int h)
     ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Channel (Y,U,V,All)","Intensity","Strength");
+    ve->param_description = vje_build_param_list( ve->num_params, "Mode","Intensity","Strength");
+    ve->hints = vje_init_value_hint_list( ve->num_params );
+
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0],0,
+		    "Show Histogram", "Equalize Frame" );
     return ve;
 }
 

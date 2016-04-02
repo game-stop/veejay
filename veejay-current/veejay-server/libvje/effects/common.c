@@ -94,7 +94,6 @@ static inline void linearBlend(unsigned char *src, int stride)
 //#endif
 }
 
-
 matrix_t matrix_placementA(int photoindex, int size, int w , int h)
 {
 	matrix_t m;
@@ -1717,6 +1716,32 @@ void	veejay_histogram_equalize( void *his, VJFrame *f , int intensity, int stren
 		y[i] = LUT[ y[i] ];
 }
 
+void	vje_histogram_auto_eq( VJFrame *frame )
+{
+	const int len = frame->len;
+	const double alpha = 255.0 / len;
+	unsigned int i;
+	uint32_t H[GREY_LEVELS];
+	double C[GREY_LEVELS];
+	uint8_t *Y = frame->data[0];
+
+	veejay_memset( H, 0, sizeof(H));
+
+	for( i = 0; i < len; i ++ ) {
+		H[ Y[i] ] ++;
+	}
+
+	C[0] = round(alpha * H[0]);
+	for( i = 1; i < GREY_LEVELS; i ++ ) {
+		C[i] = round( C[i - 1] + alpha * H[i] );
+	}
+
+	for( i = 0; i < len; i ++ )
+	{
+		Y[i] = (uint8_t) C[ Y[i] ];
+	}
+}
+
 void	veejay_histogram_analyze_rgb( void *his, uint8_t *rgb, VJFrame *f )
 {
 	histogram_t *h = (histogram_t*) his;
@@ -2067,3 +2092,62 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 	return n_labels;
 }
 
+
+void	vje_mean_filter( const uint8_t *src, uint8_t *dst, const int w, const int h )
+{
+	const int len = w * h;
+	unsigned int x,y;
+	const int aw = w - 1;
+
+	for( y = w; y < len; y += w )
+	{
+		for(x = 1; x < aw; x++ )
+		{
+			dst[x+y] = (
+				src[x - 1 + y - w ] +
+				src[x + y - w ] +
+				src[x + 1 + y - w ] +
+				src[x - 1 + y ] +
+				src[x + y] +
+				src[x + 1 + y ] +
+				src[x - 1 + y + w ] +
+				src[x + y + w] +
+				src[x + 1 + y + w ] ) / 9;
+		}
+	}
+}
+
+void	vje_weighted_average_bin( const uint8_t *src, uint8_t *dst, const int w, const int h )
+{
+	const int len = w * h;
+	unsigned int x,y;
+	const int aw = w - 1;
+
+	/* 1 2 1 
+	 * 2 4 2
+	 * 1 2 1
+	 */
+
+	for( y = w; y < len; y += w )
+	{
+		for(x = 1; x < aw; x++ )
+		{
+			if( src[x+y] > 0 ) {
+				dst[x+y] = (
+					src[x - 1 + y - w ] +
+					(2* src[x + y - w ]) +
+					src[x + 1 + y - w ] +
+					(2*src[x - 1 + y ]) +
+					(4*src[x + y]) +
+					(2*src[x + 1 + y ]) +
+					src[x - 1 + y + w ] +
+					(2*src[x + y + w]) +
+					src[x + 1 + y + w ] ) / 16;
+			}
+			else {
+				dst[x+y] = 0;
+			}
+		}
+	}
+
+}

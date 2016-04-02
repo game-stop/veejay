@@ -18,17 +18,15 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef BGSUBTRACTGAUSS_H
-#define BGSUBTRACTGAUSS_H
+#ifndef MEANFILTER_H
+#define MEANFTILER_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *bgsubtractgauss_init(int width, int height);
-int bgsubtractgauss_instances();
-void bgsubtractgauss_free();
-int bgsubtractgauss_malloc(int w, int h);
-int bgsubtractgauss_prepare(VJFrame *frame); 
-void bgsubtractgauss_apply(VJFrame *frame, int alpha, int threshold,int noise, int mode, int period, int morph);
-uint8_t *bgsubtractgauss_get_bg_frame(unsigned int plane);
+vj_effect *meanfilter_init(int w, int h);
+void meanfilter_apply( VJFrame *frame );
+int meanfilter_malloc(int w, int h);
+void meanfilter_free();
+
 #endif

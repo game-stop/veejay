@@ -567,7 +567,7 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 		} 
 	}
 
-	sample_chain_free( info->uc->sample_id );
+	sample_chain_free( info->uc->sample_id,0);
 	sample_set_framedups(info->uc->sample_id,0);
 	sample_set_resume(info->uc->sample_id, info->settings->current_frame_num );
 
@@ -582,7 +582,7 @@ static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 		}
 	}
 
-	vj_tag_chain_free( info->uc->sample_id );
+	vj_tag_chain_free( info->uc->sample_id, 0);
 }
 static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 {

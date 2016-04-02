@@ -32,6 +32,8 @@ static uint8_t *static_bg__ = NULL;
 static uint8_t *bg_frame__[4] = { NULL,NULL,NULL,NULL };
 static int bg_ssm = 0;
 static unsigned int bg_n = 0;
+static uint8_t instance = 0;
+static int auto_hist = 1;
 
 vj_effect *bgsubtract_init(int width, int height)
 {
@@ -53,6 +55,7 @@ vj_effect *bgsubtract_init(int width, int height)
 	ve->defaults[1] = 0;
 	ve->defaults[2] = 0;
 	ve->defaults[3] = 0;
+	ve->defaults[4] = 0;
 
 	ve->description = "Subtract Background";
 	ve->extra_frame = 0;
@@ -61,6 +64,7 @@ vj_effect *bgsubtract_init(int width, int height)
 	ve->user_data = NULL;
 	ve->sub_format = 0;
 	ve->parallel = 1;
+	ve->global = 1; /* this effect is not freed when switching samples */
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "BG Method","Enable", "To Alpha");
 
@@ -72,7 +76,17 @@ vj_effect *bgsubtract_init(int width, int height)
 
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
+	const char *hist = getenv( "VEEJAY_BG_AUTO_HISTOGRAM_EQ" );
+	if( hist ) {
+		auto_hist = atoi( hist );
+	}
+
 	return ve;
+}
+
+int bgsubtract_instances()
+{
+	return instance;
 }
 
 int bgsubtract_malloc(int width, int height)
@@ -84,6 +98,13 @@ int bgsubtract_malloc(int width, int height)
 		bg_frame__[2] = bg_frame__[1] + RUP8(width*height);
 		bg_frame__[3] = bg_frame__[2] + RUP8(width*height);
 	}
+	
+	instance = 1;
+	
+	veejay_msg( VEEJAY_MSG_INFO,
+			"You can enable/disable the histogram equalizer by setting env var VEEJAY_BG_AUTO_HISTOGRAM_EQ" );
+	veejay_msg( VEEJAY_MSG_INFO,
+			"Histogram equalization is %s", (auto_hist ? "enabled" : "disabled" ));
 
 	return 1;
 }
@@ -98,8 +119,10 @@ void bgsubtract_free()
 		bg_frame__[2] = NULL;
 		bg_frame__[3] = NULL;
 		static_bg__ = NULL;
-		bg_ssm = 0;
 	}
+
+	bg_ssm = 0;
+	instance = 0;
 }
 
 int bgsubtract_prepare(VJFrame *frame)
@@ -109,8 +132,12 @@ int bgsubtract_prepare(VJFrame *frame)
 		return 0;
 	}
 	
+	if( auto_hist )
+		vje_histogram_auto_eq( frame );
+
 	//@ copy the iamge
 	veejay_memcpy( bg_frame__[0], frame->data[0], frame->len );
+	
 	if( frame->ssm ) {
 		veejay_memcpy( bg_frame__[1], frame->data[1], frame->len );
 		veejay_memcpy( bg_frame__[2], frame->data[2], frame->len );
@@ -170,6 +197,10 @@ static void bgsubtract_show_bg( VJFrame *frame )
 void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int method, int enabled, int alpha )
 {
 	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
+
+	if( auto_hist )
+		vje_histogram_auto_eq( frame );
+
 	if( enabled == 0 ) {
 		switch( method ) {
 			case 0:

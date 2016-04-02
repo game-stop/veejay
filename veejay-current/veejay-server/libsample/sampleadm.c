@@ -991,7 +991,7 @@ int sample_del(int sample_id)
     if (sample_node) {
 	    int i;
 
-	    sample_chain_free( sample_id );
+	    sample_chain_free( sample_id,1 );
 
 	    if(si->soft_edl == 0 && si->edit_list != NULL)
  	 	   vj_el_break_cache( si->edit_list ); //@ destroy cache, if any
@@ -1994,7 +1994,7 @@ int sample_chain_malloc(int s1)
     return sum; 
 }
 
-int sample_chain_free(int s1)
+int sample_chain_free(int s1, int global)
 {
     sample_info *sample = sample_get(s1);
     int i=0;
@@ -2009,15 +2009,16 @@ int sample_chain_free(int s1)
 		{
 			if(vj_effect_initialized(e_id, sample->effect_chain[i]->fx_instance))
 			{
-				vj_effect_deactivate(e_id, sample->effect_chain[i]->fx_instance);
+				vj_effect_deactivate(e_id, sample->effect_chain[i]->fx_instance, global);
 				sample->effect_chain[i]->fx_instance = NULL;
 				sample->effect_chain[i]->clear = 1;
 				sum++;
-			}
-			if( sample->effect_chain[i]->source_type == 1 && 
-				vj_tag_get_active( sample->effect_chain[i]->channel ) &&
-			 	vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
-					vj_tag_disable( sample->effect_chain[i]->channel );
+				
+				if( sample->effect_chain[i]->source_type == 1 && 
+					vj_tag_get_active( sample->effect_chain[i]->channel ) &&
+				 	vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+						vj_tag_disable( sample->effect_chain[i]->channel );
+				}
 			}
 		}
 	}
@@ -2124,11 +2125,8 @@ int sample_chain_add(int s1, int c, int effect_nr)
     if (c < 0 || c >= SAMPLE_MAX_EFFECTS)
 		return 0;
 
-/*	if ( effect_nr < VJ_IMAGE_EFFECT_MIN ) return -1;
-
-	if ( effect_nr > VJ_IMAGE_EFFECT_MAX && effect_nr < VJ_VIDEO_EFFECT_MIN )
-		return -1;
-*/
+	if( vj_effect_single_instance( effect_nr ))
+		return 0;	
 
     if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
     {
@@ -2146,12 +2144,12 @@ int sample_chain_add(int s1, int c, int effect_nr)
 				}
 			
 				if( frm == 1 ) {
-					vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
+					vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance,1 );
 					sample->effect_chain[c]->fx_instance = NULL;
 					sample->effect_chain[c]->clear = 1;
 				}
 			} else {
-				vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
+				vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance,1 );
 				sample->effect_chain[c]->fx_instance = NULL;
 				sample->effect_chain[c]->clear = 1;
 			}
@@ -2317,7 +2315,7 @@ int sample_chain_clear(int s1)
 		if(sample->effect_chain[i]->effect_id != -1)
 		{
 			if(vj_effect_initialized( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance )) {
-				vj_effect_deactivate( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance ); 
+				vj_effect_deactivate( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance,1 ); 
 				sample->effect_chain[i]->fx_instance = NULL;
 				sample->effect_chain[i]->clear = 1;
 			}
@@ -2441,7 +2439,7 @@ int sample_chain_remove(int s1, int position)
     if(sample->effect_chain[position]->effect_id != -1)
     {
 		if(vj_effect_initialized( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance ) && _sample_can_free( sample, position, sample->effect_chain[position]->effect_id) ) { 
-			vj_effect_deactivate( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance);    
+			vj_effect_deactivate( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance, 1);    
 			sample->effect_chain[position]->fx_instance = NULL;
 			sample->effect_chain[position]->clear = 1;
 		}

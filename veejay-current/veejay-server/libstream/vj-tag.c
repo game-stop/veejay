@@ -1277,7 +1277,7 @@ int vj_tag_del(int id)
 		break;
     }
   
-	vj_tag_chain_free( tag->id );
+	vj_tag_chain_free( tag->id,1 );
 
 	if(tag->encoder_active)
 		vj_tag_stop_encoder( tag->id );	
@@ -1952,7 +1952,7 @@ int vj_tag_chain_malloc(int t1)
 	return sum; 
 }
 
-int vj_tag_chain_free(int t1)
+int vj_tag_chain_free(int t1, int global)
 {
     vj_tag *tag = vj_tag_get(t1);
     int i=0;
@@ -1966,7 +1966,7 @@ int vj_tag_chain_free(int t1)
 		{
 			if(vj_effect_initialized(e_id, tag->effect_chain[i]->fx_instance) )
 			{
-				vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance);
+				vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance, global);
 				tag->effect_chain[i]->fx_instance = NULL;
 				tag->effect_chain[i]->clear = 1;
 				if(tag->effect_chain[i]->kf)
@@ -1974,11 +1974,12 @@ int vj_tag_chain_free(int t1)
 				tag->effect_chain[i]->kf = vpn(VEVO_ANONYMOUS_PORT );
 
 				sum++;
-			}
-			if( tag->effect_chain[i]->source_type == 1 && 
-				vj_tag_get_active( tag->effect_chain[i]->channel ) && 
-				vj_tag_get_type( tag->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
-				vj_tag_disable( tag->effect_chain[i]->channel );
+			
+				if( tag->effect_chain[i]->source_type == 1 && 
+					vj_tag_get_active( tag->effect_chain[i]->channel ) && 
+					vj_tag_get_type( tag->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+					vj_tag_disable( tag->effect_chain[i]->channel );
+				}
 			}
 
 	  	}
@@ -2098,6 +2099,9 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 		return 0;
 
+	if( vj_effect_single_instance( effect_id ))
+		return 0;	
+
     if( tag->effect_chain[position]->effect_id != -1 && tag->effect_chain[position]->effect_id != effect_id )
     {
 		//verify if the effect should be discarded
@@ -2112,13 +2116,13 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 						frm = 0;
 				}
 				if( frm == 1 ) {
-					vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+					vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance,1 );
 					tag->effect_chain[position]->fx_instance = NULL;
 					tag->effect_chain[position]->clear = 1;
 				}
 			} 
 			else {
-				vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+				vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance,1 );
 				tag->effect_chain[position]->fx_instance = NULL;
 				tag->effect_chain[position]->clear = 1;
 			}
@@ -2671,7 +2675,7 @@ int vj_tag_chain_remove(int t1, int index)
     {
 		if( vj_effect_initialized( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance ) && vj_tag_chain_can_delete( tag, index, tag->effect_chain[index]->effect_id ) )
 		{
-			vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance );
+			vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance,1 );
 			tag->effect_chain[index]->fx_instance = NULL;
 			tag->effect_chain[index]->clear = 1;
 		}

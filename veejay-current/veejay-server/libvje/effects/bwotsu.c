@@ -41,7 +41,7 @@ vj_effect *bwotsu_init(int w, int h)
 	ve->limits[0][2] = 0;
 	ve->limits[1][2] = 1;
     
-	ve->description = "Binary Threshold via Otsu's method";
+	ve->description = "Black and White Mask by Otsu's method";
     
 	ve->sub_format = -1;
 	ve->extra_frame = 0;

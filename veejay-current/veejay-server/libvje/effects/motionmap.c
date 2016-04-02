@@ -27,21 +27,6 @@
 	 p4 = Decay
 */
 
-/*
- * This FX relies on gcc's auto vectorization.
- * To use the plain C version, define NO_AUTOVECTORIZATION
- */
-
-/* TODO:
- *
- *
- * create mask of foreground object (aproximate IR)
- * put mask into alpha-channel
- * apply secundary effect on alpha-channel
- * apply secundary effect on whole frame, using alpha channel
- *
- */
-
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -67,7 +52,7 @@ vj_effect *motionmap_init(int w, int h)
     ve->limits[0][0] = 0;    
     ve->limits[1][0] = 255; /* threshold */
     ve->limits[0][1] = 1;  
-    ve->limits[1][1] = (w*h)/2;
+    ve->limits[1][1] = (w*h)/20;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
     ve->limits[0][4] = 1;
@@ -385,12 +370,14 @@ int	motionmap_prepare( uint8_t *map[4], int width, int height )
 	return 1;
 }
 
-void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int limit, int draw, int history, int decay, int interpol, int last_act_level )
+void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int limit1, int draw, int history, int decay, int interpol, int last_act_level )
 {
 	unsigned int i;
 	const unsigned int len = (width * height);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+	const int limit = limit1 * 10;
+
 //	uint8_t *alpha = frame->data[3];
 
 	if(!have_bg) {

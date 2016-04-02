@@ -183,7 +183,7 @@ typedef struct sample_info_t {
 #define SAMPLE_DEC_BIBBER 1
 #define SAMPLE_DEC_FREEZE 2
 extern int sample_chain_malloc(int sample_id);
-extern int sample_chain_free(int sample_id);
+extern int sample_chain_free(int sample_id, int global);
 extern int sample_size();
 extern int sample_verify();
 extern int sample_init(int len, void *font, editlist *el);

@@ -104,6 +104,7 @@ typedef struct vj_effect_t {
 	int rgba_only;
 	int motion;
 	int alpha;
+	int global;
 } vj_effect;
 
 extern unsigned int get_pixel_range_min_Y();
@@ -117,6 +118,7 @@ extern const char *vj_effect_get_description(int effect_id);
 extern const char *vj_effect_get_param_description(int effect_id, int param_nr);
 extern int vj_effect_get_extra_frame(int effect_id);
 extern int vj_effect_get_num_params(int effect_id);
+extern int  vj_effect_single_instance(int effect_id);
 extern int vj_effect_get_default(int effect_id, int param_nr);
 extern int vj_effect_get_min_limit(int effect_id, int param_nr);
 extern int vj_effect_get_max_limit(int effect_id, int param_nr);
@@ -128,7 +130,7 @@ extern int vj_effect_is_valid(int effect_id);
 extern int vj_effect_get_summary(int entry, char *dst);
 extern int vj_effect_get_summary_len(int entry);
 extern void *vj_effect_activate(int e, int *retcode);
-extern int vj_effect_deactivate(int e, void *ptr);
+extern int vj_effect_deactivate(int e, void *ptr, int global);
 extern int vj_effect_initialized(int e, void *ptr);
 extern int vj_effect_get_by_name(char *name);
 extern int vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments, void *ptr);

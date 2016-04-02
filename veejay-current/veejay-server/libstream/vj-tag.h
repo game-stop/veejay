@@ -144,7 +144,7 @@ void	*vj_tag_get_dict( int id );
 int	vj_tag_set_composite(void *compiz,int id, int n);
 int	vj_tag_get_composite(int t1);
 int 	vj_tag_chain_malloc(int e);
-int 	vj_tag_chain_free(int e);
+int 	vj_tag_chain_free(int e,int global);
 int	vj_tag_get_v4l_properties(int t1, int *arr );
 int 	vj_tag_init(int w, int h, int pix_fmt, int driver);
 int	vj_tag_get_n_frames(int t1);

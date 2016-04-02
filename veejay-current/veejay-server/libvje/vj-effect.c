@@ -196,6 +196,7 @@
 #include "effects/passthrough.h"
 #include "effects/alphatransition.h"
 #include "effects/randnoise.h"
+#include "effects/meanfilter.h"
 #include "effects/common.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
@@ -224,72 +225,74 @@ static struct
 {
 	int	(*mem_init)(int width, int height);
 	void	(*free)(void);
+	int	(*num_instances)();
 	int effect_id;
 } simple_effect_index[] = {
-{ 	bathroom_malloc,		bathroom_free		,VJ_IMAGE_EFFECT_BATHROOM	},
-{ 	chromascratcher_malloc,	chromascratcher_free,VJ_IMAGE_EFFECT_CHROMASCRATCHER},
-{	complexsync_malloc	,	complexsync_free	,VJ_VIDEO_EFFECT_COMPLEXSYNC	},
-{	dices_malloc	 	,	dices_free			,VJ_IMAGE_EFFECT_DICES		},
-{	colorhis_malloc,		colorhis_free		,VJ_IMAGE_EFFECT_COLORHIS	},
-{	autoeq_malloc,			autoeq_free			,VJ_IMAGE_EFFECT_AUTOEQ		},
-{	magicscratcher_malloc,	magicscratcher_free	,VJ_IMAGE_EFFECT_MAGICSCRATCHER	},
-{	lumamask_malloc		,	lumamask_free		,VJ_VIDEO_EFFECT_LUMAMASK	},
-{	motionblur_malloc	, 	motionblur_free		,VJ_IMAGE_EFFECT_MOTIONBLUR	},
-{ 	magicmirror_malloc	,	magicmirror_free	,VJ_IMAGE_EFFECT_MAGICMIRROR	},
-{	mtracer_malloc		, 	mtracer_free		,VJ_VIDEO_EFFECT_MTRACER	},
-{	noiseadd_malloc		,	noiseadd_free		,VJ_IMAGE_EFFECT_NOISEADD	},
-{	noisepencil_malloc	,	noisepencil_free	,VJ_IMAGE_EFFECT_NOISEPENCIL	},
-{	reflection_malloc	,	reflection_free		,VJ_IMAGE_EFFECT_REFLECTION	},
-{	ripple_malloc		,	ripple_free			,VJ_IMAGE_EFFECT_RIPPLE		},
-{	rotozoom_malloc		,	rotozoom_free		,VJ_IMAGE_EFFECT_ROTOZOOM	},
-{	scratcher_malloc	,	scratcher_free		,VJ_IMAGE_EFFECT_SCRATCHER	},
-{	sinoids_malloc		,	sinoids_free		,VJ_IMAGE_EFFECT_SINOIDS	},
-{	slice_malloc		,	slice_free			,VJ_IMAGE_EFFECT_SLICE		},
-{	split_malloc		,	split_free			,VJ_VIDEO_EFFECT_SPLIT		},
-{	tracer_malloc		,	tracer_free			,VJ_VIDEO_EFFECT_TRACER		},
-{	zoom_malloc			,	zoom_free			,VJ_IMAGE_EFFECT_ZOOM		},
-{	crosspixel_malloc	,	crosspixel_free		,VJ_IMAGE_EFFECT_CROSSPIXEL	},
-{	fisheye_malloc,			fisheye_free		,VJ_IMAGE_EFFECT_FISHEYE	},
-{	swirl_malloc		,	swirl_free			,VJ_IMAGE_EFFECT_SWIRL		},
-{   radialblur_malloc,		radialblur_free,	 VJ_IMAGE_EFFECT_RADIALBLUR	},
-{	uvcorrect_malloc,		uvcorrect_free,		VJ_IMAGE_EFFECT_UVCORRECT	},
-{	overclock_malloc, 		overclock_free,		VJ_IMAGE_EFFECT_OVERCLOCK	},
-{	nervous_malloc,			nervous_free,		VJ_IMAGE_EFFECT_NERVOUS		},
-{	morphology_malloc,		morphology_free,	VJ_IMAGE_EFFECT_MORPHOLOGY	},
-{	differencemap_malloc,	differencemap_free,	VJ_VIDEO_EFFECT_EXTDIFF		},
-{	threshold_malloc,		threshold_free,		VJ_VIDEO_EFFECT_EXTTHRESHOLD	},
-{	motionmap_malloc,		motionmap_free,		VJ_IMAGE_EFFECT_MOTIONMAP	},
-{	colmorphology_malloc,	colmorphology_free,	VJ_IMAGE_EFFECT_COLMORPH	},
-{	blob_malloc,			blob_free,			VJ_IMAGE_EFFECT_VIDBLOB 	},
-{	boids_malloc,			boids_free,			VJ_IMAGE_EFFECT_VIDBOIDS 	},
-{	ghost_malloc,			ghost_free,			VJ_IMAGE_EFFECT_GHOST		},
-{	neighbours_malloc,		neighbours_free,	VJ_IMAGE_EFFECT_NEIGHBOUR	},
-{	neighbours2_malloc,		neighbours2_free,	VJ_IMAGE_EFFECT_NEIGHBOUR2	},
-{	neighbours3_malloc,		neighbours3_free,	VJ_IMAGE_EFFECT_NEIGHBOUR3	},
-{	neighbours4_malloc,		neighbours4_free,	VJ_IMAGE_EFFECT_NEIGHBOUR4	},
-{	neighbours5_malloc,		neighbours5_free,	VJ_IMAGE_EFFECT_NEIGHBOUR5	},
-{	cutstop_malloc,			cutstop_free,		VJ_IMAGE_EFFECT_CUTSTOP		},
-{	maskstop_malloc,		maskstop_free,		VJ_IMAGE_EFFECT_MASKSTOP	},
-{	photoplay_malloc,		photoplay_free,		VJ_IMAGE_EFFECT_PHOTOPLAY	},
-{	videoplay_malloc,		videoplay_free,		VJ_VIDEO_EFFECT_VIDEOPLAY	},
-{	videowall_malloc,		videowall_free,		VJ_VIDEO_EFFECT_VIDEOWALL	},
-{	flare_malloc,			flare_free,			VJ_IMAGE_EFFECT_FLARE		},
-{	timedistort_malloc,		timedistort_free,	VJ_IMAGE_EFFECT_TIMEDISTORT	},
-{	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
-{	chameleonblend_malloc,	chameleonblend_free,VJ_VIDEO_EFFECT_CHAMBLEND	},
-{	baltantv_malloc,		baltantv_free,		VJ_IMAGE_EFFECT_BALTANTV	},
-{	radcor_malloc,			radcor_free,		VJ_IMAGE_EFFECT_LENSCORRECTION	},
-{	radioactivetv_malloc,	radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
-{	waterrippletv_malloc,	waterrippletv_free,	VJ_IMAGE_EFFECT_RIPPLETV	},
-{	bgsubtract_malloc,		bgsubtract_free,	VJ_IMAGE_EFFECT_BGSUBTRACT	},
-{	bgsubtractgauss_malloc,		bgsubtractgauss_free,	VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS	},
-{	slicer_malloc,			slicer_free,		VJ_VIDEO_EFFECT_SLICER		},
-{	perspective_malloc,		perspective_free,	VJ_IMAGE_EFFECT_PERSPECTIVE },
-{	feathermask_malloc,		feathermask_free,	VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
-{	average_malloc,			average_free,		VJ_IMAGE_EFFECT_AVERAGE },
-{	rgbkey_malloc,			rgbkey_free,		VJ_VIDEO_EFFECT_RGBKEY },
-{	gaussblur_malloc,		gaussblur_free,		VJ_IMAGE_EFFECT_CHOKEMATTE },
-{	NULL			,	NULL			,0				},
+{ 	bathroom_malloc,bathroom_free,NULL,VJ_IMAGE_EFFECT_BATHROOM },
+{ 	chromascratcher_malloc,	chromascratcher_free,NULL,VJ_IMAGE_EFFECT_CHROMASCRATCHER},
+{	complexsync_malloc,complexsync_free,NULL,VJ_VIDEO_EFFECT_COMPLEXSYNC },
+{	dices_malloc,dices_free,NULL,VJ_IMAGE_EFFECT_DICES},
+{	colorhis_malloc,colorhis_free,NULL,VJ_IMAGE_EFFECT_COLORHIS},
+{	autoeq_malloc,autoeq_free,NULL,VJ_IMAGE_EFFECT_AUTOEQ},
+{	magicscratcher_malloc,magicscratcher_free,NULL,VJ_IMAGE_EFFECT_MAGICSCRATCHER},
+{	lumamask_malloc,lumamask_free,NULL,VJ_VIDEO_EFFECT_LUMAMASK},
+{	motionblur_malloc,motionblur_free,NULL,VJ_IMAGE_EFFECT_MOTIONBLUR },
+{ 	magicmirror_malloc,magicmirror_free,NULL,VJ_IMAGE_EFFECT_MAGICMIRROR },
+{	mtracer_malloc,mtracer_free,NULL,VJ_VIDEO_EFFECT_MTRACER},
+{	noiseadd_malloc,noiseadd_free,NULL,VJ_IMAGE_EFFECT_NOISEADD},
+{	noisepencil_malloc,noisepencil_free,NULL,VJ_IMAGE_EFFECT_NOISEPENCIL},
+{	reflection_malloc,reflection_free,NULL,VJ_IMAGE_EFFECT_REFLECTION},
+{	ripple_malloc,ripple_free,NULL,VJ_IMAGE_EFFECT_RIPPLE},
+{	rotozoom_malloc,rotozoom_free,NULL,VJ_IMAGE_EFFECT_ROTOZOOM},
+{	scratcher_malloc,scratcher_free,NULL,VJ_IMAGE_EFFECT_SCRATCHER},
+{	sinoids_malloc,	sinoids_free,NULL,VJ_IMAGE_EFFECT_SINOIDS},
+{	slice_malloc,slice_free,NULL,VJ_IMAGE_EFFECT_SLICE},
+{	split_malloc,split_free,NULL,VJ_VIDEO_EFFECT_SPLIT},
+{	tracer_malloc,tracer_free,NULL,VJ_VIDEO_EFFECT_TRACER},
+{	zoom_malloc,zoom_free,NULL,VJ_IMAGE_EFFECT_ZOOM},
+{	crosspixel_malloc,crosspixel_free,NULL,VJ_IMAGE_EFFECT_CROSSPIXEL},
+{	fisheye_malloc,	fisheye_free,NULL,VJ_IMAGE_EFFECT_FISHEYE},
+{	swirl_malloc,swirl_free,NULL,VJ_IMAGE_EFFECT_SWIRL},
+{   	radialblur_malloc,radialblur_free,NULL,VJ_IMAGE_EFFECT_RADIALBLUR},
+{	uvcorrect_malloc,uvcorrect_free,NULL,VJ_IMAGE_EFFECT_UVCORRECT},
+{	overclock_malloc,overclock_free,NULL,VJ_IMAGE_EFFECT_OVERCLOCK},
+{	nervous_malloc,nervous_free,NULL,VJ_IMAGE_EFFECT_NERVOUS},
+{	morphology_malloc,morphology_free,NULL,VJ_IMAGE_EFFECT_MORPHOLOGY},
+{	differencemap_malloc,differencemap_free,NULL,VJ_VIDEO_EFFECT_EXTDIFF},
+{	threshold_malloc,threshold_free,NULL,VJ_VIDEO_EFFECT_EXTTHRESHOLD},
+{	motionmap_malloc,motionmap_free,NULL,VJ_IMAGE_EFFECT_MOTIONMAP},
+{	colmorphology_malloc,colmorphology_free,NULL,VJ_IMAGE_EFFECT_COLMORPH},
+{	blob_malloc,blob_free,NULL,VJ_IMAGE_EFFECT_VIDBLOB},
+{	boids_malloc,boids_free,NULL,VJ_IMAGE_EFFECT_VIDBOIDS},
+{	ghost_malloc,ghost_free,NULL,VJ_IMAGE_EFFECT_GHOST},
+{	neighbours_malloc,neighbours_free,NULL,VJ_IMAGE_EFFECT_NEIGHBOUR},
+{	neighbours2_malloc,neighbours2_free,NULL,VJ_IMAGE_EFFECT_NEIGHBOUR2},
+{	neighbours3_malloc,neighbours3_free,NULL,VJ_IMAGE_EFFECT_NEIGHBOUR3},
+{	neighbours4_malloc,neighbours4_free,NULL,VJ_IMAGE_EFFECT_NEIGHBOUR4},
+{	neighbours5_malloc,neighbours5_free,NULL,VJ_IMAGE_EFFECT_NEIGHBOUR5},
+{	cutstop_malloc,cutstop_free,NULL,VJ_IMAGE_EFFECT_CUTSTOP},
+{	maskstop_malloc,maskstop_free,NULL,VJ_IMAGE_EFFECT_MASKSTOP},
+{	photoplay_malloc,photoplay_free,NULL,VJ_IMAGE_EFFECT_PHOTOPLAY},
+{	videoplay_malloc,videoplay_free,NULL,VJ_VIDEO_EFFECT_VIDEOPLAY},
+{	videowall_malloc,videowall_free,NULL,VJ_VIDEO_EFFECT_VIDEOWALL},
+{	flare_malloc,flare_free,NULL,VJ_IMAGE_EFFECT_FLARE},
+{	timedistort_malloc,timedistort_free,NULL,VJ_IMAGE_EFFECT_TIMEDISTORT},
+{	chameleon_malloc,chameleon_free,NULL,VJ_IMAGE_EFFECT_CHAMELEON},
+{	chameleonblend_malloc,chameleonblend_free,NULL,VJ_VIDEO_EFFECT_CHAMBLEND},
+{	baltantv_malloc,baltantv_free,NULL,VJ_IMAGE_EFFECT_BALTANTV},
+{	radcor_malloc,radcor_free,NULL,VJ_IMAGE_EFFECT_LENSCORRECTION},
+{	radioactivetv_malloc,radioactivetv_free,NULL,VJ_VIDEO_EFFECT_RADIOACTIVE},
+{	waterrippletv_malloc,waterrippletv_free,NULL,VJ_IMAGE_EFFECT_RIPPLETV},
+{	bgsubtract_malloc,bgsubtract_free,bgsubtract_instances,VJ_IMAGE_EFFECT_BGSUBTRACT},
+{	bgsubtractgauss_malloc,bgsubtractgauss_free,bgsubtractgauss_instances,VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS},
+{	slicer_malloc,slicer_free,NULL,VJ_VIDEO_EFFECT_SLICER},
+{	perspective_malloc,perspective_free,NULL,VJ_IMAGE_EFFECT_PERSPECTIVE},
+{	feathermask_malloc,feathermask_free,NULL,VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
+{	average_malloc,average_free,NULL,VJ_IMAGE_EFFECT_AVERAGE},
+{	rgbkey_malloc,rgbkey_free,NULL,VJ_VIDEO_EFFECT_RGBKEY},
+{	gaussblur_malloc,gaussblur_free,NULL,VJ_IMAGE_EFFECT_CHOKEMATTE},
+{	meanfilter_malloc,meanfilter_free,NULL,VJ_IMAGE_EFFECT_MEANFILTER},
+{	NULL,NULL,NULL,0},
 };
 
 // complex effects have a buffer per instance
@@ -366,9 +369,9 @@ int vj_effect_initialized(int effect_id, void *instance_ptr )
 			return 0;
 		return 1;
 	}
-	else if ( _no_mem_required( effect_id ) || vj_effect_ready[ effect_id ] == 1 )
+	else if ( _no_mem_required( effect_id ) || vj_effect_ready[ effect_id ] == 1 ) {
 		return 1;
-
+	}
 	return 0;
 }
 
@@ -394,6 +397,26 @@ int vj_effect_is_parallel(int effect_id)
 	int seq = vj_effect_real_to_sequence(effect_id);
 	return vj_effects[seq]->parallel;
 }
+
+int  vj_effect_single_instance(int effect_id)
+{
+	int seq = vj_effect_real_to_sequence(effect_id);
+	if( seq < 0  ) {
+		return 0;
+	}
+
+	if(!vj_effect_ready[seq] )
+		return 0;
+	
+	int index = _get_simple_effect(effect_id);
+	if( index >= 0  && simple_effect_index[index].num_instances != NULL &&
+			   simple_effect_index[index].num_instances() > 0 ) {
+		veejay_msg(0, "FX %d can only be used once ...", effect_id );
+		return 1;
+	}
+	return 0;
+}
+
 void *vj_effect_activate(int effect_id, int *result)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
@@ -438,6 +461,7 @@ void *vj_effect_activate(int effect_id, int *result)
 				return NULL;
 			}
 		}
+
 		if(!simple_effect_index[index].mem_init( max_width, max_height ))
 		{
 				*result = 0;
@@ -459,7 +483,7 @@ void	*vj_effect_get_data( int seq_id ) {
 	return vj_effects[seq_id]->user_data;
 }
 
-int vj_effect_deactivate(int effect_id, void *ptr)
+int vj_effect_deactivate(int effect_id, void *ptr, int global)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
 
@@ -473,6 +497,10 @@ int vj_effect_deactivate(int effect_id, void *ptr)
 			return 1;
 		}
 	} else if( vj_effect_ready[seq] == 1 ) {
+
+		if( vj_effects[seq]->global && !global )
+			return 1; //do not free this effect
+
 		int index = _get_simple_effect(effect_id);
 		if(index==-1) {
 			index = _get_complex_effect(effect_id);
@@ -499,7 +527,7 @@ static void vj_effect_deactivate_all()
 	{
 		if( vj_effects[ i ] == NULL )
 			continue;
-		vj_effect_deactivate( i, NULL );
+		vj_effect_deactivate( i, NULL,1 );
 	}	
 }
 
@@ -686,6 +714,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_IMAGE_EFFECT_LEVELCORRECTION]		= levelcorrection_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_ALPHADAMPEN]			= alphadampen_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_RANDNOISE]			= randnoise_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_MEANFILTER]			= meanfilter_init(width,height);
 
 	max_width = width;
 	max_height = height;

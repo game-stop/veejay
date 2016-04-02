@@ -25,6 +25,7 @@
 #include <stdint.h>
 
 vj_effect *bgsubtract_init(int width, int height);
+int bgsubtract_instances();
 void bgsubtract_free();
 int bgsubtract_malloc(int w, int h);
 int bgsubtract_prepare(VJFrame *frame); 

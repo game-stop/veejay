@@ -28,6 +28,7 @@
 #include <libvje/vje.h>
 #include <math.h>
 #define MAX_SCRATCH_FRAMES 50
+#define GREY_LEVELS 256
 #define func_opacity(a,b,p,q) (  ((a * p) + (b * q)) >> 8 )
 #define limit_luma(c)  ( c < 16 ? 16 : ( c > 235 ? 235 : c) )
 #define limit_chroma(c) ( c < 16 ? 16 :  ( c > 240 ? 240 : c) )
@@ -363,7 +364,7 @@ void veejay_histogram_del(void *his);
 void *veejay_histogram_new();
 void veejay_histogram_draw( void *his, VJFrame *src, VJFrame *dst , int intensity, int strength );
 void veejay_histogram_equalize( void *his, VJFrame *f, int intensity, int strength );
-
+void vje_histogram_auto_eq( VJFrame *frame );
 void veejay_histogram_analyze_rgb( void *his, uint8_t *rgb, VJFrame *f );
 void veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
 void veejay_histogram_draw_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
@@ -376,6 +377,7 @@ uint8_t veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M, uint
 void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len );
 void binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, int w, int h );
 void binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len);
+void vje_mean_filter( const uint8_t *src, uint8_t *dst, const int w, const int h );
 #ifdef HAVE_ASM_MMX
 void vje_load_mask(uint8_t val);
 void vje_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len );
