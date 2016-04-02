@@ -546,6 +546,7 @@ typedef struct
 } widget_name_t;
 
 static widget_name_t *slider_names_ = NULL;
+static widget_name_t *param_names_ = NULL;
 static widget_name_t *param_incs_ = NULL;
 static widget_name_t *param_decs_ = NULL;
 static widget_name_t *param_kfs_ = NULL;
@@ -6671,6 +6672,9 @@ static void process_reload_hints(int *history, int pm)
 
 				gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
 				set_tooltip( slider_names_[i].text, tt1 );
+				gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,
+				                                                   param_names_[i].text)),
+				                   tt1);
 
 				gint min,max,value;
 				value = entry_tokens[ENTRY_PARAMSET + i];
@@ -6694,6 +6698,9 @@ static void process_reload_hints(int *history, int pm)
 			disable_widget( param_kfs_[i].text );
 			set_tooltip( param_kfs_[i].text, NULL );
 			set_tooltip( slider_names_[i].text, NULL );
+			gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,
+			                                                    param_names_[i].text)),
+			                   NULL);
 			update_slider_range( slider_names_[i].text, min,max, value, 0 );
 		}
 		GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
@@ -7259,6 +7266,7 @@ void vj_gui_init(char *glade_file,
 	}
 
 	slider_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+	param_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
 	param_incs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
 	param_decs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
 	param_kfs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
@@ -7270,6 +7278,9 @@ void vj_gui_init(char *glade_file,
 	{
 		snprintf(text,sizeof(text),"slider_p%d" , i );
 		slider_names_[i].text = strdup( text );
+
+		snprintf(text,sizeof(text),"label_p%d" , i );
+		param_names_[i].text = strdup( text );
 
 		snprintf(text,sizeof(text),"inc_p%d", i );
 		param_incs_[i].text = strdup( text );
