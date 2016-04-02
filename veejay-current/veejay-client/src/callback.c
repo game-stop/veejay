@@ -759,6 +759,10 @@ void	on_slider_p10_value_changed(GtkWidget *w, gpointer user_data)
 {
 	slider_changed( 10, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
+void	on_slider_p11_value_changed(GtkWidget *w, gpointer user_data)
+{
+	slider_changed( 11, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+}
 void	on_slider_p12_value_changed(GtkWidget *w, gpointer user_data)
 {
 	slider_changed( 12, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
