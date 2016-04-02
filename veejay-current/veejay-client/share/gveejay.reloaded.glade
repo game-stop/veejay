@@ -1685,7 +1685,6 @@
                                             <property name="can_focus">False</property>
                                             <child>
                                               <widget class="GtkLabel" id="label_p0">
-                                                <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
                                               </widget>
@@ -1810,7 +1809,6 @@
                                             <property name="can_focus">False</property>
                                             <child>
                                               <widget class="GtkLabel" id="label_p1">
-                                                <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
                                               </widget>
@@ -1934,7 +1932,6 @@
                                             <property name="can_focus">False</property>
                                             <child>
                                               <widget class="GtkLabel" id="label_p2">
-                                                <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
                                               </widget>
@@ -2058,7 +2055,6 @@
                                             <property name="can_focus">False</property>
                                             <child>
                                               <widget class="GtkLabel" id="label_p3">
-                                                <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
                                               </widget>
@@ -2182,7 +2178,6 @@
                                             <property name="can_focus">False</property>
                                             <child>
                                               <widget class="GtkLabel" id="label_p4">
-                                                <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
                                               </widget>
@@ -2306,7 +2301,6 @@
                                             <property name="can_focus">False</property>
                                             <child>
                                               <widget class="GtkLabel" id="label_p5">
-                                                <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
                                               </widget>
@@ -2431,7 +2425,6 @@
                                             <property name="can_focus">False</property>
                                             <child>
                                               <widget class="GtkLabel" id="label_p6">
-                                                <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
                                               </widget>
@@ -2555,7 +2548,6 @@
                                             <property name="can_focus">False</property>
                                             <child>
                                               <widget class="GtkLabel" id="label_p7">
-                                                <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
                                               </widget>
@@ -2684,7 +2676,6 @@
                                                 <property name="can_focus">False</property>
                                                 <child>
                                                   <widget class="GtkLabel" id="label_p8">
-                                                    <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
                                                   </widget>
@@ -2821,7 +2812,6 @@
                                                 <property name="can_focus">False</property>
                                                 <child>
                                                   <widget class="GtkLabel" id="label_p9">
-                                                    <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
                                                   </widget>
@@ -2958,7 +2948,6 @@
                                                 <property name="can_focus">False</property>
                                                 <child>
                                                   <widget class="GtkLabel" id="label_p10">
-                                                    <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
                                                   </widget>
@@ -3095,7 +3084,6 @@
                                                 <property name="can_focus">False</property>
                                                 <child>
                                                   <widget class="GtkLabel" id="label_p11">
-                                                    <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
                                                   </widget>
@@ -3232,7 +3220,6 @@
                                                 <property name="can_focus">False</property>
                                                 <child>
                                                   <widget class="GtkLabel" id="label_p12">
-                                                    <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
                                                   </widget>
@@ -3369,7 +3356,6 @@
                                                 <property name="can_focus">False</property>
                                                 <child>
                                                   <widget class="GtkLabel" id="label_p13">
-                                                    <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
                                                   </widget>
@@ -3506,7 +3492,6 @@
                                                 <property name="can_focus">False</property>
                                                 <child>
                                                   <widget class="GtkLabel" id="label_p14">
-                                                    <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
                                                   </widget>
@@ -3643,7 +3628,6 @@
                                                 <property name="can_focus">False</property>
                                                 <child>
                                                   <widget class="GtkLabel" id="label_p15">
-                                                    <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
                                                   </widget>
@@ -14926,6 +14910,12 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
