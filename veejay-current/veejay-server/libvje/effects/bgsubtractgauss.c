@@ -73,7 +73,7 @@ vj_effect *bgsubtractgauss_init(int width, int height)
 	ve->sub_format = -1;
 	ve->has_user = 1;
 	ve->user_data = NULL;
-	ve->parallel = 1;
+	ve->parallel = 0;
 	ve->global = 1; /* this FX is not freed when switching between samples */
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 

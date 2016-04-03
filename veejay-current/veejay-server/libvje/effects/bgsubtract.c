@@ -63,7 +63,7 @@ vj_effect *bgsubtract_init(int width, int height)
 	ve->has_user = 1;
 	ve->user_data = NULL;
 	ve->sub_format = 0;
-	ve->parallel = 1;
+	ve->parallel = 0;
 	ve->global = 1; /* this effect is not freed when switching samples */
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "BG Method","Enable", "To Alpha");

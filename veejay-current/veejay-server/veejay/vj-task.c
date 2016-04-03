@@ -121,7 +121,7 @@ static void		task_allocate()
 	if( ret <= 0)
 		n_cpu = 1;
 	else 
-		n_cpu = (unsigned int) n_cpu;
+		n_cpu = (unsigned int) ret;
 }
 
 void		task_destroy()
