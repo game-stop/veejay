@@ -26,7 +26,7 @@
 #define VJE_SUCCESS 0
 #include <libvje/vje.h>
 
-#define VJ_IMAGE_EFFECT_MIN 92
+#define VJ_IMAGE_EFFECT_MIN 91
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -254,6 +254,7 @@ enum {
 	VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS = 94,
 	VJ_IMAGE_EFFECT_BWOTSU = 93,
 	VJ_IMAGE_EFFECT_MEANFILTER = 92,
+	VJ_IMAGE_EFFECT_BGPUSH = 91,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
@@ -524,6 +525,8 @@ extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int thres
 
 extern void pixelate_apply(VJFrame *frame, int w, int h, int v );
 
+extern void bgpush_apply( VJFrame *frame, int mode );
+
 extern void magicmirror_apply(VJFrame *frame, int w, int h, int x, int y, int d, int n, int alpha );
 
 extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int n, int m, int border, int alpha);
@@ -550,6 +553,8 @@ extern void uvcorrect_apply(VJFrame *frame, int width, int height, int angle, in
 extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int opacity);
 
 extern void overclock_apply(VJFrame *frame, int w, int h, int val, int r);
+
+uint8_t *bgpush_get_bg_frame(unsigned int plane);
 
 uint8_t *bgsubtract_get_bg_frame(unsigned int plane);
 

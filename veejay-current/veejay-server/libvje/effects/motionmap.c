@@ -16,15 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
-
-   This is a quite simple motion detection filter
-
-   There are 5 parameters:
-	 p0 = Threshold 
-	 p1 = Motion Energy Threshold
-     p2 = Draw difference frame (no processing)
-     p3 = Motion Energy Histogram
-	 p4 = Decay
 */
 
 #include <config.h>
@@ -74,8 +65,8 @@ vj_effect *motionmap_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
+    ve->global = 1;
     ve->n_out = 2;
-//    ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
     ve->param_description = vje_build_param_list( ve->num_params, 
 			"Difference Threshold", "Maximum Motion Energy","Draw Motion Map","History in frames" ,"Decay", "Interpolate frames", "Activity Mode");
 
@@ -107,7 +98,7 @@ static int do_interpolation = 0;
 static int stored_frame = 0;
 static int scale_lock = 0;
 
-int		motionmap_malloc(int w, int h )
+int	motionmap_malloc(int w, int h )
 {
 	bg_image = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w * h));
 	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h)); 
@@ -130,7 +121,7 @@ int		motionmap_malloc(int w, int h )
 	return 1;
 }
 
-void		motionmap_free(void)
+void	motionmap_free(void)
 {
 	if( interpolate_buf )
 		free(interpolate_buf); 
@@ -184,6 +175,11 @@ int motionmap_is_locked()
 uint32_t	motionmap_activity()
 {
 	return keyv_;
+}
+
+int	motionmap_instances()
+{
+	return is_initialized;
 }
 
 void	motionmap_scale_to( int p1max, int p2max, int p1min, int p2min, int *p1val, int *p2val, int *pos, int *len )
@@ -320,7 +316,6 @@ static void motionmap_calc_diff( const uint8_t *bg, uint8_t *pimg, const uint8_t
 		else
 			I2[i] = 0xff;
 
-//		A[i]  = I1[i];
 		I1[i] = abs( I1[i] - I2[i] );
 		I2[i] = bDst[i] >> 1;
 	}
@@ -339,7 +334,6 @@ static void motionmap_find_diff_job( void *arg )
 	const uint8_t *t_bg = t->input[0];
 	const uint8_t *t_img = t->input[1];
 	uint8_t *t_prev_img = t->input[2];
-//	uint8_t *t_alpha = t->input[3];
 	uint8_t *t_binary_img = t->output[0];
 	uint8_t *t_diff1 = t->output[1];
 	uint8_t *t_diff2 = t->output[2];
@@ -347,7 +341,6 @@ static void motionmap_find_diff_job( void *arg )
 	const int len = t->strides[0];
 	const int threshold = t->iparams[0];
 
-//	motionmap_calc_diff( t_bg, t_prev_img, t_img,t_diff1,t_diff2, t_binary_img,t_alpha, len, threshold );
 	motionmap_calc_diff( t_bg, t_prev_img, t_img,t_diff1,t_diff2, t_binary_img,len, threshold );
 }
 
@@ -378,8 +371,6 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 	uint8_t *Cr = frame->data[2];
 	const int limit = limit1 * 10;
 
-//	uint8_t *alpha = frame->data[3];
-
 	if(!have_bg) {
 		veejay_msg(VEEJAY_MSG_ERROR,"Motion Mapping: Snap the background frame with VIMS 339 or mask button in reloaded");
 		return;
@@ -391,12 +382,10 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		task.stride[0] = len; // plane length 
 		task.stride[1] = len;
 		task.stride[2] = len;
-	//	task.stride[3] = len;
 		task.stride[3] = 0;
 		task.data[0] = bg_image; // plane 0 = background image 
 		task.data[1] = frame->data[0]; // plane 1 = luminance channel 
 		task.data[2] = prev_img; // plane 2 = luminance channel of previous frame
-	//	task.data[3] = alpha;
 		task.data[3] = NULL;
 		task.ssm = 1; // all planes are the same size 
 		task.format = frame->format; // not important, but cannot be 0
@@ -407,7 +396,6 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		task.width = width; // dimensions
 		task.height = height;
 
-	//	uint8_t *dst[4] = { binary_img, diff_img, diff_img + RUP8(len), alpha };
 		uint8_t *dst[4] = { binary_img, diff_img, diff_img + RUP8(len), NULL };
 
 
@@ -417,7 +405,6 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		vj_task_run( task.data, dst, NULL,NULL,4, (performer_job_routine) &motionmap_find_diff_job );
 	}
 	else { 
-	//	motionmap_calc_diff( (const uint8_t*) bg_image, prev_img, (const uint8_t*) frame->data[0], diff_img, diff_img + RUP8(len), binary_img, alpha, len, threshold );
 		motionmap_calc_diff( (const uint8_t*) bg_image, prev_img, (const uint8_t*) frame->data[0], diff_img, diff_img + RUP8(len), binary_img, len, threshold );
 
 	}

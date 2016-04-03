@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2007 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,22 +18,21 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef MOTIONMAP_H
-#define MOTIONMAP_H
+/*
+ * Can only be used in combination with Magic Mirror, Mirror Alpha Only Mask parameter
+ * where original frame can be pulled from this FX to restore background pixels
+ * 
+ */
+
+#ifndef PUSH_H
+#define PUSH_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *motionmap_init(int w, int h);
-void motionmap_apply( VJFrame *frame, int width, int height, int t, int n, int draw, int histo, int op, int ip, int la);
-int	motionmap_malloc(int w,int h);
-void	motionmap_free(void);
-int	motionmap_prepare( uint8_t *map[4], int w, int h );
-int	motionmap_active();
-int	motionmap_instances();
-int	motionmap_is_locked();
-uint8_t	*motionmap_interpolate_buffer();
-uint8_t *motionmap_bgmap();
-void	motionmap_store_frame( VJFrame *fx );
-void	motionmap_interpolate_frame( VJFrame *fx, int N, int n );
+vj_effect *bgpush_init(int w, int h);
+void bgpush_apply( VJFrame *frame, int mode );
+int bgpush_malloc(int w, int h);
+void bgpush_free();
+uint8_t *bgpush_get_bg_frame( unsigned int plane );
 #endif

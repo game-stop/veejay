@@ -19,7 +19,7 @@
  */
 
 #ifndef MEANFILTER_H
-#define MEANFTILER_H
+#define MEANFILTER_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>

@@ -284,7 +284,7 @@ static void bg_subtract( VJFrame *frame, double threshold, uint8_t *A )
 	const uint8_t *Y = frame->data[0];
 	unsigned int i;
 
-	vje_mean_filter( Y, mean, frame->width, frame->height );
+//	vje_mean_filter( Y, mean, frame->width, frame->height );
 
 	for( i = 0; i < len; i ++ )
 	{
@@ -399,8 +399,7 @@ static void bg_update( VJFrame *frame, double threshold, double alpha, double no
 	uint8_t *bg = static_bg_frame__[0];
 	unsigned int i;
 
-	/* mean filter on BG */
-	vje_mean_filter( Y, mean, frame->width, frame->height );
+//	vje_mean_filter( Y, mean, frame->width, frame->height );
 
 	for( i = 0; i < len; i ++ )
 	{

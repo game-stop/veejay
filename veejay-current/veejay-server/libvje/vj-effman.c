@@ -458,6 +458,9 @@ static void vj_effman_apply_image_effect(
 	case VJ_IMAGE_EFFECT_MEANFILTER:
 		meanfilter_apply( frames[0] );
 		break;
+	case VJ_IMAGE_EFFECT_BGPUSH:
+		bgpush_apply(frames[0], arg[0]);
+		break;
    }
 }
 
@@ -719,6 +722,9 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 uint8_t* vj_effect_get_bg( int selector, unsigned int plane )
 {
 	switch( selector ) {
+		case VJ_IMAGE_EFFECT_BGPUSH:
+			return bgpush_get_bg_frame( plane );
+			break;
 		case VJ_IMAGE_EFFECT_BGSUBTRACT:
 			return bgsubtract_get_bg_frame( plane );
 			break;
@@ -727,9 +733,13 @@ uint8_t* vj_effect_get_bg( int selector, unsigned int plane )
 			break;
 		default:
 			{
-				uint8_t *tmp = bgsubtract_get_bg_frame(plane);
+				uint8_t *tmp = 
+					bgpush_get_bg_frame(plane);
+				if( tmp == NULL )
+					tmp = bgsubtract_get_bg_frame(plane);
 				if( tmp == NULL )
 					tmp = bgsubtractgauss_get_bg_frame(plane);
+
 				return tmp;
 			}
 			break;

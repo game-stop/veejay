@@ -197,6 +197,7 @@
 #include "effects/alphatransition.h"
 #include "effects/randnoise.h"
 #include "effects/meanfilter.h"
+#include "effects/bgpush.h"
 #include "effects/common.h"
 #include <libplugger/plugload.h>
 #include <veejay/vims.h>
@@ -260,7 +261,7 @@ static struct
 {	morphology_malloc,morphology_free,NULL,VJ_IMAGE_EFFECT_MORPHOLOGY},
 {	differencemap_malloc,differencemap_free,NULL,VJ_VIDEO_EFFECT_EXTDIFF},
 {	threshold_malloc,threshold_free,NULL,VJ_VIDEO_EFFECT_EXTTHRESHOLD},
-{	motionmap_malloc,motionmap_free,NULL,VJ_IMAGE_EFFECT_MOTIONMAP},
+{	motionmap_malloc,motionmap_free,motionmap_instances,VJ_IMAGE_EFFECT_MOTIONMAP},
 {	colmorphology_malloc,colmorphology_free,NULL,VJ_IMAGE_EFFECT_COLMORPH},
 {	blob_malloc,blob_free,NULL,VJ_IMAGE_EFFECT_VIDBLOB},
 {	boids_malloc,boids_free,NULL,VJ_IMAGE_EFFECT_VIDBOIDS},
@@ -292,6 +293,7 @@ static struct
 {	rgbkey_malloc,rgbkey_free,NULL,VJ_VIDEO_EFFECT_RGBKEY},
 {	gaussblur_malloc,gaussblur_free,NULL,VJ_IMAGE_EFFECT_CHOKEMATTE},
 {	meanfilter_malloc,meanfilter_free,NULL,VJ_IMAGE_EFFECT_MEANFILTER},
+{	bgpush_malloc,bgpush_free,NULL,VJ_IMAGE_EFFECT_BGPUSH},
 {	NULL,NULL,NULL,0},
 };
 
@@ -715,6 +717,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_IMAGE_EFFECT_ALPHADAMPEN]			= alphadampen_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_RANDNOISE]			= randnoise_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_MEANFILTER]			= meanfilter_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_BGPUSH]			= bgpush_init(width,height);
 
 	max_width = width;
 	max_height = height;
