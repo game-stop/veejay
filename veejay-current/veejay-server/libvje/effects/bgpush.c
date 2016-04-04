@@ -21,10 +21,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
+#include <libvje/vje.h>
+#include <libsubsample/subsample.h>
 #include "common.h"
 #include "bgpush.h"
 
-static uint8_t *frame = NULL;
+static uint8_t *frame_data = NULL;
 static uint8_t *frame_ptr[4] = { NULL,NULL,NULL,NULL };
 
 vj_effect *bgpush_init(int w, int h)
@@ -55,14 +57,19 @@ vj_effect *bgpush_init(int w, int h)
 
 int bgpush_malloc(int w, int h)
 {
-	if( frame == NULL ) {
-		frame =  (uint8_t*) vj_calloc( RUP8(w*h*4) );
-		if( frame == NULL )
+	if( frame_data == NULL ) {
+		frame_data =  (uint8_t*) vj_malloc( RUP8(w*h*4) );
+		if( frame_data == NULL )
 			return 0;
-		frame_ptr[0] = frame;
+		frame_ptr[0] = frame_data;
 		frame_ptr[1] = frame_ptr[0] + RUP8(w*h);
 		frame_ptr[2] = frame_ptr[1] + RUP8(w*h);
 		frame_ptr[3] = frame_ptr[2] + RUP8(w*h);
+
+		veejay_memset( frame_ptr[0], 0, w * h );
+		veejay_memset( frame_ptr[1], 128, w * h );
+		veejay_memset( frame_ptr[2], 128, w * h );
+		veejay_memset( frame_ptr[3], 0, w * h );
 	}
 
 	return 1;
@@ -70,9 +77,9 @@ int bgpush_malloc(int w, int h)
 
 void bgpush_free()
 {
-	if( frame ) {
-		free(frame);
-		frame = NULL;
+	if( frame_data ) {
+		free(frame_data);
+		frame_data = NULL;
 		frame_ptr[0] = NULL;
 		frame_ptr[1] = NULL;
 		frame_ptr[2] = NULL;
@@ -80,22 +87,32 @@ void bgpush_free()
 	}
 }
 
-
+//FIXME: issue #78 , background frame in 4:4:4
+//alpha channel should be cleared according to info->settings->alpha_value
 void bgpush_apply( VJFrame *frame, int mode )
 {
 	if( mode == 0 )
 		return;
 
-	const int uv_len = (frame->ssm ? frame->len : frame->len );
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
+	
 	veejay_memcpy( frame_ptr[0], frame->data[0], frame->len );
 	veejay_memcpy( frame_ptr[1], frame->data[1], uv_len );
 	veejay_memcpy( frame_ptr[2], frame->data[2], uv_len );
+
 	if( frame->stride[3] > 0 )
 		veejay_memcpy( frame_ptr[3], frame->data[3], frame->len );
+
+	if( frame->ssm == 0 ) {
+		chroma_supersample( SSM_422_444, frame, frame_ptr );
+	}
 
 }
 
 uint8_t *bgpush_get_bg_frame( unsigned int plane )
 {
+	if( frame_data == NULL )
+		return NULL;
+
 	return frame_ptr[plane];
 }

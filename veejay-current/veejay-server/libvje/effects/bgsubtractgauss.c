@@ -288,7 +288,7 @@ static void bg_subtract( VJFrame *frame, double threshold, uint8_t *A )
 
 	for( i = 0; i < len; i ++ )
 	{
-		double dY = ((double) mean[i]) - pMu[i];
+		double dY = ((double) Y[i]) - pMu[i];
 		double d2 = (dY * dY) / pVar[i];
 
 		A[i]      = (d2 < threshold ? 0: 0xff);
@@ -403,7 +403,7 @@ static void bg_update( VJFrame *frame, double threshold, double alpha, double no
 
 	for( i = 0; i < len; i ++ )
 	{
-		double src = (double) mean[i];
+		double src = (double) Y[i];
 		double d   = (src - pMu[i]) * (src - pMu[i]) - pVar[i];
 
 		pMu[i]  += (alpha * (src - pMu[i]));

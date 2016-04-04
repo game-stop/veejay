@@ -2800,7 +2800,7 @@ void vj_event_effect_set_bg(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	v->uc->take_bg = 1;
-	veejay_msg(VEEJAY_MSG_INFO, "Next frame will be taken for static background\n");
+	veejay_msg(VEEJAY_MSG_INFO, "Next frame will be taken for static background");
 }
 
 void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )

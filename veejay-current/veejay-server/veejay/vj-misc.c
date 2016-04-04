@@ -30,6 +30,8 @@
 #include <sys/statfs.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
+#include <libsample/sampleadm.h>
+#include <libstream/vj-tag.h>
 #include <veejay/vj-misc.h>
 #include <veejay/vj-lib.h>
 #include <libvjmem/vjmem.h>
@@ -218,19 +220,59 @@ filelist_t *find_media_files( veejay_t *info )
 	return fl;
 }
 
-
+/* FIXME: issue #78
+ * fx state is currently global, damage control is to check fx chain of current playing sample
+ * for FX that needs a background frame.
+ * before: apply on all FX
+ */
 int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
 {
-	vj_effect_prepare( frame, VJ_VIDEO_EFFECT_CHAMBLEND );
-	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CHAMELEON );
-	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
-	vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
-	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
-	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
-	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
-	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS );
-	vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
-	vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
+	int i;
+	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+	{
+		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+			int fx_id = sample_get_effect_any( info->uc->sample_id, i );
+			if( fx_id == VJ_VIDEO_EFFECT_CHAMBLEND ||
+			    fx_id == VJ_IMAGE_EFFECT_CHAMELEON ||
+			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
+			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
+			    fx_id == VJ_IMAGE_EFFECT_MOTIONMAP ||
+			    fx_id == VJ_IMAGE_EFFECT_CONTOUR ||
+			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
+			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS ||
+			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
+			    fx_id == VJ_IMAGE_EFFECT_CONTOUR )
+			{
+				vj_effect_prepare( frame, fx_id );
+				veejay_msg(VEEJAY_MSG_INFO,
+					"Sample %d FX entry %d takes BG for FX %d",
+					info->uc->sample_id,i, fx_id );
+			}
+		}		
+	}
+	else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
+	{
+		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+			int fx_id = vj_tag_get_effect_any( info->uc->sample_id, i );
+			if( fx_id == VJ_VIDEO_EFFECT_CHAMBLEND ||
+			    fx_id == VJ_IMAGE_EFFECT_CHAMELEON ||
+			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
+			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
+			    fx_id == VJ_IMAGE_EFFECT_MOTIONMAP ||
+			    fx_id == VJ_IMAGE_EFFECT_CONTOUR ||
+			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
+			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS ||
+			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
+			    fx_id == VJ_IMAGE_EFFECT_CONTOUR )
+			{
+				vj_effect_prepare( frame, fx_id );
+				veejay_msg(VEEJAY_MSG_INFO,
+					"Stream %d FX entry %d takes BG for FX %d",
+					info->uc->sample_id,i, fx_id );
+			}
+		}		
+	}
+	
 	return 0;
 }
 
@@ -245,7 +287,7 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 
     video_playback_setup *settings = info->settings;
 
-    jpeg_buff = (uint8_t *) malloc( 65535 * 10);
+    jpeg_buff = (uint8_t *) malloc( 65535 * 10 );
     if (!jpeg_buff)
 		return -1;
 
