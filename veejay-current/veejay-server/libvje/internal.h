@@ -525,7 +525,7 @@ extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int thres
 
 extern void pixelate_apply(VJFrame *frame, int w, int h, int v );
 
-extern void bgpush_apply( VJFrame *frame, int mode );
+extern void bgpush_apply( VJFrame *frame );
 
 extern void magicmirror_apply(VJFrame *frame, int w, int h, int x, int y, int d, int n, int alpha );
 
@@ -569,6 +569,8 @@ extern int bgsubtractgauss_prepare(VJFrame *frame);
 extern void bgsubtractgauss_apply(VJFrame *frame,int alpha, int threshold,int noise, int mode, int period, int morph );
 
 extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
+
+extern int bgpush_prepare( VJFrame *frame );
 
 extern void	cartonize_apply( VJFrame *frame, int w, int h, int b1, int b2, int b3 );
 

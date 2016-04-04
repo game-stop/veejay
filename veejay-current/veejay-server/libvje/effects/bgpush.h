@@ -31,8 +31,9 @@
 #include <stdint.h>
 
 vj_effect *bgpush_init(int w, int h);
-void bgpush_apply( VJFrame *frame, int mode );
+void bgpush_apply( VJFrame *frame );
 int bgpush_malloc(int w, int h);
 void bgpush_free();
+int bgpush_prepare( VJFrame *frame );
 uint8_t *bgpush_get_bg_frame( unsigned int plane );
 #endif

@@ -459,7 +459,7 @@ static void vj_effman_apply_image_effect(
 		meanfilter_apply( frames[0] );
 		break;
 	case VJ_IMAGE_EFFECT_BGPUSH:
-		bgpush_apply(frames[0], arg[0]);
+		bgpush_apply(frames[0]);
 		break;
    }
 }
@@ -747,6 +747,7 @@ uint8_t* vj_effect_get_bg( int selector, unsigned int plane )
 	return NULL;
 }
 
+//FIXME: issue #78 , vj_effects[fx_id]->user_data should be saved elsewhere so multiple fx states can be interchanged
 int vj_effect_prepare( VJFrame *frame, int selector)
 {
 	int fx_id = vj_effect_real_to_sequence( selector );
@@ -776,6 +777,8 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 			break;
 		case 	VJ_VIDEO_EFFECT_CHAMBLEND:
 			return chameleonblend_prepare(	frame->data,	frame->width,	frame->height );
+		case 	VJ_IMAGE_EFFECT_BGPUSH:
+			return bgpush_prepare(	frame );
 		default:
 			break;
 	}

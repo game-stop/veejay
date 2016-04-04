@@ -32,25 +32,13 @@ static uint8_t *frame_ptr[4] = { NULL,NULL,NULL,NULL };
 vj_effect *bgpush_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
-    ve->defaults[0] = 1;
-    ve->description = "Push current frame to buffer";
+    ve->num_params = 0;
+    ve->description = "Background take-frame (singleton)";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 0;
     ve->has_user = 0;
-
-    ve->param_description = vje_build_param_list( ve->num_params, "Push Frame" );
-
-    ve->hints = vje_init_value_hint_list( ve->num_params );
-
-    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Off" , "On" );
+    ve->global = 1;
 
     return ve;
 }
@@ -87,13 +75,12 @@ void bgpush_free()
 	}
 }
 
-//FIXME: issue #78 , background frame in 4:4:4
-//alpha channel should be cleared according to info->settings->alpha_value
-void bgpush_apply( VJFrame *frame, int mode )
-{
-	if( mode == 0 )
-		return;
+static int have_bg = 0;
 
+int bgpush_prepare( VJFrame *frame )
+{
+	if( frame_data == NULL )
+		return 0;
 	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
 	
 	veejay_memcpy( frame_ptr[0], frame->data[0], frame->len );
@@ -107,12 +94,23 @@ void bgpush_apply( VJFrame *frame, int mode )
 		chroma_supersample( SSM_422_444, frame, frame_ptr );
 	}
 
+	have_bg = 1;
+
+	return 1;
+}
+
+//FIXME: issue #78 , background frame in 4:4:4
+//alpha channel should be cleared according to info->settings->alpha_value
+void bgpush_apply( VJFrame *frame )
+{
+	if( have_bg == 0 ) {
+		veejay_msg(0, "BG Push: Snap the background frame with VIMS 339 or mask button in reloaded");
+	}
 }
 
 uint8_t *bgpush_get_bg_frame( unsigned int plane )
 {
 	if( frame_data == NULL )
 		return NULL;
-
 	return frame_ptr[plane];
 }
