@@ -241,6 +241,7 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
 			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
 			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS ||
 			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
+			    fx_id == VJ_IMAGE_EFFECT_BGPUSH ||
 			    fx_id == VJ_IMAGE_EFFECT_CONTOUR )
 			{
 				vj_effect_prepare( frame, fx_id );
@@ -263,6 +264,7 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
 			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
 			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS ||
 			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
+			    fx_id == VJ_IMAGE_EFFECT_BGPUSH ||
 			    fx_id == VJ_IMAGE_EFFECT_CONTOUR )
 			{
 				vj_effect_prepare( frame, fx_id );

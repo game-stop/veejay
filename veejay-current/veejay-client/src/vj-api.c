@@ -4671,8 +4671,10 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 	if( fxtext ) free(fxtext);
 	fxlen = 0;
 
-	load_from = (info->status_tokens[PLAY_MODE] == MODE_STREAM ?
-	             info->status_tokens[ SAMPLE_COUNT ] : info->status_tokens[ SAMPLE_INV_COUNT ] );
+//	load_from = (info->status_tokens[PLAY_MODE] == MODE_STREAM ?
+//	             info->status_tokens[ SAMPLE_COUNT ] : info->status_tokens[ SAMPLE_INV_COUNT ] );
+
+	load_from = 0; /* usually there are not that many streams but FIXME: offset wrong by one */
 	if( load_from < 0 )
 	{
 		load_from = 0;
