@@ -288,8 +288,11 @@ static void blur_dark_framedata(VJFrame *frame, int width, int height)
     }
 }
 
-void emboss_apply(VJFrame *frame, int width, int height, int n)
+void emboss_apply(VJFrame *frame, int n)
 {
+	int width, height;
+	width=frame->width; height = frame->height;
+
     switch (n) {
     case 1:
 	xtreme_emboss_framedata(frame, width, height);
