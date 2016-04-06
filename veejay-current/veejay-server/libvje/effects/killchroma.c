@@ -53,7 +53,7 @@ vj_effect *killchroma_init(int w, int h)
 }
 
 
-void killchroma_apply(VJFrame *frame, int width, int height, int n)
+void killchroma_apply(VJFrame *frame, int n)
 {
 	if(n==0)
 	{
