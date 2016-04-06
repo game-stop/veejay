@@ -54,12 +54,14 @@ vj_effect *dither_init(int w, int h)
 }
 
 static int last_size = 0;
-void dither_apply(VJFrame *frame, int width, int height, int size, int random_on)
+void dither_apply(VJFrame *frame, int size, int random_on)
 {
     long int w_, h_;
     long int dith[size][size];
     long int i, j, d, v, l, m;
     uint8_t *Y = frame->data[0];
+	int width, height;
+	width=frame->width; height = frame->height;
 
 	if( last_size != size || random_on ) {
 	  for (l = 0; l < size; l++) {
