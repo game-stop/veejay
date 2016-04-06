@@ -42,41 +42,43 @@ static uint8_t *g_dicemap=NULL;
 
 void dice_create_map(int w, int h);
 
-typedef enum _dice_dir {
-    Up = 0,
-    Right = 1,
-    Down = 2,
-    Left = 3,
+typedef enum _dice_dir
+{
+	Up = 0,
+	Right = 1,
+	Down = 2,
+	Left = 3,
 } DiceDir;
 
 vj_effect *dices_init(int width, int height)
 {
 
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 4;
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 32;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 1;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->defaults[0] = 4;
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 32;
 	ve->description = "Dices (EffectTV)";
-    ve->sub_format = 1;
-    ve->extra_frame = 0;
+	ve->sub_format = 1;
+	ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Dice size" );
-   
-	/* find parameter limit */	
+
+	/* find parameter limit */
 	int near = (width < height ? width: height);
 	int next = pow(2, floor(log2(near)));
 	int limit = 1;
 	int iter = 1;
-	while(limit < next) {
+	while(limit < next) 
+	{
 		limit = limit * 2;
 		iter ++;
 	}
 
-	ve->limits[1][0] = iter - 1;	
+	ve->limits[1][0] = iter - 1;
 
 	return ve;
 }
@@ -85,107 +87,122 @@ int	dices_malloc(int width, int height)
 {
 	g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height);
 	if(!g_dicemap) return 0;
-        dice_create_map(width, height);
+
+	dice_create_map(width, height);
 	return 1;
 }
 
-void dices_free() {
-   if(g_dicemap) 
-	   free(g_dicemap);
-   g_dicemap  = NULL;
+void dices_free()
+{
+	if(g_dicemap)
+		free(g_dicemap);
+	g_dicemap  = NULL;
 }
 
 void dice_create_map(int w, int h)
 {
-    int k,x, y, i = 0;
-    int maplen = (w * h);
-    g_map_height = h >> g_cube_bits;
-    g_map_width = w >> g_cube_bits;
-    g_cube_size = 1 << g_cube_bits;
-    maplen = maplen / (g_map_height * g_map_width);
-    for( k = 0; k < maplen;k++) {
-    for (y = 0; y < g_map_height; y++) {
-	for (x = 0; x < g_map_width; x++) {
-	    //g_dicemap[i] = j++;
-	    //if(j==3) j=0;
-	    g_dicemap[i] = ((1 + (rand() * (i + y))) & 0x03);
-		i++;
+	int k,x, y, i = 0;
+	int maplen = (w * h);
+	g_map_height = h >> g_cube_bits;
+	g_map_width = w >> g_cube_bits;
+	g_cube_size = 1 << g_cube_bits;
+	maplen = maplen / (g_map_height * g_map_width);
+	for( k = 0; k < maplen;k++)
+	{
+		for (y = 0; y < g_map_height; y++)
+		{
+			for (x = 0; x < g_map_width; x++)
+			{
+				//g_dicemap[i] = j++;
+				//if(j==3) j=0;
+				g_dicemap[i] = ((1 + (rand() * (i + y))) & 0x03);
+				i++;
+			}
+		}
 	}
-    }
-	}
-	fprintf(stderr, "created map of %d, %d did %d in dicemap, total is %d\n",
-		w,h,i,(w*h));
+	fprintf(stderr,
+	        "created map of %d, %d did %d in dicemap, total is %d\n",
+	        w,h,i,(w*h)
+	        );
 }
 
 void dices_apply( void* data, VJFrame *frame, int cube_bits)
 {
-
-    int i = 0, map_x, map_y, map_i = 0, base, dx, dy, di=0;
+	int i = 0, map_x, map_y, map_i = 0, base, dx, dy, di=0;
 	int width, height;
 	frame->width = width; frame->height = height;
- 	uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-    if (cube_bits != g_cube_bits) {
+	if (cube_bits != g_cube_bits)
+	{
 		g_cube_bits = cube_bits;
 		dice_create_map(width, height);
-    }
-
-    for (map_y = 0; map_y < g_map_height; map_y++) {
-	for (map_x = 0; map_x < g_map_width; map_x++) {
-	    base = (map_y << g_cube_bits) * width + (map_x << g_cube_bits);
-	    switch (g_dicemap[map_i]) {
-	    case Left:
-		for (dy = 0; dy < g_cube_size; dy++) {
-		    i = base + dy * width;
-		    for (dx = 0; dx < g_cube_size; dx++) {
-			di = base + (dx * width) + (g_cube_size - dy - 1);
-			Y[di] = Y[i];
-			Cb[di] = Cb[i];
-			Cr[di] = Cr[i];
-			i++;
-		    }
-		}
-		break;
-	    case Down:
-		for (dy = 0; dy < g_cube_size; dy++) {
-		    di = base + dy * width;
-		    i = base + (g_cube_size - dy - 1) * width +
-			g_cube_size;
-		    for (dx = 0; dx < g_cube_size; dx++) {
-			i--;
-			Y[di] = Y[i];
-			Cb[di] = Cb[i];
-			Cr[di] = Cr[i];
-			di++;
-		    }
-		}
-		break;
-	    case Right:
-		for (dy = 0; dy < g_cube_size; dy++) {
-		    i = base + (dy * width);
-		    for (dx = 0; dx < g_cube_size; dx++) {
-			di = base + dy + (g_cube_size - dx - 1) * width;
-			Y[di] = Y[i];
-			Cb[di] = Cb[i];
-			Cr[di] = Cr[i];
-			i++;
-		    }
-		}
-		break;
-	     case Up:
-		for( dy = 0; dy < g_cube_size ; dy ++ )
-		{
-			i =  base + dy * width;
-			for( dx  =  0; dx  < g_cube_size   ; dx ++ )
-			{
-				Y[di]  = Y[i]; Cb[di] =  Cb[i]; Cr[di]  =  Cr[i]; i ++;
-			}
-		}
-		break;
-	    }
-	    map_i++;
 	}
-    }
+
+	for (map_y = 0; map_y < g_map_height; map_y++)
+	{
+		for (map_x = 0; map_x < g_map_width; map_x++)
+		{
+			base = (map_y << g_cube_bits) * width + (map_x << g_cube_bits);
+			switch (g_dicemap[map_i])
+			{
+				case Left:
+					for (dy = 0; dy < g_cube_size; dy++)
+					{
+						i = base + dy * width;
+						for (dx = 0; dx < g_cube_size; dx++)
+						{
+							di = base + (dx * width) + (g_cube_size - dy - 1);
+							Y[di] = Y[i];
+							Cb[di] = Cb[i];
+							Cr[di] = Cr[i];
+							i++;
+						}
+					}
+					break;
+				case Down:
+					for (dy = 0; dy < g_cube_size; dy++)
+					{
+						di = base + dy * width;
+						i = base + (g_cube_size - dy - 1) * width + g_cube_size;
+						for (dx = 0; dx < g_cube_size; dx++)
+						{
+							i--;
+							Y[di] = Y[i];
+							Cb[di] = Cb[i];
+							Cr[di] = Cr[i];
+							di++;
+						}
+					}
+					break;
+				case Right:
+					for (dy = 0; dy < g_cube_size; dy++)
+					{
+						i = base + (dy * width);
+						for (dx = 0; dx < g_cube_size; dx++) 
+						{
+							di = base + dy + (g_cube_size - dx - 1) * width;
+							Y[di] = Y[i];
+							Cb[di] = Cb[i];
+							Cr[di] = Cr[i];
+							i++;
+						}
+					}
+					break;
+				case Up:
+					for( dy = 0; dy < g_cube_size ; dy ++ )
+					{
+						i =  base + dy * width;
+						for( dx  =  0; dx  < g_cube_size   ; dx ++ )
+						{
+							Y[di]  = Y[i]; Cb[di] =  Cb[i]; Cr[di]  =  Cr[i]; i ++;
+						}
+					}
+					break;
+			}
+			map_i++;
+		}
+	}
 }
