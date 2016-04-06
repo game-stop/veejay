@@ -50,9 +50,10 @@ vj_effect *fibdownscale_init(int w, int h)
 	return ve;
 }
 
-void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width,
-			int height, int n)
+void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n)
 {
+	int width, height;
+	width = frame->width; height = frame->height;
     if (n == 0)
 	_fibdownscale_apply(frame, frame2, width, height);
     if (n == 1)

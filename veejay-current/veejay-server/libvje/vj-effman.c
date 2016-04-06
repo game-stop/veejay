@@ -153,8 +153,7 @@ static void vj_effman_apply_image_effect(
 	break;
      case VJ_IMAGE_EFFECT_FIBDOWNSCALE:
 	for (j = 0; j < arg[1]; j++) {
-	    fibdownscale_apply(frames[0], frames[0], frames[0]->width,
-			       frames[0]->height, arg[0]);
+		fibdownscale_apply(frames[0], frames[0], arg[0]);
 	}
 	break;
      case VJ_IMAGE_EFFECT_NOISEADD:

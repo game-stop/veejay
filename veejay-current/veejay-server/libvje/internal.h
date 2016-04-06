@@ -308,7 +308,7 @@ extern void tripplicity_apply(VJFrame *frame1,VJFrame *frame2, int w, int h, int
 extern void dices_apply(void * data, VJFrame *frame, int cube_bits);
 extern void dither_apply( VJFrame *frame, int size, int n);
 extern void emboss_apply( VJFrame *frame, int n);
-extern void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int n);
+extern void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n);
 extern void _fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width, int height);
 extern void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width, int height);
 extern void flip_apply( VJFrame *frame, int width, int height, int n);
