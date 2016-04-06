@@ -6674,9 +6674,9 @@ static void process_reload_hints(int *history, int pm)
 
 				gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
 				set_tooltip( slider_names_[i].text, tt1 );
-		//		gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,
-		//		                                                   param_names_[i].text)),
-		//		                   tt1);
+				gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,
+				                                                   param_names_[i].text)),
+				                   tt1);
 
 				gint min,max,value;
 				value = entry_tokens[ENTRY_PARAMSET + i];
@@ -6700,9 +6700,9 @@ static void process_reload_hints(int *history, int pm)
 			disable_widget( param_kfs_[i].text );
 			set_tooltip( param_kfs_[i].text, NULL );
 			set_tooltip( slider_names_[i].text, NULL );
-		//	gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,
-		//	                                                    param_names_[i].text)),
-		//	                   NULL);
+			gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,
+			                                                    param_names_[i].text)),
+			                   NULL);
 			update_slider_range( slider_names_[i].text, min,max, value, 0 );
 		}
 		GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
