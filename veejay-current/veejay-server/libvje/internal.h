@@ -654,7 +654,7 @@ extern void cali_apply(void *d , VJFrame *frame,
 
 extern void waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, int loopnum, int decay);
 
-extern void radcor_apply( VJFrame *frame, int width, int height, int a, int b, int c, int alpha);
+extern void radcor_apply( VJFrame *frame, int a, int b, int c, int alpha);
 
 extern int motionmap_prepare( uint8_t *map[4], int w, int h );
 extern int chameleon_prepare( uint8_t *bg[4], int w, int h );

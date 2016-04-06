@@ -90,9 +90,11 @@ typedef struct
 } pixel_t;
 
 
-void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, int dir, int alpha)
+void radcor_apply( VJFrame *frame, int alpaX, int alpaY, int dir, int alpha)
 {
 	int i,j;
+	int width, height;
+	frame->width = width; frame->height = height;
 	int len = (width * height);
 	int i2,j2;
 	double x,y,x2,x3,y2,y3,r;
