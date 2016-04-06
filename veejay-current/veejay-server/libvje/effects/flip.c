@@ -22,6 +22,7 @@
 #include <libvjmem/vjmem.h>
 #include "common.h"
 #include "flip.h"
+
 vj_effect *flip_init(int w, int h)
 {
 
@@ -44,7 +45,7 @@ vj_effect *flip_init(int w, int h)
 	ve->hints = vje_init_value_hint_list (ve->num_params);
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Flip Horizontal", "Flip Vertical"
+	                          "Flip Horizontal", "Flip Vertical"
 	);
 
 	return ve;
@@ -161,4 +162,3 @@ void _flip_y_yuvdata(VJFrame *frame)
 		pos_b -= uv_width;
 	} while (--uy);
 }
-
