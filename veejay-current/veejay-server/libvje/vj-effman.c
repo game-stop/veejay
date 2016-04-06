@@ -498,7 +498,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
       case VJ_VIDEO_EFFECT_BINARYOVERLAY:
 	binaryoverlay_apply(frames[0], frames[1],frames[0]->width,frames[0]->height,arg[0] );   break;
       case VJ_VIDEO_EFFECT_OVERLAYMAGIC:
-	overlaymagic_apply(frames[0], frames[1], frames[0]->width,frames[0]->height, arg[0],arg[1]);
+	overlaymagic_apply(frames[0], frames[1], arg[0],arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_SLICER:
 		slicer_apply(frames[0],frames[1], frames[0]->width, frames[0]->height, arg[0],arg[1],arg[2] );

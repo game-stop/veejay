@@ -314,7 +314,7 @@ extern void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width, int 
 extern void flip_apply( VJFrame *frame, int n);
 extern void killchroma_apply(VJFrame *frame, int n);
 extern void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int op_a, int op_b );
-extern void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int n, int m);
+extern void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int n, int m);
 extern void mirrors_apply( VJFrame *frame, int width, int height,int type, int factor);
 extern void mirrors2_apply( VJFrame *frame, int width, int height,int type);
 extern void negation_apply( VJFrame *frame, int width, int height,int val);
