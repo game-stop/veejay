@@ -130,7 +130,7 @@ void dices_apply( void* data, VJFrame *frame, int cube_bits)
 {
 	int i = 0, map_x, map_y, map_i = 0, base, dx, dy, di=0;
 	int width, height;
-	frame->width = width; frame->height = height;
+	width = frame->width; height = frame->height;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
