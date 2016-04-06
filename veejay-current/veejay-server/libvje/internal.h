@@ -305,7 +305,7 @@ enum {
 #define VJ_NUM_BLEND_EFFECTS VJ_EFFECT_BLEND_ADDTEST7
 
 extern void tripplicity_apply(VJFrame *frame1,VJFrame *frame2, int w, int h, int a, int b, int c );
-extern void dices_apply(void * data, VJFrame *frame, int width, int height, int cube_bits);
+extern void dices_apply(void * data, VJFrame *frame, int cube_bits);
 extern void dither_apply( VJFrame *frame, int width, int height, int size, int n);
 extern void emboss_apply( VJFrame *frame, int width, int height, int n);
 extern void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int n);
