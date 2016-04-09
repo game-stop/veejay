@@ -28,32 +28,30 @@
 
 vj_effect *killchroma_init(int w, int h)
 {
-
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->sub_format = -1;
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 2;
-    ve->defaults[0] = 0;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 1;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->sub_format = -1;
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 2;
+	ve->defaults[0] = 0;
 	ve->has_user = 0;
-    ve->description = "Filter out chroma channels";
-    ve->extra_frame = 0;
+	ve->description = "Filter out chroma channels";
+	ve->extra_frame = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode" );
 	ve->parallel = 1;
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		   "All Channels", "Chroma Blue", "Chroma Red" );
+	                          "All Channels", "Chroma Blue", "Chroma Red" );
 
-    return ve;
+	return ve;
 }
 
-
-void killchroma_apply(VJFrame *frame, int width, int height, int n)
+void killchroma_apply(VJFrame *frame, int n)
 {
 	if(n==0)
 	{

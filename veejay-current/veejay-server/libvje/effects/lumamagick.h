@@ -26,7 +26,6 @@
 
 vj_effect *lumamagick_init();
 
-void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int width,
-		     int height, int n, int op_a, int op_b);
+void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int op_a, int op_b);
 
 #endif

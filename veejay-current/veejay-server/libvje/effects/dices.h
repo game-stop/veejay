@@ -27,6 +27,5 @@
 vj_effect *dices_init(int width, int height);
 int dices_malloc(int w, int h);
 void dices_free();
-void dices_apply( void * data, VJFrame *frame, int width, int height,
-		 int cube_bits);
+void dices_apply( void * data, VJFrame *frame, int cube_bits);
 #endif

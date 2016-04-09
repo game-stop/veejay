@@ -25,8 +25,8 @@
 #include <stdint.h>
 
 vj_effect *flip_init();
-void flip_apply(VJFrame *frame, int width, int height, int n);
-void _flip_y_yuvdata(VJFrame *frame, int width, int height);
-void _flip_x_yuvdata(VJFrame *frame, int width, int height);
+void flip_apply(VJFrame *frame, int n);
+void _flip_y_yuvdata(VJFrame *frame);
+void _flip_x_yuvdata(VJFrame *frame);
 void flip_free();
 #endif

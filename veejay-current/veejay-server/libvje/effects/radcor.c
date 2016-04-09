@@ -28,53 +28,54 @@
 #include <libvjmem/vjmem.h>
 #include "radcor.h"
 #include "common.h"
+
 vj_effect *radcor_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 3;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 1000;
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 1000;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->limits[0][0] = 1;
+	ve->limits[1][0] = 1000;
+	ve->limits[0][1] = 1;
+	ve->limits[1][1] = 1000;
+	ve->limits[0][2] = 0;
+	ve->limits[1][2] = 1;
 	ve->limits[0][1] = 0;
 	ve->limits[1][1] = 1;
-    ve->defaults[0] = 10;
-    ve->defaults[1] = 40;
-    ve->defaults[2] = 0;
-    ve->description = "Lens correction";
-    ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->has_user = 0;
-	
-	ve->alpha = FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_OUT;
+	ve->defaults[0] = 10;
+	ve->defaults[1] = 40;
+	ve->defaults[2] = 0;
+	ve->description = "Lens correction";
+	ve->sub_format = 1;
+	ve->extra_frame = 0;
+	ve->has_user = 0;
 
+	ve->alpha = FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_OUT;
 	ve->param_description = vje_build_param_list( ve->num_params, "Alpha X", "Alpha Y", "Direction", "Update Alpha");
-    return ve;
+
+	return ve;
 }
 
 static uint8_t *badbuf = NULL;
 static uint32_t *Map = NULL;
 static int map_upd[4] = {0,0,0,0};
 
-int	radcor_malloc( int width, int height )
+int radcor_malloc( int width, int height )
 {
 	badbuf = (uint8_t*) vj_malloc( RUP8( width * height * 4 * sizeof(uint8_t)));
 	if(!badbuf)
 		return 0;
-	Map    = (uint32_t*) vj_malloc( RUP8(width * height * sizeof(uint32_t)));
+	Map = (uint32_t*) vj_malloc( RUP8(width * height * sizeof(uint32_t)));
 	veejay_memset( Map, 0, RUP8(width * height * sizeof(uint32_t)) );
 	if(!Map)
 		return 0;
 	return 1;
 }
 
-void	radcor_free()
+void radcor_free()
 {
 	free(badbuf);
 	free(Map);
@@ -90,9 +91,11 @@ typedef struct
 } pixel_t;
 
 
-void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, int dir, int alpha)
+void radcor_apply( VJFrame *frame, int alpaX, int alpaY, int dir, int alpha)
 {
 	int i,j;
+	int width, height;
+	width = frame->width; height = frame->height;
 	int len = (width * height);
 	int i2,j2;
 	double x,y,x2,x3,y2,y3,r;
@@ -108,9 +111,9 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 	//@ copy source image to internal buffer 
 	uint8_t *dest[4] = { badbuf, badbuf + len, badbuf + len + len, badbuf + len + len + len };
 	int strides[4] = { len, len, len, 0 };
-	if( alpha ) 
+	if( alpha )
 		strides[3] = len;
-	
+
 	vj_frame_copy( frame->data, dest, strides );
 
 	uint8_t *Yi = badbuf;
@@ -145,7 +148,7 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 
 	if( update_map )
 	{
-		for( i = 0; i < nyout; i ++ ) 
+		for( i = 0; i < nyout; i ++ )
 		{
 			for( j = 0; j < nxout; j ++ )
 			{	
@@ -156,7 +159,7 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 				x3 = x / (1 - alphax * r);
 				y3 = y / (1 - alphay * r); 
 				x2 = x / (1 - alphax * (x3*x3+y3*y3));
-				y2 = y / (1 - alphay * (x3*x3+y3*y3));	
+				y2 = y / (1 - alphay * (x3*x3+y3*y3));
 				i2 = (y2 + 1) * ny / 2;
 				j2 = (x2 + 1) * nx / 2;
 	
@@ -164,7 +167,6 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 					Map[ i * nxout + j ] = i2 * nx + j2;
 				else
 					Map[ i * nxout + j ] = 0;
-
 			}
 		}
 	}
@@ -180,10 +182,11 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 		}
 	}
 
-	if( alpha) {
-		for( i = 0; i < len; i ++ ) {
+	if( alpha)
+	{
+		for( i = 0; i < len; i ++ )
+		{
 			A[i] = Ai[ Map[i] ];
 		}
 	}
-
 }

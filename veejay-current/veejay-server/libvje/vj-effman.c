@@ -153,8 +153,7 @@ static void vj_effman_apply_image_effect(
 	break;
      case VJ_IMAGE_EFFECT_FIBDOWNSCALE:
 	for (j = 0; j < arg[1]; j++) {
-	    fibdownscale_apply(frames[0], frames[0], frames[0]->width,
-			       frames[0]->height, arg[0]);
+		fibdownscale_apply(frames[0], frames[0], arg[0]);
 	}
 	break;
      case VJ_IMAGE_EFFECT_NOISEADD:
@@ -197,8 +196,7 @@ static void vj_effman_apply_image_effect(
 			arg[0], arg[1], arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_KILLCHROMA:
-	killchroma_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]
-			 );
+	killchroma_apply(frames[0], arg[0] );
 	break;
      case VJ_IMAGE_EFFECT_MIRROR:
 	mirrors2_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
@@ -277,7 +275,7 @@ static void vj_effman_apply_image_effect(
 		timedistort_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_LENSCORRECTION:
-		radcor_apply( frames[0], frames[0]->width,frames[0]->height, arg[0],arg[1] ,arg[2],arg[3]);
+		radcor_apply( frames[0], arg[0],arg[1] ,arg[2],arg[3]);
 		break;
      case VJ_IMAGE_EFFECT_NEGATION:
 	negation_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
@@ -301,14 +299,13 @@ static void vj_effman_apply_image_effect(
 			arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_DITHER:
-	dither_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
-		     arg[1]);
+	dither_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_EMBOSS:
-	emboss_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
+	emboss_apply(frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_FLIP:
-	flip_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
+	flip_apply(frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_REVTV:
 	revtv_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
@@ -325,8 +322,7 @@ static void vj_effman_apply_image_effect(
 	widthmirror_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_DICES:
-	dices_apply(vj_effects[entry], frames[0], frames[0]->width,
-		    frames[0]->height, arg[0]);
+	dices_apply(vj_effects[entry], frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_COLORTEST:
 	color_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
@@ -497,13 +493,12 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 		       arg[0]);
 	break;
       case VJ_VIDEO_EFFECT_LUMAMAGICK:
-	lumamagic_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
-			arg[0], arg[1],arg[2]);
+	lumamagic_apply(frames[0], frames[1], arg[0], arg[1],arg[2]);
    	break;
       case VJ_VIDEO_EFFECT_BINARYOVERLAY:
 	binaryoverlay_apply(frames[0], frames[1],frames[0]->width,frames[0]->height,arg[0] );   break;
       case VJ_VIDEO_EFFECT_OVERLAYMAGIC:
-	overlaymagic_apply(frames[0], frames[1], frames[0]->width,frames[0]->height, arg[0],arg[1]);
+	overlaymagic_apply(frames[0], frames[1], arg[0],arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_SLICER:
 		slicer_apply(frames[0],frames[1], frames[0]->width, frames[0]->height, arg[0],arg[1],arg[2] );

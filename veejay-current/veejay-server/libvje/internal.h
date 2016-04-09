@@ -305,16 +305,16 @@ enum {
 #define VJ_NUM_BLEND_EFFECTS VJ_EFFECT_BLEND_ADDTEST7
 
 extern void tripplicity_apply(VJFrame *frame1,VJFrame *frame2, int w, int h, int a, int b, int c );
-extern void dices_apply(void * data, VJFrame *frame, int width, int height, int cube_bits);
-extern void dither_apply( VJFrame *frame, int width, int height, int size, int n);
-extern void emboss_apply( VJFrame *frame, int width, int height, int n);
-extern void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int n);
+extern void dices_apply(void * data, VJFrame *frame, int cube_bits);
+extern void dither_apply( VJFrame *frame, int size, int n);
+extern void emboss_apply( VJFrame *frame, int n);
+extern void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n);
 extern void _fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width, int height);
 extern void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width, int height);
-extern void flip_apply( VJFrame *frame, int width, int height, int n);
-extern void killchroma_apply(VJFrame *frame, int width, int height,int n);
-extern void lumamagic_apply(VJFrame *frame, VJFrame *frame2,int width, int height, int n, int op_a, int op_b );
-extern void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int n, int m);
+extern void flip_apply( VJFrame *frame, int n);
+extern void killchroma_apply(VJFrame *frame, int n);
+extern void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int op_a, int op_b );
+extern void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int n, int m);
 extern void mirrors_apply( VJFrame *frame, int width, int height,int type, int factor);
 extern void mirrors2_apply( VJFrame *frame, int width, int height,int type);
 extern void negation_apply( VJFrame *frame, int width, int height,int val);
@@ -654,7 +654,7 @@ extern void cali_apply(void *d , VJFrame *frame,
 
 extern void waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, int loopnum, int decay);
 
-extern void radcor_apply( VJFrame *frame, int width, int height, int a, int b, int c, int alpha);
+extern void radcor_apply( VJFrame *frame, int a, int b, int c, int alpha);
 
 extern int motionmap_prepare( uint8_t *map[4], int w, int h );
 extern int chameleon_prepare( uint8_t *bg[4], int w, int h );
