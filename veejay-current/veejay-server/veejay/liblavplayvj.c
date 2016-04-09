@@ -1152,7 +1152,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				ptr = vj_sprintf( ptr, info->sfd); *ptr++ = ' ';
-				ptr = vj_sprintf( ptr, mstatus );
+				ptr = vj_sprintf( ptr, mstatus ); *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
