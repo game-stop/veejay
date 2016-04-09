@@ -26,16 +26,16 @@
 
 vj_effect *dupmagic_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 5;
-    ve->description = "Strong Luma Overlay";
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 12;
-    ve->extra_frame = 1;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 1;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->defaults[0] = 5;
+	ve->description = "Strong Luma Overlay";
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 12;
+	ve->extra_frame = 1;
 	ve->parallel = 1;    
 	ve->sub_format = -1;
 	ve->has_user = 0;
@@ -48,78 +48,76 @@ vj_effect *dupmagic_init(int w, int h)
 	   "Multiply", "Divide", "Lighten", "Difference Negate", "Freeze", "Unfreeze", "Relative Add",
 	   "Relative Add Luma",	"Max Select", "Min Select", "Experimental"   );
 
-    return ve;
+	return ve;
 }
 
-void dupmagic_apply(VJFrame *frame, VJFrame *frame2, int width,
-		    int height, int n)
+void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n)
 {
     switch (n) {
     case 1:
-	_overlaymagic_additive(frame, frame );
-	_overlaymagic_additive(frame2, frame2 );
-	_overlaymagic_additive(frame, frame2 );
-	break;
+		overlaymagic_additive(frame, frame );
+		overlaymagic_additive(frame2, frame2 );
+		overlaymagic_additive(frame, frame2 );
+		break;
     case 2:
-	_overlaymagic_multiply(frame, frame );
-	_overlaymagic_multiply(frame2, frame2 );
-	_overlaymagic_multiply(frame, frame2 );
-	break;
+		overlaymagic_multiply(frame, frame );
+		overlaymagic_multiply(frame2, frame2 );
+		overlaymagic_multiply(frame, frame2 );
+		break;
     case 3:
-	_overlaymagic_divide(frame, frame );
-	_overlaymagic_divide(frame2, frame2 );
-	_overlaymagic_divide(frame, frame2 );
-	break;
+		overlaymagic_divide(frame, frame );
+		overlaymagic_divide(frame2, frame2 );
+		overlaymagic_divide(frame, frame2 );
+		break;
     case 4:
-	_overlaymagic_lighten(frame, frame );
-	_overlaymagic_lighten(frame2, frame2 );
-	_overlaymagic_lighten(frame, frame2 );
-	break;
+		overlaymagic_lighten(frame, frame );
+		overlaymagic_lighten(frame2, frame2 );
+		overlaymagic_lighten(frame, frame2 );
+		break;
     case 5:
-	_overlaymagic_diffnegate(frame, frame );
-	_overlaymagic_diffnegate(frame2, frame2 );
-	_overlaymagic_diffnegate(frame, frame2 );
-	break;
+		overlaymagic_diffnegate(frame, frame );
+		overlaymagic_diffnegate(frame2, frame2 );
+		overlaymagic_diffnegate(frame, frame2 );
+		break;
     case 6:
-	_overlaymagic_freeze(frame, frame );
-	_overlaymagic_freeze(frame2, frame2 );
-	_overlaymagic_freeze(frame, frame2 );
-	break;
+		overlaymagic_freeze(frame, frame );
+		overlaymagic_freeze(frame2, frame2 );
+		overlaymagic_freeze(frame, frame2 );
+		break;
     case 7:
-	_overlaymagic_unfreeze(frame, frame );
-	_overlaymagic_unfreeze(frame2, frame2 );
-	_overlaymagic_unfreeze(frame, frame2 );
-	break;
+		overlaymagic_unfreeze(frame, frame );
+		overlaymagic_unfreeze(frame2, frame2 );
+		overlaymagic_unfreeze(frame, frame2 );
+		break;
     case 8:
-	_overlaymagic_relativeadd(frame, frame2 );
-	_overlaymagic_relativeadd(frame2, frame2 );
-	_overlaymagic_relativeadd(frame, frame2 );
-	break;
+		overlaymagic_relativeadd(frame, frame2 );
+		overlaymagic_relativeadd(frame2, frame2 );
+		overlaymagic_relativeadd(frame, frame2 );
+		break;
     case 9:
-	_overlaymagic_relativeaddlum(frame, frame );
-	_overlaymagic_relativeaddlum(frame2, frame2 );
-	_overlaymagic_relativeaddlum(frame, frame2 );
+		overlaymagic_relativeaddlum(frame, frame );
+		overlaymagic_relativeaddlum(frame2, frame2 );
+		overlaymagic_relativeaddlum(frame, frame2 );
 	break;
     case 10:
-	_overlaymagic_maxselect(frame, frame );
-	_overlaymagic_maxselect(frame2, frame2 );
-	_overlaymagic_maxselect(frame, frame2 );
-	break;
+		overlaymagic_maxselect(frame, frame );
+		overlaymagic_maxselect(frame2, frame2 );
+		overlaymagic_maxselect(frame, frame2 );
+		break;
     case 11:
-	_overlaymagic_minselect(frame, frame );
-	_overlaymagic_minselect(frame2, frame2 );
-	_overlaymagic_minselect(frame, frame2 );
-	break;
+		overlaymagic_minselect(frame, frame );
+		overlaymagic_minselect(frame2, frame2 );
+		overlaymagic_minselect(frame, frame2 );
+		break;
     case 12:
-	_overlaymagic_addtest2(frame, frame );
-	_overlaymagic_addtest2(frame2, frame2 );
-	_overlaymagic_addtest2(frame, frame2 );
-	break;
+		overlaymagic_addtest2(frame, frame );
+		overlaymagic_addtest2(frame2, frame2 );
+		overlaymagic_addtest2(frame, frame2 );
+		break;
     default:
-	_overlaymagic_softburn(frame, frame );
-	_overlaymagic_softburn(frame2, frame2 );
-	_overlaymagic_softburn(frame, frame2 );
-	break;
+		overlaymagic_softburn(frame, frame );
+		overlaymagic_softburn(frame2, frame2 );
+		overlaymagic_softburn(frame, frame2 );
+		break;
     }
 }
-void dupmagic_free(){}

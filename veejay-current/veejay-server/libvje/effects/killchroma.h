@@ -23,7 +23,6 @@
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
-
 vj_effect *killchroma_init();
-void killchroma_apply( VJFrame *v, int n);
+void killchroma_apply(VJFrame *v, int n);
 #endif

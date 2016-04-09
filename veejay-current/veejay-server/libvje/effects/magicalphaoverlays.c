@@ -63,7 +63,7 @@ vj_effect *overlayalphamagic_init(int w, int h)
 	return ve;
 }
 
-static void _overlayalphamagic_adddistorted(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_adddistorted(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -81,7 +81,7 @@ static void _overlayalphamagic_adddistorted(VJFrame *frame, VJFrame *frame2,int 
 
 }
 
-static void _overlayalphamagic_add_distorted(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_add_distorted(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
 
     unsigned int i;
@@ -98,7 +98,7 @@ static void _overlayalphamagic_add_distorted(VJFrame *frame, VJFrame *frame2,int
 
 }
 
-static void _overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -114,7 +114,7 @@ static void _overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2,int 
     }
 }
 
-static void _overlayalphamagic_sub_distorted(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_sub_distorted(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
 
     unsigned int i ;
@@ -130,7 +130,7 @@ static void _overlayalphamagic_sub_distorted(VJFrame *frame, VJFrame *frame2,int
     }
 }
 
-static void _overlayalphamagic_multiply(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_multiply(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -140,7 +140,7 @@ static void _overlayalphamagic_multiply(VJFrame *frame, VJFrame *frame2,int widt
 	A[i] = (A[i] * A2[i]) >> 8;
 }
 
-static void _overlayalphamagic_simpledivide(VJFrame *frame, VJFrame *frame2, int width,int height)
+static void overlayalphamagic_simpledivide(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -152,7 +152,7 @@ static void _overlayalphamagic_simpledivide(VJFrame *frame, VJFrame *frame2, int
     }
 }
 
-static void _overlayalphamagic_divide(VJFrame *frame, VJFrame *frame2, int width,int height)
+static void overlayalphamagic_divide(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     int a, b, c;
@@ -169,7 +169,7 @@ static void _overlayalphamagic_divide(VJFrame *frame, VJFrame *frame2, int width
     }
 }
 
-static void _overlayalphamagic_additive(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_additive(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     
     unsigned int len = width * height;
@@ -183,7 +183,7 @@ static void _overlayalphamagic_additive(VJFrame *frame, VJFrame *frame2,int widt
 	}
 }
 
-static void _overlayalphamagic_substractive(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_substractive(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
 
     unsigned int i;
@@ -195,7 +195,7 @@ static void _overlayalphamagic_substractive(VJFrame *frame, VJFrame *frame2,int 
 		A[i] = CLAMP_Y( A[i] - A2[i] );
 }
 
-static void _overlayalphamagic_softburn(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_softburn(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -222,7 +222,7 @@ static void _overlayalphamagic_softburn(VJFrame *frame, VJFrame *frame2,int widt
     }
 }
 
-static void _overlayalphamagic_inverseburn(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_inverseburn(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -241,7 +241,7 @@ static void _overlayalphamagic_inverseburn(VJFrame *frame, VJFrame *frame2,int w
     }
 }
 
-static void _overlayalphamagic_colordodge(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_colordodge(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -263,7 +263,7 @@ static void _overlayalphamagic_colordodge(VJFrame *frame, VJFrame *frame2,int wi
     }
 }
 
-static void _overlayalphamagic_mulsub(VJFrame *frame, VJFrame *frame2, int width, int height)
+static void overlayalphamagic_mulsub(VJFrame *frame, VJFrame *frame2, int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -279,7 +279,7 @@ static void _overlayalphamagic_mulsub(VJFrame *frame, VJFrame *frame2, int width
     }
 }
 
-static void _overlayalphamagic_lighten(VJFrame *frame, VJFrame *frame2, int width,int height)
+static void overlayalphamagic_lighten(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -298,7 +298,7 @@ static void _overlayalphamagic_lighten(VJFrame *frame, VJFrame *frame2, int widt
     }
 }
 
-static void _overlayalphamagic_difference(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_difference(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -313,7 +313,7 @@ static void _overlayalphamagic_difference(VJFrame *frame, VJFrame *frame2,int wi
     }
 }
 
-static void _overlayalphamagic_diffnegate(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_diffnegate(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -328,7 +328,7 @@ static void _overlayalphamagic_diffnegate(VJFrame *frame, VJFrame *frame2,int wi
     }
 }
 
-static void _overlayalphamagic_exclusive(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_exclusive(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -342,7 +342,7 @@ static void _overlayalphamagic_exclusive(VJFrame *frame, VJFrame *frame2,int wid
     }
 }
 
-static void _overlayalphamagic_basecolor(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_basecolor(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     int a, b, c, d;
@@ -359,7 +359,7 @@ static void _overlayalphamagic_basecolor(VJFrame *frame, VJFrame *frame2,int wid
     }
 }
 
-static void _overlayalphamagic_freeze(VJFrame *frame, VJFrame *frame2, int width,int height)
+static void overlayalphamagic_freeze(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -375,7 +375,7 @@ static void _overlayalphamagic_freeze(VJFrame *frame, VJFrame *frame2, int width
 	 }
 }
 
-static void _overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -391,7 +391,7 @@ static void _overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2,int widt
     }
 }
 
-static void _overlayalphamagic_hardlight(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_hardlight(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -411,7 +411,7 @@ static void _overlayalphamagic_hardlight(VJFrame *frame, VJFrame *frame2,int wid
     }
 }
 
-static void _overlayalphamagic_relativeaddlum(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_relativeaddlum(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     int a, b, c, d;
@@ -428,7 +428,7 @@ static void _overlayalphamagic_relativeaddlum(VJFrame *frame, VJFrame *frame2,in
     }
 }
 
-static void _overlayalphamagic_relativesublum(VJFrame *frame, VJFrame *frame2, int width, int height)
+static void overlayalphamagic_relativesublum(VJFrame *frame, VJFrame *frame2, int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -443,7 +443,7 @@ static void _overlayalphamagic_relativesublum(VJFrame *frame, VJFrame *frame2, i
     }
 }
 
-static void _overlayalphamagic_relativeadd(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_relativeadd(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -460,7 +460,7 @@ static void _overlayalphamagic_relativeadd(VJFrame *frame, VJFrame *frame2,int w
     }
 }
 
-static void _overlayalphamagic_relativesub(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_relativesub(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -476,7 +476,7 @@ static void _overlayalphamagic_relativesub(VJFrame *frame, VJFrame *frame2,int w
 
 }
 
-static void _overlayalphamagic_minsubselect(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_minsubselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -494,7 +494,7 @@ static void _overlayalphamagic_minsubselect(VJFrame *frame, VJFrame *frame2,int 
     }
 }
 
-static void _overlayalphamagic_maxsubselect(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_maxsubselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -512,7 +512,7 @@ static void _overlayalphamagic_maxsubselect(VJFrame *frame, VJFrame *frame2,int 
     }
 }
 
-static void _overlayalphamagic_addsubselect(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_addsubselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -531,7 +531,7 @@ static void _overlayalphamagic_addsubselect(VJFrame *frame, VJFrame *frame2,int 
     }
 }
 
-static void _overlayalphamagic_maxselect(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_maxselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -547,7 +547,7 @@ static void _overlayalphamagic_maxselect(VJFrame *frame, VJFrame *frame2,int wid
     }
 }
 
-static void _overlayalphamagic_minselect(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_minselect(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -563,7 +563,7 @@ static void _overlayalphamagic_minselect(VJFrame *frame, VJFrame *frame2,int wid
     }
 }
 
-static void _overlayalphamagic_addtest(VJFrame *frame, VJFrame *frame2, int width,int height)
+static void overlayalphamagic_addtest(VJFrame *frame, VJFrame *frame2, int width,int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -579,7 +579,7 @@ static void _overlayalphamagic_addtest(VJFrame *frame, VJFrame *frame2, int widt
     }
 }
 
-static void _overlayalphamagic_addtest2(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_addtest2(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -595,7 +595,7 @@ static void _overlayalphamagic_addtest2(VJFrame *frame, VJFrame *frame2,int widt
     }
 }
 
-static void _overlayalphamagic_addtest4(VJFrame *frame, VJFrame *frame2,int width, int height)
+static void overlayalphamagic_addtest4(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -613,7 +613,7 @@ static void _overlayalphamagic_addtest4(VJFrame *frame, VJFrame *frame2,int widt
     }
 }
 
-static void _overlayalphamagic_try
+static void overlayalphamagic_try
     (VJFrame *frame, VJFrame *frame2, int width, int height) {
     unsigned int i;
     unsigned int len = width * height;
@@ -657,100 +657,100 @@ void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,int heig
 {
     switch (n) {
     case VJ_EFFECT_BLEND_ADDITIVE:
-	_overlayalphamagic_additive(frame, frame2, width, height);
+	overlayalphamagic_additive(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_SUBSTRACTIVE:
-	_overlayalphamagic_substractive(frame, frame2, width, height);
+	overlayalphamagic_substractive(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_MULTIPLY:
-	_overlayalphamagic_multiply(frame, frame2, width, height);
+	overlayalphamagic_multiply(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_DIVIDE:
-	_overlayalphamagic_simpledivide(frame, frame2, width, height);
+	overlayalphamagic_simpledivide(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_LIGHTEN:
-	_overlayalphamagic_lighten(frame, frame2, width, height);
+	overlayalphamagic_lighten(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_DIFFERENCE:
-	_overlayalphamagic_difference(frame, frame2, width, height);
+	overlayalphamagic_difference(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_DIFFNEGATE:
-	_overlayalphamagic_diffnegate(frame, frame2, width, height);
+	overlayalphamagic_diffnegate(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_EXCLUSIVE:
-	_overlayalphamagic_exclusive(frame, frame2, width, height);
+	overlayalphamagic_exclusive(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_BASECOLOR:
-	_overlayalphamagic_basecolor(frame, frame2, width, height);
+	overlayalphamagic_basecolor(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_FREEZE:
-	_overlayalphamagic_freeze(frame, frame2, width, height);
+	overlayalphamagic_freeze(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_UNFREEZE:
-	_overlayalphamagic_unfreeze(frame, frame2, width, height);
+	overlayalphamagic_unfreeze(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_RELADD:
-	_overlayalphamagic_relativeadd(frame, frame2, width, height);
+	overlayalphamagic_relativeadd(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_RELSUB:
-	_overlayalphamagic_relativesub(frame, frame2, width, height);
+	overlayalphamagic_relativesub(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_RELADDLUM:
-	_overlayalphamagic_relativeaddlum(frame, frame2, width, height);
+	overlayalphamagic_relativeaddlum(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_RELSUBLUM:
-	_overlayalphamagic_relativesublum(frame, frame2, width, height);
+	overlayalphamagic_relativesublum(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_MAXSEL:
-	_overlayalphamagic_maxselect(frame, frame2, width, height);
+	overlayalphamagic_maxselect(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_MINSEL:
-	_overlayalphamagic_minselect(frame, frame2, width, height);
+	overlayalphamagic_minselect(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_MINSUBSEL:
-	_overlayalphamagic_minsubselect(frame, frame2, width, height);
+	overlayalphamagic_minsubselect(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_MAXSUBSEL:
-	_overlayalphamagic_maxsubselect(frame, frame2, width, height);
+	overlayalphamagic_maxsubselect(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_ADDSUBSEL:
-	_overlayalphamagic_addsubselect(frame, frame2, width, height);
+	overlayalphamagic_addsubselect(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_ADDAVG:
-	_overlayalphamagic_add_distorted(frame, frame2, width, height);
+	overlayalphamagic_add_distorted(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_ADDTEST2:
-	_overlayalphamagic_addtest(frame, frame2, width, height);
+	overlayalphamagic_addtest(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_ADDTEST3:
-	_overlayalphamagic_addtest2(frame, frame2, width, height);
+	overlayalphamagic_addtest2(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_ADDTEST4:
-	_overlayalphamagic_addtest4(frame, frame2, width, height);
+	overlayalphamagic_addtest4(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_MULSUB:
-	_overlayalphamagic_mulsub(frame, frame2, width, height);
+	overlayalphamagic_mulsub(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_SOFTBURN:
-	_overlayalphamagic_softburn(frame, frame2, width, height);
+	overlayalphamagic_softburn(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_INVERSEBURN:
-	_overlayalphamagic_inverseburn(frame, frame2, width, height);
+	overlayalphamagic_inverseburn(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_COLORDODGE:
-	_overlayalphamagic_colordodge(frame, frame2, width, height);
+	overlayalphamagic_colordodge(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_ADDDISTORT:
-	_overlayalphamagic_adddistorted(frame, frame2, width, height);
+	overlayalphamagic_adddistorted(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_SUBDISTORT:
-	_overlayalphamagic_subdistorted(frame, frame2, width, height);
+	overlayalphamagic_subdistorted(frame, frame2, width, height);
 	break;
 	case VJ_EFFECT_BLEND_ADDTEST5:
-	_overlayalphamagic_try(frame, frame2, width, height);
+	overlayalphamagic_try(frame, frame2, width, height);
 	break;
     case VJ_EFFECT_BLEND_NEGDIV:
- 	_overlayalphamagic_divide(frame,frame2,width,height);
+ 	overlayalphamagic_divide(frame,frame2,width,height);
 	break;
 
     }

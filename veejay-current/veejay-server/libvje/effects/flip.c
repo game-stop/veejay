@@ -50,22 +50,13 @@ vj_effect *flip_init(int w, int h)
 
 	return ve;
 }
-
-void flip_apply(VJFrame *frame, int n)
-{
-	if (n == 0)
-		_flip_y_yuvdata(frame);
-	if (n == 1)
-		_flip_x_yuvdata(frame);
-}
-
 /**********************************************************************************************
  * flips the image verticaly, derived from SDLcam-0.7.0 (flip_y.c)
  * added uv routine to cope with Cb and Cr data
  *
  * \param frame         Pointer to the actual VJFrame to flip
  **********************************************************************************************/
-void _flip_x_yuvdata(VJFrame *frame)
+static void flip_x_yuvdata(VJFrame *frame)
 {
 	unsigned int y = frame->height, x;
 	unsigned int pos = 0;
@@ -116,7 +107,7 @@ void _flip_x_yuvdata(VJFrame *frame)
  *
  * \param frame         Pointer to the actual VJFrame to flip
  **********************************************************************************************/
-void _flip_y_yuvdata(VJFrame *frame)
+static void flip_y_yuvdata(VJFrame *frame)
 {
 	unsigned int x, pos_a = 0, pos_b;
 	uint8_t temp;
@@ -162,3 +153,12 @@ void _flip_y_yuvdata(VJFrame *frame)
 		pos_b -= uv_width;
 	} while (--uy);
 }
+
+void flip_apply(VJFrame *frame, int n)
+{
+	if (n == 0)
+		flip_y_yuvdata(frame);
+	if (n == 1)
+		flip_x_yuvdata(frame);
+}
+

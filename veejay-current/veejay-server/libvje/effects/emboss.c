@@ -345,4 +345,3 @@ void emboss_apply(VJFrame *frame, int n)
 	}
 }
 
-void emboss_free(){}

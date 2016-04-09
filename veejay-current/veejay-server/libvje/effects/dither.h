@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *dither_init();
-void dither_apply( VJFrame *frame, int size, int n);
+void dither_apply(VJFrame *frame, int size, int n);
 #endif

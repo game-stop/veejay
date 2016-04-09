@@ -26,7 +26,4 @@
 
 vj_effect *flip_init();
 void flip_apply(VJFrame *frame, int n);
-void _flip_y_yuvdata(VJFrame *frame);
-void _flip_x_yuvdata(VJFrame *frame);
-void flip_free();
 #endif

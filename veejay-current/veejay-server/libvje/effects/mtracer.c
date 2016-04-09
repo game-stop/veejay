@@ -78,7 +78,7 @@ int mtracer_malloc(int w, int h)
 	return 1;
 }
 
-void mtracer_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int mode, int n)
+void mtracer_apply( VJFrame *frame, VJFrame *frame2, int mode, int n)
 {
     VJFrame m;
     veejay_memcpy( &m, frame, sizeof(VJFrame ));

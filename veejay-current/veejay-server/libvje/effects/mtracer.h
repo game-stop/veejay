@@ -28,6 +28,5 @@
 vj_effect *mtracer_init(int w, int h);
 int mtracer_malloc(int w, int h);
 void mtracer_free();
-void mtracer_apply( VJFrame *frame, VJFrame *frame2,
-		   int width, int height, int mode, int nframes);
+void mtracer_apply(VJFrame *frame, VJFrame *frame2,int mode, int nframes);
 #endif

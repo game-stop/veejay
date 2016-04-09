@@ -50,19 +50,7 @@ vj_effect *fibdownscale_init(int w, int h)
 	return ve;
 }
 
-void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n)
-{
-	int width, height;
-	width = frame->width; height = frame->height;
-	if (n == 0)
-		_fibdownscale_apply(frame, frame2, width, height);
-	if (n == 1)
-		_fibrectangle_apply(frame, frame2, width, height);
-}
-
-void _fibdownscale_apply(VJFrame *frame, VJFrame *frame2,
-                         int width,
-                         int height)
+static void fibdownscale1_apply(VJFrame *frame, VJFrame *frame2)
 {
 	unsigned i, f1;
 	unsigned int len = frame->len >> 1;
@@ -98,9 +86,7 @@ void _fibdownscale_apply(VJFrame *frame, VJFrame *frame2,
 	veejay_memcpy( Cr + uv_len, Cr , uv_len );
 }
 
-void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2,
-                         int width,
-                         int height)
+static void fibrectangle1_apply(VJFrame *frame, VJFrame *frame2)
 {
 	unsigned int i, f1;
 	const uint32_t len = frame->len>>1;
@@ -126,4 +112,13 @@ void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2,
 	}
 }
 
-void fibdownscale_free(){}
+void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n)
+{
+	int width, height;
+	width = frame->width; height = frame->height;
+	if (n == 0)
+		fibdownscale1_apply(frame, frame2);
+	if (n == 1)
+		fibrectangle1_apply(frame, frame2);
+}
+

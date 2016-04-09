@@ -25,6 +25,5 @@
 #include <stdint.h>
 
 vj_effect *emboss_init();
-void emboss_apply( VJFrame *frame, int n);
-void emboss_free();
+void emboss_apply(VJFrame *frame, int n);
 #endif

@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 vj_effect *radcor_init(int w, int h);
-int	radcor_malloc(int w, int h);
-void	radcor_free();
+int radcor_malloc(int w, int h);
+void radcor_free();
 void radcor_apply( VJFrame *frame, int a, int b, int c, int alpha);
 #endif

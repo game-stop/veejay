@@ -120,13 +120,9 @@ void dice_create_map(int w, int h)
 			}
 		}
 	}
-	fprintf(stderr,
-	        "created map of %d, %d did %d in dicemap, total is %d\n",
-	        w,h,i,(w*h)
-	        );
 }
 
-void dices_apply( void* data, VJFrame *frame, int cube_bits)
+void dices_apply( void *data, VJFrame *frame, int cube_bits)
 {
 	int i = 0, map_x, map_y, map_i = 0, base, dx, dy, di=0;
 	int width, height;
@@ -197,7 +193,10 @@ void dices_apply( void* data, VJFrame *frame, int cube_bits)
 						i =  base + dy * width;
 						for( dx  =  0; dx  < g_cube_size   ; dx ++ )
 						{
-							Y[di]  = Y[i]; Cb[di] =  Cb[i]; Cr[di]  =  Cr[i]; i ++;
+							Y[di]  = Y[i];
+							Cb[di] = Cb[i];
+							Cr[di] = Cr[i];
+							i ++;
 						}
 					}
 					break;

@@ -489,8 +489,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 		arg[4], arg[5]);
 	break;
       case VJ_VIDEO_EFFECT_DUPMAGIC:
-	dupmagic_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
-		       arg[0]);
+	dupmagic_apply(frames[0], frames[1], arg[0]);
 	break;
       case VJ_VIDEO_EFFECT_LUMAMAGICK:
 	lumamagic_apply(frames[0], frames[1], arg[0], arg[1],arg[2]);
@@ -558,8 +557,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	whiteframe_apply(frames[0], frames[1], frames[0]->width, frames[0]->height);
 	break;
       case VJ_VIDEO_EFFECT_MTRACER:
-	mtracer_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
-		      arg[0], arg[1]);
+	mtracer_apply(frames[0], frames[1],arg[0],arg[1] );
 	break;
       case VJ_VIDEO_EFFECT_TRACER:
 	tracer_apply(frames[0], frames[1], frames[0]->width,

@@ -25,9 +25,5 @@
 #include <stdint.h>
 
 vj_effect *dupmagic_init();
-
-void dupmagic_apply( VJFrame *frame, VJFrame *frame2, int width,
-		    int height, int n);
-
-void dupmagic_free();
+void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n);
 #endif

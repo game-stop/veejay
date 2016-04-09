@@ -24,11 +24,5 @@
 #include <stdint.h>
 #include <libvje/vje.h>
 vj_effect *fibdownscale_init();
-
 void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n);
-void _fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int width,
-                         int height);
-void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width,
-                         int height);
-void fibdownscale_free();
 #endif
