@@ -273,13 +273,16 @@ typedef struct
 	int pressed_mod;
 	int keysnoop;
 	int randplayer;
-	int expected_slots;
 	stream_templ_t	strtmpl[2]; // v4l, dv1394
 	int selected_parameter_id; // current kf
 	int selected_vims_type;
 	char *selected_vims_args;
 	int cali_duration;
 	int cali_stage;
+	int expected_num_samples;
+	int expected_num_streams;
+	int real_num_samples;
+	int real_num_streams;
 } veejay_user_ctrl_t;
 
 typedef struct
@@ -652,7 +655,6 @@ static void update_sample_slot_data(int bank_num, int slot_num, int id, gint sam
 static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data);
 static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, gchar *timecode);
 static void set_activation_of_slot_in_samplebank(gboolean activate);
-int veejay_new_slot(int stream);
 static int bank_exists( int bank_page, int slot_num );
 static int find_bank_by_sample(int sample_id, int sample_type, int *slot );
 static int add_bank( gint bank_num  );
@@ -1058,8 +1060,6 @@ void on_devicelist_row_activated(GtkTreeView *treeview,
 				num,
 				channel
 				);
-		gveejay_new_slot(MODE_STREAM);
-
 	}
 }
 
@@ -2108,14 +2108,6 @@ int is_current_track(char *host, int port )
 	return 0;
 }
 
-/* Create a new slot in the sample bank, This function is called by
-   all VIMS commands that create a new stream or a new sample */
-int gveejay_new_slot(int mode)
-{
-	info->uc.expected_slots ++;
-	return 1;
-}
-
 void gveejay_popup_err( const char *type, char *msg )
 {
 	message_dialog( type, msg );
@@ -2212,6 +2204,12 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
 
 
 	return bw;
+}
+
+void gveejay_new_slot(int mode)
+{
+	info->uc.expected_num_streams = info->uc.real_num_streams + 1;
+	info->uc.expected_num_samples = info->uc.real_num_samples + 1;
 }
 
 #include "callback.c"
@@ -3707,7 +3705,6 @@ void server_files_selection_func (GtkTreeView *treeview,
 
 		multi_vims(VIMS_EDITLIST_ADD_SAMPLE, "0 %s" , name );
 		vj_msg(VEEJAY_MSG_INFO, "Tried to open %s",name);
-		gveejay_new_slot(MODE_SAMPLE);
 		g_free(name);
 	}
 }
@@ -4587,8 +4584,10 @@ static void load_sequence_list()
 
 static void load_samplelist_info(gboolean with_reset_slotselection)
 {
+	char line[300];
+	char source[255];
+	char descr[255];
 	gint offset=0;
-	int n_slots = 0;
 	if( cali_onoff == 1 )
 		reset_tree( "cali_sourcetree");
 
@@ -4597,20 +4596,17 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 		reset_samplebank();
 		reset_tree( "tree_sources" );
 	}
+	
+	veejay_msg(0, "%s: %d , expected samples = %d, streams = %d, real = %d, real = %d",
+		  __FUNCTION__, with_reset_slotselection, info->uc.expected_num_samples, info->uc.expected_num_streams,
+		  info->uc.real_num_samples, info->uc.real_num_streams );
 
-	char line[300];
-	char source[255];
-	char descr[255];
-
-	int load_from = (info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[ SAMPLE_INV_COUNT ] : info->status_tokens[ SAMPLE_COUNT ] );
+	int load_from = info->uc.expected_num_samples;
 	if( load_from < 0 )
-	{
 		load_from = 0;
-	}
 
 	multi_vims( VIMS_SAMPLE_LIST,"%d", (with_reset_slotselection ? 0 : load_from) );
 	gint fxlen = 0;
-
 	gchar *fxtext = recv_vims(8,&fxlen);
 
 	if(fxlen > 0 && fxtext != NULL)
@@ -4626,17 +4622,13 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 				veejay_memset( line,0,sizeof(line));
 				veejay_memset( descr,0,sizeof(descr));
 				strncpy( line, fxtext + offset, len );
-
 				int values[4] = { 0,0,0,0 };
-				sscanf( line, "%05d%09d%09d%03d",
-					&values[0], &values[1], &values[2], &values[3]);
-
+				sscanf( line, "%05d%09d%09d%03d",&values[0], &values[1], &values[2], &values[3]);
 				strncpy( descr, line + 5 + 9 + 9 + 3 , values[3] );
 				gchar *title = _utf8str( descr );
 				gchar *timecode = format_selection_time( 0,(values[2]-values[1]) );
 				int int_id = values[0];
 				int poke_slot= 0; int bank_page = 0;
-
 				verify_bank_capacity( &bank_page , &poke_slot, int_id, 0);
 				if(bank_page >= 0 )
 				{
@@ -4645,10 +4637,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,int_id,0, title,timecode );
 						add_sample_to_sample_banks(bank_page, tmp_slot );
 						add_sample_to_effect_sources_list( int_id,0, title, timecode);
-
 						free_slot(tmp_slot);
-						n_slots ++;
-
 						if( !disable_sample_image )
 							veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
 					}
@@ -4656,7 +4645,6 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 					{
 						update_sample_slot_data( bank_page, poke_slot, int_id,0,title,timecode);
 					}
-
 				}
 				if( info->status_tokens[CURRENT_ID] == values[0] && info->status_tokens[PLAY_MODE] == 0 )
 					put_text( "entry_samplename", title );
@@ -4667,21 +4655,18 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 		}
 		offset = 0;
 	}
-
+	
 	if( fxtext ) free(fxtext);
 	fxlen = 0;
 
-//	load_from = (info->status_tokens[PLAY_MODE] == MODE_STREAM ?
-//	             info->status_tokens[ SAMPLE_COUNT ] : info->status_tokens[ SAMPLE_INV_COUNT ] );
 
-	load_from = 0; /* usually there are not that many streams but FIXME: offset wrong by one */
+	load_from = info->uc.expected_num_streams;
 	if( load_from < 0 )
-	{
 		load_from = 0;
-	}
 
 	multi_vims( VIMS_STREAM_LIST,"%d",(with_reset_slotselection ? 0 : load_from) );
 	fxtext = recv_vims(5, &fxlen);
+
 	if( fxlen > 0 && fxtext != NULL)
 	{
 		while( offset < fxlen )
@@ -4700,12 +4685,11 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 
 				int values[10];
 				veejay_memset(values,0, sizeof(values));
-
 				sscanf( line, "%05d%02d%03d%03d%03d%03d%03d%03d",
 				       &values[0], &values[1], &values[2],
 				       &values[3], &values[4], &values[5],
 				       &values[6], &values[7]);
-
+	
 				strncpy( descr, line + 22, values[6] );
 				switch( values[1] )
 				{
@@ -4742,7 +4726,6 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 				}
 				gchar *gsource = _utf8str( descr );
 				gchar *gtype = _utf8str( source );
-
 				int bank_page = 0;
 				int poke_slot = 0;
 
@@ -4755,7 +4738,6 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],1, gtype,gsource );
 						add_sample_to_sample_banks(bank_page, tmp_slot );
 						add_sample_to_effect_sources_list( values[0], values[1],gsource,gtype);
-						n_slots ++;
 						free_slot(tmp_slot);
 					}
 					else
@@ -4769,11 +4751,12 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 			offset += len;
 		}
 
-	}
+	}	
 
 	if(fxtext) free(fxtext);
 
 	select_slot( info->status_tokens[PLAY_MODE] );
+
 }
 
 gboolean view_el_selection_func (GtkTreeSelection *selection,
@@ -6397,14 +6380,31 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 #endif
 	}
 
-	if( info->status_tokens[TOTAL_SLOTS] !=
-	   history[TOTAL_SLOTS] ||
-	   info->status_tokens[TOTAL_SLOTS] != info->uc.expected_slots )
+	if( info->status_tokens[TOTAL_SLOTS] != history[TOTAL_SLOTS] )
 	{
-		if( info->status_tokens[TOTAL_SLOTS] <= 0 || info->uc.expected_slots == 0 )
-			info->uc.reload_hint[HINT_SLIST] = 2;
-		else
+		int n_samples = 0;
+		int n_streams = 0;
+
+		if( pm == MODE_PLAIN || pm == MODE_SAMPLE ) {
+			n_samples = info->status_tokens[SAMPLE_COUNT];
+			n_streams = info->status_tokens[SAMPLE_INV_COUNT];
+		}
+		else {
+			n_streams = info->status_tokens[SAMPLE_COUNT];
+			n_samples = info->status_tokens[SAMPLE_INV_COUNT];
+		}
+
+		if( (info->uc.real_num_samples > 0 && n_samples > info->uc.real_num_samples ) ||
+		    (info->uc.real_num_streams > 0 && n_streams > info->uc.real_num_streams) )
+		{
 			info->uc.reload_hint[HINT_SLIST] = 1;
+		}
+		else {
+			info->uc.reload_hint[HINT_SLIST] = 2;
+		}
+
+		info->uc.real_num_samples = n_samples;
+		info->uc.real_num_streams = n_streams;
 	}
 
 	if( info->status_tokens[SEQ_ACT] != history[SEQ_ACT] )
@@ -6601,8 +6601,14 @@ static void process_reload_hints(int *history, int pm)
 
 	if( info->uc.reload_hint[HINT_SLIST] )
 	{
-		load_samplelist_info( (info->uc.reload_hint[HINT_SLIST] == 2  ? TRUE: FALSE) );
-		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
+		gboolean reload_sl = FALSE;
+		if( info->uc.reload_hint[HINT_SLIST] == 2 ) {
+			info->uc.expected_num_samples = -1;
+			info->uc.expected_num_streams = -1;
+			reload_sl = TRUE;
+		}
+
+		load_samplelist_info( reload_sl );
 	}
 
 	if( info->uc.reload_hint[HINT_SEQ_ACT] == 1 )
@@ -7647,6 +7653,8 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	info->status_lock = 1;
 	info->parameter_lock = 1;
+	info->uc.expected_num_samples = -1;
+	info->uc.expected_num_streams = -1;
 
 	single_vims( VIMS_PROMOTION );
 
@@ -7687,7 +7695,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	vj_gui_preview();
 
-	info->uc.reload_hint[HINT_SLIST] = 1;
+	info->uc.reload_hint[HINT_SLIST] = 2;
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
 	info->uc.reload_hint[HINT_SEQ_ACT] = 1;
@@ -8782,5 +8790,5 @@ void veejay_release_track(int id, int release_this)
 void veejay_bind_track( int id, int bind_this )
 {
 	multitrack_bind_track(info->mt, id, bind_this );
-	info->uc.reload_hint[HINT_SLIST]  =1;
+	info->uc.reload_hint[HINT_SLIST] = 2;
 }

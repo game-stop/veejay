@@ -71,7 +71,6 @@ int gveejay_user_preview();
 void gveejay_preview(int p);
 int gveejay_restart();
 int gveejay_update();
-int gveejay_new_slot(int mode);
 int gveejay_time_to_sync( void *ptr );
 int update_gveejay();
 

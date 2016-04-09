@@ -483,8 +483,6 @@ void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
 			info->selection[0], info->selection[1] );
 		gveejay_new_slot(MODE_SAMPLE);
 	}
-
-
 }
 
 void	on_button_el_pasteat_clicked(GtkWidget *w, gpointer *user_data)
@@ -1096,7 +1094,6 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		if(erase_all)
 		{
-			info->uc.expected_slots = 0;
 			info->uc.reload_hint[HINT_SLIST] = 2; /* with bank reset */
 			single_vims( VIMS_SAMPLE_DEL_ALL ); 
 		}
@@ -1510,6 +1507,7 @@ void	on_shm_3490_clicked(GtkWidget *w, gpointer data)
 	multi_vims( VIMS_STREAM_NEW_SHARED, "%d", 3490 );
 	gveejay_new_slot(MODE_STREAM);
 }
+
 void	on_shm_4490_clicked(GtkWidget *w, gpointer data)
 {
 	multi_vims( VIMS_STREAM_NEW_SHARED, "%d", 4490 );
@@ -1721,9 +1719,7 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		single_vims( VIMS_SAMPLE_DEL_ALL ); 
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
-
 		info->uc.reload_hint[HINT_SLIST] = 2;
-		info->uc.expected_slots = 0;
 		g_free(filename );
 	}
 }
@@ -1806,7 +1802,6 @@ gint green = current_color.green / 256.0;
 	gint blue = current_color.blue / 256.0;
 	multi_vims( VIMS_STREAM_NEW_COLOR, "%d %d %d",
 		red,green,blue );
-
 	gveejay_new_slot(MODE_STREAM);
 }
 
@@ -2094,13 +2089,13 @@ void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 	if(info->selection_slot )
 	{
 		multi_vims( VIMS_SAMPLE_COPY, "%d", info->selection_slot->sample_id );
+		gveejay_new_slot(MODE_SAMPLE);
 	}
 	else if (info->selected_slot )
 	{
 		multi_vims( VIMS_SAMPLE_COPY, "%d", info->selected_slot->sample_id );
+		gveejay_new_slot(MODE_SAMPLE);
 	}
-
-	gveejay_new_slot(MODE_SAMPLE);
 }
 
 void	on_check_priout_fullscreen_clicked(
@@ -2157,8 +2152,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 	else
 		multi_vims( VIMS_STREAM_NEW_UNICAST, "%d %s", port, remote );
 
-
-	gveejay_new_slot(MODE_STREAM);	
+	gveejay_new_slot( MODE_STREAM );
 
 	if(remote) g_free(remote);
 
@@ -2184,7 +2178,6 @@ void	on_y4m_new_clicked(GtkWidget *w, gpointer user_data)
 		return;
 
 	multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
-	
 	gveejay_new_slot(MODE_STREAM);
 }
 
@@ -2320,8 +2313,7 @@ void	on_load_calibration1_activate( GtkMenuItem     *menuitem,
 		multi_vims( VIMS_STREAM_NEW_CALI, "%s", filename );
 		vj_msg(VEEJAY_MSG_INFO ,"Loaded calibration file %s",filename);
 		g_free(filename);
-	
-		gveejay_new_slot(MODE_STREAM);
+		gveejay_new_slot( MODE_STREAM );
 	}
 }
 
@@ -2471,9 +2463,7 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 			{
 				single_vims( VIMS_SAMPLE_DEL_ALL );
 				multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename);
-
 				info->uc.reload_hint[HINT_SLIST] = 2;
-				info->uc.expected_slots = 0;
 				g_free(filename);
 			}
 			break;
