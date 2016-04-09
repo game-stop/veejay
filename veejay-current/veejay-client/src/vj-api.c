@@ -4597,10 +4597,6 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 		reset_tree( "tree_sources" );
 	}
 	
-	veejay_msg(0, "%s: %d , expected samples = %d, streams = %d, real = %d, real = %d",
-		  __FUNCTION__, with_reset_slotselection, info->uc.expected_num_samples, info->uc.expected_num_streams,
-		  info->uc.real_num_samples, info->uc.real_num_streams );
-
 	int load_from = info->uc.expected_num_samples;
 	if( load_from < 0 )
 		load_from = 0;
