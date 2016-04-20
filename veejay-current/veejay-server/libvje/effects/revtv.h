@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *revtv_init(int max_width, int max_height);
-void revtv_apply(VJFrame *frame, int width, int height, int space,
-		 int vscale, int c, int cn);
+void revtv_apply(VJFrame *frame, int space, int vscale, int c, int cn);
 void revtv_free();
 #endif
