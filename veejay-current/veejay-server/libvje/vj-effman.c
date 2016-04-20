@@ -621,8 +621,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	     todo_info->tmp[0] = arg[0];
 	}
 
-	slidingdoor_apply(frames[0], frames[1], frames[0]->width,
-			  frames[0]->height, todo_info->tmp[0]  );
+	slidingdoor_apply(frames[0], frames[1], todo_info->tmp[0] );
 	break;
       case VJ_VIDEO_EFFECT_WIPE:
 	wipe_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
