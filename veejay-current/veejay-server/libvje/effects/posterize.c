@@ -74,8 +74,8 @@ static void _posterize_y_simple(uint8_t *src[3], int len, int value, int thresho
 	}
 }
 
-void posterize_apply(VJFrame *frame, int width, int height, int factor, int t1,int t2)
+void posterize_apply(VJFrame *frame, int factor, int t1,int t2)
 {
-   _posterize_y_simple( frame->data, (width*height), factor, t1,t2);
+	_posterize_y_simple( frame->data, (frame->width*frame->height), factor, t1,t2);
 }
 void posterize_free(){}

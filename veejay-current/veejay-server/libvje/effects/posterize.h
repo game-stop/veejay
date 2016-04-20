@@ -25,6 +25,6 @@
 #include <stdint.h>
 
 vj_effect *posterize_init();
-void posterize_apply(VJFrame *frame, int width, int height, int factor,int t1,int t2);
+void posterize_apply(VJFrame *frame, int factor,int t1,int t2);
 void posterize_free();
 #endif
