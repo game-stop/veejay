@@ -25,11 +25,10 @@
 #include <stdint.h>
 
 vj_effect *opacity_init(int w, int h);
-void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int opacity);
+void opacity_apply( VJFrame *frame, VJFrame *frame2, int opacity);
 
 void	opacity_blend_luma_apply( uint8_t *src, uint8_t *dst, int len, int opacity );
 void	opacity_blend_apply( uint8_t *src[3], uint8_t *dst[3], int len, int uv_len, int opacity );
-void opacity_applyN( VJFrame *frame, VJFrame *frame2, int width,  int height, int opacity);
+void opacity_applyN( VJFrame *frame, VJFrame *frame2, int opacity);
 void opacity_free();
 #endif
