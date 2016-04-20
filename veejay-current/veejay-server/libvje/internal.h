@@ -331,8 +331,7 @@ extern void transblend_apply(VJFrame *frame, VJFrame *frame2, int mode,
                              int twidth, int theight,
                              int x1, int y1, int x2, int y2);
 extern void borders_apply(VJFrame *frame, int size, int color);
-extern void frameborder_apply(VJFrame *frame, VJFrame *frame2,
-			      int width, int height, int size);
+extern void frameborder_apply(VJFrame *frame, VJFrame *frame2, int size);
 extern void noisepencil_apply(VJFrame *frame, int width, int height,
 	int a, int b, int c , int d );
 
