@@ -61,9 +61,9 @@ vj_effect *transblend_init(int width, int height)
 
 
 
-void transblend_apply( VJFrame *frame, VJFrame *frame2, int width,
-		      int height, int type, int twidth, int theight,
-		      int x1, int y1, int x2, int y2)
+void transblend_apply( VJFrame *frame, VJFrame *frame2, int type,
+                      int twidth, int theight,
+                      int x1, int y1, int x2, int y2)
 {
 
     int x, y;
@@ -89,13 +89,13 @@ void transblend_apply( VJFrame *frame, VJFrame *frame2, int width,
 
 
 
-    if( (theight + y2) > height ) y2 = (height-theight);
-    if( (twidth + x2) > width) x2 = (width-twidth);
+    if( (theight + y2) > frame->height ) y2 = (frame->height-theight);
+    if( (twidth + x2) > frame->width) x2 = (frame->width-twidth);
 
     for (y = 0; y < theight; y++) {
 	for (x = 0; x < twidth; x++) {
-	    p = (y2 + y) * width + x2 + x;
-	    q = (y1 + y) * width + x1 + x;
+	    p = (y2 + y) * frame->width + x2 + x;
+	    q = (y1 + y) * frame->width + x1 + x;
 	    Y[p] = func_y(Y[p], Y2[q]);
 	}
     }
