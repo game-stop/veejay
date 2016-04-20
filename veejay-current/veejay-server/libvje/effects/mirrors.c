@@ -135,8 +135,7 @@ static void _mirrors_h( uint8_t *yuv[3], int width, int height, int factor, int 
 static int n__ = 0;
 static int N__ = 0;
 
-void mirrors_apply(VJFrame *frame, int width, int height, int type,
-		   int factor )
+void mirrors_apply(VJFrame *frame, int type, int factor )
 {
 	int interpolate = 1;
 	int motion = 0;
@@ -144,7 +143,7 @@ void mirrors_apply(VJFrame *frame, int width, int height, int type,
 	int tmp2 = factor;
 	if( motionmap_active() )
 	{
-		int hi = (int)((float)(width * 0.33));
+		int hi = (int)((float)(frame->width * 0.33));
 
 		motionmap_scale_to( hi,hi,0,0,&tmp1,&tmp2,&n__,&N__);
 		motion = 1;
@@ -158,16 +157,16 @@ void mirrors_apply(VJFrame *frame, int width, int height, int type,
 
     switch (type) {
     case 0:
-	_mirrors_v(frame->data, width, height, tmp2, 0);
+	_mirrors_v(frame->data, frame->width, frame->height, tmp2, 0);
 	break;
     case 1:
-	_mirrors_v(frame->data,width,height,tmp2,1);
+	_mirrors_v(frame->data,frame->width, frame->height,tmp2,1);
 	break;
     case 2:
-	_mirrors_h(frame->data,width,height,tmp2,0);
+	_mirrors_h(frame->data,frame->width, frame->height,tmp2,0);
 	break;
     case 3:
-	_mirrors_h(frame->data,width,height,tmp2,1);
+	_mirrors_h(frame->data,frame->width, frame->height,tmp2,1);
 	break;
 	}
 
