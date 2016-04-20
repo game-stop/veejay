@@ -280,7 +280,7 @@ static void vj_effman_apply_image_effect(
 	negation_apply(frames[0], arg[0]);
 	break;
 	case VJ_IMAGE_EFFECT_MEDIANFILTER:
-	medianfilter_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+	medianfilter_apply(frames[0], arg[0]);
 	break;
    case VJ_IMAGE_EFFECT_NEGATECHANNEL:
 	negatechannel_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],arg[1]);

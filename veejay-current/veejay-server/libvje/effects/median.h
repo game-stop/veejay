@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *medianfilter_init(int w, int h);
-void medianfilter_apply( VJFrame *frame, int width, int height, int val);
+void medianfilter_apply( VJFrame *frame, int val);
 #endif
