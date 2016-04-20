@@ -49,12 +49,11 @@ vj_effect *opacitythreshold_init(int w, int h)
 
 
 
-void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2,
-			    int width, int height, int opacity,
-			    int threshold, int t2)
+void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2, int opacity,
+                            int threshold, int t2)
 {
 
-    unsigned int x, y, len = width * height-width;
+    unsigned int x, y, len = frame->width * frame->height-frame->width;
     uint8_t a1, a2;
     unsigned int op0, op1;
   	uint8_t *Y = frame->data[0];
@@ -67,31 +66,31 @@ void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2,
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
 
-    for (y = width; y < len; y += width) {
-	for (x = 1; x < width-1; x++) {
+    for (y = frame->width; y < len; y += frame->width) {
+	for (x = 1; x < frame->width-1; x++) {
 	    a1 = Y[x + y];
 	    a2 = Y2[x + y];
 	    if (a1 < threshold || a1 > t2) {
-		    a1 = (Y[y - width + x - 1] +
-			  Y[y - width + x + 1] +
-			  Y[y - width + x] +
+		    a1 = (Y[y - frame->width + x - 1] +
+			  Y[y - frame->width + x + 1] +
+			  Y[y - frame->width + x] +
 			  Y[y + x] +
 			  Y[y + x - 1] +
 			  Y[y + x + 1] +
-			  Y[y + width + x] +
-			  Y[y + width + x + 1] +
-			  Y[y + width + x - 1]
+			  Y[y + frame->width + x] +
+			  Y[y + frame->width + x + 1] +
+			  Y[y + frame->width + x - 1]
 			) / 9;
 
-		    a2 = (Y2[y - width + x - 1] +
-			  Y2[y - width + x + 1] +
-			  Y2[y - width + x] +
+		    a2 = (Y2[y - frame->width + x - 1] +
+			  Y2[y - frame->width + x + 1] +
+			  Y2[y - frame->width + x] +
 			  Y2[y + x] +
 			  Y2[y + x - 1] +
 			  Y2[y + x + 1] +
-			  Y2[y + width + x] +
-			  Y2[y + width + x + 1] +
-			  Y2[y + width + x - 1]
+			  Y2[y + frame->width + x] +
+			  Y2[y + frame->width + x + 1] +
+			  Y2[y + frame->width + x - 1]
 			) / 9;
 
 		    Y[x + y] = (op0 * a1 + op1 * a2) >> 8;

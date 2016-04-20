@@ -516,8 +516,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	iris_apply( frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_THRESHOLDSMOOTH:
-	opacitythreshold_apply(frames[0], frames[1], frames[0]->width,
-			       frames[0]->height, arg[0], arg[1],arg[2]);
+	opacitythreshold_apply(frames[0], frames[1], arg[0], arg[1], arg[2]);
 	break;
       case VJ_VIDEO_EFFECT_THRESHOLD:
 	opacityadv_apply(frames[0], frames[1], arg[0], arg[1], arg[2]);

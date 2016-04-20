@@ -321,8 +321,7 @@ extern void negatechannel_apply( VJFrame *frame, int chan, int val);
 extern void colormap_apply( VJFrame *frame, int r, int g, int b);
 extern void opacity_apply(VJFrame *frame, VJFrame *frame2, int opacity);
 extern void opacityadv_apply(VJFrame *frame, VJFrame *frame2, int o, int t1, int t2);
-extern void opacitythreshold_apply(VJFrame *frame, VJFrame *frame2,
-				   int w, int h, int o, int t1, int t2);
+extern void opacitythreshold_apply(VJFrame *frame, VJFrame *frame2, int o, int t1, int t2);
 
 
 extern void posterize_apply( VJFrame *frame, int width, int height,
