@@ -316,7 +316,7 @@ static void vj_effman_apply_image_effect(
 	softblur_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_WIDTHMIRROR:
-	widthmirror_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
+	widthmirror_apply(frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_DICES:
 	dices_apply(vj_effects[entry], frames[0], arg[0]);

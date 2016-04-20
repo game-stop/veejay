@@ -326,8 +326,7 @@ extern void posterize_apply( VJFrame *frame, int factor, int t1, int t2);
 extern void revtv_apply( VJFrame *frame, int space, int vscale, int c, int cn);
 extern void softblur_apply( VJFrame *frame, int width, int height, int n); ////TODO refactor call
 extern void split_apply( VJFrame *frame, VJFrame *frame2, int n, int swap);
-extern void widthmirror_apply( VJFrame *frame, int width, int height,
-			      int div);
+extern void widthmirror_apply( VJFrame *frame, int div);
 extern void transblend_apply(VJFrame *frame, VJFrame *frame2, int w,
 			     int h, int mode, int twidth, int theight,
 			     int x1, int y1, int x2, int y2);
