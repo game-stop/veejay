@@ -318,9 +318,7 @@ extern void mirrors2_apply( VJFrame *frame, int type);
 extern void negation_apply( VJFrame *frame, int val);
 extern void medianfilter_apply( VJFrame *frame, int val);
 extern void negatechannel_apply( VJFrame *frame, int chan, int val);
-
-extern void colormap_apply( VJFrame *frame, int width, int height,
-			   int r, int g, int b);
+extern void colormap_apply( VJFrame *frame, int r, int g, int b);
 extern void opacity_apply(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int opacity);
 extern void opacityadv_apply(VJFrame *frame, VJFrame *frame2, int w,
