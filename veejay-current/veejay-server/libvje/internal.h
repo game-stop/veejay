@@ -336,8 +336,7 @@ extern void noisepencil_apply(VJFrame *frame, int a, int b, int c , int d );
 extern void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int Y);
 extern void rawval_apply(VJFrame *frame, int color_cb, int color_cr,
                          int new_cb, int new_cr);
-extern void smuck_apply( VJFrame *frame, VJFrame *frame2, int width,
-			int height, int level);
+extern void smuck_apply( VJFrame *frame, VJFrame *frame2, int level);
 extern void colorfade_apply( VJFrame *frame, int width, int height,
 			    int op, int color);
 extern void slidingdoor_apply( VJFrame *frame, VJFrame *frame2,

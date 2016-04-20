@@ -55,8 +55,7 @@ static inline unsigned int smuck_fastrand()
    different is the smuck table containing some values. 
    This effect was originally created by Buddy Smith, one of EffecTV's developers from the USA
 */
-void smuck_apply( VJFrame *frame, VJFrame *frame2, int width,
-		 int height, int n)
+void smuck_apply( VJFrame *frame, VJFrame *frame2, int n)
 {
     unsigned int yd, xd, x, y;
 	// different table ...
@@ -64,15 +63,15 @@ void smuck_apply( VJFrame *frame, VJFrame *frame2, int width,
 	{ 12, 21, 30, 60, 58, 59, 57, 56, 55, 54, 53, 89, 90, 88, 87, 86, 85, 114 };
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-    for (y = 0; y < height; y++) {
-	for (x = 0; x < width; x++) {
+    for (y = 0; y < frame->height; y++) {
+	for (x = 0; x < frame->width; x++) {
 	    yd = y + (smuck_fastrand() >> smuck[n]) - 2;
 	    xd = x + (smuck_fastrand() >> smuck[n]) - 2;
-	    if (xd > width)
-		xd = width-1;
-	    if (yd > height)
-		yd = height;
-	    Y[x + y * width] = Y2[xd + yd * width];
+	    if (xd > frame->width)
+		xd = frame->width-1;
+	    if (yd > frame->height)
+		yd = frame->height;
+	    Y[x + y * frame->width] = Y2[xd + yd * frame->width];
 	}
     }
 }
