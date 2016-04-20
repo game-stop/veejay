@@ -48,12 +48,11 @@ vj_effect *opacityadv_init(int w, int h)
     return ve;
 }
 
-void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int width,
-		      int height, int opacity, int threshold,
-		      int threshold2)
+void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,
+                      int threshold, int threshold2)
 {
 
-    unsigned int x, y, len = width * height;
+    unsigned int x, y, len = frame->width * frame->height;
     uint8_t a1, a2;
     unsigned int op0, op1;
  	uint8_t *Y = frame->data[0];
@@ -66,8 +65,8 @@ void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int width,
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
 
-    for (y = 0; y < len; y += width) {
-	for (x = 0; x < width; x++) {
+    for (y = 0; y < len; y += frame->width) {
+	for (x = 0; x < frame->width; x++) {
 	    a1 = Y[x + y];
 	    a2 = Y2[x + y];
 	    /*
