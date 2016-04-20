@@ -26,7 +26,6 @@
 
 vj_effect *rawman_init();
 
-void rawman_apply(VJFrame *frame, unsigned int width,
-		  unsigned int height, unsigned int mode, unsigned int Y);
+void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int Y);
 void rawman_free();
 #endif
