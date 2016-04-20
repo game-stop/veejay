@@ -63,8 +63,7 @@ vj_effect *transop_init(int width, int height)
 /* translate, twidth,theight: size of block to transform */
 /* moves block(x2,y2) to (x1,y1), size of block to move is twidth * theight  */
 void transop_apply( VJFrame *frame, VJFrame *frame2,
-		   int twidth, int theight, int x1, int y1, int x2, int y2,
-		   int width, int height, int opacity)
+		   int twidth, int theight, int x1, int y1, int x2, int y2, int opacity)
 {
 	int x, y;
   
@@ -83,30 +82,30 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
 	int dy = y2;
 	int dx = x2;
 
-	if ( (dx + view_width ) > width )
-		view_width = width - dx;
-	if ( (dy + view_height ) > height )
-		view_height = height - dy;
+	if ( (dx + view_width ) > frame->width )
+		view_width = frame->width - dx;
+	if ( (dy + view_height ) > frame->height )
+		view_height = frame->height - dy;
 
 
-	if ( (sy + view_height) > height )
-		view_height = height - sy;
-	if ( (sx + view_width ) > width )
-		view_width = width - sx;
+	if ( (sy + view_height) > frame->height )
+		view_height = frame->height - sy;
+	if ( (sx + view_width ) > frame->width )
+		view_width = frame->width - sx;
 	
 
 	for( y = 0 ; y < view_height; y ++ )
 	{
 		for( x = 0 ; x < view_width; x ++ )
 		{
-			dY[ (dy + y ) * width + dx + x ] = 
-				sY[ (sy + y) * width + sx + x ];
+			dY[ (dy + y ) * frame->width + dx + x ] = 
+				sY[ (sy + y) * frame->width + sx + x ];
 
-			dCb[ (dy + y ) * width + dx + x ] = 
-				sCb[ (sy + y) * width + sx + x ];
+			dCb[ (dy + y ) * frame->width + dx + x ] = 
+				sCb[ (sy + y) * frame->width + sx + x ];
 					
-			dCr[ (dy + y ) * width + dx + x ] = 
-				sCr[ (sy + y) * width + sx + x ];
+			dCr[ (dy + y ) * frame->width + dx + x ] = 
+				sCr[ (sy + y) * frame->width + sx + x ];
 
 		}
 	}

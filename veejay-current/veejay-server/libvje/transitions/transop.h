@@ -26,6 +26,5 @@
 
 vj_effect *transop_init(int width, int height);
 void transop_apply( VJFrame *frame, VJFrame *frame2,
-		   int twidth, int theight, int x1, int y1, int x2, int y2,
-		   int width, int height, int opacity);
+		   int twidth, int theight, int x1, int y1, int x2, int y2, int opacity);
 #endif

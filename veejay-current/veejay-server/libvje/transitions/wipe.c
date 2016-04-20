@@ -51,8 +51,7 @@ void wipe_apply( VJFrame *frame, VJFrame *frame2,
 		int w, int h, int opacity, int inc)
 {
     /* w, h increasen */
-    transop_apply(frame, frame2, g_wipe_width, g_wipe_height, 0, 0, 0, 0, w,
-		  h, opacity);
+    transop_apply(frame, frame2, g_wipe_width, g_wipe_height, 0, 0, 0, 0, opacity);
     g_wipe_width += inc;
     g_wipe_height += ((w / h) - 0.5 + inc);
 
