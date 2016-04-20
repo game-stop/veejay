@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *borders_init(int width,int height);
-void borders_apply(VJFrame *frame, int width, int height, int size,
-		   int color);
+void borders_apply(VJFrame *frame, int size, int color);
 void borders_free();
 #endif

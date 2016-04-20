@@ -642,8 +642,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	split_apply(frames[0], frames[1], arg[0], arg[1]);
 	break;
        case VJ_VIDEO_EFFECT_BORDERS:
-	borders_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
-		      arg[1]);
+	borders_apply(frames[0], arg[0], arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_FRAMEBORDER:
 	frameborder_apply(frames[0], frames[1], frames[0]->width,
