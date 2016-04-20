@@ -345,7 +345,7 @@ extern void lumakey_apply(VJFrame *frame, VJFrame *frame2,
                           int a, int b, int c, int d, int e);
 //extern void pointfade_apply(VJFrame *frame, VJFrame *frame2,
 //                            int pointsize, int opacity);
-extern void slicer_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int a, int b, int mode );
+extern void slicer_apply( VJFrame *frame, VJFrame *frame2, int a, int b, int mode );
 
 extern void transcarot_apply(VJFrame *frame, VJFrame *frame2,
 			     int width, int height, int point_size, int dy,

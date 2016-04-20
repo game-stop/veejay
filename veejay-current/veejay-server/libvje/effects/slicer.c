@@ -107,11 +107,10 @@ vj_effect *slicer_init(int w, int h)
 }
 
 
-void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int val1, int val2, int mode)
+void slicer_apply( VJFrame *frame, VJFrame *frame2, int val1, int val2, int mode)
 {
 	int x,y,p,q;
-	const unsigned int len = (width * height);
+	const unsigned int len = (frame->width * frame->height);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -124,15 +123,15 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
 
 	srand( val1 * val2 );
 
-	recalc( width, height, Y2, val1 ,val2 );
+	recalc( frame->width, frame->height, Y2, val1 ,val2 );
 
 	if( mode == 0 ) {
-	  	for(y=0; y < height; y++){ 
-		   for(x=0; x < width; x++) {
-		     	dx = x + slice_xshift[y]; 
+		for(y=0; y < frame->height; y++){
+		   for(x=0; x < frame->width; x++) {
+			   dx = x + slice_xshift[y];
 				dy = y + slice_yshift[x];
-				p = dy * width + dx;
-				q = y * width + x;
+				p = dy * frame->width + dx;
+				q = y * frame->width + x;
 				if( p >= 0 && p < len ) {
 					Y[q] = Y2[p];
 					Cb[q] = Cb2[p];
@@ -149,12 +148,12 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
 		}
 	}
 	else {
-		for(y=0; y < height; y++){ 
-		   for(x=0; x < width; x++) {
-		     	dx = x + slice_xshift[y]; 
+		for(y=0; y < frame->height; y++){
+		   for(x=0; x < frame->width; x++) {
+			   dx = x + slice_xshift[y];
 				dy = y + slice_yshift[x];
-				p = dy * width + dx;
-				q = y * width + x;
+				p = dy * frame->width + dx;
+				q = y * frame->width + x;
 				if( p >= 0 && p < len ) {
 					Y[q] = Y2[p];
 					Cb[q] = Cb2[p];
