@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *gamma_init();
-void gamma_apply(VJFrame *frame, int width,int height, int gamma_val);
+void gamma_apply(VJFrame *frame, int gamma_val);
 #endif
