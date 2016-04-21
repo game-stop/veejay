@@ -44,24 +44,6 @@ vj_effect *softblur_init(int w,int h)
     return ve;
 }
 
-static void softblur1_apply( VJFrame *frame)
-{
-    int r, c;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	const int width = frame->width;
-
-    for (r = 0; r < len; r += width) {
-		for (c = 1; c < width-1; c++) {
-			Y[c + r] = (Y[r + c - 1] +
-					  Y[r + c] +
-					  Y[r + c + 1]
-					) / 3;
-		}
-    }
-
-}
-
 static void softblur3_apply(VJFrame *frame )
 {
 	int r,c;
@@ -171,7 +153,24 @@ static	void	mmx_blur(VJFrame *frame)
 
 	do_emms;
 }
+#else
+static void softblur1_apply( VJFrame *frame)
+{
+    int r, c;
+	const int len = frame->len;
+	uint8_t *Y = frame->data[0];
+	const int width = frame->width;
 
+    for (r = 0; r < len; r += width) {
+		for (c = 1; c < width-1; c++) {
+			Y[c + r] = (Y[r + c - 1] +
+					  Y[r + c] +
+					  Y[r + c + 1]
+					) / 3;
+		}
+    }
+
+}
 #endif
 
 void softblur_apply(VJFrame *frame, int type)
