@@ -222,20 +222,20 @@ static void rotozoom1_apply(VJFrame *frame, uint8_t *data[3], int w, int h,
 }
 
 
-void rotozoom_apply( VJFrame *frame, int width, int height, int mode,
-		    int rotate, int zoom, int autom)
+void rotozoom_apply( VJFrame *frame, int mode, int rotate, int zoom, int autom)
 {
-	int strides[4] = { width*height,width*height,width*height,0};
+	int width = frame->width;
+	int height = frame->height;
+	const int len = frame->len;
+	int strides[4] = {len ,len ,len ,0};
     switch (autom) {		/* alas must do memcpy */
     case 0:
 	vj_frame_copy( frame->data, rotobuffer, strides );
-	rotozoom2_apply(frame, rotobuffer, width, height, mode, rotate,
-			zoom);
+	rotozoom2_apply(frame, rotobuffer, width, height, mode, rotate, zoom);
 	break;
     case 1:
 	vj_frame_copy( frame->data,rotobuffer, strides );
-	rotozoom1_apply(frame, rotobuffer, width, height, mode, rotate,
-			zoom);
+	rotozoom1_apply(frame, rotobuffer, width, height, mode, rotate, zoom);
 	break;
     }
 

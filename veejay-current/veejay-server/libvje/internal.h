@@ -359,8 +359,7 @@ extern void rgbkey_apply( VJFrame *frame, VJFrame *frame2, int i_angle,
 extern void gamma_apply( VJFrame *frame, int val);
 extern void solarize_apply(VJFrame *frame, int threshold);
 extern void dummy_apply(VJFrame *frame, int color_num);
-extern void rotozoom_apply(VJFrame *frame, int width, int height, int a,
-			   int b, int c, int d);
+extern void rotozoom_apply(VJFrame *frame, int a, int b, int c, int d);
 
 extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2,
 			     int width, int height);
