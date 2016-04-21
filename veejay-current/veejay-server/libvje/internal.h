@@ -353,10 +353,9 @@ extern void transline_apply(VJFrame *frame, VJFrame *frame2, int distance,
                             int line_width, int opacity, int type);
 extern void transform_apply(VJFrame *frame, VJFrame *frame2, int size);
 extern void coloradjust_apply( VJFrame *frame, int val, int degrees);
-
-extern void rgbkey_apply( VJFrame *frame, VJFrame *frame2, int width,
-			 int height, int i_angle, int i_noise,
-			 int r, int g, int b, int min, int max, int op);
+extern void rgbkey_apply( VJFrame *frame, VJFrame *frame2, int i_angle,
+                         int i_noise, int r, int g, int b,
+                         int min, int max, int op);
 
 extern void gamma_apply( VJFrame *frame,
 			int width, int height, int val);
