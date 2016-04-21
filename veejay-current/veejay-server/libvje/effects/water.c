@@ -224,6 +224,8 @@ static	void	drawmotionframe( VJFrame *f , water_t *w )
 //	veejay_memcpy( f->data[0], w->diff_img, f->width * f->height );
 }
 
+/* globalactivity not used */
+/*
 static	int	globalactivity(VJFrame *f2, water_t *w, int in)
 {
 	int len = (f2->width * f2->height)/4;
@@ -275,6 +277,7 @@ static	int	globalactivity(VJFrame *f2, water_t *w, int in)
 		return 1;
 	return res;
 }
+*/
 
 static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
