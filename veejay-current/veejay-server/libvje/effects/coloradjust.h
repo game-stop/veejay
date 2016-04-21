@@ -26,7 +26,6 @@
 
 vj_effect *coloradjust_init();
 
-void coloradjust_apply(VJFrame *frame, int width, int height, int val,
-		       int degrees);
+void coloradjust_apply(VJFrame *frame, int val, int degrees);
 void coloradjust_free();
 #endif
