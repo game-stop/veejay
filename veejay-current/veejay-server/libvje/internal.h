@@ -349,11 +349,8 @@ extern void slicer_apply( VJFrame *frame, VJFrame *frame2, int a, int b, int mod
 extern void transcarot_apply(VJFrame *frame, VJFrame *frame2,
                              int point_size, int dy, int dye, int row_start,
                              int opacity, int type);
-
-extern
-void transline_apply(VJFrame *frame, VJFrame *frame2, int width,
-		     int height, int distance, int line_width, int opacity,
-		     int type);
+extern void transline_apply(VJFrame *frame, VJFrame *frame2, int distance,
+                            int line_width, int opacity, int type);
 extern void transform_apply(VJFrame *frame, VJFrame *frame2,
 			    int width, int height, int size);
 
