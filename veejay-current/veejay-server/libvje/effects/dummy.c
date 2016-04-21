@@ -46,7 +46,7 @@ vj_effect *dummy_init(int w, int h)
 	ve->param_description = vje_build_param_list(ve->num_params, "Color");
 	return ve;
 }
-void dummy_apply( VJFrame *frame, int width, int height, int color)
+void dummy_apply( VJFrame *frame, int color)
 {
     const int len = frame->len;
     const int uv_len = frame->uv_len;
@@ -65,7 +65,7 @@ void dummy_apply( VJFrame *frame, int width, int height, int color)
     veejay_memset( Cr,colorCr,uv_len);
 }
 
-void dummy_rgb_apply( VJFrame *frame, int width, int height, int r,int g, int b)
+void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
 {
    	const int len = frame->len;
 	const int uv_len = frame->uv_len;

@@ -2972,7 +2972,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 		dumb.data[1] = frame[1];
 		dumb.data[2] = frame[2];
 		dumb.data[3] = frame[3];
-		dummy_apply(&dumb,info->video_output_width,info->video_output_height,VJ_EFFECT_COLOR_BLACK );
+		dummy_apply(&dumb,VJ_EFFECT_COLOR_BLACK );
   	}
 
 	if(info->uc->take_bg==1 )
