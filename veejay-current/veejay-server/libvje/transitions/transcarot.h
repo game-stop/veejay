@@ -26,7 +26,6 @@
 
 vj_effect *transcarot_init(int width, int height);
 
-void transcarot_apply( VJFrame *frame, VJFrame *frame2, int width,
-		      int height, int p, int dy, int dye, int row,
-		      int opacity, int type);
+void transcarot_apply( VJFrame *frame, VJFrame *frame2, int p, int dy, int dye,
+                      int row, int opacity, int type);
 #endif
