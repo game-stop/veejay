@@ -199,7 +199,7 @@ int contourextract_prepare(uint8_t *map[4], int width, int height)
 	tmp.data[0] = static_bg;
 	tmp.width = width;
 	tmp.height = height;
-	softblur_apply( &tmp, width,height,0);
+	softblur_apply( &tmp, 0);
 
 	veejay_msg(2, "Contour extraction: Snapped background frame");
 	return 1;

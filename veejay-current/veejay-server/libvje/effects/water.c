@@ -282,7 +282,7 @@ static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
         uint8_t *in = f2->data[0];
         if(!w->have_img)
         {
-                //softblur_apply( f2,f->width,f->height,0);
+                //softblur_apply( f2, 0);
                 //veejay_memcpy(bg, f2->data[0], f->width * f->height );  
                 vj_frame_copy1( f2->data[0],bg, f->width * f->height );
 		w->have_img = 1;
@@ -330,7 +330,7 @@ static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
 	{
-		softblur_apply( f2,f->width,f->height,0);
+		softblur_apply( f2, 0);
 		//	veejay_memcpy(bg, f2->data[0], f->width * f->height );	
 		vj_frame_copy1( f2->data[0], bg, f->width * f->height );
 		w->have_img = 1;
@@ -378,7 +378,7 @@ static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
 	{
-		softblur_apply( f2,f->width,f->height,0);
+		softblur_apply( f2, 0);
 	//	veejay_memcpy(bg, f2->data[0], f->width * f->height );	
 		vj_frame_copy1( f2->data[0], bg, f->width * f->height );
 		w->have_img = 1;
