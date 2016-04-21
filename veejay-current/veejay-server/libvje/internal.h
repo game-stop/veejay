@@ -351,8 +351,7 @@ extern void transcarot_apply(VJFrame *frame, VJFrame *frame2,
                              int opacity, int type);
 extern void transline_apply(VJFrame *frame, VJFrame *frame2, int distance,
                             int line_width, int opacity, int type);
-extern void transform_apply(VJFrame *frame, VJFrame *frame2,
-			    int width, int height, int size);
+extern void transform_apply(VJFrame *frame, VJFrame *frame2, int size);
 
 extern void coloradjust_apply( VJFrame *frame, int width, int height,
 			      int val, int degrees);

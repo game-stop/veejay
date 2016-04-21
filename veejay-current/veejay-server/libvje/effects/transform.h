@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *transform_init(int w, int height);
-void transform_apply(VJFrame *frame, VJFrame *frame2, int width,
-		     int height, int size);
+void transform_apply(VJFrame *frame, VJFrame *frame2, int size);
 void transform_free();
 #endif
