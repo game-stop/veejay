@@ -538,7 +538,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 			frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
 	break;*/
       case VJ_VIDEO_EFFECT_WHITEFRAME:
-	whiteframe_apply(frames[0], frames[1], frames[0]->width, frames[0]->height);
+	whiteframe_apply(frames[0], frames[1]);
 	break;
       case VJ_VIDEO_EFFECT_MTRACER:
 	mtracer_apply(frames[0], frames[1],arg[0],arg[1] );
