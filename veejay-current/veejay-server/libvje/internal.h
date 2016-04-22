@@ -361,11 +361,9 @@ extern void solarize_apply(VJFrame *frame, int threshold);
 extern void dummy_apply(VJFrame *frame, int color_num);
 extern void rotozoom_apply(VJFrame *frame, int a, int b, int c, int d);
 extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2);
-
-extern void texmap_apply(void *dd, VJFrame *frame,
-		       VJFrame *frame2, int width, int height, 
-		       int mode, int threshold, int c , int feather, int blob);
-
+//extern void texmap_apply(void *dd, VJFrame *frame,
+//		       VJFrame *frame2, int width, int height,
+//		       int mode, int threshold, int c , int feather, int blob);
 extern void contourextract_apply(void *ed, VJFrame *frame,int width, int height, 
 		int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight);
 
