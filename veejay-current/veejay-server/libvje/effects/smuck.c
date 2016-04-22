@@ -57,21 +57,23 @@ static inline unsigned int smuck_fastrand()
 */
 void smuck_apply( VJFrame *frame, VJFrame *frame2, int n)
 {
+	const int width = frame->width;
+	const int height = frame->height;
     unsigned int yd, xd, x, y;
 	// different table ...
     const unsigned int smuck[18] =
 	{ 12, 21, 30, 60, 58, 59, 57, 56, 55, 54, 53, 89, 90, 88, 87, 86, 85, 114 };
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-    for (y = 0; y < frame->height; y++) {
-	for (x = 0; x < frame->width; x++) {
+    for (y = 0; y < height; y++) {
+	for (x = 0; x < width; x++) {
 	    yd = y + (smuck_fastrand() >> smuck[n]) - 2;
 	    xd = x + (smuck_fastrand() >> smuck[n]) - 2;
-	    if (xd > frame->width)
-		xd = frame->width-1;
-	    if (yd > frame->height)
-		yd = frame->height;
-	    Y[x + y * frame->width] = Y2[xd + yd * frame->width];
+	    if (xd > width)
+		xd = width-1;
+	    if (yd > height)
+		yd = height;
+	    Y[x + y * width] = Y2[xd + yd * width];
 	}
     }
 }
