@@ -150,6 +150,8 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
     int reverse = 0;
     int i;
     unsigned int op0, op1;
+    const int width = frame->width;
+    const int height = frame->height;
     unsigned int len = frame->len;
     unsigned int uv_width = frame->uv_width;
     int uv_dy, uv_dye, uv_row_start, uv_row_length;
@@ -159,8 +161,6 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
-
-
 
     op1 = (opacity > 235) ? 235 : opacity;
     op0 = 235 - op1;
@@ -176,18 +176,18 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
 		{
 		    for (i = row_start; i < (row_start + row_length); i++)
 			{
-				Y[(dy * frame->width + i)] =
-				    (op0 * Y[(dy * frame->width + i)] +
-		  			 op1 * Y2[(dy * frame->width + i)]) >> 8;
+				Y[(dy * width + i)] =
+				    (op0 * Y[(dy * width + i)] +
+		  			 op1 * Y2[(dy * width + i)]) >> 8;
 	    	}
 		}
 		else
 		{
 	   		for (i = row_start; i < (row_start + row_length); i++)
 			{
-				Y[(dy * frame->width + i)] =
-				    (op0 * Y[(dy * frame->width + i)] +
-		     		op1 * Y2[len - (dy * frame->width + i)]) >> 8;
+				Y[(dy * width + i)] =
+				    (op0 * Y[(dy * width + i)] +
+		     		op1 * Y2[len - (dy * width + i)]) >> 8;
 	   		}
 		}
 
