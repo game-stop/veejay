@@ -65,6 +65,8 @@ void revtv_apply(VJFrame *frame, int linespace, int vscale, int color, int color
     int yval;
     int uv_width = frame->uv_width;
     int uv_height = frame->uv_height;
+    const int height = frame->height;
+    const int width = frame->width;
 
     int colorCb = bl_pix_get_color_cb(color);
     int colorCr = bl_pix_get_color_cr(color_num);
@@ -72,15 +74,15 @@ void revtv_apply(VJFrame *frame, int linespace, int vscale, int color, int color
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-    for (y = 0; y < frame->height; y += linespace) {
-	for (x = 0; x <= frame->width; x++) {
-	    nsrc = Y + (y * frame->width) + x;
+    for (y = 0; y < height; y += linespace) {
+	for (x = 0; x <= width; x++) {
+	    nsrc = Y + (y * width) + x;
 	    X1 = ((*nsrc) & 0xff0000) >> (16 - 1);
 	    X2 = ((*nsrc) & 0xff00) >> (8 - 2);
 	    X3 = (*nsrc) & 0xff;
 	    yval = y - ((short) (X1 + X2 + X3) / vscale);
 	    if (yval > 0)
-			Y[x + (yval * frame->width)] = color;
+			Y[x + (yval * width)] = color;
 	}
     }
     if (color_num > 0) {
