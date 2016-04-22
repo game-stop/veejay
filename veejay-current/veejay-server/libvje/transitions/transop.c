@@ -66,7 +66,7 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
 		   int twidth, int theight, int x1, int y1, int x2, int y2, int opacity)
 {
 	int x, y;
-  
+
 	uint8_t *dY = frame->data[0];
 	uint8_t *dCb = frame->data[1];
 	uint8_t *dCr = frame->data[2];
@@ -76,36 +76,38 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
 
 	int view_width = twidth;
 	int view_height = theight;
+	const int width = frame->width;
+	const int height = frame->height;
 	int sy = y1;
 	int sx = x1;
 
 	int dy = y2;
 	int dx = x2;
 
-	if ( (dx + view_width ) > frame->width )
-		view_width = frame->width - dx;
-	if ( (dy + view_height ) > frame->height )
-		view_height = frame->height - dy;
+	if ( (dx + view_width) > width)
+		view_width = width - dx;
+	if ( (dy + view_height) > height)
+		view_height = height - dy;
 
 
-	if ( (sy + view_height) > frame->height )
-		view_height = frame->height - sy;
-	if ( (sx + view_width ) > frame->width )
-		view_width = frame->width - sx;
+	if ( (sy + view_height) > height)
+		view_height = height - sy;
+	if ( (sx + view_width ) > width)
+		view_width = width - sx;
 	
 
 	for( y = 0 ; y < view_height; y ++ )
 	{
 		for( x = 0 ; x < view_width; x ++ )
 		{
-			dY[ (dy + y ) * frame->width + dx + x ] = 
-				sY[ (sy + y) * frame->width + sx + x ];
+			dY[ (dy + y ) * width + dx + x ] = 
+				sY[ (sy + y) * width + sx + x ];
 
-			dCb[ (dy + y ) * frame->width + dx + x ] = 
-				sCb[ (sy + y) * frame->width + sx + x ];
-					
-			dCr[ (dy + y ) * frame->width + dx + x ] = 
-				sCr[ (sy + y) * frame->width + sx + x ];
+			dCb[ (dy + y ) * width + dx + x ] = 
+				sCb[ (sy + y) * width + sx + x ];
+
+			dCr[ (dy + y ) * width + dx + x ] = 
+				sCr[ (sy + y) * width + sx + x ];
 
 		}
 	}
