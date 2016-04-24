@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <config.h>
 #include <stdlib.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "common.h"
 #include "slicer.h"
@@ -64,8 +65,6 @@ static	void recalc(int w, int h , uint8_t *Yinp, int v1, int v2 )
   }
 
 }
-
-
 
 int     slicer_malloc(int width, int height)
 {

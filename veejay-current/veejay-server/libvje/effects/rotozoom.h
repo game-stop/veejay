@@ -20,11 +20,6 @@
 
 #ifndef ROTOZOOM_H
 #define ROTOZOOM_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *rotozoom_init(int width, int height);
 int rotozoom_malloc(int w, int h);
 void rotozoom_destroy();

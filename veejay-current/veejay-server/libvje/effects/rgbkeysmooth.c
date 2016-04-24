@@ -19,13 +19,11 @@
  */
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "rgbkey.h"
-#include <stdlib.h>
 #include <math.h>
-#include "common.h"
+#include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include "rgbkeysmooth.h"
-
+#include "common.h"
 
 vj_effect *rgbkeysmooth_init(int w,int h)
 {

@@ -20,12 +20,6 @@
 
 #ifndef WHITEFRAME_H
 #define WHITEFRAME_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *whiteframe_init();
-
 void whiteframe_apply(VJFrame *frame, VJFrame *frame2);
-void whiteframe_free();
 #endif

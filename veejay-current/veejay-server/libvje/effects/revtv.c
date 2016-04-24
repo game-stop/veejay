@@ -19,11 +19,11 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "revtv.h"
 #include "common.h"
 
-#include <stdlib.h>
 vj_effect *revtv_init(int max_width, int max_height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -106,4 +106,3 @@ void revtv_apply(VJFrame *frame, int linespace, int vscale, int color, int color
 	}
     }
 }
-void revtv_free(){}

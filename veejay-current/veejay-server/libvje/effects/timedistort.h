@@ -20,10 +20,6 @@
 
 #ifndef TIMEDISTORT_H
 #define TIMEDISTORT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *timedistort_init(int w, int h);
 void timedistort_apply( VJFrame *frame, int width, int height, int val);
 int timedistort_malloc(int w, int h);

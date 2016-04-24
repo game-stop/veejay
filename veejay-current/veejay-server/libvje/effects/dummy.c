@@ -19,12 +19,10 @@
  */
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <config.h>
-#include <stdlib.h>
 #include <libvje/vje.h>
-#include <libvje/effects/common.h>
+#include <libvjmem/vjmem.h>
 #include "dummy.h"
+#include "common.h"
 
 vj_effect *dummy_init(int w, int h)
 {
@@ -81,4 +79,3 @@ void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
    	veejay_memset( Cb,colorCb,uv_len);
    	veejay_memset( Cr,colorCr,uv_len);
 }
-void dummy_free(){}

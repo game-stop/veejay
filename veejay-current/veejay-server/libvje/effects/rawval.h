@@ -20,11 +20,6 @@
 
 #ifndef RAWVAL_H
 #define RAWVAL_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *rawval_init();
 void rawval_apply( VJFrame *frame, int a, int b, int na, int nb);
-void rawval_free();
 #endif

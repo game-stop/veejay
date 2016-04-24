@@ -20,6 +20,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "diffmap.h"
 #include "common.h"
@@ -51,7 +52,6 @@ vj_effect *differencemap_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Reverse", "Show");
     return ve;
 }
-
 
 static uint8_t *binary_img = NULL;
 static int nframe = 0;
@@ -148,7 +148,7 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 				}
 				else
 				{
-					Y[x+y] = 0;
+					Y[x+y] = pixel_Y_lo_;
 					Cb[x+y] = 128;
 					Cr[x+y] = 128;
 				}

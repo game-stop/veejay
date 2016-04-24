@@ -19,13 +19,11 @@
  */
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "rgbkey.h"
-#include <stdlib.h>
 #include <math.h>
+#include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include "common.h"
 #include "complexthreshold.h"
-
 
 vj_effect *complexthreshold_init(int w, int h)
 {
@@ -208,4 +206,3 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 	}
     }
 }
-void complexthreshold_free(){}

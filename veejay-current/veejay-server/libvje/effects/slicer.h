@@ -20,10 +20,6 @@
 
 #ifndef SLICER_H
 #define SLICER_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *slicer_init();
 void slicer_apply( VJFrame *frame, VJFrame *frame2, int slice_width, int slice_direction, int mode);
 int	slicer_malloc (int w, int h );

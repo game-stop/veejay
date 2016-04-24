@@ -20,11 +20,6 @@
 
 #ifndef TRANSFORM_H
 #define TRANSFORM_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *transform_init(int w, int height);
 void transform_apply(VJFrame *frame, VJFrame *frame2, int size);
-void transform_free();
 #endif

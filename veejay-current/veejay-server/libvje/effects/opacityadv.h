@@ -20,12 +20,6 @@
 
 #ifndef OPACITYADV_H
 #define OPACITYADV_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *opacityadv_init();
-void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,
-                      int threshold, int threshold2);
-void opacityadv_free();
+void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,int threshold, int threshold2);
 #endif

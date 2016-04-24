@@ -30,13 +30,13 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include "radioactive.h"
-#include "softblur.h"
 #include <libavutil/avutil.h>
 #include <libyuv/yuvconv.h>
+#include "radioactive.h"
+#include "softblur.h"
 #include "common.h"
-#include <stdlib.h>
 
 vj_effect *radioactivetv_init(int w, int h)
 {

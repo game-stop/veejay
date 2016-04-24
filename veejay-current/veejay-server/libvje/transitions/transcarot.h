@@ -20,10 +20,6 @@
 
 #ifndef TRANSCAROT_H
 #define TRANSCAROT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *transcarot_init(int width, int height);
 
 void transcarot_apply( VJFrame *frame, VJFrame *frame2, int p, int dy, int dye,

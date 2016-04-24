@@ -20,10 +20,6 @@
 
 #ifndef CHANNELNEGATION_H
 #define CHANNELNEGATION_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *negatechannel_init(int w, int h);
 void negatechannel_apply( VJFrame *frame, int chan, int val);
 #endif

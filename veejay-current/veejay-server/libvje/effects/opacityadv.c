@@ -20,6 +20,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "opacityadv.h"
 
@@ -61,12 +62,13 @@ void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,
     uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
+	const int width = frame->width;
 
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
 
-    for (y = 0; y < len; y += frame->width) {
-	for (x = 0; x < frame->width; x++) {
+    for (y = 0; y < len; y += width) {
+	for (x = 0; x < width; x++) {
 	    a1 = Y[x + y];
 	    a2 = Y2[x + y];
 	    /*
@@ -89,4 +91,3 @@ void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,
 	}
     }
 }
-void opacityadv_free(){}

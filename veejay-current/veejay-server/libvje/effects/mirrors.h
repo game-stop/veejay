@@ -20,13 +20,6 @@
 
 #ifndef MIRRORS_H
 #define MIRRORS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *mirrors_init(int width,int height);
-
 void mirrors_apply( VJFrame *frame, int type, int factor);
-
-void mirrors_free();
 #endif

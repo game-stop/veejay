@@ -19,8 +19,8 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include <config.h>
 #include "opacitythreshold.h"
 
 vj_effect *opacitythreshold_init(int w, int h)
@@ -47,10 +47,7 @@ vj_effect *opacitythreshold_init(int w, int h)
     return ve;
 }
 
-
-
-void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2, int opacity,
-                            int threshold, int t2)
+void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2, int opacity,int threshold, int t2)
 {
     const int width = frame->width;
     unsigned int x, y, len = frame->len-width;
@@ -104,4 +101,3 @@ void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2, int opacity,
 	}
     }
 }
-void opacitythreshold_free(){}

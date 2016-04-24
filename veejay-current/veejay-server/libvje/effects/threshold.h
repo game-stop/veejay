@@ -20,10 +20,6 @@
 
 #ifndef THRESHOLD_H
 #define THRESHOLD_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *threshold_init(int w, int h);
 void threshold_apply( VJFrame *frame,VJFrame *frame2, int width, int height, int t, int n);
 int	threshold_malloc(int w, int h);

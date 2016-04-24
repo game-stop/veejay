@@ -38,10 +38,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
+#include <veejay/vj-task.h>
 #include "opacity.h"
 #include "common.h"
-#include <veejay/vj-task.h>
 
 vj_effect *opacity_init(int w, int h)
 {
@@ -105,7 +106,7 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, i
     op0 = 255 - op1;
 
     for( i = 0; i < size; i ++ )
-	dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
+		dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
 
 
     return 0;
@@ -206,5 +207,3 @@ void	opacity_blend_luma_apply( uint8_t *A, uint8_t *B, int len,int opacity )
 	while (y--)
 		A[y] = ((opacity * (A[y] - B[y])) >> 8 ) + A[y];
 }
-
-void opacity_free(){}

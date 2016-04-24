@@ -20,11 +20,6 @@
 
 #ifndef BORDERS_H
 #define BORDERS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *borders_init(int width,int height);
 void borders_apply(VJFrame *frame, int size, int color);
-void borders_free();
 #endif

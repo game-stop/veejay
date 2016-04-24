@@ -19,11 +19,10 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "smuck.h"
 #include "common.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 static int smuck_rand_val;
 
@@ -66,15 +65,14 @@ void smuck_apply( VJFrame *frame, VJFrame *frame2, int n)
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
     for (y = 0; y < height; y++) {
-	for (x = 0; x < width; x++) {
-	    yd = y + (smuck_fastrand() >> smuck[n]) - 2;
-	    xd = x + (smuck_fastrand() >> smuck[n]) - 2;
-	    if (xd > width)
-		xd = width-1;
-	    if (yd > height)
-		yd = height;
-	    Y[x + y * width] = Y2[xd + yd * width];
-	}
+		for (x = 0; x < width; x++) {
+		    yd = y + (smuck_fastrand() >> smuck[n]) - 2;
+		    xd = x + (smuck_fastrand() >> smuck[n]) - 2;
+		    if (xd > width)
+				xd = width-1;
+		    if (yd > height)
+				yd = height;
+		    Y[x + y * width] = Y2[xd + yd * width];
+		}
     }
 }
-void smuck_free(){}

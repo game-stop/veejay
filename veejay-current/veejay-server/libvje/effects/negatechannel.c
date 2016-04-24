@@ -20,6 +20,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "negatechannel.h"
 #include "common.h"
@@ -33,7 +34,7 @@ vj_effect *negatechannel_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 2;
+    ve->limits[1][0] = 3;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 0xff;
     ve->defaults[0] = 0;
@@ -47,7 +48,7 @@ vj_effect *negatechannel_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Luminance" ,"Chroma Blue", "Chroma Red" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Luminance" ,"Chroma Blue", "Chroma Red", "Chroma Red and Blue" );
 
     return ve;
 }
@@ -55,8 +56,8 @@ vj_effect *negatechannel_init(int w, int h)
 void negatechannel_apply( VJFrame *frame, int chan, int val)
 {
     int i;
-    int len = (frame->width * frame->height);
-    int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+    const int len = (frame->width * frame->height);
+    const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
@@ -75,6 +76,11 @@ void negatechannel_apply( VJFrame *frame, int chan, int val)
 			break;
 		case 2:
 			for (i = 0; i < uv_len; i++) {
+				Cr[i] = val - Cr[i];
+			}
+		case 3:
+			for( i = 0; i < uv_len; i ++ ) {
+				Cb[i] = val - Cb[i];
 				Cr[i] = val - Cr[i];
 			}
 			break;

@@ -19,9 +19,10 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "gamma.h"
-#include <math.h>
 
 static __thread int gamma_flag = 0;
 static __thread uint8_t table[256];

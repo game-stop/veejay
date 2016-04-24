@@ -19,9 +19,9 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/effects/common.h>
-#include <stdlib.h>
 #include "slidingdoor.h"
 
 vj_effect *slidingdoor_init(int width, int height)

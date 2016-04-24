@@ -20,10 +20,6 @@
 
 #ifndef GAMMA_H
 #define GAMMA_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *gamma_init();
 void gamma_apply(VJFrame *frame, int gamma_val);
 #endif

@@ -20,6 +20,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "common.h"
 #include "negation.h"
@@ -63,5 +64,4 @@ void negation_apply( VJFrame *frame, int val)
 		Cb[i] = val - Cb[i];
 		Cr[i] = val - Cr[i];
 	}
-
 }

@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "solarize.h"
 #include <stdlib.h>
@@ -60,4 +61,3 @@ void solarize_apply( VJFrame *frame, int threshold)
     	}
     }
 }
-void solarize_free(){}

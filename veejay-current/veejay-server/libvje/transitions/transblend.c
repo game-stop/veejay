@@ -19,9 +19,10 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include "transblend.h"
 #include <libvje/effects/common.h>
+#include "transblend.h"
 
 vj_effect *transblend_init(int width, int height)
 {

@@ -20,10 +20,6 @@
 
 #ifndef CHAMELEONBLEND_H
 #define CHAMELEONBLEND_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *chameleonblend_init(int w, int h);
 void chameleonblend_apply( VJFrame *frame, VJFrame *source, int width, int height, int mode);
 int chameleonblend_malloc(int w, int h );

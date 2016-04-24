@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "common.h"
 #include "rawman.h"
@@ -106,4 +107,3 @@ void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int YY)
 
     }
 }
-void rawman_free(){}

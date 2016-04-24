@@ -20,14 +20,6 @@
 
 #ifndef SMUCK_H
 #define SMUCK_H
-
-
-
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *smuck_init();
 void smuck_apply(VJFrame *frame, VJFrame *frame2, int level);
-void smuck_free();
 #endif

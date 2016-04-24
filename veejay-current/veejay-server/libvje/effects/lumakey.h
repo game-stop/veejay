@@ -20,11 +20,6 @@
 
 #ifndef LUMAKEY_H
 #define LUMAKEY_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *lumakey_init();
-void lumakey_apply( VJFrame *frame, VJFrame *frame2, int type,
-                   int threshold, int threshold2, int feather, int d);
+void lumakey_apply( VJFrame *frame, VJFrame *frame2, int type,int threshold, int threshold2, int feather, int d);
 #endif

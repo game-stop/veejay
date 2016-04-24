@@ -28,6 +28,7 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "timedistort.h"
 #include "common.h"

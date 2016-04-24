@@ -19,8 +19,8 @@
   */
 #include <stdlib.h>
 #include <stdint.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include <stdio.h>
 #include "transform.h"
 #include "common.h"
 
@@ -135,4 +135,3 @@ void transform_apply(VJFrame *frame, VJFrame *frame2, const int size)
 		}
     }
 }
-void transform_free(){}

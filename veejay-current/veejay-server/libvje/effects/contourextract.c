@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <math.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
 #include <libavutil/avutil.h>

@@ -20,12 +20,6 @@
 
 #ifndef RAWMAN_H
 #define RAWMAN_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *rawman_init();
-
 void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int Y);
-void rawman_free();
 #endif

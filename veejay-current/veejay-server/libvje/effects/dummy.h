@@ -20,12 +20,7 @@
 
 #ifndef DUMMY_H
 #define DUMMY_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *dummy_init();
 void dummy_apply(VJFrame *frame, int n);
 void dummy_rgb_apply(VJFrame *frame, int r, int g, int b);
-void dummy_free();
 #endif

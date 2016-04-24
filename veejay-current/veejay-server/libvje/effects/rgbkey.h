@@ -20,9 +20,6 @@
 
 #ifndef RGBKEY_H
 #define RGBKEY_H
-#include <sys/types.h>
-#include <stdint.h>
-#include <libvje/vje.h>
 vj_effect *rgbkey_init();
 void rgbkey_scan_fg(uint8_t * src2[3], int *r, int *g, int *b);
 int	rgbkey_malloc(int w, int h);

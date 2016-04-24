@@ -19,12 +19,11 @@
  */
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "rgbkey.h"
 #include <math.h>
+#include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include "common.h"
 #include "complexinvert.h"
-
 
 vj_effect *complexinvert_init(int w, int h)
 {
@@ -153,4 +152,3 @@ void complexinvert_apply(VJFrame *frame, int width,
 	    }
 	}
 }
-void complexinvert_free(){}

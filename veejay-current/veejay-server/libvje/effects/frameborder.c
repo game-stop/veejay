@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <stdlib.h>
 #include "frameborder.h"
@@ -46,9 +47,8 @@ vj_effect *frameborder_init(int width, int height)
 void frameborder_apply(VJFrame *frame, VJFrame *frame2, int size)
 {
 	frameborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
-	                    frame2->data[0], frame2->data[1], frame2->data[2],
-	                    frame->width, frame->height, (size), (size), (size),
-	                    (size),frame->shift_h,frame->shift_v);
+						frame2->data[0], frame2->data[1], frame2->data[2],
+						frame->width, frame->height, (size), (size), (size),
+						(size),frame->shift_h,frame->shift_v);
 
 }
-void frameborder_free(){}

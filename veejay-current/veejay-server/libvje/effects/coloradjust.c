@@ -19,68 +19,70 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "coloradjust.h"
-#include <math.h>
 #include "common.h"
+
 vj_effect *coloradjust_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 2;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
    /* ve->limits[0][0] = -235;
-    ve->limits[1][0] = 235;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 36000;
-    ve->defaults[0] = 116;
-    ve->defaults[1] = 4500;*/
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 360;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 256;
-    ve->defaults[0] = 50;
-    ve->defaults[1] = 50;
+	ve->limits[1][0] = 235;
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] = 36000;
+	ve->defaults[0] = 116;
+	ve->defaults[1] = 4500;*/
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 360;
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] = 256;
+	ve->defaults[0] = 50;
+	ve->defaults[1] = 50;
 	ve->param_description = vje_build_param_list( ve->num_params, "Degrees", "Intensity" );
-    ve->description = "Hue and Saturation";
-    ve->extra_frame = 0;
-    ve->sub_format = -1;
+	ve->description = "Hue and Saturation";
+	ve->extra_frame = 0;
+	ve->sub_format = -1;
 	ve->has_user = 0;
 	ve->parallel = 1;
-    return ve;
+	return ve;
 }
 
 /* these methods were derived from yuv-subtitler */
 static inline uint8_t ccolor_adjust_u(double dcolor, double dsaturation)
 {
-    return (sin(dcolor) * dsaturation) + 128;
+	return (sin(dcolor) * dsaturation) + 128;
 }
 static inline uint8_t ccolor_adjust_v(double dcolor, double dsaturation)
 {
-    return (cos(dcolor) * dsaturation) + 128;
+	return (cos(dcolor) * dsaturation) + 128;
 }
 static inline double ccolor_sqrt(double u, double v)
 {
-//    return sqrt((u * u) + (v * v));
-     double r;
-     fast_sqrt( r,(u*u)+(v*v));
-     return r;
+//	  return sqrt((u * u) + (v * v));
+	 double r;
+	 fast_sqrt( r,(u*u)+(v*v));
+	 return r;
 }
 static inline double ccolor_sine(int u, double dsaturation)
 {
-    return asin((u / dsaturation));
+	return asin((u / dsaturation));
 }
 
 
 void coloradjust_apply(VJFrame *frame, int val, int _degrees)
 {
-    unsigned int i;
+	unsigned int i;
 	const int len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 //@ Hue, Saturation, copied from AVIDEMUX!
-//@ the commented out version is the same as the optimized version (?)  
+//@ the commented out version is the same as the optimized version (?)	
 //
 
 	float hue = (float) ( (val/180.0) * M_PI);
@@ -104,20 +106,20 @@ void coloradjust_apply(VJFrame *frame, int val, int _degrees)
 
 	
  /*   int cb, cr;
-    double dsaturation, dcolor;
-    const double degrees = (_degrees / 100.0);
-    double co, si;
-    const double dsat = val / 100.0;
+	double dsaturation, dcolor;
+	const double degrees = (_degrees / 100.0);
+	double co, si;
+	const double dsat = val / 100.0;
 
-    for (i = 0; i < len; i++)
+	for (i = 0; i < len; i++)
 	{
 		cb = Cb[i] - 128;
 		cr = Cr[i] - 128;
 		if (cb != 0 && cr != 0)
 		{
-		    dsaturation = ccolor_sqrt((double) cb, (double) cr);
-		    dcolor = ccolor_sine(cb, dsaturation);
-		    if (cr < 0)
+			dsaturation = ccolor_sqrt((double) cb, (double) cr);
+			dcolor = ccolor_sine(cb, dsaturation);
+			if (cr < 0)
 				dcolor = M_PI - dcolor;
 
 			dcolor += (degrees * M_PI) / 180.0;
@@ -126,7 +128,6 @@ void coloradjust_apply(VJFrame *frame, int val, int _degrees)
 			Cb[i] = si * dsaturation + 128;
 			Cr[i] = co * dsaturation + 128;
 		}
-    }
+	}
 */
 }
-void coloradjust_free(){}

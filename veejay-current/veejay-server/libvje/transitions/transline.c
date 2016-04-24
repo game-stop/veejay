@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "transline.h"
 
@@ -149,8 +150,7 @@ void transline_apply( VJFrame *frame, VJFrame *frame2, int distance,
                      int line_width, int opacity, int type)
 {
     if (type == 1)
-	transline1_apply(frame->data, frame2->data, frame->width, frame->height, distance, line_width);
+		transline1_apply(frame->data, frame2->data, frame->width, frame->height, distance, line_width);
     if (type == 0)
-	transline2_apply(frame->data, frame2->data, frame->width, frame->height, distance, line_width,
-			 opacity);
+		transline2_apply(frame->data, frame2->data, frame->width, frame->height, distance, line_width, opacity);
 }

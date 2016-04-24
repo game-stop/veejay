@@ -17,10 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdlib.h>
-#include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "softblur.h"
 #include "common.h"
@@ -176,17 +175,16 @@ static void softblur1_apply( VJFrame *frame)
 void softblur_apply(VJFrame *frame, int type)
 {
     switch (type) {
-    case 0:
+ 	   case 0:
 #ifdef HAVE_ASM_MMX
-	mmx_blur(frame);
+			mmx_blur(frame);
 #else
-	softblur1_apply(frame);
+			softblur1_apply(frame);
 #endif
-	break;
-	break;
-    case 1:
-	softblur3_apply(frame);
-	break;
+		break;
+	    case 1:
+			softblur3_apply(frame);
+		break;
     }
 }
 

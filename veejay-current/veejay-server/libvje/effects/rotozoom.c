@@ -23,6 +23,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include "rotozoom.h"
 #include "common.h"
 

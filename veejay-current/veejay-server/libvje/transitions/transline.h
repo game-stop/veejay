@@ -20,10 +20,6 @@
 
 #ifndef TRANSLINE_H
 #define TRANSLINE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *transline_init(int width, int height);
 
 void transline_apply( VJFrame *frame, VJFrame *frame2, int distance,

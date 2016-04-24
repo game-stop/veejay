@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "posterize.h"
 #include "common.h"
@@ -49,8 +50,6 @@ vj_effect *posterize_init(int w, int h)
     return ve;	
 }
 
-
-
 static void _posterize_y_simple(uint8_t *src[3], int len, int value, int threshold_min,int threshold_max)
 {
 	int i;
@@ -78,4 +77,3 @@ void posterize_apply(VJFrame *frame, int factor, int t1,int t2)
 {
 	_posterize_y_simple( frame->data, (frame->width*frame->height), factor, t1,t2);
 }
-void posterize_free(){}

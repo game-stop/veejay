@@ -20,12 +20,6 @@
 
 #ifndef OPACITYTHRESHOLD_H
 #define OPACITYTHRESHOLD_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *opacitythreshold_init();
-void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2, int opacity,
-                            int threshold, int t2);
-void opacitythreshold_free();
+void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2, int opacity,int threshold, int t2);
 #endif

@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "rawval.h"
 #include <stdlib.h>
@@ -52,8 +53,6 @@ vj_effect *rawval_init(int w,int h)
     return ve;
 }
 
-
-
 void rawval_apply( VJFrame *frame, const int color_cb, const int color_cr,
                   const int new_color_cb, const int new_color_cr)
 {
@@ -69,4 +68,3 @@ void rawval_apply( VJFrame *frame, const int color_cb, const int color_cr,
 		    Cr[i] = color_cr;
     }
 }
-void rawval_free(){}

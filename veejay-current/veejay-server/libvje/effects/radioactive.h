@@ -20,10 +20,6 @@
 
 #ifndef RADIOACTIVE_TVH
 #define RADIOACTIVE_TVH
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *radioactivetv_init(int w, int h);
 void radioactivetv_apply( VJFrame *frame, VJFrame *blue,int width, int height, int bla,int stride, int mode, int thres);
 int radioactivetv_malloc(int w, int h );

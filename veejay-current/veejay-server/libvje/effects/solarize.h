@@ -20,11 +20,6 @@
 
 #ifndef SOLARIZE_H
 #define SOLARIZE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *solarize_init();
 void solarize_apply(VJFrame *frame, int threshold);
-void solarize_free();
 #endif

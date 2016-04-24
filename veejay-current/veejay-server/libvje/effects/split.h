@@ -21,11 +21,6 @@
 
 #ifndef SPLIT_H
 #define SPLIT_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *split_init(int width, int height);
 int split_malloc(int w, int h);
 void split_free();

@@ -19,9 +19,10 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "whiteframe.h"
-
+#include "common.h"
 vj_effect *whiteframe_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -55,7 +56,7 @@ void whiteframe_apply( VJFrame *frame, VJFrame *frame2)
     for (i = 0; i < len; i++)
 	{
 		p = Y[i];
-		if (p >= 235)
+		if (p >= pixel_Y_hi_)
 		{
 		    Y[i] = Y2[i];
 		}

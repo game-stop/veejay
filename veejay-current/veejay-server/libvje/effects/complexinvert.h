@@ -20,13 +20,8 @@
 
 #ifndef COMPLEXINVERT_H
 #define COMPLEXINVERT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *complexinvert_init();
 void complexinvert_apply(VJFrame *frame, int width,
 		  int height, int i_angle, 
 		  int red, int green, int blue, int i_noise);
-void complexinvert_free();
 #endif

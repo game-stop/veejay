@@ -20,12 +20,6 @@
 
 #ifndef COLORADJUST_H
 #define COLORADJUST_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *coloradjust_init();
-
 void coloradjust_apply(VJFrame *frame, int val, int degrees);
-void coloradjust_free();
 #endif

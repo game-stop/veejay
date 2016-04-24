@@ -20,10 +20,6 @@
 
 #ifndef MEDIANFILT_H
 #define MEDIANFILT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *medianfilter_init(int w, int h);
 void medianfilter_apply( VJFrame *frame, int val);
 #endif

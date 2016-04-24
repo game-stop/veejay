@@ -20,14 +20,14 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "rgbkey.h"
-#include <stdlib.h>
 #include <math.h>
-#include "common.h"
+#include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
+#include "rgbkey.h"
+#include "common.h"
 
 extern int yuv_sws_get_cpu_flags();
 

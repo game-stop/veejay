@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "noisepencil.h"
 #include "common.h"
@@ -64,14 +65,14 @@ vj_effect *noisepencil_init(int width , int height)
 
 int  noisepencil_malloc(int width,int height)
 {
-  Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * width * height);
-  if(!Yb_frame) return 0;
-  return 1;
+	Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * width * height);
+	if(!Yb_frame) return 0;
+	return 1;
 }
 
 void noisepencil_free() {
-  if(Yb_frame) free(Yb_frame);
-  Yb_frame = NULL;
+	if(Yb_frame) free(Yb_frame);
+	Yb_frame = NULL;
 }
 
 static void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
@@ -95,7 +96,7 @@ static void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coee
 		tmp = (src[0][r + c - 1] +
 				  src[0][r + c] +
 				  src[0][r + c + 1]
-		    ) / 3;
+			) / 3;
 
 		if( tmp >= min_t && tmp <= max_t )
 		{
@@ -111,7 +112,7 @@ static void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coee
     for(c=0; c < len; c++) {
 	  /* get higher signal frequencies and*/	
 	  /* multiply result with coeffcient to get d*/
-	    if( Yb_frame[c] != 0) src[0][c] = (Yb_frame[c] - src[0][c]) * k;
+		if( Yb_frame[c] != 0) src[0][c] = (Yb_frame[c] - src[0][c]) * k;
 	}
 
 }
@@ -143,7 +144,7 @@ static void noisepencil_2_apply(uint8_t *src[3], int width, int height, int coee
 				  src[0][r + c] +
 				  src[0][r + c + 1] +
 				  src[0][r + c - 1]  
-		    ) / 9;
+			) / 9;
 
 		if( tmp >= min_t && tmp <= max_t)
 		{
@@ -189,7 +190,7 @@ static void noisepencil_3_apply(uint8_t *src[3], int width, int height, int coee
 				  src[0][r + c] +
 				  src[0][r + c + 1] +
 				  src[0][r + c - 1]  
-		    ) / 9;
+			) / 9;
 
 		if( min_t >= tmp && tmp <= max_t)
 		{
@@ -238,7 +239,7 @@ static void noisepencil_4_apply(uint8_t *src[3], int width, int height, int coee
 				  src[0][r + c] +
 				  src[0][r + c + 1] +
 				  src[0][r + c - 1]  
-		    ) / 9;
+			) / 9;
 
 		if( tmp >= min_t && tmp <= max_t )
 		{
@@ -286,7 +287,7 @@ static void noisepencil_5_apply(uint8_t *src[3], int width, int height, int coee
 				  src[0][r + c] +
 				  src[0][r + c + 1] +
 				  src[0][r + c - 1]  
-		    ) / 9;
+			) / 9;
 
 		if( min_t >= tmp && tmp <= max_t)
 		{

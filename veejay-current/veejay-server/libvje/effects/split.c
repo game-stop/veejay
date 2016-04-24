@@ -17,7 +17,8 @@
  */
 #include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
+#include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include "split.h"
 #include "common.h"
 static uint8_t *split_buf[4] = { NULL,NULL,NULL, NULL };

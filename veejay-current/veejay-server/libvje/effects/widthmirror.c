@@ -19,10 +19,10 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "widthmirror.h"
-#include <stdlib.h>
-#include <stdio.h>
+
 vj_effect *widthmirror_init(int max_width,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -91,4 +91,3 @@ void widthmirror_apply(VJFrame *frame, int width_div)
     }
 }
 
-void widthmirror_free(){}

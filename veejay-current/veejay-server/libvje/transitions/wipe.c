@@ -19,6 +19,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "wipe.h"
 #include "transop.h"
@@ -45,18 +46,23 @@ vj_effect *wipe_init(int w,int h)
     return ve;
 
 }
+
+//FIXME: private data
+
 static int g_wipe_width = 0;
 static int g_wipe_height = 0;
+
 void wipe_apply( VJFrame *frame, VJFrame *frame2,
 		int w, int h, int opacity, int inc)
 {
     /* w, h increasen */
     transop_apply(frame, frame2, g_wipe_width, g_wipe_height, 0, 0, 0, 0, opacity);
-    g_wipe_width += inc;
+    
+	g_wipe_width += inc;
     g_wipe_height += ((w / h) - 0.5 + inc);
 
     if (g_wipe_width > w || g_wipe_height > h) {
-	g_wipe_width = 0;
-	g_wipe_height = 0;
+		g_wipe_width = 0;
+		g_wipe_height = 0;
     }
 }

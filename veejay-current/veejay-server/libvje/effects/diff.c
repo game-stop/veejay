@@ -19,16 +19,17 @@
  */
 #include <config.h>
 #include <stdint.h>
-#include "diff.h"
-#include "common.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <libvje/vje.h>
 #include <libavutil/avutil.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include "softblur.h"
+#include "diff.h"
+#include "common.h"
 static uint8_t *static_bg = NULL;
 static uint32_t *dt_map = NULL;
 
@@ -40,39 +41,38 @@ typedef struct
 
 vj_effect *diff_init(int width, int height)
 {
-    //int i,j;
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;	/* reverse */
-    ve->limits[1][1] = 1;
-    ve->limits[0][2] = 0;	/* show mask */
-    ve->limits[1][2] = 2;
-    ve->limits[0][3] = 1;	/* thinning */
-    ve->limits[1][3] = 100;
+	//int i,j;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 4;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 255;
+	ve->limits[0][1] = 0;	/* reverse */
+	ve->limits[1][1] = 1;
+	ve->limits[0][2] = 0;	/* show mask */
+	ve->limits[1][2] = 2;
+	ve->limits[0][3] = 1;	/* thinning */
+	ve->limits[1][3] = 100;
 
-    ve->defaults[0] = 30;
-    ve->defaults[1] = 0;
-    ve->defaults[2] = 2;
-    ve->defaults[3] = 5;
+	ve->defaults[0] = 30;
+	ve->defaults[1] = 0;
+	ve->defaults[2] = 2;
+	ve->defaults[3] = 5;
 
-    ve->description = "Map B to A (substract background mask)";
-    ve->extra_frame = 1;
-    ve->sub_format = 1;
-    ve->has_user = 1;
-    ve->user_data = NULL;
+	ve->description = "Map B to A (substract background mask)";
+	ve->extra_frame = 1;
+	ve->sub_format = 1;
+	ve->has_user = 1;
+	ve->user_data = NULL;
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show mask/image", "Thinning" );
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 	
-	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, 
-		"Show Difference", "Show Distance Map", "Normal" );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, "Show Difference", "Show Distance Map", "Normal" );
 
-    return ve;
+	return ve;
 }
 
 
@@ -94,7 +94,6 @@ int diff_malloc(void **d, int width, int height)
 	*d = (void*) vj_calloc(sizeof(diff_data));
 	my = (diff_data*) *d;
 	my->data = (uint8_t*) vj_calloc( RUP8(sizeof(uint8_t) * width * height + width) );
-//	my->current = my->data + (width*height);
 
 	if(static_bg == NULL)	
 		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height ) + RUP8(width * 2));
@@ -139,10 +138,10 @@ void diff_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
 		int threshold, int reverse,int mode, int feather)
 {
-    
+	
 	unsigned int i;
 	const uint32_t len = frame->len;
- 	uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	uint8_t *Y2 = frame2->data[0];
@@ -174,12 +173,12 @@ void diff_apply(void *ed, VJFrame *frame,
 		vj_frame_clear1( Cr, 128, len );
 
 		return;
-	} else if (mode == 2 )
+	} 
+	else if (mode == 2 )
 	{
 		//@ show dt map as grayscale image, intensity starts at 128
 		for( i = 0; i  < len ; i ++ )
 		{
-			
 			if( dt_map[i] == feather )	
 				Y[i] = 0xff; //@ border white
 			else if( dt_map[i] > feather )	{
@@ -187,7 +186,7 @@ void diff_apply(void *ed, VJFrame *frame,
 			} else if ( dt_map[i] == 1 ) {
 				Y[i] = 0xff;
 			} else {
-				Y[i] = pixel_Y_lo_;	//@ black (background)
+				Y[i] = 0;
 			}
 			Cb[i] = 128;	
 			Cr[i] = 128;
@@ -206,7 +205,7 @@ void diff_apply(void *ed, VJFrame *frame,
 		}
 		else
 		{
-			Y[i] =  pixel_Y_lo_;
+			Y[i] = pixel_Y_lo_;
 			Cb[i] = 128;
 			Cr[i] = 128;
 		}

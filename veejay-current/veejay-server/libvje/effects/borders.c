@@ -19,38 +19,37 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include <stdlib.h>
 #include "borders.h"
 #include "common.h"
 
 vj_effect *borders_init(int width,int height)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 2;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 
-    ve->defaults[0] = 41;
-    ve->defaults[1] = 0;
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = (height / 2);
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 7;
-    ve->description = "Colored Border Translation";
-    ve->sub_format = 0;
-    ve->extra_frame = 0;
+	ve->defaults[0] = 41;
+	ve->defaults[1] = 0;
+	ve->limits[0][0] = 1;
+	ve->limits[1][0] = (height / 2);
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] = 7;
+	ve->description = "Colored Border Translation";
+	ve->sub_format = 0;
+	ve->extra_frame = 0;
 	ve->has_user = 0;	
 	ve->param_description = vje_build_param_list( ve->num_params, "Size", "Color");
-    return ve;
+	return ve;
 }
 
 void borders_apply( VJFrame *frame, int size, int color)
 {
 	blackborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
-	                    frame->width, frame->height, (size), (size), (size), (size),
-	                    frame->shift_h, frame->shift_v,color);
+						frame->width, frame->height, (size), (size), (size), (size),
+						frame->shift_h, frame->shift_v,color);
 
 }
-void borders_free(){}

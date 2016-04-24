@@ -25,41 +25,41 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
-#include <config.h>
 #include "chameleon.h"
 #include "common.h"
 #include "softblur.h"
 vj_effect *chameleon_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 1;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
-    ve->defaults[0] = 0;
-    ve->description = "ChameleonTV (EffectTV)";
-    ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->has_user = 0;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->limits[0][0] = 0;
+	ve->limits[1][0] = 1;
+	ve->defaults[0] = 0;
+	ve->description = "ChameleonTV (EffectTV)";
+	ve->sub_format = 1;
+	ve->extra_frame = 0;
+	ve->has_user = 0;
 	ve->motion = 1;
-    ve->param_description = vje_build_param_list(ve->num_params, "Appearing/Dissapearing");
-     return ve;
+	ve->param_description = vje_build_param_list(ve->num_params, "Appearing/Dissapearing");
+	return ve;
 }
 
 static int last_mode_  = -1;
 static int N__ = 0;
 static int n__ = 0;
 
-static	int	has_bg = 0;
-static int32_t	*sum = NULL;
-static uint8_t	*timebuffer = NULL;
-static uint8_t	*tmpimage[4] = { NULL,NULL,NULL, NULL};
-static	int	plane = 0;
+static int has_bg = 0;
+static int32_t *sum = NULL;
+static uint8_t *timebuffer = NULL;
+static uint8_t *tmpimage[4] = { NULL,NULL,NULL, NULL};
+static int plane = 0;
 static uint8_t	*bgimage[4] = { NULL,NULL,NULL, NULL};
 
 #define PLANES_DEPTH 6
@@ -102,7 +102,6 @@ int	chameleon_malloc(int w, int h)
 		vj_frame_clear1( tmpimage[i], 128, RUP8(w*h));
 	}
 	
-	
 	sum = (int32_t*) vj_calloc( RUP8(w * h) * sizeof(int32_t));
 	timebuffer = (uint8_t*) vj_calloc( RUP8(w * h) * PLANES );
 
@@ -136,14 +135,14 @@ void	chameleon_free()
 
 static void drawAppearing(VJFrame *src, VJFrame *dest)
 {
-        int i;
-        unsigned int Y;
-        uint8_t *p, *qy, *qu, *qv;
-        int32_t *s;
+	int i;
+	unsigned int Y;
+	uint8_t *p, *qy, *qu, *qv;
+	int32_t *s;
 	const int video_area = src->len;
 
-        p = timebuffer + plane * video_area;
-        qy = bgimage[0];
+	p = timebuffer + plane * video_area;
+	qy = bgimage[0];
 	qu = bgimage[1];
 	qv = bgimage[2];
 
@@ -155,15 +154,16 @@ static void drawAppearing(VJFrame *src, VJFrame *dest)
 	uint8_t *U1 = dest->data[1];
 	uint8_t *V1 = dest->data[2];
 
-        s = sum;
+	s = sum;
 	uint8_t a,b,c;
-        for(i=0; i<video_area; i++) {
-                Y = lum[i];
-                *s -= *p;
-                *s += Y;
-                *p = Y;
-                Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
-                if(Y>255) Y = 255;
+	for(i=0; i<video_area; i++)
+	{
+		Y = lum[i];
+		*s -= *p;
+		*s += Y;
+		*p = Y;
+		Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
+		if(Y>255) Y = 255;
 		a = lum[i];
 		b = u0[i]; 
 		c = v0[i];
@@ -173,19 +173,20 @@ static void drawAppearing(VJFrame *src, VJFrame *dest)
 		U1[i] = b;
 		c += (( qv[i] - c ) * Y )>>8;
 		V1[i] = c;
-                p++;
-                s++;
-        }
-        plane++;
-        plane = plane & (PLANES-1);
+		p++;
+		s++;
+	}
+
+	plane++;
+	plane = plane & (PLANES-1);
 }
 
 
 static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 {
-        int i;
-        unsigned int Y;
-        uint8_t *p, *qu, *qv, *qy;
+	int i;
+	unsigned int Y;
+	uint8_t *p, *qu, *qv, *qy;
 	int32_t *s;
 	const int video_area = src->len;
 
@@ -196,16 +197,16 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 	uint8_t *u0  = src->data[1];
 	uint8_t *v0  = src->data[2];
 
-        p = timebuffer + (plane * video_area);
-        qy = bgimage[0];
+	p = timebuffer + (plane * video_area);
+	qy = bgimage[0];
 	qu= bgimage[1];
 	qv= bgimage[2];
-        s = sum;
+	s = sum;
 
 	uint8_t a,b,c,A,B,C;
 
-        for(i=0; i < video_area; i++) {
-
+	for(i=0; i < video_area; i++)
+	{
 		Y = a = lum[i]; 
 		b = u0[i]; 
 		c = v0[i];
@@ -214,12 +215,12 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 		B = qu[i];
 		C = qv[i];
 
-                *s -= *p;
-                *s += Y;
-                *p = Y;
+		*s -= *p;
+		*s += Y;
+		*p = Y;
 
-                Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
-                if(Y>255) Y = 255;
+		Y = (abs(((int)Y<<PLANES_DEPTH) - (int)(*s)) * 8)>>PLANES_DEPTH;
+		if(Y>255) Y = 255;
 
 		A += (( a - A ) * Y )>> 8;
 		Y1[i] = A;	
@@ -228,12 +229,12 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 		C += (( c - C ) * Y ) >> 8;
 		V1[i] = C;
 
-                p++;
-                s++;
-        }
+		p++;
+		s++;
+	}
 
-        plane++;
-        plane = plane & (PLANES-1);
+	plane++;
+	plane = plane & (PLANES-1);
 }
 
 void chameleon_apply( VJFrame *frame, int width, int height, int mode)
