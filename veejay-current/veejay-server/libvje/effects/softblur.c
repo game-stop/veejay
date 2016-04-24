@@ -44,36 +44,18 @@ vj_effect *softblur_init(int w,int h)
     return ve;
 }
 
-static void softblur1_apply( VJFrame *frame, int width, int height)
+static void softblur3_apply(VJFrame *frame )
 {
-    int r, c;
-    int len = (width * height);
- 	uint8_t *Y = frame->data[0];
-    for (r = 0; r < len; r += width) {
-	for (c = 1; c < width-1; c++) {
-	    Y[c + r] = (Y[r + c - 1] +
-			      Y[r + c] +
-			      Y[r + c + 1]
-				) / 3;
-				
-	}
-    }
-
-}
-
-static void softblur3_apply(VJFrame *frame, int width, int height ) {
 	int r,c;
 	uint8_t *Y = frame->data[0];
 	const int len = frame->len;
-	
+	const int width = frame->width;
+
 	for(c = 1; c < width - 1; c ++ )
 	   Y[c ] = (Y[c - 1] +
 	      Y[c ] +
 	      Y[c + 1]
 		) / 3;
-
-
-
 
 	for(r=width; r < (len-width); r+=width) {
 		for(c=1; c < (width-1); c++) {
@@ -109,18 +91,18 @@ static void softblur3_apply(VJFrame *frame, int width, int height ) {
  * Authors: Dennis Smit <ds@nerds-incorporated.org>
  */
 
-static	void	mmx_blur(uint8_t *buffer, int width, int height)
+static	void	mmx_blur(VJFrame *frame)
 {
 	__asm __volatile
 		("\n\t pxor %%mm6, %%mm6"
 		 ::);
 
-	int scrsh = (width * height) >> 1;
+	const int len = frame->len;
+	const int width = frame->width;
+	int scrsh = (len) >> 1;
 	int i;
 
-	int len = (width * height);
-
-	uint8_t *buf = buffer;
+	uint8_t *buf = frame->data[0];
 	/* Prepare substraction register */
 	for (i = 0; i < scrsh; i += 4) {
 		__asm __volatile
@@ -145,8 +127,6 @@ static	void	mmx_blur(uint8_t *buffer, int width, int height)
 		  );
 		//	 : "mm0", "mm1", "mm2", "mm3", "mm6");
 	}
-
-	len = (width*height);
 
 	for (i = len; i > scrsh; i -= 4) {
 		__asm __volatile
@@ -173,22 +153,39 @@ static	void	mmx_blur(uint8_t *buffer, int width, int height)
 
 	do_emms;
 }
+#else
+static void softblur1_apply( VJFrame *frame)
+{
+    int r, c;
+	const int len = frame->len;
+	uint8_t *Y = frame->data[0];
+	const int width = frame->width;
 
+    for (r = 0; r < len; r += width) {
+		for (c = 1; c < width-1; c++) {
+			Y[c + r] = (Y[r + c - 1] +
+					  Y[r + c] +
+					  Y[r + c + 1]
+					) / 3;
+		}
+    }
+
+}
 #endif
 
-void softblur_apply(VJFrame *frame, int width, int height, int type)
+void softblur_apply(VJFrame *frame, int type)
 {
     switch (type) {
     case 0:
 #ifdef HAVE_ASM_MMX
-	mmx_blur( frame->data[0],width,height );
+	mmx_blur(frame);
 #else
-	softblur1_apply(frame, width, height);
+	softblur1_apply(frame);
 #endif
 	break;
 	break;
     case 1:
-	softblur3_apply(frame, width, height);
+	softblur3_apply(frame);
 	break;
     }
 }

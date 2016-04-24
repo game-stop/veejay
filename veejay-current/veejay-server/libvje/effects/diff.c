@@ -128,7 +128,7 @@ int diff_prepare(void *user, uint8_t *map[4], int width, int height)
 	tmp.data[0] = static_bg;
 	tmp.width = width;
 	tmp.height = height;
-	softblur_apply( &tmp, width,height,0);
+	softblur_apply( &tmp, 0);
 	veejay_msg(2 , "Map B to A: Snapped background frame");
 
 	return 1;
@@ -154,7 +154,7 @@ void diff_apply(void *ed, VJFrame *frame,
 /*	VJFrame *tmp = yuv_yuv_template( ud->current, NULL,NULL, width,height, 
 					PIX_FMT_YUV444P );
 	veejay_memcpy( ud->current, frame->data[0], len );
-	softblur_apply(tmp,width,height,0);
+	softblur_apply(tmp ,0);
 	free(tmp);
 */
 	//@ clear distance transform map

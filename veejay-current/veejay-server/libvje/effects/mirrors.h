@@ -26,8 +26,7 @@
 
 vj_effect *mirrors_init(int width,int height);
 
-void mirrors_apply( VJFrame *frame, int width, int height, int type,
-		   int factor);
+void mirrors_apply( VJFrame *frame, int type, int factor);
 
 void mirrors_free();
 #endif

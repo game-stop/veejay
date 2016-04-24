@@ -55,9 +55,10 @@ static inline unsigned int smuck_fastrand()
    different is the smuck table containing some values. 
    This effect was originally created by Buddy Smith, one of EffecTV's developers from the USA
 */
-void smuck_apply( VJFrame *frame, VJFrame *frame2, int width,
-		 int height, int n)
+void smuck_apply( VJFrame *frame, VJFrame *frame2, int n)
 {
+	const int width = frame->width;
+	const int height = frame->height;
     unsigned int yd, xd, x, y;
 	// different table ...
     const unsigned int smuck[18] =

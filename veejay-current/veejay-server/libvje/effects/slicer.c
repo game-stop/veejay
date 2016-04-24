@@ -107,11 +107,12 @@ vj_effect *slicer_init(int w, int h)
 }
 
 
-void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int val1, int val2, int mode)
+void slicer_apply( VJFrame *frame, VJFrame *frame2, int val1, int val2, int mode)
 {
 	int x,y,p,q;
-	const unsigned int len = (width * height);
+	const int width = frame->width;
+	const int height = frame->height;
+	const unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -127,9 +128,9 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
 	recalc( width, height, Y2, val1 ,val2 );
 
 	if( mode == 0 ) {
-	  	for(y=0; y < height; y++){ 
+		for(y=0; y < height; y++){
 		   for(x=0; x < width; x++) {
-		     	dx = x + slice_xshift[y]; 
+			   dx = x + slice_xshift[y];
 				dy = y + slice_yshift[x];
 				p = dy * width + dx;
 				q = y * width + x;
@@ -149,9 +150,9 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int width,
 		}
 	}
 	else {
-		for(y=0; y < height; y++){ 
+		for(y=0; y < height; y++){
 		   for(x=0; x < width; x++) {
-		     	dx = x + slice_xshift[y]; 
+			   dx = x + slice_xshift[y];
 				dy = y + slice_yshift[x];
 				p = dy * width + dx;
 				q = y * width + x;

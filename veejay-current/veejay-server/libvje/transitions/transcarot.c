@@ -58,9 +58,8 @@ vj_effect *transcarot_init(int width, int height)
     return ve;
 }
 
-static void transcarot1_apply( VJFrame *frame, VJFrame *frame2, int width,
-		       int height, int point_size, int dy, int dye,
-		       int row_start, int opacity)
+static void transcarot1_apply( VJFrame *frame, VJFrame *frame2, int point_size,
+                              int dy, int dye, int row_start, int opacity)
 {
 
     int row_length = 1;
@@ -90,9 +89,9 @@ static void transcarot1_apply( VJFrame *frame, VJFrame *frame2, int width,
 	{
 		for (i = row_start; i < (row_start + row_length); i++)
 		{
-		    Y[(dy * width + i)] =
-			(op0 * Y[(dy * width + i)] +
-			 op1 * Y2[(dy * width + i)]) >> 8 ;
+		    Y[(dy * frame->width + i)] =
+			(op0 * Y[(dy * frame->width + i)] +
+			 op1 * Y2[(dy * frame->width + i)]) >> 8 ;
 
 		}
 		if (reverse == 1)
@@ -143,16 +142,17 @@ static void transcarot1_apply( VJFrame *frame, VJFrame *frame2, int width,
 }
 
 /* carot transistion. like translate, but different form and with mirroring */
-static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int width,
-		       int height, int point_size, int dy, int dye,
-		       int row_start, int opacity)
+static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
+                              int dy, int dye, int row_start, int opacity)
 {
 
     int row_length = 1;
     int reverse = 0;
     int i;
     unsigned int op0, op1;
-    unsigned int len = (width * height);
+    const int width = frame->width;
+    const int height = frame->height;
+    unsigned int len = frame->len;
     unsigned int uv_width = frame->uv_width;
     int uv_dy, uv_dye, uv_row_start, uv_row_length;
   	uint8_t *Y = frame->data[0];
@@ -161,8 +161,6 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
-
-
 
     op1 = (opacity > 235) ? 235 : opacity;
     op0 = 235 - op1;
@@ -259,14 +257,11 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int width,
 
 }
 
-void transcarot_apply( VJFrame *frame, VJFrame *frame2, int width,
-		      int height, int p, int dy, int dye, int row,
-		      int opacity, int type)
+void transcarot_apply( VJFrame *frame, VJFrame *frame2, int p, int dy, int dye,
+                      int row, int opacity, int type)
 {
     if (type == 1)
-	transcarot1_apply(frame, frame2, width, height, p, dy, dye, row,
-			  opacity);
+	transcarot1_apply(frame, frame2, p, dy, dye, row, opacity);
     if (type == 0)
-	transcarot2_apply(frame, frame2, width, height, p, dy, dye, row,
-			  opacity);
+	transcarot2_apply(frame, frame2, p, dy, dye, row, opacity);
 }

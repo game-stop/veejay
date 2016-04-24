@@ -26,9 +26,8 @@
 
 vj_effect *transblend_init(int width, int height);
 
-void transblend_apply( VJFrame *frame, VJFrame *frame2, int w, int h,
-		      int mode, int twidth, int theight, int x1, int y1,
-		      int x2, int y2);
+void transblend_apply( VJFrame *frame, VJFrame *frame2, int mode,
+                      int twidth, int theight, int x1, int y1, int x2, int y2);
 
 
 #endif

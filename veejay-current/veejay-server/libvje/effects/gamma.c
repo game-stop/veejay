@@ -59,14 +59,13 @@ static void gamma_setup(int width, int height,
     }
 }
 
-void gamma_apply(VJFrame *frame, int width,
-		 int height, int gamma_value)
+void gamma_apply(VJFrame *frame, int gamma_value)
 {
     unsigned int i, len = frame->len;
 	uint8_t *Y = frame->data[0];
     
     if (gamma_value != gamma_flag) {
-		gamma_setup(width, height, (double) (gamma_value / 100.0));
+		gamma_setup(frame->width, frame->height, (double) (gamma_value / 100.0));
 		gamma_flag = gamma_value;
 	}
 

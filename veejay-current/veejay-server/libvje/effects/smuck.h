@@ -28,7 +28,6 @@
 #include <stdint.h>
 
 vj_effect *smuck_init();
-void smuck_apply(VJFrame *frame, VJFrame *frame2, int width,
-		 int height, int level);
+void smuck_apply(VJFrame *frame, VJFrame *frame2, int level);
 void smuck_free();
 #endif

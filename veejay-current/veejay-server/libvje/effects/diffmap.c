@@ -98,7 +98,7 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 	VJFrame tmp;
 	veejay_memcpy(&tmp, frame, sizeof(VJFrame));
 	tmp.data[0] = previous_img;
-	softblur_apply( &tmp, width,height,0 );
+	softblur_apply( &tmp, 0);
 
 	binarify_1src( binary_img,previous_img,threshold,reverse, width,height);
 	//@ clear image

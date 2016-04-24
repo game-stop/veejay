@@ -224,6 +224,8 @@ static	void	drawmotionframe( VJFrame *f , water_t *w )
 //	veejay_memcpy( f->data[0], w->diff_img, f->width * f->height );
 }
 
+/* globalactivity not used */
+/*
 static	int	globalactivity(VJFrame *f2, water_t *w, int in)
 {
 	int len = (f2->width * f2->height)/4;
@@ -275,21 +277,23 @@ static	int	globalactivity(VJFrame *f2, water_t *w, int in)
 		return 1;
 	return res;
 }
+*/
 
 static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-        uint8_t *bg = w->diff_img + (f->width * f->height);
+        const int len = f->len;
+        uint8_t *bg = w->diff_img + len;
         uint8_t *in = f2->data[0];
         if(!w->have_img)
         {
-                //softblur_apply( f2,f->width,f->height,0);
-                //veejay_memcpy(bg, f2->data[0], f->width * f->height );  
-                vj_frame_copy1( f2->data[0],bg, f->width * f->height );
+                //softblur_apply( f2, 0);
+                //veejay_memcpy(bg, f2->data[0], len );
+                vj_frame_copy1( f2->data[0],bg, len );
 		w->have_img = 1;
                 return;
         }
 
-        int i,len= f->width * f->height;
+        int i;
         uint8_t pp1;
         for(i = 0; i < len ; i ++ ) {
                 pp1 = abs(bg[i] - in[i]);
@@ -326,18 +330,19 @@ static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
 static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	uint8_t *bg = w->diff_img + (f->width * f->height);
+	const int len = f->len;
+	uint8_t *bg = w->diff_img + len;
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
 	{
-		softblur_apply( f2,f->width,f->height,0);
-		//	veejay_memcpy(bg, f2->data[0], f->width * f->height );	
-		vj_frame_copy1( f2->data[0], bg, f->width * f->height );
+		softblur_apply( f2, 0);
+		//	veejay_memcpy(bg, f2->data[0], len );
+		vj_frame_copy1( f2->data[0], bg, len );
 		w->have_img = 1;
 		return;
 	}
 
-	int i,len= f->width * f->height;
+	int i;
 	uint8_t pp1;
 	for(i = 0; i < len ; i ++ ) {
 		pp1 = abs(bg[i] - in[i]);
@@ -374,18 +379,19 @@ static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
 static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	uint8_t *bg = w->diff_img + (f->width * f->height);
+	const int len= f->len;
+	uint8_t *bg = w->diff_img + len;
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
 	{
-		softblur_apply( f2,f->width,f->height,0);
-	//	veejay_memcpy(bg, f2->data[0], f->width * f->height );	
-		vj_frame_copy1( f2->data[0], bg, f->width * f->height );
+		softblur_apply( f2, 0);
+	//	veejay_memcpy(bg, f2->data[0], len );
+		vj_frame_copy1( f2->data[0], bg, len );
 		w->have_img = 1;
 		return;
 	}
 
-	int i,len= f->width * f->height;
+	int i;
 	uint8_t pp1;
 	for(i = 0; i < len ; i ++ ) {
 		pp1 = abs(bg[i] - in[i]);

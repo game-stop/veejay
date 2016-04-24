@@ -27,6 +27,6 @@
 vj_effect *noisepencil_init  (int w, int h);
 void noisepencil_free();
 int noisepencil_malloc(int w, int h);
-void noisepencil_apply( VJFrame *frame, int w, int h, int t, int n, int a, int b);
+void noisepencil_apply( VJFrame *frame, int t, int n, int a, int b);
 
 #endif

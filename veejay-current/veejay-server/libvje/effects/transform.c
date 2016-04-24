@@ -47,12 +47,13 @@ vj_effect *transform_init(int width,int height)
     return ve;
 }
 
-void transform_apply(VJFrame *frame, VJFrame *frame2, int width,
-		     int height, const int size)
+void transform_apply(VJFrame *frame, VJFrame *frame2, const int size)
 {
     unsigned int ty, tx, y, x;
     const unsigned int uv_height = frame->uv_height;
     const unsigned int uv_width = frame->uv_width;
+	const int width = frame->width;
+	const int height = frame->height;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];

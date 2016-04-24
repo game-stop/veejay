@@ -303,22 +303,21 @@ static void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width
     }
 }
 
-void lumakey_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int type, int threshold, int threshold2,
-		   int feather, int d)
+void lumakey_apply( VJFrame *frame, VJFrame *frame2, int type,
+                   int threshold, int threshold2, int feather, int d)
 {
     switch(type)
 	{
 		case 0:
 			/* normal overlay */
-			lumakey_simple(frame->data, frame2->data, width, height, threshold, threshold2,feather);
+			lumakey_simple(frame->data, frame2->data, frame->width, frame->height, threshold, threshold2,feather);
 			break;
 		case 1:
 			/* threshold */
-			lumakey_smooth_white(frame->data, frame2->data, width, height, threshold,threshold2, feather,d);
+			lumakey_smooth_white(frame->data, frame2->data, frame->width, frame->height, threshold,threshold2, feather,d);
 			break;
 		case 2:
-			lumakey_smooth(frame->data, frame2->data, width, height, threshold, threshold2,feather, d);
+			lumakey_smooth(frame->data, frame2->data, frame->width, frame->height, threshold, threshold2,feather, d);
 			break;
     }
 

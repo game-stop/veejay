@@ -25,8 +25,7 @@
 #include <stdint.h>
 
 vj_effect *opacityadv_init();
-void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int width,
-		      int height, int opacity, int threshold,
-		      int threshold2);
+void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,
+                      int threshold, int threshold2);
 void opacityadv_free();
 #endif

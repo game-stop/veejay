@@ -113,8 +113,7 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, i
 #endif
 
 
-static void opacity_apply1( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int opacity)
+static void opacity_apply1( VJFrame *frame, VJFrame *frame2, int opacity)
 {
 	int y = blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame->len, opacity );
 	int u = blend_plane( frame->data[1], frame->data[1], frame2->data[1], (frame->ssm ? frame->len : frame->uv_len), opacity );
@@ -154,21 +153,19 @@ static void	opacity_apply_job( void *arg )
 
 }
 
-void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int opacity)
+void opacity_apply( VJFrame *frame, VJFrame *frame2, int opacity)
 {
-	opacity_apply1( frame,frame2,width,height,opacity );
+	opacity_apply1( frame, frame2, opacity);
 }
 
-void opacity_applyN( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int opacity)
+void opacity_applyN( VJFrame *frame, VJFrame *frame2, int opacity)
 {
 	if( vj_task_available() ) {
 		vj_task_set_from_frame( frame );
 		vj_task_set_param( opacity,0 );
 		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, (performer_job_routine) &opacity_apply_job );
 	} else {
-		opacity_apply1( frame,frame2,width,height,opacity );
+		opacity_apply1( frame,frame2,opacity );
 	}
 }
 	

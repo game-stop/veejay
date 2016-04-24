@@ -51,10 +51,8 @@ vj_effect *slidingdoor_init(int width, int height)
 
 
 
-void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int width,
-		       int height, int size)
+void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int size)
 {
-
 	//@ alpha luma
 	unsigned int i;
 	const int len = frame->len;
@@ -64,7 +62,6 @@ void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int width,
         uint8_t *Cr= frame->data[2];
         const uint8_t *Cb2= frame2->data[1];
         const uint8_t *Cr2= frame2->data[2];
-
 
 	for( i = 0; i < len ; i ++ )
 	{

@@ -29,6 +29,5 @@
 vj_effect *split_init(int width, int height);
 int split_malloc(int w, int h);
 void split_free();
-void split_apply( VJFrame *frame, VJFrame *frame2, int width,
-		 int height, int n, int swap);
+void split_apply( VJFrame *frame, VJFrame *frame2, int n, int swap);
 #endif

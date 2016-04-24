@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *solarize_init();
-void solarize_apply(VJFrame *frame, int width, int height,
-		    int threshold);
+void solarize_apply(VJFrame *frame, int threshold);
 void solarize_free();
 #endif

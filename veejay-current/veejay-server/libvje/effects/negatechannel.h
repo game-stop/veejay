@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *negatechannel_init(int w, int h);
-void negatechannel_apply( VJFrame *frame, int width, int height,int chan, int val);
+void negatechannel_apply( VJFrame *frame, int chan, int val);
 #endif

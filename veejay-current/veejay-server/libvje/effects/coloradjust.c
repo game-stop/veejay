@@ -73,8 +73,7 @@ static inline double ccolor_sine(int u, double dsaturation)
 }
 
 
-void coloradjust_apply(VJFrame *frame, int width, int height, int val,
-		       int _degrees)
+void coloradjust_apply(VJFrame *frame, int val, int _degrees)
 {
     unsigned int i;
 	const int len = (frame->ssm ? frame->len : frame->uv_len);

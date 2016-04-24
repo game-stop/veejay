@@ -311,19 +311,23 @@ static void noisepencil_5_apply(uint8_t *src[3], int width, int height, int coee
 
 
 /* with min_t -> max_t select the threshold to 'noise ' */
-void noisepencil_apply(VJFrame *frame, int width, int height, int type, int coeef, int min_t,
-	int max_t) {
-
+void noisepencil_apply(VJFrame *frame, int type, int coeef, int min_t, int max_t)
+{
 	switch(type) {
 		case 0:
-		noisepencil_1_apply(frame->data,width,height,coeef,min_t,max_t);	break;
+		noisepencil_1_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+			break;
 		case 1:
-		noisepencil_2_apply(frame->data,width,height,coeef,min_t,max_t);	break;
+		noisepencil_2_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+			break;
 		case 2:
-		noisepencil_3_apply(frame->data,width,height,coeef,min_t,max_t);	break;
+		noisepencil_3_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+			break;
 		case 3:
-		noisepencil_4_apply(frame->data,width,height,coeef,min_t,max_t);	break;
+		noisepencil_4_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+			break;
 		case 4:
-		noisepencil_5_apply(frame->data,width,height,coeef,min_t,max_t);	break;
+		noisepencil_5_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+			break;
 	}
 }

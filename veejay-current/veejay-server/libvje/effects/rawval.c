@@ -54,9 +54,8 @@ vj_effect *rawval_init(int w,int h)
 
 
 
-void rawval_apply( VJFrame *frame, int width, int height,
-		  const int color_cb, const int color_cr,
-		  const int new_color_cb, const int new_color_cr)
+void rawval_apply( VJFrame *frame, const int color_cb, const int color_cr,
+                  const int new_color_cb, const int new_color_cr)
 {
     unsigned int i;
 	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
