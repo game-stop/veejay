@@ -75,7 +75,7 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 
 
 extern int  frei0r_get_param_count( void *port);
-extern void dummy_rgb_apply(VJFrame *frame, int width, int height, int r, int g, int b);
+extern void dummy_rgb_apply(VJFrame *frame, int r, int g, int b);
 extern int   sufficient_space(int max_size, int nframes);
 extern char *UTF8toLAT1(unsigned char *in);
 extern int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *data, int len, int uv_len );
@@ -3556,7 +3556,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 		}
 		break;
 	case VJ_TAG_TYPE_COLOR:
-		dummy_rgb_apply( dst, width, height, tag->color_r,tag->color_g,tag->color_b );
+		dummy_rgb_apply( dst, tag->color_r,tag->color_g,tag->color_b );
 		break;
 
     case VJ_TAG_TYPE_NONE:

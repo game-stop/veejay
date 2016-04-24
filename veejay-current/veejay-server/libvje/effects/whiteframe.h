@@ -26,7 +26,6 @@
 
 vj_effect *whiteframe_init();
 
-void whiteframe_apply(VJFrame *frame, VJFrame *frame2, int width,
-		      int height );
+void whiteframe_apply(VJFrame *frame, VJFrame *frame2);
 void whiteframe_free();
 #endif

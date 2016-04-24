@@ -197,7 +197,8 @@ static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, d
 		return 1.0; /* far from color key == fg */
 }
 
-void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tola, int r, int g,int b, int tolb, int min, int max, int operator)
+void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int tola, int r, int g,int b,
+                  int tolb, int min, int max, int operator)
 {
 	unsigned int pos;
 	uint8_t *Y = frame->data[0];
@@ -208,9 +209,9 @@ void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tol
 	uint8_t *Cr2= frame2->data[2];
 	uint8_t *A = frame->data[3];
 	uint8_t *B = frame2->data[3];
-	const unsigned int len = frame->len;  
+	const unsigned int len = frame->len;
 	int iy=0,iu=128,iv=128;
-	uint8_t *T = temp[0];	
+	uint8_t *T = temp[0];
 	uint8_t op0,op1;
 
 	double dtola = (double) tola + 0.5f;
@@ -260,7 +261,7 @@ void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int tol
 
 	/* choke matte */
 	// reduces detail
-	gaussblur( A, width, temp[0], width, width,height,gaussfilter->filter_context );
+	gaussblur( A, frame->width, temp[0], frame->width, frame->width,frame->height,gaussfilter->filter_context );
 
 	/* level correction table */
 	__init_lookup_table( __lookup_table, 256, (float)min, (float)max, 0, 0xff ); 

@@ -43,20 +43,19 @@ vj_effect *solarize_init(int w,int h)
     return ve;
 }
 
-void solarize_apply( VJFrame *frame, int width, int height, int threshold)
+void solarize_apply( VJFrame *frame, int threshold)
 {
-    int i, len;
+    int i, len= frame->len;
     uint8_t val;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-	len = frame->len;
     for (i = 0; i < len; i++) {
 		val = Y[i];
 		if (val > threshold)
 		{
 			Y[i] = 255 - val;
-			Cb[i] = 255 - Cb[i]; 
+			Cb[i] = 255 - Cb[i];
             Cr[i] = 255 - Cr[i];
     	}
     }

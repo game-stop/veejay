@@ -43,7 +43,7 @@ vj_effect *medianfilter_init(int w, int h)
     return ve;
 }
 
-void medianfilter_apply( VJFrame *frame, int width, int height, int val)
+void medianfilter_apply( VJFrame *frame, int val)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
@@ -52,15 +52,15 @@ void medianfilter_apply( VJFrame *frame, int width, int height, int val)
     if( val == 0 )
 	   return; 
 
-     uint8_t *buffer = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height*3);
-     veejay_memset( buffer,0, width*height*3);
-     ctmf( Y, buffer, width,height,width,width,val,1,1024*1024*8);
-     ctmf( Cb,buffer + (width*height), width,height/2,width,width,val,1,512*1024);
-     ctmf( Cr,buffer + (width*height*2),width,height/2,width,width,val,1,512*1024);
+     uint8_t *buffer = (uint8_t*) vj_malloc(sizeof(uint8_t)*frame->width*frame->height*3);
+     veejay_memset( buffer,0, frame->width*frame->height*3);
+     ctmf( Y, buffer, frame->width,frame->height,frame->width,frame->width,val,1,1024*1024*8);
+     ctmf( Cb,buffer + (frame->width*frame->height), frame->width,frame->height/2,frame->width,frame->width,val,1,512*1024);
+     ctmf( Cr,buffer + (frame->width*frame->height*2), frame->width,frame->height/2,frame->width,frame->width,val,1,512*1024);
 
-     veejay_memcpy( Y, buffer, width*height);
-     veejay_memcpy( Cb,buffer + (width*height), width*height);
-     veejay_memcpy( Cr,buffer + (width*height*2), width*height);
+     veejay_memcpy( Y, buffer, frame->width*frame->height);
+     veejay_memcpy( Cb,buffer + (frame->width*frame->height), frame->width*frame->height);
+     veejay_memcpy( Cr,buffer + (frame->width*frame->height*2), frame->width*frame->height);
      
      free(buffer);
 

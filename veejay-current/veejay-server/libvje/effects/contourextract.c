@@ -199,7 +199,7 @@ int contourextract_prepare(uint8_t *map[4], int width, int height)
 	tmp.data[0] = static_bg;
 	tmp.width = width;
 	tmp.height = height;
-	softblur_apply( &tmp, width,height,0);
+	softblur_apply( &tmp, 0);
 
 	veejay_msg(2, "Contour extraction: Snapped background frame");
 	return 1;
@@ -207,11 +207,12 @@ int contourextract_prepare(uint8_t *map[4], int width, int height)
 
 static int bg_frame_ = 0;
 
-void contourextract_apply(void *ed, VJFrame *frame,int width, int height, 
-		int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight)
+void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
+                          int mode, int take_bg, int feather, int min_blob_weight)
 {
-    
 	unsigned int i,j,k;
+	const int width = frame->width;
+	const int height = frame->height;
 	const uint32_t len = frame->len;
 	const uint32_t uv_len = frame->uv_len;
  	uint8_t *Y = frame->data[0];

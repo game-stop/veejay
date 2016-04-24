@@ -51,10 +51,9 @@ vj_effect *rawman_init(int w,int h)
     return ve;
 }
 
-void rawman_apply(VJFrame *frame, unsigned int width,
-		  unsigned int height, unsigned int mode, unsigned int YY)
+void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int YY)
 {
-    unsigned int len = width * height;
+    unsigned int len = frame->width * frame->height;
     unsigned int i;
     uint8_t *Y = frame->data[0];
 

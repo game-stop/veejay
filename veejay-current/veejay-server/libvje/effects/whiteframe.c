@@ -39,8 +39,7 @@ vj_effect *whiteframe_init(int w,int h)
 }
 
 /* this method was created for magic motion */
-void whiteframe_apply( VJFrame *frame, VJFrame *frame2, int width,
-		      int height)
+void whiteframe_apply( VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
     const int len = frame->len;

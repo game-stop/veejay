@@ -26,30 +26,29 @@
 
 vj_effect *frameborder_init(int width, int height)
 {
-
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = width/8;
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = height / 2;
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 1;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	ve->defaults[0] = width/8;
+	ve->limits[0][0] = 1;
+	ve->limits[1][0] = height / 2;
 	ve->has_user = 0;
-    ve->description = "Frame Border Translation";
-    ve->sub_format = 1;
-    ve->extra_frame = 1;
+	ve->description = "Frame Border Translation";
+	ve->sub_format = 1;
+	ve->extra_frame = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Size");
-    return ve;
+	return ve;
 }
 
 
-void frameborder_apply(VJFrame *frame, VJFrame *frame2, int width,
-		       int height, int size)
+void frameborder_apply(VJFrame *frame, VJFrame *frame2, int size)
 {
-    frameborder_yuvdata(frame->data[0], frame->data[1], frame->data[2], frame2->data[0], frame2->data[1],
-			frame2->data[2], width, height, (size), (size), (size),
-			(size),frame->shift_h,frame->shift_v);
+	frameborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
+	                    frame2->data[0], frame2->data[1], frame2->data[2],
+	                    frame->width, frame->height, (size), (size), (size),
+	                    (size),frame->shift_h,frame->shift_v);
 
 }
 void frameborder_free(){}

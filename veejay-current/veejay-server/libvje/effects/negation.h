@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *negation_init(int w, int h);
-void negation_apply( VJFrame *frame, int width, int height, int val);
+void negation_apply( VJFrame *frame, int val);
 #endif

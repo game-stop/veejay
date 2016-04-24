@@ -186,26 +186,26 @@ static void mirror_multi_ur(uint8_t * yuv[3], int width, int height)
     }
 }
 
-void mirrors2_apply( VJFrame *frame, int width, int height, int type)
+void mirrors2_apply( VJFrame *frame, int type)
 {
     switch (type) {
     case 0:
-	mirror_multi_dr(frame->data, width, height);
+	mirror_multi_dr(frame->data, frame->width, frame->height);
 	break;
     case 1:
-	mirror_multi_ur(frame->data, width, height);
+	mirror_multi_ur(frame->data, frame->width, frame->height);
 	break;
     case 2:
-	mirror_multi_u(frame->data, width, height);
+	mirror_multi_u(frame->data, frame->width, frame->height);
 	break;
     case 3:
-	mirror_multi_d(frame->data, width, height);
+	mirror_multi_d(frame->data, frame->width, frame->height);
 	break;
     case 4:
-	mirror_multi_l(frame->data, width, height);
+	mirror_multi_l(frame->data, frame->width, frame->height);
 	break;
     case 5:
-	mirror_multi_r(frame->data, width, height);
+	mirror_multi_r(frame->data, frame->width, frame->height);
 	break;
     }
 }

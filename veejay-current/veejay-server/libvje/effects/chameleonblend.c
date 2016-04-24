@@ -82,7 +82,7 @@ int	chameleonblend_prepare( uint8_t *map[4], int width, int height )
 	tmp.height = height;
 
 	//@ 3x3 blur
-	softblur_apply( &tmp, width,height,0);
+	softblur_apply( &tmp ,0);
 
 	veejay_msg(2, "Chameleon BlendTV: Snapped background mask");
 	return 1;

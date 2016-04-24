@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *frameborder_init(int width, int height);
-void frameborder_apply( VJFrame *frame, VJFrame *frame2, int width,
-		       int height, int size);
+void frameborder_apply( VJFrame *frame, VJFrame *frame2, int size);
 void frameborder_free();
 #endif

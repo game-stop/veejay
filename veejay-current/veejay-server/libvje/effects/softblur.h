@@ -25,6 +25,6 @@
 #include <stdint.h>
 
 vj_effect *softblur_init(int w, int h);
-void softblur_apply(VJFrame *frame, int width, int height, int n);
+void softblur_apply(VJFrame *frame, int n);
 void softblur_free();
 #endif

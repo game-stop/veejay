@@ -25,5 +25,5 @@
 #include <stdint.h>
 
 vj_effect *colormap_init(int w, int h);
-void colormap_apply( VJFrame *frame, int width, int height, int vala , int valb, int valc);
+void colormap_apply( VJFrame *frame, int vala , int valb, int valc);
 #endif

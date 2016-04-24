@@ -147,7 +147,7 @@ void scratcher_apply(VJFrame *src,
 	srcB.data[0] = frame[0] + offset;
 	srcB.data[1] = frame[1] + uv_offset;
 	srcB.data[2] = frame[2] + uv_offset;
-	opacity_applyN( src, &srcB, src->width,src->height, opacity );
+	opacity_applyN( src, &srcB, opacity );
 	copy.uv_len = src->uv_len;
 	copy.data[0] = frame[0];
 	copy.data[1] = frame[1];

@@ -43,10 +43,10 @@ vj_effect *widthmirror_init(int max_width,int h)
     return ve;
 }
 
-void widthmirror_apply(VJFrame *frame, int width, int height,
-		       int width_div)
+void widthmirror_apply(VJFrame *frame, int width_div)
 {
     unsigned int r, c;
+    const int width = frame->width;
     const int len = frame->len;
     const int uv_len = frame->uv_len;
     const int uv_width = frame->uv_width;
@@ -56,7 +56,7 @@ void widthmirror_apply(VJFrame *frame, int width, int height,
     uint8_t *Y = frame->data[0];
     uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-    if (width_div >= width || width_div < 2)
+    if (width_div >= frame->width || width_div < 2)
 	width_div = 2;
 
     for (r = width; r < len; r += width) {
@@ -89,10 +89,6 @@ void widthmirror_apply(VJFrame *frame, int width, int height,
 	
 	}
     }
-
-
-
-
-
 }
+
 void widthmirror_free(){}

@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *fadecolor_init();
-void colorfade_apply( VJFrame *frame, int width, int height, int opacity,
-		     int n);
+void colorfade_apply( VJFrame *frame, int opacity, int n);
 
 #endif

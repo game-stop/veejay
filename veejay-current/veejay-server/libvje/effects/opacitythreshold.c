@@ -49,12 +49,11 @@ vj_effect *opacitythreshold_init(int w, int h)
 
 
 
-void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2,
-			    int width, int height, int opacity,
-			    int threshold, int t2)
+void opacitythreshold_apply( VJFrame *frame, VJFrame *frame2, int opacity,
+                            int threshold, int t2)
 {
-
-    unsigned int x, y, len = width * height-width;
+    const int width = frame->width;
+    unsigned int x, y, len = frame->len-width;
     uint8_t a1, a2;
     unsigned int op0, op1;
   	uint8_t *Y = frame->data[0];

@@ -313,103 +313,60 @@ extern void flip_apply(VJFrame *frame, int n);
 extern void killchroma_apply(VJFrame *frame, int n);
 extern void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int op_a, int op_b );
 extern void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int n, int m);
-extern void mirrors_apply( VJFrame *frame, int width, int height,int type, int factor);
-extern void mirrors2_apply( VJFrame *frame, int width, int height,int type);
-extern void negation_apply( VJFrame *frame, int width, int height,int val);
-extern void medianfilter_apply( VJFrame *frame, int width, int height,int val);
-extern void negatechannel_apply( VJFrame *frame, int width, int height,int chan, int val);
-
-extern void colormap_apply( VJFrame *frame, int width, int height,
-			   int r, int g, int b);
-extern void opacity_apply(VJFrame *frame, VJFrame *frame2, int width,
-			  int height, int opacity);
-extern void opacityadv_apply(VJFrame *frame, VJFrame *frame2, int w,
-			     int h, int o, int t1, int t2);
-extern void opacitythreshold_apply(VJFrame *frame, VJFrame *frame2,
-				   int w, int h, int o, int t1, int t2);
-
-
-extern void posterize_apply( VJFrame *frame, int width, int height,
-			    int factor, int t1, int t2);
-extern void revtv_apply( VJFrame *frame, int width, int height, int space,
-			int vscale, int c, int cn);
-extern void softblur_apply( VJFrame *frame, int width, int height, int n);
-extern void split_apply( VJFrame *frame, VJFrame *frame2, int width,
-			int height, int n, int swap);
-extern void widthmirror_apply( VJFrame *frame, int width, int height,
-			      int div);
-extern void transblend_apply(VJFrame *frame, VJFrame *frame2, int w,
-			     int h, int mode, int twidth, int theight,
-			     int x1, int y1, int x2, int y2);
-
-extern void borders_apply(VJFrame *frame, int width, int height,
-			  int size, int color);
-extern void frameborder_apply(VJFrame *frame, VJFrame *frame2,
-			      int width, int height, int size);
-extern void noisepencil_apply(VJFrame *frame, int width, int height,
-	int a, int b, int c , int d );
-
-extern void rawman_apply(VJFrame *frame, unsigned int width,
-			 unsigned int height, unsigned int mode,
-			 unsigned int Y);
-extern void rawval_apply(VJFrame *frame, int width, int height,
-			 int color_cb, int color_cr, int new_cb,
-			 int new_cr);
-extern void smuck_apply( VJFrame *frame, VJFrame *frame2, int width,
-			int height, int level);
-extern void colorfade_apply( VJFrame *frame, int width, int height,
-			    int op, int color);
-extern void slidingdoor_apply( VJFrame *frame, VJFrame *frame2,
-			      int width, int height, int size);
+extern void mirrors_apply( VJFrame *frame, int type, int factor);
+extern void mirrors2_apply( VJFrame *frame, int type);
+extern void negation_apply( VJFrame *frame, int val);
+extern void medianfilter_apply( VJFrame *frame, int val);
+extern void negatechannel_apply( VJFrame *frame, int chan, int val);
+extern void colormap_apply( VJFrame *frame, int r, int g, int b);
+extern void opacity_apply(VJFrame *frame, VJFrame *frame2, int opacity);
+extern void opacityadv_apply(VJFrame *frame, VJFrame *frame2, int o, int t1, int t2);
+extern void opacitythreshold_apply(VJFrame *frame, VJFrame *frame2, int o, int t1, int t2);
+extern void posterize_apply( VJFrame *frame, int factor, int t1, int t2);
+extern void revtv_apply( VJFrame *frame, int space, int vscale, int c, int cn);
+extern void softblur_apply( VJFrame *frame, int n);
+extern void split_apply( VJFrame *frame, VJFrame *frame2, int n, int swap);
+extern void widthmirror_apply( VJFrame *frame, int div);
+extern void transblend_apply(VJFrame *frame, VJFrame *frame2, int mode,
+                             int twidth, int theight,
+                             int x1, int y1, int x2, int y2);
+extern void borders_apply(VJFrame *frame, int size, int color);
+extern void frameborder_apply(VJFrame *frame, VJFrame *frame2, int size);
+extern void noisepencil_apply(VJFrame *frame, int a, int b, int c , int d );
+extern void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int Y);
+extern void rawval_apply(VJFrame *frame, int color_cb, int color_cr,
+                         int new_cb, int new_cr);
+extern void smuck_apply( VJFrame *frame, VJFrame *frame2, int level);
+extern void colorfade_apply( VJFrame *frame, int op, int color);
+extern void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int size);
 extern void transop_apply(VJFrame *frame, VJFrame *frame2, int twidth,
-			  int theight, int x1, int y1, int x2, int y2,
-			  int width, int height, int opacity);
-
-extern void lumakey_apply(VJFrame *frame, VJFrame *frame2, int width,
-			  int height, int a, int b, int c, int d, int e);
-extern void pointfade_apply(VJFrame *frame, VJFrame *frame2,
-			    int width, int height, int pointsize,
-			    int opacity);
-extern void slicer_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int a, int b, int mode );
-
+                          int theight, int x1, int y1, int x2, int y2, int opacity);
+extern void lumakey_apply(VJFrame *frame, VJFrame *frame2,
+                          int a, int b, int c, int d, int e);
+//extern void pointfade_apply(VJFrame *frame, VJFrame *frame2,
+//                            int pointsize, int opacity);
+extern void slicer_apply( VJFrame *frame, VJFrame *frame2, int a, int b, int mode );
 extern void transcarot_apply(VJFrame *frame, VJFrame *frame2,
-			     int width, int height, int point_size, int dy,
-			     int dye, int row_start, int opacity,
-			     int type);
-
-extern
-void transline_apply(VJFrame *frame, VJFrame *frame2, int width,
-		     int height, int distance, int line_width, int opacity,
-		     int type);
-extern void transform_apply(VJFrame *frame, VJFrame *frame2,
-			    int width, int height, int size);
-
-extern void coloradjust_apply( VJFrame *frame, int width, int height,
-			      int val, int degrees);
-
-extern void rgbkey_apply( VJFrame *frame, VJFrame *frame2, int width,
-			 int height, int i_angle, int i_noise,
-			 int r, int g, int b, int min, int max, int op);
-
-extern void gamma_apply( VJFrame *frame,
-			int width, int height, int val);
-
-extern void solarize_apply(VJFrame *frame, int width, int height,
-			   int threshold);
-extern void dummy_apply(VJFrame *frame, int width, int height,
-			int color_num);
-extern void rotozoom_apply(VJFrame *frame, int width, int height, int a,
-			   int b, int c, int d);
-
-extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2,
-			     int width, int height);
-
-extern void texmap_apply(void *dd, VJFrame *frame,
-		       VJFrame *frame2, int width, int height, 
-		       int mode, int threshold, int c , int feather, int blob);
-
-extern void contourextract_apply(void *ed, VJFrame *frame,int width, int height, 
-		int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight);
+                             int point_size, int dy, int dye, int row_start,
+                             int opacity, int type);
+extern void transline_apply(VJFrame *frame, VJFrame *frame2, int distance,
+                            int line_width, int opacity, int type);
+extern void transform_apply(VJFrame *frame, VJFrame *frame2, int size);
+extern void coloradjust_apply( VJFrame *frame, int val, int degrees);
+extern void rgbkey_apply( VJFrame *frame, VJFrame *frame2, int i_angle,
+                         int i_noise, int r, int g, int b,
+                         int min, int max, int op);
+extern void gamma_apply( VJFrame *frame, int val);
+extern void solarize_apply(VJFrame *frame, int threshold);
+extern void dummy_apply(VJFrame *frame, int color_num);
+extern void rotozoom_apply(VJFrame *frame, int a, int b, int c, int d);
+extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2);
+//extern void texmap_apply(void *dd, VJFrame *frame,
+//		       VJFrame *frame2, int width, int height,
+//		       int mode, int threshold, int c , int feather, int blob);
+extern void contourextract_apply(void *ed, VJFrame *frame, int threshold,
+                                 int reverse,int mode, int take_bg, int feather,
+                                 int min_blob_weight);
 
 extern void diff_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 

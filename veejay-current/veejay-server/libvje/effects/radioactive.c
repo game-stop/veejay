@@ -258,7 +258,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 	if( !first_frame )
 	{	//@ take current
 		veejay_memcpy( prev, lum, len );
-		softblur_apply( &smooth, width,height,0);
+		softblur_apply( &smooth, 0);
 		first_frame++;
 		return;
 	}
@@ -352,7 +352,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 		p += buf_width;
 	}
 	//@ prepare frame for next difference take
-	softblur_apply( &smooth, width,height,0);
+	softblur_apply( &smooth, 0);
 
 	blurzoomcore();
 	p = blurzoombuf;
