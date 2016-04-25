@@ -2747,6 +2747,7 @@ void	on_kf_none_toggled( GtkWidget widget, gpointer user_data)
 	info->uc.selected_parameter_id = -1;
 	
 	disable_widget( "fxanimcontrols" );
+	disable_widget( "curve" );
 
 	if(info->status_lock)
 		return;

@@ -31,6 +31,7 @@ void	get_points_from_curve( GtkWidget *curve, int len, float *vec )
 
 void	reset_curve( GtkWidget *curve )
 {
+	gtk_widget_set_sensitive( GTK_WIDGET(curve), TRUE );
 	gtk_curve_reset(GTK_CURVE(curve));
 	gtk_curve_set_range( GTK_CURVE(curve), 0.0, 1.0, 0.0, 1.0 );
 }

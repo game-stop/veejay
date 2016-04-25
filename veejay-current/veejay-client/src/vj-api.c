@@ -2429,7 +2429,6 @@ static void vj_kf_select_parameter(int num)
 	gchar *name = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],info->uc.selected_parameter_id));
 	update_label_str( "curve_parameter", name );
 	g_free(name);
-	set_toggle_button( "curve_toggleentry", entry_tokens[ENTRY_KF_STATUS]);
 
 	reset_curve( glade_xml_get_widget_(info->main_window, "curve"));
 

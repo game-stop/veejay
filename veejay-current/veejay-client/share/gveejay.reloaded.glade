@@ -4167,7 +4167,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
-                                    <property name="tooltip" translatable="yes">Toggle keyframing for this chain entry</property>
+                                    <property name="tooltip" translatable="yes">Toggle keyframe animation for this parameter</property>
                                     <signal name="toggled" handler="on_curve_toggleentry_param_toggled" />
                                     <child>
                                       <widget class="GtkImage" id="image2146">
