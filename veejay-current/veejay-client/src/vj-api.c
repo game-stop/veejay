@@ -2408,7 +2408,6 @@ static void vj_kf_refresh()
 		enable_widget( "frame_fxtree3" );
 	}
 	else {
-		set_toggle_button( "curve_toggleentry", 0 );
 		set_toggle_button( "curve_toggleentry_param", 0 );
 		disable_widget( "frame_fxtree3" );
 		vj_kf_reset();
