@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay-utils],[1.1.7],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay-utils],[1.1.8],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/sayVIMS.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=1
-VEEJAY_MICRO_VERSION=7
+VEEJAY_MICRO_VERSION=8
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Utilities - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -173,9 +173,7 @@ if test x"$PKG_CONFIG_PATH" = x ; then
 	PKG_CONFIG_PATH=/usr/lib/pkgconfig
 fi
 
-
 AC_SUBST(LIBM_LIBS)
-
 
 have_dl_dlopen=false
 AC_CHECK_LIB(dl,dlopen)
@@ -183,7 +181,6 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
  AC_DEFINE(HAVE_DL_DLOPEN,,[Compile with dlopen support])
  have_dl_dlopen=true
 fi
-
 
 PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.50],
 		[	
@@ -227,33 +224,12 @@ else
  AC_MSG_RESULT([no])
 fi
 
-dnl ********************************************************************
-dnl Test for MMX support if an IA32 platform.  If on a PPC then look for
-dnl Altivec support.  For the IA32 platform see if gcc understands inline 
-dnl MMX instructions.
-dnl
-dnl TODO: host = non intel, target = intel <blah> do the checks also?
-dnl       Remember we are checking that the toolchain can generate the
-dnl       code, not whether the host can execute the code, thats done
-dnl       at run time with the exception of the SSE code.
-
-
-have_asm_nasm=false
-have_asm_mmx=false
-have_asm_sse=false
-have_asm_sse2=false
-have_asm_mmx2=false
-have_asm_3dnow=false
-have_cmov=false
 have_x86cpu=false
 have_x86_64cpu=false
-have_altivec=false
 have_mips=false
 have_ppccpu=false
 have_ps2=false
-
-OP_CFLAGS=""
-YUVCFLAGS="-fif-conversion"
+have_arm=false
 
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
@@ -263,30 +239,18 @@ case $host_cpu in
 	have_x86cpu=true
 
 	PROGRAM_NOPIC="-fno-PIC"
+	CFLAGS="$CFLAGS -O3"
 
-	if test "x$enable_debug" != "xyes" ; then
-		OP_CFLAGS="-O3"
- 	fi
-
-	AC_SUBST(OP_CFLAGS)
-	AC_SUBST(YUVCFLAGS)
-
-   	dnl If the host is pentium, align on double word boundary
-    	case $host_cpu in
-		i686)
-			CFLAGS="$CFLAGS"
-		;;
-	*)
-		;;
-	esac 
-	
+	AC_MSG_RESULT([x86])
     ;;
   x86_64*|k8-*)
     	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
+		CFLAGS="$CFLAGS -m64 -fPIC -DPIC -O3"
+
+	AC_MSG_RESULT([x86_64])
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
@@ -303,12 +267,13 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
    		PROGRAM_NOPIC=""
       		;;
     	esac
+
+	AC_MSG_RESULT([powerpc])
     ;;
    mips | mipsel)
-	AC_DEFINE(ARCH_MIPS,,[Compiling for MIPS CPU])
-	AC_DEFINE(HAVE_MIPS,,[Compiling for MIPS CPU])
+	AC_DEFINE(ARCH_MIPS,1,[Compiling for MIPS CPU])
+	AC_DEFINE(HAVE_MIPS,1,[Compiling for MIPS CPU])
 	have_mips=true
-	AC_MSG_CHECKING([if we are compiling on playstation2 hardware])
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
 		[[#include <linux/ps2/dev.h>
 		  #include <linux/ps2/gs.h>
@@ -316,6 +281,9 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 		[have_ps2=true],
 		[have_ps2=false])
 
+	AC_MSG_RESULT([mips])
+
+	AC_MSG_CHECKING([if we are compiling on playstation2 hardware])
 	if test x$have_ps2 = xtrue ; then
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_PS2,1,[Compile for playstation2])
@@ -324,200 +292,53 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	fi
 
 	;;
+   arm|armv7l)
+	AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	have_arm=true
+	AC_MSG_RESULT(arm)
+	CFLAGS="$CFLAGS -O3"
+	;;
+
   *)
-    AC_MSG_RESULT([unknown])
+
+	CFLAGS="$CFLAGS"
+
     ;;
 esac
 
-dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
-dnl for shared libraries but is slower than non-pic code.  Compute bound 
-dnl programs such as yuvdenoise and y4mspatialfilter can use this flag by
-dnl simply adding programname_CFLAGS=@PROGRAM_NOPIC@ to the Makefile.am
-
 AC_SUBST(PROGRAM_NOPIC)
 
-if test x$have_x86cpu = xtrue
-then
-	AC_CACHE_CHECK(for MMX on processor(s), ac_cv_flag_mmx, [
-		if grep "^flags.* mmx" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_mmx=yes
-		else
-			ac_cv_flag_mmx=no
-		fi
-	])
-
-	if test $ac_cv_flag_mmx = yes; then
-       		AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
-		AC_DEFINE(HAVE_MMX,1,[Compiling in MMX support])
-       		have_asm_mmx=true
-	fi
-
-	AC_CACHE_CHECK(for SSE on processor(s), ac_cv_flag_sse, [
-		if grep "^flags.* sse" /proc/cpuinfo > /dev/null; then
- 			ac_cv_flag_sse=yes
-		else
-			ac_cv_flag_sse=no
-		fi
-	])
-
-	if test $ac_cv_flag_sse = yes; then
-		AC_DEFINE(HAVE_ASM_SSE,1,[Compiling in SSE support])
-		AC_DEFINE(HAVE_SSE,1,[Compiling in SSE support])
-		have_asm_sse=true
-	fi
-
-
-	dnl check for sse2
-	AC_CACHE_CHECK(for SSE2 on processor(s), ac_cv_flag_sse2, [
-		if grep "^flags.* sse2" /proc/cpuinfo > /dev/null; then
- 			ac_cv_flag_sse2=yes
-		else
-			ac_cv_flag_sse2=no
-		fi
-	])
-
-	if test $ac_cv_flag_sse2 = yes; then
-		AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in SSE2 support])
-		AC_DEFINE(HAVE_SSE2,1,[Compiling in SSE2 support])
-		have_asm_sse2=true
-	fi
-
-	AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
-		if grep "^flags.* 3dnow" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_3dnow=yes
-		else
-			ac_cv_flag_3dnow=no
-		fi
-	])
-
-	if test $ac_cv_flag_3dnow = yes; then
-		AC_DEFINE(HAVE_ASM_3DNOW,1,[Compiling in 3Dnow])
-		have_asm_3dnow=true
-	fi
-
-	AC_CACHE_CHECK(for CMOV on processor(s), ac_cv_flag_cmov, [
-		if grep "^flags.* cmov" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_cmov=yes
-		else
-			ac_cv_flag_cmov=yes
-		fi
-	])
-
-	if test $ac_cv_flag_cmov = yes; then
-		AC_DEFINE(HAVE_CMOV,1,[Compiling in CMOV])
-		have_cmov=true
-	fi
-
-
-	dnl check for MMX2
-	AC_CACHE_CHECK(for MMX2 on processor(s), ac_cv_flag_mmx2, [
-		if grep "^flags.* mmxext" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_mmx2=yes
-		else
-			ac_cv_flag_mmx2=yes
-		fi
-	])
-
-	if test $ac_cv_flag_mmx2 = yes; then
-		AC_DEFINE(HAVE_ASM_MMX2,,[Compiling in MMX2])
-		AC_DEFINE(HAVE_MMX2,,[Compiling in MMX2])
-		AC_DEFINE(HAVE_ASM_MMXEXT,,[Compiling in MMXEXT])
-		have_asm_mmx2=true
-	fi
-
-fi
-
-if test x$have_ppccpu = xtrue
-then
-    AC_MSG_CHECKING([compiler support for AltiVec])
-    cat > conftest.c <<EOF
-#ifdef HAVE_ALTIVEC_H
-#include <altivec.h>
-#endif
-int main() {
-    union { vector signed int v;
-            signed int i;
-          } vi;
-    vi.v = vec_splat_s32(1);
-    return vi.i;
-}
-EOF
-    ALTIVEC_CFLAGS=""
-    if $CC -o conftest conftest.c >/dev/null 2>&1; then
-      have_altivec=true
-    elif $CC $CFLAGS -faltivec -o conftest conftest.c >/dev/null 2>&1; then
-      # Mac OS X style
-      have_altivec=true
-      ALTIVEC_CFLAGS="-faltivec"
-    elif $CC $CFLAGS -fvec -o conftest conftest.c >/dev/null 2>&1; then
-      # Motorola style
-      have_altivec=true
-      ALTIVEC_CFLAGS="-fvec"
-    elif $CC $CFLAGS -DHAVE_ALTIVEC_H=1 -maltivec -mabi=altivec -o conftest conftest.c >/dev/null 2>&1; then
-      # gcc 3.1 style
-      have_altivec=true
-      ALTIVEC_CFLAGS="-DHAVE_ALTIVEC_H=1 -maltivec -mabi=altivec"
-    fi
-    rm -f conftest*;
-  
-    if test x$have_altivec = xtrue
-    then
-      # add -O3 flag
-      ALTIVEC_CFLAGS="-O3 ${ALTIVEC_CFLAGS}"
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_ALTIVEC,1,
-				[Inline PPC Altivec primitives available])
-      AC_SUBST(ALTIVEC_CFLAGS)
-    else
-      AC_MSG_RESULT(no)
-    fi
-
-
-fi
-
-if test ! -r $srcdir/cpuinfo.sh; then
-       AC_MSG_ERROR([cpuinfo.sh script not found - do a cvs update])
-fi
-
-
-if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
-	if test x$host_alias != x; then
-		dnl Cross compiling
-		AC_MSG_CHECKING(sub-architecture settings)
-		if test x$have_x86cpu = xtrue; then
-			host_mod_cpu=`echo $host_cpu|tr _ -`
-			ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
-			AC_MSG_RESULT($ARCHFLAGS)
-		fi
-	else
-		AC_MSG_CHECKING(sub-architecture settings)
-		chmod +x $srcdir/cpuinfo.sh
-  		ARCHFLAGS=`$srcdir/cpuinfo.sh $user_specified_target`
+if test x$host_alias != x; then
+	dnl Cross compiling
+	AC_MSG_CHECKING(sub-architecture settings)
+	if test x$have_x86cpu = xtrue; then
+		host_mod_cpu=`echo $host_cpu|tr _ -`
+		ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
 		AC_MSG_RESULT($ARCHFLAGS)
-  	fi
+	fi
+else
+	AC_MSG_CHECKING(sub-architecture settings)
+	
+	chmod +x $srcdir/cpuinfo.sh
+
+	if test "$arch_target" = "auto"; then
+		TMP=`$srcdir/cpuinfo.sh`
+		ARCHFLAGS=`cat veejay.arch`
+	else
+       		ARCHFLAGS="-mtune=generic"
+	fi
+		AC_MSG_RESULT($ARCHFLAGS)
 fi
-
-
-AC_MSG_RESULT($CFLAGS)
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
+
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
-AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
-AM_CONDITIONAL(HAVE_X86CPU, test x$have_x86cpu = xtrue)
-AM_CONDITIONAL(HAVE_PPCCPU, test x$have_ppccpu = xtrue)
 AM_CONDITIONAL(ARCH_PPC, test x$have_ppccpu = xtrue)
 AM_CONDITIONAL(ARCH_X86, test x$have_x86cpu = xtrue)
-AM_CONDITIONAL(HAVE_ALTIVEC, test x$have_altivec = xtrue)
-AM_CONDITIONAL(HAVE_ASM_MMX2, test x$have_asm_mmx2 = xtrue)
-AM_CONDITIONAL(HAVE_ASM_SSE, test x$have_asm_sse = xtrue)
-AM_CONDITIONAL(HAVE_ASM_SSE2, test x$have_asm_sse2 = xtrue)
-AM_CONDITIONAL(HAVE_ASM_NASM, test x$have_asm_nasm = xtrue)
-AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
-AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
-AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
+AM_CONDITIONAL(ARCH_X86_64, test x$have_x86_64cpu = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 
 CFLAGS="$ARCHFLAGS $CFLAGS"
@@ -538,8 +359,8 @@ if test "x$enable_compile_warnings" != "xno" ; then
      *) warnCFLAGS="-Wall -Wunused " ;;
     esac
   if test "x$enable_compile_warnings" = "xyes" ; then
-    warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wundef -Wshadow -Wbad-function-cast -Wconversion -Wpadded -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
-    warnCXXFLAGS="$warnCXXFLAGS -Wmissing-prototypes  -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
+	warnCFLAGS="$warnCFLAGS -Wundef -Wshadow -Wbad-function-cast -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wall"
+    warnCXXFLAGS="$warnCXXFLAGS -Wpointer-arith -Wcast-align -Wwrite-strings "
   fi
   if test "x$enable_warnings_as_errors" = "xyes" ; then
     warnCFLAGS="$warnCFLAGS -Werror"
@@ -578,40 +399,9 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Veejay-Utilities ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
-AC_MSG_NOTICE([                 $YUVCFLAGS])
-AC_MSG_NOTICE([			$OP_CFLAGS])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])
-if test "$have_x86cpu" = "true" ; then
-AC_MSG_NOTICE([   x86  ])
-AC_MSG_NOTICE([    MMX     enabled     : ${ac_cv_flag_mmx}])
-AC_MSG_NOTICE([    MMX2    enabled     : ${ac_cv_flag_mmx2}])
-AC_MSG_NOTICE([    SSE     enabled     : ${ac_cv_flag_sse}])
-AC_MSG_NOTICE([    SSE2    enabled     : ${ac_cv_flag_sse2}])
-AC_MSG_NOTICE([    3DNOW   enabled     : ${ac_cv_flag_3dnow}])
-AC_MSG_NOTICE([    CMOV    enabled     : ${ac_cv_flag_cmov}])
-fi
-
-if test "$have_ppccpu" = "true" ; then
-AC_MSG_NOTICE([   ppc])
-AC_MSG_NOTICE([    AltiVec enabled     : ${have_altivec}])
-fi
-
-if test "$have_mips" = "true" ; then
-AC_MSG_NOTICE([   mips])
-AC_MSG_NOTICE([    PS/2 enabled        : ${have_ps2}])
-fi
-AC_MSG_NOTICE([])
-if test "$have_linux" = "true" ; then
-AC_MSG_NOTICE([   Platform: Linux])
-fi
-
-if test "$have_darwin" = "true" ; then
-AC_MSG_NOTICE([   Platform: Darwin])
-AC_MSG_NOTICE([      Good luck! You can be the first! ])
-fi
-
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - Veejay                        : ${have_veejay}])

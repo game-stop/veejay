@@ -1,9 +1,7 @@
 #!/bin/sh
 
-# simple script that tests if march=native works
-# override auto detection with <cpu_type> as argument 1
-# generic | native | core2 | etc
-# see gcc list of cpu types for march option
+# simple script that detects march setting for this computer
+# only for gcc
 
 if test x"$CC" = x; then
 	CC=gcc
@@ -49,22 +47,26 @@ cat > conftest.c << EOF
 int main(void) { return 0; }
 EOF
 
-arch=native
-do_cc -march=native
+arch=`$CC -march=native -Q --help=target|grep -- '-march='|cut -f3|head -n1`
+do_cc -march=$arch
 if test $? -ne 0; then
-	if do_cc -march=generic; then
-		arch=generic
-	else
-		arch=
-	fi
-else
-	arch=native
-fi
-	  
-do_cc -march=$target
-if test $? -eq 0; then
-	arch=$target
+	# gcc failed, lets try -dumpmachine and test specifically for arm
+	# since we know that 'gcc -march=native -Q --help=target` fails on gcc 4.6.3
+	machine=`$CC -dumpmachine`
+	cpu=`echo $machine |cut -d '-' -f1`
+	case $cpu in
+		arm)
+			arch=`cat /proc/cpuinfo|grep 'model name'|head -n1|cut -d ':' -f2 |cut -d ' ' -f2 | tr '[:upper:]' '[:lower:]'`	
+		;;
+	esac
+
 fi
 
-echo "-march=$arch"
+if [ -z "$arch" ]; then
+	echo "Falling back to default -march=native" 
+	arch="native"
+fi
+
+rm -rf veejay.arch
+echo "-march=$arch" > veejay.arch
 
