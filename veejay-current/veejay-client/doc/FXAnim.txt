@@ -1,0 +1,29 @@
+.....................................................................................................
+..█████▒▒██...██▒.......▄▄▄.......███▄....█..██▓.███▄.▄███▓.▄▄▄.....▄▄▄█████▓.██▓.▒█████...███▄....█.
+▓██...▒.▒▒.█.█.▒░......▒████▄.....██.▀█...█.▓██▒▓██▒▀█▀.██▒▒████▄...▓..██▒.▓▒▓██▒▒██▒..██▒.██.▀█...█.
+▒████.░.░░..█...░......▒██..▀█▄..▓██..▀█.██▒▒██▒▓██....▓██░▒██..▀█▄.▒.▓██░.▒░▒██▒▒██░..██▒▓██..▀█.██▒
+░▓█▒..░..░.█.█.▒.......░██▄▄▄▄██.▓██▒..▐▌██▒░██░▒██....▒██.░██▄▄▄▄██░.▓██▓.░.░██░▒██...██░▓██▒..▐▌██▒
+░▒█░....▒██▒.▒██▒.......▓█...▓██▒▒██░...▓██░░██░▒██▒...░██▒.▓█...▓██▒.▒██▒.░.░██░░.████▓▒░▒██░...▓██░
+.▒.░....▒▒.░.░▓.░.......▒▒...▓▒█░░.▒░...▒.▒.░▓..░.▒░...░..░.▒▒...▓▒█░.▒.░░...░▓..░.▒░▒░▒░.░.▒░...▒.▒.
+.░......░░...░▒.░........▒...▒▒.░░.░░...░.▒░.▒.░░..░......░..▒...▒▒.░...░.....▒.░..░.▒.▒░.░.░░...░.▒░
+.░.░.....░....░..........░...▒......░...░.░..▒.░░......░.....░...▒....░.......▒.░░.░.░.▒.....░...░.░.
+.........░....░..............░..░.........░..░.........░.........░..░.........░......░.░...........░.
+.....................................................................................................
+
+== Effects Animation
+Because of a new veejay functionality, the fx parameters anim "workflow" (using reloaded) have changed:
+.  From _Fx List_ panel, Add an fx you like.
+. From _Fx Chain_ panel, toggle _keyframing for this fx chain entry_
+. From _Fx Anim_ panel, choose a parameter and toogle _keyframe animation for this param_
+. From _Fx Anim_ panel, draw the curve and hit [OK] _apply this keyframe_
+
+.Taddam the fx' param is animated !
+
+=== Now, what else you can do ?
+.Play with the automation
+* toggle the full fx automation hitting _keyframing for this fx chain entry_ button (VIMS 145 / keybinding TBD)
+* toggle by parameters hitting accordingly the _keyframe animation for this param_ button (VIMS 142 / keybinding TBD)
+
+.Clear the automation
+* full automation, using the _reset_ button, from the _Fx Anim_ panel (VIMS ? / keybinding TBD),
+* by parameters the _clear selected param_, from the _Fx Anim_ panel (VIMS ? / keybinding TBD).
