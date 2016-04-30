@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,8 +29,10 @@
 #include "opacity.h" 
 
 static uint8_t *frame[4] = { NULL,NULL,NULL,NULL };
-static  int nframe = 0;
+static int nframe = 0;
 static int nreverse = 0;
+static int last_reverse = 1;
+static int last_n = 8;
 
 vj_effect *scratcher_init(int w, int h)
 {
@@ -49,8 +51,8 @@ vj_effect *scratcher_init(int w, int h)
     ve->defaults[1] = 8;
     ve->defaults[2] = 1;
     ve->description = "Overlay Scratcher";
-    ve->sub_format = 0;
-    ve->extra_frame = 1;
+    ve->sub_format = -1;
+    ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Scratch buffer", "PingPong");
     return ve;
@@ -68,46 +70,47 @@ void scratcher_free() {
 int scratcher_malloc(int w, int h)
 {
 	/* need memory for bounce mode ... */
-    frame[0] =
-	(uint8_t *) vj_malloc(w * h * 2 * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
-	if(!frame[0]) return 0;
+    frame[0] = (uint8_t *) vj_malloc(w * h * 3 * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
+	if(!frame[0]) 
+		return 0;
 	
     veejay_memset( frame[0], pixel_Y_lo_, w * h * MAX_SCRATCH_FRAMES );
 
     frame[1] =
 	    frame[0] + ( w * h * MAX_SCRATCH_FRAMES );
     frame[2] =
-	    frame[1] + ( ((w*h)/4) * MAX_SCRATCH_FRAMES );
+	    frame[1] + ( w * h  * MAX_SCRATCH_FRAMES );
 
-    veejay_memset( frame[1], 128, ((w * h)/4 ) * MAX_SCRATCH_FRAMES);
-    veejay_memset( frame[2], 128, ((w * h)/4) * MAX_SCRATCH_FRAMES);
+    veejay_memset( frame[1], 128, (w * h * MAX_SCRATCH_FRAMES) );
+    veejay_memset( frame[2], 128, (w * h * MAX_SCRATCH_FRAMES) );
     return 1;
 }
 
 
-static void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
+static void store_frame(VJFrame *src, int n, int no_reverse)
 {
+	const int len = src->len;
 	int uv_len = src->uv_len;
-	int strides[4] = { (w * h), uv_len, uv_len , 0 };
+	int strides[4] = { len, uv_len, uv_len , 0 };
 
 	uint8_t *dest[4] = {
-		frame[0] + (w*h*nframe),
+		frame[0] + (len*nframe),
 		frame[1] + (uv_len*nframe),
 		frame[2] + (uv_len*nframe),
-       		NULL	};
+       	NULL
+	};
 
 	if (!nreverse) {
 		vj_frame_copy( src->data, dest, strides ); 
-    	} else {
+    }
+	else {
 		vj_frame_copy( dest, src->data, strides );
-    	}
+    }
 
 	if (nreverse)
 		nframe--;
 	else
 		nframe++;
-
-
 
 	if (nframe >= n) {
 		if (no_reverse == 0) {
@@ -118,7 +121,7 @@ static void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 		} else {
 		    nframe = 0;
 		}
-    	}
+    }
 
    	if (nframe == 0)
 		nreverse = 0;
@@ -126,34 +129,34 @@ static void store_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 }
 
 
-void scratcher_apply(VJFrame *src,
-		     int width, int height, int opacity, int n,
-		     int no_reverse)
+void scratcher_apply(VJFrame *src,int opacity, int n, int no_reverse)
 {
+    const unsigned int len = src->len;
+    const int offset = len * nframe;
+    const int uv_len = src->uv_len;
+    const int uv_offset = uv_len * nframe;
 
-    unsigned int len = src->len;
-    int offset = len * nframe;
-    int uv_len = src->uv_len;
-    int uv_offset = uv_len * nframe;
-	VJFrame copy;
-
-    if (nframe== 0) {
-		int strides[4] = { len, uv_len, uv_len, 0 };
-		vj_frame_copy( src->data, frame, strides );
-        return;
-    }
+	VJFrame tmp;
+	veejay_memcpy( &tmp, src, sizeof(VJFrame) );
 	
-	VJFrame srcB;
-	veejay_memcpy( &srcB, src, sizeof(VJFrame) );
-	srcB.data[0] = frame[0] + offset;
-	srcB.data[1] = frame[1] + uv_offset;
-	srcB.data[2] = frame[2] + uv_offset;
-	opacity_applyN( src, &srcB, opacity );
-	copy.uv_len = src->uv_len;
-	copy.data[0] = frame[0];
-	copy.data[1] = frame[1];
-	copy.data[2] = frame[2];
-   	
-	store_frame( &copy, width, height, n, no_reverse);
+	tmp.data[0] = frame[0] + offset;
+	tmp.data[1] = frame[1] + uv_offset;
+	tmp.data[2] = frame[2] + uv_offset;
 
+	if( no_reverse != last_reverse || n != last_n )
+	{
+		last_reverse = no_reverse;
+		nframe = n;
+		last_n = n;
+	}		
+
+	if( nframe == 0 ) {
+		tmp.data[0] = src->data[0];
+		tmp.data[1] = src->data[1];
+		tmp.data[2] = src->data[2];
+	}
+
+	opacity_applyN( src, &tmp, opacity );
+	
+	store_frame( src, n, no_reverse);
 }

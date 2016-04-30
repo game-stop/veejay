@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,15 +20,8 @@
 
 #ifndef SCRATCHER_H
 #define SCRATCHER_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *scratcher_init(int w, int h);
 int scratcher_malloc(int w, int h);
 void scratcher_free();
-void scratcher_apply(VJFrame *frame,
-		     int width, int height, int opacity, int nframes,
-		     int no_reverse);
+void scratcher_apply(VJFrame *frame,int opacity, int nframes, int no_reverse);
 #endif

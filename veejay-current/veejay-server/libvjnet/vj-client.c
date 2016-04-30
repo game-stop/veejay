@@ -363,10 +363,12 @@ void vj_client_decompress_frame_data( vj_client *v, uint8_t *dst, int fmt, int w
 	{
 		case PIX_FMT_YUV422P:
 		case PIX_FMT_YUVJ422P:
+		case PIX_FMT_YUVA422P:
 			uv_len = y_len / 2; 
 			break;
 		case PIX_FMT_YUV420P:
 		case PIX_FMT_YUVJ420P:
+		case PIX_FMT_YUVA420P:
 			uv_len = y_len / 4;
 			break;
 		default:

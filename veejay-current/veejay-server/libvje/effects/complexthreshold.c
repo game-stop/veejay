@@ -25,6 +25,8 @@
 #include "common.h"
 #include "complexthreshold.h"
 
+//FIXME: rewrite this FX
+
 vj_effect *complexthreshold_init(int w, int h)
 {
     vj_effect *ve;

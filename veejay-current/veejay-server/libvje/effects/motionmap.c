@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <limits.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include "motionmap.h"
@@ -35,7 +36,7 @@
 vj_effect *motionmap_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 7;
+    ve->num_params = 8;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -54,6 +55,8 @@ vj_effect *motionmap_init(int w, int h)
     ve->limits[1][5] = 1;
     ve->limits[0][6] = 0;
     ve->limits[1][6] = 3;
+	ve->limits[0][7] = 0;
+	ve->limits[1][7] = 25 * 60;
     ve->defaults[0] = 40;
     ve->defaults[1] = 1000;
     ve->defaults[2] = 1;
@@ -61,6 +64,7 @@ vj_effect *motionmap_init(int w, int h)
     ve->defaults[4] = HIS_DEFAULT;
     ve->defaults[5] = 0;
     ve->defaults[6] = 0;
+	ve->defaults[7] = 0;
     ve->description = "Motion Mapping";
     ve->sub_format = 1;
     ve->extra_frame = 0;
@@ -68,11 +72,12 @@ vj_effect *motionmap_init(int w, int h)
     ve->global = 1;
     ve->n_out = 2;
     ve->param_description = vje_build_param_list( ve->num_params, 
-			"Difference Threshold", "Maximum Motion Energy","Draw Motion Map","History in frames" ,"Decay", "Interpolate frames", "Activity Mode");
+			"Difference Threshold", "Maximum Motion Energy","Draw Motion Map","History in frames" ,"Decay", "Interpolate frames", "Activity Mode", "Activity Decay");
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][6], 6, "Normal", "Local Max", "Global Max", "Hold Last" );
+	
 
     return ve;
 }
@@ -228,7 +233,7 @@ void	motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n )
 
 #ifndef NO_AUTOVECTORIZATION
 	for ( i = 0; i < len ; i ++ ) {
-    		Y0[i] = Y1[i] + ( frac * (Y0[i] - Y1[i]));
+		Y0[i] = Y1[i] + ( frac * (Y0[i] - Y1[i]));
 	}
 	for( i = 0; i < len; i ++ ) {
 		U0[i] = U1[i] + ( frac * (U0[i] - U1[i]));
@@ -277,7 +282,7 @@ static void motionmap_blur( uint8_t *Y, int width, int height )
 	int r,c;
 	for (r = 0; r < len; r += width) {
 		for (c = 1; c < width-1; c++) {
-	    		Y[c + r] = (Y[r + c - 1] + Y[r + c] + Y[r + c + 1] ) / 3;
+			Y[c + r] = (Y[r + c - 1] + Y[r + c] + Y[r + c + 1] ) / 3;
 		}
 	}
 }
@@ -287,7 +292,7 @@ static int32_t motionmap_activity_level( uint8_t *I, int width, int height )
 	const unsigned int len = (width * height);
 	int32_t level = 0;
 	int r,c;
-   	for (r = 0; r < len; r += width) {
+	for (r = 0; r < len; r += width) {
 		for ( c = 0; c < width; c ++ ) {
 			level += I[r + c];
 		}
@@ -363,10 +368,15 @@ int	motionmap_prepare( uint8_t *map[4], int width, int height )
 	return 1;
 }
 
-void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int limit1, int draw, int history, int decay, int interpol, int last_act_level )
+static int activity_decay = 0;
+static int last_act_decay = -1;
+
+void motionmap_apply( VJFrame *frame, int threshold, int limit1, int draw, int history, int decay, int interpol, int last_act_level, int act_decay )
 {
 	unsigned int i;
-	const unsigned int len = (width * height);
+	const int width = frame->width;
+	const int height = frame->height;
+	const unsigned int len = frame->len;
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	const int limit = limit1 * 10;
@@ -374,6 +384,11 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 	if(!have_bg) {
 		veejay_msg(VEEJAY_MSG_ERROR,"Motion Mapping: Snap the background frame with VIMS 339 or mask button in reloaded");
 		return;
+	}
+
+	if( act_decay != last_act_decay ) {
+		last_act_decay = act_decay;
+		activity_decay = act_decay;
 	}
 
 	// run difference algorithm over multiple threads
@@ -397,7 +412,6 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 		task.height = height;
 
 		uint8_t *dst[4] = { binary_img, diff_img, diff_img + RUP8(len), NULL };
-
 
 		vj_task_set_from_frame( &task );
 		vj_task_set_param( threshold, 0 );
@@ -484,8 +498,19 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 				scale_lock = 1;
 			else 
 				scale_lock = 0;
+	
+			//reset to normal after "acitivity_decay"  ticks
+			if( scale_lock && act_decay > 0) {
+				activity_decay --;
+				if( activity_decay == 0 ) {
+					last_act_decay = 0;
+					scale_lock = 0;
+				}
+			}
+
 			break;
 	}
+
 
 	running = 1;
 	do_interpolation = interpol;

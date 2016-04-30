@@ -20,12 +20,9 @@
 
 #ifndef MOTIONMAP_H
 #define MOTIONMAP_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
 
 vj_effect *motionmap_init(int w, int h);
-void motionmap_apply( VJFrame *frame, int width, int height, int t, int n, int draw, int histo, int op, int ip, int la);
+void motionmap_apply( VJFrame *frame, int t, int n, int draw, int histo, int op, int ip, int la, int ad);
 int	motionmap_malloc(int w,int h);
 void	motionmap_free(void);
 int	motionmap_prepare( uint8_t *map[4], int w, int h );
