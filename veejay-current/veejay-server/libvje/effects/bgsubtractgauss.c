@@ -39,7 +39,7 @@ static uint32_t bg_n = 0;
 static double pNoise = 0.0;
 static uint8_t *morph_frame__ = NULL;
 static uint8_t *mean = NULL;
-static int auto_hist = 1;
+static int auto_hist = 0;
 
 vj_effect *bgsubtractgauss_init(int width, int height)
 {

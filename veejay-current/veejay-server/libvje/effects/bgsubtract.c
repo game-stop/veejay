@@ -33,7 +33,7 @@ static uint8_t *bg_frame__[4] = { NULL,NULL,NULL,NULL };
 static int bg_ssm = 0;
 static unsigned int bg_n = 0;
 static uint8_t instance = 0;
-static int auto_hist = 1;
+static int auto_hist = 0;
 
 vj_effect *bgsubtract_init(int width, int height)
 {
