@@ -234,15 +234,12 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
 			int fx_id = sample_get_effect_any( info->uc->sample_id, i );
 			if( fx_id == VJ_VIDEO_EFFECT_CHAMBLEND ||
 			    fx_id == VJ_IMAGE_EFFECT_CHAMELEON ||
-			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
 			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
 			    fx_id == VJ_IMAGE_EFFECT_MOTIONMAP ||
 			    fx_id == VJ_IMAGE_EFFECT_CONTOUR ||
 			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
 			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS ||
-			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
-			    fx_id == VJ_IMAGE_EFFECT_BGPUSH ||
-			    fx_id == VJ_IMAGE_EFFECT_CONTOUR )
+			    fx_id == VJ_IMAGE_EFFECT_BGPUSH )
 			{
 				vj_effect_prepare( frame, fx_id );
 				veejay_msg(VEEJAY_MSG_INFO,
@@ -257,15 +254,12 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
 			int fx_id = vj_tag_get_effect_any( info->uc->sample_id, i );
 			if( fx_id == VJ_VIDEO_EFFECT_CHAMBLEND ||
 			    fx_id == VJ_IMAGE_EFFECT_CHAMELEON ||
-			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
 			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
 			    fx_id == VJ_IMAGE_EFFECT_MOTIONMAP ||
 			    fx_id == VJ_IMAGE_EFFECT_CONTOUR ||
 			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACT ||
 			    fx_id == VJ_IMAGE_EFFECT_BGSUBTRACTGAUSS ||
-			    fx_id == VJ_VIDEO_EFFECT_DIFF ||
-			    fx_id == VJ_IMAGE_EFFECT_BGPUSH ||
-			    fx_id == VJ_IMAGE_EFFECT_CONTOUR )
+			    fx_id == VJ_IMAGE_EFFECT_BGPUSH )
 			{
 				vj_effect_prepare( frame, fx_id );
 				veejay_msg(VEEJAY_MSG_INFO,
