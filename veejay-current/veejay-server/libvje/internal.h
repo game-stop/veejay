@@ -370,8 +370,7 @@ extern void contourextract_apply(void *ed, VJFrame *frame, int threshold,
 extern void diff_apply(void *dd, VJFrame *frame, VJFrame *frame2, int threshold,
                        int reverse, int mode, int feather);
 extern void chromamagick_apply(VJFrame *frame, VJFrame *frame2, int type, int op0);
-extern void colorfadergb_apply(VJFrame *frame, int width, int height,
-			       int opacity, int r, int g, int b);
+extern void colorfadergb_apply(VJFrame *frame, int opacity, int r, int g, int b);
 
 void lumablend_apply(VJFrame *frame, VJFrame *frame2, int width,
 		     int height, int type, int t1, int t2, int op);
