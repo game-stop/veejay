@@ -134,13 +134,13 @@ int diff_prepare(void *user, uint8_t *map[4], int width, int height)
 }
 
 
-void diff_apply(void *ed, VJFrame *frame,
-		VJFrame *frame2, int width, int height, 
-		int threshold, int reverse,int mode, int feather)
+void diff_apply(void *ed, VJFrame *frame, VJFrame *frame2, int threshold,
+                int reverse, int mode, int feather)
 {
-	
 	unsigned int i;
 	const uint32_t len = frame->len;
+	const int width = frame->width;
+	const int height = frame->height;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
