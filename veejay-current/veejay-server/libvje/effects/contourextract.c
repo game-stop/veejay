@@ -33,7 +33,6 @@
 #include "contourextract.h"
 
 static uint8_t *static_bg = NULL;
-static int take_bg_ = 0;
 static uint32_t *dt_map = NULL;
 static void *shrink_ = NULL;
 static sws_template template_;
@@ -206,12 +205,10 @@ int contourextract_prepare(uint8_t *map[4], int width, int height)
 	return 1;
 }
 
-static int bg_frame_ = 0;
-
 void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
                           int mode, int take_bg, int feather, int min_blob_weight)
 {
-	unsigned int i,j,k;
+	unsigned int i;
 	const int width = frame->width;
 	const int height = frame->height;
 	const uint32_t len = frame->len;
@@ -226,9 +223,6 @@ void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
 	uint32_t ysize[256];
 	uint32_t blobs[255];
 
-	float sx = (float) width / (float) dw_;
-	float sy = (float) height / (float) dh_;
-	
 	veejay_memset( cx,0,sizeof(cx));
 	veejay_memset( cy,0,sizeof(cy));
 	veejay_memset( xsize,0,sizeof(xsize));
