@@ -25,6 +25,5 @@
 #include <stdint.h>
 
 vj_effect *chromamagick_init();
-void chromamagick_apply(VJFrame *frame, VJFrame *frame2 , int width,
-			int height, int type, int op0);
+void chromamagick_apply(VJFrame *frame, VJFrame *frame2 ,int type, int op0);
 #endif
