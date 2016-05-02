@@ -28,7 +28,6 @@
 vj_effect *chromascratcher_init(int w, int h);
 int chromascratcher_malloc(int w, int h);
 void chromascratcher_free();
-void chromascratcher_apply(VJFrame *frame,
-			   int width, int height, int mode, int opacity,
-			   int nframes, int no_reverse);
+void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int nframes,
+                           int no_reverse);
 #endif

@@ -135,11 +135,12 @@ static void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 
 
 
-void chromascratcher_apply(VJFrame *frame,
-			   int width, int height, int mode, int opacity,
-			   int n, int no_reverse)
+void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int n,
+                           int no_reverse)
 {
     unsigned int i;
+	const int width = frame->width;
+	const int height = frame->height;
     const int len = frame->len;
     const unsigned int op_a = (opacity > 255) ? 255 : opacity;
     const unsigned int op_b = 255 - op_a;

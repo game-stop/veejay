@@ -383,10 +383,8 @@ extern void distortion_apply(VJFrame *frame, int i1, int i2, int i3, int i4, int
 extern void magicscratcher_apply(VJFrame *frame, int mode, int nframes, int r);
 extern void wipe_apply(VJFrame *frame, VJFrame *frame2, int inc, int opacity);
 /* begin API */
-extern void chromascratcher_apply(VJFrame *frame,
-				  int width, int height, int mode,
-				  int opacity, int nframes,
-				  int no_reverse);
+extern void chromascratcher_apply(VJFrame *frame, int mode, int opacity,
+                                  int nframes, int no_reverse);
 
 extern void tracer_apply(VJFrame *frame, VJFrame *frame2,
 			 int w, int h, int opacity, int n);
