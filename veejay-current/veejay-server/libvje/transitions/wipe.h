@@ -25,6 +25,5 @@
 #include <stdint.h>
 
 vj_effect *wipe_init();
-void wipe_apply( VJFrame *frame, VJFrame *frame2,
-		int width, int height, int opacity, int mode);
+void wipe_apply( VJFrame *frame, VJFrame *frame2, int opacity, int mode);
 #endif
