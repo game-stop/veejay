@@ -104,12 +104,11 @@ static void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
 }
 
 
-void magicscratcher_apply(VJFrame *frame,
-			  int width, int height, int mode, int n,
-			  int no_reverse)
+void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
 {
-
-    unsigned int x, len = width * height;
+	const int width = frame->width;
+	const int height = frame->height;
+    unsigned int x, len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
