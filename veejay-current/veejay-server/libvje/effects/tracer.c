@@ -64,10 +64,8 @@ void tracer_free() {
 	trace_buffer[0] = NULL;	
 }
 
-void tracer_apply(VJFrame *frame, VJFrame *frame2,
-		  int width, int height, int opacity, int n)
+void tracer_apply(VJFrame *frame, VJFrame *frame2, int opacity, int n)
 {
-
     unsigned int x, len = frame->len;
     unsigned int op1 = (opacity > 255) ? 255 : opacity;
     unsigned int op0 = 255 - op1;

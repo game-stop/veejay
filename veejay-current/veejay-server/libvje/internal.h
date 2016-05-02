@@ -385,9 +385,7 @@ extern void wipe_apply(VJFrame *frame, VJFrame *frame2, int inc, int opacity);
 /* begin API */
 extern void chromascratcher_apply(VJFrame *frame, int mode, int opacity,
                                   int nframes, int no_reverse);
-
-extern void tracer_apply(VJFrame *frame, VJFrame *frame2,
-			 int w, int h, int opacity, int n);
+extern void tracer_apply(VJFrame *frame, VJFrame *frame2, int opacity, int n);
 
 extern void mtracer_apply(VJFrame *frame, VJFrame *frame2, int mode, int n);
 
