@@ -64,12 +64,14 @@ vj_effect *lumablend_init(int w, int h)
 }
 
 
-static void opacity_by_threshold(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
-			  int height, int threshold, int threshold2,
-			  int opacity)
+static void opacity_by_threshold(VJFrame *frame, VJFrame *frame2,
+                                 int threshold, int threshold2, int opacity)
 {
-
-    unsigned int x, y, len = width * height;
+	const int width = frame->width;
+	const int len = frame->len;
+	uint8_t **yuv1 = frame->data;
+	uint8_t **yuv2 = frame2->data;
+    unsigned int x, y;
     uint8_t a1, a2;
     unsigned int op0, op1;
     op1 = (opacity > 255) ? 255 : opacity;
@@ -92,12 +94,14 @@ static void opacity_by_threshold(uint8_t * yuv1[3], uint8_t * yuv2[3], int width
 
 }
 
-static void opacity_by_threshold_(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
-			   int height, int threshold, int threshold2,
-			   int opacity)
+static void opacity_by_threshold_(VJFrame *frame, VJFrame *frame2,
+                                  int threshold, int threshold2, int opacity)
 {
-
-    unsigned int x, y, len = width * height;
+	const int width = frame->width;
+	const int len = frame->len;
+	uint8_t **yuv1 = frame->data;
+	uint8_t **yuv2 = frame2->data;
+    unsigned int x, y;
     uint8_t a1, a2;
     unsigned int op0, op1;
     op1 = (opacity > 255) ? 255 : opacity;
@@ -118,12 +122,14 @@ static void opacity_by_threshold_(uint8_t * yuv1[3], uint8_t * yuv2[3], int widt
     }
 }
 
-static void opacity_by_threshold_blur(uint8_t * yuv1[3], uint8_t * yuv2[3],
-			       int width, int height, int threshold,
-			       int threshold2, int opacity)
+static void opacity_by_threshold_blur(VJFrame *frame, VJFrame *frame2,
+                                      int threshold, int threshold2, int opacity)
 {
-
-    unsigned int x, y, len = width * height - width;
+	const int width = frame->width;
+	const int len = frame->len - width;
+	uint8_t **yuv1 = frame->data;
+	uint8_t **yuv2 = frame2->data;
+    unsigned int x, y;
     uint8_t a1=threshold, a2=threshold2;
     unsigned int op0, op1;
     op1 = (opacity > 255) ? 255 : opacity;
@@ -197,22 +203,18 @@ static void opacity_by_threshold_blur(uint8_t * yuv1[3], uint8_t * yuv2[3],
 
 }
 
-void lumablend_apply(VJFrame *frame, VJFrame *frame2, int width,
-		     int height, int type, int t1, int t2, int opacity)
+void lumablend_apply(VJFrame *frame, VJFrame *frame2, int type,
+                     int t1, int t2, int opacity)
 {
-
     switch (type) {
     case 0:
-	opacity_by_threshold(frame->data, frame2->data, width, height, t1, t2, opacity);
+	opacity_by_threshold(frame, frame2, t1, t2, opacity);
 	break;
     case 1:
-	opacity_by_threshold_(frame->data, frame2->data, width, height, t1, t2, opacity);
+	opacity_by_threshold_(frame, frame2, t1, t2, opacity);
 	break;
     case 2:
-	opacity_by_threshold_blur(frame->data, frame2->data, width, height, t1, t2,
-				  opacity);
+	opacity_by_threshold_blur(frame, frame2, t1, t2, opacity);
 	break;
-
     }
-
 }
