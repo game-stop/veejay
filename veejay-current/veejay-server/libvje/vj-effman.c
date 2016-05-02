@@ -508,8 +508,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	             arg[4], arg[5],arg[6],arg[7]);
 	break;
       case VJ_VIDEO_EFFECT_KEYSELECT:
-	keyselect_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,
-			arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
+	keyselect_apply(frames[0],frames[1],arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 	break;
       case VJ_VIDEO_EFFECT_CHROMAMAGICK:
 	chromamagick_apply(frames[0], frames[1], arg[0], arg[1]);
