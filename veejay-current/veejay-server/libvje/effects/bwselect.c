@@ -76,9 +76,12 @@ static void gamma_setup(int width, int height, double gamma_value)
     }
 }
 
-void bwselect_apply(VJFrame *frame, int width, int height, int min_threshold, int max_threshold, int gamma, int mode) {
+void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int gamma, int mode)
+{
 	int r,c;
-    const int len = frame->len;
+	const int width = frame->width;
+	const int height = frame->height;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

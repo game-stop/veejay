@@ -327,7 +327,7 @@ static void vj_effman_apply_image_effect(
 	transform_apply(frames[0], frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_BWSELECT:
-	bwselect_apply(frames[0], frames[0]->width, frames[0]->height, arg[0], arg[1], arg[2], arg[3]);
+	bwselect_apply(frames[0], arg[0], arg[1], arg[2], arg[3]);
 	break;
 	 case VJ_IMAGE_EFFECT_BWOTSU:
 	bwotsu_apply( frames[0], arg[0],arg[1],arg[2] );
