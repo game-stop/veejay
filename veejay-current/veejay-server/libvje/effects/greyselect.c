@@ -63,11 +63,9 @@ vj_effect *greyselect_init(int w, int h)
     return ve;
 }
 
-void greyselect_apply( VJFrame *frame, int width,
-		   int height, int i_angle, int r, int g,
-		   int b, int swap)
+void greyselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int swap)
 {
-
+	const uint32_t len = frame->len;
     uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
 	int cb, cr;
@@ -97,7 +95,7 @@ void greyselect_apply( VJFrame *frame, int width,
     fg_cr = Cr;
 
 	if( swap == 0 ) {
-		for (pos = (width * height); pos != 0; pos--) {
+		for (pos = len; pos != 0; pos--) {
 			short xx, yy;
 			xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
 			yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
@@ -110,7 +108,7 @@ void greyselect_apply( VJFrame *frame, int width,
 		}
 	}
 	else {
-		for (pos = (width * height); pos != 0; pos--) {
+		for (pos = len; pos != 0; pos--) {
 			short xx, yy;
 			xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
 			yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
