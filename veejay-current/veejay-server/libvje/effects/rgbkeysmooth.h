@@ -21,7 +21,6 @@
 #ifndef RGBKEYSMOOTH_H
 #define RGBKEYSMOOTH_H
 vj_effect *rgbkeysmooth_init();
-void rgbkeysmooth_apply( VJFrame *frame, VJFrame *frame2, int width,
-			int height, int i_angle, int red, int green,
-			int blue, int op, int noise);
+void rgbkeysmooth_apply( VJFrame *frame, VJFrame *frame2, int i_angle,
+                        int red, int green, int blue, int op, int noise);
 #endif

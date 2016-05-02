@@ -68,12 +68,11 @@ vj_effect *rgbkeysmooth_init(int w,int h)
 }
 
 
-void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int width,
-			int height, int i_angle, int r, int g, int b,
-			int opacity, int i_noise)
+void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int i_angle,
+                        int r, int g, int b, int opacity, int i_noise)
 {
 
-  uint8_t *fg_y, *fg_cb, *fg_cr;
+    uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
     int kfgy_scale, kg;
@@ -90,6 +89,7 @@ void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int width,
     uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
+	const int len = frame->len;
 	int	iy=16,iu=128,iv=128;
 	unsigned int op0 = opacity > 255 ? 255 : opacity;
 	unsigned int op1 = 255 - op0;
@@ -122,7 +122,7 @@ void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int width,
     bg_cb = Cb2;
     bg_cr = Cr2;
 
-    for (pos = (width * height); pos != 0; pos--) {
+    for (pos = len; pos != 0; pos--) {
 	short xx, yy;
 	/* convert foreground to xz coordinates where x direction is
 	   defined by key color */
