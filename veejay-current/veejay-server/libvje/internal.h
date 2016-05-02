@@ -373,10 +373,7 @@ extern void chromamagick_apply(VJFrame *frame, VJFrame *frame2, int type, int op
 extern void colorfadergb_apply(VJFrame *frame, int opacity, int r, int g, int b);
 extern void lumablend_apply(VJFrame *frame, VJFrame *frame2, int type,
                             int t1, int t2, int op);
-
-extern void diffimg_apply(VJFrame *frame, 
-			  int width, int height, int type, int delta,
-			  int zeta);
+extern void diffimg_apply(VJFrame *frame, int type, int delta, int zeta);
 extern void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int w,
 			       int h, int angle, int r, int g, int b,
 			       int level, int noise);

@@ -135,9 +135,7 @@ static void vj_effman_apply_image_effect(
 		cali_apply( vj_effects[entry]->user_data,frames[0], frames[0]->width,frames[0]->height,arg[0], arg[1] );
 		break;
       case VJ_IMAGE_EFFECT_DIFF:
-	diffimg_apply(frames[0], 
-		      frames[0]->width, frames[0]->height, arg[0], arg[1],
-		      arg[2]);
+	diffimg_apply(frames[0], arg[0], arg[1], arg[2]);
 	break;
 
      case VJ_IMAGE_EFFECT_COMPLEXINVERT:
