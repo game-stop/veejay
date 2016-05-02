@@ -390,7 +390,7 @@ extern void mtracer_apply(VJFrame *frame, VJFrame *frame2, int mode, int n);
 extern void keyselect_apply(VJFrame *frame, VJFrame *frame2, int angle,
                             int r, int g, int b, int mode, int noise);
 extern void greyselect_apply(VJFrame *frame, int angle, int r, int g, int b, int swap);
-extern void isolate_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b,
+extern void isolate_apply(VJFrame *frame, int angle, int r, int g, int b,
 int opacity);
 
 extern void bwselect_apply(VJFrame *frame, int w, int h, int a , int b, int c, int g);
