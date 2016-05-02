@@ -295,6 +295,8 @@ static void bg_subtract( VJFrame *frame, double threshold, uint8_t *A )
 	}
 }
 
+//defined but not used
+/*
 static void show_pMu( VJFrame *frame )
 {
 	const int len = frame->len;
@@ -308,7 +310,10 @@ static void show_pMu( VJFrame *frame )
 	veejay_memset( frame->data[1], 128, frame->uv_len);
 	veejay_memset( frame->data[2], 128, frame->uv_len);
 }
+*/
 
+//defined but not used
+/*
 static void show_pVar( VJFrame *frame )
 {
 	const int len = frame->len;
@@ -322,6 +327,7 @@ static void show_pVar( VJFrame *frame )
 	veejay_memset( frame->data[1], 128, frame->uv_len);
 	veejay_memset( frame->data[2], 128, frame->uv_len);
 }
+*/
 
 static void fg_erode( uint8_t *I, const int w, const int h, uint8_t *O )
 {
