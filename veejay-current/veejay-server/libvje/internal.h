@@ -378,8 +378,7 @@ extern void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int angle,
                                int r, int g, int b,int level, int noise);
 extern void scratcher_apply(VJFrame *frame, int o, int n, int r);
 extern void colorshift_apply(VJFrame *frame, int type, int value);
-extern void reflection_apply(VJFrame *frame, int w, int h, int n1,
-			     int n2, int n3);
+extern void reflection_apply(VJFrame *frame, int n1, int n2, int n3);
 extern void distortion_apply(VJFrame *frame, int i1, int i2, int i3, int i4, int i5, int i6 );
 extern void magicscratcher_apply(VJFrame *frame, int w, int h, int mode,
 				 int nframes, int r);

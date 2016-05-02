@@ -115,11 +115,12 @@ void reflection_free() {
 }
 
 
-void reflection_apply(VJFrame *frame, int width, int height, int index1,
-		      int index2, int move)
+void reflection_apply(VJFrame *frame, int index1, int index2, int move)
 {
     unsigned int normalx, normaly, x, y;
     unsigned int lightx, lighty, temp;
+	const int width = frame->width;
+	const int height = frame->height;
 	int uv_height = frame->uv_height;
     int uv_width = frame->uv_width;
     uint8_t *row = frame->data[0] + width + 1;
