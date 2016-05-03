@@ -113,7 +113,7 @@ static void overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2,int w
 		A[i] = CLAMP_Y(y1);
     }
 }
-//defined but not used
+
 /*static void overlayalphamagic_sub_distorted(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
 
@@ -390,7 +390,7 @@ static void overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2,int width
 			A[i] = CLAMP_Y( 255 - ((( 255 - b ) * ( 255 - b )) / a));
     }
 }
-//defined but not used
+
 /*static void overlayalphamagic_hardlight(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;

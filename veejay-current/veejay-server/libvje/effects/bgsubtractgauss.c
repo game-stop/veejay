@@ -295,7 +295,6 @@ static void bg_subtract( VJFrame *frame, double threshold, uint8_t *A )
 	}
 }
 
-//defined but not used
 /*
 static void show_pMu( VJFrame *frame )
 {
@@ -312,7 +311,6 @@ static void show_pMu( VJFrame *frame )
 }
 */
 
-//defined but not used
 /*
 static void show_pVar( VJFrame *frame )
 {

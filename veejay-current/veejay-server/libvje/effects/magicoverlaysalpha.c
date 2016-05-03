@@ -126,7 +126,6 @@ static void overlaymagicalpha_subdistorted(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-//defined but not used
 /*
  static void overlaymagicalpha_sub_distorted(VJFrame *frame, VJFrame *frame2,
 				 int width, int height)
@@ -493,7 +492,7 @@ static void overlaymagicalpha_unfreeze(VJFrame *frame, VJFrame *frame2,int width
 			Y[i] = CLAMP_Y( 255 - ((( 255 - b ) * ( 255 - b )) / a));
 	}
 }
-//defined but not used
+
 /*
 static void overlaymagicalpha_hardlight(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
