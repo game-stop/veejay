@@ -20,11 +20,6 @@
 
 #ifndef MAGICSCRATCHER_H
 #define MAGICSCRATCHER_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *magicscratcher_init(int w, int h);
 int magicscratcher_malloc(int w, int h);
 void magicscratcher_free();

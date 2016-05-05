@@ -20,12 +20,6 @@
 
 #ifndef DIFFIMGEFFECT_H
 #define DIFFIMGEFFECT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *diffimg_init();
 void diffimg_apply(VJFrame *frame, int type, int threshold, int opacity);
-
-void diffimg_free();
 #endif

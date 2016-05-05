@@ -20,11 +20,6 @@
 
 #ifndef TRACER_H
 #define TRACER_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *tracer_init(int w, int h);
 int tracer_malloc(int w, int h);
 void tracer_free();

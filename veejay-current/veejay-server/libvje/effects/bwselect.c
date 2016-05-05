@@ -63,8 +63,7 @@ vj_effect *bwselect_init(int w, int h)
 static __thread int last_gamma = 0;
 static __thread uint8_t table[256];
 
-// FIXME int width, int height not used ... remove ?
-static void gamma_setup(int width, int height, double gamma_value)
+static void gamma_setup(double gamma_value)
 {
     int i;
     double val;

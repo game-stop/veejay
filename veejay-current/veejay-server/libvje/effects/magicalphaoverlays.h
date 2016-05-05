@@ -20,13 +20,6 @@
 
 #ifndef MAGICALPHAOVERLAYS_H
 #define MAGICALPHAOVERLAYS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *overlayalphamagic_init(int w, int h);
-
-void overlayalphamagic_apply( VJFrame *frame, VJFrame *frame2, int width,
-			int height, int n, int mode);
-
+void overlayalphamagic_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int n, int mode);
 #endif

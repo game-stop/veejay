@@ -20,10 +20,6 @@
 
 #ifndef WIPE_H
 #define WIPE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *wipe_init();
 void wipe_apply( VJFrame *frame, VJFrame *frame2, int opacity, int mode);
 #endif

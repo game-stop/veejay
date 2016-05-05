@@ -20,11 +20,11 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "magicscratcher.h"
 #include "common.h"
 
-#define        RUP8(num)(((num)+8)&~8)
 static uint8_t *mframe = NULL;
 static int m_frame = 0;
 static int m_reverse = 0;
@@ -32,7 +32,6 @@ static int m_rerun = 0;
 
 vj_effect *magicscratcher_init(int w, int h)
 {
-
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
@@ -83,24 +82,23 @@ static void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
 		veejay_memcpy(yuv1[0], mframe + (w * h * m_frame), (w * h));
     }
     if (m_reverse)
-	m_frame--;
+		m_frame--;
     else
-	m_frame++;
+		m_frame++;
 
     if (m_frame >= n ) {
-	if (no_reverse == 0) {
-	    m_reverse = 1;
-	    m_frame = n - 1;
-		if(m_frame < 0 )
-			m_frame = 0;
-	} else {
-	    m_frame = 0;
-	}
+		if (no_reverse == 0) {
+		    m_reverse = 1;
+	    	m_frame = n - 1;
+			if(m_frame < 0 )
+				m_frame = 0;
+		} else {
+	  	  m_frame = 0;
+		}
     }
 
     if (m_frame == 0)
-	m_reverse = 0;
-
+		m_reverse = 0;
 }
 
 
@@ -177,5 +175,4 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
     m_rerun = m_frame;
 
     store_mframe(frame->data, width, height, n, no_reverse);
-
 }

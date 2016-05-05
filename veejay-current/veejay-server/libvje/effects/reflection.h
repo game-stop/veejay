@@ -42,10 +42,6 @@
 
 #ifndef REFLECTION_H
 #define REFLECTION_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *reflection_init(int width,int hei);
 int reflection_malloc(int width, int height);
 void reflection_free();

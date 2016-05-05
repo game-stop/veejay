@@ -20,12 +20,6 @@
 
 #ifndef GREYSELECT_H
 #define GREYSELECT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *greyselect_init();
-void greyselect_apply( VJFrame *frame, int i_angle,
-                      int red, int green, int blue, int swap);
-void greyselect_free();
+void greyselect_apply( VJFrame *frame, int i_angle,int red, int green, int blue, int swap);
 #endif

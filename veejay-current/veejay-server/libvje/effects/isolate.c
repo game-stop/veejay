@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdlib.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <math.h>
 #include "common.h"
@@ -113,5 +114,3 @@ void isolate_apply( VJFrame *frame, int i_angle, int r, int g, int b, int opacit
 		}
     }
 }
-
-void isolate_free(){}

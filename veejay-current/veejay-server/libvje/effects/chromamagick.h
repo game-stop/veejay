@@ -20,10 +20,6 @@
 
 #ifndef CHROMAMAGICK_H
 #define CHROMAMAGICK_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *chromamagick_init();
 void chromamagick_apply(VJFrame *frame, VJFrame *frame2 ,int type, int op0);
 #endif

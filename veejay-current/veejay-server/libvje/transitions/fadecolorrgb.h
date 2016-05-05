@@ -20,11 +20,6 @@
 
 #ifndef FADECOLORRGB_H
 #define FADECOLORRGB_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *fadecolorrgb_init();
 void colorfadergb_apply(VJFrame *frame, int opacity, int r, int g, int b);
-
 #endif

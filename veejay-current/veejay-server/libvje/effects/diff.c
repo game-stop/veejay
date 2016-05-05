@@ -75,8 +75,6 @@ vj_effect *diff_init(int width, int height)
 	return ve;
 }
 
-
-
 void	diff_destroy(void)
 {
 	if(static_bg)
@@ -85,7 +83,6 @@ void	diff_destroy(void)
 		free(dt_map);
 	static_bg = NULL;
 	dt_map = NULL;
-	
 }
 
 int diff_malloc(void **d, int width, int height)
@@ -149,13 +146,6 @@ void diff_apply(void *ed, VJFrame *frame, VJFrame *frame2, int threshold,
 	uint8_t *Cr2 = frame2->data[2];
 	diff_data *ud = (diff_data*) ed;
 
-
-/*	VJFrame *tmp = yuv_yuv_template( ud->current, NULL,NULL, width,height, 
-					PIX_FMT_YUV444P );
-	veejay_memcpy( ud->current, frame->data[0], len );
-	softblur_apply(tmp ,0);
-	free(tmp);
-*/
 	//@ clear distance transform map
 	vj_frame_clear1( (uint8_t*) dt_map, 0 , len * sizeof(uint32_t) );
 

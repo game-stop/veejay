@@ -20,13 +20,8 @@
 
 #ifndef COLORSHIFT_H
 #define COLORSHIFT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 /* this effect uses bit masking to increase/decrease the luma cq chroma values
    in a frame. with this you can create distorted colours. */
-
 vj_effect *colorshift_init();
 void colorshift_apply( VJFrame *frame, int n, int type);
 #endif

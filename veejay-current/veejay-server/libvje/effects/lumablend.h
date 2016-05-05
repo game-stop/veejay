@@ -20,10 +20,6 @@
 
 #ifndef LUMABLEND_H
 #define LUMABLEND_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *lumablend_init();
 void lumablend_apply( VJFrame *frame, VJFrame *frame2,
                      int threhold1, int threshold2, int opacity, int type);

@@ -20,12 +20,6 @@
 
 #ifndef ISOLATE_H
 #define ISOLATE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *isolate_init();
-void isolate_apply( VJFrame *frame, int i_angle, int red, int green, int blue,
-                   int opacity);
-void isolate_free();
+void isolate_apply( VJFrame *frame, int i_angle, int red, int green, int blue, int opacity);
 #endif

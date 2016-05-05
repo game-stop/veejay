@@ -44,6 +44,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <math.h>
 #include "reflection.h"
@@ -57,7 +58,7 @@ static uint8_t *reflection_buffer = NULL;
 
 vj_effect *reflection_init(int width,int height)
 {
-      vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -81,30 +82,30 @@ vj_effect *reflection_init(int width,int height)
 
 int reflection_malloc(int width, int height)
 { 
-  int i, x, y;
+	int i, x, y;
     float rad;
  
     for (i = 0; i < width; i++) {
-	rad = (float) i * 0.0174532 * 0.703125;
-	reflect_aSin[i] = (short) ((sin(rad) * 100.0) + 256.0);
+		rad = (float) i * 0.0174532 * 0.703125;
+		reflect_aSin[i] = (short) ((sin(rad) * 100.0) + 256.0);
     }
-    for (x = 0; x < width; ++x) {
-	for (y = 0; y < 256; ++y) {
-	    float xx = (x - 128) / 128.0;
-	    float yy = (y - 128) / 128.0;
-	    float zz = 1.0 - sqrt(xx * xx + yy * yy);
-	    zz *= 255.0;
-	    if (zz < 0.0)
-		zz = 0.0;
-	    reflection_map[x][y] = (int) zz;
-	}
+    
+	for (x = 0; x < width; ++x) {
+		for (y = 0; y < 256; ++y) {
+		    float xx = (x - 128) / 128.0;
+		    float yy = (y - 128) / 128.0;
+		    float zz = 1.0 - sqrt(xx * xx + yy * yy);
+		    zz *= 255.0;
+		    if (zz < 0.0)
+			zz = 0.0;
+		    reflection_map[x][y] = (int) zz;
+		}
     }
-    reflection_buffer = (uint8_t *) vj_malloc(sizeof(uint8_t) * RUP8(width) );
+    
+	reflection_buffer = (uint8_t *) vj_malloc(sizeof(uint8_t) * RUP8(width) );
     if(!reflection_buffer) return 0;
 
     return 1;
-
-
 }
 
 
@@ -201,11 +202,4 @@ void reflection_apply(VJFrame *frame, int index1, int index2, int move)
 		}
 		*row += 2;
     }
-
-
-    //sin_index+=n;
-    //sin_index &= 511;
-    //sin_index2 +=n-2;
-    //sin_index2 &= 511;
-
 }

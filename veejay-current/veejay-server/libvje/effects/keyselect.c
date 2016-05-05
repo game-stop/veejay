@@ -19,9 +19,10 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "keyselect.h"
-#include <math.h>
 #include "common.h"
 
 vj_effect *keyselect_init(int w, int h)

@@ -19,6 +19,7 @@
  */
 #include <stdlib.h>
 #include <stdint.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "diffimg.h"
 #include "common.h"

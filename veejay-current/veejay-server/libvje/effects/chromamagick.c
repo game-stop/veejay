@@ -25,11 +25,12 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "chromamagick.h"
 #include <math.h>
 #include "common.h"
-// fixme: mode 8 and 9 corrupt (green/purple cbcr)
+// FIXME: mode 8 and 9 corrupt (green/purple cbcr)
 
 vj_effect *chromamagick_init(int w, int h)
 {
@@ -173,7 +174,6 @@ static void chromamagic_selectdiff(VJFrame *frame, VJFrame *frame2, int op_a)
 
 static void chromamagic_diffreplace(VJFrame *frame, VJFrame *frame2, int threshold)
 {
-	/* op_a = threshold */
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
