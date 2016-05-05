@@ -114,7 +114,7 @@ static void overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2,int w
     }
 }
 
-static void overlayalphamagic_sub_distorted(VJFrame *frame, VJFrame *frame2,int width, int height)
+/*static void overlayalphamagic_sub_distorted(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
 
     unsigned int i ;
@@ -128,7 +128,7 @@ static void overlayalphamagic_sub_distorted(VJFrame *frame, VJFrame *frame2,int 
 		y2 = A2[i];
 		A[i] = y1 - y2;
     }
-}
+}*/
 
 static void overlayalphamagic_multiply(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
@@ -391,7 +391,7 @@ static void overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2,int width
     }
 }
 
-static void overlayalphamagic_hardlight(VJFrame *frame, VJFrame *frame2,int width, int height)
+/*static void overlayalphamagic_hardlight(VJFrame *frame, VJFrame *frame2,int width, int height)
 {
     unsigned int i;
     unsigned int len = width * height;
@@ -409,7 +409,7 @@ static void overlayalphamagic_hardlight(VJFrame *frame, VJFrame *frame2,int widt
 		    c = 255 - ((255 - b) * (255 - a) >> 7);
 		A[i] = c;
     }
-}
+}*/
 
 static void overlayalphamagic_relativeaddlum(VJFrame *frame, VJFrame *frame2,int width, int height)
 {

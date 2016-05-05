@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *fadecolorrgb_init();
-void colorfadergb_apply(VJFrame *frame, int width, int height,
-			int opacity, int r, int g, int b);
+void colorfadergb_apply(VJFrame *frame, int opacity, int r, int g, int b);
 
 #endif

@@ -28,6 +28,5 @@
 vj_effect *tracer_init(int w, int h);
 int tracer_malloc(int w, int h);
 void tracer_free();
-void tracer_apply(VJFrame *frame, VJFrame *frame2,
-		  int width, int height, int opacity, int nframes);
+void tracer_apply(VJFrame *frame, VJFrame *frame2, int opacity, int nframes);
 #endif

@@ -77,7 +77,7 @@ int	chromascratcher_malloc(int w, int h)
 {
     cframe[0] =
 	(uint8_t *) vj_malloc( RUP8(w * h * 3) * MAX_SCRATCH_FRAMES * sizeof(uint8_t) );
-    if(!cframe[0]) return 0;			   
+    if(!cframe[0]) return 0;
 
     cframe[1] = cframe[0] + ( w * h * MAX_SCRATCH_FRAMES );
     cframe[2] = cframe[1] + ( w * h * MAX_SCRATCH_FRAMES );
@@ -135,11 +135,12 @@ static void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
 
 
 
-void chromascratcher_apply(VJFrame *frame,
-			   int width, int height, int mode, int opacity,
-			   int n, int no_reverse)
+void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int n,
+                           int no_reverse)
 {
     unsigned int i;
+	const int width = frame->width;
+	const int height = frame->height;
     const int len = frame->len;
     const unsigned int op_a = (opacity > 255) ? 255 : opacity;
     const unsigned int op_b = 255 - op_a;
@@ -166,7 +167,7 @@ void chromascratcher_apply(VJFrame *frame,
 
     if(mode>3) {
 	   int matte_mode = mode - 3;
-   	   chromamagick_apply( frame,&_tmp,width, height,matte_mode,opacity);
+   	   chromamagick_apply( frame,&_tmp,matte_mode,opacity);
     }
     else {
 	    switch (mode) {		/* scratching with a sequence of frames (no scene changes) */

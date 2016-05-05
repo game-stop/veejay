@@ -49,6 +49,5 @@
 vj_effect *reflection_init(int width,int hei);
 int reflection_malloc(int width, int height);
 void reflection_free();
-void reflection_apply(VJFrame *frame, int width, int height, int n1,
-		      int n2, int move);
+void reflection_apply(VJFrame *frame, int n1, int n2, int move);
 #endif

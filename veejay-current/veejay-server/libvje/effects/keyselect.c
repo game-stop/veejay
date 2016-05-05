@@ -135,12 +135,13 @@ static blend_func get_blend_func(const int mode) {
 /*
 http://www.cs.utah.edu/~michael/chroma/
 */
-void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int i_angle, int r, int g,
-		   int b, int mode, int i_noise)
+void keyselect_apply( VJFrame *frame, VJFrame *frame2, int i_angle,
+                     int r, int g, int b, int mode, int i_noise)
 {
 	uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
+	const int width = frame->width;
+	const int height = frame->height;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
     int kfgy_scale, kg;
     int cb, cr;

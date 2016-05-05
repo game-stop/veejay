@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 vj_effect *diffimg_init();
-void diffimg_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity);
+void diffimg_apply(VJFrame *frame, int type, int threshold, int opacity);
 
 void diffimg_free();
 #endif

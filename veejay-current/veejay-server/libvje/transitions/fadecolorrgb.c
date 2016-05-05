@@ -61,11 +61,10 @@ vj_effect *fadecolorrgb_init(int w,int h)
     return ve;
 }
 
-void colorfadergb_apply( VJFrame *frame, int width, int height,
-			int opacity, int r, int g, int b)
+void colorfadergb_apply( VJFrame *frame, int opacity, int r, int g, int b)
 {
     unsigned int i, op0, op1;
-    unsigned int len = width * height;
+    const int len = frame->len;
     unsigned int colorCb = 128, colorCr = 128;
     unsigned int colorY;
     const int uv_len = frame->uv_len;

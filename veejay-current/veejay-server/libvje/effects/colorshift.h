@@ -28,5 +28,5 @@
    in a frame. with this you can create distorted colours. */
 
 vj_effect *colorshift_init();
-void colorshift_apply( VJFrame *frame, int width, int height, int n, int type);
+void colorshift_apply( VJFrame *frame, int n, int type);
 #endif

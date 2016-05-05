@@ -58,7 +58,7 @@ vj_effect *colorshift_init(int w, int h)
 
 
 /* bitwise and test */
-static void softmask2_apply(VJFrame *frame, int width, int height, int paramt)
+static void softmask2_apply(VJFrame *frame, int paramt)
 {
     const unsigned int len = frame->len;
     unsigned int x;
@@ -67,8 +67,7 @@ static void softmask2_apply(VJFrame *frame, int width, int height, int paramt)
 		Y[x] &= paramt;
 }
 
-static void softmask2_applycb(VJFrame *frame, int width, int height,
-		       int paramt)
+static void softmask2_applycb(VJFrame *frame, int paramt)
 {
     const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb = frame->data[1];
@@ -77,8 +76,7 @@ static void softmask2_applycb(VJFrame *frame, int width, int height,
 		Cb[x] &= paramt;
 }
 
-static void softmask2_applycr(VJFrame *frame, int width, int height,
-		       int paramt)
+static void softmask2_applycr(VJFrame *frame, int paramt)
 {
 	uint8_t *Cr = frame->data[2];
 	const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
@@ -87,8 +85,7 @@ static void softmask2_applycr(VJFrame *frame, int width, int height,
 		Cr[x] &= paramt;
 }
 
-static void softmask2_applycbcr(VJFrame *frame, int width, int height,
-			 int paramt)
+static void softmask2_applycbcr(VJFrame *frame, int paramt)
 {
 	const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
     unsigned int x;
@@ -100,8 +97,7 @@ static void softmask2_applycbcr(VJFrame *frame, int width, int height,
     }
 }
 
-static void softmask2_applyycbcr(VJFrame *frame, int width, int height,
-			  int paramt)
+static void softmask2_applyycbcr(VJFrame *frame, int paramt)
 {
     const unsigned int len = frame->len;
 	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
@@ -121,7 +117,7 @@ static void softmask2_applyycbcr(VJFrame *frame, int width, int height,
     }
 }
 
-static void softmask_apply(VJFrame *frame, int width, int height, int paramt)
+static void softmask_apply(VJFrame *frame, int paramt)
 {
     const unsigned int len = frame->len;
     unsigned int x;
@@ -133,7 +129,7 @@ static void softmask_apply(VJFrame *frame, int width, int height, int paramt)
 }
 
 
-static void softmask_applycb(VJFrame *frame, int width, int height, int paramt)
+static void softmask_applycb(VJFrame *frame, int paramt)
 {
 	const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb = frame->data[1];
@@ -144,7 +140,7 @@ static void softmask_applycb(VJFrame *frame, int width, int height, int paramt)
 }
 
 
-static void softmask_applycr(VJFrame *frame, int width, int height, int paramt)
+static void softmask_applycr(VJFrame *frame, int paramt)
 {
 	const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cr = frame->data[2];
@@ -155,8 +151,7 @@ static void softmask_applycr(VJFrame *frame, int width, int height, int paramt)
 }
 
 
-static void softmask_applycbcr(VJFrame *frame, int width, int height,
-			int paramt)
+static void softmask_applycbcr(VJFrame *frame, int paramt)
 {
     const unsigned int len = (frame->ssm ? frame->len : frame->uv_len);
     unsigned int x;
@@ -170,8 +165,7 @@ static void softmask_applycbcr(VJFrame *frame, int width, int height,
     }
 }
 
-static void softmask_applyycbcr(VJFrame *frame, int width, int height,
-			 int paramt)
+static void softmask_applyycbcr(VJFrame *frame, int paramt)
 {
 	const int len =  frame->len;
 	uint8_t *Y = frame->data[0];
@@ -190,39 +184,38 @@ static void softmask_applyycbcr(VJFrame *frame, int width, int height,
 }
 
 
-void colorshift_apply(VJFrame *frame, int width, int height, int type,
-		      int n)
+void colorshift_apply(VJFrame *frame, int type, int value)
 {
     switch (type) {
     case 0:
-	softmask_apply(frame, width, height, n);
+	softmask_apply(frame, value);
 	break;
     case 1:
-	softmask_applycb(frame, width, height, n);
+	softmask_applycb(frame, value);
 	break;
     case 2:
-	softmask_applycr(frame, width, height, n);
+	softmask_applycr(frame, value);
 	break;
     case 3:
-	softmask_applycbcr(frame, width, height, n);
+	softmask_applycbcr(frame, value);
 	break;
     case 4:
-	softmask_applyycbcr(frame, width, height, n);
+	softmask_applyycbcr(frame, value);
 	break;
     case 5:
-	softmask2_apply(frame, width, height, n);
+	softmask2_apply(frame, value);
 	break;
     case 6:
-	softmask2_applycb(frame, width, height, n);
+	softmask2_applycb(frame, value);
 	break;
     case 7:
-	softmask2_applycr(frame, width, height, n);
+	softmask2_applycr(frame, value);
 	break;
     case 8:
-	softmask2_applycbcr(frame, width, height, n);
+	softmask2_applycbcr(frame, value);
 	break;
     case 9:
-	softmask2_applyycbcr(frame, width, height, n);
+	softmask2_applyycbcr(frame, value);
 	break;
     }
 }

@@ -52,16 +52,17 @@ vj_effect *wipe_init(int w,int h)
 static int g_wipe_width = 0;
 static int g_wipe_height = 0;
 
-void wipe_apply( VJFrame *frame, VJFrame *frame2,
-		int w, int h, int opacity, int inc)
+void wipe_apply( VJFrame *frame, VJFrame *frame2, int opacity, int inc)
 {
+	const int width = frame->width;
+	const int height = frame->height;
     /* w, h increasen */
     transop_apply(frame, frame2, g_wipe_width, g_wipe_height, 0, 0, 0, 0, opacity);
     
 	g_wipe_width += inc;
-    g_wipe_height += ((w / h) - 0.5 + inc);
+    g_wipe_height += ((width / height) - 0.5 + inc);
 
-    if (g_wipe_width > w || g_wipe_height > h) {
+    if (g_wipe_width > width || g_wipe_height > height) {
 		g_wipe_width = 0;
 		g_wipe_height = 0;
     }

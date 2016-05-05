@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *lumablend_init();
-void lumablend_apply( VJFrame *frame, VJFrame *frame2, int width,
-		     int height, int threhold1, int threshold2,
-		     int opacity, int type);
+void lumablend_apply( VJFrame *frame, VJFrame *frame2,
+                     int threhold1, int threshold2, int opacity, int type);
 #endif

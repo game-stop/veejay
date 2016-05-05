@@ -367,55 +367,31 @@ extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2);
 extern void contourextract_apply(void *ed, VJFrame *frame, int threshold,
                                  int reverse,int mode, int take_bg, int feather,
                                  int min_blob_weight);
-
-extern void diff_apply(void *dd, VJFrame *frame,
-		       VJFrame *frame2, int width, int height, 
-		       int mode, int threshold, int c ,int feather);
-
-extern void chromamagick_apply(VJFrame *frame, VJFrame *frame2,
-			       int width, int height, int type, int op0);
-extern void colorfadergb_apply(VJFrame *frame, int width, int height,
-			       int opacity, int r, int g, int b);
-
-void lumablend_apply(VJFrame *frame, VJFrame *frame2, int width,
-		     int height, int type, int t1, int t2, int op);
-
-extern void diffimg_apply(VJFrame *frame, 
-			  int width, int height, int type, int delta,
-			  int zeta);
-extern void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int w,
-			       int h, int angle, int r, int g, int b,
-			       int level, int noise);
+extern void diff_apply(void *dd, VJFrame *frame, VJFrame *frame2, int threshold,
+                       int reverse, int mode, int feather);
+extern void chromamagick_apply(VJFrame *frame, VJFrame *frame2, int type, int op0);
+extern void colorfadergb_apply(VJFrame *frame, int opacity, int r, int g, int b);
+extern void lumablend_apply(VJFrame *frame, VJFrame *frame2, int type,
+                            int t1, int t2, int op);
+extern void diffimg_apply(VJFrame *frame, int type, int delta, int zeta);
+extern void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int angle,
+                               int r, int g, int b,int level, int noise);
 extern void scratcher_apply(VJFrame *frame, int o, int n, int r);
-extern void colorshift_apply(VJFrame *frame, int width, int height,
-			     int type, int param);
-extern void reflection_apply(VJFrame *frame, int w, int h, int n1,
-			     int n2, int n3);
+extern void colorshift_apply(VJFrame *frame, int type, int value);
+extern void reflection_apply(VJFrame *frame, int n1, int n2, int n3);
 extern void distortion_apply(VJFrame *frame, int i1, int i2, int i3, int i4, int i5, int i6 );
-extern void magicscratcher_apply(VJFrame *frame, int w, int h, int mode,
-				 int nframes, int r);
-extern void wipe_apply(VJFrame *frame, VJFrame *frame2, int w, int h,
-		       int inc, int opacity);
+extern void magicscratcher_apply(VJFrame *frame, int mode, int nframes, int r);
+extern void wipe_apply(VJFrame *frame, VJFrame *frame2, int inc, int opacity);
 /* begin API */
-extern void chromascratcher_apply(VJFrame *frame,
-				  int width, int height, int mode,
-				  int opacity, int nframes,
-				  int no_reverse);
-
-extern void tracer_apply(VJFrame *frame, VJFrame *frame2,
-			 int w, int h, int opacity, int n);
-
+extern void chromascratcher_apply(VJFrame *frame, int mode, int opacity,
+                                  int nframes, int no_reverse);
+extern void tracer_apply(VJFrame *frame, VJFrame *frame2, int opacity, int n);
 extern void mtracer_apply(VJFrame *frame, VJFrame *frame2, int mode, int n);
-
-extern void keyselect_apply(VJFrame *frame, VJFrame *frame2,int w,int h, int angle,int r,
-	int g, int b, int mode, int noise);
-
-extern void greyselect_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int swap);
-extern void isolate_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b,
-int opacity);
-
-extern void bwselect_apply(VJFrame *frame, int w, int h, int a , int b, int c, int g);
-
+extern void keyselect_apply(VJFrame *frame, VJFrame *frame2, int angle,
+                            int r, int g, int b, int mode, int noise);
+extern void greyselect_apply(VJFrame *frame, int angle, int r, int g, int b, int swap);
+extern void isolate_apply(VJFrame *frame, int angle, int r, int g, int b, int opacity);
+extern void bwselect_apply(VJFrame *frame, int a , int b, int c, int g);
 extern void bwotsu_apply(VJFrame *frame, int mode, int skew,int invert);
 
 extern void meanfilter_apply(VJFrame *frame);
