@@ -30,7 +30,6 @@
 #include "chromamagick.h"
 #include <math.h>
 #include "common.h"
-// FIXME: mode 8 and 9 corrupt (green/purple cbcr)
 
 vj_effect *chromamagick_init(int w, int h)
 {
