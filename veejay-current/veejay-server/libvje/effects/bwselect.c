@@ -121,7 +121,7 @@ void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int ga
 	else
 	{
 		if( gamma != last_gamma ) {
-			gamma_setup( width,height,(double) gamma / 100.0 );
+			gamma_setup( (double) gamma / 100.0 );
 			last_gamma = gamma;
 		}
 	
