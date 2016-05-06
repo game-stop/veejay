@@ -93,23 +93,34 @@ static void	*reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
 	threaded_t *t = tag->priv;
-	
 	char buf[16];
-	snprintf(buf,sizeof(buf)-1, "%03d:%d;", VIMS_GET_FRAME, my_screen_id);
-
 	int retrieve = 0;
 	int success  = 0;
-	
-	vj_client *v = vj_client_alloc( t->w, t->h, t->af );
-	v->lzo = lzo_new();
+	int is_mcast = (tag->source_type == VJ_TAG_TYPE_MCAST ?  1: 0 );
 
-	success = vj_client_connect_dat( v, tag->source_name,tag->video_channel );
+	vj_client *v = vj_client_alloc( t->w, t->h, t->af );
+	if( v == NULL ) 
+		return NULL;
+	
+	v->lzo = lzo_new();
+	if( v->lzo == NULL ) {
+		vj_client_free(v);
+		return NULL;
+	}
+
+	if( is_mcast ) {
+		success = vj_client_connect( v, NULL, tag->source_name, tag->video_channel );
+		snprintf(buf,sizeof(buf), "%03d:%d;", VIMS_VIDEO_MCAST_START, 0 );
+	}
+	else {
+		snprintf(buf,sizeof(buf), "%03d:%d;", VIMS_GET_FRAME, my_screen_id);
+		success = vj_client_connect_dat( v, tag->source_name,tag->video_channel );
+	}
 
 	if( success > 0 ) {
-			veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name,
-				tag->video_channel + 5);
+		veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
 	}
-	else if ( tag->source_type != VJ_TAG_TYPE_MCAST ) 
+	else 
 	{
 		veejay_msg(0, "Unable to connect to %s: %d", tag->source_name, tag->video_channel+5);
 		goto NETTHREADEXIT;
@@ -119,37 +130,50 @@ static void	*reader_thread(void *data)
 	t->state = STATE_RUNNING;
 	unlock(t);
 
+/*	if( is_mcast ) {
+		vj_client_send( v, V_CMD, (unsigned char*) buf );
+	}
+*/
 	for( ;; ) {
 		int error    = 0;
 		int res      = 0;
-
 		int ret = 0;
-	        if( retrieve == 0 && t->have_frame == 0 ) {
-			ret = vj_client_send( v, V_CMD,(unsigned char*) buf );
-			if( ret <= 0 ) {
-				error = 1;
-			}
-			else {
-				retrieve = 1;
-			}
-		}
-
-		if(!error && retrieve == 1 ) {
-			res = vj_client_poll(v, V_CMD );
-			if( res ) {	
-				if(vj_client_link_can_read( v, V_CMD ) ) {
-					retrieve = 2;
+	    
+		if( !is_mcast ) {
+			if( retrieve == 0 && t->have_frame == 0 ) {
+				ret = vj_client_send( v, V_CMD,(unsigned char*) buf );
+				if( ret <= 0 ) {
+					error = 1;
 				}
-			} 
-			else if ( res < 0 ) {
-				error = 1;
-			} else if ( res == 0 ) {
-				net_delay(10,0);
-				continue;
+				else {
+					retrieve = 1;
+				}
+			}
+
+			if(!error && retrieve == 1 ) {
+				res = vj_client_poll(v, V_CMD );
+				if( res ) {	
+					if(vj_client_link_can_read( v, V_CMD ) ) {
+						retrieve = 2;
+					}
+				} 
+				else if ( res < 0 ) {
+					error = 1;
+				} else if ( res == 0 ) {
+					net_delay(10,0);
+					continue;
+				}
 			}
 		}
+		else {
+			error = 0;
+			retrieve = 2;
+			res = 1;
+		}
 	
-	
+//FIXME multicast stream has its own header, it is not compressed.
+//FIXME compressing it before sending requires to modify header
+//FIXME 	
 		if(!error && retrieve == 2) {
 			int strides[3] = { 0,0,0};
 			int compr_len = 0;
@@ -213,7 +237,7 @@ NETTHREADRETRY:
 			veejay_msg(VEEJAY_MSG_INFO, " ZZzzzzz ... waiting for Link %s:%d to become ready", tag->source_name, tag->video_channel );
 			net_delay( 0, 5 );
 
-			if(tag->source_type == VJ_TAG_TYPE_MCAST )
+			if( is_mcast )
 				success = vj_client_connect( v,NULL,tag->source_name,tag->video_channel  );
 			else
 				success = vj_client_connect_dat( v, tag->source_name,tag->video_channel );
@@ -245,7 +269,12 @@ NETTHREADRETRY:
 	}
 
 NETTHREADEXIT:
-
+/*
+	if( is_mcast ) {
+		snprintf(buf,sizeof(buf), "%03d:;", VIMS_VIDEO_MCAST_STOP );
+		vj_client_send( v, V_CMD, (unsigned char*) buf );
+	}
+*/
 	if(t->buf)
 		free(t->buf);
 	t->buf = NULL;
@@ -302,13 +331,27 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	int b_len = t->in_w * t->in_h;
 	int buvlen = b_len;
 
-	if( PIX_FMT_YUV420P == t->in_fmt || PIX_FMT_YUVJ420P == t->in_fmt )
-		buvlen = b_len/4;
-	else if ( PIX_FMT_YUV444P == t->in_fmt || PIX_FMT_YUVJ444P == t->in_fmt ) {
-		buvlen = b_len;
+	//FIXME alpha channel not yet supported in unicast/mcast streaming, work arround. refactor in libvevosample
+	if( t->in_fmt == PIX_FMT_YUVA420P ) {
+		t->in_fmt = PIX_FMT_YUVJ420P;
+	} else if (t->in_fmt == PIX_FMT_YUVA422P ) {
+		t->in_fmt = PIX_FMT_YUVJ422P;
+	} else if (t->in_fmt == PIX_FMT_YUVA444P ) {
+		t->in_fmt = PIX_FMT_YUVJ444P;
 	}
-	else {
-		buvlen = b_len/2;
+
+	switch( t->in_fmt ) {  /* fixme alpha channel support */
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
+				buvlen = b_len / 4;
+				break;
+		case PIX_FMT_YUV444P:
+		case PIX_FMT_YUVJ444P:
+				buvlen = b_len;
+				break;
+		default:
+				buvlen = b_len / 2;
+				break;
 	}
 
 	if( t->a == NULL )
@@ -324,8 +367,9 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 		t->scaler = yuv_init_swscaler( t->a,t->b, &sws_templ, yuv_sws_get_cpu_flags() );
 	}
 
+	// bad image src points if t->b is set to yuv alpha
 	yuv_convert_and_scale( t->scaler, t->a,t->b );
-	
+
 	t->have_frame = 0;
 	unlock(t);
 
@@ -334,11 +378,6 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 
 int	net_thread_start(vj_tag *tag, int wid, int height, int pixelformat)
 {
-	if(tag->source_type == VJ_TAG_TYPE_MCAST ) {
-		veejay_msg(0, "Not in this version");
-		return 0;
-	}
-	
 	threaded_t *t = (threaded_t*)tag->priv;
 
 	pthread_mutex_init( &(t->mutex), NULL );
