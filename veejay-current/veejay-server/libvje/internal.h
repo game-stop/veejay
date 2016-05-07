@@ -396,8 +396,8 @@ extern void bwotsu_apply(VJFrame *frame, int mode, int skew,int invert);
 extern void meanfilter_apply(VJFrame *frame);
 extern void complexinvert_apply(VJFrame *frame, int angle, int r, int g, int b,
                                 int i_noise);
-
-extern void complexsaturation_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int adj, int adjv, int inoise);
+extern void complexsaturation_apply(VJFrame *frame, int angle, int r, int g, int b,
+                                    int adj, int adjv, int inoise);
 
 extern void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int w, int h, int angle, int r, 
 	int g, int b, int level, int threshold);
