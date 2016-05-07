@@ -50,7 +50,7 @@ Veejay can stream over the Network (UDP / Multicast )
 
 How to activate:
 
-1. veejay -V 224.0.0.50 -p 5000 -v movie1.avi
+1. veejay -T 224.0.0.50 -p 5000 -v movie1.avi
 2. veejay -d -W <movie1 width> -H <movie1 height>
 
 3. sayVIMS -h localhost -p 3490 "246:5000 224.0.0.50;"
@@ -85,11 +85,31 @@ How to activate:
 
 How to setup multicast?
 =======================
-1. enable 'multicast' in kernel configuration
 
-2. type 'route add -net 224.0.0.0 netmask 255.255.255.0 dev eth0'
-   (or something similar, read the man page of route to figure out
-    what addresses are reserved for multicast)
+How to setup:
+(example to setup multicast over loopback)
+
+1. turn off firewall (or add allow rule)
+
+2. /sbin/ifconfig lo multicast
+
+3. route add -net 224.0.0.0 netmask 240.0.0.0 dev lo
+
+4. echo 0 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts       
+
+5. echo 1 > /proc/sys/net/ipv4/ip_forward
+
+6. ping 224.0.0.1
+
+(should reply)
+
+You can replace 'lo' for the interface you want to use.
+
+If you have multiple interfaces, you can set VEEJAY_MCAST_INTERFACE to the
+interface you want to use for multicasting:
+
+$ export VEEJAY_MCAST_INTERFACE="eth0" 
+
 
 What is multicast?
 ==================
@@ -101,16 +121,40 @@ packets to multiple hosts.
 Limitations
 ===========
 
-1. Veejay can only stream to another veejay  
-2. All veejays must have identical video properties (fps,width,height, ... )
-3. Veejay will drop frames when it cannot keep up (or when packets are dropped)
-4. Audio is not supported 
+1. Audio is not supported 
+2. Frame data is only compressed with LZO, bandwith consumption for 720p is ~
+   40 MB/sec
+
 
 What header format?
 ===================
 
-see libvjnet/packet.h for multicast packet definition
+unicast/multcast packet format:
 
-for peer-to-peer streaming, the first 11 bytes of the buffer indicate 
-width, height and format in plain ASCII: "%04d %04d %1d"
+[field:byte size]
+
+Header is the first 44 bytes:
+
+ [width:4][height:4][pixel_format:4][compressed_length:8]
+ [plane0 length:8][plane1 length:8][plane2 length:8]
+ [DATA:compressed_length]
+
+data contains redundant information:
+
+ [DATA  [ Y compressed length: 4][ U compressed length: 4 ]
+        [ V compressed length: 4][ reserved: 4 ]
+        [ pixel_data: Y + U + V compressed length ]  
+ ]
+
+compressed length should match 16 + Y + U + V compressed length.
+If compressed length is zero, then the frame is not compressed and the plane
+lengths are the sizes of the YUV planes.
+
+For multicast, the whole of this blob is send in chunks of 1500 bytes.
+
+Each chunk starts with the following header:
+
+ [sequence number:4][usec:8][timeout:4][total packets:4][ data: 1480 bytes ]
+
+The last chunk is zero padded to fill the 1500 byte marker
 
