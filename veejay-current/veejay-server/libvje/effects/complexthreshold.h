@@ -21,7 +21,6 @@
 #ifndef COMPLEXTHRESHOLD_H
 #define COMPLEXTHRESHOLD_H
 vj_effect *complexthreshold_init();
-void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
-			int height, int i_angle, int red, int green,
-			int blue, int level, int threshold);
+void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int i_angle,
+                            int red, int green, int blue, int level, int threshold);
 #endif
