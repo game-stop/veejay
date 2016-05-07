@@ -393,10 +393,9 @@ extern void greyselect_apply(VJFrame *frame, int angle, int r, int g, int b, int
 extern void isolate_apply(VJFrame *frame, int angle, int r, int g, int b, int opacity);
 extern void bwselect_apply(VJFrame *frame, int a , int b, int c, int g);
 extern void bwotsu_apply(VJFrame *frame, int mode, int skew,int invert);
-
 extern void meanfilter_apply(VJFrame *frame);
-
-extern void complexinvert_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int i_noise);
+extern void complexinvert_apply(VJFrame *frame, int angle, int r, int g, int b,
+                                int i_noise);
 
 extern void complexsaturation_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int adj, int adjv, int inoise);
 
