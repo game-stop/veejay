@@ -400,8 +400,7 @@ extern void complexsaturation_apply(VJFrame *frame, int angle, int r, int g, int
                                     int adj, int adjv, int inoise);
 extern void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int angle,
                                    int r, int g, int b, int level, int threshold);
-		
-extern void complexsync_apply(VJFrame *frame, VJFrame *frame2, int w, int h, int val );
+extern void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val );
 
 extern void enhancemask_apply(VJFrame *frame,int w, int h, int *t);
 

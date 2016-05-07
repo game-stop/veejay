@@ -69,9 +69,10 @@ void complexsync_free() {
    	 c_outofsync_buffer[0] = NULL;
 }
 
-void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int val)
+void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val)
 {
 	const int len = frame->len;
+	const int width = frame->width;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
