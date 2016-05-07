@@ -1,6 +1,6 @@
 /* vjnet - low level network I/O for VeeJay
  *
- *           (C) 2005-2007 Niels Elburg <nwelburg@gmail.com> 
+ * (C) 2005-2016 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -31,31 +31,33 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <limits.h>
 #include <arpa/inet.h>
-#include "mcastreceiver.h"
+#include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
 #include <veejay/vims.h>
-#include "packet.h"
 #include <libyuv/yuvconv.h>
+#include "mcastreceiver.h"
+#include "packet.h"
 
 typedef struct
 {
 	packet_header_t	hdr;
-	frame_info_t	inf;
-	uint8_t		*buf;
-	int		len;
-	int		count;
-	int		rdy;
+	uint8_t	*ref;
+	int	len;
+	int	count;
+	int	rdy;
 } packet_buffer_t;
 
 #define PACKET_SLOTS 3
+
 typedef struct
 {
 	packet_buffer_t	**slot;
-	int		 in_slot;
-	long		 last;
+	int	 in_slot;
+	long last;
+	uint8_t	*buf;
 } packet_slot_t;
 
 mcast_receiver	*mcast_new_receiver( const char *group_name, int port )
@@ -143,8 +145,8 @@ int     mcast_receiver_set_peer( mcast_receiver *v, const char *hostname )
                 v->addr.sin_family = AF_INET;
                 if( !inet_aton( hostname, &(v->addr.sin_addr) ) )
                 {
-			veejay_msg(0, "Invalid host '%s'", hostname );
-                        return 0;
+					veejay_msg(0, "Invalid host '%s'", hostname );
+                    return 0;
                 }
         }
         return 1;
@@ -172,24 +174,32 @@ int	mcast_recv( mcast_receiver *v, void *buf, int len )
 	return n;
 }
 
+static void mcast_clear_slot( packet_buffer_t *packet )
+{
+	packet->ref = NULL;
+	packet->count = 0;
+	packet->rdy = 0;
+	veejay_memset( &(packet->hdr), 0, PACKET_HEADER_LENGTH );
+}
+
 int	mcast_recv_packet_frame( mcast_receiver *v )
 {
-	uint8_t  chunk[PACKET_PAYLOAD_SIZE];
+	uint8_t chunk[PACKET_PAYLOAD_SIZE];
 	packet_slot_t *q = (packet_slot_t*) v->next;
-
-	packet_header_t	hdr;
-	frame_info_t	inf;
-
+	
 	int res = recv(v->sock_fd, chunk, PACKET_PAYLOAD_SIZE, 0 );
-        if( res <= 0 )
-        {
+	if( res <= 0 ) {
 		if(res == - 1)
-               	 veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
+        	veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
 		
-                return 0;
-        }
-        hdr = packet_get_header(chunk);
-        packet_get_info( &inf, chunk );
+        return 0;
+    }
+	if( res != PACKET_PAYLOAD_SIZE ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Multicast receive error, expected %d bytes got %d bytes",
+				PACKET_PAYLOAD_SIZE, res );
+	}
+
+    packet_header_t *hdr = packet_get_hdr(chunk);
 
 	//@ choose slot to fill
 	int i;
@@ -197,7 +207,8 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 
 	for(i = 0; i < PACKET_SLOTS; i ++ ) 
 	{
-		if( q->slot[i]->hdr.usec == hdr.usec ) {
+		const packet_buffer_t *packet = q->slot[i];
+		if( packet->hdr.usec == hdr->usec ) {
 			d_slot = i;
 			break;
 		}
@@ -215,10 +226,10 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 
 	//@ no slots available
 	if( d_slot == -1) {
-		veejay_msg(VEEJAY_MSG_WARNING, "All packet slots in use, cannot keep pace! Dropping oldest in queue.");
+		veejay_msg(VEEJAY_MSG_DEBUG, "All packet slots in use, cannot keep pace! Dropping oldest in queue.");
 		//@ drop oldest packet in slot
 		long oldest = LONG_MAX;
-		int  o      = 0;
+		int o = 0;
 		for(i = 0; i < PACKET_SLOTS; i ++ ) {
 			if(q->slot[i]->hdr.usec < oldest ) {
 				o = i;
@@ -227,59 +238,45 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 		}
 
 		d_slot = o;
-		free(q->slot[d_slot]->buf);
-		q->slot[d_slot]->buf = NULL;
-		q->slot[d_slot]->count = 0;
-		veejay_memset( &(q->slot[d_slot]->hdr), 0,sizeof(packet_header_t));
-		veejay_memset( &(q->slot[d_slot]->inf), 0,sizeof(frame_info_t));
-		q->slot[d_slot]->rdy = 0;
+		mcast_clear_slot( q->slot[d_slot] );
 	}
 
 	//@ destination slot
 	packet_buffer_t	*pb = q->slot[d_slot];
-	if(pb->buf == NULL) { //@ allocate buffer if needed
-		pb->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * inf.width * inf.height * 3);
-	}
-
-	pb->len = inf.len;
-	uint8_t *dst = pb->buf + (CHUNK_SIZE * hdr.seq_num );
-        packet_get_data( &hdr, chunk, dst );
+	
+	uint8_t *dst = q->buf + (CHUNK_SIZE * hdr->seq_num );
+    
+	packet_get_data( hdr, chunk, dst );
+	
 	pb->count ++;
+	pb->ref = dst;
 
-	//@ save info/hdr
-	veejay_memcpy( &(pb->hdr), &hdr, sizeof(packet_header_t));
-	veejay_memcpy( &(pb->inf), &inf, sizeof(frame_info_t));
+	veejay_memcpy( &(pb->hdr), hdr, sizeof(packet_header_t));
 
-	if( pb->count >= hdr.length )
+	if( pb->count >= hdr->length )
 	{
 		pb->rdy = 1;
-		q->last = hdr.usec;
+		q->last = hdr->usec;
 		return 2;
 	}
 
 	return 1;
 }
 
-uint8_t *mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *len )
+uint8_t *mcast_recv_frame( mcast_receiver *v, int *len, int *hdrlen, uint8_t *recvbuf )
 {
 	packet_slot_t *q = (packet_slot_t*) v->next;
 	int i,n;
+
+	q->buf = recvbuf;
+
 	for(i = 0; i < PACKET_SLOTS; i ++ ) 
 	{
 		//@ find rdy frames or too-old-frames and free them
 		if( q->slot[i]->rdy == 1 || q->slot[i]->hdr.usec < q->last ) {
-			free(q->slot[i]->buf);
-			q->slot[i]->buf = NULL;
-			q->slot[i]->count = 0;
-			veejay_memset( &(q->slot[i]->hdr), 0,sizeof(packet_header_t));
-			veejay_memset( &(q->slot[i]->inf), 0,sizeof(frame_info_t));
-			q->slot[i]->rdy = 0;
+			mcast_clear_slot( q->slot[i] );
 		}
 	}
-
-	//@ is there something todo
-//	if( mcast_poll_timeout( v, 1000 ) == 0 )
-//		return NULL;
 
 	while( (n = mcast_recv_packet_frame(v) ) )
 	{
@@ -308,18 +305,16 @@ uint8_t *mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *
 		if( q->slot[i]->rdy == 1 && q->slot[i]->hdr.usec > t1) {
 			full_frame = 1;
 			d_slot = i;
+			break;
 		}
 	}
-	/*
-	*/
+	
 	//@ return newest full frame
 	if( full_frame ) {
 		packet_buffer_t *pb = q->slot[d_slot];
-		*dw = pb->inf.width;
-		*dh = pb->inf.height;
-		*dfmt=pb->inf.fmt;
-		*len =pb->len;
-		return pb->buf;
+		*len = pb->len;
+		*hdrlen = 0;
+		return q->buf;
 	}
 
 	return NULL;
@@ -338,13 +333,12 @@ void	mcast_close_receiver( mcast_receiver *v )
 		if( q ) {
 		  for( i = 0; i < PACKET_SLOTS; i ++ ){
 			packet_buffer_t *r = q->slot[i];
-			if( r->buf ) {
-				free(r->buf);
-			}
 			free(r);
 		  }
 		  free(q->slot);
 		  free(q);
 		}
+		free(v);
+		v = NULL;
 	}
 }

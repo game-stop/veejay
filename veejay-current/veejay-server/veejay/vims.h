@@ -320,6 +320,7 @@ enum {
 #define VEEJAY_PORT_STA 1
 #define VEEJAY_PORT_DAT 3
 #define VEEJAY_PORT_MAT 2
+#define VEEJAY_PORT_OSC 6
 
 #define FMT_RGB24	2
 #define FMT_RGB32	1

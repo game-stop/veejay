@@ -19,36 +19,19 @@
  */
 #ifndef MCASTSENDER_HH
 #define MCASTSENDER_HH
-#include <stdio.h>
-#include <unistd.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/socket.h>  
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <libvje/vje.h>
-#include <stdint.h>
 typedef struct
 {
-	char 	*group;
+	char *group;
 	int	sock_fd;
 	int	addr_len;
-	struct sockaddr_in	addr; 
-	int	send_buf_size;
-	uint32_t stamp;
+	struct sockaddr_in addr; 
+	long stamp;
 } mcast_sender;
 
 mcast_sender *mcast_new_sender( const char *group_name );
-void	mcast_set_interface( mcast_sender *s, const char *interface );
-
+void mcast_set_interface( mcast_sender *s, const char *interface );
 int	mcast_send( mcast_sender *s, const void *buf, int len, int port_num );
-
 int	mcast_send_frame( mcast_sender *s, const VJFrame *frame , uint8_t *buf, int total_len,long ms, int port_num ,int mode);
-
-void	mcast_close_sender(mcast_sender *s );
-
+void mcast_close_sender(mcast_sender *s );
 int	mcast_sender_set_peer( mcast_sender *v, const char *hostname );
-
 #endif

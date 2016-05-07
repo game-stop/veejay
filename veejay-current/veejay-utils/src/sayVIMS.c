@@ -126,15 +126,17 @@ static	void reconnect(void)
 static int vjsend( int cmd, unsigned char *buf )
 {
 	/* bad-check if connection is still up */
-	int foobar = vj_client_poll(sayvims, V_CMD );
-	if( foobar && vj_client_link_can_read(sayvims, V_CMD) )
-	{
-		unsigned char dummy[8];
-		/* read one byte will fail if connection is closed */
-		/* nb: only vims query messages write something to V_CMD (vims 400-499)*/
-		int res = vj_client_read(sayvims, V_CMD, dummy, 1);
-		if( res <= 0 ) { 
-			reconnect();
+	if(!sayvims->mcast) {
+		int foobar = vj_client_poll(sayvims, V_CMD );
+		if( foobar && vj_client_link_can_read(sayvims, V_CMD) )
+		{
+			unsigned char dummy[8];
+			/* read one byte will fail if connection is closed */
+			/* nb: only vims query messages write something to V_CMD (vims 400-499)*/
+			int res = vj_client_read(sayvims, V_CMD, dummy, 1);
+			if( res <= 0 ) { 
+				reconnect();
+			}
 		}
 	}
 

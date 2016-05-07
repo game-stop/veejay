@@ -1544,18 +1544,20 @@ void vj_event_update_remote(void *ptr)
 
 	if( v->settings->use_vims_mcast )
 	{
-		int res = vj_server_update(v->vjs[VEEJAY_PORT_MAT],0 );
-		if(res > 0)
-		{
-			v->uc->current_link = 0;
-			char *buf = NULL;
-			int len =0;
-			while( ( buf = vj_server_retrieve_msg( v->vjs[VEEJAY_PORT_MAT], 0, buf,&len )) != NULL )
-			{	
-				vj_event_parse_msg( v, buf,len );
+		int res = vj_server_poll( v->vjs[VEEJAY_PORT_MAT] );
+		if( res > 0 ) {
+			 res = vj_server_update(v->vjs[VEEJAY_PORT_MAT],0 );
+			if(res > 0)
+			{
+				v->uc->current_link = 0;
+				char *buf = NULL;
+				int len =0;
+				while( ( buf = vj_server_retrieve_msg( v->vjs[VEEJAY_PORT_MAT], 0, buf,&len )) != NULL )
+				{	
+					vj_event_parse_msg( v, buf,len );
+				}
 			}
 		}
-		
 	}
 
 	v->settings->is_dat = 0;
@@ -9128,7 +9130,7 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	if( SAMPLE_PLAYING(v))
 		n_frames = sample_max_video_length( v->uc->sample_id );
 	char *s_print_buf = get_print_buf(200);
-	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d",
+	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d %d",
 		el->video_width,
 		el->video_height,
 		el->video_inter,
@@ -9140,7 +9142,8 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 		el->audio_chans,
 		el->num_video_files,
 		n_frames,
-		v->audio
+		v->audio,
+		v->settings->use_vims_mcast
 		);	
 	sprintf(s_print_buf, "%03zu%s",strlen(info_msg), info_msg);
 	SEND_MSG(v,s_print_buf);

@@ -202,9 +202,9 @@ static void Usage(char *progname)
 	fprintf(stderr,
 	   		"  -p/--port <num>\t\tTCP port to accept/send messages (default: 3490)\n");
 	fprintf(stderr,
-			"  -M/--multicast-osc \t\tmulticast OSC\n");
+			"  -M/--multicast-osc <multicast address> \t\tmulticast OSC\n");
 	fprintf(stderr,
-			"  -T/--multicast-vims \t\tmulticast VIMS\n");
+			"  -T/--multicast-vims <multicast address> \t\tmulticast VIMS\n");
  	fprintf(stderr,
 			"  -m/--memory <num>\t\tMaximum memory to use for cache (0=disable, default=0 max=100)\n");  
 	fprintf(stderr,
@@ -321,15 +321,11 @@ static void Usage(char *progname)
 #define OUT_OF_RANGE_ERR(val) if(OUT_OF_RANGE(val)) { fprintf(stderr,"\tValue must be 0-100\n"); exit(1); }
 
 #define check_val(val,msg) {\
-char *v = strdup(val);\
-if(v==NULL){\
+if(val==NULL){\
 fprintf(stderr, " Invalid argument given for %s\n",msg);\
 }\
-else\
-{\
-free(v);\
-}\
 }
+
 static int set_option(const char *name, char *value)
 {
     /* return 1 means error, return 0 means okay */

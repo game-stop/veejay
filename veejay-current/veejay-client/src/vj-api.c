@@ -116,6 +116,7 @@ static struct
 #define MAX_SLOW 25
 
 static int beta__ = 0;
+static int use_vims_mcast = 0;
 
 static struct
 {
@@ -5627,10 +5628,10 @@ static void load_editlist_info()
 #endif
 		return;
 	}
-	sscanf(res, "%d %d %d %c %f %d %d %ld %d %ld %ld %d",
+	sscanf(res, "%d %d %d %c %f %d %d %ld %d %ld %ld %d %d",
 	       &values[0], &values[1], &values[2], &norm,&fps,
 	       &values[4], &values[5], &rate, &values[7],
-	       &dum[0], &dum[1], &values[8]);
+	       &dum[0], &dum[1], &values[8], &use_vims_mcast);
 	snprintf( tmp, sizeof(tmp)-1, "%dx%d", values[0],values[1]);
 
 	info->el.width = values[0];
@@ -5665,6 +5666,13 @@ static void load_editlist_info()
 	{
 		set_toggle_button( "button_5_4", values[8]);
 		enable_widget( "button_5_4" );
+	}
+
+	if( use_vims_mcast ) {
+		enable_widget( "toggle_multicast" );
+	}
+	else {
+		disable_widget( "toggle_multicast" );
 	}
 
 	free(res);
@@ -8668,10 +8676,7 @@ static void remove_sample_from_slot()
 		             VIMS_STREAM_DELETE ),
 	           "%d",
 	           info->selection_slot->sample_id );
-	// decrement history of delete type
-	int *his = info->history_tokens[ (info->status_tokens[PLAY_MODE]) ];
 
-	his[TOTAL_SLOTS] = his[TOTAL_SLOTS] - 1;
 	update_sample_slot_data( bank_nr, slot_nr, 0, -1, NULL, NULL); 
 
 	sample_gui_slot_t *gui_slot = info->sample_banks[bank_nr]->gui_slot[slot_nr];
@@ -8679,8 +8684,12 @@ static void remove_sample_from_slot()
 		gtk_image_clear( GTK_IMAGE( gui_slot->image) );
 
 	set_selection_of_slot_in_samplebank( FALSE );
+
 	info->selection_gui_slot = NULL;
 	info->selection_slot = NULL;
+	
+	info->uc.reload_hint[HINT_SLIST] = 2;	
+
 }
 
 

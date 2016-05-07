@@ -1247,8 +1247,8 @@ void	vj_perform_done_s2( veejay_t *info ) {
 
 static int vj_perform_compress_primary_frame_s2(veejay_t *info,VJFrame *frame )
 {
-	char info_line[128];
-	int data_len = 44;  
+	char info_line[64];
+	int data_len = 44;
 	int sp_w = frame->width;
 	int sp_h = frame->height;
 	int sp_uvlen = frame->uv_len;
@@ -1285,24 +1285,24 @@ static int vj_perform_compress_primary_frame_s2(veejay_t *info,VJFrame *frame )
 		planes[1],
 		planes[2] );
 
-	veejay_memcpy( socket_buffer, info_line, 44 );
-	
+	veejay_memcpy( socket_buffer, info_line, data_len );
+
 	if( compr_ok == 0 )
 	{
 		if(!info->splitter) {
-			veejay_memcpy( socket_buffer + 44 , frame->data[0], sp_len);
-			veejay_memcpy( socket_buffer + 44 + sp_len,frame->data[1], sp_uvlen );
-			veejay_memcpy( socket_buffer + 44 + sp_len + sp_uvlen,frame->data[2],sp_uvlen );
+			veejay_memcpy( socket_buffer + data_len , frame->data[0], sp_len);
+			veejay_memcpy( socket_buffer + data_len + sp_len,frame->data[1], sp_uvlen );
+			veejay_memcpy( socket_buffer + data_len + sp_len + sp_uvlen,frame->data[2],sp_uvlen );
 		}
 		else
 		{
-			veejay_memcpy( socket_buffer + 44, frame->data[0], sp_len + sp_uvlen + sp_uvlen);
+			veejay_memcpy( socket_buffer + data_len, frame->data[0], sp_len + sp_uvlen + sp_uvlen);
 		}	
-		data_len += 16 + sp_len + sp_uvlen + sp_uvlen;
+		data_len += 16 + sp_len + sp_uvlen + sp_uvlen; // 16 is compression data header
 			
 	} 
 	else {
-		data_len += 16 + planes[0] + planes[1] + planes[2];
+		data_len += total;
 	}
 	
 	return data_len;
@@ -1352,8 +1352,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 		{
 			for( i = 0; i < VJ_MAX_CONNECTIONS; i++ ) {
 				if( info->rlinks[i] != -1 ) {
-					if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, data_len,
-							frame, info->real_fps )<=0)
+					if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, data_len, frame, info->real_fps )<=0)
 					{
 							_vj_server_del_client( info->vjs[id], info->rlinks[i] );
 					}
@@ -1363,8 +1362,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 		}
 		else
 		{		
-			if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, data_len,
-						frame, info->real_fps )<=0)
+			if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, data_len, frame, info->real_fps )<=0)
 			{
 				veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame.");
 			}

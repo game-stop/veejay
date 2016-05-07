@@ -1,5 +1,5 @@
 /* libvjnet - Linux VeeJay
- * 	     (C) 2002-2007 Niels Elburg <nwelburg@gmail.com> 
+ * 	     (C) 2002-2016 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -30,6 +30,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <libvje/vje.h>
 #include <libvjnet/vj-client.h>
 #include <veejay/vims.h>
 #include <libvjmsg/vj-msg.h>
@@ -194,9 +195,6 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 
 		mcast_sender_set_peer( v->s , group_name );
 		v->mcast = 1;
-//		mcast_receiver_set_peer( v->c[0]->r, group_name);
-		veejay_msg(VEEJAY_MSG_DEBUG, "Client is interested in packets from group %s : %d, send to %d",
-			group_name, port_id + VJ_CMD_MCAST , port_id + VJ_CMD_MCAST_IN);
 
 		return 1;
 	}
@@ -213,6 +211,9 @@ int	vj_client_link_can_read( vj_client *v, int sock_type ) {
 
 int	vj_client_poll( vj_client *v, int sock_type )
 {
+	if( v->mcast )
+		return mcast_poll( v->r );
+
 	return sock_t_poll( v->fd[sock_type ]);
 }
 
@@ -237,23 +238,28 @@ static	long	vj_client_decompress( vj_client *t,uint8_t *in, uint8_t *out, int da
  * and try to identify which software is sending frames
  *
  */
-
+#define FRAMEINFO_LENGTH 44
 static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
 {
-	uint8_t line[44];
-
+	uint8_t line[64];
 	veejay_memset( line,0, sizeof(line));
-	int plen = sock_t_recv( v->fd[0], line, 44 );
-	
+
+	int	plen = sock_t_recv( v->fd[0], line, FRAMEINFO_LENGTH );
+
 	if( plen == 0 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
-		return -1;
+		return 0;
 	}
 
 	if( plen < 0 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error while reading header: %s", strerror(errno));
-		return -1;
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while reading header: %s", strerror(errno));
+		return 0;
+	}
+
+	if( plen != FRAMEINFO_LENGTH ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame header, only got %d bytes.", plen );
+		return 0;
 	}
 
 	int n = sscanf( (char*) line, "%04d%04d%04d%08d%08d%08d%08d", 
@@ -291,6 +297,7 @@ int	vj_client_read_frame_header( vj_client *v, int *w, int *h, int *fmt, int *co
 	}
 
 	if( tokens[0] <= 0 || tokens[1] <= 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Frame packet does not contain any data" );
 		return 0;
 	}
 
@@ -301,6 +308,36 @@ int	vj_client_read_frame_header( vj_client *v, int *w, int *h, int *fmt, int *co
 	*stride1=tokens[4];
 	*stride2=tokens[5];
 	*stride3=tokens[6];
+	v->in_width = *w;
+	v->in_height = *h;
+	v->in_fmt = *fmt;
+
+	return 1;
+}
+
+int	vj_client_read_mcast_data( vj_client *v, int *compr_len, int *stride1, int *stride2, int *stride3, int *w, int *h, int *fmt, uint8_t *dst, int buflen )
+{
+	if( v->space == NULL ) {
+		v->space = vj_calloc( sizeof(uint8_t) * RUP8( buflen ));
+		if(v->space == NULL)
+			return 0;
+	}
+
+	int space_len = 0;
+	int hdr_len = 0;
+	uint8_t *space = mcast_recv_frame( v->r, &space_len, &hdr_len, v->space );
+	if( space == NULL ) {
+		free(v->space);
+		return 0;
+	}
+
+	int n_tokens = sscanf( (char*) v->space, "%04d%04d%04d%08d%08d%08d%08d",w,h,fmt,compr_len,stride1,stride2,stride3 );
+	if( n_tokens != 7 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Frame header error in mcast frame, only parsed %d tokens", n_tokens );
+		free(v->space);
+		return 0;
+	}
+
 	v->in_width = *w;
 	v->in_height = *h;
 	v->in_fmt = *fmt;
@@ -326,6 +363,7 @@ int vj_client_read_frame_data( vj_client *v, int compr_len, int stride1,int stri
 
 	if( compr_len > 0 )  {
 		int n = sock_t_recv( v->fd[0],v->space,datalen );
+		
 		if( n <= 0 ) {
 			if( n == -1 ) {
 				veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
@@ -340,11 +378,11 @@ int vj_client_read_frame_data( vj_client *v, int compr_len, int stride1,int stri
 			veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, compr_len );	
 			return 0;
 		}
-
 		return 2;
 	}
 	else {
 		int n = sock_t_recv( v->fd[0], dst, datalen );
+		
 		if( n != (stride1 + stride2 + stride3)  )
 		{
 			return 0;
@@ -375,13 +413,14 @@ void vj_client_decompress_frame_data( vj_client *v, uint8_t *dst, int fmt, int w
 			uv_len = y_len;
 			break;
 	}
-	
 
-	//@ decompress YUV buffer
-	vj_client_decompress( v, v->space, dst, compr_len, y_len, uv_len ,0, stride1,stride2,stride3);
+	uint8_t *addr = v->space;
+
+	if( v->mcast ) 
+			addr = v->space + FRAMEINFO_LENGTH;
+
+	vj_client_decompress( v, addr, dst, compr_len, y_len, uv_len ,0, stride1,stride2,stride3);
 }
-
-
 
 uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret )
 {
@@ -397,7 +436,6 @@ uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret
 	
 	int result = vj_client_packet_negotiate( v, tokens );
 	if( result == 0 ) { 
-	  	veejay_msg(0, "Unable to read frame header.");
 		*ret = -1;
 		return dst;
 	}
@@ -502,7 +540,7 @@ uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret
 
 		if( v->in_fmt == v->cur_fmt && v->cur_width == p[0] && v->cur_height == p[1] ) {
 			*ret = 1;
-		        return dst;
+			return dst;
 		}
 
 		*ret = 2;
@@ -514,11 +552,17 @@ uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret
 
 int	vj_client_read_no_wait(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
+	if( v->mcast )
+		return mcast_recv( v->r, dst, bytes );
+
 	return sock_t_recv( v->fd[ sock_type ], dst, bytes );
 }
 
 int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
+	if( v->mcast )
+		return mcast_recv( v->r, dst, bytes );
+
 	return sock_t_recv( v->fd[ sock_type ], dst, bytes );
 }
 

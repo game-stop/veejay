@@ -19,41 +19,22 @@
  */
 #ifndef MCASTRECEIVER_H
 #define MCASTRECEIVER_H
-#include <stdio.h>
-#include <unistd.h>
-#include <errno.h>
-#include <limits.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/socket.h>  
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <libvje/vje.h>
-#include <pthread.h>
 typedef struct
 {
 	char *group;
 	int	addr_len;
-	struct sockaddr_in	addr;	
+	struct sockaddr_in addr;	
 	int	port;
 	int	sock_fd;
-	int 	recv_buf_size;
 	uint8_t	*space;
-	int     space_len;
-	void	*next;
+	int space_len;
+	void *next;
 } mcast_receiver;
 
 mcast_receiver *mcast_new_receiver( const char *group_name, int port );
-
-int		mcast_poll( mcast_receiver *v );
-
-int		mcast_recv( mcast_receiver *v, void *dst, int len );
-
-uint8_t 	*mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *len );
-
-void		mcast_close_receiver( mcast_receiver *v );
-
-int		mcast_receiver_set_peer( mcast_receiver *v, const char *hostname );
-
+int	mcast_poll( mcast_receiver *v );
+int	mcast_recv( mcast_receiver *v, void *dst, int len );
+uint8_t	*mcast_recv_frame( mcast_receiver *v, int *len, int *hdrlen, uint8_t *recvbuf );
+void mcast_close_receiver( mcast_receiver *v );
+int	mcast_receiver_set_peer( mcast_receiver *v, const char *hostname );
 #endif

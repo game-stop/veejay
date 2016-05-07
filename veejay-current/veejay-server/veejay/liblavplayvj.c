@@ -918,7 +918,6 @@ static int veejay_screen_update(veejay_t * info )
 	if( info->settings->mcast_frame_sender && info->settings->use_vims_mcast )
 	{
 		vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link);
-		vj_perform_done_s2(info);
 	}
 
 	vj_perform_get_primary_frame(info,frame);
@@ -2657,7 +2656,7 @@ int vj_server_setup(veejay_t * info)
 	}
 
 	info->vjs[VEEJAY_PORT_MAT] = NULL;
-	if( info->settings->use_vims_mcast ) //FIXME mcast
+	if( info->settings->use_vims_mcast ) 
 	{
 		info->vjs[VEEJAY_PORT_MAT] =
 			vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD, recv_len );

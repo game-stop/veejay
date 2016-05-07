@@ -1797,9 +1797,9 @@ void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 		&current_color );
 
 	// scale to 0 - 255
-	gint red = current_color.red / 256.0;
-gint green = current_color.green / 256.0;
-	gint blue = current_color.blue / 256.0;
+	gint red = current_color.red / 255.0;
+	gint green = current_color.green / 255.0;
+	gint blue = current_color.blue / 255.0;
 	multi_vims( VIMS_STREAM_NEW_COLOR, "%d %d %d",
 		red,green,blue );
 	gveejay_new_slot(MODE_STREAM);
@@ -4521,7 +4521,6 @@ void	on_midievent_toggled( GtkWidget *w, gpointer data )
 	vj_midi_play( info->midi );
 }
 
-
 void	on_load_midi_layout1_activate( GtkWidget *w , gpointer data )
 {
 	gchar *filename = dialog_open_file( "Select MIDI configuration file to load",0);
@@ -4552,3 +4551,12 @@ void	on_button_vloop_start_clicked(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_VLOOPBACK_START, "%d", get_nums( "spin_vloop" ) );
 }
 
+void on_toggle_multicast_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if( is_button_toggled( "toggle_multicast" ) ) {
+		multi_vims( VIMS_VIDEO_MCAST_START, "%d", 0 );
+	}
+	else {
+		single_vims( VIMS_VIDEO_MCAST_STOP );
+	}
+}

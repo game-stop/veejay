@@ -1,6 +1,6 @@
 /* vjnet - low level network I/O for VeeJay
  *
- *           (C) 2005 Niels Elburg <nwelburg@gmail.com> 
+ * (C) 2005-2016 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -26,14 +26,8 @@
 
 void		packet_dump_header( packet_header_t *h)
 {
-	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %d/%d, Timestamp %x Timeout : %ld",
-		h->flag, h->seq_num,h->length, h->usec,h->timeout );
-}
-
-void		packet_dump_info( frame_info_t *i )
-{
-	veejay_msg(VEEJAY_MSG_DEBUG, "Frame: %dx%d, fmt %d, data_len=%d",
-		i->width,i->height,i->fmt, i->len );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %d/%d, Timestamp %ld Timeout : %d",
+		h->seq_num,h->length, h->usec,h->timeout );
 }
 
 packet_header_t		packet_construct_header(uint8_t flag)
@@ -41,8 +35,7 @@ packet_header_t		packet_construct_header(uint8_t flag)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	packet_header_t header;
-	header.flag = flag;
-	header.seq_num = 0;	// not set
+	header.seq_num = 0;
 	header.usec = tv.tv_usec;
 	header.timeout = 0;
 	header.length = 0;
@@ -52,8 +45,7 @@ packet_header_t		packet_construct_header(uint8_t flag)
 packet_header_t		packet_get_header(const void *data)
 {
 	packet_header_t h,tmp;
-	veejay_memcpy( &tmp, data, sizeof(packet_header_t) );
-	h.flag = tmp.flag;
+	veejay_memcpy( &tmp, data, PACKET_HEADER_LENGTH );
 	h.seq_num = tmp.seq_num;
 	h.length = tmp.length;
 	h.usec = tmp.usec;
@@ -61,40 +53,32 @@ packet_header_t		packet_get_header(const void *data)
 	return h;
 }
 
+packet_header_t  *packet_get_hdr(const void *data)
+{
+	return (packet_header_t*) data;
+}
+
 int			packet_get_data(packet_header_t *h, const void *data, uint8_t *plane )
 {
-	const char *addr = (const char*) data;
-	size_t len = sizeof(packet_header_t);
-	len += sizeof( frame_info_t );
-	veejay_memcpy( plane , addr + len, CHUNK_SIZE );
+	uint8_t *addr = (uint8_t*) data;
+	veejay_memcpy( plane , addr + PACKET_HEADER_LENGTH, CHUNK_SIZE );
 	return 1;
 }
 
-int			packet_get_info(frame_info_t *i, const void *data )
+int			packet_put_padded_data(packet_header_t *h, void *payload, const uint8_t *plane, int bytes )
 {
-	const char *dst = (const char*) data;
-	veejay_memcpy(i, dst + sizeof(packet_header_t), sizeof(frame_info_t));
-	return 1;
-}
-
-int			packet_put_padded_data(packet_header_t *h, frame_info_t *i , void *payload, const uint8_t *plane, int bytes )
-{
-	char *dst = (char*) payload;
-	size_t len = sizeof( packet_header_t );
+	uint8_t *dst = (uint8_t*) payload;
+	size_t len = PACKET_HEADER_LENGTH;
 	veejay_memcpy( dst, h , len );
-	veejay_memcpy( dst + len, i , sizeof( frame_info_t ));
-	len += sizeof(frame_info_t );
 	veejay_memcpy( dst + len, plane, bytes );
 	return (len + bytes);
 }
-int			packet_put_data(packet_header_t *h, frame_info_t *i , void *payload, const uint8_t *plane )
+
+int			packet_put_data(packet_header_t *h, void *payload, const uint8_t *plane )
 {
-	size_t len = sizeof( packet_header_t );
-	char *dst = (char*) payload;
-	veejay_memcpy( dst, h , len );
-	veejay_memcpy( dst + len, i , sizeof( frame_info_t ));
-	len += sizeof(frame_info_t );
-	veejay_memcpy( dst + len, plane, CHUNK_SIZE );
+	uint8_t *dst = (uint8_t*) payload;
+	veejay_memcpy( dst, h , PACKET_HEADER_LENGTH );
+	veejay_memcpy( dst + PACKET_HEADER_LENGTH, plane, CHUNK_SIZE );
 	return 1;
 }
 

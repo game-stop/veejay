@@ -22,13 +22,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <libvjmem/vjmem.h>
-#include "mcastsender.h"
 #include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <libavutil/pixfmt.h>
+#include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <veejay/vims.h>
 #include "packet.h"
+#include "mcastsender.h"
 
 static void print_error(char *msg)
 {
@@ -46,7 +54,6 @@ mcast_sender	*mcast_new_sender( const char *group_name )
 	v->addr.sin_port 	= htons( 0 );
 	v->addr_len = sizeof( struct sockaddr_in );	
 	v->sock_fd = socket( AF_INET, SOCK_DGRAM, 0 );
-	v->send_buf_size = 240 * 1024;
 	v->stamp = 1;
 	if( v->sock_fd == -1 )
 	{
@@ -77,15 +84,6 @@ mcast_sender	*mcast_new_sender( const char *group_name )
 		if(v) free(v);
 		return NULL;
 	}
-
-//	if( setsockopt( v->sock_fd, SOL_SOCKET, SO_SNDBUF, &(v->send_buf_size), sizeof(int)) < 0 )
-//	{
-//		print_error("so_sndbuf");
-//	}
-
-//	if( getsockopt( v->sock_fd, SOL_SOCKET, SO_SNDBUF, &(v->send_buf_size),
-//		sizeof(int)) < 0 )
-//		print_error();
 
 	char *eth = getenv("VEEJAY_MCAST_INTERFACE");
 	if( eth != NULL ) {
@@ -127,33 +125,19 @@ void		mcast_set_interface( mcast_sender *v, const char *interface )
 
 	if( setsockopt( v->sock_fd, IPPROTO_IP, IP_MULTICAST_IF, &if_addr, sizeof(if_addr) ) < 0 )
 		print_error("IP_MULTICAST_IF");
+	else
+		veejay_msg(VEEJAY_MSG_INFO, "Multicast interface set to %s", interface );
 }
 
 int		mcast_send( mcast_sender *v, const void *buf, int len, int port_num )
 {
-	int n ;
 	v->addr.sin_port = htons( port_num );
 	v->addr.sin_family = AF_INET;
 
-	n =  sendto( v->sock_fd, buf, len, 0, (struct sockaddr*) &(v->addr), v->addr_len );
-
-	if( n == -1 )
-	{
-		char msg[100];
-		sprintf(msg, "mcast send -> %d",
-			port_num );
-		print_error(msg);
-	}
-
-	return n;
+	return sendto( v->sock_fd, buf, len, 0, (struct sockaddr*) &(v->addr), v->addr_len );
 } 
 
-static	void	stamp_reset( mcast_sender *v )
-{
-	v->stamp = 1;
-}
-
-static	uint32_t	stamp_make( mcast_sender *v )
+static long stamp_make( mcast_sender *v )
 {
 	v->stamp ++;
 	return v->stamp;
@@ -163,34 +147,27 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 				uint8_t *buf, int total_len, long ms,int port_num, int mode)
 {
 	int i;
-	packet_header_t header = packet_construct_header( 1 );
-	frame_info_t	info;
-	info.fmt = frame->format;
-	info.width = frame->width;
-	info.height = frame->height;
-	info.len = total_len;
-	info.mode = mode;
-	uint32_t frame_num = stamp_make(v);
-
-	header.timeout = ms * 1000;
-	header.usec    = frame_num;
-
-	uint8_t	chunk[PACKET_PAYLOAD_SIZE];
 	int res = 0;
+	uint8_t chunk[PACKET_PAYLOAD_SIZE];
+	long frame_num = stamp_make(v);
+
+	packet_header_t header = packet_construct_header( 1 );
+	
+	header.timeout = (uint32_t) (ms * 1000);
+	header.usec    = frame_num;
 
 	veejay_memset( chunk, 0,sizeof(chunk));
 
 	//@ If we can send in a single packet:
 	if( total_len <= CHUNK_SIZE )
 	{
-		header.seq_num = 0; header.flag = 1; header.length = 1;
-		packet_put_padded_data( &header,&info, chunk, buf, total_len);
+		header.seq_num = 0; header.length = 1;
+		packet_put_padded_data( &header,chunk, buf, total_len);
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
 		if(res <= 0 )
 			return -1;
 		return 1;
 	}
-
 
 	int pred_chunks = (total_len / CHUNK_SIZE);
 	int bytes_left  = (total_len % CHUNK_SIZE);
@@ -201,8 +178,8 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 	{
 		const uint8_t *data = buf + (i * CHUNK_SIZE);
 		header.seq_num = i;
-		header.flag = 1;
-		packet_put_data( &header, &info, chunk, data );	
+		packet_put_data( &header, chunk, data );
+
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
 		if(res <= 0 )
 		{
@@ -212,21 +189,17 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 
 	if( bytes_left )
 	{
-		i = header.length-1;
+		i = header.length - 1;
 		header.seq_num = i;
-		header.flag = 1;
-		int bytes_done = packet_put_padded_data( &header, &info, chunk, buf + (i * CHUNK_SIZE), bytes_left );
+		int bytes_done = packet_put_padded_data( &header, chunk, buf + (i * CHUNK_SIZE), bytes_left );
+
 		veejay_memset( chunk + bytes_done, 0, (PACKET_PAYLOAD_SIZE-bytes_done));
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
 		if( res <= 0 )
 		{
-			veejay_msg(0, "Unable to send last packet");
 			return -1;
 		}
 	}
-
-	if( frame_num == 0xffff )
-		stamp_reset(v);
 
 	return 1;
 }
@@ -238,5 +211,7 @@ void		mcast_close_sender( mcast_sender *v )
 		close(v->sock_fd);
 		if(v->group) free(v->group);
 		v->group = NULL;
+		free(v);
+		v = NULL;
 	}
 }

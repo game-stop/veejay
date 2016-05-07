@@ -23,16 +23,22 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netdb.h>
+#include <errno.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
+#include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include <libvjnet/mcastreceiver.h>
 #include <libvjnet/mcastsender.h>
 #include <libvjnet/vj-server.h>
-#include <libvjmem/vjmem.h>
-#include <netinet/tcp.h>
 #include <libvjnet/cmd.h>
-#include <sys/time.h>
-#include <sys/types.h>
+
 #define RUP8(num)(((num)+8)&~8)
 
 #define __INVALID 0
@@ -426,7 +432,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 	else {
 		veejay_msg(VEEJAY_MSG_DEBUG,"env VEEJAY_NET_TIMEOUT=seconds not set");
 	}
-
+	
 	if( mcast_group_name != NULL )
 	{	/* setup multicast socket */
 		vjs->use_mcast = 1;
@@ -536,7 +542,7 @@ static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, 
 		return 0;
 	}
 
-    	return total;
+   	return total;
 }
 
 int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len, 
@@ -946,7 +952,8 @@ int	vj_server_update( vj_server *vje, int id )
 	if(!Link[id]->in_use)
 		return 0;
 
-	_vj_server_empty_queue(vje, id);
+	if( Link[id]->pool )
+		_vj_server_empty_queue(vje, id);
 
 	if(!vje->use_mcast)
 	{
