@@ -281,7 +281,6 @@ case $host_cpu in
 	PROGRAM_NOPIC="-fno-PIC"
 
 	if test "x$enable_debug" != "xyes" ; then
-		OP_CFLAGS="-O2"
 		SUBSAMPLE_CFLAGS=""
 		VJE_CFLAGS="-O3 -ftree-vectorize"
 	fi
@@ -294,7 +293,6 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
-		OP_CFLAGS="-O2 -m64 -fPIC -DPIC"
 		VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
 		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
 	fi
@@ -1059,6 +1057,7 @@ CFLAGS="$ARCHFLAGS $CFLAGS"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
 SUBSAMPLE_CFLAGS="$ARCHFLAGS $SUBSAMPLE_CFLAGS"
 VJE_CFLAGS="$ARCHFLAGS $VJE_CFLAGS"
+OP_CFLAGS="$VJE_CFLAGS"
 
 AC_SUBST(OP_CFLAGS)
 AC_SUBST(VJE_CFLAGS)

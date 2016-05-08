@@ -261,175 +261,114 @@ void	deinterlace(uint8_t *data, int w, int h, int v)
 	}
 }
 
-/**********************************************************************************************
- *
- * frameborder_yuvdata, based upon blackborder_yuvdata.
- * instead of making the borders black, fill it with pixels coming from the second YUV420 frame.
- **********************************************************************************************/
 void frameborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 			 uint8_t * input_v, uint8_t * putin_y,
 			 uint8_t * putin_u, uint8_t * putin_v, int width,
 			 int height, int top, int bottom, int left,
-			 int right, int wshift, int hshift)
+			 int right, int shift_h, int shift_v)
 {
 
     int line, x;
-    int input_active_width = (height - top - bottom);
-    int input_active_height = (width - left -right);
+    int input_active_width;
+    int input_active_height;
     uint8_t *rightvector;
-    int uv_top = top >> hshift;
-    int uv_bottom = bottom >> hshift;
-    int uv_left = left >> wshift;
-    int uv_right = right >> wshift;
-    int uv_width = width >> wshift;
-    int uv_height = height >> hshift;
-    int uv_input_active_height = uv_height - uv_top - uv_bottom;
-    int uv_input_active_width = uv_width - uv_left - uv_right;   
+    input_active_height = height - top - bottom;
+    input_active_width = width - left - right;
 
     /* Y component TOP */
-
-    if(top)
-    {
-    	for (line = 0; line < top; line++) {
-		for (x = 0; x < width; x++) {
-		    *(input_y + x) = *(putin_y + x);
-		}
-		//memcpy (input_y, putin_y, width);
-		input_y += width;
-		putin_y += width;
-   	 }
+    for (line = 0; line < top; line++) {
+	for (x = 0; x < width; x++) {
+	    *(input_y + x) = *(putin_y + x);
+	}
+	input_y += width;
+	putin_y += width;
     }
-
-    if(left && right)
-    {
-	    rightvector = input_y + left + input_active_width;
-	    /* 	Y component LEFT AND RIGHT */
-	    for (line = 0; line < input_active_height; line++) {
-		for (x = 0; x < left; x++) {
-		    *(input_y + x) = *(putin_y + x);
-		}
-		//memcpy (input_y, putin_y, left);
-		for (x = 0; x < right; x++) {
-		    *(rightvector + x) =
-			*(putin_y + left + input_active_width + x);
-		}
-		//memcpy (rightvector, putin_y + left + input_active_width, right);
-		input_y += width;
-		rightvector += width;
-		putin_y += width;
-    	}
+    rightvector = input_y + left + input_active_width;
+    /* Y component LEFT AND RIGHT */
+    for (line = 0; line < input_active_height; line++) {
+	for (x = 0; x < left; x++) {
+	    *(input_y + x) = *(putin_y + x);
+	}
+	for (x = 0; x < right; x++) {
+	    *(rightvector + x) =
+		*(putin_y + left + input_active_width + x);
+	}
+	input_y += width;
+	rightvector += width;
+	putin_y += width;
     }
-
- 
     /* Y component BOTTOM  */
-    if(bottom)
-    {
-  	  for (line = 0; line < bottom; line++) {
-		for (x = 0; x < width; x++)
-		    *(input_y + x) = *(putin_y + x);
+    for (line = 0; line < bottom; line++) {
+	for (x = 0; x < width; x++)
+	    *(input_y + x) = *(putin_y + x);
 
-		//memcpy (input_y, putin_y, width);
-		input_y += width;
-		putin_y += width;
-    	}
+	input_y += width;
+	putin_y += width;
     }
 
 
-	/* U V components */
-	/* U component TOP */
-
-	if(uv_top)
-   	{
-    		for (line = 0; line < uv_top; line++)
-		{
-			for (x = 0; x < uv_width; x++)
-			{
-			    *(input_u + x) = *(putin_u + x);
-			}
-			input_u += uv_width;
-			putin_u += uv_width;
-    		}
-    	}
-
-
-	if(left && right)
-	{
-    		rightvector = input_u + uv_left + uv_input_active_width;
-		for (line = 0; line < uv_input_active_height; line++)
-		{
-			//memcpy (input_u, putin_u, left >> 1);
-			for (x = 0; x < uv_left; x++)
-			{
-			    *(input_u + x) = *(putin_u + x);
-			}
-			//memcpy (rightvector, putin_u + ((left + input_active_width)>>1) , right >> 1);
-			for (x = 0; x < uv_right;  x++)
-			{
-		    		*(rightvector + x) = *(putin_u +
-					   uv_left + uv_input_active_width + x );
-	
-			}
-			input_u += uv_width; 
-			rightvector += uv_width;
-			putin_u += uv_width;
-    		}
- 	}
-
-	if(uv_bottom)
-    	{
-		for (line = 0; line < uv_bottom; line++)
-		{
-			for (x = 0; x < uv_width; x++)
-			    *(input_u + x) = *(putin_u + x);
-			input_u += uv_width;
-			putin_u += uv_width;
-    		}
-     	}
-
-	/* V component Top */
-    	if(uv_top) 
-	{
-	    for (line = 0; line < uv_top; line++)
-	    {
-		for (x = 0; x < uv_width; x++) 
-		    *(input_v + x) = *(putin_v + x);
-		input_v += uv_width;
-		putin_v += uv_width;
-   	    }
+    /* U component TOP */
+    for (line = 0; line < (top >> shift_v); line++) {
+	for (x = 0; x < (width >> shift_h); x++) {
+	    *(input_u + x) = *(putin_u + x);
 	}
+	input_u += width >> shift_h;
+	putin_u += width >> shift_h;
+    }
 
-	if(uv_left && uv_right)
-	{
+    rightvector = input_u + ((left + input_active_width) >> shift_h);
+    for (line = 0; line < (input_active_height >> shift_v); line++) {
+	for (x = 0; x < (left >> shift_h); x++) {
+	    *(input_u + x) = *(putin_u + x);
+	}
+	for (x = 0; x < (right >> shift_h); x++) {
+	    *(rightvector + x) = *(putin_u +
+				   ((left + input_active_width + x) >> shift_h));
+
+	}
+	input_u += width >> shift_h;
+	rightvector += width >> shift_h;
+	putin_u += width >> shift_h;
+    }
+
+    for (line = 0; line < (bottom >> shift_v); line++) {
+	for (x = 0; x < (width >> shift_h); x++)
+	    *(input_u + x) = *(putin_u + x);
+	input_u += width >> shift_h;
+	putin_u += width >> shift_h;
+    }
+
+    /* V component Top */
+    for (line = 0; line < (top >> shift_v); line++) {
+	for (x = 0; x < (width >> shift_h); x++) {
+	    *(input_v + x) = *(putin_v + x);
+	}
+	input_v += width >> shift_h;
+	putin_v += width >> shift_h;
+    }
     /* Left and Right */
-		rightvector = input_v + uv_left + uv_input_active_width;
-   		for (line = 0; line < uv_input_active_height; line++)
-		{
-			for (x = 0; x < uv_left; x++)
-	  			*(input_v + x) = *(putin_v + x);
+    rightvector = input_v + ((left + input_active_width) >> shift_h);
+    for (line = 0; line < (input_active_height >> shift_v); line++) {
+	for (x = 0; x < (left >> shift_h); x++)
+	    *(input_v + x) = *(putin_v + x);
 
-			for (x = 0; x < uv_right;  x++)
-	   			 *(rightvector + x) =
-					*(putin_v + uv_left + uv_input_active_width + x);
+	for (x = 0; x < (right >> shift_h); x++)
+	    *(rightvector + x) =
+		*(putin_v + ((left + input_active_width + x) >> shift_h));
 
-			input_v += uv_width;
-			rightvector += uv_width;
-			putin_v += uv_width;
-	
-	    	}
-	}
+	input_v += width >> shift_h;
+	rightvector += width >> shift_h;
+	putin_v += width >> shift_h;
+    }
+    /* Bottom */
+    for (line = 0; line < (bottom >> shift_v); line++) {
+	for (x = 0; x < (width >> shift_h); x++)
+	    *(input_v + x) = *(putin_v + x);
+	input_v += width >> shift_h;
+	putin_v += width >> shift_h;
+    }
 
-	if(uv_bottom)
-	{
-	/* Bottom */
-		for (line = 0; line < uv_bottom; line++) {
-			for (x = 0; x < uv_width; x++)
-			    *(input_v + x) = *(putin_v + x);
-			input_v += uv_width;
-			putin_v += uv_width;
-    		}
-	}
 }
-
 
 
 void blackborder_yuvdata(uint8_t * input_y, uint8_t * input_u,

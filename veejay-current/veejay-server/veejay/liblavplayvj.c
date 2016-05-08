@@ -2033,7 +2033,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			}
 			if( vj_vloopback_start_pipe( info->vloopback ) <= 0 )
 			{
-				veejay_msg(0, "Unable to setup vloopback");
+				veejay_msg(0, "Unable to setup vloopback output");
 				vj_vloopback_close( info->vloopback );
 				return -1;
 			}

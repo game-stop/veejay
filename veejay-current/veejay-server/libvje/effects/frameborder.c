@@ -37,7 +37,7 @@ vj_effect *frameborder_init(int width, int height)
 	ve->limits[1][0] = height / 2;
 	ve->has_user = 0;
 	ve->description = "Frame Border Translation";
-	ve->sub_format = 1;
+	ve->sub_format = 0;
 	ve->extra_frame = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Size");
 	return ve;
@@ -49,6 +49,6 @@ void frameborder_apply(VJFrame *frame, VJFrame *frame2, int size)
 	frameborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
 						frame2->data[0], frame2->data[1], frame2->data[2],
 						frame->width, frame->height, (size), (size), (size),
-						(size),frame->shift_h,frame->shift_v);
+						(size),frame->shift_h, frame->shift_v);
 
 }

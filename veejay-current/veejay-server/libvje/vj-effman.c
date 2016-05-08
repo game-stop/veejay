@@ -592,15 +592,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	bar_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
       case VJ_VIDEO_EFFECT_SLIDINGDOOR:
-	if(arg[1] == 1) { /* auto increment as option in effect*/
-	   todo_info->tmp[0] ++; /* val / max frames */
-	   if(todo_info->tmp[0] >= (frames[0]->height/16))
-		   todo_info->tmp[0] = 1;
-	} else { /* arg1 = off , copy arg*/
-	     todo_info->tmp[0] = arg[0];
-	}
-
-	slidingdoor_apply(frames[0], frames[1], todo_info->tmp[0] );
+	slidingdoor_apply(frames[0], frames[1], arg[0] );
 	break;
       case VJ_VIDEO_EFFECT_WIPE:
 	wipe_apply(frames[0], frames[1], arg[0], arg[1]);
