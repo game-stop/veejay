@@ -160,7 +160,7 @@ static void vj_effman_apply_image_effect(
 	contrast_apply(frames[0], frames[0]->width, frames[0]->height,arg);
 	break;
      case VJ_IMAGE_EFFECT_ENHANCEMASK:
-	enhancemask_apply(frames[0],frames[0]->width,frames[0]->height,arg);
+	enhancemask_apply(frames[0],arg);
 	break;
      case VJ_IMAGE_EFFECT_SOLARIZE:
 	solarize_apply(frames[0], arg[0]);
