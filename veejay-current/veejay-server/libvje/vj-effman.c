@@ -157,7 +157,7 @@ static void vj_effman_apply_image_effect(
 	noiseadd_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_CONTRAST:
-	contrast_apply(frames[0], frames[0]->width, frames[0]->height,arg);
+	contrast_apply(frames[0], arg);
 	break;
      case VJ_IMAGE_EFFECT_ENHANCEMASK:
 	enhancemask_apply(frames[0],arg);

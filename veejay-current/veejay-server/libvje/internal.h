@@ -402,8 +402,7 @@ extern void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int angle,
                                    int r, int g, int b, int level, int threshold);
 extern void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val );
 extern void enhancemask_apply(VJFrame *frame, int *t);
-
-extern void contrast_apply(VJFrame *frame, int w, int h, int *t);
+extern void contrast_apply(VJFrame *frame, int *t);
 
 extern void noiseadd_apply(VJFrame *frame, int w , int h , int t, int n);
 
