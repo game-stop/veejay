@@ -1,5 +1,5 @@
 /* veejay - Linux VeeJay
- * 	     (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
+ * 	     (C) 2002-2016 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -18,9 +18,9 @@
  */
 #ifndef VV_VLOOPBACK_H
 #define VV_VLOOPBACK_H
-void *vj_vloopback_open(const char *device_name, int norm, int mode, int w, int h, int pixel_format);
-int	vj_vloopback_start_pipe( void *vloop );
-int	vj_vloopback_write_pipe( void *vloop );
-int	vj_vloopback_fill_buffer( void *vloop, uint8_t **image );
+void *vj_vloopback_open(const char *device_name, VJFrame *src, int dw, int dh, int df);
+int vj_vloopback_write( void *vloop );
+int vj_vloopback_fill_buffer( void *vloop, uint8_t **image );
 void vj_vloopback_close( void *vloop );
+int vj_vloopback_get_pixfmt( int v );
 #endif

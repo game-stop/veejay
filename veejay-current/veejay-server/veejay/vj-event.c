@@ -9539,9 +9539,11 @@ void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
 
 void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 {
-	int args[2];
+	int args[5];
 	char *s = NULL;
 	char device_name[100];
+
+	memset( &args, -1, sizeof(args));
 
 	P_A(args,s,format,ap);
 	
@@ -9551,42 +9553,13 @@ void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 
 	veejay_msg(VEEJAY_MSG_INFO, "Open vloopback %s", device_name );
 
-	v->vloopback = vj_vloopback_open( device_name, 	
-			(v->current_edit_list->video_norm == 'p' ? 1 : 0),
-			 1, // pipe, 0 = mmap 
-			 v->video_output_width,
-			 v->video_output_height,
-			 v->pixel_format );
+	v->vloopback = vj_vloopback_open( device_name, v->effect_frame1, args[1], args[2],vj_vloopback_get_pixfmt( args[3] ) );	
 	if(v->vloopback == NULL)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,
 			"Cannot open vloopback %s", device_name );
 		return;
 	}
-
-	int ret = 0;
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "Vloopback pipe");
-	ret = vj_vloopback_start_pipe( v->vloopback );
-
-	if(ret)
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG,
-			"Setup vloopback!");
-	}
-
-	if(!ret)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,
-			"closing vloopback");
-		if(v->vloopback)
-			vj_vloopback_close( v->vloopback );
-		v->vloopback = NULL;
-	}	
-
-	if( v->vloopback == NULL )
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to setup vloopback pusher"); 
-
 }
 
 void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )

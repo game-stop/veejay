@@ -329,7 +329,7 @@ int	v4l2_pixelformat2ffmpeg( int pf )
 	return 0;
 }
 
-static	int	v4l2_ffmpeg2v4l2( int pf)
+int	v4l2_ffmpeg2v4l2( int pf)
 {
 	switch(pf) {
 		case PIX_FMT_RGB24:
@@ -337,22 +337,26 @@ static	int	v4l2_ffmpeg2v4l2( int pf)
 		case PIX_FMT_BGR24:
 			return V4L2_PIX_FMT_BGR24;
 		case PIX_FMT_BGR32:
+		case PIX_FMT_ABGR:
 			return V4L2_PIX_FMT_BGR32;
-		case PIX_FMT_RGB32:
+		case PIX_FMT_RGB32:	
+		case PIX_FMT_ARGB:
 			return V4L2_PIX_FMT_RGB32;
 		case PIX_FMT_YUV420P:
 		case PIX_FMT_YUVJ420P:
+		case PIX_FMT_YUVA420P:
 			return V4L2_PIX_FMT_YUV420;
 		case PIX_FMT_YUYV422:
 			return V4L2_PIX_FMT_YUYV;
 		case PIX_FMT_YUV422P:
-			return V4L2_PIX_FMT_YUV422P;
 		case PIX_FMT_YUVJ422P:
+		case PIX_FMT_YUVA422P:
 			return V4L2_PIX_FMT_YUV422P;
 		case PIX_FMT_UYVY422:
 			return V4L2_PIX_FMT_UYVY;
 		case PIX_FMT_YUVJ444P:
 		case PIX_FMT_YUV444P:
+		case PIX_FMT_YUVA444P:
 			return V4L2_PIX_FMT_YUV32;
 
 		default:
@@ -366,8 +370,8 @@ static	int	v4l2_set_framerate( v4l2info *v , float fps )
 	struct v4l2_streamparm sfps;
 	memset(&sfps,0,sizeof(sfps));
 	sfps.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	sfps.parm.capture.timeperframe.numerator=1;
-	sfps.parm.capture.timeperframe.denominator=(int)(fps);
+	sfps.parm.capture.timeperframe.numerator= ( fps == 29.97f ? 1001 : 1 );
+	sfps.parm.capture.timeperframe.denominator=( fps == 29.97f ? 30000 : (int)(fps));
 
 	if( -1 == vioctl( v->fd, VIDIOC_S_PARM,&sfps ) )
 	{

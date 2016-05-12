@@ -106,6 +106,6 @@ v4l2_thread_info *v4l2_thread_info_get( void *vv);
 void	v4l2_set_status( void *d , int status);
 void	v4l2_thread_set_status( v4l2_thread_info *i, int status );
 int v4l2_pixelformat2ffmpeg(int pf);
-
+int v4l2_ffmpeg2v4l2( int pf);
 #endif
 

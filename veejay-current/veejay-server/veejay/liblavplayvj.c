@@ -950,7 +950,7 @@ static int veejay_screen_update(veejay_t * info )
 	if( info->vloopback )
 	{
 		vj_vloopback_fill_buffer( info->vloopback , frame );		
-		vj_vloopback_write_pipe( info->vloopback );
+		vj_vloopback_write( info->vloopback );
 	}
 
 	if( info->splitter ) {
@@ -2020,21 +2020,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 		case 5:
 			veejay_msg(VEEJAY_MSG_INFO, "Entering vloopback streaming mode. ");
-			info->vloopback = vj_vloopback_open( info->y4m_file,
-				el->video_norm == 'p' ? 1: 0, 1,
-				info->video_output_width,
-				info->video_output_height,
-				info->pixel_format );
+			info->vloopback = vj_vloopback_open( info->y4m_file, info->effect_frame1, info->video_output_width, info->video_output_height, -1 );
 			if( info->vloopback == NULL )
 			{
-				veejay_msg(0, "Cannot open %s as vloopback.",
-					info->y4m_file);
-				return -1;
-			}
-			if( vj_vloopback_start_pipe( info->vloopback ) <= 0 )
-			{
-				veejay_msg(0, "Unable to setup vloopback output");
-				vj_vloopback_close( info->vloopback );
+				veejay_msg(0, "Cannot open %s as vloopback", info->y4m_file);
 				return -1;
 			}
 		break;

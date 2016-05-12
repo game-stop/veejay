@@ -2424,15 +2424,22 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 	index_map_[VIMS_VLOOPBACK_START]		=	_new_event(
-				"%d",
+				"%d %d %d %d",
 				VIMS_VLOOPBACK_START,
 				"OUT: Start writing video output to a vloopback device",
 				vj_event_vloopback_start,
-				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				4,
+				VIMS_ALLOW_ANY,
 				"Vloopback pipe number",
 				0,
+				"Output width (-1 = same as source, 0 = current width setting)",
+				-1,
+				"Output height (-1 = same as source, 0 = current height setting)",
+				-1,
+				"Pixel format (0=YUV420P,1=YUV422P,2=YUV444P,3=YUVJ420P,4=YUVJ422P,5=YUVJ444P,6=RGB24,7=BGR24,8=RGB32,9=BGR32,10=ARGB,11=ABGR)",
+				-1,
 				NULL );
+
 	index_map_[VIMS_VLOOPBACK_STOP]			=	_new_event(
 				NULL,
 				VIMS_VLOOPBACK_STOP,
