@@ -1131,57 +1131,6 @@ int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
 	return 1;
 }
 
-int	vj_perform_init_cropped_output_frame(veejay_t *info, VJFrame *src, int *dw, int *dh )
-{
-	video_playback_setup *settings = info->settings;
-	if( crop_frame )
-		free(crop_frame);
-	crop_frame = yuv_allocate_crop_image( src, &(settings->viewport) );
-	if(!crop_frame)
-		return 0;
-
-	*dw = crop_frame->width;
-	*dh = crop_frame->height;
-
-	/* enough space to supersample*/
-	int i;
-	for( i = 0; i < 3; i ++ )
-	{
-		crop_frame->data[i] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(crop_frame->len) );
-		if(!crop_frame->data[i])
-			return 0;
-	}
-	return 1;
-}
-void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
-				int dst_w, int dst_h )
-{
-    int i;
-    for(i = 0; i < 2; i ++ )
-	{
-	if( video_output_buffer[i]->Y != NULL )
- 		free(video_output_buffer[i]->Y );
-	if( video_output_buffer[i]->Cb != NULL )
-		free(video_output_buffer[i]->Cb );
-	if( video_output_buffer[i]->Cr != NULL )
-		free(video_output_buffer[i]->Cr );
-
-	video_output_buffer[i]->Y = (uint8_t*)
-			vj_malloc(sizeof(uint8_t) * RUP8( dst_w * dst_h) );
-	veejay_memset( video_output_buffer[i]->Y, pixel_Y_lo_, dst_w * dst_h );
-	video_output_buffer[i]->Cb = (uint8_t*)
-			vj_malloc(sizeof(uint8_t) * RUP8( dst_w * dst_h) );
-	veejay_memset( video_output_buffer[i]->Cb, 128, dst_w * dst_h );
-	video_output_buffer[i]->Cr = (uint8_t*)
-			vj_malloc(sizeof(uint8_t) * RUP8(dst_w * dst_h) );
-	veejay_memset( video_output_buffer[i]->Cr, 128, dst_w * dst_h );
-
-	}
-	frame[0] = video_output_buffer[0]->Y;
-	frame[1] = video_output_buffer[0]->Cb;
-	frame[2] = video_output_buffer[0]->Cr;
-}
-
 static void long2str(uint8_t *dst, uint32_t n)
 {
    dst[0] = (n    )&0xff;
@@ -3460,6 +3409,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 #endif
 	}
 
+	//FIXME: refactor this 
 	if( settings->composite  ) {
 		VJFrame out;
 		veejay_memcpy( &out, info->effect_frame1, sizeof(VJFrame));

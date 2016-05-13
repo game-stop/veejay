@@ -901,7 +901,7 @@ static int veejay_screen_update(veejay_t * info )
 {
 	uint8_t *frame[4];
 #ifdef HAVE_DIRECTFB
-	uint8_t *c_frame[3];
+	uint8_t *c_frame[4];
 #endif
 	int i = 0;
 	int skip_update = 0;

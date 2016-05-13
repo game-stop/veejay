@@ -781,7 +781,6 @@ static	int	v4l2_configure_format( v4l2info *v, int host_fmt, int wid, int hei )
 	return 0;
 }
 
-
 static void	v4l2_set_output_pointers( v4l2info *v, void *src )
 {
 	uint8_t *map = (uint8_t*) src;
@@ -800,13 +799,14 @@ static void	v4l2_set_output_pointers( v4l2info *v, void *src )
 	}
 }
 
-VJFrame	*v4l2_get_dst( void *vv, uint8_t *Y, uint8_t *U, uint8_t *V ) {
+VJFrame	*v4l2_get_dst( void *vv, uint8_t *Y, uint8_t *U, uint8_t *V, uint8_t *A ) {
 	v4l2info *v = (v4l2info*) vv;
 	if(v->threaded)
 		lock_(v->video_info);
 	v->host_frame->data[0] = Y;
 	v->host_frame->data[1] = U;
-	v->host_frame->data[2] = V;
+	v->host_frame->data[2] = V;	
+	v->host_frame->data[3] = A;
 	if(v->threaded)
 		unlock_(v->video_info);
 	return v->host_frame;
@@ -1150,6 +1150,27 @@ v4l2_rw_fallback:
 		v->buffers[0].length = v->sizeimage;
 		v->buffers[0].start = vj_malloc( RUP8( v->sizeimage * 2 ) );
 
+	}
+
+	//FIXME this is here since libstream and libsample should be refactored (for now)
+	if( v->format.fmt.pix.pixelformat == V4L2_PIX_FMT_RGB32 ||
+	    v->format.fmt.pix.pixelformat == V4L2_PIX_FMT_BGR32 ) {
+		// this allows us to convert to yuva regardless
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: source in RGB? format, converting to YUVA");
+		switch( dst_fmt ) {
+			case PIX_FMT_YUVJ422P:
+			case PIX_FMT_YUV422P:
+				dst_fmt = PIX_FMT_YUVA422P;
+			break;
+			case PIX_FMT_YUVJ420P:
+			case PIX_FMT_YUV420P:
+				dst_fmt = PIX_FMT_YUVA420P;
+				break;
+			case PIX_FMT_YUVJ444P:
+			case PIX_FMT_YUV444P:
+				dst_fmt = PIX_FMT_YUVA444P;
+				break;
+		}
 	}	
 
 	for( i = 0; i < N_FRAMES; i ++ ) {
@@ -1157,7 +1178,7 @@ v4l2_rw_fallback:
 		v->frames_done[i] = 0;
 	}
 
-	v->host_frame = yuv_yuv_template( NULL,NULL,NULL,wid,hei,host_fmt );
+	v->host_frame = yuv_yuv_template( NULL,NULL,NULL,wid,hei,dst_fmt );
 	v->frame_ready = 0;
 	v->frameidx = 0;
 
@@ -1181,7 +1202,7 @@ v4l2_rw_fallback:
 }
 
 static	int	v4l2_pull_frame_intern( v4l2info *v )
-{ //@ fixme more functions no pasta
+{
 	void *src = NULL;
 	int  length = 0;
 	int  n = 0;
@@ -2163,6 +2184,11 @@ int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst )
 			veejay_memset( dst->data[1], 127, dst->uv_len );
 			veejay_memset( dst->data[2], 127, dst->uv_len );
 		}
+		
+		if( v->frames[v->frame_ready]->stride[3] > 0 && dst->stride[3] > 0 ) {
+			veejay_memcpy( dst->data[3], v->frames[v->frame_ready]->data[3], v->out_planes[3]);
+		}
+
 		//@ "free" buffer
 		lock_(i);
 		v->frames_done[v->frameidx] = 0;

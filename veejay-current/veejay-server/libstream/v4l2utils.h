@@ -95,7 +95,7 @@ void	v4l2_set_whiteness(void *d, int32_t value);
 int32_t v4l2_get_whiteness(void *d);
 void	v4l2_set_vflip(void *d, int32_t value);
 int32_t v4l2_get_vflip(void *d);
-VJFrame	*v4l2_get_dst( void *v,uint8_t *Y, uint8_t *U, uint8_t *V );
+VJFrame	*v4l2_get_dst( void *v,uint8_t *Y, uint8_t *U, uint8_t *V, uint8_t *A );
 void	v4l2_set_control( void *d, uint32_t type,  int32_t value );
 int	v4l2_poll( void *d , int nfds, int timeout );
 int	v4l2_thread_start( v4l2_thread_info *info );

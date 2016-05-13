@@ -8,9 +8,6 @@ uint8_t *vj_perform_get_preview_buffer();
 int vj_perform_preview_max_width();
 int vj_perform_preview_max_height();
 
-void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
-                                int dst_w, int dst_h );
-
 void	vj_perform_update_plugin_frame(VJFrame *frame);         
 
 VJFrame	*vj_perform_init_plugin_frame(veejay_t *info);
@@ -53,7 +50,6 @@ void vj_perform_record_tag_frame(veejay_t *info );
 void vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, int h );
 
 int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop );
-int	vj_perform_init_cropped_output_frame(veejay_t *info, VJFrame *src, int *dw, int *dh );
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h);
 int	vj_perform_rand_update(veejay_t *info);
 void	vj_perform_randomize(veejay_t *info);

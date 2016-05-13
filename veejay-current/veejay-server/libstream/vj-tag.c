@@ -904,10 +904,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
 	    tag->priv = net_threader(_tag_info->effect_frame1);
 
-#ifdef HAVE_V4L2
 	palette = get_ffmpeg_pixfmt( pix_fmt );
-#endif
-    switch (type) {
+    
+	switch (type) {
 	    case VJ_TAG_TYPE_V4L:
 			snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
 		
@@ -3405,17 +3404,12 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 		if( tag->capture_type == 1 ) {
 #ifdef HAVE_V4L2
 			if( no_v4l2_threads_ ) {
-			 res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]) );
+			 res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2],buffer[3]) );
 			} else {
 			 res = v4l2_thread_pull( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]),
-						v4l2_get_dst( vj_tag_input->unicap[tag->index], buffer[0],buffer[1],buffer[2]));
+						v4l2_get_dst( vj_tag_input->unicap[tag->index], buffer[0],buffer[1],buffer[2],buffer[3]));
 			}
 #endif
-			if( res <= 0 ) {
-				veejay_memset( buffer[0], 0, len );
-				veejay_memset( buffer[1], 128, uv_len );
-				veejay_memset( buffer[2], 128, uv_len );
-			}
 		}
 		switch( tag->noise_suppression ) {
 			case V4L_BLACKFRAME:
