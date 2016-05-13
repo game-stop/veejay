@@ -209,6 +209,7 @@ static void vj_vloopback_setup_ptrs( uint8_t *buf, uint8_t *planes[4], int pixfm
 
 static	int vj_vloopback_user_pixelformat( VJFrame *src )
 {
+#ifdef HAVE_V4L2
 	char *str = getenv( "VEEJAY_VLOOPBACK_PIXELFORMAT" );
 	if( str != NULL ) {
 		int i;
@@ -227,10 +228,15 @@ static	int vj_vloopback_user_pixelformat( VJFrame *src )
 	}
 	
 	return v4l2_ffmpeg2v4l2( src->format );
+#else
+	return src->format;
+#endif
+
 }
 
 void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int dst_h, int dst_format ) 
 {
+#ifdef HAVE_V4L2
 	int dst_v4l2_format = v4l2_ffmpeg2v4l2( dst_format );
 	int dst_v4l2_w = dst_w;
 	int dst_v4l2_h = dst_h;
@@ -345,6 +351,9 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 	}
 
 	return (void*) v;
+#else
+	return NULL;
+#endif
 }
 
 int	vj_vloopback_write( void *vloop  )

@@ -1918,9 +1918,9 @@ int	vj_tag_v4l_set_control( int t1, uint32_t id, int value )
 		return 0;
 	if(tag->source_type != VJ_TAG_TYPE_V4L )
 		return 0;
-
+#ifdef HAVE_V4L2
 	v4l2_set_control( vj_tag_input->unicap[tag->index], id, value );
-
+#endif
 	return 1;	
 }
 
