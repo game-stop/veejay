@@ -81,7 +81,7 @@ static editlist *plain_editlist=NULL;
 
 extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp);
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
-extern int vj_tag_size();
+extern int vj_tag_highest_valid_id();
 extern int    veejay_sprintf( char *s, size_t size, const char *format, ... );
 
 typedef struct
@@ -92,18 +92,29 @@ typedef struct
         int     *samples;
 } seq_t;
 
-/****************************************************************************************************
- *
- * sample_size
- *
- * \return current sample_id pointer. size is actually this_sample_id - next_avail_num,
- * but people tend to use size as in length.
- *
- ****************************************************************************************************/
-int sample_size()
+unsigned int sample_size()
+{
+//    return this_sample_id;
+	return (unsigned int) hash_count( SampleHash );
+}
+
+int sample_highest()
 {
     return this_sample_id;
 }
+
+int sample_highest_valid_id()
+{
+	int id = this_sample_id;
+	while( !sample_exists( id ) ) {
+		id --;
+		if( id <= 0 )
+		    break;
+	}
+
+	return id;
+}
+
 
 int sample_verify() {
    return hash_verify( SampleHash );
@@ -168,7 +179,7 @@ static void sample_close_edl(int s1, editlist *el)
 {
 	/* check if another sample has same EDL */
 	if( el != NULL ) {
-		    int end = sample_size() + 1;
+		    int end = sample_highest_valid_id();
 			int same = 0;
 			int i;
 
@@ -367,7 +378,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 		}
 		si->effect_chain[i]->effect_id = -1;
 		si->effect_chain[i]->volume = 50;
-		si->effect_chain[i]->channel = ( sample_size() <= 0 ? si->sample_id : sample_size()-1);
+		si->effect_chain[i]->channel = ( sample_highest_valid_id() <= 0 ? si->sample_id : sample_highest_valid_id());
     }
 #ifdef HAVE_FREETYPE
     si->dict = vpn( VEVO_ANONYMOUS_PORT );
@@ -955,7 +966,8 @@ int sample_get_endFrame(int sample_id)
 int sample_verify_delete( int sample_id, int sample_type )
 {
 	int i,j;
-	for( i = 1; i < sample_size()-1; i ++ )
+	int n = sample_highest();
+	for( i = 1; i <= n; i ++ )
 	{
 		sample_info *s = sample_get(i);
 		if(s)
@@ -1035,10 +1047,10 @@ int sample_del(int sample_id)
 
 void sample_del_all(void *edl)
 {
-    int end = sample_size() + 1;
+    int end = sample_highest();
     int i;
 
-    for (i = 1; i < end; i++) {
+    for (i = 1; i <= end; i++) {
 		if (!sample_exists(i))
 			continue;
 	
@@ -2208,7 +2220,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
 		if(!sample_exists(s1)) s1 = s1 + 1;
 
 		if(sample->effect_chain[c]->channel <= 0)
-			sample->effect_chain[c]->channel = sample_size()-1; // follow newest
+			sample->effect_chain[c]->channel = sample_highest_valid_id(); // follow newest
 		if(sample->effect_chain[c]->source_type < 0)
 			sample->effect_chain[c]->source_type = 0;
 
@@ -3430,7 +3442,7 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
      * Check the document is of the right kind
      */
 
-    int start_at = sample_size()-1;
+    int start_at = sample_size();
 	if( start_at <= 0 )
 		start_at = 0;
 
@@ -3775,25 +3787,23 @@ int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id,
 	
     SaveCurrentPlaying( childnode , id, mode );
 
-    for (i = 1; i < sample_size(); i++) {
-	next_sample = sample_get(i);
-	if (next_sample) {
+	int n= sample_highest();
+    for (i = 1; i <= n; i++) {
+		next_sample = sample_get(i);
+		if (next_sample) {
 	    	if(sample_write_edl( next_sample ))
-			veejay_msg(VEEJAY_MSG_DEBUG ,"Saved sample %d EDL '%s'", next_sample->sample_id,
-				next_sample->edit_list_file );	
+				veejay_msg(VEEJAY_MSG_DEBUG ,"Saved sample %d EDL '%s'", next_sample->sample_id,next_sample->edit_list_file );	
 	      
-	    childnode =
-		xmlNewChild(rootnode, NULL,
-			    (const xmlChar *) XMLTAG_SAMPLE, NULL);
+	   		childnode = xmlNewChild(rootnode, NULL, (const xmlChar *) XMLTAG_SAMPLE, NULL);
 
             WriteSubtitles( next_sample,font, sampleFile );
 
-	    CreateSample(childnode, next_sample, font);
+	    	CreateSample(childnode, next_sample, font);
 	
-	}
+		}
     }
 
-    int max = vj_tag_size()-1;
+    int max = vj_tag_highest_valid_id();
     i = 0; 
     for( i = 1; i <= max; i ++ )
     {

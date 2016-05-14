@@ -2684,8 +2684,9 @@ void vj_perform_record_stop(veejay_t *info)
 	 {
 		settings->sample_record_switch = 0;
 		if( df != ENCODER_YUV4MPEG && df != ENCODER_YUV4MPEG420 ) {
-			veejay_set_sample( info,sample_size()-1);
-			veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d", sample_size()-1);
+			int id = sample_highest_valid_id();
+			veejay_set_sample( info,id);
+			veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
 		} else {
 			veejay_msg(VEEJAY_MSG_WARNING, "Not autoplaying new streams.");
 		}
@@ -2718,8 +2719,9 @@ void vj_perform_record_stop(veejay_t *info)
 		if(df != ENCODER_YUV4MPEG && df != ENCODER_YUV4MPEG420)
 		{
 			info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
-			veejay_set_sample(info ,sample_size()-1);
-			veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d", sample_size()-1);
+			int id = sample_highest_valid_id();
+			veejay_set_sample(info, id );
+			veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
 		}
 		else {
 
@@ -3265,7 +3267,7 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 			snprintf(buf,256, "%s %d of %d Cache=%dMb Cost=%dms",
 					timecode,
 					info->uc->sample_id,
-					sample_size()-1,
+					sample_size(),
 					sample_cache_used(0),
 					info->real_fps );
 			break;
@@ -3804,7 +3806,7 @@ void	vj_perform_randomize(veejay_t *info)
 	if(settings->randplayer.mode == RANDMODE_INACTIVE)
 		return;
 
-	double n_sample = (double) (sample_size()-1);
+	double n_sample = (double) (sample_highest_valid_id());
 
 	if( settings->randplayer.mode == RANDMODE_SAMPLE )
 	track_dup = info->uc->sample_id;

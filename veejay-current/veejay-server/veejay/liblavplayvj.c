@@ -1098,8 +1098,8 @@ static void veejay_pipe_write_status(veejay_t * info)
     video_playback_setup *settings = (video_playback_setup *) info->settings;
     int d_len = 0;
     int pm = info->uc->playback_mode;
-    int n_samples = sample_size()-1;
-    int tags = vj_tag_true_size() -1;
+    int n_samples = sample_size();
+    int tags = vj_tag_size();
 
 	int cache_used = 0;
 	int mstatus = vj_event_macro_status();
@@ -1107,7 +1107,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 	int total_slots = n_samples;
 	if(tags>0)
 		total_slots+=tags;
-    
+   
 	switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
 			cache_used = sample_cache_used(0);
@@ -2120,10 +2120,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	{
 		int dummy_id;
 		/* Use dummy mode, action file could have specified something */
-		if( vj_tag_size()-1 <= 0 )
+		if( vj_tag_size() <= 0 )
 			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, (char*) "Solid", -1, el,info->pixel_format,-1,0,0);
 		else
-			dummy_id = vj_tag_size()-1;
+			dummy_id = vj_tag_highest_valid_id();
 		
 		if( info->uc->sample_id <= 0 )
 		{

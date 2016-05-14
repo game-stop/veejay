@@ -3489,16 +3489,21 @@ void reportbug ()
 	         "firefox \"http://groups.google.com/group/veejay-discussion/post?hl=%s\"",l );
 
 	puts(URL);
-	system(URL);
+	
+	if( system(URL) <= 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open browser to veejay homepage");
+	}
 }
 
 void donatenow()
 {
 	char URL[512];
 	snprintf(URL , sizeof(URL),
-	         "mozilla \"http://www.veejayhq.net/contributing\"" );
+	         "firefox \"http://www.veejayhq.net/contributing\"" );
 
-	system(URL);
+	if( system(URL) <= 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open browser to veejay homepage");
+	}
 }
 
 static void reset_tree(const char *name)
@@ -4600,6 +4605,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 	if( load_from < 0 )
 		load_from = 0;
 
+	
 	multi_vims( VIMS_SAMPLE_LIST,"%d", (with_reset_slotselection ? 0 : load_from) );
 	gint fxlen = 0;
 	gchar *fxtext = recv_vims(8,&fxlen);
@@ -4653,7 +4659,6 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 	
 	if( fxtext ) free(fxtext);
 	fxlen = 0;
-
 
 	load_from = info->uc.expected_num_streams;
 	if( load_from < 0 )

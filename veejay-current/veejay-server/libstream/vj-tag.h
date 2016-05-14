@@ -180,7 +180,7 @@ void	*vj_tag_get_plugin( int t1, int position, void *ptr );
 int		vj_tag_get_subrender(int t1);
 void	vj_tag_set_subrender(int t1, int status);
 
-int 	vj_tag_size();
+unsigned int 	vj_tag_size();
 
 vj_tag 	*vj_tag_get(int id);
 /* always return effect (-1 = empty) */
@@ -343,7 +343,8 @@ void	vj_tag_set_kf_type(int t1, int entry, int type );
 int	vj_tag_chain_set_kf_status( int s1, int entry, int status );
 int	vj_tag_chain_reset_kf( int s1, int entry );
 int     vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active, int *method, int *entry, int *alpha );
-int vj_tag_true_size();
+int	vj_tag_highest();
+int	vj_tag_highest_valid_id();
 void    *vj_tag_get_kf_port( int s1, int entry );
 
 char *vj_tag_scan_devices( void );

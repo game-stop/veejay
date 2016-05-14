@@ -417,6 +417,18 @@ if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8
 #define p_invalid_mode() {  veejay_msg(VEEJAY_MSG_DEBUG, "Invalid playback mode for this action"); }
 #define v_chi(v) ( (v < 0  || v >= SAMPLE_MAX_EFFECTS ) ) 
 
+#define SAMPLE_DEFAULTS(args) {\
+\
+ if(args == -1)	args = sample_highest_valid_id();\
+ if(args == 0) args = v->uc->sample_id;\
+}
+
+#define STREAM_DEFAULTS(args) {\
+\
+ if(args == -1) args = vj_tag_highest_valid_id();\
+ if(args == 0) args = v->uc->sample_id;\
+}
+
 #define P_A(a,b,c,d)\
 {\
 int __z = 0;\
@@ -2606,8 +2618,9 @@ void vj_event_no_caching(void *ptr, const char format[], va_list ap)
 	{
 		int i = 0;
 		int k = 0;
+		int n = sample_highest();
 		vj_el_break_cache( v->edit_list );
-		for( i = 1; i < sample_size() - 1; i ++ ) {
+		for( i = 1; i <= n; i ++ ) {
 			editlist *e = sample_get_editlist(i);
 			if(e) {
 				vj_el_break_cache(e); k++;
@@ -2679,12 +2692,7 @@ void	vj_event_sub_render( void *ptr, const char format[], va_list ap )
 	P_A(args,s,format,ap);
 
 	if( SAMPLE_PLAYING(v)) {
-		if(args[0] == -1)
-			args[0] = sample_size() - 1;
-
-		if( args[0] == 0) 
-			args[0] = v->uc->sample_id;
-
+		SAMPLE_DEFAULTS(args[0]);
 		int cur = sample_get_subrender(args[0]);
 		if( cur == 0 ) {
 			cur = 1;
@@ -2699,13 +2707,7 @@ void	vj_event_sub_render( void *ptr, const char format[], va_list ap )
 				( sample_get_subrender(args[0]) == 1 ? "Enabled" : "Disabled" ));
 	} 
 	if( STREAM_PLAYING(v)) {
-
-		if( args[0] == 0 )
-			args[0] = v->uc->sample_id;
-
-		if(args[0] == -1)
-			args[0] = vj_tag_size()-1;
-
+		STREAM_DEFAULTS(args[0]);
 		int cur = vj_tag_get_subrender(args[0]);
 		if( cur == 0 ) {
 			cur = 1;
@@ -2741,8 +2743,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 	
 		if(args[0] == VJ_PLAYBACK_MODE_SAMPLE) 
 		{
-			if(args[1]==0) args[1] = v->uc->sample_id;
-			if(args[1]==-1) args[1] = sample_size()-1;
+			SAMPLE_DEFAULTS(args[0]);
 			if(sample_exists(args[1]))
 			{
 				veejay_change_playback_mode(v,args[0] ,args[1]);
@@ -2755,8 +2756,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 		}
 		if(args[0] == VJ_PLAYBACK_MODE_TAG)
 		{
-			if(args[1]==0) args[1] = v->uc->sample_id;
-			if(args[1]==-1) args[1] = vj_tag_size()-1;
+			STREAM_DEFAULTS(args[0]);
 			if(vj_tag_exists(args[1]))
 			{
 				veejay_change_playback_mode(v,args[0],args[1]);
@@ -2968,14 +2968,7 @@ void vj_event_sample_select(void *ptr, const char format[], va_list ap)
 	char *s = NULL;	
 	P_A( args, s , format, ap);
 
-	if(args[0] == 0 )
-	{
-		args[0] = v->uc->sample_id;
-	}
-	if(args[0] == -1)
-	{
-		args[0] = sample_size()-1;
-	}
+	SAMPLE_DEFAULTS(args[0]);
 	if(sample_exists(args[0]))
 	{
 		veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,args[0] );
@@ -2992,16 +2985,7 @@ void vj_event_tag_select(void *ptr, const char format[], va_list ap)
 	int args[1];
 	char *s = NULL;	
 	P_A( args, s , format, ap);
-
-	if(args[0] == 0 )
-	{
-		args[0] = v->uc->sample_id;
-	}
-	if(args[0]==-1)
-	{
-		args[0] = vj_tag_size()-1;
-	}
-
+	STREAM_DEFAULTS(args[0]);
 	if(vj_tag_exists(args[0]))
 	{
 		veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG,args[0]);
@@ -3017,8 +3001,8 @@ void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 
-	int last_tag = vj_tag_size()-1;
-	int last_sample=sample_size()-1;
+	int last_tag = vj_tag_highest_valid_id();
+	int last_sample=sample_highest_valid_id();
 
 	if(last_tag < 1 ) 
 		last_tag = 1;
@@ -3037,7 +3021,7 @@ void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
 			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, v->last_tag_id);
 			return;
 		}
-		if(sample_size()-1 <= 0)
+		if(sample_size() <= 0)
 		{
 			if(vj_tag_exists( last_tag ))
 			{
@@ -3103,7 +3087,7 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 		/* check if current playing ID is valid for this mode */
 		if(mode == VJ_PLAYBACK_MODE_SAMPLE)
 		{
-			int last_id = sample_size()-1;
+			int last_id = sample_highest_valid_id();
 			if(last_id == 0)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "There are no samples. Cannot switch to sample mode");
@@ -3120,7 +3104,7 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 		}
 		if(mode == VJ_PLAYBACK_MODE_TAG)
 		{
-			int last_id = vj_tag_size()-1;
+			int last_id = vj_tag_highest_valid_id();
 			if(last_id == 0)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "There are no streams. Cannot switch to stream mode");
@@ -3470,11 +3454,13 @@ void vj_event_play_reverse(void *ptr,const char format[],va_list ap)
 	if(!STREAM_PLAYING(v))
 	{
 		int speed = v->settings->current_playback_speed;
-		if( speed == 0 ) speed = -1;
-		else 
-			if(speed > 0) speed = -(speed);
-		veejay_set_speed(v,
-				speed );
+		if( speed == 0 ) {
+			speed = -1; 
+		}
+		else if(speed > 0) {
+			speed = -(speed);
+		} 
+		veejay_set_speed(v,speed );
 
 		veejay_msg(VEEJAY_MSG_INFO, "Video is playing in reverse at speed %d.", speed);
 	}
@@ -3493,8 +3479,7 @@ void vj_event_play_forward(void *ptr, const char format[],va_list ap)
 		if(speed == 0) speed = 1;
 		else if(speed < 0 ) speed = -1 * speed;
 
-	 	veejay_set_speed(v,
-			speed );  
+	 	veejay_set_speed(v,speed );  
 
 		veejay_msg(VEEJAY_MSG_INFO, "Video is playing forward at speed %d" ,speed);
 	}
@@ -3915,11 +3900,7 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( args[0] == 0) 
-	{
-		args[0] = v->uc->sample_id;
-	}
-	if(args[0] == -1) args[0] = sample_size()-1;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if(args[1] == -1)
 	{
@@ -3980,18 +3961,14 @@ void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
 	char *s = NULL;
 	P_A(args, s, format, ap);
 
-	if(args[0] == -1)
-		args[0] = sample_size() - 1;
-
-	if( args[0] == 0) 
-		args[0] = v->uc->sample_id;
+	SAMPLE_DEFAULTS(args[0]);
 
 	int entry = args[1];
 	if( entry == -1 )
-		entry = sample_get_selected_entry(v->uc->sample_id);
+		entry = sample_get_selected_entry(args[0]);
 
-	sample_get_chain_source(v->uc->sample_id, entry);
-	int cha = sample_get_chain_channel( v->uc->sample_id, entry );
+	sample_get_chain_source(args[0], entry);
+	int cha = sample_get_chain_channel( args[0], entry );
 
 	int pos = sample_get_offset( cha,entry );
 			
@@ -4009,16 +3986,12 @@ void	vj_event_sample_skip_frame(void	*ptr, const char format[], va_list ap)
 	char *s = NULL;
 	P_A(args, s, format, ap);
 
-	if(args[0] == -1)
-		args[0] = sample_size() - 1;
-
-	if( args[0] == 0) 
-		args[0] = v->uc->sample_id;
+	SAMPLE_DEFAULTS(args[0]);
 	
-	int job = sample_size();
+	int job = sample_highest();
 	int i   = 1;
 	int k   = 0;
-	for( i = 1; i < job; i ++ ) {
+	for( i = 1; i <= job; i ++ ) {
 		sample_info *si = sample_get( i );
 		if(!si)
 		  continue;
@@ -4059,11 +4032,7 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
 	char *s = NULL;
 	P_A(args, s, format, ap);
 
-	if(args[0] == -1)
-		args[0] = sample_size() - 1;
-
-	if( args[0] == 0) 
-		args[0] = v->uc->sample_id;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_set_speed(args[0], args[1]) != -1)
 	{
@@ -4090,12 +4059,7 @@ void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap
 		return;
 	}
 
-	if( args[0] == 0) 
-	{
-		args[0] = v->uc->sample_id;
-	}
-
-	if(args[0] == -1) args[0] = sample_size()-1;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0]) )
 	{
@@ -4133,11 +4097,7 @@ void vj_event_sample_set_marker_end(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( args[0] == 0 ) 
-		args[0] = v->uc->sample_id;
-
-	if(args[0] == -1)
-		args[0] = sample_size()-1;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0]) )
 	{
@@ -4175,11 +4135,7 @@ void vj_event_sample_set_marker(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( args[0] == 0) 
-	{
-		args[0] = v->uc->sample_id;
-	}
-	if(args[0] == -1) args[0] = sample_size()-1;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0]) )
 	{
@@ -4217,10 +4173,7 @@ void vj_event_sample_set_marker_clear(void *ptr, const char format[],va_list ap)
 		return;
 	}
 
-	if( args[0] == 0) 
-		args[0] = v->uc->sample_id;
-
-	if(args[0] == -1) args[0] = sample_size()-1;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0]) )
 	{
@@ -4248,9 +4201,7 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( args[0] == 0) 
-		args[0] = v->uc->sample_id;
-	if(args[0] == -1) args[0] = sample_size()-1;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0])) 
 	{
@@ -4293,11 +4244,7 @@ void	vj_event_tag_set_descr( void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( args[0] == 0 )
-		args[0] = v->uc->sample_id;
-
-	if(args[0] == -1)
-		args[0] = vj_tag_size()-1;
+	STREAM_DEFAULTS(args[0]);
 
 	if( vj_tag_set_description(args[0],str) == 1)
 		veejay_msg(VEEJAY_MSG_INFO, "Changed stream title to '%s'", str );
@@ -4318,10 +4265,7 @@ void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( args[0] == 0 ) 
-		args[0] = v->uc->sample_id;
-
-	if(args[0] == -1) args[0] = sample_size()-1;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if(sample_set_description(args[0],str) == 0)
 		veejay_msg(VEEJAY_MSG_INFO, "Changed sample title to %s",str);
@@ -4338,7 +4282,7 @@ void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 	if(sample_writeToFile( str, v->composite,v->seq,v->font, v->uc->sample_id, v->uc->playback_mode) )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Saved %d samples to file '%s'", sample_size()-1, str);
+		veejay_msg(VEEJAY_MSG_INFO, "Saved %d samples to file '%s'", sample_size(), str);
 	}
 	else
 	{
@@ -4554,15 +4498,14 @@ void vj_event_sample_set_num_loops(void *ptr, const char format[], va_list ap)
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(args[0] == 0) args[0] = v->uc->sample_id;
-	if(args[0] == -1) args[0] = sample_size()-1;
+	SAMPLE_DEFAULTS(args[0]);
 
 	if(sample_exists(args[0]))
 	{
 
-		if(	sample_set_loops(v->uc->sample_id, args[1]))
+		if(	sample_set_loops(args[0], args[1]))
 		{	veejay_msg(VEEJAY_MSG_INFO, "Setted %d no. of loops for sample %d",
-				sample_get_loops(v->uc->sample_id),args[0]);
+				sample_get_loops(args[0]),args[0]);
 		}
 		else	
 		{
@@ -4585,36 +4528,24 @@ void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
 	int s_end;
 
 	P_A(args,str,format,ap);
-	if(SAMPLE_PLAYING(v))
+	SAMPLE_DEFAULTS(args[0]);
+
+	if(!sample_exists(args[0]))
 	{
-
-		if(args[0] == 0)
-			args[0] = v->uc->sample_id;
-
-		if(args[0] == -1) args[0] = sample_size()-1;	
-
-		if(!sample_exists(args[0]))
-		{
-			p_no_sample(args[0]);
-			return;
-		}
-		
-		s_start = sample_get_startFrame(args[0]) + args[1];
-		s_end = sample_get_endFrame(args[0]) + args[2];
-
-		if	(sample_set_startframe(args[0],s_start) &&
-			sample_set_endframe(args[0],s_end))
-		{
-			constrain_sample( v, args[0] );
-			veejay_msg(VEEJAY_MSG_INFO, "Sample update start %d end %d",
-				s_start,s_end);
-		}
-	}
-	else
-	{
-		p_invalid_mode();
+		p_no_sample(args[0]);
+		return;
 	}
 
+	s_start = sample_get_startFrame(args[0]) + args[1];
+	s_end = sample_get_endFrame(args[0]) + args[2];
+
+	if	(sample_set_startframe(args[0],s_start) &&
+		sample_set_endframe(args[0],s_end))
+	{
+		constrain_sample( v, args[0] );
+		veejay_msg(VEEJAY_MSG_INFO, "Sample update start %d end %d",
+			s_start,s_end);
+	}
 }
 
 void vj_event_sample_set_start(void *ptr, const char format[], va_list ap) 
@@ -4624,19 +4555,13 @@ void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
-	if(!SAMPLE_PLAYING(v))
+	SAMPLE_DEFAULTS(args[0]);
+
+	if(!sample_exists(args[0]))
 	{
-		p_invalid_mode();
+		p_no_sample(args[0]);
 		return;
 	}
-
-	if(args[0] == 0) 
-		args[0] = v->uc->sample_id;
-	if(args[0] == -1)
-		args[0] = sample_size()-1;
-	
-	if( args[0] <= 0 )
-		return;
 
 	if( args[1] < sample_get_endFrame(args[0])) {
 		if( sample_set_startframe(args[0],args[1] ) ) {
@@ -4661,22 +4586,24 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(!SAMPLE_PLAYING(v))
+	
+	SAMPLE_DEFAULTS(args[0]);
+
+	if(!sample_exists(args[0]))
 	{
-		p_invalid_mode();
+		p_no_sample(args[0]);
 		return;
 	}
 
-	if(args[0] == 0) 
-		args[0] = v->uc->sample_id;
 	if(args[1] == -1)
 		args[1] = sample_video_length( args[0] );
+	
 	if(args[1] <= 0 )
 	{
 		veejay_msg(0, "Impossible to set ending position %d for sample %d", args[1],args[0] );
 		return;
 	}
-	if( args[1] >= sample_get_startFrame(v->uc->sample_id))
+	if( args[1] >= sample_get_startFrame(args[0]))
 	{
 		if(sample_set_endframe(args[0],args[1]))
 		{
@@ -4747,7 +4674,7 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
 	if( SAMPLE_PLAYING(v)) {
 		if( !vj_has_video(v,v->edit_list) ) {
 			veejay_msg(VEEJAY_MSG_WARNING,"There are no video frames in plain mode.");
-			if( vj_tag_size() > 0 ) {
+			if( vj_tag_highest_valid_id() > 0 ) {
 				veejay_msg(VEEJAY_MSG_WARNING,"Switching to stream 1 to clear all samples");
 				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, 1 );
 			} else {
@@ -4836,25 +4763,14 @@ void vj_event_sample_chain_enable(void *ptr, const char format[], va_list ap)
 	int args[4];
 	char *s = NULL;
 	P_A(args,s,format,ap);
-	if(!SAMPLE_PLAYING(v))
-	{
-		p_invalid_mode();
-		return;
-	}
 
-	if(args[0] == 0)
-	{
-		args[0] = v->uc->sample_id;
-	}
-	
+	SAMPLE_DEFAULTS(args[0]);
+
 	if(sample_exists(args[0]))
 	{
 		sample_set_effect_status(args[0], 1);
 		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Sample %d is enabled",args[0]);
 	}
-	else
-		p_no_sample(args[0]);
-	
 }
 
 void	vj_event_all_samples_chain_toggle(void *ptr, const char format[], va_list ap)
@@ -4866,7 +4782,8 @@ void	vj_event_all_samples_chain_toggle(void *ptr, const char format[], va_list a
 	if(SAMPLE_PLAYING(v))
 	{
 		int i;
-		for(i=0; i < sample_size()-1; i++)
+		int n = sample_highest_valid_id();
+		for(i=1; i <= n; i++)
 			sample_set_effect_status( i, args[0] );
 		veejay_msg(VEEJAY_MSG_INFO, "Effect Chain on all samples %s", (args[0]==0 ? "Disabled" : "Enabled"));
 	}
@@ -4874,8 +4791,9 @@ void	vj_event_all_samples_chain_toggle(void *ptr, const char format[], va_list a
 	{
 		if(STREAM_PLAYING(v))
 		{
-			int i;
-			for(i=0; i < vj_tag_size()-1; i++)
+			int i;	
+			int n = vj_tag_highest_valid_id();
+			for(i=1; i <= n; i++)
 				vj_tag_set_effect_status(i,args[0]);
 			veejay_msg(VEEJAY_MSG_INFO, "Effect Chain on all streams %s", (args[0]==0 ? "Disabled" : "Enabled"));
 		}
@@ -4898,8 +4816,7 @@ void vj_event_tag_chain_enable(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( args[0] == 0 )
-		args[0] = v->uc->sample_id;
+	STREAM_DEFAULTS(args[0]);	
 
 	if(vj_tag_exists(args[0]))
 	{
@@ -4916,14 +4833,9 @@ void vj_event_tag_chain_disable(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *s = NULL;
 	P_A(args,s,format,ap);
-	if(!STREAM_PLAYING(v))
-	{
-		p_invalid_mode();	
-		return;
-	}
 
-	if( args[0] == 0 )
-		args[0] = v->uc->sample_id;
+	STREAM_DEFAULTS(args[0]);
+
 	if(vj_tag_exists(args[0]))
 	{
 		vj_tag_set_effect_status(args[0], 0);
@@ -5037,10 +4949,11 @@ void vj_event_chain_entry_enable_video(void *ptr, const char format[], va_list a
 
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
+		SAMPLE_DEFAULTS(args[0]);
 		if(sample_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+
 			if(sample_set_chain_status(args[0],args[1],1) != -1)	
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Sample %d: Video on chain entry %d is %s",args[0],args[1],
@@ -5052,10 +4965,12 @@ void vj_event_chain_entry_enable_video(void *ptr, const char format[], va_list a
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0)args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
+		STREAM_DEFAULTS(args[0]);
+
 		if(vj_tag_exists(args[0])) 
 		{
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+
 			if(vj_tag_set_chain_status(args[0],args[1],1)!=-1)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
@@ -5075,17 +4990,19 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
+
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			if(sample_set_chain_status(args[0],args[1],0)!=-1)
 			{	
 				veejay_msg(VEEJAY_MSG_INFO, "Sample %d: Video on chain entry %d is %s",args[0],args[1],
@@ -5097,17 +5014,19 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;	
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
-
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		STREAM_DEFAULTS(args[0]);
 
 		if(vj_tag_exists(args[0]))
 		{
+
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+	
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			if(vj_tag_set_chain_status(args[0],args[1],0)!=-1)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
@@ -5351,16 +5270,17 @@ void vj_event_chain_entry_del(void *ptr, const char format[], va_list ap)
 
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int effect = sample_get_effect_any(args[0],args[1]);
 			if( vj_effect_is_valid(effect)) 
 			{
@@ -5374,16 +5294,17 @@ void vj_event_chain_entry_del(void *ptr, const char format[], va_list ap)
 
 	if (STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		STREAM_DEFAULTS(args[0]);	
 
 		if(vj_tag_exists(args[0])) 		
 		{
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int effect = vj_tag_get_effect_any(args[0],args[1]);
 			if(vj_effect_is_valid(effect))
 			{
@@ -5410,18 +5331,18 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[0] == -1) args[0] = sample_size()-1;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+	
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			//int real_id = vj_effect_real_to_sequence(args[2]);
 			if(sample_chain_add(args[0],args[1],args[2])) 
 			{
@@ -5435,18 +5356,17 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 	}
 	if( STREAM_PLAYING(v)) 
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[0] == -1) args[0] = vj_tag_size()-1;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);	
-
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
-
+		STREAM_DEFAULTS(args[0]);
 		if(vj_tag_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);	
+
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			if(vj_tag_set_effect(args[0],args[1], args[2]))
 			{
 				v->uc->chain_changed = 1;
@@ -5573,17 +5493,19 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
-			int effect = sample_get_effect_any(v->uc->sample_id, args[1]);
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+	
+			int effect = sample_get_effect_any(args[0], args[1]);
 			int num_p   = vj_effect_get_num_params(effect);
 			if( args[2] > num_p ) {
 				args[2] = num_p;
@@ -5603,17 +5525,18 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 	}
    	else if( STREAM_PLAYING(v)) 
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		STREAM_DEFAULTS(args[0]);
 
-		if(vj_tag_exists(v->uc->sample_id)) 
+		if(vj_tag_exists(args[0])) 
 		{
-			int effect = vj_tag_get_effect_any(v->uc->sample_id, args[1]);
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
+			int effect = vj_tag_get_effect_any(args[0], args[1]);
 			int num_p   = vj_effect_get_num_params(effect);
 			if( args[2] > num_p ) {
 				args[2] = num_p;
@@ -5654,17 +5577,19 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 
 	if(SAMPLE_PLAYING(v)) 
 	{
-	    int num_p = 0;
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds: %d", args[1]);
-			return;
-		}
+	   	int num_p = 0;	
+
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds: %d", args[1]);
+				return;
+			}
+
 			int real_id = args[2];
 			int i;
 			num_p   = vj_effect_get_num_params(real_id);
@@ -5691,16 +5616,17 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 	}
 	if( STREAM_PLAYING(v)) 
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds %d", args[1]);
-			return;
-		}
+		STREAM_DEFAULTS(args[0]);
 
-		if(vj_tag_exists(v->uc->sample_id)) 
+		if(vj_tag_exists(args[0])) 
 		{
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds %d", args[1]);
+				return;
+			}
+
 			int real_id = args[2];
 			int num_p   = vj_effect_get_num_params(real_id);
 			int i;
@@ -5745,7 +5671,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		{
 			if(!vj_tag_exists(cha))
 			{
-				cha =vj_tag_size()-1;
+				cha = vj_tag_highest_valid_id();
 				if(cha <= 0)
 				{
 					veejay_msg(VEEJAY_MSG_ERROR, "No streams to mix with");
@@ -5760,7 +5686,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		{
 			if(!sample_exists(cha))
 			{
-				cha = sample_size()-1;
+				cha = sample_highest_valid_id();
 				if(cha<=0)
 				{
 					veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
@@ -5770,7 +5696,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_DEBUG, "Switched from source Stream to Sample");
 			src = 0;
 		}
-		sample_set_chain_source( v->uc->sample_id, entry, src );
+		sample_set_chain_source(v->uc->sample_id,entry,src);
 		sample_set_chain_channel(v->uc->sample_id,entry,cha);
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d", entry,(src==VJ_TAG_TYPE_NONE ? "Sample":"Stream"), cha);
 		if(v->no_bezerk)
@@ -5790,7 +5716,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		{
 			if(!vj_tag_exists(cha))
 			{
-				cha = vj_tag_size()-1;
+				cha = vj_tag_highest_valid_id();
 				if(cha <= 0)
 				{
 					veejay_msg(VEEJAY_MSG_ERROR, "No streams to mix with");
@@ -5803,7 +5729,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		{
 			if(!sample_exists(cha))
 			{
-				cha = sample_size()-1;
+				cha = sample_highest_valid_id();
 				if(cha<=0)
 				{
 					veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
@@ -5812,7 +5738,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 			}
 			src = 0;
 		}
-		vj_tag_set_chain_source( v->uc->sample_id, entry, src );
+		vj_tag_set_chain_source(v->uc->sample_id,entry,src);
 		vj_tag_set_chain_channel(v->uc->sample_id,entry,cha);
 
 		vj_tag_get_descriptive(cha, description);
@@ -5829,23 +5755,24 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int src = args[2];
 			int c = sample_get_chain_channel(args[0],args[1]);
 			if(src == VJ_TAG_TYPE_NONE)
 			{
 				if(!sample_exists(c))
 				{
-					c = sample_size()-1;
+					c = sample_highest_valid_id();
 					if(c<=0)
 					{
 						veejay_msg(VEEJAY_MSG_ERROR, "You should create a sample first\n");
@@ -5857,7 +5784,7 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			{
 				if(!vj_tag_exists(c) )
 				{
-					c = vj_tag_size() - 1;
+					c = vj_tag_highest_valid_id();
 					if(c<=0)
 					{
 						veejay_msg(VEEJAY_MSG_ERROR, "You should create a stream first (there are none)");
@@ -5877,11 +5804,10 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 				   sample_speed = sample_get_speed(c);
 				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d) at speed %d position %d", 
 					src == VJ_TAG_TYPE_NONE ? "sample" : "stream",c,sample_speed,sample_offset);
-	//			if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 				if(v->no_bezerk)
 				{
 					veejay_set_frame(v,
-						sample_get_startFrame(v->uc->sample_id));
+						sample_get_startFrame(args[0]));
 				}
 			}
 				
@@ -5889,16 +5815,17 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		STREAM_DEFAULTS(args[0]);
 
 		if(vj_tag_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int src = args[2];
 			int c = vj_tag_get_chain_channel(args[0],args[1]);
 
@@ -5906,7 +5833,7 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			{
 				if(!sample_exists(c))
 				{
-					c = sample_size()-1;
+					c = sample_highest_valid_id();
 					if(c<=0)
 					{
 						veejay_msg(VEEJAY_MSG_ERROR, "You should create a sample first\n");
@@ -5918,7 +5845,7 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			{
 				if(!vj_tag_exists(c) )
 				{
-					c = vj_tag_size() - 1;
+					c = vj_tag_highest_valid_id();
 					if(c<=0)
 					{
 						veejay_msg(VEEJAY_MSG_ERROR, "You should create a stream first (there are none)");
@@ -5939,8 +5866,6 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 
 				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d) at speed %d position %d", 
 					src==VJ_TAG_TYPE_NONE ? "sample" : "stream",c,sample_speed, sample_offset);
-	//		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
-
 			}	
 		}
 	}
@@ -5963,7 +5888,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 		if(src==VJ_TAG_TYPE_NONE)
 		{	//decrease sample id
 			cha = cha - args[0];
-			if( sample_size()-1 <= 0 )
+			if( sample_size() <= 0 )
 			{
 				veejay_msg(0, "No samples to mix with");
 				return;
@@ -5971,7 +5896,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 			clamp_channel(
 				cha,
 				1,
-				sample_size()-1 );
+				sample_highest_valid_id() );
 
 			if( !sample_exists( cha ) )
 				cha = old;
@@ -5979,7 +5904,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 		else	
 		{
 			cha = cha - args[0];
-			if( vj_tag_size()-1 <= 0 )
+			if( vj_tag_size() <= 0 )
 			{
 				veejay_msg(0, "No streams to mix with");
 				return;
@@ -5987,7 +5912,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 			clamp_channel(
 				cha,
 				1,
-				vj_tag_size()-1 );
+				vj_tag_highest_valid_id() );
 
 			if( !vj_tag_exists( cha ))
 				cha = old;
@@ -6010,7 +5935,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 		if(src==VJ_TAG_TYPE_NONE)
 		{	//decrease sample id
 			cha = cha - args[0];
-			if( sample_size()-1 <= 0 )
+			if( sample_size() <= 0 )
 			{
 				veejay_msg(0, "No samples to mix with");
 				return;
@@ -6018,14 +5943,14 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 			clamp_channel(
 				cha,
 				1,
-				sample_size()-1 );
+				sample_highest_valid_id() );
 			if( !sample_exists(cha ) )
 				cha = old;
 		}
 		else	
 		{
 			cha = cha - args[0];
-			if( vj_tag_size()-1 <= 0 )
+			if( vj_tag_size() <= 0 )
 			{
 				veejay_msg(0, "No streams to mix with");
 				return;
@@ -6033,7 +5958,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 			clamp_channel(
 				cha,
 				1,
-				vj_tag_size()-1 );
+				vj_tag_highest_valid_id() );
 			if(! vj_tag_exists( cha ))
 				cha = old;
 		}
@@ -6042,8 +5967,6 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 		vj_tag_get_descriptive( cha, description);
 
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,cha,description);
-//		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
- 
 	}
 
 }
@@ -6063,7 +5986,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 		if(src==VJ_TAG_TYPE_NONE)
 		{	//decrease sample id
 			cha = cha + args[0];
-			if( sample_size()-1 <= 0 )
+			if( sample_size() <= 0 )
 			{
 				veejay_msg(0, "No samples to mix with");
 				return;
@@ -6071,14 +5994,14 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 			clamp_channel(
 				cha,
 				1,
-				sample_size()-1 );
+				sample_highest_valid_id() );
 			if( !sample_exists( cha ) )
 				cha = old;
 		}
 		else	
 		{
 			cha = cha + args[0];
-			if( vj_tag_size()-1 <= 0 )
+			if( vj_tag_size() <= 0 )
 			{
 				veejay_msg(0, "No streams to mix with");
 				return;
@@ -6086,7 +6009,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 			clamp_channel(
 				cha,
 				1,
-				vj_tag_size()-1 );
+				vj_tag_highest_valid_id() );
 			if( !vj_tag_exists(cha) )
 				cha = old;
 		}
@@ -6109,7 +6032,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 		if(src==0)
 		{	//decrease sample id
 			cha = cha + args[0];
-			if( sample_size()-1 <= 0 )
+			if( sample_size() <= 0 )
 			{
 				veejay_msg(0, "No samples to mix with");
 				return;
@@ -6117,14 +6040,14 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 			clamp_channel(
 				cha,
 				1,
-				sample_size()-1 );
+				sample_highest_valid_id() );
 			if( !sample_exists( cha ) )
 				cha = old;
 		}
 		else	
 		{
 			cha = cha + args[0];
-			if( vj_tag_size()-1 <= 0 )
+			if( vj_tag_size() <= 0 )
 			{
 				veejay_msg(0, "No streams to mix with");
 				return;
@@ -6132,7 +6055,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 			clamp_channel(
 				cha,
 				1,
-				vj_tag_size()-1 );
+				vj_tag_highest_valid_id() );
 			if( !vj_tag_exists( cha ))
 				cha = old;
 		}
@@ -6153,16 +6076,17 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 	char *str = NULL; P_A(args,str,format,ap);
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds: %d", args[1]);
-			return;
-		}
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds: %d", args[1]);
+				return;
+			}
+
 			int src = sample_get_chain_source( args[0],args[1]);
 			int err = 1;
 			if(src == VJ_TAG_TYPE_NONE && sample_exists(args[2]))
@@ -6187,16 +6111,17 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		STREAM_DEFAULTS(args[0]);
 
 		if(vj_tag_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int src = vj_tag_get_chain_source(args[0],args[1]);
 			int err = 1;
 			if( src == VJ_TAG_TYPE_NONE && sample_exists( args[2]))
@@ -6226,17 +6151,17 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[0] == -1) args[0] = sample_size()-1;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int source = args[2];
 			int channel_id = args[3];
 			int err = 1;
@@ -6269,17 +6194,18 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[0] == -1) args[0] = sample_size()-1;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		STREAM_DEFAULTS(args[0]);
 
 	 	if(vj_tag_exists(args[0])) 
 		{
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+		
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int source = args[2];
 			int channel_id = args[3];
 			int err = 1;
@@ -6377,17 +6303,17 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 	
 	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[0] == -1) args[0] = sample_size()-1;
-		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(sample_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int effect = sample_get_effect_any( args[0], args[1] );
 			const char *effect_descr = vj_effect_get_description(effect);
 			const char *effect_param_descr = vj_effect_get_param_description(effect,args[2]);
@@ -6407,16 +6333,17 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->sample_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
-		if(v_chi(args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-			return;
-		}
+		STREAM_DEFAULTS(args[0]);
 
 		if(vj_tag_exists(args[0]))
 		{
+			if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+			if(v_chi(args[1]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+				return;
+			}
+
 			int effect = vj_tag_get_effect_any(args[0],args[1] );
 			const char *effect_descr = vj_effect_get_description(effect);
 			const char *effect_param_descr = vj_effect_get_param_description(effect,args[2]);
@@ -7021,8 +6948,9 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->sample_id;
-	if(args[0]==-1) args[0] = vj_tag_size()-1;
+	
+	STREAM_DEFAULTS(args[0]);
+	
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
 		if(vj_tag_set_brightness(args[0],args[1]))
@@ -7112,8 +7040,8 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->sample_id;
-	if(args[0]==-1) args[0] = vj_tag_size()-1;
+
+	STREAM_DEFAULTS(args[0]);
 
 	char send_msg[128];
 	char message[128];
@@ -7142,8 +7070,9 @@ void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->sample_id;
-	if(args[0]==-1)args[0] = vj_tag_size()-1;
+
+	STREAM_DEFAULTS(args[0]);
+
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
 		if(vj_tag_set_contrast(args[0],args[1]))
@@ -7159,8 +7088,9 @@ void vj_event_v4l_set_white(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->sample_id;
-	if(args[0]==-1)args[0] = vj_tag_size()-1;
+
+	STREAM_DEFAULTS(args[0]);
+
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
 		if(vj_tag_set_white(args[0],args[1]))
@@ -7176,8 +7106,9 @@ void vj_event_v4l_set_saturation(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->sample_id;
-	if(args[0]==-1)args[0] = vj_tag_size()-1;
+
+	STREAM_DEFAULTS(args[0]);
+
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
 #ifdef HAVE_V4L2 
@@ -7199,8 +7130,9 @@ void vj_event_v4l_set_color(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0] == 0) args[0] = v->uc->sample_id;
-	if(args[0] == -1) args[0] = vj_tag_size()-1;
+
+	STREAM_DEFAULTS(args[0]);
+
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
 		if(vj_tag_set_color(args[0],args[1]))
@@ -7218,9 +7150,9 @@ void vj_event_v4l_set_property( void *ptr, const char format[], va_list ap )
 	char str[255];
 #ifdef HAVE_V4L2 
    	P_A(args,str,format,ap);
-	if(args[0] == 0) args[0] = v->uc->sample_id;
-	if(args[0] == -1) args[0] = vj_tag_size()-1;
-	
+
+	STREAM_DEFAULTS(args[0]);
+
 	uint32_t v4l_ctrl_id = v4l2_get_property_id( str );
 	if(v4l_ctrl_id == 0 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG,"Invalid v4l2 property name '%s'",str );
@@ -7241,8 +7173,9 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0] == 0) args[0] = v->uc->sample_id;
-	if(args[0] == -1) args[0] = vj_tag_size()-1;
+
+	STREAM_DEFAULTS(args[0]);
+
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
 		if(vj_tag_set_hue(args[0],args[1]))
@@ -7276,8 +7209,8 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 
 void	vj_event_toggle_osl( void *ptr, const char format[], va_list ap )
 {
-	veejay_t *v = (veejay_t*) ptr;
 #ifdef HAVE_SDL_TTF
+	veejay_t *v = (veejay_t*) ptr;	
 	if( v->settings->composite ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Sorry, on-screen-logging is not supported yet in projection mapping. Start veejay with -D");
 	} else {
@@ -7555,8 +7488,9 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 
 		if(play_now) 
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d now", sample_size()-1);
-			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, sample_size()-1 );
+			int last_id = sample_highest_valid_id();
+			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d now", last_id );
+			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, last_id );
 		}
 	}
 	else
@@ -7665,8 +7599,9 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 
 			if(s->offline_created_sample) 
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Playing new sample %d now ", sample_size()-1);
-				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE , sample_size()-1);
+				int last_id = sample_highest_valid_id();
+				veejay_msg(VEEJAY_MSG_INFO, "Playing new sample %d now ",last_id );
+				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,last_id );
 			}
 		}
 		s->offline_record = 0;
@@ -7912,13 +7847,13 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 
 	if(v->settings->tag_record)
 		veejay_msg(VEEJAY_MSG_INFO, "Stream '%s' [%d]/[%d] [%s] %s recorded: %06ld frames ",
-			title,id,vj_tag_size()-1,description,
+			title,id,vj_tag_size(),description,
 		(vj_tag_get_active(id) ? "is active" : "is not active"),
 		vj_tag_get_encoded_frames(id));
 	else
 	veejay_msg(VEEJAY_MSG_INFO,
 		"Stream [%d]/[%d] [%s] %s ",
-		id, vj_tag_size()-1, description,
+		id, vj_tag_size(), description,
 		(vj_tag_get_active(id) == 1 ? "is active" : "is not active"));
 
 	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
@@ -8057,7 +7992,6 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 	long speed = sample_get_speed(id);
 	long len = end - start;
 
-//	if(start == 0) len ++;
 	veejay_memset( &tc,0,sizeof(MPEG_timecode_t));
 	mpeg_timecode(&tc, len,	mpeg_framerate_code( ratio ),v->current_edit_list->video_fps);
 	sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
@@ -8068,7 +8002,7 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 
 	veejay_msg(VEEJAY_MSG_INFO, 
 		"Sample %s [%4d]/[%4d]\t[duration: %s | %8ld] @%8ld %s",
-		sampletitle,id,sample_size()-1,timecode,len, (long)v->settings->current_frame_num,
+		sampletitle,id,sample_size(),timecode,len, (long)v->settings->current_frame_num,
 		curtime);
 	
 	if(sample_encoder_active(v->uc->sample_id))
@@ -8173,7 +8107,7 @@ void	vj_event_send_track_list		(	void *ptr,	const char format[], 	va_list ap 	)
 	veejay_t *v = (veejay_t*)ptr;
 	char *s_print_buf = get_print_buf(0);
 	sprintf(s_print_buf, "%05d",0);
-	int n = vj_tag_size()-1;
+	int n = vj_tag_highest();
 	if (n >= 1 )
 	{
 		char *print_buf = get_print_buf(SEND_BUF);
@@ -8215,7 +8149,7 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	if(args[0]>0) 
 		start_from_tag = args[0];
 
-	n = vj_tag_size()-1;
+	n = vj_tag_highest();
 	if (n >= 1 )
 	{
 		char line[300];
@@ -8310,17 +8244,13 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	int failed = 1;
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0] == 0 )
-		args[0] = v->uc->sample_id;
-
 
 	char *s_print_buf = NULL;
 
 	switch( args[1] )
 	{
 		case 0:
-			if(args[0] == -1)
-				args[0] = sample_size() - 1;
+			SAMPLE_DEFAULTS(args[0]);
 
 			if(sample_exists(args[0]))
 			{
@@ -8329,8 +8259,7 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 			}
 			break;
 		case  1:
-			if(args[0] == -1)
-				args[0] = vj_tag_size() - 1;
+			STREAM_DEFAULTS(args[0]);
 
 			if(vj_tag_exists(args[0]))
 			{
@@ -8618,7 +8547,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 
 	sprintf(s_print_buf, "00000000");
 
-	n = sample_size();
+	n = sample_highest();
 	if( n > 1 )
 	{
 		char *print_buf = get_print_buf(SEND_BUF);
@@ -8731,10 +8660,7 @@ void	vj_event_send_stream_args		(	void *ptr, const char format[],		va_list ap )
 
 	if(STREAM_PLAYING(v)) 
 	{
-		if( args[0] == 0 )
-			args[0] = v->uc->sample_id;
-		else if (args[0] == -1 )
-			args[0] = vj_tag_size()-1;
+		STREAM_DEFAULTS(args[0]);
 
 		if( vj_tag_get_type(args[0]) == VJ_TAG_TYPE_GENERATOR ) {
 			int tagargs[SAMPLE_MAX_PARAMETERS];
@@ -8779,8 +8705,7 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 
 	if( SAMPLE_PLAYING(v)  )
 	{
-		if(args[0] == 0) 
-			args[0] = v->uc->sample_id;
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(args[1]==-1)
 			args[1] = sample_get_selected_entry(args[0]);
@@ -8823,9 +8748,7 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 	
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) 
-			args[0] = v->uc->sample_id;
-
+		STREAM_DEFAULTS(args[0]);
 		if(args[1] == -1)
 			args[1] = vj_tag_get_selected_entry(args[0]);
 
@@ -8892,8 +8815,7 @@ void	vj_event_send_chain_entry_parameters	( 	void *ptr,	const char format[],	va_
 
 	if( SAMPLE_PLAYING(v)  )
 	{
-		if(args[0] == 0) 
-			args[0] = v->uc->sample_id;
+		SAMPLE_DEFAULTS(args[0]);
 
 		if(args[1]==-1)
 			args[1] = sample_get_selected_entry(args[0]);
@@ -8944,8 +8866,7 @@ void	vj_event_send_chain_entry_parameters	( 	void *ptr,	const char format[],	va_
 	
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) 
-			args[0] = v->uc->sample_id;
+		STREAM_DEFAULTS(args[0]);
 
 		if(args[1] == -1)
 			args[1] = vj_tag_get_selected_entry(args[0]);
@@ -9018,16 +8939,12 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,str,format,ap);
 
-	if(args[0] == 0) 
-		args[0] = v->uc->sample_id;
-
 	char *s_print_buf = get_print_buf(0);
-
 	sprintf( s_print_buf, "%03d",0 );
 
 	if(SAMPLE_PLAYING(v))
 	{
-		if(args[0] == -1) args[0] = sample_size()-1;
+		SAMPLE_DEFAULTS(args[0]);
 		char *print_buf = get_print_buf(16*SAMPLE_MAX_EFFECTS);
 		for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 		{
@@ -9052,9 +8969,10 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 		sprintf(s_print_buf, "%03zu%s",strlen(print_buf), print_buf);
 		free(print_buf);
 
-	} else if(STREAM_PLAYING(v))
+	} 
+	else if(STREAM_PLAYING(v))
 	{
-		if(args[0] == -1) args[0] = vj_tag_size()-1;
+		STREAM_DEFAULTS(args[0]);
 		char *print_buf = get_print_buf(16*SAMPLE_MAX_EFFECTS);
 
 		for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
@@ -9454,10 +9372,8 @@ void	vj_event_set_stream_arg( void *ptr, const char format[], va_list ap)
 	}
 
 	int *n_args = &args[1];
-	if( args[0] == 0 ) 
-		args[0] = v->uc->sample_id;
-	else if (args[0] == -1 )
-		args[0] = vj_tag_size()-1;
+
+	STREAM_DEFAULTS(args[0]);
 
 	if(STREAM_PLAYING(v)) 
 	{
@@ -9475,11 +9391,7 @@ void	vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
 	P_A(args,s,format,ap);
 	veejay_t *v = (veejay_t*) ptr;
 	
-	if(STREAM_PLAYING(v))
-	{
-		if(args[0] == 0 ) args[0] = v->uc->sample_id;
-		if(args[0] == -1) args[0] = vj_tag_size()-1;
-	}
+	STREAM_DEFAULTS(args[0]);
 	// allow changing of color while playing plain/sample
 	if(vj_tag_exists(args[0]) && vj_tag_get_type(args[0]) == VJ_TAG_TYPE_COLOR )
 	{
@@ -9490,7 +9402,7 @@ void	vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist",
+		veejay_msg(VEEJAY_MSG_ERROR, "Solid stream %d does not exist",
 			args[0]);
 	}
 }
@@ -9585,12 +9497,7 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 	int failed = 1;	
 
 	P_A(args,str,format,ap);
-	if(args[0] == 0 )
-		args[0] = v->uc->sample_id;
-	if(args[0] == -1)
-		args[0] = sample_size() - 1;
-
-	id = args[0];
+	
 	char options[100];
 	char prefix[4];
 
@@ -9599,11 +9506,16 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 
 	switch(args[1])
 	{
-	    case VJ_PLAYBACK_MODE_SAMPLE: 
-			if(sample_exists(id))
+		case VJ_PLAYBACK_MODE_SAMPLE: 
+
+		SAMPLE_DEFAULTS(args[0]);
+		
+		id = args[0];
+
+		    if(sample_exists(id))
 		    {
-				/* For gathering sample-infos use the sample_info_t-structure that is defined in /libsample/sampleadm.h */
-				sample_info *si = sample_get(id);
+			/* For gathering sample-infos use the sample_info_t-structure that is defined in /libsample/sampleadm.h */
+			sample_info *si = sample_get(id);
 	        	if (si)
 		        {
 			       int start = si->first_frame;
@@ -9620,8 +9532,13 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 				}	
 		    }
 			break;
-	    case VJ_PLAYBACK_MODE_TAG:		
-			if(vj_tag_exists(id)) 
+	    case VJ_PLAYBACK_MODE_TAG:	
+
+		STREAM_DEFAULTS(args[0]);
+	
+		id = args[0];
+	
+		if(vj_tag_exists(id)) 
 		    {
 		    /* For gathering further informations of the stream first decide which type of stream it is 
 		       the types are definded in libstream/vj-tag.h and uses then the structure that is definded in 
@@ -9789,7 +9706,7 @@ void	vj_event_connect_shm( void *ptr, const char format[], va_list ap )
 
 void	vj_event_connect_split_shm( void *ptr, const char format[], va_list ap )
 {
-		veejay_t *v = (veejay_t*) ptr;
+	veejay_t *v = (veejay_t*) ptr;
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
@@ -10026,7 +9943,8 @@ void	vj_event_get_keyframes( void *ptr, 	const char format[],	va_list ap	)
 			free(data);
 			return;
 		}
-	} else if (STREAM_PLAYING(v))
+	}
+	else if (STREAM_PLAYING(v))
 	{
 		int data_len = 0;
 		unsigned char *data = vj_tag_chain_get_kfs( v->uc->sample_id, args[0],args[1], &data_len );
@@ -10051,20 +9969,15 @@ void	vj_event_set_kf_status_param( void *ptr, const char format[], va_list ap)
 
 	P_A(args,NULL,format,ap);
 
-	if(args[0] == -1 && SAMPLE_PLAYING(v))
-		args[0] = sample_size() - 1;
-	else if (args[0] == -1 && STREAM_PLAYING(v) ) 
-		args[0] = vj_tag_size() - 1;
-
-	if( args[0] == 0) 
-		args[0] = v->uc->sample_id;
-
 	if(SAMPLE_PLAYING(v))
 	{
+		SAMPLE_DEFAULTS(args[0]);
+
 		keyframe_set_param_status( args[0], args[1], args[2], args[3], 1 );
 	}
 	else if (STREAM_PLAYING(v))
 	{
+		STREAM_DEFAULTS(args[0]);
 		keyframe_set_param_status( args[0], args[1], args[2], args[3], 0 );
 	}
 }
@@ -10320,7 +10233,7 @@ static void vj_event_sample_next1( veejay_t *v )
 			veejay_set_sample(v,n );
 		} else {
 		    n = v->uc->sample_id;
-		    int stop = sample_size() -1;
+		    int stop = sample_highest_valid_id();
 		    while(!sample_exists(n) ) {
 			    n += s;
 			    if( n > stop || n < 1 ) {
@@ -10334,11 +10247,10 @@ static void vj_event_sample_next1( veejay_t *v )
 		int n = v->uc->sample_id + 1;
 		if( vj_tag_exists(n) ) {
 			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, n );
-		
 		}
 		else {
 			n = 1;
-			int stop = vj_tag_size()-1;
+			int stop = vj_tag_highest_valid_id();
 			while( !vj_tag_exists(n) ) {
 				n ++;
 				if( n > stop ) {
@@ -10551,13 +10463,12 @@ void	vj_event_get_sample_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	int type = args[1];
 
-	if(args[0] == -1 && type == 0)
-		args[0] = sample_size() - 1;
-	else if (args[0] == -1 && type != 0 ) 
-		args[0] = vj_tag_size() - 1;
-
-	if( args[0] == 0) 
-		args[0] = v->uc->sample_id;
+	if( type == 0 ) {
+		SAMPLE_DEFAULTS(args[0]);
+	}
+	else {
+		STREAM_DEFAULTS(args[0]);
+	}
 
 	int id = args[0];
 

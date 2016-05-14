@@ -146,15 +146,28 @@ int vj_tag_get_last_tag() {
 	return last_added_tag;
 }
 
-int vj_tag_true_size()
-{
-    return (this_tag_id - next_avail_tag);
-}
-
-
-int vj_tag_size()
+int vj_tag_highest()
 {
     return this_tag_id;
+// - next_avail_tag);
+}
+
+int vj_tag_highest_valid_id()
+{
+	int id = this_tag_id;
+	while(!vj_tag_exists(id) ) {
+		id --;
+		if( id <= 0 )
+		   break;
+	}
+
+	return id;
+}
+
+unsigned int vj_tag_size()
+{
+//    return this_tag_id;
+	return (unsigned int) hash_count( TagHash );
 }
 
 void vj_tag_set_veejay_t(void *info) {
@@ -1173,7 +1186,8 @@ int vj_tag_clear_chain(int id)
 int	vj_tag_verify_delete(int id, int type )
 {
 	int i,j;
-	for( i = 1; i < vj_tag_size()-1; i ++ )
+	int n = vj_tag_highest();
+	for( i = 1; i <= n; i ++ )
 	{
 		vj_tag *s = vj_tag_get(i);
 		if(s)
@@ -1328,11 +1342,11 @@ int vj_tag_del(int id)
 }
 
 void vj_tag_close_all() {
-   int n=vj_tag_size();
+   int n=vj_tag_highest();
    int i;
    vj_tag *tag;
 
-   for(i=1; i < n; i++) {
+   for(i=1; i <= n; i++) {
     tag = vj_tag_get(i);
     if(tag) {
     	if(vj_tag_del(i)) veejay_msg(VEEJAY_MSG_DEBUG, "Deleted stream %d", i);
@@ -3581,7 +3595,7 @@ int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int p
 	ptr = vj_sprintf( ptr, tag->encoder_active ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->encoder_frames_to_record ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->encoder_total_frames_recorded ); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, vj_tag_true_size() - 1 ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, vj_tag_size() ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->source_type ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->n_frames ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->selected_entry ); *ptr++ = ' ';
