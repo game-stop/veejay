@@ -1100,6 +1100,7 @@ static void veejay_pipe_write_status(veejay_t * info)
     int pm = info->uc->playback_mode;
     int n_samples = sample_size()-1;
     int tags = vj_tag_true_size() -1;
+
 	int cache_used = 0;
 	int mstatus = vj_event_macro_status();
 	int curfps  = (int) ( 100.0f / settings->spvf );

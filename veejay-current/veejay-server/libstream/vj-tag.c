@@ -3581,7 +3581,7 @@ int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int p
 	ptr = vj_sprintf( ptr, tag->encoder_active ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->encoder_frames_to_record ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->encoder_total_frames_recorded ); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, vj_tag_size() - 1 ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, vj_tag_true_size() - 1 ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->source_type ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->n_frames ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->selected_entry ); *ptr++ = ' ';
