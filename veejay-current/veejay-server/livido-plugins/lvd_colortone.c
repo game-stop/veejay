@@ -42,7 +42,7 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	if( error != LIVIDO_NO_ERROR )
 		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
 
-    error = lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
+	error = lvd_extract_channel_values( my_instance, "in_channels" , 0, &w, &h, A, &palette );
 	if( error != LIVIDO_NO_ERROR )
 		return LIVIDO_ERROR_NO_INPUT_CHANNELS;
 	
@@ -53,7 +53,8 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	int		green  =  lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int		blue   =  lvd_extract_param_index( my_instance,"in_parameters", 2 );
 	int		shift = 1;
-    
+    	int		black_incl = lvd_extract_param_index( my_instance,"in_parameters", 3 );
+
 	if( palette == LIVIDO_PALETTE_YUV444P )
 		shift = 0;
 	
@@ -64,8 +65,19 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	int		y,u,v;
 	GIMP_rgb2yuv( red, green, blue, y, u, v );
 
-	livido_memset( O[1], u, uv_len );
-	livido_memset( O[2], v, uv_len );
+	if( black_incl ) {
+		livido_memset( O[1], u, uv_len );
+		livido_memset( O[2], v, uv_len );
+	}
+	else {
+		int i;
+		for( i = 0; i < len; i ++ ) {
+			if( O[0][i] > 0 ) {
+				O[1][(i>>shift)] = u;
+				O[2][(i>>shift)] = v;
+			}
+		}
+	}
 
 	return LIVIDO_NO_ERROR;
 }
@@ -76,7 +88,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	LIVIDO_IMPORT(list);
 
 	livido_port_t *port = NULL;
-	livido_port_t *in_params[3];
+	livido_port_t *in_params[4];
 	livido_port_t *in_chans[3];
 	livido_port_t *out_chans[1];
 	livido_port_t *info = NULL;
@@ -150,8 +162,6 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "default", 66 );
 		livido_set_string_value( port, "description" ,"Color Green");
 
-
-	
 	in_params[2] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
 	port = in_params[2];
 
@@ -162,9 +172,18 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "default", 20 );
 		livido_set_string_value( port, "description" ,"Color Blue");
 
+	in_params[3] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+	port = in_params[3];
+
+		livido_set_string_value(port, "name", "Black inclusion" );
+		livido_set_string_value(port, "kind", "SWITCH" );
+		livido_set_int_value( port, "min", 0);
+		livido_set_int_value( port, "max", 1 );
+		livido_set_int_value( port, "default", 1 );
+		livido_set_string_value( port, "description" ,"Black inclusion");
 
 	//@ setup the nodes
-	livido_set_portptr_array( filter, "in_parameter_templates",3, in_params );
+	livido_set_portptr_array( filter, "in_parameter_templates",4, in_params );
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
         livido_set_portptr_array( filter, "in_channel_templates",1, in_chans );
 

@@ -56,7 +56,8 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	int	dst_blue   =  lvd_extract_param_index( my_instance,"in_parameters", 5 );
 
 	int mode	   =  lvd_extract_param_index( my_instance,"in_parameters", 6 );
-
+	int black_incl	   =  lvd_extract_param_index( my_instance,"in_parameters", 7 );
+		
 	int		sy,su,sv;
 	GIMP_rgb2yuv( src_red, src_green, src_blue, sy,su,sv );
 
@@ -77,11 +78,24 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	const int maxUV= ( mode == 1 ? 240: 255 );
 
 	int i;
-	for( i = 0; i < len; i ++ )
-	{
-		o0[i] = CLAMP( ch0[i] + dy - sy,minY,maxY );
-		o1[i] = CLAMP( ch1[i] + du - su,minUV,maxUV );
-		o2[i] = CLAMP( ch2[i] + dv - sv,minUV,maxUV );
+
+	if( black_incl ) {
+		for( i = 0; i < len; i ++ )
+		{
+			o0[i] = CLAMP( ch0[i] + dy - sy,minY,maxY );
+			o1[i] = CLAMP( ch1[i] + du - su,minUV,maxUV );
+			o2[i] = CLAMP( ch2[i] + dv - sv,minUV,maxUV );
+		}
+	}
+	else {
+		for( i = 0; i < len; i ++ )
+		{
+			if(ch0[i] != 0 ) {
+				o0[i] = CLAMP( ch0[i] + dy - sy,minY,maxY );
+				o1[i] = CLAMP( ch1[i] + du - su,minUV,maxUV );
+				o2[i] = CLAMP( ch2[i] + dv - sv,minUV,maxUV );
+			}
+		}
 
 	}	
 
@@ -95,7 +109,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	LIVIDO_IMPORT(list);
 
 	livido_port_t *port = NULL;
-	livido_port_t *in_params[7];
+	livido_port_t *in_params[8];
 	livido_port_t *in_chans[3];
 	livido_port_t *out_chans[1];
 	livido_port_t *info = NULL;
@@ -225,8 +239,20 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "default",0 );
 		livido_set_string_value( port, "description" ,"Clamp range");
 
+	in_params[7] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+	port = in_params[7];
+
+		livido_set_string_value(port, "name", "Black inclusion" );
+		livido_set_string_value(port, "kind", "SWITCH" );
+		livido_set_int_value( port, "min", 0);
+		livido_set_int_value( port, "max", 1 );
+		livido_set_int_value( port, "default",1 );
+		livido_set_string_value( port, "description" ,"Include black pixels");
+
+
+
 	//@ setup the nodes
-	livido_set_portptr_array( filter, "in_parameter_templates",7, in_params );
+	livido_set_portptr_array( filter, "in_parameter_templates",8, in_params );
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
         livido_set_portptr_array( filter, "in_channel_templates",1, in_chans );
 
