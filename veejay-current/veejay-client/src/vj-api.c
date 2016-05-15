@@ -3788,6 +3788,8 @@ void	generators_selection_func(GtkTreeView *treeview,
 		g_free(name);
 
 		gveejay_new_slot(MODE_STREAM);
+
+		gtk_widget_hide( glade_xml_get_widget(info->main_window, "generator_window") );
 	}
 }
 
