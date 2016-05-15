@@ -449,6 +449,11 @@ void	plug_sys_init( int fmt, int w, int h )
 	plug_sys_set_palette( base_fmt_ );
 }
 
+char	*plug_get_so_name_by_idx( int id )
+{
+	return vevo_property_get_string( index_map_[id], "so_name" );
+}
+
 int *plug_find_all_generator_plugins( int *total )
 {
 	int n;
@@ -607,11 +612,25 @@ void	plug_set_parameter( void *instance, int seq_num,int n_elements,void *value 
 
 void 	plug_set_parameters( void *instance, int n_args, void *values )
 {
-	frei0r_plug_param_f( instance, n_args, (int*) values );
+	int type = 0;
+	vevo_property_get(instance, "HOST_type", 0, &type );
+	if( type == VEVO_PLUG_FR ) {
+		frei0r_plug_param_f( instance, n_args, (int*) values );
+	} else if (type == VEVO_PLUG_LIVIDO ) {
+		int i;
+		int *iv = (int*) values;
+		for( i = 0; i < n_args; i ++ ) {
+			livido_set_parameter( instance, i, &iv[i] );
+		}
+	}
 }
 void	plug_get_parameters( void *instance, int *args, int *n_args)
 {
-	*n_args = frei0r_get_params_f( instance, args );
+	int type = 0;
+	vevo_property_get(instance, "HOST_type", 0, &type );
+	if( type == VEVO_PLUG_FR ) {
+		*n_args = frei0r_get_params_f( instance, args );
+	}
 }
 
 void	plug_get_defaults( void *instance, void *fx_values )
@@ -938,7 +957,17 @@ int	plug_get_num_parameters( int fx_id )
 		return 0;
 
 	return res;
-}	
+}
+
+int	plug_instance_get_num_parameters(void *instance)
+{
+	int type = 0;
+	vevo_property_get(instance, "HOST_type", 0, &type );
+	if( type == VEVO_PLUG_FR ) {
+		return frei0r_get_param_count( instance );
+	}
+	return vevo_property_num_elements( instance, "in_parameters");
+}
 
 void	plug_sys_set_palette( int pref_palette )
 {

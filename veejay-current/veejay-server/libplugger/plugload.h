@@ -21,6 +21,8 @@
 
 /*
 	veejay plugin loader, library that wraps up all kinds of "plugin standards"
+
+	FIXME: must be refactored
  */
 void	plug_sys_free(void);
 void	plug_sys_init( int fmt, int w, int h );
@@ -44,6 +46,7 @@ int	plug_clone_from_output_parameters( void *instance, void *fx_values );
 char	*plug_get_osc_format(void *fx_instance, int p);
 void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id, int sample_id, void(*cb)(void *ud, void *p, void *v), void *cb_data);
 char 	*plug_get_osc_path_parameter(void *instance, int k);
+char	*plug_get_so_name_by_idx( int index );
 int 	*plug_find_all_generator_plugins( int *total );
 void	plug_clear_namespace( void *fx_instance, void *data );
 int	plug_find_generator_plugins(int *total, int seq );
@@ -53,6 +56,7 @@ void	*plug_get_by_so_name( char *soname );
 int	plug_get_idx_by_name( char *name);
 int 	plug_get_idx_by_so_name( char *soname );
 int	plug_is_frei0r( void *instance );
+char	*plug_get_so_name_by_idx( int id );
 void	plug_get_parameters( void *instance, int *args, int *n_args);
 char	*plug_describe_param( void *plugin, int p );
 char	*list_plugins();
@@ -62,6 +66,7 @@ void	plug_set_defaults( void *instance, void *fx_values );
 char	*plug_describe( int fx_id );
 void 	plug_concatenate_all(void *osc, void *msg);
 void	*plug_get_name_space( void *instance );
+int	plug_instance_get_num_parameters( void *instance );
 int	plug_parameter_get_range_dbl( void *fx_instance,const char *key, int k, double *min, double *max , int *kind );
 int 	plug_get_index_parameter_as_dbl( void *fx_instance,const char *key, int k , double *res);
 int	plug_get_number_parameter_as_dbl( void *fx_instance, const char *key, int k , double *res);

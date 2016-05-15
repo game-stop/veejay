@@ -3559,7 +3559,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
 			plug_push_frame( tag->generator, 1, 0, dst );
-			plug_set_parameters( tag->generator, frei0r_get_param_count(tag->generator),tag->genargs );
+			plug_set_parameters( tag->generator, plug_instance_get_num_parameters(tag->generator),tag->genargs );
 			plug_process( tag->generator, -1.0 ); 
 		}
 		break;

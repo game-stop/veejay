@@ -1190,7 +1190,6 @@ void	livido_set_parameter( void *instance, int seq, void *value )
 	}
 }
 
-
 static	void	*livido_get_parameter_template(void *plugin, unsigned int pos )
 {
 	void *param_templ = NULL; 

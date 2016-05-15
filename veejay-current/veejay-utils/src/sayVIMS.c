@@ -84,6 +84,7 @@ vims_replies[] =
 	{ VIMS_CHAIN_GET_PARAMETERS,4},
 	{ VIMS_GET_SHM,SHM_ID_LEN },
 	{ VIMS_GET_STREAM_ARGS, 3 },
+	{ VIMS_GET_GENERATORS,5 },
 	{ 0,0 },
 };
 

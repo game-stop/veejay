@@ -78,6 +78,8 @@
 #include <libstream/v4l2utils.h>
 #endif
 
+#include <libplugger/plugload.h>
+
 static int use_bw_preview_ = 0;
 static int _last_known_num_args = 0;
 static hash_t *BundleHash = NULL;
@@ -8688,6 +8690,39 @@ void	vj_event_send_stream_args		(	void *ptr, const char format[],		va_list ap )
 	}
 
 	SEND_MSG(v, dummy);
+}
+
+void	vj_event_send_generator_list( void *ptr, const char format[], va_list ap )
+{
+	int total = 0;
+	int *generators = plug_find_all_generator_plugins( &total );
+	int i;
+	char *s_print_buf = get_print_buf(6 + (total * 128));
+	veejay_t *v = (veejay_t*) ptr;
+
+	if( s_print_buf == NULL ) {
+		SEND_MSG(v, "00000" );	
+	}
+	else {
+	
+		char *print_buf = get_print_buf( total * 128 );
+		char  line[128];
+
+		for( i = 0; i < total; i ++ ) {
+			char *name = plug_get_so_name_by_idx( generators[i] );
+			int   name_len = strlen(name);
+
+			snprintf( line, sizeof(line), "%03d%.124s", name_len, name );
+			APPEND_MSG( print_buf, line );
+		}
+
+		sprintf( s_print_buf, "%05zu%s", strlen( print_buf ), print_buf );
+		free(print_buf);
+		free(generators);
+
+		SEND_MSG(v, s_print_buf);
+		free(s_print_buf);
+	}
 }
 
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)

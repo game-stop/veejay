@@ -2142,6 +2142,16 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[VIMS_GET_GENERATORS]				=	_new_event(
+				NULL,
+				VIMS_GET_GENERATORS,
+				"Get all generator plugins",
+				vj_event_send_generator_list,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+				
+
 	index_map_[VIMS_CHAIN_GET_ENTRY]			=	_new_event(
 				"%d %d",
 				VIMS_CHAIN_GET_ENTRY,
