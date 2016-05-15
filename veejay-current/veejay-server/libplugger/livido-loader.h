@@ -26,6 +26,8 @@ void	*deal_with_livido(void *handle, const char *name, int w, int h);
 
 void	*livido_plug_init( void *plugin, int w, int h, int pixfmt, int orgfmt );
 
+int	livido_get_num_input_parameters(void *instance);
+
 void	 livido_plug_deinit( void *plugin );
 
 void	livido_plug_free( void *plugin );

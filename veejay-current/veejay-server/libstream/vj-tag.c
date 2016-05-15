@@ -1049,6 +1049,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 					free(tag);
 					return -1;
 			}
+			int tmp = 0;
+			
+			plug_get_parameters( tag->generator, tag->genargs, &tmp);	
+			
 			if( filename != NULL )
 				strcpy( tag->source_name, filename );
 		}

@@ -1189,7 +1189,6 @@ void	livido_set_parameter( void *instance, int seq, void *value )
 		}
 	}
 }
-
 static	void	*livido_get_parameter_template(void *plugin, unsigned int pos )
 {
 	void *param_templ = NULL; 
@@ -1198,6 +1197,33 @@ static	void	*livido_get_parameter_template(void *plugin, unsigned int pos )
 		return NULL;
 	
 	return param_templ;	
+}
+
+int	livido_get_num_input_parameters( void *instance )
+{
+	return vevo_property_num_elements( instance, "in_parameters" );
+}
+
+void	livido_get_default_parameters( void *instance, int *values )
+{
+	void *in_params;
+	int i;
+
+	if( vevo_property_get( instance, "in_parameters" ,0, &in_params ) != VEVO_NO_ERROR )
+		return;
+
+	int n_params = vevo_property_num_elements( instance, "in_parameters" );
+	if( n_params <= 0 ) {
+		return;
+	}
+	
+	for( i = 0; i < n_params; i ++ ) {
+		void *templ;
+		if( vevo_property_get( in_params, "parent_template", 0, &templ ) != VEVO_NO_ERROR )
+			continue;
+
+		vevo_property_get( templ, "default", i, &(values[i]));
+	}
 }
 
 static int	livido_read_plug_configuration(void *filter_template, const char *name)

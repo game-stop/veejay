@@ -631,6 +631,9 @@ void	plug_get_parameters( void *instance, int *args, int *n_args)
 	if( type == VEVO_PLUG_FR ) {
 		*n_args = frei0r_get_params_f( instance, args );
 	}
+	else if (type == VEVO_PLUG_LIVIDO ) {
+		livido_get_default_parameters( instance, args );
+	}
 }
 
 void	plug_get_defaults( void *instance, void *fx_values )
@@ -966,7 +969,9 @@ int	plug_instance_get_num_parameters(void *instance)
 	if( type == VEVO_PLUG_FR ) {
 		return frei0r_get_param_count( instance );
 	}
-	return vevo_property_num_elements( instance, "in_parameters");
+	else if (type == VEVO_PLUG_LIVIDO ) {
+		return livido_get_num_input_parameters(instance);
+	}
 }
 
 void	plug_sys_set_palette( int pref_palette )
