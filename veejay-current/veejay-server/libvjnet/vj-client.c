@@ -155,17 +155,20 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 			return error;
 
 		v->fd[0] = alloc_sock_t();
-		v->fd[1] = alloc_sock_t();
 		if(!v->fd[0]) {
 			return error;
 		}
+		v->fd[1] = alloc_sock_t();
 		if(!v->fd[1] ) {
 			free(v->fd[0]);
+			v->fd[0] = NULL;
 			return error;
 		}
 
 		if( sock_t_connect( v->fd[0], host, port_id + VJ_CMD_PORT ) ) {
-			if( sock_t_connect( v->fd[1], host, port_id + VJ_STA_PORT ) ) {		
+			if( sock_t_connect( v->fd[1], host, port_id + VJ_STA_PORT ) ) {	
+				v->ports[0] = port_id + VJ_CMD_PORT;
+				v->ports[1] = port_id + VJ_STA_PORT;
 				return 1;
 
 			} else {
@@ -174,8 +177,11 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		} else {
 			veejay_msg(0, "Failed to connect to command port.");
 		}
-		v->ports[0] = port_id + VJ_CMD_PORT;
-		v->ports[1] = port_id + VJ_STA_PORT;
+
+		free(v->fd[0]);
+		free(v->fd[1]);
+		v->fd[0] = NULL;
+		v->fd[1] = NULL;
 	}
 	else
 	{
