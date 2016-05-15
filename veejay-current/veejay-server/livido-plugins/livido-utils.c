@@ -91,7 +91,7 @@ int livido_set_voidptr_value (livido_port_t *port, const char *key, void *value)
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // general property getter
 
-inline int livido_get_value (livido_port_t *port, const char *key, void *value) {
+int livido_get_value (livido_port_t *port, const char *key, void *value) {
   // returns a LIVIDO_ERROR
   return livido_property_get( port, key, 0, value);
 }
