@@ -1494,14 +1494,6 @@ void 	on_new_shm_stream_clicked(GtkWidget *wid, gpointer data)
 	gveejay_new_slot(MODE_STREAM);
 }
 
-void	on_new_generator_stream_clicked(GtkWidget *wid, gpointer data)
-{
-	// generator_text_args optionals args
-	// tree_generators get selected row
-	//        VIMS_STREAM_NEW_GENERATOR
-	veejay_msg(0, "implemented me");
-}
-
 void	on_shm_3490_clicked(GtkWidget *w, gpointer data)
 {
 	multi_vims( VIMS_STREAM_NEW_SHARED, "%d", 3490 );
@@ -2979,11 +2971,24 @@ void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
 	
 }
 
+void	on_generatornew_clicked(GtkWidget *widget, gpointer user_data)
+{
+	GtkWidget *w = glade_xml_get_widget(info->main_window, "generator_window");
+	scan_generators( "generators" );
+	gtk_widget_show(w);
+}
+
 void	on_inputstream_close_clicked(GtkWidget *w,  gpointer user_data)
 {
 	GtkWidget *wid = glade_xml_get_widget(info->main_window, "inputstream_window");
 	gtk_widget_hide(wid);	
 }
+
+void	on_generators_close_clicked(GtkWidget *w, gpointer user_data)
+{
+	GtkWidget *wid = glade_xml_get_widget(info->main_window, "generator_window");
+	gtk_widget_hide(wid);	
+}	
 
 void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
 {
@@ -3153,6 +3158,12 @@ void	on_vs_mcastvims_changed( GtkWidget *w, gpointer user_data)
 void	on_inputstream_window_delete_event(GtkWidget *w, gpointer user_data)
 {
 	GtkWidget *vs = glade_xml_get_widget(info->main_window, "inputstream_window");
+	gtk_widget_hide(vs);
+}
+
+void	on_generator_window_delete_event(GtkWidget *w, gpointer user_data)
+{
+	GtkWidget *vs = glade_xml_get_widget(info->main_window, "generator_window");
 	gtk_widget_hide(vs);
 }
 

@@ -1025,6 +1025,63 @@ static void scan_devices( const char *name)
 	gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
 }
 
+static void scan_generators( const char *name)
+{
+	GtkWidget *tree = glade_xml_get_widget_(info->main_window,name);
+	GtkListStore *store;
+	GtkTreeIter iter;
+
+	reset_tree(name);
+	gint len = 0;
+	single_vims( VIMS_GET_GENERATORS );
+	gchar *text = recv_vims(5,&len);
+	if(len <= 0|| !text )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "No generators found on veejay server");
+		return;
+	}
+	GtkTreeModel *model = gtk_tree_view_get_model
+		(GTK_TREE_VIEW(tree));
+
+	store = GTK_LIST_STORE(model);
+
+	gint offset =0;
+	gint i = 0;
+	gchar *ptr = text + offset;
+	while( offset < len )
+	{
+		char tmp[4];
+
+		gchar *name = NULL;
+		gint name_len=0;
+
+		strncpy(tmp,ptr+offset,3);
+		tmp[3] = '\0';
+		offset += 3;
+		name_len = atoi( tmp );
+		if(name_len <=  0 )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Reading name of generator: '%s'",ptr+offset );
+			return;
+		}
+		name = strndup( ptr + offset, name_len );
+		offset += name_len;
+		gchar *thename = _utf8str( name );
+
+		gtk_list_store_append( store, &iter);
+		gtk_list_store_set(store, &iter,0,thename,-1);
+
+		g_free(thename);
+
+		free(name);
+		i ++;
+	}
+	free(text);
+
+	gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
+}
+
+
 static void set_tooltip_by_widget(GtkWidget *w, const char *text)
 {
 	gtk_widget_set_tooltip_text( w,text );
@@ -3712,6 +3769,40 @@ void server_files_selection_func (GtkTreeView *treeview,
 	}
 }
 
+void	generators_selection_func(GtkTreeView *treeview,
+                                  GtkTreePath *path,
+                                  GtkTreeViewColumn *col,
+                                  gpointer user_data)
+{
+	GtkTreeModel *model;
+	GtkTreeIter iter;
+	model = gtk_tree_view_get_model(treeview);
+
+	if(gtk_tree_model_get_iter(model,&iter,path))
+	{
+		gchar *name = NULL;
+		gtk_tree_model_get(model, &iter, 0, &name, -1);
+
+		multi_vims(VIMS_STREAM_NEW_GENERATOR, "0 %s" , name );
+		vj_msg(VEEJAY_MSG_INFO, "Tried to open %s",name);
+		g_free(name);
+
+		gveejay_new_slot(MODE_STREAM);
+	}
+}
+
+static void setup_generators()
+{
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "generators");
+	GtkListStore *store = gtk_list_store_new( 1,  G_TYPE_STRING );
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+	g_object_unref( G_OBJECT( store ));
+
+	setup_tree_text_column( "generators", 0, "Filename",0 );
+
+	g_signal_connect( tree, "row-activated", (GCallback) generators_selection_func, NULL);
+}
+
 static void setup_server_files(void)
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "server_files");
@@ -3720,8 +3811,6 @@ static void setup_server_files(void)
 	g_object_unref( G_OBJECT( store ));
 
 	setup_tree_text_column( "server_files", 0, "Filename",0 );
-//	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-//	gtk_tree_selection_set_select_function(selection, server_files_selection_func, NULL, NULL);
 
 	g_signal_connect( tree, "row-activated", (GCallback) server_files_selection_func, NULL);
 }
@@ -7420,6 +7509,7 @@ void vj_gui_init(char *glade_file,
 	setup_rgbkey();
 	setup_bundles();
 	setup_server_files();
+	setup_generators();
 
 	text_defaults();
 
