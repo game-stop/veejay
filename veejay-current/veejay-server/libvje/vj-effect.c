@@ -294,6 +294,7 @@ static struct
 {	gaussblur_malloc,gaussblur_free,NULL,VJ_IMAGE_EFFECT_CHOKEMATTE},
 {	meanfilter_malloc,meanfilter_free,NULL,VJ_IMAGE_EFFECT_MEANFILTER},
 {	bgpush_malloc,bgpush_free,NULL,VJ_IMAGE_EFFECT_BGPUSH},
+{	distortion_malloc,distortion_free, NULL, VJ_IMAGE_EFFECT_DISTORTION },
 {	NULL,NULL,NULL,0},
 };
 

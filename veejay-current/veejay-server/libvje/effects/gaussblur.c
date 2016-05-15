@@ -31,35 +31,35 @@
 
 vj_effect *gaussblur_init(int w,int h)
 {
-    vj_effect *ve;
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+	vj_effect *ve;
+	ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+	ve->num_params = 3;
+	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 
-    ve->defaults[0] = 100;	/* Radius */
-    ve->defaults[1] = 100;	/* Strength */
-    ve->defaults[2] = 300;	/* Quality */
+	ve->defaults[0] = 100;	/* Radius */
+	ve->defaults[1] = 100;	/* Strength */
+	ve->defaults[2] = 300;	/* Quality */
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 500;
+	ve->limits[0][0] = 1;
+	ve->limits[1][0] = 500;
 
-    ve->limits[0][1] = -100;
-    ve->limits[1][1] = 100;
+	ve->limits[0][1] = -100;
+	ve->limits[1][1] = 100;
 
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 300;
+	ve->limits[0][2] = 0;
+	ve->limits[1][2] = 300;
 
 	ve->param_description = vje_build_param_list(ve->num_params, 
 			"Radius", "Strength", "Quality" );
 
 	ve->has_user = 0;
-    ve->description = "Alpha: Choke Matte";
-    ve->extra_frame = 0;
-    ve->sub_format = -1;
+	ve->description = "Alpha: Choke Matte";
+	ve->extra_frame = 0;
+	ve->sub_format = -1;
 	ve->rgb_conv = 0;
-    ve->parallel = 0;
+	ve->parallel = 0;
 
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
 
@@ -69,37 +69,37 @@ vj_effect *gaussblur_init(int w,int h)
 extern int yuv_sws_get_cpu_flags();
 
 typedef struct {
-    float              radius;
-    float              strength;
-    float              quality;
-    struct SwsContext *filter_context;
+	float			   radius;
+	float			   strength;
+	float			   quality;
+	struct SwsContext *filter_context;
 } FilterParam;
 
 static int alloc_sws_context(FilterParam *f, int width, int height, unsigned int flags)
 {
-    SwsVector *vec;
-    SwsFilter sws_filter;
+	SwsVector *vec;
+	SwsFilter sws_filter;
 
-    vec = sws_getGaussianVec(f->radius, f->quality);
+	vec = sws_getGaussianVec(f->radius, f->quality);
 
-    if (!vec)
-        return 0;
+	if (!vec)
+		return 0;
 
-    sws_scaleVec(vec, f->strength);
-    vec->coeff[vec->length / 2] += 1.0 - f->strength;
-    sws_filter.lumH = sws_filter.lumV = vec;
-    sws_filter.chrH = sws_filter.chrV = NULL;
-    f->filter_context = sws_getCachedContext(NULL,
-                                             width, height, AV_PIX_FMT_GRAY8,
-                                             width, height, AV_PIX_FMT_GRAY8,
-                                             flags, &sws_filter, NULL, NULL);
+	sws_scaleVec(vec, f->strength);
+	vec->coeff[vec->length / 2] += 1.0 - f->strength;
+	sws_filter.lumH = sws_filter.lumV = vec;
+	sws_filter.chrH = sws_filter.chrV = NULL;
+	f->filter_context = sws_getCachedContext(NULL,
+											 width, height, AV_PIX_FMT_GRAY8,
+											 width, height, AV_PIX_FMT_GRAY8,
+											 flags, &sws_filter, NULL, NULL);
 
-    sws_freeVec(vec);
+	sws_freeVec(vec);
 
-    if (!f->filter_context)
-        return 0;
+	if (!f->filter_context)
+		return 0;
 
-    return 1;
+	return 1;
 }
 
 static uint8_t *temp = NULL;
@@ -151,15 +151,15 @@ static int	 gaussfilter_init(int w, int h, int radius, int strength, int quality
 }
 
 static void gaussblur(uint8_t *dst, const int dst_linesize,const uint8_t *src, const int src_linesize,
-                 const int w, const int h,struct SwsContext *filter_context)
+				 const int w, const int h,struct SwsContext *filter_context)
 {
-    const uint8_t* const src_array[4] = {src};
-    uint8_t *dst_array[4]             = {dst};
-    int src_linesize_array[4] = {src_linesize};
-    int dst_linesize_array[4] = {dst_linesize};
+	const uint8_t* const src_array[4] = {src,0,0,0};
+	uint8_t *dst_array[4]			  = {dst,0,0,0};
+	int src_linesize_array[4] = {src_linesize,0,0,0};
+	int dst_linesize_array[4] = {dst_linesize,0,0,0};
 
-    sws_scale(filter_context, src_array, src_linesize_array,
-              0, h, dst_array, dst_linesize_array);
+	sws_scale(filter_context, src_array, src_linesize_array,
+			  0, h, dst_array, dst_linesize_array);
 }
 
 void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality )

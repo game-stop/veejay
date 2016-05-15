@@ -20,11 +20,8 @@
 
 #ifndef DISTORT_H
 #define DISTORT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *distortion_init(int w, int h);
 void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, int inc_val4, int inc_val5, int inc_val6 );
-void distort_free();
+int  distortion_malloc(int w, int h);
+void distortion_free();
 #endif
