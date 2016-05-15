@@ -2743,7 +2743,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 	
 		if(args[0] == VJ_PLAYBACK_MODE_SAMPLE) 
 		{
-			SAMPLE_DEFAULTS(args[0]);
+			SAMPLE_DEFAULTS(args[1]);
 			if(sample_exists(args[1]))
 			{
 				veejay_change_playback_mode(v,args[0] ,args[1]);
@@ -2756,7 +2756,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 		}
 		if(args[0] == VJ_PLAYBACK_MODE_TAG)
 		{
-			STREAM_DEFAULTS(args[0]);
+			STREAM_DEFAULTS(args[1]);
 			if(vj_tag_exists(args[1]))
 			{
 				veejay_change_playback_mode(v,args[0],args[1]);
