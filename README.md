@@ -3,9 +3,7 @@ Have a moment ? Sign the TTIP Referendum
 
 https://ttip-referendum.nl/
 
-
-
-![Veejay!](http://veejayhq.net/img/header.png)
+ 
 
 ##Veejay Is A Visual Instrument
 
