@@ -5,7 +5,7 @@ https://ttip-referendum.nl/
 
  
 
-##Veejay Is A Visual Instrument
+##Veejay is a Visual Instrument
 
 *a 'visual' instrument and realtime video sampler (for live video improvisation)*
 
