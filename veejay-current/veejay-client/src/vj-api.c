@@ -1,4 +1,3 @@
-
 /* Gveejay Reloaded - graphical interface for VeeJay
  *          (C) 2002-2004 Niels Elburg <nwelburg@gmail.com>
  *  with contributions by  Thomas Rheinhold (2005)
@@ -492,7 +491,7 @@ typedef struct
 	config_settings_t	config;
 	int status_frame;
 	int key_id;
-	GdkColor	*fg_;
+	GdkColor	*normal;
 	gboolean key_now;
 	void *mt;
 	watchdog_t	watch;
@@ -4522,8 +4521,8 @@ static void select_slot( int pm )
 				if( info->selected_slot )
 				{
 					if ( info->selected_slot->sample_type != pm || info->selected_slot->sample_id !=
-						info->selected_slot->sample_id ) {
-					set_activation_of_slot_in_samplebank(FALSE);
+						info->status_tokens[CURRENT_ID] ) {
+						set_activation_of_slot_in_samplebank(FALSE);
 					}
 				}
 				info->selected_slot = info->sample_banks[b]->slot[p];
@@ -4925,9 +4924,9 @@ void on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 		gtk_color_selection_get_current_color(GTK_COLOR_SELECTION( colorsel ),
 			                                  &current_color );
 
-		gint red = current_color.red / 256.0;
-		gint green = current_color.green / 256.0;
-		gint blue = current_color.blue / 256.0;
+		gint red = current_color.red / 255.0;
+		gint green = current_color.green / 255.0;
+		gint blue = current_color.blue / 255.0;
 
 		multi_vims(VIMS_STREAM_COLOR, "%d %d %d %d",
 			       info->selected_slot->sample_id,
@@ -4957,9 +4956,9 @@ void on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 		                                      &current_color );
 
 		// scale to 0 - 255
-		gint red = current_color.red / 256.0;
-		gint green = current_color.green / 256.0;
-		gint blue = current_color.blue / 256.0;
+		gint red = current_color.red / 255.0;
+		gint green = current_color.green / 255.0;
+		gint blue = current_color.blue / 255.0;
 
 		multi_vims(VIMS_CHAIN_ENTRY_SET_ARG_VAL,
 		           "%d %d %d %d",
@@ -7987,9 +7986,9 @@ static int add_bank( gint bank_num )
 		}
 	}
 
-	if( !info->fg_ )
+	if( !info->normal )
 	{
-		info->fg_ = widget_get_fg( GTK_WIDGET(info->sample_banks[bank_num]->gui_slot[0]->frame) );
+		info->normal = widget_get_fg( GTK_WIDGET(info->sample_banks[bank_num]->gui_slot[0]->frame) );
 	}
 	return bank_num;
 }
@@ -8531,6 +8530,7 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 				set_selection_of_slot_in_samplebank(FALSE);
 			info->selection_slot = sample_banks[bank_nr]->slot[slot_nr];
 			info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
+
 			set_selection_of_slot_in_samplebank(TRUE );
 		}
 	}
@@ -8545,32 +8545,20 @@ static void indicate_sequence( gboolean active, sequence_gui_slot_t *slot )
 		gtk_frame_set_shadow_type( GTK_FRAME(slot->frame), GTK_SHADOW_OUT );
 }
 
-/* --------------------------------------------------------------------------------------------------------------------------
- *  Function that handles to select/activate a special slot in the samplebank
-   -------------------------------------------------------------------------------------------------------------------------- */
-void set_widget_color( GtkWidget *widget , int red, int green, int blue, int def )
-{
-	GdkColor color;
-	if( def ) {
-		color.red = info->fg_->red;
-		color.green = info->fg_->green;
-		color.blue = info->fg_->blue;
-	} else {
-		color.red = red;
-		color.green = green;
-		color.blue = blue;
-	}
-	gtk_widget_modify_fg ( GTK_WIDGET(widget),GTK_STATE_NORMAL, &color );
-}
-
 static void set_activation_of_slot_in_samplebank( gboolean activate)
 {
 	if(!info->selected_gui_slot || !info->selected_slot )
 		return;
 	GdkColor color;
-	color.red = info->fg_->red;
-	color.green = info->fg_->green;
-	color.blue = info->fg_->blue;
+	color.red = info->normal->red;
+	color.green = info->normal->green;
+	color.blue = info->normal->blue;
+
+	if( activate ) {
+		color.green = 0xffff;
+		color.red = 0;
+		color.blue = 0;
+	}
 
 	if(info->selected_slot->sample_id <= 0 )
 	{
@@ -8580,9 +8568,6 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 	{
 		if (activate)
 		{
-			color.green = 0xffff;
-			color.red = 0;
-			color.blue =0;
 			gtk_frame_set_shadow_type(GTK_FRAME(info->selected_gui_slot->frame),GTK_SHADOW_IN);
 			gtk_widget_grab_focus(GTK_WIDGET(info->selected_gui_slot->frame));
 		}
@@ -8592,26 +8577,20 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 		}
 	}
 
-	gtk_widget_modify_fg ( GTK_WIDGET(info->selected_gui_slot->timecode),
-		GTK_STATE_NORMAL, &color );
+	veejay_msg(0, "%s: set color: %d,%d,%d",__FUNCTION__,color.red, color.green, color.blue );
+
+	gtk_widget_modify_fg ( GTK_WIDGET(info->selected_gui_slot->timecode),GTK_STATE_NORMAL, &color );
 }
 
 static void set_selection_of_slot_in_samplebank(gboolean active)
 {
-	if(!info->selection_slot)
+	if(!info->selection_slot || info->selection_slot->sample_id <= 0)
 		return;
-	if(info->selection_slot->sample_id <= 0 )
-		return;
+	
 	GdkColor color;
-	color.red = info->fg_->red;
-	color.green = info->fg_->green;
-	color.blue = info->fg_->blue;
-	if(active)
-	{
-		color.blue = 0xffff;
-		color.green = 0;
-		color.red =0;
-	}
+	color.red = info->normal->red;
+	color.green = info->normal->green;
+	color.blue = info->normal->blue;
 
 	if(info->selected_slot == info->selection_slot)
 	{
@@ -8619,6 +8598,16 @@ static void set_selection_of_slot_in_samplebank(gboolean active)
 		color.red = 0;
 		color.blue = 0;
 	}
+	else if(active)
+	{
+		color.blue = 0xffff;
+		color.green = 0;
+		color.red =0;
+	}
+	
+	veejay_msg(0, "%s: set color: %d,%d,%d",__FUNCTION__,color.red, color.green, color.blue );
+
+
 //	gtk_widget_modify_fg ( GTK_WIDGET(info->selection_gui_slot->title),
 //		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( GTK_WIDGET(info->selection_gui_slot->timecode),
@@ -8688,7 +8677,7 @@ static void remove_sample_from_slot()
 	if(gui_slot)
 		gtk_image_clear( GTK_IMAGE( gui_slot->image) );
 
-	set_selection_of_slot_in_samplebank( FALSE );
+	//set_selection_of_slot_in_samplebank( FALSE );
 
 	info->selection_gui_slot = NULL;
 	info->selection_slot = NULL;

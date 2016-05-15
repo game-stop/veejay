@@ -25,7 +25,6 @@ extern void	veejay_release_track(int id, int release_this);
 extern void	veejay_bind_track( int id, int bind_this );
 extern int 	                multitrack_get_sequence_view_id( void *data );
 extern gchar  *_utf8str( const char *c_str );
-extern void 	set_widget_color( GtkWidget *widget , int red, int green, int blue, int def );
 typedef struct
 {
 	int track_id;
@@ -65,12 +64,10 @@ static	void	cell_toggled_callback( GtkCellRenderer *cell, gchar *path_string, gp
 		if( gtk_cell_renderer_toggle_get_active( GTK_CELL_RENDERER_TOGGLE( cell) ) )
 		{
 		     veejay_release_track( v->track_id, id_data);
-//		     set_widget_color( v->view, 0,255,0,0);
 		}
 		else
 		{
 		     veejay_bind_track( v->track_id, id_data );
-//	             set_widget_color( v->view, 0,0,0,1 );
 		}
 		g_free(data);
 	}
