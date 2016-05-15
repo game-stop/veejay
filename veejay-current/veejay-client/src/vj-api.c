@@ -3485,7 +3485,7 @@ void reportbug ()
 //	if( prompt_dialog("Report a problem", "" )
 //		 == GTK_RESPONSE_ACCEPT )
 	snprintf(URL , sizeof(URL),
-	         "firefox \"http://groups.google.com/group/veejay-discussion/post?hl=%s\"",l );
+	         "firefox \"http://groups.google.com/group/veejay-discussion/post?hl=%s\" &",l );
 
 	puts(URL);
 	
@@ -3498,7 +3498,7 @@ void donatenow()
 {
 	char URL[512];
 	snprintf(URL , sizeof(URL),
-	         "firefox \"http://www.veejayhq.net/contributing\"" );
+	         "firefox \"http://www.veejayhq.net/contributing\" &" );
 
 	if( system(URL) <= 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open browser to veejay homepage");
@@ -8577,8 +8577,6 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 		}
 	}
 
-	veejay_msg(0, "%s: set color: %d,%d,%d",__FUNCTION__,color.red, color.green, color.blue );
-
 	gtk_widget_modify_fg ( GTK_WIDGET(info->selected_gui_slot->timecode),GTK_STATE_NORMAL, &color );
 }
 
@@ -8605,9 +8603,6 @@ static void set_selection_of_slot_in_samplebank(gboolean active)
 		color.red =0;
 	}
 	
-	veejay_msg(0, "%s: set color: %d,%d,%d",__FUNCTION__,color.red, color.green, color.blue );
-
-
 //	gtk_widget_modify_fg ( GTK_WIDGET(info->selection_gui_slot->title),
 //		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( GTK_WIDGET(info->selection_gui_slot->timecode),
