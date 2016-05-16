@@ -972,6 +972,7 @@ int	plug_instance_get_num_parameters(void *instance)
 	else if (type == VEVO_PLUG_LIVIDO ) {
 		return livido_get_num_input_parameters(instance);
 	}
+	return 0;
 }
 
 void	plug_sys_set_palette( int pref_palette )
@@ -1038,11 +1039,20 @@ vj_effect *plug_get_plugin( int fx_id ) {
 	void *port = index_map_[fx_id];
 	if(port == NULL)
 		return NULL;
+	int is_gen = 0;
+	int num_outputs = 0;
+	int num_inputs = 0;
+
+	vevo_property_get( port, "num_inputs",0, &num_inputs );
+	vevo_property_get( port, "num_outputs",0,&num_outputs);
+	if( num_inputs == 0 && num_outputs > 0 ) 
+			is_gen = 1;
 
 	vj_effect *vje = (vj_effect*) vj_calloc(sizeof(vj_effect));
 	
 	size_t name_len = vevo_property_element_size( port, "name", 0);
 	vje->description = (char*) vj_calloc(name_len);
+	vje->is_gen = is_gen;
 	vevo_property_get( port, "name", 0 , &(vje->description));
 	vevo_property_get( port, "num_params", 0, &(vje->num_params));
 	vevo_property_get( port, "mixer", 0, &(vje->extra_frame));

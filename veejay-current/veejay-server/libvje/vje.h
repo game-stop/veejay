@@ -105,6 +105,7 @@ typedef struct vj_effect_t {
 	int motion;
 	int alpha;
 	int global;
+	int is_gen;
 } vj_effect;
 
 extern unsigned int get_pixel_range_min_Y();

@@ -1207,7 +1207,24 @@ typedef struct {
 	int is_video;
 	int num_arg;
 	int has_rgb;
+	int is_gen;
 } effect_constr;
+
+int _effect_is_gen(int effect_id)
+{
+	int n = g_list_length(info->effect_info);
+	int i;
+	if(effect_id < 0) return -1;
+	for(i=0; i <= n; i++)
+	{
+		effect_constr *ec = g_list_nth_data( info->effect_info, i );
+		if(ec != NULL)
+		{
+			if(ec->id == effect_id) return ec->is_gen;
+		}
+	}
+	return 0;
+}
 
 int _effect_get_mix(int effect_id)
 {
@@ -1496,8 +1513,8 @@ effect_constr* _effect_new( char *effect_line )
 	ec = vj_calloc( sizeof(effect_constr));
 	strncpy( ec->description, effect_line+3, descr_len );
 
-	sscanf(effect_line+(descr_len+3), "%03d%1d%1d%02d", &(ec->id),&(ec->is_video),&(ec->has_rgb), &(ec->num_arg));
-	offset = descr_len + 10;
+	sscanf(effect_line+(descr_len+3), "%03d%1d%1d%1d%02d", &(ec->id),&(ec->is_video),&(ec->has_rgb),&(ec->is_gen), &(ec->num_arg));
+	offset = descr_len + 11;
 	for(p=0; p < ec->num_arg; p++)
 	{
 		int len = 0;
@@ -4558,7 +4575,10 @@ void load_effectlist_info()
 	for( i = 0; i < fxlen; i ++)
 	{
 		effect_constr *ec = g_list_nth_data( info->effect_info, i );
+		if( ec->is_gen )
+			continue;
 		gchar *name = _utf8str( _effect_get_description( ec->id ) );
+	
 		if( name != NULL)
 		{
 			// tree_alphalist

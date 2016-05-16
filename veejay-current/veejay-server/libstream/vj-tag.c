@@ -756,7 +756,7 @@ int vj_tag_generator_get_args(int t1, int *args, int *n_args, int *fx_id)
 	if(tag->generator) {
 		vevo_property_get(tag->generator, "HOST_id", 0, fx_id );
 		int i;
-		int n = vj_effect_get_num_params( *fx_id );
+		int n = plug_instance_get_num_parameters( tag->generator );
 		for( i = 0; i < n; i ++ ) {
 			args[i] = tag->genargs[i];
 		}

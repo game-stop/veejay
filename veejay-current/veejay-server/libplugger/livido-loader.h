@@ -70,6 +70,8 @@ void	livido_plug_free_namespace( void *fx_instance , void *data );
 
 void	*livido_get_name_space( void *instance );
 
+void	livido_get_default_parameters(void *instance, int *args);
+
 // utility
 int	livido_plug_get_coord_parameter_as_dbl( void *fx_instance,const char *key, int k, double *res_x, double *res_y );
 int	livido_plug_parameter_get_range_dbl( void *fx_instance,const char *key, int k, double *min, double *max, int *dkind );

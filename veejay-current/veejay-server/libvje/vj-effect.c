@@ -984,6 +984,7 @@ int vj_effect_get_summary_len(int entry)
 	len += 3;
 	len += 1;
 	len += 1;
+	len += 1;
 	len += 2;
 	len += 3;
 	len += ( p * 18 );
@@ -1007,12 +1008,13 @@ int vj_effect_get_summary(int entry, char *dst)
 	int i,j;		
 	char tmp[4096];
 
-	sprintf(dst,"%03zu%s%03d%1d%1d%02d",
+	sprintf(dst,"%03zu%s%03d%1d%1d%1d%02d",
 		strlen( vj_effects[entry]->description),
 		vj_effects[entry]->description,
 		vj_effect_get_real_id(entry),
 		vj_effects[entry]->extra_frame,
 		vj_effects[entry]->rgb_conv,
+		vj_effects[entry]->is_gen,
 		p
 		);
 	for(i=0; i < p; i++)
