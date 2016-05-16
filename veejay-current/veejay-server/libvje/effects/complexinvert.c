@@ -63,8 +63,8 @@ vj_effect *complexinvert_init(int w, int h)
     return ve;
 }
 
-void complexinvert_apply(VJFrame *frame, int width,
-			int height, int i_angle, int r, int g, int b, int i_noise)
+void complexinvert_apply(VJFrame *frame, int i_angle, int r, int g, int b,
+                         int i_noise)
 {
 	uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;

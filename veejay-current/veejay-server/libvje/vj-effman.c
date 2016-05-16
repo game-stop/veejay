@@ -139,10 +139,11 @@ static void vj_effman_apply_image_effect(
 	break;
 
      case VJ_IMAGE_EFFECT_COMPLEXINVERT:
-	complexinvert_apply(frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	complexinvert_apply(frames[0], arg[0], arg[1], arg[2], arg[3], arg[4]);
 	break;
      case VJ_IMAGE_EFFECT_COMPLEXSATURATE:
-	complexsaturation_apply(frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
+	complexsaturation_apply(frames[0], arg[0], arg[1], arg[2], arg[3],
+	                        arg[4], arg[5], arg[6]);
 	break;
      case VJ_IMAGE_EFFECT_REFLECTION:
 	reflection_apply(frames[0], arg[0], arg[1], arg[2]);
@@ -156,10 +157,10 @@ static void vj_effman_apply_image_effect(
 	noiseadd_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_CONTRAST:
-	contrast_apply(frames[0], frames[0]->width, frames[0]->height,arg);
+	contrast_apply(frames[0], arg);
 	break;
      case VJ_IMAGE_EFFECT_ENHANCEMASK:
-	enhancemask_apply(frames[0],frames[0]->width,frames[0]->height,arg);
+	enhancemask_apply(frames[0],arg);
 	break;
      case VJ_IMAGE_EFFECT_SOLARIZE:
 	solarize_apply(frames[0], arg[0]);
@@ -465,8 +466,8 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 		frames[0]->width,frames[0]->height, arg[0],arg[1],arg[2]);
 		break;
       case VJ_VIDEO_EFFECT_COMPLEXTHRESHOLD:
-	complexthreshold_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],
-		arg[4], arg[5]);
+	complexthreshold_apply(frames[0], frames[1], arg[0], arg[1], arg[2], arg[3],
+	                       arg[4], arg[5]);
 	break;
       case VJ_VIDEO_EFFECT_DUPMAGIC:
 	dupmagic_apply(frames[0], frames[1], arg[0]);
@@ -554,8 +555,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	} else { /* arg1 = off , copy arg*/
 	     todo_info->tmp[0] = arg[0];
 	}
-	complexsync_apply(frames[0], frames[1],frames[0]->width, frames[0]->height, 
-			todo_info->tmp[0]);
+	complexsync_apply(frames[0], frames[1], todo_info->tmp[0]);
 	break;
       case VJ_VIDEO_EFFECT_FADECOLORRGB:
 	if (arg[4] == 0) {

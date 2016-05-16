@@ -21,7 +21,6 @@
 #ifndef COMPLEXINVERT_H
 #define COMPLEXINVERT_H
 vj_effect *complexinvert_init();
-void complexinvert_apply(VJFrame *frame, int width,
-		  int height, int i_angle, 
-		  int red, int green, int blue, int i_noise);
+void complexinvert_apply(VJFrame *frame, int i_angle, int red, int green, int blue,
+                         int i_noise);
 #endif

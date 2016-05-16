@@ -47,11 +47,14 @@ vj_effect *enhancemask_init(int width, int height)
     return ve;
 }
 
-void enhancemask_apply(VJFrame *frame, int width, int height, int *s ) {
+void enhancemask_apply(VJFrame *frame, int *s )
+{
 
    //int s[9]= { 1, 0, -1, 2, 0, -2, 1 , 0 , -1};
    unsigned int r;
-   const unsigned int len = (width*height)-width-1;
+	const int width = frame->width;
+	const int height = frame->height;
+   const unsigned int len = (frame->len)-width-1;
    uint8_t *Y = frame->data[0];
 	/*
    int sum=0;

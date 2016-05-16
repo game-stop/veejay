@@ -27,7 +27,7 @@
 vj_effect *contrast_init();
 
 
-void contrast_apply(VJFrame *frame, int w, int h, int *t);
+void contrast_apply(VJFrame *frame, int *t);
 
 void contrast_free();
 #endif

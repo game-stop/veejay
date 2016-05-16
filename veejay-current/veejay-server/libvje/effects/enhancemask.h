@@ -27,7 +27,7 @@
 vj_effect *enhancemask_init(int w, int h);
 
 
-void enhancemask_apply(VJFrame *frame, int w, int h, int *t);
+void enhancemask_apply(VJFrame *frame, int *t);
 
 void enhancemask_free();
 #endif

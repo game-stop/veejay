@@ -92,9 +92,8 @@ static int accept_tpixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
     return 0;
 }
 
-void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
-			int height, int i_angle, int r, int g, int b,
-			int level, int threshold)
+void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int i_angle,
+                            int r, int g, int b, int level, int threshold)
 {
 
     uint8_t *fg_y, *fg_cb, *fg_cr;
@@ -110,6 +109,7 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
     int matrix[5];
     int val, tmp1;
 	const int len = frame->len;
+	const int width = frame->width;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

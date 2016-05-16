@@ -25,8 +25,8 @@
 #include <stdint.h>
 
 vj_effect *complexsaturation_init();
-void complexsaturation_apply(VJFrame *frame, int width,
-		  int height, int i_angle, 
-		  int red, int green, int blue, int adjust_degrees, int adjust_v, int i_noise );
+void complexsaturation_apply(VJFrame *frame, int i_angle,
+                             int red, int green, int blue,
+                             int adjust_degrees, int adjust_v, int i_noise );
 void complexsaturate_free();
 #endif
