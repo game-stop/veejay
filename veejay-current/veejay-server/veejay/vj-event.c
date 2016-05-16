@@ -4323,10 +4323,19 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 	char prefix[150];
 	P_A(args,str,format,ap);
 
-	if(!SAMPLE_PLAYING(v)) 
+	if( !SAMPLE_PLAYING(v))
 	{
-		p_invalid_mode();
-		return;
+		if(!STREAM_PLAYING(v) && !v->seq->active) {
+			p_invalid_mode();
+			return;
+		}
+	}
+	else if( !STREAM_PLAYING(v))
+	{
+		if(!SAMPLE_PLAYING(v) && !v->seq->active) {
+			p_invalid_mode();
+			return;
+		}
 	}
 	
 	int format_ = _recorder_format;
@@ -4370,7 +4379,10 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 			int i;
 			for( i = 0; i < MAX_SEQUENCES; i ++ )
 			{
-				args[0] += sample_get_longest( v->seq->samples[i] );
+				if( v->seq->samples[i].type == 0)
+					args[0] += sample_get_longest( v->seq->samples[i].sample_id );
+				else
+					args[0] += vj_tag_get_n_frames( v->seq->samples[i].sample_id );
 			}
 		}
 		veejay_msg(VEEJAY_MSG_DEBUG, "\tRecording %d frames (sequencer is %s)", args[0],
@@ -4384,10 +4396,10 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		return;
 	}
 
+	//FIXME refactor in libvevosample
 	if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->effect_frame1, v->current_edit_list, args[0]) == 1)
 	{
 		video_playback_setup *s = v->settings;
-		s->sample_record_id = v->uc->sample_id;
 		s->sample_record_switch = args[1];
 		result = 1;
 		if(v->use_osd)
@@ -4400,6 +4412,9 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 	}
 	else
 	{
+		if( STREAM_PLAYING(v) && !vj_tag_exists(v->uc->sample_id) )
+			veejay_msg(VEEJAY_MSG_ERROR,"issue #60: You need a sample which identifier matches that of the current playing stream... ");
+
 		veejay_msg(VEEJAY_MSG_ERROR,"Unable to start sample recorder");
 		sample_stop_encoder( v->uc->sample_id );
 		result = 0;
@@ -4417,21 +4432,28 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 	{
 		int i;
 		int start_at = 0;
+		int type_at = 0;
 		for( i = 0; i < MAX_SEQUENCES; i ++ )
 		{
-			if( sample_exists( v->seq->samples[i] ))
+			if( sample_exists( v->seq->samples[i].sample_id ) || vj_tag_exists( v->seq->samples[i].sample_id) )
 			{
-				start_at = v->seq->samples[i];
+				start_at = v->seq->samples[i].sample_id;
+				type_at = v->seq->samples[i].type;
 				break;	
 			}
 		}
 		
 		v->seq->rec_id = v->uc->sample_id;
 
-		if( start_at == v->uc->sample_id )
-			veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
-		else
-			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, start_at );	
+		if( type_at == 0 ) {
+			if( start_at == v->uc->sample_id )
+				veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
+			else
+				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, start_at );	
+		}
+		else {
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, start_at );
+		}
 	}
 	else
 	{
@@ -4644,8 +4666,8 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 		deleted_sample = args[0];
 		int i;
 		for( i = 0; i < MAX_SEQUENCES ; i ++ )
-			if( v->seq->samples[i] == deleted_sample )
-				v->seq->samples[i] = 0;
+			if( v->seq->samples[i].sample_id == deleted_sample && v->seq->samples[i].type == 0 )
+				v->seq->samples[i].sample_id = 0;
 
 		sample_verify_delete( args[0] , 0 );
 	}
@@ -6701,6 +6723,14 @@ void vj_event_tag_del(void *ptr, const char format[] , va_list ap )
 	{
 		if(vj_tag_exists(args[0]))	
 		{
+			int i;
+			for( i = 0; i < MAX_SEQUENCES ; i ++ ) {
+				if( v->seq->samples[i].sample_id == args[0] && v->seq->samples[i].type != 0 ) {
+					v->seq->samples[i].sample_id = 0;
+					v->seq->samples[i].type = 0;
+				}
+			}
+
 			if(vj_tag_del(args[0]))
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Deleted stream %d", args[0]);
@@ -7306,7 +7336,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 	char str[255]; 
 	P_A(args,str,format,ap);
 
-	if(v->settings->tag_record || v->settings->offline_record)
+	if(v->settings->tag_record || v->settings->offline_record || (v->seq->active && v->seq->rec_id) )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot change data format while recording to disk");
 		return;
@@ -10256,9 +10286,17 @@ static void vj_event_sample_next1( veejay_t *v )
 		int s = (v->settings->current_playback_speed < 0 ? -1 : 1 );
 		int p = v->seq->current + s;
 		if( p < 0 ) p = 0;
-		int n = v->seq->samples[ p ];
-		if( sample_exists( n ) ) {
-			veejay_set_sample(v, n );
+		int n = v->seq->samples[ p ].sample_id;
+		int t = v->seq->samples[ p ].type;
+
+		if( t == 0 ) {
+			if( sample_exists( n ) ) {
+				veejay_set_sample(v, n );
+			}
+		} else {
+			if( vj_tag_exists( n ) ) {
+				veejay_set_stream_f(v, n );
+			}
 		}
 	}
 	if( SAMPLE_PLAYING(v)) {
@@ -10312,26 +10350,41 @@ void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap 
 
 	int seq = args[0];
 	int id = args[1];
+	int type = args[2];
 
 	if( seq < 0 || seq >= MAX_SEQUENCES )
 	{
 		veejay_msg( VEEJAY_MSG_ERROR,"Slot not within bounds");
 		return;
 	}
-	
-	if( sample_exists(id ))
-	{
-		v->seq->samples[ seq ] = id;
-		if( v->seq->size < MAX_SEQUENCES )
-		{ 
-			v->seq->size ++;
+
+	if( type == 0 ) {
+		if( sample_exists(id ))
+		{
+			v->seq->samples[seq].sample_id = id;
+			v->seq->samples[seq].type = type;
+			if( v->seq->size < MAX_SEQUENCES )
+				v->seq->size ++;
+			veejay_msg(VEEJAY_MSG_INFO, "Added sample %d to slot %d/%d",id, seq,MAX_SEQUENCES );
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Added sample %d to slot %d/%d",
-				id, seq,MAX_SEQUENCES );
+		else
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist. It cannot be added to the sequencer",id);
+		}
 	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist. It cannot be added to the sequencer",id);
+    else {
+		if( vj_tag_exists(id) )
+		{
+			v->seq->samples[seq].sample_id = id;
+			v->seq->samples[seq].type = type;
+			if( v->seq->size < MAX_SEQUENCES ) 
+				v->seq->size ++;
+			veejay_msg(VEEJAY_MSG_INFO, "Added stream %d to slot %d/%d", id, seq, MAX_SEQUENCES );
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist. It cannot be added to the sequencer", id );
+		}
 	}	
 
 }
@@ -10350,11 +10403,11 @@ void	vj_event_sequencer_del_sample(		void *ptr, 	const char format[], 	va_list a
 		return;
 	}	
 
-	if( v->seq->samples[ seq_it ] )
+	if( v->seq->samples[ seq_it ].sample_id )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Deleted sequence %d (Sample %d)", seq_it,
-				v->seq->samples[ seq_it ] );
-		v->seq->samples[ seq_it ] = 0;
+		veejay_msg(VEEJAY_MSG_INFO, "Deleted sequence %d (Sample %d)", seq_it, v->seq->samples[ seq_it ].sample_id );
+		v->seq->samples[ seq_it ].sample_id = 0;
+		v->seq->samples[ seq_it ].type = 0;
 	}
 	else
 	{
@@ -10374,16 +10427,16 @@ void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list a
 		return;
 	}
 	
-	char *s_print_buf = get_print_buf( 32  + (MAX_SEQUENCES*4));
+	char *s_print_buf = get_print_buf( 32  + (MAX_SEQUENCES*6));
 	sprintf(s_print_buf, "%06d%04d%04d%04d",
-			( 12 + (4*MAX_SEQUENCES)),
+			( 12 + (6*MAX_SEQUENCES)),
 			v->seq->current,MAX_SEQUENCES, v->seq->active );
 	
 	for( i =0; i < MAX_SEQUENCES ;i ++ )
 	{
 		char tmp[32];
-		sprintf(tmp, "%04d", v->seq->samples[i]);
-		veejay_strncat(s_print_buf, tmp, 4 );
+		sprintf(tmp, "%04d%02d", v->seq->samples[i].sample_id, v->seq->samples[i].type);
+		veejay_strncat(s_print_buf, tmp, 6 );
 	}
 
 	SEND_MSG(v, s_print_buf );

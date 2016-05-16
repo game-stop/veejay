@@ -103,10 +103,16 @@ typedef struct
 
 typedef struct
 {
+	int sample_id;
+	int type;
+} seq_sample_t;
+
+typedef struct
+{
 	int   active;
 	int   current;
 	int   size;
-	int	*samples;
+	seq_sample_t	samples[MAX_SEQUENCES];
 	int	rec_id;
 } sequencer_t;
 

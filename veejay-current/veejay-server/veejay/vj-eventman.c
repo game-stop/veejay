@@ -2986,15 +2986,17 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 	index_map_[ VIMS_SEQUENCE_ADD ]			=	_new_event(
-				"%d %d",
+				"%d %d %d",
 				VIMS_SEQUENCE_ADD,
 				"Add a sample to the sequence",
 				vj_event_sequencer_add_sample,
-				2,
+				3,
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Seq ID",
 				0,
 				"Sample ID",
+				0,
+				"Type",
 				0,
 				NULL );
 

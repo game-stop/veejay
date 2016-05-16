@@ -1065,10 +1065,11 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 	if(info->selection_slot)
 	{
 		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" ,
-			info->selection_slot->sample_type,		
+			(info->selection_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM),		
 			info->selection_slot->sample_id );
 
-		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, info->selection_slot->sample_type,
+		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, 
+			(info->selection_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ),
 						info->selection_slot->sample_id );
 	}
 }
@@ -2845,15 +2846,15 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 	if(info->selected_slot)	
 	{
 		/* Only if we are not playing it */
-		if(info->status_tokens[PLAY_MODE] != 
+		if(info->status_tokens[STREAM_TYPE] != 
 			info->selected_slot->sample_type &&
 		   info->status_tokens[CURRENT_ID] !=
 			info->selected_slot->sample_id )
 		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d",
-			info->selected_slot->sample_type,
+			(info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE : MODE_STREAM ),
 			info->selected_slot->sample_id );
 		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,
-				info->selected_slot->sample_type,
+				info->selected_slot->sample_type == MODE_SAMPLE ? MODE_SAMPLE: MODE_STREAM,
 				info->selected_slot->sample_id );
 	}
 }

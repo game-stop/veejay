@@ -44,7 +44,7 @@ int vj_perform_queue_video_frame(veejay_t * info, int skip);
 
 void vj_perform_record_stop(veejay_t *info);
 
-void vj_perform_record_sample_frame(veejay_t *info, int sample); 
+void vj_perform_record_sample_frame(veejay_t *info, int sample, int type); 
 
 void vj_perform_record_tag_frame(veejay_t *info ); 
 void vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, int h );

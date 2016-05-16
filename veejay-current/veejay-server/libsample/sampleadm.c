@@ -84,14 +84,6 @@ extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, v
 extern int vj_tag_highest_valid_id();
 extern int    veejay_sprintf( char *s, size_t size, const char *format, ... );
 
-typedef struct
-{
-        int   active;
-        int   current;
-        int   size;
-        int     *samples;
-} seq_t;
-
 unsigned int sample_size()
 {
 //    return this_sample_id;
@@ -2973,26 +2965,37 @@ static void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mo
 
 static void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_samples )
 {
-	seq_t *s = (seq_t*) seq;
+	sequencer_t *s = (sequencer_t*) seq;
 
 	int i;
 	xmlChar *xmlTemp = NULL;
 	char *chTemp = NULL;
 
-	int tmp_seq[MAX_SEQUENCES];
+	seq_sample_t tmp_seq[MAX_SEQUENCES];
 	int tmp_idx = 0;
 
 	veejay_memset( &tmp_seq, 0, sizeof(tmp_seq));  
 
 	while (cur != NULL)
 	{
+		if (!xmlStrcmp(cur->name, (const xmlChar *) "TYPE")) {
+			xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+			chTemp = UTF8toLAT1(xmlTemp);
+			if(chTemp) {
+				tmp_seq[ tmp_idx ].type = atoi(chTemp);
+				free(chTemp);
+			}
+			if(xmlTemp)
+				xmlFree(xmlTemp);
+		}
+
 		if (!xmlStrcmp(cur->name, (const xmlChar *) "SEQ_ID")) {
 			xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    		chTemp = UTF8toLAT1(xmlTemp);
 	    		if (chTemp) {
 				int id = atoi( chTemp );
 				if( tmp_idx < MAX_SEQUENCES && id > 0 ) {
-					tmp_seq[ tmp_idx ] = id;
+					tmp_seq[ tmp_idx ].sample_id = id;
 					tmp_idx ++;
 				}
 				free(chTemp);
@@ -3007,14 +3010,18 @@ static void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_sampl
 		return;
 
 	if( s->size == 0 ) {
-		veejay_memcpy( s->samples, &tmp_seq, tmp_idx * sizeof(int));
+		for( i = 0; i < tmp_idx; i ++ ) {
+			s->samples[i].sample_id = tmp_seq[i].sample_id;
+			s->samples[i].type = tmp_seq[i].type;
+		}
 		s->size = tmp_idx;
 		return;
 	} 
 
 	if( (s->size + tmp_idx ) < MAX_SEQUENCES ) {
 		for( i = 0; i < tmp_idx; i ++ ) {
-			s->samples[ s->size + i ] = tmp_seq[ i ] + n_samples;
+			s->samples[ s->size + i ].sample_id = tmp_seq[ i ].sample_id + n_samples;
+			s->samples[ s->size + i ].type = tmp_seq[i].type;
 		}
 		s->size = s->size + tmp_idx;
 	} else {
@@ -3603,12 +3610,14 @@ static void	SaveSequences( xmlNodePtr node, void *seq )
 {
     char buffer[100];
     int i = 0;
-    seq_t *s = (seq_t*) seq;
+    sequencer_t *s = (sequencer_t*) seq;
     for( i = 0; i < MAX_SEQUENCES; i ++ )
     {
-	sprintf(buffer, "%d", s->samples[i] );
-	xmlNewChild(node, NULL, (const xmlChar*) "SEQ_ID",
-		(const xmlChar*) buffer );
+		sprintf(buffer, "%d", s->samples[i].type );
+		xmlNewChild(node,NULL,(const xmlChar*) "TYPE", (const xmlChar*) buffer );
+
+		sprintf(buffer, "%d", s->samples[i].sample_id );
+		xmlNewChild(node, NULL, (const xmlChar*) "SEQ_ID", (const xmlChar*) buffer );
     }	
 		
 }

@@ -895,6 +895,7 @@ static struct
 	{"fxpanel"},
 	{"panels"},
 	{"scrolledwindow49"}, // srt stuff
+	{"samplegrid_frame"},
 	{NULL},
 };
 
@@ -2282,8 +2283,12 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
 
 void gveejay_new_slot(int mode)
 {
-	info->uc.expected_num_streams = info->uc.real_num_streams + 1;
-	info->uc.expected_num_samples = info->uc.real_num_samples + 1;
+	if( mode == MODE_STREAM ) {
+		info->uc.expected_num_streams = info->uc.real_num_streams + 1;
+	}
+	else {
+		info->uc.expected_num_samples = info->uc.real_num_samples + 1;
+	}
 }
 
 #include "callback.c"
@@ -4353,7 +4358,7 @@ int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_
 
 	if(bank_page == -1) {
 		veejay_msg(VEEJAY_MSG_ERROR, "No slot found for (%d,%d)",sample_id,sample_type);
-		return 0;
+		return -1;
 	}
 
 	if( !bank_exists(bank_page, poke_slot))
@@ -4627,7 +4632,7 @@ static void select_slot( int pm )
 		/* falsify activation */
 		if(info->status_tokens[CURRENT_ID] > 0)
 		{
-			if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],pm ))
+			if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID], info->status_tokens[STREAM_TYPE] ))
 			{
 				if( info->selected_slot )
 				{
@@ -4674,12 +4679,13 @@ static void load_sequence_list()
 	while( offset < nlen )
 	{
 		int sample_id = 0;
+		int type = 0;
 		char seqtext[32];
-		sscanf( in + offset, "%04d", &sample_id );
-		offset += 4;
+		sscanf( in + offset, "%04d%02d", &sample_id, &type );
+		offset += 6;
 		if( sample_id > 0 )
 		{
-			sprintf(seqtext,"%d",sample_id);
+			sprintf(seqtext,"%c%d",( type == 0 ? 'S' : 'T' ), sample_id);
 			gtk_label_set_text(
 				GTK_LABEL(info->sequencer_view->gui_slot[id]->image),
 				seqtext );
@@ -4739,8 +4745,8 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 				gchar *title = _utf8str( descr );
 				gchar *timecode = format_selection_time( 0,(values[2]-values[1]) );
 				int int_id = values[0];
-				int poke_slot= 0; int bank_page = 0;
-				verify_bank_capacity( &bank_page , &poke_slot, int_id, 0);
+				int poke_slot= 0; int bank_page = -1;
+				verify_bank_capacity( &bank_page , &poke_slot, int_id, values[1]);
 				if(bank_page >= 0 )
 				{
 					if( info->sample_banks[bank_page]->slot[poke_slot]->sample_id <= 0 )
@@ -4836,16 +4842,16 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 				}
 				gchar *gsource = _utf8str( descr );
 				gchar *gtype = _utf8str( source );
-				int bank_page = 0;
+				int bank_page = -1;
 				int poke_slot = 0;
 
-				verify_bank_capacity( &bank_page , &poke_slot, values[0], 1);
+				verify_bank_capacity( &bank_page , &poke_slot, values[0], values[1]);
 
 				if(bank_page >= 0)
 				{
 					if( info->sample_banks[bank_page]->slot[poke_slot]->sample_id <= 0 )
 					{
-						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],1, gtype,gsource );
+						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],values[1], gtype,gsource );
 						add_sample_to_sample_banks(bank_page, tmp_slot );
 						add_sample_to_effect_sources_list( values[0], values[1],gsource,gtype);
 						free_slot(tmp_slot);
@@ -8341,9 +8347,12 @@ static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget,
 	if(event->type == GDK_BUTTON_PRESS)
 	{
 		int id = info->status_tokens[CURRENT_ID];
-		if( info->selection_slot )
+		int type=info->status_tokens[STREAM_TYPE];
+		if( info->selection_slot ) {
 			id = info->selection_slot->sample_id;
-		multi_vims( VIMS_SEQUENCE_ADD, "%d %d", slot_nr, id );
+			type=info->selection_slot->sample_type;
+		}
+		multi_vims( VIMS_SEQUENCE_ADD, "%d %d %d", slot_nr, id,type );
 		info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 	}
 	return FALSE;
@@ -8762,7 +8771,7 @@ static void remove_sample_from_slot()
 	slot_nr = info->selection_slot->slot_number;
 
 	if( info->selection_slot->sample_id == info->status_tokens[CURRENT_ID] &&
-		info->selection_slot->sample_type == info->status_tokens[PLAY_MODE] )
+		info->selection_slot->sample_type == info->status_tokens[STREAM_TYPE] )
 	{
 		gchar error_msg[100];
 		sprintf(error_msg, "Cannot delete %s %d while playing",

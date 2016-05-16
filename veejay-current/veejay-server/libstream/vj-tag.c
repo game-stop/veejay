@@ -3581,10 +3581,29 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 
 
 //int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
-int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int curfps, uint32_t lo, uint32_t hi, int macro, char *str )
+int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
+    if(!tag)
+	return 0;
+
+	int e_a, e_d, e_s;
+	//@ issue #60
+	if( sa && seq_rec)
+	{
+		sample_info *rs = sample_get( seq_rec );
+		e_a = rs->encoder_active;
+		e_d = rs->encoder_frames_to_record;
+		e_s = rs->encoder_total_frames_recorded;
+	}
+	else
+	{
+		e_a = tag->encoder_active;
+		e_d = tag->encoder_frames_to_record;
+		e_s = tag->encoder_total_frames_recorded;
+	}
+
 
 	char *ptr = str;
 	ptr = vj_sprintf( ptr, pfps ); *ptr++ = ' ';
@@ -3596,9 +3615,9 @@ int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int p
 	ptr = vj_sprintf( ptr, tag->color_g ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->color_b ); *ptr++ = ' ';
 	*ptr++ = '0'; *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, tag->encoder_active ); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, tag->encoder_frames_to_record ); *ptr++ = ' ';
-	ptr = vj_sprintf( ptr, tag->encoder_total_frames_recorded ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, e_a ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, e_d ); *ptr++ = ' ';
+	ptr = vj_sprintf( ptr, e_s ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, vj_tag_size() ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->source_type ); *ptr++ = ' ';
 	ptr = vj_sprintf( ptr, tag->n_frames ); *ptr++ = ' ';

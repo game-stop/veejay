@@ -376,8 +376,7 @@ int veejay_increase_frame(veejay_t * info, long num)
  ******************************************************/
 int veejay_free(veejay_t * info)
 {
-	video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
+	video_playback_setup *settings = (video_playback_setup *) info->settings;
 
 	vj_mem_threaded_stop();
 
@@ -418,7 +417,6 @@ int veejay_free(veejay_t * info)
 #ifdef HAVE_SDL
 	free(info->sdl);
 #endif
-	free( info->seq->samples );
 	free( info->seq );
 
     free(info->status_what);
@@ -747,13 +745,14 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		int cur_id = info->uc->sample_id;
 		if( cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_TAG )
 		{
-			veejay_msg(0, "Already playing stream %d", cur_id );
 			return;
 		}
 		else
 		{
 			veejay_stop_playing_stream(info, cur_id );
 		}
+		info->settings->min_frame_num = 0;
+		info->settings->max_frame_num = vj_tag_get_n_frames( cur_id );
 	}
 
 	if(new_pm == VJ_PLAYBACK_MODE_PLAIN )
@@ -789,19 +788,20 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 
 void	veejay_set_sample_f(veejay_t *info, int sample_id, int offset )
 {
-	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && info->uc->sample_id == sample_id )
 	{
-		if( info->uc->sample_id == sample_id )
-		{
-			int start = sample_get_startFrame( info->uc->sample_id );
-			veejay_set_frame(info,start+offset);
-			veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,start);
-			return;
-		}
+		int start = sample_get_startFrame( info->uc->sample_id );
+		veejay_set_frame(info,start+offset);
+		veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,start);
+		return;
 	}
 
-
 	veejay_change_playback_mode( info, VJ_PLAYBACK_MODE_SAMPLE, sample_id );
+}
+
+void	veejay_set_stream_f(veejay_t *info, int stream_id )
+{
+	veejay_change_playback_mode( info, VJ_PLAYBACK_MODE_TAG, stream_id );
 }
 
 void veejay_set_sample(veejay_t * info, int sampleid)
@@ -1116,7 +1116,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 
 		if( sample_chain_sprint_status
-			(info->uc->sample_id, tags,cache_used,info->seq->size,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
+			(info->uc->sample_id, tags,cache_used,info->seq->size,info->seq->active,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
 			veejay_change_state( info, LAVPLAY_STATE_STOP );
@@ -1161,8 +1161,8 @@ static void veejay_pipe_write_status(veejay_t * info)
 			}
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
-		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,info->seq->current, info->real_fps,
-			settings->current_frame_num, info->uc->playback_mode,total_slots,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what ) != 0 )
+		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,info->seq->active, info->real_fps,
+			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 		}
@@ -2417,9 +2417,8 @@ static void veejay_playback_cycle(veejay_t * info)
 				if(!skipi)
 					vj_perform_queue_frame(info,skipi);
 
-				if(!skipa)
+				if(frame_ok)
 					vj_perform_record_video_frame(info);
-
 			}
 #ifdef HAVE_SDL
 			te = SDL_GetTicks();
@@ -2809,11 +2808,6 @@ veejay_t *veejay_malloc()
 	memset(&(info->settings->sws_templ), 0, sizeof(sws_template));
 
 	info->seq = (sequencer_t*) vj_calloc(sizeof( sequencer_t) );
-	if(!info->seq)
-		return NULL;
-	
-	info->seq->samples = (int*) vj_calloc(sizeof(int) * (MAX_SEQUENCES+1) ); //@ SL contains 100 sequence items
-	
     info->audio = AUDIO_PLAY;
     info->continuous = 1;
     info->sync_correction = 1;
