@@ -55,7 +55,6 @@ vj_effect *bgsubtract_init(int width, int height)
 	ve->defaults[1] = 0;
 	ve->defaults[2] = 0;
 	ve->defaults[3] = 0;
-	ve->defaults[4] = 0;
 
 	ve->description = "Subtract Background";
 	ve->extra_frame = 0;
