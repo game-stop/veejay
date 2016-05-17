@@ -63,7 +63,6 @@ if test $? -ne 0; then
 fi
 
 if [ -z "$arch" ]; then
-	echo "Falling back to default -march=native" 
 	arch="native"
 fi
 
