@@ -282,7 +282,7 @@ case $host_cpu in
 
 	if test "x$enable_debug" != "xyes" ; then
 		SUBSAMPLE_CFLAGS=""
-		VJE_CFLAGS="-O3 -ftree-vectorize"
+		VJE_CFLAGS="-O3 -ftree-vectorize -ffast-math"
 	fi
 
 	AC_MSG_RESULT([x86])
