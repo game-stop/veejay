@@ -498,7 +498,7 @@ then
 		if grep "^flags.* cmov" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_cmov=yes
 		else
-			ac_cv_flag_cmov=yes
+			ac_cv_flag_cmov=no
 		fi
 	])
 
@@ -513,7 +513,7 @@ then
 		if grep "^flags.* mmxext" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_mmx2=yes
 		else
-			ac_cv_flag_mmx2=yes
+			ac_cv_flag_mmx2=no
 		fi
 	])
 
@@ -528,7 +528,7 @@ then
 		if grep "^flags.* avx" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_avx=yes
 		else
-			ac_cv_flag_avx=yes
+			ac_cv_flag_avx=no
 		fi
 	])
 
