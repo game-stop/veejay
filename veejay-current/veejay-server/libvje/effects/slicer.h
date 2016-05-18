@@ -21,7 +21,7 @@
 #ifndef SLICER_H
 #define SLICER_H
 vj_effect *slicer_init();
-void slicer_apply( VJFrame *frame, VJFrame *frame2, int slice_width, int slice_direction, int mode);
+void slicer_apply( VJFrame *frame, VJFrame *frame2, int slice_width, int slice_direction,int shatter, int period, int mode);
 int	slicer_malloc (int w, int h );
 void slicer_free();
 #endif

@@ -2152,8 +2152,7 @@ static void	vj_perform_tag_render_chain_entry(veejay_t *info, sample_eff_chain *
 	video_playback_setup *settings = info->settings;
 		
 	frameinfo = info->effect_frame_info;
-	frameinfo->timecode = settings->current_frame_num;
-    	
+ 	
 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 	frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
@@ -2383,7 +2382,6 @@ static void	vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
 	video_playback_setup *settings = info->settings;
 		
 	frameinfo = info->effect_frame_info;
-	frameinfo->timecode = settings->current_frame_num;
 	
 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
@@ -3706,8 +3704,10 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 	int cur_out = info->out_buf;
 
+	info->effect_frame_info->timecode = settings->current_frame_num;
 	info->effect_frame1->ssm = 0;
 	info->effect_frame2->ssm = 0;
+	info->effect_frame1->timecode = (double) settings->current_frame_num;
 
 	for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
 		frame_buffer[i]->ssm = -1;
