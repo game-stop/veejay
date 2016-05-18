@@ -46,7 +46,7 @@ typedef struct
 	STAR **stars;
 } starfield_t;
 
-static void init_star(STAR* star, int i)
+static void init_star(STAR* star, int i, int speed)
 {
   /* randomly init stars, generate them around the center of the screen */
   
@@ -57,7 +57,7 @@ static void init_star(STAR* star, int i)
   star->ypos *= 3072.0;
 
   star->zpos =  i;
-  star->speed =  2 + (int)(2.0 * (rand()/(RAND_MAX+1.0)));
+  star->speed = (speed+2) + (int)( ( (double)speed) * (rand()/(RAND_MAX+1.0)));
 
   star->color = i >> 2; /*the closer to the viewer the brighter*/
 }
@@ -72,7 +72,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	int i;
 	for( i = 0; i < MAX_STARS ; i ++ ) {
 		starfield->stars[i] = (STAR*) livido_malloc( sizeof(STAR) );
-		init_star( starfield->stars[i], i + 1 );
+		init_star( starfield->stars[i], i + 1 , 2 );
 	}
 
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &starfield);
@@ -122,6 +122,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 	//@ get parameter values
 	int		number_of_stars =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
+	int		speed = 2 + lvd_extract_param_index( my_instance, "in_parameters", 1 );
 
 	livido_memset( O[0], 0, len );
 	livido_memset( O[1], 128, uv_len );
@@ -139,14 +140,14 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 		stars[i]->zpos -= stars[i]->speed;
 
 		if( stars[i]->zpos <= 0 ) {
-			init_star( stars[i], i + 1 );
+			init_star( stars[i], i + 1, speed );
 		}
 
 		temp_x = (stars[i]->xpos / stars[i]->zpos ) + center_x;
 		temp_y = (stars[i]->ypos / stars[i]->zpos ) + center_y;
 
 		if( temp_x < 0 || temp_x > (w-1) || temp_y < 0 || temp_y > (h-1) ) {
-			init_star( stars[i], i + 1 );
+			init_star( stars[i], i + 1, speed );
 			continue;
 		}
 
@@ -219,9 +220,17 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "default", 1020 );
 		livido_set_string_value( port, "description" ,"Number of stars");
 
-	
+	in_params[1] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+	port = in_params[1];
+
+		livido_set_string_value(port, "name", "Speed" );
+		livido_set_string_value(port, "kind", "INDEX" );
+		livido_set_int_value( port, "min", 0 );
+		livido_set_int_value( port, "max", 64 );
+		livido_set_int_value( port, "default", 0 );
+		livido_set_string_value( port, "description" ,"Speed");
 	//@ setup the nodes
-	livido_set_portptr_array( filter, "in_parameter_templates",1, in_params );
+	livido_set_portptr_array( filter, "in_parameter_templates",2, in_params );
 	livido_set_portptr_array( filter, "in_channel_templates",0, NULL );
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
 
