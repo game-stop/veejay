@@ -1650,6 +1650,18 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <widget class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -1844,8 +1856,8 @@
                                 <property name="label">_New Generator</property>
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-				<property name="use_stock">False</property>
-				<property name="use_underline">True</property>
+                                <property name="use_underline">True</property>
+                                <property name="use_stock">False</property>
                                 <signal name="activate" handler="on_generatornew_clicked" />
                               </widget>
                             </child>
@@ -14506,6 +14518,28 @@ YUV (current)</property>
                                   </packing>
                                 </child>
                                 <child>
+                                  <widget class="GtkButton" id="new_generatorstream">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">True</property>
+                                    <property name="has_tooltip">True</property>
+                                    <property name="tooltip" translatable="yes">Create a new generator</property>
+                                    <signal name="clicked" handler="on_generatornew_clicked" />
+                                    <child>
+                                      <widget class="GtkImage" id="image52">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="pixbuf">icon_generator.png</property>
+                                      </widget>
+                                    </child>
+                                  </widget>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">3</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <widget class="GtkButton" id="button_samplelist_open">
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
@@ -14543,7 +14577,7 @@ YUV (current)</property>
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">False</property>
-                                    <property name="position">3</property>
+                                    <property name="position">4</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -14584,7 +14618,7 @@ YUV (current)</property>
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">False</property>
-                                    <property name="position">4</property>
+                                    <property name="position">5</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -14625,7 +14659,7 @@ YUV (current)</property>
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">False</property>
-                                    <property name="position">5</property>
+                                    <property name="position">6</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -14666,7 +14700,7 @@ YUV (current)</property>
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">False</property>
-                                    <property name="position">6</property>
+                                    <property name="position">7</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -14687,11 +14721,8 @@ YUV (current)</property>
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">False</property>
-                                    <property name="position">7</property>
+                                    <property name="position">8</property>
                                   </packing>
-                                </child>
-                                <child>
-                                  <placeholder/>
                                 </child>
                               </widget>
                               <packing>
@@ -15564,6 +15595,18 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
