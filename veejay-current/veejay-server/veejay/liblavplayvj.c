@@ -1105,6 +1105,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 	int mstatus = vj_event_macro_status();
 	int curfps  = (int) ( 100.0f / settings->spvf );
 	int total_slots = n_samples;
+	int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES );
 	if(tags>0)
 		total_slots+=tags;
    
@@ -1116,7 +1117,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 
 		if( sample_chain_sprint_status
-			(info->uc->sample_id, tags,cache_used,info->seq->size,info->seq->active,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
+			(info->uc->sample_id, tags,cache_used,info->seq->size,seq_cur,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
 			veejay_change_state( info, LAVPLAY_STATE_STOP );
@@ -1161,7 +1162,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 			}
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
-		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,info->seq->active, info->real_fps,
+		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,seq_cur, info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");

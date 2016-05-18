@@ -99,13 +99,13 @@ typedef struct vj_effect_t {
 	int n_out;
 	int instance;
 	void *user_data;		
-	char padding[4];
 	int parallel;
 	int rgba_only;
 	int motion;
 	int alpha;
 	int global;
 	int is_gen;
+	int is_plugin;
 } vj_effect;
 
 extern unsigned int get_pixel_range_min_Y();

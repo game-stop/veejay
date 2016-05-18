@@ -1364,7 +1364,18 @@ void	yuv_free_swscaler(void *sws)
 			sws_freeContext( s->sws );
 			s->sws = NULL;
 		}
-		if(s) free(s);
+		if(s) {
+			if(s->dst_filter) 
+			{
+				sws_freeFilter( s->dst_filter );
+				s->dst_filter = NULL;
+			}
+			if(s->src_filter) {
+				sws_freeFilter( s->src_filter );
+				s->src_filter = NULL;
+			}
+			free(s);
+		}
 		sws = NULL;
 	}
 }

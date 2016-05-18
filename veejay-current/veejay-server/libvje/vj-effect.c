@@ -728,11 +728,12 @@ void vj_effect_initialize(int width, int height, int full_range)
 	n_ext_plugs_ = plug_sys_detect_plugins();
 
 	int p = 0;
-	int p_stop = VJ_PLUGIN + n_ext_plugs_;
+	const int p_stop = VJ_PLUGIN + n_ext_plugs_;
 
-
-	for( p = VJ_PLUGIN; p < p_stop; p ++ )
+	for( p = VJ_PLUGIN; p < p_stop; p ++ ) {
 		vj_effects[p] = plug_get_plugin( p - VJ_PLUGIN );
+		vj_effects[p]->is_plugin = 1; //@ to free description field in vj_effect_free 
+	}
 
 }
 
@@ -769,7 +770,10 @@ static void vj_effect_free(vj_effect *ve) {
 	if(ve->limits[0]) free(ve->limits[0]);
 	if(ve->limits[1]) free(ve->limits[1]);
 	if(ve->defaults) free(ve->defaults);
-    if(ve->param_description) vj_effect_free_parameters( ve );
+	if(ve->is_plugin) {    	
+		if(ve->description) free(ve->description);
+	}
+	if(ve->param_description) vj_effect_free_parameters( ve );
 	 
 	free(ve);
   }

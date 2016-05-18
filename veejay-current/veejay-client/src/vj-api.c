@@ -6537,17 +6537,18 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 	if( info->status_tokens[SEQ_CUR] != history[SEQ_CUR] )
 	{
 		int in = info->status_tokens[SEQ_CUR];
-		if( in )
+		if( in < MAX_SEQUENCES )
 		{
 			set_toggle_button( "seqactive" , 1 );
-		} else
+			indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
+			info->sequence_playing = in;
+			indicate_sequence( TRUE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
+		} 
+		else
 		{
+			indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
 			set_toggle_button( "seqactive" , 0 );
 		}
-		if(info->sequence_playing >= 0)
-			indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
-		info->sequence_playing = in;
-		indicate_sequence( TRUE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
 	}
 
 	total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );

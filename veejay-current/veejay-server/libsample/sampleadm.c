@@ -959,9 +959,11 @@ int sample_verify_delete( int sample_id, int sample_type )
 {
 	int i,j;
 	int n = sample_highest();
+
 	for( i = 1; i <= n; i ++ )
 	{
 		sample_info *s = sample_get(i);
+		
 		if(s)
 		{
 			for( j = 0 ; j < SAMPLE_MAX_EFFECTS; j ++ )
@@ -975,6 +977,26 @@ int sample_verify_delete( int sample_id, int sample_type )
 			}
 		}
 	}
+
+	n = vj_tag_highest();
+	for( i = 1; i <= n; i ++ )
+	{
+		vj_tag *s = vj_tag_get(i);
+		if(s)
+		{
+			for( j = 0 ; j < SAMPLE_MAX_EFFECTS; j ++ )
+			{
+				if(s->effect_chain[j]->channel == sample_id &&
+				   s->effect_chain[j]->source_type == sample_type )
+				{
+					s->effect_chain[j]->channel = i;
+					s->effect_chain[j]->source_type = 1;
+				}
+			}
+		}
+	}
+
+
 	return 1;
 }
 

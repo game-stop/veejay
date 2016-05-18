@@ -24,9 +24,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <math.h>
 #include <sys/types.h>
 #include <libvje/vje.h>
-#include <math.h>
 #define MAX_SCRATCH_FRAMES 50
 #define GREY_LEVELS 256
 #define func_opacity(a,b,p,q) (  ((a * p) + (b * q)) >> 8 )
@@ -75,7 +75,6 @@ extern void veejay_msg(int type, const char format[], ...);
 #define ALPHA_BLEND( a0, p0, p1 ) ( ((0xff - a0) * p0 + (a0 * p1) ) >> 8 )
 #define FEATHER( P, op0, aB, Q, op1 ) \
 	( ( P * op0 ) + ALPHA_BLEND( aB, P, Q) * op1 ) >> 8;
-
 
 #ifdef HAVE_ASM_3DNOW
 #define do_emms			__asm__ __volatile__( "femms" :::"memory" )
