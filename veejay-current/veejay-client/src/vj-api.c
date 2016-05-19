@@ -154,6 +154,8 @@ enum
 	STREAM_MCAST = 14,
 	STREAM_YUV4MPEG = 1,
 	STREAM_AVFORMAT = 12,
+	STREAM_CLONE = 15,
+	STREAM_VLOOP = 3,
 	STREAM_PICTURE = 5
 };
 
@@ -4836,6 +4838,12 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 					case STREAM_GENERATOR:
 						snprintf(source,sizeof(source),"Z%d",values[0]);
 						break;
+					case STREAM_CLONE:
+						snprintf(source,sizeof(source),"T%d", values[0]);
+						break;
+					case STREAM_VLOOP:
+						snprintf(source,sizeof(source),"vloop %d", values[0]);
+						break;
 					default:
 						snprintf(source,sizeof(source),"??? %d", values[0]);
 						break;
@@ -8724,7 +8732,7 @@ static void set_selection_of_slot_in_samplebank(gboolean active)
 		color.green = 0;
 		color.red =0;
 	}
-	
+
 //	gtk_widget_modify_fg ( GTK_WIDGET(info->selection_gui_slot->title),
 //		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( GTK_WIDGET(info->selection_gui_slot->timecode),

@@ -343,6 +343,24 @@ void vj_tag_record_init(int w, int h)
 {
 }
 
+static int _vj_tag_new_clone(vj_tag *tag, int which_id )
+{
+	vj_tag *tag2 = vj_tag_get(which_id);
+	if( tag2 == NULL ) {
+		return 0;	
+	}
+
+	char tmp[128];
+	snprintf(tmp,sizeof(tmp),"T%d", which_id );
+	tag->extra = strdup(tmp);
+
+	tag2->clone ++;
+
+	tag->active = 1;
+	tag->video_channel = which_id;
+	return 1;
+}
+
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int type )
 {
 	char tmp[1024];
@@ -1108,7 +1126,15 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 
 	tag->active = 1;
 	break;
+	case VJ_TAG_TYPE_CLONE:
+		snprintf(tag->source_name, SOURCE_NAME_LEN, "[clone %d]", tag->id );
 
+		if( _vj_tag_new_clone(tag,channel) == 0 ) {
+			free(tag->source_name);
+			free(tag);
+			return -1;
+		}
+		break;
     default:
 		veejay_msg(0, "Stream type %d invalid", type );
 		free(tag->source_name);
@@ -1116,7 +1142,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 		return -1;
     }
 
-	vj_tag_get_by_type( tag->source_type, tag->descr);
+	vj_tag_get_by_type( tag->id, tag->source_type, tag->descr);
 
     /* effect chain is empty */
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
@@ -1244,10 +1270,19 @@ int vj_tag_del(int id)
 #endif
     
     if(tag->extra)
- 	free(tag->extra);
+ 		free(tag->extra);
 
     /* stop streaming in first */
     switch(tag->source_type) {
+	case VJ_TAG_TYPE_CLONE:
+		{
+			int t2 = tag->video_channel;
+			vj_tag *tag2 = vj_tag_get( t2 );
+			if( tag2 ) {
+				if(tag2->clone > 0 )
+					tag2->clone --;
+			}
+		}
 	case VJ_TAG_TYPE_V4L: 
 		if(tag->capture_type==1) { 
 #ifdef HAVE_V4L2
@@ -2431,7 +2466,7 @@ int vj_tag_disable(int t1) {
 	{
 		net_thread_stop( tag );
 	}
-	if(tag->source_type == VJ_TAG_TYPE_V4L )
+	if(tag->source_type == VJ_TAG_TYPE_V4L && !tag->clone )
 	{
 #ifdef HAVE_V4L2
 		if(tag->capture_type==1) {
@@ -2753,13 +2788,13 @@ void vj_tag_get_source_name(int t1, char *dst)
 {
     vj_tag *tag = vj_tag_get(t1);
     if (tag) {
-	sprintf(dst, "%s", tag->source_name);
+		sprintf(dst, "%s", tag->source_name);
     } else {
-	vj_tag_get_description( tag->source_type, dst );
+		vj_tag_get_description( tag->source_type, dst );
     }
 }
 
-void	vj_tag_get_by_type(int type, char *description )
+void	vj_tag_get_by_type(int id,int type, char *description )
 {
  	switch (type) {
 	case VJ_TAG_TYPE_GENERATOR:
@@ -2796,8 +2831,13 @@ void	vj_tag_get_by_type(int type, char *description )
     case VJ_TAG_TYPE_CALI:
 	sprintf(description, "%s", "Image Calibration");
 	break;
-    }
-
+	case VJ_TAG_TYPE_CLONE:
+	sprintf(description, "%s", "Clone" );
+	break;
+	default:
+	sprintf(description ,"T%d", id );
+	break;
+	}
 }
 
 void vj_tag_get_descriptive(int id, char *description)
@@ -2809,7 +2849,7 @@ void vj_tag_get_descriptive(int id, char *description)
 	}
     else	
 	{
-		vj_tag_get_by_type( tag->source_type, description );
+		vj_tag_get_by_type( id, tag->source_type, description );
 	}
 }
 
@@ -3591,13 +3631,25 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 	case VJ_TAG_TYPE_COLOR:
 		dummy_rgb_apply( dst, tag->color_r,tag->color_g,tag->color_b );
 		break;
+	case VJ_TAG_TYPE_CLONE:
+		{
+			int t2 = tag->video_channel;
+			vj_tag *tag2 = vj_tag_get(t2);
+			if(tag2 && tag2->clone == 0)
+				tag2->clone ++; //@ auto restore
 
+			if( vj_tag_get_frame(t2, dst, NULL) <= 0 ) {
+				dummy_rgb_apply( dst, 0,0,0 );
+			}
+		}
+		break;
     case VJ_TAG_TYPE_NONE:
 		break;
 		default:
 		break;
-    	}
-    	return 1;
+    }
+
+    return 1;
 }
 
 

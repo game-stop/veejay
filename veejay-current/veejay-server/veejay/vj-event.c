@@ -4464,6 +4464,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 
 void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap) 
 {
+	char avi_file[1024];
 	veejay_t *v = (veejay_t*)ptr;
 	
 	if( SAMPLE_PLAYING(v)) 
@@ -4476,7 +4477,6 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 
 		if( sample_stop_encoder( stop_sample ) == 1 ) 
 		{
-			char avi_file[1024];
 			v->settings->sample_record = 0;
 			if( sample_get_encoded_file( stop_sample, avi_file) <= 0 )
 			{
@@ -6847,6 +6847,22 @@ void	vj_event_cali_write_file( void *ptr, const char format[], va_list ap)
 	}
 }
 
+void 	vj_event_stream_new_clone( void *ptr, const char format[], va_list ap )
+{
+	char *str = NULL;
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+
+	P_A(args,str,format,ap);
+
+	int id = veejay_create_tag( v, VJ_TAG_TYPE_CLONE, NULL, v->nstreams, args[0],args[0] );
+
+	if( id <= 0 )
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a clone of stream %d", args[0]);
+	else
+		veejay_msg(VEEJAY_MSG_ERROR, "Created a clone of stream %d", args[0]);
+}
+
 void	vj_event_stream_new_cali( void *ptr, const char format[], va_list ap)
 {
 	char str[1024];
@@ -7446,11 +7462,12 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 		return;
 	}
 
-	if( vj_tag_init_encoder( v->uc->sample_id, tmp, format,		
-			args[0]) <= 0 ) 
+	if( vj_tag_init_encoder( v->uc->sample_id, tmp, format, args[0]) <= 0 ) 
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Error trying to start recording from stream %d", v->uc->sample_id);
-		vj_tag_stop_encoder(v->uc->sample_id);
+		if(!v->settings->offline_record || v->settings->offline_tag_id != v->uc->sample_id) {
+			vj_tag_stop_encoder(v->uc->sample_id);
+		}
 		v->settings->tag_record = 0;
 		return;
 	} 
@@ -7481,6 +7498,7 @@ void vj_event_tag_rec_start(void *ptr, const char format[], va_list ap)
 
 void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap) 
 {
+	char avi_file[1024];
 	veejay_t *v = (veejay_t *)ptr;
 	video_playback_setup *s = v->settings;
 
@@ -7493,12 +7511,7 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 			return;
 		}
 		
-		char avi_file[255];
-		if( !vj_tag_get_encoded_file(v->uc->sample_id, avi_file)) 
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Dont know where I put the file?!");
-			return;
-		}	
+		vj_tag_get_encoded_file(v->uc->sample_id, avi_file); 
 
 		// create new sample 
 		int ns = veejay_edit_addmovie_sample( v,avi_file, 0 );
@@ -7525,15 +7538,6 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, last_id );
 		}
 	}
-	else
-	{
-		if(v->settings->offline_record)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Perhaps you want to stop recording from a non visible stream ? See VIMS id %d",
-				VIMS_STREAM_OFFLINE_REC_STOP);
-		}
-		veejay_msg(VEEJAY_MSG_ERROR, "Not recording from visible stream");
-	}
 }
 
 void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
@@ -7548,12 +7552,12 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 		return;
 	}
  	
-	if( v->settings->tag_record)
+	if( v->settings->tag_record && STREAM_PLAYING(v) && v->uc->sample_id == v->settings->offline_tag_id)
     {
-		veejay_msg(VEEJAY_MSG_ERROR ,"Please stop the stream recorder first");
+		veejay_msg(VEEJAY_MSG_ERROR ,"Please stop the stream recorder on stream %d first", v->uc->sample_id);
 		return;
 	}
-
+	
 	if( vj_tag_exists(args[0]))
 	{
 		char tmp[255];
@@ -7571,7 +7575,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 
 		if(!veejay_create_temp_file(prefix, tmp ))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error creating temporary file %s. Unable to start offline recorder", tmp);
+			veejay_msg(VEEJAY_MSG_ERROR, "(Offline) Error creating temporary file %s. Unable to start offline recorder", tmp);
 			return;
 		}
 
@@ -7596,22 +7600,20 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 
 void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 {
+	char avi_file[1024];
 	veejay_t *v = (veejay_t*)ptr;
 	video_playback_setup *s = v->settings;
 	if(s->offline_record) 
 	{
-		if( vj_tag_stop_encoder( s->offline_tag_id ) == 0 )
+		if( vj_tag_stop_encoder( s->offline_tag_id ) == 1 )
 		{
-			char avi_file[255];
-
-			if( vj_tag_get_encoded_file(v->uc->sample_id, avi_file)!=0) return;
-		
+			vj_tag_get_encoded_file(s->offline_tag_id, avi_file);
+			
 			// create new sample	
 			int ns = veejay_edit_addmovie_sample(v,avi_file,0);
-
 			if(ns)
 			{
-				if( vj_tag_get_encoded_frames(v->uc->sample_id) > 0)
+				if( vj_tag_get_encoded_frames(s->offline_tag_id) > 0)
 					veejay_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s",
 							ns,avi_file);
 			}		
@@ -7620,7 +7622,7 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
 			}
 
-			vj_tag_reset_encoder( v->uc->sample_id);
+			vj_tag_reset_encoder(s->offline_tag_id);
 
 			if(s->offline_created_sample) 
 			{
@@ -7632,6 +7634,9 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 		s->offline_record = 0;
 		s->offline_tag_id = 0;
 		s->offline_created_sample = 0;
+	}
+	else {
+		veejay_msg(0, "(Offline) recorder not active" );
 	}
 }
 

@@ -2077,18 +2077,49 @@ void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 free(test);
 }
 
+void on_button_offline_start_clicked(GtkWidget *widget, gpointer user_data)
+{
+	int stream_id = 0;
+	if( info->selection_slot ) {
+		stream_id = info->selection_slot->sample_type != 0 ? info->selection_slot->sample_id : 0;
+	}
+	else if (info->selected_slot ) {
+		stream_id = info->selected_slot->sample_type != 0 ? info->selected_slot->sample_id : 0;
+	}
+
+	if( stream_id > 0 ) {
+		multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d", stream_id, get_nums("spin_offlineduration1" ), is_button_toggled("button_offline_autoplay1"));
+	}	
+}
+void on_button_offline_stop_clicked(GtkWidget *widget, gpointer user_data)
+{
+	single_vims( VIMS_STREAM_OFFLINE_REC_STOP );
+}
+
 void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->selection_slot )
 	{
-		multi_vims( VIMS_SAMPLE_COPY, "%d", info->selection_slot->sample_id );
-		gveejay_new_slot(MODE_SAMPLE);
+		if( info->selection_slot->sample_type != 0 ) {
+				multi_vims( VIMS_STREAM_NEW_CLONE, "%d", info->selection_slot->sample_id );
+				gveejay_new_slot(MODE_STREAM);
+		}
+		else {
+			multi_vims( VIMS_SAMPLE_COPY, "%d", info->selection_slot->sample_id );
+			gveejay_new_slot(MODE_SAMPLE);
+		}
 	}
 	else if (info->selected_slot )
 	{
-		multi_vims( VIMS_SAMPLE_COPY, "%d", info->selected_slot->sample_id );
-		gveejay_new_slot(MODE_SAMPLE);
-	}
+		if( info->selected_slot->sample_type != 0 ) {
+				multi_vims( VIMS_STREAM_NEW_CLONE, "%d", info->selected_slot->sample_id );
+				gveejay_new_slot(MODE_STREAM);
+		}
+		else {
+			multi_vims( VIMS_SAMPLE_COPY, "%d", info->selected_slot->sample_id );
+			gveejay_new_slot(MODE_SAMPLE);
+		}
+	}		
 }
 
 void	on_check_priout_fullscreen_clicked(

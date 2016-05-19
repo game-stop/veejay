@@ -2629,24 +2629,41 @@ static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[4], int
 	return res;
 }
 
+static int vj_perform_render_offline_tag_frame(veejay_t *info, uint8_t *frame[4])
+{
+	vj_tag_get_frame( info->settings->offline_tag_id, info->effect_frame1, NULL );
+
+	return vj_tag_record_frame( info->settings->offline_tag_id, info->effect_frame1->data, NULL, 0, info->pixel_format );
+}
 	
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
 {
-	int sample_id = info->uc->sample_id;
-	
-	if(info->settings->offline_record)
-		sample_id = info->settings->offline_tag_id;
-
-	if(info->settings->offline_record)
-	{
-		if (!vj_tag_get_frame(sample_id, info->effect_frame1, NULL))
-	   	{
-			return 0;//skip and dont care
-		}
-	}
-
-	return vj_tag_record_frame( sample_id, frame, NULL, 0, info->pixel_format);
+	return vj_tag_record_frame( info->uc->sample_id, frame, NULL, 0, info->pixel_format);
 }	
+
+static int vj_perform_record_offline_commit_single(veejay_t *info)
+{
+	char filename[1024];
+
+	int stream_id = info->settings->offline_tag_id;
+	if(vj_tag_get_encoded_file(stream_id, filename))
+	{
+		int df = vj_event_get_video_format();
+		int id = 0;
+		if( df == ENCODER_YUV4MPEG || df == ENCODER_YUV4MPEG420 ) {
+			id = veejay_create_tag( info, VJ_TAG_TYPE_YUV4MPEG,filename,info->nstreams,0,0 );
+		} else {
+			id = veejay_edit_addmovie_sample(info, filename, 0);
+		}
+		if( id <= 0 )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Adding file %s to new sample", filename);
+			return 0;
+		}
+		return id;
+	}
+	return 0;
+}
 
 static int vj_perform_record_commit_single(veejay_t *info)
 {
@@ -2672,7 +2689,7 @@ static int vj_perform_record_commit_single(veejay_t *info)
 			return id;
 	}
 	else {
-		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && !info->settings->offline_record)
+		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
   		{
  			if(sample_get_encoded_file(info->uc->sample_id, filename))
   			{
@@ -2694,9 +2711,9 @@ static int vj_perform_record_commit_single(veejay_t *info)
  	 		}
 		}
 
-		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG || info->settings->offline_record)
+		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG)
   		{
-			int stream_id = (info->settings->offline_record ? info->settings->offline_tag_id : info->uc->sample_id);
+			int stream_id = info->uc->sample_id;
 			if(vj_tag_get_encoded_file(stream_id, filename))
 	  		{
 				int df = vj_event_get_video_format();
@@ -2718,12 +2735,42 @@ static int vj_perform_record_commit_single(veejay_t *info)
 	return 0;
 }
 
+void vj_perform_record_offline_stop(veejay_t *info)
+{	
+	video_playback_setup *settings = info->settings;
+	int df = vj_event_get_video_format();
+
+	int stream_id = settings->offline_tag_id;
+	int play = settings->offline_created_sample;
+	
+	vj_tag_reset_encoder(stream_id);
+    vj_tag_reset_autosplit(stream_id);
+	
+	settings->offline_record = 0;
+	settings->offline_created_sample = 0;
+	settings->offline_tag_id = 0;
+
+	if( play ) {
+		if(df != ENCODER_YUV4MPEG && df != ENCODER_YUV4MPEG420)
+		{
+			info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
+			int id = sample_highest_valid_id();
+			veejay_set_sample(info, id );
+			veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
+		}
+		else {
+
+			veejay_msg(VEEJAY_MSG_INFO, "Completed offline recording");
+		}
+ 	}
+}
+
 void vj_perform_record_stop(veejay_t *info)
 {
  video_playback_setup *settings = info->settings;
  int df = vj_event_get_video_format();
 
- if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE && !info->settings->offline_record)
+ if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
  {
 	 sample_reset_encoder(info->uc->sample_id);
 	 sample_reset_autosplit(info->uc->sample_id);
@@ -2741,24 +2788,17 @@ void vj_perform_record_stop(veejay_t *info)
 	 settings->sample_record = 0;
 	 settings->sample_record_switch =0;
 	 settings->render_list = 0;
- } else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG || info->settings->offline_record)
+
+ } 
+ else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
  {
-	int stream_id = (settings->offline_record ? settings->offline_tag_id : info->uc->sample_id);
+	int stream_id = info->uc->sample_id;
 	int play = settings->tag_record_switch;
 	vj_tag_reset_encoder(stream_id);
-        vj_tag_reset_autosplit(stream_id);
-	if(settings->offline_record)
-	{
-		play = settings->offline_created_sample;
-		settings->offline_record = 0;
-		settings->offline_created_sample = 0;
-		settings->offline_tag_id = 0;
-	}
-	else 
-	{
-		settings->tag_record = 0;
-		settings->tag_record_switch = 0;
-	}
+    vj_tag_reset_autosplit(stream_id);
+	
+	settings->tag_record = 0;
+	settings->tag_record_switch = 0;
 
 	if(play)
 	{
@@ -2837,32 +2877,82 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample, int type) {
  	 }
 }
 
+void vj_perform_record_offline_tag_frame(veejay_t *info)
+{
+	video_playback_setup *settings = info->settings;
+	uint8_t *frame[4];
+	int res = 1;
+	int stream_id = settings->offline_tag_id;
+	
+	if( record_buffer->Y == NULL )
+		vj_perform_record_buffer_init();
+
+	frame[0] = record_buffer->Y;
+	frame[1] = record_buffer->Cb;
+	frame[2] = record_buffer->Cr;
+	frame[3] = NULL;
+
+	info->effect_frame1->data[0] = frame[0];
+	info->effect_frame1->data[1] = frame[1];
+	info->effect_frame1->data[2] = frame[2];
+	info->effect_frame1->data[3] = frame[3];
+
+	if(available_diskspace())
+		res = vj_perform_render_offline_tag_frame(info, frame);
+
+	if( res == 2)
+	{
+		int df = vj_event_get_video_format();
+		long frames_left = vj_tag_get_frames_left(stream_id) ;
+
+		vj_tag_stop_encoder( stream_id );
+		int n = vj_perform_record_offline_commit_single( info );
+		vj_tag_reset_encoder( stream_id );
+		
+		if(frames_left > 0 )
+		{
+			if( vj_tag_init_encoder( stream_id, NULL,
+				df, frames_left)==-1)
+			{
+				veejay_msg(VEEJAY_MSG_WARNING,"Error while auto splitting."); 
+				report_bug();
+			}
+		}
+		else
+		{
+			long len = vj_tag_get_total_frames(stream_id);
+	
+			veejay_msg(VEEJAY_MSG_DEBUG, "Added new sample %d of %ld frames",n,len);
+			vj_tag_reset_encoder( stream_id );
+			vj_tag_reset_autosplit( stream_id );
+		}
+	 }
+	
+	 if( res == 1)
+	 {
+		vj_tag_stop_encoder(stream_id);
+		vj_perform_record_offline_commit_single( info );	    
+		vj_perform_record_offline_stop(info);
+	 }
+
+	 if( res == -1)
+	 {
+		vj_tag_stop_encoder(stream_id);
+		vj_perform_record_offline_stop(info);
+ 	 }
+
+}
 
 void vj_perform_record_tag_frame(veejay_t *info) {
 	video_playback_setup *settings = info->settings;
 	uint8_t *frame[4];
 	int res = 1;
 	int stream_id = info->uc->sample_id;
-	if( settings->offline_record )
-	  stream_id = settings->offline_tag_id;
-
-        if(settings->offline_record)
-	{
-		if( record_buffer->Y == NULL )
-			vj_perform_record_buffer_init();
-
-		frame[0] = record_buffer->Y;
-		frame[1] = record_buffer->Cb;
-		frame[2] = record_buffer->Cr;
-		frame[3] = NULL;
-	}
-	else
-	{
-		frame[0] = primary_buffer[0]->Y;
-		frame[1] = primary_buffer[0]->Cb;
-		frame[2] = primary_buffer[0]->Cr;
-		frame[3] = NULL;
-	}
+	
+	frame[0] = primary_buffer[0]->Y;
+	frame[1] = primary_buffer[0]->Cb;
+	frame[2] = primary_buffer[0]->Cr;
+	frame[3] = NULL;
 
 	info->effect_frame1->data[0] = frame[0];
 	info->effect_frame1->data[1] = frame[1];
@@ -2882,8 +2972,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 		vj_tag_reset_encoder( stream_id );
 		if(frames_left > 0 )
 		{
-			if( vj_tag_init_encoder( stream_id, NULL,
-				df, frames_left)==-1)
+			if( vj_tag_init_encoder( stream_id, NULL, df, frames_left)==-1)
 			{
 				veejay_msg(VEEJAY_MSG_WARNING,
 					"Error while auto splitting."); 
@@ -2908,10 +2997,10 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 	 }
 
 	 if( res == -1)
-	{
+	 { 
 		vj_tag_stop_encoder(stream_id);
 		vj_perform_record_stop(info);
- 	}
+ 	 }
 
 }
 
@@ -3639,6 +3728,11 @@ static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settin
 //FIXME refactor recorders - there only needs to be two: online (what is playing) , offline (what is not playing but active)
 static	void	vj_perform_record_frame( veejay_t *info )
 {
+	if( info->settings->offline_record )
+	{
+		vj_perform_record_offline_tag_frame(info);
+	}
+
 	if( info->seq->active && info->seq->rec_id > 0 ) {
 		int type = 0;
 		if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
@@ -3648,9 +3742,9 @@ static	void	vj_perform_record_frame( veejay_t *info )
 	}
 	else {
 
-		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
+		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG && info->settings->tag_record )
 			vj_perform_record_tag_frame(info);
-		else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+		else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && info->settings->sample_record )
 			vj_perform_record_sample_frame(info, info->uc->sample_id,0 );
 	}
 }
@@ -3661,14 +3755,10 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 	vj_perform_finish_chain( info, is444 );
 
 	vj_perform_render_font( info, settings);
-	//@ record frame 
-//	if( pvar_.enc_active )
-//		vj_perform_record_frame(info);
 
 	if(!info->settings->composite)
 		vj_perform_render_osd( info, settings, deep );
 
-	//@ Do the subsampling 
 	vj_perform_finish_render( info, settings,deep );
 
 	return deep;
@@ -3676,7 +3766,6 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 
 void	vj_perform_record_video_frame(veejay_t *info)
 {
-	//@ record frame 
 	if( pvar_.enc_active )
 		vj_perform_record_frame(info);
 }
@@ -3698,9 +3787,6 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 	pvar_.follow_fade = safe_ff;
 	pvar_.fade_value = safe_fv;
 	pvar_.fade_entry = -1;
-
-	if(settings->offline_record)	
-		vj_perform_record_tag_frame(info);
 
 	int cur_out = info->out_buf;
 
@@ -3727,7 +3813,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 						&(pvar_.fade_entry),
 						&(pvar_.fade_alpha));
 
-			if( info->seq->active && info->seq->rec_id )
+			if( (info->seq->active && info->seq->rec_id) || info->settings->offline_record )
 				pvar_.enc_active = 1;
 			
 			vj_perform_plain_fill_buffer(info, &res);
@@ -3742,6 +3828,10 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
      		break;
 		    
 		case VJ_PLAYBACK_MODE_PLAIN:
+
+			if( info->settings->offline_record )
+				pvar_.enc_active = 1;
+
 			vj_perform_plain_fill_buffer(info, &res);
 			if( res > 0 ) {
 				cur_out = vj_perform_render_magic( info, info->settings,0 );
@@ -3759,7 +3849,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 						&(pvar_.fade_entry),
 						&(pvar_.fade_alpha));
 	
-			if( info->seq->active && info->seq->rec_id )
+			if( (info->seq->active && info->seq->rec_id) || info->settings->offline_record )
 				pvar_.enc_active = 1;
 
 

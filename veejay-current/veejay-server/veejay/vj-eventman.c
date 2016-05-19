@@ -1249,6 +1249,17 @@ void		vj_init_vevo_events(void)
 				".so plugin filename (must have been loaded at startup)",
 				NULL );
 
+	index_map_[VIMS_STREAM_NEW_CLONE]			=	_new_event(
+				"%d",
+				VIMS_STREAM_NEW_CLONE,
+				"Clone an existing stream as a new stream",
+				vj_event_stream_new_clone,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Stream ID",
+				0,
+				NULL );
+
 	index_map_[VIMS_STREAM_NEW_V4L]				=	_new_event(
 				"%d %d",
 				VIMS_STREAM_NEW_V4L,

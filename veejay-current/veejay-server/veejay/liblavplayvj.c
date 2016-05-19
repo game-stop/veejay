@@ -844,7 +844,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 	int id = vj_tag_new(type, filename, index, info->edit_list, info->pixel_format, channel, device,info->settings->composite );
 	char descr[200];
 	veejay_memset(descr,0,200);
-	vj_tag_get_by_type(type,descr);
+	vj_tag_get_by_type(id,type,descr);
 	if(id > 0 )	{
 		info->nstreams++;
 		veejay_msg(VEEJAY_MSG_INFO, "New Input Stream '%s' with ID %d created",descr, id );

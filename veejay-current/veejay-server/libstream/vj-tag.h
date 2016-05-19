@@ -31,6 +31,7 @@
 #define VJ_TAG_TYPE_SHM 11
 #define VJ_TAG_TYPE_NET 13
 #define VJ_TAG_TYPE_MCAST 14
+#define VJ_TAG_TYPE_CLONE 15
 #define VJ_TAG_MAX_V4L 16
 #define VJ_TAG_MAX_STREAM_IN 255
 #define VJ_TAG_TYPE_DV1394 17
@@ -80,6 +81,7 @@ typedef struct {
     int video_channel;
     int capture_type;
     int encoder_active;
+    int clone;
     unsigned long sequence_num;
     char encoder_base[256];
     char encoder_destination[256];
@@ -330,7 +332,7 @@ int 	vj_tag_continue_record( int t1 );
 int 	vj_tag_set_logical_index(int t1, int stream_nr);
 int	vj_tag_set_description(int t1, char *descr);
 int	vj_tag_get_description(int t1, char *descr);
-void	vj_tag_get_by_type( int type, char *descr );
+void	vj_tag_get_by_type(int id, int type, char *descr );
 int	vj_tag_get_width();
 int	vj_tag_get_height();
 int	vj_tag_get_uvlen();
