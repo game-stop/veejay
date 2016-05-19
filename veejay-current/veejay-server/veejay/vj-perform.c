@@ -2672,7 +2672,7 @@ static int vj_perform_record_commit_single(veejay_t *info)
 			return id;
 	}
 	else {
-		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && !info->settings->offline_record)
   		{
  			if(sample_get_encoded_file(info->uc->sample_id, filename))
   			{
@@ -2694,7 +2694,7 @@ static int vj_perform_record_commit_single(veejay_t *info)
  	 		}
 		}
 
-		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG)
+		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG || info->settings->offline_record)
   		{
 			int stream_id = (info->settings->offline_record ? info->settings->offline_tag_id : info->uc->sample_id);
 			if(vj_tag_get_encoded_file(stream_id, filename))
@@ -2723,7 +2723,7 @@ void vj_perform_record_stop(veejay_t *info)
  video_playback_setup *settings = info->settings;
  int df = vj_event_get_video_format();
 
- if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
+ if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE && !info->settings->offline_record)
  {
 	 sample_reset_encoder(info->uc->sample_id);
 	 sample_reset_autosplit(info->uc->sample_id);
@@ -2741,7 +2741,7 @@ void vj_perform_record_stop(veejay_t *info)
 	 settings->sample_record = 0;
 	 settings->sample_record_switch =0;
 	 settings->render_list = 0;
- } else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
+ } else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG || info->settings->offline_record)
  {
 	int stream_id = (settings->offline_record ? settings->offline_tag_id : info->uc->sample_id);
 	int play = settings->tag_record_switch;

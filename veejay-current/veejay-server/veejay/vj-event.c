@@ -7547,19 +7547,12 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR, "Already recording from stream %d", v->settings->offline_tag_id);
 		return;
 	}
- 	if( v->settings->tag_record)
-        {
+ 	
+	if( v->settings->tag_record)
+    {
 		veejay_msg(VEEJAY_MSG_ERROR ,"Please stop the stream recorder first");
 		return;
 	}
-
-	if( STREAM_PLAYING(v) && (args[0] == v->uc->sample_id) )
-	{
-		veejay_msg(VEEJAY_MSG_INFO,"Using stream recorder for stream  %d (is playing)",args[0]);
-		_vj_event_tag_record(v, args+1, str);
-		return;
-	}
-
 
 	if( vj_tag_exists(args[0]))
 	{
@@ -7567,22 +7560,22 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 		
 		int rec_format = _recorder_format;
 		char prefix[40];
-		sprintf(prefix, "stream-%02d", args[0]);
-
-		if(!veejay_create_temp_file(prefix, tmp ))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error creating temporary file %s", tmp);
-			return;
-		}
 
 		if(rec_format==-1)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Set a destination format first");
+			veejay_msg(VEEJAY_MSG_ERROR, "Error, no video format selected");
 			return;
 		}
-	
-		if( vj_tag_init_encoder( args[0], tmp, rec_format,		
-			args[1]) ) 
+
+		snprintf(prefix,sizeof(prefix),"stream-%02d", args[0]);
+
+		if(!veejay_create_temp_file(prefix, tmp ))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Error creating temporary file %s. Unable to start offline recorder", tmp);
+			return;
+		}
+
+		if( vj_tag_init_encoder( args[0], tmp, rec_format, args[1]) ) 
 		{
 			video_playback_setup *s = v->settings;
 			veejay_msg(VEEJAY_MSG_INFO, "(Offline) recording from stream %d", args[0]);
