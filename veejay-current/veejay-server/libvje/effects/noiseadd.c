@@ -163,6 +163,7 @@ static void noiseneg3x3_maskapply(VJFrame *frame, int coeef ) {
 
 }
 
+/*
 static void noiseadd3x3_maskapply(VJFrame *frame, int coeef ) {
 
     int r, c;
@@ -189,13 +190,14 @@ static void noiseadd3x3_maskapply(VJFrame *frame, int coeef ) {
     }
 
     for(c=width; c < len; c++) {
-	  /* get higher signal frequencies and*/	
-	  /* multiply result with coeffcient to get d*/
+	  // get higher signal frequencies and
+	  // multiply result with coeffcient to get d
 	  d = (Y[c] - Yb_frame[c]) * k;
 	  Y[c] = d;
 	}
 
 }
+*/
 
 void noiseadd_apply( VJFrame *frame, int type, int coeef) {
 
