@@ -25,8 +25,8 @@
 #include <stdint.h>
 
 vj_effect *bar_init(int width, int height);
-void bar_apply(VJFrame *frame, VJFrame *frame2,
-		   int width, int height, int d, int x1, int x2, int t1, int b1);
+void bar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
+               int t1, int b1);
 #endif
 /* 
  * Linux VeeJay
