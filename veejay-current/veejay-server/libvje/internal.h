@@ -403,8 +403,7 @@ extern void enhancemask_apply(VJFrame *frame, int *t);
 extern void contrast_apply(VJFrame *frame, int *t);
 extern void noiseadd_apply(VJFrame *frame, int t, int n);
 extern void motionblur_apply(VJFrame *frame, int n);
-
-extern void sinoids_apply(VJFrame *frame, int w, int h, int a,int b);
+extern void sinoids_apply(VJFrame *frame, int a,int b);
 
 extern void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n);
 
