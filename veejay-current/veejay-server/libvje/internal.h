@@ -416,8 +416,8 @@ extern void ripple_apply(VJFrame *frame, int waves, int ampli,int atten);
 extern void bathroom_apply(VJFrame *frame, int mode, int val, int x0, int x1);
 extern void slice_apply(VJFrame *frame, int val, int reinit);
 extern void zoom_apply(VJFrame *frame, int xo, int yo, int f, int dir, int alpha);
-
-extern void perspective_apply( VJFrame *frame, int width, int height, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse);
+extern void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
+                              int x3, int y3, int x4, int y4, int reverse);
 
 extern void deinterlace_apply(VJFrame *frame, int w, int h, int val);
 

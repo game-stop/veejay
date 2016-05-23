@@ -97,8 +97,13 @@ void perspective_free() {
 	perspective_vp_ = NULL;
 }
 
-void perspective_apply( VJFrame *frame, int width, int height, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse)
+void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
+                       int x3, int y3, int x4, int y4, int reverse)
 {
+	const int width = frame->width;
+	const int height = frame->height;
+	const uint32_t len = frame->len;
+
 	if( x1 != perspective_[0] || y1 != perspective_[1] || x2 != perspective_[2] || y2 != perspective_[3] ||
 			x3 != perspective_[4] || y3 != perspective_[5] || x4 != perspective_[6] || y4 != perspective_[7] || reverse != perspective_[8] )
 	{
@@ -118,7 +123,7 @@ void perspective_apply( VJFrame *frame, int width, int height, int x1, int y1, i
 		perspective_[8] = reverse;
 	}
 
-	int strides[4] = { (width*height),(width*height),(width*height), 0 };
+	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, perspective_private_, strides );
 
 	viewport_process_dynamic( perspective_vp_, perspective_private_, frame->data );
