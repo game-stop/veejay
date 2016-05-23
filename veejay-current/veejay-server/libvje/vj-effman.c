@@ -175,7 +175,7 @@ static void vj_effman_apply_image_effect(
 	coloradjust_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_MOTIONBLUR:
-        motionblur_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+        motionblur_apply(frames[0], arg[0]);
 	break;
 
      case VJ_IMAGE_EFFECT_MAGICSCRATCHER:

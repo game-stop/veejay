@@ -28,6 +28,6 @@
 vj_effect *motionblur_init(int w, int h);
 int motionblur_malloc(int w, int h);
 void motionblur_free();
-void motionblur_apply( VJFrame *frame, int width, int height, int n);
-		   
+void motionblur_apply( VJFrame *frame, int n);
+
 #endif
