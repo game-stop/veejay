@@ -358,7 +358,7 @@ static void vj_effman_apply_image_effect(
 	bgsubtractgauss_apply( frames[0],arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 	break;
      case VJ_IMAGE_EFFECT_BATHROOM:
-	bathroom_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
+	bathroom_apply(frames[0], arg[0], arg[1], arg[2], arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_RGBCHANNEL:
 	rgbchannel_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);

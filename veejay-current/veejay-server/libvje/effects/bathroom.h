@@ -27,5 +27,5 @@
 vj_effect *bathroom_init(int w, int h);
 int bathroom_malloc(int w, int h);
 void bathroom_free();
-void bathroom_apply(VJFrame *Frame, int width, int height,int mode, int val, int x0, int x1);
+void bathroom_apply(VJFrame *Frame, int mode, int val, int x0, int x1);
 #endif

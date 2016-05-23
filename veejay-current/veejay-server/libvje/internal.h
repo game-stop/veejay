@@ -413,8 +413,7 @@ extern void vbar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
                        int t1, int t2);
 extern void average_apply(VJFrame *frame, int val, int mode);
 extern void ripple_apply(VJFrame *frame, int waves, int ampli,int atten);
-
-extern void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val, int x0, int x1);
+extern void bathroom_apply(VJFrame *frame, int mode, int val, int x0, int x1);
 
 extern void slice_apply(VJFrame *frame, int width, int height, int val, int reinit);
 
