@@ -73,12 +73,14 @@ void crosspixel_free() {
 	}
 }
 
-void crosspixel_apply(VJFrame *frame, int w, int h, int t,int v) {
+void crosspixel_apply(VJFrame *frame, int t,int v) {
     unsigned int x,y,pos;
     const unsigned int vv = v * 2; // only even numbers 
     const unsigned int u_vv = vv >> frame->shift_h; // sfhit = / 2, shift_v = 2
 
-	const int len = frame->len;
+	const int width = frame->width;
+	const int height = frame->height;
+	const uint32_t len = frame->len;
 	const int uv_len = frame->uv_len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -102,12 +104,12 @@ void crosspixel_apply(VJFrame *frame, int w, int h, int t,int v) {
 	    vj_frame_clear1(Cr, 128, uv_len);
     }
 
-    for(y=0; y < (h>>1); y++) {
+    for(y=0; y < (height>>1); y++) {
 	if( (y%vv)==1) {
-	  for(x=0; x < w; x+=vv) {	
+	  for(x=0; x < width; x+=vv) {	
 	  	  for(p=0; p < vv; p++) {
-		    pos = (x+p) + ( y * w ); 	 
-		    Y[(x+(y*w))] = cross_pixels[0][pos];  
+		    pos = (x+p) + ( y * width ); 	 
+		    Y[(x+(y*width))] = cross_pixels[0][pos];  
 		  }
 	  }
 	}
@@ -126,12 +128,12 @@ void crosspixel_apply(VJFrame *frame, int w, int h, int t,int v) {
     }
 
 
-    for(y=(h>>1); y < h; y++) {
+    for(y=(height>>1); y < height; y++) {
 	if( (y%vv)==1) {
-	  for(x=0; x < w; x+=vv) {	
+	  for(x=0; x < width; x+=vv) {	
 	  	  for(p=0; p < vv; p++) {
-		    pos = (x+p) + ( y * w ); 	 
-		    Y[(x+(y*w))] = cross_pixels[0][pos];  
+		    pos = (x+p) + ( y * width ); 	 
+		    Y[(x+(y*width))] = cross_pixels[0][pos];  
 		  }
 	  }
 	}

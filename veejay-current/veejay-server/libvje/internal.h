@@ -420,8 +420,7 @@ extern void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
                               int x3, int y3, int x4, int y4, int reverse);
 extern void deinterlace_apply(VJFrame *frame, int val);
 //extern void simplematte_apply(VJFrame *frame, int threshold, int invert);
-
-extern void crosspixel_apply(VJFrame *frame, int w, int h,int type, int val);
+extern void crosspixel_apply(VJFrame *frame,int type, int val);
 
 extern void color_apply(VJFrame *frame, int w, int h, int a,int b, int c);
 
