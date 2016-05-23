@@ -404,11 +404,9 @@ extern void contrast_apply(VJFrame *frame, int *t);
 extern void noiseadd_apply(VJFrame *frame, int t, int n);
 extern void motionblur_apply(VJFrame *frame, int n);
 extern void sinoids_apply(VJFrame *frame, int a,int b);
-
 extern void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n);
-
-extern void simplemask_apply(VJFrame *frame, VJFrame *frame2, int width,
-                   int height, int threshold, int invert);
+extern void simplemask_apply(VJFrame *frame, VJFrame *frame2,
+                             int threshold, int invert);
 
 extern void bar_apply(VJFrame *frame, VJFrame *frame2,
                    int width, int height, int d, int x1, int x2, int t1, int b1);
