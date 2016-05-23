@@ -27,6 +27,6 @@
 vj_effect *noiseadd_init(int w, int h);
 void noiseadd_free();
 int noiseadd_malloc(int w, int h);
-void noiseadd_apply( VJFrame *frame, int w, int h, int t, int n);
+void noiseadd_apply( VJFrame *frame, int t, int n);
 
 #endif
