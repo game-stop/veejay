@@ -349,7 +349,7 @@ static void vj_effman_apply_image_effect(
 	average_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_RIPPLE:
-	ripple_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
+	ripple_apply(frames[0], arg[0], arg[1], arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_BGSUBTRACT:
 	bgsubtract_apply( frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
