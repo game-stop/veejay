@@ -409,9 +409,8 @@ extern void simplemask_apply(VJFrame *frame, VJFrame *frame2,
                              int threshold, int invert);
 extern void bar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
                       int t1, int b1);
-
-extern void vbar_apply(VJFrame *frame, VJFrame *frame2,
-	int w, int h, int d, int x1, int x2, int t1, int t2);
+extern void vbar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
+                       int t1, int t2);
 
 extern void average_apply(VJFrame *frame, int w, int h, int val, int mode);
 
