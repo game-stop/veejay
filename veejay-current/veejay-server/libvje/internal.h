@@ -418,8 +418,7 @@ extern void slice_apply(VJFrame *frame, int val, int reinit);
 extern void zoom_apply(VJFrame *frame, int xo, int yo, int f, int dir, int alpha);
 extern void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
                               int x3, int y3, int x4, int y4, int reverse);
-
-extern void deinterlace_apply(VJFrame *frame, int w, int h, int val);
+extern void deinterlace_apply(VJFrame *frame, int val);
 
 extern void simplematte_apply(VJFrame *frame, int w, int h, int threshold, int invert);
 

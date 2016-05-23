@@ -42,10 +42,12 @@ vj_effect *deinterlace_init(int w, int h)
     return ve;
 }
 
-void deinterlace_apply(VJFrame *frame, int width, int height, int val)
+void deinterlace_apply(VJFrame *frame, int val)
 {
 	const unsigned int uv_width = frame->uv_width;
 	const unsigned int uv_height = frame->uv_height;
+	const int width = frame->width;
+	const int height = frame->height;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

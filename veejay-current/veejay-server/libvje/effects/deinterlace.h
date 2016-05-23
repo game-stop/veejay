@@ -25,6 +25,6 @@
 #include <stdint.h>
 
 vj_effect *deinterlace_init();
-void deinterlace_apply(VJFrame *frame, int width, int height, int val);
+void deinterlace_apply(VJFrame *frame, int val);
 void deinterlace_free();
 #endif
