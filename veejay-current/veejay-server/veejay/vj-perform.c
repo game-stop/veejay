@@ -167,7 +167,7 @@ static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame);
 static void seq_play_sample( veejay_t *info, int n, int t);
 static	int	vj_perform_valid_sequence( veejay_t *info, int *type );
 static void vj_perform_plain_fill_buffer(veejay_t * info, int *result);
-static int vj_perform_tag_fill_buffer(veejay_t * info);
+static void vj_perform_tag_fill_buffer(veejay_t * info);
 static void vj_perform_clear_cache(void);
 static int vj_perform_increase_tag_frame(veejay_t * info, long num);
 static int vj_perform_increase_plain_frame(veejay_t * info, long num);
@@ -2944,7 +2944,6 @@ void vj_perform_record_offline_tag_frame(veejay_t *info)
 }
 
 void vj_perform_record_tag_frame(veejay_t *info) {
-	video_playback_setup *settings = info->settings;
 	uint8_t *frame[4];
 	int res = 1;
 	int stream_id = info->uc->sample_id;
@@ -3004,7 +3003,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 
 }
 
-static int vj_perform_tag_fill_buffer(veejay_t * info)
+static void vj_perform_tag_fill_buffer(veejay_t * info)
 {
     int error = 1;
     uint8_t *frame[4];
@@ -3028,7 +3027,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 			0,
 		};
 		vj_frame_copy(feedback_buffer,frame,strides);
-		return 1;
+		return;
 	}
     
     if(!active)
@@ -3061,8 +3060,6 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
    	{
 		info->uc->take_bg = vj_perform_take_bg(info,info->effect_frame1);
    	} 
-
-	return 1;      	
 }
 
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame)
@@ -3321,14 +3318,16 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 				if(el->has_audio)
 				{
 				    	num_samples = vj_tag_get_audio_frame(info->uc->sample_id, a_buf);
-					if(num_samples <= 0 )
-					{
-						num_samples = pred_len;
-						veejay_memset(a_buf, 0, num_samples * bps );
-					}
+				}
+
+				if(num_samples <= 0 )
+				{
+					num_samples = pred_len;
+					veejay_memset(a_buf, 0, num_samples * bps );
 				}
 				break;
 		}
+
 		vj_jack_continue( settings->current_playback_speed );
 		
 		vj_perform_play_audio( settings, a_buf, (num_samples * bps ));
@@ -3852,16 +3851,14 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 			if( (info->seq->active && info->seq->rec_id) || info->settings->offline_record )
 				pvar_.enc_active = 1;
 
+			vj_perform_tag_fill_buffer(info);
 
-			 if (vj_perform_tag_fill_buffer(info))
-			 {
-				if(vj_perform_verify_rows(info))
-					vj_perform_tag_complete_buffers(info, &is444);
+			if(vj_perform_verify_rows(info))
+				vj_perform_tag_complete_buffers(info, &is444);
 				
-				cur_out = vj_perform_render_magic( info, info->settings, is444 );
-			 }
-			 res = 1;	 
-		   	 break;
+			cur_out = vj_perform_render_magic( info, info->settings, is444 );
+			res = 1;	 
+		   	break;
 		default:
 			return 0;
 	}

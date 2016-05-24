@@ -277,7 +277,8 @@ static	int	v4l2_vidioc_qbuf( v4l2info *v )
 		v->buffer.index = i;
 
 		if( -1 == vioctl( v->fd, VIDIOC_QBUF, &(v->buffer)) ) {
-			veejay_msg(0, "v4l2: first VIDIOC_QBUF failed with %s", strerror(errno));
+			if( errno != ENODEV )
+				veejay_msg(0, "v4l2: first VIDIOC_QBUF failed with %s", strerror(errno));
 			return -1;
 		}
 	}
@@ -288,7 +289,8 @@ static	int		v4l2_stop_video_capture( v4l2info *v )
 {
 	if(v->is_streaming) {
 		if( -1 == vioctl( v->fd, VIDIOC_STREAMOFF, &(v->buftype)) ) {
-			veejay_msg(0,"v4l2: unable to stop streaming:%d, %s",errno,strerror(errno));
+			if( errno != ENODEV )
+				veejay_msg(0,"v4l2: unable to stop streaming:%d, %s",errno,strerror(errno));
 			return 0;
 		}
 		v->is_streaming = 0;
@@ -801,14 +803,22 @@ static void	v4l2_set_output_pointers( v4l2info *v, void *src )
 
 VJFrame	*v4l2_get_dst( void *vv, uint8_t *Y, uint8_t *U, uint8_t *V, uint8_t *A ) {
 	v4l2info *v = (v4l2info*) vv;
+	v4l2_thread_info *i = (v4l2_thread_info *) v->video_info;
+
+	if(i->stop)
+		return NULL;
+
 	if(v->threaded)
-		lock_(v->video_info);
+		lock_(i);
+	
 	v->host_frame->data[0] = Y;
 	v->host_frame->data[1] = U;
 	v->host_frame->data[2] = V;	
 	v->host_frame->data[3] = A;
+	
 	if(v->threaded)
-		unlock_(v->video_info);
+		unlock_(i);
+	
 	return v->host_frame;
 }
 
@@ -1209,8 +1219,9 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 	if( v->rw == 0 ) {
 	
 		if( -1 == vioctl( v->fd, VIDIOC_DQBUF, &(v->buffer))) {
-			veejay_msg(0, "v4l2: VIDIOC_DQBUF: %s", strerror(errno));
-			if( errno != EIO ) {
+			if( errno == ENODEV ) {
+				veejay_msg(0, "v4l2: %s (anymore)", strerror(errno));
+			} else if( errno != EIO ) {
 				veejay_msg(0,"v4l2: unable to grab a frame: %d, %s",errno,strerror(errno));
 			}
 			v4l2_stop_video_capture(v);
@@ -1302,7 +1313,7 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 
 	v4l2info *v = (v4l2info*) vv;
 
-	if( (v->rw == 1 && v->pause_read ) || (v->rw == 0 && !v->is_streaming) )
+	if( (dst == NULL || v->rw == 1 && v->pause_read ) || (v->rw == 0 && !v->is_streaming) )
 		return 0;
 
 	if( v->scaler == NULL ) {
@@ -1447,7 +1458,7 @@ void	v4l2_close( void *d )
 
 	if( v->buffers ) {
 		free(v->buffers);
-		v->host_frame = NULL;
+		v->buffers = NULL;
 	}
 
 	free(v);
@@ -2058,7 +2069,8 @@ static	void	*v4l2_grabber_thread( void *v )
 
 	while( 1 ) {
 		int err = (v4l2->rw);
-	
+		int ret = 0;
+
 		if( i->stop ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Closing video capture device");
 			goto v4l2_grabber_exit;
@@ -2086,6 +2098,18 @@ static	void	*v4l2_grabber_thread( void *v )
 			continue;
 		} 
 
+		ret = v4l2_poll( v4l2, 1, 200 );
+		if( ret > 0 ) {
+			   if(!v4l2_pull_frame_intern( v4l2 ) )
+				   err = -1;
+			   else
+				   i->retries = max_retries;
+		}
+ 		else if ( ret == -1 ) {
+				   err = -1;
+		}		   
+
+		/*
 		while( ( err = v4l2_poll( v4l2, 1, 200 ) ) < 0 ) {
 			if( !(err == -1) ) {
 				break;
@@ -2093,6 +2117,7 @@ static	void	*v4l2_grabber_thread( void *v )
 		}
 		if( err > 0 && !v4l2_pull_frame_intern( v4l2 ) )
 			err = -1;
+		*/
 
 		if( err == -1 ) {
 			if( i->retries < 0 ) {
@@ -2101,6 +2126,7 @@ static	void	*v4l2_grabber_thread( void *v )
 
 			} else {
 				i->retries --;
+				nanosleep(&req, NULL);
 			}
 		}
 
@@ -2163,7 +2189,7 @@ int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst )
 	int	status = 0;
 	
 		lock_(i);
-			if(i->stop) {
+			if(i->stop || dst == NULL) {
 				unlock_(i);
 				return status;
 			}
