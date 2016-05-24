@@ -81,14 +81,18 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 		return NULL;
 	}
 
-	size_t pixbuf_size = gdk_pixbuf_get_byte_length( image );
+	const size_t pixbuf_size = gdk_pixbuf_get_byte_length( image );
 
 	/* convert image to veejay frame in proper dimensions, free image */
 
 	int img_fmt = PIX_FMT_RGB24;
 
 	if( pic->pixels == NULL ) {
-		pic->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(pixbuf_size+15) );
+		pic->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(pixbuf_size) );
+		if(!pic->pixels) {
+			g_object_unref(image);
+			return NULL;
+		}
 	}
 
 	veejay_memcpy( pic->pixels, (uint8_t*) gdk_pixbuf_get_pixels( image ), pixbuf_size );
@@ -131,6 +135,13 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 		sws_template tmpl;
 		tmpl.flags = 1;
 		pic->scaler = yuv_init_swscaler( src,dst, &tmpl, yuv_sws_get_cpu_flags());
+		if(pic->scaler == NULL) {
+			free(src);
+			free(dst);
+			free(pic->pixels);
+			g_object_unref(image);
+			return NULL;
+		}
 	}
 
 	yuv_convert_any3( pic->scaler, src, src->stride, dst, src->format, dst->format );
@@ -140,6 +151,8 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	g_object_unref( image ); 
 	
 	free(src);
+
+	yuv_free_swscaler( pic->scaler );
 
 
 	return dst;
@@ -157,13 +170,9 @@ void	vj_picture_cleanup( void *pic )
 		if( picture->filename )
 			free(picture->filename );
 		if(picture->img)
-			free( picture->img );
+			free(picture->img);
 		if(picture->space)
 			free(picture->space);
-		if(picture->scaler)
-			yuv_free_swscaler(picture->scaler);
-		if(picture->pixels)
-			free(picture->pixels);
 		if( picture )
 			free(picture);		
 	}
@@ -253,6 +262,9 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			pic->space + len,
 			pic->space + len + ulen,
 		    pic->space + len + ulen + ulen);
+
+	free( pic->pixels );
+	pic->pixels = NULL;
 
 	if(!pic->img) {
 		free(pic->space);
