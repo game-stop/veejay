@@ -2051,8 +2051,26 @@ avi_t *AVI_open_indexfd(int fd, int getIndex, char *indexfile)
       return AVI;
 }
 
+static int AVI_mmap_file(avi_t *AVI, long mmap_size)
+{
+	off_t movi_end = lseek( AVI->fdes, 0, SEEK_END );
+	if( lseek( AVI->fdes, AVI->movi_start, SEEK_SET ) < 0 )
+	{
+		veejay_msg(0,"Unable to seek to start position of AVI");
+		return 0;
+	}
+	
+	AVI->mmap_size = ( mmap_size > movi_end ? movi_end : mmap_size );
+	
+	if(AVI->mmap_size > 0 )
+	{
+		AVI->mmap_region = mmap_file( AVI->fdes,0,AVI->mmap_size, movi_end );
+	}
 
-avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
+	return 1;
+}
+
+avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
 {
   avi_t *AVI=NULL;
   
@@ -2084,29 +2102,25 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
       AVI->aptr=0; //reset  
   }
 
-  if (AVI_errno)
-      return AVI=NULL;
+  if (AVI_errno) {
+	  free(AVI);
+      return 0;
+  }
   
  
   
   if(!AVI_errno)
   {
-	long file_size = (long)lseek( AVI->fdes, 0, SEEK_END );
-	lseek( AVI->fdes, AVI->movi_start, SEEK_SET );
-	long tmp = AVI->width * AVI->height * mmap_size;
-	if( tmp > file_size )
-		tmp = file_size;
-
-	AVI->mmap_size = tmp;
-	if(AVI->mmap_size > 0 ) {
-		AVI->mmap_region = mmap_file( AVI->fdes,0,AVI->mmap_size,file_size );
+	if( AVI_mmap_file(AVI,mmap_size) == 0 ) {
+		free(AVI);
+		return 0;
 	}
   }
 
 	return AVI;
 }
 
-avi_t *AVI_open_fd(int fd, int getIndex, int mmap_size)
+avi_t *AVI_open_fd(int fd, int getIndex, long mmap_size)
 {
   avi_t *AVI=NULL;
   
@@ -2135,13 +2149,9 @@ avi_t *AVI_open_fd(int fd, int getIndex, int mmap_size)
   
   if(!AVI_errno)
   {
-	long file_size = (long)lseek( AVI->fdes, 0, SEEK_END );
-	lseek( AVI->fdes, AVI->movi_start, SEEK_SET );
-	AVI->mmap_size = AVI->width * AVI->height * mmap_size;
-	if(AVI->mmap_size > 0 )
-	{
-		AVI->mmap_region =
-			mmap_file( AVI->fdes,0,AVI->mmap_size,file_size );
+ 	if( AVI_mmap_file(AVI,mmap_size) == 0 ) {
+		free(AVI);
+		return 0;
 	}
   }
 

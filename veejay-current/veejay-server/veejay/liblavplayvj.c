@@ -2451,12 +2451,8 @@ static void veejay_playback_cycle(veejay_t * info)
 				}
 			}
 
-			if( skipv || frame_ok == 0 )
+			if( skipv )
 			{
-				if(!frame_ok) {
-					veejay_msg(VEEJAY_MSG_WARNING, "Unable to queue video frame %ld", 
-							settings->current_frame_num );
-				}
 				continue;
 			}
 
@@ -2745,7 +2741,7 @@ int	prepare_cache_line(int perc, int n_slots)
 
 	n_cache_slots_ = n_slots;
 
-	vj_el_set_mmap_size( mmap_memory );	
+	vj_el_set_mmap_size( mmap_memory * 1024 );	
 
 	total_mem_mb_ = total / 1024;
 	if(chunk_size > 0 )

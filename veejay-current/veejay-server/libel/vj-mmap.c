@@ -41,7 +41,7 @@ void		mmap_free(mmap_region_t *map)
 	map = NULL;
 }
 
-mmap_region_t *	mmap_file(int fd, long offset, long length, int fs)
+mmap_region_t *	mmap_file(int fd, long offset, long length, long fs)
 {
 	mmap_region_t *map = (mmap_region_t*) vj_malloc(sizeof( mmap_region_t ));
 	veejay_memset( map, 0, sizeof( mmap_region_t ));
@@ -63,7 +63,6 @@ int	is_mapped( mmap_region_t *map, long offset, long size )
 {
 	// check if memory is in mapped region
 	off_t real_offset = PADDED( offset, map );
-
 	long rel_o = (map->mem_offset > 0 ? offset - map->mem_offset : offset );
 
 	if( (rel_o + size) > map->map_length )
@@ -74,6 +73,7 @@ int	is_mapped( mmap_region_t *map, long offset, long size )
 	if( real_offset >= map->start_region && 
 		real_offset + size <= map->end_region )
 		return 1;
+
 
 	return 0;
 }
@@ -136,6 +136,12 @@ long	mmap_read( mmap_region_t *map,long offset, long bytes, uint8_t *buf )
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to map %ld bytes from position %ld" , bytes, offset );
 			return -1;
 		}
+	}
+
+	//check if read beyond
+	if( (offset + bytes) > map->eof ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to read beyond EOF at position %ld (bad movie file?)", offset );
+		return -1;
 	}
 
 	long rel_offset = (map->mem_offset > 0 ? offset - map->mem_offset : offset );
