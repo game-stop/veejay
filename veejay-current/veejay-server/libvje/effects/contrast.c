@@ -61,8 +61,6 @@ static void contrast_cb_apply(VJFrame *frame, int *s) {
 	register int cb;
 	register int cr;
 	const unsigned int uv_len = (frame->ssm ? frame->len: frame->uv_len);
-	const int width = frame->width;
-	const int height = frame->height;
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
@@ -85,20 +83,18 @@ static void contrast_cb_apply(VJFrame *frame, int *s) {
 }
 
 static void contrast_y_apply(VJFrame *frame, int *s) {
-   unsigned int r;
-   register int m;
+	unsigned int r;
+	register int m;
 	const int len = frame->len;
-	const int width = frame->width;
-	const int height = frame->height;
- 	uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 
-   for(r=0; r < len; r++) {
-	m = Y[r];
-	m -= 128;
-	m *= s[1];
-	m = (m + 50)/100;
-	m += 128;
-	Y[r] = CLAMP_Y(m);
+	for(r=0; r < len; r++) {
+		m = Y[r];
+		m -= 128;
+		m *= s[1];
+		m = (m + 50)/100;
+		m += 128;
+		Y[r] = CLAMP_Y(m);
     }
 
 }

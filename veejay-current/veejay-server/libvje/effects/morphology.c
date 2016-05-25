@@ -149,7 +149,6 @@ void morphology_apply( VJFrame *frame, int threshold, int convolution_kernel, in
 	unsigned int x,y;
 	int len = frame->len;
 	int width = frame->width;
-	int height = frame->height;
 
 	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	
