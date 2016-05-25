@@ -291,11 +291,9 @@ static int32_t motionmap_activity_level( uint8_t *I, int width, int height )
 {
 	const unsigned int len = (width * height);
 	int32_t level = 0;
-	int r,c;
-	for (r = 0; r < len; r += width) {
-		for ( c = 0; c < width; c ++ ) {
-			level += I[r + c];
-		}
+	unsigned int i;
+	for( i = 0; i < len; i ++ ) {
+		level += I[i];
 	}
 	return (level>>8);
 }

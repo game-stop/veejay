@@ -1313,7 +1313,7 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 
 	v4l2info *v = (v4l2info*) vv;
 
-	if( (dst == NULL || v->rw == 1 && v->pause_read ) || (v->rw == 0 && !v->is_streaming) )
+	if( (dst == NULL) || ( v->rw == 1 && v->pause_read ) || (v->rw == 0 && !v->is_streaming) )
 		return 0;
 
 	if( v->scaler == NULL ) {
