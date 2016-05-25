@@ -806,6 +806,20 @@ void		vj_init_vevo_events(void)
 				-1,
 				NULL);
 
+	index_map_[VIMS_SAMPLE_TOGGLE_RAND_LOOP] = _new_event(
+				"%d %d",
+				VIMS_SAMPLE_TOGGLE_RAND_LOOP,
+				"Switch between loop types random and play once",
+				vj_event_sample_set_rand_loop,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				"Looptype (3=Random, 4=Play Once)",
+				-1,
+				NULL );
+
+
 	index_map_[VIMS_PREVIEW_BW]	=	_new_event(
 				NULL,
 				VIMS_PREVIEW_BW,

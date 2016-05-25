@@ -2371,6 +2371,8 @@ int get_loop_value()
 				return 2;
 			else if (is_button_toggled("loop_random"))
 				return 3;
+			if( is_button_toggled( "loop_oncenop" ))
+				return 4;
 	}
 	return 1;
 }
@@ -3311,6 +3313,9 @@ static void update_current_slot(int *history, int pm, int last_pm)
 				case 3:
 					set_toggle_button("loop_random", 1 );
 				break;
+				case 4:
+					set_toggle_button("loop_oncenop", 1 );
+					break;
 			}
 		}
 

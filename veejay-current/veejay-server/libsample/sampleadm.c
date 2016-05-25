@@ -1771,7 +1771,7 @@ int sample_set_looptype(int s1, int looptype)
     sample_info *sample = sample_get(s1);
     if(!sample) return -1;
 
-    if (looptype == 3 || looptype == 0 || looptype == 1 || looptype == 2) {
+	if( looptype >= 0 && looptype < 5 ) {
 		sample->looptype = looptype;
 		return 1;
     }

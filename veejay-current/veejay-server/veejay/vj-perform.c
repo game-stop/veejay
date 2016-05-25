@@ -401,8 +401,7 @@ static	int	vj_perform_try_sequence( veejay_t *info )
 
 static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 {
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
+    video_playback_setup *settings = (video_playback_setup *) info->settings;
     int start,end,looptype,speed;
     int ret_val = 1;
 
@@ -474,6 +473,9 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 			sample_loopcount( info->uc->sample_id);
 			veejay_set_frame(info, start);
 			break;
+			case 4:
+			veejay_set_frame(info,end);
+			break;
 		    default:
 			veejay_set_frame(info, end);
 			veejay_set_speed(info, 0);
@@ -522,6 +524,9 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 		sample_loopcount( info->uc->sample_id);
 
 		veejay_set_frame(info,end);
+		break;
+		case 4:
+		veejay_set_frame(info,start);
 		break;
 	    default:
 		veejay_set_frame(info, start);

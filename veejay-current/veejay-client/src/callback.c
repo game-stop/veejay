@@ -1680,6 +1680,16 @@ void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 
 	}
 }
+
+void	on_loop_oncenop_clicked(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock) 
+	{
+		multi_vims(VIMS_SAMPLE_SET_LOOPTYPE,"%d %d",0,4);
+		vj_midi_learning_vims_msg2(info->midi,NULL,VIMS_SAMPLE_SET_LOOPTYPE,0,4);
+	}
+}
+
 /*
 void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
 {

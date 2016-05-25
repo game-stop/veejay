@@ -339,6 +339,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_SAMPLE_SET_MARKER_START,	SDLK_LEFTBRACKET,VIMS_MOD_ALT,	NULL	},
 	{ VIMS_SAMPLE_SET_MARKER_END,	SDLK_RIGHTBRACKET,VIMS_MOD_ALT,	NULL	},
 	{ VIMS_SAMPLE_TOGGLE_LOOP,		SDLK_KP_MULTIPLY,VIMS_MOD_NONE,NULL	},
+	{ VIMS_SAMPLE_TOGGLE_RAND_LOOP,	SDLK_KP_MULTIPLY, VIMS_MOD_SHIFT },
 	{ VIMS_SWITCH_SAMPLE_STREAM,	SDLK_ESCAPE,	VIMS_MOD_NONE, NULL	},
 	{ VIMS_PRINT_INFO,				SDLK_HOME,		VIMS_MOD_NONE, NULL	},
 	{ VIMS_OSL,						SDLK_HOME,		VIMS_MOD_CTRL, NULL	},
@@ -3889,18 +3890,44 @@ void	vj_event_sample_rand_stop( void *ptr, const char format[], va_list ap)
 	settings->randplayer.mode = RANDMODE_INACTIVE;
 }
 
-void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
+void vj_event_sample_set_rand_loop(void *ptr, const char format[], va_list ap)
 {
 	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(!SAMPLE_PLAYING(v)) 
+	SAMPLE_DEFAULTS(args[0]);
+
+	if( args[1] == -1 )
 	{
-		p_invalid_mode();
-		return;
+		if( sample_exists(args[0]) )
+		{
+			int cur_loop = sample_get_looptype(args[0]);
+		    if( cur_loop == 4 ) {
+				sample_set_looptype(args[0],3 );
+			}
+			else {
+				sample_set_looptype(args[0],4 );
+			}
+			cur_loop = sample_get_looptype(args[0]);
+
+			veejay_msg(VEEJAY_MSG_INFO,"Sample %d loop type is now %s", args[0], (cur_loop == 3 ? "Random" : "Play once and keep playing last frame" ) );
+		}
+		else
+		{	
+			p_no_sample(args[0]);
+		}
+
 	}
+}
+
+void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
 
 	SAMPLE_DEFAULTS(args[0]);
 
@@ -3934,7 +3961,7 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	if(args[1] >= 0 && args[1] <= 3) 
+	if(args[1] >= 0 && args[1] <= 4) 
 	{
 		if(sample_exists(args[0]))
 		{
@@ -3947,6 +3974,7 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
 				case 1: veejay_msg(VEEJAY_MSG_INFO, "Normal looping");break;
 				case 2: veejay_msg(VEEJAY_MSG_INFO, "Pingpong looping");break;
 				case 3: veejay_msg(VEEJAY_MSG_INFO, "Random frame");break;
+				case 4: veejay_msg(VEEJAY_MSG_INFO, "Play once (no pause)");break;
 			}
 		}
 	}
@@ -4055,12 +4083,6 @@ void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap
 	char *str = NULL;
 	P_A(args,str,format,ap);
 	
-	if(!SAMPLE_PLAYING(v))
-	{
-		p_invalid_mode();
-		return;
-	}
-
 	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0]) )
@@ -4093,12 +4115,6 @@ void vj_event_sample_set_marker_end(void *ptr, const char format[], va_list ap)
 	char *str = NULL;
 	P_A(args,str,format,ap);
 	
-	if(!SAMPLE_PLAYING(v))
-	{
-		p_invalid_mode();	
-		return;
-	}
-
 	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0]) )
@@ -4131,12 +4147,6 @@ void vj_event_sample_set_marker(void *ptr, const char format[], va_list ap)
 	char *s = NULL;
 	P_A(args,s,format,ap);
 	
-	if(!SAMPLE_PLAYING(v))
-	{
-		p_invalid_mode();
-		return;
-	}
-
 	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0]) )
@@ -4169,12 +4179,6 @@ void vj_event_sample_set_marker_clear(void *ptr, const char format[],va_list ap)
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(!SAMPLE_PLAYING(v))
-	{
-		p_invalid_mode();
-		return;
-	}
-
 	SAMPLE_DEFAULTS(args[0]);
 
 	if( sample_exists(args[0]) )
@@ -4196,12 +4200,6 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
 	P_A(args,s,format,ap);
-
-	if(!SAMPLE_PLAYING(v))
-	{
-		p_invalid_mode();
-		return;
-	}
 
 	SAMPLE_DEFAULTS(args[0]);
 
@@ -4260,12 +4258,6 @@ void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 	int args[5];
 	veejay_t *v = (veejay_t*) ptr;
 	P_A(args,str,format,ap);
-
-	if(!SAMPLE_PLAYING(v))
-	{
-		p_invalid_mode();
-		return;
-	}
 
 	SAMPLE_DEFAULTS(args[0]);
 
