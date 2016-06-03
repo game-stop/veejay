@@ -154,7 +154,7 @@ static void vj_effman_apply_image_effect(
 	}
 	break;
      case VJ_IMAGE_EFFECT_NOISEADD:
-	noiseadd_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
+	noiseadd_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_CONTRAST:
 	contrast_apply(frames[0], arg);
@@ -175,7 +175,7 @@ static void vj_effman_apply_image_effect(
 	coloradjust_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_MOTIONBLUR:
-        motionblur_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+        motionblur_apply(frames[0], arg[0]);
 	break;
 
      case VJ_IMAGE_EFFECT_MAGICSCRATCHER:
@@ -343,13 +343,13 @@ static void vj_effman_apply_image_effect(
 	rotozoom_apply(frames[0], arg[0], arg[1], arg[2], arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_SINOIDS:
-	sinoids_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1]);
+	sinoids_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_AVERAGE:
-	average_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
+	average_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_RIPPLE:
-	ripple_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
+	ripple_apply(frames[0], arg[0], arg[1], arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_BGSUBTRACT:
 	bgsubtract_apply( frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
@@ -358,19 +358,19 @@ static void vj_effman_apply_image_effect(
 	bgsubtractgauss_apply( frames[0],arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 	break;
      case VJ_IMAGE_EFFECT_BATHROOM:
-	bathroom_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
+	bathroom_apply(frames[0], arg[0], arg[1], arg[2], arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_RGBCHANNEL:
 	rgbchannel_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_ZOOM:
-	zoom_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	zoom_apply(frames[0], arg[0], arg[1], arg[2], arg[3], arg[4]);
 	break;
      case VJ_IMAGE_EFFECT_CROSSPIXEL:
-	crosspixel_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
+	crosspixel_apply(frames[0],arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_DEINTERLACE:
-	 deinterlace_apply( frames[0], frames[0]->width, frames[0]->height, arg[0]);
+	 deinterlace_apply( frames[0], arg[0]);
 	 break;
 	case VJ_IMAGE_EFFECT_MOTIONMAP:
 	motionmap_apply( frames[0],arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6],arg[7]);
@@ -387,11 +387,11 @@ static void vj_effman_apply_image_effect(
 	     todo_info->tmp[1] = arg[1];
 	}
 
-	slice_apply(frames[0],frames[0]->width,frames[0]->height,arg[0], todo_info->tmp[1]);
+	slice_apply(frames[0], arg[0], todo_info->tmp[1]);
 	todo_info->tmp[1] = 0;
 	break;
 	 case VJ_IMAGE_EFFECT_PERSPECTIVE:
-		perspective_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6],arg[7],arg[8] );
+		perspective_apply(frames[0],arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6],arg[7],arg[8] );
 		break;
 	case VJ_IMAGE_EFFECT_ALPHAFILL:
 		alphafill_apply( frames[0], frames[0]->width,frames[0]->height, arg[0] );
@@ -484,7 +484,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 		slicer_apply(frames[0],frames[1], arg[0],arg[1],arg[2],arg[3],arg[4] );
 		break;
       case VJ_VIDEO_EFFECT_MASK:
-	simplemask_apply(frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0], arg[1]);
+	simplemask_apply(frames[0], frames[1], arg[0], arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_LUMAMASK:
 	lumamask_apply(frames[0], frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
@@ -586,10 +586,10 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	colorfade_apply(frames[0], todo_info->tmp[0], arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_VBAR:
-		vbar_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+		vbar_apply(frames[0],frames[1],arg[0],arg[1],arg[2],arg[3],arg[4]);
 		break;
       case VJ_VIDEO_EFFECT_3BAR:
-	bar_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	bar_apply(frames[0],frames[1],arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
       case VJ_VIDEO_EFFECT_SLIDINGDOOR:
 	slidingdoor_apply(frames[0], frames[1], arg[0] );

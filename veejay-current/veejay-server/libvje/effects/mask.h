@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 vj_effect *simplemask_init();
-void simplemask_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int threshold, int invert);
+void simplemask_apply( VJFrame *frame, VJFrame *frame2, int threshold, int invert);
 void mask_free();
 #endif

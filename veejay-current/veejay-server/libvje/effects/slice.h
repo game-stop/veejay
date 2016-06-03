@@ -28,5 +28,5 @@
 vj_effect *slice_init(int width, int height);
 int slice_malloc(int width, int height);
 void slice_free();
-void slice_apply(VJFrame *frame, int width, int height,int val, int re_init);
+void slice_apply(VJFrame *frame, int val, int re_init);
 #endif

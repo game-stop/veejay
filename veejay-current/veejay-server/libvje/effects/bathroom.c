@@ -95,9 +95,11 @@ void bathroom_free() {
 	}
 }
 
-static void bathroom_verti_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+static void bathroom_verti_apply(VJFrame *frame, int val, int x0, int x1)
 {
-    const unsigned int len = frame->len;
+	const int width = frame->width;
+	const int height = frame->height;
+    const uint32_t len = frame->len;
     unsigned int y_val = val;
     unsigned int x,y;
     uint8_t *Y = frame->data[0];
@@ -121,9 +123,11 @@ static void bathroom_verti_apply(VJFrame *frame, int width, int height, int val,
     }
 }
 
-static void	bathroom_alpha_verti_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+static void	bathroom_alpha_verti_apply(VJFrame *frame, int val, int x0, int x1)
 {
-    const unsigned int len = frame->len;
+	const int width = frame->width;
+	const int height = frame->height;
+    const uint32_t len = frame->len;
     unsigned int y_val = val;
     unsigned int x,y;
     uint8_t *Y = frame->data[0];
@@ -150,9 +154,11 @@ static void	bathroom_alpha_verti_apply(VJFrame *frame, int width, int height, in
     }
 }
 
-static void bathroom_hori_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+static void bathroom_hori_apply(VJFrame *frame, int val, int x0, int x1)
 {
-    unsigned int len = (width * height);
+	const int width = frame->width;
+	const int height = frame->height;
+    const uint32_t len = frame->len;
     unsigned int y_val = val;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
@@ -175,9 +181,11 @@ static void bathroom_hori_apply(VJFrame *frame, int width, int height, int val, 
     }
 }
 
-static void bathroom_alpha_hori_apply(VJFrame *frame, int width, int height, int val, int x0, int x1)
+static void bathroom_alpha_hori_apply(VJFrame *frame, int val, int x0, int x1)
 {
-    unsigned int len = (width * height);
+	const int width = frame->width;
+	const int height = frame->height;
+    const uint32_t len = frame->len;
     unsigned int y_val = val;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
@@ -203,7 +211,7 @@ static void bathroom_alpha_hori_apply(VJFrame *frame, int width, int height, int
 }
 
 
-void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val, int x0, int x1) {
+void bathroom_apply(VJFrame *frame, int mode, int val, int x0, int x1) {
 
 	int interpolate = 1;
  	int tmp1 = val;
@@ -224,10 +232,10 @@ void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val, in
 
 	switch(mode)
 	{
-		case 1: bathroom_hori_apply(frame,width,height,tmp1,x0,x1); break;
-		case 0: bathroom_verti_apply(frame,width,height,tmp1,x0,x1); break;
-		case 2: bathroom_alpha_hori_apply(frame,width,height,tmp1,x0,x1); break;
-		case 3: bathroom_alpha_verti_apply(frame,width,height,tmp1,x0,x1); break;
+		case 1: bathroom_hori_apply(frame,tmp1,x0,x1); break;
+		case 0: bathroom_verti_apply(frame,tmp1,x0,x1); break;
+		case 2: bathroom_alpha_hori_apply(frame,tmp1,x0,x1); break;
+		case 3: bathroom_alpha_verti_apply(frame,tmp1,x0,x1); break;
   	}
 
 	if( interpolate )

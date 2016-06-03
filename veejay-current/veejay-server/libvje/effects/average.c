@@ -76,10 +76,10 @@ void average_free()
 	frame_count = -1;
 }	
 
-void average_apply(VJFrame *frame, int width, int height, int max_sum, int mode)
+void average_apply(VJFrame *frame, int max_sum, int mode)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const uint32_t len = frame->len;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];

@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 vj_effect *average_init();
-void average_apply(VJFrame *src, int width, int height, int sum, int mode);
+void average_apply(VJFrame *src, int sum, int mode);
 void average_free();
 int	average_malloc(int width, int height);
 void average_free();

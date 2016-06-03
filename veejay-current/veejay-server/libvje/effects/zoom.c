@@ -99,8 +99,12 @@ void zoom_free() {
 	zoom_vp_ = NULL;
 }
 
-void zoom_apply( VJFrame *frame, int width, int height, int x, int y, int factor, int dir, int alpha)
+void zoom_apply( VJFrame *frame, int x, int y, int factor, int dir, int alpha)
 {
+	const int width = frame->width;
+	const int height = frame->height;
+	const uint32_t len = frame->len;
+
 	if( zoom_[0] != x || zoom_[1] != y || zoom_[2] != factor || !zoom_vp_ || dir != zoom_[3])
 	{
 		if( zoom_vp_ )
@@ -111,7 +115,7 @@ void zoom_apply( VJFrame *frame, int width, int height, int x, int y, int factor
 		zoom_[0] = x; zoom_[1] = y; zoom_[2] = factor; zoom_[3] = dir;
 	}
 
-	int strides[4] = { (width*height),(width*height),(width*height), (alpha ? width * height : 0 ) };
+	int strides[4] = { len, len, len, (alpha ? len : 0 ) };
 	vj_frame_copy( frame->data, zoom_private_, strides );
 
 	if(alpha == 0) {

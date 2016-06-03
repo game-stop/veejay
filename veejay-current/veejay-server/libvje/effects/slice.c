@@ -115,10 +115,12 @@ void slice_recalc(int width, int height, int val) {
 int frame_periods = 0;
 int current_period = 0;
 
-void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
-  unsigned int x,y,dx,dy;
-  unsigned int len = (width*height);
-  uint8_t *Y = frame->data[0];
+void slice_apply(VJFrame *frame, int val, int re_init) {
+	unsigned int x,y,dx,dy;
+	const int width = frame->width;
+	const int height = frame->height;
+	const uint32_t len = frame->len;
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 	uint8_t *A = frame->data[3];	

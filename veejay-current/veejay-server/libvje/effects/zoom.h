@@ -28,6 +28,5 @@
 vj_effect *zoom_init(int width, int height);
 int zoom_malloc(int w, int h);
 void zoom_free();
-void zoom_apply(VJFrame *frame, int width,
-		 int height, int x_offset, int y_offset, int factor, int dir, int alpha);
+void zoom_apply(VJFrame *frame, int x_offset, int y_offset, int factor, int dir, int alpha);
 #endif
