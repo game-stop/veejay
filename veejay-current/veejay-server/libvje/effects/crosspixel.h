@@ -28,5 +28,5 @@
 vj_effect *crosspixel_init(int w, int h);
 int crosspixel_malloc(int w, int h);
 void crosspixel_free();
-void crosspixel_apply(VJFrame *frame, int width, int height, int type, int val);
+void crosspixel_apply(VJFrame *frame, int type, int val);
 #endif

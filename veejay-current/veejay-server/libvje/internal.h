@@ -401,41 +401,26 @@ extern void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int angle,
 extern void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val );
 extern void enhancemask_apply(VJFrame *frame, int *t);
 extern void contrast_apply(VJFrame *frame, int *t);
-
-extern void noiseadd_apply(VJFrame *frame, int w , int h , int t, int n);
-
-extern void motionblur_apply(VJFrame *frame, int w, int h, int n);
-
-extern void sinoids_apply(VJFrame *frame, int w, int h, int a,int b);
-
+extern void noiseadd_apply(VJFrame *frame, int t, int n);
+extern void motionblur_apply(VJFrame *frame, int n);
+extern void sinoids_apply(VJFrame *frame, int a,int b);
 extern void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n);
-
-extern void simplemask_apply(VJFrame *frame, VJFrame *frame2, int width,
-                   int height, int threshold, int invert);
-
-extern void bar_apply(VJFrame *frame, VJFrame *frame2,
-                   int width, int height, int d, int x1, int x2, int t1, int b1);
-
-extern void vbar_apply(VJFrame *frame, VJFrame *frame2,
-	int w, int h, int d, int x1, int x2, int t1, int t2);
-
-extern void average_apply(VJFrame *frame, int w, int h, int val, int mode);
-
-extern void ripple_apply(VJFrame *frame, int width, int height, int waves, int ampli,int atten);
-
-extern void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val, int x0, int x1);
-
-extern void slice_apply(VJFrame *frame, int width, int height, int val, int reinit);
-
-extern void zoom_apply(VJFrame *frame, int w, int h , int xo, int yo, int f, int dir, int alpha);
-
-extern void perspective_apply( VJFrame *frame, int width, int height, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse);
-
-extern void deinterlace_apply(VJFrame *frame, int w, int h, int val);
-
-extern void simplematte_apply(VJFrame *frame, int w, int h, int threshold, int invert);
-
-extern void crosspixel_apply(VJFrame *frame, int w, int h,int type, int val);
+extern void simplemask_apply(VJFrame *frame, VJFrame *frame2,
+                             int threshold, int invert);
+extern void bar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
+                      int t1, int b1);
+extern void vbar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
+                       int t1, int t2);
+extern void average_apply(VJFrame *frame, int val, int mode);
+extern void ripple_apply(VJFrame *frame, int waves, int ampli,int atten);
+extern void bathroom_apply(VJFrame *frame, int mode, int val, int x0, int x1);
+extern void slice_apply(VJFrame *frame, int val, int reinit);
+extern void zoom_apply(VJFrame *frame, int xo, int yo, int f, int dir, int alpha);
+extern void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
+                              int x3, int y3, int x4, int y4, int reverse);
+extern void deinterlace_apply(VJFrame *frame, int val);
+//extern void simplematte_apply(VJFrame *frame, int threshold, int invert);
+extern void crosspixel_apply(VJFrame *frame,int type, int val);
 
 extern void color_apply(VJFrame *frame, int w, int h, int a,int b, int c);
 

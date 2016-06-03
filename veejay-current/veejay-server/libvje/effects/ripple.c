@@ -116,8 +116,11 @@ void ripple_free() {
 }
 
 
-void ripple_apply(VJFrame *frame, int width, int height, int _w, int _a , int _att ) {
+void ripple_apply(VJFrame *frame, int _w, int _a , int _att ) {
 
+	const int width = frame->width;
+	const int height = frame->height;
+	const uint32_t len = frame->len;
 	double wp2 = width * 0.5;
 	double hp2 = height * 0.5;
 	int x,y,dx,dy,a=0,sx=0,sy=0,angle=0;
@@ -149,7 +152,7 @@ void ripple_apply(VJFrame *frame, int width, int height, int _w, int _a , int _a
 		have_calc_data = 0;
 	}
 	
-	int strides[4] = { width * height, width * height, width * height,0 };
+	int strides[4] = { len, len, len,0 };
 	vj_frame_copy( frame->data, ripple_data , strides );
 	if (have_calc_data==0) {
   	   for(y=0; y < height-1;y++) {

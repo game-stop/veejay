@@ -27,6 +27,6 @@
 vj_effect *sinoids_init(int w, int h);
 void sinoids_free();
 int sinoids_malloc(int w, int h);
-void sinoids_apply(VJFrame *frame, int width, int height, int a,int b);
-		    
+void sinoids_apply(VJFrame *frame, int a,int b);
+
 #endif

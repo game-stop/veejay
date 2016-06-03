@@ -66,8 +66,10 @@ static int bar_top_vert = 0;
 
 static int bar_bot_vert = 0;
 
-void bar_apply(VJFrame *frame, VJFrame *frame2, int width, int height,int divider, int top_y, int bot_y, int top_x, int bot_x  ) {
+void bar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_y, int top_x, int bot_x  ) {
 
+	const int width = frame->width;
+	const int height = frame->height;
 	int top_width = width;		   /* frame in frame destination area */
 	int top_height = height/(divider);
 
@@ -85,7 +87,7 @@ void bar_apply(VJFrame *frame, VJFrame *frame2, int width, int height,int divide
 	uint8_t *Cr2= frame2->data[2];
 
 	if(y2 > width) { y2 = 0; bar_top_auto = 0; }
-	if(x2 > (height-top_height)) {x2 = 0; bar_top_vert = 0; }
+	if(x2 > (bottom_height)) {x2 = 0; bar_top_vert = 0; }
 	/* start with top frame in a frame */
 	for( y = 0; y < top_height; y++ ) {
 		for ( x = 0; x < top_width; x++ ) {
@@ -98,7 +100,7 @@ void bar_apply(VJFrame *frame, VJFrame *frame2, int width, int height,int divide
 	y2 = bar_bot_auto + bot_y;
 	x2 = bar_bot_vert + bot_x;
 	if(y2 > width) { y2 = 0; bar_bot_auto = 0; }
-	if(x2 > (height-top_height)) { x2 = 0; bar_bot_vert = 0; }
+	if(x2 > (bottom_height)) { x2 = 0; bar_bot_vert = 0; }
 	/* start with bottom frame in a frame */
 	for ( y = bottom_height; y < height; y++) {
 		yy++;

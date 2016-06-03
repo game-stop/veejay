@@ -65,12 +65,14 @@ static int bar_top_auto = 0;
 static int bar_bot_auto = 0;
 static int bar_top_vert = 0;
 static int bar_bot_vert = 0;
-void vbar_apply(VJFrame *frame, VJFrame *frame2, int width, int height,int divider, int top_y, int bot_y, int top_x, int bot_x  ) {
+void vbar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_y, int top_x, int bot_x) {
 
+	const int width = frame->width;
+	const int height = frame->height;
+	const uint32_t len = frame->len;
 	//int top_width = width;		   /* frame in frame destination area */
-
-	int top_width = width/divider; 
-        int bottom_width = width - top_width;
+	int top_width = width/divider;
+	int bottom_width = width - top_width;
 
 	//int bottom_width = width;	  /* frame in frame destionation area */
 	
@@ -85,9 +87,6 @@ void vbar_apply(VJFrame *frame, VJFrame *frame2, int width, int height,int divid
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
-	int	len = frame->len;        
-
-
 
 	if(y2 > height) { y2 = 0; bar_top_auto = 0; }
 	if(x2 > width)  { x2 = 0; bar_top_vert = 0; }

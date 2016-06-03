@@ -69,19 +69,20 @@ void noiseadd_free() {
   Yb_frame = NULL;
 }
 
-static void noiseblur1x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
+static void noiseblur1x3_maskapply(VJFrame* frame, int coeef ) {
 
     int r, c;
     double k = (coeef/100.0);
     uint8_t d;
-    
-    const int len = (width*height);
+	const int width = frame->width;
+    const int len = frame->len;
+	uint8_t *Y = frame->data[0];
 
     for (r = 0; r < len; r += width) {
 	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = (src[0][r + c - 1] +
-				  src[0][r + c] +
-				  src[0][r + c + 1]
+		Yb_frame[c + r] = (Y[r + c - 1] +
+				  Y[r + c] +
+				  Y[r + c + 1]
 		    ) / 3;
 	}
     }
@@ -89,32 +90,32 @@ static void noiseblur1x3_maskapply(uint8_t *src[3], int width, int height, int c
     for(c=0; c < len; c++) {
 	  /* get higher signal frequencies and*/	
 	  /* multiply result with coeffcient to get d*/
-	  d = (Yb_frame[c] - src[0][c]) * k;
-	  src[0][c] = d;
+	  d = (Yb_frame[c] - Y[c]) * k;
+	  Y[c] = d;
 	}
 
 }
 
-static void noiseblur3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
+static void noiseblur3x3_maskapply(VJFrame* frame, int coeef ) {
 
     int r, c;
     const double k = (coeef/1000.0);
     uint8_t d;
-    
-    const int len = (width*height)-width;
-
+	const int width = frame->width;
+    const int len = (frame->len)-width;
+	uint8_t *Y = frame->data[0];
 
     for (r = width; r < len; r += width) {
 	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = (src[0][r - width + c - 1] +
-				  src[0][r - width + c] +
-				  src[0][r - width + c + 1] +
-				  src[0][r + width + c - 1] +
-				  src[0][r + width + c] +
-				  src[0][r + width + c + 1] +
-				  src[0][r + c] +
-				  src[0][r + c + 1] +
-				  src[0][r + c - 1]  
+		Yb_frame[c + r] = (Y[r - width + c - 1] +
+				  Y[r - width + c] +
+				  Y[r - width + c + 1] +
+				  Y[r + width + c - 1] +
+				  Y[r + width + c] +
+				  Y[r + width + c + 1] +
+				  Y[r + c] +
+				  Y[r + c + 1] +
+				  Y[r + c - 1]  
 		    ) / 9;
 	}
     }
@@ -122,32 +123,33 @@ static void noiseblur3x3_maskapply(uint8_t *src[3], int width, int height, int c
     for(c=width; c < len; c++) {
 	  /* get higher signal frequencies and*/	
 	  /* multiply result with coeffcient to get d*/
-	  d = (Yb_frame[c] - src[0][c]) * k;
-	  src[0][c] = d;
+	  d = (Yb_frame[c] - Y[c]) * k;
+	  Y[c] = d;
 	}
 
 }
 
-static void noiseneg3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
+static void noiseneg3x3_maskapply(VJFrame *frame, int coeef ) {
 
     int r, c;
     const double k = (coeef/1000.0);
     uint8_t d;
-    
-    int len = (width*height)-width;
+	const int width = frame->width;
+    const int len = (frame->len)-width;
+	uint8_t *Y = frame->data[0];
 
 
     for (r = width; r < len; r += width) {
 	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = 255 - ((src[0][r - width + c - 1] +
-				  src[0][r - width + c] +
-				  src[0][r - width + c + 1] +
-				  src[0][r + width + c - 1] +
-				  src[0][r + width + c] +
-				  src[0][r + width + c + 1] +
-				  src[0][r + c] +
-				  src[0][r + c + 1] +
-				  src[0][r + c - 1]  
+		Yb_frame[c + r] = 255 - ((Y[r - width + c - 1] +
+				  Y[r - width + c] +
+				  Y[r - width + c + 1] +
+				  Y[r + width + c - 1] +
+				  Y[r + width + c] +
+				  Y[r + width + c + 1] +
+				  Y[r + c] +
+				  Y[r + c + 1] +
+				  Y[r + c - 1]  
 		    )) / 9;
 	}
     }
@@ -155,53 +157,56 @@ static void noiseneg3x3_maskapply(uint8_t *src[3], int width, int height, int co
     for(c=width; c < len; c++) {
 	  /* get higher signal frequencies and*/	
 	  /* multiply result with coeffcient to get d*/
-	  d = (src[0][c] - Yb_frame[c]) * k;
-	  src[0][c] = d;
+	  d = (Y[c] - Yb_frame[c]) * k;
+	  Y[c] = d;
 	}
 
 }
 
-static void noiseadd3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
+/*
+static void noiseadd3x3_maskapply(VJFrame *frame, int coeef ) {
 
     int r, c;
     const double k = (coeef/1000.0);
     uint8_t d;
-    
-    const int len = (width*height)-width;
+	const int width = frame->width;
+    const int len = (frame->len)-width;
+	uint8_t *Y = frame->data[0];
 
 
     for (r = width; r < len; r += width) {
 	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = (src[0][r - width + c - 1] +
-				  src[0][r - width + c] +
-				  src[0][r - width + c + 1] +
-				  src[0][r + width + c - 1] +
-				  src[0][r + width + c] +
-				  src[0][r + width + c + 1] +
-				  src[0][r + c] +
-				  src[0][r + c + 1] +
-				  src[0][r + c - 1]  
+		Yb_frame[c + r] = (Y[r - width + c - 1] +
+				  Y[r - width + c] +
+				  Y[r - width + c + 1] +
+				  Y[r + width + c - 1] +
+				  Y[r + width + c] +
+				  Y[r + width + c + 1] +
+				  Y[r + c] +
+				  Y[r + c + 1] +
+				  Y[r + c - 1]  
 		    ) / 9;
 	}
     }
 
     for(c=width; c < len; c++) {
-	  /* get higher signal frequencies and*/	
-	  /* multiply result with coeffcient to get d*/
-	  d = (src[0][c] - Yb_frame[c]) * k;
-	  src[0][c] = d;
+	  // get higher signal frequencies and
+	  // multiply result with coeffcient to get d
+	  d = (Y[c] - Yb_frame[c]) * k;
+	  Y[c] = d;
 	}
 
 }
+*/
 
-void noiseadd_apply( VJFrame *frame, int width, int height, int type, int coeef) {
+void noiseadd_apply( VJFrame *frame, int type, int coeef) {
 
 	switch(type) {
 	case 0:
-	noiseblur1x3_maskapply(frame->data,width,height,coeef);	break;
+	noiseblur1x3_maskapply(frame, coeef);	break;
 	case 1:
-	noiseblur3x3_maskapply(frame->data,width,height,coeef);	break;
+	noiseblur3x3_maskapply(frame, coeef);	break;
 	case 2:
-	noiseneg3x3_maskapply(frame->data,width,height,coeef);	 break;
+	noiseneg3x3_maskapply(frame, coeef);	 break;
 	}
 }

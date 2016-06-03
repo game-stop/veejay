@@ -52,8 +52,8 @@ vj_effect *simplemask_init(int w, int h )
  	return ve;
 }
 
-static void mask_replace_black(uint8_t *yuv1[3], uint8_t *yuv2[3], int w, int h, int threshold) {
-  unsigned int len = w * h;
+static void mask_replace_black(uint8_t *yuv1[3], uint8_t *yuv2[3],
+                               const int w, const int h, const int len, int threshold) {
   unsigned int i=0;
   for(i=0; i < len; i++) {
     if (yuv1[0][i] > threshold) {
@@ -64,8 +64,8 @@ static void mask_replace_black(uint8_t *yuv1[3], uint8_t *yuv2[3], int w, int h,
   }
 }
 
-static void mask_replace_black_fill(uint8_t *yuv1[3], uint8_t *yuv2[3], int w, int h, int threshold) {
-  unsigned int len = w * h;
+static void mask_replace_black_fill(uint8_t *yuv1[3], uint8_t *yuv2[3],
+                                    const int w, const int h, const int len, int threshold) {
   unsigned int i=0;
   for(i=0; i < len; i++) {
     if (yuv1[0][i] > threshold) {
@@ -81,8 +81,8 @@ static void mask_replace_black_fill(uint8_t *yuv1[3], uint8_t *yuv2[3], int w, i
   }
 }
 
-static void mask_replace_white_fill(uint8_t *yuv1[3], uint8_t *yuv2[3], int w, int h, int threshold) {
-  unsigned int len = w * h;
+static void mask_replace_white_fill(uint8_t *yuv1[3], uint8_t *yuv2[3],
+                                    const int w, const int h, const int len, int threshold) {
   unsigned int i=0;
   for(i=0; i < len; i++) {
     if (yuv1[0][i] > threshold) {
@@ -98,15 +98,17 @@ static void mask_replace_white_fill(uint8_t *yuv1[3], uint8_t *yuv2[3], int w, i
   }
 }
 
-void simplemask_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int threshold, int invert)
+void simplemask_apply( VJFrame *frame, VJFrame *frame2, int threshold, int invert)
 {
+	const int width = frame->width;
+	const int height = frame->height;
+	const int len = frame->len;
 	switch(invert) {
-		case 0 : mask_replace_black(frame->data,frame2->data,width,height,threshold);
+		case 0 : mask_replace_black(frame->data,frame2->data,width,height,len,threshold);
 			break;
-		case 1 : mask_replace_black_fill(frame->data,frame2->data,width,height,threshold);
+		case 1 : mask_replace_black_fill(frame->data,frame2->data,width,height,len,threshold);
 			break;
-		case 2: mask_replace_white_fill(frame->data,frame2->data,width,height,threshold);
+		case 2: mask_replace_white_fill(frame->data,frame2->data,width,height,len,threshold);
 			break;
     	}  
 }
