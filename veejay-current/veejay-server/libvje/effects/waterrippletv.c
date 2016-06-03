@@ -355,7 +355,7 @@ void	waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, 
 
 			dy = y + 1 + (v+(int)vp[map_w*2+1])/2;
 			if(dy<0) dy=0;
-			if(dy>=hi) dy=h-1;
+			if(dy>=hi) dy=hi-1;
 			dest[wi] = src[dy*wi+i];
 
 			dest[wi+1] = src[dy*wi+dx];

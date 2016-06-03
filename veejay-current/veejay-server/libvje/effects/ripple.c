@@ -47,7 +47,6 @@ static double *ripple_cos;
 static int ripple_waves = 0;
 static int ripple_ampli = 0;
 static int ripple_attn = 0;
-static int have_calc_data = 0;
 
 vj_effect *ripple_init(int width, int height)
 {
@@ -91,8 +90,8 @@ int	ripple_malloc(int width, int height)
     if(!ripple_cos) return 0;
     
     for(i=0; i < RIPPLE_DEGREES; i++) {
- 	ripple_sin[i] = sin ((M_PI * i) / RIPPLE_VAL);
-	ripple_cos[i] = sin ((M_PI * i) / RIPPLE_VAL);
+ 		fast_sin(ripple_sin[i], (M_PI * i) / RIPPLE_VAL);
+		fast_sin(ripple_cos[i], (M_PI * i) / RIPPLE_VAL);
     }
 
     return 1;
@@ -112,7 +111,6 @@ void ripple_free() {
 	ripple_sin = NULL;
 	ripple_cos = NULL;
 	ripple_table = NULL;
-	have_calc_data = 0;
 }
 
 
@@ -134,27 +132,22 @@ void ripple_apply(VJFrame *frame, int _w, int _a , int _att ) {
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-	maxradius = sqrt(wp2 * wp2 + hp2 * hp2);
+	fast_sqrt(maxradius, wp2 * wp2 + hp2 * hp2);
 	frequency = 360.0 * waves / maxradius;
 	amplitude = maxradius / ampli;
 
+	int have_calc_data=0;
 
-	if(ripple_waves != _w) {
-		ripple_waves = _w;	
-		have_calc_data=0;
-	}
-	if(ripple_ampli != _a) {
+	if(ripple_waves != _w || ripple_ampli != _a || ripple_attn != _att) {
+		ripple_waves = _w;
 		ripple_ampli = _a;
-		have_calc_data=0;
-	}
-	if(ripple_attn != _att) {
-		ripple_attn = _att;
-		have_calc_data = 0;
+		ripple_attn = _att;	
+		have_calc_data=1;
 	}
 	
 	int strides[4] = { len, len, len,0 };
 	vj_frame_copy( frame->data, ripple_data , strides );
-	if (have_calc_data==0) {
+	if (have_calc_data) {
   	   for(y=0; y < height-1;y++) {
 		for (x=0; x < width; x++) {
 		  dx = x - wp2;
@@ -164,7 +157,7 @@ void ripple_apply(VJFrame *frame, int _w, int _a , int _att ) {
 
 		  if (angle < 0) angle+=360.0;
 
-		  r = sqrt( dx * dx + dy * dy);
+		  fast_sqrt( r, dx * dx + dy * dy);
 
 		  z = amplitude/ pow(r,attenuation) * ripple_sin[ ((int)(frequency * r)) % 360 ];
 

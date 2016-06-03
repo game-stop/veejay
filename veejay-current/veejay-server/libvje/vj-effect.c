@@ -650,7 +650,7 @@ void vj_effect_initialize(int width, int height, int full_range)
     vj_effects[VJ_IMAGE_EFFECT_MOTIONBLUR]			= motionblur_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_SINOIDS]				= sinoids_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_AVERAGE]				= average_init(width,height);
-    vj_effects[VJ_IMAGE_EFFECT_RIPPLETV]			= ripple_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_RIPPLE]				= ripple_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_BATHROOM]			= bathroom_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_SLICE]				= slice_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_ZOOM]				= zoom_init(width, height);
