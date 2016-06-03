@@ -66,7 +66,7 @@ vj_effect *isolate_init(int w, int h)
 
 void isolate_apply( VJFrame *frame, int i_angle, int r, int g, int b, int opacity)
 {
-	const uint32_t len = frame->len;
+	const int len = frame->len;
 	uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
     int cb, cr;

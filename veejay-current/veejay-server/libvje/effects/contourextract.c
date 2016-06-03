@@ -211,8 +211,8 @@ void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
 	unsigned int i;
 	const int width = frame->width;
 	const int height = frame->height;
-	const uint32_t len = frame->len;
-	const uint32_t uv_len = frame->uv_len;
+	const int len = frame->len;
+	const int uv_len = frame->uv_len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

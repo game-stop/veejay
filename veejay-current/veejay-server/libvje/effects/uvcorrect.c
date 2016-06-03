@@ -131,7 +131,7 @@ void uvcorrect_apply(VJFrame *frame, int width, int height, int angle, int urot_
 	const uint8_t centerV = vrot_center;
 	const float Ufactor = (float)iuFactor * 0.1;
 	const float Vfactor = (float)ivFactor * 0.1;
-	const uint32_t uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	const uint8_t uvmin = (uint8_t) uv_min;
 	const uint8_t uvmax = (uint8_t) uv_max;
 	uint8_t *Uplane = frame->data[1];

@@ -102,7 +102,7 @@ void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
 {
 	const int width = frame->width;
 	const int height = frame->height;
-	const uint32_t len = frame->len;
+	const int len = frame->len;
 
 	if( x1 != perspective_[0] || y1 != perspective_[1] || x2 != perspective_[2] || y2 != perspective_[3] ||
 			x3 != perspective_[4] || y3 != perspective_[5] || x4 != perspective_[6] || y4 != perspective_[7] || reverse != perspective_[8] )

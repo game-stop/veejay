@@ -80,7 +80,7 @@ void crosspixel_apply(VJFrame *frame, int t,int v) {
 
 	const int width = frame->width;
 	const int height = frame->height;
-	const uint32_t len = frame->len;
+	const int len = frame->len;
 	const int uv_len = frame->uv_len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

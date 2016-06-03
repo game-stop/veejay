@@ -99,7 +99,7 @@ static void bathroom_verti_apply(VJFrame *frame, int val, int x0, int x1)
 {
 	const int width = frame->width;
 	const int height = frame->height;
-    const uint32_t len = frame->len;
+    const int len = frame->len;
     unsigned int y_val = val;
     unsigned int x,y;
     uint8_t *Y = frame->data[0];
@@ -127,7 +127,7 @@ static void	bathroom_alpha_verti_apply(VJFrame *frame, int val, int x0, int x1)
 {
 	const int width = frame->width;
 	const int height = frame->height;
-    const uint32_t len = frame->len;
+    const int len = frame->len;
     unsigned int y_val = val;
     unsigned int x,y;
     uint8_t *Y = frame->data[0];
@@ -158,7 +158,7 @@ static void bathroom_hori_apply(VJFrame *frame, int val, int x0, int x1)
 {
 	const int width = frame->width;
 	const int height = frame->height;
-    const uint32_t len = frame->len;
+    const int len = frame->len;
     unsigned int y_val = val;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
@@ -185,7 +185,7 @@ static void bathroom_alpha_hori_apply(VJFrame *frame, int val, int x0, int x1)
 {
 	const int width = frame->width;
 	const int height = frame->height;
-    const uint32_t len = frame->len;
+    const int len = frame->len;
     unsigned int y_val = val;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];

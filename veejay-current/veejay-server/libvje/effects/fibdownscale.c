@@ -89,8 +89,8 @@ static void fibdownscale1_apply(VJFrame *frame, VJFrame *frame2)
 static void fibrectangle1_apply(VJFrame *frame, VJFrame *frame2)
 {
 	unsigned int i, f1;
-	const uint32_t len = frame->len>>1;
-	const uint32_t uv_len = (frame->ssm ? frame->len: frame->uv_len)>>1;
+	const int len = frame->len>>1;
+	const int uv_len = (frame->ssm ? frame->len: frame->uv_len)>>1;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
