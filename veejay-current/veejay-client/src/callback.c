@@ -3674,7 +3674,11 @@ on_button_samplebank_prev_clicked      (GtkButton       *button,
                                         gpointer         user_data)
 {
 	GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
-	gtk_notebook_prev_page(samplebank);        
+	gtk_notebook_prev_page(samplebank);
+	//update the bank spin widget
+	gint page = gtk_notebook_get_current_page (samplebank);
+	if (page != -1)
+		update_spin_value("spin_samplebank_select", page);
 }
 
 
@@ -3683,7 +3687,11 @@ on_button_samplebank_next_clicked      (GtkButton       *button,
                                         gpointer         user_data)
 {
 	GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
-    	gtk_notebook_next_page(samplebank);        
+	gtk_notebook_next_page(samplebank);
+	//update the bank spin widget
+	gint page = gtk_notebook_get_current_page (samplebank);
+	if (page != -1)
+		update_spin_value("spin_samplebank_select", page);
 }
 
 void
