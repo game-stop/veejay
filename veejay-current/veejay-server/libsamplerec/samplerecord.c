@@ -28,8 +28,6 @@
 #include <libel/vj-avcodec.h>
 #include <libvjmem/vjmem.h>
 void	sample_reset_encoder(int sample_id);
-extern int   sufficient_space(int max_size, int nframes); 
-
 
 int sample_record_init(int len)
 {
@@ -179,15 +177,6 @@ static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, i
 	si->encoder_width = frame->width;
 	si->encoder_height =  frame->height;
 
-
-	if( sufficient_space( si->encoder_max_size, nframes ) == 0 )
-	{
-		vj_avcodec_close_encoder( si->encoder );
-		si->encoder = NULL;
-		si->encoder_active = 0;
-		return -1;
-	}
-
 	if( cformat != 'S' ) {
 
 		si->encoder_file = (void*)lav_open_output_file(si->encoder_destination,cformat,
@@ -285,7 +274,7 @@ int sample_record_frame(int s1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
    if(buf_len <= 0) 
    {
 
-  	veejay_msg(VEEJAY_MSG_ERROR, "Cannot encode frame");
+  	veejay_msg(VEEJAY_MSG_ERROR, "Unable to encode frame");
 	return -1;
    }
 //	si->rec_total_bytes += buf_len;
@@ -296,9 +285,12 @@ int sample_record_frame(int s1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
 
     if(lav_write_frame( (lav_file_t*) si->encoder_file,vj_avcodec_get_buf(si->encoder),buf_len,1))
 	{
-			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up: '%s' (%d bytes buffer)", lav_strerror(),
-					buf_len);
-			return 1;
+			veejay_msg(VEEJAY_MSG_ERROR, "%s", lav_strerror());
+			if( si->encoder_frames_recorded > 1 ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "Recorded only %ld frames", si->encoder_frames_recorded );
+				return 1;
+			}
+			return -1;
 	}
 
 	if(audio_size > 0)

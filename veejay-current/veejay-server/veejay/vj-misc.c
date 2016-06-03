@@ -452,10 +452,6 @@ void	vj_get_yuv444_template(VJFrame *src, int w, int h)
 	src->data[1] = NULL;
 	src->data[2] = NULL;
 }
-int	available_diskspace(void)
-{
-	return 1;
-}
 
 static int	possible_veejay_file( const char *file )
 {
@@ -505,11 +501,6 @@ int	verify_working_dir()
 }
 
 
-int	sufficient_space(int max_size, int nframes)
-{
-//bogus
-	return available_diskspace();
-}
 #define ZEROPAD	1		/* pad with zero */
 #define SIGN	2		/* unsigned/signed long */
 #define PLUS	4		/* show plus */

@@ -37,9 +37,7 @@ filelist_t *find_media_files( veejay_t *info );
 #else
 #define VEEJAY_FILE_LIMIT LLONG_MAX
 #endif
-int   available_diskspace(void);
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
-int	sufficient_space(int max_size, int nframes);
 #ifdef ARCH_X86
 int	veejay_sprintf( char *s, size_t size, const char *format, ... );
 #define	veejay_snprintf	veejay_sprintf

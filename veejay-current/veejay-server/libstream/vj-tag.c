@@ -76,7 +76,6 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 
 extern int  frei0r_get_param_count( void *port);
 extern void dummy_rgb_apply(VJFrame *frame, int r, int g, int b);
-extern int   sufficient_space(int max_size, int nframes);
 extern char *UTF8toLAT1(unsigned char *in);
 extern int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *data, int len, int uv_len );
 
@@ -1749,14 +1748,6 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		tag->encoder_frames_recorded = 0;
 	}
 
-	if( sufficient_space( tag->encoder_max_size, nframes ) == 0 )
-	{
-		vj_avcodec_close_encoder(tag->encoder );
-		tag->encoder_active = 0;
-		tag->encoder = NULL;
-		return 0;
-	}
-
 	if( cformat != 'S' ) {
 		tag->encoder_file = lav_open_output_file(
 			tag->encoder_destination,
@@ -2952,15 +2943,19 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
 
    buf_len =	vj_avcodec_encode_frame( tag->encoder, nframe, tag->encoder_format, buffer, vj_avcodec_get_buf(tag->encoder), tag->encoder_max_size, pixel_format);
    if(buf_len <= 0 ) {
-	veejay_msg(VEEJAY_MSG_ERROR, "unable to encode frame" );
+	veejay_msg(VEEJAY_MSG_ERROR, "Unable to encode frame" ); 
    	return -1;
    }
 
    	if(tag->encoder_file ) {
 		if(lav_write_frame(tag->encoder_file, vj_avcodec_get_buf(tag->encoder), buf_len,1))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up :[%s]", lav_strerror());
-				return -1;
+			veejay_msg(VEEJAY_MSG_ERROR, "%s", lav_strerror());
+			if( tag->encoder_frames_recorded > 1 ) {
+				veejay_msg(VEEJAY_MSG_WARNING, "Recorded only %ld frames", tag->encoder_frames_recorded);
+				return 1; //@ auto commit sample even if it did not write all frames
+			}
+			return -1;
 		}
 	
 		if(audio_size > 0)

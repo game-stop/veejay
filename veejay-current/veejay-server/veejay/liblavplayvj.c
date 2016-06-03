@@ -1716,8 +1716,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	editlist *el = NULL;
 	video_playback_setup *settings = info->settings;
 
-	available_diskspace();
-
 	int id=0;
 
 	if(info->video_out<0)

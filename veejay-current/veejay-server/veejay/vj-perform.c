@@ -2832,8 +2832,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample, int type) {
 	frame[2] = primary_buffer[0]->Cr;
 	frame[3] = NULL;
 
-	if( available_diskspace() )
-		res = vj_perform_render_sample_frame(info, frame, sample,type);
+	res = vj_perform_render_sample_frame(info, frame, sample,type);
 
 	if( res == 2)
 	{
@@ -2902,8 +2901,7 @@ void vj_perform_record_offline_tag_frame(veejay_t *info)
 	info->effect_frame1->data[2] = frame[2];
 	info->effect_frame1->data[3] = frame[3];
 
-	if(available_diskspace())
-		res = vj_perform_render_offline_tag_frame(info, frame);
+	res = vj_perform_render_offline_tag_frame(info, frame);
 
 	if( res == 2)
 	{
@@ -2963,9 +2961,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 	info->effect_frame1->data[2] = frame[2];
 	info->effect_frame1->data[3] = frame[3];
 
-
-	if(available_diskspace())
-		res = vj_perform_render_tag_frame(info, frame);
+	res = vj_perform_render_tag_frame(info, frame);
 
 	if( res == 2)
 	{
