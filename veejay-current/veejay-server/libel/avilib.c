@@ -2103,7 +2103,6 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
   }
 
   if (AVI_errno) {
-	  free(AVI);
       return 0;
   }
   
@@ -2112,7 +2111,6 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
   if(!AVI_errno)
   {
 	if( AVI_mmap_file(AVI,mmap_size) == 0 ) {
-		free(AVI);
 		return 0;
 	}
   }
