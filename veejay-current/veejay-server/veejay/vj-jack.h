@@ -57,5 +57,7 @@ int vj_jack_initialize();
 
 int  vj_jack_rate();
 
+void	vj_jack_reset();
+
 #endif
 #endif

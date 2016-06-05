@@ -1712,11 +1712,11 @@ int sample_set_framedups(int s1, int n) {
 	return 1;
 }
 
-
 int sample_set_framedup(int s1, int n) {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return -1;
 	sample->dup = n;
+	sample->dups = 0;
 	return 1;
 }
 

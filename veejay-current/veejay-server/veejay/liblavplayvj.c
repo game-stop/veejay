@@ -229,8 +229,9 @@ int veejay_set_framedup(veejay_t *info, int n)
 			info->sfd = n;
 		break;
 		case VJ_PLAYBACK_MODE_SAMPLE:
-			sample_set_framedup(info->uc->sample_id,n);
-			sample_set_framedups(info->uc->sample_id,0);
+			if( sample_get_framedup( info->uc->sample_id ) != n ) {
+				sample_set_framedup(info->uc->sample_id,n);
+			}
 		break;
 
 		default:
@@ -2403,7 +2404,6 @@ static void veejay_playback_cycle(veejay_t * info)
 			{
 				settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
 			}
-
 
 			if( settings->state != LAVPLAY_STATE_PAUSED )
 			{

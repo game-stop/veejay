@@ -264,6 +264,9 @@ DEBUGSTATE(enum status_enum state)
 #define SAMPLE_MAX_16BIT  32767.0f
 #define SAMPLE_MAX_8BIT   255.0f
 
+static const float BIT16_MULT = 1.0f / SAMPLE_MAX_16BIT;
+static const float BIT8_MULT = 1.0f / SAMPLE_MAX_8BIT;
+
 /* floating point volume routine */
 /* volume should be a value between 0.0 and 1.0 */
 static void
@@ -317,7 +320,8 @@ sample_move_short_float(sample_t * dst, short *src, unsigned long nsamples)
   /* ALERT: signed sign-extension portability !!! */
   unsigned long i;
   for(i = 0; i < nsamples; i++)
-    dst[i] = (sample_t) (src[i]) / SAMPLE_MAX_16BIT;
+		dst[i] = (sample_t) (src[i] * BIT16_MULT);
+      //dst[i] = (sample_t) (src[i]) / SAMPLE_MAX_16BIT;
 }
 
 /* convert from floating point to 16 bit */
@@ -337,7 +341,8 @@ sample_move_char_float(sample_t * dst, unsigned char *src, unsigned long nsample
   /* ALERT: signed sign-extension portability !!! */
   unsigned long i;
   for(i = 0; i < nsamples; i++)
-    dst[i] = (sample_t) (src[i]) / SAMPLE_MAX_8BIT;
+		dst[i] = (sample_t) (src[i] * BIT8_MULT);
+					//dst[i] = (sample_t) (src[i]) / SAMPLE_MAX_8BIT;
 }
 
 /* convert from floating point to 8 bit */

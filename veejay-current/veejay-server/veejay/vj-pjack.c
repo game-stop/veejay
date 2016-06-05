@@ -190,4 +190,9 @@ long	vj_jack_get_status(long int *sec, long int *usec)
 {
 	return JACK_OutputStatus( driver, sec, usec);
 }
+
+void	vj_jack_reset()
+{
+	JACK_ResetBuffer( driver );
+}
 #endif
