@@ -1,7 +1,7 @@
 # Process with automake to produce Makefile.in
 
 SUBDIRS = thirdparty
-SUBDIRS += libvjmsg libvjmem libqrwrap 
+SUBDIRS += libvjmsg libvjmem libvjxml libqrwrap
 SUBDIRS += libvevo libvje libplugger libsample libvjnet libsubsample libyuv libel libstream libsamplerec
 SUBDIRS += veejay 
 SUBDIRS += livido-plugins

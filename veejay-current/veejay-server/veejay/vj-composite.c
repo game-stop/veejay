@@ -35,10 +35,6 @@
 #include <veejay/vj-misc.h>
 #include <libavutil/pixfmt.h>
 #include <libsubsample/subsample.h>
-#ifdef HAVE_XML2
-#include <libxml/xmlmemory.h>
-#include <libxml/parser.h>
-#endif
 #include <veejay/vj-split.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>

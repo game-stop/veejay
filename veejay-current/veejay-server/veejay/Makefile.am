@@ -22,6 +22,7 @@ AM_CPPFLAGS += -I /usr/X11R6/include \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
 		-I$(top_srcdir)/libqrwrap \
+		-I$(top_srcdir)/libvjxml \
 		$(FFMPEG_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) $(MJPEGTOOLS_CFLAGS) $(GLIB_CFLAGS) \
 		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) $(LIBLO_CFLAGS) \
 		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) $(LIBUNWIND_CFLAGS) $(PTHREAD_CFLAGS) $(LIBQRENCODE_CFLAGS)
@@ -60,6 +61,7 @@ libveejay_la_LIBADD = \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libqrwrap -lqrwrap \
+			-L$(top_builddir)/libvjxml -lvjxml \
 			-L$(top_builddir)/libvevo -lvevo
 
 if !HAVE_MJPEGTOOLS

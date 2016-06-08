@@ -45,7 +45,7 @@
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #endif
-
+#include <libvjxml/vj-xml.h>
 extern	int	vj_tag_size();
 
 #ifdef HAVE_FREETYPE
@@ -526,34 +526,6 @@ int	vj_font_load_srt( void *font, const char *filename )
 	
 	return 1;
 }
-static   int    get_xml_int( xmlDocPtr doc, xmlNodePtr node )
-{
-        xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
-        char *ch = UTF8toLAT1( tmp );
-        int res = 0;
-        if( ch )
-        {
-                res = atoi( ch );
-                free(ch);
-        }
-        if(tmp)
-                free(tmp);
-        return res;
-}
-
-static   void    get_xml_3int( xmlDocPtr doc, xmlNodePtr node, int *first , int *second, int *third )
-{
-        xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
-        char *ch = UTF8toLAT1( tmp );
-        if( ch )
-        {
-                sscanf( ch, "%d %d %d" , first, second, third );
-                free(ch);
-        }
-        if(tmp)
-                free(tmp);
-}
-
 
 void	vj_font_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *font )
 {
@@ -687,7 +659,6 @@ int     vj_font_save_srt( void *font , const char *filename )
 	char **items = vevo_list_properties ( ff->dictionary );
 	if(!items)
 	{
-		veejay_msg(0, "No subtitle sequences present, nothing to save");
 		return 0;
 	}
 	int i;

@@ -37,6 +37,7 @@
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #endif
+#include <libvjxml/vj-xml.h>
 /* veejay server stores keyframes 
  *
  *
@@ -357,17 +358,10 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 			return 0;
 	}
 
-
-	unsigned char xmlbuf[100];
-
-	snprintf((char*)xmlbuf, 100,"%d", start );
-	xmlNewChild(node, NULL, (const xmlChar*) k_s, xmlbuf );
-	snprintf((char*)xmlbuf, 100,"%d", end );
-	xmlNewChild(node, NULL, (const xmlChar*) k_e, xmlbuf );
-	snprintf((char*)xmlbuf, 100,"%d", type );
-	xmlNewChild(node, NULL, (const xmlChar*) k_t, xmlbuf );
-	snprintf((char*)xmlbuf, 100,"%d", status);
-	xmlNewChild(node, NULL, (const xmlChar*) k_x, xmlbuf );
+	put_xml_int( node, k_s, start );
+	put_xml_int( node, k_e, end );
+	put_xml_int( node, k_t, type );
+	put_xml_int( node, k_x, status );
 
 	for( i = start; i < end; i ++ )
 	{
@@ -376,8 +370,9 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 
 		if(vevo_property_get(port, key, 0, &value )==VEVO_NO_ERROR)
 		{
+			char xmlbuf[128];
 			sprintf((char*)xmlbuf, "%d %d", parameter_id,value );
-			xmlNewChild(node, NULL, (const xmlChar*) "value", xmlbuf);	
+			put_xml_str( node, "value", xmlbuf );
 		}
 		free(key);
 	}
@@ -388,34 +383,6 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 	free( k_x);
 
 	return 1;
-}
-static	 int	get_xml_int( xmlDocPtr doc, xmlNodePtr node )
-{
-	xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
-	char *ch = UTF8toLAT1( tmp );
-	int res = 0;
-	if( ch )
-	{
-		res = atoi( ch );
-		free(ch);
-	}
-	if(tmp)
-		free(tmp);
-	return res;
-}
-static	 int	get_xml_2int( xmlDocPtr doc, xmlNodePtr node, int *second )
-{
-	xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
-	char *ch = UTF8toLAT1( tmp );
-	int res = 0;
-	if( ch )
-	{
-		sscanf( ch, "%d %d", &res, second );
-		free(ch);
-	}
-	if(tmp)
-		free(tmp);
-	return res;
 }
 
 int		keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port )
@@ -470,7 +437,6 @@ int		keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port )
 
 	return nodes;
 }
-
 
 int	get_keyframe_value(void *port, int n_frame, int parameter_id, int *result )
 {

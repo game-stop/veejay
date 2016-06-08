@@ -65,6 +65,7 @@
 #include <veejay/vj-share.h>
 #include <veejay/vevo.h>
 #include <veejay/vj-misc.h>
+#include <libvjxml/vj-xml.h>
 /* Highest possible SDL Key identifier */
 #define MAX_SDL_KEY	(3 * SDLK_LAST) + 1  
 #define MSG_MIN_LEN	  4 /* stripped ';' */
@@ -1730,82 +1731,33 @@ void vj_event_none(void *ptr, const char format[], va_list ap)
 }
 
 #ifdef HAVE_XML2
-static	int	get_cstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, char *dst )
+static	void	get_cstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, char *dst, size_t dst_len )
 {
-	xmlChar *tmp = NULL;
 	char *t = NULL;
 	if(! xmlStrcmp( cur->name, what ))
 	{
-		tmp = xmlNodeListGetString( doc, cur->xmlChildrenNode,1 );
-		t   = UTF8toLAT1(tmp);
-		if(!t)
-			return 0;
-
-		veejay_strncpy( dst, t, strlen(t) );	
+		t = get_xml_str( doc, cur );
+		veejay_strncpy( dst, t, dst_len );	
 		free(t);
-		xmlFree(tmp);
-		return 1;
 	}
-	return 0;
 }
-static	int	get_fstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, float *dst )
+
+static	void	get_fstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, float *dst )
 {
-	xmlChar *tmp = NULL;
-	char *t = NULL;
-	float tmp_f = 0;
-	int n = 0;
+	if(!xmlStrcmp( cur->name, what ))
+	{
+		*dst = get_xml_float( doc, cur );
+	}
+}
+
+static	void	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *dst )
+{
 	if(! xmlStrcmp( cur->name, what ))
 	{
-		tmp = xmlNodeListGetString( doc, cur->xmlChildrenNode,1 );
-		t   = UTF8toLAT1(tmp);
-		if(!t)
-			return 0;
-
-		n = sscanf( t, "%f", &tmp_f );
-		free(t);
-		xmlFree(tmp);
-
-		if( n )
-			*dst = tmp_f;
-		else
-			return 0;
-
-		return 1;
+		*dst = get_xml_int( doc, cur );
 	}
-	return 0;
 }
 
-static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *dst )
-{
-	xmlChar *tmp = NULL;
-	char *t = NULL;
-	int tmp_i = 0;
-	int n = 0;
-	if(! xmlStrcmp( cur->name, what ))
-	{
-		tmp = xmlNodeListGetString( doc, cur->xmlChildrenNode,1 );
-		t   = UTF8toLAT1(tmp);
-		if(!t)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Input not in UTF8 format!");
-			return 0;
-		}
-
-		n = sscanf( t, "%d", &tmp_i );
-		free(t);
-		xmlFree(tmp);
-
-		if( n )
-			*dst = tmp_i;
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot convert value '%s'to number", t);
-			return 0;
-		}
-		return 1;
-	}
-	return 0;
-}
 #define XML_CONFIG_STREAM		"stream"
 #define XML_CONFIG_STREAM_SOURCE	"source"
 #define XML_CONFIG_STREAM_FILENAME	"filename"
@@ -1854,61 +1806,35 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 #define XML_CONFIG_SCALERFLAGS		"scaler_flags"
 #define XML_CONFIG_SETTING_OSD		"use_osd"
 
-#define __xml_cint( buf, var , node, name )\
-{\
-sprintf(buf,"%d", var);\
-xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
-}
-
-#define __xml_cfloat( buf, var , node, name )\
-{\
-sprintf(buf,"%f", var);\
-xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
-}
-
-#define __xml_cstr( buf, var , node, name )\
-{\
-if(var != NULL){\
-veejay_strncpy(buf,var,strlen(var));\
-xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );}\
-}
-
 static void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 {
-	char *buf = (char*) vj_calloc(sizeof(char) * 4000 );
-	int c = veejay_is_colored();
-
-	__xml_cint( buf, v->video_out,node,		XML_CONFIG_SETTING_PRIOUTPUT );
-	__xml_cint( buf, v->bes_width,node,	XML_CONFIG_SETTING_SDLSIZEX );
-	__xml_cint( buf, v->bes_height,node,	XML_CONFIG_SETTING_SDLSIZEY );
-	__xml_cint( buf, v->uc->geox,node,		XML_CONFIG_SETTING_GEOX );
-	__xml_cint( buf, v->uc->geoy,node,		XML_CONFIG_SETTING_GEOY );
-	__xml_cint( buf, v->video_output_width,node, XML_CONFIG_SETTING_WIDTH );
-	__xml_cint( buf, v->video_output_height,node, XML_CONFIG_SETTING_HEIGHT );
-
-	__xml_cint( buf, v->audio,node,		XML_CONFIG_SETTING_AUDIO );
-	__xml_cint( buf, v->sync_correction,node,	XML_CONFIG_SETTING_SYNC );
-
-	__xml_cint( buf, v->uc->use_timer,node,		XML_CONFIG_SETTING_TIMER );
-	__xml_cint( buf, v->no_bezerk,node,		XML_CONFIG_SETTING_BEZERK );
-	__xml_cint( buf, c,node, XML_CONFIG_SETTING_COLOR );
-	__xml_cint( buf, v->pixel_format,node,	XML_CONFIG_SETTING_YCBCR );
-	__xml_cfloat( buf,v->dummy->fps,node,	XML_CONFIG_SETTING_DFPS ); 
-	__xml_cint( buf, v->dummy->norm,node,	XML_CONFIG_SETTING_NORM );
-	__xml_cint( buf, v->dummy->active,node,	XML_CONFIG_SETTING_DUMMY );
-	__xml_cint( buf, v->settings->use_mcast,node, XML_CONFIG_SETTING_MCASTOSC );
-	__xml_cint( buf, v->settings->use_vims_mcast,node, XML_CONFIG_SETTING_MCASTVIMS );
-	__xml_cint( buf, v->settings->zoom ,node,	XML_CONFIG_SETTING_SCALE );
-	__xml_cfloat( buf, v->settings->output_fps, node, XML_CONFIG_SETTING_FPS );
-	__xml_cint( buf, v->uc->playback_mode, node, XML_CONFIG_SETTING_PMODE );
-	__xml_cint( buf, v->uc->sample_id, node, XML_CONFIG_SETTING_PID );
-	__xml_cint( buf, v->settings->fxdepth, node, XML_CONFIG_BACKFX);
-	__xml_cint( buf, v->settings->composite, node, XML_CONFIG_COMPOSITEMODE );
-	__xml_cint( buf, v->settings->sws_templ.flags ,node, XML_CONFIG_SCALERFLAGS );
-	__xml_cint( buf, v->uc->file_as_sample, node, XML_CONFIG_SETTING_FILEASSAMPLE );
-	__xml_cint( buf, v->use_osd, node, XML_CONFIG_SETTING_OSD );
-
-	free(buf);
+	put_xml_int( node, XML_CONFIG_SETTING_PRIOUTPUT, v->video_out );
+	put_xml_int( node, XML_CONFIG_SETTING_SDLSIZEX, v->bes_width );
+	put_xml_int( node, XML_CONFIG_SETTING_SDLSIZEY, v->bes_height );
+	put_xml_int( node, XML_CONFIG_SETTING_GEOX, v->uc->geox );
+	put_xml_int( node, XML_CONFIG_SETTING_GEOY, v->uc->geoy );
+	put_xml_int( node, XML_CONFIG_SETTING_WIDTH, v->video_output_width );
+	put_xml_int( node, XML_CONFIG_SETTING_HEIGHT, v->video_output_height );
+	put_xml_int( node, XML_CONFIG_SETTING_AUDIO, v->audio );
+	put_xml_int( node, XML_CONFIG_SETTING_SYNC, v->sync_correction );
+	put_xml_int( node, XML_CONFIG_SETTING_TIMER, v->uc->use_timer );
+	put_xml_int( node, XML_CONFIG_SETTING_BEZERK, v->no_bezerk );
+	put_xml_int( node, XML_CONFIG_SETTING_COLOR, veejay_is_colored() );
+	put_xml_int( node, XML_CONFIG_SETTING_YCBCR, v->pixel_format );
+	put_xml_float( node, XML_CONFIG_SETTING_DFPS, v->dummy->fps );
+	put_xml_int( node, XML_CONFIG_SETTING_NORM, v->dummy->norm );
+	put_xml_int( node, XML_CONFIG_SETTING_DUMMY, v->dummy->active );
+	put_xml_int( node, XML_CONFIG_SETTING_MCASTOSC, v->settings->use_mcast );
+	put_xml_int( node, XML_CONFIG_SETTING_MCASTVIMS, v->settings->use_vims_mcast );
+	put_xml_int( node, XML_CONFIG_SETTING_SCALE, v->settings->zoom );
+	put_xml_float( node, XML_CONFIG_SETTING_FPS, v->settings->output_fps );
+	put_xml_int( node, XML_CONFIG_SETTING_PMODE, v->uc->playback_mode );
+	put_xml_int( node, XML_CONFIG_SETTING_PID, v->uc->sample_id );
+	put_xml_int( node, XML_CONFIG_BACKFX, v->settings->fxdepth );
+	put_xml_int( node, XML_CONFIG_COMPOSITEMODE, v->settings->composite );
+	put_xml_int( node, XML_CONFIG_SCALERFLAGS, v->settings->sws_templ.flags );
+	put_xml_int( node, XML_CONFIG_SETTING_FILEASSAMPLE, v->uc->file_as_sample );
+	put_xml_int( node, XML_CONFIG_SETTING_OSD, v->use_osd );
 }
 
 static void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
@@ -1918,12 +1844,11 @@ static void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cu
 
 	int c = 0;
 	char sample_list[1024];
-	veejay_memset(sample_list,0,sizeof(sample_list));
 	// FIXME editlist loading ; veejay restart
 
 	while( cur != NULL )
 	{
-		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SAMPLELIST, sample_list );
+		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SAMPLELIST, sample_list,sizeof(sample_list) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PORTNUM, &(v->uc->port) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PRIOUTPUT, &(v->video_out) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SDLSIZEX, &(v->bes_width) );
@@ -1939,7 +1864,7 @@ static void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cu
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_WIDTH, &(v->video_output_width) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_HEIGHT,&(v->video_output_height) );
 		get_fstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_DFPS, &(v->dummy->fps ) );
-		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_NORM, &(v->dummy->norm) );
+//		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_NORM, &(v->dummy->norm) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_DUMMY, &(v->dummy->active) ); 
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_MCASTOSC, &(v->settings->use_mcast) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_MCASTVIMS, &(v->settings->use_vims_mcast) );
@@ -1975,7 +1900,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 	while( cur != NULL )
 	{
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_KEY_VIMS, &event_id );
-		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_KEY_EXTRA, msg );
+		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_KEY_EXTRA, msg,sizeof(msg) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_KEY_SYM, &key );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_KEY_MOD, &key_mod );		
 		cur = cur->next;
@@ -2092,40 +2017,31 @@ int  veejay_load_action_file( void *ptr, char *file_name )
 
 void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 {
-	char buffer[4096];
 	int key_id=0;
 	int key_mod=-1;
 
-	veejay_memset( buffer,0, sizeof(buffer) );
-
 	if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END)
-	{ /* its a Bundle !*/
+	{
+	       	/* its a Bundle !*/
 		vj_msg_bundle *m = vj_event_bundle_get( event_id );
 		if(!m) 
 		{	
 			veejay_msg(VEEJAY_MSG_ERROR, "bundle %d does not exist", event_id);
 			return;
 		}
-		veejay_strncpy(buffer, m->bundle, strlen(m->bundle) );
-		xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_KEY_EXTRA ,
-			(const xmlChar*) buffer);
-			// m->event_id and event_id should be equal
+	
+		put_xml_str( node, XML_CONFIG_KEY_EXTRA, m->bundle );
 	}
 	/* Put all known VIMS so we can detect differences in runtime
            some Events will not exist if SDL, Jack, DV, Video4Linux would be missing */
 
-	sprintf(buffer, "%d", event_id);
-	xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_KEY_VIMS , 
-		(const xmlChar*) buffer);
+	put_xml_int( node, XML_CONFIG_KEY_VIMS, event_id );
+		
 #ifdef HAVE_SDL
 	if(key_id > 0 && key_mod >= 0 )
 	{
-		sprintf(buffer, "%d", key_id );
-		xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_KEY_SYM ,
-			(const xmlChar*) buffer);
-		sprintf(buffer, "%d", key_mod );
-		xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_KEY_MOD ,
-			(const xmlChar*) buffer);
+		put_xml_int( node, XML_CONFIG_KEY_SYM, key_id );
+		put_xml_int( node, XML_CONFIG_KEY_MOD, key_mod );
 	}
 #endif
 }

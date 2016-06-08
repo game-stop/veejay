@@ -219,7 +219,6 @@ static void		viewport_print_matrix( matrix_t *M )
 	veejay_msg(0, "|%f\t%f\t%f", M->m[2][0], M->m[2][1], M->m[2][2] );
 }
 */
-extern unsigned char *UTF8toLAT1(unsigned char*);
 
 /*
  * Bresenham line implementation from Xine

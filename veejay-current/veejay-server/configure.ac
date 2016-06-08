@@ -1149,6 +1149,7 @@ thirdparty/libhash/Makefile
 thirdparty/liblzo/Makefile
 thirdparty/libOSC/Makefile
 thirdparty/libresample/Makefile
+libvjxml/Makefile
 libvjmsg/Makefile
 libvevo/Makefile
 libvjmem/Makefile
