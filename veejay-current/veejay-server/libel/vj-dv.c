@@ -27,6 +27,7 @@
 #include <libvje/vje.h>
 #include <libel/vj-dv.h>
 #include <libel/vj-avcodec.h>
+#include <libel/avcommon.h>
 #include <libyuv/yuvconv.h> 
 #include <string.h>
 
