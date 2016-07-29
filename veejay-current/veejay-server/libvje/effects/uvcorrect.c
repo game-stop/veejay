@@ -36,13 +36,9 @@
   *  along with this program; if not, write to the Free Software
   *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
   */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "uvcorrect.h"
-#include "common.h"
-#include <math.h>
 
 static uint8_t *chrominance = NULL;
 
@@ -121,7 +117,8 @@ static inline void _chrominance_treatment(uint8_t *u,uint8_t *v, const int len)
 
 }
 
-void uvcorrect_apply(VJFrame *frame, int width, int height, int angle, int urot_center, int vrot_center, int iuFactor, int ivFactor, int uv_min, int uv_max )
+void uvcorrect_apply(VJFrame *frame, int angle, int urot_center, int vrot_center,
+                     int iuFactor, int ivFactor, int uv_min, int uv_max )
 {
 	float fU,fV,si,co;
 	uint16_t iU,iV;
