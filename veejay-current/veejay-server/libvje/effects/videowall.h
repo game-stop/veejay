@@ -20,13 +20,8 @@
 
 #ifndef VIDEOWALL_H
 #define VIDEOWALL_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *videowall_init(int w, int h);
 int videowall_malloc(int w, int h);
 void videowall_free(void);
-void videowall_apply( VJFrame *frameA, VJFrame *frameB,int width, int height,
-	 int a, int b , int c, int d);
+void videowall_apply( VJFrame *frameA, VJFrame *frameB, int a, int b , int c, int d);
 #endif
