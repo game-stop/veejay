@@ -20,10 +20,6 @@
 
 #ifndef PORTERDUFF_H
 #define PORTERUDFF_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *porterduff_init();
-void porterduff_apply( VJFrame *frame, VJFrame *frame2, int width,int height,int mode );
+void porterduff_apply( VJFrame *frame, VJFrame *frame2,int mode );
 #endif

@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "porterduff.h"
-#include <stdlib.h>
-#include <math.h>
-#include "common.h"
 
 #ifndef MIN
 #define MIN(a,b) ( (a)>(b) ? (b) : (a) )
@@ -359,9 +356,9 @@ static void divide( uint8_t *A, uint8_t *B, int n_pixels )
 	}
 }
 
-void porterduff_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int mode)
+void porterduff_apply(VJFrame *frame, VJFrame *frame2, int mode)
 {
-	switch( mode )  
+	switch( mode )
 	{
 		case 0:
 			porterduff_dst( frame->data[0],frame2->data[0],frame->len );
