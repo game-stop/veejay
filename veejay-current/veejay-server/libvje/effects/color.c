@@ -19,8 +19,10 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "color.h"
+
 vj_effect *color_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -94,4 +96,3 @@ void color_apply(VJFrame *frame, int opacity_a, int opacity_b, int opacity_c)
 	}
 
 }
-void color_free(){}

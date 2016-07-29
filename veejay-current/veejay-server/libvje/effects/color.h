@@ -20,12 +20,6 @@
 
 #ifndef COLORVAL_H
 #define COLORVAL_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *color_init();
 void color_apply( VJFrame *frame, int a, int b, int c);
-
-void color_free();
 #endif
