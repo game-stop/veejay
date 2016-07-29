@@ -20,13 +20,8 @@
 
 #ifndef BLOB_H
 #define BLOB_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *blob_init(int w, int h);
-void blob_apply( VJFrame *frame, int width, int height, int p0,int p1, int p2, int p3);
+void blob_apply( VJFrame *frame, int p0,int p1, int p2, int p3);
 int	blob_malloc( int w, int h );
 void blob_free(void);
-
 #endif
