@@ -471,7 +471,7 @@ extern void neighbours4_apply( VJFrame *frame, int radius, int brush_size, int l
 extern void neighbours5_apply( VJFrame *frame, int radius, int brush_size, int level);
 extern void cutstop_apply( VJFrame *frame, int treshold, int freq, int cutmode, int holdmode);
 extern void maskstop_apply( VJFrame *frame, int treshold, int freq, int cutmode, int holdmode);
-extern void photoplay_apply(VJFrame *frame, int w, int h, int a, int b, int c);
+extern void photoplay_apply(VJFrame *frame, int a, int b, int c);
 
 extern void videoplay_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int b, int c);
 
