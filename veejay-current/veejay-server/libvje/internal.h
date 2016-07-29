@@ -474,8 +474,7 @@ extern void maskstop_apply( VJFrame *frame, int treshold, int freq, int cutmode,
 extern void photoplay_apply(VJFrame *frame, int a, int b, int c);
 extern void videoplay_apply(VJFrame *frame,VJFrame *B, int a, int b, int c);
 extern void videowall_apply(VJFrame *frame,VJFrame *B, int a, int b, int c, int d);
-
-extern void flare_apply(VJFrame *frame, int w, int h, int type, int threshold, int radius );
+extern void flare_apply(VJFrame *frame, int type, int threshold, int radius );
 
 extern void constantblend_apply(VJFrame *frame , int w, int h, int type, int scale, int y );
 

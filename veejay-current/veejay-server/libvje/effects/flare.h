@@ -20,12 +20,8 @@
 
 #ifndef FLARE_H
 #define FLARE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *flare_init(int w, int h);
 int flare_malloc(int w, int h);
-void flare_apply(VJFrame *A, int width, int height, int type, int theshold,int radius );
+void flare_apply(VJFrame *frame, int type, int theshold,int radius );
 void flare_free();
 #endif
