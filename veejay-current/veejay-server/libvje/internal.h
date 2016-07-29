@@ -475,8 +475,7 @@ extern void photoplay_apply(VJFrame *frame, int a, int b, int c);
 extern void videoplay_apply(VJFrame *frame,VJFrame *B, int a, int b, int c);
 extern void videowall_apply(VJFrame *frame,VJFrame *B, int a, int b, int c, int d);
 extern void flare_apply(VJFrame *frame, int type, int threshold, int radius );
-
-extern void constantblend_apply(VJFrame *frame , int w, int h, int type, int scale, int y );
+extern void constantblend_apply(VJFrame *frame, int type, int scale, int y );
 
 extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
 		   int twidth, int theight, int x1, int y1,

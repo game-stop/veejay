@@ -20,11 +20,6 @@
 
 #ifndef constantblend_H
 #define constantblend_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *constantblend_init(int w, int h);
-void constantblend_apply( VJFrame *frame, int width, int height, int a,
-	int b, int c  );
+void constantblend_apply( VJFrame *frame, int a, int b, int c);
 #endif

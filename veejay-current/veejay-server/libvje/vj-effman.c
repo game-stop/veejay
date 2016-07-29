@@ -83,8 +83,7 @@ static void vj_effman_apply_image_effect(
 
    switch (e) {
 	case VJ_IMAGE_EFFECT_CONSTANTBLEND:
-		constantblend_apply( frames[0], frames[0]->width,
-			frames[0]->height, arg[0], arg[1], arg[2]);
+		constantblend_apply( frames[0], arg[0], arg[1], arg[2]);
 		break;
 	case VJ_IMAGE_EFFECT_FLARE:
 		flare_apply( frames[0],arg[0],arg[1],arg[2] );
