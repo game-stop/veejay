@@ -603,8 +603,8 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	                 arg[4], arg[5], arg[6]);
 	break;
 	case VJ_VIDEO_EFFECT_PICINPIC:
-	picinpic_apply( vj_effects[entry]->user_data,frames[0], frames[1], frames[0]->width, frames[0]->height,
-			arg[0], arg[1], arg[2], arg[3] );
+	picinpic_apply( vj_effects[entry]->user_data,frames[0], frames[1],
+	               arg[0], arg[1], arg[2], arg[3] );
 	break;
 	case VJ_VIDEO_EFFECT_RIPPLETV:
 	water_apply( vj_effects[entry]->user_data,frames[0],frames[1],arg[0],arg[1],arg[2],arg[3],arg[4] );
