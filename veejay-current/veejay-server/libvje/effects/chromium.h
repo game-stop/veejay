@@ -20,10 +20,6 @@
 
 #ifndef CHROMIUM_H
 #define CHROMIUM_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *chromium_init(int w, int h);
-void chromium_apply(VJFrame *frame, int width, int height, int n);
+void chromium_apply(VJFrame *frame, int n);
 #endif

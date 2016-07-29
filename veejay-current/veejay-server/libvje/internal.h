@@ -436,8 +436,7 @@ extern void fisheye_apply(VJFrame *frame, int v, int alpha );
 extern void swirl_apply(VJFrame *frame, int v );
 extern void radialblur_apply(VJFrame *frame, int r, int p, int n);
 extern void binaryoverlay_apply(VJFrame *frame, VJFrame *frame2, int n);
-
-extern void chromium_apply( VJFrame *frame, int w, int h, int n);
+extern void chromium_apply( VJFrame *frame, int n);
 
 extern void chromapalette_apply( VJFrame *frame, int w, int h, int a, int r, int g, int b, int c1, int c2);
 
