@@ -466,7 +466,7 @@ extern void porterduff_apply( VJFrame *frame, VJFrame *frame2, int mode);
 extern void ghost_apply(VJFrame *frame, int o );
 extern void neighbours_apply( VJFrame *frame, int brush_size, int level, int mode);
 extern void neighbours2_apply( VJFrame *frame, int brush_size, int level, int mode);
-extern void		neighbours3_apply( VJFrame *frame, int width, int height, int brush_size, int level, int mode);
+extern void neighbours3_apply( VJFrame *frame, int brush_size, int level, int mode);
 extern void		neighbours4_apply( VJFrame *frame, int width, int height, int radius, int brush_size, int level, int mode);
 extern void		neighbours5_apply( VJFrame *frame, int width, int height, int radius, int brush_size, int level);
 extern void cutstop_apply( VJFrame *frame,

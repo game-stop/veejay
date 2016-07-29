@@ -117,8 +117,7 @@ static void vj_effman_apply_image_effect(
 		neighbours_apply(frames[0], arg[0], arg[1], arg[2]);
 		break;
 	case VJ_IMAGE_EFFECT_NEIGHBOUR3:
-	neighbours3_apply(frames[0],frames[0]->width,
-			frames[0]->height,arg[0],arg[1],arg[2]);
+	neighbours3_apply(frames[0], arg[0], arg[1], arg[2]);
 		break;
 
 	case VJ_IMAGE_EFFECT_RIPPLETV:
