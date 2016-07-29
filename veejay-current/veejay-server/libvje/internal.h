@@ -427,7 +427,6 @@ extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2,
                         int fresh,int loopnum, int decay, int mode, int threshold);
 extern void pencilsketch_apply(VJFrame *frame, int type, int threshold, int opacity, int mode);
 extern void pixelate_apply(VJFrame *frame, int v );
-
 extern void bgpush_apply( VJFrame *frame );
 
 extern void magicmirror_apply(VJFrame *frame, int w, int h, int x, int y, int d, int n, int alpha );

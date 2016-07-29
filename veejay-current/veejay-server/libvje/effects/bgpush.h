@@ -26,10 +26,6 @@
 
 #ifndef PUSH_H
 #define PUSH_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *bgpush_init(int w, int h);
 void bgpush_apply( VJFrame *frame );
 int bgpush_malloc(int w, int h);
