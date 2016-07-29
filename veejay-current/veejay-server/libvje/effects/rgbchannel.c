@@ -17,12 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include "rgbchannel.h"
@@ -55,8 +52,10 @@ vj_effect *rgbchannel_init(int w, int h)
     return ve;
 }
 
-void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb)
+void rgbchannel_apply( VJFrame *frame, int chr, int chg , int chb)
 {
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	int row_stride = width * 4;
 	int x,y;
 	uint8_t *rgba = frame->data[0];

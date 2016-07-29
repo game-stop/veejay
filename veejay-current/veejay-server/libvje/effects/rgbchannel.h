@@ -20,10 +20,6 @@
 
 #ifndef RGBCHANNEL_H
 #define RGBCHANNEL_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *rgbchannel_init(int w, int h);
-void rgbchannel_apply( VJFrame *frame, int width, int height, int r, int g, int b);
+void rgbchannel_apply( VJFrame *frame, int r, int g, int b);
 #endif

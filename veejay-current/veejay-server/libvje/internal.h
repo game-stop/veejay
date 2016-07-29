@@ -480,7 +480,7 @@ extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
                            int x1, int y1, int width, int height);
 extern void threshold_apply( VJFrame *frame, VJFrame *frame2, int threshold, int reverse );
 extern void motionmap_apply( VJFrame *frame, int threshold, int reverse, int draw, int his, int op, int ip, int la, int ad );
-extern void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb);
+extern void rgbchannel_apply( VJFrame *frame, int chr, int chg , int chb);
 
 extern	void	differencemap_apply( VJFrame *f, VJFrame *f2, int w, int h, int t1, int rev, int show );
 
