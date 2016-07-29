@@ -449,16 +449,14 @@ extern int bgsubtract_prepare(VJFrame *frame);
 extern void bgsubtract_apply(VJFrame *frame, int threshold, int method, int enabled, int alpha );
 
 extern uint8_t* bgsubtractgauss_get_bg_frame(unsigned int plane);
-
 extern int bgsubtractgauss_prepare(VJFrame *frame);
-
 extern void bgsubtractgauss_apply(VJFrame *frame,int alpha, int threshold,int noise, int mode, int period, int morph );
 
 extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
 
 extern int bgpush_prepare( VJFrame *frame );
 
-extern void	cartonize_apply( VJFrame *frame, int w, int h, int b1, int b2, int b3 );
+extern void cartonize_apply( VJFrame *frame, int b1, int b2, int b3 );
 
 extern void 	morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
 
