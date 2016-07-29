@@ -20,12 +20,8 @@
 
 #ifndef NEIGHBOURS_H
 #define NEIGHBOURS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *neighbours_init(int w, int h);
 int neighbours_malloc(int w, int h);
 void neighbours_free(void);
-void neighbours_apply( VJFrame *frame, int width, int height, int brush_size, int level,int mode);
+void neighbours_apply( VJFrame *frame, int brush_size, int level,int mode);
 #endif
