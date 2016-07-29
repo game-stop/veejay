@@ -17,14 +17,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <math.h>
-#include "magicmirror.h"
+#include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include "common.h"
 #include "motionmap.h"
-#include <libvje/internal.h>
+#include "magicmirror.h"
+
 
 // if d or n changes, tables need to be calculated
 static uint8_t *magicmirrorbuf[4] = { NULL,NULL,NULL,NULL };
@@ -123,8 +123,11 @@ void magicmirror_free()
 	funhouse_y = NULL;
 }
 
-void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int n, int alpha )
+void magicmirror_apply( VJFrame *frame, int vx, int vy, int d, int n, int alpha )
 {
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 	double c1 = (double)vx;
 	double c2 = (double)vy;
 	int motion = 0;
@@ -151,10 +154,10 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 		interpolate = 0;
 
 	double c3 = (double)d * 0.001;
-	unsigned int dx,dy,x,y,p,q,len=w*h;
+	unsigned int dx,dy,x,y,p,q;
 	double c4 = (double)n * 0.001;
 	int changed = 0;
-  	uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 	uint8_t *A = frame->data[3];
@@ -176,31 +179,31 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 	if(changed==1)
 	{	
 		// degrees x or y changed, need new sin
-		for(x=0; x < w ; x++)
+		for(x=0; x < width ; x++)
 		{
 			double res;
 			fast_sin(res,(double)(c3*x));
 			funhouse_x[x] = res;
 		}
-		for(y=0; y < h; y++)
+		for(y=0; y < height; y++)
 		{
 			double res;
 			fast_sin(res,(double)(c4*y));
 			funhouse_y[y] = res;
 		}
 	}
-	for(x=0; x < w; x++)
+	for(x=0; x < width; x++)
 	{
 		dx = x + funhouse_x[x] * c1;
-		if(dx < 0) dx += w;
-		if(dx < 0) dx = 0; else if (dx >= w) dx = w-1;
+		if(dx < 0) dx += width;
+		if(dx < 0) dx = 0; else if (dx >= width) dx = width-1;
 		cache_x[x] = dx;
 	}
-	for(y=0; y < h; y++)
+	for(y=0; y < height; y++)
 	{
 		dy = y + funhouse_y[y] * c2;
-		if(dy < 0) dy += h;
-		if(dy < 0) dy = 0; else if (dy >= h) dy = h-1;
+		if(dy < 0) dy += height;
+		if(dy < 0) dy = 0; else if (dy >= height) dy = height-1;
 		cache_y[y] = dy;
 	}
 
@@ -211,12 +214,12 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 	if( alpha ) {
 		veejay_memcpy( magicmirrorbuf[3], frame->data[3], len );
 		/* apply on alpha first */
-		for(y=1; y < h-1; y++)
+		for(y=1; y < height-1; y++)
 		{
-			for(x=1; x < w-1; x++)
+			for(x=1; x < width-1; x++)
 			{
-				q = y * w + x;
-				p = cache_y[y] * w + cache_x[x];
+				q = y * width + x;
+				p = cache_y[y] * width + cache_x[x];
 				A[q] = magicmirrorbuf[3][p];
 			}
 		}
@@ -225,12 +228,12 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 		
 		switch(alpha) {
 				case 1:
-					for(y=1; y < h-1; y++)
+					for(y=1; y < height-1; y++)
 					{
-						for(x=1; x < w-1; x++)
+						for(x=1; x < width-1; x++)
 						{
-							q = y * w + x;
-							p = cache_y[y] * w + cache_x[x];
+							q = y * width + x;
+							p = cache_y[y] * width + cache_x[x];
 							if( Am[p] || A[q] ) { 
 								Y[q] = magicmirrorbuf[0][p];
 								Cb[q] = magicmirrorbuf[1][p];
@@ -250,12 +253,12 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 							veejay_msg(0,"This mode requires 'Subtract background' FX");
 							break;
 						}
-						for(y=1; y < h-1; y++)
+						for(y=1; y < height-1; y++)
 						{
-							for(x=1; x < w-1; x++)
+							for(x=1; x < width-1; x++)
 							{
-								q = y * w + x;
-								p = cache_y[y] * w + cache_x[x];
+								q = y * width + x;
+								p = cache_y[y] * width + cache_x[x];
 
 								if( A[q] ) {
 									Y[q] = magicmirrorbuf[0][p];
@@ -266,7 +269,7 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 									Y[q] = bgY[q];
 									Cb[q] = bgCb[q];
 									Cr[q] = bgCr[q];
-								} 
+								}
 							}
 						}
 
@@ -275,12 +278,12 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 		}
 	}
 	else {
-		for(y=1; y < h-1; y++)
+		for(y=1; y < height-1; y++)
 		{
-			for(x=1; x < w-1; x++)
+			for(x=1; x < width-1; x++)
 			{
-				q = y * w + x;
-				p = cache_y[y] * w + cache_x[x];
+				q = y * width + x;
+				p = cache_y[y] * width + cache_x[x];
 	
 				Y[q] = magicmirrorbuf[0][p];
 				Cb[q] = magicmirrorbuf[1][p];
