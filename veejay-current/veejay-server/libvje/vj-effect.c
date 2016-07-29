@@ -113,7 +113,7 @@
 #include "effects/sinoids.h"
 #include "effects/average.h"
 #include "effects/ripple.h"
-#include "effects/rippletv.h"
+#include "effects/water.h"
 #include "effects/waterrippletv.h"
 #include "effects/bathroom.h"
 #include "effects/slicer.h"

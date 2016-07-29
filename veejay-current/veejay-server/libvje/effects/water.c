@@ -22,20 +22,14 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-
-#include <config.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
 #include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include <stdlib.h>
-#include <math.h>
-#include <stdio.h>
-#include <stdint.h>
 #include "common.h"
-#include "rippletv.h"
 #include "softblur.h"
+#include "water.h"
 
 typedef struct {
 	uint8_t *ripple_data[4];
@@ -502,7 +496,8 @@ static void raindrop(water_t *w)
 	period--;
 }
 
-void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height, int fresh_rate, int loopnum, int decay, int mode, int threshold )
+void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int fresh_rate,
+                 int loopnum, int decay, int mode, int threshold )
 {
 	int x, y, i;
 	int dx, dy;
@@ -621,8 +616,8 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 		vp+=2;
 	}
 
-	hi = height;
-	wi = width;
+	hi = frame->height;
+	wi = frame->width;
 	vp = w->vtable;
 
 	for(y=0; y<hi; y+=2) {
