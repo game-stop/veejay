@@ -17,13 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include "chromapalette.h"
 #include "common.h"
-#include <math.h>
+#include <libvjmem/vjmem.h>
+#include "chromapalette.h"
 
 vj_effect *chromapalette_init(int w, int h)
 {
@@ -83,10 +79,10 @@ static inline int _chroma_key( uint8_t fg_cb, uint8_t fg_cr, uint8_t cb, uint8_t
 
 
 
-void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r, int g, int b, int color_cb, int color_cr )
+void chromapalette_apply(VJFrame *frame, int angle, int r, int g, int b, int color_cb, int color_cr )
 {
 	unsigned int i;
-	const int len = frame->len;
+	const unsigned int len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
