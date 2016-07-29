@@ -17,14 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <config.h>
-#include "swirl.h"
-#include <stdlib.h>
+
 #include "common.h"
-#include <math.h>
+#include <libvjmem/vjmem.h>
+#include "swirl.h"
 
 vj_effect *swirl_init(int w, int h)
 {
@@ -108,65 +104,64 @@ void	swirl_free()
 
 
 static int _v = 0;
-void swirl_apply(VJFrame *frame, int w, int h, int v)
+void swirl_apply(VJFrame *frame, int v)
 {
 	int i;
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
 	if( v != _v )
 	{
-             //const double curve = (double) v; 
-                const unsigned int R = w;
-	        const double coeef = v;   
-             //const double coeef = R / log(curve * R + 1);
-                //const double coeef = R / log( curve * R + 2);
-             /* pre calculate */
-                int px,py;
-                double r,a;
-		double si,co;	
-                const int w2 = w/2;
-                const int h2 = h/2;
-                
-                for(i=0; i < len; i++)
-                {
-                        r = polar_map[i];
-                        a = fish_angle[i];
-                        if(r <= R)
-                        {
+		//const double curve = (double) v; 
+		const unsigned int R = width;
+		const double coeef = v;
+		//const double coeef = R / log(curve * R + 1);
+		//const double coeef = R / log( curve * R + 2);
+		/* pre calculate */
+		int px,py;
+		double r,a;
+		double si,co;
+		const int w2 = width/2;
+		const int h2 = height/2;
+
+		for(i=0; i < len; i++)
+		{
+			r = polar_map[i];
+			a = fish_angle[i];
+			if(r <= R)
+			{
 				//uncomment for simple fisheye
 				//p_y = a;
 				//p_r = (r*r)/R;
 				//sin_cos( co, si, p_y );
-			sin_cos( co,si, (a+r/coeef));	
-			px = (int) ( r * co );
-			py = (int) ( r * si );
+				sin_cos( co,si, (a+r/coeef));
+				px = (int) ( r * co );
+				py = (int) ( r * si );
 				//sin_cos( co, si, (double)v );
 				//px = (int) (r * co);
 				//py = (int) (r * si);
 				//px = (int) ( p_r * co);
 				//py = (int) ( p_r * si);
-                                px += w2;
-                                py += h2;
+				px += w2;
+				py += h2;
 
-                                if(px < 0) px =0;
-                                if(px > w) px = w;
-                                if(py < 0) py = 0;
-                                if(py >= (h-1)) py = h-1;
+				if(px < 0) px =0;
+				if(px > width) px = width;
+				if(py < 0) py = 0;
+				if(py >= (height-1)) py = height-1;
 
-                                cached_coords[i] = (py * w)+px;
-
-     			  }
-                        else
-                        {
-                                cached_coords[i] = -1;
-
-                        }
-                }
-                _v = v;
-
+				cached_coords[i] = (py * width)+px;
+			}
+			else
+			{
+				cached_coords[i] = -1;
+			}
+		}
+		_v = v;
 	}
 
 	int strides[4] = { len, len, len , 0 };
@@ -176,13 +171,12 @@ void swirl_apply(VJFrame *frame, int w, int h, int v)
 	{
 		if(cached_coords[i] == -1)
 		{
-			Y[i] = pixel_Y_lo_;		
+			Y[i] = pixel_Y_lo_;
 			Cb[i] = 128;
 			Cr[i] = 128;
 		}
 		else
 		{
-
 			Y[i] = Y[ cached_coords[i] ];
 			Cb[i] = Cb[ cached_coords[i] ];
 			Cr[i] = Cr[ cached_coords[i] ];

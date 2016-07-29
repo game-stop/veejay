@@ -433,8 +433,7 @@ extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int n, int m, int bor
 extern void smear_apply(VJFrame *frame, int n, int m);
 extern void raster_apply(VJFrame *frame, int v, int mode);
 extern void fisheye_apply(VJFrame *frame, int v, int alpha );
-
-extern void swirl_apply(VJFrame *frame, int w, int h , int v );
+extern void swirl_apply(VJFrame *frame, int v );
 
 extern void radialblur_apply(VJFrame *frame, int w, int h, int r, int p, int n);
 
