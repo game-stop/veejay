@@ -23,7 +23,6 @@
 #include <math.h>
 #include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
 #include <libavutil/avutil.h>
 #include <libvjmsg/vj-msg.h>
 #include <libyuv/yuvconv.h>

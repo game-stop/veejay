@@ -20,13 +20,8 @@
 
 #ifndef MAGICMIRROR_H
 #define MAGICMIRROR_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *magicmirror_init(int w, int h);
 int magicmirror_malloc(int w, int h);
-void magicmirror_apply( VJFrame *frame, int width, int height, int a, int b, int na, int nb, int alpha);
+void magicmirror_apply( VJFrame *frame, int a, int b, int na, int nb, int alpha);
 void magicmirror_free();
 #endif

@@ -20,8 +20,8 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
+#include <libvjmem/vjmem.h>
 #include <libsubsample/subsample.h>
 #include "common.h"
 #include "bgpush.h"

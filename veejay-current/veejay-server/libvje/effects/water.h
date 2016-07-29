@@ -18,10 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef RIPPLETV_H
-#define RIPPLETV_H
-vj_effect* water_init(int width, int height);
-int water_malloc(void **d,int w, int h);
-void water_free(void *d);
-void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height,int fresh, int loopnum, int decay, int mode, int threshold );
+#ifndef WATERRIPPLE_H
+#define WATERRIPPLE_H
+vj_effect *water_init(int width, int height);
+int water_malloc(void **d, int width, int height);
+void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int fresh_rate,
+                 int loopnum, int decay, int mode, int threshold );
+void water_free(void *ud);
 #endif

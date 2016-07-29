@@ -126,7 +126,7 @@ static void vj_effman_apply_image_effect(
 	waterrippletv_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
 	 case VJ_IMAGE_EFFECT_PENCILSKETCH:
-	  pencilsketch_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
+	  pencilsketch_apply(frames[0],arg[0],arg[1],arg[2],arg[3]);
 	 break;
       case VJ_IMAGE_EFFECT_NOISEPENCIL:
 	noisepencil_apply(frames[0], arg[0], arg[1], arg[2], arg[3]);
@@ -197,10 +197,10 @@ static void vj_effman_apply_image_effect(
 	mirrors_apply(frames[0], arg[0], arg[1]);
 	break;
 	case VJ_IMAGE_EFFECT_MAGICMIRROR:
-	magicmirror_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	magicmirror_apply(frames[0],arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
     case  VJ_IMAGE_EFFECT_RASTER:
-	raster_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
+	raster_apply(frames[0], arg[0], arg[1]);
 	break;
 	case VJ_IMAGE_EFFECT_SWIRL:
 	swirl_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
@@ -212,7 +212,7 @@ static void vj_effman_apply_image_effect(
 	fisheye_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_PIXELSMEAR:
-	smear_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1]);
+	smear_apply(frames[0], arg[0], arg[1]);
 	break;  
      case VJ_IMAGE_EFFECT_UVCORRECT:
 	uvcorrect_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
@@ -313,7 +313,7 @@ static void vj_effman_apply_image_effect(
 	dices_apply(vj_effects[entry], frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_COLORTEST:
-	color_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
+	color_apply(frames[0], arg[0], arg[1], arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_RAWMAN:
 	rawman_apply(frames[0], arg[0], arg[1]);
@@ -415,7 +415,7 @@ static void vj_effman_apply_image_effect(
 		alphaselect2_apply(frames[0],arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 		break;
 	 case VJ_IMAGE_EFFECT_PIXELATE:
-		pixelate_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+		pixelate_apply(frames[0],arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_ALPHANEGATE:
 		alphanegate_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
@@ -487,7 +487,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	simplemask_apply(frames[0], frames[1], arg[0], arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_LUMAMASK:
-	lumamask_apply(frames[0], frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
+	lumamask_apply(frames[0], frames[1], arg[0],arg[1],arg[2],arg[3]);
 	break;
 	case VJ_VIDEO_EFFECT_DISSOLVE:
 	dissolve_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0]);break; 
@@ -619,7 +619,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 			arg[0], arg[1], arg[2], arg[3] );
 	break;
 	case VJ_VIDEO_EFFECT_RIPPLETV:
-	water_apply( vj_effects[entry]->user_data,frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );
+	water_apply( vj_effects[entry]->user_data,frames[0],frames[1],arg[0],arg[1],arg[2],arg[3],arg[4] );
 
 	break;
 	case VJ_VIDEO_EFFECT_RADIOACTIVE:

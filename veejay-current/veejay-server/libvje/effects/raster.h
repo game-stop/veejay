@@ -20,10 +20,6 @@
 
 #ifndef RASTER_H
 #define RASTER_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *raster_init(int w, int h);
-void raster_apply( VJFrame *frame, int width, int height, int val, int mode);
+void raster_apply( VJFrame *frame, int val, int mode);
 #endif

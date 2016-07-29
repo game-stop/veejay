@@ -17,13 +17,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include "raster.h"
 #include "common.h"
-#include <math.h>
+#include "raster.h"
 
 vj_effect *raster_init(int w, int h)
 {
@@ -51,34 +50,37 @@ vj_effect *raster_init(int w, int h)
     return ve;
 }
 
-void raster_apply(VJFrame *frame, int w, int h, int val, int mode)
+void raster_apply(VJFrame *frame, int val, int mode)
 {
 	int x,y;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 
 	if(val == 0 )
 	  return;
 
 	uint8_t pixel_color = mode ? pixel_Y_hi_ : pixel_Y_lo_;
 
-	for(y=0; y < h; y++)
+	for(y=0; y < height; y++)
 	{
-		for(x=0; x < w; x++)
+		for(x=0; x < width; x++)
 		{
-			Y[y*w+x] = ((x%val>1)? ((y%val>1) ? Y[y*w+x]: pixel_color):pixel_color);
+			Y[y*width+x] = ((x%val>1)? ((y%val>1) ? Y[y*width+x]: pixel_color):pixel_color);
 		}
 	}
-	w= frame->uv_width;
-	h= frame->uv_height;
 
-	for(y=0; y < h; y++)
+	const unsigned int uv_width= frame->uv_width;
+	const unsigned int uv_height= frame->uv_height;
+
+	for(y=0; y < uv_height; y++)
 	{
-		for(x=0; x < w; x++)
+		for(x=0; x < uv_width; x++)
 		{
-			Cb[y*w+x] = ((x%val>1)? ((y%val>1) ? Cb[y*w+x]:128):128);
-			Cr[y*w+x] = ((x%val>1)? ((y%val>1) ? Cr[y*w+x]:128):128);
+			Cb[y*uv_width+x] = ((x%val>1)? ((y%val>1) ? Cb[y*uv_width+x]:128):128);
+			Cr[y*uv_width+x] = ((x%val>1)? ((y%val>1) ? Cr[y*uv_width+x]:128):128);
 		}
 	}
 /*

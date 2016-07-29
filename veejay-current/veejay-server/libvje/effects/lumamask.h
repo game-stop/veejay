@@ -20,11 +20,7 @@
 
 #ifndef LUMAMASK_H
 #define LUMAMASK_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
-void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode, int h_scale, int border, int alpha);
+void lumamask_apply( VJFrame *frame, VJFrame *frame2, int mode, int h_scale, int border, int alpha);
 vj_effect *lumamask_init(int w, int h);
 int lumamask_malloc(int w, int h);
 void lumamask_free();

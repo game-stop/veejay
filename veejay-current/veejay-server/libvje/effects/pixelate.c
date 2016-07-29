@@ -20,6 +20,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include "pixelate.h"
 
@@ -58,11 +59,11 @@ vj_effect *pixelate_init(int width, int height)
 	return ve;
 }
 
-void pixelate_apply( VJFrame *frame, int w, int h , int vv )
+void pixelate_apply( VJFrame *frame, int vv )
 {
 	unsigned int i,j ;
 	unsigned int len = frame->len;
-  	const unsigned int v = values[vv];
+	const unsigned int v = values[vv];
 	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	unsigned int u_v = v >> (frame->ssm ? frame->shift_h: 1 );
 	if( u_v == 0 )
@@ -76,7 +77,7 @@ void pixelate_apply( VJFrame *frame, int w, int h , int vv )
 		for(j=0; j < v; j++)
 		{
 			Y[i+j] = Y[i];
-	    	}
+		}
 	}
 
 	for (i = 0; i < uv_len; i+=u_v) {
@@ -85,6 +86,6 @@ void pixelate_apply( VJFrame *frame, int w, int h , int vv )
 			Cb[i+j] = Cb[i];
 			Cr[i+j] = Cr[i];
 		}
-   	}
+	}
 }
 

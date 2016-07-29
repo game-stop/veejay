@@ -421,25 +421,17 @@ extern void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
 extern void deinterlace_apply(VJFrame *frame, int val);
 //extern void simplematte_apply(VJFrame *frame, int threshold, int invert);
 extern void crosspixel_apply(VJFrame *frame,int type, int val);
-
-extern void color_apply(VJFrame *frame, int w, int h, int a,int b, int c);
-
+extern void color_apply(VJFrame *frame, int a, int b, int c);
 //extern void water_apply(VJFrame *frame, int w, int h, int val, int l, int d);
-extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height, int fresh,int loopnum, int decay, int mode, int threshold);
-
-extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity, int mode);
-
-extern void pixelate_apply(VJFrame *frame, int w, int h, int v );
-
+extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2,
+                        int fresh,int loopnum, int decay, int mode, int threshold);
+extern void pencilsketch_apply(VJFrame *frame, int type, int threshold, int opacity, int mode);
+extern void pixelate_apply(VJFrame *frame, int v );
 extern void bgpush_apply( VJFrame *frame );
-
-extern void magicmirror_apply(VJFrame *frame, int w, int h, int x, int y, int d, int n, int alpha );
-
-extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int n, int m, int border, int alpha);
-
-extern void smear_apply(VJFrame *frame, int w, int h, int n, int m);
-
-extern void raster_apply(VJFrame *frame, int w, int h, int v, int mode);
+extern void magicmirror_apply(VJFrame *frame, int x, int y, int d, int n, int alpha );
+extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int n, int m, int border, int alpha);
+extern void smear_apply(VJFrame *frame, int n, int m);
+extern void raster_apply(VJFrame *frame, int v, int mode);
 
 extern void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha );
 

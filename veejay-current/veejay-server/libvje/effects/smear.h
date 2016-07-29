@@ -20,10 +20,6 @@
 
 #ifndef SMEAR_H
 #define SMEAR_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *smear_init(int w, int h);
-void smear_apply(VJFrame *frame, int width, int height,int mode, int val);
+void smear_apply(VJFrame *frame, int mode, int val);
 #endif
