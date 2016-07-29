@@ -20,15 +20,11 @@
 
 #ifndef BGSUBTRACT_H
 #define BGSUBTRACT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *bgsubtract_init(int width, int height);
 int bgsubtract_instances();
 void bgsubtract_free();
 int bgsubtract_malloc(int w, int h);
 int bgsubtract_prepare(VJFrame *frame); 
-void bgsubtract_apply(VJFrame *frame,int width,int height,int threshold, int method, int enabled, int to_alpha);
+void bgsubtract_apply(VJFrame *frame,int threshold, int method, int enabled, int to_alpha);
 uint8_t *bgsubtract_get_bg_frame(unsigned int plane);
 #endif

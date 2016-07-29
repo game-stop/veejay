@@ -444,12 +444,9 @@ extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int opacity);
 extern void overclock_apply(VJFrame *frame, int val, int r);
 
 uint8_t *bgpush_get_bg_frame(unsigned int plane);
-
 uint8_t *bgsubtract_get_bg_frame(unsigned int plane);
-
 extern int bgsubtract_prepare(VJFrame *frame);
-
-extern void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int method, int enabled, int alpha );
+extern void bgsubtract_apply(VJFrame *frame, int threshold, int method, int enabled, int alpha );
 
 extern uint8_t* bgsubtractgauss_get_bg_frame(unsigned int plane);
 

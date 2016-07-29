@@ -17,16 +17,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "bgsubtract.h"
+
 #include "common.h"
-#include <math.h>
-#include <libyuv/yuvconv.h>
+#include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
-#include "softblur.h"
 #include <libsubsample/subsample.h>
+#include "softblur.h"
+#include "bgsubtract.h"
 
 static uint8_t *static_bg__ = NULL;
 static uint8_t *bg_frame__[4] = { NULL,NULL,NULL,NULL };
@@ -193,9 +190,9 @@ static void bgsubtract_show_bg( VJFrame *frame )
 	}	
 }
 
-void bgsubtract_apply(VJFrame *frame,int width, int height, int threshold, int method, int enabled, int alpha )
+void bgsubtract_apply(VJFrame *frame,int threshold, int method, int enabled, int alpha )
 {
-	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len );
 
 	if( auto_hist )
 		vje_histogram_auto_eq( frame );
