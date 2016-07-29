@@ -18,11 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <libvjmem/vjmem.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "ghost.h"
 
 static uint8_t 		*ghost_buf[4] = { NULL,NULL,NULL, NULL};
@@ -77,14 +74,14 @@ void ghost_free()
 	diff_map = NULL;
 }
 
-void ghost_apply(VJFrame *frame,
-			   int width, int height, int opacity)
+void ghost_apply(VJFrame *frame, int opacity)
 {
 	register int q,z=0;
- 	int x,y,i;
-    	const int len = frame->len;
-    	const unsigned int op_a = opacity;
-    	const unsigned int op_b = 255 - op_a;
+	int x,y,i;
+	const unsigned int width = frame->width;
+	const unsigned int len = frame->len;
+	const unsigned int op_a = opacity;
+	const unsigned int op_b = 255 - op_a;
 	uint8_t *srcY = frame->data[0];
 	uint8_t *srcCb= frame->data[1];
 	uint8_t *srcCr= frame->data[2];
@@ -111,8 +108,6 @@ void ghost_apply(VJFrame *frame,
 
 	for(i = 0; i < len; i ++ )
 		bm[i] = ( abs(srcY[i] - dY[i]) > 1 ? 0xff: 0x0);
-
-	  
 
 	for( y = width; y < (len-width); y += width )
 	{
