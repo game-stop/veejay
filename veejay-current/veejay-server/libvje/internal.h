@@ -421,8 +421,7 @@ extern void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
 extern void deinterlace_apply(VJFrame *frame, int val);
 //extern void simplematte_apply(VJFrame *frame, int threshold, int invert);
 extern void crosspixel_apply(VJFrame *frame,int type, int val);
-
-extern void color_apply(VJFrame *frame, int w, int h, int a,int b, int c);
+extern void color_apply(VJFrame *frame, int a, int b, int c);
 
 //extern void water_apply(VJFrame *frame, int w, int h, int val, int l, int d);
 extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height, int fresh,int loopnum, int decay, int mode, int threshold);

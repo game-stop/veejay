@@ -48,9 +48,7 @@ vj_effect *color_init(int w, int h)
 }
 
 
-void color_apply(VJFrame *frame, int width, int height,
-		 int opacity_a, int opacity_b,
-		 int opacity_c)
+void color_apply(VJFrame *frame, int opacity_a, int opacity_b, int opacity_c)
 {
 	unsigned int i;
 	const unsigned int op_a0 = 255 - opacity_a; 
@@ -93,7 +91,7 @@ void color_apply(VJFrame *frame, int width, int height,
  		Cb[i] = q1;
 		Cr[i] = q2;
 
-    	}
+	}
 
 }
 void color_free(){}

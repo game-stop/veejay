@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 vj_effect *color_init();
-void color_apply( VJFrame *frame , int width, int height, int a, int b, int c);
-		 
+void color_apply( VJFrame *frame, int a, int b, int c);
+
 void color_free();
 #endif

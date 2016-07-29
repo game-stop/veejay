@@ -313,7 +313,7 @@ static void vj_effman_apply_image_effect(
 	dices_apply(vj_effects[entry], frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_COLORTEST:
-	color_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
+	color_apply(frames[0], arg[0], arg[1], arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_RAWMAN:
 	rawman_apply(frames[0], arg[0], arg[1]);
