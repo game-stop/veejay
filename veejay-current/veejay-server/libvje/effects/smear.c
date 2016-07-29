@@ -17,12 +17,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
+
 #include <stdint.h>
 #include <stdlib.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include "smear.h"
 #include "common.h"
+#include "smear.h"
 
 vj_effect *smear_init(int w, int h)
 {
@@ -51,15 +52,17 @@ vj_effect *smear_init(int w, int h)
 
 	return ve;
 }
+
 static void _smear_apply_x(VJFrame *frame, int width, int height, int val)
 {
-    unsigned int j;
-    unsigned int x,y;
+	unsigned int j;
+	unsigned int x,y;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-    for(y=0; y < height-1; y++)
-    {
+
+	for(y=0; y < height-1; y++)
+	{
 	for(x=0; x < width; x++)
 	{
 		j = Y[y*width+x];
@@ -70,8 +73,9 @@ static void _smear_apply_x(VJFrame *frame, int width, int height, int val)
 			Cr[y*width+x] = Cr[y*width+x+j];
 		}
 	}
-     }
+	}
 }
+
 static void _smear_apply_x_avg(VJFrame *frame, int width, int height, int val)
 {
     unsigned int j;
@@ -93,6 +97,7 @@ static void _smear_apply_x_avg(VJFrame *frame, int width, int height, int val)
 	}
      }
 }
+
 static void _smear_apply_y_avg(VJFrame *frame, int width, int height, int val)
 {
     unsigned int i,j;
@@ -117,6 +122,7 @@ static void _smear_apply_y_avg(VJFrame *frame, int width, int height, int val)
 	}
      }
 }
+
 static void _smear_apply_y(VJFrame *frame, int width, int height, int val)
 {
     unsigned int i,j;
@@ -146,44 +152,43 @@ static void _smear_apply_y(VJFrame *frame, int width, int height, int val)
 static int n__ = 0;
 static int N__ = 0;
 
-void smear_apply( VJFrame *frame, int width, int height,int mode, int val)
+void smear_apply( VJFrame *frame,int mode, int val)
 {
-   	int interpolate = 1;
-        int tmp1 = mode;
-        int tmp2 = val;
-        int motion = 0;
-        if(motionmap_active())
-        {
-                motionmap_scale_to( 255, 3, 0, 0, &tmp2, &tmp1, &n__, &N__ );
-                motion = 1;
-        }
+	int interpolate = 1;
+	int tmp1 = mode;
+	int tmp2 = val;
+	int motion = 0;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+
+	if(motionmap_active())
+	{
+		motionmap_scale_to( 255, 3, 0, 0, &tmp2, &tmp1, &n__, &N__ );
+		motion = 1;
+	}
 	else
 	{
 		N__ = 0;
 		n__ = 0;
 	}
 
-        if( n__ == N__ || n__ == 0 )
-                interpolate = 0;
+	if( n__ == N__ || n__ == 0 )
+		interpolate = 0;
 
 	switch(mode)
-   	{
+	{
 		case 0:	_smear_apply_x(frame,width,height,tmp2); break;
 		case 1: _smear_apply_x_avg(frame,width,height,tmp2); break;
 		case 2: _smear_apply_y(frame,width,height,tmp2); break; 
 		case 3: _smear_apply_y_avg(frame,width,height,tmp2); break;
 		default: break;
-   	}
+	}
 
-  	if( interpolate )
-        {
-                motionmap_interpolate_frame( frame, N__,n__ );
-        }
+	if( interpolate )
+		motionmap_interpolate_frame( frame, N__,n__ );
 
-        if(motion)
-        {
-                motionmap_store_frame( frame );
-        }
+	if(motion)
+		motionmap_store_frame( frame );
 
 }
 

@@ -430,8 +430,7 @@ extern void pixelate_apply(VJFrame *frame, int v );
 extern void bgpush_apply( VJFrame *frame );
 extern void magicmirror_apply(VJFrame *frame, int x, int y, int d, int n, int alpha );
 extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int n, int m, int border, int alpha);
-
-extern void smear_apply(VJFrame *frame, int w, int h, int n, int m);
+extern void smear_apply(VJFrame *frame, int n, int m);
 
 extern void raster_apply(VJFrame *frame, int w, int h, int v, int mode);
 
