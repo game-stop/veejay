@@ -457,8 +457,7 @@ extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
 extern int bgpush_prepare( VJFrame *frame );
 
 extern void cartonize_apply( VJFrame *frame, int b1, int b2, int b3 );
-
-extern void 	morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
+extern void morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
 
 extern void 	colmorphology_apply( VJFrame *frame, int w, int h, int t, int v, int p);
 

@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "morphology.h"
-#include "common.h"
+
 typedef uint8_t (*morph_func)(uint8_t *kernel, uint8_t *mt );
 
 static  uint8_t kernels[8][9] ={
@@ -31,8 +28,8 @@ static  uint8_t kernels[8][9] ={
 		 { 0,1,0, 1,1,1, 0,1,0 },//1
 		 { 0,0,0, 1,1,1, 0,0,0 },//2
 		 { 0,1,0, 0,1,0, 0,1,0 },//3
-		 { 0,0,1, 0,1,0, 1,0,0 },//4	
-		 { 1,0,0, 0,1,0, 0,0,1 },	
+		 { 0,0,1, 0,1,0, 1,0,0 },//4
+		 { 1,0,0, 0,1,0, 0,0,1 },
 		 { 1,1,1, 0,0,0, 0,0,0 },
 		 { 0,0,0, 0,0,0, 1,1,1 }
 		};

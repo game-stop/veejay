@@ -20,10 +20,6 @@
 
 #ifndef MORPHOLOGY_H
 #define MORPHOLOGY_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *morphology_init(int w, int h);
 void morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
 int morphology_malloc(int w, int h);
