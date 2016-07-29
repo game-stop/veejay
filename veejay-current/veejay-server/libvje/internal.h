@@ -460,9 +460,8 @@ extern void cartonize_apply( VJFrame *frame, int b1, int b2, int b3 );
 extern void morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
 extern void colmorphology_apply( VJFrame *frame, int t, int v, int p);
 extern void blob_apply( VJFrame *frame, int p0,int p1, int p2, int p3);
-
-extern void		boids_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, int p3, int p4, int p5, int p6, int p7
-);
+extern void boids_apply( VJFrame *frame, int p0,int p1, int p2, int p3,
+                        int p4, int p5, int p6, int p7);
 extern void		porterduff_apply( VJFrame *frame, VJFrame *frame2, int w, int h, int mode);
 
 extern void		ghost_apply(VJFrame *frame, int w, int h, int o );

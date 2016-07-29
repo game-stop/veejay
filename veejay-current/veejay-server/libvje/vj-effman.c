@@ -230,8 +230,7 @@ static void vj_effman_apply_image_effect(
 		blob_apply( frames[0], arg[0], arg[1], arg[2], arg[3] );
 			break;
 	case VJ_IMAGE_EFFECT_VIDBOIDS:
-		boids_apply( frames[0],frames[0]->width,frames[0]->height,
-			arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6],arg[7] );
+		boids_apply( frames[0], arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6],arg[7] );
 		break;
 	case VJ_IMAGE_EFFECT_GHOST:
 		ghost_apply( frames[0], frames[0]->width,frames[0]->height,arg[0]);

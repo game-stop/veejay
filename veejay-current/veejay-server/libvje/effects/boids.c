@@ -56,14 +56,9 @@
 
 */
 
-#include <config.h>
-#include <stdint.h>
-#include <math.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "boids.h"
-
 
 typedef struct 
 {
@@ -333,10 +328,12 @@ static void	boid_rule4_( int boid_id, int vlim )
 		blobs_[boid_id].vy = ( blobs_[boid_id].vy / fabs( blobs_[boid_id].vy) ) * vlim;
 }
 
-void boids_apply(VJFrame *frame,
-			   int width, int height, int radius, int num, int shape, int m1, int m2, int m3, int speed, int home_radius )
+void boids_apply(VJFrame *frame, int radius, int num, int shape, int m1, int m2,
+                 int m3, int speed, int home_radius )
 {
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 	uint8_t *srcY = frame->data[0];
 	uint8_t *srcCb= frame->data[1];
 	uint8_t *srcCr= frame->data[2];
