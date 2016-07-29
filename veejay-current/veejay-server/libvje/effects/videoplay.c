@@ -18,11 +18,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "videoplay.h"
-#include "common.h"
 
 vj_effect *videoplay_init(int w, int h)
 {
@@ -202,9 +201,11 @@ static void put_video( uint8_t *dst_plane, uint8_t *video, int dst_w, int dst_h,
 	}
 }
 
-void videoplay_apply( VJFrame *frame, VJFrame *B, int width, int height, int size, int delay, int mode )
+void videoplay_apply( VJFrame *frame, VJFrame *B, int size, int delay, int mode )
 {
 	unsigned int i;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	uint8_t *dstY = frame->data[0];
 	uint8_t *dstU = frame->data[1];
 	uint8_t *dstV = frame->data[2];

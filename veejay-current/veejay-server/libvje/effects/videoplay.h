@@ -20,12 +20,8 @@
 
 #ifndef VIDEOPLAY_H
 #define VIDEOPLAY_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *videoplay_init(int w, int h);
 int videoplay_malloc(int w, int h);
 void videoplay_free(void);
-void videoplay_apply( VJFrame *frame, VJFrame *b,int width, int height, int size, int behaviour, int mode);
+void videoplay_apply( VJFrame *frame, VJFrame *b, int size, int behaviour, int mode);
 #endif
