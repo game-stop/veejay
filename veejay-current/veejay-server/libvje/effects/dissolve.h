@@ -20,11 +20,6 @@
 
 #ifndef DISSOLVE_H
 #define DISSOLVE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *dissolve_init(int w, int h);
-void dissolve_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int dissolve);
+void dissolve_apply( VJFrame *frame, VJFrame *frame2, int dissolve);
 #endif
