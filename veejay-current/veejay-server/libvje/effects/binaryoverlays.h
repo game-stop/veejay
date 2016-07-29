@@ -20,14 +20,7 @@
 
 #ifndef BINARYOVERLAYS_H
 #define BINARYOVERLAYS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *binaryoverlay_init(int w, int h);
-
-void binaryoverlay_apply(VJFrame *frame, VJFrame *frame2, int width,
-			int height, int n);
-
+void binaryoverlay_apply(VJFrame *frame, VJFrame *frame2, int n);
 void magicoverlays_free();
 #endif

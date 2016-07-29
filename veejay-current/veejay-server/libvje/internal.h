@@ -435,8 +435,7 @@ extern void raster_apply(VJFrame *frame, int v, int mode);
 extern void fisheye_apply(VJFrame *frame, int v, int alpha );
 extern void swirl_apply(VJFrame *frame, int v );
 extern void radialblur_apply(VJFrame *frame, int r, int p, int n);
-
-extern void binaryoverlay_apply(VJFrame *frame, VJFrame *frame2,int w, int h, int n);
+extern void binaryoverlay_apply(VJFrame *frame, VJFrame *frame2, int n);
 
 extern void chromium_apply( VJFrame *frame, int w, int h, int n);
 
