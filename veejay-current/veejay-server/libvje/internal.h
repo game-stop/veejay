@@ -468,7 +468,7 @@ extern void neighbours_apply( VJFrame *frame, int brush_size, int level, int mod
 extern void neighbours2_apply( VJFrame *frame, int brush_size, int level, int mode);
 extern void neighbours3_apply( VJFrame *frame, int brush_size, int level, int mode);
 extern void neighbours4_apply( VJFrame *frame, int radius, int brush_size, int level, int mode);
-extern void		neighbours5_apply( VJFrame *frame, int width, int height, int radius, int brush_size, int level);
+extern void neighbours5_apply( VJFrame *frame, int radius, int brush_size, int level);
 extern void cutstop_apply( VJFrame *frame,
         int width, int height, int treshold,
         int freq, int cutmode, int holdmode);
