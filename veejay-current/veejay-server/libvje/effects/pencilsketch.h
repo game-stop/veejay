@@ -20,12 +20,7 @@
 
 #ifndef PENCILSKETCH_EFFECT_H
 #define PENCILSKETCH_EFFECT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *pencilsketch_init();
-void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity,int mode);
-
+void pencilsketch_apply(VJFrame *frame, int type, int threshold, int opacity,int mode);
 void pencilsketch_free();
 #endif

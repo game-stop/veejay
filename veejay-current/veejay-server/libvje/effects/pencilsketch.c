@@ -19,12 +19,13 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include "pencilsketch.h"
 #include "common.h"
+#include "pencilsketch.h"
 
 extern int vj_task_available();
- 	 
+
 vj_effect *pencilsketch_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -152,18 +153,12 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	}
 
 
-void pencilsketch_apply(
-	 	VJFrame *frame,
-		int width,	
-		int height,
-		int type,
-	   	int threshold_min,
-		int threshold_max,
-		int mode
-		)
+void pencilsketch_apply(VJFrame *frame, int type, int threshold_min,
+                        int threshold_max, int mode)
 {
 	unsigned int i;
 	unsigned int len = frame->len;
+	const unsigned int width = frame->width;
 	const unsigned int uv_len = (frame->ssm ?frame->len : frame->uv_len);
 	int m,d;
 	uint8_t y,yb;
