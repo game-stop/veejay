@@ -28,12 +28,13 @@
 
 
 */
-#include <config.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
-#include "lumamask.h"
 #include "common.h"
+#include "lumamask.h"
+
 static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
 
 vj_effect *lumamask_init(int width, int height)
@@ -84,8 +85,8 @@ int lumamask_malloc(int width, int height)
    return 1;
 }
 
-void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int v_scale, int h_scale, int border, int alpha )
+void lumamask_apply( VJFrame *frame, VJFrame *frame2, int v_scale, int h_scale,
+                    int border, int alpha )
 {
 	unsigned int x,y;
 	int dx,dy,nx,ny;
@@ -94,6 +95,9 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 	int tmp1 = v_scale;
 	int tmp2 = h_scale;
 	int motion = 0;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 
 	if( motionmap_active() )
 	{
@@ -118,7 +122,7 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Cr2 = frame2->data[2];
 	uint8_t *aA = frame->data[3];
 	uint8_t *aB = frame2->data[3];
-	int strides[4] = { width * height, width * height, width * height ,( alpha ? width * height : 0 )};
+	int strides[4] = { len, len, len ,( alpha ? len : 0 )};
 	vj_frame_copy( frame->data, buf, strides );
 
 	if( alpha == 0 )
