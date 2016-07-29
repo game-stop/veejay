@@ -20,13 +20,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
 */
-#include <config.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "cutstop.h"
 
 static uint8_t *vvcutstop_buffer[4] = { NULL,NULL,NULL,NULL };
@@ -90,10 +86,11 @@ void cutstop_free() {
 }
 
 
-void cutstop_apply( VJFrame *frame, int width, int height, int threshold, int freq, int cutmode, int holdmode) {
+void cutstop_apply( VJFrame *frame, int threshold, int freq, int cutmode, int holdmode)
+{
 	int i=0;
 	const unsigned int len = frame->len;
- 
+
 	uint8_t *Yb = vvcutstop_buffer[0];
 	uint8_t *Ub = vvcutstop_buffer[1];
 	uint8_t *Vb = vvcutstop_buffer[2];
