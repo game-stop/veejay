@@ -20,13 +20,8 @@
 
 #ifndef RADIALBLUR_H
 #define RADIALBLUR_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *radialblur_init(int w, int h);
 int radialblur_malloc(int w, int h);
-void radialblur_apply(VJFrame *frame, int width, int height, int r,
-		    int p, int n);
+void radialblur_apply(VJFrame *frame, int r, int p, int n);
 void radialblur_free();
 #endif
