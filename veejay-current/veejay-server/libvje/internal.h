@@ -441,8 +441,7 @@ extern void chromapalette_apply( VJFrame *frame, int a, int r, int g, int b, int
 extern void uvcorrect_apply(VJFrame *frame, int angle, int urot_center,
                             int vrot_center, int iuFactor, int ivFactor, int uvmin, int uvmax );
 extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int opacity);
-
-extern void overclock_apply(VJFrame *frame, int w, int h, int val, int r);
+extern void overclock_apply(VJFrame *frame, int val, int r);
 
 uint8_t *bgpush_get_bg_frame(unsigned int plane);
 

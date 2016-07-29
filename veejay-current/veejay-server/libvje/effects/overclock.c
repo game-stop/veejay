@@ -17,11 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+#include "common.h"
+ #include <libvjmem/vjmem.h>
 #include "overclock.h"
 
 vj_effect *overclock_init(int w, int h)
@@ -48,61 +45,6 @@ vj_effect *overclock_init(int w, int h)
 
 static uint8_t *oc_buf[3] = { NULL,NULL,NULL };
 
-//copied from xine
-static inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep){
-	int x;
-	const int length= radius*2 + 1;
-	const int inv= ((1<<16) + length/2)/length;
-
-	int sum= 0;
-
-	for(x=0; x<radius; x++){
-		sum+= src[x*srcStep]<<1;
-	}
-	sum+= src[radius*srcStep];
-
-	for(x=0; x<=radius; x++){
-		sum+= src[(radius+x)*srcStep] - src[(radius-x)*srcStep];
-		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
-	}
-
-	for(; x<w-radius; x++){
-		sum+= src[(radius+x)*srcStep] - src[(x-radius-1)*srcStep];
-		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
-	}
-
-	for(; x<w; x++){
-		sum+= src[(2*w-radius-x-1)*srcStep] - src[(x-radius-1)*srcStep];
-		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
-	}
-}
-
-//copied from xine
-static void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep){
-	uint8_t temp[2][4096];
-	uint8_t *a= temp[0], *b=temp[1];
-	
-	if(radius){
-		blur(a, src, w, radius, 1, srcStep);
-		for(; power>2; power--){
-			uint8_t *c;
-			blur(b, a, w, radius, 1, 1);
-			c=a; a=b; b=c;
-		}
-		if(power>1)
-			blur(dst, a, w, radius, dstStep, 1);
-		else{
-			int i;
-			for(i=0; i<w; i++)
-				dst[i*dstStep]= a[i];
-		}
-	}else{
-		int i;
-		for(i=0; i<w; i++)
-			dst[i*dstStep]= src[i*srcStep];
-	}
-}
-
 int overclock_malloc(int w, int h)
 {
 	const int len = w* h;
@@ -116,8 +58,10 @@ void overclock_free()
 	if(oc_buf[0]) free( oc_buf[0] );
 }
 
-void overclock_apply(VJFrame *frame, int width, int height, int n, int radius )
+void overclock_apply(VJFrame *frame, int n, int radius )
 {
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
     int x,y,dx,dy;
     uint8_t t = 0; 
 	int s = 0;
