@@ -20,12 +20,8 @@
 
 #ifndef COLMORPHOLOGY_H
 #define COLMORPHOLOGY_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *colmorphology_init(int w, int h);
-void colmorphology_apply( VJFrame *frame, int width, int height, int t, int val, int n);
-int	colmorphology_malloc(int w, int h);
-void	colmorphology_free(void);
+void colmorphology_apply( VJFrame *frame, int t, int val, int n);
+int colmorphology_malloc(int w, int h);
+void colmorphology_free(void);
 #endif

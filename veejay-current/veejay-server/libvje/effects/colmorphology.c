@@ -17,12 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "colmorphology.h"
-#include "common.h"
+
 typedef uint8_t (*morph_func)(uint8_t *kernel, uint8_t mt[9] );
 
 vj_effect *colmorphology_init(int w, int h)
@@ -92,9 +91,10 @@ static inline uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
 	return pixel_Y_hi_;
 }
 
-void colmorphology_apply( VJFrame *frame, int width, int height, int threshold, int type, int passes )
+void colmorphology_apply( VJFrame *frame, int threshold, int type, int passes )
 {
 	unsigned int i,x,y;
+	const unsigned int width = frame->width;
 	unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t kernels[8][9] ={
@@ -102,8 +102,8 @@ void colmorphology_apply( VJFrame *frame, int width, int height, int threshold, 
 		 { 0,1,0, 1,1,1, 0,1,0 },//1
 		 { 0,0,0, 1,1,1, 0,0,0 },//2
 		 { 0,1,0, 0,1,0, 0,1,0 },//3
-		 { 0,0,1, 0,1,0, 1,0,0 },//4	
-		 { 1,0,0, 0,1,0, 0,0,1 },	
+		 { 0,0,1, 0,1,0, 1,0,0 },//4
+		 { 1,0,0, 0,1,0, 0,0,1 },
 		 { 1,1,1, 0,0,0, 0,0,0 },
 		 { 0,0,0, 0,0,0, 1,1,1 }
 		};

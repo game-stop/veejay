@@ -458,8 +458,7 @@ extern int bgpush_prepare( VJFrame *frame );
 
 extern void cartonize_apply( VJFrame *frame, int b1, int b2, int b3 );
 extern void morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
-
-extern void 	colmorphology_apply( VJFrame *frame, int w, int h, int t, int v, int p);
+extern void colmorphology_apply( VJFrame *frame, int t, int v, int p);
 
 extern void		blob_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, int p3);
 
