@@ -20,13 +20,8 @@
 
 #ifndef FISHEYE_H
 #define FISHEYE_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *fisheye_init(int w, int h);
 int fisheye_malloc(int w, int h);
 void fisheye_free();
-void fisheye_apply(VJFrame *frame, int width, int height, int val, int alpha );
+void fisheye_apply(VJFrame *frame, int val, int alpha );
 #endif

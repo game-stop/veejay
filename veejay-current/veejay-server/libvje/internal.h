@@ -432,8 +432,7 @@ extern void magicmirror_apply(VJFrame *frame, int x, int y, int d, int n, int al
 extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int n, int m, int border, int alpha);
 extern void smear_apply(VJFrame *frame, int n, int m);
 extern void raster_apply(VJFrame *frame, int v, int mode);
-
-extern void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha );
+extern void fisheye_apply(VJFrame *frame, int v, int alpha );
 
 extern void swirl_apply(VJFrame *frame, int w, int h , int v );
 

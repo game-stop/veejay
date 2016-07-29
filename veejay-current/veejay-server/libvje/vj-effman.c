@@ -209,7 +209,7 @@ static void vj_effman_apply_image_effect(
 	radialblur_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
     case VJ_IMAGE_EFFECT_FISHEYE:
-	fisheye_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
+	fisheye_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_PIXELSMEAR:
 	smear_apply(frames[0], arg[0], arg[1]);
