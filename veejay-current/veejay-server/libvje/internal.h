@@ -478,8 +478,7 @@ extern void flare_apply(VJFrame *frame, int type, int threshold, int radius );
 extern void constantblend_apply(VJFrame *frame, int type, int scale, int y );
 extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
                            int x1, int y1, int width, int height);
-
-extern void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse );
+extern void threshold_apply( VJFrame *frame, VJFrame *frame2, int threshold, int reverse );
 
 extern void motionmap_apply( VJFrame *frame, int threshold, int reverse, int draw, int his, int op, int ip, int la, int ad );
 
