@@ -17,9 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+#include <libvje/effects/common.h>
 #include <libvjmem/vjmem.h>
 #include "transop.h"
 
@@ -77,8 +75,8 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
 
 	int view_width = twidth;
 	int view_height = theight;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	int sy = y1;
 	int sx = x1;
 
