@@ -24,10 +24,8 @@
 	in EffecTV ( http://effectv.sf.net ).
 	
 */
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "nervous.h"
 
@@ -85,10 +83,10 @@ void	nervous_free(void)
 }	
 
 
-void nervous_apply( VJFrame *frame, int width, int height, int delay)
+void nervous_apply( VJFrame *frame, int delay)
 {
-    int len = (width * height);
-    int uv_len = (frame->ssm == 1 ? frame->len : frame->uv_len);
+	const unsigned int len = frame->len;
+	int uv_len = (frame->ssm == 1 ? frame->len : frame->uv_len);
 	uint8_t *NY = nervous_buf[0] + (len * frames_elapsed );
 	uint8_t *NCb= nervous_buf[1] + (uv_len * frames_elapsed );
 	uint8_t *NCr= nervous_buf[2] + (uv_len * frames_elapsed );
