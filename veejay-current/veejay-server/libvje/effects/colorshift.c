@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "colorshift.h"
-#include "common.h"
 
 vj_effect *colorshift_init(int w, int h)
 {
@@ -101,7 +98,7 @@ static void softmask2_applycbcr(VJFrame *frame, int paramt)
 static void softmask2_applyycbcr(VJFrame *frame, int paramt)
 {
     const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const unsigned int uv_len = (frame->ssm ? len : frame->uv_len);
 	
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -168,11 +165,11 @@ static void softmask_applycbcr(VJFrame *frame, int paramt)
 
 static void softmask_applyycbcr(VJFrame *frame, int paramt)
 {
-	const int len =  frame->len;
+	const unsigned int len =  frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const unsigned int uv_len = (frame->ssm ? len : frame->uv_len);
 
     unsigned int x;
     for (x = 0; x < len; x++)
