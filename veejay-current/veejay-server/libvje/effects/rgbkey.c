@@ -18,16 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <math.h>
-#include <libvje/vje.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 #include "rgbkey.h"
-#include "common.h"
 
 extern int yuv_sws_get_cpu_flags();
 
