@@ -492,8 +492,7 @@ extern void distortion_destroy();
 extern void rotozoom_destroy();
 
 extern void timedistort_apply( VJFrame *frame, int val );
-
-extern void chameleon_apply( VJFrame *frame, int w, int h, int mode );
+extern void chameleon_apply( VJFrame *frame, int mode );
 
 extern void	chameleonblend_apply( VJFrame *frame, VJFrame *source, int w, int h, int mode );
 

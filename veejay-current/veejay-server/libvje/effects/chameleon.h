@@ -21,7 +21,7 @@
 #ifndef CHAMELEON_H
 #define CHAMELEON_H
 vj_effect *chameleon_init(int w, int h);
-void chameleon_apply( VJFrame *frame, int width, int height, int mode);
+void chameleon_apply( VJFrame *frame, int mode);
 int chameleon_malloc(int w, int h );
 void chameleon_free();
 int chameleon_prepare( uint8_t *bg[4], int w, int h );

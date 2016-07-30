@@ -22,15 +22,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
-#include "chameleon.h"
-#include "common.h"
 #include "softblur.h"
+#include "chameleon.h"
+
 vj_effect *chameleon_init(int w, int h)
 {
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -237,9 +235,9 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 	plane = plane & (PLANES-1);
 }
 
-void chameleon_apply( VJFrame *frame, int width, int height, int mode)
+void chameleon_apply( VJFrame *frame, int mode)
 {
-	const int len = (width * height);
+	const unsigned int len = frame->len;
 	VJFrame source;
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, tmpimage, strides );
