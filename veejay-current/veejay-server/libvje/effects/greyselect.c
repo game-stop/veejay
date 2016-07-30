@@ -17,12 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "greyselect.h"
 
 vj_effect *greyselect_init(int w, int h)
@@ -66,7 +63,7 @@ vj_effect *greyselect_init(int w, int h)
 
 void greyselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int swap)
 {
-	const int len = frame->len;
+	const unsigned int len = frame->len;
     uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
 	int cb, cr;
