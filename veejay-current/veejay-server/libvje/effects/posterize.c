@@ -17,12 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "posterize.h"
-#include "common.h"
+
 vj_effect *posterize_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -75,5 +74,5 @@ static void _posterize_y_simple(uint8_t *src[3], int len, int value, int thresho
 
 void posterize_apply(VJFrame *frame, int factor, int t1,int t2)
 {
-	_posterize_y_simple( frame->data, (frame->width*frame->height), factor, t1,t2);
+	_posterize_y_simple( frame->data, frame->len, factor, t1,t2);
 }
