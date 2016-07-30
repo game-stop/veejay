@@ -17,13 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "autoeq.h"
-#include <stdlib.h>
-#include "common.h"
+
 vj_effect *autoeq_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -73,7 +71,7 @@ void	autoeq_free()
 }
 
 
-void autoeq_apply( VJFrame *frame, int width, int height, int val, int intensity, int strength)
+void autoeq_apply( VJFrame *frame, int val, int intensity, int strength)
 {
 	if( val == 0 )
 	{

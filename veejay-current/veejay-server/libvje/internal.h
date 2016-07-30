@@ -482,8 +482,7 @@ extern void threshold_apply( VJFrame *frame, VJFrame *frame2, int threshold, int
 extern void motionmap_apply( VJFrame *frame, int threshold, int reverse, int draw, int his, int op, int ip, int la, int ad );
 extern void rgbchannel_apply( VJFrame *frame, int chr, int chg , int chb);
 extern void differencemap_apply( VJFrame *f, VJFrame *f2, int t1, int rev, int show );
-
-extern void autoeq_apply( VJFrame *frame, int width, int height, int val, int i, int s);
+extern void autoeq_apply( VJFrame *frame, int val, int i, int s);
 
 extern void colorhis_apply( VJFrame *frame, int w, int h, int v, int m, int i, int s );
 

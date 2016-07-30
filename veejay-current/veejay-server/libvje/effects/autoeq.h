@@ -20,12 +20,8 @@
 
 #ifndef AUTOEQ_H
 #define AUTOEQ_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *autoeq_init(int w, int h);
 int autoeq_malloc(int w , int h );
 void autoeq_free( );
-void autoeq_apply( VJFrame *frame, int width, int height, int val, int intensity, int strength);
+void autoeq_apply( VJFrame *frame, int val, int intensity, int strength);
 #endif
