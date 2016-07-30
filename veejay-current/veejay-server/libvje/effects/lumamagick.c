@@ -19,13 +19,10 @@
  */
 
 /* 7 ,14, 24, 25, 26 */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvje/internal.h>
 #include <libvjmem/vjmem.h>
 #include "lumamagick.h"
-#include "common.h"
 /* 04/01/03: added transparency parameters for frame a and frame b in each function */
 
 vj_effect *lumamagick_init(int width, int height)

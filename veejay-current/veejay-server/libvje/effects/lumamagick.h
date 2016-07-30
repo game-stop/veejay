@@ -20,11 +20,6 @@
 
 #ifndef LUMAMAGIC_H
 #define LUMAMAGIC_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *lumamagick_init();
 void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int op_a, int op_b);
-
 #endif
