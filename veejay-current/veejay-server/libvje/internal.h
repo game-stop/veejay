@@ -494,8 +494,7 @@ extern void rotozoom_destroy();
 extern void timedistort_apply( VJFrame *frame, int val );
 extern void chameleon_apply( VJFrame *frame, int mode );
 extern void chameleonblend_apply( VJFrame *frame, VJFrame *source, int mode );
-
-extern void	baltantv_apply (VJFrame *frame, int w, int h , int stride, int mode );
+extern void baltantv_apply (VJFrame *frame, int stride, int mode );
 
 extern void	radioactivetv_apply( VJFrame *a, VJFrame *b,int w, int h, int mode, int t, int sn, int threhold);
 
