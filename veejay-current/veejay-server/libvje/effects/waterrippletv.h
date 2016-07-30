@@ -20,13 +20,8 @@
 
 #ifndef WARIPPLETV_H
 #define WARIPPLETV_H
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect* waterrippletv_init(int width, int height);
 int waterrippletv_malloc(int w, int h);
 void waterrippletv_free();
-void waterrippletv_apply(VJFrame *frame, int width, int height, int val, int loop, int decay);
+void waterrippletv_apply(VJFrame *frame, int val, int loop, int decay);
 #endif

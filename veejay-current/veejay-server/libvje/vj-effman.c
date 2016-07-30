@@ -114,7 +114,7 @@ static void vj_effman_apply_image_effect(
 		break;
 
 	case VJ_IMAGE_EFFECT_RIPPLETV:
-	waterrippletv_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
+	waterrippletv_apply(frames[0],arg[0],arg[1],arg[2]);
 	break;
 	 case VJ_IMAGE_EFFECT_PENCILSKETCH:
 	  pencilsketch_apply(frames[0],arg[0],arg[1],arg[2],arg[3]);
