@@ -21,7 +21,7 @@
 #ifndef TIMEDISTORT_H
 #define TIMEDISTORT_H
 vj_effect *timedistort_init(int w, int h);
-void timedistort_apply( VJFrame *frame, int width, int height, int val);
+void timedistort_apply( VJFrame *frame, int val);
 int timedistort_malloc(int w, int h);
 void timedistort_free();
 #endif

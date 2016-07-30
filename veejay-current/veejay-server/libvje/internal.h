@@ -486,16 +486,12 @@ extern void autoeq_apply( VJFrame *frame, int val, int i, int s);
 extern void colorhis_apply( VJFrame *frame, int v, int m, int i, int s );
 
 extern void diff_destroy();
-
 extern void texmap_destroy();
-
 extern void contourextract_destroy();
-
 extern void distortion_destroy();
-
 extern void rotozoom_destroy();
 
-extern void timedistort_apply( VJFrame *frame, int w, int h, int val );
+extern void timedistort_apply( VJFrame *frame, int val );
 
 extern void chameleon_apply( VJFrame *frame, int w, int h, int mode );
 
