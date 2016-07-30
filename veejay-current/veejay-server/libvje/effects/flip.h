@@ -20,10 +20,6 @@
 
 #ifndef FLIP_H
 #define FLIP_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *flip_init();
 void flip_apply(VJFrame *frame, int n);
 #endif

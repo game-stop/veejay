@@ -17,10 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "flip.h"
 
 vj_effect *flip_init(int w, int h)
