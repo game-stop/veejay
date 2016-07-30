@@ -22,11 +22,8 @@
  * Add pseudo random noise to image
  */
 
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "randnoise.h"
 
 vj_effect *randnoise_init(int w, int h)
