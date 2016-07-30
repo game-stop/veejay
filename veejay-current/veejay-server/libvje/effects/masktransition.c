@@ -18,13 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "masktransition.h"
-#include <veejay/vj-task.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include <veejay/vj-task.h>
+#include "masktransition.h"
 
 vj_effect *masktransition_init(int width, int height)
 {
@@ -143,8 +140,7 @@ void	alpha_transition_apply( VJFrame *frame, uint8_t *B[4], int time_index )
 	}
 }
 
-void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int time_index, int duration  )
+void masktransition_apply( VJFrame *frame, VJFrame *frame2, int time_index, int duration  )
 {
 	alpha_blend_transition(
 		frame->data[0],frame->data[1],frame->data[2],frame->data[3],

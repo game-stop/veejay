@@ -20,11 +20,7 @@
 
 #ifndef MASKTRANSITION_H
 #define MASKTRANSITION_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
-void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int index, int duration);
-void	alpha_transition_apply( VJFrame *frame, uint8_t *B[4], int time_index );
+void masktransition_apply( VJFrame *frame, VJFrame *frame2, int index, int duration);
+void alpha_transition_apply( VJFrame *frame, uint8_t *B[4], int time_index );
 vj_effect *masktransition_init(int w, int h);
 #endif

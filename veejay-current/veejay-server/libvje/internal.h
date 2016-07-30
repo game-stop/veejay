@@ -526,7 +526,7 @@ extern void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int type, 
 extern void alphanegate_apply( VJFrame *frame, int value );
 extern void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality );
 extern void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin, int bmax);
-extern void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int time_index, int duration);
+extern void masktransition_apply( VJFrame *frame, VJFrame *frame2, int time_index, int duration);
 extern void alphadampen_apply( VJFrame *frame, int b1);
 extern void passthrough_apply( VJFrame *frame, VJFrame *frame2);
 extern void alphatransition_apply( VJFrame *frame, VJFrame *frame2, int time_index, int duration, int direction, int threshold);
