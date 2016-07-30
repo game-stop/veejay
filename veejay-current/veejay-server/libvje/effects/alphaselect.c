@@ -22,11 +22,8 @@
  * derived from greyselect.c
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "alphaselect.h"
 
 vj_effect *alphaselect_init(int w, int h)
@@ -76,9 +73,7 @@ vj_effect *alphaselect_init(int w, int h)
 	return ve;
 }
 
-void alphaselect_apply( VJFrame *frame, int width,
-		   int height, int i_angle, int r, int g,
-		   int b, int swap)
+void alphaselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int swap)
 {
     uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
@@ -87,6 +82,7 @@ void alphaselect_apply( VJFrame *frame, int width,
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     uint8_t val;
+	const unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -113,7 +109,7 @@ void alphaselect_apply( VJFrame *frame, int width,
     fg_cr = Cr;
 
 	if( swap == 0 ) {
-		for (pos = (width * height); pos != 0; pos--) {
+		for (pos = len; pos != 0; pos--) {
 			short xx, yy;
 			xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
 			yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
@@ -133,7 +129,7 @@ void alphaselect_apply( VJFrame *frame, int width,
 		}
 	}
 	else {
-		for (pos = (width * height); pos != 0; pos--) {
+		for (pos = len; pos != 0; pos--) {
 			short xx, yy;
 			xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
 			yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
@@ -153,4 +149,3 @@ void alphaselect_apply( VJFrame *frame, int width,
 		}
 	}
 }
-

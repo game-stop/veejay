@@ -20,13 +20,7 @@
 
 #ifndef ALPHASELECT_H
 #define ALPHASELECT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *alphaselect_init();
-void alphaselect_apply( VJFrame *frame, int width,
-		  int height, int i_angle, 
-		  int red, int green, int blue, int swap);
+void alphaselect_apply( VJFrame *frame, int i_angle, int red, int green, int blue, int swap);
 void alphaselect_free();
 #endif
