@@ -20,10 +20,6 @@
 
 #ifndef NEGATION_H
 #define NEGATION_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *negation_init(int w, int h);
 void negation_apply( VJFrame *frame, int val);
 #endif
