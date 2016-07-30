@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "alpha2img.h"
 
 vj_effect *alpha2img_init(int w, int h)
@@ -38,11 +36,11 @@ vj_effect *alpha2img_init(int w, int h)
 }
 
 
-void alpha2img_apply( VJFrame *frame, int width, int height)
+void alpha2img_apply( VJFrame *frame)
 {
-    uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
+	uint8_t *Y = frame->data[0];
+	uint8_t *Cb = frame->data[1];
+	uint8_t *Cr = frame->data[2];
 	uint8_t *a = frame->data[3];
 
 	veejay_memcpy(  Y, a, frame->len );

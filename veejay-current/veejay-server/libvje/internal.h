@@ -511,7 +511,7 @@ extern int chameleonblend_prepare( uint8_t *bg[4],int w, int h );
 extern void average_blend_apply( VJFrame *frame, VJFrame *frame2, int average_blend);
 extern void toalpha_apply( VJFrame *frame, int mode);
 extern void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int mode, int scale);
-extern void alpha2img_apply( VJFrame *frame, int width, int height);
+extern void alpha2img_apply( VJFrame *frame);
 extern void alphafill_apply( VJFrame *frame, int width, int height, int val);
 extern void alphaflatten_apply( VJFrame *frame, int width, int height, int mode);
 extern void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int width,int height, int n, int visible);

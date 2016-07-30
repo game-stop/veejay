@@ -384,7 +384,7 @@ static void vj_effman_apply_image_effect(
 		alphafill_apply( frames[0], frames[0]->width,frames[0]->height, arg[0] );
 		break;
 	case VJ_IMAGE_EFFECT_ALPHA2IMG:
-		alpha2img_apply( frames[0], frames[0]->width,frames[0]->height );
+		alpha2img_apply( frames[0] );
 		break;
 	case VJ_IMAGE_EFFECT_TOALPHA:
 		toalpha_apply( frames[0], arg[0] );

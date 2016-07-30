@@ -20,10 +20,6 @@
 
 #ifndef ALPHA2IMG_H
 #define ALPHA2IMG_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *alpha2img_init(int w, int h);
-void alpha2img_apply( VJFrame *frame, int width, int height);
+void alpha2img_apply( VJFrame *frame);
 #endif
