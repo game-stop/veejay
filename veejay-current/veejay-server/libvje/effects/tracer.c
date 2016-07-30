@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "tracer.h"
-#include "common.h"
 
 static uint8_t *trace_buffer[4] = { NULL,NULL,NULL,NULL};
 static int trace_counter = 0;
@@ -68,7 +65,8 @@ void tracer_free() {
 
 void tracer_apply(VJFrame *frame, VJFrame *frame2, int opacity, int n)
 {
-    unsigned int x, len = frame->len;
+    unsigned int x;
+	const unsigned int len = frame->len;
     unsigned int op1 = (opacity > 255) ? 255 : opacity;
     unsigned int op0 = 255 - op1;
     unsigned int uv_len = frame->uv_len;
