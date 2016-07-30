@@ -17,10 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "opacityadv.h"
 
@@ -53,7 +51,9 @@ void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,
                       int threshold, int threshold2)
 {
 
-    unsigned int x, y, len = frame->width * frame->height;
+    unsigned int x, y;
+	const unsigned int width = frame->width;
+	const unsigned len = frame->len;
     uint8_t a1, a2;
     unsigned int op0, op1;
  	uint8_t *Y = frame->data[0];
@@ -62,7 +62,6 @@ void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,
     uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-	const int width = frame->width;
 
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
