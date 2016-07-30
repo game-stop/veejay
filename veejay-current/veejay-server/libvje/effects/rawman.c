@@ -17,12 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "rawman.h"
+
 vj_effect *rawman_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -54,7 +53,7 @@ vj_effect *rawman_init(int w,int h)
 
 void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int YY)
 {
-    unsigned int len = frame->width * frame->height;
+    const unsigned int len = frame->len;
     unsigned int i;
     uint8_t *Y = frame->data[0];
 
