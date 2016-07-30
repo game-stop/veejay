@@ -17,14 +17,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include "median.h"
 #include <ctmf/ctmf.h>
+#include "median.h"
+
 vj_effect *medianfilter_init(int w, int h)
 {
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -46,6 +44,9 @@ vj_effect *medianfilter_init(int w, int h)
 
 void medianfilter_apply( VJFrame *frame, int val)
 {
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -53,15 +54,15 @@ void medianfilter_apply( VJFrame *frame, int val)
 	if( val == 0 )
 	   return; 
 
-	 uint8_t *buffer = (uint8_t*) vj_malloc(sizeof(uint8_t)*frame->width*frame->height*3);
-	 veejay_memset( buffer,0, frame->width*frame->height*3);
-	 ctmf( Y, buffer, frame->width,frame->height,frame->width,frame->width,val,1,1024*1024*8);
-	 ctmf( Cb,buffer + (frame->width*frame->height), frame->width,frame->height/2,frame->width,frame->width,val,1,512*1024);
-	 ctmf( Cr,buffer + (frame->width*frame->height*2), frame->width,frame->height/2,frame->width,frame->width,val,1,512*1024);
+	 uint8_t *buffer = (uint8_t*) vj_malloc(sizeof(uint8_t)*len*3);
+	 veejay_memset( buffer,0, len*3);
+	 ctmf( Y, buffer, width,height,width,width,val,1,1024*1024*8);
+	 ctmf( Cb,buffer + (len), width,height/2,width,width,val,1,512*1024);
+	 ctmf( Cr,buffer + (len*2), width,height/2,width,width,val,1,512*1024);
 
-	 veejay_memcpy( Y, buffer, frame->width*frame->height);
-	 veejay_memcpy( Cb,buffer + (frame->width*frame->height), frame->width*frame->height);
-	 veejay_memcpy( Cr,buffer + (frame->width*frame->height*2), frame->width*frame->height);
+	 veejay_memcpy( Y, buffer, len);
+	 veejay_memcpy( Cb,buffer + (len), len);
+	 veejay_memcpy( Cr,buffer + (len*2), len);
 	 
 	 free(buffer);
 
