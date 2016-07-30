@@ -495,8 +495,7 @@ extern void timedistort_apply( VJFrame *frame, int val );
 extern void chameleon_apply( VJFrame *frame, int mode );
 extern void chameleonblend_apply( VJFrame *frame, VJFrame *source, int mode );
 extern void baltantv_apply (VJFrame *frame, int stride, int mode );
-
-extern void	radioactivetv_apply( VJFrame *a, VJFrame *b,int w, int h, int mode, int t, int sn, int threhold);
+extern void radioactivetv_apply( VJFrame *a, VJFrame *b, int mode, int t, int sn, int threhold);
 
 extern void nervous_apply(VJFrame *Frame, int width, int height,int delay);
 
