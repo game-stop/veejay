@@ -17,13 +17,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "chromascratcher.h"
 #include "chromamagick.h"
+
 #define    RUP8(num)(((num)+8)&~8)
 static uint8_t *cframe[4] = {NULL,NULL,NULL,NULL};
 static int cnframe = 0;
@@ -139,9 +138,9 @@ void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int n,
                            int no_reverse)
 {
     unsigned int i;
-	const int width = frame->width;
-	const int height = frame->height;
-    const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+    const unsigned int len = frame->len;
     const unsigned int op_a = (opacity > 255) ? 255 : opacity;
     const unsigned int op_b = 255 - op_a;
     const int offset = len * cnframe;
