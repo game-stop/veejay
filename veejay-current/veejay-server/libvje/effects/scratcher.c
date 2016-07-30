@@ -18,15 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include "scratcher.h"
 #include "common.h"
-#include "opacity.h" 
+#include <libvjmem/vjmem.h>
+#include "opacity.h"
+#include "scratcher.h"
 
 static uint8_t *frame[4] = { NULL,NULL,NULL,NULL };
 static int nframe = 0;
