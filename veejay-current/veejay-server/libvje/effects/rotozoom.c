@@ -19,14 +19,9 @@
  */
 
 /* distortion effects */
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <math.h>
-#include <libvje/vje.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "rotozoom.h"
-#include "common.h"
 
 static int *test_roto[9];
 static int *test_roto2[9];
@@ -226,9 +221,9 @@ static void rotozoom1_apply(VJFrame *frame, uint8_t *data[3], int w, int h,
 
 void rotozoom_apply( VJFrame *frame, int mode, int rotate, int zoom, int autom)
 {
-	int width = frame->width;
-	int height = frame->height;
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned  int len = frame->len;
 	int strides[4] = {len ,len ,len ,0};
     switch (autom) {		/* alas must do memcpy */
     case 0:
