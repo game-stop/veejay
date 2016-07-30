@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "revtv.h"
-#include "common.h"
 
 vj_effect *revtv_init(int max_width, int max_height)
 {
@@ -65,8 +63,8 @@ void revtv_apply(VJFrame *frame, int linespace, int vscale, int color, int color
     int yval;
     int uv_width = frame->uv_width;
     int uv_height = frame->uv_height;
-    const int height = frame->height;
-    const int width = frame->width;
+    const unsigned int height = frame->height;
+    const unsigned int width = frame->width;
 
     int colorCb = bl_pix_get_color_cb(color);
     int colorCr = bl_pix_get_color_cr(color_num);
