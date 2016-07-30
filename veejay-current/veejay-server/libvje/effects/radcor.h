@@ -20,10 +20,6 @@
 
 #ifndef LENSCOR_H
 #define LENSCOR_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *radcor_init(int w, int h);
 int radcor_malloc(int w, int h);
 void radcor_free();
