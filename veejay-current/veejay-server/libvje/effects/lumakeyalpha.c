@@ -17,11 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "lumakeyalpha.h"
-#include "common.h"
 
 vj_effect *lumakeyalpha_init(int width, int height)
 {
@@ -54,9 +53,10 @@ vj_effect *lumakeyalpha_init(int width, int height)
     return ve;
 }
 
-void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int type, int opacity )
+void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int opacity )
 {
-	unsigned int i, len = width * height;
+	unsigned int i;
+	const unsigned int len = frame->len;
     unsigned int op1 = (opacity > 255) ? 255 : opacity;
     unsigned int op0 = 255 - op1;
 
@@ -77,37 +77,37 @@ void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, 
 
 				Y[i] = FEATHER( Y[i],op0,aB[i],Y2[i],op1 );
 				Cb[i]= FEATHER(Cb[i],op0,aB[i],Cb2[i],op1 );
-				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );	
+				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );
 			}	
 			break;
-		case 1:							
+		case 1:
 			for( i = 0; i < len; i ++ ) {
 				if( aA[i] == 0 )
 					continue;
 
 				Y[i] = FEATHER( Y[i],op0,aB[i],Y2[i],op1 );
 				Cb[i]= FEATHER(Cb[i],op0,aB[i],Cb2[i],op1 );
-				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );	
+				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );
 			}
 			break;
-		case 2:							
+		case 2:
 			for( i = 0; i < len; i ++ ) {
 				if( aB[i] == 0 || aA[i] == 0 )
 					continue;
 
 				Y[i] = FEATHER( Y[i],op0,aB[i],Y2[i],op1 );
 				Cb[i]= FEATHER(Cb[i],op0,aB[i],Cb2[i],op1 );
-				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );	
+				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );
 			}
 			break;
-		case 3:							
+		case 3:
 			for( i = 0; i < len; i ++ ) {
 				if( aB[i] == 0 && aA[i] == 0 )
 					continue;
 
 				Y[i] = FEATHER( Y[i],op0,aB[i],Y2[i],op1 );
 				Cb[i]= FEATHER(Cb[i],op0,aB[i],Cb2[i],op1 );
-				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );	
+				Cr[i]= FEATHER(Cr[i],op0,aB[i],Cr2[i],op1 );
 			}
 			break;
 		case 4:
@@ -120,14 +120,14 @@ void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, 
 				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );
 			}	
 			break;
-		case 5:						
+		case 5:
 			for( i = 0; i < len; i ++ ) {
 				if( aA[i] == 0 )
 					continue;
 
 				Y[i] = FEATHER( Y[i],op0,aA[i],Y2[i],op1 );
 				Cb[i]= FEATHER(Cb[i],op0,aA[i],Cb2[i],op1 );
-				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );	
+				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );
 			}
 			break;
 		case 6:	
@@ -137,7 +137,7 @@ void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, 
 
 				Y[i] = FEATHER( Y[i],op0,aA[i],Y2[i],op1 );
 				Cb[i]= FEATHER(Cb[i],op0,aA[i],Cb2[i],op1 );
-				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );	
+				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );
 			}
 			break;
 		case 7:	
@@ -147,7 +147,7 @@ void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, 
 
 				Y[i] = FEATHER( Y[i],op0,aA[i],Y2[i],op1 );
 				Cb[i]= FEATHER(Cb[i],op0,aA[i],Cb2[i],op1 );
-				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );	
+				Cr[i]= FEATHER(Cr[i],op0,aA[i],Cr2[i],op1 );
 			}
 			break;
 		

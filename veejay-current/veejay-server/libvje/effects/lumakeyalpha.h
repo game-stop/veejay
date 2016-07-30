@@ -20,10 +20,6 @@
 
 #ifndef LUMAKEYA_H
 #define LUMAKEYA_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *lumakeyalpha_init(int w, int h);
-void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int opacity );
+void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int opacity );
 #endif
