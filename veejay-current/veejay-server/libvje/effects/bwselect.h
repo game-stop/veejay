@@ -20,10 +20,6 @@
 
 #ifndef BWSELECT_H
 #define BWSELECT_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *bwselect_init();
 void bwselect_apply(VJFrame *frame, int min_threshold,int max_threshold, int mode, int gamma);
 #endif

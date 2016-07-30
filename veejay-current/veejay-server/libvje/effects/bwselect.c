@@ -18,11 +18,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "bwselect.h"
-#include "common.h"
+
 vj_effect *bwselect_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -79,9 +79,9 @@ static void gamma_setup(double gamma_value)
 void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int gamma, int mode)
 {
 	int r,c;
-	const int width = frame->width;
-	const int height = frame->height;
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
