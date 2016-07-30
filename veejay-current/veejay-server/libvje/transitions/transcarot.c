@@ -17,9 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include <libvje/effects/common.h>
 #include <libvjmem/vjmem.h>
 #include "transcarot.h"
 
@@ -147,8 +146,8 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
 	int reverse = 0;
 	int i;
 	unsigned int op0, op1;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	unsigned int len = frame->len;
 	unsigned int uv_width = frame->uv_width;
 	int uv_dy, uv_dye, uv_row_start, uv_row_length;
