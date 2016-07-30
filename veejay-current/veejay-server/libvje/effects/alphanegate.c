@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "alphanegate.h"
 
 vj_effect *alphanegate_init(int w, int h)
@@ -49,7 +47,7 @@ vj_effect *alphanegate_init(int w, int h)
 }
 
 
-void alphanegate_apply( VJFrame *frame, int width, int height, int val)
+void alphanegate_apply( VJFrame *frame, int val)
 {
     const unsigned int len = frame->len;
     uint8_t *A = frame->data[3];

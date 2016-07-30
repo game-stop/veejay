@@ -20,10 +20,6 @@
 
 #ifndef ALPHANEGATE_H
 #define ALPHANEGATE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *alphanegate_init(int w, int h);
-void alphanegate_apply( VJFrame *frame, int width, int height, int val);
+void alphanegate_apply( VJFrame *frame, int val);
 #endif

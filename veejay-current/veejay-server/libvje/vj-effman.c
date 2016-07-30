@@ -405,7 +405,7 @@ static void vj_effman_apply_image_effect(
 		pixelate_apply(frames[0],arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_ALPHANEGATE:
-		alphanegate_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+		alphanegate_apply(frames[0],arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_CHOKEMATTE:
 		gaussblur_apply(frames[0], arg[0],arg[1],arg[2] );

@@ -523,7 +523,7 @@ extern void alphablend_apply( VJFrame *frame, VJFrame *frame2);
 extern void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int opacity );
 extern void chromamagickalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int opacity );
 extern void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int mode );
-extern void alphanegate_apply( VJFrame *frame, int width, int height, int value );
+extern void alphanegate_apply( VJFrame *frame, int value );
 extern void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality );
 extern void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin, int bmax);
 extern void masktransition_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int time_index, int duration);
