@@ -20,11 +20,7 @@
 
 #ifndef TRAVELMATTE_H
 #define TRAVELMATTE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *travelmatte_init(int w, int h);
-void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode);
+void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int mode);
 void travelmatte_free();
 #endif
