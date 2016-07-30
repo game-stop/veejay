@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+
 #include <libvje/effects/common.h>
+#include <libvjmem/vjmem.h>
 #include "transblend.h"
 
 vj_effect *transblend_init(int width, int height)
@@ -69,8 +67,8 @@ void transblend_apply( VJFrame *frame, VJFrame *frame2, int type,
     int x, y;
     int p, q;
     int uv_width = frame->uv_width;
-    const int width = frame->width;
-    const int height = frame->height;
+    const unsigned int width = frame->width;
+    const unsigned int height = frame->height;
 
     int uvy1, uvy2, uvx1, uvx2;
     uint8_t *Y, *Cb, *Cr, *Y2, *Cb2, *Cr2;
