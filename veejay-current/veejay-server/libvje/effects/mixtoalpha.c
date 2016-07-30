@@ -17,14 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-    	
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "mixtoalpha.h"
 
 vj_effect *mixtoalpha_init(int w, int h)
@@ -57,9 +52,9 @@ vj_effect *mixtoalpha_init(int w, int h)
     return ve;
 }
 
-void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int mode, int scale)
+void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int mode, int scale)
 {
-	int len = frame->len;
+	const unsigned int len = frame->len;
 	uint8_t *a = frame->data[3];
 	const uint8_t *Y = frame2->data[0];
 	uint8_t __lookup_table[256];
@@ -74,7 +69,7 @@ void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, in
 		veejay_memcpy(a, frame2->data[3], len );
 	}
 
-	if( scale ) {	
+	if( scale ) {
 		int i;
 		for( i = 0; i < len; i ++ )
 		{
