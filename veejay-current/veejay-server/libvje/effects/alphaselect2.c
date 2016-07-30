@@ -22,11 +22,8 @@
  * originally from http://gc-films.com/chromakey.html
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "alphaselect2.h"
 
 vj_effect *alphaselect2_init(int w, int h)

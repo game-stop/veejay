@@ -20,10 +20,6 @@
 
 #ifndef ALPHASELECT2_H
 #define ALPHASELECT2_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *alphaselect2_init();
 void alphaselect2_apply( VJFrame *frame, int tola,int red,int green,int blue, int tolb,int use_alpha);
 #endif
