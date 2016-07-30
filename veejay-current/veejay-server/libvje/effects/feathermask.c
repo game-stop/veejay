@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdlib.h>
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "feathermask.h"
-#include "common.h"
 
 vj_effect *feathermask_init(int w,int h)
 {
@@ -54,11 +51,11 @@ void feathermask_free()
 	}
 }
 
-static void feathermask1_apply( VJFrame *frame, uint8_t *alpha, int width, int height)
+static void feathermask1_apply( VJFrame *frame, uint8_t *alpha, unsigned int width, unsigned int height)
 {
-    int r, c;
-    int len = (width * height) - width;
- 	uint8_t *aA = frame->data[3];
+	int r, c;
+	const unsigned int len = frame->len - width;
+	uint8_t *aA = frame->data[3];
 	
 	for(r=width; r < len; r+=width) {
 		for(c=1; c < (width-1); c++) {
@@ -76,9 +73,11 @@ static void feathermask1_apply( VJFrame *frame, uint8_t *alpha, int width, int h
 	}
 }
 
-void feathermask_apply(VJFrame *frame, int width, int height)
+void feathermask_apply(VJFrame *frame)
 {
-	vj_frame_copy1( frame->data[3],mask, width * height );
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	vj_frame_copy1( frame->data[3],mask, frame->len );
 	feathermask1_apply(frame, mask, width, height);
 }
 

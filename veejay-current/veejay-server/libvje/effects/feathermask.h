@@ -20,12 +20,8 @@
 
 #ifndef FEATHERMASK_H
 #define FEATHERMASK_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *feathermask_init(int w, int h);
-void feathermask_apply( VJFrame *frame, int width, int height);
+void feathermask_apply( VJFrame *frame);
 int feathermask_malloc(int width, int height);
 void feathermask_free();
 #endif
