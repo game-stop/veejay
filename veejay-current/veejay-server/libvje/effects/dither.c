@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "dither.h"
-#include "common.h"
 
 vj_effect *dither_init(int w, int h)
 {
@@ -60,8 +58,8 @@ void dither_apply(VJFrame *frame, int size, int random_on)
 	long int dith[size][size];
 	long int i, j, d, v, l, m;
 	uint8_t *Y = frame->data[0];
-	int width, height;
-	width=frame->width; height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 
 	if( last_size != size || random_on )
 	{
