@@ -20,9 +20,6 @@
 
 #ifndef ALEVELCORRECTION_H
 #define ALEVELCORRECTION_H
-#include <sys/types.h>
-#include <stdint.h>
-#include <libvje/vje.h>
 void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin, int bmax);
 vj_effect *levelcorrection_init(int w,int h);
 #endif
