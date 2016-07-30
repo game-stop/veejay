@@ -17,19 +17,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include <libavutil/avutil.h>
-#include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-msg.h>
-#include "common.h"
-#include "cali.h"
 #include "softblur.h"
+#include "cali.h"
 
 typedef struct
 {
@@ -111,7 +104,7 @@ void cali_free(void *d)
 
 static int flood =0;
 
-void cali_apply(void *ed, VJFrame *frame, int w, int h,int mode, int full)
+void cali_apply(void *ed, VJFrame *frame,int mode, int full)
 {
 	cali_data *c = (cali_data*) ed;
 
@@ -129,24 +122,25 @@ void cali_apply(void *ed, VJFrame *frame, int w, int h,int mode, int full)
 	uint8_t *Y = frame->data[0];
 	uint8_t *U = frame->data[1];
 	uint8_t *V = frame->data[2];
-	const int chroma = 127;	
+	const int chroma = 127;
 	const int uv_len = frame->uv_len;
+	const unsigned int len = frame->len;
 	int p,i;
-	const int len = w*h;
+
 	if( mode == 1 ) {
 		//@ just show dark frame
-		veejay_memcpy(Y, c->b[0], (w*h));
+		veejay_memcpy(Y, c->b[0], (len));
 		veejay_memcpy(U, c->b[1], uv_len);
 		veejay_memcpy(V, c->b[2], uv_len);
 		return;
 	} else if ( mode == 2 ) {
 		//@ just show light frame
-		veejay_memcpy(Y, c->l[0], (w*h));
+		veejay_memcpy(Y, c->l[0], (len));
 		veejay_memcpy(U, c->l[1], uv_len);
 		veejay_memcpy(V, c->l[2], uv_len);
 		return;
 	} else if ( mode == 3 ) {
-		veejay_memcpy(Y, c->m[0], (w*h));
+		veejay_memcpy(Y, c->m[0], (len));
 		veejay_memcpy(U, c->m[1], uv_len);
 		veejay_memcpy(V, c->m[2], uv_len);
 		return;
@@ -195,7 +189,7 @@ void cali_apply(void *ed, VJFrame *frame, int w, int h,int mode, int full)
 
 	} else {
 		//@ just show result of frame - dark current
-		for( i = 0; i <(w*h); i ++ ) {
+		for( i = 0; i <(len); i ++ ) {
 			p = ( Y[i] - by[i] );
 			if( p < 0 )
 				Y[i] = pixel_Y_lo_;
@@ -218,7 +212,3 @@ void cali_apply(void *ed, VJFrame *frame, int w, int h,int mode, int full)
 	}
 
 }
-
-
-
-

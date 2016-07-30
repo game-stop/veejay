@@ -499,10 +499,7 @@ extern void radioactivetv_apply( VJFrame *a, VJFrame *b, int mode, int t, int sn
 extern void nervous_apply(VJFrame *Frame, int delay);
 extern void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d);
 extern void iris_apply( VJFrame *frame,VJFrame *frame2, int value, int shape );
-
-extern void cali_apply(void *d , VJFrame *frame,
-                int width, int height, 
-                int mode, int full);
+extern void cali_apply(void *d , VJFrame *frame, int mode, int full);
 
 extern void waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, int loopnum, int decay);
 

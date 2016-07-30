@@ -24,5 +24,5 @@ vj_effect *cali_init(int width, int height);
 void cali_free(void *d);
 int cali_malloc(void **c, int w, int h);
 int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *data, int len, int uv_len );
-void cali_apply(void *d , VJFrame *frame,int width, int height, int mode, int full);
+void cali_apply(void *d , VJFrame *frame, int mode, int full);
 #endif
