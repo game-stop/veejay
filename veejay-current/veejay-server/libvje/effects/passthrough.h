@@ -20,11 +20,6 @@
 
 #ifndef PASSTHROUGHB_H
 #define PASSTHROUGHB_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *passthrough_init(int w, int h);
 void passthrough_apply( VJFrame *frame, VJFrame *frame2);
-
 #endif
