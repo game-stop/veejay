@@ -21,7 +21,7 @@
 #ifndef CHAMELEONBLEND_H
 #define CHAMELEONBLEND_H
 vj_effect *chameleonblend_init(int w, int h);
-void chameleonblend_apply( VJFrame *frame, VJFrame *source, int width, int height, int mode);
+void chameleonblend_apply( VJFrame *frame, VJFrame *source, int mode);
 int chameleonblend_malloc(int w, int h );
 int chameleonblend_prepare( uint8_t *bg[4],int w, int h );
 void chameleonblend_free();
