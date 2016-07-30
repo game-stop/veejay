@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+
 #include <libvje/effects/common.h>
+#include <libvjmem/vjmem.h>
 #include "slidingdoor.h"
 
 vj_effect *slidingdoor_init(int width, int height)
@@ -61,7 +59,7 @@ vj_effect *slidingdoor_init(int width, int height)
 void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int mode)
 {
 	unsigned int i;
-	const int len = frame->len;
+	const unsigned int len = frame->len;
 	const uint8_t *Y2 = frame2->data[0];
     const uint8_t *Cb2= frame2->data[1];
     const uint8_t *Cr2= frame2->data[2];
