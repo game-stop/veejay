@@ -18,11 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <libvje/vje.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include <veejay/vj-task.h>
 #include "average-blend.h"
@@ -48,8 +44,7 @@ vj_effect *average_blend_init(int w, int h)
     return ve;
 }
 
-static void average_blend_apply1( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int average_blend)
+static void average_blend_apply1( VJFrame *frame, VJFrame *frame2, int average_blend)
 {
 	unsigned int i;
 	for( i = 0; i < average_blend; i ++ ) {
@@ -70,24 +65,22 @@ static void	average_blend_apply_job( void *arg )
 	}
 }
 
-void average_blend_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int average_blend)
+void average_blend_apply( VJFrame *frame, VJFrame *frame2, int average_blend)
 {
-	average_blend_apply1( frame,frame2,width,height,average_blend );
+	average_blend_apply1( frame,frame2,average_blend );
 }
 
-void average_blend_applyN( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int average_blend)
+void average_blend_applyN( VJFrame *frame, VJFrame *frame2,int average_blend)
 {
 	if( vj_task_available() ) {
 		vj_task_set_from_frame( frame );
 		vj_task_set_param( average_blend,0 );
 		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, (performer_job_routine) &average_blend_apply_job );
 	} else {
-		average_blend_apply1( frame,frame2,width,height,average_blend );
+		average_blend_apply1( frame,frame2,average_blend );
 	}
 }
-	
+
 static void	average_blend_blend_apply1( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int average_blend )
 {
 }
