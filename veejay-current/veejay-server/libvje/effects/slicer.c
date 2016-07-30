@@ -17,15 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-    	
-#include <stdint.h>	
-#include <stdio.h>
-#include <config.h>
-#include <stdlib.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "slicer.h"
+
 static int *slice_xshift = NULL;
 static int *slice_yshift = NULL;
 static int last_period = -1;
@@ -119,8 +115,8 @@ vj_effect *slicer_init(int w, int h)
 void slicer_apply( VJFrame *frame, VJFrame *frame2, int val1, int val2,int shatter, int period, int mode)
 {
 	int x,y,p,q;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	const unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
