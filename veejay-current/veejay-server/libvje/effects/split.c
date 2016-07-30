@@ -15,12 +15,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdio.h>
-#include <stdint.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "split.h"
-#include "common.h"
+
 static uint8_t *split_buf[4] = { NULL,NULL,NULL, NULL };
 
 vj_effect *split_init(int width,int height)
