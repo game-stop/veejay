@@ -43,15 +43,10 @@
    along with this program; see the file COPYING.  If not, write to the Free
    Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
 #include "common.h"
-#include "distort.h"
+#include <libvjmem/vjmem.h>
 #include "widthmirror.h"
+#include "distort.h"
 
 static int plasma_table[512];
 static int plasma_pos1 = 0;
@@ -153,9 +148,9 @@ void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, 
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-	const int height = (const int) frame->height;
-	const int width = (const int) frame->width;
-	const int len = frame->len;
+	const unsigned int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int len = frame->len;
 
 	int strides[4] = { len,len,len, 0 };
 
