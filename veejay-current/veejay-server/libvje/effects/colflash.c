@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "colflash.h"
-#include "common.h"
 
 // very simple color flashing fx
 
@@ -61,25 +59,25 @@ vj_effect *colflash_init(int w, int h)
 static int color_flash_ = 0;
 static int color_delay_ = 0;
 static int delay_ = 0;
-void colflash_apply( VJFrame *frame, int width, int height, int f,int r, int g, int b, int d)
+void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d)
 {
-	unsigned int len =  frame->len;
-	unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const unsigned int len =  frame->len;
+	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 
-  	uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
 	uint8_t y=0,u=0,v=0;
 
 	_rgb2yuv( r,g,b,y,u,v );
-	
+
 	if( d != delay_ )
 	{
 		delay_ = d;
 		color_delay_ = d;
-	}	
-	
+	}
+
 	if( color_delay_ )
 	{
 		veejay_memset(  Y, y, len );
@@ -95,8 +93,7 @@ void colflash_apply( VJFrame *frame, int width, int height, int f,int r, int g, 
 			color_delay_ = delay_;
 			color_flash_ = 0;
 		}
-		
 	}
-	
+
 }
 

@@ -497,8 +497,7 @@ extern void chameleonblend_apply( VJFrame *frame, VJFrame *source, int mode );
 extern void baltantv_apply (VJFrame *frame, int stride, int mode );
 extern void radioactivetv_apply( VJFrame *a, VJFrame *b, int mode, int t, int sn, int threhold);
 extern void nervous_apply(VJFrame *Frame, int delay);
-
-extern void colflash_apply( VJFrame *frame, int width, int height, int f,int r, int g, int b, int d);
+extern void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d);
 
 extern	void	iris_apply( VJFrame *frame,VJFrame *frame2, int width, int height, int value, int shape );
 

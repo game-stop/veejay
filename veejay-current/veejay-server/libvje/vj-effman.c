@@ -267,8 +267,7 @@ static void vj_effman_apply_image_effect(
 	break;
 
 	case VJ_IMAGE_EFFECT_COLFLASH:
-	colflash_apply(frames[0], frames[0]->width,frames[0]->height,arg[0],
-			arg[1],arg[2],arg[3],arg[4] );
+	colflash_apply(frames[0],arg[0],arg[1],arg[2],arg[3],arg[4] );
 	break;
      case VJ_IMAGE_EFFECT_COLORMAP:
 	colormap_apply(frames[0], arg[0], arg[1], arg[2]);
