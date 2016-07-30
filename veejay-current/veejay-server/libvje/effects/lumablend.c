@@ -18,12 +18,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include <veejay/vj-task.h>
-#include "common.h"
 #include "lumablend.h"
 
 vj_effect *lumablend_init(int w, int h)
@@ -67,8 +64,8 @@ vj_effect *lumablend_init(int w, int h)
 static void opacity_by_threshold(VJFrame *frame, VJFrame *frame2,
 								 int threshold, int threshold2, int opacity)
 {
-	const int width = frame->width;
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int len = frame->len;
 	uint8_t **yuv1 = frame->data;
 	uint8_t **yuv2 = frame2->data;
 	unsigned int x, y;
@@ -95,8 +92,8 @@ static void opacity_by_threshold(VJFrame *frame, VJFrame *frame2,
 static void opacity_by_threshold_(VJFrame *frame, VJFrame *frame2,
 								  int threshold, int threshold2, int opacity)
 {
-	const int width = frame->width;
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int len = frame->len;
 	uint8_t **yuv1 = frame->data;
 	uint8_t **yuv2 = frame2->data;
 	unsigned int x, y;
@@ -121,8 +118,8 @@ static void opacity_by_threshold_(VJFrame *frame, VJFrame *frame2,
 static void opacity_by_threshold_blur(VJFrame *frame, VJFrame *frame2,
 									  int threshold, int threshold2, int opacity)
 {
-	const int width = frame->width;
-	const int len = frame->len - width;
+	const unsigned int width = frame->width;
+	const unsigned int len = frame->len - width;
 	uint8_t **yuv1 = frame->data;
 	uint8_t **yuv2 = frame2->data;
 	unsigned int x, y;
