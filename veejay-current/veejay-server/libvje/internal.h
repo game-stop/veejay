@@ -519,7 +519,7 @@ extern void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int mode);
 extern void feathermask_apply( VJFrame *frame );
 extern void alphaselect_apply( VJFrame *frame, int i_angle, int r, int g,int b, int swap);
 extern void alphaselect2_apply( VJFrame *frame, int tola, int r, int g,int b, int tolb,int alpha);
-extern void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
+extern void alphablend_apply( VJFrame *frame, VJFrame *frame2);
 extern void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int opacity );
 extern void chromamagickalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int opacity );
 extern void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int type, int mode );
