@@ -17,14 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include "diffmap.h"
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "softblur.h"
+#include "diffmap.h"
 
 typedef int (*morph_func)(uint8_t *kernel, uint8_t mt[9] );
 
@@ -78,12 +74,14 @@ void		differencemap_free(void)
 #define MAX(a,b) ( (a)>(b) ? (a) : (b) )
 #endif
 
-void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse,
+void differencemap_apply( VJFrame *frame, VJFrame *frame2, int threshold, int reverse,
 		int show )
 {
 	unsigned int x,y;
-	int len = (width * height);
-   	uint8_t *Y = frame->data[0];
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	unsigned int len = frame->len;
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	uint8_t *Y2 = frame2->data[0];
