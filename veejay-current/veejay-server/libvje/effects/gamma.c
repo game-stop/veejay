@@ -17,10 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <math.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "gamma.h"
 
@@ -62,7 +60,8 @@ static void gamma_setup(int width, int height,
 
 void gamma_apply(VJFrame *frame, int gamma_value)
 {
-    unsigned int i, len = frame->len;
+	unsigned int i;
+	const unsigned len = frame->len;
 	uint8_t *Y = frame->data[0];
     
     if (gamma_value != gamma_flag) {
