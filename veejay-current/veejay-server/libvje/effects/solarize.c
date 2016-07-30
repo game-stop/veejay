@@ -1,3 +1,4 @@
+
 /* 
  * Linux VeeJay
  *
@@ -17,12 +18,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "solarize.h"
-#include <stdlib.h>
+
 vj_effect *solarize_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -46,7 +46,8 @@ vj_effect *solarize_init(int w,int h)
 
 void solarize_apply( VJFrame *frame, int threshold)
 {
-    int i, len= frame->len;
+    unsigned int i;
+	const unsigned int len= frame->len;
     uint8_t val;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
