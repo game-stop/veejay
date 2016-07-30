@@ -20,10 +20,6 @@
 
 #ifndef AGAUSSB_H
 #define AGAUSSB_H
-#include <sys/types.h>
-#include <stdint.h>
-#include <libvje/vje.h>
-
 void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality );
 void gaussblur_free();
 int	gaussblur_malloc(int w, int h);
