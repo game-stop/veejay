@@ -20,10 +20,6 @@
 
 #ifndef MEANFILTER_H
 #define MEANFILTER_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *meanfilter_init(int w, int h);
 void meanfilter_apply( VJFrame *frame );
 int meanfilter_malloc(int w, int h);
