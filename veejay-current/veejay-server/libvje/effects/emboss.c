@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "emboss.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include "common.h"
 
 vj_effect *emboss_init(int w, int h)
 {
@@ -86,7 +83,7 @@ static void xtreme_emboss_framedata(VJFrame *frame, int width, int height)
 {
 	unsigned int r, c;
 	uint8_t *Y = frame->data[0];
-	int len = ( width * height ) - width;
+	int len = ( frame->len ) - width;
 	for (r = width; r < len; r += width)
 	{
 		for (c = 1; c < (width-1); c++)
@@ -107,7 +104,7 @@ static void xtreme_emboss_framedata(VJFrame *frame, int width, int height)
 static void another_try_edge(VJFrame *frame, int w, int h)
 {
 	uint8_t p;
-	const unsigned int len=(w*h)-w;
+	const unsigned int len=frame->len-w;
 	unsigned int r,c;
 	uint8_t *Y = frame->data[0];
 	for(r=w; r < len; r+= w)
@@ -132,7 +129,7 @@ static void another_try_edge(VJFrame *frame, int w, int h)
 static void lines_white_balance_framedata(VJFrame *frame, int width, int height)
 {
 	unsigned int r, c;
-	const unsigned int len = (width * height) - width;
+	const unsigned int len = frame->len - width;
 	uint8_t val;
 	uint8_t *Y = frame->data[0];
 	for (r = width; r < len; r += width)
@@ -157,7 +154,7 @@ static void emboss_test_framedata(VJFrame *frame, int width, int height)
 {
 	int a, b, c;
 	int i;
-	const int len = width * height;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	for (i = 0; i < len; i++)
 	{
@@ -178,7 +175,7 @@ static void gray_emboss_framedata(VJFrame *frame, int width, int height)
 	int r, c;
 	uint8_t val;
 	uint8_t *Y = frame->data[0];
-	for (r = 0; r < (width * height); r += width)
+	for (r = 0; r < frame->len; r += width)
 	{
 		for (c = 0; c < width; c++)
 		{
@@ -206,7 +203,7 @@ static void aggressive_emboss_framedata(VJFrame *frame, int width, int height)
 	int r, c;
 	uint8_t val;
 	uint8_t *Y = frame->data[0];
-	const int len = width * height;
+	const int len = frame->len;
 	for (r = 0; r < len; r += width)
 	{
 		for (c = 0; c < width; c++)
@@ -234,7 +231,7 @@ static void dark_emboss_framedata(VJFrame *frame, int width, int height)
 {
 	int r, c;
 	uint8_t *Y = frame->data[0];
-	for (r = 0; r < (width * height); r += width)
+	for (r = 0; r < frame->len; r += width)
 	{
 		for (c = 0; c < width; c++)
 		{
@@ -260,7 +257,7 @@ static void grayish_mood_framedata(VJFrame *frame, int width, int height)
 {
 	int r, c;
 	uint8_t *Y = frame->data[0];
-	for (r = 0; r < (width * height); r += width)
+	for (r = 0; r < frame->len; r += width)
 	{
 		for (c = 0; c < width; c++)
 		{
@@ -285,7 +282,7 @@ static void grayish_mood_framedata(VJFrame *frame, int width, int height)
 static void blur_dark_framedata(VJFrame *frame, int width, int height)
 {
 	int r, c;
-	int len = (width*height) - width;
+	int len = frame->len - width;
 	/* incomplete */
 	uint8_t *Y = frame->data[0]; 
 	for (r = width; r < len; r += width)
@@ -307,8 +304,8 @@ static void blur_dark_framedata(VJFrame *frame, int width, int height)
 
 void emboss_apply(VJFrame *frame, int n)
 {
-	int width, height;
-	width=frame->width; height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 
 	switch (n)
 	{

@@ -20,10 +20,6 @@
 
 #ifndef EMBOSS_H
 #define EMBOSS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *emboss_init();
 void emboss_apply(VJFrame *frame, int n);
 #endif
