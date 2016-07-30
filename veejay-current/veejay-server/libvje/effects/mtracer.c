@@ -17,14 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdlib.h>
-#include <stdint.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "mtracer.h"
-#include "common.h"
 #include "magicoverlays.h"
-
 
 static uint8_t *mtrace_buffer[4] = { NULL,NULL,NULL,NULL };
 static int mtrace_counter = 0;
