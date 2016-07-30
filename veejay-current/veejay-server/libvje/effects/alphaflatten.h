@@ -20,10 +20,6 @@
 
 #ifndef ALPHAFLATTEN_H
 #define ALPHAFLATTEN_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *alphaflatten_init(int w, int h);
-void alphaflatten_apply( VJFrame *frame, int width, int height, int mode);
+void alphaflatten_apply( VJFrame *frame, int mode);
 #endif

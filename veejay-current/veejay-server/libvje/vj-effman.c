@@ -390,7 +390,7 @@ static void vj_effman_apply_image_effect(
 		toalpha_apply( frames[0], arg[0] );
 		break;
 	case VJ_IMAGE_EFFECT_ALPHAFLATTEN:
-		alphaflatten_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
+		alphaflatten_apply(frames[0], arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_ALPHAFEATHERMASK:
 		feathermask_apply(frames[0], frames[0]->width, frames[0]->height );
