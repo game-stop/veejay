@@ -16,13 +16,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include <libvje/effects/common.h>
 #include <libvjmem/vjmem.h>
-#include "wipe.h"
 #include "transop.h"
+#include "wipe.h"
 
 vj_effect *wipe_init(int w,int h)
 {
@@ -54,8 +52,8 @@ static int g_wipe_height = 0;
 
 void wipe_apply( VJFrame *frame, VJFrame *frame2, int opacity, int inc)
 {
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
     /* w, h increasen */
     transop_apply(frame, frame2, g_wipe_width, g_wipe_height, 0, 0, 0, 0, opacity);
     
