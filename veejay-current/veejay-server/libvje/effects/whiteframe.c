@@ -17,12 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "whiteframe.h"
-#include "common.h"
+
 vj_effect *whiteframe_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -43,7 +42,7 @@ vj_effect *whiteframe_init(int w,int h)
 void whiteframe_apply( VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const int len = frame->len;
+    const unsigned int len = frame->len;
 	const int uv_len = frame->uv_len;
     uint8_t p;
     uint8_t *Y = frame->data[0];
