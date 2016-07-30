@@ -20,10 +20,6 @@
 
 #ifndef BWOTSU_H
 #define BWOTSU_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *bwotsu_init();
 void bwotsu_apply(VJFrame *frame, int mode, int skew, int invert );
 #endif
