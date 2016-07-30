@@ -20,10 +20,6 @@
 
 #ifndef MAGICOVERLAYS_H
 #define MAGICOVERLAYS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *overlaymagic_init(int w, int h);
 void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int n, int mode);
 void overlaymagic_adddistorted(VJFrame *frame, VJFrame *frame2 );

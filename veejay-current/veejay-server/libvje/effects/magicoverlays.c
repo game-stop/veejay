@@ -17,14 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include "magicoverlays.h"
 #include <libvje/internal.h>
-#include "common.h"  
-#include <veejay/vj-task.h>
+#include "magicoverlays.h"
 
 vj_effect *overlaymagic_init(int w, int h)
 {
