@@ -23,10 +23,11 @@
 	Result will vary over different color spaces.
 
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "tripplicity.h"
+
 vj_effect *tripplicity_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -56,12 +57,11 @@ vj_effect *tripplicity_init(int w, int h)
 
 
 
-void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int opacityL, int opacityCb, int opacityCr)
+void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int opacityL, int opacityCb, int opacityCr)
 {
     unsigned int i;
     const unsigned int len =  frame->len;
-    const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+    const unsigned int uv_len = (frame->ssm ? len : frame->uv_len);
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -75,7 +75,6 @@ void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int width,
     const uint8_t opCr1= (opacityCr > 255) ? 255: opacityCr;
     const uint8_t opCr0= 255 - opCr1;
 
- 
     for (i = 0; i < len; i++)
     {
 		Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;

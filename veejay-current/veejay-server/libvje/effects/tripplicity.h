@@ -20,11 +20,6 @@
 
 #ifndef TRCITY_H
 #define TRCITY_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *tripplicity_init();
-void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int opacityL, int opacityCb, int opacityCr);
+void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int opacityL, int opacityCb, int opacityCr);
 #endif
