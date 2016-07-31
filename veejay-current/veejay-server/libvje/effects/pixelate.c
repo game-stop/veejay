@@ -17,10 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "pixelate.h"
 
@@ -62,9 +60,9 @@ vj_effect *pixelate_init(int width, int height)
 void pixelate_apply( VJFrame *frame, int vv )
 {
 	unsigned int i,j ;
-	unsigned int len = frame->len;
+	const unsigned int len = frame->len;
 	const unsigned int v = values[vv];
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const unsigned int uv_len = (frame->ssm ? len : frame->uv_len);
 	unsigned int u_v = v >> (frame->ssm ? frame->shift_h: 1 );
 	if( u_v == 0 )
 		u_v = 1;
