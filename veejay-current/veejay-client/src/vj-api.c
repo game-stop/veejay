@@ -482,6 +482,8 @@ typedef struct
 	sample_gui_slot_t *selection_gui_slot;
 	sequence_envelope *sequence_view;
 	sequence_envelope *sequencer_view;
+	int sequencer_col;
+	int sequencer_row;
 	int sequence_playing;
 	gint current_sequence_slot;
 //	GtkKnob		*audiovolume_knob;
@@ -562,6 +564,9 @@ static widget_name_t *gen_decs_ = NULL;
 #define MAX_PATH_LEN 1024
 #define VEEJAY_MSG_OUTPUT	4
 #define GENERATOR_PARAMS 11
+
+#define SEQUENCER_COL 10
+#define SEQUENCER_ROW 10
 
 static vj_gui_t *info = NULL;
 void reloaded_restart();
@@ -7527,7 +7532,7 @@ void vj_gui_init(char *glade_file,
 	create_ref_slots( 10 );
 
 	//SEQ
-	create_sequencer_slots( 10,10 );
+	create_sequencer_slots( SEQUENCER_COL, SEQUENCER_ROW );
 
 	veejay_memset( vj_event_list, 0, sizeof( vj_event_list ));
 	veejay_memset( vims_keys_list, 0, sizeof( vims_keys_list) );
@@ -8424,6 +8429,9 @@ static void create_sequencer_slots(int nx, int ny)
 
 	gtk_container_add( GTK_CONTAINER(info->sample_sequencer), table );
 	gtk_widget_show(table);
+
+	info->sequencer_col = nx;
+	info->sequencer_row = ny;
 
 	gint col=0;
 	gint row=0;
