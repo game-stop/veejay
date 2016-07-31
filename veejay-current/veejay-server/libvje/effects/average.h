@@ -20,10 +20,6 @@
 
 #ifndef AVERAGE_H
 #define AVERAGE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *average_init();
 void average_apply(VJFrame *src, int sum, int mode);
 void average_free();
