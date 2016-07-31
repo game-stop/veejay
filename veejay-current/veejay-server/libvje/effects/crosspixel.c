@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "crosspixel.h"
-#include "common.h"
-#include <stdlib.h>
 
 static uint8_t *cross_pixels[4] = { NULL,NULL,NULL, NULL};
 
@@ -78,15 +76,15 @@ void crosspixel_apply(VJFrame *frame, int t,int v) {
     const unsigned int vv = v * 2; // only even numbers 
     const unsigned int u_vv = vv >> frame->shift_h; // sfhit = / 2, shift_v = 2
 
-	const int width = frame->width;
-	const int height = frame->height;
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 	const int uv_len = frame->uv_len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-    const int uv_width = frame->uv_width;
-	const int uv_height = frame->uv_height;
+    const unsigned int uv_width = frame->uv_width;
+	const unsigned int uv_height = frame->uv_height;
 
     unsigned int p = 0;
    	int strides[4] = { len, uv_len, uv_len ,0};
