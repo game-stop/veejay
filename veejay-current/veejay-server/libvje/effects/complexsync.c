@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "complexsync.h"
-#include <stdlib.h>
 
 static uint8_t *c_outofsync_buffer[4] = { NULL,NULL,NULL, NULL };
 
@@ -71,8 +69,8 @@ void complexsync_free() {
 
 void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val)
 {
-	const int len = frame->len;
-	const int width = frame->width;
+	const unsigned int len = frame->len;
+	const unsigned int width = frame->width;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
