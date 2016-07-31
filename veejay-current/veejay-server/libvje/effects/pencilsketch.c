@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "pencilsketch.h"
 
 extern int vj_task_available();
@@ -159,7 +157,7 @@ void pencilsketch_apply(VJFrame *frame, int type, int threshold_min,
 	unsigned int i;
 	unsigned int len = frame->len;
 	const unsigned int width = frame->width;
-	const unsigned int uv_len = (frame->ssm ?frame->len : frame->uv_len);
+	const unsigned int uv_len = (frame->ssm ?len : frame->uv_len);
 	int m,d;
 	uint8_t y,yb;
   	uint8_t *Y = frame->data[0];
