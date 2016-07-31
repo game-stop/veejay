@@ -20,13 +20,8 @@
 
 #ifndef SINOIDS_H
 #define SINOIDS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *sinoids_init(int w, int h);
 void sinoids_free();
 int sinoids_malloc(int w, int h);
 void sinoids_apply(VJFrame *frame, int a,int b);
-
 #endif
