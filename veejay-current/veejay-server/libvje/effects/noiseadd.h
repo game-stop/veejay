@@ -20,13 +20,8 @@
 
 #ifndef NOISEADD_H
 #define NOISEADD_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *noiseadd_init(int w, int h);
 void noiseadd_free();
 int noiseadd_malloc(int w, int h);
 void noiseadd_apply( VJFrame *frame, int t, int n);
-
 #endif
