@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "motionblur.h"
-#include <config.h>
 
 static uint8_t *previous_frame[3] = { NULL,NULL,NULL };
 vj_effect *motionblur_init(int width, int height)
@@ -62,7 +60,7 @@ void motionblur_free() {
 
 
 void motionblur_apply( VJFrame *frame, int n) {
-	const int len = frame->len;
+	const unsigned int len = frame->len;
 	const int uv_len = frame->uv_len;
 
 	unsigned int i;
