@@ -22,12 +22,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <math.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "softblur.h"
 #include "water.h"
 
@@ -142,9 +138,7 @@ vj_effect *water_init(int width, int height)
 #define HIS_DEFAULT 2
 
 static uint32_t histogram_[HIS_LEN];
-static int n__ = 0;
-static uint32_t keyv_ = 0;
-static uint32_t keyp_ = 0;
+
 int water_malloc(void **d, int width, int height)
 {
 	*d = (void*) vj_calloc(sizeof(water_t));
@@ -221,6 +215,9 @@ static	void	drawmotionframe( VJFrame *f , water_t *w )
 
 /* globalactivity not used */
 /*
+static int n__ = 0;
+static uint32_t keyv_ = 0;
+static uint32_t keyp_ = 0;
 static	int	globalactivity(VJFrame *f2, water_t *w, int in)
 {
 	int len = (f2->width * f2->height)/4;
@@ -276,7 +273,7 @@ static	int	globalactivity(VJFrame *f2, water_t *w, int in)
 
 static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-        const int len = f->len;
+        const unsigned int len = f->len;
         uint8_t *bg = w->diff_img + len;
         uint8_t *in = f2->data[0];
         if(!w->have_img)
@@ -302,7 +299,7 @@ static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
         int *p = w->map1 + w->map_w + 1;
         int *q = w->map2 + w->map_w + 1;        
-        int width = f->width;
+        const unsigned int width = f->width;
         int x,y,h;
         uint8_t *d = w->diff_img + width + 2;
         for( y = w->map_h - 2; y > 0 ; y -- ) { 
@@ -325,7 +322,7 @@ static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
 static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	const int len = f->len;
+	const unsigned int len = f->len;
 	uint8_t *bg = w->diff_img + len;
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
@@ -351,7 +348,7 @@ static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
 	int *p = w->map1 + w->map_w + 1;
 	int *q = w->map2 + w->map_w + 1;	
-	int width = f->width;
+	const unsigned int width = f->width;
 	int x,y,h;
 	uint8_t *d = w->diff_img + width + 2;
 	for( y = w->map_h - 2; y > 0 ; y -- ) {	
@@ -374,7 +371,7 @@ static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
 static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	const int len= f->len;
+	const unsigned int len= f->len;
 	uint8_t *bg = w->diff_img + len;
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
@@ -400,7 +397,7 @@ static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
 	int *p = w->map1 + w->map_w + 1;
 	int *q = w->map2 + w->map_w + 1;	
-	int width = f->width;
+	const unsigned int width = f->width;
 	int x,y,h;
 	uint8_t *d = w->diff_img + width + 2;
 	for( y = w->map_h - 2; y > 0 ; y -- ) {	
@@ -506,7 +503,7 @@ void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int fresh_rat
 	int *p, *q, *r;
 	signed char *vp;
 	uint8_t *src,*dest;
-	const int len = frame->len;
+	const unsigned int len = frame->len;
 	water_t *w = (water_t*) user_data;
 
 	if(w->last_fresh_rate != fresh_rate)
