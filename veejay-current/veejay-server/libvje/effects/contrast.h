@@ -20,14 +20,7 @@
 
 #ifndef CONTRAST_H
 #define CONTRAST_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *contrast_init();
-
-
 void contrast_apply(VJFrame *frame, int *t);
-
 void contrast_free();
 #endif
