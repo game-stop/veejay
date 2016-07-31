@@ -17,12 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <math.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "complexthreshold.h"
 
 //FIXME: rewrite this FX
@@ -108,8 +105,8 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int i_angle,
     unsigned int pos;
     int matrix[5];
     int val, tmp1;
-	const int len = frame->len;
-	const int width = frame->width;
+	const unsigned int len = frame->len;
+	const unsigned int width = frame->width;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
