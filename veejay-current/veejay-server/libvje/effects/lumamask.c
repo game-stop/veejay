@@ -28,11 +28,9 @@
 
 
 */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "lumamask.h"
 
 static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
