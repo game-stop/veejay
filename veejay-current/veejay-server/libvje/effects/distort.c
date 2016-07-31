@@ -141,7 +141,7 @@ void distortion_free()
 void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, int inc_val4, int inc_val5, int inc_val6 )
 {
 
-    int x, y, i, j,yi;
+    int x, i, j;
     int tpos1 = 0, tpos2 = 0, tpos3 = 0, tpos4 = 0;
     const int z = 511;
  	uint8_t *Y = frame->data[0];

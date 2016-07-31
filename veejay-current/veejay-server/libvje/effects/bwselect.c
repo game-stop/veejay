@@ -80,7 +80,6 @@ void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int ga
 {
 	int r,c;
 	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
 	const unsigned int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

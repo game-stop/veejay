@@ -78,7 +78,7 @@ void alphaselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int sw
     uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
     int cb, cr;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
+    float kg1, tmp, aa = 255.0f, bb = 255.0f;
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     uint8_t val;
@@ -90,7 +90,6 @@ void alphaselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int sw
 	int iy=0,iu=128,iv=128;
 	
 	_rgb2yuv(r,g,b,iy,iu,iv);
-	_y = (float) iy;
 	aa = (float) iu;
 	bb = (float) iv;
 

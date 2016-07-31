@@ -147,7 +147,6 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
 	int i;
 	unsigned int op0, op1;
 	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
 	unsigned int len = frame->len;
 	unsigned int uv_width = frame->uv_width;
 	int uv_dy, uv_dye, uv_row_start, uv_row_length;

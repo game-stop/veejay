@@ -67,7 +67,7 @@ void isolate_apply( VJFrame *frame, int i_angle, int r, int g, int b, int opacit
 	uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
     int cb, cr;
-    float kg1, tmp, aa = 255, bb = 255, _y = 0;
+    float kg1, tmp, aa = 255, bb = 255;
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     uint8_t val;
@@ -76,7 +76,6 @@ void isolate_apply( VJFrame *frame, int i_angle, int r, int g, int b, int opacit
 	uint8_t *Cr = frame->data[2];
 	int iy=0,iu=0,iv=0;
 	_rgb2yuv(r,g,b,iy,iu,iv);
-	_y = (float) iy;
 	aa = (float) iu;
 	bb = (float) iv;
     tmp = sqrt(((aa * aa) + (bb * bb)));
