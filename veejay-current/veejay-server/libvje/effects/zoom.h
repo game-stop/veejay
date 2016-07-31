@@ -21,10 +21,6 @@
 
 #ifndef ZOOM_H
 #define ZOOM_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *zoom_init(int width, int height);
 int zoom_malloc(int w, int h);
 void zoom_free();

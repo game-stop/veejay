@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <veejay/vj-viewport.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include <veejay/vj-viewport.h>
 #include "zoom.h"
 
 vj_effect *zoom_init(int width , int height)
@@ -101,9 +98,9 @@ void zoom_free() {
 
 void zoom_apply( VJFrame *frame, int x, int y, int factor, int dir, int alpha)
 {
-	const int width = frame->width;
-	const int height = frame->height;
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 
 	if( zoom_[0] != x || zoom_[1] != y || zoom_[2] != factor || !zoom_vp_ || dir != zoom_[3])
 	{
