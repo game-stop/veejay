@@ -28,12 +28,8 @@
 
 */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <math.h>
-#include <stdio.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "ripple.h"
 
 #define RIPPLE_DEGREES 360
@@ -116,9 +112,9 @@ void ripple_free() {
 
 void ripple_apply(VJFrame *frame, int _w, int _a , int _att ) {
 
-	const int width = frame->width;
-	const int height = frame->height;
-	const int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const unsigned int len = frame->len;
 	double wp2 = width * 0.5;
 	double hp2 = height * 0.5;
 	int x,y,dx,dy,a=0,sx=0,sy=0,angle=0;
