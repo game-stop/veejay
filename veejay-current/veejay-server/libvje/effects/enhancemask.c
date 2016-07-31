@@ -17,13 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
 
-#include "enhancemask.h"
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "enhancemask.h"
+
 vj_effect *enhancemask_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -52,9 +50,9 @@ void enhancemask_apply(VJFrame *frame, int *s )
 
    //int s[9]= { 1, 0, -1, 2, 0, -2, 1 , 0 , -1};
    unsigned int r;
-	const int width = frame->width;
-	const int height = frame->height;
-   const unsigned int len = (frame->len)-width-1;
+	const unsigned int width = frame->width;
+	const unsigned int len = frame->len;
+   const unsigned int len2 = len-width-1;
    uint8_t *Y = frame->data[0];
 	/*
    int sum=0;
@@ -84,7 +82,7 @@ void enhancemask_apply(VJFrame *frame, int *s )
 //   unsigned int op0,op1;
   // op0 = (s[1] > 255) ? 255 : s[1];
   // op1 = 255 - op1;
-   for(r=0; r < len; r++) {
+   for(r=0; r < len2; r++) {
 	m = ( Y[r] + Y[r+1] + Y[r+width] + Y[r+width+1] + 2) >> 2;
 	d = Y[r] - m;
 	d *= s[0];
@@ -94,7 +92,7 @@ void enhancemask_apply(VJFrame *frame, int *s )
 //	Y[r] = (m * op0 + a * op1) / 255;
 	Y[r] = m;
 	}
-   for(r=len; r < (width*height); r++) {
+   for(r=len2; r < len; r++) {
         m = (Y[r] + Y[r+1] + Y[r-width] + Y[r-width+1] + 2) >> 2;
 	d = Y[r]-m;
 	d *= s[0];
