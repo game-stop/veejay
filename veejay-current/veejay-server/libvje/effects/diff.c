@@ -131,8 +131,8 @@ void diff_apply(void *ed, VJFrame *frame, VJFrame *frame2, int threshold,
 {
 	unsigned int i;
 	const int len = frame->len;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
