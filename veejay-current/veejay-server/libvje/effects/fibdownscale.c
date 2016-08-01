@@ -51,8 +51,8 @@ vj_effect *fibdownscale_init(int w, int h)
 static void fibdownscale1_apply(VJFrame *frame, VJFrame *frame2)
 {
 	unsigned i, f1;
-	unsigned int len = frame->len >> 1;
-	unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len) >> 1;
+	const int len = frame->len >> 1;
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len) >> 1;
 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

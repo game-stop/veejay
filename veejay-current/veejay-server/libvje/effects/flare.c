@@ -219,7 +219,7 @@ static void flare_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a
 static void	flare_simple( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a )
 {
 	unsigned int i;
- 	unsigned int len = w* h;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 

@@ -204,7 +204,7 @@ static void overlaymagicalpha_divide(VJFrame *frame, VJFrame *frame2)
 static void overlaymagicalpha_additive(VJFrame *frame, VJFrame *frame2)
 {
     
-    unsigned int len = frame->len;
+    int len = frame->len;
   	uint8_t *Y = frame->data[0];
     uint8_t *Y2 = frame2->data[0];
 	uint8_t *aA = frame->data[3];

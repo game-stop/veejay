@@ -266,7 +266,7 @@ static void lumamagick_divide(VJFrame *frame, VJFrame *frame2 , int op_a, int op
 static void lumamagick_negdiv(VJFrame *frame, VJFrame *frame2, int op_a ,int op_b )
 {
 	unsigned int i;
-	unsigned int len = frame->width * frame->height;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 	int b, c;

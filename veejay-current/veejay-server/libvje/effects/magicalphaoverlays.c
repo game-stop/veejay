@@ -168,7 +168,7 @@ static void overlayalphamagic_divide(VJFrame *frame, VJFrame *frame2)
 
 static void overlayalphamagic_additive(VJFrame *frame, VJFrame *frame2)
 {
-    unsigned int len = frame->len;
+    int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
