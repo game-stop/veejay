@@ -20,10 +20,6 @@
 
 #ifndef ALPHATRANSITION_H
 #define ALPHATRANSITION_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 void alphatransition_apply( VJFrame *frame, VJFrame *frame2, int index, int duration, int dir, int threshold);
 vj_effect *alphatransition_init(int w, int h);
 #endif

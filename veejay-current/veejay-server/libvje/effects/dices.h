@@ -20,10 +20,6 @@
 
 #ifndef DICES_H
 #define DICES_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *dices_init(int width, int height);
 int dices_malloc(int w, int h);
 void dices_free();

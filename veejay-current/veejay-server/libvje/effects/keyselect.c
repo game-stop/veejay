@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <math.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "keyselect.h"
-#include "common.h"
 
 vj_effect *keyselect_init(int w, int h)
 {
@@ -141,8 +138,8 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int i_angle,
 {
 	uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;
     int kfgy_scale, kg;
     int cb, cr;

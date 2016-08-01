@@ -20,10 +20,6 @@
 
 #ifndef DUPMAGIC_H
 #define DUPMAGIC_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *dupmagic_init();
 void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n);
 #endif

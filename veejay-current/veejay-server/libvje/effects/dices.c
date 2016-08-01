@@ -26,11 +26,8 @@
  *  the GNU Public License.
  *
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "dices.h"
 
@@ -125,8 +122,8 @@ void dice_create_map(int w, int h)
 void dices_apply( void *data, VJFrame *frame, int cube_bits)
 {
 	int i = 0, map_x, map_y, map_i = 0, base, dx, dy, di=0;
-	int width, height;
-	width = frame->width; height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

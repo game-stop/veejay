@@ -22,12 +22,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "baltantv.h"
-#include "common.h"
 
 vj_effect *baltantv_init(int w, int h)
 {
@@ -84,23 +82,23 @@ void	baltantv_free()
 	planetable_ = NULL;
 }
 
-void baltantv_apply( VJFrame *frame, int width, int height, int stride, int mode)
+void baltantv_apply( VJFrame *frame, int stride, int mode)
 {
 	unsigned int i,cf;
-	const int len = (width * height);
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
-	uint8_t *pDst = planetable_ + (plane_ * frame->len);
+	uint8_t *pDst = planetable_ + (plane_ * len);
 
 	for( i = 0; i < len ; i ++ )
 		pDst[i] = (Y[i] >> 2 );
 
-	cf = plane_ & (stride-1);	
+	cf = plane_ & (stride-1);
 
 	uint8_t *pSrc[4] = {
-			planetable_ + (cf * frame->len),
-			planetable_ + ((cf+stride) * frame->len),
-			planetable_ + ((cf+stride*2) * frame->len),
-			planetable_ + ((cf+stride*3) * frame->len)
+			planetable_ + (cf * len),
+			planetable_ + ((cf+stride) * len),
+			planetable_ + ((cf+stride*2) * len),
+			planetable_ + ((cf+stride*3) * len)
 		};
 
 	if( mode == 0 )

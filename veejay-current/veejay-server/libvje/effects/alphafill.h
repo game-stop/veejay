@@ -20,10 +20,6 @@
 
 #ifndef ALPHAFILL_H
 #define ALPHAFILL_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *alphafill_init(int w, int h);
-void alphafill_apply( VJFrame *frame, int width, int height, int val);
+void alphafill_apply( VJFrame *frame, int val);
 #endif

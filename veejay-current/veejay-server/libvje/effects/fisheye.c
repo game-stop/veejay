@@ -17,13 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include "fisheye.h"
-#include <stdlib.h>
+
 #include "common.h"
-#include <math.h>
+#include <libvjmem/vjmem.h>
+#include "fisheye.h"
+
 #define    RUP8(num)(((num)+8)&~8)
 
 vj_effect *fisheye_init(int w, int h)
@@ -117,12 +115,14 @@ static double __fisheye_i(double r, double v, double e)
 
 
 
-void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha )
+void fisheye_apply(VJFrame *frame, int v, int alpha )
 {
 	int i;
 	double (*pf)(double a, double b, double c);
- 	const int len = frame->len;
- 	uint8_t *Y = frame->data[0];
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
@@ -139,13 +139,13 @@ void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha )
 	if( v != _v )
 	{
 		const double curve = 0.001 * v;
-		const unsigned int R = h/2;
+		const unsigned int R = height/2;
 		const double coeef = R / log(curve * R + 1);
 		/* pre calculate */
 		int px,py;
 		double r,a,co,si;
-		const int w2 = w/2;
-		const int h2 = h/2;
+		const int w2 = width/2;
+		const int h2 = height/2;
 		
 		for(i=0; i < len; i++)
 		{
@@ -162,11 +162,11 @@ void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha )
 				py += h2;
 
 				if(px < 0) px =0;
-				if(px > w) px = w;
+				if(px > width) px = width;
 				if(py < 0) py = 0;
-				if(py >= (h-1)) py = h-1;
+				if(py >= (height-1)) py = height-1;
 
-				cached_coords[i] = (py * w)+px;
+				cached_coords[i] = (py * width)+px;
 			}
 			else
 			{
@@ -177,16 +177,16 @@ void fisheye_apply(VJFrame *frame, int w, int h, int v, int alpha )
 		_v = v;
 	}
 
-	veejay_memcpy(buf[0], Y,(w*h));
-	veejay_memcpy(buf[1], Cb,(w*h));
-	veejay_memcpy(buf[2], Cr,(w*h));
+	veejay_memcpy(buf[0], Y,(len));
+	veejay_memcpy(buf[1], Cb,(len));
+	veejay_memcpy(buf[2], Cr,(len));
 
 	if( alpha == 0 ) {
 		for(i=0; i < len; i++)
 		{
 			if(cached_coords[i] == -1)
 			{
-				Y[i] = pixel_Y_lo_;		
+				Y[i] = pixel_Y_lo_;
 				Cb[i] = 128;
 				Cr[i] = 128;
 			}

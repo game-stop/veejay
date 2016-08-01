@@ -21,7 +21,8 @@
 #ifndef RADIOACTIVE_TVH
 #define RADIOACTIVE_TVH
 vj_effect *radioactivetv_init(int w, int h);
-void radioactivetv_apply( VJFrame *frame, VJFrame *blue,int width, int height, int bla,int stride, int mode, int thres);
+void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int bla,int stride,
+                         int mode, int thres);
 int radioactivetv_malloc(int w, int h );
 void radioactivetv_free();
 #endif

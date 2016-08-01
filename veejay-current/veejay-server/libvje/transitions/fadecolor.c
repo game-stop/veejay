@@ -17,9 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include <libvje/effects/common.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
 #include "fadecolor.h"
@@ -56,7 +55,7 @@ vj_effect *fadecolor_init(int w,int h)
 void colorfade_apply(VJFrame *frame, int opacity, int color)
 {
 	unsigned int i, op0, op1;
-	unsigned int len = frame->width * frame->height;
+	const int len = frame->len;
 	uint8_t colorCb = 128, colorCr = 128;
 	uint8_t colorY=0;
 	const int uv_len = frame->uv_len;

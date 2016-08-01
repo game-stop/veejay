@@ -18,14 +18,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <stdlib.h>
-#include <math.h>
-#include "flare.h"
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "flare.h"
 
 /* blend by blurred mask.
    derived from radial blur and chromamagick effect.
@@ -224,7 +219,7 @@ static void flare_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a
 static void	flare_simple( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a )
 {
 	unsigned int i;
- 	unsigned int len = w* h;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -264,20 +259,23 @@ static void flare_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_
 	}
 }
 
-void flare_apply(VJFrame *A, 
-			int width, int height, int type, int op_a, int radius)
+void flare_apply(VJFrame *frame, int type, int op_a, int radius)
 {
-	int y,x;   
+	int y,x;
 	int plane = 0;
-	/* clone A */
-	VJFrame B;
-	veejay_memcpy( &B, A, sizeof(VJFrame));
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
+
+	/* clone frame */
+	VJFrame frame2;
+	veejay_memcpy( &frame2, frame, sizeof(VJFrame));
 	/* data is local */
-	B.data[0] = flare_buf[0];
-	B.data[1] = flare_buf[1];
-	B.data[2] = flare_buf[2];
-	int strides[4] = { A->len, A->len, A->len, 0 };
-	vj_frame_copy( A->data, B.data,strides );
+	frame2.data[0] = flare_buf[0];
+	frame2.data[1] = flare_buf[1];
+	frame2.data[2] = flare_buf[2];
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy( frame->data, frame2.data,strides );
 
 	/* apply blur on Image, horizontal and vertical
 	   (blur2 is from xine, see radial blur */
@@ -285,8 +283,8 @@ void flare_apply(VJFrame *A,
 	for( plane = 0; plane < 2; plane ++ )
 	{
 		for( y = 0; y < height; y ++ ) 
-			blur2( A->data[plane] + (y * width),
-				   B.data[plane] + (y * width),
+			blur2( frame->data[plane] + (y * width),
+				   frame2.data[plane] + (y * width),
 					width,
 					radius,
 					2,
@@ -297,8 +295,8 @@ void flare_apply(VJFrame *A,
 	for( plane = 0; plane <2; plane ++ )
 	{
 		for( x = 0; x < width; x ++ )
-			blur2( A->data[plane] + x ,
-				B.data[plane] + x,
+			blur2( frame->data[plane] + x ,
+				frame2.data[plane] + x,
 				height,
 				radius,
 				2,
@@ -310,23 +308,23 @@ void flare_apply(VJFrame *A,
 	switch( type )
 	{
     	case 1:
-			flare_exclusive(A,&B,width,height,op_a);
+			flare_exclusive(frame,&frame2,width,height,op_a);
 			break;
 		case  2:
-			flare_additive(A,&B,width,height,op_a);	
+			flare_additive(frame,&frame2,width,height,op_a);
 			break;
 		case  3:
-			flare_unfreeze(A,&B,width,height,op_a);
+			flare_unfreeze(frame,&frame2,width,height,op_a);
 			break;
 		case  4:
-			flare_darken(A,&B,width,height,op_a);
+			flare_darken(frame,&frame2,width,height,op_a);
 			break;
 		case 5:
-			flare_lighten( A, &B, width, height, op_a );
+			flare_lighten( frame, &frame2, width, height, op_a );
 			break;
 
 		default:
-			flare_simple( A, &B, width,height, op_a );
+			flare_simple( frame, &frame2, width,height, op_a );
 			break;
 
 	}

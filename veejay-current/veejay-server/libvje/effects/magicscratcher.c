@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "magicscratcher.h"
-#include "common.h"
 
 static uint8_t *mframe = NULL;
 static int m_frame = 0;
@@ -104,9 +101,10 @@ static void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
 
 void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
 {
-	const int width = frame->width;
-	const int height = frame->height;
-    unsigned int x, len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	unsigned int x;
+	int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -169,8 +167,8 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
 		Y[x] = func_y( mframe[offset + x], Y[x]);
     }
     
-    veejay_memset( Cb, 128, (frame->ssm ? frame->len : frame->uv_len));
-    veejay_memset( Cr, 128, (frame->ssm ? frame->len : frame->uv_len));
+    veejay_memset( Cb, 128, (frame->ssm ? len : frame->uv_len));
+    veejay_memset( Cr, 128, (frame->ssm ? len : frame->uv_len));
 
     m_rerun = m_frame;
 

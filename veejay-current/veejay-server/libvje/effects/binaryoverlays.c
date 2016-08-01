@@ -17,12 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include <config.h>
 #include "binaryoverlays.h"
-#include <libvje/effects/common.h>
 
 vj_effect *binaryoverlay_init(int w, int h)
 {
@@ -305,21 +302,24 @@ static void _binary_and( VJFrame *frame, VJFrame *frame2, int w, int h )
 
 
 
-void binaryoverlay_apply( VJFrame *frame, VJFrame *frame2, int w, int h, int mode )
+void binaryoverlay_apply( VJFrame *frame, VJFrame *frame2, int mode )
 {
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+
 	switch(mode)
 	{
-		case 0:	_binary_not_and( frame,frame2,w,h ); break;// not a and not b
-		case 1: _binary_not_or( frame,frame2,w,h); break; // not a or not b
-		case 2: _binary_not_xor( frame,frame2,w,h); break; // not a xor not b
-		case 3:	_binary_not_and_lh( frame,frame2,w,h ); break; // a and not b 
-		case 4: _binary_not_or_lh( frame,frame2,w,h); break; // a or not b 
-		case 5: _binary_not_xor_lh( frame,frame2,w,h); break; // a xor not b 
-		case 6: _binary_not_and_rh (frame,frame2,w,h); break; // a and not b
-		case 7: _binary_not_or_rh( frame,frame2,w,h); break; // a or not b
-		case 8: _binary_or( frame,frame2,w,h); break; // a or b
-		case 9: _binary_and( frame,frame2,w,h); break; // a and b
-		case 10: _binary_not_xor_rh(frame,frame2,w,h); break; 
+		case 0:	_binary_not_and( frame,frame2,width, height ); break;// not a and not b
+		case 1: _binary_not_or( frame,frame2,width, height); break; // not a or not b
+		case 2: _binary_not_xor( frame,frame2,width, height); break; // not a xor not b
+		case 3:	_binary_not_and_lh( frame,frame2,width, height ); break; // a and not b 
+		case 4: _binary_not_or_lh( frame,frame2,width, height); break; // a or not b 
+		case 5: _binary_not_xor_lh( frame,frame2,width, height); break; // a xor not b 
+		case 6: _binary_not_and_rh (frame,frame2,width, height); break; // a and not b
+		case 7: _binary_not_or_rh( frame,frame2,width, height); break; // a or not b
+		case 8: _binary_or( frame,frame2,width, height); break; // a or b
+		case 9: _binary_and( frame,frame2,width, height); break; // a and b
+		case 10: _binary_not_xor_rh(frame,frame2,width, height); break; 
 	}
 }
 

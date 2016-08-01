@@ -20,11 +20,6 @@
 
 #ifndef CHROMAPAL_H
 #define CHROMAPAL_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *chromapalette_init(int w, int h);
-void chromapalette_apply(VJFrame *frame, int width, int height, int a,int r,int g, int b,int c1,int c2);
+void chromapalette_apply(VJFrame *frame, int a,int r,int g, int b,int c1,int c2);
 #endif

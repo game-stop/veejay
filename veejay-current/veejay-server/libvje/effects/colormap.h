@@ -20,10 +20,6 @@
 
 #ifndef COLORMAP_H
 #define COLORMAP_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *colormap_init(int w, int h);
 void colormap_apply( VJFrame *frame, int vala , int valb, int valc);
 #endif

@@ -20,10 +20,6 @@
 
 #ifndef ALPHA_DAMPEN_H
 #define ALPHA_DAMPEN_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *alphadampen_init(int w, int h);
 void alphadampen_apply( VJFrame *frame, int b1);
 #endif

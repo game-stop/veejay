@@ -20,14 +20,8 @@
 
 #ifndef MOTIONBLUR_H
 #define MOTIONBLUR_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *motionblur_init(int w, int h);
 int motionblur_malloc(int w, int h);
 void motionblur_free();
 void motionblur_apply( VJFrame *frame, int n);
-
 #endif

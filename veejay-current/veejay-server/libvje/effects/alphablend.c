@@ -17,14 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-    	
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "alphablend.h"
-#include "common.h"
 
 vj_effect *alphablend_init(int w, int h)
 {
@@ -51,10 +47,11 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, uint8_t *aA
     return 0;
 }
 
-void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height)
+void alphablend_apply( VJFrame *frame, VJFrame *frame2)
 {
-	size_t uv_len = (frame->ssm ? frame->len : frame->uv_len );
-	blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame2->data[3], frame->len );
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len );
+	blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame2->data[3], len );
 	blend_plane( frame->data[1], frame->data[1], frame2->data[1], frame2->data[3], uv_len );
 	blend_plane( frame->data[2], frame->data[2], frame2->data[2], frame2->data[3], uv_len );
 }

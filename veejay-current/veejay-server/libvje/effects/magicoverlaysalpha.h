@@ -20,12 +20,6 @@
 
 #ifndef MAGICOVERLAYSALPHA_H
 #define MAGICOVERLAYSALPHA_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *overlaymagicalpha_init(int w, int h);
-
-void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int width,int height, int n, int mode);
-
+void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int n, int mode);
 #endif

@@ -18,11 +18,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "bwselect.h"
-#include "common.h"
+
 vj_effect *bwselect_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -79,8 +79,7 @@ static void gamma_setup(double gamma_value)
 void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int gamma, int mode)
 {
 	int r,c;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -100,8 +99,8 @@ void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int ga
 					}
 				}
 			}
-			veejay_memset(Cb, 128, (frame->ssm ? frame->len : frame->uv_len));
-			veejay_memset(Cr, 128, (frame->ssm ? frame->len : frame->uv_len));
+			veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
+			veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
 		}
 		else {
 			uint8_t *aA = frame->data[3];
@@ -137,8 +136,8 @@ void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int ga
 					}
 				}
 			}
-			veejay_memset(Cb, 128, (frame->ssm ? frame->len : frame->uv_len));
-			veejay_memset(Cr, 128, (frame->ssm ? frame->len : frame->uv_len));
+			veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
+			veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
 		}
 		else {
 			uint8_t *aA = frame->data[3];

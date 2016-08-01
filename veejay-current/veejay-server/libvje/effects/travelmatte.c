@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "travelmatte.h"
 
 vj_effect *travelmatte_init(int w, int h)
@@ -45,13 +43,13 @@ vj_effect *travelmatte_init(int w, int h)
 }
 
 
-void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int mode)
+void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int mode)
 {
-    const unsigned int len = frame->len;
+	const int len = frame->len;
 
-    uint8_t *a0 = frame->data[0];
-    uint8_t *a1 = frame->data[1];
-    uint8_t *a2 = frame->data[2];
+	uint8_t *a0 = frame->data[0];
+	uint8_t *a1 = frame->data[1];
+	uint8_t *a2 = frame->data[2];
 	uint8_t *aA = frame->data[3];
 
 	uint8_t *o0 = frame->data[0];

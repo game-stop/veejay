@@ -17,10 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "deinterlace.h"
 
 vj_effect *deinterlace_init(int w, int h)
@@ -46,8 +45,8 @@ void deinterlace_apply(VJFrame *frame, int val)
 {
 	const unsigned int uv_width = frame->uv_width;
 	const unsigned int uv_height = frame->uv_height;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

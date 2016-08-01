@@ -17,9 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "cartonize.h"
 
@@ -51,13 +50,13 @@ vj_effect *cartonize_init(int w, int h)
     return ve;
 }
 
-void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int b3)
+void cartonize_apply( VJFrame *frame, int b1, int b2, int b3)
 {
     unsigned int i;
-    int len = (width * height);
-    int uv_len = (frame->ssm ? frame->len : frame->uv_len);
-	uint8_t tmp;	
-	int		p;
+    const int len = frame->len;
+    int uv_len = (frame->ssm ? len : frame->uv_len);
+	uint8_t tmp;
+	int p;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
@@ -68,7 +67,7 @@ void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int
 	// ubase/vbase cannot be 0
 	if(ubase==0) ubase=1;
 	if(vbase==0) vbase=1;
-	for( i = 0 ; i < len ; i ++ )	
+	for( i = 0 ; i < len ; i ++ )
 	{
 		tmp = Y[i];
 		Y[i] = (tmp / base) * base; // loose fractional part

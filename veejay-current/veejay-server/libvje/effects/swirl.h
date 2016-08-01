@@ -20,12 +20,8 @@
 
 #ifndef SWIRL_H
 #define SWIRL_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *swirl_init(int w, int h);
 int swirl_malloc(int w, int h);
 void swirl_free();
-void swirl_apply(VJFrame *frame, int width, int height, int val);
+void swirl_apply(VJFrame *frame, int val);
 #endif

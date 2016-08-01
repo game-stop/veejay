@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "alphaflatten.h"
 
 vj_effect *alphaflatten_init(int w, int h)
@@ -49,10 +47,10 @@ vj_effect *alphaflatten_init(int w, int h)
 }
 
 
-void alphaflatten_apply( VJFrame *frame, int width, int height, int mode)
+void alphaflatten_apply( VJFrame *frame, int mode)
 {
-    unsigned int i;
-    const unsigned int len = frame->len;
+	unsigned int i;
+	const int len = frame->len;
 
 	uint8_t *o0 = frame->data[0];
 	uint8_t *o1 = frame->data[1];
@@ -75,6 +73,4 @@ void alphaflatten_apply( VJFrame *frame, int width, int height, int mode)
 	if( mode ) {
 		veejay_memset( oA, 0, len );
 	}
-
-
 }

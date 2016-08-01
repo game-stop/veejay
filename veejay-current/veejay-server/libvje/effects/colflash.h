@@ -20,10 +20,6 @@
 
 #ifndef COLFLASH_H
 #define COLFLASH_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *colflash_init();
-void colflash_apply( VJFrame *frame, int width, int height, int f,int r, int g, int b, int d);
+void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d);
 #endif

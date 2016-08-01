@@ -20,14 +20,7 @@
 
 #ifndef ENHANCEMASK_H
 #define ENHANCEMASK_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *enhancemask_init(int w, int h);
-
-
 void enhancemask_apply(VJFrame *frame, int *t);
-
 void enhancemask_free();
 #endif

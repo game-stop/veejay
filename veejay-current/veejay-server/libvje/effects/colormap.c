@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include <libvje/effects/common.h>
 #include "colormap.h"
 
 vj_effect *colormap_init(int w, int h)
@@ -55,7 +53,7 @@ vj_effect *colormap_init(int w, int h)
 void colormap_apply( VJFrame *frame, int r, int g, int b)
 {
     unsigned int i;
-    const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len );
+    const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
 	uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];

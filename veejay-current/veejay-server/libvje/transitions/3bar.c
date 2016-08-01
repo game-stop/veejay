@@ -17,9 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include <libvje/effects/common.h>
 #include <libvjmem/vjmem.h>
 #include "3bar.h"
 
@@ -68,13 +67,13 @@ static int bar_bot_vert = 0;
 
 void bar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_y, int top_x, int bot_x  ) {
 
-	const int width = frame->width;
-	const int height = frame->height;
-	int top_width = width;		   /* frame in frame destination area */
-	int top_height = height/(divider);
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	unsigned int top_width = width;		   /* frame in frame destination area */
+	unsigned int top_height = height/(divider);
 
-	int bottom_width = width;	  /* frame in frame destionation area */
-	int bottom_height = (height - top_height);
+	unsigned int bottom_width = width;	  /* frame in frame destionation area */
+	unsigned int bottom_height = (height - top_height);
 	int y,x;
 	int yy=0;
 	int y2 = bar_top_auto + top_y;  /* destination */

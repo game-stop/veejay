@@ -41,14 +41,9 @@
 /* orignal code for RGB, define INTENSITY( r + b + g / 3 ),
    this effect works in YCbCr space now. */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
-#include "reflection.h"
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "reflection.h"
 
 static short reflect_aSin[2048];
 static int reflection_map[2048][256];
@@ -120,8 +115,8 @@ void reflection_apply(VJFrame *frame, int index1, int index2, int move)
 {
     unsigned int normalx, normaly, x, y;
     unsigned int lightx, lighty, temp;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	int uv_height = frame->uv_height;
     int uv_width = frame->uv_width;
     uint8_t *row = frame->data[0] + width + 1;

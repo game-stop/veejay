@@ -17,11 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "toalpha.h"
 
 static int __lookup_table[256];
@@ -56,9 +54,9 @@ vj_effect *toalpha_init(int w, int h)
 }
 
 
-void toalpha_apply( VJFrame *frame, int width, int height, int mode)
+void toalpha_apply( VJFrame *frame, int mode)
 {
-	int len = frame->len;
+	const int len = frame->len;
 	uint8_t *a = frame->data[3];
 	uint8_t *Y = frame->data[0];
 		

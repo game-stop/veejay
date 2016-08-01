@@ -20,12 +20,8 @@
 
 #ifndef BALTAN_TVH
 #define BALTAN_TVH
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *baltantv_init(int w, int h);
-void baltantv_apply( VJFrame *frame, int width, int height, int stride, int mode);
+void baltantv_apply( VJFrame *frame, int stride, int mode);
 int baltantv_malloc(int w, int h );
 void baltantv_free();
 #endif

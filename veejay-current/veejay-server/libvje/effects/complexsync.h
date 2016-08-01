@@ -20,11 +20,6 @@
 
 #ifndef COMPLEXSYNC_H
 #define COMPLEXSYNC_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *complexsync_init(int width, int height);
 int complexsync_malloc(int w, int h);
 void complexsync_free();

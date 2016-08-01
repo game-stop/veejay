@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "smuck.h"
-#include "common.h"
 
 static int smuck_rand_val;
 
@@ -56,8 +54,8 @@ static inline unsigned int smuck_fastrand()
 */
 void smuck_apply( VJFrame *frame, VJFrame *frame2, int n)
 {
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
     unsigned int yd, xd, x, y;
 	// different table ...
     const unsigned int smuck[18] =

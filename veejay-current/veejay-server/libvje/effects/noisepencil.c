@@ -18,13 +18,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvje/vje.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "noisepencil.h"
-#include "common.h"
 
 static uint8_t *Yb_frame = NULL;
 
@@ -314,21 +310,23 @@ static void noisepencil_5_apply(uint8_t *src[3], int width, int height, int coee
 /* with min_t -> max_t select the threshold to 'noise ' */
 void noisepencil_apply(VJFrame *frame, int type, int coeef, int min_t, int max_t)
 {
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	switch(type) {
 		case 0:
-		noisepencil_1_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+		noisepencil_1_apply(frame->data,width, height, coeef,min_t,max_t);
 			break;
 		case 1:
-		noisepencil_2_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+		noisepencil_2_apply(frame->data, width, height, coeef,min_t,max_t);
 			break;
 		case 2:
-		noisepencil_3_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+		noisepencil_3_apply(frame->data, width, height, coeef,min_t,max_t);
 			break;
 		case 3:
-		noisepencil_4_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+		noisepencil_4_apply(frame->data, width, height, coeef,min_t,max_t);
 			break;
 		case 4:
-		noisepencil_5_apply(frame->data,frame->width,frame->height,coeef,min_t,max_t);
+		noisepencil_5_apply(frame->data, width, height, coeef,min_t,max_t);
 			break;
 	}
 }

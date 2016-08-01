@@ -17,12 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
-#include "bwotsu.h"
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "bwotsu.h"
+
 vj_effect *bwotsu_init(int w, int h)
 {
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -129,8 +128,8 @@ void bwotsu_apply(VJFrame *frame, int mode, int skew, int invert)
 				else
 					Y[i] = h;
 			}
-			veejay_memset( frame->data[1], 128, (frame->ssm ? frame->len : frame->uv_len) );
-			veejay_memset( frame->data[2], 128, (frame->ssm ? frame->len : frame->uv_len) );
+			veejay_memset( frame->data[1], 128, (frame->ssm ? len : frame->uv_len) );
+			veejay_memset( frame->data[2], 128, (frame->ssm ? len : frame->uv_len) );
 
 			break;
 		case 1:

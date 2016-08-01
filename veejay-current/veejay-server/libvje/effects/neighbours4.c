@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
-#include "neighbours4.h"
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "neighbours4.h"
 
 vj_effect *neighbours4_init(int w, int h)
 {
@@ -265,32 +262,37 @@ static inline uint8_t evaluate_pixel_b(
 	return( (uint8_t) (  y_map[ peak_index] / peak_value ));
 }
 
-void neighbours4_apply( VJFrame *frame, int width, int height, int radius, int brush_size, int intensity_level, int mode )
+void neighbours4_apply( VJFrame *frame, int radius, int brush_size,
+                       int intensity_level, int mode )
 {
 	int x,y; 
 	const double intensity = intensity_level / 255.0;
 	uint8_t *Y = tmp_buf[0];
 	uint8_t *Y2 = tmp_buf[1];
+
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
 	uint8_t *dstY = frame->data[0];
 	uint8_t *dstCb = frame->data[1];
 	uint8_t *dstCr = frame->data[2];
 	double	r      = (double)radius;
 	// keep luma
-	vj_frame_copy1( frame->data[0], Y2, frame->len );
+	vj_frame_copy1( frame->data[0], Y2, len );
 	create_circle( r, brush_size,width ); 
 
 	relpoint_t *p_points = &points[0];
 
 	if(mode)
 	{
-		int strides[4] = { 0,frame->len, frame->len };
+		int strides[4] = { 0,len, len };
 		uint8_t *dest[3] = { NULL, chromacity[0], chromacity[1] };
 		vj_frame_copy( frame->data, dest, strides );
 	}
 
 
 	// premultiply intensity map
-	for( y = 0 ; y < frame->len ; y ++ )
+	for( y = 0 ; y < len ; y ++ )
 		Y[y] = (uint8_t) ( (double)Y2[y] * intensity );
 
 	if(!mode)
@@ -311,8 +313,8 @@ void neighbours4_apply( VJFrame *frame, int width, int height, int radius, int b
 				);
 			}
 		}
-		veejay_memset( frame->data[1], 128, frame->len );
-		veejay_memset( frame->data[2], 128, frame->len );
+		veejay_memset( frame->data[1], 128, len );
+		veejay_memset( frame->data[2], 128, len );
 	} 
 	else
 	{

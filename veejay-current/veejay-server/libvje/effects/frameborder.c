@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include <stdlib.h>
-#include "frameborder.h"
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "frameborder.h"
 
 vj_effect *frameborder_init(int width, int height)
 {

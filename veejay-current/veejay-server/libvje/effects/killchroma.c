@@ -17,14 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include "killchroma.h"
 #include "common.h"
-#include <stdlib.h>
-#include <sys/types.h>
-#include <stdint.h>
 #include <libvjmem/vjmem.h>
+#include "killchroma.h"
 
 vj_effect *killchroma_init(int w, int h)
 {
@@ -53,13 +48,14 @@ vj_effect *killchroma_init(int w, int h)
 
 void killchroma_apply(VJFrame *frame, int n)
 {
+	const int len = frame->len;
 	if(n==0)
 	{
-		veejay_memset( frame->data[1], 128, (frame->ssm ? frame->len : frame->uv_len) );
-		veejay_memset( frame->data[2], 128, (frame->ssm ? frame->len : frame->uv_len) );
+		veejay_memset( frame->data[1], 128, (frame->ssm ? len : frame->uv_len) );
+		veejay_memset( frame->data[2], 128, (frame->ssm ? len : frame->uv_len) );
 	}
 	else
 	{
-		veejay_memset( frame->data[n], 128, (frame->ssm ? frame->len : frame->uv_len ) );
+		veejay_memset( frame->data[n], 128, (frame->ssm ? len : frame->uv_len ) );
 	}
 }

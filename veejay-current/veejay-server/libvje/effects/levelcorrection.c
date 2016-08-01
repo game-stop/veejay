@@ -18,13 +18,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "levelcorrection.h"
-#include <stdlib.h>
-#include <math.h>
-#include "common.h"
 
 vj_effect *levelcorrection_init(int w,int h)
 {
@@ -68,7 +64,7 @@ void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin,int bmax)
 {
 	unsigned int pos;
 	uint8_t *A = frame->data[3];
-	const unsigned int len = frame->len;  
+	const int len = frame->len;
 	/* level correction tables */
 
 	uint8_t __lookup_table[256];

@@ -20,12 +20,8 @@
 
 #ifndef NERVOUS_H
 #define NERVOUS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *nervous_init(int w, int h);
 int nervous_malloc(int w, int h);
 void nervous_free(void);
-void nervous_apply(VJFrame *Frame, int width, int height,int delay);
+void nervous_apply(VJFrame *Frame, int delay);
 #endif

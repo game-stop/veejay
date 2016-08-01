@@ -23,13 +23,10 @@
    threshold value or substraction value depending on the mode
    of this effect */
 
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "chromamagickalpha.h"
-#include <math.h>
-#include "common.h"
-// fixme: mode 8 and 9 corrupt (green/purple cbcr)
+// FIXME: mode 8 and 9 corrupt (green/purple cbcr)
 
 vj_effect *chromamagickalpha_init(int w, int h)
 {
@@ -69,8 +66,7 @@ vj_effect *chromamagickalpha_init(int w, int h)
 	return ve;
 }
 
-static void chromamagicalpha_selectmin(VJFrame *frame, VJFrame *frame2, int width,
-			   int height, int op_a)
+static void chromamagicalpha_selectmin(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -97,8 +93,7 @@ static void chromamagicalpha_selectmin(VJFrame *frame, VJFrame *frame2, int widt
     }
 }
 
-static void chromamagicalpha_addsubselectlum(VJFrame *frame, VJFrame *frame2,
-				 int width, int height, int op_a)
+static void chromamagicalpha_addsubselectlum(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
     int c, a, b;
@@ -136,8 +131,7 @@ static void chromamagicalpha_addsubselectlum(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-static void chromamagicalpha_selectmax(VJFrame *frame, VJFrame *frame2, int width,
-			   int height, int op_a)
+static void chromamagicalpha_selectmax(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -166,8 +160,7 @@ static void chromamagicalpha_selectmax(VJFrame *frame, VJFrame *frame2, int widt
     }
 }
 
-static void chromamagicalpha_selectdiff(VJFrame *frame, VJFrame *frame2,
-			    int width, int height, int op_a)
+static void chromamagicalpha_selectdiff(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -196,7 +189,7 @@ static void chromamagicalpha_selectdiff(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-static void chromamagicalpha_diffreplace(VJFrame *frame, VJFrame *frame2, int width, int height, int threshold)
+static void chromamagicalpha_diffreplace(VJFrame *frame, VJFrame *frame2, int threshold)
 {
 	/* op_a = threshold */
 	const int len = frame->len;
@@ -244,8 +237,7 @@ static void chromamagicalpha_diffreplace(VJFrame *frame, VJFrame *frame2, int wi
 	}
 }
 
-static void chromamagicalpha_selectdiffneg(VJFrame *frame, VJFrame *frame2,
-			       int width, int height, int op_a)
+static void chromamagicalpha_selectdiffneg(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -274,8 +266,7 @@ static void chromamagicalpha_selectdiffneg(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-static void chromamagicalpha_selectunfreeze(VJFrame *frame, VJFrame *frame2,
-				int width, int height, int op_a)
+static void chromamagicalpha_selectunfreeze(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -305,8 +296,7 @@ static void chromamagicalpha_selectunfreeze(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-static void chromamagicalpha_addlum(VJFrame *frame, VJFrame *frame2, int width,
-			int height, int op_a)
+static void chromamagicalpha_addlum(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -334,7 +324,7 @@ static void chromamagicalpha_addlum(VJFrame *frame, VJFrame *frame2, int width,
     }
 }
 
-static void chromamagicalpha_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a)
+static void chromamagicalpha_exclusive(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -372,7 +362,7 @@ static void chromamagicalpha_exclusive(VJFrame *frame, VJFrame *frame2, int widt
 
 }
 
-static void chromamagicalpha_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a)
+static void chromamagicalpha_diffnegate(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -415,8 +405,7 @@ static void chromamagicalpha_diffnegate(VJFrame *frame, VJFrame *frame2, int wid
 	}
 }
 
-static void chromamagicalpha_additive(VJFrame *frame, VJFrame *frame2, int width,
-		int height, int op_a)
+static void chromamagicalpha_additive(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -452,8 +441,7 @@ static void chromamagicalpha_additive(VJFrame *frame, VJFrame *frame2, int width
 
 }
 
-static void chromamagicalpha_basecolor(VJFrame *frame, VJFrame *frame2,
-			     int width, int height, int op_a)
+static void chromamagicalpha_basecolor(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -494,7 +482,7 @@ static void chromamagicalpha_basecolor(VJFrame *frame, VJFrame *frame2,
     }
 }
 
-static void chromamagicalpha_freeze(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagicalpha_freeze(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -547,7 +535,7 @@ static void chromamagicalpha_freeze(VJFrame *frame, VJFrame *frame2, int w, int 
 
 }
 
-static void chromamagicalpha_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a )
+static void chromamagicalpha_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a )
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -584,7 +572,7 @@ static void chromamagicalpha_unfreeze( VJFrame *frame, VJFrame *frame2, int w, i
 	}
 }
 
-static void chromamagicalpha_hardlight( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagicalpha_hardlight( VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -629,7 +617,7 @@ static void chromamagicalpha_hardlight( VJFrame *frame, VJFrame *frame2, int w, 
 	}
 }
 
-static void chromamagicalpha_multiply( VJFrame *frame, VJFrame *frame2, int w, int h,int op_a )
+static void chromamagicalpha_multiply( VJFrame *frame, VJFrame *frame2,int op_a )
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -668,7 +656,7 @@ static void chromamagicalpha_multiply( VJFrame *frame, VJFrame *frame2, int w, i
 	}
 }
 
-static void chromamagicalpha_divide(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a )
+static void chromamagicalpha_divide(VJFrame *frame, VJFrame *frame2, int op_a )
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -705,7 +693,7 @@ static void chromamagicalpha_divide(VJFrame *frame, VJFrame *frame2, int w, int 
 	}
 }
 
-static void chromamagicalpha_substract(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagicalpha_substract(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -743,7 +731,7 @@ static void chromamagicalpha_substract(VJFrame *frame, VJFrame *frame2, int w, i
 
 }
 
-static void chromamagicalpha_add(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a)
+static void chromamagicalpha_add(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -779,7 +767,7 @@ static void chromamagicalpha_add(VJFrame *frame, VJFrame *frame2, int width, int
 	}
 }
 
-static void chromamagicalpha_screen(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagicalpha_screen(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -813,7 +801,7 @@ static void chromamagicalpha_screen(VJFrame *frame, VJFrame *frame2, int w, int 
 	}
 }
 
-static void chromamagicalpha_difference(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagicalpha_difference(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -852,7 +840,7 @@ static void chromamagicalpha_difference(VJFrame *frame, VJFrame *frame2, int w, 
 }
 
 /* not really softlight but still cool */
-static void chromamagicalpha_softlightmode(VJFrame *frame,VJFrame *frame2,int width,int height, int op_a)
+static void chromamagicalpha_softlightmode(VJFrame *frame,VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -893,8 +881,7 @@ static void chromamagicalpha_softlightmode(VJFrame *frame,VJFrame *frame2,int wi
 	}
 }
 
-static void chromamagicalpha_dodge(VJFrame *frame, VJFrame *frame2, int w, int h,
-		int op_a) {
+static void chromamagicalpha_dodge(VJFrame *frame, VJFrame *frame2, int op_a) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -934,7 +921,7 @@ static void chromamagicalpha_dodge(VJFrame *frame, VJFrame *frame2, int w, int h
 	}	
 }
 
-static void chromamagicalpha_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagicalpha_darken(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -963,7 +950,7 @@ static void chromamagicalpha_darken(VJFrame *frame, VJFrame *frame2, int w, int 
 	}
 }
 
-static void chromamagicalpha_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
+static void chromamagicalpha_lighten(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 
 	unsigned int i;
@@ -993,7 +980,7 @@ static void chromamagicalpha_lighten(VJFrame *frame, VJFrame *frame2, int w, int
 	}
 }
 
-static void chromamagicalpha_reflect(VJFrame *frame, VJFrame *frame2,int width,int height, int op_a)
+static void chromamagicalpha_reflect(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 	unsigned int i;
 	const int len = frame->len;
@@ -1040,7 +1027,7 @@ static void chromamagicalpha_reflect(VJFrame *frame, VJFrame *frame2,int width,i
 	}
 }
 
-static void chromamagicalpha_modadd(VJFrame *frame, VJFrame *frame2, int width,int height, int op_a)
+static void chromamagicalpha_modadd(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
 	const int len = frame->len;
@@ -1079,91 +1066,89 @@ static void chromamagicalpha_modadd(VJFrame *frame, VJFrame *frame2, int width,i
 }
 
 
-void chromamagickalpha_apply(VJFrame *frame, VJFrame *frame2,
-			int width, int height, int type, int op_a)
+void chromamagickalpha_apply(VJFrame *frame, VJFrame *frame2, int type, int op_a)
 {
-
     switch (type) {
     case 0:
-	chromamagicalpha_addsubselectlum(frame, frame2, width, height, op_a);
+	chromamagicalpha_addsubselectlum(frame, frame2, op_a);
 	break;
     case 1:
-	chromamagicalpha_selectmin(frame, frame2, width, height, op_a);
+	chromamagicalpha_selectmin(frame, frame2, op_a);
 	break;
     case 2:
-	chromamagicalpha_selectmax(frame, frame2, width, height, op_a);
+	chromamagicalpha_selectmax(frame, frame2, op_a);
 	break;
     case 3:
-	chromamagicalpha_selectdiff(frame, frame2, width, height, op_a);
+	chromamagicalpha_selectdiff(frame, frame2, op_a);
 	break;
     case 4:
-	chromamagicalpha_selectdiffneg(frame, frame2, width, height, op_a);
+	chromamagicalpha_selectdiffneg(frame, frame2, op_a);
 	break;
     case 5:
-	chromamagicalpha_addlum(frame, frame2, width, height, op_a);
+	chromamagicalpha_addlum(frame, frame2, op_a);
 	break;
     case 6:
-	chromamagicalpha_selectunfreeze(frame, frame2, width, height, op_a);
+	chromamagicalpha_selectunfreeze(frame, frame2, op_a);
 	break;
     case 7:
-	chromamagicalpha_exclusive(frame,frame2,width,height,op_a);
+	chromamagicalpha_exclusive(frame,frame2,op_a);
 	break;
    case 8:
-	chromamagicalpha_diffnegate(frame,frame2,width,height,op_a);
+	chromamagicalpha_diffnegate(frame,frame2,op_a);
 	break;
    case 9:
-	chromamagicalpha_additive( frame,frame2,width,height,op_a);	
+	chromamagicalpha_additive( frame,frame2,op_a);
 	break;
    case 10:
-	chromamagicalpha_basecolor(frame,frame2,width,height,op_a);
+	chromamagicalpha_basecolor(frame,frame2,op_a);
 	break;
    case 11:
-	chromamagicalpha_freeze(frame,frame2,width,height,op_a);
+	chromamagicalpha_freeze(frame,frame2,op_a);
 	break;
    case 12:
-	chromamagicalpha_unfreeze(frame,frame2,width,height,op_a);
+	chromamagicalpha_unfreeze(frame,frame2,op_a);
 	break;
    case 13:
-	chromamagicalpha_hardlight(frame,frame2,width,height,op_a);
+	chromamagicalpha_hardlight(frame,frame2,op_a);
 	break;
    case 14:
-	chromamagicalpha_multiply(frame,frame2,width,height,op_a);
+	chromamagicalpha_multiply(frame,frame2,op_a);
 	break;
   case 15:
-	chromamagicalpha_divide(frame,frame2,width,height,op_a);
+	chromamagicalpha_divide(frame,frame2,op_a);
 	break;
   case 16:
-	chromamagicalpha_substract(frame,frame2,width,height,op_a);
+	chromamagicalpha_substract(frame,frame2,op_a);
 	break;
   case 17:
-	chromamagicalpha_add(frame,frame2,width,height,op_a);
+	chromamagicalpha_add(frame,frame2,op_a);
 	break;
   case 18:
-	chromamagicalpha_screen(frame,frame2,width,height,op_a);
+	chromamagicalpha_screen(frame,frame2,op_a);
 	break;
   case 19:
-	chromamagicalpha_difference(frame,frame2,width,height,op_a);
+	chromamagicalpha_difference(frame,frame2,op_a);
 	break;
   case 20:
-	chromamagicalpha_softlightmode(frame,frame2,width,height,op_a);
+	chromamagicalpha_softlightmode(frame,frame2,op_a);
 	break;
   case 21:
-	chromamagicalpha_dodge(frame,frame2,width,height,op_a);
+	chromamagicalpha_dodge(frame,frame2,op_a);
 	break;
   case 22:
-	chromamagicalpha_reflect(frame,frame2,width,height,op_a);
+	chromamagicalpha_reflect(frame,frame2,op_a);
 	break;
   case 23:
-	chromamagicalpha_diffreplace(frame,frame2,width,height,op_a);
+	chromamagicalpha_diffreplace(frame,frame2,op_a);
 	break;
   case 24:
-	chromamagicalpha_darken( frame,frame2,width,height,op_a);
+	chromamagicalpha_darken( frame,frame2,op_a);
 	break;
   case 25:
-	chromamagicalpha_lighten( frame,frame2,width,height,op_a);
+	chromamagicalpha_lighten( frame,frame2,op_a);
 	break;
   case 26:
-	chromamagicalpha_modadd( frame,frame2,width,height,op_a);
+	chromamagicalpha_modadd( frame,frame2,op_a);
 	break;
     }
 }

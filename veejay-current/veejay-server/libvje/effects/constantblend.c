@@ -25,12 +25,10 @@
 
  */
 
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "constantblend.h"
-#include "common.h"
+
 vj_effect *constantblend_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -68,11 +66,10 @@ vj_effect *constantblend_init(int w, int h)
     return ve;
 }
 
-void constantblend_apply( VJFrame *frame, int width, int height, 
-	int type, int scale, int valY )
+void constantblend_apply( VJFrame *frame, int type, int scale, int valY )
 {
 	unsigned int i;
-	const int len = (width * height);
+	const int len = frame->len;
 	const uint8_t y = (uint8_t) valY;
 	const float   s = ((float) scale / 100.0 );
 

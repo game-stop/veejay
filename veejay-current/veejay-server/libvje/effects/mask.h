@@ -20,10 +20,6 @@
 
 #ifndef SIMPLEMASK_H
 #define SIMPLEMASK_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *simplemask_init();
 void simplemask_apply( VJFrame *frame, VJFrame *frame2, int threshold, int invert);
 void mask_free();

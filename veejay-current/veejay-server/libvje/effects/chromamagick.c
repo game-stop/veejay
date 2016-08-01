@@ -23,13 +23,9 @@
    threshold value or substraction value depending on the mode
    of this effect */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "chromamagick.h"
-#include <math.h>
-#include "common.h"
 
 vj_effect *chromamagick_init(int w, int h)
 {

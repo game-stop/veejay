@@ -20,11 +20,6 @@
 
 #ifndef RIPPLE_H
 #define RIPPLE_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *ripple_init(int w, int h);
 void ripple_free();
 int ripple_malloc(int w, int h);

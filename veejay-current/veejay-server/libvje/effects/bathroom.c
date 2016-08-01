@@ -24,13 +24,10 @@
   to set the distance and mode
  */
 
-#include <config.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "bathroom.h"
-#include "common.h"
+
 static uint8_t *bathroom_frame[4] = { NULL,NULL,NULL,NULL };
 
 vj_effect *bathroom_init(int width,int height)
@@ -97,8 +94,8 @@ void bathroom_free() {
 
 static void bathroom_verti_apply(VJFrame *frame, int val, int x0, int x1)
 {
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
     const int len = frame->len;
     unsigned int y_val = val;
     unsigned int x,y;
@@ -125,8 +122,8 @@ static void bathroom_verti_apply(VJFrame *frame, int val, int x0, int x1)
 
 static void	bathroom_alpha_verti_apply(VJFrame *frame, int val, int x0, int x1)
 {
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
     const int len = frame->len;
     unsigned int y_val = val;
     unsigned int x,y;
@@ -156,8 +153,8 @@ static void	bathroom_alpha_verti_apply(VJFrame *frame, int val, int x0, int x1)
 
 static void bathroom_hori_apply(VJFrame *frame, int val, int x0, int x1)
 {
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
     const int len = frame->len;
     unsigned int y_val = val;
     uint8_t *Y = frame->data[0];
@@ -183,8 +180,8 @@ static void bathroom_hori_apply(VJFrame *frame, int val, int x0, int x1)
 
 static void bathroom_alpha_hori_apply(VJFrame *frame, int val, int x0, int x1)
 {
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
     const int len = frame->len;
     unsigned int y_val = val;
     uint8_t *Y = frame->data[0];

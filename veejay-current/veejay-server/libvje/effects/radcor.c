@@ -22,12 +22,10 @@
  * http://local.wasp.uwa.edu.au/~pbourke/projection/lenscorrection/
  *
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "radcor.h"
-#include "common.h"
 
 vj_effect *radcor_init(int w, int h)
 {
@@ -94,10 +92,10 @@ typedef struct
 void radcor_apply( VJFrame *frame, int alpaX, int alpaY, int dir, int alpha)
 {
 	int i,j;
-	int width, height;
-	width = frame->width; height = frame->height;
-	int len = (width * height);
 	int i2,j2;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
 	double x,y,x2,x3,y2,y3,r;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

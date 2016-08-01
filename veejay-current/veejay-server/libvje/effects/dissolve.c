@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "dissolve.h"
-#include <stdlib.h>
 
 vj_effect *dissolve_init(int w, int h)
 {
@@ -45,11 +43,10 @@ vj_effect *dissolve_init(int w, int h)
 
 
 
-void dissolve_apply(VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int opacity)
+void dissolve_apply(VJFrame *frame, VJFrame *frame2, int opacity)
 {
     unsigned int i;
-    unsigned int len = frame->len;
+    const int len = frame->len;
     const int op1 = (opacity > 255) ? 255 : opacity;
     const int op0 = 255 - op1;
 

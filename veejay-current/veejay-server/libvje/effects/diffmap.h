@@ -21,7 +21,7 @@
 #ifndef DIFFERENCEMAP_H
 #define DIFFERENCEMAP_H
 vj_effect *differencemap_init(int w, int h);
-void differencemap_apply( VJFrame *frame,VJFrame *frame2, int width, int height, int t, int n, int show);
+void differencemap_apply( VJFrame *frame,VJFrame *frame2, int t, int n, int show);
 int	differencemap_malloc(int w, int h);
 void differencemap_free(void);
 #endif

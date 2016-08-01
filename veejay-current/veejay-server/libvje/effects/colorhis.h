@@ -20,12 +20,8 @@
 
 #ifndef COLORHIS_H
 #define COLORHIS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *colorhis_init(int w, int h);
 int colorhis_malloc(int w , int h );
 void colorhis_free( );
-void colorhis_apply( VJFrame *frame, int width, int height, int mode,int val, int intensity, int strength);
+void colorhis_apply( VJFrame *frame, int mode,int val, int intensity, int strength);
 #endif

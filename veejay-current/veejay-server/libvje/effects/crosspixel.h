@@ -20,11 +20,6 @@
 
 #ifndef CROSSPIXEL_H
 #define CROSSPIXEL_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *crosspixel_init(int w, int h);
 int crosspixel_malloc(int w, int h);
 void crosspixel_free();

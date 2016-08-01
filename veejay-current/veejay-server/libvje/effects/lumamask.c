@@ -28,11 +28,9 @@
 
 
 */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "lumamask.h"
 
 static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
@@ -97,7 +95,7 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int v_scale, int h_scale,
 	int motion = 0;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	if( motionmap_active() )
 	{

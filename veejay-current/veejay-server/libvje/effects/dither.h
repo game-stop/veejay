@@ -20,10 +20,6 @@
 
 #ifndef DITHER_H
 #define DITHER_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *dither_init();
 void dither_apply(VJFrame *frame, int size, int n);
 #endif

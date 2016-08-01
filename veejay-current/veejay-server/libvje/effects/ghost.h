@@ -20,12 +20,8 @@
 
 #ifndef GHOST_H
 #define GHOST_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *ghost_init(int w, int h);
-void ghost_apply( VJFrame *frame, int width, int height, int op);
+void ghost_apply( VJFrame *frame, int op);
 int	ghost_malloc( int w, int h );
 void ghost_free(void);
 

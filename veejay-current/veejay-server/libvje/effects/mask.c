@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "mask.h"
-#include "common.h"
 
 vj_effect *simplemask_init(int w, int h )
 {
@@ -100,8 +98,8 @@ static void mask_replace_white_fill(uint8_t *yuv1[3], uint8_t *yuv2[3],
 
 void simplemask_apply( VJFrame *frame, VJFrame *frame2, int threshold, int invert)
 {
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	const int len = frame->len;
 	switch(invert) {
 		case 0 : mask_replace_black(frame->data,frame2->data,width,height,len,threshold);

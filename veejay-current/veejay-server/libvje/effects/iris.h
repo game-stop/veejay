@@ -20,11 +20,7 @@
 
 #ifndef IRIS_H
 #define IRIS_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *iris_init();
-void iris_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int value, int shape);
+void iris_apply( VJFrame *frame, VJFrame *frame2, int value, int shape);
 void iris_free();
 #endif

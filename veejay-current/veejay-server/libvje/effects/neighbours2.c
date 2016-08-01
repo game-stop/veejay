@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
-#include "neighbours2.h"
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "neighbours2.h"
 
 vj_effect *neighbours2_init(int w, int h)
 {
@@ -225,27 +222,31 @@ static inline uint8_t evaluate_pixel_b(
 	return( (uint8_t) (  y_map[ peak_index] ));
 }
 
-void neighbours2_apply( VJFrame *frame, int width, int height, int brush_size, int intensity_level, int mode )
+void neighbours2_apply( VJFrame *frame, int brush_size, int intensity_level, int mode )
 {
 	int x,y; 
 	const double intensity = intensity_level / 255.0;
 	uint8_t *Y = tmp_buf[0];
 	uint8_t *Y2 = tmp_buf[1];
+
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
 	uint8_t *dstY = frame->data[0];
 	uint8_t *dstCb = frame->data[1];
 	uint8_t *dstCr = frame->data[2];
 	// keep luma
-	vj_frame_copy1(  frame->data[0],Y2, frame->len );
+	vj_frame_copy1(  frame->data[0],Y2, len );
 
 	if(mode)
 	{
-		int strides[4] = { 0, frame->len, frame->len,0 };
+		int strides[4] = { 0, len, len,0 };
 		uint8_t *dest[4] = { NULL, chromacity[0],chromacity[1],NULL };
 		vj_frame_copy( frame->data, dest, strides );
 	}
 
 	// premultiply intensity map
-	for( y = 0 ; y < frame->len ; y ++ )
+	for( y = 0 ; y < len ; y ++ )
 		Y[y] = (uint8_t) ( (double)Y2[y] * intensity );
 
 	if(!mode)

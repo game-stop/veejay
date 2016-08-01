@@ -20,11 +20,6 @@
 
 #ifndef CHROMASCRATCHER_H
 #define CHROMASCRATCHER_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *chromascratcher_init(int w, int h);
 int chromascratcher_malloc(int w, int h);
 void chromascratcher_free();

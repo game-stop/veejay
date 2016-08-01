@@ -20,11 +20,8 @@
 
 #ifndef OVERCLOCK_H
 #define OVERCLOCK_H
-#include <sys/types.h>
-#include <stdint.h>
-#include <libvje/vje.h>
 vj_effect *overclock_init(int w, int h);
 int overclock_malloc(int w, int h );
 void overclock_free();
-void overclock_apply(VJFrame *frame, int width, int height, int val, int r);
+void overclock_apply(VJFrame *frame, int val, int r);
 #endif

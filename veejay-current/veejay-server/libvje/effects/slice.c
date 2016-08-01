@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include "slice.h"
-#include <stdlib.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "slice.h"
 
 static uint8_t *slice_frame[4] = { NULL,NULL,NULL,NULL };
 static int *slice_xshift = NULL;
@@ -117,13 +115,13 @@ int current_period = 0;
 
 void slice_apply(VJFrame *frame, int val, int re_init) {
 	unsigned int x,y,dx,dy;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-	uint8_t *A = frame->data[3];	
+	uint8_t *A = frame->data[3];
 
 	int interpolate = 1;
 	int tmp1 = val;

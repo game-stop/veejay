@@ -17,12 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "dupmagic.h"
-#include "magicoverlays.h"
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "magicoverlays.h"
+#include "dupmagic.h"
 
 vj_effect *dupmagic_init(int w, int h)
 {

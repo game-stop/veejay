@@ -17,19 +17,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <libvje/vje.h>
-#include <libavutil/avutil.h>
-#include <libyuv/yuvconv.h>
-#include <libvjmsg/vj-msg.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
+#include <libavutil/avutil.h>
+#include <libvjmsg/vj-msg.h>
 #include "softblur.h"
 #include "diff.h"
-#include "common.h"
+
 static uint8_t *static_bg = NULL;
 static uint32_t *dt_map = NULL;
 
@@ -136,8 +131,8 @@ void diff_apply(void *ed, VJFrame *frame, VJFrame *frame2, int threshold,
 {
 	unsigned int i;
 	const int len = frame->len;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

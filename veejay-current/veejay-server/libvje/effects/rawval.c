@@ -17,13 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "rawval.h"
-#include <stdlib.h>
-#include <math.h>
+
 vj_effect *rawval_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -57,7 +55,7 @@ void rawval_apply( VJFrame *frame, const int color_cb, const int color_cr,
                   const int new_color_cb, const int new_color_cr)
 {
     unsigned int i;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 

@@ -20,11 +20,6 @@
 
 #ifndef ALPHABLEND_H
 #define ALPHABLEND_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *alphablend_init(int w, int h);
-void alphablend_apply( VJFrame *frame, VJFrame *frame2, int width,int height);
-
+void alphablend_apply( VJFrame *frame, VJFrame *frame2);
 #endif

@@ -18,18 +18,14 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
 */
 
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <limits.h>
-#include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
-#include "motionmap.h"
-#include "common.h"
+#include <veejay/vj-task.h>
 #include "softblur.h"
 #include "opacity.h"
-#include <veejay/vj-task.h>
+#include "motionmap.h"
 
 #define HIS_DEFAULT 6
 #define HIS_LEN (8*25)
@@ -372,9 +368,9 @@ static int last_act_decay = -1;
 void motionmap_apply( VJFrame *frame, int threshold, int limit1, int draw, int history, int decay, int interpol, int last_act_level, int act_decay )
 {
 	unsigned int i;
-	const int width = frame->width;
-	const int height = frame->height;
-	const unsigned int len = frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	const int limit = limit1 * 10;

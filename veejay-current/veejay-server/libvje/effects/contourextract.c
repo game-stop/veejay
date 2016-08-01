@@ -18,15 +18,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <math.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include <libavutil/avutil.h>
 #include <libvjmsg/vj-msg.h>
 #include <libyuv/yuvconv.h>
-#include "common.h"
 #include "softblur.h"
 #include "diff.h"
 #include "contourextract.h"
@@ -208,8 +205,8 @@ void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
                           int mode, int take_bg, int feather, int min_blob_weight)
 {
 	unsigned int i;
-	const int width = frame->width;
-	const int height = frame->height;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
  	uint8_t *Y = frame->data[0];

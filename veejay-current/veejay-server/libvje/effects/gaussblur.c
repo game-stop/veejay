@@ -18,16 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "gaussblur.h"
-#include <stdlib.h>
-#include <math.h>
 #include "common.h"
-#include <libavutil/opt.h>
+#include <libvjmem/vjmem.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
+#include "gaussblur.h"
 
 vj_effect *gaussblur_init(int w,int h)
 {
@@ -165,14 +160,16 @@ static void gaussblur(uint8_t *dst, const int dst_linesize,const uint8_t *src, c
 void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality )
 {
 	uint8_t *A = frame->data[3];
-	const unsigned int len = frame->len;  
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
 
 	if( last_radius != radius || last_strength != strength || last_quality != quality )
 	{
 		if( gaussfilter->filter_context ) {
 			sws_freeContext( gaussfilter->filter_context );
 		}
-		if( gaussfilter_init( frame->width,frame->height, radius, strength, quality ) == 0 )
+		if( gaussfilter_init( width, height, radius, strength, quality ) == 0 )
 			return;
 
 		last_radius = radius;
@@ -182,6 +179,6 @@ void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality )
 
 
 	veejay_memcpy( temp, A, len );
-	gaussblur( A, frame->width, temp, frame->width, frame->width,frame->height,gaussfilter->filter_context );
+	gaussblur( A, width, temp, width, width, height, gaussfilter->filter_context );
 
 }

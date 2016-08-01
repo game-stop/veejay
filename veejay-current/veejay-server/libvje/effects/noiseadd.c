@@ -17,13 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "noiseadd.h"
-#include "common.h"
 
 static uint8_t *Yb_frame;
 
@@ -74,7 +71,7 @@ static void noiseblur1x3_maskapply(VJFrame* frame, int coeef ) {
     int r, c;
     double k = (coeef/100.0);
     uint8_t d;
-	const int width = frame->width;
+	const unsigned int width = frame->width;
     const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 
@@ -101,7 +98,7 @@ static void noiseblur3x3_maskapply(VJFrame* frame, int coeef ) {
     int r, c;
     const double k = (coeef/1000.0);
     uint8_t d;
-	const int width = frame->width;
+	const unsigned int width = frame->width;
     const int len = (frame->len)-width;
 	uint8_t *Y = frame->data[0];
 
@@ -134,7 +131,7 @@ static void noiseneg3x3_maskapply(VJFrame *frame, int coeef ) {
     int r, c;
     const double k = (coeef/1000.0);
     uint8_t d;
-	const int width = frame->width;
+	const unsigned int width = frame->width;
     const int len = (frame->len)-width;
 	uint8_t *Y = frame->data[0];
 

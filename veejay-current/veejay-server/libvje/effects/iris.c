@@ -23,12 +23,10 @@
  *  weed-plugins/multi_transitions.c?revision=286
  *
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "iris.h"
-#include "common.h"
 
 vj_effect *iris_init(int w, int h)
 {
@@ -53,10 +51,12 @@ vj_effect *iris_init(int w, int h)
 }
 
 
-void iris_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int val, int shape)
+void iris_apply( VJFrame *frame, VJFrame *frame2, int val, int shape)
 {
     int i,j,k=0;
-    int len = (width * height);
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
 
     uint8_t *Y0 = frame->data[0];
     uint8_t *Cb0 = frame->data[1];

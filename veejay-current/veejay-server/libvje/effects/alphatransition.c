@@ -18,13 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include "alphatransition.h"
-#include <veejay/vj-task.h>
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include <veejay/vj-task.h>
+#include "alphatransition.h"
 
 /* almost the same as masktransition.c, but adding threshold and direction parameters */
 

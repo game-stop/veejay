@@ -20,10 +20,6 @@
 
 #ifndef CARTONIZE_H
 #define CARTONIZE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *cartonize_init(int w, int h);
-void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int b3);
+void cartonize_apply( VJFrame *frame, int b1, int b2, int b3);
 #endif

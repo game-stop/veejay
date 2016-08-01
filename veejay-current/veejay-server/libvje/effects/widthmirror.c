@@ -17,9 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "widthmirror.h"
 
@@ -46,7 +45,7 @@ vj_effect *widthmirror_init(int max_width,int h)
 void widthmirror_apply(VJFrame *frame, int width_div)
 {
     unsigned int r, c;
-    const int width = frame->width;
+    const unsigned int width = frame->width;
     const int len = frame->len;
     const int uv_len = frame->uv_len;
     const int uv_width = frame->uv_width;

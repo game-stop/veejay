@@ -18,15 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <config.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include "scratcher.h"
 #include "common.h"
-#include "opacity.h" 
+#include <libvjmem/vjmem.h>
+#include "opacity.h"
+#include "scratcher.h"
 
 static uint8_t *frame[4] = { NULL,NULL,NULL,NULL };
 static int nframe = 0;
@@ -131,7 +126,7 @@ static void store_frame(VJFrame *src, int n, int no_reverse)
 
 void scratcher_apply(VJFrame *src,int opacity, int n, int no_reverse)
 {
-    const unsigned int len = src->len;
+    const int len = src->len;
     const int offset = len * nframe;
     const int uv_len = src->uv_len;
     const int uv_offset = uv_len * nframe;

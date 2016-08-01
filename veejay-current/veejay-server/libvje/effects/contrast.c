@@ -17,12 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "contrast.h"
-#include "common.h"
+
 vj_effect *contrast_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -60,7 +59,7 @@ static void contrast_cb_apply(VJFrame *frame, int *s) {
 	unsigned int r;
 	register int cb;
 	register int cr;
-	const unsigned int uv_len = (frame->ssm ? frame->len: frame->uv_len);
+	const int uv_len = (frame->ssm ? frame->len: frame->uv_len);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 

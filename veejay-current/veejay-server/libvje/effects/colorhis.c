@@ -17,16 +17,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include "colorhis.h"
 #include <libavutil/pixfmt.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
-#include <libel/avcommon.h>
-#include "common.h"
+#include "colorhis.h"
+
 vj_effect *colorhis_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -107,10 +105,10 @@ void	colorhis_free()
 }
 
 
-void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, int intensity, int strength)
+void colorhis_apply( VJFrame *frame,int mode, int val, int intensity, int strength)
 {
-	int src_fmt = (frame->uv_height == height ? PIX_FMT_YUV422P : PIX_FMT_YUV420P);
-	
+	int src_fmt = (frame->uv_height == frame->height ? PIX_FMT_YUV422P : PIX_FMT_YUV420P);
+
 	if(!convert_yuv)
 		convert_yuv = yuv_fx_context_create( frame, rgb_frame_, src_fmt, PIX_FMT_RGB24 );
 
@@ -124,10 +122,10 @@ void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, in
 	{
 		veejay_histogram_analyze_rgb( histogram_,rgb_, frame );
 		veejay_histogram_equalize_rgb( histogram_, frame, rgb_, intensity, strength, mode );
-		
+
 		if(!convert_rgb )
 			convert_rgb = yuv_fx_context_create( rgb_frame_, frame, PIX_FMT_RGB24, src_fmt );
 		yuv_fx_context_process( convert_rgb, rgb_frame_, frame );
-	}	
+	}
 }
 

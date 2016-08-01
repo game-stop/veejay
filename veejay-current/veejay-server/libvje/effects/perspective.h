@@ -20,10 +20,6 @@
 
 #ifndef PERSPECTIVE_H
 #define PERSPECTIVE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *perspective_init(int width, int height);
 int perspective_malloc(int w, int h);
 void perspective_free();

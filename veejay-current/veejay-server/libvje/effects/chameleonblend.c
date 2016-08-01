@@ -22,14 +22,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "softblur.h"
 #include "chameleonblend.h"
-#include "common.h"
 
 vj_effect *chameleonblend_init(int w, int h)
 {
@@ -239,7 +236,7 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
         plane = plane & (PLANES-1);
 }
 
-void chameleonblend_apply( VJFrame *frame, VJFrame *source, int width, int height, int mode )
+void chameleonblend_apply( VJFrame *frame, VJFrame *source, int mode )
 {
 	uint32_t activity = 0;
 	int auto_switch = 0;

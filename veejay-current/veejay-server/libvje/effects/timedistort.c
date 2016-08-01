@@ -25,14 +25,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include "timedistort.h"
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "softblur.h"
+#include "timedistort.h"
+
 #define PLANES 32
 
 vj_effect *timedistort_init(int w, int h)
@@ -129,10 +126,12 @@ void	timedistort_free()
 	nonmap = NULL;
 }
 
-void timedistort_apply( VJFrame *frame, int width, int height, int val)
+void timedistort_apply( VJFrame *frame, int val)
 {
 	unsigned int i;
-	const int len = (width * height);
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

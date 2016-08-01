@@ -20,9 +20,6 @@
 
 #ifndef FIBDOWNSCALE_H
 #define FIBDOWNSCALE_H
-#include <sys/types.h>
-#include <stdint.h>
-#include <libvje/vje.h>
 vj_effect *fibdownscale_init();
 void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n);
 #endif

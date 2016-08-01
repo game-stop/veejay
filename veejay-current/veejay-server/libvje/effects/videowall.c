@@ -17,11 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "videowall.h"
-#include "common.h"
+
 static inline	int	gcd(int p, int q ) { if(q==0) return p; else return(gcd(q,p%q)); }
 
 static inline	int	n_pics(int w, int h)
@@ -214,9 +214,11 @@ static void put_photo( uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h,
 	}
 }
 
-void videowall_apply( VJFrame *frameA, VJFrame *frameB, int width, int height, int a,int b, int c, int d )
+void videowall_apply( VJFrame *frameA, VJFrame *frameB, int a,int b, int c, int d )
 {
 	unsigned int i;
+	const unsigned int width = frameA->width;
+	const unsigned int height = frameA->height;
 	uint8_t *dstY = frameA->data[0];
 	uint8_t *dstU = frameA->data[1];
 	uint8_t *dstV = frameA->data[2];
@@ -225,14 +227,14 @@ void videowall_apply( VJFrame *frameA, VJFrame *frameB, int width, int height, i
 	{
 		offset_table_x[a] = b;
 		offset_table_y[a] = c;
-	}	
+	}
 
 	for( i = 0; i < 3; i ++ )
 	{
 		take_photo( frameA->data[i], photo_list[(frame_counter%num_photos)]->data[i], width, height , frame_counter % num_photos);
 	}
 	frame_counter++;
-		
+
 	for( i = 0; i < 3; i ++ )
 	{
 		take_photo( frameB->data[i], photo_list[(frame_counter%num_photos)]->data[i], width, height , frame_counter % num_photos);

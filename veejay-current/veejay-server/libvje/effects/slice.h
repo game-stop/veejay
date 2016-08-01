@@ -20,11 +20,6 @@
 
 #ifndef SLICE_H
 #define SLICE_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *slice_init(int width, int height);
 int slice_malloc(int width, int height);
 void slice_free();

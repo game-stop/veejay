@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "dummy.h"
-#include "common.h"
 
 vj_effect *dummy_init(int w, int h)
 {
@@ -65,7 +63,7 @@ void dummy_apply( VJFrame *frame, int color)
 
 void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
 {
-   	const int len = frame->len;
+	const int len = frame->len;
 	const int uv_len = frame->uv_len;
 	int colorCb=128, colorCr=128, colorY=0;
 

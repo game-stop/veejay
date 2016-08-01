@@ -17,12 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "greyselect.h"
 
 vj_effect *greyselect_init(int w, int h)
@@ -70,7 +67,7 @@ void greyselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int swa
     uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
 	int cb, cr;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
+    float kg1, tmp, aa = 255.0f, bb = 255.0f;
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     uint8_t val;
@@ -78,7 +75,6 @@ void greyselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int swa
 	uint8_t *Cr = frame->data[2];
 	int iy=0,iu=128,iv=128;
 	_rgb2yuv(r,g,b,iy,iu,iv);
-	_y = (float) iy;
 	aa = (float) iu;
 	bb = (float) iv;
 

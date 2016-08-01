@@ -20,11 +20,6 @@
 
 #ifndef MTRACER_H
 #define MTRACER_H
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *mtracer_init(int w, int h);
 int mtracer_malloc(int w, int h);
 void mtracer_free();

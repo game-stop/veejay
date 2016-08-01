@@ -20,12 +20,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <libvjmem/vjmem.h>
-#include <libvje/vje.h>
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
 #include "maskstop.h"
 
 static uint8_t *vvmaskstop_buffer[6];
@@ -90,9 +87,10 @@ void maskstop_free() {
 }
 
 
-void maskstop_apply( VJFrame *frame, int width, int height, int negmask, int swapmask, int framefreq, int maskfreq) {
+void maskstop_apply( VJFrame *frame, int negmask, int swapmask, int framefreq, int maskfreq)
+{
 	int i=0;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
  
 	uint8_t *Yframe = vvmaskstop_buffer[0];
 	uint8_t *Uframe = vvmaskstop_buffer[1];

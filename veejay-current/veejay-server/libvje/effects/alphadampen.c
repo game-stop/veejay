@@ -17,9 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "alphadampen.h"
 
@@ -46,13 +45,13 @@ vj_effect *alphadampen_init(int w, int h)
 
 void alphadampen_apply( VJFrame *frame, int b1)
 {
-    size_t i;
-    const size_t len = frame->len;
-	uint8_t tmp;	
-    uint8_t *A = frame->data[3];
+	size_t i;
+	const int len = frame->len;
+	uint8_t tmp;
+	uint8_t *A = frame->data[3];
 
 	const int base = (const int) b1;
-	for( i = 0 ; i < len ; i ++ )	
+	for( i = 0 ; i < len ; i ++ )
 	{
 		tmp = A[i];
 		A[i] = (tmp / base) * base; // loose fractional part

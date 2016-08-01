@@ -27,16 +27,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include <libavutil/avutil.h>
-#include <libyuv/yuvconv.h>
-#include "radioactive.h"
-#include "softblur.h"
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+//#include <libavutil/avutil.h>
+#include <libyuv/yuvconv.h>
+#include "softblur.h"
+#include "radioactive.h"
 
 vj_effect *radioactivetv_init(int w, int h)
 {
@@ -227,13 +224,16 @@ void	radioactivetv_free()
 	diffbuf = NULL;
 
 }
-void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
-		int mode, int snapRatio, int snapInterval, int threshold)
+void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int mode, int snapRatio,
+                         int snapInterval, int threshold)
 {
 	unsigned int x, y;
-	uint8_t *diff = diffbuf;
-	uint8_t *prev = diff + frame->len;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	const int len = frame->len;
+
+	uint8_t *diff = diffbuf;
+	uint8_t *prev = diff + len;
 	uint8_t *lum = frame->data[0];
 	uint8_t *dstY = lum;
 	uint8_t *dstU = frame->data[1];
@@ -280,7 +280,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 			for( y = 0; y < len; y ++ ){
 				diff[y] = abs(lum[y] - prev[y]);
 				if(diff[y] < threshold )
-					diff[y] = 0;	
+					diff[y] = 0;
 				prev[y] = (prev[y] + lum[y])>>1;
 			}
 			break;
@@ -288,7 +288,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs(lum[y] - prev[y]);
 				if(diff[y] < threshold )
-					diff[y] = 0;	
+					diff[y] = 0;
 				prev[y] = lum[y];
 			}
 			break;
@@ -324,7 +324,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs(lum[y] - prev[y]);
 				if(diff[y] < threshold )
-					diff[y] = 0;	
+					diff[y] = 0;
 				prev[y] = lum[y];
 			}
 			break;

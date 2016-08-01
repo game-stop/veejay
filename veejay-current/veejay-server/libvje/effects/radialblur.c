@@ -41,11 +41,10 @@
  * mplayer's boxblur
  * Copyright (C) 2002 Michael Niedermayer <michaelni@gmx.at>
  */
-#include <stdint.h>
-#include <stdio.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "radialblur.h"
-#include "common.h"
 
 static uint8_t *radial_src[4] = { NULL,NULL,NULL,NULL};
 
@@ -104,8 +103,10 @@ static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r , int 
 }
 
 
-void radialblur_apply(VJFrame *frame, int width, int height, int radius, int power, int direction)
+void radialblur_apply(VJFrame *frame, int radius, int power, int direction)
 {
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
 

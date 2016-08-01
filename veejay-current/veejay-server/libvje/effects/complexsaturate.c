@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <math.h>
-#include "complexsaturate.h"
+
 #include "common.h"
+#include <libvjmem/vjmem.h>
+#include "complexsaturate.h"
 
 vj_effect *complexsaturation_init(int w, int h)
 {
@@ -75,7 +73,7 @@ void complexsaturation_apply(VJFrame *frame, int i_angle, int r, int g, int b,
 {
 //	double degrees = adjust_degrees * 0.01;
 //	double dsat = adjust_v * 0.01;
-
+	const int len = frame->len;
 
 	float	hue	= (adjust_degrees/180.0)*M_PI;
 	float	sat	= (adjust_v / 100.0f);
@@ -123,7 +121,7 @@ void complexsaturation_apply(VJFrame *frame, int i_angle, int r, int g, int b,
     bg_cr = frame->data[2];
 	const int s = (int) rint( sin(hue) * (1<<16) * sat );
 	const int c = (int) rint( cos(hue) * (1<<16) * sat );
-	for (pos = 0; pos < frame->len; pos++)
+	for (pos = 0; pos < len; pos++)
 	{
 		short xx, yy;
 

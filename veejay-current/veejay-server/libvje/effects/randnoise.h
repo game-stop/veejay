@@ -20,10 +20,6 @@
 
 #ifndef RANDNOISE_H
 #define RANDNOISE_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *randnoise_init(int w, int h);
 void randnoise_apply( VJFrame *frame, int min, int max);
 #endif

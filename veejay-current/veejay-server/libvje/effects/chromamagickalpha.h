@@ -20,10 +20,6 @@
 
 #ifndef CHROMAMAGICKALPHA_H
 #define CHROMAMAGICKALPHA_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *chromamagickalpha_init();
-void chromamagickalpha_apply(VJFrame *frame, VJFrame *frame2 , int width,int height, int type, int op0);
+void chromamagickalpha_apply(VJFrame *frame, VJFrame *frame2, int type, int op0);
 #endif

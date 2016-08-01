@@ -34,15 +34,11 @@
  *
  */     
 
-#include <config.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <libvje/vje.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include <veejay/vj-task.h>
 #include "opacity.h"
-#include "common.h"
 
 vj_effect *opacity_init(int w, int h)
 {

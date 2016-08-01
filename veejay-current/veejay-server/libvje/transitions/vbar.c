@@ -17,11 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+
+#include <libvje/effects/common.h>
 #include <libvjmem/vjmem.h>
-#include "vbar.h"     
+#include "vbar.h"
 
 vj_effect *vbar_init(int width, int height)
 {
@@ -65,11 +64,11 @@ static int bar_top_auto = 0;
 static int bar_bot_auto = 0;
 static int bar_top_vert = 0;
 static int bar_bot_vert = 0;
-void vbar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_y, int top_x, int bot_x) {
-
-	const int width = frame->width;
-	const int height = frame->height;
-	const uint32_t len = frame->len;
+void vbar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_y, int top_x, int bot_x)
+{
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
+	const int len = frame->len;
 	//int top_width = width;		   /* frame in frame destination area */
 	int top_width = width/divider;
 	int bottom_width = width - top_width;

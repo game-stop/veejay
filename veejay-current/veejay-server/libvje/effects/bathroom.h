@@ -20,10 +20,6 @@
 
 #ifndef BATHROOM_H
 #define BATHROOM_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *bathroom_init(int w, int h);
 int bathroom_malloc(int w, int h);
 void bathroom_free();

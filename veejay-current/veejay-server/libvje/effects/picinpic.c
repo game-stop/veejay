@@ -22,15 +22,12 @@
 	This effect uses libpostproc , it should be enabled at compile time
 	(--with-swscaler) if you want to use this Effect.
  */
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include "picinpic.h"
 #include <libyuv/yuvconv.h>
 #include <libavutil/pixfmt.h>
-#include <libel/avcommon.h>
-#include "common.h" 
+#include "picinpic.h"
+
 extern void    vj_get_yuv444_template(VJFrame *src, int w, int h);
 typedef struct
 {
@@ -99,10 +96,12 @@ static int	nearest_div(int val )
 	return val;
 }
 
-void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height,
-		   int twidth, int theight, int x1, int y1 ) 
+void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
+                    int twidth, int theight, int x1, int y1 )
 {
 	int x, y;
+	const unsigned int width = frame->width;
+	const unsigned int height = frame->height;
 	pic_t	*picture = (pic_t*) user_data;
 	int view_width = nearest_div(twidth);
 	int view_height = nearest_div(theight);

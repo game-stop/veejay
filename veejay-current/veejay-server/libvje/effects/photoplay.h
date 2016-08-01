@@ -20,12 +20,8 @@
 
 #ifndef PHOTOPLAY_H
 #define PHOTOPLAY_H
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
 vj_effect *photoplay_init(int w, int h);
 int photoplay_malloc(int w, int h);
 void photoplay_free(void);
-void photoplay_apply( VJFrame *frame, int width, int height, int size, int behaviour, int mode);
+void photoplay_apply( VJFrame *frame, int size, int behaviour, int mode);
 #endif

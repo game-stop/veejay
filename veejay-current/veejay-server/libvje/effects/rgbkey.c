@@ -18,16 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <math.h>
-#include <libvje/vje.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
-#include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 #include "rgbkey.h"
-#include "common.h"
 
 extern int yuv_sws_get_cpu_flags();
 
@@ -209,7 +204,7 @@ void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int tola, int r, int g,int b,
 	uint8_t *Cr2= frame2->data[2];
 	uint8_t *A = frame->data[3];
 	uint8_t *B = frame2->data[3];
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	int iy=0,iu=128,iv=128;
 	uint8_t *T = temp[0];
 	uint8_t op0,op1;

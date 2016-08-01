@@ -22,15 +22,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-
-#include <config.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "waterrippletv.h"
-#include <stdlib.h>
-#include <math.h>
-#include "common.h"
 
 static uint8_t *ripple_data[3];
 
@@ -218,7 +212,7 @@ static void raindrop()
 }
 
 static int last_fresh_rate = 0;
-void	waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, int loopnum, int decay)
+void	waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay)
 {
 	int x, y, i;
 	int dx, dy;
@@ -307,8 +301,8 @@ void	waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, 
 		vp+=2;
 	}
 
-	hi = height;
-	wi = width;
+	hi = frame->height;
+	wi = frame->width;
 	vp = vtable;
 
 /*	dest2 = dest;

@@ -19,14 +19,9 @@
  */
 
 #ifndef NOISEPENCIL_H
-#define NOISEPENCIL_H          
-#include <libvje/vje.h>
-#include <sys/types.h>
-#include <stdint.h>
-
+#define NOISEPENCIL_H
 vj_effect *noisepencil_init  (int w, int h);
 void noisepencil_free();
 int noisepencil_malloc(int w, int h);
 void noisepencil_apply( VJFrame *frame, int t, int n, int a, int b);
-
 #endif

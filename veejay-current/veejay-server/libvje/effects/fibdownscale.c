@@ -17,12 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-#include <stdint.h>
-#include <sys/types.h>
-#include <stdlib.h>
+
+#include "common.h"
 #include <libvjmem/vjmem.h>
 #include "fibdownscale.h"
-#include "common.h"
 
 vj_effect *fibdownscale_init(int w, int h)
 {
@@ -53,8 +51,8 @@ vj_effect *fibdownscale_init(int w, int h)
 static void fibdownscale1_apply(VJFrame *frame, VJFrame *frame2)
 {
 	unsigned i, f1;
-	unsigned int len = frame->len >> 1;
-	unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len) >> 1;
+	const int len = frame->len >> 1;
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len) >> 1;
 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -114,8 +112,6 @@ static void fibrectangle1_apply(VJFrame *frame, VJFrame *frame2)
 
 void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n)
 {
-	int width, height;
-	width = frame->width; height = frame->height;
 	if (n == 0)
 		fibdownscale1_apply(frame, frame2);
 	if (n == 1)
