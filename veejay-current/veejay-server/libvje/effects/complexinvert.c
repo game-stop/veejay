@@ -77,6 +77,7 @@ void complexinvert_apply(VJFrame *frame, int i_angle, int r, int g, int b,
     uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
+	const int len = frame->len;
 	int	iy=pixel_Y_lo_,iu=128,iv=128;
 	_rgb2yuv( r,g,b, iy,iu,iv );
 	_y = (float) iy;
@@ -105,7 +106,7 @@ void complexinvert_apply(VJFrame *frame, int i_angle, int r, int g, int b,
     bg_cb = frame->data[1];
     bg_cr = frame->data[2];
 
-    for (pos = 0; pos < frame->len; pos++)
+    for (pos = 0; pos < len; pos++)
 	{
 		short xx, yy;
 

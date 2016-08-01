@@ -73,17 +73,19 @@ void	autoeq_free()
 
 void autoeq_apply( VJFrame *frame, int val, int intensity, int strength)
 {
+	const int len = frame->len;
+	const int uv_len = frame->uv_len;
 	if( val == 0 )
 	{
 		VJFrame tmp;
 		veejay_memcpy( &tmp, frame, sizeof(VJFrame));
-		tmp.data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * frame->len );
-		vj_frame_copy1( frame->data[0], tmp.data[0], frame->len );
+		tmp.data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * len );
+		vj_frame_copy1( frame->data[0], tmp.data[0], len );
 
 		veejay_histogram_draw( histogram_,&tmp, frame, intensity, strength );
 
-		vj_frame_clear1( frame->data[1], 128, frame->uv_len );
-		vj_frame_clear1( frame->data[2], 128, frame->uv_len );
+		vj_frame_clear1( frame->data[1], 128, uv_len );
+		vj_frame_clear1( frame->data[2], 128, uv_len );
 
 		free(tmp.data[0]);
 	}

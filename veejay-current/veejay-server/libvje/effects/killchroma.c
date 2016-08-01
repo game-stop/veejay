@@ -48,13 +48,14 @@ vj_effect *killchroma_init(int w, int h)
 
 void killchroma_apply(VJFrame *frame, int n)
 {
+	const int len = frame->len;
 	if(n==0)
 	{
-		veejay_memset( frame->data[1], 128, (frame->ssm ? frame->len : frame->uv_len) );
-		veejay_memset( frame->data[2], 128, (frame->ssm ? frame->len : frame->uv_len) );
+		veejay_memset( frame->data[1], 128, (frame->ssm ? len : frame->uv_len) );
+		veejay_memset( frame->data[2], 128, (frame->ssm ? len : frame->uv_len) );
 	}
 	else
 	{
-		veejay_memset( frame->data[n], 128, (frame->ssm ? frame->len : frame->uv_len ) );
+		veejay_memset( frame->data[n], 128, (frame->ssm ? len : frame->uv_len ) );
 	}
 }

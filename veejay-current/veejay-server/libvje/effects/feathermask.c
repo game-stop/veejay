@@ -77,7 +77,8 @@ void feathermask_apply(VJFrame *frame)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	vj_frame_copy1( frame->data[3],mask, frame->len );
+	const int len = frame->len;
+	vj_frame_copy1( frame->data[3],mask, len );
 	feathermask1_apply(frame, mask, width, height);
 }
 

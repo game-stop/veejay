@@ -77,12 +77,13 @@ int mtracer_malloc(int w, int h)
 
 void mtracer_apply( VJFrame *frame, VJFrame *frame2, int mode, int n)
 {
+	const int len = frame->len;
     VJFrame m;
     veejay_memcpy( &m, frame, sizeof(VJFrame ));
 
     if (mtrace_counter == 0) {
 		overlaymagic_apply(frame, frame2, mode,0);
-		vj_frame_copy1( mtrace_buffer[0], frame->data[0], frame->len );
+		vj_frame_copy1( mtrace_buffer[0], frame->data[0], len );
     } else {
 		overlaymagic_apply(frame, frame2, mode,0);
 		m.data[0] = mtrace_buffer[0];
@@ -90,7 +91,7 @@ void mtracer_apply( VJFrame *frame, VJFrame *frame2, int mode, int n)
 		m.data[2] = frame->data[2];
 		m.data[3] = frame->data[3];
 		overlaymagic_apply( &m, frame2, mode, 0 );
-		vj_frame_copy1( mtrace_buffer[0],frame->data[0], frame->len );
+		vj_frame_copy1( mtrace_buffer[0],frame->data[0], len );
     }
 
     mtrace_counter++;
