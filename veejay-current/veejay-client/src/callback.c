@@ -1414,13 +1414,40 @@ g_return_val_if_fail( GTK_IS_LIST_STORE(_model),NULL);
 
 void on_button_seq_clearall_clicked( GtkWidget *w, gpointer data )
 {
-	int slot;
-	for (slot = 0; slot < info->sequencer_col * info->sequencer_row ; slot++)
+	single_vims( VIMS_SEQUENCE_LIST );
+	gint len = 0;
+	gchar *text = recv_vims( 6, &len );
+	if( len <= 0 || text == NULL )
+		return;
+
+	int playing=0;
+	int size =0;
+	int active=0;
+
+	sscanf( text, "%04d%04d%4d",&playing,&size,&active );
+	int nlen = len - 12;
+	int offset = 0;
+	int id = 0;
+	gchar *in = text + 12;
+
+	while( offset < nlen )
 	{
-		multi_vims( VIMS_SEQUENCE_DEL, "%d", slot );
-		gtk_label_set_text(GTK_LABEL(info->sequencer_view->gui_slot[slot]->image),
-		                   NULL );
+		int sample_id = 0;
+		int type = 0;
+		char seqtext[32];
+		sscanf( in + offset, "%04d%02d", &sample_id, &type );
+		offset += 6;
+		if( sample_id > 0 )
+		{
+			multi_vims( VIMS_SEQUENCE_DEL, "%d", id );
+			gtk_label_set_text(GTK_LABEL(info->sequencer_view->gui_slot[id]->image),
+			                   NULL );
+		}
+
+		id ++;
 	}
+	free(text);
+
 	vj_msg(VEEJAY_MSG_INFO, "Sequencer cleared");
 }
 
