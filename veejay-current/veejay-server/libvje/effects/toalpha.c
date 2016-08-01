@@ -56,7 +56,7 @@ vj_effect *toalpha_init(int w, int h)
 
 void toalpha_apply( VJFrame *frame, int mode)
 {
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *a = frame->data[3];
 	uint8_t *Y = frame->data[0];
 		

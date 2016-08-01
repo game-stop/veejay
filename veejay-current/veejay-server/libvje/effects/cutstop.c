@@ -89,7 +89,7 @@ void cutstop_free() {
 void cutstop_apply( VJFrame *frame, int threshold, int freq, int cutmode, int holdmode)
 {
 	int i=0;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	uint8_t *Yb = vvcutstop_buffer[0];
 	uint8_t *Ub = vvcutstop_buffer[1];

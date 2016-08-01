@@ -56,7 +56,7 @@ void iris_apply( VJFrame *frame, VJFrame *frame2, int val, int shape)
     int i,j,k=0;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
     uint8_t *Y0 = frame->data[0];
     uint8_t *Cb0 = frame->data[1];

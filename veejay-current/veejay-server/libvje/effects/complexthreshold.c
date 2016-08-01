@@ -105,7 +105,7 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int i_angle,
     unsigned int pos;
     int matrix[5];
     int val, tmp1;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	const unsigned int width = frame->width;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

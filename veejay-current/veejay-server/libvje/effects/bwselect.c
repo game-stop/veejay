@@ -80,7 +80,7 @@ void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int ga
 {
 	int r,c;
 	const unsigned int width = frame->width;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -99,8 +99,8 @@ void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int ga
 					}
 				}
 			}
-			veejay_memset(Cb, 128, (frame->ssm ? frame->len : frame->uv_len));
-			veejay_memset(Cr, 128, (frame->ssm ? frame->len : frame->uv_len));
+			veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
+			veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
 		}
 		else {
 			uint8_t *aA = frame->data[3];
@@ -136,8 +136,8 @@ void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int ga
 					}
 				}
 			}
-			veejay_memset(Cb, 128, (frame->ssm ? frame->len : frame->uv_len));
-			veejay_memset(Cr, 128, (frame->ssm ? frame->len : frame->uv_len));
+			veejay_memset(Cb, 128, (frame->ssm ? len : frame->uv_len));
+			veejay_memset(Cr, 128, (frame->ssm ? len : frame->uv_len));
 		}
 		else {
 			uint8_t *aA = frame->data[3];

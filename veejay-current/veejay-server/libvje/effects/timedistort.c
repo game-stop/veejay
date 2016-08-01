@@ -131,7 +131,7 @@ void timedistort_apply( VJFrame *frame, int val)
 	unsigned int i;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

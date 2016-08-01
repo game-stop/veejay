@@ -51,8 +51,8 @@ void enhancemask_apply(VJFrame *frame, int *s )
    //int s[9]= { 1, 0, -1, 2, 0, -2, 1 , 0 , -1};
    unsigned int r;
 	const unsigned int width = frame->width;
-	const unsigned int len = frame->len;
-   const unsigned int len2 = len-width-1;
+	const int len = frame->len;
+   const int len2 = len-width-1;
    uint8_t *Y = frame->data[0];
 	/*
    int sum=0;

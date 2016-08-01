@@ -86,7 +86,7 @@ void bwotsu_apply(VJFrame *frame, int mode, int skew, int invert)
 {
 	uint32_t Histogram[256];
 	unsigned int i;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *A = frame->data[3];
 

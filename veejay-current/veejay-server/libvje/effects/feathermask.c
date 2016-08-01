@@ -54,7 +54,7 @@ void feathermask_free()
 static void feathermask1_apply( VJFrame *frame, uint8_t *alpha, unsigned int width, unsigned int height)
 {
 	int r, c;
-	const unsigned int len = frame->len - width;
+	const int len = frame->len - width;
 	uint8_t *aA = frame->data[3];
 	
 	for(r=width; r < len; r+=width) {

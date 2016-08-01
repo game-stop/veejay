@@ -55,7 +55,7 @@ void rawval_apply( VJFrame *frame, const int color_cb, const int color_cr,
                   const int new_color_cb, const int new_color_cr)
 {
     unsigned int i;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 

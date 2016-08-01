@@ -60,7 +60,7 @@ void motionblur_free() {
 
 
 void motionblur_apply( VJFrame *frame, int n) {
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	const int uv_len = frame->uv_len;
 
 	unsigned int i;

@@ -69,7 +69,7 @@ vj_effect *constantblend_init(int w, int h)
 void constantblend_apply( VJFrame *frame, int type, int scale, int valY )
 {
 	unsigned int i;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	const uint8_t y = (uint8_t) valY;
 	const float   s = ((float) scale / 100.0 );
 

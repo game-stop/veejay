@@ -124,7 +124,7 @@ void cali_apply(void *ed, VJFrame *frame,int mode, int full)
 	uint8_t *V = frame->data[2];
 	const int chroma = 127;
 	const int uv_len = frame->uv_len;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	int p,i;
 
 	if( mode == 1 ) {

@@ -126,7 +126,7 @@ static void store_frame(VJFrame *src, int n, int no_reverse)
 
 void scratcher_apply(VJFrame *src,int opacity, int n, int no_reverse)
 {
-    const unsigned int len = src->len;
+    const int len = src->len;
     const int offset = len * nframe;
     const int uv_len = src->uv_len;
     const int uv_offset = uv_len * nframe;

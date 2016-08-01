@@ -150,7 +150,7 @@ void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, 
 
 	const unsigned int height = frame->height;
 	const unsigned int width = frame->width;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	int strides[4] = { len,len,len, 0 };
 

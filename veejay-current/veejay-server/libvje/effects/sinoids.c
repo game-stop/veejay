@@ -103,7 +103,7 @@ static int current_sinoids = 100;
 
 void sinoids_apply(VJFrame *frame, int m, int s)
 {
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	const unsigned int width = frame->width;
 	unsigned int r,c;
 	uint8_t *Y = frame->data[0];

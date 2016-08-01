@@ -214,7 +214,7 @@ void blob_apply(VJFrame *frame, int radius, int num, int speed, int shape)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *srcY = frame->data[0];
 	uint8_t *srcCb= frame->data[1];
 	uint8_t *srcCr= frame->data[2];

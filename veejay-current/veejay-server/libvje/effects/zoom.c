@@ -100,7 +100,7 @@ void zoom_apply( VJFrame *frame, int x, int y, int factor, int dir, int alpha)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	if( zoom_[0] != x || zoom_[1] != y || zoom_[2] != factor || !zoom_vp_ || dir != zoom_[3])
 	{

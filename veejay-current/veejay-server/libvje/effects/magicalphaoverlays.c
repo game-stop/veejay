@@ -64,7 +64,7 @@ vj_effect *overlayalphamagic_init(int w, int h)
 static void overlayalphamagic_adddistorted(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
 
 	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
@@ -83,7 +83,7 @@ static void overlayalphamagic_add_distorted(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
     uint8_t y1, y2;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -98,7 +98,7 @@ static void overlayalphamagic_add_distorted(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -115,7 +115,7 @@ static void overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2)
 {
 
     unsigned int i ;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -130,7 +130,7 @@ static void overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_multiply(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
     for (i = 0; i < len; i++) 
@@ -140,7 +140,7 @@ static void overlayalphamagic_multiply(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_simpledivide(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
     for (i = 0; i < len; i++) {
@@ -153,7 +153,7 @@ static void overlayalphamagic_divide(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
     int a, b, c;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
 	uint8_t *A2 = frame2->data[3];
     for (i = 0; i < len; i++) {
@@ -183,7 +183,7 @@ static void overlayalphamagic_substractive(VJFrame *frame, VJFrame *frame2)
 {
 
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -194,7 +194,7 @@ static void overlayalphamagic_substractive(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_softburn(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -221,7 +221,7 @@ static void overlayalphamagic_softburn(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_inverseburn(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -240,7 +240,7 @@ static void overlayalphamagic_inverseburn(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_colordodge(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -262,7 +262,7 @@ static void overlayalphamagic_colordodge(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_mulsub(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -278,7 +278,7 @@ static void overlayalphamagic_mulsub(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_lighten(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -297,7 +297,7 @@ static void overlayalphamagic_lighten(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_difference(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -312,7 +312,7 @@ static void overlayalphamagic_difference(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_diffnegate(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     int a, b;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
@@ -327,7 +327,7 @@ static void overlayalphamagic_diffnegate(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_exclusive(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -342,7 +342,7 @@ static void overlayalphamagic_basecolor(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
     int a, b, c, d;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -358,7 +358,7 @@ static void overlayalphamagic_basecolor(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_freeze(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -374,7 +374,7 @@ static void overlayalphamagic_freeze(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -390,7 +390,7 @@ static void overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2)
 /*static void overlayalphamagic_hardlight(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -411,7 +411,7 @@ static void overlayalphamagic_relativeaddlum(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
     int a, b, c, d;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -427,7 +427,7 @@ static void overlayalphamagic_relativeaddlum(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_relativesublum(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -442,7 +442,7 @@ static void overlayalphamagic_relativesublum(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_relativeadd(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -459,7 +459,7 @@ static void overlayalphamagic_relativeadd(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_relativesub(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -475,7 +475,7 @@ static void overlayalphamagic_relativesub(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_minsubselect(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -493,7 +493,7 @@ static void overlayalphamagic_minsubselect(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_maxsubselect(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -511,7 +511,7 @@ static void overlayalphamagic_maxsubselect(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_addsubselect(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
     int c, a, b;
@@ -530,7 +530,7 @@ static void overlayalphamagic_addsubselect(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_maxselect(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -546,7 +546,7 @@ static void overlayalphamagic_maxselect(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_minselect(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -562,7 +562,7 @@ static void overlayalphamagic_minselect(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_addtest(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -578,7 +578,7 @@ static void overlayalphamagic_addtest(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_addtest2(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
@@ -594,7 +594,7 @@ static void overlayalphamagic_addtest2(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_addtest4(VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
 	uint8_t *A = frame->data[3];
 	uint8_t *A2 = frame2->data[3];
     int a, b;
@@ -612,7 +612,7 @@ static void overlayalphamagic_addtest4(VJFrame *frame, VJFrame *frame2)
 static void overlayalphamagic_try (VJFrame *frame, VJFrame *frame2, int width, int height)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     int a, b, p, q;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];

@@ -100,7 +100,7 @@ void simplemask_apply( VJFrame *frame, VJFrame *frame2, int threshold, int inver
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	switch(invert) {
 		case 0 : mask_replace_black(frame->data,frame2->data,width,height,len,threshold);
 			break;

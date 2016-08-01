@@ -54,7 +54,7 @@ vj_effect *mixtoalpha_init(int w, int h)
 
 void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int mode, int scale)
 {
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *a = frame->data[3];
 	const uint8_t *Y = frame2->data[0];
 	uint8_t __lookup_table[256];

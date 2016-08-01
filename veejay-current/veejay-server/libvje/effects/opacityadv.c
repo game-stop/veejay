@@ -53,7 +53,7 @@ void opacityadv_apply( VJFrame *frame, VJFrame *frame2, int opacity,
 
     unsigned int x, y;
 	const unsigned int width = frame->width;
-	const unsigned len = frame->len;
+	const int len = frame->len;
     uint8_t a1, a2;
     unsigned int op0, op1;
  	uint8_t *Y = frame->data[0];

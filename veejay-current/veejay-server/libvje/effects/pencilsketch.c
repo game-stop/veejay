@@ -155,9 +155,9 @@ void pencilsketch_apply(VJFrame *frame, int type, int threshold_min,
                         int threshold_max, int mode)
 {
 	unsigned int i;
-	unsigned int len = frame->len;
+	int len = frame->len;
 	const unsigned int width = frame->width;
-	const unsigned int uv_len = (frame->ssm ?len : frame->uv_len);
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	int m,d;
 	uint8_t y,yb;
   	uint8_t *Y = frame->data[0];

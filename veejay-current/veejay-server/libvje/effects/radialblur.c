@@ -107,8 +107,8 @@ void radialblur_apply(VJFrame *frame, int radius, int power, int direction)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = frame->uv_len;
+	const int len = frame->len;
+	const int uv_len = frame->uv_len;
 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];

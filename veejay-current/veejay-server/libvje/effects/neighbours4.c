@@ -272,7 +272,7 @@ void neighbours4_apply( VJFrame *frame, int radius, int brush_size,
 
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *dstY = frame->data[0];
 	uint8_t *dstCb = frame->data[1];
 	uint8_t *dstCr = frame->data[2];

@@ -90,7 +90,7 @@ void maskstop_free() {
 void maskstop_apply( VJFrame *frame, int negmask, int swapmask, int framefreq, int maskfreq)
 {
 	int i=0;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
  
 	uint8_t *Yframe = vvmaskstop_buffer[0];
 	uint8_t *Uframe = vvmaskstop_buffer[1];

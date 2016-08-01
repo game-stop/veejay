@@ -60,9 +60,9 @@ vj_effect *pixelate_init(int width, int height)
 void pixelate_apply( VJFrame *frame, int vv )
 {
 	unsigned int i,j ;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	const unsigned int v = values[vv];
-	const unsigned int uv_len = (frame->ssm ? len : frame->uv_len);
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	unsigned int u_v = v >> (frame->ssm ? frame->shift_h: 1 );
 	if( u_v == 0 )
 		u_v = 1;

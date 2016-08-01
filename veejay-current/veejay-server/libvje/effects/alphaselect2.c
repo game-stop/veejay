@@ -89,7 +89,7 @@ void alphaselect2_apply( VJFrame *frame,int tola, int r, int g,
 		   int b, int tolb,int alpha)
 {
     unsigned int pos;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

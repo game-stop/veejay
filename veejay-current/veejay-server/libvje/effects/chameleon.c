@@ -237,7 +237,7 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
 
 void chameleon_apply( VJFrame *frame, int mode)
 {
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	VJFrame source;
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, tmpimage, strides );

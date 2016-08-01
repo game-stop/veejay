@@ -47,7 +47,7 @@ vj_effect *solarize_init(int w,int h)
 void solarize_apply( VJFrame *frame, int threshold)
 {
     unsigned int i;
-	const unsigned int len= frame->len;
+	const int len= frame->len;
     uint8_t val;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];

@@ -265,7 +265,7 @@ void flare_apply(VJFrame *frame, int type, int op_a, int radius)
 	int plane = 0;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	/* clone frame */
 	VJFrame frame2;

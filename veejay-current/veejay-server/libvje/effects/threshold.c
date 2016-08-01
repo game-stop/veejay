@@ -77,7 +77,7 @@ void threshold_apply( VJFrame *frame, VJFrame *frame2, int threshold, int revers
 	unsigned int y,x;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

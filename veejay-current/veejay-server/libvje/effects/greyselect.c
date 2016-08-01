@@ -63,7 +63,7 @@ vj_effect *greyselect_init(int w, int h)
 
 void greyselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int swap)
 {
-	const unsigned int len = frame->len;
+	const int len = frame->len;
     uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
 	int cb, cr;

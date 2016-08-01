@@ -50,7 +50,7 @@ vj_effect *alphaflatten_init(int w, int h)
 void alphaflatten_apply( VJFrame *frame, int mode)
 {
 	unsigned int i;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	uint8_t *o0 = frame->data[0];
 	uint8_t *o1 = frame->data[1];

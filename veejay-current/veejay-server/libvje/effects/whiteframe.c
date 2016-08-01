@@ -42,7 +42,7 @@ vj_effect *whiteframe_init(int w,int h)
 void whiteframe_apply( VJFrame *frame, VJFrame *frame2)
 {
     unsigned int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
 	const int uv_len = frame->uv_len;
     uint8_t p;
     uint8_t *Y = frame->data[0];

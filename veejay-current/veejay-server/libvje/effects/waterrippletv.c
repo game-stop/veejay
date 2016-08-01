@@ -221,7 +221,7 @@ void	waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay)
 	int *p, *q, *r;
 	signed char *vp;
 	uint8_t *src,*dest;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	if(last_fresh_rate != fresh_rate || tick > fresh_rate)
 	{

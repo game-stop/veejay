@@ -85,7 +85,7 @@ void	baltantv_free()
 void baltantv_apply( VJFrame *frame, int stride, int mode)
 {
 	unsigned int i,cf;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *pDst = planetable_ + (plane_ * len);
 

@@ -230,7 +230,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int mode, int snapRatio
 	unsigned int x, y;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	uint8_t *diff = diffbuf;
 	uint8_t *prev = diff + len;

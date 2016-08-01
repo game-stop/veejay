@@ -68,7 +68,7 @@ void vbar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	//int top_width = width;		   /* frame in frame destination area */
 	int top_width = width/divider;
 	int bottom_width = width - top_width;

@@ -223,7 +223,7 @@ void rotozoom_apply( VJFrame *frame, int mode, int rotate, int zoom, int autom)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned  int len = frame->len;
+	const int len = frame->len;
 	int strides[4] = {len ,len ,len ,0};
     switch (autom) {		/* alas must do memcpy */
     case 0:

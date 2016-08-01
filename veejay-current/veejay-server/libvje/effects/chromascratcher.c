@@ -140,7 +140,7 @@ void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int n,
     unsigned int i;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     const unsigned int op_a = (opacity > 255) ? 255 : opacity;
     const unsigned int op_b = 255 - op_a;
     const int offset = len * cnframe;

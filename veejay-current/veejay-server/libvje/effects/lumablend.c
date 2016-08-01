@@ -65,7 +65,7 @@ static void opacity_by_threshold(VJFrame *frame, VJFrame *frame2,
 								 int threshold, int threshold2, int opacity)
 {
 	const unsigned int width = frame->width;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t **yuv1 = frame->data;
 	uint8_t **yuv2 = frame2->data;
 	unsigned int x, y;
@@ -93,7 +93,7 @@ static void opacity_by_threshold_(VJFrame *frame, VJFrame *frame2,
 								  int threshold, int threshold2, int opacity)
 {
 	const unsigned int width = frame->width;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t **yuv1 = frame->data;
 	uint8_t **yuv2 = frame2->data;
 	unsigned int x, y;
@@ -119,7 +119,7 @@ static void opacity_by_threshold_blur(VJFrame *frame, VJFrame *frame2,
 									  int threshold, int threshold2, int opacity)
 {
 	const unsigned int width = frame->width;
-	const unsigned int len = frame->len - width;
+	const int len = frame->len - width;
 	uint8_t **yuv1 = frame->data;
 	uint8_t **yuv2 = frame2->data;
 	unsigned int x, y;

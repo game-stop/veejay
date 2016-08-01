@@ -59,7 +59,7 @@ static void contrast_cb_apply(VJFrame *frame, int *s) {
 	unsigned int r;
 	register int cb;
 	register int cr;
-	const unsigned int uv_len = (frame->ssm ? frame->len: frame->uv_len);
+	const int uv_len = (frame->ssm ? frame->len: frame->uv_len);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 

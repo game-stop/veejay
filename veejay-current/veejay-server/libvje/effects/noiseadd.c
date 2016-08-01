@@ -72,7 +72,7 @@ static void noiseblur1x3_maskapply(VJFrame* frame, int coeef ) {
     double k = (coeef/100.0);
     uint8_t d;
 	const unsigned int width = frame->width;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 
     for (r = 0; r < len; r += width) {
@@ -99,7 +99,7 @@ static void noiseblur3x3_maskapply(VJFrame* frame, int coeef ) {
     const double k = (coeef/1000.0);
     uint8_t d;
 	const unsigned int width = frame->width;
-    const unsigned int len = (frame->len)-width;
+    const int len = (frame->len)-width;
 	uint8_t *Y = frame->data[0];
 
     for (r = width; r < len; r += width) {
@@ -132,7 +132,7 @@ static void noiseneg3x3_maskapply(VJFrame *frame, int coeef ) {
     const double k = (coeef/1000.0);
     uint8_t d;
 	const unsigned int width = frame->width;
-    const unsigned int len = (frame->len)-width;
+    const int len = (frame->len)-width;
 	uint8_t *Y = frame->data[0];
 
 

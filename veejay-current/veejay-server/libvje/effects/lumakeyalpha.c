@@ -56,7 +56,7 @@ vj_effect *lumakeyalpha_init(int width, int height)
 void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int opacity )
 {
 	unsigned int i;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
     unsigned int op1 = (opacity > 255) ? 255 : opacity;
     unsigned int op0 = 255 - op1;
 

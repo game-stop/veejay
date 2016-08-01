@@ -103,7 +103,8 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-    unsigned int x, len = frame->len;
+	unsigned int x;
+	int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -166,8 +167,8 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
 		Y[x] = func_y( mframe[offset + x], Y[x]);
     }
     
-    veejay_memset( Cb, 128, (frame->ssm ? frame->len : frame->uv_len));
-    veejay_memset( Cr, 128, (frame->ssm ? frame->len : frame->uv_len));
+    veejay_memset( Cb, 128, (frame->ssm ? len : frame->uv_len));
+    veejay_memset( Cr, 128, (frame->ssm ? len : frame->uv_len));
 
     m_rerun = m_frame;
 

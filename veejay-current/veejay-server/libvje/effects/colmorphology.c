@@ -95,7 +95,7 @@ void colmorphology_apply( VJFrame *frame, int threshold, int type, int passes )
 {
 	unsigned int i,x,y;
 	const unsigned int width = frame->width;
-	unsigned int len = frame->len;
+	int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t kernels[8][9] ={
 		 { 1,1,1, 1,1,1 ,1,1,1 },//0

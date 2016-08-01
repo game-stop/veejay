@@ -59,7 +59,7 @@ vj_effect *slidingdoor_init(int width, int height)
 void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int mode)
 {
 	unsigned int i;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	const uint8_t *Y2 = frame2->data[0];
     const uint8_t *Cb2= frame2->data[1];
     const uint8_t *Cr2= frame2->data[2];

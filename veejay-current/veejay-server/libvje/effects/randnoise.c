@@ -57,7 +57,7 @@ static __thread unsigned long x = 123456789, y = 362436069, z = 521288629;
 void randnoise_apply( VJFrame *frame, int min, int max)
 {
     int i;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     uint8_t *Y = frame->data[0];
 	unsigned long t;
 

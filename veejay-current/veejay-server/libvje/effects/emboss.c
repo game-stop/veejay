@@ -104,7 +104,7 @@ static void xtreme_emboss_framedata(VJFrame *frame, int width, int height)
 static void another_try_edge(VJFrame *frame, int w, int h)
 {
 	uint8_t p;
-	const unsigned int len=frame->len-w;
+	const int len=frame->len-w;
 	unsigned int r,c;
 	uint8_t *Y = frame->data[0];
 	for(r=w; r < len; r+= w)
@@ -129,7 +129,7 @@ static void another_try_edge(VJFrame *frame, int w, int h)
 static void lines_white_balance_framedata(VJFrame *frame, int width, int height)
 {
 	unsigned int r, c;
-	const unsigned int len = frame->len - width;
+	const int len = frame->len - width;
 	uint8_t val;
 	uint8_t *Y = frame->data[0];
 	for (r = width; r < len; r += width)
@@ -175,7 +175,8 @@ static void gray_emboss_framedata(VJFrame *frame, int width, int height)
 	int r, c;
 	uint8_t val;
 	uint8_t *Y = frame->data[0];
-	for (r = 0; r < frame->len; r += width)
+	const int len = frame->len;
+	for (r = 0; r < len; r += width)
 	{
 		for (c = 0; c < width; c++)
 		{
@@ -231,7 +232,8 @@ static void dark_emboss_framedata(VJFrame *frame, int width, int height)
 {
 	int r, c;
 	uint8_t *Y = frame->data[0];
-	for (r = 0; r < frame->len; r += width)
+	const int len = frame->len;
+	for (r = 0; r < len; r += width)
 	{
 		for (c = 0; c < width; c++)
 		{
@@ -257,7 +259,8 @@ static void grayish_mood_framedata(VJFrame *frame, int width, int height)
 {
 	int r, c;
 	uint8_t *Y = frame->data[0];
-	for (r = 0; r < frame->len; r += width)
+	const int len = frame->len;
+	for (r = 0; r < len; r += width)
 	{
 		for (c = 0; c < width; c++)
 		{

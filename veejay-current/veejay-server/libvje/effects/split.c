@@ -65,8 +65,8 @@ void split_free() {
 
 static void split_fib_downscale(VJFrame *frame, int width, int height)
 {
-    unsigned int i, len = frame->len/2;
-    unsigned int f;
+    int i, len = frame->len/2;
+    int f;
     unsigned int x, y;
     int uv_width;
     const int ilen = frame->len;
@@ -104,7 +104,7 @@ static void split_fib_downscale(VJFrame *frame, int width, int height)
 
 static void split_fib_downscaleb(VJFrame *frame, int width, int height)
 {
-    unsigned int len = frame->len / 2;
+    int len = frame->len / 2;
     unsigned int uv_len = frame->uv_len /2;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
@@ -124,11 +124,11 @@ static void split_fib_downscaleb(VJFrame *frame, int width, int height)
 
 static void dosquarefib(VJFrame *frame, int width, int height)
 {
-    unsigned int i, len = frame->len / 2;
-    unsigned int f;
-    unsigned int x, y, y1, y2;
-    unsigned int uv_len = frame->uv_len;
-    unsigned int uv_width = frame->uv_width;
+    int i, len = frame->len / 2;
+    int f;
+    int x, y, y1, y2;
+    int uv_len = frame->uv_len;
+    int uv_width = frame->uv_width;
     const unsigned int uv_height = frame->uv_height;
     unsigned int w3 = width >> 2;
     const unsigned int u_w3 = w3 >> frame->shift_h;
@@ -204,7 +204,7 @@ static void dosquarefib(VJFrame *frame, int width, int height)
 
 static void split_push_downscale_uh(VJFrame *frame, int width, int height)
 {
-	unsigned int len = frame->len/2;
+	int len = frame->len/2;
 	int	strides[4] = { len,len,len ,0};
 	vj_frame_copy( frame->data, split_buf,strides );
 
@@ -593,7 +593,8 @@ static void split_v_first_half(VJFrame *frame, VJFrame *frame2, int width,
 static void split_v_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			  int height)
 {
-    unsigned int r, c;
+    int r;
+	unsigned int c;
     const int lw = width / 2;
     const int len = frame->len;
     const int uv_height = frame->uv_height;
@@ -638,8 +639,8 @@ static void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
 static void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
-	const unsigned int len = frame->len / 2;
-	const unsigned int uv_len = frame->uv_len / 2;
+	const int len = frame->len / 2;
+	const int uv_len = frame->uv_len / 2;
 	int strides[4] = { len, uv_len, uv_len, 0 };
 	vj_frame_copy( frame2->data,frame->data, strides );
 }
@@ -647,8 +648,8 @@ static void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
 static void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
-	const unsigned int len = frame->len / 2;
-	const unsigned int uv_len = frame->uv_len / 2;
+	const int len = frame->len / 2;
+	const int uv_len = frame->uv_len / 2;
 	int strides[4] = { len,uv_len,uv_len, 0 };
 	vj_frame_copy( frame2->data, frame->data, strides );
 }
@@ -656,8 +657,8 @@ static void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 static void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			  int height)
 {
-	const unsigned int len = frame->len / 2;
-	const unsigned int uv_len = frame->uv_len / 2;
+	const int len = frame->len / 2;
+	const int uv_len = frame->uv_len / 2;
 	int strides[4] = { len, uv_len, uv_len, 0 };
 	vj_frame_copy( frame2->data, frame->data, strides );
 }

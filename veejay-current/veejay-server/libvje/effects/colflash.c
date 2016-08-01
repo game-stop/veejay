@@ -61,8 +61,8 @@ static int color_delay_ = 0;
 static int delay_ = 0;
 void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d)
 {
-	const unsigned int len =  frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len =  frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];

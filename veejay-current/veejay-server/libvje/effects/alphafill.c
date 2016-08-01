@@ -45,7 +45,7 @@ vj_effect *alphafill_init(int w, int h)
 
 void alphafill_apply( VJFrame *frame, int val)
 {
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *a = frame->data[3];
 	veejay_memset(a, val, len );
 }

@@ -192,7 +192,8 @@ static void bgsubtract_show_bg( VJFrame *frame )
 
 void bgsubtract_apply(VJFrame *frame,int threshold, int method, int enabled, int alpha )
 {
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len );
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len );
 
 	if( auto_hist )
 		vje_histogram_auto_eq( frame );
@@ -203,12 +204,12 @@ void bgsubtract_apply(VJFrame *frame,int threshold, int method, int enabled, int
 				bgsubtract_show_bg( frame );
 				break;
 			case 1:
-				bgsubtract_cma_frame( frame->len, frame->data[0], bg_frame__[0] );
+				bgsubtract_cma_frame( len, frame->data[0], bg_frame__[0] );
 				bgsubtract_show_bg( frame );
 				bg_n ++;
 				break;
 			case 2:
-				bgsubtract_avg_frame( frame->len, frame->data[0], bg_frame__[0] );
+				bgsubtract_avg_frame( len, frame->data[0], bg_frame__[0] );
 				bgsubtract_show_bg( frame );
 				break;	
 			default:
@@ -219,10 +220,10 @@ void bgsubtract_apply(VJFrame *frame,int threshold, int method, int enabled, int
 		if( alpha == 0 ) {
 			veejay_memset( frame->data[1], 128, uv_len );
 			veejay_memset( frame->data[2], 128, uv_len );
-			vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[0], threshold, frame->len );
+			vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[0], threshold, len );
 		}
 		else {
-			vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[3], threshold, frame->len );
+			vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[3], threshold, len );
 		}
 	}
 }

@@ -95,7 +95,7 @@ void radcor_apply( VJFrame *frame, int alpaX, int alpaY, int dir, int alpha)
 	int i2,j2;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	double x,y,x2,x3,y2,y3,r;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

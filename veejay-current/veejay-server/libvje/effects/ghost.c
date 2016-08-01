@@ -79,7 +79,7 @@ void ghost_apply(VJFrame *frame, int opacity)
 	register int q,z=0;
 	int x,y,i;
 	const unsigned int width = frame->width;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	const unsigned int op_a = opacity;
 	const unsigned int op_b = 255 - op_a;
 	uint8_t *srcY = frame->data[0];

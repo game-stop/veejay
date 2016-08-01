@@ -64,7 +64,7 @@ void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin,int bmax)
 {
 	unsigned int pos;
 	uint8_t *A = frame->data[3];
-	const unsigned int len = frame->len;  
+	const int len = frame->len;
 	/* level correction tables */
 
 	uint8_t __lookup_table[256];

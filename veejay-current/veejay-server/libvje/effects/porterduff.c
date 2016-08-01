@@ -358,49 +358,50 @@ static void divide( uint8_t *A, uint8_t *B, int n_pixels )
 
 void porterduff_apply(VJFrame *frame, VJFrame *frame2, int mode)
 {
+	const int len = frame->len;
 	switch( mode )
 	{
 		case 0:
-			porterduff_dst( frame->data[0],frame2->data[0],frame->len );
+			porterduff_dst( frame->data[0],frame2->data[0],len );
 			break;
 		case 1:
-			porterduff_atop( frame->data[0],frame2->data[0], frame->len );
+			porterduff_atop( frame->data[0],frame2->data[0], len );
 			break;
 		case 2:
-			porterduff_dst_in( frame->data[0],frame2->data[0], frame->len );
+			porterduff_dst_in( frame->data[0],frame2->data[0], len );
 			break;
 		case 3:
-			porterduff_dst_over( frame->data[0],frame2->data[0],frame->len );
+			porterduff_dst_over( frame->data[0],frame2->data[0],len );
 			break;
 		case 4:
-			porterduff_dst_out( frame->data[0],frame2->data[0],frame->len );
+			porterduff_dst_out( frame->data[0],frame2->data[0],len );
 			break;
 		case 5:
-			porterduff_src_over( frame->data[0],frame2->data[0],frame->len );
+			porterduff_src_over( frame->data[0],frame2->data[0],len );
 			break;
 		case 6:
-			porterduff_src_atop( frame->data[0],frame2->data[0],frame->len );
+			porterduff_src_atop( frame->data[0],frame2->data[0],len );
 			break;
 		case 7:
-			porterduff_src_in( frame->data[0],frame2->data[0],frame->len );
+			porterduff_src_in( frame->data[0],frame2->data[0],len );
 			break;
 		case 8:
-			porterduff_src_out( frame->data[0],frame2->data[0],frame->len);
+			porterduff_src_out( frame->data[0],frame2->data[0],len);
 			break;
 		case 9:
-			svg_multiply( frame->data[0], frame2->data[0], frame->len );
+			svg_multiply( frame->data[0], frame2->data[0], len );
 			break;
 		case 10:
-			xor( frame->data[0], frame2->data[0], frame->len);
+			xor( frame->data[0], frame2->data[0], len);
 			break;
 		case 11:
-			add( frame->data[0], frame2->data[0], frame->len );
+			add( frame->data[0], frame2->data[0], len );
 			break;
 		case 12:
-			subtract(frame->data[0],frame2->data[0],frame->len);
+			subtract(frame->data[0],frame2->data[0],len);
 			break;
 		case 13:
-			divide(frame->data[0],frame2->data[0],frame->len);
+			divide(frame->data[0],frame2->data[0],len);
 			break;
 	}
 }

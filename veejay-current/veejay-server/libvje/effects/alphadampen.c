@@ -46,7 +46,7 @@ vj_effect *alphadampen_init(int w, int h)
 void alphadampen_apply( VJFrame *frame, int b1)
 {
 	size_t i;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t tmp;
 	uint8_t *A = frame->data[3];
 

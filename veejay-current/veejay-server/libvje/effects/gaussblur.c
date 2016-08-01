@@ -162,7 +162,7 @@ void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality )
 	uint8_t *A = frame->data[3];
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 
 	if( last_radius != radius || last_strength != strength || last_quality != quality )
 	{

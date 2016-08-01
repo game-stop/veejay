@@ -85,7 +85,7 @@ void	nervous_free(void)
 
 void nervous_apply( VJFrame *frame, int delay)
 {
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	int uv_len = (frame->ssm == 1 ? frame->len : frame->uv_len);
 	uint8_t *NY = nervous_buf[0] + (len * frames_elapsed );
 	uint8_t *NCb= nervous_buf[1] + (uv_len * frames_elapsed );

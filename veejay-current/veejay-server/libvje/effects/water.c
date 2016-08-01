@@ -273,7 +273,7 @@ static	int	globalactivity(VJFrame *f2, water_t *w, int in)
 
 static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-        const unsigned int len = f->len;
+        const int len = f->len;
         uint8_t *bg = w->diff_img + len;
         uint8_t *in = f2->data[0];
         if(!w->have_img)
@@ -322,7 +322,7 @@ static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
 static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	const unsigned int len = f->len;
+	const int len = f->len;
 	uint8_t *bg = w->diff_img + len;
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
@@ -371,7 +371,7 @@ static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 
 static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
-	const unsigned int len= f->len;
+	const int len= f->len;
 	uint8_t *bg = w->diff_img + len;
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
@@ -503,7 +503,7 @@ void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int fresh_rat
 	int *p, *q, *r;
 	signed char *vp;
 	uint8_t *src,*dest;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	water_t *w = (water_t*) user_data;
 
 	if(w->last_fresh_rate != fresh_rate)

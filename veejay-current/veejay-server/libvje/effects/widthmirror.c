@@ -46,7 +46,7 @@ void widthmirror_apply(VJFrame *frame, int width_div)
 {
     unsigned int r, c;
     const unsigned int width = frame->width;
-    const unsigned int len = frame->len;
+    const int len = frame->len;
     const int uv_len = frame->uv_len;
     const int uv_width = frame->uv_width;
     const int uv_width_div = width_div;

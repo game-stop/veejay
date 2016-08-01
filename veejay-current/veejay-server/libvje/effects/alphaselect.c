@@ -82,7 +82,7 @@ void alphaselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int sw
     float angle = (float) i_angle / 100.0f;
     unsigned int pos;
     uint8_t val;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

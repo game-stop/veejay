@@ -74,8 +74,8 @@ vj_effect *lumamagick_init(int width, int height)
 static void lumamagick_adddistorted(VJFrame *frame, VJFrame *frame2, int op_a, int op_b)
 {
 	unsigned int i;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -114,8 +114,8 @@ static void lumamagick_add_distorted(VJFrame *frame, VJFrame *frame2, int op_a, 
 	uint8_t y1, y2, y3, cb, cr, cs;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -155,8 +155,8 @@ static void lumamagick_subdistorted(VJFrame *frame, VJFrame *frame2, int op_a, i
 	uint8_t y1, y2, cb, cr;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -190,8 +190,8 @@ static void lumamagick_sub_distorted(VJFrame *frame, VJFrame *frame2, int op_a, 
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
 	uint8_t y1, y2, cb, cr, y3, cs;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -231,7 +231,7 @@ static void lumamagick_multiply(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	uint8_t y1, y2;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -247,7 +247,7 @@ static void lumamagick_multiply(VJFrame *frame, VJFrame *frame2, int op_a, int o
 static void lumamagick_divide(VJFrame *frame, VJFrame *frame2 , int op_a, int op_b)
 {
 	unsigned int i;
-	const unsigned int len = frame->width * frame->height;
+	const int len = frame->len;
 	int b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
@@ -290,7 +290,7 @@ static void lumamagick_additive(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	int a=0;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -307,7 +307,7 @@ static void lumamagick_substractive(VJFrame *frame, VJFrame *frame2, int op_a, i
 	int a;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -324,7 +324,7 @@ static void lumamagick_softburn(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	int a, b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -355,7 +355,7 @@ static void lumamagick_inverseburn(VJFrame *frame, VJFrame *frame2, int op_a, in
 	int a, b, c;
 	const double opacity_a = op_a  * 0.01;
 	const double opacity_b = op_b *  0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -377,7 +377,7 @@ static void lumamagick_colordodge(VJFrame *frame, VJFrame *frame2, int op_a, int
 	int a, b, c,d;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -404,7 +404,7 @@ static void lumamagick_mulsub(VJFrame *frame, VJFrame *frame2 , int op_a, int op
 	int a, b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -425,7 +425,7 @@ static void lumamagick_lighten(VJFrame *frame, VJFrame *frame2, int op_a, int op
 	int a, b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -447,7 +447,7 @@ static void lumamagick_difference(VJFrame *frame, VJFrame *frame2, int op_a, int
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -465,7 +465,7 @@ static void lumamagick_diffnegate(VJFrame *frame, VJFrame *frame2, int op_a, int
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -483,7 +483,7 @@ static void lumamagick_exclusive(VJFrame *frame, VJFrame *frame2, int op_a, int 
 	int a, b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -504,7 +504,7 @@ static void lumamagick_basecolor(VJFrame *frame, VJFrame *frame2, int op_a, int 
 	int a, b, c, d;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -524,7 +524,7 @@ static void lumamagick_freeze(VJFrame *frame, VJFrame *frame2 , int op_a, int op
 	int a, b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -548,7 +548,7 @@ static void lumamagick_unfreeze(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	int a, b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -569,7 +569,7 @@ static void lumamagick_unfreeze(VJFrame *frame, VJFrame *frame2, int op_a, int o
 static void lumamagick_hardlight(VJFrame *frame, VJFrame *frame2, int op_a, int op_b)
 {
 	unsigned int i;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -593,7 +593,7 @@ static void lumamagick_hardlight(VJFrame *frame, VJFrame *frame2, int op_a, int 
 static void lumamagick_relativeaddlum(VJFrame *frame, VJFrame *frame2, int op_a, int op_b)
 {
 	unsigned int i;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 	int a, b, c, d;
@@ -616,7 +616,7 @@ static void lumamagick_relativesublum(VJFrame *frame, VJFrame *frame2, int op_a,
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -634,8 +634,8 @@ static void lumamagick_relativeadd(VJFrame *frame, VJFrame *frame2, int op_a, in
 	int a, b, c, d;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
@@ -674,8 +674,8 @@ static void lumamagick_relativesub(VJFrame *frame, VJFrame *frame2, int op_a, in
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -706,7 +706,7 @@ static void lumamagick_minsubselect(VJFrame *frame, VJFrame *frame2, int op_a, i
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -727,7 +727,7 @@ static void lumamagick_maxsubselect(VJFrame *frame, VJFrame *frame2, int op_a, i
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -748,7 +748,7 @@ static void lumamagick_addsubselect(VJFrame *frame, VJFrame *frame2, int op_a, i
 	int c, a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -771,7 +771,7 @@ static void lumamagick_maxselect(VJFrame *frame, VJFrame *frame2, int op_a, int 
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -790,7 +790,7 @@ static void lumamagick_minselect(VJFrame *frame, VJFrame *frame2, int op_a, int 
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -809,7 +809,7 @@ static void lumamagick_addtest(VJFrame *frame, VJFrame *frame2, int op_a, int op
 	int c, a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -828,8 +828,8 @@ static void lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	int c, a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -864,7 +864,7 @@ static void lumamagick_addtest4(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	int c, a, b;
 	double opacity_a = op_a * 0.01;
 	double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
@@ -888,8 +888,8 @@ void lumamagick_selectmin(VJFrame *frame, VJFrame *frame2, int op_a, int op_b)
 	int a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = frame->uv_len;
+	const int len = frame->len;
+	const int uv_len = frame->uv_len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -926,8 +926,8 @@ static void lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	int c, a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
-	const unsigned int uv_len = (frame->ssm ? frame->len : frame->uv_len);
+	const int len = frame->len;
+	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -981,7 +981,7 @@ static void lumamagick_addlum(VJFrame *frame, VJFrame *frame2, int op_a, int op_
 	int c, a, b;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-	const unsigned int len = frame->len;
+	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
