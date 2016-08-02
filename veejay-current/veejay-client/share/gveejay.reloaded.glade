@@ -14787,7 +14787,7 @@ YUV (current)</property>
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
-                                    <property name="tooltip" translatable="yes">Save Samplelist</property>
+                                    <property name="tooltip" translatable="yes">Save Samplelist (press [SHIFT] to Save as)</property>
                                     <signal name="button_press_event" handler="on_button_samplelist_qsave_clicked" />
                                     <child>
                                       <widget class="GtkAlignment" id="alignment55">
