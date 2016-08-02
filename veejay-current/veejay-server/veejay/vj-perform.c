@@ -99,7 +99,7 @@ typedef struct {
 #define	RUP8(num)(((num)+8)&~8)
 static long performer_frame_size_ = 0;
 
-extern int pixel_Y_lo_;
+extern uint8_t pixel_Y_lo_;
 
 static varcache_t pvar_;
 static void	*lzo_;
@@ -188,8 +188,6 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,int chain
 #ifdef HAVE_JACK
 static void vj_perform_reverse_audio_frame(veejay_t * info, int len, uint8_t *buf );
 #endif
-
-extern int  pixel_Y_lo_;
 
 static	void	vj_perform_copy( ycbcr_frame *src, ycbcr_frame *dst, int Y_len, int UV_len, int alpha_len )
 {
