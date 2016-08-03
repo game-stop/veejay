@@ -10302,7 +10302,21 @@ void	vj_event_sequencer_del_sample(		void *ptr, 	const char format[], 	va_list a
 	P_A(args,NULL,format,ap);
 
 	int seq_it = args[0];
-	
+
+	if( seq_it == -1 ) {
+		int i;
+		for( i = 0; i < MAX_SEQUENCES; i ++ )
+		{
+			v->seq->samples[i].sample_id = 0;
+			v->seq->samples[i].type = 0;
+		}
+		v->seq->active = 0;
+		v->seq->current = 0;
+
+		veejay_msg(VEEJAY_MSG_INFO, "Deleted all sequences");
+		return;
+	}
+
 	if( seq_it < 0 || seq_it >= MAX_SEQUENCES )
 	{
 		veejay_msg( VEEJAY_MSG_ERROR, "Sequence slot %d is not used, nothing deleted",seq_it );
