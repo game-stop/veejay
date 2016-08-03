@@ -26,6 +26,176 @@
 #define VJE_SUCCESS 0
 #include <libvje/vje.h>
 
+#include "./effects/alpha2img.h"
+#include "./effects/alphablend.h"
+#include "./effects/alphadampen.h"
+#include "./effects/alphafill.h"
+#include "./effects/alphaflatten.h"
+#include "./effects/alphanegate.h"
+#include "./effects/alphaselect2.h"
+#include "./effects/alphaselect.h"
+#include "./effects/alphatransition.h"
+#include "./effects/autoeq.h"
+#include "./effects/average-blend.h"
+#include "./effects/average.h"
+#include "./effects/baltantv.h"
+#include "./effects/bathroom.h"
+#include "./effects/bgpush.h"
+#include "./effects/bgsubtractgauss.h"
+#include "./effects/bgsubtract.h"
+#include "./effects/binaryoverlays.h"
+#include "./effects/blob.h"
+#include "./effects/boids.h"
+#include "./effects/borders.h"
+#include "./effects/bwotsu.h"
+#include "./effects/bwselect.h"
+#include "./effects/cali.h"
+#include "./effects/cartonize.h"
+#include "./effects/chameleonblend.h"
+#include "./effects/chameleon.h"
+#include "./effects/chromamagickalpha.h"
+#include "./effects/chromamagick.h"
+#include "./effects/chromapalette.h"
+#include "./effects/chromascratcher.h"
+#include "./effects/chromium.h"
+#include "./effects/colflash.h"
+#include "./effects/colmorphology.h"
+#include "./effects/coloradjust.h"
+#include "./effects/color.h"
+#include "./effects/colorhis.h"
+#include "./effects/colormap.h"
+#include "./effects/colorshift.h"
+#include "./effects/common.h"
+#include "./effects/complexinvert.h"
+#include "./effects/complexsaturate.h"
+#include "./effects/complexsync.h"
+#include "./effects/complexthreshold.h"
+#include "./effects/constantblend.h"
+#include "./effects/contourextract.h"
+#include "./effects/contrast.h"
+#include "./effects/crosspixel.h"
+#include "./effects/cutstop.h"
+#include "./effects/deinterlace.h"
+#include "./effects/dices.h"
+#include "./effects/diff.h"
+#include "./effects/diffimg.h"
+#include "./effects/diffmap.h"
+#include "./effects/dissolve.h"
+#include "./effects/distort.h"
+#include "./effects/dither.h"
+#include "./effects/dummy.h"
+#include "./effects/dupmagic.h"
+#include "./effects/emboss.h"
+#include "./effects/enhancemask.h"
+#include "./effects/feathermask.h"
+#include "./effects/fibdownscale.h"
+#include "./effects/fisheye.h"
+#include "./effects/flare.h"
+#include "./effects/flip.h"
+#include "./effects/frameborder.h"
+#include "./effects/gamma.h"
+#include "./effects/gaussblur.h"
+#include "./effects/ghost.h"
+#include "./effects/greyselect.h"
+#include "./effects/iris.h"
+#include "./effects/isolate.h"
+#include "./effects/keyselect.h"
+#include "./effects/killchroma.h"
+#include "./effects/levelcorrection.h"
+#include "./effects/lumablend.h"
+#include "./effects/lumakeyalpha.h"
+#include "./effects/lumakey.h"
+#include "./effects/lumamagick.h"
+#include "./effects/lumamask.h"
+#include "./effects/magicalphaoverlays.h"
+#include "./effects/magicmirror.h"
+#include "./effects/magicoverlaysalpha.h"
+#include "./effects/magicoverlays.h"
+#include "./effects/magicscratcher.h"
+#include "./effects/mask.h"
+#include "./effects/maskstop.h"
+#include "./effects/masktransition.h"
+#include "./effects/meanfilter.h"
+#include "./effects/median.h"
+#include "./effects/mirrors2.h"
+#include "./effects/mirrors.h"
+#include "./effects/mixtoalpha.h"
+#include "./effects/morphology.h"
+#include "./effects/motionblur.h"
+#include "./effects/motionmap.h"
+#include "./effects/mtracer.h"
+#include "./effects/negatechannel.h"
+#include "./effects/negation.h"
+#include "./effects/neighbours2.h"
+#include "./effects/neighbours3.h"
+#include "./effects/neighbours4.h"
+#include "./effects/neighbours5.h"
+#include "./effects/neighbours.h"
+#include "./effects/nervous.h"
+#include "./effects/noiseadd.h"
+#include "./effects/noisepencil.h"
+#include "./effects/opacityadv.h"
+#include "./effects/opacity.h"
+#include "./effects/opacitythreshold.h"
+#include "./effects/overclock.h"
+#include "./effects/passthrough.h"
+#include "./effects/pencilsketch.h"
+#include "./effects/perspective.h"
+#include "./effects/photoplay.h"
+#include "./effects/picinpic.h"
+#include "./effects/pixelate.h"
+#include "./effects/porterduff.h"
+#include "./effects/posterize.h"
+#include "./effects/radcor.h"
+#include "./effects/radialblur.h"
+#include "./effects/radioactive.h"
+#include "./effects/randnoise.h"
+#include "./effects/raster.h"
+#include "./effects/rawman.h"
+#include "./effects/rawval.h"
+#include "./effects/reflection.h"
+#include "./effects/revtv.h"
+#include "./effects/rgbchannel.h"
+#include "./effects/rgbkey.h"
+#include "./effects/rgbkeysmooth.h"
+#include "./effects/ripple.h"
+#include "./effects/rotozoom.h"
+#include "./effects/scratcher.h"
+#include "./effects/sinoids.h"
+#include "./effects/slice.h"
+#include "./effects/slicer.h"
+#include "./effects/smear.h"
+#include "./effects/smuck.h"
+#include "./effects/softblur.h"
+#include "./effects/solarize.h"
+#include "./effects/split.h"
+#include "./effects/swirl.h"
+#include "./effects/threshold.h"
+#include "./effects/timedistort.h"
+#include "./effects/toalpha.h"
+#include "./effects/tracer.h"
+#include "./effects/transform.h"
+#include "./effects/travelmatte.h"
+#include "./effects/tripplicity.h"
+#include "./effects/uvcorrect.h"
+#include "./effects/videoplay.h"
+#include "./effects/videowall.h"
+#include "./effects/water.h"
+#include "./effects/waterrippletv.h"
+#include "./effects/whiteframe.h"
+#include "./effects/widthmirror.h"
+#include "./effects/zoom.h"
+#include "./transitions/3bar.h"
+#include "./transitions/fadecolor.h"
+#include "./transitions/fadecolorrgb.h"
+#include "./transitions/slidingdoor.h"
+#include "./transitions/transblend.h"
+#include "./transitions/transcarot.h"
+#include "./transitions/transline.h"
+#include "./transitions/transop.h"
+#include "./transitions/vbar.h"
+#include "./transitions/wipe.h"
+
 #define VJ_IMAGE_EFFECT_MIN 91
 #define VJ_IMAGE_EFFECT_MAX 199
 
@@ -304,231 +474,4 @@ enum {
 
 #define VJ_NUM_BLEND_EFFECTS VJ_EFFECT_BLEND_ADDTEST7
 
-extern void tripplicity_apply(VJFrame *frame1,VJFrame *frame2, int a, int b, int c );
-extern void dices_apply(void * data, VJFrame *frame, int cube_bits);
-extern void dither_apply( VJFrame *frame, int size, int n);
-extern void emboss_apply( VJFrame *frame, int n);
-extern void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n);
-extern void flip_apply(VJFrame *frame, int n);
-extern void killchroma_apply(VJFrame *frame, int n);
-extern void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int op_a, int op_b );
-extern void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int n, int m);
-extern void mirrors_apply( VJFrame *frame, int type, int factor);
-extern void mirrors2_apply( VJFrame *frame, int type);
-extern void negation_apply( VJFrame *frame, int val);
-extern void medianfilter_apply( VJFrame *frame, int val);
-extern void negatechannel_apply( VJFrame *frame, int chan, int val);
-extern void colormap_apply( VJFrame *frame, int r, int g, int b);
-extern void opacity_apply(VJFrame *frame, VJFrame *frame2, int opacity);
-extern void opacityadv_apply(VJFrame *frame, VJFrame *frame2, int o, int t1, int t2);
-extern void opacitythreshold_apply(VJFrame *frame, VJFrame *frame2, int o, int t1, int t2);
-extern void posterize_apply( VJFrame *frame, int factor, int t1, int t2);
-extern void revtv_apply( VJFrame *frame, int space, int vscale, int c, int cn);
-extern void softblur_apply( VJFrame *frame, int n);
-extern void split_apply( VJFrame *frame, VJFrame *frame2, int n, int swap);
-extern void widthmirror_apply( VJFrame *frame, int div);
-extern void transblend_apply(VJFrame *frame, VJFrame *frame2, int mode,
-                             int twidth, int theight,
-                             int x1, int y1, int x2, int y2);
-extern void borders_apply(VJFrame *frame, int size, int color);
-extern void frameborder_apply(VJFrame *frame, VJFrame *frame2, int size);
-extern void noisepencil_apply(VJFrame *frame, int a, int b, int c , int d );
-extern void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int Y);
-extern void rawval_apply(VJFrame *frame, int color_cb, int color_cr,
-                         int new_cb, int new_cr);
-extern void smuck_apply( VJFrame *frame, VJFrame *frame2, int level);
-extern void colorfade_apply( VJFrame *frame, int op, int color);
-extern void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int size);
-extern void transop_apply(VJFrame *frame, VJFrame *frame2, int twidth,
-                          int theight, int x1, int y1, int x2, int y2, int opacity);
-extern void lumakey_apply(VJFrame *frame, VJFrame *frame2,
-                          int a, int b, int c, int d, int e);
-extern void slicer_apply( VJFrame *frame, VJFrame *frame2, int a, int b, int c, int d, int mode );
-extern void transcarot_apply(VJFrame *frame, VJFrame *frame2,
-                             int point_size, int dy, int dye, int row_start,
-                             int opacity, int type);
-extern void transline_apply(VJFrame *frame, VJFrame *frame2, int distance,
-                            int line_width, int opacity, int type);
-extern void transform_apply(VJFrame *frame, VJFrame *frame2, int size);
-extern void coloradjust_apply( VJFrame *frame, int val, int degrees);
-extern void rgbkey_apply( VJFrame *frame, VJFrame *frame2, int i_angle,
-                         int i_noise, int r, int g, int b,
-                         int min, int max, int op);
-extern void gamma_apply( VJFrame *frame, int val);
-extern void solarize_apply(VJFrame *frame, int threshold);
-extern void dummy_apply(VJFrame *frame, int color_num);
-extern void rotozoom_apply(VJFrame *frame, int a, int b, int c, int d);
-extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2);
-//extern void texmap_apply(void *dd, VJFrame *frame,
-//		       VJFrame *frame2, int width, int height,
-//		       int mode, int threshold, int c , int feather, int blob);
-extern void contourextract_apply(void *ed, VJFrame *frame, int threshold,
-                                 int reverse,int mode, int take_bg, int feather,
-                                 int min_blob_weight);
-extern void diff_apply(void *dd, VJFrame *frame, VJFrame *frame2, int threshold,
-                       int reverse, int mode, int feather);
-extern void chromamagick_apply(VJFrame *frame, VJFrame *frame2, int type, int op0);
-extern void colorfadergb_apply(VJFrame *frame, int opacity, int r, int g, int b);
-extern void lumablend_apply(VJFrame *frame, VJFrame *frame2, int type,
-                            int t1, int t2, int op);
-extern void diffimg_apply(VJFrame *frame, int type, int delta, int zeta);
-extern void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int angle,
-                               int r, int g, int b,int level, int noise);
-extern void scratcher_apply(VJFrame *frame, int o, int n, int r);
-extern void colorshift_apply(VJFrame *frame, int type, int value);
-extern void reflection_apply(VJFrame *frame, int n1, int n2, int n3);
-extern void distortion_apply(VJFrame *frame, int i1, int i2, int i3, int i4, int i5, int i6 );
-extern void magicscratcher_apply(VJFrame *frame, int mode, int nframes, int r);
-extern void wipe_apply(VJFrame *frame, VJFrame *frame2, int inc, int opacity);
-/* begin API */
-extern void chromascratcher_apply(VJFrame *frame, int mode, int opacity,
-                                  int nframes, int no_reverse);
-extern void tracer_apply(VJFrame *frame, VJFrame *frame2, int opacity, int n);
-extern void mtracer_apply(VJFrame *frame, VJFrame *frame2, int mode, int n);
-extern void keyselect_apply(VJFrame *frame, VJFrame *frame2, int angle,
-                            int r, int g, int b, int mode, int noise);
-extern void greyselect_apply(VJFrame *frame, int angle, int r, int g, int b, int swap);
-extern void isolate_apply(VJFrame *frame, int angle, int r, int g, int b, int opacity);
-extern void bwselect_apply(VJFrame *frame, int a , int b, int c, int g);
-extern void bwotsu_apply(VJFrame *frame, int mode, int skew,int invert);
-extern void meanfilter_apply(VJFrame *frame);
-extern void complexinvert_apply(VJFrame *frame, int angle, int r, int g, int b,
-                                int i_noise);
-extern void complexsaturation_apply(VJFrame *frame, int angle, int r, int g, int b,
-                                    int adj, int adjv, int inoise);
-extern void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int angle,
-                                   int r, int g, int b, int level, int threshold);
-extern void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val );
-extern void enhancemask_apply(VJFrame *frame, int *t);
-extern void contrast_apply(VJFrame *frame, int *t);
-extern void noiseadd_apply(VJFrame *frame, int t, int n);
-extern void motionblur_apply(VJFrame *frame, int n);
-extern void sinoids_apply(VJFrame *frame, int a,int b);
-extern void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n);
-extern void simplemask_apply(VJFrame *frame, VJFrame *frame2,
-                             int threshold, int invert);
-extern void bar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
-                      int t1, int b1);
-extern void vbar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
-                       int t1, int t2);
-extern void average_apply(VJFrame *frame, int val, int mode);
-extern void ripple_apply(VJFrame *frame, int waves, int ampli,int atten);
-extern void bathroom_apply(VJFrame *frame, int mode, int val, int x0, int x1);
-extern void slice_apply(VJFrame *frame, int val, int reinit);
-extern void zoom_apply(VJFrame *frame, int xo, int yo, int f, int dir, int alpha);
-extern void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
-                              int x3, int y3, int x4, int y4, int reverse);
-extern void deinterlace_apply(VJFrame *frame, int val);
-//extern void simplematte_apply(VJFrame *frame, int threshold, int invert);
-extern void crosspixel_apply(VJFrame *frame,int type, int val);
-extern void color_apply(VJFrame *frame, int a, int b, int c);
-//extern void water_apply(VJFrame *frame, int w, int h, int val, int l, int d);
-extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2,
-                        int fresh,int loopnum, int decay, int mode, int threshold);
-extern void pencilsketch_apply(VJFrame *frame, int type, int threshold, int opacity, int mode);
-extern void pixelate_apply(VJFrame *frame, int v );
-extern void bgpush_apply( VJFrame *frame );
-extern void magicmirror_apply(VJFrame *frame, int x, int y, int d, int n, int alpha );
-extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int n, int m, int border, int alpha);
-extern void smear_apply(VJFrame *frame, int n, int m);
-extern void raster_apply(VJFrame *frame, int v, int mode);
-extern void fisheye_apply(VJFrame *frame, int v, int alpha );
-extern void swirl_apply(VJFrame *frame, int v );
-extern void radialblur_apply(VJFrame *frame, int r, int p, int n);
-extern void binaryoverlay_apply(VJFrame *frame, VJFrame *frame2, int n);
-extern void chromium_apply( VJFrame *frame, int n);
-extern void chromapalette_apply( VJFrame *frame, int a, int r, int g, int b, int c1, int c2);
-extern void uvcorrect_apply(VJFrame *frame, int angle, int urot_center,
-                            int vrot_center, int iuFactor, int ivFactor, int uvmin, int uvmax );
-extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int opacity);
-extern void overclock_apply(VJFrame *frame, int val, int r);
-
-uint8_t *bgpush_get_bg_frame(unsigned int plane);
-uint8_t *bgsubtract_get_bg_frame(unsigned int plane);
-extern int bgsubtract_prepare(VJFrame *frame);
-extern void bgsubtract_apply(VJFrame *frame, int threshold, int method, int enabled, int alpha );
-
-extern uint8_t* bgsubtractgauss_get_bg_frame(unsigned int plane);
-extern int bgsubtractgauss_prepare(VJFrame *frame);
-extern void bgsubtractgauss_apply(VJFrame *frame,int alpha, int threshold,int noise, int mode, int period, int morph );
-
-extern int diff_prepare(void *data, uint8_t *map[4], int w, int h);
-
-extern int bgpush_prepare( VJFrame *frame );
-
-extern void cartonize_apply( VJFrame *frame, int b1, int b2, int b3 );
-extern void morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
-extern void colmorphology_apply( VJFrame *frame, int t, int v, int p);
-extern void blob_apply( VJFrame *frame, int p0,int p1, int p2, int p3);
-extern void boids_apply( VJFrame *frame, int p0,int p1, int p2, int p3,
-                        int p4, int p5, int p6, int p7);
-extern void porterduff_apply( VJFrame *frame, VJFrame *frame2, int mode);
-extern void ghost_apply(VJFrame *frame, int o );
-extern void neighbours_apply( VJFrame *frame, int brush_size, int level, int mode);
-extern void neighbours2_apply( VJFrame *frame, int brush_size, int level, int mode);
-extern void neighbours3_apply( VJFrame *frame, int brush_size, int level, int mode);
-extern void neighbours4_apply( VJFrame *frame, int radius, int brush_size, int level, int mode);
-extern void neighbours5_apply( VJFrame *frame, int radius, int brush_size, int level);
-extern void cutstop_apply( VJFrame *frame, int treshold, int freq, int cutmode, int holdmode);
-extern void maskstop_apply( VJFrame *frame, int treshold, int freq, int cutmode, int holdmode);
-extern void photoplay_apply(VJFrame *frame, int a, int b, int c);
-extern void videoplay_apply(VJFrame *frame,VJFrame *B, int a, int b, int c);
-extern void videowall_apply(VJFrame *frame,VJFrame *B, int a, int b, int c, int d);
-extern void flare_apply(VJFrame *frame, int type, int threshold, int radius );
-extern void constantblend_apply(VJFrame *frame, int type, int scale, int y );
-extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
-                           int x1, int y1, int width, int height);
-extern void threshold_apply( VJFrame *frame, VJFrame *frame2, int threshold, int reverse );
-extern void motionmap_apply( VJFrame *frame, int threshold, int reverse, int draw, int his, int op, int ip, int la, int ad );
-extern void rgbchannel_apply( VJFrame *frame, int chr, int chg , int chb);
-extern void differencemap_apply( VJFrame *f, VJFrame *f2, int t1, int rev, int show );
-extern void autoeq_apply( VJFrame *frame, int val, int i, int s);
-extern void colorhis_apply( VJFrame *frame, int v, int m, int i, int s );
-
-extern void diff_destroy();
-extern void texmap_destroy();
-extern void contourextract_destroy();
-extern void distortion_destroy();
-extern void rotozoom_destroy();
-
-extern void timedistort_apply( VJFrame *frame, int val );
-extern void chameleon_apply( VJFrame *frame, int mode );
-extern void chameleonblend_apply( VJFrame *frame, VJFrame *source, int mode );
-extern void baltantv_apply (VJFrame *frame, int stride, int mode );
-extern void radioactivetv_apply( VJFrame *a, VJFrame *b, int mode, int t, int sn, int threhold);
-extern void nervous_apply(VJFrame *Frame, int delay);
-extern void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d);
-extern void iris_apply( VJFrame *frame,VJFrame *frame2, int value, int shape );
-extern void cali_apply(void *d , VJFrame *frame, int mode, int full);
-extern void waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay);
-extern void radcor_apply( VJFrame *frame, int a, int b, int c, int alpha);
-
-extern int motionmap_prepare( uint8_t *map[4], int w, int h );
-extern int chameleon_prepare( uint8_t *bg[4], int w, int h );
-extern int contourextract_prepare(uint8_t *map[4], int w, int h);
-extern int chameleonblend_prepare( uint8_t *bg[4],int w, int h );
-
-extern void average_blend_apply( VJFrame *frame, VJFrame *frame2, int average_blend);
-extern void toalpha_apply( VJFrame *frame, int mode);
-extern void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int mode, int scale);
-extern void alpha2img_apply( VJFrame *frame);
-extern void alphafill_apply( VJFrame *frame, int val);
-extern void alphaflatten_apply( VJFrame *frame, int mode);
-extern void overlayalphamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int visible);
-extern void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int mode);
-extern void feathermask_apply( VJFrame *frame );
-extern void alphaselect_apply( VJFrame *frame, int i_angle, int r, int g,int b, int swap);
-extern void alphaselect2_apply( VJFrame *frame, int tola, int r, int g,int b, int tolb,int alpha);
-extern void alphablend_apply( VJFrame *frame, VJFrame *frame2);
-extern void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int opacity );
-extern void chromamagickalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int opacity );
-extern void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int mode );
-extern void alphanegate_apply( VJFrame *frame, int value );
-extern void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality );
-extern void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin, int bmax);
-extern void masktransition_apply( VJFrame *frame, VJFrame *frame2, int time_index, int duration);
-extern void alphadampen_apply( VJFrame *frame, int b1);
-extern void passthrough_apply( VJFrame *frame, VJFrame *frame2);
-extern void alphatransition_apply( VJFrame *frame, VJFrame *frame2, int time_index, int duration, int direction, int threshold);
-extern void randnoise_apply( VJFrame *frame, int min, int max);
 #endif
