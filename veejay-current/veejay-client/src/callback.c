@@ -1412,6 +1412,18 @@ g_return_val_if_fail( GTK_IS_LIST_STORE(_model),NULL);
 #define gtk_combo_box_get_active_text( combo ) my_gtk_combo_box_get_active_text(combo)
 #endif
 
+void on_button_seq_clearall_clicked( GtkWidget *w, gpointer data )
+{
+	multi_vims( VIMS_SEQUENCE_DEL, "-1");
+	int slot;
+	for (slot = 0; slot < info->sequencer_col * info->sequencer_row ; slot++)
+	{
+		gtk_label_set_text(GTK_LABEL(info->sequencer_view->gui_slot[slot]->image),
+		                   NULL );
+	}
+	vj_msg(VEEJAY_MSG_INFO, "Sequencer cleared");
+}
+
 void	on_seq_rec_stop_clicked( GtkWidget *w, gpointer data )
 {
 	single_vims( VIMS_SAMPLE_REC_STOP );
