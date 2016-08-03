@@ -19,7 +19,6 @@
 // todo: clean up initialization (use function pointers!)   
 
 #include <config.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <libvjmsg/vj-msg.h>
@@ -27,6 +26,7 @@
 #include <libvje/internal.h>
 #include <libavutil/pixfmt.h>
 #include <libel/avcommon.h>
+#include <libvjmem/vjmem.h>
 #include "effects/fibdownscale.h"
 #include "effects/magicoverlays.h"
 #include "effects/negation.h"
