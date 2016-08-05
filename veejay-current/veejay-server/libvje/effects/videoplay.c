@@ -128,6 +128,7 @@ static void destroy_filmstrip(void)
 	num_videos = 0;
 	frame_counter = 0;
 	rt = NULL;
+	last_mode = -1;
 }
 
 
