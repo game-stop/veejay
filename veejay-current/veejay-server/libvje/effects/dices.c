@@ -208,9 +208,11 @@ void dices_apply( void *data, VJFrame *frame, int cube_bits, int orientation)
 				case Up:
 					for( dy = 0; dy < g_cube_size ; dy ++ )
 					{
+						di = base + (g_cube_size - dy - 1) * width + g_cube_size;
 						i =  base + dy * width;
 						for( dx  =  0; dx  < g_cube_size   ; dx ++ )
 						{
+							di --;
 							Y[di]  = Y[i];
 							Cb[di] = Cb[i];
 							Cr[di] = Cr[i];
