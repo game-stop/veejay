@@ -92,6 +92,10 @@ vj_effect *contourextract_init(int width, int height)
 	                           "Normal",	//0
 	                           "Reverse");	//1
 
+	vje_build_value_hint_list (ve->hints, ve->limits[1][2],2,
+	                           "Image",		//0
+	                           "Contour");	//1
+
     return ve;
 }
 
