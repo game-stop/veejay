@@ -68,7 +68,7 @@ vj_effect *contourextract_init(int width, int height)
     ve->limits[0][1] = 0;	/* reverse */
     ve->limits[1][1] = 1;
     ve->limits[0][2] = 0;	/* show thresholded image / contour */
-    ve->limits[1][2] = 2;
+    ve->limits[1][2] = 1;
     ve->limits[0][3] = 1;	/* thinning */
     ve->limits[1][3] = 100;
     ve->limits[0][4] = 1;	/* minimum blob weight */
