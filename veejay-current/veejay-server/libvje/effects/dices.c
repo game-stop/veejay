@@ -36,8 +36,11 @@ static int g_map_height = 0;
 static int g_cube_size = 0;
 static int g_cube_bits = 0;
 static uint8_t *g_dicemap=NULL;
+static uint8_t g_orientation=0;
 
-void dice_create_map(int w, int h);
+#define VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT 4 //random
+
+void dice_create_map(int w, int h, int orientation);
 
 typedef enum _dice_dir
 {
@@ -45,24 +48,32 @@ typedef enum _dice_dir
 	Right = 1,
 	Down = 2,
 	Left = 3,
+	Random = 4,
 } DiceDir;
 
 vj_effect *dices_init(int width, int height)
 {
 
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 1;
+	ve->num_params = 2;
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	ve->defaults[0] = 4;
+	ve->defaults[1] = VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT;
 	ve->limits[0][0] = 0;
 	ve->limits[1][0] = 32;
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] = 4; //dices orientation : up, right , down, left, random
 	ve->description = "Dices (EffectTV)";
 	ve->sub_format = 1;
 	ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Dice size" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Dice size", "Orientation" );
+
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,
+	                          "Up" ,"Right" ,"Down" ,"Left" ,"Random");
 
 	/* find parameter limit */
 	int near = (width < height ? width: height);
@@ -85,7 +96,7 @@ int	dices_malloc(int width, int height)
 	g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height);
 	if(!g_dicemap) return 0;
 
-	dice_create_map(width, height);
+	dice_create_map(width, height, VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT);
 	return 1;
 }
 
@@ -96,7 +107,7 @@ void dices_free()
 	g_dicemap  = NULL;
 }
 
-void dice_create_map(int w, int h)
+void dice_create_map(int w, int h, int orientation)
 {
 	int k,x, y, i = 0;
 	int maplen = (w * h);
@@ -112,14 +123,18 @@ void dice_create_map(int w, int h)
 			{
 				//g_dicemap[i] = j++;
 				//if(j==3) j=0;
-				g_dicemap[i] = ((1 + (rand() * (i + y))) & 0x03);
+				if (orientation == Random)
+					g_dicemap[i] = ((1 + (rand() * (i + y))) & 0x03);
+				else
+					g_dicemap[i] = orientation;
+
 				i++;
 			}
 		}
 	}
 }
 
-void dices_apply( void *data, VJFrame *frame, int cube_bits)
+void dices_apply( void *data, VJFrame *frame, int cube_bits, int orientation)
 {
 	int i = 0, map_x, map_y, map_i = 0, base, dx, dy, di=0;
 	const unsigned int width = frame->width;
@@ -128,11 +143,17 @@ void dices_apply( void *data, VJFrame *frame, int cube_bits)
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-	if (cube_bits != g_cube_bits)
+	if ((cube_bits != g_cube_bits) || (orientation != g_orientation))
 	{
 		g_cube_bits = cube_bits;
-		dice_create_map(width, height);
+		g_orientation = orientation;
+		dice_create_map(width, height, orientation);
 	}
+
+	//TODO dices map centering
+	// when dices size * dice width < frame width ,dice is shifted to be centered.
+	unsigned int shift_w = (width  - (g_cube_size*g_map_width)) >> 1;
+	unsigned int shift_h = (height  - (g_cube_size*g_map_height)) >> 1;
 
 	for (map_y = 0; map_y < g_map_height; map_y++)
 	{
