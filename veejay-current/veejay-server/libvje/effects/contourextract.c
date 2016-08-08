@@ -59,7 +59,7 @@ vj_effect *contourextract_init(int width, int height)
 {
     //int i,j;
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
+    ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -69,23 +69,26 @@ vj_effect *contourextract_init(int width, int height)
     ve->limits[1][1] = 1;
     ve->limits[0][2] = 0;	/* show thresholded image / contour */
     ve->limits[1][2] = 1;
-    ve->limits[0][3] = 1;	/* thinning */
-    ve->limits[1][3] = 100;
-    ve->limits[0][4] = 1;	/* minimum blob weight */
-    ve->limits[1][4] = 5000;
+    ve->limits[0][3] = 0;	/* Take background */
+    ve->limits[1][3] = 1;
+    ve->limits[0][4] = 1;	/* thinning */
+    ve->limits[1][4] = 100;
+    ve->limits[0][5] = 1;	/* minimum blob weight */
+    ve->limits[1][5] = 5000;
     
     ve->defaults[0] = 30;
     ve->defaults[1] = 0;
     ve->defaults[2] = 0;
-    ve->defaults[3] = 3;
-    ve->defaults[4] = 200;
+    ve->defaults[3] = 0;
+    ve->defaults[4] = 3;
+    ve->defaults[5] = 200;
     
     ve->description = "Contour extraction";
     ve->extra_frame = 0;
     ve->sub_format = 0;
     ve->has_user = 1;
     ve->user_data = NULL;
-	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show image/contour", "Thinning", "Min weight" );
+	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show image/contour", "Take background", "Thinning", "Min weight" );
 
 	ve->hints = vje_init_value_hint_list (ve->num_params);
 	vje_build_value_hint_list (ve->hints, ve->limits[1][1],1,
@@ -95,6 +98,10 @@ vj_effect *contourextract_init(int width, int height)
 	vje_build_value_hint_list (ve->hints, ve->limits[1][2],2,
 	                           "Image",		//0
 	                           "Contour");	//1
+
+	vje_build_value_hint_list (ve->hints, ve->limits[1][3],3,
+	                           "Do not take background",		//0
+	                           "Take background");	//1
 
     return ve;
 }
