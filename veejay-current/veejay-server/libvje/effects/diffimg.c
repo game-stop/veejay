@@ -36,7 +36,7 @@ vj_effect *diffimg_init(int width, int height)
     ve->defaults[2] = 240;	/* max */
 
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 7;
+    ve->limits[1][0] = 6;
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 255;
 
@@ -48,6 +48,11 @@ vj_effect *diffimg_init(int width, int height)
     ve->sub_format = -1;
 	ve->has_user = 0;
 	ve->parallel = 0;
+
+	ve->hints = vje_init_value_hint_list (ve->num_params);
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+	                          "Negation", "Minimum", "Maximum", "Lenght", "None", "Quantize", "Negation2"
+	);
 
     return ve;
 }
@@ -82,5 +87,6 @@ void diffimg_apply(VJFrame *frame, int type, int threshold_min, int threshold_ma
 			if(y < lo) y = lo; else if (y > pixel_Y_hi_) y = pixel_Y_hi_;
 			Y[i] = _pff(y,yb);
 		}
+
 	}
 }
