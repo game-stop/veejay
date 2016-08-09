@@ -153,6 +153,8 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
     case 8:
 		mode = VJ_EFFECT_BLEND_DIFFNEGATE;
 		break;
+    default:
+		mode = -1; // None
 	}
 
     func_y = get_pix_func_Y((const int) mode);
