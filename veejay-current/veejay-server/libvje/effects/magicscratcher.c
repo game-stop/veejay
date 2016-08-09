@@ -20,6 +20,7 @@
 
 #include "common.h"
 #include <libvjmem/vjmem.h>
+#include <libvje/internal.h>
 #include "magicscratcher.h"
 
 static uint8_t *mframe = NULL;
@@ -118,39 +119,39 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
     switch (mode) {
 	//case 0: mode = 5; break;
     case 0:
-		mode = 22;
+		mode = VJ_EFFECT_BLEND_ADDTEST2;
 		break;
     case 1:
-		mode = 25;
+		mode = VJ_EFFECT_BLEND_MULSUB;
 		break;
 	//case 3: mode = 30; break;
+    case 2:
+		mode = VJ_EFFECT_BLEND_RELSUBLUM;
+		break;
     case 3:
-		mode = 24;
+		mode = VJ_EFFECT_BLEND_ADDTEST4;
 		break;
 	//case 5: mode = 21; break;
 	//case 6: mode = 20; break;
 	//case 7: mode = 19; break;
 	//case 8: mode = 18; break;
-    case 2:
-		mode = 17;
-		break;
     case 4:
-		mode = 16;
+		mode = VJ_EFFECT_BLEND_RELADDLUM;
 		break;
 	//case 11: mode = 14; break;
 	//case 12: mode = 12; break;
 	//case 13: mode = 11; break;
+    case 5:
+		mode = VJ_EFFECT_BLEND_DIFFERENCE;
+		break;
     case 6:
-		mode = 9;
+		mode = VJ_EFFECT_BLEND_BASECOLOR;
 		break;
     case 7:
-		mode = 8;
+		mode = VJ_EFFECT_BLEND_EXCLUSIVE;
 		break;
     case 8:
-		mode = 7;
-		break;
-    case 5:
-		mode = 6;
+		mode = VJ_EFFECT_BLEND_DIFFNEGATE;
 		break;
 	}
 
