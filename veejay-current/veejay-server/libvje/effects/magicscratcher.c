@@ -56,6 +56,9 @@ vj_effect *magicscratcher_init(int w, int h)
 		"Additive", "Multiply", "Experimental IV", "Luma Subtract", "Luma Additive",
 		"Difference", "Basecolor", "Exclusive", "Difference Negate", "None" );
 
+	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2,
+	                          "Enabled", "Disabled");
+
     return ve;
 }
 int magicscratcher_malloc(int w, int h)
