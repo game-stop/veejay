@@ -4070,6 +4070,7 @@ static void load_effectchain_info()
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
 	store = GTK_LIST_STORE(model);
 
+	// no fx, clean list and return
 	if(fxlen <= 0 )
 	{
 		int i;
@@ -4100,6 +4101,7 @@ static void load_effectchain_info()
 		char *name = _effect_get_description( arr[1] );
 		snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
 
+		// clean list entries until next
 		while( last_index < arr[0] )
 		{
 			gtk_list_store_append( store, &iter );
@@ -4107,6 +4109,7 @@ static void load_effectchain_info()
 			last_index ++;
 		}
 
+		// time to fill current entry
 		if( last_index == arr[0])
 		{
 			gchar *utf8_name = _utf8str( name );
@@ -4121,7 +4124,7 @@ static void load_effectchain_info()
 			gchar *mixing = _utf8str(tmp);
 
 			gtk_list_store_append( store, &iter );
-			GdkPixbuf *toggle = update_pixmap_entry( info->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
+			GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
 			GdkPixbuf *kf_togglepf = update_pixmap_kf( info->uc.entry_tokens[ENTRY_KF_STATUS] );
 			gtk_list_store_set( store, &iter,
 			                   FXC_ID, arr[0],
@@ -4137,6 +4140,8 @@ static void load_effectchain_info()
 		}
 		offset += 8;
 	}
+
+	// finally clean list end
 	while( last_index < 20 )
 	{
 		gtk_list_store_append( store, &iter );
