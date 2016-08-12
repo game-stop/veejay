@@ -7346,9 +7346,9 @@ gboolean slider_scroll_event( GtkWidget *widget, GdkEventScroll *ev, gpointer us
 {
 	gint i = GPOINTER_TO_INT(user_data);
 	if(ev->direction == GDK_SCROLL_UP ) {
-		param_changed( i, 1, slider_names_[i].text );
+		PARAM_CHANGED( i, 1, slider_names_[i].text );
 	} else if (ev->direction == GDK_SCROLL_DOWN ) {
-		param_changed( i, -1, slider_names_[i].text );
+		PARAM_CHANGED( i, -1, slider_names_[i].text );
 	}
 	return FALSE;
 }

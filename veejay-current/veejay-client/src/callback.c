@@ -16,10 +16,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
 #include <ctype.h>
 #include <veejay/vj-msg.h>
 #include <gtktimeselection.h>
 #include <veejay/vims.h>
+#include "callback.h"
+
 static int config_file_status = 0;
 static gchar *config_file = NULL;
 static int srt_locked_ = 0;
@@ -606,44 +609,6 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 		info->uc.selected_chain_entry);
 }
 
-#define	slider_changed( arg_num, value ) \
-{\
-if(!info->status_lock && !info->parameter_lock)\
-{\
-info->parameter_lock = 1;\
-multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, value );\
-vj_midi_learning_vims_fx( info->midi, arg_num, VIMS_CHAIN_ENTRY_SET_ARG_VAL, 0,info->uc.selected_chain_entry, arg_num,1 );\
-if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
-int *entry_tokens = &(info->uc.entry_tokens[0]);\
-update_label_str( "value_friendlyname", _effect_get_hint( entry_tokens[ENTRY_FXID], arg_num, value ));\
-info->parameter_lock = 0;\
-}\
-}
-
-#define	param_changed( arg_num, fraction, name ) \
-{\
-if(!info->status_lock && !info->parameter_lock)\
-{\
-info->parameter_lock = 1;\
-multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, (get_slider_val(name) + fraction) );\
-update_slider_value( name, (get_slider_val(name) + fraction), 0 );\
-vj_midi_learning_vims_fx( info->midi, arg_num, VIMS_CHAIN_ENTRY_SET_ARG_VAL, 0, info->uc.selected_chain_entry,arg_num,2 );\
-if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
-int *entry_tokens = &(info->uc.entry_tokens[0]);\
-update_label_str( "value_friendlyname", _effect_get_hint( entry_tokens[ENTRY_FXID], arg_num, get_slider_val(name) ));\
-info->parameter_lock = 0;\
-}\
-}
-
-
-#define kf_changed( arg_num ) \
-{\
-enable_widget("fxanimcontrols");\
-if(arg_num != info->uc.selected_parameter_id)\
-{\
-vj_kf_select_parameter(arg_num);\
-}\
-}
 static void gen_changed( int num, int value )
 {
 	int i;
@@ -709,206 +674,206 @@ static void genv_changed( int num, int value, const char *selected )
 
 void	on_slider_p0_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p1_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 1, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 1, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p2_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 2, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 2, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p3_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 3, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 3, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p4_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 4, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 4, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p5_value_changed(GtkWidget *w, gpointer user_data)
 {
-		slider_changed( 5, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+		SLIDER_CHANGED( 5, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p6_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 6, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 6, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p7_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 7, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 7, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p8_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 8, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 8, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p9_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 9, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 9, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p10_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 10, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 10, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p11_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 11, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 11, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p12_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 12, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 12, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p13_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 13, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 13, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p14_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 14, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 14, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p15_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 15, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	SLIDER_CHANGED( 15, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_inc_p0_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 0, 1 , "slider_p0" );
+	PARAM_CHANGED( 0, 1 , "slider_p0" );
 }
 void	on_dec_p0_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 0, -1, "slider_p0");
+	PARAM_CHANGED( 0, -1, "slider_p0");
 }
 void	on_inc_p1_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 1, 1 , "slider_p1" );
+	PARAM_CHANGED( 1, 1 , "slider_p1" );
 }
 void	on_dec_p1_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 1, -1, "slider_p1");
+	PARAM_CHANGED( 1, -1, "slider_p1");
 
 }
 void	on_inc_p2_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 2, 1 , "slider_p2" );
+	PARAM_CHANGED( 2, 1 , "slider_p2" );
 }
 void	on_dec_p2_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 2, -1, "slider_p2");
+	PARAM_CHANGED( 2, -1, "slider_p2");
 }
 void	on_inc_p3_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 3, 1 , "slider_p3" );
+	PARAM_CHANGED( 3, 1 , "slider_p3" );
 }
 	void	on_dec_p3_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 3, -1, "slider_p3");
+	PARAM_CHANGED( 3, -1, "slider_p3");
 }
 void	on_inc_p4_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(4, 1 , "slider_p4" );
+	PARAM_CHANGED(4, 1 , "slider_p4" );
 }
 void	on_dec_p4_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 4, -1, "slider_p4");
+	PARAM_CHANGED( 4, -1, "slider_p4");
 }
 
 void	on_inc_p5_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(5, 1 , "slider_p5" );
+	PARAM_CHANGED(5, 1 , "slider_p5" );
 }
 void	on_dec_p5_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 5, -1, "slider_p5");
+	PARAM_CHANGED( 5, -1, "slider_p5");
 }
 
 void	on_inc_p6_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(6, 1 , "slider_p6" );
+	PARAM_CHANGED(6, 1 , "slider_p6" );
 }
 void	on_dec_p6_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 6, -1, "slider_p6");
+	PARAM_CHANGED( 6, -1, "slider_p6");
 }
 
 void	on_inc_p7_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(7, 1 , "slider_p7" );
+	PARAM_CHANGED(7, 1 , "slider_p7" );
 }
 void	on_dec_p7_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 7, -1, "slider_p7");
+	PARAM_CHANGED( 7, -1, "slider_p7");
 }
 void	on_inc_p8_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(8, 1 , "slider_p8" );
+	PARAM_CHANGED(8, 1 , "slider_p8" );
 }
 void	on_dec_p8_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 8, -1, "slider_p8");
+	PARAM_CHANGED( 8, -1, "slider_p8");
 }
 void	on_inc_p9_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(9, 1 , "slider_p9" );
+	PARAM_CHANGED(9, 1 , "slider_p9" );
 }
 void	on_dec_p9_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 9, -1, "slider_p9");
+	PARAM_CHANGED( 9, -1, "slider_p9");
 }
 void	on_inc_p10_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(10, 1 , "slider_p10" );
+	PARAM_CHANGED(10, 1 , "slider_p10" );
 }
 void	on_dec_p10_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 10, -1, "slider_p10");
+	PARAM_CHANGED( 10, -1, "slider_p10");
 }
 void	on_inc_p11_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(11, 1 , "slider_p11" );
+	PARAM_CHANGED(11, 1 , "slider_p11" );
 }
 void	on_dec_p11_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 11, -1, "slider_p11");
+	PARAM_CHANGED( 11, -1, "slider_p11");
 }
 void	on_inc_p12_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(12, 1 , "slider_p12" );
+	PARAM_CHANGED(12, 1 , "slider_p12" );
 }
 void	on_dec_p12_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 12, -1, "slider_p12");
+	PARAM_CHANGED( 12, -1, "slider_p12");
 }
 void	on_inc_p13_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(13, 1 , "slider_p13" );
+	PARAM_CHANGED(13, 1 , "slider_p13" );
 }
 void	on_dec_p13_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 13, -1, "slider_p13");
+	PARAM_CHANGED( 13, -1, "slider_p13");
 }
 void	on_inc_p14_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(14, 1 , "slider_p14" );
+	PARAM_CHANGED(14, 1 , "slider_p14" );
 }
 void	on_dec_p14_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 14, -1, "slider_p14");
+	PARAM_CHANGED( 14, -1, "slider_p14");
 }
 void	on_inc_p15_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed(15, 1 , "slider_p15" );
+	PARAM_CHANGED(15, 1 , "slider_p15" );
 }
 void	on_dec_p15_clicked(GtkWidget *w, gpointer user_data)
 {
-	param_changed( 15, -1, "slider_p15");
+	PARAM_CHANGED( 15, -1, "slider_p15");
 }
 
 void	slider_g0_value_changed(GtkWidget *w, gpointer user_data)
@@ -2804,89 +2769,89 @@ void	on_kf_none_toggled( GtkWidget widget, gpointer user_data)
 void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if(is_button_toggled("kf_p0"))
-		kf_changed( 0 );
+		KF_CHANGED( 0 );
 }
 void	on_kf_p1_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p1")) 
-		kf_changed( 1 );
+		KF_CHANGED( 1 );
 }
 void	on_kf_p2_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p2"))
-		kf_changed( 2 );
+		KF_CHANGED( 2 );
 }
 void	on_kf_p3_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p3"))
-		kf_changed( 3 );
+		KF_CHANGED( 3 );
 }
 void	on_kf_p4_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p4"))
-		kf_changed( 4 );
+		KF_CHANGED( 4 );
 }
 void	on_kf_p5_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p5"))
-		kf_changed( 5 );
+		KF_CHANGED( 5 );
 }
 void	on_kf_p6_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p6"))
-		kf_changed( 6 );
+		KF_CHANGED( 6 );
 }
 void	on_kf_p7_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p7"))
-		kf_changed( 7 );
+		KF_CHANGED( 7 );
 }
 void	on_kf_p8_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p8"))
-		kf_changed( 8 );
+		KF_CHANGED( 8 );
 }
 void	on_kf_p9_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p9"))
-		kf_changed( 9 );
+		KF_CHANGED( 9 );
 }
 void	on_kf_p10_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p10"))
-		kf_changed( 10 );
+		KF_CHANGED( 10 );
 }
 
 void	on_kf_p11_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p11"))
-		kf_changed( 11 );
+		KF_CHANGED( 11 );
 }
 
 void	on_kf_p12_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p12"))
-		kf_changed( 12 );
+		KF_CHANGED( 12 );
 }
 
 
 void	on_kf_p13_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p13"))
-		kf_changed( 13 );
+		KF_CHANGED( 13 );
 }
 
 
 void	on_kf_p14_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p14"))
-		kf_changed( 14 );
+		KF_CHANGED( 14 );
 }
 
 void	on_kf_p15_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p15"))
-		kf_changed( 15 );
+		KF_CHANGED( 15 );
 }
 
 void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
