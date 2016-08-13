@@ -8899,12 +8899,10 @@ void	vj_event_send_chain_entry_parameters	( 	void *ptr,	const char format[],	va_
 	}
 }
 
-
-
 void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	int i;
-	char line[18];
+	char line[VIMS_CHAIN_LIST_ENTRY_LENGHT];
 	int args[1];
 	char *str = NULL;
 	veejay_t *v = (veejay_t*)ptr;
@@ -8916,7 +8914,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	if(SAMPLE_PLAYING(v))
 	{
 		SAMPLE_DEFAULTS(args[0]);
-		char *print_buf = get_print_buf(16*SAMPLE_MAX_EFFECTS);
+		char *print_buf = get_print_buf(VIMS_CHAIN_LIST_ENTRY_LENGHT * SAMPLE_MAX_EFFECTS);
 		for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 		{
 			int effect_id = sample_get_effect_any(args[0], i);
@@ -8925,13 +8923,17 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 				int is_video = vj_effect_get_extra_frame(effect_id);
 				int using_effect = sample_get_chain_status(args[0], i);
 				int using_audio = 0;
+				int chain_source = sample_get_chain_source(args[0], i);
+				int chain_channel = sample_get_chain_channel(args[0], i);
 				//int using_audio = sample_get_chain_audio(args[0],i);
-				sprintf(line,"%02d%03d%1d%1d%1d",
+				sprintf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
 					i,
 					effect_id,
 					is_video,
 					(using_effect <= 0  ? 0 : 1 ),
-					(using_audio  <= 0  ? 0 : 1 )
+					(using_audio  <= 0  ? 0 : 1 ),
+					chain_source,
+					chain_channel
 				);
 						
 				APPEND_MSG(print_buf,line);
@@ -8944,7 +8946,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	else if(STREAM_PLAYING(v))
 	{
 		STREAM_DEFAULTS(args[0]);
-		char *print_buf = get_print_buf(16*SAMPLE_MAX_EFFECTS);
+		char *print_buf = get_print_buf(VIMS_CHAIN_LIST_ENTRY_LENGHT * SAMPLE_MAX_EFFECTS);
 
 		for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 		{
@@ -8953,12 +8955,16 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 			{
 				int is_video = vj_effect_get_extra_frame(effect_id);
 				int using_effect = vj_tag_get_chain_status(args[0],i);
-				sprintf(line, "%02d%03d%1d%1d%1d",
+				int chain_source = sample_get_chain_source(args[0], i);
+				int chain_channel = sample_get_chain_channel(args[0], i);
+				sprintf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
 					i,
 					effect_id,
 					is_video,
 					(using_effect <= 0  ? 0 : 1 ),
-					0
+					0,
+					chain_source,
+					chain_channel
 				);
 				APPEND_MSG(print_buf, line);
 			}

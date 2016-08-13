@@ -4056,7 +4056,7 @@ static void load_effectchain_info()
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 	GtkListStore *store;
 	gchar toggle[4];
-	guint arr[6];
+	guint arr[VIMS_CHAIN_LIST_ENTRY_VALUES];
 	GtkTreeIter iter;
 	gint offset=0;
 
@@ -4074,7 +4074,7 @@ static void load_effectchain_info()
 	if(fxlen <= 0 )
 	{
 		int i;
-		for( i = 0; i < 20; i ++ )
+		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ )
 		{
 			gtk_list_store_append(store,&iter);
 			gtk_list_store_set(store,&iter, FXC_ID, i ,-1);
@@ -4090,13 +4090,13 @@ static void load_effectchain_info()
 
 	while( offset < fxlen )
 	{
-		char line[12];
+		char line[VIMS_CHAIN_LIST_ENTRY_LENGHT];
 		veejay_memset(arr,0,sizeof(arr));
 		veejay_memset(line,0,sizeof(line));
 
-		strncpy( line, fxtext + offset, 8 );
-		sscanf( line, "%02d%03d%1d%1d%1d",
-			&arr[0],&arr[1],&arr[2],&arr[3],&arr[4]);
+		strncpy( line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGHT );
+		sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
+		       &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6]); // FIXME How to use of VIMS_CHAIN_LIST_ENTRY_VALUES ?
 
 		char *name = _effect_get_description( arr[1] );
 		snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
@@ -4114,9 +4114,9 @@ static void load_effectchain_info()
 		{
 			gchar *utf8_name = _utf8str( name );
 			char  tmp[128];
-			if( _effect_get_mix( arr[0] ) ) {
-				snprintf(tmp,sizeof(tmp),"%s %d", (info->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T " ),
-					info->uc.entry_tokens[ENTRY_CHANNEL]);
+			if( _effect_get_mix( arr[1] ) ) {
+				snprintf(tmp,sizeof(tmp),"%s %d", (arr[5] == 0 ? "Sample " : "T " ),
+					arr[6]);
 			}
 			else {
 				snprintf(tmp,sizeof(tmp),"%s"," ");
@@ -4138,11 +4138,11 @@ static void load_effectchain_info()
 			g_object_unref( toggle );
 			g_object_unref( kf_togglepf );
 		}
-		offset += 8;
+		offset += VIMS_CHAIN_LIST_ENTRY_LENGHT;
 	}
 
 	// finally clean list end
-	while( last_index < 20 )
+	while( last_index < SAMPLE_MAX_EFFECTS )
 	{
 		gtk_list_store_append( store, &iter );
 		gtk_list_store_set( store, &iter,
