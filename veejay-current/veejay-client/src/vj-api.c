@@ -4096,7 +4096,7 @@ static void load_effectchain_info()
 
 		strncpy( line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGHT );
 		sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
-		       &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6]); // FIXME How to use of VIMS_CHAIN_LIST_ENTRY_VALUES ?
+		       &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6], &arr[7]); // FIXME How to use of VIMS_CHAIN_LIST_ENTRY_VALUES ?
 
 		char *name = _effect_get_description( arr[1] );
 		snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
@@ -4125,7 +4125,7 @@ static void load_effectchain_info()
 
 			gtk_list_store_append( store, &iter );
 			GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
-			GdkPixbuf *kf_togglepf = update_pixmap_kf( info->uc.entry_tokens[ENTRY_KF_STATUS] );
+			GdkPixbuf *kf_togglepf = update_pixmap_kf( arr[7] );
 			gtk_list_store_set( store, &iter,
 			                   FXC_ID, arr[0],
 			                   FXC_FXID, utf8_name,

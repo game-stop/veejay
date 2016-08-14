@@ -8925,7 +8925,10 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 				int using_audio = 0;
 				int chain_source = sample_get_chain_source(args[0], i);
 				int chain_channel = sample_get_chain_channel(args[0], i);
+				int kf_type = 0;
+				int kf_status = sample_get_kf_status( args[0], i, &kf_type );
 				//int using_audio = sample_get_chain_audio(args[0],i);
+
 				sprintf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
 					i,
 					effect_id,
@@ -8933,7 +8936,8 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 					(using_effect <= 0  ? 0 : 1 ),
 					(using_audio  <= 0  ? 0 : 1 ),
 					chain_source,
-					chain_channel
+					chain_channel,
+					kf_status
 				);
 						
 				APPEND_MSG(print_buf,line);
@@ -8957,6 +8961,9 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 				int using_effect = vj_tag_get_chain_status(args[0],i);
 				int chain_source = sample_get_chain_source(args[0], i);
 				int chain_channel = sample_get_chain_channel(args[0], i);
+				int kf_type = 0;
+				int kf_status = sample_get_kf_status( args[0], i, &kf_type ); // exist for streaù ? or 0 ?
+
 				sprintf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
 					i,
 					effect_id,
@@ -8964,7 +8971,8 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 					(using_effect <= 0  ? 0 : 1 ),
 					0,
 					chain_source,
-					chain_channel
+					chain_channel,
+					kf_status
 				);
 				APPEND_MSG(print_buf, line);
 			}
