@@ -1692,6 +1692,12 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <widget class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -4764,6 +4770,21 @@
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <child>
+                                  <widget class="GtkToggleButton" id="curve_panel_toggleentry">
+                                    <property name="label" translatable="yes">FX Anim</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">True</property>
+                                    <property name="tooltip" translatable="yes">Toggle keyframing for this chain entry</property>
+                                    <signal name="toggled" handler="curve_panel_toggleentry_toggled" />
+                                  </widget>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <widget class="GtkLabel" id="label686">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
@@ -4773,7 +4794,7 @@
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">False</property>
-                                    <property name="position">0</property>
+                                    <property name="position">1</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -4786,7 +4807,7 @@
                                   <packing>
                                     <property name="expand">True</property>
                                     <property name="fill">False</property>
-                                    <property name="position">1</property>
+                                    <property name="position">2</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -4807,7 +4828,7 @@
                                   <packing>
                                     <property name="expand">False</property>
                                     <property name="fill">False</property>
-                                    <property name="position">2</property>
+                                    <property name="position">3</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -4902,7 +4923,7 @@
                                   <packing>
                                     <property name="expand">True</property>
                                     <property name="fill">True</property>
-                                    <property name="position">3</property>
+                                    <property name="position">4</property>
                                   </packing>
                                 </child>
                               </widget>
@@ -5582,7 +5603,7 @@
                                                 <property name="can_focus">True</property>
                                                 <property name="receives_default">True</property>
                                                 <property name="tooltip" translatable="yes">Clear all sequencer slots</property>
-                                                <signal name="clicked" handler="on_button_seq_clearall_clicked" swapped="no"/>
+                                                <signal name="clicked" handler="on_button_seq_clearall_clicked" />
                                                 <child>
                                                   <widget class="GtkHBox" id="hbox48">
                                                     <property name="visible">True</property>
@@ -13504,13 +13525,13 @@ YUV (current)</property>
                                                       </packing>
                                                     </child>
                                                     <child>
-                                                      <widget class="GtkToggleButton" id="curve_toggleentry">
+                                                      <widget class="GtkToggleButton" id="curve_chain_toggleentry">
                                                         <property name="visible">True</property>
                                                         <property name="can_focus">True</property>
                                                         <property name="receives_default">True</property>
                                                         <property name="has_tooltip">True</property>
                                                         <property name="tooltip" translatable="yes">Toggle keyframing for this chain entry</property>
-                                                        <signal name="toggled" handler="curve_toggleentry_toggled" />
+                                                        <signal name="toggled" handler="curve_chain_toggleentry_toggled" />
                                                         <child>
                                                           <widget class="GtkImage" id="image50">
                                                             <property name="visible">True</property>
@@ -15797,6 +15818,12 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>

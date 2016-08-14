@@ -2740,7 +2740,7 @@ void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 		return;
 	}
 
-	int k = is_button_toggled( "curve_toggleentry" );
+	int k = is_button_toggled( "curve_chain_toggleentry" );
 	int type = 0;
 	if(  is_button_toggled("curve_typespline")) {
 		type = 1;
@@ -2753,6 +2753,29 @@ void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d", i, k,type );
 
 	info->uc.reload_hint[HINT_ENTRY] = 1;
+}
+
+
+void	curve_chain_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
+{
+	curve_toggleentry_toggled( widget, user_data);
+
+	GtkWidget *siamese = glade_xml_get_widget_( info->main_window, "curve_panel_toggleentry");
+	if(siamese) {
+		gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(siamese),
+		                              gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) )) ;
+	}
+}
+
+void	curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
+{
+	curve_toggleentry_toggled( widget, user_data);
+
+	GtkWidget *siamese = glade_xml_get_widget_( info->main_window, "curve_chain_toggleentry");
+	if(siamese) {
+		gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(siamese),
+		                              gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) )) ;
+	}
 }
 
 void	on_kf_none_toggled( GtkWidget widget, gpointer user_data)

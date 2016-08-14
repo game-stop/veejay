@@ -2473,7 +2473,7 @@ static void vj_kf_reset()
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
 
 	reset_curve( curve );
-	set_toggle_button( "curve_toggleentry", 0 );
+	set_toggle_button( "curve_chain_toggleentry", 0 );
 	set_toggle_button( "curve_toggleentry_param", 0);
 	update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
 }
@@ -3967,7 +3967,7 @@ static gint load_parameter_info()
 		info->uc.selected_rgbkey = 0;
 	}
 
-	set_toggle_button( "curve_toggleentry", p[ENTRY_KF_STATUS] );
+	set_toggle_button( "curve_chain_toggleentry", p[ENTRY_KF_STATUS] );
 
 	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
 	{
