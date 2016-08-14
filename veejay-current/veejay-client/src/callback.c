@@ -2751,6 +2751,8 @@ void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	}
 
 	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d", i, k,type );
+
+	info->uc.reload_hint[HINT_ENTRY] = 1;
 }
 
 void	on_kf_none_toggled( GtkWidget widget, gpointer user_data)
