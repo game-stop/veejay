@@ -2761,9 +2761,19 @@ void	curve_chain_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	curve_toggleentry_toggled( widget, user_data);
 
 	GtkWidget *siamese = glade_xml_get_widget_( info->main_window, "curve_panel_toggleentry");
-	if(siamese) {
+	if(siamese)
+	{
+		guint signal_id=g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
+		gulong handler_id=handler_id=g_signal_handler_find( (gpointer)siamese, G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+		if (handler_id)
+			g_signal_handler_block((gpointer)siamese, handler_id);
+
 		gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(siamese),
 		                              gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) )) ;
+
+		if (handler_id)
+			g_signal_handler_unblock((gpointer)siamese, handler_id);
 	}
 }
 
@@ -2772,9 +2782,19 @@ void	curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	curve_toggleentry_toggled( widget, user_data);
 
 	GtkWidget *siamese = glade_xml_get_widget_( info->main_window, "curve_chain_toggleentry");
-	if(siamese) {
+	if(siamese)
+	{
+		guint signal_id=g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
+		gulong handler_id=handler_id=g_signal_handler_find( (gpointer)siamese, G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+		if (handler_id)
+			g_signal_handler_block((gpointer)siamese, handler_id);
+
 		gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(siamese),
 		                              gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) )) ;
+
+		if (handler_id)
+			g_signal_handler_unblock((gpointer)siamese, handler_id);
 	}
 }
 
