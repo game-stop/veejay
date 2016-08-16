@@ -2800,15 +2800,18 @@ void	curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 
 void	on_kf_none_toggled( GtkToggleButton *widget, gpointer user_data)
 {
-	info->uc.selected_parameter_id = -1;
-	
-	disable_widget( "fxanimcontrols" );
-	disable_widget( "curve" );
+	if(gtk_toggle_button_get_active( widget ))
+	{
+		info->uc.selected_parameter_id = -1;
 
-	if(info->status_lock)
-		return;
+		disable_widget( "fxanimcontrols" );
+		disable_widget( "curve" );
 
-	vj_kf_reset();	
+		if(info->status_lock)
+			return;
+
+		vj_kf_reset();
+	}
 }
 
 void	on_kf_p0_toggled( GtkToggleButton *widget, gpointer user_data)
