@@ -2740,7 +2740,7 @@ void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 		return;
 	}
 
-	int k = is_button_toggled( "curve_chain_toggleentry" );
+	int k = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
 	int type = 0;
 	if(  is_button_toggled("curve_typespline")) {
 		type = 1;
