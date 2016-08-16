@@ -674,7 +674,7 @@ void free_samplebank(void);
 void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
 static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
-static void update_curve_widget(const char *name);
+static void update_curve_widget( GtkWidget *curve );
 /* not used */ /* static void update_curve_accessibility(const char *name); */
 static void reset_tree(const char *name);
 static void reload_srt();
@@ -2518,14 +2518,14 @@ static void vj_kf_select_parameter(int num)
 	update_label_str( "curve_parameter", name );
 	g_free(name);
 
-	reset_curve( glade_xml_get_widget_(info->main_window, "curve"));
+	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
+	reset_curve( curve );
 
-	update_curve_widget("curve");
+	update_curve_widget( curve );
 }
 
-static void update_curve_widget(const char *name)
+static void update_curve_widget(GtkWidget *curve)
 {
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window,name);
 	sample_slot_t *s = info->selected_slot;
 	if(!s ) 	return;
 	int i = info->uc.selected_chain_entry; /* chain entry */
