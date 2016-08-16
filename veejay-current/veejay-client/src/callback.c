@@ -2798,7 +2798,7 @@ void	curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void	on_kf_none_toggled( GtkWidget widget, gpointer user_data)
+void	on_kf_none_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	info->uc.selected_parameter_id = -1;
 	
@@ -2811,89 +2811,89 @@ void	on_kf_none_toggled( GtkWidget widget, gpointer user_data)
 	vj_kf_reset();	
 }
 
-void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p0_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if(is_button_toggled("kf_p0"))
 		KF_CHANGED( 0 );
 }
-void	on_kf_p1_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p1_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p1")) 
 		KF_CHANGED( 1 );
 }
-void	on_kf_p2_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p2_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p2"))
 		KF_CHANGED( 2 );
 }
-void	on_kf_p3_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p3_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p3"))
 		KF_CHANGED( 3 );
 }
-void	on_kf_p4_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p4_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p4"))
 		KF_CHANGED( 4 );
 }
-void	on_kf_p5_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p5_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p5"))
 		KF_CHANGED( 5 );
 }
-void	on_kf_p6_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p6_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p6"))
 		KF_CHANGED( 6 );
 }
-void	on_kf_p7_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p7_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p7"))
 		KF_CHANGED( 7 );
 }
-void	on_kf_p8_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p8_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p8"))
 		KF_CHANGED( 8 );
 }
-void	on_kf_p9_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p9_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p9"))
 		KF_CHANGED( 9 );
 }
-void	on_kf_p10_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p10_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p10"))
 		KF_CHANGED( 10 );
 }
 
-void	on_kf_p11_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p11_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p11"))
 		KF_CHANGED( 11 );
 }
 
-void	on_kf_p12_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p12_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p12"))
 		KF_CHANGED( 12 );
 }
 
 
-void	on_kf_p13_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p13_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p13"))
 		KF_CHANGED( 13 );
 }
 
 
-void	on_kf_p14_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p14_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p14"))
 		KF_CHANGED( 14 );
 }
 
-void	on_kf_p15_toggled( GtkWidget *widget, gpointer user_data)
+void	on_kf_p15_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p15"))
 		KF_CHANGED( 15 );
