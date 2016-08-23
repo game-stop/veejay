@@ -2494,6 +2494,7 @@ static void vj_kf_refresh()
 	int *entry_tokens = &(info->uc.entry_tokens[0]);
 	if( entry_tokens[ENTRY_FXID] > 0 ) {
 		enable_widget( "frame_fxtree3" );
+		update_curve_widget(glade_xml_get_widget_(info->main_window, "curve"));
 	}
 	else {
 		set_toggle_button( "curve_toggleentry_param", 0 );
