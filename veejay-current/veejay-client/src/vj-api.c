@@ -7411,6 +7411,7 @@ void vj_gui_init(char *glade_file,
 	veejay_memset( gui->sample, 0, 2 );
 	veejay_memset( gui->selection, 0, 3 );
 	veejay_memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
+	gui->uc.selected_parameter_id = -1;
 	veejay_memset( gui->uc.entry_tokens,0, sizeof(int) * ENTRY_LAST);
 	gui->prev_mode = -1;
 	veejay_memset( &(gui->el), 0, sizeof(veejay_el_t));
