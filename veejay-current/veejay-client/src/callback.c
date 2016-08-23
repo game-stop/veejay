@@ -2734,25 +2734,37 @@ void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	if(info->status_lock)
 		return;
 
-	int i = info->uc.selected_chain_entry;
-	if( i == -1 ) {
+	int selected_chain_entry = info->uc.selected_chain_entry;
+	if( selected_chain_entry == -1 ) {
 		vj_msg(VEEJAY_MSG_INFO,"No parameter selected for animation");
 		return;
 	}
 
-	int k = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
-	int type = 0;
-	if(  is_button_toggled("curve_typespline")) {
-		type = 1;
+	int active = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
+	int curve_type = 0;
+	if( is_button_toggled("curve_typespline")) {
+		curve_type = 1;
 	} else if ( is_button_toggled("curve_typefreehand")) {
-		type = 2;
+		curve_type = 2;
 	} else if (is_button_toggled("curve_typelinear")) {
-		type = 0;
+		curve_type = 0;
 	}
 
-	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d", i, k,type );
+	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d",
+	           selected_chain_entry, active, curve_type );
 
-	info->uc.reload_hint[HINT_ENTRY] = 1;
+	//update anim mode
+	GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
+	GtkTreeModel *model = gtk_tree_view_get_model( view );
+	GtkTreeIter iter;
+
+	GtkTreePath *path = gtk_tree_path_new_from_indices(selected_chain_entry, -1);
+	if(gtk_tree_model_get_iter(model, &iter, path))
+	{
+		GdkPixbuf *kf_toggle = update_pixmap_kf( active );
+		gtk_list_store_set (GTK_LIST_STORE( model ), &iter, FXC_KF, kf_toggle, -1);
+	}
+	gtk_tree_path_free(path);
 }
 
 
