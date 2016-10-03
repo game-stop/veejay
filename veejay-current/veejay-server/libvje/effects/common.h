@@ -89,13 +89,22 @@ extern void veejay_msg(int type, const char format[], ...);
 # define fast_cos(res,x ) res = cos(x) 
 # define fast_abs(res,x ) res = abs(x)
 # define fast_exp(res,x ) res = exp(x)
-#else
+#endif
+
+#if __x86_64__ || __ppc64__ //FIXME global def (configure?) , more arch support
 # define sin_cos(si, co, x)     asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
 # define fast_sqrt(res__,x) 	asm ("fsqrt" : "=t" (res__) : "0" (x)) 
 # define fast_sin(res__,x)	asm ("fsin" : "=t" (res__) : "0" (x))
 # define fast_cos(res__,x)	asm ("fcos" : "=t" (res__) : "0" (x))
 # define fast_abs(res__,x)	asm ("fabs" : "=t" (res__) : "0" (x))
 # define fast_exp(res__,x)	asm ("fexp" : "=t" (res__) : "0" (x))
+#else
+# define sin_cos(si, co, x)     si = sin(x); co = cos(x)
+# define fast_sqrt( res,x ) res = sqrt(x)
+# define fast_sin(res,x ) res = sin(x)
+# define fast_cos(res,x ) res = cos(x)
+# define fast_abs(res,x ) res = abs(x)
+# define fast_exp(res,x ) res = exp(x)
 #endif
 
 #define Y_Red 		( 0.29900)
