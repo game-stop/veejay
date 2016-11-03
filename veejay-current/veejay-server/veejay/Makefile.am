@@ -1,4 +1,28 @@
 # Makefile for veejay
+
+SUBDIRS = \
+        ../thirdparty/aclib \
+        ../thirdparty/bio2jack \
+        ../thirdparty/libhash \
+        ../thirdparty/liblzo \
+        ../thirdparty/libOSC \
+        ../thirdparty/libresample \
+        ../libvjmsg \
+        ../libvjmem \
+        ../libvjxml \
+        ../libqrwrap \
+        ../libvevo \
+        ../libvje \
+        ../libplugger \
+        ../libsample \
+        ../libvjnet \
+        ../libsubsample \
+        ../libyuv \
+        ../libel \
+        ../libstream \
+        ../libsamplerec \
+        .
+
 AM_CFLAGS = $(OP_CFLAGS)
 MAINTAINERCLEANFILES = Makefile.in
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
@@ -43,33 +67,33 @@ libveejay_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 
 
 libveejay_la_LIBADD = \
-			-L$(top_builddir)/thirdparty/aclib -lac \
-			-L$(top_builddir)/thirdparty/bio2jack -lbio2jack4vj \
-			-L$(top_builddir)/thirdparty/libhash  -lhash \
-			-L$(top_builddir)/thirdparty/liblzo  -lvjlzo \
-			-L$(top_builddir)/thirdparty/libOSC  -lOSC \
-			-L$(top_builddir)/thirdparty/libresample -lresample \
-			-L$(top_builddir)/libvjmsg -lvjmsg \
-			-L$(top_builddir)/libvjmem -lvjmem \
-			-L$(top_builddir)/libvje -lvje \
-			-L$(top_builddir)/libplugger -lvjplug \
-			-L$(top_builddir)/libsample -lsample \
-			-L$(top_builddir)/libvjnet -lvjnet \
-			-L$(top_builddir)/libel -lel \
-			-L$(top_builddir)/libstream -lstream \
-			-L$(top_builddir)/libsubsample -lsubsample \
-			-L$(top_builddir)/libyuv -lyuv \
-			-L$(top_builddir)/libsamplerec -lsamplerec \
-			-L$(top_builddir)/libqrwrap -lqrwrap \
-			-L$(top_builddir)/libvjxml -lvjxml \
-			-L$(top_builddir)/libvevo -lvevo
+			$(top_builddir)/thirdparty/aclib/libac.la \
+			$(top_builddir)/thirdparty/bio2jack/libbio2jack4vj.la \
+			$(top_builddir)/thirdparty/libhash/libhash.la \
+			$(top_builddir)/thirdparty/liblzo/libvjlzo.la \
+			$(top_builddir)/thirdparty/libOSC/libOSC.la \
+			$(top_builddir)/thirdparty/libresample/libresample.la \
+			$(top_builddir)/libvjmsg/libvjmsg.la \
+			$(top_builddir)/libvjmem/libvjmem.la \
+			$(top_builddir)/libvje/libvje.la \
+			$(top_builddir)/libplugger/libvjplug.la \
+			$(top_builddir)/libsample/libsample.la \
+			$(top_builddir)/libvjnet/libvjnet.la \
+			$(top_builddir)/libel/libel.la \
+			$(top_builddir)/libstream/libstream.la \
+			$(top_builddir)/libsubsample/libsubsample.la \
+			$(top_builddir)/libyuv/libyuv.la \
+			$(top_builddir)/libsamplerec/libsamplerec.la \
+			$(top_builddir)/libqrwrap/libqrwrap.la \
+			$(top_builddir)/libvjxml/libvjxml.la \
+			$(top_builddir)/libvevo/libvevo.la
 
 if !HAVE_MJPEGTOOLS
-libveejay_la_LIBADD+=-L$(top_builddir)/thirdparty/mjpegtools -lmjpegutils
+libveejay_la_LIBADD+=$(top_builddir)/thirdparty/mjpegtools/libmjpegutils.la
 endif
 
 if HAVE_ARM
-libveejay_la_LIBADD+=-L$(top_builddir)/thirdparty/fastarm -lfastarm
+libveejay_la_LIBADD+=$(top_builddir)/thirdparty/fastarm/libfastarm.la
 endif
 
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(SDL_TTF_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
