@@ -1152,18 +1152,18 @@ uint8_t _pf_none(uint8_t a, uint8_t b)
 
 _pf	_get_pf(int type)
 {
-	
+
 	switch(type)
 	{
-	 
 	 case 0: return &_pf_dneg;
-	 case 3: return &_pf_lghtn;
 	 case 1: return &_pf_min;
 	 case 2: return &_pf_max;
+	 case 3: return &_pf_lghtn;
+	 case 4: return &_pf_none;
 	 case 5: return &_pf_pq;
 	 case 6: return &_pf_dneg2;
-
 	}
+
 	return &_pf_none;
 }
 

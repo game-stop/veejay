@@ -297,7 +297,7 @@ static void vj_effman_apply_image_effect(
 	widthmirror_apply(frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_DICES:
-	dices_apply(vj_effects[entry], frames[0], arg[0]);
+	dices_apply(vj_effects[entry], frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_COLORTEST:
 	color_apply(frames[0], arg[0], arg[1], arg[2]);

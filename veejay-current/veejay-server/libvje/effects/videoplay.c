@@ -128,6 +128,7 @@ static void destroy_filmstrip(void)
 	num_videos = 0;
 	frame_counter = 0;
 	rt = NULL;
+	last_mode = -1;
 }
 
 
@@ -221,15 +222,22 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int size, int delay, int mode 
 		
 		for( i = 0; i < num_videos; i ++ )
 			rt[i] = i;
+
+		if( mode == 0)
+			fx_shuffle_int_array( rt, num_videos );
 	}
 
-	if( mode == 0 && last_mode != mode ) {
+	if( last_mode != mode )
+	{
 		for( i = 0; i < num_videos; i ++ )
 			rt[i] = i;
 
-		fx_shuffle_int_array( rt, num_videos );
-		last_mode = 0;
+		if (mode == 0)
+			fx_shuffle_int_array( rt, num_videos );
+
 	}
+
+	last_mode = mode;
 
 	if( frame_delay )
 		frame_delay --;	
@@ -282,7 +290,7 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int size, int delay, int mode 
 
 	for ( i = 0; i < num_videos; i ++ )
 	{
-		matrix_t m = matrix_placement(i, size,width,height );
+		matrix_t m = matrix_placement(rt[i], size,width,height );
 		put_video( dstY, video_list[i]->data[0],width,height,i, m);
 		put_video( dstU, video_list[i]->data[1],width,height,i, m);
 		put_video( dstV, video_list[i]->data[2],width,height,i, m);
