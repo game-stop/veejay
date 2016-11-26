@@ -1692,6 +1692,18 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <widget class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -4760,136 +4772,162 @@
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <child>
-                              <widget class="GtkHBox" id="fxanimcontrols">
+                              <widget class="GtkHBox" id="hbox49">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <child>
-                                  <widget class="GtkLabel" id="label686">
+                                  <widget class="GtkToggleButton" id="curve_panel_toggleentry">
+                                    <property name="label" translatable="yes">FX Anim</property>
                                     <property name="visible">True</property>
-                                    <property name="can_focus">False</property>
-                                    <property name="label" translatable="yes">&lt;b&gt;current control:&lt;/b&gt;</property>
-                                    <property name="use_markup">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">True</property>
+                                    <property name="tooltip" translatable="yes">Toggle keyframing for this chain entry</property>
+                                    <signal name="toggled" handler="curve_panel_toggleentry_toggled" />
                                   </widget>
                                   <packing>
                                     <property name="expand">False</property>
-                                    <property name="fill">False</property>
+                                    <property name="fill">True</property>
                                     <property name="position">0</property>
                                   </packing>
                                 </child>
                                 <child>
-                                  <widget class="GtkLabel" id="curve_parameter">
+                                  <widget class="GtkHBox" id="fxanimcontrols">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
-                                    <property name="xalign">0</property>
-                                    <property name="label" translatable="yes">P0</property>
-                                  </widget>
-                                  <packing>
-                                    <property name="expand">True</property>
-                                    <property name="fill">False</property>
-                                    <property name="position">1</property>
-                                  </packing>
-                                </child>
-                                <child>
-                                  <widget class="GtkToggleButton" id="curve_toggleentry_param">
-                                    <property name="visible">True</property>
-                                    <property name="can_focus">True</property>
-                                    <property name="receives_default">False</property>
-                                    <property name="tooltip" translatable="yes">Toggle keyframe animation for this parameter</property>
-                                    <signal name="toggled" handler="on_curve_toggleentry_param_toggled" />
                                     <child>
-                                      <widget class="GtkImage" id="image2146">
+                                      <widget class="GtkLabel" id="label686">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
-                                        <property name="pixbuf">icon_keyframe.png</property>
-                                      </widget>
-                                    </child>
-                                  </widget>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">False</property>
-                                    <property name="position">2</property>
-                                  </packing>
-                                </child>
-                                <child>
-                                  <widget class="GtkHBox" id="hbox850">
-                                    <property name="visible">True</property>
-                                    <property name="can_focus">False</property>
-                                    <property name="homogeneous">True</property>
-                                    <child>
-                                      <widget class="GtkButton" id="curve_buttonstore">
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="tooltip" translatable="yes">Apply this keyframe</property>
-                                        <signal name="clicked" handler="on_curve_buttonstore_clicked" />
-                                        <child>
-                                          <widget class="GtkImage" id="image2521">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="pixbuf">icon_apply.png</property>
-                                          </widget>
-                                        </child>
+                                        <property name="label" translatable="yes">&lt;b&gt;current control:&lt;/b&gt;</property>
+                                        <property name="use_markup">True</property>
                                       </widget>
                                       <packing>
-                                        <property name="expand">True</property>
-                                        <property name="fill">True</property>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
                                         <property name="position">0</property>
                                       </packing>
                                     </child>
                                     <child>
-                                      <widget class="GtkToggleButton" id="curve_togglerun">
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="tooltip" translatable="yes">Start keyframing</property>
-                                        <signal name="toggled" handler="on_curve_togglerun_toggled" />
-                                        <child>
-                                          <widget class="GtkImage" id="image530">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="pixbuf">button_play.png</property>
-                                          </widget>
-                                        </child>
+                                      <widget class="GtkLabel" id="curve_parameter">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="xalign">0</property>
+                                        <property name="label" translatable="yes">P0</property>
                                       </widget>
                                       <packing>
                                         <property name="expand">True</property>
-                                        <property name="fill">True</property>
+                                        <property name="fill">False</property>
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
                                     <child>
-                                      <widget class="GtkButton" id="curve_buttonclear">
+                                      <widget class="GtkToggleButton" id="curve_toggleentry_param">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
                                         <property name="receives_default">False</property>
-                                        <property name="tooltip" translatable="yes">Reset</property>
-                                        <signal name="clicked" handler="on_curve_buttonclear_clicked" />
+                                        <property name="tooltip" translatable="yes">Toggle keyframe animation for this parameter</property>
+                                        <signal name="toggled" handler="on_curve_toggleentry_param_toggled" />
                                         <child>
-                                          <widget class="GtkImage" id="image532">
+                                          <widget class="GtkImage" id="image2146">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="pixbuf">icon_clearall.png</property>
+                                            <property name="pixbuf">icon_keyframe.png</property>
                                           </widget>
                                         </child>
                                       </widget>
                                       <packing>
-                                        <property name="expand">True</property>
-                                        <property name="fill">True</property>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
                                         <property name="position">2</property>
                                       </packing>
                                     </child>
                                     <child>
-                                      <widget class="GtkButton" id="curve_clear_parameter">
+                                      <widget class="GtkHBox" id="hbox850">
                                         <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="tooltip" translatable="yes">Clear selected parameter</property>
-                                        <signal name="clicked" handler="on_curve_clear_parameter_clicked" />
+                                        <property name="can_focus">False</property>
+                                        <property name="homogeneous">True</property>
                                         <child>
-                                          <widget class="GtkImage" id="image17">
+                                          <widget class="GtkButton" id="curve_buttonstore">
                                             <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="pixbuf">icon_clear.png</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="receives_default">False</property>
+                                            <property name="tooltip" translatable="yes">Apply this keyframe</property>
+                                            <signal name="clicked" handler="on_curve_buttonstore_clicked" />
+                                            <child>
+                                              <widget class="GtkImage" id="image2521">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="pixbuf">icon_apply.png</property>
+                                              </widget>
+                                            </child>
                                           </widget>
+                                          <packing>
+                                            <property name="expand">True</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <widget class="GtkToggleButton" id="curve_togglerun">
+                                            <property name="can_focus">True</property>
+                                            <property name="receives_default">False</property>
+                                            <property name="tooltip" translatable="yes">Start keyframing</property>
+                                            <signal name="toggled" handler="on_curve_togglerun_toggled" />
+                                            <child>
+                                              <widget class="GtkImage" id="image530">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="pixbuf">button_play.png</property>
+                                              </widget>
+                                            </child>
+                                          </widget>
+                                          <packing>
+                                            <property name="expand">True</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <widget class="GtkButton" id="curve_buttonclear">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="receives_default">False</property>
+                                            <property name="tooltip" translatable="yes">Reset</property>
+                                            <signal name="clicked" handler="on_curve_buttonclear_clicked" />
+                                            <child>
+                                              <widget class="GtkImage" id="image532">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="pixbuf">icon_clearall.png</property>
+                                              </widget>
+                                            </child>
+                                          </widget>
+                                          <packing>
+                                            <property name="expand">True</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <widget class="GtkButton" id="curve_clear_parameter">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="receives_default">False</property>
+                                            <property name="tooltip" translatable="yes">Clear selected parameter</property>
+                                            <signal name="clicked" handler="on_curve_clear_parameter_clicked" />
+                                            <child>
+                                              <widget class="GtkImage" id="image17">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="pixbuf">icon_clear.png</property>
+                                              </widget>
+                                            </child>
+                                          </widget>
+                                          <packing>
+                                            <property name="expand">True</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">3</property>
+                                          </packing>
                                         </child>
                                       </widget>
                                       <packing>
@@ -4902,7 +4940,7 @@
                                   <packing>
                                     <property name="expand">True</property>
                                     <property name="fill">True</property>
-                                    <property name="position">3</property>
+                                    <property name="position">1</property>
                                   </packing>
                                 </child>
                               </widget>
@@ -5582,7 +5620,7 @@
                                                 <property name="can_focus">True</property>
                                                 <property name="receives_default">True</property>
                                                 <property name="tooltip" translatable="yes">Clear all sequencer slots</property>
-                                                <signal name="clicked" handler="on_button_seq_clearall_clicked" swapped="no"/>
+                                                <signal name="clicked" handler="on_button_seq_clearall_clicked" />
                                                 <child>
                                                   <widget class="GtkHBox" id="hbox48">
                                                     <property name="visible">True</property>
@@ -13504,13 +13542,13 @@ YUV (current)</property>
                                                       </packing>
                                                     </child>
                                                     <child>
-                                                      <widget class="GtkToggleButton" id="curve_toggleentry">
+                                                      <widget class="GtkToggleButton" id="curve_chain_toggleentry">
                                                         <property name="visible">True</property>
                                                         <property name="can_focus">True</property>
                                                         <property name="receives_default">True</property>
                                                         <property name="has_tooltip">True</property>
                                                         <property name="tooltip" translatable="yes">Toggle keyframing for this chain entry</property>
-                                                        <signal name="toggled" handler="curve_toggleentry_toggled" />
+                                                        <signal name="toggled" handler="curve_chain_toggleentry_toggled" />
                                                         <child>
                                                           <widget class="GtkImage" id="image50">
                                                             <property name="visible">True</property>
@@ -14787,7 +14825,7 @@ YUV (current)</property>
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
-                                    <property name="tooltip" translatable="yes">Save Samplelist</property>
+                                    <property name="tooltip" translatable="yes">Save Samplelist (press [SHIFT] to Save as)</property>
                                     <signal name="button_press_event" handler="on_button_samplelist_qsave_clicked" />
                                     <child>
                                       <widget class="GtkAlignment" id="alignment55">
@@ -15797,6 +15835,18 @@ YUV (current)</property>
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>

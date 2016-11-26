@@ -674,7 +674,7 @@ void free_samplebank(void);
 void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
 static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
-static void update_curve_widget(const char *name);
+static void update_curve_widget( GtkWidget *curve );
 /* not used */ /* static void update_curve_accessibility(const char *name); */
 static void reset_tree(const char *name);
 static void reload_srt();
@@ -2473,7 +2473,7 @@ static void vj_kf_reset()
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
 
 	reset_curve( curve );
-	set_toggle_button( "curve_toggleentry", 0 );
+	set_toggle_button( "curve_chain_toggleentry", 0 );
 	set_toggle_button( "curve_toggleentry_param", 0);
 	update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
 }
@@ -2494,6 +2494,7 @@ static void vj_kf_refresh()
 	int *entry_tokens = &(info->uc.entry_tokens[0]);
 	if( entry_tokens[ENTRY_FXID] > 0 ) {
 		enable_widget( "frame_fxtree3" );
+		update_curve_widget(glade_xml_get_widget_(info->main_window, "curve"));
 	}
 	else {
 		set_toggle_button( "curve_toggleentry_param", 0 );
@@ -2518,14 +2519,14 @@ static void vj_kf_select_parameter(int num)
 	update_label_str( "curve_parameter", name );
 	g_free(name);
 
-	reset_curve( glade_xml_get_widget_(info->main_window, "curve"));
+	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
+	reset_curve( curve );
 
-	update_curve_widget("curve");
+	update_curve_widget( curve );
 }
 
-static void update_curve_widget(const char *name)
+static void update_curve_widget(GtkWidget *curve)
 {
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window,name);
 	sample_slot_t *s = info->selected_slot;
 	if(!s ) 	return;
 	int i = info->uc.selected_chain_entry; /* chain entry */
@@ -3967,7 +3968,7 @@ static gint load_parameter_info()
 		info->uc.selected_rgbkey = 0;
 	}
 
-	set_toggle_button( "curve_toggleentry", p[ENTRY_KF_STATUS] );
+	set_toggle_button( "curve_chain_toggleentry", p[ENTRY_KF_STATUS] );
 
 	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
 	{
@@ -4056,7 +4057,7 @@ static void load_effectchain_info()
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 	GtkListStore *store;
 	gchar toggle[4];
-	guint arr[6];
+	guint arr[VIMS_CHAIN_LIST_ENTRY_VALUES];
 	GtkTreeIter iter;
 	gint offset=0;
 
@@ -4070,10 +4071,11 @@ static void load_effectchain_info()
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
 	store = GTK_LIST_STORE(model);
 
+	// no fx, clean list and return
 	if(fxlen <= 0 )
 	{
 		int i;
-		for( i = 0; i < 20; i ++ )
+		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ )
 		{
 			gtk_list_store_append(store,&iter);
 			gtk_list_store_set(store,&iter, FXC_ID, i ,-1);
@@ -4089,17 +4091,18 @@ static void load_effectchain_info()
 
 	while( offset < fxlen )
 	{
-		char line[12];
+		char line[VIMS_CHAIN_LIST_ENTRY_LENGHT];
 		veejay_memset(arr,0,sizeof(arr));
 		veejay_memset(line,0,sizeof(line));
 
-		strncpy( line, fxtext + offset, 8 );
-		sscanf( line, "%02d%03d%1d%1d%1d",
-			&arr[0],&arr[1],&arr[2],&arr[3],&arr[4]);
+		strncpy( line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGHT );
+		sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
+		       &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6], &arr[7]); // FIXME How to use of VIMS_CHAIN_LIST_ENTRY_VALUES ?
 
 		char *name = _effect_get_description( arr[1] );
 		snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
 
+		// clean list entries until next
 		while( last_index < arr[0] )
 		{
 			gtk_list_store_append( store, &iter );
@@ -4107,13 +4110,14 @@ static void load_effectchain_info()
 			last_index ++;
 		}
 
+		// time to fill current entry
 		if( last_index == arr[0])
 		{
 			gchar *utf8_name = _utf8str( name );
 			char  tmp[128];
-			if( _effect_get_mix( arr[0] ) ) {
-				snprintf(tmp,sizeof(tmp),"%s %d", (info->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T " ),
-					info->uc.entry_tokens[ENTRY_CHANNEL]);
+			if( _effect_get_mix( arr[1] ) ) {
+				snprintf(tmp,sizeof(tmp),"%s %d", (arr[5] == 0 ? "Sample " : "T " ),
+					arr[6]);
 			}
 			else {
 				snprintf(tmp,sizeof(tmp),"%s"," ");
@@ -4121,8 +4125,8 @@ static void load_effectchain_info()
 			gchar *mixing = _utf8str(tmp);
 
 			gtk_list_store_append( store, &iter );
-			GdkPixbuf *toggle = update_pixmap_entry( info->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
-			GdkPixbuf *kf_togglepf = update_pixmap_kf( info->uc.entry_tokens[ENTRY_KF_STATUS] );
+			GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
+			GdkPixbuf *kf_togglepf = update_pixmap_kf( arr[7] );
 			gtk_list_store_set( store, &iter,
 			                   FXC_ID, arr[0],
 			                   FXC_FXID, utf8_name,
@@ -4135,9 +4139,11 @@ static void load_effectchain_info()
 			g_object_unref( toggle );
 			g_object_unref( kf_togglepf );
 		}
-		offset += 8;
+		offset += VIMS_CHAIN_LIST_ENTRY_LENGHT;
 	}
-	while( last_index < 20 )
+
+	// finally clean list end
+	while( last_index < SAMPLE_MAX_EFFECTS )
 	{
 		gtk_list_store_append( store, &iter );
 		gtk_list_store_set( store, &iter,
@@ -7341,9 +7347,9 @@ gboolean slider_scroll_event( GtkWidget *widget, GdkEventScroll *ev, gpointer us
 {
 	gint i = GPOINTER_TO_INT(user_data);
 	if(ev->direction == GDK_SCROLL_UP ) {
-		param_changed( i, 1, slider_names_[i].text );
+		PARAM_CHANGED( i, 1, slider_names_[i].text );
 	} else if (ev->direction == GDK_SCROLL_DOWN ) {
-		param_changed( i, -1, slider_names_[i].text );
+		PARAM_CHANGED( i, -1, slider_names_[i].text );
 	}
 	return FALSE;
 }
@@ -7405,6 +7411,7 @@ void vj_gui_init(char *glade_file,
 	veejay_memset( gui->sample, 0, 2 );
 	veejay_memset( gui->selection, 0, 3 );
 	veejay_memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
+	gui->uc.selected_parameter_id = -1;
 	veejay_memset( gui->uc.entry_tokens,0, sizeof(int) * ENTRY_LAST);
 	gui->prev_mode = -1;
 	veejay_memset( &(gui->el), 0, sizeof(veejay_el_t));
