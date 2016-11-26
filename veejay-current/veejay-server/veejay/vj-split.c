@@ -628,12 +628,6 @@ void vj_split_process( void *ptr, VJFrame *src )
 	vj_split_t *x = (vj_split_t*) ptr;
 	int i;
 
-	if(!x)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Failed to get splitter data on processing");
-		return;
-	}
-
 	for( i = 0; i < x->n_screens; i ++ ) {
 		if( x->frames[i] == NULL || x->screens[i] == NULL )
 			continue;
@@ -657,12 +651,6 @@ void vj_split_render( void *ptr )
 	vj_split_t *x = (vj_split_t*) ptr;
 	int i;
 
-	if(!x)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Failed to get splitter data on rendering");
-		return;
-	}
-
 	for( i = 0; i < x->n_screens; i ++ ) {
 		if( x->frames[i] == NULL || x->screens[i] == NULL )
 			continue;
@@ -679,14 +667,7 @@ void vj_split_render( void *ptr )
 VJFrame *vj_split_get_screen(void *ptr, int screen_id)
 {
 	vj_split_t *x = (vj_split_t*) ptr;
-
-	if(!x)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Failed to get splitter data on getting screen");
-		return NULL;
-	}
-
-	if( screen_id < 0 || screen_id >= x->n_screens)
+	if( x == NULL || screen_id < 0 || screen_id >= x->n_screens)
 		return NULL;
 	
 	return x->frames[ screen_id ];

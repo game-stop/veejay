@@ -40,7 +40,8 @@ static uint8_t g_orientation=0;
 
 #define VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT 4 //random
 
-void dice_create_map(int w, int h, int orientation);
+static void dice_create_map(int w, int h);
+static void dice_create_map_orientation(int w, int h, int orientation);
 
 typedef enum _dice_dir
 {
@@ -96,7 +97,7 @@ int	dices_malloc(int width, int height)
 	g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height);
 	if(!g_dicemap) return 0;
 
-	dice_create_map(width, height, VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT);
+	dice_create_map(width, height);
 	return 1;
 }
 
@@ -107,7 +108,7 @@ void dices_free()
 	g_dicemap  = NULL;
 }
 
-void dice_create_map(int w, int h, int orientation)
+static void dice_create_map_orientation(int w, int h, int orientation)
 {
 	int k,x, y, i = 0;
 	int maplen = (w * h);
@@ -121,13 +122,28 @@ void dice_create_map(int w, int h, int orientation)
 		{
 			for (x = 0; x < g_map_width; x++)
 			{
-				//g_dicemap[i] = j++;
-				//if(j==3) j=0;
-				if (orientation == Random)
-					g_dicemap[i] = ((1 + (rand() * (i + y))) & 0x03);
-				else
-					g_dicemap[i] = orientation;
+				g_dicemap[i] = orientation;
+				i++;
+			}
+		}
+	}
+}
 
+static void dice_create_map(int w, int h)
+{
+	int k,x, y, i = 0;
+	int maplen = (w * h);
+	g_map_height = h >> g_cube_bits;
+	g_map_width = w >> g_cube_bits;
+	g_cube_size = 1 << g_cube_bits;
+	maplen = maplen / (g_map_height * g_map_width);
+	for( k = 0; k < maplen;k++)
+	{
+		for (y = 0; y < g_map_height; y++)
+		{
+			for (x = 0; x < g_map_width; x++)
+			{
+				g_dicemap[i] = ((1 + (rand() * (i + y))) & 0x03);
 				i++;
 			}
 		}
@@ -147,7 +163,11 @@ void dices_apply( void *data, VJFrame *frame, int cube_bits, int orientation)
 	{
 		g_cube_bits = cube_bits;
 		g_orientation = orientation;
-		dice_create_map(width, height, orientation);
+
+		if( orientation == VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT) 
+			dice_create_map(width,height);
+		else
+			dice_create_map_orientation(width, height, orientation);
 	}
 
 	//TODO dices map centering
