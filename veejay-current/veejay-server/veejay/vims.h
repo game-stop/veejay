@@ -280,8 +280,8 @@ enum {
 	VIMS_VLOOPBACK_STOP				=	46,
 };
 
-#define VIMS_CHAIN_LIST_ENTRY_LENGHT 13 // Size of sub message anwser (real size if SAMPLE_MAX_EFFECTS * VIMS_CHAIN_LIST_ENTRY_LENGHT)
 #define VIMS_CHAIN_LIST_ENTRY_FORMAT "%02d%03d%1d%1d%1d%1d%03d%1d"
+#define VIMS_CHAIN_LIST_ENTRY_LENGHT sizeof(VIMS_CHAIN_LIST_ENTRY_FORMAT) // Size of sub message anwser (real size if SAMPLE_MAX_EFFECTS * VIMS_CHAIN_LIST_ENTRY_LENGHT)
 #define VIMS_CHAIN_LIST_ENTRY_VALUES 8 // Number of values of the message
 
 enum {
