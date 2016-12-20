@@ -489,72 +489,107 @@ unsigned int fastrand(int val)
 /* function to blend luminance pixel */
 pix_func_Y get_pix_func_Y(const int pix_type)
 {
-    if (pix_type == 0)
-	return &bl_pix_swap_Y;
-    if (pix_type == VJ_EFFECT_BLEND_ADDDISTORT)
-	return &bl_pix_add_distorted_Y;
-    if (pix_type == VJ_EFFECT_BLEND_SUBDISTORT)
-	return &bl_pix_sub_distorted_Y;
-    if (pix_type == VJ_EFFECT_BLEND_MULTIPLY)
-	return &bl_pix_multiply_Y;
-    if (pix_type == VJ_EFFECT_BLEND_DIVIDE)
-	return &bl_pix_divide_Y;
-    if (pix_type == VJ_EFFECT_BLEND_ADDITIVE)
-	return &bl_pix_additive_Y;
-    if (pix_type == VJ_EFFECT_BLEND_SUBSTRACTIVE)
-	return &bl_pix_substract_Y;
-    if (pix_type == VJ_EFFECT_BLEND_SOFTBURN)
-	return &bl_pix_softburn_Y;
-    if (pix_type == VJ_EFFECT_BLEND_INVERSEBURN)
-	return &bl_pix_inverseburn_Y;
-    if (pix_type == VJ_EFFECT_BLEND_COLORDODGE)
-	return &bl_pix_colordodge_Y;
-    if (pix_type == VJ_EFFECT_BLEND_MULSUB)
-	return &bl_pix_mulsub_Y;
-    if (pix_type == VJ_EFFECT_BLEND_LIGHTEN)
-	return &bl_pix_lighten_Y;
-    if (pix_type == VJ_EFFECT_BLEND_DIFFERENCE)
-	return &bl_pix_difference_Y;
-    if (pix_type == VJ_EFFECT_BLEND_DIFFNEGATE)
-	return &bl_pix_diffnegate_Y;
-    if (pix_type == VJ_EFFECT_BLEND_EXCLUSIVE)
-	return &bl_pix_exclusive_Y;
-    if (pix_type == VJ_EFFECT_BLEND_BASECOLOR)
-	return &bl_pix_basecolor_Y;
-    if (pix_type == VJ_EFFECT_BLEND_FREEZE)
-	return &bl_pix_freeze_Y;
-    if (pix_type == VJ_EFFECT_BLEND_UNFREEZE)
-	return &bl_pix_unfreeze_Y;
-    if (pix_type == VJ_EFFECT_BLEND_HARDLIGHT)
-	return &bl_pix_hardlight_Y;
-    if (pix_type == VJ_EFFECT_BLEND_RELADD)
-	return &bl_pix_relativeadd_Y;
-    if (pix_type == VJ_EFFECT_BLEND_RELSUB)
-	return &bl_pix_relativesub_Y;
-    if (pix_type == VJ_EFFECT_BLEND_MAXSEL)
-	return &bl_pix_maxsel_Y;
-    if (pix_type == VJ_EFFECT_BLEND_MINSEL)
-	return &bl_pix_minsel_Y;
-    if (pix_type == VJ_EFFECT_BLEND_RELADDLUM)
-	return &bl_pix_relativeadd_Y;
-    if (pix_type == VJ_EFFECT_BLEND_RELSUBLUM)
-	return &bl_pix_relativesub_Y;
-    if (pix_type == VJ_EFFECT_BLEND_MINSUBSEL)
-	return &bl_pix_minsubsel_Y;
-    if (pix_type == VJ_EFFECT_BLEND_MAXSUBSEL)
-	return &bl_pix_maxsubsel_Y;
-    if (pix_type == VJ_EFFECT_BLEND_ADDSUBSEL)
-	return &bl_pix_addsubsel_Y;
-    if (pix_type == VJ_EFFECT_BLEND_ADDAVG)
-	return &bl_pix_dblbneg_Y;
-    if (pix_type == VJ_EFFECT_BLEND_ADDTEST2)
-	return &bl_pix_dblbneg_Y;
-    if (pix_type == VJ_EFFECT_BLEND_ADDTEST3)
-	return &bl_pix_relneg_Y;
-    if (pix_type == VJ_EFFECT_BLEND_ADDTEST4)
-	return &bl_pix_test3_Y;
-	if( pix_type == VJ_EFFECT_BLEND_SUBSTRACTIVE)
-	return &bl_pix_subtract_Y;
+	switch(pix_type)
+	{
+		case VJ_EFFECT_BLEND_SWAP:
+			return &bl_pix_swap_Y;
+			break;
+		case VJ_EFFECT_BLEND_ADDDISTORT:
+			return &bl_pix_add_distorted_Y;
+			break;
+		case VJ_EFFECT_BLEND_SUBDISTORT:
+			return &bl_pix_sub_distorted_Y;
+			break;
+		case VJ_EFFECT_BLEND_MULTIPLY:
+			return &bl_pix_multiply_Y;
+			break;
+		case VJ_EFFECT_BLEND_DIVIDE:
+			return &bl_pix_divide_Y;
+			break;
+		case VJ_EFFECT_BLEND_ADDITIVE:
+			return &bl_pix_additive_Y;
+			break;
+		case VJ_EFFECT_BLEND_SUBSTRACTIVE:
+			return &bl_pix_substract_Y;
+			break;
+		case VJ_EFFECT_BLEND_SOFTBURN:
+			return &bl_pix_softburn_Y;
+			break;
+		case VJ_EFFECT_BLEND_INVERSEBURN:
+			return &bl_pix_inverseburn_Y;
+			break;
+		case VJ_EFFECT_BLEND_COLORDODGE:
+			return &bl_pix_colordodge_Y;
+			break;
+		case VJ_EFFECT_BLEND_MULSUB:
+			return &bl_pix_mulsub_Y;
+			break;
+		case VJ_EFFECT_BLEND_LIGHTEN:
+			return &bl_pix_lighten_Y;
+			break;
+		case VJ_EFFECT_BLEND_DIFFERENCE:
+			return &bl_pix_difference_Y;
+			break;
+		case VJ_EFFECT_BLEND_DIFFNEGATE:
+			return &bl_pix_diffnegate_Y;
+			break;
+		case VJ_EFFECT_BLEND_EXCLUSIVE:
+			return &bl_pix_exclusive_Y;
+			break;
+		case VJ_EFFECT_BLEND_BASECOLOR:
+			return &bl_pix_basecolor_Y;
+			break;
+		case VJ_EFFECT_BLEND_FREEZE:
+			return &bl_pix_freeze_Y;
+			break;
+		case VJ_EFFECT_BLEND_UNFREEZE:
+			return &bl_pix_unfreeze_Y;
+			break;
+		case VJ_EFFECT_BLEND_HARDLIGHT:
+			return &bl_pix_hardlight_Y;
+			break;
+		case VJ_EFFECT_BLEND_RELADD:
+			return &bl_pix_relativeadd_Y;
+			break;
+		case VJ_EFFECT_BLEND_RELSUB:
+			return &bl_pix_relativesub_Y;
+			break;
+		case VJ_EFFECT_BLEND_MAXSEL:
+			return &bl_pix_maxsel_Y;
+			break;
+		case VJ_EFFECT_BLEND_MINSEL:
+			return &bl_pix_minsel_Y;
+			break;
+		case VJ_EFFECT_BLEND_RELADDLUM:
+			return &bl_pix_relativeadd_Y;
+			break;
+		case VJ_EFFECT_BLEND_RELSUBLUM:
+			return &bl_pix_relativesub_Y;
+			break;
+		case VJ_EFFECT_BLEND_MINSUBSEL:
+			return &bl_pix_minsubsel_Y;
+			break;
+		case VJ_EFFECT_BLEND_MAXSUBSEL:
+			return &bl_pix_maxsubsel_Y;
+			break;
+		case VJ_EFFECT_BLEND_ADDSUBSEL:
+			return &bl_pix_addsubsel_Y;
+			break;
+		case VJ_EFFECT_BLEND_ADDAVG:
+			return &bl_pix_dblbneg_Y;
+			break;
+		case VJ_EFFECT_BLEND_ADDTEST2:
+			return &bl_pix_dblbneg_Y;
+			break;
+		case VJ_EFFECT_BLEND_ADDTEST3:
+			return &bl_pix_relneg_Y;
+			break;
+		case VJ_EFFECT_BLEND_ADDTEST4:
+			return &bl_pix_test3_Y;
+			break;
+		case VJ_EFFECT_BLEND_SUBSTRACTIVE2:
+			return &bl_pix_subtract_Y;  //Clamped
+			break;
     /*
        if(pix_type == VJ_EFFECT_BLEND_SELECTMIN) return &bl_pix_minsel_Y;
        if(pix_type == VJ_EFFECT_BLEND_SELECTMAX) return &bl_pix_maxsel_Y;   
@@ -564,7 +599,9 @@ pix_func_Y get_pix_func_Y(const int pix_type)
        if(pix_type == VJ_EFFECT_BLEND_SELECTFREEZE) return &bl_pix_selfreeze_Y;
        if(pix_type == VJ_EFFECT_BLEND_SELECTUNFREEZE) return &bl_pix_selunfreeze_Y;
      */
-    return &bl_pix_noswap_Y;
+		default:
+			return &bl_pix_noswap_Y;
+	}
 }
 
 /* function to blend chrominance pixel */
@@ -622,6 +659,7 @@ uint8_t bl_pix_substract_Y(uint8_t y1, uint8_t y2)
 {
 	return ( y1 + (y2 - 0xff ) );
 }
+
 
 uint8_t bl_pix_softburn_Y(uint8_t y1, uint8_t y2)
 {
