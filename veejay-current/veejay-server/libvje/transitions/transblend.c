@@ -21,6 +21,7 @@
 #include <libvje/effects/common.h>
 #include <libvjmem/vjmem.h>
 #include "transblend.h"
+#include <libvje/internal.h>
 
 vj_effect *transblend_init(int width, int height)
 {
@@ -37,7 +38,7 @@ vj_effect *transblend_init(int width, int height)
     ve->defaults[5] = 50;
     ve->defaults[6] = 50;
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 30;
+    ve->limits[1][0] = VJ_EFFECT_BLEND_COUNT;
     ve->limits[0][1] = 1;
     ve->limits[1][1] = width;
     ve->limits[0][2] = 1;
@@ -50,11 +51,17 @@ vj_effect *transblend_init(int width, int height)
     ve->limits[1][5] = width;
     ve->limits[0][6] = 1;
     ve->limits[1][6] = height;
-    ve->description = "Transition Translate Blend";
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Width", "Height", "Ax offset", "Ay offset" , "Bx offset", "By offset");
+
     ve->sub_format = 0;
     ve->extra_frame = 1;
-	ve->has_user = 0;
+    ve->has_user = 0;
+
+    ve->description = "Transition Translate Blend";
+    ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Width", "Height", "Ax offset", "Ay offset" , "Bx offset", "By offset");
+
+    ve->hints = vje_init_value_hint_list( ve->num_params );
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, VJ_EFFECT_BLEND_STRINGS);
+
     return ve;
 }
 
