@@ -179,7 +179,7 @@ void dices_apply( void *data, VJFrame *frame, int cube_bits, int orientation)
 	{
 		for (map_x = 0; map_x < g_map_width; map_x++)
 		{
-			base = (map_y << g_cube_bits) * width + (map_x << g_cube_bits);
+			base = (shift_h + (map_y << g_cube_bits)) * width + (map_x << g_cube_bits) + shift_w;
 			switch (g_dicemap[map_i])
 			{
 				case Left:
