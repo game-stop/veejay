@@ -675,7 +675,11 @@ uint8_t bl_pix_softburn_Y(uint8_t y1, uint8_t y2)
 		new_Y = pixel_Y_hi_;
 	}
     } else {
-	new_Y = 0xff - (((0xff - a) >> 7) / b);
+        if (b <= pixel_Y_lo_)
+        {
+            b = 255;
+        }
+        new_Y = 0xff - (((0xff - a) >> 7) / b);
     }
     return new_Y;
 }
