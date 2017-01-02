@@ -25,5 +25,5 @@ void rgbkey_scan_fg(uint8_t * src2[3], int *r, int *g, int *b);
 int	rgbkey_malloc(int w, int h);
 void rgbkey_free();
 void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int tola, int r, int g,int b,
-                  int tolb, int min, int max, int alpha_operator);
+                  int tolb, int alpha_operator);
 #endif
