@@ -4091,13 +4091,17 @@ static void load_effectchain_info()
 
 	while( offset < fxlen )
 	{
-		char line[VIMS_CHAIN_LIST_ENTRY_LENGHT];
+		char line[VIMS_CHAIN_LIST_ENTRY_LENGTH+1];
 		veejay_memset(arr,0,sizeof(arr));
 		veejay_memset(line,0,sizeof(line));
 
-		strncpy( line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGHT );
-		sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
-		       &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6], &arr[7]); // FIXME How to use of VIMS_CHAIN_LIST_ENTRY_VALUES ?
+		strncpy( line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGTH );
+		int n_tokens = sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
+		       &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6], &arr[7]);
+		if( n_tokens != VIMS_CHAIN_LIST_ENTRY_VALUES ) {
+			veejay_msg(0,"Error parsing FX chain response");
+			break;
+		}
 
 		char *name = _effect_get_description( arr[1] );
 		snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
@@ -4139,7 +4143,7 @@ static void load_effectchain_info()
 			g_object_unref( toggle );
 			g_object_unref( kf_togglepf );
 		}
-		offset += VIMS_CHAIN_LIST_ENTRY_LENGHT;
+		offset += VIMS_CHAIN_LIST_ENTRY_LENGTH;
 	}
 
 	// finally clean list end

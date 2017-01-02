@@ -281,7 +281,7 @@ enum {
 };
 
 #define VIMS_CHAIN_LIST_ENTRY_FORMAT "%02d%03d%1d%1d%1d%1d%03d%1d"
-#define VIMS_CHAIN_LIST_ENTRY_LENGHT sizeof(VIMS_CHAIN_LIST_ENTRY_FORMAT) // Size of sub message anwser (real size if SAMPLE_MAX_EFFECTS * VIMS_CHAIN_LIST_ENTRY_LENGHT)
+#define VIMS_CHAIN_LIST_ENTRY_LENGTH (2+3+1+1+1+1+3+1) // String length of entry format
 #define VIMS_CHAIN_LIST_ENTRY_VALUES 8 // Number of values of the message
 
 enum {

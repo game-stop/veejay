@@ -8902,7 +8902,7 @@ void	vj_event_send_chain_entry_parameters	( 	void *ptr,	const char format[],	va_
 void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	int i;
-	char line[VIMS_CHAIN_LIST_ENTRY_LENGHT];
+	char line[VIMS_CHAIN_LIST_ENTRY_LENGTH+1]; // null terminated buffer
 	int args[1];
 	char *str = NULL;
 	veejay_t *v = (veejay_t*)ptr;
@@ -8914,7 +8914,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	if(SAMPLE_PLAYING(v))
 	{
 		SAMPLE_DEFAULTS(args[0]);
-		char *print_buf = get_print_buf(VIMS_CHAIN_LIST_ENTRY_LENGHT * SAMPLE_MAX_EFFECTS);
+		char *print_buf = get_print_buf( 1 + (VIMS_CHAIN_LIST_ENTRY_LENGTH * SAMPLE_MAX_EFFECTS ));
 		for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 		{
 			int effect_id = sample_get_effect_any(args[0], i);
@@ -8950,7 +8950,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	else if(STREAM_PLAYING(v))
 	{
 		STREAM_DEFAULTS(args[0]);
-		char *print_buf = get_print_buf(VIMS_CHAIN_LIST_ENTRY_LENGHT * SAMPLE_MAX_EFFECTS);
+		char *print_buf = get_print_buf(1 + (VIMS_CHAIN_LIST_ENTRY_LENGTH * SAMPLE_MAX_EFFECTS));
 
 		for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 		{
