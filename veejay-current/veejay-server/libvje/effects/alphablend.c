@@ -42,7 +42,7 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, uint8_t *aA
 	{
 		unsigned int op0 = aA[i];
 		unsigned int op1 = 0xff - op0;
-		dst[i] = (op1 * A[i] + op0 * B[i] ) >> 8;
+		dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
 	}
     return 0;
 }
@@ -51,7 +51,7 @@ void alphablend_apply( VJFrame *frame, VJFrame *frame2)
 {
 	const int len = frame->len;
 	const int uv_len = (frame->ssm ? len : frame->uv_len );
-	blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame2->data[3], len );
-	blend_plane( frame->data[1], frame->data[1], frame2->data[1], frame2->data[3], uv_len );
-	blend_plane( frame->data[2], frame->data[2], frame2->data[2], frame2->data[3], uv_len );
+	blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame->data[3], len );
+	blend_plane( frame->data[1], frame->data[1], frame2->data[1], frame->data[3], uv_len );
+	blend_plane( frame->data[2], frame->data[2], frame2->data[2], frame->data[3], uv_len );
 }
