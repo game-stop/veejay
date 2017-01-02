@@ -355,6 +355,8 @@ int vj_effect_deactivate(int effect_id, void *ptr, int global)
 static void vj_effect_deactivate_all()
 {
 	int i;
+	sqrt_table_pixels_free();
+
 	for(i = 0 ; i < FX_LIMIT; i ++ )
 	{
 		if( vj_effects[ i ] == NULL )
@@ -373,6 +375,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	if( (width % 32) != 0 ) {
 		veejay_msg(VEEJAY_MSG_WARNING,"Video width should be a multiple of 32 for some effects" );
 	}
+
+	init_sqrt_map_pixel_values();
 
 	veejay_memset( vj_effects, 0, sizeof(vj_effects));
 	veejay_memset( vj_effect_ready,0,sizeof(vj_effect_ready));
