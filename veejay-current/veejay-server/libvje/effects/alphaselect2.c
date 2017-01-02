@@ -34,11 +34,11 @@ vj_effect *alphaselect2_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 15;	/* acceptance radius */
+    ve->defaults[0] = 15;	/* acceptance near */
     ve->defaults[1] = 0;	/* r */
     ve->defaults[2] = 255;	/* g */
     ve->defaults[3] = 0;	/* b */
-	ve->defaults[4] = 15;	/* smooth */
+	ve->defaults[4] = 15;	/* acceptance far */
 	ve->defaults[5] = 0;    /* alpha operator */
 
     ve->limits[0][0] = 1;
@@ -57,7 +57,7 @@ vj_effect *alphaselect2_init(int w, int h)
 	ve->limits[1][4] = 2550;
 
 	ve->limits[0][5] = 0;
-	ve->limits[1][5] = 2;
+	ve->limits[1][5] = 3;
 
 	ve->has_user = 0;
     ve->parallel = 1;
@@ -65,17 +65,25 @@ vj_effect *alphaselect2_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-	ve->param_description = vje_build_param_list(ve->num_params, "Accept","Red","Green","Blue", "Smooth", "Alpha Operator");
+	ve->param_description = vje_build_param_list(ve->num_params, "Tolerance Near","Red","Green","Blue", "Tolerance Far", "Alpha Operator");
 
 	ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_OUT;
+	ve->hints = vje_init_value_hint_list( ve->num_params );
+	vje_build_value_hint_list( ve->hints, ve->limits[1][5],5, 
+			
+			"Ignore Alpha-IN", "Alpha-IN A or B", "Alpha-In A and B avg", "Alpha-In A and B" );
+
 
     return ve;
 }
 
 static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, const double dA, const double dB )
 {
-		double tmp = 0.0; 
-		fast_sqrt( tmp, (Cbk - Cb) * (Cbk-Cb) + (Crk - Cr) * (Crk - Cr) );
+		//double tmp = 0.0; 
+		//fast_sqrt( tmp, (Cbk - Cb) * (Cbk-Cb) + (Crk - Cr) * (Crk - Cr) );
+
+		double tmp = sqrt_table_get_pixel( (Cbk-Cb), (Crk-Cr) );
+		
 		if( tmp < dA ) { /* near color key == bg */
 			return 0.0;
 		}
@@ -100,65 +108,34 @@ void alphaselect2_apply( VJFrame *frame,int tola, int r, int g,
 	const double dtola = tola * 0.1f;
 	const double dtolb = tolb * 0.1f;
 
-	if(alpha == 0 ) {
-		for (pos = len; pos != 0; pos--) {
-			double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
-			uint8_t av = (uint8_t) (d * 255.0);
-			if( av < 0xff ) {
-				Cb[pos] = 128;
-				Cr[pos] = 128;
-			}
-			else if (av == 0) {
-				Cb[pos] = 128;
-				Cr[pos] = 128;
-				Y[pos] = pixel_Y_lo_;
-			}
-			A[pos] = av;
-		}
-		return;
-	}
-	
 	switch(alpha)
 	{
+		case 0:
+			for (pos = len; pos != 0; pos--) {
+				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
+				A[pos] = (uint8_t) (d*255.0); /* overwrite alpha regardless */
+			}
+			break;
 		case 1:
 			for (pos = len; pos != 0; pos--) {
 				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
-				A[pos] = (uint8_t) (d * 255.0);
-				if( A[pos] < 0xff ) {
-					Y[pos] = A[pos];
-					Cb[pos] = 128;
-					Cr[pos] = 128;
-				}
-				else if( A[pos] == 0) {
-					Cb[pos] = 128;
-					Cr[pos] = 128;
-					Y[pos] = pixel_Y_lo_;
+				if( A[pos] == 0 ) {
+					A[pos] = (uint8_t) (d * 255.0);
 				}
 			}
 			break;
 		case 2:
 			for (pos = len; pos != 0; pos--) {
-				if(A[pos] == 0 )
-					continue;
-				if(A[pos] == 0xff) {
-					Y[pos] = 0xff;
-					Cb[pos] = 128;
-					Cr[pos] = 128;
-				}
-				else {
-					double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
-					A[pos] = (uint8_t) (d * 255.0);
-					if( A[pos] < 0xff ) {
-						Y[pos] = A[pos];
-						Cb[pos] = 128;
-						Cr[pos] = 128;
-					}
-					else if( A[pos] == 0) {
-						Cb[pos] = 128;
-						Cr[pos] = 128;
-						Y[pos] = pixel_Y_lo_;
-					}
-				}
+				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
+				uint8_t tmp = (uint8_t) (d * 255.0);
+				A[pos] = (A[pos] + tmp ) >> 1;
+			}
+			break;
+		case 3:
+			for (pos = len; pos != 0; pos--) {
+				double d = color_distance( Cb[pos],Cr[pos],iu,iv,dtola,dtolb );
+				int tmp = A[pos] + (uint8_t) (d * 255.0);    
+				A[pos] = ( tmp > 0xff ? 0xff: tmp );
 			}
 			break;
 
