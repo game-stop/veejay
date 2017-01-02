@@ -73,12 +73,14 @@ int	ripple_malloc(int width, int height)
    int i;
     ripple_table = (double*) vj_malloc(sizeof(double) * RUP8(width * height) + width );
     if(!ripple_table) return 0;
-    ripple_data[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) + width );
+    ripple_data[0] = (uint8_t*)vj_calloc( sizeof(uint8_t) * RUP8(width * height) + width );
     if(!ripple_data[0]) return 0; 
     ripple_data[1] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) + width );
     if(!ripple_data[1]) return 0;
+	veejay_memset( ripple_data[1], 128, RUP8(width * height) + width );
     ripple_data[2] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height) + width );
     if(!ripple_data[1]) return 0;
+	veejay_memset( ripple_data[2], 128, RUP8(width * height) + width );
 
     ripple_sin = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
     if(!ripple_sin) return 0;
@@ -129,6 +131,7 @@ void ripple_apply(VJFrame *frame, int _w, int _a , int _att ) {
 	uint8_t *Cr= frame->data[2];
 
 	fast_sqrt(maxradius, wp2 * wp2 + hp2 * hp2);
+	
 	frequency = 360.0 * waves / maxradius;
 	amplitude = maxradius / ampli;
 
@@ -154,7 +157,7 @@ void ripple_apply(VJFrame *frame, int _w, int _a , int _att ) {
 		  if (angle < 0) angle+=360.0;
 
 		  fast_sqrt( r, dx * dx + dy * dy);
-
+	
 		  z = amplitude/ pow(r,attenuation) * ripple_sin[ ((int)(frequency * r)) % 360 ];
 
 		  a = ((int) (angle)) % 360;
