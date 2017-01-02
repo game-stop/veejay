@@ -2090,3 +2090,47 @@ void	vje_weighted_average_bin( const uint8_t *src, uint8_t *dst, const int w, co
 	}
 
 }
+
+
+// temporary fix for fast_sqrt, use lookup table 
+// todo: intialization can be divided over n cpu cores, see vj-task
+
+double **sqrt_map_pixel_values = NULL;
+
+void init_sqrt_map_pixel_values() {
+
+	int i;
+	
+	sqrt_map_pixel_values = (double**) vj_calloc( sizeof(double*) * 512 );
+	for( i = 0; i < 512; i ++ ) {
+		sqrt_map_pixel_values[i] = (double*) vj_calloc( sizeof(double) * 512 );
+	}	
+	
+	
+	int dx,dy,x,y;
+	double r;
+	for( y = -255; y < 255; y ++ ) {
+		for( x = -255; x < 255; x ++ ) {
+			fast_sqrt(r, (y * y) + (x * x) );
+
+			dy = 255 + y;
+			dx = 255 + x;
+
+			sqrt_map_pixel_values[dy][dx] = r;
+		}
+	}
+} 
+
+double sqrt_table_get_pixel( int x, int y ) {
+	return sqrt_map_pixel_values[(255+y)][(255+x)];
+}
+
+void	sqrt_table_pixels_free() {
+	int i;
+	for( i = 0; i < 512; i ++ ) {
+		free( sqrt_map_pixel_values[i] );
+	}
+	free(sqrt_map_pixel_values);
+}
+
+

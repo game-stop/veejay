@@ -82,12 +82,32 @@ extern void veejay_msg(int type, const char format[], ...);
 #define do_emms         __asm__ __volatile__ ( "emms":::"memory" )
 #endif
 
+#ifdef ARCH_X86_64
+#define sin_cos(si, co, x) asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
+#define fast_sin(res__,x) asm ("fsin" : "=t" (res__) : "0" (x))
+#define fast_cos(res__,x) asm ("fcos" : "=t" (res__) : "0" (x))
+#define fast_abs(res__,x) asm ("fabs" : "=t" (res__) : "0" (x))
+#define fast_exp(res__,x) asm ("fexp" : "=t" (res__) : "0" (x))
+#else
 #define sin_cos(si, co, x)     si = sin(x); co = cos(x)
-#define fast_sqrt( res,x ) res = sqrt(x)
 #define fast_sin(res,x ) res = sin(x)
 #define fast_cos(res,x ) res = cos(x)
 #define fast_abs(res,x ) res = abs(x)
 #define fast_exp(res,x ) res = exp(x)
+#endif
+
+#if defined(HAVE_ASM_SSE2)
+#include <emmintrin.h>
+static inline double __sqrt_sd(double value) {
+	double ret;
+	__m128d v = _mm_load_sd(&value);
+	_mm_store_sd(&ret, _mm_sqrt_sd(v, v));
+	return ret;
+}
+#define fast_sqrt( res,x ) res = __sqrt_sd(x)
+#else
+#define fast_sqrt( res,x ) res = sqrt(x)
+#endif
 
 #define Y_Red 		( 0.29900)
 #define Y_Green 	( 0.58700)
@@ -368,6 +388,11 @@ void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len )
 void binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, int w, int h );
 void binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len);
 void vje_mean_filter( const uint8_t *src, uint8_t *dst, const int w, const int h );
+
+void init_sqrt_map_pixel_values();
+double sqrt_table_get_pixel( int x, int h );
+void sqrt_table_pixels_free();
+
 #ifdef HAVE_ASM_MMX
 void vje_load_mask(uint8_t val);
 void vje_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len );
