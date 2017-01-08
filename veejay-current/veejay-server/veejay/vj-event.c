@@ -81,6 +81,8 @@
 
 #include <libplugger/plugload.h>
 
+#define MAX_ARGUMENTS (SAMPLE_MAX_PARAMETERS + 8)
+
 static int use_bw_preview_ = 0;
 static int _last_known_num_args = 0;
 static hash_t *BundleHash = NULL;
@@ -5257,7 +5259,7 @@ void vj_event_chain_entry_set_defaults(void *ptr, const char format[], va_list a
 void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	int args[3];
+	int args[4];
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
@@ -5279,6 +5281,8 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 			if(sample_chain_add(args[0],args[1],args[2])) 
 			{
 				v->uc->chain_changed = 1;
+
+				sample_set_chain_status( args[0],args[1], args[3] );
 			}
 			else
 			{
@@ -5302,11 +5306,14 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 			if(vj_tag_set_effect(args[0],args[1], args[2]))
 			{
 				v->uc->chain_changed = 1;
-			}
+			
+				vj_tag_set_chain_status( args[0], args[1], args[3] );
+			}	
 			else
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set effect %d on stream %d chain %d",args[2],args[0],args[1]);
 			}
+
 		}
 	}
 }
@@ -5408,12 +5415,12 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 
 void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap)
 {
-	int args[SAMPLE_MAX_PARAMETERS];
+	int args[MAX_ARGUMENTS];
 	char str[4096];
 	int value = 0;
 	veejay_t *v = (veejay_t*)ptr;
 
-	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
+	veejay_memset(args,0,sizeof(int) * MAX_ARGUMENTS); 
 
 	P_A(args,str,format,ap);    
 
@@ -5493,12 +5500,12 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 {
 	long int tmp = 0;
 	int base = 10;
-	int index = 3; // sample, chain, fx_id
-	int args[SAMPLE_MAX_PARAMETERS];
+	int index = 4; // sample, chain, fx_id, status
+	int args[MAX_ARGUMENTS];
 	char str[1024]; 
 	char *end = str;
 	veejay_t *v = (veejay_t*)ptr;
-	veejay_memset(args,0,sizeof(int) * SAMPLE_MAX_PARAMETERS); 
+	veejay_memset(args,0,sizeof(int) * MAX_ARGUMENTS); 
    
    	P_A(args,str,format,ap);
 
@@ -5528,8 +5535,10 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 			
 			if(sample_chain_add( args[0],args[1],args[2]))
 			{
-				int args_offset = 3;
+				int args_offset = 4;
 				
+				sample_set_chain_status( args[0],args[1], args[3] );
+
 				for(i=0; i < num_p; i++)
 				{
 					if(vj_effect_valid_value(real_id,i,args[(i+args_offset)]) )
@@ -5565,22 +5574,26 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 		
 			if(vj_tag_set_effect(args[0],args[1], args[2]) )
 			{
+				int args_offset = 4;
+			
+				vj_tag_set_chain_status( args[0], args[1], args[3] );
+
 				for(i=0; i < num_p; i++) 
 				{
-					if(vj_effect_valid_value(real_id, i, args[i+3]) )
+					if(vj_effect_valid_value(real_id, i, args[i+args_offset]) )
 					{
-						if(vj_tag_set_effect_arg(args[0],args[1],i,args[i+3]))
+						if(vj_tag_set_effect_arg(args[0],args[1],i,args[i+args_offset]))
 						{
 							veejay_msg(VEEJAY_MSG_DEBUG, "Changed parameter %d to %d (%s)",
 								i,
-								args[i+3],
+								args[i+args_offset],
 								vj_effect_get_description(real_id));
 						}
 					}
 					else
 					{
 						veejay_msg(VEEJAY_MSG_ERROR, "Parameter %d value %d is invalid for effect %d (%d-%d)",
-							i,args[(i+3)], real_id,
+							i,args[(i+args_offset)], real_id,
 							vj_effect_get_min_limit(real_id,i),
 							vj_effect_get_max_limit(real_id,i));
 					}
@@ -7871,7 +7884,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 			{
 				char bundle[512];
 				int np = vj_effect_get_num_params(y);
-				sprintf(bundle, "%03d:0 %d %d", VIMS_CHAIN_ENTRY_SET_PRESET,i, effect_id );
+				sprintf(bundle, "%03d:0 %d %d 1", VIMS_CHAIN_ENTRY_SET_PRESET,i, effect_id );
 		    		for (j = 0; j < np; j++)
 				{
 					char svalue[32];
@@ -8601,7 +8614,7 @@ void	vj_event_send_stream_args		(	void *ptr, const char format[],		va_list ap )
 		STREAM_DEFAULTS(args[0]);
 
 		if( vj_tag_get_type(args[0]) == VJ_TAG_TYPE_GENERATOR ) {
-			int tagargs[SAMPLE_MAX_PARAMETERS];
+			int tagargs[MAX_ARGUMENTS];
 			int n_args = 0;
 			int id = 0;
 			veejay_memset( tagargs, 0, sizeof(tagargs));
@@ -9343,7 +9356,7 @@ void	vj_event_set_stream_arg( void *ptr, const char format[], va_list ap)
 	long int tmp = 0;
 	int base = 10;
 	int index = 1; 
-	int args[1 + SAMPLE_MAX_PARAMETERS];
+	int args[MAX_ARGUMENTS];
 	char str[1024]; 
 	char *end = str;
 	veejay_t *v = (veejay_t*)ptr;

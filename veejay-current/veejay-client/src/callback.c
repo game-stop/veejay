@@ -3612,11 +3612,12 @@ static clipboard_t *last_clipboard = NULL;
 static void			do_clipboard(clipboard_t *c, int id, int entry_id)
 {
 	char msg[1024];
-	snprintf( msg, sizeof(msg), "%03d:%d %d %d %s;",
+	snprintf( msg, sizeof(msg), "%03d:%d %d %d %d %s;",
 			VIMS_CHAIN_ENTRY_SET_PRESET,
 			id,
 			entry_id,
 			c->fx_id,
+			c->enabled,
 			c->parameters
 			);
 

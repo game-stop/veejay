@@ -1475,11 +1475,11 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 	index_map_[VIMS_CHAIN_ENTRY_SET_EFFECT]			=	_new_event(
-				"%d %d %d",
+				"%d %d %d %d",
 				VIMS_CHAIN_ENTRY_SET_EFFECT,
 				"Add effect to chain entry with default values",
 				vj_event_chain_entry_set,
-				3,
+				4,
 				VIMS_REQUIRE_ALL_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
@@ -1487,13 +1487,15 @@ void		vj_init_vevo_events(void)
 				-1,
 				"Effect ID",
 				0,
+				"Effect enabled (1) or disabled (0)",
+				1,
 				NULL );
 	index_map_[VIMS_CHAIN_ENTRY_SET_PRESET]			=	_new_event(
-				"%d %d %d %s",
+				"%d %d %d %d %s",
 				VIMS_CHAIN_ENTRY_SET_PRESET,
 				"Preset effect on chain entry",
 				vj_event_chain_entry_preset,
-				4,
+				5,
 				VIMS_LONG_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
@@ -1501,6 +1503,8 @@ void		vj_init_vevo_events(void)
 				-1,
 				"Effect ID",
 				0,
+				"Effect enabled (1) or disabled (0)",
+				1,
 				"space separated value string",
 				NULL,
 				NULL );	

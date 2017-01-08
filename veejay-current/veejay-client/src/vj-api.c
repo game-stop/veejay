@@ -4193,6 +4193,14 @@ gboolean view_fx_selection_func (GtkTreeSelection *selection,
 	return TRUE; /* allow selection state to change */
 }
 
+static int effectlist_key_down = 0;
+
+gboolean on_effectlist_row_key_pressed (GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+{
+	effectlist_key_down = !(event->state & GDK_SHIFT_MASK );
+	return FALSE;
+}
+
 void on_effectlist_row_activated(GtkTreeView *treeview,
                                  GtkTreePath *path,
                                  GtkTreeViewColumn *col,
@@ -4207,20 +4215,21 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
 		gint gid =0;
 		gchar *name = NULL;
 		gtk_tree_model_get(model,&iter, FX_STRING, &name, -1);
-
 		if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 )
 		{
-			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
-				0, info->uc.selected_chain_entry,gid );
+			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
+				0, info->uc.selected_chain_entry,gid, !effectlist_key_down );
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 			char trip[100];
-			snprintf(trip,sizeof(trip), "%03d:%d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid );
+			snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid, effectlist_key_down );
 			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
 			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
 		g_free(name);
 	}
+
+	effectlist_key_down = 0;
 
 }
 
@@ -4330,6 +4339,8 @@ void setup_effectlist_info()
 		GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(trees[i]));
 		gtk_tree_selection_set_select_function(selection, view_fx_selection_func, NULL, NULL);
 		gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+
+		g_signal_connect( G_OBJECT(trees[i]), "key_press_event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
 	}
 }
 
