@@ -65,13 +65,14 @@ void vj_gui_theme_setup(int default_theme);
 
 int vj_img_cb(GdkPixbuf *img );
 void vj_fork_or_connect_veejay();
-
+void vj_event_list_free();
 gboolean gveejay_running();
+gboolean gveejay_relaunch();
 int gveejay_user_preview();
 void gveejay_preview(int p);
 int gveejay_restart();
 int gveejay_update();
 int gveejay_time_to_sync( void *ptr );
 int update_gveejay();
-
+void	reloaded_show_launcher();
 #endif

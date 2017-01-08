@@ -280,6 +280,8 @@ int main(int argc, char *argv[])
 		gveejay_preview(preview);
 	}
 
+restart_me:
+
 	if( launcher )
 	{
 		reloaded_launcher( hostname, port_num );
@@ -293,6 +295,15 @@ int main(int argc, char *argv[])
 			break;
 		while( gtk_events_pending()  )
 			gtk_main_iteration();
+	}
+
+	vj_event_list_free();
+
+	if( gveejay_relaunch() ) {
+		launcher = 1;
+		reloaded_restart();
+		reloaded_show_launcher();
+		goto restart_me;
 	}
 
 	veejay_msg(VEEJAY_MSG_INFO, "See you!");

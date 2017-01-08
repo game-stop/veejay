@@ -900,9 +900,14 @@ void		multitrack_close_track( void *data )
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[mt->selected]->toggle), FALSE );
 		gtk_image_clear( GTK_IMAGE(mt->view[mt->selected]->area ) );
 		mt->view[mt->selected]->status_lock = 0;
-
 	}
+}
 
+void		multitrack_disconnect(void *data)
+{
+	multitracker_t *mt = (multitracker_t*) data;
+	//release connection to veejay
+	gvr_track_disconnect( mt->preview, 0 );
 }
 
 int		multrack_audoadd( void *data, char *hostname, int port_num )

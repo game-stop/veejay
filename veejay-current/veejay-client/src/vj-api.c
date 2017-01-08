@@ -86,7 +86,7 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-
+#define RUP8(num)(((num)+8)&~8)
 #ifdef ARCH_X86_64
 static gpointer castIntToGpointer( int val )
 {
@@ -1556,7 +1556,7 @@ effect_constr* _effect_new( char *effect_line )
 			continue;
 
 		ec->hints[p] = (value_hint*) vj_calloc(sizeof(value_hint));
-		ec->hints[p]->description = (char**) vj_calloc(sizeof(char*) * (ec->max[p]+1) );
+		ec->hints[p]->description = (char**) vj_calloc(sizeof(char*) * (ec->max[p]+2) );
 		for(q = 0; q <= ec->max[p]; q ++ )
 		{
 			int value_hint = 0;
@@ -1580,6 +1580,23 @@ void _effect_free( effect_constr *effect )
 {
 	if(effect)
 	{
+		int p;
+		for( p = 0; p < effect->num_arg; p ++ ) {
+			free( effect->param_description[p] );
+		}
+		if( effect->hints ) {
+			for( p = 0; p < effect->num_arg; p ++ ) {
+				if( effect->hints[p] == NULL )
+					continue;
+				int q;
+				for( q = 0; effect->hints[p]->description[q] != NULL; q ++ ) {
+					free( effect->hints[p]->description[q] );
+				}
+				free( effect->hints[p]->description );
+				free( effect->hints[p] );
+			}
+		}
+
 		free(effect);
 	}
 }
@@ -2137,6 +2154,11 @@ gboolean gveejay_running()
 	return TRUE;
 }
 
+gboolean gveejay_relaunch()
+{
+	return (info->watch.state == STATE_QUIT ? FALSE: TRUE);
+}
+
 gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
 {
 	if(!running_g_)
@@ -2202,7 +2224,7 @@ void update_gui();
 int veejay_get_sample_image(int id, int type, int wid, int hei)
 {
 	multi_vims( VIMS_GET_SAMPLE_IMAGE, "%d %d %d %d", id, type, wid, hei );
-	uint8_t *data_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * wid * hei * 3);
+	uint8_t *data_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(wid * hei * 3));
 	int sample_id = 0;
 	int sample_type =0;
 	gint bw = 0;
@@ -2426,7 +2448,7 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1)
 	unsigned char *result = NULL;
 	if( ret <= 0 || len <= 0 || slen <= 0)
 		return (gchar*)result;
-	result = (unsigned char*) vj_calloc(sizeof(unsigned char) * (len + 1) );
+	result = (unsigned char*) vj_calloc(sizeof(unsigned char) * RUP8(len + 1 + 16) );
 	*bytes_written = vj_client_read( info->client, V_CMD, result, len );
 	if( *bytes_written == -1 )
 		reloaded_schedule_restart();
@@ -6307,6 +6329,11 @@ int veejay_update_multitrack( void *ptr )
 
 	if( s->status_list[s->master] == NULL ) {
 		info->watch.w_state = STATE_STOPPED;
+		free(s->status_list);
+		free(s->img_list );
+		free(s->widths);
+		free(s->heights);
+		free(s);
 		return 1;
 	}
 
@@ -7347,6 +7374,8 @@ void vj_gui_wipe()
 	{
 		veejay_memset(info->history_tokens[i],0, sizeof(int) * (STATUS_TOKENS+1));
 	}
+
+	reset_samplebank();
 }
 
 GtkWidget *new_bank_pad(GtkWidget *box)
@@ -7401,6 +7430,21 @@ void vj_gui_set_geom( int x, int y )
 {
 	geo_pos_[0] = x;
 	geo_pos_[1] = y;
+}
+
+void vj_event_list_free() 
+{
+	int i;
+	for( i = 0; i < VIMS_MAX; i ++ ) {
+		if( vj_event_list[i].format ) 
+			free(vj_event_list[i].format);
+		if( vj_event_list[i].descr )
+			free(vj_event_list[i].descr);
+		if( vj_event_list[i].args )
+			free(vj_event_list[i].args);
+	}
+
+	veejay_memset( vj_event_list, 0, sizeof(vj_event_list));
 }
 
 void vj_gui_init(char *glade_file,
@@ -7894,6 +7938,15 @@ void reloaded_launcher(char *hostname, int port_num)
 	update_spin_value( "button_portnum", port_num );
 }
 
+void	reloaded_show_launcher()
+{
+	info->watch.state = STATE_WAIT_FOR_USER;
+	info->launch_sensitive = TRUE;
+
+	GtkWidget *mw = glade_xml_get_widget_(info->main_window,"veejay_connection" );
+	gtk_widget_show(mw);
+}
+
 void reloaded_schedule_restart()
 {
 	info->watch.state = STATE_STOPPED;
@@ -7908,6 +7961,8 @@ void reloaded_restart()
 	gtk_widget_hide( mw );
 
 	vj_gui_wipe();
+
+	multitrack_disconnect(info->mt);
 /*
 	 //@ bring up the launcher window
 	gtk_widget_show( cd );
@@ -7946,6 +8001,7 @@ gboolean 	is_alive( int *do_sync )
 	{
 		if(info->client)
 			vj_gui_disconnect();
+		vj_gui_wipe();
 	//	reloaded_schedule_restart();
 		reloaded_restart();
 		*do_sync = 0;
@@ -8223,8 +8279,6 @@ void free_samplebank(void)
 	}
 	veejay_memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
 }
-
-#define RUP8(num)(((num)+8)&~8)
 
 void setup_samplebank(gint num_cols, gint num_rows, GtkWidget *pad, int *idx, int *idy)
 {
