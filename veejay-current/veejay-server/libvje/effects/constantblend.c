@@ -72,7 +72,7 @@ void constantblend_apply( VJFrame *frame, int type, int scale, int valY )
 
 	uint8_t *Y = frame->data[0];
 
-	for (i = 0; i < len; i++) // TODO Unroll for loop ?
+	for (i = 0; i < len; i++)
 	{
 		int tmp_val =(int)( ((float) *(Y)) * s);
 		*(Y)++ = blend_y( (uint8_t) ( (uint8_t) tmp_val ) , y ); 

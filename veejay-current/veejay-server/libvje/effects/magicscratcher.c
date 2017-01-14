@@ -131,7 +131,7 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse, int g
     }
 
     for (x = 0; x < len; x++) {
-		Y[x] = func_y( mframe[offset + x], Y[x]); // TODO Unrol loop len+=4 ...Duff's_device ?
+		Y[x] = func_y( mframe[offset + x], Y[x]);
     }
 
     if (grayscale)

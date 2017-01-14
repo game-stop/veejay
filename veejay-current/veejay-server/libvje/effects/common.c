@@ -493,103 +493,70 @@ pix_func_Y get_pix_func_Y(const int pix_type)
 	{
 		case VJ_EFFECT_BLEND_SWAP:
 			return &bl_pix_swap_Y;
-			break;
 		case VJ_EFFECT_BLEND_ADDDISTORT:
 			return &bl_pix_add_distorted_Y;
-			break;
 		case VJ_EFFECT_BLEND_SUBDISTORT:
 			return &bl_pix_sub_distorted_Y;
-			break;
 		case VJ_EFFECT_BLEND_MULTIPLY:
 			return &bl_pix_multiply_Y;
-			break;
 		case VJ_EFFECT_BLEND_DIVIDE:
 			return &bl_pix_divide_Y;
-			break;
 		case VJ_EFFECT_BLEND_ADDITIVE:
 			return &bl_pix_additive_Y;
-			break;
 		case VJ_EFFECT_BLEND_SUBSTRACTIVE:
 			return &bl_pix_substract_Y;
-			break;
 		case VJ_EFFECT_BLEND_SOFTBURN:
 			return &bl_pix_softburn_Y;
-			break;
 		case VJ_EFFECT_BLEND_INVERSEBURN:
 			return &bl_pix_inverseburn_Y;
-			break;
 		case VJ_EFFECT_BLEND_COLORDODGE:
 			return &bl_pix_colordodge_Y;
-			break;
 		case VJ_EFFECT_BLEND_MULSUB:
 			return &bl_pix_mulsub_Y;
-			break;
 		case VJ_EFFECT_BLEND_LIGHTEN:
 			return &bl_pix_lighten_Y;
-			break;
 		case VJ_EFFECT_BLEND_DIFFERENCE:
 			return &bl_pix_difference_Y;
-			break;
 		case VJ_EFFECT_BLEND_DIFFNEGATE:
 			return &bl_pix_diffnegate_Y;
-			break;
 		case VJ_EFFECT_BLEND_EXCLUSIVE:
 			return &bl_pix_exclusive_Y;
-			break;
 		case VJ_EFFECT_BLEND_BASECOLOR:
 			return &bl_pix_basecolor_Y;
-			break;
 		case VJ_EFFECT_BLEND_FREEZE:
 			return &bl_pix_freeze_Y;
-			break;
 		case VJ_EFFECT_BLEND_UNFREEZE:
 			return &bl_pix_unfreeze_Y;
-			break;
 		case VJ_EFFECT_BLEND_HARDLIGHT:
 			return &bl_pix_hardlight_Y;
-			break;
 		case VJ_EFFECT_BLEND_RELADD:
 			return &bl_pix_relativeadd_Y;
-			break;
 		case VJ_EFFECT_BLEND_RELSUB:
 			return &bl_pix_relativesub_Y;
-			break;
 		case VJ_EFFECT_BLEND_MAXSEL:
 			return &bl_pix_maxsel_Y;
-			break;
 		case VJ_EFFECT_BLEND_MINSEL:
 			return &bl_pix_minsel_Y;
-			break;
 		case VJ_EFFECT_BLEND_RELADDLUM:
 			return &bl_pix_relativeadd_Y;
-			break;
 		case VJ_EFFECT_BLEND_RELSUBLUM:
 			return &bl_pix_relativesub_Y;
-			break;
 		case VJ_EFFECT_BLEND_MINSUBSEL:
 			return &bl_pix_minsubsel_Y;
-			break;
 		case VJ_EFFECT_BLEND_MAXSUBSEL:
 			return &bl_pix_maxsubsel_Y;
-			break;
 		case VJ_EFFECT_BLEND_ADDSUBSEL:
 			return &bl_pix_addsubsel_Y;
-			break;
 		case VJ_EFFECT_BLEND_ADDAVG:
 			return &bl_pix_dblbneg_Y;
-			break;
 		case VJ_EFFECT_BLEND_ADDTEST2:
 			return &bl_pix_dblbneg_Y;
-			break;
 		case VJ_EFFECT_BLEND_ADDTEST3:
 			return &bl_pix_relneg_Y;
-			break;
 		case VJ_EFFECT_BLEND_ADDTEST4:
 			return &bl_pix_test3_Y;
-			break;
 		case VJ_EFFECT_BLEND_SUBSTRACTIVE2:
 			return &bl_pix_subtract_Y;  //Clamped
-			break;
     /*
        if(pix_type == VJ_EFFECT_BLEND_SELECTMIN) return &bl_pix_minsel_Y;
        if(pix_type == VJ_EFFECT_BLEND_SELECTMAX) return &bl_pix_maxsel_Y;   
@@ -599,9 +566,10 @@ pix_func_Y get_pix_func_Y(const int pix_type)
        if(pix_type == VJ_EFFECT_BLEND_SELECTFREEZE) return &bl_pix_selfreeze_Y;
        if(pix_type == VJ_EFFECT_BLEND_SELECTUNFREEZE) return &bl_pix_selunfreeze_Y;
      */
-		default:
-			return &bl_pix_noswap_Y;
 	}
+
+	return &bl_pix_noswap_Y;
+
 }
 
 /* function to blend chrominance pixel */
@@ -677,7 +645,7 @@ uint8_t bl_pix_softburn_Y(uint8_t y1, uint8_t y2)
     } else {
         if (b <= pixel_Y_lo_)
         {
-            b = 255;
+            b = pixel_Y_hi_;
         }
         new_Y = 0xff - (((0xff - a) >> 7) / b);
     }
@@ -689,7 +657,7 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (a < 16) {
+    if (a < pixel_Y_lo_) {
 	new_Y = pixel_Y_lo_;
     } else {
 	new_Y = 0xff - (((0xff - b) >> 8) / a);
@@ -710,10 +678,10 @@ uint8_t bl_pix_mulsub_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b;
     a = y1;
     b = (0xff - y2);
-    if( a < 16 )
-        a = 16;
-    if (b < 16)
-	b = 16;
+    if( a <  pixel_Y_lo_ )
+        a =  pixel_Y_lo_;
+    if (b <  pixel_Y_lo_)
+	b =  pixel_Y_lo_;
     return ( a / b );
 }
 
@@ -752,10 +720,10 @@ uint8_t bl_pix_basecolor_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, c, new_Y;
     a = y1;
     b = y2;
-    if (a < 16)
-	a = 16;
-    if (b < 16)
-	b = 16;
+    if (a < pixel_Y_lo_)
+	a = pixel_Y_lo_;
+    if (b < pixel_Y_lo_)
+	b = pixel_Y_lo_;
     c = a * b >> 7;
     new_Y = c + a * ((0xff - (((0xff - a) * (0xff - b)) >> 7) - c) >> 7);
     return new_Y;
@@ -766,8 +734,8 @@ uint8_t bl_pix_freeze_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (b < 16) {
-	new_Y = 16;
+    if (b < pixel_Y_lo_) {
+	new_Y = pixel_Y_lo_;
     } else {
 	new_Y = 0xff - ((0xff - a) * (0xff - a)) / b;
     }
@@ -779,7 +747,7 @@ uint8_t bl_pix_unfreeze_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (a < 16) {
+    if (a < pixel_Y_lo_) {
 	new_Y = pixel_Y_lo_;
     } else {
 	if(b > pixel_Y_hi_) b = pixel_Y_hi_;
@@ -892,10 +860,10 @@ uint8_t bl_pix_add_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (b < 16)
-	b = 16;
-    if (a < 16)
-	a = 16;
+    if (b < pixel_Y_lo_)
+	b = pixel_Y_lo_;
+    if (a < pixel_Y_lo_)
+	a = pixel_Y_lo_;
     if ((0xff - b) <= 0) {
 	new_Y = (a * a) >> 8;
     } else {
@@ -911,12 +879,12 @@ uint8_t bl_pix_relneg_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = 0xff - y2;
-    if (a < 16)
-	a = 16;
-    if (b < 16)
+    if (a < pixel_Y_lo_)
+	a = pixel_Y_lo_;
+    if (b < pixel_Y_lo_)
 	b = y1;
-    if (b < 16)
-	b = 16;
+    if (b < pixel_Y_lo_)
+	b = pixel_Y_lo_;
     new_Y = (a * a) / b;
     return new_Y;
 }
@@ -945,8 +913,8 @@ uint8_t bl_pix_selfreeze_Y(uint8_t y1, uint8_t y2)
     a = y1;
     b = y2;
     if (a > b) {
-	if (a < 16) {
-	    new_Y = 16;
+	if (a < pixel_Y_lo_) {
+	    new_Y = pixel_Y_lo_;
 	} else {
 	    new_Y = 0xff - ((0xff - b) * (0xff - b)) / a;
 	}
@@ -962,7 +930,7 @@ uint8_t bl_pix_selunfreeze_Y(uint8_t y1, uint8_t y2)
     a = y1;
     b = y2;
     if (a > b) {
-	if (b < 16) {
+	if (b < pixel_Y_lo_) {
 	    new_Y = pixel_Y_lo_;
 	} else {
 	    if( a > pixel_Y_hi_ ) a = pixel_Y_hi_;
@@ -1055,10 +1023,10 @@ uint8_t bl_pix_test3_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (b < 16)
-	b = 16;
-    if (a < 16)
-	a = 16;
+    if (b < pixel_Y_lo_)
+	b = pixel_Y_lo_;
+    if (a < pixel_Y_lo_)
+	a = pixel_Y_lo_;
     new_Y = (a >> 1) + (b >> 1);
     return new_Y;
 }
