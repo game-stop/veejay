@@ -5259,8 +5259,11 @@ void vj_event_chain_entry_set_defaults(void *ptr, const char format[], va_list a
 void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	int args[4];
+	int args[MAX_ARGUMENTS];
 	char *str = NULL;
+
+	veejay_memset( args,0,sizeof(args));
+
 	P_A(args,str,format,ap);
 
 	if(SAMPLE_PLAYING(v)) 
