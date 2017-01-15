@@ -8004,8 +8004,9 @@ gboolean 	is_alive( int *do_sync )
 		vj_gui_wipe();
 	//	reloaded_schedule_restart();
 		reloaded_restart();
-		*do_sync = 0;
-		if( 	info->launch_sensitive == 0 ) {
+	//	*do_sync = 0;
+		gui->watch.state = STATE_WAIT_FOR_USER; 
+		if( info->launch_sensitive == 0 ) {
 			return FALSE;
 		}
 
@@ -8055,6 +8056,7 @@ gboolean 	is_alive( int *do_sync )
 	if( gui->watch.state == STATE_WAIT_FOR_USER )
 	{
 		*do_sync = 0;
+		gveejay_sleep(NULL);
 	}
 
 	return TRUE;

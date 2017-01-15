@@ -195,10 +195,7 @@ gboolean gveejay_idle(gpointer data)
 			{
 				veejay_update_multitrack( get_ui_info() );
 			}
-		} else
-		{
-		//	gveejay_sleep( get_ui_info() );
-		}
+		} 
 
 		update_gveejay();
 
