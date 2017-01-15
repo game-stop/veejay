@@ -28,6 +28,7 @@
 #include "common.h"
 #include <libvjmem/vjmem.h>
 #include "constantblend.h"
+#include <libvje/internal.h>
 
 vj_effect *constantblend_init(int w, int h)
 {
@@ -38,12 +39,12 @@ vj_effect *constantblend_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 32;
+    ve->limits[1][0] = VJ_EFFECT_BLEND_COUNT;
     ve->limits[0][1] = 1;  // scale from 0.0 to 5.0 (only luma)
     ve->limits[1][1] = 500;
     ve->limits[0][2] = pixel_Y_lo_;
     ve->limits[1][2] = pixel_Y_hi_;
-    ve->defaults[0] = 1;   // blend type (additive)
+    ve->defaults[0] = 0;   // blend type (additive)
     ve->defaults[1] = 110; // scale before blend
     ve->defaults[2] = 16;  // constant Y
     ve->description = "Constant Luminance Blend";
@@ -55,13 +56,7 @@ vj_effect *constantblend_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",
-		"Difference","Difference Negate","Exclusive","Base","Freeze",
-		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",
-		"Relative Luma Add", "Relative Luma Subtract", "Min Subselect", "Max Subselect",
-		"Add Subselect", "Add Average", "Experimental 1","Experimental 2", "Experimental 3",
-		"Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add", "Distorted Subtract", "Experimental 4", "Negation Divide");
+	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, VJ_EFFECT_BLEND_STRINGS);
 
     return ve;
 }

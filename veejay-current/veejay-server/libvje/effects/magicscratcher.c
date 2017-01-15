@@ -31,33 +31,37 @@ static int m_rerun = 0;
 vj_effect *magicscratcher_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
+    ve->num_params = 4;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 9;
+    ve->limits[1][0] = VJ_EFFECT_BLEND_COUNT;
     ve->limits[0][1] = 1;
     ve->limits[1][1] = MAX_SCRATCH_FRAMES - 1;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 1;
     ve->defaults[0] = 1;
     ve->defaults[1] = 7;
     ve->defaults[2] = 1;
+    ve->defaults[3] = 1;
     ve->description = "Magic Overlay Scratcher";
     ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Scratch frames", "PingPong");
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Scratch frames", "PingPong", "Grayscale");
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Additive", "Multiply", "Experimental IV", "Luma Subtract", "Luma Additive",
-		"Difference", "Basecolor", "Exclusive", "Difference Negate", "None" );
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, VJ_EFFECT_BLEND_STRINGS);
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2,
 	                          "Enabled", "Disabled");
+
+	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3,
+	                          "Colorful", "Grayscale");
 
     return ve;
 }
@@ -103,7 +107,7 @@ static void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
 }
 
 
-void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
+void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse, int grayscale)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
@@ -117,50 +121,7 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
        16 voor default ?, 17 (!),18,19, 20(!), 21, 24,,25,30 */
     int offset = len * m_frame;
 
-    pix_func_Y func_y;
-
-    switch (mode) {
-	//case 0: mode = 5; break;
-    case 0:
-		mode = VJ_EFFECT_BLEND_ADDTEST2;
-		break;
-    case 1:
-		mode = VJ_EFFECT_BLEND_MULSUB;
-		break;
-	//case 3: mode = 30; break;
-    case 2:
-		mode = VJ_EFFECT_BLEND_RELSUBLUM;
-		break;
-    case 3:
-		mode = VJ_EFFECT_BLEND_ADDTEST4;
-		break;
-	//case 5: mode = 21; break;
-	//case 6: mode = 20; break;
-	//case 7: mode = 19; break;
-	//case 8: mode = 18; break;
-    case 4:
-		mode = VJ_EFFECT_BLEND_RELADDLUM;
-		break;
-	//case 11: mode = 14; break;
-	//case 12: mode = 12; break;
-	//case 13: mode = 11; break;
-    case 5:
-		mode = VJ_EFFECT_BLEND_DIFFERENCE;
-		break;
-    case 6:
-		mode = VJ_EFFECT_BLEND_BASECOLOR;
-		break;
-    case 7:
-		mode = VJ_EFFECT_BLEND_EXCLUSIVE;
-		break;
-    case 8:
-		mode = VJ_EFFECT_BLEND_DIFFNEGATE;
-		break;
-    default:
-		mode = -1; // None
-	}
-
-    func_y = get_pix_func_Y((const int) mode);
+    pix_func_Y func_y = get_pix_func_Y((const int) mode);
 
     if (m_frame == 0) {
   	  veejay_memcpy(mframe + (len * m_frame), Y, len);
@@ -172,9 +133,12 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse)
     for (x = 0; x < len; x++) {
 		Y[x] = func_y( mframe[offset + x], Y[x]);
     }
-    
-    veejay_memset( Cb, 128, (frame->ssm ? len : frame->uv_len));
-    veejay_memset( Cr, 128, (frame->ssm ? len : frame->uv_len));
+
+    if (grayscale)
+    {
+        veejay_memset( Cb, 128, (frame->ssm ? len : frame->uv_len));
+        veejay_memset( Cr, 128, (frame->ssm ? len : frame->uv_len));
+    }
 
     m_rerun = m_frame;
 

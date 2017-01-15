@@ -432,7 +432,9 @@ enum {
 
 #define	VJ_EXT_EFFECT	500
 
-/* luma blend types */
+/* luma blend types
+   Important : don't forget to had conresponding string in VJ_EFFECT_BLEND_STRINGS
+*/
 enum {
 	VJ_EFFECT_BLEND_ADDITIVE = 0,
 	VJ_EFFECT_BLEND_SUBSTRACTIVE = 1,
@@ -470,7 +472,19 @@ enum {
 	VJ_EFFECT_BLEND_ADDLUM = 33, 
 	VJ_EFFECT_BLEND_ADDTEST6 = 34,
 	VJ_EFFECT_BLEND_ADDTEST7 = 35,
+	VJ_EFFECT_BLEND_SUBSTRACTIVE2 = 36,
+	VJ_EFFECT_BLEND_SWAP = 37,
+	VJ_EFFECT_BLEND_COUNT = VJ_EFFECT_BLEND_SWAP,
 };
+
+#define VJ_EFFECT_BLEND_STRINGS 	"Additive", "Subtractive","Multiply","Divide","Lighten","Hardlight",	\
+		"Difference","Difference Negate","Exclusive","Base","Freeze",										\
+		"Unfreeze","Relative Add","Relative Subtract","Max select", "Min select",							\
+		"Relative Luma Add", "Relative Luma Subtract", "Min Subselect", "Max Subselect",					\
+		"Add Subselect", "Add Average", "Experimental 1","Experimental 2", "Experimental 3",				\
+		"Multisub", "Softburn", "Inverse Burn", "Dodge", "Distorted Add",									\
+		"Distorted Subtract", "Experimental 4", "Negation Divide", "Additive Luma",							\
+		"Experimental Add6", "Experimental Add7", "Subtractive Clamped", "Swap"
 
 #define VJ_NUM_BLEND_EFFECTS VJ_EFFECT_BLEND_ADDTEST7
 
