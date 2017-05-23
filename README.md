@@ -1,9 +1,4 @@
-
-Have a moment ? Sign the TTIP Referendum
-
-https://ttip-referendum.nl/
-
- 
+![Veejay banner](http://veejayhq.github.io/img/header.png)
 
 ##Veejay is a Visual Instrument
 
