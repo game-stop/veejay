@@ -9,18 +9,26 @@ In this directory:
  examples/
 	perl scripts that generate the files in vims/ are found here
 
+ keyboard/
+	veejay simple keyboard layout
+
  livecinema/
-	action-file.xml  	;example action file for veejay , run with -l or --action-file 
-	     
+	action-file.xml  	;example action file for veejay , run with -l or --action-file
+
+ videowall/
+	split screen configuration shell example.
+
  vims/
 	the files in this directory can be send to veejay, it demonstrates series of effect chains.
 
-	sendVIMS -f montevideo-auto.txt
+ $ sayVIMS -f montevideo-auto.txt
 
 
  Example to produce a vims file and to send it to veejay:
 
  $ perl examples/swirl.nl > vims/swirl.vims
 
- $ sendVIMS -f vims/swirl.vims
+ $ sayVIMS -f vims/swirl.vims
  
+ youtube/
+	simple bash script that encodes a youtube video to mjpeg avi file with audio for use in veejay
