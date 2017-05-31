@@ -122,10 +122,11 @@ static struct
 	const char *text;
 } tooltips[] =
 {
-	{"Mouse left: Set in point, Mouse right: Set out point, Double click: Clear selected, Mouse middle: Drag selection"},
-	{"Mouse left/right: Play slot, Shift + Mouse left: Put sample in slot. You can also put selected samples."},
-	{"Mouse left click: Select slot (sample in slot), Mouse double click: Play sample in slot, Mouse left + SHIFT: Set slot as mixing current mixing channel"},
+	{"Mouse left: Set in point,\nMouse right: Set out point,\nDouble click: Clear selected,\nMouse middle: Drag selection"},
+	{"Mouse left/right: Play slot,\nShift + Mouse left: Put sample in slot.\nYou can also put selected samples."},
+	{"Mouse left click: Select slot (sample in slot),\nMouse double click: Play sample in slot,\nShift + Mouse left: Set slot as mixing current mixing channel"},
 	{"Select a SRT sequence to edit"},
+	{"Double click: add effect to chain list,\nShift + Double click: add disabled effect to chain list"},
 	{NULL},
 };
 
@@ -134,7 +135,8 @@ enum
 	TOOLTIP_TIMELINE = 0,
 	TOOLTIP_QUICKSELECT = 1,
 	TOOLTIP_SAMPLESLOT = 2,
-	TOOLTIP_SRTSELECT = 3
+	TOOLTIP_SRTSELECT = 3,
+	TOOLTIP_FXSELECT = 4
 };
 
 #define FX_PARAMETER_DEFAULT_NAME "<none>"
@@ -3888,7 +3890,6 @@ static void setup_effectchain_info( void )
 	setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
 	GtkTreeSelection *selection;
 
-	tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
 	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 	gtk_tree_selection_set_select_function(selection, view_entry_selection_func, NULL, NULL);
@@ -4328,6 +4329,10 @@ void setup_effectlist_info()
 	trees[0] = glade_xml_get_widget_( info->main_window, "tree_effectlist");
 	trees[1] = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
 	trees[2] = glade_xml_get_widget_( info->main_window, "tree_alphalist" );
+
+	set_tooltip_by_widget (trees[0], tooltips[TOOLTIP_FXSELECT].text);
+	set_tooltip_by_widget (trees[1], tooltips[TOOLTIP_FXSELECT].text);
+	set_tooltip_by_widget (trees[2], tooltips[TOOLTIP_FXSELECT].text);
 
 	GtkListStore *stores[3];
 
