@@ -3398,6 +3398,30 @@ void	on_image_effects_toggled(GtkWidget *w, gpointer user_data)
 		 gtk_notebook_set_page(GTK_NOTEBOOK(n),1);
 }
 
+void	on_filter_effects_activate(GtkWidget *widget, gpointer user_data)
+{
+}
+
+void	on_filter_effects_changed( GtkWidget *w, EffectListData *user_data)
+{
+	gchar* fx_txt = get_text("filter_effects");
+	int filterlen = strlen(fx_txt);
+
+	if(filterlen) {
+		vj_msg(VEEJAY_MSG_INFO, "filtering effects '%s'", fx_txt);
+		user_data->filter_string = vj_calloc(sizeof(gchar)*filterlen);  // FIXME mem LEAK
+		strcpy(user_data->filter_string, fx_txt);
+		gtk_tree_model_filter_refilter (user_data->effect_list_stores[0].effect_list_filtered);
+		gtk_tree_model_filter_refilter (user_data->effect_list_stores[1].effect_list_filtered);
+		gtk_tree_model_filter_refilter (user_data->effect_list_stores[2].effect_list_filtered);
+
+		free(user_data->filter_string);
+		user_data->filter_string = NULL;
+	} else {
+		vj_msg(VEEJAY_MSG_INFO, "");
+	}
+}
+
 void	on_console1_activate(GtkWidget *w, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );

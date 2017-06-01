@@ -4216,11 +4216,13 @@ gboolean view_fx_selection_func (GtkTreeSelection *selection,
 	return TRUE; /* allow selection state to change */
 }
 
-static int effectlist_key_down = 0;
+static int effectlist_key_down_shift = 0;  //MASK!
+static int effectlist_key_down_ctrl = 0;
 
 gboolean on_effectlist_row_key_pressed (GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-	effectlist_key_down = !(event->state & GDK_SHIFT_MASK );
+	effectlist_key_down_shift = !(event->state & GDK_SHIFT_MASK );
+	//effectlist_key_down_ctrl = !(event->state & GDK_CONTROL_MASK );
 	return FALSE;
 }
 
@@ -4241,10 +4243,10 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
 		if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 )
 		{
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
-				0, info->uc.selected_chain_entry,gid, !effectlist_key_down );
+				0, info->uc.selected_chain_entry,gid, !effectlist_key_down_shift );
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 			char trip[100];
-			snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid, effectlist_key_down );
+			snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid, effectlist_key_down_shift );
 			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
 			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 			info->uc.reload_hint[HINT_CHAIN] = 1;
@@ -4252,8 +4254,8 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
 		g_free(name);
 	}
 
-	effectlist_key_down = 0;
-
+	effectlist_key_down_shift = 0;
+	effectlist_key_down_ctrl = 0;
 }
 
 gint sort_iter_compare_func( GtkTreeModel *model,
@@ -4321,6 +4323,27 @@ gint sort_vims_func(GtkTreeModel *model,
 	return ret;
 }
 
+EffectListData effectlistdata;
+
+static gboolean effect_row_visible (GtkTreeModel *model, GtkTreeIter *iter, gpointer user_data)
+{
+	EffectListData *fxlistdata = (EffectListData*) user_data;
+	gboolean value=TRUE;
+	if(fxlistdata != NULL && fxlistdata->filter_string != NULL) {
+		if(strlen(fxlistdata->filter_string)) {
+			value=FALSE;
+			gchar *idstr = NULL;
+			gtk_tree_model_get(model, iter, SL_ID, &idstr, -1);
+			if((idstr != NULL) && strcasestr(idstr, fxlistdata->filter_string) != NULL) {
+				value = TRUE;
+			}
+
+			g_free (idstr);
+		}
+	}
+    return value;
+}
+
 // load effectlist from veejay
 void setup_effectlist_info()
 {
@@ -4334,26 +4357,30 @@ void setup_effectlist_info()
 	set_tooltip_by_widget (trees[1], tooltips[TOOLTIP_FXSELECT].text);
 	set_tooltip_by_widget (trees[2], tooltips[TOOLTIP_FXSELECT].text);
 
-	GtkListStore *stores[3];
-
 	fx_list_ = (vevo_port_t*) vpn( 200 );
 
 	for(i = 0; i < 3; i ++ )
 	{
-		stores[i] = gtk_list_store_new( 1, G_TYPE_STRING );
+		effectlistdata.effect_list_stores[i].effect_list = gtk_list_store_new( 1, G_TYPE_STRING );
 
-		GtkTreeSortable *sortable = GTK_TREE_SORTABLE(stores[i]);
+		effectlistdata.effect_list_stores[i].effect_list_filtered = GTK_TREE_MODEL_FILTER (gtk_tree_model_filter_new (GTK_TREE_MODEL (effectlistdata.effect_list_stores[i].effect_list), NULL));
+		effectlistdata.effect_list_stores[i].effect_list_sorted = GTK_TREE_MODEL_SORT (gtk_tree_model_sort_new_with_model (GTK_TREE_MODEL (effectlistdata.effect_list_stores[i].effect_list_filtered)));
+
+		effectlistdata.filter_string = NULL;
+		gtk_tree_model_filter_set_visible_func (effectlistdata.effect_list_stores[i].effect_list_filtered,
+                                        effect_row_visible,
+                                        &effectlistdata, NULL);
+
+		GtkTreeSortable *sortable = GTK_TREE_SORTABLE(effectlistdata.effect_list_stores[i].effect_list);
 		gtk_tree_sortable_set_sort_func(
 			sortable, FX_STRING, sort_iter_compare_func,
 				GINT_TO_POINTER(FX_STRING),NULL);
 
-		gtk_tree_sortable_set_sort_column_id(
-		                                     sortable, FX_STRING, GTK_SORT_ASCENDING);
-
+		gtk_tree_sortable_set_sort_column_id(sortable, FX_STRING, GTK_SORT_ASCENDING);
 		gtk_tree_view_set_headers_visible( GTK_TREE_VIEW(trees[i]), FALSE );
 
-		gtk_tree_view_set_model( GTK_TREE_VIEW(trees[i]), GTK_TREE_MODEL(stores[i]));
-		g_object_unref( G_OBJECT( stores[i] ));
+		gtk_tree_view_set_model( GTK_TREE_VIEW(trees[i]),GTK_TREE_MODEL( effectlistdata.effect_list_stores[i].effect_list_sorted));
+		g_object_unref( G_OBJECT( effectlistdata.effect_list_stores[i].effect_list ));
 	}
 
 	setup_tree_text_column( "tree_effectlist", FX_STRING, "Effect",0 );
@@ -4369,6 +4396,9 @@ void setup_effectlist_info()
 
 		g_signal_connect( G_OBJECT(trees[i]), "key_press_event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
 	}
+
+	g_signal_connect(  G_OBJECT(glade_xml_get_widget_( info->main_window, "filter_effects")), "changed", G_CALLBACK( on_filter_effects_changed ), &effectlistdata );
+
 }
 
 
@@ -4608,14 +4638,9 @@ void load_effectlist_info()
 	reset_tree( "tree_effectmixlist" );
 	reset_tree( "tree_alphalist" );
 
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
-	store = GTK_LIST_STORE(model);
-
-	GtkTreeModel *model2 = gtk_tree_view_get_model( GTK_TREE_VIEW(tree2));
-	store2 = GTK_LIST_STORE(model2);
-
-	GtkTreeModel *model3 = gtk_tree_view_get_model( GTK_TREE_VIEW(tree3));
-	store3 = GTK_LIST_STORE(model3);
+	store = effectlistdata.effect_list_stores[0].effect_list;
+	store2 = effectlistdata.effect_list_stores[1].effect_list;
+	store3 = effectlistdata.effect_list_stores[2].effect_list;
 
 	while( offset < fxlen )
 	{
@@ -4678,9 +4703,9 @@ void load_effectlist_info()
 		g_free(name);
 	}
 
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(store2));
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(store3));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(effectlistdata.effect_list_stores[0].effect_list_sorted));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(effectlistdata.effect_list_stores[1].effect_list_sorted));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(effectlistdata.effect_list_stores[2].effect_list_sorted));// GTK_TREE_MODEL(store3));
 	free(fxtext);
 }
 
