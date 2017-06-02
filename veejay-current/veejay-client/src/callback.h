@@ -21,36 +21,6 @@
 #define VJCALLBACK_H
 
 
-typedef struct
-{
-    GtkListStore       *effect_list;
-    GtkTreeModelSort   *effect_list_sorted;
-    GtkTreeModelFilter *effect_list_filtered;
-} EffectListStore;
-
-typedef struct
-{
-	EffectListStore effect_list_stores[3];
-	gchar              *filter_string;
-} EffectListData;
-
-
-/*
-struct _PhotosPreviewModel
-{
-  GtkTreeModelFilter parent_instance;
-  PhotosBaseManager *item_mngr;
-};
-
-struct _PhotosPreviewModelClass
-{
-  GtkTreeModelFilterClass parent_class;
-};
-
-
-G_DEFINE_TYPE (PhotosPreviewModel, photos_preview_model, GTK_TYPE_TREE_MODEL_FILTER);*/
-
-
 #define	SLIDER_CHANGED( arg_num, value ) \
 {\
 if(!info->status_lock && !info->parameter_lock)\

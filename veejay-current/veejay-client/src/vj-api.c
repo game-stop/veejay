@@ -127,6 +127,7 @@ static struct
 	{"Mouse left click: Select slot (sample in slot),\nMouse double click: Play sample in slot,\nShift + Mouse left: Set slot as mixing current mixing channel"},
 	{"Select a SRT sequence to edit"},
 	{"Double click: add effect to chain list,\nShift + Double click: add disabled effect to chain list"},
+	{"Filter the effects list by any string"},
 	{NULL},
 };
 
@@ -136,7 +137,8 @@ enum
 	TOOLTIP_QUICKSELECT = 1,
 	TOOLTIP_SAMPLESLOT = 2,
 	TOOLTIP_SRTSELECT = 3,
-	TOOLTIP_FXSELECT = 4
+	TOOLTIP_FXSELECT = 4,
+	TOOLTIP_FXFILTER = 5
 };
 
 #define FX_PARAMETER_DEFAULT_NAME "<none>"
@@ -553,6 +555,19 @@ typedef struct
 {
 	const char *text;
 } widget_name_t;
+
+typedef struct
+{
+    GtkListStore       *list;
+    GtkTreeModelSort   *sorted;
+    GtkTreeModelFilter *filtered;
+} effectlist_models;
+
+typedef struct
+{
+	effectlist_models  stores[3];
+	gchar              *filter_string;
+} effectlist_data;
 
 static widget_name_t *slider_names_ = NULL;
 static widget_name_t *param_names_ = NULL;
@@ -4216,13 +4231,13 @@ gboolean view_fx_selection_func (GtkTreeSelection *selection,
 	return TRUE; /* allow selection state to change */
 }
 
-static int effectlist_key_down_shift = 0;  //MASK!
+static int effectlist_key_down_shift = 0;  //TODO BitMASK!
 static int effectlist_key_down_ctrl = 0;
 
 gboolean on_effectlist_row_key_pressed (GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-	effectlist_key_down_shift = !(event->state & GDK_SHIFT_MASK );
-	//effectlist_key_down_ctrl = !(event->state & GDK_CONTROL_MASK );
+	effectlist_key_down_shift = (event->type & GDK_KEY_PRESS) && !(event->state & GDK_SHIFT_MASK ); // add effect to current sample (green)
+	//effectlist_key_down_ctrl = !(event->state & GDK_CONTROL_MASK ); //TODO add effect to selected sample (blue)
 	return FALSE;
 }
 
@@ -4323,11 +4338,14 @@ gint sort_vims_func(GtkTreeModel *model,
 	return ret;
 }
 
-EffectListData effectlistdata;
+
+effectlist_data fxlist_data;
+
+//EffectListData* get_effectlistdata
 
 static gboolean effect_row_visible (GtkTreeModel *model, GtkTreeIter *iter, gpointer user_data)
 {
-	EffectListData *fxlistdata = (EffectListData*) user_data;
+	effectlist_data *fxlistdata = (effectlist_data*) user_data;
 	gboolean value=TRUE;
 	if(fxlistdata != NULL && fxlistdata->filter_string != NULL) {
 		if(strlen(fxlistdata->filter_string)) {
@@ -4337,7 +4355,6 @@ static gboolean effect_row_visible (GtkTreeModel *model, GtkTreeIter *iter, gpoi
 			if((idstr != NULL) && strcasestr(idstr, fxlistdata->filter_string) != NULL) {
 				value = TRUE;
 			}
-
 			g_free (idstr);
 		}
 	}
@@ -4361,26 +4378,26 @@ void setup_effectlist_info()
 
 	for(i = 0; i < 3; i ++ )
 	{
-		effectlistdata.effect_list_stores[i].effect_list = gtk_list_store_new( 1, G_TYPE_STRING );
+		fxlist_data.stores[i].list = gtk_list_store_new( 1, G_TYPE_STRING );
 
-		effectlistdata.effect_list_stores[i].effect_list_filtered = GTK_TREE_MODEL_FILTER (gtk_tree_model_filter_new (GTK_TREE_MODEL (effectlistdata.effect_list_stores[i].effect_list), NULL));
-		effectlistdata.effect_list_stores[i].effect_list_sorted = GTK_TREE_MODEL_SORT (gtk_tree_model_sort_new_with_model (GTK_TREE_MODEL (effectlistdata.effect_list_stores[i].effect_list_filtered)));
+		fxlist_data.stores[i].filtered = GTK_TREE_MODEL_FILTER (gtk_tree_model_filter_new (GTK_TREE_MODEL (fxlist_data.stores[i].list), NULL));
+		fxlist_data.stores[i].sorted = GTK_TREE_MODEL_SORT (gtk_tree_model_sort_new_with_model (GTK_TREE_MODEL (fxlist_data.stores[i].filtered)));
 
-		effectlistdata.filter_string = NULL;
-		gtk_tree_model_filter_set_visible_func (effectlistdata.effect_list_stores[i].effect_list_filtered,
-                                        effect_row_visible,
-                                        &effectlistdata, NULL);
+		fxlist_data.filter_string = NULL;
+		gtk_tree_model_filter_set_visible_func (fxlist_data.stores[i].filtered,
+		                                        effect_row_visible,
+		                                        &fxlist_data, NULL);
 
-		GtkTreeSortable *sortable = GTK_TREE_SORTABLE(effectlistdata.effect_list_stores[i].effect_list);
-		gtk_tree_sortable_set_sort_func(
-			sortable, FX_STRING, sort_iter_compare_func,
-				GINT_TO_POINTER(FX_STRING),NULL);
+		GtkTreeSortable *sortable = GTK_TREE_SORTABLE(fxlist_data.stores[i].list);
+		gtk_tree_sortable_set_sort_func(sortable, FX_STRING,
+		                                sort_iter_compare_func,
+		                                GINT_TO_POINTER(FX_STRING),NULL);
 
 		gtk_tree_sortable_set_sort_column_id(sortable, FX_STRING, GTK_SORT_ASCENDING);
 		gtk_tree_view_set_headers_visible( GTK_TREE_VIEW(trees[i]), FALSE );
 
-		gtk_tree_view_set_model( GTK_TREE_VIEW(trees[i]),GTK_TREE_MODEL( effectlistdata.effect_list_stores[i].effect_list_sorted));
-		g_object_unref( G_OBJECT( effectlistdata.effect_list_stores[i].effect_list ));
+		gtk_tree_view_set_model( GTK_TREE_VIEW(trees[i]),GTK_TREE_MODEL( fxlist_data.stores[i].sorted));
+		g_object_unref( G_OBJECT( fxlist_data.stores[i].list ));
 	}
 
 	setup_tree_text_column( "tree_effectlist", FX_STRING, "Effect",0 );
@@ -4397,7 +4414,12 @@ void setup_effectlist_info()
 		g_signal_connect( G_OBJECT(trees[i]), "key_press_event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
 	}
 
-	g_signal_connect(  G_OBJECT(glade_xml_get_widget_( info->main_window, "filter_effects")), "changed", G_CALLBACK( on_filter_effects_changed ), &effectlistdata );
+	GtkWidget *entry_filterfx = glade_xml_get_widget_( info->main_window, "filter_effects");
+	set_tooltip_by_widget (entry_filterfx, tooltips[TOOLTIP_FXFILTER].text);
+	g_signal_connect(G_OBJECT(entry_filterfx),
+	                 "changed",
+	                 G_CALLBACK( on_filter_effects_changed ),
+	                 &fxlist_data );
 
 }
 
@@ -4638,9 +4660,9 @@ void load_effectlist_info()
 	reset_tree( "tree_effectmixlist" );
 	reset_tree( "tree_alphalist" );
 
-	store = effectlistdata.effect_list_stores[0].effect_list;
-	store2 = effectlistdata.effect_list_stores[1].effect_list;
-	store3 = effectlistdata.effect_list_stores[2].effect_list;
+	store = fxlist_data.stores[0].list;
+	store2 = fxlist_data.stores[1].list;
+	store3 = fxlist_data.stores[2].list;
 
 	while( offset < fxlen )
 	{
@@ -4703,9 +4725,9 @@ void load_effectlist_info()
 		g_free(name);
 	}
 
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(effectlistdata.effect_list_stores[0].effect_list_sorted));
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(effectlistdata.effect_list_stores[1].effect_list_sorted));
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(effectlistdata.effect_list_stores[2].effect_list_sorted));// GTK_TREE_MODEL(store3));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(fxlist_data.stores[0].sorted));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(fxlist_data.stores[1].sorted));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(fxlist_data.stores[2].sorted));
 	free(fxtext);
 }
 
