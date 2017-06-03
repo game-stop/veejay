@@ -1,5 +1,4 @@
-
-Video files ¶
+## Video files
 
 A video file consists out of TWO seperate elements:
 
