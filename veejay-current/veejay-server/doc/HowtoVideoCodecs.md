@@ -1,5 +1,5 @@
-## Video files
-### A video file consists out of TWO seperate elements
+## Video files
+### A video file consist out of two SEPARATE elements
 * container
 * codec 
 
@@ -61,9 +61,12 @@ Optionally add PCM 16bit audio, 44.1/48.0 Khz, 2 channels, 8 bits per channel
 consult mplayer documentation about other options, such as cropping and filtering out blocks in video.
 
 ### a quick hint for bulk encoding a bunch of capture.dv files
-`$ for i in `ls *dv`;do mencoder -ovc lavc -oac pcm -lavcopts vcodec=mjpeg -o `echo $i | sed s/.dv/.avi/` $i; done;`
+̀```$ for i in `ls *dv`;do mencoder -ovc lavc -oac pcm -lavcopts vcodec=mjpeg -o `echo $i | sed s/.dv/.avi/` $i; done;```
 
-## What is this dummy mode
+
+
+## What is Dummy mode ?
+
 Dummy mode opens up a 'color stream' to start veejay without a video file.
 
 If you use a video file, veejay will take that file's properties as default settings for the whole session.
