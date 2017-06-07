@@ -126,7 +126,7 @@ static struct
 	{"Mouse left/right: Play slot,\nShift + Mouse left: Put sample in slot.\nYou can also put selected samples."},
 	{"Mouse left click: Select slot (sample in slot),\nMouse double click: Play sample in slot,\nShift + Mouse left: Set slot as mixing current mixing channel"},
 	{"Select a SRT sequence to edit"},
-	{"Double click: add effect to chain list,\nShift + Double click: add disabled effect to chain list"},
+	{"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample"},
 	{"Filter the effects list by any string"},
 	{NULL},
 };
@@ -4231,13 +4231,37 @@ gboolean view_fx_selection_func (GtkTreeSelection *selection,
 	return TRUE; /* allow selection state to change */
 }
 
-static int effectlist_key_down_shift = 0;  //TODO BitMASK!
-static int effectlist_key_down_ctrl = 0;
+static guint effectlist_add_mask = 0;
+static const guint FXLIST_ADD_DISABLED = 1 << 1;
+static const guint FXLIST_ADD_TO_SELECTED = 1 << 2;
 
 gboolean on_effectlist_row_key_pressed (GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-	effectlist_key_down_shift = (event->type & GDK_KEY_PRESS) && !(event->state & GDK_SHIFT_MASK ); // add effect to current sample (green)
-	//effectlist_key_down_ctrl = !(event->state & GDK_CONTROL_MASK ); //TODO add effect to selected sample (blue)
+	if(event->type & GDK_KEY_PRESS){
+		switch(event->keyval){
+			case GDK_KEY_Shift_L:
+				effectlist_add_mask |= FXLIST_ADD_DISABLED;
+				break;
+			case GDK_KEY_Control_L:
+				effectlist_add_mask |= FXLIST_ADD_TO_SELECTED;
+				break;
+		}
+	}
+	return FALSE;
+}
+
+gboolean on_effectlist_row_key_released (GtkWidget *widget, GdkEventKey  *event, gpointer   user_data)
+{
+	if(event->type & GDK_KEY_RELEASE){
+		switch(event->keyval){
+			case GDK_KEY_Shift_L:
+				effectlist_add_mask &= !(FXLIST_ADD_DISABLED);
+				break;
+			case GDK_KEY_Control_L:
+				effectlist_add_mask &= !(FXLIST_ADD_TO_SELECTED);
+				break;
+		}
+	}
 	return FALSE;
 }
 
@@ -4250,27 +4274,25 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
 	GtkTreeIter iter;
 	model = gtk_tree_view_get_model(treeview);
 
-	if(gtk_tree_model_get_iter(model,&iter,path))
-	{
+	if(gtk_tree_model_get_iter(model,&iter,path)) {
 		gint gid =0;
 		gchar *name = NULL;
 		gtk_tree_model_get(model,&iter, FX_STRING, &name, -1);
-		if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 )
-		{
+		if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 ) {
+			guint slot = 0;
+			if((effectlist_add_mask & FXLIST_ADD_TO_SELECTED) && info->selection_slot)
+				slot = info->selection_slot->sample_id;
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
-				0, info->uc.selected_chain_entry,gid, !effectlist_key_down_shift );
+				slot, info->uc.selected_chain_entry,gid, !(effectlist_add_mask & FXLIST_ADD_DISABLED) );
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 			char trip[100];
-			snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid, effectlist_key_down_shift );
+			snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,slot,info->uc.selected_chain_entry, gid, !(effectlist_add_mask & FXLIST_ADD_DISABLED) );
 			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
 			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
 		g_free(name);
 	}
-
-	effectlist_key_down_shift = 0;
-	effectlist_key_down_ctrl = 0;
 }
 
 gint sort_iter_compare_func( GtkTreeModel *model,
@@ -4412,6 +4434,7 @@ void setup_effectlist_info()
 		gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
 		g_signal_connect( G_OBJECT(trees[i]), "key_press_event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
+		g_signal_connect( G_OBJECT(trees[i]), "key-release-event", G_CALLBACK( on_effectlist_row_key_released ), NULL );
 	}
 
 	GtkWidget *entry_filterfx = glade_xml_get_widget_( info->main_window, "filter_effects");
