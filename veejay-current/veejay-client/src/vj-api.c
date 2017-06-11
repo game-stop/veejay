@@ -6921,17 +6921,22 @@ static void process_reload_hints(int *history, int pm)
 		if( entry_tokens[ENTRY_FXID] == 0)
 		{
 			put_text( "entry_effectname" ,"" );
+			// disable fx widgets but keep "button_fx_entry" enabled
 			disable_widget( "frame_fxtree2" );
-			disable_widget( "frame_fxtree4" );
+			disable_widget( "entry_effectname");
+			disable_widget( "button_entry_toggle");
 			disable_widget( "tree_sources");
 			disable_widget( "rgbkey");
+			set_toggle_button( "button_entry_toggle"), FALSE );
 			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 		}
 		else
 		{
 			put_text( "entry_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
+			// enable fx widgets
 			enable_widget( "frame_fxtree2");
-			enable_widget( "frame_fxtree4");
+			enable_widget( "entry_effectname");
+			enable_widget( "button_entry_toggle");
 			enable_widget( "tree_sources");
 			enable_widget( "rgbkey" );
 			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_VIDEO_ENABLED] );
