@@ -120,7 +120,7 @@ void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
 		return; // nothing to do
 
 	// sub_format up is always 4:4:4 planar
-	int pixfmt = (frame->format == PIX_FMT_YUVJ422P ? PIX_FMT_YUVJ444P: PIX_FMT_YUV444P);
+	int pixfmt = (frame->format == AV_PIX_FMT_YUVJ422P ? AV_PIX_FMT_YUVJ444P: AV_PIX_FMT_YUV444P);
 	VJFrame src;
 	veejay_memcpy(&src,frame2,sizeof(VJFrame));
 	src.format = pixfmt;

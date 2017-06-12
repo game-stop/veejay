@@ -122,10 +122,12 @@ static struct
 	const char *text;
 } tooltips[] =
 {
-	{"Mouse left: Set in point, Mouse right: Set out point, Double click: Clear selected, Mouse middle: Drag selection"},
-	{"Mouse left/right: Play slot, Shift + Mouse left: Put sample in slot. You can also put selected samples."},
-	{"Mouse left click: Select slot (sample in slot), Mouse double click: Play sample in slot, Mouse left + SHIFT: Set slot as mixing current mixing channel"},
+	{"Mouse left: Set in point,\nMouse right: Set out point,\nDouble click: Clear selected,\nMouse middle: Drag selection"},
+	{"Mouse left/right: Play slot,\nShift + Mouse left: Put sample in slot.\nYou can also put selected samples."},
+	{"Mouse left click: Select slot (sample in slot),\nMouse double click: Play sample in slot,\nShift + Mouse left: Set slot as mixing current mixing channel"},
 	{"Select a SRT sequence to edit"},
+	{"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample"},
+	{"Filter the effects list by any string"},
 	{NULL},
 };
 
@@ -134,7 +136,9 @@ enum
 	TOOLTIP_TIMELINE = 0,
 	TOOLTIP_QUICKSELECT = 1,
 	TOOLTIP_SAMPLESLOT = 2,
-	TOOLTIP_SRTSELECT = 3
+	TOOLTIP_SRTSELECT = 3,
+	TOOLTIP_FXSELECT = 4,
+	TOOLTIP_FXFILTER = 5
 };
 
 #define FX_PARAMETER_DEFAULT_NAME "<none>"
@@ -551,6 +555,19 @@ typedef struct
 {
 	const char *text;
 } widget_name_t;
+
+typedef struct
+{
+    GtkListStore       *list;
+    GtkTreeModelSort   *sorted;
+    GtkTreeModelFilter *filtered;
+} effectlist_models;
+
+typedef struct
+{
+	effectlist_models  stores[3];
+	gchar              *filter_string;
+} effectlist_data;
 
 static widget_name_t *slider_names_ = NULL;
 static widget_name_t *param_names_ = NULL;
@@ -3888,7 +3905,6 @@ static void setup_effectchain_info( void )
 	setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
 	GtkTreeSelection *selection;
 
-	tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
 	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 	gtk_tree_selection_set_select_function(selection, view_entry_selection_func, NULL, NULL);
@@ -4215,11 +4231,37 @@ gboolean view_fx_selection_func (GtkTreeSelection *selection,
 	return TRUE; /* allow selection state to change */
 }
 
-static int effectlist_key_down = 0;
+static guint effectlist_add_mask = 0;
+static const guint FXLIST_ADD_DISABLED = 1 << 1;
+static const guint FXLIST_ADD_TO_SELECTED = 1 << 2;
 
 gboolean on_effectlist_row_key_pressed (GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-	effectlist_key_down = !(event->state & GDK_SHIFT_MASK );
+	if(event->type & GDK_KEY_PRESS){
+		switch(event->keyval){
+			case GDK_KEY_Shift_L:
+				effectlist_add_mask |= FXLIST_ADD_DISABLED;
+				break;
+			case GDK_KEY_Control_L:
+				effectlist_add_mask |= FXLIST_ADD_TO_SELECTED;
+				break;
+		}
+	}
+	return FALSE;
+}
+
+gboolean on_effectlist_row_key_released (GtkWidget *widget, GdkEventKey  *event, gpointer   user_data)
+{
+	if(event->type & GDK_KEY_RELEASE){
+		switch(event->keyval){
+			case GDK_KEY_Shift_L:
+				effectlist_add_mask &= !(FXLIST_ADD_DISABLED);
+				break;
+			case GDK_KEY_Control_L:
+				effectlist_add_mask &= !(FXLIST_ADD_TO_SELECTED);
+				break;
+		}
+	}
 	return FALSE;
 }
 
@@ -4232,27 +4274,25 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
 	GtkTreeIter iter;
 	model = gtk_tree_view_get_model(treeview);
 
-	if(gtk_tree_model_get_iter(model,&iter,path))
-	{
+	if(gtk_tree_model_get_iter(model,&iter,path)) {
 		gint gid =0;
 		gchar *name = NULL;
 		gtk_tree_model_get(model,&iter, FX_STRING, &name, -1);
-		if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 )
-		{
+		if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 ) {
+			guint slot = 0;
+			if((effectlist_add_mask & FXLIST_ADD_TO_SELECTED) && info->selection_slot)
+				slot = info->selection_slot->sample_id;
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
-				0, info->uc.selected_chain_entry,gid, !effectlist_key_down );
+				slot, info->uc.selected_chain_entry,gid, !(effectlist_add_mask & FXLIST_ADD_DISABLED) );
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 			char trip[100];
-			snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid, effectlist_key_down );
+			snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,slot,info->uc.selected_chain_entry, gid, !(effectlist_add_mask & FXLIST_ADD_DISABLED) );
 			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
 			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
 		g_free(name);
 	}
-
-	effectlist_key_down = 0;
-
 }
 
 gint sort_iter_compare_func( GtkTreeModel *model,
@@ -4320,6 +4360,29 @@ gint sort_vims_func(GtkTreeModel *model,
 	return ret;
 }
 
+
+effectlist_data fxlist_data;
+
+//EffectListData* get_effectlistdata
+
+static gboolean effect_row_visible (GtkTreeModel *model, GtkTreeIter *iter, gpointer user_data)
+{
+	effectlist_data *fxlistdata = (effectlist_data*) user_data;
+	gboolean value=TRUE;
+	if(fxlistdata != NULL && fxlistdata->filter_string != NULL) {
+		if(strlen(fxlistdata->filter_string)) {
+			value=FALSE;
+			gchar *idstr = NULL;
+			gtk_tree_model_get(model, iter, SL_ID, &idstr, -1);
+			if((idstr != NULL) && strcasestr(idstr, fxlistdata->filter_string) != NULL) {
+				value = TRUE;
+			}
+			g_free (idstr);
+		}
+	}
+    return value;
+}
+
 // load effectlist from veejay
 void setup_effectlist_info()
 {
@@ -4329,26 +4392,34 @@ void setup_effectlist_info()
 	trees[1] = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
 	trees[2] = glade_xml_get_widget_( info->main_window, "tree_alphalist" );
 
-	GtkListStore *stores[3];
+	set_tooltip_by_widget (trees[0], tooltips[TOOLTIP_FXSELECT].text);
+	set_tooltip_by_widget (trees[1], tooltips[TOOLTIP_FXSELECT].text);
+	set_tooltip_by_widget (trees[2], tooltips[TOOLTIP_FXSELECT].text);
 
 	fx_list_ = (vevo_port_t*) vpn( 200 );
 
 	for(i = 0; i < 3; i ++ )
 	{
-		stores[i] = gtk_list_store_new( 1, G_TYPE_STRING );
+		fxlist_data.stores[i].list = gtk_list_store_new( 1, G_TYPE_STRING );
 
-		GtkTreeSortable *sortable = GTK_TREE_SORTABLE(stores[i]);
-		gtk_tree_sortable_set_sort_func(
-			sortable, FX_STRING, sort_iter_compare_func,
-				GINT_TO_POINTER(FX_STRING),NULL);
+		fxlist_data.stores[i].filtered = GTK_TREE_MODEL_FILTER (gtk_tree_model_filter_new (GTK_TREE_MODEL (fxlist_data.stores[i].list), NULL));
+		fxlist_data.stores[i].sorted = GTK_TREE_MODEL_SORT (gtk_tree_model_sort_new_with_model (GTK_TREE_MODEL (fxlist_data.stores[i].filtered)));
 
-		gtk_tree_sortable_set_sort_column_id(
-		                                     sortable, FX_STRING, GTK_SORT_ASCENDING);
+		fxlist_data.filter_string = NULL;
+		gtk_tree_model_filter_set_visible_func (fxlist_data.stores[i].filtered,
+		                                        effect_row_visible,
+		                                        &fxlist_data, NULL);
 
+		GtkTreeSortable *sortable = GTK_TREE_SORTABLE(fxlist_data.stores[i].list);
+		gtk_tree_sortable_set_sort_func(sortable, FX_STRING,
+		                                sort_iter_compare_func,
+		                                GINT_TO_POINTER(FX_STRING),NULL);
+
+		gtk_tree_sortable_set_sort_column_id(sortable, FX_STRING, GTK_SORT_ASCENDING);
 		gtk_tree_view_set_headers_visible( GTK_TREE_VIEW(trees[i]), FALSE );
 
-		gtk_tree_view_set_model( GTK_TREE_VIEW(trees[i]), GTK_TREE_MODEL(stores[i]));
-		g_object_unref( G_OBJECT( stores[i] ));
+		gtk_tree_view_set_model( GTK_TREE_VIEW(trees[i]),GTK_TREE_MODEL( fxlist_data.stores[i].sorted));
+		g_object_unref( G_OBJECT( fxlist_data.stores[i].list ));
 	}
 
 	setup_tree_text_column( "tree_effectlist", FX_STRING, "Effect",0 );
@@ -4363,7 +4434,16 @@ void setup_effectlist_info()
 		gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
 		g_signal_connect( G_OBJECT(trees[i]), "key_press_event", G_CALLBACK( on_effectlist_row_key_pressed ), NULL );
+		g_signal_connect( G_OBJECT(trees[i]), "key-release-event", G_CALLBACK( on_effectlist_row_key_released ), NULL );
 	}
+
+	GtkWidget *entry_filterfx = glade_xml_get_widget_( info->main_window, "filter_effects");
+	set_tooltip_by_widget (entry_filterfx, tooltips[TOOLTIP_FXFILTER].text);
+	g_signal_connect(G_OBJECT(entry_filterfx),
+	                 "changed",
+	                 G_CALLBACK( on_filter_effects_changed ),
+	                 &fxlist_data );
+
 }
 
 
@@ -4603,14 +4683,9 @@ void load_effectlist_info()
 	reset_tree( "tree_effectmixlist" );
 	reset_tree( "tree_alphalist" );
 
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
-	store = GTK_LIST_STORE(model);
-
-	GtkTreeModel *model2 = gtk_tree_view_get_model( GTK_TREE_VIEW(tree2));
-	store2 = GTK_LIST_STORE(model2);
-
-	GtkTreeModel *model3 = gtk_tree_view_get_model( GTK_TREE_VIEW(tree3));
-	store3 = GTK_LIST_STORE(model3);
+	store = fxlist_data.stores[0].list;
+	store2 = fxlist_data.stores[1].list;
+	store3 = fxlist_data.stores[2].list;
 
 	while( offset < fxlen )
 	{
@@ -4673,9 +4748,9 @@ void load_effectlist_info()
 		g_free(name);
 	}
 
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(store2));
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(store3));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(fxlist_data.stores[0].sorted));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(fxlist_data.stores[1].sorted));
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(fxlist_data.stores[2].sorted));
 	free(fxtext);
 }
 
@@ -6846,17 +6921,22 @@ static void process_reload_hints(int *history, int pm)
 		if( entry_tokens[ENTRY_FXID] == 0)
 		{
 			put_text( "entry_effectname" ,"" );
+			// disable fx widgets but keep "button_fx_entry" enabled
 			disable_widget( "frame_fxtree2" );
-			disable_widget( "frame_fxtree4" );
+			disable_widget( "entry_effectname");
+			disable_widget( "button_entry_toggle");
 			disable_widget( "tree_sources");
 			disable_widget( "rgbkey");
+			set_toggle_button( "button_entry_toggle"), FALSE );
 			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 		}
 		else
 		{
 			put_text( "entry_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
+			// enable fx widgets
 			enable_widget( "frame_fxtree2");
-			enable_widget( "frame_fxtree4");
+			enable_widget( "entry_effectname");
+			enable_widget( "button_entry_toggle");
 			enable_widget( "tree_sources");
 			enable_widget( "rgbkey" );
 			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_VIDEO_ENABLED] );

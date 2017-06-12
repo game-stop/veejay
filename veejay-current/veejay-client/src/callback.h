@@ -20,6 +20,7 @@
 #ifndef VJCALLBACK_H
 #define VJCALLBACK_H
 
+
 #define	SLIDER_CHANGED( arg_num, value ) \
 {\
 if(!info->status_lock && !info->parameter_lock)\

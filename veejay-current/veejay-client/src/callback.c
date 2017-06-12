@@ -3398,6 +3398,37 @@ void	on_image_effects_toggled(GtkWidget *w, gpointer user_data)
 		 gtk_notebook_set_page(GTK_NOTEBOOK(n),1);
 }
 
+void	on_filter_effects_activate(GtkWidget *widget, gpointer user_data)
+{
+}
+
+void	on_filter_effects_changed( GtkWidget *w, effectlist_data *user_data)
+{
+	if(user_data != NULL) {
+		gchar* fx_txt = get_text("filter_effects");
+		int filterlen = strlen(fx_txt);
+
+		if(filterlen) {
+			vj_msg(VEEJAY_MSG_INFO, "filtering effects '%s'", fx_txt);
+			user_data->filter_string = g_new0(gchar, filterlen+1);
+			if(user_data->filter_string != NULL) {
+				strcpy(user_data->filter_string, fx_txt);
+				gtk_tree_model_filter_refilter (user_data->stores[0].filtered);
+				gtk_tree_model_filter_refilter (user_data->stores[1].filtered);
+				gtk_tree_model_filter_refilter (user_data->stores[2].filtered);
+				g_free(user_data->filter_string);
+			}
+			user_data->filter_string = NULL;
+		} else {
+			vj_msg(VEEJAY_MSG_DEBUG, ""); // FIXME why debug ? check vj-msg.h and "void vj_msg( " from vj-api.c:2340
+			// filter with "user_data->filter_string = NULL" to remove the filter
+			gtk_tree_model_filter_refilter (user_data->stores[0].filtered);
+			gtk_tree_model_filter_refilter (user_data->stores[1].filtered);
+			gtk_tree_model_filter_refilter (user_data->stores[2].filtered);
+		}
+	}
+}
+
 void	on_console1_activate(GtkWidget *w, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
