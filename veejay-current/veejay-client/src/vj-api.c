@@ -6927,7 +6927,7 @@ static void process_reload_hints(int *history, int pm)
 			disable_widget( "button_entry_toggle");
 			disable_widget( "tree_sources");
 			disable_widget( "rgbkey");
-			set_toggle_button( "button_entry_toggle"), FALSE );
+			set_toggle_button( "button_entry_toggle", FALSE );
 			update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 		}
 		else
