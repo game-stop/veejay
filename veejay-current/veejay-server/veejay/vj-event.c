@@ -5365,12 +5365,15 @@ void vj_event_entry_up(void *ptr, const char format[], va_list ap)
 	{
 		int effect_id=-1;
 		int c=-1;
+		int flag=-1;
+
 		if(SAMPLE_PLAYING(v))
 		{
 			c = sample_get_selected_entry(v->uc->sample_id) + args[0];
 			if(c >= SAMPLE_MAX_EFFECTS) c = 0;
 			sample_set_selected_entry( v->uc->sample_id, c);
 			effect_id = sample_get_effect_any(v->uc->sample_id, c );
+			flag = sample_get_chain_status(v->uc->sample_id,c);
 		}
 		if(STREAM_PLAYING(v))
 		{
@@ -5378,10 +5381,11 @@ void vj_event_entry_up(void *ptr, const char format[], va_list ap)
 			if( c>= SAMPLE_MAX_EFFECTS) c = 0;
 			vj_tag_set_selected_entry(v->uc->sample_id,c);
 			effect_id = vj_tag_get_effect_any(v->uc->sample_id,c);
+			flag = vj_tag_get_chain_status(v->uc->sample_id,c);
 		}
 
-		veejay_msg(VEEJAY_MSG_INFO, "Entry %d has effect %s",
-			c, vj_effect_get_description(effect_id));
+		veejay_msg(VEEJAY_MSG_INFO, "Entry %d has effect %s %s",
+			c, vj_effect_get_description(effect_id), (flag==0 ? "Disabled" : "Enabled"));
 
 	}
 }
@@ -5396,6 +5400,7 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 	{
 		int effect_id=-1;
 		int c = -1;
+		int flag=-1;
 		
 		if(SAMPLE_PLAYING(v))
 		{
@@ -5403,6 +5408,7 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 			if(c < 0) c = SAMPLE_MAX_EFFECTS-1;
 			sample_set_selected_entry( v->uc->sample_id, c);
 			effect_id = sample_get_effect_any(v->uc->sample_id, c );
+			flag = sample_get_chain_status(v->uc->sample_id,c);
 		}
 		if(STREAM_PLAYING(v))
 		{
@@ -5410,9 +5416,10 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 			if(c<0) c= SAMPLE_MAX_EFFECTS-1;
 			vj_tag_set_selected_entry(v->uc->sample_id,c);
 			effect_id = vj_tag_get_effect_any(v->uc->sample_id,c);
+			flag = vj_tag_get_chain_status(v->uc->sample_id,c);
 		}
-		veejay_msg(VEEJAY_MSG_INFO , "Entry %d has effect %s",
-			c, vj_effect_get_description(effect_id));
+		veejay_msg(VEEJAY_MSG_INFO , "Entry %d has effect %s %s",
+			c, vj_effect_get_description(effect_id), (flag==0 ? "Disabled" : "Enabled"));
 	}
 }
 
