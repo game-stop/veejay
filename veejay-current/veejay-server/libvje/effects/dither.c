@@ -33,7 +33,7 @@ vj_effect *dither_init(int w, int h)
 	ve->defaults[1] = 0;
 
 	ve->limits[0][0] = 2;
-	ve->limits[1][0] = w;
+	ve->limits[1][0] = w-1;
 	ve->limits[0][1] = 0;
 	ve->limits[1][1] = 1;
 
