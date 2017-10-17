@@ -2104,6 +2104,8 @@ double sqrt_table_get_pixel( int x, int y ) {
 
 void	sqrt_table_pixels_free() {
 	int i;
+	if(sqrt_map_pixel_values == NULL)
+	  return;
 	for( i = 0; i < 512; i ++ ) {
 		free( sqrt_map_pixel_values[i] );
 	}
