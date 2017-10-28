@@ -2630,8 +2630,11 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	
 	unsigned char *ptr = buf + hdr_len;
 	int k;
+	int diff = max - min;
 	for( k = 0 ; k < length ; k++ ) {
-		int pval = (int) ( (float) min + ( data[k] * ((float) max) ));
+		// pval = ((Input - InputLow) / (InputHigh - InputLow)) * (OutputHigh - OutputLow) + OutputLow;
+		// with InputLow==0 and InputHigh==1 in gtkcurve range
+		int pval = ((data[k]) * ((float)diff)) + min;
 		ptr[0] = pval & 0xff;
 		ptr[1] = (pval >> 8) & 0xff;
 		ptr[2] = (pval >> 16) & 0xff;

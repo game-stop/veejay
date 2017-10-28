@@ -62,15 +62,16 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	unsigned int k = 0;
 	unsigned char *in = blob + 27;
 	float	*vec = (float*) vj_calloc(sizeof(float) * len );
+	int diff = max - min;
 	for(i = start ; i < end; i ++ )
 	{
 		unsigned char *ptr = in + (k * 4);
 		int value = 
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
-	
 
-		float top = 1.0 / (float) max;
-		float val = ( (float)value * top );
+		// val = ((Input - InputLow) / (InputHigh - InputLow)) * (OutputHigh - OutputLow) + OutputLow;
+		// with OutputLow==0 and OutputHigh==1 in gtkcurve range
+		float val = ((float)(value - min) / (diff));
 
 		vec[k] = val;
 		k++;
