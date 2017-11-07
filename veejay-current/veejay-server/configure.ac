@@ -105,8 +105,8 @@ AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
 
 arch_target="auto"
-AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic or auto],
-					[Build a generic binary or auto-detect current cpu type (defaults to auto-detect)]),
+AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic, auto or user defined],
+					[Build a generic binary, auto-detect current cpu type or user defined -mtune/-march setting)]),
 					[ arch_target="$withval"])
 
 AC_GNU_SOURCE
@@ -379,7 +379,7 @@ else
 		TMP=`$srcdir/cpuinfo.sh`
 		ARCHFLAGS=`cat veejay.arch`
 	else
-       		ARCHFLAGS="-mtune=generic"
+       		ARCHFLAGS="-mtune=$arch_target"
 	fi
 		AC_MSG_RESULT($ARCHFLAGS)
 fi
