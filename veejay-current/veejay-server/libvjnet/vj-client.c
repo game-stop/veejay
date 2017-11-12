@@ -47,7 +47,6 @@
 #define VJC_SOCKET 2
 #define VJC_BAD_HOST 3
 #define RUP8(num)(((num)+8)&~8)
-#define PACKET_LEN 4096
 
 extern int get_ffmpeg_pixfmt( int p);
 
@@ -64,12 +63,6 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	v->cur_height = h;
 	v->cur_fmt = get_ffmpeg_pixfmt(f);
 	v->orig_fmt = v->cur_fmt;
-	v->blob = (unsigned char*) vj_calloc(sizeof(unsigned char) * PACKET_LEN ); 
-	if(!v->blob ) {
-		veejay_msg(0, "Memory allocation error.");
-		free(v);
-		return NULL;
-	}
 	return v;
 }
 
@@ -87,8 +80,6 @@ void		vj_client_free(vj_client *v)
 		v->fd[0] = NULL;
 		v->fd[1] = NULL;
 
-		if(v->blob)
-			free(v->blob);
 		if(v->lzo)
 			lzo_free(v->lzo);
 		free(v);
@@ -579,19 +570,31 @@ int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len) 
 	return sock_t_send( v->fd[ sock_type ], buf, len );
 }
 
+#define HDR_LEN 5
+
 int vj_client_send(vj_client *v, int sock_type,unsigned char *buf) {
-	int len = strlen( (const char*)buf);
 	
-	if( v->mcast ) {
-		sprintf( (char*) v->blob, "V%03dD", len );
-		memcpy( v->blob + 5, buf, len );
-		return mcast_send( v->s, (void*) v->blob, len + 5, v->ports[sock_type ] );
+	int len = strlen( (const char*)buf);
+	int ret = -1;
+	char *blob = (char*) vj_malloc(sizeof(char) * (len + HDR_LEN ));
+	if(!blob) {
+		veejay_msg(0, "Out of memory" );
+		return -1;
 	}
 
-	sprintf( (char*) v->blob, "V%03dD", len );
-	memcpy( v->blob + 5, buf, len );
+	snprintf( blob, sizeof(blob), "V%03dD", len );
+	memcpy( blob + HDR_LEN, buf, len );
 
-	return sock_t_send( v->fd[ sock_type ], v->blob, len + 5 );
+	if( v->mcast ) {
+		ret = mcast_send( v->s, (void*) blob, len + HDR_LEN, v->ports[sock_type ] );
+	}
+	else {
+		ret = sock_t_send( v->fd[ sock_type ], blob, len + HDR_LEN );
+	}
+
+	free(blob);
+
+	return ret;
 }
 
 void vj_client_close( vj_client *v )
