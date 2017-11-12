@@ -345,7 +345,6 @@ static int cali_stream_id = 0;
 static int cali_onoff     = 0;
 static int geo_pos_[2] = { -1,-1 };
 static vevo_port_t *fx_list_ = NULL;
-
 typedef struct
 {
 	GtkWidget *title;
@@ -577,6 +576,7 @@ static widget_name_t *param_kfs_ = NULL;
 static widget_name_t *gen_names_ = NULL;
 static widget_name_t *gen_incs_ = NULL;
 static widget_name_t *gen_decs_ = NULL;
+static effectlist_data fxlist_data;
 
 #define MAX_PATH_LEN 1024
 #define VEEJAY_MSG_OUTPUT	4
@@ -3636,12 +3636,35 @@ void donatenow()
 	}
 }
 
+static void reset_fxtree()
+{	
+	int i;
+	for(i = 0; i < 3; i ++ )
+	{
+		gtk_list_store_clear(fxlist_data.stores[i].list);
+	}
+
+}
+
 static void reset_tree(const char *name)
 {
 	GtkWidget *tree_widget = glade_xml_get_widget_( info->main_window,name );
 	GtkTreeModel *tree_model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree_widget) );
 
-	gtk_list_store_clear( GTK_LIST_STORE( tree_model ) );
+
+	if(GTK_IS_TREE_MODEL_SORT(tree_model)) {
+		GtkTreeModel *child_model = gtk_tree_model_sort_get_model( GTK_TREE_MODEL_SORT(tree_model) );
+
+		gtk_list_store_clear( GTK_LIST_STORE( child_model ) );
+	}
+	else {
+		if( GTK_IS_LIST_STORE(tree_model) ) {
+			gtk_list_store_clear(GTK_LIST_STORE(tree_model));
+		} 
+		else {
+			veejay_msg(0,"%s: wrong tree model type" ,__FUNCTION__);
+		}
+	}
 }
 
 // load effect controls
@@ -4361,8 +4384,6 @@ gint sort_vims_func(GtkTreeModel *model,
 }
 
 
-effectlist_data fxlist_data;
-
 //EffectListData* get_effectlistdata
 
 static gboolean effect_row_visible (GtkTreeModel *model, GtkTreeIter *iter, gpointer user_data)
@@ -4679,9 +4700,10 @@ void load_effectlist_info()
 
 	_effect_reset();
 
-	reset_tree( "tree_effectlist");
-	reset_tree( "tree_effectmixlist" );
-	reset_tree( "tree_alphalist" );
+	reset_fxtree();
+	//reset_tree( "tree_effectlist");
+	//reset_tree( "tree_effectmixlist" );
+	//reset_tree( "tree_alphalist" );
 
 	store = fxlist_data.stores[0].list;
 	store2 = fxlist_data.stores[1].list;
@@ -8155,8 +8177,10 @@ void vj_gui_disconnect()
 		info->client = NULL;
 	}
 	/* reset all trees */
-	reset_tree("tree_effectlist");
-	reset_tree("tree_effectmixlist");
+//	reset_tree("tree_effectlist");
+//	reset_tree("tree_effectmixlist");
+
+	reset_fxtree();
 	reset_tree("tree_chain");
 	reset_tree("tree_sources");
 	reset_tree("editlisttree");
