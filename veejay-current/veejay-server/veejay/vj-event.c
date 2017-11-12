@@ -8982,10 +8982,10 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 			{
 				int is_video = vj_effect_get_extra_frame(effect_id);
 				int using_effect = vj_tag_get_chain_status(args[0],i);
-				int chain_source = sample_get_chain_source(args[0], i);
-				int chain_channel = sample_get_chain_channel(args[0], i);
+				int chain_source = vj_tag_get_chain_source(args[0], i);
+				int chain_channel = vj_tag_get_chain_channel(args[0], i);
 				int kf_type = 0;
-				int kf_status = sample_get_kf_status( args[0], i, &kf_type ); // exist for streaù ? or 0 ?
+				int kf_status = vj_tag_get_kf_status( args[0], i, &kf_type ); // exist for streaù ? or 0 ?
 
 				sprintf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
 					i,
