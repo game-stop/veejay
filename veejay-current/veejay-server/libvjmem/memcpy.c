@@ -348,13 +348,17 @@ char	*veejay_strncat( char *s1, char *s2, size_t n )
 }
 
 static uint8_t ppmask[16] = { 0,128,128,0, 128,128,0,128, 128,0,128,128,0,128,128, 0 };
+#if defined ( HAVE_ASM_MMX ) || defined ( HAVE_ASM_SSE )
 static uint8_t yuyv_mmreg_[AC_MMREG_SIZE];
+#endif
 
 void	yuyv_plane_init()
 {
+#if defined ( HAVE_ASM_MMX ) || defined ( HAVE_ASM_SSE )
 	unsigned int i;
 	for( i = 0; i < AC_MMREG_SIZE ;i ++ )
 		yuyv_mmreg_[i] = ( (i%2) ? 128: 0 );
+#endif
 }
 
 
@@ -1170,6 +1174,7 @@ void fast_memset_finish()
 
 void fast_memset_dirty(void * to, int val, size_t len)
 {
+#if defined ( HAVE_ASM_MMX ) || defined ( HAVE_ASM_SSE )
 	size_t i;
 	unsigned char mm_reg[AC_MMREG_SIZE], *pmm_reg;
 	unsigned char *t = to;
@@ -1238,6 +1243,9 @@ void fast_memset_dirty(void * to, int val, size_t len)
 	 *	Now do the tail of the block
 	 */
 	if(len) small_memset(t, val, len);
+#else
+	memset(to,val,len);
+#endif
 }
 
 static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {

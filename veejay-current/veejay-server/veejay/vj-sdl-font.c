@@ -51,7 +51,7 @@ static inline void _overlay_text( uint8_t *dst, uint8_t *a, uint8_t *b, const in
 	unsigned int op1 = (ialpha > 255) ? 255 : ialpha;
    	unsigned int op0 = 255 - op1;
 	unsigned int i;
-	    for( i = 0; i < size; i ++ )
+	    for( i = 0; i < len; i ++ )
         	dst[i] = (op0 * a[i] + op1 * b[i] ) >> 8;
 #else
         unsigned int i;
@@ -92,8 +92,8 @@ static inline void _overlay_text_uv( uint8_t *dst, uint8_t *a, const int len, ui
 	unsigned int op1 = (ialpha > 255) ? 255 : ialpha;
    	unsigned int op0 = 255 - op1;
 	unsigned int i;
-	    for( i = 0; i < size; i ++ )
-        	dst[i] = (op0 * a[i] + op1 * b[i] ) >> 8;
+	    for( i = 0; i < len; i ++ )
+        	dst[i] = (op0 * a[i] + op1 * dst[i] ) >> 8;
 #else
         unsigned int i;
 	uint8_t B[8] = { 128,128,128,128,128,128,128,128 };
