@@ -889,6 +889,7 @@ static void vj_perform_close_audio() {
 int vj_perform_init_audio(veejay_t * info)
 {
 #ifndef HAVE_JACK
+	veejay_msg(VEEJAY_MSG_DEBUG, "Jack was not enabled during build, no support for audio.");
 	return 0;
 #else
 	int i;
