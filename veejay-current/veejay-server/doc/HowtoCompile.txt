@@ -6,7 +6,9 @@
 
 Required:
 
+* Build-essential
 * FFmpeg (libavcodec, libavformat, libavutil, libswscale) *please use ffmpeg instead of libav*
+* libjpeg
 * libxml2 for saving project data
 * SDL for the video window
 * libdv for playback of DV Video
@@ -18,6 +20,7 @@ Required:
 * Libquicktime for Quicktime]
 * Video4Linux II
 * libpthread
+* Glade (needed for GVeejay Reloaded)
 
 Optional:
 * liblo
@@ -49,7 +52,7 @@ If echo is silent, you must set the PKG_CONFIG_PATH to point to the directory co
 
 1. Get the sources from Veejay's repository:
 <pre>
-  $ git clone git://code.dyne.org/veejay.git veejay
+  $ git clone git://github.com/c0ntrol/veejay.git veejay
 </pre>
 2. Enter the source directory and run autogen.sh
 <pre>
