@@ -396,6 +396,9 @@ static void Usage(char *progname)
 	fprintf(stderr, "Example: echo \"%03d:;\" | %s \n", VIMS_QUIT, progname);
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Example: sayVIMS -h 192.168.100.12 -m \"600:;\"\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Example: sayVIMS -m \"360:0 0 101 1;\"\n");
+	fprintf(stderr, "         (Add effect 'Mirror' to chain entry)\n");
 }
 
 static int set_option(const char *name, char *value)
