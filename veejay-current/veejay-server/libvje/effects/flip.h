@@ -21,5 +21,5 @@
 #ifndef FLIP_H
 #define FLIP_H
 vj_effect *flip_init();
-void flip_apply(VJFrame *frame, int n);
+void flip_apply(VJFrame *frame, int h, int v);
 #endif
