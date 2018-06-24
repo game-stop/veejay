@@ -26,25 +26,31 @@ vj_effect *flip_init(int w, int h)
 {
 
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 1;
+	ve->num_params = 2;
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	ve->defaults[0] = 0;
+	ve->defaults[1] = 0;
 
 	ve->limits[0][0] = 0;
 	ve->limits[1][0] = 1;
+	ve->limits[0][1] = 0;
+	ve->limits[1][1] = 1;
 
 	ve->description = "Flip Frame";
 	ve->sub_format = 0;
 	ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list(ve->num_params, "H or V");
+	ve->param_description = vje_build_param_list(ve->num_params, "Horizontal", "Vertical");
 
 	ve->hints = vje_init_value_hint_list (ve->num_params);
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-	                          "Flip Horizontal", "Flip Vertical"
+	                          "Normal", "Flip Horizontal"
+	);
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 0,
+	                          "Normal", "Flip Vertical"
 	);
 
 	return ve;
@@ -153,11 +159,11 @@ static void flip_y_yuvdata(VJFrame *frame)
 	} while (--uy);
 }
 
-void flip_apply(VJFrame *frame, int n)
+void flip_apply(VJFrame *frame, int h, int v)
 {
-	if (n == 0)
+	if (h == 1)
 		flip_y_yuvdata(frame);
-	if (n == 1)
+	if (v == 1)
 		flip_x_yuvdata(frame);
 }
 

@@ -282,7 +282,7 @@ static void vj_effman_apply_image_effect(
 	emboss_apply(frames[0], arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_FLIP:
-	flip_apply(frames[0], arg[0]);
+	flip_apply(frames[0], arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_REVTV:
 	revtv_apply(frames[0], arg[0], arg[1], arg[2], arg[3]);
