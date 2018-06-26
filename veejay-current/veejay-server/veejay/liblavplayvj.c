@@ -2112,6 +2112,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 				if(skel)
 				{
 					skel->edit_list = sample_el;
+          char* sample_name;
+          if(!vj_create_sample_nicename(&sample_name, el->video_file_list[i])){
+            veejay_msg(VEEJAY_MSG_ERROR,"Failed to create new sample filename for '%s'", el->video_file_list[i]);
+          } else {
+            snprintf(skel->descr, SAMPLE_MAX_DESCR_LEN, "%s", sample_name);
+            free (sample_name);
+          }
 					sample_store(skel);
 				}
 			}
@@ -3443,9 +3450,16 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		}
 	}
 
+  char* sample_name;
+  if(!vj_create_sample_nicename(&sample_name, files[0])){
+    veejay_msg(VEEJAY_MSG_ERROR,"Failed to create new sample filename for '%s'", files[0]);
+  } else {
+    sample_set_description(sample->sample_id, sample_name);
+    free (sample_name);
+  }
+
 	// free temporary values
    	if(files[0]) free(files[0]);
-
 
     return sample->sample_id;
 }

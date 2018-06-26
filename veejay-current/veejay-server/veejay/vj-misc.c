@@ -649,3 +649,39 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... )
 	return done;
 }
 #endif
+
+/*
+ *
+ * find basename of new sample, remove any directory prefix and
+ * file extension. Reduce the name to 10 char max.
+ *
+ * caller responsible de free dest pointer
+ *
+ * return 0 on error.
+ */
+int vj_create_sample_nicename(char **destination, char *filename)
+{
+  char *start;
+  if ((start = strrchr(filename, '/')) != NULL) {
+    start = start + 1;
+  } else {
+    start = filename;
+  }
+
+  *destination = NULL;
+  char *end;
+  if ((end = strrchr(start, '.')) != NULL) {
+    if((end - start) > 12) {
+      *destination = strndup(start, 12);
+      strncpy ( (*destination)+9, end-3, 3);
+      (*destination)[8] = '~';
+    } else {
+    *destination = strndup(start,(end - start));
+    }
+  }
+  if (*destination == NULL) {
+    *destination = strdup (start);
+  }
+
+  return 1;
+}
