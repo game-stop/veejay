@@ -659,7 +659,7 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... )
  *
  * return 0 on error.
  */
-int vj_create_sample_nicename(char **destination, char *filename)
+int vj_get_sample_display_name(char **destination, char *filename)
 {
   char *start;
   if ((start = strrchr(filename, '/')) != NULL) {

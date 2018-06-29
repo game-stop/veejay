@@ -67,6 +67,6 @@ int	verify_working_dir();
 
 void	free_media_files( veejay_t *info, filelist_t *fl );
 
-int vj_create_sample_nicename(char **dest, char *filename);
+int vj_get_sample_display_name(char **dest, char *filename);
 
 #endif
