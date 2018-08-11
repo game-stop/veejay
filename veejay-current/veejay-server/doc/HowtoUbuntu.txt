@@ -50,3 +50,32 @@ To install the binary version:
 (meet package dependency requirements)
 # apt-cache search <package name>
 # apt-get install <package name>
+
+
+
+Build instructions for Ubuntu 18.04
+------------------------------------
+
+To build from git/source tree:
+===============================
+
+# 1 # get the required dependencies:
+
+  sudo apt-get install autoconf automake libtool m4 gcc libjpeg62-dev libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev libgtk2.0-dev libxml2-dev libsdl1.2-dev libjack0 libjack-dev jackd1 libquicktime-dev liblo-dev
+
+# 2 # run the autogen.sh script:
+
+  sh autogen.sh
+
+# 3 # run the configure script:
+
+  ./configure
+
+# 4 # run make
+
+  make
+
+# 5 # install 
+
+  make install
+
