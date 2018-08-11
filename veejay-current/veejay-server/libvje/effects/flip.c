@@ -49,7 +49,7 @@ vj_effect *flip_init(int w, int h)
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 	                          "Normal", "Flip Horizontal"
 	);
-	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 0,
+	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1,
 	                          "Normal", "Flip Vertical"
 	);
 

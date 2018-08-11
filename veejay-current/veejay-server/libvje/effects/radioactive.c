@@ -200,7 +200,7 @@ int	radioactivetv_malloc(int w, int h)
 		return 0;
 	}
 
-	diffbuf   = (uint8_t*) vj_malloc( RUP8((4*w) + 2 * w * h * sizeof(uint8_t)));
+	diffbuf   = (uint8_t*) vj_calloc( RUP8((4*w) + 2 * w * h * sizeof(uint8_t)));
 
 	setTable();
 

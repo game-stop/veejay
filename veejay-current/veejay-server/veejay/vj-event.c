@@ -8671,10 +8671,15 @@ void    vj_event_send_generator_list( void *ptr, const char format[], va_list ap
 
         for( i = 0; i < total; i ++ ) {
             char *name = plug_get_so_name_by_idx( generators[i] );
+            if(name == NULL)
+                continue;
+    
             int   name_len = strlen(name);
 
             snprintf( line, sizeof(line), "%03d%.124s", name_len, name );
             APPEND_MSG( print_buf, line );
+        
+            free(name);
         }
 
         sprintf( s_print_buf, "%05zu%s", strlen( print_buf ), print_buf );
