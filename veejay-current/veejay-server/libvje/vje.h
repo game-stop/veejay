@@ -84,7 +84,7 @@ typedef struct {
 #define FLAG_ALPHA_IN_BLEND (1<<6) /* blend operator */
 
 typedef struct vj_effect_t {
-	const char *description;			
+	char *description;			
 	int num_params;			
 	char **param_description;
 	vj_value_hint_t **hints;

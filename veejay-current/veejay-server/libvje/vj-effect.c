@@ -570,7 +570,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 
 }
 
-static void vj_effect_free_parameters( vj_effect *v )
+static void vj_effect_free_parameters_hints( vj_effect *v )
 {
 	int i;
 	for( i = 0; i < v->num_params; i ++ ) {
@@ -599,17 +599,23 @@ static void vj_effect_free_parameters( vj_effect *v )
 }
 
 static void vj_effect_free(vj_effect *ve) {
-  if( ve ) {
-	if(ve->limits[0]) free(ve->limits[0]);
-	if(ve->limits[1]) free(ve->limits[1]);
-	if(ve->defaults) free(ve->defaults);
+	if(ve->limits[0]) 
+		free(ve->limits[0]);
+	if(ve->limits[1]) 
+		free(ve->limits[1]);
+	if(ve->defaults) 
+		free(ve->defaults);
+	
 	if(ve->is_plugin) {    	
-		if(ve->description) free(ve->description);
+		if(ve->description) 
+			free(ve->description);
 	}
-	if(ve->param_description) vj_effect_free_parameters( ve );
-	 
+
+	if(ve->param_description) {
+		vj_effect_free_parameters_hints( ve );
+	}
+
 	free(ve);
-  }
 }
 
 int	vj_effect_max_effects()
