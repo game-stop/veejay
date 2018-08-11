@@ -2617,7 +2617,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	get_points_from_curve( curve, length, data );
 
-	char header[37];
+	char header[64];
 	
 	int msg_len = 27 + (4*length); /*K00000000 */
 
