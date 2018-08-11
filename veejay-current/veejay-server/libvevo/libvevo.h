@@ -37,21 +37,11 @@ int 	vevo_property_atom_type( vevo_port_t *p, const char *key);
 
 size_t 	vevo_property_element_size( vevo_port_t * p, const char *key, const int idx);
 
-#ifdef STRICT_CHECKING
-vevo_port_t *vevo_port_new( int port_type, const char *func,const int line_no );
-void	vevo_port_free( vevo_port_t *port, const char *func, const int line_no );
-#else
 vevo_port_t *vevo_port_new(int port_type);
 void	vevo_port_free( vevo_port_t *port );
-#endif
 
-#ifdef STRICT_CHECKING
-#define vpn(type) vevo_port_new( type, __FUNCTION__ , __LINE__ )
-#define vpf( port ) vevo_port_free( port, __FUNCTION__, __LINE__ )
-#else
 #define vpn(type) vevo_port_new( type )
 #define vpf( port ) vevo_port_free( port )
-#endif
 
 int 	vevo_property_soft_reference(vevo_port_t * p, const char *key);
 
