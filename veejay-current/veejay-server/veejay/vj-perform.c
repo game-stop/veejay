@@ -548,7 +548,7 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
 		return 1;
 
 	size_t frame_len = RUP8( ((plane_len+helper_frame->width)/7)*8 );
-	uint8_t *buf = vj_malloc(sizeof(uint8_t) * frame_len * 3 * 3);
+	uint8_t *buf = vj_malloc(sizeof(uint8_t) * frame_len * 4 * 3);
 
 	if(!buf)
 		return 0;
@@ -558,9 +558,9 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
 	frame_buffer[c]->Y = buf;
 	frame_buffer[c]->Cb = frame_buffer[c]->Y + frame_len;
 	frame_buffer[c]->Cr = frame_buffer[c]->Cb + frame_len;
-	frame_buffer[c]->P0  = buf + (frame_len * 3);
-	frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*3);
-	return (frame_len * 3 * 3);
+	frame_buffer[c]->P0  = buf + (frame_len * 4);
+	frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*4);
+	return (frame_len * 4 * 3);
 }
 
 static void vj_perform_free_row(int c)
@@ -813,8 +813,18 @@ int vj_perform_init(veejay_t * info)
 
 				frame_buffer[c]->P0  = ptr + (frame_len * 4);
 				frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*4);
+
+				veejay_memset( frame_buffer[c]->Y, pixel_Y_lo_,frame_len);
+				veejay_memset( frame_buffer[c]->Cb,128,frame_len);
+				veejay_memset( frame_buffer[c]->Cr,128,frame_len);
+				veejay_memset( frame_buffer[c]->alpha,0,frame_len);
+				veejay_memset( frame_buffer[c]->P0, pixel_Y_lo_, frame_len );
+				veejay_memset( frame_buffer[c]->P0 + frame_len, 128, frame_len * 3);
+				veejay_memset( frame_buffer[c]->P1, pixel_Y_lo_, frame_len );
+				veejay_memset( frame_buffer[c]->P1 + frame_len, 128, frame_len * 3);
 		 }
    	 }
+
 
 	vj_perform_clear_cache();
 	veejay_memset( frame_info[0],0,SAMPLE_MAX_EFFECTS);
