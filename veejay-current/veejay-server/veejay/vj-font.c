@@ -1307,6 +1307,10 @@ void	vj_font_destroy(void *ctx)
 		if( f->font_table[i] )
 			free(f->font_table[i]);
 	}
+
+	if(f->add)
+		free(f->add);	
+
 //	free( f->text_buffer );	
 	free( f->font_table );
 	free( f->font_list );
