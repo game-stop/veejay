@@ -319,11 +319,11 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 
 #define _MMX1_MIN_LEN 0x800 /* 2k blocks */
 
-#ifdef HAVE_ASM_3DNOW
-#define EMMS     "femms"
-#else
+//#ifdef HAVE_ASM_3DNOW
+//#define EMMS     "femms"
+//#else
 #define EMMS     "emms"
-#endif
+//#endif
 
 #define is_aligned__(PTR,LEN) \
 	(((uintptr_t)(const void*)(PTR)) % (LEN) == 0 )

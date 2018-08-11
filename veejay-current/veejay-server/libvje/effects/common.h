@@ -76,10 +76,12 @@ extern void veejay_msg(int type, const char format[], ...);
 #define FEATHER( P, op0, aB, Q, op1 ) \
 	( ( P * op0 ) + ALPHA_BLEND( aB, P, Q) * op1 ) >> 8;
 
-#ifdef HAVE_ASM_3DNOW
-#define do_emms			__asm__ __volatile__( "femms" :::"memory" )
-#else
-#define do_emms         __asm__ __volatile__ ( "emms":::"memory" )
+//#ifdef HAVE_ASM_3DNOW
+//#define do_emms __asm__ __volatile__( "femms":::"memory" )
+//#else
+
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
+#define do_emms __asm__ __volatile__ ( "emms":::"memory" )
 #endif
 
 #ifdef ARCH_X86_64
