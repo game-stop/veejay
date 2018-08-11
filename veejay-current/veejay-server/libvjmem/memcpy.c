@@ -1986,7 +1986,7 @@ void	benchmark_veejay(int w, int h)
 
 void	*vj_hmalloc(size_t sze, const char *name)
 {
-	void *data = vj_malloc( sze );
+	void *data = vj_calloc( sze );
 	if( data == NULL ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate memory (needed %ld bytes)", (long) sze );
 		return NULL;
