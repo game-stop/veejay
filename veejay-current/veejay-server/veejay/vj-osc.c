@@ -286,7 +286,9 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 	int  args[16];
 	int __a = vj_osc_count_int_arguments(arglen,vargs);
 	int __n = vj_osc_parse_char_arguments(arglen,vargs,str);
-	memset( args,0,16 );
+	
+	memset( args,0,sizeof(args) );
+
 	str[__n] = '\0';
 
 	vj_osc_parse_int_arguments( arglen , vargs , args );
@@ -451,8 +453,6 @@ static	void	osc_iterate_clients()
 
 			int res = osc_client_status_send( clnt, cmd );
 			if( res == 0 ) {
-				( port );
-				osc_clients[i] = NULL;
 				veejay_msg(VEEJAY_MSG_WARNING,"Failed to send %s",cmd);
 			} 
 			free(cmd);
@@ -468,7 +468,8 @@ static 	void osc_vims_method(void *context, int arglen, const void *vargs, OSCTi
 	int  args[16];
 	int __a = vj_osc_count_int_arguments(arglen,vargs);
 	int __n = vj_osc_parse_char_arguments(arglen,vargs,str);
-	memset( args,0,16 );
+	
+	memset( args,0,sizeof(args) );
 	str[__n] = '\0';
 
 	vj_osc_parse_int_arguments( arglen , vargs , args );

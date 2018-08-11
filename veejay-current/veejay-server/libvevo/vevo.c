@@ -898,8 +898,14 @@ vevo_property_element_size(vevo_port_t * p, const char *key, const int idx )
  \param port_type Type of Port to Create. Port types <= 1024 are typed, > 1024 are anonymous ports.
  \return A New Port
  */
+#ifdef STRICT_CHECKING
+vevo_port_t *vevo_port_new(int port_type, const char *func, const int line_no)
+{
+	veejay_msg(VEEJAY_MSG_DEBUG,"New port %d called from %s:%d", port_type, func, line_no);
+#else
 vevo_port_t *vevo_port_new(int port_type)
 {
+#endif
     __vevo_port_t *port = (__vevo_port_t *) vj_malloc(sizeof(__vevo_port_t));
 
     port->index = NULL;
@@ -998,8 +1004,14 @@ int	vevo_port_verify( vevo_port_t *port )
 /*!
  \param p Port to destroy
  */
+#ifdef STRICT_CHECKING
+void	vevo_port_free( vevo_port_t *port, const char *func, const int line_no) 
+{
+	veejay_msg(VEEJAY_MSG_DEBUG, "Free port called from %s:%d", func, line_no);
+#else
 void	vevo_port_free( vevo_port_t *port )
 {
+#endif
 	if(port != NULL) {
 		vevo_port_free_(port );
 		port = NULL;
@@ -1506,7 +1518,7 @@ void	*vevo_port_register( vevo_port_t *in, vevo_port_t *ref )
 	void *port = in;
 	const void *store = ref;
 	if(!port)
-		port = vevo_port_new( VEVO_PORT_POOL );
+		port = vpn( VEVO_PORT_POOL );
 	char pkey[32];
 	if(store)
 	{

@@ -60,12 +60,8 @@ void veejay_set_sample(veejay_t *info, int sample);
 
 int veejay_set_frame(veejay_t *info, long frame_num);
 
-#ifdef STRICT_CHECKING
-#define veejay_change_state(a,b) vcs(a,b,__FUNCTION__,__LINE__)
-void vcs(veejay_t *info, int new_state,const char *caller_func,const int caller_line);
-#else
 void veejay_change_state(veejay_t *info, int new_state);
-#endif
+
 int veejay_set_speed(veejay_t *info , int speed);
 
 int veejay_hold_frame(veejay_t *info, int rrp, int pos);
