@@ -1122,6 +1122,8 @@ static  void    dump_arguments_(int net_id,int arglen, int np, int prefixed, cha
             i,help );
         if(help) free(help);
     }
+
+    free(name);
 }
 
 static  int vvm_[600];
