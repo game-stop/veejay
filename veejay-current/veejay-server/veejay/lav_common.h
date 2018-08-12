@@ -32,7 +32,6 @@
 
 #include <config.h>
 
-#include "editlist.h"
 #include "yuv4mpeg.h"
 
 
