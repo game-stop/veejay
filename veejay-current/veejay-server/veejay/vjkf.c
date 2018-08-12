@@ -50,13 +50,6 @@
 
 #include <veejay/vjkf.h>
 
-static	char	*keyframe_id( int p_id, int n_frame )
-{
-	char tmp[32];
-	snprintf(tmp,sizeof(tmp), "FX%d_%d",p_id,n_frame );
-	return vj_strdup(tmp);
-}
-
 static	char	*extract_( const char *prefix , int p_id )
 {
 	char tmp[100];
@@ -68,38 +61,52 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 {
 	int i,k=0;
 	unsigned char *result = NULL;
-	int start = 0, end = 0, type =0, status = 0;
+	int start = 0, end = 0, type =0, status = 0, values_len = 0;
+	int *values = NULL;
 
 	char *k_s = extract_( "start", parameter_id );
 	char *k_e = extract_( "end",   parameter_id );
 	char *k_t = extract_( "type",  parameter_id );
 	char *k_x = extract_( "status", parameter_id );
+	char *k_d = extract_( "data", parameter_id );
+	char *k_dn= extract_( "datalen", parameter_id );
 
 	if( vevo_property_get( port, k_s, 0, &start ) != VEVO_NO_ERROR )
 	{
-		free(k_s); free(k_e); free(k_t); free(k_x);
+		free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
 		return NULL;
 	}
 	if( vevo_property_get( port, k_e,   0, &end ) != VEVO_NO_ERROR )
 	{
-		free(k_s); free(k_e); free(k_t); free(k_x);
+		free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
 		return NULL;
 	}
 	if( vevo_property_get( port, k_t,   0, &type ) != VEVO_NO_ERROR )
 	{
-		free(k_s); free(k_e); free(k_t); free(k_x);
+		free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
 		return NULL;
 	}
 	if( vevo_property_get( port, k_x,   0, &status ) != VEVO_NO_ERROR )
 	{
-		free(k_s); free(k_e); free(k_t); free(k_x);
+		free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
 		return NULL;
 	}
-
+	if( vevo_property_get( port, k_d, 0, &values ) != VEVO_NO_ERROR ) 
+	{
+		free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
+		return NULL;
+	}	
+	if( vevo_property_get( port, k_dn, 0, &values_len ) != VEVO_NO_ERROR ) 
+	{
+		free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
+		return NULL;
+	}	
 	free(k_s);
 	free(k_e);
 	free(k_t);
 	free(k_x);
+	free(k_d);
+	free(k_dn);
 
 	int len = end - start;
 
@@ -109,33 +116,22 @@ unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *r
 
 	unsigned char *out = result + 27;
 
-	for( i = start; i < end; i ++ )
+	for( i = 0; i < values_len; i ++ ) 
 	{
-		char *key = keyframe_id( parameter_id, i );
-		int value = 0;
-
-		if(vevo_property_get(port, key, 0, &value )==VEVO_NO_ERROR)
-		{
-			unsigned char *buf = out + (4 * k);
+		int value = values[i];
+		unsigned char *buf = out + (4 * k);
 		
-			buf[0] = ( value ) & 0xff;
-			buf[1] = (value >> 8) & 0xff;
-			buf[2] = (value >> 16) & 0xff;
-			buf[3] = (value >> 24) & 0xff;
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_WARNING, "No keyframe at position %d", i );
-		}
+		buf[0] = ( value ) & 0xff;
+		buf[1] = (value >> 8) & 0xff;
+		buf[2] = (value >> 16) & 0xff;
+		buf[3] = (value >> 24) & 0xff;
 		k++;
-		
-		free(key);
 	}
-
+	
 	*rlen = 27 + (4 *  k);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "KF %p pack: range=%d-%d, FX entry %d, P%d, type %d status %d",
-		port,start,end, entry_id,parameter_id, type, status );
+	veejay_msg(VEEJAY_MSG_DEBUG, "KF %p pack %2.2fKb: range=%d-%d, FX entry %d, P%d, type %d status %d",
+		port,(*rlen/1024.0f),start,end, entry_id,parameter_id, type, status );
 
 	return result;
 }
@@ -195,8 +191,8 @@ void	keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is_sa
 	int end = 0;
 	int type = 0;
 	int status = 0;
-	int i;
-
+	int values_len = 0;
+	int *values = NULL;
 	void *port = NULL;
 
 	if( is_sample ) {
@@ -214,28 +210,33 @@ void	keyframe_clear_entry( int lookup, int fx_entry, int parameter_id, int is_sa
 	char *k_e = extract_ ( "end", parameter_id );
 	char *k_t = extract_ ( "type", parameter_id );
 	char *k_x = extract_ ( "status", parameter_id );
+	char *k_d = extract_ ( "data", parameter_id );
+	char *k_dn= extract_ ( "datalen", parameter_id );
 	
 	vevo_property_get( port, k_s,0, &start );
 	vevo_property_get( port, k_e,0, &end );
 	vevo_property_get( port, k_t,0, &type );
 	vevo_property_get( port, k_x,0, &status );   
+	vevo_property_get( port, k_d,0, &values );
+	vevo_property_get( port, k_dn,0,&values_len);
 
-	for(i = start ; i <= end; i ++ )
-	{
-		char *key = keyframe_id( parameter_id, i );
-		vevo_property_del( port, key );
-		free(key);
+	if( values != NULL ) {
+		free(values);
 	}
 
 	vevo_property_del( port, k_s );
 	vevo_property_del( port, k_e );
 	vevo_property_del( port, k_t );
 	vevo_property_del( port, k_x );
+	vevo_property_del( port, k_d );
+	vevo_property_del( port, k_dn);
 
 	free(k_s);
 	free(k_e);
 	free(k_t);
 	free(k_x);
+	free(k_d);
+	free(k_dn);
 }
 
 int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is_sample )
@@ -246,10 +247,18 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	int fx_entry = 0;
 	int status = 0;
 	int n = sscanf( (char*) in, "key%2d%2d%8d%8d%2d%2d", &fx_entry,&parameter_id, &start, &end,&type,&status );
-	
+	int idx = 0;
+
 	if(n != 6 )
 	{
 		veejay_msg(0, "Unable to unpack keyframe data");
+		return 0;
+	}
+
+	int values_len = (end-start+1);
+	int *values = (int*) vj_calloc( sizeof(int) * values_len);
+	if(values == NULL) {
+		veejay_msg(0, "Unable to allocate space for keyframe data");
 		return 0;
 	}
 
@@ -271,26 +280,33 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	{
 		int value = 
 		  ( ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24) );
-		char *key = keyframe_id( parameter_id, i );
-		vevo_property_set( port, key, VEVO_ATOM_TYPE_INT, 1, &value );
+		//char *key = keyframe_id( parameter_id, i );
+		//vevo_property_set( port, key, VEVO_ATOM_TYPE_INT, 1, &value );
 		ptr += 4;
-		free(key);
+		//free(key);
+		values[idx] = value;
+		idx ++;
 	}
 
 	char *k_s = extract_ ( "start", parameter_id );
 	char *k_e = extract_ ( "end", parameter_id );
 	char *k_t = extract_ ( "type", parameter_id );
 	char *k_x = extract_ ( "status", parameter_id );
+	char *k_d = extract_ ( "data" , parameter_id );
+	char *k_dn = extract_( "datalen", parameter_id );
 
 	vevo_property_set( port, k_s, VEVO_ATOM_TYPE_INT,1, &start );
 	vevo_property_set( port, k_e, VEVO_ATOM_TYPE_INT,1, &end );
 	vevo_property_set( port, k_t, VEVO_ATOM_TYPE_INT,1, &type );
 	vevo_property_set( port, k_x, VEVO_ATOM_TYPE_INT,1, &status );
+	vevo_property_set( port, k_d, VEVO_ATOM_TYPE_VOIDPTR, 1, &values);
+	vevo_property_set( port, k_dn, VEVO_ATOM_TYPE_INT,1, &values_len);
 
 	free(k_s);
 	free(k_e);
 	free(k_t);
 	free(k_x);
+	free(k_d);
 		
 	*entry = fx_entry;
 
@@ -330,31 +346,44 @@ int		keyframe_get_tokens( void *port, int parameter_id, int *start, int *end, in
 int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 {
 	int i;
-	int start = 0, end = 0, type = 0, status = 0;
+	int start = 0, end = 0, type = 0, status = 0, values_len = 0;
+	int *values = NULL;
 	
 	char *k_s = extract_ ( "start", parameter_id );
 	char *k_e = extract_ ( "end", parameter_id );
 	char *k_t = extract_ ( "type", parameter_id );
 	char *k_x = extract_ ( "status", parameter_id );
+	char *k_d = extract_ ( "data", parameter_id );
+	char *k_dn = extract_ ( "datalen", parameter_id );
 
 	if( vevo_property_get( port, k_s, 0, &start ) != VEVO_NO_ERROR )
 	{
-			free(k_s); free(k_e); free(k_t); free(k_x);
+			free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
 			return 0;
 	}
 	if( vevo_property_get( port, k_e,   0, &end ) != VEVO_NO_ERROR )
 	{
-			free(k_s); free(k_e); free(k_t); free(k_x);
+			free(k_s); free(k_e); free(k_t); free(k_x); free(k_d); free(k_dn);
 			return 0;
 	}
 	if( vevo_property_get( port, k_t,   0, &type ) != VEVO_NO_ERROR )
 	{
-			free(k_s); free(k_e);free(k_t); free(k_x);
+			free(k_s); free(k_e);free(k_t); free(k_x); free(k_d); free(k_dn);
 			return 0;
 	}
 	if( vevo_property_get( port, k_x,   0, &status ) != VEVO_NO_ERROR )
 	{
-			free(k_s); free(k_e);free(k_t); free(k_x);
+			free(k_s); free(k_e);free(k_t); free(k_x); free(k_d); free(k_dn);
+			return 0;
+	}
+	if( vevo_property_get( port, k_d,   0, &values ) != VEVO_NO_ERROR )
+	{
+			free(k_s); free(k_e);free(k_t); free(k_x); free(k_d); free(k_dn);
+			return 0;
+	}
+	if( vevo_property_get( port, k_dn,   0, &values_len ) != VEVO_NO_ERROR )
+	{
+			free(k_s); free(k_e);free(k_t); free(k_x); free(k_d); free(k_dn);
 			return 0;
 	}
 
@@ -362,36 +391,50 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 	put_xml_int( node, k_e, end );
 	put_xml_int( node, k_t, type );
 	put_xml_int( node, k_x, status );
+	put_xml_int( node, k_dn, values_len );
 
-	for( i = start; i < end; i ++ )
+	for( i = 0; i < values_len ; i ++ ) 
 	{
-		char *key = keyframe_id( parameter_id, i );
-		int value = 0;
-
-		if(vevo_property_get(port, key, 0, &value )==VEVO_NO_ERROR)
-		{
-			char xmlbuf[128];
-			sprintf((char*)xmlbuf, "%d %d", parameter_id,value );
-			put_xml_str( node, "value", xmlbuf );
-		}
-		free(key);
+		char xmlbuf[128];
+		snprintf((char*)xmlbuf,sizeof(xmlbuf), "%d %d", parameter_id,values[i] );
+		put_xml_str( node, "value", xmlbuf );
 	}
 
-	free( k_s);
-	free( k_e);
-	free( k_t);
-	free( k_x);
+	free(k_s);
+	free(k_e);
+	free(k_t);
+	free(k_x);
+	free(k_d);
+	free(k_dn);
 
 	return 1;
 }
 
 int		keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port )
 {
-	int start = 0 , end = 0, type = 0, status = 0;
+	int start = 0 , end = 0, type = 0, status = 0, values_len = 0;
 	int frame = 0;
 	int nodes = 0;
+	int *values = NULL;
 	if(!node)
 		return 0;
+
+	xmlNodePtr n = node;
+	while( n != NULL )
+	{
+ 		if ( !xmlStrncmp(n->name, (const xmlChar*) "datalen", 7 ))
+		{
+			values_len = get_xml_int(doc,n);
+			vevo_property_set(port, (char*)n->name, VEVO_ATOM_TYPE_INT,1,&values_len);
+
+			if(values != NULL ) {
+				free(values);
+			}
+
+			values = (int*) vj_calloc(sizeof(int) * values_len );
+		}
+		n = n->next;
+	}
 
 	while( node != NULL )
 	{
@@ -420,15 +463,25 @@ int		keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port )
 		{
 			int val = 0;
 			int pid = get_xml_2int( doc, node, &val);
-			char *key = keyframe_id( pid, start + frame );
 
-			vevo_property_set( port, key, VEVO_ATOM_TYPE_INT, 1, &val );
-			free(key);
+			if( values == NULL ) {
+				veejay_msg(0,"Invalid KF tree, datalen is not (yet) found");
+			}
+			else {
+				// There is no node for data
+				char *k_d = extract_ ( "data", pid );
+				int *tmp = NULL;
+				if( vevo_property_get( port, k_d, 0, &tmp ) != VEVO_NO_ERROR ) {
+					vevo_property_set(port, k_d, VEVO_ATOM_TYPE_VOIDPTR,1, &values );
+				}
+				    
 
-			frame ++;
-			if( frame > end )
-				end = frame;
-		}
+				values[ frame ] = val;
+				frame ++;
+				if( frame > end )
+					end = frame;
+			}
+		}	
 
 		node = node->next;
 	}
@@ -441,29 +494,45 @@ int		keyframe_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *port )
 int	get_keyframe_value(void *port, int n_frame, int parameter_id, int *result )
 {
 	char *k_x = extract_ ( "status", parameter_id );
-	int status= 0;
+	char *k_s = extract_ ( "start", parameter_id );
+	char *k_d = extract_ ( "data", parameter_id );
+	int status= 0,start=0;
 	if( vevo_property_get( port, k_x,   0, &status ) != VEVO_NO_ERROR )
 	{
-		free(k_x);
+		free(k_x); free(k_s); free(k_d);
+		return 0;
+	}
+	if( vevo_property_get( port, k_s,   0, &start ) != VEVO_NO_ERROR )
+	{
+		free(k_x); free(k_s); free(k_d);
 		return 0;
 	}
 
 	if( status == 0 ) {
 		free(k_x);
+		free(k_s);
+		free(k_d);
 		return 0;
 	}
 	
-	char *key = keyframe_id( parameter_id, n_frame );
-	
-	int error = vevo_property_get( port, key, 0, result );
-	if( error != VEVO_NO_ERROR ) {
-		free(key);
-		free(k_x);
+	int idx = n_frame - start;
+	if( idx < 0 ) {
+		veejay_msg(0,"Key frame position is before start ?!");
+		idx = 0;
+	}
+
+	int *values = NULL;
+	if( vevo_property_get( port, k_d, 0, &values ) != VEVO_NO_ERROR ) 
+	{
+		free(k_x); free(k_s); free(k_d);
 		return 0;
 	}
-	
-	free(key);
+
+	*result = values[ idx ];
+
 	free(k_x);
+	free(k_s);
+	free(k_d);
 
 	return 1;
 }
