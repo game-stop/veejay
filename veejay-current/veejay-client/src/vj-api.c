@@ -7002,10 +7002,22 @@ static void process_reload_hints(int *history, int pm)
                                NULL);
             update_slider_range( slider_names_[i].text, min,max, value, 0 );
         }
-        GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
-                info->main_window, "tree_chain") ));
+
+        GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
+        GtkTreeModel *model = gtk_tree_view_get_model( view );
 
         gtk_tree_model_foreach( model, chain_update_row, (gpointer*) info );
+
+        /* upate effect tree chain selection */
+        {
+          GtkTreeSelection *selection = gtk_tree_view_get_selection( view );
+          GtkTreeIter iter;
+
+          GtkTreePath *path = gtk_tree_path_new_from_indices(info->uc.selected_chain_entry, -1);
+          gtk_tree_model_get_iter(model, &iter, path);
+
+          gtk_tree_selection_select_iter (selection, &iter);
+        }
     }
     info->parameter_lock = 0;
 
