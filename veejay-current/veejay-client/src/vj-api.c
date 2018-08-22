@@ -4111,7 +4111,12 @@ static void load_generator_info()
     free(fxtext);
 }
 
-// load effect chain
+/******************************************************
+ * load_effectchain_info()
+ *   load effect chain from server (VIMS transmition)
+ *   to the fx chain tree view
+ *
+ ******************************************************/
 static void load_effectchain_info()
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
@@ -4163,10 +4168,7 @@ static void load_effectchain_info()
             break;
         }
 
-        char *name = _effect_get_description( arr[1] );
-        snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
-
-        // clean list entries until next
+        // clean list until next entry
         while( last_index < arr[0] )
         {
             gtk_list_store_append( store, &iter );
@@ -4175,6 +4177,9 @@ static void load_effectchain_info()
         }
 
         // time to fill current entry
+        char *name = _effect_get_description( arr[1] );
+        snprintf(toggle,sizeof(toggle),"%s",arr[3] == 1 ? "on" : "off" );
+
         if( last_index == arr[0])
         {
             gchar *utf8_name = _utf8str( name );
@@ -4217,6 +4222,13 @@ static void load_effectchain_info()
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     free(fxtext);
 }
+
+
+/******************************************************
+ *
+ *                    EFFECTS LISTS
+ *
+ ******************************************************/
 
 enum
 {
@@ -4403,7 +4415,14 @@ static gboolean effect_row_visible (GtkTreeModel *model, GtkTreeIter *iter, gpoi
     return value;
 }
 
-// load effectlist from veejay
+
+/******************************************************
+ * setup_effectlist_info()
+ *   prepare the views of effects lists
+ *
+ * Three treeview : fxlist mixlist, alphalist
+ *
+ ******************************************************/
 void setup_effectlist_info()
 {
     int i;
@@ -4466,6 +4485,100 @@ void setup_effectlist_info()
 
 }
 
+/******************************************************
+ * load_effectlist_info()
+ *   load the effects information from the server
+ *   (VIMS transmission) to the treeviews
+ *
+ ******************************************************/
+void load_effectlist_info()
+{
+    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
+    GtkWidget *tree2 = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
+    GtkWidget *tree3 = glade_xml_get_widget_( info->main_window, "tree_alphalist");
+    GtkListStore *store,*store2,*store3;
+    char line[4096];
+
+    GtkTreeIter iter;
+    gint i,offset=0;
+    gint fxlen = 0;
+    single_vims( VIMS_EFFECT_LIST );
+    gchar *fxtext = recv_vims(6,&fxlen);
+
+    _effect_reset();
+
+    reset_fxtree();
+
+    store = fxlist_data.stores[0].list;
+    store2 = fxlist_data.stores[1].list;
+    store3 = fxlist_data.stores[2].list;
+
+    while( offset < fxlen )
+    {
+        char tmp_len[4];
+        veejay_memset(tmp_len,0,sizeof(tmp_len));
+        strncpy(tmp_len, fxtext + offset, 3 );
+        int len = atoi(tmp_len);
+        offset += 3;
+        if(len > 0)
+        {
+            effect_constr *ec;
+            veejay_memset( line,0,sizeof(line));
+            strncpy( line, fxtext + offset, len );
+
+            ec = _effect_new(line);
+            if(ec) info->effect_info = g_list_append( info->effect_info, ec );
+        }
+        offset += len;
+    }
+
+    fxlen = g_list_length( info->effect_info );
+    for( i = 0; i < fxlen; i ++)
+    {
+        effect_constr *ec = g_list_nth_data( info->effect_info, i );
+        if( ec->is_gen )
+            continue;
+        gchar *name = _utf8str( _effect_get_description( ec->id ) );
+
+        if( name != NULL)
+        {
+            // tree_alphalist
+            if( strncasecmp( "alpha:" , ec->description, 6 ) == 0 )
+            {
+                gtk_list_store_append( store3, &iter );
+                int len = strlen( ec->description );
+                char *newName = vj_calloc( len );
+                veejay_memcpy(newName,ec->description+6, len-6 );
+                gtk_list_store_set( store3,&iter, FX_STRING, newName, -1 );
+                vevo_property_set( fx_list_, newName, VEVO_ATOM_TYPE_INT,1,&(ec->id));
+                free(newName);
+            }
+            else
+            {
+                // tree_effectmixlist
+                if( _effect_get_mix(ec->id) > 0 )
+                {
+                    gtk_list_store_append( store2, &iter );
+                    gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
+                    vevo_property_set( fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
+                }
+                else
+                {
+                    // tree_effectlist
+                    gtk_list_store_append( store, &iter );
+                    gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
+                    vevo_property_set( fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
+                }
+            }
+        }
+        g_free(name);
+    }
+
+    gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(fxlist_data.stores[0].sorted));
+    gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(fxlist_data.stores[1].sorted));
+    gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(fxlist_data.stores[2].sorted));
+    free(fxtext);
+}
 
 void on_effectlist_sources_row_activated(GtkTreeView *treeview,
                                          GtkTreePath *path,
@@ -4504,6 +4617,12 @@ void on_effectlist_sources_row_activated(GtkTreeView *treeview,
         if(idstr) g_free(idstr);
     }
 }
+
+/******************************************************
+ *
+ *                    SAMPLES LIST
+ *
+ ******************************************************/
 
 /* Return a bank page and slot number to place sample in */
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type )
@@ -4681,98 +4800,6 @@ int get_and_draw_frame(int type, char *wid_name)
     pix_trashcan[type] = pix;
 
     return 1;
-}
-
-void load_effectlist_info()
-{
-    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
-    GtkWidget *tree2 = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
-    GtkWidget *tree3 = glade_xml_get_widget_( info->main_window, "tree_alphalist");
-    GtkListStore *store,*store2,*store3;
-    char line[4096];
-
-    GtkTreeIter iter;
-    gint i,offset=0;
-    gint fxlen = 0;
-    single_vims( VIMS_EFFECT_LIST );
-    gchar *fxtext = recv_vims(6,&fxlen);
-
-    _effect_reset();
-
-    reset_fxtree();
-    //reset_tree( "tree_effectlist");
-    //reset_tree( "tree_effectmixlist" );
-    //reset_tree( "tree_alphalist" );
-
-    store = fxlist_data.stores[0].list;
-    store2 = fxlist_data.stores[1].list;
-    store3 = fxlist_data.stores[2].list;
-
-    while( offset < fxlen )
-    {
-        char tmp_len[4];
-        veejay_memset(tmp_len,0,sizeof(tmp_len));
-        strncpy(tmp_len, fxtext + offset, 3 );
-        int len = atoi(tmp_len);
-        offset += 3;
-        if(len > 0)
-        {
-            effect_constr *ec;
-            veejay_memset( line,0,sizeof(line));
-            strncpy( line, fxtext + offset, len );
-
-            ec = _effect_new(line);
-            if(ec) info->effect_info = g_list_append( info->effect_info, ec );
-        }
-        offset += len;
-    }
-
-    fxlen = g_list_length( info->effect_info );
-    for( i = 0; i < fxlen; i ++)
-    {
-        effect_constr *ec = g_list_nth_data( info->effect_info, i );
-        if( ec->is_gen )
-            continue;
-        gchar *name = _utf8str( _effect_get_description( ec->id ) );
-    
-        if( name != NULL)
-        {
-            // tree_alphalist
-            if( strncasecmp( "alpha:" , ec->description, 6 ) == 0 )
-            {
-                gtk_list_store_append( store3, &iter );
-                int len = strlen( ec->description );
-                char *newName = vj_calloc( len );
-                veejay_memcpy(newName,ec->description+6, len-6 );
-                gtk_list_store_set( store3,&iter, FX_STRING, newName, -1 );
-                vevo_property_set( fx_list_, newName, VEVO_ATOM_TYPE_INT,1,&(ec->id));
-                free(newName);
-            }
-            else
-            {
-                // tree_effectmixlist
-                if( _effect_get_mix(ec->id) > 0 )
-                {
-                    gtk_list_store_append( store2, &iter );
-                    gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
-                    vevo_property_set( fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
-                }
-                else
-                {
-                    // tree_effectlist
-                    gtk_list_store_append( store, &iter );
-                    gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
-                    vevo_property_set( fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
-                }
-            }
-        }
-        g_free(name);
-    }
-
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(fxlist_data.stores[0].sorted));
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(fxlist_data.stores[1].sorted));
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(fxlist_data.stores[2].sorted));
-    free(fxtext);
 }
 
 static void select_slot( int pm )
