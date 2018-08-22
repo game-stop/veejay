@@ -58,14 +58,14 @@ But the quick answer would be:
 ### 1. Start one or more Veejay servers:
 
 ```
-veejay my-movie-A.avi
-veejay -p 4490 my-movie-B.avi
+veejay --clip-as-sample my-movie-A.avi
+veejay -p 4490 -g my-movie-B.avi
 ```
 
-### 2. Start the veejay graphical interface:
+### 2. Start and autoconnect the veejay graphical interface:
 
 ```
-reloaded
+reloaded -a
 ```
 
 ## Building/Configuring plugins
