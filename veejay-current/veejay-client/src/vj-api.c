@@ -8749,7 +8749,7 @@ static void create_ref_slots(int envelope_size)
 
 static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 {
-    gchar hotkey[3];
+    gchar hotkey[5];
 
     sample_bank_t **sample_banks = info->sample_banks;
     sample_gui_slot_t *gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
@@ -8797,7 +8797,7 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
     if( sample_banks[bank_nr]->slot[slot_nr]->sample_type >= 0 )
     {
         /* the hotkey that is assigned to this slot */
-        sprintf(hotkey, "F-%d", (slot_nr+1));
+        snprintf(hotkey,sizeof(hotkey), "F-%d", (slot_nr+1));
         gui_slot->hotkey = gtk_label_new(hotkey);
     }
     else
