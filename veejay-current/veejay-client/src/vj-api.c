@@ -656,6 +656,7 @@ static void enable_widget_(const char *name, const char *function, int line );
 #endif
 static void setup_tree_spin_column(const char *tree_name, int type, const char *title);
 static void setup_tree_text_column( const char *tree_name, int type, const char *title, int expand );
+static void setup_tree_combo_column( const char *tree_name, int type, const char *title, int expand );
 static void setup_tree_pixmap_column( const char *tree_name, int type, const char *title );
 gchar *_utf8str( const char *c_str );
 static gchar *recv_vims(int len, int *bytes_written);
@@ -3834,6 +3835,50 @@ static void setup_tree_text_column( const char *tree_name, int type, const char 
     }
 }
 
+static void setup_tree_combo_column( const char *tree_name, int type, const char *title,int len )
+{
+    GtkWidget *tree = glade_xml_get_widget_( info->main_window, tree_name );
+    GtkCellRenderer *renderer;
+    GtkTreeViewColumn *column;
+
+    renderer = gtk_cell_renderer_combo_new ();//gtk_cell_renderer_text_new();
+    column = gtk_tree_view_column_new_with_attributes( title, renderer, NULL );
+    gtk_tree_view_append_column( GTK_TREE_VIEW( tree ), column );
+    
+  /* create the model from enum_data */
+  GtkListStore *model;
+  GtkTreeIter iter;
+  int i;
+  
+  /* TODO : toujours la liste a jour !!!! creation a l'avnt l'ouverture ?     *
+   * en tout cas; model unique partagé dans le treeview                       *
+   * TreeModel* gui_get_chain_combo_model ()                                   */
+  model = gtk_list_store_new (2/*ENUM*/, G_TYPE_STRING, G_TYPE_INT);
+  for (i = 0; i<4; i++) {
+  
+    gtk_list_store_append (model, &iter);
+
+    gtk_list_store_set (model, &iter,
+                        0/*ENUM*/, "X#X",
+                        1/*ENUM*/, i,
+                        -1);
+  }
+
+  g_object_set (renderer,
+                "model", model,
+                "text-column", 0/*ENUM*/,
+                "has-entry", FALSE,
+                "editable", TRUE,
+NULL);
+    
+//    g_object_set(renderer, "editable", TRUE, NULL);
+    if(len)
+    {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Tree %s ,Title %s, width=%d", tree_name,title, len );
+        gtk_tree_view_column_set_min_width( column, len);
+    }
+}
+
 static void setup_tree_pixmap_column( const char *tree_name, int type, const char *title )
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, tree_name );
@@ -3924,7 +3969,7 @@ static void setup_effectchain_info( void )
     setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",0 ); //FIXME
     setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run"); // todo: could be checkbox!!
     setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // parameter interpolation on/off per entry
-    setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
+    setup_tree_combo_column( "tree_chain", FXC_MIXING, "Channel",0);
     GtkTreeSelection *selection;
 
     selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
