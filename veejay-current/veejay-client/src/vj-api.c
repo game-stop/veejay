@@ -128,6 +128,7 @@ static struct
     {"Select a SRT sequence to edit"},
     {"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample"},
     {"Filter the effects list by any string"},
+    {"Shift + Mouse left : Toogle selected fx chain"},
     {NULL},
 };
 
@@ -138,7 +139,8 @@ enum
     TOOLTIP_SAMPLESLOT = 2,
     TOOLTIP_SRTSELECT = 3,
     TOOLTIP_FXSELECT = 4,
-    TOOLTIP_FXFILTER = 5
+    TOOLTIP_FXFILTER = 5,
+    TOOLTIP_FXCHAINTREE = 6
 };
 
 #define FX_PARAMETER_DEFAULT_NAME "<none>"
@@ -4092,6 +4094,27 @@ static void load_generator_info()
     free(fxtext);
 }
 
+/******************************************************
+ * get_col_number_from_tree_view_column()
+ *
+ *   Returns column number or -1 if not found or on error
+ ******************************************************/
+/* Actually not used
+gint get_treeview_col_number_from_column (GtkTreeViewColumn *col)
+{
+    GList *cols;
+    gint   num;
+
+    g_return_val_if_fail ( col != NULL, -1 );
+    g_return_val_if_fail ( col->tree_view != NULL, -1 );
+
+    cols = gtk_tree_view_get_columns(GTK_TREE_VIEW(col->tree_view));
+    num = g_list_index(cols, (gpointer) col);
+    g_list_free(cols);
+
+    return num;
+}
+*/
 
 /******************************************************
  *
@@ -4099,6 +4122,62 @@ static void load_generator_info()
  *
  ******************************************************/
 
+
+ /******************************************************
+ * on_effectchain_button_pressed()
+ *
+ *  Signal handler over the effect chain.
+ *
+ *  Catch button press event on shift+click to toogle chain state.
+ *  NOTA : works over the FULL row
+ *
+ *  TODO : User can click on any no empty row to toggle any fx
+ * VIMS_CHAIN_ENTRY_SET_VIDEO_ON / VIMS_CHAIN_ENTRY_SET_VIDEO_OFF ?
+ ******************************************************/
+gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, gpointer userdata)
+{
+    /* shift key + single click with the left mouse button? */
+    if (event->state & GDK_SHIFT_MASK)
+    {
+        if (event->type == GDK_BUTTON_PRESS && event->button == 1)
+        {
+            GtkTreePath *path;
+            GtkTreeViewColumn *column;
+            gint cell_x, cell_y;
+
+            if(gtk_tree_view_get_path_at_pos( GTK_TREE_VIEW( tree ),
+                                (gint) event->x,
+                                (gint) event->y,
+                                &path, &column, &cell_x, &cell_y ))
+
+            {
+                /* compare iter from tree selection and clicked path */
+                GtkTreeIter iter_p, iter_s;
+                gint fxcid_p, fxcid_s = 0;
+                GtkTreeSelection *selection;
+                GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW( tree ));
+
+                gtk_tree_model_get_iter(model, &iter_p, path);
+                gtk_tree_model_get(model,&iter_p, FXC_ID, &fxcid_p, -1 );
+
+                selection = gtk_tree_view_get_selection(GTK_TREE_VIEW( tree ));
+                gtk_tree_selection_get_selected (selection, NULL, &iter_s);
+                gtk_tree_model_get(model,&iter_s, FXC_ID, &fxcid_s, -1 );
+
+                if( fxcid_p ==  fxcid_s )
+                {
+                    /* user can click on all row, uncomment and fix accordingly the test to check particular column */
+                    //guint column_num = get_treeview_col_number_from_column ( column );
+                    //if(column_num != -1)
+                    {
+                        single_vims( VIMS_CHAIN_ENTRY_SET_STATE );
+                    }
+                }
+            }
+        }
+    }
+    return FALSE; /* lets normal things happening */
+}
 
 /******************************************************
  * setup_effectchain_info()
@@ -4119,9 +4198,14 @@ static void setup_effectchain_info( void )
     setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
     GtkTreeSelection *selection;
 
+    // selection stuff
     selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
     gtk_tree_selection_set_select_function(selection, view_entry_selection_func, NULL, NULL);
+
+    // signal stuff (button press)
+    g_signal_connect(GTK_TREE_VIEW(tree), "button-press-event",
+                     (GCallback) on_effectchain_button_pressed, NULL);
 }
 
 
@@ -4134,6 +4218,9 @@ static void setup_effectchain_info( void )
 static void load_effectchain_info()
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
+
+    set_tooltip_by_widget (tree, tooltips[TOOLTIP_FXCHAINTREE].text);
+
     GtkListStore *store;
     gchar toggle[4];
     guint arr[VIMS_CHAIN_LIST_ENTRY_VALUES];
