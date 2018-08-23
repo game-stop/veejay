@@ -3913,25 +3913,6 @@ static void setup_server_files(void)
     g_signal_connect( tree, "row-activated", (GCallback) server_files_selection_func, NULL);
 }
 
-static void setup_effectchain_info( void )
-{
-    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
-    GtkListStore *store = gtk_list_store_new( 5, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING );
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-    g_object_unref( G_OBJECT( store ));
-
-    setup_tree_text_column( "tree_chain", FXC_ID, "#",0 );
-    setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",0 ); //FIXME
-    setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run"); // todo: could be checkbox!!
-    setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // parameter interpolation on/off per entry
-    setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
-    GtkTreeSelection *selection;
-
-    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-    gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-    gtk_tree_selection_set_select_function(selection, view_entry_selection_func, NULL, NULL);
-}
-
 static void load_v4l_info()
 {
     int values[21];
@@ -4110,6 +4091,39 @@ static void load_generator_info()
 
     free(fxtext);
 }
+
+
+/******************************************************
+ *
+ *                    EFFECT CHAIN
+ *
+ ******************************************************/
+
+
+/******************************************************
+ * setup_effectchain_info()
+ *   setup tree effect chain model and selection mode
+ *
+ ******************************************************/
+static void setup_effectchain_info( void )
+{
+    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
+    GtkListStore *store = gtk_list_store_new( 5, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING );
+    gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+    g_object_unref( G_OBJECT( store ));
+
+    setup_tree_text_column( "tree_chain", FXC_ID, "#",0 );
+    setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",0 ); //FIXME
+    setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run"); // todo: could be checkbox!!
+    setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // parameter interpolation on/off per entry
+    setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
+    GtkTreeSelection *selection;
+
+    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+    gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+    gtk_tree_selection_set_select_function(selection, view_entry_selection_func, NULL, NULL);
+}
+
 
 /******************************************************
  * load_effectchain_info()
