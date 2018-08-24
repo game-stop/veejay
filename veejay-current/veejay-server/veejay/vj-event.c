@@ -4840,48 +4840,53 @@ void vj_event_chain_toggle(void *ptr, const char format[], va_list ap)
         }
         veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s.", (vj_tag_get_effect_status(v->uc->sample_id) ? "enabled" : "disabled"));
     }
-}   
+}
 
 void vj_event_chain_entry_video_toggle(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
+    int args[2];
+    char *s = NULL;
+    P_A(args,s,format,ap);
+
     if(SAMPLE_PLAYING(v))
     {
-        int c = sample_get_selected_entry(v->uc->sample_id);
-        int flag = sample_get_chain_status(v->uc->sample_id,c);
-        if(flag == 0)
+        SAMPLE_DEFAULTS(args[0]);
+        if(sample_exists(args[0]))
         {
-            sample_set_chain_status(v->uc->sample_id, c,1); 
+            if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+
+            if(sample_set_chain_status(args[0],args[1],!sample_get_chain_status(args[0],args[1]))!=-1)
+            {
+                veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
+                    vj_tag_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled" );
+            }
         }
         else
-        {   
-            sample_set_chain_status(v->uc->sample_id, c,0);
-        }
-        veejay_msg(VEEJAY_MSG_INFO, "Video on chain entry %d is %s", c,
-            (flag==0 ? "Disabled" : "Enabled"));
+            p_no_sample(args[0]);
     }
     if(STREAM_PLAYING(v))
     {
-        int c = vj_tag_get_selected_entry(v->uc->sample_id);
-        int flag = vj_tag_get_chain_status( v->uc->sample_id,c);
-        if(flag == 0)
+        STREAM_DEFAULTS(args[0]);
+
+        if(vj_tag_exists(args[0]))
         {
-            vj_tag_set_chain_status(v->uc->sample_id, c,1); 
+            if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+            if(vj_tag_set_chain_status(args[0],args[1],!vj_tag_get_chain_status(args[0],args[1]))!=-1)
+            {
+                veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
+                    vj_tag_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled" );
+            }
         }
         else
-        {   
-            vj_tag_set_chain_status(v->uc->sample_id, c,0);
-        }
-        veejay_msg(VEEJAY_MSG_INFO, "Video on chain entry %d is %s", c,
-            (flag==0 ? "Disabled" : "Enabled"));
-
+            p_no_tag(args[0]);
     }
 }
 
-void vj_event_chain_entry_enable_video(void *ptr, const char format[], va_list ap)
+void enable_chain_entry_video(void *ptr, const char format[], va_list ap, int enable_chain)
 {
     veejay_t *v = (veejay_t*)ptr;
-    int args[2];    
+    int args[2];
     char *s = NULL;
     P_A(args,s,format,ap);
 
@@ -4892,7 +4897,7 @@ void vj_event_chain_entry_enable_video(void *ptr, const char format[], va_list a
         {
             if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
 
-            if(sample_set_chain_status(args[0],args[1],1) != -1)    
+            if(sample_set_chain_status(args[0],args[1],enable_chain) != -1)
             {
                 veejay_msg(VEEJAY_MSG_INFO, "Sample %d: Video on chain entry %d is %s",args[0],args[1],
                     ( sample_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled"));
@@ -4905,11 +4910,11 @@ void vj_event_chain_entry_enable_video(void *ptr, const char format[], va_list a
     {
         STREAM_DEFAULTS(args[0]);
 
-        if(vj_tag_exists(args[0])) 
+        if(vj_tag_exists(args[0]))
         {
             if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
 
-            if(vj_tag_set_chain_status(args[0],args[1],1)!=-1)
+            if(vj_tag_set_chain_status(args[0],args[1],enable_chain)!=-1)
             {
                 veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
                     vj_tag_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled" );
@@ -4919,61 +4924,16 @@ void vj_event_chain_entry_enable_video(void *ptr, const char format[], va_list a
             p_no_tag(args[0]);
     }
 }
+
+void vj_event_chain_entry_enable_video(void *ptr, const char format[], va_list ap)
+{
+    enable_chain_entry_video(ptr, format, ap, 1);
+    return;
+}
 void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*)ptr;
-    int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
-
-    if(SAMPLE_PLAYING(v)) 
-    {
-        SAMPLE_DEFAULTS(args[0]);
-
-        if(sample_exists(args[0]))
-        {
-
-            if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
-
-            if(v_chi(args[1]))
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-                return;
-            }
-
-            if(sample_set_chain_status(args[0],args[1],0)!=-1)
-            {   
-                veejay_msg(VEEJAY_MSG_INFO, "Sample %d: Video on chain entry %d is %s",args[0],args[1],
-                ( sample_get_chain_status(args[0],args[1])==1 ? "Enabled" : "Disabled"));
-            }
-        }
-        else
-            p_no_sample(args[0]);
-    }
-    if(STREAM_PLAYING(v))
-    {
-        STREAM_DEFAULTS(args[0]);
-
-        if(vj_tag_exists(args[0]))
-        {
-
-            if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
-    
-            if(v_chi(args[1]))
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-                return;
-            }
-
-            if(vj_tag_set_chain_status(args[0],args[1],0)!=-1)
-            {
-                veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
-                    vj_tag_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled" );
-            }
-        }
-        else
-            p_no_tag(args[0]);
-    }
+    enable_chain_entry_video(ptr, format, ap, 0);
+    return;
 }
 
 void    vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )

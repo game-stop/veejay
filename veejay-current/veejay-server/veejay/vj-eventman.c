@@ -623,8 +623,12 @@ void		vj_init_vevo_events(void)
 				VIMS_CHAIN_ENTRY_SET_STATE,
 				"Enable / disable effect on current entry",
 				vj_event_chain_entry_video_toggle,
-				0,	
+				2,
 				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Chain Index (-1=current)",
+				-1,
 				NULL );
 
 	index_map_[VIMS_CHAIN_TOGGLE]			=	_new_event(
