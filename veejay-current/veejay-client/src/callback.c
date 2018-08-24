@@ -3561,6 +3561,63 @@ void	on_new_source1_activate( GtkWidget *w , gpointer data )
 void	on_add_file1_activate(GtkWidget *w, gpointer user_data)
 {
 }
+
+/******************************************************
+ * on_effectchain_button_pressed()
+ *
+ *  Signal handler over the effect chain.
+ *
+ *  Catch button press event on shift+click to toogle chain state.
+ *  NOTA : works over the FULL row
+ *
+ *  TODO : User can click on any no empty row to toggle any fx
+ * VIMS_CHAIN_ENTRY_SET_VIDEO_ON / VIMS_CHAIN_ENTRY_SET_VIDEO_OFF ?
+ ******************************************************/
+gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, gpointer userdata)
+{
+    /* shift key + single click with the left mouse button? */
+    if (event->state & GDK_SHIFT_MASK)
+    {
+        if (event->type == GDK_BUTTON_PRESS && event->button == 1)
+        {
+            GtkTreePath *path;
+            GtkTreeViewColumn *column;
+            gint cell_x, cell_y;
+
+            if(gtk_tree_view_get_path_at_pos( GTK_TREE_VIEW( tree ),
+                                (gint) event->x,
+                                (gint) event->y,
+                                &path, &column, &cell_x, &cell_y ))
+
+            {
+                /* compare iter from tree selection and clicked path */
+                GtkTreeIter iter_p, iter_s;
+                gint fxcid_p, fxcid_s = 0;
+                GtkTreeSelection *selection;
+                GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW( tree ));
+
+                gtk_tree_model_get_iter(model, &iter_p, path);
+                gtk_tree_model_get(model,&iter_p, FXC_ID, &fxcid_p, -1 );
+
+                selection = gtk_tree_view_get_selection(GTK_TREE_VIEW( tree ));
+                gtk_tree_selection_get_selected (selection, NULL, &iter_s);
+                gtk_tree_model_get(model,&iter_s, FXC_ID, &fxcid_s, -1 );
+
+                if( fxcid_p ==  fxcid_s )
+                {
+                    /* user can click on all row, uncomment and fix accordingly the test to check particular column */
+                    //guint column_num = get_treeview_col_number_from_column ( column );
+                    //if(column_num != -1)
+                    {
+                        single_vims( VIMS_CHAIN_ENTRY_SET_STATE );
+                    }
+                }
+            }
+        }
+    }
+    return FALSE; /* lets normal things happening */
+}
+
 static 
 gchar *get_clipboard_fx_parameter_buffer(int *mixing_src, int *mixing_cha, int *enabled, int *fx_id)
 {
