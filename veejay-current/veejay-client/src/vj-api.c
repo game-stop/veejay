@@ -4136,8 +4136,8 @@ static void setup_effectchain_info( void )
 
     setup_tree_text_column( "tree_chain", FXC_ID, "#",0 );
     setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",0 ); //FIXME
-    setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run"); // todo: could be checkbox!!
-    setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // parameter interpolation on/off per entry
+    setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run");
+    setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // TODO parameter interpolation on/off per entry
     setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
     GtkTreeSelection *selection;
 
