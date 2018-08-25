@@ -4153,6 +4153,68 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
     }
 }
 
+void vj_event_mixing_sample_set_speed(void *ptr, const char format[], va_list ap)
+{
+    int args[1];
+    veejay_t *v = (veejay_t*) ptr;
+    int sample_id = -1;
+    char *s = NULL;
+    P_A(args, s, format, ap);
+
+    if(SAMPLE_PLAYING(v))
+    {
+        int entry = sample_get_selected_entry(v->uc->sample_id);
+        sample_id = sample_get_chain_channel(v->uc->sample_id,entry);
+    }
+    if(STREAM_PLAYING(v))
+    {
+        int entry = vj_tag_get_selected_entry(v->uc->sample_id);
+        sample_id   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
+    }
+
+    if( sample_set_speed(sample_id, args[0]) != -1)
+    {
+        veejay_msg(VEEJAY_MSG_INFO, "Changed speed of current mixing sample %d to %d",
+            sample_id,args[0]);
+    }
+    else
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Can't change speed %d on mixing sample %d !",
+            args[0],sample_id);
+    }
+}
+
+void vj_event_mixing_sample_set_dup(void *ptr, const char format[], va_list ap)
+{
+    int args[1];
+    veejay_t *v = (veejay_t*) ptr;
+    int sample_id = -1;
+    char *s = NULL;
+    P_A(args, s, format, ap);
+
+    if(SAMPLE_PLAYING(v))
+    {
+        int entry = sample_get_selected_entry(v->uc->sample_id);
+        sample_id = sample_get_chain_channel(v->uc->sample_id,entry);
+    }
+    if(STREAM_PLAYING(v))
+    {
+        int entry = vj_tag_get_selected_entry(v->uc->sample_id);
+        sample_id   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
+    }
+
+    if( sample_set_framedup(sample_id, args[0]) != -1)
+    {
+        veejay_msg(VEEJAY_MSG_INFO, "Changed frame duplication of current mixing sample %d to %d",
+            sample_id,args[0]);
+    }
+    else
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Can't change frame duplication %d on mixing sample %d !",
+            args[0],sample_id);
+    }
+}
+
 void    vj_event_tag_set_descr( void *ptr, const char format[], va_list ap)
 {
     char str[TAG_MAX_DESCR_LEN];

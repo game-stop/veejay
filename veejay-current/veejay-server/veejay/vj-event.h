@@ -160,6 +160,8 @@ void	vj_event_playmode_rule			(	void *ptr,	const char format[],	va_list ap );
 void 	vj_event_set_screen_size		(	void *ptr, 	const char format[], 	va_list ap	);
 #endif
 void	vj_event_sample_set_dup			(	void *ptr,	const char format[],	va_list ap	);
+void vj_event_mixing_sample_set_speed(void *ptr, const char format[], va_list ap);
+void vj_event_mixing_sample_set_dup(void *ptr, const char format[], va_list ap);
 void 	vj_event_tag_del			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_tag_new_raw			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_tag_new_generator		(  	void *ptr,	const char format[], 	va_list ap );
