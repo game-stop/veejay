@@ -125,7 +125,10 @@ typedef struct
 
 static hash_t *keyboard_events = NULL;
 
-static  vj_keyboard_event *keyboard_event_map_[2048];
+// WARNING size depend on this formula (modifier * SDLK_LAST) + key
+// FIXME should be max modifier value when modifier combinaison possible ?
+// here : 15 * 330 + 330 = 5280 + align*1024
+static  vj_keyboard_event *keyboard_event_map_[6144];
 
 typedef struct
 {
@@ -215,16 +218,19 @@ enum {
 };
 
 #ifdef HAVE_SDL
-#define VIMS_MOD_CAPSLOCK 4
-#define VIMS_MOD_SHIFT  3
-#define VIMS_MOD_NONE   0
-#define VIMS_MOD_CTRL   2
-#define VIMS_MOD_ALT    1
+//TODO Check if doc for keybinding should be updated
+typedef enum { //WARNING ; on change this think to update keyboard_event_map_[] !!!!
+  VIMS_MOD_NONE  = 0x0000,
+  VIMS_MOD_ALT= 0x0001,
+  VIMS_MOD_CTRL= 0x0002,
+  VIMS_MOD_SHIFT = 0x0004,
+  VIMS_MOD_CAPSLOCK = 0x0008,
+} KEYMod;
 
 static struct {                 /* hardcoded keyboard layout (the default keys) */
     int event_id;           
     int key_sym;            
-    int key_mod;
+    KEYMod key_mod;
     const char *value;
 } vj_event_default_sdl_keys[] = {
 
@@ -1674,14 +1680,14 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     veejay_t *v =  (veejay_t*) ptr;
     int vims_mod = 0;
 
-    if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT ))
-        vims_mod = VIMS_MOD_SHIFT;
-    if( (mod & KMOD_LALT) || (mod & KMOD_ALT) )
-        vims_mod = VIMS_MOD_ALT;
-    if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) )
-        vims_mod = VIMS_MOD_CTRL;
+    if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT )) // could use direct KMOD_SHIFT ?
+        vims_mod |= VIMS_MOD_SHIFT;
+    if( (mod & KMOD_LALT) || (mod & KMOD_ALT) ) // ONLY LEFT SHIFT !!!
+        vims_mod |= VIMS_MOD_ALT;
+    if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) ) // Both CTRL (but not explicit l & r)
+        vims_mod |= VIMS_MOD_CTRL;
     if( (mod & KMOD_CAPS) ) {
-        vims_mod = VIMS_MOD_CAPSLOCK;
+        vims_mod = VIMS_MOD_CAPSLOCK; // FIXME change to |= or not ???
     }
 
     int vims_key = key->keysym.sym;
