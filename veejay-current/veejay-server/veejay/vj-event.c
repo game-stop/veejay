@@ -218,7 +218,6 @@ enum {
 };
 
 #ifdef HAVE_SDL
-//TODO Check if doc for keybinding should be updated
 typedef enum { //WARNING ; on change this think to update keyboard_event_map_[] !!!!
   VIMS_MOD_NONE  = 0x0000,
   VIMS_MOD_ALT= 0x0001,
@@ -226,6 +225,11 @@ typedef enum { //WARNING ; on change this think to update keyboard_event_map_[] 
   VIMS_MOD_SHIFT = 0x0004,
   VIMS_MOD_CAPSLOCK = 0x0008,
 } KEYMod;
+
+#define VIMS_MOD_ALT_SHIFT        VIMS_MOD_ALT|VIMS_MOD_SHIFT
+#define VIMS_MOD_CTRL_SHIFT       VIMS_MOD_CTRL|VIMS_MOD_SHIFT
+#define VIMS_MOD_CTRL_ALT         VIMS_MOD_CTRL|VIMS_MOD_ALT
+#define VIMS_MOD_CTRL_ALT_SHIFT   VIMS_MOD_CTRL|VIMS_MOD_ALT|VIMS_MOD_SHIFT
 
 static struct {                 /* hardcoded keyboard layout (the default keys) */
     int event_id;           
@@ -263,14 +267,31 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_VIDEO_SET_SLOW,          SDLK_a,         VIMS_MOD_ALT,   "1" },
     { VIMS_VIDEO_SET_SLOW,          SDLK_s,         VIMS_MOD_ALT,   "2" },
     { VIMS_VIDEO_SET_SLOW,          SDLK_d,         VIMS_MOD_ALT,   "3" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_e,         VIMS_MOD_ALT,   "4" },  
-    { VIMS_VIDEO_SET_SLOW,          SDLK_f,         VIMS_MOD_ALT,   "5" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_g,         VIMS_MOD_ALT,   "6" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_h,         VIMS_MOD_ALT,   "7" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_j,         VIMS_MOD_ALT,   "8" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_k,         VIMS_MOD_ALT,   "9" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_l,         VIMS_MOD_ALT,   "10"    },
-#ifdef HAVE_SDL
+    { VIMS_VIDEO_SET_SLOW,          SDLK_f,         VIMS_MOD_ALT,   "4" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_g,         VIMS_MOD_ALT,   "5" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_h,         VIMS_MOD_ALT,   "6" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_j,         VIMS_MOD_ALT,   "7" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_k,         VIMS_MOD_ALT,   "8" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_l,         VIMS_MOD_ALT,   "9"    },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_a,         VIMS_MOD_SHIFT,   "1" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_s,         VIMS_MOD_SHIFT,   "2" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_d,         VIMS_MOD_SHIFT,   "3" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_f,         VIMS_MOD_SHIFT,   "4" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_g,         VIMS_MOD_SHIFT,   "5" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_h,         VIMS_MOD_SHIFT,   "6" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_j,         VIMS_MOD_SHIFT,   "7" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_k,         VIMS_MOD_SHIFT,   "8" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_l,         VIMS_MOD_SHIFT,   "9" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_a,         VIMS_MOD_ALT_SHIFT,   "1" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_s,         VIMS_MOD_ALT_SHIFT,   "2" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_d,         VIMS_MOD_ALT_SHIFT,   "3" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_f,         VIMS_MOD_ALT_SHIFT,   "4" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_g,         VIMS_MOD_ALT_SHIFT,   "5" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_h,         VIMS_MOD_ALT_SHIFT,   "6" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_j,         VIMS_MOD_ALT_SHIFT,   "7" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_k,         VIMS_MOD_ALT_SHIFT,   "8" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_l,         VIMS_MOD_ALT_SHIFT,   "9" },
+    #ifdef HAVE_SDL
     { VIMS_FULLSCREEN,              SDLK_f,         VIMS_MOD_CTRL,  NULL    },
 #endif  
     { VIMS_CHAIN_ENTRY_DOWN,        SDLK_KP_MINUS,  VIMS_MOD_NONE,  "1" },
