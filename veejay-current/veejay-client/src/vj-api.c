@@ -6698,12 +6698,17 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( ww ));
         if(deckpage != 1)
         {
-            if( (reload_entry_tick_ % ((int)info->el.fps/2))==0)
+		    int rate = 1;
+    		if( info->el.fps > 1 ) {
+				rate = info->el.fps/2; 
+			}
+
+            if( (reload_entry_tick_ % rate)==0)
             {
                 info->uc.reload_hint[HINT_ENTRY] = 1;
             }
             if( deckpage == 5 && info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR){
-                if( (reload_entry_tick_ % ((int)info->el.fps/2))==0)
+                if( (reload_entry_tick_ % rate)==0)
                 {
                     info->uc.reload_hint[HINT_GENERATOR] = 1;
                 }
