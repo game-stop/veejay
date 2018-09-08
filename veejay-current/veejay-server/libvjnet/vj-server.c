@@ -373,7 +373,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 
 	size_t bl = RUP8(buflen);
 	if( bl < RECV_SIZE ) {
-		bl = RECV_SIZE;
+		bl = RECV_SIZE; //@ Ensure that receive buffer is minimally 4kb
 	}
 
 	vjs->recv_bufsize = bl;
@@ -445,6 +445,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 	if ( _vj_server_classic( vjs,port_offset ) )
 		return vjs;
 
+	//running in mcast mode
 	free( vjs->recv_buf );
 	free( vjs );
 
@@ -942,6 +943,28 @@ int	vj_server_new_connection(vj_server *vje)
 	return 0;
 }
 
+static void vj_server_flush(int sock_fd)
+{
+	char buffer[RECV_SIZE];
+	int n;
+	
+flushmore_lbl:
+	n = recv( sock_fd, buffer, RECV_SIZE, 0 ); //@ read 4 kb
+	if( n == - 1) {
+		if( errno == EAGAIN ) {
+			goto flushmore_lbl;
+		}
+		veejay_msg( 0, "Error: %s", strerror(errno) );
+		return;		
+	}
+
+	if( n == RECV_SIZE && errno == EAGAIN) //@ read 4kb, but still data left
+	{ 
+		goto flushmore_lbl;
+	}
+
+}
+
 //@ return 0 when work is done
 int	vj_server_update( vj_server *vje, int id )
 {
@@ -970,35 +993,65 @@ int	vj_server_update( vj_server *vje, int id )
 		
 		char *ptr = vje->recv_buf;
 		
-		n = recv( sock_fd, ptr, 1, 0 );
+		n = recv( sock_fd, ptr, 1, 0 ); //@ all read operations are BLOCKING
 		if( n != 1 ) {
-			bytes_received = -1;
-		}
-		else {
-			if( *ptr == 'V' || *ptr == 'K' || *ptr == 'D' ) {
-				ptr ++;
-readmore_lbl:
-				n = recv( sock_fd, ptr, RECV_SIZE, 0 ); //@ read 4 kb
-				if( n == - 1) {
-					if( errno == EAGAIN ) {
-						goto readmore_lbl;
-					}
-					veejay_msg( 0, "Error: %s", strerror(errno) );
-					bytes_received = -1;
-				}
-				if( n == RECV_SIZE && errno == EAGAIN) //@ read 4kb, but still data left
-				{ // deal with large messages
-					ptr += n;
-					bytes_received += n;
-					if( bytes_received > max ) {
-						veejay_msg(VEEJAY_MSG_ERROR,"VIMS message does not fit receive buffer.");
-						return -1;
-					}
-					goto readmore_lbl;
-				}
-				bytes_received += n;
+			if(n == -1) {
+				veejay_msg(0, "Error: %s", strerror(errno));
+				return -1;
+			}
+			if(n == 0) {
+				veejay_msg(VEEJAY_MSG_DEBUG, "Something that shouldn't happen, just happened!" );
+				return 0;
 			}
 		}
+		
+		int isD = (*ptr == 'D');
+
+		if( *ptr == 'V' || *ptr == 'K' || isD ) {
+			ptr ++;
+readmore_lbl:
+			n = recv( sock_fd, ptr, RECV_SIZE, 0 ); //@ read 4 kb
+			if( n == - 1) {
+				if( errno == EAGAIN ) {
+					goto readmore_lbl;
+				}
+				veejay_msg( 0, "Error: %s", strerror(errno) );
+				return -1;
+			}
+
+			if( n == RECV_SIZE && errno == EAGAIN) //@ read 4kb, but still data left
+			{ // deal with large messages
+				char *start = ptr;
+				ptr += n;
+				bytes_received += n;
+				if( bytes_received > max ) {
+					veejay_msg(VEEJAY_MSG_ERROR,"VIMS message does not fit the receive buffer.");
+					return -1;
+				}
+				if( bytes_received == max ) {
+					veejay_msg(VEEJAY_MSG_WARNING,"VIMS message queue is full, discarding new messages.");
+					vj_server_flush( sock_fd );
+
+					//now, delete partial messages from message buffer
+					if(!isD) {
+						int k;
+						for( k = RECV_SIZE; k > 0; k -- ) {
+							if(start[k] == ';') {
+								break;
+							}
+							start[k] = '\0';
+							bytes_received --;
+						}
+					}
+
+					goto end_lbl;
+				}
+				goto readmore_lbl;
+			}
+			bytes_received += n;
+		}
+
+end_lbl:
 		//bytes_received = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "received %d bytes from handle %d (link %d)\n", 

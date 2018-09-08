@@ -179,6 +179,7 @@ static  int current_macro_ = 0;
 static  int macro_status_ = 0;
 static  int macro_line_[3] = {-1 ,0,0};
 #define MAX_MACROS 16
+#define MAX_VIMS_ARGUMENTS 16
 typedef struct {
     char *msg[MAX_MACROS];
 } macro_block_t;
@@ -1237,7 +1238,9 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
     char *fmt = vj_event_vevo_get_event_format( net_id );
     int flags = vj_event_vevo_get_flags( net_id );
     int fmt_offset = 1; 
-    vims_arg_t  vims_arguments[16];
+    vims_arg_t  vims_arguments[MAX_VIMS_ARGUMENTS];
+
+    veejay_memset(vims_arguments, 0, sizeof(vims_arguments));
 
     if(!vj_event_verify_args(args , net_id, arglen, np, prefixed, fmt ))
     {
@@ -1291,9 +1294,10 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
             vims_arguments[i].value = (void*) &(dv);
         }
         i++;
+	fmt_offset += 3;
     }
 
-    while( i < 16 ) {
+    while( i < MAX_VIMS_ARGUMENTS ) {
         vims_arguments[i].value = 0;
         i++;
     }
@@ -1316,6 +1320,7 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
                 vims_arguments[13].value,
                 vims_arguments[14].value,
                 vims_arguments[15].value);
+
     fmt_offset = 1;
     for ( i = 0; i < np ; i ++ )
     {
@@ -1424,7 +1429,9 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
         v->rmodes[ v->uc->current_link ] = -1000;
     }
 */
-    int i_args[16];
+    int i_args[MAX_VIMS_ARGUMENTS];
+
+    veejay_memset(i_args, 0, sizeof(i_args) );
 
     np = vj_event_vevo_get_num_args( net_id );
         
