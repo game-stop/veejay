@@ -105,7 +105,8 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	{
 		a = CLAMP_Y(a);
 		b = CLAMP_Y(b);
-		if( a == 0 ) a = 1; else if ( b == 0 ) b = 1;
+		if( a == 0 ) a = 1; 
+		if( b == 0 ) b = 1;
 		int p = 0xff - ((0xff-a) * (0xff-a)) / a;
 		int q = 0xff - ((0xff-b) * (0xff-b)) / b;
 		p = ( 0xff - ((0xff-p) * (0xff - a)) / q);
