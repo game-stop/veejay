@@ -2773,15 +2773,13 @@ int vj_tag_chain_remove(int t1, int index)
     return 1;
 }
 
-
+// very old code, 2 callers; 150 and 255 size of dst
 void vj_tag_get_source_name(int t1, char *dst)
 {
     vj_tag *tag = vj_tag_get(t1);
     if (tag) {
-        sprintf(dst, "%s", tag->source_name);
-    } else {
-        vj_tag_get_description( tag->source_type, dst );
-    }
+        snprintf(dst,150, "%s", tag->source_name);
+    } 
 }
 
 void    vj_tag_get_by_type(int id,int type, char *description )
