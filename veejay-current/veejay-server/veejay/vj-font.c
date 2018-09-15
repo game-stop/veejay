@@ -452,6 +452,9 @@ int	vj_font_load_srt( void *font, const char *filename )
 	rewind( f );
 
 	ff->fd_buf = (uint8_t*) vj_calloc( len );
+	if(!ff->fd_buf) {
+		return 0;
+	}
 	fread( ff->fd_buf, len,1, f );
 
 	fclose( f );
@@ -459,7 +462,6 @@ int	vj_font_load_srt( void *font, const char *filename )
 	//parse the file
 	unsigned char *str = ff->fd_buf;
 	int offset   = 0;
-
 
 	font_lock( ff );
 	while( offset < len )
@@ -481,6 +483,7 @@ int	vj_font_load_srt( void *font, const char *filename )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to parse timecode in srt file");
 			font_unlock(ff);
+			free(line);
 			return 0;
 		}
 		n = strlen( (char*)timecode );
@@ -493,6 +496,8 @@ int	vj_font_load_srt( void *font, const char *filename )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to parse subtitle text in srt file");
 			font_unlock(ff);
+			free(line);
+			free(timecode);
 			return 0;
 		}
 		n = strlen ( (char*) text );
@@ -509,6 +514,9 @@ int	vj_font_load_srt( void *font, const char *filename )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "It makes no sense to create a subtitle sequence with length 0");
 			font_unlock(ff);
+			free(line);
+			free(timecode);
+			free(text);
 			return 0;
 		}
 
