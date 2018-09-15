@@ -75,6 +75,7 @@ void	get_xml_str_n( xmlDocPtr doc, xmlNodePtr node, char *val, size_t len )
 	xmlChar *xmlTemp = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 	char *chTemp = UTF8toLAT1(xmlTemp);
 	strncpy( val, chTemp, len );
+	free(chTemp);
 }
 
 float	get_xml_float( xmlDocPtr doc, xmlNodePtr node )
