@@ -1000,7 +1000,7 @@ int	vj_server_update( vj_server *vje, int id )
 				return -1;
 			}
 			if(n == 0) {
-				veejay_msg(VEEJAY_MSG_DEBUG, "Something that shouldn't happen, just happened!" );
+				veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection" );
 				return 0;
 			}
 		}
