@@ -237,6 +237,9 @@ void viewport_line (uint8_t *plane,
   if( x2 < 0 ) x2 = 0; else if (x2 > w ) x2 = w;
   if( y2 < 0 ) y2 = 0; else if (y2 > h ) y2 = h;
 
+  if( x1 == x2 || y1 == y2 )
+     return;
+
   /* sort line */
   if (x2 < x1) {
     t  = x1;
@@ -3267,7 +3270,6 @@ void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *ou
 	register uint32_t n,i,x,y;
 
 	// clear the yuyv plane (black)
-	y  = ty1 * w;
 	yuyv_plane_clear( len*2, out_img); 
 
 	for( y = ty1 ; y < ty2; y ++ )
