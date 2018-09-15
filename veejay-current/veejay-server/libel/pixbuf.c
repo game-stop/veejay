@@ -263,15 +263,18 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			pic->space + len + ulen,
 		    pic->space + len + ulen + ulen);
 
-	free( pic->pixels );
-	pic->pixels = NULL;
-
 	if(!pic->img) {
 		free(pic->space);
 		free(pic->filename);
 		free(pic);
 		return NULL;
 	}
+
+	if(pic->pixels) {
+		free(pic->pixels);
+		pic->pixels = NULL;
+	}
+
 
 	return (void*) pic;
 #else
