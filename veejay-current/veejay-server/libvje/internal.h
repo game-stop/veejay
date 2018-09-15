@@ -146,6 +146,7 @@
 #include "./effects/pixelate.h"
 #include "./effects/porterduff.h"
 #include "./effects/posterize.h"
+#include "./effects/posterize2.h"
 #include "./effects/radcor.h"
 #include "./effects/radialblur.h"
 #include "./effects/radioactive.h"
@@ -196,7 +197,7 @@
 #include "./transitions/vbar.h"
 #include "./transitions/wipe.h"
 
-#define VJ_IMAGE_EFFECT_MIN 91
+#define VJ_IMAGE_EFFECT_MIN 90
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -425,6 +426,7 @@ enum {
 	VJ_IMAGE_EFFECT_BWOTSU = 93,
 	VJ_IMAGE_EFFECT_MEANFILTER = 92,
 	VJ_IMAGE_EFFECT_BGPUSH = 91,
+	VJ_IMAGE_EFFECT_POSTERIZE2 = 90,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

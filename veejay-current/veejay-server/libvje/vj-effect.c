@@ -552,6 +552,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_IMAGE_EFFECT_RANDNOISE]			= randnoise_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_MEANFILTER]			= meanfilter_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_BGPUSH]			= bgpush_init(width,height);
+	vj_effects[VJ_IMAGE_EFFECT_POSTERIZE2]			= posterize2_init(width,height);
 
 	max_width = width;
 	max_height = height;

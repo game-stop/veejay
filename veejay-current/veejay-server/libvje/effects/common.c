@@ -1152,6 +1152,9 @@ int calculate_luma_value(uint8_t *Y, int w , int h) {
 		sum += *(Y++);	
 		i--;
 	}
+	if( sum == 0 )
+		return pixel_Y_lo_;
+
 	return (sum/len);
 }
 
@@ -1163,6 +1166,9 @@ int calculate_cbcr_value(uint8_t *Cb,uint8_t *Cr, int w, int h) {
 		sum += 	( Cb[i] + Cr[i] ) >> 1;
 		i--;
 	}
+	if( sum == 0 )
+		return pixel_U_lo_;
+
 	return (sum/len);
 
 }
@@ -1758,6 +1764,8 @@ uint32_t 	veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M)
 	uint32_t Eq[5000];
 
 	uint32_t n_labels = 0;
+
+	veejay_memset(Eq, 0, sizeof(Eq)); 
 
 	for( y = 1; y < (h-1); y ++ )
 	{

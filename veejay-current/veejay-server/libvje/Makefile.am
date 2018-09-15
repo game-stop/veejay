@@ -23,7 +23,7 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/diff.c effects/fibdownscale.c effects/killchroma.c \
 			effects/lumamagick.c effects/autoeq.c effects/colorhis.c \
 		    effects/mirrors.c effects/colormap.c effects/negatechannel.c effects/negation.c \
-			effects/overclock.c effects/dissolve.c effects/opacity.c effects/iris.c effects/posterize.c \
+			effects/overclock.c effects/dissolve.c effects/opacity.c effects/iris.c effects/posterize.c effects/posterize2.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
 			effects/frameborder.c effects/dummy.c effects/rawman.c effects/rawval.c \
