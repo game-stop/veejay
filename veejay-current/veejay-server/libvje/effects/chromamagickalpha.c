@@ -1001,8 +1001,8 @@ static void chromamagicalpha_reflect(VJFrame *frame, VJFrame *frame2, int op_a)
 		a = Y[i];
 		b = Y2[i];
 
-		if ( b > op_a ) c = b;
-		else {
+		if ( b >= op_a )
+		{
 			Y[i] = (a * a) / ( 256 - b );
 
 			a = Cb[i];

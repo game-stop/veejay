@@ -86,8 +86,6 @@ void isolate_apply( VJFrame *frame, int i_angle, int r, int g, int b, int opacit
     /* obtain coordinate system for cb / cr */
     accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
  
-    tmp = 1 / kg1;
-
     /* intialize pointers */
     fg_cb = Cb;
     fg_cr = Cr;

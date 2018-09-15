@@ -137,7 +137,7 @@ static inline uint8_t evaluate_pixel(
 			peak_index = i;
 		}
 	}
-	if( peak_value < 16)
+	if( peak_value <= pixel_Y_lo_)
 		return image[ y * w + x];
 
 	return( (uint8_t) (  y_map[ peak_index] / peak_value ));
@@ -213,14 +213,19 @@ static inline pixel_t evaluate_pixel_c(
 	}
 	pixel_t val;
 
+	if(peak_value == 0) {
+		val.y = pixel_Y_lo_;
+		val.u = 128;
+		val.v = 128;
+		return val;
+	}
+
 	val.y = y_map[peak_index] / peak_value;
 	val.u = cb_map[peak_index] / peak_value;
 	val.v = cr_map[peak_index] / peak_value;
 
 	return val;	
-
 }
-
 
 void neighbours_apply( VJFrame *frame, int brush_size, int intensity_level, int mode )
 {
