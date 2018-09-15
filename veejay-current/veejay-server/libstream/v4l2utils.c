@@ -1065,6 +1065,12 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 		}
 
 		v->buffers = (bufs*) calloc( v->reqbuf.count, sizeof(*v->buffers));
+		if(!v->buffers) {
+			veejay_msg(0, "v4l2: Memory allocation failed");
+			free(v);
+			close(fd);
+			return NULL;
+		}
 
 		for( i = 0; i < v->reqbuf.count; i ++ ) {
 			memset( &(v->buffer), 0, sizeof(v->buffer));
@@ -1091,6 +1097,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 		//		munmap( v->buffer[k].start, v->buffer[k].length );
 	
 				free(v->buffers);
+				v->buffers = NULL;
 				//free(v);
 				//close(fd);
 				//return NULL;
@@ -1102,6 +1109,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 		if( v4l2_vidioc_qbuf( v ) == -1 ) {
 				veejay_msg(0, "v4l2: VIDIOC_QBUF failed with:%d, %s", errno,strerror(errno));
 				free(v->buffers);
+				v->buffers = NULL;
 			//	free(v);
 			//	close(fd);
 			//	return NULL;
@@ -1120,14 +1128,14 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
  				v->fd = open( file , O_RDWR );
 				if(v->fd <= 0 ) {
 					veejay_msg(0,"v4l2: Cannot re-open device:%d,%s",errno,strerror(errno));
-					free(v->buffers);
+					if(v->buffers) free(v->buffers);
 					free(v);
 					return NULL;
 				}
 				v->rw = 1;
 				goto v4l2_rw_fallback;
 			} else{
-			  	free(v->buffers);
+			  	if(v->buffers) free(v->buffers);
 				free(v);
 				close(fd);
 				return NULL;
@@ -1154,6 +1162,12 @@ v4l2_rw_fallback:
 			v->format.fmt.pix.sizeimage = min;
 
 		v->sizeimage = v->format.fmt.pix.sizeimage;
+
+		if(v->buffers != NULL) {
+			veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: read/write buffer is dirty, re-allocate");
+			free(v->buffers);
+		}
+
 		v->buffers = (bufs*) calloc( 1, sizeof(*v->buffers));
 		veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: read/write buffer size is %d bytes", v->format.fmt.pix.sizeimage );
 
