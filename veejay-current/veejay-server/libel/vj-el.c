@@ -1923,11 +1923,9 @@ editlist	*vj_el_clone(editlist *el)
 
 	if( vj_el_framelist_clone( el, clone ) )
 		return clone;
-	else
-	{
-		if(clone) vj_el_free(clone);
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot clone: Memory error?!");
-	}	
 	
-	return clone;
+	if(clone) vj_el_free(clone);
+	veejay_msg(VEEJAY_MSG_ERROR, "Cannot clone: Memory error?!");\
+	
+	return NULL;
 }
