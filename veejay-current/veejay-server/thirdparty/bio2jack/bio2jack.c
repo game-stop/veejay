@@ -1984,7 +1984,9 @@ JACK_GetMaxOutputBufferedBytes(int deviceID)
   jack_driver_t *drv = getDriver(deviceID);
   long return_val;
 
-  if(drv->pPlayPtr == 0 || drv->bytes_per_jack_output_frame == 0) return_val = 0;
+  if(drv->pPlayPtr == 0 || drv->bytes_per_jack_output_frame == 0) {
+	  return 0;
+  }
 
   /* adjust from jack bytes to client bytes */
   return_val =
@@ -2016,7 +2018,9 @@ JACK_GetMaxInputBufferedBytes(int deviceID)
   jack_driver_t *drv = getDriver(deviceID);
   long return_val;
 
-  if(drv->pRecPtr == 0 || drv->bytes_per_jack_input_frame == 0) return_val = 0;
+  if(drv->pRecPtr == 0 || drv->bytes_per_jack_input_frame == 0) {
+	  return 0;
+  }
 
   /* adjust from jack bytes to client bytes */
   return_val =
