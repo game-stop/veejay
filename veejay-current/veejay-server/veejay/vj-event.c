@@ -457,7 +457,7 @@ switch(*c++) {\
             __z++ ;\
         }\
     break;\
-    case 'd': a[__z] = *( va_arg(d, int*)); __z++ ;\
+    case 'd': if(a != NULL) { a[__z] = *( va_arg(d, int*)); __z++ ;}\
     break; }\
 }\
 }
@@ -3109,14 +3109,11 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
             if(skel)
             {
                 skel->edit_list = el;
-                if(!skel->edit_list)
-                    veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy EDL !!");
-            }
-
-            if(sample_store(skel)==0) 
-            {
-                veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d]", skel->sample_id);
-            }
+            	if(sample_store(skel)==0) 
+            	{
+               		veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d]", skel->sample_id);
+            	}
+	    }
         
         }
         else
