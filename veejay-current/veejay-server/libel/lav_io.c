@@ -425,12 +425,9 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
    int16_t *qt_audio = (int16_t *)buff, **qt_audion;
    int channels = lav_audio_channels(lav_file);
    int bits = lav_audio_bits(lav_file);
-#ifdef HAVE_LIBQUICKTIME
    int res=0;
-#endif
-   qt_audion = malloc(channels * sizeof (int16_t **));
    for (i = 0; i < channels; i++)
-    qt_audion[i] = (int16_t *)malloc(samps * lav_file->bps);
+    qt_audion[i] = (int16_t *)malloc(samps * lav_file->bps * sizeof(int16_t));
 #endif
     switch(lav_file->format )
     {
@@ -439,6 +436,7 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
       case 'Q':
     if (bits != 16 || channels > 1)
      {
+	qt_audion = (int16_t**) malloc(channels * sizeof (int16_t*));
     /* Deinterleave the audio into the two channels and/or convert
      * bits per sample to the required format.
      */
@@ -895,9 +893,9 @@ int lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
         int16_t *qt_audio = (int16_t *)audbuf, **qt_audion;
         int channels = lav_audio_channels(lav_file);
         uint8_t b0, b1;
-        qt_audion = malloc(channels * sizeof (int16_t **));
+        qt_audion = (int16_t**) malloc(channels * sizeof (int16_t*));
         for (i = 0; i < channels; i++)
-            qt_audion[i] = (int16_t *)malloc(samps * lav_file->bps);
+            qt_audion[i] = (int16_t *)malloc(samps * lav_file->bps * sizeof(int16_t));
 
         start_pos = quicktime_audio_position(lav_file->qt_fd, 0);
         lqt_decode_audio_track(lav_file->qt_fd, qt_audion, NULL, samps, 0);
