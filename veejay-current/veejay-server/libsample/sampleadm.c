@@ -569,8 +569,11 @@ int sample_get_longest(int sample_id)
                 tmp = sample_get_endFrame( _id) - sample_get_startFrame(_id);
                 if(tmp>0)
                 {
-                    tmp = tmp / sample_get_speed(_id);
-                    if(tmp < 0) tmp *= -1;
+					int mix_speed = sample_get_speed(_id);
+					if(mix_speed != 0) {
+                    	tmp = tmp / mix_speed;
+					}
+					if(tmp < 0) tmp *= -1;
                     if(sample_get_looptype(_id)==2) tmp *= 2; //pingpong loop underlying sample
                 }
                 if(tmp > duration) duration = tmp; //which one is longer ...    
