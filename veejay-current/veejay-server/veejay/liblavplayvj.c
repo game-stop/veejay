@@ -1430,7 +1430,6 @@ static	void	veejay_event_handle(veejay_t *info)
 			{
 				SDL_MouseButtonEvent *mev = &(event.button);
 				alt_pressed = (mod & KMOD_RSHIFT );
-				shift_pressed = (mod & KMOD_LSHIFT );
 				if( mod == 0x1080 || mod == 0x1040 || (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL) )
 					ctrl_pressed = 1; 
 				else
@@ -3377,7 +3376,9 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	{
 		if( !sample_usable_edl( id ) )
 		{
-			veejay_msg(0, "Sample %d is a picture ...", id ); //FIXME check if this can be removed
+			veejay_msg(0, "Sample %d is a picture ...", id );
+			if(files[0])
+				free(files[0]);
 			return -1;
 		}
 
@@ -3446,6 +3447,8 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		}
 		else {
 			veejay_msg(VEEJAY_MSG_ERROR,"Failed to create new sample from file '%s'", files[0]);
+			if(files[0])
+				free(files[0]);
 			return -1;
 		}
 	}
@@ -3470,7 +3473,6 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
 		(video_playback_setup *) info->settings;
 	uint64_t n, i;
 	uint64_t c = el->video_frames;
-	long end   = c;
 	if( el->is_empty )
 		c -= 2;
 
@@ -3485,7 +3487,7 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
 		return 0;
 	}
 
-	end = el->video_frames;
+	long end = el->video_frames;
 
 	el->frame_list = (uint64_t *) realloc(el->frame_list, (end + el->num_frames[n])*sizeof(uint64_t));
 	if (el->frame_list==NULL)
