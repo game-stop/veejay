@@ -547,10 +547,10 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 	    //mjpeg_info("YUV 4:4:4 %d.\n",y);
 	    row1_444[y] =
 		(unsigned char *) malloc(dinfo.output_width *
-					 sizeof(char));
+					 sizeof(unsigned char));
 	    row2_444[y] =
 		(unsigned char *) malloc(dinfo.output_width *
-					 sizeof(char));
+					 sizeof(unsigned char));
 	}
 	//mjpeg_info("YUV 4:4:4 sampling encountered ! Allocating done.\n");
 	scanarray[1] = row1_444;
