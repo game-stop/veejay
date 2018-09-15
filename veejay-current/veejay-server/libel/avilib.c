@@ -233,7 +233,7 @@ static int avi_add_chunk(avi_t *AVI, unsigned char *tag, unsigned char *data, in
 static int avi_ixnn_entry(avi_t *AVI, avistdindex_chunk *ch, avisuperindex_entry *en) 
 {
     int bl = 0, k;
-    unsigned int max = ch->nEntriesInUse * sizeof (uint32_t) * ch->wLongsPerEntry + 24; // header
+    unsigned int max = ch->nEntriesInUse * sizeof (avistdindex_entry) * ch->wLongsPerEntry + 24; // header
     unsigned char *ix00 = vj_malloc (max);
 //  char dfcc[5];
 //  veejay_memcpy (dfcc, ch->fcc, 4);
