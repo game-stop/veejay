@@ -153,7 +153,7 @@ static const char *intro =
 static const char *license =
 	"This program is licensed as\nFree Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejayhq.net\n";
 static const char *copyr =
-	"(C) 2002-2015 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
+	"(C) 2002-2018 Copyright N.Elburg et all (nwelburg@gmail.com)\n";
 
 #define MLIMIT(var, low, high) \
 if((var) < (low)) { var = (low); } \
