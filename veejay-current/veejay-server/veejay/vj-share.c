@@ -31,7 +31,7 @@
 #include <libvjnet/vj-client.h>
 #include <veejay/vj-share.h>
 #include <veejay/vj-shm.h>
-static vj_client	*vj_share_connect(char *hostname, int port)
+static vj_client	*vj_share_connect(const char *hostname, int port)
 {
 	vj_client *c = vj_client_alloc( 0,0,0 );
 	if(!c) return NULL;
