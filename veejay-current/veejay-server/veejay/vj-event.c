@@ -4196,30 +4196,26 @@ void vj_event_mixing_sample_set_dup(void *ptr, const char format[], va_list ap)
 {
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
-    int sample_id = -1;
-    P_A(args,sizeof(args),NULL,0, format, ap);
+    P_A(args,sizeof(args),NULL,0,format, ap);
 
-    if(SAMPLE_PLAYING(v))
-    {
-        int entry = sample_get_selected_entry(v->uc->sample_id);
-        sample_id = sample_get_chain_channel(v->uc->sample_id,entry);
-    }
-    if(STREAM_PLAYING(v))
-    {
-        int entry = vj_tag_get_selected_entry(v->uc->sample_id);
-        sample_id   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
-    }
-
-    if( sample_set_framedup(sample_id, args[0]) != -1)
-    {
-        veejay_msg(VEEJAY_MSG_INFO, "Changed frame duplication of current mixing sample %d to %d",
-            sample_id,args[0]);
-    }
-    else
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Can't change frame duplication %d on mixing sample %d !",
-            args[0],sample_id);
-    }
+	if(SAMPLE_PLAYING(v)) {
+		int entry= sample_get_selected_entry( v->uc->sample_id );
+		int type = sample_get_chain_source( v->uc->sample_id, entry );
+		if(type == 0) {
+			int sample_id = sample_get_chain_channel( v->uc->sample_id, entry );
+			sample_set_framedup( sample_id, args[0] );
+			veejay_msg(VEEJAY_MSG_INFO, "Changed speed of mixing sample %d to %d on entry %d",sample_id,args[0], entry);
+		}
+	}
+	if(STREAM_PLAYING(v)) {
+		int entry = vj_tag_get_selected_entry( v->uc->sample_id );
+		int type = vj_tag_get_chain_source( v->uc->sample_id, entry );
+		if( type == 0 ) {
+			int sample_id = vj_tag_get_chain_channel( v->uc->sample_id, entry );
+			sample_set_framedup( sample_id, args[0] );
+			veejay_msg(VEEJAY_MSG_INFO, "Changed speed of mixing sample %d to %d on entry %d",sample_id,args[0], entry);
+		}
+	}
 }
 
 void    vj_event_tag_set_descr( void *ptr, const char format[], va_list ap)
