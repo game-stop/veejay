@@ -81,6 +81,10 @@
 
 #include <libplugger/plugload.h>
 
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
+
 #define MAX_ARGUMENTS (SAMPLE_MAX_PARAMETERS + 8)
 
 static int use_bw_preview_ = 0;
@@ -463,39 +467,57 @@ if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8
  if(args == 0) args = v->uc->sample_id;\
 }
 
-#define P_A(a,b,c,d)\
-{\
-int __z = 0;\
-char *__tmpstr = NULL;\
-if(a!=NULL){\
-unsigned int __rp;\
-unsigned int __rplen = (sizeof(a) / sizeof(int) );\
-for(__rp = 0; __rp < __rplen; __rp++) a[__rp] = 0;\
-}\
-while(*c) { \
-if(__z > _last_known_num_args )  break; \
-switch(*c++) {\
-    case 's':\
-        if( b != NULL ) {\
-            __tmpstr = (char*)va_arg(d,char*);\
-            if(__tmpstr != NULL) {\
-                sprintf( b,"%s",__tmpstr);\
-            }\
-            __z++ ;\
-        }\
-    break;\
-    case 'd': if(a != NULL) { a[__z] = *( va_arg(d, int*)); __z++ ;}\
-    break; }\
-}\
+
+static inline void P_A(int *args, size_t argsize, char *str, size_t strsize, const char *format, va_list ap)
+{
+	unsigned int index;
+	int num_args = (argsize > 0 ? argsize / sizeof(int) : 0);
+
+#ifdef STRICT_CHECKING
+	if( args == NULL ) {
+		assert( argsize == 0 );
+	}
+	if( str == NULL ) {
+		assert( strsize == 0 );
+	}
+	if( argsize > 0 ) {
+		assert(args != NULL);
+	}
+	if( strsize > 0 ) {
+		assert(str != NULL);
+	}
+#endif
+
+	for( index = 0; index < num_args ; index ++ )
+			args[index] = 0;
+
+	index = 0;
+
+	while(*format) {
+		switch(*format++) {
+			case 's':
+				if( str == NULL )
+					break;
+				char *tmp = (char*)va_arg(ap, char*);
+				if(tmp != NULL ) {
+					int tmplen= strlen(tmp);
+					if(tmplen > strsize) {
+							veejay_msg(VEEJAY_MSG_WARNING, "Truncated user input (%d bytes needed, have room for %d bytes)", tmplen, strsize);
+							tmplen = strsize;
+					}
+					strncpy( str, tmp, tmplen );
+				}
+				break;
+			case 'd':
+				if( args == NULL)
+					break;
+				args[index] = *( va_arg(ap, int*));
+				index ++;
+				break;
+		}
+	}
+
 }
-
-
-#define DUMP_ARG(a)\
-if(sizeof(a)>0){\
-int __l = sizeof(a)/sizeof(int);\
-int __i; for(__i=0; __i < __l; __i++) veejay_msg(VEEJAY_MSG_DEBUG,"[%02d]=[%06d], ",__i,a[__i]);}\
-else { veejay_msg(VEEJAY_MSG_DEBUG,"arg has size of 0x0");}
-
 
 #define CLAMPVAL(a) { if(a<0)a=0; else if(a >255) a =255; }
 //@ TODO: implement embedded help
@@ -2095,7 +2117,7 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
     //veejay_t *v = (veejay_t*) ptr;
     xmlDocPtr doc;
     xmlNodePtr rootnode,childnode;  
-    P_A(args,file_name,format,ap);
+    P_A(args,sizeof(args),file_name,sizeof(file_name),format,ap);
     doc = xmlNewDoc( (const xmlChar*) "1.0" );
     rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) XML_CONFIG_FILE,NULL);
     xmlDocSetRootElement( doc, rootnode );
@@ -2122,7 +2144,7 @@ void    vj_event_read_file( void *ptr,  const char format[], va_list ap )
     char file_name[512];
     int args[1];
 
-    P_A(args,file_name,format,ap);
+	P_A(args,sizeof(args),file_name,sizeof(file_name),format,ap);
 
 #ifdef HAVE_XML2
     if(veejay_load_action_file( ptr, file_name ))
@@ -2514,9 +2536,7 @@ void    vj_event_set_framerate( void *ptr, const char format[] , va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
         int args[2];
-        char *s = NULL;
-
-        P_A(args,s,format,ap);
+		P_A(args,sizeof(args),NULL,0,format,ap);
 
     float new_fps = (float) args[0] * 0.01;
 
@@ -2539,9 +2559,8 @@ void    vj_event_sync_correction( void *ptr,const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *s = NULL;
 
-    P_A(args,s,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(args[0] == 0 )
     {
@@ -2625,8 +2644,7 @@ void    vj_event_play_norestart( void *ptr, const char format[], va_list ap )
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     //@ change mode so veejay does not restart samples at all
 
@@ -2647,8 +2665,7 @@ void    vj_event_sub_render( void *ptr, const char format[], va_list ap )
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( SAMPLE_PLAYING(v)) {
         SAMPLE_DEFAULTS(args[0]);
@@ -2685,9 +2702,8 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
 
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if(vj_event_valid_mode(args[0]))
     {
         if(args[0] == VJ_PLAYBACK_MODE_PLAIN) 
@@ -2733,14 +2749,10 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
     }
 }
 
-
-
 void    vj_event_set_rgb_parameter_type(void *ptr, const char format[], va_list ap)
 {   
-    
     int args[3];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if(args[0] >= 0 && args[0] <= 3 )
     {
         rgb_parameter_conversion_type_ = args[0];
@@ -2924,8 +2936,7 @@ void vj_event_sample_select(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *s = NULL; 
-    P_A( args, s , format, ap);
+    P_A( args,sizeof(args), NULL ,0, format, ap);
 
     SAMPLE_DEFAULTS(args[0]);
     if(sample_exists(args[0]))
@@ -2943,7 +2954,7 @@ void vj_event_tag_select(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
     char *s = NULL; 
-    P_A( args, s , format, ap);
+    P_A( args, 1, s ,0, format, ap);
     STREAM_DEFAULTS(args[0]);
     if(vj_tag_exists(args[0]))
     {
@@ -3015,8 +3026,8 @@ void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
 void    vj_event_set_volume(void *ptr, const char format[], va_list ap)
 {
     int args[1];    
-    char *s = NULL;
-    P_A(args,s,format,ap)
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
     if(args[0] >= 0 && args[0] <= 100)
     {
 #ifdef HAVE_JACK
@@ -3036,9 +3047,8 @@ void    vj_event_set_volume(void *ptr, const char format[], va_list ap)
 void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 {
     int args[1];
-    char *s = NULL;
     veejay_t *v = (veejay_t*) ptr;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(vj_event_valid_mode(args[0]))
     {
@@ -3101,8 +3111,7 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
     if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v)) 
     {
         int args[2];
-        char *s = NULL;
-        P_A(args,s,format,ap);
+        P_A(args,sizeof(args),NULL,0,format,ap);
 
         editlist *E = v->edit_list;
         if( SAMPLE_PLAYING(v))
@@ -3160,8 +3169,7 @@ void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     // parsed display num!! -> index of SDL array
 
     //int id = args[0];
@@ -3227,9 +3235,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 {
     int args[5];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int id = 0;
     int w  = args[0];
@@ -3358,8 +3364,7 @@ void    vj_event_feedback( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if( args[0] == 0 ) {
         v->settings->feedback = 0;
     } else if ( args[0] == 1 ) {
@@ -3374,8 +3379,7 @@ void    vj_event_render_depth( void *ptr, const char format[] , va_list ap )
 {
     int args[1];
     veejay_t *v = (veejay_t*)ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     int status = 0;
     int toggle = 0;
     if( args[0] == 2 ) 
@@ -3451,9 +3455,8 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     if(!STREAM_PLAYING(v))
     {
-        char *s = NULL;
         int speed = 0;
-        P_A(args,s,format,ap);
+        P_A(args,sizeof(args),NULL,0,format,ap);
         veejay_set_speed(v, args[0] );
         speed = v->settings->current_playback_speed;
         veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
@@ -3471,8 +3474,7 @@ void    vj_event_hold_frame( void *ptr, const char format[], va_list ap )
     veejay_t *v = (veejay_t*) ptr;
 
     if(SAMPLE_PLAYING(v)||PLAIN_PLAYING(v)) {
-        char *s = NULL;
-        P_A( args,s,format, ap);
+        P_A( args,sizeof(args),NULL,0,format, ap);
         if(args[1] <= 0 )
             args[1] = 1;
         if(args[2] <= 0 )
@@ -3491,8 +3493,7 @@ void vj_event_play_speed_kb(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     if(!STREAM_PLAYING(v))
     {
-        char *s = NULL;
-        P_A(args,s,format,ap);
+        P_A(args,sizeof(args),NULL,0,format,ap);
     
         int speed = abs(args[0]);
         if( v->settings->current_playback_speed <  0 )
@@ -3515,8 +3516,7 @@ void vj_event_play_slow(void *ptr, const char format[],va_list ap)
 {
     int args[1];
     veejay_t *v = (veejay_t*)ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v))
     {
@@ -3548,8 +3548,7 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     if(!STREAM_PLAYING(v))
     {
-        char *str = NULL;
-        P_A(args,str,format,ap);
+        P_A(args,sizeof(args),NULL,0,format,ap);
         if(args[0] == -1 )
             args[0] = v->current_edit_list->total_frames;
         veejay_set_frame(v, args[0]);
@@ -3565,8 +3564,7 @@ void    vj_event_projection_dec( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     float inc_x = (float) args[0];
     float inc_y = (float) args[1];
@@ -3585,8 +3583,7 @@ void    vj_event_projection_inc( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     if(!v->composite)
     {
@@ -3602,8 +3599,7 @@ void vj_event_inc_frame(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *str = NULL;
-    P_A( args,str,format, ap );
+    P_A( args,sizeof(args),NULL,0,format, ap );
     if(!STREAM_PLAYING(v))
     {
         video_playback_setup *s = v->settings;
@@ -3620,8 +3616,7 @@ void vj_event_dec_frame(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *) ptr;
     int args[1];
-    char *str = NULL;
-    P_A( args,str,format, ap );
+    P_A( args,sizeof(args),NULL,0,format, ap );
     if(!STREAM_PLAYING(v))
     {
         video_playback_setup *s = v->settings;
@@ -3638,8 +3633,7 @@ void vj_event_prev_second(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;  
     int args[1];
-    char *str = NULL;
-    P_A( args,str,format, ap );
+    P_A( args,sizeof(args),NULL,0,format, ap );
     if(!STREAM_PLAYING(v))
     {
         video_playback_setup *s = v->settings;
@@ -3657,8 +3651,7 @@ void vj_event_next_second(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[1];
-    char *str = NULL;
-    P_A( args,str,format, ap );
+    P_A( args,sizeof(args),NULL,0,format, ap );
     if(!STREAM_PLAYING(v))
     {
         video_playback_setup *s = v->settings;
@@ -3815,8 +3808,7 @@ void    vj_event_sample_rand_start( void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     video_playback_setup *settings = v->settings;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(args[0] == RANDTIMER_FRAME)
         settings->randplayer.timer = RANDTIMER_FRAME;
@@ -3847,8 +3839,7 @@ void vj_event_sample_set_rand_loop(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -3879,8 +3870,7 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -3941,8 +3931,7 @@ void    vj_event_sample_set_position( void *ptr, const char format[], va_list ap
 {
     int args[3];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args, s, format, ap);
+    P_A(args,sizeof(args),NULL,0, format, ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -3966,8 +3955,7 @@ void    vj_event_sample_skip_frame(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args, s, format, ap);
+    P_A(args,sizeof(args),NULL,0,format, ap);
 
     SAMPLE_DEFAULTS(args[0]);
     
@@ -4012,8 +4000,7 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args, s, format, ap);
+    P_A(args,sizeof(args),NULL,0, format, ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4033,8 +4020,7 @@ void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap
     int args[2];
     veejay_t *v = (veejay_t*)ptr;
     
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4065,8 +4051,7 @@ void vj_event_sample_set_marker_end(void *ptr, const char format[], va_list ap)
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
     
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4097,8 +4082,7 @@ void vj_event_sample_set_marker(void *ptr, const char format[], va_list ap)
 {
     int args[3];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4129,8 +4113,7 @@ void vj_event_sample_set_marker_clear(void *ptr, const char format[],va_list ap)
 {
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4151,8 +4134,7 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4188,8 +4170,7 @@ void vj_event_mixing_sample_set_speed(void *ptr, const char format[], va_list ap
 {
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
-    char *s = NULL;
-    P_A(args, s, format, ap);
+    P_A(args,sizeof(args),NULL,0,format, ap);
 
 	if(SAMPLE_PLAYING(v)) {
 		int entry= sample_get_selected_entry( v->uc->sample_id );
@@ -4216,8 +4197,7 @@ void vj_event_mixing_sample_set_dup(void *ptr, const char format[], va_list ap)
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
     int sample_id = -1;
-    char *s = NULL;
-    P_A(args, s, format, ap);
+    P_A(args,sizeof(args),NULL,0, format, ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -4247,7 +4227,7 @@ void    vj_event_tag_set_descr( void *ptr, const char format[], va_list ap)
     char str[TAG_MAX_DESCR_LEN];
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
     if(!STREAM_PLAYING(v))
     {
@@ -4268,7 +4248,7 @@ void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
     char str[SAMPLE_MAX_DESCR_LEN];
     int args[5];
     veejay_t *v = (veejay_t*) ptr;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4283,8 +4263,7 @@ void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     char str[1024];
-    int *args = NULL;
-    P_A(args,str,format,ap);
+    P_A(NULL,0,str,sizeof(str),format,ap);
     if(sample_writeToFile( str, v->composite,v->seq,v->font, v->uc->sample_id, v->uc->playback_mode) )
     {
         veejay_msg(VEEJAY_MSG_INFO, "Saved %d samples to file '%s'", sample_size(), str);
@@ -4298,9 +4277,8 @@ void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
 void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
 {
     char str[1024];
-    int *args = NULL;
     veejay_t *v = (veejay_t*) ptr;
-    P_A( args, str, format, ap);
+    P_A( NULL,0, str,sizeof(str), format, ap);
 
     int id = 0;
     int mode = 0;
@@ -4322,9 +4300,8 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t *)ptr;
     int args[2];
     int result = 0;
-    char *str = NULL;
     char prefix[150];
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( !SAMPLE_PLAYING(v))
     {
@@ -4522,8 +4499,7 @@ void vj_event_sample_set_num_loops(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4550,11 +4526,10 @@ void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[4];
-    char *str = NULL;
     int s_start;
     int s_end;
 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     SAMPLE_DEFAULTS(args[0]);
 
     if(!sample_exists(args[0]))
@@ -4579,8 +4554,7 @@ void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4611,8 +4585,7 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4653,8 +4626,7 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     int deleted_sample = 0;
 
     if(SAMPLE_PLAYING(v) && v->uc->sample_id == args[0])
@@ -4683,9 +4655,8 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 {
     int args[1];
-    char *s = NULL;
     int new_sample =0;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( sample_exists(args[0] ))
     {
@@ -4746,8 +4717,7 @@ void    vj_event_stream_set_length( void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(STREAM_PLAYING(v))
     {
@@ -4788,8 +4758,7 @@ void vj_event_sample_chain_enable(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[4];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     SAMPLE_DEFAULTS(args[0]);
 
@@ -4804,8 +4773,7 @@ void    vj_event_all_samples_chain_toggle(void *ptr, const char format[], va_lis
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if(SAMPLE_PLAYING(v))
     {
         int i;
@@ -4834,8 +4802,7 @@ void vj_event_tag_chain_enable(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[4];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(!STREAM_PLAYING(v))
     {
@@ -4858,8 +4825,7 @@ void vj_event_tag_chain_disable(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     STREAM_DEFAULTS(args[0]);
 
@@ -4879,8 +4845,7 @@ void vj_event_sample_chain_disable(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(args[0] == 0)
     {
@@ -4935,8 +4900,7 @@ void vj_event_chain_entry_video_toggle(void *ptr, const char format[], va_list a
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -4976,8 +4940,7 @@ void enable_chain_entry_video(void *ptr, const char format[], va_list ap, int en
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v)) 
     {
@@ -5028,8 +4991,7 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 void    vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
 {
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( args[0] == 0 || args[0] == 1 ) {
         vj_perform_follow_fade( args[0] );
@@ -5040,8 +5002,7 @@ void    vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[3];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
     {
@@ -5080,7 +5041,7 @@ void    vj_event_chain_fade_alpha(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
     {
@@ -5101,7 +5062,7 @@ void    vj_event_chain_fade_method(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
     {
@@ -5122,7 +5083,8 @@ void    vj_event_chain_fade_entry(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
+
 
     if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
     {
@@ -5143,7 +5105,7 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
     {
@@ -5175,8 +5137,7 @@ void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL; 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
     {
@@ -5208,8 +5169,7 @@ void vj_event_chain_clear(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[1];
-    char *str = NULL; 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
     {
@@ -5252,8 +5212,7 @@ void vj_event_chain_entry_del(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v)) 
     {
@@ -5313,11 +5272,8 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[MAX_ARGUMENTS];
-    char *str = NULL;
 
-    veejay_memset( args,0,sizeof(args));
-
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v)) 
     {
@@ -5378,7 +5334,7 @@ void vj_event_chain_entry_select(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args), NULL,0,format,ap);
 
     if( SAMPLE_PLAYING(v)  )
     {
@@ -5412,8 +5368,7 @@ void vj_event_entry_up(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if(SAMPLE_PLAYING(v) || STREAM_PLAYING(v))
     {
         int effect_id=-1;
@@ -5447,8 +5402,7 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if(SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) 
     {
         int effect_id=-1;
@@ -5485,7 +5439,7 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 
     veejay_memset(args,0,sizeof(int) * MAX_ARGUMENTS); 
 
-    P_A(args,str,format,ap);    
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);    
 
     if( sscanf( str, "%d" , &value ) != 1 )
     {
@@ -5570,7 +5524,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
     veejay_t *v = (veejay_t*)ptr;
     veejay_memset(args,0,sizeof(int) * MAX_ARGUMENTS); 
    
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
     while( (tmp = strtol( end, &end, base ))) {
         args[index] = (int) tmp;
@@ -5758,8 +5712,7 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[3];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v)) 
     {
@@ -5885,7 +5838,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[1];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args), NULL, 0,format,ap);
 
     if(SAMPLE_PLAYING(v))
     { 
@@ -5983,7 +5936,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[1];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -6081,7 +6034,8 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[3];
-    char *str = NULL; P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
     if(SAMPLE_PLAYING(v)) 
     {
         SAMPLE_DEFAULTS(args[0]);
@@ -6155,7 +6109,7 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[4];
-    char *str = NULL; P_A(args,str,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v)) 
     {
@@ -6256,7 +6210,7 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v)) 
     {
@@ -6307,7 +6261,7 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 {
     int args[4];
     veejay_t *v = (veejay_t*)ptr;
-    char *str = NULL; P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     if(SAMPLE_PLAYING(v)) 
     {
@@ -6377,8 +6331,7 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *)ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( SAMPLE_PLAYING(v))
     {
@@ -6424,7 +6377,7 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
 
     if ( SAMPLE_PLAYING(v))
     {
@@ -6469,7 +6422,7 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
 
     if ( SAMPLE_PLAYING(v))
     {
@@ -6516,7 +6469,7 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL; P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
     {
@@ -6579,7 +6532,7 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
 
     if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
     {
@@ -6619,8 +6572,9 @@ void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     char str[1024];
-    int args[2] = {0,0};
-    P_A(args,str,format,ap);
+    int args[2];
+
+    P_A(args,sizeof(args),str,sizeof(str), format,ap);
     if( STREAM_PLAYING(v) || PLAIN_PLAYING(v) )
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Wrong playback mode for saving EDL of sample");
@@ -6648,8 +6602,7 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*)ptr;
     int start = -1;
     char str[1024];
-    int *args = NULL;
-    P_A(args,str,format,ap);
+    P_A(NULL,0,str,sizeof(str),format,ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -6671,7 +6624,7 @@ void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*)ptr;
     char str[1024];
     int args[2];
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
     int new_sample_id = args[0];
     if(new_sample_id == 0 )
@@ -6696,8 +6649,7 @@ void vj_event_tag_del(void *ptr, const char format[] , va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    char *str = NULL; P_A(args,str,format,ap);
-
+	P_A(args,sizeof(args),NULL,0,format,ap);
     
     if(STREAM_PLAYING(v) && v->uc->sample_id == args[0])
     {
@@ -6728,7 +6680,7 @@ void vj_event_tag_toggle(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[1];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
     if(STREAM_PLAYING(v))
     {
         int active = vj_tag_get_active(v->uc->sample_id);
@@ -6741,8 +6693,8 @@ void    vj_event_tag_new_generator( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     char str[255];
-    int args[2] = { 0,0 };
-    P_A(args,str,format,ap);
+    int args[2];
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
     int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR, str, v->nstreams,0,args[0]);
 
@@ -6756,8 +6708,7 @@ void vj_event_tag_new_picture(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     char str[255];
-    int *args = NULL;
-    P_A(args,str,format,ap);
+    P_A(NULL,0,str,sizeof(str),format,ap);
 
     int id = veejay_create_tag(v, VJ_TAG_TYPE_PICTURE, str, v->nstreams,0,0);
 
@@ -6771,8 +6722,7 @@ void    vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(args[0] == -1) args[0] = 63;
     veejay_msg(VEEJAY_MSG_DEBUG, "Try channel %d", args[0]);
@@ -6786,10 +6736,8 @@ void    vj_event_v4l_blackframe( void *ptr, const char format[] , va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
 
-    char *str = NULL;
     int args[4];
-    
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     int id = args[0];
     if( id == 0 ) {
@@ -6814,7 +6762,7 @@ void    vj_event_cali_write_file( void *ptr, const char format[], va_list ap)
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
     int id = args[0];
     if( id == 0 ) {
@@ -6833,11 +6781,10 @@ void    vj_event_cali_write_file( void *ptr, const char format[], va_list ap)
 
 void    vj_event_stream_new_clone( void *ptr, const char format[], va_list ap )
 {
-    char *str = NULL;
-    int args[2];
-    veejay_t *v = (veejay_t*) ptr;
+    int args[1];
+	veejay_t *v = (veejay_t*) ptr;
 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int id = veejay_create_tag( v, VJ_TAG_TYPE_CLONE, NULL, v->nstreams, args[0],args[0] );
 
@@ -6853,7 +6800,7 @@ void    vj_event_stream_new_cali( void *ptr, const char format[], va_list ap)
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
 
     int id = veejay_create_tag(
@@ -6875,12 +6822,11 @@ void    vj_event_stream_new_cali( void *ptr, const char format[], va_list ap)
 void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
-    char *str = NULL;
     int args[2];
     char filename[255];
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
-    sprintf(filename, "video%d", args[0]);
+    snprintf(filename,sizeof(filename), "video%d", args[0]);
 
     int id = vj_tag_new(VJ_TAG_TYPE_V4L,
                 filename,
@@ -6905,7 +6851,7 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
     char str[255];
     int args[2];
 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), str, sizeof(str), format,ap);
 
     if( strncasecmp( str, "localhost",9 ) == 0 || strncasecmp( str, "127.0.0.1",9 ) == 0 )
     {
@@ -6929,7 +6875,7 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
     char str[255];
     int args[3];
 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), str,sizeof(str), format,ap);
 
     int id = veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, args[0],0);
 
@@ -6943,9 +6889,8 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
 void vj_event_tag_new_color(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v= (veejay_t*) ptr;
-    char *str=NULL;
     int args[4];
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int i;
     for(i = 0 ; i < 3; i ++ )
@@ -6967,8 +6912,7 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v= (veejay_t*) ptr;
     char str[255];
-    int *args = NULL;
-    P_A(args,str,format,ap);
+    P_A(NULL,0, str,sizeof(str), format,ap);
     int id  = veejay_create_tag(v, VJ_TAG_TYPE_YUV4MPEG, str, v->nstreams,0,0);
 
     if( id <= 0 )
@@ -6978,8 +6922,7 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
     
     STREAM_DEFAULTS(args[0]);
     
@@ -7012,8 +6955,7 @@ void    vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(!v->composite ) {
         veejay_msg(0, "No viewport active.");
@@ -7038,10 +6980,9 @@ void    vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 
 void    vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
 {
-    int args[4] = { 0,0,0,0 };
+    int args[4];
     veejay_t *v = (veejay_t*)ptr;
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(!v->composite ) {
         veejay_msg(0, "No viewport active.");
@@ -7070,8 +7011,7 @@ void    vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     STREAM_DEFAULTS(args[0]);
 
@@ -7100,8 +7040,7 @@ void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     STREAM_DEFAULTS(args[0]);
 
@@ -7118,8 +7057,7 @@ void vj_event_v4l_set_white(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     STREAM_DEFAULTS(args[0]);
 
@@ -7136,8 +7074,7 @@ void vj_event_v4l_set_saturation(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     STREAM_DEFAULTS(args[0]);
 
@@ -7146,7 +7083,7 @@ void vj_event_v4l_set_saturation(void *ptr, const char format[], va_list ap)
 #ifdef HAVE_V4L2 
         uint32_t v4l_ctrl_id = v4l2_get_property_id( "saturation" );
         if(v4l_ctrl_id == 0 ) {
-            veejay_msg(0,"Invalid v4l2 property name '%s'",str );
+            veejay_msg(0,"Invalid v4l2 property name 'saturation'" );
             return;
         }
         if(!vj_tag_v4l_set_control( args[0], v4l_ctrl_id, args[1] ) ) {
@@ -7160,8 +7097,7 @@ void vj_event_v4l_set_color(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     STREAM_DEFAULTS(args[0]);
 
@@ -7181,7 +7117,7 @@ void vj_event_v4l_set_property( void *ptr, const char format[], va_list ap )
     int args[2];
     char str[255];
 #ifdef HAVE_V4L2 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
     STREAM_DEFAULTS(args[0]);
 
@@ -7203,8 +7139,7 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     STREAM_DEFAULTS(args[0]);
 
@@ -7334,7 +7269,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
     char str[255]; 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str),format,ap);
 
     if(v->settings->tag_record || v->settings->offline_record || (v->seq->active && v->seq->rec_id) )
     {
@@ -7402,7 +7337,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
     veejay_msg(VEEJAY_MSG_INFO, "Selected recording format %s" , vj_avcodec_get_encoder_name(old_format));
 }
 
-static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
+static void _vj_event_tag_record( veejay_t *v , int *args )
 {
     if(!STREAM_PLAYING(v))
     {
@@ -7474,10 +7409,9 @@ void vj_event_tag_rec_start(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL; 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
-    _vj_event_tag_record( v, args, str );
+    _vj_event_tag_record( v, args );
 }
 
 void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap) 
@@ -7528,7 +7462,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[3];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args), NULL,0,format,ap);
 
     if( v->settings->offline_record )
     {
@@ -7668,8 +7602,7 @@ void vj_event_effect_inc(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     int real_id;
     int args[1];
-    char *s = NULL;
-    P_A(args,s,format,ap);  
+    P_A(args,sizeof(args),NULL,0,format,ap);  
     if(!SAMPLE_PLAYING(v) && !STREAM_PLAYING(v))
     {
         p_invalid_mode();
@@ -7704,8 +7637,7 @@ void vj_event_effect_dec(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     int real_id;
     int args[1];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if(!SAMPLE_PLAYING(v) && !STREAM_PLAYING(v))
     {
         p_invalid_mode();
@@ -7795,8 +7727,7 @@ void vj_event_select_id(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v=  (veejay_t*)ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str, format, ap);
+    P_A(args,sizeof(args),NULL,0,format, ap);
     if(!STREAM_PLAYING(v))
     { 
         int sample_id = (v->uc->sample_key*12)-12 + args[0];
@@ -7829,8 +7760,7 @@ void vj_event_select_id(void *ptr, const char format[], va_list ap)
 void    vj_event_select_macro( void *ptr, const char format[], va_list ap )
 {
     int args[2];
-    char *str = NULL;
-    P_A( args, str, format, ap );
+    P_A( args,sizeof(args),NULL,0, format, ap );
     macro_select( args[0] );
     veejay_msg(VEEJAY_MSG_INFO, "Changed VIMS macro slot to %d", current_macro_ );
 }
@@ -7840,7 +7770,7 @@ void vj_event_select_bank(void *ptr, const char format[], va_list ap)
     veejay_t *v =(veejay_t*) ptr;
     int args[1];
 
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
     if(args[0] >= 1 && args[0] <= 9)
     {
         veejay_msg(VEEJAY_MSG_INFO,"Selected bank %d (active sample range is now %d-%d)",args[0],
@@ -8094,7 +8024,7 @@ void vj_event_print_info(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[1];
-    char *str = NULL; P_A(args,str,format,ap);
+	P_A(args,sizeof(args),NULL,0,format,ap);
     if(args[0]==0)
     {
         args[0] = v->uc->sample_id;
@@ -8154,8 +8084,7 @@ void    vj_event_send_tag_list          (   void *ptr,  const char format[],    
     int args[1];
     
     veejay_t *v = (veejay_t*)ptr;
-    char *str = NULL; 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
     int i,n;
     char *s_print_buf = get_print_buf(0);
     sprintf(s_print_buf, "%05d",0);
@@ -8256,8 +8185,7 @@ void    vj_event_send_sample_info       (   void *ptr,  const char format[],    
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
     int failed = 1;
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     char *s_print_buf = NULL;
 
@@ -8297,8 +8225,7 @@ void    vj_event_get_image_part         (   void *ptr,  const char format[],    
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[5];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int w=0,h=0,x=0,y=0;
     int y_only = 0;
@@ -8410,8 +8337,7 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int w=0,h=0;
     int max_w = vj_perform_preview_max_width();
@@ -8459,8 +8385,7 @@ void    vj_event_get_cali_image     (   void *ptr,  const char format[],    va_l
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int id   = args[0];
     int type = args[1];
@@ -8504,7 +8429,7 @@ void    vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
     char str[2048];
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str), format,ap);
 
     
     filelist_t *list = (filelist_t*)find_media_files(v);
@@ -8552,9 +8477,8 @@ void    vj_event_send_sample_list       (   void *ptr,  const char format[],    
     int start_from_sample = 1;
     char cmd[512];
     char line[512];
-    char *str = NULL;
     int i,n;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if(args[0] > 0 )
         start_from_sample = args[0];
     char *s_print_buf = get_print_buf(0);
@@ -8603,12 +8527,10 @@ void    vj_event_send_sample_stack      (   void *ptr,  const char format[],    
 {
     char line[32];
     int args[4];
-    char *str = NULL;
-
     char    buffer[1024];
     char    message[1024];  
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     buffer[0] = '\0';
     message[0] = '\0';
@@ -8666,9 +8588,8 @@ void    vj_event_send_stream_args       (   void *ptr, const char format[],     
     char fline[100];
     char line[1000];
     int args[4];
-    char *str = NULL;
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     const char *dummy = "000";
 
@@ -8747,10 +8668,9 @@ void    vj_event_send_chain_entry       (   void *ptr,  const char format[],    
     char fline[1024];
     char line[1024];
     int args[4];
-    char *str = NULL;
     int error = 1;
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     sprintf(line, "%03d", 0);
 
     char param[1024];
@@ -8856,12 +8776,11 @@ void    vj_event_send_chain_entry_parameters    (   void *ptr,  const char forma
     char fline[1024];
     char line[1024];
     int args[4];
-    char *str = NULL;
     int error = 1;
     veejay_t *v = (veejay_t*)ptr;
 
-    P_A(args,str,format,ap);
-    sprintf(line, "%03d", 0);
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    snprintf(line,sizeof(line), "%03d", 0);
 
     char param[1024];
 
@@ -8985,9 +8904,8 @@ void    vj_event_send_chain_list        (   void *ptr,  const char format[],    
     int i;
     char line[VIMS_CHAIN_LIST_ENTRY_LENGTH+1]; // null terminated buffer
     int args[1];
-    char *str = NULL;
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     char *s_print_buf = get_print_buf(0);
     sprintf( s_print_buf, "%03d",0 );
@@ -9069,9 +8987,8 @@ void    vj_event_send_chain_list        (   void *ptr,  const char format[],    
 void    vj_event_send_shm_info( void *ptr, const char format[], va_list ap)
 {
     int args[1] = { -1 };
-    char *str = NULL;
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     net_set_screen_id( args[0] );
 
@@ -9163,10 +9080,9 @@ void    vj_event_send_frame             (   void *ptr, const char format[], va_l
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1] = { -1 };
-    char *str = NULL;
 
     if( v->splitter ) {
-        P_A(args,str,format,ap);
+        P_A(args,sizeof(args),NULL,0,format,ap);
     }
 
     int i = 0;
@@ -9197,7 +9113,7 @@ void    vj_event_mcast_start                (   void *ptr,  const char format[],
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
     char s[255];    
-    P_A( args, s , format, ap);
+    P_A( args,sizeof(args), s ,sizeof(s), format, ap);
 
     if(!v->settings->use_vims_mcast)
         veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -T commandline option)"); 
@@ -9292,7 +9208,7 @@ void vj_event_do_bundled_msg(void *ptr, const char format[], va_list ap)
     int args[1];
     char s[1024];   
     vj_msg_bundle *m;
-    P_A( args, s , format, ap);
+    P_A( args,sizeof(args), s ,sizeof(s), format, ap);
     //veejay_msg(VEEJAY_MSG_INFO, "Parsing message bundle as event");
     m = vj_event_bundle_get(args[0]);
     if(m)
@@ -9308,12 +9224,12 @@ void vj_event_do_bundled_msg(void *ptr, const char format[], va_list ap)
 #ifdef HAVE_SDL
 void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
 {
-    int args[4] = { 0,0,0,0 };
+    int args[4];
     char value[100];
     int mode = 0;
     
 
-    P_A( args, value, format ,ap );
+    P_A( args, sizeof(args), value,sizeof(value), format ,ap );
 
     if( args[1] <= 0 || args[1] >= SDLK_LAST)
     {
@@ -9348,8 +9264,7 @@ void vj_event_bundled_msg_del(void *ptr, const char format[], va_list ap)
 {
     
     int args[1];    
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     if ( vj_event_bundle_del( args[0] ) == 0)
     {
         veejay_msg(VEEJAY_MSG_INFO,"Bundle %d deleted from event system",args[0]);
@@ -9366,9 +9281,9 @@ void vj_event_bundled_msg_del(void *ptr, const char format[], va_list ap)
 void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
 {
     
-    int args[2] = {0,0};
+    int args[2];
     char s[1024];
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),s,sizeof(s),format,ap);
 
     if(args[0] == 0)
     {
@@ -9430,7 +9345,7 @@ void    vj_event_set_stream_arg( void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*)ptr;
     veejay_memset(args,0,sizeof(args));
    
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),str,sizeof(str), format,ap);
 
     while( (tmp = strtol( end, &end, base ))) {
         args[index] = (int) tmp;
@@ -9453,8 +9368,7 @@ void    vj_event_set_stream_arg( void *ptr, const char format[], va_list ap)
 void    vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
 {
     int args[4];
-    char *s = NULL;
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     veejay_t *v = (veejay_t*) ptr;
     
     STREAM_DEFAULTS(args[0]);
@@ -9478,7 +9392,7 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 {
     int args[4];
     char filename[1024];
-    P_A(args, filename, format, ap );
+    P_A(args,sizeof(args), filename,sizeof(filename), format, ap );
     veejay_t *v = (veejay_t*) ptr;
 
     char type[5] = { 0 };
@@ -9501,7 +9415,7 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 {
     int args[4];
     char filename[1024];
-    P_A(args, filename, format, ap );
+    P_A(args,sizeof(args), filename,sizeof(filename), format, ap );
     veejay_t *v = (veejay_t*) ptr;
 
     v->uc->hackme = 1;
@@ -9518,12 +9432,11 @@ void        vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
 void    vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 {
     int args[5];
-    char *s = NULL;
     char device_name[100];
 
     memset( &args, -1, sizeof(args));
 
-    P_A(args,s,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     veejay_t *v = (veejay_t*)ptr;
 
@@ -9559,10 +9472,9 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
     int id=0;
-    char *str = NULL;
     int failed = 1; 
 
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     char options[256];
     char prefix[4];
@@ -9681,8 +9593,7 @@ void    vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     if(!v->shm) {
         //@ try it anyway
@@ -9754,8 +9665,7 @@ void    vj_event_connect_shm( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     if( args[0] == v->uc->port ) {
         veejay_msg(0, "Cannot pull info from myself inside VIMS event!");
@@ -9774,8 +9684,7 @@ void    vj_event_connect_split_shm( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
     
     int32_t key = args[0];
     int safe_key = vj_shm_get_id();
@@ -9906,9 +9815,8 @@ void    vj_event_get_font_list( void *ptr,  const char format[],    va_list ap  
 void    vj_event_get_srt_info(  void *ptr,  const char format[],    va_list ap  )
 {
     veejay_t *v = (veejay_t*)ptr;
-    int args[2] = {0,0};
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    int args[2];
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(!v->font)
     {
@@ -9926,7 +9834,7 @@ void    vj_event_get_srt_info(  void *ptr,  const char format[],    va_list ap  
     }
     
     int len = strlen( sequence );
-    str = vj_calloc( len+20 );
+    char *str = vj_calloc( len+20 );
     sprintf(str,"%06d%s",len,sequence);
     free(sequence); 
     
@@ -9939,7 +9847,7 @@ void    vj_event_save_srt(  void *ptr,  const char format[],    va_list ap  )
     int args[1];
     veejay_t *v = (veejay_t*)ptr;
 
-    P_A(args,file_name,format,ap);
+    P_A(args,sizeof(args),file_name,sizeof(file_name),format,ap);
 
     if(!v->font)
     {
@@ -9958,7 +9866,7 @@ void    vj_event_load_srt(  void *ptr,  const char format[],    va_list ap  )
     int args[1];
     veejay_t *v = (veejay_t*)ptr;
 
-    P_A(args,file_name,format,ap);
+    P_A(args,sizeof(args),file_name,sizeof(file_name), format,ap);
 
     if(!v->font)
     {
@@ -9983,7 +9891,7 @@ void    vj_event_select_subtitle(   void *ptr,  const char format[],    va_list 
         return;
     }
     
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     vj_font_set_current( v->font, args[0] );
 }
@@ -9994,7 +9902,7 @@ void    vj_event_get_keyframes( void *ptr,  const char format[],    va_list ap  
     int args[3];
     veejay_t *v = (veejay_t*)ptr;
 
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -10033,7 +9941,7 @@ void    vj_event_set_kf_status_param( void *ptr, const char format[], va_list ap
     int args[4];
     veejay_t *v = (veejay_t*)ptr;
 
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -10053,7 +9961,7 @@ void    vj_event_set_kf_status( void *ptr,  const char format[],    va_list ap  
     int args[3];
     veejay_t *v = (veejay_t*)ptr;
 
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -10073,7 +9981,7 @@ void    vj_event_reset_kf( void *ptr,   const char format[],    va_list ap  )
     int args[3];
     veejay_t *v = (veejay_t*)ptr;
 
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -10089,7 +9997,7 @@ void    vj_event_del_keyframes( void *ptr, const char format[], va_list ap )
     int args[3];
     veejay_t *v = (veejay_t*)ptr;
 
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(SAMPLE_PLAYING(v))
     {
@@ -10122,7 +10030,7 @@ void    vj_event_add_subtitle(  void *ptr,  const char format[],    va_list ap  
         return;
     }
 
-    P_A(args,text,format,ap);
+    P_A(args,sizeof(args),text,sizeof(text), format,ap);
 
     void *dict = select_dict( v, v->uc->sample_id );
     if(!dict)
@@ -10166,7 +10074,7 @@ void    vj_event_upd_subtitle(  void *ptr,  const char format[],    va_list ap  
     char text[2048];
 
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,text,format,ap);
+    P_A(args,sizeof(args),text,sizeof(text), format,ap);
 
     if(!v->font )
     {
@@ -10186,7 +10094,7 @@ void    vj_event_del_subtitle(  void *ptr,  const char format[],    va_list ap  
 {
     int args[5];
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
     
     if(!v->font)
     {
@@ -10207,7 +10115,7 @@ void    vj_event_font_set_position( void *ptr,  const char format[],    va_list 
 {
     int args[5];
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(!v->font)
     {
@@ -10227,7 +10135,7 @@ void    vj_event_font_set_color(    void *ptr,  const char format[],    va_list 
 {
     int args[6];
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(!v->font)
     {
@@ -10264,7 +10172,7 @@ void    vj_event_font_set_size_and_font(    void *ptr,  const char format[],    
 {
     int args[5];
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
  
     if(!v->font)
     {
@@ -10347,7 +10255,7 @@ void    vj_event_sequencer_add_sample(      void *ptr,  const char format[],    
 {
     int args[5];
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int seq = args[0];
     int id = args[1];
@@ -10394,7 +10302,7 @@ void    vj_event_sequencer_del_sample(      void *ptr,  const char format[],    
 {
     int args[5];
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int seq_it = args[0];
 
@@ -10462,7 +10370,7 @@ void    vj_event_sample_sequencer_active(   void *ptr,  const char format[],    
 {
     int args[5];
     veejay_t *v = (veejay_t*)ptr;
-    P_A(args,NULL,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( v->seq->size == 0 )
     {
@@ -10486,9 +10394,8 @@ void    vj_event_sample_sequencer_active(   void *ptr,  const char format[],    
 void    vj_event_set_macro_status( void *ptr,   const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*)ptr;
-    int args[2] = {0,0};
-    char *str = NULL;
-    P_A(args,str,format,ap);
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( args[1] == 0 )
     {
@@ -10554,9 +10461,8 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[4];
-    char *str = NULL;
     
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args),NULL,0,format,ap);
 
     int max_w = vj_perform_preview_max_width();
     int max_h = vj_perform_preview_max_height();
@@ -10655,9 +10561,8 @@ void vj_event_alpha_composite(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[4];
-    char *str = NULL;
     
-    P_A(args,str,format,ap);
+    P_A(args,sizeof(args), NULL,0,format,ap);
 
     if( args[0] == 0 ) {
         v->settings->clear_alpha = 0;
