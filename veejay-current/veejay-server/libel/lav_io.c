@@ -426,10 +426,9 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
    int channels = lav_audio_channels(lav_file);
    int bits = lav_audio_bits(lav_file);
    int res=0;
-   for (i = 0; i < channels; i++)
-    qt_audion[i] = (int16_t *)malloc(samps * lav_file->bps * sizeof(int16_t));
 #endif
-    switch(lav_file->format )
+
+   switch(lav_file->format )
     {
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
@@ -440,9 +439,8 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
     /* Deinterleave the audio into the two channels and/or convert
      * bits per sample to the required format.
      */
-    qt_audion = malloc(channels * sizeof(*qt_audion));
     for (i = 0; i < channels; i++)
-      qt_audion[i] = malloc(samps * sizeof(**qt_audion));
+      qt_audion[i] = malloc(samps * lav_file->bps * sizeof(int16_t));
 
     if (bits == 16)
       for (i = 0; i < samps; i++)
