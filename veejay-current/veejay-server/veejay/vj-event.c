@@ -4188,7 +4188,6 @@ void vj_event_mixing_sample_set_speed(void *ptr, const char format[], va_list ap
 {
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
-    int sample_id = -1;
     char *s = NULL;
     P_A(args, s, format, ap);
 
