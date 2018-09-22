@@ -148,7 +148,6 @@ static void vj_perform_record_buffer_free();
 static void *resample_context[(MAX_SPEED+1)];
 static void *downsample_context[(MAX_SPEED+1)];
 
-static int last_rate_[2] = { 0, 0 };
 static const char *intro = 
 	"A visual instrument for GNU/Linux\n";
 static const char *license =
