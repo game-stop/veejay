@@ -4185,7 +4185,7 @@ void vj_event_mixing_sample_set_speed(void *ptr, const char format[], va_list ap
 		int entry = vj_tag_get_selected_entry( v->uc->sample_id );
 		int type = vj_tag_get_chain_source( v->uc->sample_id, entry );
 		if( type == 0 ) {
-			int sample_id = sample_get_chain_channel( v->uc->sample_id, entry );
+			int sample_id = vj_tag_get_chain_channel( v->uc->sample_id, entry );
 			sample_set_speed( sample_id, args[0] );
 			veejay_msg(VEEJAY_MSG_INFO, "Changed speed of mixing sample %d to %d on entry %d",sample_id,args[0], entry);
 		}
