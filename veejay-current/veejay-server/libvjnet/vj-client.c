@@ -576,13 +576,13 @@ int vj_client_send(vj_client *v, int sock_type,unsigned char *buf) {
 	
 	int len = strlen( (const char*)buf);
 	int ret = -1;
-	char *blob = (char*) vj_malloc(sizeof(char) * (len + HDR_LEN));
+	unsigned char *blob = (unsigned char*) vj_malloc(sizeof(unsigned char) * (len + HDR_LEN));
 	if(!blob) {
 		veejay_msg(0, "Out of memory" );
 		return -1;
 	}
 
-	sprintf( blob, "V%03dD", len );
+	sprintf( (char*) blob, "V%03dD", len );
 	memcpy( blob + HDR_LEN, buf, len );
 
 	if( v->mcast ) {

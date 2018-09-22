@@ -114,25 +114,6 @@ static int	get_cache_line_size()
 	return ret;
 }
 
-#ifdef ARCH_X86
-static void mymemset_generic(void * s, char c,size_t count)
-{
-int d0, d1;
-__asm__ __volatile__(
-	"rep\n\t"
-	"stosb"
-	: "=&c" (d0), "=&D" (d1)
-	:"a" (c),"1" (s),"0" (count)
-	:"memory");
-}
-
-#else 
-static void mymemset_generic(void *s, char c, size_t cc )
-{
-	memset(s,c,cc);
-} 
-#endif
-
 int	cpu_cache_size()
 {
 	return CACHE_LINE_SIZE;

@@ -364,7 +364,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 
 	pthread_rwlockattr_t	rw_lock_attr;
 	veejay_memset( v->sms, 0, size );
-	uint8_t *sms_addr = (const uint8_t*) v->sms;
+	uint8_t *sms_addr = (uint8_t*) v->sms;
 		
 	uint8_t *Y = sms_addr + HEADER_LENGTH;
 	uint8_t *U = Y + frame->len;
