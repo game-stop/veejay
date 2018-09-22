@@ -125,7 +125,10 @@ typedef struct
 
 static hash_t *keyboard_events = NULL;
 
-static  vj_keyboard_event *keyboard_event_map_[2048];
+// WARNING size depend on this formula (modifier * SDLK_LAST) + key
+// FIXME should be max modifier value when modifier combinaison possible ?
+// here : 15 * 330 + 330 = 5280 + align*1024
+static  vj_keyboard_event *keyboard_event_map_[6144];
 
 typedef struct
 {
@@ -216,16 +219,23 @@ enum {
 };
 
 #ifdef HAVE_SDL
-#define VIMS_MOD_CAPSLOCK 4
-#define VIMS_MOD_SHIFT  3
-#define VIMS_MOD_NONE   0
-#define VIMS_MOD_CTRL   2
-#define VIMS_MOD_ALT    1
+typedef enum { //WARNING ; on change this think to update keyboard_event_map_[] !!!!
+  VIMS_MOD_NONE  = 0x0000,
+  VIMS_MOD_ALT= 0x0001,
+  VIMS_MOD_CTRL= 0x0002,
+  VIMS_MOD_SHIFT = 0x0004,
+  VIMS_MOD_CAPSLOCK = 0x0008,
+} KEYMod;
+
+#define VIMS_MOD_ALT_SHIFT        VIMS_MOD_ALT|VIMS_MOD_SHIFT
+#define VIMS_MOD_CTRL_SHIFT       VIMS_MOD_CTRL|VIMS_MOD_SHIFT
+#define VIMS_MOD_CTRL_ALT         VIMS_MOD_CTRL|VIMS_MOD_ALT
+#define VIMS_MOD_CTRL_ALT_SHIFT   VIMS_MOD_CTRL|VIMS_MOD_ALT|VIMS_MOD_SHIFT
 
 static struct {                 /* hardcoded keyboard layout (the default keys) */
     int event_id;           
     int key_sym;            
-    int key_mod;
+    KEYMod key_mod;
     const char *value;
 } vj_event_default_sdl_keys[] = {
 
@@ -258,14 +268,31 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_VIDEO_SET_SLOW,          SDLK_a,         VIMS_MOD_ALT,   "1" },
     { VIMS_VIDEO_SET_SLOW,          SDLK_s,         VIMS_MOD_ALT,   "2" },
     { VIMS_VIDEO_SET_SLOW,          SDLK_d,         VIMS_MOD_ALT,   "3" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_e,         VIMS_MOD_ALT,   "4" },  
-    { VIMS_VIDEO_SET_SLOW,          SDLK_f,         VIMS_MOD_ALT,   "5" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_g,         VIMS_MOD_ALT,   "6" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_h,         VIMS_MOD_ALT,   "7" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_j,         VIMS_MOD_ALT,   "8" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_k,         VIMS_MOD_ALT,   "9" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_l,         VIMS_MOD_ALT,   "10"    },
-#ifdef HAVE_SDL
+    { VIMS_VIDEO_SET_SLOW,          SDLK_f,         VIMS_MOD_ALT,   "4" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_g,         VIMS_MOD_ALT,   "5" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_h,         VIMS_MOD_ALT,   "6" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_j,         VIMS_MOD_ALT,   "7" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_k,         VIMS_MOD_ALT,   "8" },
+    { VIMS_VIDEO_SET_SLOW,          SDLK_l,         VIMS_MOD_ALT,   "9"    },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_a,         VIMS_MOD_SHIFT,   "1" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_s,         VIMS_MOD_SHIFT,   "2" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_d,         VIMS_MOD_SHIFT,   "3" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_f,         VIMS_MOD_SHIFT,   "4" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_g,         VIMS_MOD_SHIFT,   "5" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_h,         VIMS_MOD_SHIFT,   "6" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_j,         VIMS_MOD_SHIFT,   "7" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_k,         VIMS_MOD_SHIFT,   "8" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_l,         VIMS_MOD_SHIFT,   "9" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_a,         VIMS_MOD_ALT_SHIFT,   "1" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_s,         VIMS_MOD_ALT_SHIFT,   "2" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_d,         VIMS_MOD_ALT_SHIFT,   "3" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_f,         VIMS_MOD_ALT_SHIFT,   "4" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_g,         VIMS_MOD_ALT_SHIFT,   "5" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_h,         VIMS_MOD_ALT_SHIFT,   "6" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_j,         VIMS_MOD_ALT_SHIFT,   "7" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_k,         VIMS_MOD_ALT_SHIFT,   "8" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_l,         VIMS_MOD_ALT_SHIFT,   "9" },
+    #ifdef HAVE_SDL
     { VIMS_FULLSCREEN,              SDLK_f,         VIMS_MOD_CTRL,  NULL    },
 #endif  
     { VIMS_CHAIN_ENTRY_DOWN,        SDLK_KP_MINUS,  VIMS_MOD_NONE,  "1" },
@@ -1681,14 +1708,14 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     veejay_t *v =  (veejay_t*) ptr;
     int vims_mod = 0;
 
-    if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT ))
-        vims_mod = VIMS_MOD_SHIFT;
-    if( (mod & KMOD_LALT) || (mod & KMOD_ALT) )
-        vims_mod = VIMS_MOD_ALT;
-    if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) )
-        vims_mod = VIMS_MOD_CTRL;
+    if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT )) // could use direct KMOD_SHIFT ?
+        vims_mod |= VIMS_MOD_SHIFT;
+    if( (mod & KMOD_LALT) || (mod & KMOD_ALT) ) // ONLY LEFT SHIFT !!!
+        vims_mod |= VIMS_MOD_ALT;
+    if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) ) // Both CTRL (but not explicit l & r)
+        vims_mod |= VIMS_MOD_CTRL;
     if( (mod & KMOD_CAPS) ) {
-        vims_mod = VIMS_MOD_CAPSLOCK;
+        vims_mod = VIMS_MOD_CAPSLOCK; // FIXME change to |= or not ???
     }
 
     int vims_key = key->keysym.sym;
@@ -4154,6 +4181,68 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
     else
     {
         p_no_sample(args[0]);
+    }
+}
+
+void vj_event_mixing_sample_set_speed(void *ptr, const char format[], va_list ap)
+{
+    int args[1];
+    veejay_t *v = (veejay_t*) ptr;
+    int sample_id = -1;
+    char *s = NULL;
+    P_A(args, s, format, ap);
+
+    if(SAMPLE_PLAYING(v))
+    {
+        int entry = sample_get_selected_entry(v->uc->sample_id);
+        sample_id = sample_get_chain_channel(v->uc->sample_id,entry);
+    }
+    if(STREAM_PLAYING(v))
+    {
+        int entry = vj_tag_get_selected_entry(v->uc->sample_id);
+        sample_id   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
+    }
+
+    if( sample_set_speed(sample_id, args[0]) != -1)
+    {
+        veejay_msg(VEEJAY_MSG_INFO, "Changed speed of current mixing sample %d to %d",
+            sample_id,args[0]);
+    }
+    else
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Can't change speed %d on mixing sample %d !",
+            args[0],sample_id);
+    }
+}
+
+void vj_event_mixing_sample_set_dup(void *ptr, const char format[], va_list ap)
+{
+    int args[1];
+    veejay_t *v = (veejay_t*) ptr;
+    int sample_id = -1;
+    char *s = NULL;
+    P_A(args, s, format, ap);
+
+    if(SAMPLE_PLAYING(v))
+    {
+        int entry = sample_get_selected_entry(v->uc->sample_id);
+        sample_id = sample_get_chain_channel(v->uc->sample_id,entry);
+    }
+    if(STREAM_PLAYING(v))
+    {
+        int entry = vj_tag_get_selected_entry(v->uc->sample_id);
+        sample_id   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
+    }
+
+    if( sample_set_framedup(sample_id, args[0]) != -1)
+    {
+        veejay_msg(VEEJAY_MSG_INFO, "Changed frame duplication of current mixing sample %d to %d",
+            sample_id,args[0]);
+    }
+    else
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Can't change frame duplication %d on mixing sample %d !",
+            args[0],sample_id);
     }
 }
 

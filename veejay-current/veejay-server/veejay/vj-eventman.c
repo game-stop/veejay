@@ -1185,6 +1185,28 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[VIMS_SAMPLE_MIX_SET_SPEED]	=	_new_event(
+				"%d",
+				VIMS_SAMPLE_MIX_SET_SPEED,
+				"Change playback speed of current mix sample",
+				vj_event_mixing_sample_set_speed,
+				1,
+				VIMS_ALLOW_ANY,
+				"Speed (0=pause, > 0  and < (end-start)",
+				1,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_MIX_SET_DUP]		=	_new_event(
+				"%d",
+				VIMS_SAMPLE_MIX_SET_DUP,
+				"Change frame repeat of current mix sample",
+				vj_event_mixing_sample_set_dup,
+				1,
+				VIMS_ALLOW_ANY,
+				"Frame repeat",
+				0,
+				NULL );
+
 	index_map_[VIMS_STREAM_SELECT]				=	_new_event(
 				"%d",
 				VIMS_STREAM_SELECT,
