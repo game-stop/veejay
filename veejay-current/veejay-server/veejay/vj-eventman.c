@@ -1188,7 +1188,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_SAMPLE_MIX_SET_SPEED]	=	_new_event(
 				"%d",
 				VIMS_SAMPLE_MIX_SET_SPEED,
-				"Change playback speed of current mix sample",
+				"Change playback speed of the mixing sample on the current chain entry",
 				vj_event_mixing_sample_set_speed,
 				1,
 				VIMS_ALLOW_ANY,
