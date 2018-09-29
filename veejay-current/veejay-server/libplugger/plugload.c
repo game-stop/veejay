@@ -329,6 +329,8 @@ int plug_get_idx_by_so_name( char *soname )
 
 		if( strcmp( soname,str ) == 0 )
 			return i;
+	
+		free(str);
 	}
 
 	return -1;
