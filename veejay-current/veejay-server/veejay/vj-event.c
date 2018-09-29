@@ -498,6 +498,7 @@ static inline void P_A(int *args, size_t argsize, char *str, size_t strsize, con
 			case 's':
 				if( str == NULL )
 					break;
+				veejay_memset( str, 0, strsize );
 				char *tmp = (char*)va_arg(ap, char*);
 				if(tmp != NULL ) {
 					int tmplen= strlen(tmp);
