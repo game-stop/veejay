@@ -846,13 +846,17 @@ void	frei0r_plug_deinit( void *plugin )
 			(*base)(instance);
 	}
 
+	int n_in = 0;
+	int i = 0;
+	vevo_property_get( plugin, "num_inputs",0,&n_in );
+	
 	fr0_conv_t *fr = NULL;
 	err = vevo_property_get( plugin, "HOST_conv",0,&fr);
 	if( fr && err == VEVO_NO_ERROR ){
 		if(fr->buf) free(fr->buf);
-		if(fr->in[0]) free(fr->in[0]);
-		if(fr->in[1]) free(fr->in[1]);
-		if(fr->in[2]) free(fr->in[2]);
+		for(i = 0;i < (n_in+1); i++ ){
+			if(fr->in[i]) free(fr->in[i]);
+		}
 		if(fr->out) free(fr->out);
 		free(fr);
 		fr = NULL;
@@ -929,10 +933,6 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 
 	fr->out          = yuv_yuv_template(bufx, bufx+(w*h), bufx+(w*h*2), w,h,pf );
 	fr->out->data[3] = bufx + (fr->out->len + fr->out->uv_len + fr->out->uv_len);
-
-	if( n_in == 0 ) {
-		fr->in[0] = yuv_rgb_template( fr->buf, w, h, frfmt );
-	}
 
 	if( out_scaler__ == NULL ) {
 		out_scaler__	= yuv_init_swscaler( fr->in[0],fr->out,&templ,yuv_sws_get_cpu_flags()); // rgb -> yuv

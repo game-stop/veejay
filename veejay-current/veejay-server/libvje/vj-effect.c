@@ -381,7 +381,6 @@ void vj_effect_initialize(int width, int height, int full_range)
 	veejay_memset( vj_effects, 0, sizeof(vj_effects));
 	veejay_memset( vj_effect_ready,0,sizeof(vj_effect_ready));
 
-    vj_effects[VJ_IMAGE_EFFECT_DUMMY]				= dummy_init(width,height);
     vj_effects[VJ_VIDEO_EFFECT_OVERLAYMAGIC]		= overlaymagic_init( width,height );
     vj_effects[VJ_VIDEO_EFFECT_LUMAMAGICK]			= lumamagick_init( width,height );
     vj_effects[VJ_VIDEO_EFFECT_DIFF]				= diff_init(width, height);
