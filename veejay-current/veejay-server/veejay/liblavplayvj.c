@@ -290,6 +290,7 @@ int veejay_set_speed(veejay_t * info, int speed)
 			}
 			if(sample_set_speed(info->uc->sample_id, speed) != -1)
 				settings->current_playback_speed = speed;
+
 		break;
 
 		case VJ_PLAYBACK_MODE_TAG:
@@ -328,11 +329,7 @@ int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
 
 static void	veejay_sample_resume_at( veejay_t *info, int cur_id )
 {
-	long pos = 0;
-	if( info->settings->sample_restart )
-		pos = sample_get_startFrame( cur_id );
-	else
-		pos = sample_get_resume( cur_id );
+	long pos = sample_get_resume(cur_id);
 	veejay_set_frame(info, pos );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d continues with frame %d", cur_id, pos );
 }
@@ -568,7 +565,6 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 
 	sample_chain_free( info->uc->sample_id,0);
 	sample_set_framedups(info->uc->sample_id,0);
-	sample_set_resume(info->uc->sample_id, info->settings->current_frame_num );
 
 	return 1;
 }
@@ -651,7 +647,7 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	 if( speed != 0 )
 		 settings->previous_playback_speed = speed;
 
-     veejay_set_speed(info, speed);
+     	 veejay_set_speed(info, speed);
  	 
 	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, Loop=%d)",
 			sample_id, tmp,info->sfd, speed, start, looptype );
@@ -725,7 +721,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		{
 			if( info->settings->sample_restart )
 			{
-				long pos = sample_get_startFrame( cur_id );
+				long pos = sample_get_resume( cur_id );
 
 				veejay_set_frame(info, pos );
 			
@@ -2931,7 +2927,7 @@ veejay_t *veejay_malloc()
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_FULLSCREEN=[0|1] not set");
 	}
 
-	info->pause_render = 1;// old behaviour was always to pause everything on speed=0
+	info->pause_render = 0;
 	char *pausefl = getenv( "VEEJAY_PAUSE_EVERYTHING" );
 	if( pausefl ) {
 		int val = 0;

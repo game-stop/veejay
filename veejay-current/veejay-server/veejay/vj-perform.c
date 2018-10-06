@@ -284,7 +284,7 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
 	    settings->current_playback_speed =
 		+(settings->current_playback_speed);
 	}
-	return -1;
+		return 0;
     }
 
 	if( info->seq->active ) {
@@ -298,9 +298,10 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
 	}
 
     if (settings->current_frame_num >= settings->max_frame_num) {
-	settings->current_frame_num = settings->min_frame_num;
-	return -1;
+		settings->current_frame_num = settings->min_frame_num;
+		return 0;
     }
+
     return 0;
 }
 
@@ -311,25 +312,26 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
 
     settings->simple_frame_dup ++;
     if (settings->simple_frame_dup >= info->sfd) {
-	settings->current_frame_num += num;
-	settings->simple_frame_dup = 0;
+		settings->current_frame_num += num;
+		settings->simple_frame_dup = 0;
     }
 
-// auto loop plain mode
+	// auto loop plain mode
     if (settings->current_frame_num < settings->min_frame_num) {
-	settings->current_frame_num = settings->max_frame_num;
-	        	
-	return 0;
+		settings->current_frame_num = settings->max_frame_num;
+		return 0;
     }
+
     if (settings->current_frame_num > settings->max_frame_num) {
-	if(!info->continuous)
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - Ending veejay session ... ");
-		veejay_change_state(info, LAVPLAY_STATE_STOP);
-	}
-	settings->current_frame_num = settings->min_frame_num;
-	return 0;
+		if(!info->continuous)
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - Ending veejay session ... ");
+			veejay_change_state(info, LAVPLAY_STATE_STOP);
+		}
+		settings->current_frame_num = settings->min_frame_num;
+		return 0;
     }
+
     return 0;
 }
 
@@ -403,9 +405,11 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 {
     video_playback_setup *settings = (video_playback_setup *) info->settings;
     int start,end,looptype,speed;
-    int ret_val = 1;
 
-    if(sample_get_short_info(info->uc->sample_id,&start,&end,&looptype,&speed)!=0) return -1;
+    if(sample_get_short_info(info->uc->sample_id,&start,&end,&looptype,&speed)!=0) {
+			veejay_msg(0, "Sample %d no longer exists ?! Unable to queue frame", info->uc->sample_id);
+			return -1;
+	}
 
     settings->current_playback_speed = speed;
 
@@ -424,13 +428,18 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 		sample_set_framedups( info->uc->sample_id , cur_sfd);
 		
 		if( cur_sfd != 0 ) 
-			return 1;
+			return 0;
 
 	}
+
+
 	settings->current_frame_num += num;
 
+	sample_set_resume( info->uc->sample_id, settings->current_frame_num );
+
+
 	if( num == 0 )
-		return 1;
+		return 0;
 
     if (speed >= 0) {		/* forward play */
 
@@ -534,11 +543,13 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	    }
 	}
     }
- //   sample_update_offset( info->uc->sample_id, settings->current_frame_num );	
+ //   sample_update_offset( info->uc->sample_id, settings->current_frame_num );
    	sample_set_resume( info->uc->sample_id, settings->current_frame_num );
-   	vj_perform_rand_update( info );
+   	
+		
+	vj_perform_rand_update( info );
 
-    return ret_val;
+    return 0;
 }
 
 static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
@@ -1512,7 +1523,7 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
 
 	if(sample_get_short_info(a,&sample_a[0],&sample_a[1],&sample_a[2],&sample_a[3])!=0) return -1;
 
-	if( info->settings->current_playback_speed == 0 ) 
+	if( sample_b[3] == 0 ) 
 	{
 		return sample_b[0] + offset;
 	}
@@ -1618,7 +1629,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
     
 	if(sample_get_short_info(sub_sample,&sample[0],&sample[1],&sample[2],&sample[3])!=0) return -1;
 	
-	if( info->settings->current_playback_speed == 0 ) 
+	if( sample[3] == 0 ) 
 	{
 		return sample[0] + offset;
 	}
@@ -3876,6 +3887,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 int vj_perform_queue_frame(veejay_t * info, int skip )
 {
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
+	int ret_val = 0;
 
 	if( pvar_.follow_run ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Following to [%d,%d]", pvar_.follow_now[0], pvar_.follow_now[1] );
@@ -3915,13 +3927,13 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 		switch(info->uc->playback_mode) 
 		{
 			case VJ_PLAYBACK_MODE_TAG:
-				vj_perform_increase_tag_frame(info, speed);
+				ret_val = vj_perform_increase_tag_frame(info, speed);
 				break;
 			case VJ_PLAYBACK_MODE_SAMPLE: 
-	 			vj_perform_increase_sample_frame(info, speed);
+	 			ret_val = vj_perform_increase_sample_frame(info, speed);
 	  			break;
 			case VJ_PLAYBACK_MODE_PLAIN:
-				vj_perform_increase_plain_frame(info, speed);
+				ret_val = vj_perform_increase_plain_frame(info, speed);
 				break;
 			default:
 				break;
@@ -3935,7 +3947,7 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 			settings->cycle_count[1] ++;
 	}
 
-	return 0;
+	return ret_val;
 }
 
 static int track_dup = 0;

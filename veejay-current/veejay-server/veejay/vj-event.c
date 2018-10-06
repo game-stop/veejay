@@ -4434,8 +4434,9 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     }
     else
     {
-        veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
-        v->seq->rec_id = 0;
+        //veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
+        veejay_set_frame(v, sample_get_resume(v->uc->sample_id));
+	v->seq->rec_id = 0;
     }
 }
 
@@ -5660,7 +5661,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
         veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d", entry,(src==VJ_TAG_TYPE_NONE ? "Sample":"Stream"), cha);
         if(v->no_bezerk)
         {
-            veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
+            veejay_set_frame(v, sample_get_resume(v->uc->sample_id));
         }
     } 
 
@@ -5765,7 +5766,7 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
                 if(v->no_bezerk)
                 {
                     veejay_set_frame(v,
-                        sample_get_startFrame(args[0]));
+                        sample_get_resume(args[0]));
                 }
             }
                 
@@ -5880,7 +5881,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
                 (src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
              
         if(v->no_bezerk) 
-            veejay_set_frame(v , sample_get_startFrame(v->uc->sample_id));
+            veejay_set_frame(v , sample_get_resume(v->uc->sample_id));
     }
     if(STREAM_PLAYING(v))
     {
@@ -5976,7 +5977,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
         veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
             (src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
 //      if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
-        if(v->no_bezerk) veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));   
+        if(v->no_bezerk) veejay_set_frame(v,sample_get_resume(v->uc->sample_id));   
              
     }
     if(STREAM_PLAYING(v))
@@ -7682,10 +7683,7 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
             );
             if(v->no_bezerk && vj_effect_get_extra_frame(real_id) ) 
             {
-                //veejay_set_sample(v,v->uc->sample_id);
-                //
-                int nf = sample_get_startFrame( v->uc->sample_id );
-                veejay_set_frame(v,nf );
+		veejay_set_frame(v,sample_get_resume(v->uc->sample_id));
             }
             v->uc->chain_changed = 1;
         }
