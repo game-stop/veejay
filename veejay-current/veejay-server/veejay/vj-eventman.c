@@ -414,6 +414,15 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[VIMS_VIDEO_PLAY_STOP_ALL]	=	_new_event(
+				NULL,
+				VIMS_VIDEO_PLAY_STOP,
+				"Play stop all samples",
+				vj_event_play_stop_all,
+				0,	
+				VIMS_ALLOW_ANY,
+				NULL );
+
 	index_map_[VIMS_VIDEO_SKIP_FRAME]	=	_new_event(
 				"%d",
 				VIMS_VIDEO_SKIP_FRAME,

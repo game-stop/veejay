@@ -254,6 +254,7 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_VIDEO_PLAY_FORWARD,      SDLK_KP6,       VIMS_MOD_NONE,  NULL    },
     { VIMS_VIDEO_PLAY_BACKWARD,     SDLK_KP4,       VIMS_MOD_NONE,  NULL    },
     { VIMS_VIDEO_PLAY_STOP,         SDLK_KP5,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_PLAY_STOP_ALL,	    SDLK_KP5,	    VIMS_MOD_SHIFT, NULL    },
     { VIMS_VIDEO_SKIP_FRAME,        SDLK_KP9,       VIMS_MOD_NONE,  "1" },
     { VIMS_VIDEO_PREV_FRAME,        SDLK_KP7,       VIMS_MOD_NONE,  "1" },
     { VIMS_VIDEO_SKIP_SECOND,       SDLK_KP8,       VIMS_MOD_NONE,  NULL    },
@@ -3361,7 +3362,43 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
     }
 }
 
-void    vj_event_feedback( void *ptr, const char format[], va_list ap )
+void vj_event_play_stop_all(void *ptr, const char format[], va_list ap) 
+{
+    veejay_t *v = (veejay_t*) ptr;
+      
+
+    if(STREAM_PLAYING(v))
+    {
+	vj_tag_set_chain_paused( v->uc->sample_id, v->settings->current_playback_speed == 0 ? 0 : 1 );
+    }
+    else if(SAMPLE_PLAYING(v)) {
+	int speed = v->settings->current_playback_speed;
+        if(speed != 0)
+        {
+            v->settings->previous_playback_speed = speed;
+            veejay_set_speed(v, 0 );
+	    
+	    sample_set_chain_paused( v->uc->sample_id, 1);
+
+            veejay_msg(VEEJAY_MSG_INFO,"Video is paused");
+        }
+        else
+        {
+            veejay_set_speed(v, v->settings->previous_playback_speed );
+	    
+	    sample_set_chain_paused( v->uc->sample_id, 0);
+
+            veejay_msg(VEEJAY_MSG_INFO,"Video is playing (resumed at speed %d)", v->settings->previous_playback_speed);
+        }
+
+    }
+    else
+    {
+        p_invalid_mode();
+    }
+}
+
+void vj_event_feedback( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[1];

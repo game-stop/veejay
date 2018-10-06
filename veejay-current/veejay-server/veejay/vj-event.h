@@ -116,6 +116,7 @@ void 	vj_event_play_speed			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_play_speed_kb			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_play_slow			( 	void *ptr,	const char format[], 	va_list ap	);
 void 	vj_event_play_stop			(	void *ptr, 	const char format[], 	va_list ap	); 
+void 	vj_event_play_stop_all			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_prev_second			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_sample_next			( 	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_clear_all		(	void *ptr, 	const char format[], 	va_list ap	);

@@ -1151,6 +1151,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         tag->effect_chain[i]->e_flag = 0;
         tag->effect_chain[i]->frame_trimmer = 0;
         tag->effect_chain[i]->frame_offset = 0;
+	tag->effect_chain[i]->speed = INT_MAX;
         tag->effect_chain[i]->volume = 0;
         tag->effect_chain[i]->a_flag = 0;
         tag->effect_chain[i]->channel = 0;
@@ -2771,6 +2772,43 @@ int vj_tag_chain_remove(int t1, int index)
         tag->fade_entry = -1;
 
     return 1;
+}
+
+void	vj_tag_set_chain_paused(int t1, int paused)
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag)
+		return;
+	int entry;
+	for( entry = 0; entry < SAMPLE_MAX_EFFECTS; entry ++ ) {
+		if( tag->effect_chain[entry]->source_type != 0 ||
+	     		tag->effect_chain[entry]->channel <= 0 )
+			continue;
+
+		if( paused == 1 ) {
+			int speed = sample_get_speed( tag->effect_chain[entry]->channel );
+			if( speed != 0) {
+				tag->effect_chain[entry]->speed = speed;
+				sample_set_speed( tag->effect_chain[entry]->channel, 0 );
+			}
+		} 
+		else {
+			if( tag->effect_chain[entry]->speed == 0 ) {
+				tag->effect_chain[entry]->speed = sample_get_speed( tag->effect_chain[entry]->channel );
+				if( tag->effect_chain[entry]->speed == 0 ) {
+					veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d on mixing entry %d is paused. Please set speed manually",
+							tag->effect_chain[entry]->channel, entry);
+				}	
+			}
+
+
+			if( tag->effect_chain[entry]->speed != INT_MAX ) {
+				sample_set_speed( tag->effect_chain[entry]->channel, tag->effect_chain[entry]->speed );
+				veejay_msg(VEEJAY_MSG_DEBUG, "Restoring speed %d for sample %d on mixing entry %d",
+					tag->effect_chain[entry]->speed, tag->effect_chain[entry]->channel, entry );
+			}
+		}
+	}
 }
 
 // very old code, 2 callers; 150 and 255 size of dst

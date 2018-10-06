@@ -344,7 +344,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "Sample %4d", si->sample_id);
     si->first_frame = startFrame;
     si->last_frame = endFrame;
-    si->resume_pos = startFrame;
+    si->resume_pos = -1;
     si->edit_list = NULL;   // clone later
     si->soft_edl = 1;
     si->speed = 1;
@@ -371,6 +371,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
         }
         si->effect_chain[i]->effect_id = -1;
         si->effect_chain[i]->volume = 50;
+	si->effect_chain[i]->speed = INT_MAX;
         si->effect_chain[i]->channel = ( sample_highest_valid_id() <= 0 ? si->sample_id : sample_highest_valid_id());
     }
 #ifdef HAVE_FREETYPE
@@ -2258,6 +2259,43 @@ int sample_chain_add(int s1, int c, int effect_nr)
         }
     }
     return 1;           /* return position on which it was added */
+}
+
+void	sample_set_chain_paused( int s1, int paused )
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample)
+		return;
+	int entry;
+	for( entry = 0; entry < SAMPLE_MAX_EFFECTS; entry ++ ) {
+		if( sample->effect_chain[entry]->source_type != 0 ||
+	     		sample->effect_chain[entry]->channel <= 0 )
+			continue;
+
+		if( paused == 1 ) {
+			int speed = sample_get_speed( sample->effect_chain[entry]->channel );
+			if( speed != 0 ) {
+				sample->effect_chain[entry]->speed = sample_get_speed( sample->effect_chain[entry]->channel );
+				sample_set_speed( sample->effect_chain[entry]->channel, 0 );
+			}
+		} 
+		else {
+				if( sample->effect_chain[entry]->speed == 0 ) {
+					sample->effect_chain[entry]->speed = sample_get_speed( sample->effect_chain[entry]->channel );
+					if( sample->effect_chain[entry]->speed == 0 ) {
+						veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d on mixing entry %d is paused. Please set speed manually",
+								sample->effect_chain[entry]->channel, entry);
+					}	
+				}
+
+
+				if( sample->effect_chain[entry]->speed != INT_MAX ) {
+					sample_set_speed( sample->effect_chain[entry]->channel, sample->effect_chain[entry]->speed );
+					veejay_msg(VEEJAY_MSG_DEBUG, "Restoring speed %d for sample %d on mixing entry %d",
+									sample->effect_chain[entry]->speed, sample->effect_chain[entry]->channel, entry );
+				}
+		}
+	}
 }
 
 int sample_reset_offset(int s1)

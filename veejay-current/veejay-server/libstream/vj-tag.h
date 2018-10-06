@@ -363,7 +363,7 @@ int	vj_tag_cali_write_file( int id, char *name, editlist *el );
 int	vj_tag_has_cali_fx( int t1 );
 int     vj_tag_cali_write_file( int t1, char *name, editlist *el );
 uint8_t *vj_tag_get_cali_data( int t1, int what );
-
+void	vj_tag_set_chain_paused(int t1, int paused);
 
 #ifdef HAVE_XML2
 void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);

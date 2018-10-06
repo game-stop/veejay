@@ -101,6 +101,7 @@ typedef struct sample_eff_t {
     int arg[SAMPLE_MAX_PARAMETERS];	/* array of arguments */
     int frame_offset;
     int frame_trimmer;		/* sub frame scratcher */
+    int speed;			/* last known play speed */
     /* audio settings */
     int a_flag;			/* audio enabled/disabled */
     int volume;			/* volume of 0-100 of audio */
@@ -362,7 +363,7 @@ extern	long	sample_get_resume(int s1);
 extern	int		sample_set_resume(int s1, long pos );
 
 extern void	sample_chain_alloc_kf( int s1, int entry );
-
+extern void	sample_set_chain_paused( int s1, int paused );
 extern sample_eff_chain **sample_get_effect_chain(int s1);
 
 #ifdef HAVE_XML2

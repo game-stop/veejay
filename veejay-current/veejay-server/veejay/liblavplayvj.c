@@ -2392,24 +2392,7 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_SDL
 			ts= SDL_GetTicks();
 #endif
-			if( info->pause_render )
-			{
-				int hti = (settings->current_playback_speed == 0 ? 0 : 1);
-				if( hti == 0 )
-					hti = info->sfd ? 1: 0;
-				if( hti )
-				{
-					settings->buffer_entry[frame] = (settings->buffer_entry[frame]+1)%2; //@!
-				}
-				else
-				{
-					settings->buffer_entry[frame] = settings->current_frame_num;
-				}
-			}
-			else
-			{
-				settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
-			}
+			settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
 
 			if( settings->state != LAVPLAY_STATE_PAUSED )
 			{
@@ -2925,21 +2908,6 @@ veejay_t *veejay_malloc()
 		}
 	} else {
 		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_FULLSCREEN=[0|1] not set");
-	}
-
-	info->pause_render = 0;
-	char *pausefl = getenv( "VEEJAY_PAUSE_EVERYTHING" );
-	if( pausefl ) {
-		int val = 0;
-		if( sscanf( pausefl, "%d", &val) ) {
-			veejay_msg(VEEJAY_MSG_WARNING,
-					"Playback engine will %s",
-					(val == 0 ? "only stop top sample on pause" :
-					 		    "stop rendering on pause" ) );
-			info->pause_render = val;
-		}
-	} else {
-		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_PAUSE_EVERYTHING=[0|1] (continues rendering is ON)");
 	}
 
 	if( best_performance) {
