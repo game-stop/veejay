@@ -81,6 +81,16 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 		return NULL;
 	}
 
+	GdkPixbuf *scaled_image = gdk_pixbuf_scale_simple( image, dst_w, dst_h, GDK_INTERP_HYPER );
+	if( scaled_image == NULL ) {
+		g_object_unref(image);
+		return NULL;
+	}
+
+	g_object_unref(image);
+
+	image = scaled_image;
+
 	const size_t pixbuf_size = gdk_pixbuf_get_byte_length( image );
 
 	/* convert image to veejay frame in proper dimensions, free image */

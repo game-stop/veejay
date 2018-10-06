@@ -1827,6 +1827,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	veejay_msg(VEEJAY_MSG_DEBUG, "               full range=%d",
 			full_range );
 
+	if(( info->effect_frame1->width % 4) != 0 || (info->effect_frame1->height % 4) != 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "You should specify an output resolution that is a multiple of 4");
+	}
+
 	if(!vj_perform_init(info))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
