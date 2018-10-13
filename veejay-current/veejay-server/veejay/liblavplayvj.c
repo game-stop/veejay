@@ -579,7 +579,7 @@ static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 
 	vj_tag_chain_free( info->uc->sample_id, 0);
 }
-static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
+int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 {
 	int looptype,speed,start,end;
 	video_playback_setup *settings = info->settings;
@@ -721,6 +721,8 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		{
 			if( info->settings->sample_restart )
 			{
+				sample_set_resume(cur_id,-1);
+
 				long pos = sample_get_resume( cur_id );
 
 				veejay_set_frame(info, pos );

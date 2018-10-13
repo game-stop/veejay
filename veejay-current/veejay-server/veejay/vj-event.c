@@ -360,6 +360,18 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_SELECT_ID,               SDLK_F10,       VIMS_MOD_NONE,  "10"    },
     { VIMS_SELECT_ID,               SDLK_F11,       VIMS_MOD_NONE,  "11"    },
     { VIMS_SELECT_ID,               SDLK_F12,       VIMS_MOD_NONE,  "12"    },
+    { VIMS_RESUME_ID,               SDLK_F1,        VIMS_MOD_SHIFT,  "1" },
+    { VIMS_RESUME_ID,               SDLK_F2,        VIMS_MOD_SHIFT,  "2" },
+    { VIMS_RESUME_ID,               SDLK_F3,        VIMS_MOD_SHIFT,  "3" },
+    { VIMS_RESUME_ID,               SDLK_F4,        VIMS_MOD_SHIFT,  "4" },
+    { VIMS_RESUME_ID,               SDLK_F5,        VIMS_MOD_SHIFT,  "5" },
+    { VIMS_RESUME_ID,               SDLK_F6,        VIMS_MOD_SHIFT,  "6" },
+    { VIMS_RESUME_ID,               SDLK_F7,        VIMS_MOD_SHIFT,  "7" },
+    { VIMS_RESUME_ID,               SDLK_F8,        VIMS_MOD_SHIFT,  "8" },
+    { VIMS_RESUME_ID,               SDLK_F9,        VIMS_MOD_SHIFT,  "9" },
+    { VIMS_RESUME_ID,               SDLK_F10,       VIMS_MOD_SHIFT,  "10"    },
+    { VIMS_RESUME_ID,               SDLK_F11,       VIMS_MOD_SHIFT,  "11"    },
+    { VIMS_RESUME_ID,               SDLK_F12,       VIMS_MOD_SHIFT,  "12"    },
     { VIMS_SET_PLAIN_MODE,          SDLK_KP_DIVIDE, VIMS_MOD_NONE,  NULL    },
     { VIMS_REC_AUTO_START,          SDLK_e,         VIMS_MOD_CTRL,  "100"   },
     { VIMS_REC_STOP,                SDLK_t,         VIMS_MOD_CTRL,  NULL    },
@@ -7754,6 +7766,30 @@ void vj_event_misc_stop_rec(void *ptr, const char format[], va_list ap)
 {
 
 }
+
+
+void vj_event_resume_id(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v=  (veejay_t*)ptr;
+    int args[2];
+    P_A(args,sizeof(args),NULL,0,format, ap);
+
+	if(STREAM_PLAYING(v)) {
+		vj_event_select_id(ptr,format,ap);
+	}
+	else if(SAMPLE_PLAYING(v)) {
+		int sample_id = (v->uc->sample_key*12)-12 + args[0];
+		if(sample_exists(sample_id)) {
+			if(sample_id != v->uc->sample_id) {
+				long pos = sample_get_resume(sample_id);
+				veejay_start_playing_sample(v, sample_id);
+				veejay_set_frame(v,pos);
+			}
+		}
+	}	
+
+}
+
 
 void vj_event_select_id(void *ptr, const char format[], va_list ap)
 {

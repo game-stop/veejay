@@ -131,4 +131,6 @@ int      prepare_cache_line(int perc, int n_slots);
 
 int	veejay_set_yuv_range( veejay_t *info );
 
+int	veejay_start_playing_sample( veejay_t *info, int sample_id );
+
 #endif

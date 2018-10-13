@@ -786,6 +786,18 @@ void		vj_init_vevo_events(void)
 				1,
 				NULL );
 
+	index_map_[VIMS_RESUME_ID]	= 	_new_event(
+				"%d",
+				VIMS_RESUME_ID,
+				"Resume playing sample from last known position",
+				vj_event_resume_id,
+				1,
+				VIMS_ALLOW_ANY,
+				"Slot number",
+				1,
+				NULL );
+
+
 	index_map_[VIMS_SAMPLE_RAND_START]	=	_new_event(
 				"%d",
 				VIMS_SAMPLE_RAND_START,

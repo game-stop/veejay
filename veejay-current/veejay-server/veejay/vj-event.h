@@ -185,6 +185,7 @@ void 	vj_event_tag_rec_stop			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_select			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_toggle			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_select_id			(	void *ptr,	const char format[], 	va_list ap	);
+void	vj_event_resume_id			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_select_bank			( 	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_enable_audio			( 	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_disable_audio			(	void *ptr,	const char format[],	va_list ap	);
