@@ -3488,11 +3488,6 @@ static void on_vims_messenger (void)
     if(info->vims_line >= gtk_text_buffer_get_line_count(buffer))
     {
         info->vims_line = 0;
-        if(!is_button_toggled( "vims_messenger_loop"))
-        {
-            set_toggle_button( "vims_messenger_play", 0 );
-            return;
-        }
     }
 
     if(is_button_toggled( "vims_messenger_play" ))
@@ -3509,17 +3504,23 @@ static void on_vims_messenger (void)
             gtk_text_iter_forward_sentence_end(&end);
             str = gtk_text_buffer_get_text (buffer, &start, &end, TRUE);
 
+	    if(strlen(str) <= 0) {
+		    vj_msg(VEEJAY_MSG_INFO, "Nothing to do at line %d", info->vims_line);
+		    info->vims_line++;
+		    return;
+	    }
+
             if(str[0] == '+')
             {
                 str[0] = ' ';
                 g_strstrip(str);
                 wait = atoi(str);
+		vj_msg(VEEJAY_MSG_INFO, "Next VIMS message in %d frames", wait);
             }
             else
             {
-                vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'",str );
-                msg_vims( str );
-                printf("\nSent VIMS: %s", str);
+		msg_vims( str );
+                vj_msg(VEEJAY_MSG_INFO, "Sent VIMS message '%s' (line %d)",str, info->vims_line );
             }
             info->vims_line++;
         }

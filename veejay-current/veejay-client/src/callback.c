@@ -3818,6 +3818,7 @@ void
 on_vims_messenger_rewind_clicked( GtkButton *togglebutton, gpointer user_data)
 {
 	info->vims_line = 0;
+	vj_msg(VEEJAY_MSG_INFO, "Start from line 0 in vims messenger editor");
 }
 
 void
@@ -3849,14 +3850,17 @@ on_vims_messenger_single_clicked( void )
  	 	end = start;
                 
 	        gtk_text_iter_forward_sentence_end(&end);
-       		gchar *str = gtk_text_buffer_get_text (buffer, &start, &end, TRUE);
-
+       		gchar *str = gtk_text_buffer_get_text (buffer, &start, &end, FALSE);
+	
 		info->vims_line++;
+
+		if(strlen(str) <= 0)
+			continue; // skip empty lines
 
 	        if(str[0] != '+')
 		{
-       		 	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'",str );
-                	msg_vims( str );
+	               	msg_vims( str );
+       		 	vj_msg(VEEJAY_MSG_INFO, "Sent VIMS message '%s' (line %d)",str, info->vims_line-1 );
 			break;
         	}
 	}
