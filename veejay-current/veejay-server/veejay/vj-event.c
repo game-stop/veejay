@@ -9759,7 +9759,7 @@ void    vj_event_connect_split_shm( void *ptr, const char format[], va_list ap )
 
     vj_shm_set_id( key );
 
-    veejay_msg(VEEJAY_MSG_INFO,"Shared memory resource %x (%d)", key,key);
+    veejay_msg(VEEJAY_MSG_INFO,"Connect to shared memory resource %x (%d)", key,key);
 
     int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, 0, key);
     

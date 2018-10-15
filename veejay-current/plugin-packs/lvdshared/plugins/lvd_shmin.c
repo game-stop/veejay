@@ -66,16 +66,14 @@ static	inline int	lvd_to_ffmpeg( int lvd, int fr ) {
 				return PIX_FMT_YUVJ444P;
 			return PIX_FMT_YUV444P;
 		case LIVIDO_PALETTE_YUVA8888:
-			if(fr)
-				return PIX_FMT_YUVJ444P;
 			return PIX_FMT_YUVA444P;
 		case LIVIDO_PALETTE_YUVA422:
 			return PIX_FMT_YUVA422P;
-		default:
-			if( fr ) 
-				return PIX_FMT_YUVJ422P;
-			return PIX_FMT_YUV422P;
 	}
+
+	if( fr ) 
+		return PIX_FMT_YUVJ422P;
+
 	return PIX_FMT_YUV422P;
 }
 
@@ -274,15 +272,9 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	if( srcFormat == PIX_FMT_YUVA422P || srcFormat == PIX_FMT_YUVA444P ) {
 		strides[3] = strides[0];
 		dst_strides[3] = dst_strides[0];
+		in[3] = in[2] + (strides[1] * srcH);
 	}
-
-	if( srcFormat == PIX_FMT_YUVA422P ) {
-		in[3] = in[2] + (srcW>>1) * srcH;
-	}
-	if( srcFormat == PIX_FMT_YUVA444P ) {
-		in[3] = in[2] + (srcW * srcH);
-	}
-
+	
 	sws_scale( sws, (const uint8_t *const *)in, strides,0, srcH,(uint8_t * const*) O, dst_strides );
 
 	res = pthread_rwlock_unlock( &v->rwlock );
@@ -336,6 +328,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
            	LIVIDO_PALETTE_YUV422P,
 			LIVIDO_PALETTE_RGB24,
 			LIVIDO_PALETTE_RGBA32,
+			LIVIDO_PALETTE_YUVA422,
+			LIVIDO_PALETTE_YUVA8888,
             0
 	};
 	

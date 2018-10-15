@@ -137,6 +137,8 @@ int	vj_share_get_info( char *host, int port, int *width, int *height, int *forma
 
 		sscanf( tmp, "%d %d %d %d",
 				width,height,format,key );
+
+		veejay_msg(VEEJAY_MSG_DEBUG, "Veejay %s:%d has a shared memory resource at %x (%d) in %dx%d@%d", host,port, *key,*key, *width,*height,*format);
 	}
 	vj_client_close( c );
 

@@ -46,6 +46,7 @@
 #define PATH_MAX 1024
 #endif
 
+#define RUP8(num)(((num)+8)&~8)
 typedef struct {
 	int shm_id;
 	void *sms;
@@ -152,19 +153,26 @@ int		vj_shm_read( void *vv , uint8_t *dst[4] )
 	vj_shared_data *data = (vj_shared_data*) v->sms;
 	int res = pthread_rwlock_rdlock( &data->rwlock );
 	if( res == -1 ) {
-		veejay_msg(0, "%s",strerror(errno));
+		veejay_msg(0, "Unable to acquire lock: %s",strerror(errno));
 		return 0;
 	}
 	uint8_t *ptr = ( (uint8_t*) v->sms ) + HEADER_LENGTH;
 	
-	int len = data->header[0] * data->header[1]; //@ 
+	int len = data->header[0] * data->header[1]; 
 	uint8_t *in[4] = { ptr, ptr + len, ptr + len + len,NULL };
 	int strides[4]    = { len, len, len,0 };
+
+
+	if(data->header[5] == LIVIDO_PALETTE_YUVA8888 || data->header[5] == LIVIDO_PALETTE_YUVA422) {
+		strides[3] = len;
+		in[3] = in[2] + len;
+	}
+
 	vj_frame_copy( in, dst, strides );
 
 	res = pthread_rwlock_unlock( &data->rwlock );
 	if( res == -1 ) {
-		veejay_msg(0, "%s",strerror(errno));
+		veejay_msg(0, "Unable to release lock: %s",strerror(errno));
 		return 0;
 	}
 
@@ -220,18 +228,18 @@ void	vj_shm_free_slave(void *slave)
 
 void	*vj_shm_new_slave(int shm_id)
 { 
-	veejay_msg(VEEJAY_MSG_INFO, "Trying SHM_ID %d", shm_id );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Trying to attach to shared memory segment %d", shm_id );
 
 	int r = shmget( shm_id, 0, 0400 );
 	if( r == -1 ) {
-		veejay_msg(0, "SHM ID '%d' gives error: %s", shm_id, strerror(errno));
+		veejay_msg(0, "Unable to get shared memory segment '%d': %s", shm_id, strerror(errno));
 		return NULL;
 	}
 
 	char *ptr = shmat( r, NULL, 0 );
 
 	if( ptr == (char*) (-1) ) {
-		veejay_msg(0, "failed to attach to shared memory %d", shm_id );
+		veejay_msg(0, "Failed to attach to shared memory segment %d", shm_id );
 		shmctl( shm_id, IPC_RMID, NULL );
 		return NULL;
 	}
@@ -244,8 +252,7 @@ void	*vj_shm_new_slave(int shm_id)
 	int width   = data->header[0];
 	int height  = data->header[1];
 
-	veejay_msg(0, "SHM IN: %d, %d, %d", palette, width,height);
-
+	veejay_msg(VEEJAY_MSG_DEBUG, "Veejay shared resource publish information: %dx%d@d",width,height,palette);
 
 	v->shm_id = shm_id;
 
@@ -342,13 +349,13 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 		return NULL;
 	}
 
-	long size = (frame->width * frame->height * 4);
+	size_t size = RUP8(frame->width * frame->height * 4);
 
 	//@ create
 	v->shm_id = shmget( v->key,size, IPC_CREAT |0666 );
 
 	if( v->shm_id == -1 ) {
-		veejay_msg(0,"Error while allocating shared memory segment: %s", strerror(errno));
+		veejay_msg(0,"Error while allocating shared memory segment of size %ld: %s",size, strerror(errno));
 		failed_init_cleanup( v );
 		return NULL;
 	}
@@ -357,7 +364,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	v->sms 	    =  shmat( v->shm_id, NULL , 0 );
 	if( v->sms == NULL || v->sms == (char*) (-1) ) {
 		shmctl( v->shm_id, IPC_RMID, NULL );
-		veejay_msg(0, "Failed to attach to shared memory:%s",strerror(errno));
+		veejay_msg(0, "Failed to attach to shared memory segment: %s",strerror(errno));
 		failed_init_cleanup(v);
 		return NULL;
 	}
@@ -420,8 +427,8 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 		return NULL;
 	}
 
-	veejay_msg( VEEJAY_MSG_DEBUG, "Shared Memory ID = %d", v->shm_id );
-	veejay_msg( VEEJAY_MSG_INFO, "(SHM) Shared Memory consumer key is %d", v->key );
+	veejay_msg( VEEJAY_MSG_DEBUG, "Shared Memory ID = %x (%d)", v->shm_id, v->shm_id );
+	veejay_msg( VEEJAY_MSG_INFO, "(SHM) Shared Memory consumer key is %x (%d)", v->key,v->key );
 	veejay_msg( VEEJAY_MSG_DEBUG, "Starting Address: %p, Frame starts at: %p, Lock at %p",
 			v->sms, sms_addr + HEADER_LENGTH, &(data->rwlock));
 
