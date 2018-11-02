@@ -6448,44 +6448,41 @@ int gveejay_time_to_sync( void *ptr )
     float fps = 0.0;
 
     struct timespec nsecsleep;
+
+    long nsec = 1600000; // some default sleep time in nanoseconds
+
     if ( ui->watch.state == STATE_PLAYING )
     {
         fps = ui->el.fps;
         float spvf = 1.0 / fps;
-        float ela  = ( info->status_tokens[ELAPSED_TIME] / 1000.0 );
-        spvf += ela; //@ add elapsed time
 
         if( diff > spvf ) {
             ui->time_last.tv_sec = time_now.tv_sec;
             ui->time_last.tv_usec = time_now.tv_usec;
-            return 1;
-        }
-        int usec = 0;
-        int uspf = (int)(1000000.0 / fps);
-        if( ela )
-            uspf += (int)(1000000.0 / ela );
-        usec = time_now.tv_usec - ui->time_last.tv_usec;
-        if( usec < 0 )
-            usec += 1000000;
-        if( time_now.tv_sec > ui->time_last.tv_sec + 1 )
-            usec = 1000000;
-        if( (uspf - usec) < (1000000 / 100)) {
-            return 0;
+	    
+	    //it is time to update the UI anyway now, we are behind!
+	    return 1;
         }
 
-//veejay_msg(VEEJAY_MSG_ERROR , "%d", (uspf - usec - 1000000 / 100 ) * 1000);
-        nsecsleep.tv_nsec = 3200000;
-//      nsecsleep.tv_nsec =(uspf - usec - 1000000 / 100 ) * 1000;
-        nsecsleep.tv_sec = 0;
-        nanosleep( &nsecsleep, NULL );
-        return 0;
-    } else if ( ui->watch.state == STATE_STOPPED )
+	// calculate time to sleep based on seconds per video frame
+	nsec = (spvf * 1000000 * 10000);
+    } 
+    else if ( ui->watch.state == STATE_STOPPED )
     {
         reloaded_restart();
     }
-    nsecsleep.tv_nsec = 1600000;
+    
+    //after the sleep period, gveejay will continue updating the UI
+    //a shorter sleep time implies more calls to update_gveejay() per second
+    //fixing xorg usage should be done by not unnessarily updating the UI
+    //however, there is some unnessary work done there
+    //latest change simply has increased nsec to wait, reducing the symptons of xorg usage
+    //
+    
+    nsecsleep.tv_nsec = nsec;
     nsecsleep.tv_sec = 0;
-    nanosleep( &nsecsleep, NULL );
+    nanosleep( &nsecsleep, NULL );  //FIXME: comment the nanosleep statement and diagnose update_gveejay()
+    
     return 0;
 }
 
