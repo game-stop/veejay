@@ -41,67 +41,67 @@ USER_CFLAGS="$CFLAGS"
 CFLAGS=""
 dnl enable auto vectorization for libvjmem, libvje and libyuv
 
-AC_ARG_ENABLE(strict,
+AC_ARG_ENABLE([strict],
 		AC_HELP_STRING([--enable-strict],
 			     [Compile in paranoia assertion checking]))
-AC_ARG_ENABLE(portleak,
+AC_ARG_ENABLE([portleak],
 	      	AC_HELP_STRING([--enable-portleak],
 			      [Compile in vevo port validation (requires --enable-strict)]))
 
-AC_ARG_ENABLE(debug,
+AC_ARG_ENABLE([debug],
 		AC_HELP_STRING([--enable-debug],
 			     [Compile in debugging information]))
-AC_ARG_ENABLE(profile,
+AC_ARG_ENABLE([profile],
 		AC_HELP_STRING([--enable-profiling],
 			     [Compile in profiling information]))
-AC_ARG_ENABLE(compile-warnings,     
+AC_ARG_ENABLE([compile-warnings],     
               AC_HELP_STRING([--enable-compile-warnings],
                              [Turn on compiler warnings.]))
-AC_ARG_ENABLE(warnings_as_errors,   
+AC_ARG_ENABLE([warnings_as_errors],   
               AC_HELP_STRING([--enable-warnings_as_errors],
                              [Compiler warnings are errors.]))
-AC_ARG_WITH(extra-cflags,
+AC_ARG_WITH([extra-cflags],
             AC_HELP_STRING([--with-extra-cflags=flags],
                            [Options to be added to CFLAGS (optional)]))
-AC_ARG_WITH(libdv,
+AC_ARG_WITH([libdv],
             AC_HELP_STRING([--without-libdv], [Do not use libdv.]),
             [], [with_libdv=yes])
 
-AC_ARG_WITH(pixbuf,
+AC_ARG_WITH([pixbuf],
             AC_HELP_STRING([--without-pixbuf], [Do not use GDK pixbuf]),
             [], [with_pixbuf=yes])
 
-AC_ARG_WITH(playthread,
+AC_ARG_WITH([playthread],
             AC_HELP_STRING([--without-playthread], [Do not use playback thread]),
             [], [with_playthread=yes])
 	    
-AC_ARG_WITH(directfb,
+AC_ARG_WITH([directfb],
 	     AC_HELP_STRING([--without-directfb], [Do not use DirectFB.]),
 	 	[], [with_directfb=yes])
-AC_ARG_WITH(sdl,
+AC_ARG_WITH([sdl],
 	     AC_HELP_STRING([--without-sdl], [Do not use SDL.]),
 	        [], [with_sdl=yes])
-AC_ARG_WITH(jack,
+AC_ARG_WITH([jack],
 		AC_HELP_STRING([--without-jack], [Do not use jack.]),
 		[], [with_jack=yes])
 
-AC_ARG_ENABLE(v4l1,
+AC_ARG_ENABLE([v4l1],
 		AC_HELP_STRING([--enable-v4l1],
 			     [Compile with video4linux instead of video4linux 2]))
 
-AC_ARG_WITH(xml2,
+AC_ARG_WITH([xml2],
 		AC_HELP_STRING([--without-xml2], [Do not use the XML library for Gnome]),
 		[], [with_xml2=yes])
 
-AC_ARG_WITH(jpeg,
+AC_ARG_WITH([jpeg],
 		AC_HELP_STRING([--without-jpeg], [Do not JPEG support]),
 		[],	[with_libjpeg=yes])
 
-AC_ARG_WITH(jpeg-mmx,
+AC_ARG_WITH([jpeg-mmx],
             AC_HELP_STRING([--with-jpegmmx=PFX],
                            [Prefix where jpeg-mmx is installed (optional).]))
 
-AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
+AC_ARG_WITH([v4l2], AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
 
 arch_target="auto"
