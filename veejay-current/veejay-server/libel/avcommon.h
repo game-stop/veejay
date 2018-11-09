@@ -72,6 +72,17 @@
 #ifndef PIX_FMT_YUV411P
 #define PIX_FMT_YUV411P AV_PIX_FMT_YUV411P
 #endif
+
+#ifndef CODEC_FLAG_QSCALE
+#define CODEC_FLAG_QSCALE AV_CODEC_FLAG_QSCALE
+#endif
+#ifndef CODEC_CAP_TRUNCATED
+#define CODEC_CAP_TRUNCATED AV_CODEC_CAP_TRUNCATED
+#endif
+#ifndef CODEC_FLAG_TRUNCATED
+#define CODEC_FLAG_TRUNCATED AV_CODEC_FLAG_TRUNCATED
+#endif
+
 /* these have been removed but lets keep backwards compat */
 #ifndef SWS_CPU_CAPS_MMX 
 #define SWS_CPU_CAPS_MMX 0x80000000

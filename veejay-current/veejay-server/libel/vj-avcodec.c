@@ -36,6 +36,7 @@
 #include <libavformat/avformat.h>
 #include <libel/av.h>
 #include <libel/avhelper.h>
+#include <libel/avcommon.h>
 
 //from gst-ffmpeg, round up a number
 #define GEN_MASK(x) ((1<<(x))-1)
@@ -411,9 +412,16 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 	out_pixel_format = pixel_format;
 	
 	av_log_set_level( AV_LOG_QUIET);
-	
-	//av_log_set_level( AV_LOG_VERBOSE );
-	
+
+	char *av_log_setting = getenv("VEEJAY_AV_LOG");
+	if(av_log_setting != NULL) {
+		int enabled = atoi(av_log_setting);
+		if(enabled) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "FFMpeg Log is enabled");
+			av_log_set_level(AV_LOG_VERBOSE);
+		}
+	}
+
 #if LIBAVCODEC_BUILD < 5400
 	avcodec_register_all();
 #else
