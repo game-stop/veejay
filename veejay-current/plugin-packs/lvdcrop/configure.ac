@@ -35,34 +35,34 @@ AC_CONFIG_MACRO_DIR([m4])
 
 dnl kill CFLAGS
 CFLAGS=""
-AC_ARG_ENABLE(strict,
+AC_ARG_ENABLE([strict],
 		AC_HELP_STRING([--enable-strict],
 			     [Compile in paranoia assertion checking]))
-AC_ARG_ENABLE(debug,
+AC_ARG_ENABLE([debug],
 		AC_HELP_STRING([--enable-debug],
 			     [Compile in debugging information]))
-AC_ARG_ENABLE(profile,
+AC_ARG_ENABLE([profile],
 		AC_HELP_STRING([--enable-profiling],
 			     [Compile in profiling information]))
-AC_ARG_ENABLE(compile-warnings,     
+AC_ARG_ENABLE([compile-warnings],     
               AC_HELP_STRING([--enable-compile-warnings],
                              [Turn on compiler warnings.]))
-AC_ARG_ENABLE(warnings_as_errors,   
+AC_ARG_ENABLE([warnings_as_errors],   
               AC_HELP_STRING([--enable-warnings_as_errors],
                              [Compiler warnings are errors.]))
-AC_ARG_ENABLE(simd-accel,
+AC_ARG_ENABLE([simd-accel],
               AC_HELP_STRING([--enable-simd-accel],
                              [use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
-AC_ARG_WITH(extra-cflags,
+AC_ARG_WITH([extra-cflags],
             AC_HELP_STRING([--with-extra-cflags=flags],
                            [Options to be added to CFLAGS (optional)]))
 arch_target="auto"
-AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic or auto],
+AC_ARG_WITH([arch-target], AS_HELP_STRING( [--with-arch-target=generic or auto],
 					[Build a generic binary or auto-detect current cpu type (defaults to auto-detect)]),
 					[ arch_target="$withval"])
 
 user_specified_target=
-AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
+AC_ARG_WITH([arch-target], AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
                                          [Set a specific sub-architecture (defaults to native)]),
                 [ user_specified_target="$withval" ])
 
