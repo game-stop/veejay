@@ -152,7 +152,10 @@ static int set_option( const char *name, char *value )
 	else if (strcmp(name, "P" ) == 0 || strcmp(name, "preview" ) == 0 )
 	{
 		preview = atoi(optarg);
-		if(preview <= 0 || preview > 4 )
+		if(preview <= 0 ) {
+			preview = 2;
+		}
+		if(preview > 4 )
 		{
 			fprintf(stderr, "--preview [0-4]\n");
 			err++;
