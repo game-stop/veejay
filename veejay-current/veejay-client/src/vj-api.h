@@ -26,7 +26,7 @@ int veejay_tick();
 void veejay_preview(int p);
 int veejay_update_multitrack();
 void veejay_sleep( void *ui );
-
+void reloaded_restart();
 void *get_ui_info();
 char *get_glade_path();
 char *get_gveejay_dir();

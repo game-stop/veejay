@@ -588,7 +588,6 @@ static effectlist_data fxlist_data;
 #define SEQUENCER_ROW 10
 
 static vj_gui_t *info = NULL;
-void reloaded_restart();
 void *get_ui_info() { return (void*) info; }
 void reloaded_schedule_restart();
 /* global pointer to the sample-bank */
@@ -6446,43 +6445,32 @@ int gveejay_time_to_sync( void *ptr )
     double diff = time_now.tv_sec - ui->time_last.tv_sec +
             (time_now.tv_usec - ui->time_last.tv_usec ) * 1.e-6;
     float fps = 0.0;
-
     struct timespec nsecsleep;
 
     long nsec = 1600000; // some default sleep time in nanoseconds
 
     if ( ui->watch.state == STATE_PLAYING )
     {
-        fps = ui->el.fps;
-        float spvf = 1.0 / fps;
-
-        if( diff > spvf ) {
-            ui->time_last.tv_sec = time_now.tv_sec;
-            ui->time_last.tv_usec = time_now.tv_usec;
-	    
-	    //it is time to update the UI anyway now, we are behind!
-	    return 1;
-        }
+	fps = ui->el.fps;
+	float spvf = 1.0f / fps;
+	float delay = spvf * 0.5f;
+	float ela  = ( info->status_tokens[ELAPSED_TIME] / 1000.0 );
 
 	// calculate time to sleep based on seconds per video frame
-	nsec = (spvf * 1000000 * 10000);
+	nsec = (delay * 1000000 * 10000);
+	// if elapsed time > seconds per video frame or diff > delay, update the UI now
+	if( diff >= delay || ela >= spvf ) {
+		return 1;
+	}
     } 
     else if ( ui->watch.state == STATE_STOPPED )
     {
         reloaded_restart();
     }
     
-    //after the sleep period, gveejay will continue updating the UI
-    //a shorter sleep time implies more calls to update_gveejay() per second
-    //fixing xorg usage should be done by not unnessarily updating the UI
-    //however, there is some unnessary work done there
-    //latest change simply has increased nsec to wait, reducing the symptons of xorg usage
-    //
-    
     nsecsleep.tv_nsec = nsec;
     nsecsleep.tv_sec = 0;
-    nanosleep( &nsecsleep, NULL );  //FIXME: comment the nanosleep statement and diagnose update_gveejay()
-    
+    nanosleep( &nsecsleep, NULL );  
     return 0;
 }
 
@@ -6593,6 +6581,10 @@ int veejay_update_multitrack( void *ptr )
     free(s->widths);
     free(s->heights);
     free(s);
+
+    gettimeofday( &(info->time_last) , 0 );
+
+
     return 1;
 }
 
