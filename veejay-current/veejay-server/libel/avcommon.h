@@ -83,24 +83,5 @@
 #define CODEC_FLAG_TRUNCATED AV_CODEC_FLAG_TRUNCATED
 #endif
 
-/* these have been removed but lets keep backwards compat */
-#ifndef SWS_CPU_CAPS_MMX 
-#define SWS_CPU_CAPS_MMX 0x80000000
-#endif
-#ifndef SWS_CPU_CAPS_MMXEXT
-#define SWS_CPU_CAPS_MMXEXT 0x2000000
-#endif
-#ifndef SWS_CPU_CAPS_MMX2
-#define SWS_CPU_CAPS_MMX2 0x2000000
-#endif
-#ifndef SWS_CPU_CAPS_3DNOW
-#define SWS_CPU_CAPS_3DNOW 0x20000000
-#endif
-#ifndef SWS_CPU_CAPS_ALTIVEC
-#define SWS_CPU_CAPS_ALTIVEC 0x1000000
-#endif
-#ifndef SWS_CPU_CAPS_SSE2
-#define SWS_CPU_CAPS_SSE2 0x02000000
-#endif
 #endif
 #endif

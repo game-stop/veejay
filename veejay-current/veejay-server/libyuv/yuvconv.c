@@ -56,7 +56,7 @@ typedef struct
 	struct SwsContext *sws;
 	SwsFilter	  *src_filter;
 	SwsFilter	  *dst_filter;
-	int	cpu_flags;
+	int	swscale_flags;
 	int 	format;	
 	int	width;
 	int	height;
@@ -659,11 +659,8 @@ void	yuv_fx_context_destroy( void *ctx )
 void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[4], VJFrame *dst, int src_fmt, int dst_fmt )
 {
 	vj_sws *s = (vj_sws*) scaler;
-
-	if(s->sws) {
-		int dst_stride[4] = { ru4(dst->stride[0]),ru4(dst->stride[1]),ru4(dst->stride[2]), ru4(dst->stride[3]) };
-		sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride);
-	}
+	int dst_stride[4] = { ru4(dst->stride[0]),ru4(dst->stride[1]),ru4(dst->stride[2]), ru4(dst->stride[3]) };
+	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride);
 }	
 
 
@@ -1095,69 +1092,52 @@ int luminance_mean(uint8_t * frame[], int w, int h)
 
 
 
-void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flagss)
+void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int swscale_flagss)
 {
 	vj_sws *s = (vj_sws*) vj_calloc(sizeof(vj_sws));
 	if(!s)
 		return NULL;
 
-	int 	cpu_flags = 0;
-
-#ifdef HAVE_ASM_MMX
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
-#endif
-#ifdef HAVE_ASM_MMX2
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
-#endif
-#ifdef HAVE_ASM_3DNOW
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
-#endif
-#ifdef HAVE_ASM_SSE2
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_SSE2;
-#endif
-#ifdef HAVE_ALTIVEC
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
-#endif
-	
+	int 	swscale_flags = 0;
 	switch(tmpl->flags)
 	{
 		case 1:
-			cpu_flags = cpu_flags|SWS_FAST_BILINEAR;
+			swscale_flags = swscale_flags|SWS_FAST_BILINEAR;
 			break;
 		case 2:
-			cpu_flags = cpu_flags|SWS_BILINEAR;
+			swscale_flags = swscale_flags|SWS_BILINEAR;
 			break;
 		case 4:
-			cpu_flags = cpu_flags|SWS_BICUBIC;
+			swscale_flags = swscale_flags|SWS_BICUBIC;
 			break;
 		case 3:
-			cpu_flags = cpu_flags |SWS_POINT;
+			swscale_flags = swscale_flags |SWS_POINT;
 			break;
 		case 5:
-			cpu_flags = cpu_flags|SWS_X;
+			swscale_flags = swscale_flags|SWS_X;
 			break;
 		case 6:
-			cpu_flags = cpu_flags | SWS_AREA;
+			swscale_flags = swscale_flags | SWS_AREA;
 			break;
 		case 7:
-			cpu_flags = cpu_flags | SWS_BICUBLIN;
+			swscale_flags = swscale_flags | SWS_BICUBLIN;
 			break;
 		case 8: 
-			cpu_flags = cpu_flags | SWS_GAUSS;
+			swscale_flags = swscale_flags | SWS_GAUSS;
 			break;
 		case 9:
-			cpu_flags = cpu_flags | SWS_SINC;
+			swscale_flags = swscale_flags | SWS_SINC;
 			break;
 		case 10:
-			cpu_flags = cpu_flags |SWS_LANCZOS;
+			swscale_flags = swscale_flags |SWS_LANCZOS;
 			break;
 		case 11:
-			cpu_flags = cpu_flags | SWS_SPLINE;
+			swscale_flags = swscale_flags | SWS_SPLINE;
 			break;
 	}	
 
 	if( full_chroma_interpolation_ ) 
-		cpu_flags = cpu_flags |  SWS_FULL_CHR_H_INT;
+		swscale_flags = swscale_flags |  SWS_FULL_CHR_H_INT;
 
 	s->src_filter = sws_getDefaultFilter( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1 );
 	s->dst_filter = sws_getDefaultFilter( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1 );
@@ -1169,7 +1149,7 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 			dst->width,
 			dst->height,
 			dst->format,
-			cpu_flags,
+			swscale_flags,
 			s->src_filter,
 			s->dst_filter,
 			NULL
@@ -1186,64 +1166,48 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 
 }
 
-static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flagss)
+static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, sws_template *tmpl, int swscale_flagss)
 {
-	int 	cpu_flags = 0;
-
-#ifdef HAVE_ASM_MMX
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
-#endif
-#ifdef HAVE_ASM_MMX2
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
-#endif
-#ifdef HAVE_ASM_3DNOW
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
-#endif
-#ifdef HAVE_ASM_SSE2
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_SSE2;
-#endif
-#ifdef HAVE_ALTIVEC
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
-#endif
+	int 	swscale_flags = 0;
 	switch(tmpl->flags)
 	{
 		case 1:
-			cpu_flags = cpu_flags|SWS_FAST_BILINEAR;
+			swscale_flags = swscale_flags|SWS_FAST_BILINEAR;
 			break;
 		case 2:
-			cpu_flags = cpu_flags|SWS_BILINEAR;
+			swscale_flags = swscale_flags|SWS_BILINEAR;
 			break;
 		case 4:
-			cpu_flags = cpu_flags|SWS_BICUBIC;
+			swscale_flags = swscale_flags|SWS_BICUBIC;
 			break;
 		case 3:
-			cpu_flags = cpu_flags |SWS_POINT;
+			swscale_flags = swscale_flags |SWS_POINT;
 			break;
 		case 5:
-			cpu_flags = cpu_flags|SWS_X;
+			swscale_flags = swscale_flags|SWS_X;
 			break;
 		case 6:
-			cpu_flags = cpu_flags | SWS_AREA;
+			swscale_flags = swscale_flags | SWS_AREA;
 			break;
 		case 7:
-			cpu_flags = cpu_flags | SWS_BICUBLIN;
+			swscale_flags = swscale_flags | SWS_BICUBLIN;
 			break;
 		case 8: 
-			cpu_flags = cpu_flags | SWS_GAUSS;
+			swscale_flags = swscale_flags | SWS_GAUSS;
 			break;
 		case 9:
-			cpu_flags = cpu_flags | SWS_SINC;
+			swscale_flags = swscale_flags | SWS_SINC;
 			break;
 		case 10:
-			cpu_flags = cpu_flags |SWS_LANCZOS;
+			swscale_flags = swscale_flags |SWS_LANCZOS;
 			break;
 		case 11:
-			cpu_flags = cpu_flags | SWS_SPLINE;
+			swscale_flags = swscale_flags | SWS_SPLINE;
 			break;
 	}	
 
 	if( full_chroma_interpolation_ ) 
-		cpu_flags = cpu_flags |  SWS_FULL_CHR_H_INT;
+		swscale_flags = swscale_flags |  SWS_FULL_CHR_H_INT;
 
 	if( !sws_isSupportedInput( src->format ) ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "No support for input format");
@@ -1270,7 +1234,7 @@ static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, 
 			dst->width,
 			dst->height,
 			dst->format,
-			cpu_flags,
+			swscale_flags,
 			s->src_filter,
 			s->dst_filter,
 			NULL
@@ -1278,8 +1242,6 @@ static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, 
 		s->width = src->width;
 		s->height = src->height;
 		s->format = src->format;
-//		veejay_msg(VEEJAY_MSG_DEBUG, "sws new context: %dx%d in %d -> %dx%d in %d",
-//			src->width,src->height,src->format, dst->width,dst->height,dst->format );
 	}
 
 	if( s->sws == NULL )
@@ -1295,16 +1257,16 @@ static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, 
 }
 
 
-void*	yuv_init_cached_swscaler(void *cache,VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flags)
+void*	yuv_init_cached_swscaler(void *cache,VJFrame *src, VJFrame *dst, sws_template *tmpl, int swscale_flags)
 {
 	vj_sws *ctx = (vj_sws*) cache;
 	if( ctx == NULL )
 	{
 		ctx = (vj_sws*) vj_calloc(sizeof(vj_sws));
-		return yuv_init_sws_cached_context(ctx,src, dst, tmpl, cpu_flags);
+		return yuv_init_sws_cached_context(ctx,src, dst, tmpl, swscale_flags);
 	}
 	
-	return yuv_init_sws_cached_context( ctx, src, dst, tmpl, cpu_flags);
+	return yuv_init_sws_cached_context( ctx, src, dst, tmpl, swscale_flags);
 }
 
 
@@ -1452,23 +1414,10 @@ void	yuv_convert_and_scale_packed(void *sws , VJFrame *src, VJFrame *dst)
 
 int	yuv_sws_get_cpu_flags(void)
 {
-	int cpu_flags = 0;
-#ifdef HAVE_ASM_MMX
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
-#endif
-#ifdef HAVE_ASM_3DNOW
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
-#endif
-#ifdef HAVE_ASM_MMX2
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
-#endif
-#ifdef HAVE_ALTIVEC
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
-#endif
+	int swscale_flags = 0;
+	swscale_flags = swscale_flags | global_scaler_;
 
-	cpu_flags = cpu_flags | SWS_FAST_BILINEAR;
-
-	return cpu_flags;
+	return swscale_flags;
 }
 /*
 void	yuv_deinterlace(
