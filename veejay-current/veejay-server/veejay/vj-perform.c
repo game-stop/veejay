@@ -207,6 +207,36 @@ static	void	vj_perform_copy3( uint8_t **input, uint8_t **output, int Y_len, int 
 	vj_frame_copy(input,output,strides);
 }
 
+
+static inline void vj_copy_frame_holder(VJFrame *src, ycbcr_frame *data, VJFrame *dst) {
+	int i;
+	
+	dst->data[0] = data->Y;
+	dst->data[1] = data->Cb;
+	dst->data[2] = data->Cr;
+	dst->data[3] = data->alpha;
+	
+	dst->uv_len = src->uv_len;
+	dst->len = src->len;
+	dst->uv_width = src->uv_width;
+	dst->uv_height = src->uv_height;
+	dst->shift_v = src->shift_v;
+	dst->shift_h = src->shift_h;
+	dst->format = src->format;
+	dst->width = src->width;
+	dst->height = src->height;
+	dst->ssm = src->ssm;
+
+	for( i = 0; i < 4; i ++ ) {
+		dst->stride[i] = src->stride[i];
+	}
+
+	dst->stand = src->stand;
+	dst->fps = src->fps;
+	dst->timecode = src->timecode;
+}
+
+
 #ifdef HAVE_JACK
 static inline void vj_perform_play_audio( video_playback_setup *settings, uint8_t *source, int len )
 {
@@ -1337,14 +1367,10 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 	}
 	else {
 		VJFrame fxframe;
-		veejay_memcpy(&fxframe, info->effect_frame1, sizeof(VJFrame));
 
-		VJFrame *frame = &fxframe;
-		fxframe.data[0] = primary_buffer[info->out_buf]->Y;
-		fxframe.data[1] = primary_buffer[info->out_buf]->Cb;
-		fxframe.data[2] = primary_buffer[info->out_buf]->Cr;
+		vj_copy_frame_holder(info->effect_frame1, primary_buffer[info->out_buf], &fxframe);
 
-		int	data_len = vj_perform_compress_primary_frame_s2( info,frame );
+		int	data_len = vj_perform_compress_primary_frame_s2( info,&fxframe );
 
 		int id = (mcast ? 2: 3);
 
@@ -1352,7 +1378,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 		{
 			for( i = 0; i < VJ_MAX_CONNECTIONS; i++ ) {
 				if( info->rlinks[i] != -1 ) {
-					if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, data_len, frame, info->real_fps )<=0)
+					if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, data_len, &fxframe, info->real_fps )<=0)
 					{
 							_vj_server_del_client( info->vjs[id], info->rlinks[i] );
 					}
@@ -1362,7 +1388,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 		}
 		else
 		{		
-			if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, data_len, frame, info->real_fps )<=0)
+			if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, data_len, &fxframe, info->real_fps )<=0)
 			{
 				veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame.");
 			}
@@ -2582,13 +2608,10 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
 static void vj_perform_plain_fill_buffer(veejay_t * info, int *ret)
 {
 	video_playback_setup *settings = (video_playback_setup*)  info->settings;
-
+	
 	VJFrame frame;
-	veejay_memcpy(&frame, info->effect_frame1, sizeof(VJFrame));
-	frame.data[0] = primary_buffer[0]->Y;
-	frame.data[1] = primary_buffer[0]->Cb;
-	frame.data[2] = primary_buffer[0]->Cr;
-	frame.data[3] = primary_buffer[0]->alpha;
+
+	vj_copy_frame_holder(info->effect_frame1, primary_buffer[0], &frame);
 
 	uint8_t *p0_buffer[PSLOW_B] = {
 		primary_buffer[PSLOW_B]->Y,
