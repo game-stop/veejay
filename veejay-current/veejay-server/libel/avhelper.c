@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
@@ -35,6 +36,7 @@
 #include <libavformat/version.h>
 #include <libel/avhelper.h>
 #include <libel/av.h>
+#include <libhash/hash.h>
 
 static struct
 {
@@ -98,6 +100,42 @@ typedef struct
 	void *scaler;
 } el_decoder_t;
 
+//instead of iterating _supported_codecs and using a strncasecmp on every entry to find the codec_id, use a hash table that returns the codec identifier on hashed fourcc key
+//this collection is never freed and initialized on first access
+static hash_t *fourccTable = NULL;
+
+typedef struct {
+	int codec_id;
+} fourcc_node;
+
+//from libvevo/vevo.c
+static inline int hash_key_code( const char *str )           
+{
+	int hash = 5381;
+    int c;
+    while( (c = (int) *str++) != 0)
+    	hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+}
+static hash_val_t key_hash(const void *key)
+{
+    return (hash_val_t) key;
+}
+static int key_compare(const void *key1, const void *key2)
+{
+    return ((const int) key1 == (const int) key2 ? 0 : 1);
+}
+
+static char* to_lower(char *in) {
+	char *result = strdup(in);
+	char *start = result;
+	while( *result != 0 ) {
+		*result++ = tolower(*result);
+	}
+	return start;
+}
+
 int 	avhelper_get_codec_by_id(int id)
 {
 	int i;
@@ -111,16 +149,42 @@ int 	avhelper_get_codec_by_id(int id)
 	return -1;
 }
 
+static int		avhelper_build_table()
+{
+	fourccTable = hash_create( 100, key_compare, key_hash );
+	if(!fourccTable) {
+		return -1;
+	}
+
+	int i;
+	for( i = 0; _supported_codecs[i].name != NULL; i ++ ) {
+		fourcc_node *node = (fourcc_node*) vj_malloc(sizeof(fourcc_node));
+		node->codec_id = _supported_codecs[i].id;
+		hnode_t *hnode = hnode_create(node);
+		hash_insert( fourccTable, hnode, (const void*) hash_key_code(_supported_codecs[i].name ) );
+	}
+
+	return 0;
+}
 
 int	avhelper_get_codec_by_name( const char *compr )
 {
-	int i;
-	int len = strlen( compr );
-	for( i = 0; _supported_codecs[i].name != NULL ; i ++ ) {
-		if( strncasecmp( compr, _supported_codecs[i].name,len ) == 0 ) {
-			return _supported_codecs[i].id;
-		}
+	if( fourccTable == NULL ) {
+		/* lets initialize the hash of fourcc/codec_id pairs now */
+		if(avhelper_build_table() != 0)
+			return -1;
 	}
+	
+	char *compr_lc = to_lower(compr);
+	int key = hash_key_code(compr_lc);
+
+	hnode_t *node = hash_lookup( fourccTable,(const void*) key);
+	fourcc_node *fourcc = hnode_get(node);
+	if(fourcc) {
+		return fourcc->codec_id;
+	}
+	
+	free(compr_lc);
 	return -1;
 }
 

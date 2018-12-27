@@ -45,8 +45,9 @@
 #include <liblzo/lzo.h>
 #include <libvjmem/vjmem.h>
 #include <libel/avcommon.h>
+#include <libel/avhelper.h>
+
 #define QUICKTIME_MJPG_TAG 0x6d6a7067
-extern int vj_el_get_decoder_from_fourcc( const char *fourcc );
 extern int get_ffmpeg_pixfmt(int p);
 
 extern int AVI_errno;
@@ -627,11 +628,10 @@ int lav_video_compressor_type(lav_file_t *lav_file)
     if(lav_file->format == 'q' || lav_file->format == 'Q')
     {
         const char *compressor = quicktime_video_compressor(lav_file->qt_fd,0);
-        return  vj_el_get_decoder_from_fourcc( compressor );
+        return  avhelper_get_codec_by_name(compressor);
     }
 #endif
-    return vj_el_get_decoder_from_fourcc( AVI_video_compressor(lav_file->avi_fd) );
-
+    return avhelper_get_codec_by_name(AVI_video_compressor(lav_file->avi_fd) );
 }
 
 #define FOURCC_DV "dvsd"

@@ -62,8 +62,6 @@ static char id_str[MAX_INFO_STRLEN];
 
 #define FRAME_RATE_SCALE 1000000
 
-extern int vj_el_get_decoder_from_fourcc( const char *fourcc );
-
 
 /*******************************************************************
  *                                                                 *

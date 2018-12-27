@@ -147,13 +147,7 @@ float	vj_el_get_default_framerate( int norm )
 
 int	vj_el_get_usec_per_frame( float video_fps ) 
 {
-//			norm_usec_per_frame = 1001000 / 30;	/* 30ish Hz */
 	return (int)(1000000 / video_fps);
-}
-
-int		vj_el_get_decoder_from_fourcc( const char *fourcc )
-{
-	return avhelper_get_codec_by_name( fourcc );
 }
 
 static void	_el_free_decoder( vj_decoder *d )
