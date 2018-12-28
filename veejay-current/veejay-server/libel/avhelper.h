@@ -30,7 +30,7 @@ void	*avhelper_alloc_frame();
 
 int 	avhelper_get_codec_by_id(int id);
 
-int	avhelper_get_codec_by_name( const char *compr );
+int	avhelper_get_codec_by_key( int key );
 
 void	*avhelper_get_codec_ctx( void *ptr );
 

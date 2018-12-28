@@ -627,6 +627,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	compr_type = (const char*) lav_video_compressor(el->lav_fd[n]);
 
+	set_fourcc(el->lav_fd[n], compr_type );
+
 	if(!compr_type)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to read codec information from file");
@@ -644,7 +646,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	if( el->decoders[n] == NULL ) {
 		long max_frame_size = get_max_frame_size( el->lav_fd[n] );
-		decoder_id = avhelper_get_codec_by_name( compr_type );
+		decoder_id = el->lav_fd[n]->codec_id;
 		el->decoders[n] = 
 			_el_new_decoder( el->ctx[n], decoder_id, el->video_width, el->video_height, el->video_fps, el->pixfmt[ n ],el_pixel_format_, max_frame_size );
 		if( el->decoders[n] == NULL ) {

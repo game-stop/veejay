@@ -24,7 +24,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <ctype.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
@@ -127,15 +126,6 @@ static int key_compare(const void *key1, const void *key2)
     return ((const int) key1 == (const int) key2 ? 0 : 1);
 }
 
-static char* to_lower(char *in) {
-	char *result = strdup(in);
-	char *start = result;
-	while( *result != 0 ) {
-		*result++ = tolower(*result);
-	}
-	return start;
-}
-
 int 	avhelper_get_codec_by_id(int id)
 {
 	int i;
@@ -167,7 +157,7 @@ static int		avhelper_build_table()
 	return 0;
 }
 
-int	avhelper_get_codec_by_name( const char *compr )
+int	avhelper_get_codec_by_key( int key )
 {
 	if( fourccTable == NULL ) {
 		/* lets initialize the hash of fourcc/codec_id pairs now */
@@ -175,16 +165,12 @@ int	avhelper_get_codec_by_name( const char *compr )
 			return -1;
 	}
 	
-	char *compr_lc = to_lower(compr);
-	int key = hash_key_code(compr_lc);
-
 	hnode_t *node = hash_lookup( fourccTable,(const void*) key);
 	fourcc_node *fourcc = hnode_get(node);
 	if(fourcc) {
 		return fourcc->codec_id;
 	}
 	
-	free(compr_lc);
 	return -1;
 }
 

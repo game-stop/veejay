@@ -76,9 +76,10 @@ typedef struct
    int         MJPG_chroma;
    long	       mmap_size;
    int	       bogus_len;
+   int	       codec_id;
 } lav_file_t;
 
-
+void set_fourcc(lav_file_t *lav_file, char *fourcc);
 int lav_detect_endian (void);
 int  lav_query_APP_marker(char format);
 int  lav_query_APP_length(char format);

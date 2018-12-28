@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <libel/lav_io.h>
 //#include <veejay/vj-lib.h>
@@ -90,8 +91,28 @@ void    lav_set_project(int w, int h, float f, int fmt)
 #define M_APP1  0xE1
 #define TMP_EXTENSION ".tmp"
 
-/* The query routines about the format */
+void set_fourcc(lav_file_t *lav_file, char *fourcc)
+{
+	/* ensure fourcc is in lowercase */
+	char fourcc_lc[5];
+	int i;
+	for( i = 0; i < 4; i ++ ) {
+		fourcc_lc[i] = tolower(fourcc[i]);
+	}
+	fourcc_lc[4] = 0;
+	char *ptr = &fourcc_lc;
 
+	/* hash the string */
+	int hash = 5381;
+    	int c;
+    	while( (c = (int) *ptr++) != 0)
+    		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */\
+
+	/* look up codec_id in hashtable by key (hash) */
+	lav_file->codec_id = avhelper_get_codec_by_key( hash );
+}
+
+/* The query routines about the format */
 int lav_query_APP_marker(char format)
 {
    /* AVI needs the APP0 marker, Quicktime APP1 */
@@ -616,22 +637,7 @@ int lav_video_MJPG_chroma(lav_file_t *lav_file)
 
 int lav_video_compressor_type(lav_file_t *lav_file)
 {
-#ifdef SUPPORT_READ_DV2
-    if(lav_file->format == 'b')
-        return rawdv_compressor( lav_file->dv_fd );
-#endif
-#ifdef USE_GDK_PIXBUF
-    if(lav_file->format == 'x')
-        return 0xffff;
-#endif
-#ifdef HAVE_LIBQUICKTIME
-    if(lav_file->format == 'q' || lav_file->format == 'Q')
-    {
-        const char *compressor = quicktime_video_compressor(lav_file->qt_fd,0);
-        return  avhelper_get_codec_by_name(compressor);
-    }
-#endif
-    return avhelper_get_codec_by_name(AVI_video_compressor(lav_file->avi_fd) );
+    return lav_file->codec_id;
 }
 
 #define FOURCC_DV "dvsd"
@@ -1015,8 +1021,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
         }
         else if ( lav_fd->avi_fd && AVI_errno == 0 )
         {
-            veejay_msg(VEEJAY_MSG_DEBUG,
-                "\tFile is AVI" );
+            veejay_msg(VEEJAY_MSG_DEBUG,"\tFile is AVI" );
             ret =1;
         }
     }
@@ -1037,7 +1042,6 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                 if(lav_fd) free(lav_fd);
                 return NULL;
         }
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tFOURCC is %s", video_comp );
     }
     else if( AVI_errno==AVI_ERR_NO_AVI || (!lav_fd->avi_fd && !ret) )
     {
@@ -1059,8 +1063,6 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
             lav_fd->avi_fd = NULL;
             lav_fd->format = 'q';
             video_comp = quicktime_video_compressor(lav_fd->qt_fd,0);
-            veejay_msg(VEEJAY_MSG_DEBUG,"\tFile has fourcc '%s'",
-                    video_comp );
             /* We want at least one video track */
             if (quicktime_video_tracks(lav_fd->qt_fd) < 1)
                 {
@@ -1110,6 +1112,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                     veejay_msg(VEEJAY_MSG_WARNING, "Audio compressor '%s' not supported",
                             audio_comp );
                 }
+
             alt = 1;
             ret = 1;
         }
@@ -1134,7 +1137,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
                 veejay_msg(VEEJAY_MSG_DEBUG,
                         "RAW DV file '%s'",
                         video_comp );
-                }
+            }
             else
                 veejay_msg(VEEJAY_MSG_DEBUG, "\tNot a raw dv file");
         }
@@ -1147,6 +1150,8 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
         internal_error = ERROR_FORMAT;
         return NULL;
     }
+
+	set_fourcc(lav_fd, video_comp);
     
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
