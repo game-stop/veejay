@@ -128,12 +128,11 @@ typedef struct
 } vj_keyboard_event;
 
 static hash_t *keyboard_events = NULL;
-static hash_t *keyboard_eventid_map = NULL;
 
-
-// maximum number of key combinations
-#define MAX_KEY_MNE (SDLK_LAST * 16)
-static  vj_keyboard_event *keyboard_event_map_[MAX_KEY_MNE];
+// WARNING size depend on this formula (modifier * SDLK_LAST) + key
+// FIXME should be max modifier value when modifier combinaison possible ?
+// here : 15 * 330 + 330 = 5280 + align*1024
+static  vj_keyboard_event *keyboard_event_map_[6144];
 
 typedef struct
 {
@@ -866,15 +865,11 @@ int     keyboard_event_exists(int id)
 static void destroy_keyboard_event( vj_keyboard_event *ev )
 {
     if( ev ) {
-        if( ev->vims ) {
+        if( ev->vims )
             free( ev->vims );
-		}
 
-        if( ev->arguments ) {
+        if( ev->arguments )
             free( ev->arguments );  
-		}
-
-		memset(ev, 0, sizeof(vj_keyboard_event));
 
         free(ev);
     }
@@ -2177,6 +2172,8 @@ void    vj_event_read_file( void *ptr,  const char format[], va_list ap )
 vims_key_list   *vj_event_get_keys( int event_id )
 {
     vims_key_list *list = vj_calloc( sizeof(vims_key_list));
+    vims_key_list *tree = list;
+    vims_key_list *next = NULL;
     if ( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
         {
                 if( vj_event_bundle_exists( event_id ))
@@ -2190,25 +2187,30 @@ vims_key_list   *vj_event_get_keys( int event_id )
                 }
         return list;
     }
-#ifdef ARCH_X86_64
-    uint64_t eid = (uint64_t) event_id;
-#else
-    uint32_t eid = (uint32_t) event_id;
-#endif    
-    hnode_t *node = hash_lookup(keyboard_eventid_map, (void*) eid);
-    if(node == NULL) {
-		return list;
-	}
 
-    vj_keyboard_event *ev = hnode_get( node );
-    if(ev)
-    {
-        list->key_symbol = ev->key_symbol;
-        list->key_mod = ev->key_mod;
-        list->args = ev->arguments;
-        list->arg_len = ev->arg_len;
-    }
-
+        if(!hash_isempty( keyboard_events ))
+        {
+                hscan_t scan;
+                hash_scan_begin( &scan, keyboard_events );
+                hnode_t *node;
+                while( ( node = hash_scan_next(&scan)) != NULL )
+                {
+                        vj_keyboard_event *ev = NULL;
+                        ev = hnode_get( node );
+                        if(ev && ev->event_id == event_id)
+                        {
+                next = vj_calloc( sizeof(vims_key_list));
+                 
+                tree->key_symbol = ev->key_symbol;
+                tree->key_mod = ev->key_mod;
+                tree->args = ev->arguments;
+                tree->arg_len = ev->arg_len;
+                tree->next = next;
+                
+                tree = next;
+                        }       
+                }
+        }
     return list;
 }
 
@@ -2309,10 +2311,8 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
 
 #ifdef ARCH_X86_64
     uint64_t tid = (uint64_t) index;
-    uint64_t eid = (uint64_t) ev->event_id;
 #else
     uint32_t tid = (uint32_t) index;
-    uint32_t eid = (uint32_t) ev->event_id;
 #endif
 
     hnode_t *old = hash_lookup( keyboard_events, (void*) tid );
@@ -2320,17 +2320,8 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
         hash_delete( keyboard_events, old );
     }
 
-    old = hash_lookup( keyboard_eventid_map, (void*) eid );
-    if(old) {
-        hash_delete( keyboard_eventid_map, old );
-    }
-
-    //register keybinding by index (SDLK key mne)
     hash_insert( keyboard_events, node, (void*) tid );
-
-    //register keybinding by event id
-    hash_insert( keyboard_eventid_map, node, (void*) eid );
-
+    
     return 1;
 }
 #endif
@@ -2433,13 +2424,9 @@ void vj_event_init(void *ptr)
 #endif
     vj_init_vevo_events();
 #ifdef HAVE_SDL
-    if( !(keyboard_events = hash_create( MAX_KEY_MNE, int_bundle_compare, int_bundle_hash)))
+    if( !(keyboard_events = hash_create( HASHCOUNT_T_MAX, int_bundle_compare, int_bundle_hash)))
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize hash for keyboard events");
-        return;
-    }
-    if( !(keyboard_eventid_map = hash_create( MAX_KEY_MNE, int_bundle_compare, int_bundle_hash))) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cannot creating mapping between keyboard events and VIMS event identifiers");
         return;
     }
 #endif
@@ -2449,7 +2436,7 @@ void vj_event_init(void *ptr)
         net_list[i].list_id = 0;
     }
 
-    if( !(BundleHash = hash_create(MAX_KEY_MNE, int_bundle_compare, int_bundle_hash)))
+    if( !(BundleHash = hash_create(HASHCOUNT_T_MAX, int_bundle_compare, int_bundle_hash)))
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize hashtable for message bundles");
         return;
@@ -2502,7 +2489,7 @@ static void vj_event_destroy_bundles( hash_t *h )
 void    vj_event_destroy()
 {
 #ifdef HAVE_SDL
-	//let's not destroy keyboard mappings, we are shutting down anyway so why bother
+    if(keyboard_events) vj_event_destroy_hash( keyboard_events );
 #endif
     if(BundleHash) vj_event_destroy_bundles( BundleHash );
 
