@@ -98,7 +98,7 @@ static	void	printbuf( FILE *f, uint8_t *buf , int len )
 int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);
 int		_vj_server_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, int priority );
-int		_vj_server_empty_queue(vj_server *vje, int link_id);
+static void		_vj_server_empty_queue(vj_server *vje, int link_id);
 /*
 static		int geo_stat_ = 0;
 
@@ -698,23 +698,16 @@ int vj_server_poll(vj_server * vje)
 	return status;
 }
 
-int	_vj_server_empty_queue(vj_server *vje, int link_id)
+static void	_vj_server_empty_queue(vj_server *vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
-	vj_message **v = Link[link_id]->m_queue;
-	int i;
-	for( i = 0; i < VJ_MAX_PENDING_MSG; i ++ )
-	{
-		v[i]->msg = NULL;
-		v[i]->len = 0;
-	}
+	
+	veejay_memset( Link[link_id]->lin_queue, 0, sizeof(vj_message) * VJ_MAX_PENDING_MSG );
 
 	vj_simple_pool_reset( Link[link_id]->pool );
 
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
-	
-	return 1;
 }
 
 #define _vj_malfunction(msg,content,buflen, index)\
@@ -1179,6 +1172,8 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 	Link[id]->n_retrieved = index;
 
 	*str_len = len;
+
+	//msg is in pool, no need to free it
 	return msg;
 }
 
