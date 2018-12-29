@@ -226,7 +226,7 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 
 	//@ no slots available
 	if( d_slot == -1) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "All packet slots in use, cannot keep pace! Dropping oldest in queue.");
+		veejay_msg(VEEJAY_MSG_DEBUG, "All packet slots in use, cannot keep pace! Dropping oldest in queue");
 		//@ drop oldest packet in slot
 		long oldest = LONG_MAX;
 		int o = 0;

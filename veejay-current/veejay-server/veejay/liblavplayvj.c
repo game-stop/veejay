@@ -264,7 +264,7 @@ int veejay_set_speed(veejay_t * info, int speed)
 			if( abs(speed) <= info->current_edit_list->total_frames )
 				settings->current_playback_speed = speed;	
 			else
-				veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d too high to set!", speed);
+				veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d too high to set", speed);
 		break;
 
 		case VJ_PLAYBACK_MODE_SAMPLE:
@@ -273,7 +273,7 @@ int veejay_set_speed(veejay_t * info, int speed)
 			{
 				if ( (-1*len) > speed )
 				{
-					veejay_msg(VEEJAY_MSG_ERROR,"Speed %d too high to set!",speed);
+					veejay_msg(VEEJAY_MSG_ERROR,"Speed %d too high to set",speed);
 					return 1;
 				}
 			}
@@ -699,17 +699,17 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 {
 	if( new_pm == VJ_PLAYBACK_MODE_SAMPLE ) {
 		if(!sample_exists(sample_id)) {
-			veejay_msg(0,"Sample %d does not exist!");
+			veejay_msg(0,"Sample %d does not exist");
 			return;
 		}
 	} else if (new_pm == VJ_PLAYBACK_MODE_TAG ) {
 		if(!vj_tag_exists(sample_id)) {
-			veejay_msg(0,"Stream %d does not exist!");
+			veejay_msg(0,"Stream %d does not exist");
 			return;
 		}
 	} else if ( new_pm == VJ_PLAYBACK_MODE_PLAIN ) {
 		if( info->edit_list->video_frames < 1 ) {
-			veejay_msg( 0, "No video frames in EditList!");
+			veejay_msg( 0, "No video frames in EditList");
 			return;	
 		}
 	}
@@ -855,30 +855,6 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
  	return 0;
 }
 
-/******************************************************
- * veejay_stop()
- *   stop playing
- *
- * return value: 1 on succes, 0 on error
- ******************************************************/
-/*
-int veejay_stop(veejay_t * info)
-{
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
-
-    if (settings->state == LAVPLAY_STATE_STOP) {
-	if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG) {
-		vj_tag_set_active(info->uc->sample_id,0);
-	}
-    }
-
- 	veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for playback_thread ...");
- 	pthread_join(settings->playback_thread, NULL);
-    return 1;
-}
-*/
-
 /* stop playing a sample, continue with video */
 void veejay_stop_sampling(veejay_t * info)
 {
@@ -942,7 +918,7 @@ static int veejay_screen_update(veejay_t * info )
 		int plane_sizes[4] = { info->effect_frame1->len, info->effect_frame1->uv_len,
 		   		info->effect_frame1->uv_len,0 };	
 		if( vj_shm_write(info->shm, frame,plane_sizes) == -1 ) {
-			veejay_msg(0, "failed to write to shared resource!");
+			veejay_msg(0, "Failed to write to shared resource");
 		}
 	}
       
@@ -1028,7 +1004,7 @@ static int veejay_screen_update(veejay_t * info )
 			break;	
 		case 4:
 			if( vj_yuv_put_frame( info->y4m, frame ) == -1 ) {
-				veejay_msg(0, "Failed to write a frame!");
+				veejay_msg(0, "Failed to write a frame");
 				veejay_change_state(info,LAVPLAY_STATE_STOP);
 				return 0;
 			}
@@ -1164,7 +1140,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,seq_cur, info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what ) != 0 )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status");
 		}
 		break;
     }
@@ -1193,7 +1169,7 @@ static int	veejay_is_dir(char *path)
 		return 0;
 	}
 	if( !S_ISDIR( s.st_mode )) {
-		veejay_msg(0, "%s is not a valid path.");
+		veejay_msg(0, "%s is not a valid path");
 		return 0;
 	}
 	return 1;
@@ -1265,7 +1241,7 @@ void	veejay_check_homedir(void *arg)
 	if(!home)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,
-				"HOME environment variable not set.");
+				"HOME environment variable not set");
 		return;
 	}
 	snprintf(path,sizeof(path), "%s/.veejay", home );
@@ -1765,7 +1741,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	info->font = vj_font_init( info->video_output_width,info->video_output_height,el->video_fps,0 );
 
 	if(!info->font) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system");
 		return -1;
 	}
 
@@ -1788,7 +1764,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	}
 
 	if(!info->osd) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system for OSD.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system for OSD");
 		return -1;
 	}
 
@@ -1840,7 +1816,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
 	if( !info->shm ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize shared resource!");
+		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize shared resource");
 	}
 
 
@@ -2048,7 +2024,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		int total  = 0;
 		int *world = plug_find_all_generator_plugins( &total );
 		if( total == 0 ) {
-			veejay_msg(0,"No generator plugins found!");
+			veejay_msg(0,"No generator plugins found");
 			return -1;
 		}
 		int i;
@@ -2063,7 +2039,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		free(world);
 
 		if( plugrdy > 0 ) {
-			veejay_msg(VEEJAY_MSG_INFO, "Initialized %d generators.", plugrdy);
+			veejay_msg(VEEJAY_MSG_INFO, "Initialized %d generators", plugrdy);
 			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
 			info->uc->sample_id = ( gen_tags <= plugrdy ? gen_tags : 1 );
 		} else {
@@ -2435,7 +2411,7 @@ static void veejay_playback_cycle(veejay_t * info)
 			} else {
 				if( info->audio == AUDIO_PLAY && settings->auto_mute )
 				{
-					veejay_msg(VEEJAY_MSG_WARNING, "Back in pace with audio, audio is now unmuted." );
+					veejay_msg(VEEJAY_MSG_WARNING, "Back in pace with audio, audio is now unmuted" );
 					settings->auto_mute = 0;
 				}
 			}
@@ -2504,7 +2480,7 @@ static void Welcome(veejay_t *info)
 	if( k > 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING,
-			"Found %d veejay project files in current working directory (.edl,.sl, .cfg,.avi).",k);
+			"Found %d veejay project files in current working directory (.edl,.sl, .cfg,.avi)",k);
 		veejay_msg(VEEJAY_MSG_WARNING,
 			"If you want to start a new project, start veejay in an empty directory");
 	}
@@ -2938,7 +2914,7 @@ veejay_t *veejay_malloc()
 
 	if(!vj_avcodec_init( info->pixel_format, info->verbose))
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders!");
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders");
 		return 0;
 	}
 	
@@ -2973,7 +2949,7 @@ int veejay_main(veejay_t * info)
 
 		int err = pthread_attr_init( &attr );
 		if( err == ENOMEM ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Out of memory error.");
+			veejay_msg(VEEJAY_MSG_ERROR, "Out of memory error");
 			return 0;
 
 		}
@@ -2990,7 +2966,7 @@ int veejay_main(veejay_t * info)
     	if( err != 0 ) {
 		switch( err ) {
 		 case EAGAIN:
-			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient resources to create playback timer thread.");
+			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient resources to create playback timer thread");
 			break;
 	  	default:
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to create playback timer thread, code %d ", err);
@@ -3082,7 +3058,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 	if(len < 1 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Sample too short!");
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample too short");
 		return NULL;
 	}
 
@@ -3135,7 +3111,7 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
 
 	if(info->dummy->active)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Playing dummy video!");
+		veejay_msg(VEEJAY_MSG_ERROR, "Playing dummy video");
 		return 0;
 	}
 
@@ -3235,7 +3211,7 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 				veejay_msg(VEEJAY_MSG_ERROR, 
 					    "Destination cannot be negative");
 			if(destination > el->total_frames)
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste beyond Edit List!");
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste beyond Edit List");
 			return 0;
     		}
 	}
@@ -3346,7 +3322,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	{
 		if( !sample_usable_edl( id ) )
 		{
-			veejay_msg(0, "Sample %d is a picture ...", id );
+			veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d is a picture", id );
 			if(files[0])
 				free(files[0]);
 			return -1;
@@ -3713,7 +3689,7 @@ static int configure_dummy_defaults(veejay_t *info, char override_norm, float fp
 			info->dummy->arate = tmp_arate;
 
 		if( fps > 0.0f ) {
-			veejay_msg(VEEJAY_MSG_WARNING,"Going to run with audio but user defined frames per second ...");
+			veejay_msg(VEEJAY_MSG_WARNING,"Going to run with audio but you have defined the framerate");
 		}
 	}
 

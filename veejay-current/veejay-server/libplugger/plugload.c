@@ -123,7 +123,7 @@ static	void* instantiate_plugin( void *plugin, int w , int h )
 			instance = frei0r_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_) );
 			break;
 		default:
-			veejay_msg(0, "Plugin type not supported.");
+			veejay_msg(0, "Plugin type not supported");
 			break;
 	}
 
@@ -1061,7 +1061,7 @@ vj_effect *plug_get_plugin( int fx_id ) {
 
 	if( vje->num_params > 0 ) {
 		if( vje->num_params > SAMPLE_MAX_PARAMETERS ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "%s has %d parameters, supporting only %d.",
+			veejay_msg(VEEJAY_MSG_WARNING, "%s has %d parameters, supporting only %d",
 				vje->description,vje->num_params, SAMPLE_MAX_PARAMETERS );
 			vje->num_params = SAMPLE_MAX_PARAMETERS;
 		}

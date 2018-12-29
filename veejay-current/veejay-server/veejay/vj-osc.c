@@ -306,7 +306,7 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 	}
 
 	if( free_id == -1 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to add more OSC senders.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to add more OSC senders");
 		return;
 	}
 
@@ -329,7 +329,7 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 	lo_address t 	       = lo_address_new( str, port );
 
 	if(vevo_property_set( osc_clients[free_id], "lo", VEVO_ATOM_TYPE_VOIDPTR,1, &t ) != VEVO_NO_ERROR ) {
-		veejay_msg(0, "Unable to add lo_address to vevo port.");
+		veejay_msg(0, "Unable to add lo_address to vevo port");
 		( osc_clients[free_id] );
 		osc_clients[free_id] = NULL;
 		return;
@@ -343,13 +343,13 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 	}
 
 	if( vevo_property_set( osc_clients[free_id], "connection", VEVO_ATOM_TYPE_STRING,1,&nptr ) != VEVO_NO_ERROR ) {
-		veejay_msg(0, "Unable to store connection string.");
+		veejay_msg(0, "Unable to store connection string");
 		(osc_clients[free_id]);
 		osc_clients[free_id] = NULL;
 		return;
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Configured OSC sender to %s:%s, send /status [ArgList] every cycle.",
+	veejay_msg(VEEJAY_MSG_INFO, "Configured OSC sender to %s:%s, send /status [ArgList] every cycle",
 		       str,port );	
 }
 

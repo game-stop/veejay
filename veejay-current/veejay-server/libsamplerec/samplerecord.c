@@ -243,7 +243,7 @@ int sample_continue_record( int s1 )
 	long	bytesRemaining = lav_bytes_remain( si->encoder_file );
 	if( bytesRemaining >= 0 && bytesRemaining < (512 * 1024) ) {
 		si->sequence_num ++;
-		veejay_msg(VEEJAY_MSG_WARNING, "Auto splitting file, %ld frames left to record.", 
+		veejay_msg(VEEJAY_MSG_WARNING, "Auto splitting file, %ld frames left to record", 
 			( si->encoder_frames_to_record - si->encoder_total_frames_recorded ) );
 		si->encoder_frames_recorded= 0;	
 		return 2;

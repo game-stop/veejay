@@ -544,12 +544,18 @@ enum
 enum
 {
     VIMS_ID=0,
-    VIMS_DESCR=1,
-    VIMS_KEY=2,
-    VIMS_MOD=3,
+    VIMS_KEY=1,
+    VIMS_MOD=2,
+    VIMS_DESCR=3,
     VIMS_PARAMS=4,
     VIMS_FORMAT=5,
     VIMS_CONTENTS=6,
+};
+
+enum
+{
+    VIMS_LIST_ITEM_ID=0,
+    VIMS_LIST_ITEM_DESCR=1
 };
 
 typedef struct
@@ -5227,7 +5233,7 @@ gboolean view_vims_selection_func (GtkTreeSelection *selection,
             info->uc.selected_vims_accel[1] = k;
 
             clear_textview_buffer( "vimsview" );
-            if( info->uc.selected_vims_type == 1 && text)
+            if(text)
                 set_textview_buffer( "vimsview", text );
         }
         if(vimsid) g_free( vimsid );
@@ -5347,8 +5353,8 @@ static void setup_vimslist()
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     g_object_unref( G_OBJECT( store ));
 
-    setup_tree_text_column( "tree_vims", VIMS_ID, "VIMS ID",0);
-    setup_tree_text_column( "tree_vims", VIMS_DESCR, "Description",0 );
+    setup_tree_text_column( "tree_vims", VIMS_LIST_ITEM_ID, "VIMS ID",0);
+    setup_tree_text_column( "tree_vims", VIMS_LIST_ITEM_DESCR, "Description",0 );
 
     GtkTreeSortable *sortable = GTK_TREE_SORTABLE(store);
 
@@ -5380,10 +5386,10 @@ static void setup_bundles()
 
     g_object_unref( G_OBJECT( store ));
 
-    setup_tree_text_column( "tree_bundles", VIMS_ID, "VIMS",0);
-    setup_tree_text_column( "tree_bundles", VIMS_DESCR, "Description",0 );
+    setup_tree_text_column( "tree_bundles", VIMS_ID, "Event ID",0);
     setup_tree_text_column( "tree_bundles", VIMS_KEY, "Key",0);
     setup_tree_text_column( "tree_bundles", VIMS_MOD, "Mod",0);
+    setup_tree_text_column( "tree_bundles", VIMS_DESCR, "Description",0 );
     setup_tree_text_column( "tree_bundles", VIMS_PARAMS, "Max args",0);
     setup_tree_text_column( "tree_bundles", VIMS_FORMAT, "Format",0 );
     g_signal_connect(tree,
@@ -5508,9 +5514,7 @@ static void reload_bundles()
         char *message = NULL;
         char *format  = NULL;
         char *args    = NULL;
-        int val[6];
-
-        veejay_memset(val,0,sizeof(val));
+        int val[6] = { 0,0,0,0,0,0 };
 
         sscanf( ptr + offset, "%04d%03d%03d%04d", &val[0],&val[1],&val[2],&val[3]);
 
@@ -5552,6 +5556,7 @@ static void reload_bundles()
         if( val[0] >= VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
         {
             g_content = _utf8str( message );
+	    g_descr = _utf8str("Bundle");
         }
         else
         {
@@ -5574,12 +5579,12 @@ static void reload_bundles()
         gtk_list_store_append( store, &iter );
         gtk_list_store_set(store, &iter,
                            VIMS_ID,     g_vims,
-                           VIMS_DESCR,  g_descr,
                            VIMS_KEY,    g_keyname,
                            VIMS_MOD,    g_keymod,
+ 			   VIMS_DESCR,  g_descr,
                            VIMS_PARAMS,     vj_event_list[ val[0] ].params,
                            VIMS_FORMAT,     g_format,
-                           VIMS_CONTENTS,  g_content,
+                           VIMS_CONTENTS,  g_content, /* this is a hidden column, when the item is selected, the text is displayed in the textview widget */
                            -1 );
 
         if(message) free(message);
@@ -5660,8 +5665,8 @@ static void reload_vimslist()
 
         sprintf(vimsid, "%03d", val[0] );
         gtk_list_store_set(store, &iter,
-                           VIMS_ID, vimsid,
-                           VIMS_DESCR, g_descr,-1 );
+                           VIMS_LIST_ITEM_ID, vimsid,
+                           VIMS_LIST_ITEM_DESCR, g_descr,-1 );
 
         if(g_format) g_free(g_format);
         if(g_descr) g_free(g_descr);

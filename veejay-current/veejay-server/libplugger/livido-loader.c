@@ -634,7 +634,7 @@ static	int	init_channel_port(livido_port_t *ptr, livido_port_t *in_channel, int 
 	error = vevo_property_get( in_channel, "current_palette",0,NULL );
 	if( error != LIVIDO_NO_ERROR )
 	{
-		veejay_msg(0, "No suitable palette found.");
+		veejay_msg(0, "No suitable palette found");
 		return 0;
 	}
 	
@@ -1336,7 +1336,7 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 	}
 
 	if( compiled_as > LIVIDO_API_VERSION ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Plugin '%s' uses newer LiViDO API (version %d).", plugin_name, compiled_as);
+		veejay_msg(VEEJAY_MSG_WARNING, "Plugin '%s' uses newer LiViDO API (version %d)", plugin_name, compiled_as);
 		free(plugin_name);
 		return NULL;
 	}

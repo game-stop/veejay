@@ -1664,7 +1664,7 @@ int	viewport_reconfigure_from_config(void *vv, void *config, char *filename)
 						c->grid_resolution );
 
 	if(!res) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot load calibration settings, restoring defaults.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot load calibration settings, restoring defaults");
 		res = viewport_configure( v,	o->x1,o->y1,
 						o->x2,o->y2,
 						o->x3,o->y3,
@@ -1680,7 +1680,7 @@ int	viewport_reconfigure_from_config(void *vv, void *config, char *filename)
 	}
 
 	if(!res) {	
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to revert to old configuration.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to revert to old configuration");
 		v->disable = 1;
 		free(o);
 		return 0;
@@ -1745,7 +1745,7 @@ void	viewport_update_from(void *vv, void *bb)
 			b->w,b->h,b->x1,b->y1,b->x2,b->y2,b->x3,b->y3,b->x4,b->y4,b->x0,b->y0,b->w0,b->h0);
 	}
 	else {
-		veejay_msg(VEEJAY_MSG_DEBUG,"Failed to apply projection calibration. Press CTRL-s to configure this sample or press CTRL-p to disable."); 
+		veejay_msg(VEEJAY_MSG_DEBUG,"Failed to apply projection calibration. Press CTRL-s to configure this sample or press CTRL-p to disable"); 
 		b->disable = 1;
 	}
 
@@ -2555,7 +2555,7 @@ int	viewport_event_set_projection(void *data, float x, float y, int num, int fro
 	p[7] = v->y4;
 
 	if(	viewport_update_perspective( v, p ) )  {
-		veejay_msg(VEEJAY_MSG_INFO, "Accepted viewport configuration from remote.");
+		veejay_msg(VEEJAY_MSG_INFO, "Accepted viewport configuration from remote");
 	} else {
 		veejay_msg(0, "Error updating points");
 	}

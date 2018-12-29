@@ -552,7 +552,7 @@ static  void    macro_select( int slot )
         if(macro_bank_[slot] == NULL ) {
             macro_bank_[slot] = vpn( VEVO_ANONYMOUS_PORT );
             if(!macro_bank_[slot]) {
-                veejay_msg(0,"Unable to get port for macro slot %d", slot );
+                veejay_msg(VEEJAY_MSG_DEBUG,"Unable to get port for macro slot %d", slot );
                 slot = old;
                 macro_bank_[old] = oldptr;
             }
@@ -591,7 +591,7 @@ static  void    display_replay_macro_(void)
             }
             free(items[k]); 
         }
-        veejay_msg(VEEJAY_MSG_INFO, "Replay %d VIMS messages in macro bank %d!", strokes,current_macro_ );
+        veejay_msg(VEEJAY_MSG_INFO, "Replay of %d VIMS messages in macro bank %d", strokes,current_macro_ );
         free(items);
     }
 }
@@ -733,7 +733,7 @@ void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod);
 #ifdef HAVE_SDL
 static vims_key_list * vj_event_get_keys( int event_id );
 int vj_event_single_fire(void *ptr , SDL_Event event, int pressed);
-int vj_event_register_keyb_event(int event_id, int key_id, int key_mod, const char *args);
+int vj_event_register_keyb_event(int event_id, int key_id, int key_mod, char *args);
 void vj_event_unregister_keyb_event(int key_id, int key_mod);
 #endif
 
@@ -834,18 +834,14 @@ int         del_keyboard_event(int id )
     return 1;  
 }
 
-vj_keyboard_event   *get_keyboard_event(int id )
+vj_keyboard_event   *get_keyboard_event(int id)
 {
-#ifdef ARCH_X86_64
-    uint64_t tid = (uint64_t) id;
-#else
-    uint32_t tid = (uint32_t) id;
-#endif
+    if( id < 0 || id > MAX_KEY_MNE ) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Keybinding %d does not fit in keyboard map", id );
+        return NULL;
+    }   
 
-    hnode_t *node = hash_lookup( keyboard_events, (void*) tid );
-    if(node)
-        return ((vj_keyboard_event*) hnode_get( node ));
-    return NULL;
+    return keyboard_event_map_[id];
 }
 
 int     keyboard_event_exists(int id)
@@ -874,44 +870,14 @@ static void destroy_keyboard_event( vj_keyboard_event *ev )
             free( ev->arguments );  
 		}
 
-		memset(ev, 0, sizeof(vj_keyboard_event));
-
         free(ev);
     }
 }
 
-vj_keyboard_event *new_keyboard_event(
-        int symbol, int modifier, const char *value, int event_id )
+static void configure_vims_key_event(vj_keyboard_event *ev, int symbol, int modifier, int event_id, const char *value)
 {
-//  int vims_id = event_id;
-/*  if(vims_id == 0)
-    {
-        if(!vj_event_bundle_exists( event_id ))
-        {
-            veejay_msg(VEEJAY_MSG_ERROR,
-                "VIMS %d does not exist", event_id);
-            return NULL;
-        }
-    }*/
-    
-
-    if( event_id <= 0 )
-    {
-        veejay_msg(VEEJAY_MSG_ERROR,
-         "VIMS event %d does not exist", event_id );
-        return NULL;
-    }
-
-    vj_keyboard_event *ev = (vj_keyboard_event*)vj_calloc(sizeof(vj_keyboard_event));
-    if(!ev)
-        return NULL;
-    ev->vims = (vj_events*) vj_calloc(sizeof(vj_events));
-    if(!ev->vims)
-        return NULL;
-
-    ev->event_id = event_id;
-
-    keyboard_event_map_ [ (modifier * SDLK_LAST) + symbol ] = ev;
+    ev->arg_len = 0;
+    ev->arguments = NULL;
 
     if(value)
     {
@@ -925,11 +891,6 @@ vj_keyboard_event *new_keyboard_event(
             ev->arguments = find_keyboard_default( event_id );
             if(ev->arguments)
                 ev->arg_len = strlen(ev->arguments);
-            else
-            {
-                ev->arguments = NULL;
-                ev->arg_len   = 0;
-            }
         }   
     }
 
@@ -943,8 +904,37 @@ vj_keyboard_event *new_keyboard_event(
         ev->vims->act = vj_event_do_bundled_msg;
         ev->vims->list_id = event_id;
     }
+    else
+    {
+        ev->vims->act = vj_event_none;
+        ev->vims->list_id = event_id;
+    }
+
     ev->key_symbol = symbol;
     ev->key_mod = modifier;
+    ev->event_id = event_id;
+
+}
+
+vj_keyboard_event *new_keyboard_event(
+        int symbol, int modifier, const char *value, int event_id )
+{
+    if( event_id <= 0 )
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "VIMS event %d does not exist", event_id );
+        return NULL;
+    }
+
+    vj_keyboard_event *ev = (vj_keyboard_event*)vj_calloc(sizeof(vj_keyboard_event));
+    if(!ev)
+        return NULL;
+    ev->vims = (vj_events*) vj_calloc(sizeof(vj_events));
+    if(!ev->vims)
+        return NULL;
+
+    keyboard_event_map_ [ (modifier * SDLK_LAST) + symbol ] = ev;
+
+    configure_vims_key_event( ev,symbol,modifier, event_id, value );
 
     return ev;
 }
@@ -997,8 +987,7 @@ int vj_event_bundle_store( vj_msg_bundle *m )
     }
 
     // add bundle to VIMS list
-    veejay_msg(VEEJAY_MSG_DEBUG,
-        "Added Bundle VIMS %d to net_list", m->event_id );
+    veejay_msg(VEEJAY_MSG_DEBUG, "Added VIMS Bundle %d", m->event_id );
  
     net_list[ m->event_id ].list_id = m->event_id;
     net_list[ m->event_id ].act = vj_event_none;
@@ -1042,14 +1031,14 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
     int len = 0;
     if(!bundle_msg || strlen(bundle_msg) < 1)
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Doesn't make sense to store empty bundles in memory");
+        veejay_msg(VEEJAY_MSG_ERROR, "A VIMS Bundle must have some contents");
         return NULL;
     }   
     len = strlen(bundle_msg);
     m = (vj_msg_bundle*) vj_calloc(sizeof(vj_msg_bundle));
     if(!m) 
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message");
+        veejay_msg(VEEJAY_MSG_DEBUG, "Error allocating memory for bundled message");
         return NULL;
     }
     m->bundle = (char*) vj_calloc(sizeof(char) * len+1);
@@ -1057,7 +1046,7 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
     m->modifier = 0;
     if(!m->bundle)
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message context");
+        veejay_msg(VEEJAY_MSG_DEBUG, "Error allocating memory for bundled message context");
         return NULL;
     }
     veejay_strncpy(m->bundle, bundle_msg, len);
@@ -1065,7 +1054,7 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
     m->event_id = event_id;
 
     veejay_msg(VEEJAY_MSG_DEBUG, 
-        "New VIMS Bundle %d [%s] created",
+        "(VIMS) New VIMS Bundle %d [%s] created",
             event_id, m->bundle );
 
     return m;
@@ -1118,7 +1107,7 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
         }
         if ( num_msg <= 0 ) 
         {
-            veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Invalid number of message given to execute. Skipping message [%s]",msg);
+            veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Invalid number of messages given to execute. Skipping message [%s]",msg);
             return;
         }
 
@@ -1126,7 +1115,7 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
 
         if ( msg[offset] != '{' )
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) 'al' expected. Skipping message [%s]",msg);
+            veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Expected a left bracket at position %d. Skipping message [%s]",offset,msg);
             return;
         }   
 
@@ -1343,7 +1332,7 @@ void    vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *arg
             {
                 if( strlen((char*)vims_arguments[i].value) <= 0 )
                 {
-                    veejay_msg(VEEJAY_MSG_ERROR, "Argument %d is not a string!",i );
+                    veejay_msg(VEEJAY_MSG_ERROR, "Argument %d is not a string",i );
                     if(fmt)free(fmt);
                     return;
                 }
@@ -1439,13 +1428,13 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
     
     if( msg == NULL )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Dropped empty VIMS message.");
+        veejay_msg(VEEJAY_MSG_ERROR, "Dropped empty VIMS message");
         return 0;
     }
 
     if( msg_len < MSG_MIN_LEN )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "VIMS Message too small (%s), dropped!",msg);
+        veejay_msg(VEEJAY_MSG_ERROR, "Dropped VIMS message that was too small (%s)",msg);
         return 0;
 
     }
@@ -1765,7 +1754,6 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     vj_keyboard_event *ev = get_keyboard_event( index );
     if(!ev )
     {
-    //  veejay_msg(VEEJAY_MSG_ERROR,"Keyboard event %d unknown", index );
         if( event.button.button == SDL_BUTTON_WHEELUP && v->use_osd != 3 ) {
             char msg[100];
             sprintf(msg,"%03d:;", VIMS_VIDEO_SKIP_SECOND );
@@ -1786,7 +1774,7 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
         vj_msg_bundle *bun = vj_event_bundle_get(event_id );
         if(!bun)
         {
-            veejay_msg(VEEJAY_MSG_DEBUG, "Requested BUNDLE %d does not exist", event_id);
+            veejay_msg(VEEJAY_MSG_DEBUG, "Requested VIMS Bundle %d does not exist", event_id);
             return 0;
         }
         vj_event_parse_bundle( (veejay_t*) ptr, bun->bundle );
@@ -1995,7 +1983,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 
     if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
     {
-        int b_key = 0, b_mod = 0;
+        int b_key = key, b_mod = key_mod;
         if( vj_event_bundle_exists(event_id))
         {
             vj_msg_bundle *mm = vj_event_bundle_get( event_id );
@@ -2007,14 +1995,14 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
             if(!override_keyboard)
             {
                 veejay_msg(VEEJAY_MSG_WARNING,
-                     "Bundle %d already exists in VIMS system! (Bundle in configfile was ignored)",event_id);
+                     "VIMS Bundle %d already exists. Ignoring VIMS Bundle defined in action file", event_id);
                 return;
             }
             else
             {
                 if(vj_event_bundle_del(event_id) != 0)
                 {
-                    veejay_msg(0, "Unable to delete bundle %d", event_id);
+                    veejay_msg(VEEJAY_MSG_ERROR, "Unable to delete VIMS bundle %d", event_id);
                     return;
                 }
             }
@@ -2023,7 +2011,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
         vj_msg_bundle *m = vj_event_bundle_new( msg, event_id);
         if(!m)
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "Failed to create new Bundle %d - [%s]", event_id, msg );
+            veejay_msg(VEEJAY_MSG_ERROR, "Failed to create a new VIMS Bundle %d - [%s]", event_id, msg );
             return;
         }
     
@@ -2032,7 +2020,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 
 
         if(vj_event_bundle_store(m))
-            veejay_msg(VEEJAY_MSG_DEBUG, "Added bundle %d , trigger with key %d (mod %d)", event_id, b_key, b_mod);
+            veejay_msg(VEEJAY_MSG_DEBUG, "Added VIMS Bundle %d , trigger with key %d using modifier %d", event_id, b_key, b_mod);
     }
 
 #ifdef HAVE_SDL
@@ -2041,7 +2029,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
         if( override_keyboard )
             vj_event_unregister_keyb_event( key, key_mod );
         if( !vj_event_register_keyb_event( event_id, key, key_mod, NULL ))
-            veejay_msg(VEEJAY_MSG_ERROR, "Attaching key %d + %d to Bundle %d ", key,key_mod,event_id);
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to attach key %d with modifier %d to VIMS Bundle %d", key,key_mod,event_id);
     }
 #endif
 }
@@ -2058,21 +2046,21 @@ int  veejay_load_action_file( void *ptr, char *file_name )
     doc = xmlParseFile( file_name );
 
     if(doc==NULL) {
-        veejay_msg(0, "Cannot read file '%s'",file_name);   
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to open file '%s' for reading", file_name);   
         return 0;
     }
     
     cur = xmlDocGetRootElement( doc );
     if( cur == NULL)
     {
-        veejay_msg(0, "Cannot get document root from '%s'",file_name);
+        veejay_msg(VEEJAY_MSG_ERROR, "The file '%s' is not in the expected format", file_name);
         xmlFreeDoc(doc);
         return 0;
     }
 
     if( xmlStrcmp( cur->name, (const xmlChar *) XML_CONFIG_FILE))
     {
-        veejay_msg(0, "This is not a veejay configuration file.");
+        veejay_msg(VEEJAY_MSG_ERROR, "The file '%s' is not a Veejay Action File", file_name );
         xmlFreeDoc(doc);
         return 0;
     }
@@ -2107,7 +2095,7 @@ void    vj_event_format_xml_event( xmlNodePtr node, int event_id )
         vj_msg_bundle *m = vj_event_bundle_get( event_id );
         if(!m) 
         {   
-            veejay_msg(VEEJAY_MSG_ERROR, "bundle %d does not exist", event_id);
+            veejay_msg(VEEJAY_MSG_ERROR, "VIMS Bundle %d does not exist", event_id);
             return;
         }
     
@@ -2225,85 +2213,28 @@ void    vj_event_unregister_keyb_event( int sdl_key, int modifier )
             m->modifier = 0;
 
             vj_event_bundle_update( m, ev->event_id );
-            veejay_msg(VEEJAY_MSG_DEBUG, "Bundle %d dropped key binding",
-                ev->event_id);
         }
+
+        veejay_msg(VEEJAY_MSG_DEBUG, "Dropped key binding for VIMS Bundle %d", ev->event_id);
+        
         if( ev->vims )
             free(ev->vims);
         if( ev->arguments)
             free(ev->arguments );
+
         veejay_memset(ev, 0, sizeof( vj_keyboard_event ));
 
         del_keyboard_event( index );
     }
-    else
-    {
-        veejay_msg(0,"No event was attached to key %d : %d", modifier, sdl_key);
-    }
 }
 
-int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, const char *value)
+static int vj_event_update_key_collection(vj_keyboard_event *ev, int index)
 {
-    int offset = SDLK_LAST * modifier;
-    int index = offset + symbol;
-    if( keyboard_event_exists( index ))
-    {
-        vj_keyboard_event *ff = get_keyboard_event(index);
-        if(ff)
-        {
-            if(ff->arguments) free(ff->arguments);
-            if( value ) ff->arguments = vj_strdup(value);
-            if( value ) ff->arg_len   = strlen(value); else ff->arg_len = 0;
-            ff->event_id = event_id;
-            veejay_msg( VEEJAY_MSG_DEBUG,"Updated keybinding %d + %d to VIMS %03d:%s;",modifier,symbol, ff->event_id, value);
-            return 1;
-        }
-        return 0;
-    }
-
-    if( vj_event_bundle_exists(event_id))
-    {
-        vj_keyboard_event *ev = get_keyboard_event( index );
-        if( ev )
-        {
-            ev->key_symbol = symbol;
-            ev->key_mod = modifier;
-            veejay_msg(VEEJAY_MSG_INFO,
-                "Updated Bundle ID %d with keybinding %d+%d",ev->event_id, modifier, symbol );
-            return 1;
-        }
-    }
-
-    vj_keyboard_event *ev = NULL;
-
-    if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
-    {
-        char val[10];
-        vj_msg_bundle *m = vj_event_bundle_get( event_id );
-        sprintf(val, "%d", event_id );
-        if( m )
-        {
-            m->accelerator = symbol;
-            m->modifier    = modifier;
-            
-            vj_event_bundle_update( m, event_id );
-        
-            ev = new_keyboard_event( symbol, modifier, val, event_id ); 
-            veejay_msg(VEEJAY_MSG_DEBUG, "Bundle %d triggered by key %d (mod %d)", event_id,symbol, modifier);
-        }
-    }
-    else
-    {
-        ev = new_keyboard_event( symbol, modifier, value, event_id );
-    }
-
-
-    if(!ev)
-        return 0;
-    
     hnode_t *node = hnode_create( ev );
-    if(!node)
+    hnode_t *node2 = hnode_create( ev );
+    if(!node || !node2)
     {
+	    veejay_msg(0,"Unable to create a new node");
         return 0;
     }
 
@@ -2329,9 +2260,49 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, con
     hash_insert( keyboard_events, node, (void*) tid );
 
     //register keybinding by event id
-    hash_insert( keyboard_eventid_map, node, (void*) eid );
+    hash_insert( keyboard_eventid_map, node2, (void*) eid );
 
     return 1;
+}
+
+int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, char *value)
+{
+    int offset = SDLK_LAST * modifier;
+    int index = offset + symbol;
+    int is_bundle = (event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END);
+
+    vj_keyboard_event *ff = get_keyboard_event(index);
+    if( ff == NULL ) {
+        char *extra = value;
+        /* registering a new bundle or vims event triggered by key action */
+        if(is_bundle) {
+            char val[10];
+            sprintf(val, "%d", event_id);
+            extra = val;
+        }   
+        ff = new_keyboard_event( symbol, modifier, extra, event_id ); 
+        if( ff == NULL ) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Failed to register a new action");
+            return 0;
+        }
+    }
+    else {
+        /* the action already exists, free old stuff */
+        if(ff->arguments) {
+        	free(ff->arguments);
+	    }
+    }
+
+    if( is_bundle ) {
+        vj_msg_bundle *bun = vj_event_bundle_get( event_id );
+        bun->accelerator = symbol;
+        bun->modifier = modifier;
+        vj_event_bundle_update( bun, event_id );
+    }
+
+    configure_vims_key_event( ff,symbol,modifier, event_id, value );
+
+	return vj_event_update_key_collection(ff, index);
 }
 #endif
 static void vj_event_init_network_events()
@@ -2391,7 +2362,7 @@ static void vj_event_load_keyboard_configuration(veejay_t *info)
                 msg ) ) {
             keyb_events++;
         } else {
-            veejay_msg(VEEJAY_MSG_ERROR,"VIMS event %03d does not exist", event_id );
+            veejay_msg(VEEJAY_MSG_ERROR,"Error registering VIMS event %03d", event_id );
         }
     }
 
@@ -2417,9 +2388,7 @@ static void vj_event_init_keyboard_defaults()
         }
         else
         {
-
-            veejay_msg(VEEJAY_MSG_ERROR,
-              "VIMS event %03d does not exist ", vj_event_default_sdl_keys[i].event_id );
+            veejay_msg(VEEJAY_MSG_ERROR, "VIMS event %03d does not exist ", vj_event_default_sdl_keys[i].event_id );
         }
     }
 }
@@ -2526,7 +2495,7 @@ void    vj_event_destroy()
 void vj_event_linkclose(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
-    veejay_msg(VEEJAY_MSG_INFO, "Remote requested session-end, quitting Client");
+    veejay_msg(VEEJAY_MSG_INFO, "Remote requested session-end");
     int i = v->uc->current_link;
     if( v->vjs[0] )
         _vj_server_del_client( v->vjs[0], i );
@@ -2540,7 +2509,7 @@ void vj_event_quit(void *ptr, const char format[], va_list ap)
 {
     int i;
     veejay_t *v = (veejay_t*)ptr;
-    veejay_msg(VEEJAY_MSG_INFO, "Remote requested session-end, quitting Veejay");
+    veejay_msg(VEEJAY_MSG_INFO, "Remote requested veejay quit, quitting Veejay");
 //@ hang up clients
     for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
     {   
@@ -2575,7 +2544,7 @@ void    vj_event_set_framerate( void *ptr, const char format[] , va_list ap )
     }
 
     if( v->audio == AUDIO_PLAY ) {
-        veejay_msg(VEEJAY_MSG_WARNING,"Sorry, can only change framerate when started without audio playback");
+        veejay_msg(VEEJAY_MSG_WARNING,"You need to run without audio playback(-a0) to dynamically change the framerate");
     }else {
         veejay_set_framerate( v, new_fps );
         veejay_msg(VEEJAY_MSG_INFO, "Playback engine is now playing at %2.2f FPS", new_fps );
@@ -2631,7 +2600,7 @@ void vj_event_no_caching(void *ptr, const char format[], va_list ap)
                 vj_el_break_cache(e); k++;
             }
         }
-        veejay_msg(VEEJAY_MSG_INFO,"Cleared %d samples from cache.", k );
+        veejay_msg(VEEJAY_MSG_INFO,"Cleared %d samples from cache", k );
     }
     else
     {
@@ -2659,11 +2628,11 @@ void vj_event_suspend(void *ptr, const char format[], va_list ap)
     if( veejay_get_state(v) == LAVPLAY_STATE_PAUSED )
     {
         veejay_change_state(v, LAVPLAY_STATE_PLAYING );
-        veejay_msg(VEEJAY_MSG_WARNING, "Resuming playback.");
+        veejay_msg(VEEJAY_MSG_WARNING, "Resume playback");
     }
     else {
         veejay_change_state(v, LAVPLAY_STATE_PAUSED);
-        veejay_msg(VEEJAY_MSG_WARNING, "Suspending playback.");
+        veejay_msg(VEEJAY_MSG_WARNING, "Suspend playback");
     }
 }
 
@@ -2683,9 +2652,7 @@ void    vj_event_play_norestart( void *ptr, const char format[], va_list ap )
         v->settings->sample_restart = 1;
     }
 
-    veejay_msg(VEEJAY_MSG_INFO, "Sample continuous mode is %s.",
-            (v->settings->sample_restart == 0 ? "enabled" : "disabled"));
-
+    veejay_msg(VEEJAY_MSG_INFO, "Sample continuous mode is %s", (v->settings->sample_restart == 0 ? "enabled" : "disabled"));
 }
 
 void    vj_event_sub_render( void *ptr, const char format[], va_list ap )
@@ -3435,7 +3402,7 @@ void vj_event_feedback( void *ptr, const char format[], va_list ap )
         v->settings->feedback_stage = 1;
     }
     veejay_msg(VEEJAY_MSG_INFO ,"Feedback on main source is %s",
-            ( v->settings->feedback ? "enabled." : "disabled.") );
+            ( v->settings->feedback ? "enabled" : "disabled") );
 }
 
 void    vj_event_render_depth( void *ptr, const char format[] , va_list ap )
@@ -3485,7 +3452,7 @@ void vj_event_play_reverse(void *ptr,const char format[],va_list ap)
         } 
         veejay_set_speed(v,speed );
 
-        veejay_msg(VEEJAY_MSG_INFO, "Video is playing in reverse at speed %d.", speed);
+        veejay_msg(VEEJAY_MSG_INFO, "Video is playing in reverse at speed %d", speed);
     }
     else
     {
@@ -3759,7 +3726,7 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
             int se = v->uc->sample_end;
             v->uc->sample_end = v->uc->sample_start;
             v->uc->sample_start = se;   
-            veejay_msg(VEEJAY_MSG_WARNING, "Swapped starting and ending positions: %ld - %ld, please set a new starting position.", v->uc->sample_start,v->uc->sample_end );
+            veejay_msg(VEEJAY_MSG_WARNING, "Swapped starting and ending positions: %ld - %ld, please set a new starting position", v->uc->sample_start,v->uc->sample_end );
         }
         
         if( v->uc->sample_end > v->uc->sample_start) {
@@ -3786,7 +3753,7 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
             editlist *el = veejay_edit_copy_to_new( v, E, vstart, vend );
             if(!el)
             {
-                veejay_msg(VEEJAY_MSG_ERROR, "Unable to clone current editlist!");
+                veejay_msg(VEEJAY_MSG_ERROR, "Unable to clone current editlist");
                 return;
             }
 
@@ -3796,7 +3763,7 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
             sample_info *skel = sample_skeleton_new(start,end);
             if(!skel)
             {
-                veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new sample!");
+                veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a new sample");
                 return;
             }   
 
@@ -3814,7 +3781,7 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
             }
             else
             {
-                veejay_msg(VEEJAY_MSG_ERROR,"Unable to create new sample");
+                veejay_msg(VEEJAY_MSG_ERROR,"Unable to create a new sample");
             }
         }
     }
@@ -4073,7 +4040,7 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
     }
     else
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d !",
+        veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d",
             args[1],args[0]); 
     }
 }
@@ -4392,7 +4359,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     {
         if( v->seq->rec_id )
         {
-            veejay_msg(0, "Already recording the sequence!");
+            veejay_msg(0, "Already recording the sequence");
             return;
         }
         else
@@ -4403,7 +4370,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 
     if(!veejay_create_temp_file(prefix, tmp))
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Unable to create temporary file, Record aborted." );
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to create temporary file, Record aborted" );
         return;
     }
 
@@ -4529,7 +4496,7 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
                 if(ns > 0)
                     veejay_msg(VEEJAY_MSG_INFO, "Loaded file '%s' to new sample %d",avi_file, ns);
                 if(ns <= 0 )
-                    veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file %s to EditList!",avi_file);
+                    veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file %s to EDL",avi_file);
             
         
                 sample_reset_encoder( stop_sample );
@@ -4636,7 +4603,7 @@ void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
     }
     else 
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Sample %d 's starting position %d must be greater than ending position %d.",
+        veejay_msg(VEEJAY_MSG_ERROR, "Sample %d 's starting position %d must be greater than ending position %d",
             args[0],args[1], sample_get_endFrame(args[0]));
     }
 }
@@ -4722,7 +4689,7 @@ void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
     {
         new_sample = sample_copy(args[0]);
         if(!new_sample)
-            veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy sample %d.",args[0]);
+            veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy sample %d",args[0]);
     }
 }
 
@@ -4731,12 +4698,12 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     if( SAMPLE_PLAYING(v)) {
         if( !vj_has_video(v,v->edit_list) ) {
-            veejay_msg(VEEJAY_MSG_WARNING,"There are no video frames in plain mode.");
+            veejay_msg(VEEJAY_MSG_WARNING,"There are no video frames in plain mode");
             if( vj_tag_highest_valid_id() > 0 ) {
                 veejay_msg(VEEJAY_MSG_WARNING,"Switching to stream 1 to clear all samples");
                 veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, 1 );
             } else {
-                veejay_msg(VEEJAY_MSG_ERROR, "Nothing to fallback to, cannot delete all samples.");
+                veejay_msg(VEEJAY_MSG_ERROR, "Nothing to fallback to, cannot delete all samples");
                 return;
             }
         } else {
@@ -4751,7 +4718,7 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
     v->seq->active = 0;
     v->seq->size = 0;
 
-    veejay_msg(VEEJAY_MSG_INFO, "Deleted all samples.");
+    veejay_msg(VEEJAY_MSG_INFO, "Deleted all samples");
 } 
 
 void vj_event_chain_enable(void *ptr, const char format[], va_list ap) 
@@ -4939,7 +4906,7 @@ void vj_event_chain_toggle(void *ptr, const char format[], va_list ap)
         {
             sample_set_effect_status(v->uc->sample_id,0);
         }
-        veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s.", (sample_get_effect_status(v->uc->sample_id) ? "enabled" : "disabled"));
+        veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s", (sample_get_effect_status(v->uc->sample_id) ? "enabled" : "disabled"));
     }
     if(STREAM_PLAYING(v))
     {
@@ -4952,7 +4919,7 @@ void vj_event_chain_toggle(void *ptr, const char format[], va_list ap)
         {
             vj_tag_set_effect_status(v->uc->sample_id,0);
         }
-        veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s.", (vj_tag_get_effect_status(v->uc->sample_id) ? "enabled" : "disabled"));
+        veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s", (vj_tag_get_effect_status(v->uc->sample_id) ? "enabled" : "disabled"));
     }
 }
 
@@ -5071,7 +5038,7 @@ void    vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 
     if( args[1] < 0 || args[1] > 255)
     {
-        veejay_msg(VEEJAY_MSG_DEBUG,"Invalid opacity range %d use [0-255] ", args[1]);
+        veejay_msg(VEEJAY_MSG_DEBUG,"Invalid opacity range %d use [0-255]", args[1]);
         //clamp values
         if(args[1] < 0)
             args[1] = 0;
@@ -5503,7 +5470,7 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 
     if( sscanf( str, "%d" , &value ) != 1 )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid value." );
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid value" );
         return;
     }
 
@@ -6583,7 +6550,7 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 
         }
         if(!res)
-            veejay_msg(VEEJAY_MSG_ERROR, "Invalid range given to crop ! %d - %d", args[0],args[1] );
+            veejay_msg(VEEJAY_MSG_ERROR, "Invalid range given to crop %d - %d", args[0],args[1] );
         
     }
 }
@@ -6759,7 +6726,7 @@ void    vj_event_tag_new_generator( void *ptr, const char format[], va_list ap )
     int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR, str, v->nstreams,0,args[0]);
 
     if( id <= 0 ) {
-        veejay_msg(0,"Error launching plugin '%s'.", str );
+        veejay_msg(0,"Error launching plugin '%s'", str );
     }
 }
 
@@ -6917,7 +6884,7 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
     {
         if( args[0] == v->uc->port )
         {   
-            veejay_msg(0, "Try another port number, I am listening on this one.");
+            veejay_msg(0, "Try another port number, I am listening on this one");
             return;
         }
     }
@@ -7001,14 +6968,14 @@ void    vj_event_vp_proj_toggle(void *ptr, const char format[],va_list ap )
     veejay_t *v = (veejay_t*) ptr;
 
     if(!v->composite ) {
-        veejay_msg(0, "No viewport active.");
+        veejay_msg(0, "No viewport active");
         return;
     }
 
     int mode = !composite_get_status(v->composite);
     composite_set_status( v->composite, mode );
 
-    veejay_msg(VEEJAY_MSG_INFO, "Projection transform is now %s on startup.",(mode==0? "inactive" : "active"));
+    veejay_msg(VEEJAY_MSG_INFO, "Projection transform is now %s on startup",(mode==0? "inactive" : "active"));
 }
 
 void    vj_event_vp_stack( void *ptr, const char format[], va_list ap )
@@ -7018,7 +6985,7 @@ void    vj_event_vp_stack( void *ptr, const char format[], va_list ap )
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(!v->composite ) {
-        veejay_msg(0, "No viewport active.");
+        veejay_msg(0, "No viewport active");
         return;
     }
 
@@ -7045,7 +7012,7 @@ void    vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     if(!v->composite ) {
-        veejay_msg(0, "No viewport active.");
+        veejay_msg(0, "No viewport active");
         return;
     }
 
@@ -7054,7 +7021,7 @@ void    vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
         return;
     }
     if( args[1] < 0 ) {
-        veejay_msg(0, "Scale must be a positive number.");
+        veejay_msg(0, "Scale must be a positive number");
         return;
     }
     float point_x =  ( (float) args[2] / (float) args[1] );
@@ -7216,7 +7183,7 @@ void    vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     if(!v->composite) {
-        veejay_msg(VEEJAY_MSG_ERROR, "No viewport active.");
+        veejay_msg(VEEJAY_MSG_ERROR, "No viewport active");
         return;
     }
 
@@ -7230,7 +7197,7 @@ void    vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
         composite_set_ui( v->composite, 2 );
         v->settings->composite = 2;
         v->use_osd=3;
-        veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to save and exit.");
+        veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to save and exit");
     }
 }
 
@@ -7501,7 +7468,7 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
         }       
         else
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
+            veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList",avi_file);
         }
 
         veejay_msg(VEEJAY_MSG_ERROR, "Stopped recording from stream %d", v->uc->sample_id);
@@ -7597,7 +7564,7 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
             }       
             else
             {
-                veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
+                veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList",avi_file);
             }
 
             vj_tag_reset_encoder(s->offline_tag_id);
@@ -7621,12 +7588,12 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 
 void vj_event_output_y4m_start(void *ptr, const char format[], va_list ap)
 {
-    veejay_msg(0, "Y4M out stream: obsolete - use recorder.");
+    veejay_msg(0, "Y4M out stream: obsolete - use recorder");
 }
 
 void vj_event_output_y4m_stop(void *ptr, const char format[], va_list ap)
 {
-    veejay_msg(0, "Y4M out stream: obsolete - use recorder.");
+    veejay_msg(0, "Y4M out stream: obsolete - use recorder");
 }
 
 void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
@@ -7635,7 +7602,7 @@ void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*)ptr;
     if (!v->audio_running )
     {
-        veejay_msg(0,"Veejay was started without audio.");
+        veejay_msg(0,"Veejay was started without audio");
         return;
     }
 
@@ -7649,7 +7616,7 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t *)ptr;
     if (!v->audio_running )
     {
-        veejay_msg(0,"Veejay was started without audio.");
+        veejay_msg(0,"Veejay was started without audio");
         return;
     }
     v->settings->audio_mute = 1;
@@ -7942,7 +7909,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
     }
     if(num_cmd < 0) 
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Effect Chain is empty." );    
+        veejay_msg(VEEJAY_MSG_ERROR, "Effect Chain is empty" );    
         free(blob);     
         return;
     }
@@ -9180,7 +9147,7 @@ void    vj_event_send_frame             (   void *ptr, const char format[], va_l
 
     if (!v->settings->is_dat )
     {
-        veejay_msg(0, "Wrong control port for retrieving frames!");
+        veejay_msg(0, "Wrong control port for retrieving frames");
         SEND_MSG(v, "00000000000000000000"); //@ send empty header only (20 bytes)
         return;
     }
@@ -9369,17 +9336,12 @@ void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
     if(args[0] == 0)
     {
         args[0] = vj_event_suggest_bundle_id();
-        veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) suggested new Event id %d", args[0]);
-    }
-    else
-    {
-        veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) requested to add/replace %d", args[0]);
     }
 
     if(args[0] < VIMS_BUNDLE_START|| args[0] > VIMS_BUNDLE_END )
     {
         // invalid bundle
-        veejay_msg(VEEJAY_MSG_ERROR, "Customized events range from %d-%d", VIMS_BUNDLE_START, VIMS_BUNDLE_END);
+        veejay_msg(VEEJAY_MSG_ERROR, "VIMS Bundle identifiers range from %d-%d", VIMS_BUNDLE_START, VIMS_BUNDLE_END);
         return;
     }
     // allocate new
@@ -9387,14 +9349,14 @@ void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
     vj_msg_bundle *m = vj_event_bundle_new(s, args[0]);
     if(!m)
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Error adding bundle ?!");
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to add new VIMS Bundle");
         return;
     }
 
     // bye existing bundle
     if( vj_event_bundle_exists(args[0]))
     {
-        veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) Bundle exists - replacing contents ");
+        veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) Bundle exists - replacing contents");
         vj_msg_bundle *mm = vj_event_bundle_get( args[0] );
         if(mm)
         {
@@ -9739,7 +9701,7 @@ void    vj_event_playmode_rule( void *ptr, const char format[],  va_list ap )
         }
         v->rmodes[ i ] = -1;
     }
-    veejay_msg(VEEJAY_MSG_INFO, "Okay, play-mode depending VIMS for link %d no longer enforced.", v->uc->current_link);
+    veejay_msg(VEEJAY_MSG_INFO, "Okay, play-mode depending VIMS for link %d no longer enforced", v->uc->current_link);
 }
 
 void    vj_event_connect_shm( void *ptr, const char format[], va_list ap )
@@ -9749,7 +9711,7 @@ void    vj_event_connect_shm( void *ptr, const char format[], va_list ap )
     P_A(args,sizeof(args),NULL,0,format,ap);
     
     if( args[0] == v->uc->port ) {
-        veejay_msg(0, "Cannot pull info from myself inside VIMS event!");
+        veejay_msg(0, "Cannot pull info from myself inside VIMS event");
         return;
     }
 
@@ -10529,7 +10491,7 @@ void    vj_event_set_macro_status( void *ptr,   const char format[], va_list ap 
         else
         {
             veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro has nothing to playback");
-            veejay_msg(VEEJAY_MSG_INFO, "Use CAPS-LOCK modifier to jump to next or previous sample."); 
+            veejay_msg(VEEJAY_MSG_INFO, "Use CAPS-LOCK modifier to jump to next or previous sample"); 
         }
     }
     else if ( args[0] == 3 )

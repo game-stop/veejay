@@ -939,7 +939,7 @@ static void vj_perform_close_audio() {
 int vj_perform_init_audio(veejay_t * info)
 {
 #ifndef HAVE_JACK
-	veejay_msg(VEEJAY_MSG_DEBUG, "Jack was not enabled during build, no support for audio.");
+	veejay_msg(VEEJAY_MSG_DEBUG, "Jack was not enabled during build, no support for audio");
 	return 0;
 #else
 	int i;
@@ -1390,7 +1390,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 		{		
 			if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, data_len, &fxframe, info->real_fps )<=0)
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame.");
+				veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame");
 			}
 		}
 	}
@@ -2015,7 +2015,7 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, VJFrame *
 	int max_sfd = ( s1 ? sample_get_framedup(s1) : info->sfd );
 	editlist *el = ( s1 ? sample_get_editlist(s1) : info->edit_list);
 	if( el == NULL ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Selected mixing source and ID does not exist, Use / to toggle mixing type!" );
+		veejay_msg(VEEJAY_MSG_WARNING, "Selected mixing source and ID does not exist, Use / to toggle mixing type" );
 		if( info->edit_list == NULL ) {
 			veejay_msg(VEEJAY_MSG_WARNING, "No plain source playing");
 			return 0;
@@ -2817,7 +2817,7 @@ void vj_perform_record_stop(veejay_t *info)
 			veejay_set_sample( info,id);
 			veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
 		} else {
-			veejay_msg(VEEJAY_MSG_WARNING, "Not autoplaying new streams.");
+			veejay_msg(VEEJAY_MSG_WARNING, "Not autoplaying new streams");
 		}
 	 }
 	 settings->sample_record = 0;
@@ -2846,7 +2846,7 @@ void vj_perform_record_stop(veejay_t *info)
 		}
 		else {
 
-			veejay_msg(VEEJAY_MSG_WARNING, "Not autoplaying new streams.");
+			veejay_msg(VEEJAY_MSG_WARNING, "Not autoplaying new streams");
 		}
  	}
   }
@@ -2947,7 +2947,7 @@ void vj_perform_record_offline_tag_frame(veejay_t *info)
 			if( vj_tag_init_encoder( stream_id, NULL,
 				df, frames_left)==-1)
 			{
-				veejay_msg(VEEJAY_MSG_WARNING,"Error while auto splitting."); 
+				veejay_msg(VEEJAY_MSG_WARNING,"Error while auto splitting"); 
 				report_bug();
 			}
 		}
@@ -3005,7 +3005,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 			if( vj_tag_init_encoder( stream_id, NULL, df, frames_left)==-1)
 			{
 				veejay_msg(VEEJAY_MSG_WARNING,
-					"Error while auto splitting."); 
+					"Error while auto splitting"); 
 				report_bug();
 			}
 		}

@@ -313,7 +313,7 @@ lav_file_t *lav_open_output_file(char *filename, char format,
                 
         return lav_fd;
 #else
-        veejay_msg(0,"Quicktime not compiled in, cannot use Quicktime.");
+        veejay_msg(0,"Quicktime not compiled in, cannot use Quicktime");
         internal_error = ERROR_FORMAT;
         return NULL;
 #endif

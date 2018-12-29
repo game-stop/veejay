@@ -697,7 +697,7 @@ static void print_license()
 		"Veejay comes with ABSOLUTELY NO WARRANTY; this is free software and");
 	
 	veejay_msg(VEEJAY_MSG_INFO,
-		"you are welcome to redistribute it under certain conditions.");
+		"you are welcome to redistribute it under certain conditions");
 	
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "The license must be included in the (source) package (COPYING)");
@@ -717,8 +717,8 @@ static void	veejay_backtrace_handler(int n , siginfo_t *si, void *ptr)
 {
 	switch(n) {
 		case SIGSEGV:
-			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system."); //@ Suggested by Matthijs
-			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge."); //@
+			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system"); //@ Suggested by Matthijs
+			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge!"); //@
 			veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision..."); //@
 
 			veejay_print_backtrace();

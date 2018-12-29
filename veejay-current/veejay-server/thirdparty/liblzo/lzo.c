@@ -77,7 +77,7 @@ static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , lzo_ui
 	}
 
 	if( out_len >= in_len ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "LZO (test) Block contains incompressible data.");
+		veejay_msg(VEEJAY_MSG_ERROR, "LZO (test) Block contains incompressible data");
 		return 0;
 	}
 
@@ -136,15 +136,15 @@ void	*lzo_new( )
 		int i;
 		for( i = 0; i < sizeof(in); i ++ ) { 
 			if( in[i] != 1 )  //decompression back into 'in'
-				veejay_msg(VEEJAY_MSG_ERROR, "LZO verify error at byte pos %d.", i );
+				veejay_msg(VEEJAY_MSG_ERROR, "LZO verify error at byte pos %d", i );
 	
 		}
 
-		veejay_msg(VEEJAY_MSG_DEBUG, "LZO verified compression algorithms successfully.");
+		veejay_msg(VEEJAY_MSG_DEBUG, "LZO verified compression algorithms successfully");
 	}
 	*/
 
-	veejay_msg(VEEJAY_MSG_DEBUG,"LZO real-time data compression library (v%s, %s) enabled.",
+	veejay_msg(VEEJAY_MSG_DEBUG,"LZO real-time data compression library (v%s, %s) enabled",
             lzo_version_string(), lzo_version_date());
 
 	l->tmp[0] = NULL;
@@ -232,7 +232,7 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	mode   = str2ulong( linbuf+12 );
 
 	if( len[0] != stride1 || len[1] != stride2 || len[2] != stride3 ) {
-		veejay_msg(0, "LZO received corrupted packet.");
+		veejay_msg(0, "LZO received corrupted packet");
 		return 0;
 	}
 

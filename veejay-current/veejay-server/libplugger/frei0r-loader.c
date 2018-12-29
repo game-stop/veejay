@@ -701,7 +701,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	}
 
 	if( is_bad_frei0r_plugin( &finfo ) ) { 
-		veejay_msg(VEEJAY_MSG_ERROR, "Frei0r %s-%d.%d is blacklisted. Please upgrade this plug-in to a newer version.",
+		veejay_msg(VEEJAY_MSG_ERROR, "Frei0r %s-%d.%d is blacklisted. Please upgrade this plug-in to a newer version",
 				finfo.name, finfo.major_version, finfo.minor_version);
 		(*f0r_deinit_func)();
 		vpf(port);
@@ -830,7 +830,7 @@ void	frei0r_plug_deinit( void *plugin )
 	void *parent = NULL;
 	int err	     = vevo_property_get( plugin, "parent",0, &parent );	
 	if( err != VEVO_NO_ERROR ) {
-		veejay_msg(0,"Unable to free plugin.");
+		veejay_msg(0,"Unable to free plugin");
 		return;
 	}
 
@@ -966,7 +966,7 @@ int	frei0r_process_frame_f( void *plugin )
 	void *parent  = NULL;
 	int err       = vevo_property_get( plugin, "parent",0,&parent );
 	if( err != VEVO_NO_ERROR ) {
-		veejay_msg(0, "unable to process frei0r plugin.");
+		veejay_msg(0, "unable to process frei0r plugin");
 		return 0;
 	}
 

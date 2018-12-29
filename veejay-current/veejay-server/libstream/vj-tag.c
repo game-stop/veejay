@@ -510,7 +510,7 @@ static  int cali_write_file( char *file, vj_tag *tag , editlist *el)
     snprintf(fileheader,sizeof(fileheader), "%03d %s",offset,header );
 
     if( fwrite( fileheader,strlen(fileheader),1, f ) <= 0 ) {
-        veejay_msg(0 ,"Error while writing file header.");
+        veejay_msg(0 ,"Error while writing file header");
         return 0;
     }   
     int n = 0;
@@ -541,7 +541,7 @@ static  int cali_write_file( char *file, vj_tag *tag , editlist *el)
     return 1;
 CALIERR:
     fclose(f);
-    veejay_msg(0, "File write error.");
+    veejay_msg(0, "File write error");
 
     
     return 0;
@@ -556,11 +556,11 @@ int     vj_tag_cali_write_file( int t1, char *name, editlist *el ) {
         return 0;
     }
     if(tag->noise_suppression == 0 ) {
-        veejay_msg(0, "Stream %d is not yet calibrated.", t1 );
+        veejay_msg(0, "Stream %d is not yet calibrated", t1 );
         return 0;
     }
     if(tag->noise_suppression != V4L_BLACKFRAME_PROCESS ) {
-        veejay_msg(0, "Please finish calibration first.");
+        veejay_msg(0, "Please finish calibration first");
         return 0;
     }
     if(! cali_write_file( name, tag, el ) ) {
@@ -591,7 +591,7 @@ static int  cali_read_file( cali_tag_t *p, char *file,int w, int h )
     if(sscanf(header, "%3d %8d %8d %8d %8d %lf %lf %lf",&offset, &w,&h,&len,&uv_len,
             &mean[0],&mean[1],&mean[2] ) != 8  )
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid header.");
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid header");
         return 0;
     }
 
@@ -634,12 +634,12 @@ static int  cali_read_file( cali_tag_t *p, char *file,int w, int h )
         goto CALIREADERR;
     }
 
-    veejay_msg(VEEJAY_MSG_INFO, "Image calibration data loaded.");
+    veejay_msg(VEEJAY_MSG_INFO, "Image calibration data loaded");
 
     return 1;
 
 CALIREADERR:
-    veejay_msg(VEEJAY_MSG_ERROR, "Only got %d bytes.",n);
+    veejay_msg(VEEJAY_MSG_ERROR, "Only got %d bytes",n);
     return 0;
 }
 
@@ -662,7 +662,7 @@ static int  _vj_tag_new_cali( vj_tag *tag, int stream_nr, int w, int h )
     
     vj_tag_input->cali[stream_nr] = (void*)p;
     
-    veejay_msg(VEEJAY_MSG_INFO, "Image Cailbration files ready.");
+    veejay_msg(VEEJAY_MSG_INFO, "Image Calibration files ready");
     
     return 1;
 }
@@ -1030,7 +1030,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             if( channel == -1 ) {
                 channel = plug_get_idx_by_name( filename );
                 if( channel == - 1) {
-                    veejay_msg(0, "'%s' not found.",filename );
+                    veejay_msg(0, "'%s' not found",filename );
                     free(tag->source_name );
                     free(tag);
                     return -1;
@@ -1095,7 +1095,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             free(plugname);
         }
         else {
-            veejay_msg(VEEJAY_MSG_WARNING, "No generator plugins found. Using built-in.");
+            veejay_msg(VEEJAY_MSG_WARNING, "No generator plugins found. Using built-in");
         }
     }
     
@@ -1111,11 +1111,11 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                 free(tag);
                 return -1;
             }
-            veejay_msg(VEEJAY_MSG_DEBUG, "Using plug '%s' to generate frames for this stream.",plugname);
+            veejay_msg(VEEJAY_MSG_DEBUG, "Using plug '%s' to generate frames for this stream",plugname);
             strcpy( tag->source_name, plugname );
             free(plugname);
         } else {
-            veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator.");
+            veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator");
             free(tag->source_name);
             free(tag);
             return -1;
@@ -1711,7 +1711,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
     tag->encoder =  vj_avcodec_start( _tag_info->effect_frame1, format, tag->encoder_destination );
     if(!tag->encoder)
     {
-        veejay_msg(0, "Unable to use selected encoder, please choose another.");
+        veejay_msg(0, "Unable to use selected encoder, please choose another");
         return 0;
     }
     tag->encoder_active = 1;
@@ -1822,7 +1822,7 @@ int vj_tag_continue_record( int t1 )
     if( bytesRemaining >= 0 && bytesRemaining < (512 * 1024) ) {
         tag->sequence_num ++;
         veejay_msg(VEEJAY_MSG_WARNING,
-            "Auto splitting file, %ld frames left to record.",
+            "Auto splitting file, %ld frames left to record",
             (tag->encoder_frames_to_record - tag->encoder_total_frames_recorded ));
         tag->encoder_frames_recorded=0;
 
@@ -1831,7 +1831,7 @@ int vj_tag_continue_record( int t1 )
     
     if( tag->encoder_total_frames_recorded >= tag->encoder_frames_to_record)
     {
-        veejay_msg(VEEJAY_MSG_INFO, "Recorded %ld frames.",
+        veejay_msg(VEEJAY_MSG_INFO, "Recorded %ld frames",
             tag->encoder_total_frames_recorded );
         return 1;
     }
@@ -3021,7 +3021,7 @@ int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 static uint8_t  *blackframe_new( int w, int h, int uv_len, uint8_t *Y, uint8_t *U, uint8_t *V, int median_radius, vj_tag *tag ) {
     uint8_t *buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * 5 * ((w*h) + 2 * uv_len ));
     if(buf == NULL) {
-        veejay_msg(0,"Insufficient memory to initialize calibration.");
+        veejay_msg(0,"Insufficient memory to initialize calibration");
         return NULL;
     }
     veejay_memset( buf, 0, sizeof(uint8_t) * 5 * ((w*h)+2*uv_len));
@@ -3457,7 +3457,7 @@ int vj_tag_grab_blackframe(int t1, int duration, int median_radius , int mode)
     if(!tag)
         return 0;
     if( tag->source_type != VJ_TAG_TYPE_V4L ) {
-    veejay_msg(VEEJAY_MSG_INFO, "Source is not a video device.");
+    veejay_msg(VEEJAY_MSG_INFO, "Source is not a video device");
     return 0;
     }
     
@@ -3482,12 +3482,12 @@ int vj_tag_drop_blackframe(int t1)
     if(!tag)
     return 0;
     if( tag->source_type != VJ_TAG_TYPE_V4L ) {
-    veejay_msg(VEEJAY_MSG_INFO, "Source is not a video device.");
+    veejay_msg(VEEJAY_MSG_INFO, "Source is not a video device");
     return 0;
     }
     if( tag->blackframe ) {
     tag->noise_suppression = -1;
-    veejay_msg(VEEJAY_MSG_INFO, "Black Frame dropped.");
+    veejay_msg(VEEJAY_MSG_INFO, "Black Frame dropped");
     }
 
     return 1;
@@ -3552,7 +3552,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
                     tag->noise_suppression = V4L_BLACKFRAME_PROCESS;
                     master_lightframe( width,height,uv_len,tag );
                     master_flatframe( width,height,uv_len, tag );
-                    veejay_msg(VEEJAY_MSG_DEBUG, "Master flat frame.");
+                    veejay_msg(VEEJAY_MSG_DEBUG, "Master flat frame");
                 }
                 break;
             case V4L_WHITEFRAME_NEXT:
@@ -3572,7 +3572,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
                 if( tag->bf_count <= 0 ) {
                     tag->noise_suppression = 0;
                     master_blackframe(width,height,uv_len,tag);
-                    veejay_msg(VEEJAY_MSG_INFO, "Please create a lightframe.");
+                    veejay_msg(VEEJAY_MSG_INFO, "Please create a lightframe");
                 } else {
                     veejay_msg(VEEJAY_MSG_DEBUG, "Blackframe %d", tag->bf_count );
                     tag->bf_count --;

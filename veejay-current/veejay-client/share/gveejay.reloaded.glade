@@ -18072,7 +18072,7 @@ YUV (current)</property>
                   <widget class="GtkLabel" id="label357">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="label" translatable="yes">&lt;b&gt;Edit VIMS message contents &lt;/b&gt;</property>
+                    <property name="label" translatable="yes">&lt;b&gt;Edit VIMS Bundle contents &lt;/b&gt;</property>
                     <property name="use_markup">True</property>
                   </widget>
                   <packing>

@@ -630,7 +630,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 				v->grey=1;
 				return 1;
 			} else {
-				veejay_msg(VEEJAY_MSG_WARNING, "v4l2: User requested greyscale video but device does not support it.");
+				veejay_msg(VEEJAY_MSG_WARNING, "v4l2: User requested greyscale video but device does not support it");
 			}
 		}
 	}
@@ -653,7 +653,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		if( supported ) {
 			veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Capture device supports JPEG format" );
 			if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
-				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
+				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder");
 			return 0;
 			}
 			return 1;
@@ -663,7 +663,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		if( supported ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports MJPEG format");
 			if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
-				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
+				veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder");
 				return 0;
 			}
 			return 1;
@@ -689,7 +689,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	if( supported ) {
 		veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Capture device supports JPEG format" );
 		if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
-			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder");
 			return 0;
 		}
 		return 1;
@@ -699,7 +699,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	if( supported ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Capture device supports MJPEG format");
 		if( v4l2_setup_avcodec_capture( v, wid,hei, CODEC_ID_MJPEG ) == 0 )  {
-			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder.");
+			veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to intialize MJPEG decoder");
 			return 0;
 		}
 		return 1;
@@ -946,7 +946,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	}
 
 	if( (v->capability.capabilities & V4L2_CAP_READWRITE ) == 0  ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: %s does not support read/write interface.", v->capability.card);
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: %s does not support read/write interface", v->capability.card);
 		can_read = 0;
 	}
 
@@ -984,7 +984,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			v->capability.card );
 	if( strncasecmp( (char*) v->capability.card, "Dummy" , 5 ) == 0 ) {
 		v->is_vloopback = 1;
-		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: This is a dummy device.");
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: This is a dummy device");
 	}
 
 	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Capture method: %s",
@@ -1031,7 +1031,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 
 
 	if( v4l2_configure_format( v, host_fmt, wid, hei ) == 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to negotiate pixel format with your capture device.");
+		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Failed to negotiate pixel format with your capture device");
 		free(v);
 		close(fd);
 		return NULL;
@@ -1090,7 +1090,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			v->buffers[i].start  = mmap( NULL, v->buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,fd, v->buffer.m.offset );
 		
 			if( MAP_FAILED == v->buffers[i].start ) {
-				veejay_msg(0,  "v4l2: mmap( NULL, %d , PROT_READ|PROT_WRITE , MAP_SHARED , %d, %d ) failed.",
+				veejay_msg(0,  "v4l2: mmap( NULL, %d , PROT_READ|PROT_WRITE , MAP_SHARED , %d, %d ) failed",
 					v->buffer.length,fd, v->buffer.m.offset );
 		//	int k;
 		//	for( k = 0; k < i; k ++ ) 
@@ -2135,7 +2135,7 @@ static	void	*v4l2_grabber_thread( void *v )
 
 		if( err == -1 ) {
 			if( i->retries < 0 ) {
-				veejay_msg(0,"v4l2: giving up on this device, too many errors.");
+				veejay_msg(0,"v4l2: giving up on this device, too many errors");
 				goto v4l2_grabber_exit;
 
 			} else {
@@ -2166,7 +2166,7 @@ int	v4l2_thread_start( v4l2_thread_info *i )
 //	pthread_attr_destroy( &(i->attr) );
 
 	if( err == 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Started video capture thread.");
+		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Started video capture thread");
 		return 1;
 	}
 
@@ -2292,7 +2292,7 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 	}
 
 	if( i->stop ) {
-		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Grabber thread was told to exit.");
+		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Grabber thread was told to exit");
 		pthread_mutex_destroy(&(i->mutex));
 		pthread_cond_destroy(&(i->cond));
 		free(i);

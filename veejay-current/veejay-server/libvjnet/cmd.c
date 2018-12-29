@@ -290,7 +290,7 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 			return -1;
 		}
 		if( n == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection");
 			return -1;
 		}
 		buf += n;
@@ -314,7 +314,7 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 		}
 
 		if( n == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection");
 			return -1;
 		}
 

@@ -626,7 +626,7 @@ void    sample_cali_prepare( int sample_id, int slot, int chan )
             si->effect_chain[slot]->effect_id );
     if( fx_id >= 0 ) {
         vj_tag_cali_prepare_now( chan, fx_id );
-        veejay_msg(VEEJAY_MSG_DEBUG, "Prepared calibration data.");
+        veejay_msg(VEEJAY_MSG_DEBUG, "Prepared calibration data");
     }
 }
 
@@ -2939,7 +2939,7 @@ static void LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq, int n_sampl
         }
         s->size = s->size + tmp_idx;
     } else {
-        veejay_msg(VEEJAY_MSG_DEBUG, "Can't load this sequence, sequence bank is full.");
+        veejay_msg(VEEJAY_MSG_DEBUG, "Can't load this sequence, sequence bank is full");
     }
 }
 

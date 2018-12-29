@@ -648,7 +648,7 @@ JACK_shutdown(void *arg)
   
   ERR("unable to reconnect with jack");
 
-  veejay_msg(VEEJAY_MSG_ERROR, "Cannot recover from this error! You will probably need to restart for Audio playback.");
+  veejay_msg(VEEJAY_MSG_ERROR, "Cannot recover from this error! You will probably need to restart for Audio playback");
 
 }
 

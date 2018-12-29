@@ -414,9 +414,9 @@ void	veejay_chomp_str( char *msg, int *nlen )
 void    report_bug(void)
 {
     veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to http://groups.google.com/group/veejay-discussion?hl=en");
-    veejay_msg(VEEJAY_MSG_WARNING, "Send at least veejay's output and include the command(s) you have used to start it.");
-	veejay_msg(VEEJAY_MSG_WARNING, "Also, please consider sending in the recovery files if any have been created.");
-	veejay_msg(VEEJAY_MSG_WARNING, "If you compiled it yourself, please include information about your system.");
+    veejay_msg(VEEJAY_MSG_WARNING, "Send at least veejay's output and include the command(s) you have used to start it");
+	veejay_msg(VEEJAY_MSG_WARNING, "Also, please consider sending in the recovery files if any have been created");
+	veejay_msg(VEEJAY_MSG_WARNING, "If you compiled it yourself, please include information about your system");
 /*
 	veejay_msg(VEEJAY_MSG_WARNING, "Dumping core file to: core.%d",getpid() );
 	

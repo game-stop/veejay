@@ -163,10 +163,10 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 				return 1;
 
 			} else {
-				veejay_msg(0, "Failed to connect to status port.");
+				veejay_msg(0, "Failed to connect to status port");
 			}
 		} else {
-			veejay_msg(0, "Failed to connect to command port.");
+			veejay_msg(0, "Failed to connect to command port");
 		}
 
 		free(v->fd[0]);
@@ -225,7 +225,7 @@ static	long	vj_client_decompress( vj_client *t,uint8_t *in, uint8_t *out, int da
 
 	long total = lzo_decompress( t->lzo, in, data_len, dst, UV,s1,s2,s3 );
 	if( total != (Y+UV+UV) )
-		veejay_msg(0, "Error decompressing: expected %d bytes got %d.", (Y+UV+UV),total);
+		veejay_msg(0, "Error decompressing: expected %d bytes got %d", (Y+UV+UV),total);
 
 	return total;
 }
@@ -244,7 +244,7 @@ static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
 	int	plen = sock_t_recv( v->fd[0], line, FRAMEINFO_LENGTH );
 
 	if( plen == 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
+		veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection");
 		return 0;
 	}
 
@@ -255,7 +255,7 @@ static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
 	}
 
 	if( plen != FRAMEINFO_LENGTH ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame header, only got %d bytes.", plen );
+		veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame header, only got %d bytes", plen );
 		return 0;
 	}
 
@@ -353,7 +353,7 @@ int vj_client_read_frame_data( vj_client *v, int compr_len, int stride1,int stri
 		v->space_len = RUP8( compr_len );
 		v->space = vj_calloc(sizeof(uint8_t) * v->space_len );
 		if(!v->space) {
-			veejay_msg(0,"Could not allocate memory for network stream.");
+			veejay_msg(0,"Could not allocate memory for network stream");
 			return 0;
 		}
 	}
@@ -460,7 +460,7 @@ uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret
 		v->space_len = RUP8( p[3] );
 		v->space = vj_calloc(sizeof(uint8_t) * v->space_len );
 		if(!v->space) {
-			veejay_msg(0,"Could not allocate memory for network stream.");
+			veejay_msg(0,"Could not allocate memory for network stream");
 			*ret = -1;
 			return dst;
 		}

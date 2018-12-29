@@ -164,7 +164,7 @@ int	vj_mem_threaded_init(int w, int h)
 		num_tasks  = atoi( str2 );
 	
 		if( num_tasks >= MAX_WORKERS ) {
-			veejay_msg(0, "Maximum number of tasks is %d tasks.", MAX_WORKERS);
+			veejay_msg(0, "Maximum number of tasks is %d", MAX_WORKERS);
 			return -1;
 		}
 	
@@ -189,10 +189,10 @@ int	vj_mem_threaded_init(int w, int h)
 	if( num_tasks > 1 ) {
 		int res = task_start( num_tasks );
 		if( res != num_tasks ) {
-			veejay_msg(0, "Failed to initialize threadpool of %d threads.", num_tasks );
+			veejay_msg(0, "Failed to initialize threadpool of %d workers", num_tasks );
 			return 0;
 		}
-		veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer.", num_tasks, n_cpus );
+		veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer", num_tasks, n_cpus );
 	}
 
 	return 1;

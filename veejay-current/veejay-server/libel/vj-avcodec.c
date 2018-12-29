@@ -134,7 +134,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	if( id == 995 || id == 994) {
 		e->y4m = vj_yuv4mpeg_alloc(frame->width,frame->height,frame->fps, out_pixel_format );
 		if( !e->y4m) {
-			veejay_msg(0, "Error while trying to setup Y4M stream, abort.");
+			veejay_msg(0, "Error while trying to setup Y4M stream, abort");
 			return NULL;
 		}
 
@@ -393,7 +393,7 @@ void 		*vj_avcodec_start( VJFrame *frame, int encoder, char *filename )
 	void *ee = NULL;
 #ifndef SUPPORT_READ_DV2
 	if( codec_id == CODEC_ID_DVVIDEO ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "No support for DV encoding built in.");
+		veejay_msg(VEEJAY_MSG_ERROR, "No support for DV encoding built in");
 		return NULL;
 	}
 #endif	

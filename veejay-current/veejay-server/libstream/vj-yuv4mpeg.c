@@ -287,7 +287,7 @@ int vj_yuv_stream_start_write(vj_yuv * yuv4mpeg,VJFrame *frame, char *filename, 
     }
 
     if( vj_yuv_stream_write_header(yuv4mpeg, frame, outchroma) < 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error while writing y4m header.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while writing y4m header");
 		return -1;
     }
 
@@ -371,7 +371,7 @@ static	int	vj_yuv_restart(vj_yuv *yuv4mpeg )
 {
 	y4m_stream_info_t dummy;
 	if( lseek( yuv4mpeg->fd , 0, SEEK_SET ) < 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error seeking to start of y4m stream.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Error seeking to start of y4m stream");
 		return -1;
 	}
 

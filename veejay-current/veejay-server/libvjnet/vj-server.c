@@ -467,7 +467,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 
 
 	if( !vj_server_link_can_write( vje,link_id ) ) {
-		veejay_msg(0,"Not ready for sending.");
+		veejay_msg(0,"Not ready for sending");
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "failed to send buf of len %d to link_id %d, not ready for writing!\n", len, link_id );
 			printbuf(vje->logfd,buf,len);
@@ -852,7 +852,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 
 			if(num_msg >= VJ_MAX_PENDING_MSG )
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "VIMS server queue full - got %d/%d messages.",
+				veejay_msg(VEEJAY_MSG_ERROR, "VIMS server queue full - got %d/%d messages",
 					num_msg,VJ_MAX_PENDING_MSG );	
 				return VJ_MAX_PENDING_MSG; // cant take more
 			}
@@ -1018,11 +1018,11 @@ readmore_lbl:
 				ptr += n;
 				bytes_received += n;
 				if( bytes_received > max ) {
-					veejay_msg(VEEJAY_MSG_ERROR,"VIMS message does not fit the receive buffer.");
+					veejay_msg(VEEJAY_MSG_ERROR,"VIMS message does not fit the receive buffer");
 					return -1;
 				}
 				if( bytes_received == max ) {
-					veejay_msg(VEEJAY_MSG_WARNING,"VIMS message queue is full, discarding new messages.");
+					veejay_msg(VEEJAY_MSG_WARNING,"VIMS message queue is full, discarding new messages");
 					vj_server_flush( sock_fd );
 
 					//now, delete partial messages from message buffer
@@ -1064,7 +1064,7 @@ end_lbl:
 			veejay_msg(VEEJAY_MSG_DEBUG, "Networking error with socket %d: %s",sock_fd,strerror(errno));
 		}
 		if( bytes_received == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Link %d closed connection, terminating client connection.",id);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Link %d closed connection, terminating client connection",id);
 		}
 		return -1; // close client now
 	}
@@ -1096,7 +1096,7 @@ end_lbl:
 		}
 		return nn;
 	} else {
-		veejay_msg(VEEJAY_MSG_ERROR, "Queue too small to handle all VIMS messages.");
+		veejay_msg(VEEJAY_MSG_ERROR, "Queue too small to handle all VIMS messages");
 		return -1;
 	}
 	return 0;

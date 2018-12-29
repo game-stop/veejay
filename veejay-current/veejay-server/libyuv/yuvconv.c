@@ -1157,7 +1157,7 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int swsc
 
 	if(!s->sws)
 	{
-		veejay_msg(0,"sws_getContext failed.");
+		veejay_msg(VEEJAY_MSG_DEBUG,"sws_getContext failed");
 		if(s)free(s);
 		return NULL;
 	}	
