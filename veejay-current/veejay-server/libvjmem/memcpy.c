@@ -334,8 +334,6 @@ char	*veejay_strncpy( char *dest, const char *src, size_t n )
 	dest[n] = '\0';
 	if( n < 0xff ) {
 		small_memcpy( dest,src, n );
-	} else if ( n < 512 ) {
-		small_memcpy( dest,src, n );
 	} else {
 		return veejay_memcpy( dest,src, n );
 	}
