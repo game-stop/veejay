@@ -53,8 +53,11 @@ How to activate:
 1. veejay -T 224.0.0.50 -p 5000 -v movie1.avi
 2. veejay -d -W <movie1 width> -H <movie1 height>
 
-3. sayVIMS -h localhost -p 3490 "246:5000 224.0.0.50;"
-4. press F7 to activate newest created stream
+3. echo "246:5000 224.0.0.50;" |sayVIMS
+
+4. enable mcast sender on veejay: echo "022:1;" |sayVIMS -p 5000
+
+4. press F2 to activate newest created stream
 
 
 Veejay can receive OSC (Open Sound Control) messages over Multicast protocol
