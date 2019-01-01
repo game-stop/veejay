@@ -60,8 +60,7 @@ int vj_server_poll(vj_server * vje);
 
 int vj_server_send(vj_server *vje, int link_id, uint8_t *buf, int len);
 
-int vj_server_send_frame(vj_server *vje, int link_id, uint8_t *buf, int total_len, VJFrame *frame, long ms
-		);
+int vj_server_send_frame(vj_server *vje, int link_id, uint8_t *buf, int total_len, VJFrame *frame);
 
 int	vj_server_init(void);
 

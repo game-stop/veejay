@@ -144,7 +144,7 @@ static long stamp_make( mcast_sender *v )
 }
 
 int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,  
-				uint8_t *buf, int total_len, long ms,int port_num, int mode)
+				uint8_t *buf, int total_len, int port_num, int mode)
 {
 	int i;
 	int res = 0;
@@ -153,7 +153,6 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 
 	packet_header_t header = packet_construct_header( 1 );
 	
-	header.timeout = (uint32_t) (ms * 1000);
 	header.usec    = frame_num;
 
 	veejay_memset( chunk, 0,sizeof(chunk));
@@ -161,7 +160,7 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 	//@ If we can send in a single packet:
 	if( total_len <= CHUNK_SIZE )
 	{
-		header.seq_num = 0; header.length = 1;
+		header.seq_num = 0; header.length = 1; header.data_size = total_len;
 		packet_put_padded_data( &header,chunk, buf, total_len);
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
 		if(res <= 0 )
@@ -178,6 +177,8 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 	{
 		const uint8_t *data = buf + (i * CHUNK_SIZE);
 		header.seq_num = i;
+		header.data_size = CHUNK_SIZE;
+
 		packet_put_data( &header, chunk, data );
 
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
@@ -191,9 +192,8 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 	{
 		i = header.length - 1;
 		header.seq_num = i;
-		int bytes_done = packet_put_padded_data( &header, chunk, buf + (i * CHUNK_SIZE), bytes_left );
-
-		veejay_memset( chunk + bytes_done, 0, (PACKET_PAYLOAD_SIZE-bytes_done));
+		header.data_size = packet_put_padded_data( &header, chunk, buf + (i * CHUNK_SIZE), bytes_left );
+		veejay_memset( chunk + header.data_size, 0, (PACKET_PAYLOAD_SIZE-header.data_size));
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
 		if( res <= 0 )
 		{

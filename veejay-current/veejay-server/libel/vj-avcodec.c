@@ -568,8 +568,12 @@ static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, 
 
 		int res = avcodec_encode_video2( ctx, &pkt, frame, &got_packet_ptr);
 
-		if( res == 00 ) {
+		if( res == 0 ) {
 			return pkt.size;
+		}
+
+		if( res == -1) {
+			veejay_msg(0, "Unable to encode frame");
 		}
 
 		return 0;
@@ -626,7 +630,8 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	pict.linesize[0] = stride;
 	pict.linesize[1] = stride2;
 	pict.linesize[2] = stride2;
-
+	pict.width = av->width;
+	pict.height = av->height;
 	return vj_avcodec_encode_video( av->context, buf, buf_len, &pict );
 }
 

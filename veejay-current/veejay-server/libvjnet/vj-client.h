@@ -21,29 +21,17 @@
 
 typedef struct
 {
-	int planes[3];
-	int cur_width;
-	int cur_height;
-	int cur_fmt;
-	int in_width;
-	int in_height;
-	int in_fmt;
-
-	int orig_width;
-	int orig_height;
-	int orig_fmt;
-
 	uint8_t *space;
 	ssize_t space_len;
 	int mcast;
-	void *lzo;
-	unsigned char *blob;
 
 	void	*r;
 	void	*s;
 	
 	void	*fd[2];
-	int		ports[2];
+	int	ports[2];
+
+	void *decoder;
 } vj_client;
 
 int	vj_client_link_can_write(vj_client *v, int s);
@@ -56,8 +44,6 @@ void	vj_client_flush( vj_client *v, int delay );
 
 int	vj_client_poll( vj_client *v, int sock_type );
 
-uint8_t	*vj_client_read_i(vj_client *v, uint8_t *dst, ssize_t *len, int *ret );
-
 int vj_client_read( vj_client *v, int sock_type, uint8_t *dst, int bytes );
 
 int vj_client_read_no_wait( vj_client *v, int sock_type, uint8_t *dst, int bytes );
@@ -68,7 +54,9 @@ int vj_client_send( vj_client *v, int sock_type,unsigned char *buf);
 
 int vj_client_send_buf( vj_client *v, int sock_type,unsigned char *buf, int len);
 
-vj_client *vj_client_alloc(int w , int h, int f);
+vj_client *vj_client_alloc();
+
+vj_client *vj_client_alloc_stream(VJFrame *info);
 
 void	vj_client_free(vj_client *v);
 
@@ -78,14 +66,13 @@ int	vj_client_window_sizes( int socket_fd, int *r, int *s );
 
 int vj_client_connect_dat(vj_client *v, char *host, int port_id  );
 
-int	vj_client_read_mcast_data( vj_client *v, int *compr_len, int *stride1, int *stride2, int *stride3, int *w, int *h, int *fmt, uint8_t *dst, int buflen );
+int	vj_client_read_mcast_data( vj_client *v, int buflen );
 
+int vj_client_read_frame_data( vj_client *v, int datalen);
 
-void vj_client_decompress_frame_data( vj_client *v, uint8_t *dst, int fmt, int w, int h, int compr_len, int stride1, int stride2, int stride3  );
+void vj_client_rescale_video( vj_client *v, uint8_t *data[4] );
 
-int vj_client_read_frame_data( vj_client *v, int compr_len, int stride1,int stride2, int stride3, uint8_t *dst );
-
-int	vj_client_read_frame_header( vj_client *v, int *w, int *h, int *fmt, int *compr_len, int *stride1,int *stride2, int *stride3 );
+int vj_client_read_frame_hdr( vj_client *v );
 
 #endif
 

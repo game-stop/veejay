@@ -30,9 +30,12 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
 #include <libvje/vje.h>
 #include <libvjnet/vj-client.h>
 #include <veejay/vims.h>
+#include <libel/avhelper.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include <libvjnet/cmd.h>
@@ -40,7 +43,6 @@
 #include <libvjnet/mcastsender.h>
 #include <libavutil/pixfmt.h>
 #include <pthread.h>
-#include <liblzo/lzo.h>
 #include <libel/avcommon.h>
 #define VJC_OK 0
 #define VJC_NO_MEM 1
@@ -50,19 +52,31 @@
 
 extern int get_ffmpeg_pixfmt( int p);
 
-vj_client *vj_client_alloc( int w, int h, int f )
+vj_client *vj_client_alloc( )
 {
 	vj_client *v = (vj_client*) vj_calloc(sizeof(vj_client));
 	if(!v)
 	{
 		return NULL;
 	}
-	v->orig_width = w;
-	v->orig_height = h;
-	v->cur_width = w;
-	v->cur_height = h;
-	v->cur_fmt = get_ffmpeg_pixfmt(f);
-	v->orig_fmt = v->cur_fmt;
+	v->decoder = NULL;
+	return v;
+}
+
+vj_client *vj_client_alloc_stream(VJFrame *output) 
+{
+	vj_client *v = (vj_client*) vj_calloc(sizeof(vj_client));
+	if(!v)
+	{
+		return NULL;
+	}
+
+	v->decoder = avhelper_get_mjpeg_decoder(output);
+	if(v->decoder == NULL) {
+		veejay_msg(0,"Failed to initialize MJPEG decoder");
+		free(v);
+		return NULL;
+	}
 	return v;
 }
 
@@ -77,11 +91,13 @@ void		vj_client_free(vj_client *v)
 			sock_t_free( v->fd[1] );
 		}
 
+		if( v->decoder ) {
+			avhelper_close_decoder( v->decoder );
+		}
+
 		v->fd[0] = NULL;
 		v->fd[1] = NULL;
 
-		if(v->lzo)
-			lzo_free(v->lzo);
 		free(v);
 		v = NULL;
 	}
@@ -94,11 +110,11 @@ int	vj_client_window_sizes( int socket_fd, int *r, int *s )
 		veejay_msg(0, "Cannot read socket buffer size: %s", strerror(errno));
 		return 0;
 	} 
-    if( getsockopt( socket_fd, SOL_SOCKET, SO_RCVBUF, (unsigned char*) r, &tmp) == -1 )
-    {
-         veejay_msg(0, "Cannot read socket buffer receive size %s" , strerror(errno));
-         return 0;
-    }
+    	if( getsockopt( socket_fd, SOL_SOCKET, SO_RCVBUF, (unsigned char*) r, &tmp) == -1 )
+    	{
+         	veejay_msg(0, "Cannot read socket buffer receive size %s" , strerror(errno));
+        	 return 0;
+    	}
 	return 1;
 }
 
@@ -214,338 +230,89 @@ int	vj_client_poll( vj_client *v, int sock_type )
 	return sock_t_poll( v->fd[sock_type ]);
 }
 
-static	long	vj_client_decompress( vj_client *t,uint8_t *in, uint8_t *out, int data_len, int Y, int UV , int header_len,
-		uint32_t s1, uint32_t s2, uint32_t s3)
-{
-	uint8_t *dst[3] = {
-			out,
-			out + Y,
-			out + Y + UV };
+void vj_client_rescale_video( vj_client *v, uint8_t *data[4] ) {
+	
+	if(v->decoder == NULL) {
+		veejay_msg(0, "No decoder initialized");
+		return;
+	}
 
-
-	long total = lzo_decompress( t->lzo, in, data_len, dst, UV,s1,s2,s3 );
-	if( total != (Y+UV+UV) )
-		veejay_msg(0, "Error decompressing: expected %d bytes got %d", (Y+UV+UV),total);
-
-	return total;
+	avhelper_rescale_video( v->decoder, data );		
 }
 
-/* packet negotation.
- * read a small portion (44 bytes for veejay, its veejay's full header size) 
- * and try to identify which software is sending frames
- *
- */
-#define FRAMEINFO_LENGTH 44
-static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
-{
-	uint8_t line[64];
-	veejay_memset( line,0, sizeof(line));
-
-	int	plen = sock_t_recv( v->fd[0], line, FRAMEINFO_LENGTH );
-
-	if( plen == 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection");
-		return 0;
-	}
-
-	if( plen < 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Error while reading header: %s", strerror(errno));
-		return 0;
-	}
-
-	if( plen != FRAMEINFO_LENGTH ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame header, only got %d bytes", plen );
-		return 0;
-	}
-
-	int n = sscanf( (char*) line, "%04d%04d%04d%08d%08d%08d%08d", 
-			&tokens[0],
-			&tokens[1],
-			&tokens[2],
-			
-			&tokens[3],
-			&tokens[4],
-			&tokens[5],
-			&tokens[6]);
-
-	if( n != 7 ) {
-		veejay_msg(0, "Unable to parse header data: '%s'", line );
-		return 0;
-	}
-
-	if( tokens[3] > 0  ) {
-		if( v->lzo == NULL ) {
-			v->lzo = lzo_new();
-		}
-	}
-
-	return 1;
-}
-
-int	vj_client_read_frame_header( vj_client *v, int *w, int *h, int *fmt, int *compr_len, int *stride1,int *stride2, int *stride3 )
-{
-	int	tokens[16];
-	veejay_memset( tokens,0,sizeof(tokens));
-
-	int result = vj_client_packet_negotiate( v, tokens );
-	if( result == 0 ) { 
-		return 0;
-	}
-
-	if( tokens[0] <= 0 || tokens[1] <= 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Frame packet does not contain any data" );
-		return 0;
-	}
-
-	*w = tokens[0];
-	*h = tokens[1];
-	*fmt=tokens[2];
-	*compr_len=tokens[3];
-	*stride1=tokens[4];
-	*stride2=tokens[5];
-	*stride3=tokens[6];
-	v->in_width = *w;
-	v->in_height = *h;
-	v->in_fmt = *fmt;
-
-	return 1;
-}
-
-int	vj_client_read_mcast_data( vj_client *v, int *compr_len, int *stride1, int *stride2, int *stride3, int *w, int *h, int *fmt, uint8_t *dst, int buflen )
+int	vj_client_read_mcast_data( vj_client *v, int max_len )
 {
 	if( v->space == NULL ) {
-		v->space = vj_calloc( sizeof(uint8_t) * RUP8( buflen ));
+		v->space = vj_calloc( sizeof(uint8_t) * RUP8( max_len ));
 		if(v->space == NULL)
 			return 0;
+	}
+
+	if( v->decoder == NULL ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "MJPEG decoder is not initialized");
+		return 0;
 	}
 
 	int space_len = 0;
 	int hdr_len = 0;
 	uint8_t *space = mcast_recv_frame( v->r, &space_len, &hdr_len, v->space );
-	if( space == NULL ) {
-		free(v->space);
+
+	if( space_len <= 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Nothing received from network");
 		return 0;
 	}
 
-	int n_tokens = sscanf( (char*) v->space, "%04d%04d%04d%08d%08d%08d%08d",w,h,fmt,compr_len,stride1,stride2,stride3 );
-	if( n_tokens != 7 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Frame header error in mcast frame, only parsed %d tokens", n_tokens );
-		free(v->space);
-		return 0;
-	}
-
-	v->in_width = *w;
-	v->in_height = *h;
-	v->in_fmt = *fmt;
-
-	return 1;
+	return avhelper_decode_video( v->decoder, space, space_len );
 }
 
-int vj_client_read_frame_data( vj_client *v, int compr_len, int stride1,int stride2, int stride3, uint8_t *dst )
+int vj_client_read_frame_hdr( vj_client *v )
 {
-	int datalen = (compr_len > 0 ? compr_len : stride1+stride2+stride3);
-	if( (compr_len > 0) && ( v->space == NULL || v->space_len < compr_len) ) {
-		if( v->space ) {
-			free(v->space);
-			v->space = NULL;
+	char header[16];
+	memset(header,0,sizeof(header));
+	int n = sock_t_recv( v->fd[0], header, 10 );
+	if( n <= 0 ) {
+		if( n == -1 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
+		} else {
+			veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
 		}
-		v->space_len = RUP8( compr_len );
-		v->space = vj_calloc(sizeof(uint8_t) * v->space_len );
-		if(!v->space) {
-			veejay_msg(0,"Could not allocate memory for network stream");
-			return 0;
-		}
+		return n;
 	}
-
-	if( compr_len > 0 )  {
-		int n = sock_t_recv( v->fd[0],v->space,datalen );
-		
-		if( n <= 0 ) {
-			if( n == -1 ) {
-				veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
-			} else {
-				veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
-			}
-			return 0;
-		}
-
-		if( n != compr_len && n > 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, compr_len );	
-			return 0;
-		}
-		return 2;
-	}
-	else {
-		int n = sock_t_recv( v->fd[0], dst, datalen );
-		
-		if( n != (stride1 + stride2 + stride3)  )
-		{
-			return 0;
-		}
-
-		return 1;
-	}
-	return 0;
-}
-
-void vj_client_decompress_frame_data( vj_client *v, uint8_t *dst, int fmt, int w, int h, int compr_len, int stride1, int stride2, int stride3  )
-{
-	int y_len = w * h;
-	int uv_len = 0;
-	switch(fmt) //@ veejay is sending compressed YUV data, calculate UV size
-	{
-		case PIX_FMT_YUV422P:
-		case PIX_FMT_YUVJ422P:
-		case PIX_FMT_YUVA422P:
-			uv_len = y_len / 2; 
-			break;
-		case PIX_FMT_YUV420P:
-		case PIX_FMT_YUVJ420P:
-		case PIX_FMT_YUVA420P:
-			uv_len = y_len / 4;
-			break;
-		default:
-			uv_len = y_len;
-			break;
-	}
-
-	uint8_t *addr = v->space;
-
-	if( v->mcast ) 
-			addr = v->space + FRAMEINFO_LENGTH;
-
-	vj_client_decompress( v, addr, dst, compr_len, y_len, uv_len ,0, stride1,stride2,stride3);
-}
-
-uint8_t *vj_client_read_i( vj_client *v, uint8_t *dst, ssize_t *dstlen, int *ret )
-{
-	uint32_t p[4] = {0, 0,0,0 };
-	uint32_t strides[4] = { 0,0,0,0 };
-
-	int	tokens[16];
-
-	int y_len = 0;
-	int uv_len = 0;
 	
-	memset( tokens,0,sizeof(tokens));
+	int data_len = 0;
+	if( n != 10 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Bad header");
+		return -1;
+	}
+
+	if(sscanf(header, "F%08dD", &data_len ) != 1 ) {
+		veejay_msg(VEEJAY_MSG_ERROR,"Expected header information");
+		return -1;
+	}
 	
-	int result = vj_client_packet_negotiate( v, tokens );
-	if( result == 0 ) { 
-		*ret = -1;
-		return dst;
-	}
-	p[0] = tokens[0]; //w
-	p[1] = tokens[1]; //h
-	p[2] = tokens[2]; //fmt
-	p[3] = tokens[3]; //compr len
-	strides[0] = tokens[4]; // 0
-	strides[1] = tokens[5]; // 1
-	strides[2] = tokens[6]; // 2
-	v->in_width = p[0];
-	v->in_height = p[1];
-	v->in_fmt = p[2];
-	if( p[0] <= 0 || p[1] <= 0 ) {
-		veejay_msg(0, "Invalid values in network frame header");
-		*ret = -1;
-		return dst;
-	}
-
-	if( v->space == NULL || v->space_len < p[3] ) {
-		if( v->space ) {
-			free(v->space);
-			v->space = NULL;
-		}
-		v->space_len = RUP8( p[3] );
-		v->space = vj_calloc(sizeof(uint8_t) * v->space_len );
-		if(!v->space) {
-			veejay_msg(0,"Could not allocate memory for network stream");
-			*ret = -1;
-			return dst;
-		}
-	}
-		
-	uv_len = 0;
-	y_len = p[0] * p[1];
-
-	if( p[3] > 0 )  {
-		switch(v->in_fmt ) //@ veejay is sending compressed YUV data, calculate UV size
-		{
-			case PIX_FMT_YUV422P:
-			case PIX_FMT_YUVJ422P:
-				uv_len = y_len / 2; 
-				break;
-			case PIX_FMT_YUV420P:
-			case PIX_FMT_YUVJ420P:
-				uv_len = y_len / 4;break;
-			default:
-				uv_len = y_len;
-				veejay_msg(VEEJAY_MSG_ERROR, "Unknown pixel format: %02x", v->in_fmt);
-				*ret = -1;
-				return dst;
-				break;
-		}
-		int n = sock_t_recv( v->fd[0],v->space,p[3] );
-		if( n <= 0 ) {
-			if( n == -1 ) {
-				veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
-			} else {
-				veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
-			}
-			*ret = -1;
-			return dst;
-		}
-
-		if( n != p[3] && n > 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, p[3] );	
-			*ret = -1;
-			return dst;
-		}
-
-
-		if( *dstlen < (y_len*3) || dst == NULL ) {
-			dst = realloc( dst, RUP8( y_len * 3) );
-			*dstlen = y_len  * 3;
-		} 
-
-		//@ decompress YUV buffer
-		vj_client_decompress( v, v->space, dst, p[3], y_len, uv_len , 0, strides[0],strides[1],strides[2]);
-		
-		if( v->in_fmt == v->cur_fmt && v->cur_width == p[0] && v->cur_height == p[1] ) {
-			*ret = 1;
-		  	return dst;	
-		}
-
-
-		*ret = 2;
-		return dst; //@ caller will scale frame in dst
-	} else {
-			
-		if( *dstlen < (strides[0] + strides[1] + strides[2]) || dst == NULL ) {
-			dst = realloc( dst, RUP8( strides[0]+strides[1]+strides[2]) );
-			*dstlen = strides[0] + strides[1] + strides[2];
-		}
-
-		int n = sock_t_recv( v->fd[0], dst, strides[0] + strides[1] + strides[2] );
-		if( n !=  (strides[0] + strides[1] + strides[2] ) )
-		{
-			*ret = -1;
-			return dst;
-		}
-
-		if( v->in_fmt == v->cur_fmt && v->cur_width == p[0] && v->cur_height == p[1] ) {
-			*ret = 1;
-			return dst;
-		}
-
-		*ret = 2;
-		return dst;
-	}
-	return dst;
+	return data_len;
 }
 
+int vj_client_read_frame_data( vj_client *v, int datalen)
+{
+	if(v->space_len < datalen || v->space == NULL) {
+		v->space_len = RUP8(datalen);
+		v->space = (uint8_t*) realloc( v->space, v->space_len );
+	}	
+
+	int n = sock_t_recv( v->fd[0],v->space,datalen );
+		
+	if( n <= 0 ) {
+		if( n == -1 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
+		} else {
+			veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
+		}
+		return n;
+	}
+
+	return avhelper_decode_video( v->decoder, v->space, n );
+}
 
 int	vj_client_read_no_wait(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
@@ -616,6 +383,7 @@ void vj_client_close( vj_client *v )
 			v->fd[1] = NULL;
 		}
 	}
+
 }
 
 int	vj_client_test(char *host, int port)

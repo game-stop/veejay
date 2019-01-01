@@ -69,7 +69,6 @@
 #ifndef X_DISPLAY_MISSING
 #include <veejay/x11misc.h>
 #endif
-#include <libvjnet/vj-client.h>
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
 #endif
@@ -85,6 +84,7 @@
 #include <libel/vj-avcodec.h>
 #include <libel/pixbuf.h>
 #include <libel/avcommon.h>
+#include <libvjnet/vj-client.h>
 #ifdef HAVE_JACK
 #include <veejay/vj-jack.h>
 #endif
@@ -887,7 +887,6 @@ static int veejay_screen_update(veejay_t * info )
 	if( info->settings->unicast_frame_sender )
 	{
 		vj_perform_send_primary_frame_s2(info, 0, info->uc->current_link );
-		vj_perform_done_s2(info);
 	}
 
 	if( info->settings->mcast_frame_sender && info->settings->use_vims_mcast )
@@ -1782,6 +1781,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	                   info->video_output_height);
 
 	int full_range = veejay_set_yuv_range( info );
+	yuv_set_pixel_range(full_range);
 
 	info->settings->sample_mode = SSM_422_444;
 
@@ -3739,6 +3739,8 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	info->effect_frame1->fps = info->settings->output_fps;
 	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame2->fps = info->settings->output_fps;
+
+	veejay_msg(VEEJAY_MSG_DEBUG,"Performer is working in %s (%d)", yuv_get_pixfmt_description(info->effect_frame1->format), info->effect_frame1->format);
 
 	if(num_files == 0)
 	{

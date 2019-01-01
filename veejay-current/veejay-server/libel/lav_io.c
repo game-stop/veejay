@@ -100,7 +100,7 @@ void set_fourcc(lav_file_t *lav_file, char *fourcc)
 		fourcc_lc[i] = tolower(fourcc[i]);
 	}
 	fourcc_lc[4] = 0;
-	char *ptr = &fourcc_lc;
+	char *ptr = fourcc_lc;
 
 	/* hash the string */
 	int hash = 5381;

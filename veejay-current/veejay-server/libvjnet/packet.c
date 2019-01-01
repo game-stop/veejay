@@ -26,8 +26,8 @@
 
 void		packet_dump_header( packet_header_t *h)
 {
-	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %d/%d, Timestamp %ld Timeout : %d",
-		h->seq_num,h->length, h->usec,h->timeout );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %d/%d, Timestamp %ld DattaSize : %d",
+		h->seq_num,h->length, h->usec,h->data_size );
 }
 
 packet_header_t		packet_construct_header(uint8_t flag)
@@ -37,20 +37,9 @@ packet_header_t		packet_construct_header(uint8_t flag)
 	packet_header_t header;
 	header.seq_num = 0;
 	header.usec = tv.tv_usec;
-	header.timeout = 0;
 	header.length = 0;
+	header.data_size = 0;
 	return header;
-}
-
-packet_header_t		packet_get_header(const void *data)
-{
-	packet_header_t h,tmp;
-	veejay_memcpy( &tmp, data, PACKET_HEADER_LENGTH );
-	h.seq_num = tmp.seq_num;
-	h.length = tmp.length;
-	h.usec = tmp.usec;
-	h.timeout = tmp.timeout;
-	return h;
 }
 
 packet_header_t  *packet_get_hdr(const void *data)

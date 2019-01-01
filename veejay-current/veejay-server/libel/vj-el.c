@@ -892,8 +892,10 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 			break;			
 		default:
 
-			return avhelper_decode_video( el->ctx[ N_EL_FILE(n) ], data, res, dst );
-
+			if( avhelper_decode_video( el->ctx[ N_EL_FILE(n) ], data, res ) ) {
+				avhelper_rescale_video( el->ctx[N_EL_FILE(n) ], dst );
+				return 1;
+			}
 			break;
 	}
 

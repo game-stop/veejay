@@ -2502,7 +2502,7 @@ int vj_tag_enable(int t1) {
     }
     if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
     {
-        if(!net_thread_start(tag, vj_tag_input->width , vj_tag_input->height,  vj_tag_input->pix_fmt))
+        if(!net_thread_start(tag, _tag_info->effect_frame1))
         {
             veejay_msg(VEEJAY_MSG_ERROR,
                     "Unable to start thread");
@@ -3633,7 +3633,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 #endif
     case VJ_TAG_TYPE_MCAST:
     case VJ_TAG_TYPE_NET:
-        if(!net_thread_get_frame( tag,buffer ))
+        if(!net_thread_get_frame( tag,dst ))
             return 0;
         return 1;
         break;

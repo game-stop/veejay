@@ -55,8 +55,6 @@ How to activate:
 
 3. echo "246:5000 224.0.0.50;" |sayVIMS
 
-4. enable mcast sender on veejay: echo "022:1;" |sayVIMS -p 5000
-
 4. press F2 to activate newest created stream
 
 

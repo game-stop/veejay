@@ -29,9 +29,10 @@ int vj_to_pixfmt(int fmt);
 int pixfmt_to_vj(int pixfmt);
 int pixfmt_is_full_range(int pixfmt);
 int vj_is_full_range(int fmt);
-
-int			yuv_to_alpha_fmt(int fmt);
-
+const char *yuv_get_pixfmt_description(int fmt);
+int yuv_to_alpha_fmt(int fmt);
+int alpha_fmt_to_yuv(int fmt);
+void  yuv_set_pixel_range(int full_range);
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);
 // yuv 4:2:2 packet to yuv 4:2:2 planar

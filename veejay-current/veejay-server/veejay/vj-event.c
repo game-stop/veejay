@@ -9163,8 +9163,9 @@ void    vj_event_mcast_start                (   void *ptr,  const char format[],
     char s[255];    
     P_A( args,sizeof(args), s ,sizeof(s), format, ap);
 
-    if(!v->settings->use_vims_mcast)
+    if(!v->settings->use_vims_mcast) {
         veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -T commandline option)"); 
+    }
     else
     {
         v->settings->mcast_frame_sender = 1;

@@ -102,7 +102,6 @@ static long performer_frame_size_ = 0;
 extern uint8_t pixel_Y_lo_;
 
 static varcache_t pvar_;
-static void	*lzo_;
 static VJFrame *crop_frame = NULL;
 static VJFrame *rgba_frame[2] = { NULL };
 static VJFrame *yuva_frame[2] = { NULL };
@@ -113,6 +112,7 @@ static ycbcr_frame **primary_buffer = NULL;	/* normal */
 static ycbcr_frame *preview_buffer = NULL;
 static int preview_max_w;
 static int preview_max_h;
+static void *encoder_ = NULL;
 
 #define CACHE_TOP 0
 #define CACHE 1
@@ -138,7 +138,6 @@ static void *rgba2yuv_scaler = NULL;
 static void *yuv2rgba_scaler = NULL;
 static uint8_t *pribuf_area = NULL;
 static size_t pribuf_len = 0;
-static uint8_t *socket_buffer = NULL;
 static uint8_t *fx_chain_buffer = NULL;
 static	size_t fx_chain_buflen = 0;
 static ycbcr_frame *record_buffer = NULL;	// needed for recording invisible streams
@@ -1033,9 +1032,6 @@ void vj_perform_free(veejay_t * info)
 
     sample_record_free();
 
-	if( socket_buffer ) 
-		free( socket_buffer );
-
     if(info->edit_list->has_audio)
 	    vj_perform_close_audio();
 
@@ -1103,14 +1099,13 @@ void vj_perform_free(veejay_t * info)
 		free(pribuf_area);
 	}
 
-	if(lzo_)
-		lzo_free(lzo_);
-
 	yuv_free_swscaler( rgba2yuv_scaler );
 	yuv_free_swscaler( yuv2rgba_scaler );
 
 	free(rgba_frame[0]);
 	free(rgba_frame[1]);
+
+	vj_avcodec_stop(encoder_,0);
 }
 
 int vj_perform_preview_max_width() {
@@ -1220,125 +1215,26 @@ static void long2str(uint8_t *dst, uint32_t n)
    dst[3] = (n>>24)&0xff;
 }
 
-static	uint32_t	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_t *p1_len, uint32_t *p2_len, uint32_t *p3_len, VJFrame *frame)
-{
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
-	uint8_t *dstI = dst + 16;
-
-	if(lzo_ == NULL ) {
-		lzo_ = lzo_new();
-		if( lzo_ == NULL ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize lzo encoder :(");
-			return 0;
-		}
-	}
-
-	int i = lzo_compress( lzo_ , frame->data[0], dstI, p1_len, len );
-	if( i == 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress Y plane");
-		return 0;
-	}
-	uint32_t size1 = ( *p1_len );
-	dstI = dst + 16 + (sizeof(uint8_t) * size1 );
-	
-	i = lzo_compress( lzo_, frame->data[1], dstI, p2_len, uv_len );
-	if( i == 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress U plane");
-		return 0;
-	}
-
-	uint32_t size2 = ( *p2_len );
-	dstI = dst + 16 + size1 + size2;
-
-	i = lzo_compress( lzo_, frame->data[2], dstI, p3_len, uv_len );
-	if( i == 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress V plane");
-		return 0;
-	}	
-
-	uint32_t size3 = ( *p3_len );
-
-	long2str( dst,size1);
-	long2str( dst+4, size2 );
-	long2str( dst+8, size3 );
-	long2str( dst+12,info->settings->mcast_mode );
-
-	return 1;
-}
-
-void	vj_perform_done_s2( veejay_t *info ) {
-
-	info->settings->unicast_frame_sender = 0;
-}
-
+static long stream_pts_ = 0;
 static int vj_perform_compress_primary_frame_s2(veejay_t *info,VJFrame *frame )
 {
-	char info_line[64];
-	int data_len = 44;
-	int sp_w = frame->width;
-	int sp_h = frame->height;
-	int sp_uvlen = frame->uv_len;
-	int sp_len = frame->len;
-	int sp_format = frame->format;
-	uint32_t planes[4] = { 0 };
-
-	if(socket_buffer == NULL ) {
-		socket_buffer = vj_malloc(RUP8(data_len + (frame->len * 4 )));
-		if(socket_buffer == NULL) {
+	if( encoder_ == NULL ) {
+		encoder_ = vj_avcodec_start(info->effect_frame1, ENCODER_MJPEG, NULL);
+		if(encoder_ == NULL) {
 			return 0;
 		}
 	}
-	veejay_memset(info_line, 0, sizeof(info_line) );
-	uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * data_len );
 
-	int compr_ok = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2], frame);
-	int total = planes[0] + planes[1] + planes[2] + 16;
-	if( compr_ok == 0 ) {
-		planes[0] = sp_len;
-		planes[1] = sp_uvlen;
-		planes[2] = planes[1];
-		total = 0;
-	}
-	
-	/* peer to peer connection */
-	sprintf(info_line,
-		"%04d%04d%04d%08d%08d%08d%08d", 
-		sp_w,
-		sp_h,
-		sp_format,
-		total,
-		planes[0],
-		planes[1],
-		planes[2] );
-
-	veejay_memcpy( socket_buffer, info_line, data_len );
-
-	if( compr_ok == 0 )
-	{
-		if(!info->splitter) {
-			veejay_memcpy( socket_buffer + data_len , frame->data[0], sp_len);
-			veejay_memcpy( socket_buffer + data_len + sp_len,frame->data[1], sp_uvlen );
-			veejay_memcpy( socket_buffer + data_len + sp_len + sp_uvlen,frame->data[2],sp_uvlen );
-		}
-		else
-		{
-			veejay_memcpy( socket_buffer + data_len, frame->data[0], sp_len + sp_uvlen + sp_uvlen);
-		}	
-		data_len += 16 + sp_len + sp_uvlen + sp_uvlen; // 16 is compression data header
-			
-	} 
-	else {
-		data_len += total;
-	}
-	
-	return data_len;
+ 	return vj_avcodec_encode_frame(encoder_,
+			stream_pts_ ++,
+			ENCODER_MJPEG,
+	                frame->data, 
+			vj_avcodec_get_buf(encoder_), 
+			8 * 16 * 65535, 
+			frame->format);
 }
 
-int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_link_id)
+void	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_link_id)
 {
 	int i;
 	
@@ -1355,8 +1251,10 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 
 				VJFrame *frame = vj_split_get_screen( info->splitter, screen_id );
 				int data_len = vj_perform_compress_primary_frame_s2( info, frame );
+				if(data_len <= 0)
+					continue;
 
-				if( vj_server_send_frame( info->vjs[3], link_id, socket_buffer,data_len, frame, info->real_fps ) <= 0 ) {
+				if( vj_server_send_frame( info->vjs[3], link_id, vj_avcodec_get_buf(encoder_),data_len, frame ) <= 0 ) {
 					_vj_server_del_client( info->vjs[3], link_id );
 				}
 
@@ -1364,6 +1262,8 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 				info->splitted_screens[i] = -1;
 			}
 		}
+
+		info->settings->unicast_frame_sender = 0;
 	}
 	else {
 		VJFrame fxframe;
@@ -1371,6 +1271,9 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 		vj_copy_frame_holder(info->effect_frame1, primary_buffer[info->out_buf], &fxframe);
 
 		int	data_len = vj_perform_compress_primary_frame_s2( info,&fxframe );
+		if( data_len <= 0) {
+			return;
+		}
 
 		int id = (mcast ? 2: 3);
 
@@ -1378,24 +1281,24 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 		{
 			for( i = 0; i < VJ_MAX_CONNECTIONS; i++ ) {
 				if( info->rlinks[i] != -1 ) {
-					if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, data_len, &fxframe, info->real_fps )<=0)
+					if(vj_server_send_frame( info->vjs[id], info->rlinks[i], vj_avcodec_get_buf(encoder_), data_len, &fxframe )<=0)
 					{
 							_vj_server_del_client( info->vjs[id], info->rlinks[i] );
 					}
 					info->rlinks[i] = -1;
 				}	
 			}
+
+			info->settings->unicast_frame_sender = 0;
 		}
 		else
 		{		
-			if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, data_len, &fxframe, info->real_fps )<=0)
+			if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, vj_avcodec_get_buf(encoder_), data_len, &fxframe )<=0)
 			{
 				veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame");
 			}
 		}
 	}
-
-	return 1;
 }
 
 void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, int h )

@@ -19,8 +19,6 @@ int vj_perform_init_audio(veejay_t * info);
 
 void vj_perform_free(veejay_t *info);
 
-void	vj_perform_done_s2( veejay_t *info );
-
 int vj_perform_audio_start(veejay_t * info);
 
 void vj_perform_audio_status(struct timeval tmpstmp, unsigned int nb_out,
@@ -56,7 +54,7 @@ void	vj_perform_randomize(veejay_t *info);
 
 void       vj_perform_free_plugin_frame(VJFrameInfo *f );
 
-int        vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int dst_link);
+void       vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int dst_link);
 void       vj_perform_get_backstore( uint8_t **frame );
 int        vj_perform_get_sampling();
 

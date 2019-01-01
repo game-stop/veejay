@@ -2638,8 +2638,8 @@ void		vj_init_vevo_events(void)
 				vj_event_mcast_start,
 				1,
 				VIMS_ALLOW_ANY,
-				"0=Color,1=Grayscale (default)",
-				1,
+				"(unused)",
+				0,
 				NULL );
 	index_map_[VIMS_VIDEO_MCAST_STOP]		=	_new_event(
 				NULL,

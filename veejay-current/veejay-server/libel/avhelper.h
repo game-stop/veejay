@@ -38,12 +38,22 @@ void	*avhelper_get_codec( void *ptr );
 
 void	avhelper_close_decoder( void *ptr );
 
-int	avhelper_decode_video( void *ptr, uint8_t *data, int len, uint8_t *dst[3] );
+int	avhelper_decode_video( void *ptr, uint8_t *data, int len);
+
+void	avhelper_rescale_video(void *ptr, uint8_t *dst[4]);
 
 void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height );
+
+VJFrame	*avhelper_get_decoded_video(void *ptr);
 
 void	avhelper_free_context(AVCodecContext **avctx);
 
 void	avhelper_frame_unref(AVFrame *ptr);
+
+void	*avhelper_get_mjpeg_decoder(VJFrame *output_info);
+
+VJFrame	*avhelper_get_input_frame( void *ptr );
+
+VJFrame *avhelper_get_output_frame( void *ptr);
 
 #endif

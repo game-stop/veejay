@@ -31,7 +31,7 @@ typedef struct
 mcast_sender *mcast_new_sender( const char *group_name );
 void mcast_set_interface( mcast_sender *s, const char *interface );
 int	mcast_send( mcast_sender *s, const void *buf, int len, int port_num );
-int	mcast_send_frame( mcast_sender *s, const VJFrame *frame , uint8_t *buf, int total_len,long ms, int port_num ,int mode);
+int	mcast_send_frame( mcast_sender *s, const VJFrame *frame , uint8_t *buf, int total_len, int port_num ,int mode);
 void mcast_close_sender(mcast_sender *s );
 int	mcast_sender_set_peer( mcast_sender *v, const char *hostname );
 #endif

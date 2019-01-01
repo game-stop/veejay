@@ -190,10 +190,11 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 	int res = recv(v->sock_fd, chunk, PACKET_PAYLOAD_SIZE, 0 );
 	if( res <= 0 ) {
 		if(res == - 1)
-        	veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
+        		veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
 		
-        return 0;
-    }
+        	return res;
+    	}
+
 	if( res != PACKET_PAYLOAD_SIZE ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Multicast receive error, expected %d bytes got %d bytes",
 				PACKET_PAYLOAD_SIZE, res );
@@ -312,7 +313,8 @@ uint8_t *mcast_recv_frame( mcast_receiver *v, int *len, int *hdrlen, uint8_t *re
 	//@ return newest full frame
 	if( full_frame ) {
 		packet_buffer_t *pb = q->slot[d_slot];
-		*len = pb->len;
+		// we can calculate the size of the data directly
+		*len = (pb->hdr.length * CHUNK_SIZE) + pb->hdr.data_size;
 		*hdrlen = 0;
 		return q->buf;
 	}

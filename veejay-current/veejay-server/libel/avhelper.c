@@ -159,13 +159,18 @@ static int		avhelper_build_table()
 
 int	avhelper_get_codec_by_key( int key )
 {
+#ifdef ARCH_X86_64
+	int64_t k = (int64_t) key;
+#else
+	int k = key;
+#endif
 	if( fourccTable == NULL ) {
 		/* lets initialize the hash of fourcc/codec_id pairs now */
 		if(avhelper_build_table() != 0)
 			return -1;
 	}
 	
-	hnode_t *node = hash_lookup( fourccTable,(const void*) key);
+	hnode_t *node = hash_lookup( fourccTable,(const void*) k);
 	fourcc_node *fourcc = hnode_get(node);
 	if(fourcc) {
 		return fourcc->codec_id;
@@ -221,6 +226,37 @@ static void avhelper_close_input_file( AVFormatContext *s ) {
 #else
 	av_close_input_file(s);
 #endif
+}
+
+void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
+	el_decoder_t *x = (el_decoder_t*) vj_calloc( sizeof( el_decoder_t ));
+	if(!x) {
+		return NULL;
+	}
+
+	x->codec = avcodec_find_decoder( CODEC_ID_MJPEG );
+	if(x->codec == NULL) {
+		veejay_msg(0,"Unable to find MJPEG decoder");
+		return NULL;
+	}
+
+#if LIBAVCODEC_BUILD > 5400
+	x->codec_ctx = avcodec_alloc_context3(x->codec);
+	if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
+#else
+	x->codec_ctx = avcodec_alloc_context();
+	if ( avcodec_open( x->codec_ctx, x->codec ) < 0 ) 
+#endif
+	{
+		free(x);
+		return NULL;
+	}
+
+	x->frame = avhelper_alloc_frame();
+
+	x->output = yuv_yuv_template( NULL,NULL,NULL, output->width, output->height, alpha_fmt_to_yuv(output->format) );
+
+	return (void*) x;
 }
 
 void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height ) {
@@ -366,24 +402,6 @@ further:
 	x->frame = avhelper_alloc_frame();
 	x->input = yuv_yuv_template( NULL,NULL,NULL, x->codec_ctx->width,x->codec_ctx->height, x->pixfmt );
 
-	sws_template sws_tem;
-    veejay_memset(&sws_tem, 0,sizeof(sws_template));
-    sws_tem.flags = yuv_which_scaler();
-    x->scaler = yuv_init_swscaler( x->input,x->output, &sws_tem, yuv_sws_get_cpu_flags());
-	
-	if( x->scaler == NULL ) {
-		veejay_msg(VEEJAY_MSG_ERROR,"FFmpeg: Failed to get scaler context for %dx%d in %d to %dx%d in %d",
-				x->codec_ctx->width,x->codec_ctx->height, x->pixfmt,
-				wid,hei,dst_pixfmt);
-		av_free(f);
-		avcodec_close( x->codec_ctx );
-		avhelper_close_input_file( x->avformat_ctx );
-		free(x->output);
-		free(x->input);
-		free(x);
-		return NULL;
-	}
-	
 	return (void*) x;
 }
 
@@ -404,8 +422,12 @@ void	avhelper_close_decoder( void *ptr )
 {
 	el_decoder_t *e = (el_decoder_t*) ptr;
 	avcodec_close( e->codec_ctx );
-	avhelper_close_input_file( e->avformat_ctx );
-	yuv_free_swscaler( e->scaler );
+	if(e->avformat_ctx) {
+		avhelper_close_input_file( e->avformat_ctx );
+	}
+	if(e->scaler) {
+		yuv_free_swscaler( e->scaler );
+	}
 	if(e->input)
 		free(e->input);
 	if(e->output)
@@ -415,17 +437,72 @@ void	avhelper_close_decoder( void *ptr )
 	free(e);
 }
 
-int	avhelper_decode_video( void *ptr, uint8_t *data, int len, uint8_t *dst[3] ) 
+VJFrame	*avhelper_get_input_frame( void *ptr )
+{
+	el_decoder_t *e = (el_decoder_t*) ptr;
+	return e->input;
+}
+
+VJFrame *avhelper_get_output_frame( void *ptr)
+{
+	el_decoder_t *e = (el_decoder_t*) ptr;
+	return e->output;
+}
+
+
+int	avhelper_decode_video( void *ptr, uint8_t *data, int len ) 
 {
 	int got_picture = 0;
 	el_decoder_t * e = (el_decoder_t*) ptr;
 
 	int result = avcodec_decode_video( e->codec_ctx, e->frame, &got_picture, data, len );
 
+	avhelper_frame_unref(e->frame);
+	
 	if(!got_picture || result <= 0) {
-		avhelper_frame_unref( e->frame );
 		return 0;
 	}
+	return 1;
+}
+
+VJFrame	*avhelper_get_decoded_video(void *ptr) {
+	el_decoder_t * e = (el_decoder_t*) ptr;
+
+	if(e->input == NULL) {
+		e->input = yuv_yuv_template( NULL,NULL,NULL, e->codec_ctx->width,e->codec_ctx->height, e->codec_ctx->pix_fmt );
+	}
+	
+	e->input->data[0] = e->frame->data[0];
+	e->input->data[1] = e->frame->data[1];
+	e->input->data[2] = e->frame->data[2];
+	e->input->data[3] = e->frame->data[3];
+
+	return e->input;
+}
+
+void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
+{
+	el_decoder_t * e = (el_decoder_t*) ptr;
+
+	if(e->input == NULL) {
+		e->input = yuv_yuv_template( NULL,NULL,NULL, e->codec_ctx->width,e->codec_ctx->height, e->codec_ctx->pix_fmt );
+	}
+
+	if(e->scaler == NULL ) {
+		sws_template sws_tem;
+  		veejay_memset(&sws_tem, 0,sizeof(sws_template));
+    		sws_tem.flags = yuv_which_scaler();
+    		e->scaler = yuv_init_swscaler( e->input,e->output, &sws_tem, yuv_sws_get_cpu_flags());
+		if(e->scaler == NULL) {
+			free(e->input);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Unable to initialize scaler context for [%d,%d, @%d %p,%p,%p ] -> [%d,%d, @%d, %p,%p,%p ]",
+				e->input->width,e->input->height,e->input->format,e->input->data[0],e->input->data[1],e->input->data[2],
+				e->output->width,e->output->height,e->output->format,e->output->data[0],e->output->data[1],e->output->data[2]);
+			
+			return;
+		}
+	}
+
 
 	e->input->data[0] = e->frame->data[0];
 	e->input->data[1] = e->frame->data[1];
@@ -438,7 +515,4 @@ int	avhelper_decode_video( void *ptr, uint8_t *data, int len, uint8_t *dst[3] )
 
 	yuv_convert_any3( e->scaler, e->input, e->frame->linesize, e->output, e->input->format, e->pixfmt );
 
-	avhelper_frame_unref( e->frame );
-
-	return 1;
 }

@@ -63,6 +63,7 @@ typedef struct
 } vj_sws;
 
 static	int		    sws_context_flags_ = 0;
+static	int		    full_range_pixel_value_ = 0;
 static  int		    ffmpeg_aclib[AV_PIX_FMT_NB];
 
 #define	put(a,b)	ffmpeg_aclib[a] = b
@@ -92,11 +93,18 @@ static struct {
 {	PIX_FMT_BGRA,		"PIX_FMT_BGRA"},
 {	PIX_FMT_ARGB,		"PIX_FMT_ARGB"},
 {	PIX_FMT_ABGR,		"PIX_FMT_ABGR"},
-{	PIX_FMT_YUVA422P,	"PIX_FMT_YUVA422P"},
-{	PIX_FMT_YUVA444P,	"PIX_FMT_YUVA444P"},
 {	0	,		NULL}
-
 };
+
+
+const char	*yuv_get_pixfmt_description(int fmt)
+{
+	int i;
+	for( i = 0; pixstr[i].s != NULL ; i ++ )
+		if( fmt == pixstr[i].i ) 
+			return pixstr[i].s;
+	return "NONE";
+}
 
 static void	yuv_pixstr( const char *s, const char *s2, int fmt ) {
 	const char *str = NULL;
@@ -466,6 +474,25 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 			break;
 	}
 }
+
+void			yuv_set_pixel_range(int full_range)
+{
+	full_range_pixel_value_ = full_range;
+}
+
+int			alpha_fmt_to_yuv(int fmt)
+{
+	switch(fmt) {
+		case PIX_FMT_YUVA422P: 
+			return (full_range_pixel_value_ ? PIX_FMT_YUVJ422P: PIX_FMT_YUV422P ); break;
+		case PIX_FMT_YUVA420P:
+			return (full_range_pixel_value_ ? PIX_FMT_YUVJ420P: PIX_FMT_YUV420P ); break;
+		case PIX_FMT_YUVA444P:
+			return (full_range_pixel_value_ ? PIX_FMT_YUVJ444P: PIX_FMT_YUV444P ); break;
+
+	}
+	return fmt;
+}	
 
 int			yuv_to_alpha_fmt(int fmt)
 {

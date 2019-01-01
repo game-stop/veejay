@@ -30,9 +30,14 @@
 #include <netinet/tcp.h>
 #include <netdb.h>
 #include <errno.h>
+
+#include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
+
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
 #include <libvje/vje.h>
+#include <libel/avhelper.h>
 #include <libvjmem/vjmem.h>
 #include <libvjnet/mcastreceiver.h>
 #include <libvjnet/mcastsender.h>
@@ -524,16 +529,23 @@ int	vj_server_link_can_read( vj_server *vje, int link_id)
 		return 1;
 	return 0;
 }
-
 static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, int len )
 {
     unsigned int total = 0;
 
 	vj_link **Link = (vj_link**) vje->link;
+
+	/* write size of data to header */
+	char hdr_buf[16];
+	snprintf(hdr_buf, sizeof(hdr_buf), "F%08dD", len );
+	if( sock_t_send_fd( Link[link_id]->handle, vje->send_size, hdr_buf, 10 ) <= 0 ) {
+		veejay_msg(0, "Unable to send header to %s: %s", (char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
+		return 0;
+	}
+
 	total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len);
 	if( vje->logfd ) {
 		fprintf(vje->logfd, "sent frame %d of %d bytes to handle %d (link %d) %s\n", total,len, Link[link_id]->handle,link_id,(char*)(inet_ntoa(vje->remote.sin_addr)) );
-		//	printbuf( vje->logfd, buf, len );
 	}
 		
 	if( total <= 0 )
@@ -546,15 +558,15 @@ static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, 
    	return total;
 }
 
-int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len, 
-					VJFrame *frame, long ms )
+int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len, VJFrame *frame )
 {
 	if(!vje->use_mcast )
 	{
 		if( vj_server_link_can_write( vje, link_id ))
 		{
 			return vj_server_send_frame_now( vje, link_id, buf, len );
-		} else {
+		} 
+		else {
 			veejay_msg(VEEJAY_MSG_ERROR, "Link %d's socket not ready for immediate send: %s", link_id, strerror(errno));
 		}
 		return 0;
@@ -563,7 +575,7 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
 		if( vje->server_type == V_CMD  )
-			return mcast_send_frame( proto[0]->s, frame, buf,len,ms, vje->ports[0],vje->mcast_gray );
+			return mcast_send_frame( proto[0]->s, frame, buf,len,vje->ports[0],vje->mcast_gray );
 	}
 	return 0;
 }
