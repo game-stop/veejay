@@ -17,8 +17,6 @@
  * along with this program; if not, write to the Free Software
  */
 
-#define THREAD_START 0
-#define THREAD_STOP 1
 #include <config.h>
 #include <stdint.h>
 #include <pthread.h>
