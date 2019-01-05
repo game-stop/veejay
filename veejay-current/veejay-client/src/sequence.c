@@ -25,6 +25,7 @@
 #include <libavutil/pixfmt.h>
 #include <veejay/vjmem.h>
 #include <veejay/vims.h>
+#include <veejay/vje.h>
 #include <veejay/vj-client.h>
 #include <veejay/vj-msg.h>
 #include <veejay/avcommon.h>

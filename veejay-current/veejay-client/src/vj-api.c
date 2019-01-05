@@ -721,6 +721,15 @@ void set_disable_sample_image(int status)
     disable_sample_image = status;
 }
 
+static gchar* strduplastn(gchar *title) {
+	gchar *reversed = g_strreverse(title);
+	gchar *part = g_strndup(reversed,8);
+	gchar *reverse = g_strreverse(part);
+	gchar *result = g_strdup(reverse);
+	g_free(part);
+	return result;
+}
+
 GtkWidget *glade_xml_get_widget_( GladeXML *m, const char *name )
 {
     GtkWidget *widget = glade_xml_get_widget( m , name );
@@ -2220,8 +2229,8 @@ sample_slot_t   *create_temporary_slot( gint slot_id, gint id, gint type, gchar 
     {
         slot->sample_id = id;
         slot->sample_type = type;
-        slot->timecode = strdup(timecode);
-        slot->title = strdup(title);
+        slot->timecode = strduplastn(timecode);
+        slot->title = strduplastn(title);
         slot->slot_number = slot_id;
     }
     return slot;
@@ -2596,7 +2605,7 @@ static void update_curve_widget(GtkWidget *curve)
                     set_toggle_button( "curve_typespline", 1 );
                     break;
                 case GTK_CURVE_TYPE_FREE:
-                    set_toggle_button( "curve_typefree",1 );
+                    set_toggle_button( "curve_typefreehand",1 );
                     break;
                 default: set_toggle_button( "curve_typelinear", 1 );
                     break;
@@ -5070,6 +5079,9 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
                     case STREAM_VLOOP:
                         snprintf(source,sizeof(source),"vloop %d", values[0]);
                         break;
+		    case STREAM_AVF:
+			snprintf(source,sizeof(source),"stream %d", values[0]);
+			break;
                     default:
                         snprintf(source,sizeof(source),"??? %d", values[0]);
                         break;
@@ -6458,11 +6470,11 @@ int gveejay_time_to_sync( void *ptr )
     {
 	fps = ui->el.fps;
 	float spvf = 1.0f / fps;
-	float delay = spvf * 0.5f;
 	float ela  = ( info->status_tokens[ELAPSED_TIME] / 1000.0 );
-
+	float delay = spvf - ela;
 	// calculate time to sleep based on seconds per video frame
-	nsec = (delay * 1000000 * 10000);
+	nsec = (delay * 1000000000);
+
 	// if elapsed time > seconds per video frame or diff > delay, update the UI now
 	if( diff >= delay || ela >= spvf ) {
 		return 1;
@@ -6526,8 +6538,7 @@ int veejay_update_multitrack( void *ptr )
     info->uc.playmode = info->status_tokens[ PLAY_MODE ];
     update_gui();
     info->prev_mode = info->status_tokens[ PLAY_MODE ];
-    info->status_lock = 0;
-
+   
     int pm = info->status_tokens[PLAY_MODE];
 #ifdef STRICT_CHECKING
     assert( pm >= 0 && pm < 4 );
@@ -6573,14 +6584,12 @@ int veejay_update_multitrack( void *ptr )
 
             if( s->img_list[i] )
                 g_object_unref( s->img_list[i] );
-        } else
-        {
-            if( i == s->master )
-            {
-                multitrack_set_logo( info->mt, maintrack );
-            }
-        }
+        } 
     }
+
+    info->status_lock = 0;
+
+
     free(s->status_list);
     free(s->img_list );
     free(s->widths);
@@ -9143,8 +9152,8 @@ static void update_sample_slot_data(int page_num,
     slot->sample_id = sample_id;
     slot->sample_type = sample_type;
 
-    slot->timecode = timecode == NULL ? NULL : strdup( timecode );
-    slot->title = title == NULL ? NULL : strdup( title );
+    slot->timecode = timecode == NULL ? NULL : strduplastn( timecode );
+    slot->title = title == NULL ? NULL : strduplastn( title );
 
     if( sample_id )
     {

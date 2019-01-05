@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <veejay/vjmem.h>
+#include <veejay/vje.h>
 #include <veejay/vj-client.h>
 #include <veejay/vj-msg.h>
 #include <veejay/vims.h>

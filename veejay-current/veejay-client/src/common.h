@@ -61,11 +61,10 @@
 #define STREAM_COL_R	5
 #define STREAM_COL_G	6
 #define STREAM_COL_B	7
-
 #define STREAM_RECORDED  11
 #define STREAM_DURATION  10
 #define STREAM_RECORDING 9
-
 #define MAX_UI_PARAMETERS  16
+#define STREAM_AVF 12
 
 #endif
