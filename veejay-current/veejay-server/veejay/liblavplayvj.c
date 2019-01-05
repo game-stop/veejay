@@ -316,7 +316,8 @@ int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
 		settings->hold_resume ++;
 		if(settings->hold_resume < hold_pos )
 			settings->hold_resume = hold_pos;
-	} else
+	} 
+	else
 	{
 		//@first press aprox
 		settings->hold_pos = hold_pos + rel_resume_pos;
@@ -597,60 +598,37 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	settings->max_frame_num = sample_video_length( sample_id );
 	settings->first_frame = 1;
 	
-	sample_reset_loopcount( sample_id );
-
 #ifdef HAVE_FREETYPE
 	if(info->font && info->uc->sample_id != sample_id)
 	{
 		void *dict = sample_get_dict( sample_id );
 		vj_font_set_dict( info->font, dict );
-		vj_font_prepare( info->font,start,end );
-
-		veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling sample %d: %ld - %ld", sample_id,
+		if( vj_font_prepare( info->font,start,end ) > 0 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling sample %d: %ld - %ld", sample_id,
 			  start, end );
-
+		}
 	}
 #endif
-/*	if(info->composite )
-	{
-		void *cur = sample_get_composite_view(sample_id);
-		if( cur == NULL ) {
-			composite_set_file_mode( info->composite, info->homedir, info->uc->playback_mode,sample_id);
-			if( sample_load_composite_config( info->composite, sample_id ) ) {
-				veejay_msg(VEEJAY_MSG_WARNING, "Sample %d has composite view %p", sample_id, sample_get_composite_view(sample_id) );
-			}
-		}
-		else {
-			composite_set_backing( info->composite, cur );
-		}
 
-		switch(composite_has_back(info->composite)) {
-			case 2:
-				settings->composite = composite_restore_config(info->composite);
-				break;
-			default:
-				settings->composite = 0;
-				break;
-		}
-	}
-*/
 	 info->uc->sample_id = sample_id;
 	 info->last_sample_id = sample_id;
 
 	 info->sfd = sample_get_framedup(sample_id);
 
-	 if( info->settings->sample_restart )
-		 sample_reset_offset( sample_id );	/* reset mixing offsets */
-	
-	 veejay_sample_resume_at( info, sample_id );
+	 if(!info->seq->active) {
+		if( info->settings->sample_restart )
+		 	sample_reset_offset( sample_id );	/* reset mixing offsets */
+	 }
 
+	 veejay_sample_resume_at( info, sample_id );
+	 
 	 if( speed != 0 )
 		 settings->previous_playback_speed = speed;
 
-     	 veejay_set_speed(info, speed);
+     veejay_set_speed(info, speed);
  	 
-	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, Loop=%d)",
-			sample_id, tmp,info->sfd, speed, start, looptype );
+	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, End=%d, Loop=%d)",
+			sample_id, tmp,info->sfd, speed, start, end, looptype );
 	 
 	 return 1;
 }
@@ -719,20 +697,19 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		int cur_id = info->uc->sample_id;
 		if( cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_SAMPLE )
 		{
-			if( info->settings->sample_restart )
-			{
-				sample_set_resume(cur_id,-1);
-
-				long pos = sample_get_resume( cur_id );
-
-				veejay_set_frame(info, pos );
-			
-				veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,pos);
-			} 
-			else {
-				veejay_msg(VEEJAY_MSG_INFO, "Already playing sample (continous mode is on)");
+			if( !info->seq->active ) {
+				if( info->settings->sample_restart)
+				{
+					sample_set_resume(cur_id,-1);
+					long pos = sample_get_resume( cur_id );
+					veejay_set_frame(info, pos );
+					veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,pos);
+				} 
+				else {
+					veejay_msg(VEEJAY_MSG_INFO, "Already playing sample (continous mode is on)");
+				}
+				return;
 			}
-			return;
 		}
 		else
 		{
@@ -742,12 +719,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
 		int cur_id = info->uc->sample_id;
-		if( cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_TAG )
-		{
-			return;
-		}
-		else
-		{
+		if( cur_id != sample_id) {
 			veejay_stop_playing_stream(info, cur_id );
 		}
 		info->settings->min_frame_num = 0;
@@ -766,11 +738,6 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		settings->min_frame_num = 0;
 		settings->max_frame_num = info->edit_list->total_frames;
 
-	/*	if(info->composite) {
-			composite_set_file_mode( info->composite, info->homedir, new_pm, 0);
-			composite_restore_config( info->composite );
-		}
-		*/
 		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %ld - %ld", (long)settings->min_frame_num,  (long)settings->max_frame_num );
 	}
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
@@ -785,22 +752,81 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	}
 }
 
-void	veejay_set_sample_f(veejay_t *info, int sample_id, int offset )
+void veejay_sample_set_initial_positions(veejay_t *info)
 {
-	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && info->uc->sample_id == sample_id )
-	{
-		int start = sample_get_startFrame( info->uc->sample_id );
-		veejay_set_frame(info,start+offset);
-		veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,start);
-		return;
+	int first_sample = -1;
+	int i;
+	for( i = 0; i < MAX_SEQUENCES; i ++ ) {
+			if( info->seq->samples[i].sample_id > 0 && first_sample == -1) {
+				first_sample = i;
+			}
+
+			if( info->seq->samples[i].type != 0 ) 
+				continue;
+			int id = info->seq->samples[i].sample_id;
+			int stats[4];
+    
+    		sample_reset_offset(id);
+    		sample_set_loops(id,-1);
+    		sample_get_short_info( id, &stats[0],&stats[1],&stats[2],&stats[3]);
+    		if( stats[2] == 2 ) {
+				if( stats[3] < 0 ) {
+		  			sample_set_speed(id, -1 * stats[3]);
+				}
+            sample_set_resume(id, stats[0]);
+         }
+    	   else {
+        		if( stats[3] < 0 ) { 
+            	sample_set_resume(id, stats[1]);
+        		}
+       		else if(stats[3] > 0) {
+            	sample_set_resume(id, stats[0]);
+        		}
+    	   } 
 	}
 
-	veejay_change_playback_mode( info, VJ_PLAYBACK_MODE_SAMPLE, sample_id );
+	if(first_sample >= 0) {
+		veejay_change_playback_mode(info, (info->seq->samples[first_sample].type == 0 ?
+														VJ_PLAYBACK_MODE_SAMPLE : VJ_PLAYBACK_MODE_TAG), info->seq->samples[first_sample].sample_id);
+	}
 }
 
-void	veejay_set_stream_f(veejay_t *info, int stream_id )
+void veejay_prepare_sample_positions(int id) {
+    int stats[4];
+    
+    sample_reset_offset(id);
+    sample_set_loops(id,-1);
+    sample_get_short_info( id, &stats[0],&stats[1],&stats[2],&stats[3]);
+    if( stats[2] == 2 ) {
+        if( stats[3] < 0 ) { 
+		  		sample_set_speed(id, -1 * stats[3]);
+            sample_set_resume(id, stats[0]);
+        }
+    } 
+    else {
+        if( stats[3] < 0 ) { 
+            sample_set_resume(id, stats[1]);
+        }
+        else if(stats[3] > 0) {
+            sample_set_resume(id, stats[0]);
+        }
+    } 
+}
+
+void veejay_reset_sample_positions(veejay_t *info, int sample_id)
 {
-	veejay_change_playback_mode( info, VJ_PLAYBACK_MODE_TAG, stream_id );
+	if( sample_id == -1 ) {
+		int i;
+		for( i = 0; i < MAX_SEQUENCES; i ++ ) {
+			if( info->seq->samples[i].type != 0 ) 
+				continue;
+			int id = info->seq->samples[i].sample_id;
+         veejay_prepare_sample_positions(id);
+        }
+	}
+	else {
+        veejay_prepare_sample_positions(sample_id);
+	}
 }
 
 void veejay_set_sample(veejay_t * info, int sampleid)
@@ -808,10 +834,10 @@ void veejay_set_sample(veejay_t * info, int sampleid)
    	if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
 	{
 		veejay_start_playing_stream(info,sampleid );
-    }
+   	}
     else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
-		if( info->uc->sample_id == sampleid )
+		if( info->uc->sample_id == sampleid)
 		{
 			veejay_sample_resume_at( info, sampleid );
 		}

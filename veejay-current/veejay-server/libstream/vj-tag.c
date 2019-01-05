@@ -44,6 +44,7 @@
 #include <libvje/internal.h>
 #include <libvje/ctmf/ctmf.h>
 #include <libstream/vj-net.h>
+#include <libstream/vj-avformat.h>
 #include <pthread.h>
 #ifdef HAVE_V4L2
 #include <libstream/v4l2utils.h>
@@ -377,27 +378,8 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
          return 0;
     }
 
-/*  vj_tag_input->net[stream_nr] = vj_client_alloc(w,h,f);
-    v = vj_tag_input->net[stream_nr];
-    if(!v) 
-    {
-        veejay_msg(0, "Memory allocation error while creating network stream");
-        return 0;
-    }*/
     snprintf(tmp,sizeof(tmp), "%s %d", host, port );
     tag->extra = (void*) strdup(tmp);
-
-    if( tag->socket_ready == 0 )
-    {
-        tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8( w * h * 3));
-        tag->socket_len = w * h * 3;
-        if(!tag->socket_frame) 
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Insufficient error to allocate memory for Network Stream");
-            return 0;
-        }
-        tag->socket_ready = 1;
-    }
 
     return 1;
 }
@@ -702,6 +684,7 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps)
     }
     return 1;
 }
+
 #ifdef SUPPORT_READ_DV2
 int _vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel,int quality, editlist *el)
 {
@@ -921,17 +904,18 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->selected_entry = 0;
     tag->depth = 0;
     tag->effect_toggle = 1; /* same as for samples */
-    tag->socket_ready = 0;
-    tag->socket_frame = NULL;
-    tag->socket_len = 0;
     tag->color_r = 0;
     tag->color_g = 0;
     tag->color_b = 0;
     tag->opacity = 0;
     tag->priv = NULL;
     tag->subrender = 1;
-    if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
+    
+	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
         tag->priv = net_threader(_tag_info->effect_frame1);
+
+	if(type == VJ_TAG_TYPE_AVFORMAT )
+		tag->priv = avformat_thread_allocate(_tag_info->effect_frame1);
 
     palette = get_ffmpeg_pixfmt( pix_fmt );
     
@@ -965,6 +949,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                 return -1;
             }
     break;
+	case VJ_TAG_TYPE_AVFORMAT:
+		 	snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
+		break;
     case VJ_TAG_TYPE_DV1394:
 #ifdef SUPPORT_READ_DV2
     snprintf(tag->source_name, SOURCE_NAME_LEN,"dv1394 %d", channel);
@@ -1306,7 +1293,11 @@ int vj_tag_del(int id)
             tag->source_name,id);
         vj_yuv_stream_stop_read(vj_tag_input->stream[tag->index]);
 //      vj_yuv4mpeg_free( vj_tag_input->stream[tag->index]);
-     break; 
+     break;
+	 case VJ_TAG_TYPE_AVFORMAT:
+		avformat_thread_stop(tag);
+        if(tag->priv) free(tag->priv);  
+	 break;
 #ifdef SUPPORT_READ_DV2
       case VJ_TAG_TYPE_DV1394:
         vj_dv1394_close( vj_tag_input->dv1394[tag->index] );
@@ -1369,12 +1360,6 @@ int vj_tag_del(int id)
             free(tag->effect_chain[i]);
         }
         tag->effect_chain[i] = NULL;
-    }
-
-    if(tag->socket_frame)
-    {
-        free(tag->socket_frame);
-        tag->socket_frame = NULL;
     }
 
 #ifdef ARCH_X86_64
@@ -2041,7 +2026,7 @@ int vj_tag_chain_free(int t1, int global)
             
                 if( tag->effect_chain[i]->source_type == 1 && 
                     vj_tag_get_active( tag->effect_chain[i]->channel ) && 
-                    vj_tag_get_type( tag->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+                    vj_tag_get_type( tag->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) { //FIXME: check if this behaviour is correct
                     vj_tag_disable( tag->effect_chain[i]->channel );
                 }
             }
@@ -2194,7 +2179,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
         if( tag->effect_chain[position]->source_type == 1 && 
             vj_tag_get_active( tag->effect_chain[position]->channel ) && 
             tag->effect_chain[position]->channel != t1 &&
-            vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) {
+            vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) { //FIXME: test if this behaviour is correct
             vj_tag_disable( tag->effect_chain[position]->channel );
         }
     }
@@ -2457,6 +2442,11 @@ int vj_tag_disable(int t1) {
     {
         net_thread_stop( tag );
     }
+
+	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT ) {
+		avformat_thread_stop( tag );
+	}
+
     if(tag->source_type == VJ_TAG_TYPE_V4L && !tag->clone )
     {
 #ifdef HAVE_V4L2
@@ -2509,6 +2499,16 @@ int vj_tag_enable(int t1) {
             return 1;
         }
     }
+
+	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT )
+	{
+		if(!avformat_thread_start(tag, _tag_info->effect_frame1)) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to start thread");
+			return 1;
+		}
+
+	}
+
 #ifdef USE_GDK_PIXBUF
     if( tag->source_type == VJ_TAG_TYPE_PICTURE )
     {
@@ -2571,6 +2571,7 @@ int vj_tag_set_active(int t1, int active)
              vj_yuv_stream_stop_read( vj_tag_input->stream[tag->index]);
         }
     break;
+	case VJ_TAG_TYPE_AVFORMAT:
     case VJ_TAG_TYPE_MCAST:
     case VJ_TAG_TYPE_NET:
     case VJ_TAG_TYPE_PICTURE:
@@ -2756,7 +2757,7 @@ int vj_tag_chain_remove(int t1, int index)
     if( tag->effect_chain[index]->source_type == 1 && 
         vj_tag_get_active( tag->effect_chain[index]->channel ) && 
         tag->effect_chain[index]->channel != t1 &&
-        vj_tag_get_type( tag->effect_chain[index]->channel ) == VJ_TAG_TYPE_NET ) {
+        vj_tag_get_type( tag->effect_chain[index]->channel ) == VJ_TAG_TYPE_NET ) { //FIXME test if this behaviour is correct
         vj_tag_disable( tag->effect_chain[index]->channel );
     }
 
@@ -2838,6 +2839,9 @@ void    vj_tag_get_by_type(int id,int type, char *description )
     case VJ_TAG_TYPE_NET:
     sprintf(description, "%s", "Unicast");
     break;
+	case VJ_TAG_TYPE_AVFORMAT:
+	sprintf(description, "%s", "AVFormat stream reader");
+	break;
 #ifdef USE_GDK_PIXBUF
     case VJ_TAG_TYPE_PICTURE:
     sprintf(description, "%s", "GdkPixbuf");
@@ -3658,6 +3662,12 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
             plug_process( tag->generator, -1.0 ); 
         }
         break;
+	case VJ_TAG_TYPE_AVFORMAT:
+		if(!avformat_thread_get_frame( tag,dst )) //TODO: net and avformat seem to be the same, just like all other types. use a modular structure
+            return 0;
+        return 1;
+
+		break;
     case VJ_TAG_TYPE_COLOR:
         dummy_rgb_apply( dst, tag->color_r,tag->color_g,tag->color_b );
         break;

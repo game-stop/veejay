@@ -1321,6 +1321,18 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[VIMS_STREAM_NEW_AVFORMAT]			=	_new_event(
+				"%s",
+				VIMS_STREAM_NEW_AVFORMAT,
+				"Open video stream using libavformat",
+				vj_event_tag_new_avformat,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Filename or connection string",
+				NULL,
+				NULL
+				);
+
 	index_map_[VIMS_STREAM_NEW_V4L]				=	_new_event(
 				"%d %d",
 				VIMS_STREAM_NEW_V4L,

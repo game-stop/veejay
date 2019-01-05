@@ -35,6 +35,8 @@
 #define	DV_PAL_SIZE 144000
 #define DV_NTSC_SIZE 120000
 
+#define DVSD "dvsd"
+
 static void	rawdv_free(dv_t *dv)
 {
 	if(dv->filename) free(dv->filename);
@@ -288,8 +290,7 @@ int	rawdv_compressor(dv_t *dv)
 
 char 	*rawdv_video_compressor(dv_t *dv)
 {
-	char res[5] = "dvsd\0";
-	return res;
+	return DVSD;
 }
 
 int	rawdv_audio_channels(dv_t *dv)

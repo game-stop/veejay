@@ -169,14 +169,14 @@ typedef struct sample_info_t {
     int effect_toggle;
     int offset;
     int play_length;
-    int loopcount;
     editlist *edit_list;
     char     *edit_list_file;
     int		soft_edl;
     void	*dict;
     void	*kf;
     long	resume_pos;
-	int		subrender;
+    int		subrender;
+    int	loops;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -219,15 +219,10 @@ extern int sample_get_playmode(int s1);
 extern int sample_set_playmode(int s1, int playmode);
 extern int sample_get_subrender(int s1);
 extern void sample_set_subrender(int s1, int status);
-extern int sample_get_loops(int s1);
-extern int sample_get_loops2(int s1);
 extern int sample_get_next(int s1);
 extern int sample_get_depth(int s1);
 extern int sample_set_depth(int s1, int n);
 extern int sample_set_speed(int s1, int speed);
-extern void sample_loopcount(int s1);
-extern void sample_reset_loopcount(int s1);
-extern int sample_get_loopcount(int s1);
 extern int sample_set_framedup(int s1, int n);
 extern int sample_get_framedup(int s1);
 extern int sample_set_framedups(int s1, int n);
@@ -236,8 +231,6 @@ extern int sample_marker_clear(int sample_id);
 extern int sample_set_looptype(int s1, int looptype);
 extern int sample_get_speed(int s1);
 extern int sample_get_looptype(int s1);
-extern int sample_set_loops(int s1, int nr_of_loops);
-extern int sample_set_loops2(int s1, int nr);
 extern int sample_set_next(int s1, int next_sample_id);
 extern int sample_get_chain_source(int sample_id, int position);
 extern int sample_set_chain_source(int sample_id, int position, int source);
@@ -356,11 +349,14 @@ extern int sample_start_playing(int s1, int no_cache);
 extern int sample_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
 extern char *UTF8toLAT1(unsigned char *in);
 extern int sample_read_edl( sample_info *sample );
-
+extern void sample_set_loops(int s1, int loops);
+extern int sample_get_loops(int s1);
+extern int sample_get_frame_length(int s1);
+extern int sample_loop_dec(int s1);
 extern int     sample_max_video_length(int s1);
-
 extern	long	sample_get_resume(int s1);
 extern	int		sample_set_resume(int s1, long pos );
+extern void	sample_update_ascociated_samples(int s1);
 
 extern void	sample_chain_alloc_kf( int s1, int entry );
 extern void	sample_set_chain_paused( int s1, int paused );

@@ -26,6 +26,8 @@
 #define CODEC_ID_YUV420F 996
 #define CODEC_ID_YUVLZO 900
 
+// This is not a library, it is a collection of helper functions for various purposes
+
 void	*avhelper_alloc_frame();
 
 int 	avhelper_get_codec_by_id(int id);
@@ -44,6 +46,8 @@ void	avhelper_rescale_video(void *ptr, uint8_t *dst[4]);
 
 void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height );
 
+void	*avhelper_get_stream_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height );
+
 VJFrame	*avhelper_get_decoded_video(void *ptr);
 
 void	avhelper_free_context(AVCodecContext **avctx);
@@ -52,8 +56,16 @@ void	avhelper_frame_unref(AVFrame *ptr);
 
 void	*avhelper_get_mjpeg_decoder(VJFrame *output_info);
 
+int	avhelper_get_frame( void *decoder, int *got_picture );
+
 VJFrame	*avhelper_get_input_frame( void *ptr );
 
 VJFrame *avhelper_get_output_frame( void *ptr);
+
+int avhelper_recv_decode( void *decoder, int *got_picture );
+
+int avhelper_recv_frame_packet( void *decoder );
+
+double avhelper_get_spvf( void *decoder );
 
 #endif

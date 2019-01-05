@@ -164,8 +164,7 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, VJFrame 
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame);
 static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame);
 static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame);
-static void seq_play_sample( veejay_t *info, int n, int t);
-static	int	vj_perform_valid_sequence( veejay_t *info, int *type );
+static int vj_perform_next_sequence( veejay_t *info, int *type );
 static void vj_perform_plain_fill_buffer(veejay_t * info, int *result);
 static void vj_perform_tag_fill_buffer(veejay_t * info);
 static void vj_perform_clear_cache(void);
@@ -320,15 +319,14 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
 			if( settings->current_frame_num >= settings->max_frame_num ) {
 				settings->current_frame_num = settings->min_frame_num;
 				int type = 0;
-				int n = vj_perform_valid_sequence( info, &type );
-				if( n >= 0 )
-						seq_play_sample(info,n,type);
+				int n = vj_perform_next_sequence( info, &type );
+				if( n > 0 )
+					veejay_change_playback_mode(info,(type == 0 ? VJ_PLAYBACK_MODE_SAMPLE: VJ_PLAYBACK_MODE_TAG),n );
 			}
 	}
 
     if (settings->current_frame_num >= settings->max_frame_num) {
 		settings->current_frame_num = settings->min_frame_num;
-		return 0;
     }
 
     return 0;
@@ -364,69 +362,65 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
     return 0;
 }
 
-
-static	int	vj_perform_valid_sequence( veejay_t *info, int *type )
+static  int vj_perform_next_sequence( veejay_t *info, int *type )
 {
-	int cur = info->seq->current + 1;
-	int cycle = 0;
+
+    if( info->seq->samples[info->seq->current].type == 0 &&
+        info->seq->samples[info->seq->current].sample_id > 0 ) {
+    
+        if(sample_loop_dec(info->seq->samples[info->seq->current].sample_id) != 0) /* loop count zero, select next sequence */
+            return 0;
+        veejay_prepare_sample_positions( info->seq->samples[info->seq->current].sample_id );
+    }
+
+
+    int cur = info->seq->current + 1;
+    int cycle = 0;
+    
+    if( cur >= MAX_SEQUENCES )
+            cur = 0;
+
 	while( info->seq->samples[ cur ].sample_id == 0 )
 	{
 		cur ++;
-		if( cur >= MAX_SEQUENCES && !cycle)
-		{
-			cur = 0;
-			cycle = 1;
-		}
-		else if ( cur >= MAX_SEQUENCES && cycle )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "No valid sequence to play. Sequence Play disabled");
+		if( cur >= MAX_SEQUENCES && !cycle) {
+            cur = 0;
+            cycle = 1;
+        }
+        else if (cur >= MAX_SEQUENCES && cycle) {
+            veejay_msg(VEEJAY_MSG_ERROR, "No valid sequence to play. Sequence Play disabled");
 			info->seq->active = 0;
-			return -1;
-		}
-	}
+			return 0;
+        }
+    }
+
+    info->seq->current = cur;
+
+    sample_update_ascociated_samples( info->seq->samples[cur].sample_id );
+    sample_reset_offset( info->seq->samples[cur].sample_id );
+    sample_set_loops( info->seq->samples[cur].sample_id, -1 ); /* reset loop count */
 
 	*type = info->seq->samples[cur].type;
-
-	return cur;
-}
-
-static	void	seq_play_sample( veejay_t *info, int n, int type)
-{
-	info->seq->current = n;
-
-	if( type == 0 ) {
-
-		int which_sample = 0;
-		int offset = sample_get_first_mix_offset( info->uc->sample_id, &which_sample, info->seq->samples[info->seq->current].sample_id );
-
-		veejay_set_sample_f( info, info->seq->samples[ info->seq->current ].sample_id , offset );
-	}
-	else {
-		veejay_set_stream_f( info, info->seq->samples[ info->seq->current ].sample_id );
-	}
+	return info->seq->samples[cur].sample_id;
 }
 
 static	int	vj_perform_try_sequence( veejay_t *info )
 {
 	if(! info->seq->active )
 		return 0;
-	
-	if( sample_get_loop_dec( info->uc->sample_id ) >= 1 )
+
+	int type = 0;
+	int n = vj_perform_next_sequence( info, &type );
+	if( n > 0 )
 	{
-		int type = 0;
-		int n = vj_perform_valid_sequence( info, &type );
-		if( n >= 0 )
-		{
-			if( type == 0 )
-				sample_set_loop_dec( info->uc->sample_id, 0 ); //reset loop
+		veejay_msg(VEEJAY_MSG_INFO, "Sequence play selects %s %d", (type == 0 ? "sample" : "stream" ) , info->seq->samples[info->seq->current].sample_id);
 		
-			veejay_msg(0, "Sequence play selects %s %d", (type == 0 ? "sample" : "stream" ) , info->seq->samples[n].sample_id);
-		
-			seq_play_sample(info, n, type );
-			return 1;
-		}
-		return 0;
-	}		
+		veejay_change_playback_mode( info, 
+				info->seq->samples[ info->seq->current ].type == 0 ? VJ_PLAYBACK_MODE_SAMPLE : VJ_PLAYBACK_MODE_TAG,
+				info->seq->samples[ info->seq->current ].sample_id);
+
+		return 1;
+	}
 	return 0;
 }
 
@@ -458,124 +452,93 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 		
 		if( cur_sfd != 0 ) 
 			return 0;
-
 	}
-
 
 	settings->current_frame_num += num;
 
-	sample_set_resume( info->uc->sample_id, settings->current_frame_num );
-
-
-	if( num == 0 )
-		return 0;
+	if( num == 0 ) {
+    	sample_set_resume( info->uc->sample_id, settings->current_frame_num );
+        return 0;
+    }
 
     if (speed >= 0) {		/* forward play */
 
-	if(looptype==3)
-	{
-		int range = end - start;
-		int n2   = start + ((int) ( (double)range * rand()/(RAND_MAX)));
-		settings->current_frame_num = n2;
-	}
+    	if(looptype==3)
+	    {
+		    int range = end - start;
+		    int n2   = start + ((int) ( (double)range * rand()/(RAND_MAX)));
+		    settings->current_frame_num = n2;
+	    }   
 
-	if (settings->current_frame_num > end || settings->current_frame_num < start) {
-	    switch (looptype) {
-		    case 2:
-			sample_loopcount( info->uc->sample_id);
-			info->uc->direction = -1;
-			if(!vj_perform_try_sequence( info ) )
-			{
-				editlist *E = sample_get_editlist(info->uc->sample_id);
-				sample_apply_loop_dec( info->uc->sample_id,E->video_fps);
-				veejay_set_frame(info, end);
-				veejay_set_speed(info, (-1 * speed));
-			}
-			sample_loopcount( info->uc->sample_id);
-			break;
-		    case 1:
-			sample_loopcount( info->uc->sample_id);
-			if(! info->seq->active )
-				veejay_set_frame(info, start);
-			else
-			{
-				int type = 0;
-				int n = vj_perform_valid_sequence( info, &type );
-				if( n >= 0 )
-					seq_play_sample( info, n, type );				
-				else 
-					veejay_set_frame(info,start);
-			}
-			break;
-		    case 3:
-			sample_loopcount( info->uc->sample_id);
-			veejay_set_frame(info, start);
-			break;
-			case 4:
-			veejay_set_frame(info,end);
-			break;
-		    default:
-			veejay_set_frame(info, end);
-			veejay_set_speed(info, 0);
+	    if (settings->current_frame_num > end || settings->current_frame_num < start) {
+	        switch (looptype) {
+		        case 2:
+			       info->uc->direction = -1;
+			        if(!vj_perform_try_sequence( info ) )
+		    	    {
+				        veejay_set_frame(info, end);
+				        veejay_set_speed(info, (-1 * speed));
+			        }
+			        break;
+		        case 1:
+			        if(!vj_perform_try_sequence(info) ) {
+			    	    veejay_set_frame(info, start);
+			        }
+			        break;
+		        case 3:
+			        veejay_set_frame(info, start);
+			        break;
+			    case 4:
+			        veejay_set_frame(info,end);
+			        break;
+		        default:
+			        veejay_set_frame(info, end);
+			        veejay_set_speed(info, 0);
+                    break;
+	        }
 	    }
-	}
-    } else {			/* reverse play */
-	if( looptype == 3)
-	{
-		int range = end - start;
-		int n2   = end - ((int) ( (double)range*rand()/(RAND_MAX)));
-		settings->current_frame_num = n2;
-	}
-
-	if (settings->current_frame_num < start || settings->current_frame_num >= end ) {
-	    switch (looptype) {
-	    case 2:
-		sample_loopcount( info->uc->sample_id);
-
-		info->uc->direction = 1;
-		if(!vj_perform_try_sequence(info) )
-		{
-			editlist *E = sample_get_editlist(info->uc->sample_id);
-		  	sample_apply_loop_dec( info->uc->sample_id, E->video_fps);
-			veejay_set_frame(info, start);
-			veejay_set_speed(info, (-1 * speed));
-		}
-		break;
-	    case 1:
-		sample_loopcount( info->uc->sample_id);
-
-		if(!info->seq->active)
-			veejay_set_frame(info, end);
-		else
-		{
-			int type = 0;
-			int n = vj_perform_valid_sequence( info, &type );
-			if( n >= 0 )
-			{
-				seq_play_sample(info, n, type );
-			}
-			else
-				veejay_set_frame(info,end);
-		}
-		break;
-	    case 3:
-		sample_loopcount( info->uc->sample_id);
-
-		veejay_set_frame(info,end);
-		break;
-		case 4:
-		veejay_set_frame(info,start);
-		break;
-	    default:
-		veejay_set_frame(info, start);
-		veejay_set_speed(info, 0);
+    } 
+    else
+    {			/* reverse play */
+	    if( looptype == 3)
+	    {
+	    	int range = end - start;
+	    	int n2   = end - ((int) ( (double)range*rand()/(RAND_MAX)));
+	    	settings->current_frame_num = n2;
 	    }
-	}
+
+	    if (settings->current_frame_num < start || settings->current_frame_num >= end ) {
+	        switch (looptype) {
+	            case 2:
+		            info->uc->direction = 1;
+		            if(!vj_perform_try_sequence(info) )
+	     	        {
+		        	    veejay_set_frame(info, start);
+		        	    veejay_set_speed(info, (-1 * speed));
+	    	        }
+		            break;
+	            case 1:
+                    if(!vj_perform_try_sequence(info)) {
+		                veejay_set_frame(info, end);
+		            }
+		            break;
+	            case 3:
+		            veejay_set_frame(info,end);
+		            break;
+		        case 4:
+		            veejay_set_frame(info,start);
+		            break;
+	            default:
+		            veejay_set_frame(info, start);
+		            veejay_set_speed(info, 0);
+                    break;
+	        }
+	    }
     }
- //   sample_update_offset( info->uc->sample_id, settings->current_frame_num );
-   	sample_set_resume( info->uc->sample_id, settings->current_frame_num );
    	
-		
+    if(!info->seq->active) {
+        sample_set_resume( info->uc->sample_id, settings->current_frame_num );
+	}
 	vj_perform_rand_update( info );
 
     return 0;
@@ -1205,14 +1168,6 @@ int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
 	frame[2] = crop_frame->data[2];
 
 	return 1;
-}
-
-static void long2str(uint8_t *dst, uint32_t n)
-{
-   dst[0] = (n    )&0xff;
-   dst[1] = (n>> 8)&0xff;
-   dst[2] = (n>>16)&0xff;
-   dst[3] = (n>>24)&0xff;
 }
 
 static long stream_pts_ = 0;
@@ -1850,7 +1805,10 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int ty
 	break;
 	
    case VJ_TAG_TYPE_NONE:
-	    nframe = vj_perform_get_subframe_tag(info, sample_id, chain_entry); 
+	    nframe = vj_perform_get_subframe_tag(info, sample_id, chain_entry);
+
+	    sample_set_resume( sample_id, nframe );
+
  	    if(!subrender)
 			centry = vj_perform_sample_is_cached(info,sample_id, chain_entry);
         if(centry == -1 || info->no_caching|| subrender )
@@ -2068,10 +2026,14 @@ static int vj_perform_apply_secundary(veejay_t * info, int this_sample_id, int s
 			break;
 		
 		case VJ_TAG_TYPE_NONE:
-	    	nframe = vj_perform_get_subframe(info,this_sample_id, sample_id, chain_entry); // get exact frame number to decode
+	    	 	nframe = vj_perform_get_subframe(info,this_sample_id, sample_id, chain_entry); // get exact frame number to decode
+
+			sample_set_resume( sample_id, nframe );
+
 			if(!subrender)
 				centry = vj_perform_sample_is_cached(info,sample_id, chain_entry);
-	    	if(centry == -1 || info->no_caching||subrender) {
+	    		
+			if(centry == -1 || info->no_caching||subrender) {
 				len = vj_perform_get_frame_fx( info, sample_id, nframe, src, dst, p0_ref, p1_ref );	
 			    if(len > 0 ) {
 				    error = 0;
@@ -2623,7 +2585,6 @@ static int vj_perform_record_commit_single(veejay_t *info)
 				}
 
 			}
-			info->seq->rec_id = 0;
 			return id;
 	}
 	else {
@@ -2708,7 +2669,7 @@ void vj_perform_record_stop(veejay_t *info)
  video_playback_setup *settings = info->settings;
  int df = vj_event_get_video_format();
 
- if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
+ if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE || ( info->seq->active && info->seq->rec_id > 0 ))
  {
 	 sample_reset_encoder(info->uc->sample_id);
 	 sample_reset_autosplit(info->uc->sample_id);
@@ -2726,6 +2687,8 @@ void vj_perform_record_stop(veejay_t *info)
 	 settings->sample_record = 0;
 	 settings->sample_record_switch =0;
 	 settings->render_list = 0;
+
+     info->seq->rec_id = 0;
 
  } 
  else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
@@ -2759,7 +2722,7 @@ void vj_perform_record_stop(veejay_t *info)
 void vj_perform_record_sample_frame(veejay_t *info, int sample, int type) {
 	uint8_t *frame[4];
 	int res = 1;
-	int n = 0;
+	
 	frame[0] = primary_buffer[0]->Y;
 	frame[1] = primary_buffer[0]->Cb;
 	frame[2] = primary_buffer[0]->Cr;
@@ -2767,51 +2730,19 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample, int type) {
 
 	res = vj_perform_render_sample_frame(info, frame, sample,type);
 
-	if( res == 2)
+	if( res == 2 || res == 1)
 	{
-		int df = vj_event_get_video_format();
-		long frames_left = sample_get_frames_left(sample) ;
-		
 		sample_stop_encoder( sample );
 		
-		n = vj_perform_record_commit_single( info );
-		
-		if(frames_left > 0 )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Continue, %d frames left to record", frames_left);
-			if( sample_init_encoder( sample, NULL,
-				df, info->effect_frame1, info->current_edit_list, frames_left)==-1)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR,
-				"Error while auto splitting "); 
-				report_bug();
-			}
-		}
-		else
-		{
-			int len = sample_get_total_frames(sample);
-	
-			veejay_msg(VEEJAY_MSG_DEBUG, "Added new sample %d of %d frames",n,len);
-			sample_reset_encoder( sample );
-			sample_reset_autosplit( sample );
-		}
-	 }
-	
-	 if( res == 1)
-	 {
-		sample_stop_encoder(sample);
 		vj_perform_record_commit_single( info );
-		vj_perform_record_stop(info);
+        vj_perform_record_stop(info);
 	 }
-
+	
 	 if( res == -1)
 	 {
-		if( info->seq->active && info->seq->rec_id )
-			info->seq->rec_id = 0;
-
 		sample_stop_encoder(sample);
 		vj_perform_record_stop(info);
- 	 }
+     }
 }
 
 void vj_perform_record_offline_tag_frame(veejay_t *info)
@@ -3666,11 +3597,7 @@ static	void	vj_perform_record_frame( veejay_t *info )
 	}
 
 	if( info->seq->active && info->seq->rec_id > 0 ) {
-		int type = 0;
-		if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
-			type = vj_tag_get_type( info->uc->sample_id );
-
-		vj_perform_record_sample_frame(info,info->seq->rec_id,type);
+		vj_perform_record_sample_frame(info,info->seq->rec_id, 0);
 	}
 	else {
 

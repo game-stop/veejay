@@ -3555,8 +3555,6 @@ void vj_event_play_slow(void *ptr, const char format[],va_list ap)
 
         if(veejay_set_framedup(v, args[0]))
         {
-            if( SAMPLE_PLAYING(v))
-                sample_reset_loopcount( v->uc->sample_id );
             veejay_msg(VEEJAY_MSG_INFO,"A/V frames will be repeated %d times ",args[0]);
         }
         else
@@ -3904,56 +3902,36 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
 
     SAMPLE_DEFAULTS(args[0]);
 
-    if(args[1] == -1)
-    {
-        if(sample_exists(args[0]))
-        {
-            if(sample_get_looptype(args[0])==2)
-            {
-                int lp;
-                sample_set_looptype(args[0],1);
-                lp = sample_get_looptype(args[0]);
-                veejay_msg(VEEJAY_MSG_INFO, "Sample %d loop type is now %s",args[0],
-                    ( lp==1 ? "Normal Looping" : (lp==2 ? "Pingpong Looping" : "No Looping" ) ) );
-                return;
-            }
-            else
-            {
-                int lp;
-                sample_set_looptype(args[0],2);
-                lp = sample_get_looptype(args[0]);
-                veejay_msg(VEEJAY_MSG_INFO, "Sample %d loop type is now %s",args[0],
-                    ( lp==1 ? "Normal Looping" : lp==2 ? "Pingpong Looping" : "No Looping" ) );
-                return;
-            }
-        }
-        else
-        {
-            p_no_sample(args[0]);
-            return;
-        }
-    }
+	if(!sample_exists(args[0])) {
+		p_no_sample(args[0]);
+		return;
+	}
 
-    if(args[1] >= 0 && args[1] <= 4) 
-    {
-        if(sample_exists(args[0]))
-        {
-            int lp;
-            sample_set_looptype( args[0] , args[1]);
-            lp = sample_get_looptype(args[0]);
-            switch(lp)
-            {
-                case 0: veejay_msg(VEEJAY_MSG_INFO, "Play once");break;
-                case 1: veejay_msg(VEEJAY_MSG_INFO, "Normal looping");break;
-                case 2: veejay_msg(VEEJAY_MSG_INFO, "Pingpong looping");break;
-                case 3: veejay_msg(VEEJAY_MSG_INFO, "Random frame");break;
-                case 4: veejay_msg(VEEJAY_MSG_INFO, "Play once (no pause)");break;
-            }
-        }
+	if(args[1] == -1) {
+        int lp = sample_get_looptype(args[0]);
+		if( lp == 1 && args[1] == -1 )
+			lp = 2;
+		else if ( lp == 2 && args[1] == -1 )
+			lp = 1;
+
+		sample_set_looptype( args[0], lp );
+
+        veejay_msg(VEEJAY_MSG_INFO, "Sample %d loop type is now %s",args[0],
+                    ( lp==1 ? "Normal Looping" : lp==2 ? "Pingpong Looping" : "No Looping" ) );
+
     }
-    else
+	else if(args[1] >= 0 && args[1] <= 4)
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist or invalid looptype %d",args[1],args[0]);
+        int lp = sample_set_looptype( args[0] , args[1]);
+        lp = sample_get_looptype(args[0]);
+        switch(lp)
+        {
+        	case 0: veejay_msg(VEEJAY_MSG_INFO, "Play once");break;
+            case 1: veejay_msg(VEEJAY_MSG_INFO, "Normal looping");break;
+            case 2: veejay_msg(VEEJAY_MSG_INFO, "Pingpong looping");break;
+            case 3: veejay_msg(VEEJAY_MSG_INFO, "Random frame");break;
+            case 4: veejay_msg(VEEJAY_MSG_INFO, "Play once (no pause)");break;
+        }
     }
 }
 
@@ -4188,7 +4166,6 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
         {
             veejay_msg(VEEJAY_MSG_ERROR,"Cannot set frame repeat to %d for sample %d",args[0],args[1]);
         }
-        sample_reset_loopcount( args[0] );
     }
     else
     {
@@ -4386,15 +4363,17 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
             for( i = 0; i < MAX_SEQUENCES; i ++ )
             {
                 if( v->seq->samples[i].type == 0)
-                    args[0] += sample_get_longest( v->seq->samples[i].sample_id );
+                    args[0] += sample_get_frame_length( v->seq->samples[i].sample_id );
                 else
                     args[0] += vj_tag_get_n_frames( v->seq->samples[i].sample_id );
             }
+
+	    	veejay_sample_set_initial_positions( v );
+	    	v->seq->current = 0;
         }
         veejay_msg(VEEJAY_MSG_DEBUG, "\tRecording %d frames (sequencer is %s)", args[0],
                 (v->seq->active ? "active" : "inactive"));
     }
-
     
     if(args[0] <= 1 )
     {
@@ -4425,6 +4404,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
         sample_stop_encoder( v->uc->sample_id );
         result = 0;
         v->settings->sample_record = 0;
+		v->seq->rec_id = 0;
         return;
     }   
 
@@ -4436,36 +4416,11 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 
     if( v->seq->active )
     {
-        int i;
-        int start_at = 0;
-        int type_at = 0;
-        for( i = 0; i < MAX_SEQUENCES; i ++ )
-        {
-            if( sample_exists( v->seq->samples[i].sample_id ) || vj_tag_exists( v->seq->samples[i].sample_id) )
-            {
-                start_at = v->seq->samples[i].sample_id;
-                type_at = v->seq->samples[i].type;
-                break;  
-            }
-        }
-        
         v->seq->rec_id = v->uc->sample_id;
-
-        if( type_at == 0 ) {
-            if( start_at == v->uc->sample_id )
-                veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
-            else
-                veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, start_at ); 
-        }
-        else {
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, start_at );
-        }
     }
     else
     {
-        //veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
         veejay_set_frame(v, sample_get_resume(v->uc->sample_id));
-	v->seq->rec_id = 0;
     }
 }
 
@@ -4479,12 +4434,13 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
         video_playback_setup *s = v->settings;
         int stop_sample = v->uc->sample_id;
 
-        if(v->seq->active && v->seq->rec_id )
+        if(v->seq->rec_id )
             stop_sample = v->seq->rec_id;
 
         if( sample_stop_encoder( stop_sample ) == 1 ) 
         {
             v->settings->sample_record = 0;
+			v->seq->rec_id = 0;
             if( sample_get_encoded_file( stop_sample, avi_file) <= 0 )
             {
                 veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file '%s' to sample %d", avi_file, stop_sample);
@@ -4502,7 +4458,6 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
                 sample_reset_encoder( stop_sample );
                 s->sample_record = 0;   
                 s->sample_record_id = 0;
-                v->seq->rec_id = 0;
                 if(s->sample_record_switch) 
                 {
                     s->sample_record_switch = 0;
@@ -4519,33 +4474,6 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
     else 
     {
         p_invalid_mode();
-    }
-}
-
-void vj_event_sample_set_num_loops(void *ptr, const char format[], va_list ap) 
-{
-    veejay_t *v = (veejay_t *)ptr;
-    int args[2];
-    P_A(args,sizeof(args),NULL,0,format,ap);
-
-    SAMPLE_DEFAULTS(args[0]);
-
-    if(sample_exists(args[0]))
-    {
-
-        if( sample_set_loops(args[0], args[1]))
-        {   veejay_msg(VEEJAY_MSG_INFO, "Setted %d no. of loops for sample %d",
-                sample_get_loops(args[0]),args[0]);
-        }
-        else    
-        {
-            veejay_msg(VEEJAY_MSG_ERROR,"Cannot set %d loops for sample %d",args[1],args[0]);
-        }
-
-    }
-    else
-    {
-        p_no_sample(args[0]);
     }
 }
 
@@ -6846,6 +6774,27 @@ void    vj_event_stream_new_cali( void *ptr, const char format[], va_list ap)
 
 }
 
+void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+
+	char input[1024];
+	P_A(NULL,0, input,sizeof(input),format,ap);
+
+	int id = vj_tag_new(VJ_TAG_TYPE_AVFORMAT, input, v->nstreams,
+                v->edit_list,
+                v->pixel_format,
+               	-1,
+                -1,
+                v->settings->composite );
+
+    	if(id > 0 )
+        	v->nstreams++;
+
+   	if( id <= 0 )
+        	veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new video stream ");
+}
+
 void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
@@ -7505,14 +7454,13 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
     
     if( vj_tag_exists(args[0]))
     {
-        char tmp[255];
-        
+        char tmp[1024];
         int rec_format = _recorder_format;
         char prefix[40];
 
         if(rec_format==-1)
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "Error, no video format selected");
+            veejay_msg(VEEJAY_MSG_ERROR, "(Offline) Error, no video recording format selected");
             return;
         }
 
@@ -7539,7 +7487,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
     }
     else
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist",args[0]);
+        veejay_msg(VEEJAY_MSG_ERROR, "(Offline) Unable to record from stream %d as it does not exists",args[0]);
     }
 }
 
@@ -10248,7 +10196,7 @@ static void vj_event_sample_next1( veejay_t *v )
             }
         } else {
             if( vj_tag_exists( n ) ) {
-                veejay_set_stream_f(v, n );
+		veejay_change_playback_mode(v,VJ_PLAYBACK_MODE_TAG,n);
             }
         }
     }
@@ -10426,11 +10374,14 @@ void    vj_event_sample_sequencer_active(   void *ptr,  const char format[],    
     {
         v->seq->active = 0;
         v->seq->current = 0;
+	veejay_reset_sample_positions( v, -1 );
         veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer disabled");
     }
     else 
     {
         v->seq->active = 1;
+	v->seq->current = 0;
+	veejay_reset_sample_positions( v, -1 );
         veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer enabled");
     }
 }

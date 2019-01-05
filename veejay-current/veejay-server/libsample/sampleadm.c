@@ -352,7 +352,6 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->audio_volume = 50;
     si->marker_start = 0;
     si->marker_end = 0;
-    si->loopcount = 0;
     si->effect_toggle = 1;
     si->fade_method = 0;
     si->fade_alpha = 0;
@@ -1160,6 +1159,29 @@ int sample_get_first_mix_offset(int s1, int *parent, int look_for)
     return 0;
 }
 
+void	sample_update_ascociated_samples(int s1)
+{
+    sample_info *sample = sample_get(s1);
+    if(!sample) {
+        return;
+    }
+	
+	int p = 0;
+    for( p = 0; p < SAMPLE_MAX_EFFECTS; p ++ ) {
+    	if( sample->effect_chain[p]->source_type != 0  ) 
+			continue;
+		if( !sample_exists(sample->effect_chain[p]->channel) )
+			continue;
+
+		int pos = sample->effect_chain[p]->frame_offset;
+		if(pos == 0 )
+			continue;	
+
+		sample_set_resume( sample->effect_chain[p]->channel, pos );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d will resume playback from position %d",
+					sample->effect_chain[p]->channel, pos );
+	}
+}
 
 int sample_set_resume(int s1,long position)
 {
@@ -1300,6 +1322,28 @@ int sample_set_chain_status(int s1, int position, int status)
     return -1;
     sample->effect_chain[position]->e_flag = status;
     return 1;
+}
+
+int sample_get_frame_length(int s1)
+{
+	sample_info *sample = sample_get(s1);
+    if (!sample)
+		return 0;
+
+	int len = 1 + abs( sample->last_frame - sample->first_frame );
+	int speed = abs( sample->speed );
+
+	len = len / speed;
+
+	if( sample->dup > 0) {
+		len = len * sample->dup;
+	}
+
+	if(sample->looptype == 2) {
+		len *= 2;
+	}
+
+	return len;
 }
 
 /****************************************************************************************************
@@ -1667,6 +1711,36 @@ int sample_set_chain_source(int s1, int position, int input)
     return 1;
 }
 
+int	sample_get_loops(int s1) {
+	sample_info *sample = sample_get(s1);
+    	if (!sample) return 0;
+	return sample->loops;
+}
+
+void sample_set_loops(int s1, int loops) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) return;
+	if(loops==-1) {
+		if(sample->looptype == 2) {
+			sample->loops = 2;
+		}
+		else {
+			sample->loops = 1;
+		}
+		return;
+	}
+	sample->loops = loops;
+}
+
+int	sample_loop_dec(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return 0;
+	if(sample->loops > 0)
+		sample->loops --;
+	return sample->loops;	
+}
+
 /****************************************************************************************************
  *
  * sample_set_speed
@@ -1675,28 +1749,6 @@ int sample_set_chain_source(int s1, int position, int input)
  * returns -1  on error.
  *
  ****************************************************************************************************/
-void sample_loopcount(int s1)
-{
-    sample_info *sample = sample_get(s1);
-    if (!sample) return;
-    sample->loopcount ++;
-    if(sample->loopcount > 1000000 )
-    sample->loopcount = 0;
-}
-int sample_get_loopcount(int s1)
-{
-  sample_info *sample = sample_get(s1);
-  if (!sample) return 0;
-
-  return sample->loopcount;
-}
-void    sample_reset_loopcount(int s1)
-{
-    sample_info *sample = sample_get(s1);
-    if (!sample) return;
-    sample->loopcount = 0;
-}
-
 int sample_set_speed(int s1, int speed)
 {
     sample_info *sample = sample_get(s1);
@@ -1747,23 +1799,6 @@ int sample_get_chain_source(int s1, int position)
     return sample->effect_chain[position]->source_type;
 }
 
-int sample_get_loops(int s1)
-{
-    sample_info *sample = sample_get(s1);
-    if (sample) {
-        return sample->max_loops;
-    }
-    return -1;
-}
-int sample_get_loops2(int s1)
-{
-    sample_info *sample;
-    sample = sample_get(s1);
-    if (!sample)
-    return -1;
-    return sample->max_loops2;
-}
-
 /****************************************************************************************************
  *
  * sample_set_looptype
@@ -1780,6 +1815,14 @@ int sample_set_looptype(int s1, int looptype)
 
     if( looptype >= 0 && looptype < 5 ) {
         sample->looptype = looptype;
+
+		if(looptype == 2) {
+			sample->loops = 2;
+		}
+		else {
+			sample->loops = 1;
+		}
+
         return 1;
     }
     return 0;
@@ -1909,22 +1952,6 @@ int sample_get_next(int s1)
     if (!sample)
     return -1;
     return sample->next_sample_id;
-}
-int sample_set_loops(int s1, int nr_of_loops)
-{
-    sample_info *sample = sample_get(s1);
-    if (!sample)
-    return -1;
-    sample->max_loops = nr_of_loops;
-    return 1;
-}
-int sample_set_loops2(int s1, int nr_of_loops)
-{
-    sample_info *sample = sample_get(s1);
-    if (!sample)
-    return -1;
-    sample->max_loops2 = nr_of_loops;
-    return 1;
 }
 
 int sample_get_subrender(int s1)
@@ -2315,8 +2342,6 @@ int sample_set_offset(int s1, int chain_entry, int frame_offset)
     sample_info *sample = sample_get(s1);
     if (!sample)
     return -1;
-    /* set to zero if frame_offset is greater than sample length */
-    //if(frame_offset > (sample->last_frame - sample->first_frame)) frame_offset=0;
     sample->effect_chain[chain_entry]->frame_offset = frame_offset;
     return 1;
 }
@@ -2550,19 +2575,6 @@ int sample_chain_remove(int s1, int position)
     return 1;
 }
 
-int sample_set_loop_dec(int s1, int active) {
-    sample_info *sample = sample_get(s1);
-    if(!sample) return -1;
-    sample->loop_dec = active;
-    return 1;
-}
-
-int sample_get_loop_dec(int s1) {
-    sample_info *sample = sample_get(s1);
-    if(!sample) return -1;
-    return sample->loop_dec;
-}
-
 editlist *sample_get_editlist(int s1)
 {
     sample_info *sample = sample_get(s1);
@@ -2601,27 +2613,6 @@ int sample_set_editlist(int s1, editlist *edl)
     }
     sample->edit_list = edl;
     sample->soft_edl = 1;
-    return 1;
-}
-
-int sample_apply_loop_dec(int s1, double fps) {
-    sample_info *sample = sample_get(s1);
-    if(!sample) return -1;
-/*    if(sample->loop_dec==1) {
-    if( (sample->first_frame + inc) >= sample->last_frame) {
-        sample->first_frame = sample->last_frame-1;
-        sample->loop_dec = 0;
-    }
-    else {
-        sample->first_frame += (inc / sample->loop_periods);
-    }
-    veejay_msg(VEEJAY_MSG_DEBUG, "New starting postions are %ld - %ld",
-        sample->first_frame, sample->last_frame);
-    return ( sample_update(sample, s1));
-    }*/
-
-    sample->loop_dec ++;
-    
     return 1;
 }
 

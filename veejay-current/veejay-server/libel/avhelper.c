@@ -45,10 +45,10 @@ static struct
 {
 	{ "vj20", CODEC_ID_YUV420F	},
 	{ "vj22", CODEC_ID_YUV422F	},
-    { "mjpg" ,CODEC_ID_MJPEG 	},
+    	{ "mjpg" ,CODEC_ID_MJPEG 	},
 	{ "mjpb", CODEC_ID_MJPEGB	},
-    { "i420", CODEC_ID_YUV420	},
-    { "i422", CODEC_ID_YUV422	},
+	{ "i420", CODEC_ID_YUV420	},
+    	{ "i422", CODEC_ID_YUV422	},
 	{ "dmb1", CODEC_ID_MJPEG	},
 	{ "jpeg", CODEC_ID_MJPEG	},
 	{ "mjpa", CODEC_ID_MJPEG	},
@@ -81,9 +81,12 @@ static struct
 	{ "rpza", CODEC_ID_RPZA		},
 	{ "y42b", CODEC_ID_YUV422F  },
 	{ "pict", 0xffff			},
+
 	{ NULL  , 0,				},
 };
 
+
+#define MAX_PACKETS 5
 
 typedef struct
 {
@@ -97,11 +100,19 @@ typedef struct
 	VJFrame *output;
 	VJFrame *input;
 	void *scaler;
+    int video_stream_id;
+    AVPacket packets[MAX_PACKETS];
+    uint32_t write_index;
+    uint32_t read_index;
+    double  spvf;
 } el_decoder_t;
+
 
 //instead of iterating _supported_codecs and using a strncasecmp on every entry to find the codec_id, use a hash table that returns the codec identifier on hashed fourcc key
 //this collection is never freed and initialized on first access
 static hash_t *fourccTable = NULL;
+
+static inline void *avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, int dst_width, int dst_height, int force_intra_frame_only );
 
 typedef struct {
 	int codec_id;
@@ -260,6 +271,112 @@ void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 }
 
 void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height ) {
+        return avhelper_get_decoder_intra(filename, dst_pixfmt,dst_width,dst_height,1);
+}
+
+void	*avhelper_get_stream_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height ) {
+
+        el_decoder_t *x = (el_decoder_t*) avhelper_get_decoder_intra(filename, dst_pixfmt,dst_width,dst_height,0);
+
+        veejay_memset( &(x->packets[0]), 0, sizeof(AVPacket));
+        veejay_memset( &(x->packets[1]), 0, sizeof(AVPacket));
+
+        x->read_index = 0;
+        x->write_index = 0;
+        
+        return (void*) x;
+}
+
+
+#define MAX_QUEUE 1000
+#define OK 0
+// FIXME dirty now, refactor later
+// need timing information, pts, packet queue
+
+double avhelper_get_spvf( void *decoder ) {
+	el_decoder_t *x = (el_decoder_t*) decoder;
+	return x->spvf;
+}
+
+int avhelper_recv_frame_packet( void *decoder )
+{
+    el_decoder_t *x = (el_decoder_t*) decoder;
+
+    int ret = av_read_frame(x->avformat_ctx, &(x->packets[x->write_index]) );
+
+    if( ret == OK ) {
+        if( x->packets[ x->write_index ].stream_index != x->video_stream_id ) {
+            av_free_packet( &(x->packets[x->write_index]) );
+            veejay_memset( &(x->packets[x->write_index]), 0, sizeof(AVPacket) );
+            return 2; // discarded
+        }
+
+        x->write_index = (x->write_index + 1) % MAX_PACKETS;
+        return 1; // accepted
+    }
+
+    return -1; // error
+}
+
+int avhelper_recv_decode( void *decoder, int *got_picture )
+{
+    el_decoder_t *x = (el_decoder_t*) decoder;
+    int result = 0;
+    int gp = 0;
+
+
+    while(1) {
+
+        // only decode video
+        if( x->packets[ x->read_index ].stream_index != x->video_stream_id )
+            break;
+
+        result = avcodec_decode_video( x->codec_ctx, x->frame, &gp, x->packets[ x->read_index ].data, x->packets[ x->read_index ].size );
+        avhelper_frame_unref(x->frame);
+
+        av_free_packet( &(x->packets[x->write_index]) );
+        veejay_memset( &(x->packets[x->write_index]), 0, sizeof(AVPacket) );
+
+        x->read_index = (x->read_index + 1) % MAX_PACKETS;
+
+        if( gp )
+           break;
+    }
+    *got_picture = gp;
+    return result;
+}
+
+
+int	avhelper_get_frame( void *decoder, int *got_picture )
+{
+	el_decoder_t *x = (el_decoder_t*) decoder;
+
+	veejay_memset( &(x->pkt), 0, sizeof(AVPacket));
+	
+	int gp = 0;
+	int result = 0;
+	while(1) {
+	    int ret = av_read_frame(x->avformat_ctx, &(x->pkt));
+		if( ret < 0 )
+			break;
+
+		if ( x->pkt.stream_index == x->video_stream_id ) {
+			result = avcodec_decode_video( x->codec_ctx,x->frame,&gp, x->pkt.data, x->pkt.size );
+			avhelper_frame_unref(x->frame);
+		}
+				
+		av_free_packet( &(x->pkt) );	
+
+		if( gp )
+			break;
+	}
+
+    *got_picture = gp;
+
+	return result;
+}
+
+static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, int dst_width, int dst_height, int force_intra_frame_only ) {
 	char errbuf[512];
 	el_decoder_t *x = (el_decoder_t*) vj_calloc( sizeof( el_decoder_t ));
 	if(!x) {
@@ -298,31 +415,35 @@ void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width,
 	
 	unsigned int i,j;
 	unsigned int n = x->avformat_ctx->nb_streams;
-	int vi = -1;
+	
+        x->video_stream_id = -1;
 
 	for( i = 0; i < n; i ++ )
 	{
 		if( !x->avformat_ctx->streams[i]->codec )
 			continue;
 
-		if( x->avformat_ctx->streams[i]->codec->codec_type > CODEC_ID_FIRST_SUBTITLE ) 
+		if( x->avformat_ctx->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO )
 			continue;
-		
-		if( x->avformat_ctx->streams[i]->codec->codec_type < CODEC_ID_FIRST_AUDIO )
+
+		if( x->avformat_ctx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO )
 		{
-				int sup_codec = 0;
-				for( j = 0; _supported_codecs[j].name != NULL; j ++ ) {
-					if( x->avformat_ctx->streams[i]->codec->codec_id == _supported_codecs[j].id ) {
-						sup_codec = 1;
-						goto further;
-					}
-				}	
+				int sup_codec = !force_intra_frame_only;
+                                if( force_intra_frame_only ) {
+			        	for( j = 0; _supported_codecs[j].name != NULL; j ++ ) {
+				        	if( x->avformat_ctx->streams[i]->codec->codec_id == _supported_codecs[j].id ) {
+				        		sup_codec = 1;
+				        		goto further;
+				        	}
+				        }	
+                                }
 further:
 				if( !sup_codec ) {
 					avhelper_close_input_file( x->avformat_ctx );
 					free(x);
 					return NULL;
 				}
+
 				x->codec = avcodec_find_decoder( x->avformat_ctx->streams[i]->codec->codec_id );
 				if(x->codec == NULL ) 
 				{
@@ -330,22 +451,22 @@ further:
 					free(x);
 					return NULL;
 				}
-				vi = i;
+				x->video_stream_id = i;
 
-				veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: video stream %d, codec_id %d", vi, x->avformat_ctx->streams[i]->codec->codec_id);
+				veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: video stream %d, codec_id %d", x->video_stream_id, x->avformat_ctx->streams[i]->codec->codec_id);
 
 				break;
 		}
 	}
 
-	if( vi == -1 ) {
+	if( x->video_stream_id == -1 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: No video streams found");
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
 	}
 
-	x->codec_ctx = x->avformat_ctx->streams[vi]->codec;
+	x->codec_ctx = x->avformat_ctx->streams[x->video_stream_id]->codec;
 
 	int wid = dst_width;
 	int hei = dst_height;
@@ -369,6 +490,7 @@ further:
 	veejay_memset( &(x->pkt), 0, sizeof(AVPacket));
 	AVFrame *f = avhelper_alloc_frame();
 	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
+   x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
 
 	int got_picture = 0;
 	while(1) {
@@ -376,7 +498,7 @@ further:
 		if( ret < 0 )
 			break;
 
-		if ( x->pkt.stream_index == vi ) {
+		if ( x->pkt.stream_index == x->video_stream_id ) {
 			avcodec_decode_video( x->codec_ctx,f,&got_picture, x->pkt.data, x->pkt.size );
 			avhelper_frame_unref( f );
 		}
@@ -476,6 +598,11 @@ VJFrame	*avhelper_get_decoded_video(void *ptr) {
 	e->input->data[1] = e->frame->data[1];
 	e->input->data[2] = e->frame->data[2];
 	e->input->data[3] = e->frame->data[3];
+
+    e->input->stride[0] = e->frame->linesize[0];
+    e->input->stride[1] = e->frame->linesize[1];
+    e->input->stride[2] = e->frame->linesize[2];
+    e->input->stride[3] = e->frame->linesize[3];
 
 	return e->input;
 }

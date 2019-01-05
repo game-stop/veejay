@@ -1176,7 +1176,7 @@ v4l2_rw_fallback:
 
 	}
 
-	//FIXME this is here since libstream and libsample should be refactored (for now)
+	//TODO this is here since libstream and libsample should be refactored (for now)
 	if( v->format.fmt.pix.pixelformat == V4L2_PIX_FMT_RGB32 ||
 	    v->format.fmt.pix.pixelformat == V4L2_PIX_FMT_BGR32 ) {
 		// this allows us to convert to yuva regardless

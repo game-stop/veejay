@@ -53,9 +53,14 @@ int      get_total_mem(void);
 
 char     *veejay_title(veejay_t *info);
 
+void veejay_sample_set_initial_positions(veejay_t *info);
+
+void veejay_prepare_sample_positions(int id);
+
+void veejay_reset_sample_positions(veejay_t *info, int sample_id);
+
 void veejay_stop_sampling(veejay_t *info);
-void veejay_set_sample_f(veejay_t *info, int sample, int offset );
-void veejay_set_stream_f(veejay_t *info, int stream );
+
 void veejay_set_sample(veejay_t *info, int sample);
 
 int veejay_set_frame(veejay_t *info, long frame_num);

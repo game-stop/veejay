@@ -49,6 +49,7 @@ typedef struct
 } vj_picture;
 #endif
 
+// very old junk, should be re-written
 typedef struct {
 	void	*unicap[VJ_TAG_MAX_STREAM_IN];
     vj_yuv *stream[VJ_TAG_MAX_STREAM_IN];
@@ -57,7 +58,8 @@ typedef struct {
 #ifdef USE_GDK_PIXBUF
 	vj_picture *picture[VJ_TAG_MAX_STREAM_IN];
 #endif 
-       void	*cali[VJ_TAG_MAX_STREAM_IN];	
+    void	*cali[VJ_TAG_MAX_STREAM_IN];
+	void	*avformat[VJ_TAG_MAX_STREAM_IN];	
     int width;
     int height;
     int depth;
@@ -108,9 +110,6 @@ typedef struct {
 	int fade_alpha;
     int selected_entry;	
     int effect_toggle;
-    int socket_ready;
-    int socket_len;
-    uint8_t *socket_frame;
     int n_frames;
     void *priv;
     void *extra;
