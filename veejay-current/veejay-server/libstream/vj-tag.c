@@ -950,7 +950,13 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             }
     break;
 	case VJ_TAG_TYPE_AVFORMAT:
-		 	snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
+		snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
+		if(!avformat_thread_start(tag, _tag_info->effect_frame1)) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to start thread");
+			free(tag->source_name);
+			free(tag);
+			return -1;
+		}
 		break;
     case VJ_TAG_TYPE_DV1394:
 #ifdef SUPPORT_READ_DV2
@@ -2444,7 +2450,7 @@ int vj_tag_disable(int t1) {
     }
 
 	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT ) {
-		avformat_thread_stop( tag );
+		avformat_thread_set_state( tag,0 );
 	}
 
     if(tag->source_type == VJ_TAG_TYPE_V4L && !tag->clone )
@@ -2502,11 +2508,7 @@ int vj_tag_enable(int t1) {
 
 	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT )
 	{
-		if(!avformat_thread_start(tag, _tag_info->effect_frame1)) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to start thread");
-			return 1;
-		}
-
+		avformat_thread_set_state(tag,1);
 	}
 
 #ifdef USE_GDK_PIXBUF
@@ -3664,9 +3666,8 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
         break;
 	case VJ_TAG_TYPE_AVFORMAT:
 		if(!avformat_thread_get_frame( tag,dst )) //TODO: net and avformat seem to be the same, just like all other types. use a modular structure
-            return 0;
+         		   return 0;
         return 1;
-
 		break;
     case VJ_TAG_TYPE_COLOR:
         dummy_rgb_apply( dst, tag->color_r,tag->color_g,tag->color_b );

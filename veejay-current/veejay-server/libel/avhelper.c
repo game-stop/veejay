@@ -90,18 +90,19 @@ static struct
 
 typedef struct
 {
+	AVPacket packets[MAX_PACKETS];
 	AVCodec *codec;
 	AVCodecContext *codec_ctx;
 	AVFormatContext *avformat_ctx;
-	AVPacket pkt;
-	AVFrame *frame;
+	AVFrame *frames[2];
+	int	     frameinfo[2];
+	int frame_index;
 	int pixfmt;
 	int codec_id;
 	VJFrame *output;
 	VJFrame *input;
 	void *scaler;
     int video_stream_id;
-    AVPacket packets[MAX_PACKETS];
     uint32_t write_index;
     uint32_t read_index;
     double  spvf;
@@ -263,7 +264,8 @@ void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 		return NULL;
 	}
 
-	x->frame = avhelper_alloc_frame();
+	x->frames[0] = avhelper_alloc_frame();
+	x->frames[1] = avhelper_alloc_frame();
 
 	x->output = yuv_yuv_template( NULL,NULL,NULL, output->width, output->height, alpha_fmt_to_yuv(output->format) );
 
@@ -277,9 +279,9 @@ void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width,
 void	*avhelper_get_stream_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height ) {
 
         el_decoder_t *x = (el_decoder_t*) avhelper_get_decoder_intra(filename, dst_pixfmt,dst_width,dst_height,0);
-
-        veejay_memset( &(x->packets[0]), 0, sizeof(AVPacket));
-        veejay_memset( &(x->packets[1]), 0, sizeof(AVPacket));
+	if( x == NULL ) {
+		return NULL;
+	}
 
         x->read_index = 0;
         x->write_index = 0;
@@ -288,10 +290,7 @@ void	*avhelper_get_stream_decoder( const char *filename, int dst_pixfmt, int dst
 }
 
 
-#define MAX_QUEUE 1000
 #define OK 0
-// FIXME dirty now, refactor later
-// need timing information, pts, packet queue
 
 double avhelper_get_spvf( void *decoder ) {
 	el_decoder_t *x = (el_decoder_t*) decoder;
@@ -302,12 +301,13 @@ int avhelper_recv_frame_packet( void *decoder )
 {
     el_decoder_t *x = (el_decoder_t*) decoder;
 
+    veejay_memset( &(x->packets[x->write_index]), 0 , sizeof(AVPacket));
+
     int ret = av_read_frame(x->avformat_ctx, &(x->packets[x->write_index]) );
 
     if( ret == OK ) {
         if( x->packets[ x->write_index ].stream_index != x->video_stream_id ) {
             av_free_packet( &(x->packets[x->write_index]) );
-            veejay_memset( &(x->packets[x->write_index]), 0, sizeof(AVPacket) );
             return 2; // discarded
         }
 
@@ -324,18 +324,19 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
     int result = 0;
     int gp = 0;
 
-
     while(1) {
 
         // only decode video
         if( x->packets[ x->read_index ].stream_index != x->video_stream_id )
             break;
 
-        result = avcodec_decode_video( x->codec_ctx, x->frame, &gp, x->packets[ x->read_index ].data, x->packets[ x->read_index ].size );
-        avhelper_frame_unref(x->frame);
+        // poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
+        // this function, is the only function, that may manipulate frame_index, as it is used together with avhelper_get_decoded_video
+        // other functions in this source file, assume an index of 0 
+        result = avcodec_decode_video( x->codec_ctx, x->frames[x->frame_index], &gp, x->packets[ x->read_index ].data, x->packets[ x->read_index ].size );
+        avhelper_frame_unref(x->frames[x->frame_index]);
 
         av_free_packet( &(x->packets[x->write_index]) );
-        veejay_memset( &(x->packets[x->write_index]), 0, sizeof(AVPacket) );
 
         x->read_index = (x->read_index + 1) % MAX_PACKETS;
 
@@ -343,6 +344,16 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
            break;
     }
     *got_picture = gp;
+
+	if(gp) {
+		x->frameinfo[x->frame_index] = 1; /* we have a full picture at this index */
+		x->frame_index = (x->frame_index + 1) % 2; /* use next available buffer */
+		x->frameinfo[x->frame_index] = 0; /* and clear the information */
+	}
+	else {
+		x->frameinfo[x->frame_index] = 0;
+	}
+
     return result;
 }
 
@@ -351,21 +362,21 @@ int	avhelper_get_frame( void *decoder, int *got_picture )
 {
 	el_decoder_t *x = (el_decoder_t*) decoder;
 
-	veejay_memset( &(x->pkt), 0, sizeof(AVPacket));
+	veejay_memset( &(x->packets[0]), 0, sizeof(AVPacket));
 	
 	int gp = 0;
 	int result = 0;
 	while(1) {
-	    int ret = av_read_frame(x->avformat_ctx, &(x->pkt));
+	    int ret = av_read_frame(x->avformat_ctx, &(x->packets[0]));
 		if( ret < 0 )
 			break;
 
-		if ( x->pkt.stream_index == x->video_stream_id ) {
-			result = avcodec_decode_video( x->codec_ctx,x->frame,&gp, x->pkt.data, x->pkt.size );
-			avhelper_frame_unref(x->frame);
+		if ( x->packets[0].stream_index == x->video_stream_id ) {
+			result = avcodec_decode_video( x->codec_ctx,x->frames[x->frame_index],&gp, x->packets[0].data, x->packets[0].size );
+			avhelper_frame_unref(x->frames[x->frame_index]);
 		}
 				
-		av_free_packet( &(x->pkt) );	
+		av_free_packet( &(x->packets[0]) );	
 
 		if( gp )
 			break;
@@ -487,23 +498,23 @@ further:
 		return NULL;
 	}
 
-	veejay_memset( &(x->pkt), 0, sizeof(AVPacket));
+	veejay_memset( &(x->packets[0]), 0, sizeof(AVPacket));
 	AVFrame *f = avhelper_alloc_frame();
 	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
    x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
 
 	int got_picture = 0;
 	while(1) {
-	    int ret = av_read_frame(x->avformat_ctx, &(x->pkt));
+	    	int ret = av_read_frame(x->avformat_ctx, &(x->packets[0]));
 		if( ret < 0 )
 			break;
 
-		if ( x->pkt.stream_index == x->video_stream_id ) {
-			avcodec_decode_video( x->codec_ctx,f,&got_picture, x->pkt.data, x->pkt.size );
+		if ( x->packets[0].stream_index == x->video_stream_id ) {
+			avcodec_decode_video( x->codec_ctx,f,&got_picture, x->packets[0].data, x->packets[0].size );
 			avhelper_frame_unref( f );
 		}
 				
-		av_free_packet( &(x->pkt) );	
+		av_free_packet( &(x->packets[0]) );	
 
 		if( got_picture )
 			break;
@@ -521,7 +532,8 @@ further:
 
 	x->pixfmt = x->codec_ctx->pix_fmt;
 	x->codec_id = x->codec_ctx->codec_id;
-	x->frame = avhelper_alloc_frame();
+	x->frames[0] = avhelper_alloc_frame();
+	x->frames[1] = avhelper_alloc_frame();
 	x->input = yuv_yuv_template( NULL,NULL,NULL, x->codec_ctx->width,x->codec_ctx->height, x->pixfmt );
 
 	return (void*) x;
@@ -544,18 +556,26 @@ void	avhelper_close_decoder( void *ptr )
 {
 	el_decoder_t *e = (el_decoder_t*) ptr;
 	avcodec_close( e->codec_ctx );
+
+	for( int i = 0; i < MAX_PACKETS ; i ++ ) {
+		av_free_packet( &(e->packets[i]) );
+	}
+	
 	if(e->avformat_ctx) {
 		avhelper_close_input_file( e->avformat_ctx );
 	}
 	if(e->scaler) {
 		yuv_free_swscaler( e->scaler );
 	}
+	
 	if(e->input)
 		free(e->input);
 	if(e->output)
 		free(e->output);
-	if(e->frame)
-		av_free(e->frame);
+	if(e->frames[0])
+		av_free(e->frames[0]);
+	if(e->frames[1])
+		av_free(e->frames[1]);
 	free(e);
 }
 
@@ -577,9 +597,9 @@ int	avhelper_decode_video( void *ptr, uint8_t *data, int len )
 	int got_picture = 0;
 	el_decoder_t * e = (el_decoder_t*) ptr;
 
-	int result = avcodec_decode_video( e->codec_ctx, e->frame, &got_picture, data, len );
+	int result = avcodec_decode_video( e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
 
-	avhelper_frame_unref(e->frame);
+	avhelper_frame_unref(e->frames[e->frame_index]);
 	
 	if(!got_picture || result <= 0) {
 		return 0;
@@ -593,16 +613,25 @@ VJFrame	*avhelper_get_decoded_video(void *ptr) {
 	if(e->input == NULL) {
 		e->input = yuv_yuv_template( NULL,NULL,NULL, e->codec_ctx->width,e->codec_ctx->height, e->codec_ctx->pix_fmt );
 	}
-	
-	e->input->data[0] = e->frame->data[0];
-	e->input->data[1] = e->frame->data[1];
-	e->input->data[2] = e->frame->data[2];
-	e->input->data[3] = e->frame->data[3];
 
-    e->input->stride[0] = e->frame->linesize[0];
-    e->input->stride[1] = e->frame->linesize[1];
-    e->input->stride[2] = e->frame->linesize[2];
-    e->input->stride[3] = e->frame->linesize[3];
+	int idx = 0;
+	if( e->frameinfo[1] == 1 ) // find best frame
+			idx = 1;
+	
+	if( e->frameinfo[0] == 0 && e->frameinfo[1] == 0 ) {
+			veejay_msg(0, "No frames have been decoded yet");
+	}
+
+	
+	e->input->data[0] = e->frames[idx]->data[0];
+	e->input->data[1] = e->frames[idx]->data[1];
+	e->input->data[2] = e->frames[idx]->data[2];
+	e->input->data[3] = e->frames[idx]->data[3];
+
+    	e->input->stride[0] = e->frames[idx]->linesize[0];
+    	e->input->stride[1] = e->frames[idx]->linesize[1];
+    	e->input->stride[2] = e->frames[idx]->linesize[2];
+    	e->input->stride[3] = e->frames[idx]->linesize[3];
 
 	return e->input;
 }
@@ -631,15 +660,15 @@ void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
 	}
 
 
-	e->input->data[0] = e->frame->data[0];
-	e->input->data[1] = e->frame->data[1];
-	e->input->data[2] = e->frame->data[2];
-	e->input->data[3] = e->frame->data[3];
+	e->input->data[0] = e->frames[e->frame_index]->data[0];
+	e->input->data[1] = e->frames[e->frame_index]->data[1];
+	e->input->data[2] = e->frames[e->frame_index]->data[2];
+	e->input->data[3] = e->frames[e->frame_index]->data[3];
 
 	e->output->data[0] = dst[0];
 	e->output->data[1] = dst[1];
 	e->output->data[2] = dst[2];
 
-	yuv_convert_any3( e->scaler, e->input, e->frame->linesize, e->output, e->input->format, e->pixfmt );
+	yuv_convert_any3( e->scaler, e->input, e->frames[e->frame_index]->linesize, e->output, e->input->format, e->pixfmt );
 
 }
