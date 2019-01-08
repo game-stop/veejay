@@ -66,6 +66,8 @@ int avhelper_recv_decode( void *decoder, int *got_picture );
 
 int avhelper_recv_frame_packet( void *decoder );
 
+int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len );
+
 double avhelper_get_spvf( void *decoder );
 
 #endif

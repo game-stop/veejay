@@ -318,6 +318,29 @@ int avhelper_recv_frame_packet( void *decoder )
     return -1; // error
 }
 
+int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len ) 
+{
+	int got_picture = 0;
+	el_decoder_t * e = (el_decoder_t*) ptr;
+
+	avcodec_decode_video( e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
+
+	//avhelper_frame_unref(e->frames[e->frame_index]);
+
+	if(got_picture) {
+		e->frameinfo[e->frame_index] = 1; /* we have a full picture at this index */
+		e->frame_index = (e->frame_index + 1) % 2; /* use next available buffer */
+		e->frameinfo[e->frame_index] = 0; /* and clear the information */
+		return 1;
+	}
+	else {
+		e->frameinfo[e->frame_index] = 0;
+	}
+
+	return 0;
+}
+
+
 int avhelper_recv_decode( void *decoder, int *got_picture )
 {
     el_decoder_t *x = (el_decoder_t*) decoder;
@@ -501,7 +524,7 @@ further:
 	veejay_memset( &(x->packets[0]), 0, sizeof(AVPacket));
 	AVFrame *f = avhelper_alloc_frame();
 	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
-   x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
+	x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
 
 	int got_picture = 0;
 	while(1) {

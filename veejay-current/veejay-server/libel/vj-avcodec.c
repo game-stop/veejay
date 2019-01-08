@@ -415,11 +415,9 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 
 	char *av_log_setting = getenv("VEEJAY_AV_LOG");
 	if(av_log_setting != NULL) {
-		int enabled = atoi(av_log_setting);
-		if(enabled) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "FFMpeg Log is enabled");
-			av_log_set_level(AV_LOG_VERBOSE);
-		}
+		int level = atoi(av_log_setting);
+		veejay_msg(VEEJAY_MSG_DEBUG, "ffmpeg/libav log level set to %d", level);
+		av_log_set_level(level);
 	}
 
 #if LIBAVCODEC_BUILD < 5400

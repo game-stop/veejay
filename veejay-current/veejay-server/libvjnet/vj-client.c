@@ -311,7 +311,7 @@ int vj_client_read_frame_data( vj_client *v, int datalen)
 		return n;
 	}
 
-	return avhelper_decode_video( v->decoder, v->space, n );
+	return avhelper_decode_video_buffer( v->decoder, v->space, n );
 }
 
 int	vj_client_read_no_wait(vj_client *v, int sock_type, uint8_t *dst, int bytes )

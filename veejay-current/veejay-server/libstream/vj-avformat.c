@@ -55,6 +55,10 @@ static int lock(threaded_t *t)
 {
 	return pthread_mutex_lock( &(t->mutex ));
 }
+static int trylock(threaded_t *t)
+{
+	return pthread_mutex_trylock( &(t->mutex ));
+}
 
 static int unlock(threaded_t *t)
 {
@@ -67,6 +71,9 @@ static int eval_state(threaded_t *t, vj_tag *tag)
 	lock(t);
 
 	if(t->state == STATE_ERROR || t->decoder == NULL) {
+
+			//FIXME: this part can take some time, but we must let other functions not block due to having the sema up here
+			//
 			if(t->decoder) {
 				avhelper_close_decoder(t->decoder);
 				t->decoder = NULL;
@@ -140,6 +147,7 @@ static void	*reader_thread(void *data)
 					if( error ) {
 						lock(t);
 						t->state = STATE_ERROR;
+						t->have_frame = 0;
 						unlock(t);
 					}
 				}
@@ -168,9 +176,12 @@ NETTHREADEXIT:
 void	avformat_thread_set_state(vj_tag *tag, int new_state)
 {
 	threaded_t *t = (threaded_t*) tag->priv;
-	lock(t);
-	t->state = new_state;
-	unlock(t);
+	if(trylock(t) == 0 ) {
+		t->state = new_state;
+		unlock(t);
+	} else {
+		veejay_msg(VEEJAY_MSG_WARNING,"Failed to set state, thread is busy"); //FIXME thread that initially takes a long startup time, locks main thread from controls
+	}
 }
 
 void	*avformat_thread_allocate(VJFrame *frame)
@@ -183,9 +194,14 @@ int	avformat_thread_get_frame( vj_tag *tag, VJFrame *dst )
 {
 	threaded_t *t = (threaded_t*) tag->priv;
 
-	lock(t);
+	lock(t);  //FIXME thread that initially takes a long startup time, locks main thread from controls
+
+	if( !(t->state==STATE_RUNNING) || t->have_frame == 0 ) {
+		unlock(t);
+		return 1;
+	}
 	VJFrame *src = avhelper_get_decoded_video(t->decoder);
-		if(t->scaler == NULL) {
+	if(t->scaler == NULL) {
 		sws_template sws_templ;
 		memset( &sws_templ, 0, sizeof(sws_template));
 		sws_templ.flags = yuv_which_scaler();
@@ -217,7 +233,7 @@ int	avformat_thread_start(vj_tag *tag, VJFrame *info)
 	p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
 		
 	if( p_err ==0) {
-		veejay_msg(VEEJAY_MSG_INFO, "Created thread for stream [%s]",tag->source_name );
+		veejay_msg(VEEJAY_MSG_INFO, "Created new input stream %d for [%s]",tag->id, tag->source_name );
 	}
 
 	return 1; 
