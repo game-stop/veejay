@@ -616,22 +616,17 @@ VJFrame	*avhelper_get_decoded_video(void *ptr) {
 
 	int idx = 0;
 	if( e->frameinfo[1] == 1 ) // find best frame
-			idx = 1;
-	
-	if( e->frameinfo[0] == 0 && e->frameinfo[1] == 0 ) {
-			veejay_msg(0, "No frames have been decoded yet");
-	}
-
+		idx = 1;
 	
 	e->input->data[0] = e->frames[idx]->data[0];
 	e->input->data[1] = e->frames[idx]->data[1];
 	e->input->data[2] = e->frames[idx]->data[2];
 	e->input->data[3] = e->frames[idx]->data[3];
 
-    	e->input->stride[0] = e->frames[idx]->linesize[0];
-    	e->input->stride[1] = e->frames[idx]->linesize[1];
-    	e->input->stride[2] = e->frames[idx]->linesize[2];
-    	e->input->stride[3] = e->frames[idx]->linesize[3];
+   	e->input->stride[0] = e->frames[idx]->linesize[0];
+   	e->input->stride[1] = e->frames[idx]->linesize[1];
+   	e->input->stride[2] = e->frames[idx]->linesize[2];
+   	e->input->stride[3] = e->frames[idx]->linesize[3];
 
 	return e->input;
 }
