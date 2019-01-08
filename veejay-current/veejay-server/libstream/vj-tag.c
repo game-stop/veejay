@@ -2450,7 +2450,8 @@ int vj_tag_disable(int t1) {
     }
 
 	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT ) {
-		avformat_thread_set_state( tag,0 );
+		tag->active = avformat_thread_set_state( tag,0 );
+		return 1;
 	}
 
     if(tag->source_type == VJ_TAG_TYPE_V4L && !tag->clone )
@@ -2502,13 +2503,16 @@ int vj_tag_enable(int t1) {
         {
             veejay_msg(VEEJAY_MSG_ERROR,
                     "Unable to start thread");
-            return 1;
+            return -1;
         }
     }
 
 	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT )
 	{
-		avformat_thread_set_state(tag,1);
+		if(!avformat_thread_set_state(tag,1)) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Thread is not ready to change state");
+			return -1;
+		}
 	}
 
 #ifdef USE_GDK_PIXBUF
@@ -3639,9 +3643,9 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 #endif
     case VJ_TAG_TYPE_MCAST:
     case VJ_TAG_TYPE_NET:
-        if(!net_thread_get_frame( tag,dst ))
-            return 0;
-        return 1;
+        if(!net_thread_get_frame( tag,dst )) {
+		return 0; //failed to get frame
+	}
         break;
     case VJ_TAG_TYPE_YUV4MPEG:
         res = vj_yuv_get_frame(vj_tag_input->stream[tag->index],buffer);
@@ -3665,9 +3669,12 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
         }
         break;
 	case VJ_TAG_TYPE_AVFORMAT:
+		if(!tag->active)
+			return 0; // not allowed to enter get_frame
 		if(!avformat_thread_get_frame( tag,dst )) //TODO: net and avformat seem to be the same, just like all other types. use a modular structure
-         		   return 0;
-        return 1;
+		{
+			return 0; // failed to get frame
+		}
 		break;
     case VJ_TAG_TYPE_COLOR:
         dummy_rgb_apply( dst, tag->color_r,tag->color_g,tag->color_b );

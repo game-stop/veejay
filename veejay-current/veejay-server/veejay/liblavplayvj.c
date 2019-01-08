@@ -639,11 +639,10 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	
 	if(vj_tag_enable( stream_id ) <= 0 )
 	{
-		veejay_msg(0, "Unable to activate stream ?");
-		return 0;
+		veejay_msg(VEEJAY_MSG_WARNING, "Unable to activate stream %d", stream_id);
 	}
 
-	vj_tag_set_active( stream_id, 1 );
+//	vj_tag_set_active( stream_id, 1 );
 
 	int	tmp = vj_tag_chain_malloc( stream_id);
 	if( settings->current_playback_speed == 0 )

@@ -71,18 +71,16 @@ static int eval_state(threaded_t *t, vj_tag *tag)
 	lock(t);
 
 	if(t->state == STATE_ERROR || t->decoder == NULL) {
-
-			//FIXME: this part can take some time, but we must let other functions not block due to having the sema up here
-			//
 			if(t->decoder) {
 				avhelper_close_decoder(t->decoder);
 				t->decoder = NULL;
 			}
-			veejay_msg(VEEJAY_MSG_INFO, " ... Waiting for thread to become ready [%s]",tag->source_name);
+			veejay_msg(VEEJAY_MSG_INFO, "[%s] ... Waiting for thread to become ready",tag->source_name);
 
 			t->decoder = avhelper_get_stream_decoder( tag->source_name, t->info->format, t->info->width, t->info->height );
 			if(t->decoder == NULL) {
 				t->state = STATE_ERROR;
+
 			}
 			else {
 				t->spvf = avhelper_get_spvf(t->decoder);
@@ -120,14 +118,14 @@ static void	*reader_thread(void *data)
 					double time_start = av_gettime_relative() / 1000000.0;
 					while( (result = avhelper_recv_frame_packet(t->decoder))== 2) {} 
 					if( result < 0 ) {
-						veejay_msg(0, "There was an error retrieving the frame");
+						veejay_msg(0, "[%s] There was an error retrieving the frame", tag->source_name);
 						error = 1;
 					}
 					if( result == 1 ) {
 						lock(t);
 						result = avhelper_recv_decode( t->decoder, &got_picture );
 						if( result < 0 ) {
-							veejay_msg(0,"There was an error decoding the frame");
+							veejay_msg(0,"[%s] There was an error decoding the frame", tag->source_name);
 							error = 1;
 						}
 						if( got_picture ) {
@@ -166,22 +164,24 @@ NETTHREADEXIT:
 		t->decoder = NULL;
 	}
 
-	veejay_msg(VEEJAY_MSG_ERROR, "Thread was told to exit");
+	veejay_msg(VEEJAY_MSG_ERROR, "[%s] Thread was told to exit", tag->source_name);
 
 	pthread_exit(NULL);
 
 	return NULL;
 }
 
-void	avformat_thread_set_state(vj_tag *tag, int new_state)
+int	avformat_thread_set_state(vj_tag *tag, int new_state)
 {
 	threaded_t *t = (threaded_t*) tag->priv;
 	if(trylock(t) == 0 ) {
 		t->state = new_state;
 		unlock(t);
+		return 1;
 	} else {
-		veejay_msg(VEEJAY_MSG_WARNING,"Failed to set state, thread is busy"); //FIXME thread that initially takes a long startup time, locks main thread from controls
+		veejay_msg(VEEJAY_MSG_WARNING,"[%s] Thread is busy, cannot set state to %d",tag->source_name, new_state); 
 	}
+	return 0;
 }
 
 void	*avformat_thread_allocate(VJFrame *frame)
@@ -194,8 +194,7 @@ int	avformat_thread_get_frame( vj_tag *tag, VJFrame *dst )
 {
 	threaded_t *t = (threaded_t*) tag->priv;
 
-	lock(t);  //FIXME thread that initially takes a long startup time, locks main thread from controls
-
+	lock(t);  
 	if( !(t->state==STATE_RUNNING) || t->have_frame == 0 ) {
 		unlock(t);
 		return 1;
@@ -233,7 +232,7 @@ int	avformat_thread_start(vj_tag *tag, VJFrame *info)
 	p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
 		
 	if( p_err ==0) {
-		veejay_msg(VEEJAY_MSG_INFO, "Created new input stream %d for [%s]",tag->id, tag->source_name );
+		veejay_msg(VEEJAY_MSG_INFO, "[%s] Created new input stream %d",tag->source_name, tag->id );
 	}
 
 	return 1; 
@@ -252,6 +251,6 @@ void	avformat_thread_stop(vj_tag *tag)
 		free(t->dest);
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Thread has exited");
+	veejay_msg(VEEJAY_MSG_INFO, "[%s] Thread has exited", tag->source_name);
 }
 

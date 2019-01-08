@@ -1780,8 +1780,8 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int ty
 				vj_tag_set_active(sample_id, 1 );
 			}
 		
-		  	if (vj_tag_get_active(sample_id) == 1 )
-			{	
+		  	//if (vj_tag_get_active(sample_id) == 1 )
+			//{	
 				int res = vj_tag_get_frame(sample_id, dst,audio_buffer[chain_entry]);
 				if(res==1)	{
 			  		error = 0;
@@ -1789,9 +1789,9 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int ty
 				}
 				else
 				{
-					vj_tag_set_active(sample_id, 0);
+					//vj_tag_set_active(sample_id, 0);  <-- user issue now, delete the stream
 				}
-			}
+			//}
 		}
 		else
 		{	
@@ -2002,18 +2002,18 @@ static int vj_perform_apply_secundary(veejay_t * info, int this_sample_id, int s
 					vj_tag_set_active(sample_id, 1 );
 				}
 		
-				if (vj_tag_get_active(sample_id) == 1)
-				{ 
+			//	if (vj_tag_get_active(sample_id) == 1)
+		//		{ 
 					res = vj_tag_get_frame(sample_id, dst,audio_buffer[chain_entry]);
 					if(res) {
 						error = 0; 
 						ssm = dst->ssm;
 					}					
-					else
-					{
-						vj_tag_set_active(sample_id, 0); // stop stream
-					}
-				}
+			//		else
+		//			{
+		//				vj_tag_set_active(sample_id, 0); // stop stream
+		//			}
+		//		}
 			}
 			else
 			{
@@ -2897,15 +2897,16 @@ static void vj_perform_tag_fill_buffer(veejay_t * info)
     
     if(!active)
     {
-		if (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE ) 
-			vj_tag_enable( info->uc->sample_id );	
-	}
+		if (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE || type == VJ_TAG_TYPE_AVFORMAT ) 
+			vj_tag_enable( info->uc->sample_id );
+		
+    }
     else
     {
 		if (vj_tag_get_frame(info->uc->sample_id, info->effect_frame1,NULL))
 		{
-				error = 0;
-				cached_tag_frames[0] = info->uc->sample_id;
+			error = 0;
+			cached_tag_frames[0] = info->uc->sample_id;
 		}
 	}         
 

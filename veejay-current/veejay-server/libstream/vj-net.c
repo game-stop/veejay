@@ -52,6 +52,22 @@ typedef struct
 #define STATE_RUNNING  1
 #define STATE_QUIT 2
 #define STATE_ERROR 4
+#define MS_TO_NANO(a) (a *= 1000000)
+static	void	net_delay(long ms, long sec )
+{
+	struct timespec ts;
+	ts.tv_sec = sec;
+	ts.tv_nsec = MS_TO_NANO( ms );
+	clock_nanosleep( CLOCK_REALTIME,0, &ts, NULL );
+}
+
+static int my_screen_id = -1;
+void  net_set_screen_id(int id)
+{
+	my_screen_id = id;
+	veejay_msg(VEEJAY_MSG_DEBUG,"Network stream bound to screen %d", id );
+}
+
 
 static int lock(threaded_t *t)
 {
@@ -81,6 +97,7 @@ static int eval_state(threaded_t *t, vj_tag *tag)
 				vj_client_free(t->v);
 				t->v = NULL;
 			}
+			net_delay(0,1);
 		}
 		else {
 			veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
@@ -112,6 +129,7 @@ static int eval_state_mcast(threaded_t *t, vj_tag *tag) //FIXME: split this up i
 				vj_client_free(t->v);
 				t->v = NULL;
 			}
+			net_delay(0,1);
 		}
 		else {
 			veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
@@ -125,22 +143,6 @@ static int eval_state_mcast(threaded_t *t, vj_tag *tag) //FIXME: split this up i
 	return ret;
 }
 
-
-#define MS_TO_NANO(a) (a *= 1000000)
-static	void	net_delay(long ms, long sec )
-{
-	struct timespec ts;
-	ts.tv_sec = sec;
-	ts.tv_nsec = MS_TO_NANO( ms );
-	clock_nanosleep( CLOCK_REALTIME,0, &ts, NULL );
-}
-
-static int my_screen_id = -1;
-void  net_set_screen_id(int id)
-{
-	my_screen_id = id;
-	veejay_msg(VEEJAY_MSG_DEBUG,"Network stream bound to screen %d", id );
-}
 
 static void	*reader_thread(void *data)
 {
@@ -359,9 +361,12 @@ int	net_thread_start(vj_tag *tag, VJFrame *info)
 			tag->source_type == VJ_TAG_TYPE_MCAST ? 
 			"multicast" : "unicast", tag->source_name,tag->video_channel);
 	}
+	//FIXME: limited resources is not a concept in veejay
 
 	return 1; 
 }
+
+//FIXME: net_thread_set_state or modular structure
 
 void	net_thread_stop(vj_tag *tag)
 {

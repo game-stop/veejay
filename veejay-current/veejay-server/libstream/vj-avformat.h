@@ -24,5 +24,5 @@ void	avformat_thread_stop(vj_tag *tag);
 int	avformat_thread_start(vj_tag *tag, VJFrame *info);
 int	avformat_thread_get_frame( vj_tag *tag, VJFrame *dst);
 void	*avformat_thread_allocate(VJFrame *frame);
-void	avformat_thread_set_state(vj_tag *,int new_state);
+int	avformat_thread_set_state(vj_tag *,int new_state);
 #endif
