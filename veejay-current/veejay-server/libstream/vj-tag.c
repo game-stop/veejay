@@ -3669,7 +3669,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 	case VJ_TAG_TYPE_AVFORMAT:
 		if(!tag->active)
 			return 0; // not allowed to enter get_frame
-		if(!avformat_thread_get_frame( tag,dst )) //TODO: net and avformat seem to be the same, just like all other types. use a modular structure
+		if(!avformat_thread_get_frame( tag,dst,_tag_info->real_fps )) //TODO: net and avformat seem to be the same, just like all other types. use a modular structure
 		{
 			return 0; // failed to get frame
 		}

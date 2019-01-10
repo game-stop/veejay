@@ -47,6 +47,7 @@ typedef struct
 	VJFrame *dest; // there is no full range YUV + alpha in PIX_FMT family
 	void *scaler;
 	double spvf;
+	double elapsed;
 } threaded_t;
 
 #define STATE_INACTIVE 0
@@ -149,9 +150,9 @@ static void	*reader_thread(void *data)
 
 						double time_end = av_gettime_relative() / 1000000.0;
 						double time_diff = time_end - time_start;
-
+						double spvf = t->spvf + t->elapsed; // if FX chain is slow, slow down thread - no point in decoding 
 						// naive implementation for clock, source is too slow for playback at specified framerate when time_diff > spvf
-						if( time_diff < t->spvf && t->have_frame ) {
+						if( time_diff < spvf && t->have_frame ) {
 							unsigned int usec = (unsigned int) (( t->spvf - time_diff ) * 1000000.0);
 							av_usleep(usec);
 						}
@@ -211,7 +212,7 @@ void	*avformat_thread_allocate(VJFrame *frame)
 	return (void*) t;
 }
 
-int	avformat_thread_get_frame( vj_tag *tag, VJFrame *dst )
+int	avformat_thread_get_frame( vj_tag *tag, VJFrame *dst, int ms_elapsed_since_last_frame )
 {
 	threaded_t *t = (threaded_t*) tag->priv;
 
@@ -227,6 +228,8 @@ int	avformat_thread_get_frame( vj_tag *tag, VJFrame *dst )
 		sws_templ.flags = yuv_which_scaler();
 		t->scaler = yuv_init_swscaler( src,t->dest, &sws_templ, yuv_sws_get_cpu_flags() );
 	}
+
+	t->elapsed = (double) (ms_elapsed_since_last_frame > 0 ? ms_elapsed_since_last_frame / 1000.0 : 0.0 );
 
 	yuv_convert_and_scale( t->scaler, src,dst );
 	unlock(t);
