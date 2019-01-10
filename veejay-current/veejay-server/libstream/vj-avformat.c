@@ -19,6 +19,8 @@
 
 #include <config.h>
 #include <stdint.h>
+#include <errno.h>
+#include <string.h>
 #include <pthread.h>
 #include <libavutil/time.h>
 #include <libavcodec/avcodec.h>
@@ -36,6 +38,7 @@
 typedef struct
 {
 	pthread_mutex_t mutex;
+	pthread_mutexattr_t attr;
 	pthread_t thread;
 	int state;
 	int have_frame;
@@ -53,16 +56,28 @@ typedef struct
 
 static int lock(threaded_t *t)
 {
-	return pthread_mutex_lock( &(t->mutex ));
+	int p_err = 0;
+	if( (p_err = pthread_mutex_lock( &(t->mutex )) != 0 )) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Error %d: %s (lock)", p_err, strerror(p_err));
+	}
+	return p_err;
 }
 static int trylock(threaded_t *t)
 {
-	return pthread_mutex_trylock( &(t->mutex ));
+	int p_err = 0;
+	if( pthread_mutex_trylock( &(t->mutex )) != 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Error %d: %s (trylock)",p_err, strerror(p_err));
+	}
+	return p_err;
 }
 
 static int unlock(threaded_t *t)
 {
-	return pthread_mutex_unlock( &(t->mutex ));
+	int p_err = 0;
+	if(pthread_mutex_unlock( &(t->mutex )) != 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Error %d: %s (unlock)",p_err, strerror(p_err));
+	}
+	return p_err;
 }
 
 static int eval_state(threaded_t *t, vj_tag *tag)
@@ -78,11 +93,7 @@ static int eval_state(threaded_t *t, vj_tag *tag)
 			veejay_msg(VEEJAY_MSG_INFO, "[%s] ... Waiting for thread to become ready",tag->source_name);
 
 			t->decoder = avhelper_get_stream_decoder( tag->source_name, t->info->format, t->info->width, t->info->height );
-			if(t->decoder == NULL) {
-				t->state = STATE_ERROR;
-
-			}
-			else {
+			if(t->decoder != NULL) {
 				t->spvf = avhelper_get_spvf(t->decoder);
 				t->state = STATE_RUNNING;
 			}
@@ -116,11 +127,14 @@ static void	*reader_thread(void *data)
 			case STATE_RUNNING:	
 				{
 					double time_start = av_gettime_relative() / 1000000.0;
-					while( (result = avhelper_recv_frame_packet(t->decoder))== 2) {} 
+					lock(t);
+					while( (result = avhelper_recv_frame_packet(t->decoder))== 2) {}
+				        unlock(t);	
 					if( result < 0 ) {
 						veejay_msg(0, "[%s] There was an error retrieving the frame", tag->source_name);
 						error = 1;
 					}
+					
 					if( result == 1 ) {
 						lock(t);
 						result = avhelper_recv_decode( t->decoder, &got_picture );
@@ -150,6 +164,11 @@ static void	*reader_thread(void *data)
 					}
 				}
 				break;
+			case STATE_ERROR:
+				{
+					av_usleep(1000000);
+				}
+				break;
 			case STATE_QUIT:
 				{
 					goto NETTHREADEXIT;
@@ -159,10 +178,12 @@ static void	*reader_thread(void *data)
 
 NETTHREADEXIT:
 
+	lock(t);
 	if(t->decoder) {
 		avhelper_close_decoder(t->decoder);
 		t->decoder = NULL;
 	}
+	unlock(t);
 
 	veejay_msg(VEEJAY_MSG_ERROR, "[%s] Thread was told to exit", tag->source_name);
 
@@ -223,6 +244,10 @@ int	avformat_thread_start(vj_tag *tag, VJFrame *info)
 		return 0;
 	}
 
+	if((p_err = pthread_mutexattr_settype( &(t->attr), PTHREAD_MUTEX_ERRORCHECK)) != 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s", strerror(errno));
+	}
+
 	pthread_mutex_init( &(t->mutex), NULL );
 
 	t->have_frame = 0;
@@ -240,16 +265,26 @@ int	avformat_thread_start(vj_tag *tag, VJFrame *info)
 
 void	avformat_thread_stop(vj_tag *tag)
 {
+	int p_err = 0;
 	threaded_t *t = (threaded_t*)tag->priv;
 	
 	lock(t);
 	t->state = STATE_QUIT;
 	unlock(t);
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for termination of thread ...");
+	if((p_err = pthread_join( t->thread, NULL )) != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Error %d (%s)",p_err,strerror(p_err));
+	}
+
 	pthread_mutex_destroy( &(t->mutex));
 	if(t->dest) {
 		free(t->dest);
+		t->dest = NULL;
 	}
+
+	free(t);
+	t = NULL;
 
 	veejay_msg(VEEJAY_MSG_INFO, "[%s] Thread has exited", tag->source_name);
 }

@@ -1302,7 +1302,6 @@ int vj_tag_del(int id)
      break;
 	 case VJ_TAG_TYPE_AVFORMAT:
 		avformat_thread_stop(tag);
-        if(tag->priv) free(tag->priv);  
 	 break;
 #ifdef SUPPORT_READ_DV2
       case VJ_TAG_TYPE_DV1394:
@@ -1334,7 +1333,6 @@ int vj_tag_del(int id)
     case VJ_TAG_TYPE_MCAST:
     case VJ_TAG_TYPE_NET:
         net_thread_stop(tag);
-        if(tag->priv) free(tag->priv);  
         break;
     case VJ_TAG_TYPE_COLOR:
         break;

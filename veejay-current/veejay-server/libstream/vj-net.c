@@ -123,7 +123,6 @@ static int eval_state_mcast(threaded_t *t, vj_tag *tag) //FIXME: split this up i
 		veejay_msg(VEEJAY_MSG_INFO, " ... Waiting for mcast stream to become ready [%s]",tag->source_name);
 		int success = vj_client_connect( t->v, NULL, tag->source_name, tag->video_channel );
 		if(success <= 0) {
-			t->state = STATE_ERROR;
 			if(t->v) {
 				vj_client_close(t->v);
 				vj_client_free(t->v);
@@ -150,7 +149,6 @@ static void	*reader_thread(void *data)
 	threaded_t *t = tag->priv;
 	char buf[16];
 	int retrieve = 0;
-	int success  = 0;
 
 	snprintf(buf,sizeof(buf), "%03d:%d;", VIMS_GET_FRAME, my_screen_id);
 
@@ -167,7 +165,6 @@ static void	*reader_thread(void *data)
 			case STATE_INACTIVE:
 				net_delay(10,0);
 				retrieve = 0;
-				success = 0;
 				continue;
 			break;
 			case STATE_RUNNING:
@@ -237,12 +234,14 @@ static void	*reader_thread(void *data)
 	}
 
 NETTHREADEXIT:
-	
+
+	lock(t);	
 	if(t->v) {
 		vj_client_close(t->v);
 		vj_client_free(t->v);
 		t->v = NULL;
 	}
+	unlock(t);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d has exited",tag->source_name,tag->video_channel+5);
 
@@ -256,7 +255,6 @@ static void	*mcast_reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
 	threaded_t *t = tag->priv;
-	int success  = 0;
 	const int padded = 256;
 	int max_len = padded + RUP8( 1920 * 1080 * 3 );
 		
@@ -291,11 +289,13 @@ static void	*mcast_reader_thread(void *data)
 
 NETTHREADEXIT:
 	
+	lock(t);
 	if(t->v) {
 		vj_client_close(t->v);
 		vj_client_free(t->v);
 		t->v = NULL;
 	}
+	unlock(t);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Multicast receiver %s: %d has stopped",tag->source_name,tag->video_channel+5);
 
@@ -370,6 +370,7 @@ int	net_thread_start(vj_tag *tag, VJFrame *info)
 
 void	net_thread_stop(vj_tag *tag)
 {
+	int p_err = 0;
 	threaded_t *t = (threaded_t*)tag->priv;
 	
 	lock(t);
@@ -380,11 +381,20 @@ void	net_thread_stop(vj_tag *tag)
 	}
 	t->state = 0;
 	unlock(t);
-	
+
+//FIXME: thread keeps running, but is inactive. behaviour should like vj-avformat	
+/*	if((p_err = pthread_join( t->thread, NULL )) != 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Error %d (%s)", p_err, strerror(p_err));
+	}
+*/
 	pthread_mutex_destroy( &(t->mutex));
 	if(t->dest) {
 		free(t->dest);
+		t->dest = NULL;
 	}
+
+	free(t);
+	t = NULL;
 
 	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from Veejay host %s:%d", tag->source_name,tag->video_channel);
 }

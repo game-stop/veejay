@@ -585,7 +585,7 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 	src_frame->data[2] = yuv420[2];
 	dst_frame->data[0] = vjsdl->yuv_overlay->pixels[0];
 
-	yuv_convert_and_scale_packed( vjsdl->scaler, vjsdl->src_frame,dst_frame );
+	yuv_convert_and_scale_packed( vjsdl->scaler, src_frame,dst_frame );
 
 	if (!vj_sdl_unlock(vjsdl))
 		return 0;
