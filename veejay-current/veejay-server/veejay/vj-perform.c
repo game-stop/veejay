@@ -133,6 +133,7 @@ static uint8_t *temp_buffer[4];
 static uint8_t temp_ssm = 0;
 static uint8_t *subrender_buffer[4];
 static uint8_t *feedback_buffer[4];
+static uint8_t *rgba_buffer[2];
 static void *rgba2yuv_scaler = NULL;
 static void *yuv2rgba_scaler = NULL;
 static uint8_t *pribuf_area = NULL;
@@ -732,6 +733,18 @@ int vj_perform_init(veejay_t * info)
     if(mlock( temp_buffer[0], buf_len ) != 0 )
 		mlock_success = 0;
 
+	rgba_buffer[0] = (uint8_t*) vj_malloc( buf_len * 2 );
+	if(!rgba_buffer[0] ) {
+		return 0;
+	}
+
+	rgba_buffer[1] = rgba_buffer[0] + buf_len;
+
+	if( mlock( rgba_buffer[0], buf_len * 2 ) != 0 )
+		mlock_success = 0;
+
+	veejay_memset( rgba_buffer[0], 0, buf_len * 2 );
+
 	subrender_buffer[0] = (uint8_t*) vj_malloc( buf_len * 3 ); //frame, p0, p1
 	if(!subrender_buffer[0]) {
 		return 0;
@@ -822,6 +835,8 @@ int vj_perform_init(veejay_t * info)
 	veejay_memset(&templ,0,sizeof(sws_template));
 	templ.flags = yuv_which_scaler();
 
+	rgba_frame[0] = yuv_rgb_template( rgba_buffer[0], w, h, PIX_FMT_RGBA );
+	rgba_frame[1] = yuv_rgb_template( rgba_buffer[1], w, h, PIX_FMT_RGBA );
 	yuva_frame[0] = yuv_yuv_template( NULL, NULL, NULL, w,h,PIX_FMT_YUVA444P );
 	yuva_frame[1] = yuv_yuv_template( NULL, NULL, NULL, w,h,PIX_FMT_YUVA444P );
 	
@@ -832,6 +847,9 @@ int vj_perform_init(veejay_t * info)
 	rgba2yuv_scaler = yuv_init_swscaler( rgba_frame[1], yuva_frame[0], &templ, yuv_sws_get_cpu_flags());
 	if(rgba2yuv_scaler == NULL )
 		return 0;
+
+	rgba_frame[0]->data[0] = rgba_buffer[0];
+	rgba_frame[1]->data[0] = rgba_buffer[1];
 
 	veejay_msg(VEEJAY_MSG_INFO,
 	 	"Using %.2f MB RAM in performer (memory %s paged to the swap area, %.2f MB pre-allocated for fx-chain)",
@@ -1013,6 +1031,7 @@ void vj_perform_free(veejay_t * info)
    if(temp_buffer[0]) free(temp_buffer[0]);
    if(subrender_buffer[0]) free(subrender_buffer[0]);
    if(feedback_buffer[0]) free(feedback_buffer[0]);
+   if(rgba_buffer[0]) free(rgba_buffer[0]);
 	
    vj_perform_record_buffer_free();
 
