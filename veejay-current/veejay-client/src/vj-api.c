@@ -723,7 +723,7 @@ void set_disable_sample_image(int status)
 
 static gchar* strduplastn(gchar *title) {
 	gchar *reversed = g_strreverse(title);
-	gchar *part = g_strndup(reversed,8);
+	gchar *part = g_strndup(reversed,12);
 	gchar *reverse = g_strreverse(part);
 	gchar *result = g_strdup(reverse);
 	g_free(part);
@@ -2230,7 +2230,8 @@ sample_slot_t   *create_temporary_slot( gint slot_id, gint id, gint type, gchar 
         slot->sample_id = id;
         slot->sample_type = type;
         slot->timecode = strduplastn(timecode);
-        slot->title = strduplastn(title);
+        //slot->title = strduplastn(title);
+	slot->title = strdup(title);
         slot->slot_number = slot_id;
     }
     return slot;
