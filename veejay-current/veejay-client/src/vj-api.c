@@ -7659,6 +7659,8 @@ void vj_gui_init(char *glade_file,
     }
     snprintf( glade_path, sizeof(glade_path), "%s/%s",RELOADED_DATADIR,glade_file);
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Loading glade file %s", glade_path);
+
     veejay_memset( gui->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
     veejay_memset( gui->sample, 0, 2 );
     veejay_memset( gui->selection, 0, 3 );

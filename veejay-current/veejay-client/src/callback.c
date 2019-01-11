@@ -1465,6 +1465,14 @@ void	on_spin_streamduration_value_changed(GtkWidget *widget , gpointer user_data
 	update_label_str( "label_streamrecord_duration", time );
 	free(time);
 }
+
+void	on_new_avformat_stream_clicked(GtkWidget *wid, gpointer data)
+{
+	char *url = get_text("inputstream_filename");
+	multi_vims(VIMS_STREAM_NEW_AVFORMAT, "%s", url);
+	gveejay_new_slot(MODE_STREAM);
+}
+
 void 	on_new_shm_stream_clicked(GtkWidget *wid, gpointer data)
 {
 	char	*port = get_text("shm_text_port");

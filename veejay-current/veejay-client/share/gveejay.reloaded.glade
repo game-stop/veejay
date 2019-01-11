@@ -15502,7 +15502,7 @@ YUV (current)</property>
   <widget class="GtkWindow" id="inputstream_window">
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">GVeejay Reloaded - New input stream</property>
-    <property name="default_width">400</property>
+    <property name="default_width">500</property>
     <property name="default_height">400</property>
     <property name="icon">icon_stream.png</property>
     <signal name="delete_event" handler="on_inputstream_window_delete_event" />
@@ -15543,7 +15543,7 @@ YUV (current)</property>
                       <widget class="GtkLabel" id="label607">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">&lt;b&gt;Device&lt;/b&gt;</property>
+                        <property name="label" translatable="yes">&lt;b&gt;Video Capture Device&lt;/b&gt;</property>
                         <property name="use_markup">True</property>
                       </widget>
                       <packing>
@@ -15552,7 +15552,7 @@ YUV (current)</property>
                     </child>
                   </widget>
                   <packing>
-                    <property name="expand">True</property>
+										<property name="expand">True</property>
                     <property name="fill">True</property>
                     <property name="position">0</property>
                   </packing>
@@ -15677,7 +15677,7 @@ YUV (current)</property>
                       <widget class="GtkLabel" id="label608">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">&lt;b&gt;Network&lt;/b&gt;</property>
+                        <property name="label" translatable="yes">&lt;b&gt;veejay-2-veejay via network&lt;/b&gt;</property>
                         <property name="use_markup">True</property>
                       </widget>
                       <packing>
@@ -15692,8 +15692,9 @@ YUV (current)</property>
                   </packing>
                 </child>
                 <child>
-                  <widget class="GtkExpander" id="expander9">
-                    <property name="can_focus">True</property>
+										<widget class="GtkExpander" id="expander9">
+											<property name="visible">True</property>
+                    	<property name="can_focus">True</property>
                     <child>
                       <widget class="GtkTable" id="table55">
                         <property name="visible">True</property>
@@ -15715,7 +15716,7 @@ YUV (current)</property>
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <property name="xalign">0</property>
-                            <property name="label" translatable="yes">Filename</property>
+                            <property name="label" translatable="yes">URL or filename</property>
                           </widget>
                           <packing>
                             <property name="left_attach">1</property>
@@ -15725,25 +15726,11 @@ YUV (current)</property>
                           </packing>
                         </child>
                         <child>
-                          <widget class="GtkRadioButton" id="inputstream_filey4m">
-                            <property name="label" translatable="yes">use YUV4MPEG</property>
-                            <property name="visible">True</property>
-                            <property name="can_focus">True</property>
-                            <property name="receives_default">False</property>
-                            <property name="use_underline">True</property>
-                            <property name="draw_indicator">True</property>
-                          </widget>
-                          <packing>
-                            <property name="x_options"/>
-                            <property name="y_options"/>
-                          </packing>
-                        </child>
-                        <child>
                           <widget class="GtkRadioButton" id="inputstream_fileffmpeg">
-                            <property name="label" translatable="yes">use FFmpeg</property>
-                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">use FFmpeg's AVFormat</property>
+                            <property name="visible">False</property>
                             <property name="can_focus">True</property>
-                            <property name="receives_default">False</property>
+                            <property name="receives_default">True</property>
                             <property name="use_underline">True</property>
                             <property name="draw_indicator">True</property>
                             <property name="group">inputstream_filey4m</property>
@@ -15754,7 +15741,22 @@ YUV (current)</property>
                             <property name="x_options"/>
                             <property name="y_options"/>
                           </packing>
+												</child>
+												 <child>
+                          <widget class="GtkRadioButton" id="inputstream_filey4m">
+                            <property name="label" translatable="yes">use YUV4MPEG</property>
+                            <property name="visible">False</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">False</property>
+                            <property name="use_underline">True</property>
+                            <property name="draw_indicator">True</property>
+                          </widget>
+                          <packing>
+                            <property name="x_options"/>
+                            <property name="y_options"/>
+                          </packing>
                         </child>
+
                         <child>
                           <widget class="GtkEntry" id="inputstream_filename">
                             <property name="visible">True</property>
@@ -15776,20 +15778,21 @@ YUV (current)</property>
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
-                            <property name="use_underline">True</property>
+														<property name="use_underline">True</property>
+														<signal name="clicked" handler="on_new_avformat_stream_clicked"/>
                           </widget>
                           <packing>
                             <property name="left_attach">4</property>
                             <property name="right_attach">5</property>
                             <property name="top_attach">1</property>
-                            <property name="bottom_attach">2</property>
+                            <property name="bottom_attach">1</property>
                             <property name="x_options"/>
                             <property name="y_options"/>
                           </packing>
                         </child>
                         <child>
                           <widget class="GtkButton" id="inputstream_filebrowse">
-                            <property name="visible">True</property>
+                            <property name="visible">False</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
                             <property name="tooltip" translatable="yes">Load Actionfile</property>
@@ -15814,7 +15817,7 @@ YUV (current)</property>
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
-                                        <property name="position">0</property>
+                                        <property name="position">1</property>
                                       </packing>
                                     </child>
                                   </widget>
@@ -15835,7 +15838,7 @@ YUV (current)</property>
                       <widget class="GtkLabel" id="label609">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">&lt;b&gt;File&lt;/b&gt;</property>
+                        <property name="label" translatable="yes">&lt;b&gt;URL or filename&lt;/b&gt;</property>
                         <property name="use_markup">True</property>
                       </widget>
                       <packing>
