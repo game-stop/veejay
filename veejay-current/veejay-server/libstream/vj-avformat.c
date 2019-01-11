@@ -57,28 +57,16 @@ typedef struct
 
 static int lock(threaded_t *t)
 {
-	int p_err = 0;
-	if( (p_err = pthread_mutex_lock( &(t->mutex )) != 0 )) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Error %d: %s (lock)", p_err, strerror(p_err));
-	}
-	return p_err;
+	return pthread_mutex_lock( &(t->mutex) );
 }
 static int trylock(threaded_t *t)
 {
-	int p_err = 0;
-	if( pthread_mutex_trylock( &(t->mutex )) != 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Error %d: %s (trylock)",p_err, strerror(p_err));
-	}
-	return p_err;
+	return pthread_mutex_trylock( &(t->mutex) );
 }
 
 static int unlock(threaded_t *t)
 {
-	int p_err = 0;
-	if(pthread_mutex_unlock( &(t->mutex )) != 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "Error %d: %s (unlock)",p_err, strerror(p_err));
-	}
-	return p_err;
+	return pthread_mutex_unlock( &(t->mutex) );
 }
 
 static int eval_state(threaded_t *t, vj_tag *tag)
@@ -112,7 +100,6 @@ static void	*reader_thread(void *data)
 	threaded_t *t = tag->priv;
 
 	for( ;; ) {
-		int error	 = 0;
 		int got_picture  = 0;
 		int result = 0;
 	
@@ -128,12 +115,13 @@ static void	*reader_thread(void *data)
 			case STATE_RUNNING:	
 				{
 					double time_start = av_gettime_relative() / 1000000.0;
-					lock(t);
 					while( (result = avhelper_recv_frame_packet(t->decoder))== 2) {}
-				        unlock(t);	
 					if( result < 0 ) {
 						veejay_msg(0, "[%s] There was an error retrieving the frame", tag->source_name);
-						error = 1;
+						lock(t);
+						t->state = STATE_ERROR;
+						t->have_frame = 0;
+						unlock(t);
 					}
 					
 					if( result == 1 ) {
@@ -141,7 +129,8 @@ static void	*reader_thread(void *data)
 						result = avhelper_recv_decode( t->decoder, &got_picture );
 						if( result < 0 ) {
 							veejay_msg(0,"[%s] There was an error decoding the frame", tag->source_name);
-							error = 1;
+							t->have_frame = 0;
+							t->state = STATE_ERROR;
 						}
 						if( got_picture ) {
 							t->have_frame = 1;
@@ -153,15 +142,9 @@ static void	*reader_thread(void *data)
 						double spvf = t->spvf + t->elapsed; // if FX chain is slow, slow down thread - no point in decoding 
 						// naive implementation for clock, source is too slow for playback at specified framerate when time_diff > spvf
 						if( time_diff < spvf && t->have_frame ) {
-							unsigned int usec = (unsigned int) (( t->spvf - time_diff ) * 1000000.0);
+							unsigned int usec = (unsigned int) (( spvf - time_diff ) * 1000000.0);
 							av_usleep(usec);
 						}
-					}
-					if( error ) {
-						lock(t);
-						t->state = STATE_ERROR;
-						t->have_frame = 0;
-						unlock(t);
 					}
 				}
 				break;
