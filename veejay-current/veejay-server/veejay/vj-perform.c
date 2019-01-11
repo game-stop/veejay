@@ -133,6 +133,7 @@ static uint8_t *temp_buffer[4];
 static uint8_t temp_ssm = 0;
 static uint8_t *subrender_buffer[4];
 static uint8_t *feedback_buffer[4];
+static VJFrame feedback_frame;
 static uint8_t *rgba_buffer[2];
 static void *rgba2yuv_scaler = NULL;
 static void *yuv2rgba_scaler = NULL;
@@ -782,8 +783,13 @@ int vj_perform_init(veejay_t * info)
 
 	helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
 	veejay_memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
-
+	veejay_memcpy(&feedback_frame, info->effect_frame1, sizeof(VJFrame));
 	veejay_memset( &pvar_, 0, sizeof( varcache_t));
+
+	feedback_frame.data[0] = feedback_buffer[0];
+	feedback_frame.data[1] = feedback_buffer[1];
+	feedback_frame.data[2] = feedback_buffer[2];
+	feedback_frame.data[3] = feedback_buffer[3];
 
 	size_t tmp1 = 0;
 	if( info->uc->ram_chain ) {
@@ -2476,7 +2482,15 @@ static void vj_perform_plain_fill_buffer(veejay_t * info, int *ret)
 	
 	VJFrame frame;
 
-	vj_copy_frame_holder(info->effect_frame1, primary_buffer[0], &frame);
+	if(info->settings->feedback && info->settings->feedback_stage > 1 ) {
+		info->effect_frame1->data[0] = feedback_frame.data[0];
+		info->effect_frame1->data[1] = feedback_frame.data[1];
+		info->effect_frame1->data[2] = feedback_frame.data[2];
+		info->effect_frame1->data[3] = feedback_frame.data[3];
+		info->effect_frame1->ssm = feedback_frame.ssm;
+	} else {
+		vj_copy_frame_holder(info->effect_frame1, primary_buffer[0], &frame);
+	}
 
 	uint8_t *p0_buffer[PSLOW_B] = {
 		primary_buffer[PSLOW_B]->Y,
@@ -2489,18 +2503,6 @@ static void vj_perform_plain_fill_buffer(veejay_t * info, int *ret)
 		primary_buffer[PSLOW_A]->Cb,
 		primary_buffer[PSLOW_A]->Cr,
 		primary_buffer[PSLOW_A]->alpha };
-
-	if( info->settings->feedback && info->settings->feedback_stage > 1 )
-	{
-		int strides[4] = { 
-			frame.len,
-			(frame.ssm == 1 ? frame.len : frame.uv_len ),
-			(frame.ssm == 1 ? frame.len : frame.uv_len ),
-			frame.stride[3] * frame.height
-		};
-		vj_frame_copy(feedback_buffer,frame.data,strides);
-		return;
-	}
 
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
@@ -2871,35 +2873,26 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 static void vj_perform_tag_fill_buffer(veejay_t * info)
 {
     int error = 1;
-    uint8_t *frame[4];
     int type = pvar_.type;
     int active = pvar_.active;
-    frame[0] = primary_buffer[0]->Y;
-    frame[1] = primary_buffer[0]->Cb;
-    frame[2] = primary_buffer[0]->Cr;
-	frame[3] = primary_buffer[0]->alpha;
 
-	info->effect_frame1->data[0] = frame[0];
-	info->effect_frame1->data[1] = frame[1];
-	info->effect_frame1->data[2] = frame[2];
-	info->effect_frame1->data[3] = frame[3];
-
-	if( info->settings->feedback && info->settings->feedback_stage > 1 ) {
-		int 	strides[4] = { 
-			info->effect_frame1->len,
-			info->effect_frame1->uv_len,
-			info->effect_frame1->uv_len,
-			0,
-		};
-		vj_frame_copy(feedback_buffer,frame,strides);
-		return;
+	if(info->settings->feedback && info->settings->feedback_stage > 1 ) {
+		info->effect_frame1->data[0] = feedback_frame.data[0];
+		info->effect_frame1->data[1] = feedback_frame.data[1];
+		info->effect_frame1->data[2] = feedback_frame.data[2];
+		info->effect_frame1->data[3] = feedback_frame.data[3];
+		info->effect_frame1->ssm = feedback_frame.ssm;
+	} else {
+		info->effect_frame1->data[0] = primary_buffer[0]->Y;
+		info->effect_frame1->data[1] = primary_buffer[0]->Cb;
+		info->effect_frame1->data[2] = primary_buffer[0]->Cr;
+		info->effect_frame1->data[3] = primary_buffer[0]->alpha;
 	}
     
     if(!active)
     {
 		if (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE || type == VJ_TAG_TYPE_AVFORMAT ) 
 			vj_tag_enable( info->uc->sample_id );
-		
     }
     else
     {
@@ -2912,14 +2905,7 @@ static void vj_perform_tag_fill_buffer(veejay_t * info)
 
 	if (error == 1)
  	{
-		VJFrame dumb;
-		veejay_memcpy( &dumb, info->effect_frame1, sizeof(VJFrame));
-
-		dumb.data[0] = frame[0];
-		dumb.data[1] = frame[1];
-		dumb.data[2] = frame[2];
-		dumb.data[3] = frame[3];
-		dummy_apply(&dumb,VJ_EFFECT_COLOR_BLACK );
+		dummy_apply(info->effect_frame1,VJ_EFFECT_COLOR_BLACK );
   	}
 
 	if(info->uc->take_bg==1 )
@@ -3726,13 +3712,21 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 	info->out_buf = cur_out;
 	
-	if( info->settings->feedback && info->settings->feedback_stage > 0 ) 
+	if( info->settings->feedback && info->settings->feedback_stage == 1 ) 
 	{
 		int idx = info->out_buf;
-		vj_perform_copy2( primary_buffer[idx], feedback_buffer, info->effect_frame1->len, info->effect_frame1->uv_len,info->effect_frame1->stride[3] * info->effect_frame1->height  );
+		uint8_t *dst[4] = { 
+			primary_buffer[idx]->Y,
+			primary_buffer[idx]->Cb,
+			primary_buffer[idx]->Cr,
+			primary_buffer[idx]->alpha };
+
+		vj_perform_copy3( dst,feedback_buffer, info->effect_frame1->len, info->effect_frame1->uv_len,info->effect_frame1->stride[3] * info->effect_frame1->height  );
 
 		info->settings->feedback_stage = 2;
 	}
+	
+
 
 	return res;
 }
