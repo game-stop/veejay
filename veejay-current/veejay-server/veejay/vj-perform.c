@@ -3296,7 +3296,7 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 	frame->data[1] = primary_buffer[destination]->Cb;
 	frame->data[2] = primary_buffer[destination]->Cr;
 
-	if( !frame->ssm)
+	if( !frame->ssm) //FIXME this is costly just to render OSD
 	{
 		chroma_supersample(
 			settings->sample_mode,

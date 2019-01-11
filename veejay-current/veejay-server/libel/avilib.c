@@ -63,6 +63,34 @@ static char id_str[MAX_INFO_STRLEN];
 #define FRAME_RATE_SCALE 1000000
 
 
+static char *avi_error_list[] = {
+	"Unknown",				
+	"The write of the data would exceed",		// AVI_ERR_SIZELIM
+	"Error opening the AVI file - wrong path",	// AVI_ERR_OPEN
+	"Error reading from AVI file",			// AVI_ERR_READ
+	"Error writing to AVI file",
+	"Could not write index to AVI file",
+	"Could not write header to AVI file",
+	"Operation not permitted",
+	"Memory allocation failed",
+	"Not an AVI file",
+	"AVI file has no header list",
+	"AVI file has no MOVI list",
+	"AVI file contains no video data",
+	"AVI file has no index",
+	"AVI file is empty (header only)",		// AVI_ERR_EMPTY
+	NULL
+};
+
+static void avierror(long AVI_errno) {
+	if(AVI_errno < 0 || AVI_errno > 14) {
+		veejay_msg(0, "AVI Error: %s", avi_error_list[0]);
+	}
+
+	veejay_msg(0, "AVI Error: %s", avi_error_list[ AVI_errno ] );
+}
+
+
 /*******************************************************************
  *                                                                 *
  *    Utilities for writing an AVI File                            *
@@ -1972,6 +2000,7 @@ avi_t *AVI_open_input_indexfile(char *filename, int getIndex, char *indexfile)
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
+      avierror(AVI_errno);
       return 0;
     }
   veejay_memset((void *)AVI,0,sizeof(avi_t));
@@ -1989,6 +2018,7 @@ avi_t *AVI_open_input_indexfile(char *filename, int getIndex, char *indexfile)
     {
       AVI_errno = AVI_ERR_OPEN;
       free(AVI);
+      avierror(AVI_errno);
       return 0;
     }
  
@@ -1997,6 +2027,7 @@ avi_t *AVI_open_input_indexfile(char *filename, int getIndex, char *indexfile)
 	{
 		AVI_errno = AVI_ERR_EMPTY;
 		free(AVI);
+		avierror(AVI_errno);
 		return 0;
 	}
 	lseek( AVI->fdes,0,SEEK_SET );
@@ -2010,8 +2041,10 @@ avi_t *AVI_open_input_indexfile(char *filename, int getIndex, char *indexfile)
       AVI->aptr=0; //reset  
   }
 
-  if (AVI_errno)
-      return AVI=NULL;
+  if (AVI_errno) {
+   	  avierror(AVI_errno);
+      	  return AVI=NULL;
+  }
   else
       return AVI;
 }
@@ -2078,6 +2111,7 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
+      avierror(AVI_errno);
       return 0;
     }
   
@@ -2090,6 +2124,7 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
     {
       AVI_errno = AVI_ERR_OPEN;
       free(AVI);
+      avierror(AVI_errno);
       return 0;
     }
   
@@ -2101,10 +2136,9 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, long mmap_size)
   }
 
   if (AVI_errno) {
-      return 0;
+	avierror(AVI_errno);
+	return 0;
   }
-  
- 
   
   if(!AVI_errno)
   {

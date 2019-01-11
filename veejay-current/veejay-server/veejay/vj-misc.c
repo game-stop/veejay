@@ -220,7 +220,7 @@ filelist_t *find_media_files( veejay_t *info )
 	return fl;
 }
 
-/* FIXME: issue #78
+/* TODO: libvevosample
  * fx state is currently global, damage control is to check fx chain of current playing sample
  * for FX that needs a background frame.
  * before: apply on all FX

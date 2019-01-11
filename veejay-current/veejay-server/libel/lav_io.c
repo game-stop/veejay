@@ -34,6 +34,8 @@
 //#include <veejay/vj-lib.h>
 #include <libvjmsg/vj-msg.h>
 #ifdef USE_GDK_PIXBUF
+#include <gmodule.h>
+#include <gdk-pixbuf/gdk-pixbuf.h>
 #include <libel/pixbuf.h>
 #endif
 #include <libavcodec/avcodec.h>
@@ -66,6 +68,37 @@ static int      output_scale_width = 0;
 static int      output_scale_height = 0;
 static float        output_fps = 25.0;
 static int      output_yuv = 1; // 422
+
+
+char *get_filename_ext(char *filename) {
+	char *dot = strrchr(filename, '.');
+	if(!dot || dot == filename) 
+		return NULL;
+	return dot + 1;
+}
+
+int	lav_is_supported_image_file(char *filename)
+{
+	GSList *list = gdk_pixbuf_get_formats();
+	GSList *iter;
+	int i;
+
+	char *ext = get_filename_ext(filename);
+
+	for( iter = list; iter->next != NULL; iter = iter->next ) {
+		gchar **extensions = gdk_pixbuf_format_get_extensions (list->data);
+		for( i = 0; extensions[i] != NULL; i ++ ) {
+			if( strncasecmp(ext, extensions[i], strlen(ext)) == 0 ) {
+				g_strfreev(extensions);
+				g_slist_free(list);
+				return 1;	
+			}
+		}	
+		g_strfreev (extensions);
+	}
+	g_slist_free(list);
+	return 0;
+}
 
 void    lav_set_project(int w, int h, float f, int fmt)
 {
@@ -997,18 +1030,24 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     }
 
 #ifdef USE_GDK_PIXBUF
-    lav_fd->picture = vj_picture_open( (const char*) filename,
-        output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
-    if(lav_fd->picture)
-    {
-        lav_fd->format = 'x';
-        lav_fd->bogus_len = (int) output_fps;
-        video_comp = pict;
-        ret = 1;
-        veejay_msg(VEEJAY_MSG_DEBUG,"\tLoaded image file");
-        return lav_fd;
-    }
+    int is_picture = lav_is_supported_image_file( filename );
+#else
+    int is_picture = 0;
 #endif
+
+    if( is_picture ) {
+#ifdef USE_GDK_PIXBUF
+    	lav_fd->picture = vj_picture_open( (const char*) filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
+   	if(lav_fd->picture)
+    	{
+        	lav_fd->format = 'x';
+        	lav_fd->bogus_len = (int) output_fps;
+        	video_comp = pict;
+        	veejay_msg(VEEJAY_MSG_DEBUG,"\tLoaded image file");
+        	return lav_fd;
+    	}
+#endif
+    }
     else
     {
         lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
