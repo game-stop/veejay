@@ -70,6 +70,8 @@ void	generator_to_arr( char *line, int *array)
 	int i = 0;
 	while(*p) {
 		char *end = NULL;
+		if(p == NULL)
+			break;
 		array[i] = strtol(p, &end, 10 );
 		if( end == p)
 			break;
