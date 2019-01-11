@@ -5482,8 +5482,10 @@ static void reload_keys()
 
         index = (val[1] * G_MOD_OFFSET) + val[2];
 
-        if( index < 0 || index >= VIMS_MAX )
-            continue;
+        if( index < 0 || index >= VIMS_MAX ) {
+         	free(message);
+	     	continue;
+	}
 
         vims_keys_list[ index ].keyval      = val[2];
         vims_keys_list[ index ].state       = val[1];

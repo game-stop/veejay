@@ -3623,7 +3623,7 @@ gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, 
 static 
 gchar *get_clipboard_fx_parameter_buffer(int *mixing_src, int *mixing_cha, int *enabled, int *fx_id)
 {
-	char rest[1024];
+	char rest[2048 + 22 + 1];
 	int	len = 0;
 	int tmp[8];
 	int 	i;
@@ -3658,6 +3658,7 @@ gchar *get_clipboard_fx_parameter_buffer(int *mixing_src, int *mixing_cha, int *
 	);	
 
 	if( i != 12 ) {
+		g_free(answer);
 		return NULL;
 	}
 
@@ -3665,6 +3666,8 @@ gchar *get_clipboard_fx_parameter_buffer(int *mixing_src, int *mixing_cha, int *
 	*mixing_cha = tmp[2];
 	*enabled = tmp[3];
 	*fx_id = fid;
+
+	g_free(answer);
 
 	return strdup(rest);
 }	 
