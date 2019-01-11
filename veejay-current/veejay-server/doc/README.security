@@ -1,0 +1,8 @@
+For security reasons:
+
+1) veejay has no concept of authentication, authorization or access management
+2) everyone can quit veejay by sending "600:;" using sayVIMS
+3) everyone can connect with reloaded to any other veejay in the network
+4) many routines in veejay's event manager are not safe for buffer exploits
+5) you should firewall the veejay ports on IP basis, if you want to have some minimal security
+
