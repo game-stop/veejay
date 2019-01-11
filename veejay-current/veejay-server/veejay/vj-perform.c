@@ -210,10 +210,12 @@ static	void	vj_perform_copy3( uint8_t **input, uint8_t **output, int Y_len, int 
 static inline void vj_copy_frame_holder(VJFrame *src, ycbcr_frame *data, VJFrame *dst) {
 	int i;
 	
-	dst->data[0] = data->Y;
-	dst->data[1] = data->Cb;
-	dst->data[2] = data->Cr;
-	dst->data[3] = data->alpha;
+	if(data != NULL) {
+		dst->data[0] = data->Y;
+		dst->data[1] = data->Cb;
+		dst->data[2] = data->Cr;
+		dst->data[3] = data->alpha;
+	}
 	
 	dst->uv_len = src->uv_len;
 	dst->len = src->len;
@@ -234,7 +236,6 @@ static inline void vj_copy_frame_holder(VJFrame *src, ycbcr_frame *data, VJFrame
 	dst->fps = src->fps;
 	dst->timecode = src->timecode;
 }
-
 
 #ifdef HAVE_JACK
 static inline void vj_perform_play_audio( video_playback_setup *settings, uint8_t *source, int len )
@@ -1947,13 +1948,13 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, VJFrame 
 		p0plane,
 		p0plane + dst->len,
 		p0plane + dst->len + dst->len,
-		NULL,
+		p0plane + dst->len + dst->len + dst->len
 	};
 	uint8_t *p1_buffer[4] = {
 		p1plane,
 		p1plane + dst->len,
 		p1plane + dst->len + dst->len,
-		NULL
+		p1plane + dst->len + dst->len + dst->len
 	};
 
 	return vj_perform_get_frame_(info, s1, nframe,src,dst,p0_buffer,p1_buffer,1 );
@@ -2483,11 +2484,12 @@ static void vj_perform_plain_fill_buffer(veejay_t * info, int *ret)
 	VJFrame frame;
 
 	if(info->settings->feedback && info->settings->feedback_stage > 1 ) {
-		info->effect_frame1->data[0] = feedback_frame.data[0];
-		info->effect_frame1->data[1] = feedback_frame.data[1];
-		info->effect_frame1->data[2] = feedback_frame.data[2];
-		info->effect_frame1->data[3] = feedback_frame.data[3];
-		info->effect_frame1->ssm = feedback_frame.ssm;
+		vj_copy_frame_holder(info->effect_frame1, NULL, &frame); 
+		frame.data[0] = feedback_frame.data[0];
+		frame.data[1] = feedback_frame.data[1];
+		frame.data[2] = feedback_frame.data[2];
+		frame.data[3] = feedback_frame.data[3];
+
 	} else {
 		vj_copy_frame_holder(info->effect_frame1, primary_buffer[0], &frame);
 	}
