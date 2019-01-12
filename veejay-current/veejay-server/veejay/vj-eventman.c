@@ -2219,6 +2219,15 @@ void		vj_init_vevo_events(void)
 				SAMPLE_STREAM_ID_HELP,
 				NULL );
 
+	index_map_[VIMS_GET_FEEDBACK]				=	_new_event(
+				NULL,
+				VIMS_GET_FEEDBACK,
+				"GUI: Get feedback enabled",
+				vj_event_get_feedback,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
 	index_map_[VIMS_GET_STREAM_ARGS]			=	_new_event(
 				"%d",
 				VIMS_GET_STREAM_ARGS,

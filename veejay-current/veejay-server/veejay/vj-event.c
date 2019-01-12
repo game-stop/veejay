@@ -8466,6 +8466,17 @@ void    vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
     free( s_print_buf );
 }
 
+void	vj_event_get_feedback		(   void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	char message[16];
+	char *s_print_buf = get_print_buf(0);
+
+	sprintf(message, "%d", v->settings->feedback);
+	FORMAT_MSG(s_print_buf, message);
+	SEND_MSG(v, s_print_buf);
+}
+
 void    vj_event_send_sample_list       (   void *ptr,  const char format[],    va_list ap  )
 {
     veejay_t *v = (veejay_t*)ptr;
