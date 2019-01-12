@@ -641,6 +641,7 @@ static gint load_parameter_info();
 static void load_v4l_info();
 static void reload_editlist_contents();
 static void load_effectchain_info();
+static void set_feedback_status();
 static void load_effectlist_info();
 static void load_sequence_list();
 static void load_generator_info();
@@ -4545,6 +4546,19 @@ void setup_effectlist_info()
 
 }
 
+void set_feedback_status()
+{
+	int len = 0;
+	single_vims(VIMS_GET_FEEDBACK);
+	gchar *answer = recv_vims(3,&len);
+	
+	int status = atoi(answer);
+
+	set_toggle_button("feedbackbutton", status);
+
+	g_free(answer);
+}
+
 /******************************************************
  * load_effectlist_info()
  *   load the effects information from the server
@@ -8077,6 +8091,8 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     reload_editlist_contents();
     reload_bundles();
 
+    set_feedback_status();
+
     GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
     gtk_widget_show( w );
 
@@ -8494,8 +8510,8 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkWidget *pad, int *idx, in
     gint image_height = result.height / num_cols;
 
     if( image_width > 64 && image_height > 64 ) {
-        image_width -= 16; /* some spacing between slot border and image */
-        image_height -= 16;
+        image_width -= 4; /* some spacing between slot border and image */
+        image_height -= 4;
     }
 
     float ratio = (float) info->el.height / (float) info->el.width;
@@ -8512,8 +8528,6 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkWidget *pad, int *idx, in
 
     *idx = (int)w;
     *idy = (int)h;
-
-    veejay_msg(VEEJAY_MSG_DEBUG, "Sample bank [%dx%d] image dimensions %dx%d -> %dx%d %2.2f",result.width,result.height,image_width,image_height, *idx,*idy, ratio);
 }
 
 /* --------------------------------------------------------------------------------------------------------------------------

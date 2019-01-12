@@ -142,8 +142,10 @@ void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_feedbackbutton_toggled( GtkWidget *widget, gpointer data )
 {
-	int val = is_button_toggled( "feedbackbutton" ) ? 1:0;
-	multi_vims( VIMS_FEEDBACK, "%d", val );
+	if(!info->status_lock) {
+		int val = is_button_toggled( "feedbackbutton" ) ? 1:0;
+		multi_vims( VIMS_FEEDBACK, "%d", val );
+	}
 }
 
 static int follow_return_id = 0;
