@@ -52,6 +52,7 @@
 #include <veejay/vj-misc.h>
 #include <libstream/vj-tag.h>
 #include <libvjxml/vj-xml.h>
+#include <veejay/vj-macro.h>
 //#define KAZLIB_OPAQUE_DEBUG 1
 
 #ifdef HAVE_XML2
@@ -378,6 +379,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 #endif
 
     sample_cache[ si->sample_id ] = (void*) si;
+
+	si->macro = vj_macro_new();
 
     return si;
 }
@@ -1055,6 +1058,8 @@ int sample_del(int sample_id)
 
         sample_cache[ sample_id ] = NULL;
     
+		vj_macro_free( si->macro );
+
         free(si);
 
         return 1;
@@ -1709,6 +1714,12 @@ int sample_set_chain_source(int s1, int position, int input)
     sample->effect_chain[position]->clear = 1;
     
     return 1;
+}
+
+void	*sample_get_macro(int s1) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) return NULL;
+	return sample->macro;
 }
 
 int	sample_get_loop_stat_stop(int s1) {
@@ -3052,6 +3063,10 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
             skel->subrender = get_xml_int( doc, cur );
         }
 
+		if( !xmlStrcmp(cur->name, (const xmlChar*) "loop_stat_stop")) {
+			skel->loop_stat_stop = get_xml_int(doc,cur);
+		}
+
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_MAXLOOPS)) {
             skel->max_loops = get_xml_int( doc, cur );
         }
@@ -3119,7 +3134,11 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
         if( !xmlStrcmp( cur->name, (const xmlChar*) "calibration" ) ) {
             ParseCalibration( doc, cur->xmlChildrenNode, skel ,vp);
         }
-    
+
+	if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO )) {
+		vj_macro_load( skel->macro, doc, cur->xmlChildrenNode );
+	}
+
         cur = cur->next;
     }
 
@@ -3264,7 +3283,7 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
             tagParseStreamFX( sampleFile, doc, cur->xmlChildrenNode, font,vp );
         }
 
-        cur = cur->next;
+	cur = cur->next;
     }
 
     xmlFreeDoc(doc);
@@ -3382,11 +3401,15 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
     put_xml_int( node, XMLTAG_FADER_DIRECTION, sample->fader_direction );
     put_xml_int( node, XMLTAG_LASTENTRY, sample->selected_entry );
     put_xml_int( node, "subrender", sample->subrender );
+	put_xml_int( node, "loop_stat_stop", sample->loop_stat_stop);
 
     vj_font_xml_pack( node, font );
 
     childnode = xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTS, NULL);
     CreateEffects(childnode, sample->effect_chain);
+
+	childnode = xmlNewChild(node, NULL, (const xmlChar*) XMLTAG_MACRO, NULL );
+	vj_macro_store( sample->macro, childnode );
 } 
 
 /****************************************************************************************************

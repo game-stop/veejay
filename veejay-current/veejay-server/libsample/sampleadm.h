@@ -179,6 +179,7 @@ typedef struct sample_info_t {
     int	loops;
     int	loop_stat;
     int loop_stat_stop;
+    void *macro;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -297,6 +298,8 @@ extern int sample_chain_sprint_status(int s1,int tags,int cache,int sa,int ca, i
 
 extern int sample_set_render_entry(int s1, int entry);
 extern int sample_get_render_entry(int s1);
+
+extern void *sample_get_macro(int s1);
 
 extern int sample_set_description(int sample_id, char *description);
 extern int sample_get_description(int sample_id, char *description);

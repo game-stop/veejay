@@ -55,6 +55,7 @@
 #include <veejay/vj-font.h>
 #endif
 #include <libvjxml/vj-xml.h>
+#include <veejay/vj-macro.h>
 #define SOURCE_NAME_LEN 255
 
 #include <libplugger/plugload.h>
@@ -766,6 +767,12 @@ int vj_tag_generator_get_args(int t1, int *args, int *n_args, int *fx_id)
     return 0;
 }
 
+void	*vj_tag_get_macro(int t1) {
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return NULL;
+	return tag->macro;
+}	
+
 int vj_tag_set_stream_color(int t1, int r, int g, int b)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -1169,6 +1176,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->dict = vpn(VEVO_ANONYMOUS_PORT );
 #endif
 
+    tag->macro = vj_macro_new();
+
     tag_cache[ tag->id ] = (void*) tag;
 
    return (int)(tag->id);
@@ -1363,6 +1372,8 @@ int vj_tag_del(int id)
         }
         tag->effect_chain[i] = NULL;
     }
+
+    vj_macro_free( tag->macro );
 
 #ifdef ARCH_X86_64
     uint64_t tid = (uint64_t) tag->id;
@@ -3967,13 +3978,14 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
     char *source_file = NULL;
     char *extra_data = NULL;
     int col[3] = {0,0,0};
-    int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,fade_alpha = 0,fade_entry = -1,opacity=0, nframes=0;
+    int fader_active=0, fader_val=0, fader_dir=0, fade_method=0,fade_alpha = 0,fade_entry = -1,opacity=0, nframes=0, loop_stat_stop=0;
     xmlNodePtr fx[32];
     veejay_memset( fx, 0, sizeof(fx));
     int k = 0;
     int subrender = 0;
     xmlNodePtr subs = NULL;
     xmlNodePtr cali = NULL;
+    xmlNodePtr macro = NULL;
     void *d = vj_font_get_dict( font );
 
     while (cur != NULL)
@@ -4019,8 +4031,14 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 
         if (!xmlStrcmp(cur->name, (const xmlChar*) "calibration" ))
             cali = cur->xmlChildrenNode;
+
+	if (!xmlStrcmp(cur->name, (const xmlChar*) XMLTAG_MACRO ))
+	    macro = cur->xmlChildrenNode;
+
         if (!xmlStrcmp(cur->name, (const xmlChar*) "subrender" ))
             subrender = get_xml_int(doc,cur);
+	if( !xmlStrcmp(cur->name, (const xmlChar*) "loop_stat_stop"))
+	    loop_stat_stop = get_xml_int(doc,cur);
 
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTS)) {
             fx[k] = cur->xmlChildrenNode;
@@ -4074,6 +4092,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             tag->opacity = opacity;
             tag->nframes = nframes;
             tag->subrender = subrender;
+	    tag->loop_stat_stop = loop_stat_stop;
 
             switch( source_type )
             {
@@ -4098,6 +4117,11 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
                 tagParseCalibration( doc, cali, id, vp );
             }
 
+	    if( macro ) 
+	    {
+		vj_macro_load( tag->macro, doc, macro );
+	    }
+	    	
             int q;
             for( q = 0; q < k ; q ++ )
             {
@@ -4172,7 +4196,7 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
     put_xml_int( node, "source_id", tag->video_channel );
     put_xml_str( node, "source_file", tag->source_name );
     put_xml_int( node, "subrender", tag->subrender );
-
+    put_xml_int( node, "loop_stat_stop", tag->loop_stat_stop );
     if(tag->extra )
     {
         put_xml_str( node, "extra_data", tag->extra );
@@ -4190,6 +4214,10 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
     xmlNodePtr childnode =  xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTS, NULL);
 
     tagCreateEffects(childnode, tag->effect_chain);
+
+    childnode = xmlNewChild( node, NULL, (const xmlChar*) XMLTAG_MACRO, NULL );
+
+    vj_macro_store( tag->macro, childnode );
 
 }
 

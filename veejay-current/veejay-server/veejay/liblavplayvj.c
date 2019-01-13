@@ -1107,7 +1107,7 @@ static void veejay_pipe_write_status(veejay_t * info)
     int tags = vj_tag_size();
 
 	int cache_used = 0;
-	int mstatus = vj_macro_get_status(info->uc->macro);
+	int mstatus = 0;
 	int curfps  = (int) ( 100.0f / settings->spvf );
 	int total_slots = n_samples;
 	int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES );
@@ -1117,6 +1117,8 @@ static void veejay_pipe_write_status(veejay_t * info)
 	switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
 			cache_used = sample_cache_used(0);
+
+		mstatus = vj_macro_get_status( sample_get_macro( info->uc->sample_id ));
 
 		if( info->settings->randplayer.mode == RANDMODE_SAMPLE)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
@@ -1167,6 +1169,9 @@ static void veejay_pipe_write_status(veejay_t * info)
 			}
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
+
+		mstatus = vj_macro_get_status( vj_tag_get_macro( info->uc->sample_id ));
+
 		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,seq_cur, info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what ) != 0 )
 		{

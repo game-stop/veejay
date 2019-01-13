@@ -295,6 +295,10 @@ void	vj_event_toggle_osd_extra(void *ptr, const char format[], va_list ap);
 #endif
 void	vj_event_get_image_part(void *ptr, const char format[], va_list ap);
 void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap );
+void	vj_event_macro_get(void *ptr, const char format[], va_list ap);
+void	vj_event_macro_get_all(void *ptr, const char format[], va_list ap);
+void	vj_event_macro_del(void *ptr, const char format[], va_list ap);
+void    vj_event_macro_put(void *ptr, const char format[], va_list ap);
 void	vj_event_set_framerate( void *ptr, const char format[], va_list ap );
 void	vj_event_sync_correction( void *ptr,const char format[], va_list ap );
 void	vj_event_get_keyframes( void *ptr, 	const char format[],	va_list ap	);

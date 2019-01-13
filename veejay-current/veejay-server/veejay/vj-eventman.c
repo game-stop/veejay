@@ -374,6 +374,66 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+    index_map_[VIMS_PUT_MACRO] = _new_event(
+                "%d %d %d %s",
+                VIMS_PUT_MACRO,
+                "Macro put VIMS message at position <frame number> <dup number> <loop number> <message>",
+                vj_event_macro_put,
+                4,
+                VIMS_ALLOW_ANY,
+                "frame number",
+                0,
+                "dup number",
+                0,
+                "loop number",
+                0,
+                "message",
+                NULL,
+                NULL );
+
+    index_map_[VIMS_GET_MACRO] = _new_event(
+                "%d %d %d",
+                VIMS_GET_MACRO,
+                "Macro get VIMS message at position <frame number> <dup number> <loop number>",
+                vj_event_macro_get,
+                3,
+                VIMS_ALLOW_ANY,
+                "frame number",
+                0,
+                "dup number",
+                0,
+                "loop number",
+                0,
+                NULL
+                 );
+
+	index_map_[VIMS_GET_ALL_MACRO] = _new_event(
+				NULL,
+				VIMS_GET_ALL_MACRO,
+				"Macro get all VIMS messages stored for the current sample/stream",
+				vj_event_macro_get_all,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+    index_map_[VIMS_DEL_MACRO] = _new_event(
+                "%d %d %d %d",
+                VIMS_DEL_MACRO,
+                "Macro delete a VIMS message",
+                vj_event_macro_del,
+                4,
+                VIMS_ALLOW_ANY,
+                "frame number",
+                0,
+                "dup number",
+                0,
+                "loop number",
+                0,
+                "message sequence number",
+                -1,
+                NULL
+                );
+
 	index_map_[VIMS_MACRO_SELECT] = _new_event(
 				"%d",
 				VIMS_MACRO_SELECT,

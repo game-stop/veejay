@@ -383,10 +383,7 @@ static	int	osc_client_status_send( lo_address t, char *cmd )
 				 (int)( 100.0f/osc_info->settings->spvf ),
 				 osc_info->settings->cycle_count[0],
 				 osc_info->settings->cycle_count[1],
-				 vj_macro_get_status(osc_info->uc->macro) );
-				 
-
-
+				 vj_macro_get_status(sample_get_macro(osc_info->uc->sample_id)) );
 		break;
 		case VJ_PLAYBACK_MODE_TAG:
 			tag = vj_tag_get( osc_info->uc->sample_id );
@@ -406,7 +403,7 @@ static	int	osc_client_status_send( lo_address t, char *cmd )
 				 (int) ( 100.0f/osc_info->settings->spvf ),
 				 osc_info->settings->cycle_count[0],
 				 osc_info->settings->cycle_count[1],
-				 vj_macro_get_status(osc_info->uc->macro) );	 
+				 vj_macro_get_status(vj_tag_get_macro(osc_info->uc->sample_id)));
 		break;
 		case VJ_PLAYBACK_MODE_PLAIN:
 			err = lo_send( t,
@@ -425,7 +422,8 @@ static	int	osc_client_status_send( lo_address t, char *cmd )
 				 (int) ( 100.0f / osc_info->settings->spvf ),
 				 osc_info->settings->cycle_count[0],
 				 osc_info->settings->cycle_count[1],
-				 vj_macro_get_status(osc_info->uc->macro));
+				 0
+				 );
 				 
 		break;
 	}
@@ -592,7 +590,7 @@ static struct
 
 	{ "video/forward"					, VIMS_VIDEO_PLAY_FORWARD },
 	{ "video/play"						, VIMS_VIDEO_PLAY_FORWARD },
-//@FIXME	{ "video/reverse"					, VIMS_VIDEO_PLAY_REVERSE },
+	{ "video/reverse"					, VIMS_VIDEO_PLAY_REVERSE },
 	{ "video/pause"						, VIMS_VIDEO_PLAY_STOP },
 	{ "video/nextframe"					, VIMS_VIDEO_SKIP_FRAME },	
 	{ "video/prevframe"					, VIMS_VIDEO_PREV_FRAME },

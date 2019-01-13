@@ -27,8 +27,13 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include <libvevo/libvevo.h>
-#include <veejay/vj-macro.h>
 #include <veejay/vims.h>
+#ifdef HAVE_XML2
+#include <libxml/xmlmemory.h>
+#include <libxml/parser.h>
+#include <libvjxml/vj-xml.h>
+#endif
+#include <veejay/vj-macro.h>
 
 #define MAX_MACROS 16
 #define MAX_MACRO_BANKS 12
@@ -52,6 +57,7 @@ typedef struct {
 
 typedef struct {
 	void *macro_bank[MAX_MACRO_BANKS];
+	int loop_stat_stop[MAX_MACRO_BANKS];
 	uint8_t current_bank;
 	uint8_t status;
 } vj_macro_t;
@@ -70,7 +76,6 @@ void *vj_macro_new(void)
 void vj_macro_free(void *ptr)
 {
 	vj_macro_t *macro = (vj_macro_t*) ptr;
-	int i;
 	for(macro->current_bank = 0; macro->current_bank < MAX_MACRO_BANKS; macro->current_bank ++ ) {
 		vj_macro_clear(ptr);
 	}
@@ -137,9 +142,59 @@ int vj_macro_put(void *ptr, char *message, long frame_num, int at_loop, int at_d
 	m->msg[ m->num_msg ] = strdup(message);
 	m->num_msg = m->num_msg + 1;
 	
-//	veejay_msg(VEEJAY_MSG_DEBUG, "record VIMS [%s]/%d at position %ld.%d, loop %d", message,m->num_msg, frame_num, at_dup, at_loop );
+	//veejay_msg(VEEJAY_MSG_DEBUG, "VIMS [%s]/%d at position %ld.%d, loop %d", message,m->num_msg, frame_num, at_dup, at_loop );
 	
 	return 1;
+}
+
+static  void vj_macro_reclaim_block( macro_block_t *blk, int seq_no )
+{
+    int i=0;
+    if( blk->num_msg == 0 )
+        return;
+
+    /* delete all VIMS messages if seq_no equals -1 */
+    if( seq_no == -1 ) {
+        for( i = 0;i < blk->num_msg; i ++ ) {
+            if(blk->msg[i]) {
+                free( blk->msg[i] );
+                blk->msg[i] = NULL;
+            }
+        }
+        blk->num_msg = 0;
+        return;
+    }
+
+    /* delete VIMS message */
+    if(blk->msg[seq_no] != NULL) {
+        free( blk->msg[seq_no] );
+        blk->msg[seq_no] = NULL;
+    }
+
+    /* permutate message pointers in block */
+    for( i = (seq_no + 1); i < blk->num_msg ; i ++ ) {
+        blk->msg[i - 1] = blk->msg[i];
+    }
+    blk->msg[ blk->num_msg - 1 ] = NULL;
+    
+    blk->num_msg --;
+
+}
+
+void    vj_macro_del(void *ptr, long frame_num, int at_loop, int at_dup, int seq_no)
+{
+    vj_macro_t *macro = (vj_macro_t*) ptr;
+	char key[32];
+	snprintf(key,sizeof(key),"%08ld%02d%08d", frame_num, at_dup, at_loop );
+
+    void *mb = NULL;
+	int error = vevo_property_get(macro->macro_bank[ macro->current_bank ], key,0, &mb );
+	macro_block_t *m = NULL;
+
+    if( error == VEVO_NO_ERROR ) {
+        m = (macro_block_t*) mb;
+        vj_macro_reclaim_block( m, seq_no );
+    }
 }
 
 void vj_macro_clear(void *ptr)
@@ -187,33 +242,244 @@ int vj_macro_select( void *ptr, int slot )
 	macro->current_bank = slot;
 	return 1;
 }
-/*
-static void vj_macro_print(vj_macro_t *macro)
+
+int vj_macro_get_loop_stat_stop( void *ptr )
 {
+	vj_macro_t *macro = (vj_macro_t*) ptr;
+	return macro->loop_stat_stop[ macro->current_bank ];	
+}
+
+int	vj_macro_set_loop_stat_stop( void *ptr, int stop)
+{
+	vj_macro_t *macro = (vj_macro_t*) ptr;
+    if( stop == 0 ) {
+        macro->loop_stat_stop[ macro->current_bank ] = 0;
+    } else {
+        // set new stop position only if greater than current stop position
+        if( stop > macro->loop_stat_stop[ macro->current_bank ] )
+        	macro->loop_stat_stop[ macro->current_bank ] = stop;
+    }
+    return 1;
+}
+
+static char** vj_macro_get_messages(void *ptr, long frame_num, int at_dup, int at_loop, int *len)
+{
+	int i;
+	char **messages = vj_macro_pull(ptr, frame_num, at_loop, at_dup);
+	if(messages != NULL) {
+        int msglen = 0;
+		for( i = 0; messages[i] != NULL; i ++ ) {
+			msglen += strlen(messages[i]);
+			msglen += (8 + 2 + 8 + 2 + 3);
+		}
+		*len += msglen;
+	}
+	return messages;
+}
+
+static char *vj_macro_flatten_messages(void *ptr, char **messages, long frame_num, int at_dup, int at_loop, int len)
+{
+	int i;
+	char *buf = vj_calloc(sizeof(char) * (len + 1));
+	char *buf_ptr = buf;
+
+	for( i = 0; messages[i] != NULL; i ++ ) {
+		int msg_len = strlen(messages[i]);
+		sprintf(buf_ptr, "%08ld%02d%08d%02d%03d%s", frame_num, at_dup, at_loop, i,msg_len, messages[i] );
+		buf_ptr += (msg_len + 8 +2 + 8 + 2 + 3);
+	}
+
+	int buf_len = strlen(buf);
+	if( buf_len != len ) {
+		veejay_msg(0, "Length is calculated incorrectly: was %d, expected %d", buf_len, len);
+	}
+
+	return buf;
+}
+
+char* vj_macro_serialize_macro(void *ptr, long frame_num, int at_dup, int at_loop )
+{
+	int len = 0;
+	char **messages = vj_macro_get_messages(ptr, frame_num, at_dup, at_loop, &len );
+	if(len == 0) {
+		return NULL;
+	}		
+	return vj_macro_flatten_messages( ptr, messages, frame_num, at_dup, at_loop, len );
+}
+
+static int vj_macro_get_serialized_length(void *ptr, char **items)
+{
+	int i;
+	int len = 0;
+	/* calculate data length */
+	for( i = 0; items[i] != NULL;  i++ ) {
+		long frame_num = 0;
+    	int  at_loop = 0;
+    	int  at_dup = 0;
+
+    	if( sscanf( items[i], "%08ld%02d%08d", &frame_num, &at_dup, &at_loop ) == 3 ) {
+			char **messages = vj_macro_get_messages(ptr, frame_num, at_dup, at_loop, &len );
+			if(messages) {
+				free(messages);
+			}
+		}
+	}
+	return len;
+}
+
+char *vj_macro_serialize(void *ptr)
+{
+ 	vj_macro_t *macro = (vj_macro_t*) ptr;
 	char **items = vevo_list_properties( macro->macro_bank[ macro->current_bank ] );
 	if(items == NULL) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "No VIMS events have been recorded in bank %d", macro->current_bank);
+		return NULL;
+	}
+	
+	int len = vj_macro_get_serialized_length(ptr, items);
+	
+	size_t data_len = 8 + len + 1;
+	char *buf = (char*) vj_calloc(sizeof(char) * data_len);
+	char *save_ptr = buf;
+	char *buf_ptr = buf + 8;
+	int i;
+	for( i = 0; items[i] != NULL; i ++ ) {
+		long frame_num = 0;
+    	int  at_loop = 0;
+    	int  at_dup = 0;
+
+    	if( sscanf( items[i], "%08ld%02d%08d", &frame_num, &at_dup, &at_loop ) == 3 ) {
+			char *macro_str = vj_macro_serialize_macro( ptr, frame_num, at_dup, at_loop );
+			if(macro_str == NULL) {
+				free(items[i]);
+				continue;
+			}
+
+			int macro_len = strlen(macro_str);
+            memcpy( buf_ptr, macro_str, macro_len );
+			buf_ptr += (macro_len);
+		}
+		free(items[i]);
+	}
+
+	free(items);
+
+	char header[9];
+	sprintf(header, "%08d", (int) len );
+	memcpy(buf, header, 8);
+	
+	return save_ptr;
+}
+
+#ifdef HAVE_XML2
+static void vj_macro_store_bank(void *ptr, xmlNodePtr node)
+{
+    vj_macro_t *macro = (vj_macro_t*) ptr;
+	char **items = vevo_list_properties( macro->macro_bank[ macro->current_bank ] );
+	if(items == NULL) {
 		return;
 	}
+
+    xmlNodePtr mnode = xmlNewChild( node, NULL, (const xmlChar*) XMLTAG_MACRO_BANK, NULL );
+
+	put_xml_int( mnode, XMLTAG_MACRO_LOOP_STAT_STOP, macro->loop_stat_stop[ macro->current_bank ] );
+
+    if( macro->status == MACRO_STOP || macro->status == MACRO_PLAY ) {
+        put_xml_int( mnode, XMLTAG_MACRO_STATUS, macro->status );
+    }
 
 	int i,j;
 	for( i = 0; items[i] != NULL; i ++ ) {
 		void *mb = NULL;
 		if( vevo_property_get( macro->macro_bank[ macro->current_bank ], items[i], 0, &mb ) == VEVO_NO_ERROR ) {
 			macro_block_t *m = (macro_block_t*) mb;
-			long n_frame = 0;
-			int at_dup = 0;
-			int at_loop = 0;
-			sscanf( items[i], "%08ld%02d%08d", &n_frame, &at_dup, &at_loop );
+            put_xml_str( mnode, XMLTAG_MACRO_KEY, items[i] );
+			    
+            xmlNodePtr childnode = xmlNewChild( mnode, NULL, (const xmlChar*) XMLTAG_MACRO_MESSAGES, NULL );
+
 			for( j = 0; j < m->num_msg; j ++ ) {
-				veejay_msg(VEEJAY_MSG_DEBUG,"VIMS [%s] at frame position %d.%d, loop %d", m->msg[j], n_frame, at_dup, at_loop );
-			}	
+			    put_xml_str( childnode, XMLTAG_MACRO_MSG, m->msg[j] );
+            }	
 		}
 		free(items[i]);
 	}
 	free(items);
 }
-*/
+
+void vj_macro_store( void *ptr, xmlNodePtr node )
+{
+    vj_macro_t *macro = (vj_macro_t*) ptr;
+    int i;
+    int cur = macro->current_bank;
+    for( i = 0; i < MAX_MACRO_BANKS; i ++ ) {
+        macro->current_bank = i;
+        vj_macro_store_bank( ptr, node );
+    }
+    macro->current_bank = cur;
+}
+
+static void vj_macro_load_messages( void *ptr, char *key, xmlDocPtr doc, xmlNodePtr cur )
+{
+    long frame_num = 0;
+    int  at_loop = 0;
+    int  at_dup = 0;
+
+    if( sscanf( key, "%08ld%02d%08d", &frame_num, &at_dup, &at_loop ) == 3 ) {
+        while(cur != NULL) {
+            if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_MSG )) {
+                char *msg = get_xml_str(doc, cur );
+                vj_macro_put( ptr, msg, frame_num, at_loop, at_dup );
+                free(msg);
+            }
+            cur = cur->next;
+        }
+    }
+}
+
+static void vj_macro_load_bank( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
+{
+	vj_macro_t* macro = (vj_macro_t*) ptr;
+    char *key = NULL;
+    while( cur != NULL ) {
+
+		if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_LOOP_STAT_STOP)) {
+			int stop = get_xml_int(doc, cur);
+			macro->loop_stat_stop[ macro->current_bank ] = stop;
+		}
+
+        if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_STATUS )) {
+            int status = get_xml_int(doc, cur);
+            macro->status = (uint8_t) status;
+        }
+
+        if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_KEY)) {
+            key = get_xml_str( doc, cur );
+        }
+        
+        if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_MESSAGES)) {
+            vj_macro_load_messages( ptr, key, doc, cur->xmlChildrenNode );
+            free(key);
+        }
+      
+        cur = cur->next;
+    }
+}
+
+void vj_macro_load( void *ptr, xmlDocPtr doc, xmlNodePtr cur)
+{   
+    vj_macro_t *macro = (vj_macro_t*) ptr;
+    macro->current_bank = 0;
+    while( cur != NULL ) {
+        if(!xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_BANK)) {
+            vj_macro_load_bank( ptr, doc, cur->xmlChildrenNode );
+            macro->current_bank ++;
+            vj_macro_select( ptr, macro->current_bank );
+        }
+        cur = cur->next;
+    }
+    macro->current_bank = 0;
+}
+
+#endif
 
 void vj_macro_init(void)
 {
@@ -274,6 +540,8 @@ void vj_macro_init(void)
     vvm_[VIMS_FRONTBACK]=0;
     vvm_[VIMS_RECVIEWPORT]=0;
     vvm_[VIMS_PROJECTION] = 0;
+	vvm_[VIMS_DEL_MACRO] = 0;
+	vvm_[VIMS_PUT_MACRO] = 0;
 }
 
 int vj_macro_is_vims_accepted(int net_id)

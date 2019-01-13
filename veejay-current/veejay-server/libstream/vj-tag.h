@@ -137,6 +137,7 @@ typedef struct {
 	int		genargs[16];
 	int 	loop_stat;
 	int	loop_stat_stop;
+	void	*macro;
 } vj_tag;
 
 #define V4L_BLACKFRAME 1
@@ -153,6 +154,8 @@ int 	vj_tag_init(int w, int h, int pix_fmt, int driver);
 int	vj_tag_get_n_frames(int t1);
 int	vj_tag_set_n_frames(int t1, int n_frames);
 int 	vj_tag_get_last_tag();
+
+void	*vj_tag_get_macro(int t1);
 
 void 	vj_tag_set_loop_stats(int s1, int loops);
 int	vj_tag_get_loop_stats(int s1);
