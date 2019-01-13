@@ -1711,6 +1711,32 @@ int sample_set_chain_source(int s1, int position, int input)
     return 1;
 }
 
+int	sample_get_loop_stat_stop(int s1) {
+	sample_info *sample = sample_get(s1);
+    	if (!sample) return 0;
+	return sample->loop_stat_stop;
+}
+void sample_set_loop_stat_stop(int s1, int loop_stop) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) return;
+	sample->loop_stat_stop = loop_stop;
+}
+
+int	sample_get_loop_stats(int s1) {
+	sample_info *sample = sample_get(s1);
+    	if (!sample) return 0;
+	return sample->loop_stat;
+}
+void sample_set_loop_stats(int s1, int loops) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) return;
+	if( loops == -1) {
+		sample->loop_stat = (sample->loop_stat_stop > 0 ? (sample->loop_stat + 1 ) % sample->loop_stat_stop : sample->loop_stat + 1);
+	}
+	else
+		sample->loop_stat = loops;
+}
+
 int	sample_get_loops(int s1) {
 	sample_info *sample = sample_get(s1);
     	if (!sample) return 0;

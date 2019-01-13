@@ -39,6 +39,7 @@
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-composite.h>
 #include <veejay/vj-shm.h>
+#include <veejay/vj-macro.h>
 #include <libel/vj-avcodec.h>
 #include <libsamplerec/samplerecord.h>
 #include <mjpegtools/mpegconsts.h>
@@ -157,50 +158,9 @@ static  char    *get_print_buf(int size) {
     char *res = (char*) vj_calloc(sizeof(char) * s );
     return res;
 }
-/**
- * MACRO|keystrokes|VIMS macro
- *
- * macro banks are selected by [CTRL] + [F1...F12] (or via VIMS 34)
- *
- * depending on macro_status, we are:
- * 0 : stopped
- * 1 : recording VIMS events
- * 2 : playing VIMS events
- *
- * the messages are indexed by frame_position and slow_multiplier
- * MAX_MACROS messages can be stored per keyframe
- *
- * the playback resumes from where you have started the macro recorder
- * the reset function clears all macro banks
- *
- * TODO clear selected macro slot instead of clear all 
- * TODO play all macro banks simultaneously (instead of playing only selected bank)
- * TODO play macro once (instead of looping)
- * TODO reloaded select macro bank / macro tabbed page | VIMS getters/setters etc 
- * TODO once macro is done, FX configuration is not restored
-*/
-#define MAX_MACRO_BANKS 12
 
-static  void *macro_bank_[MAX_MACRO_BANKS];
-static  void *macro_port_ = NULL;
-static  int current_macro_ = 0;
-static  int macro_status_ = 0;
-static  int macro_line_[3] = {-1 ,0,0};
-#define MAX_MACROS 16
 #define MAX_VIMS_ARGUMENTS 16
-typedef struct {
-    char *msg[MAX_MACROS];
-} macro_block_t;
 
-int vj_event_macro_status(void)
-{
-    return macro_status_;
-}
-
-static  char    *retrieve_macro_(veejay_t *v,int idx, char *key );
-static  void    store_macro_( veejay_t *v,char *str, long frame );
-static  void    reset_macro_(void);
-static  void    display_replay_macro_(void);
 static void vj_event_sample_next1( veejay_t *v );
 
 extern void veejay_pipe_write_status(veejay_t *info);
@@ -535,152 +495,35 @@ static inline void P_A(int *args, size_t argsize, char *str, size_t strsize, con
 }
 
 #define CLAMPVAL(a) { if(a<0)a=0; else if(a >255) a =255; }
-//@ TODO: implement embedded help
-//@ F1 -> sample playing FX=off -> standard help
-//@ F1 -> sample playing FX=on entry >= 0 <= MAX_E : show help for FX on entry N
-//
 
-static  void    init_vims_for_macro();
-
-static  void    macro_select( int slot )
+static 	void	vj_event_macro_get_loop_dup( veejay_t *v, int *at_loop, int *at_dup )
 {
-    if( slot >= 0 && slot < MAX_MACRO_BANKS )
-    {
-        void *oldptr = macro_bank_[ current_macro_ ];
-        int  old     = current_macro_;
-
-        if(macro_bank_[slot] == NULL ) {
-            macro_bank_[slot] = vpn( VEVO_ANONYMOUS_PORT );
-            if(!macro_bank_[slot]) {
-                veejay_msg(VEEJAY_MSG_DEBUG,"Unable to get port for macro slot %d", slot );
-                slot = old;
-                macro_bank_[old] = oldptr;
-            }
-        }
-        
-        current_macro_ = slot;
-        macro_port_ = macro_bank_[slot];
+	if( SAMPLE_PLAYING(v)) {
+    	*at_dup = sample_get_framedups( v->uc->sample_id );
+	    *at_loop = sample_get_loop_stats( v->uc->sample_id );
+	}
+    else if (STREAM_PLAYING(v)) {
+        *at_dup = 0;
+        *at_loop = vj_tag_get_loop_stats( v->uc->sample_id );
     }
+    else if ( PLAIN_PLAYING(v)) {
+    	*at_dup = v->settings->simple_frame_dup;
+	}
 }
 
-static  void    display_replay_macro_(void)
+static  void	reset_loop_stats(void)
 {
-    int i,k;
-    char **items;
-
-    if(!macro_port_ )
-        return; 
-
-    items = vevo_list_properties( macro_port_ );
-    if(items)
-    {
-        int strokes = 0;
-        for(k = 0; items[k] != NULL ; k ++ )
-        {
-            void *mb = NULL;
-            if( vevo_property_get( macro_port_, items[k],0,&mb ) == VEVO_NO_ERROR )
-            {
-                macro_block_t *m = (macro_block_t*) mb;
-                for( i = 0; i < MAX_MACROS; i ++ )
-                {
-                    if(m->msg[i]) { 
-                        veejay_msg(VEEJAY_MSG_DEBUG,"\tVIMS [%s] at macro %s",m->msg[i],items[k]);
-                        strokes ++;
-                    }
-                }
-            }
-            free(items[k]); 
-        }
-        veejay_msg(VEEJAY_MSG_INFO, "Replay of %d VIMS messages in macro bank %d", strokes,current_macro_ );
-        free(items);
+	int i;
+	int n = sample_size();
+	for( i = 0; i < n; i ++ ) {
+		sample_set_loop_stats( i, 0 );
+	}
+    n = vj_tag_size();
+    for( i = 0; i < n; i ++ ) {
+        vj_tag_set_loop_stats( i, 0 );
     }
+
 }
-
-static  void    reset_macro_(void)
-{
-    int i,k;
-    char **items;
-
-    if(!macro_port_ )
-        return; 
-
-    items = vevo_list_properties( macro_port_ );
-    if(items)
-    {
-        int strokes = 0;
-        for(k = 0; items[k] != NULL ; k ++ )
-        {
-            void *mb = NULL;
-            if( vevo_property_get( macro_port_, items[k],0,&mb ) == VEVO_NO_ERROR )
-            {
-                macro_block_t *m = (macro_block_t*) mb;
-                for( i = 0; i < MAX_MACROS; i ++ )
-                    if(m->msg[i]) { free(m->msg[i]); strokes ++; }
-                free(m);
-            }
-            free(items[k]); 
-        }
-        veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro recorder cleared %d VIMS messages from bank %d",
-                strokes, current_macro_ );
-        free(items);
-    }
-    vpf(macro_port_);
-    macro_bank_[ current_macro_ ] = NULL;
-    macro_port_ = NULL;
-}
-
-static  char    *retrieve_macro_(veejay_t *v, int idx, char *key )
-{
-    void *mb = NULL;
-    int error = vevo_property_get( macro_port_, key, 0, &mb );
-    if( error == VEVO_NO_ERROR )
-    {
-        macro_block_t *m = (macro_block_t*) mb;
-        if( m->msg[idx ])
-        {
-            return m->msg[idx];
-        }
-    }
-    return NULL;
-}
-
-static  void    store_macro_(veejay_t *v, char *str, long frame )
-{
-    void *mb = NULL;
-    char key[16];
-    int k;
-    int s = 0;
-    if( SAMPLE_PLAYING(v))
-        s = sample_get_framedups( v->uc->sample_id );
-    else if ( PLAIN_PLAYING(v))
-        s = v->settings->simple_frame_dup;
-
-    snprintf(key,16,"%08ld%02d", frame,s );
-
-    int error = vevo_property_get( macro_port_, key, 0, &mb );
-    if( error != VEVO_NO_ERROR )
-    { // first element
-        macro_block_t *m = vj_calloc( sizeof(macro_block_t));
-        m->msg[0] = vj_strdup(str);     
-        vevo_property_set( macro_port_, key, VEVO_ATOM_TYPE_VOIDPTR,1,&m );
-    }
-    else
-    {
-     // following elements
-        macro_block_t *c = (macro_block_t*) mb;
-        for( k = 1; k < MAX_MACROS; k ++ )
-        {
-            if(c->msg[k] == NULL )  
-            {
-                c->msg[k] = vj_strdup(str);
-                return;
-            }
-        }
-        veejay_msg(VEEJAY_MSG_ERROR, "VIMS Macro recorder reached buffer limit at frame %ld",frame );
-    }
-}
-
-
 
 static hash_val_t int_bundle_hash(const void *key)
 {
@@ -1184,76 +1027,6 @@ static  void    dump_arguments_(int net_id,int arglen, int np, int prefixed, cha
     free(name);
 }
 
-static  int vvm_[600];
-
-static  void    init_vims_for_macro()
-{
-    veejay_memset( vvm_,1, sizeof(vvm_));
-    vvm_[VIMS_MACRO] = 0;
-    vvm_[VIMS_TRACK_LIST] = 0;
-    vvm_[VIMS_RGB24_IMAGE] = 0;
-    vvm_[VIMS_SET_SAMPLE_START] =0;
-    vvm_[VIMS_SET_SAMPLE_END] = 0;
-    vvm_[VIMS_SAMPLE_NEW] = 0;
-    vvm_[VIMS_SAMPLE_DEL] = 0;
-    vvm_[VIMS_STREAM_DELETE] = 0;
-    vvm_[VIMS_SAMPLE_LOAD_SAMPLELIST]=0;
-    vvm_[VIMS_SAMPLE_SAVE_SAMPLELIST]=0;
-    vvm_[VIMS_SAMPLE_DEL_ALL] = 0;
-    vvm_[VIMS_SAMPLE_COPY] = 0;
-    vvm_[VIMS_SAMPLE_UPDATE] = 0;
-    vvm_[VIMS_SAMPLE_KF_GET]=0;
-    vvm_[VIMS_SAMPLE_KF_RESET]=0;
-    vvm_[VIMS_SAMPLE_KF_STATUS]=0;
-    vvm_[VIMS_STREAM_NEW_V4L] = 0;
-    vvm_[VIMS_STREAM_NEW_DV1394] = 0;
-    vvm_[VIMS_STREAM_NEW_COLOR] = 0;
-    vvm_[VIMS_STREAM_NEW_Y4M] = 0;
-    vvm_[VIMS_STREAM_NEW_UNICAST]=0;
-    vvm_[VIMS_STREAM_NEW_MCAST]=0;
-    vvm_[VIMS_STREAM_NEW_PICTURE]=0;
-    vvm_[VIMS_STREAM_SET_DESCRIPTION]=0;
-    vvm_[VIMS_SAMPLE_SET_DESCRIPTION]=0;
-    vvm_[VIMS_STREAM_SET_LENGTH]=0;
-    vvm_[VIMS_SEQUENCE_STATUS]=0;
-    vvm_[VIMS_SEQUENCE_ADD]=0;
-    vvm_[VIMS_SEQUENCE_DEL]=0;
-    vvm_[VIMS_CHAIN_LIST]=0;
-    vvm_[VIMS_OUTPUT_Y4M_START]=0;
-    vvm_[VIMS_OUTPUT_Y4M_STOP]=0;
-    vvm_[VIMS_GET_FRAME]=0;
-    vvm_[VIMS_VLOOPBACK_START]=0;
-    vvm_[VIMS_VLOOPBACK_STOP]=0;
-    vvm_[VIMS_VIDEO_MCAST_START]=0;
-    vvm_[VIMS_VIDEO_MCAST_STOP]=0;
-    vvm_[VIMS_SYNC_CORRECTION]=0;
-    vvm_[VIMS_NO_CACHING]=0;
-    vvm_[VIMS_SCREENSHOT]=0;
-    vvm_[VIMS_RGB_PARAMETER_TYPE]=0;
-    vvm_[VIMS_RESIZE_SDL_SCREEN] =0;
-    vvm_[VIMS_DEBUG_LEVEL]=0;
-    vvm_[VIMS_SAMPLE_MODE]=0;
-    vvm_[VIMS_BEZERK] = 0;
-    vvm_[VIMS_AUDIO_ENABLE]=0;
-    vvm_[VIMS_AUDIO_DISABLE]=0;
-    vvm_[VIMS_RECORD_DATAFORMAT]=0;
-    vvm_[VIMS_INIT_GUI_SCREEN]=0;
-    vvm_[VIMS_SUSPEND]=0;
-    vvm_[VIMS_VIEWPORT]=0;
-    vvm_[VIMS_PREVIEW_BW]=0;
-    vvm_[VIMS_FRONTBACK]=0;
-    vvm_[VIMS_RECVIEWPORT]=0;
-    vvm_[VIMS_PROJECTION] = 0;
-}
-
-static  int valid_for_macro(int net_id)
-{
-    if(net_id > 400 || net_id >= 388 || (net_id >= 80 && net_id <= 86) || (net_id >= 50 && net_id <= 59))
-        return 0;
-
-    return vvm_[net_id];
-}
-
 static  void    dump_argument_( int net_id , int i )
 {
     char *help = vj_event_vevo_help_vims( net_id, i );
@@ -1479,14 +1252,8 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
         vj_event_parse_bundle( v, bun->bundle );
         return 1;
     }
-/*
-    if( net_id >= 400 && net_id < 499 )
-    {
-        vj_server_client_promote( v->vjs[VEEJAY_PORT_CMD] , v->uc->current_link );
-        v->rmodes[ v->uc->current_link ] = -1000;
-    }
-*/
-    int i_args[MAX_VIMS_ARGUMENTS];
+    
+	int i_args[MAX_VIMS_ARGUMENTS];
 
     veejay_memset(i_args, 0, sizeof(i_args) );
 
@@ -1501,12 +1268,6 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
             i++;
         }
         vj_event_fire_net_event( v, net_id, NULL, i_args, np, 0 );
-        if( macro_status_ == 1 && macro_port_ != NULL)
-        {
-            if( valid_for_macro(net_id))
-                store_macro_( v,msg, v->settings->current_frame_num );
-        }
-        
     }
     else
     {
@@ -1590,21 +1351,25 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
         if( flags & VIMS_ALLOW_ANY )
             i = np;
 
-        if( macro_status_ == 1 && macro_port_ != NULL)
-        {
-            if( valid_for_macro(net_id))
-                store_macro_( v,msg, v->settings->current_frame_num );
-        }
-
         vj_event_fire_net_event( v, net_id, str, i_args, i, 0 );
 
         if(fmt) free(fmt);
         if(arg_str) free(arg_str);
         if(str) free(str);
 
-        return 1;
-        
     }
+
+	if( vj_macro_get_status( v->uc->macro ) == MACRO_REC ) {
+    	if( vj_macro_is_vims_accepted(net_id)) {
+			int at_loop = 0;
+			int at_dup = 0;
+			vj_event_macro_get_loop_dup(v, &at_loop, &at_dup );
+			if(vj_macro_put( v->uc->macro, msg, v->settings->current_frame_num, at_loop, at_dup ) == 0 ) {
+				veejay_msg(0, "[Macro] max number of VIMS messages for this position reached");
+			}
+		}
+    }
+
     return 0;
 }
 
@@ -1701,26 +1466,20 @@ void vj_event_update_remote(void *ptr)
 
     v->settings->is_dat = 0;
 
-    if(macro_status_ == 2 && macro_port_ != NULL)
+    if(vj_macro_get_status(v->uc->macro) == MACRO_PLAY)
     {
-        int n_macro = 0;
-        int s = 0;
-        char *macro_msg = NULL;
-        char key[32];
+        int at_dup = 0;
+		int at_loop = 0;
+		vj_event_macro_get_loop_dup(v, &at_loop, &at_dup );
 
-        if( SAMPLE_PLAYING(v))
-            s = sample_get_framedups( v->uc->sample_id );
-        else if ( PLAIN_PLAYING(v))
-            s = v->settings->simple_frame_dup;
+		char **vims_messages = vj_macro_pull( v->uc->macro, v->settings->current_frame_num, at_loop, at_dup );
 
-        snprintf(key,sizeof(key),"%08d%02d", v->settings->current_frame_num,s );
-
-        for( n_macro = 0; n_macro < MAX_MACROS ; n_macro ++ )
-        {
-            macro_msg = retrieve_macro_( v, n_macro,key );
-            if(macro_msg)
-                vj_event_parse_msg(v,macro_msg, strlen(macro_msg));
-        }
+		if(vims_messages != NULL) {
+			for( i = 0; vims_messages[i] != NULL; i ++ ) {
+				vj_event_parse_msg(v,vims_messages[i], strlen(vims_messages[i]));
+			}
+			free(vims_messages);
+		}
     }
 }
 
@@ -2396,6 +2155,7 @@ static void vj_event_init_keyboard_defaults()
 
 void vj_event_init(void *ptr)
 {
+	veejay_t *v = (veejay_t*) ptr;
     int i;
 #ifdef HAVE_SDL 
     veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
@@ -2427,9 +2187,10 @@ void vj_event_init(void *ptr)
     vj_event_init_network_events();
 #ifdef HAVE_SDL
     vj_event_init_keyboard_defaults();
-    if(ptr) vj_event_load_keyboard_configuration( (veejay_t*) ptr );
+    if(ptr) vj_event_load_keyboard_configuration(v);
 #endif
-    init_vims_for_macro();
+	vj_macro_init();
+	v->uc->macro = vj_macro_new();
 }
 
 #ifdef HAVE_SDL
@@ -2468,8 +2229,9 @@ static void vj_event_destroy_bundles( hash_t *h )
     hash_destroy( h );
 }
 
-void    vj_event_destroy()
+void    vj_event_destroy(void *ptr)
 {
+	veejay_t *v = (veejay_t*) ptr;
 #ifdef HAVE_SDL
 	//let's not destroy keyboard mappings, we are shutting down anyway so why bother
 #endif
@@ -2482,14 +2244,7 @@ void    vj_event_destroy()
 
     vj_event_vevo_free();
 
-    int i;
-    for( i = 0; i < MAX_MACRO_BANKS; i ++ )
-    {
-        macro_port_ = macro_bank_[i];
-        if(macro_port_)
-            reset_macro_();
-    }
-
+	vj_macro_free( v->uc->macro );	
 }
 
 void vj_event_linkclose(void *ptr, const char format[], va_list ap)
@@ -6184,7 +5939,7 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
                     tval = vj_effect_get_max_limit( effect,args[0] );
             if(sample_set_effect_arg( v->uc->sample_id, c,args[0],tval)!=-1 )
             {
-                veejay_msg(VEEJAY_MSG_INFO,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval);
+                veejay_msg(VEEJAY_MSG_DEBUG,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval);
             }
         }
     }
@@ -6207,7 +5962,7 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 
         if(vj_tag_set_effect_arg(v->uc->sample_id, c, args[0], tval) )
         {
-            veejay_msg(VEEJAY_MSG_INFO,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval );
+            veejay_msg(VEEJAY_MSG_DEBUG,"Set \"%s\" parameter %d \"%s\" value %d",effect_descr, args[0], effect_param_descr, tval );
         }
     }
 }
@@ -7755,10 +7510,16 @@ void vj_event_select_id(void *ptr, const char format[], va_list ap)
 
 void    vj_event_select_macro( void *ptr, const char format[], va_list ap )
 {
+	veejay_t *v = (veejay_t*) ptr;
     int args[2];
     P_A( args,sizeof(args),NULL,0, format, ap );
-    macro_select( args[0] );
-    veejay_msg(VEEJAY_MSG_INFO, "Changed VIMS macro slot to %d", current_macro_ );
+
+	if(vj_macro_select( v->uc->macro, args[0] )) {
+    	veejay_msg(VEEJAY_MSG_INFO, "Changed VIMS macro slot to %d", args[0] );
+	}
+	else {
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to change VIMS macro slot to %d", args[0]);
+	}
 }
 
 void vj_event_select_bank(void *ptr, const char format[], va_list ap) 
@@ -10403,64 +10164,50 @@ void    vj_event_set_macro_status( void *ptr,   const char format[], va_list ap 
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    if( args[1] == 0 )
-    {
-        reset_macro_();
-        macro_status_ = 0;
-        args[0] = 0;
-        macro_line_[0] = -1;
-        macro_line_[1] = 0;
-        macro_line_[2] = 0;
-        veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro reset");
-    }
     if( args[0] == 0 )
     {
-        if( macro_port_ )
-        {
-            macro_status_ = 0;
-            veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro recorder stopped");
+		vj_macro_set_status( v->uc->macro, MACRO_STOP );
+        if(SAMPLE_PLAYING(v)) {
+            sample_set_loop_stat_stop( v->uc->sample_id, sample_get_loop_stats( v->uc->sample_id ) );
         }
-    } else if (args[0] == 1 )
-    {
-        reset_macro_();
-        macro_port_ = vpn(VEVO_ANONYMOUS_PORT);
-        macro_bank_[ current_macro_ ] = macro_port_;
-        macro_status_ = 1; 
-        macro_line_[0] = v->settings->current_frame_num;
-        macro_line_[1] = v->uc->playback_mode;
-        macro_line_[2] = v->uc->sample_id;
-
-        veejay_msg(VEEJAY_MSG_INFO , "VIMS Macro recorder started (replay at %x | frame %ld, id %d | bank %d)",
-                macro_line_[1], macro_line_[0], macro_line_[2], current_macro_);
-
-    } 
+        if(STREAM_PLAYING(v)) {
+            vj_tag_set_loop_stat_stop( v->uc->sample_id, vj_tag_get_loop_stats( v->uc->sample_id ) );
+        }
+        veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro is now inactive");
+    }
+	else if (args[0] == 1) {
+		reset_loop_stats();
+		vj_macro_set_status( v->uc->macro, MACRO_REC );
+		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro recorder is active");
+	}
     else if (args[0] == 2)
     {
-        if( macro_status_ == 0 && macro_port_ )
-        {
-            macro_status_ = 2;
-            veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro resuming playback from bank %d", current_macro_);
+        if(SAMPLE_PLAYING(v)) {
+            sample_set_loop_stat_stop( v->uc->sample_id, sample_get_loop_stats( v->uc->sample_id ) );
         }
-        else if( macro_line_[0] >= 0 && macro_port_ != NULL)
-        {
-            macro_status_ = 2;
-            veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro playback (%x| frame %ld, id %d)",
-                    macro_line_[1], macro_line_[0], macro_line_[2]);
-            veejay_change_playback_mode( v, macro_line_[1],macro_line_[2] );
-            veejay_set_frame( v, macro_line_[0] );
-            if( veejay_get_debug_level() )
-                display_replay_macro_();
+        if(STREAM_PLAYING(v)) {
+            vj_tag_set_loop_stat_stop( v->uc->sample_id, vj_tag_get_loop_stats( v->uc->sample_id ) );
         }
-        else
-        {
-            veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro has nothing to playback");
-            veejay_msg(VEEJAY_MSG_INFO, "Use CAPS-LOCK modifier to jump to next or previous sample"); 
-        }
+
+		reset_loop_stats();
+		vj_macro_set_status( v->uc->macro, MACRO_PLAY );
+		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro playback is active");
     }
-    else if ( args[0] == 3 )
-    {
-        vj_event_sample_next1( v );
-    }
+	else if (args[0] == 3)
+	{
+        if(SAMPLE_PLAYING(v)) {
+            sample_set_loop_stat_stop( v->uc->sample_id, 0 );
+        }
+        if(STREAM_PLAYING(v)) {
+            vj_tag_set_loop_stat_stop( v->uc->sample_id, 0 );
+        }
+
+		reset_loop_stats();
+        vj_macro_set_status( v->uc->macro, MACRO_STOP );
+		vj_macro_clear(v->uc->macro);
+        vj_macro_select(v->uc->macro, -1 );
+		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro current slot is cleared");
+	}
 }
 
 void    vj_event_get_sample_image       (   void *ptr,  const char format[],    va_list ap  )

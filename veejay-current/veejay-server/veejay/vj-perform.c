@@ -308,6 +308,10 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
     video_playback_setup *settings = info->settings;
     settings->current_frame_num += num;
  
+    if (settings->current_frame_num >= settings->max_frame_num) {
+        vj_tag_set_loop_stats( info->uc->sample_id, -1 );
+    }
+
    if (settings->current_frame_num < settings->min_frame_num) {
 	settings->current_frame_num = settings->min_frame_num;
 	if (settings->current_playback_speed < 0) {
@@ -476,6 +480,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	        switch (looptype) {
 		        case 2:
 			       info->uc->direction = -1;
+				   sample_set_loop_stats(info->uc->sample_id, -1);
 			        if(!vj_perform_try_sequence( info ) )
 		    	    {
 				        veejay_set_frame(info, end);
@@ -483,6 +488,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 			        }
 			        break;
 		        case 1:
+					sample_set_loop_stats(info->uc->sample_id, -1);
 			        if(!vj_perform_try_sequence(info) ) {
 			    	    veejay_set_frame(info, start);
 			        }
@@ -513,6 +519,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	        switch (looptype) {
 	            case 2:
 		            info->uc->direction = 1;
+					sample_set_loop_stats(info->uc->sample_id, -1);
 		            if(!vj_perform_try_sequence(info) )
 	     	        {
 		        	    veejay_set_frame(info, start);
@@ -520,6 +527,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	    	        }
 		            break;
 	            case 1:
+					sample_set_loop_stats(info->uc->sample_id, -1);
                     if(!vj_perform_try_sequence(info)) {
 		                veejay_set_frame(info, end);
 		            }

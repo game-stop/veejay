@@ -94,6 +94,7 @@
 #include <veejay/vj-OSC.h>
 #include <veejay/vj-task.h>
 #include <veejay/vj-split.h>
+#include <veejay/vj-macro.h>
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
 #ifdef HAVE_SDL_TTF
@@ -379,7 +380,7 @@ int veejay_free(veejay_t * info)
 
 	vj_mem_threaded_stop();
 
-	vj_event_destroy();
+	vj_event_destroy(info);
 
 	vj_tag_free();
    	
@@ -616,9 +617,12 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	 info->sfd = sample_get_framedup(sample_id);
 
 	 if(!info->seq->active) {
-		if( info->settings->sample_restart )
+		if( info->settings->sample_restart ) {
 		 	sample_reset_offset( sample_id );	/* reset mixing offsets */
-	 }
+        }
+     }
+
+	 sample_set_loop_stats( sample_id, 0 );
 
 	 veejay_sample_resume_at( info, sample_id );
 	 
@@ -668,6 +672,8 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	info->current_edit_list = info->edit_list;
   	 
 	veejay_reset_el_buffer(info);
+
+    vj_tag_set_loop_stats( stream_id, 0 );
 	
 	return 1;
 }
@@ -1101,7 +1107,7 @@ static void veejay_pipe_write_status(veejay_t * info)
     int tags = vj_tag_size();
 
 	int cache_used = 0;
-	int mstatus = vj_event_macro_status();
+	int mstatus = vj_macro_get_status(info->uc->macro);
 	int curfps  = (int) ( 100.0f / settings->spvf );
 	int total_slots = n_samples;
 	int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES );

@@ -37,6 +37,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include <veejay/vj-OSC.h>
+#include <veejay/vj-macro.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -382,7 +383,7 @@ static	int	osc_client_status_send( lo_address t, char *cmd )
 				 (int)( 100.0f/osc_info->settings->spvf ),
 				 osc_info->settings->cycle_count[0],
 				 osc_info->settings->cycle_count[1],
-				 vj_event_macro_status() );
+				 vj_macro_get_status(osc_info->uc->macro) );
 				 
 
 
@@ -405,7 +406,7 @@ static	int	osc_client_status_send( lo_address t, char *cmd )
 				 (int) ( 100.0f/osc_info->settings->spvf ),
 				 osc_info->settings->cycle_count[0],
 				 osc_info->settings->cycle_count[1],
-				 vj_event_macro_status() );	 
+				 vj_macro_get_status(osc_info->uc->macro) );	 
 		break;
 		case VJ_PLAYBACK_MODE_PLAIN:
 			err = lo_send( t,
@@ -424,7 +425,7 @@ static	int	osc_client_status_send( lo_address t, char *cmd )
 				 (int) ( 100.0f / osc_info->settings->spvf ),
 				 osc_info->settings->cycle_count[0],
 				 osc_info->settings->cycle_count[1],
-				 vj_event_macro_status());
+				 vj_macro_get_status(osc_info->uc->macro));
 				 
 		break;
 	}

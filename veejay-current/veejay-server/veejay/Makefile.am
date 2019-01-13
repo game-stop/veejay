@@ -58,7 +58,7 @@ VEEJAY_LIB_FILE = libveejay.la
 lib_LTLIBRARIES = $(VEEJAY_LIB_FILE) 
 
 libveejay_la_SOURCES =  jpegutils.c vj-misc.c vj-task.c \
-			vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-perform.c \
+			vj-osc.c vjkf.c vj-macro.c vj-event.c vj-eventman.c vj-perform.c \
 			x11misc.c vj-shm.c vj-sdl.c vj-sdl-font.c vj-dfb.c vj-viewport.c vj-composite.c \
 			vj-font.c vj-pjack.c vj-share.c vj-split.c liblavplayvj.c 
 

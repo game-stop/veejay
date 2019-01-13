@@ -27,13 +27,11 @@
 
 void 	vj_event_fmt_arg			(	int *args, 	char *str, 	const char format[], 	va_list ap);
 void 	vj_event_init				(void *ptr);
-void	vj_event_destroy();
+void	vj_event_destroy(void *ptr);
 void	vj_event_print_range			(	int n1,		int n2);
 int	veejay_finish_action_file(void *ptr, char *filename );
 int	veejay_load_action_file( void *ptr, char *filename );
-int	vj_event_macro_status(void);
-void	vj_event_select_macro(				void *ptr,
-	const char format[], va_list ap);
+void	vj_event_select_macro(				void *ptr, const char format[], va_list ap);
 void    vj_event_stop();
 int  	vj_event_parse_msg( void *v, char *msg, int msg_len );
 void	vj_event_push_coords(void *ptr);
@@ -294,9 +292,9 @@ void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_copyright( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_osl( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_osd_extra(void *ptr, const char format[], va_list ap);
+#endif
 void	vj_event_get_image_part(void *ptr, const char format[], va_list ap);
 void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap );
-#endif
 void	vj_event_set_framerate( void *ptr, const char format[], va_list ap );
 void	vj_event_sync_correction( void *ptr,const char format[], va_list ap );
 void	vj_event_get_keyframes( void *ptr, 	const char format[],	va_list ap	);

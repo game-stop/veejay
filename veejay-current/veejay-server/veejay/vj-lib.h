@@ -261,6 +261,7 @@ typedef struct {
 	int	max_cached_slots;
 	int drawmode;
 	int drawsize;
+	void *macro;
 } user_control;
 
 typedef struct {

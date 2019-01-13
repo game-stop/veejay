@@ -364,14 +364,12 @@ void		vj_init_vevo_events(void)
 	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * MAX_INDEX );
 
 	index_map_[VIMS_MACRO] = _new_event(
-				"%d %d",
+				"%d",
 				VIMS_MACRO,
 				"Macro keystroke recorder/playback",
 				vj_event_set_macro_status,
-				2,
-				VIMS_ALLOW_ANY,
-				"Keep or reset (1=reset)",
 				1,
+				VIMS_ALLOW_ANY,
 				"Macro status (0=disabled,1=record,2=playing)",
 				0,
 				NULL );

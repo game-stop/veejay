@@ -772,8 +772,6 @@ int vj_tag_set_stream_color(int t1, int r, int g, int b)
     if(!tag)
     return 0;
     
-    veejay_msg(VEEJAY_MSG_DEBUG,"Set stream %d color %d,%d,%d",t1, r,g, b );
- 
     tag->color_r = r;
     tag->color_g = g;
     tag->color_b = b;
@@ -2815,6 +2813,34 @@ void	vj_tag_set_chain_paused(int t1, int paused)
 		}
 	}
 }
+
+int	vj_tag_get_loop_stat_stop(int s1) {
+	vj_tag *tag = vj_tag_get(s1);
+    	if (!tag) return 0;
+	return tag->loop_stat_stop;
+}
+void 	vj_tag_set_loop_stat_stop(int s1, int loop_stop) {
+	vj_tag *tag = vj_tag_get(s1);
+	if(!tag) return;
+	tag->loop_stat_stop = loop_stop;
+}
+
+int	vj_tag_get_loop_stats(int s1) {
+	vj_tag *tag = vj_tag_get(s1);
+    	if (!tag) return 0;
+	return tag->loop_stat;
+}
+void 	vj_tag_set_loop_stats(int s1, int loops) {
+	vj_tag *tag = vj_tag_get(s1);
+	if(!tag) return;
+	if( loops == -1) {
+		tag->loop_stat = (tag->loop_stat_stop > 0 ? (tag->loop_stat + 1 ) % tag->loop_stat_stop : tag->loop_stat + 1);
+	}
+	else
+		tag->loop_stat = loops;
+}
+
+
 
 // very old code, 2 callers; 150 and 255 size of dst
 void vj_tag_get_source_name(int t1, char *dst)
