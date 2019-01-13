@@ -4676,8 +4676,8 @@ void	on_macroplay_toggled( GtkWidget *w, gpointer data )
 		return;
 	if( is_button_toggled( "macroplay" ))
 	{	
-		multi_vims( VIMS_MACRO, "%d %d", 2,1 );
-		vj_midi_learning_vims_msg2( info->midi,NULL,VIMS_MACRO,2,1 );
+		multi_vims( VIMS_MACRO, "%d", 2 );
+		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,2 );
 	}
 }
 
@@ -4687,8 +4687,8 @@ void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
 		return;
 	if( is_button_toggled( "macrorecord"))
 	{	
-		multi_vims( VIMS_MACRO, "%d %d", 1, 1 );
-		vj_midi_learning_vims_msg2( info->midi,NULL,VIMS_MACRO,1,1 );
+		multi_vims( VIMS_MACRO, "%d", 1 );
+		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,1 );
 	}
 }
 
@@ -4698,8 +4698,8 @@ void	on_macrostop_toggled( GtkWidget *w, gpointer data )
 		return;
 	if( is_button_toggled( "macrostop"))
 	{
-		multi_vims( VIMS_MACRO, "%d %d", 0 , 1 );
-		vj_midi_learning_vims_msg2( info->midi,NULL,VIMS_MACRO,0,1 );
+		multi_vims( VIMS_MACRO, "%d", 0 );
+		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,0 );
 	}
 }
 
@@ -4708,8 +4708,8 @@ void	on_macroclear_clicked( GtkWidget *w, gpointer data )
 	if(info->status_lock)
 		return;
 	
-	multi_vims( VIMS_MACRO, "%d %d", 0, 0 );
-	vj_midi_learning_vims_msg2( info->midi,NULL, VIMS_MACRO, 0, 0);
+	multi_vims( VIMS_MACRO, "%d", 3 );
+	vj_midi_learning_vims_msg( info->midi,NULL, VIMS_MACRO, 3);
 }
 
 void	on_midilearn_toggled( GtkWidget *w, gpointer data )
