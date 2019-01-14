@@ -118,7 +118,7 @@ char **vj_macro_pull(void *ptr, long frame_num, int at_loop, int at_dup)
 }
 
 // store a macro at the given position
-int vj_macro_put(void *ptr, char *message, long frame_num, int at_loop, int at_dup)
+int vj_macro_put(void *ptr, char *message, long frame_num, int at_dup, int at_loop)
 {
 	vj_macro_t *macro = (vj_macro_t*) ptr;
 	char key[32];
@@ -181,7 +181,7 @@ static  void vj_macro_reclaim_block( macro_block_t *blk, int seq_no )
 
 }
 
-void    vj_macro_del(void *ptr, long frame_num, int at_loop, int at_dup, int seq_no)
+void    vj_macro_del(void *ptr, long frame_num, int at_dup, int at_loop, int seq_no)
 {
     vj_macro_t *macro = (vj_macro_t*) ptr;
 	char key[32];
@@ -195,6 +195,17 @@ void    vj_macro_del(void *ptr, long frame_num, int at_loop, int at_dup, int seq
         m = (macro_block_t*) mb;
         vj_macro_reclaim_block( m, seq_no );
     }
+}
+
+void vj_macro_clear_bank(void *ptr, int bank)
+{
+	vj_macro_t* macro = (vj_macro_t*) ptr;
+	if(bank < 0 || bank > MAX_MACRO_BANKS ) 
+	       return;
+	vpf( macro->macro_bank[ bank ] );
+	macro->macro_bank[ bank ] = NULL;
+
+	vj_macro_select( ptr, bank );
 }
 
 void vj_macro_clear(void *ptr)
@@ -427,7 +438,7 @@ static void vj_macro_load_messages( void *ptr, char *key, xmlDocPtr doc, xmlNode
         while(cur != NULL) {
             if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_MSG )) {
                 char *msg = get_xml_str(doc, cur );
-                vj_macro_put( ptr, msg, frame_num, at_loop, at_dup );
+                vj_macro_put( ptr, msg, frame_num, at_dup, at_loop );
                 free(msg);
             }
             cur = cur->next;
@@ -542,6 +553,7 @@ void vj_macro_init(void)
     vvm_[VIMS_PROJECTION] = 0;
 	vvm_[VIMS_DEL_MACRO] = 0;
 	vvm_[VIMS_PUT_MACRO] = 0;
+	vvm_[VIMS_QUIT] = 0;
 }
 
 int vj_macro_is_vims_accepted(int net_id)

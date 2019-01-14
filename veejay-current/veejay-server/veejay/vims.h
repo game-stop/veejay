@@ -37,6 +37,7 @@ enum {
 	VIMS_COMPOSITE					=	47,
 	VIMS_RENDER_DEPTH				=	48,
 	VIMS_FEEDBACK					= 	49,
+	VIMS_CLEAR_MACRO_BANK				=	31,
 	VIMS_MACRO						=	33,
 	VIMS_MACRO_SELECT				=	34,
 	VIMS_CONTINUOUS_PLAY			=	35,			//FIXME delete this event

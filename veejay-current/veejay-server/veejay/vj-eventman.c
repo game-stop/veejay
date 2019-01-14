@@ -374,13 +374,24 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[VIMS_CLEAR_MACRO_BANK] = _new_event(
+				"%d",
+				VIMS_CLEAR_MACRO_BANK,
+				"Macro clear bank 0 - 12",
+				vj_event_macro_clear_bank,
+				1,
+				VIMS_ALLOW_ANY,
+				"bank",
+				0,
+				NULL );
+
     index_map_[VIMS_PUT_MACRO] = _new_event(
                 "%d %d %d %s",
                 VIMS_PUT_MACRO,
                 "Macro put VIMS message at position <frame number> <dup number> <loop number> <message>",
                 vj_event_macro_put,
                 4,
-                VIMS_ALLOW_ANY,
+                VIMS_LONG_PARAMS,
                 "frame number",
                 0,
                 "dup number",

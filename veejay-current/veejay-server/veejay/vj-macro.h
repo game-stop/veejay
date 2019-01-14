@@ -46,6 +46,7 @@ void vj_macro_init(void);
 int vj_macro_is_vims_accepted(int vims_id);
 int vj_macro_get_loop_stat_stop( void *ptr );
 int vj_macro_set_loop_stat_stop( void *ptr, int stop);
+void vj_macro_clear_bank(void *ptr, int bank);
 void vj_macro_del(void *ptr, long frame_num, int at_loop, int at_dup, int seq_no);
 char* vj_macro_serialize_macro(void *ptr, long frame_num, int at_dup, int at_loop );
 char *vj_macro_serialize(void *ptr);
