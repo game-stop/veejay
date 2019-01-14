@@ -4678,6 +4678,7 @@ void	on_macroplay_toggled( GtkWidget *w, gpointer data )
 	{	
 		multi_vims( VIMS_MACRO, "%d", 2 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,2 );
+		info->uc.reload_hint[HINT_MACRO] = 1;
 	}
 }
 
@@ -4689,6 +4690,7 @@ void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
 	{	
 		multi_vims( VIMS_MACRO, "%d", 1 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,1 );
+		info->uc.reload_hint[HINT_MACRO] = 1;
 	}
 }
 
@@ -4700,6 +4702,7 @@ void	on_macrostop_toggled( GtkWidget *w, gpointer data )
 	{
 		multi_vims( VIMS_MACRO, "%d", 0 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,0 );
+		info->uc.reload_hint[HINT_MACRO] = 1;
 	}
 }
 
@@ -4710,6 +4713,73 @@ void	on_macroclear_clicked( GtkWidget *w, gpointer data )
 	
 	multi_vims( VIMS_MACRO, "%d", 3 );
 	vj_midi_learning_vims_msg( info->midi,NULL, VIMS_MACRO, 3);
+        info->uc.reload_hint[HINT_MACRO] = 1;
+}
+
+
+void	on_macro_loop_position_value_changed( GtkWidget *w, gpointer data)
+{
+	if(!info->status_lock)
+		macro_line[2] = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w) );
+}
+
+void	on_macro_dup_position_value_changed( GtkWidget *w, gpointer data )
+{
+	if(!info->status_lock)
+		macro_line[1] = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w) );
+}
+
+void	on_macro_frame_position_value_changed( GtkWidget *w, gpointer data)
+{
+	if(!info->status_lock)
+		macro_line[0] = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w) );
+}
+
+void	on_macro_button_clear_bank_clicked( GtkWidget *w, gpointer data)
+{
+	int num = get_nums("macro_bank_select");
+	multi_vims(VIMS_CLEAR_MACRO_BANK, "%d", num);
+        info->uc.reload_hint[HINT_MACRO] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Macro bank %d cleared", num);
+}
+
+void 	on_macro_save_button_clicked( GtkWidget *w, gpointer data)
+{
+	macro_line[0] = get_nums("macro_frame_position");
+	macro_line[1] = get_nums("macro_dup_position");
+	macro_line[2] = get_nums("macro_loop_position");
+
+	char *message = get_text("macro_vims_message");
+	multi_vims( VIMS_PUT_MACRO, "%d %d %d %s", macro_line[0],macro_line[1],macro_line[2], message );
+        info->uc.reload_hint[HINT_MACRO] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Saved new event at frame %ld.%d, loop %d", macro_line[0],macro_line[1],macro_line[2]);
+}
+
+void	on_macro_delete_button_clicked( GtkWidget *w, gpointer data)
+{
+	multi_vims( VIMS_DEL_MACRO,"%d %d %d %d", macro_line[0], macro_line[1], macro_line[2], macro_line[3] );
+        info->uc.reload_hint[HINT_MACRO] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Removed event at frame %ld.%d, loop %d #%d", macro_line[0],macro_line[1],macro_line[2],macro_line[3]);
+}
+
+void    on_macro_refresh_button_clicked( GtkWidget *w, gpointer data)
+{
+	info->uc.reload_hint[HINT_MACRO] = 1;
+}
+
+void    on_macro_delete_all_button_clicked( GtkWidget *w, gpointer data)
+{
+        multi_vims( VIMS_MACRO, "%d", 3 );
+        info->uc.reload_hint[HINT_MACRO] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Removed all events from all banks");
+}
+
+void    on_macro_bank_select_value_changed( GtkWidget *w, gpointer data)
+{
+	int bank = gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
+        multi_vims( VIMS_MACRO_SELECT, "%d",bank);
+        info->uc.reload_hint[HINT_MACRO] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Selected macro bank %d",bank);
 }
 
 void	on_midilearn_toggled( GtkWidget *w, gpointer data )

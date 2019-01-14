@@ -234,7 +234,8 @@ enum
     HINT_SEQ_ACT = 14,
     HINT_SEQ_CUR = 15,
     HINT_GENERATOR =16,
-    NUM_HINTS = 17
+	HINT_MACRO=17,
+    NUM_HINTS = 18,
 };
 
 enum
@@ -533,6 +534,14 @@ enum
     FXC_N_COLS,
 };
 
+enum {
+	MACRO_FRAME = 0,
+	MACRO_DUP = 1,
+	MACRO_LOOP = 2,
+	MACRO_MSG_SEQ = 3,
+	MACRO_VIMS = 4,
+};
+
 enum
 {
     V4L_NUM=0,
@@ -592,6 +601,7 @@ static effectlist_data fxlist_data;
 
 #define SEQUENCER_COL 10
 #define SEQUENCER_ROW 10
+static guint macro_line[4] = { 0,0,0,0 };
 
 static vj_gui_t *info = NULL;
 void *get_ui_info() { return (void*) info; }
@@ -711,6 +721,7 @@ int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 static void vj_kf_refresh();
 static void vj_kf_reset();
+void reload_macros();
 /* not used */ /* static int vj_kf_is_displayed(); */
 
 void reset_cali_images( int type, char *wid_name );
@@ -1211,6 +1222,54 @@ static void setup_v4l_devices()
         (GCallback) on_devicelist_row_activated, NULL );
 
     //scan_devices( "tree_v4ldevices" );
+}
+
+gboolean vims_macro_selection_func( GtkTreeSelection *sel, GtkTreeModel *model, GtkTreePath *path, gboolean path_currently_selected, gpointer data)
+{
+	GtkTreeIter iter;
+	if( gtk_tree_model_get_iter( model, &iter, path) ) {
+			
+		guint frame_num = 0, dup_num = 0, loop_num = 0, seq_no = 0;
+
+		gchar *message = NULL;
+		gtk_tree_model_get( model, &iter, MACRO_FRAME, &frame_num, -1);
+		gtk_tree_model_get( model, &iter, MACRO_DUP, &dup_num, -1);
+	    gtk_tree_model_get( model, &iter, MACRO_MSG_SEQ, &seq_no, -1);
+		gtk_tree_model_get( model, &iter, MACRO_LOOP, &loop_num, -1);
+	    gtk_tree_model_get( model, &iter, MACRO_VIMS, &message, -1 );
+		
+		macro_line[0] = frame_num;
+		macro_line[1] = dup_num;
+		macro_line[2] = loop_num;
+		macro_line[3] = seq_no;
+
+		update_spin_value( "macro_frame_position", frame_num );
+		update_spin_value( "macro_dup_position", dup_num );
+		update_spin_value( "macro_loop_position", loop_num );
+		put_text( "macro_vims_message", message );
+	
+		g_free(message);
+	}
+	return TRUE;
+}
+
+static void setup_macros()
+{
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "macro_macros" );
+	GtkListStore *store = gtk_list_store_new( 5, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING );
+
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store) );
+	GtkTreeSelection *sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tree) );
+	gtk_tree_selection_set_mode( sel, GTK_SELECTION_SINGLE );
+	gtk_tree_selection_set_select_function( sel, vims_macro_selection_func, NULL,NULL );
+
+	g_object_unref( G_OBJECT(store) );
+
+	setup_tree_text_column( "macro_macros", MACRO_FRAME, "Frame",0 );
+	setup_tree_text_column( "macro_macros", MACRO_DUP, "Dup",0);
+	setup_tree_text_column( "macro_macros", MACRO_LOOP, "Loop",0);
+	setup_tree_text_column( "macro_macros", MACRO_MSG_SEQ, "#",0);
+	setup_tree_text_column( "macro_macros", MACRO_VIMS, "VIMS Message",0);
 }
 
 #define SAMPLE_MAX_PARAMETERS 32
@@ -4551,7 +4610,9 @@ void set_feedback_status()
 	int len = 0;
 	single_vims(VIMS_GET_FEEDBACK);
 	gchar *answer = recv_vims(3,&len);
-	
+	if(answer == NULL)
+		return;
+
 	int status = atoi(answer);
 
 	set_toggle_button("feedbackbutton", status);
@@ -5828,6 +5889,75 @@ void _edl_reset(void)
         }
         g_list_free( info->elref );
     }
+}
+
+void	reload_macros()
+{
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "macro_macros" );
+	GtkListStore *store;
+	GtkTreeIter iter;
+
+	gint consumed = 0;
+	gint len = 0;
+	single_vims( VIMS_GET_ALL_MACRO );
+	gchar *answer = recv_vims(8, &len);
+
+	reset_tree("macro_macros");
+
+	if( answer == NULL || len < 0 )
+		return;
+
+	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
+    store = GTK_LIST_STORE(model);
+
+	gchar *ptr = answer;
+
+	int error = 0;
+
+	while(consumed < len) {
+		
+		long frame_num = 0;
+		int at_dup = 0;
+		int at_loop = 0;
+		int at_seq = 0;
+		int msg_len = 0;
+
+		int n = sscanf( ptr, "%08ld%02d%08d%02d%03d", &frame_num, &at_dup, &at_loop, &at_seq, &msg_len );
+		if( n != 5) {
+			error = 1;
+			break;
+		}
+
+		ptr += (8 + 2 + 8 + 2 + 3);
+
+		char *msg = strndup( ptr, msg_len );
+		
+		gtk_list_store_append( store, &iter );
+    	gtk_list_store_set(store, &iter,
+    		MACRO_FRAME, (guint) frame_num,
+			MACRO_DUP, (guint) at_dup,
+			MACRO_LOOP, (guint) at_loop,
+			MACRO_MSG_SEQ, (guint) at_seq,
+			MACRO_VIMS, msg, 
+			-1 );
+
+		ptr += msg_len;
+
+		free(msg);
+
+		consumed += (8 + 2 + 8 + 2 + 3);
+		consumed += msg_len;
+	}
+
+	if(error){
+		veejay_msg(0,"Unable to read all VIMS macros");
+	}
+
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+		
+	free(answer);
+
+	info->uc.reload_hint[HINT_MACRO] = 0;
 }
 
 static void reload_editlist_contents()
@@ -7124,13 +7254,19 @@ static void process_reload_hints(int *history, int pm)
     }
 
     /* Curve needs update (start/end changed, effect id changed */
-    if ( info->uc.reload_hint[HINT_KF]  )
+    if ( info->uc.reload_hint[HINT_KF]  ) {
         vj_kf_refresh();
+    }
 
-    if( beta__ && info->uc.reload_hint[HINT_HISTORY] )
+    if( beta__ && info->uc.reload_hint[HINT_HISTORY] ) {
         reload_srt();
+    }
 
-    veejay_memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));
+	if( info->uc.reload_hint[HINT_MACRO] ) {
+		reload_macros();
+	}
+ 
+	veejay_memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));
 }
 
 void update_gui()
@@ -7830,7 +7966,8 @@ void vj_gui_init(char *glade_file,
     setup_editlist_info();
     setup_samplelist_info();
     setup_v4l_devices();
-    setup_colorselection();
+    setup_macros();
+	setup_colorselection();
     setup_rgbkey();
     setup_bundles();
     setup_server_files();
@@ -8090,6 +8227,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     reload_vimslist();
     reload_editlist_contents();
     reload_bundles();
+	reload_macros();
 
     set_feedback_status();
 
