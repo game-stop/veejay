@@ -590,7 +590,7 @@ static struct
 
 	{ "video/forward"					, VIMS_VIDEO_PLAY_FORWARD },
 	{ "video/play"						, VIMS_VIDEO_PLAY_FORWARD },
-	{ "video/reverse"					, VIMS_VIDEO_PLAY_REVERSE },
+//	{ "video/reverse"					, VIMS_VIDEO_PLAY_REVERSE },
 	{ "video/pause"						, VIMS_VIDEO_PLAY_STOP },
 	{ "video/nextframe"					, VIMS_VIDEO_SKIP_FRAME },	
 	{ "video/prevframe"					, VIMS_VIDEO_PREV_FRAME },
