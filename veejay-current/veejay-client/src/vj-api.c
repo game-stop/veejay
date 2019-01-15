@@ -540,6 +540,7 @@ enum {
 	MACRO_LOOP = 2,
 	MACRO_MSG_SEQ = 3,
 	MACRO_VIMS = 4,
+	MACRO_VIMS_DESCR = 5,
 };
 
 enum
@@ -1237,7 +1238,7 @@ gboolean vims_macro_selection_func( GtkTreeSelection *sel, GtkTreeModel *model, 
 	    gtk_tree_model_get( model, &iter, MACRO_MSG_SEQ, &seq_no, -1);
 		gtk_tree_model_get( model, &iter, MACRO_LOOP, &loop_num, -1);
 	    gtk_tree_model_get( model, &iter, MACRO_VIMS, &message, -1 );
-		
+
 		macro_line[0] = frame_num;
 		macro_line[1] = dup_num;
 		macro_line[2] = loop_num;
@@ -1256,7 +1257,7 @@ gboolean vims_macro_selection_func( GtkTreeSelection *sel, GtkTreeModel *model, 
 static void setup_macros()
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "macro_macros" );
-	GtkListStore *store = gtk_list_store_new( 5, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING );
+	GtkListStore *store = gtk_list_store_new( 6, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING );
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store) );
 	GtkTreeSelection *sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tree) );
@@ -1270,6 +1271,7 @@ static void setup_macros()
 	setup_tree_text_column( "macro_macros", MACRO_LOOP, "Loop",0);
 	setup_tree_text_column( "macro_macros", MACRO_MSG_SEQ, "#",0);
 	setup_tree_text_column( "macro_macros", MACRO_VIMS, "VIMS Message",0);
+	setup_tree_text_column( "macro_macros", MACRO_VIMS_DESCR, "Description",0);
 }
 
 #define SAMPLE_MAX_PARAMETERS 32
@@ -2988,9 +2990,9 @@ static void update_label_i(const char *name, int num, int prefix)
     }
     char str[20];
     if(prefix)
-        g_snprintf( str,20, "%09d", num );
+        g_snprintf( str,sizeof(str), "%09d", num );
     else
-        g_snprintf( str,20, "%d",    num );
+        g_snprintf( str,sizeof(str), "%d",    num );
     gchar *utf8_value = _utf8str( str );
     gtk_label_set_text( GTK_LABEL(label), utf8_value);
     g_free( utf8_value );
@@ -5908,7 +5910,7 @@ void	reload_macros()
 		return;
 
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
-    store = GTK_LIST_STORE(model);
+    	store = GTK_LIST_STORE(model);
 
 	gchar *ptr = answer;
 
@@ -5931,14 +5933,20 @@ void	reload_macros()
 		ptr += (8 + 2 + 8 + 2 + 3);
 
 		char *msg = strndup( ptr, msg_len );
-		
+		int vims_id = -1;
+		n = sscanf(msg,"%03d:", &vims_id);
+		char *descr = NULL;
+		if( vims_id >= 0 && vims_id < VIMS_QUIT )
+			descr = vj_event_list[vims_id].descr;
+	
 		gtk_list_store_append( store, &iter );
-    	gtk_list_store_set(store, &iter,
+    		gtk_list_store_set(store, &iter,
     		MACRO_FRAME, (guint) frame_num,
 			MACRO_DUP, (guint) at_dup,
 			MACRO_LOOP, (guint) at_loop,
 			MACRO_MSG_SEQ, (guint) at_seq,
 			MACRO_VIMS, msg, 
+			MACRO_VIMS_DESCR, (descr == NULL ? "Unknown": descr),
 			-1 );
 
 		ptr += msg_len;
@@ -6872,6 +6880,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     {
         info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_CHAIN] = 1;
+	info->uc.reload_hint[HINT_MACRO] = 1;
 
         if( pm != MODE_STREAM )
             info->uc.reload_hint[HINT_EL] = 1;
@@ -6918,6 +6927,14 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         info->uc.real_num_samples = n_samples;
         info->uc.real_num_streams = n_streams;
     }
+
+    if( info->status_tokens[SAMPLE_LOOP_STAT_STOP] != history[SAMPLE_LOOP_STAT_STOP] ) {
+	update_label_i( "label_loop_stat_stop", info->status_tokens[SAMPLE_LOOP_STAT_STOP],0);
+    }
+    if( info->status_tokens[SAMPLE_LOOP_STAT ] != history[SAMPLE_LOOP_STAT] ) {
+	update_label_i( "label_loop_stats", info->status_tokens[SAMPLE_LOOP_STAT], 0);
+    }
+
 
     if( info->status_tokens[SEQ_ACT] != history[SEQ_ACT] )
     {
@@ -8227,7 +8244,6 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     reload_vimslist();
     reload_editlist_contents();
     reload_bundles();
-	reload_macros();
 
     set_feedback_status();
 

@@ -357,7 +357,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	if( k == -1 && v->is_master )
 		reloaded_schedule_restart();
 	
-	veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * STATUS_TOKENS));
+	veejay_memset( v->status_tokens,0, sizeof(int) * STATUS_TOKENS);
 	status_to_arr( (char*) v->status_buffer, v->status_tokens );	
 	return 1;
 }
