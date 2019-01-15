@@ -2712,6 +2712,8 @@ int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfp
     ptr = vj_sprintf( ptr, sample->fade_method ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, sample->fade_entry ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, sample->fade_alpha );*ptr++ = ' ';
+    ptr = vj_sprintf( ptr, sample->loop_stat); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, sample->loop_stat_stop); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, tags );
     return 0;
 }
@@ -3137,6 +3139,10 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 
 	if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO )) {
 		vj_macro_load( skel->macro, doc, cur->xmlChildrenNode );
+		int lss = vj_macro_get_loop_stat_stop(skel->macro);
+		if( lss > skel->loop_stat_stop ) {
+			skel->loop_stat_stop = lss;
+		}
 	}
 
         cur = cur->next;

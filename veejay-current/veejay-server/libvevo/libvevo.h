@@ -30,6 +30,7 @@ typedef void vevo_port_t;
 #define TRUE 1
 #endif
 
+int	vevo_port_is_empty(vevo_port_t *p);
 
 int	vevo_property_num_elements( vevo_port_t *p, const char *key);
 

@@ -3792,6 +3792,8 @@ int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int p
     ptr = vj_sprintf( ptr, tag->fade_method); *ptr++ = ' '; 
     ptr = vj_sprintf( ptr, tag->fade_entry ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, tag->fade_alpha ); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, tag->loop_stat ); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, tag->loop_stat_stop); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, samples );
     return 0;
 }
@@ -4120,6 +4122,10 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	    if( macro ) 
 	    {
 		vj_macro_load( tag->macro, doc, macro );
+	    	int lss = vj_macro_get_loop_stat_stop(tag->macro);
+		if( lss > tag->loop_stat_stop ) {
+			tag->loop_stat_stop = lss;
+		}
 	    }
 	    	
             int q;

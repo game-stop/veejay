@@ -57,8 +57,10 @@ typedef struct {
 
 typedef struct {
 	void *macro_bank[MAX_MACRO_BANKS];
+	void *playback_bank; // the playback bank consumes the messages in this port
 	int loop_stat_stop[MAX_MACRO_BANKS];
 	uint8_t current_bank;
+	uint8_t play_bank;
 	uint8_t status;
 } vj_macro_t;
 
@@ -94,9 +96,126 @@ uint8_t vj_macro_get_status(void *ptr) {
 	return macro->status;
 }
 
+static void vj_macro_bank_playback_clear(void *ptr)
+{
+	vj_macro_t *macro = (vj_macro_t*) ptr;
+	if(macro->playback_bank != NULL) {
+		vpf(macro->playback_bank);
+		macro->playback_bank = NULL;
+	}
+
+	macro->playback_bank = vpn(VEVO_ANONYMOUS_PORT );
+}
+
+static macro_block_t *vj_macro_clone_block(macro_block_t *in)
+{
+	macro_block_t *m = (macro_block_t*) vj_calloc(sizeof(macro_block_t));
+	for( int i = 0; i < in->num_msg; i ++ ) {
+		m->msg[i] = strdup( in->msg[i] );
+		m->num_msg ++;
+	}
+	return m;
+}
+
+static void	vj_macro_free_block(macro_block_t* in)
+{
+	if(in) {
+		for( int i = 0; i < in->num_msg; i ++ ) {
+			if(in->msg[i]) {
+				free(in->msg[i]);
+			}	
+		}
+		free(in);
+	}
+}
+
+static void vj_macro_clear_bank_item(void *bank, char *item)
+{
+	void *data = NULL;
+	int error = vevo_property_get( bank, item, 0, &data );
+	if( error == VEVO_NO_ERROR )
+	{
+		vj_macro_free_block( data );
+	}
+	vevo_property_del( bank, item );
+}
+
+static int vj_macro_clone_bank_item(void *input, void *output, char *item)
+{
+	void *data = NULL;
+	int error = vevo_property_get( input, item, 0, &data );
+	if( error != VEVO_NO_ERROR )
+		return 0;
+	macro_block_t *blk = vj_macro_clone_block((macro_block_t*) data);
+	error = vevo_property_set( output, item, VEVO_ATOM_TYPE_VOIDPTR, 1, &blk );
+	if( error != VEVO_NO_ERROR ) {
+		vj_macro_free_block(blk);
+		return 0;
+	}
+
+	return 1;
+}
+
+static int vj_macro_bank_prepare_playback(void *ptr)
+{
+	vj_macro_t *macro = (vj_macro_t*) ptr;
+	char **items = vevo_list_properties( macro->macro_bank[ macro->current_bank ] );
+	if(items == NULL)
+		return 0;
+
+	vj_macro_bank_playback_clear(ptr);
+
+	macro->play_bank = macro->current_bank;
+
+	int i;
+	for( i = 0; items[i] != NULL; i ++ ) {
+		vj_macro_clone_bank_item( macro->macro_bank[ macro->current_bank ], macro->playback_bank, items[i] );	
+		free( items[i] );
+	}
+
+	return i;
+}
+
+void	vj_macro_get_key( long frame_num, int at_dup, int at_loop, char *key, size_t key_len)
+{
+	snprintf(key,key_len,"%08ld%02d%08d", frame_num, at_dup, at_loop );
+}
+
+char **vj_macro_play_event(void *ptr, char *key)
+{
+	vj_macro_t *macro = (vj_macro_t*) ptr;
+
+	if( vevo_port_is_empty( macro->playback_bank ) ) {
+		if( vj_macro_bank_prepare_playback( ptr ) == 0 )
+				return NULL;
+	} 
+
+	void *mb = NULL;
+	int error = vevo_property_get(macro->playback_bank, key, 0, &mb );
+	if( error != VEVO_NO_ERROR )
+		return NULL;
+
+	macro_block_t *m = (macro_block_t*) mb;
+
+	char **messages = (char**) vj_calloc(sizeof(char*) * (m->num_msg + 1));
+	for( int i = 0; i < m->num_msg; i ++ ) {
+		messages[i] = m->msg[ i ];
+//		veejay_msg(VEEJAY_MSG_DEBUG, "playback VIMS [%s] at position %ld.%d, loop %d", messages[i], frame_num, at_dup, at_loop );
+	}
+
+	return messages;
+}
+
+void vj_macro_finish_event(void *ptr, char *key)
+{
+	vj_macro_t* macro = (vj_macro_t*) ptr;
+	vj_macro_clear_bank_item( macro->playback_bank, key );
+}
+
+
 // caller frees array of pointers, not contents
 // returns NULL if there are no macros recorded at this position
-char **vj_macro_pull(void *ptr, long frame_num, int at_loop, int at_dup)
+char **vj_macro_pull(void *ptr, long frame_num, int at_dup, int at_loop)
 {
 	vj_macro_t *macro = (vj_macro_t*) ptr;
 	char key[32];
@@ -130,7 +249,10 @@ int vj_macro_put(void *ptr, char *message, long frame_num, int at_dup, int at_lo
 	if( error != VEVO_NO_ERROR ) {
 		m = (macro_block_t*) vj_calloc(sizeof(macro_block_t));
 
-		vevo_property_set(macro->macro_bank[ macro->current_bank ], key, VEVO_ATOM_TYPE_VOIDPTR, 1, &m );
+		if( vevo_property_set(macro->macro_bank[ macro->current_bank ], key, VEVO_ATOM_TYPE_VOIDPTR, 1, &m ) == VEVO_NO_ERROR && macro->current_bank == macro->play_bank ) {
+			vj_macro_clone_bank_item( macro->macro_bank[ macro->current_bank ], macro->playback_bank, key );	
+		}
+
 	}
 	else {
 		m = (macro_block_t*) mb;
@@ -191,6 +313,10 @@ void    vj_macro_del(void *ptr, long frame_num, int at_dup, int at_loop, int seq
 	int error = vevo_property_get(macro->macro_bank[ macro->current_bank ], key,0, &mb );
 	macro_block_t *m = NULL;
 
+	if( macro->play_bank == macro->current_bank ) {
+		vj_macro_clear_bank_item( macro->playback_bank, key );
+	}
+
     if( error == VEVO_NO_ERROR ) {
         m = (macro_block_t*) mb;
         vj_macro_reclaim_block( m, seq_no );
@@ -230,6 +356,10 @@ void vj_macro_clear(void *ptr)
 	free(items);
 
 	vpf(macro->macro_bank[ macro->current_bank ]);
+	if(macro->current_bank == macro->play_bank) {
+		vpf(macro->playback_bank);
+		macro->playback_bank = NULL;
+	}
 	macro->macro_bank[macro->current_bank] = NULL;
 }
 
@@ -250,14 +380,17 @@ int vj_macro_select( void *ptr, int slot )
 		}
 	}
 
+	vj_macro_bank_playback_clear(ptr);
+
 	macro->current_bank = slot;
+	macro->play_bank = slot; // consider adding another VIMS event to select which bank to play and which to edit
 	return 1;
 }
 
 int vj_macro_get_loop_stat_stop( void *ptr )
 {
 	vj_macro_t *macro = (vj_macro_t*) ptr;
-	return macro->loop_stat_stop[ macro->current_bank ];	
+	return 1 + macro->loop_stat_stop[ macro->current_bank ]; // loop stop is inclusive
 }
 
 int	vj_macro_set_loop_stat_stop( void *ptr, int stop)
@@ -276,7 +409,7 @@ int	vj_macro_set_loop_stat_stop( void *ptr, int stop)
 static char** vj_macro_get_messages(void *ptr, long frame_num, int at_dup, int at_loop, int *len)
 {
 	int i;
-	char **messages = vj_macro_pull(ptr, frame_num, at_loop, at_dup);
+	char **messages = vj_macro_pull(ptr, frame_num, at_dup, at_loop);
 	if(messages != NULL) {
         int msglen = 0;
 		for( i = 0; messages[i] != NULL; i ++ ) {
@@ -325,8 +458,8 @@ static int vj_macro_get_serialized_length(void *ptr, char **items)
 	/* calculate data length */
 	for( i = 0; items[i] != NULL;  i++ ) {
 		long frame_num = 0;
-    	int  at_loop = 0;
-    	int  at_dup = 0;
+		int at_dup = 0;
+    	int at_loop = 0;
 
     	if( sscanf( items[i], "%08ld%02d%08d", &frame_num, &at_dup, &at_loop ) == 3 ) {
 			char **messages = vj_macro_get_messages(ptr, frame_num, at_dup, at_loop, &len );
@@ -355,8 +488,8 @@ char *vj_macro_serialize(void *ptr)
 	int i;
 	for( i = 0; items[i] != NULL; i ++ ) {
 		long frame_num = 0;
-    	int  at_loop = 0;
-    	int  at_dup = 0;
+		int at_dup = 0;
+    	int at_loop = 0;
 
     	if( sscanf( items[i], "%08ld%02d%08d", &frame_num, &at_dup, &at_loop ) == 3 ) {
 			char *macro_str = vj_macro_serialize_macro( ptr, frame_num, at_dup, at_loop );
@@ -435,7 +568,13 @@ static void vj_macro_load_messages( void *ptr, char *key, xmlDocPtr doc, xmlNode
     int  at_dup = 0;
 
     if( sscanf( key, "%08ld%02d%08d", &frame_num, &at_dup, &at_loop ) == 3 ) {
-        while(cur != NULL) {
+	
+	    if(frame_num == 0 && at_loop == 0 && at_dup == 0 ) {
+			//this is not valid
+			return;
+    	}
+    
+		while(cur != NULL) {
             if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_MSG )) {
                 char *msg = get_xml_str(doc, cur );
                 vj_macro_put( ptr, msg, frame_num, at_dup, at_loop );

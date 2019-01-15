@@ -1394,6 +1394,18 @@ char **vevo_list_properties(vevo_port_t * p)
     return list;
 }
 
+int	vevo_port_is_empty(vevo_port_t *p)
+{
+	__vevo_port_t *port = (__vevo_port_t *) p;
+
+	if(port == NULL)
+		return -1;
+	if(port->index)
+		return 0;
+	return 1;
+}
+
+
 int	vevo_num_properties(vevo_port_t * p)
 {
      __vevo_port_t *port = (__vevo_port_t *) p;

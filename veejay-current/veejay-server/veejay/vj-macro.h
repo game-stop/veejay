@@ -25,6 +25,7 @@
 #define MACRO_STOP 0
 #define MACRO_REC 1
 #define MACRO_PLAY 2
+#define MACRO_DESTROY 3
 
 #define XMLTAG_MACRO_BANK "macrobank"
 #define XMLTAG_MACRO "macro"
@@ -38,8 +39,8 @@ void *vj_macro_new(void);
 void vj_macro_free(void *ptr);
 void vj_macro_set_status(void *ptr, uint8_t status);
 uint8_t vj_macro_get_status(void *ptr);
-char **vj_macro_pull(void *ptr, long frame_num, int at_loop, int at_dup);
-int vj_macro_put(void *ptr, char *message, long frame_num, int at_loop, int at_dup);
+char **vj_macro_pull(void *ptr, long frame_num, int at_dup, int at_loop);
+int vj_macro_put(void *ptr, char *message, long frame_num, int at_dup, int at_loop);
 void vj_macro_clear(void *ptr);
 int vj_macro_select( void *ptr, int slot );
 void vj_macro_init(void);
@@ -47,9 +48,12 @@ int vj_macro_is_vims_accepted(int vims_id);
 int vj_macro_get_loop_stat_stop( void *ptr );
 int vj_macro_set_loop_stat_stop( void *ptr, int stop);
 void vj_macro_clear_bank(void *ptr, int bank);
-void vj_macro_del(void *ptr, long frame_num, int at_loop, int at_dup, int seq_no);
+void vj_macro_del(void *ptr, long frame_num, int at_dup, int at_loop, int seq_no);
 char* vj_macro_serialize_macro(void *ptr, long frame_num, int at_dup, int at_loop );
 char *vj_macro_serialize(void *ptr);
+char **vj_macro_play_event(void *ptr, char *key );
+void vj_macro_finish_event(void *ptr, char *key);
+void vj_macro_get_key( long frame_num, int at_dup, int at_loop, char *key, size_t key_len);
 #ifdef HAVE_XML2
 void vj_macro_load( void *ptr, xmlDocPtr doc, xmlNodePtr cur);
 void vj_macro_store( void *ptr, xmlNodePtr node );

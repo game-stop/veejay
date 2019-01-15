@@ -496,7 +496,7 @@ static inline void P_A(int *args, size_t argsize, char *str, size_t strsize, con
 
 #define CLAMPVAL(a) { if(a<0)a=0; else if(a >255) a =255; }
 
-static 	void	vj_event_macro_get_loop_dup( veejay_t *v, int *at_loop, int *at_dup )
+static 	void	vj_event_macro_get_loop_dup( veejay_t *v, int *at_dup, int *at_loop )
 {
 	if( SAMPLE_PLAYING(v)) {
     	*at_dup = sample_get_framedups( v->uc->sample_id );
@@ -508,21 +508,8 @@ static 	void	vj_event_macro_get_loop_dup( veejay_t *v, int *at_loop, int *at_dup
     }
     else if ( PLAIN_PLAYING(v)) {
     	*at_dup = v->settings->simple_frame_dup;
+		*at_loop = 0;
 	}
-}
-
-static  void	reset_loop_stats(void)
-{
-	int i;
-	int n = sample_size();
-	for( i = 0; i < n; i ++ ) {
-		sample_set_loop_stats( i, 0 );
-	}
-    n = vj_tag_size();
-    for( i = 0; i < n; i ++ ) {
-        vj_tag_set_loop_stats( i, 0 );
-    }
-
 }
 
 static hash_val_t int_bundle_hash(const void *key)
@@ -1375,10 +1362,10 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 
 	if( vj_macro_get_status( macro ) == MACRO_REC ) {
    		if( vj_macro_is_vims_accepted(net_id)) {
-			int at_loop = 0;
 			int at_dup = 0;
-			vj_event_macro_get_loop_dup(v, &at_loop, &at_dup );
-			if(vj_macro_put( macro, msg, v->settings->current_frame_num, at_loop, at_dup ) == 0 ) {
+			int at_loop = 0;
+			vj_event_macro_get_loop_dup(v, &at_dup, &at_loop );
+			if(vj_macro_put( macro, msg, v->settings->current_frame_num, at_dup, at_loop ) == 0 ) {
 				veejay_msg(0, "[Macro] max number of VIMS messages for this position reached");
 			} else {
                 vj_macro_set_loop_stat_stop( macro, loop_stat_stop );
@@ -1498,9 +1485,12 @@ void vj_event_update_remote(void *ptr)
     {
        	int at_dup = 0;
 		int at_loop = 0;
-		vj_event_macro_get_loop_dup(v, &at_loop, &at_dup );
+		vj_event_macro_get_loop_dup(v, &at_dup, &at_loop );
 
-		char **vims_messages = vj_macro_pull( macro, v->settings->current_frame_num, at_loop, at_dup );
+		char key[32];
+		vj_macro_get_key(v->settings->current_frame_num, at_dup, at_loop , key, sizeof(key));
+
+		char **vims_messages = vj_macro_play_event( macro, key );
 
 		if(vims_messages != NULL) {
 			for( i = 0; vims_messages[i] != NULL; i ++ ) {
@@ -1508,6 +1498,8 @@ void vj_event_update_remote(void *ptr)
 			}
 			free(vims_messages);
 		}
+
+		vj_macro_finish_event( macro ,key );
 	}
 }
 
@@ -7623,7 +7615,6 @@ void	vj_event_macro_get(void *ptr, const char format[], va_list ap)
 	}	
 }
 
-
 void    vj_event_select_macro( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7647,7 +7638,6 @@ void    vj_event_select_macro( void *ptr, const char format[], va_list ap )
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to change VIMS macro bank to %d", args[0]);
 		}
 	}
-	
 }
 
 void vj_event_select_bank(void *ptr, const char format[], va_list ap) 
@@ -7713,7 +7703,7 @@ void vj_event_print_tag_info(veejay_t *v, int id)
                 veejay_msg(VEEJAY_MSG_INFO, "Mixing with %s %d",(source_type == VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),vj_tag_get_chain_channel(id,i));
                 }
         }
-        }
+    }
 }
 
 void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_mod )
@@ -10286,79 +10276,84 @@ void    vj_event_sample_sequencer_active(   void *ptr,  const char format[],    
     }
 }
 
+static int	vj_event_macro_loop_stat_auto( veejay_t *v, void *macro, int new_state )
+{
+	int cur_state = vj_macro_get_status( macro );
+	if( cur_state == new_state ) {
+		return -1; // nothing to do
+	}
+
+	if( new_state == MACRO_REC || new_state == MACRO_DESTROY ) {
+		return 0;
+	}
+
+	if( new_state == MACRO_PLAY ) {
+		return vj_macro_get_loop_stat_stop( macro );
+	}
+
+	return -1;
+}
+
 void    vj_event_set_macro_status( void *ptr,   const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    if( args[0] == 0 )
+	void *macro = NULL;
+
+	if( SAMPLE_PLAYING(v) ) {
+		macro = sample_get_macro(v->uc->sample_id);
+	}
+	if( STREAM_PLAYING(v) ) {
+		macro = vj_tag_get_macro(v->uc->sample_id);
+	}
+
+	if(macro == NULL) {
+		return;
+	}
+
+	if(args[0] != MACRO_STOP && args[0] != MACRO_REC && args[0] != MACRO_PLAY && args[0] != MACRO_DESTROY) {
+		veejay_msg(0, "VIMS macro event rec/play valid states are (%d=STOP,%d=REC,%d=PLAY,%d=DESTROY)", MACRO_STOP,MACRO_REC,MACRO_PLAY,MACRO_DESTROY);
+		return;
+	}
+
+	int loop_stat_stop = vj_event_macro_loop_stat_auto(v, macro, args[0] );
+
+    if( args[0] == MACRO_STOP )
     {
-        if(SAMPLE_PLAYING(v)) {
-            //sample_set_loop_stat_stop( v->uc->sample_id, sample_get_loop_stats( v->uc->sample_id ) );
-        	vj_macro_set_status( sample_get_macro(v->uc->sample_id), MACRO_STOP );
-			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro is now inactive");
-		}
-        if(STREAM_PLAYING(v)) {
-            //vj_tag_set_loop_stat_stop( v->uc->sample_id, vj_tag_get_loop_stats( v->uc->sample_id ) );
-			vj_macro_set_status( vj_tag_get_macro(v->uc->sample_id), MACRO_STOP);
-			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro is now inactive");
-        }
+        vj_macro_set_status( macro, MACRO_STOP );
+		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro is now inactive");
     }
-	else if (args[0] == 1) {
+	else if (args[0] == MACRO_REC)
+	{	
+		vj_macro_set_status( macro, MACRO_REC );
+		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro recorder is active");
+	}
+    else if (args[0] == MACRO_PLAY)
+    {
+		vj_macro_set_status( macro, MACRO_PLAY);
+		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro playback is active");
+    }
+	else if (args[0] == MACRO_DESTROY)
+	{
+		vj_macro_set_status( macro, MACRO_STOP );
+		vj_macro_clear(macro);
+        vj_macro_select(macro, -1 );
+        vj_macro_set_loop_stat_stop(macro,loop_stat_stop);
+	}
+
+	if(loop_stat_stop != -1) {
 		if(SAMPLE_PLAYING(v)) {
-			reset_loop_stats();
-		//	sample_set_loop_stat_stop( v->uc->sample_id, 0 );
-			vj_macro_set_status( sample_get_macro(v->uc->sample_id), MACRO_REC );
-			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro recorder is active");
+			sample_set_loop_stat_stop( v->uc->sample_id, loop_stat_stop );
+			sample_set_loop_stats( v->uc->sample_id, 0 );
 		}
 		if(STREAM_PLAYING(v)) {
-			reset_loop_stats();
-		//	vj_tag_set_loop_stat_stop( v->uc->sample_id, 0 );
-			vj_macro_set_status( vj_tag_get_macro(v->uc->sample_id), MACRO_REC );
-			veejay_msg(VEEJAY_MSG_INFO,"VIMS Macro recorder is active");
+			vj_tag_set_loop_stat_stop( v->uc->sample_id, loop_stat_stop );
+			vj_tag_set_loop_stats( v->uc->sample_id, 0 );
 		}
 	}
-    else if (args[0] == 2)
-    {
-        if(SAMPLE_PLAYING(v)) {
-            void *macro = sample_get_macro(v->uc->sample_id);
-            sample_set_loop_stat_stop( v->uc->sample_id, vj_macro_get_loop_stat_stop( macro ) );
-			vj_macro_set_status( macro, MACRO_PLAY );
-			reset_loop_stats();
-			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro playback is active");
-        }
-        if(STREAM_PLAYING(v)) {
-            void *macro = vj_tag_get_macro(v->uc->sample_id);
-            vj_tag_set_loop_stat_stop( v->uc->sample_id, vj_macro_get_loop_stat_stop( macro ) );
-			vj_macro_set_status( macro, MACRO_PLAY);
-			reset_loop_stats();
-			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro playback is active");
-        }
-    }
-	else if (args[0] == 3)
-	{
-        if(SAMPLE_PLAYING(v)) {
-            sample_set_loop_stat_stop( v->uc->sample_id, 0 );
-			void *macro = sample_get_macro(v->uc->sample_id);
-			vj_macro_set_status( macro, MACRO_STOP );
-			vj_macro_clear(macro);
-        	vj_macro_select(macro, -1 );
-            vj_macro_set_loop_stat_stop(macro,0);
-			reset_loop_stats();
-			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro current slot is cleared");
-		}
-        if(STREAM_PLAYING(v)) {
-            vj_tag_set_loop_stat_stop( v->uc->sample_id, 0 );
-			void *macro = vj_tag_get_macro(v->uc->sample_id);
-			vj_macro_set_status( macro, MACRO_STOP );
-			vj_macro_clear(macro);
-        	vj_macro_select(macro, -1 );
-            vj_macro_set_loop_stat_stop(macro,0);
-			reset_loop_stats();
-			veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro current slot is cleared");
-		}
-	}
+
 }
 
 void    vj_event_macro_clear_bank( void *ptr,   const char format[], va_list ap )
@@ -10373,7 +10368,7 @@ void    vj_event_macro_clear_bank( void *ptr,   const char format[], va_list ap 
 		vj_macro_set_status( macro, MACRO_STOP );
 		vj_macro_clear_bank(macro,args[0]);
         vj_macro_set_loop_stat_stop(macro,0);
-		reset_loop_stats();
+		sample_set_loop_stats(v->uc->sample_id,0);
 		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro bank %d is cleared",args[0]);
 	}
     
@@ -10383,7 +10378,7 @@ void    vj_event_macro_clear_bank( void *ptr,   const char format[], va_list ap 
 		vj_macro_set_status( macro, MACRO_STOP );
 		vj_macro_clear_bank(macro,args[0]);
         vj_macro_set_loop_stat_stop(macro,0);
-		reset_loop_stats();
+		vj_tag_set_loop_stats(v->uc->sample_id,0);
 		veejay_msg(VEEJAY_MSG_INFO, "VIMS Macro bank %d is cleared",args[0]);
 	}
 }
