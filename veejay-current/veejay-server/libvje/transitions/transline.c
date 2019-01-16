@@ -51,100 +51,53 @@ vj_effect *transline_init(int width, int height)
     return ve;
 }
 
-static void transline1_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
-		      int height, int distance, int line_width)
+static void transline1_apply(uint8_t *yuv1[4], uint8_t *yuv2[4], int width, int height, int distance, int line_width)
 {
-    unsigned int uv_width = width >> 1;
-    unsigned int uv_height = height >> 1;
-    unsigned int uv_distance = distance >> 1;
     int x, y, z;
     int step;
 
-
     for (y = 0; y < height; y++) {
-	for (x = 0; x < width; x += distance) {
-	    step = line_width;
-	    if (distance < step)
-		step = distance - 1;
-	    for (z = 0; z < step; z++) {
-		yuv1[0][(y * width + x + z)] =
-		    yuv2[0][(y * width + x + z)];
-	    }
-	}
+		for (x = 0; x < width; x += distance) {
+	    	step = line_width;
+	    	if (distance < step)
+				step = distance - 1;
+	    	for (z = 0; z < step; z++) {
+				yuv1[0][(y * width + x + z)] = yuv2[0][(y * width + x + z)];
+				yuv1[1][(y * width + x + z)] = yuv2[1][(y * width + x + z)];
+				yuv1[2][(y * width + x + z)] = yuv2[2][(y * width + x + z)];
+	    	}
+		}
     }
-    uv_width >>= 1;
-    uv_height >>= 1;
-    line_width >>= 1;
-    for (y = 0; y < uv_height; y++) {
-	for (x = 0; x < uv_width; x += uv_distance) {
-	    step = line_width;
-	    if (uv_distance > step)
-		step = uv_distance;
-	    for (z = 0; z < step; z++) {
-		yuv1[1][y * uv_width + x + z] = yuv2[1][y * uv_width + x];
-		yuv1[2][y * uv_width + x + z] =
-		    yuv2[2][y * uv_width + x + z];
-	    }
-
-	}
-    }
-
 }
 
-static void transline2_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
-		      int height, int distance, int line_width,
-		      int opacity)
+static void transline2_apply(uint8_t *yuv1[4], uint8_t *yuv2[4], int width, int height, int distance, int line_width, int opacity)
 {
     unsigned int op0, op1;
-    int x, y, z=0;
+    int x, y, z;
     int step;
- 
 
-    op1 = (opacity > 235) ? 235 : opacity;
-    op0 = 235 - op1;
+    op1 = (opacity > 255) ? 255 : opacity;
+    op0 = 255 - op1;
     for (y = 0; y < height; y++) {
-	for (x = 0; (x + z + distance) < width; x += distance) {
-	    step = line_width;
-	    if (distance < step)
-		step = distance - 1;
-	    for (z = 0; z < step; z++) {
-		yuv1[0][(y * width + x + z)] =
-		    (op0 * yuv1[0][(y * width + x + z)] +
-		     op1 * yuv2[0][(y * width + x + z)]) / 235;
-	yuv1[1][(y * width + x + z)] =
-		    (op0 * yuv1[1][(y * width + x + z)] +
-		     op1 * yuv2[1][(y * width + x + z)]) / 235;
-	yuv1[2][(y * width + x + z)] =
-		    (op0 * yuv1[2][(y * width + x + z)] +
-		     op1 * yuv2[2][(y * width + x + z)]) / 235;
-
-	    }
-	}
+		for (x = 0; x < width; x += distance) {
+	    	step = line_width;
+	    	if (distance < step)
+				step = distance - 1;
+	    	for (z = 0; z < step; z++) {
+				yuv1[0][(y * width + x + z)] =
+		   		 	(op0 * yuv1[0][(y * width + x + z)] +
+		   	 		 op1 * yuv2[0][(y * width + x + z)]) >> 8;
+				yuv1[1][(y * width + x + z)] =
+		   			(op0 * yuv1[1][(y * width + x + z)] +
+		   		  	op1 * yuv2[1][(y * width + x + z)]) >> 8;
+				yuv1[2][(y * width + x + z)] =
+				    (op0 * yuv1[2][(y * width + x + z)] +
+				     op1 * yuv2[2][(y * width + x + z)]) >> 8;
+	    	}
+		}
     }
-
-	/*
-    uv_width >>= 1;
-    uv_height >>= 1;
-    line_width >>= 1;
-    for (y = 0; y < uv_height; y++) {
-	for (x = 0; x < uv_width; x += uv_distance) {
-	    step = line_width;
-	    if (uv_distance > step)
-		step = uv_distance;
-	    for (z = 0; z < step; z++) {
-		yuv1[1][y * uv_width + x + z] =
-		    (op0 * yuv1[1][y * uv_width + x + z] +
-		     op1 * yuv2[1][y * uv_width + x]) / 235;
-		yuv1[2][y * uv_width + x + z] =
-		    (op0 * yuv1[2][y * uv_width + x + z] +
-		     op1 * yuv2[2][y * uv_width + x + z]) / 235;
-	    }
-
-	}
-    }
-	*/
-
 }
+
 void transline_apply( VJFrame *frame, VJFrame *frame2, int distance,
                      int line_width, int opacity, int type)
 {
