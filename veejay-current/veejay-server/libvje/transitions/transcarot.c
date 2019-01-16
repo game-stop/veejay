@@ -157,8 +157,8 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	op1 = (opacity > 235) ? 235 : opacity;
-	op0 = 235 - op1;
+	op1 = (opacity > 255) ? 255 : opacity;
+	op0 = 255 - op1;
 
 	uv_dy = dy >> frame->shift_v;
 	uv_dye = dye >> frame->shift_v;
@@ -193,7 +193,7 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
 			row_start--;
 		}
 
-		if (row_length >= point_size)
+		if (row_length > point_size)
 			reverse = 1;
 		dy--;
 	}
@@ -244,7 +244,7 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
 			uv_row_length += 2;
 			uv_row_start--;
 		}
-		if (uv_row_length >= point_size)
+		if (uv_row_length > point_size)
 			reverse = 1;
 		dy--;
 	}
