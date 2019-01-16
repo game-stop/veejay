@@ -24,45 +24,43 @@
 vj_effect *transop_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 7;
+    ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 150;	/* opacity */
-    ve->defaults[1] = 265;	/* width of view port */
-    ve->defaults[2] = 194;	/* height of viewport */
-    ve->defaults[3] = 59;	/* y1 */
-    ve->defaults[4] = 58;	/* x1 */
-    ve->defaults[5] = 45;	/* y2 */
-    ve->defaults[6] = 58;	/* x2 */
+    ve->defaults[0] = 265;	/* width of view port */
+    ve->defaults[1] = 194;	/* height of viewport */
+    ve->defaults[2] = 59;	/* y1 */
+    ve->defaults[3] = 58;	/* x1 */
+    ve->defaults[4] = 45;	/* y2 */
+    ve->defaults[5] = 58;	/* x2 */
 
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-
+    ve->limits[1][0] = width;
     ve->limits[0][1] = 0;
-    ve->limits[1][1] = width;
+    ve->limits[1][1] = height;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = height;
     ve->limits[0][3] = 0;
-    ve->limits[1][3] = height;
+    ve->limits[1][3] = width;
     ve->limits[0][4] = 0;
-    ve->limits[1][4] = width;
+    ve->limits[1][4] = height;
     ve->limits[0][5] = 0;
-    ve->limits[1][5] = height;
-    ve->limits[0][6] = 0;
-    ve->limits[1][6] = width;
-    ve->description = "Transition Translate Opacity";
+    ve->limits[1][5] = width;
+
+    ve->description = "Transition Translate";
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Width", "Height", "Ay", "Ax", "By", "Bx");
+
+    ve->param_description = vje_build_param_list(ve->num_params, "Width", "Height", "Ay", "Ax", "By", "Bx");
     return ve;
 }
 
 /* translate, twidth,theight: size of block to transform */
 /* moves block(x2,y2) to (x1,y1), size of block to move is twidth * theight  */
 void transop_apply( VJFrame *frame, VJFrame *frame2,
-		   int twidth, int theight, int x1, int y1, int x2, int y2, int opacity)
+		   int twidth, int theight, int x1, int y1, int x2, int y2 )
 {
 	int x, y;
 
