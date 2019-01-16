@@ -22,6 +22,8 @@
 #include <libvjmem/vjmem.h>
 #include "tracer.h"
 
+#define func_opacity(a,b,p,q) (  ((a * p) + (b * q)) >> 8 )
+
 static uint8_t *trace_buffer[4] = { NULL,NULL,NULL,NULL};
 static int trace_counter = 0;
 
