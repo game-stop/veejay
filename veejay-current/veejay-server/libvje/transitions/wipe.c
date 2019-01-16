@@ -25,43 +25,47 @@
 vj_effect *wipe_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 1;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->defaults[0] = 150;
-    ve->defaults[1] = 0;
+    ve->defaults[0] = 0;
 
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 25;
+    ve->limits[1][0] = (w > h ? w: h);
     ve->description = "Transition Wipe";
-    ve->sub_format = 0;
+    ve->sub_format = 1;
     ve->extra_frame = 1;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Increment" );
+	ve->param_description = vje_build_param_list(ve->num_params, "Increment" );
     return ve;
 
 }
 
 //FIXME: private data
 
-static int g_wipe_width = 0;
-static int g_wipe_height = 0;
+static double g_wipe_width = 0;
+static double g_wipe_height = 0;
 
-void wipe_apply( VJFrame *frame, VJFrame *frame2, int opacity, int inc)
+
+
+void wipe_apply( VJFrame *frame, VJFrame *frame2, int inc)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-    /* w, h increasen */
-    transop_apply(frame, frame2, g_wipe_width, g_wipe_height, 0, 0, 0, 0, opacity);
-    
-	g_wipe_width += inc;
-    g_wipe_height += ((width / height) - 0.5 + inc);
+	double ratio = (double) width / (double) height;
 
-    if (g_wipe_width > width || g_wipe_height > height) {
+	transop_apply(frame, frame2, (int) g_wipe_width, (int) g_wipe_height, 0, 0, 0, 0);
+    
+	g_wipe_width += ratio * ((double ) inc);
+	g_wipe_height += ((double) inc);
+
+    if (g_wipe_width > width && g_wipe_height > height) {
+		g_wipe_width = width;
+		g_wipe_height = height;
+    }
+	if( g_wipe_width < 0 && g_wipe_height < 0) {
 		g_wipe_width = 0;
 		g_wipe_height = 0;
-    }
+	}
 }
