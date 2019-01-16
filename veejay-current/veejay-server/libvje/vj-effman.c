@@ -533,8 +533,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	transline_apply(frames[0], frames[1], arg[2], arg[1], arg[0], arg[3]);
 	break;
       case VJ_VIDEO_EFFECT_TRANSOP:
-	transop_apply(frames[0], frames[1], arg[1], arg[2], arg[3],
-	              arg[4], arg[5], arg[6], arg[0]);
+	transop_apply(frames[0], frames[1], arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]);
 	break;
       case VJ_VIDEO_EFFECT_COMPLEXSYNC:
 	if(arg[1] == 1) { /* auto increment as option in effect*/
@@ -584,7 +583,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	slidingdoor_apply(frames[0], frames[1], arg[0] );
 	break;
       case VJ_VIDEO_EFFECT_WIPE:
-	wipe_apply(frames[0], frames[1], arg[0], arg[1]);
+	wipe_apply(frames[0], frames[1], arg[0]);
 	break;
       case VJ_VIDEO_EFFECT_RGBKEYSMOOTH:
 	rgbkeysmooth_apply(frames[0], frames[1], arg[0], arg[1], arg[2], arg[3],
