@@ -29,12 +29,6 @@
 #include <libvje/vje.h>
 #define MAX_SCRATCH_FRAMES 50
 #define GREY_LEVELS 256
-#define func_opacity(a,b,p,q) (  ((a * p) + (b * q)) >> 8 )
-#define limit_luma(c)  ( c < 16 ? 16 : ( c > 235 ? 235 : c) )
-#define limit_chroma(c) ( c < 16 ? 16 :  ( c > 240 ? 240 : c) )
-#define func_multiply(a,b) ( (a * b) >> 8 )
-#define func_additive(a,b) ( a + (2 * b) - 235 )
-#define func_substractive(a,b) ( a + (b - 235) )
 
 #define ALPHA_IGNORE_STR "Ignore Alpha-IN"
 #define ALPHA_IGNORE 0
@@ -47,7 +41,7 @@
 #define ALPHA_IN_A_AND_B_STR "Alpha-IN A and B"
 #define ALPHA_IN_A_AND_B 4
 
-#define    RUP8(num)(((num)+8)&~8)
+#define RUP8(num)(((num)+8)&~8)
 
 #define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
 #define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
