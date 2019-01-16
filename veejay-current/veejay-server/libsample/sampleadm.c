@@ -2653,6 +2653,71 @@ int sample_set_editlist(int s1, editlist *edl)
     return 1;
 }
 
+int sample_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop_at, int frame_pos) {
+	sample_info *sample = sample_get(s1);
+	if(!sample)
+		return 0;
+
+	if( sample->effect_chain[entry]->effect_id <= 0 ) 
+		return 0;
+
+	int arg_len = 0;
+    int is_mixer = 0;
+    
+	vj_effect_get_info( sample->effect_chain[entry]->effect_id, &is_mixer, &arg_len );
+
+	if(!is_mixer || arg_len <= 0)
+		return 0;
+
+	if( enabled == 1 ) {
+		if( sample_get_all_effect_arg( s1, entry, sample->effect_chain[entry]->transition.args, arg_len, frame_pos ) == -1 )
+			return 0;
+
+		sample->effect_chain[entry]->transition.at_loop = loop_at;
+		sample->effect_chain[entry]->transition.enabled = 1;
+	}
+	else {
+		for( int i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) {
+			sample->effect_chain[entry]->transition.args[i] = 0;
+		}
+		sample->effect_chain[entry]->transition.at_loop = -1;
+		sample->effect_chain[entry]->transition.enabled = 0;
+	}
+
+	return 1;
+}
+
+int sample_chain_entry_transition_now(int s1, int entry, int *type) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) 
+			return 0;
+	
+	if( sample->effect_chain[entry]->effect_id <= 0 )
+			return 0;
+
+	int arg_len = 0;
+    int is_mixer = 0;
+    vj_effect_get_info( sample->effect_chain[entry]->effect_id, &is_mixer, &arg_len );
+
+	if( is_mixer == 0 || arg_len == 0 )
+			return 0;
+
+	if( sample->effect_chain[entry]->transition.enabled == 0 )
+			return 0;
+
+	for( int i = 0;i < arg_len; i ++ ) {
+		if( sample->effect_chain[entry]->arg[i] < sample->effect_chain[entry]->transition.args[i] ) {
+			return 0;
+		}
+	}
+
+	if( sample->loop_stat < sample->effect_chain[entry]->transition.at_loop )
+			return 0;
+
+	*type = sample->effect_chain[entry]->source_type;
+
+	return sample->effect_chain[entry]->channel;
+}
 
 /* print sample status information into an allocated string str*/
 //int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,

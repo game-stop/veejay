@@ -92,7 +92,11 @@ enum {
     SAMPLE_PEEK = 2,
 };
 
-
+typedef struct transition_eff_t {
+	int args[SAMPLE_MAX_PARAMETERS];
+	int enabled;
+	int at_loop;
+} transition_eff;
 
 typedef struct sample_eff_t {
     int effect_id;		/* effect ID */
@@ -113,6 +117,7 @@ typedef struct sample_eff_t {
     int kf_type;		/* store type used */
     void *fx_instance;		/* lib plugger instance */
 	int clear;
+	transition_eff transition;
 } sample_eff_chain;
 
 
@@ -371,6 +376,9 @@ extern void	sample_update_ascociated_samples(int s1);
 extern void	sample_chain_alloc_kf( int s1, int entry );
 extern void	sample_set_chain_paused( int s1, int paused );
 extern sample_eff_chain **sample_get_effect_chain(int s1);
+
+extern int sample_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop, int frame_pos);
+extern int sample_chain_entry_transition_now(int s1, int entry, int *type);
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);

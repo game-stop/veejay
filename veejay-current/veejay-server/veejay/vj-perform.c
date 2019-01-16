@@ -410,8 +410,33 @@ static  int vj_perform_next_sequence( veejay_t *info, int *type )
 	return info->seq->samples[cur].sample_id;
 }
 
+// path is only called in sample playing mode
+static  int	vj_perform_try_transition( veejay_t *info )
+{
+	for(int c = 0; c < SAMPLE_MAX_EFFECTS; c ++ ) {	
+		int type = 0;
+		int id = sample_chain_entry_transition_now( info->uc->sample_id, c, &type );
+		if( id == 0 )
+			continue;
+		veejay_prepare_sample_positions( info->uc->sample_id );
+
+		sample_update_ascociated_samples( id );
+    	sample_reset_offset( id );
+    	sample_set_loops( id, -1 );
+		veejay_change_playback_mode( info, (type == 0 ? VJ_PLAYBACK_MODE_SAMPLE : VJ_PLAYBACK_MODE_TAG), id );
+
+		return 1;	
+	}
+
+	return 0;
+}
+
 static	int	vj_perform_try_sequence( veejay_t *info )
 {
+	if( vj_perform_try_transition(info) ) {
+		return 1;
+	}
+
 	if(! info->seq->active )
 		return 0;
 

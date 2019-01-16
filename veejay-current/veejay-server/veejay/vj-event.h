@@ -215,6 +215,7 @@ void	vj_event_write_actionfile		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_screenshot			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_sample_chain_enable		(	void *ptr,	const char format[],	va_list ap 	);
 void	vj_event_sample_chain_disable		(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_sample_chain_transition( void *ptr, const char format[], va_list ap );
 void	vj_event_tag_chain_enable		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_v4l_set_brightness		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_v4l_set_contrast		(	void *ptr,	const char format[],	va_list ap	);
