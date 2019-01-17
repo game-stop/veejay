@@ -20,6 +20,10 @@
 #ifndef VJE_H
 #define VJE_H
 
+#define TRANSITION_RUNNING 1
+#define TRANSITION_COMPLETED 2
+#define TRANSITION_NONE 0
+
 #define FX_LIMIT	1024
 
 #define MAX_EFFECTS		166
@@ -83,6 +87,8 @@ typedef struct {
 #define FLAG_ALPHA_IN_OPERATOR (1<<5) /* logical operator */
 #define FLAG_ALPHA_IN_BLEND (1<<6) /* blend operator */
 
+typedef int (*is_transition_ready_func)(int width, int height);
+
 typedef struct vj_effect_t {
 	char *description;			
 	int num_params;			
@@ -106,6 +112,7 @@ typedef struct vj_effect_t {
 	int global;
 	int is_gen;
 	int is_plugin;
+	int (*is_transition_ready_func)();
 } vj_effect;
 
 extern unsigned int get_pixel_range_min_Y();
@@ -144,4 +151,5 @@ extern void	*vj_effect_get_data( int seq_id );
 extern int vj_effect_is_parallel(int effect_id);
 extern int vj_effect_get_info( int effect_id, int *is_mixer, int *n_params );
 extern int vj_effect_get_static_bg(int effect_id);
+extern int vj_effect_is_transition_ready(int selector, int wid, int hei);
 #endif
