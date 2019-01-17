@@ -21,5 +21,6 @@
 #ifndef WIPE_H
 #define WIPE_H
 vj_effect *wipe_init();
-void wipe_apply( VJFrame *frame, VJFrame *frame2, int mode);
+int  wipe_ready(int wid, int hei);
+void wipe_apply( VJFrame *frame, VJFrame *frame2, int mode, int restart);
 #endif
