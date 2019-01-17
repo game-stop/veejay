@@ -2962,6 +2962,11 @@ static void update_slider_range(const char *name, gint min, gint max, gint value
         veejay_msg(VEEJAY_MSG_ERROR, "No such widget (slider): '%s'",name);
         return;
     }
+
+    if(min == max) {
+	return;
+    }
+
     GtkRange *range = GTK_RANGE(w);
     if(!scaled)
     {
