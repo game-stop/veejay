@@ -2162,7 +2162,9 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
         return 0;
 
     if( vj_effect_single_instance( effect_id ))
-        return 0;   
+		return 0;   
+
+	veejay_memset( &(tag->effect_chain[position]->transition), 0 ,sizeof(transition_eff));
 
     if( tag->effect_chain[position]->effect_id != -1 && tag->effect_chain[position]->effect_id != effect_id )
     {
@@ -2249,6 +2251,87 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
         }
     }
     return 1;
+}
+
+int vj_tag_chain_entry_set_transition_stop(int t1, int entry, int enabled, int loop_at, int frame_pos) {
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag)
+		return 0;
+
+	if( tag->effect_chain[entry]->effect_id <= 0 ) 
+		return 0;
+
+	int arg_len = 0;
+    int is_mixer = 0;
+    
+	vj_effect_get_info( tag->effect_chain[entry]->effect_id, &is_mixer, &arg_len );
+
+	if(!is_mixer || arg_len <= 0)
+		return 0;
+
+	if( enabled == 1 ) {
+		if( vj_tag_get_all_effect_args( t1, entry, tag->effect_chain[entry]->transition.args, arg_len, frame_pos ) == -1 )
+			return 0;
+
+		tag->effect_chain[entry]->transition.at_loop = loop_at;
+		tag->effect_chain[entry]->transition.enabled = 1;
+	}
+	else {
+		for( int i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) {
+			tag->effect_chain[entry]->transition.args[i] = 0;
+		}
+		tag->effect_chain[entry]->transition.at_loop = -1;
+		tag->effect_chain[entry]->transition.enabled = 0;
+	}
+
+	return 1;
+} 
+
+int vj_tag_chain_entry_transition_now(int t1, int entry, int *type) {
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) 
+		return 0;
+	
+	if( tag->effect_chain[entry]->effect_id <= 0 )
+		return 0;
+
+	int arg_len = 0;
+    int is_mixer = 0;
+    vj_effect_get_info( tag->effect_chain[entry]->effect_id, &is_mixer, &arg_len );
+
+	if( is_mixer == 0 || arg_len == 0 )
+			return 0;
+
+	if( tag->effect_chain[entry]->transition.enabled == 0 )
+			return 0;
+
+	// These type of FX know when the transition is done 
+	int state = vj_effect_is_transition_ready(
+				tag->effect_chain[entry]->effect_id,
+				_tag_info->effect_frame1->width,
+				_tag_info->effect_frame1->height );
+	if(state == TRANSITION_COMPLETED) {
+		if( tag->loop_stat < tag->effect_chain[entry]->transition.at_loop )
+				return 0;
+
+		*type = tag->effect_chain[entry]->source_type;
+		return tag->effect_chain[entry]->channel;
+	} else if(state == TRANSITION_RUNNING) {
+		return 0;
+	}
+
+	// Any other FX, the user can define the transition by defining parameter values
+	for( int i = 0;i < arg_len; i ++ ) {
+		if( tag->effect_chain[entry]->arg[i] < tag->effect_chain[entry]->transition.args[i] ) {
+			return 0;
+		}
+	}
+
+	if( tag->loop_stat < tag->effect_chain[entry]->transition.at_loop )
+			return 0;
+
+	*type = tag->effect_chain[entry]->source_type;
+	return tag->effect_chain[entry]->channel;
 }
 
 int vj_tag_has_cali_fx( int t1 ) {
@@ -2778,9 +2861,14 @@ int vj_tag_chain_remove(int t1, int index)
     tag->effect_chain[index]->source_type = 1;
     tag->effect_chain[index]->channel     = t1; //set to self
 
+	tag->effect_chain[index]->transition.enabled = 0;
+	tag->effect_chain[index]->transition.at_loop = 0;
+
     int j;
-    for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
+    for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
         tag->effect_chain[index]->arg[j] = 0;
+		tag->effect_chain[index]->transition.args[j] = 0;
+	}
 
     if( index == tag->fade_entry )
         tag->fade_entry = -1;
