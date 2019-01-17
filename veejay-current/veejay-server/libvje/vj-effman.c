@@ -583,7 +583,7 @@ static void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,in
 	slidingdoor_apply(frames[0], frames[1], arg[0] );
 	break;
       case VJ_VIDEO_EFFECT_WIPE:
-	wipe_apply(frames[0], frames[1], arg[0]);
+	wipe_apply(frames[0], frames[1], arg[0],arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_RGBKEYSMOOTH:
 	rgbkeysmooth_apply(frames[0], frames[1], arg[0], arg[1], arg[2], arg[3],
@@ -748,6 +748,20 @@ static void	vj_effman_apply_job( void *arg )
 	}	
 
 }
+
+int	vj_effect_is_transition_ready(int selector, int width, int height)
+{
+	int fx_id = vj_effect_real_to_sequence( selector );
+	if( fx_id < 0 )
+		return TRANSITION_NONE;
+
+	int is_transition = vj_effects[fx_id]->is_transition_ready_func ? 1: 0;
+	if( is_transition ) {
+		return vj_effects[fx_id]->is_transition_ready_func(width,height);
+	}
+	return TRANSITION_NONE;
+}
+
 
 int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments, void *ptr )
 {
