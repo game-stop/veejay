@@ -4530,22 +4530,30 @@ void vj_event_sample_chain_transition(void *ptr, const char format[], va_list ap
     int args[4];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    if(!SAMPLE_PLAYING(v)) {
-		p_invalid_mode();
-		return;
-	}
+    if(SAMPLE_PLAYING(v)) {
+        SAMPLE_DEFAULTS(args[0]);
 	
-    SAMPLE_DEFAULTS(args[0]);
-	
-    if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+        if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
 
-	int ok = sample_chain_entry_set_transition_stop( args[0], args[1], args[2],args[3], v->settings->current_frame_num );
-	if(!ok) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to configure transition at entry %d of sample %d", args[1],args[0]);
-	}
-	else {
-		veejay_msg(VEEJAY_MSG_INFO,"Transition configured at entry %d of sample %d",args[1],args[0]);
-	}
+    	int ok = sample_chain_entry_set_transition_stop( args[0], args[1], args[2],args[3], v->settings->current_frame_num );
+    	if(!ok) {
+    		veejay_msg(VEEJAY_MSG_ERROR, "Failed to configure transition at entry %d of sample %d", args[1],args[0]);
+    	}
+    	else {
+	    	veejay_msg(VEEJAY_MSG_INFO,"Transition configured at entry %d of sample %d",args[1],args[0]);
+	    }
+    }
+    if(STREAM_PLAYING(v)) {
+        STREAM_DEFAULTS(args[0]);
+        if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+    	int ok = vj_tag_chain_entry_set_transition_stop( args[0], args[1], args[2],args[3], v->settings->current_frame_num );
+    	if(!ok) {
+    		veejay_msg(VEEJAY_MSG_ERROR, "Failed to configure transition at entry %d of stream %d", args[1],args[0]);
+    	}
+    	else {
+	    	veejay_msg(VEEJAY_MSG_INFO,"Transition configured at entry %d of stream %d",args[1],args[0]);
+	    }
+    }
 }
 
 void vj_event_tag_chain_enable(void *ptr, const char format[], va_list ap)
