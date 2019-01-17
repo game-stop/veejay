@@ -21,6 +21,7 @@
 #ifndef COMPLEXSYNC_H
 #define COMPLEXSYNC_H
 vj_effect *complexsync_init(int width, int height);
+int complexsync_ready(int width, int height);
 int complexsync_malloc(int w, int h);
 void complexsync_free();
 void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val);

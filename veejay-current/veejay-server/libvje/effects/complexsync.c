@@ -23,6 +23,7 @@
 #include "complexsync.h"
 
 static uint8_t *c_outofsync_buffer[4] = { NULL,NULL,NULL, NULL };
+static int complex_not_completed = 0;
 
 vj_effect *complexsync_init(int width, int height)
 {
@@ -46,7 +47,13 @@ vj_effect *complexsync_init(int width, int height)
     ve->extra_frame = 1;
     ve->has_user = 0;	
     ve->param_description = vje_build_param_list( ve->num_params, "Vertical size", "Mode", "Framespeed" );
+    ve->is_transition_ready_func = complexsync_ready;
     return ve;
+}
+
+int complexsync_ready(int width, int height)
+{
+    return !complex_not_completed;
 }
 
 int complexsync_malloc(int width, int height)
@@ -81,8 +88,11 @@ void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val)
 	vj_frame_copy( frame->data, c_outofsync_buffer, planes );
 	vj_frame_copy( frame2->data, frame->data, planes );
 
-    if( (len - region) > 0)
+    complex_not_completed = (len - region) > 0;
+
+    if( complex_not_completed )
 	{
+        complex_completed
 		uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
 		int dst_strides[4] = { len - region, len - region, len - region,0 };
 

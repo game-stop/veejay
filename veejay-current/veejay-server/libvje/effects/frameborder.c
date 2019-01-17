@@ -40,12 +40,10 @@ vj_effect *frameborder_init(int width, int height)
 	return ve;
 }
 
-
 void frameborder_apply(VJFrame *frame, VJFrame *frame2, int size)
 {
 	frameborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
 						frame2->data[0], frame2->data[1], frame2->data[2],
 						frame->width, frame->height, (size), (size), (size),
 						(size),frame->shift_h, frame->shift_v);
-
 }
