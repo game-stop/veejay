@@ -574,7 +574,7 @@ int sample_get_longest(int sample_id)
                 {
 					int mix_speed = sample_get_speed(_id);
 					if(mix_speed != 0) {
-                    	tmp = tmp / mix_speed;
+						tmp = tmp / mix_speed;
 					}
 					if(tmp < 0) tmp *= -1;
                     if(sample_get_looptype(_id)==2) tmp *= 2; //pingpong loop underlying sample
@@ -1173,7 +1173,7 @@ void	sample_update_ascociated_samples(int s1)
 	
 	int p = 0;
     for( p = 0; p < SAMPLE_MAX_EFFECTS; p ++ ) {
-    	if( sample->effect_chain[p]->source_type != 0  ) 
+		if( sample->effect_chain[p]->source_type != 0  ) 
 			continue;
 		if( !sample_exists(sample->effect_chain[p]->channel) )
 			continue;
@@ -1543,8 +1543,6 @@ int sample_set_chain_channel(int s1, int position, int input)
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
     return -1;
  
-    
- 
     //sample->effect_chain[position]->channel = input;
     int src_type =  sample->effect_chain[position]->source_type;
     // now, reset cache and setup
@@ -1724,7 +1722,7 @@ void	*sample_get_macro(int s1) {
 
 int	sample_get_loop_stat_stop(int s1) {
 	sample_info *sample = sample_get(s1);
-    	if (!sample) return 0;
+		if (!sample) return 0;
 	return sample->loop_stat_stop;
 }
 void sample_set_loop_stat_stop(int s1, int loop_stop) {
@@ -1735,7 +1733,7 @@ void sample_set_loop_stat_stop(int s1, int loop_stop) {
 
 int	sample_get_loop_stats(int s1) {
 	sample_info *sample = sample_get(s1);
-    	if (!sample) return 0;
+		if (!sample) return 0;
 	return sample->loop_stat;
 }
 void sample_set_loop_stats(int s1, int loops) {
@@ -1750,7 +1748,7 @@ void sample_set_loop_stats(int s1, int loops) {
 
 int	sample_get_loops(int s1) {
 	sample_info *sample = sample_get(s1);
-    	if (!sample) return 0;
+		if (!sample) return 0;
 	return sample->loops;
 }
 
@@ -2223,9 +2221,11 @@ int sample_chain_add(int s1, int c, int effect_nr)
         return 0;
 
     if( vj_effect_single_instance( effect_nr ))
-        return 0;   
+	return 0;   
 
-    if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
+	veejay_memset( &(sample->effect_chain[c]->transition), 0 ,sizeof(transition_eff));
+
+	if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
     {
         //verify if the effect should be discarded
         if(vj_effect_initialized( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance )  ) 
@@ -2333,7 +2333,7 @@ void	sample_set_chain_paused( int s1, int paused )
 	int entry;
 	for( entry = 0; entry < SAMPLE_MAX_EFFECTS; entry ++ ) {
 		if( sample->effect_chain[entry]->source_type != 0 ||
-	     		sample->effect_chain[entry]->channel <= 0 )
+				sample->effect_chain[entry]->channel <= 0 )
 			continue;
 
 		if( paused == 1 ) {
@@ -2423,9 +2423,6 @@ int sample_set_chain_volume(int s1, int chain_entry, int volume)
     return 1;
 }
 
-
-
-
 /****************************************************************************************************
  *
  * sample_chain_clear( sample_nr )
@@ -2481,8 +2478,12 @@ int sample_chain_clear(int s1)
 
         sample->effect_chain[i]->source_type = 0;
         sample->effect_chain[i]->channel = s1;
-        for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
+		sample->effect_chain[i]->transition.enabled = 0;
+		sample->effect_chain[i]->transition.at_loop = 0;
+        for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
             sample->effect_chain[i]->arg[j] = 0;
+			sample->effect_chain[i]->transition.args[j] = 0;
+		}
     }
 
     sample->fade_entry = -1;
@@ -2603,8 +2604,13 @@ int sample_chain_remove(int s1, int position)
 
     sample->effect_chain[position]->source_type = 0;
     sample->effect_chain[position]->channel = 0;
-    for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
+	sample->effect_chain[position]->transition.enabled = 0;
+	sample->effect_chain[position]->transition.at_loop = 0;
+
+    for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
         sample->effect_chain[position]->arg[j] = 0;
+		sample->effect_chain[position]->transition.args[j] = 0;
+	}
 
     if( position == sample->fade_entry )
         sample->fade_entry = -1;
@@ -2705,6 +2711,22 @@ int sample_chain_entry_transition_now(int s1, int entry, int *type) {
 	if( sample->effect_chain[entry]->transition.enabled == 0 )
 			return 0;
 
+	// These type of FX know when the transition is done 
+	int state = vj_effect_is_transition_ready(
+				sample->effect_chain[entry]->effect_id,
+				__sample_project_settings.width,
+				__sample_project_settings.height );
+	if(state == TRANSITION_COMPLETED) {
+		if( sample->loop_stat < sample->effect_chain[entry]->transition.at_loop )
+				return 0;
+
+		*type = sample->effect_chain[entry]->source_type;
+		return sample->effect_chain[entry]->channel;
+	} else if(state == TRANSITION_RUNNING) {
+		return 0;
+	}
+
+	// Any other FX, the user can define the transition by defining parameter values
 	for( int i = 0;i < arg_len; i ++ ) {
 		if( sample->effect_chain[entry]->arg[i] < sample->effect_chain[entry]->transition.args[i] ) {
 			return 0;
@@ -2715,7 +2737,6 @@ int sample_chain_entry_transition_now(int s1, int entry, int *type) {
 			return 0;
 
 	*type = sample->effect_chain[entry]->source_type;
-
 	return sample->effect_chain[entry]->channel;
 }
 
