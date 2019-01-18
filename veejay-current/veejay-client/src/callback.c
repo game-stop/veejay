@@ -2777,7 +2777,7 @@ void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	GtkTreePath *path = gtk_tree_path_new_from_indices(selected_chain_entry, -1);
 	if(gtk_tree_model_get_iter(model, &iter, path))
 	{
-		GdkPixbuf *kf_toggle = update_pixmap_kf( active );
+		GdkPixbuf *kf_toggle = update_pixmap_entry( active );
 		gtk_list_store_set (GTK_LIST_STORE( model ), &iter, FXC_KF, kf_toggle, -1);
 	}
 	gtk_tree_path_free(path);
@@ -3344,6 +3344,8 @@ void	on_curve_spinend_value_changed(GtkWidget *w, gpointer user_data)
 			end_pos,info->el.fps );
 	update_label_str( "curve_endtime", end_time );
 	free(end_time);
+
+    vj_msg(VEEJAY_MSG_INFO, "Click the FX store button to save the new values");
 }
 
 void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
@@ -3354,6 +3356,8 @@ void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
 			start_pos,info->el.fps );
 	update_label_str( "curve_endtime", start_time );
 	free(start_time);
+
+    vj_msg(VEEJAY_MSG_INFO, "Click the FX store button to save the new values");
 }
 
 void	on_veejayevent_enter_notify_event(GtkWidget *w, gpointer user_data)
@@ -3649,8 +3653,8 @@ gchar *get_clipboard_fx_parameter_buffer(int *mixing_src, int *mixing_cha, int *
 			&tmp[0], //is video
 			&n_params, //num params
 			&tmp[0], //kf_type
-			&tmp[0], //0
-			&tmp[0], //0
+			&tmp[0], //transition enabled, not copied
+			&tmp[0], //transition loop, not copied
 			&tmp[0], //kf_status
 			&tmp[1], //source
 			&tmp[2], //channel
@@ -4668,6 +4672,35 @@ void	on_uq_button_clicked( GtkWidget *w, gpointer data ) // 1/8
 void	on_record_vp_clicked( GtkWidget *w, gpointer data )
 {
 	single_vims( VIMS_RECVIEWPORT );
+}
+
+void    on_subrender_entry_toggle_toggled(GtkWidget *w, gpointer data)
+{
+    if(info->status_lock || info->parameter_lock)
+		return;
+    int enabled = is_button_toggled( "subrender_entry_toggle" );
+    multi_vims( VIMS_SUB_RENDER_ENTRY,"%d %d %d", 0,-1,enabled);
+}
+
+void    on_transition_enabled_toggled(GtkWidget *w, gpointer data)
+{
+    if(info->status_lock || info->parameter_lock)
+		return;
+    int enabled = is_button_toggled( "transition_enabled" );
+    int loop = get_nums("transition_loop");
+
+    multi_vims( VIMS_SAMPLE_MIX_TRANSITION, "%d %d %d %d", 0, -1, enabled, loop );
+}
+
+void    on_transition_loop_value_changed(GtkWidget *w, gpointer data)
+{
+    if(info->status_lock || info->parameter_lock)
+		return;
+    
+    int enabled = is_button_toggled( "transition_enabled" );
+    int loop = get_nums("transition_loop");
+
+    multi_vims( VIMS_SAMPLE_MIX_TRANSITION, "%d %d %d %d", 0, -1, enabled, loop );
 }
 
 void	on_macroplay_toggled( GtkWidget *w, gpointer data )

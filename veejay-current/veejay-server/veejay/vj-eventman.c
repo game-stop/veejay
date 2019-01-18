@@ -2770,7 +2770,7 @@ void		vj_init_vevo_events(void)
 	index_map_[ VIMS_SUB_RENDER ] 		=	_new_event(
 				"%d",
 				VIMS_SUB_RENDER,
-				"Render image effects on mixing source",
+				"Render FX on mixing source enabled",
 				vj_event_sub_render,
 				1,
 				VIMS_ALLOW_ANY,
@@ -2778,6 +2778,20 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+    index_map_[ VIMS_SUB_RENDER_ENTRY ] 		=	_new_event(
+				"%d %d %d",
+				VIMS_SUB_RENDER_ENTRY,
+				"Render FX on mixing source chain entry toggle",
+				vj_event_sub_render_entry,
+				3,
+				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
+                "Chain entry",
+                -1,
+                "Render",
+                0,
+				NULL );
 
 	index_map_[VIMS_ALPHA_COMPOSITE]				=	_new_event(
 				"%d %d",

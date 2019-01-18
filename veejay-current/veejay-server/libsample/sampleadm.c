@@ -371,7 +371,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
         }
         si->effect_chain[i]->effect_id = -1;
         si->effect_chain[i]->volume = 50;
-	si->effect_chain[i]->speed = INT_MAX;
+	    si->effect_chain[i]->speed = INT_MAX;
+        si->effect_chain[i]->is_rendering = 1;
         si->effect_chain[i]->channel = ( sample_highest_valid_id() <= 0 ? si->sample_id : sample_highest_valid_id());
     }
 #ifdef HAVE_FREETYPE
@@ -1989,11 +1990,12 @@ int sample_get_next(int s1)
     return sample->next_sample_id;
 }
 
-int sample_get_subrender(int s1)
+int sample_get_subrender(int s1, int position, int *do_subrender)
 {
     sample_info *sample = sample_get(s1);
     if(!sample)
         return 0;
+    *do_subrender = sample->effect_chain[position]->is_rendering;
     return sample->subrender;
 }
 
@@ -2132,16 +2134,16 @@ int sample_chain_reset_kf( int s1, int entry )
     sample->effect_chain[entry]->kf = NULL;
     return 1;
 }
-/*
-int sample_get_kf_tokens( int s1, int entry, int id, int *start, int *end, int *type )
+
+int sample_get_kf_tokens( int s1, int entry, int id, int *start, int *end, int *type, int *status )
 {
     sample_info *sample = sample_get(s1);
     if(!sample) return 0;
     if( sample->effect_chain[entry]->kf == NULL )
         return 0;
-    return keyframe_get_tokens( sample->effect_chain[entry]->kf, id, start,end,type );
+    return keyframe_get_tokens( sample->effect_chain[entry]->kf, id, start,end,type, status );
 }
-*/
+
 void    *sample_get_kf_port( int s1, int entry )
 {
     sample_info *sample = sample_get(s1);
@@ -2456,6 +2458,7 @@ int sample_chain_clear(int s1)
         sample->effect_chain[i]->frame_trimmer = 0;
         sample->effect_chain[i]->volume = 0;
         sample->effect_chain[i]->a_flag = 0;
+        sample->effect_chain[i]->is_rendering = 1;
         if( sample->effect_chain[i]->kf )   
             vpf( sample->effect_chain[i]->kf );
         sample->effect_chain[i]->kf = NULL;
@@ -2582,6 +2585,7 @@ int sample_chain_remove(int s1, int position)
     sample->effect_chain[position]->frame_trimmer = 0;
     sample->effect_chain[position]->volume = 0;
     sample->effect_chain[position]->a_flag = 0;
+    sample->effect_chain[position]->is_rendering = 1;
 
     if( sample->effect_chain[position]->kf )
         vpf( sample->effect_chain[position]->kf );
@@ -2679,18 +2683,24 @@ int sample_chain_entry_set_transition_stop(int s1, int entry, int enabled, int l
 		if( sample_get_all_effect_arg( s1, entry, sample->effect_chain[entry]->transition.args, arg_len, frame_pos ) == -1 )
 			return 0;
 
-		sample->effect_chain[entry]->transition.at_loop = loop_at;
 		sample->effect_chain[entry]->transition.enabled = 1;
 	}
 	else {
 		for( int i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) {
 			sample->effect_chain[entry]->transition.args[i] = 0;
 		}
-		sample->effect_chain[entry]->transition.at_loop = -1;
 		sample->effect_chain[entry]->transition.enabled = 0;
 	}
+	sample->effect_chain[entry]->transition.at_loop = loop_at;
 
 	return 1;
+}
+
+void sample_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype)
+{
+    sample_info *sample = sample_get(s1);
+    *enabled =  sample->effect_chain[entry]->transition.enabled;
+    *looptype =  sample->effect_chain[entry]->transition.at_loop;
 }
 
 int sample_chain_entry_transition_now(int s1, int entry, int *type) {
@@ -2719,6 +2729,8 @@ int sample_chain_entry_transition_now(int s1, int entry, int *type) {
 	if(state == TRANSITION_COMPLETED) {
 		if( sample->loop_stat < sample->effect_chain[entry]->transition.at_loop )
 				return 0;
+
+        sample->effect_chain[entry]->transition.enabled = 0; // Turn off transition when completed
 
 		*type = sample->effect_chain[entry]->source_type;
 		return sample->effect_chain[entry]->channel;

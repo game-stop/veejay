@@ -1160,6 +1160,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         }
         tag->effect_chain[i]->kf_status = 0;
         tag->effect_chain[i]->kf_type = 0;
+        tag->effect_chain[i]->is_rendering = 1;
         tag->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
     }
     if (!vj_tag_put(tag))   
@@ -2272,20 +2273,26 @@ int vj_tag_chain_entry_set_transition_stop(int t1, int entry, int enabled, int l
 	if( enabled == 1 ) {
 		if( vj_tag_get_all_effect_args( t1, entry, tag->effect_chain[entry]->transition.args, arg_len, frame_pos ) == -1 )
 			return 0;
-
-		tag->effect_chain[entry]->transition.at_loop = loop_at;
 		tag->effect_chain[entry]->transition.enabled = 1;
 	}
 	else {
 		for( int i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) {
 			tag->effect_chain[entry]->transition.args[i] = 0;
 		}
-		tag->effect_chain[entry]->transition.at_loop = -1;
 		tag->effect_chain[entry]->transition.enabled = 0;
 	}
+	
+    tag->effect_chain[entry]->transition.at_loop = loop_at;
 
 	return 1;
 } 
+
+void vj_tag_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype)
+{
+    vj_tag *tag = vj_tag_get(s1);
+    *enabled =  tag->effect_chain[entry]->transition.enabled;
+    *looptype =  tag->effect_chain[entry]->transition.at_loop;
+}
 
 int vj_tag_chain_entry_transition_now(int t1, int entry, int *type) {
 	vj_tag *tag = vj_tag_get(t1);
@@ -2313,6 +2320,8 @@ int vj_tag_chain_entry_transition_now(int t1, int entry, int *type) {
 	if(state == TRANSITION_COMPLETED) {
 		if( tag->loop_stat < tag->effect_chain[entry]->transition.at_loop )
 				return 0;
+
+        tag->effect_chain[entry]->transition.enabled = 0; // Turn off transition when completed
 
 		*type = tag->effect_chain[entry]->source_type;
 		return tag->effect_chain[entry]->channel;
@@ -2692,11 +2701,12 @@ int vj_tag_get_active(int t1)
     return tag->active;
 }
 
-int vj_tag_get_subrender(int t1)
+int vj_tag_get_subrender(int t1, int position, int *do_subrender)
 {
     vj_tag *tag = vj_tag_get(t1);
     if(!tag)
         return -1;
+    *do_subrender = tag->effect_chain[position]->is_rendering;
     return tag->subrender;
 }
 
@@ -2706,6 +2716,28 @@ void    vj_tag_set_subrender(int t1, int status)
     if(!tag)
         return;
     tag->subrender = status;
+}
+
+void    vj_tag_entry_set_is_rendering(int t1, int position, int state)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag)
+        return;
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
+        return;
+
+    tag->effect_chain[position]->is_rendering = state;
+}
+
+int    vj_tag_entry_is_rendering(int t1, int position)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag)
+        return -1; 
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
+        return -1;
+
+    return tag->effect_chain[position]->is_rendering;
 }
 
 int vj_tag_set_chain_channel(int t1, int position, int channel)
@@ -2844,6 +2876,7 @@ int vj_tag_chain_remove(int t1, int index)
 
     tag->effect_chain[index]->effect_id = -1;
     tag->effect_chain[index]->e_flag = 0;
+    tag->effect_chain[index]->is_rendering = 1;
 
     if( tag->effect_chain[index]->kf )
         vpf(tag->effect_chain[index]->kf );
@@ -2857,7 +2890,7 @@ int vj_tag_chain_remove(int t1, int index)
         vj_tag_disable( tag->effect_chain[index]->channel );
     }
 
-
+    tag->effect_chain[index]->is_rendering = 1;
     tag->effect_chain[index]->source_type = 1;
     tag->effect_chain[index]->channel     = t1; //set to self
 

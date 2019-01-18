@@ -112,7 +112,12 @@ typedef struct vj_effect_t {
 	int global;
 	int is_gen;
 	int is_plugin;
-	int (*is_transition_ready_func)();
+	int (*is_transition_ready_func)(); //FIXME pass in private data
+    int (*prepare)(void *fx_instance, VJFrame *frame);
+    int (*apply)(void *fx_instance, VJFrame *frame, int *parameter_values);
+    int (*apply2)(void *fx_instance, VJFrame *frame, VJFrame *frame2, int *parameter_values);
+    void (*instantiate)(VJFrame *frame);
+    int (*destroy)(void *fx_instance);
 } vj_effect;
 
 extern unsigned int get_pixel_range_min_Y();

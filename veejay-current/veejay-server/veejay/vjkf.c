@@ -495,16 +495,22 @@ int	get_keyframe_value(void *port, int n_frame, int parameter_id, int *result )
 {
 	char *k_x = extract_ ( "status", parameter_id );
 	char *k_s = extract_ ( "start", parameter_id );
+    char *k_e = extract_ ( "end", parameter_id );
 	char *k_d = extract_ ( "data", parameter_id );
-	int status= 0,start=0;
+	int status= 0,start=0,end=0;
 	if( vevo_property_get( port, k_x,   0, &status ) != VEVO_NO_ERROR )
 	{
-		free(k_x); free(k_s); free(k_d);
+		free(k_x); free(k_s); free(k_d); free(k_e);
 		return 0;
 	}
 	if( vevo_property_get( port, k_s,   0, &start ) != VEVO_NO_ERROR )
 	{
-		free(k_x); free(k_s); free(k_d);
+		free(k_x); free(k_s); free(k_d); free(k_e);
+		return 0;
+	}
+	if( vevo_property_get( port, k_e,   0, &end ) != VEVO_NO_ERROR )
+	{
+		free(k_x); free(k_s); free(k_d); free(k_e);
 		return 0;
 	}
 
@@ -512,21 +518,30 @@ int	get_keyframe_value(void *port, int n_frame, int parameter_id, int *result )
 		free(k_x);
 		free(k_s);
 		free(k_d);
+        free(k_e);
 		return 0;
 	}
 	
-	int idx = n_frame - start;
-	if( idx < 0 ) {
-		veejay_msg(0,"Key frame position is before start ?!");
-		idx = 0;
-	}
+
+    if( n_frame < start || n_frame > end ) {
+        free(k_x); free(k_s); free(k_d); free(k_e);
+        return 0;
+    }
 
 	int *values = NULL;
 	if( vevo_property_get( port, k_d, 0, &values ) != VEVO_NO_ERROR ) 
 	{
-		free(k_x); free(k_s); free(k_d);
+		free(k_x); free(k_s); free(k_d); free(k_e);
 		return 0;
 	}
+
+    int idx = n_frame - start;
+    int max = end - start;
+    if( idx < 0||idx > max ) {
+        free(k_x); free(k_s); free(k_d); free(k_e);
+        veejay_msg(VEEJAY_MSG_DEBUG, "KF position %d is not within bounds %d-%d", n_frame, start,end );
+        return 0;
+    } 
 
 	*result = values[ idx ];
 

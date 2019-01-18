@@ -225,7 +225,7 @@ extern int sample_set_marker(int s1, int start, int end);
 extern int sample_get_longest(int sample_id);
 extern int sample_get_playmode(int s1);
 extern int sample_set_playmode(int s1, int playmode);
-extern int sample_get_subrender(int s1);
+extern int sample_get_subrender(int s1, int position, int *do_subrender);
 extern void sample_set_subrender(int s1, int status);
 extern int sample_get_next(int s1);
 extern int sample_get_depth(int s1);
@@ -243,7 +243,8 @@ extern int sample_set_next(int s1, int next_sample_id);
 extern int sample_get_chain_source(int sample_id, int position);
 extern int sample_set_chain_source(int sample_id, int position, int source);
 extern int sample_get_sub_audio(int s1);
-void    *sample_get_kf_port( int s1, int entry );
+extern int sample_get_kf_tokens( int s1, int entry, int id, int *start, int *end, int *type, int *status );
+extern void    *sample_get_kf_port( int s1, int entry );
 extern int	sample_chain_set_kf_status( int s1, int entry, int status );
 extern int	sample_get_kf_status( int s1, int entry, int *type );
 extern unsigned char * sample_chain_get_kfs( int s1, int entry, int parameter_id, int *len );
@@ -356,7 +357,6 @@ extern int sample_cache_used( int s1 );
 extern void        sample_free(void *edl);
 extern int sample_stop_playing(int s1, int new_s1);
 extern int sample_start_playing(int s1, int no_cache);
-extern int sample_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
 extern char *UTF8toLAT1(unsigned char *in);
 extern int sample_read_edl( sample_info *sample );
 extern void sample_set_loops(int s1, int loops);
@@ -379,6 +379,7 @@ extern sample_eff_chain **sample_get_effect_chain(int s1);
 
 extern int sample_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop, int frame_pos);
 extern int sample_chain_entry_transition_now(int s1, int entry, int *type);
+extern void sample_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype);
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);

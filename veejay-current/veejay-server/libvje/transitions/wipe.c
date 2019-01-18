@@ -22,6 +22,11 @@
 #include "transop.h"
 #include "wipe.h"
 
+typedef struct {
+    double g_wipe_width;
+    double g_wipe_height;
+} fx_wipe_t;
+
 vj_effect *wipe_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -51,13 +56,25 @@ vj_effect *wipe_init(int w,int h)
 static double g_wipe_width = 0;
 static double g_wipe_height = 0;
 
-int  wipe_ready(int width, int height) {
+int  wipe_ready(int width, int height) { //FIXME pass in fx instance data
     if (g_wipe_width == width && g_wipe_height == height)
 	    return TRANSITION_COMPLETED;
     return TRANSITION_RUNNING;
 }
 
-void wipe_apply( VJFrame *frame, VJFrame *frame2, int inc, int restart)
+void    *wipe_instantiate(VJFrame *frame)
+{
+    fx_wipe_t *prv = (fx_wipe_t*) vj_calloc(sizeof(fx_wipe_t));
+    return prv;
+}
+
+void    wipe_destroy(void *ptr)
+{
+    free(ptr);
+}
+
+
+void wipe_apply( VJFrame *frame, VJFrame *frame2, int inc, int restart) //FIXME pass in fx instance data, take parameters from array
 {
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;

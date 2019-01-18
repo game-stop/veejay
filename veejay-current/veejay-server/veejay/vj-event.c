@@ -2427,6 +2427,39 @@ void    vj_event_play_norestart( void *ptr, const char format[], va_list ap )
     veejay_msg(VEEJAY_MSG_INFO, "Sample continuous mode is %s", (v->settings->sample_restart == 0 ? "enabled" : "disabled"));
 }
 
+void    vj_event_sub_render_entry( void *ptr, const char format[], va_list ap )
+{
+    int args[3];
+    veejay_t *v = (veejay_t*) ptr;
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    if( SAMPLE_PLAYING(v)) {
+        SAMPLE_DEFAULTS(args[0]);
+
+        if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+
+        sample_entry_set_is_rendering(args[0],args[1], args[2]);
+
+        int subrender = sample_get_subrender(args[0],args[1],&args[2]);
+
+        veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing source on entry %d",
+                ( (subrender == 1 ? args[2] : 0) ? "Enabled" : "Disabled" ),args[1]);
+    } 
+    if( STREAM_PLAYING(v)) {
+        STREAM_DEFAULTS(args[0]);
+        
+        if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+
+        vj_tag_entry_set_is_rendering(args[0],args[1],args[2]);
+
+        int subrender = vj_tag_get_subrender(args[0],args[1],&args[2]);
+
+        veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing source on entry %d",
+                ( (subrender == 1 ? args[2] :0) ? "Enabled" : "Disabled" ),args[1]);
+    }
+}   
+
+
 void    vj_event_sub_render( void *ptr, const char format[], va_list ap )
 {
     int args[2];
@@ -2435,7 +2468,8 @@ void    vj_event_sub_render( void *ptr, const char format[], va_list ap )
 
     if( SAMPLE_PLAYING(v)) {
         SAMPLE_DEFAULTS(args[0]);
-        int cur = sample_get_subrender(args[0]);
+        int ignored = 0;
+        int cur = sample_get_subrender(args[0],0,&ignored);
         if( cur == 0 ) {
             cur = 1;
         }
@@ -2444,13 +2478,15 @@ void    vj_event_sub_render( void *ptr, const char format[], va_list ap )
         }
 
         sample_set_subrender(args[0], cur);
+        cur = sample_get_subrender(args[0],0,&ignored);
 
         veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing sources",
-                ( sample_get_subrender(args[0]) == 1 ? "Enabled" : "Disabled" ));
+                ( cur == 1 ? "Enabled" : "Disabled" ));
     } 
     if( STREAM_PLAYING(v)) {
         STREAM_DEFAULTS(args[0]);
-        int cur = vj_tag_get_subrender(args[0]);
+        int ignored = 0;
+        int cur = vj_tag_get_subrender(args[0],0,&ignored);
         if( cur == 0 ) {
             cur = 1;
         }
@@ -2459,8 +2495,9 @@ void    vj_event_sub_render( void *ptr, const char format[], va_list ap )
         }
 
         vj_tag_set_subrender(args[0], cur);
+        cur = vj_tag_get_subrender(args[0],0,&ignored);
         veejay_msg(VEEJAY_MSG_INFO, "%s rendering of mixing sources",
-                ( vj_tag_get_subrender(args[0]) == 1 ? "Enabled" : "Disabled" ));
+                ( cur == 1 ? "Enabled" : "Disabled" ));
     }
 }   
 
@@ -5365,13 +5402,13 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
                                 vj_effect_get_description(real_id));
                         }
                     }
-                    else
+                 /*   else
                     {
                         veejay_msg(VEEJAY_MSG_ERROR, "Parameter %d value %d is invalid for effect %d (%d-%d)",
                             i,args[(i+args_offset)], real_id,
                             vj_effect_get_min_limit(real_id,i),
                             vj_effect_get_max_limit(real_id,i));
-                    }
+                    } */
                 }
                 v->uc->chain_changed = 1;
             }
@@ -8607,25 +8644,40 @@ void    vj_event_send_chain_entry       (   void *ptr,  const char format[],    
             int params[SAMPLE_MAX_PARAMETERS];
             int p;
             int video_on = sample_get_chain_status(args[0],args[1]);
-            //int audio_on = sample_get_chain_audio(args[0],args[1]);
             int num_params = vj_effect_get_num_params(effect_id);
             int kf_type = 0;
             int kf_status = sample_get_kf_status( args[0],args[1],&kf_type );
+            int transition_enabled = 0;
+            int transition_loop = 0;
+            int subrender_entry = sample_entry_is_rendering(args[0],args[1]);
+            sample_chain_entry_get_transition(args[0],args[1], &transition_enabled,&transition_loop);
 
             for(p = 0 ; p < num_params; p++)
                 params[p] = sample_get_effect_arg(args[0],args[1],p);
             for(p = num_params; p < SAMPLE_MAX_PARAMETERS; p++)
                 params[p] = 0;
 
-            snprintf( param, sizeof(param), "%d %d %d %d 0 0 %d %d %d %d 0 ", effect_id, is_video, num_params,
-                   kf_type,kf_status,
+            snprintf( param, sizeof(param), "%d %d %d %d %d %d %d %d %d %d %d ", 
+                   effect_id,
+                   is_video,
+                   num_params,
+                   kf_status,
+                   kf_type,
+                   transition_enabled, transition_loop, 
                    sample_get_chain_source(args[0],args[1]),
                    sample_get_chain_channel(args[0],args[1]),
-                   video_on);
+                   video_on,
+                   subrender_entry);
 
             strncat( line, param, strlen(param));
             for(p = 0; p < num_params - 1; p ++ ) {
-                snprintf(param,sizeof(param), "%d ", params[p] );
+               /* int kfe_start = 0;
+                int kfe_end = 0;
+                int kfe_type = 0;
+                int kfe_status = 0;
+                sample_get_kf_tokens( args[0],args[1], p, &kfe_start, &kfe_end, &kfe_type, &kfe_status );
+                snprintf(param,sizeof(param), "%d %d %d %d %d ", params[p], kfe_start, kfe_end, kfe_type, kfe_status ); */
+                snprintf(param,sizeof(param), "%d ",params[p]);
                 strncat( line, param,strlen(param));
             }
             snprintf(param, sizeof(param),"%d",params[p]);
@@ -8649,26 +8701,41 @@ void    vj_event_send_chain_entry       (   void *ptr,  const char format[],    
             int params[SAMPLE_MAX_PARAMETERS];
             int p;
             int num_params = vj_effect_get_num_params(effect_id);
-
             int video_on = vj_tag_get_chain_status(args[0], args[1]);
             int kf_type = 0;
             int kf_status = vj_tag_get_kf_status( args[0],args[1], &kf_type );
+            int transition_enabled = 0;
+            int transition_loop = 0;
+            int subrender_entry = vj_tag_entry_is_rendering(args[0],args[1]);
+            vj_tag_chain_entry_get_transition(args[0],args[1], &transition_enabled,&transition_loop);
 
             for(p = 0 ; p < num_params; p++)
                 params[p] = vj_tag_get_effect_arg(args[0],args[1],p);
             for(p = num_params; p < SAMPLE_MAX_PARAMETERS;p++)
                 params[p] = 0;
 
-            snprintf( param, sizeof(param), "%d %d %d %d 0 0 %d %d %d %d 0 ", effect_id, is_video, num_params,  
+            snprintf( param, sizeof(param), "%d %d %d %d %d %d %d %d %d %d %d ", 
+                    effect_id, 
+                    is_video, 
+                    num_params,  
+                   kf_status,
                    kf_type,
-                       kf_status,          
+                   transition_enabled,
+                   transition_loop,
                    vj_tag_get_chain_source(args[0],args[1]),
                    vj_tag_get_chain_channel(args[0],args[1]),
-                   video_on);
+                   video_on,
+                   subrender_entry);
 
             strncat( line, param, strlen(param));
             for(p = 0; p < num_params - 1; p ++ ) {
-                snprintf(param,sizeof(param), "%d ", params[p] );
+               /* int kfe_start = 0;
+                int kfe_end = 0;
+                int kfe_type = 0;
+                int kfe_status = 0;
+                vj_tag_get_kf_tokens( args[0],args[1], p, &kfe_start, &kfe_end, &kfe_type, &kfe_status );
+                snprintf(param,sizeof(param), "%d %d %d %d %d ", params[p], kfe_start, kfe_end, kfe_type, kfe_status );*/
+                snprintf(param,sizeof(param), "%d ",params[p]);
                 strncat( line, param,strlen(param));
             }
             snprintf(param, sizeof(param),"%d",params[p]);
@@ -8843,7 +8910,8 @@ void    vj_event_send_chain_list        (   void *ptr,  const char format[],    
                 int chain_channel = sample_get_chain_channel(args[0], i);
                 int kf_type = 0;
                 int kf_status = sample_get_kf_status( args[0], i, &kf_type );
-                //int using_audio = sample_get_chain_audio(args[0],i);
+                int subrender_entry = 0;
+                sample_get_subrender(args[0], i, &subrender_entry);
 
                 sprintf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
                     i,
@@ -8853,7 +8921,8 @@ void    vj_event_send_chain_list        (   void *ptr,  const char format[],    
                     (using_audio  <= 0  ? 0 : 1 ),
                     chain_source,
                     chain_channel,
-                    kf_status
+                    kf_status,
+                    subrender_entry
                 );
                         
                 APPEND_MSG(print_buf,line);
@@ -8879,7 +8948,8 @@ void    vj_event_send_chain_list        (   void *ptr,  const char format[],    
                 int chain_channel = vj_tag_get_chain_channel(args[0], i);
                 int kf_type = 0;
                 int kf_status = vj_tag_get_kf_status( args[0], i, &kf_type ); // exist for streaù ? or 0 ?
-
+                int subrender_entry = 0;
+                vj_tag_get_subrender(args[0],i,&subrender_entry);
                 sprintf(line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
                     i,
                     effect_id,
@@ -8888,7 +8958,8 @@ void    vj_event_send_chain_list        (   void *ptr,  const char format[],    
                     0,
                     chain_source,
                     chain_channel,
-                    kf_status
+                    kf_status,
+                    subrender_entry
                 );
                 APPEND_MSG(print_buf, line);
             }

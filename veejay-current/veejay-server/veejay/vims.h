@@ -113,6 +113,7 @@ enum {
 	VIMS_CALI_IMAGE					=	332,
 	VIMS_SYNC_CORRECTION			=	334,
 	VIMS_FRAMERATE					=	335,
+    VIMS_SUB_RENDER_ENTRY           =   319,
 	VIMS_SUB_RENDER					=	336,
 	VIMS_ALPHA_COMPOSITE			=	337,
 	VIMS_RESUME_ID				=	338,
@@ -292,9 +293,9 @@ enum {
 	VIMS_VLOOPBACK_STOP				=	46,
 };
 
-#define VIMS_CHAIN_LIST_ENTRY_FORMAT "%02d%03d%1d%1d%1d%1d%03d%1d"
-#define VIMS_CHAIN_LIST_ENTRY_LENGTH (2+3+1+1+1+1+3+1) // String length of entry format
-#define VIMS_CHAIN_LIST_ENTRY_VALUES 8 // Number of values of the message
+#define VIMS_CHAIN_LIST_ENTRY_FORMAT "%02d%03d%1d%1d%1d%1d%03d%1d%1d"
+#define VIMS_CHAIN_LIST_ENTRY_LENGTH (2+3+1+1+1+1+3+1+1) // String length of entry format
+#define VIMS_CHAIN_LIST_ENTRY_VALUES 9 // Number of values of the message
 
 enum {
     VJ_PLAYBACK_MODE_PLAIN = 2,

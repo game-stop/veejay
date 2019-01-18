@@ -188,7 +188,9 @@ sample_eff_chain **vj_tag_get_effect_chain(int t1);
 
 void	*vj_tag_get_plugin( int t1, int position, void *ptr );
 
-int		vj_tag_get_subrender(int t1);
+void    vj_tag_entry_set_is_rendering(int t1, int position, int state);
+int     vj_tag_entry_is_rendering(int t1, int position);
+int		vj_tag_get_subrender(int t1, int position, int *do_subrender);
 void	vj_tag_set_subrender(int t1, int status);
 
 unsigned int 	vj_tag_size();
@@ -375,7 +377,8 @@ uint8_t *vj_tag_get_cali_data( int t1, int what );
 void	vj_tag_set_chain_paused(int t1, int paused);
 int vj_tag_chain_entry_transition_now(int s1, int entry, int *type);
 int vj_tag_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop_at, int frame_pos);
-
+int vj_tag_chain_entry_transition_now(int s1, int entry, int *type);
+void vj_tag_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype);
 #ifdef HAVE_XML2
 void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);
 void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp);

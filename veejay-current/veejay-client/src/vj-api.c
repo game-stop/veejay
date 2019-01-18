@@ -180,14 +180,14 @@ enum
     ENTRY_FXID = 0,
     ENTRY_ISVIDEO = 1,
     ENTRY_NUM_PARAMETERS = 2,
-    ENTRY_KF_TYPE = 3,
-    ENTRY_KF_START = 4,
-    ENTRY_KF_END = 5,
-    ENTRY_KF_STATUS = 6,
+    ENTRY_KF_STATUS = 3,
+    ENTRY_KF_TYPE = 4,
+    ENTRY_TRANSITION_ENABLED = 5,
+    ENTRY_TRANSITION_LOOP = 6,
     ENTRY_SOURCE = 7,
     ENTRY_CHANNEL = 8,
     ENTRY_VIDEO_ENABLED = 9,
-    ENTRY_AUDIO_ENABLED = 10,
+    ENTRY_SUBRENDER_ENTRY = 10,
     ENTRY_P0 = 11,
     ENTRY_P1 = 12,
     ENTRY_P2 = 13,
@@ -202,8 +202,24 @@ enum
     ENTRY_P12 = 22,
     ENTRY_P13 = 23,
     ENTRY_P14 = 24,
-    ENTRY_P15 = 26,
-    ENTRY_LAST = 27
+    ENTRY_P15 = 25,
+    ENTRY_LAST = 26
+    /*
+    ENTRY_P1 = 16,
+    ENTRY_P2 = 21,
+    ENTRY_P3 = 26,
+    ENTRY_P4 = 31,
+    ENTRY_P5 = 36,
+    ENTRY_P6 = 41,
+    ENTRY_P8 = 46,
+    ENTRY_P9 = 51,
+    ENTRY_P10 = 56,
+    ENTRY_P11 = 61,
+    ENTRY_P12 = 66,
+    ENTRY_P13 = 71,
+    ENTRY_P14 = 76,
+    ENTRY_P15 = 81,
+    ENTRY_LAST = 86 */
 };
 
 #define ENTRY_PARAMSET ENTRY_P0
@@ -531,7 +547,8 @@ enum
     FXC_FXSTATUS = 2,
     FXC_KF = 3,
     FXC_MIXING = 4,
-    FXC_N_COLS,
+    FXC_SUBRENDER = 5,
+    FXC_N_COLS = 6,
 };
 
 enum {
@@ -679,7 +696,6 @@ static void setup_tree_pixmap_column( const char *tree_name, int type, const cha
 gchar *_utf8str( const char *c_str );
 static gchar *recv_vims(int len, int *bytes_written);
 static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1);
-static GdkPixbuf *update_pixmap_kf( int status );
 static GdkPixbuf *update_pixmap_entry( int status );
 static gboolean chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,gpointer data);
 int resize_primary_ratio_y();
@@ -2692,7 +2708,6 @@ static void update_curve_widget(GtkWidget *curve)
     }
     update_spin_range( "curve_spinstart", lo, hi, lo );
     update_spin_range( "curve_spinend", lo, hi, hi );
-
     if(blob)    free(blob);
 }
 
@@ -3142,22 +3157,6 @@ int update_gveejay()
     return vj_midi_handle_events( info->midi );
 }
 
-static GdkPixbuf    *update_pixmap_kf( int status )
-{
-    char path[MAX_PATH_LEN];
-    char filename[MAX_PATH_LEN];
-
-    snprintf(filename,sizeof(filename), "fx_entry_%s.png",
-             ( status == 1 ? "on" : "off" ));
-    get_gd(path,NULL, filename);
-
-    GError *error = NULL;
-    GdkPixbuf *toggle = gdk_pixbuf_new_from_file( path , &error);
-    if(error)
-        return NULL;
-    return toggle;
-}
-
 static  GdkPixbuf   *update_pixmap_entry( int status )
 {
     char path[MAX_PATH_LEN];
@@ -3218,18 +3217,21 @@ static gboolean chain_update_row(GtkTreeModel * model,
 
             gchar *mixing = _utf8str(tmp);
             GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
-            GdkPixbuf *kf_toggle = update_pixmap_kf( gui->uc.entry_tokens[ENTRY_KF_STATUS] );
+            GdkPixbuf *kf_toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_KF_STATUS] );
+            GdkPixbuf *subrender_toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_SUBRENDER_ENTRY]);
             gtk_list_store_set( GTK_LIST_STORE(model),iter,
                                FXC_ID, entry,
                                FXC_FXID, descr,
                                FXC_FXSTATUS, toggle,
                                FXC_KF, kf_toggle,
                                FXC_MIXING, mixing,
+                               FXC_SUBRENDER, subrender_toggle,
                                -1 );
             g_free(descr);
             g_free(mixing);
             g_object_unref( kf_toggle );
             g_object_unref( toggle );
+            g_object_unref( subrender_toggle );
 
             enable_widget( "fx_m1" );
             enable_widget( "fx_m2" );
@@ -4095,7 +4097,8 @@ static gint load_parameter_info()
     }
 
     set_toggle_button( "curve_chain_toggleentry", p[ENTRY_KF_STATUS] );
-
+//FIXME:
+/*
     if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
     {
         update_spin_range( "curve_spinstart",
@@ -4109,7 +4112,7 @@ static gint load_parameter_info()
         int nl = info->status_tokens[SAMPLE_MARKER_END];
         update_spin_range( "curve_spinstart", 0, nl, p[ENTRY_KF_START] );
         update_spin_range( "curve_spinend", 0,nl, p[ENTRY_KF_END] );
-    }
+    }*/
 
     update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
 
@@ -4119,13 +4122,18 @@ static gint load_parameter_info()
             set_toggle_button( "curve_typespline", 1 );
             break;
         case 2:
-            set_toggle_button( "curve_typefree",1 );
+            set_toggle_button( "curve_typefreehand",1 );
             break;
         default:
             case GTK_CURVE_TYPE_LINEAR: set_toggle_button( "curve_typelinear", 1 );
             break;
         break;
     }
+
+
+    set_toggle_button("subrender_entry_toggle", p[ENTRY_SUBRENDER_ENTRY]);
+    update_spin_value("transition_loop", p[ENTRY_TRANSITION_LOOP] );
+    set_toggle_button("transition_enabled", p[ENTRY_TRANSITION_ENABLED] );
 
     free(answer);
     return 1;
@@ -4213,7 +4221,7 @@ gint get_treeview_col_number_from_column (GtkTreeViewColumn *col)
 static void setup_effectchain_info( void )
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
-    GtkListStore *store = gtk_list_store_new( 5, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING );
+    GtkListStore *store = gtk_list_store_new( FXC_N_COLS, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING, GDK_TYPE_PIXBUF );
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     g_object_unref( G_OBJECT( store ));
 
@@ -4222,6 +4230,7 @@ static void setup_effectchain_info( void )
     setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run");
     setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // TODO parameter interpolation on/off per entry
     setup_tree_text_column( "tree_chain", FXC_MIXING, "Channel",0);
+    setup_tree_pixmap_column( "tree_chain", FXC_SUBRENDER, "Subrender");
     GtkTreeSelection *selection;
 
     // selection stuff
@@ -4289,7 +4298,7 @@ static void load_effectchain_info()
 
         strncpy( line, fxtext + offset, VIMS_CHAIN_LIST_ENTRY_LENGTH );
         int n_tokens = sscanf( line, VIMS_CHAIN_LIST_ENTRY_FORMAT,
-               &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6], &arr[7]);
+               &arr[0],&arr[1],&arr[2],&arr[3],&arr[4],&arr[5],&arr[6], &arr[7], &arr[8]);
         if( n_tokens != VIMS_CHAIN_LIST_ENTRY_VALUES ) {
             veejay_msg(0,"Error parsing FX chain response");
             break;
@@ -4322,18 +4331,21 @@ static void load_effectchain_info()
 
             gtk_list_store_append( store, &iter );
             GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
-            GdkPixbuf *kf_togglepf = update_pixmap_kf( arr[7] );
+            GdkPixbuf *kf_togglepf = update_pixmap_entry( arr[7] );
+            GdkPixbuf *subrender_toggle = update_pixmap_entry(arr[8]);
             gtk_list_store_set( store, &iter,
                                FXC_ID, arr[0],
                                FXC_FXID, utf8_name,
                                FXC_FXSTATUS, toggle,
                                FXC_KF, kf_togglepf,
-                               FXC_MIXING,mixing,   -1 );
+                               FXC_MIXING,mixing, 
+                               FXC_SUBRENDER, subrender_toggle,  -1 );
             last_index ++;
             g_free(utf8_name);
             g_free(mixing);
             g_object_unref( toggle );
             g_object_unref( kf_togglepf );
+            g_object_unref( subrender_toggle );
         }
         offset += VIMS_CHAIN_LIST_ENTRY_LENGTH;
     }
@@ -6864,7 +6876,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         {
 		    int rate = 1;
     		if( info->el.fps > 1 ) {
-				rate = info->el.fps/2; 
+				rate = info->el.fps; // less often 
 			}
 
             if( (reload_entry_tick_ % rate)==0)
@@ -7198,6 +7210,11 @@ static void process_reload_hints(int *history, int pm)
             disable_widget( "tree_sources");
             disable_widget( "rgbkey");
             set_toggle_button( "button_entry_toggle", FALSE );
+            set_toggle_button( "transition_enabled", FALSE);
+            update_spin_value( "transition_loop",0);
+            disable_widget( "transition_enabled");
+            disable_widget( "transition_loop");
+            disable_widget( "subrender_entry_toggle");
             update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
         }
         else
@@ -7209,7 +7226,11 @@ static void process_reload_hints(int *history, int pm)
             enable_widget( "button_entry_toggle");
             enable_widget( "tree_sources");
             enable_widget( "rgbkey" );
+            enable_widget( "transition_enabled" );
+            enable_widget( "transition_loop" );
+            enable_widget( "subrender_entry_toggle");
             set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_VIDEO_ENABLED] );
+            set_toggle_button( "subrender_entry_toggle", entry_tokens[ENTRY_SUBRENDER_ENTRY]);
             np = _effect_get_np( entry_tokens[ENTRY_FXID] );
             for( i = 0; i < np ; i ++ )
             {
@@ -7235,6 +7256,8 @@ static void process_reload_hints(int *history, int pm)
             }
         }
         update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);
+        update_spin_value( "transition_loop", entry_tokens[ENTRY_TRANSITION_LOOP] );
+        set_toggle_button( "transition_enabled", entry_tokens[ENTRY_TRANSITION_ENABLED] );
 
         for( i = np; i < MAX_UI_PARAMETERS; i ++ )
         {

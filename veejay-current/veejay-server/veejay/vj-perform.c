@@ -1786,7 +1786,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 
 static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0_ref, uint8_t *p1_ref, int subrender )
 {   
-    if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG 
+/*    if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG 
             && sample_id == info->uc->sample_id && type != 0 )
     {
         uint8_t *pri[4];
@@ -1801,7 +1801,7 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id, int ty
         pri[3] = primary_buffer[ info->out_buf ]->alpha;
         vj_frame_copy( pri, dst->data, strides ); 
         return src->ssm;
-    }
+    } */
 
     int error = 1;
     int nframe;
@@ -2007,8 +2007,8 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, VJFrame 
 
 
 static int vj_perform_apply_secundary(veejay_t * info, int this_sample_id, int sample_id, int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0_ref, uint8_t *p1_ref, int subrender)
-{               
-    if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE 
+{       
+    /*if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE 
             && sample_id == info->uc->sample_id && type == 0 ) {
         uint8_t *pri[4];
         int strides[4] = { src->len,
@@ -2022,7 +2022,7 @@ static int vj_perform_apply_secundary(veejay_t * info, int this_sample_id, int s
         pri[3] = primary_buffer[ info->out_buf ]->alpha;
         vj_frame_copy( pri, dst->data, strides );
         return src->ssm;
-    }
+    }*/
     int error = 1;
     int nframe;
     int len;
@@ -2455,14 +2455,15 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
         }
     }
 
-    int subrender = sample_get_subrender(info->uc->sample_id);
+    int subrender_entry = -1;
     for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
     {
+        int subrender = sample_get_subrender(info->uc->sample_id, chain_entry, &subrender_entry);
         sample_eff_chain *fx_entry = chain[chain_entry];
         if(fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
             continue;
-
-        vj_perform_render_chain_entry(info, fx_entry, chain_entry, frames, subrender);
+        
+        vj_perform_render_chain_entry(info, fx_entry, chain_entry, frames, (subrender? subrender_entry: subrender));
     }
     *hint444 = frames[0]->ssm;
 
@@ -2507,14 +2508,15 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
         }
     }
 
-    int subrender = vj_tag_get_subrender( info->uc->sample_id );
+    int subrender_entry = -1;
     for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
     {
+        int subrender = vj_tag_get_subrender( info->uc->sample_id, chain_entry, &subrender_entry );
         sample_eff_chain *fx_entry = chain[chain_entry];
         if(fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
             continue;
 
-        vj_perform_tag_render_chain_entry( info, fx_entry, chain_entry, frames, subrender);
+        vj_perform_tag_render_chain_entry( info, fx_entry, chain_entry, frames, (subrender ? subrender_entry : subrender));
     }
 
     *hint444 = frames[0]->ssm;
