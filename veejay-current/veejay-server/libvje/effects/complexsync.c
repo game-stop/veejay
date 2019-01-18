@@ -92,7 +92,6 @@ void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val)
 
     if( complex_not_completed )
 	{
-        complex_completed
 		uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
 		int dst_strides[4] = { len - region, len - region, len - region,0 };
 
