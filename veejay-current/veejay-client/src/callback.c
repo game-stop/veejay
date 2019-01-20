@@ -4680,6 +4680,7 @@ void    on_subrender_entry_toggle_toggled(GtkWidget *w, gpointer data)
 		return;
     int enabled = is_button_toggled( "subrender_entry_toggle" );
     multi_vims( VIMS_SUB_RENDER_ENTRY,"%d %d %d", 0,-1,enabled);
+    vj_msg(VEEJAY_MSG_INFO, "Sub rendering is %s", (enabled ? "enabled" : "disabled"));
 }
 
 void    on_transition_enabled_toggled(GtkWidget *w, gpointer data)
@@ -4690,6 +4691,12 @@ void    on_transition_enabled_toggled(GtkWidget *w, gpointer data)
     int loop = get_nums("transition_loop");
 
     multi_vims( VIMS_SAMPLE_MIX_TRANSITION, "%d %d %d %d", 0, -1, enabled, loop );
+    if(enabled) {
+        vj_msg(VEEJAY_MSG_INFO, "Transitioning to mixing source at loop %d", loop);
+    }
+    else {
+        vj_msg(VEEJAY_MSG_INFO, "Disabled transition to mixing source");
+    }
 }
 
 void    on_transition_loop_value_changed(GtkWidget *w, gpointer data)
@@ -4712,6 +4719,7 @@ void	on_macroplay_toggled( GtkWidget *w, gpointer data )
 		multi_vims( VIMS_MACRO, "%d", 2 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,2 );
 		info->uc.reload_hint[HINT_MACRO] = 1;
+        vj_msg( VEEJAY_MSG_INFO, "Started macro playback");
 	}
 }
 
@@ -4724,6 +4732,7 @@ void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
 		multi_vims( VIMS_MACRO, "%d", 1 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,1 );
 		info->uc.reload_hint[HINT_MACRO] = 1;
+        vj_msg(VEEJAY_MSG_INFO, "Started macro record");
 	}
 }
 
@@ -4736,6 +4745,7 @@ void	on_macrostop_toggled( GtkWidget *w, gpointer data )
 		multi_vims( VIMS_MACRO, "%d", 0 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,0 );
 		info->uc.reload_hint[HINT_MACRO] = 1;
+        vj_msg(VEEJAY_MSG_INFO, "Stopped macro playback/record");
 	}
 }
 
@@ -4746,7 +4756,8 @@ void	on_macroclear_clicked( GtkWidget *w, gpointer data )
 	
 	multi_vims( VIMS_MACRO, "%d", 3 );
 	vj_midi_learning_vims_msg( info->midi,NULL, VIMS_MACRO, 3);
-        info->uc.reload_hint[HINT_MACRO] = 1;
+    info->uc.reload_hint[HINT_MACRO] = 1;
+    vj_msg(VEEJAY_MSG_INFO, "Reset macro playback/record");
 }
 
 
@@ -4859,8 +4870,10 @@ void on_toggle_multicast_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled( "toggle_multicast" ) ) {
 		multi_vims( VIMS_VIDEO_MCAST_START, "%d", 0 );
+        vj_msg(VEEJAY_MSG_INFO, "Multicast enabled");
 	}
 	else {
 		single_vims( VIMS_VIDEO_MCAST_STOP );
+        vj_msg(VEEJAY_MSG_INFO, "Multicast disabled");
 	}
 }
