@@ -3484,13 +3484,14 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
 {
 	single_vims( VIMS_PREVIEW_BW );
-	
-
+    vj_msg(VEEJAY_MSG_INFO,"Changed preview to greyscale");
 }
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-	multitrack_toggle_preview( info->mt, -1, is_button_toggled("previewtoggle"),glade_xml_get_widget(info->main_window, "imageA") );
+    int enabled = is_button_toggled("previewtoggle");
+	multitrack_toggle_preview( info->mt, -1, enabled,glade_xml_get_widget(info->main_window, "imageA") );
+    vj_msg(VEEJAY_MSG_INFO,"Live view is %s", (enabled ? "enabled" : "disabled" ));
 }
 
 void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
@@ -4648,25 +4649,31 @@ void	on_seqactive_toggled( GtkWidget *w, gpointer data )
 {
 	if(info->status_lock)
 		return;
-	multi_vims( VIMS_SEQUENCE_STATUS, "%d" , is_button_toggled("seqactive" ) ? 1 : 0 );
-	vj_midi_learning_vims_msg(info->midi,NULL, VIMS_SEQUENCE_STATUS, is_button_toggled("seqactive"));
+    int enabled = is_button_toggled("seqactive" );
+	multi_vims( VIMS_SEQUENCE_STATUS, "%d", enabled );
+	vj_midi_learning_vims_msg(info->midi,NULL, VIMS_SEQUENCE_STATUS, enabled);
+    vj_msg(VEEJAY_MSG_INFO, "Sample sequencer is %s", (enabled ? "enabled" : "disabled" ));
 }
 
 void	on_hqbutton_clicked( GtkWidget *w, gpointer data ) // 1/1
 {
 	multitrack_set_quality( info->mt, 0 );
+    vj_msg(VEEJAY_MSG_INFO, "Live view quality set to best");
 }
 void	on_lqbutton_clicked( GtkWidget *w, gpointer data ) // 1/2
 {
 	multitrack_set_quality( info->mt, 1 );
+    vj_msg(VEEJAY_MSG_INFO, "Live view quality set to half resolution");
 }
 void	on_bq_button_clicked( GtkWidget *w, gpointer data ) // 1/4
 {
 	multitrack_set_quality( info->mt, 2 );
+    vj_msg(VEEJAY_MSG_INFO, "Live view quality set to a quarter resolution");
 }
 void	on_uq_button_clicked( GtkWidget *w, gpointer data ) // 1/8
 {
 	multitrack_set_quality( info->mt, 3 );
+    vj_msg(VEEJAY_MSG_INFO,"Live view quality set to an eighth resolution");
 }
 
 void	on_record_vp_clicked( GtkWidget *w, gpointer data )
