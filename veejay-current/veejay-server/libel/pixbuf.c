@@ -454,7 +454,6 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 	dest[2] = dest[1] + (out_w * out_h)/4;
 	dest[3] = NULL;
 	
-	veejay_memset(dst1,0,sizeof(VJFrame));
 	veejay_memcpy( src1, frame,sizeof(VJFrame));
 
 	src1->format = (frame->ssm == 1 ? PIX_FMT_YUVJ444P : PIX_FMT_YUVJ422P );
@@ -469,10 +468,6 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 	dst1->stride[0] = out_w;
 	dst1->stride[1] = out_w >> 1;
 	dst1->stride[2] = out_w >> 1;
-	dst1->shift_v = 1;
-	dst1->shift_h = 1;
-	dst1->uv_len = (out_w * out_h)/4;
-	dst1->len = (out_w * out_h);
 
 	pic_changed_ = pic_has_changed( out_w,out_h, dst_fmt );
 
@@ -503,7 +498,7 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 	veejay_memset(dst1,0,sizeof(VJFrame));
 	veejay_memcpy( src1, frame,sizeof(VJFrame));
 
-	src1->format = (frame->ssm == 1 ? PIX_FMT_YUVJ444P : PIX_FMT_YUVJ422P );
+	//src1->format = (frame->ssm == 1 ? PIX_FMT_YUVJ444P : PIX_FMT_YUVJ422P );
 	src1->stride[3] = 0;
 
 	dst1->data[0] = planes[0];

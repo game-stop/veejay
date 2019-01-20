@@ -125,9 +125,9 @@ static void split_fib_downscaleb(VJFrame *frame, int width, int height)
 static void split_push_downscale_uh(VJFrame *frame, int width, int height)
 {
 	int len = frame->len/2;
-	int	strides[4] = { len,len,len ,0};
+    int uvlen = frame->uv_len/2;
+	int	strides[4] = { len,uvlen,uvlen ,0};
 	vj_frame_copy( frame->data, split_buf,strides );
-
 }
 
 static void split_push_vscale_left(VJFrame *frame, int width, int height)

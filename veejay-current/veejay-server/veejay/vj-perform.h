@@ -45,7 +45,6 @@ void vj_perform_record_stop(veejay_t *info);
 void vj_perform_record_sample_frame(veejay_t *info, int sample, int type); 
 
 void vj_perform_record_tag_frame(veejay_t *info ); 
-void vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, int h );
 
 int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop );
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h);

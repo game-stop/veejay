@@ -186,33 +186,6 @@ void	verify_CCIR_auto(int a, int b, VJFrame *dst )
 
 }
 
-static	void	verify_CCIR_( int a, int b, char *caller, int line ) {
-
-	int a_is_CCIR = is_CCIR(a);
-	int a_is_JPEG = is_JPEG(a);
-
-	int b_is_CCIR = is_CCIR(b);
-	int b_is_JPEG = is_JPEG(b);
-
-
-	if( a_is_JPEG && b_is_CCIR ) {
-		if(caller) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Output is expecting CCIR, but source still in JPEG %s:%d",
-					caller,line );
-		} else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Output is expecting CCIR, but source still in JPEG!");
-		}
-	}
-	if( a_is_CCIR && b_is_JPEG ) {
-		if(caller) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Input is CCIR, but output is expecting JPEG %s:%d",
-					caller,line );
-		} else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Input is CCIR, but output is in JPEG");
-		}
-	}
-}
-
 int	yuv_use_auto_ccir_jpeg()
 {
 	return auto_conversion_ccir_jpeg_;
@@ -661,7 +634,6 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 	}
 	if( auto_conversion_ccir_jpeg_ )
         	verify_CCIR_auto( src_fmt,dst_fmt, dst );
-
 }
 
 void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
