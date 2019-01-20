@@ -68,7 +68,7 @@ vj_effect *reflection_init(int width,int height)
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
     ve->description = "Bump 2D";
-    ve->sub_format = 0;
+    ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Value 1", "Value 2", "Mode");
@@ -117,11 +117,9 @@ void reflection_apply(VJFrame *frame, int index1, int index2, int move)
     unsigned int lightx, lighty, temp;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	int uv_height = frame->uv_height;
-    int uv_width = frame->uv_width;
     uint8_t *row = frame->data[0] + width + 1;
-    uint8_t *cbrow = frame->data[1] + uv_width + 1;
-	uint8_t *crrow = frame->data[2] + uv_width + 1;
+    uint8_t *cbrow = frame->data[1] + width + 1;
+	uint8_t *crrow = frame->data[2] + width + 1;
     uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -144,7 +142,6 @@ void reflection_apply(VJFrame *frame, int index1, int index2, int move)
 		reflection_buffer[x]= Y[x];
     }
 
-
     for (y = 1; y < height - 1; y++) {
 		uint8_t p;
 		temp = lighty - y;
@@ -165,33 +162,9 @@ void reflection_apply(VJFrame *frame, int index1, int index2, int move)
 		    else if (normaly > 255)
 				normaly = 255;
 		    *row++ = reflection_map[normalx][normaly];
-		    p = i2;
-		    reflection_buffer[x] = i2;
-		}
-		*row += 2;
-    }
+            *cbrow++ = ((reflection_map[normalx][normaly] * (Cb[x + 1 + (y * width)]-128)) >> 8) +128;
+			*crrow++ = ((reflection_map[normalx][normaly] * (Cr[x + 1 + (y * width)]-128)) >> 8) +128;
 
-    for (y = 1; y < uv_height - 1; y++) {
-		uint8_t p;
-		temp = lighty - y;
-		p = Y[(x<<frame->shift_h) + (y << frame->shift_v) * width];
-
-		for (x = 0; x < uv_width; x++) {
-		    int i1 = (int) p;
-		    int i2 = Y[(x<<frame->shift_h) + 1 + ((y<<frame->shift_v) * width)];	
-		    int i3 = (int) reflection_buffer[(x<<frame->shift_h)];
-		    normalx = i2 - i1 + lightx - x;
-		    normaly = i1 - i3 + temp;
-		    if (normalx < 0)
-				normalx = 0;
-		    else if (normalx > 255)
-				normalx = 255;
-		    if (normaly < 0)
-				normaly = 0;
-		    else if (normaly > 255)
-				normaly = 255;
-		    *cbrow++ = ((reflection_map[normalx][normaly] * (Cb[x + 1 + (y * uv_width)]-128)) >> 8) +128;
-			*crrow++ = ((reflection_map[normalx][normaly] * (Cr[x + 1 + (y * uv_width)]-128)) >> 8) +128;
 		    p = i2;
 		    reflection_buffer[x] = i2;
 		}

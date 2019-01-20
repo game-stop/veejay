@@ -30,7 +30,7 @@
 vj_effect *radcor_init(int w, int h)
 {
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 3;
+	ve->num_params = 4;
 
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -41,11 +41,12 @@ vj_effect *radcor_init(int w, int h)
 	ve->limits[1][1] = 1000;
 	ve->limits[0][2] = 0;
 	ve->limits[1][2] = 1;
-	ve->limits[0][1] = 0;
-	ve->limits[1][1] = 1;
+	ve->limits[0][3] = 0;
+	ve->limits[1][3] = 1;
 	ve->defaults[0] = 10;
 	ve->defaults[1] = 40;
 	ve->defaults[2] = 0;
+    ve->defaults[3] = 0;
 	ve->description = "Lens correction";
 	ve->sub_format = 1;
 	ve->extra_frame = 0;
