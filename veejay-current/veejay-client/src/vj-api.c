@@ -3141,12 +3141,10 @@ static void update_rgbkey()
         GdkColor color;
         /* update from entry tokens (delivered by GET_CHAIN_ENTRY */
         int *p = &(info->uc.entry_tokens[0]);
-        /* 0 = effect_id, 1 = has second input, 2 = num parameters,
-            3 = p0 , 4 = p1, 5 = p2, 6 = p3 ... */
-
-        color.red = 255 * p[ENTRY_P0];
-        color.green = 255 * p[ENTRY_P1];
-        color.blue = 255 * p[ENTRY_P2];
+        
+        color.red = 255 * p[ENTRY_P1];
+        color.green = 255 * p[ENTRY_P2];
+        color.blue = 255 * p[ENTRY_P3];
 
         gtk_color_selection_set_current_color(
             GTK_COLOR_SELECTION( colorsel ),
@@ -4654,7 +4652,7 @@ void setup_effectlist_info()
 
 void set_feedback_status()
 {
-	int len = 0,i;
+	int len = 0;
 	single_vims(VIMS_GET_FEEDBACK);
 	gchar *answer = recv_vims(3,&len);
 	if(answer == NULL)
