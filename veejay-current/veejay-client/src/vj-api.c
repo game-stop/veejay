@@ -56,7 +56,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cellrendererspin.h>
-#include <gtkknob.h>
 #include <gtktimeselection.h>
 #include <libgen.h>
 #ifdef HAVE_SDL
@@ -2902,40 +2901,6 @@ static void update_slider_value(const char *name, gint value, gint scale)
     gtk_adjustment_set_value(
         GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), gvalue );
 }
-
-/*
-static void update_knob_value(GtkWidget *w, gdouble value, gdouble scale)
-{
-    GtkAdjustment *adj = gtk_knob_get_adjustment(GTK_KNOB(w));
-    gdouble gvalue;
-
-    if(scale) gvalue = (gdouble) value / (gdouble) scale;
-    else gvalue = (gdouble) value;
-
-    gtk_adjustment_set_value(adj, gvalue );
-}*/
-
-/*
-static  void update_knob_range(GtkWidget *w, gdouble min, gdouble max, gdouble value, gint scaled)
-{
-    GtkAdjustment *adj = gtk_knob_get_adjustment(GTK_KNOB(w));
-
-    if(!scaled)
-    {
-        adj->lower = min;
-        adj->upper = max;
-        adj->value = value;
-}
-    else
-    {
-        gdouble gmin =0.0;
-        gdouble gmax =100.0;
-        gdouble gval = gmax / value;
-        adj->lower = gmin;
-        adj->upper = gmax;
-        adj->value = gval;
-}
-}*/
 
 static void update_spin_incr( const char *name, gdouble step, gdouble page )
 {
