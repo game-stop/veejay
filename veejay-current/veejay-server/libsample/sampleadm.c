@@ -2755,7 +2755,7 @@ int sample_chain_entry_transition_now(int s1, int entry, int *type) {
 /* print sample status information into an allocated string str*/
 //int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
 //                 int frame)
-int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, uint32_t lo, uint32_t hi,int macro,char *str )
+int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, uint32_t lo, uint32_t hi,int macro,char *str, int feedback )
 {
     sample_info *sample;
     sample = sample_get(s1);
@@ -2812,6 +2812,7 @@ int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfp
     ptr = vj_sprintf( ptr, sample->fade_alpha );*ptr++ = ' ';
     ptr = vj_sprintf( ptr, sample->loop_stat); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, sample->loop_stat_stop); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, feedback); *ptr ++ = ' ';
     ptr = vj_sprintf( ptr, tags );
     return 0;
 }

@@ -1124,14 +1124,14 @@ static void veejay_pipe_write_status(veejay_t * info)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 
 		if( sample_chain_sprint_status
-			(info->uc->sample_id, tags,cache_used,info->seq->size,seq_cur,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
+			(info->uc->sample_id, tags,cache_used,info->seq->size,seq_cur,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what, settings->feedback ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
 			veejay_change_state( info, LAVPLAY_STATE_STOP );
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		// 30 status symbols
+		// 33 status symbols
 			{
 				char *ptr = info->status_what;
 				*ptr++ = ' ';
@@ -1165,6 +1165,9 @@ static void veejay_pipe_write_status(veejay_t * info)
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
 				*ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0'; *ptr++ = ' ';
+                ptr = vj_sprintf(ptr, settings->feedback); *ptr++ = ' ';
 				ptr = vj_sprintf(ptr, tags); *ptr++ = ' ';
 			}
 		break;
@@ -1173,7 +1176,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 		mstatus = vj_macro_get_status( vj_tag_get_macro( info->uc->sample_id ));
 
 		if( vj_tag_sprint_status( info->uc->sample_id,n_samples,cache_used,info->seq->size,seq_cur, info->real_fps,
-			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what ) != 0 )
+			settings->current_frame_num, info->uc->playback_mode,total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what, settings->feedback ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status");
 		}

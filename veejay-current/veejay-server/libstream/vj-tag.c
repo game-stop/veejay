@@ -3858,7 +3858,7 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
 
 
 //int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
-int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str )
+int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int pfps,int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str, int feedback )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
@@ -3915,6 +3915,7 @@ int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int p
     ptr = vj_sprintf( ptr, tag->fade_alpha ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, tag->loop_stat ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, tag->loop_stat_stop); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, feedback ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, samples );
     return 0;
 }

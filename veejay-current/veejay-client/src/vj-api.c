@@ -132,6 +132,28 @@ static struct
     {NULL},
 };
 
+static struct
+{
+    const char *name;
+} non_feedback_widgets[] = 
+{
+    { "markerframe" },
+    { "vbox633" },
+    { "hbox910" },
+    { "hbox27" },
+    { "sample_bank_hbox" },
+    { "button_samplebank_prev" },
+    { "button_samplebank_next" },
+    { "spin_samplebank_select" },
+    { "hbox709" },
+    { "sample_panel" },
+    { "notebook15" },
+    { "vbox623" },
+    { "samplegrid_frame" },
+    { "panels" },
+    { NULL },
+};
+
 enum
 {
     TOOLTIP_TIMELINE = 0,
@@ -3207,12 +3229,18 @@ static gboolean chain_update_row(GtkTreeModel * model,
                     gui->uc.entry_tokens[ENTRY_CHANNEL]);
                 enable_widget( "fx_m4" );
                 enable_widget( "fx_m3" );
+                enable_widget( "transition_enabled" );
+                enable_widget( "transition_loop" );
+                enable_widget( "subrender_entry_toggle" );
             }
             else
             {
                 snprintf(tmp,sizeof(tmp),"%s"," ");
                 disable_widget( "fx_m4" );
                 disable_widget( "fx_m3" );
+                disable_widget( "transition_enabled" );
+                disable_widget( "transition_loop" );
+                disable_widget( "subrender_entry_toggle" );
             }
 
             gchar *mixing = _utf8str(tmp);
@@ -4626,7 +4654,7 @@ void setup_effectlist_info()
 
 void set_feedback_status()
 {
-	int len = 0;
+	int len = 0,i;
 	single_vims(VIMS_GET_FEEDBACK);
 	gchar *answer = recv_vims(3,&len);
 	if(answer == NULL)
@@ -6855,6 +6883,20 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     if( last_pm != pm )
         update_status_accessibility( last_pm, pm);
 
+    if( info->status_tokens[FEEDBACK] != history[FEEDBACK] ) {
+        if(info->status_tokens[FEEDBACK] == 1) { // when feedback is enabled
+            for( i = 0; non_feedback_widgets[i].name != NULL ; i ++ ) {
+                disable_widget( non_feedback_widgets[i].name );
+            }
+        }
+        else {
+            for( i = 0; non_feedback_widgets[i].name != NULL ; i ++ ) {
+                enable_widget( non_feedback_widgets[i].name );
+            }
+        }
+        set_toggle_button( "feedbackbutton", info->status_tokens[FEEDBACK]);
+    }
+
     if( info->status_tokens[MACRO] != history[MACRO] )
     {
         switch(info->status_tokens[MACRO])
@@ -8251,8 +8293,6 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     veejay_msg(VEEJAY_MSG_INFO,
                "Connection established with %s:%d (Track 0)",
                hostname,port_num);
-
-    sleep(1); //@ give it some time to settle ( at least 1 frame period )
 
     info->status_lock = 1;
     info->parameter_lock = 1;

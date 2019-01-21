@@ -17587,7 +17587,7 @@ YUV (current)</property>
 			      </child>
 
 			      <child>
-				<widget class="GtkHBox" id="hbox896">
+				<widget class="GtkHBox" id="hbox_vidnav">
 				  <property name="visible">True</property>
 				  <property name="homogeneous">False</property>
 				  <property name="spacing">0</property>

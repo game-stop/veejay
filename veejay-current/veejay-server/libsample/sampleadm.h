@@ -300,7 +300,7 @@ extern int sample_set_chain_channel(int s1, int position, int channel);
 
 //int sample_chain_replace(int s1, int position, int effect_id);
 
-extern int sample_chain_sprint_status(int s1,int tags,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s ); 
+extern int sample_chain_sprint_status(int s1,int tags,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s, int feedback ); 
 
 extern int sample_set_render_entry(int s1, int entry);
 extern int sample_get_render_entry(int s1);
