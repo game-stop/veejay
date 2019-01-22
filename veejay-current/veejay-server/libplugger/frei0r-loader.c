@@ -110,6 +110,7 @@ static struct  {
 	{ "RGB-Parade", 0, 1 },
 	{ "pr0file",0,2 },
 	{ "NDVI filter", 0, 1},
+    { "bgsubtract0r",0, 3},
 	{ NULL, 0, 0 },
 };
 
