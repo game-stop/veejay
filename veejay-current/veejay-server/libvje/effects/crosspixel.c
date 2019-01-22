@@ -53,22 +53,24 @@ vj_effect *crosspixel_init(int w, int h)
 
 int crosspixel_malloc(int w, int h)
 {
-	int i;
-	for( i = 0; i < 3 ; i ++ ) {
-	   cross_pixels[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(w*h) );
-	   if(!cross_pixels[i])
-		return 0;
-	}
+    const int total_len = RUP8( w * h * 3 );
+    const int len = RUP8(w * h);
+
+    cross_pixels[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len );
+    if(!cross_pixels[0])
+        return 0;
+
+    cross_pixels[1] = cross_pixels[0] + len;
+    cross_pixels[2] = cross_pixels[1] + len;
+
     return 1;
 }
 
 void crosspixel_free() {
-	int i;
-	for( i =0; i < 3 ;i ++ ) {
-		if(cross_pixels[i])
-		 free(cross_pixels[i]);
-		cross_pixels[i] = NULL;
-	}
+    
+    if(cross_pixels[0])
+        free(cross_pixels[0]);
+    cross_pixels[0] = NULL;
 }
 
 void crosspixel_apply(VJFrame *frame, int t,int v) {

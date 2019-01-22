@@ -46,18 +46,13 @@ vj_effect *ghost_init(int w, int h)
 
 int	ghost_malloc(int w, int h)
 {
-	const int len = (w * h );
-	
+	const int len = RUP8(w * h);
+    const int total_len = RUP8(len * 4);
 
-	ghost_buf[0] = vj_malloc( sizeof(uint8_t) * RUP8(len*3));
-	ghost_buf[1] = ghost_buf[0] + RUP8(len);
-	ghost_buf[2] = ghost_buf[1] + RUP8(len);
-
-	vj_frame_clear1( ghost_buf[0], pixel_Y_lo_, RUP8(len));
-	vj_frame_clear1( ghost_buf[1], 128, RUP8(len*2));
-
-	diff_map = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(len));
-	vj_frame_clear1( diff_map, 0, RUP8(len));
+	ghost_buf[0] = vj_malloc( sizeof(uint8_t) * total_len);
+	ghost_buf[1] = ghost_buf[0] + len;
+	ghost_buf[2] = ghost_buf[1] + len;
+    diff_map = ghost_buf[2] + len;
 	diff_period = 0;
 
 	return 1;
@@ -68,9 +63,8 @@ void ghost_free()
 	if(ghost_buf[0])
 		free(ghost_buf[0]);
 	ghost_buf[0] = NULL;
-	
-	if( diff_map )
-		free(diff_map);
+    ghost_buf[1] = NULL;
+    ghost_buf[2] = NULL;
 	diff_map = NULL;
 }
 

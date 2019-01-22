@@ -56,7 +56,8 @@ vj_effect *nervous_init(int w, int h)
 
 int	nervous_malloc(int w, int h )
 {
-	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * N_MAX * 4));
+    const int total_len = RUP8(w * h * N_MAX * 4);
+	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len);
 	if(!nervous_buf[0]) {
 		return 0;
 	}

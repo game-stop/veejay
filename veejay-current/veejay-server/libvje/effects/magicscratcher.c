@@ -70,7 +70,6 @@ int magicscratcher_malloc(int w, int h)
    mframe =
 	(uint8_t *) vj_calloc( RUP8(w * h) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
    if(!mframe) return 0;
-   vj_frame_clear1( mframe, w * h * MAX_SCRATCH_FRAMES, 0 );
    return 1;
 	
 }

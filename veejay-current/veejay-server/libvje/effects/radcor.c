@@ -62,15 +62,20 @@ static uint8_t *badbuf = NULL;
 static uint32_t *Map = NULL;
 static int map_upd[4] = {0,0,0,0};
 
-int radcor_malloc( int width, int height )
+int radcor_malloc( int w, int h )
 {
-	badbuf = (uint8_t*) vj_malloc( RUP8( width * height * 4 * sizeof(uint8_t)));
+    const int len = RUP8(w * h);
+    const int total_len = RUP8(len * 4);
+
+	badbuf = (uint8_t*) vj_malloc( sizeof(uint8_t) * total_len );
 	if(!badbuf)
 		return 0;
-	Map = (uint32_t*) vj_malloc( RUP8(width * height * sizeof(uint32_t)));
-	veejay_memset( Map, 0, RUP8(width * height * sizeof(uint32_t)) );
-	if(!Map)
+	Map = (uint32_t*) vj_malloc( sizeof(uint32_t) * len );
+	veejay_memset( Map, 0, len );
+	if(!Map) {
+        free(badbuf);
 		return 0;
+    }
 	return 1;
 }
 
