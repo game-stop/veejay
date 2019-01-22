@@ -1,5 +1,5 @@
 # # Process this file with automake to produce Makefile.in.
-
+MAINTAINERCLEANFILES=Makefile.in
 EXTRA_DIST= ac.h ac_internal.h imgconvert.h img_internal.h img_x86_common.h
 
 AM_CPPFLAGS = -I$(top_srcdir)/thirdparty
