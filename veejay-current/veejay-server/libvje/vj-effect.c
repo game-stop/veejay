@@ -556,7 +556,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	max_width = width;
 	max_height = height;
 
-	plug_sys_init( (full_range == 0 ? PIX_FMT_YUV422P : PIX_FMT_YUVJ422P ),width,height );
+	plug_sys_init( (full_range == 0 ? PIX_FMT_YUVA444P : PIX_FMT_YUVA444P ),width,height );
 
 	n_ext_plugs_ = plug_sys_detect_plugins();
 
