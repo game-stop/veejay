@@ -95,7 +95,7 @@ typedef struct
 	AVCodecContext *codec_ctx;
 	AVFormatContext *avformat_ctx;
 	AVFrame *frames[2];
-	int	     frameinfo[2];
+	int	frameinfo[2];
 	int frame_index;
 	int pixfmt;
 	int codec_id;
@@ -330,11 +330,7 @@ int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )
 	if(got_picture) {
 		e->frameinfo[e->frame_index] = 1; /* we have a full picture at this index */
 		e->frame_index = (e->frame_index + 1) % 2; /* use next available buffer */
-		e->frameinfo[e->frame_index] = 0; /* and clear the information */
 		return 1;
-	}
-	else {
-		e->frameinfo[e->frame_index] = 0;
 	}
 
 	return 0;
@@ -357,7 +353,7 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
         // this function, is the only function, that may manipulate frame_index, as it is used together with avhelper_get_decoded_video
         // other functions in this source file, assume an index of 0 
         result = avcodec_decode_video( x->codec_ctx, x->frames[x->frame_index], &gp, x->packets[ x->read_index ].data, x->packets[ x->read_index ].size );
-        avhelper_frame_unref(x->frames[x->frame_index]);
+        //avhelper_frame_unref(x->frames[x->frame_index]);
 
         av_free_packet( &(x->packets[x->write_index]) );
 
@@ -371,11 +367,8 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
 	if(gp) {
 		x->frameinfo[x->frame_index] = 1; /* we have a full picture at this index */
 		x->frame_index = (x->frame_index + 1) % 2; /* use next available buffer */
-		x->frameinfo[x->frame_index] = 0; /* and clear the information */
-	}
-	else {
-		x->frameinfo[x->frame_index] = 0;
-	}
+        x->frameinfo[x->frame_index] = 0;
+    }
 
     return result;
 }
@@ -590,7 +583,12 @@ void	avhelper_close_decoder( void *ptr )
 	if(e->scaler) {
 		yuv_free_swscaler( e->scaler );
 	}
-	
+
+    if(e->frames[0]->data[0])
+        avhelper_frame_unref(e->frames[0]);
+    if(e->frames[1]->data[0])
+        avhelper_frame_unref(e->frames[1]);
+
 	if(e->input)
 		free(e->input);
 	if(e->output)
@@ -614,17 +612,17 @@ VJFrame *avhelper_get_output_frame( void *ptr)
 	return e->output;
 }
 
-
 int	avhelper_decode_video( void *ptr, uint8_t *data, int len ) 
 {
 	int got_picture = 0;
 	el_decoder_t * e = (el_decoder_t*) ptr;
 
 	int result = avcodec_decode_video( e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
-
-	avhelper_frame_unref(e->frames[e->frame_index]);
 	
 	if(!got_picture || result <= 0) {
+        e->frameinfo[e->frame_index] = 1;
+        e->frame_index = (e->frame_index +1) %2;
+        e->frameinfo[e->frame_index] = 0;
 		return 0;
 	}
 	return 1;
@@ -677,7 +675,6 @@ void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
 		}
 	}
 
-
 	e->input->data[0] = e->frames[e->frame_index]->data[0];
 	e->input->data[1] = e->frames[e->frame_index]->data[1];
 	e->input->data[2] = e->frames[e->frame_index]->data[2];
@@ -688,5 +685,4 @@ void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
 	e->output->data[2] = dst[2];
 
 	yuv_convert_any3( e->scaler, e->input, e->frames[e->frame_index]->linesize, e->output, e->input->format, e->pixfmt );
-
 }
