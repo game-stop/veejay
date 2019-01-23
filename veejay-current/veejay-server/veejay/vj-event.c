@@ -3720,7 +3720,7 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
         int lp = sample_get_looptype(args[0]);
 		if( lp == 1 && args[1] == -1 )
 			lp = 2;
-		else if ( lp == 2 && args[1] == -1 )
+		else if ( lp >= 2 && args[1] == -1 )
 			lp = 1;
 
 		sample_set_looptype( args[0], lp );
