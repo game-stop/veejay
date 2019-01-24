@@ -1823,7 +1823,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	yuv_set_pixel_range(full_range);
 
 	info->settings->sample_mode = SSM_422_444;
-
+/*
 	veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:2 Planar, %d x %d",
 	           info->video_output_width,
 	           info->video_output_height);
@@ -1838,7 +1838,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	           info->effect_frame1->len,
 	           info->effect_frame1->uv_len );
 	veejay_msg(VEEJAY_MSG_DEBUG, "               full range=%d",
-			full_range );
+			full_range ); */
 
 	if(( info->effect_frame1->width % 4) != 0 || (info->effect_frame1->height % 4) != 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "You should specify an output resolution that is a multiple of 4");
@@ -1857,7 +1857,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	if( !info->shm ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize shared resource");
 	}
-
 
 	if( info->settings->composite )
 	{
@@ -2734,7 +2733,6 @@ int	prepare_cache_line(int perc, int n_slots)
 	if( perc > 0 && max_memory <= 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Please enter a larger value for -m");
 		veejay_msg(VEEJAY_MSG_ERROR, "Need a minimum of %ld MB RAM to run if -M is not specified", vj_perform_fx_chain_size()/(1024*1024));
-		veejay_msg(VEEJAY_MSG_WARNING, "Memory frame cache disabled");
 		return 1;
 	}
 
@@ -2750,14 +2748,15 @@ int	prepare_cache_line(int perc, int n_slots)
 	total_mem_mb_ = total / 1024;
 	if(chunk_size > 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "%d Kb total system RAM , Consuming up to %2.2f Mb",total, (float)max_memory / 1024.0f );
+        veejay_msg(VEEJAY_MSG_INFO, "In-memory video file cache is enabled");
+		veejay_msg(VEEJAY_MSG_INFO, "%d Kb total system RAM, consuming up to %2.2f Mb",total, (float)max_memory / 1024.0f );
 		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Kb (%2.2f Mb) per sample",chunk_size, (float) chunk_size/1024.0);
 		vj_el_init_chunk( chunk_size );
 	}
 	else {
-		veejay_msg(VEEJAY_MSG_INFO, "Memory frame cache disabled");
+		veejay_msg(VEEJAY_MSG_INFO, "In-memory video file cache is not enabled");
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "Memory cache size per EDL is %2.2f Mb",(float) mmap_memory / 1024.0f);
+	veejay_msg(VEEJAY_MSG_INFO, "In-memory video file cache per EDL is %2.2f Mb",(float) mmap_memory / 1024.0f);
 
 	return 1;
 }

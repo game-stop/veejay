@@ -389,13 +389,13 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	data->header[4]      = frame->stride[2];
 	data->header[5]      = ffmpeg_to_lvd( frame->format );
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Starting address: %p", data );
+/*	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Starting address: %p", data );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Frame data      : %p", data + HEADER_LENGTH );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Static resolution of %d x %d, YUV 4:2:2 planar",
 			data->header[0],data->header[1] );
 	veejay_msg(VEEJAY_MSG_DEBUG,"Shared Resource:  Planes {%d,%d,%d,X} LVD pixel format %d",
 			data->header[2],data->header[3],data->header[4],data->header[5]);
-
+*/
 	v->alpha = ( data->header[5] == LIVIDO_PALETTE_YUVA8888 ? 1 :
 				 (data->header[5] == LIVIDO_PALETTE_YUVA422 ? 1 : 0) );
 
@@ -427,15 +427,10 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 		return NULL;
 	}
 
-	veejay_msg( VEEJAY_MSG_DEBUG, "Shared Memory ID = %x (%d)", v->shm_id, v->shm_id );
-	veejay_msg( VEEJAY_MSG_INFO, "(SHM) Shared Memory consumer key is %x (%d)", v->key,v->key );
-	veejay_msg( VEEJAY_MSG_DEBUG, "Starting Address: %p, Frame starts at: %p, Lock at %p",
-			v->sms, sms_addr + HEADER_LENGTH, &(data->rwlock));
-
+	veejay_msg( VEEJAY_MSG_DEBUG, "Initialized Shared Resource (%x)", v->key );
 
 	simply_my_shmid = v->key;
 	simply_my_shmkey = v->shm_id;
-
 
 	return v;
 }

@@ -70,6 +70,8 @@
 #define SAMPLE_FMT_S16 AV_SAMPLE_FMT_S16
 #endif
 
+#define PRIMARY_FRAMES 5
+
 typedef struct {
     uint8_t *Y;
     uint8_t *Cb;
@@ -664,19 +666,22 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
         return 1;
 
     size_t frame_len = RUP8( ((plane_len+helper_frame->width)/7)*8 );
-    uint8_t *buf = vj_malloc(sizeof(uint8_t) * frame_len * 4 * 3);
+    size_t buf_len = sizeof(uint8_t) * frame_len * 4 * 3;
+
+    uint8_t *buf = vj_malloc(buf_len);
 
     if(!buf)
         return 0;
 
-    mlock( buf, frame_len * 3 * 3 * sizeof(uint8_t));
+    mlock( buf, frame_len * buf_len);
 
     frame_buffer[c]->Y = buf;
     frame_buffer[c]->Cb = frame_buffer[c]->Y + frame_len;
     frame_buffer[c]->Cr = frame_buffer[c]->Cb + frame_len;
     frame_buffer[c]->P0  = buf + (frame_len * 4);
     frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*4);
-    return (frame_len * 4 * 3);
+
+    return buf_len;
 }
 
 static void vj_perform_free_row(int c)
@@ -774,7 +779,6 @@ static void vj_perform_record_buffer_free()
 
 int vj_perform_init(veejay_t * info)
 {
-    #define PRIMARY_FRAMES 5
     const int w = info->video_output_width;
     const int h = info->video_output_height;
 
@@ -794,7 +798,7 @@ int vj_perform_init(veejay_t * info)
     if(!primary_buffer) return 0;
 
     size_t buf_len = performer_frame_size_ * sizeof(uint8_t);
-    int mlock_success =1 ;
+    int mlock_success = 1;
 
     pribuf_len = PRIMARY_FRAMES * performer_frame_size_;
     pribuf_area = vj_hmalloc( pribuf_len, "in primary buffers" );
@@ -926,7 +930,7 @@ int vj_perform_init(veejay_t * info)
          if(!frame_buffer[c]) return 0;
 
          if(fx_chain_buffer != NULL ) {
-                uint8_t *ptr = fx_chain_buffer + (c * frame_len * 4 * 3);
+                uint8_t *ptr = fx_chain_buffer + (c * frame_len * 4 * 3); // each entry, has 3 frames with 4 planes each
                 frame_buffer[c]->Y = ptr;
                 frame_buffer[c]->Cb = frame_buffer[c]->Y + frame_len;
                 frame_buffer[c]->Cr = frame_buffer[c]->Cb + frame_len;
@@ -940,9 +944,9 @@ int vj_perform_init(veejay_t * info)
                 veejay_memset( frame_buffer[c]->Cr,128,frame_len);
                 veejay_memset( frame_buffer[c]->alpha,0,frame_len);
                 veejay_memset( frame_buffer[c]->P0, pixel_Y_lo_, frame_len );
-                veejay_memset( frame_buffer[c]->P0 + frame_len, 128, frame_len * 3);
+                veejay_memset( frame_buffer[c]->P0 + frame_len, 128, frame_len * 4);
                 veejay_memset( frame_buffer[c]->P1, pixel_Y_lo_, frame_len );
-                veejay_memset( frame_buffer[c]->P1 + frame_len, 128, frame_len * 3);
+                veejay_memset( frame_buffer[c]->P1 + frame_len, 128, frame_len * 4);
          }
      }
 

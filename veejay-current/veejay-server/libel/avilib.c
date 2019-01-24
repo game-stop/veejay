@@ -3118,10 +3118,10 @@ multiple_riff:
        AVI->video_index[nvi].pos = str2ulong(AVI->idx[i]+ 8)+ioff;
        AVI->video_index[nvi].len = str2ulong(AVI->idx[i]+12);
 
-       if(AVI->video_index[nvi].len == 0) {
+       /*if(AVI->video_index[nvi].len == 0) {
 		  veejay_msg(VEEJAY_MSG_WARNING, "Frame %d is not a full frame (its length is %d)!",
 			nvi, AVI->video_index[nvi].len );
-		}
+		}*/
 
        nvi++;
      }

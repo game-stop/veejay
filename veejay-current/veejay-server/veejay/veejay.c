@@ -781,7 +781,6 @@ int main(int argc, char **argv)
  	}
 
 	print_license();
-
 	
    	if(info->dump)
  	{
