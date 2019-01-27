@@ -12,15 +12,18 @@ You can cluster to allow a number of machines to work together over the network 
 
 The engine is historically based upon mjpegtools's lavplay and processes all video in YUV planar It performs at its best, currently with MJPEG AVI (through ffmpeg/libav) or one of veejay's internal formats. Veejay is built upon a servent architecture.
 
+see also : [README whatis](./veejay-current/veejay-server/doc/README.whatis)
+
 ### Veejay Applications:
 * __Reloaded__
-    A GUI developed in GLADE/GTK
+    A GUI developed in GLADE/GTK ([veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client))
 * __sendVIMS__
-    A PureData object allowing direct communications with the server
+    A PureData object allowing direct communications with the server ([sendVIMS](https://github.com/c0ntrol/veejay/tree/master/veejay-current/sendVIMS))
 * __sayVIMS__
-    A console based utility for quick'n'dirty scripting
+    A console based utility for quick'n'dirty scripting ([veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils))
 
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ## Installation
 
@@ -38,6 +41,7 @@ For each package, run confgure and make:
  ./configure
  make && sudo make install
 ```
+ __Nota :__ in some configuration you should have to __manually build__ the __shared libraries cache__ just after the __first__ veejay-server installation (ex `sudo ldconfig` or similar)
 
 If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. 
 
@@ -97,8 +101,10 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
 
      ./configure --enable-debug
 
-[//]: # ( comment : END installation section duplicated in /veejay-server/doc/Instalation)
+see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 
+[//]: # ( comment : END installation section duplicated in /veejay-server/doc/Instalation)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ## FEATURE OVERVIEW
 
@@ -120,6 +126,8 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
  * Support for unlimited capture devices
  * Support for Image files (PNG ,JPEG,TIFF,etc)
 
+see also : [How to Video Codecs](./veejay-current/veejay-server/doc/HowtoVideoCodecs.md), [README audio](./veejay-current/veejay-server/doc/README.audio)
+
 ### Editing
 
  * 161 built-in FX , many unique and original FX filters 
@@ -135,6 +143,8 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
  * Live clip loading 
  * Live sample sequencing
 
+see also : [README alpha](./veejay-current/veejay-server/doc/README.alpha)
+
 ### Trickplay
 
  * VIMS event recording/playback (6)
@@ -147,7 +157,7 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
  * Dynamic framerate 
  * Random frame play
  * Random sample play
- * Access up to 4096 video samples instantly	
+ * Access up to 4096 video samples instantly
 
 ### Output
 
@@ -159,13 +169,17 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
  * Network streaming (unicast and multicast)
  * Image grabbing
 
+ see also : [How to Network](./veejay-current/veejay-server/doc/NET.txt)
+
 ### Interaction
 
  * Programmable keyboard interface
  * VIMS (tcp/ip) 
  * OSC (udp)
  * PureData trough sendVIMS external
- * MIDI 
+ * MIDI
+
+see also : [How to PureData](./veejay-current/veejay-server/doc/HowtoVeejay-PureData.html)
 
 ### Viewing
 
@@ -173,13 +187,16 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
  * Perspective and foward projection (9)
  * Twinview/BigDesktop
  * Split-screen video wall
- 
+
+see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
 
 ### Additional
 
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
  * Support for FreeFrame plugins (only for 32 bit systems!)
+
+ see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.txt)
 
 ## Contact / Feedback & HELP
 

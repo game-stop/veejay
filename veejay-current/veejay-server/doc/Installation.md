@@ -1,5 +1,6 @@
 
-[//]: # ( comment : installation section duplicated from /README.md)
+[//]: # ( comment : END installation section duplicated in /README.md)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ## Installation
 
@@ -18,6 +19,7 @@ For each package, run confgure and make:
  ./configure
  make && make install
 ```
+__Nota :__ in some configuration you will have to rebuild the shared libraries cache just after veejay-server installation (ex `sudo ldconfig` or similar)
 
 If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. If you do not know what cpu veejay will be running on , pass `--with-arch-target=auto` to configure.
 
@@ -29,7 +31,7 @@ Before running veejay, be sure to add/link some TrueType fonts in
 ## Usage
 
 Running veejay is a much too large topic to cover in this readme. Various
-pointers have been bundled with the sources in [veejay/veejay-current/veejay-server/doc](./veejay-current/veejay-server/doc)
+pointers have been bundled with the sources in [veejay/veejay-current/veejay-server/doc](./doc)
 
 Articles covering various aspects of "how to veejay" can be found on [veejayhq.net](http://veejayhq.net)
 
@@ -77,3 +79,5 @@ You can change the default parameter values by editing the files in $HOME/.veeja
 if you want to debug veejay-server (or if you want to submit a meaningful backtrace), build with:
 
      ./configure --enable-debug
+
+see also : [How to debug](./HowToDebugging.txt)

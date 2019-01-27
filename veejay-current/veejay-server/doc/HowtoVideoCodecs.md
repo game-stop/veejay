@@ -46,7 +46,7 @@ If you load multiple video files on the commandline, make sure that all files ha
 ## How to convert
 ### You can use FFMpeg
 
-̀`$ ffmpeg -i input-file -vcodec mjpeg -pix_fmt yuvj422p -q:v 0 output-file.avi`
+`$ ffmpeg -i input-file -vcodec mjpeg -pix_fmt yuvj422p -q:v 0 output-file.avi`
 
 Optionally add PCM 16bit audio, 44.1/48.0 Khz, 2 channels, 8 bits per channel
 
@@ -61,9 +61,14 @@ Optionally add PCM 16bit audio, 44.1/48.0 Khz, 2 channels, 8 bits per channel
 consult mplayer documentation about other options, such as cropping and filtering out blocks in video.
 
 ### a quick hint for bulk encoding a bunch of capture.dv files
-̀```$ for i in `ls *dv`;do mencoder -ovc lavc -oac pcm -lavcopts vcodec=mjpeg -o `echo $i | sed s/.dv/.avi/` $i; done;```
+```$ for i in `ls *dv`;do mencoder -ovc lavc -oac pcm -lavcopts vcodec=mjpeg -o `echo $i | sed s/.dv/.avi/` $i; done;```
 
-
+### Alternatively, create a fake v4l2 device and stream some video to it:
+```
+$ sudo modprobe v4l2loopback
+$ ffmpeg -f x11grab -r 25 -s 720x576 -i :0.0+0,0 -vcodec rawvideo -pix_fmt yuv422p -f v4l2 /dev/video0
+$ veejay -A1 -a0
+```
 
 ## What is Dummy mode ?
 
