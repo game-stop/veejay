@@ -22,6 +22,8 @@ see also : [README whatis](./veejay-current/veejay-server/doc/README.whatis)
 * __sayVIMS__
     A console based utility for quick'n'dirty scripting ([veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils))
 
+And of course [__Veejay__](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) himself ! The video output server (Ffmpeg/libSDL). Could be remote, headless, multiples ... !
+
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
 [//]: # ( WARNING : some URL/PATH have to be adapted )
 
@@ -106,6 +108,12 @@ see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 [//]: # ( comment : END installation section duplicated in /veejay-server/doc/Instalation)
 [//]: # ( WARNING : some URL/PATH have to be adapted )
 
+## Quick Start & Play!
+
+### Let's VJing Now...
+
+[__Veejay Quick start and play!__](./veejay-current/veejay-server/doc/README.quickstart) : start veejay, manually send VIMS messages, tricks to video fifo or some essentials of keyboards user interaction...
+
 ## FEATURE OVERVIEW
 
 ### General
@@ -117,6 +125,8 @@ see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
  * Loop based editing (5)
  * Native YUV(A) processing
  * Crash recovery
+
+see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [README Memory](./veejay-current/veejay-server/doc/REAMDE.memory), [README Performance](./veejay-current/veejay-server/doc/README.performance)
 
 ### Media
 
@@ -195,8 +205,9 @@ see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
  * Support for FreeFrame plugins (only for 32 bit systems!)
+ * Android server!
 
- see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.txt)
+ see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.txt), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3) ,[README Android](./veejay-current/veejay-server/doc/README.android)
 
 ## Contact / Feedback & HELP
 
