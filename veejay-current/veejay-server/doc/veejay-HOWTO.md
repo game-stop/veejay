@@ -20,38 +20,38 @@ instrument for Linux/GNU*
 
 ------------------------------------------------------------------------
 
-1. [Introduction](veejay-HOWTO.html#1)
-    1. [Disclaimer](veejay-HOWTO.html#1.1)
-    1. [Acknowledgements](veejay-HOWTO.html#1.2)
-    1. [Audience and Intent](veejay-HOWTO.html#1.3)
-    1. [Revision History](veejay-HOWTO.html#1.4)
-    1. [New versions of this document](veejay-HOWTO.html#1.5)
-    1. [Feedback](veejay-HOWTO.html#1.6)
-    1. [Distribution Policy](veejay-HOWTO.html#1.7)
-1. [About veejay](veejay-HOWTO.html#2)
-    1. [Features](veejay-HOWTO.html#2.1)
-    1. [Hardware configuration](veejay-HOWTO.html#2.2)
-1. [Installation](veejay-HOWTO.html#3)
-    1. [Dependencies](veejay-HOWTO.html#3.1)
-    1. [Installing veejay](veejay-HOWTO.html#3.2)
-    1. [Setting up multicast](veejay-HOWTO.html#3.3)
-1. [Using Veejay](veejay-HOWTO.html#4)
-    1. [Terminology and limitations](veejay-HOWTO.html#4.1)
-    1. [VIMS](veejay-HOWTO.html#4.2)
-    1. [The keyboard interface](veejay-HOWTO.html#4.3)
-    1. [Recording video](veejay-HOWTO.html#4.4)
-    1. [Streaming video](veejay-HOWTO.html#4.5)
-    1. [Other utilities](veejay-HOWTO.html#4.5)
-1. [Popular packages](veejay-HOWTO.html#5)
-    1. [EffecTV](veejay-HOWTO.html#5.1)
-    1. [mplayer](veejay-HOWTO.html#5.2)
-    1. [The MJPEG Tools](veejay-HOWTO.html#5.3)
-    1. [Transcode](veejay-HOWTO.html#5.4)
-1. [Other Resources](veejay-HOWTO.html#6)
-    1. [Web Sites](veejay-HOWTO.html#6.1)
-    1. [Mailing Lists](veejay-HOWTO.html#6.2)
-1. [Credits](veejay-HOWTO.html#7)
-1. [GNU Free Documentation License](veejay-HOWTO.html#8)
+1. [Introduction](veejay-HOWTO.md#1)
+    1. [Disclaimer](veejay-HOWTO.md#1.1)
+    1. [Acknowledgements](veejay-HOWTO.md#1.2)
+    1. [Audience and Intent](veejay-HOWTO.md#1.3)
+    1. [Revision History](veejay-HOWTO.md#1.4)
+    1. [New versions of this document](veejay-HOWTO.md#1.5)
+    1. [Feedback](veejay-HOWTO.md#1.6)
+    1. [Distribution Policy](veejay-HOWTO.md#1.7)
+1. [About veejay](veejay-HOWTO.md#2)
+    1. [Features](veejay-HOWTO.md#2.1)
+    1. [Hardware configuration](veejay-HOWTO.md#2.2)
+1. [Installation](veejay-HOWTO.md#3)
+    1. [Dependencies](veejay-HOWTO.md#3.1)
+    1. [Installing veejay](veejay-HOWTO.md#3.2)
+    1. [Setting up multicast](veejay-HOWTO.md#3.3)
+1. [Using Veejay](veejay-HOWTO.md#4)
+    1. [Terminology and limitations](veejay-HOWTO.md#4.1)
+    1. [VIMS](veejay-HOWTO.md#4.2)
+    1. [The keyboard interface](veejay-HOWTO.md#4.3)
+    1. [Recording video](veejay-HOWTO.md#4.4)
+    1. [Streaming video](veejay-HOWTO.md#4.5)
+    1. [Other utilities](veejay-HOWTO.md#4.5)
+1. [Popular packages](veejay-HOWTO.md#5)
+    1. [EffecTV](veejay-HOWTO.md#5.1)
+    1. [mplayer](veejay-HOWTO.md#5.2)
+    1. [The MJPEG Tools](veejay-HOWTO.md#5.3)
+    1. [Transcode](veejay-HOWTO.md#5.4)
+1. [Other Resources](veejay-HOWTO.md#6)
+    1. [Web Sites](veejay-HOWTO.md#6.1)
+    1. [Mailing Lists](veejay-HOWTO.md#6.2)
+1. [Credits](veejay-HOWTO.md#7)
+1. [GNU Free Documentation License](veejay-HOWTO.md#8)
 
 ------------------------------------------------------------------------
 
@@ -315,7 +315,7 @@ installed but you may be missing the -devel- packages! (especially on
 redhat, suse and debdian systems!!)*  
   
 You can find the websites of these projects in [Other
-Resources](veejay-HOWTO.html#6).  
+Resources](veejay-HOWTO.md#6).  
   
 
 ### <span id="3.1.0">3.1.0 From source</span>
@@ -459,9 +459,9 @@ Next, Veejay can be started with the commandline flags
 Veejay uses by default a SDL window to play the video. All the
 keybinding in veejay depend on SDL; if you move your mouse over to the
 SDL windows to focus it , you can press the keys explained in [4.3 The
-keyboard interface](veejay-HOWTO.html#4.3).  
+keyboard interface](veejay-HOWTO.md#4.3).  
 To use veejay in commandline style interface mode, see [4.2
-sayVIMS](veejay-HOWTO.html#4.2).  
+sayVIMS](veejay-HOWTO.md#4.2).  
 You must no longer provide a video file to use with veejay; it will run
 in dummy mode by using the '-d' commandline parameter:  
 
@@ -855,7 +855,7 @@ and using the commandline parameter -c 0 to disable sync correction.
 It is possible to start veejay headless and have it write all video data
 to a (special) file for further processing.  
   
-Refer to chapter [5.3](veejay-HOWTO.html#5.3) for some examples.  
+Refer to chapter [5.3](veejay-HOWTO.md#5.3) for some examples.  
   
 
 <span id="4.5">4.5 Streaming video</span>
@@ -1052,7 +1052,7 @@ Usefull software (in no apparant order):
 -   PureData (PD)
 -   PDP for PD
 
-Please refer to [Other Resources](veejay-HOWTO.html#5) to find the
+Please refer to [Other Resources](veejay-HOWTO.md#5) to find the
 project's website  
 
 5.1 The MJPEG Tools
