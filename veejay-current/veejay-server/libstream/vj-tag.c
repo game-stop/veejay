@@ -385,7 +385,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
     return 1;
 }
 
-static int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,
+static int _vj_tag_new_v4l2( vj_tag * tag, int stream_nr, int width, int height, int device_num,
             char norm, int palette,int pixfmt, int freq, int channel, int has_composite, int driver)
 {
     char refname[100];
@@ -395,31 +395,22 @@ static int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int heigh
     }
     
     snprintf(refname,sizeof(refname), "/dev/video%d",device_num ); // freq->device_num
-    tag->capture_type = driver;
-    veejay_msg(VEEJAY_MSG_INFO, "Open capture device with %s",
-      ( driver == 1 ? "v4l[x]"  : "Unicap" ) );
-    if( tag->capture_type == 1 )  {
 #ifdef HAVE_V4L2
-        if(  no_v4l2_threads_ ) {
-            vj_tag_input->unicap[stream_nr] = v4l2open( refname, channel, palette,width,height,
-                _tag_info->dummy->fps,_tag_info->dummy->norm );
-        } else {
-            vj_tag_input->unicap[stream_nr] = v4l2_thread_new( refname, channel,palette,width,height,
-            _tag_info->dummy->fps,_tag_info->dummy->norm );
-        }
-        if( !vj_tag_input->unicap[stream_nr] ) {
-            veejay_msg(0, "Unable to open device %d (%s)",device_num, refname );
-            return 0;
-        }
-        snprintf(refname,sizeof(refname), "%d", channel );
-        tag->extra = strdup(refname);
-#else
-        veejay_msg(0,"No support for video capture built-in");
-#endif
-        return 1;
-    } 
-    
+    if(  no_v4l2_threads_ ) {
+        vj_tag_input->v4l2[stream_nr] = v4l2open( refname, channel, palette,width,height,_tag_info->dummy->fps,_tag_info->dummy->norm );
+    } else {
+        vj_tag_input->v4l2[stream_nr] = v4l2_thread_new( refname, channel,palette,width,height,_tag_info->dummy->fps,_tag_info->dummy->norm );
+    }
+    if( !vj_tag_input->v4l2[stream_nr] ) {
+        veejay_msg(0, "Unable to open device %d (%s)",device_num, refname );
+        return 0;
+    }
+    snprintf(refname,sizeof(refname), "%d", channel );
+    tag->extra = strdup(refname);
     return 1;
+#else
+    return 0;
+#endif
 }
 
 #ifdef USE_GDK_PIXBUF
@@ -928,7 +919,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         case VJ_TAG_TYPE_V4L:
             snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
         
-            if (!_vj_tag_new_unicap( tag,
+            if (!_vj_tag_new_v4l2( tag,
                      stream_nr,w,h,
                      extra, // device num
                      el->video_norm,
@@ -1284,15 +1275,13 @@ int vj_tag_del(int id)
             }
         }
     case VJ_TAG_TYPE_V4L: 
-        if(tag->capture_type==1) { 
 #ifdef HAVE_V4L2
-            if( no_v4l2_threads_ ) {
-            v4l2_close( vj_tag_input->unicap[tag->index]);
-            } else {
-                v4l2_thread_stop( v4l2_thread_info_get(vj_tag_input->unicap[tag->index]));
-            }
-#endif
+        if( no_v4l2_threads_ ) {
+            v4l2_close( vj_tag_input->v4l2[tag->index]);
+        } else {
+            v4l2_thread_stop( v4l2_thread_info_get(vj_tag_input->v4l2[tag->index]));
         }
+#endif
         if(tag->blackframe)free(tag->blackframe);
         if( tag->bf ) free(tag->bf);
         if( tag->bfu ) free(tag->bfu);
@@ -1847,14 +1836,9 @@ int vj_tag_set_brightness(int t1, int value)
         veejay_msg(VEEJAY_MSG_ERROR,"Brightness valid range is 0 - 65535");
         return 0;
     }
-    else    
-    {
-        if(tag->capture_type==1) {
 #ifdef HAVE_V4L2
-            v4l2_set_brightness( vj_tag_input->unicap[tag->index],value);
+    v4l2_set_brightness( vj_tag_input->v4l2[tag->index],value);
 #endif
-        }
-    }
     return 1;
 }
 int vj_tag_set_white(int t1, int value)
@@ -1866,14 +1850,9 @@ int vj_tag_set_white(int t1, int value)
         veejay_msg(VEEJAY_MSG_ERROR,"White valid range is 0 - 65535");
         return -1;
     }
-    else
-    {
-        if(tag->capture_type==1) {
 #ifdef HAVE_V4L2
-            v4l2_set_gamma( vj_tag_input->unicap[tag->index],value);
+    v4l2_set_gamma( vj_tag_input->v4l2[tag->index],value);
 #endif
-        }               
-    }
     return 1;
 }
 
@@ -1886,11 +1865,9 @@ int vj_tag_set_hue(int t1, int value)
         veejay_msg(VEEJAY_MSG_ERROR,"Hue valid range is 0 - 65535");
         return -1;
     }
-    if( tag->capture_type==1) {
 #ifdef HAVE_V4L2
-        v4l2_set_hue( vj_tag_input->unicap[tag->index],value );     
+    v4l2_set_hue( vj_tag_input->v4l2[tag->index],value );     
 #endif
-    }
     return 1;
 }
 int vj_tag_set_contrast(int t1,int value)
@@ -1902,14 +1879,9 @@ int vj_tag_set_contrast(int t1,int value)
         veejay_msg(VEEJAY_MSG_ERROR,"Contrast valid range is 0 - 65535");
         return -1;
     }
-    else
-    {
-        if(tag->capture_type==1) {
 #ifdef HAVE_V4L2
-            v4l2_set_contrast( vj_tag_input->unicap[tag->index], value );
+    v4l2_set_contrast( vj_tag_input->v4l2[tag->index], value );
 #endif
-        }
-    }
     return 1;
 }
 int vj_tag_set_color(int t1, int value)
@@ -1922,15 +1894,9 @@ int vj_tag_set_color(int t1, int value)
         veejay_msg(VEEJAY_MSG_ERROR,"Contrast valid range is 0 - 65535");
         return -1;
     }
-    else
-    {
-        if(tag->capture_type==1) {
 #ifdef HAVE_V4L2
-            v4l2_set_whiteness( vj_tag_input->unicap[tag->index], value );
+    v4l2_set_whiteness( vj_tag_input->v4l2[tag->index], value );
 #endif
-            return -1;
-        }
-    }
     return 1;
 }
 
@@ -1944,34 +1910,34 @@ int vj_tag_get_v4l_properties(int t1, int *values )
         return 0;
     }
     
-    if(tag->capture_type == 1 ) {
 #ifdef HAVE_V4L2
-        values[0] = v4l2_get_brightness(  vj_tag_input->unicap[tag->index] );
-        values[1] = v4l2_get_contrast( vj_tag_input->unicap[tag->index] );
-        values[2] = v4l2_get_hue( vj_tag_input->unicap[tag->index] );
-        values[3] = v4l2_get_saturation( vj_tag_input->unicap[tag->index] );
-        values[4] = v4l2_get_temperature( vj_tag_input->unicap[tag->index] );
-        values[5] = v4l2_get_gamma( vj_tag_input->unicap[tag->index] );
-        values[6] = v4l2_get_sharpness( vj_tag_input->unicap[tag->index] );
-        values[7] = v4l2_get_gain( vj_tag_input->unicap[tag->index] );
-        values[8] = v4l2_get_red_balance( vj_tag_input->unicap[tag->index] );
-        values[9] = v4l2_get_blue_balance( vj_tag_input->unicap[tag->index] );
-        values[10]= -1;
-        values[11]= v4l2_get_gain(vj_tag_input->unicap[tag->index]);
-        values[12]= v4l2_get_backlight_compensation( vj_tag_input->unicap[tag->index] );
-        values[13]= v4l2_get_whiteness( vj_tag_input->unicap[tag->index] );
-        values[14]= v4l2_get_black_level( vj_tag_input->unicap[tag->index]);
-        values[15]= v4l2_get_exposure(vj_tag_input->unicap[tag->index] );
-            values[16]= v4l2_get_auto_white_balance( vj_tag_input->unicap[tag->index] );
-        values[17]= v4l2_get_autogain( vj_tag_input->unicap[tag->index] );
-        values[18]= v4l2_get_hue_auto(vj_tag_input->unicap[tag->index] );
-        values[19]= v4l2_get_hflip(vj_tag_input->unicap[tag->index] );
-        values[20]= v4l2_get_vflip(vj_tag_input->unicap[tag->index]);   
-        return 1;
-#endif
-    }
+    values[0] = v4l2_get_brightness(  vj_tag_input->v4l2[tag->index] );
+    values[1] = v4l2_get_contrast( vj_tag_input->v4l2[tag->index] );
+    values[2] = v4l2_get_hue( vj_tag_input->v4l2[tag->index] );
+    values[3] = v4l2_get_saturation( vj_tag_input->v4l2[tag->index] );
+    values[4] = v4l2_get_temperature( vj_tag_input->v4l2[tag->index] );
+    values[5] = v4l2_get_gamma( vj_tag_input->v4l2[tag->index] );
+    values[6] = v4l2_get_sharpness( vj_tag_input->v4l2[tag->index] );
+    values[7] = v4l2_get_gain( vj_tag_input->v4l2[tag->index] );
+    values[8] = v4l2_get_red_balance( vj_tag_input->v4l2[tag->index] );
+    values[9] = v4l2_get_blue_balance( vj_tag_input->v4l2[tag->index] );
+    values[10]= -1;
+    values[11]= v4l2_get_gain(vj_tag_input->v4l2[tag->index]);
+    values[12]= v4l2_get_backlight_compensation( vj_tag_input->v4l2[tag->index] );
+    values[13]= v4l2_get_whiteness( vj_tag_input->v4l2[tag->index] );
+    values[14]= v4l2_get_black_level( vj_tag_input->v4l2[tag->index]);
+    values[15]= v4l2_get_exposure(vj_tag_input->v4l2[tag->index] );
+    values[16]= v4l2_get_auto_white_balance( vj_tag_input->v4l2[tag->index] );
+    values[17]= v4l2_get_autogain( vj_tag_input->v4l2[tag->index] );
+    values[18]= v4l2_get_hue_auto(vj_tag_input->v4l2[tag->index] );
+    values[19]= v4l2_get_hflip(vj_tag_input->v4l2[tag->index] );
+    values[20]= v4l2_get_vflip(vj_tag_input->v4l2[tag->index]);
+ 
+    return 1;   
+#else
 
     return 0;
+#endif
 }
 
 int vj_tag_v4l_set_control( int t1, uint32_t id, int value )
@@ -1982,7 +1948,7 @@ int vj_tag_v4l_set_control( int t1, uint32_t id, int value )
     if(tag->source_type != VJ_TAG_TYPE_V4L )
         return 0;
 #ifdef HAVE_V4L2
-    v4l2_set_control( vj_tag_input->unicap[tag->index], id, value );
+    v4l2_set_control( vj_tag_input->v4l2[tag->index], id, value );
 #endif
     return 1;   
 }
@@ -2556,13 +2522,11 @@ int vj_tag_disable(int t1) {
     if(tag->source_type == VJ_TAG_TYPE_V4L && !tag->clone )
     {
 #ifdef HAVE_V4L2
-        if(tag->capture_type==1) {
-            if( no_v4l2_threads_ ) {
-                v4l2_set_status( vj_tag_input->unicap[tag->index],1);
-            } else {
-                v4l2_thread_set_status( v4l2_thread_info_get(vj_tag_input->unicap[tag->index]),0 );
-            }
-        }
+       if( no_v4l2_threads_ ) {
+           v4l2_set_status( vj_tag_input->v4l2[tag->index],1);
+       } else {
+           v4l2_thread_set_status( v4l2_thread_info_get(vj_tag_input->v4l2[tag->index]),0 );
+       }
 #endif
     }
 
@@ -2585,17 +2549,17 @@ int vj_tag_enable(int t1) {
     vj_tag *tag = vj_tag_get(t1);
     if( tag->source_type == VJ_TAG_TYPE_V4L )
     {
-        if(tag->capture_type == 1 ) {
 #ifdef HAVE_V4L2
-            if( no_v4l2_threads_ ) {
-                v4l2_set_status( vj_tag_input->unicap[tag->index],1);
-            } else {
-                v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->unicap[tag->index] ), 1 );
-            }
-#endif
+        if( no_v4l2_threads_ ) {
+            v4l2_set_status( vj_tag_input->v4l2[tag->index],1);
+        } else {
+            v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->v4l2[tag->index] ), 1 );
         }
+        tag->active = 1;
+#endif
         return 1;
     }
+
     if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
     {
         if(!net_thread_start(tag, _tag_info->effect_frame1))
@@ -2657,17 +2621,14 @@ int vj_tag_set_active(int t1, int active)
     switch (tag->source_type) {
        case VJ_TAG_TYPE_V4L:
 
-        if(tag->capture_type == 1 ) {
 #ifdef HAVE_V4L2
-            if( no_v4l2_threads_ ) {
-                v4l2_set_status( vj_tag_input->unicap[tag->index],1);
-
-            } else {
-                v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]), active );
-            }
-#endif
-        } 
+        if( no_v4l2_threads_ ) {
+            v4l2_set_status( vj_tag_input->v4l2[tag->index],active);
+        } else {
+            v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->v4l2[tag->index]), active );
+        }
         tag->active = active;
+#endif
         break;
     case VJ_TAG_TYPE_YUV4MPEG:
          if(active==0)
@@ -3676,16 +3637,14 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
     switch (tag->source_type)
     {
     case VJ_TAG_TYPE_V4L:
-        if( tag->capture_type == 1 ) {
 #ifdef HAVE_V4L2
-            if( no_v4l2_threads_ ) {
-             res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2],buffer[3]) );
-            } else {
-             res = v4l2_thread_pull( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]),
-                        v4l2_get_dst( vj_tag_input->unicap[tag->index], buffer[0],buffer[1],buffer[2],buffer[3]));
-            }
-#endif
+        if( no_v4l2_threads_ ) {
+            res = v4l2_pull_frame( vj_tag_input->v4l2[tag->index],v4l2_get_dst(vj_tag_input->v4l2[tag->index],buffer[0],buffer[1],buffer[2],buffer[3]) );
+        } else {
+            res = v4l2_thread_pull( v4l2_thread_info_get( vj_tag_input->v4l2[tag->index]),
+                        v4l2_get_dst( vj_tag_input->v4l2[tag->index], buffer[0],buffer[1],buffer[2],buffer[3]));
         }
+#endif
         switch( tag->noise_suppression ) {
             case V4L_BLACKFRAME:
                 tag->cali_duration = tag->bf_count;

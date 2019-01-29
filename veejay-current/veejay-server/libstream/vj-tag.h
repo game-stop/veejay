@@ -51,7 +51,7 @@ typedef struct
 
 // very old junk, should be re-written
 typedef struct {
-	void	*unicap[VJ_TAG_MAX_STREAM_IN];
+	void	*v4l2[VJ_TAG_MAX_STREAM_IN];
     vj_yuv *stream[VJ_TAG_MAX_STREAM_IN];
 	vj_client *net[VJ_TAG_MAX_STREAM_IN];
     vj_dv1394 *dv1394[VJ_TAG_MAX_STREAM_IN];

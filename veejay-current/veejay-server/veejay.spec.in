@@ -36,7 +36,6 @@ Prereq:        /sbin/ldconfig
 #Requires:      libxml2 >= 2.5.4
 #Requires: 	cairo
 #Requires:	gtkcairo
-#Requires:	unicap
 #BuildRequires: libdv >= 0.102
 #BuildRequires: libxml2-devel >= 2.5.4
 #BuildRequires: jack-devel >= 0.98
@@ -54,7 +53,6 @@ Prereq:        /sbin/ldconfig
 #BuildRequires: valgrind
 #BuildRequires: gtkcairo-devel
 #BuildRequires: cairo-devel
-#BuildRequires: unicap
 
 %description
 Veejay is a visual instrument and realtime video sampler.
