@@ -636,7 +636,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG,"env VEEJAY_V4L2_GREYSCALE_ONLY=[0|1] not set");
+		veejay_msg(VEEJAY_MSG_INFO,"env VEEJAY_V4L2_GREYSCALE_ONLY=[0|1] not set, capturing in color");
 	}
 
 	if( mjpegcap ) {
@@ -669,6 +669,11 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 			return 1;
 		}
 	} //@ otherwise, continue with normal preference of formats
+	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO,"env VEEJAY_V4L2_PREFER_JPEG=[0|1] not set, using raw video format");
+	}
+
 
 	//@ does capture card support our native format
 	supported = v4l2_tryout_pixel_format( v, native_pixel_format, wid, hei,dw,dh,candidate );
@@ -1274,11 +1279,16 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 		pkt.data = src;
 	    pkt.size = length;
 
-	    avcodec_decode_video2( 
+	    int res = avcodec_decode_video2( 
 						v->c, 
 						v->picture, 
 						&got_picture,
 						&pkt );
+
+        if(res < 0) {
+            veejay_msg(VEEJAY_MSG_ERROR, "v4l2: error decoding frame");
+            return 0;
+        }
 
 		v->info->data[0] = v->picture->data[0];
 		v->info->data[1] = v->picture->data[1];
@@ -1382,11 +1392,16 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 		pkt.data = src;
 	    pkt.size = length;
 
-	    avcodec_decode_video2( 
+	    int res = avcodec_decode_video2( 
 						v->c, 
 						v->picture, 
 						&got_picture,
 						&pkt );
+
+        if( res < 0 ) {
+            veejay_msg(VEEJAY_MSG_ERROR, "v4l2: error decoding frame");
+            return 0;
+        }
 
 		v->info->data[0] = v->picture->data[0];
 		v->info->data[1] = v->picture->data[1];
