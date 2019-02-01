@@ -124,6 +124,8 @@ static struct
 {	meanfilter_malloc,meanfilter_free,NULL,VJ_IMAGE_EFFECT_MEANFILTER},
 {	bgpush_malloc,bgpush_free,NULL,VJ_IMAGE_EFFECT_BGPUSH},
 {	distortion_malloc,distortion_free, NULL, VJ_IMAGE_EFFECT_DISTORTION },
+{   pixelsort_malloc,pixelsort_free,NULL,VJ_IMAGE_EFFECT_PIXELSORT },
+{   pixelsortalpha_malloc,pixelsortalpha_free,NULL,VJ_IMAGE_EFFECT_PIXELSORTALPHA },
 {	NULL,NULL,NULL,0},
 };
 
@@ -552,6 +554,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[VJ_IMAGE_EFFECT_MEANFILTER]			= meanfilter_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_BGPUSH]			= bgpush_init(width,height);
 	vj_effects[VJ_IMAGE_EFFECT_POSTERIZE2]			= posterize2_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_PIXELSORT]           = pixelsort_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_PIXELSORTALPHA]           = pixelsortalpha_init(width,height);
 
 	max_width = width;
 	max_height = height;

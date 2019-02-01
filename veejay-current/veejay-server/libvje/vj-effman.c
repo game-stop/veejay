@@ -428,6 +428,13 @@ static void vj_effman_apply_image_effect(
 	case VJ_IMAGE_EFFECT_BGPUSH:
 		bgpush_apply(frames[0]);
 		break;
+    case VJ_IMAGE_EFFECT_PIXELSORT:
+        pixelsort_apply(frames[0],arg[0],arg[1],arg[2]);
+        break;
+    case VJ_IMAGE_EFFECT_PIXELSORTALPHA:
+        pixelsortalpha_apply(frames[0],arg[0],arg[1]);
+        break;
+
    }
 }
 

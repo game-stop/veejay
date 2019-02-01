@@ -26,7 +26,7 @@
 
 #define FX_LIMIT	1024
 
-#define MAX_EFFECTS		166
+#define MAX_EFFECTS		168
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)

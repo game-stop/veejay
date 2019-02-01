@@ -134,6 +134,8 @@
 #include "./effects/nervous.h"
 #include "./effects/noiseadd.h"
 #include "./effects/noisepencil.h"
+#include "./effects/pixelsort.h"
+#include "./effects/pixelsortalpha.h"
 #include "./effects/opacityadv.h"
 #include "./effects/opacity.h"
 #include "./effects/opacitythreshold.h"
@@ -197,7 +199,7 @@
 #include "./transitions/vbar.h"
 #include "./transitions/wipe.h"
 
-#define VJ_IMAGE_EFFECT_MIN 90
+#define VJ_IMAGE_EFFECT_MIN 88
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -427,6 +429,8 @@ enum {
 	VJ_IMAGE_EFFECT_MEANFILTER = 92,
 	VJ_IMAGE_EFFECT_BGPUSH = 91,
 	VJ_IMAGE_EFFECT_POSTERIZE2 = 90,
+    VJ_IMAGE_EFFECT_PIXELSORT = 89,
+    VJ_IMAGE_EFFECT_PIXELSORTALPHA = 88,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
