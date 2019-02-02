@@ -66,8 +66,8 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 	lvdgmic_pull( gmic, 0, O );
 
-	livido_memset( O[1], 128, (w*h)/2);
-	livido_memset( O[2], 128, (w*h)/2);
+	livido_memset( O[1], 128, (w*h));
+	livido_memset( O[2], 128, (w*h));
 
 	return LIVIDO_NO_ERROR;
 }
@@ -111,7 +111,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	
 	//@ some palettes veejay-classic uses
 	int palettes0[] = {
-		LIVIDO_PALETTE_YUV422P,
+		LIVIDO_PALETTE_YUV444P,
             	0,
 	};
 	
