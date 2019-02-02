@@ -103,7 +103,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	
 	//@ some palettes veejay-classic uses
 	int palettes0[] = {
-		LIVIDO_PALETTEYUV444P,
+		LIVIDO_PALETTE_YUV444P,
 		LIVIDO_PALETTE_YUV444P,
             	0,
 	};
