@@ -300,7 +300,6 @@ usable without them.
 
 -   (required) mjpegtools &gt;= 1.9.0
 -   (required) The XML C library 2 for gnome &gt;= 2.5.4
--   (required) libunicap &gt;= 0.2.0
 -   (required) ffmpeg (libavcodec, etc) &gt;= 0.50.0
 -   (optional) libdv &gt;= 1.02
 -   (optional) The SDL library &gt;= 1.2.3
@@ -326,7 +325,6 @@ does not include them:
 -   libavcodec, libavutil, libswscale and libavformat from the FFmpeg
     project
 -   mjpegtools
--   unicap
 -   gtkcairo
 
   
@@ -343,10 +341,9 @@ with the following options:
     $ make
     # make install
 
-#### MjpegTools, Unicap
+#### MjpegTools
 
 You can download the MjpegTools from <http://mjpeg.sourceforge.net>  
-and the Unicap Imaging library from <http://unicap.sourceforge.net>  
   
 Compilation of both packages is straightforward , in general the
 following will do it:  
