@@ -195,35 +195,35 @@ Veejay consists out of several packages:
 
 ### Media
 
--   Codecs: MJPEG,MPNG, DV, YUV (raw)
--   Containers: AVI , Quicktime, rawDV
+-   Codecs: MJPEG, MPNG, DV, YUV (raw)
+-   Containers: AVI, Quicktime, rawDV
 -   Devices: USB webcams, DV1394, TV capture cards, etc.
 -   Support for unlimited capture devices
--   Support for Image files (PNG ,JPEG,TIFF,etc)
+-   Support for Image files (PNG ,JPEG, TIFF, etc)
 
 ### FX processing
 
--   132 built-in FX , many unique and original FX filters
--   FX chain (20 slots)
+-   161 built-in FX, many unique and original FX filters
+-   60 Livido filters
+-   FX chain (20 slots) with Alpha Channels
 -   All FX parameters can be animated.
 -   Mix up to two layers per FX slot
 
 ### Editing
 
 -   Non destructive edit decision lists (cut/copy/paste/crop video)
--   Simple text editor
 -   Sample editor
 -   Sequence editor
 -   Live disk recorder (sampling)
 -   Full deck save/restore
 -   Live clip loading
 -   Live sample sequencing
--   VIMS event recording/playback (6)
--   Various looping modes including bounce looping
+-   VIMS event recording/playback
+-   Various looping modes including bounce and random
 -   Playback speed and direction
 -   Video scratching
 -   Change in-and out points of a sample (marker)
--   Slow motion audio / video (7)
+-   Slow motion audio / video
 -   Fast motion audio / video
 -   Dynamic framerate
 -   Random frame play
@@ -234,25 +234,36 @@ Veejay consists out of several packages:
 
 ### Output
 
--   Audio trough Jack (low latency audio server) (8)
--   SDL and OpenGL video
--   Headless
+-   Audio trough Jack (low latency audio server)
+-   SDL video
+-   Headless (no video output)
 -   YUV4MPEG streaming
+-   V4L2 loopback devices
 -   Network streaming (unicast and multicast)
 -   Preview rendering
+-   Image grabbing
 
-### Input
+### Interaction
 
 -   Programmable keyboard interface
 -   VIMS (tcp/ip)
 -   OSC (udp)
 -   PureData trough sendVIMS external
+-   MIDI
+
+### Viewing
+
 -   Full screen or windowed mode
+-   Perspective and foward projection
+-   Twinview/BigDesktop
+-   Split-screen video wall
 
-### Plugin systems
+### Plugins and more...
 
--   Support for FreeFrame plugins
 -   Support for Frei0r plugins
+-   Support for LiVIDO plugins
+-   Support for FreeFrame plugins (only for 32 bit systems!)
+-   Android server!
 
 <span id="2.2">2.2</span> Hardware configuration
 ------------------------------------------------

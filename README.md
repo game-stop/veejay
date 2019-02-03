@@ -118,29 +118,29 @@ see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 
 ### General
 
- * Free Software (GNU GPL) (1)
- * Servent architecture (2)
- * Soft realtime (3)
- * Frame accurate (4)
- * Loop based editing (5)
- * Native YUV(A) processing
+ * Free Software (GNU GPL)
+ * Servent architecture
+ * Soft realtime
+ * Frame accurate
+ * Loop based editing
+ * Native YUV processing
  * Crash recovery
 
 see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [README Memory](./veejay-current/veejay-server/doc/REAMDE.memory), [README Performance](./veejay-current/veejay-server/doc/README.performance)
 
 ### Media
 
- * Codecs: MJPEG,MPNG, DV, YUV (raw)
- * Containers: AVI , Quicktime, rawDV
+ * Codecs: MJPEG, MPNG, DV, YUV (raw)
+ * Containers: AVI, Quicktime, rawDV
  * Devices: USB webcams, DV1394, TV capture cards, etc.
  * Support for unlimited capture devices
- * Support for Image files (PNG ,JPEG,TIFF,etc)
+ * Support for Image files (PNG ,JPEG, TIFF, etc)
 
 see also : [How to Video Codecs](./veejay-current/veejay-server/doc/HowtoVideoCodecs.md), [README audio](./veejay-current/veejay-server/doc/README.audio)
 
 ### Editing
 
- * 161 built-in FX , many unique and original FX filters 
+ * 161 built-in FX, many unique and original FX filters
  * 60 Livido filters
  * FX chain (20 slots) with Alpha Channels
  * All FX parameters can be animated.
@@ -157,12 +157,12 @@ see also : [README alpha](./veejay-current/veejay-server/doc/README.alpha)
 
 ### Trickplay
 
- * VIMS event recording/playback (6)
+ * VIMS event recording/playback
  * Various looping modes including bounce looping
  * Playback speed and direction
  * Video scratching
  * Change in-and out points of a sample (marker)
- * Slow motion audio / video (7)
+ * Slow motion audio / video
  * Fast motion audio / video
  * Dynamic framerate 
  * Random frame play
@@ -171,12 +171,13 @@ see also : [README alpha](./veejay-current/veejay-server/doc/README.alpha)
 
 ### Output
 
- * Audio trough Jack (low latency audio server) (8)
+ * Audio trough Jack (low latency audio server)
  * SDL video
- * Headless (no output)
+ * Headless (no video output)
  * YUV4MPEG streaming
  * V4L2 loopback devices
  * Network streaming (unicast and multicast)
+ * Preview rendering
  * Image grabbing
 
  see also : [How to Network](./veejay-current/veejay-server/doc/NET.txt)
@@ -184,7 +185,7 @@ see also : [README alpha](./veejay-current/veejay-server/doc/README.alpha)
 ### Interaction
 
  * Programmable keyboard interface
- * VIMS (tcp/ip) 
+ * VIMS (tcp/ip)
  * OSC (udp)
  * PureData trough sendVIMS external
  * MIDI
@@ -194,13 +195,13 @@ see also : [How to PureData](./veejay-current/veejay-server/doc/HowtoVeejay-Pure
 ### Viewing
 
  * Full screen or windowed mode
- * Perspective and foward projection (9)
+ * Perspective and foward projection
  * Twinview/BigDesktop
  * Split-screen video wall
 
 see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
 
-### Additional
+### Plugins and more...
 
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
