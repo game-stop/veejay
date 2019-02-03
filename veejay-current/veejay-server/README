@@ -12,18 +12,16 @@
         x10x0x10x0         x10x0x10x0x10x   10x0x10x0x10x0  x10x  10x0    0x0x        0x10      0x0x
           0x0x10           x10x0x10x0x10x   10x0x10x0x10x0    0x010x0     0x0x        0x10      0x0x    
 
-									              version 1.5	
-												  Dec 2018
+                                                                                     version 1.5
+                                                                                                 Feb 2019
 
        =================================================================================================
- 
- 			 :: 	   Veejay, a visual instrument for GNU            ::
-					   http://veejayhq.net
-		                         http://veejay.dyne.org 
-	
+
+                        ::         Veejay, a visual instrument for GNU            ::
+                                          http://veejayhq.net
 
 
- Veejay - a 'visual' instrument and realtime video sampler
+Veejay - a 'visual' instrument and realtime video sampler
 
 Veejay is a visual instrument and real-time video sampler.
 It allows you to "play" the video like you would play a piano.
@@ -61,11 +59,11 @@ While playing, you can record the resulting video directly to disk (video sampli
    echo "/tmp/plugins" >> ~/.veejay/plugins.cfg
 
 
-   install GMIC, 
+   install GMIC,
 
    cd plugin-packs/lvdgmic
    ./autogen.sh
-   ./configure && make 
+   ./configure && make
 
 
 
@@ -84,11 +82,11 @@ General
 
 Media
 -----
- # Codecs: MJPEG,MPNG, DV, YUV (raw)
- # Containers: AVI , Quicktime, rawDV
+ # Codecs: MJPEG, MPNG, DV, YUV (raw)
+ # Containers: AVI, Quicktime, rawDV
  # Devices: USB webcams, DV1394, TV capture cards, etc.
  # Support for unlimited capture devices
- # Support for Image files (PNG ,JPEG,TIFF,etc)
+ # Support for Image files (PNG ,JPEG, TIFF, etc)
 
 Editing
 -------
@@ -105,12 +103,10 @@ Editing
  # Live clip loading 
  # Live sample sequencing
 
-
-
 Trickplay
 ---------
  # VIMS event recording/playback (6)
- # Various looping modes including bounce looping
+ # Various looping modes including bounce and random
  # Playback speed and direction
  # Video scratching
  # Change in-and out points of a sample (marker)
@@ -119,24 +115,26 @@ Trickplay
  # Dynamic framerate 
  # Random frame play
  # Random sample play
- # Access up to 4096 video samples instantly	
+ # Access up to 4096 video samples instantly
 
 Output
 ------
  # Audio trough Jack (low latency audio server) (8)
  # SDL video
- # Headless
+ # Headless (no video output)
  # YUV4MPEG streaming
  # V4L2 loopback devices
- # Network streaming
+ # Network streaming (unicast and multicast)
+ * Preview rendering
  # Image grabbing
 
 Interaction
 -----------
  # Programmable keyboard interface
- # VIMS (tcp/ip) 
+ # VIMS (tcp/ip)
  # OSC (udp)
  # PureData trough sendVIMS external
+ # MIDI
 
 Viewing
 -------
@@ -144,14 +142,14 @@ Viewing
  # Perspective and foward projection (9)
  # Twinview/BigDesktop
  # Split-screen video wall
- 
 
-Additional
+
+Plugins and more...
 ----------
  # Support for Frei0r plugins
  # Support for LiVIDO plugins
  # Support for FreeFrame plugins (only for 32 bit systems!)
-
+ # Android server!
 
 
 
@@ -161,7 +159,7 @@ Additional
 	Free software is the matter of the users freedom to run, copy, distribute, study, change and improve the software. 
 
 (2)	A servent architecture is a peer-to-peer network mode with both functionalities of a
-	server and a client. The setup is designed so that each veejay-node can send and receive video, 
+	server and a client. The setup is designed so that each veejay-node can send and receive video,
 	allowing for the creation and maintenance of ad-hoc veejay-networks.
 	Reloaded , veejay's graphical interface, is a thin client and can be run from another computer
 	to track one or more veejay servers.
@@ -169,7 +167,7 @@ Additional
 (3)	Soft realtime: A system is realtime if the correctness of the application not only depends on
 	the logical correctness but also upon the time at which it was performed.
 	Veejay tolerates such lateness and responds by dropping video frames. 
-	You can instruct veejay to ignore the time aspect of the video and render all frames, effectivly 
+	You can instruct veejay to ignore the time aspect of the video and render all frames, effectivly
 	turning the server into a frame producer.
 
 (4)	VIMS: Veejay Internal Message System.  Control data is distributed via this message system,
@@ -177,7 +175,7 @@ Additional
 	level control interface available. The keyboard interface and OSC server are built on top of it.
 	Also all veejay clients communicate usings VIMS.
 
-(5)	Loop based editing:  Loops are (short) sections of video (up to any length) that are repeated 
+(5)	Loop based editing:  Loops are (short) sections of video (up to any length) that are repeated
 	continuously. While playing, you can change the properties of the video sample, add filters to it
 	and record it on the fly to a new sample (which can be used instantly).
 
@@ -185,17 +183,17 @@ Additional
 	As a consequence, veejay has no support for video codecs that make use of difference frames.
 
 (7)	In trickplay mode, veejay will always resample the audio analogous to varying the speed
-	of an analogue tape recorder . Halve the speed results in the pitch going down an octave. 
+	of an analogue tape recorder . Halve the speed results in the pitch going down an octave.
 	Slow motion video is produced by linearly interpolating in-between frames and
-	faster motion is accomplished by skipping video frames or, if playing without audio, 
+	faster motion is accomplished by skipping video frames or, if playing without audio,
 	by changing the framerate dynamically.
 
 (8)	JACK: A low latency audio server that can connect a number of different applications to an audio device,
-	allowing them to share audio between themselves. 
+	allowing them to share audio between themselves. http://jackaudio.org/
 
-(9)	Perspective Viewing: You can define a quadrilateral to which the rendered image will be mapped. 
+(9)	Perspective Viewing: You can define a quadrilateral to which the rendered image will be mapped.
 	This is usefull for setups where the image borders fall outside the projection screen area, or where
-	the projector/camera has a (wide) angle to the projection. 
+	the projector/camera has a (wide) angle to the projection.
 	Last but not least, it can be used for on-body projection performances.
 
 
@@ -213,13 +211,7 @@ See doc/Howto_Compile_on_Ubuntu.html
 Documentation
 =============
 
-See the directory 'doc' in this package, it contains usefull documentation.
-
-
-First time setup
-================
-
-You need to font a TrueType Font file in $HOME/.veejay/fonts
+See the directory 'doc' in this package, it contains a lot of usefull documentation.
 
 
 Running
@@ -228,20 +220,22 @@ Running
 Start 1 or more Veejay servers:
 $ veejay my-movie-A.avi
 $ veejay -p 4490 my-movie-B.avi
- 
+
 CONTACT / FEEDBACK & HELP
 =========================
 
-http://veejayhq.net
+The veejay website is over http://veejayhq.net
+
+You can join our mailing list on http://groups.google.com/group/veejay-discussion
 
 
 BUG REPORTS / BLEEDING EDGE SOURCE CODE
 =======================================
 
-Please use the ticket system !
+Please use the ticket system on https://github.com/c0ntrol/veejay/issues
 
-http://veejay.dyne.org
-http://veejayhq.net
+The code is actually develloped from http://github.com/c0ntrol/veejay
 
-ENJOY! And let us know about your performances/installations with veejay! 
+
+ENJOY! And let us know about your performances/installations with veejay!
 
