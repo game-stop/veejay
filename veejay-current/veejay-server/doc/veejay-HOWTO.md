@@ -33,8 +33,9 @@ instrument for Linux/GNU*
     1. [Hardware configuration](veejay-HOWTO.md#2.2)
 1. [Installation](veejay-HOWTO.md#3)
     1. [Dependencies](veejay-HOWTO.md#3.1)
-    1. [Installing veejay](veejay-HOWTO.md#3.2)
-    1. [Setting up multicast](veejay-HOWTO.md#3.3)
+    1. [Installing from archive](veejay-HOWTO.md#3.2)
+    1. [Installing from repository](veejay-HOWTO.md#3.3)
+    1. [Setting up multicast](veejay-HOWTO.md#3.4)
 1. [Using Veejay](veejay-HOWTO.md#4)
     1. [Terminology and limitations](veejay-HOWTO.md#4.1)
     1. [VIMS](veejay-HOWTO.md#4.2)
@@ -271,7 +272,7 @@ Veejay consists out of several packages:
 Veejay requires at least a linux kernel 2.4.x, 2.6.x or later, a lot of
 diskspace and a fast CPU. Depending on the speed of your machine, your
 milage may vary. See the list below for a few systems veejay was
-reported to work on:  
+reported to work on :
 
 -   An Intel Pentium 4 3.0 Ghz HT/512 MB DDR RAM with a ATI Radeon 9600
     XT
@@ -290,14 +291,15 @@ reported to work on:
 -   Sony Playstation 2 (MIPS, little endian) (but runs very slow +/- 20
     fps)
 
-  
+
 Video Editing requires a lot of diskspace, make sure you you have enough
-diskspace available for your project. If you are going to use the
-recording functions, make sure you have sufficient free disk space
-available.Otherwise you are quite safe, veejay does not change your
-original video or fill your harddisk with needless temporary files.
+diskspace available for your project. Real Time video editing require
+even more, the video file codecs used must be full frame (only I‑frames).
+If you are going to use the recording functions, make sure you have sufficient
+free disk space available. Otherwise you are quite safe, veejay does not
+change your original video or fill your harddisk with needless temporary files.
 Neither does it waste your resources (unless you fill the effect chain
-with a lot of effects)  
+with a lot of effects)
 
 <span id="3">3. Installation</span>
 -----------------------------------
@@ -307,7 +309,7 @@ with a lot of effects)
 
 Before you install Veejay, you should install the following software
 packages. Although none of them is required, Veejay will be much less
-usable without them.  
+usable without them.
 
 -   (required) mjpegtools &gt;= 1.9.0
 -   (required) The XML C library 2 for gnome &gt;= 2.5.4
@@ -319,365 +321,329 @@ usable without them.
 -   (optional) FreeType &gt;= 2.1.9
 -   (optional) GTK &gt;= 2.6.0
 
-  
+
 *On newer distributions, some of the listed software is already
 installed but you may be missing the -devel- packages! (especially on
-redhat, suse and debdian systems!!)*  
-  
+redhat, suse and debdian systems!!)*
+
 You can find the websites of these projects in [Other
-Resources](veejay-HOWTO.md#6).  
-  
+Resources](veejay-HOWTO.md#6).
+
 
 ### <span id="3.1.0">3.1.0 From source</span>
 
 You can compile the following packages from source if your distribution
-does not include them:  
+does not include them :
 
--   libavcodec, libavutil, libswscale and libavformat from the FFmpeg
-    project
+-   libavcodec, libavutil, libswscale and libavformat from the FFmpeg project
 -   mjpegtools
--   gtkcairo
-
-  
 
 #### FFmpeg
 
-You can download the ffmpeg sources from the SVN repository via
-[http://ffmpeg.sourecforge.net"](http://ffmpeg.sourceforge.net) After
-downloading and unpacking the source tarball, run the configure script
-with the following options:  
-
-    $ ./configure --enable-swscaler --enable-shared --enable-gpl
-    ...
-    $ make
-    # make install
-
+You can download the [ffmpeg](https://ffmpeg.org/) sources from the repository via
+[https://git.ffmpeg.org/ffmpeg.git](https://git.ffmpeg.org/ffmpeg.git) After
+downloading, run the configure script with the following options:
+```
+$ ./configure --enable-swscaler --enable-shared --enable-gpl
+...
+$ make
+# make install
+```
 #### MjpegTools
 
-You can download the MjpegTools from <http://mjpeg.sourceforge.net>  
-  
-Compilation of both packages is straightforward , in general the
-following will do it:  
+You can download the MjpegTools from <http://mjpeg.sourceforge.net>
 
-    $ ./configure && make
-    # make install
-
-#### GtkCairo
-
-GtkCairo is available from the veejay repository.
-
-<span id="3.2">3.2 Installing veejay</span>
+Compilation of both packages is straightforward, in general the
+following will do it:
+```
+$ ./configure && make
+# make install
+```
+<span id="3.2">3.2 Installing from archive</span>
 -------------------------------------------
 
-Verify that the PKG\_CONFIG\_PATH variable is set to the directory
-containing files like jack.pc and directfb.pc to include them in the
-build process. If it is not set , the configure script will abort with
-an error message.
-
-    $ echo $PKG_CONFIG_PATH   
-
-If nothing is set, do something like
-
-    $ export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+From archive, you install a published version. Installing the last published version insure you to get last stable veejay. **Ideal for partying !**
 
 Decompress and untar the file by typing:
+```
+$ tar -jxvf veejay-1.5.x.tar.bz2
+```
+Change to the directory containing veejay's source's and configure the build:
+```
+$ cd veejay-1.5.x/veejay-current/veejay-server
 
-    $ tar -jxvf veejay-1.1.x.tar.bz2
+$ ./configure
+```
+On completion it will summarize the results of the `./configure` script.  
+You can run `./configure --help` to view all configure options and tweak your installation.
 
-Change to the directory containing veejay's source's:
-
-    $ cd veejay-1.1.x
-
-    $ ./configure
-
-On completion it will summarize the results of the ./configure script,
-which could look like this:
-
-    configure:  Veejay 1.1 build configuration :
-    configure: 
-    configure:  Compiler flags: -march=pentium4 -mtune=pentium4  -msse -mfpmath=sse 
-    configure:                  -fif-conversion
-    configure:                      -O3
-    configure: 
-    configure:  Architecture: i686 
-    configure: 
-    configure:    x86  
-    configure:     MMX     enabled     : yes
-    configure:     MMX2    enabled     : yes
-    configure:     SSE     enabled     : yes
-    configure:     SSE2    enabled     : yes
-    configure:     3DNOW   enabled     : no
-    configure:     CMOV    enabled     : yes
-    configure: 
-    configure:    Platform: Linux
-    configure: 
-    configure:  Required dependencies:
-    configure:   - POSIX Threads (pthread)       : true
-    configure:   - MJPEGTools                        : true
-    configure:   - AVI MJPEG playback/recording  : true (always)
-    configure:   - FFmpeg AVFormat               : true 
-    configure:   - FFmpeg AVCodec                : true 
-    configure:   - FFmpeg Swscaler           : true 
-    configure:  Optional dependencies
-    configure:   - SDL support                   : true
-    configure:   - DirectFB support              : false
-    configure:   - OpenGL support                : false
-    configure:   - libDV (digital video) support : false 
-    configure:   - QuickTime support             : false 
-    configure:   - Unicap Imaging                : true 
-    configure:   - video4linux                   : true
-    configure:   - JPEG support                  : true 
-    configure:   - GDK Pixbuf support            : true
-    configure:   - Jack Audio Connection Kit     : false
-    configure:   - XML c library for Gnome       : true
-    configure:   - Freetype support              : true
-
-Now, you can start building veejay
-
-    $ make
-
+Now, you can start building veejay (using all cores)
+```
+$ make -j$(nproc)
+```
 Followed by
+```
+# make install && ldconfig
+```
+For **full installation instruction** please refer to this [documentation](./Installation.md)
 
-    # make install
+<span id="3.3">3.3 Installing from repository</span>
+-------------------------------------------
 
-3.3 Setting up multicast
+From sources, you will install last veejay version, could be in no stable situation, **ideal for coding !**
+
+The last Veejay's source code could be found here [github / veejay](https://github.com/c0ntrol/veejay).  
+Download the last source code by typing :
+```
+$ git clone https://github.com/c0ntrol/veejay.git
+```
+Enter the directory containing veejay's source's :
+```
+$ cd veejay/veejay-current/veejay-server
+```
+You need to prepare and configure the build:
+```
+$ ./autogen.sh
+$ ./configure
+```
+On completion it will summarize the results of the `./configure` script.  
+You can run `./configure --help` to view all configure options and tweak your installation.
+
+Now, you can start building veejay (using all cores)
+```
+$ make -j$(nproc)
+```
+Followed by
+```
+# make install && ldconfig
+```
+For **full installation instruction** please refer to this [documentation](./Installation.md)
+
+<span id="3.4">3.4 Setting up multicast</span>
 ------------------------
 
 Multicast is a technology that reduces network traffic by simultaneously
-delivering a single stream of information to any interested recipient.  
-  
+delivering a single stream of information to any interested recipient.
+
 To enable multicast in Veejay, you must have enabled *IP multicast* in
-your kernel configuration.  
-  
+your kernel configuration.
+
 Finally you need to add a multicast route :
+```
+for 1 ethernet device:
+# route add -net 224.0.0.0 netmask 255.255.255.0 dev eth0
 
-    for 1 ethernet device:
-    # route add -net 224.0.0.0 netmask 255.255.255.0 dev eth0
+for > 1 
+# route add -net 224.0.0.0 netmask 255.255.255.0 gw 192.168.100.1 dev eth1
+```
 
-    for > 1 
-    # route add -net 224.0.0.0 netmask 255.255.255.0 gw 192.168.100.1 dev eth1
-
-  
 Next, Veejay can be started with the commandline flags
-**-M/--multicast-osc** and/or **-V/--multicast-vims**  
+**-M/--multicast-osc** and/or **-V/--multicast-vims**
 
 <span id="4">4. Using Veejay</span>
 -----------------------------------
 
-Veejay uses by default a SDL window to play the video. All the
+Veejay uses by default a [SDL window](http://libsdl.org/) to play the video. All the
 keybinding in veejay depend on SDL; if you move your mouse over to the
-SDL windows to focus it , you can press the keys explained in [4.3 The
+SDL windows to focus it, you can press the keys explained in [4.3 The
 keyboard interface](veejay-HOWTO.md#4.3).  
-To use veejay in commandline style interface mode, see [4.2
-sayVIMS](veejay-HOWTO.md#4.2).  
-You must no longer provide a video file to use with veejay; it will run
-in dummy mode by using the '-d' commandline parameter:  
+To use veejay in commandline style interface mode, see [sayVIMS](veejay-HOWTO.md##sayVIMS).  
 
-    $ veejay -d
+You don't even need a video file to use with veejay; you can run it
+in dummy mode by using the `-d` commandline parameter:  
+```
+$ veejay -d
+```
 
-  
-To use the graphical client with veejay:
-
-    $ reloaded -h localhost
-
-  
+To use the graphical client with veejay (`-a` for auto-connection):
+```
+$ reloaded -a
+```
 
 <span id="4.1">4.1 Terminology and limitations</span>
 -----------------------------------------------------
 
-Veejay has a number of playback modes, each playback mode is unique and
-defines more or less a different functionality:  
-  
-Also, note that veejay runs in only 1 resolution at a time (depending on
+Note that veejay runs in only 1 resolution at a time (depending on
 the video dimensions of the first loaded movie). All movies loaded must
-have identical properties, otherwise veejay will not start. This
-limitation is also valid when streaming video from veejay to another
-veejay.  
-  
-  
+have identical properties when streaming video from veejay to another
+veejay.
 
-#### Playback modes in veejay
+Veejay has a number of playback modes, each playback mode is unique and
+defines more or less a different functionality.
 
-*Mode*
+<table>
+<tbody>
+<caption><strong>Playback modes in veejay</strong></caption>
+<tr class="">
+<td><strong>Mode</strong></td>
+<td><strong>Description</strong></td>
+<td><strong>Navigation</strong></td>
+<td><strong>Looping</strong></td>
+<td><strong>Speed</strong></td>
+<td><strong>Effect Chain</strong></td>
+</tr>
+<tr class="odd">
+<td>Plain</td>
+<td>Default mode, playback of video</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td>Sample</td>
+<td>Sample mode, playback of video samples.</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr class="odd">
+<td>Tag</td>
+<td>Tag mode, playback of video streams</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
 
-*Description*
-
-*Navigation*
-
-*Looping*
-
-*Speed*
-
-*Effect Chain*
-
-Plain
-
-Default mode, playback of video
-
-Yes
-
-No
-
-Yes
-
-No
-
-Sample
-
-Sample mode, playback of video samples.
-
-Yes
-
-Yes
-
-Yes
-
-Yes
-
-Tag
-
-Tag mode, playback of video streams
-
-No
-
-No
-
-No
-
-Yes
 
 <span id="4.2">4.2 VIMS</span>
 ------------------------------
+```
+Use the command
 
-
-    Use the command 
     $ veejay -u -n |less
 
-    to dump all VIMS messages.
+to see documentation generated by veejay on VIMS, using Effects and OSC.
 
-    1.1 Message Format
-    ==================
+If there is an error in the documentation, you have found a bug in veejay
+and should report it :)
 
-    A message is described as:
+1.1 Message Format
+==================
 
-          :  ; 
+A message is described as:
 
-    Example:
+    <Action Identifer> : <Argument List> ;
 
-        080:;
-        099:0 0;
+Example:
 
+    080:;
+    099:0 0;
 
+<Action Identifier>
+The action identifier is a 3 digit number describing a Network Event  
+The colon is used to indicate the start of the Argument List and must be given. 
 
-    The action identifier is a 3 digit number describing a Network Event  
-    The colon is used to indicate the start of the Argument List and must be given. 
+<Argument List>
+The Argument List is described by a printf() style formatted template 
+which describes the number and type of arguments to be used. 
 
+The semicolon must be given to indicate the end of this message
 
+1.2 Bundled Messages
+====================
 
-    The Argument List is described by a printf() style formatted template 
-    which describes the number and type of arguments to be used. 
+A message bundle is a special message that contains an ordered list of at least 1 or more messages. Each message is executed from left to right (first in, first out) while parsing the bundle.   
 
-    The semicolon must be given to indicate the end of this message
+You can dynamically assign keybindings to trigger a bundle in reloaded ( View -> Bundles )
 
-    1.2 Bundled Messages
-    ====================
+There is an example Action File that a number of bundles with keybindings:
 
-    A message bundle is a special message that contains an ordered list of at least 1 or more messages. Each message is executed from left to right (first in, first out) while parsing the bundle.   
+    $ veejay -v /path/to/video.avi -F test/livecinema/action-file.xml
 
+The bundles can be triggered by the keys SHIFT + [ q,w,e,r,t,y,u,i,o,p,a,s,d,f,g,h,j,k,l,z,x,c,v,b,n,m ] 
 
-    Example:
+Structure of bundled message
+============================
 
-        5032|BUN:002{361:0 3 56 230 93 0;361:0 4 1 7;}|
-        5033|BUN:003{361:0 3 56 230 93 0;361:0 4 1 7;361:0 5 1 7;}|
-        5034|BUN:003{361:0 3 56 230 93 0;361:0 4 1 7;361:0 5 1 8;}|
+Example:
 
-
-    A message bundle is described as:
-
-         BUN:  { 
-             :  ;
-             :  ;
-            ... 
-            }
-            ;
-
-
-    The token 'BUN:' indicates the start of a messaage bundle, the first 3 digit numeric value represents the total number of messages in the bundle. The '{' symbol indicates the start of a message block and is ended with '};' or just '}'. 
+    5032|BUN:002{361:0 3 56 230 93 0;361:0 4 1 7;}|
+    5033|BUN:003{361:0 3 56 230 93 0;361:0 4 1 7;361:0 5 1 7;}|
+    5034|BUN:003{361:0 3 56 230 93 0;361:0 4 1 7;361:0 5 1 8;}|
 
 
-    1.3 Format of an Action File/Attaching Keys to Bundles
-    ======================================================
+A message bundle is described as:
 
-        <501 - 599> |  |
-
-    The contents of some action file can be :
-
-        516|BUN:001{355:;}|
-
-
-
-    The message bundle BUN sends '355' for clear effect chain.
-    This message bundle is attached to action identifier 516.
-
-    A key is attached to this function trough using the GUI (GVeejay)
-    or by using: 
+  BUN: <Number of Messages> {
+      <Action Idenfifier> : <Argument List> ;
+      <Action Identifier> : <Argument List> ;
+      ...
+      }
+    ;
 
 
-    DYNAMIC KEYMAPPING:
-    ==================
+The token 'BUN:' indicates the start of a messaage bundle, the first 3 digit numeric
+value represents the total number of messages in the bundle. The '{' symbol indicates
+the start of a message block and is ended with '};' or just '}'.
 
-        "083:516   ;"
+1.3 Format of an Action File/Attaching Keys to Bundles
+======================================================
+
+    <501 - 599> | <message bundle> |
+
+The contents of some action file can be :
+
+    516|BUN:001{355:;}|
+
+The message bundle BUN sends '355' for clear effect chain.
+This message bundle is attached to action identifier 516.
+
+A key is attached to this function trough using the GUI (GVeejay)
+or by using:
+
+DYNAMIC KEYMAPPING:
+==================
+
+    "083:516 <sdl symbol> <modifier> <optional arguments>;"
+
+The message bundle can be attached to a key , for example 'SHIFT + A' by sending
+
+    083:516 97 3;
+
+Which attaches bundle '516' to SDL key '97' using a modifier '3', which is SHIFT.
+
+Modifiers: 0 = none, 1 = alt , 2 = ctrl,  3 = shift
+Keys     : see SDLkeysym.h somewhere in include/SDL/
+
+If the number 0 is used for an event number, a given key combination can be
+unset (wiped) :
+
+    083:0 97 3;
+
+Alternativly, you can bind keys to any action identifier. The complete
+list can be viewd by typing veejay -u |less or with Gveejay.
+
+    083:20 97 0 4;
+
+The example above sets key 'a' to 'change video speed to 4'
+
+General  description of VIMS messages
+=====================================
 
 
-    The message bundle can be attached to a key , for example 'SHIFT + A' by sending 
-        
-        083:516 97 3;
+Some reserved numbers:
 
-    Which attaches bundle '516' to SDL key '97' using a modifier '3', which is SHIFT. 
-
-    Modifiers: 0 = none, 1 = alt , 2 = ctrl,  3 = shift
-    Keys     : see SDLkeysym.h somewhere in include/SDL/
-
-    If the number 0 is used for an event number, a given key combination can be
-    unset (wiped) :
-
-        083:0 97 3;
-
-    Alternativly, you can bind keys to any action identifier. The complete
-    list can be viewd by typing veejay -u |less or with Gveejay. 
-
-        083:20 97 0 4;
-
-    The example above sets key 'a' to 'change video speed to 4'
-
-
-
-    General  description of VIMS messages
-    =====================================  
-
-
-    Some reserved numbers:
-
-        clip id     0   :   select currently playing clip   
-        clip id     -1  :   select highest clip number 
-            chain entry -1      :       select current chain entry 
-        stream id   0   :   select currently playing stream 
-        stream id   -1  :   select highest stream number
-        key modifier            :   0 = normal, 1= alt , 2 = ctrl, 3 = shift
-        frame       -1  :   use highest possible frame number (usually num video frames)
-        playback mode       :   0 = clip, 1 = stream, 2 = plain
-        data format         :   yv16 (yuv 4:2:2 raw) , mpeg4, divx, msmpeg4v3,
+    clip id     0   :   select currently playing clip
+    clip id     -1  :   select highest clip number
+    chain entry -1  :   select current chain entry
+    stream id   0   :   select currently playing stream
+    stream id   -1  :   select highest stream number
+    key modifier    :   0 = normal, 1= alt , 2 = ctrl, 3 = shift
+    frame       -1  :   use highest possible frame number (usually num video frames)
+    playback mode   :   0 = clip, 1 = stream, 2 = plain
+    data format     :   yv16 (yuv 4:2:2 raw) , mpeg4, divx, msmpeg4v3,
                         div3, dvvideo, dvsd, mjpeg, i420 and yv12 (yuv 4:2:0 raw)
-        loop type       :   0 = no looping, 1 = normal loop, 2 = pingpong (bounce) loop
+    loop type       :   0 = no looping, 1 = normal loop, 2 = pingpong (bounce) loop
+```
 
-  
-  
-
-<span id="#4.2"></span>sayVIMS
+<span id="#sayVIMS"></span>sayVIMS
 ------------------------------
 
-  
-  
 sayVIMS is a commandline utility distributed with the veejay package, it
 allows you to give short commands in interactive mode  
   
