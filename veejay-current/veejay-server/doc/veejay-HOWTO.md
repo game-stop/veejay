@@ -645,76 +645,83 @@ Some reserved numbers:
 ------------------------------
 
 sayVIMS is a commandline utility distributed with the veejay package, it
-allows you to give short commands in interactive mode  
-  
-*$ sayVIMS -i -h localhost -p 3490*  
-  
-Typing '?' followed by pressing ENTER gives the list of command below:
+allows you to send to a veejay server short commands in interactive mode,
+single VIMS message or files containing VIMS messages.
 
-      vi [file]           Open video4linux device 
-      fi [file]           Open Y4M stream for input 
-      fo [file]           Open Y4M stream for output 
-      av [file]           Open (almost any) video file using FFmpeg 
-      mc [address] [port] Open a multicast UDP video stream 
-      pr [hostname][port] Open a unicast TCP video stream
-      cl [file]           Load cliplist from file 
-      cn [n1] [n2]        New clip from frames n1 to n2 
-      cd [n]              Delete clip n1 
-      sd [n]              Delete Stream n1 
-      cs [file]           Save cliplist to file 
-      es [file]           Save editlist to file 
-      ec [n1] [n2]        Cut frames n1 - n2 to buffer 
-      ed [n1] [n2]        Del franes n1 - n2  
-      ep [n]              Paste from buffer at frame n1 
-      ex [n1] [n2]        Copy frames n1 - n2 to buffer 
-      er [n1] [n2]        Crop frames n1 - n2 
-      al [file]           Action file Load 
-      as [file]           Action file save 
-      de                  Toggle debug level (default off) 
-      be                  Toggle bezerk mode (default on) 
+In the following examples, lets say a veejay instance is running on host
+`localhost` using port `3490` (its default values).
 
-Also, you can send messages in VIMS format (or files, containing VIMS
-messages )  
-  
+**Interactive Mode**
+```
+$ sayVIMS -i -h localhost -p 3490
+```
+In interactive mode, after a connection is establish with a veejay server,
+a prompt wait you to enter VIMS commands. Press `ENTER` to send it.  
+The connection remain open until you exit by typing `quit`.
+
+Typing '?' followed by pressing `ENTER` gives the list of command below:
+```
+vi [file]           Open video4linux device
+fi [file]           Open Y4M stream for input
+fo [file]           Open Y4M stream for output
+av [file]           Open (almost any) video file using FFmpeg
+mc [address] [port] Open a multicast UDP video stream
+pr [hostname][port] Open a unicast TCP video stream
+cl [file]           Load cliplist from file
+cn [n1] [n2]        New clip from frames n1 to n2
+cd [n]              Delete clip n1
+sd [n]              Delete Stream n1
+cs [file]           Save cliplist to file
+es [file]           Save editlist to file
+ec [n1] [n2]        Cut frames n1 - n2 to buffer
+ed [n1] [n2]        Del franes n1 - n2
+ep [n]              Paste from buffer at frame n1
+ex [n1] [n2]        Copy frames n1 - n2 to buffer
+er [n1] [n2]        Crop frames n1 - n2
+al [file]           Action file Load
+as [file]           Action file save
+de                  Toggle debug level (default off)
+be                  Toggle bezerk mode (default on)
+```
+
+**Single VIMS message**
+
+Also, you can send single VIMS format message.
+
 For example, add the Pixelate effect on the Effect Chain of the current
-playing stream or clip:
+playing stream or clip :
+```
+sayVIMS -h localhost -p 3490 -m "361:0 0 100 3;"
+```
 
-    sayVIMS -h localhost -p 3490 "361:0 0 150 3;"
+**Using files**
 
-  
-Last but not least, sayVIMS can parse files containing VIMS messages.  
-See the test/examples directory of the package for a list of perl
-scripts that output a VIMS script.  
+Last but not least, sayVIMS can parse files containing VIMS messages.
 
-    sayVIMS -f advocate.vims -h localhost -p 3490
+See the `veejay-server/test/examples` directory of the package for a list of perl
+scripts that output a VIMS script.
+```
+sayVIMS -f advocate.vims -h localhost -p 3490
+```
 
-  
+**Others examples**
+
 Alternativly, you can start a secundary veejay and stream from peer to
-peer in uncompressed video:  
+peer in uncompressed video :
+```
+$ veejay -d -p 5000
+$ sayVIMS -h localhost -p 5000 -m "245:localhost 3490;"
 
-    $ veejay -d -p 5000
-
-    $ sayVIMS -h localhost -p 5000 "245:localhost 3490;"
-
-    (press 'F7' in veejay to display the stream, prob. stream 7)
-
+(press 'F7' in veejay to display the stream, prob. stream 7)
+```
 Or for multicast:
-
-    $ veejay -V 224.0.0.50 -p 5000 -n -L movie1.avi
-
-    $ veejay -d 
-
-    $ sayVIMS -h localhost -p 3490 "246:224.0.0.50 5000;"
-
-    $ veejay -d -p 4000
-
-    $ sayVIMS -h localhost -p 4000 "246:224.0.0.50 5000;"
-
-Or, if you want to play a XVID movie (or any other compressed format
-that is not I frame only):
-
-    $ sayVIMS -h localhost -p 3490 "244:/tmp/my-XVID-movie.avi;"
-
+```
+$ veejay -V 224.0.0.50 -p 5000 -n -L movie1.avi
+$ veejay -d
+$ sayVIMS -h localhost -p 3490 -m "246:224.0.0.50 5000;"
+$ veejay -d -p 4000
+$ sayVIMS -h localhost -p 4000 -m "246:224.0.0.50 5000;"
+```
 <span id="4.3">4.3 The keyboard interface</span>
 ------------------------------------------------
 
