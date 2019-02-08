@@ -160,15 +160,15 @@ Veejay consists out of several packages:
 <tbody>
 <tr class="odd">
 <td><strong>veejay-server</strong></td>
-<td>This is veejay</td>
+<td>This is <strong>veejay</strong> !</td>
 </tr>
 <tr class="even">
 <td><strong>veejay-client</strong></td>
-<td>This is reloaded, the graphical user interface to veejay</td>
+<td><strong>reloaded</strong>, the graphical user interface to veejay</td>
 </tr>
 <tr class="odd">
 <td><strong>veejay-utils</strong></td>
-<td>Commandline utilities to interface with veejay</td>
+<td>Command-line interface with veejay, <strong>sayVIMS</strong></td>
 </tr>
 <tr class="even">
 <td><strong>sendVIMS</strong></td>
@@ -176,7 +176,7 @@ Veejay consists out of several packages:
 </tr>
 <tr class="odd">
 <td><strong>veejay-themes</strong></td>
-<td>Themepack for reloaded</td>
+<td>Theme-pack for reloaded</td>
 </tr>
 </tbody>
 </table>
@@ -691,7 +691,7 @@ Also, you can send single VIMS format message.
 For example, add the Pixelate effect on the Effect Chain of the current
 playing stream or clip :
 ```
-sayVIMS -h localhost -p 3490 -m "361:0 0 100 3;"
+$ sayVIMS -h localhost -p 3490 -m "361:0 0 100 3;"
 ```
 
 **Using files**
@@ -701,7 +701,7 @@ Last but not least, sayVIMS can parse files containing VIMS messages.
 See the `veejay-server/test/examples` directory of the package for a list of perl
 scripts that output a VIMS script.
 ```
-sayVIMS -f advocate.vims -h localhost -p 3490
+$ sayVIMS -f advocate.vims -h localhost -p 3490
 ```
 
 **Others examples**
@@ -728,137 +728,122 @@ $ sayVIMS -h localhost -p 4000 -m "246:224.0.0.50 5000;"
 Here is a quick overview for the most used default keys, if applied in
 order you will end up with a newly created video sample looping in some
 way (depending on how many times you press the asterix key)  
-  
-  
 
-#### Some keyboard bindings
 
-*Description*
+<table>
+<tbody>
+<caption><strong>Some keyboard bindings</strong></caption>
+<tr class="">
+<td><strong>Description</strong></td>
+<td><strong>SDL key</strong></td>
+<td><strong>In plain english</strong></td>
+</tr>
+<tr class="odd">
+<td>Set the starting position of a new sample</td>
+<td>SDLK_LEFTBRACKET</td>
+<td>Left bracket</td>
+</tr>
+<tr class="odd">
+<td>Set ending position and create a new sample</td>
+<td>SDLK_RIGHTBRACKET</td>
+<td>Right bracket</td>
+</tr>
+<tr class="odd">
+<td>Select and play sample 1</td>
+<td>SDLK_F1</td>
+<td>F1</td>
+</tr>
+<tr class="odd">
+<td>Set playback speed to 3</td>
+<td>SDLK_d</td>
+<td>d</td>
+</tr>
+<tr class="odd">
+<td>Change looptype</td>
+<td>SDLK_KP_MULTIPLY</td>
+<td>asterix on numeric keypad</td>
+<tr class="odd">
+<td>Play backward</td>
+<td>SDLK_KP_4</td>
+<td>Cursor left on numeric keypad</td>
+</tr>
+<tr class="odd">
+<td>Play forward</td>
+<td>SDLK_KP_6</td>
+<td>Cursor right on numeric keypad</td>
+</tr>
+<tr class="odd">
+<td>Skip 1 second</td>
+<td>SDLK_KP_8</td>
+<td>Cursor up on numeric keypad</td>
+</tr>
+<tr class="odd">
+<td>Switch playmode to Plain</td>
+<td>SDLK_KP_DIVIDE</td>
+<td>Divide on numeric keypad</td>
+</tr>
+<tr class="odd">
+<td>Print information about sample</td>
+<td>SDLK_HOME</td>
+<td>Home</td>
+</tr>
+</tbody>
+</table>
 
-*SDL key*
-
-*In plain english*
-
-Set the starting position of a new sample
-
-SDLK\_LEFTBRACKET
-
-Left bracket
-
-Set ending position and create a new sample
-
-SDLK\_RIGHTBRACKET
-
-Right bracket
-
-Select and play sample **1**
-
-SDLK\_F1
-
-F1
-
-Set playback speed to 3
-
-SDLK\_d
-
-d
-
-Change looptype
-
-SDLK\_KP\_MULTIPLY
-
-asterix on numeric keypad
-
-Play backward
-
-SDLK\_KP\_4
-
-Cursor left on numeric keypad
-
-Play forward
-
-SDLK\_KP\_6
-
-Cursor right on numeric keypad
-
-Skip 1 second
-
-SDLK\_KP\_8
-
-Cursor up on numeric keypad
-
-Switch playmode to Plain
-
-SDLK\_KP\_DIVIDE
-
-Divide on numeric keypad
-
-Print information about sample
-
-SDLK\_HOME
-
-Home
-
-  
-  
 The function keys **F1**...**F12** can be used to select sample **1**
 ... **12**, use the keys **1**...**9** to select a sample range **1-12**
 ... **108-120** and press one of the **F**-keys to play that sample.  
   
 Use **ESC** to switch between samples and streams. Press **ESC** again
-to switch back to the sample playmode  
-You can create new input streams by using the console interface or by
-using GVeejay.  
-All new input streams (and samples) are auto numbered.  
-  
-  
+to switch back to the sample playmode.
+
+You can create new input streams by using the console interface **sayVIMS** or by
+using the graphical user interface **reloaded**. All new input streams (and samples) are auto numbered.
 
 <span id="4.4">4.4 Recording video</span>
 -----------------------------------------
 
-You can record video to a new clip , by using the stream- or clip
-recorder functions.  
-For example, to record a new clip from a playing clip in MJPG format:  
+You can record video to a new clip, in a specified codec format, by using the stream or clip recorder functions.
 
-    302:mjpg;
+For example, to select a MJPG codec to record a new clip from a playing clip:
+```
+$ sayVIMS -m "302:mjpg;"
+```
 
-Record 100 frames and start playing new clip when ready:
+Record 100 frames and start playing (1 = auto-play) new clip when ready:
+```
+$ sayVIMS -m "130:100 1;"
+```
 
-    130:100 1;
+Record the whole clip and don't start playing new clip when ready:
+```
+$ sayVIMS -m "130:0 0;"
+```
 
-Record the whole clip and dont start playing new clip when ready:
+If your Effect Chain is very CPU demanding, consider disabling audio and using the command-line parameter `-c 0` to disable synchronization correction.
 
-    130:0 0;
-
-If your Effect Chain is very CPU demanding , consider disabling audio
-and using the commandline parameter -c 0 to disable sync correction.  
-  
 It is possible to start veejay headless and have it write all video data
-to a (special) file for further processing.  
-  
-Refer to chapter [5.3](veejay-HOWTO.md#5.3) for some examples.  
-  
+to a (special) file for further processing. Refer to chapter [5.1](veejay-HOWTO.md#5.1) for some examples.
 
 <span id="4.5">4.5 Streaming video</span>
 -----------------------------------------
 
 You can create an input stream to read video coming from a video4linux
-device, from a pipe or from a network socket (both unicast and
-multicast).  
+device (USB webcam, TV tuner...), from a pipe or from a network socket (both unicast and multicast).
 
 ### <span id="4.5.1">4.5.1 video4linux</span>
 
-To open a video4linux device use gveejay or type the command:  
-  
+To open a video4linux device use reloaded or type the command:
+```
+$ sayVIMS -m "240:0 1;"
+```
 
-    $ sayVIMS 240:0 1;
-
-The selector '240' tells veejay to open a video4linux device, the first
+The VIMS selector `240` tells veejay to open a video4linux device, the first
 argument '0' indicates the device number (i.e. /dev/video0) and the last
 argument '1' indicates the video in port of your capture card (in this
 case composite).  
-Veejay will create a new stream see [chapter 4.4](#4.4) for activating
-the stream.  
+Veejay will create a new stream see [chapter 4.3](#4.3) for activating
+the stream.
 
 ### <span id="4.5.2">4.5.2 pipe</span>
 
@@ -866,19 +851,20 @@ Veejay supports reading video data from a pipe (FIFO) by means of an
 input stream.  
 The only supported transport format is yuv4mpeg (yuv 4:2:0). When
 playing YUV 4:2:2 the video stream will be sampled to YUV 4:2:0 and vice
-versa  
-You can create the input stream by typing the command
+versa.
 
-    $ sayVIMS 243:/tmp/stream.yuv;
+You can create the input stream by typing the command
+```
+$ sayVIMS -m "243:/tmp/stream.yuv;"
+```
 
 ### <span id="4.5.3">4.5.3 network</span>
 
-To get frames from another running veejay, use the command:  
+To get frames from another running veejay, use the VIMS selector `245` with hostname (or IP number) and port:
+```
+$ sayVIMS 245:localhost 5000;
+```
 
-    $ sayVIMS 245: ;
-
-For example, sayVIMS 245:localhost 5000;  
-  
 If you want to send the same video to multiple running veejays accross
 the network, you can save bandwith by starting the veejay you wish to
 use as server with the -V option.  
