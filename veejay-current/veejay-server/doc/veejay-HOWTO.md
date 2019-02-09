@@ -39,10 +39,11 @@ instrument for Linux/GNU*
 1. [Using Veejay](veejay-HOWTO.md#4)
     1. [Terminology and limitations](veejay-HOWTO.md#4.1)
     1. [VIMS](veejay-HOWTO.md#4.2)
+        1. [Global view](veejay-HOWTO.md#4.2.1)
+        1. [sayVIMS utility](veejay-HOWTO.md#4.2.2)
     1. [The keyboard interface](veejay-HOWTO.md#4.3)
     1. [Recording video](veejay-HOWTO.md#4.4)
     1. [Streaming video](veejay-HOWTO.md#4.5)
-    1. [Other utilities](veejay-HOWTO.md#4.5)
 1. [Popular packages](veejay-HOWTO.md#5)
     1. [EffecTV](veejay-HOWTO.md#5.1)
     1. [mplayer](veejay-HOWTO.md#5.2)
@@ -447,10 +448,10 @@ Veejay uses by default a [SDL window](http://libsdl.org/) to play the video. All
 keybinding in veejay depend on SDL; if you move your mouse over to the
 SDL windows to focus it, you can press the keys explained in [4.3 The
 keyboard interface](veejay-HOWTO.md#4.3).  
-To use veejay in commandline style interface mode, see [sayVIMS](veejay-HOWTO.md##sayVIMS).  
+To use veejay in commandline style interface mode, see [sayVIMS](veejay-HOWTO.md##sayVIMS).
 
 You don't even need a video file to use with veejay; you can run it
-in dummy mode by using the `-d` commandline parameter:  
+in dummy mode by using the `-d` commandline parameter:
 ```
 $ veejay -d
 ```
@@ -512,6 +513,7 @@ defines more or less a different functionality.
 
 <span id="4.2">4.2 VIMS</span>
 ------------------------------
+### <span id="4.2.1">4.2.1 Global view</span>
 ```
 Use the command
 
@@ -622,7 +624,7 @@ list can be viewd by typing veejay -u |less or with Gveejay.
 
 The example above sets key 'a' to 'change video speed to 4'
 
-General  description of VIMS messages
+General description of VIMS messages
 =====================================
 
 
@@ -641,48 +643,44 @@ Some reserved numbers:
     loop type       :   0 = no looping, 1 = normal loop, 2 = pingpong (bounce) loop
 ```
 
-<span id="#sayVIMS"></span>sayVIMS
-------------------------------
+### <span id="4.2.2">4.2.2 sayVIMS utility</span>
 
-sayVIMS is a commandline utility distributed with the veejay package, it
-allows you to send to a veejay server short commands in interactive mode,
-single VIMS message or files containing VIMS messages.
+***sayVIMS*** is a commandline utility distributed with the veejay package. It allows you to send short commands in interactive mode, single VIMS message or files containing VIMS messages to batch-process to veejay.
+```
+Usage: sayVIMS [options] [messages]
+where options are:
+ -p          Veejay port (3490)
+ -g          Veejay groupname (224.0.0.31)
+ -h          Veejay hostname (localhost)
+ -m          Send single message
+ -i          Interactive mode
+ -f file     Read from (special) file
+ -d          Dump status to stdout
+ -b          Base64 encode binary data
+ -v          Verbose
+ -?          Print this help
+```
 
 In the following examples, lets say a veejay instance is running on host
-`localhost` using port `3490` (its default values).
+`localhost` using port `3490` (veejay default values).
 
 **Interactive Mode**
 ```
 $ sayVIMS -i -h localhost -p 3490
 ```
 In interactive mode, after a connection is establish with a veejay server,
-a prompt wait you to enter VIMS commands. Press `ENTER` to send it.  
-The connection remain open until you exit by typing `quit`.
+a prompt wait you to enter VIMS commands (see previous chapter about the VIMS message format). Simply press `[ENTER]` to send it. 
 
-Typing '?' followed by pressing `ENTER` gives the list of command below:
 ```
-vi [file]           Open video4linux device
-fi [file]           Open Y4M stream for input
-fo [file]           Open Y4M stream for output
-av [file]           Open (almost any) video file using FFmpeg
-mc [address] [port] Open a multicast UDP video stream
-pr [hostname][port] Open a unicast TCP video stream
-cl [file]           Load cliplist from file
-cn [n1] [n2]        New clip from frames n1 to n2
-cd [n]              Delete clip n1
-sd [n]              Delete Stream n1
-cs [file]           Save cliplist to file
-es [file]           Save editlist to file
-ec [n1] [n2]        Cut frames n1 - n2 to buffer
-ed [n1] [n2]        Del franes n1 - n2
-ep [n]              Paste from buffer at frame n1
-ex [n1] [n2]        Copy frames n1 - n2 to buffer
-er [n1] [n2]        Crop frames n1 - n2
-al [file]           Action file Load
-as [file]           Action file save
-de                  Toggle debug level (default off)
-be                  Toggle bezerk mode (default on)
+$ sayVIMS -i
+veejay sayVIMS 1.1.8
+    type 'quit' or press CTRL-c to exit
+    see 'veejay -u' for a list of commands
+017:;
 ```
+Here, the `017` tells veejay to go to sample starting position.
+
+The connection remain open until you exit by typing `quit` or hit  `[Ctrl]-[c]`.
 
 **Single VIMS message**
 
@@ -706,15 +704,15 @@ $ sayVIMS -f advocate.vims -h localhost -p 3490
 
 **Others examples**
 
-Alternativly, you can start a secundary veejay and stream from peer to
-peer in uncompressed video :
+Alternatively, you can start a secundary veejay and stream from peer to
+peer (TCP) in uncompressed video:
 ```
 $ veejay -d -p 5000
 $ sayVIMS -h localhost -p 5000 -m "245:localhost 3490;"
 
 (press 'F7' in veejay to display the stream, prob. stream 7)
 ```
-Or for multicast:
+Or for multicast (UDP):
 ```
 $ veejay -V 224.0.0.50 -p 5000 -n -L movie1.avi
 $ veejay -d
@@ -722,13 +720,14 @@ $ sayVIMS -h localhost -p 3490 -m "246:224.0.0.50 5000;"
 $ veejay -d -p 4000
 $ sayVIMS -h localhost -p 4000 -m "246:224.0.0.50 5000;"
 ```
+Have a look on [4.5.3 network](veejay-HOWTO.md#4.5.3) for more UDP multicasting.
+
 <span id="4.3">4.3 The keyboard interface</span>
 ------------------------------------------------
 
 Here is a quick overview for the most used default keys, if applied in
 order you will end up with a newly created video sample looping in some
-way (depending on how many times you press the asterix key)  
-
+way (depending on how many times you press the asterix key)
 
 <table>
 <tbody>
@@ -839,8 +838,8 @@ $ sayVIMS -m "240:0 1;"
 ```
 
 The VIMS selector `240` tells veejay to open a video4linux device, the first
-argument '0' indicates the device number (i.e. /dev/video0) and the last
-argument '1' indicates the video in port of your capture card (in this
+argument `0` indicates the device number (i.e. `/dev/video0`) and the last
+argument `1` indicates the video in port of your capture card (in this
 case composite).  
 Veejay will create a new stream see [chapter 4.3](#4.3) for activating
 the stream.
@@ -860,155 +859,38 @@ $ sayVIMS -m "243:/tmp/stream.yuv;"
 
 ### <span id="4.5.3">4.5.3 network</span>
 
-To get frames from another running veejay, use the VIMS selector `245` with hostname (or IP number) and port:
+#### TCP
+To get frames from another running veejay, use the VIMS selector `245` with port and hostname (or IP number):
 ```
-$ sayVIMS 245:localhost 5000;
+$ sayVIMS -m "245:5000 localhost;"
 ```
 
-If you want to send the same video to multiple running veejays accross
+#### UDP
+If you want to send the same video to multiple running veejays across
 the network, you can save bandwith by starting the veejay you wish to
-use as server with the -V option.  
-You can use the -V option to start an optional multicast frame sender.  
+use as server with the `-V` option.
+
 First, you need a multicast route in your routing table. See chapter
-[3.3](#3.3) for a short introduction or consult a howto that disuccess
-setting up multicast for your operating system.  
-  
+[3.4](#3.4) for a short introduction or consult a howto that discuss
+on setting up multicast for your operating system.
 
-    $ veejay -V 224.0.0.50 -p 5000
+You can use the `-V` option to start an optional multicast frame sender.
+```
+$ veejay -V 224.0.0.50 -p 5000 -L movie1.avi
+```
 
-Start another veejay, and use this command:  
+Start another veejay in dummy mode, and use **sayVIMS** to create input stream:
+```
+$ veejay -d
+$ sayVIMS -h localhost -p 3490 -m "246:5000 224.0.0.50;"
+```
+Start more veejays and use sayVIMS with
+the `-p` option to give it a port offset number.
 
-    $ sayVIMS "246:5000 224.0.0.50;" 
-
-To create a new input stream. Start more veejays and use sayVIMS with
-the -p option to give it a port offset number.  
-
-<span id="4.6">4.6 Other utilities</span>
------------------------------------------
-
-Currently there are 4 extra utilities **yuv2rawdv** , **rawdv2yuv** ,
-**sayVIMS** and **any2yuv** included in the veejay package for encoding
-a Y'C<sub>B</sub>C<sub>R</sub> 4:2:0 stream to raw DV and vice versa.  
-  
-**yuv2rawdv** takes input from STDIN and outputs to STDOUT, we
-illustrate this with a few examples.  
-  
-When loading yuv2raw dv without parameters you will see:  
-
-    This program reads a YUV4MPEG stream and puts RAW DV to stdout
-    Usage:  yuv2rawdv [params]
-    where possible params are:
-        -v num    Verbosity [0..2] (default 1)
-        -l num    Clamp Luma (default 0)
-        -c num    Clamp Chroma (default 0)
-
-If you use the clamp parameters, it will clip (not scale!) a pixel into
-a valid range, the resulting video could be for example a bit darker if
-the input stream has values for Luminance exceeding the maximum of
-235.  
-See the table below for all valid ranges.
-
-#### Y'C<sub>B</sub>C<sub>R</sub>
-
-*Channel*
-
-*Range (Clamp)*
-
-*Byte range (no clamping)*
-
-Y (Luminance)
-
-16 - 235
-
-0 - 255
-
-Cb (Chroma Blue)
-
-16 - 240
-
-0 - 255
-
-Cr (Chroma Red)
-
-16 - 240
-
-0 - 255
-
-  
-To convert a yuv4mpeg file to rawdv (the yuv4mpeg file needs to be
-compatible with the digital video format properties)  
-
-    $ cat yuv4mpeg-file.yuv | yuv2rawdv | playdv
-
-  
-  
-To convert a yuv4mpeg file to rawdv with luminance and chroma
-information clipped to a valid range:  
-
-    $ cat yuv4mpeg-file.yuv | yuv2rawdv -l 1 -c 1 | playdv
-
-  
-  
-  
-**rawdv2yuv** takes input from STDIN and outputs to STDOUT, we
-illustrate this with a few examples.  
-
-    This program reads a raw DV stream from stdin and puts YV12/I420 to stdout
-    Usage:  rawdv2yuv [params]
-    where possible params are:
-       -v num     Verbosity [0..2] (default 1)
-       -x         Swap Cb/Cr channels to produce IV12 (default is I420)
-       -n num     Norm to use: 0 = NTSC, 1 = PAL (default 1)
-       -q         DV quality to fastest (Monochrome)
-       -h         Output Half frame size
-       -c num     clip off  rows of frame (for use with -h)
-                  must be a multiple of 8
-
-  
-If you want to convert a full PAL/NTSC dv frame to half PAL YCbCr (I420
-or YV12) you can give the command:  
-
-    $ cat raw.dv | rawdv2yuv -h | yuvplay
-
-  
-You can use the -c parameter to clip the width of the video frame.  
-
-    $ cat raw.dv | rawdv2yuv -h -c 8 | yuvplay
-
-  
-The resizer in rawdv2yuv uses a best neighbour interpolation algorithm
-for downsizing.  
-  
-  
-**any2yuv** takes input from STDIN and puts YV12/I420 to stdout:
-
-    This program reads anything from stdin and puts YV12/I420 to stdout
-    Usage:  any2yuv [params]
-    where possible params are:
-       -v num     Verbosity [0..2] (default 1)
-       -x         Swap Cb/Cr channels to produce IV12 (default is I420)
-       -n num     Norm to use: 0 = NTSC, 1 = PAL (default 1)
-
-  
-  
-  
-**sayVIMS** can be used to send commands or files to batch-process to
-veejay
-
-    Usage: sayVIMS [options] [messages]
-    where options are:
-     -p             Veejay port (3490)
-     -h             Veejay host (localhost)
-     -g             Veejay multicast address (224.0.0.50)
-     -f   Send contents of this file to veejay
-     -c             Colored output (geek feature)
-
-    Messages to send to veejay must be wrapped in quotes
-    You can send multiple messages by seperating them with a whitespace
-
-  
-  
-
+```
+$ veejay -d -p 4000
+$ sayVIMS -h localhost -p 4000 -m "246:224.0.0.50 5000;"
+```
 <span id="5">5 Popular Packages</span>
 --------------------------------------
 
@@ -1019,7 +901,7 @@ Usefull software (in no apparant order):
 -   PureData (PD)
 -   PDP for PD
 
-Please refer to [Other Resources](veejay-HOWTO.md#5) to find the
+Please refer to [Other Resources](veejay-HOWTO.md#6) to find the
 project's website  
 
 5.1 The MJPEG Tools
