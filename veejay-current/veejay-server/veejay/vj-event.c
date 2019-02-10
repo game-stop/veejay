@@ -9104,15 +9104,15 @@ void    vj_event_mcast_start                (   void *ptr,  const char format[],
     P_A( args,sizeof(args), s ,sizeof(s), format, ap);
 
     if(!v->settings->use_vims_mcast) {
-        veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -T commandline option)"); 
+        veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -V commandline option)");
     }
     else
     {
         v->settings->mcast_frame_sender = 1;
         v->settings->mcast_mode = args[0];
         vj_server_set_mcast_mode( v->vjs[2],args[0] );
-        veejay_msg(VEEJAY_MSG_INFO, "Veejay started mcast frame sender");
-    }   
+        veejay_msg(VEEJAY_MSG_INFO, "Veejay started multicast frame sender");
+    }
 }
 
 
@@ -9120,12 +9120,12 @@ void    vj_event_mcast_stop             (   void *ptr,  const char format[],    
 {
     veejay_t *v = (veejay_t*) ptr;
     if(!v->settings->use_vims_mcast)
-        veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -V commandline option)"); 
+        veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -V commandline option)");
     else
     {
         v->settings->mcast_frame_sender = 0;
-        veejay_msg(VEEJAY_MSG_INFO, "Veejay stopped mcast frame sender");
-    }   
+        veejay_msg(VEEJAY_MSG_INFO, "Veejay stopped multicast frame sender");
+    }
 }
 
 void    vj_event_send_effect_list       (   void *ptr,  const char format[],    va_list ap  )

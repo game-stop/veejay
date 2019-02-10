@@ -2741,7 +2741,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_VIDEO_MCAST_START]		=	_new_event(
 				"%d",	
 				VIMS_VIDEO_MCAST_START,
-				"Start built-in UDP mcast server (YUV planar)",
+				"Start built-in UDP multicast server (YUV planar)",
 				vj_event_mcast_start,
 				1,
 				VIMS_ALLOW_ANY,
@@ -2751,7 +2751,7 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_VIDEO_MCAST_STOP]		=	_new_event(
 				NULL,
 				VIMS_VIDEO_MCAST_STOP,
-				"Stop built-in UDP mcast server",
+				"Stop built-in UDP multicast server",
 				vj_event_mcast_stop,
 				0,
 				VIMS_ALLOW_ANY ,

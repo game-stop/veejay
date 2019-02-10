@@ -2654,7 +2654,7 @@ int vj_server_setup(veejay_t * info)
 			vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD, recv_len );
 		if(!info->vjs[VEEJAY_PORT_MAT])
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize mcast sender");
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize multicast sender");
 			return 0;
 		}
 	}
