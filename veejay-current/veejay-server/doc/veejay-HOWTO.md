@@ -149,13 +149,7 @@ allows you to 'play' the video like you would play **a Piano** and it
 allows you to record the resulting video directly to disk for immediate
 playback (video sampling).  
   
-Veejay consists out of several packages:  
-
--   veejay-server
--   veejay-client
--   veejay-utils
--   sendVIMS
--   veejay-themes
+Veejay consists out of several packages:
 
 <table>
 <tbody>
@@ -891,7 +885,7 @@ the `-p` option to give it a port offset number.
 $ veejay -d -p 4000
 $ sayVIMS -h localhost -p 4000 -m "246:224.0.0.50 5000;"
 ```
-<span id="5">5 Popular Packages</span>
+<span id="5">5 Popular Packages (outdated for archive only)</span>
 --------------------------------------
 
 Usefull software (in no apparant order):
@@ -900,6 +894,7 @@ Usefull software (in no apparant order):
 -   Transcode
 -   PureData (PD)
 -   PDP for PD
+-   Ffmpeg
 
 Please refer to [Other Resources](veejay-HOWTO.md#6) to find the
 project's website  
@@ -958,28 +953,22 @@ as packages you can use in combination with veejay.
 
 ### Packages you need
 
--   [veejay](http://veejay.sourceforge.net)
--   [Quasar DV Codec
-    http://libdv.sourcefoge.net](http://libdv.sourceforge.net)
--   [Simple DirectMedia Layer
-    http://www.libsdl.org](http://www.libsdl.org)
--   [The XML C library for Gnome
-    http://www.xmlsoft.org](http://www.xmlsoft.org)
--   [DirectFB http://www.directfb.org](http://www.directfb.org)
--   [JACK http://jackit.sourceforge.net](http://jackit.sourceforge.net)
--   [FreeType ,
-    http://freetype.sourceforge.net](http://freetype.sourceforge.net)
+-   [veejay - veejayhq.net](http://veejayhq.net)
+-   [Quasar DV Codec - libdv.sourceforge.net/](http://libdv.sourceforge.net/)
+-   [Simple DirectMedia Layer - libsdl.org](https://libsdl.org/)
+-   [The XML C library for Gnome - xmlsoft.org](http://www.xmlsoft.org/)
+-   [DirectFB - directfb.org](http://www.directfb.org) (outdated)
+-   [JACK - jackaudio.org](http://jackaudio.org/)
+-   [FreeType - freetype.org](https://www.freetype.org/)
+-   [Ffmpeg - ffmpeg.org](https://ffmpeg.org)
 
 ### Usefull software
 
--   [Mplayer http://www.mplayerhq.hu](http://www.mplayerhq.hu/)
--   [The MJPEGTools
-    http://mjpeg.sourceforge.net](http://mjpeg.sourceforge.net)
--   [Pure Data](http://pure-data.sourceforge.net)
--   [sendVIMS PD module (very
-    cool!)](http://zwizwa.fartit.com/pd/sendVIMS/)
--   [Transcode
-    http://www.theorie.physik.uni-goettingen.de/~ostreich/transcode/](http://www.theorie.physik.uni-goettingen.de/~ostreich/transcode/)
+-   [Mplayer - mplayerhq.hu](http://www.mplayerhq.hu/)
+-   [The MJPEGTools - mjpeg.sourceforge.net](http://mjpeg.sourceforge.net)
+-   [Pure Data - puredata.info](https://puredata.info/)
+-   [sendVIMS PD module (very cool!)](http://zwizwa.fartit.com/pd/sendVIMS/) (**now in veejay** see chapter [2](veejay-HOWTO.md#2))
+-   [Transcode ](http://www.theorie.physik.uni-goettingen.de/~ostreich/transcode/) (outdated)
 
 <span id="6.2">6.2 Mailing Lists</span>
 ---------------------------------------
@@ -990,14 +979,19 @@ address is <veejay-users@lists.sourceforge.net>
 <span id="6.3">6.3 Veejay developer's lounge</span>
 ---------------------------------------------------
 
-Veejay's developer lounge provides a ticket system for you , the user,
+Veejay's developer lounge provides a [ticket system](https://github.com/c0ntrol/veejay/issues) for you , the user,
 to report any problem or feature requests. The ticket system allows us
-to keep track of problems.  
-Also, the developer lounge hosts a subversion code repository where you
-can find the 'on the bleeding edge' source codes of veejay.  
+to keep track of problems.
+
+Also, the [developer lounge](https://github.com/c0ntrol/veejay) hosts a git based code repository where you
+can find the 'on the bleeding edge' source codes of veejay.
+
+```
+$ git clone https://github.com/c0ntrol/veejay.git
+```
+
 Many thanks to jaromil (author of FreeJ/Muse) and the [Dyne
-Foundation](http://dyne.org) for providing these tools  
-.
+Foundation](http://dyne.org) for previously providing, to the veejay project, those tools during many years !
 
 <span id="7">7. Credits</span>
 ------------------------------
