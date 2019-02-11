@@ -1,7 +1,7 @@
 * [COPYING](./COPYING)
 * [HowtoCompile.txt](./HowtoCompile.txt)
 * [HowToDebugging.txt](./HowToDebugging.txt)
-* [HowtoPlugins.txt](./HowtoPlugins.txt)
+* Configure external video plugins - [How to Plugins](./HowtoPlugins.md)
 * [HowtoUbuntu.txt](./HowtoUbuntu.txt)
 * [HowtoVeejay-PureData.html](./HowtoVeejay-PureData.html)
 * [HowtoVideoCodecs.txt](./HowtoVideoCodecs.txt)

@@ -126,7 +126,7 @@ see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
  * Native YUV processing
  * Crash recovery
 
-see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [README Memory](./veejay-current/veejay-server/doc/REAMDE.memory), [README Performance](./veejay-current/veejay-server/doc/README.performance)
+see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [README Memory](./veejay-current/veejay-server/doc/README.memory.md), [README Performance](./veejay-current/veejay-server/doc/README.performance)
 
 ### Media
 
@@ -208,7 +208,7 @@ see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
  * Support for FreeFrame plugins (only for 32 bit systems!)
  * Android server!
 
- see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.txt), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3) ,[README Android](./veejay-current/veejay-server/doc/README.android)
+ see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3) ,[README Android](./veejay-current/veejay-server/doc/README.android)
 
 ## Contact / Feedback & HELP
 
