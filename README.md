@@ -143,17 +143,17 @@ see also : [How to Video Codecs](./veejay-current/veejay-server/doc/HowtoVideoCo
  * 161 built-in FX, many unique and original FX filters
  * 60 Livido filters
  * FX chain (20 slots) with Alpha Channels
- * All FX parameters can be animated.
+ * All FX parameters can be animated
  * Mix up to two layers per FX slot
  * Non destructive edit decision lists (cut/copy/paste/crop video)
  * Sample editor
  * Sequence editor
  * Live disk recorder (sampling)
  * Full deck save/restore
- * Live clip loading 
+ * Live clip loading
  * Live sample sequencing
 
-see also : [README alpha](./veejay-current/veejay-server/doc/README.alpha)
+see also : [README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
 
 ### Trickplay
 
@@ -164,7 +164,7 @@ see also : [README alpha](./veejay-current/veejay-server/doc/README.alpha)
  * Change in-and out points of a sample (marker)
  * Slow motion audio / video
  * Fast motion audio / video
- * Dynamic framerate 
+ * Dynamic framerate
  * Random frame play
  * Random sample play
  * Access up to 4096 video samples instantly
@@ -206,6 +206,7 @@ see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
  * Support for FreeFrame plugins (only for 32 bit systems!)
+ * Support for GMIC plugins
  * Android server!
 
  see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3) ,[README Android](./veejay-current/veejay-server/doc/README.android)
@@ -218,7 +219,7 @@ Please join our mailing list on http://groups.google.com/group/veejay-discussion
 
 Please use the ticket system on https://github.com/c0ntrol/veejay/issues or simply write a mail to the veejay-discussion group!
 
-ENJOY! And let us know about your performances/installations with veejay! 
+ENJOY! And let us know about your performances/installations with veejay!
 
 ---
 ```
