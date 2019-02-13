@@ -315,6 +315,7 @@ usable without them.
 -   (optional) DirectFB &gt;= 0.9.17
 -   (optional) FreeType &gt;= 2.1.9
 -   (optional) GTK &gt;= 2.6.0
+-   (optional) libqrencode &gt;= 3.4.2
 
 
 *On newer distributions, some of the listed software is already
