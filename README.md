@@ -207,10 +207,8 @@ see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
  * Support for LiVIDO plugins
  * Support for FreeFrame plugins (only for 32 bit systems!)
  * Support for GMIC plugins
-<!- * Android client!
 
 see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3)
-<!- [README Android](./veejay-current/veejay-server/doc/README.android)
 
 ## Contact / Feedback & HELP
 
