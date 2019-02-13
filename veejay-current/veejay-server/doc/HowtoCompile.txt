@@ -12,7 +12,6 @@ Required:
 * libxml2 for saving project data
 * SDL for the video window
 * libdv for playback of DV Video
-* freetype2 for font rendering
 * [http://www.gtk.org GTK-2.4 (GTK 2.6 recommended)
 * [http://www.gnome.org GdkPixbuf (comes with Gnome)
 * Cairo (needed for GVeejay Reloaded)
@@ -27,7 +26,7 @@ Optional:
 * DirectFB for secundary head (TVOut)
 * Jack for audio playback
 * G'MIC - GREYC's Magic for Image Computing
-
+* libqrencode (Android VJ remote control)
 
 ## Generic build instructions
 
@@ -45,8 +44,9 @@ If echo is silent, you must set the PKG_CONFIG_PATH to point to the directory co
 
 ### Configure flags
 
-`--enable-debug` Builds veejay for debugging purposes (disables optimization)
+`--enable-debug` Builds veejay for debugging purposes (disables optimization) see also profiling ?
 `--with-arch-target=generic` Build veejay for generic x86 cpu-type. If the default is used (auto), the resulting binary may not run on another computer.
+--without-jack ?
 
 ## Building
 

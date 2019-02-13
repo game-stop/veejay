@@ -9,7 +9,7 @@
 * [Installation](./Installation.md)
 * [NET.txt](./NET.txt)
 * Support for alpha channel compositing - [README.alpha](./README.alpha.md)
-* [README.android](./README.android)
+* [README.android](./README.android.md)
 * [README.audio](./README.audio)
 * Memory concern with veejay - [README.memory](./README.memory.md)
 * [README.performance](./README.performance)

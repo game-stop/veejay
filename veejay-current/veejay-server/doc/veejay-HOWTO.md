@@ -259,7 +259,7 @@ Veejay consists out of several packages:
 -   Support for Frei0r plugins
 -   Support for LiVIDO plugins
 -   Support for FreeFrame plugins (only for 32 bit systems!)
--   Android server!
+-   Android client!
 
 <span id="2.2">2.2</span> Hardware configuration
 ------------------------------------------------
