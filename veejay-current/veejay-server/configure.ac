@@ -964,31 +964,31 @@ dnl		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
 dnl		have_freetype2=true],
 dnl		[have_freetype2=false] )
 
-if test x$have_freetype2 != xtrue; then
-	AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
-	if test $FREETYPE_CONFIG = yes; then
-		FT_CFLAGS="`freetype-config --cflags`" 
-		FT_WORD="`freetype-config --libs`"
-		FT_LIBS=""
-		for word in $FT_WORD; do	
-			beginning=`echo $word |cut -c -2` 
-			if test ".$beginning" = ".-L"; then
-				FT_LDFLAGS="$FT_LDFLAGS $word"
-			else
-				FT_LIBS="$FT_LIBS $word"
-			fi
-		done
-		AC_DEFINE(HAVE_FREETYPE,1,[compiling with freetype])
-		FTPATHTOKENS=${FT_CFLAGS##*/}
-		AC_SUBST(FT_LIBS)
-		AC_SUBST(FT_LDFLAGS)
-		AC_SUBST(FT_CFLAGS)
-		have_freetype=true
-		AC_MSG_NOTICE([Compiling with FreeType])
-	else
-		AC_MSG_ERROR([Cannot find the freetype-config program])
-	fi
-fi
+dnl if test x$have_freetype2 != xtrue; then
+dnl 	AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
+dnl 	if test $FREETYPE_CONFIG = yes; then
+dnl 		FT_CFLAGS="`freetype-config --cflags`" 
+dnl 		FT_WORD="`freetype-config --libs`"
+dnl 		FT_LIBS=""
+dnl 		for word in $FT_WORD; do	
+dnl 			beginning=`echo $word |cut -c -2` 
+dnl 			if test ".$beginning" = ".-L"; then
+dnl 				FT_LDFLAGS="$FT_LDFLAGS $word"
+dnl 			else
+dnl 				FT_LIBS="$FT_LIBS $word"
+dnl 			fi
+dnl 		done
+dnl 		AC_DEFINE(HAVE_FREETYPE,1,[compiling with freetype])
+dnl 		FTPATHTOKENS=${FT_CFLAGS##*/}
+dnl 		AC_SUBST(FT_LIBS)
+dnl 		AC_SUBST(FT_LDFLAGS)
+dnl 		AC_SUBST(FT_CFLAGS)
+dnl 		have_freetype=true
+dnl 		AC_MSG_NOTICE([Compiling with FreeType])
+dnl 	else
+dnl 		AC_MSG_ERROR([Cannot find the freetype-config program])
+dnl 	fi
+dnl fi
 
 AC_MSG_CHECKING(if libunwind is installed)
 have_unwind=false
@@ -1226,13 +1226,13 @@ AC_MSG_NOTICE([  - FFmpeg/AV AVUtil              : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 AC_MSG_NOTICE([  - SDL on-screen-logging         : ${have_sdl_ttf}])
 
-if test "$have_freetype" = "true"; then
-	AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
-fi
+dnl if test "$have_freetype" = "true"; then
+dnl 	AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
+dnl fi
 
-if test "$have_freetype2" = "true"; then
-	AC_MSG_NOTICE([  - FreeType 2 support            : ${have_freetype2}])
-fi
+dnl if test "$have_freetype2" = "true"; then
+dnl 	AC_MSG_NOTICE([  - FreeType 2 support            : ${have_freetype2}])
+dnl fi
 
 AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
