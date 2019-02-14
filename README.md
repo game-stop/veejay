@@ -153,7 +153,7 @@ see also : [How to Video Codecs](./veejay-current/veejay-server/doc/HowtoVideoCo
  * Live clip loading
  * Live sample sequencing
 
-see also : [README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
+see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
 
 ### Trickplay
 
