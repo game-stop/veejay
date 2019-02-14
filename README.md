@@ -126,7 +126,7 @@ see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
  * Native YUV processing
  * Crash recovery
 
-see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [README Memory](./veejay-current/veejay-server/doc/README.memory.md), [README Performance](./veejay-current/veejay-server/doc/README.performance)
+see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [README Memory](./veejay-current/veejay-server/doc/README.memory.md), [README Performance](./veejay-current/veejay-server/doc/README.performance.md)
 
 ### Media
 
