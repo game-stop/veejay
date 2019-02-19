@@ -136,7 +136,7 @@ see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [READ
  * Support for unlimited capture devices
  * Support for Image files (PNG ,JPEG, TIFF, etc)
 
-see also : [How to Video Codecs](./veejay-current/veejay-server/doc/HowtoVideoCodecs.md), [README audio](./veejay-current/veejay-server/doc/README.audio)
+see also : [README Video & Codecs](./veejay-current/veejay-server/doc/README.video-codec.md), [README audio](./veejay-current/veejay-server/doc/README.audio)
 
 ### Editing
 
