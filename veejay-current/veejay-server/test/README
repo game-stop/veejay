@@ -13,7 +13,7 @@ In this directory:
 	veejay simple keyboard layout
 
  livecinema/
-	action-file.xml  	;example action file for veejay , run with -l or --action-file
+	action-file.xml  	;example action file for veejay , run with -F or --action-file
 
  videowall/
 	split screen configuration shell example.

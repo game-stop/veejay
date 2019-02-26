@@ -1,24 +1,25 @@
- __   __   __     __    __     ______    
+```
+ __   __   __     __    __     ______
 /\ \ / /  /\ \   /\ "-./  \   /\  ___\   
 \ \ \'/   \ \ \  \ \ \-./\ \  \ \___  \  
  \ \__|    \ \_\  \ \_\ \ \_\  \/\_____\ 
   \/_/      \/_/   \/_/  \/_/   \/_____/ 
+```
+VIMS is Veejay's IMS (Internal Message System)
+=======================
 
-1. VIMS is Veejay's IMS (Internal Message System)
-=================================================
-
-All control data is distributed via VIMS. Each (atomical) message consists of an Action Identifier
-and a list of zero or more Arguments which can be used to control Video Clips, Video Streams,
+Veejay is server/client model and all control data is distributed via VIMS. Each (atomical) message consists of an _Action Identifier_ ( aka __selector__ ) 
+and a list of zero or more _Arguments_ which can be used to control Video Clips, Video Streams,
 the Effect Chain and many other things.
 
 VIMS allows events to be triggered through:
 
-SDL Keyboard Event (libsdl)
-OSC (OpenSoundControl)
-IMP (Internal Message Protocol)
+* SDL - Keyboard Event ([libsdl](https://en.wikipedia.org/wiki/Simple_DirectMedia_Layer))
+* OSC - Synthesizers, computers, and other multimedia devices network protocol ([Open Sound Control](https://en.wikipedia.org/wiki/Open_Sound_Control))
+* IMP - Veejay Internal Message Protocol
 
 
-After intalling veejay, you will have a commandline utility 'sayVIMS'
+After [installing](./Installation.md) all veejay's packages, you will have a commandline utility `sayVIMS`
 
 This document describes what messages you can send to veejay through using VIMS
 
@@ -71,7 +72,7 @@ You can dynamically assign keybindings to trigger a bundle in reloaded ( View ->
 
 There is an example Action File that a number of bundles with keybindings:
 
-  $ veejay -v /path/to/video.avi -F test/livecinema/action-file.xml
+  $ veejay -v /path/to/video.avi -F test/livecinema/action-file.xml HERE CHECK OTHER AF
 
 The bundles can be triggered by the keys SHIFT + [ q,w,e,r,t,y,u,i,o,p,a,s,d,f,g,h,j,k,l,z,x,c,v,b,n,m ]
 
@@ -129,8 +130,8 @@ The message bundle can be attached to a key , for example 'SHIFT + A' by sending
 
 Which attaches bundle '516' to SDL key '97' using a modifier '3', which is SHIFT.
 
-Modifiers: 0 = none, 1 = alt , 2 = ctrl,  3 = shift
-Keys     : see SDLkeysym.h somewhere in include/SDL/
+Modifiers    : 0 = none, 1 = alt , 2 = ctrl,  3 = shift  
+SDL Keys     : see SDL_keysym.h (somewhere like `/usr/include/SDL/`)
 
 If the number 0 is used for an event number, a given key combination can be
 unset (wiped) :
