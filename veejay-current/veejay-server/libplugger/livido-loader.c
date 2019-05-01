@@ -101,7 +101,6 @@ static	struct
 	{	FMT_422,	LIVIDO_PALETTE_YUV422P },
 	{	FMT_422F,	LIVIDO_PALETTE_YUV422P },
 	{	FMT_444,	LIVIDO_PALETTE_YUV444P },
-	//{	FMT_444F,	LIVIDO_PALETTE_YUV444P },
 	{	-1,	-1 },
 };
 
@@ -141,8 +140,6 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 			switch( current_palette ) {
 				case LIVIDO_PALETTE_YUV444P:
 				case LIVIDO_PALETTE_YUVA8888:
-					if( pref_palette_ == LIVIDO_PALETTE_YUV422P )
-						chroma_supersample ( SSM_422_444, frame, frame->data );
 					break;
 				
 			}
@@ -578,7 +575,7 @@ static	int	match_palette(livido_port_t *ptr, int palette )
 
 static	int	find_cheap_palette(livido_port_t *c, livido_port_t *ptr , int w)
 {
-	int palette = LIVIDO_PALETTE_YUV422P;
+	int palette = LIVIDO_PALETTE_YUV444P;
 	if( match_palette(ptr,palette ))
 	{
 		vevo_property_set( c, "current_palette", LIVIDO_ATOM_TYPE_INT,1, &palette );
@@ -620,7 +617,7 @@ static	int	init_channel_port(livido_port_t *ptr, livido_port_t *in_channel, int 
 	{
 		if(!find_cheap_palette(in_channel ,ptr,w))
 		{
-			veejay_msg(0, "No support for any palette in plugin");
+			veejay_msg(VEEJAY_MSG_WARNING, "No support for any palette in plugin");
 			return 0;
 		}
 	}	
@@ -879,7 +876,7 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_)
 	//@ call livido init
 	livido_init_f init_f;
 	vevo_property_get( filter_templ, "init_func", 0, &init_f );
-	int fullrange = ( org_fmt_ == PIX_FMT_YUVJ422P ? 1: 0 );
+	int fullrange = ( (org_fmt_ == PIX_FMT_YUVJ422P || org_fmt_ == PIX_FMT_YUVJ444P) ? 1: 0 );
 	vevo_property_set( filter_instance, 
 					"HOST_fullrange",
 					VEVO_ATOM_TYPE_INT,
@@ -970,20 +967,16 @@ void	livido_plug_process( void *instance, double time_code )
 	vevo_property_get( channel, "current_palette", 0, &current_palette );
 	if( current_palette != pref_palette_ ) {
 		switch( current_palette ) {
-			case LIVIDO_PALETTE_YUVA8888: 
-			case LIVIDO_PALETTE_YUV444P: {
+            default: {
 				VJFrame frame; VJFrame *f = &frame;
 				vevo_property_get( channel, "width", 0, &(f->width));
 				vevo_property_get( channel, "height", 0, &(f->height));
 				int i;
-				for( i = 0; i < 3; i ++ ) {
+				for( i = 0; i < 4; i ++ ) {
 					vevo_property_get( channel, "pixel_data", i, &(f->data[i]));
 				}
-				if( pref_palette_ == LIVIDO_PALETTE_YUV422P )
-					chroma_subsample( SSM_422_444, f, f->data );
-			}
+                     }
 			break;
-			
 		}
 	}
 
@@ -1384,10 +1377,13 @@ static int		host_to_palette( int pref_palette )
 		case PIX_FMT_YUVJ422P:
 		case PIX_FMT_YUVA422P:
 			return LIVIDO_PALETTE_YUV422P;
+        case PIX_FMT_YUV444P:
+        case PIX_FMT_YUVJ444P:
+            return LIVIDO_PALETTE_YUV444P;
 		default:
 			return LIVIDO_PALETTE_YUVA8888;
 	}
-	return LIVIDO_PALETTE_YUV422P;
+	return LIVIDO_PALETTE_YUVA8888;
 }
 
 

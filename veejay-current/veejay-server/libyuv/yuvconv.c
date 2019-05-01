@@ -480,7 +480,7 @@ int			yuv_to_alpha_fmt(int fmt)
 		case PIX_FMT_YUVJ444P:
 			return PIX_FMT_YUVA444P;
 	}
-	return fmt;
+	return  (full_range_pixel_value_ ? PIX_FMT_YUVJ444P: PIX_FMT_YUV444P );
 }
 
 

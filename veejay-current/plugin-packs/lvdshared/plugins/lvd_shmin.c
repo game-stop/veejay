@@ -330,6 +330,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 			LIVIDO_PALETTE_RGBA32,
 			LIVIDO_PALETTE_YUVA422,
 			LIVIDO_PALETTE_YUVA8888,
+            LIVIDO_PALETTE_YUV444P,
             0
 	};
 	

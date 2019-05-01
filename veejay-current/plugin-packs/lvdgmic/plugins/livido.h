@@ -11,7 +11,8 @@
 
 	  Revised by Niels, 2010 ( 101 )
                         2011 ( 102 )
-						2015 ( 103 )		
+						2015 ( 103 )	
+					    2016 ( 104 ) 
  
    LiViDO is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -74,6 +75,9 @@ typedef void livido_port_t;
 #define LIVIDO_PALETTE_YUV444P16BE 10
 #define LIVIDO_PALETTE_YUV422P16LE 11
 #define LIVIDO_PALETTE_YUV422P16BE 12
+
+#define LIVIDO_PALETTE_GRAY 200
+
 #define LIVIDO_PALETTE_YUV422P 513
 #define LIVIDO_PALETTE_YV16 513
 #define LIVIDO_PALETTE_YUV420P 514

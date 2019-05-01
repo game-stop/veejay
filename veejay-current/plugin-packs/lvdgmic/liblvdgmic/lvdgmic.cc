@@ -17,9 +17,14 @@ lvdgmic::~lvdgmic()
 }
 
 static inline int get_n_planes(int fmt) {
-	if(fmt < 516 )
+	if(fmt < 516)
 		return 1;
-	return 3; //FIXME
+
+    if(fmt == 522 || fmt == 524 ) {
+        return 4;
+    }
+
+	return 3; // its usually 3 planes
 }
 
 void lvdgmic::push( int w, int h, int fmt, unsigned char **data, int n )

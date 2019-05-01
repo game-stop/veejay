@@ -277,6 +277,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	int palettes0[] = {
            	LIVIDO_PALETTE_YUV420P,
            	LIVIDO_PALETTE_YUV422P,
+            LIVIDO_PALETTE_YUV444P,
             0
 	};
 	
