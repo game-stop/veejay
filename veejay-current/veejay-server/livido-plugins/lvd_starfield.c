@@ -64,14 +64,29 @@ static void init_star(STAR* star, int i, int speed)
 
 
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	starfield_t *starfield = (starfield_t*) livido_malloc( sizeof(starfield_t));
+    if(!starfield) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
     starfield->stars = (STAR**) livido_malloc(sizeof(STAR*) * MAX_STARS );
+    if(!starfield->stars) {
+        free(starfield);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
 
-	int i;
+	int i,j;
 	for( i = 0; i < MAX_STARS ; i ++ ) {
 		starfield->stars[i] = (STAR*) livido_malloc( sizeof(STAR) );
+        if(starfield->stars[i] == NULL) {
+            for(j = 0; j < i; j ++ ) {
+                free(starfield->stars[j]);
+            }
+            free(starfield->stars);
+            free(starfield);
+            return LIVIDO_ERROR_MEMORY_ALLOCATION;
+        }
 		init_star( starfield->stars[i], i + 1 , 2 );
 	}
 

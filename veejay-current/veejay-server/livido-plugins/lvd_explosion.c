@@ -60,20 +60,43 @@ void init_particle(PARTICLE* particle, int w, int h)
   particle->dead = 0;
 }
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	int w = 0, h = 0;
 	lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
 
 	particles_t *particles = (particles_t*) livido_malloc( sizeof(particles_t));
-	particles->particles = (PARTICLE**) livido_malloc(sizeof(PARTICLE*) * MAX_PARTICLES );
-	particles->fire = (uint8_t*) livido_malloc( sizeof(uint8_t) * w * h );
+    if(!particles) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+
+    particles->particles = (PARTICLE**) livido_malloc(sizeof(PARTICLE*) * MAX_PARTICLES );
+	if(!particles->particles) {
+        free(particles);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+
+    particles->fire = (uint8_t*) livido_malloc( sizeof(uint8_t) * w * h );
+    if(!particles->fire) {
+        free(particles->particles);
+        free(particles);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
 
 	livido_memset( particles->fire, 0, w * h );
-	int i;
+	int i,j;
 	for( i = 0; i < MAX_PARTICLES ; i ++ ) {
 		particles->particles[i] = (PARTICLE*) livido_malloc( sizeof(PARTICLE) );
-		init_particle( particles->particles[i], w,h );
+	    if(particles->particles[i]==NULL) {
+            for(j = 0; j < i; j ++ ) {
+                free(particles->particles[j]);
+            }
+            free(particles->particles);
+            free(particles->fire);
+            free(particles);
+            return LIVIDO_ERROR_MEMORY_ALLOCATION;
+        }
+        init_particle( particles->particles[i], w,h );
 	}
 
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &particles);

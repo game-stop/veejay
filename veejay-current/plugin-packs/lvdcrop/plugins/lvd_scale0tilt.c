@@ -149,13 +149,16 @@ static void update_scaler( scale0tilt_instance_t* inst )
 	gavl_video_scaler_init( inst->video_scaler, &inst->format_src, &format_dst );
 }
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	int width = 0, height = 0;
 
 	lvd_extract_dimensions( my_instance, "out_channels", &width, &height );
 
 	scale0tilt_instance_t* inst = (scale0tilt_instance_t*)livido_malloc(sizeof(scale0tilt_instance_t));
+    if(!inst) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
 
 	livido_memset( inst, 0, sizeof(scale0tilt_instance_t) );
 
@@ -173,8 +176,25 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	inst->format_src.pixelformat = GAVL_YUVJ_444_P;
 
 	inst->video_scaler = gavl_video_scaler_create();
+    if(!inst->video_scaler) {
+        free(inst);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+
 	inst->frame_src = gavl_video_frame_create( NULL );
+    if(!inst->frame_src) {
+        gavl_video_scaler_destroy(inst->video_scaler);
+        free(inst);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+
 	inst->frame_dst = gavl_video_frame_create( NULL );
+    if(!inst->frame_dst) {
+        gavl_video_scaler_destroy(inst->video_scaler);
+        gavl_video_frame_destroy(inst->frame_src);
+        free(inst);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
 
 	inst->frame_src->strides[0] = width;
 	inst->frame_src->strides[1] = width;
@@ -198,21 +218,21 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 {
 	scale0tilt_instance_t *inst = NULL;
-	livido_property_get( my_instance, "PLUGIN_private", 0, &inst );
+    if(livido_property_get( my_instance, "PLUGIN_private", 0, &inst ) == LIVIDO_NO_ERROR ) {
+	    gavl_video_scaler_destroy(inst->video_scaler);
+	    gavl_video_frame_null( inst->frame_src );
+	    gavl_video_frame_destroy( inst->frame_src );
+	    gavl_video_frame_null( inst->frame_dst );
+	    gavl_video_frame_destroy( inst->frame_dst );
+	    gavl_video_frame_null( inst->temp );
+	    gavl_video_frame_destroy( inst->temp );
+	    gavl_video_frame_null( inst->temp_alpha );
+	    gavl_video_frame_destroy( inst->temp_alpha );
 
-	gavl_video_scaler_destroy(inst->video_scaler);
-	gavl_video_frame_null( inst->frame_src );
-	gavl_video_frame_destroy( inst->frame_src );
-	gavl_video_frame_null( inst->frame_dst );
-	gavl_video_frame_destroy( inst->frame_dst );
-	gavl_video_frame_null( inst->temp );
-	gavl_video_frame_destroy( inst->temp );
-	gavl_video_frame_null( inst->temp_alpha );
-	gavl_video_frame_destroy( inst->temp_alpha );
-
-	free(inst);
+	    free(inst);
     
-	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR, 0, NULL );
+	    livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR, 0, NULL );
+    }
 
 	return LIVIDO_NO_ERROR;
 }

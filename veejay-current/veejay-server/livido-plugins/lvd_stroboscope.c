@@ -24,13 +24,21 @@ typedef struct
 #define RUP8(num)(((num)+8)&~8)
 
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	int w = 0, h = 0;
 	lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
 
 	hold_buffer_t *hb = (hold_buffer_t*) livido_malloc( sizeof( hold_buffer_t ));
-	hb->buffer = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8( w * h * 3));
+    if(!hb) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+    hb->buffer = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8( w * h * 3));
+    if(!hb->buffer) {
+        free(hb);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+    
 	hb->planes[0] = hb->buffer;
 	hb->planes[1] = hb->planes[0] + RUP8(w*h);
 	hb->planes[2] = hb->planes[1] + RUP8(w*h);

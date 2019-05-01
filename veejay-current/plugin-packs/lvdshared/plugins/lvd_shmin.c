@@ -77,7 +77,7 @@ static	inline int	lvd_to_ffmpeg( int lvd, int fr ) {
 	return PIX_FMT_YUV422P;
 }
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	int shm_id = 0;
 	char *env_id = getenv( "VEEJAY_SHMID" );

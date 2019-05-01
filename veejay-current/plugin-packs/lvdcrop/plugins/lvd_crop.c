@@ -25,16 +25,25 @@ typedef struct
 	int flags;
 } lvd_crop_t;
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	int w = 0, h = 0;
         lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
 
 	lvd_crop_t *c = (lvd_crop_t*) livido_malloc( sizeof(lvd_crop_t));
+    if(!c) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+
 	livido_memset(c,0,sizeof(lvd_crop_t));
 
 	c->buf[0]     = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8(w * h * 4));
-	c->buf[1]     = c->buf[0] + RUP8(w*h);
+	if(!c->buf[0]) {
+        free(c);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+
+    c->buf[1]     = c->buf[0] + RUP8(w*h);
 	c->buf[2]     = c->buf[1] + RUP8(w*h);
 
 	c->w		  = -1;
@@ -49,17 +58,16 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 {
 	lvd_crop_t *crop = NULL;
-	livido_property_get( my_instance, "PLUGIN_private", 0, &crop );
-
-	if( crop ) {
-		if( crop->buf[0] ) {
-			free(crop->buf[0]);
-		}
-		
-		free(crop);
-		crop = NULL;
-	}		
-    livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR, 0, NULL );
+	if( livido_property_get( my_instance, "PLUGIN_private", 0, &crop ) == LIVIDO_NO_ERROR ) {
+	    if( crop ) {
+		    if( crop->buf[0] ) {
+		    	free(crop->buf[0]);
+		    }
+		    free(crop);
+		    crop = NULL;
+	    }		
+        livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR, 0, NULL );
+    }
 
 	return LIVIDO_NO_ERROR;
 }

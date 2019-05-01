@@ -96,7 +96,7 @@ static int displaywall_draw(displaywall_t *wall, uint8_t *src, uint8_t *dst, int
 	return 0;
 }
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	int w = 0, h = 0;
         lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
@@ -104,12 +104,19 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	int video_area = w * h * 3;
 
 	displaywall_t *entry = (displaywall_t*) livido_malloc(sizeof(displaywall_t));
-	livido_memset( entry, 0, sizeof(displaywall_t));
+	if(entry == NULL) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+
+    livido_memset( entry, 0, sizeof(displaywall_t));
 
 	entry->vecx = (int *)livido_malloc(sizeof(int) * video_area);
 	entry->vecy = (int *)livido_malloc(sizeof(int) * video_area);
-	if(entry->vecx == NULL || entry->vecy == NULL) {
+	
+    if(entry->vecx == NULL || entry->vecy == NULL) {
 		free(entry);
+        if(entry->vecx) free(entry->vecx);
+        if(entry->vecy) free(entry->vecy);
 		return LIVIDO_ERROR_MEMORY_ALLOCATION;
 	}
 
@@ -128,7 +135,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 }
 
 
-livido_deinit_f	deinit_instance( livido_port_t *my_instance )
+int	deinit_instance( livido_port_t *my_instance )
 {
 	displaywall_t *wall = NULL;
 	livido_property_get( my_instance, "PLUGIN_private", 0, &wall );

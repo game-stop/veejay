@@ -125,7 +125,7 @@ static 	void	failed_init_cleanup( shared_video_t *v )
 	free(v);
 }
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int init_instance( livido_port_t *my_instance )
 {
 	shared_video_t *v = (shared_video_t*) livido_malloc( sizeof( shared_video_t ) );
 

@@ -17,9 +17,12 @@ LIVIDO_PLUGIN
 #include 	"lvd_common.h"
 #include	"lvdgmicglue.h"
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	Clvdgmic *gmic = lvdgmic_new(1);
+    if(!gmic) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
 
 	livido_property_set( my_instance, "PLUGIN_private",
 			LIVIDO_ATOM_TYPE_VOIDPTR,1,&gmic );
@@ -27,16 +30,15 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-
 livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 {
 	Clvdgmic *gmic = NULL;
-	livido_property_get( my_instance, "PLUGIN_private",0, &gmic);
-	lvdgmic_delete(gmic);
+	if(livido_property_get( my_instance, "PLUGIN_private",0, &gmic) == LIVIDO_NO_ERROR) {
+	    lvdgmic_delete(gmic);
+    }
 
 	return LIVIDO_NO_ERROR;
 }
-
 
 int		process_instance( livido_port_t *my_instance, double timecode )
 {

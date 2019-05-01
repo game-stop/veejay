@@ -24,13 +24,20 @@ typedef struct
 	int      frame_no;
 } bgsubtract_t;
 
-livido_init_f	init_instance( livido_port_t *my_instance )
+int	init_instance( livido_port_t *my_instance )
 {
 	int w = 0, h = 0;
 	lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
 	
 	bgsubtract_t *b = (bgsubtract_t*) livido_malloc(sizeof(bgsubtract_t));
-	b->bg = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8(w * h) );
+    if(!b) {
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+    b->bg = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8(w * h) );
+    if(!b->bg) {
+        free(b);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
 
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &b);
 
