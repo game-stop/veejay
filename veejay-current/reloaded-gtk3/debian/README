@@ -1,0 +1,117 @@
+                                                                                
+                                                                      ~==   
+                                                                    ~====     
+              :...                                                 ~~====       
+             :......                                            ~~~~====         
+              :.....:                                        ~~~~====          
+               :......                                    -~~~~===             
+                :.......                                 --~~~~~==               
+                 :.......                              ::~~~~~~=                 
+                   :......                           "::~~~~==                   
+                    :.....,                         :::~~~===                    
+                     :.....                      =::~~~~===      
+                      :......                    :::~~~====     
+                       .......                 ::~~~~~===      
+                         .......              :::~~~~~~==     
+                           ......            ~::~~~~~~==      
+                            ......          |::~~~=|
+                            .....         :::|:~==|
+                           ..:::        |:=|||==+
+                           ., :.,       :|||?||+=                   
+                           ..::,,.:      :||=~=.||                         
+                              ,...::,,, |~:=|||||+|                                
+                              :..,:::||||~~~====++                                 
+                            ,:,,,:::~~~~~===++++            Reloaded                               
+                             ,::::~~~====++++                                 
+                               ~~~~~===+++++               version 1.5.47              
+                                ~~===+++++++:                               
+                                 N=++++++++++              Feb.  2015.                             
+                                   +++++++++                                   
+                                    ++++::::                                  
+                                     :::::                                      
+                                       ||                                         
+          
+   
+ 	        :: Reloaded, a graphical interface for Veejay ::
+
+	
+	FEATURE OVERVIEW
+
+
+General:
+
+ # Thin client (TCP/IP) 
+ # MIDI support (auto learning)
+ # Slick interface designed for live performing
+ # Tracks multiple veejay servers
+
+Install
+=======
+
+See file 'INSTALL'
+
+See doc/Howto_Compile.html
+See doc/Howto_Compile_on_Ubuntu.html
+
+Documentation
+=============
+
+See source code. 
+
+Running
+=======
+
+Reloaded requires a running veejay
+
+$ reloaded
+
+$ reloaded -h hostname -p portnumber
+
+
+To use a midi controller with veejay you must connect
+the veejay's sequencer port to the MIDI controller port.
+There is a utility 'aconnect' (comes with ALSA) that does this.
+
+1. List inputs (midi keyboards)
+  $ aconnect -i
+
+  client 129: 'Virtual Keyboard' [type=user]
+
+
+2. List outputs (Veejay)
+  $ aconnect -o
+
+  client 128: 'Veejay' [type=user]
+
+
+3. Connect the ports
+
+  $ aconnect 129 128
+
+
+4. Launch reloaded
+
+
+
+Know bugs
+=========
+- Multitracker crashes when using very high resolution video
+
+
+
+
+About
+=====
+
+GveejayReloaded is a client for veejay. As long as veejay (the server)
+is running, you can connect and disconnect from it with reloaded.
+
+
+
+
+
+
+
+
+
+                                                                      

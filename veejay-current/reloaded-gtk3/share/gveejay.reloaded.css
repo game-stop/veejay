@@ -1,0 +1,16 @@
+.smallaspossible {
+    min-height: 0px;
+    min-width: 0px;
+}
+
+.padplusfour {
+ padding-left: 4px;
+ padding-right: 4px;
+}
+
+button {
+ color : #00ff00;
+ background-color : #ff00ff;
+ padding-left: 1px;
+ padding-right: 1px;
+}

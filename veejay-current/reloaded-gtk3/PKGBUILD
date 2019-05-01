@@ -1,0 +1,31 @@
+# Contributor: Luciano A. Ferrer <laferrer@gmail.com>
+# Modified for ArchLinux by Niels <nwelburg@gmail.com>
+pkgname=reloaded
+pkgrel=1
+pkgver=1.5.9
+pkgdesc="Reloaded is the graphical user interface for Veejay"
+arch=('i686' 'x86_64')
+url="http://www.veejayhq.net"
+license=('GPL')
+groups=()
+conflicts=('reloaded')
+depends=('libxml2' 'veejay' 'gtk2' 'glib2' 'glade' 'alsa-lib' )
+optdepends=()
+source=()
+md5sums=()
+changelog=('ChangeLog')
+backup=()
+replaces=()
+
+build() {
+	export PKG_CONFIG_PATH=/usr/lib/pkgconfig
+	cd $startdir
+  ./autogen.sh
+  ./configure --prefix=/usr
+  make || return 1
+}
+
+package() {
+	cd $startdir
+	make DESTDIR="$pkgdir/" install
+}

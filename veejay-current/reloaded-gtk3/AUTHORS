@@ -1,0 +1,28 @@
+Tim Philipp Müller
+	(CellRendererSpin 15 minute hack - good enough)
+
+Matthijs v. Henten <matthijs.vanhenten@gmail.com>
+	Glade-2 interface design
+	Icon/picture design
+
+Thomas Reinhold <stan@jf-chemnitz.de>
+	Samplebank 
+
+Dursun Koca
+	Veejay Logo (V) design
+
+Niels Elburg <nwelburg@gmail.com>
+	Lead programming  
+
+Jerome Blanchi <d.j.a.y@free.fr>
+    user interface improvemnts, port to GTK 3
+
+Contributions by:
+	Toni < oc2pus@arcor.de > 
+        (making gveejay happen on GTK 2.4, veejay.spec file)  
+
+Icons:
+
+	share/multicast.ico
+	
+	icons8.com as Creative Commons Attribution-NoDerivs 3.0 Unported 

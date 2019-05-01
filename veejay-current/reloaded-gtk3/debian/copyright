@@ -1,0 +1,53 @@
+Upstream Author(s):
+
+    Glade-2 interface design
+    Icon/picture design
+    Matthijs v. Henten <matthijs.vanhenten@gmail.com>
+
+    Samplebank
+    Thomas Reinhold <stan@jf-chemnitz.de>
+
+    Veejay Logo (V) design
+    Dursun Koca
+
+    Lead programming
+    Niels Elburg <nwelburg@gmail.com>
+
+    Contributions by:
+    Toni < oc2pus@arcor.de >
+    (making gveejay happen on GTK 2.4, veejay.spec file)
+
+    CellRendererSpin 15 minute hack - good enough
+    Tim Philipp Müller
+
+    Initial debian packaging by
+    Jof Thibaut <tangostudio@tuxfamily.org> 
+   
+
+Copyright: 
+
+    Copyright (C) 2008-2015, Niels Elburg VeejayHQ.
+
+License:
+
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
+    as published by the Free Software Foundation; either version 2
+    of the License, or (at your option) any later version.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+    On Debian systems, the complete text of the GNU General
+    Public License version 2 can be found in `/usr/share/common-licenses/GPL-2'.
+
+The Debian packaging is:
+
+    Copyright (C) 2010 Jof Thibaut <tangostudio@tuxfamily.org>
+    and is licensed under the GPL version 3, 
+    see `/usr/share/common-licenses/GPL-3'.
