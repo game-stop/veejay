@@ -27,7 +27,7 @@ The engine is historically based upon mjpegtools's lavplay and processes all vid
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
 1. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server)
-2. [veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client)
+2. [reloaded-gtk3](https://github.com/c0ntrol/veejay/tree/master/veejay-current/reloaded-gtk3) or [veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client) for GTK2
 3. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
 4. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
 
@@ -36,11 +36,10 @@ For each package, run confgure and make:
 ```bash
  ./autogen.sh
  ./configure
- make && make install
+ make && sudo make install
 ```
 
-If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. If you don't now what cpu veejay will be running on , pass `--with-arch-target=auto` to configure.
-
+If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. 
 
 Before running veejay, be sure to add or link some TrueType fonts in 
 
@@ -74,7 +73,7 @@ There are several plugin-packs available for veejay: https://github.com/c0ntrol/
 
 * lvdcrop ; a couple of crop filters and a port of frei0r's scale0tilt 
 * lvdshared ; a couple of plugins that implement a producer/consumer mechanism for shared video resources
-* lvdgmic ; a couple of GMIC based filters, although slow in processing they are quite amazing
+* lvdgmic ; GMIC based filters, although slow in processing they are quite amazing
 
 To compile and install a plugin-pack:
 ```bash
