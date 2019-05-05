@@ -40,7 +40,6 @@ extern int mt_get_max_tracks();
 static int load_midi = 0;
 static int port_num = DEFAULT_PORT_NUM;
 static char hostname[255];
-static int gveejay_theme = 0; //GTK3Migr : KEEP for now // set to 1 to load with the default reloaded theme
 static int verbosity = 0;
 static int col = 0;
 static int row = 0;
