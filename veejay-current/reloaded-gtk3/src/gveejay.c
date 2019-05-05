@@ -64,6 +64,7 @@ static gint arg_preview = 0;
 static gint arg_tracks = 0;
 static gchar *arg_size = NULL;
 static gboolean arg_version = FALSE;
+static gchar *arg_style = NULL;
 
 static const char skinfile[] = "gveejay.reloaded.glade"; //FIXME Has binary ressource ?
 
@@ -86,6 +87,7 @@ static void usage(char *progname)
     printf( "-b\t\tEnable beta features.\n");
     printf( "-a\t\tAuto-connect to local running veejays.\n");
     printf( "-L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
+    printf( "-t\t\tLoad user defined stylesheet from FILE or use \"djay\"\n");
 
     printf( "\n\n");
 }
@@ -291,6 +293,11 @@ gint vj_gui_command_line (GApplication            *app,
         if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "TracXs parameted at %d", n_tracks);
     }
 
+    if( arg_style ) {
+        vj_gui_set_stylesheet(arg_style);
+        g_free(arg_style);
+    }
+
     if( err )
     {
         usage(argv[0]);
@@ -341,6 +348,7 @@ int main(int argc, char **argv)
     {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be extra verbose (usefull for debugging)", NULL},
     {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version, data directory and exit.", NULL},
     {"tracXs",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
+    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE or \"djay\"", NULL },
     {NULL}};
 
     context = g_option_context_new (NULL);

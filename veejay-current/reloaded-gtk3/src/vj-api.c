@@ -5801,12 +5801,6 @@ static void reload_vimslist()
     free( eltext );
 }
 
-static void remove_all (GtkComboBox *combo_box)
-{
-    GtkTreeModel* model = gtk_combo_box_get_model (combo_box);
-    gtk_list_store_clear (GTK_LIST_STORE(model));
-}
-
 static char *tokenize_on_space( char *q )
 {
     int n = 0;
@@ -6429,14 +6423,6 @@ static void init_recorder(int total_frames, gint mode)
 }
 
 static char glade_path[1024];
-
-static int select_f(const struct dirent *d )
-{
-    if ((strcmp(d->d_name, ".") == 0) ||
-        (strcmp(d->d_name, "..") == 0))
-         return 0;
-    return 1;
-}
 
 char *get_glade_path()
 {
@@ -7674,6 +7660,41 @@ void vj_event_list_free()
     veejay_memset( vj_event_list, 0, sizeof(vj_event_list));
 }
 
+char reloaded_css_file[1024];
+int  use_css_file = 0;
+
+void vj_gui_set_stylesheet(const char *css_file) {
+    int use_djay = 0;
+    if(strlen(css_file)==4) {
+        if(strncasecmp(css_file, "djay", 4) == 0 ) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Using d/j/a/y's theme for darkly lit environments");
+            snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s",RELOADED_DATADIR,"gveejay.reloaded.css");
+            use_djay = 1;
+        }
+    }
+
+    if(!use_djay) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Using CSS %s", reloaded_css_file);
+        snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s", css_file);
+    }
+    use_css_file = 1;
+}
+
+void vj_gui_activate_stylesheet()
+{
+    GtkCssProvider *css = gtk_css_provider_new();
+    gtk_style_context_add_provider_for_screen ( gdk_screen_get_default (),GTK_STYLE_PROVIDER (css),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    if(use_css_file) {
+        GError* error = NULL;
+        if(!gtk_css_provider_load_from_path(css, reloaded_css_file, &error))
+        {
+            veejay_msg(VEEJAY_MSG_WARNING, "Could not load CSS file: %s , %s", error->message, reloaded_css_file);
+            g_error_free (error);
+        }
+    }
+    g_clear_object(&css);
+}
+
 void vj_gui_init(const char *glade_file,
                  int launcher,
                  char *hostname,
@@ -7774,22 +7795,7 @@ void vj_gui_init(const char *glade_file,
     }
     info = gui;
 
-// FIXME hardcoded ressource file
-    char css_path[1024];
-    snprintf( css_path, sizeof(css_path), "%s/%s",RELOADED_DATADIR,"gveejay.reloaded.css");
-    GtkCssProvider *css = gtk_css_provider_new();
-    if(!gtk_css_provider_load_from_path(css, css_path, &error))
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Couldn't load style file: %s , %s", error->message, css_path);
-        g_error_free (error);
-    }
-    else
-    {
-      gtk_style_context_add_provider_for_screen ( gdk_screen_get_default (),
-                                                  GTK_STYLE_PROVIDER (css),
-                                                  GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    }
-    g_clear_object(&css);
+    vj_gui_activate_stylesheet();
 
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 

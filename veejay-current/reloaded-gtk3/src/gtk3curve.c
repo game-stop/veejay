@@ -120,8 +120,6 @@ static gboolean gtk3_curve_button_release   (GtkWidget            *widget,
                                              GdkEventButton       *event);
 static gboolean gtk3_curve_motion_notify    (GtkWidget            *widget,
                                              GdkEventMotion       *event);
-static void gtk3_curve_screen_changed       (GtkWidget            *widget,
-                                             GdkScreen            *prev_screen);
 static void gtk3_curve_style_updated        (GtkWidget            *widget);
 static void gtk3_curve_finalize             (GObject              *object);
 static void gtk3_curve_dispose              (GObject              *object);
@@ -134,7 +132,6 @@ static void gtk3_curve_set_property         (GObject              *object,
                                              const GValue         *value,
                                              GParamSpec           *pspec);
 static void gtk3_curve_size_graph           (Gtk3Curve            *curve);
-static void gtk3_curve_create_layouts       (GtkWidget            *widget);
 static void gtk3_curve_reset_vector         (GtkWidget            *widget);
 static void gtk3_curve_interpolate          (GtkWidget            *widget,
                                              gint                  width,
@@ -172,13 +169,6 @@ static inline gpointer
 gtk3_curve_get_instance_private (Gtk3Curve *self)
 {
   return (G_STRUCT_MEMBER_P (self, Gtk3Curve_private_offset));
-}
-
-static void gtk_gadget_class_intern_init (gpointer klass)
-{
-  g_type_class_adjust_private_offset (klass, &Gtk3Curve_private_offset);
-  gtk3_curve_parent_class = g_type_class_peek_parent (klass);
-  gtk3_curve_class_init ((Gtk3CurveClass*) klass);
 }
 
 GType
@@ -232,7 +222,6 @@ gtk3_curve_type_get_type (void)
 static void
 gtk3_curve_class_init (Gtk3CurveClass* klass)
 {
-  GtkContainerClass *container_class;
   GObjectClass *gobject_class;
   GtkWidgetClass *widget_class;
 
@@ -256,7 +245,6 @@ gtk3_curve_class_init (Gtk3CurveClass* klass)
   widget_class->button_release_event = gtk3_curve_button_release;
 
   widget_class->size_allocate = gtk3_curve_size_allocate;
-  widget_class->screen_changed = gtk3_curve_screen_changed;
   widget_class->style_updated = gtk3_curve_style_updated;
 
   gtk_widget_class_set_accessible_role (widget_class, ATK_ROLE_DRAWING_AREA);
@@ -398,7 +386,6 @@ static void
 gtk3_curve_realize (GtkWidget *widget)
 {
   GtkAllocation allocation;
-  GdkWindow *window;
   GdkWindow *parent_window;
   GdkWindowAttr attributes;
   gint attributes_mask;
@@ -545,7 +532,6 @@ gtk3_curve_draw (GtkWidget *widget,
 {
   Gtk3CurvePrivate *priv;
   GtkStyleContext  *style_context;
-  GtkStyle         *style;
   GdkRGBA           color;
   gint              last_x, last_y;
   gint              i;
@@ -786,18 +772,18 @@ gtk3_curve_button_press (GtkWidget        *widget,
                          GdkEventButton   *event)
 {
   Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
-  GdkCursorType     new_type = priv->cursor_type;
+  //GdkCursorType     new_type = priv->cursor_type;
   GtkAllocation     allocation;
   gint              cx, x, y, width, height, i;
   gint              closest_point = 0;
-  gfloat            rx, ry, min_x;
+  gfloat            min_x;
   gint              tx, ty;
   guint             distance;
 
   DEBUG_INFO("button press [S]\n");
 
   gtk_grab_add (widget);
-  new_type = GDK_TCROSS;
+  //new_type = GDK_TCROSS;
 
   gtk_widget_get_allocation (widget, &allocation);
 
@@ -885,10 +871,8 @@ gtk3_curve_button_release (GtkWidget        *widget,
 {
   Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
   GtkAllocation     allocation;
-  GdkCursorType     new_type = priv->cursor_type;
-  gint              src, dst, cx, x, y, width, height, i;
-  gfloat            rx, ry, min_x;
-  gint              closest_point = 0;
+  gint              src, dst, cx, x,width, height, i;
+  gfloat            min_x;
   guint             distance;
   gint              tx, ty;
 
@@ -907,11 +891,6 @@ gtk3_curve_button_release (GtkWidget        *widget,
   /*  get the pointer position  */
   gtk3_curve_get_cursor_coord (widget, &tx, &ty);
   x = CLAMP ((tx - RADIUS), 0, width - 1);
-  y = CLAMP ((ty - RADIUS), 0, height - 1);
-
-  DEBUG_INFO("release : xy[%dx%d] txy[%dx%d]\n",
-              x, y,
-              tx, ty);
 
   min_x = priv->min_x;
 
@@ -923,7 +902,6 @@ gtk3_curve_button_release (GtkWidget        *widget,
       if ((guint) abs (x - cx) < distance)
         {
           distance = abs (x - cx);
-          closest_point = i;
         }
     }
 
@@ -966,7 +944,7 @@ gtk3_curve_button_release (GtkWidget        *widget,
         }
     }
 
-  new_type = GDK_FLEUR;
+  priv->cursor_type = GDK_FLEUR;
   priv->grab_point = -1;
 
   DEBUG_INFO("button release [E]\n");
@@ -981,19 +959,16 @@ gtk3_curve_motion_notify (GtkWidget        *widget,
   Gtk3CurvePrivate *priv = GTK3_CURVE (widget)->priv;
   GtkAllocation     allocation;
   GdkCursorType     new_type = priv->cursor_type;
-  gint              i, src, dst, leftbound, rightbound;
+  gint              i, leftbound, rightbound;
   GdkEventMotion   *mevent;
-  gint              tx, ty, h,w;
+  gint              tx, ty ;
   gint              cx, x, y, width, height;
-  gint              closest_point = 0;
   gfloat            rx, ry, min_x;
   guint             distance;
   gint              x1, x2, y1, y2;
-  gint              retval = FALSE;
 
   DEBUG_INFO("motion_notify [S]\n");
   mevent = (GdkEventMotion *) event;
-
 
   gtk_widget_get_allocation (widget, &allocation);
 
@@ -1021,7 +996,6 @@ gtk3_curve_motion_notify (GtkWidget        *widget,
       if ((guint) abs (x - cx) < distance)
         {
           distance = abs (x - cx);
-          closest_point = i;
         }
     }
 
@@ -1135,21 +1109,13 @@ gtk3_curve_motion_notify (GtkWidget        *widget,
     }
 
   DEBUG_INFO("motion_notify [E]\n");
-}
 
-static void
-gtk3_curve_screen_changed (GtkWidget *widget,
-                           GdkScreen *prev_screen)
-{
-  DEBUG_INFO("screen changed [S]\n");
-  gtk3_curve_create_layouts (widget);
-  DEBUG_INFO("screen changed [E]\n");
+  return TRUE;
 }
 
 static void
 gtk3_curve_dispose (GObject *object)
 {
-  Gtk3CurvePrivate *priv = GTK3_CURVE (object)->priv;
   G_OBJECT_CLASS (gtk3_curve_parent_class)->dispose (object);
 }
 
@@ -1282,15 +1248,6 @@ gtk3_curve_size_graph (Gtk3Curve *curve)
   DEBUG_INFO("Set requested size to [%dx%d]\n", width, height);
 
   gtk_widget_set_size_request (GTK_WIDGET (curve), width, height);
-}
-
-static void
-gtk3_curve_create_layouts (GtkWidget *widget)
-{
-  Gtk3Curve *curve = GTK3_CURVE (widget);
-  Gtk3CurvePrivate *priv = curve->priv;
-  DEBUG_INFO("create pango [S]\n");
-  DEBUG_INFO("create pango [E]\n");
 }
 
 static void
@@ -1963,13 +1920,3 @@ gtk3_curve_reset (GtkWidget *widget)
     }
 }
 
-void
-gtk3_curve_save(Gtk3CurveData *data, gchar *filename) {
-  // TODO - add code here
-}
-
-
-Gtk3CurveData
-gtk3_curve_load(gchar *filename) {
-  // TODO - add code here
-}
