@@ -7683,7 +7683,10 @@ void vj_gui_set_stylesheet(const char *css_file) {
 void vj_gui_activate_stylesheet(vj_gui_t *gui)
 {
     GtkCssProvider *css = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(css, "* { font-size:98%; }", -1, NULL );
+
     gtk_style_context_add_provider_for_screen ( gdk_screen_get_default (),GTK_STYLE_PROVIDER (css),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    
     if(use_css_file) {
         GError* error = NULL;
         if(!gtk_css_provider_load_from_path(css, reloaded_css_file, &error))
@@ -7695,6 +7698,7 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     else {
         gtk3_curve_set_use_theme_background(gui->curve,FALSE);
     }
+
     g_clear_object(&css);
 }
 
