@@ -7680,7 +7680,7 @@ void vj_gui_set_stylesheet(const char *css_file) {
     use_css_file = 1;
 }
 
-void vj_gui_activate_stylesheet()
+void vj_gui_activate_stylesheet(vj_gui_t *gui)
 {
     GtkCssProvider *css = gtk_css_provider_new();
     gtk_style_context_add_provider_for_screen ( gdk_screen_get_default (),GTK_STYLE_PROVIDER (css),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -7691,6 +7691,9 @@ void vj_gui_activate_stylesheet()
             veejay_msg(VEEJAY_MSG_WARNING, "Could not load CSS file: %s , %s", error->message, reloaded_css_file);
             g_error_free (error);
         }
+    }
+    else {
+        gtk3_curve_set_use_theme_background(gui->curve,FALSE);
     }
     g_clear_object(&css);
 }
@@ -7794,9 +7797,6 @@ void vj_gui_init(const char *glade_file,
         return;
     }
     info = gui;
-
-    vj_gui_activate_stylesheet();
-
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
     //set "connection" button has default in veejay connection dialog
@@ -7939,6 +7939,9 @@ void vj_gui_init(const char *glade_file,
 
     veejay_memset( &info->watch, 0, sizeof(watchdog_t));
     info->watch.state = STATE_WAIT_FOR_USER; //
+
+    vj_gui_activate_stylesheet(gui);
+
 
     //connect client at first available server
     //and try to connect multitrack to all existing server

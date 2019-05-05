@@ -1721,7 +1721,6 @@ gtk3_curve_set_curve_type (GtkWidget *widget, Gtk3CurveType new_type)
         }
     }
 }
-
 void gtk3_curve_set_color_background (GtkWidget *widget, Gtk3CurveColor color)
 {
   Gtk3Curve *curve = GTK3_CURVE (widget);
@@ -1729,12 +1728,13 @@ void gtk3_curve_set_color_background (GtkWidget *widget, Gtk3CurveColor color)
   priv->background.red = color.red;
   priv->background.green = color.green;
   priv->background.blue = color.blue;
-  priv->background.alpha = color.alpha;
+  priv->background.alpha =color.alpha;
   if (gtk_widget_is_visible (widget))
     {
       DEBUG_INFO("queue draw\n");
       gtk_widget_queue_draw (widget);
     }
+
 }
 
 void gtk3_curve_set_color_background_rgba (GtkWidget *widget, gfloat r,
