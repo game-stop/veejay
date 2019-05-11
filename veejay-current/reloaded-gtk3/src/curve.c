@@ -19,6 +19,7 @@
 
 #include <config.h>
 #include <glib.h>
+#include <gtk/gtk.h>
 #include <veejay/vj-msg.h>
 #include <veejay/vjmem.h>
 #include <src/vj-api.h>

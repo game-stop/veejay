@@ -383,10 +383,10 @@ static void timeline_init( TimelineSelection *te )
   te->has_stepper = TRUE;
   te->has_selection = FALSE;
   te->stepper_size = 24;
-  te->stepper_draw_size = 16;
+  te->stepper_draw_size = 12;
   te->stepper_length = 0;
-  te->frame_height = 10;
-  te->font_line = 18;
+  te->frame_height = 8;
+  te->font_line = 22;
   te->move_x = 0;
 }
 
@@ -741,7 +741,6 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
   double height = gtk_widget_get_allocated_height (widget);
 
   gdouble marker_width = width/ te->num_video_frames;
-//  gdouble marker_height = height / te->num_video_frames;
   gdouble marker_height = te->frame_height;
 
   te->frame_width = marker_width;
@@ -749,16 +748,17 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
   GtkStyleContext *sc = gtk_widget_get_style_context(widget);
   GdkRGBA color;
   gtk_style_context_get_color ( sc, gtk_style_context_get_state (sc), &color );
-
+  GdkRGBA col2;
+  gtk_style_context_get_border_color( sc, gtk_style_context_get_state(sc), &col2 );
 /* Draw stepper */
   if( te->has_stepper )
   {
-    cairo_set_source_rgba( cr, 1.0,0.0,0.0,1.0); //FIXME use context state color ?
+    cairo_set_source_rgba( cr, col2.red,col2.green,col2.blue,1.0); 
     double x1 = marker_width * te->frame_num;
-    te->stepper.x = x1 - 8;
+    te->stepper.x = x1;
     te->stepper.y = 0;
-    te->stepper.width = te->stepper_size + 8;
-    te->stepper.height = te->stepper_size + 2;
+    te->stepper.width = te->stepper_size;
+    te->stepper.height = te->stepper_size;
 
     cairo_move_to( cr, x1 - te->stepper_draw_size, 0.0 * height );
     cairo_rel_line_to( cr, te->stepper_draw_size, te->stepper_draw_size  );
@@ -772,8 +772,7 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
     {
       cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
         CAIRO_FONT_WEIGHT_BOLD );
-
-      cairo_move_to(cr, x1 + (te->stepper_size * 0.5),te->font_line );
+      cairo_move_to(cr, x1,te->font_line );
       gchar text[40];
       sprintf(text, "%d",  (gint)te->frame_num );
       cairo_text_path( cr, text );

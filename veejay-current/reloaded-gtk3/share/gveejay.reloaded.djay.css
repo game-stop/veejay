@@ -1,0 +1,27 @@
+* {
+    font-size:98%;
+    background:#27282f;
+    border-color:#454f60;
+    color:#ffffff;
+}
+
+.smallaspossible {
+    min-height: 0px;
+    min-width: 0px;
+}
+
+.padplusfour {
+ padding-left: 4px;
+ padding-right: 4px;
+}
+
+entry {
+ background:#454f60;
+ color:#ffffff;
+}
+
+button {
+ color : #ffffff;
+ border-color:#454f60;
+}
+

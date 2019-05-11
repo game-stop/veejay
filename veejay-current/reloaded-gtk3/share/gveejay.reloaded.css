@@ -1,20 +1,169 @@
+
+
 * {
-    font-size:98%;
+ border-color:#434449;
+ background-image:none;
+ border-width:0px;
+ color:#ffffff;
+ font-size:98%;
 }
 
-.smallaspossible {
-    min-height: 0px;
-    min-width: 0px;
+/* .reloaded is a style class for a window, using * to set the background color gives issues with treeview */
+.reloaded {
+ border-color:#434449;
+ background-image:none;
+ border-width:0px;
+ background:#27282f;
+ color:#ffffff;
 }
 
-.padplusfour {
- padding-left: 4px;
- padding-right: 4px;
+.sequencer {
+ padding:8px;
 }
 
-button {
- color : #00ff00;
- background-color : #ff00ff;
- padding-left: 1px;
- padding-right: 1px;
+.sample_slot, .sequencer_slot, .quickselect_slot {
+ border-width:1px;
+ border-style:solid;
+}
+
+.active {
+ border-color:#ff8400;
+}
+
+checkbutton,radiobutton {
+ border-style:none;
+}
+
+entry,button {
+ border-style:outset;
+ border-color:#2e2f36;
+ border-width:1px;
+ border-radius:0px;
+}
+
+entry:hover, button:hover {
+  background-color:#ff8400;
+  border-radius:6px;
+}
+
+button:hover image, button:hover label {
+  background-color:#ff8400;
+}
+
+spinbutton {
+ border-width:4px;
+}
+
+entry:focus {
+ background-color:#626580;
+ color:#ffffff;
+}
+
+notebook header.top tabs tab {
+ border-style:outset;
+}
+
+notebook header.top tabs tab:hover {
+ border-style:outset;
+ background-color:#ff8400;
+}
+
+notebook header.top tabs tab:hover label {
+ background-color:#ff8400;
+}
+
+.timeline {
+ border-color:#ff8400;
+}
+
+.timeline stepper hover {
+ color:#ff0000;
+}
+
+scale {
+ padding-right:8px;
+ padding-left:8px;
+}
+
+scale contents trough highlight {
+ background-color:#e59420;
+}
+
+scale contents slider:hover {
+ background-color:#ffdbb4;
+}
+
+scale contents slider {
+ background-color:#ff8400;
+ border-radius:4px;
+}
+
+scale value {
+ color:#e59420;
+ padding-top:5px;
+ min-width:24px;
+ margin-bottom:6px;
+}
+
+treeview {
+ background:#27282f;
+}
+
+treeview *:selected {
+ background-color:#37383f;
+}
+
+treeview *:hover {
+  background-color:#ff8400;
+}
+
+.curve {
+ background-color:#2e2f36;
+ color:#ffffff;
+}
+
+progressbar progress  {
+  border-color:#ff8400;
+  background-color:#ff8400;
+  border-width:2px;
+  border-style:solid;
+}
+
+progressbar trough  {
+  background-color:#37383f;
+  border-color:#ff8400;
+  border-width:6px;
+  border-style:solid;
+}
+
+.track {
+ border-style:solid;
+ border-width:1px;
+}
+
+scrollbar contents slider {
+ background-color:#434449;
+ border-radius:4px;
+}
+
+scrollbar contents slider:hover {
+ background-color:#ff8400;
+ border-radius:4px;
+}
+
+scrollbar contents trough highlight {
+ background-color:#434449;
+}
+
+textview text {
+ background-color:#434449;
+}
+
+.p_box {
+ padding-left:4px;
+ padding-right:4px;
+ border-color:#434449;
+ border-width:1px;
+ border-style:solid;
+ border-radius:4px;
 }

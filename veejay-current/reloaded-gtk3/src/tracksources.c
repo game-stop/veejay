@@ -92,7 +92,7 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 		if(id != i)
 		{
 			char name[12];
-			snprintf(name,sizeof(name),"%d", i);
+			snprintf(name,sizeof(name),"Track %d", i);
 			gchar *uname = _utf8str( name );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set(
@@ -147,7 +147,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 		
 //	GtkWidget *col = gtk_tree_view_get_column( GTK_TREE_VIEW(view) , 0 );
 	GtkTreeViewColumn *col = gtk_tree_view_get_column( GTK_TREE_VIEW(view),0);
-	gtk_tree_view_column_set_fixed_width(  col , 5 );
+	gtk_tree_view_column_set_fixed_width(  col , 40 );
 
 	col = gtk_tree_view_get_column( GTK_TREE_VIEW( view ), 1 );
 	gtk_tree_view_column_set_clickable(  col , TRUE );
@@ -167,7 +167,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 		if( i != track_id )
 		{
 			char str[16];
-			snprintf(str,sizeof(str),"%d",i);
+			snprintf(str,sizeof(str),"Track %d",i);
 			gchar *ustr = _utf8str( str );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set( store, &iter,

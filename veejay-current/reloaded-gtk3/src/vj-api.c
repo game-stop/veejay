@@ -58,11 +58,11 @@
 #include <unistd.h>
 #include <cellrendererspin.h>
 #include <gtktimeselection.h>
-#include <gtk3curve.h>
 #include <libgen.h>
 #ifdef HAVE_SDL
 #include <src/keyboard.h>
 #endif
+#include <gtk3curve.h>
 #include <src/curve.h>
 #include <src/multitrack.h>
 #include <src/common.h>
@@ -110,6 +110,7 @@ static gpointer castIntToGpointer( int val)
 //~ };
 
 #define MAX_SLOW 25
+#define QUICKSELECT_SLOTS 10
 
 static int beta__ = 0;
 static int use_vims_mcast = 0;
@@ -772,6 +773,18 @@ void set_disable_sample_image(gboolean status)
     disable_sample_image = status;
 }
 
+void add_class(GtkWidget *widget, const char *name)
+{
+    GtkStyleContext *ctx = gtk_widget_get_style_context(widget);
+    gtk_style_context_add_class(ctx, name);
+}
+
+void remove_class(GtkWidget *widget, const char *name)
+{
+    GtkStyleContext *ctx = gtk_widget_get_style_context(widget);
+    gtk_style_context_remove_class(ctx, name);
+}
+
 static gchar* strduplastn(gchar *title) {
 	gchar *reversed = g_strreverse(title);
 	gchar *part = g_strndup(reversed,12);
@@ -792,6 +805,11 @@ GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name )
     assert( widget != NULL );
 #endif
     return widget;
+}
+
+static void add_class_by_name(const char *widget_name, const char *name) {
+  GtkWidget *widget = glade_xml_get_widget_(info->main_window,widget_name);
+  add_class(widget, name);
 }
 
 void gtk_notebook_set_current_page__( GtkWidget *w, gint num, const char *f, int line )
@@ -1177,7 +1195,6 @@ static void scan_generators( const char *name)
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
 }
-
 
 static void set_tooltip_by_widget(GtkWidget *w, const char *text)
 {
@@ -2491,19 +2508,16 @@ void vj_msg(int type, const char format[], ...)
     switch(type)
     {
         case 2:
-            sprintf(prefix,"Info   : ");
+            sprintf(prefix,"Info:");
             break;
         case 1:
-            sprintf(prefix,"Warning: ");
+            sprintf(prefix,"Warning:");
             break;
         case 0:
-            sprintf(prefix,"Error  : ");
+            sprintf(prefix,"Error:" );
             break;
-        case 3:
-            sprintf(prefix,"Debug  : ");
-            break;
-        case 4:
-            sprintf(prefix, " ");
+        default:
+            sprintf(prefix,"Debug:");
             break;
     }
 
@@ -4977,13 +4991,15 @@ static void select_slot( int pm )
         {
             if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID], info->status_tokens[STREAM_TYPE] ))
             {
-                if( info->selected_slot )
+               /* if( info->selected_slot )
                 {
                     if ( info->selected_slot->sample_type != pm || info->selected_slot->sample_id !=
                         info->status_tokens[CURRENT_ID] ) {
                         set_activation_of_slot_in_samplebank(FALSE);
                     }
-                }
+                }*/
+                if(info->selected_slot && info->selected_gui_slot)
+                    set_activation_of_slot_in_samplebank(FALSE);
                 info->selected_slot = info->sample_banks[b]->slot[p];
                 info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
                 set_activation_of_slot_in_samplebank(TRUE);
@@ -7072,10 +7088,9 @@ static void process_reload_hints(int *history, int pm)
         info->uc.reload_hint[HINT_KF] = 1;
         if( entry_tokens[ENTRY_FXID] == 0)
         {
-            put_text( "entry_effectname" ,"" );
+            update_label_str( "label_effectname" ,"" );
             // disable fx widgets but keep "button_fx_entry" enabled
             disable_widget( "frame_fxtree2" );
-            disable_widget( "entry_effectname");
             disable_widget( "button_entry_toggle");
             disable_widget( "tree_sources");
             disable_widget( "rgbkey");
@@ -7089,10 +7104,9 @@ static void process_reload_hints(int *history, int pm)
         }
         else
         {
-            put_text( "entry_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
+            update_label_str( "label_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
             // enable fx widgets
             enable_widget( "frame_fxtree2");
-            enable_widget( "entry_effectname");
             enable_widget( "button_entry_toggle");
             enable_widget( "tree_sources");
             enable_widget( "rgbkey" );
@@ -7447,6 +7461,7 @@ int vj_img_cb(GdkPixbuf *img )
     if( info->selected_slot->sample_type != sample_type || info->selected_slot->sample_id != sample_id ) {
         return 0;
     }
+
     if( sample_type == MODE_SAMPLE || sample_type == MODE_STREAM )
     {
         sample_slot_t *slot = find_slot_by_sample( sample_id, sample_type );
@@ -7463,12 +7478,11 @@ int vj_img_cb(GdkPixbuf *img )
             }
         }
     }
-
+    
     for( i = 0; i < info->sequence_view->envelope_size; i ++ )
     {
         sequence_gui_slot_t *g = info->sequence_view->gui_slot[i];
-        sample_slot_t *s = info->selected_slot;
-        if(g->sample_id == info->selected_slot->sample_id && g->sample_type == info->selected_slot->sample_type && s->pixbuf)
+        if(g->sample_id == info->selected_slot->sample_id && g->sample_type == info->selected_slot->sample_type)
         {
             g->pixbuf_ref = vj_gdk_pixbuf_scale_simple(img,
                                                        info->sequence_view->w,
@@ -7665,11 +7679,24 @@ int  use_css_file = 0;
 
 void vj_gui_set_stylesheet(const char *css_file) {
     int use_djay = 0;
+    if( css_file == NULL ) {
+        snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s", RELOADED_DATADIR, "gveejay.reloaded.css");
+        use_css_file = 1;
+        return;
+    }
+
     if(strlen(css_file)==4) {
         if(strncasecmp(css_file, "djay", 4) == 0 ) {
             veejay_msg(VEEJAY_MSG_DEBUG, "Using d/j/a/y's theme for darkly lit environments");
-            snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s",RELOADED_DATADIR,"gveejay.reloaded.css");
+            snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s",RELOADED_DATADIR,"gveejay.reloaded.djay.css");
             use_djay = 1;
+        }
+    }
+    if(strlen(css_file)==8) {
+        if(strncasecmp(css_file, "default",8) == 0 ) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Using system's default style");
+            use_css_file = 0;
+            return;
         }
     }
 
@@ -7677,6 +7704,7 @@ void vj_gui_set_stylesheet(const char *css_file) {
         veejay_msg(VEEJAY_MSG_DEBUG, "Using CSS %s", reloaded_css_file);
         snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s", css_file);
     }
+
     use_css_file = 1;
 }
 
@@ -7689,14 +7717,30 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     
     if(use_css_file) {
         GError* error = NULL;
+        veejay_msg(VEEJAY_MSG_DEBUG, "Loading stylesheet %s", reloaded_css_file);
         if(!gtk_css_provider_load_from_path(css, reloaded_css_file, &error))
         {
             veejay_msg(VEEJAY_MSG_WARNING, "Could not load CSS file: %s , %s", error->message, reloaded_css_file);
             g_error_free (error);
         }
+        GtkStyleContext *sc = gtk_widget_get_style_context( GTK_WIDGET(gui->curve) );
+        GdkRGBA bg,col,border;
+        gtk_style_context_get_background_color(sc, gtk_style_context_get_state(sc), &bg );
+        gtk_style_context_get_border_color(sc,gtk_style_context_get_state(sc), &border);
+        gtk_style_context_get_color(sc, gtk_style_context_get_state(sc), &col );
+
+        gtk3_curve_set_color_background_rgba (GTK_WIDGET(gui->curve), bg.red, bg.green, bg.blue, 1.0);
+        gtk3_curve_set_color_curve_rgba (GTK_WIDGET(gui->curve), col.red, col.green, col.blue, 1.0);
+        gtk3_curve_set_color_grid_rgba (GTK_WIDGET(gui->curve), col.red, col.green, col.blue, 0.33);
+        gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(gui->curve), border.red, border.green, border.blue, 1.0);
+
     }
     else {
-        gtk3_curve_set_use_theme_background(gui->curve,FALSE);
+        gtk3_curve_set_color_background_rgba (GTK_WIDGET(gui->curve), 1.0f,1.0f,1.0f, 1.0);
+        gtk3_curve_set_color_curve_rgba (GTK_WIDGET(gui->curve), 0.0f, 0.0f, 0.0f, 1.0);
+        gtk3_curve_set_color_grid_rgba (GTK_WIDGET(gui->curve), 0.0f, 0.0f, 0.0f, 0.33);
+        gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(gui->curve), 0.0f, 0.0f, 0.0f, 1.0);
+
     }
 
     g_clear_object(&css);
@@ -7801,6 +7845,15 @@ void vj_gui_init(const char *glade_file,
         return;
     }
     info = gui;
+
+    for( i = 0; i < MAX_UI_PARAMETERS; i ++ ) {
+      add_class_by_name( slider_names_[i].text, "p_slider" );
+    }
+
+    add_class_by_name( "speed_slider", "h_slider" );
+    add_class_by_name( "slow_slider", "h_slider" );
+    add_class_by_name( "framerate", "h_slider" );
+
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
     //set "connection" button has default in veejay connection dialog
@@ -7820,7 +7873,7 @@ void vj_gui_init(const char *glade_file,
     gtk_builder_connect_signals( gui->main_window , NULL);
     GtkWidget *frame = glade_xml_get_widget_( info->main_window, "markerframe" );
     info->tl = timeline_new();
-
+    add_class(info->tl, "timeline");
     set_tooltip_by_widget(info->tl, tooltips[TOOLTIP_TIMELINE].text );
 
     g_signal_connect( info->tl, "pos_changed",
@@ -7862,7 +7915,7 @@ void vj_gui_init(const char *glade_file,
     info->sample_bank_pad = new_bank_pad( box );
 
     //QuickSelect slots
-    create_ref_slots( 10 );
+    create_ref_slots( QUICKSELECT_SLOTS );
 
     //SEQ
     create_sequencer_slots( SEQUENCER_COL, SEQUENCER_ROW );
@@ -7938,6 +7991,8 @@ void vj_gui_init(const char *glade_file,
 
     GtkWidget *curve_container = glade_xml_get_widget_( info->main_window,"curve_container" );
     gui->curve = gtk3_curve_new ();
+    add_class(gui->curve, "curve");
+
     gtk_container_add(GTK_CONTAINER(curve_container), gui->curve);
     gtk_widget_show_all(curve_container);
 
@@ -7966,8 +8021,8 @@ void vj_gui_init(const char *glade_file,
     info->midi =  vj_midi_new( info->main_window );
     gettimeofday( &(info->time_last) , 0 );
 
-    GtkWidget *srtbox = glade_xml_get_widget_( info->main_window, "combobox_textsrt");
-    set_tooltip_by_widget( srtbox, tooltips[TOOLTIP_SRTSELECT].text);
+    //GtkWidget *srtbox = glade_xml_get_widget_( info->main_window, "combobox_textsrt");
+    //set_tooltip_by_widget( srtbox, tooltips[TOOLTIP_SRTSELECT].text);
 
     if(!beta) // srt-titling sequence stuff
     {
@@ -8051,7 +8106,10 @@ void vj_gui_preview(void)
 
     info->sequence_view->w = image_width;
     info->sequence_view->h = image_height;
-    gtk_widget_set_size_request_(info->quick_select, image_width, image_height );
+
+    for( int i = 0; i < QUICKSELECT_SLOTS; i ++ ) {
+        gtk_widget_set_size_request_( info->sequence_view->gui_slot[i]->image, info->sequence_view->w,info->sequence_view->h );
+    }
 }
 
 void gveejay_preview( int p )
@@ -8433,8 +8491,7 @@ static int add_bank( gint bank_num )
     GtkWidget *frame = gtk_frame_new(frame_label);
     GtkWidget *label = gtk_label_new( str_label );
 
-    gtk_container_set_border_width( GTK_CONTAINER( frame), 0 );
-
+    gtk_container_set_border_width( GTK_CONTAINER( frame), 1 );
     gtk_widget_show(frame);
     info->sample_banks[bank_num]->page_num = gtk_notebook_append_page(GTK_NOTEBOOK(info->sample_bank_pad), frame, label);
 
@@ -8741,6 +8798,12 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
             vj_msg(VEEJAY_MSG_ERROR, "Memory slot %d empty, put with SHIFT + mouse button1",slot_nr);
             return FALSE;
         }
+        else 
+        {
+            vj_msg(VEEJAY_MSG_INFO,
+               "Start playing %s %d",
+               (g->sample_type==0 ? "Sample" : "Stream" ), g->sample_id );
+        }
         multi_vims(VIMS_SET_MODE_AND_GO, "%d %d", g->sample_type, g->sample_id );
         vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, g->sample_type,g->sample_id );
     }
@@ -8751,6 +8814,7 @@ static void create_sequencer_slots(int nx, int ny)
 {
     GtkWidget *vbox = glade_xml_get_widget_ (info->main_window, "SampleSequencerBox");
     info->sample_sequencer = gtk_frame_new(NULL);
+    add_class(info->sample_sequencer, "sequencer");
     gtk_box_pack_start( GTK_BOX( vbox ), GTK_WIDGET(info->sample_sequencer), TRUE, TRUE, 0);
     gtk_widget_show(info->sample_sequencer);
 
@@ -8790,6 +8854,7 @@ static void create_sequencer_slots(int nx, int ny)
         gtk_frame_set_shadow_type(GTK_FRAME( gui_slot->frame), GTK_SHADOW_IN );
         gtk_widget_show(GTK_WIDGET(gui_slot->frame));
         gtk_container_add (GTK_CONTAINER (gui_slot->event_box), gui_slot->frame);
+        add_class(gui_slot->frame, "sequencer_slot");
 
         /* the slot main container */
         gui_slot->main_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
@@ -8808,14 +8873,12 @@ static void create_sequencer_slots(int nx, int ny)
 
 static void create_ref_slots(int envelope_size)
 {
-    gchar frame_label[50];
     GtkWidget *vbox = glade_xml_get_widget_ (info->main_window, "quickselect");
     info->quick_select = gtk_frame_new(NULL);
     gtk_box_pack_start( GTK_BOX( vbox ), GTK_WIDGET(info->quick_select), TRUE, TRUE, 0);
     gtk_widget_show(info->quick_select);
     info->sequence_view = (sequence_envelope*) vj_calloc(sizeof(sequence_envelope) );
     info->sequence_view->gui_slot = (sequence_gui_slot_t**) vj_calloc(sizeof(sequence_gui_slot_t*) * envelope_size );
-    sprintf(frame_label, "Last played" );
     GtkWidget *table = gtk_table_new( 1, envelope_size, TRUE );
     gtk_container_add( GTK_CONTAINER(info->quick_select), table );
     gtk_widget_show(table);
@@ -8838,8 +8901,8 @@ static void create_ref_slots(int envelope_size)
         gtk_widget_show(GTK_WIDGET(gui_slot->event_box));
         /* the surrounding frame for each slot */
         gui_slot->frame = gtk_frame_new(NULL);
+        add_class(gui_slot->frame, "quickselect_slot");
         set_tooltip_by_widget(gui_slot->frame, tooltips[TOOLTIP_QUICKSELECT].text );
-        gtk_container_set_border_width (GTK_CONTAINER(gui_slot->frame),1);
         gtk_widget_show(GTK_WIDGET(gui_slot->frame));
         gtk_container_add (GTK_CONTAINER (gui_slot->event_box), gui_slot->frame);
 
@@ -8851,7 +8914,6 @@ static void create_ref_slots(int envelope_size)
         /* The sample's image */
         gui_slot->image = gtk_image_new();
         gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
-//      gtk_widget_set_size_request_( gui_slot->image, info->sequence_view->w,info->sequence_view->h );
         gtk_widget_show( GTK_WIDGET(gui_slot->image));
 
         gtk_table_attach_defaults ( GTK_TABLE(table), gui_slot->event_box, row, row+1, col, col+1);
@@ -8879,7 +8941,7 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
     gtk_widget_show(GTK_WIDGET(gui_slot->event_box));
     /* the surrounding frame for each slot */
     gui_slot->frame = gtk_frame_new(NULL);
-
+    add_class(gui_slot->frame, "sample_slot");
     gtk_container_set_border_width (GTK_CONTAINER(gui_slot->frame),0);
     gtk_widget_show(GTK_WIDGET(gui_slot->frame));
     gtk_container_add (GTK_CONTAINER (gui_slot->event_box), GTK_WIDGET(gui_slot->frame));
@@ -9014,10 +9076,12 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 
 static void indicate_sequence( gboolean active, sequence_gui_slot_t *slot )
 {
-    if(!active)
-        gtk_frame_set_shadow_type( GTK_FRAME(slot->frame), GTK_SHADOW_IN );
-    else
-        gtk_frame_set_shadow_type( GTK_FRAME(slot->frame), GTK_SHADOW_OUT );
+    if(!active) {
+        remove_class( slot->frame, "active");
+    }
+    else {
+        add_class( slot->frame, "active");
+    }
 }
 
 static void set_activation_of_slot_in_samplebank( gboolean activate)
@@ -9045,10 +9109,12 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
         {
             gtk_frame_set_shadow_type(GTK_FRAME(info->selected_gui_slot->frame),GTK_SHADOW_IN);
             gtk_widget_grab_focus(GTK_WIDGET(info->selected_gui_slot->frame));
+            add_class(info->selected_gui_slot->frame, "active");
         }
         else
         {
             gtk_frame_set_shadow_type(GTK_FRAME(info->selected_gui_slot->frame),GTK_SHADOW_ETCHED_IN);
+            remove_class(info->selected_gui_slot->frame, "active");
         }
     }
 
@@ -9082,9 +9148,13 @@ static void set_selection_of_slot_in_samplebank(gboolean active)
 
 //  gtk_widget_override_color ( GTK_WIDGET(info->selection_gui_slot->title),
 //      GTK_STATE_NORMAL, &color );
-    gtk_widget_override_color ( GTK_WIDGET(info->selected_gui_slot->timecode),
+    if( info->selected_gui_slot ) {
+
+        gtk_widget_override_color ( GTK_WIDGET(info->selected_gui_slot->timecode),
                                 GTK_STATE_FLAG_NORMAL,
                                 &color );
+
+    }
 //  gtk_widget_override_color ( gtk_frame_get_label_widget( info->selection_gui_slot->frame ),
 //      GTK_STATE_NORMAL, &color );
 }

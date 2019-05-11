@@ -86,7 +86,7 @@ static void usage(char *progname)
     printf( "-b\t\tEnable beta features.\n");
     printf( "-a\t\tAuto-connect to local running veejays.\n");
     printf( "-L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
-    printf( "-t\t\tLoad user defined stylesheet from FILE or use \"djay\"\n");
+    printf( "-t\t\tLoad user defined stylesheet from FILE or use one of the following: \"djay\"\n");
 
     printf( "\n\n");
 }
@@ -295,6 +295,8 @@ gint vj_gui_command_line (GApplication            *app,
     if( arg_style ) {
         vj_gui_set_stylesheet(arg_style);
         g_free(arg_style);
+    } else {
+        vj_gui_set_stylesheet(NULL);
     }
 
     if( err )
@@ -312,7 +314,7 @@ gint vj_gui_command_line (GApplication            *app,
 
 int main(int argc, char **argv)
 {
-    if(!argc) { usage(argv[0]); exit(-1);}// ??? FIXME
+    if(!argc) { usage(argv[0]); exit(1);}
     clone_args( argv, argc );
 
 /* default host to connect to */

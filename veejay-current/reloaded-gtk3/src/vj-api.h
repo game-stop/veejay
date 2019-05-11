@@ -37,6 +37,8 @@ void get_gd(char *buf, char *suf, const char *filename);
 
 void set_disable_sample_image(gboolean status);
 
+void add_class(GtkWidget *widget, const char *name);
+void remove_class(GtkWidget *widget, const char *name);
 void default_bank_values(int *col, int *row );
 gboolean is_alive( int *sync );
 

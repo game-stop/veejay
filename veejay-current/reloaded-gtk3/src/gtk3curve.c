@@ -341,7 +341,7 @@ gtk3_curve_init (Gtk3Curve* self)
   /* Misc */
   priv->use_bg_theme = TRUE;
   priv->cursor_type = GDK_TOP_LEFT_ARROW;
-  priv->grid_size = GTK3_CURVE_GRID_LARGE;
+  priv->grid_size = GTK3_CURVE_GRID_MICRO;
   priv->height = 0;
   priv->grab_point = -1;
 
@@ -350,12 +350,6 @@ gtk3_curve_init (Gtk3Curve* self)
   priv->max_x = 1.0;
   priv->min_y = 0.0;
   priv->max_y = 1.0;
-
-  /* Default Colors */
-  gtk3_curve_set_color_background_rgba (GTK_WIDGET(self), 1.0, 1.0, 1.0, 1.0);
-  gtk3_curve_set_color_curve_rgba (GTK_WIDGET(self), 0.0, 0.0, 0.0, 1.0);
-  gtk3_curve_set_color_grid_rgba (GTK_WIDGET(self), 0.0, 0.0, 0.0, 1.0);
-  gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(self), 0.2, 0.2, 0.2, 1.0);
 
   gtk3_curve_size_graph (self);
 
@@ -571,7 +565,7 @@ gtk3_curve_draw (GtkWidget *widget,
                             0, 0,
                             allocation.width + RADIUS * 2,
                             allocation.height + RADIUS * 2);
-      gtk_style_context_get_color (style_context,
+      gtk_style_context_get_background_color (style_context,
                                    gtk_style_context_get_state (style_context),
                                    &color);
       gdk_cairo_set_source_rgba (cr, &color);

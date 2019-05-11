@@ -389,10 +389,10 @@ static	void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *
 		veejay_memset(path,0,sizeof(path));
 		get_gd(path,NULL, button_template_t[i].file );
 		seqv->icons[i] = gtk_image_new_from_file( path );
-		seqv->buttons[i] = gtk_button_new_with_label(" ");
-		gtk_widget_set_size_request_( seqv->icons[i],24,20 );
+		seqv->buttons[i] = gtk_button_new();
+		//gtk_widget_set_size_request_( seqv->icons[i],24,20 );
 		gtk_button_set_image( GTK_BUTTON(seqv->buttons[i]), seqv->icons[i] );
-		gtk_widget_set_size_request_( seqv->buttons[i],24,20 );
+		//gtk_widget_set_size_request_( seqv->buttons[i],24,20 );
 		gtk_box_pack_start( GTK_BOX(w), seqv->buttons[i], TRUE,TRUE, 0 );
 		g_signal_connect( G_OBJECT( seqv->buttons[i] ), "clicked", G_CALLBACK( button_template_t[i].f),
 				(gpointer)p );
@@ -410,7 +410,7 @@ static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget 
 		veejay_memset(path,0,sizeof(path));
 		get_gd(path,NULL, button_template_t[i].file );
 		seqv->icons[i] = gtk_image_new_from_file( path );
-		seqv->buttons2[i] = gtk_button_new_with_label(" ");
+		seqv->buttons2[i] = gtk_button_new();
 		gtk_widget_set_size_request_( seqv->icons[i],24,20 );
 
 		gtk_button_set_image( GTK_BUTTON(seqv->buttons2[i]), seqv->icons[i] );
@@ -642,6 +642,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
 	seqv->timeline_ = gtk_scale_new_with_range( GTK_ORIENTATION_HORIZONTAL, 
                                               0.0, 1.0, 0.1);
+    gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->timeline_), "Set frame position");
 	gtk_scale_set_draw_value( GTK_SCALE(seqv->timeline_), FALSE );
 	//gtk_widget_set_size_request_( seqv->panel,180 ,180);
   GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( seqv->timeline_ ));
@@ -673,8 +674,13 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	seqv->sliders_[0] = gtk_scale_new_with_range( GTK_ORIENTATION_VERTICAL,
                                                 -12.0,12.0,1.0 );
+
+    gtk_widget_set_tooltip_text( GTK_WIDGET(seqv->sliders_[0]), "Speed" );
+
 	seqv->sliders_[1] = gtk_scale_new_with_range( GTK_ORIENTATION_VERTICAL,
                                                 0.0, 1.0, 0.01 );
+
+    gtk_widget_set_tooltip_text( GTK_WIDGET(seqv->sliders_[1]), "Opacity");
 
   a = gtk_range_get_adjustment( GTK_RANGE( seqv->sliders_[0]));
   gtk_adjustment_set_value( a, 1.0 );
@@ -713,7 +719,9 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	gtk_widget_set_sensitive_(GTK_WIDGET(seqv->panel), FALSE );
 
+    add_class( GTK_WIDGET(seqv->frame), "track");
 	gtk_widget_show( GTK_WIDGET( seqv->area ) );
+
 
 	return seqv;
 }
@@ -838,7 +846,7 @@ void		*multitrack_new(
 	GtkWidget *grid = gtk_grid_new();
 
 	gtk_box_pack_start( GTK_BOX( mt->main_box ), mt->scroll , TRUE,TRUE, 0 );
-	gtk_widget_show(mt->scroll);
+    gtk_widget_show(mt->scroll);
 	int c = 0;
 	for( c = 0; c < MAX_TRACKS; c ++ )
 	{
