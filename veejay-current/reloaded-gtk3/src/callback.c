@@ -615,14 +615,14 @@ static void gen_changed( int num, int value )
 	{
 		info->parameter_lock = 1;
 
-		for( i = 0; gen_names_[i].text != NULL; i ++ ) {
+		for( i = 0; i < GENERATOR_PARAMS; i ++ ) {
 			if( num == i ) {
 				values[num] = value;
 			}
 			else {
 				GtkWidget *w = glade_xml_get_widget_( info->main_window, gen_names_[i].text );
-        GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
-        values[i] = gtk_adjustment_get_value (a);
+                GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+                values[i] = gtk_adjustment_get_value (a);
 			}
 		}
 
@@ -647,12 +647,15 @@ static void genv_changed( int num, int value, const char *selected )
 	{
 		info->parameter_lock = 1;
 
-		for( i = 0; gen_names_[i].text != NULL; i ++ ) {
+		for( i = 0; i < GENERATOR_PARAMS; i ++ ) {
 			GtkWidget *w = glade_xml_get_widget_( info->main_window, gen_names_[i].text );
-
-      GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+            if( w == NULL ) {
+                veejay_msg(0, "No such widget: %s", gen_names_[i].text);
+                return;
+            }
+            GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
 			if( num == i ) {
-				update_slider_value( gen_names_[i].text, (get_slider_val(gen_names_[i].text) + value), 0 );\
+				update_slider_value( gen_names_[i].text, (get_slider_val(gen_names_[i].text) + value), 0 );
 				values[i] = (gint) gtk_adjustment_get_value (a);
 			}
 			else {
@@ -3424,6 +3427,8 @@ void	on_curve_spinend_value_changed(GtkWidget *w, gpointer user_data)
 	update_label_str( "curve_endtime", end_time );
 	free(end_time);
 
+    gtk3_curve_set_x_hi( info->curve, (gfloat) end_pos );
+
     vj_msg(VEEJAY_MSG_INFO, "Click the FX store button to save the new values");
 }
 
@@ -3435,6 +3440,8 @@ void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
 			start_pos,info->el.fps );
 	update_label_str( "curve_endtime", start_time );
 	free(start_time);
+
+    gtk3_curve_set_x_lo( info->curve, (gfloat) start_pos );
 
     vj_msg(VEEJAY_MSG_INFO, "Click the FX store button to save the new values");
 }

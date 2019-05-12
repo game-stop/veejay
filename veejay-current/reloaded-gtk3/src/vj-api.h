@@ -34,7 +34,7 @@ char *get_glade_path();
 char *get_gveejay_dir();
 int get_total_frames();
 void get_gd(char *buf, char *suf, const char *filename);
-
+char *format_selection_time(int start, int end);
 void set_disable_sample_image(gboolean status);
 
 void add_class(GtkWidget *widget, const char *name);

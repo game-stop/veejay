@@ -1336,8 +1336,6 @@ static void setup_macros()
 
 #define SAMPLE_MAX_PARAMETERS 32
 
-static gchar* format_selection_time(int start, int end);
-
 typedef struct
 {
     int id;
@@ -1789,6 +1787,9 @@ gchar *dialog_save_file(const char *title )
                                                     GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                                     GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
                                                     NULL);
+
+    add_class(dialog, "reloaded" );
+
 #ifdef HAVE_GTK2_8
     gtk_file_chooser_set_do_overwrite_confirmation( GTK_FILE_CHOOSER(dialog), TRUE );
 #endif
@@ -1879,6 +1880,7 @@ gchar *dialog_open_file(const char *title, int type)
                                                     GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                                     GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
                                                     NULL);
+    add_class( dialog, "reloaded" );
 
     add_file_filters(dialog, type );
     gchar *file = NULL;
@@ -2022,6 +2024,9 @@ void about_dialog()
         "comments", blob,
         "license", license,
         "logo", pixbuf, NULL );
+
+    add_class(about,"reloaded");
+
     g_object_unref(pixbuf);
 
     g_signal_connect( about , "response", G_CALLBACK( gtk_widget_destroy),NULL);
@@ -2109,6 +2114,8 @@ int prompt_keydialog(const char *title, char *msg)
                                                     GTK_STOCK_OK,
                                                     GTK_RESPONSE_ACCEPT,
                                                     NULL);
+
+    add_class(dialog, "reloaded" );
 
     GtkWidget *keyentry = gtk_entry_new();
     gtk_entry_set_text( GTK_ENTRY(keyentry), "<press any key>");
@@ -2211,6 +2218,9 @@ void message_dialog( const char *title, char *msg )
                                                     GTK_STOCK_OK,
                                                     GTK_RESPONSE_NONE,
                                                     NULL);
+
+    add_class(dialog, "reloaded" );
+
     GtkWidget *label = gtk_label_new( msg );
     g_signal_connect_swapped(dialog, "response",
                              G_CALLBACK(gtk_widget_destroy),dialog);
@@ -2232,6 +2242,8 @@ prompt_dialog(const char *title, char *msg)
                                                     GTK_STOCK_YES,
                                                     GTK_RESPONSE_ACCEPT,
                                                     NULL);
+    add_class( dialog, "reloaded" );
+
     gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );
     gtk_window_set_resizable( GTK_WINDOW(dialog), FALSE );
     g_signal_connect(G_OBJECT(dialog), "response",
@@ -2264,6 +2276,8 @@ error_dialog(const char *title, char *msg)
                                                     GTK_STOCK_OK,
                                                     GTK_RESPONSE_OK,
                                                     NULL);
+    add_class(dialog, "reloaded" );
+
     gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_OK );
     gtk_window_set_resizable( GTK_WINDOW(dialog), FALSE );
     g_signal_connect(G_OBJECT(dialog), "response",
@@ -2700,6 +2714,13 @@ static void vj_kf_select_parameter(int num)
 
     reset_curve( info->curve );
     update_curve_widget( info->curve );
+
+    
+    int id = entry_tokens[ENTRY_FXID];
+    int min=0,max=0;
+    _effect_get_minmax( id, &min, &max,num );
+
+   gtk3_curve_set_yaxis_range(info->curve, (gfloat)min, (gfloat) max);
 }
 
 static void update_curve_widget(GtkWidget *curve)
@@ -2712,6 +2733,9 @@ static void update_curve_widget(GtkWidget *curve)
     int lo = 0, hi = 0, curve_type=0;
     int p = -1;
     int status = 0;
+
+    if(is_button_toggled("kf_none"))
+        return;
 
     multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
 
@@ -2752,6 +2776,10 @@ static void update_curve_widget(GtkWidget *curve)
     }
     update_spin_range( "curve_spinstart", lo, hi, lo );
     update_spin_range( "curve_spinend", lo, hi, hi );
+
+    gtk3_curve_set_xaxis_range(info->curve, (gfloat)lo, (gfloat) hi);
+    gtk3_curve_set_grid_resolution(info->curve, 16);
+
     if(blob)    free(blob);
 }
 
@@ -5102,7 +5130,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
                 sscanf( line, "%05d%09d%09d%03d",&values[0], &values[1], &values[2], &values[3]);
                 strncpy( descr, line + 5 + 9 + 9 + 3 , values[3] );
                 gchar *title = _utf8str( descr );
-                gchar *timecode = format_selection_time( 0,(values[2]-values[1]) );
+                char *timecode = format_selection_time( 0,(values[2]-values[1]) );
                 int int_id = values[0];
                 int poke_slot= 0; int bank_page = -1;
                 verify_bank_capacity( &bank_page , &poke_slot, int_id, values[1]);
@@ -6141,7 +6169,7 @@ static void reload_editlist_contents()
         info->elref = g_list_append( info->elref, _el_ref_new( row_num,(int) nl,n1,n2,total_frames ) ) ;
         char *tmpname = _el_get_filename(nl);
         gchar *fname = get_relative_path(tmpname);
-        gchar *timecode = format_selection_time( n1,n2 );
+        char *timecode = format_selection_time( n1,n2 );
         gchar *gfourcc = _utf8str( _el_get_fourcc(nl) );
         gchar *timeline = format_selection_time( 0, total_frames );
 
@@ -6317,7 +6345,7 @@ static void enable_widget_(const char *name, const char *s, int line)
 #endif
 
 
-static gchar *format_selection_time(int start, int end)
+char *format_selection_time(int start, int end)
 {
     double fps = (double) info->el.fps;
     int pos = (end-start);

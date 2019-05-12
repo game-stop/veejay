@@ -138,6 +138,10 @@
       <object class="GtkFrame" id="frame_generator">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="margin_left">4</property>
+        <property name="margin_right">4</property>
+        <property name="margin_top">4</property>
+        <property name="margin_bottom">4</property>
         <property name="label_xalign">0</property>
         <property name="shadow_type">none</property>
         <child>
@@ -177,6 +181,30 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
@@ -1299,6 +1327,10 @@
       <object class="GtkBox" id="vbox637">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="margin_left">4</property>
+        <property name="margin_right">4</property>
+        <property name="margin_top">4</property>
+        <property name="margin_bottom">4</property>
         <property name="orientation">vertical</property>
         <child>
           <object class="GtkLabel" id="current_step_label">
@@ -2134,6 +2166,10 @@
         <property name="width_request">340</property>
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="margin_left">4</property>
+        <property name="margin_right">4</property>
+        <property name="margin_top">4</property>
+        <property name="margin_bottom">4</property>
         <property name="label_xalign">0</property>
         <child>
           <object class="GtkBox">
@@ -2976,6 +3012,10 @@
       <object class="GtkBox" id="vbox_video_options">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="margin_left">4</property>
+        <property name="margin_right">4</property>
+        <property name="margin_top">4</property>
+        <property name="margin_bottom">4</property>
         <property name="orientation">vertical</property>
         <child internal-child="action_area">
           <object class="GtkButtonBox" id="hbuttonbox1">
@@ -3840,6 +3880,10 @@
       <object class="GtkBox" id="dialog-vbox5">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="margin_left">4</property>
+        <property name="margin_right">4</property>
+        <property name="margin_top">4</property>
+        <property name="margin_bottom">4</property>
         <property name="orientation">vertical</property>
         <child internal-child="action_area">
           <object class="GtkButtonBox" id="dialog-action_area5">
@@ -4613,6 +4657,7 @@
           <object class="GtkBox" id="hbox912">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
+            <property name="margin_top">2</property>
             <child>
               <object class="GtkNotebook" id="notebook18">
                 <property name="visible">True</property>
@@ -7400,522 +7445,418 @@
                             <property name="can_focus">False</property>
                             <property name="orientation">vertical</property>
                             <child>
-                              <object class="GtkBox" id="hbox49">
+                              <object class="GtkLabel" id="curve_parameter">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <child>
-                                  <object class="GtkToggleButton" id="curve_panel_toggleentry">
-                                    <property name="label" translatable="yes">FX Anim</property>
-                                    <property name="visible">True</property>
-                                    <property name="can_focus">True</property>
-                                    <property name="receives_default">True</property>
-                                    <property name="tooltip_text" translatable="yes">Toggle keyframing for this chain entry</property>
-                                    <signal name="toggled" handler="curve_panel_toggleentry_toggled" swapped="no"/>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">0</property>
-                                  </packing>
-                                </child>
-                                <child>
-                                  <object class="GtkBox" id="fxanimcontrols">
-                                    <property name="visible">True</property>
-                                    <property name="can_focus">False</property>
-                                    <child>
-                                      <object class="GtkLabel" id="label686">
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">False</property>
-                                        <property name="label" translatable="yes">&lt;b&gt;current control:&lt;/b&gt;</property>
-                                        <property name="use_markup">True</property>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">False</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="curve_parameter">
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">False</property>
-                                        <property name="label" translatable="yes">None</property>
-                                        <property name="xalign">0</property>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">True</property>
-                                        <property name="fill">False</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkToggleButton" id="curve_toggleentry_param">
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="tooltip_text" translatable="yes">Toggle keyframe animation for this parameter</property>
-                                        <signal name="toggled" handler="on_curve_toggleentry_param_toggled" swapped="no"/>
-                                        <child>
-                                          <object class="GtkImage" id="image2146">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="pixbuf">icon_keyframe.png</property>
-                                          </object>
-                                        </child>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">False</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkBox" id="hbox850">
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">False</property>
-                                        <property name="homogeneous">True</property>
-                                        <child>
-                                          <object class="GtkButton" id="curve_buttonstore">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="receives_default">False</property>
-                                            <property name="tooltip_text" translatable="yes">Apply this keyframe</property>
-                                            <signal name="clicked" handler="on_curve_buttonstore_clicked" swapped="no"/>
-                                            <child>
-                                              <object class="GtkImage" id="image2521">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="pixbuf">icon_apply.png</property>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="expand">True</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">0</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkToggleButton" id="curve_togglerun">
-                                            <property name="can_focus">True</property>
-                                            <property name="receives_default">False</property>
-                                            <property name="tooltip_text" translatable="yes">Start keyframing</property>
-                                            <signal name="toggled" handler="on_curve_togglerun_toggled" swapped="no"/>
-                                            <child>
-                                              <object class="GtkImage" id="image530">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="pixbuf">button_play.png</property>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="expand">True</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">1</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkButton" id="curve_buttonclear">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="receives_default">False</property>
-                                            <property name="tooltip_text" translatable="yes">Reset</property>
-                                            <signal name="clicked" handler="on_curve_buttonclear_clicked" swapped="no"/>
-                                            <child>
-                                              <object class="GtkImage" id="image532">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="pixbuf">icon_clearall.png</property>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="expand">True</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkButton" id="curve_clear_parameter">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="receives_default">False</property>
-                                            <property name="tooltip_text" translatable="yes">Clear selected parameter</property>
-                                            <signal name="clicked" handler="on_curve_clear_parameter_clicked" swapped="no"/>
-                                            <child>
-                                              <object class="GtkImage" id="image17">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="pixbuf">icon_clear.png</property>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="expand">True</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">3</property>
-                                          </packing>
-                                        </child>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">True</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">3</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">True</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">1</property>
-                                  </packing>
-                                </child>
+                                <property name="halign">center</property>
+                                <property name="margin_top">4</property>
+                                <property name="margin_bottom">4</property>
+                                <property name="label" translatable="yes">None</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="expand">True</property>
-                                <property name="fill">True</property>
+                                <property name="fill">False</property>
                                 <property name="position">0</property>
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkBox" id="hbox13">
+                              <object class="GtkGrid">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <child>
-                                  <object class="GtkTable" id="table88">
+                                  <object class="GtkRadioButton" id="kf_p15">
+                                    <property name="label" translatable="yes">15</property>
                                     <property name="visible">True</property>
-                                    <property name="can_focus">False</property>
-                                    <property name="n_columns">9</property>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_none">
-                                        <property name="label" translatable="yes">None</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="relief">half</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="yalign">0.47999998927116394</property>
-                                        <property name="draw_indicator">True</property>
-                                        <signal name="toggled" handler="on_kf_none_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p7">
-                                        <property name="label" translatable="yes">7</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="toggled" handler="on_kf_p7_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">8</property>
-                                        <property name="right_attach">9</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p6">
-                                        <property name="label" translatable="yes">6</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="toggled" handler="on_kf_p6_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">7</property>
-                                        <property name="right_attach">8</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p5">
-                                        <property name="label" translatable="yes">5</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="toggled" handler="on_kf_p5_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">6</property>
-                                        <property name="right_attach">7</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p4">
-                                        <property name="label" translatable="yes">4</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="toggled" handler="on_kf_p4_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">5</property>
-                                        <property name="right_attach">6</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p3">
-                                        <property name="label" translatable="yes">3</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="toggled" handler="on_kf_p3_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">4</property>
-                                        <property name="right_attach">5</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p2">
-                                        <property name="label" translatable="yes">2</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="toggled" handler="on_kf_p2_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">3</property>
-                                        <property name="right_attach">4</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p1">
-                                        <property name="label" translatable="yes">1</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="toggled" handler="on_kf_p1_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">2</property>
-                                        <property name="right_attach">3</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p0">
-                                        <property name="label" translatable="yes">0</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="toggled" handler="on_kf_p0_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">1</property>
-                                        <property name="right_attach">2</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="group-changed" handler="on_kf_p15_toggled" swapped="no"/>
                                   </object>
                                   <packing>
-                                    <property name="expand">True</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">0</property>
+                                    <property name="left_attach">18</property>
+                                    <property name="top_attach">0</property>
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkTable" id="table_kf_group2">
+                                  <object class="GtkRadioButton" id="kf_p14">
+                                    <property name="label" translatable="yes">14</property>
                                     <property name="visible">True</property>
-                                    <property name="can_focus">False</property>
-                                    <property name="n_columns">8</property>
-                                    <child>
-                                      <placeholder/>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p8">
-                                        <property name="label" translatable="yes">8</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                      </object>
-                                      <packing>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p9">
-                                        <property name="label" translatable="yes">9</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="group-changed" handler="on_kf_p9_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">2</property>
-                                        <property name="right_attach">3</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p10">
-                                        <property name="label" translatable="yes">10</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="group-changed" handler="on_kf_p10_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">3</property>
-                                        <property name="right_attach">4</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p11">
-                                        <property name="label" translatable="yes">11</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="group-changed" handler="on_kf_p11_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">4</property>
-                                        <property name="right_attach">5</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p12">
-                                        <property name="label" translatable="yes">12</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="group-changed" handler="on_kf_p12_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">5</property>
-                                        <property name="right_attach">6</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p13">
-                                        <property name="label" translatable="yes">13</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="group-changed" handler="on_kf_p13_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">6</property>
-                                        <property name="right_attach">7</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p14">
-                                        <property name="label" translatable="yes">14</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="group-changed" handler="on_kf_p14_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">7</property>
-                                        <property name="right_attach">8</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkRadioButton" id="kf_p15">
-                                        <property name="label" translatable="yes">15</property>
-                                        <property name="visible">True</property>
-                                        <property name="can_focus">True</property>
-                                        <property name="receives_default">False</property>
-                                        <property name="use_underline">True</property>
-                                        <property name="draw_indicator">True</property>
-                                        <property name="group">kf_none</property>
-                                        <signal name="group-changed" handler="on_kf_p15_toggled" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="left_attach">8</property>
-                                        <property name="right_attach">9</property>
-                                        <property name="x_options"/>
-                                        <property name="y_options"/>
-                                      </packing>
-                                    </child>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="group-changed" handler="on_kf_p14_toggled" swapped="no"/>
                                   </object>
                                   <packing>
-                                    <property name="expand">True</property>
-                                    <property name="fill">False</property>
-                                    <property name="position">1</property>
+                                    <property name="left_attach">17</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p13">
+                                    <property name="label" translatable="yes">13</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="group-changed" handler="on_kf_p13_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">16</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p12">
+                                    <property name="label" translatable="yes">12</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="group-changed" handler="on_kf_p12_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">15</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p11">
+                                    <property name="label" translatable="yes">11</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="group-changed" handler="on_kf_p11_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">14</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p10">
+                                    <property name="label" translatable="yes">10</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="group-changed" handler="on_kf_p10_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">13</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p9">
+                                    <property name="label" translatable="yes">9</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="group-changed" handler="on_kf_p9_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">12</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p8">
+                                    <property name="label" translatable="yes">8</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">11</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p7">
+                                    <property name="label" translatable="yes">7</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="toggled" handler="on_kf_p7_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">10</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p6">
+                                    <property name="label" translatable="yes">6</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="toggled" handler="on_kf_p6_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">9</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p5">
+                                    <property name="label" translatable="yes">5</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="toggled" handler="on_kf_p5_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">8</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p4">
+                                    <property name="label" translatable="yes">4</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="toggled" handler="on_kf_p4_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">7</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p3">
+                                    <property name="label" translatable="yes">3</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="toggled" handler="on_kf_p3_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">6</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p2">
+                                    <property name="label" translatable="yes">2</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="toggled" handler="on_kf_p2_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">5</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p1">
+                                    <property name="label" translatable="yes">1</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="toggled" handler="on_kf_p1_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">4</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_p0">
+                                    <property name="label" translatable="yes">0</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <property name="group">kf_none</property>
+                                    <signal name="toggled" handler="on_kf_p0_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">3</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
+                                    <property name="margin_right">8</property>
+                                    <property name="label" translatable="yes">Selected FX parameter:</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">1</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkRadioButton" id="kf_none">
+                                    <property name="label" translatable="yes">None</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">False</property>
+                                    <property name="use_underline">True</property>
+                                    <property name="yalign">0.5</property>
+                                    <property name="active">True</property>
+                                    <property name="draw_indicator">True</property>
+                                    <signal name="toggled" handler="on_kf_none_toggled" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">2</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <placeholder/>
+                                </child>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkGrid">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="margin_left">8</property>
+                                <property name="margin_right">8</property>
+                                <property name="margin_top">8</property>
+                                <property name="margin_bottom">8</property>
+                                <property name="row_homogeneous">True</property>
+                                <property name="column_homogeneous">True</property>
+                                <child>
+                                  <object class="GtkSpinButton" id="curve_spinstart">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="text" translatable="yes">0</property>
+                                    <property name="primary_icon_activatable">False</property>
+                                    <property name="secondary_icon_activatable">False</property>
+                                    <property name="adjustment">fx_anim_start</property>
+                                    <property name="climb_rate">1</property>
+                                    <signal name="value-changed" handler="on_curve_spinstart_value_changed" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">1</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkSpinButton" id="curve_spinend">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="text" translatable="yes">0</property>
+                                    <property name="primary_icon_activatable">False</property>
+                                    <property name="secondary_icon_activatable">False</property>
+                                    <property name="adjustment">fx_anim_end</property>
+                                    <property name="climb_rate">1</property>
+                                    <signal name="value-changed" handler="on_curve_spinend_value_changed" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">4</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="curve_endtime">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="label" translatable="yes">00:00:00:00</property>
+                                    <property name="width_chars">0</property>
+                                    <property name="xalign">0</property>
+                                    <property name="yalign">0.49000000953674316</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">5</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="label682">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="label" translatable="yes">End position</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">3</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="curve_starttime">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="label" translatable="yes">00:00:00:00</property>
+                                    <property name="width_chars">0</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">2</property>
+                                    <property name="top_attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="label615">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="label" translatable="yes">Start position</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">0</property>
+                                    <property name="top_attach">0</property>
                                   </packing>
                                 </child>
                               </object>
                               <packing>
-                                <property name="expand">True</property>
+                                <property name="expand">False</property>
                                 <property name="fill">True</property>
-                                <property name="position">1</property>
+                                <property name="position">2</property>
                               </packing>
                             </child>
                           </object>
@@ -7944,73 +7885,62 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkFrame" id="Curve/line type">
+                      <object class="GtkBox" id="hbox657">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label_xalign">0</property>
+                        <property name="halign">end</property>
+                        <property name="margin_top">8</property>
+                        <property name="margin_bottom">8</property>
                         <child>
-                          <object class="GtkBox" id="hbox657">
+                          <object class="GtkRadioButton" id="curve_typelinear">
+                            <property name="label" translatable="yes">Linear</property>
                             <property name="visible">True</property>
-                            <property name="can_focus">False</property>
-                            <child>
-                              <object class="GtkRadioButton" id="curve_typelinear">
-                                <property name="label" translatable="yes">Linear</property>
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="receives_default">False</property>
-                                <property name="use_underline">True</property>
-                                <property name="draw_indicator">True</property>
-                                <signal name="toggled" handler="on_curve_typelinear_toggled" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">False</property>
-                                <property name="position">0</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkRadioButton" id="curve_typespline">
-                                <property name="label" translatable="yes">Spline</property>
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="receives_default">False</property>
-                                <property name="use_underline">True</property>
-                                <property name="draw_indicator">True</property>
-                                <property name="group">curve_typelinear</property>
-                                <signal name="toggled" handler="on_curve_typespline_toggled" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">False</property>
-                                <property name="position">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkRadioButton" id="curve_typefreehand">
-                                <property name="label" translatable="yes">Freehand</property>
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="receives_default">False</property>
-                                <property name="use_underline">True</property>
-                                <property name="draw_indicator">True</property>
-                                <property name="group">curve_typelinear</property>
-                                <signal name="toggled" handler="on_curve_typefreehand_toggled" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">False</property>
-                                <property name="position">2</property>
-                              </packing>
-                            </child>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">False</property>
+                            <property name="use_underline">True</property>
+                            <property name="active">True</property>
+                            <property name="draw_indicator">True</property>
+                            <signal name="toggled" handler="on_curve_typelinear_toggled" swapped="no"/>
                           </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">0</property>
+                          </packing>
                         </child>
-                        <child type="label">
-                          <object class="GtkLabel" id="label685">
+                        <child>
+                          <object class="GtkRadioButton" id="curve_typespline">
+                            <property name="label" translatable="yes">Spline</property>
                             <property name="visible">True</property>
-                            <property name="can_focus">False</property>
-                            <property name="label" translatable="yes">&lt;b&gt;Curve drawing method&lt;/b&gt;</property>
-                            <property name="use_markup">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">False</property>
+                            <property name="use_underline">True</property>
+                            <property name="draw_indicator">True</property>
+                            <property name="group">curve_typelinear</property>
+                            <signal name="toggled" handler="on_curve_typespline_toggled" swapped="no"/>
                           </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkRadioButton" id="curve_typefreehand">
+                            <property name="label" translatable="yes">Freehand</property>
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">False</property>
+                            <property name="use_underline">True</property>
+                            <property name="draw_indicator">True</property>
+                            <property name="group">curve_typelinear</property>
+                            <signal name="toggled" handler="on_curve_typefreehand_toggled" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">2</property>
+                          </packing>
                         </child>
                       </object>
                       <packing>
@@ -8020,150 +7950,134 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkFrame" id="frame266">
+                      <object class="GtkBox" id="fxanimcontrols">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label_xalign">0</property>
                         <child>
-                          <object class="GtkTable" id="table100">
+                          <object class="GtkToggleButton" id="curve_panel_toggleentry">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Toggle status</property>
+                            <signal name="toggled" handler="curve_panel_toggleentry_toggled" swapped="no"/>
+                            <child>
+                              <object class="GtkImage" id="image58">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="pixbuf">icon_keyframe.png</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkToggleButton" id="curve_toggleentry_param">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Toggle status</property>
+                            <signal name="toggled" handler="on_curve_toggleentry_param_toggled" swapped="no"/>
+                            <child>
+                              <object class="GtkImage" id="image2146">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="pixbuf">icon_connect.png</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="curve_buttonstore">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Save this curve</property>
+                            <signal name="clicked" handler="on_curve_buttonstore_clicked" swapped="no"/>
+                            <child>
+                              <object class="GtkImage" id="image2521">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="pixbuf">icon_save.png</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">2</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="curve_clear_parameter">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Clear selected parameter</property>
+                            <signal name="clicked" handler="on_curve_clear_parameter_clicked" swapped="no"/>
+                            <child>
+                              <object class="GtkImage" id="image17">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="pixbuf">icon_clear.png</property>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">3</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkBox" id="hbox850">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="n_rows">2</property>
-                            <property name="n_columns">5</property>
+                            <property name="homogeneous">True</property>
                             <child>
-                              <placeholder/>
-                            </child>
-                            <child>
-                              <placeholder/>
-                            </child>
-                            <child>
-                              <object class="GtkLabel" id="label615">
+                              <object class="GtkButton" id="curve_buttonclear">
                                 <property name="visible">True</property>
-                                <property name="can_focus">False</property>
-                                <property name="label" translatable="yes">startframe</property>
-                                <property name="xalign">0</property>
-                              </object>
-                              <packing>
-                                <property name="x_options"/>
-                                <property name="y_options"/>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkSpinButton" id="curve_spinstart">
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="primary_icon_activatable">False</property>
-                                <property name="secondary_icon_activatable">False</property>
-                                <property name="adjustment">fx_anim_start</property>
-                                <property name="climb_rate">1</property>
-                                <signal name="value-changed" handler="on_curve_spinstart_value_changed" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="left_attach">1</property>
-                                <property name="right_attach">2</property>
-                                <property name="y_options"/>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel" id="label682">
-                                <property name="visible">True</property>
-                                <property name="can_focus">False</property>
-                                <property name="label" translatable="yes">endframe</property>
-                                <property name="xalign">0</property>
-                              </object>
-                              <packing>
-                                <property name="left_attach">2</property>
-                                <property name="right_attach">3</property>
-                                <property name="x_options"/>
-                                <property name="y_options"/>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkSpinButton" id="curve_spinend">
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="primary_icon_activatable">False</property>
-                                <property name="secondary_icon_activatable">False</property>
-                                <property name="adjustment">fx_anim_end</property>
-                                <property name="climb_rate">1</property>
-                                <signal name="value-changed" handler="on_curve_spinend_value_changed" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="left_attach">3</property>
-                                <property name="right_attach">4</property>
-                                <property name="y_options"/>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel" id="curve_starttime">
-                                <property name="visible">True</property>
-                                <property name="can_focus">False</property>
-                                <property name="label" translatable="yes">00:00:00:00</property>
-                                <property name="width_chars">0</property>
-                                <property name="xalign">0</property>
-                              </object>
-                              <packing>
-                                <property name="left_attach">1</property>
-                                <property name="right_attach">2</property>
-                                <property name="top_attach">1</property>
-                                <property name="bottom_attach">2</property>
-                                <property name="x_options"/>
-                                <property name="y_options"/>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel" id="curve_endtime">
-                                <property name="visible">True</property>
-                                <property name="can_focus">False</property>
-                                <property name="label" translatable="yes">00:00:00:00</property>
-                                <property name="width_chars">0</property>
-                                <property name="xalign">0</property>
-                                <property name="yalign">0.49000000953674316</property>
-                              </object>
-                              <packing>
-                                <property name="left_attach">3</property>
-                                <property name="right_attach">4</property>
-                                <property name="top_attach">1</property>
-                                <property name="bottom_attach">2</property>
-                                <property name="x_options"/>
-                                <property name="y_options"/>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkButton" id="buttontime">
                                 <property name="can_focus">True</property>
                                 <property name="receives_default">False</property>
-                                <property name="tooltip_text" translatable="yes">Update start/end</property>
-                                <signal name="clicked" handler="on_curve_buttontime_clicked" swapped="no"/>
+                                <property name="tooltip_text" translatable="yes">Reset</property>
+                                <signal name="clicked" handler="on_curve_buttonclear_clicked" swapped="no"/>
                                 <child>
-                                  <object class="GtkImage" id="image2144">
+                                  <object class="GtkImage" id="image532">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
-                                    <property name="pixbuf">icon_refresh.png</property>
+                                    <property name="pixbuf">icon_clearall.png</property>
                                   </object>
                                 </child>
                               </object>
                               <packing>
-                                <property name="left_attach">4</property>
-                                <property name="right_attach">5</property>
-                                <property name="top_attach">1</property>
-                                <property name="bottom_attach">2</property>
-                                <property name="x_options"/>
-                                <property name="y_options"/>
+                                <property name="expand">False</property>
+                                <property name="fill">False</property>
+                                <property name="position">0</property>
                               </packing>
                             </child>
                             <child>
                               <placeholder/>
                             </child>
+                            <child>
+                              <placeholder/>
+                            </child>
+                            <child>
+                              <placeholder/>
+                            </child>
                           </object>
-                        </child>
-                        <child type="label">
-                          <object class="GtkLabel" id="label889">
-                            <property name="visible">True</property>
-                            <property name="can_focus">False</property>
-                            <property name="label" translatable="yes">&lt;b&gt;timeline&lt;/b&gt;</property>
-                            <property name="use_markup">True</property>
-                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                            <property name="fill">True</property>
+                            <property name="position">4</property>
+                          </packing>
                         </child>
                       </object>
                       <packing>
@@ -10106,11 +10020,13 @@
                                   <object class="GtkBox" id="hbox886">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
+                                    <property name="margin_top">8</property>
                                     <child>
-                                      <object class="GtkLabel" id="sample_length_label">
+                                      <object class="GtkLabel">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
-                                        <property name="label" translatable="yes">00:00:00:00</property>
+                                        <property name="label" translatable="yes">Duration: </property>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -10142,6 +10058,18 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <child>
+                                      <object class="GtkLabel" id="sample_length_label">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="label" translatable="yes">00:00:00:00</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">2</property>
+                                      </packing>
+                                    </child>
                                   </object>
                                   <packing>
                                     <property name="expand">False</property>
@@ -10167,6 +10095,7 @@
                           <object class="GtkNotebook" id="notebook15">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
+                            <property name="margin_left">8</property>
                             <property name="margin_top">8</property>
                             <child>
                               <object class="GtkBox" id="vbox623">
@@ -10619,185 +10548,125 @@
                                     <property name="margin_top">8</property>
                                     <property name="label_xalign">0</property>
                                     <child>
-                                      <object class="GtkBox">
+                                      <object class="GtkGrid">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
-                                        <property name="orientation">vertical</property>
+                                        <property name="margin_left">8</property>
+                                        <property name="row_homogeneous">True</property>
                                         <child>
-                                          <object class="GtkBox">
+                                          <object class="GtkLabel" id="label117">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="margin_bottom">8</property>
-                                            <property name="homogeneous">True</property>
-                                            <child>
-                                              <object class="GtkLabel" id="label117">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Start position</property>
-                                                <property name="justify">right</property>
-                                                <property name="track_visited_links">False</property>
-                                                <property name="xalign">0</property>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">True</property>
-                                                <property name="fill">False</property>
-                                                <property name="padding">8</property>
-                                                <property name="position">0</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkSpinButton" id="spin_samplestart">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="text" translatable="yes">0</property>
-                                                <property name="primary_icon_activatable">False</property>
-                                                <property name="secondary_icon_activatable">False</property>
-                                                <property name="adjustment">start_pos</property>
-                                                <property name="climb_rate">1</property>
-                                                <signal name="value-changed" handler="on_spin_samplestart_value_changed" swapped="no"/>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">True</property>
-                                                <property name="fill">True</property>
-                                                <property name="position">1</property>
-                                              </packing>
-                                            </child>
+                                            <property name="label" translatable="yes">Start position</property>
+                                            <property name="justify">right</property>
+                                            <property name="track_visited_links">False</property>
+                                            <property name="xalign">0</property>
                                           </object>
                                           <packing>
-                                            <property name="expand">False</property>
-                                            <property name="fill">False</property>
-                                            <property name="position">0</property>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">0</property>
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkBox">
+                                          <object class="GtkSpinButton" id="spin_samplestart">
+                                            <property name="width_request">200</property>
                                             <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="margin_bottom">8</property>
-                                            <property name="homogeneous">True</property>
-                                            <child>
-                                              <object class="GtkLabel" id="label118">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">End position</property>
-                                                <property name="xalign">0</property>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">False</property>
-                                                <property name="fill">False</property>
-                                                <property name="position">0</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkSpinButton" id="spin_sampleend">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="text" translatable="yes">0</property>
-                                                <property name="primary_icon_activatable">False</property>
-                                                <property name="secondary_icon_activatable">False</property>
-                                                <property name="adjustment">end_pos</property>
-                                                <property name="climb_rate">1</property>
-                                                <signal name="value-changed" handler="on_spin_sampleend_value_changed" swapped="no"/>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">True</property>
-                                                <property name="fill">True</property>
-                                                <property name="position">1</property>
-                                              </packing>
-                                            </child>
+                                            <property name="can_focus">True</property>
+                                            <property name="text" translatable="yes">0</property>
+                                            <property name="primary_icon_activatable">False</property>
+                                            <property name="secondary_icon_activatable">False</property>
+                                            <property name="adjustment">start_pos</property>
+                                            <property name="climb_rate">1</property>
+                                            <signal name="value-changed" handler="on_spin_samplestart_value_changed" swapped="no"/>
                                           </object>
                                           <packing>
-                                            <property name="expand">True</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">1</property>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">0</property>
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkBox">
+                                          <object class="GtkLabel" id="label118">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="margin_bottom">8</property>
-                                            <property name="homogeneous">True</property>
-                                            <child>
-                                              <object class="GtkLabel" id="label706">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Playback speed</property>
-                                                <property name="xalign">0</property>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">True</property>
-                                                <property name="fill">False</property>
-                                                <property name="padding">8</property>
-                                                <property name="position">0</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkSpinButton" id="spin_samplespeed">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="text" translatable="yes">0</property>
-                                                <property name="primary_icon_activatable">False</property>
-                                                <property name="secondary_icon_activatable">False</property>
-                                                <property name="adjustment">speed</property>
-                                                <property name="climb_rate">1</property>
-                                                <signal name="value-changed" handler="on_spin_samplespeed_value_changed" swapped="no"/>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">True</property>
-                                                <property name="fill">True</property>
-                                                <property name="position">1</property>
-                                              </packing>
-                                            </child>
+                                            <property name="label" translatable="yes">End position</property>
+                                            <property name="xalign">0</property>
                                           </object>
                                           <packing>
-                                            <property name="expand">False</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">2</property>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">1</property>
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkBox">
+                                          <object class="GtkSpinButton" id="spin_sampleend">
                                             <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="margin_bottom">8</property>
-                                            <property name="homogeneous">True</property>
-                                            <child>
-                                              <object class="GtkLabel" id="label707">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Slow motion multiplier</property>
-                                                <property name="justify">center</property>
-                                                <property name="xalign">0</property>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">False</property>
-                                                <property name="fill">False</property>
-                                                <property name="position">0</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkSpinButton" id="spin_framedelay">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="text" translatable="yes">0</property>
-                                                <property name="primary_icon_activatable">False</property>
-                                                <property name="secondary_icon_activatable">False</property>
-                                                <property name="adjustment">dup</property>
-                                                <property name="climb_rate">1</property>
-                                                <signal name="value-changed" handler="on_spin_framedelay_value_changed" swapped="no"/>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">True</property>
-                                                <property name="fill">True</property>
-                                                <property name="position">1</property>
-                                              </packing>
-                                            </child>
+                                            <property name="can_focus">True</property>
+                                            <property name="text" translatable="yes">0</property>
+                                            <property name="primary_icon_activatable">False</property>
+                                            <property name="secondary_icon_activatable">False</property>
+                                            <property name="adjustment">end_pos</property>
+                                            <property name="climb_rate">1</property>
+                                            <signal name="value-changed" handler="on_spin_sampleend_value_changed" swapped="no"/>
                                           </object>
                                           <packing>
-                                            <property name="expand">False</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">3</property>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="label706">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="label" translatable="yes">Playback speed</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="spin_samplespeed">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="text" translatable="yes">0</property>
+                                            <property name="primary_icon_activatable">False</property>
+                                            <property name="secondary_icon_activatable">False</property>
+                                            <property name="adjustment">speed</property>
+                                            <property name="climb_rate">1</property>
+                                            <signal name="value-changed" handler="on_spin_samplespeed_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="label707">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="label" translatable="yes">Slow motion multiplier</property>
+                                            <property name="justify">center</property>
+                                            <property name="xalign">0</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">3</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="spin_framedelay">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="text" translatable="yes">0</property>
+                                            <property name="primary_icon_activatable">False</property>
+                                            <property name="secondary_icon_activatable">False</property>
+                                            <property name="adjustment">dup</property>
+                                            <property name="climb_rate">1</property>
+                                            <signal name="value-changed" handler="on_spin_framedelay_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">3</property>
                                           </packing>
                                         </child>
                                       </object>
@@ -11604,11 +11473,14 @@
                       <object class="GtkBox" id="stream_panel">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
+                        <property name="margin_left">7</property>
+                        <property name="margin_right">8</property>
                         <property name="orientation">vertical</property>
                         <child>
                           <object class="GtkFrame" id="frame271">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
+                            <property name="margin_top">8</property>
                             <property name="label_xalign">0</property>
                             <child>
                               <object class="GtkBox" id="hbox854">
@@ -11721,6 +11593,7 @@
                           <object class="GtkBox" id="streamrecord">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
+                            <property name="margin_top">8</property>
                             <property name="orientation">vertical</property>
                             <child>
                               <object class="GtkFrame" id="frame272">
@@ -11852,6 +11725,7 @@
                               <object class="GtkBox" id="hbox855">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
+                                <property name="margin_top">8</property>
                                 <child>
                                   <object class="GtkBox" id="hbox722">
                                     <property name="visible">True</property>
@@ -12000,6 +11874,7 @@
                                       <object class="GtkBox" id="vbox30">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
+                                        <property name="margin_top">8</property>
                                         <property name="orientation">vertical</property>
                                         <child>
                                           <object class="GtkLabel" id="label35">
@@ -12027,7 +11902,8 @@
                                                   <object class="GtkGrid">
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
-                                                    <property name="column_homogeneous">True</property>
+                                                    <property name="column_spacing">8</property>
+                                                    <property name="row_homogeneous">True</property>
                                                     <child>
                                                       <object class="GtkLabel" id="label333">
                                                         <property name="visible">True</property>
@@ -12290,6 +12166,7 @@
                                                     </child>
                                                     <child>
                                                       <object class="GtkScale" id="v4l_brightness">
+                                                        <property name="width_request">400</property>
                                                         <property name="visible">True</property>
                                                         <property name="can_focus">True</property>
                                                         <property name="adjustment">v4l_brightnes</property>
@@ -12644,6 +12521,7 @@
                                       <object class="GtkScale" id="slider_g0">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
+                                        <property name="margin_bottom">8</property>
                                         <property name="orientation">vertical</property>
                                         <property name="adjustment">gen_p0</property>
                                         <property name="inverted">True</property>
@@ -12726,12 +12604,16 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <style>
+                                      <class name="p_box"/>
+                                    </style>
                                   </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="label9">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
                                     <property name="label" translatable="yes">&lt;b&gt;p0&lt;/b&gt;</property>
                                     <property name="use_markup">True</property>
                                   </object>
@@ -12758,6 +12640,7 @@
                                       <object class="GtkScale" id="slider_g1">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
+                                        <property name="margin_bottom">8</property>
                                         <property name="orientation">vertical</property>
                                         <property name="adjustment">gen_p1</property>
                                         <property name="inverted">True</property>
@@ -12839,12 +12722,16 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <style>
+                                      <class name="p_box"/>
+                                    </style>
                                   </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="label10">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
                                     <property name="label" translatable="yes">&lt;b&gt;p1&lt;/b&gt;</property>
                                     <property name="use_markup">True</property>
                                   </object>
@@ -12871,6 +12758,7 @@
                                       <object class="GtkScale" id="slider_g2">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
+                                        <property name="margin_bottom">8</property>
                                         <property name="orientation">vertical</property>
                                         <property name="adjustment">gen_p2</property>
                                         <property name="inverted">True</property>
@@ -12952,12 +12840,16 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <style>
+                                      <class name="p_box"/>
+                                    </style>
                                   </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="label11">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
                                     <property name="label" translatable="yes">&lt;b&gt;p2&lt;/b&gt;</property>
                                     <property name="use_markup">True</property>
                                   </object>
@@ -12984,6 +12876,7 @@
                                       <object class="GtkScale" id="slider_g3">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
+                                        <property name="margin_bottom">8</property>
                                         <property name="orientation">vertical</property>
                                         <property name="adjustment">gen_p3</property>
                                         <property name="inverted">True</property>
@@ -13065,12 +12958,16 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <style>
+                                      <class name="p_box"/>
+                                    </style>
                                   </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="label12">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
                                     <property name="label" translatable="yes">&lt;b&gt;p3&lt;/b&gt;</property>
                                     <property name="use_markup">True</property>
                                   </object>
@@ -13097,6 +12994,7 @@
                                       <object class="GtkScale" id="slider_g4">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
+                                        <property name="margin_bottom">8</property>
                                         <property name="orientation">vertical</property>
                                         <property name="adjustment">gen_p4</property>
                                         <property name="inverted">True</property>
@@ -13178,12 +13076,16 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <style>
+                                      <class name="p_box"/>
+                                    </style>
                                   </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="label13">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
                                     <property name="label" translatable="yes">&lt;b&gt;p4&lt;/b&gt;</property>
                                     <property name="use_markup">True</property>
                                   </object>
@@ -13214,6 +13116,7 @@
                                           <object class="GtkScale" id="slider_g5">
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="margin_bottom">8</property>
                                             <property name="orientation">vertical</property>
                                             <property name="adjustment">gen_p5</property>
                                             <property name="inverted">True</property>
@@ -13297,12 +13200,16 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <style>
+                                      <class name="p_box"/>
+                                    </style>
                                   </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="label14">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
                                     <property name="label" translatable="yes">&lt;b&gt;p5&lt;/b&gt;</property>
                                     <property name="use_markup">True</property>
                                   </object>
@@ -13329,6 +13236,7 @@
                                       <object class="GtkScale" id="slider_g6">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
+                                        <property name="margin_bottom">8</property>
                                         <property name="orientation">vertical</property>
                                         <property name="adjustment">gen_p6</property>
                                         <property name="inverted">True</property>
@@ -13410,12 +13318,16 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <style>
+                                      <class name="p_box"/>
+                                    </style>
                                   </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="label15">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
                                     <property name="label" translatable="yes">&lt;b&gt;p6&lt;/b&gt;</property>
                                     <property name="use_markup">True</property>
                                   </object>
@@ -13442,6 +13354,7 @@
                                       <object class="GtkScale" id="slider_g7">
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
+                                        <property name="margin_bottom">8</property>
                                         <property name="orientation">vertical</property>
                                         <property name="adjustment">gen_p8</property>
                                         <property name="inverted">True</property>
@@ -13524,12 +13437,16 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
+                                    <style>
+                                      <class name="p_box"/>
+                                    </style>
                                   </object>
                                 </child>
                                 <child type="label">
                                   <object class="GtkLabel" id="label16">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="margin_left">8</property>
                                     <property name="label" translatable="yes">&lt;b&gt;p7&lt;/b&gt;</property>
                                     <property name="use_markup">True</property>
                                   </object>
@@ -13561,6 +13478,7 @@
                                           <object class="GtkScale" id="slider_g8">
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="margin_bottom">8</property>
                                             <property name="orientation">vertical</property>
                                             <property name="inverted">True</property>
                                             <property name="round_digits">0</property>
@@ -13642,12 +13560,16 @@
                                             <property name="position">1</property>
                                           </packing>
                                         </child>
+                                        <style>
+                                          <class name="p_box"/>
+                                        </style>
                                       </object>
                                     </child>
                                     <child type="label">
                                       <object class="GtkLabel" id="label17">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
+                                        <property name="margin_left">8</property>
                                         <property name="label" translatable="yes">&lt;b&gt;p8&lt;/b&gt;</property>
                                         <property name="use_markup">True</property>
                                       </object>
@@ -13685,6 +13607,7 @@
                                           <object class="GtkScale" id="slider_g9">
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="margin_bottom">8</property>
                                             <property name="orientation">vertical</property>
                                             <property name="adjustment">gen_p9</property>
                                             <property name="inverted">True</property>
@@ -13767,12 +13690,16 @@
                                             <property name="position">1</property>
                                           </packing>
                                         </child>
+                                        <style>
+                                          <class name="p_box"/>
+                                        </style>
                                       </object>
                                     </child>
                                     <child type="label">
                                       <object class="GtkLabel" id="label18">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
+                                        <property name="margin_left">8</property>
                                         <property name="label" translatable="yes">&lt;b&gt;p9&lt;/b&gt;</property>
                                         <property name="use_markup">True</property>
                                       </object>
@@ -13810,6 +13737,7 @@
                                             <property name="visible">True</property>
                                             <property name="sensitive">False</property>
                                             <property name="can_focus">True</property>
+                                            <property name="margin_bottom">8</property>
                                             <property name="orientation">vertical</property>
                                             <property name="adjustment">gen_p10</property>
                                             <property name="inverted">True</property>
@@ -13892,12 +13820,16 @@
                                             <property name="position">1</property>
                                           </packing>
                                         </child>
+                                        <style>
+                                          <class name="p_box"/>
+                                        </style>
                                       </object>
                                     </child>
                                     <child type="label">
                                       <object class="GtkLabel" id="label19">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
+                                        <property name="margin_left">8</property>
                                         <property name="label" translatable="yes">&lt;b&gt;p10&lt;/b&gt;</property>
                                         <property name="use_markup">True</property>
                                       </object>
@@ -13927,6 +13859,7 @@
                           <object class="GtkFrame" id="frame287">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
+                            <property name="margin_top">8</property>
                             <property name="label_xalign">0</property>
                             <child>
                               <object class="GtkAlignment" id="alignment493">
@@ -14748,6 +14681,9 @@
                     <property name="tab_fill">False</property>
                   </packing>
                 </child>
+                <style>
+                  <class name="panel"/>
+                </style>
               </object>
               <packing>
                 <property name="expand">True</property>

@@ -167,3 +167,89 @@ textview text {
  border-style:solid;
  border-radius:4px;
 }
+
+
+
+list {
+ background-color:#27282f;
+}
+
+
+.search-bar {
+ background-color:#27282f;
+}
+
+.view {
+background-color:#27282f;
+}
+
+.image-button {
+background-color:#27282f;
+}
+.sidebar-button {
+background-color:#27282f;
+}
+/*
+revealer box.horizontal, box.vertical {
+background-color:#27281f;
+}*/
+
+menubar {
+background-color:#1b1c20;
+border-bottom-width:2px;
+border-color:#434449;
+border-style:solid;
+}
+
+menuitem {
+background-color:#1b1c20;
+padding-bottom:4px;
+}
+
+button:disabled, spinbutton:disabled,radiobutton:disabled, checkbutton:disabled  {
+ border-style:solid;
+ border-width:2px;
+ border-color:#4a4a4e;
+ border-radius:5px;
+ color:#000000;
+ text-shadow:none;
+ background-image: none;
+ text-shadow: none;
+ border-image-source:none;
+ background-color: mix (#4a4a4e, @bg_color, 0.25);
+ text-shadow: 0 1px alpha (shade (@button_bg_color, 1.25), 0.4);
+}
+
+button:disabled label, spinbutton:disabled entry {
+ background-color: mix (#4a4a4e, @bg_color, 0.25);
+}
+
+radiobutton:disabled label, radiobutton:disabled entry {
+ color: mix (#4a4a4e, @bg_color, 0.25);
+}
+
+radiobutton:hover {
+ background-color:#ff8400;
+} 
+
+scale:disabled contents slider {
+ background-color:mix (#4a4a4e, @bg_color, 0.25);
+}
+scale:disabled contents trough highlight {
+ background-color:mix (#4a4a4e, @bg_color, 0.25);
+}
+scale:disabled value {
+ color: mix (#4a4a4e, @bg_color, 0.25);
+}
+
+.panel {
+ border-style:solid;
+ border-right-width:2px;
+ 
+}
+
+.toggle:checked {
+ background-color:#e59420;
+ border-radius:8px;
+ border-style:solid;
+}

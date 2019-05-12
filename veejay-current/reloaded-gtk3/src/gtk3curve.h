@@ -156,6 +156,14 @@ void gtk3_curve_set_color_cpoint_rgba             (GtkWidget         *widget,
                                                    gfloat             b,
                                                    gfloat             a);
 
+void gtk3_curve_set_grid_resolution(GtkWidget *widget, gint grid_resolution);
+void gtk3_curve_set_yaxis_range( GtkWidget *widget, gfloat lo, gfloat hi );
+void gtk3_curve_set_xaxis_range( GtkWidget *widget, gfloat lo, gfloat hi );
+void gtk3_curve_set_x_lo( GtkWidget *widget, gfloat lo );
+void gtk3_curve_set_x_hi( GtkWidget *widget, gfloat hi );
+void gtk3_curve_set_y_lo( GtkWidget *widget, gfloat lo );
+void gtk3_curve_set_y_hi( GtkWidget *widget, gfloat hi );
+
 Gtk3CurveColor gtk3_curve_get_color_background    (GtkWidget          *widget);
 Gtk3CurveColor gtk3_curve_get_color_grid          (GtkWidget          *widget);
 Gtk3CurveColor gtk3_curve_get_color_curve         (GtkWidget          *widget);

@@ -36,6 +36,8 @@ void	reset_curve( GtkWidget *curve )
   gtk_widget_set_sensitive( curve, TRUE );
   gtk3_curve_reset( curve );
   gtk3_curve_set_range( curve , 0.0, 1.0, 0.0, 1.0 );
+  gtk3_curve_set_yaxis_range( curve, 0.0, 0.0 );
+  gtk3_curve_set_grid_resolution( curve, 0 );
 }
 
 void	set_points_in_curve( Gtk3CurveType type, GtkWidget *curve)
@@ -43,6 +45,27 @@ void	set_points_in_curve( Gtk3CurveType type, GtkWidget *curve)
   gtk3_curve_set_curve_type( curve , type );
 }
 
+
+void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int start, int end, int value )
+{
+    int min=0, max=0;
+	_effect_get_minmax(fx_id, &min, &max, parameter_id );
+    int len = end - start;
+	int i,k=0;
+    float	*vec = (float*) vj_calloc(sizeof(float) * len );
+
+	int diff = max - min;
+	for(i = start ; i < end; i ++ )
+	{
+		float val = ((float)(value - min) / (diff));
+		vec[k] = val;
+		k++;
+	}
+	
+    gtk3_curve_set_vector( curve , len, vec );
+
+    free(vec);
+}
 
 int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *curve_type, int *status)
 {
@@ -64,6 +87,10 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	unsigned int k = 0;
 	unsigned char *in = blob + 27;
 	float	*vec = (float*) vj_calloc(sizeof(float) * len );
+    if(vec == NULL) {
+        return -1;
+    }
+
 	int diff = max - min;
 	for(i = start ; i < end; i ++ )
 	{
@@ -91,6 +118,10 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 
 	*lo = start;
 	*hi = end;
+
+    gtk3_curve_set_xaxis_range( curve, (gfloat) start, (gfloat) end );
+    gtk3_curve_set_yaxis_range( curve, (gfloat) min, (gfloat) max );
+    gtk3_curve_set_grid_resolution(curve, 16); // default grid resolution
 
 	free(vec);
 
