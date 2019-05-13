@@ -1226,6 +1226,18 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -7968,6 +7980,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p15</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -7984,6 +7997,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p14</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8000,6 +8014,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p13</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8016,6 +8031,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p12</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8032,6 +8048,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p11</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8048,6 +8065,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p10</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8064,6 +8082,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p9</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8080,6 +8099,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p8</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8095,6 +8115,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p7</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8111,6 +8132,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p6</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8127,6 +8149,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p5</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8143,6 +8166,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p4</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8159,6 +8183,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p3</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8191,6 +8216,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p1</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8207,6 +8233,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
+                                    <property name="tooltip_text" translatable="yes">Select parameter p0</property>
                                     <property name="use_underline">True</property>
                                     <property name="draw_indicator">True</property>
                                     <property name="group">kf_none</property>
@@ -8271,6 +8298,7 @@
                                   <object class="GtkSpinButton" id="curve_spinstart">
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
+                                    <property name="tooltip_text" translatable="yes">Set starting position of animation</property>
                                     <property name="text" translatable="yes">0</property>
                                     <property name="primary_icon_activatable">False</property>
                                     <property name="secondary_icon_activatable">False</property>
@@ -8287,6 +8315,7 @@
                                   <object class="GtkSpinButton" id="curve_spinend">
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
+                                    <property name="tooltip_text" translatable="yes">Set ending position of animation</property>
                                     <property name="text" translatable="yes">0</property>
                                     <property name="primary_icon_activatable">False</property>
                                     <property name="secondary_icon_activatable">False</property>
@@ -8395,6 +8424,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Change curve type to Linear</property>
                             <property name="use_underline">True</property>
                             <property name="active">True</property>
                             <property name="draw_indicator">True</property>
@@ -8412,6 +8442,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Change curve type to Spline</property>
                             <property name="use_underline">True</property>
                             <property name="draw_indicator">True</property>
                             <property name="group">curve_typelinear</property>
@@ -8429,6 +8460,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Change curve type to Freehand</property>
                             <property name="use_underline">True</property>
                             <property name="draw_indicator">True</property>
                             <property name="group">curve_typelinear</property>
@@ -8456,7 +8488,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
-                            <property name="tooltip_text" translatable="yes">Toggle status</property>
+                            <property name="tooltip_text" translatable="yes">Toggle rendering of this animation in FX chain</property>
                             <signal name="toggled" handler="curve_panel_toggleentry_toggled" swapped="no"/>
                             <child>
                               <object class="GtkImage" id="image58">
@@ -8498,7 +8530,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
-                            <property name="tooltip_text" translatable="yes">Save this curve</property>
+                            <property name="tooltip_text" translatable="yes">Save this animation (Apply)</property>
                             <signal name="clicked" handler="on_curve_buttonstore_clicked" swapped="no"/>
                             <child>
                               <object class="GtkImage" id="image2521">
@@ -8519,7 +8551,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
-                            <property name="tooltip_text" translatable="yes">Clear selected parameter</property>
+                            <property name="tooltip_text" translatable="yes">Clear this animation</property>
                             <signal name="clicked" handler="on_curve_clear_parameter_clicked" swapped="no"/>
                             <child>
                               <object class="GtkImage" id="image17">
@@ -14741,6 +14773,7 @@
                               <object class="GtkSpinButton" id="macro_frame_position">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
+                                <property name="tooltip_text" translatable="yes">Set frame position on which to fire VIMS message</property>
                                 <property name="margin_top">8</property>
                                 <property name="margin_bottom">8</property>
                                 <property name="adjustment">vims_frame_pos</property>
@@ -14757,6 +14790,7 @@
                               <object class="GtkSpinButton" id="macro_dup_position">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
+                                <property name="tooltip_text" translatable="yes">Set dup position on which to fire VIMS message</property>
                                 <property name="margin_bottom">8</property>
                                 <property name="adjustment">vims_frame_dup</property>
                                 <property name="climb_rate">1</property>
@@ -14774,6 +14808,7 @@
                               <object class="GtkSpinButton" id="macro_loop_position">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
+                                <property name="tooltip_text" translatable="yes">Set loop position on which to fire VIMS message</property>
                                 <property name="adjustment">vims_loop_pos</property>
                                 <property name="climb_rate">1</property>
                               </object>
@@ -14834,6 +14869,7 @@
                               <object class="GtkEntry" id="macro_vims_message">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
+                                <property name="tooltip_text" translatable="yes">VIMS message (see veejay -u)</property>
                                 <property name="margin_right">8</property>
                                 <property name="margin_top">8</property>
                                 <property name="margin_bottom">8</property>
@@ -14850,6 +14886,7 @@
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
                                 <property name="receives_default">False</property>
+                                <property name="tooltip_text" translatable="yes">Apply</property>
                                 <signal name="clicked" handler="on_macro_save_button_clicked" swapped="no"/>
                                 <child>
                                   <object class="GtkAlignment" id="alignment564">
@@ -14911,6 +14948,7 @@
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
                                 <property name="receives_default">False</property>
+                                <property name="tooltip_text" translatable="yes">Delete</property>
                                 <signal name="clicked" handler="on_macro_delete_button_clicked" swapped="no"/>
                                 <child>
                                   <object class="GtkAlignment" id="alignment561">
@@ -15013,6 +15051,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Clear all macro banks</property>
                             <signal name="clicked" handler="on_macro_delete_all_button_clicked" swapped="no"/>
                             <child>
                               <object class="GtkAlignment" id="alignment562">
@@ -15072,6 +15111,7 @@
                           <object class="GtkSpinButton" id="macro_bank_select">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
+                            <property name="tooltip_text" translatable="yes">Select a macro bank</property>
                             <property name="adjustment">macro_bank</property>
                             <property name="climb_rate">1</property>
                             <signal name="value-changed" handler="on_macro_bank_select_value_changed" swapped="no"/>
@@ -15088,6 +15128,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Refresh selected macro bank</property>
                             <signal name="clicked" handler="on_macro_refresh_button_clicked" swapped="no"/>
                             <child>
                               <object class="GtkAlignment" id="alignment563">
@@ -15134,6 +15175,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
+                            <property name="tooltip_text" translatable="yes">Clear selected Macro-bank</property>
                             <signal name="clicked" handler="on_macro_button_clear_bank_clicked" swapped="no"/>
                             <child>
                               <object class="GtkImage" id="image3513">
@@ -16515,6 +16557,7 @@
                                             <property name="width_request">50</property>
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="tooltip_text" translatable="yes">Speed up/down video</property>
                                             <property name="digits">0</property>
                                             <signal name="value-changed" handler="on_speed_slider_value_changed" swapped="no"/>
                                           </object>
@@ -16529,6 +16572,7 @@
                                             <property name="width_request">50</property>
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="tooltip_text" translatable="yes">Slow video</property>
                                             <property name="adjustment">dup</property>
                                             <property name="digits">0</property>
                                             <signal name="value-changed" handler="on_slow_slider_value_changed" swapped="no"/>
@@ -16713,6 +16757,7 @@
                                                         <property name="visible">True</property>
                                                         <property name="can_focus">True</property>
                                                         <property name="receives_default">False</property>
+                                                        <property name="tooltip_text" translatable="yes">Select previous sample bank</property>
                                                         <signal name="clicked" handler="on_button_samplebank_prev_clicked" swapped="no"/>
                                                         <child>
                                                           <object class="GtkImage" id="image3173">
@@ -16774,6 +16819,7 @@
                                                             <object class="GtkSpinButton" id="spin_samplebank_select">
                                                             <property name="visible">True</property>
                                                             <property name="can_focus">True</property>
+                                                            <property name="tooltip_text" translatable="yes">Change active sample bank</property>
                                                             <property name="primary_icon_activatable">False</property>
                                                             <property name="secondary_icon_activatable">False</property>
                                                             <property name="adjustment">samplebankpage</property>
@@ -16822,6 +16868,7 @@
                                                         <property name="visible">True</property>
                                                         <property name="can_focus">True</property>
                                                         <property name="receives_default">False</property>
+                                                        <property name="tooltip_text" translatable="yes">Select next sample bank</property>
                                                         <signal name="clicked" handler="on_button_samplebank_next_clicked" swapped="no"/>
                                                         <child>
                                                           <object class="GtkImage" id="image3174">
@@ -18287,7 +18334,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="receives_default">False</property>
-                                                <property name="tooltip_text" translatable="yes">Stop Event Record/Playback</property>
+                                                <property name="tooltip_text" translatable="yes">Stop macro record or playback</property>
                                                 <property name="active">True</property>
                                                 <property name="draw_indicator">True</property>
                                                 <signal name="toggled" handler="on_macrostop_toggled" swapped="no"/>
@@ -18310,7 +18357,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="receives_default">False</property>
-                                                <property name="tooltip_text" translatable="yes">Start recording events</property>
+                                                <property name="tooltip_text" translatable="yes">Start recording events to macro bank</property>
                                                 <property name="draw_indicator">True</property>
                                                 <property name="group">macrostop</property>
                                                 <signal name="toggled" handler="on_macrorecord_toggled" swapped="no"/>
@@ -18333,7 +18380,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="receives_default">False</property>
-                                                <property name="tooltip_text" translatable="yes">Start playback of events</property>
+                                                <property name="tooltip_text" translatable="yes">Start playback of VIMS messages in this macro bank</property>
                                                 <property name="draw_indicator">True</property>
                                                 <property name="group">macrostop</property>
                                                 <signal name="toggled" handler="on_macroplay_toggled" swapped="no"/>
@@ -18356,7 +18403,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="receives_default">False</property>
-                                                <property name="tooltip_text" translatable="yes">Clear recorded events</property>
+                                                <property name="tooltip_text" translatable="yes">Clear this macro bank</property>
                                                 <signal name="clicked" handler="on_macroclear_clicked" swapped="no"/>
                                                 <child>
                                                   <object class="GtkAlignment" id="alignment486">
@@ -18503,7 +18550,7 @@
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
-                                    <property name="tooltip_text" translatable="yes">Fallback to default framerate</property>
+                                    <property name="tooltip_text" translatable="yes">Restore framerate</property>
                                     <signal name="clicked" handler="on_frameratenormal_clicked" swapped="no"/>
                                     <child>
                                       <object class="GtkImage" id="image3064">
