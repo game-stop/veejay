@@ -2922,6 +2922,10 @@ void	on_kf_none_toggled( GtkToggleButton *widget, gpointer user_data)
 
 		vj_kf_reset();
 	}
+    else {
+        enable_widget("fxanimcontrols");
+        enable_widget("curve_container");
+    }
 }
 
 void	on_kf_p0_toggled( GtkToggleButton *widget, gpointer user_data)

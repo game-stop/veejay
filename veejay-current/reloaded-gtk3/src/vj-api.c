@@ -2713,14 +2713,23 @@ static void vj_kf_select_parameter(int num)
     g_free(name);
 
     reset_curve( info->curve );
-    update_curve_widget( info->curve );
 
+    int lo=0,hi=0;
+    if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
+    {
+        lo = info->status_tokens[SAMPLE_START];
+        hi = info->status_tokens[SAMPLE_END];
+    }
+    else
+    {
+        lo = 0;
+        hi = info->status_tokens[SAMPLE_MARKER_END];
+    }
     
-    int id = entry_tokens[ENTRY_FXID];
-    int min=0,max=0;
-    _effect_get_minmax( id, &min, &max,num );
-
-   gtk3_curve_set_yaxis_range(info->curve, (gfloat)min, (gfloat) max);
+    set_initial_curve( info->curve, entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id, 
+            lo, hi ,
+            entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
+    update_curve_widget( info->curve );
 }
 
 static void update_curve_widget(GtkWidget *curve)
@@ -2777,28 +2786,8 @@ static void update_curve_widget(GtkWidget *curve)
     update_spin_range( "curve_spinstart", lo, hi, lo );
     update_spin_range( "curve_spinend", lo, hi, hi );
 
-    gtk3_curve_set_xaxis_range(info->curve, (gfloat)lo, (gfloat) hi);
-    gtk3_curve_set_grid_resolution(info->curve, 16);
-
     if(blob)    free(blob);
 }
-
-/* Not used
-static void update_curve_accessibility(const char *name)
-{
-    sample_slot_t *s = info->selected_slot;
-    if(!s ) return;
-
-    if( info->status_tokens[PLAY_MODE] == MODE_PLAIN )
-    {
-        disable_widget( "frame_fxtree3" );
-    }
-    else
-    {
-        enable_widget( "frame_fxtree3" );
-    }
-}
-*/
 
 static int get_nums(const char *name)
 {
