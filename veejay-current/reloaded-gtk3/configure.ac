@@ -606,7 +606,7 @@ fi
 
 dnl Check for Gtk3
 have_gtk3=false
-gtk_modules="gtk+-3.0 >= 3" # 3.14 jessie oldstable
+gtk_modules="gtk+-3.0 >= 3.2" # 3.14 jessie oldstable
 PKG_CHECK_MODULES( GTK, [$gtk_modules],
 	[
 		AC_SUBST(GTK_CFLAGS)

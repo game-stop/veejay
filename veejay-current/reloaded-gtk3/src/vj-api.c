@@ -7693,9 +7693,13 @@ void vj_event_list_free()
 
 char reloaded_css_file[1024];
 int  use_css_file = 0;
+gboolean smallest_possible = FALSE;
 
-void vj_gui_set_stylesheet(const char *css_file) {
+void vj_gui_set_stylesheet(const char *css_file, gboolean small_as_possible) {
     int use_djay = 0;
+
+    smallest_possible = small_as_possible;
+
     if( css_file == NULL ) {
         snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s", RELOADED_DATADIR, "gveejay.reloaded.css");
         use_css_file = 1;
@@ -7728,7 +7732,6 @@ void vj_gui_set_stylesheet(const char *css_file) {
 void vj_gui_activate_stylesheet(vj_gui_t *gui)
 {
     GtkCssProvider *css = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(css, "* { font-size:98%; }", -1, NULL );
 
     gtk_style_context_add_provider_for_screen ( gdk_screen_get_default (),GTK_STYLE_PROVIDER (css),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     
@@ -7759,8 +7762,22 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
         gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(gui->curve), 0.0f, 0.0f, 0.0f, 1.0);
 
     }
+    
+    gchar *css_in_mem = gtk_css_provider_to_string(css);
+    gchar *data = NULL;
+        
+    if( smallest_possible ) {
+        data = g_strconcat(css_in_mem, "\n* { font-size:98%; }\nframe,box,scale,spinbutton,button,radiobutton,checkbutton,entry, .vertical { padding-left:0px; padding-right: 0px }\nbutton,checkbutton,radiobutton,spinbutton { padding-top:1px; padding-bottom:1px;}\n", NULL );
+    }
+    else {
+        data = g_strconcat(css_in_mem, "\n* { font-size:98%; }", NULL);
+    }
+
+    gtk_css_provider_load_from_data(css, data,-1, NULL);
 
     g_clear_object(&css);
+    g_free(css_in_mem);
+    g_free(data);
 }
 
 void vj_gui_init(const char *glade_file,

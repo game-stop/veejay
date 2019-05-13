@@ -64,6 +64,7 @@ static gint arg_tracks = 0;
 static gchar *arg_size = NULL;
 static gboolean arg_version = FALSE;
 static gchar *arg_style = NULL;
+static gboolean arg_smallaspossible = FALSE;
 
 static const char skinfile[] = "gveejay.reloaded.glade"; //FIXME Has binary ressource ?
 
@@ -293,10 +294,10 @@ gint vj_gui_command_line (GApplication            *app,
     }
 
     if( arg_style ) {
-        vj_gui_set_stylesheet(arg_style);
+        vj_gui_set_stylesheet(arg_style,arg_smallaspossible);
         g_free(arg_style);
     } else {
-        vj_gui_set_stylesheet(NULL);
+        vj_gui_set_stylesheet(NULL,arg_smallaspossible);
     }
 
     if( err )
@@ -350,6 +351,7 @@ int main(int argc, char **argv)
     {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version, data directory and exit.", NULL},
     {"tracXs",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
     {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE or \"djay\"", NULL },
+    {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI",NULL},
     {NULL}};
 
     context = g_option_context_new (NULL);

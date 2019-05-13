@@ -1190,6 +1190,42 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -4845,8 +4881,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -4957,6 +4995,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -4984,8 +5025,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -5095,6 +5138,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -5122,8 +5168,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -5235,6 +5283,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -5262,8 +5313,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -5373,6 +5426,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -5400,8 +5456,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -5511,6 +5569,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -5538,8 +5599,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -5650,6 +5713,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -5677,8 +5743,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -5788,6 +5856,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -5815,8 +5886,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -5926,6 +5999,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -5953,8 +6029,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -6067,6 +6145,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -6094,8 +6175,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -6206,6 +6289,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -6233,8 +6319,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -6345,6 +6433,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -6372,8 +6463,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -6484,6 +6577,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -6511,8 +6607,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -6623,6 +6721,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -6650,8 +6751,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -6762,6 +6865,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -6789,8 +6895,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -6905,6 +7013,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -6932,8 +7043,10 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="angle">90</property>
-                                                <property name="xalign">0</property>
                                                 <property name="yalign">0.94999998807907104</property>
+                                                <style>
+                                                  <class name="p_label"/>
+                                                </style>
                                               </object>
                                               <packing>
                                                 <property name="expand">True</property>
@@ -7044,6 +7157,9 @@
                                         <property name="use_markup">True</property>
                                       </object>
                                     </child>
+                                    <style>
+                                      <class name="p_frame"/>
+                                    </style>
                                   </object>
                                   <packing>
                                     <property name="expand">True</property>
@@ -7059,83 +7175,434 @@
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkNotebook" id="notebook14">
+                              <object class="GtkBox">
                                 <property name="visible">True</property>
-                                <property name="can_focus">True</property>
+                                <property name="can_focus">False</property>
                                 <child>
-                                  <object class="GtkBox" id="vbox529">
+                                  <object class="GtkNotebook" id="notebook14">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <child>
+                                      <object class="GtkBox" id="vbox529">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="orientation">vertical</property>
+                                        <child>
+                                          <object class="GtkBox" id="hbox740">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <child>
+                                              <object class="GtkRadioButton" id="mixing_effects">
+                                                <property name="label" translatable="yes">Mixing effects</property>
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="receives_default">False</property>
+                                                <property name="use_underline">True</property>
+                                                <property name="active">True</property>
+                                                <property name="draw_indicator">True</property>
+                                                <signal name="toggled" handler="on_mixing_effects_toggled" swapped="no"/>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkRadioButton" id="image_effects">
+                                                <property name="label" translatable="yes">Image effects</property>
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="receives_default">False</property>
+                                                <property name="use_underline">True</property>
+                                                <property name="draw_indicator">True</property>
+                                                <property name="group">mixing_effects</property>
+                                                <signal name="toggled" handler="on_image_effects_toggled" swapped="no"/>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkRadioButton" id="alpha_effects">
+                                                <property name="label" translatable="yes">Alpha</property>
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="receives_default">False</property>
+                                                <property name="use_underline">True</property>
+                                                <property name="draw_indicator">True</property>
+                                                <property name="group">mixing_effects</property>
+                                                <signal name="toggled" handler="on_alpha_effects_toggled" swapped="no"/>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="position">2</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkEntry" id="filter_effects">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="primary_icon_activatable">False</property>
+                                                <property name="secondary_icon_activatable">False</property>
+                                                <signal name="activate" handler="on_filter_effects_activate" swapped="no"/>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">True</property>
+                                                <property name="position">3</property>
+                                              </packing>
+                                            </child>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkNotebook" id="effectspanel">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="show_tabs">False</property>
+                                            <property name="show_border">False</property>
+                                            <child>
+                                              <object class="GtkScrolledWindow" id="scrolledwindow36">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="margin_top">8</property>
+                                                <property name="margin_bottom">8</property>
+                                                <property name="hscrollbar_policy">never</property>
+                                                <property name="vscrollbar_policy">always</property>
+                                                <property name="kinetic_scrolling">False</property>
+                                                <property name="overlay_scrolling">False</property>
+                                                <child>
+                                                  <object class="GtkTreeView" id="tree_effectmixlist">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <property name="show_expanders">False</property>
+                                                    <child internal-child="selection">
+                                                      <object class="GtkTreeSelection"/>
+                                                    </child>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                              <packing>
+                                                <property name="tab_expand">True</property>
+                                              </packing>
+                                            </child>
+                                            <child type="tab">
+                                              <object class="GtkLabel" id="label692">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="label" translatable="yes">video effects</property>
+                                                <property name="angle">270</property>
+                                              </object>
+                                              <packing>
+                                                <property name="tab_fill">False</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkScrolledWindow" id="scrolledwindow23">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="margin_top">8</property>
+                                                <property name="margin_bottom">8</property>
+                                                <property name="hscrollbar_policy">never</property>
+                                                <property name="vscrollbar_policy">always</property>
+                                                <property name="kinetic_scrolling">False</property>
+                                                <property name="overlay_scrolling">False</property>
+                                                <child>
+                                                  <object class="GtkTreeView" id="tree_effectlist">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <child internal-child="selection">
+                                                      <object class="GtkTreeSelection"/>
+                                                    </child>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                              <packing>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
+                                            <child type="tab">
+                                              <object class="GtkLabel" id="label693">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="label" translatable="yes">image effects</property>
+                                                <property name="angle">270</property>
+                                              </object>
+                                              <packing>
+                                                <property name="position">1</property>
+                                                <property name="tab_fill">False</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkScrolledWindow" id="scrolledwindow1">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="margin_top">8</property>
+                                                <property name="hscrollbar_policy">never</property>
+                                                <property name="vscrollbar_policy">always</property>
+                                                <property name="kinetic_scrolling">False</property>
+                                                <property name="overlay_scrolling">False</property>
+                                                <child>
+                                                  <object class="GtkTreeView" id="tree_alphalist">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <child internal-child="selection">
+                                                      <object class="GtkTreeSelection"/>
+                                                    </child>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                              <packing>
+                                                <property name="position">2</property>
+                                              </packing>
+                                            </child>
+                                            <child type="tab">
+                                              <object class="GtkLabel" id="label9alpha">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="label" translatable="yes">alpha effects</property>
+                                                <property name="angle">270</property>
+                                              </object>
+                                              <packing>
+                                                <property name="position">2</property>
+                                                <property name="tab_fill">False</property>
+                                              </packing>
+                                            </child>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">True</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="tab">
+                                      <object class="GtkLabel" id="label891">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="label" translatable="yes">&lt;b&gt;FX list&lt;/b&gt;</property>
+                                        <property name="use_markup">True</property>
+                                      </object>
+                                      <packing>
+                                        <property name="tab_fill">False</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkScrolledWindow" id="scrolledwindow43">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="margin_top">8</property>
+                                        <property name="hscrollbar_policy">never</property>
+                                        <property name="vscrollbar_policy">always</property>
+                                        <property name="kinetic_scrolling">False</property>
+                                        <property name="overlay_scrolling">False</property>
+                                        <child>
+                                          <object class="GtkViewport" id="viewport8">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <child>
+                                              <object class="GtkBox" id="vbox624">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="orientation">vertical</property>
+                                                <child>
+                                                  <object class="GtkTreeView" id="tree_sources">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">True</property>
+                                                    <child internal-child="selection">
+                                                      <object class="GtkTreeSelection"/>
+                                                    </child>
+                                                  </object>
+                                                  <packing>
+                                                    <property name="expand">True</property>
+                                                    <property name="fill">True</property>
+                                                    <property name="position">0</property>
+                                                  </packing>
+                                                </child>
+                                                <child>
+                                                  <object class="GtkBox" id="samplemix_hbox">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">False</property>
+                                                    <property name="orientation">vertical</property>
+                                                    <child>
+                                                      <placeholder/>
+                                                    </child>
+                                                  </object>
+                                                  <packing>
+                                                    <property name="expand">True</property>
+                                                    <property name="fill">True</property>
+                                                    <property name="position">1</property>
+                                                  </packing>
+                                                </child>
+                                              </object>
+                                            </child>
+                                          </object>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child type="tab">
+                                      <object class="GtkLabel" id="label890">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="label" translatable="yes">&lt;b&gt;Mixing Sources&lt;/b&gt;</property>
+                                        <property name="use_markup">True</property>
+                                      </object>
+                                      <packing>
+                                        <property name="position">1</property>
+                                        <property name="tab_fill">False</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkScrolledWindow" id="scrolledwindow40">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="margin_top">8</property>
+                                        <property name="margin_bottom">8</property>
+                                        <property name="hscrollbar_policy">never</property>
+                                        <property name="vscrollbar_policy">never</property>
+                                        <property name="kinetic_scrolling">False</property>
+                                        <property name="overlay_scrolling">False</property>
+                                        <child>
+                                          <object class="GtkViewport" id="viewport4">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <child>
+                                              <object class="GtkColorSelection" id="rgbkey">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="has_palette">True</property>
+                                                <child>
+                                                  <placeholder/>
+                                                </child>
+                                                <child>
+                                                  <placeholder/>
+                                                </child>
+                                              </object>
+                                            </child>
+                                          </object>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="position">2</property>
+                                      </packing>
+                                    </child>
+                                    <child type="tab">
+                                      <object class="GtkLabel" id="label892">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="label" translatable="yes">&lt;b&gt;Color Wheel&lt;/b&gt;</property>
+                                        <property name="use_markup">True</property>
+                                      </object>
+                                      <packing>
+                                        <property name="position">2</property>
+                                        <property name="tab_fill">False</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkBox" id="vbox604">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
                                     <property name="orientation">vertical</property>
                                     <child>
-                                      <object class="GtkBox" id="hbox740">
+                                      <object class="GtkBox" id="vbox614">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
+                                        <property name="orientation">vertical</property>
                                         <child>
-                                          <object class="GtkRadioButton" id="mixing_effects">
-                                            <property name="label" translatable="yes">Mixing effects</property>
+                                          <object class="GtkBox" id="hbox708">
                                             <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="receives_default">False</property>
-                                            <property name="use_underline">True</property>
-                                            <property name="draw_indicator">True</property>
-                                            <signal name="toggled" handler="on_mixing_effects_toggled" swapped="no"/>
+                                            <property name="can_focus">False</property>
+                                            <property name="homogeneous">True</property>
+                                            <child>
+                                              <object class="GtkButton" id="button_fadein">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="receives_default">True</property>
+                                                <property name="has_tooltip">True</property>
+                                                <property name="tooltip_text" translatable="yes">Fade in FX Chain</property>
+                                                <signal name="clicked" handler="on_button_fadein_clicked" swapped="no"/>
+                                                <child>
+                                                  <object class="GtkImage" id="image102">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">False</property>
+                                                    <property name="pixbuf">icon_fadein.png</property>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="padding">4</property>
+                                                <property name="position">0</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkButton" id="button_fadeout">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="receives_default">True</property>
+                                                <property name="has_tooltip">True</property>
+                                                <property name="tooltip_text" translatable="yes">Fade Out FX Chain</property>
+                                                <signal name="clicked" handler="on_button_fadeout_clicked" swapped="no"/>
+                                                <child>
+                                                  <object class="GtkAlignment" id="alignment3">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">False</property>
+                                                    <property name="xscale">0</property>
+                                                    <property name="yscale">0</property>
+                                                    <child>
+                                                      <object class="GtkBox" id="hbox60">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="spacing">2</property>
+                                                        <child>
+                                                          <object class="GtkImage" id="image48">
+                                                            <property name="visible">True</property>
+                                                            <property name="can_focus">False</property>
+                                                            <property name="pixbuf">icon_fadeout.png</property>
+                                                          </object>
+                                                          <packing>
+                                                            <property name="expand">False</property>
+                                                            <property name="fill">False</property>
+                                                            <property name="position">0</property>
+                                                          </packing>
+                                                        </child>
+                                                      </object>
+                                                    </child>
+                                                  </object>
+                                                </child>
+                                              </object>
+                                              <packing>
+                                                <property name="expand">False</property>
+                                                <property name="fill">False</property>
+                                                <property name="padding">4</property>
+                                                <property name="position">1</property>
+                                              </packing>
+                                            </child>
                                           </object>
                                           <packing>
                                             <property name="expand">False</property>
                                             <property name="fill">False</property>
                                             <property name="position">0</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkRadioButton" id="image_effects">
-                                            <property name="label" translatable="yes">Image effects</property>
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="receives_default">False</property>
-                                            <property name="use_underline">True</property>
-                                            <property name="draw_indicator">True</property>
-                                            <property name="group">mixing_effects</property>
-                                            <signal name="toggled" handler="on_image_effects_toggled" swapped="no"/>
-                                          </object>
-                                          <packing>
-                                            <property name="expand">False</property>
-                                            <property name="fill">False</property>
-                                            <property name="position">1</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkRadioButton" id="alpha_effects">
-                                            <property name="label" translatable="yes">Alpha</property>
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="receives_default">False</property>
-                                            <property name="use_underline">True</property>
-                                            <property name="draw_indicator">True</property>
-                                            <property name="group">mixing_effects</property>
-                                            <signal name="toggled" handler="on_alpha_effects_toggled" swapped="no"/>
-                                          </object>
-                                          <packing>
-                                            <property name="expand">False</property>
-                                            <property name="fill">False</property>
-                                            <property name="position">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <placeholder/>
-                                        </child>
-                                        <child>
-                                          <object class="GtkEntry" id="filter_effects">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="primary_icon_activatable">False</property>
-                                            <property name="secondary_icon_activatable">False</property>
-                                            <signal name="activate" handler="on_filter_effects_activate" swapped="no"/>
-                                          </object>
-                                          <packing>
-                                            <property name="expand">True</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">4</property>
                                           </packing>
                                         </child>
                                       </object>
@@ -7146,121 +7613,20 @@
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkNotebook" id="effectspanel">
+                                      <object class="GtkScale" id="manualopacity">
                                         <property name="visible">True</property>
-                                        <property name="can_focus">False</property>
-                                        <property name="show_tabs">False</property>
-                                        <property name="show_border">False</property>
-                                        <child>
-                                          <object class="GtkScrolledWindow" id="scrolledwindow36">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="margin_left">8</property>
-                                            <property name="margin_top">8</property>
-                                            <property name="margin_bottom">8</property>
-                                            <property name="hscrollbar_policy">never</property>
-                                            <property name="vscrollbar_policy">always</property>
-                                            <property name="kinetic_scrolling">False</property>
-                                            <property name="overlay_scrolling">False</property>
-                                            <child>
-                                              <object class="GtkTreeView" id="tree_effectmixlist">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="show_expanders">False</property>
-                                                <child internal-child="selection">
-                                                  <object class="GtkTreeSelection"/>
-                                                </child>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="tab_expand">True</property>
-                                          </packing>
-                                        </child>
-                                        <child type="tab">
-                                          <object class="GtkLabel" id="label692">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="label" translatable="yes">video effects</property>
-                                            <property name="angle">270</property>
-                                          </object>
-                                          <packing>
-                                            <property name="tab_fill">False</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkScrolledWindow" id="scrolledwindow23">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="margin_left">8</property>
-                                            <property name="margin_top">8</property>
-                                            <property name="margin_bottom">8</property>
-                                            <property name="hscrollbar_policy">never</property>
-                                            <property name="vscrollbar_policy">always</property>
-                                            <property name="kinetic_scrolling">False</property>
-                                            <property name="overlay_scrolling">False</property>
-                                            <child>
-                                              <object class="GtkTreeView" id="tree_effectlist">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <child internal-child="selection">
-                                                  <object class="GtkTreeSelection"/>
-                                                </child>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="position">1</property>
-                                          </packing>
-                                        </child>
-                                        <child type="tab">
-                                          <object class="GtkLabel" id="label693">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="label" translatable="yes">image effects</property>
-                                            <property name="angle">270</property>
-                                          </object>
-                                          <packing>
-                                            <property name="position">1</property>
-                                            <property name="tab_fill">False</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkScrolledWindow" id="scrolledwindow1">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="margin_left">8</property>
-                                            <property name="margin_top">8</property>
-                                            <property name="hscrollbar_policy">never</property>
-                                            <property name="vscrollbar_policy">always</property>
-                                            <property name="kinetic_scrolling">False</property>
-                                            <property name="overlay_scrolling">False</property>
-                                            <child>
-                                              <object class="GtkTreeView" id="tree_alphalist">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <child internal-child="selection">
-                                                  <object class="GtkTreeSelection"/>
-                                                </child>
-                                              </object>
-                                            </child>
-                                          </object>
-                                          <packing>
-                                            <property name="position">2</property>
-                                          </packing>
-                                        </child>
-                                        <child type="tab">
-                                          <object class="GtkLabel" id="label9alpha">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="label" translatable="yes">alpha effects</property>
-                                            <property name="angle">270</property>
-                                          </object>
-                                          <packing>
-                                            <property name="position">2</property>
-                                            <property name="tab_fill">False</property>
-                                          </packing>
-                                        </child>
+                                        <property name="can_focus">True</property>
+                                        <property name="margin_top">4</property>
+                                        <property name="margin_bottom">4</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="adjustment">opacity</property>
+                                        <property name="fill_level">255</property>
+                                        <property name="round_digits">0</property>
+                                        <property name="digits">0</property>
+                                        <signal name="value-changed" handler="on_manualopacity_value_changed" swapped="no"/>
+                                        <style>
+                                          <class name="p_slider"/>
+                                        </style>
                                       </object>
                                       <packing>
                                         <property name="expand">True</property>
@@ -7268,132 +7634,264 @@
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
-                                  </object>
-                                </child>
-                                <child type="tab">
-                                  <object class="GtkLabel" id="label891">
-                                    <property name="visible">True</property>
-                                    <property name="can_focus">False</property>
-                                    <property name="label" translatable="yes">&lt;b&gt;FX list&lt;/b&gt;</property>
-                                    <property name="use_markup">True</property>
-                                  </object>
-                                  <packing>
-                                    <property name="tab_fill">False</property>
-                                  </packing>
-                                </child>
-                                <child>
-                                  <object class="GtkScrolledWindow" id="scrolledwindow43">
-                                    <property name="visible">True</property>
-                                    <property name="can_focus">True</property>
-                                    <property name="margin_left">8</property>
-                                    <property name="margin_top">8</property>
-                                    <property name="hscrollbar_policy">never</property>
-                                    <property name="vscrollbar_policy">always</property>
-                                    <property name="kinetic_scrolling">False</property>
-                                    <property name="overlay_scrolling">False</property>
                                     <child>
-                                      <object class="GtkViewport" id="viewport8">
+                                      <object class="GtkSpinButton" id="button_fadedur">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="has_tooltip">True</property>
+                                        <property name="tooltip_text" translatable="yes">FX Chain fade duration in frames</property>
+                                        <property name="invisible_char">●</property>
+                                        <property name="text" translatable="yes">25</property>
+                                        <property name="primary_icon_activatable">False</property>
+                                        <property name="secondary_icon_activatable">False</property>
+                                        <property name="adjustment">chainfade_duration</property>
+                                        <property name="climb_rate">1</property>
+                                        <property name="value">25</property>
+                                        <signal name="value-changed" handler="on_button_fadedur_value_changed" swapped="no"/>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">2</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkBox" id="hbox28">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
                                         <child>
-                                          <object class="GtkBox" id="vbox624">
+                                          <object class="GtkBox">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="orientation">vertical</property>
                                             <child>
-                                              <object class="GtkTreeView" id="tree_sources">
+                                              <object class="GtkCheckButton" id="fx_followfade">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <child internal-child="selection">
-                                                  <object class="GtkTreeSelection"/>
+                                                <property name="receives_default">False</property>
+                                                <property name="has_tooltip">True</property>
+                                                <property name="tooltip_text" translatable="yes">Switch to sample #B after completing fade.</property>
+                                                <property name="draw_indicator">True</property>
+                                                <signal name="toggled" handler="on_fx_followfade_toggled" swapped="no"/>
+                                                <child>
+                                                  <object class="GtkImage" id="image3508">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">False</property>
+                                                    <property name="pixbuf">icon_follow.png</property>
+                                                  </object>
                                                 </child>
                                               </object>
                                               <packing>
-                                                <property name="expand">True</property>
+                                                <property name="expand">False</property>
                                                 <property name="fill">True</property>
                                                 <property name="position">0</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkBox" id="samplemix_hbox">
+                                              <object class="GtkButton" id="button_return">
                                                 <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="orientation">vertical</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="receives_default">True</property>
+                                                <property name="has_tooltip">True</property>
+                                                <property name="tooltip_text" translatable="yes">Return to previous sample</property>
+                                                <property name="xalign">0</property>
+                                                <property name="yalign">0</property>
+                                                <signal name="clicked" handler="on_button_return_clicked" swapped="no"/>
                                                 <child>
-                                                  <placeholder/>
+                                                  <object class="GtkAlignment" id="alignment24">
+                                                    <property name="visible">True</property>
+                                                    <property name="can_focus">False</property>
+                                                    <property name="xscale">0</property>
+                                                    <property name="yscale">0</property>
+                                                    <child>
+                                                      <object class="GtkBox" id="hbox29">
+                                                        <property name="visible">True</property>
+                                                        <property name="can_focus">False</property>
+                                                        <property name="spacing">2</property>
+                                                        <child>
+                                                          <object class="GtkImage" id="image43">
+                                                            <property name="visible">True</property>
+                                                            <property name="can_focus">False</property>
+                                                            <property name="pixbuf">icon_bounce.png</property>
+                                                          </object>
+                                                          <packing>
+                                                            <property name="expand">False</property>
+                                                            <property name="fill">False</property>
+                                                            <property name="position">0</property>
+                                                          </packing>
+                                                        </child>
+                                                      </object>
+                                                    </child>
+                                                  </object>
                                                 </child>
                                               </object>
                                               <packing>
-                                                <property name="expand">True</property>
+                                                <property name="expand">False</property>
                                                 <property name="fill">True</property>
                                                 <property name="position">1</property>
                                               </packing>
                                             </child>
                                           </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
                                         </child>
                                       </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">3</property>
+                                      </packing>
                                     </child>
                                   </object>
                                   <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">False</property>
                                     <property name="position">1</property>
-                                  </packing>
-                                </child>
-                                <child type="tab">
-                                  <object class="GtkLabel" id="label890">
-                                    <property name="visible">True</property>
-                                    <property name="can_focus">False</property>
-                                    <property name="label" translatable="yes">&lt;b&gt;Mixing Sources&lt;/b&gt;</property>
-                                    <property name="use_markup">True</property>
-                                  </object>
-                                  <packing>
-                                    <property name="position">1</property>
-                                    <property name="tab_fill">False</property>
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkScrolledWindow" id="scrolledwindow40">
+                                  <object class="GtkBox" id="vbox32">
                                     <property name="visible">True</property>
-                                    <property name="can_focus">True</property>
-                                    <property name="margin_left">8</property>
-                                    <property name="margin_top">8</property>
-                                    <property name="margin_bottom">8</property>
-                                    <property name="hscrollbar_policy">never</property>
-                                    <property name="vscrollbar_policy">never</property>
-                                    <property name="kinetic_scrolling">False</property>
-                                    <property name="overlay_scrolling">False</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="orientation">vertical</property>
                                     <child>
-                                      <object class="GtkViewport" id="viewport4">
+                                      <object class="GtkRadioButton" id="fx_mnone">
                                         <property name="visible">True</property>
-                                        <property name="can_focus">False</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="has_tooltip">True</property>
+                                        <property name="tooltip_text" translatable="yes">From original source to completed FX chain</property>
+                                        <property name="margin_bottom">4</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">fx_m1</property>
+                                        <signal name="toggled" handler="on_fx_mnone_toggled" swapped="no"/>
                                         <child>
-                                          <object class="GtkColorSelection" id="rgbkey">
+                                          <object class="GtkImage" id="image47">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="has_palette">True</property>
+                                            <property name="pixbuf">icon_fxmnone.png</property>
                                           </object>
                                         </child>
                                       </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkRadioButton" id="fx_m1">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="has_tooltip">True</property>
+                                        <property name="tooltip_text" translatable="yes">From selected FX entry (before FX) to completed FX chain</property>
+                                        <property name="margin_bottom">4</property>
+                                        <property name="active">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <signal name="toggled" handler="on_fx_m1_toggled" swapped="no"/>
+                                        <child>
+                                          <object class="GtkImage" id="image44">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="pixbuf">icon_fxm1.png</property>
+                                          </object>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkRadioButton" id="fx_m2">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="has_tooltip">True</property>
+                                        <property name="tooltip_text" translatable="yes">From selected FX entry (after FX) to completed FX chain</property>
+                                        <property name="margin_bottom">4</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">fx_m1</property>
+                                        <signal name="toggled" handler="on_fx_m2_toggled" swapped="no"/>
+                                        <child>
+                                          <object class="GtkImage" id="image45">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="pixbuf">icon_fxm2.png</property>
+                                          </object>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
+                                        <property name="position">2</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkRadioButton" id="fx_m3">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="has_tooltip">True</property>
+                                        <property name="tooltip_text" translatable="yes">From mixing source of selected FX entry (before FX) to completed FX chain</property>
+                                        <property name="margin_bottom">4</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">fx_m1</property>
+                                        <signal name="toggled" handler="on_fx_m3_toggled" swapped="no"/>
+                                        <child>
+                                          <object class="GtkImage" id="image46">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="pixbuf">icon_fxm4.png</property>
+                                          </object>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
+                                        <property name="position">3</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkRadioButton" id="fx_m4">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="has_tooltip">True</property>
+                                        <property name="tooltip_text" translatable="yes">From mixing source of selected FX entry (after FX) to completed FX chain</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">fx_m1</property>
+                                        <signal name="toggled" handler="on_fx_m4_toggled" swapped="no"/>
+                                        <child>
+                                          <object class="GtkImage" id="image49">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="margin_bottom">4</property>
+                                            <property name="pixbuf">icon_fxm3.png</property>
+                                          </object>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
+                                        <property name="position">4</property>
+                                      </packing>
                                     </child>
                                   </object>
                                   <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="pack_type">end</property>
                                     <property name="position">2</property>
-                                  </packing>
-                                </child>
-                                <child type="tab">
-                                  <object class="GtkLabel" id="label892">
-                                    <property name="visible">True</property>
-                                    <property name="can_focus">False</property>
-                                    <property name="label" translatable="yes">&lt;b&gt;Color Wheel&lt;/b&gt;</property>
-                                    <property name="use_markup">True</property>
-                                  </object>
-                                  <packing>
-                                    <property name="position">2</property>
-                                    <property name="tab_fill">False</property>
                                   </packing>
                                 </child>
                               </object>
                               <packing>
-                                <property name="expand">True</property>
+                                <property name="expand">False</property>
                                 <property name="fill">True</property>
                                 <property name="position">2</property>
                               </packing>
@@ -16073,6 +16571,7 @@
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
                                 <property name="margin_right">11</property>
+                                <property name="show_border">False</property>
                                 <child>
                                   <object class="GtkBox" id="vbox483">
                                     <property name="visible">True</property>
@@ -16667,371 +17166,6 @@
                                                 <property name="expand">True</property>
                                                 <property name="fill">True</property>
                                                 <property name="position">0</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkBox" id="vbox32">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="orientation">vertical</property>
-                                                <child>
-                                                  <object class="GtkRadioButton" id="fx_mnone">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">True</property>
-                                                    <property name="receives_default">False</property>
-                                                    <property name="has_tooltip">True</property>
-                                                    <property name="tooltip_text" translatable="yes">From original source to completed FX chain</property>
-                                                    <property name="draw_indicator">True</property>
-                                                    <property name="group">fx_m1</property>
-                                                    <signal name="toggled" handler="on_fx_mnone_toggled" swapped="no"/>
-                                                    <child>
-                                                      <object class="GtkImage" id="image47">
-                                                        <property name="visible">True</property>
-                                                        <property name="can_focus">False</property>
-                                                        <property name="pixbuf">icon_fxmnone.png</property>
-                                                      </object>
-                                                    </child>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">False</property>
-                                                    <property name="position">0</property>
-                                                  </packing>
-                                                </child>
-                                                <child>
-                                                  <object class="GtkRadioButton" id="fx_m1">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">True</property>
-                                                    <property name="receives_default">False</property>
-                                                    <property name="has_tooltip">True</property>
-                                                    <property name="tooltip_text" translatable="yes">From selected FX entry (before FX) to completed FX chain</property>
-                                                    <property name="relief">half</property>
-                                                    <property name="draw_indicator">True</property>
-                                                    <signal name="toggled" handler="on_fx_m1_toggled" swapped="no"/>
-                                                    <child>
-                                                      <object class="GtkImage" id="image44">
-                                                        <property name="visible">True</property>
-                                                        <property name="can_focus">False</property>
-                                                        <property name="pixbuf">icon_fxm1.png</property>
-                                                      </object>
-                                                    </child>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">False</property>
-                                                    <property name="position">1</property>
-                                                  </packing>
-                                                </child>
-                                                <child>
-                                                  <object class="GtkRadioButton" id="fx_m2">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">True</property>
-                                                    <property name="receives_default">False</property>
-                                                    <property name="has_tooltip">True</property>
-                                                    <property name="tooltip_text" translatable="yes">From selected FX entry (after FX) to completed FX chain</property>
-                                                    <property name="draw_indicator">True</property>
-                                                    <property name="group">fx_m1</property>
-                                                    <signal name="toggled" handler="on_fx_m2_toggled" swapped="no"/>
-                                                    <child>
-                                                      <object class="GtkImage" id="image45">
-                                                        <property name="visible">True</property>
-                                                        <property name="can_focus">False</property>
-                                                        <property name="pixbuf">icon_fxm2.png</property>
-                                                      </object>
-                                                    </child>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">False</property>
-                                                    <property name="position">2</property>
-                                                  </packing>
-                                                </child>
-                                                <child>
-                                                  <object class="GtkRadioButton" id="fx_m3">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">True</property>
-                                                    <property name="receives_default">False</property>
-                                                    <property name="has_tooltip">True</property>
-                                                    <property name="tooltip_text" translatable="yes">From mixing source of selected FX entry (before FX) to completed FX chain</property>
-                                                    <property name="draw_indicator">True</property>
-                                                    <property name="group">fx_m1</property>
-                                                    <signal name="toggled" handler="on_fx_m3_toggled" swapped="no"/>
-                                                    <child>
-                                                      <object class="GtkImage" id="image46">
-                                                        <property name="visible">True</property>
-                                                        <property name="can_focus">False</property>
-                                                        <property name="pixbuf">icon_fxm4.png</property>
-                                                      </object>
-                                                    </child>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">False</property>
-                                                    <property name="position">3</property>
-                                                  </packing>
-                                                </child>
-                                                <child>
-                                                  <object class="GtkRadioButton" id="fx_m4">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">True</property>
-                                                    <property name="receives_default">False</property>
-                                                    <property name="has_tooltip">True</property>
-                                                    <property name="tooltip_text" translatable="yes">From mixing source of selected FX entry (after FX) to completed FX chain</property>
-                                                    <property name="draw_indicator">True</property>
-                                                    <property name="group">fx_m1</property>
-                                                    <signal name="toggled" handler="on_fx_m4_toggled" swapped="no"/>
-                                                    <child>
-                                                      <object class="GtkImage" id="image49">
-                                                        <property name="visible">True</property>
-                                                        <property name="can_focus">False</property>
-                                                        <property name="pixbuf">icon_fxm3.png</property>
-                                                      </object>
-                                                    </child>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">False</property>
-                                                    <property name="position">4</property>
-                                                  </packing>
-                                                </child>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">False</property>
-                                                <property name="fill">True</property>
-                                                <property name="position">1</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkBox" id="vbox604">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="orientation">vertical</property>
-                                                <child>
-                                                  <object class="GtkBox" id="vbox614">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">False</property>
-                                                    <property name="orientation">vertical</property>
-                                                    <child>
-                                                      <object class="GtkBox" id="hbox708">
-                                                        <property name="visible">True</property>
-                                                        <property name="can_focus">False</property>
-                                                        <property name="homogeneous">True</property>
-                                                        <child>
-                                                          <object class="GtkButton" id="button_fadein">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">True</property>
-                                                            <property name="receives_default">True</property>
-                                                            <property name="has_tooltip">True</property>
-                                                            <property name="tooltip_text" translatable="yes">Fade in FX Chain</property>
-                                                            <signal name="clicked" handler="on_button_fadein_clicked" swapped="no"/>
-                                                            <child>
-                                                            <object class="GtkImage" id="image102">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">False</property>
-                                                            <property name="pixbuf">icon_fadein.png</property>
-                                                            </object>
-                                                            </child>
-                                                          </object>
-                                                          <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">False</property>
-                                                            <property name="padding">4</property>
-                                                            <property name="position">0</property>
-                                                          </packing>
-                                                        </child>
-                                                        <child>
-                                                          <object class="GtkButton" id="button_fadeout">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">True</property>
-                                                            <property name="receives_default">True</property>
-                                                            <property name="has_tooltip">True</property>
-                                                            <property name="tooltip_text" translatable="yes">Fade Out FX Chain</property>
-                                                            <signal name="clicked" handler="on_button_fadeout_clicked" swapped="no"/>
-                                                            <child>
-                                                            <object class="GtkAlignment" id="alignment3">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">False</property>
-                                                            <property name="xscale">0</property>
-                                                            <property name="yscale">0</property>
-                                                            <child>
-                                                            <object class="GtkBox" id="hbox60">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">False</property>
-                                                            <property name="spacing">2</property>
-                                                            <child>
-                                                            <object class="GtkImage" id="image48">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">False</property>
-                                                            <property name="pixbuf">icon_fadeout.png</property>
-                                                            </object>
-                                                            <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">False</property>
-                                                            <property name="position">0</property>
-                                                            </packing>
-                                                            </child>
-                                                            </object>
-                                                            </child>
-                                                            </object>
-                                                            </child>
-                                                          </object>
-                                                          <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">False</property>
-                                                            <property name="padding">4</property>
-                                                            <property name="position">1</property>
-                                                          </packing>
-                                                        </child>
-                                                      </object>
-                                                      <packing>
-                                                        <property name="expand">False</property>
-                                                        <property name="fill">False</property>
-                                                        <property name="position">0</property>
-                                                      </packing>
-                                                    </child>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">True</property>
-                                                    <property name="position">0</property>
-                                                  </packing>
-                                                </child>
-                                                <child>
-                                                  <object class="GtkScale" id="manualopacity">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">True</property>
-                                                    <property name="margin_top">4</property>
-                                                    <property name="margin_bottom">4</property>
-                                                    <property name="orientation">vertical</property>
-                                                    <property name="adjustment">opacity</property>
-                                                    <property name="fill_level">255</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_manualopacity_value_changed" swapped="no"/>
-                                                    <style>
-                                                      <class name="p_slider"/>
-                                                    </style>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">True</property>
-                                                    <property name="fill">True</property>
-                                                    <property name="position">1</property>
-                                                  </packing>
-                                                </child>
-                                                <child>
-                                                  <object class="GtkSpinButton" id="button_fadedur">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">True</property>
-                                                    <property name="has_tooltip">True</property>
-                                                    <property name="tooltip_text" translatable="yes">FX Chain fade duration in frames</property>
-                                                    <property name="invisible_char">●</property>
-                                                    <property name="text" translatable="yes">0</property>
-                                                    <property name="primary_icon_activatable">False</property>
-                                                    <property name="secondary_icon_activatable">False</property>
-                                                    <property name="adjustment">chainfade_duration</property>
-                                                    <property name="climb_rate">1</property>
-                                                    <property name="value">25</property>
-                                                    <signal name="value-changed" handler="on_button_fadedur_value_changed" swapped="no"/>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">True</property>
-                                                    <property name="position">2</property>
-                                                  </packing>
-                                                </child>
-                                                <child>
-                                                  <object class="GtkBox" id="hbox28">
-                                                    <property name="visible">True</property>
-                                                    <property name="can_focus">False</property>
-                                                    <child>
-                                                      <object class="GtkBox">
-                                                        <property name="visible">True</property>
-                                                        <property name="can_focus">False</property>
-                                                        <child>
-                                                          <object class="GtkCheckButton" id="fx_followfade">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">True</property>
-                                                            <property name="receives_default">False</property>
-                                                            <property name="has_tooltip">True</property>
-                                                            <property name="tooltip_text" translatable="yes">Switch to sample #B after completing fade.</property>
-                                                            <property name="draw_indicator">True</property>
-                                                            <signal name="toggled" handler="on_fx_followfade_toggled" swapped="no"/>
-                                                            <child>
-                                                            <object class="GtkImage" id="image3508">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">False</property>
-                                                            <property name="pixbuf">icon_follow.png</property>
-                                                            </object>
-                                                            </child>
-                                                          </object>
-                                                          <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">True</property>
-                                                            <property name="position">0</property>
-                                                          </packing>
-                                                        </child>
-                                                        <child>
-                                                          <object class="GtkButton" id="button_return">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">True</property>
-                                                            <property name="receives_default">True</property>
-                                                            <property name="has_tooltip">True</property>
-                                                            <property name="tooltip_text" translatable="yes">Return to previous sample</property>
-                                                            <property name="xalign">0</property>
-                                                            <property name="yalign">0</property>
-                                                            <signal name="clicked" handler="on_button_return_clicked" swapped="no"/>
-                                                            <child>
-                                                            <object class="GtkAlignment" id="alignment24">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">False</property>
-                                                            <property name="xscale">0</property>
-                                                            <property name="yscale">0</property>
-                                                            <child>
-                                                            <object class="GtkBox" id="hbox29">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">False</property>
-                                                            <property name="spacing">2</property>
-                                                            <child>
-                                                            <object class="GtkImage" id="image43">
-                                                            <property name="visible">True</property>
-                                                            <property name="can_focus">False</property>
-                                                            <property name="pixbuf">icon_bounce.png</property>
-                                                            </object>
-                                                            <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">False</property>
-                                                            <property name="position">0</property>
-                                                            </packing>
-                                                            </child>
-                                                            </object>
-                                                            </child>
-                                                            </object>
-                                                            </child>
-                                                          </object>
-                                                          <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">True</property>
-                                                            <property name="position">1</property>
-                                                          </packing>
-                                                        </child>
-                                                      </object>
-                                                      <packing>
-                                                        <property name="expand">False</property>
-                                                        <property name="fill">True</property>
-                                                        <property name="position">0</property>
-                                                      </packing>
-                                                    </child>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">True</property>
-                                                    <property name="position">3</property>
-                                                  </packing>
-                                                </child>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">False</property>
-                                                <property name="fill">True</property>
-                                                <property name="position">2</property>
                                               </packing>
                                             </child>
                                           </object>
