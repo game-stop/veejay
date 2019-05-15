@@ -4846,3 +4846,21 @@ void on_toggle_multicast_toggled(GtkWidget *widget, gpointer user_data)
         vj_msg(VEEJAY_MSG_INFO, "Multicast disabled");
 	}
 }
+
+void on_stream_loopstop_value_changed( GtkWidget *widget, gpointer user_data )
+{
+    if(info->status_lock)
+        return;
+
+    multi_vims( VIMS_SAMPLE_SET_LOOPS, "%d %d", 0, get_nums("stream_loopstop"));
+}
+
+void on_sample_loopstop_value_changed( GtkWidget *widget, gpointer user_data )
+{
+    if(info->status_lock)
+        return;
+
+    multi_vims( VIMS_SAMPLE_SET_LOOPS, "%d %d", 0, get_nums("sample_loopstop"));
+}
+
+

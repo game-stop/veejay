@@ -114,6 +114,7 @@ static gpointer castIntToGpointer( int val)
 
 static int beta__ = 0;
 static int use_vims_mcast = 0;
+static int samplebank_ready_ = 0;
 
 static struct
 {
@@ -368,8 +369,8 @@ typedef struct
 static  int user_preview = 0;
 static int NUM_BANKS = 50;
 static  int NUM_SAMPLES_PER_PAGE = 12;
-static int NUM_SAMPLES_PER_COL = 6;
-static int NUM_SAMPLES_PER_ROW = 2;
+static int SAMPLEBANK_COLUMNS = 6;
+static int SAMPLEBANK_ROWS = 2;
 static int use_key_snoop = 0;
 
 #define G_MOD_OFFSET 200
@@ -731,7 +732,7 @@ static void reload_bundles();
 static void update_rgbkey_from_slider();
 static gchar *get_textview_buffer(const char *name);
 static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h);
-static void setup_samplebank(gint c, gint r, GtkWidget *pad, gint *image_w, gint *image_h);
+static void setup_samplebank(gint c, gint r, GtkAllocation *allocation, gint *image_w, gint *image_h);
 static int add_sample_to_sample_banks( int bank_page,sample_slot_t *slot );
 static void update_sample_slot_data(int bank_num, int slot_num, int id, gint sample_type, gchar *title, gchar *timecode);
 static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data);
@@ -4837,14 +4838,6 @@ int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_
     *bank_page_ = bank_page;
     *slot_      = poke_slot;
 
-#ifdef STRICT_CHECKING
-    veejay_msg(VEEJAY_MSG_DEBUG, "(type=%d,id=%d) needs new slot, suggesting page %d, slot %d",
-            sample_type, sample_id, bank_page, poke_slot );
-
-//  if( info->sample_banks[bank_page] )
-//      assert( info->sample_banks[bank_page]->slot[poke_slot]->sample_id <= 0 );
-#endif
-
     return 1;
 }
 
@@ -5131,8 +5124,11 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
                         add_sample_to_sample_banks(bank_page, tmp_slot );
                         add_sample_to_effect_sources_list( int_id,0, title, timecode);
                         free_slot(tmp_slot);
-                        if( !disable_sample_image )
+                        if( !disable_sample_image ) {
                             veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
+                            veejay_msg(VEEJAY_MSG_DEBUG, "Get image %dx%d", info->image_dimensions[0],
+                                        info->image_dimensions[1]);
+                        }
                     }
                     else
                     {
@@ -6606,7 +6602,7 @@ int veejay_update_multitrack( void *ptr )
     int *history = info->history_tokens[pm];
 
     veejay_memcpy( history, info->status_tokens, sizeof(int) * STATUS_TOKENS );
-
+    
     for( i = 0; i < s->tracks ; i ++ )
     {
         if( s->status_list[i] )
@@ -6649,7 +6645,6 @@ int veejay_update_multitrack( void *ptr )
 
     info->status_lock = 0;
 
-
     free(s->status_list);
     free(s->img_list );
     free(s->widths);
@@ -6657,7 +6652,6 @@ int veejay_update_multitrack( void *ptr )
     free(s);
 
     gettimeofday( &(info->time_last) , 0 );
-
 
     return 1;
 }
@@ -6798,9 +6792,9 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm )
     {
-        info->uc.reload_hint[HINT_ENTRY] = 1;
+        info->uc.reload_hint[HINT_ENTRY] = 1; //FIXME
         info->uc.reload_hint[HINT_CHAIN] = 1;
-	info->uc.reload_hint[HINT_MACRO] = 1;
+	    info->uc.reload_hint[HINT_MACRO] = 1;
 
         if( pm != MODE_STREAM )
             info->uc.reload_hint[HINT_EL] = 1;
@@ -6835,8 +6829,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             n_samples = info->status_tokens[SAMPLE_INV_COUNT];
         }
 
-        if( (info->uc.real_num_samples > 0 && n_samples > info->uc.real_num_samples ) ||
-            (info->uc.real_num_streams > 0 && n_streams > info->uc.real_num_streams) )
+        if( samplebank_ready_ &&( (info->uc.real_num_samples > 0 && n_samples > info->uc.real_num_samples ) ||
+            (info->uc.real_num_streams > 0 && n_streams > info->uc.real_num_streams)) )
         {
             info->uc.reload_hint[HINT_SLIST] = 1;
         }
@@ -6849,10 +6843,14 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     }
 
     if( info->status_tokens[SAMPLE_LOOP_STAT_STOP] != history[SAMPLE_LOOP_STAT_STOP] ) {
-	update_label_i( "label_loop_stat_stop", info->status_tokens[SAMPLE_LOOP_STAT_STOP],0);
+	    update_label_i( "label_loop_stat_stop", info->status_tokens[SAMPLE_LOOP_STAT_STOP],0);
+        if( pm == MODE_SAMPLE )
+            update_spin_value( "sample_loopstop", info->status_tokens[SAMPLE_LOOP_STAT_STOP] );
+         if( pm == MODE_STREAM )
+            update_spin_value( "stream_loopstop", info->status_tokens[SAMPLE_LOOP_STAT_STOP] );
     }
     if( info->status_tokens[SAMPLE_LOOP_STAT ] != history[SAMPLE_LOOP_STAT] ) {
-	update_label_i( "label_loop_stats", info->status_tokens[SAMPLE_LOOP_STAT], 0);
+	    update_label_i( "label_loop_stats", info->status_tokens[SAMPLE_LOOP_STAT], 0);
     }
 
 
@@ -6860,7 +6858,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     {
         info->uc.reload_hint[HINT_SEQ_ACT] = 1;
     }
-    if( info->status_tokens[SEQ_CUR] != history[SEQ_CUR] )
+    if( info->status_tokens[SEQ_CUR] != history[SEQ_CUR] && pm != MODE_PLAIN )
     {
         int in = info->status_tokens[SEQ_CUR];
         if( in < MAX_SEQUENCES )
@@ -6889,9 +6887,15 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             update_spin_value( "stream_length", info->status_tokens[SAMPLE_MARKER_END] );
             update_label_str( "stream_length_label", time );
         }
-        update_spin_range("button_fadedur", 0, total_frames_, ( total_frames_ > 25 ? 25 : total_frames_-1 ) );
+        if( pm != MODE_SAMPLE) {
+            update_spin_range("button_fadedur", 0, total_frames_, ( total_frames_ > 25 ? 25 : total_frames_-1 ) );
+        }
+
         update_label_i( "label_totframes", total_frames_, 1 );
-        update_label_str( "label_samplelength",time);
+        
+        if( pm == MODE_SAMPLE )
+            update_label_str( "label_samplelength",time);
+        
         if( pm == MODE_PLAIN )
         {
             for( i = 0; i < 3; i ++)
@@ -7049,7 +7053,7 @@ static void process_reload_hints(int *history, int pm)
         reload_editlist_contents();
     }
 
-    if( info->uc.reload_hint[HINT_SLIST] )
+    if( info->uc.reload_hint[HINT_SLIST] && samplebank_ready_)
     {
         gboolean reload_sl = FALSE;
         if( info->uc.reload_hint[HINT_SLIST] == 2 ) {
@@ -7078,7 +7082,7 @@ static void process_reload_hints(int *history, int pm)
         reload_bundles();
 
     if( info->selected_slot && info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] &&
-            info->selected_slot->sample_type == 0 && pm == MODE_PLAIN)
+            info->selected_slot->sample_type == 0 )
     {
         if( history[SAMPLE_FX] != info->status_tokens[SAMPLE_FX])
         {
@@ -7091,7 +7095,8 @@ static void process_reload_hints(int *history, int pm)
                     info->status_tokens[SAMPLE_FX]);
         }
     }
-    if( info->uc.reload_hint[HINT_CHAIN] == 1 )
+
+    if( info->uc.reload_hint[HINT_CHAIN] == 1 && pm != MODE_PLAIN)
     {
         load_effectchain_info();
     }
@@ -7187,25 +7192,29 @@ static void process_reload_hints(int *history, int pm)
     }
     info->parameter_lock = 0;
 
-    if( info->uc.reload_hint[HINT_GENERATOR])
+    if( info->uc.reload_hint[HINT_GENERATOR] && pm != MODE_PLAIN)
     {
         load_generator_info();
     }
 
     /* Curve needs update (start/end changed, effect id changed */
-    if ( info->uc.reload_hint[HINT_KF]  ) {
+    if ( info->uc.reload_hint[HINT_KF] && pm != MODE_PLAIN ) {
         vj_kf_refresh();
     }
 
-    if( beta__ && info->uc.reload_hint[HINT_HISTORY] ) {
+    if( beta__ && info->uc.reload_hint[HINT_HISTORY] && pm != MODE_PLAIN ) {
         reload_srt();
     }
 
-	if( info->uc.reload_hint[HINT_MACRO] ) {
+	if( info->uc.reload_hint[HINT_MACRO] && pm != MODE_PLAIN) {
 		reload_macros();
 	}
  
 	veejay_memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));
+
+    if(!samplebank_ready_) {
+        info->uc.reload_hint[HINT_SLIST] = 2;
+    }
 }
 
 void update_gui()
@@ -7246,104 +7255,6 @@ void update_gui()
     update_cachemeter_timeout(NULL);
 }
 
-/*
-void vj_fork_or_connect_veejay(char *configfile)
-{
-    char *files  = get_text( "entry_filename" );
-    int port    = get_nums( "button_portnum" );
-    gchar **args;
-    int n_args = 0;
-    char port_str[15];
-    char config[512];
-    char tmp[20];
-    int i = 0;
-
-    int arglen = vims_verbosity ? 15 :14 ;
-    arglen += (info->config.deinter);
-    arglen += (info->config.osc);
-    arglen += (info->config.vims);
-    args = g_new ( gchar *, arglen );
-
-    args[0] = g_strdup("veejay");
-
-    sprintf(port_str, "-p%d", port);
-    args[1] = g_strdup( port_str );
-
-    if(configfile)
-        sprintf(config,   "-l%s", configfile);
-
-    if( config_file_status == 0 )
-    {
-        if(files == NULL || strlen(files)<= 0)
-            args[2] = g_strdup("-d");
-        else
-            args[2] = g_strdup(files);
-}
-    else
-    {
-        args[2] = g_strdup( config );
-    }
-
-    args[3] = g_strdup( "-O5" );
-    sprintf(tmp, "-W%d", info->config.w );
-    args[4] = g_strdup( tmp );
-    sprintf(tmp, "-H%d", info->config.h );
-    args[5] = g_strdup( tmp );
-    sprintf(tmp, "-R%g", info->config.fps );
-    args[6] = g_strdup( tmp );
-    sprintf(tmp, "-N%d", info->config.norm );
-    args[7] = g_strdup( tmp );
-    sprintf(tmp, "-Y%d", info->config.pixel_format );
-    args[8] = g_strdup( tmp );
-    sprintf(tmp, "-m%d", info->config.sampling );
-    args[9] = g_strdup( tmp );
-    sprintf(tmp, "-c%d", info->config.sync );
-    args[10] = g_strdup( tmp );
-    sprintf(tmp, "-t%d", info->config.timer  == 0 ? 0 : 2);
-    args[11] = g_strdup( tmp );
-    sprintf(tmp, "-r%d", info->config.audio_rate );
-    args[12] = g_strdup( tmp );
-    args[13] = NULL;
-    int k=13;
-    while( k <= (arglen-1))
-        args[k++] = NULL;
-
-    if( vims_verbosity )
-        args[13] = g_strdup( "-v" );
-
-        if( info->config.deinter )
-    {
-        if(args[13]==NULL)
-            args[13] = g_strdup( "-I");
-            else args[14] = g_strdup( "-I" );
-    }
-    if( info->config.osc)
-    {
-        gchar osc_token[20];
-        sprintf(osc_token , "-M %s", info->config.mcast_osc );
-        int f = 13;
-        while(args[f] != NULL ) f ++;
-        args[f] = g_strdup( osc_token );
-}
-    if( info->config.vims)
-    {
-        gchar vims_token[20];
-        sprintf(vims_token, "-V %s", info->config.mcast_vims );
-        int f = 13;
-        while(args[f] != NULL) f++;
-        args[f] = g_strdup( vims_token );
-    }
-    if( info->watch.state == STATE_STOPPED)
-    {
-        info->watch.state = STATE_CONNECT;
-        info->run_state = RUN_STATE_REMOTE;
-    }
-
-    for( i = 0; i < n_args; i ++)
-        g_free(args[i]);
-}
-*/
-
 void vj_gui_free()
 {
     if(info)
@@ -7371,49 +7282,6 @@ void vj_gui_style_setup()
     info->color_map = gdk_screen_get_system_visual (gdk_screen_get_default ());
 }
 
-//~ NOT USED FIXME
-//~ void send_refresh_signal(void)
-//~ {
-    //~ GdkEventClient event;
-    //~ event.type = GDK_CLIENT_EVENT;
-    //~ event.send_event = TRUE;
-    //~ event.window = NULL;
-    //~ event.message_type = gdk_atom_intern("_GTK_READ_RCFILES", FALSE);
-    //~ event.data_format = 8;
-    //~ gdk_event_send_clientmessage_toall((GdkEvent *)&event);
-//~ }
-
-//~ gint gui_client_event_signal(GtkWidget *widget,
-                             //~ GdkEventClient *event,
-                             //~ void *data)
-//~ {
-    //~ static GdkAtom atom_rcfiles = GDK_NONE;
-    //~ if(!atom_rcfiles)
-        //~ atom_rcfiles = gdk_atom_intern("_GTK_READ_RCFILES", FALSE);
-
-    //~ if(event->message_type == atom_rcfiles)
-    //~ {
-        //~ gtk_rc_parse( theme_file );
-
-        //~ gtk_widget_reset_rc_styles(glade_xml_get_widget_(info->main_window,
-                                                         //~ "gveejay_window")
-                                   //~ );
-
-        //~ gtk_rc_reparse_all();
-
-        //~ veejay_msg(VEEJAY_MSG_WARNING,
-            //~ "Loaded GTK theme %s (catched _GTK_READ_RCFILES)", theme_file );
-        //~ veejay_msg(VEEJAY_MSG_INFO,
-            //~ "If the new theme is using an engine that modifies the internal structure");
-        //~ veejay_msg(VEEJAY_MSG_INFO,
-            //~ "of the widgets, there is no way for me to undo those changes and display");
-        //~ veejay_msg(VEEJAY_MSG_INFO,
-            //~ "%s correctly", theme_file );
-        //~ return TRUE;
-    //~ }
-    //~ return FALSE;
-//~ }
-
 void vj_gui_set_debug_level(int level, int n_tracks, int pw, int ph )
 {
     veejay_set_debug_level( level );
@@ -7432,23 +7300,23 @@ int vj_gui_get_preview_priority(void)
 
 void default_bank_values(int *col, int *row )
 {
-    int nsc = 2;
-    int nsy = 6;
+    int nsc = SAMPLEBANK_COLUMNS;
+    int nsy = SAMPLEBANK_ROWS;
 
     if( *col == 0 && *row == 0 )
     {
-        NUM_SAMPLES_PER_COL = nsc;
-        NUM_SAMPLES_PER_ROW = nsy;
+        SAMPLEBANK_COLUMNS = nsc;
+        SAMPLEBANK_ROWS = nsy;
     }
     else
     {
-        NUM_SAMPLES_PER_ROW = *row;
-        NUM_SAMPLES_PER_COL = *col;
+        SAMPLEBANK_ROWS = *row;
+        SAMPLEBANK_COLUMNS = *col;
     }
-    NUM_SAMPLES_PER_PAGE = NUM_SAMPLES_PER_COL * NUM_SAMPLES_PER_ROW;
+    NUM_SAMPLES_PER_PAGE = SAMPLEBANK_COLUMNS * SAMPLEBANK_ROWS;
     NUM_BANKS = (4096 / NUM_SAMPLES_PER_PAGE );
 
-    veejay_msg(VEEJAY_MSG_INFO, "Sample bank layout is %d rows by %d columns", NUM_SAMPLES_PER_ROW,NUM_SAMPLES_PER_COL );
+    veejay_msg(VEEJAY_MSG_INFO, "Sample bank layout is %d rows by %d columns", SAMPLEBANK_ROWS,SAMPLEBANK_COLUMNS );
 }
 
 int vj_gui_sleep_time( void )
@@ -7468,14 +7336,14 @@ int vj_gui_sleep_time( void )
 int vj_img_cb(GdkPixbuf *img )
 {
     int i;
-    if( !info->selected_slot || !info->selected_gui_slot ) {
+    if( !info->selected_slot || !info->selected_gui_slot || info->status_tokens[PLAY_MODE] == MODE_PLAIN)    {
         return 0;
     }
 
     int sample_id = info->status_tokens[ CURRENT_ID ];
     int sample_type = info->status_tokens[ PLAY_MODE ];
 
-    if( info->selected_slot->sample_type != sample_type || info->selected_slot->sample_id != sample_id ) {
+    if( info->selected_slot->sample_type != sample_type || info->selected_slot->sample_id != sample_id )     {
         return 0;
     }
 
@@ -7488,6 +7356,8 @@ int vj_img_cb(GdkPixbuf *img )
         {
             slot->pixbuf = vj_gdk_pixbuf_scale_simple(img,
                 info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
+            veejay_msg(VEEJAY_MSG_DEBUG, "Scale image to %d x %d", 
+                    info->image_dimensions[0], info->image_dimensions[1]);
             if(slot->pixbuf) {
                 gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
                 g_object_unref( slot->pixbuf );
@@ -7934,9 +7804,6 @@ void vj_gui_init(const char *glade_file,
     gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,
                                                         "build_revision")),
                        text);
-    //~ NOT USED
-    //~ g_signal_connect_after( GTK_OBJECT(mainw), "client_event",
-        //~ GTK_SIGNAL_FUNC( G_CALLBACK(gui_client_event_signal) ), NULL );
 
     g_signal_connect( mainw, "destroy",
             G_CALLBACK( gveejay_quit ),
@@ -8481,13 +8348,12 @@ static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r)
  *  The GUI componenets are in sample_bank[i]->gui_slot[j]
  *
   -------------------------------------------------------------------------------------------------------------------------- */
-
-int power_of_2(int x)
+static void samplebank_size_allocate(GtkWidget *widget, GtkAllocation *allocation, void *data)
 {
-    int p = 1;
-    while( p < x )
-        p <<= 1;
-    return p;
+    setup_samplebank( 
+            SAMPLEBANK_COLUMNS, SAMPLEBANK_ROWS, allocation, &(info->image_dimensions[0]),&(info->image_dimensions[1]) );
+  
+    samplebank_ready_ = 1;
 }
 
 /* Add a page to the notebook and initialize slots */
@@ -8499,8 +8365,8 @@ static int add_bank( gint bank_num )
     sprintf(frame_label, "Slots %d to %d",
         (bank_num * NUM_SAMPLES_PER_PAGE), (bank_num * NUM_SAMPLES_PER_PAGE) + NUM_SAMPLES_PER_PAGE  );
 
-    setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW, info->sample_bank_pad, &(info->image_dimensions[0]),
-                &(info->image_dimensions[1]) );
+//    setup_samplebank( SAMPLEBANK_COLUMNS, SAMPLEBANK_ROWS, info->sample_bank_pad, &(info->image_dimensions[0]),
+      //          &(info->image_dimensions[1]) );
 
     info->sample_banks[bank_num] = (sample_bank_t*) vj_calloc(sizeof(sample_bank_t));
     info->sample_banks[bank_num]->bank_number = bank_num;
@@ -8512,7 +8378,6 @@ static int add_bank( gint bank_num )
     {
         slot[j] = (sample_slot_t*) vj_calloc(sizeof(sample_slot_t) );
         gui_slot[j] = (sample_gui_slot_t*) vj_calloc(sizeof(sample_gui_slot_t));
-//      slot[j]->rawdata = (guchar*) vj_calloc(sizeof(guchar) * 3 * 128 * 128 );
         slot[j]->slot_number = j;
         slot[j]->sample_id = -1;
         slot[j]->sample_type = -1;
@@ -8529,26 +8394,26 @@ static int add_bank( gint bank_num )
     gtk_widget_show(frame);
     info->sample_banks[bank_num]->page_num = gtk_notebook_append_page(GTK_NOTEBOOK(info->sample_bank_pad), frame, label);
 
-    GtkWidget *table = gtk_table_new( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW, TRUE );
-    gtk_container_add( GTK_CONTAINER(frame), table );
-    gtk_widget_show(table);
-    gtk_widget_show(sb );
+    GtkWidget *grid = gtk_grid_new();
+    gtk_grid_set_column_homogeneous(GTK_GRID(grid),TRUE);
+    gtk_grid_set_row_homogeneous(GTK_GRID(grid),TRUE);
+
+    g_signal_connect(grid,"size-allocate",G_CALLBACK(samplebank_size_allocate), NULL);
+
+    gtk_container_add( GTK_CONTAINER(frame), grid );
 
     gint col, row;
-    for( col = 0; col < NUM_SAMPLES_PER_COL; col ++ )
-    {
-        for( row = 0; row < NUM_SAMPLES_PER_ROW; row ++ )
-        {
-            int slot_nr = col * NUM_SAMPLES_PER_ROW + row;
-            if(slot_nr < NUM_SAMPLES_PER_PAGE)
-            {
-                create_slot( bank_num, slot_nr ,info->image_dimensions[0], info->image_dimensions[1]);
-                sample_gui_slot_t *gui_slot = info->sample_banks[bank_num]->gui_slot[slot_nr];
-                gtk_table_attach_defaults ( GTK_TABLE(table), gui_slot->event_box, row, row+1, col, col+1);
-                set_tooltip_by_widget( gui_slot->frame, tooltips[TOOLTIP_SAMPLESLOT].text);
-            }
+    for( row = 0; row < SAMPLEBANK_ROWS; row ++ ) {
+        for( col = 0; col < SAMPLEBANK_COLUMNS; col ++ ) {
+            int slot_nr = row * SAMPLEBANK_COLUMNS + col;
+            create_slot( bank_num, slot_nr ,info->image_dimensions[0], info->image_dimensions[1]);
+            sample_gui_slot_t *gui_slot = info->sample_banks[bank_num]->gui_slot[slot_nr];
+            gtk_grid_attach( GTK_GRID(grid), gui_slot->event_box, col, row, 1,1);
+            set_tooltip_by_widget( gui_slot->frame, tooltips[TOOLTIP_SAMPLESLOT].text);
         }
     }
+    gtk_widget_show(grid);
+    gtk_widget_show(sb );
 
     if( !info->normal )
     {
@@ -8629,16 +8494,10 @@ void free_samplebank(void)
     veejay_memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
 }
 
-void setup_samplebank(gint num_cols, gint num_rows, GtkWidget *pad, int *idx, int *idy)
+void setup_samplebank(gint num_cols, gint num_rows, GtkAllocation *allocation, int *idx, int *idy)
 {
-    GdkRectangle result;
-    widget_get_rect_in_screen(
-        pad,
-        &result
-    );
-
-    gint image_width = result.width / num_rows;
-    gint image_height = result.height / num_cols;
+    gint image_width = allocation->width / num_cols;
+    gint image_height = allocation->height / num_rows;
 
     if( image_width > 64 && image_height > 64 ) {
         image_width -= 4; /* some spacing between slot border and image */
@@ -8657,6 +8516,8 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkWidget *pad, int *idx, in
         w = image_width / ratio;
     }
 
+    veejay_msg(VEEJAY_MSG_DEBUG, "Sample bank icon size is %2.2fx%2.2f",w,h);
+    veejay_msg(VEEJAY_MSG_DEBUG, "Sample bank is %d rows, %d columns", num_rows,num_cols);
     *idx = (int)w;
     *idy = (int)h;
 }
@@ -8989,7 +8850,7 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 //  gui_slot->image = gtk_drawing_area_new();
     gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
 //  gtk_widget_show(GTK_WIDGET(gui_slot->image));
-    gtk_widget_set_size_request_( gui_slot->image, info->image_dimensions[0],info->image_dimensions[1] );
+ //   gtk_widget_set_size_request_( gui_slot->image, info->image_dimensions[0],info->image_dimensions[1] );
 /*
     g_signal_connect( gui_slot->image, "expose_event",
             G_CALLBACK(image_expose_event),
@@ -9260,7 +9121,6 @@ static void remove_sample_from_slot()
     info->selection_slot = NULL;
 
     info->uc.reload_hint[HINT_SLIST] = 2;
-
 }
 
 

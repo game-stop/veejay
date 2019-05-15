@@ -894,7 +894,7 @@ static int	*gvr_grab_heights( void *preview )
 	int i;
 	for( i = 0; i < vp->n_tracks; i ++ )
 		if( vp->tracks[i] && vp->tracks[i]->active )
-			list[i] = vp->track_sync->widths[i];
+			list[i] = vp->track_sync->heights[i];
 	
 	return list;
 }

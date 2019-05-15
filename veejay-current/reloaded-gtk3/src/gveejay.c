@@ -113,7 +113,7 @@ gboolean gveejay_idle(gpointer data)
             veejay_update_multitrack( get_ui_info() );
           }
         }
-        update_gveejay();
+        //update_gveejay();
     }
 
     if( gveejay_restart() )
@@ -176,10 +176,11 @@ restart_me:
 
     while(gveejay_running())
     {
-        if(gveejay_idle(NULL)==FALSE)
-            break;
         while( gtk_events_pending()  )
             gtk_main_iteration();
+    
+        if(gveejay_idle(NULL)==FALSE)
+            break;
     }
 
     vj_event_list_free();
@@ -346,7 +347,7 @@ int main(int argc, char **argv)
     {"notcolored",  'n', 0, G_OPTION_ARG_NONE, &arg_notcolored, "Dont use colored text.", NULL},
     {"port",        'p', 0, G_OPTION_ARG_INT, &arg_port, port_description, NULL},
     {"preview",     'P', 0, G_OPTION_ARG_INT, &arg_preview, "Start with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)", NULL},
-    {"size",        's', 0, G_OPTION_ARG_STRING, &arg_size, "Set bank row and columns resolution \"RxC\".", NULL},
+    {"size",        's', 0, G_OPTION_ARG_STRING, &arg_size, "Set bank resolution \"CxR\".", NULL},
     {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be extra verbose (usefull for debugging)", NULL},
     {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version, data directory and exit.", NULL},
     {"tracXs",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
