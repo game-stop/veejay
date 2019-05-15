@@ -1009,6 +1009,20 @@ void		vj_init_vevo_events(void)
 				1,
 				NULL );
 
+    index_map_[VIMS_SAMPLE_SET_LOOPS]   = _new_event(
+                "%d %d",
+                VIMS_SAMPLE_SET_LOOPS,
+                "Set the number of loops",
+                vj_event_sample_set_loops,
+                2,
+                VIMS_REQUIRE_ALL_PARAMS,
+                SAMPLE_ID_HELP,
+                0,
+                "Number of loops",
+                -1,
+                NULL
+                );
+
 	index_map_[VIMS_SAMPLE_SET_SPEED]	=	_new_event(
 				"%d %d",
 				VIMS_SAMPLE_SET_SPEED,

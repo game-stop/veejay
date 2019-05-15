@@ -1757,11 +1757,12 @@ void sample_set_loops(int s1, int loops) {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return;
 	if(loops==-1) {
+        int lss = sample->loop_stat_stop;
 		if(sample->looptype == 2) {
-			sample->loops = 2;
+			sample->loops = (lss > 0 ? lss * 2: 2);
 		}
 		else {
-			sample->loops = 1;
+			sample->loops = (lss > 0 ? lss : 1);
 		}
 		return;
 	}
