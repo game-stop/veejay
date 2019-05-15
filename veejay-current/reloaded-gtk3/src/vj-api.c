@@ -5126,8 +5126,6 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
                         free_slot(tmp_slot);
                         if( !disable_sample_image ) {
                             veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
-                            veejay_msg(VEEJAY_MSG_DEBUG, "Get image %dx%d", info->image_dimensions[0],
-                                        info->image_dimensions[1]);
                         }
                     }
                     else
@@ -7356,8 +7354,6 @@ int vj_img_cb(GdkPixbuf *img )
         {
             slot->pixbuf = vj_gdk_pixbuf_scale_simple(img,
                 info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
-            veejay_msg(VEEJAY_MSG_DEBUG, "Scale image to %d x %d", 
-                    info->image_dimensions[0], info->image_dimensions[1]);
             if(slot->pixbuf) {
                 gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
                 g_object_unref( slot->pixbuf );
@@ -8516,8 +8512,6 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkAllocation *allocation, i
         w = image_width / ratio;
     }
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Sample bank icon size is %2.2fx%2.2f",w,h);
-    veejay_msg(VEEJAY_MSG_DEBUG, "Sample bank is %d rows, %d columns", num_rows,num_cols);
     *idx = (int)w;
     *idy = (int)h;
 }
