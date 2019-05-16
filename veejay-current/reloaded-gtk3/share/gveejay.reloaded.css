@@ -74,6 +74,8 @@ notebook header.top tabs tab:hover label {
 
 .timeline {
  border-color:#ff8400;
+ padding-top:4px;
+ padding-bottom:4px;
 }
 
 .timeline stepper hover {

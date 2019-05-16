@@ -43,6 +43,7 @@ enum
   BIND_CHANGED,
   CLEAR_CHANGED,
   SELECTION_CHANGED_SIGNAL,
+  POINT_CHANGED,
   LAST_SIGNAL
 };
 
@@ -57,6 +58,7 @@ enum
   SEL = 7,
   BIND = 8,
   CLEARED = 9,
+  POINT = 10,
 };
 
 typedef enum {
@@ -80,6 +82,7 @@ typedef enum TimelineAction
   action_out_point,
   action_pos,
   action_atomic,
+  action_point,
 } TimelineAction;
 
 #define POINT_IN_RECT(xcoord, ycoord, rect) \
@@ -117,6 +120,7 @@ struct _TimelineSelection
   gdouble           font_line;
   gboolean          has_selection;  /* use in/out points for selection */
   gdouble           move_x;
+  gdouble           point;
 };
 
 static void get_property( GObject *object,
@@ -150,6 +154,7 @@ struct _TimelineSelectionClass
 {
   GtkWidgetClass  parent_class;
   void  (*pos_changed) (TimelineSelection *te);
+  void  (*point_changed) (TimelineSelection *te);
   void  (*in_point_changed) (TimelineSelection *te);
   void  (*out_point_changed) (TimelineSelection *te);
   void  (*bind_toggled) (TimelineSelection *te);
@@ -177,6 +182,12 @@ static  void  set_property  (GObject *object,
     if(te->frame_num != g_value_get_double(value))
     {
       te->frame_num = g_value_get_double(value);
+    }
+    break;
+    case POINT:
+    if(te->point != g_value_get_double(value))
+    {
+        te->point = g_value_get_double(value);
     }
     break;
     case LENGTH:
@@ -234,6 +245,7 @@ static void get_property( GObject *object,
     case MIN: g_value_set_double( value, te->min );break;
     case MAX: g_value_set_double( value, te->max );break;
     case POS: g_value_set_double( value, te->frame_num ); break;
+    case POINT: g_value_set_double( value, te->point ); break;
     case LENGTH: g_value_set_double( value, te->num_video_frames ); break;
     case IN_POINT: g_value_set_double( value, te->in ); break;
     case OUT_POINT: g_value_set_double( value, te->out ); break;
@@ -289,18 +301,22 @@ static  void  timeline_class_init( TimelineSelectionClass *class )
         G_PARAM_READWRITE ));
 
   g_object_class_install_property( gobject_class,
+      POINT,
+      g_param_spec_double( "point",
+        "point at position", "point at position", 0.0,9999999.0, 0.0,
+        G_PARAM_READWRITE ));
+
+  g_object_class_install_property( gobject_class,
       LENGTH,
       g_param_spec_double( "length",
         "Length (in frames)", "Length (in frames) ",0.0,9999999.0, 1.0,
         G_PARAM_READWRITE ));
-
 
   g_object_class_install_property( gobject_class,
       IN_POINT,
       g_param_spec_double( "in",
         "In point", "(in frames) ",0.0,1.0, 0.0,
         G_PARAM_READWRITE ));
-
 
   g_object_class_install_property( gobject_class,
       OUT_POINT,
@@ -331,6 +347,14 @@ static  void  timeline_class_init( TimelineSelectionClass *class )
                         G_TYPE_FROM_CLASS(gobject_class),
                         G_SIGNAL_RUN_LAST,
                         G_STRUCT_OFFSET( TimelineSelectionClass, pos_changed ),
+                        NULL,NULL,
+                        g_cclosure_marshal_VOID__VOID,
+                        G_TYPE_NONE, 0, NULL);
+
+  timeline_signals[ POINT_CHANGED ] = g_signal_new( "point_changed",
+                        G_TYPE_FROM_CLASS(gobject_class),
+                        G_SIGNAL_RUN_LAST,
+                        G_STRUCT_OFFSET( TimelineSelectionClass, point_changed ),
                         NULL,NULL,
                         g_cclosure_marshal_VOID__VOID,
                         G_TYPE_NONE, 0, NULL);
@@ -387,6 +411,7 @@ static void timeline_init( TimelineSelection *te )
   te->stepper_length = 0;
   te->frame_height = 8;
   te->font_line = 22;
+  te->point = 0.0;
   te->move_x = 0;
 }
 
@@ -505,6 +530,22 @@ gdouble timeline_get_pos( TimelineSelection *te )
 {
   gdouble result = 0.0;
   g_object_get( G_OBJECT(te), "pos", &result, NULL );
+  return result;
+}
+
+void  timeline_set_point( GtkWidget *widget,gdouble point)
+{
+  TimelineSelection *te = TIMELINE_SELECTION( widget );
+  if( point < 0.0 ) point = 0.0;
+  g_object_set( G_OBJECT(te), "point", point, NULL );
+  g_signal_emit( te->widget, timeline_signals[POINT_CHANGED], 0);
+  gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
+}
+
+gdouble timeline_get_point( TimelineSelection *te )
+{
+  gdouble result = 0.0;
+  g_object_get( G_OBJECT(te), "point", &result, NULL );
   return result;
 }
 
@@ -666,6 +707,11 @@ static gboolean event_motion (GtkWidget *widget, GdkEventMotion *ev, gpointer us
   if(te->has_selection && te->bind && te->grab_button == 2 )
     move_selection( widget, x, width );
 
+  gdouble rel_pos = ((gdouble)ev->x / width) * te->num_video_frames;
+  gdouble new_pos = (gdouble) ((gint) rel_pos );
+
+  timeline_set_point( widget, new_pos);
+
   gtk_widget_queue_draw( widget );
 
   return FALSE;
@@ -736,6 +782,7 @@ void cairo_rectangle_round ( cairo_t * cr,
 
 static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
 {
+  gchar text[40];
   TimelineSelection *te = TIMELINE_SELECTION( widget );
   double width = gtk_widget_get_allocated_width (widget);
   double height = gtk_widget_get_allocated_height (widget);
@@ -750,6 +797,25 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
   gtk_style_context_get_color ( sc, gtk_style_context_get_state (sc), &color );
   GdkRGBA col2;
   gtk_style_context_get_border_color( sc, gtk_style_context_get_state(sc), &col2 );
+
+/*
+  
+  double x1 = marker_width * te->point;
+  cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
+  cairo_move_to(cr, x1,te->font_line/2 );
+  sprintf(text, "%d",  (gint)te->point );
+  cairo_set_source_rgba( cr, color.red,color.green,color.blue,0.3 );
+  cairo_show_text(cr, text);
+  cairo_fill(cr);
+ 
+ */
+ double x1 = marker_width * te->point;
+  cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
+  cairo_move_to(cr, x1,te->font_line );
+  sprintf(text, "%d",  (gint)te->point );
+  cairo_set_source_rgba( cr, color.red,color.green,color.blue,0.3 );
+  cairo_show_text(cr, text);
+
 /* Draw stepper */
   if( te->has_stepper )
   {
@@ -773,7 +839,6 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
       cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
         CAIRO_FONT_WEIGHT_BOLD );
       cairo_move_to(cr, x1,te->font_line );
-      gchar text[40];
       sprintf(text, "%d",  (gint)te->frame_num );
       cairo_text_path( cr, text );
       cairo_set_font_size( cr, 0.2 );
@@ -782,7 +847,8 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
       cairo_fill(cr);
     }
   }
-/* Draw selection */
+  
+  /* Draw selection */
   if( te->has_selection )
   {
     gdouble in = te->in * width;
@@ -792,18 +858,17 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
     if( te->grab_button == 1 && te->current_location != MOUSE_STEPPER )
     {
       gdouble f = te->in * te->num_video_frames;
+      gdouble f2 = te->out * te->num_video_frames;
 
       cairo_set_source_rgba( cr, 0.0, color.green, color.blue,0.3 );
       cairo_move_to( cr, in, 0.0 );
       cairo_rel_line_to( cr, 0.0 , te->stepper_length );
       cairo_stroke(cr);
 
-      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
-        CAIRO_FONT_WEIGHT_BOLD );
+      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
 
       cairo_move_to(cr, in , te->font_line  );
-      gchar text[40];
-      sprintf(text, "%d",(gint) f );
+      sprintf(text, "%d - %d",(gint) f, (gint) f2 );
       cairo_text_path( cr, text );
       cairo_set_font_size( cr, 0.2 );
       cairo_set_source_rgba( cr, color.red,color.green,color.blue,0.7 );
@@ -813,36 +878,48 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
     if( te->grab_button == 3 && te->current_location != MOUSE_STEPPER )
     {
       gdouble f = te->out * te->num_video_frames;
+      gdouble f2 = te->in * te->num_video_frames;
+
       cairo_set_source_rgba( cr, 0.0,color.green,color.blue,0.3 );
       cairo_move_to( cr, out , 0.0 );
       cairo_rel_line_to( cr, 0.0 , te->stepper_length );
       cairo_stroke(cr);
 
-      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
-        CAIRO_FONT_WEIGHT_BOLD );
+      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
 
-      cairo_move_to(cr, out ,te->font_line );
-      gchar text[40];
-      sprintf(text, "%d", (gint) f );
+      cairo_move_to(cr, in ,te->font_line );
+      sprintf(text, "%d - %d", (gint) f2, (gint) f );
       cairo_text_path( cr, text );
       cairo_set_font_size( cr, 0.2 );
       cairo_set_source_rgba( cr,color.red,color.green,color.blue,0.7 );
       cairo_fill(cr);
     }
 
-    cairo_set_source_rgba( cr, color.red,color.green,color.blue, 0.3 );
+    cairo_set_source_rgba( cr, col2.red,col2.green,col2.blue, 1.0 );
     cairo_rectangle_round(cr, in,
       0.095 * height,
       (out - in),
       marker_height,
       10);
+    cairo_fill_preserve(cr);
+
+    cairo_set_source_rgba( cr, color.red,color.green,color.blue, 0.3 );
+    cairo_rectangle_round(cr, 0.0, 0.095 * height, width, marker_height,10);
+    cairo_fill(cr);
+
     te->selection.x = in;
     te->selection.y = 0;
     te->selection.width = out;
     te->selection.height = te->font_line;
-    cairo_fill_preserve(cr);
+   // cairo_fill_preserve(cr);
+  }
+  else {
+      cairo_set_source_rgba( cr, color.red,color.green,color.blue, 0.3 );
+      cairo_rectangle_round(cr, 0.0, 0.095 * height, width, marker_height,10);
+      cairo_fill(cr);
   }
 
+ 
   return FALSE;
 }
 

@@ -157,7 +157,6 @@ static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
     register_signals();
 
     vj_gui_init( skinfile, launcher, hostname, port_num, use_threads, load_midi, midi_file,arg_beta, arg_autoconnect);
-    vj_gui_style_setup();
 
     if( preview )
     {
@@ -165,12 +164,6 @@ static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
     }
 
 restart_me:
-
-    reloaded_show_launcher ();
-    if( launcher )
-    {
-        reloaded_launcher( hostname, port_num );
-    }
 
     memset( &time_last_, 0, sizeof(struct timeval));
 
@@ -188,6 +181,12 @@ restart_me:
     if( gveejay_relaunch() ) {
       launcher = 1;
       reloaded_restart();
+      reloaded_show_launcher ();
+      if( launcher )
+      {
+        reloaded_launcher( hostname, port_num );
+      }
+
       goto restart_me;
     }
 }

@@ -762,6 +762,8 @@ int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 static void vj_kf_refresh();
 static void vj_kf_reset();
+static void veejay_stop_connecting(vj_gui_t *gui);
+
 void reload_macros();
 /* not used */ /* static int vj_kf_is_displayed(); */
 
@@ -2408,7 +2410,6 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
     gchar *data = recv_vims_args( 12, &bw, &sample_id, &sample_type );
     if( data == NULL || bw <= 0 )
     {
-        veejay_msg(VEEJAY_MSG_WARNING, "Can't get a preview image! Only got %d bytes", bw);
         if( data_buffer )
             free(data_buffer);
         if( data )
@@ -3431,8 +3432,11 @@ static void update_current_slot(int *history, int pm, int last_pm)
             }
             char *dur = format_time( info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START],
                 (double)info->el.fps );
+            char *start = format_time( info->status_tokens[SAMPLE_MARKER_START] , (double)info->el.fps);
             update_label_str( "label_markerduration", dur );
+            update_label_str( "label_markerstart", start );
             free(dur);
+            free(start);
         }
 
         if( (history[SAMPLE_MARKER_END] != info->status_tokens[SAMPLE_MARKER_END]) )
@@ -3453,6 +3457,12 @@ static void update_current_slot(int *history, int pm, int last_pm)
                     marker_go = 1;
                 }
             }
+
+            char *end = format_time( info->status_tokens[SAMPLE_MARKER_END], (double)info->el.fps );
+            update_label_str( "label_markerend", end );
+            free(end);
+
+
             update = 1;
         }
 
@@ -6930,10 +6940,15 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     info->status_frame = info->status_tokens[FRAME_NUM];
     timeline_set_pos( info->tl, (gdouble) info->status_frame );
     char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
+    char *mouse_at_time = format_time( 
+            timeline_get_point(TIMELINE_SELECTION(info->tl)),
+            (double)info->el.fps);
     update_label_i(   "label_curframe", info->status_frame ,1 );
+    update_label_str(   "label_mouseat", mouse_at_time );
     update_label_str( "label_curtime", current_time_ );
     update_label_str( "label_sampleposition", current_time_);
     free(current_time_);
+    free(mouse_at_time);
 
     if( pm == MODE_SAMPLE )
         update_label_i( "label_samplepos",
@@ -7051,7 +7066,7 @@ static void process_reload_hints(int *history, int pm)
         reload_editlist_contents();
     }
 
-    if( info->uc.reload_hint[HINT_SLIST] && samplebank_ready_)
+    if( info->uc.reload_hint[HINT_SLIST] )
     {
         gboolean reload_sl = FALSE;
         if( info->uc.reload_hint[HINT_SLIST] == 2 ) {
@@ -7646,6 +7661,39 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     g_free(data);
 }
 
+static int auto_connect_to_veejay(char *host, int port_num)
+{
+    char *hostname = (host == NULL ? "localhost" : host );
+    int i,j;
+
+    for( i = port_num; i < 9999; i += 1000 ) {
+        //connect client at first available server
+        if( vj_gui_reconnect( hostname, NULL, i ) ) {
+            info->watch.state = STATE_PLAYING;
+            multrack_audoadd( info->mt, hostname, i);
+            // set reconnect info
+            update_spin_value( "button_portnum", i );
+            put_text( "entry_hostname", hostname );
+
+            // setup tracks
+            for( j = (i+1000); j < 9999; j+= 1000 )
+            {
+                multrack_audoadd( info->mt, hostname, j);
+            }
+            multitrack_set_quality( info->mt, 1 );
+
+            i = j;
+
+            return 1;
+        }
+    }
+
+    update_spin_value( "button_portnum", port_num );
+    put_text( "entry_hostname", hostname );
+
+    return 0;
+}
+
 void vj_gui_init(const char *glade_file,
                  int launcher,
                  char *hostname,
@@ -7897,29 +7945,9 @@ void vj_gui_init(const char *glade_file,
     info->watch.state = STATE_WAIT_FOR_USER; //
 
     vj_gui_activate_stylesheet(gui);
-
-
-    //connect client at first available server
-    //and try to connect multitrack to all existing server
-    if( auto_connect )
-    {
-        for( i = DEFAULT_PORT_NUM; i < 9999; i+= 1000 )
-        {
-            if (multrack_audoadd( gui->mt, "localhost", i) != -1 && auto_connect)
-            {
-                update_spin_value( "button_portnum", i );
-                info->watch.state = STATE_CONNECT;
-                auto_connect = FALSE;
-            }
-        }
-    }
-
     veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));
     info->midi =  vj_midi_new( info->main_window );
     gettimeofday( &(info->time_last) , 0 );
-
-    //GtkWidget *srtbox = glade_xml_get_widget_( info->main_window, "combobox_textsrt");
-    //set_tooltip_by_widget( srtbox, tooltips[TOOLTIP_SRTSELECT].text);
 
     if(!beta) // srt-titling sequence stuff
     {
@@ -7935,9 +7963,8 @@ void vj_gui_init(const char *glade_file,
     update_slider_range( "speed_slider", -25,25,1,0);
     update_slider_range( "slow_slider",1,MAX_SLOW,1,0);
 
-
     if( load_midi )
-            vj_midi_load(info->midi,midi_file);
+       vj_midi_load(info->midi,midi_file);
 
     for( i = 0 ; i < MAX_UI_PARAMETERS; i ++ )
     {
@@ -7951,12 +7978,7 @@ void vj_gui_init(const char *glade_file,
     g_signal_connect(glade_xml_get_widget_(info->main_window, "slow_slider"), "scroll-event",
                      G_CALLBACK(slow_scroll_event), NULL );
 
-    GtkWidget *lw = glade_xml_get_widget_( info->main_window, "veejay_connection");
-
-    if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
-        gtk_window_move( GTK_WINDOW(lw), geo_pos_[0], geo_pos_[1] );
-
-    char *have_snoop = getenv( "RELOADED_KEY_SNOOP" );
+        char *have_snoop = getenv( "RELOADED_KEY_SNOOP" );
     if( have_snoop == NULL )
     {
         veejay_msg(VEEJAY_MSG_DEBUG, "Use setenv RELOADED_KEY_SNOOP=1 to mirror veejay server keyb layout" );
@@ -7966,6 +7988,28 @@ void vj_gui_init(const char *glade_file,
         if( use_key_snoop < 0 || use_key_snoop > 1 )
             use_key_snoop = 0;
     }
+
+    vj_gui_style_setup();
+
+    GtkWidget *lw = glade_xml_get_widget_( info->main_window, "veejay_connection");
+
+    if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
+        gtk_window_move( GTK_WINDOW(lw), geo_pos_[0], geo_pos_[1] );
+
+    if( auto_connect ) {
+        if(auto_connect_to_veejay(hostname, port_num)) {
+            veejay_stop_connecting(gui);
+        }
+    }
+    else {
+        if(hostname) {
+            put_text("entry_hostname",hostname);
+        }
+        update_spin_value( "button_portnum", port_num );
+
+        reloaded_show_launcher ();
+    }
+
 }
 
 void vj_gui_preview(void)
@@ -8138,11 +8182,9 @@ static void veejay_stop_connecting(vj_gui_t *gui)
         gtk_window_move( GTK_WINDOW(mw), geo_pos_[0], geo_pos_[1] );
 }
 
-void reloaded_launcher(char *hostname, int port_num)
+void reloaded_launcher()
 {
     info->watch.state = STATE_RECONNECT;
-    put_text( "entry_hostname", hostname );
-    update_spin_value( "button_portnum", port_num );
 }
 
 void reloaded_show_launcher()

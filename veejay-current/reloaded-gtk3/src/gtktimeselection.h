@@ -45,6 +45,7 @@ gdouble		timeline_get_in_point	(TimelineSelection *te );
 gdouble		timeline_get_out_point  (TimelineSelection *te );
 gboolean	timeline_get_selection  (TimelineSelection *te );
 gboolean	timeline_get_bind	(TimelineSelection *te );
+gdouble     timeline_get_point (TimelineSelection *te);
 
 void		timeline_set_pos	(GtkWidget *widget, gdouble pos );
 
@@ -54,7 +55,7 @@ void		timeline_set_out_point	(GtkWidget *widget, gdouble pos);
 void		timeline_set_length	(GtkWidget *widget, gdouble length, gdouble pos);
 
 void		timeline_set_bind	(GtkWidget *widget, gboolean active); 
-
+void        timeline_set_point  (GtkWidget *widget, gdouble point);
 
 void		timeline_clear_points( GtkWidget *widget );
 
