@@ -268,7 +268,7 @@ int 	vj_tag_get_offset(int t1, int entry);
 
 int 	vj_tag_set_offset(int t1, int entry, int offset);
 
-//int vj_tag_record_frame(int t1, uint8_t *buffer[3]);
+int     vj_tag_reset_offset(int t1);
 
 int 	vj_tag_get_frame(int t1, VJFrame *dst, uint8_t *abuf);
 

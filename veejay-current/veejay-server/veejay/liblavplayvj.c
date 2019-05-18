@@ -729,6 +729,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		}
 		info->settings->min_frame_num = 0;
 		info->settings->max_frame_num = vj_tag_get_n_frames( cur_id );
+        info->settings->current_frame_num = 0;
 	}
 
 	if(new_pm == VJ_PLAYBACK_MODE_PLAIN )

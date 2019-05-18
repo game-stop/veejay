@@ -474,10 +474,14 @@ static  int vj_perform_next_sequence( veejay_t *info, int *type )
 
     info->seq->current = cur;
 
-    sample_update_ascociated_samples( info->seq->samples[cur].sample_id );
-    sample_reset_offset( info->seq->samples[cur].sample_id );
-    sample_set_loops( info->seq->samples[cur].sample_id, -1 ); /* reset loop count */
-
+    if( info->seq->samples[info->seq->current].type == 0 ) {
+        sample_update_ascociated_samples( info->seq->samples[cur].sample_id );
+        sample_reset_offset( info->seq->samples[cur].sample_id );
+        sample_set_loops( info->seq->samples[cur].sample_id, -1 ); /* reset loop count */
+    }
+    else {
+        vj_tag_reset_offset( info->seq->samples[cur].sample_id );
+    }
     *type = info->seq->samples[cur].type;
     return info->seq->samples[cur].sample_id;
 }
@@ -504,6 +508,7 @@ static  int vj_perform_try_transition( veejay_t *info, int is_tag )
             int id = vj_tag_chain_entry_transition_now(info->uc->sample_id,c, &type);
             if( id == 0 )
                 continue;
+            vj_tag_reset_offset(id);
             veejay_change_playback_mode( info, (type == 0 ? VJ_PLAYBACK_MODE_SAMPLE : VJ_PLAYBACK_MODE_TAG), id );
             return 1;
         }   

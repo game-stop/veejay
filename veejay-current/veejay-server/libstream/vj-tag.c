@@ -3017,7 +3017,18 @@ int vj_tag_by_type(int type)
     return 0;
 }
 
-
+int vj_tag_reset_offset(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if (!tag)
+        return -1;
+    int i;
+    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
+    {
+        tag->effect_chain[i]->frame_offset = 0;
+    }
+    return 1;
+}
 
 int vj_tag_set_offset(int t1, int chain_entry, int frame_offset)
 {
