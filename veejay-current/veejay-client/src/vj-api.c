@@ -6014,14 +6014,14 @@ static void reload_editlist_contents()
     for( i = 0; i < num_files ; i ++ )
     {
         int name_len = 0;
-        tmp = strndup( eltext + offset, 3 );
+        tmp = strndup( eltext + offset, 4 );
         if( sscanf( tmp,"%d", &name_len ) != 1 )
         {
             free(tmp);
             free(eltext);
             return;
         }
-        offset += 3;
+        offset += 4;
         free(tmp);
         char *file = strndup( eltext + offset, name_len );
 
