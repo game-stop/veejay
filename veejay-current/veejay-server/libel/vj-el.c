@@ -1643,13 +1643,13 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 
 	int num_files	= 0;
 	int64_t oldfile, oldframe, of1,ofr;
-	int64_t index[MAX_EDIT_LIST_FILES]; //@ TRACE
+	int64_t index[MAX_EDIT_LIST_FILES]; 
 	int64_t n,n1=0;
 	char 	*result = NULL;
 	int64_t j = 0;
 	int64_t n2 = el->total_frames;
-	char	filename[2048];		    //@ TRACE
-	char	fourcc[6];                  //@ TRACE
+	char	filename[2048];		    
+	char	fourcc[6];              
 
 	/* get which files are actually referenced in the edit list entries */
 
@@ -1665,7 +1665,8 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
    
 	num_files = 0;
 	int nnf   = 0;
-	long len  = 0;
+	size_t len  = 0;
+    size_t fl_len = 0;
 
    	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
 	{
@@ -1673,7 +1674,8 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		{
 			index[j] = (int64_t)num_files;
 			nnf ++;
-			len     += (strlen(el->video_file_list[j])) + 25 + 20;
+			len     += (strlen(el->video_file_list[j]));
+            len     += 64; /* more than needed */
 			num_files ++;
 		}
 	}
@@ -1687,22 +1689,27 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	of1 = oldfile;
 	ofr = oldframe;
 
+    fl_len += 32;
 	for (j = n1+1; j <= n2; j++)
 	{
 		n = el->frame_list[j];
 		if ( index[ N_EL_FILE(n) ] != oldfile ||
 			N_EL_FRAME(n) != oldframe + 1 )	{
-				len += 64;
+				fl_len += 48;
 			}
 		oldfile = index[N_EL_FILE(n)];
 		oldframe = N_EL_FRAME(n);
 	}
+    fl_len += 16;
+    fl_len += 64; /* more than needed */
 
 	n = n1;
 	oldfile = of1;
 	oldframe = ofr;
 	
 	n1 = 0;
+
+    len += (num_files * fl_len);
  
 	est_len = 2 * len;
 
@@ -1715,7 +1722,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		{
 			snprintf(fourcc,sizeof(fourcc),"%s", "????");
 			vj_el_get_file_fourcc( el, j, fourcc );
-			snprintf(filename,sizeof(filename),"%03zu%s%04lu%010lu%02zu%s",
+			snprintf(filename,sizeof(filename),"%04zu%s%04lu%010lu%02zu%s",
 				strlen( el->video_file_list[j]  ),
 				el->video_file_list[j],
 				(long unsigned int) j,

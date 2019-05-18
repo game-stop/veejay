@@ -1087,6 +1087,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
 #ifdef HAVE_LIBQUICKTIME
         if(quicktime_check_sig(filename))
         {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Opening quicktime file ...");
             quicktime_pasp_t pasp;
             int nfields, detail;
             lav_fd->qt_fd = quicktime_open(filename,1,0);
