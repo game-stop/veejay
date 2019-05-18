@@ -27,5 +27,6 @@ void multitrack_sync_start(void *data);
 void multitrack_sync_simple_cmd( void *data, int vims, int arg );
 void multitrack_resize( void *m , int w, int h );
 int mt_set_max_tracks(int tracks);
+int  multitrack_get_track_status(void *data, int track );
 #endif
 

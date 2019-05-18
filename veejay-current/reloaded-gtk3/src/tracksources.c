@@ -23,12 +23,13 @@
 #include <veejay/vjmem.h>
 extern void	veejay_release_track(int id, int release_this);
 extern void	veejay_bind_track( int id, int bind_this );
-extern int 	                multitrack_get_sequence_view_id( void *data );
+extern int multitrack_get_sequence_view_id( void *data );
 extern gchar  *_utf8str( const char *c_str );
 typedef struct
 {
 	int track_id;
 	GtkWidget *view;
+    void *mt;
 } track_view_t;
 
 static	void	cell_data_func(
@@ -59,16 +60,19 @@ static	void	cell_toggled_callback( GtkCellRenderer *cell, gchar *path_string, gp
 	gtk_tree_model_get( model, &iter,0, &data, -1 );
 
 	int id_data = -1; // invalid
-	if(sscanf( data, "%d", &id_data ) == 1 )
+	if(sscanf( data, "Track %d", &id_data ) == 1 )
 	{
 		if( gtk_cell_renderer_toggle_get_active( GTK_CELL_RENDERER_TOGGLE( cell) ) )
 		{
 		     veejay_release_track( v->track_id, id_data);
-		}
+        }
 		else
 		{
 		     veejay_bind_track( v->track_id, id_data );
-		}
+        }
+        
+        gtk_list_store_set(model, &iter,1, multitrack_get_track_status(v->mt, id_data), -1 );
+        
 		g_free(data);
 	}
 	gtk_tree_path_free( path );
@@ -115,7 +119,7 @@ GtkWidget	*get_track_tree( void *data)
 	return t->view;
 }
 
-void *create_track_view(int track_id, int ref_tracks, void *user_data)
+void *create_track_view(int track_id, int ref_tracks, void *user_data, void *mt)
 {
 	GtkCellRenderer *renderer, *wrenderer;
 	GtkTreeModel *model;
@@ -125,6 +129,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 	wrenderer = gtk_cell_renderer_toggle_new();
 
 	track_view_t *my_view = (track_view_t*) vj_calloc(sizeof(track_view_t));
+    my_view->mt = mt;
 
 	gtk_cell_renderer_toggle_set_active( GTK_CELL_RENDERER_TOGGLE(wrenderer) , FALSE );
 
@@ -145,7 +150,6 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 			1,
 			NULL);
 		
-//	GtkWidget *col = gtk_tree_view_get_column( GTK_TREE_VIEW(view) , 0 );
 	GtkTreeViewColumn *col = gtk_tree_view_get_column( GTK_TREE_VIEW(view),0);
 	gtk_tree_view_column_set_fixed_width(  col , 40 );
 
@@ -160,7 +164,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 	GtkListStore *store;
 	GtkTreeIter iter;
 
-	store = gtk_list_store_new( 2, G_TYPE_STRING, G_TYPE_INT );
+	store = gtk_list_store_new( 2, G_TYPE_STRING, G_TYPE_BOOLEAN );
 	int i;
 	for( i = 0; i < ref_tracks ; i ++ )
 	{

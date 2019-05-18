@@ -1,4 +1,5 @@
-
+@define-color border-color #434449;
+@define-color bg-color #27282f;
 
 * {
  border-color:#434449;
@@ -29,6 +30,11 @@
 .active {
  border-color:#ff8400;
 }
+
+.selected {
+ border-color:#9ec5e3;
+}
+
 
 checkbutton,radiobutton {
  border-style:none;
@@ -81,7 +87,6 @@ notebook header.top tabs tab:hover label {
 .timeline stepper hover {
  color:#ff0000;
 }
-
 scale {
  padding-right:8px;
  padding-left:8px;

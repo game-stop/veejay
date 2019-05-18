@@ -798,18 +798,7 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
   GdkRGBA col2;
   gtk_style_context_get_border_color( sc, gtk_style_context_get_state(sc), &col2 );
 
-/*
-  
   double x1 = marker_width * te->point;
-  cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
-  cairo_move_to(cr, x1,te->font_line/2 );
-  sprintf(text, "%d",  (gint)te->point );
-  cairo_set_source_rgba( cr, color.red,color.green,color.blue,0.3 );
-  cairo_show_text(cr, text);
-  cairo_fill(cr);
- 
- */
- double x1 = marker_width * te->point;
   cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
   cairo_move_to(cr, x1,te->font_line );
   sprintf(text, "%d",  (gint)te->point );

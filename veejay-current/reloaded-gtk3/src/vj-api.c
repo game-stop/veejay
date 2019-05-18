@@ -72,15 +72,7 @@
 #include <veejay/vevo.h>
 #include <veejay/libvevo.h>
 #include <src/vmidi.h>
-//if gtk2_6 is not defined, 2.4 is assumed.
-#ifdef GTK_CHECK_VERSION   //FIXME FIXME !
-#if GTK_MINOR_VERSION >= 6
-  #define HAVE_GTK2_6 1
-#endif
-#if GTK_MINOR_VERSION >= 8
- #define HAVE_GTK2_8 1
-#endif
-#endif
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -115,15 +107,16 @@ static gpointer castIntToGpointer( int val)
 static int beta__ = 0;
 static int use_vims_mcast = 0;
 static int samplebank_ready_ = 0;
+static int faster_ui_ = 0;
 
 static struct
 {
     const char *text;
 } tooltips[] =
 {
-    {"Mouse left: Set in point,\nMouse right: Set out point,\nDouble click: Clear selected,\nMouse middle: Drag selection"},
+    {"Mouse left: Set in point,\nMouse right: Set out point,\nDouble click: Clear selection,\nMouse middle: Drag selection"},
     {"Mouse left/right: Play slot,\nShift + Mouse left: Put sample in slot.\nYou can also put selected samples."},
-    {"Mouse left click: Select slot (sample in slot),\nMouse double click: Play sample in slot,\nShift + Mouse left: Set slot as mixing current mixing channel"},
+    {"Mouse left: Select slot (sample in slot),\nMouse double click: Play sample in slot,\nShift + Mouse left: Set slot as mixing current mixing channel"},
     {"Select a SRT sequence to edit"},
     {"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample"},
     {"Filter the effects list by any string"},
@@ -272,7 +265,8 @@ enum
     HINT_SEQ_CUR = 15,
     HINT_GENERATOR =16,
 	HINT_MACRO=17,
-    NUM_HINTS = 18,
+    HINT_KEYS = 18,
+    NUM_HINTS = 19,
 };
 
 enum
@@ -306,6 +300,7 @@ typedef struct
     int iterator;
     int selected_effect_id;
     int reload_hint[NUM_HINTS];
+    int reload_hint_checksums[NUM_HINTS];
     gboolean reload_force_avoid;
     int playmode;
     int sample_rec_duration;
@@ -627,6 +622,7 @@ typedef struct
 
 static widget_name_t *slider_box_names_ = NULL;
 static widget_name_t *slider_names_ = NULL;
+static widget_name_t *param_frame_ = NULL;
 static widget_name_t *param_names_ = NULL;
 static widget_name_t *param_incs_ = NULL;
 static widget_name_t *param_decs_ = NULL;
@@ -763,9 +759,40 @@ GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterp
 static void vj_kf_refresh();
 static void vj_kf_reset();
 static void veejay_stop_connecting(vj_gui_t *gui);
-
 void reload_macros();
-/* not used */ /* static int vj_kf_is_displayed(); */
+GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
+
+gboolean   periodic_pull(gpointer data)
+{
+    GtkWidget *ww = glade_xml_get_widget_( info->main_window, "notebook18" );
+    int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( ww ));
+
+    int pm = info->status_tokens[PLAY_MODE];
+    if( pm == MODE_STREAM && deckpage == 5 && info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR)
+    {
+        info->uc.reload_hint[HINT_GENERATOR] = 1;
+    }
+
+    if( pm != MODE_PLAIN )
+    {
+        info->uc.reload_hint[HINT_ENTRY] = 1;
+        info->uc.reload_hint[HINT_CHAIN] = 1;
+    }
+
+    return TRUE;
+}
+
+static int data_checksum(char *data,size_t len)
+{
+    int i;
+    int checksum = 0;
+    for( i = 0; i < len; i ++ ) {
+        checksum = (checksum >> 1) + ((checksum & 1) << 15 );
+        checksum += (int) data[i];
+        checksum &= 0xffff;
+    }
+    return checksum;
+}
 
 void reset_cali_images( int type, char *wid_name );
 
@@ -845,6 +872,18 @@ static struct
 enum {
     TEXT_REALTIME = 0
 };
+
+static struct {
+    const char *name;
+} fx_fade_entry[] = {
+    { "fx_mnone" },
+    { "fx_m1" },
+    { "fx_m2" },
+    { "fx_m3" },
+    { "fx_m4" },
+    { NULL },
+};
+
 
 static struct
 {
@@ -2008,7 +2047,6 @@ void about_dialog()
     "For more information , see also: http://www.gnu.org\n"
     };
 
-#ifdef HAVE_GTK2_6
     char path[MAX_PATH_LEN];
     veejay_memset( path,0, sizeof(path));
     get_gd( path, NULL,  "veejay-logo.png" );
@@ -2034,7 +2072,6 @@ void about_dialog()
 
     g_signal_connect( about , "response", G_CALLBACK( gtk_widget_destroy),NULL);
     gtk_window_present( GTK_WINDOW( about ) );
-#endif
 }
 
 gboolean dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data)
@@ -2626,6 +2663,7 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1)
     *bytes_written = vj_client_read( info->client, V_CMD, result, len );
     if( *bytes_written == -1 )
         reloaded_schedule_restart();
+
     return (gchar*) result;
 }
 
@@ -2667,32 +2705,29 @@ static int get_slider_val(const char *name)
 
 static void vj_kf_reset()
 {
+    info->status_lock = 1;
     reset_curve( info->curve );
-    set_toggle_button( "curve_chain_toggleentry", 0 );
+    //set_toggle_button( "curve_chain_toggleentry", 0 );
     set_toggle_button( "curve_toggleentry_param", 0);
     update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
+    info->status_lock = 0;
 }
-
-/* not used
-static int vj_kf_is_displayed()
-{
-    GtkWidget *ww = glade_xml_get_widget_( info->main_window, "notebook18" );
-    int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
-    if(deckpage == 1)
-        return 1;
-    return 0;
-}
-*/
 
 static void vj_kf_refresh()
 {
     int *entry_tokens = &(info->uc.entry_tokens[0]);
+
     if( entry_tokens[ENTRY_FXID] > 0 ) {
         enable_widget( "frame_fxtree3" );
         update_curve_widget(info->curve);
     }
     else {
-        set_toggle_button( "curve_toggleentry_param", 0 );
+        if(!is_button_toggled("kf_none")) {
+            set_toggle_button("kf_none",1);
+        }
+        if(!is_button_toggled("curve_toggleentry_param")) {
+            set_toggle_button( "curve_toggleentry_param", 0 );
+        }
         disable_widget( "frame_fxtree3" );
         vj_kf_reset();
     }
@@ -2745,12 +2780,20 @@ static void update_curve_widget(GtkWidget *curve)
     int p = -1;
     int status = 0;
 
-    if(is_button_toggled("kf_none"))
-        return;
+    //if(is_button_toggled("kf_none"))
+      //  return;
 
     multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
 
     unsigned char *blob = (unsigned char*) recv_vims( 8, &blen );
+    int checksum = data_checksum( (char*) blob, blen );
+    if( info->uc.reload_hint_checksums[HINT_KF] == checksum ) {
+        if( blob ) free(blob);
+        return;
+    }
+    info->uc.reload_hint_checksums[HINT_KF] = checksum;
+
+
     if( blob && blen > 0 )
     {
         p = set_points_in_curve_ext( curve, blob,id,i, &lo,&hi, &curve_type,&status );
@@ -2768,7 +2811,9 @@ static void update_curve_widget(GtkWidget *curve)
                 default: set_toggle_button( "curve_typelinear", 1 );
                     break;
             }
-            set_toggle_button( "curve_toggleentry_param", status );
+            if( is_button_toggled("curve_toggleentry_param") != status ) {
+                set_toggle_button( "curve_toggleentry_param", status );
+            }
         }
     }
 
@@ -2912,7 +2957,6 @@ static void set_toggle_button(const char *name, int status)
         return;
     }
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), (status==1 ? TRUE: FALSE));
-
 }
 
 
@@ -2952,9 +2996,7 @@ static void update_spin_incr( const char *name, gdouble step, gdouble page )
         veejay_msg(VEEJAY_MSG_ERROR, "No such widget (spin): '%s'",name);
         return;
     }
-#ifdef STRICT_CHECKING
-    veejay_msg(VEEJAY_MSG_DEBUG, "SpinButton: %s, step=%g,page=%g",name,step,page);
-#endif
+    
     gtk_spin_button_set_increments(GTK_SPIN_BUTTON(w),step,page );
 }
 
@@ -2965,7 +3007,6 @@ static void update_spin_range(const char *name, gint min, gint max, gint val)
         veejay_msg(VEEJAY_MSG_ERROR, "No such widget (spin): '%s'",name);
         return;
     }
-
     gtk_spin_button_set_range( GTK_SPIN_BUTTON(w), (gdouble)min, (gdouble) max );
     gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)val);
 }
@@ -2993,10 +3034,7 @@ static void update_spin_value(const char *name, gint value )
         veejay_msg(VEEJAY_MSG_ERROR, "No such widget (spin): '%s'",name);
         return;
     }
-#ifdef STRICT_CHECKING
-    veejay_msg(VEEJAY_MSG_DEBUG, "SpinButton: %s, value=%d",name,value);
-#endif
-
+    
     gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
 }
 
@@ -3069,6 +3107,7 @@ static void update_label_str(const char *name, gchar *text)
 {
     GtkWidget *label = glade_xml_get_widget_(
                 info->main_window, name);
+
 #ifdef STRICT_CHECKING
     if(!label) veejay_msg(VEEJAY_MSG_ERROR, "No such widget (label): '%s'",name);
     assert( label != NULL );
@@ -3212,8 +3251,8 @@ static gboolean chain_update_row(GtkTreeModel * model,
         return FALSE;
     int entry = info->uc.selected_chain_entry;
     gint gentry = 0;
-    gtk_tree_model_get (model, iter,
-                        FXC_ID, &gentry, -1);
+
+    gtk_tree_model_get (model, iter,FXC_ID, &gentry, -1);
 
     if(gentry == entry)
     {
@@ -3221,10 +3260,6 @@ static gboolean chain_update_row(GtkTreeModel * model,
         if( effect_id <= 0 )
         {
             gtk_list_store_set( GTK_LIST_STORE(model),iter, FXC_ID, entry, -1 );
-            disable_widget( "fx_m1" );
-            disable_widget( "fx_m2" );
-            disable_widget( "fx_m3" );
-            disable_widget( "fx_m4" );
         }
         else
         {
@@ -3234,20 +3269,10 @@ static gboolean chain_update_row(GtkTreeModel * model,
             {
                 snprintf(tmp,sizeof(tmp),"%s %d", (gui->uc.entry_tokens[ENTRY_SOURCE] == 0 ? "Sample " : "T " ),
                     gui->uc.entry_tokens[ENTRY_CHANNEL]);
-                enable_widget( "fx_m4" );
-                enable_widget( "fx_m3" );
-                enable_widget( "transition_enabled" );
-                enable_widget( "transition_loop" );
-                enable_widget( "subrender_entry_toggle" );
             }
             else
             {
                 snprintf(tmp,sizeof(tmp),"%s"," ");
-                disable_widget( "fx_m4" );
-                disable_widget( "fx_m3" );
-                disable_widget( "transition_enabled" );
-                disable_widget( "transition_loop" );
-                disable_widget( "subrender_entry_toggle" );
             }
 
             gchar *mixing = _utf8str(tmp);
@@ -3267,14 +3292,6 @@ static gboolean chain_update_row(GtkTreeModel * model,
             g_object_unref( kf_toggle );
             g_object_unref( toggle );
             g_object_unref( subrender_toggle );
-
-            enable_widget( "fx_m1" );
-            enable_widget( "fx_m2" );
-
-    /*      if( gui->uc.entry_tokens[FADE_METHOD] <= 1 ||
-                gui->uc.entry_tokens[FADE_ENTRY] != info->uc.selected_chain_entry )
-                    set_toggle_button( "fx_mnone",1 ); */
-
         }
     }
     return FALSE;
@@ -3304,10 +3321,28 @@ static void update_record_tab(int pm)
     }
 }
 
+static int fx_get_current_fade_entry_method() {
+    int i;
+    for( i = 0; fx_fade_entry[i].name != NULL; i ++ ) {
+        if( is_button_toggled( fx_fade_entry[i].name ) )
+            return i;
+    }
+    return 0;
+}
+
+static int fx_get_fade_entry_method(int idx) {
+    if( idx < 0 )
+        return 0;
+    if( idx >4 ) {
+        veejay_msg(VEEJAY_MSG_WARNING, "%s: Fade method not known in UI", __FUNCTION__);
+        idx = 0;
+    }
+    return idx;
+}
+
 static void update_current_slot(int *history, int pm, int last_pm)
 {
     gint update = 0;
-    gint fx_anim = 0;
 
     if( pm != last_pm || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
     {
@@ -3362,23 +3397,17 @@ static void update_current_slot(int *history, int pm, int last_pm)
         info->uc.reload_hint[HINT_HISTORY] = 1;
         info->uc.reload_hint[HINT_CHAIN] = 1;
         info->uc.reload_hint[HINT_ENTRY] = 1;
+        info->uc.reload_hint[HINT_KF] = 1;
 
         put_text( "entry_samplename", "" );
         set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
 
-        fx_anim = 1;
     }
-    if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
-        info->uc.reload_hint[HINT_ENTRY] == 1 )
+    if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY])
     {
         info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
-        if(info->uc.selected_chain_entry < 0 || info->uc.selected_chain_entry >= MAX_CHAIN_LEN  )
-            info->uc.selected_chain_entry = 0;
+        info->uc.reload_hint[HINT_KF] = 1;
         info->uc.reload_hint[HINT_ENTRY] = 1;
-        load_parameter_info();
-        if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] )
-            update_label_str( "value_friendlyname",FX_PARAMETER_VALUE_DEFAULT_HINT );
-        fx_anim = 1;
     }
 
     /* Actions for stream */
@@ -3403,8 +3432,10 @@ static void update_current_slot(int *history, int pm, int last_pm)
         char *time = format_time( info->status_frame,(double)info->el.fps );
         update_label_str( "label_curtime", time );
         free(time);
-        fx_anim = 1;
+        
         update_label_str( "playhint", "Streaming");
+    
+        info->uc.reload_hint[HINT_KF] = 1;
     }
 
     /* Actions for sample */
@@ -3538,27 +3569,9 @@ static void update_current_slot(int *history, int pm, int last_pm)
             set_toggle_button( "toggle_fademethod", info->status_tokens[FADE_ALPHA]);
         }
 
-        if( info->status_tokens[FADE_ENTRY] >= 0 )
+        if( history[FADE_ENTRY] != info->status_tokens[FADE_ENTRY] || fx_get_current_fade_entry_method() != fx_get_fade_entry_method(info->status_tokens[FADE_ENTRY]) ) 
         {
-            if( info->status_tokens[FADE_METHOD] == 0 && !is_button_toggled( "fx_mnone" ))
-            {
-                set_toggle_button( "fx_mmone", 1 );
-            } else if (info->status_tokens[FADE_METHOD] == 1 && !is_button_toggled( "fx_m1" ))
-            {
-                set_toggle_button( "fx_m1",1 );
-            } else if (info->status_tokens[FADE_METHOD] == 2 && !is_button_toggled( "fx_m2" ))
-            {
-                set_toggle_button( "fx_m2",1 );
-            } else if (info->status_tokens[FADE_METHOD] == 3 && !is_button_toggled( "fx_m3" ))
-            {
-                set_toggle_button( "fx_m3",1);
-            } else if (info->status_tokens[FADE_METHOD] == 4 && !is_button_toggled( "fx_m4" ))
-            {
-                set_toggle_button( "fx_m4",1);
-            }
-        } else
-        {
-            set_toggle_button( "fx_mnone", 1 );
+            set_toggle_button( fx_fade_entry[ fx_get_fade_entry_method( info->status_tokens[FADE_ENTRY] ) ].name, 1 );
         }
 
         if(update)
@@ -3595,10 +3608,6 @@ static void update_current_slot(int *history, int pm, int last_pm)
         update_slider_value( "manualopacity", val,0 );
     }
 
-    if( fx_anim ) {
-        set_toggle_button("kf_none",1);
-        reset_curve(info->curve);
-    }
 }
 
 
@@ -3801,9 +3810,6 @@ static void reset_tree(const char *name)
             gtk_list_store_clear(GTK_LIST_STORE(tree_model));
             gtk_tree_selection_set_select_function(selection, selection_func, NULL, NULL);
         }
-        else {
-            veejay_msg(0,"%s: wrong tree model type" ,__FUNCTION__);
-        }
     }
 }
 
@@ -3829,6 +3835,13 @@ gboolean view_entry_selection_func (GtkTreeSelection *selection,
             }
             update_label_i( "label_fxentry", name, 0 );
             vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY,name );
+
+            if( get_nums("button_fx_entry") != name ) {
+                info->status_lock = 1;
+                update_spin_value( "button_fx_entry", name );
+                info->status_lock = 0;
+            }
+
             return TRUE; /*the state of the node may be toggled*/
         }
         return TRUE;
@@ -4113,15 +4126,24 @@ static gint load_parameter_info()
     int len = 0;
     int i = 0;
 
-    veejay_memset( p, 0, sizeof(info->uc.entry_tokens));
-
     multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, info->uc.selected_chain_entry );
 
     gchar *answer = recv_vims(3,&len);
+
+    int checksum = data_checksum(answer,len);
+    if( info->uc.reload_hint_checksums[HINT_ENTRY] == checksum ) {
+        if(answer) free(answer);
+        return -1;
+    }
+ 
+    info->uc.reload_hint_checksums[HINT_ENTRY] = checksum;
+
+
+    veejay_memset( p, 0, sizeof(info->uc.entry_tokens));
+
     if(len <= 0 || answer == NULL )
     {
         if(answer) free(answer);
-        veejay_memset(p,0,sizeof(info->uc.entry_tokens));
         if(info->uc.selected_rgbkey )
             disable_widget("rgbkey");
         return 0;
@@ -4152,45 +4174,36 @@ static gint load_parameter_info()
         info->uc.selected_rgbkey = 0;
     }
 
-    set_toggle_button( "curve_chain_toggleentry", p[ENTRY_KF_STATUS] );
-//FIXME:
-/*
-    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
-    {
-        update_spin_range( "curve_spinstart",
-                          info->status_tokens[SAMPLE_START],
-                          info->status_tokens[SAMPLE_END], p[ENTRY_KF_START] );
-        update_spin_range( "curve_spinend", info->status_tokens[SAMPLE_START],
-            info->status_tokens[SAMPLE_END] ,p[ENTRY_KF_END] );
+    if(is_button_toggled("curve_chain_toggleentry") != p[ENTRY_KF_STATUS]) {
+        set_toggle_button( "curve_chain_toggleentry", p[ENTRY_KF_STATUS] );
     }
-    else
-    {
-        int nl = info->status_tokens[SAMPLE_MARKER_END];
-        update_spin_range( "curve_spinstart", 0, nl, p[ENTRY_KF_START] );
-        update_spin_range( "curve_spinend", 0,nl, p[ENTRY_KF_END] );
-    }*/
 
     update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
 
     switch( p[ENTRY_KF_TYPE] )
     {
         case GTK3_CURVE_TYPE_SPLINE:
-            set_toggle_button( "curve_typespline", 1 );
-            break;
+            if(!is_button_toggled("curve_typespline")) {
+                 set_toggle_button( "curve_typespline", 1 );
+             }
+             break;
         case GTK3_CURVE_TYPE_FREE:
-            set_toggle_button( "curve_typefreehand",1 );
-            break;
-        default:
+             if(!is_button_toggled("curve_typefreehand")) {
+                set_toggle_button( "curve_typefreehand",1 );
+             }
+             break;
         case GTK3_CURVE_TYPE_LINEAR:
-            set_toggle_button( "curve_typelinear", 1 );
-            break;
-        break;
+             if(!is_button_toggled("curve_typelinear")) {
+                set_toggle_button( "curve_typelinear", 1 );
+             }
+             break;
+        default:
+             break;
     }
 
-
-    set_toggle_button("subrender_entry_toggle", p[ENTRY_SUBRENDER_ENTRY]);
-    update_spin_value("transition_loop", p[ENTRY_TRANSITION_LOOP] );
-    set_toggle_button("transition_enabled", p[ENTRY_TRANSITION_ENABLED] );
+    if(is_button_toggled("subrender_entry_toggle") != p[ENTRY_SUBRENDER_ENTRY]) {
+        set_toggle_button("subrender_entry_toggle", p[ENTRY_SUBRENDER_ENTRY]);
+    }
 
     free(answer);
     return 1;
@@ -4202,6 +4215,16 @@ static void load_generator_info()
     gint fxlen = 0;
     multi_vims( VIMS_GET_STREAM_ARGS,"%d",0 );
     gchar *fxtext = recv_vims(3,&fxlen);
+
+    int checksum = data_checksum(fxtext,fxlen);
+    if( info->uc.reload_hint_checksums[HINT_GENERATOR] == checksum ) {
+        if(fxtext) free(fxtext);
+        return;
+    }
+    info->uc.reload_hint_checksums[HINT_GENERATOR] = checksum;
+
+    if(fxtext == NULL)
+        return;
 
     veejay_memset(args,0,sizeof(args));
     generator_to_arr(fxtext, args);
@@ -4307,7 +4330,16 @@ static void load_effectchain_info()
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 
-    set_tooltip_by_widget (tree, tooltips[TOOLTIP_FXCHAINTREE].text);
+    gint fxlen = 0;
+    multi_vims( VIMS_CHAIN_LIST,"%d",0 );
+    gchar *fxtext = recv_vims(3,&fxlen);
+
+    int checksum = data_checksum(fxtext,fxlen);
+    if( info->uc.reload_hint_checksums[HINT_CHAIN] == checksum ) {
+        if(fxtext) free(fxtext);
+        return;
+    }
+    info->uc.reload_hint_checksums[HINT_CHAIN] = checksum;
 
     GtkListStore *store;
     gchar toggle[4];
@@ -4315,12 +4347,9 @@ static void load_effectchain_info()
     GtkTreeIter iter;
     gint offset=0;
 
-    gint fxlen = 0;
-    multi_vims( VIMS_CHAIN_LIST,"%d",0 );
-    gchar *fxtext = recv_vims(3,&fxlen);
+    set_tooltip_by_widget (tree, tooltips[TOOLTIP_FXCHAINTREE].text);
 
     reset_tree( "tree_chain" );
-    update_label_str( "value_friendlyname",FX_PARAMETER_VALUE_DEFAULT_HINT );
 
     GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
     store = GTK_LIST_STORE(model);
@@ -4506,16 +4535,20 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
         gtk_tree_model_get(model,&iter, FX_STRING, &name, -1);
         if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 ) {
             guint slot = 0;
+            
             if((effectlist_add_mask & FXLIST_ADD_TO_SELECTED) && info->selection_slot)
                 slot = info->selection_slot->sample_id;
+
             multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
                 slot, info->uc.selected_chain_entry,gid, !(effectlist_add_mask & FXLIST_ADD_DISABLED) );
-            info->uc.reload_hint[HINT_ENTRY] = 1;
+            
             char trip[100];
             snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,slot,info->uc.selected_chain_entry, gid, !(effectlist_add_mask & FXLIST_ADD_DISABLED) );
             vj_midi_learning_vims( info->midi, NULL, trip, 0 );
-            update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
+            
             info->uc.reload_hint[HINT_CHAIN] = 1;
+            info->uc.reload_hint[HINT_ENTRY] = 1;
+
         }
         g_free(name);
     }
@@ -5006,28 +5039,15 @@ static void select_slot( int pm )
     if( pm == MODE_SAMPLE || pm == MODE_STREAM  )
     {
         int b = 0; int p = 0;
-        /* falsify activation */
         if(info->status_tokens[CURRENT_ID] > 0)
         {
             if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID], info->status_tokens[STREAM_TYPE] ))
             {
-               /* if( info->selected_slot )
-                {
-                    if ( info->selected_slot->sample_type != pm || info->selected_slot->sample_id !=
-                        info->status_tokens[CURRENT_ID] ) {
-                        set_activation_of_slot_in_samplebank(FALSE);
-                    }
-                }*/
-                if(info->selected_slot && info->selected_gui_slot)
-                    set_activation_of_slot_in_samplebank(FALSE);
+                set_activation_of_slot_in_samplebank(FALSE);
                 info->selected_slot = info->sample_banks[b]->slot[p];
                 info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
                 set_activation_of_slot_in_samplebank(TRUE);
             }
-            /*bank_page =  find_bank_by_sample( info->status_tokens[CURRENT_ID], pm, &poke_slot );
-
-            info->selected_slot=  info->sample_banks[bank_page]->slot[poke_slot];
-            info->selected_gui_slot= info->sample_banks[bank_page]->gui_slot[poke_slot];*/
         }
     }
     else
@@ -5045,6 +5065,14 @@ static void load_sequence_list()
     gchar *text = recv_vims( 6, &len );
     if( len <= 0 || text == NULL )
         return;
+
+    int checksum = data_checksum(text,len);
+    if( info->uc.reload_hint_checksums[HINT_SEQ_ACT] == checksum ) {
+        if(text) free(text);
+        return;
+    }
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = checksum;
+
 
     int playing=0;
     int size =0;
@@ -5087,6 +5115,8 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
     char source[255];
     char descr[255];
     gint offset=0;
+    gint no_samples = 1;
+
     if( cali_onoff == 1 )
         reset_tree( "cali_sourcetree");
 
@@ -5107,6 +5137,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 
     if(fxlen > 0 && fxtext != NULL)
     {
+        no_samples = 0;
         while( offset < fxlen )
         {
             char tmp_len[8] = { 0 };
@@ -5165,6 +5196,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
 
     if( fxlen > 0 && fxtext != NULL)
     {
+        no_samples = 0;
         while( offset < fxlen )
         {
             char tmp_len[4];
@@ -5261,7 +5293,9 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
     if(fxtext) free(fxtext);
 
     select_slot( info->status_tokens[PLAY_MODE] );
-
+    if(no_samples) {
+        samplebank_ready_ = 1; // as long as there are no samples, samplebank will not initialize
+    }
 }
 
 gboolean view_el_selection_func (GtkTreeSelection *selection,
@@ -5590,6 +5624,13 @@ static void reload_keys()
     gchar *text = recv_vims( 6, &len );
     gint offset = 0;
 
+    int checksum = data_checksum(text,len);
+    if( info->uc.reload_hint_checksums[HINT_KEYS] == checksum ) {
+        if(text) free(text);
+        return;
+    }
+    info->uc.reload_hint_checksums[HINT_KEYS] = checksum;
+
     if( len == 0 || text == NULL )
         return;
 
@@ -5650,6 +5691,13 @@ static void reload_bundles()
     single_vims( VIMS_BUNDLE_LIST );
     gchar *eltext = recv_vims(6,&len); // msg len
     gint offset = 0;
+
+    int checksum = data_checksum(eltext,len);
+    if( info->uc.reload_hint_checksums[HINT_BUNDLES] == checksum ) {
+        if( eltext) free(eltext);
+        return;
+    }
+    info->uc.reload_hint_checksums[HINT_BUNDLES] = checksum;
 
     reset_tree("tree_bundles");
 
@@ -5964,6 +6012,14 @@ void	reload_macros()
 	single_vims( VIMS_GET_ALL_MACRO );
 	gchar *answer = recv_vims(8, &len);
 
+    int checksum = data_checksum(answer,len);
+    if( info->uc.reload_hint_checksums[HINT_MACRO] == checksum ) {
+        if(answer) free(answer);
+        return;
+    }
+    info->uc.reload_hint_checksums[HINT_MACRO] = checksum;
+
+
 	reset_tree("macro_macros");
 
 	if( answer == NULL || len < 0 )
@@ -6066,14 +6122,14 @@ static void reload_editlist_contents()
     for( i = 0; i < num_files ; i ++ )
     {
         int name_len = 0;
-        tmp = strndup( eltext + offset, 3 );
+        tmp = strndup( eltext + offset, 4 );
         if( sscanf( tmp,"%d", &name_len ) != 1 )
         {
             free(tmp);
             free(eltext);
             return;
         }
-        offset += 3;
+        offset += 4;
         free(tmp);
         char *file = strndup( eltext + offset, name_len );
 
@@ -6291,6 +6347,16 @@ static void show_widget(const char *name)
     gtk_widget_show(w);
 }
 
+static gboolean is_widget_enabled(const char *name)
+{
+    GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
+    if(!w)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "%s: Widget '%s' not found",__FUNCTION__,name);
+        return FALSE;
+    }
+    return gtk_widget_is_sensitive( GTK_WIDGET(w) );
+}
 
 #ifndef STRICT_CHECKING
 static void disable_widget_(const char *name)
@@ -6733,11 +6799,10 @@ static void set_pm_page_label(int sample_id, int type)
     gchar *title = _utf8str(ostitle);
     snprintf(ftitle,sizeof(ftitle), "<b>%s</b>", ostitle);
     label_set_markup( "label_current_mode", ftitle);
-    update_label_str( "label_currentsource", title );
+    update_label_str( "label_currentsource", (type == 0 ? "Sample" : "Stream" ) );
     g_free(title);
 }
 
-static int reload_entry_tick_=0;
 static void update_globalinfo(int *history, int pm, int last_pm)
 {
     int i;
@@ -6772,35 +6837,9 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         }
     }
 
-    if( pm != MODE_PLAIN )
-    {
-        GtkWidget *ww = glade_xml_get_widget_( info->main_window, "notebook18" );
-        int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( ww ));
-        if(deckpage != 1)
-        {
-            int rate = 1;
-            if( info->el.fps > 1 )
-            {
-                rate = info->el.fps; // less often
-            }
-
-            if( (reload_entry_tick_ % rate)==0)
-            {
-                info->uc.reload_hint[HINT_ENTRY] = 1;
-            }
-            if( deckpage == 5 && info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR){
-                if( (reload_entry_tick_ % rate)==0)
-                {
-                    info->uc.reload_hint[HINT_GENERATOR] = 1;
-                }
-            }
-        }
-        reload_entry_tick_++;
-    }
-
     if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm )
     {
-        info->uc.reload_hint[HINT_ENTRY] = 1; //FIXME
+        info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_CHAIN] = 1;
 	    info->uc.reload_hint[HINT_MACRO] = 1;
 
@@ -6811,16 +6850,14 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
         if( pm == MODE_SAMPLE )
             timeline_set_selection( info->tl, TRUE );
-        else
+        else {
             timeline_set_selection( info->tl, FALSE );
+            info->status_lock = 1;
+            timeline_clear_points( info->tl );
+            info->status_lock = 0;
+        }
 
         select_slot( info->status_tokens[PLAY_MODE] );
-
-
-#ifdef STRICT_CHECKING
-        if( pm != MODE_PLAIN )
-        assert( info->selected_slot != NULL );
-#endif
     }
 
     if( info->status_tokens[TOTAL_SLOTS] != history[TOTAL_SLOTS] )
@@ -7047,6 +7084,175 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 //  info->uc.playmode = pm;
 }
 
+static void disable_fx_entry() {
+    int i;
+    gint min=0,max=1,value=0;
+    if( is_widget_enabled( "frame_fxtree2" ) ) {
+        disable_widget("frame_fxtree2");
+    }
+
+    update_label_str( "label_effectname" ,"" );
+    update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
+
+    if( is_button_toggled("button_entry_toggle") ) {
+        set_toggle_button( "button_entry_toggle", FALSE );
+    }
+    if( is_button_toggled("subrender_entry_toggle")) {
+        set_toggle_button("subrender_entry_toggle", FALSE);
+    }
+
+    if( get_nums("transition_loop") != 0 ) {
+        update_spin_value( "transition_loop",0);
+    }
+
+    if( is_button_toggled("transition_enabled") ) {
+        set_toggle_button( "transition_enabled", FALSE);\
+    }
+    
+    for( i = 0; fx_fade_entry[i].name != NULL;i ++ ) {
+        disable_widget( fx_fade_entry[i].name );
+    }
+
+    for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
+    {
+        if( !is_widget_enabled( slider_names_[i].text ) && !is_widget_enabled( param_kfs_[i].text ) )
+            continue;
+
+        update_slider_range( slider_names_[i].text, min,max, value, 0 );
+
+        disable_widget( slider_box_names_[i].text );
+        disable_widget( param_kfs_[i].text );
+
+        set_tooltip( param_kfs_[i].text, NULL );
+        set_tooltip( slider_names_[i].text, NULL );
+        
+        gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,param_names_[i].text)),NULL);
+    
+        if( faster_ui_ ) 
+          hide_widget( param_frame_[i].text );
+    }
+
+}
+
+static void enable_fx_entry() {
+
+    int *entry_tokens = &(info->uc.entry_tokens[0]);
+    int i;
+    if( !is_widget_enabled("frame_fxtree2" )) {
+        enable_widget("frame_fxtree2");
+    }
+
+    update_label_str( "label_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
+
+    if( entry_tokens[ENTRY_VIDEO_ENABLED] != is_button_toggled( "button_entry_toggle" ) ) {
+        set_toggle_button("button_entry_toggle", entry_tokens[ENTRY_VIDEO_ENABLED] );
+    }
+    if( entry_tokens[ENTRY_SUBRENDER_ENTRY] != is_button_toggled( "subrender_entry_toggle" ) ) {
+        set_toggle_button("subrender_entry_toggle", entry_tokens[ENTRY_SUBRENDER_ENTRY]);
+    }
+    if( get_nums("button_fx_entry") != info->uc.selected_chain_entry ) {
+        update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);
+    }
+
+    if( get_nums("transition_loop") != entry_tokens[ENTRY_TRANSITION_LOOP] ) {
+        update_spin_value( "transition_loop", entry_tokens[ENTRY_TRANSITION_LOOP] );
+    }
+
+    if( is_button_toggled("transition_enabled") != entry_tokens[ENTRY_TRANSITION_ENABLED] ) {
+        set_toggle_button( "transition_enabled", entry_tokens[ENTRY_TRANSITION_ENABLED] );
+    }
+  
+    for( i = 0; fx_fade_entry[i].name != NULL;i ++ ) {
+        if(!is_widget_enabled( fx_fade_entry[i].name)) {
+            enable_widget( fx_fade_entry[i].name );
+        }
+    }
+
+    if( _effect_get_mix( entry_tokens[ENTRY_FXID] ) )
+    {
+        if(!is_widget_enabled("transition_enabled" ) ) {   
+            enable_widget( "transition_enabled" );
+        }
+        if(!is_widget_enabled("transition_loop")) {
+            enable_widget( "transition_loop" );
+        }
+        if(!is_widget_enabled("subrender_entry_toggle")) {
+            enable_widget( "subrender_entry_toggle" );
+        }
+    }
+    else {
+        if( is_widget_enabled( "fx_m4") ) {
+            disable_widget( "fx_m4" );
+        }
+        if( is_widget_enabled( "fx_m3") ) {
+            disable_widget( "fx_m3" );
+        }
+        if( is_widget_enabled( "transition_enabled" ) ) {
+            disable_widget( "transition_enabled" );
+        }
+        if( is_widget_enabled( "transition_loop") ) {
+            disable_widget( "transition_loop" );
+        }
+        if( is_widget_enabled( "subrender_entry_toggle" ) ) {
+            disable_widget( "subrender_entry_toggle" );
+        }
+    }
+
+    int np = _effect_get_np( entry_tokens[ENTRY_FXID] );
+    gint min,max,value;
+    for( i = 0; i < np ; i ++ )
+    {
+        if( !is_widget_enabled( slider_box_names_[i].text ) ) {
+            enable_widget( slider_box_names_[i].text );
+        }
+
+        if( !is_widget_enabled( param_kfs_[i].text ) ) {
+            enable_widget( param_kfs_[i].text );
+        }
+
+        if( faster_ui_ )
+         show_widget( param_frame_[i].text );
+
+        gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
+        set_tooltip( slider_names_[i].text, tt1 );
+        gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,param_names_[i].text)),tt1);
+
+        value = entry_tokens[ENTRY_PARAMSET + i];
+        if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
+        {
+            GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( glade_xml_get_widget_( info->main_window, slider_names_[i].text)  ));
+            if( (gint) gtk_adjustment_get_lower(a) == min &&
+                (gint) gtk_adjustment_get_upper(a) == max &&
+                (gint) gtk_adjustment_get_value(a) == value )
+                continue;
+    
+            update_slider_range( slider_names_[i].text,min,max, value, 0);
+        }
+        set_tooltip( param_kfs_[i].text, tt1 );
+        g_free(tt1);
+    }
+   
+    min = 0; max = 1; value = 0; 
+    for( i = np; i < MAX_UI_PARAMETERS; i ++ )
+    {
+        if( !is_widget_enabled( slider_names_[i].text ) && !is_widget_enabled( param_kfs_[i].text ) )
+            continue;
+
+        update_slider_range( slider_names_[i].text, min,max, value, 0 );
+
+        disable_widget( slider_box_names_[i].text );
+        disable_widget( param_kfs_[i].text );
+
+        if( faster_ui_ )
+          hide_widget( param_frame_[i].text );
+
+        set_tooltip( param_kfs_[i].text, NULL );
+        set_tooltip( slider_names_[i].text, NULL );
+        
+        gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,param_names_[i].text)),NULL);
+    }
+}
+
 static void process_reload_hints(int *history, int pm)
 {
     int *entry_tokens = &(info->uc.entry_tokens[0]);
@@ -7109,117 +7315,45 @@ static void process_reload_hints(int *history, int pm)
         }
     }
 
-    if( info->uc.reload_hint[HINT_CHAIN] == 1 && pm != MODE_PLAIN)
+    if( info->uc.reload_hint[HINT_CHAIN] == 1)
     {
         load_effectchain_info();
     }
 
     info->parameter_lock = 1;
-    if(info->uc.reload_hint[HINT_ENTRY] == 1 && pm != MODE_PLAIN)
+    if(info->uc.reload_hint[HINT_ENTRY] == 1)
     {
-        gint np = 0;
-        gint i;
-        /* update effect description */
-        info->uc.reload_hint[HINT_KF] = 1;
-        if( entry_tokens[ENTRY_FXID] == 0)
-        {
-            update_label_str( "label_effectname" ,"" );
-            // disable fx widgets but keep "button_fx_entry" enabled
-            disable_widget( "frame_fxtree2" );
-            disable_widget( "button_entry_toggle");
-            disable_widget( "tree_sources");
-            disable_widget( "rgbkey");
-            set_toggle_button( "button_entry_toggle", FALSE );
-            set_toggle_button( "transition_enabled", FALSE);
-            update_spin_value( "transition_loop",0);
-            disable_widget( "transition_enabled");
-            disable_widget( "transition_loop");
-            disable_widget( "subrender_entry_toggle");
-            update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
-        }
-        else
-        {
-            update_label_str( "label_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
-            // enable fx widgets
-            enable_widget( "frame_fxtree2");
-            enable_widget( "button_entry_toggle");
-            enable_widget( "tree_sources");
-            enable_widget( "rgbkey" );
-            enable_widget( "transition_enabled" );
-            enable_widget( "transition_loop" );
-            enable_widget( "subrender_entry_toggle");
-            set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_VIDEO_ENABLED] );
-            set_toggle_button( "subrender_entry_toggle", entry_tokens[ENTRY_SUBRENDER_ENTRY]);
-            np = _effect_get_np( entry_tokens[ENTRY_FXID] );
-            for( i = 0; i < np ; i ++ )
-            {
-                enable_widget( slider_box_names_[i].text );
-                enable_widget( param_kfs_[i].text );
-
-                gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
-                set_tooltip( slider_names_[i].text, tt1 );
-                gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,
-                                                                   param_names_[i].text)),
-                                   tt1);
-
-                gint min,max,value;
-                value = entry_tokens[ENTRY_PARAMSET + i];
-                if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
-                {
-                    update_slider_range( slider_names_[i].text,min,max, value, 0);
-                }
-                set_tooltip( param_kfs_[i].text, tt1 );
-                g_free(tt1);
+        int lpi = load_parameter_info();
+        if( lpi == 0 ) {
+            if( entry_tokens[ENTRY_FXID] == 0 && is_widget_enabled( "frame_fxtree2" ) ) {
+                disable_fx_entry();
+            }
+        } else if (lpi == 1 ) {
+            if (entry_tokens[ENTRY_FXID] != 0 ) {
+                enable_fx_entry();
             }
         }
-        update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);
-        update_spin_value( "transition_loop", entry_tokens[ENTRY_TRANSITION_LOOP] );
-        set_toggle_button( "transition_enabled", entry_tokens[ENTRY_TRANSITION_ENABLED] );
 
-        for( i = np; i < MAX_UI_PARAMETERS; i ++ )
-        {
-            gint min = 0, max = 1, value = 0;
-            update_slider_range( slider_names_[i].text, min,max, value, 0 );
-
-            disable_widget( slider_box_names_[i].text );
-            disable_widget( param_kfs_[i].text );
-
-            set_tooltip( param_kfs_[i].text, NULL );
-            set_tooltip( slider_names_[i].text, NULL );
-            gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,
-                                                                param_names_[i].text)),
-                               NULL);
-        }
-
-        GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
-        GtkTreeModel *model = gtk_tree_view_get_model( view );
-
-        gtk_tree_model_foreach( model, chain_update_row, (gpointer*) info );
-
-        /* upate effect tree chain selection */
-        {
-          GtkTreePath *path = gtk_tree_path_new_from_indices(info->uc.selected_chain_entry, -1);
-          gtk_tree_view_set_cursor (view, path, NULL, FALSE);
-          gtk_tree_path_free (path);
-        }
+    //     update_fx_chain();
     }
     info->parameter_lock = 0;
 
-    if( info->uc.reload_hint[HINT_GENERATOR] && pm != MODE_PLAIN)
+    if( info->uc.reload_hint[HINT_GENERATOR])
     {
         load_generator_info();
     }
 
-    /* Curve needs update (start/end changed, effect id changed */
-    if ( info->uc.reload_hint[HINT_KF] && pm != MODE_PLAIN ) {
+    //int fx_anim = 0;
+    if ( info->uc.reload_hint[HINT_KF]) {
         vj_kf_refresh();
+       // fx_anim = 1;
     }
 
-    if( beta__ && info->uc.reload_hint[HINT_HISTORY] && pm != MODE_PLAIN ) {
+    if( beta__ && info->uc.reload_hint[HINT_HISTORY]) {
         reload_srt();
     }
 
-	if( info->uc.reload_hint[HINT_MACRO] && pm != MODE_PLAIN) {
+	if( info->uc.reload_hint[HINT_MACRO]) {
 		reload_macros();
 	}
  
@@ -7228,6 +7362,11 @@ static void process_reload_hints(int *history, int pm)
     if(!samplebank_ready_) {
         info->uc.reload_hint[HINT_SLIST] = 2;
     }
+/*
+    if(is_curve_empty() && fx_anim ) {
+        info->uc.reload_hint[HINT_KF] = 1;
+    }
+    */
 }
 
 void update_gui()
@@ -7262,6 +7401,7 @@ void update_gui()
     update_globalinfo(history, pm, last_pm);
 
     process_reload_hints(history, pm);
+    
     on_vims_messenger();
 
     update_cpumeter_timeout(NULL);
@@ -7643,7 +7783,8 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
         gtk3_curve_set_color_cpoint_rgba (GTK_WIDGET(gui->curve), 0.0f, 0.0f, 0.0f, 1.0);
 
     }
-    
+   
+#if (GTK_MINOR_VERSION >= 20)
     gchar *css_in_mem = gtk_css_provider_to_string(css);
     gchar *data = NULL;
         
@@ -7659,13 +7800,14 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
     g_clear_object(&css);
     g_free(css_in_mem);
     g_free(data);
+#endif
 }
 
 static int auto_connect_to_veejay(char *host, int port_num)
 {
     char *hostname = (host == NULL ? "localhost" : host );
     int i,j;
-
+    
     for( i = port_num; i < 9999; i += 1000 ) {
         //connect client at first available server
         if( vj_gui_reconnect( hostname, NULL, i ) ) {
@@ -7702,10 +7844,14 @@ void vj_gui_init(const char *glade_file,
                  int load_midi,
                  char *midi_file,
                  gboolean beta,
-                 gboolean auto_connect)
+                 gboolean auto_connect,
+                 gboolean fasterui)
 {
     int i;
     char text[100];
+
+    faster_ui_ = fasterui;
+
     vj_gui_t *gui = (vj_gui_t*)vj_calloc(sizeof(vj_gui_t));
     if(!gui)
     {
@@ -7729,9 +7875,13 @@ void vj_gui_init(const char *glade_file,
     {
         gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * (STATUS_TOKENS+1));
     }
+    for( i = 0; i < NUM_HINTS ; i ++ ) {
+        gui->uc.reload_hint_checksums[i] = -1;
+    }
 
     slider_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
     slider_box_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
+    param_frame_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
     param_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
     param_incs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
     param_decs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
@@ -7743,6 +7893,9 @@ void vj_gui_init(const char *glade_file,
 
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
+        snprintf(text,sizeof(text), "frame_p%d", i );
+        param_frame_[i].text = strdup( text );
+
         snprintf(text,sizeof(text),"slider_p%d" , i );
         slider_names_[i].text = strdup( text );
 
@@ -7915,7 +8068,8 @@ void vj_gui_init(const char *glade_file,
 
     int pw = MAX_PREVIEW_WIDTH;
     int ph = MAX_PREVIEW_HEIGHT;
-
+            
+   
     GtkWidget *img_wid = glade_xml_get_widget_( info->main_window, "imageA");
 
     gui->mt = multitrack_new((void(*)(int,char*,int)) vj_gui_cb,
@@ -8008,6 +8162,10 @@ void vj_gui_init(const char *glade_file,
         update_spin_value( "button_portnum", port_num );
 
         reloaded_show_launcher ();
+    }
+
+    if( user_preview ) {
+        set_toggle_button( "previewtoggle", 1 );
     }
 
 }
@@ -8160,6 +8318,10 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     info->uc.reload_hint[HINT_ENTRY] = 1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
     info->uc.reload_hint[HINT_HISTORY] = 1;
+    info->uc.reload_hint[HINT_KF] = 1;
+
+    // periodically pull information from veejay
+    g_timeout_add( 1000, periodic_pull, NULL );
 
     return 1;
 }
@@ -8212,14 +8374,6 @@ void reloaded_restart()
     vj_gui_wipe();
 
     multitrack_disconnect(info->mt);
-/*
-     //@ bring up the launcher window
-    gtk_widget_show( cd );
-//  info->watch.state = STATE_CONNECT;
-    info->watch.state = STATE_WAIT_FOR_USER;
-    info->launch_sensitive = TRUE;
-
-    veejay_msg(VEEJAY_MSG_INFO, "Ready to make a connection to a veejay server");*/
 }
 
 gboolean    is_alive( int *do_sync )
@@ -8251,16 +8405,13 @@ gboolean    is_alive( int *do_sync )
         if(info->client)
             vj_gui_disconnect();
         vj_gui_wipe();
-    //  reloaded_schedule_restart();
         reloaded_restart();
-    //  *do_sync = 0;
         gui->watch.state = STATE_WAIT_FOR_USER;
         if( info->launch_sensitive == 0 ) {
             return FALSE;
         }
 
         return TRUE;
-    //  return FALSE;
     }
 
     if( gui->watch.state == STATE_QUIT )
@@ -8295,9 +8446,7 @@ gboolean    is_alive( int *do_sync )
             multitrack_set_quality( info->mt, 1 );
 
             *do_sync = 1;
-            if( user_preview ) {
-                set_toggle_button( "previewtoggle", 1 );
-            }
+
             veejay_stop_connecting(gui);
         }
     }
@@ -8402,9 +8551,6 @@ static int add_bank( gint bank_num )
     sprintf(str_label, "%d", bank_num );
     sprintf(frame_label, "Slots %d to %d",
         (bank_num * NUM_SAMPLES_PER_PAGE), (bank_num * NUM_SAMPLES_PER_PAGE) + NUM_SAMPLES_PER_PAGE  );
-
-//    setup_samplebank( SAMPLEBANK_COLUMNS, SAMPLEBANK_ROWS, info->sample_bank_pad, &(info->image_dimensions[0]),
-      //          &(info->image_dimensions[1]) );
 
     info->sample_banks[bank_num] = (sample_bank_t*) vj_calloc(sizeof(sample_bank_t));
     info->sample_banks[bank_num]->bank_number = bank_num;
@@ -8532,16 +8678,20 @@ void free_samplebank(void)
     veejay_memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
 }
 
+// approximate best image size for sample slot
 void setup_samplebank(gint num_cols, gint num_rows, GtkAllocation *allocation, int *idx, int *idy)
 {
-    gint image_width = allocation->width / num_cols;
-    gint image_height = allocation->height / num_rows;
+    gint bank_wid = allocation->width;
+    gint bank_hei = allocation->height;
 
-    if( image_width > 64 && image_height > 64 ) {
-        image_width -= 4; /* some spacing between slot border and image */
-        image_height -= 4;
-    }
+    bank_hei -= ((12 + 12) * num_rows); // there are 2 labels on each slot
+    if( bank_hei < 0 )
+        bank_hei = 1;
+    bank_wid -= (8 * num_cols); // there is some spacing between the columns
 
+    gint image_height = bank_hei / num_rows;
+    gint image_width = bank_wid / num_cols;
+  
     float ratio = (float) info->el.height / (float) info->el.width;
 
     float w,h;
@@ -8553,6 +8703,18 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkAllocation *allocation, i
         h = image_height;
         w = image_width / ratio;
     }
+
+
+    if( image_height < h ) {
+        w = (w / h) * image_height;
+        h = image_height;
+    }
+
+    if( image_width < w ) {
+        h = (h / w) * image_width;
+        w = image_width;
+    }
+
 
     *idx = (int)w;
     *idy = (int)h;
@@ -8992,13 +9154,12 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
                 x->sample_id );
 
             vj_midi_learning_vims( info->midi, NULL, trip, 0 );
-        } else
+        } 
+        else
         {
-            if(info->selection_slot)
-                set_selection_of_slot_in_samplebank(FALSE);
+            set_selection_of_slot_in_samplebank(FALSE);
             info->selection_slot = sample_banks[bank_nr]->slot[slot_nr];
             info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
-
             set_selection_of_slot_in_samplebank(TRUE );
         }
     }
@@ -9019,75 +9180,50 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 {
     if(!info->selected_gui_slot || !info->selected_slot )
         return;
-    GdkRGBA color;
-    color.red = info->normal->red;
-    color.green = info->normal->green;
-    color.blue = info->normal->blue;
 
-    if( activate ) {
-        color.green = 0xffff;
-        color.red = 0;
-        color.blue = 0;
-    }
-
-    if(info->selected_slot->sample_id <= 0 )
+    if (activate)
     {
-        gtk_frame_set_shadow_type( GTK_FRAME(info->selected_gui_slot->frame), GTK_SHADOW_ETCHED_IN );
-    }
-    else
-    {
-        if (activate)
-        {
-            gtk_frame_set_shadow_type(GTK_FRAME(info->selected_gui_slot->frame),GTK_SHADOW_IN);
+        if( (info->status_tokens[CURRENT_ID] == info->selected_slot->sample_id &&
+        info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
+        info->selected_slot->sample_type == 0 ) ||
+        (info->status_tokens[CURRENT_ID] == info->selected_slot->sample_id &&
+        info->status_tokens[PLAY_MODE] == MODE_STREAM &&
+        info->selected_slot->sample_type != 0 ) 
+       ) {
             gtk_widget_grab_focus(GTK_WIDGET(info->selected_gui_slot->frame));
+            if( info->selection_gui_slot ) {
+                // double click event also submitted button press event
+                remove_class(info->selection_gui_slot->frame, "selected");
+            }
             add_class(info->selected_gui_slot->frame, "active");
         }
-        else
-        {
-            gtk_frame_set_shadow_type(GTK_FRAME(info->selected_gui_slot->frame),GTK_SHADOW_ETCHED_IN);
-            remove_class(info->selected_gui_slot->frame, "active");
-        }
     }
-
-    gtk_widget_override_color ( GTK_WIDGET(info->selected_gui_slot->timecode),
-                                GTK_STATE_FLAG_NORMAL,
-                                &color );
+    else {
+        remove_class(info->selected_gui_slot->frame, "active");
+    }
 }
 
 static void set_selection_of_slot_in_samplebank(gboolean active)
 {
-    if(!info->selection_slot || info->selection_slot->sample_id <= 0)
+    if(!info->selection_gui_slot || !info->selection_slot )
         return;
 
-    GdkRGBA color;
-    color.red = info->normal->red;
-    color.green = info->normal->green;
-    color.blue = info->normal->blue;
-
-    if(info->selected_slot == info->selection_slot)
-    {
-        color.green = 0xffff;
-        color.red = 0;
-        color.blue = 0;
-    }
-    else if(active)
-    {
-        color.blue = 0xffff;
-        color.green = 0;
-        color.red =0;
+    if( (info->status_tokens[CURRENT_ID] == info->selection_slot->sample_id &&
+        info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
+        info->selection_slot->sample_type == 0 ) ||
+        (info->status_tokens[CURRENT_ID] == info->selection_slot->sample_id &&
+        info->status_tokens[PLAY_MODE] == MODE_STREAM &&
+        info->selection_slot->sample_type != 0 ) 
+       ) {
+        return;
     }
 
-//  gtk_widget_override_color ( GTK_WIDGET(info->selection_gui_slot->title),
-//      GTK_STATE_NORMAL, &color );
-    if( info->selected_gui_slot ) {
-
-        gtk_widget_override_color ( GTK_WIDGET(info->selected_gui_slot->timecode),
-                                GTK_STATE_FLAG_NORMAL,
-                                &color );
-
+    if(active) {
+        add_class(info->selection_gui_slot->frame, "selected");
     }
-//  gtk_widget_override_color ( gtk_frame_get_label_widget( info->selection_gui_slot->frame ),
-//      GTK_STATE_NORMAL, &color );
+    else {
+        remove_class(info->selection_gui_slot->frame, "selected");
+    }
 }
 
 static int add_sample_to_sample_banks(int bank_page,sample_slot_t *slot)
@@ -9095,10 +9231,6 @@ static int add_sample_to_sample_banks(int bank_page,sample_slot_t *slot)
     int bp = 0; int s = 0;
 #ifdef STRICT_CHECKING
     int result = verify_bank_capacity( &bp, &s, slot->sample_id, slot->sample_type );
-
-    veejay_msg(VEEJAY_MSG_DEBUG,
-               "add slot on page %d: type=%d id=%d. result=%d",
-               bank_page,slot->sample_type,slot->sample_id,result );
 
     if( result )
         update_sample_slot_data( bp, s, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
@@ -9151,7 +9283,7 @@ static void remove_sample_from_slot()
     if(gui_slot)
         gtk_image_clear( GTK_IMAGE( gui_slot->image) );
 
-    //set_selection_of_slot_in_samplebank( FALSE );
+    set_selection_of_slot_in_samplebank( FALSE );
 
     info->selection_gui_slot = NULL;
     info->selection_slot = NULL;
@@ -9231,6 +9363,7 @@ static void update_sample_slot_data(int page_num,
         if(sample_id > 0 )
         {
             gtk_frame_set_label( GTK_FRAME(gui_slot->frame),slot->title );
+            gtk_frame_set_label_align( GTK_FRAME(gui_slot->frame), 0.5f, 0.0f );
             gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
             gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
         }

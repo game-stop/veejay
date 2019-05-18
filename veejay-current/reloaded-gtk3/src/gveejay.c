@@ -65,6 +65,7 @@ static gchar *arg_size = NULL;
 static gboolean arg_version = FALSE;
 static gchar *arg_style = NULL;
 static gboolean arg_smallaspossible = FALSE;
+static gboolean arg_fasterui = FALSE;
 
 static const char skinfile[] = "gveejay.reloaded.glade"; //FIXME Has binary ressource ?
 
@@ -156,12 +157,12 @@ static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
 
     register_signals();
 
-    vj_gui_init( skinfile, launcher, hostname, port_num, use_threads, load_midi, midi_file,arg_beta, arg_autoconnect);
-
     if( preview )
     {
         gveejay_preview(preview);
     }
+    
+    vj_gui_init( skinfile, launcher, hostname, port_num, use_threads, load_midi, midi_file,arg_beta, arg_autoconnect, arg_fasterui);
 
 restart_me:
 
@@ -337,21 +338,24 @@ int main(int argc, char **argv)
 
 /* in alphabetical order of short options */
     const GOptionEntry options[] = {
-    {"autoconnect", 'a', 0, G_OPTION_ARG_NONE, &arg_autoconnect, "Auto-connect to local running veejays.", NULL},
+    {"auto-connect", 'a', 0, G_OPTION_ARG_NONE, &arg_autoconnect, "Auto-connect to local running veejays.", NULL},
     {"beta",        'b', 0, G_OPTION_ARG_NONE, &arg_beta, "Enable beta features.", NULL},
     {"geometry",    'g', 0, G_OPTION_ARG_STRING, &arg_geometry, "Window position on screen \"X,Y\".", NULL},
     {"host",        'h', 0, G_OPTION_ARG_STRING, &arg_host, "Veejay host to connect to (defaults to localhost).", NULL},
     {"lowband",     'L', 0, G_OPTION_ARG_NONE, &arg_lowband, "Low-bandwith connection (disables image loading in samplebank)", NULL},
     {"midi",        'm', 0, G_OPTION_ARG_FILENAME, &arg_midifile, "MIDI configuration file.", NULL},
-    {"notcolored",  'n', 0, G_OPTION_ARG_NONE, &arg_notcolored, "Dont use colored text.", NULL},
+    {"no-color",    'n', 0, G_OPTION_ARG_NONE, &arg_notcolored, "Do not use colored text in console logging.", NULL},
     {"port",        'p', 0, G_OPTION_ARG_INT, &arg_port, port_description, NULL},
     {"preview",     'P', 0, G_OPTION_ARG_INT, &arg_preview, "Start with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)", NULL},
     {"size",        's', 0, G_OPTION_ARG_STRING, &arg_size, "Set bank resolution \"CxR\".", NULL},
-    {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be extra verbose (usefull for debugging)", NULL},
+    {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be extra verbose", NULL},
     {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version, data directory and exit.", NULL},
-    {"tracXs",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
-    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE or \"djay\"", NULL },
+    {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
+    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE , \"default\" or \"djay\"", NULL },
     {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI",NULL},
+#if GTK_CHECK_VERSION(3,22,30)
+    {"faster-ui",   'f', 0, G_OPTION_ARG_NONE, &arg_fasterui, "Hide FX parameter sliders instead of disabling to reduce CPU usage (GTK3 3.22.30)", NULL},
+#endif
     {NULL}};
 
     context = g_option_context_new (NULL);

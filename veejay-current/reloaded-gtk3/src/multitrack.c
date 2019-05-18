@@ -94,6 +94,7 @@ typedef struct
 	GtkWidget	*preview_toggle;
 	int	  pw;
 	int  	  ph;
+    int   track_status[__MAX_TRACKS];
 } multitracker_t;
 
 static int	MAX_TRACKS = 8; /* MASTER (current) + Track 1 to 6 */
@@ -601,9 +602,8 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	seqv->area = gtk_image_new();
 
-
 	gtk_box_pack_start( GTK_BOX(seqv->main_vbox),GTK_WIDGET( seqv->area), FALSE,FALSE,0);
-	gtk_widget_set_size_request_( seqv->area, 176,144  ); //FIXME
+	gtk_widget_set_size_request_( seqv->area, 176,144  ); 
 	seqv->panel = gtk_frame_new(NULL);
 
 	seqv->toggle = gtk_toggle_button_new_with_label( "preview" );
@@ -660,7 +660,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_container_set_border_width(GTK_CONTAINER(scroll),0);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scroll),GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC );
 	GtkWidget *vvvbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
-	seqv->tracks = create_track_view(seqv->num, MAX_TRACKS, (void*) seqv );
+	seqv->tracks = create_track_view(seqv->num, MAX_TRACKS, (void*) seqv, (void*) vp );
 	gtk_tree_view_set_headers_visible( GTK_TREE_VIEW( get_track_tree(seqv->tracks)) , FALSE );
 	gtk_widget_set_size_request_( get_track_tree(seqv->tracks),20,80 );
 	gtk_widget_show(scroll);
@@ -772,7 +772,7 @@ static char *mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *er
 				GTK_RESPONSE_ACCEPT,
 				NULL );
 
-
+    add_class( dialog, "reloaded" );
 	GtkWidget *text_entry = gtk_entry_new();
 	gtk_entry_set_text( GTK_ENTRY(text_entry), "localhost" );
 	gtk_editable_set_editable( GTK_EDITABLE(text_entry), TRUE );
@@ -892,7 +892,7 @@ int		multitrack_add_track( void *data )
 			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mt->view[track]->toggle), TRUE );
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
-
+        mt->track_status[ track ] = 1;
 		res = 1;
 	}
 	else
@@ -903,6 +903,14 @@ int		multitrack_add_track( void *data )
 	free( hostname );
 
 	return res;
+}
+
+int         multitrack_get_track_status(void *data, int track )
+{
+    multitracker_t *mt = (multitracker_t*) data;
+    if(track < 0 || track > __MAX_TRACKS)
+        return 0;
+    return mt->track_status[ track ];
 }
 
 void		multitrack_close_track( void *data )
@@ -919,6 +927,7 @@ void		multitrack_close_track( void *data )
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[mt->selected]->toggle), FALSE );
 		gtk_image_clear( GTK_IMAGE(mt->view[mt->selected]->area ) );
 		mt->view[mt->selected]->status_lock = 0;
+        mt->track_status[ mt->selected ] = 0;
 	}
 }
 

@@ -422,7 +422,6 @@ void	on_button_el_cut_clicked(GtkWidget *w, gpointer *user_data)
 			time1, time2 );
 		free(time1);
 		free(time2);
-		info->uc.reload_hint[HINT_EL] = 1;
 	}
 }
 void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
@@ -431,6 +430,7 @@ void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_DEL, "%d %d",
 			info->selection[0], info->selection[1]);
+        multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
 		char *time1 = format_time( info->selection[0],info->el.fps );
 		char *time2 = format_time( info->selection[1],info->el.fps );
 		vj_msg(VEEJAY_MSG_INFO, "Delete %s - %s from EditList",
@@ -447,6 +447,7 @@ void	on_button_el_crop_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_CROP, "%d %d",
 			info->selection[0], info->selection[1]);
+        multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
 		char *total = format_time( info->status_tokens[TOTAL_FRAMES],info->el.fps );
 		char *time2 = format_time( info->selection[1],info->el.fps );
 		char *time1 = format_time( info->selection[0],info->el.fps );
@@ -483,6 +484,14 @@ void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
 			info->selection[0], info->selection[1] );
 		gveejay_new_slot(MODE_SAMPLE);
 	}
+}
+
+void    on_button_el_takepastepos_clicked(GtkWidget *w, gpointer *user_data)
+{
+    update_spin_value ("button_el_selpaste", 
+                        info->status_tokens[FRAME_NUM] );       
+    vj_msg(VEEJAY_MSG_INFO, "Set current frame %d as destination position",
+           info->status_tokens[FRAME_NUM]);
 }
 
 void	on_button_el_pasteat_clicked(GtkWidget *w, gpointer *user_data)
@@ -568,7 +577,7 @@ void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_button_entry_toggle_clicked(GtkWidget *w, gpointer user_data)
 {
-	if(!info->status_lock)
+	if(!info->status_lock && !info->parameter_lock)
 	{
 		gint val = is_button_toggled( "button_entry_toggle" );
 		int vims_id = VIMS_CHAIN_ENTRY_SET_VIDEO_OFF;
@@ -584,14 +593,25 @@ void	on_button_entry_toggle_clicked(GtkWidget *w, gpointer user_data)
 	}	
 }
 
+static void update_fx_chain(int val) {
+    GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
+    GtkTreeModel *model = gtk_tree_view_get_model( view );
+
+    gtk_tree_model_foreach( model, chain_update_row, (gpointer*) info );
+
+    GtkTreePath *path = gtk_tree_path_new_from_indices(val, -1);
+    gtk_tree_view_set_cursor (view, path, NULL, FALSE);
+    gtk_tree_path_free (path);
+}
+
 void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d",
-			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w))
-		);
+        int val = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w));
+		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", val );
 		vj_midi_learning_vims_spin( info->midi, "button_fx_entry", VIMS_CHAIN_SET_ENTRY );
+        update_fx_chain(val);
 	}  	
 }
 
@@ -1425,23 +1445,6 @@ void	on_check_autowhitebalance_toggled(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-//~ NOT USED
-//~ #ifndef HAVE_GTK2_6
-//~ static gchar	*my_gtk_combo_box_get_active_text(GtkComboBox *combo )
-//~ {
- //~ GtkTreeIter _iter = { 0 };
- //~ gchar *_format = NULL;
-	 //~ GtkTreeModel *_model=NULL;
- //~ g_return_val_if_fail( GTK_IS_COMBO_BOX(combo),NULL);
- //~ _model = gtk_combo_box_get_model(combo);
-//~ g_return_val_if_fail( GTK_IS_LIST_STORE(_model),NULL);
- //~ if(gtk_combo_box_get_active_iter(combo,&_iter))
-	//~ gtk_tree_model_get(_model, &_iter,0,&_format,-1);
- //~ return _format;
-//~ }
-//~ #define gtk_combo_box_get_active_text( combo ) my_gtk_combo_box_get_active_text(combo)
-//~ #endif
-
 void on_button_seq_clearall_clicked( GtkWidget *w, gpointer data )
 {
 	multi_vims( VIMS_SEQUENCE_DEL, "-1");
@@ -1653,6 +1656,8 @@ void	on_sample_mulloop_clicked(GtkWidget *w, gpointer user_data)
 	char *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
 	free(time);
+
+    update_spin_range( "spin_sampleduration", 1, 1000000, 1 );
 }
 
 void	on_sample_mulframes_clicked(GtkWidget *w, gpointer user_data)
@@ -1661,6 +1666,8 @@ void	on_sample_mulframes_clicked(GtkWidget *w, gpointer user_data)
 	char *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
 	free(time);
+
+    update_spin_range( "spin_sampleduration", 2, 1000000, 2 );
 }
 
 void	on_spin_mudplay_value_changed(GtkWidget *widget, gpointer user_data)
@@ -2305,8 +2312,10 @@ void on_openConnection_activate (GtkMenuItem     *menuitem,
 {
   if(!info->status_lock)
   {
-    GtkWidget *veejay_conncection_window = glade_xml_get_widget_(info->main_window, "veejay_connection");
-    gtk_widget_show(veejay_conncection_window);
+    GtkWidget *veejay_connection_window = glade_xml_get_widget_(info->main_window, "veejay_connection");
+    gtk_widget_show(veejay_connection_window);
+    gtk_window_set_keep_above( GTK_WINDOW(veejay_connection_window), TRUE );
+
   }
 }
 
@@ -2341,6 +2350,8 @@ void on_video_settings_activate (GtkMenuItem     *menuitem,
   {
     GtkWidget *veejay_settings_window = glade_xml_get_widget_(info->main_window, "video_options");
     gtk_widget_show(veejay_settings_window);
+    gtk_window_set_keep_above( GTK_WINDOW(veejay_settings_window), TRUE );
+
   }
 }
 
@@ -2353,6 +2364,8 @@ void on_image_calibration_activate (GtkMenuItem    *menuitem,
 {
   GtkWidget *win = glade_xml_get_widget_(info->main_window,"calibration_window" );
   gtk_widget_show(win);
+  gtk_window_set_keep_above( GTK_WINDOW(win), TRUE );
+
   cali_onoff = 1;
 }
 
@@ -2516,6 +2529,8 @@ void on_vims_bundles_activate (GtkMenuItem     *menuitem,
   GtkWidget *vims_bundles_window = glade_xml_get_widget_(info->main_window, "vims_bundles");
   GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
   gtk_window_set_transient_for (GTK_WINDOW(vims_bundles_window),GTK_WINDOW (mainw));
+  gtk_window_set_keep_above( GTK_WINDOW(vims_bundles_window), TRUE );
+
   gtk_widget_show(vims_bundles_window);
 }
 
@@ -2740,7 +2755,6 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		ptr[3] = (pval >> 24) & 0xff;
 
 		ptr += 4;
-		veejay_msg( VEEJAY_MSG_DEBUG, "(%d/%d) FX set value %d on frame %d",k,length,pval, start+k );
 	}
 
 	vj_client_send_buf( info->client, V_CMD, buf, msg_len + 9  );
@@ -2749,9 +2763,6 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 				
 	free(buf);
 	free(data);
-
-
-	 info->uc.reload_hint[HINT_KF] = 1;
 }
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
@@ -2869,22 +2880,6 @@ void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 void	curve_chain_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
 	curve_toggleentry_toggled( widget, user_data);
-
-	GtkWidget *siamese = glade_xml_get_widget_( info->main_window, "curve_panel_toggleentry");
-	if(siamese)
-	{
-		guint signal_id=g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
-		gulong handler_id=handler_id=g_signal_handler_find( (gpointer)siamese, G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
-
-		if (handler_id)
-			g_signal_handler_block((gpointer)siamese, handler_id);
-
-		gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(siamese),
-		                              gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) )) ;
-
-		if (handler_id)
-			g_signal_handler_unblock((gpointer)siamese, handler_id);
-	}
 }
 
 void	curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
@@ -3070,8 +3065,10 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
 {
-	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
-	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0 );
+    if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE && !info->status_lock) {
+	    multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
+	    vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0 );
+    }
 }
 
 void	on_timeline_bind_toggled( GtkWidget *widget, gpointer user_data)
@@ -3149,7 +3146,7 @@ void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "inputstream_window");
 	scan_devices( "tree_v4ldevices" );
 	gtk_widget_show(w);
-	
+    gtk_window_set_keep_above( GTK_WINDOW(w), TRUE );
 }
 
 void	on_generatornew_clicked(GtkWidget *widget, gpointer user_data)
@@ -3157,6 +3154,7 @@ void	on_generatornew_clicked(GtkWidget *widget, gpointer user_data)
   GtkWidget *w = glade_xml_get_widget_(info->main_window, "generator_window");
   scan_generators( "generators" );
   gtk_widget_show(w);
+  gtk_window_set_keep_above( GTK_WINDOW(w), TRUE );
 }
 
 void	on_inputstream_close_clicked(GtkWidget *w,  gpointer user_data)

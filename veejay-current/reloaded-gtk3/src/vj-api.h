@@ -48,7 +48,7 @@ int is_button_toggled(const char *name);
 gchar *_utf8str( const char *c_str );
 void vj_gui_set_stylesheet(const char *css_file, gboolean small_as_possible); 
 void vj_gui_cb(int state, char *hostname, int port_num);
-void vj_gui_init(const char *glade_file, int launcher, char *hostname, int port_num, int threads,int load_midi, char *midi_file, gboolean beta, gboolean autoconnect);
+void vj_gui_init(const char *glade_file, int launcher, char *hostname, int port_num, int threads,int load_midi, char *midi_file, gboolean beta, gboolean autoconnect, gboolean fasterui);
 int vj_gui_reconnect( char *host, char *group, int port);
 void vj_gui_free();
 void vj_gui_wipe();

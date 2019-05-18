@@ -22,7 +22,7 @@
 
 GtkWidget        *get_track_tree( void *data);
 
-void		*create_track_view( int id, int ref, void *data );
+void		*create_track_view( int id, int ref, void *data, void *mt );
 
 void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data );
 #endif

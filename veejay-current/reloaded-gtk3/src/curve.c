@@ -26,6 +26,12 @@
 #include <stdlib.h>
 #include "curve.h"
 
+static int curve_is_empty = 1;
+
+int     is_curve_empty() {
+    return curve_is_empty;
+}
+
 void	get_points_from_curve( GtkWidget *curve, int len, float *vec )
 {
   gtk3_curve_get_vector( curve, len, vec );
@@ -35,11 +41,14 @@ void	reset_curve( GtkWidget *curve )
 {
   gtk_widget_set_sensitive( curve, TRUE );
   gtk3_curve_reset( curve );
+  curve_is_empty = 0;
 }
 
 void	set_points_in_curve( Gtk3CurveType type, GtkWidget *curve)
 {
   gtk3_curve_set_curve_type( curve , type );
+
+  curve_is_empty = 0;
 }
 
 
@@ -66,6 +75,8 @@ void   set_initial_curve( GtkWidget *curve, int fx_id, int parameter_id, int sta
     gtk3_curve_set_curve_type( curve, GTK3_CURVE_TYPE_LINEAR );
 
     free(vec);
+
+    curve_is_empty = 0;
 }
 
 int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int fx_entry, int *lo, int *hi, int *curve_type, int *status)
@@ -125,6 +136,8 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	*hi = end;
 
 	free(vec);
+
+    curve_is_empty = 0;
 
 	return parameter_id;
 }
