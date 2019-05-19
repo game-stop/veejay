@@ -3403,12 +3403,6 @@ static void update_current_slot(int *history, int pm, int last_pm)
         set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
 
     }
-    if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY])
-    {
-        info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
-        info->uc.reload_hint[HINT_KF] = 1;
-        info->uc.reload_hint[HINT_ENTRY] = 1;
-    }
 
     /* Actions for stream */
     if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )
@@ -4548,6 +4542,7 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
             
             info->uc.reload_hint[HINT_CHAIN] = 1;
             info->uc.reload_hint[HINT_ENTRY] = 1;
+            info->uc.reload_hint[HINT_KF] = 1;
 
         }
         g_free(name);
@@ -6837,6 +6832,12 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         }
     }
 
+    if( (pm == MODE_SAMPLE || pm == MODE_STREAM ) && info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ) {
+        info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
+        info->uc.reload_hint[HINT_KF] = 1;
+        info->uc.reload_hint[HINT_ENTRY] = 1;
+    }
+
     if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm )
     {
         info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -8270,7 +8271,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     info->parameter_lock = 1;
     info->uc.expected_num_samples = -1;
     info->uc.expected_num_streams = -1;
-    info->uc.selected_chain_entry = -1;
+    info->uc.selected_chain_entry = 0;
 
     single_vims( VIMS_PROMOTION );
 
