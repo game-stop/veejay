@@ -3067,10 +3067,11 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 
     k = 0;
 
-    for (i = n1; i <= n2; i++)
-		settings->save_list[k++] = el->frame_list[i];
-  
-    settings->save_list_len = k;
+    for (i = n1; i <= n2; i++) {
+		settings->save_list[k] = el->frame_list[i];
+        k++;
+    }
+    settings->save_list_len = (n2 - n1 + 1);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Copied frames %d - %d to buffer (of size %d)",n1,n2,k );
 
@@ -3255,10 +3256,11 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
     		}
 	}
 
-        el->frame_list = (uint64_t*)realloc(el->frame_list,
-				   ((el->is_empty ? 0 :el->video_frames) +
-				    settings->save_list_len) *
-				   sizeof(uint64_t));
+    el->frame_list = (uint64_t*)realloc(el->frame_list,
+	    ((el->is_empty ? 0 :el->video_frames) +
+		settings->save_list_len) *
+		sizeof(uint64_t));
+
 	if (!el->frame_list)
 	{
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
@@ -3266,9 +3268,10 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
    	}
 
    	k = (uint64_t)settings->save_list_len;
-    	for (i = el->total_frames; i >= destination && i > 0; i--)
+    for (i = el->total_frames; i >= destination && i > 0; i--)
 		el->frame_list[i + k] = el->frame_list[i];
-    	k = destination;
+    
+    k = destination;
 	for (i = 0; i < settings->save_list_len; i++)
 	{
 		if (k <= settings->min_frame_num)
@@ -3281,12 +3284,10 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 	}
 	el->video_frames += settings->save_list_len;
 
-	el->total_frames += settings->save_list_len -1;
+	el->total_frames += settings->save_list_len;
 
 	if(el->is_empty)
 		el->is_empty = 0;
-    	veejay_increase_frame(info, 0);
-
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"Pasted %lld frames from buffer into position %ld in movie",

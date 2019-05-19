@@ -255,6 +255,27 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 		return 0;
 	}
 
+    if( fx_entry < 0 || fx_entry > SAMPLE_MAX_EFFECTS ) {
+        veejay_msg(0, "Invalid fx entry [%d] in '%s'", fx_entry, in );
+        return 0;
+    }
+    if( parameter_id < 0 || parameter_id > SAMPLE_MAX_PARAMETERS ) {
+        veejay_msg(0, "Invalid parameter id [%d] in '%s'", parameter_id, in );
+        return 0;
+    }
+    if( start < 0 || start > end ) {
+        veejay_msg(0, "Invalid starting position [%d] in '%s'", start, in );
+        return 0;
+    }
+    if( end < 0 || end < start ) {
+        veejay_msg(0, "Invalid ending position [%d] in '%s'", end, in );
+        return 0;
+    }
+    if( status < 0 || status > 1 ) {
+        veejay_msg(0, "Invalid status value [%d] in '%s'", status, in );
+        return 0;
+    }
+
 	int values_len = (end-start+1);
 	int *values = (int*) vj_calloc( sizeof(int) * values_len);
 	if(values == NULL) {
@@ -309,6 +330,9 @@ int		keyframe_unpack( unsigned char *in, int len, int *entry, int lookup, int is
 	free(k_d);
 		
 	*entry = fx_entry;
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Stored FX anim data %d - %d (status %d, %d values)",
+            start,end,status, values_len );
 
 	return 1;
 }

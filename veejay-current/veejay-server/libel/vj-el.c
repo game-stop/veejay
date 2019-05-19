@@ -1642,21 +1642,23 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		return NULL;
 
 	int num_files	= 0;
-	int64_t oldfile, oldframe, of1,ofr;
-	int64_t index[MAX_EDIT_LIST_FILES]; 
-	int64_t n,n1=0;
+	int64_t oldfile=0, oldframe=0, of1=0,ofr=0;
+	int64_t n=0,n1=0;
 	char 	*result = NULL;
 	int64_t j = 0;
 	int64_t n2 = el->total_frames;
 	char	filename[2048];		    
 	char	fourcc[6];              
 
-	/* get which files are actually referenced in the edit list entries */
+    int64_t *index = (int64_t*) vj_malloc(sizeof(int64_t) * MAX_EDIT_LIST_FILES );
+    
+    if(!index) {
+        return NULL;
+    }
+
+    memset(index,-1,sizeof(int64_t) * MAX_EDIT_LIST_FILES );
 
 	int est_len = 0;
-   	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
-		index[j] = -1;
-
    	for (j = n1; j <= n2; j++)
 	{
 		n = el->frame_list[j];
@@ -1672,7 +1674,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	{
 		if (index[j] >= 0 && el->video_file_list[j] != NULL )
 		{
-			index[j] = (int64_t)num_files;
+			index[j] = num_files;
 			nnf ++;
 			len     += (strlen(el->video_file_list[j]));
             len     += 64; /* more than needed */
@@ -1709,11 +1711,15 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	
 	n1 = 0;
 
-    len += (num_files * fl_len);
+    len += ( (num_files+1) * fl_len);
  
 	est_len = 2 * len;
 
 	result = (char*) vj_calloc(sizeof(char) * est_len );
+    if( result == NULL ) {
+        free(index);
+        return NULL;
+    }
 	sprintf(result, "%04d",nnf );
 
 	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
@@ -1762,6 +1768,10 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 
 	int datalen = strlen(result);
 	*bytes_written =  datalen;
+
+
+    free(index);
+
 	return result;
 }
 
