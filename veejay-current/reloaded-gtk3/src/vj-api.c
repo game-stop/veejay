@@ -6801,6 +6801,62 @@ static void set_pm_page_label(int sample_id, int type)
 static void update_globalinfo(int *history, int pm, int last_pm)
 {
     int i;
+    total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );
+    gint history_frames_ = (pm == MODE_STREAM ? history[SAMPLE_MARKER_END] : history[TOTAL_FRAMES] );
+
+    if( total_frames_ != history_frames_ )
+    {
+        gint current_frame_ = info->status_tokens[FRAME_NUM];
+
+        char *time = format_time( total_frames_,(double) info->el.fps );
+        if( pm == MODE_STREAM )
+        {
+            update_spin_value( "stream_length", info->status_tokens[SAMPLE_MARKER_END] );
+            update_label_str( "stream_length_label", time );
+        }
+        if( pm != MODE_SAMPLE) {
+            update_spin_range("button_fadedur", 0, total_frames_, ( total_frames_ > 25 ? 25 : total_frames_-1 ) );
+        }
+
+        update_label_i( "label_totframes", total_frames_, 1 );
+        
+        if( pm == MODE_SAMPLE )
+            update_label_str( "label_samplelength",time);
+        
+        update_label_i( "label_totframes", total_frames_, 1 );
+        update_label_str( "label_totaltime", time );
+        if(pm == MODE_SAMPLE)
+            update_label_str( "sample_length_label", time );
+        else
+            update_label_str( "sample_length_label", "0:00:00:00" );
+
+        timeline_set_length( info->tl,
+                (gdouble) total_frames_ , current_frame_);
+
+        if( pm != MODE_STREAM )
+            info->uc.reload_hint[HINT_EL] = 1;
+
+        free(time);
+    }
+
+    info->status_frame = info->status_tokens[FRAME_NUM];
+    timeline_set_pos( info->tl, (gdouble) info->status_frame );
+    char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
+    char *mouse_at_time = format_time( 
+            timeline_get_point(TIMELINE_SELECTION(info->tl)),
+            (double)info->el.fps);
+    update_label_i(   "label_curframe", info->status_frame ,1 );
+    update_label_str(   "label_mouseat", mouse_at_time );
+    update_label_str( "label_curtime", current_time_ );
+    update_label_str( "label_sampleposition", current_time_);
+    free(current_time_);
+    free(mouse_at_time);
+
+    if( pm == MODE_SAMPLE )
+        update_label_i( "label_samplepos",
+            info->status_frame , 1);
+    else
+        update_label_i( "label_samplepos" , 0 , 1 );
 
     if( last_pm != pm )
         update_status_accessibility( last_pm, pm);
@@ -6921,78 +6977,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         }
     }
 
-    total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );
-    gint history_frames_ = (pm == MODE_STREAM ? history[SAMPLE_MARKER_END] : history[TOTAL_FRAMES] );
-    gint current_frame_ = info->status_tokens[FRAME_NUM];
-
-    if( total_frames_ != history_frames_ || total_frames_ != (int) timeline_get_length(TIMELINE_SELECTION(info->tl)))
-    {
-        char *time = format_time( total_frames_,(double) info->el.fps );
-        if( pm == MODE_STREAM )
-        {
-            update_spin_value( "stream_length", info->status_tokens[SAMPLE_MARKER_END] );
-            update_label_str( "stream_length_label", time );
-        }
-        if( pm != MODE_SAMPLE) {
-            update_spin_range("button_fadedur", 0, total_frames_, ( total_frames_ > 25 ? 25 : total_frames_-1 ) );
-        }
-
-        update_label_i( "label_totframes", total_frames_, 1 );
-        
-        if( pm == MODE_SAMPLE )
-            update_label_str( "label_samplelength",time);
-        
-        if( pm == MODE_PLAIN )
-        {
-            for( i = 0; i < 3; i ++)
-                if(info->selection[i] > total_frames_ ) info->selection[i] = total_frames_;
-            update_spin_range("button_el_selstart",
-                              0,
-                              total_frames_,
-                              info->selection[0]);
-            update_spin_range("button_el_selend",
-                              0,
-                              total_frames_,
-                              info->selection[1]);
-            update_spin_range("button_el_selpaste",
-                              0,
-                              total_frames_,
-                              info->selection[2]);
-        }
-        update_label_i( "label_totframes", total_frames_, 1 );
-        update_label_str( "label_totaltime", time );
-        if(pm == MODE_SAMPLE)
-            update_label_str( "sample_length_label", time );
-        else
-            update_label_str( "sample_length_label", "0:00:00:00" );
-
-        timeline_set_length( info->tl,
-                (gdouble) total_frames_ , current_frame_);
-
-        if( pm != MODE_STREAM )
-            info->uc.reload_hint[HINT_EL] = 1;
-
-        free(time);
-    }
-
-    info->status_frame = info->status_tokens[FRAME_NUM];
-    timeline_set_pos( info->tl, (gdouble) info->status_frame );
-    char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
-    char *mouse_at_time = format_time( 
-            timeline_get_point(TIMELINE_SELECTION(info->tl)),
-            (double)info->el.fps);
-    update_label_i(   "label_curframe", info->status_frame ,1 );
-    update_label_str(   "label_mouseat", mouse_at_time );
-    update_label_str( "label_curtime", current_time_ );
-    update_label_str( "label_sampleposition", current_time_);
-    free(current_time_);
-    free(mouse_at_time);
-
-    if( pm == MODE_SAMPLE )
-        update_label_i( "label_samplepos",
-            info->status_frame , 1);
-    else
-        update_label_i( "label_samplepos" , 0 , 1 );
+    //if( total_frames_ != history_frames_ || total_frames_ != (int) timeline_get_length(TIMELINE_SELECTION(info->tl)))
 
     if( history[CURRENT_ID] != info->status_tokens[CURRENT_ID] )
     {

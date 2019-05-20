@@ -498,6 +498,8 @@ void	on_button_el_pasteat_clicked(GtkWidget *w, gpointer *user_data)
 {
 	gint val = get_nums( "button_el_selpaste" );
 	info->selection[2] = val;
+    multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
+
 	multi_vims( VIMS_EDITLIST_PASTE_AT, "%d",
 		info->selection[2]);
 	char *time1 = format_time( info->selection[2],info->el.fps );
@@ -3113,6 +3115,8 @@ void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 			char *dur = format_time( pos2 - pos1,info->el.fps );
 			update_label_str( "label_markerduration", dur );
 			free(dur);
+
+            update_spin_value ( "button_el_selend", pos2 );
 		}
 		else
 			vj_msg(VEEJAY_MSG_INFO, "Set Out point after In point !");
@@ -3135,6 +3139,8 @@ void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 			char *dur = format_time( pos2 - pos1,info->el.fps );
 			update_label_str( "label_markerduration", dur );
 			free(dur);
+
+            update_spin_value( "button_el_selstart",pos1 );
 		}
 		else
 			vj_msg(VEEJAY_MSG_INFO,"Set In Point before Out Point !");
