@@ -6353,7 +6353,7 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
             {
                 veejay_msg(VEEJAY_MSG_INFO, "Pasted buffer at frame %d",args[0]);
             }
-            sample_set_startframe( v->uc->sample_id, 0 );
+            sample_set_startframe( v->uc->sample_id, args[0] );
             sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
             constrain_sample( v, v->uc->sample_id );
         }

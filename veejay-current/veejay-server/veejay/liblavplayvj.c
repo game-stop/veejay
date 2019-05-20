@@ -3274,17 +3274,28 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
     k = destination;
 	for (i = 0; i < settings->save_list_len; i++)
 	{
-		if (k <= settings->min_frame_num)
-		    settings->min_frame_num++;
-		if (k < settings->max_frame_num)
-		    settings->max_frame_num++;
+//		if (k <= settings->min_frame_num)
+//		    settings->min_frame_num++;
+//		if (k < settings->max_frame_num)
+//		    settings->max_frame_num++;
 
 		el->frame_list[k] = settings->save_list[i];
 		k++;
 	}
+
+    if( destination < settings->min_frame_num ) {
+        settings->min_frame_num = destination;
+    }
+
 	el->video_frames += settings->save_list_len;
 
 	el->total_frames += settings->save_list_len;
+
+    if( el->total_frames < settings->max_frame_num ) {
+        settings->max_frame_num = el->total_frames;
+    }
+
+    settings->current_frame_num = destination;
 
 	if(el->is_empty)
 		el->is_empty = 0;
