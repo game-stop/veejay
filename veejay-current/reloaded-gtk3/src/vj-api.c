@@ -3827,12 +3827,16 @@ gboolean view_entry_selection_func (GtkTreeSelection *selection,
             if( !is_button_toggled( "fx_mnone" )) {
                 multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d",0, name );
             }
+ 
             update_label_i( "label_fxentry", name, 0 );
             vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY,name );
 
             if( get_nums("button_fx_entry") != name ) {
                 info->status_lock = 1;
-                update_spin_value( "button_fx_entry", name );
+                update_spin_value( "button_fx_entry", name   );
+                vj_kf_reset();
+                info->uc.reload_hint[HINT_KF] = 1;
+                info->uc.reload_hint[HINT_ENTRY] = 1;
                 info->status_lock = 0;
             }
 
