@@ -70,29 +70,22 @@ void overlaymagic_adddistorted(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a, b, c;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		c = a + b;
-		Y[i] = CLAMP_Y(c);
+		Y[i] = CLAMP_Y(Y[i] + Y2[i]);
 	}
 }
 
 void overlaymagic_add_distorted(VJFrame *frame, VJFrame *frame2 )
 {
 	int i;
-	uint8_t y1, y2;
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
 	for (i = 0; i < len; i++)
 	{
-		y1 = Y[i];
-		y2 = Y2[i];
-		Y[i] = CLAMP_Y(y1 + y2);
+		Y[i] = CLAMP_Y(Y[i] + Y2[i]);
 	}
 }
 
@@ -103,13 +96,9 @@ void overlaymagic_subdistorted(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	uint8_t y1, y2;
 	for (i = 0; i < len; i++)
 	{
-		y1 = Y[i];
-		y2 = Y2[i];
-		y1 -= y2;
-		Y[i] = CLAMP_Y(y1);
+		Y[i] = CLAMP_Y(Y[i] - Y2[i]);
 	}
 }
 
@@ -120,12 +109,9 @@ void overlaymagic_sub_distorted(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	uint8_t y1, y2;
 	for (i = 0; i < len; i++)
 	{
-		y1 = Y[i];
-		y2 = Y2[i];
-		Y[i] = y1 - y2;
+		Y[i] = Y2[i] - Y[i];
 	}
 }
 
@@ -179,11 +165,9 @@ void overlaymagic_additive(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a;
 	while(len--)
 	{
-		a = Y[len] + (2 * Y2[len]) - 255;
-		Y[len] = CLAMP_Y(a);
+		Y[len] = CLAMP_Y(Y[len] + (2 * Y2[len]) - 255);
 	}
 }
 
@@ -297,17 +281,10 @@ void overlaymagic_lighten(VJFrame *frame, VJFrame *frame2 )
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-	int a, b, c;
 
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		if (a > b)
-			c = a;
-		else
-			c = b;
-		Y[i] = c;
+		Y[i] = Y[i] > Y2[i] ? Y[i] : Y2[i];
 	}
 }
 
@@ -318,12 +295,9 @@ void overlaymagic_difference(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a, b;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		Y[i] = abs(a - b);
+		Y[i] = abs(Y[i] - Y2[i]);
 	}
 }
 
@@ -331,15 +305,12 @@ void overlaymagic_diffnegate(VJFrame *frame, VJFrame *frame2 )
 {
 	int i;
 	const int len = frame->len;
-	int a, b;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
 	for (i = 0; i < len; i++)
 	{
-		a = (255 - Y[i]);
-		b = Y2[i];
-		Y[i] = 255 - abs(a - b);
+		Y[i] = 255 - abs((255 - Y[i]) - Y2[i]);
 	}
 }
 
@@ -434,18 +405,13 @@ void overlaymagic_hardlight(VJFrame *frame, VJFrame *frame2 )
 void overlaymagic_relativeaddlum(VJFrame *frame, VJFrame *frame2 )
 {
 	int i;
-	int a, b, c, d;
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		c = a >> 1;
-		b = Y2[i];
-		d = b >> 1;
-		Y[i] = CLAMP_Y(c + d);
+		Y[i] = CLAMP_Y( (Y[i]>>1) + (Y2[i] >> 1));
 	}
 }
 
@@ -456,12 +422,9 @@ void overlaymagic_relativesublum(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a, b;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		Y[i] = (a - b + 255) >> 1;
+		Y[i] = (Y[i] - Y2[i] + 255) >> 1;
 	}
 }
 
@@ -472,14 +435,9 @@ void overlaymagic_relativeadd(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a, b, c, d;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		c = a >> 1;
-		b = Y2[i];
-		d = b >> 1;
-		Y[i] = c + d;
+		Y[i] = (Y[i]>>1) + (Y2[i]>>1);
 	}
 }
 
@@ -490,12 +448,9 @@ void overlaymagic_relativesub(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a, b;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		Y[i] = (a - b + 255) >> 1;
+		Y[i] = (Y[i] - Y2[i] + 255) >> 1;
 	}
 }
 
@@ -506,15 +461,9 @@ void overlaymagic_minsubselect(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a, b;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		if (b < a)
-			Y[i] = (b - a + 255) >> 1;
-		else
-			Y[i] = (a - b + 255) >> 1;
+        Y[i] = (Y2[i] < Y[i] ? (Y2[i] - Y[i] + 255) >> 1 : (Y[i] - Y2[i] + 255) >> 1);
 	}
 }
 
@@ -525,15 +474,9 @@ void overlaymagic_maxsubselect(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a, b;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		if (b > a)
-			Y[i] = (b - a + 255) >> 1;
-		else
-			Y[i] = (a - b + 255) >> 1;
+        Y[i] = (Y2[i] > Y[i] ? ( Y2[i] - Y[i] + 255 ) >> 1 : (Y[i] - Y2[i] + 255 ) >> 1 );
 	}
 }
 
@@ -543,17 +486,9 @@ void overlaymagic_addsubselect(VJFrame *frame, VJFrame *frame2 )
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-	int c, a, b;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-
-		if (b < a)
-		{
-			c = (a + b) >> 1;
-			Y[i] = c;
-		}
+        Y[i] = (Y2[i] < Y[i] ? (Y[i] + Y2[i])>>1 : Y[i] );
 	}
 }
 
@@ -563,14 +498,10 @@ void overlaymagic_maxselect(VJFrame *frame, VJFrame *frame2 )
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
-	int a, b;
-	for (i = 0; i < len; i++)
+	
+    for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		if (b > a)
-			Y[i] = b;
+        Y[i] = (Y2[i] > Y[i] ? Y2[i] : Y[i] );
 	}
 }
 
@@ -581,13 +512,9 @@ void overlaymagic_minselect(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int a, b;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		if (b < a)
-			Y[i] = b;
+        Y[i] = (Y2[i] < Y[i] ? Y2[i] : Y[i]);
 	}
 }
 
@@ -598,13 +525,9 @@ void overlaymagic_addtest(VJFrame *frame, VJFrame *frame2 )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
 
-	int c, a, b;
 	for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		c = (a + ((2 * b) - 255) )>>1;
-		Y[i] = CLAMP_Y(c);
+        Y[i] = CLAMP_Y( Y[i] + (((2 * Y2[i]) - 255 ) >> 1) );
 	}
 }
 
@@ -614,14 +537,10 @@ void overlaymagic_addtest2(VJFrame *frame, VJFrame *frame2 )
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
-	int c, a, b;
-	for (i = 0; i < len; i++)
+	
+    for (i = 0; i < len; i++)
 	{
-		a = Y[i];
-		b = Y2[i];
-		c = a + (2 * b) - 255;
-		Y[i] = CLAMP_Y(c);
+		Y[i] = CLAMP_Y( Y[i] + ( 2 * Y2[i] ) - 255 );
 	}
 }
 

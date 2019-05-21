@@ -69,12 +69,8 @@ static void overlayalphamagic_adddistorted(VJFrame *frame, VJFrame *frame2)
 	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
-    int a, b, c;
     for (i = 0; i < len; i++) {
-		a = A[i];
-		b = A2[i];
-		c = a + b;
-		A[i] = CLAMP_Y(c);
+		A[i] = CLAMP_Y(A[i] + A2[i]);
     }
 
 }

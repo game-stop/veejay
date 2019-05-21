@@ -536,7 +536,7 @@ static void lumamagick_freeze(VJFrame *frame, VJFrame *frame2 , int op_a, int op
 		if (b <= pixel_Y_lo_)
 			c = pixel_Y_lo_;
 		else
-			c = 0xff - ((0xff - a) * (0xff - a)) / b;
+			c = (b <= pixel_Y_lo_ ? pixel_Y_lo_ : 0xff - ((0xff - a) * (0xff - a)) / b);
 
 		Y[i] = c;
 	}
