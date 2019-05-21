@@ -31,7 +31,7 @@ vj_effect *chromium_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 8;
+    ve->limits[1][0] = 9;
     ve->defaults[0] = 0;
     ve->description = "Chromium";
    	ve->parallel = 1;
@@ -41,12 +41,12 @@ vj_effect *chromium_init(int w, int h)
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
-	
+
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Chroma Blue", "Chroma Red", "Chroma Red and Blue", "Chroma Swap",
 		"Chroma Yellow", "Chroma Orange", "Chroma Rose",
-		"Chroma Green", "Chroma Purple"
-	);	
+		"Chroma Green", "Chroma Purple", "Chroma Yellow swap White"
+	);
 
     return ve;
 }
@@ -125,6 +125,13 @@ void chromium_apply(VJFrame *frame, int m )
 			Cb[i] = tmp;
 		}
 		break;
+		case 9: // yellow on white
+		for( i = 0; i < len ; i++)
+		{
+			Cb[i] = 0xaa - Cb[i];
+		}
+		break;
+
 /*
 		case 4:
 		// U - blue - Y , V = Red - Y
