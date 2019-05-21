@@ -188,6 +188,7 @@
 #include "./effects/whiteframe.h"
 #include "./effects/widthmirror.h"
 #include "./effects/zoom.h"
+#include "./effects/stretch.h"
 #include "./transitions/3bar.h"
 #include "./transitions/fadecolor.h"
 #include "./transitions/fadecolorrgb.h"
@@ -199,7 +200,7 @@
 #include "./transitions/vbar.h"
 #include "./transitions/wipe.h"
 
-#define VJ_IMAGE_EFFECT_MIN 88
+#define VJ_IMAGE_EFFECT_MIN 87
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -431,6 +432,7 @@ enum {
 	VJ_IMAGE_EFFECT_POSTERIZE2 = 90,
     VJ_IMAGE_EFFECT_PIXELSORT = 89,
     VJ_IMAGE_EFFECT_PIXELSORTALPHA = 88,
+    VJ_IMAGE_EFFECT_CREATIVESTRETCH = 87,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

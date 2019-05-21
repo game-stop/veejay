@@ -451,6 +451,7 @@ void vj_effect_initialize(int width, int height, int full_range)
     vj_effects[VJ_IMAGE_EFFECT_FLIP]				= flip_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_POSTERIZE]			= posterize_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_NEGATION]			= negation_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_CREATIVESTRETCH]     = stretch_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_SOLARIZE]			= solarize_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_COLORADJUST]			= coloradjust_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_GAMMA]				= gamma_init(width,height);
