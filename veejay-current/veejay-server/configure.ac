@@ -793,7 +793,7 @@ if test x$with_jpeg != xno ; then
 fi
 have_pixbuf=false
 if test x$with_pixbuf != xno ; then
-  PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.0 gdk-pixbuf-2.0],
+  PKG_CHECK_MODULES(PIXBUF, [gdk-pixbuf-2.0],
                     [
  		     AC_SUBST(PIXBUF_CFLAGS)
 		     AC_SUBST(PIXBUF_LIBS)
@@ -804,7 +804,7 @@ fi
 
 
 if test x$have_pixbuf != xtrue ; then
-	AC_MSG_ERROR([Cannot find the gtk-2.0-dev / gdk pixbuf library.])
+	AC_MSG_ERROR([Cannot find the gdk pixbuf library.])
 fi
 
 dnl *********************************************************************
