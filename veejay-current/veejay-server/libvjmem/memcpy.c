@@ -570,6 +570,85 @@ void	packed_plane_clear( size_t len, void *to )
 	}
 }
 
+
+#if defined (__SSE2__)
+
+/* Xine + William Chan + Others
+ * https://duckduckgo.com/?q=william+chan+sse2+memcpy&t=ffsb&ia=web
+ * https://stackoverflow.com/questions/1715224/very-fast-memcpy-for-image-processing
+ * http://www.ibiblio.org/gferg/ldp/GCC-Inline-Assembly-HOWTO.html#ss5.4
+ */
+
+
+/* for veejay, moving 128 bytes a time makes a difference */
+static void *sse2_memcpy(void * to, const void * from, size_t len)
+{
+    void *retval = to;
+
+    if(len >= 128)
+    {
+        register uintptr_t delta;
+        /* Align destination to SSE_MMREG_SIZE -boundary */
+        delta = ((uintptr_t)to)&(SSE_MMREG_SIZE-1);
+        if(delta)
+        {
+            delta=SSE_MMREG_SIZE-delta;
+            len -= delta;
+            small_memcpy(to, from, delta);
+        }
+        __asm__ /*__volatile__ */(
+
+            "mov %2, %%ebx\n"        //ebx is our counter
+            "shr $0x7, %%ebx\n"      //divide by 128 (8 * 128bit registers)
+            "jz loop_copy_end\n"
+        "loop_copy:\n"
+
+            "prefetchnta 128(%0)\n" //SSE2 prefetch
+            "prefetchnta 160(%0)\n"
+            "prefetchnta 192(%0)\n"
+            "prefetchnta 224(%0)\n"
+// check align is ! source or dest ???? with movdqa
+// 16-byte boundary
+            "movdqu (%0),    %%xmm0\n" //move data from src to registers
+            "movdqu 16(%0),  %%xmm1\n"
+            "movdqu 32(%0),  %%xmm2\n"
+            "movdqu 48(%0),  %%xmm3\n"
+            "movdqu 64(%0),  %%xmm4\n"
+            "movdqu 80(%0),  %%xmm5\n"
+            "movdqu 96(%0),  %%xmm6\n"
+            "movdqu 112(%0), %%xmm7\n"
+
+            "movntdq %%xmm0, (%1)  \n" //move data from registers to dest
+            "movntdq %%xmm1, 16(%1)\n"
+            "movntdq %%xmm2, 32(%1)\n"
+            "movntdq %%xmm3, 48(%1)\n"
+            "movntdq %%xmm4, 64(%1)\n"
+            "movntdq %%xmm5, 80(%1)\n"
+            "movntdq %%xmm6, 96(%1)\n"
+            "movntdq %%xmm7,112(%1)\n"
+
+            "add $128, %0\n"
+            "add $128, %1\n"
+            "dec %%ebx\n"
+
+            "jnz loop_copy\n" //loop please
+        "loop_copy_end:"
+
+            : : "r" (from) ,
+            "r" (to),
+            "m" (len)
+            : "ebx", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"
+        );
+
+        len&=127; //get the tail size
+    }
+
+    /* Now do the tail of the block */
+    if(len) __memcpy(to, from, len);
+    return retval;
+}
+#endif
+
 #ifdef HAVE_ASM_SSE
 /* for veejay, moving 128 bytes a time makes a difference */
 static void *sse_memcpy2(void * to, const void * from, size_t len)
@@ -1357,8 +1436,12 @@ static struct {
 #ifdef HAVE_ASM_SSE
 	 { "SSE optimized memcpy() (64)", (void*) sse_memcpy, 0,AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
 	 { "SSE optimized memcpy() (128)", (void*) sse_memcpy2, 0,AV_CPU_FLAG_MMXEXT | AV_CPU_FLAG_SSE },
-
 #endif
+  /* based on xine-lib + William Chan + other */
+#if defined (__SSE2__)
+	 { "SSE2 optimized memcpy() (128)", (void*) sse2_memcpy, 0,AV_CPU_FLAG_SSE2},
+#endif
+
 	/* aclib_template.c: */
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE ) || defined( HAVE_ASM_MMX2)
      { "MMX/MMX2/SSE optimized memcpy() v1", (void*) fast_memcpy, 0,AV_CPU_FLAG_MMX |AV_CPU_FLAG_SSE |AV_CPU_FLAG_MMX2 },
