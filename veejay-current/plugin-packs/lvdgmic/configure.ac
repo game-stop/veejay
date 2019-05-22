@@ -344,6 +344,7 @@ debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
  debugCFLAGS="-g"
  AC_MSG_RESULT([yes])
+ AC_DEFINE(GMIC_VERBOSE, 1, [GMIC debugging and error output]) 
 else
  AC_MSG_RESULT([no])
 fi
@@ -457,15 +458,13 @@ if test "x$enable_compile_warnings" != "xno" ; then
  fi
 fi
 
-if test "x$cflags_set" != "xyes" ; then
-  if test "x$enable_debug" = "xyes" ; then
-  	CFLAGS="$debugCFLAGS $warnCFLAGS $CFLAGS"
-  else
- 	CFLAGS="$CFLAGS $warnCFLAGS -DSILENT"
-  fi
-  CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
-  cflags_set=yes
+if test "x$enable_debug" = "xyes" ; then
+    CFLAGS="$debugCFLAGS $warnCFLAGS $CFLAGS"
+else
+ 	CFLAGS="$CFLAGS $warnCFLAGS"
 fi
+
+CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
 
 
 if test x"$with_extra_cflags" != "x"; then

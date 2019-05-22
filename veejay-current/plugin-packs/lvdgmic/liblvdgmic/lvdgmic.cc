@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <cmath>
 #include <gmic.h>
+#include <config.h>
 #include "lvdgmic.hh"
 
 lvdgmic::lvdgmic(int n)
@@ -54,8 +55,10 @@ void lvdgmic::gmic_command( char const *str )
 	try {
 		gmic_instance.run( str, images, image_names );
 	} catch(gmic_exception &e) {
-		fprintf(stderr,"GMIC error: %s\n", e.what());
-	}
+/*#ifdef GMIC_VERBOSE
+        fprintf(stderr,"GMIC error: %s\n", e.what());
+#endif*/
+    }
 }
 
 void lvdgmic::pull(int n, unsigned char **frame)
