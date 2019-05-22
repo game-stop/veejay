@@ -2381,7 +2381,7 @@ gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
 
     if( info->watch.state == STATE_PLAYING)
     {
-        if( prompt_dialog("Quit Reloaded", "Are you sure?" ) == GTK_RESPONSE_REJECT)
+        if(prompt_dialog("Quit Reloaded", "Are you sure?") != GTK_RESPONSE_ACCEPT)
             return TRUE;
     }
 
