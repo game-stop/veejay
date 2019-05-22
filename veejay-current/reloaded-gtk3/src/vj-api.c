@@ -2057,7 +2057,7 @@ void about_dialog()
         "program_name", "reloaded",
         "name", VEEJAY_CODENAME,
         "version", VERSION,
-        "copyright", "(C) 2004 - 2015 N. Elburg et all.",
+        "copyright", "(C) 2004 - 2019 N. Elburg et all.",
         "comments", "The graphical interface for Veejay",
         "website", web,
         "authors", authors,
@@ -2071,7 +2071,12 @@ void about_dialog()
     g_object_unref(pixbuf);
 
     g_signal_connect( about , "response", G_CALLBACK( gtk_widget_destroy),NULL);
-    gtk_window_present( GTK_WINDOW( about ) );
+
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_transient_for(GTK_WINDOW(about),GTK_WINDOW (mainw));
+    gtk_window_set_keep_above(GTK_WINDOW(about), TRUE);
+
+    gtk_window_present(GTK_WINDOW(about));
 }
 
 gboolean dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data)
