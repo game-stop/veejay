@@ -63,7 +63,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 	snprintf(cmd,sizeof(cmd),"-gimp_8bits %d,%d,%d", scale, dithering, levels );
 
-	lvdgmic_push( gmic, w, h, palette, A, 0);
+	lvdgmic_push( gmic, w, h, 0, A, 0);
 
 	lvdgmic_gmic( gmic, cmd );
 
@@ -111,7 +111,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	
 	//@ some palettes veejay-classic uses
 	int palettes0[] = {
-	        	LIVIDO_PALETTE_GRAY,
+	            LIVIDO_PALETTE_YUV444P,    	
+                LIVIDO_PALETTE_GRAY,
             	0,
 	};
 	
@@ -120,13 +121,13 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	port = out_chans[0];
 	
 		livido_set_string_value( port, "name", "Output Channel");
-		livido_set_int_array( port, "palette_list", 2, palettes0);
+		livido_set_int_array( port, "palette_list", 3, palettes0);
 		livido_set_int_value( port, "flags", 0);
 
         in_chans[0] = livido_port_new( LIVIDO_PORT_TYPE_CHANNEL_TEMPLATE );
         port = in_chans[0];
   		livido_set_string_value( port, "name", "Input Channel");
-       		livido_set_int_array( port, "palette_list", 2, palettes0);
+       		livido_set_int_array( port, "palette_list", 3, palettes0);
        		livido_set_int_value( port, "flags", 0);
 	
 	in_params[0] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
