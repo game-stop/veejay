@@ -61,9 +61,9 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int lowfreq = lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int freqrange = lvd_extract_param_index(my_instance, "in_parameters",2);
 	
-	snprintf(cmd,sizeof(cmd),"-gimp_shockwaves %d,%d,%d,%d", amplitude, lowfreq, freqrange );
+	snprintf(cmd,sizeof(cmd),"-gimp_shockwaves %f,%f,%f,%f", (float)amplitude *0.1f, (float)lowfreq*0.1f, (float)freqrange*0.1f );
 
-	lvdgmic_push( gmic, w, h, palette, A, 0);
+	lvdgmic_push( gmic, w, h, 0, A, 0);
 
 	lvdgmic_gmic( gmic, cmd );
 
@@ -138,8 +138,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Amplitude" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 100 );
-		livido_set_int_value( port, "default", 10 );
+		livido_set_int_value( port, "max", 1000 );
+		livido_set_int_value( port, "default", 100 );
 		livido_set_string_value( port, "description" ,"Amplitude");
 
 	
@@ -149,8 +149,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Low frequency" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 100 );
-		livido_set_int_value( port, "default", 10 );
+		livido_set_int_value( port, "max", 1000 );
+		livido_set_int_value( port, "default", 100 );
 		livido_set_string_value( port, "description" ,"Low frequency");
 
 	in_params[2] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
@@ -159,8 +159,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Frequency range" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 100 );
-		livido_set_int_value( port, "default", 20 );
+		livido_set_int_value( port, "max", 1000 );
+		livido_set_int_value( port, "default", 200 );
 		livido_set_string_value( port, "description" ,"Frequency range");
 
 	//@ setup the nodes

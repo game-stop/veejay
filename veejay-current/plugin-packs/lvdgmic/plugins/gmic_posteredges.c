@@ -69,7 +69,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	snprintf(cmd,sizeof(cmd),"-poster_edges %d,%d,%d,%d,%d,%d,%d",
 		smoothness,threshold,shade,thickness,antialiasing,posterization_lvl,posterization_aa);
 
-	lvdgmic_push( gmic, w, h, palette, A, 0);
+	lvdgmic_push( gmic, w, h, 0, A, 0);
 
 	lvdgmic_gmic( gmic, cmd );
 

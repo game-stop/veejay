@@ -72,7 +72,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	snprintf(cmd,sizeof(cmd),"-array_fade %d,%d,%d,%d,%d,%d,%d,%d",
 			x_tiles,y_tiles,x_offset,y_offset,fade_start,fade_end,mirror,size);
 
-	lvdgmic_push( gmic, w, h, palette, A, 0);
+	lvdgmic_push( gmic, w, h, 0, A, 0);
 
 	lvdgmic_gmic( gmic, cmd );
 

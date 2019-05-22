@@ -61,10 +61,11 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 	int amplitude =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
 	int smoothness = lvd_extract_param_index( my_instance,"in_parameters", 1 );
+    int angle = lvd_extract_param_index( my_instance, "in_parameters", 2);
 	
-	snprintf(cmd,sizeof(cmd),"-water %d,%f", amplitude, (float)smoothness/100.0f);
+	snprintf(cmd,sizeof(cmd),"-water %f,%f,%f", (float)amplitude * 0.1f, (float)smoothness * 0.01f, (float) angle * 0.1f);
 
-	lvdgmic_push( gmic, w, h, palette, A, 0);
+	lvdgmic_push( gmic, w, h, 0, A, 0);
 
 	lvdgmic_gmic( gmic, cmd );
 
@@ -79,7 +80,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	LIVIDO_IMPORT(list);
 
 	livido_port_t *port = NULL;
-	livido_port_t *in_params[2];
+	livido_port_t *in_params[3];
 	livido_port_t *in_chans[3];
 	livido_port_t *out_chans[1];
 	livido_port_t *info = NULL;
@@ -136,8 +137,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Amplitude" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 300 );
-		livido_set_int_value( port, "default", 30 );
+		livido_set_int_value( port, "max", 3000 );
+		livido_set_int_value( port, "default", 300 );
 		livido_set_string_value( port, "description" ,"Amplitude");
 
 	
@@ -151,9 +152,19 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "default", 150 );
 		livido_set_string_value( port, "description" ,"Smoothness");
 
+    in_params[2] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+	port = in_params[2];
+
+		livido_set_string_value(port, "name", "Angle" );
+		livido_set_string_value(port, "kind", "INDEX" );
+		livido_set_int_value( port, "min", 0 );
+		livido_set_int_value( port, "max", 1800 );
+		livido_set_int_value( port, "default", 450 );
+		livido_set_string_value( port, "description" ,"Angle");
+
 
 	//@ setup the nodes
-	livido_set_portptr_array( filter, "in_parameter_templates",2, in_params );
+	livido_set_portptr_array( filter, "in_parameter_templates",3, in_params );
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
         livido_set_portptr_array( filter, "in_channel_templates",1, in_chans );
 

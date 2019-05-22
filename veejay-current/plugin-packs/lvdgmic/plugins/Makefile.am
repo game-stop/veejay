@@ -18,11 +18,9 @@ lividoplugin_LTLIBRARIES = gmic_cartoon.la \
 			   gmic_abstraction.la \
 			   gmic_whirl.la \
 			   gmic_posteredges.la \
-			   gmic_posterhope.la \
 			   gmic_kuwahara.la \
 			   gmic_pendrawing.la \
 			   gmic_oldscool8bits.la \
-			   gmic_tetris.la \
 			   gmic_shifttiles.la \
 			   gmic_edges.la \
 			   gmic_ditheredbw.la \
@@ -98,8 +96,8 @@ gmic_whirl_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 gmic_posteredges_la_SOURCES = gmic_posteredges.c
 gmic_posteredges_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
-gmic_posterhope_la_SOURCES = gmic_posterhope.c
-gmic_posterhope_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+#gmic_posterhope_la_SOURCES = gmic_posterhope.c
+#gmic_posterhope_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
 gmic_kuwahara_la_SOURCES = gmic_kuwahara.c
 gmic_kuwahara_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
@@ -113,8 +111,8 @@ gmic_oldscool8bits_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 #gmic_sponge_la_SOURCES = gmic_sponge.c
 #gmic_sponge_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
-gmic_tetris_la_SOURCES = gmic_tetris.c
-gmic_tetris_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
+#gmic_tetris_la_SOURCES = gmic_tetris.c
+#gmic_tetris_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
 gmic_shifttiles_la_SOURCES = gmic_shifttiles.c
 gmic_shifttiles_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic

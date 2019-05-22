@@ -61,9 +61,9 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int gamma =  lvd_extract_param_index( my_instance,"in_parameters", 0 );
 	int smoothness = lvd_extract_param_index( my_instance,"in_parameters", 1 );
 
-	snprintf(cmd,sizeof(cmd),"-poster_hope %f,%d", (float) gamma/100.0f, smoothness );
+	snprintf(cmd,sizeof(cmd),"-poster_hope %f,%f", (float) gamma * 0.01f, (float) smoothness * 0.01f );
 
-	lvdgmic_push( gmic, w, h, palette, A, 0);
+	lvdgmic_push( gmic, w, h, 0, A, 0);
 
 	lvdgmic_gmic( gmic, cmd );
 
@@ -134,8 +134,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Gamma" );
 		livido_set_string_value(port, "kind", "INDEX" );
-		livido_set_int_value( port, "min", -300 );
-		livido_set_int_value( port, "max", 300 );
+		livido_set_int_value( port, "min", -3000 );
+		livido_set_int_value( port, "max", 3000 );
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Gamma");
 
@@ -146,8 +146,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Smoothness" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 20 );
-		livido_set_int_value( port, "default", 3 );
+		livido_set_int_value( port, "max", 2000 );
+		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Smoothness");
 
 	livido_set_portptr_array( filter, "in_parameter_templates",2, in_params );

@@ -62,7 +62,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int scale = lvd_extract_param_index(my_instance, "in_parameters",2);
 	int seed = lvd_extract_param_index(my_instance, "in_parameters",3);
 
-	snprintf(cmd,sizeof(cmd),"-srand %d -plasma %f,%f,%d", seed,alpha/100.0f, beta/100.0f, scale );
+	snprintf(cmd,sizeof(cmd),"-srand %d -plasma %d,%d,%d", seed,alpha, beta, scale );
 
 	lvdgmic_push( gmic, w, h, 0, A, 0);
 

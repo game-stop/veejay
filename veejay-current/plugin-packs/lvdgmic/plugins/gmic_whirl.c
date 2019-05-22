@@ -60,9 +60,9 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 	int amplitude = lvd_extract_param_index( my_instance,"in_parameters", 0 );
 
-	snprintf(cmd,sizeof(cmd),"-draw_whirl %d", amplitude );
+	snprintf(cmd,sizeof(cmd),"-draw_whirl %f", (float)amplitude * 0.1f );
 
-	lvdgmic_push( gmic, w, h, palette, A, 0);
+	lvdgmic_push( gmic, w, h, 0, A, 0);
 
 	lvdgmic_gmic( gmic, cmd );
 
@@ -135,8 +135,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "name", "Amplitude" );
 		livido_set_string_value(port, "kind", "INDEX" );
 		livido_set_int_value( port, "min", 0 );
-		livido_set_int_value( port, "max", 100 );
-		livido_set_int_value( port, "default", 20 );
+		livido_set_int_value( port, "max", 1000 );
+		livido_set_int_value( port, "default", 200 );
 		livido_set_string_value( port, "description" ,"Amplitude");
 	
 	livido_set_portptr_array( filter, "in_parameter_templates",1,in_params );
