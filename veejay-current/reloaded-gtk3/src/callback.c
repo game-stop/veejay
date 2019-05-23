@@ -2351,9 +2351,11 @@ void on_video_settings_activate (GtkMenuItem     *menuitem,
   if(!info->status_lock)
   {
     GtkWidget *veejay_settings_window = glade_xml_get_widget_(info->main_window, "video_options");
-    gtk_widget_show(veejay_settings_window);
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_transient_for (GTK_WINDOW(veejay_settings_window),GTK_WINDOW (mainw));
     gtk_window_set_keep_above( GTK_WINDOW(veejay_settings_window), TRUE );
 
+    gtk_window_present(GTK_WINDOW(veejay_settings_window));
   }
 }
 
@@ -2364,11 +2366,14 @@ void on_video_settings_activate (GtkMenuItem     *menuitem,
 void on_image_calibration_activate (GtkMenuItem    *menuitem,
                                     gpointer        data)
 {
-  GtkWidget *win = glade_xml_get_widget_(info->main_window,"calibration_window" );
-  gtk_widget_show(win);
-  gtk_window_set_keep_above( GTK_WINDOW(win), TRUE );
+    GtkWidget *calibration_window = glade_xml_get_widget_(info->main_window,"calibration_window" );
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_transient_for (GTK_WINDOW(calibration_window),GTK_WINDOW (mainw));
+    gtk_window_set_keep_above( GTK_WINDOW(calibration_window), TRUE );
 
-  cali_onoff = 1;
+    gtk_window_present(GTK_WINDOW(calibration_window));
+
+    cali_onoff = 1;
 }
 
 /* 
@@ -2528,12 +2533,12 @@ void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
 void on_vims_bundles_activate (GtkMenuItem     *menuitem,
                                gpointer         user_data)
 {
-  GtkWidget *vims_bundles_window = glade_xml_get_widget_(info->main_window, "vims_bundles");
-  GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
-  gtk_window_set_transient_for (GTK_WINDOW(vims_bundles_window),GTK_WINDOW (mainw));
-  gtk_window_set_keep_above( GTK_WINDOW(vims_bundles_window), TRUE );
+    GtkWidget *vims_bundles_window = glade_xml_get_widget_(info->main_window, "vims_bundles");
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_transient_for (GTK_WINDOW(vims_bundles_window),GTK_WINDOW (mainw));
+    gtk_window_set_keep_above( GTK_WINDOW(vims_bundles_window), TRUE );
 
-  gtk_widget_show(vims_bundles_window);
+    gtk_window_present(GTK_WINDOW(vims_bundles_window));
 }
 
 
@@ -2682,18 +2687,15 @@ void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
 	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SYNC_CORRECTION, status );
 }
 
-void	on_curve_clear_parameter_clicked( GtkWidget *widget, gpointer user_data ) 
+void	on_curve_clear_parameter_clicked( GtkWidget *widget, gpointer user_data )
 {
-	if( info->uc.selected_parameter_id == -1 )
-		return;
-	multi_vims( VIMS_SAMPLE_KF_CLEAR, "%d %d", info->uc.selected_chain_entry, info->uc.selected_parameter_id  );
+    if( info->uc.selected_parameter_id == -1 )
+        return;
+
+    multi_vims(VIMS_SAMPLE_KF_CLEAR, "%d %d",info->uc.selected_chain_entry,info->uc.selected_parameter_id);
     info->uc.reload_hint[HINT_KF] = 1;
-
-    if(!is_button_toggled("kf_none")) {
-        set_toggle_button("kf_none",1);
-    }
     reset_curve(info->curve);
-
+    vj_kf_select_parameter(info->uc.selected_parameter_id);
 }
 
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
@@ -3160,19 +3162,27 @@ void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
 {
-	// inputstream_window
-	GtkWidget *w = glade_xml_get_widget_(info->main_window, "inputstream_window");
-	scan_devices( "tree_v4ldevices" );
-	gtk_widget_show(w);
-    gtk_window_set_keep_above( GTK_WINDOW(w), TRUE );
+    // inputstream_window
+    scan_devices( "tree_v4ldevices" );
+
+    GtkWidget *inputstream_window = glade_xml_get_widget_(info->main_window, "inputstream_window");
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_transient_for (GTK_WINDOW(inputstream_window),GTK_WINDOW (mainw));
+    gtk_window_set_keep_above( GTK_WINDOW(inputstream_window), TRUE );
+
+    gtk_window_present(GTK_WINDOW(inputstream_window));
 }
 
 void	on_generatornew_clicked(GtkWidget *widget, gpointer user_data)
 {
-  GtkWidget *w = glade_xml_get_widget_(info->main_window, "generator_window");
-  scan_generators( "generators" );
-  gtk_widget_show(w);
-  gtk_window_set_keep_above( GTK_WINDOW(w), TRUE );
+    scan_generators( "generators" );
+
+    GtkWidget *generator_window = glade_xml_get_widget_(info->main_window, "generator_window");
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_transient_for (GTK_WINDOW(generator_window),GTK_WINDOW (mainw));
+    gtk_window_set_keep_above( GTK_WINDOW(generator_window), TRUE );
+
+    gtk_window_present(GTK_WINDOW(generator_window));
 }
 
 void	on_inputstream_close_clicked(GtkWidget *w,  gpointer user_data)
