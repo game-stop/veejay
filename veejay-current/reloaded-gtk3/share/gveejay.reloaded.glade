@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.20.0 -->
+<!-- Generated with glade 3.22.1 -->
 <interface>
   <requires lib="gtk+" version="3.16"/>
   <!-- interface-css-provider-path gveejay.reloaded.css -->
@@ -8,9 +8,15 @@
     <child>
       <placeholder/>
     </child>
+    <child>
+      <placeholder/>
+    </child>
   </object>
   <object class="GtkApplicationWindow">
     <property name="can_focus">False</property>
+    <child>
+      <placeholder/>
+    </child>
     <child>
       <placeholder/>
     </child>
@@ -144,6 +150,9 @@
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_generator_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkFrame" id="frame_generator">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
@@ -190,6 +199,12 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
@@ -1558,6 +1573,9 @@
     <property name="title" translatable="yes">Image Calibration</property>
     <signal name="delete-event" handler="on_calibration_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkBox" id="vbox637">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
@@ -2398,6 +2416,9 @@
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_inputstream_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkFrame" id="frame161">
         <property name="width_request">340</property>
         <property name="visible">True</property>
@@ -2769,6 +2790,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_veejay_connection_close" swapped="no"/>
     <signal name="delete-event" handler="on_veejay_connection_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox3">
         <property name="visible">True</property>
@@ -3240,6 +3264,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_video_options_close" swapped="no"/>
     <signal name="delete-event" handler="on_video_options_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="vbox_video_options">
         <property name="visible">True</property>
@@ -4105,6 +4132,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_vims_bundles_close" swapped="no"/>
     <signal name="delete-event" handler="on_vims_bundles_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox5">
         <property name="visible">True</property>
@@ -4501,6 +4531,9 @@
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Reloaded</property>
     <property name="icon">veejay-icon.png</property>
+    <child>
+      <placeholder/>
+    </child>
     <child>
       <object class="GtkBox" id="veejay_box">
         <property name="visible">True</property>
@@ -8485,9 +8518,6 @@
                                     <property name="top_attach">0</property>
                                   </packing>
                                 </child>
-                                <child>
-                                  <placeholder/>
-                                </child>
                               </object>
                               <packing>
                                 <property name="expand">False</property>
@@ -10826,6 +10856,7 @@
                             <property name="can_focus">True</property>
                             <property name="margin_left">8</property>
                             <property name="margin_top">8</property>
+                            <signal name="switch-page" handler="on_sample_panel_switch_page" swapped="no"/>
                             <child>
                               <object class="GtkBox" id="vbox623">
                                 <property name="visible">True</property>

@@ -746,7 +746,7 @@ void free_samplebank(void);
 void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
 static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
-static void update_curve_widget( GtkWidget *curve );
+static int update_curve_widget( GtkWidget *curve );
 /* not used */ /* static void update_curve_accessibility(const char *name); */
 static void reset_tree(const char *name);
 static void reload_srt();
@@ -2712,8 +2712,22 @@ static void vj_kf_reset()
 {
     info->status_lock = 1;
     reset_curve( info->curve );
+    
+    if(!is_button_toggled("kf_none")) {
+        set_toggle_button("kf_none",1);
+    }
+    if(!is_button_toggled("curve_toggleentry_param")) {
+        set_toggle_button( "curve_toggleentry_param", 0 );
+    }
+    
+    int lo = (info->selection[0] == info->selection[1] ? 0 : info->selection[0]);
+    int hi = (info->selection[1] > info->selection[0] ? info->selection[1] : info->status_tokens[TOTAL_FRAMES] );
+
+    update_spin_range( "curve_spinstart", 0, info->status_tokens[TOTAL_FRAMES], lo );
+    update_spin_range( "curve_spinend", 0, info->status_tokens[TOTAL_FRAMES], hi );
+
     //set_toggle_button( "curve_chain_toggleentry", 0 );
-    set_toggle_button( "curve_toggleentry_param", 0);
+    //set_toggle_button( "curve_toggleentry_param", 0);
     update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
     info->status_lock = 0;
 }
@@ -2722,18 +2736,16 @@ static void vj_kf_refresh()
 {
     int *entry_tokens = &(info->uc.entry_tokens[0]);
 
+    int status = 0;
     if( entry_tokens[ENTRY_FXID] > 0 ) {
         enable_widget( "frame_fxtree3" );
-        update_curve_widget(info->curve);
+        status = update_curve_widget(info->curve);
     }
     else {
-        if(!is_button_toggled("kf_none")) {
-            set_toggle_button("kf_none",1);
-        }
-        if(!is_button_toggled("curve_toggleentry_param")) {
-            set_toggle_button( "curve_toggleentry_param", 0 );
-        }
         disable_widget( "frame_fxtree3" );
+    }
+
+    if( status == 0 ) {
         vj_kf_reset();
     }
 }
@@ -2759,8 +2771,8 @@ static void vj_kf_select_parameter(int num)
     int lo=0,hi=0;
     if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
     {
-        lo = info->status_tokens[SAMPLE_START];
-        hi = info->status_tokens[SAMPLE_END];
+        lo = info->status_tokens[SAMPLE_MARKER_START];
+        hi = info->status_tokens[SAMPLE_MARKER_END];
     }
     else
     {
@@ -2774,10 +2786,12 @@ static void vj_kf_select_parameter(int num)
     update_curve_widget( info->curve );
 }
 
-static void update_curve_widget(GtkWidget *curve)
+static int update_curve_widget(GtkWidget *curve)
 {
     sample_slot_t *s = info->selected_slot;
-    if(!s )     return;
+    if(!s ) 
+        return 0;
+
     int i = info->uc.selected_chain_entry; /* chain entry */
     int id = info->uc.entry_tokens[ENTRY_FXID];
     int blen = 0;
@@ -2794,7 +2808,7 @@ static void update_curve_widget(GtkWidget *curve)
     int checksum = data_checksum( (char*) blob, blen );
     if( info->uc.reload_hint_checksums[HINT_KF] == checksum ) {
         if( blob ) free(blob);
-        return;
+        return 0;
     }
     info->uc.reload_hint_checksums[HINT_KF] = checksum;
 
@@ -2835,10 +2849,12 @@ static void update_curve_widget(GtkWidget *curve)
             hi = info->status_tokens[SAMPLE_MARKER_END];
         }
     }
-    update_spin_range( "curve_spinstart", lo, hi, lo );
-    update_spin_range( "curve_spinend", lo, hi, hi );
+    update_spin_range( "curve_spinstart", 0, info->status_tokens[TOTAL_FRAMES], lo );
+    update_spin_range( "curve_spinend", 0, info->status_tokens[TOTAL_FRAMES], hi );
 
     if(blob)    free(blob);
+
+    return 1;
 }
 
 static int get_nums(const char *name)
@@ -3839,7 +3855,7 @@ gboolean view_entry_selection_func (GtkTreeSelection *selection,
             if( get_nums("button_fx_entry") != name ) {
                 info->status_lock = 1;
                 update_spin_value( "button_fx_entry", name   );
-                vj_kf_reset();
+                //vj_kf_reset();
                 info->uc.reload_hint[HINT_KF] = 1;
                 info->uc.reload_hint[HINT_ENTRY] = 1;
                 info->status_lock = 0;
@@ -4140,7 +4156,6 @@ static gint load_parameter_info()
     }
  
     info->uc.reload_hint_checksums[HINT_ENTRY] = checksum;
-
 
     veejay_memset( p, 0, sizeof(info->uc.entry_tokens));
 
@@ -6923,6 +6938,14 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             info->status_lock = 0;
         }
 
+        if( pm == MODE_SAMPLE ) {
+            info->selection[0] = info->status_tokens[SAMPLE_MARKER_START];
+            info->selection[1] = info->status_tokens[SAMPLE_MARKER_END];
+
+            update_spin_value( "button_el_selstart", info->selection[0]);
+            update_spin_value( "button_el_selend", info->selection[1]);
+        }
+        
         select_slot( info->status_tokens[PLAY_MODE] );
     }
 
@@ -9210,6 +9233,8 @@ static void set_selection_of_slot_in_samplebank(gboolean active)
         info->status_tokens[PLAY_MODE] == MODE_STREAM &&
         info->selection_slot->sample_type != 0 ) 
        ) {
+        remove_class(info->selection_gui_slot->frame, "selected" );
+        add_class(info->selected_gui_slot->frame, "active");
         return;
     }
 

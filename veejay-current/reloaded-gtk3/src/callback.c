@@ -573,6 +573,7 @@ void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 	multi_vims( VIMS_CHAIN_CLEAR, "%d",0);
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
+    info->uc.reload_hint[HINT_KF] = 1;
 	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_CLEAR,0 );
 	vj_msg(VEEJAY_MSG_INFO, "Clear FX Chain");
 }
@@ -623,6 +624,7 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 		info->uc.selected_chain_entry );
 	info->uc.reload_hint[HINT_ENTRY] = 1;
 	info->uc.reload_hint[HINT_CHAIN] = 1;
+    info->uc.reload_hint[HINT_KF] = 1;
 	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_CHAIN_ENTRY_CLEAR, 0, info->uc.selected_chain_entry );
 	vj_msg(VEEJAY_MSG_INFO, "Clear Effect from Entry %d",
 		info->uc.selected_chain_entry);
@@ -3119,6 +3121,8 @@ void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 			free(dur);
 
             update_spin_value ( "button_el_selend", pos2 );
+            update_spin_value ( "curve_spinend", pos2 );
+            info->selection[0] = pos2;
 		}
 		else
 			vj_msg(VEEJAY_MSG_INFO, "Set Out point after In point !");
@@ -3143,6 +3147,8 @@ void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 			free(dur);
 
             update_spin_value( "button_el_selstart",pos1 );
+            update_spin_value( "curve_spinstart", pos1 );
+            info->selection[1] = pos1;
 		}
 		else
 			vj_msg(VEEJAY_MSG_INFO,"Set In Point before Out Point !");
@@ -4887,6 +4893,15 @@ void on_sample_loopstop_value_changed( GtkWidget *widget, gpointer user_data )
         return;
 
     multi_vims( VIMS_SAMPLE_SET_LOOPS, "%d %d", 0, get_nums("sample_loopstop"));
+}
+
+void on_sample_panel_switch_page( GtkWidget *widget, gpointer user_data ) 
+{
+    int page = gtk_notebook_get_current_page(GTK_NOTEBOOK(widget));
+    if( page == 1 ) {
+        update_spin_value("button_el_selstart", info->selection[0] );
+        update_spin_value("button_el_selend", info->selection[1] );
+    }
 }
 
 
