@@ -658,7 +658,6 @@ static widget_name_t *param_frame_ = NULL;
 static widget_name_t *param_names_ = NULL;
 static widget_name_t *param_incs_ = NULL;
 static widget_name_t *param_decs_ = NULL;
-static widget_name_t *param_kfs_ = NULL;
 static widget_name_t *gen_names_ = NULL;
 static widget_name_t *gen_box_names_ = NULL;
 static widget_name_t *gen_incs_ = NULL;
@@ -2773,9 +2772,8 @@ static void vj_kf_reset()
     //set_toggle_button( "curve_toggleentry_param", 0);
 
     GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
-    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0); // FX_PARAMETER_DEFAULT_NAME
 
-    update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
     info->status_lock = 0;
 }
 
@@ -2789,10 +2787,9 @@ static void vj_kf_refresh()
         status = update_curve_widget(info->curve);
     }
     else {
-        if(!is_button_toggled("kf_none")) {
-            GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
-            gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
-            set_toggle_button("kf_none",1);
+        GtkComboBox *kf_param = GTK_COMBO_BOX(glade_xml_get_widget_(info->main_window,"combo_curve_fx_param"));
+        if(gtk_combo_box_get_active(kf_param) != 0) {
+            gtk_combo_box_set_active (kf_param,0); // FX_PARAMETER_DEFAULT_NAME
         }
         if(!is_button_toggled("curve_toggleentry_param")) {
             set_toggle_button( "curve_toggleentry_param", 0 );
@@ -2811,17 +2808,12 @@ static void vj_kf_select_parameter(int num)
     if(!s)
     {
         GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
-        gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
-        update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
+        gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0); // FX_PARAMETER_DEFAULT_NAME
         return;
     }
     int *entry_tokens = &(info->uc.entry_tokens[0]);
 
     info->uc.selected_parameter_id = num;
-
-    gchar *name = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],info->uc.selected_parameter_id));
-    update_label_str( "curve_parameter", name );
-    g_free(name);
 
     reset_curve( info->curve );
 
@@ -2836,15 +2828,15 @@ static void vj_kf_select_parameter(int num)
         lo = 0;
         hi = info->status_tokens[SAMPLE_MARKER_END];
     }
-    
     if( lo == 0 && hi == 0 ) {
         lo = 0;
         hi = info->status_tokens[TOTAL_FRAMES];
     }
 
     set_initial_curve( info->curve, entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id, 
-            lo, hi ,
-            entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
+                       lo, hi ,
+                       entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
+
     update_curve_widget( info->curve );
 }
 
@@ -4269,7 +4261,7 @@ static gint load_parameter_info()
         set_toggle_button( "curve_chain_toggleentry", p[ENTRY_KF_STATUS] );
     }
 
-    update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
+//    update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
 
     switch( p[ENTRY_KF_TYPE] )
     {
@@ -7191,6 +7183,7 @@ static void disable_fx_entry() {
     }
 
     update_label_str( "label_effectname" ,"" );
+    update_label_str( "label_effectanim_name" ,"" );
     update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
 
     if( is_button_toggled("button_entry_toggle") ) {
@@ -7207,7 +7200,7 @@ static void disable_fx_entry() {
     if( is_button_toggled("transition_enabled") ) {
         set_toggle_button( "transition_enabled", FALSE);\
     }
-    
+
     for( i = 0; fx_fade_entry[i].name != NULL;i ++ ) {
         disable_widget( fx_fade_entry[i].name );
     }
@@ -7217,15 +7210,11 @@ static void disable_fx_entry() {
 
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
-        if( !is_widget_enabled( slider_names_[i].text ) && !is_widget_enabled( param_kfs_[i].text ) )
+        if( !is_widget_enabled( slider_names_[i].text ) )
             continue;
 
         update_slider_range( slider_names_[i].text, min,max, value, 0 );
-
         disable_widget( slider_box_names_[i].text );
-        disable_widget( param_kfs_[i].text );
-
-        set_tooltip( param_kfs_[i].text, NULL );
         set_tooltip( slider_names_[i].text, NULL );
 
         gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,param_names_[i].text)),NULL);
@@ -7245,6 +7234,7 @@ static void enable_fx_entry() {
     }
 
     update_label_str( "label_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
+    update_label_str( "label_effectanim_name", _effect_get_description( entry_tokens[ENTRY_FXID] ));
 
     if( entry_tokens[ENTRY_VIDEO_ENABLED] != is_button_toggled( "button_entry_toggle" ) ) {
         set_toggle_button("button_entry_toggle", entry_tokens[ENTRY_VIDEO_ENABLED] );
@@ -7314,17 +7304,26 @@ static void enable_fx_entry() {
             enable_widget( slider_box_names_[i].text );
         }
 
-        if( !is_widget_enabled( param_kfs_[i].text ) ) {
-            enable_widget( param_kfs_[i].text );
+//~ if( !is_widget_enabled( param_kfs_[i].text ) ) {
+            //~ enable_widget( param_kfs_[i].text );
+//~ }
+        if( faster_ui_ ){
+            show_widget( param_frame_[i].text );
         }
-
-        if( faster_ui_ )
-         show_widget( param_frame_[i].text );
 
         gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
         set_tooltip( slider_names_[i].text, tt1 );
         gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,param_names_[i].text)),tt1);
 
+        size_t n = 1 + 2 + 1 + strlen(tt1); // see sprintf
+        gchar *kf_param_text = (gchar*)vj_malloc(sizeof(gchar)*(n+1));
+        sprintf(kf_param_text, "p%d %s",i, tt1); // i < MAX_UI_PARAMETERS
+        gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), kf_param_text);
+
+        g_free(tt1);
+        free(kf_param_text);
+
+/* WARNING : conditional loop break. Do not add code after this statement. */
         value = entry_tokens[ENTRY_PARAMSET + i];
         if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
         {
@@ -7336,32 +7335,21 @@ static void enable_fx_entry() {
     
             update_slider_range( slider_names_[i].text,min,max, value, 0);
         }
-        set_tooltip( param_kfs_[i].text, tt1 );
-
-        size_t n = 1 + 2 + 1 + strlen(tt1); // see sprintf
-        gchar *kf_param_text = (gchar*)vj_malloc(sizeof(gchar)*(n+1));
-        sprintf(kf_param_text, "p%d %s",i, tt1);
-        gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), kf_param_text);
-
-        g_free(tt1);
-        free(kf_param_text);
     }
    
     min = 0; max = 1; value = 0; 
     for( i = np; i < MAX_UI_PARAMETERS; i ++ )
     {
-        if( !is_widget_enabled( slider_names_[i].text ) && !is_widget_enabled( param_kfs_[i].text ) )
+        if( !is_widget_enabled( slider_names_[i].text ) )
             continue;
 
         update_slider_range( slider_names_[i].text, min,max, value, 0 );
 
         disable_widget( slider_box_names_[i].text );
-        disable_widget( param_kfs_[i].text );
 
         if( faster_ui_ )
           hide_widget( param_frame_[i].text );
 
-        set_tooltip( param_kfs_[i].text, NULL );
         set_tooltip( slider_names_[i].text, NULL );
         
         gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,param_names_[i].text)),NULL);
@@ -8000,7 +7988,6 @@ void vj_gui_init(const char *glade_file,
     param_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
     param_incs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
     param_decs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
-    param_kfs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * MAX_UI_PARAMETERS );
     gen_decs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * GENERATOR_PARAMS );
     gen_incs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * GENERATOR_PARAMS );
     gen_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * GENERATOR_PARAMS );
@@ -8025,9 +8012,6 @@ void vj_gui_init(const char *glade_file,
 
         snprintf(text,sizeof(text), "dec_p%d", i );
         param_decs_[i].text = strdup( text );
-
-        snprintf(text,sizeof(text), "kf_p%d", i );
-        param_kfs_[i].text = strdup( text );
     }
 
     for( i = 0; i < GENERATOR_PARAMS; i ++ )

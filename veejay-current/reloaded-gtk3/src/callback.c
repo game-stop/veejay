@@ -2791,9 +2791,6 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
     GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
     gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param), 0); // <None>
 
-    if(!is_button_toggled("kf_none")) {
-        set_toggle_button("kf_none",1);
-    }
     reset_curve(info->curve);
 }
 
@@ -2949,116 +2946,7 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
         g_free(active_kf);//DEBUG
     }
 }
-/*
-void	on_kf_none_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-	{
-		info->uc.selected_parameter_id = -1;
 
-		disable_widget( "fxanimcontrols" );
-		disable_widget( "curve_container" );
-
-		if(info->status_lock)
-			return;
-
-		vj_kf_reset();
-	}
-    else {
-        enable_widget("fxanimcontrols");
-        enable_widget("curve_container");
-    }
-}
-*/
-/*
-void	on_kf_p0_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 0 );
-}
-void	on_kf_p1_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 1 );
-}
-void	on_kf_p2_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 2 );
-}
-void	on_kf_p3_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 3 );
-}
-void	on_kf_p4_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 4 );
-}
-void	on_kf_p5_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 5 );
-}
-void	on_kf_p6_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 6 );
-}
-void	on_kf_p7_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 7 );
-}
-void	on_kf_p8_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 8 );
-}
-void	on_kf_p9_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 9 );
-}
-void	on_kf_p10_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 10 );
-}
-
-void	on_kf_p11_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 11 );
-}
-
-void	on_kf_p12_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 12 );
-}
-
-
-void	on_kf_p13_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 13 );
-}
-
-
-void	on_kf_p14_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 14 );
-}
-
-void	on_kf_p15_toggled( GtkToggleButton *widget, gpointer user_data)
-{
-	if(gtk_toggle_button_get_active( widget ))
-		KF_CHANGED( 15 );
-}
-*/
 void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "videobook" );
