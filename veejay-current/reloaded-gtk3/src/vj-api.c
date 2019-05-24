@@ -2771,6 +2771,10 @@ static void vj_kf_reset()
 
     //set_toggle_button( "curve_chain_toggleentry", 0 );
     //set_toggle_button( "curve_toggleentry_param", 0);
+
+    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+
     update_label_str( "curve_parameter",FX_PARAMETER_DEFAULT_NAME);
     info->status_lock = 0;
 }
@@ -2785,6 +2789,14 @@ static void vj_kf_refresh()
         status = update_curve_widget(info->curve);
     }
     else {
+        if(!is_button_toggled("kf_none")) {
+            GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+            gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+            set_toggle_button("kf_none",1);
+        }
+        if(!is_button_toggled("curve_toggleentry_param")) {
+            set_toggle_button( "curve_toggleentry_param", 0 );
+        }
         disable_widget( "frame_fxtree3" );
     }
 
@@ -2798,6 +2810,8 @@ static void vj_kf_select_parameter(int num)
     sample_slot_t *s = info->selected_slot;
     if(!s)
     {
+        GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+        gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
         update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
         return;
     }
@@ -7198,6 +7212,9 @@ static void disable_fx_entry() {
         disable_widget( fx_fade_entry[i].name );
     }
 
+    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
+
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
         if( !is_widget_enabled( slider_names_[i].text ) && !is_widget_enabled( param_kfs_[i].text ) )
@@ -7210,9 +7227,9 @@ static void disable_fx_entry() {
 
         set_tooltip( param_kfs_[i].text, NULL );
         set_tooltip( slider_names_[i].text, NULL );
-        
+
         gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,param_names_[i].text)),NULL);
-    
+
         if( faster_ui_ ) 
           hide_widget( param_frame_[i].text );
     }
@@ -7283,8 +7300,14 @@ static void enable_fx_entry() {
         }
     }
 
+    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), FX_PARAMETER_DEFAULT_NAME);
+    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+
     int np = _effect_get_np( entry_tokens[ENTRY_FXID] );
     gint min,max,value;
+
     for( i = 0; i < np ; i ++ )
     {
         if( !is_widget_enabled( slider_box_names_[i].text ) ) {
@@ -7314,7 +7337,14 @@ static void enable_fx_entry() {
             update_slider_range( slider_names_[i].text,min,max, value, 0);
         }
         set_tooltip( param_kfs_[i].text, tt1 );
+
+        size_t n = 1 + 2 + 1 + strlen(tt1); // see sprintf
+        gchar *kf_param_text = (gchar*)vj_malloc(sizeof(gchar)*(n+1));
+        sprintf(kf_param_text, "p%d %s",i, tt1);
+        gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), kf_param_text);
+
         g_free(tt1);
+        free(kf_param_text);
     }
    
     min = 0; max = 1; value = 0; 

@@ -2788,6 +2788,9 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 
     info->uc.reload_hint[HINT_KF] = 1;
 
+    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param), 0); // <None>
+
     if(!is_button_toggled("kf_none")) {
         set_toggle_button("kf_none",1);
     }
@@ -2921,6 +2924,32 @@ void	curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	}
 }
 
+void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
+{
+    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    gchar *active_kf = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT(kf_param));//DEBUG
+    gint active_kf_id = gtk_combo_box_get_active (GTK_COMBO_BOX(kf_param));
+    if (active_kf_id != -1) {
+        if(active_kf_id == 0){
+            info->uc.selected_parameter_id = -1;
+
+            disable_widget( "fxanimcontrols" );
+            disable_widget( "curve_container" );
+
+            if(info->status_lock)
+              return;
+
+            vj_kf_reset();
+        } else {
+            KF_CHANGED (active_kf_id -1); ////None is id 0
+            enable_widget( "fxanimcontrols" );
+            enable_widget( "curve_container" );
+        }
+        veejay_msg(VEEJAY_MSG_INFO,"kf param changed !!! %s ", active_kf);//DEBUG
+        g_free(active_kf);//DEBUG
+    }
+}
+/*
 void	on_kf_none_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if(gtk_toggle_button_get_active( widget ))
@@ -2940,7 +2969,8 @@ void	on_kf_none_toggled( GtkToggleButton *widget, gpointer user_data)
         enable_widget("curve_container");
     }
 }
-
+*/
+/*
 void	on_kf_p0_toggled( GtkToggleButton *widget, gpointer user_data)
 {
 	if(gtk_toggle_button_get_active( widget ))
@@ -3028,7 +3058,7 @@ void	on_kf_p15_toggled( GtkToggleButton *widget, gpointer user_data)
 	if(gtk_toggle_button_get_active( widget ))
 		KF_CHANGED( 15 );
 }
-
+*/
 void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "videobook" );
