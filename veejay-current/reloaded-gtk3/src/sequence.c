@@ -849,11 +849,10 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 static	int	*int_dup( int *status )
 {
 	int *res = (int*) vj_calloc( sizeof(int) * STATUS_TOKENS );
-	int i;
-	for(i =0; i < STATUS_TOKENS ; i ++ )
-		res[i] = status[i];
-	return res;
+    veejay_memcpy( res, status, STATUS_TOKENS * sizeof(int));
+    return res;
 }
+
 // TODO related profil_no_2
 static int	**gvr_grab_stati( void *preview )
 {

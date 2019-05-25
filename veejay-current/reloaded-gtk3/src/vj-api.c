@@ -103,11 +103,43 @@ static gpointer castIntToGpointer( int val)
 
 #define MAX_SLOW 25
 #define QUICKSELECT_SLOTS 10
+#define MAX_WIDGET_CACHE 100
 
 static int beta__ = 0;
 static int use_vims_mcast = 0;
 static int samplebank_ready_ = 0;
 static int faster_ui_ = 0;
+
+static GtkWidget *widget_cache[MAX_WIDGET_CACHE];
+
+enum {
+  WIDGET_IMAGEA = 0,
+  WIDGET_NOTEBOOK18 = 1,
+  WIDGET_LABEL_CURFRAME = 2,
+  WIDGET_LABEL_MOUSEAT = 3,
+  WIDGET_LABEL_CURTIME = 4,
+  WIDGET_LABEL_SAMPLEPOSITION = 5,
+  WIDGET_PANELS = 6,
+  WIDGET_VIMS_MESSENGER_PLAY = 7,
+};
+
+static struct
+{
+    const char *name;
+    const int id;
+} widget_map[] = 
+{
+    { "imageA",                 WIDGET_IMAGEA },
+    { "notebook18",             WIDGET_NOTEBOOK18 },
+    { "panels",                 WIDGET_PANELS },
+    { "label_curframe",         WIDGET_LABEL_CURFRAME },
+    { "label_mouseat",          WIDGET_LABEL_MOUSEAT },
+    { "label_curtime",          WIDGET_LABEL_CURTIME },
+    { "label_sampleposition",   WIDGET_LABEL_SAMPLEPOSITION },
+    { "vims_messenger_play",    WIDGET_VIMS_MESSENGER_PLAY },
+    { NULL, -1 },
+};
+
 
 static struct
 {
@@ -681,6 +713,7 @@ static void update_spin_range(const char *name, gint min, gint max, gint val);
 static void update_spin_incr(const char *name, gdouble step, gdouble page);
 //static void update_knob_value(GtkWidget *w, gdouble value, gdouble scale );
 static void update_spin_value(const char *name, gint value);
+static void update_label_i2(GtkWidget *label, int num, int prefix);
 static void update_label_i(const char *name, int num, int prefix);
 static void update_label_f(const char *name, float val);
 static void update_label_str(const char *name, gchar *text);
@@ -761,6 +794,16 @@ static void vj_kf_reset();
 static void veejay_stop_connecting(vj_gui_t *gui);
 void reload_macros();
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
+
+static void init_widget_cache()
+{
+    // TODO: add more mappings to reduce the number of times we need to call glade_xml_get_widget_ from update_gui() 
+    memset(widget_cache, 0, sizeof(widget_cache));
+
+    for( int i = 0; widget_map[i].name != NULL; i ++ ) {
+        widget_cache[ widget_map[i].id ] = glade_xml_get_widget_( info->main_window, widget_map[i].name );
+    }
+}
 
 gboolean   periodic_pull(gpointer data)
 {
@@ -3090,6 +3133,16 @@ static void update_slider_range(const char *name, gint min, gint max, gint value
     gtk_range_set_adjustment(range, a );
 }
 
+static void update_label_i2(GtkWidget *label, int num, int prefix)
+{
+    char str[20];
+    if(prefix)
+        g_snprintf( str,sizeof(str), "%09d", num );
+    else
+        g_snprintf( str,sizeof(str), "%d",    num );
+    gtk_label_set_text( GTK_LABEL(label), str);
+}
+
 static void update_label_i(const char *name, int num, int prefix)
 {
     GtkWidget *label = glade_xml_get_widget_(
@@ -3444,9 +3497,9 @@ static void update_current_slot(int *history, int pm, int last_pm)
             info->uc.reload_hint[HINT_GENERATOR] = 1;
         }
 
-        char *time = format_time( info->status_frame,(double)info->el.fps );
+        /*char *time = format_time( info->status_frame,(double)info->el.fps );
         update_label_str( "label_curtime", time );
-        free(time);
+        free(time);*/
         
         update_label_str( "playhint", "Streaming");
     
@@ -3628,12 +3681,15 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
 static void on_vims_messenger (void)
 {
+    if( !gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_VIMS_MESSENGER_PLAY] )) )
+        return;
+
     GtkTextIter start, end;
     GtkTextBuffer* buffer;
-    GtkTextView* t= NULL;
     gchar *str = NULL;
     static int wait = 0;
-    t = GTK_TEXT_VIEW(GTK_WIDGET(glade_xml_get_widget_
+
+    GtkTextView *t = GTK_TEXT_VIEW(GTK_WIDGET(glade_xml_get_widget_
                                  (info->main_window,"vims_messenger_textview")));
     buffer = gtk_text_view_get_buffer(t);
 
@@ -3642,19 +3698,17 @@ static void on_vims_messenger (void)
         info->vims_line = 0;
     }
 
-    if(is_button_toggled( "vims_messenger_play" ))
+    if(wait)
     {
-        if(wait)
-        {
-            wait--;
-        }
-        else
-        {
-            gtk_text_buffer_get_iter_at_line(buffer, &start, info->vims_line);
-            end = start;
+        wait--;
+    }
+    else
+    {
+        gtk_text_buffer_get_iter_at_line(buffer, &start, info->vims_line);
+        end = start;
 
-            gtk_text_iter_forward_sentence_end(&end);
-            str = gtk_text_buffer_get_text (buffer, &start, &end, TRUE);
+        gtk_text_iter_forward_sentence_end(&end);
+        str = gtk_text_buffer_get_text (buffer, &start, &end, TRUE);
 
 	    if(strlen(str) <= 0) {
 		    vj_msg(VEEJAY_MSG_INFO, "Nothing to do at line %d", info->vims_line);
@@ -3662,21 +3716,21 @@ static void on_vims_messenger (void)
 		    return;
 	    }
 
-            if(str[0] == '+')
-            {
-                str[0] = ' ';
-                g_strstrip(str);
-                wait = atoi(str);
-		vj_msg(VEEJAY_MSG_INFO, "Next VIMS message in %d frames", wait);
-            }
-            else
-            {
-		msg_vims( str );
-                vj_msg(VEEJAY_MSG_INFO, "Sent VIMS message '%s' (line %d)",str, info->vims_line );
-            }
-            info->vims_line++;
+        if(str[0] == '+')
+        {
+            str[0] = ' ';
+            g_strstrip(str);
+            wait = atoi(str);
+		    vj_msg(VEEJAY_MSG_INFO, "Next VIMS message in %d frames", wait);
         }
+        else
+        {
+		    msg_vims( str );
+            vj_msg(VEEJAY_MSG_INFO, "Sent VIMS message '%s' (line %d)",str, info->vims_line );
+        }
+        info->vims_line++;    
     }
+    
 }
 
 static int total_frames_ = 0;
@@ -6434,13 +6488,15 @@ char *format_selection_time(int start, int end)
 static gboolean update_cpumeter_timeout( gpointer data )
 {
     gdouble ms   = (gdouble)info->status_tokens[ELAPSED_TIME];
-    gdouble fs   = (gdouble)get_slider_val( "framerate" );
+    //gdouble fs   = (gdouble)get_slider_val( "framerate" );
+    gdouble fs = (gdouble) info->status_tokens[18] * 0.01;
     gdouble lim  = (1.0f/fs)*1000.0;
 
     if( ms < lim )
     {
         update_label_str( "cpumeter", text_msg_[TEXT_REALTIME].text );
-    } else
+    } 
+    else
     {
         char text[32];
         sprintf(text, "%2.2f FPS", ( 1.0f / ms ) * 1000.0 );
@@ -6644,6 +6700,7 @@ int gveejay_time_to_sync( void *ptr )
 
 int veejay_update_multitrack( void *ptr )
 {
+    
     sync_info *s = multitrack_sync( info->mt );
 
     if( s->status_list[s->master] == NULL ) {
@@ -6656,9 +6713,9 @@ int veejay_update_multitrack( void *ptr )
         return 1;
     }
 
-    GtkWidget *maintrack = glade_xml_get_widget_( info->main_window, "imageA");
+    GtkWidget *maintrack = widget_cache[ WIDGET_IMAGEA ];
     int i;
-    GtkWidget *ww = glade_xml_get_widget_( info->main_window, "notebook18" );
+    GtkWidget *ww = widget_cache[ WIDGET_NOTEBOOK18 ];
     int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
 
 #ifdef STRICT_CHECKING
@@ -6786,7 +6843,7 @@ static void update_status_accessibility(int old_pm, int new_pm)
             enable_widget( plainwidgets[i].name);
     }
 
-    GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
+    GtkWidget *n = widget_cache[ WIDGET_PANELS ];
     int page_needed = 0;
     switch( new_pm )
     {
@@ -6869,10 +6926,15 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     char *mouse_at_time = format_time( 
             timeline_get_point(TIMELINE_SELECTION(info->tl)),
             (double)info->el.fps);
-    update_label_i(   "label_curframe", info->status_frame ,1 );
-    update_label_str(   "label_mouseat", mouse_at_time );
-    update_label_str( "label_curtime", current_time_ );
-    update_label_str( "label_sampleposition", current_time_);
+
+    update_label_i2(  widget_cache[ WIDGET_LABEL_CURFRAME ],info->status_frame ,1 );
+
+    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_CURTIME] ), current_time_ );
+    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_SAMPLEPOSITION] ), current_time_ );
+    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_MOUSEAT] ), mouse_at_time);
+
+
+
     free(current_time_);
     free(mouse_at_time);
 
@@ -7876,7 +7938,7 @@ void vj_gui_init(const char *glade_file,
         return;
     }
     snprintf( glade_path, sizeof(glade_path), "%s/%s",RELOADED_DATADIR,glade_file);
-
+    
 	veejay_msg(VEEJAY_MSG_DEBUG, "Loading glade file %s", glade_path);
 
     veejay_memset( gui->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
@@ -7974,6 +8036,8 @@ void vj_gui_init(const char *glade_file,
     add_class_by_name( "framerate", "h_slider" );
 
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+
+    init_widget_cache();
 
     //set "connection" button has default in veejay connection dialog
     gtk_entry_set_activates_default(GTK_ENTRY(glade_xml_get_widget_( info->main_window,
@@ -8088,7 +8152,7 @@ void vj_gui_init(const char *glade_file,
     int ph = MAX_PREVIEW_HEIGHT;
             
    
-    GtkWidget *img_wid = glade_xml_get_widget_( info->main_window, "imageA");
+    GtkWidget *img_wid = widget_cache[WIDGET_IMAGEA];
 
     gui->mt = multitrack_new((void(*)(int,char*,int)) vj_gui_cb,
                              NULL,
