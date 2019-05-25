@@ -2823,6 +2823,11 @@ static void vj_kf_select_parameter(int num)
         hi = info->status_tokens[SAMPLE_MARKER_END];
     }
     
+    if( lo == 0 && hi == 0 ) {
+        lo = 0;
+        hi = info->status_tokens[TOTAL_FRAMES];
+    }
+
     set_initial_curve( info->curve, entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id, 
             lo, hi ,
             entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
