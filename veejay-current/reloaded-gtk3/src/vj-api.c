@@ -9233,8 +9233,6 @@ static void set_selection_of_slot_in_samplebank(gboolean active)
         info->status_tokens[PLAY_MODE] == MODE_STREAM &&
         info->selection_slot->sample_type != 0 ) 
        ) {
-        remove_class(info->selection_gui_slot->frame, "selected" );
-        add_class(info->selected_gui_slot->frame, "active");
         return;
     }
 
@@ -9302,11 +9300,6 @@ static void remove_sample_from_slot()
     sample_gui_slot_t *gui_slot = info->sample_banks[bank_nr]->gui_slot[slot_nr];
     if(gui_slot)
         gtk_image_clear( GTK_IMAGE( gui_slot->image) );
-
-    set_selection_of_slot_in_samplebank( FALSE );
-
-    info->selection_gui_slot = NULL;
-    info->selection_slot = NULL;
 
     info->uc.reload_hint[HINT_SLIST] = 2;
 }
