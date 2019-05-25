@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.22.1 -->
+<!-- Generated with glade 3.20.0 -->
 <interface>
   <requires lib="gtk+" version="3.16"/>
   <!-- interface-css-provider-path gveejay.reloaded.css -->
@@ -8,15 +8,9 @@
     <child>
       <placeholder/>
     </child>
-    <child>
-      <placeholder/>
-    </child>
   </object>
   <object class="GtkApplicationWindow">
     <property name="can_focus">False</property>
-    <child>
-      <placeholder/>
-    </child>
     <child>
       <placeholder/>
     </child>
@@ -150,9 +144,6 @@
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_generator_window_delete_event" swapped="no"/>
     <child>
-      <placeholder/>
-    </child>
-    <child>
       <object class="GtkFrame" id="frame_generator">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
@@ -199,6 +190,12 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
@@ -1591,9 +1588,6 @@
     <property name="title" translatable="yes">Image Calibration</property>
     <signal name="delete-event" handler="on_calibration_window_delete_event" swapped="no"/>
     <child>
-      <placeholder/>
-    </child>
-    <child>
       <object class="GtkBox" id="vbox637">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
@@ -2434,9 +2428,6 @@
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_inputstream_window_delete_event" swapped="no"/>
     <child>
-      <placeholder/>
-    </child>
-    <child>
       <object class="GtkFrame" id="frame161">
         <property name="width_request">340</property>
         <property name="visible">True</property>
@@ -2808,9 +2799,6 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_veejay_connection_close" swapped="no"/>
     <signal name="delete-event" handler="on_veejay_connection_close" swapped="no"/>
-    <child>
-      <placeholder/>
-    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox3">
         <property name="visible">True</property>
@@ -3282,9 +3270,6 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_video_options_close" swapped="no"/>
     <signal name="delete-event" handler="on_video_options_close" swapped="no"/>
-    <child>
-      <placeholder/>
-    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="vbox_video_options">
         <property name="visible">True</property>
@@ -4150,9 +4135,6 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_vims_bundles_close" swapped="no"/>
     <signal name="delete-event" handler="on_vims_bundles_close" swapped="no"/>
-    <child>
-      <placeholder/>
-    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox5">
         <property name="visible">True</property>
@@ -4549,9 +4531,6 @@
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Reloaded</property>
     <property name="icon">veejay-icon.png</property>
-    <child>
-      <placeholder/>
-    </child>
     <child>
       <object class="GtkBox" id="veejay_box">
         <property name="visible">True</property>
@@ -4963,7 +4942,6 @@
                                 <property name="margin_bottom">4</property>
                                 <property name="label" translatable="yes">FX name</property>
                                 <property name="use_markup">True</property>
-                                <property name="xalign">0.5</property>
                               </object>
                               <packing>
                                 <property name="expand">False</property>
@@ -8212,13 +8190,12 @@
                             <property name="can_focus">False</property>
                             <property name="orientation">vertical</property>
                             <child>
-                              <object class="GtkGrid">
+                              <object class="GtkBox">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="halign">start</property>
-                                <property name="column_spacing">9</property>
                                 <child>
                                   <object class="GtkLabel" id="label_effectanim_name">
+                                    <property name="width_request">300</property>
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
                                     <property name="halign">center</property>
@@ -8226,16 +8203,15 @@
                                     <property name="margin_right">4</property>
                                     <property name="label" translatable="yes">None</property>
                                     <property name="ellipsize">middle</property>
-                                    <property name="width_chars">15</property>
                                     <property name="single_line_mode">True</property>
-                                    <property name="max_width_chars">15</property>
                                     <attributes>
                                       <attribute name="weight" value="bold"/>
                                     </attributes>
                                   </object>
                                   <packing>
-                                    <property name="left_attach">0</property>
-                                    <property name="top_attach">0</property>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">0</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -8244,24 +8220,26 @@
                                     <property name="can_focus">False</property>
                                     <property name="margin_left">8</property>
                                     <property name="margin_right">8</property>
-                                    <property name="label" translatable="yes">Selected FX parameter:</property>
+                                    <property name="label" translatable="yes">Selected FX parameter :</property>
                                   </object>
                                   <packing>
-                                    <property name="left_attach">2</property>
-                                    <property name="top_attach">0</property>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">1</property>
                                   </packing>
                                 </child>
                                 <child>
                                   <object class="GtkComboBoxText" id="combo_curve_fx_param">
-                                    <property name="width_request">10</property>
+                                    <property name="width_request">150</property>
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
                                     <property name="popup_fixed_width">False</property>
                                     <signal name="changed" handler="on_curve_fx_param_changed" swapped="no"/>
                                   </object>
                                   <packing>
-                                    <property name="left_attach">3</property>
-                                    <property name="top_attach">0</property>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">2</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -8312,14 +8290,16 @@
                                     </child>
                                   </object>
                                   <packing>
-                                    <property name="left_attach">1</property>
-                                    <property name="top_attach">0</property>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="pack_type">end</property>
+                                    <property name="position">4</property>
                                   </packing>
                                 </child>
                               </object>
                               <packing>
                                 <property name="expand">False</property>
-                                <property name="fill">True</property>
+                                <property name="fill">False</property>
                                 <property name="position">0</property>
                               </packing>
                             </child>
@@ -8371,10 +8351,10 @@
                                   <object class="GtkLabel" id="curve_endtime">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="margin_left">2</property>
                                     <property name="label" translatable="yes">00:00:00:00</property>
                                     <property name="width_chars">0</property>
-                                    <property name="xalign">0</property>
-                                    <property name="yalign">0.49000000953674316</property>
                                   </object>
                                   <packing>
                                     <property name="left_attach">5</property>
@@ -8385,8 +8365,9 @@
                                   <object class="GtkLabel" id="label682">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="halign">end</property>
+                                    <property name="margin_right">2</property>
                                     <property name="label" translatable="yes">End position</property>
-                                    <property name="xalign">0</property>
                                   </object>
                                   <packing>
                                     <property name="left_attach">3</property>
@@ -8397,9 +8378,10 @@
                                   <object class="GtkLabel" id="curve_starttime">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="margin_left">2</property>
                                     <property name="label" translatable="yes">00:00:00:00</property>
                                     <property name="width_chars">0</property>
-                                    <property name="xalign">0</property>
                                   </object>
                                   <packing>
                                     <property name="left_attach">2</property>
@@ -8410,8 +8392,9 @@
                                   <object class="GtkLabel" id="label615">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
+                                    <property name="halign">end</property>
+                                    <property name="margin_right">2</property>
                                     <property name="label" translatable="yes">Start position</property>
-                                    <property name="xalign">0</property>
                                   </object>
                                   <packing>
                                     <property name="left_attach">0</property>
@@ -8422,7 +8405,7 @@
                               <packing>
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
-                                <property name="position">2</property>
+                                <property name="position">1</property>
                               </packing>
                             </child>
                           </object>
