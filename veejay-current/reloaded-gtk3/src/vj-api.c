@@ -7210,19 +7210,15 @@ static void disable_fx_entry() {
 
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
-        if( !is_widget_enabled( slider_names_[i].text ) )
-            continue;
-
         update_slider_range( slider_names_[i].text, min,max, value, 0 );
         disable_widget( slider_box_names_[i].text );
         set_tooltip( slider_names_[i].text, NULL );
 
         gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,param_names_[i].text)),NULL);
 
-        if( faster_ui_ ) 
-          hide_widget( param_frame_[i].text );
+        if( faster_ui_ )
+            hide_widget( param_frame_[i].text );
     }
-
 }
 
 static void enable_fx_entry() {
