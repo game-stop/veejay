@@ -3392,7 +3392,7 @@ void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
 
 	char *start_time = format_time(
 			start_pos,info->el.fps );
-	update_label_str( "curve_endtime", start_time );
+	update_label_str( "curve_starttime", start_time );
 	free(start_time);
 
     gtk3_curve_set_x_lo( info->curve, (gfloat) start_pos );
