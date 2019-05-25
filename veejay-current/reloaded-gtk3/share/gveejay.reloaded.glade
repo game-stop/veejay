@@ -1454,6 +1454,12 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -14078,6 +14084,7 @@
                                             <property name="can_focus">True</property>
                                             <property name="margin_bottom">8</property>
                                             <property name="orientation">vertical</property>
+                                            <property name="adjustment">gen_p8</property>
                                             <property name="inverted">True</property>
                                             <property name="round_digits">0</property>
                                             <property name="digits">0</property>
