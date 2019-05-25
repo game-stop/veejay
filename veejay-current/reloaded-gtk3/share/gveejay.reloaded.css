@@ -35,6 +35,10 @@
  border-color:#9ec5e3;
 }
 
+.smallaspossible {
+    min-height: 0px;
+    min-width: 0px;
+}
 
 checkbutton,radiobutton {
  border-style:none;
@@ -56,9 +60,11 @@ button:hover image, button:hover label {
   background-color:#ff8400;
 }
 
+/*
 spinbutton {
  border-width:4px;
 }
+*/
 
 entry:focus {
  background-color:#626580;
