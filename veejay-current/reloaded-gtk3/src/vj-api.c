@@ -7798,7 +7798,6 @@ static void process_reload_hints(int *history, int pm)
             }
         }
     }
-
     info->parameter_lock = 0;
 
     if( info->uc.reload_hint[HINT_GENERATOR])
