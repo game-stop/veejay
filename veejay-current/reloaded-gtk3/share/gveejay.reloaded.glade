@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.20.0 -->
+<!-- Generated with glade 3.22.1 -->
 <interface>
   <requires lib="gtk+" version="3.16"/>
   <!-- interface-css-provider-path gveejay.reloaded.css -->
@@ -8,9 +8,15 @@
     <child>
       <placeholder/>
     </child>
+    <child>
+      <placeholder/>
+    </child>
   </object>
   <object class="GtkApplicationWindow">
     <property name="can_focus">False</property>
+    <child>
+      <placeholder/>
+    </child>
     <child>
       <placeholder/>
     </child>
@@ -144,6 +150,9 @@
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_generator_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkFrame" id="frame_generator">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
@@ -190,6 +199,12 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
@@ -1588,6 +1603,9 @@
     <property name="title" translatable="yes">Image Calibration</property>
     <signal name="delete-event" handler="on_calibration_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkBox" id="vbox637">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
@@ -2428,6 +2446,9 @@
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_inputstream_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkFrame" id="frame161">
         <property name="width_request">340</property>
         <property name="visible">True</property>
@@ -2799,6 +2820,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_veejay_connection_close" swapped="no"/>
     <signal name="delete-event" handler="on_veejay_connection_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox3">
         <property name="visible">True</property>
@@ -3270,6 +3294,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_video_options_close" swapped="no"/>
     <signal name="delete-event" handler="on_video_options_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="vbox_video_options">
         <property name="visible">True</property>
@@ -4135,6 +4162,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_vims_bundles_close" swapped="no"/>
     <signal name="delete-event" handler="on_vims_bundles_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox5">
         <property name="visible">True</property>
@@ -4531,6 +4561,9 @@
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Reloaded</property>
     <property name="icon">veejay-icon.png</property>
+    <child>
+      <placeholder/>
+    </child>
     <child>
       <object class="GtkBox" id="veejay_box">
         <property name="visible">True</property>
@@ -11466,6 +11499,8 @@
                                         <property name="can_focus">False</property>
                                         <property name="label" translatable="yes">0:00:00:00</property>
                                         <property name="width_chars">11</property>
+                                        <property name="single_line_mode">True</property>
+                                        <property name="track_visited_links">False</property>
                                         <property name="xalign">0</property>
                                       </object>
                                       <packing>
@@ -11491,6 +11526,8 @@
                                         <property name="can_focus">False</property>
                                         <property name="label" translatable="yes">0000000000</property>
                                         <property name="width_chars">12</property>
+                                        <property name="single_line_mode">True</property>
+                                        <property name="track_visited_links">False</property>
                                         <property name="xalign">0</property>
                                       </object>
                                       <packing>
@@ -11504,6 +11541,8 @@
                                         <property name="can_focus">False</property>
                                         <property name="label" translatable="yes">0:00:00:00</property>
                                         <property name="width_chars">11</property>
+                                        <property name="single_line_mode">True</property>
+                                        <property name="track_visited_links">False</property>
                                         <property name="xalign">0</property>
                                       </object>
                                       <packing>
@@ -15624,6 +15663,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                         <property name="can_focus">False</property>
                                         <property name="label" translatable="yes">0:00:00:00</property>
                                         <property name="width_chars">12</property>
+                                        <property name="single_line_mode">True</property>
+                                        <property name="track_visited_links">False</property>
                                         <property name="xalign">0</property>
                                       </object>
                                       <packing>
@@ -15649,6 +15690,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                         <property name="can_focus">False</property>
                                         <property name="label" translatable="yes">00000000</property>
                                         <property name="width_chars">12</property>
+                                        <property name="single_line_mode">True</property>
+                                        <property name="track_visited_links">False</property>
                                         <property name="xalign">0</property>
                                       </object>
                                       <packing>
@@ -15811,6 +15854,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
                                         <property name="label" translatable="yes">0:00:00:00</property>
+                                        <property name="single_line_mode">True</property>
+                                        <property name="track_visited_links">False</property>
                                         <property name="xalign">0</property>
                                       </object>
                                       <packing>

@@ -90,20 +90,9 @@ static gpointer castIntToGpointer( int val)
 }
 #endif
 
-//~ static struct
-//~ {
-    //~ const int id;
-    //~ const char *name;
-    //~ const int page;
-//~ } crappy_design[] =
-//~ {
-    //~ { 1,"notebook18", 3 },    // On which notebook page is the multitrack view
-    //~ { 0,NULL, 0 }
-//~ };
-
 #define MAX_SLOW 25
 #define QUICKSELECT_SLOTS 10
-#define MAX_WIDGET_CACHE 100
+#define MAX_WIDGET_CACHE 200
 
 static int beta__ = 0;
 static int use_vims_mcast = 0;
@@ -121,6 +110,171 @@ enum {
   WIDGET_LABEL_SAMPLEPOSITION = 5,
   WIDGET_PANELS = 6,
   WIDGET_VIMS_MESSENGER_PLAY = 7,
+  WIDGET_STATUSBAR = 8,
+  WIDGET_LOOP_NONE = 9,
+  WIDGET_LOOP_NORMAL = 10,
+  WIDGET_LOOP_PINGPONG = 11,
+  WIDGET_LOOP_RANDOM = 12,
+  WIDGET_LOOP_ONCENOP = 13,
+  WIDGET_LABEL_MARKEREND = 14,
+  WIDGET_TOGGLE_SUBRENDER = 15,
+  WIDGET_TOGGLE_FADEMETHOD = 16,
+  WIDGET_SPIN_SAMPLESPEED = 17,
+  WIDGET_SPIN_SAMPLESTART = 18,
+  WIDGET_SPIN_SAMPLEEND = 19,
+  WIDGET_PLAYHINT = 20,
+  WIDGET_LABEL_MARKERDURATION = 21,
+  WIDGET_LABEL_MARKERSTART = 22,
+  WIDGET_SPEED_SLIDER = 23,
+  WIDGET_SLOW_SLIDER = 24,
+  WIDGET_SPIN_TEXT_START = 25,
+  WIDGET_SPIN_TEXT_END = 26,
+  WIDGET_MANUALOPACITY = 27,
+  WIDGET_SAMPLERAND = 28,
+  WIDGET_STREAM_LENGTH = 29,
+  WIDGET_STREAM_LENGTH_LABEL = 30,
+  WIDGET_BUTTON_FADEDUR = 31,
+  WIDGET_LABEL_TOTFRAMES = 32,
+  WIDGET_LABEL_SAMPLELENGTH = 33,
+  WIDGET_LABEL_TOTALTIME = 34,
+  WIDGET_LABEL_SAMPLEPOS = 35,
+  WIDGET_FEEDBACKBUTTON = 36,
+  WIDGET_MACRORECORD = 37,
+  WIDGET_MACROPLAY = 38,
+  WIDGET_MACROSTOP = 39,
+  WIDGET_BUTTON_EL_SELSTART = 40,
+  WIDGET_BUTTON_EL_SELEND = 41,
+  WIDGET_LABEL_LOOP_STAT_STOP = 42,
+  WIDGET_SAMPLE_LOOPSTOP = 43,
+  WIDGET_STREAM_LOOPSTOP = 44,
+  WIDGET_LABEL_LOOP_STATS = 45,
+  WIDGET_SEQACTIVE = 46,
+  WIDGET_LABEL_CURRENTID = 47,
+  WIDGET_CALI_TAKE_BUTTON = 48,
+  WIDGET_CURRENT_STEP_LABEL = 49,
+  WIDGET_LABEL_EFFECTNAME = 50,
+  WIDGET_LABEL_EFFECTANIM_NAME = 51,
+  WIDGET_VALUE_FRIENDLYNAME = 52,
+  WIDGET_BUTTON_ENTRY_TOGGLE = 53,
+  WIDGET_SUBRENDER_ENTRY_TOGGLE = 54,
+  WIDGET_TRANSITION_LOOP = 55,
+  WIDGET_TRANSITION_ENABLED = 56,
+  WIDGET_COMBO_CURVE_FX_PARAM = 57,
+  WIDGET_FX_M1 = 58,
+  WIDGET_FX_M2 = 59,
+  WIDGET_FX_M3 = 60,
+  WIDGET_FX_M4 = 61,
+  WIDGET_CHECK_SAMPLEFX = 62,
+  WIDGET_CHECK_STREAMFX = 63,
+  WIDGET_SLIDER_P0 = 64,
+  WIDGET_SLIDER_P1 = 65,
+  WIDGET_SLIDER_P2 = 66,
+  WIDGET_SLIDER_P3 = 67,
+  WIDGET_SLIDER_P4 = 68,
+  WIDGET_SLIDER_P5 = 69,
+  WIDGET_SLIDER_P6 = 70,
+  WIDGET_SLIDER_P7 = 71,
+  WIDGET_SLIDER_P8 = 72,
+  WIDGET_SLIDER_P9 = 73,
+  WIDGET_SLIDER_P10 = 74,
+  WIDGET_SLIDER_P11 = 75,
+  WIDGET_SLIDER_P12 = 76,
+  WIDGET_SLIDER_P13 = 77,
+  WIDGET_SLIDER_P14 = 78,
+  WIDGET_SLIDER_P15 = 79,
+  WIDGET_RGBKEY = 80,
+  WIDGET_FRAME_P0 = 81,
+  WIDGET_FRAME_P1 = 82,
+  WIDGET_FRAME_P2 = 83,
+  WIDGET_FRAME_P3 = 84,
+  WIDGET_FRAME_P4 = 85,
+  WIDGET_FRAME_P5 = 86,
+  WIDGET_FRAME_P6 = 87,
+  WIDGET_FRAME_P7 = 88,
+  WIDGET_FRAME_P8 = 89,
+  WIDGET_FRAME_P9 = 90,
+  WIDGET_FRAME_P10 = 91,
+  WIDGET_FRAME_P11 = 92,
+  WIDGET_FRAME_P12 = 93,
+  WIDGET_FRAME_P13 = 94,
+  WIDGET_FRAME_P14 = 95,
+  WIDGET_FRAME_P15 = 96,
+  WIDGET_SLIDER_BOX_P0 = 97,
+  WIDGET_SLIDER_BOX_P1 = 98,
+  WIDGET_SLIDER_BOX_P2 = 99,
+  WIDGET_SLIDER_BOX_P3 = 100,
+  WIDGET_SLIDER_BOX_P4 = 101,
+  WIDGET_SLIDER_BOX_P5 = 102,
+  WIDGET_SLIDER_BOX_P6 = 103,
+  WIDGET_SLIDER_BOX_P7 = 104,
+  WIDGET_SLIDER_BOX_P8 = 105,
+  WIDGET_SLIDER_BOX_P9 = 106,
+  WIDGET_SLIDER_BOX_P10 = 107,
+  WIDGET_SLIDER_BOX_P11 = 108,
+  WIDGET_SLIDER_BOX_P12 = 109,
+  WIDGET_SLIDER_BOX_P13 = 110,
+  WIDGET_SLIDER_BOX_P14 = 111,
+  WIDGET_SLIDER_BOX_P15 = 112,
+  WIDGET_LABEL_P0 = 113,
+  WIDGET_LABEL_P1 = 114,
+  WIDGET_LABEL_P2 = 115,
+  WIDGET_LABEL_P3 = 116,
+  WIDGET_LABEL_P4 = 117,
+  WIDGET_LABEL_P5 = 118,
+  WIDGET_LABEL_P6 = 119,
+  WIDGET_LABEL_P7 = 120,
+  WIDGET_LABEL_P8 = 121,
+  WIDGET_LABEL_P9 = 122,
+  WIDGET_LABEL_P10 = 123,
+  WIDGET_LABEL_P11 = 124,
+  WIDGET_LABEL_P12 = 125,
+  WIDGET_LABEL_P13 = 126,
+  WIDGET_LABEL_P14 = 127,
+  WIDGET_LABEL_P15 = 128,
+  WIDGET_INC_P0 = 129,
+  WIDGET_INC_P1 = 130,
+  WIDGET_INC_P2 = 131,
+  WIDGET_INC_P3 = 132,
+  WIDGET_INC_P4 = 133,
+  WIDGET_INC_P5 = 134,
+  WIDGET_INC_P6 = 135,
+  WIDGET_INC_P7 = 136,
+  WIDGET_INC_P8 = 137,
+  WIDGET_INC_P9 = 138,
+  WIDGET_INC_P10 = 139,
+  WIDGET_INC_P11 = 140,
+  WIDGET_INC_P12 = 141,
+  WIDGET_INC_P13 = 142,
+  WIDGET_INC_P14 = 143,
+  WIDGET_INC_P15 = 144,
+  WIDGET_DEC_P0 = 145,
+  WIDGET_DEC_P1 = 146,
+  WIDGET_DEC_P2 = 147,
+  WIDGET_DEC_P3 = 148,
+  WIDGET_DEC_P4 = 149,
+  WIDGET_DEC_P5 = 150,
+  WIDGET_DEC_P6 = 151,
+  WIDGET_DEC_P7 = 152,
+  WIDGET_DEC_P8 = 153,
+  WIDGET_DEC_P9 = 154,
+  WIDGET_DEC_P10 = 155,
+  WIDGET_DEC_P11 = 156,
+  WIDGET_DEC_P12 = 157,
+  WIDGET_DEC_P13 = 158,
+  WIDGET_DEC_P14 = 159,
+  WIDGET_DEC_P15 = 160,
+  WIDGET_FRAME_FXTREE2 = 161,
+  WIDGET_CURVE_TOGGLEENTRY_PARAM = 163,
+  WIDGET_CURVE_SPINSTART = 164,
+  WIDGET_CURVE_SPINEND = 165,
+  WIDGET_CURVE_CHAIN_TOGGLEENTRY = 166,
+  WIDGET_FRAME_FXTREE3 = 167,
+  WIDGET_CURVE_TYPESPLINE = 168,
+  WIDGET_CURVE_TYPEFREEHAND = 169,
+  WIDGET_CURVE_TYPELINEAR = 170,
+  WIDGET_SAMPLE_LENGTH_LABEL = 171,
+  WIDGET_BUTTON_FX_ENTRY = 172,
+  WIDGET_NOTEBOOK15 = 173,
 };
 
 static struct
@@ -132,14 +286,178 @@ static struct
     { "imageA",                 WIDGET_IMAGEA },
     { "notebook18",             WIDGET_NOTEBOOK18 },
     { "panels",                 WIDGET_PANELS },
+    { "notebook15",             WIDGET_NOTEBOOK15 },
     { "label_curframe",         WIDGET_LABEL_CURFRAME },
     { "label_mouseat",          WIDGET_LABEL_MOUSEAT },
     { "label_curtime",          WIDGET_LABEL_CURTIME },
     { "label_sampleposition",   WIDGET_LABEL_SAMPLEPOSITION },
     { "vims_messenger_play",    WIDGET_VIMS_MESSENGER_PLAY },
+    { "statusbar",              WIDGET_STATUSBAR },
+    { "loop_none",              WIDGET_LOOP_NONE },
+    { "loop_normal",            WIDGET_LOOP_NORMAL },
+    { "loop_pingpong",          WIDGET_LOOP_PINGPONG },
+    { "loop_random",            WIDGET_LOOP_RANDOM },
+    { "loop_oncenop",           WIDGET_LOOP_ONCENOP },
+    { "label_markerend",        WIDGET_LABEL_MARKEREND },
+    { "toggle_subrender",       WIDGET_TOGGLE_SUBRENDER },
+    { "toggle_fademethod",      WIDGET_TOGGLE_FADEMETHOD },
+    { "spin_samplespeed",       WIDGET_SPIN_SAMPLESPEED },
+    { "spin_samplestart",       WIDGET_SPIN_SAMPLESTART },
+    { "spin_sampleend",         WIDGET_SPIN_SAMPLEEND },
+    { "playhint",               WIDGET_PLAYHINT },
+    { "label_markerduration",   WIDGET_LABEL_MARKERDURATION },
+    { "label_markerstart",      WIDGET_LABEL_MARKERSTART },
+    { "speed_slider",           WIDGET_SPEED_SLIDER },
+    { "slow_slider",            WIDGET_SLOW_SLIDER },
+    { "spin_text_start",        WIDGET_SPIN_TEXT_START },
+    { "spin_text_end",          WIDGET_SPIN_TEXT_END },
+    { "manualopacity",          WIDGET_MANUALOPACITY },
+    { "samplerand",             WIDGET_SAMPLERAND },
+    { "stream_length",          WIDGET_STREAM_LENGTH },
+    { "stream_length_label",    WIDGET_STREAM_LENGTH_LABEL },
+    { "button_fadedur",         WIDGET_BUTTON_FADEDUR },
+    { "label_totframes",        WIDGET_LABEL_TOTFRAMES },
+    { "label_samplelength",     WIDGET_LABEL_SAMPLELENGTH },
+    { "label_totaltime",        WIDGET_LABEL_TOTALTIME },
+    { "sample_length_label",    WIDGET_SAMPLE_LENGTH_LABEL },
+    { "label_samplepos",        WIDGET_LABEL_SAMPLEPOS },
+    { "feedbackbutton",         WIDGET_FEEDBACKBUTTON },
+    { "macrorecord",            WIDGET_MACRORECORD },
+    { "macroplay",              WIDGET_MACROPLAY },
+    { "macrostop",              WIDGET_MACROSTOP },
+    { "button_el_selstart",     WIDGET_BUTTON_EL_SELSTART },
+    { "button_el_selend",       WIDGET_BUTTON_EL_SELEND },
+    { "label_loop_stat_stop",   WIDGET_LABEL_LOOP_STAT_STOP },
+    { "sample_loopstop",        WIDGET_SAMPLE_LOOPSTOP },
+    { "stream_loopstop",        WIDGET_STREAM_LOOPSTOP },
+    { "label_loop_stats",       WIDGET_LABEL_LOOP_STATS },
+    { "seqactive",              WIDGET_SEQACTIVE },
+    { "label_currentid",        WIDGET_LABEL_CURRENTID },
+    { "cali_take_button",       WIDGET_CALI_TAKE_BUTTON },
+    { "current_step_label",     WIDGET_CURRENT_STEP_LABEL },
+    { "check_samplefx",         WIDGET_CHECK_SAMPLEFX },
+    { "check_streamfx",         WIDGET_CHECK_STREAMFX },
+    { "slider_p0",              WIDGET_SLIDER_P0 },
+    { "slider_p1",              WIDGET_SLIDER_P1 },
+    { "slider_p2",              WIDGET_SLIDER_P2 },
+    { "slider_p3",              WIDGET_SLIDER_P3 },
+    { "slider_p4",              WIDGET_SLIDER_P4 },
+    { "slider_p5",              WIDGET_SLIDER_P5 },
+    { "slider_p6",              WIDGET_SLIDER_P6 },
+    { "slider_p7",              WIDGET_SLIDER_P7 },
+    { "slider_p8",              WIDGET_SLIDER_P8 },
+    { "slider_p9",              WIDGET_SLIDER_P9 },
+    { "slider_p10",             WIDGET_SLIDER_P10 },
+    { "slider_p11",             WIDGET_SLIDER_P11 },
+    { "slider_p12",             WIDGET_SLIDER_P12 },
+    { "slider_p13",             WIDGET_SLIDER_P13 },
+    { "slider_p14",             WIDGET_SLIDER_P14 },
+    { "slider_p15",             WIDGET_SLIDER_P15 },
+    { "frame_p0",               WIDGET_FRAME_P0 },
+    { "frame_p1",               WIDGET_FRAME_P1 },
+    { "frame_p2",               WIDGET_FRAME_P2 },
+    { "frame_p3",               WIDGET_FRAME_P3 },
+    { "frame_p4",               WIDGET_FRAME_P4 },
+    { "frame_p5",               WIDGET_FRAME_P5 },
+    { "frame_p6",               WIDGET_FRAME_P6 },
+    { "frame_p7",               WIDGET_FRAME_P7 },
+    { "frame_p8",               WIDGET_FRAME_P8 },
+    { "frame_p9",               WIDGET_FRAME_P9 },
+    { "frame_p10",              WIDGET_FRAME_P10 },
+    { "frame_p11",              WIDGET_FRAME_P11 },
+    { "frame_p12",              WIDGET_FRAME_P12 },
+    { "frame_p13",              WIDGET_FRAME_P13 },
+    { "frame_p14",              WIDGET_FRAME_P14 },
+    { "frame_p15",              WIDGET_FRAME_P15 },
+    { "slider_box_p0",          WIDGET_SLIDER_BOX_P0 },
+    { "slider_box_p1",          WIDGET_SLIDER_BOX_P1 },
+    { "slider_box_p2",          WIDGET_SLIDER_BOX_P2 },
+    { "slider_box_p3",          WIDGET_SLIDER_BOX_P3 },
+    { "slider_box_p4",          WIDGET_SLIDER_BOX_P4 },
+    { "slider_box_p5",          WIDGET_SLIDER_BOX_P5 },
+    { "slider_box_p6",          WIDGET_SLIDER_BOX_P6 },
+    { "slider_box_p7",          WIDGET_SLIDER_BOX_P7 },
+    { "slider_box_p8",          WIDGET_SLIDER_BOX_P8 },
+    { "slider_box_p9",          WIDGET_SLIDER_BOX_P9 },
+    { "slider_box_p10",         WIDGET_SLIDER_BOX_P10 },
+    { "slider_box_p11",         WIDGET_SLIDER_BOX_P11 },
+    { "slider_box_p12",         WIDGET_SLIDER_BOX_P12 },
+    { "slider_box_p13",         WIDGET_SLIDER_BOX_P13 },
+    { "slider_box_p14",         WIDGET_SLIDER_BOX_P14 },
+    { "slider_box_p15",         WIDGET_SLIDER_BOX_P15 },
+    { "label_p0",               WIDGET_LABEL_P0 },
+    { "label_p1",               WIDGET_LABEL_P1 },
+    { "label_p2",               WIDGET_LABEL_P2 },
+    { "label_p3",               WIDGET_LABEL_P3 },
+    { "label_p4",               WIDGET_LABEL_P4 },
+    { "label_p5",               WIDGET_LABEL_P5 },
+    { "label_p6",               WIDGET_LABEL_P6 },
+    { "label_p7",               WIDGET_LABEL_P7 },
+    { "label_p8",               WIDGET_LABEL_P8 },
+    { "label_p9",               WIDGET_LABEL_P9 },
+    { "label_p10",              WIDGET_LABEL_P10 },
+    { "label_p11",              WIDGET_LABEL_P11 },
+    { "label_p12",              WIDGET_LABEL_P12 },
+    { "label_p13",              WIDGET_LABEL_P13 },
+    { "label_p14",              WIDGET_LABEL_P14 },
+    { "label_p15",              WIDGET_LABEL_P15 },
+    { "inc_p0",                 WIDGET_INC_P0 },
+    { "inc_p1",                 WIDGET_INC_P1 },
+    { "inc_p2",                 WIDGET_INC_P2 },
+    { "inc_p3",                 WIDGET_INC_P3 },
+    { "inc_p4",                 WIDGET_INC_P4 },
+    { "inc_p5",                 WIDGET_INC_P5 },
+    { "inc_p6",                 WIDGET_INC_P6 },
+    { "inc_p7",                 WIDGET_INC_P7 },
+    { "inc_p8",                 WIDGET_INC_P8 },
+    { "inc_p9",                 WIDGET_INC_P9 },
+    { "inc_p10",                WIDGET_INC_P10 },
+    { "inc_p11",                WIDGET_INC_P11 },
+    { "inc_p12",                WIDGET_INC_P12 },
+    { "inc_p13",                WIDGET_INC_P13 },
+    { "inc_p14",                WIDGET_INC_P14 },
+    { "inc_p15",                WIDGET_INC_P15 },
+    { "dec_p0",                 WIDGET_DEC_P0 },
+    { "dec_p1",                 WIDGET_DEC_P1 },
+    { "dec_p2",                 WIDGET_DEC_P2 },
+    { "dec_p3",                 WIDGET_DEC_P3 },
+    { "dec_p4",                 WIDGET_DEC_P4 },
+    { "dec_p5",                 WIDGET_DEC_P5 },
+    { "dec_p6",                 WIDGET_DEC_P6 },
+    { "dec_p7",                 WIDGET_DEC_P7 },
+    { "dec_p8",                 WIDGET_DEC_P8 },
+    { "dec_p9",                 WIDGET_DEC_P9 },
+    { "dec_p10",                WIDGET_DEC_P10 },
+    { "dec_p11",                WIDGET_DEC_P11 },
+    { "dec_p12",                WIDGET_DEC_P12 },
+    { "dec_p13",                WIDGET_DEC_P13 },
+    { "dec_p14",                WIDGET_DEC_P14 },
+    { "dec_p15",                WIDGET_DEC_P15 },
+    { "rgbkey",                 WIDGET_RGBKEY },
+    { "frame_fxtree2",          WIDGET_FRAME_FXTREE2 },
+    { "curve_toggleentry_param",WIDGET_CURVE_TOGGLEENTRY_PARAM },
+    { "curve_spinstart",        WIDGET_CURVE_SPINSTART },
+    { "curve_spinend",          WIDGET_CURVE_SPINEND },
+    { "curve_chain_toggleentry",WIDGET_CURVE_CHAIN_TOGGLEENTRY },
+    { "frame_fxtree3",          WIDGET_FRAME_FXTREE3 },
+    { "curve_typespline",       WIDGET_CURVE_TYPESPLINE },
+    { "curve_typefreehand",     WIDGET_CURVE_TYPEFREEHAND },
+    { "curve_typelinear",       WIDGET_CURVE_TYPELINEAR },
+    { "button_fx_entry",        WIDGET_BUTTON_FX_ENTRY },
+    { "subrender_entry_toggle", WIDGET_SUBRENDER_ENTRY_TOGGLE },
+    { "label_effectname",       WIDGET_LABEL_EFFECTNAME },
+    { "label_effectanim_name",  WIDGET_LABEL_EFFECTANIM_NAME },
+    { "value_friendlyname",     WIDGET_VALUE_FRIENDLYNAME },
+    { "button_entry_toggle",    WIDGET_BUTTON_ENTRY_TOGGLE },
+    { "transition_loop",        WIDGET_TRANSITION_LOOP },
+    { "transition_enabled",     WIDGET_TRANSITION_ENABLED },
+    { "combo_curve_fx_param",   WIDGET_COMBO_CURVE_FX_PARAM },
+    { "fx_m1",                  WIDGET_FX_M1 },
+    { "fx_m2",                  WIDGET_FX_M2 },
+    { "fx_m3",                  WIDGET_FX_M3 },
+    { "fx_m4",                  WIDGET_FX_M4 },
     { NULL, -1 },
 };
-
 
 static struct
 {
@@ -693,6 +1011,7 @@ static GtkListStore *editlist_store = NULL;
 static GtkTreeModel *editlist_model = NULL;
 //void    gtk_configure_window_cb( GtkWidget *w, GdkEventConfigure *ev, gpointer data );
 static int get_slider_val(const char *name);
+static int get_slider_val2(GtkWidget *w);
 void vj_msg(int type, const char format[], ...);
 //static  void    vj_msg_detail(int type, const char format[], ...);
 void msg_vims(char *message);
@@ -705,9 +1024,13 @@ static gchar *get_text(const char *name);
 static void put_text(const char *name, char *text);
 static void set_toggle_button(const char *name, int status);
 static void update_slider_gvalue(const char *name, gdouble value );
+static void update_slider_value2(GtkWidget *w, gint value, gint scale);
+static void update_slider_range2(GtkWidget *w, gint min, gint max, gint value, gint scaled);
+
 static void update_slider_value(const char *name, gint value, gint scale);
 static void update_slider_range(const char *name, gint min, gint max, gint value, gint scaled);
 //static  void update_knob_range( GtkWidget *w, gdouble min, gdouble max, gdouble value, gint scaled );
+static void update_spin_range2(GtkWidget *w, gint min, gint max, gint val);
 static void update_spin_range(const char *name, gint min, gint max, gint val);
 static void update_spin_incr(const char *name, gdouble step, gdouble page);
 //static void update_knob_value(GtkWidget *w, gdouble value, gdouble scale );
@@ -801,13 +1124,36 @@ static void init_widget_cache()
 
     for( int i = 0; widget_map[i].name != NULL; i ++ ) {
         widget_cache[ widget_map[i].id ] = glade_xml_get_widget_( info->main_window, widget_map[i].name );
+        if( widget_cache[ widget_map[i].id ] == NULL ){
+            veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' does not exist", widget_map[i].name );
+        }
     }
+}
+/*
+static void identify_widget(GtkWidget *w)
+{
+    for( int i = 0; widget_map[i].name != NULL; i ++ ) {
+        if( widget_cache[ widget_map[i].id ] == w ) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Widget %p is %s", w, widget_map[i].name );
+            return;
+        }
+    }
+    veejay_msg(VEEJAY_MSG_DEBUG, "Widget %p is not in widget_cache");
+}*/
+
+static gboolean is_edl_displayed()
+{
+    int panel_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
+    int sample_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK15] ));
+
+    if( panel_page == 5 && sample_page == 2 )
+        return TRUE;
+    return FALSE;
 }
 
 gboolean   periodic_pull(gpointer data)
 {
-    GtkWidget *ww = glade_xml_get_widget_( info->main_window, "notebook18" );
-    int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( ww ));
+    int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
 
     int pm = info->status_tokens[PLAY_MODE];
     if( pm == MODE_STREAM && deckpage == 5 && info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR)
@@ -2626,8 +2972,7 @@ void vj_msg(int type, const char format[], ...)
     gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
     text[strlen(text)-1] = '\0';
 
-    GtkWidget *sb = glade_xml_get_widget_( info->main_window, "statusbar");
-    gtk_statusbar_push( GTK_STATUSBAR(sb),0, text );
+    gtk_statusbar_push( GTK_STATUSBAR( widget_cache[ WIDGET_STATUSBAR] ),0, text );
 
     g_free( text );
     va_end(args);
@@ -2644,20 +2989,16 @@ void msg_vims(char *message)
 
 int get_loop_value()
 {
-    if( is_button_toggled( "loop_none" ) )
-        return 0;
-
-    if( is_button_toggled( "loop_normal" ))
-        return 1;
-
-    if( is_button_toggled( "loop_pingpong" ))
-        return 2;
-
-    if (is_button_toggled("loop_random"))
-        return 3;
-
-    if( is_button_toggled( "loop_oncenop" ))
-        return 4;
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_LOOP_NONE]) ) )
+       return 0; 
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_LOOP_NORMAL]) ) )
+       return 1; 
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_LOOP_PINGPONG]) ) )
+       return 2; 
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_LOOP_RANDOM]) ) )
+       return 3; 
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_LOOP_ONCENOP]) ) )
+       return 4; 
 
     return 1; // loop normal
 }
@@ -2742,39 +3083,49 @@ static gdouble  get_numd(const char *name)
     return (gdouble) gtk_spin_button_get_value( GTK_SPIN_BUTTON( w ) );
 }
 
+static int get_slider_val2(GtkWidget *w) 
+{
+    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+    return (int) gtk_adjustment_get_value (a);
+}
+
 static int get_slider_val(const char *name)
 {
     GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
     if(!w) return 0;
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
-    return (gint) gtk_adjustment_get_value (a);
+    return (int) gtk_adjustment_get_value (a);
 }
 
 static void vj_kf_reset()
 {
+    int osl = info->status_lock;
+
     info->status_lock = 1;
     reset_curve( info->curve );
     
-    if(!is_button_toggled("kf_none")) {
-        set_toggle_button("kf_none",1);
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
     }
-    if(!is_button_toggled("curve_toggleentry_param")) {
-        set_toggle_button( "curve_toggleentry_param", 0 );
-    }
-    
+ 
+    int total_frames = (info->status_tokens[PLAY_MODE] == MODE_STREAM ? 
+                        info->status_tokens[SAMPLE_MARKER_END] : 
+                        ( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[TOTAL_FRAMES]: 0) );
+  
     int lo = (info->selection[0] == info->selection[1] ? 0 : info->selection[0]);
-    int hi = (info->selection[1] > info->selection[0] ? info->selection[1] : info->status_tokens[TOTAL_FRAMES] );
+    int hi = (info->selection[1] > info->selection[0] ? info->selection[1] : total_frames );
 
-    update_spin_range( "curve_spinstart", 0, info->status_tokens[TOTAL_FRAMES], lo );
-    update_spin_range( "curve_spinend", 0, info->status_tokens[TOTAL_FRAMES], hi );
+    if( lo == hi ) {
+        lo = 0;
+        hi = total_frames;
+    }
 
-    //set_toggle_button( "curve_chain_toggleentry", 0 );
-    //set_toggle_button( "curve_toggleentry_param", 0);
+    update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART], 0, total_frames, lo );
+    update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
 
-    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
-    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0); // FX_PARAMETER_DEFAULT_NAME
+    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),0); 
 
-    info->status_lock = 0;
+    info->status_lock = osl;
 }
 
 static void vj_kf_refresh()
@@ -2783,18 +3134,18 @@ static void vj_kf_refresh()
 
     int status = 0;
     if( entry_tokens[ENTRY_FXID] > 0 ) {
-        enable_widget( "frame_fxtree3" );
+        gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3] , TRUE );
         status = update_curve_widget(info->curve);
     }
     else {
-        GtkComboBox *kf_param = GTK_COMBO_BOX(glade_xml_get_widget_(info->main_window,"combo_curve_fx_param"));
+        GtkComboBox *kf_param = GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]);
         if(gtk_combo_box_get_active(kf_param) != 0) {
             gtk_combo_box_set_active (kf_param,0); // FX_PARAMETER_DEFAULT_NAME
         }
-        if(!is_button_toggled("curve_toggleentry_param")) {
-            set_toggle_button( "curve_toggleentry_param", 0 );
+        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
         }
-        disable_widget( "frame_fxtree3" );
+        gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], FALSE );
     }
 
     if( status == 0 ) {
@@ -2807,8 +3158,7 @@ static void vj_kf_select_parameter(int num)
     sample_slot_t *s = info->selected_slot;
     if(!s)
     {
-        GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
-        gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0); // FX_PARAMETER_DEFAULT_NAME
+        gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),0);
         return;
     }
     int *entry_tokens = &(info->uc.entry_tokens[0]);
@@ -2853,9 +3203,6 @@ static int update_curve_widget(GtkWidget *curve)
     int p = -1;
     int status = 0;
 
-    //if(is_button_toggled("kf_none"))
-      //  return;
-
     multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
 
     unsigned char *blob = (unsigned char*) recv_vims( 8, &blen );
@@ -2865,30 +3212,6 @@ static int update_curve_widget(GtkWidget *curve)
         return 0;
     }
     info->uc.reload_hint_checksums[HINT_KF] = checksum;
-
-
-    if( blob && blen > 0 )
-    {
-        p = set_points_in_curve_ext( curve, blob,id,i, &lo,&hi, &curve_type,&status );
-        if( p >= 0 )
-        {
-            info->uc.selected_parameter_id = p;
-            switch( curve_type )
-            {
-                case GTK3_CURVE_TYPE_SPLINE:
-                    set_toggle_button( "curve_typespline", 1 );
-                    break;
-                case GTK3_CURVE_TYPE_FREE:
-                    set_toggle_button( "curve_typefreehand",1 );
-                    break;
-                default: set_toggle_button( "curve_typelinear", 1 );
-                    break;
-            }
-            if( is_button_toggled("curve_toggleentry_param") != status ) {
-                set_toggle_button( "curve_toggleentry_param", status );
-            }
-        }
-    }
 
     if( lo == hi && hi == 0 )
     {
@@ -2903,9 +3226,42 @@ static int update_curve_widget(GtkWidget *curve)
             hi = info->status_tokens[SAMPLE_MARKER_END];
         }
     }
-    update_spin_range( "curve_spinstart", 0, info->status_tokens[TOTAL_FRAMES], lo );
-    update_spin_range( "curve_spinend", 0, info->status_tokens[TOTAL_FRAMES], hi );
 
+    int total_frames = (info->status_tokens[PLAY_MODE] == MODE_STREAM ? 
+                        info->status_tokens[SAMPLE_MARKER_END] : 
+                        ( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[TOTAL_FRAMES]: 0) );
+  
+    update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART],0, total_frames, lo );
+    update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
+
+
+    if( blob && blen > 0 )
+    {
+        p = set_points_in_curve_ext( curve, blob,id,i, &lo,&hi, &curve_type,&status );
+        if( p >= 0 )
+        {
+            info->uc.selected_parameter_id = p;
+            switch( curve_type )
+            {
+                case GTK3_CURVE_TYPE_SPLINE:
+                    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]), TRUE );
+                    break;
+                case GTK3_CURVE_TYPE_FREE:
+                    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE);
+                    break;
+                default: 
+                    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
+                    break;
+            }
+            if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) != status ) {
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status );
+            }
+        }
+    }
+    else {
+        reset_curve( curve );
+    }
+  
     if(blob)    free(blob);
 
     return 1;
@@ -3046,6 +3402,18 @@ static void update_slider_gvalue(const char *name, gdouble value)
     gtk_adjustment_set_value( a, value );
 }
 
+static void update_slider_value2(GtkWidget *w, gint value, gint scale) 
+{
+    gdouble gvalue;
+    if(scale)
+        gvalue = (gdouble) value / (gdouble) scale;
+    else
+        gvalue = (gdouble) value;
+
+    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+    gtk_adjustment_set_value( a, gvalue );
+}
+
 static void update_slider_value(const char *name, gint value, gint scale)
 {
     GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
@@ -3073,6 +3441,12 @@ static void update_spin_incr( const char *name, gdouble step, gdouble page )
     }
     
     gtk_spin_button_set_increments(GTK_SPIN_BUTTON(w),step,page );
+}
+
+static void update_spin_range2(GtkWidget *w, gint min, gint max, gint val)
+{
+    gtk_spin_button_set_range( GTK_SPIN_BUTTON(w), (gdouble)min, (gdouble) max );
+    gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)val);
 }
 
 static void update_spin_range(const char *name, gint min, gint max, gint val)
@@ -3111,6 +3485,30 @@ static void update_spin_value(const char *name, gint value )
     }
     
     gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
+}
+static void update_slider_range2(GtkWidget *w, gint min, gint max, gint value, gint scaled)
+{
+    if(min == max) {
+        return;
+    }
+
+    GtkRange *range = GTK_RANGE(w);
+    if(!scaled)
+    {
+        gtk_range_set_range(range, (gdouble) min, (gdouble) max );
+        gtk_range_set_value(range, value );
+    }
+    else
+    {
+        gdouble gmin =0.0;
+        gdouble gmax =100.0;
+        gdouble gval = gmax / value;
+        gtk_range_set_range(range, gmin, gmax);
+        gtk_range_set_value(range, gval );
+    }
+
+    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+    gtk_range_set_adjustment(range, a );
 }
 
 static void update_slider_range(const char *name, gint min, gint max, gint value, gint scaled)
@@ -3269,8 +3667,7 @@ static void update_rgbkey()
     if(!info->entry_lock)
     {
         info->entry_lock =1;
-        GtkWidget *colorsel = glade_xml_get_widget_(info->main_window,
-                                                    "rgbkey");
+        GtkWidget *colorsel = widget_cache[ WIDGET_RGBKEY ];
         GdkColor color;
         /* update from entry tokens (delivered by GET_CHAIN_ENTRY */
         int *p = &(info->uc.entry_tokens[0]);
@@ -3290,14 +3687,13 @@ static void update_rgbkey_from_slider()
 {
     if(!info->entry_lock)
     {
-        GtkWidget *colorsel = glade_xml_get_widget_(info->main_window,
-                                                    "rgbkey");
+        GtkWidget *colorsel = widget_cache[ WIDGET_RGBKEY ];
         info->entry_lock = 1;
         GdkColor color;
 
-        color.red = 255 * ( get_slider_val( "slider_p1" ) );
-        color.green = 255 * ( get_slider_val( "slider_p2" ) );
-        color.blue = 255 * ( get_slider_val( "slider_p3" ) );
+        color.red = 255 * ( get_slider_val2( widget_cache[WIDGET_SLIDER_P1]) );
+        color.green = 255 * ( get_slider_val2( widget_cache[WIDGET_SLIDER_P2]) );
+        color.blue = 255 * ( get_slider_val2( widget_cache[WIDGET_SLIDER_P3]) );
 
         gtk_color_selection_set_current_color(GTK_COLOR_SELECTION( colorsel ),
                                               &color );
@@ -3569,9 +3965,8 @@ static void update_current_slot(int *history, int pm, int last_pm)
             }
 
             char *end = format_time( info->status_tokens[SAMPLE_MARKER_END], (double)info->el.fps );
-            update_label_str( "label_markerend", end );
+            gtk_label_set_text( GTK_LABEL(widget_cache[WIDGET_LABEL_MARKEREND]), end);
             free(end);
-
 
             update = 1;
         }
@@ -3586,19 +3981,19 @@ static void update_current_slot(int *history, int pm, int last_pm)
             switch( info->status_tokens[SAMPLE_LOOP] )
             {
                 case 0:
-                    set_toggle_button( "loop_none", 1 );
+                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_NONE]), TRUE); 
                 break;
                 case 1:
-                    set_toggle_button( "loop_normal", 1 );
+                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_NORMAL]), TRUE); 
                 break;
                 case 2:
-                    set_toggle_button("loop_pingpong", 1 );
+                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_PINGPONG]), TRUE); 
                 break;
                 case 3:
-                    set_toggle_button("loop_random", 1 );
+                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_RANDOM]), TRUE); 
                 break;
                 case 4:
-                    set_toggle_button("loop_oncenop", 1 );
+                    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_LOOP_ONCENOP]), TRUE); 
                     break;
             }
         }
@@ -3612,7 +4007,8 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
             if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
             if( speed < 0 ) speed *= -1;
-            update_spin_value( "spin_samplespeed", speed);
+
+            gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESPEED]), (gdouble) speed );
 
             if( pm == MODE_SAMPLE ) {
                 if( speed == 0 )
@@ -3638,14 +4034,14 @@ static void update_current_slot(int *history, int pm, int last_pm)
             update = 1;
         }
 
-        if( (history[SUBRENDER] != info->status_tokens[SUBRENDER] || is_button_toggled( "toggle_subrender") != info->status_tokens[SUBRENDER]) )
+        if( (history[SUBRENDER] != info->status_tokens[SUBRENDER] || gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_TOGGLE_SUBRENDER ]) ) != info->status_tokens[SUBRENDER]) )
         {
-            set_toggle_button( "toggle_subrender", info->status_tokens[SUBRENDER] );
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_SUBRENDER ] ) , TRUE );
         }
 
-        if( history[FADE_ALPHA] != info->status_tokens[FADE_ALPHA] || info->status_tokens[FADE_ALPHA] != is_button_toggled( "toggle_fademethod" ))
+        if( history[FADE_ALPHA] != info->status_tokens[FADE_ALPHA] || info->status_tokens[FADE_ALPHA] != gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] )) )
         {
-            set_toggle_button( "toggle_fademethod", info->status_tokens[FADE_ALPHA]);
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] ), TRUE );
         }
 
         if( history[FADE_ENTRY] != info->status_tokens[FADE_ENTRY] || fx_get_current_fade_entry_method() != fx_get_fade_entry_method(info->status_tokens[FADE_ENTRY]) ) 
@@ -3664,10 +4060,11 @@ static void update_current_slot(int *history, int pm, int last_pm)
             if(speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
             if(speed < 0 ) speed *= -1;
 
-            update_spin_range( "spin_samplespeed", -1 * len, len, speed );
 
-            update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START]);
-            update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
+            update_spin_range2( widget_cache[ WIDGET_SPIN_SAMPLESPEED ], -1 * len, len, speed );
+
+            gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART]), (gdouble) info->status_tokens[SAMPLE_START] );
+            gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]), (gdouble) info->status_tokens[SAMPLE_END]);
 
             gint n_frames = sample_calctime();
 
@@ -3919,8 +4316,7 @@ gboolean view_entry_selection_func (GtkTreeSelection *selection,
 
             if( get_nums("button_fx_entry") != name ) {
                 info->status_lock = 1;
-                update_spin_value( "button_fx_entry", name   );
-                //vj_kf_reset();
+                update_spin_value( "button_fx_entry", name   ); //FIXME
                 info->uc.reload_hint[HINT_KF] = 1;
                 info->uc.reload_hint[HINT_ENTRY] = 1;
                 info->status_lock = 0;
@@ -4228,7 +4624,7 @@ static gint load_parameter_info()
     {
         if(answer) free(answer);
         if(info->uc.selected_rgbkey )
-            disable_widget("rgbkey");
+            gtk_widget_set_sensitive_( widget_cache[WIDGET_RGBKEY], FALSE );
         return 0;
     }
 
@@ -4236,6 +4632,7 @@ static gint load_parameter_info()
     char *token = strtok_r( answer," ", &ptr );
     if(!token) {
         veejay_msg(VEEJAY_MSG_ERROR,"Invalid reply from %d", VIMS_CHAIN_GET_ENTRY );
+        free(answer);
         return 0;
     }
     p[i] = atoi(token);
@@ -4248,44 +4645,42 @@ static gint load_parameter_info()
     info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
     if(info->uc.selected_rgbkey)
     {
-        enable_widget( "rgbkey");
+        gtk_widget_set_sensitive_( widget_cache[WIDGET_RGBKEY], TRUE );
         update_rgbkey();
     }
     else
     {
-        disable_widget( "rgbkey");
+        gtk_widget_set_sensitive_( widget_cache[WIDGET_RGBKEY], FALSE );
         info->uc.selected_rgbkey = 0;
     }
 
-    if(is_button_toggled("curve_chain_toggleentry") != p[ENTRY_KF_STATUS]) {
-        set_toggle_button( "curve_chain_toggleentry", p[ENTRY_KF_STATUS] );
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY])) != p[ENTRY_KF_STATUS]){
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY]), p[ENTRY_KF_STATUS]);
     }
-
-//    update_label_str( "curve_parameter", FX_PARAMETER_DEFAULT_NAME);
 
     switch( p[ENTRY_KF_TYPE] )
     {
         case GTK3_CURVE_TYPE_SPLINE:
-            if(!is_button_toggled("curve_typespline")) {
-                 set_toggle_button( "curve_typespline", 1 );
+            if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]))) {
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPESPLINE]), TRUE );
              }
              break;
         case GTK3_CURVE_TYPE_FREE:
-             if(!is_button_toggled("curve_typefreehand")) {
-                set_toggle_button( "curve_typefreehand",1 );
+             if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]))) {
+                 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPEFREEHAND]), TRUE );
              }
              break;
         case GTK3_CURVE_TYPE_LINEAR:
-             if(!is_button_toggled("curve_typelinear")) {
-                set_toggle_button( "curve_typelinear", 1 );
-             }
-             break;
+            if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]))) {
+                 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
+            }
+            break;
         default:
-             break;
+            break;
     }
 
-    if(is_button_toggled("subrender_entry_toggle") != p[ENTRY_SUBRENDER_ENTRY]) {
-        set_toggle_button("subrender_entry_toggle", p[ENTRY_SUBRENDER_ENTRY]);
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE])) != p[ENTRY_SUBRENDER_ENTRY]) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE]), p[ENTRY_SUBRENDER_ENTRY]);
     }
 
     free(answer);
@@ -4338,33 +4733,11 @@ static void load_generator_info()
         update_slider_range( gen_names_[i].text, min,max, value, 0 );
 
         disable_widget( gen_box_names_[i].text );
-        set_tooltip( gen_names_[i].text, NULL );
+        set_tooltip( gen_names_[i].text, "" );
     }
 
     free(fxtext);
 }
-
-/******************************************************
- * get_col_number_from_tree_view_column()
- *
- *   Returns column number or -1 if not found or on error
- ******************************************************/
-/* Actually not used
-gint get_treeview_col_number_from_column (GtkTreeViewColumn *col)
-{
-    GList *cols;
-    gint   num;
-
-    g_return_val_if_fail ( col != NULL, -1 );
-    g_return_val_if_fail ( col->tree_view != NULL, -1 );
-
-    cols = gtk_tree_view_get_columns(GTK_TREE_VIEW(col->tree_view));
-    num = g_list_index(cols, (gpointer) col);
-    g_list_free(cols);
-
-    return num;
-}
-*/
 
 /******************************************************
  *
@@ -5604,9 +5977,9 @@ void on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
                    blue );
 
         info->parameter_lock = 1;
-        update_slider_value("slider_p1", red, 0 );
-        update_slider_value("slider_p2", green, 0 );
-        update_slider_value("slider_p3", blue, 0 );
+        update_slider_value2(widget_cache[WIDGET_SLIDER_P1], red, 0 );
+        update_slider_value2(widget_cache[WIDGET_SLIDER_P2], green, 0 );
+        update_slider_value2(widget_cache[WIDGET_SLIDER_P3], blue, 0 );
 
         info->parameter_lock = 0;
     }
@@ -5614,7 +5987,7 @@ void on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 
 static void setup_rgbkey()
 {
-    GtkWidget *sel = glade_xml_get_widget_(info->main_window, "rgbkey");
+    GtkWidget *sel = widget_cache[ WIDGET_RGBKEY ];
     g_signal_connect( sel, "color-changed",
     (GCallback) on_rgbkey_color_changed, NULL );
 }
@@ -6431,17 +6804,6 @@ static void show_widget(const char *name)
     gtk_widget_show(w);
 }
 
-static gboolean is_widget_enabled(const char *name)
-{
-    GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
-    if(!w)
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "%s: Widget '%s' not found",__FUNCTION__,name);
-        return FALSE;
-    }
-    return gtk_widget_is_sensitive( GTK_WIDGET(w) );
-}
-
 #ifndef STRICT_CHECKING
 static void disable_widget_(const char *name)
 {
@@ -6702,7 +7064,7 @@ int gveejay_time_to_sync( void *ptr )
     {
         reloaded_restart();
     }
-    
+   
     nsecsleep.tv_nsec = nsec;
     nsecsleep.tv_sec = 0;
     nanosleep( &nsecsleep, NULL );  
@@ -6711,7 +7073,6 @@ int gveejay_time_to_sync( void *ptr )
 
 int veejay_update_multitrack( void *ptr )
 {
-    
     sync_info *s = multitrack_sync( info->mt );
 
     if( s->status_list[s->master] == NULL ) {
@@ -6903,27 +7264,31 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         char *time = format_time( total_frames_,(double) info->el.fps );
         if( pm == MODE_STREAM )
         {
-            update_spin_value( "stream_length", info->status_tokens[SAMPLE_MARKER_END] );
-            update_label_str( "stream_length_label", time );
+            gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_STREAM_LENGTH] ), (gdouble) info->status_tokens[SAMPLE_MARKER_END]);
+
+            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_STREAM_LENGTH_LABEL] ), time );
         }
+
         if( pm != MODE_SAMPLE) {
-            update_spin_range("button_fadedur", 0, total_frames_, ( total_frames_ > 25 ? 25 : total_frames_-1 ) );
+            update_spin_range2( widget_cache[WIDGET_BUTTON_FADEDUR],0, total_frames_, ( total_frames_ > 25 ? 25 : total_frames_-1 ) );
         }
 
-        update_label_i( "label_totframes", total_frames_, 1 );
+        update_label_i2( widget_cache[WIDGET_LABEL_TOTFRAMES], total_frames_, 1 );
         
-        if( pm == MODE_SAMPLE )
-            update_label_str( "label_samplelength",time);
+        if( pm == MODE_SAMPLE ) {
+            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_SAMPLELENGTH] ), time );
+        }
         
-        update_label_i( "label_totframes", total_frames_, 1 );
-        update_label_str( "label_totaltime", time );
-        if(pm == MODE_SAMPLE)
-            update_label_str( "sample_length_label", time );
-        else
-            update_label_str( "sample_length_label", "0:00:00:00" );
+        update_label_i2( widget_cache[ WIDGET_LABEL_TOTFRAMES ], total_frames_, 1 );
 
-        timeline_set_length( info->tl,
-                (gdouble) total_frames_ , current_frame_);
+        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_TOTALTIME] ), time );
+
+        if(pm == MODE_SAMPLE)
+            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_SAMPLE_LENGTH_LABEL] ), time );
+        else
+            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_SAMPLE_LENGTH_LABEL] ), "0:00:00:00" );
+
+        timeline_set_length( info->tl, (gdouble) total_frames_ , current_frame_);
 
         if( pm != MODE_STREAM )
             info->uc.reload_hint[HINT_EL] = 1;
@@ -6932,6 +7297,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     }
 
     info->status_frame = info->status_tokens[FRAME_NUM];
+    
     timeline_set_pos( info->tl, (gdouble) info->status_frame );
     char *current_time_ = format_time( info->status_frame, (double) info->el.fps );
     char *mouse_at_time = format_time( 
@@ -6941,19 +7307,17 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     update_label_i2(  widget_cache[ WIDGET_LABEL_CURFRAME ],info->status_frame ,1 );
 
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_CURTIME] ), current_time_ );
-    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_SAMPLEPOSITION] ), current_time_ );
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_MOUSEAT] ), mouse_at_time);
 
 
+    // WARNING: updating EDL labels when not visible on screen incurs high cost (these labels are updated every frame period)
+    if( pm == MODE_SAMPLE && is_edl_displayed() ) {
+        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_SAMPLEPOSITION] ), current_time_ );
+        update_label_i2( widget_cache[ WIDGET_LABEL_SAMPLEPOS ], info->status_frame, 1);
+    }
 
     free(current_time_);
     free(mouse_at_time);
-
-    if( pm == MODE_SAMPLE )
-        update_label_i( "label_samplepos",
-            info->status_frame , 1);
-    else
-        update_label_i( "label_samplepos" , 0 , 1 );
 
     if( last_pm != pm )
         update_status_accessibility( last_pm, pm);
@@ -6969,7 +7333,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
                 enable_widget( non_feedback_widgets[i].name );
             }
         }
-        set_toggle_button( "feedbackbutton", info->status_tokens[FEEDBACK]);
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_FEEDBACKBUTTON] ), info->status_tokens[FEEDBACK] );
     }
 
     if( info->status_tokens[MACRO] != history[MACRO] )
@@ -6977,11 +7341,11 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         switch(info->status_tokens[MACRO])
         {
             case 1:
-                set_toggle_button( "macrorecord",1); break;
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACRORECORD] ), TRUE ); break;
             case 2:
-                set_toggle_button( "macroplay",1 ); break;
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROPLAY] ), TRUE ); break;
             default:
-                set_toggle_button( "macrostop",1); break;
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROSTOP] ), TRUE ); break;
         }
     }
 
@@ -7006,17 +7370,19 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             timeline_set_selection( info->tl, TRUE );
         else {
             timeline_set_selection( info->tl, FALSE );
-            info->status_lock = 1;
             timeline_clear_points( info->tl );
-            info->status_lock = 0;
         }
 
         if( pm == MODE_SAMPLE ) {
             info->selection[0] = info->status_tokens[SAMPLE_MARKER_START];
             info->selection[1] = info->status_tokens[SAMPLE_MARKER_END];
 
-            update_spin_value( "button_el_selstart", info->selection[0]);
-            update_spin_value( "button_el_selend", info->selection[1]);
+            gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_BUTTON_EL_SELSTART] ), (gdouble) info->selection[0]);
+            gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_BUTTON_EL_SELEND ] ), (gdouble) info->selection[1]);
+        }
+        if( pm == MODE_STREAM ) {
+            info->selection[0] = 0;
+            info->selection[1] = total_frames_;
         }
         
         select_slot( info->status_tokens[PLAY_MODE] );
@@ -7050,16 +7416,16 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     }
 
     if( info->status_tokens[SAMPLE_LOOP_STAT_STOP] != history[SAMPLE_LOOP_STAT_STOP] ) {
-	    update_label_i( "label_loop_stat_stop", info->status_tokens[SAMPLE_LOOP_STAT_STOP],0);
+	    update_label_i2( widget_cache[WIDGET_LABEL_LOOP_STAT_STOP], info->status_tokens[SAMPLE_LOOP_STAT_STOP],0);
         if( pm == MODE_SAMPLE )
-            update_spin_value( "sample_loopstop", info->status_tokens[SAMPLE_LOOP_STAT_STOP] );
+            gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[ WIDGET_SAMPLE_LOOPSTOP ] ), (gdouble) info->status_tokens[SAMPLE_LOOP_STAT_STOP] );
          if( pm == MODE_STREAM )
-            update_spin_value( "stream_loopstop", info->status_tokens[SAMPLE_LOOP_STAT_STOP] );
-    }
-    if( info->status_tokens[SAMPLE_LOOP_STAT ] != history[SAMPLE_LOOP_STAT] ) {
-	    update_label_i( "label_loop_stats", info->status_tokens[SAMPLE_LOOP_STAT], 0);
+             gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[ WIDGET_STREAM_LOOPSTOP ] ), (gdouble) info->status_tokens[SAMPLE_LOOP_STAT_STOP] );
     }
 
+    if( info->status_tokens[SAMPLE_LOOP_STAT ] != history[SAMPLE_LOOP_STAT] ) {
+	    update_label_i2( widget_cache[ WIDGET_LABEL_LOOP_STATS ], info->status_tokens[SAMPLE_LOOP_STAT], 0);
+    }
 
     if( info->status_tokens[SEQ_ACT] != history[SEQ_ACT] )
     {
@@ -7070,7 +7436,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         int in = info->status_tokens[SEQ_CUR];
         if( in < MAX_SEQUENCES )
         {
-            set_toggle_button( "seqactive" , 1 );
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]), TRUE );
             indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
             info->sequence_playing = in;
             indicate_sequence( TRUE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
@@ -7078,16 +7444,14 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         else
         {
             indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
-            set_toggle_button( "seqactive" , 0 );
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SEQACTIVE]), FALSE );
         }
     }
-
-    //if( total_frames_ != history_frames_ || total_frames_ != (int) timeline_get_length(TIMELINE_SELECTION(info->tl)))
 
     if( history[CURRENT_ID] != info->status_tokens[CURRENT_ID] )
     {
         if(pm == MODE_SAMPLE || pm == MODE_STREAM)
-            update_label_i( "label_currentid", info->status_tokens[CURRENT_ID] ,0);
+            update_label_i2( widget_cache[ WIDGET_LABEL_CURRENTID], info->status_tokens[CURRENT_ID] ,0);
     }
 
     if( history[STREAM_RECORDING] != info->status_tokens[STREAM_RECORDING] )
@@ -7109,18 +7473,21 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         {
             int plainspeed =  info->status_tokens[SAMPLE_SPEED];
 
-            update_slider_value( "speed_slider", plainspeed, 0);
+            update_slider_value2( widget_cache[WIDGET_SPEED_SLIDER], plainspeed, 0);
             if( plainspeed < 0 )
                 info->play_direction = -1;
             else
                 info->play_direction = 1;
+            
             if( plainspeed < 0 ) plainspeed *= -1;
+
             if( plainspeed == 0 )
             {
-                update_label_str( "playhint", "Paused");
-            } else
+                gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_PLAYHINT] ), "Paused" );
+            }
+            else
             {
-                update_label_str( "playhint", "Playing");
+                gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_PLAYHINT] ), "Playing" );
             }
         }
     }
@@ -7131,7 +7498,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         {
             if(info->uc.cali_duration > 0 )
             {
-                GtkWidget *tb = glade_xml_get_widget_( info->main_window, "cali_take_button");
+                GtkWidget *tb = widget_cache[WIDGET_CALI_TAKE_BUTTON];
                 info->uc.cali_duration--;
                 vj_msg(VEEJAY_MSG_INFO,
                        "Calibrate step %d of %d",
@@ -7144,23 +7511,23 @@ static void update_globalinfo(int *history, int pm, int last_pm)
                     switch(info->uc.cali_stage)
                     {
                         case 1: //@ capturing black frames
-                            update_label_str( "current_step_label",
-                            "Please take an image of a uniformly lit area in placed in front of your lens.");
+                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                                "Please take an image of a uniformly lit area in placed in front of your lens.");
                             gtk_button_set_label( GTK_BUTTON(tb), "Take White Frames");
                             break;
                         case 2:
                         case 3:
-                            update_label_str( "current_step_label",
-                            "Image calibrated. You may need to adjust brightness.");
+                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                                "Image calibrated. You may need to adjust brightness.");
                             enable_widget( "cali_save_button");
                             break;
                         default:
-                            update_label_str( "current_step_label","Image calibrated. You may need to adjust brightness.");
+                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                                "Image calibrated. You may need to adjust brightness.");
                             gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
                             veejay_msg(VEEJAY_MSG_ERROR, "Warning, mem leak if not reset first.");
                             break;
                     }
-                    veejay_msg(VEEJAY_MSG_ERROR, "Label update for case %d", info->uc.cali_stage);
 
                     if(info->uc.cali_stage >= 2 )
                     {
@@ -7172,52 +7539,55 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     }
 
     update_current_slot(history, pm, last_pm);
-//  info->uc.playmode = pm;
 }
 
 static void disable_fx_entry() {
     int i;
     gint min=0,max=1,value=0;
-    if( is_widget_enabled( "frame_fxtree2" ) ) {
-        disable_widget("frame_fxtree2");
+
+    if(gtk_widget_is_sensitive( widget_cache[WIDGET_FRAME_FXTREE2 ] ) ) {
+        gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE2 ] , FALSE );
     }
 
-    update_label_str( "label_effectname" ,"" );
-    update_label_str( "label_effectanim_name" ,"" );
-    update_label_str( "value_friendlyname", FX_PARAMETER_VALUE_DEFAULT_HINT );
+    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTNAME] ), "");
+    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTANIM_NAME] ), "");
+    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME ] ), FX_PARAMETER_VALUE_DEFAULT_HINT );
 
-    if( is_button_toggled("button_entry_toggle") ) {
-        set_toggle_button( "button_entry_toggle", FALSE );
-    }
-    if( is_button_toggled("subrender_entry_toggle")) {
-        set_toggle_button("subrender_entry_toggle", FALSE);
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON( widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE] ) ))
+    {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE] ), FALSE );
     }
 
-    if( get_nums("transition_loop") != 0 ) {
-        update_spin_value( "transition_loop",0);
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON( widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE] ) )) 
+    {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE] ), FALSE);
     }
 
-    if( is_button_toggled("transition_enabled") ) {
-        set_toggle_button( "transition_enabled", FALSE);\
+    if( (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_TRANSITION_LOOP] ) ) != 0 ) {
+        gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_TRANSITION_LOOP] ), (gdouble) 0);
+    }
+
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_TRANSITION_ENABLED] ) ) ) {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_TRANSITION_ENABLED] ), FALSE );
     }
 
     for( i = 0; fx_fade_entry[i].name != NULL;i ++ ) {
         disable_widget( fx_fade_entry[i].name );
     }
 
-    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    GtkWidget *kf_param = widget_cache[ WIDGET_COMBO_CURVE_FX_PARAM ];
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
 
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
-        update_slider_range( slider_names_[i].text, min,max, value, 0 );
-        disable_widget( slider_box_names_[i].text );
-        set_tooltip( slider_names_[i].text, NULL );
+        update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i], min,max, value, 0 );
+        gtk_widget_set_sensitive_( widget_cache[WIDGET_SLIDER_BOX_P0 + i], FALSE );
+        gtk_widget_set_tooltip_text( widget_cache[WIDGET_SLIDER_P0 + i], "" );
 
-        gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,param_names_[i].text)),NULL);
+        gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 +i ]), "");
 
         if( faster_ui_ )
-            hide_widget( param_frame_[i].text );
+            gtk_widget_hide( widget_cache[WIDGET_FRAME_P0 + i]);
     }
 }
 
@@ -7225,68 +7595,65 @@ static void enable_fx_entry() {
 
     int *entry_tokens = &(info->uc.entry_tokens[0]);
     int i;
-    if( !is_widget_enabled("frame_fxtree2" )) {
-        enable_widget("frame_fxtree2");
+
+    if(!gtk_widget_is_sensitive( widget_cache[ WIDGET_FRAME_FXTREE2 ] )) {
+        gtk_widget_set_sensitive( widget_cache[ WIDGET_FRAME_FXTREE2 ] ,TRUE );
     }
 
-    update_label_str( "label_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
-    update_label_str( "label_effectanim_name", _effect_get_description( entry_tokens[ENTRY_FXID] ));
+    char *fx_name =  _effect_get_description( entry_tokens[ENTRY_FXID] );
 
-    if( entry_tokens[ENTRY_VIDEO_ENABLED] != is_button_toggled( "button_entry_toggle" ) ) {
-        set_toggle_button("button_entry_toggle", entry_tokens[ENTRY_VIDEO_ENABLED] );
-    }
-    if( entry_tokens[ENTRY_SUBRENDER_ENTRY] != is_button_toggled( "subrender_entry_toggle" ) ) {
-        set_toggle_button("subrender_entry_toggle", entry_tokens[ENTRY_SUBRENDER_ENTRY]);
-    }
-    if( get_nums("button_fx_entry") != info->uc.selected_chain_entry ) {
-        update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);
-    }
+    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTNAME] ),fx_name );
+    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTANIM_NAME] ), fx_name );
 
-    if( get_nums("transition_loop") != entry_tokens[ENTRY_TRANSITION_LOOP] ) {
-        update_spin_value( "transition_loop", entry_tokens[ENTRY_TRANSITION_LOOP] );
+    if( entry_tokens[ENTRY_VIDEO_ENABLED] != gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE])) ) {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_BUTTON_ENTRY_TOGGLE]), entry_tokens[ENTRY_VIDEO_ENABLED]);
+    }
+    if( entry_tokens[ENTRY_SUBRENDER_ENTRY] != gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE])) ) {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE]), entry_tokens[ENTRY_SUBRENDER_ENTRY]);
     }
 
-    if( is_button_toggled("transition_enabled") != entry_tokens[ENTRY_TRANSITION_ENABLED] ) {
-        set_toggle_button( "transition_enabled", entry_tokens[ENTRY_TRANSITION_ENABLED] );
+    if( (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_BUTTON_FX_ENTRY])) != info->uc.selected_chain_entry ) {
+        gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_BUTTON_FX_ENTRY]), info->uc.selected_chain_entry );
+    }
+    if( (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_TRANSITION_LOOP])) != entry_tokens[ENTRY_TRANSITION_LOOP] ) {
+        gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_TRANSITION_LOOP]), entry_tokens[ENTRY_TRANSITION_LOOP] );
+    }
+
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_TRANSITION_ENABLED]) ) != entry_tokens[ENTRY_TRANSITION_ENABLED]) {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_TRANSITION_ENABLED]), entry_tokens[ENTRY_TRANSITION_ENABLED]);
     }
   
-    for( i = 0; fx_fade_entry[i].name != NULL;i ++ ) {
-        if(!is_widget_enabled( fx_fade_entry[i].name)) {
-            enable_widget( fx_fade_entry[i].name );
+    for( i = WIDGET_FX_M1; i < WIDGET_FX_M4; i ++ ) { 
+        if( !gtk_widget_is_sensitive(widget_cache[i]) ) {
+            gtk_widget_set_sensitive_(widget_cache[i], TRUE);
         }
     }
 
     if( _effect_get_mix( entry_tokens[ENTRY_FXID] ) )
     {
-        if(!is_widget_enabled("transition_enabled" ) ) {   
-            enable_widget( "transition_enabled" );
-        }
-        if(!is_widget_enabled("transition_loop")) {
-            enable_widget( "transition_loop" );
-        }
-        if(!is_widget_enabled("subrender_entry_toggle")) {
-            enable_widget( "subrender_entry_toggle" );
-        }
+        if(!gtk_widget_is_sensitive(widget_cache[WIDGET_TRANSITION_ENABLED])) 
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_TRANSITION_ENABLED], TRUE);
+        if(!gtk_widget_is_sensitive(widget_cache[WIDGET_TRANSITION_LOOP]))
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_TRANSITION_LOOP], TRUE);
+        if(!gtk_widget_is_sensitive(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE]))
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE], TRUE );
     }
     else {
-        if( is_widget_enabled( "fx_m4") ) {
-            disable_widget( "fx_m4" );
-        }
-        if( is_widget_enabled( "fx_m3") ) {
-            disable_widget( "fx_m3" );
-        }
-        if( is_widget_enabled( "transition_enabled" ) ) {
-            disable_widget( "transition_enabled" );
-        }
-        if( is_widget_enabled( "transition_loop") ) {
-            disable_widget( "transition_loop" );
-        }
-        if( is_widget_enabled( "subrender_entry_toggle" ) ) {
-            disable_widget( "subrender_entry_toggle" );
-        }
+
+        if( gtk_widget_is_sensitive(widget_cache[WIDGET_FX_M4]))
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_FX_M4], FALSE );
+        if( gtk_widget_is_sensitive(widget_cache[WIDGET_FX_M3]))
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_FX_M3], FALSE );
+        if( gtk_widget_is_sensitive(widget_cache[WIDGET_TRANSITION_LOOP]))
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_TRANSITION_LOOP], FALSE );
+        if( gtk_widget_is_sensitive(widget_cache[WIDGET_TRANSITION_ENABLED]))
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_TRANSITION_ENABLED], FALSE );
+        if( gtk_widget_is_sensitive(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE]))
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE], FALSE );
     }
 
-    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    GtkWidget *kf_param = widget_cache[ WIDGET_COMBO_CURVE_FX_PARAM ];
+    
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
     gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), FX_PARAMETER_DEFAULT_NAME);
     gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
@@ -7294,65 +7661,61 @@ static void enable_fx_entry() {
     int np = _effect_get_np( entry_tokens[ENTRY_FXID] );
     gint min,max,value;
 
+    char kf_param_text[20];
+
     for( i = 0; i < np ; i ++ )
     {
-        if( !is_widget_enabled( slider_box_names_[i].text ) ) {
-            enable_widget( slider_box_names_[i].text );
-        }
+        if(!gtk_widget_is_sensitive(widget_cache[WIDGET_SLIDER_BOX_P0 + i]))
+            gtk_widget_set_sensitive_(widget_cache[WIDGET_SLIDER_BOX_P0 + i], TRUE );
 
-//~ if( !is_widget_enabled( param_kfs_[i].text ) ) {
-            //~ enable_widget( param_kfs_[i].text );
-//~ }
         if( faster_ui_ ){
-            show_widget( param_frame_[i].text );
+            gtk_widget_show(widget_cache[WIDGET_FRAME_P0 + i]);
         }
 
-        gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
-        set_tooltip( slider_names_[i].text, tt1 );
-        gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,param_names_[i].text)),tt1);
+        gchar *tt1 = _effect_get_param_description(entry_tokens[ENTRY_FXID],i);
+        gtk_widget_set_tooltip_text( widget_cache[WIDGET_SLIDER_P0 + i], tt1 );
+        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_P0 + i ] ), tt1 );
 
-        if (strlen(tt1) != 0){
+        if (tt1 != NULL && tt1[0] != '\0' ) {
             gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), tt1);
-        } else { //Fail back if parameter name is missing
-            size_t n = 1 + 2; // see sprintf
-            gchar *kf_param_text = (gchar*)vj_malloc(sizeof(gchar)*(n+1));
-            sprintf(kf_param_text, "p%d",i); // i < MAX_UI_PARAMETERS
+        } 
+        else 
+        { 
+            //Fall back if parameter name is missing
+            snprintf(kf_param_text,sizeof(kf_param_text), "p%d",i);
             gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), kf_param_text);
-            free(kf_param_text);
         }
-        g_free(tt1);
 
-
-/* WARNING : conditional loop break. Do not add code after this statement. */
+        /* WARNING : conditional loop break. Do not add code after this statement. */
         value = entry_tokens[ENTRY_PARAMSET + i];
         if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
         {
-            GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( glade_xml_get_widget_( info->main_window, slider_names_[i].text)  ));
+            GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget_cache[WIDGET_SLIDER_P0 + i] ));
             if( (gint) gtk_adjustment_get_lower(a) == min &&
                 (gint) gtk_adjustment_get_upper(a) == max &&
                 (gint) gtk_adjustment_get_value(a) == value )
                 continue;
     
-            update_slider_range( slider_names_[i].text,min,max, value, 0);
+            update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i],min,max, value, 0);
         }
     }
    
     min = 0; max = 1; value = 0; 
     for( i = np; i < MAX_UI_PARAMETERS; i ++ )
     {
-        if( !is_widget_enabled( slider_names_[i].text ) )
+        if( !gtk_widget_is_sensitive(widget_cache[WIDGET_SLIDER_P0 + i]) )
             continue;
 
-        update_slider_range( slider_names_[i].text, min,max, value, 0 );
+        update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i ],min,max, value, 0 );
 
-        disable_widget( slider_box_names_[i].text );
+        gtk_widget_set_sensitive(widget_cache[ WIDGET_SLIDER_BOX_P0 + i ], FALSE );
 
         if( faster_ui_ )
-          hide_widget( param_frame_[i].text );
+          gtk_widget_hide( widget_cache[ WIDGET_FRAME_P0 + i ] );
 
-        set_tooltip( slider_names_[i].text, NULL );
-        
-        gtk_label_set_text(GTK_LABEL (glade_xml_get_widget_(info->main_window,param_names_[i].text)),NULL);
+        gtk_widget_set_tooltip_text( widget_cache[ WIDGET_SLIDER_P0 + i ], "" );
+
+        gtk_label_set_text(GTK_LABEL (widget_cache[WIDGET_LABEL_P0 + i]), "");
     }
 }
 
@@ -7410,11 +7773,9 @@ static void process_reload_hints(int *history, int pm)
         {
             //also for stream (index is equivalent)
             if(pm == MODE_SAMPLE)
-                set_toggle_button( "check_samplefx",
-                    info->status_tokens[SAMPLE_FX]);
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]), info->status_tokens[SAMPLE_FX] );
             if(pm == MODE_STREAM)
-                set_toggle_button( "check_streamfx",
-                    info->status_tokens[SAMPLE_FX]);
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_STREAMFX]), info->status_tokens[SAMPLE_FX] );
         }
     }
 
@@ -7428,7 +7789,7 @@ static void process_reload_hints(int *history, int pm)
     {
         int lpi = load_parameter_info();
         if( lpi == 0 ) {
-            if( entry_tokens[ENTRY_FXID] == 0 && is_widget_enabled( "frame_fxtree2" ) ) {
+            if( entry_tokens[ENTRY_FXID] == 0 && gtk_widget_is_sensitive(widget_cache[WIDGET_FRAME_FXTREE2])) {
                 disable_fx_entry();
             }
         } else if (lpi == 1 ) {
@@ -7436,9 +7797,8 @@ static void process_reload_hints(int *history, int pm)
                 enable_fx_entry();
             }
         }
-
-    //     update_fx_chain();
     }
+
     info->parameter_lock = 0;
 
     if( info->uc.reload_hint[HINT_GENERATOR])
@@ -7446,10 +7806,8 @@ static void process_reload_hints(int *history, int pm)
         load_generator_info();
     }
 
-    //int fx_anim = 0;
     if ( info->uc.reload_hint[HINT_KF]) {
         vj_kf_refresh();
-       // fx_anim = 1;
     }
 
     if( beta__ && info->uc.reload_hint[HINT_HISTORY]) {
@@ -7465,11 +7823,6 @@ static void process_reload_hints(int *history, int pm)
     if(!samplebank_ready_) {
         info->uc.reload_hint[HINT_SLIST] = 2;
     }
-/*
-    if(is_curve_empty() && fx_anim ) {
-        info->uc.reload_hint[HINT_KF] = 1;
-    }
-    */
 }
 
 void update_gui()
@@ -7487,7 +7840,7 @@ void update_gui()
     if( info->uc.randplayer && pm != last_pm )
     {
         info->uc.randplayer = 0;
-        set_toggle_button( "samplerand", 0 );
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_SAMPLERAND] ), FALSE );
     }
 
     if( pm == MODE_PATTERN && last_pm != pm)
@@ -7495,7 +7848,7 @@ void update_gui()
         if(!info->uc.randplayer )
         {
             info->uc.randplayer = 1;
-            set_toggle_button( "samplerand", 1 );
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_SAMPLERAND] ), TRUE );
         }
         info->status_tokens[PLAY_MODE] = MODE_SAMPLE;
         pm = MODE_SAMPLE;
@@ -8206,15 +8559,14 @@ void vj_gui_init(const char *glade_file,
 
     if(!beta) // srt-titling sequence stuff
     {
-        GtkWidget *ww = glade_xml_get_widget_(info->main_window, "notebook18");
-        GtkWidget *srtpad = gtk_notebook_get_nth_page(GTK_NOTEBOOK(ww),4);
+        GtkWidget *srtpad = gtk_notebook_get_nth_page(GTK_NOTEBOOK( widget_cache[WIDGET_NOTEBOOK18]),4);
         gtk_widget_hide(srtpad);
     }
 
     beta__ = beta;
 
     update_spin_range( "spin_framedelay", 1, MAX_SLOW, 0);
-    update_spin_range( "spin_samplespeed", -25,25,1);
+    update_spin_range2( widget_cache[WIDGET_SPIN_SAMPLESPEED], -25,25,1);
     update_slider_range( "speed_slider", -25,25,1,0);
     update_slider_range( "slow_slider",1,MAX_SLOW,1,0);
 

@@ -2924,7 +2924,6 @@ void	curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
 {
     GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
-    gchar *active_kf = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT(kf_param));//DEBUG
     gint active_kf_id = gtk_combo_box_get_active (GTK_COMBO_BOX(kf_param));
     if (active_kf_id != -1) {
         if(active_kf_id == 0){
@@ -2942,8 +2941,6 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
             enable_widget( "fxanimcontrols" );
             enable_widget( "curve_container" );
         }
-        veejay_msg(VEEJAY_MSG_INFO,"kf param changed !!! %s ", active_kf);//DEBUG
-        g_free(active_kf);//DEBUG
     }
 }
 

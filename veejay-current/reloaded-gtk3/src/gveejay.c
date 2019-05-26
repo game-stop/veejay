@@ -114,7 +114,6 @@ gboolean gveejay_idle(gpointer data)
             veejay_update_multitrack( get_ui_info() );
           }
         }
-        //update_gveejay();
     }
 
     if( gveejay_restart() )
@@ -122,6 +121,7 @@ gboolean gveejay_idle(gpointer data)
         //@ reinvoke
         if( execvp( cargv[0], cargv ) == -1 )
             veejay_msg(VEEJAY_MSG_ERROR, "Unable to restart");
+        return FALSE;
     }
 
     return TRUE;
@@ -173,8 +173,8 @@ restart_me:
         while( gtk_events_pending()  )
             gtk_main_iteration();
     
-        if(gveejay_idle(NULL)==FALSE)
-            break;
+       if(gveejay_idle(NULL)==FALSE)
+           break;
     }
 
     vj_event_list_free();
