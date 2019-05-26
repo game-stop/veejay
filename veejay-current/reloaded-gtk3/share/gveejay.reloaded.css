@@ -221,7 +221,6 @@ padding-bottom:4px;
 
 button:disabled, spinbutton:disabled,radiobutton:disabled, checkbutton:disabled  {
  border-style:solid;
- border-width:2px;
  border-color:#4a4a4e;
  border-radius:5px;
  color:#000000;

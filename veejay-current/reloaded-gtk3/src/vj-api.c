@@ -7311,13 +7311,17 @@ static void enable_fx_entry() {
         set_tooltip( slider_names_[i].text, tt1 );
         gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,param_names_[i].text)),tt1);
 
-        size_t n = 1 + 2 + 1 + strlen(tt1); // see sprintf
-        gchar *kf_param_text = (gchar*)vj_malloc(sizeof(gchar)*(n+1));
-        sprintf(kf_param_text, "p%d %s",i, tt1); // i < MAX_UI_PARAMETERS
-        gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), kf_param_text);
-
+        if (strlen(tt1) != 0){
+            gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), tt1);
+        } else { //Fail back if parameter name is missing
+            size_t n = 1 + 2; // see sprintf
+            gchar *kf_param_text = (gchar*)vj_malloc(sizeof(gchar)*(n+1));
+            sprintf(kf_param_text, "p%d",i); // i < MAX_UI_PARAMETERS
+            gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), kf_param_text);
+            free(kf_param_text);
+        }
         g_free(tt1);
-        free(kf_param_text);
+
 
 /* WARNING : conditional loop break. Do not add code after this statement. */
         value = entry_tokens[ENTRY_PARAMSET + i];
