@@ -95,9 +95,7 @@ static void usage(char *progname)
 
 static volatile gulong g_trap_free_size = 0;
 static struct timeval time_last_;
-
 static char **cargv = NULL;
-
 gboolean gveejay_idle(gpointer data)
 {
     if(gveejay_running())
@@ -170,12 +168,15 @@ restart_me:
 
     while(gveejay_running())
     {
-        while( gtk_events_pending()  )
+        while( gtk_events_pending()  ) {
             gtk_main_iteration();
-    
-       if(gveejay_idle(NULL)==FALSE)
-           break;
+        }
+        
+        //FIXME: cannot update the UI while gtk events are pending (eg, dragging sliders etc)
+        if(gveejay_idle(NULL)==FALSE)
+            break;
     }
+
 
     vj_event_list_free();
 
