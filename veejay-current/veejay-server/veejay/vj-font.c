@@ -1347,15 +1347,12 @@ static int	configure(vj_font_t *f, int size, int font)
 	FT_BBox bbox;
 	int yMax,yMin,xMax,xMin;
 
-	f->current_font = font;
 	f->font = select_font( f , font );
+
 	if(f->font == NULL )
 	{
 		fallback_font( f );
 	}
-
-	veejay_memset( selected_default_font, 0, sizeof(selected_default_font));
-	strncpy( selected_default_font, (char*)f->font,strlen((char*)f->font)) ;
 
 	if( f->face )
 	{
@@ -1381,6 +1378,9 @@ static int	configure(vj_font_t *f, int size, int font)
 				f->current_size, error );
 		return 0;
 	}
+
+	veejay_memset( selected_default_font, 0, sizeof(selected_default_font));
+	strncpy( selected_default_font, (char*)f->font,strlen((char*)f->font)) ;
 
 	f->use_kerning	=	FT_HAS_KERNING(f->face);
 	
@@ -1559,9 +1559,9 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	qsort( f->font_table, f->font_index, sizeof(char*), compare_strings );
 	qsort( f->font_list,  f->font_index, sizeof(char*), compare_strings );
 
-	int df = get_default_font( f );
+	f->current_font = get_default_font( f );
 	
-	while(!configure( f, f->current_size, df ))
+	while(!configure( f, f->current_size, f->current_font ))
 	{
 		f->current_font ++;
 		if( f->current_font >= f->font_index )
@@ -1649,9 +1649,9 @@ void	*vj_font_single_init( int w, int h, float fps,char *path )
 	qsort( f->font_table, f->font_index, sizeof(char*), compare_strings );
 	qsort( f->font_list,  f->font_index, sizeof(char*), compare_strings );
 
-	int df = get_default_font( f );
+	f->current_font = get_default_font( f );
 	
-	while(!configure( f, f->current_size, df ))
+	while(!configure( f, f->current_size, f->current_font ))
 	{
 		f->current_font ++;
 		if( f->current_font >= f->font_index )
