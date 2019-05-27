@@ -1537,6 +1537,15 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 		return NULL;
 	}
 
+    char *home = getenv("HOME");
+	char path[1024];
+	snprintf(path,1024,"%s/.veejay/fonts",home);
+
+	find_fonts(f,path);
+	if( f->font_index <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "No TrueType fonts found in $HOME/.veejay/fonts");
+	} 
 
 	find_fonts(f,"/usr/X11R6/lib/X11/fonts/TTF");
 	find_fonts(f,"/usr/X11R6/lib/X11/fonts/Type1");
@@ -1545,21 +1554,6 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	find_fonts(f,"/usr/share/fonts/truetype");
 	find_fonts(f, "/usr/share/fonts/TTF");
 	
-	if( f->font_index <= 0 )
-	{
-		char *home = getenv("HOME");
-		char path[1024];
-		snprintf(path,1024,"%s/.veejay/fonts",home);
-		veejay_msg(VEEJAY_MSG_ERROR, "No TrueType fonts found");
-
-		find_fonts(f,path);
-		if( f->font_index <= 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Please put some TrueType font files in %s",path);
-			return NULL;
-		} 
-	}
-
 	veejay_msg(VEEJAY_MSG_DEBUG, "Loaded %d TrueType fonts", f->font_index );
 
 	qsort( f->font_table, f->font_index, sizeof(char*), compare_strings );
