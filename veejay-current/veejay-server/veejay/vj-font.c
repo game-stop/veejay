@@ -1354,7 +1354,6 @@ static int	configure(vj_font_t *f, int size, int font)
 		fallback_font( f );
 	}
 
-//	veejay_msg(VEEJAY_MSG_DEBUG, "Using font %s, size %d (#%d)", f->font, size, font );
 	veejay_memset( selected_default_font, 0, sizeof(selected_default_font));
 	strncpy( selected_default_font, (char*)f->font,strlen((char*)f->font)) ;
 
@@ -1469,9 +1468,8 @@ static	int	get_default_font( vj_font_t *f )
 	{
 		char *name;
 	} default_fonts[] = {
-		{ "Arab (Regular)"},
-		{ "Mashq (Regular)" },
 		{ "DejaVu Sans (Bold)" },
+        { "FreeMono" },
 		{ NULL },	
 	};
 	int i,j;

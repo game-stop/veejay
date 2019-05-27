@@ -151,7 +151,7 @@ void	veejay_set_instance( veejay_t *info )
 	veejay_instance_ = info;
 }
 
-
+static void veejay_playback_close(veejay_t *info);
 static void	veejay_schedule_fifo( veejay_t *info, int pid );
 
 static int	total_mem_mb_ = 0;
@@ -377,6 +377,8 @@ int veejay_increase_frame(veejay_t * info, long num)
 int veejay_free(veejay_t * info)
 {
 	video_playback_setup *settings = (video_playback_setup *) info->settings;
+
+    veejay_playback_close(info);
 
 	vj_mem_threaded_stop();
 
@@ -2524,26 +2526,11 @@ static void Welcome(veejay_t *info)
 			"If you want to start a new project, start veejay in an empty directory");
 	}
 }
-static	void *veejay_playback_thread(void *data)
+
+static void veejay_playback_close(veejay_t *info)
 {
-    veejay_t *info = (veejay_t *) data;
     int i;
-	sigset_t mask;
-	struct sigaction act;
-	sigemptyset(&mask);
-	sigaddset( &mask, SIGPIPE );
-	act.sa_handler = donothing2;
-	act.sa_flags = SA_SIGINFO | SA_ONESHOT;
-	sigemptyset(&act.sa_mask);
-
-
-    pthread_sigmask( SIG_BLOCK, &mask, NULL );
-
-    veejay_schedule_fifo( info, getpid());
-
-    Welcome(info);
-    veejay_playback_cycle(info);
-    veejay_close(info);
+    
     if(info->uc->is_server) {
 	for(i = 0; i < 4; i ++ )
 	  if(info->vjs[i]) vj_server_shutdown(info->vjs[i]); 
@@ -2607,9 +2594,36 @@ static	void *veejay_playback_thread(void *data)
 	vj_font_destroy( info->osd );
 #endif
 
-    veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     vj_perform_free(info);
 
+}
+
+
+static	void *veejay_playback_thread(void *data)
+{
+    veejay_t *info = (veejay_t *) data;
+    int i;
+	sigset_t mask;
+	struct sigaction act;
+	sigemptyset(&mask);
+	sigaddset( &mask, SIGPIPE );
+	act.sa_handler = donothing2;
+	act.sa_flags = SA_SIGINFO | SA_ONESHOT;
+	sigemptyset(&act.sa_mask);
+
+
+    pthread_sigmask( SIG_BLOCK, &mask, NULL );
+
+    veejay_schedule_fifo( info, getpid());
+
+    Welcome(info);
+    veejay_playback_cycle(info);
+    veejay_close(info);
+
+   // veejay_playback_close(info);
+
+    veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
+   
     pthread_exit(NULL);
     return NULL;
 }
