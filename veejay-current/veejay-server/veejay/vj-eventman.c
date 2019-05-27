@@ -107,7 +107,7 @@ char	*vj_event_vevo_help_vims( int id, int n )
 {
 	char *help = NULL;
 	char key[10];
-	sprintf(key, "help_%d", n);
+	snprintf(key, "help_%d", n);
 	size_t len = vevo_property_element_size( index_map_[id], key, 0  );
 	if(len > 0 )
 	{
@@ -119,10 +119,10 @@ char	*vj_event_vevo_help_vims( int id, int n )
 
 char	*vj_event_vevo_list_serialize(void)
 {
-	int len = vj_event_vevo_list_size() + 5;
-	char *res = (char*) vj_calloc(sizeof(char) * len + 100 );
+	int len = vj_event_vevo_list_size();
+	char *res = (char*) vj_calloc(sizeof(char) * (len+6) );
 	int i;
-	sprintf(res, "%05d", len  - 5);
+	sprintf( res, "%05d", len);
 	for ( i = 0; i < MAX_INDEX ;i ++ )
 	{
 		if ( index_map_[i] != NULL )
@@ -134,11 +134,11 @@ char	*vj_event_vevo_list_serialize(void)
 			char tmp[16];
 			snprintf( tmp,sizeof(tmp),"%04d%02d%03d%03d",
 				i, vj_event_vevo_get_num_args(i), fmt_len, name_len );
-			veejay_strncat( res, tmp, 12 );
+			strncat( res, tmp, strlen(tmp));
 			if( format != NULL )
-				veejay_strncat( res, format, fmt_len );
+				strncat( res, format, fmt_len );
 			if( name != NULL )
-				veejay_strncat( res, name, name_len );
+				strncat( res, name, name_len );
 			if(name) free(name);
 			if(format) free(format);
 			
@@ -253,8 +253,9 @@ static vevo_port_t	*_new_event(
 void *		vj_event_vevo_get_event_function( int id )
 {
 	void *func = NULL;
-	if( index_map_[id] )
+	if( index_map_[id] ) {
 		vevo_property_get( index_map_[id] , "function", 0, &func );
+    }
 	return func;
 }
 
@@ -267,8 +268,14 @@ char	*vj_event_vevo_get_event_name( int id )
 	size_t len = vevo_property_element_size( index_map_[id], "description", 0  );
 	if(len > 0 )
 	{
-		descr = (char*) vj_malloc(sizeof(char) * len );
-		vevo_property_get( index_map_[id], "description", 0, &descr );
+		descr = (char*) vj_calloc(sizeof(char) * len );
+        if(descr == NULL) 
+            return NULL;
+
+		if( vevo_property_get( index_map_[id], "description", 0, &descr ) != VEVO_NO_ERROR ) {
+            veejay_msg(0,"Error getting name of VIMS %d", id );
+            return NULL;
+        }
 	}
 	return descr;
 }
@@ -280,8 +287,14 @@ char	*vj_event_vevo_get_event_format( int id )
 	size_t len = vevo_property_element_size( index_map_[id], "format", 0 );
 	if(len > 0 )
 	{
-		fmt = (char*) vj_malloc(sizeof(char) * len );
-		vevo_property_get( index_map_[id], "format", 0, &fmt );
+		fmt = (char*) vj_calloc(sizeof(char) * len );
+        if(fmt == NULL) 
+            return NULL;
+
+		if(vevo_property_get( index_map_[id], "format", 0, &fmt ) != VEVO_NO_ERROR ) {
+            veejay_msg(0, "Error getting format specifier for VIMS %d", id );
+            return NULL;
+        }
 	}
 	return fmt;
 }
