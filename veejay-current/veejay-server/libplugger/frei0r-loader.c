@@ -929,11 +929,11 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 
 	for( i = 0; i < (n_in+1); i ++ ) { //@ extra buffer for rgb output
 		fr->in[i] = yuv_rgb_template(bufx, w,h, frfmt );
-		bufx   += (w*h*4);
+		bufx   += RUP8(w*h*4);
 	}
 
-	fr->out          = yuv_yuv_template(bufx, bufx+(w*h), bufx+(w*h*2), w,h,pf );
-	fr->out->data[3] = bufx + (fr->out->len + fr->out->uv_len + fr->out->uv_len);
+	fr->out          = yuv_yuv_template(bufx, bufx+RUP8(w*h), bufx+RUP8(w*h*2), w,h,pf );
+	fr->out->data[3] = bufx + RUP8(fr->out->len + fr->out->uv_len + fr->out->uv_len);
 
 	if( out_scaler__ == NULL ) {
 		out_scaler__	= yuv_init_swscaler( fr->in[0],fr->out,&templ,yuv_sws_get_cpu_flags()); // rgb -> yuv
