@@ -1117,6 +1117,29 @@ static void veejay_stop_connecting(vj_gui_t *gui);
 void reload_macros();
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 
+static gboolean gveejay_idle(gpointer data)
+{
+    if(gveejay_running())
+    {
+        int sync = 0;
+        if( is_alive(&sync) == FALSE )
+        {
+          gtk_main_quit();
+          return FALSE;
+        } 
+        if( sync )
+        {
+          if( gveejay_time_to_sync( get_ui_info() ) )
+          {
+            veejay_update_multitrack( get_ui_info() );
+          }
+        }
+    }
+
+    return TRUE;
+}
+
+
 static void init_widget_cache()
 {
     // TODO: add more mappings to reduce the number of times we need to call glade_xml_get_widget_ from update_gui() 
@@ -2780,6 +2803,8 @@ gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
 
     running_g_ = 0;
     info->watch.state = STATE_QUIT;
+
+    gtk_main_quit();
 
     return FALSE;
 }
@@ -6183,6 +6208,7 @@ static void reload_bundles()
         offset += 14;
 
         message = strndup( ptr + offset , val[3] );
+
         offset += val[3];
 
         sscanf( ptr + offset, "%03d%03d", &val[4], &val[5] );
@@ -6290,10 +6316,28 @@ static void reload_vimslist()
     {
         char *format = NULL;
         char *descr = NULL;
-        char *line = strndup( eltext + offset, 14 );
+        char *line = strndup( eltext + offset, 12 );
         int val[4];
-        sscanf(line, "%04d%02d%03d%03d",
-               &val[0],&val[1],&val[2],&val[3]);
+        if( sscanf(line, "%04d%02d%03d%03d",
+               &val[0],&val[1],&val[2],&val[3]) != 4 ) {
+            veejay_msg(0,"Expected exactly 4 tokens");
+        }
+
+        if( val[0] < 0 || val[0] > 1024 ) {
+            veejay_msg(0,"Invalid ID at position %d", offset );
+        }
+
+        if( val[1] < 0 || val[1] > 99 ) {
+            veejay_msg(0, "Invalid number of arguments at position %d", offset);
+        }
+
+        if( val[2] < 0 || val[2] > 999 ) {
+            veejay_msg(0, "Invalid format length at position %d", offset );
+        }
+
+        if( val[3] < 0 || val[3] > 999 ) {
+            veejay_msg(0, "Invalid name length at position %d", offset );
+        }
 
         char vimsid[5];
 
@@ -6310,8 +6354,9 @@ static void reload_vimslist()
             offset += val[3];
         }
 
-        gchar *g_format = (format == NULL ? NULL :_utf8str( format ));
-        gchar *g_descr  = (descr == NULL ? NULL :_utf8str( descr  ));
+        gchar *g_format = format;
+        gchar *g_descr = descr;
+
 
         if(vj_event_list[val[0]].format )
             free(vj_event_list[val[0]].format);
@@ -6322,16 +6367,13 @@ static void reload_vimslist()
 
         vj_event_list[ val[0] ].event_id = val[0];
         vj_event_list[ val[0] ].params   = val[1];
-        vj_event_list[ val[0] ].format   = (format == NULL ? NULL :_utf8str( format ));
-        vj_event_list[ val[0] ].descr    = (descr == NULL ? NULL : _utf8str( descr ));
+        vj_event_list[ val[0] ].format   = format; 
+        vj_event_list[ val[0] ].descr    = descr;
 
         sprintf(vimsid, "%03d", val[0] );
         gtk_list_store_set(store, &iter,
                            VIMS_LIST_ITEM_ID, vimsid,
                            VIMS_LIST_ITEM_DESCR, g_descr,-1 );
-
-        if(g_format) g_free(g_format);
-        if(g_descr) g_free(g_descr);
 
         if(format) free(format);
         if(descr) free(descr);
@@ -8619,7 +8661,6 @@ void vj_gui_init(const char *glade_file,
     if( user_preview ) {
         set_toggle_button( "previewtoggle", 1 );
     }
-
 }
 
 void vj_gui_preview(void)
@@ -8775,6 +8816,8 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     // periodically pull information from veejay
     g_timeout_add( 1000, periodic_pull, NULL );
 
+    g_timeout_add( 1000 / info->el.fps, gveejay_idle, NULL );
+
     return 1;
 }
 
@@ -8826,6 +8869,8 @@ void reloaded_restart()
     vj_gui_wipe();
 
     multitrack_disconnect(info->mt);
+    
+    reloaded_show_launcher();   
 }
 
 gboolean    is_alive( int *do_sync )
@@ -8859,10 +8904,6 @@ gboolean    is_alive( int *do_sync )
         vj_gui_wipe();
         reloaded_restart();
         gui->watch.state = STATE_WAIT_FOR_USER;
-        if( info->launch_sensitive == 0 ) {
-            return FALSE;
-        }
-
         return TRUE;
     }
 
@@ -8902,13 +8943,13 @@ gboolean    is_alive( int *do_sync )
             veejay_stop_connecting(gui);
         }
     }
-
+/*
     if( gui->watch.state == STATE_WAIT_FOR_USER )
     {
         *do_sync = 0;
         gveejay_sleep(NULL);
     }
-
+*/
     return TRUE;
 }
 

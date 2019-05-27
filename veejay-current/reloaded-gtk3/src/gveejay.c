@@ -94,37 +94,7 @@ static void usage(char *progname)
 }
 
 static volatile gulong g_trap_free_size = 0;
-static struct timeval time_last_;
 static char **cargv = NULL;
-gboolean gveejay_idle(gpointer data)
-{
-    if(gveejay_running())
-    {
-        int sync = 0;
-        if( is_alive(&sync) == FALSE )
-        {
-          return FALSE;
-        } 
-        if( sync )
-        {
-          if( gveejay_time_to_sync( get_ui_info() ) )
-          {
-            veejay_update_multitrack( get_ui_info() );
-          }
-        }
-    }
-
-    if( gveejay_restart() )
-    {
-        //@ reinvoke
-        if( execvp( cargv[0], cargv ) == -1 )
-            veejay_msg(VEEJAY_MSG_ERROR, "Unable to restart");
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
 static  void  clone_args( char *argv[], int argc )
 {
     int i = 0;
@@ -162,35 +132,7 @@ static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
     
     vj_gui_init( skinfile, launcher, hostname, port_num, use_threads, load_midi, midi_file,arg_beta, arg_autoconnect, arg_fasterui);
 
-restart_me:
-
-    memset( &time_last_, 0, sizeof(struct timeval));
-
-    while(gveejay_running())
-    {
-        while( gtk_events_pending()  ) {
-            gtk_main_iteration();
-        }
-        
-        //FIXME: cannot update the UI while gtk events are pending (eg, dragging sliders etc)
-        if(gveejay_idle(NULL)==FALSE)
-            break;
-    }
-
-
-    vj_event_list_free();
-
-    if( gveejay_relaunch() ) {
-      launcher = 1;
-      reloaded_restart();
-      reloaded_show_launcher ();
-      if( launcher )
-      {
-        reloaded_launcher( hostname, port_num );
-      }
-
-      goto restart_me;
-    }
+    gtk_main();
 }
 
 /*

@@ -256,6 +256,8 @@ void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
 	//assert( info->watch.state == STATE_WAIT_FOR_USER );
 #endif
 	info->watch.state = STATE_CONNECT;
+    int do_sync = 0;
+    is_alive(&do_sync);
 }
 void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)
 {
