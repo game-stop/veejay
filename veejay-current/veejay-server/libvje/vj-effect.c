@@ -126,6 +126,7 @@ static struct
 {	distortion_malloc,distortion_free, NULL, VJ_IMAGE_EFFECT_DISTORTION },
 {   pixelsort_malloc,pixelsort_free,NULL,VJ_IMAGE_EFFECT_PIXELSORT },
 {   pixelsortalpha_malloc,pixelsortalpha_free,NULL,VJ_IMAGE_EFFECT_PIXELSORTALPHA },
+{   raster_malloc,raster_free,NULL,VJ_IMAGE_EFFECT_RASTER },
 {	NULL,NULL,NULL,0},
 };
 
