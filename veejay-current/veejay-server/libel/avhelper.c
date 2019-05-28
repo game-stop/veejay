@@ -418,7 +418,7 @@ static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pi
 
 	if(err < 0 ) {
 		av_strerror( err, errbuf, sizeof(errbuf));
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s: %s", filename,errbuf );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Error opening %s: %s", filename,errbuf );
 		free(x);
 		return NULL;
 	}
