@@ -1117,13 +1117,14 @@ static void veejay_stop_connecting(vj_gui_t *gui);
 void reload_macros();
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 
-static gboolean gveejay_idle(gpointer data)
+gboolean gveejay_idle(gpointer data)
 {
     if(gveejay_running())
     {
         int sync = 0;
         if( is_alive(&sync) == FALSE )
         {
+          veejay_msg(0, "Veejay has left the building");
           gtk_main_quit();
           return FALSE;
         } 
@@ -1135,7 +1136,6 @@ static gboolean gveejay_idle(gpointer data)
           }
         }
     }
-
     return TRUE;
 }
 
@@ -1475,6 +1475,7 @@ enum
 
 static sample_slot_t *find_slot_by_sample( int sample_id , int sample_type );
 static sample_gui_slot_t *find_gui_slot_by_sample( int sample_id , int sample_type );
+void gveejay_time_elapsed( struct timeval time_last );
 
 gchar *_utf8str(const char *c_str)
 {
@@ -6269,7 +6270,7 @@ static void reload_bundles()
                            VIMS_ID,     g_vims,
                            VIMS_KEY,    g_keyname,
                            VIMS_MOD,    g_keymod,
- 			   VIMS_DESCR,  g_descr,
+ 			               VIMS_DESCR,  g_descr,
                            VIMS_PARAMS,     vj_event_list[ val[0] ].params,
                            VIMS_FORMAT,     g_format,
                            VIMS_CONTENTS,  g_content, /* this is a hidden column, when the item is selected, the text is displayed in the textview widget */
@@ -7075,6 +7076,17 @@ void gveejay_sleep( void *u )
     nanosleep( &nsecsleep, NULL );
 }
 
+void gveejay_time_elapsed( struct timeval time_last )
+{
+    struct timeval time_now;
+    gettimeofday( &time_now, 0 );
+
+    double diff = time_now.tv_sec - time_last.tv_sec +
+            (time_now.tv_usec - time_last.tv_usec ) * 1.e-6;
+
+    veejay_msg(0,"%s: %g", __FUNCTION__, diff );
+}
+
 int gveejay_time_to_sync( void *ptr )
 {
     vj_gui_t *ui = (vj_gui_t*) ptr;
@@ -7083,34 +7095,26 @@ int gveejay_time_to_sync( void *ptr )
 
     double diff = time_now.tv_sec - ui->time_last.tv_sec +
             (time_now.tv_usec - ui->time_last.tv_usec ) * 1.e-6;
+    
     float fps = 0.0;
-    struct timespec nsecsleep;
-
-    long nsec = 1600000; // some default sleep time in nanoseconds
+    int ret = 0;
 
     if ( ui->watch.state == STATE_PLAYING )
     {
-	fps = ui->el.fps;
-	float spvf = 1.0f / fps;
-	float ela  = ( info->status_tokens[ELAPSED_TIME] / 1000.0 );
-	float delay = spvf - ela;
-	// calculate time to sleep based on seconds per video frame
-	nsec = (delay * 1000000000);
-
-	// if elapsed time > seconds per video frame or diff > delay, update the UI now
-	if( diff >= delay || ela >= spvf ) {
-		return 1;
-	}
+	    fps = ui->el.fps;
+	    float spvf = 1.0f / fps;
+	    float ela  = ( info->status_tokens[ELAPSED_TIME] / 1000.0 );
+        if( diff > spvf ) {
+            veejay_msg(0, "diff = %g, delay=%f, ela=%f, spvf=%f", diff, 0.0,ela,spvf);
+	        ret = 1;
+        }
     } 
     else if ( ui->watch.state == STATE_STOPPED )
     {
         reloaded_restart();
     }
-   
-    nsecsleep.tv_nsec = nsec;
-    nsecsleep.tv_sec = 0;
-    nanosleep( &nsecsleep, NULL );  
-    return 0;
+  
+    return ret;
 }
 
 int veejay_update_multitrack( void *ptr )
@@ -7124,6 +7128,9 @@ int veejay_update_multitrack( void *ptr )
         free(s->widths);
         free(s->heights);
         free(s);
+        
+        gettimeofday( &(info->time_last) , 0 );
+
         return 1;
     }
 
@@ -7151,6 +7158,9 @@ int veejay_update_multitrack( void *ptr )
         free(s->widths);
         free(s->heights);
         free(s);
+        
+        gettimeofday( &(info->time_last) , 0 );
+
         return 0;
     }
 
@@ -7166,7 +7176,7 @@ int veejay_update_multitrack( void *ptr )
     int *history = info->history_tokens[pm];
 
     veejay_memcpy( history, info->status_tokens, sizeof(int) * STATUS_TOKENS );
-    
+   
     for( i = 0; i < s->tracks ; i ++ )
     {
         if( s->status_list[i] )
@@ -7214,7 +7224,7 @@ int veejay_update_multitrack( void *ptr )
     free(s->widths);
     free(s->heights);
     free(s);
-
+    
     gettimeofday( &(info->time_last) , 0 );
 
     return 1;
@@ -8596,7 +8606,7 @@ void vj_gui_init(const char *glade_file,
     vj_gui_activate_stylesheet(gui);
     veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));
     info->midi =  vj_midi_new( info->main_window );
-    gettimeofday( &(info->time_last) , 0 );
+ 
 
     if(!beta) // srt-titling sequence stuff
     {
@@ -8815,8 +8825,9 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
     // periodically pull information from veejay
     g_timeout_add( 1000, periodic_pull, NULL );
-
-    g_timeout_add( 1000 / info->el.fps, gveejay_idle, NULL );
+   
+    gettimeofday( &(info->time_last) , 0 );
+    //g_idle_add_full( G_PRIORITY_LOW,  gveejay_idle,NULL,  NULL );
 
     return 1;
 }

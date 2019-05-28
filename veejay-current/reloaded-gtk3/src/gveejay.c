@@ -132,7 +132,20 @@ static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
     
     vj_gui_init( skinfile, launcher, hostname, port_num, use_threads, load_midi, midi_file,arg_beta, arg_autoconnect, arg_fasterui);
 
-    gtk_main();
+    while( gveejay_idle(NULL) )
+    {
+        int events_processed = 0;
+        while( gtk_events_pending() ) {
+            events_processed ++;
+            gtk_main_iteration_do(FALSE);
+            gveejay_idle(NULL);
+        }
+
+        if(!gtk_events_pending() ) {
+            g_usleep(1000 * 5);
+        }
+    }
+
 }
 
 /*

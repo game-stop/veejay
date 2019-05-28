@@ -41,7 +41,7 @@ void add_class(GtkWidget *widget, const char *name);
 void remove_class(GtkWidget *widget, const char *name);
 void default_bank_values(int *col, int *row );
 gboolean is_alive( int *sync );
-
+gboolean gveejay_idle(gpointer data);
 int _effect_get_minmax( int effect_id, int *min, int *max, int index );
 void register_signals();
 int is_button_toggled(const char *name);
