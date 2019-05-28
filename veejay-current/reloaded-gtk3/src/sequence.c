@@ -335,16 +335,23 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 			break;
 		}
 		
-		if( sscanf( (char*) status_len+1, "%03d", &bytes ) != 1 ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status message.");
-			bytes = 0;
-			reloaded_schedule_restart();
-			break;
-		}
+        char sta_len[4];
+        sta_len[0] = *(status_len + 1);
+        sta_len[1] = *(status_len + 2);
+        sta_len[2] = *(status_len + 3);
+        sta_len[3] = '\0';
+
+        bytes = atoi(sta_len);
+		//if( sscanf( (char*) status_len+1, "%03d", &bytes ) != 1 ) {
+		//	veejay_msg(VEEJAY_MSG_ERROR, "Invalid status message.");
+	 	// bytes = 0;
+		//	reloaded_schedule_restart();
+		//	break;
+		//}
 
 		if(bytes > 0 )
 		{
-			veejay_memset( v->status_buffer,0, STATUS_LENGTH );
+			//veejay_memset( v->status_buffer,0, STATUS_LENGTH );
 			n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
 			if( n <= 0 ) {	
 				if( n == -1 && v->is_master )
@@ -357,8 +364,12 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	if( k == -1 && v->is_master )
 		reloaded_schedule_restart();
 	
-	veejay_memset( v->status_tokens,0, sizeof(int) * STATUS_TOKENS);
-	status_to_arr( (char*) v->status_buffer, v->status_tokens );	
+	//veejay_memset( v->status_tokens,0, sizeof(int) * STATUS_TOKENS);
+	if( status_to_arr( (char*) v->status_buffer, v->status_tokens ) < 34 )
+    {
+        veejay_msg(VEEJAY_MSG_WARNING, "Expected more status tokens");
+        return 0;
+    }
 	return 1;
 }
 extern int     is_button_toggled(const char *name);

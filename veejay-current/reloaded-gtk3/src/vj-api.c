@@ -275,6 +275,128 @@ enum {
   WIDGET_SAMPLE_LENGTH_LABEL = 171,
   WIDGET_BUTTON_FX_ENTRY = 172,
   WIDGET_NOTEBOOK15 = 173,
+  WIDGET_SAMPLE_LOOP_BOX = 174,
+  WIDGET_BUTTON_084 = 175,
+  WIDGET_VIDEO_NAVIGATION_BUTTONS = 176,
+  WIDGET_BUTTON_SAMPLESTART = 177,
+  WIDGET_BUTTON_SAMPLEEND = 178,
+  WIDGET_BUTTON_200 = 181,
+  WIDGET_FRAME_FXTREE = 182,
+  WIDGET_VJFRAMERATE = 183,
+  WIDGET_SCROLLEDWINDOW49 = 184,
+  WIDGET_SAMPLEGRID_FRAME = 185,
+  WIDGET_MARKERFRAME = 186,
+  WIDGET_FXPANEL = 187,
+  WIDGET_BUTTON_083 = 188,
+
+};
+
+
+enum {
+ SAMPLE_WIDGET_SAMPLE_LOOP_BOX = 0,
+ SAMPLE_WIDGET_BUTTON_084,
+ SAMPLE_WIDGET_VIDEO_NAVIGATION_BUTTONS,
+ SAMPLE_WIDGET_BUTTON_SAMPLESTART,
+ SAMPLE_WIDGET_BUTTON_SAMPLEEND,
+ SAMPLE_WIDGET_SPEED_SLIDER,
+ SAMPLE_WIDGET_SLOW_SLIDER,
+ SAMPLE_WIDGET_BUTTON_200,
+ SAMPLE_WIDGET_FRAME_FXTREE,
+ SAMPLE_WIDGET_VJFRAMERATE,
+ SAMPLE_WIDGET_SCROLLEDWINDOW49,
+ SAMPLE_WIDGET_SAMPLEGRID_FRAME,
+ SAMPLE_WIDGET_MARKERFRAME,
+ SAMPLE_WIDGET_FXPANEL,
+ SAMPLE_WIDGET_BUTTON_083,
+ SAMPLE_WIDGET_PANEL,
+ SAMPLE_WIDGET_NONE // must be last
+};
+
+enum {
+  PLAIN_WIDGET_VIDEO_NAVIGATION_BUTTONS = 0,
+  PLAIN_WIDGET_BUTTON_084,
+  PLAIN_WIDGET_BUTTON_083,
+  PLAIN_WIDGET_BUTTON_SAMPLESTART,
+  PLAIN_WIDGET_BUTTON_SAMPLEEND,
+  PLAIN_WIDGET_SPEED_SLIDER,
+  PLAIN_WIDGET_SLOW_SLIDER,
+  PLAIN_WIDGET_VJFRAMERATE,
+  PLAIN_WIDGET_MARKERFRAME,
+  PLAIN_WIDGET_NONE,
+};
+
+enum {
+  STREAM_WIDGET_BUTTON_200 = 0,
+  STREAM_WIDGET_FRAME_FXTREE,
+  STREAM_WIDGET_FRAME_FXTREE3,
+  STREAM_WIDGET_FXPANEL,
+  STREAM_WIDGET_PANEL,
+  STREAM_WIDGET_SCROLLEDWINDOW49,
+  STREAM_WIDGET_SAMPLEGRID_FRAME,
+  STREAM_WIDGET_NONE,
+};
+
+static struct 
+{
+    const int stream_widget_id;
+    const int widget_id;
+} 
+stream_widget_map[] = 
+{
+    { STREAM_WIDGET_BUTTON_200,           WIDGET_BUTTON_200 },
+    { STREAM_WIDGET_FRAME_FXTREE,         WIDGET_FRAME_FXTREE },
+    { STREAM_WIDGET_FRAME_FXTREE3,        WIDGET_FRAME_FXTREE3 },
+    { STREAM_WIDGET_FXPANEL,              WIDGET_FXPANEL },
+    { STREAM_WIDGET_PANEL,                WIDGET_PANELS },
+    { STREAM_WIDGET_SCROLLEDWINDOW49,     WIDGET_SCROLLEDWINDOW49 },
+    { STREAM_WIDGET_SAMPLEGRID_FRAME,     WIDGET_SAMPLEGRID_FRAME },
+    { STREAM_WIDGET_NONE, -1 },
+};
+
+
+
+
+static struct 
+{
+    const int sample_widget_id;
+    const int widget_id;
+} sample_widget_map[] = 
+{
+    {  SAMPLE_WIDGET_SAMPLE_LOOP_BOX,           WIDGET_SAMPLE_LOOP_BOX },
+    {  SAMPLE_WIDGET_BUTTON_084,                WIDGET_BUTTON_084 },
+    {  SAMPLE_WIDGET_VIDEO_NAVIGATION_BUTTONS,  WIDGET_VIDEO_NAVIGATION_BUTTONS },
+    {  SAMPLE_WIDGET_BUTTON_SAMPLESTART,        WIDGET_BUTTON_SAMPLESTART },
+    {  SAMPLE_WIDGET_BUTTON_SAMPLEEND,          WIDGET_BUTTON_SAMPLEEND },
+    {  SAMPLE_WIDGET_SPEED_SLIDER,              WIDGET_SPEED_SLIDER },
+    {  SAMPLE_WIDGET_SLOW_SLIDER,               WIDGET_SLOW_SLIDER },
+    {  SAMPLE_WIDGET_BUTTON_200,                WIDGET_BUTTON_200 },
+    {  SAMPLE_WIDGET_FRAME_FXTREE,              WIDGET_FRAME_FXTREE },
+    {  SAMPLE_WIDGET_VJFRAMERATE,               WIDGET_VJFRAMERATE },
+    {  SAMPLE_WIDGET_SCROLLEDWINDOW49,          WIDGET_SCROLLEDWINDOW49 },
+    {  SAMPLE_WIDGET_SAMPLEGRID_FRAME,          WIDGET_SAMPLEGRID_FRAME },
+    {  SAMPLE_WIDGET_MARKERFRAME,               WIDGET_MARKERFRAME },
+    {  SAMPLE_WIDGET_FXPANEL,                   WIDGET_FXPANEL },
+    {  SAMPLE_WIDGET_BUTTON_083,                WIDGET_BUTTON_083 },
+    {  SAMPLE_WIDGET_PANEL,                     WIDGET_PANELS },
+    {  SAMPLE_WIDGET_NONE,                      -1 },
+};
+
+static struct 
+{
+    const int plain_widget_id;
+    const int widget_id;
+} plain_widget_map[] = 
+{
+    { PLAIN_WIDGET_VIDEO_NAVIGATION_BUTTONS,    WIDGET_VIDEO_NAVIGATION_BUTTONS },
+    { PLAIN_WIDGET_BUTTON_084,                  WIDGET_BUTTON_084 },
+    { PLAIN_WIDGET_BUTTON_083,                  WIDGET_BUTTON_083 },
+    { PLAIN_WIDGET_BUTTON_SAMPLESTART,          WIDGET_BUTTON_SAMPLESTART },
+    { PLAIN_WIDGET_BUTTON_SAMPLEEND,            WIDGET_BUTTON_SAMPLEEND },
+    { PLAIN_WIDGET_SPEED_SLIDER,                WIDGET_SPEED_SLIDER },
+    { PLAIN_WIDGET_SLOW_SLIDER,                 WIDGET_SLOW_SLIDER },
+    { PLAIN_WIDGET_VJFRAMERATE,                 WIDGET_VJFRAMERATE },
+    { PLAIN_WIDGET_MARKERFRAME,                 WIDGET_MARKERFRAME },
+    { PLAIN_WIDGET_NONE,                        -1 },
 };
 
 static struct
@@ -456,6 +578,22 @@ static struct
     { "fx_m2",                  WIDGET_FX_M2 },
     { "fx_m3",                  WIDGET_FX_M3 },
     { "fx_m4",                  WIDGET_FX_M4 },
+    {"sample_loop_box",         WIDGET_SAMPLE_LOOP_BOX },
+    {"button_084",              WIDGET_BUTTON_084 },
+    {"button_083",              WIDGET_BUTTON_083 },
+    {"video_navigation_buttons", WIDGET_VIDEO_NAVIGATION_BUTTONS},
+    {"button_samplestart",       WIDGET_BUTTON_SAMPLESTART},
+    {"button_sampleend",         WIDGET_BUTTON_SAMPLEEND},
+    {"speed_slider",             WIDGET_SPEED_SLIDER},
+    {"slow_slider",              WIDGET_SLOW_SLIDER},
+    {"button_200",               WIDGET_BUTTON_200}, // mask button
+    {"frame_fxtree",             WIDGET_FRAME_FXTREE},
+    {"fxpanel",                  WIDGET_FXPANEL},
+    {"vjframerate",              WIDGET_VJFRAMERATE },
+    {"scrolledwindow49",         WIDGET_SCROLLEDWINDOW49 },
+    {"samplegrid_frame",         WIDGET_SAMPLEGRID_FRAME },
+    {"markerframe",              WIDGET_MARKERFRAME },
+
     { NULL, -1 },
 };
 
@@ -639,23 +777,28 @@ enum
     DV1394_DEVICE=1,
 };
 
+// NUM_HINTS_MAX must be larger than NUM_HINTS and divisable by 8
+#define NUM_HINTS_MAX 32
+
 typedef struct
 {
+    int reload_hint[NUM_HINTS_MAX];
+    int reload_hint_checksums[NUM_HINTS_MAX];
+    int selected_vims_accel[2];
+    int entry_tokens[ENTRY_LAST];
+    int streams[4096];
+    int recording[2];
+
     int selected_chain_entry;
     int selected_el_entry;
     int selected_vims_entry;
-    int selected_vims_accel[2];
+
     int render_record;
-    int entry_tokens[ENTRY_LAST];
     int iterator;
     int selected_effect_id;
-    int reload_hint[NUM_HINTS];
-    int reload_hint_checksums[NUM_HINTS];
     gboolean reload_force_avoid;
     int playmode;
     int sample_rec_duration;
-    int streams[4096];
-    int recording[2];
     int selected_mix_sample_id;
     int selected_mix_stream_id;
     int selected_rgbkey;
@@ -734,15 +877,11 @@ typedef struct
 {
     GtkWidget *title;
     GtkWidget *timecode;
-    GtkWidget *hotkey;
-//  GtkWidget *edit_button;
-//    GtkTooltip *tips;
     GtkWidget *image;
-    GtkWidget  *frame;
+    GtkWidget *frame;
     GtkWidget *event_box;
-    GtkWidget *main_vbox;
     GtkWidget *upper_hbox;
-    GtkWidget *upper_vbox;
+    GtkWidget *hotkey;
 } sample_gui_slot_t;
 
 typedef struct
@@ -821,6 +960,27 @@ typedef struct
     int w_delay;
 } watchdog_t;
 
+typedef struct {
+    char **description;
+} value_hint;
+
+#define SAMPLE_MAX_PARAMETERS 32
+
+typedef struct {
+    int defaults[SAMPLE_MAX_PARAMETERS];
+    int min[SAMPLE_MAX_PARAMETERS];
+    int max[SAMPLE_MAX_PARAMETERS];
+    char description[150];
+    char *param_description[SAMPLE_MAX_PARAMETERS];
+    value_hint *hints[SAMPLE_MAX_PARAMETERS];
+    int id;
+    int is_video;
+    int num_arg;
+    int has_rgb;
+    int is_gen;
+} effect_constr;
+
+#define EFFECT_LIST_SIZE 2048
 typedef struct
 {
     GtkBuilder *main_window;
@@ -851,7 +1011,7 @@ typedef struct
     gint image_h;
     veejay_el_t el;
     veejay_user_ctrl_t uc;
-    GList       *effect_info;
+    effect_constr **effect_info;
     GList       *devlist;
     GList       *chalist;
     GList       *editlist;
@@ -1117,6 +1277,8 @@ static void veejay_stop_connecting(vj_gui_t *gui);
 void reload_macros();
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 
+//#include <valgrind/callgrind.h>
+
 gboolean gveejay_idle(gpointer data)
 {
     if(gveejay_running())
@@ -1125,15 +1287,22 @@ gboolean gveejay_idle(gpointer data)
         if( is_alive(&sync) == FALSE )
         {
           veejay_msg(0, "Veejay has left the building");
-          gtk_main_quit();
           return FALSE;
         } 
         if( sync )
         {
+//        CALLGRIND_START_INSTRUMENTATION;
+//        CALLGRIND_TOGGLE_COLLECT;
+
           if( gveejay_time_to_sync( get_ui_info() ) )
           {
             veejay_update_multitrack( get_ui_info() );
           }
+
+//      CALLGRIND_TOGGLE_COLLECT;
+//      CALLGRIND_STOP_INSTRUMENTATION;
+//      CALLGRIND_DUMP_STATS;
+
         }
     }
     return TRUE;
@@ -1152,7 +1321,7 @@ static void init_widget_cache()
         }
     }
 }
-/*
+
 static void identify_widget(GtkWidget *w)
 {
     for( int i = 0; widget_map[i].name != NULL; i ++ ) {
@@ -1162,7 +1331,7 @@ static void identify_widget(GtkWidget *w)
         }
     }
     veejay_msg(VEEJAY_MSG_DEBUG, "Widget %p is not in widget_cache");
-}*/
+}
 
 static gboolean is_edl_displayed()
 {
@@ -1420,7 +1589,7 @@ static struct
     {"markerframe"},
     {NULL}
 };
-
+/*
 static struct
 {
     const char *name;
@@ -1444,7 +1613,7 @@ static struct
     {"samplegrid_frame"},
     {"markerframe"},
     {NULL}
-};
+};*/
 
 static struct
 {
@@ -1475,7 +1644,6 @@ enum
 
 static sample_slot_t *find_slot_by_sample( int sample_id , int sample_type );
 static sample_gui_slot_t *find_gui_slot_by_sample( int sample_id , int sample_type );
-void gveejay_time_elapsed( struct timeval time_last );
 
 gchar *_utf8str(const char *c_str)
 {
@@ -1788,8 +1956,6 @@ static void setup_macros()
 	setup_tree_text_column( "macro_macros", MACRO_VIMS_DESCR, "Description",0);
 }
 
-#define SAMPLE_MAX_PARAMETERS 32
-
 typedef struct
 {
     int id;
@@ -1807,69 +1973,28 @@ typedef struct
     int num_frames;
 } el_constr;
 
-typedef struct {
-    char **description;
-} value_hint;
-
-typedef struct {
-    int defaults[SAMPLE_MAX_PARAMETERS];
-    int min[SAMPLE_MAX_PARAMETERS];
-    int max[SAMPLE_MAX_PARAMETERS];
-    char description[150];
-    char *param_description[SAMPLE_MAX_PARAMETERS];
-    value_hint *hints[SAMPLE_MAX_PARAMETERS];
-    int id;
-    int is_video;
-    int num_arg;
-    int has_rgb;
-    int is_gen;
-} effect_constr;
 
 int _effect_is_gen(int effect_id)
 {
-    int n = g_list_length(info->effect_info);
-    int i;
-    if(effect_id < 0) return -1;
-    for(i=0; i <= n; i++)
-    {
-        effect_constr *ec = g_list_nth_data( info->effect_info, i );
-        if(ec != NULL)
-        {
-            if(ec->id == effect_id) return ec->is_gen;
-        }
-    }
+    effect_constr *ec = info->effect_info[effect_id];
+    if(ec != NULL)
+        return ec->is_gen;
     return 0;
 }
 
 int _effect_get_mix(int effect_id)
 {
-    int n = g_list_length(info->effect_info);
-    int i;
-    if(effect_id < 0) return -1;
-    for(i=0; i <= n; i++)
-    {
-        effect_constr *ec = g_list_nth_data( info->effect_info, i );
-        if(ec != NULL)
-        {
-            if(ec->id == effect_id) return ec->is_video;
-        }
-    }
+    effect_constr *ec = info->effect_info[effect_id];
+    if(ec != NULL)
+        return ec->is_video;
     return 0;
 }
 
 int _effect_get_rgb(int effect_id)
 {
-    int n = g_list_length(info->effect_info);
-    int i;
-    if(effect_id < 0) return -1;
-    for(i=0; i <= n; i++)
-    {
-        effect_constr *ec = g_list_nth_data( info->effect_info, i );
-        if(ec != NULL)
-        {
-            if(ec->id == effect_id) return ec->has_rgb;
-        }
-    }
+    effect_constr *ec = info->effect_info[effect_id];
+    if(ec != NULL)
+        return ec->has_rgb;
     return 0;
 }
 
@@ -1880,92 +2005,48 @@ int _effect_get_rgb(int effect_id)
  */
 int _effect_get_np(int effect_id)
 {
-    int n = g_list_length(info->effect_info);
-    int i;
-    if(effect_id < 0) return -1;
-    for(i=0; i <= n; i++)
-    {
-        effect_constr *ec = g_list_nth_data( info->effect_info, i );
-        if(ec != NULL)
-        {
-            if(ec->id == effect_id) return ec->num_arg;
-        }
-    }
+    effect_constr *ec = info->effect_info[effect_id];
+    if(ec != NULL)
+        return ec->num_arg;
     return 0;
 }
 
 int _effect_get_minmax( int effect_id, int *min, int *max, int index )
 {
-    int n = g_list_length(info->effect_info);
-    int i;
-    if(effect_id < 0) return 0;
-    for(i=0; i <= n; i++)
-    {
-        effect_constr *ec = g_list_nth_data( info->effect_info, i );
-        if(ec != NULL)
-        {
-            if(ec->id == effect_id)
-            {
-                if( index > ec->num_arg )
-                    return 0;
-                *min = ec->min[index];
-                *max = ec->max[index];
-                return 1;
-            }
-        }
+    effect_constr *ec = info->effect_info[effect_id];
+    if(ec != NULL && index < ec->num_arg) {
+        *min = ec->min[index];
+        *max = ec->max[index];
+        return 1;
     }
     return 0;
 }
 
 char *_effect_get_param_description(int effect_id, int param)
 {
-    int n = g_list_length( info->effect_info );
-    int i;
-    for(i = 0;i <= n ; i++)
-    {
-        effect_constr *ec = g_list_nth_data(info->effect_info, i);
-        if(ec != NULL)
-        {
-            if(effect_id == ec->id )
-                return ec->param_description[param];
-        }
-    }
+    effect_constr *ec = info->effect_info[effect_id];
+    if(ec != NULL)
+        return ec->param_description[param];
     return FX_PARAMETER_DEFAULT_NAME;
 }
 
 char *_effect_get_description(int effect_id)
 {
-    int n = g_list_length( info->effect_info );
-    int i;
-    for(i = 0;i <= n ; i++)
-    {
-        effect_constr *ec = g_list_nth_data(info->effect_info, i);
-        if(ec != NULL)
-        {
-            if(effect_id == ec->id )
-                return ec->description;
-        }
-    }
+    effect_constr *ec = info->effect_info[effect_id];
+    if(ec != NULL)
+        return ec->description;
     return FX_PARAMETER_DEFAULT_NAME;
 }
 
 char *_effect_get_hint(int effect_id, int p, int v)
 {
-    int n = g_list_length( info->effect_info );
-    int i;
-    for(i = 0;i <= n ; i++)
+    effect_constr *ec = info->effect_info[effect_id];
+    if(ec != NULL)
     {
-        effect_constr *ec = g_list_nth_data(info->effect_info, i);
-        if(ec == NULL)
-            continue;
+        if( ec->hints[p] == NULL)
+                return FX_PARAMETER_VALUE_DEFAULT_HINT;
 
-        if(effect_id == ec->id )
-        {
-            if( ec->hints[p] == NULL)
-                break;
-
-            return ec->hints[p]->description[v];
-        }
+        return ec->hints[p]->description[v];
     }
     return FX_PARAMETER_VALUE_DEFAULT_HINT;
 }
@@ -2215,14 +2296,10 @@ void _effect_free( effect_constr *effect )
 
 void _effect_reset(void)
 {
-    if( info->effect_info != NULL)
-    {
-        int n = g_list_length(info->effect_info);
-        int i;
-        for( i = 0; i <=n ; i ++ )
-            _effect_free( g_list_nth_data( info->effect_info , i ) );
-        g_list_free( info->effect_info );
-        info->effect_info = NULL;
+    int i;
+    for( i = 0; i < EFFECT_LIST_SIZE; i ++ ) {
+        _effect_free( info->effect_info[i] );
+        info->effect_info[i] = NULL;
     }
 }
 
@@ -2804,8 +2881,6 @@ gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
 
     running_g_ = 0;
     info->watch.state = STATE_QUIT;
-
-    gtk_main_quit();
 
     return FALSE;
 }
@@ -5236,6 +5311,8 @@ void load_effectlist_info()
     store2 = fxlist_data.stores[1].list;
     store3 = fxlist_data.stores[2].list;
 
+    int ec_idx = 0;
+
     while( offset < fxlen )
     {
         char tmp_len[4];
@@ -5250,18 +5327,22 @@ void load_effectlist_info()
             strncpy( line, fxtext + offset, len );
 
             ec = _effect_new(line);
-            if(ec) info->effect_info = g_list_append( info->effect_info, ec );
+            if( ec  ) {
+                info->effect_info[ec->id] = ec;
+                ec_idx ++;
+            }
         }
         offset += len;
     }
 
-    fxlen = g_list_length( info->effect_info );
-    for( i = 0; i < fxlen; i ++)
+    for( i = 0; i < ec_idx; i ++)
     {
-        effect_constr *ec = g_list_nth_data( info->effect_info, i );
+        effect_constr *ec = info->effect_info[i];
+        if(ec == NULL)
+            continue;
         if( ec->is_gen )
             continue;
-        gchar *name = _utf8str( _effect_get_description( ec->id ) );
+        gchar *name = _utf8str( ec->description );
 
         if( name != NULL)
         {
@@ -5279,7 +5360,7 @@ void load_effectlist_info()
             else
             {
                 // tree_effectmixlist
-                if( _effect_get_mix(ec->id) > 0 )
+                if( ec->is_video )
                 {
                     gtk_list_store_append( store2, &iter );
                     gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
@@ -6855,7 +6936,8 @@ static void disable_widget_(const char *name)
         veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
         return;
     }
-    gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
+    if(gtk_widget_is_sensitive(GTK_WIDGET(w) ) )
+        gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
 }
 
 static void enable_widget_(const char *name)
@@ -6866,7 +6948,8 @@ static void enable_widget_(const char *name)
         veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
         return;
     }
-    gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
+    if(!gtk_widget_is_sensitive( GTK_WIDGET(w) ) )
+        gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
 }
 #else
 static void disable_widget_(const char *name, const char *s, int line)
@@ -6877,7 +6960,8 @@ static void disable_widget_(const char *name, const char *s, int line)
         veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found, caller is %s:%d",name,s,line);
         return;
     }
-    gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
+    if(gtk_widget_is_sensitive(GTK_WIDGET(w)) )
+        gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
 }
 
 static void enable_widget_(const char *name, const char *s, int line)
@@ -6888,7 +6972,8 @@ static void enable_widget_(const char *name, const char *s, int line)
         veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found, caller is %s:%d",name,s,line);
         return;
     }
-    gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
+    if(!gtk_widget_is_sensitive(GTK_WIDGET(w), TRUE ) ) 
+        gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
 }
 #endif
 
@@ -7070,23 +7155,12 @@ GdkPixbuf   *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInte
 void gveejay_sleep( void *u )
 {
     struct timespec nsecsleep;
-//  nsecsleep.tv_nsec = 1000000 * 4; //@ too long
     nsecsleep.tv_nsec = 500000;
     nsecsleep.tv_sec = 0;
     nanosleep( &nsecsleep, NULL );
 }
 
-void gveejay_time_elapsed( struct timeval time_last )
-{
-    struct timeval time_now;
-    gettimeofday( &time_now, 0 );
-
-    double diff = time_now.tv_sec - time_last.tv_sec +
-            (time_now.tv_usec - time_last.tv_usec ) * 1.e-6;
-
-    veejay_msg(0,"%s: %g", __FUNCTION__, diff );
-}
-
+//static int tick = 0;
 int gveejay_time_to_sync( void *ptr )
 {
     vj_gui_t *ui = (vj_gui_t*) ptr;
@@ -7105,7 +7179,7 @@ int gveejay_time_to_sync( void *ptr )
 	    float spvf = 1.0f / fps;
 	    float ela  = ( info->status_tokens[ELAPSED_TIME] / 1000.0 );
         if( diff > spvf ) {
-            veejay_msg(0, "diff = %g, delay=%f, ela=%f, spvf=%f", diff, 0.0,ela,spvf);
+           // veejay_msg(0, "%d diff = %g, delay=%f, ela=%f, spvf=%f", tick++, diff, 0.0,ela,spvf);
 	        ret = 1;
         }
     } 
@@ -7239,32 +7313,67 @@ static void update_status_accessibility(int old_pm, int new_pm)
 
     if( new_pm == MODE_STREAM )
     {
-        for(i=0; samplewidgets[i].name != NULL; i++)
-            disable_widget( samplewidgets[i].name);
-        for(i=0; plainwidgets[i].name != NULL; i++)
-            disable_widget( plainwidgets[i].name);
-        for(i=0; streamwidgets[i].name != NULL; i++)
-            enable_widget( streamwidgets[i].name);
+        for(i=0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i ++ ) {
+            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] ), FALSE);
+            }
+        }
+
+        for(i=0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i ++ ) {
+            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] ), FALSE);
+            }
+        }
+        
+        for(i=0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i ++ ) {
+            if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] ), TRUE);
+            }
+        }
     }
 
     if( new_pm == MODE_SAMPLE )
     {
-        for(i=0; streamwidgets[i].name != NULL; i++)
-            disable_widget( streamwidgets[i].name);
-        for(i=0; plainwidgets[i].name != NULL; i++)
-            disable_widget( plainwidgets[i].name);
-        for(i=0; samplewidgets[i].name != NULL; i++)
-            enable_widget( samplewidgets[i].name);
+        for(i=0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i ++ ) {
+            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] ), FALSE);
+            }
+        }
+
+        for(i=0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i ++ ) {
+            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] ), FALSE);
+            }
+        }
+
+        for(i=0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i ++ ) {
+            if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] ), TRUE);
+            }
+        }
+
     }
 
     if( new_pm == MODE_PLAIN)
     {
-        for(i=0; streamwidgets[i].name != NULL; i++)
-            disable_widget( streamwidgets[i].name);
-        for(i=0; samplewidgets[i].name != NULL; i++)
-            disable_widget( samplewidgets[i].name);
-        for(i=0; plainwidgets[i].name != NULL; i++)
-            enable_widget( plainwidgets[i].name);
+        for(i=0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i ++ ) {
+            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] ), FALSE);
+            }
+        }
+
+        for(i=0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i ++ ) {
+            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] ), FALSE);
+            }
+        }
+
+        for(i=0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i ++ ) {
+            if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] )) ) {
+                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] ), TRUE);
+            }
+        }
+
     }
 
     GtkWidget *n = widget_cache[ WIDGET_PANELS ];
@@ -7440,7 +7549,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         select_slot( info->status_tokens[PLAY_MODE] );
     }
 
-    if( info->status_tokens[TOTAL_SLOTS] != history[TOTAL_SLOTS] )
+    if( info->status_tokens[TOTAL_SLOTS] != history[TOTAL_SLOTS] && samplebank_ready_)
     {
         int n_samples = 0;
         int n_streams = 0;
@@ -7454,7 +7563,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             n_samples = info->status_tokens[SAMPLE_INV_COUNT];
         }
 
-        if( samplebank_ready_ &&( (info->uc.real_num_samples > 0 && n_samples > info->uc.real_num_samples ) ||
+        if( ( (info->uc.real_num_samples > 0 && n_samples > info->uc.real_num_samples ) ||
             (info->uc.real_num_streams > 0 && n_streams > info->uc.real_num_streams)) )
         {
             info->uc.reload_hint[HINT_SLIST] = 1;
@@ -7770,7 +7879,6 @@ static void enable_fx_entry() {
         gtk_label_set_text(GTK_LABEL (widget_cache[WIDGET_LABEL_P0 + i]), "");
     }
 }
-
 static void process_reload_hints(int *history, int pm)
 {
     int *entry_tokens = &(info->uc.entry_tokens[0]);
@@ -7869,11 +7977,11 @@ static void process_reload_hints(int *history, int pm)
 		reload_macros();
 	}
  
-	veejay_memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));
+	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));
 
-    if(!samplebank_ready_) {
+    /*if(!samplebank_ready_) {
         info->uc.reload_hint[HINT_SLIST] = 2;
-    }
+    }*/
 }
 
 void update_gui()
@@ -7907,8 +8015,16 @@ void update_gui()
 
     update_globalinfo(history, pm, last_pm);
 
+//  #include <valgrind/callgrind.h>
+//    CALLGRIND_START_INSTRUMENTATION;
+//    CALLGRIND_TOGGLE_COLLECT;
+
     process_reload_hints(history, pm);
-    
+//   CALLGRIND_TOGGLE_COLLECT;
+//    CALLGRIND_STOP_INSTRUMENTATION;
+//    CALLGRIND_DUMP_STATS;
+
+
     on_vims_messenger();
 
     update_cpumeter_timeout(NULL);
@@ -8529,7 +8645,7 @@ void vj_gui_init(const char *glade_file,
     gtk_widget_show( info->sample_bank_pad );
 
     info->elref = NULL;
-    info->effect_info = NULL;
+    info->effect_info = (effect_constr**) vj_calloc(sizeof(effect_constr*) * EFFECT_LIST_SIZE );
     info->devlist = NULL;
     info->chalist = NULL;
     info->editlist = NULL;
@@ -8816,7 +8932,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
     vj_gui_preview();
 
-    info->uc.reload_hint[HINT_SLIST] = 2;
+   // info->uc.reload_hint[HINT_SLIST] = 2;
     info->uc.reload_hint[HINT_CHAIN] = 1;
     info->uc.reload_hint[HINT_ENTRY] = 1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
@@ -9044,7 +9160,10 @@ static void samplebank_size_allocate(GtkWidget *widget, GtkAllocation *allocatio
     setup_samplebank( 
             SAMPLEBANK_COLUMNS, SAMPLEBANK_ROWS, allocation, &(info->image_dimensions[0]),&(info->image_dimensions[1]) );
   
-    samplebank_ready_ = 1;
+    if(!samplebank_ready_) {
+        samplebank_ready_ = 1;
+       info->uc.reload_hint[HINT_SLIST] = 2;
+    }
 }
 
 /* Add a page to the notebook and initialize slots */
@@ -9125,7 +9244,7 @@ void reset_samplebank(void)
             {
                 sample_slot_t *slot = info->sample_banks[i]->slot[j];
 
-                if(slot->sample_id)
+                if(slot->sample_id > 0)
                 {
                     if(slot->title) free(slot->title);
                     if(slot->timecode) free(slot->timecode);
@@ -9137,8 +9256,9 @@ void reset_samplebank(void)
                     slot->timecode = NULL;
                     slot->sample_id = 0;
                     slot->sample_type = 0;
+                
+                    update_sample_slot_data( i,j, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
                 }
-                update_sample_slot_data( i,j, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
             }
         }
     }
@@ -9520,8 +9640,6 @@ static void create_ref_slots(int envelope_size)
 
 static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 {
-    gchar hotkey[5];
-
     sample_bank_t **sample_banks = info->sample_banks;
     sample_gui_slot_t *gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
 
@@ -9544,54 +9662,28 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
     gtk_container_add (GTK_CONTAINER (gui_slot->event_box), GTK_WIDGET(gui_slot->frame));
 
     /* the slot main container */
-    gui_slot->main_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
-    gtk_container_add (GTK_CONTAINER (gui_slot->frame), gui_slot->main_vbox);
-    gtk_widget_show( GTK_WIDGET(gui_slot->main_vbox) );
+    gui_slot->upper_hbox = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
+    gtk_container_add (GTK_CONTAINER (gui_slot->frame), gui_slot->upper_hbox);
+ 
+    gui_slot->title = gtk_label_new("");
+    gtk_misc_set_alignment(GTK_MISC(gui_slot->title), 0.5, 0.0);
+    gtk_box_pack_start( GTK_BOX(gui_slot->upper_hbox), GTK_WIDGET(gui_slot->title), FALSE, FALSE, 0 );
 
     gui_slot->image = gtk_image_new();
-//  gui_slot->image = gtk_drawing_area_new();
-    gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
-//  gtk_widget_show(GTK_WIDGET(gui_slot->image));
- //   gtk_widget_set_size_request_( gui_slot->image, info->image_dimensions[0],info->image_dimensions[1] );
-/*
-    g_signal_connect( gui_slot->image, "expose_event",
-            G_CALLBACK(image_expose_event),
-            (gpointer) info->sample_banks[bank_nr]->slot[slot_nr]->slot_number  );
-*/
-    gtk_widget_show( GTK_WIDGET(gui_slot->image));
-
-    /* the upper container for all slot-informations */
-    gui_slot->upper_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
-    gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), gui_slot->upper_hbox, FALSE, TRUE, 0);
-    gtk_widget_show(GTK_WIDGET(gui_slot->upper_hbox));
-
-    if( sample_banks[bank_nr]->slot[slot_nr]->sample_type >= 0 )
-    {
-        /* the hotkey that is assigned to this slot */
-        snprintf(hotkey,sizeof(hotkey), "F-%d", (slot_nr+1));
-        gui_slot->hotkey = gtk_label_new(hotkey);
-    }
-    else
-    {
-        gui_slot->hotkey = gtk_label_new("");
-    }
-
-    gtk_misc_set_alignment(GTK_MISC(gui_slot->hotkey), 0.0, 0.0);
-    gtk_misc_set_padding (GTK_MISC(gui_slot->hotkey), 0, 0);
+    gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
+   
+    gui_slot->hotkey = gtk_label_new("");
+    gtk_misc_set_alignment(GTK_MISC(gui_slot->hotkey), 0.5, 0.0);
+    gtk_misc_set_padding (GTK_MISC(gui_slot->hotkey), 0,0 );
     gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), GTK_WIDGET(gui_slot->hotkey), FALSE, FALSE, 0);
-    gtk_widget_show(GTK_WIDGET(gui_slot->hotkey));
-    gui_slot->upper_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
-    gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), gui_slot->upper_vbox, TRUE, TRUE, 0);
-    gtk_widget_show(GTK_WIDGET(gui_slot->upper_vbox));
-    gui_slot->title = gtk_label_new("");
 
     gui_slot->timecode = gtk_label_new("");
     gtk_misc_set_alignment(GTK_MISC(gui_slot->timecode), 0.5, 0.0);
-    gtk_misc_set_alignment(GTK_MISC(gui_slot->title), 0.5, 0.0);
-
     gtk_misc_set_padding (GTK_MISC(gui_slot->timecode), 0,0 );
-    gtk_box_pack_start (GTK_BOX (gui_slot->upper_vbox), GTK_WIDGET(gui_slot->timecode), FALSE, FALSE, 0);
-    gtk_widget_show(GTK_WIDGET(gui_slot->timecode));
+    gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), GTK_WIDGET(gui_slot->timecode), FALSE, FALSE, 0);
+
+    gtk_widget_show_all(GTK_WIDGET(gui_slot->upper_hbox));
+
 }
 
 
@@ -9848,7 +9940,7 @@ static void update_sample_slot_data(int page_num,
     slot->timecode = timecode == NULL ? NULL : strduplastn( timecode );
     slot->title = title == NULL ? NULL : strduplastn( title );
 
-    if( sample_id )
+    if( sample_id > 0)
     {
         char sample_key[32];
         snprintf(sample_key,sizeof(sample_key), "S%04d%02d", sample_id, sample_type );
@@ -9861,16 +9953,22 @@ static void update_sample_slot_data(int page_num,
     {
         if(sample_id > 0 )
         {
-            gtk_frame_set_label( GTK_FRAME(gui_slot->frame),slot->title );
-            gtk_frame_set_label_align( GTK_FRAME(gui_slot->frame), 0.5f, 0.0f );
-            gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
+            char hotkey[16];
+            if( sample_type == MODE_SAMPLE ) {
+                snprintf(hotkey, sizeof(hotkey), "[F%d] Sample %d", (sample_id % 12), sample_id);
+            }
+            else{
+                snprintf(hotkey, sizeof(hotkey), "[F%d] Stream %d", (sample_id % 12), sample_id);
+            }
             gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
+            gtk_label_set_text( GTK_LABEL( gui_slot->hotkey ), hotkey );
+            gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
         }
         else
         {
-            gtk_frame_set_label(GTK_FRAME(gui_slot->frame), "" );
-            gtk_label_set_text( GTK_LABEL(gui_slot->timecode), "" );
             gtk_label_set_text( GTK_LABEL(gui_slot->title), "" );
+            gtk_label_set_text( GTK_LABEL(gui_slot->hotkey), "" );
+            gtk_label_set_text( GTK_LABEL(gui_slot->timecode), "" );
         }
     }
 
