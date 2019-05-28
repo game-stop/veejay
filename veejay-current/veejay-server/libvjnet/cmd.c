@@ -190,8 +190,10 @@ int			sock_t_poll( vj_sock_t *s )
 {
 	int	status;
 	struct timeval no_wait;
-	memset( &no_wait, 0, sizeof(no_wait) );
-
+	//memset( &no_wait, 0, sizeof(no_wait) );
+    no_wait.tv_sec = 0;
+    no_wait.tv_usec = 0;
+        
 	FD_ZERO( &(s->rds) );
 	FD_ZERO( &(s->wds) );
 

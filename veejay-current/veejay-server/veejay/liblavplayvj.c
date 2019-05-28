@@ -2565,7 +2565,7 @@ static void veejay_playback_close(veejay_t *info)
 		 if(info->sdl[i]->display)
 			 x11_enable_screensaver( info->sdl[i]->display);
 #endif
-		 vj_sdl_free(info->sdl[i]);
+		 //vj_sdl_free(info->sdl[i]);
 	}
 
 	vj_sdl_quit();

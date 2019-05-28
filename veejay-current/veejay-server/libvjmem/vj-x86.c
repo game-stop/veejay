@@ -211,8 +211,8 @@ void *vj_malloc_(size_t size)
 		return NULL;
 	void *ptr = NULL;
 #ifdef HAVE_POSIX_MEMALIGN
-	size_t aligned_size = (size + 3) & ~0x03;
-	int err = posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, aligned_size );
+    size_t aligned_size = (size + 15) & ~0x0F;
+    int err = posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, aligned_size );
 	if( err == EINVAL )
 	{
 		veejay_msg(0, "Memory is not a multiple of %d : %d", sizeof(void*), aligned_size );

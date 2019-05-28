@@ -501,8 +501,9 @@ void	vj_task_set_from_frame( VJFrame *in )
 int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func )
 {
 	const uint8_t n = task_get_workers();
-	if( n <= 1 )
-		return 0;
+	if( n <= 1 ) {
+        return 0;
+    }
 
 	vj_task_arg_t **f = (vj_task_arg_t**) vj_task_args;
 	uint8_t i,j;

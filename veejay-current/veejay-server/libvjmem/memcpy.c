@@ -1690,7 +1690,7 @@ static	void	vj_frame_copy_job( void *arg ) {
 	int i;
 	vj_task_arg_t *info = (vj_task_arg_t*) arg;
 	for( i = 0; i < 4; i ++ ) {
-		if( info->strides[i] <= 0 || info->output[i] == NULL || info->output[i] == NULL )
+		if( info->strides[i] <= 0 || info->input[i] == NULL || info->output[i] == NULL )
 			continue;
 		veejay_memcpy( info->output[i], info->input[i], info->strides[i] );
 	}
