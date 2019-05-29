@@ -320,6 +320,9 @@ enum {
   WIDGET_CURVE_CHAIN_TOGGLECHAIN = 231,
   WIDGET_FX_MNONE = 232,
   WIDGET_SPIN_MACRODELAY = 233,
+  WIDGET_MACRORECORD1 = 234,
+  WIDGET_MACROPLAY1 = 235,
+  WIDGET_MACROSTOP1 = 236,
 };
 
 
@@ -697,7 +700,9 @@ static struct
     { "slider_box_p10",          WIDGET_SLIDER_BOX_G10 },
     { "curve_chain_togglechain", WIDGET_CURVE_CHAIN_TOGGLECHAIN },
     { "spin_macrodelay",         WIDGET_SPIN_MACRODELAY },
-
+    { "macrorecord1",            WIDGET_MACRORECORD1 },
+    { "macroplay1",              WIDGET_MACROPLAY1 },
+    { "macrostop1",              WIDGET_MACROSTOP1 },
     { NULL, -1 },
 };
 
@@ -7452,10 +7457,13 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         switch(info->status_tokens[MACRO])
         {
             case 1:
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACRORECORD1] ), TRUE ); 
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACRORECORD] ), TRUE ); break;
             case 2:
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROPLAY1] ), TRUE ); 
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROPLAY] ), TRUE ); break;
             default:
+                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROSTOP1] ), TRUE );
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROSTOP] ), TRUE ); break;
         }
     }
@@ -7940,8 +7948,6 @@ static void process_reload_hints(int *history, int pm)
 	if( info->uc.reload_hint[HINT_MACRO]) {
 		reload_macros();
 	}
-
-    
 
 	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));
 
