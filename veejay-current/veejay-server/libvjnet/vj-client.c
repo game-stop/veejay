@@ -302,13 +302,15 @@ int vj_client_read_frame_data( vj_client *v, int datalen)
 
 	int n = sock_t_recv( v->fd[0],v->space,datalen );
 		
-	if( n <= 0 ) {
+	if( n <= 0 || (n!=datalen)) {
 		if( n == -1 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
-		} else {
+		} else if( n == 0 ) {
 			veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
-		}
-		return n;
+		} else {
+            veejay_msg(VEEJAY_MSG_ERROR, "Incomplete frame received from remote");
+        }
+		return 0;
 	}
 
 	return avhelper_decode_video_buffer( v->decoder, v->space, n );
