@@ -5301,7 +5301,7 @@ void load_effectlist_info()
     store3 = fxlist_data.stores[2].list;
 
     int ec_idx = 0;
-
+    int hi_id = 0;
     while( offset < fxlen )
     {
         char tmp_len[4];
@@ -5319,12 +5319,14 @@ void load_effectlist_info()
             if( ec  ) {
                 info->effect_info[ec->id] = ec;
                 ec_idx ++;
+                if( hi_id < ec->id )
+                    hi_id = ec->id;
             }
         }
         offset += len;
     }
 
-    for( i = 0; i < ec_idx; i ++)
+    for( i = 0; i <= hi_id; i ++)
     {
         effect_constr *ec = info->effect_info[i];
         if(ec == NULL)
@@ -5371,6 +5373,8 @@ void load_effectlist_info()
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(fxlist_data.stores[1].sorted));
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(fxlist_data.stores[2].sorted));
     free(fxtext);
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Loaded %d effects (highest ID is %d)", ec_idx, hi_id );
 }
 
 void on_effectlist_sources_row_activated(GtkTreeView *treeview,
