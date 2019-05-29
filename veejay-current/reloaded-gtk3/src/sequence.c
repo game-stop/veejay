@@ -822,15 +822,20 @@ int		gvr_get_preview_status( void *preview, int track_num )
 int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	vp->tracks[ track_num ]->preview = status;
+	if( track_num < vp->n_tracks ) {
+        vp->tracks[ track_num ]->preview = status;
 
-	vj_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on Track %d %s",
-		vp->tracks[ track_num ]->width,
-		vp->tracks[ track_num ]->height,
-		vp->tracks[ track_num ]->hostname,
-		vp->tracks[ track_num ]->port_num,
-		track_num,
-		(status ? "enabled" : "disabled") );
+	    vj_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on Track %d %s",
+		    vp->tracks[ track_num ]->width,
+		    vp->tracks[ track_num ]->height,
+		    vp->tracks[ track_num ]->hostname,
+		    vp->tracks[ track_num ]->port_num,
+		    track_num,
+		    (status ? "enabled" : "disabled") );
+    }
+    else {
+        veejay_msg(0, "Track %d is not valid [0-%d]", track_num, vp->n_tracks );
+    }
 	return status;
 }
 
