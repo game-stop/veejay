@@ -4435,7 +4435,7 @@ void	on_macroplay_toggled( GtkWidget *w, gpointer data )
 {
 	if(info->status_lock)
 		return;
-	if( is_button_toggled( "macroplay" ))
+	if( is_button_toggled( "macroplay" ) || is_button_toggled("macroplay1"))
 	{	
 		multi_vims( VIMS_MACRO, "%d", 2 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,2 );
@@ -4451,7 +4451,7 @@ void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
 
     int delay = get_nums("spin_macrodelay");
 
-	if( is_button_toggled( "macrorecord") && delay == 0)
+	if( (is_button_toggled( "macrorecord") || is_button_toggled("macrorecord1")) && delay == 0)
 	{	
 		multi_vims( VIMS_MACRO, "%d", 1 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,1 );
@@ -4468,7 +4468,7 @@ void	on_macrostop_toggled( GtkWidget *w, gpointer data )
 {
 	if(info->status_lock)
 		return;
-	if( is_button_toggled( "macrostop"))
+	if( is_button_toggled( "macrostop") || is_button_toggled("macrostop1"))
 	{
 		multi_vims( VIMS_MACRO, "%d", 0 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,0 );

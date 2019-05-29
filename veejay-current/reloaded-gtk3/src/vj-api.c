@@ -2849,16 +2849,12 @@ gboolean gveejay_relaunch()
 
 gboolean gveejay_quit( GtkWidget *widget, gpointer user_data)
 {
-    if(!running_g_)
-        return FALSE;
-
     if( info->watch.state == STATE_PLAYING)
     {
         if(prompt_dialog("Quit Reloaded", "Are you sure?") != GTK_RESPONSE_ACCEPT)
             return TRUE;
     }
 
-    running_g_ = 0;
     info->watch.state = STATE_QUIT;
 
     return FALSE;
