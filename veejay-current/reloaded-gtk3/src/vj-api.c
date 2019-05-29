@@ -290,7 +290,6 @@ enum {
   WIDGET_BUTTON_083 = 188,
   WIDGET_FXANIMCONTROLS = 189,
   WIDGET_CURVECONTAINER = 190,
-  WIDGET_VS_FRAME = 191,
   WIDGET_SRTFRAME = 192,
   WIDGET_FRAME_FXTREE1 = 193,
   WIDGET_BUTTON_5_4 = 194,
@@ -666,7 +665,6 @@ static struct
     {"markerframe",              WIDGET_MARKERFRAME },
     {"fxanimcontrols",           WIDGET_FXANIMCONTROLS },
     {"curve_container",          WIDGET_CURVECONTAINER },
-    {"vs_frame",                 WIDGET_VS_FRAME },
     {"SRTframe",                 WIDGET_SRTFRAME },
     {"frame_fxtree1",            WIDGET_FRAME_FXTREE1 },
     {"button_5_4",               WIDGET_BUTTON_5_4 },
@@ -966,24 +964,6 @@ typedef struct
 
 typedef struct
 {
-    gint w;
-    gint h;
-    gdouble fps;
-    gint pixel_format;
-    gint sampling;
-    gint audio_rate;
-    gint norm;
-    gint sync;
-    gint timer;
-    gint deinter;
-    gchar *mcast_osc;
-    gchar *mcast_vims;
-    gint osc;
-    gint vims;
-} config_settings_t;
-
-typedef struct
-{
     GtkWidget *frame;
     GtkWidget *image;
     GtkWidget *event_box;
@@ -1121,7 +1101,6 @@ typedef struct
     int prev_mode;
     GtkWidget   *tl;
     GtkWidget   *curve;
-    config_settings_t   config;
     int status_frame;
     int key_id;
     GdkRGBA    *normal;
@@ -8162,24 +8141,6 @@ void vj_gui_cb(int state, char *hostname, int port_num)
     }
 }
 
-void vj_gui_setup_defaults( vj_gui_t *gui )
-{
-    gui->config.w = MAX_PREVIEW_WIDTH;
-    gui->config.h = MAX_PREVIEW_HEIGHT;
-    gui->config.fps = 25.0;
-    gui->config.sampling = 1;
-    gui->config.pixel_format = 1;
-    gui->config.sync = 1;
-    gui->config.timer = 1;
-    gui->config.deinter = 1;
-    gui->config.norm = 0;
-    gui->config.audio_rate = 0;
-    gui->config.osc = 0;
-    gui->config.vims = 0;
-    gui->config.mcast_osc = g_strdup( "224.0.0.32" );
-    gui->config.mcast_vims = g_strdup( "224.0.0.33" );
-}
-
 static void reloaded_sighandler(int x)
 {
     veejay_msg(VEEJAY_MSG_WARNING, "Caught signal %x", x);
@@ -8634,7 +8595,6 @@ void vj_gui_init(const char *glade_file,
     info->chalist = NULL;
     info->editlist = NULL;
 
-    vj_gui_setup_defaults(gui);
     setup_vimslist();
     setup_effectchain_info();
     setup_effectlist_info();
