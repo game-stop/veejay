@@ -1684,8 +1684,8 @@ void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
 	if(!info->status_lock)
 	{
 		int vims_id = VIMS_SAMPLE_CHAIN_DISABLE;
-		
-		if( is_button_toggled( "check_samplefx" ) )
+
+        if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE )
 			vims_id = VIMS_SAMPLE_CHAIN_ENABLE;
 		multi_vims( vims_id, "%d", 0 );
 

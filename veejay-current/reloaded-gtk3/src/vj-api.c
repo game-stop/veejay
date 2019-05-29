@@ -318,6 +318,7 @@ enum {
   WIDGET_SLIDER_BOX_G9 = 216,
   WIDGET_SLIDER_BOX_G10 = 217,
   WIDGET_VEEJAY_BOX = 230,
+  WIDGET_CURVE_CHAIN_TOGGLECHAIN = 231,
 };
 
 
@@ -693,6 +694,7 @@ static struct
     { "slider_box_p8",           WIDGET_SLIDER_BOX_G8 },
     { "slider_box_p9",           WIDGET_SLIDER_BOX_G9 },
     { "slider_box_p10",          WIDGET_SLIDER_BOX_G10 },
+    { "curve_chain_togglechain", WIDGET_CURVE_CHAIN_TOGGLECHAIN },
 
     { NULL, -1 },
 };
@@ -4925,6 +4927,15 @@ static void load_effectchain_info()
     GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
     store = GTK_LIST_STORE(model);
 
+    //update chain fx status
+    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLECHAIN]), info->status_tokens[SAMPLE_FX] );
+    //also for stream (index is equivalent)
+    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE){
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]), info->status_tokens[SAMPLE_FX] );
+    } else {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_STREAMFX]), info->status_tokens[SAMPLE_FX] );
+    }
+
     // no fx, clean list and return
     if(fxlen <= 0 )
     {
@@ -7906,6 +7917,8 @@ static void process_reload_hints(int *history, int pm)
     {
         if( history[SAMPLE_FX] != info->status_tokens[SAMPLE_FX])
         {
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLECHAIN]), info->status_tokens[SAMPLE_FX] );
+
             //also for stream (index is equivalent)
             if(pm == MODE_SAMPLE)
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]), info->status_tokens[SAMPLE_FX] );
