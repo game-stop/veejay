@@ -140,7 +140,7 @@ static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
         }
 
         if(!gtk_events_pending() ) {
-            g_usleep(2000);
+            g_usleep(500);
         }
     }
 
