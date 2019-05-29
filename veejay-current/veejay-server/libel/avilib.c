@@ -3310,9 +3310,17 @@ long AVI_read_frame(avi_t *AVI, unsigned char *vidbuf, int *keyframe)
      return n;
    }
 
+   if( AVI->video_pos >= AVI->video_frames) {
+       AVI_errno = AVI_ERR_READ;
+       return -1;
+   }
+
    if( AVI->mmap_region == NULL )
    {
-  	lseek(AVI->fdes, AVI->video_index[AVI->video_pos].pos, SEEK_SET);
+  	if( lseek(AVI->fdes, AVI->video_index[AVI->video_pos].pos, SEEK_SET) == (off_t) -1 ) {
+        AVI_errno = AVI_ERR_READ;
+        return -1;
+    }
    	if (avi_read(AVI->fdes,vidbuf,n) != n)
    	{
       		AVI_errno = AVI_ERR_READ;
