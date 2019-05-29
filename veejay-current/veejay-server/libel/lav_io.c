@@ -86,7 +86,7 @@ int	lav_is_supported_image_file(char *filename)
 	char *ext = get_filename_ext(filename);
 
 	for( iter = list; iter->next != NULL; iter = iter->next ) {
-		gchar **extensions = gdk_pixbuf_format_get_extensions (list->data);
+		gchar **extensions = gdk_pixbuf_format_get_extensions (iter->data);
 		for( i = 0; extensions[i] != NULL; i ++ ) {
 			if( strncasecmp(ext, extensions[i], strlen(ext)) == 0 ) {
 				g_strfreev(extensions);
