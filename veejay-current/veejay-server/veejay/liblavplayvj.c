@@ -3703,6 +3703,8 @@ static int configure_dummy_defaults(veejay_t *info, char override_norm, float fp
 			dh = in_h;
 
 		default_norm = (override_norm == '\0' ? veejay_get_norm(vj_el_get_default_norm(tmp_fps)) : veejay_get_norm(override_norm));
+        dw = (dw / 8) * 8;
+        dh = (dh / 8) * 8;
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Video source is: %dx%d %2.2f fps norm %d",in_w,in_h,tmp_fps, default_norm);
 	} 
