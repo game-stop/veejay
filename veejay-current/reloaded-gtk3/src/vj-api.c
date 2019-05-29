@@ -1343,7 +1343,6 @@ gboolean gveejay_idle(gpointer data)
         int sync = 0;
         if( is_alive(&sync) == FALSE )
         {
-          veejay_msg(0, "Veejay has left the building");
           return FALSE;
         } 
         if( sync )
