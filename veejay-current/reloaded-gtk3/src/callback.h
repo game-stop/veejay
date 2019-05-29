@@ -49,7 +49,8 @@ update_label_str( "value_friendlyname", _effect_get_hint( entry_tokens[ENTRY_FXI
 
 #define KF_CHANGED( arg_num ) \
 {\
-enable_widget("fxanimcontrols");\
+if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ]))\
+    gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], TRUE);\
 if(arg_num != info->uc.selected_parameter_id)\
 {\
 vj_kf_select_parameter(arg_num);\

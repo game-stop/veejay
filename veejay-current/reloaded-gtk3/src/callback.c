@@ -2527,8 +2527,8 @@ void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
 	GtkWidget *tb = glade_xml_get_widget_( info->main_window, "cali_take_button");
 	gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
 
-	disable_widget( "cali_save_button" );
-
+    if(gtk_widget_is_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ] ))
+        gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], FALSE);
 }
 
 /*
@@ -2931,8 +2931,12 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
         if(active_kf_id == 0){
             info->uc.selected_parameter_id = -1;
 
-            disable_widget( "fxanimcontrols" );
-            disable_widget( "curve_container" );
+            if(gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ] ))
+               gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], FALSE);
+
+            if(gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ] ))
+               gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], FALSE);
+
 
             if(info->status_lock)
               return;
@@ -2940,8 +2944,11 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
             vj_kf_reset();
         } else {
             KF_CHANGED (active_kf_id -1); ////None is id 0
-            enable_widget( "fxanimcontrols" );
-            enable_widget( "curve_container" );
+            // if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ]))
+            //   gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], TRUE);
+
+            if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ]))
+               gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], TRUE);
         }
     }
 }
@@ -3168,10 +3175,14 @@ void	on_vs_ntsc_toggled( GtkWidget *w , gpointer user_data)
 }
 void	on_vs_custom_toggled( GtkWidget *w, gpointer user_data)
 {
-	if(is_button_toggled( "vs_custom" ))
-		enable_widget( "vs_frame");
-	else
-		disable_widget( "vs_frame");
+	if(is_button_toggled( "vs_custom" )) {
+       if(!gtk_widget_is_sensitive( widget_cache[ WIDGET_VS_FRAME ] )) 
+           gtk_widget_set_sensitive( widget_cache[ WIDGET_VS_FRAME ], TRUE);
+    }
+	else {
+        if(gtk_widget_is_sensitive( widget_cache[ WIDGET_VS_FRAME ] )) 
+           gtk_widget_set_sensitive( widget_cache[ WIDGET_VS_FRAME ], FALSE);
+    }
 }
 
 static void _rgroup_audio(void)
@@ -3341,10 +3352,14 @@ void	on_configure1_activate( GtkWidget *w, gpointer user_data)
 			set_toggle_button( "vs_custom", 1 );
 	}
 	
-	if( is_button_toggled( "vs_custom" ))
-		enable_widget( "vs_frame" );
-	else	
-		disable_widget( "vs_frame" );
+	if( is_button_toggled( "vs_custom" )) {
+         if(!gtk_widget_is_sensitive( widget_cache[ WIDGET_VS_FRAME ] )) 
+           gtk_widget_set_sensitive( widget_cache[ WIDGET_VS_FRAME ], TRUE);
+    }
+	else {
+        if(gtk_widget_is_sensitive( widget_cache[ WIDGET_VS_FRAME ] )) 
+           gtk_widget_set_sensitive( widget_cache[ WIDGET_VS_FRAME ], FALSE);
+    }
 
 	if( info->config.audio_rate == 0 )
 		set_toggle_button( "vs_noaudio" , 1 );

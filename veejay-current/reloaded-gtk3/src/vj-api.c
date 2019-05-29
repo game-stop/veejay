@@ -92,7 +92,7 @@ static gpointer castIntToGpointer( int val)
 
 #define MAX_SLOW 25
 #define QUICKSELECT_SLOTS 10
-#define MAX_WIDGET_CACHE 200
+#define MAX_WIDGET_CACHE 512
 
 static int beta__ = 0;
 static int use_vims_mcast = 0;
@@ -288,7 +288,36 @@ enum {
   WIDGET_MARKERFRAME = 186,
   WIDGET_FXPANEL = 187,
   WIDGET_BUTTON_083 = 188,
-
+  WIDGET_FXANIMCONTROLS = 189,
+  WIDGET_CURVECONTAINER = 190,
+  WIDGET_VS_FRAME = 191,
+  WIDGET_SRTFRAME = 192,
+  WIDGET_FRAME_FXTREE1 = 193,
+  WIDGET_BUTTON_5_4 = 194,
+  WIDGET_TOGGLE_MULTICAST = 195,
+  WIDGET_CALI_SAVE_BUTTON = 196,
+  WIDGET_VBOX633 = 197,
+  WIDGET_HBOX910 = 198,
+  WIDGET_HBOX27 = 199,
+  WIDGET_SAMPLE_BANK_HBOX = 200,
+  WIDGET_BUTTON_SAMPLEBANK_PREV = 201,
+  WIDGET_BUTTON_SAMPLEBANK_NEXT = 202,
+  WIDGET_SPIN_SAMPLEBANK_SELECT = 203,
+  WIDGET_HBOX709 = 204,
+  WIDGET_SAMPLE_PANEL = 205,
+  WIDGET_VBOX623 = 206,
+  WIDGET_SLIDER_BOX_G0 = 207,
+  WIDGET_SLIDER_BOX_G1 = 208,
+  WIDGET_SLIDER_BOX_G2 = 209,
+  WIDGET_SLIDER_BOX_G3 = 210,
+  WIDGET_SLIDER_BOX_G4 = 211,
+  WIDGET_SLIDER_BOX_G5 = 212,
+  WIDGET_SLIDER_BOX_G6 = 213,
+  WIDGET_SLIDER_BOX_G7 = 214,
+  WIDGET_SLIDER_BOX_G8 = 215,
+  WIDGET_SLIDER_BOX_G9 = 216,
+  WIDGET_SLIDER_BOX_G10 = 217,
+  WIDGET_VEEJAY_BOX = 230,
 };
 
 
@@ -335,6 +364,47 @@ enum {
   STREAM_WIDGET_SAMPLEGRID_FRAME,
   STREAM_WIDGET_NONE,
 };
+
+enum {
+  FB_WIDGET_MARKERFRAME = 0,
+  FB_WIDGET_VBOX633,
+  FB_WIDGET_HBOX910,
+  FB_WIDGET_HBOX27,
+  FB_WIDGET_SAMPLE_BANK_HBOX,
+  FB_WIDGET_BUTTON_SAMPLEBANK_PREV,
+  FB_WIDGET_BUTTON_SAMPLEBANK_NEXT,
+  FB_WIDGET_SPIN_SAMPLEBANK_SELECT,
+  FB_WIDGET_HBOX709,
+  FB_WIDGET_SAMPLE_PANEL,
+  FB_WIDGET_NOTEBOOK15,
+  FB_WIDGET_VBOX623,
+  FB_WIDGET_SAMPLEGRID_FRAME,
+  FB_WIDGET_PANELS,
+  FB_WIDGET_NONE
+};
+
+static struct 
+{
+    const int fb_widget_id;
+    const int widget_id;
+} fb_widget_map[] = 
+{
+    {  FB_WIDGET_MARKERFRAME, WIDGET_MARKERFRAME },
+    {  FB_WIDGET_VBOX633, WIDGET_VBOX633 },
+    {  FB_WIDGET_HBOX910, WIDGET_HBOX910 },
+    {  FB_WIDGET_HBOX27, WIDGET_HBOX27 },
+    {  FB_WIDGET_SAMPLE_BANK_HBOX, WIDGET_SAMPLE_BANK_HBOX },
+    {  FB_WIDGET_BUTTON_SAMPLEBANK_PREV, WIDGET_BUTTON_SAMPLEBANK_PREV },
+    {  FB_WIDGET_BUTTON_SAMPLEBANK_NEXT, WIDGET_BUTTON_SAMPLEBANK_NEXT },
+    {  FB_WIDGET_SPIN_SAMPLEBANK_SELECT, WIDGET_SPIN_SAMPLEBANK_SELECT },
+    {  FB_WIDGET_HBOX709,WIDGET_HBOX709 },
+    {  FB_WIDGET_SAMPLE_PANEL, WIDGET_SAMPLE_PANEL },
+    {  FB_WIDGET_NOTEBOOK15, WIDGET_NOTEBOOK15 },
+    {  FB_WIDGET_VBOX623, WIDGET_VBOX623 },
+    {  FB_WIDGET_SAMPLEGRID_FRAME,FB_WIDGET_SAMPLEGRID_FRAME },
+    {  FB_WIDGET_PANELS, WIDGET_PANELS },
+};
+
 
 static struct 
 {
@@ -593,6 +663,36 @@ static struct
     {"scrolledwindow49",         WIDGET_SCROLLEDWINDOW49 },
     {"samplegrid_frame",         WIDGET_SAMPLEGRID_FRAME },
     {"markerframe",              WIDGET_MARKERFRAME },
+    {"fxanimcontrols",           WIDGET_FXANIMCONTROLS },
+    {"curve_container",          WIDGET_CURVECONTAINER },
+    {"vs_frame",                 WIDGET_VS_FRAME },
+    {"SRTframe",                 WIDGET_SRTFRAME },
+    {"frame_fxtree1",            WIDGET_FRAME_FXTREE1 },
+    {"button_5_4",               WIDGET_BUTTON_5_4 },
+    {"toggle_multicast",         WIDGET_TOGGLE_MULTICAST },
+    {"cali_save_button",         WIDGET_CALI_SAVE_BUTTON },
+    {"veejay_box",               WIDGET_VEEJAY_BOX }, 
+    { "vbox633",                 WIDGET_VBOX633 },
+    { "hbox910",                 WIDGET_HBOX910 },
+    { "hbox27",                  WIDGET_HBOX27 },
+    { "sample_bank_hbox",        WIDGET_SAMPLE_BANK_HBOX },
+    { "button_samplebank_prev",  WIDGET_BUTTON_SAMPLEBANK_PREV },
+    { "button_samplebank_next",  WIDGET_BUTTON_SAMPLEBANK_NEXT },
+    { "spin_samplebank_select",  WIDGET_SPIN_SAMPLEBANK_SELECT },
+    { "hbox709",                 WIDGET_HBOX709 },
+    { "sample_panel",            WIDGET_SAMPLE_PANEL },
+    { "vbox623",                 WIDGET_VBOX623 },
+    { "slider_box_p0",           WIDGET_SLIDER_BOX_G0 },
+    { "slider_box_p1",           WIDGET_SLIDER_BOX_G1 },
+    { "slider_box_p2",           WIDGET_SLIDER_BOX_G2 },
+    { "slider_box_p3",           WIDGET_SLIDER_BOX_G3 },
+    { "slider_box_p4",           WIDGET_SLIDER_BOX_G4 },
+    { "slider_box_p5",           WIDGET_SLIDER_BOX_G5 },
+    { "slider_box_p6",           WIDGET_SLIDER_BOX_G6 },
+    { "slider_box_p7",           WIDGET_SLIDER_BOX_G7 },
+    { "slider_box_p8",           WIDGET_SLIDER_BOX_G8 },
+    { "slider_box_p9",           WIDGET_SLIDER_BOX_G9 },
+    { "slider_box_p10",          WIDGET_SLIDER_BOX_G10 },
 
     { NULL, -1 },
 };
@@ -610,28 +710,6 @@ static struct
     {"Filter the effects list by any string"},
     {"Shift + Mouse left : Toogle selected fx chain"},
     {NULL},
-};
-
-static struct
-{
-    const char *name;
-} non_feedback_widgets[] = 
-{
-    { "markerframe" },
-    { "vbox633" },
-    { "hbox910" },
-    { "hbox27" },
-    { "sample_bank_hbox" },
-    { "button_samplebank_prev" },
-    { "button_samplebank_next" },
-    { "spin_samplebank_select" },
-    { "hbox709" },
-    { "sample_panel" },
-    { "notebook15" },
-    { "vbox623" },
-    { "samplegrid_frame" },
-    { "panels" },
-    { NULL },
 };
 
 enum
@@ -980,7 +1058,7 @@ typedef struct {
     int is_gen;
 } effect_constr;
 
-#define EFFECT_LIST_SIZE 2048
+#define EFFECT_LIST_SIZE 4096
 typedef struct
 {
     GtkBuilder *main_window;
@@ -1137,7 +1215,6 @@ static widget_name_t *param_names_ = NULL;
 static widget_name_t *param_incs_ = NULL;
 static widget_name_t *param_decs_ = NULL;
 static widget_name_t *gen_names_ = NULL;
-static widget_name_t *gen_box_names_ = NULL;
 static widget_name_t *gen_incs_ = NULL;
 static widget_name_t *gen_decs_ = NULL;
 static effectlist_data fxlist_data;
@@ -1214,17 +1291,6 @@ static void set_pm_page_label(int sample_id, int type);
 static void notebook_set_page(const char *name, int page);
 static void hide_widget(const char *name);
 static void show_widget(const char *name);
-#ifndef STRICT_CHECKING
-static void disable_widget_( const char *name );
-static void enable_widget_(const char *name );
-#define enable_widget(a) enable_widget_(a)
-#define disable_widget(a) disable_widget_(a)
-#else
-static void disable_widget_( const char *name, const char *function, int line );
-static void enable_widget_(const char *name, const char *function, int line );
-#define enable_widget(a) enable_widget_(a,__FUNCTION__,__LINE__ )
-#define disable_widget(a) disable_widget_(a,__FUNCTION__,__LINE__)
-#endif
 static void setup_tree_spin_column(const char *tree_name, int type, const char *title);
 static void setup_tree_text_column( const char *tree_name, int type, const char *title, int expand );
 static void setup_tree_pixmap_column( const char *tree_name, int type, const char *title );
@@ -1453,18 +1519,6 @@ enum {
     TEXT_REALTIME = 0
 };
 
-static struct {
-    const char *name;
-} fx_fade_entry[] = {
-    { "fx_mnone" },
-    { "fx_m1" },
-    { "fx_m2" },
-    { "fx_m3" },
-    { "fx_m4" },
-    { NULL },
-};
-
-
 static struct
 {
     const char *name;
@@ -1563,72 +1617,6 @@ static void select_slot(int pm);
 #define gtk_widget_set_sensitive_( w,p ) gtk_widget_set_sensitive( w,p )
 #define gtk_image_set_from_pixbuf_(w,p) gtk_image_set_from_pixbuf( w,p )
 #endif
-
-static struct
-{
-    const char *name;
-} uiwidgets[] =
-{
-    {"veejay_box"},
-    {NULL}
-};
-
-static struct
-{
-    const char *name;
-} plainwidgets[] =
-{
-    {"video_navigation_buttons"},
-    {"button_084"},
-    {"button_083"},
-    {"button_samplestart"},
-    {"button_sampleend"},
-    {"speed_slider"},
-    {"slow_slider"},
-    {"vjframerate"},
-    {"markerframe"},
-    {NULL}
-};
-/*
-static struct
-{
-    const char *name;
-} samplewidgets[] =
-{
-    {"sample_loop_box"},
-    {"button_084"},
-    {"button_083"},
-    {"video_navigation_buttons"},
-    {"button_samplestart"},
-    {"button_sampleend"},
-    {"speed_slider"},
-    {"slow_slider"},
-    {"button_200"}, // mask button
-    {"frame_fxtree"},
-    {"frame_fxtree3"},
-    {"fxpanel"},
-    {"panels"},
-    {"vjframerate"},
-    {"scrolledwindow49"}, // srt stuff
-    {"samplegrid_frame"},
-    {"markerframe"},
-    {NULL}
-};*/
-
-static struct
-{
-    const char *name;
-} streamwidgets[] =
-{
-    {"button_200"}, // mask button
-    {"frame_fxtree"},
-    {"frame_fxtree3"},
-    {"fxpanel"},
-    {"panels"},
-    {"scrolledwindow49"}, // srt stuff
-    {"samplegrid_frame"},
-    {NULL},
-};
 
 enum
 {
@@ -3904,11 +3892,16 @@ static void update_record_tab(int pm)
 }
 
 static int fx_get_current_fade_entry_method() {
-    int i;
-    for( i = 0; fx_fade_entry[i].name != NULL; i ++ ) {
-        if( is_button_toggled( fx_fade_entry[i].name ) )
-            return i;
-    }
+
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_FX_M1 ]) ))
+        return 0;
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_FX_M2] ) ))
+        return 1;
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_FX_M3] ) ))
+        return 2;
+    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_FX_M4] ) ))
+        return 3;
+
     return 0;
 }
 
@@ -3953,25 +3946,35 @@ static void update_current_slot(int *history, int pm, int last_pm)
         switch(info->status_tokens[STREAM_TYPE])
         {
             case STREAM_GENERATOR:
+                    if(!gtk_widget_is_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ) ) ) {
+                        gtk_widget_set_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ), TRUE );
+                    }
                     show_widget("frame_fxtree1");
-                    enable_widget("frame_fxtree1");
                     hide_widget("notebook16");
                     break;
             case STREAM_WHITE:
                     hide_widget("frame_fxtree1");
-                    disable_widget("frame_fxtree1");
+                    if(gtk_widget_is_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ) ) ) {
+                        gtk_widget_set_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ), FALSE );
+                    }
+
                     show_widget("notebook16");
                     notebook_set_page("notebook16",1 );
                     break;
             case STREAM_VIDEO4LINUX:
                     hide_widget("frame_fxtree1");
-                    disable_widget("frame_fxtree1");
+                    if(gtk_widget_is_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ) ) ) {
+                        gtk_widget_set_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ), FALSE );
+                    }
+
                     show_widget("notebook16");
                     notebook_set_page("notebook16",0 );
                     break;
             default:
                     hide_widget( "frame_fxtree1");
-                    disable_widget("frame_fxtree1");
+                    if(gtk_widget_is_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ) ) ) {
+                        gtk_widget_set_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ), FALSE );
+                    }
                     hide_widget( "notebook16");
                     break;
         }
@@ -4145,9 +4148,15 @@ static void update_current_slot(int *history, int pm, int last_pm)
             gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] ), TRUE );
         }
 
-        if( history[FADE_ENTRY] != info->status_tokens[FADE_ENTRY] || fx_get_current_fade_entry_method() != fx_get_fade_entry_method(info->status_tokens[FADE_ENTRY]) ) 
+        int fx_fade_entry = fx_get_fade_entry_method(info->status_tokens[FADE_ENTRY]);
+        if( history[FADE_ENTRY] != info->status_tokens[FADE_ENTRY] || fx_get_current_fade_entry_method() != fx_fade_entry ) 
         {
-            set_toggle_button( fx_fade_entry[ fx_get_fade_entry_method( info->status_tokens[FADE_ENTRY] ) ].name, 1 );
+            switch(fx_fade_entry) {
+                case 0: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M1]), TRUE ); break;
+                case 1: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M2]), TRUE ); break;
+                case 2: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M3]), TRUE ); break;
+                case 3: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M4]), TRUE ); break;
+            }
         }
 
         if(update)
@@ -4813,7 +4822,9 @@ static void load_generator_info()
 
     for( i = 0; i < np ; i ++ )
     {
-        enable_widget( gen_box_names_[i].text );
+        if(!gtk_widget_is_sensitive( GTK_WIDGET(widget_cache[WIDGET_SLIDER_BOX_G0 + i] ))) {
+            gtk_widget_set_sensitive( GTK_WIDGET(widget_cache[WIDGET_SLIDER_BOX_G0 + i] ), TRUE );
+        }
 
         gchar *tt1 = _utf8str(_effect_get_param_description( args[0],i));
         set_tooltip( gen_names_[i].text, tt1 );
@@ -4833,7 +4844,10 @@ static void load_generator_info()
         gint min = 0, max = 1, value = 0;
         update_slider_range( gen_names_[i].text, min,max, value, 0 );
 
-        disable_widget( gen_box_names_[i].text );
+        if(gtk_widget_is_sensitive( GTK_WIDGET(widget_cache[WIDGET_SLIDER_BOX_G0 + i] ))) {
+            gtk_widget_set_sensitive( GTK_WIDGET(widget_cache[WIDGET_SLIDER_BOX_G0 + i] ), FALSE );
+        }
+
         set_tooltip( gen_names_[i].text, "" );
     }
 
@@ -6436,9 +6450,7 @@ static void reload_vimslist()
             offset += val[3];
         }
 
-        gchar *g_format = format;
         gchar *g_descr = descr;
-
 
         if(vj_event_list[val[0]].format )
             free(vj_event_list[val[0]].format);
@@ -6878,19 +6890,24 @@ static void load_editlist_info()
 
     if( values[4] == 0 )
     {
-        disable_widget( "button_5_4" );
+        if(gtk_widget_is_sensitive( widget_cache[ WIDGET_BUTTON_5_4 ] ))
+            gtk_widget_set_sensitive(widget_cache[ WIDGET_BUTTON_5_4 ], FALSE);
     }
     else
     {
-        set_toggle_button( "button_5_4", values[8]);
-        enable_widget( "button_5_4" );
+        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_BUTTON_5_4 ] ))
+            gtk_widget_set_sensitive(widget_cache[ WIDGET_BUTTON_5_4 ], TRUE);
+        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_BUTTON_5_4 ] )) != values[8] )
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_BUTTON_5_4 ] ) , values[8] );
     }
 
     if( use_vims_mcast ) {
-        enable_widget( "toggle_multicast" );
+        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST] ))
+            gtk_widget_set_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST ], TRUE);
     }
     else {
-        disable_widget( "toggle_multicast" );
+         if(gtk_widget_is_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST ] ))
+            gtk_widget_set_sensitive(widget_cache[ WIDGET_TOGGLE_MULTICAST ], FALSE);
     }
 
     free(res);
@@ -6927,56 +6944,6 @@ static void show_widget(const char *name)
     }
     gtk_widget_show(w);
 }
-
-#ifndef STRICT_CHECKING
-static void disable_widget_(const char *name)
-{
-    GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
-    if(!w) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
-        return;
-    }
-    if(gtk_widget_is_sensitive(GTK_WIDGET(w) ) )
-        gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
-}
-
-static void enable_widget_(const char *name)
-{
-    GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
-    if(!w)
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found",name);
-        return;
-    }
-    if(!gtk_widget_is_sensitive( GTK_WIDGET(w) ) )
-        gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
-}
-#else
-static void disable_widget_(const char *name, const char *s, int line)
-{
-    GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
-    if(!w)
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found, caller is %s:%d",name,s,line);
-        return;
-    }
-    if(gtk_widget_is_sensitive(GTK_WIDGET(w)) )
-        gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
-}
-
-static void enable_widget_(const char *name, const char *s, int line)
-{
-    GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
-    if(!w)
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Widget '%s' not found, caller is %s:%d",name,s,line);
-        return;
-    }
-    if(!gtk_widget_is_sensitive(GTK_WIDGET(w), TRUE ) ) 
-        gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
-}
-#endif
-
 
 char *format_selection_time(int start, int end)
 {
@@ -7177,7 +7144,6 @@ int gveejay_time_to_sync( void *ptr )
     {
 	    fps = ui->el.fps;
 	    float spvf = 1.0f / fps;
-	    float ela  = ( info->status_tokens[ELAPSED_TIME] / 1000.0 );
         if( diff > spvf ) {
            // veejay_msg(0, "%d diff = %g, delay=%f, ela=%f, spvf=%f", tick++, diff, 0.0,ela,spvf);
 	        ret = 1;
@@ -7485,16 +7451,22 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( info->status_tokens[FEEDBACK] != history[FEEDBACK] ) {
         if(info->status_tokens[FEEDBACK] == 1) { // when feedback is enabled
-            for( i = 0; non_feedback_widgets[i].name != NULL ; i ++ ) {
-                disable_widget( non_feedback_widgets[i].name );
+            for ( i = 0; fb_widget_map[i].fb_widget_id != FB_WIDGET_NONE; i ++ ) {
+               if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[fb_widget_map[i].widget_id])))
+                   gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[fb_widget_map[i].widget_id]), FALSE);
             }
         }
         else {
-            for( i = 0; non_feedback_widgets[i].name != NULL ; i ++ ) {
-                enable_widget( non_feedback_widgets[i].name );
+            for ( i = 0; fb_widget_map[i].fb_widget_id != FB_WIDGET_NONE; i ++ ) {
+               if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[fb_widget_map[i].widget_id])))
+                   gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[fb_widget_map[i].widget_id]), TRUE);
             }
         }
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_FEEDBACKBUTTON] ), info->status_tokens[FEEDBACK] );
+
+        if(info->status_tokens[FEEDBACK] != 
+                gtk_toggle_button_get_active(  GTK_TOGGLE_BUTTON( widget_cache[WIDGET_FEEDBACKBUTTON] ) )) {
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_FEEDBACKBUTTON] ), info->status_tokens[FEEDBACK] );
+        }
     }
 
     if( info->status_tokens[MACRO] != history[MACRO] )
@@ -7680,7 +7652,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
                         case 3:
                             gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
                                 "Image calibrated. You may need to adjust brightness.");
-                            enable_widget( "cali_save_button");
+                            if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ] ))
+                                gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], TRUE);
                             break;
                         default:
                             gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
@@ -7731,9 +7704,11 @@ static void disable_fx_entry() {
     if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_TRANSITION_ENABLED] ) ) ) {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_TRANSITION_ENABLED] ), FALSE );
     }
-
-    for( i = 0; fx_fade_entry[i].name != NULL;i ++ ) {
-        disable_widget( fx_fade_entry[i].name );
+  
+    for( i = WIDGET_FX_M1; i < WIDGET_FX_M4; i ++ ) { 
+        if( gtk_widget_is_sensitive(widget_cache[i]) ) {
+            gtk_widget_set_sensitive_(widget_cache[i], FALSE);
+        }
     }
 
     GtkWidget *kf_param = widget_cache[ WIDGET_COMBO_CURVE_FX_PARAM ];
@@ -8511,7 +8486,6 @@ void vj_gui_init(const char *glade_file,
     gen_decs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * GENERATOR_PARAMS );
     gen_incs_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * GENERATOR_PARAMS );
     gen_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * GENERATOR_PARAMS );
-    gen_box_names_ = (widget_name_t*) vj_calloc(sizeof(widget_name_t) * GENERATOR_PARAMS );
 
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
@@ -8538,9 +8512,6 @@ void vj_gui_init(const char *glade_file,
     {
         snprintf(text,sizeof(text), "slider_g%d",i);
         gen_names_[i].text = strdup( text );
-
-        snprintf(text,sizeof(text), "slider_box_g%d",i);
-        gen_box_names_[i].text = strdup( text );
 
         snprintf(text,sizeof(text), "dec_g%d", i);
         gen_decs_[i].text = strdup(text);
@@ -8709,7 +8680,7 @@ void vj_gui_init(const char *glade_file,
                              (void*) gui,
                              use_threads);
 
-    GtkWidget *curve_container = glade_xml_get_widget_( info->main_window,"curve_container" );
+    GtkWidget *curve_container = widget_cache[ WIDGET_CURVECONTAINER ];
     gui->curve = gtk3_curve_new ();
     add_class(gui->curve, "curve");
 
@@ -9109,12 +9080,8 @@ void vj_gui_disconnect()
 
 void vj_gui_disable()
 {
-    int i = 0;
-
-    while( uiwidgets[i].name != NULL )
-    {
-     disable_widget( uiwidgets[i].name );
-     i++;
+    if(gtk_widget_is_sensitive( GTK_WIDGET(widget_cache[WIDGET_VEEJAY_BOX] ))) {
+        gtk_widget_set_sensitive( GTK_WIDGET(widget_cache[WIDGET_VEEJAY_BOX] ), FALSE );
     }
 
     info->sensitive = 0;
@@ -9122,12 +9089,10 @@ void vj_gui_disable()
 
 void vj_gui_enable()
 {
-    int i =0;
-    while( uiwidgets[i].name != NULL)
-    {
-        enable_widget( uiwidgets[i].name );
-         i++;
+    if(!gtk_widget_is_sensitive( GTK_WIDGET(widget_cache[WIDGET_VEEJAY_BOX] ))) {
+        gtk_widget_set_sensitive( GTK_WIDGET(widget_cache[WIDGET_VEEJAY_BOX] ), TRUE );
     }
+
     info->sensitive = 1;
 }
 
