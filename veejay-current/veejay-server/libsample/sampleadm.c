@@ -543,17 +543,30 @@ int sample_get_longest(int sample_id)
     sample_info *si = sample_get(sample_id);
     if(si)
     {
-        int len = (si->last_frame -
-              si->first_frame );
+        int len;
+        int start,end;
+        if( si->marker_start == si->marker_end ) {
+           len =  (si->last_frame - si->first_frame );
+           start = si->first_frame;
+           end = si->last_frame;
+        }
+        else {
+            len = (si->marker_end - si->marker_start );
+            start = si->marker_start;
+            end = si->marker_end;
+        }
         int c = 0;
         int tmp = 0;
         int t=0;
         int _id=0;
         int speed = abs(si->speed);
+
+        si->resume_pos = ( si->speed < 0 ? end : (si->speed > 0 ? start : si->resume_pos ) );
+
         if( speed == 0 ) {
             veejay_msg(VEEJAY_MSG_WARNING,
-                 "Starting paused sample %d at normal speed",
-                    sample_id);
+                 "Starting paused sample %d at normal speed from position %d",
+                    sample_id, si->resume_pos);
             speed = 1;
         }
         int duration = len / speed; //how many frames are played of this sample
