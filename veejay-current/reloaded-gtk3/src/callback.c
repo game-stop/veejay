@@ -4448,13 +4448,20 @@ void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
 {
 	if(info->status_lock)
 		return;
-	if( is_button_toggled( "macrorecord"))
+
+    int delay = get_nums("spin_macrodelay");
+
+	if( is_button_toggled( "macrorecord") && delay == 0)
 	{	
 		multi_vims( VIMS_MACRO, "%d", 1 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,1 );
 		info->uc.reload_hint[HINT_MACRO] = 1;
         vj_msg(VEEJAY_MSG_INFO, "Started macro record");
 	}
+    else {
+        info->uc.reload_hint[HINT_MACRODELAY] = delay;
+        vj_msg(VEEJAY_MSG_INFO, "Delayed start of macro recording");
+    }
 }
 
 void	on_macrostop_toggled( GtkWidget *w, gpointer data )

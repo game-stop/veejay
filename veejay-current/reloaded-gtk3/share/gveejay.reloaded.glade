@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.20.0 -->
+<!-- Generated with glade 3.22.1 -->
 <interface>
   <requires lib="gtk+" version="3.16"/>
   <!-- interface-css-provider-path gveejay.reloaded.css -->
@@ -8,9 +8,15 @@
     <child>
       <placeholder/>
     </child>
+    <child>
+      <placeholder/>
+    </child>
   </object>
   <object class="GtkApplicationWindow">
     <property name="can_focus">False</property>
+    <child>
+      <placeholder/>
+    </child>
     <child>
       <placeholder/>
     </child>
@@ -144,6 +150,9 @@
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_generator_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkFrame" id="frame_generator">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
@@ -190,6 +199,24 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
@@ -1612,6 +1639,9 @@
     <property name="title" translatable="yes">Image Calibration</property>
     <signal name="delete-event" handler="on_calibration_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkBox" id="vbox637">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
@@ -2452,6 +2482,9 @@
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_inputstream_window_delete_event" swapped="no"/>
     <child>
+      <placeholder/>
+    </child>
+    <child>
       <object class="GtkFrame" id="frame161">
         <property name="width_request">340</property>
         <property name="visible">True</property>
@@ -2823,6 +2856,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_veejay_connection_close" swapped="no"/>
     <signal name="delete-event" handler="on_veejay_connection_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox3">
         <property name="visible">True</property>
@@ -3067,6 +3103,14 @@
       <class name="reloaded"/>
     </style>
   </object>
+  <object class="GtkRadioButton" id="radiobutton1">
+    <property name="label" translatable="yes">radiobutton</property>
+    <property name="visible">True</property>
+    <property name="can_focus">True</property>
+    <property name="receives_default">False</property>
+    <property name="active">True</property>
+    <property name="draw_indicator">True</property>
+  </object>
   <object class="GtkAdjustment" id="red_balance">
     <property name="upper">65535</property>
     <property name="step_increment">1</property>
@@ -3294,6 +3338,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_video_options_close" swapped="no"/>
     <signal name="delete-event" handler="on_video_options_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="vbox_video_options">
         <property name="visible">True</property>
@@ -4159,6 +4206,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_vims_bundles_close" swapped="no"/>
     <signal name="delete-event" handler="on_vims_bundles_close" swapped="no"/>
+    <child>
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox5">
         <property name="visible">True</property>
@@ -4555,6 +4605,9 @@
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Reloaded</property>
     <property name="icon">veejay-icon.png</property>
+    <child>
+      <placeholder/>
+    </child>
     <child>
       <object class="GtkBox" id="veejay_box">
         <property name="visible">True</property>
@@ -15023,6 +15076,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                     <property name="tooltip_text" translatable="yes">Stop macro record or playback</property>
                                     <property name="active">True</property>
                                     <property name="draw_indicator">True</property>
+                                    <property name="group">macrorecord1</property>
+                                    <signal name="toggled" handler="on_macrostop_toggled" swapped="no"/>
                                     <child>
                                       <object class="GtkImage" id="image57">
                                         <property name="visible">True</property>
@@ -15044,7 +15099,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                     <property name="receives_default">False</property>
                                     <property name="tooltip_text" translatable="yes">Start recording events to macro bank</property>
                                     <property name="draw_indicator">True</property>
-                                    <property name="group">macrostop</property>
+                                    <property name="group">macrostop1</property>
+                                    <signal name="toggled" handler="on_macrorecord_toggled" swapped="no"/>
                                     <child>
                                       <object class="GtkImage" id="image59">
                                         <property name="visible">True</property>
@@ -15066,7 +15122,8 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                     <property name="receives_default">False</property>
                                     <property name="tooltip_text" translatable="yes">Start playback of VIMS events in this macro bank</property>
                                     <property name="draw_indicator">True</property>
-                                    <property name="group">macrostop</property>
+                                    <property name="group">macrostop1</property>
+                                    <signal name="toggled" handler="on_macroplay_toggled" swapped="no"/>
                                     <child>
                                       <object class="GtkImage" id="image60">
                                         <property name="visible">True</property>
@@ -15086,6 +15143,21 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
                                 <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSpinButton" id="spin_macrodelay">
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="tooltip_text" translatable="yes">Delay Macro Recorder</property>
+                                <property name="width_chars">6</property>
+                                <property name="caps_lock_warning">False</property>
+                                <property name="adjustment">vims_frame_pos</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
                               </packing>
                             </child>
                           </object>

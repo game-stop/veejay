@@ -319,6 +319,7 @@ enum {
   WIDGET_VEEJAY_BOX = 230,
   WIDGET_CURVE_CHAIN_TOGGLECHAIN = 231,
   WIDGET_FX_MNONE = 232,
+  WIDGET_SPIN_MACRODELAY = 233,
 };
 
 
@@ -695,6 +696,7 @@ static struct
     { "slider_box_p9",           WIDGET_SLIDER_BOX_G9 },
     { "slider_box_p10",          WIDGET_SLIDER_BOX_G10 },
     { "curve_chain_togglechain", WIDGET_CURVE_CHAIN_TOGGLECHAIN },
+    { "spin_macrodelay",         WIDGET_SPIN_MACRODELAY },
 
     { NULL, -1 },
 };
@@ -834,7 +836,8 @@ enum
     HINT_GENERATOR =16,
 	HINT_MACRO=17,
     HINT_KEYS = 18,
-    NUM_HINTS = 19,
+    HINT_MACRODELAY = 19,
+    NUM_HINTS = 20,
 };
 
 enum
@@ -7832,6 +7835,15 @@ static void enable_fx_entry() {
 static void process_reload_hints(int *history, int pm)
 {
     int *entry_tokens = &(info->uc.entry_tokens[0]);
+    int md = info->uc.reload_hint[HINT_MACRODELAY];
+    if( md ) {
+        md = md - 1;
+        if( md <= 0 ) {
+            multi_vims( VIMS_MACRO, "%d", 1 );
+		    info->uc.reload_hint[HINT_MACRO] = 1;
+            vj_msg(VEEJAY_MSG_INFO, "Started macro record");
+        }
+    }
 
     if( pm == MODE_STREAM )
     {
@@ -7928,9 +7940,14 @@ static void process_reload_hints(int *history, int pm)
 	if( info->uc.reload_hint[HINT_MACRO]) {
 		reload_macros();
 	}
- 
+
+    
+
 	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));
 
+    if( md > 0 ) {
+        info->uc.reload_hint[HINT_MACRODELAY] = md;
+    }
     /*if(!samplebank_ready_) {
         info->uc.reload_hint[HINT_SLIST] = 2;
     }*/
