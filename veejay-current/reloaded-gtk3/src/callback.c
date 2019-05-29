@@ -2717,7 +2717,13 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	int end = get_nums( "curve_spinend" );
 	int start = get_nums( "curve_spinstart" );
-	int status = is_button_toggled( "curve_toggleentry_param" );
+
+    if( start == end ) {
+        vj_msg(VEEJAY_MSG_ERROR, "Start and end position are the same, there is nothing todo");
+        return;
+    }
+
+    int status = is_button_toggled( "curve_toggleentry_param" );
 	const int length = end - start + 1;
 
 
