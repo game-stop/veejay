@@ -33,6 +33,7 @@ static int fg_[4];
 static int ln_[4];
 
 static int sample_calctime();
+static int sample_calctime_selection();
 
 static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill );
 
@@ -1481,8 +1482,12 @@ void	on_rec_seq_start_clicked( GtkWidget *w, gpointer data )
 	else
 	{
 		format = NULL;
-	}	
+	}
 
+    if( is_button_toggled("sample_mulloop") ) {// reset selection when user wants to record a loop
+        multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);    
+    }
+    
 	multi_vims( VIMS_SAMPLE_REC_START,
 		"%d %d",
 		0,
@@ -1591,15 +1596,21 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	gint n_frames = 0;
 
 	gint dur_val = get_nums( "spin_sampleduration" );
+
 	if( is_button_toggled( "sample_mulloop" ) )
 	{
 		int base = sample_calctime();
 		n_frames = base * dur_val;
+        multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
 	}
-	else
+	else if( is_button_toggled( "sample_mulframes" ))
 	{
 		n_frames = dur_val;
 	}
+    else if ( is_button_toggled("sample_markerloop" ))
+    {
+        n_frames = 0;
+    }
 
 	if(format != NULL)
 	{
@@ -1631,6 +1642,21 @@ void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "Sample record stop");
 }
 
+static	int	sample_calctime_selection()
+{
+	int n_frames = info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START];
+	if( info->status_tokens[SAMPLE_LOOP] == 2 )
+		n_frames *= 2;
+	if( info->status_tokens[FRAME_DUP] > 0 )
+		n_frames *= info->status_tokens[FRAME_DUP];
+    int speed = info->status_tokens[SAMPLE_SPEED];
+    if( speed == 0 )
+       speed = 1;
+    n_frames = n_frames / abs(speed);
+
+	return n_frames;
+}
+
 static	int	sample_calctime()
 {
 	int n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
@@ -1638,17 +1664,30 @@ static	int	sample_calctime()
 		n_frames *= 2;
 	if( info->status_tokens[FRAME_DUP] > 0 )
 		n_frames *= info->status_tokens[FRAME_DUP];
+    int speed = info->status_tokens[SAMPLE_SPEED];
+    if( speed == 0 )
+       speed = 1;
+    n_frames = n_frames / abs(speed);
+
 	return n_frames;
 }
 
 void	on_spin_sampleduration_value_changed(GtkWidget *widget , gpointer user_data)
 {
+    int n_frames = 0;
 	// get num and display label_samplerecord_duration
-	gint n_frames = sample_calctime();
-	if( is_button_toggled( "sample_mulloop" ))
-		n_frames *= get_nums( "spin_sampleduration" );
-	else
+	if( is_button_toggled( "sample_mulloop" )) {
+		n_frames = sample_calctime();
+        n_frames *= get_nums( "spin_sampleduration" );
+    }
+	else if ( is_button_toggled( "sample_mulframes" ) ) {
 		n_frames = get_nums( "spin_sampleduration" );
+    }
+    else if ( is_button_toggled( "sample_markerloop" ) )
+    {
+        n_frames = sample_calctime_selection();
+    }
+
 	char *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
 	free(time);
@@ -1656,25 +1695,31 @@ void	on_spin_sampleduration_value_changed(GtkWidget *widget , gpointer user_data
 
 void	on_sample_mulloop_clicked(GtkWidget *w, gpointer user_data)
 {
-	gint n_frames = sample_calctime();
-	if( is_button_toggled( "sample_mulloop" ))
-		n_frames *= get_nums( "spin_sampleduration");
-	char *time = format_time( n_frames,info->el.fps );
-	update_label_str( "label_samplerecord_duration", time );
-	free(time);
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == FALSE ) {
+        return;
+    }
 
     update_spin_range( "spin_sampleduration", 1, 1000000, 1 );
 }
 
 void	on_sample_mulframes_clicked(GtkWidget *w, gpointer user_data)
 {
-	gint n_frames = get_nums( "spin_sampleduration" );
-	char *time = format_time( n_frames,info->el.fps );
-	update_label_str( "label_samplerecord_duration", time );
-	free(time);
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == FALSE ) {
+        return;
+    }
 
     update_spin_range( "spin_sampleduration", 2, 1000000, 2 );
 }
+
+void	on_sample_markerloop_clicked(GtkWidget *w, gpointer user_data)
+{
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == FALSE ) {
+        return;
+    }
+
+    update_spin_range( "spin_sampleduration", 0, 1000000, 0 );
+}
+
 
 void	on_spin_mudplay_value_changed(GtkWidget *widget, gpointer user_data)
 {
