@@ -2339,8 +2339,9 @@ void on_veejay_connection_close (GtkDialog       *dialog,
     GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
     gtk_widget_show( w );
   }
-  else
-    gveejay_quit(NULL,NULL);
+  else {
+    info->watch.state = STATE_QUIT;
+  }
 }
 
 
