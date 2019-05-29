@@ -290,7 +290,6 @@ enum {
   WIDGET_BUTTON_083 = 188,
   WIDGET_FXANIMCONTROLS = 189,
   WIDGET_CURVECONTAINER = 190,
-  WIDGET_VS_FRAME = 191,
   WIDGET_SRTFRAME = 192,
   WIDGET_FRAME_FXTREE1 = 193,
   WIDGET_BUTTON_5_4 = 194,
@@ -318,6 +317,7 @@ enum {
   WIDGET_SLIDER_BOX_G9 = 216,
   WIDGET_SLIDER_BOX_G10 = 217,
   WIDGET_VEEJAY_BOX = 230,
+  WIDGET_CURVE_CHAIN_TOGGLECHAIN = 231,
 };
 
 
@@ -665,7 +665,6 @@ static struct
     {"markerframe",              WIDGET_MARKERFRAME },
     {"fxanimcontrols",           WIDGET_FXANIMCONTROLS },
     {"curve_container",          WIDGET_CURVECONTAINER },
-    {"vs_frame",                 WIDGET_VS_FRAME },
     {"SRTframe",                 WIDGET_SRTFRAME },
     {"frame_fxtree1",            WIDGET_FRAME_FXTREE1 },
     {"button_5_4",               WIDGET_BUTTON_5_4 },
@@ -693,6 +692,7 @@ static struct
     { "slider_box_p8",           WIDGET_SLIDER_BOX_G8 },
     { "slider_box_p9",           WIDGET_SLIDER_BOX_G9 },
     { "slider_box_p10",          WIDGET_SLIDER_BOX_G10 },
+    { "curve_chain_togglechain", WIDGET_CURVE_CHAIN_TOGGLECHAIN },
 
     { NULL, -1 },
 };
@@ -964,24 +964,6 @@ typedef struct
 
 typedef struct
 {
-    gint w;
-    gint h;
-    gdouble fps;
-    gint pixel_format;
-    gint sampling;
-    gint audio_rate;
-    gint norm;
-    gint sync;
-    gint timer;
-    gint deinter;
-    gchar *mcast_osc;
-    gchar *mcast_vims;
-    gint osc;
-    gint vims;
-} config_settings_t;
-
-typedef struct
-{
     GtkWidget *frame;
     GtkWidget *image;
     GtkWidget *event_box;
@@ -1119,7 +1101,6 @@ typedef struct
     int prev_mode;
     GtkWidget   *tl;
     GtkWidget   *curve;
-    config_settings_t   config;
     int status_frame;
     int key_id;
     GdkRGBA    *normal;
@@ -4925,6 +4906,15 @@ static void load_effectchain_info()
     GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
     store = GTK_LIST_STORE(model);
 
+    //update chain fx status
+    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLECHAIN]), info->status_tokens[SAMPLE_FX] );
+    //also for stream (index is equivalent)
+    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE){
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]), info->status_tokens[SAMPLE_FX] );
+    } else {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_STREAMFX]), info->status_tokens[SAMPLE_FX] );
+    }
+
     // no fx, clean list and return
     if(fxlen <= 0 )
     {
@@ -7906,6 +7896,8 @@ static void process_reload_hints(int *history, int pm)
     {
         if( history[SAMPLE_FX] != info->status_tokens[SAMPLE_FX])
         {
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLECHAIN]), info->status_tokens[SAMPLE_FX] );
+
             //also for stream (index is equivalent)
             if(pm == MODE_SAMPLE)
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]), info->status_tokens[SAMPLE_FX] );
@@ -8147,24 +8139,6 @@ void vj_gui_cb(int state, char *hostname, int port_num)
         int *h = info->history_tokens[i];
         veejay_memset( h, 0, sizeof(int) * STATUS_TOKENS );
     }
-}
-
-void vj_gui_setup_defaults( vj_gui_t *gui )
-{
-    gui->config.w = MAX_PREVIEW_WIDTH;
-    gui->config.h = MAX_PREVIEW_HEIGHT;
-    gui->config.fps = 25.0;
-    gui->config.sampling = 1;
-    gui->config.pixel_format = 1;
-    gui->config.sync = 1;
-    gui->config.timer = 1;
-    gui->config.deinter = 1;
-    gui->config.norm = 0;
-    gui->config.audio_rate = 0;
-    gui->config.osc = 0;
-    gui->config.vims = 0;
-    gui->config.mcast_osc = g_strdup( "224.0.0.32" );
-    gui->config.mcast_vims = g_strdup( "224.0.0.33" );
 }
 
 static void reloaded_sighandler(int x)
@@ -8621,7 +8595,6 @@ void vj_gui_init(const char *glade_file,
     info->chalist = NULL;
     info->editlist = NULL;
 
-    vj_gui_setup_defaults(gui);
     setup_vimslist();
     setup_effectchain_info();
     setup_effectlist_info();
