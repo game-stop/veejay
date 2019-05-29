@@ -2990,6 +2990,9 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
 
 void gveejay_new_slot(int mode)
 {
+    if(!samplebank_ready_) {
+        samplebank_ready_ = 1;
+    }
     if( mode == MODE_STREAM ) {
         info->uc.expected_num_streams = info->uc.real_num_streams + 1;
     }
@@ -7236,7 +7239,11 @@ int veejay_update_multitrack( void *ptr )
                         g_object_unref(result);
                     }
                 }
-                vj_img_cb( s->img_list[i] );
+
+                if( history[PLAY_MODE] == info->status_tokens[PLAY_MODE] &&
+                    history[CURRENT_ID] == info->status_tokens[CURRENT_ID] ) {
+                    vj_img_cb( s->img_list[i] );
+                }
             }
 
             if(deckpage == 3) // notebook18 >>> Multitrack page
