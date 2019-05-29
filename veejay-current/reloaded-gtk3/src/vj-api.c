@@ -318,6 +318,7 @@ enum {
   WIDGET_SLIDER_BOX_G10 = 217,
   WIDGET_VEEJAY_BOX = 230,
   WIDGET_CURVE_CHAIN_TOGGLECHAIN = 231,
+  WIDGET_FX_MNONE = 232,
 };
 
 
@@ -648,6 +649,7 @@ static struct
     { "fx_m2",                  WIDGET_FX_M2 },
     { "fx_m3",                  WIDGET_FX_M3 },
     { "fx_m4",                  WIDGET_FX_M4 },
+    { "fx_mnone",               WIDGET_FX_MNONE },
     {"sample_loop_box",         WIDGET_SAMPLE_LOOP_BOX },
     {"button_084",              WIDGET_BUTTON_084 },
     {"button_083",              WIDGET_BUTTON_083 },
@@ -3875,30 +3877,6 @@ static void update_record_tab(int pm)
     }
 }
 
-static int fx_get_current_fade_entry_method() {
-
-    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_FX_M1 ]) ))
-        return 0;
-    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_FX_M2] ) ))
-        return 1;
-    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_FX_M3] ) ))
-        return 2;
-    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_FX_M4] ) ))
-        return 3;
-
-    return 0;
-}
-
-static int fx_get_fade_entry_method(int idx) {
-    if( idx < 0 )
-        return 0;
-    if( idx >4 ) {
-        veejay_msg(VEEJAY_MSG_WARNING, "%s: Fade method not known in UI", __FUNCTION__);
-        idx = 0;
-    }
-    return idx;
-}
-
 static void update_current_slot(int *history, int pm, int last_pm)
 {
     gint update = 0;
@@ -4132,14 +4110,14 @@ static void update_current_slot(int *history, int pm, int last_pm)
             gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] ), TRUE );
         }
 
-        int fx_fade_entry = fx_get_fade_entry_method(info->status_tokens[FADE_ENTRY]);
-        if( history[FADE_ENTRY] != info->status_tokens[FADE_ENTRY] || fx_get_current_fade_entry_method() != fx_fade_entry ) 
+        if( history[FADE_ENTRY] != info->status_tokens[FADE_ENTRY] ) 
         {
-            switch(fx_fade_entry) {
-                case 0: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M1]), TRUE ); break;
-                case 1: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M2]), TRUE ); break;
-                case 2: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M3]), TRUE ); break;
-                case 3: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M4]), TRUE ); break;
+            switch(info->status_tokens[FADE_ENTRY]) {
+                case 0: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_MNONE]), TRUE ); break;
+                case 1: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M1]), TRUE ); break;
+                case 2: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M2]), TRUE ); break;
+                case 3: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M3]), TRUE ); break;
+                case 4: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M4]), TRUE ); break;
             }
         }
 
@@ -7702,7 +7680,7 @@ static void disable_fx_entry() {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_TRANSITION_ENABLED] ), FALSE );
     }
   
-    for( i = WIDGET_FX_M1; i < WIDGET_FX_M4; i ++ ) { 
+    for( i = WIDGET_FX_M1; i <= WIDGET_FX_M4; i ++ ) { 
         if( gtk_widget_is_sensitive(widget_cache[i]) ) {
             gtk_widget_set_sensitive_(widget_cache[i], FALSE);
         }
@@ -7756,7 +7734,7 @@ static void enable_fx_entry() {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_TRANSITION_ENABLED]), entry_tokens[ENTRY_TRANSITION_ENABLED]);
     }
   
-    for( i = WIDGET_FX_M1; i < WIDGET_FX_M4; i ++ ) { 
+    for( i = WIDGET_FX_M1; i <= WIDGET_FX_M4; i ++ ) { 
         if( !gtk_widget_is_sensitive(widget_cache[i]) ) {
             gtk_widget_set_sensitive_(widget_cache[i], TRUE);
         }
