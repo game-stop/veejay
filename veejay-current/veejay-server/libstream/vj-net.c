@@ -85,10 +85,17 @@ static int eval_state(threaded_t *t, vj_tag *tag)
 	lock(t);
 
 	if(t->state == STATE_ERROR || t->v == NULL) {
+        if(t->v != NULL ) { // close stream on error
+            vj_client_close(t->v);
+			vj_client_free(t->v);
+			t->v = NULL;
+        }
+
 		if(t->v == NULL) {
 			t->v = vj_client_alloc_stream(t->info);
 		}
-		veejay_msg(VEEJAY_MSG_INFO, " ... Waiting for network stream to become ready [%s]",tag->source_name);
+		
+        veejay_msg(VEEJAY_MSG_INFO, " ... Waiting for network stream to become ready [%s]",tag->source_name);
 		int success = vj_client_connect_dat( t->v, tag->source_name,tag->video_channel );
 		if(success <= 0) {
 			t->state = STATE_ERROR;
