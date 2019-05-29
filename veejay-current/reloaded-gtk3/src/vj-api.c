@@ -4141,13 +4141,12 @@ static void update_current_slot(int *history, int pm, int last_pm)
             gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART]), (gdouble) info->status_tokens[SAMPLE_START] );
             gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]), (gdouble) info->status_tokens[SAMPLE_END]);
 
-            gint n_frames = sample_calctime();
-
             timeline_set_length( info->tl,
-                (gdouble) n_frames , info->status_tokens[FRAME_NUM]- info->status_tokens[SAMPLE_START] );
+                (gdouble) info->status_tokens[SAMPLE_END], 
+                info->status_tokens[FRAME_NUM] );
 
-            update_spin_range( "spin_text_start", 0, n_frames ,0);
-            update_spin_range( "spin_text_end", 0, n_frames,n_frames );
+         //   update_spin_range( "spin_text_start", 0, n_frames ,0);
+         //   update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
         }
     }
