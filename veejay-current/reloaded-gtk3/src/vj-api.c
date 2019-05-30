@@ -6278,7 +6278,11 @@ static void reload_bundles()
         char *args    = NULL;
         int val[6] = { 0,0,0,0,0,0 };
 
-        sscanf( ptr + offset, "%04d%03d%03d%04d", &val[0],&val[1],&val[2],&val[3]);
+        if(sscanf( ptr + offset, "%04d%03d%03d%04d", &val[0],&val[1],&val[2],&val[3]) != 4 ) {
+            veejay_msg(VEEJAY_MSG_DEBUG,"%s: Unexpected input at byte %d",__FUNCTION__, offset );
+            free(eltext);
+            return;
+        }
 
         offset += 14;
 
@@ -6286,7 +6290,11 @@ static void reload_bundles()
 
         offset += val[3];
 
-        sscanf( ptr + offset, "%03d%03d", &val[4], &val[5] );
+        if( sscanf( ptr + offset, "%03d%03d", &val[4], &val[5] ) != 2 ) {
+            veejay_msg(VEEJAY_MSG_DEBUG,"%s: Unexpected input at byte %d",__FUNCTION__, offset );
+            free(eltext);
+            return;
+        }
 
         offset += 6;
 
@@ -6314,12 +6322,12 @@ static void reload_bundles()
 #endif
         gchar *g_vims[5];
 
-        sprintf( (char*) g_vims, "%03d", val[0] );
+        snprintf( (char*) g_vims,sizeof(g_vims), "%03d", val[0] );
 
         if( val[0] >= VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
         {
             g_content = _utf8str( message );
-	    g_descr = _utf8str("Bundle");
+	        g_descr = _utf8str("Bundle");
         }
         else
         {
@@ -6338,7 +6346,7 @@ static void reload_bundles()
                 vj_event_list[ val[0] ].args = strdup( args );
             }
         }
-
+        
         gtk_list_store_append( store, &iter );
         gtk_list_store_set(store, &iter,
                            VIMS_ID,     g_vims,
@@ -6429,7 +6437,6 @@ static void reload_vimslist()
             offset += val[3];
         }
 
-        gchar *g_descr = descr;
 
         if(vj_event_list[val[0]].format )
             free(vj_event_list[val[0]].format);
@@ -6446,10 +6453,7 @@ static void reload_vimslist()
         sprintf(vimsid, "%03d", val[0] );
         gtk_list_store_set(store, &iter,
                            VIMS_LIST_ITEM_ID, vimsid,
-                           VIMS_LIST_ITEM_DESCR, g_descr,-1 );
-
-        if(format) free(format);
-        if(descr) free(descr);
+                           VIMS_LIST_ITEM_DESCR,descr,-1 );
 
         free( line );
     }
