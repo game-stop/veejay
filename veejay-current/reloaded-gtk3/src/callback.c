@@ -1698,7 +1698,9 @@ void	on_sample_mulloop_clicked(GtkWidget *w, gpointer user_data)
     if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == FALSE ) {
         return;
     }
-
+    if(!gtk_widget_is_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION])) {
+        gtk_widget_set_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION], TRUE );
+    }
     update_spin_range( "spin_sampleduration", 1, 1000000, 1 );
 }
 
@@ -1706,6 +1708,9 @@ void	on_sample_mulframes_clicked(GtkWidget *w, gpointer user_data)
 {
     if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == FALSE ) {
         return;
+    }
+    if(!gtk_widget_is_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION])) {
+        gtk_widget_set_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION], TRUE );
     }
 
     update_spin_range( "spin_sampleduration", 2, 1000000, 2 );
@@ -1715,6 +1720,9 @@ void	on_sample_markerloop_clicked(GtkWidget *w, gpointer user_data)
 {
     if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == FALSE ) {
         return;
+    }
+    if(gtk_widget_is_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION])) {
+        gtk_widget_set_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION], FALSE );
     }
 
     update_spin_range( "spin_sampleduration", 0, 1000000, 0 );

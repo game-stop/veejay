@@ -323,6 +323,7 @@ enum {
   WIDGET_MACRORECORD1 = 234,
   WIDGET_MACROPLAY1 = 235,
   WIDGET_MACROSTOP1 = 236,
+  WIDGET_SPIN_SAMPLEDURATION = 237,
 };
 
 
@@ -703,6 +704,7 @@ static struct
     { "macrorecord1",            WIDGET_MACRORECORD1 },
     { "macroplay1",              WIDGET_MACROPLAY1 },
     { "macrostop1",              WIDGET_MACROSTOP1 },
+    { "spin_sampleduration",   WIDGET_SPIN_SAMPLEDURATION },
     { NULL, -1 },
 };
 
@@ -8395,13 +8397,14 @@ static int auto_connect_to_veejay(char *host, int port_num)
             update_spin_value( "button_portnum", i );
             put_text( "entry_hostname", hostname );
 
+            /*
             // setup tracks
             for( j = (i+1000); j < 9999; j+= 1000 )
             {
                 multrack_audoadd( info->mt, hostname, j);
             }
             multitrack_set_quality( info->mt, 1 );
-
+            */
             i = j;
 
             return 1;
