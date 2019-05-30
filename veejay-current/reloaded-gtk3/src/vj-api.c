@@ -8229,7 +8229,7 @@ void vj_gui_wipe()
 
 GtkWidget *new_bank_pad(GtkWidget *box)
 {
-    GtkWidget *pad = info->sample_bank_pad = gtk_notebook_new();
+    GtkWidget *pad = gtk_notebook_new();
     gtk_notebook_set_tab_pos( GTK_NOTEBOOK(pad), GTK_POS_BOTTOM );
     gtk_notebook_set_show_tabs( GTK_NOTEBOOK(pad ), FALSE );
     gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(pad), TRUE, TRUE, 0);
@@ -8600,8 +8600,6 @@ void vj_gui_init(const char *glade_file,
     veejay_memset( vj_event_list, 0, sizeof( vj_event_list ));
     veejay_memset( vims_keys_list, 0, sizeof( vims_keys_list) );
 
-    gtk_widget_show( info->sample_bank_pad );
-
     info->elref = NULL;
     info->effect_info = (effect_constr**) vj_calloc(sizeof(effect_constr*) * EFFECT_LIST_SIZE );
     info->devlist = NULL;
@@ -8744,6 +8742,8 @@ void vj_gui_init(const char *glade_file,
     if( user_preview ) {
         set_toggle_button( "previewtoggle", 1 );
     }
+
+    gtk_widget_show( info->sample_bank_pad );
 }
 
 void vj_gui_preview(void)
@@ -8933,8 +8933,10 @@ void reloaded_show_launcher()
     info->watch.state = STATE_WAIT_FOR_USER;
     info->launch_sensitive = TRUE;
 
-    GtkWidget *mw = glade_xml_get_widget_(info->main_window,"veejay_connection" );
-    gtk_widget_show(mw);
+    GtkWidget *veejay_connection = glade_xml_get_widget_(info->main_window,"veejay_connection" );
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_transient_for(GTK_WINDOW(veejay_connection),GTK_WINDOW(mainw));
+    gtk_widget_show(veejay_connection);
 }
 
 void reloaded_schedule_restart()
@@ -9156,8 +9158,6 @@ static int add_bank( gint bank_num )
     gtk_grid_set_column_homogeneous(GTK_GRID(grid),TRUE);
     gtk_grid_set_row_homogeneous(GTK_GRID(grid),TRUE);
 
-    g_signal_connect(grid,"size-allocate",G_CALLBACK(samplebank_size_allocate), NULL);
-
     gtk_container_add( GTK_CONTAINER(frame), grid );
 
     gint col, row;
@@ -9170,6 +9170,8 @@ static int add_bank( gint bank_num )
             set_tooltip_by_widget( gui_slot->frame, tooltips[TOOLTIP_SAMPLESLOT].text);
         }
     }
+    g_signal_connect(grid,"size-allocate",G_CALLBACK(samplebank_size_allocate), NULL);
+
     gtk_widget_show(grid);
     gtk_widget_show(sb );
 
