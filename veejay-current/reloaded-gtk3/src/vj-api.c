@@ -8954,7 +8954,7 @@ void reloaded_restart()
 
     vj_gui_wipe();
 
-    multitrack_disconnect(info->mt);
+    
     
     reloaded_show_launcher();   
 }
@@ -8980,6 +8980,7 @@ gboolean    is_alive( int *do_sync )
     {
         gui->watch.state = STATE_STOPPED;
         vj_gui_disconnect();
+        vj_gui_wipe();
         return FALSE;
     }
 
@@ -8996,6 +8997,7 @@ gboolean    is_alive( int *do_sync )
     if( gui->watch.state == STATE_QUIT )
     {
         if(info->client) vj_gui_disconnect();
+        vj_gui_wipe();
         return FALSE;
     }
 
@@ -9043,14 +9045,9 @@ void vj_gui_disconnect()
 {
     if(info->key_id)
         gtk_key_snooper_remove( info->key_id );
-    free_samplebank();
 
-    if(info->client)
-    {
-        vj_client_close(info->client);
-        vj_client_free(info->client);
-        info->client = NULL;
-    }
+
+   
     /* reset all trees */
 //  reset_tree("tree_effectlist");
 //  reset_tree("tree_effectmixlist");
@@ -9061,9 +9058,18 @@ void vj_gui_disconnect()
     reset_tree("editlisttree");
 
     multitrack_close_track(info->mt);
-
+    multitrack_disconnect(info->mt);
     reloaded_schedule_restart();
+
+     if(info->client)
+    {
+        vj_client_close(info->client);
+        vj_client_free(info->client);
+        info->client = NULL;
+    }
+
     info->key_id = 0;
+    free_samplebank();
 }
 
 void vj_gui_disable()
@@ -9252,7 +9258,7 @@ void free_samplebank(void)
             info->sample_banks[i] = NULL;
         }
     }
-    veejay_memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
+   veejay_memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
 }
 
 // approximate best image size for sample slot
