@@ -8954,9 +8954,7 @@ void reloaded_restart()
 
     vj_gui_wipe();
 
-    
-    
-    reloaded_show_launcher();   
+    reloaded_show_launcher();
 }
 
 gboolean    is_alive( int *do_sync )
@@ -8972,14 +8970,14 @@ gboolean    is_alive( int *do_sync )
 
     if( gui->watch.state == STATE_RECONNECT )
     {
-        vj_gui_disconnect();
+        vj_gui_disconnect(TRUE);
         gui->watch.state = STATE_CONNECT;
     }
 
     if(gui->watch.state == STATE_DISCONNECT )
     {
         gui->watch.state = STATE_STOPPED;
-        vj_gui_disconnect();
+        vj_gui_disconnect(TRUE);
         vj_gui_wipe();
         return FALSE;
     }
@@ -8987,8 +8985,7 @@ gboolean    is_alive( int *do_sync )
     if( gui->watch.state == STATE_STOPPED )
     {
         if(info->client)
-            vj_gui_disconnect();
-        vj_gui_wipe();
+            vj_gui_disconnect(TRUE);
         reloaded_restart();
         gui->watch.state = STATE_WAIT_FOR_USER;
         return TRUE;
@@ -8996,7 +8993,7 @@ gboolean    is_alive( int *do_sync )
 
     if( gui->watch.state == STATE_QUIT )
     {
-        if(info->client) vj_gui_disconnect();
+        if(info->client) vj_gui_disconnect(FALSE);
         vj_gui_wipe();
         return FALSE;
     }
@@ -9041,7 +9038,7 @@ gboolean    is_alive( int *do_sync )
     return TRUE;
 }
 
-void vj_gui_disconnect()
+void vj_gui_disconnect(int restart_schedule)
 {
     if(info->key_id)
         gtk_key_snooper_remove( info->key_id );
@@ -9059,7 +9056,8 @@ void vj_gui_disconnect()
 
     multitrack_close_track(info->mt);
     multitrack_disconnect(info->mt);
-    reloaded_schedule_restart();
+    if (restart_schedule)
+        reloaded_schedule_restart();
 
      if(info->client)
     {
