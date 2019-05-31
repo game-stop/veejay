@@ -136,13 +136,16 @@ static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
     {
         while( gtk_events_pending() ) {
             gtk_main_iteration_do(FALSE);
-            gveejay_idle(NULL);
+            if (!gveejay_idle(NULL))
+                break;
         }
 
         if(!gtk_events_pending() ) {
             g_usleep(500);
         }
     }
+    
+    gtk_main_quit();
 
 }
 
