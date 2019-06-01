@@ -8229,7 +8229,7 @@ void vj_gui_wipe()
 
 GtkWidget *new_bank_pad(GtkWidget *box)
 {
-    GtkWidget *pad = info->sample_bank_pad = gtk_notebook_new();
+    GtkWidget *pad = gtk_notebook_new();
     gtk_notebook_set_tab_pos( GTK_NOTEBOOK(pad), GTK_POS_BOTTOM );
     gtk_notebook_set_show_tabs( GTK_NOTEBOOK(pad ), FALSE );
     gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(pad), TRUE, TRUE, 0);
@@ -8600,8 +8600,6 @@ void vj_gui_init(const char *glade_file,
     veejay_memset( vj_event_list, 0, sizeof( vj_event_list ));
     veejay_memset( vims_keys_list, 0, sizeof( vims_keys_list) );
 
-    gtk_widget_show( info->sample_bank_pad );
-
     info->elref = NULL;
     info->effect_info = (effect_constr**) vj_calloc(sizeof(effect_constr*) * EFFECT_LIST_SIZE );
     info->devlist = NULL;
@@ -8727,12 +8725,14 @@ void vj_gui_init(const char *glade_file,
     if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
         gtk_window_move( GTK_WINDOW(lw), geo_pos_[0], geo_pos_[1] );
 
+
     if( auto_connect ) {
         if(auto_connect_to_veejay(hostname, port_num)) {
             veejay_stop_connecting(gui);
         }
     }
-    else {
+
+    if(info->watch.state != STATE_PLAYING) {
         if(hostname) {
             put_text("entry_hostname",hostname);
         }
@@ -8744,6 +8744,8 @@ void vj_gui_init(const char *glade_file,
     if( user_preview ) {
         set_toggle_button( "previewtoggle", 1 );
     }
+
+    gtk_widget_show( info->sample_bank_pad );
 }
 
 void vj_gui_preview(void)
@@ -8933,8 +8935,10 @@ void reloaded_show_launcher()
     info->watch.state = STATE_WAIT_FOR_USER;
     info->launch_sensitive = TRUE;
 
-    GtkWidget *mw = glade_xml_get_widget_(info->main_window,"veejay_connection" );
-    gtk_widget_show(mw);
+    GtkWidget *veejay_connection = glade_xml_get_widget_(info->main_window,"veejay_connection" );
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    gtk_window_set_transient_for(GTK_WINDOW(veejay_connection),GTK_WINDOW(mainw));
+    gtk_widget_show(veejay_connection);
 }
 
 void reloaded_schedule_restart()
@@ -8952,9 +8956,7 @@ void reloaded_restart()
 
     vj_gui_wipe();
 
-    multitrack_disconnect(info->mt);
-    
-    reloaded_show_launcher();   
+    reloaded_show_launcher();
 }
 
 gboolean    is_alive( int *do_sync )
@@ -8970,22 +8972,22 @@ gboolean    is_alive( int *do_sync )
 
     if( gui->watch.state == STATE_RECONNECT )
     {
-        vj_gui_disconnect();
+        vj_gui_disconnect(TRUE);
         gui->watch.state = STATE_CONNECT;
     }
 
     if(gui->watch.state == STATE_DISCONNECT )
     {
         gui->watch.state = STATE_STOPPED;
-        vj_gui_disconnect();
+        vj_gui_disconnect(TRUE);
+        vj_gui_wipe();
         return FALSE;
     }
 
     if( gui->watch.state == STATE_STOPPED )
     {
         if(info->client)
-            vj_gui_disconnect();
-        vj_gui_wipe();
+            vj_gui_disconnect(TRUE);
         reloaded_restart();
         gui->watch.state = STATE_WAIT_FOR_USER;
         return TRUE;
@@ -8993,7 +8995,8 @@ gboolean    is_alive( int *do_sync )
 
     if( gui->watch.state == STATE_QUIT )
     {
-        if(info->client) vj_gui_disconnect();
+        if(info->client) vj_gui_disconnect(FALSE);
+        vj_gui_wipe();
         return FALSE;
     }
 
@@ -9037,18 +9040,13 @@ gboolean    is_alive( int *do_sync )
     return TRUE;
 }
 
-void vj_gui_disconnect()
+void vj_gui_disconnect(int restart_schedule)
 {
     if(info->key_id)
         gtk_key_snooper_remove( info->key_id );
-    free_samplebank();
 
-    if(info->client)
-    {
-        vj_client_close(info->client);
-        vj_client_free(info->client);
-        info->client = NULL;
-    }
+
+   
     /* reset all trees */
 //  reset_tree("tree_effectlist");
 //  reset_tree("tree_effectmixlist");
@@ -9059,9 +9057,19 @@ void vj_gui_disconnect()
     reset_tree("editlisttree");
 
     multitrack_close_track(info->mt);
+    multitrack_disconnect(info->mt);
+    if (restart_schedule)
+        reloaded_schedule_restart();
 
-    reloaded_schedule_restart();
+     if(info->client)
+    {
+        vj_client_close(info->client);
+        vj_client_free(info->client);
+        info->client = NULL;
+    }
+
     info->key_id = 0;
+    free_samplebank();
 }
 
 void vj_gui_disable()
@@ -9156,8 +9164,6 @@ static int add_bank( gint bank_num )
     gtk_grid_set_column_homogeneous(GTK_GRID(grid),TRUE);
     gtk_grid_set_row_homogeneous(GTK_GRID(grid),TRUE);
 
-    g_signal_connect(grid,"size-allocate",G_CALLBACK(samplebank_size_allocate), NULL);
-
     gtk_container_add( GTK_CONTAINER(frame), grid );
 
     gint col, row;
@@ -9170,6 +9176,8 @@ static int add_bank( gint bank_num )
             set_tooltip_by_widget( gui_slot->frame, tooltips[TOOLTIP_SAMPLESLOT].text);
         }
     }
+    g_signal_connect(grid,"size-allocate",G_CALLBACK(samplebank_size_allocate), NULL);
+
     gtk_widget_show(grid);
     gtk_widget_show(sb );
 
@@ -9250,7 +9258,7 @@ void free_samplebank(void)
             info->sample_banks[i] = NULL;
         }
     }
-    veejay_memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
+   veejay_memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
 }
 
 // approximate best image size for sample slot

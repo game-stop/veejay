@@ -54,7 +54,7 @@ void vj_gui_free();
 void vj_gui_wipe();
 void vj_gui_enable(void);
 void vj_gui_disable(void);
-void vj_gui_disconnect(void);
+void vj_gui_disconnect(int restart_schedule);
 int vj_get_preview_box_w();
 int vj_get_preview_box_h();
 void vj_gui_set_geom(int x, int y);
