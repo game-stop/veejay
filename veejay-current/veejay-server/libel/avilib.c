@@ -3301,6 +3301,11 @@ int AVI_set_audio_bitrate(avi_t *AVI, long bitrate)
 long AVI_read_frame(avi_t *AVI, unsigned char *vidbuf, int *keyframe)
 {
 //  if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
+   if( AVI->video_pos >= AVI->video_frames) {
+       AVI_errno = AVI_ERR_READ;
+       return -1;
+   }
+
     long n = AVI->video_index[AVI->video_pos].len;
 
    *keyframe = (AVI->video_index[AVI->video_pos].key==0x10) ? 1:0;
@@ -3308,11 +3313,6 @@ long AVI_read_frame(avi_t *AVI, unsigned char *vidbuf, int *keyframe)
    if (vidbuf == NULL) {
      AVI->video_pos++;
      return n;
-   }
-
-   if( AVI->video_pos >= AVI->video_frames) {
-       AVI_errno = AVI_ERR_READ;
-       return -1;
    }
 
    if( AVI->mmap_region == NULL )
