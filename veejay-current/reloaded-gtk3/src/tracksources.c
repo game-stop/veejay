@@ -71,7 +71,7 @@ static	void	cell_toggled_callback( GtkCellRenderer *cell, gchar *path_string, gp
 		     veejay_bind_track( v->track_id, id_data );
         }
         
-        gtk_list_store_set(model, &iter,1, multitrack_get_track_status(v->mt, id_data), -1 );
+        gtk_list_store_set(GTK_LIST_STORE(model), &iter,1, multitrack_get_track_status(v->mt, id_data), -1 );
         
 		g_free(data);
 	}
