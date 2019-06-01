@@ -8725,12 +8725,14 @@ void vj_gui_init(const char *glade_file,
     if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
         gtk_window_move( GTK_WINDOW(lw), geo_pos_[0], geo_pos_[1] );
 
+
     if( auto_connect ) {
         if(auto_connect_to_veejay(hostname, port_num)) {
             veejay_stop_connecting(gui);
         }
     }
-    else {
+
+    if(info->watch.state != STATE_PLAYING) {
         if(hostname) {
             put_text("entry_hostname",hostname);
         }
