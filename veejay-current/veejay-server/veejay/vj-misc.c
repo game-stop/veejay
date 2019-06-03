@@ -87,6 +87,9 @@ static struct
  { ".dv"  },
  { ".edl" },
  { ".y4m" },
+ { ".jpg" },
+ { ".jpeg" },
+ { ".png" },
  { NULL}
 };
 
