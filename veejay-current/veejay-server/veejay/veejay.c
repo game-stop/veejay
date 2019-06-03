@@ -457,7 +457,7 @@ static int set_option(const char *name, char *value)
 	}else if (strcmp(name, "sample-file")==0 || strcmp(name,"l")==0) {
 	check_val(optarg,name);
 	veejay_strncpy(info->action_file[1],(char*) optarg, strlen( (char*) optarg));
-	info->load_action_file = 1;
+	info->load_sample_file = 1;
 	}
 	else if (strcmp(name, "geometry-x") == 0 || strcmp(name, "x")==0) {
 		default_geometry_x = atoi(optarg);

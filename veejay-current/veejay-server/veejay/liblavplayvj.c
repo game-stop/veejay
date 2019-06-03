@@ -2289,11 +2289,13 @@ static void veejay_playback_cycle(veejay_t * info)
 		}
 	}
 
-	if(info->load_action_file ) {
+	if(info->load_sample_file ) {
 		if(sample_readFromFile( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
 			 &(info->uc->sample_id), &(info->uc->playback_mode)  ))
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file[1]);
+		} else {
+			veejay_msg(VEEJAY_MSG_WARNING, "File %s is not a sample file", info->action_file[1]);
 		}
 	}
 

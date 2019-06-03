@@ -275,6 +275,7 @@ typedef struct {
     int sync_ins_frames;	/* [0-1] If video is ahead of audio: 1 = insert video, 0 = skip audio */
     int auto_deinterlace;
     int load_action_file;
+    int load_sample_file;
     editlist *current_edit_list;
     editlist *edit_list;		/* the playing editlist */
     editlist *plain_editlist;	/* editlist loaded from command line */
