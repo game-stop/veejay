@@ -79,77 +79,67 @@ static int unlock(threaded_t *t)
 	return pthread_mutex_unlock( &(t->mutex ));
 }
 
-static int eval_state(threaded_t *t, vj_tag *tag)
+static void close_client(threaded_t *t)
 {
-	int ret = 0;
-	lock(t);
+    if(t->v != NULL) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Closing connection to remote veejay");
+        vj_client_close(t->v);
+        vj_client_free(t->v);
+        t->v = NULL;
+    }
+}
 
-    if(t->info == NULL) {
-        t->state = STATE_ERROR;
-    } else {
-        if(t->state == STATE_ERROR || t->v == NULL) {
-            if(t->v != NULL ) { // close stream on error
-                vj_client_close(t->v);
-                vj_client_free(t->v);
-                t->v = NULL;
-            }
+static int connect_client(threaded_t *t, vj_tag *tag)
+{
+    veejay_msg(VEEJAY_MSG_INFO, " ... Waiting for network stream to become ready [%s]",tag->source_name);
 
-            if(t->v == NULL) {
-                t->v = vj_client_alloc_stream(t->info);
-            }
-
-            veejay_msg(VEEJAY_MSG_INFO, " ... Waiting for network stream to become ready [%s]",tag->source_name);
-            int success = vj_client_connect_dat( t->v, tag->source_name,tag->video_channel );
-            if(success <= 0) {
-                t->state = STATE_ERROR;
-                if(t->v) {
-                    vj_client_close(t->v);
-                    vj_client_free(t->v);
-                    t->v = NULL;
-                }
-                net_delay(0,1);
-            }
-            else {
-                veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
-                t->state = STATE_RUNNING;
-            }
-        }
+    if(t->v == NULL) {
+        t->v = vj_client_alloc_stream(t->info);
     }
 
-	ret = t->state;
+    int success = vj_client_connect_dat( t->v, tag->source_name,tag->video_channel );
+    if(success <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,"Unable to connect to %s:%d", tag->source_name, tag->video_channel + 5 );
+        return STATE_ERROR;
+    }
+       
+    veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
+    return STATE_RUNNING;
+}
 
-	unlock(t);
+static int connect_client_mcast(threaded_t *t, vj_tag *tag)
+{
+    veejay_msg(VEEJAY_MSG_INFO, " ... Waiting for network stream to become ready [%s]",tag->source_name);
+
+    if(t->v == NULL) {
+        t->v = vj_client_alloc_stream(t->info);
+    }
+
+    int success = vj_client_connect( t->v, NULL, tag->source_name,tag->video_channel );
+    if(success <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,"Unable to connect to %s:%d", tag->source_name, tag->video_channel + 5 );
+        return STATE_ERROR;
+    }
+       
+    veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
+    return STATE_RUNNING;
+}
+
+static int eval_state(threaded_t *t, vj_tag *tag)
+{
+    int ret = t->state;
+    if(t->state == STATE_INACTIVE) {
+        ret = connect_client(t,tag);
+    }
 	return ret;
 }
 
-static int eval_state_mcast(threaded_t *t, vj_tag *tag) //FIXME: split this up in seperate source files, use modular structure
+static int eval_state_mcast(threaded_t *t, vj_tag *tag) 
 {
-	int ret = 0;
-	lock(t);
-
-	if(t->state == STATE_ERROR || t->v == NULL) {
-		if(t->v == NULL) {
-			t->v = vj_client_alloc_stream(t->info);
-		}
-		veejay_msg(VEEJAY_MSG_INFO, " ... Waiting for mcast stream to become ready [%s]",tag->source_name);
-		int success = vj_client_connect( t->v, NULL, tag->source_name, tag->video_channel );
-		if(success <= 0) {
-			if(t->v) {
-				vj_client_close(t->v);
-				vj_client_free(t->v);
-				t->v = NULL;
-			}
-			net_delay(0,1);
-		}
-		else {
-			veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
-			t->state = STATE_RUNNING;
-		}
-	}
-
-	ret = t->state;
-
-	unlock(t);
+    int ret = t->state;
+	if(t->state == STATE_INACTIVE) {
+	    ret = connect_client_mcast(t,tag);
+    }
 	return ret;
 }
 
@@ -163,16 +153,23 @@ static void	*reader_thread(void *data)
 
 	snprintf(buf,sizeof(buf), "%03d:%d;", VIMS_GET_FRAME, my_screen_id);
 
-	t->state = STATE_ERROR;
-
 	for( ;; ) {
 		int error	 = 0;
 		int res		 = 0;
 		int ret = 0;
 
-		int state_eval = eval_state(t, tag);
+        lock(t);
+		t->state = eval_state(t, tag);
+        unlock(t);
 
-		switch(state_eval) {
+		switch(t->state) {
+            case STATE_ERROR:
+                close_client(t);
+                lock(t);
+                t->state = STATE_INACTIVE;
+                unlock(t);
+                net_delay(0,1);
+            break;
 			case STATE_INACTIVE:
 				net_delay(10,0);
 				retrieve = 0;
@@ -220,8 +217,7 @@ static void	*reader_thread(void *data)
 					if(ret) {
 						retrieve = 0;
 					}
-
-					if( ret <= 0 ) {
+                    else {
 						veejay_msg(VEEJAY_MSG_DEBUG,"Error reading video frame from %s:%d",tag->source_name,tag->video_channel );
 						error = 1;
 					}
@@ -246,13 +242,7 @@ static void	*reader_thread(void *data)
 
 NETTHREADEXIT:
 
-	lock(t);	
-	if(t->v) {
-		vj_client_close(t->v);
-		vj_client_free(t->v);
-		t->v = NULL;
-	}
-	unlock(t);
+    close_client(t);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Network thread with %s: %d has exited",tag->source_name,tag->video_channel+5);
 
@@ -271,10 +261,20 @@ static void	*mcast_reader_thread(void *data)
 		
 	for( ;; ) {
 		int error = 0;
-		
-		int state_eval = eval_state_mcast(t, tag);
 
-		switch(state_eval) {
+		lock(t);
+		t->state = eval_state_mcast(t, tag);
+        unlock(t);
+		
+        switch(t->state) {
+            case STATE_ERROR:
+                close_client(t);
+                lock(t);
+                t->state = STATE_INACTIVE;
+                unlock(t);
+
+                 net_delay(0,1);
+                 break;
 			case STATE_INACTIVE:
 				net_delay(10,0);
 				continue;
@@ -284,11 +284,15 @@ static void	*mcast_reader_thread(void *data)
 				if( vj_client_read_mcast_data( t->v, max_len ) < 0 ) {
 					error = 1;
 				}
-				t->have_frame = 1;
-				if( error ) {
+				
+                if( error ) {
 					t->state = STATE_ERROR;
 					t->have_frame = 0;
 				}
+                else {
+                    t->have_frame = 1;
+                }
+
 				unlock(t);
 
 				break;
@@ -300,23 +304,11 @@ static void	*mcast_reader_thread(void *data)
 
 NETTHREADEXIT:
 	
-	lock(t);
-	if(t->v) {
-		vj_client_close(t->v);
-		vj_client_free(t->v);
-		t->v = NULL;
-	}
-	unlock(t);
-
+    close_client(t);
+	
 	veejay_msg(VEEJAY_MSG_INFO, "Multicast receiver %s: %d has stopped",tag->source_name,tag->video_channel+5);
 
 	return NULL;
-}
-
-void	*net_threader(VJFrame *frame)
-{
-	threaded_t *t = (threaded_t*) vj_calloc(sizeof(threaded_t));
-	return (void*) t;
 }
 
 int	net_thread_get_frame( vj_tag *tag, VJFrame *dst )
@@ -346,18 +338,23 @@ int	net_thread_get_frame( vj_tag *tag, VJFrame *dst )
 
 int	net_thread_start(vj_tag *tag, VJFrame *info)
 {
-	threaded_t *t = (threaded_t*)tag->priv;
-	int p_err = 0;
+    threaded_t *t = (threaded_t*) vj_calloc(sizeof(threaded_t));
+    if(t == NULL ) {
+        return 0;
+    }
+
+    int p_err = 0;
 
 	t->dest = yuv_yuv_template(NULL,NULL,NULL, info->width,info->height, alpha_fmt_to_yuv(info->format));
 	if(t->dest == NULL) {
+        free(t);
 		return 0;
 	}
 
 	pthread_mutex_init( &(t->mutex), NULL );
 	
 	t->info = info;
-
+    tag->priv = t;
 
 	if( tag->source_type == VJ_TAG_TYPE_MCAST ) {
 		p_err = pthread_create( &(t->thread), NULL, &mcast_reader_thread, (void*) tag );
@@ -372,7 +369,6 @@ int	net_thread_start(vj_tag *tag, VJFrame *info)
 			tag->source_type == VJ_TAG_TYPE_MCAST ? 
 			"multicast" : "unicast", tag->source_name,tag->video_channel);
 	}
-	//FIXME: limited resources is not a concept in veejay
 
 	return 1; 
 }
@@ -385,19 +381,14 @@ void	net_thread_stop(vj_tag *tag)
 	threaded_t *t = (threaded_t*)tag->priv;
 	
 	lock(t);
-	if( t->state == 0 ) {
+	if( t->state == STATE_QUIT ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Stream was already stopped");
 		unlock(t);
 		return;
 	}
-	t->state = 0;
+	t->state = STATE_QUIT;
 	unlock(t);
-
-//FIXME: thread keeps running, but is inactive. behaviour should like vj-avformat	
-/*	if((p_err = pthread_join( t->thread, NULL )) != 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error %d (%s)", p_err, strerror(p_err));
-	}
-*/
+    pthread_join(t->thread, NULL);
 	pthread_mutex_destroy( &(t->mutex));
 	if(t->dest) {
 		free(t->dest);
@@ -405,7 +396,7 @@ void	net_thread_stop(vj_tag *tag)
 	}
 
 	free(t);
-	t = NULL;
+	tag->priv = NULL;
 
 	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from Veejay host %s:%d", tag->source_name,tag->video_channel);
 }

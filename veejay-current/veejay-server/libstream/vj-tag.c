@@ -907,9 +907,6 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->priv = NULL;
     tag->subrender = 1;
     
-	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
-        tag->priv = net_threader(_tag_info->effect_frame1);
-
 	if(type == VJ_TAG_TYPE_AVFORMAT )
 		tag->priv = avformat_thread_allocate(_tag_info->effect_frame1);
 
