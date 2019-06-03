@@ -771,15 +771,15 @@ static int vj_perform_record_buffer_init()
 
 static void vj_perform_record_buffer_free()
 {
-
-    if(record_buffer->Y) free(record_buffer->Y);
-    record_buffer->Y = NULL;
-    if(record_buffer->Cb) free(record_buffer->Cb);
-    record_buffer->Cb = NULL;
-    if(record_buffer->Cr) free(record_buffer->Cr);
-    record_buffer->Cr = NULL;
-    if(record_buffer)
+    if(record_buffer){
+        if(record_buffer->Y) free(record_buffer->Y);
+        record_buffer->Y = NULL;
+        if(record_buffer->Cb) free(record_buffer->Cb);
+        record_buffer->Cb = NULL;
+        if(record_buffer->Cr) free(record_buffer->Cr);
+        record_buffer->Cr = NULL;
         free(record_buffer);
+    }
 }
 
 int vj_perform_init(veejay_t * info)
@@ -1127,31 +1127,32 @@ void vj_perform_free(veejay_t * info)
 
     sample_record_free();
 
-    if(info->edit_list->has_audio)
+    if(info->edit_list && info->edit_list->has_audio)
         vj_perform_close_audio();
 
-    if( fx_chain_buffer == NULL ) {
+    if( fx_chain_buffer != NULL ) {
        for (c = 0; c < fblen; c++) {
         if(vj_perform_row_used(c))
             vj_perform_free_row(c);
        }
     }
 
-    for(c = 0; c < fblen; c ++ )
-    {
-        if(frame_buffer[c])
-            free(frame_buffer[c]);
+    if(frame_buffer) {
+        for(c = 0; c < fblen; c ++ )
+        {
+            if(frame_buffer[c])
+                free(frame_buffer[c]);
+        }
+        free(frame_buffer);
     }
 
-    if(frame_buffer) free(frame_buffer);
-
-    for( c = 0;c < PRIMARY_FRAMES; c++ )
-    {
-        free(primary_buffer[c] );
+    if(primary_buffer){
+        for( c = 0;c < PRIMARY_FRAMES; c++ )
+        {
+            free(primary_buffer[c] );
+        }
+        free(primary_buffer);
     }
-
-    if(primary_buffer) free(primary_buffer);
-    
 
     if(crop_frame)
     {
@@ -1167,21 +1168,27 @@ void vj_perform_free(veejay_t * info)
     
    vj_perform_record_buffer_free();
 
-    for( c = 0 ; c < 2 ; c ++ )
-    {
-        if(video_output_buffer[c]->Y )
-            free(video_output_buffer[c]->Y);
-        if(video_output_buffer[c]->Cb )
-            free(video_output_buffer[c]->Cb );
-        if(video_output_buffer[c]->Cr )
-            free(video_output_buffer[c]->Cr );
-        free(video_output_buffer[c]);
+    if(video_output_buffer){
+        for( c = 0 ; c < 2 ; c ++ )
+        {
+            if(video_output_buffer[c]->Y )
+                free(video_output_buffer[c]->Y);
+            if(video_output_buffer[c]->Cb )
+                free(video_output_buffer[c]->Cb );
+            if(video_output_buffer[c]->Cr )
+                free(video_output_buffer[c]->Cr );
+            free(video_output_buffer[c]);
+        }
+        free(video_output_buffer);
     }
-    free(video_output_buffer);
+
     free(helper_frame);
 
-    free(preview_buffer->Y);
-    free(preview_buffer);
+    if (preview_buffer){
+        if(preview_buffer->Y)
+            free(preview_buffer->Y);
+        free(preview_buffer);
+    }
 
     if(fx_chain_buffer)
     {

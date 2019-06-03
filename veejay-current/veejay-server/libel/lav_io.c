@@ -1018,7 +1018,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     if( stat(filename, &s ) != 0 )
     {
         if(lav_fd) free(lav_fd);
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid file '%s'. Proper permissions?",filename);
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid file '%s'. %s",filename, strerror(errno));
         return NULL;
     }
 
