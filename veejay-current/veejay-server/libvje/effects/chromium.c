@@ -31,100 +31,96 @@ vj_effect *chromium_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 8;
+    ve->limits[1][0] = 9;
     ve->defaults[0] = 0;
     ve->description = "Chromium";
-   	ve->parallel = 1;
-	ve->sub_format = -1;
+    ve->parallel = 1;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-	
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Chroma Blue", "Chroma Red", "Chroma Red and Blue", "Chroma Swap",
-		"Chroma Yellow", "Chroma Orange", "Chroma Rose",
-		"Chroma Green", "Chroma Purple"
-	);	
+    ve->hints = vje_init_value_hint_list( ve->num_params );
+
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+        "Chroma Blue", "Chroma Red", "Chroma Red and Blue", "Chroma Swap",
+        "Chroma Yellow", "Chroma Orange", "Chroma Rose",
+        "Chroma Green", "Chroma Purple", "Chroma Yellow swap White"
+    );
 
     return ve;
 }
 
 void chromium_apply(VJFrame *frame, int m )
 {
-	const int len = (frame->ssm ? frame->len : frame->uv_len);
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
+    const int len = (frame->ssm ? frame->len : frame->uv_len);
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
 
-	unsigned int i;
-	double tmp;
-	switch(m)
-	{
-		case 0:
-		for( i = 0; i < len ; i++)
-		{
-			Cb[i] = 0xff - Cb[i];
-		}
-		break;
-		case 1:
-		for( i = 0; i < len ; i++ )
-		{
-			Cr[i] = 0xff - Cr[i];
-		}
-		break;
-		case 2:
-		for( i = 0; i < len; i++)
-		{
-			Cb[i] = 0xff - Cb[i];
-			Cr[i] = 0xff - Cr[i];
-		}
-		break;
-		case 3:
-		// swap cb/cr
-		for (i = 0; i < len ; i ++ )
-		{
-			tmp = Cb[i];
-			Cb[i] = Cr[i];
-			Cr[i] = tmp;
-		}
-		break;
-		case 4:
-		for (i = 0; i < len ; i ++ )
-		{
-			Cb[i] = 0xff - Cr[i];
-		}
-		break;
-		case 5:
-		for (i = 0; i < len ; i ++ )
-		{
-			Cr[i] = 0xff - Cb[i];
-		}
-		break;
-		case 6:
-		for (i = 0; i < len ; i ++ )
-		{
-			tmp = Cr[i];
-			Cr[i] = 0xff - Cb[i];
-			Cb[i] = 0xff - tmp;
-		}
-		break;
-		case 7:
-		for (i = 0; i < len ; i ++ )
-		{
-			tmp = Cr[i];
-			Cr[i] = Cb[i];
-			Cb[i] = 0xff - tmp;
-		}
-		break;
-		case 8:
-		for (i = 0; i < len ; i ++ )
-		{
-			tmp = Cr[i];
-			Cr[i] = 0xff - Cb[i];
-			Cb[i] = tmp;
-		}
-		break;
+    unsigned int i;
+    double tmp;
+    switch(m){
+        case 0:
+        for( i = 0; i < len ; i++) {
+          Cb[i] = 0xff - Cb[i];
+        }
+        break;
+        case 1:
+        for( i = 0; i < len ; i++) {
+          Cr[i] = 0xff - Cr[i];
+        }
+        break;
+        case 2:
+        for( i = 0; i < len; i++) {
+          Cb[i] = 0xff - Cb[i];
+          Cr[i] = 0xff - Cr[i];
+        }
+        break;
+        case 3:
+        // swap cb/cr
+        for (i = 0; i < len ; i++) {
+          tmp = Cb[i];
+          Cb[i] = Cr[i];
+          Cr[i] = tmp;
+        }
+        break;
+        case 4:
+        for (i = 0; i < len ; i++) {
+          Cb[i] = 0xff - Cr[i];
+        }
+        break;
+        case 5:
+        for (i = 0; i < len ; i++) {
+          Cr[i] = 0xff - Cb[i];
+        }
+        break;
+        case 6:
+        for (i = 0; i < len ; i++) {
+          tmp = Cr[i];
+          Cr[i] = 0xff - Cb[i];
+          Cb[i] = 0xff - tmp;
+        }
+        break;
+        case 7:
+        for (i = 0; i < len ; i++) {
+          tmp = Cr[i];
+          Cr[i] = Cb[i];
+          Cb[i] = 0xff - tmp;
+        }
+        break;
+        case 8:
+        for (i = 0; i < len ; i++) {
+          tmp = Cr[i];
+          Cr[i] = 0xff - Cb[i];
+          Cb[i] = tmp;
+        }
+        break;
+        case 9: // yellow on white
+        for( i = 0; i < len ; i++) {
+          Cb[i] = 0xaa - Cb[i];
+        }
+        break;
+
 /*
 		case 4:
 		// U - blue - Y , V = Red - Y
@@ -137,6 +133,6 @@ void chromium_apply(VJFrame *frame, int m )
 		}
 		break;
 */
-	}
- 
+    }
+
 }
