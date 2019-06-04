@@ -8297,36 +8297,25 @@ int  use_css_file = 0;
 gboolean smallest_possible = FALSE;
 
 void vj_gui_set_stylesheet(const char *css_file, gboolean small_as_possible) {
-    int use_djay = 0;
-
     smallest_possible = small_as_possible;
 
     if( css_file == NULL ) {
-        snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s", RELOADED_DATADIR, "gveejay.reloaded.css");
-        use_css_file = 1;
+        veejay_msg(VEEJAY_MSG_DEBUG,"Using system's default style");
+        use_css_file = 0;
         return;
     }
 
-    if(strlen(css_file)==4) {
-        if(strncasecmp(css_file, "djay", 4) == 0 ) {
-            veejay_msg(VEEJAY_MSG_DEBUG, "Using d/j/a/y's theme for darkly lit environments");
-            snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s",RELOADED_DATADIR,"gveejay.reloaded.djay.css");
-            use_djay = 1;
-        }
-    }
-    if(strlen(css_file)==8) {
-        if(strncasecmp(css_file, "default",8) == 0 ) {
-            veejay_msg(VEEJAY_MSG_DEBUG, "Using system's default style");
-            use_css_file = 0;
+    if(strlen(css_file)==7) {
+        if(strncasecmp(css_file, "default",7) == 0 ) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Using reloaded's default style");
+            snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s/%s", RELOADED_DATADIR, "gveejay.reloaded.css");
+            use_css_file = 1;
             return;
         }
     }
 
-    if(!use_djay) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "Using CSS %s", reloaded_css_file);
-        snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s", css_file);
-    }
-
+    veejay_msg(VEEJAY_MSG_DEBUG, "Using CSS %s", reloaded_css_file);
+    snprintf( reloaded_css_file, sizeof(reloaded_css_file), "%s", css_file);
     use_css_file = 1;
 }
 

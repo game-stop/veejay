@@ -88,7 +88,7 @@ static void usage(char *progname)
     printf( "-b\t\tEnable beta features.\n");
     printf( "-a\t\tAuto-connect to local running veejays.\n");
     printf( "-L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
-    printf( "-t\t\tLoad user defined stylesheet from FILE or use one of the following: \"djay\"\n");
+    printf( "-t\t\tLoad user defined stylesheet from FILE or use 'default'");
 
     printf( "\n\n");
 }
@@ -307,7 +307,7 @@ int main(int argc, char **argv)
     {"verbose",     'v', 0, G_OPTION_ARG_NONE, &arg_verbose,"Be extra verbose", NULL},
     {"version",     'V', 0, G_OPTION_ARG_NONE, &arg_version,"Show version, data directory and exit.", NULL},
     {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
-    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE , \"default\" or \"djay\"", NULL },
+    {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE or \"default\"", NULL },
     {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI",NULL},
 #if GTK_CHECK_VERSION(3,22,30)
     {"faster-ui",   'f', 0, G_OPTION_ARG_NONE, &arg_fasterui, "Hide FX parameter sliders instead of disabling to reduce CPU usage (GTK3 3.22.30)", NULL},
