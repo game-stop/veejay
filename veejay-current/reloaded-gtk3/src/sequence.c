@@ -47,12 +47,12 @@ extern void    vj_msg(int type, const char format[], ...);
 
 typedef struct
 {
-	uint8_t *image_data[16];
-	int *status_tokens[16];
-	int	widths[16];	
-	int	heights[16];
-	int	active_list[16];
-	int	frame_list[16];
+	uint8_t *image_data[__MAX_TRACKS];
+	int *status_tokens[__MAX_TRACKS];
+	int	widths[__MAX_TRACKS];	
+	int	heights[__MAX_TRACKS];
+	int	active_list[__MAX_TRACKS];
+	int	frame_list[__MAX_TRACKS];
 } track_sync_t;
 
 typedef struct
@@ -63,7 +63,7 @@ typedef struct
 	uint8_t *data_buffer;
 	uint8_t *tmp_buffer;
 	uint8_t *status_buffer;		
-	int	 track_list[16];
+	int	 track_list[__MAX_TRACKS];
 	int	 track_items;			//shared
 	int	 status_tokens[STATUS_TOKENS];	//shared
 	int   	 active;
@@ -74,7 +74,7 @@ typedef struct
 	int	height;
 	int	prevmode;
 	int	need_track_list;
-	char 	*queue[16];
+	char 	*queue[__MAX_TRACKS];
 	int	n_queued;
 	int	bw;
 	int	is_master;
@@ -576,7 +576,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	}
 	if(track_exists( vp, hostname, port_num, new_track ) )
 	{
-		vj_msg(VEEJAY_MSG_WARNING, "Veejay '%s':%d already in track %d", hostname, port_num, *new_track );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Veejay '%s':%d already in track %d", hostname, port_num, *new_track );
 		return 0;
 	}
 	vj_client *fd = vj_client_alloc(0,0,0);
@@ -625,7 +625,7 @@ static	void	gvr_single_queue_vims( veejay_track_t *v, int vims_id )
 
 	sprintf(message, "%03d:;", vims_id );
 
-	if( v->n_queued < 16 )
+	if( v->n_queued < __MAX_TRACKS )
 	{
 		v->queue[ v->n_queued ] = strdup( message );
 		v->n_queued ++;
@@ -634,11 +634,11 @@ static	void	gvr_single_queue_vims( veejay_track_t *v, int vims_id )
 
 static void	gvr_multi_queue_vims( veejay_track_t *v, int vims_id, int val )
 {
-	char message[16];
+	char message[64];
 
 	sprintf(message, "%03d:%d;", vims_id,val );
 
-	if( v->n_queued < 16 )
+	if( v->n_queued < __MAX_TRACKS )
 	{
 		v->queue[ v->n_queued ] = strdup( message );
 		v->n_queued ++;
@@ -646,11 +646,11 @@ static void	gvr_multi_queue_vims( veejay_track_t *v, int vims_id, int val )
 }
 static	void	gvr_multivx_queue_vims( veejay_track_t *v, int vims_id, int val1,unsigned char *val2 )
 {
-	char message[300];
+	char message[1024];
 
 	sprintf(message, "%03d:%d %s;", vims_id,val1,val2 );
 
-	if( v->n_queued < 16 )
+	if( v->n_queued < __MAX_TRACKS )
 	{
 		v->queue[ v->n_queued ] = strdup( message );
 		v->n_queued ++;
@@ -658,11 +658,11 @@ static	void	gvr_multivx_queue_vims( veejay_track_t *v, int vims_id, int val1,uns
 }
 static	void	gvr_multivvv_queue_vims( veejay_track_t *v, int vims_id, int val1,int val2, int val3 )
 {
-	char message[16];
+	char message[64];
 
 	sprintf(message, "%03d:%d %d %d;", vims_id,val1,val2, val3 );
 
-	if( v->n_queued < 16 )
+	if( v->n_queued < __MAX_TRACKS )
 	{
 		v->queue[ v->n_queued ] = strdup( message );
 		v->n_queued ++;
@@ -671,11 +671,11 @@ static	void	gvr_multivvv_queue_vims( veejay_track_t *v, int vims_id, int val1,in
 
 static	void	gvr_multiv_queue_vims( veejay_track_t *v, int vims_id, int val1,int val2 )
 {
-	char message[16];
+	char message[64];
 
 	sprintf(message, "%03d:%d %d;", vims_id,val1,val2 );
 
-	if( v->n_queued < 16 )
+	if( v->n_queued < __MAX_TRACKS )
 	{
 		v->queue[ v->n_queued ] = strdup( message );
 		v->n_queued ++;
@@ -825,7 +825,7 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 	if( track_num < vp->n_tracks ) {
         vp->tracks[ track_num ]->preview = status;
 
-	    vj_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on Track %d %s",
+	    veejay_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on Track %d %s",
 		    vp->tracks[ track_num ]->width,
 		    vp->tracks[ track_num ]->height,
 		    vp->tracks[ track_num ]->hostname,
@@ -1032,7 +1032,9 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 		score ++;
 	}
 
-	v->preview = is_button_toggled( "previewtoggle" );
+//    v->preview = gveejay_user_preview();
+
+//	v->preview = is_button_toggled( "previewtoggle" );
 
 	if( gvr_preview_process_image( vp,v ))
 		score++;
@@ -1060,7 +1062,8 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 		}
 		else
 		{
-			v->preview = is_button_toggled( "previewtoggle");
+ //           v->preview = gveejay_user_preview();
+//			v->preview = is_button_toggled( "previewtoggle");
 			v->active = 1;
   			vj_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: %s:%d  track %d@%dx%d preview: %s", 
 				v->hostname, v->port_num, track_num, v->width,v->height, (v->preview ? "yes" : "no"));

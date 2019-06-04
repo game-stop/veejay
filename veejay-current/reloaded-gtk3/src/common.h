@@ -70,4 +70,6 @@
 #define MAX_UI_PARAMETERS  16
 #define STREAM_AVF 12
 
+#define __MAX_TRACKS 16
+
 #endif

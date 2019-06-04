@@ -34,6 +34,7 @@
 #include <src/vj-api.h>
 #include "sequence.h"
 #include "tracksources.h"
+#include "common.h"
 
 #define SEQ_BUTTON_CLOSE 0
 #define SEQ_BUTTON_RULE  1
@@ -43,7 +44,6 @@
 #include <src/gtktimeselection.h>
 #include <src/vj-api.h>
 #include <src/multitrack.h>
-#define __MAX_TRACKS 64
 #define RUP8(num)(num/8*8)
 
 typedef struct
@@ -432,7 +432,7 @@ static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 	if( pm == MODE_STREAM || pm == MODE_PLAIN || pm == MODE_SAMPLE )
 	{
 		if(p->num > 0)
-			gtk_widget_set_sensitive_( GTK_WIDGET( p->toggle ), TRUE );
+		    gtk_widget_set_sensitive_( GTK_WIDGET( p->toggle ), TRUE );
 		gtk_widget_set_sensitive_( GTK_WIDGET( p->panel ), TRUE );
 	}
 
@@ -536,22 +536,19 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 {
 	sequence_view_t *v = (sequence_view_t*) user_data;
 	multitracker_t *mt = v->backlink;
-	int status = 0;
 
 	if(v->status_lock)
 		return;
 
-	if(v->num != mt->master_track )
-	{
-		 status = (gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE ? 1 : 0 );
+    int status = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
+        
+	gvr_track_toggle_preview( mt->preview, v->num,status );
 
-		gvr_track_toggle_preview( mt->preview, v->num,status );
+	sequence_preview_size( mt, v->num );
 
-		sequence_preview_size( mt, v->num );
-
-		if( !status )
-			gtk_image_clear( GTK_IMAGE(v->area ) );
-	}
+	if( !status )
+		gtk_image_clear( GTK_IMAGE(v->area ) );
+	
 }
 
 static	void	sequence_set_current_frame(GtkWidget *w, gpointer user_data)
@@ -562,8 +559,8 @@ static	void	sequence_set_current_frame(GtkWidget *w, gpointer user_data)
 	if(v->status_lock)
 		return;
 
-  GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
-  gdouble pos = gtk_adjustment_get_value (a);
+    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+    gdouble pos = gtk_adjustment_get_value (a);
 	gint frame = pos * v->status_cache[TOTAL_FRAMES];
 
 	gvr_queue_mvims( mt->preview, v->num, VIMS_VIDEO_SET_FRAME, frame );
@@ -571,6 +568,7 @@ static	void	sequence_set_current_frame(GtkWidget *w, gpointer user_data)
 
 static sequence_view_t *new_sequence_view( void *vp, int num )
 {
+    char track_title[50];
 	sequence_view_t *seqv = (sequence_view_t*) vj_calloc(sizeof(sequence_view_t));
 
 	seqv->num = num;
@@ -578,7 +576,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	seqv->event_box = gtk_event_box_new();
 	gtk_event_box_set_visible_window( GTK_EVENT_BOX(seqv->event_box), TRUE );
-  gtk_widget_set_can_focus(seqv->event_box, TRUE);
+    gtk_widget_set_can_focus(seqv->event_box, TRUE);
 
 	g_signal_connect( G_OBJECT( seqv->event_box ),
 				"button_press_event",
@@ -587,10 +585,8 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_widget_show( GTK_WIDGET( seqv->event_box ) );
 
 
-	gchar *track_title = g_new0( gchar, 20 );
-	sprintf(track_title, "Track %d", num );
+	snprintf(track_title,sizeof(track_title), "Track %d", num );
 	seqv->frame = gtk_frame_new( track_title );
-	g_free(track_title);
 
 	gtk_container_set_border_width( GTK_CONTAINER( seqv->frame) , 1 );
 	gtk_widget_show( GTK_WIDGET( seqv->frame ) );
@@ -608,21 +604,14 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	seqv->toggle = gtk_toggle_button_new_with_label( "preview" );
 
-	if(num>0) {
-		gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(seqv->toggle), FALSE );
-		g_signal_connect( G_OBJECT( seqv->toggle ), "toggled", G_CALLBACK(sequence_preview_cb),
-			(gpointer)seqv );
-		gtk_box_pack_start( GTK_BOX(seqv->main_vbox), seqv->toggle,FALSE,FALSE, 0 );
+    gtk_toggle_button_set_active(
+		GTK_TOGGLE_BUTTON(seqv->toggle), gveejay_user_preview()  );
+	g_signal_connect( G_OBJECT( seqv->toggle ), "toggled", G_CALLBACK(sequence_preview_cb),
+		(gpointer)seqv );
+	gtk_box_pack_start( GTK_BOX(seqv->main_vbox), seqv->toggle,FALSE,FALSE, 0 );
 
-		gtk_widget_set_sensitive_( GTK_WIDGET( seqv->toggle ), FALSE );
-
-		gtk_widget_show( seqv->toggle );
-	} else {
-		gtk_box_pack_start( GTK_BOX(seqv->main_vbox), seqv->toggle,FALSE,FALSE, 0 );
-		gtk_widget_show( seqv->toggle );
-		gtk_widget_set_sensitive_( GTK_WIDGET( seqv->toggle ), FALSE );
-	}
+	gtk_widget_set_sensitive_( GTK_WIDGET( seqv->toggle ), FALSE );
+    gtk_widget_show( seqv->toggle );
 
 	GtkWidget *vvbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	seqv->button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
@@ -645,10 +634,10 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
     gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->timeline_), "Set frame position");
 	gtk_scale_set_draw_value( GTK_SCALE(seqv->timeline_), FALSE );
 	//gtk_widget_set_size_request_( seqv->panel,180 ,180);
-  GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( seqv->timeline_ ));
-  gtk_adjustment_set_value( a , 0.0 );
+    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( seqv->timeline_ ));
+    gtk_adjustment_set_value( a , 0.0 );
 	gtk_widget_show( seqv->panel );
-	gtk_box_pack_start( GTK_BOX( box ), seqv->timeline_, FALSE,FALSE, 0 );
+ 	gtk_box_pack_start( GTK_BOX( box ), seqv->timeline_, FALSE,FALSE, 0 );
 	gtk_box_pack_start( GTK_BOX( vvbox ), box , FALSE,FALSE,0);
 	gtk_widget_show(seqv->timeline_);
 	g_signal_connect( seqv->timeline_, "value_changed",
@@ -682,10 +671,10 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
     gtk_widget_set_tooltip_text( GTK_WIDGET(seqv->sliders_[1]), "Opacity");
 
-  a = gtk_range_get_adjustment( GTK_RANGE( seqv->sliders_[0]));
-  gtk_adjustment_set_value( a, 1.0 );
-  a = gtk_range_get_adjustment( GTK_RANGE( seqv->sliders_[1]));
-  gtk_adjustment_set_value( a, 0.0 );
+    a = gtk_range_get_adjustment( GTK_RANGE( seqv->sliders_[0]));
+    gtk_adjustment_set_value( a, 1.0 );
+    a = gtk_range_get_adjustment( GTK_RANGE( seqv->sliders_[1]));
+    gtk_adjustment_set_value( a, 0.0 );
 
 
 	gtk_scale_set_digits( GTK_SCALE(seqv->sliders_[1]), 2 );
@@ -727,35 +716,12 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 }
 
 
-static	int	vt__[16];
-static	int	vt___ = 0;
 void		*multitrack_sync( void * mt )
 {
 	multitracker_t *m = (multitracker_t*) mt;
 	sync_info *s = gvr_sync( m->preview );
 	if(!s)
 		return NULL;
-
-	if(!vt___)
-	{
-		veejay_memset(vt__,0,sizeof(vt__));
-		vt___ = 1;
-	}
-
-	int i;
-	for( i =0; i < MAX_TRACKS ;i ++ )
-	{
-		if(!vt__[i] && s->status_list[i] == NULL )
-		{
-			//gtk_widget_set_sensitive_(GTK_WIDGET(m->view[i]), FALSE );
-			vt__[i] = 1;
-		}
-		else if( s->status_list[i] && vt__[i] )
-		{
-			//gtk_widget_set_sensitive_(GTK_WIDGET(m->view[i]), TRUE );
-			vt__[i] = 0;
-		}
-	}
 	s->master = m->master_track;
 	return (void*)s;
 }
@@ -796,7 +762,7 @@ static char *mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *er
 	gtk_container_add( GTK_CONTAINER( vbox ), text_entry );
 	gtk_container_add( GTK_CONTAINER( vbox ), num_label );
 	gtk_container_add( GTK_CONTAINER( vbox ), num_entry );
-  GtkWidget* content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+    GtkWidget* content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
 	gtk_container_add( GTK_CONTAINER (content_area), vbox );
 	gtk_widget_show_all( dialog );
 
@@ -860,10 +826,8 @@ void		*multitrack_new(
 	gtk_widget_show(grid);
 
 	mt->master_track = 0;
-
 	mt->preview = gvr_preview_init( MAX_TRACKS, threads );
 //	gvr_set_master( mt->preview, mt->master_track );
-
 
 	parent__ = infog;
 
@@ -888,8 +852,7 @@ int		multitrack_add_track( void *data )
 	if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
 	{
 		status_print( mt, "Connection established with veejay runnning on %s port %d", hostname, port_num );
-		if( gveejay_user_preview() )
-			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mt->view[track]->toggle), TRUE );
+		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mt->view[track]->toggle), gveejay_user_preview() );
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
         mt->track_status[ track ] = 1;
@@ -931,6 +894,16 @@ void		multitrack_close_track( void *data )
 	}
 }
 
+void        multitrack_close_tracks(void *data)
+{
+    multitracker_t *mt = (multitracker_t*) data;
+    int i;
+    for( i = 0; i < MAX_TRACKS; i ++ ){
+        gvr_track_disconnect(mt->preview,i);
+    }
+
+}
+
 void		multitrack_disconnect(void *data)
 {
 	multitracker_t *mt = (multitracker_t*) data;
@@ -950,42 +923,23 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 			return -1;
 	}
 
-	if(mt->pw > 0 && mt->ph > 0 )
-	{
-		//sequence_preview_size( mt, mt->master_track );
+	gvr_track_configure(mt->preview, track, mt->pw,mt->ph);
 
-		/* configure master preview size */
-		if(!gvr_track_configure( mt->preview, track, mt->pw,mt->ph) )
-		{
-			veejay_msg(0, "Unable to configure preview %d x %d",mt->pw , mt->ph );
-		}
+    mt->view[track]->status_lock = 1;
 
+    gvr_track_toggle_preview( mt->preview, track, gveejay_user_preview() );
+    int preview = gvr_get_preview_status( mt->preview, mt->master_track );
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( mt->view[track]->toggle ), (preview ? TRUE: FALSE ) );
 
-		int preview = gvr_get_preview_status( mt->preview, mt->master_track );
+    gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
+    gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), (track == 0 ? FALSE : TRUE) );
+    mt->view[track]->status_lock = 0;
 
-		/* set status of preview toggle button in trackview */
-		if( track == 0 )
-		{
-		//	mt->view[track]->status_lock=1;
-		//	gtk_toggle_button_set_active(
-		//		GTK_TOGGLE_BUTTON( mt->preview_toggle), (preview ? TRUE: FALSE ) );
-		//	mt->view[track]->status_lock=0;
-		}
-		else
-		{
-			mt->view[track]->status_lock=1;
-			gtk_toggle_button_set_active(
-				GTK_TOGGLE_BUTTON( mt->view[track]->toggle ), (preview ? TRUE: FALSE ) );
-			mt->view[track]->status_lock=0;
-
-		}
-	}
-
-//	mt->master_track = track;
-	gvr_set_master( mt->preview, track );
+//	gvr_set_master( mt->preview, track );
 
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 
+    veejay_msg(VEEJAY_MSG_DEBUG, "Connected to %s:%d", hostname, port_num);
 
 	return track;
 }
@@ -1016,16 +970,19 @@ void		multitrack_set_quality( void *data , int quality )
 	float ratio = 0.0f;
 	int w = 0;
 	int h = 0;
+    int i;
 
 	calculate_img_dimension(mt->width,mt->height,&w,&h,&ratio,vj_get_preview_box_w(),vj_get_preview_box_h(),quality);
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"Preview image dimensions changed to %d x %d",w,h);
 
-	if(!gvr_track_configure( mt->preview, mt->master_track,w,h ) )
-	{
-		veejay_msg(0, "Unable to configure preview %d x %d",w , h );
-	}
+    for( i = 0; i < MAX_TRACKS; i ++ ) {
+	    if(!gvr_track_configure( mt->preview, i,w,h ) )
+	    {
+		    veejay_msg(0, "Unable to configure preview %d x %d",w , h );
+	    }
+    }
 
 	mt->pw = w;
 	mt->ph = h;
@@ -1106,11 +1063,21 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 {
     sequence_view_t *v = (sequence_view_t*) user_data;
     multitracker_t *mt = v->backlink;
+    char track_title[50];
 
-    if(event->type == GDK_BUTTON_PRESS)
+    if(event->type == GDK_BUTTON_PRESS) {
+        vj_msg(VEEJAY_MSG_INFO, "Double-click to focus track %d", v->num);
+    }
+
+    if(event->type == GDK_2BUTTON_PRESS)
     {
       if( !gvr_track_test( mt->preview , v->num ) )
         return FALSE;
+
+      if( mt->master_track == v->num ) {
+        vj_msg(VEEJAY_MSG_INFO, "Already have focus on track %d", mt->master_track);
+        return FALSE;
+      }
 
       int last_selected = mt->selected;
       mt->selected = v->num;
@@ -1135,14 +1102,19 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
       }
       veejay_msg(VEEJAY_MSG_INFO, "Set master to track %d", mt->master_track );
       mt->master_track = v->num;
+
       if( last_selected >= 0 && last_selected < MAX_TRACKS )
       {
-        gtk_widget_set_state_flags( mt->view[last_selected]->event_box,
-                                    GTK_STATE_FLAG_NORMAL, TRUE);
+          snprintf(track_title,sizeof(track_title), "Track %d", mt->view[last_selected]->num );
+	      gtk_frame_set_label( GTK_FRAME(mt->view[last_selected]->frame), track_title );
       }
-      gtk_widget_set_state_flags(w, GTK_STATE_FLAG_SELECTED, TRUE);
+
+      snprintf(track_title,sizeof(track_title), "Track %d (MASTER)", v->num );
+	  gtk_frame_set_label( GTK_FRAME(v->frame), track_title );
 
       vj_gui_enable();
+    
+      vj_msg(VEEJAY_MSG_INFO, "Switched focus to track %d (%s:%d)", v->num, host, port );
     }
     return FALSE;
 }

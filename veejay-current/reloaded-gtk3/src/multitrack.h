@@ -11,6 +11,7 @@ void multitrack_disconnect(void *data);
 void multitrack_set_logo(void *data , GtkWidget *img);
 int multitrack_add_track( void *data );
 void multitrack_close_track( void *data );
+void multitrack_close_tracks(void *data);
 int multrack_audoadd( void *data, char *hostname, int port_num );
 void multitrack_release_track(void *data, int id, int release_this );
 void multitrack_bind_track( void *data, int id, int bind_this );

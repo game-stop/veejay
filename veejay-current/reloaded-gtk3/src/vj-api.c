@@ -1026,7 +1026,7 @@ typedef struct
 {
     char *hostname;
     int port_num;
-    int state;    // IDLE, PLAYING, RECONNECT, STOPPED
+    int state;    // IDLE, PLAYING
     struct timeval p_time;
     int w_state; // watchdog state
     int w_delay;
@@ -7132,10 +7132,6 @@ int gveejay_time_to_sync( void *ptr )
 	        ret = 1;
         }
     } 
-    else if ( ui->watch.state == STATE_STOPPED )
-    {
-        reloaded_restart();
-    }
   
     return ret;
 }
@@ -7143,7 +7139,7 @@ int gveejay_time_to_sync( void *ptr )
 int veejay_update_multitrack( void *ptr )
 {
     sync_info *s = multitrack_sync( info->mt );
-
+/*
     if( s->status_list[s->master] == NULL ) {
         info->watch.w_state = STATE_STOPPED;
         free(s->status_list);
@@ -7155,7 +7151,7 @@ int veejay_update_multitrack( void *ptr )
         gettimeofday( &(info->time_last) , 0 );
 
         return 1;
-    }
+    }*/
 
     GtkWidget *maintrack = widget_cache[ WIDGET_IMAGEA ];
     int i;
@@ -8396,19 +8392,19 @@ static int auto_connect_to_veejay(char *host, int port_num)
         //connect client at first available server
         if( vj_gui_reconnect( hostname, NULL, i ) ) {
             info->watch.state = STATE_PLAYING;
+            veejay_msg(VEEJAY_MSG_INFO,"Trying to connect to %s:%d", hostname, i);
             multrack_audoadd( info->mt, hostname, i);
             // set reconnect info
             update_spin_value( "button_portnum", i );
             put_text( "entry_hostname", hostname );
 
-            /*
             // setup tracks
             for( j = (i+1000); j < 9999; j+= 1000 )
             {
+                veejay_msg(VEEJAY_MSG_INFO, "Trying to add %s:%d as a track", hostname, j);
                 multrack_audoadd( info->mt, hostname, j);
             }
             multitrack_set_quality( info->mt, 1 );
-            */
             i = j;
 
             return 1;
@@ -8943,7 +8939,7 @@ void reloaded_show_launcher()
 
 void reloaded_schedule_restart()
 {
-    info->watch.state = STATE_STOPPED;
+ //   info->watch.state = STATE_STOPPED;
 }
 
 void reloaded_restart()
@@ -8973,29 +8969,15 @@ gboolean    is_alive( int *do_sync )
     if( gui->watch.state == STATE_RECONNECT )
     {
         vj_gui_disconnect(TRUE);
-        gui->watch.state = STATE_CONNECT;
-    }
-
-    if(gui->watch.state == STATE_DISCONNECT )
-    {
-        gui->watch.state = STATE_STOPPED;
-        vj_gui_disconnect(TRUE);
         vj_gui_wipe();
-        return FALSE;
-    }
-
-    if( gui->watch.state == STATE_STOPPED )
-    {
-        if(info->client)
-            vj_gui_disconnect(TRUE);
-        reloaded_restart();
-        gui->watch.state = STATE_WAIT_FOR_USER;
+        gui->watch.state = STATE_CONNECT;
         return TRUE;
     }
 
     if( gui->watch.state == STATE_QUIT )
     {
-        if(info->client) vj_gui_disconnect(FALSE);
+        if(info->client) 
+            vj_gui_disconnect(FALSE);
         vj_gui_wipe();
         return FALSE;
     }
@@ -9030,13 +9012,6 @@ gboolean    is_alive( int *do_sync )
             veejay_stop_connecting(gui);
         }
     }
-/*
-    if( gui->watch.state == STATE_WAIT_FOR_USER )
-    {
-        *do_sync = 0;
-        gveejay_sleep(NULL);
-    }
-*/
     return TRUE;
 }
 
@@ -9044,9 +9019,6 @@ void vj_gui_disconnect(int restart_schedule)
 {
     if(info->key_id)
         gtk_key_snooper_remove( info->key_id );
-
-
-   
     /* reset all trees */
 //  reset_tree("tree_effectlist");
 //  reset_tree("tree_effectmixlist");
@@ -9056,12 +9028,15 @@ void vj_gui_disconnect(int restart_schedule)
     reset_tree("tree_sources");
     reset_tree("editlisttree");
 
-    multitrack_close_track(info->mt);
-    multitrack_disconnect(info->mt);
-    if (restart_schedule)
+    if (restart_schedule) {
         reloaded_schedule_restart();
+    }
+    else {
+        multitrack_close_tracks(info->mt);
+        multitrack_disconnect(info->mt);
+    }
 
-     if(info->client)
+    if(info->client)
     {
         vj_client_close(info->client);
         vj_client_free(info->client);

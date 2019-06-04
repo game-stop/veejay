@@ -1069,16 +1069,9 @@ void	on_dec_g10_clicked(GtkWidget *w, gpointer user_data)
 	genv_changed(10, -1, "slider_g9");
 }
 
-
-
-
-
-void	on_button_stoplaunch_clicked(GtkWidget *widget, gpointer user_data)
+void    on_button_stoplaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if( info->watch.state == STATE_PLAYING)
-	{	
-		info->watch.state = STATE_DISCONNECT;
-	}
+    //TODO: remove me and glade part
 }
 
 void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
@@ -2385,16 +2378,7 @@ void on_openConnection_activate (GtkMenuItem     *menuitem,
 void on_veejay_connection_close (GtkDialog       *dialog,
                                  gpointer         user_data)
 {
-  if( info->watch.state == STATE_PLAYING)
-  {
-    info->watch.state = STATE_DISCONNECT;
-
-    //~ GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
-    //~ gtk_widget_show( w );
-  }
-  else {
     info->watch.state = STATE_QUIT;
-  }
 }
 
 
@@ -3384,9 +3368,10 @@ void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-    int enabled = is_button_toggled("previewtoggle");
+    int enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
     multitrack_toggle_preview( info->mt, -1, enabled,glade_xml_get_widget_(info->main_window, "imageA") );
     vj_msg(VEEJAY_MSG_INFO,"Live view is %s", (enabled ? "enabled" : "disabled" ));
+    gveejay_preview(enabled);
 }
 
 void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)

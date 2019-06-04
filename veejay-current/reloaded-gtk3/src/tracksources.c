@@ -21,6 +21,8 @@
 #include <gtk/gtk.h>
 #include <glib.h>
 #include <veejay/vjmem.h>
+#include "multitrack.h"
+
 extern void	veejay_release_track(int id, int release_this);
 extern void	veejay_bind_track( int id, int bind_this );
 extern int multitrack_get_sequence_view_id( void *data );

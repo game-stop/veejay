@@ -144,9 +144,8 @@ static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
             g_usleep(500);
         }
     }
-    
-    gtk_main_quit();
 
+    g_application_quit(app);
 }
 
 /*
