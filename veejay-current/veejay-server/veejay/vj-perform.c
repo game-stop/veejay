@@ -671,7 +671,7 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
         return 1;
 
     size_t frame_len = RUP8( ((plane_len+helper_frame->width)/7)*8 );
-    size_t buf_len = sizeof(uint8_t) * frame_len * 4 * 3;
+    size_t buf_len = sizeof(uint8_t) * frame_len * 4 * 3 * sizeof(uint8_t);
 
     uint8_t *buf = vj_malloc(buf_len);
 
@@ -683,6 +683,7 @@ static long vj_perform_alloc_row(veejay_t *info, int c, int plane_len)
     frame_buffer[c]->Y = buf;
     frame_buffer[c]->Cb = frame_buffer[c]->Y + frame_len;
     frame_buffer[c]->Cr = frame_buffer[c]->Cb + frame_len;
+    frame_buffer[c]->alpha = frame_buffer[c]->Cr + frame_len;
     frame_buffer[c]->P0  = buf + (frame_len * 4);
     frame_buffer[c]->P1  = frame_buffer[c]->P0 + (frame_len*4);
 
@@ -698,12 +699,13 @@ static void vj_perform_free_row(int c)
 
     if(frame_buffer[c]->Y)
     {
-        munlock( frame_buffer[c]->Y, frame_len * 3 * 3 * sizeof(uint8_t));
+        munlock( frame_buffer[c]->Y, frame_len * 4 * 3 * sizeof(uint8_t));
         free( frame_buffer[c]->Y );
     }
     frame_buffer[c]->Y = NULL;
     frame_buffer[c]->Cb = NULL;
     frame_buffer[c]->Cr = NULL;
+    frame_buffer[c]->alpha = NULL;
     frame_buffer[c]->P0 = NULL;
     frame_buffer[c]->P1 = NULL;
     cached_sample_frames[c+1] = 0;
@@ -771,14 +773,21 @@ static int vj_perform_record_buffer_init()
 
 static void vj_perform_record_buffer_free()
 {
-    if(record_buffer){
-        if(record_buffer->Y) free(record_buffer->Y);
-        record_buffer->Y = NULL;
-        if(record_buffer->Cb) free(record_buffer->Cb);
-        record_buffer->Cb = NULL;
-        if(record_buffer->Cr) free(record_buffer->Cr);
-        record_buffer->Cr = NULL;
+    if(record_buffer) {
+        if(record_buffer->Y) {
+            free(record_buffer->Y);
+            record_buffer->Y = NULL;
+        }
+        if(record_buffer->Cb) {
+            free(record_buffer->Cb);
+            record_buffer->Cb = NULL;
+        }
+        if(record_buffer->Cr) {
+            free(record_buffer->Cr);
+            record_buffer->Cr = NULL;
+        }
         free(record_buffer);
+        record_buffer = NULL;
     }
 }
 
@@ -1130,56 +1139,96 @@ void vj_perform_free(veejay_t * info)
     if(info->edit_list && info->edit_list->has_audio)
         vj_perform_close_audio();
 
-    if( fx_chain_buffer != NULL ) {
-       for (c = 0; c < fblen; c++) {
-        if(vj_perform_row_used(c))
-            vj_perform_free_row(c);
-       }
+    if( fx_chain_buffer == NULL ) {
+        if(frame_buffer) {
+            for (c = 0; c < fblen; c++) {
+            if(vj_perform_row_used(c))
+                vj_perform_free_row(c);
+            }
+        }
     }
 
     if(frame_buffer) {
         for(c = 0; c < fblen; c ++ )
         {
-            if(frame_buffer[c])
+            if(frame_buffer[c]) {
                 free(frame_buffer[c]);
+                frame_buffer[c] = NULL;
+            }
         }
         free(frame_buffer);
+        frame_buffer = NULL;
     }
 
     if(primary_buffer){
         for( c = 0;c < PRIMARY_FRAMES; c++ )
         {
             free(primary_buffer[c] );
+            primary_buffer[c] = NULL;
         }
         free(primary_buffer);
+        primary_buffer = NULL;
     }
 
     if(crop_frame)
     {
-        if(crop_frame->data[0]) free(crop_frame->data[0]);
-        if(crop_frame->data[1]) free(crop_frame->data[1]);
-        if(crop_frame->data[2]) free(crop_frame->data[2]);
+        if(crop_frame->data[0]) {
+            free(crop_frame->data[0]);
+            crop_frame->data[0] = NULL;
+        }
+        if(crop_frame->data[1]) {
+            free(crop_frame->data[1]);
+            crop_frame->data[1] = NULL;
+        }
+        if(crop_frame->data[2]) {
+            free(crop_frame->data[2]);
+            crop_frame->data[2] = NULL;
+        }
+        free(crop_frame);
+        crop_frame = NULL;
     }
 
-   if(temp_buffer[0]) free(temp_buffer[0]);
-   if(subrender_buffer[0]) free(subrender_buffer[0]);
-   if(feedback_buffer[0]) free(feedback_buffer[0]);
-   if(rgba_buffer[0]) free(rgba_buffer[0]);
+   if(temp_buffer[0]) {
+       free(temp_buffer[0]);
+       temp_buffer[0] = NULL;
+   }
+   if(subrender_buffer[0]) {
+       free(subrender_buffer[0]);
+       subrender_buffer[0] = NULL;
+   }
+
+   if(feedback_buffer[0]) {
+       free(feedback_buffer[0]);
+       feedback_buffer[0] = NULL;
+   }
+
+   if(rgba_buffer[0]) {
+       free(rgba_buffer[0]);
+       rgba_buffer[0] = NULL;
+   }
     
    vj_perform_record_buffer_free();
 
     if(video_output_buffer){
         for( c = 0 ; c < 2 ; c ++ )
         {
-            if(video_output_buffer[c]->Y )
+            if(video_output_buffer[c]->Y ) {
                 free(video_output_buffer[c]->Y);
-            if(video_output_buffer[c]->Cb )
+                video_output_buffer[c]->Y = NULL;
+            }
+            if(video_output_buffer[c]->Cb ) {
                 free(video_output_buffer[c]->Cb );
-            if(video_output_buffer[c]->Cr )
+                video_output_buffer[c]->Cb = NULL;
+            }
+            if(video_output_buffer[c]->Cr ) {
                 free(video_output_buffer[c]->Cr );
+                video_output_buffer[c]->Cr = NULL;
+            }
             free(video_output_buffer[c]);
+            video_output_buffer[c] = NULL;
         }
         free(video_output_buffer);
+        video_output_buffer = NULL;
     }
 
     free(helper_frame);

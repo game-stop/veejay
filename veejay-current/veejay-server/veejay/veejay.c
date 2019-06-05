@@ -777,7 +777,8 @@ int main(int argc, char **argv)
 	if(!check_command_line_options(argc, argv))
 	{
 		veejay_free(info);
-		return 0;
+		vj_mem_destroy();
+        return 0;
  	}
 
 	print_license();
