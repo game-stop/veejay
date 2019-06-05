@@ -44,6 +44,11 @@ dnl enable auto vectorization for libvjmem, libvje and libyuv
 AC_ARG_ENABLE([strict],
 		AC_HELP_STRING([--enable-strict],
 			     [Compile in paranoia assertion checking]))
+
+AC_ARG_ENABLE([sanitizer],
+        AC_HELP_STRING([--enable-sanitizer],
+                 [Enable AddressSanitizer]))
+
 AC_ARG_ENABLE([portleak],
 	      	AC_HELP_STRING([--enable-portleak],
 			      [Compile in vevo port validation (requires --enable-strict)]))
@@ -229,6 +234,12 @@ fi
 AC_MSG_CHECKING(whether to compile in assertion checking)
 if test "x$enable_strict" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -DSTRICT_CHECKING"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
+if test "x$enable_sanitizer" = "xyes" ; then
+ debugCFLAGS="$debugCFLAGS -fsanitize=address -fno-omit-frame-pointer"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
