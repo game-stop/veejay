@@ -46,6 +46,7 @@ static char *group_name = NULL;
 static char *host_name = NULL;
 static vj_client *sayvims = NULL;
 static int single_msg = 0;
+static char *msg = NULL;
 static int dump = 0;
 static int verbose = 0;
 static int base64_encode = 0;
@@ -426,7 +427,8 @@ static int set_option(const char *name, char *value)
 	else if (strcmp(name, "m") == 0 )
 	{
 		single_msg = 1;
-	}
+	    msg = strdup( optarg );
+    }
 	else if(strcmp(name, "d") == 0)
 	{
 		dump = 1;
@@ -487,13 +489,14 @@ int main(int argc, char *argv[])
 	char option[2];
 	int err = 0;
 	int std_fd = 0;
+    int ret = 0;
 	struct stat std_stat;
 	memset( &std_stat, 0, sizeof(std_stat));
 
 	veejay_set_debug_level(verbose);
 
 	// parse commandline parameters
-	while( ( n = getopt(argc,argv, "h:g:p:f:midbv?")) != EOF)
+	while( ( n = getopt(argc,argv, "h:g:p:f:m:idbv?")) != EOF)
 	{
 		sprintf(option,"%c",n);
 		err += set_option( option,optarg);
@@ -538,48 +541,19 @@ int main(int argc, char *argv[])
 
 	if(single_msg)  /* single message send */
 	{
-		char **msg = argv + optind;
-		int  nmsg  = argc - optind;
-		while( i < nmsg )
-		{
-			if(msg[i][0] == '+')
-			{
-				int delay = 1;
-				char *tmp = msg[i];
-				if(sscanf(tmp + 1, "%d",&delay) == 1 )
-				{
-					vj_flush(delay);
-				}
-				else
-				{
-					fprintf(stderr, "unable to parse frame-wait period '%s'\n", tmp );
-					goto end_program;
-				}
-			}
-			else
-			{
-				if( vjsend( V_CMD, (unsigned char*)msg[i] ) == 0 )
-				{
-					goto end_program;
-				}
-			}
-
-			i++;
-		}
-
-		vj_flush(1);
+		ret = vjsend( V_CMD, (unsigned char*)msg );
+        free(msg);
 	}
 	else
 	{
 		do_work( std_fd, ( interactive ? stdout : NULL ) );
 	}
 
-end_program:
 	vj_client_close(sayvims);
 	vj_client_free(sayvims);
 	free(host_name);
 
 	close(std_fd);
 
-	return 0;
+	return ret;
 } 

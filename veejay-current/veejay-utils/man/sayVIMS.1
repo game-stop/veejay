@@ -11,31 +11,47 @@ is a simple program to send VIMS messages to veejay.
 The command line options allow to specify its behaviour
 .TP
 .B \-p [3490]
-Veejay port to connect to
+Veejay port
 .TP
 .B \-h [localhost]
-Veejay host to connect to
+Veejay host
 .TP
 .B \-f [filename]
-Use a filename instead of strings on the commandline
+Use a filename instead of stdin
 .TP
 .B \-g [multicast address]
-Multicast address to send to
+Multicast address
 .TP
 .B \-i
 Start in interactive mode (use -? to get help, exit interactive mode typing 'quit')
 .TP
 .B \-c
-Start with colored text (geek feature)
-
-.SH USEFULL EXAMPLES
+Start with colored text
 .TP
-.B sayVIMS -h localhost -p3490 """017:;"""
+.B \-m
+Send a single message and quit
+.TP
+.B \-d
+Dump status line to stdout
+.TP
+.B \-b
+Base64 encode binary data
+.TP
+.B \-v
+Verbose
+
+.SH USEFUL EXAMPLES
+.TP
+.B echo """600:;""" |sayVIMS
+Send the quit message to veejay running on localhost:3490
+
+.TP
+.B sayVIMS -h localhost -p3490 -m """017:;"""
 Start sayVIMS and connect to veejay (and tell veejay go to sample starting position)
 .TP
-.B sayVIMS -g 224.0.0.50 -p5000 """017:;"""
+.B sayVIMS -g 224.0.0.50 -p5000 -m """017:;"""
 Ditto, for multicast.
-.TP
+
 .SH Message Format
 A message is described as
 .B <selector>:<arguments>;
@@ -60,8 +76,6 @@ In case of messages clips, streams or effect chain some values refer to defaults
 .B >= 0 < 20 any chain entry
  
 
-.SH BUGS
-see BUGS in the source package
 .SH AUTHOR
 This man page was written by Niels Elburg.
 If you have questions, remarks or you just want to
@@ -75,4 +89,4 @@ This tool was first named 'sendVIMS' , but it
 confused to much with 'sendVIMS for PD' although
 the latter is derived from this one.
 .SH "SEE ALSO"
-.B veejay yuv2rawdv rawdv2yuv  
+.B veejay  
