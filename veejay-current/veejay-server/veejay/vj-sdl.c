@@ -606,14 +606,20 @@ void vj_sdl_free(vj_sdl * vjsdl)
 	if( vjsdl->font ) 
 		vj_sdl_font_free(vjsdl->font);
 #endif
-	if( vjsdl->yuv_overlay)
+	if( vjsdl->yuv_overlay) {
  	   SDL_FreeYUVOverlay(vjsdl->yuv_overlay);
-	if( vjsdl->scaler )
+       vjsdl->yuv_overlay = NULL;
+    }
+
+	if( vjsdl->scaler ) 
 	   yuv_free_swscaler(vjsdl->scaler);
+
 	if( vjsdl->src_frame )
 	   free(vjsdl->src_frame );
+
 	if( vjsdl->dst_frame )
 	   free(vjsdl->dst_frame );
-	free(vjsdl);
+	
+    free(vjsdl);
 }
 #endif
