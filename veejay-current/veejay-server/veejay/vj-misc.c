@@ -47,7 +47,9 @@
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #include <pthread.h>
-
+#ifdef USE_GDK_PIXBUF
+#include <libel/lav_io.h>
+#endif
 
 static unsigned int vj_relative_time = 0;
 static unsigned int vj_stamp_ = 0;
@@ -87,9 +89,6 @@ static struct
  { ".dv"  },
  { ".edl" },
  { ".y4m" },
- { ".jpg" },
- { ".jpeg" },
- { ".png" },
  { NULL}
 };
 
@@ -135,7 +134,11 @@ static int	is_usable_file( filelist_t *filelist, const char *node, const char *f
 	}
 
 	if( S_ISREG( l.st_mode ) ) {
-		if( is_it_usable(node)) {
+		if( is_it_usable(node)
+#ifdef USE_GDK_PIX_BUF
+            || lav_is_supported_image_file(node)
+#endif               
+            ) {
 			if( filelist->num_files < filelist->max_files ) {
 				filelist->files[ filelist->num_files ] =
 					relative_path(filelist,node);

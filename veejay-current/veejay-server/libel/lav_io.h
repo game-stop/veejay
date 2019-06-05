@@ -123,5 +123,6 @@ void    lav_bogus_set_length( lav_file_t *lav_file , int len );
 #ifdef USE_GDK_PIXBUF
 VJFrame *lav_get_frame_ptr( lav_file_t *lav_file );
 void	lav_set_project( int w, int h, float fps, int shift );
+int	lav_is_supported_image_file(char *filename);
 #endif
 #endif
