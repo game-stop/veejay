@@ -2237,11 +2237,11 @@ int sample_chain_add(int s1, int c, int effect_nr)
         return 0;
 
     if( vj_effect_single_instance( effect_nr ))
-	return 0;   
+        return 0;
 
-	veejay_memset( &(sample->effect_chain[c]->transition), 0 ,sizeof(transition_eff));
+    veejay_memset( &(sample->effect_chain[c]->transition), 0 ,sizeof(transition_eff));
 
-	if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
+    if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
     {
         //verify if the effect should be discarded
         if(vj_effect_initialized( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance )  ) 
