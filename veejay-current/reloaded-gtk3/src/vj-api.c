@@ -1315,7 +1315,7 @@ static void set_selection_of_slot_in_samplebank(gboolean active);
 static void remove_sample_from_slot();
 static void create_ref_slots(int envelope_size);
 static void create_sequencer_slots(int x, int y);
-//void setup_knobs();
+void clear_samplebank_pages();
 void free_samplebank(void);
 void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
@@ -9019,10 +9019,13 @@ void vj_gui_disconnect(int restart_schedule)
 
     if (restart_schedule) {
         reloaded_schedule_restart();
+        clear_samplebank_pages();
+        free_samplebank();
     }
     else {
         multitrack_close_tracks(info->mt);
         multitrack_disconnect(info->mt);
+        free_samplebank();
     }
 
     if(info->client)
@@ -9033,7 +9036,6 @@ void vj_gui_disconnect(int restart_schedule)
     }
 
     info->key_id = 0;
-    free_samplebank();
 }
 
 void vj_gui_disable()
@@ -9165,33 +9167,21 @@ void reset_samplebank(void)
         {
             for(j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
             {
-                sample_slot_t *slot = info->sample_banks[i]->slot[j];
-
-                if(slot->sample_id > 0)
-                {
-                    if(slot->title) free(slot->title);
-                    if(slot->timecode) free(slot->timecode);
-                    if(slot->pixbuf) {
-                        g_object_unref( slot->pixbuf );
-                        slot->pixbuf = NULL;
-                    }
-                    slot->title = NULL;
-                    slot->timecode = NULL;
-                    slot->sample_id = 0;
-                    slot->sample_type = 0;
-                
-                    update_sample_slot_data( i,j, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
-                }
+                update_sample_slot_data( i,j,0,0,NULL,NULL );
             }
         }
     }
 }
 
+void clear_samplebank_pages()
+{
+    while( gtk_notebook_get_n_pages(GTK_NOTEBOOK(info->sample_bank_pad) ) > 0 )
+        gtk_notebook_remove_page( GTK_NOTEBOOK(info->sample_bank_pad), -1 );
+}
+
 void free_samplebank(void)
 {
     int i,j;
-    while( gtk_notebook_get_n_pages(GTK_NOTEBOOK(info->sample_bank_pad) ) > 0 )
-        gtk_notebook_remove_page( GTK_NOTEBOOK(info->sample_bank_pad), -1 );
 
     info->selection_slot = NULL;
     info->selection_gui_slot = NULL;
@@ -9207,22 +9197,28 @@ void free_samplebank(void)
             {
                 sample_slot_t *slot = info->sample_banks[i]->slot[j];
                 sample_gui_slot_t *gslot = info->sample_banks[i]->gui_slot[j];
-                if(slot->title) free(slot->title);
-                if(slot->timecode) free(slot->timecode);
+                if(slot->title) {
+                    free(slot->title);
+                    slot->title = NULL;
+                }
+                if(slot->timecode) {
+                    free(slot->timecode);
+                    slot->timecode = NULL;
+                }
                 if(slot->pixbuf) {
                     g_object_unref(slot->pixbuf);
                     slot->pixbuf = NULL;
                 }
                 free(slot);
                 free(gslot);
+
                 info->sample_banks[i]->slot[j] = NULL;
                 info->sample_banks[i]->gui_slot[j] = NULL;
             }
             free(info->sample_banks[i]);
             info->sample_banks[i] = NULL;
         }
-    }
-   veejay_memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
+   }
 }
 
 // approximate best image size for sample slot

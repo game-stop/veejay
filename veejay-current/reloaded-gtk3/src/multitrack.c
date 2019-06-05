@@ -109,6 +109,7 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 
 extern GdkPixbuf       *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 extern void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *f, int line );
+extern void    vj_msg(int type, const char format[], ...);
 
 #define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request(a,b,c)
 
