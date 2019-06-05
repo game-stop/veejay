@@ -29,6 +29,16 @@ And of course [__Veejay__](https://github.com/c0ntrol/veejay/tree/master/veejay-
 
 ## Installation
 
+#### Get all the dependencies
+First, make sure you system is up-to-date, and install the dependencies with:
+```bash
+sudo apt-get install git autoconf automake libtool m4 gcc libjpeg62-dev \
+libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev  \
+gtk-3.0-dev libxml2-dev libsdl1.2-dev libjack0 libjack-dev jackd1
+```
+
+#### Build the veejay's applications
+
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
 1. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server)
@@ -36,7 +46,7 @@ Veejay is divided into multiple packages. Each must be build separately and in a
 3. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
 4. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
 
-For each package, run confgure and make:
+For __each package__, run the triptich commands of the *GNU build system* (for a quick start you can build the first two):
 
 ```bash
  ./autogen.sh
@@ -45,7 +55,9 @@ For each package, run confgure and make:
 ```
  __Nota :__ in some configuration you should have to __manually build__ the __shared libraries cache__ just after the __first__ veejay-server installation (ex `sudo ldconfig` or similar)
 
-If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. 
+You do not need to pass any parameters to `./configure` for veejay to be optimized with the current cpu-type.
+If you want to build for a specific architecture or without sound support (jack) ... take a look to the
+`./configure --help` to adapt to many kinds of systems.
 
 Before running veejay, be sure to add or link some TrueType fonts in 
 
