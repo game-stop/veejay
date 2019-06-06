@@ -1758,6 +1758,11 @@ void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
 
 		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
 	}
+
+    GtkWidget *check_samplefx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_samplefx"));
+    GtkWidget *curve_chain_togglechain = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_togglechain"));
+
+    toggle_siamese_widget(widget, check_samplefx, curve_chain_togglechain);
 }
 
 void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
