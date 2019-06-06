@@ -839,7 +839,7 @@ int vj_perform_init(veejay_t * info)
     preview_max_w = w * 2;
     preview_max_h = h * 2;
 
-    preview_buffer->Y = (uint8_t*) vj_calloc( RUP8(preview_max_w * preview_max_h * 3) );
+    preview_buffer->Y = (uint8_t*) vj_calloc( RUP8(preview_max_w * preview_max_h * 2) );
 
     video_output_buffer_convert = 0;
     video_output_buffer = (ycbcr_frame**) vj_calloc(sizeof(ycbcr_frame*) * 2 );
