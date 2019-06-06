@@ -638,7 +638,7 @@ void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int fresh_rat
 
 			dy = y + 1 + (v+(int)vp[w->map_w*2+1])/2;
 			if(dy<0) dy=0;
-			if(dy>=hi) dy=h-1;
+			if(dy>=hi) dy=hi-1;
 			dest[wi] = src[dy*wi+i];
 
 			dest[wi+1] = src[dy*wi+dx];
