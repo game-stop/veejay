@@ -51,12 +51,40 @@ vj_effect *dither_init(int w, int h)
 	return ve;
 }
 
+int **dith = NULL;
+int dither_malloc(int w, int h)
+{
+    unsigned int i;
+    dith = (int**) vj_calloc(sizeof(int*) * w);
+    if(!dith)
+        return 0;
+    for( i = 0; i < w; i ++ ) {
+        dith[i] = (int*) vj_calloc(sizeof(int) * w);
+        if(!dith[i]) {
+            int j;
+            for( j = 0; j < i; j ++ )
+                if( dith[i] ) free(dith[i]);
+            free(dith);
+            dith = NULL;
+            return 0;
+        }
+    }
+    return 1;
+}
+
+void dither_free()
+{
+    if(dith) {
+        free(dith);
+        dith = NULL;
+    }
+}
+
 static int last_size = 0;
 void dither_apply(VJFrame *frame, int size, int random_on)
 {
-	long int w_, h_;
-	long int dith[size][size];
-	long int i, j, d, v, l, m;
+	int w_, h_;
+	int i, j, d, v, l, m;
 	uint8_t *Y = frame->data[0];
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
