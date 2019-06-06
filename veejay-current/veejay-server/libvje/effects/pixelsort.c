@@ -63,7 +63,8 @@ vj_effect *pixelsort_init(int w, int h)
 static uint8_t *mask = NULL;
 
 int pixelsort_malloc(int w, int h){
-    mask = (uint8_t*) vj_malloc(sizeof(uint8_t) * w *h );
+    mask = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w + w * h) );
+    veejay_memset(mask, 0, RUP8(w + w*h) );
     if(!mask)
         return 0;
     return 1;
