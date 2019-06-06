@@ -127,6 +127,7 @@ static struct
 {   pixelsort_malloc,pixelsort_free,NULL,VJ_IMAGE_EFFECT_PIXELSORT },
 {   pixelsortalpha_malloc,pixelsortalpha_free,NULL,VJ_IMAGE_EFFECT_PIXELSORTALPHA },
 {   raster_malloc,raster_free,NULL,VJ_IMAGE_EFFECT_RASTER },
+{   dither_malloc,dither_free, NULL, VJ_IMAGE_EFFECT_DITHER },
 {	NULL,NULL,NULL,0},
 };
 

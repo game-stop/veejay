@@ -22,4 +22,6 @@
 #define DITHER_H
 vj_effect *dither_init();
 void dither_apply(VJFrame *frame, int size, int n);
+int dither_malloc(int w, int h);
+void dither_free();
 #endif

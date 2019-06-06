@@ -39,6 +39,7 @@ typedef struct
 
 typedef struct VJFrame_t 
 {
+    int stride[4];
 	uint8_t *data[4];
 	int	uv_len;
 	int	len;
@@ -50,7 +51,6 @@ typedef struct VJFrame_t
 	int	width;
 	int	height;
 	int	ssm;
-	int	stride[4];
 	int	stand; //ccir/jpeg
 	float	fps;
 	double	timecode;
