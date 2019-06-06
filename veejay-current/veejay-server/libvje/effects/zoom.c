@@ -74,11 +74,16 @@ static uint8_t *zoom_private_[4] = { NULL, NULL, NULL, NULL };
 
 int	zoom_malloc(int width, int height)
 {
-	int i;
+	int i,j;
 	for( i = 0; i < 4; i ++ ) {	
 		zoom_private_[i] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height+width));
-		if(!zoom_private_[i])
+		if(!zoom_private_[i]) {
+            for( j = 0; j < i; j ++ ) {
+                free(zoom_private_[j]);
+                zoom_private_[j] = NULL;
+            }
 			return 0;
+        }
 	}
 
 	return 1;
@@ -87,10 +92,11 @@ int	zoom_malloc(int width, int height)
 void zoom_free() {
 	int i;
 	for( i = 0; i < 4; i ++ ) {	
-	if( zoom_private_[i] )
-		free(zoom_private_[i] );
-	zoom_private_[i] = NULL;
-	}
+	    if( zoom_private_[i] ) {
+		    free(zoom_private_[i] );
+	        zoom_private_[i] = NULL;
+	    }
+    }
 	if( zoom_vp_ )
 		viewport_destroy( zoom_vp_ );
 	zoom_vp_ = NULL;
