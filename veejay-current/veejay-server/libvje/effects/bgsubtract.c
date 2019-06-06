@@ -88,7 +88,7 @@ int bgsubtract_instances()
 int bgsubtract_malloc(int width, int height)
 {
 	if(static_bg__ == NULL){
-		static_bg__ = (uint8_t*) vj_malloc( RUP8(width*height)*4);
+		static_bg__ = (uint8_t*) vj_malloc( RUP8(width + width*height)*4);
 		bg_frame__[0] = static_bg__;
 		bg_frame__[1] = bg_frame__[0] + RUP8(width*height);
 		bg_frame__[2] = bg_frame__[1] + RUP8(width*height);
