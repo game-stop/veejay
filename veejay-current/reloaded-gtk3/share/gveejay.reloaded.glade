@@ -1523,6 +1523,12 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -10604,7 +10610,7 @@
                                         <property name="tooltip_text" translatable="yes">Enable/disable effectchain</property>
                                         <property name="active">True</property>
                                         <property name="draw_indicator">True</property>
-                                        <signal name="clicked" handler="on_check_samplefx_clicked" swapped="no"/>
+                                        <signal name="toggled" handler="on_check_samplefx_toggled" swapped="no"/>
                                         <child>
                                           <object class="GtkLabel" id="label268">
                                             <property name="visible">True</property>
@@ -12204,7 +12210,7 @@
                                             <property name="use_underline">True</property>
                                             <property name="active">True</property>
                                             <property name="draw_indicator">True</property>
-                                            <signal name="clicked" handler="on_check_streamfx_clicked" swapped="no"/>
+                                            <signal name="toggled" handler="on_check_streamfx_toggled" swapped="no"/>
                                           </object>
                                           <packing>
                                             <property name="expand">False</property>
@@ -17322,7 +17328,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                                         <property name="receives_default">True</property>
                                                         <property name="tooltip_text" translatable="yes">Enable/disable effectchain</property>
                                                         <property name="margin_right">20</property>
-                                                        <signal name="clicked" handler="on_chain_togglechain_toggled" swapped="no"/>
+                                                        <signal name="toggled" handler="on_chain_togglechain_toggled" swapped="no"/>
                                                         <child>
                                                           <object class="GtkImage" id="image61">
                                                             <property name="visible">True</property>

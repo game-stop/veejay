@@ -45,7 +45,12 @@ void	text_defaults()
 	srt_seq_ = 0;
 }
 
-static int toggle_siamese_widget(GtkWidget *widget,GtkWidget *first,GtkWidget *second)
+/* --------------------------------------------------------------------------------------------------------------------------
+ *  Function to easily maintain toggle siamese widget state
+ *
+ *  To be used for widgets that support "toggled" event.
+  -------------------------------------------------------------------------------------------------------------------------- */
+static void toggle_siamese_widget(GtkWidget *widget,GtkWidget *first,GtkWidget *second)
 {
     GtkWidget *siamese = second;
     if(widget == second)
@@ -1746,7 +1751,7 @@ void	on_spin_mudplay_value_changed(GtkWidget *widget, gpointer user_data)
 {
 }
 
-void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
+void on_check_samplefx_toggled(GtkWidget *widget , gpointer user_data)
 {
 	if(!info->status_lock)
 	{
@@ -1765,7 +1770,7 @@ void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
     toggle_siamese_widget(widget, check_samplefx, curve_chain_togglechain);
 }
 
-void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
+void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
@@ -1790,10 +1795,10 @@ void on_chain_togglechain_toggled( GtkWidget *widget, gpointer user_data)
     switch(info->status_tokens[PLAY_MODE])
     {
       case MODE_STREAM:
-            on_check_streamfx_clicked( widget, user_data);
+            on_check_streamfx_toggled( widget, user_data);
         break;
       case MODE_SAMPLE:
-            on_check_samplefx_clicked( widget, user_data);
+            on_check_samplefx_toggled( widget, user_data);
         break;
       default:
         return;
