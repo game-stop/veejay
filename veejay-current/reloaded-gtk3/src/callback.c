@@ -1770,11 +1770,34 @@ void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		int vims_id = VIMS_STREAM_CHAIN_DISABLE;
-		if( is_button_toggled( "check_streamfx"))
+
+        if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE )
 			vims_id = VIMS_STREAM_CHAIN_ENABLE;
 		multi_vims( vims_id, "%d", 0 );	
+
 		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
 	}
+
+    GtkWidget *check_streamfx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_streamfx"));
+    GtkWidget *curve_chain_togglechain = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_togglechain"));
+
+    toggle_siamese_widget(widget, check_streamfx, curve_chain_togglechain);
+
+}
+
+void on_chain_togglechain_toggled( GtkWidget *widget, gpointer user_data)
+{
+    switch(info->status_tokens[PLAY_MODE])
+    {
+      case MODE_STREAM:
+            on_check_streamfx_clicked( widget, user_data);
+        break;
+      case MODE_SAMPLE:
+            on_check_samplefx_clicked( widget, user_data);
+        break;
+      default:
+        return;
+    }
 }
 
 void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)
