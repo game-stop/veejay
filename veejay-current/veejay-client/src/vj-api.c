@@ -9612,11 +9612,15 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 }
 
 
-/* --------------------------------------------------------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  *  Handler of mouse clicks on the GUI-elements of one slot
- *  single-click activates the slot and the loaded sample (if there is one)
- *  double-click or tripple-click activates it and plays it immediatelly
-   -------------------------------------------------------------------------------------------------------------------------- */
+ *
+ * - FIRST BUTTON
+ *  single-click : activates the slot and the loaded sample (if there is one)
+ *  single-click + modifier shift : select it has current channel source
+ *  double-click or tripple-click : activates it and plays it immediatelly
+ *
+ * --------------------------------------------------------------------------- */
 static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data)
 {
     gint bank_nr = -1;
@@ -9632,56 +9636,59 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
     if( info->sample_banks[ bank_nr ]->slot[ slot_nr ]->sample_id <= 0 )
         return FALSE;
 
+    sample_slot_t *select_slot = sample_banks[bank_nr]->slot[slot_nr];
     if( event->type == GDK_2BUTTON_PRESS )
     {
-        sample_slot_t *s = sample_banks[bank_nr]->slot[slot_nr];
-        multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", (s->sample_type==0? 0:1), s->sample_id);
-        vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, s->sample_type, s->sample_id );
+
+        multi_vims( VIMS_SET_MODE_AND_GO,
+                    "%d %d",
+                    (select_slot->sample_type==MODE_SAMPLE? MODE_SAMPLE:MODE_STREAM),
+                    select_slot->sample_id);
+        vj_midi_learning_vims_msg2( info->midi,
+                                    NULL,
+                                    VIMS_SET_MODE_AND_GO,
+                                    select_slot->sample_type,
+                                    select_slot->sample_id );
         vj_msg(VEEJAY_MSG_INFO,
                "Start playing %s %d",
-               (s->sample_type==0 ? "Sample" : "Stream" ), s->sample_id );
+               (select_slot->sample_type==MODE_SAMPLE ? "Sample" : "Stream" ),
+               select_slot->sample_id );
     }
     else if(event->type == GDK_BUTTON_PRESS )
     {
-        if( (event->state & GDK_SHIFT_MASK ) == GDK_SHIFT_MASK )
-        {
-            sample_slot_t *x = sample_banks[bank_nr]->slot[slot_nr];
-            multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
-                "%d %d %d %d",
-                0,
-                info->uc.selected_chain_entry,
-                x->sample_type,
-                x->sample_id );
+        switch(event->state & GDK_SHIFT_MASK){
+            case GDK_SHIFT_MASK :
+            {
+                multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+                    "%d %d %d %d",
+                    0,
+                    info->uc.selected_chain_entry,
+                    select_slot->sample_type,
+                    select_slot->sample_id );
 
-            if(x->sample_id == 1 )
-            {
                 vj_msg(VEEJAY_MSG_INFO,
-                       "Set mixing channel %d to Stream %d",
+                       "Set mixing channel %d to %s %d",
                        info->uc.selected_chain_entry,
-                       x->sample_id );
-            } else
-            {
-                vj_msg(VEEJAY_MSG_INFO,
-                       "Set mixing channel %d to Sample %d",
-                       info->uc.selected_chain_entry,
-                       x->sample_id);
+                       (select_slot->sample_type==MODE_SAMPLE ? "Sample" : "Stream" ),
+                       select_slot->sample_id );
+
+                char trip[100];
+                snprintf(trip, sizeof(trip), "%03d:%d %d %d %d",VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+                    0,
+                    info->uc.selected_chain_entry,
+                    select_slot->sample_type,
+                    select_slot->sample_id );
+
+                vj_midi_learning_vims( info->midi, NULL, trip, 0 );
             }
+            break;
 
-            char trip[100];
-            snprintf(trip, sizeof(trip), "%03d:%d %d %d %d",VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
-                0,
-                info->uc.selected_chain_entry,
-                x->sample_type,
-                x->sample_id );
-
-            vj_midi_learning_vims( info->midi, NULL, trip, 0 );
-        } 
-        else
-        {
-            set_selection_of_slot_in_samplebank(FALSE);
-            info->selection_slot = sample_banks[bank_nr]->slot[slot_nr];
-            info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
-            set_selection_of_slot_in_samplebank(TRUE );
+            default :
+                set_selection_of_slot_in_samplebank(FALSE);
+                info->selection_slot = select_slot;
+                info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
+                set_selection_of_slot_in_samplebank(TRUE );
+            break;
         }
     }
     return FALSE;
