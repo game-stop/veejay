@@ -2959,42 +2959,47 @@ void	on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), i );
 }
 
+void curve_toggleentry_activate( int selected_chain_entry, int active)
+{
+    int curve_type = 0;
+    if( is_button_toggled("curve_typespline")) {
+        curve_type = 1;
+    } else if ( is_button_toggled("curve_typefreehand")) {
+        curve_type = 2;
+    } else if (is_button_toggled("curve_typelinear")) {
+        curve_type = 0;
+    }
+
+    multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d",
+               selected_chain_entry, active, curve_type );
+
+    //update anim mode
+    GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
+    GtkTreeModel *model = gtk_tree_view_get_model( view );
+    GtkTreeIter iter;
+
+    GtkTreePath *path = gtk_tree_path_new_from_indices(selected_chain_entry, -1);
+    if(gtk_tree_model_get_iter(model, &iter, path))
+    {
+        GdkPixbuf *kf_toggle = update_pixmap_entry( active );
+        gtk_list_store_set (GTK_LIST_STORE( model ), &iter, FXC_KF, kf_toggle, FXC_KF_STATUS, active, -1);
+    }
+    gtk_tree_path_free(path);
+}
+
 void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
 
-	int selected_chain_entry = info->uc.selected_chain_entry;
+    int selected_chain_entry = info->uc.selected_chain_entry;
 	if( selected_chain_entry == -1 ) {
 		vj_msg(VEEJAY_MSG_INFO,"No parameter selected for animation");
 		return;
 	}
 
 	int active = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
-	int curve_type = 0;
-	if( is_button_toggled("curve_typespline")) {
-		curve_type = 1;
-	} else if ( is_button_toggled("curve_typefreehand")) {
-		curve_type = 2;
-	} else if (is_button_toggled("curve_typelinear")) {
-		curve_type = 0;
-	}
-
-	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d",
-	           selected_chain_entry, active, curve_type );
-
-	//update anim mode
-	GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
-	GtkTreeModel *model = gtk_tree_view_get_model( view );
-	GtkTreeIter iter;
-
-	GtkTreePath *path = gtk_tree_path_new_from_indices(selected_chain_entry, -1);
-	if(gtk_tree_model_get_iter(model, &iter, path))
-	{
-		GdkPixbuf *kf_toggle = update_pixmap_entry( active );
-		gtk_list_store_set (GTK_LIST_STORE( model ), &iter, FXC_KF, kf_toggle, -1);
-	}
-	gtk_tree_path_free(path);
+    curve_toggleentry_activate(selected_chain_entry, active);
 }
 
 void curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
@@ -3505,42 +3510,61 @@ void	on_add_file1_activate(GtkWidget *w, gpointer user_data)
  *
  *  Signal handler over the effect chain.
  *
- *  Catch button press event on shift+click to toogle chain state.
+ *  Catch button press event on shift+click to toogle fx state.
+ *  Catch button press event on ctrl+click to toogle fx anim state.
  *  NOTA : works over the FULL row
  *
  ******************************************************/
 gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, gpointer userdata)
 {
-    /* shift key + single click with the left mouse button? */
-    if (event->state & GDK_SHIFT_MASK)
+    //filter events over ctrl and shift
+    int state_modifier = event->state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK);
+
+    if (state_modifier && (event->type == GDK_BUTTON_PRESS) && (event->button == 1))
     {
-        if (event->type == GDK_BUTTON_PRESS && event->button == 1)
+        GtkTreePath *path;
+        GtkTreeViewColumn *column;
+        gint cell_x, cell_y;
+
+        if(gtk_tree_view_get_path_at_pos( GTK_TREE_VIEW( tree ),
+                            (gint) event->x,
+                            (gint) event->y,
+                            &path, &column, &cell_x, &cell_y ))
+
         {
-            GtkTreePath *path;
-            GtkTreeViewColumn *column;
-            gint cell_x, cell_y;
+            /* get iter from clicked path */
+            GtkTreeIter iter;
+            gint fxcid = 0;
+            GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW( tree ));
 
-            if(gtk_tree_view_get_path_at_pos( GTK_TREE_VIEW( tree ),
-                                (gint) event->x,
-                                (gint) event->y,
-                                &path, &column, &cell_x, &cell_y ))
+            gtk_tree_model_get_iter(model, &iter, path);
+            gtk_tree_model_get(model,&iter, FXC_ID, &fxcid, -1 );
 
-            {
-                /* compare iter from tree selection and clicked path */
-                GtkTreeIter iter;
-                gint fxcid = 0;
-                GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW( tree ));
-
-                gtk_tree_model_get_iter(model, &iter, path);
-                gtk_tree_model_get(model,&iter, FXC_ID, &fxcid, -1 );
-
-                /* user can click on all row, uncomment and fix accordingly the test to check particular column */
-                //guint column_num = get_treeview_col_number_from_column ( column );
-                //if(column_num != -1)
+            switch (state_modifier){
+                case GDK_SHIFT_MASK:
                 {
-                    multi_vims(VIMS_CHAIN_ENTRY_SET_STATE, "%d %d",0, fxcid);
-                    info->uc.reload_hint[HINT_HISTORY] = 1;
+                    /* user can click on all row, uncomment and fix accordingly the test to check particular column */
+                    //guint column_num = get_treeview_col_number_from_column ( column );
+                    //if(column_num != -1)
+                    {
+                        multi_vims(VIMS_CHAIN_ENTRY_SET_STATE, "%d %d",0, fxcid);
+                        info->uc.reload_hint[HINT_HISTORY] = 1;
+                    }
                 }
+                break;
+
+                case GDK_CONTROL_MASK:
+                {
+                    /* user can click on all row, uncomment and fix accordingly the test to check particular column */
+                    //guint column_num = get_treeview_col_number_from_column ( column );
+                    //if(column_num != -1)
+                    {
+                        int active;
+                        gtk_tree_model_get ( model, &iter, FXC_KF_STATUS, &active, -1);
+                        curve_toggleentry_activate(fxcid, !active);
+                    }
+                }
+                break;
             }
         }
     }

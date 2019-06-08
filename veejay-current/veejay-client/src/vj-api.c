@@ -719,7 +719,7 @@ static struct
     {"Select a SRT sequence to edit"},
     {"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample"},
     {"Filter the effects list by any string"},
-    {"Shift + Mouse left : Toogle selected fx chain"},
+    {"Shift + Mouse left : Toogle selected fx,\nControl + Mouse left : Toogle selected fx anim"},
     {NULL},
 };
 
@@ -1146,7 +1146,8 @@ enum
     FXC_KF = 3,
     FXC_MIXING = 4,
     FXC_SUBRENDER = 5,
-    FXC_N_COLS = 6,
+    FXC_KF_STATUS = 6,
+    FXC_N_COLS = 7,
 };
 
 enum {
@@ -3824,8 +3825,9 @@ static gboolean chain_update_row(GtkTreeModel * model,
             }
 
             gchar *mixing = _utf8str(tmp);
+            int kf_status = gui->uc.entry_tokens[ENTRY_KF_STATUS];
             GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
-            GdkPixbuf *kf_toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_KF_STATUS] );
+            GdkPixbuf *kf_toggle = update_pixmap_entry( kf_status );
             GdkPixbuf *subrender_toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_SUBRENDER_ENTRY]);
             gtk_list_store_set( GTK_LIST_STORE(model),iter,
                                FXC_ID, entry,
@@ -3834,6 +3836,7 @@ static gboolean chain_update_row(GtkTreeModel * model,
                                FXC_KF, kf_toggle,
                                FXC_MIXING, mixing,
                                FXC_SUBRENDER, subrender_toggle,
+                               FXC_KF_STATUS, kf_status,
                                -1 );
             g_free(descr);
             g_free(mixing);
@@ -4829,7 +4832,7 @@ static void load_generator_info()
 static void setup_effectchain_info( void )
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
-    GtkListStore *store = gtk_list_store_new( FXC_N_COLS, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING, GDK_TYPE_PIXBUF );
+    GtkListStore *store = gtk_list_store_new( FXC_N_COLS, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING, GDK_TYPE_PIXBUF, G_TYPE_INT);
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     g_object_unref( G_OBJECT( store ));
 
@@ -4953,8 +4956,9 @@ static void load_effectchain_info()
             gchar *mixing = _utf8str(tmp);
 
             gtk_list_store_append( store, &iter );
+            int kf_status = arr[7];
             GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
-            GdkPixbuf *kf_togglepf = update_pixmap_entry( arr[7] );
+            GdkPixbuf *kf_togglepf = update_pixmap_entry( kf_status );
             GdkPixbuf *subrender_toggle = update_pixmap_entry(arr[8]);
             gtk_list_store_set( store, &iter,
                                FXC_ID, arr[0],
@@ -4962,7 +4966,9 @@ static void load_effectchain_info()
                                FXC_FXSTATUS, toggle,
                                FXC_KF, kf_togglepf,
                                FXC_MIXING,mixing, 
-                               FXC_SUBRENDER, subrender_toggle,  -1 );
+                               FXC_SUBRENDER, subrender_toggle,
+                               FXC_KF_STATUS, kf_status,
+                                -1 );
             last_index ++;
             g_free(utf8_name);
             g_free(mixing);
