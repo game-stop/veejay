@@ -118,7 +118,7 @@ void vj_gui_startup (GApplication *application, gpointer user_data)
  *
  * FIXME  gtk_builder_new (); -ADD->   g_object_unref (info->main_window); (vj_gui_clean()?)
  */
-static void vj_gui_activate (GtkApplication* app, gpointer        user_data)
+static void vj_gui_activate (GApplication* app, gpointer        user_data)
 {
     vj_gui_set_debug_level( verbosity , n_tracks,0,0);
     default_bank_values( &col, &row );
