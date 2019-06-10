@@ -3219,9 +3219,9 @@ static void vj_kf_refresh()
         if(gtk_combo_box_get_active(kf_param) != 0) {
             gtk_combo_box_set_active (kf_param,0); // FX_PARAMETER_DEFAULT_NAME
         }
-        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
-            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
-        }
+        //~ if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
+            //~ gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
+        //~ }
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], FALSE );
     }
 
@@ -7934,6 +7934,7 @@ static void process_reload_hints(int *history, int pm)
         } else if (lpi == 1 ) {
             if (entry_tokens[ENTRY_FXID] != 0 ) {
                 enable_fx_entry();
+                info->uc.reload_hint[HINT_KF] = 1;
             }
         }
     }
