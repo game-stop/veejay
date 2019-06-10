@@ -73,6 +73,8 @@
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/libvevo.h>
 #include <src/vmidi.h>
+#include <src/utils-gtk.h>
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -8339,9 +8341,10 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
         }
         GtkStyleContext *sc = gtk_widget_get_style_context( GTK_WIDGET(gui->curve) );
         GdkRGBA bg,col,border;
-        gtk_style_context_get_background_color(sc, gtk_style_context_get_state(sc), &bg );
-        gtk_style_context_get_border_color(sc,gtk_style_context_get_state(sc), &border);
-        gtk_style_context_get_color(sc, gtk_style_context_get_state(sc), &col );
+        GtkStateFlags context_state = gtk_style_context_get_state(sc);
+        vj_gtk_context_get_color(sc, "background-color", context_state, &bg);
+        vj_gtk_context_get_color(sc, "border-color", context_state, &bg);
+        gtk_style_context_get_color(sc, context_state, &col );
 
         gtk3_curve_set_color_background_rgba (GTK_WIDGET(gui->curve), bg.red, bg.green, bg.blue, 1.0);
         gtk3_curve_set_color_curve_rgba (GTK_WIDGET(gui->curve), col.red, col.green, col.blue, 1.0);

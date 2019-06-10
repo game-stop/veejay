@@ -32,6 +32,7 @@
 #include <stdlib.h>
 
 #include "gtktimeselection.h"
+#include "utils-gtk.h"
 
 //G_DEFINE_TYPE(TimelineSelectionClass, timeline, GTK_TYPE_DRAWING_AREA );
 
@@ -780,15 +781,6 @@ void cairo_rectangle_round ( cairo_t * cr,
   cairo_close_path (cr);
 }
 
-static void get_border_color (GtkStyleContext *context, GtkStateFlags state, GdkRGBA *color)
-{
-    GdkRGBA *c;
-
-    gtk_style_context_get (context, state, "border-color", &c, NULL);
-    *color = *c;
-    gdk_rgba_free (c);
-}
-
 static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
 {
   gchar text[40];
@@ -805,7 +797,7 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
   GdkRGBA color;
   gtk_style_context_get_color ( sc, gtk_style_context_get_state (sc), &color );
   GdkRGBA col2;
-  get_border_color(sc, GTK_STATE_FLAG_NORMAL, &col2);
+  vj_gtk_context_get_color(sc, "border-color",GTK_STATE_FLAG_NORMAL, &col2);
 
   double x1 = marker_width * te->point;
   cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );

@@ -26,6 +26,7 @@
 #include <gtk/gtk.h>
 #include <vj-api.h> /* to format timecode string */
 #include "gtk3curve.h"
+#include "utils-gtk.h"
 
 #ifdef DEBUG
 #define DEBUG_INFO g_print
@@ -695,9 +696,10 @@ gtk3_curve_draw (GtkWidget *widget,
                             0, 0,
                             allocation.width + RADIUS * 2,
                             allocation.height + RADIUS * 2);
-      gtk_style_context_get_background_color (style_context,
-                                   gtk_style_context_get_state (style_context),
-                                   &color);
+      vj_gtk_context_get_color (style_context,
+                                "background-color",
+                                gtk_style_context_get_state (style_context),
+                                &color);
       gdk_cairo_set_source_rgba (cr, &color);
     }
   else
