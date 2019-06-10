@@ -2891,7 +2891,7 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 
     info->uc.reload_hint[HINT_KF] = 1;
 
-    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    GtkWidget *kf_param = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
     gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param), 0); // <None>
 
     reset_curve(info->curve);
@@ -3007,14 +3007,14 @@ void curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
     curve_toggleentry_toggled( widget, user_data);
 
     GtkWidget *panel_toggleentry = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_panel_toggleentry"));
-    GtkWidget *chain_toggleentry = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_toggleentry"));
+    GtkWidget *chain_toggleentry = widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY];
 
     toggle_siamese_widget(widget, panel_toggleentry, chain_toggleentry);
 }
 
 void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
 {
-    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    GtkWidget *kf_param = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
     gint active_kf_id = gtk_combo_box_get_active (GTK_COMBO_BOX(kf_param));
     if (active_kf_id != -1) {
         if(active_kf_id == 0){
