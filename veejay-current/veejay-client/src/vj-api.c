@@ -1374,6 +1374,7 @@ static void init_widget_cache()
     }
 }
 
+/* NOT USED
 static void identify_widget(GtkWidget *w)
 {
     for( int i = 0; widget_map[i].name != NULL; i ++ ) {
@@ -1384,6 +1385,7 @@ static void identify_widget(GtkWidget *w)
     }
     veejay_msg(VEEJAY_MSG_DEBUG, "Widget %p is not in widget_cache");
 }
+*/
 
 static gboolean is_edl_displayed()
 {
