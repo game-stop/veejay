@@ -45,6 +45,31 @@ void	text_defaults()
 	srt_seq_ = 0;
 }
 
+/* --------------------------------------------------------------------------------------------------------------------------
+ *  Function to easily maintain toggle siamese widget state
+ *
+ *  To be used for widgets that support "toggled" event.
+  -------------------------------------------------------------------------------------------------------------------------- */
+static void toggle_siamese_widget(GtkWidget *widget,GtkWidget *first,GtkWidget *second)
+{
+    GtkWidget *siamese = second;
+    if(widget == second)
+        siamese = first;
+
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
+    gulong handler_id=handler_id=g_signal_handler_find( (gpointer)siamese, G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
+
+    if (handler_id)
+        g_signal_handler_block((gpointer)siamese, handler_id);
+
+    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(siamese),
+                                  gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) )) ;
+
+    if (handler_id)
+        g_signal_handler_unblock((gpointer)siamese, handler_id);
+}
+
 void	on_no_caching_clicked( GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_NO_CACHING );
@@ -1721,7 +1746,8 @@ void	on_sample_markerloop_clicked(GtkWidget *w, gpointer user_data)
 void	on_spin_mudplay_value_changed(GtkWidget *widget, gpointer user_data)
 {
 }
-void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
+
+void on_check_samplefx_toggled(GtkWidget *widget , gpointer user_data)
 {
 	if(!info->status_lock)
 	{
@@ -1733,17 +1759,46 @@ void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
 
 		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
 	}
+
+    GtkWidget *check_samplefx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_samplefx"));
+    GtkWidget *curve_chain_togglechain = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_togglechain"));
+
+    toggle_siamese_widget(widget, check_samplefx, curve_chain_togglechain);
 }
-void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
+
+void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
 		int vims_id = VIMS_STREAM_CHAIN_DISABLE;
-		if( is_button_toggled( "check_streamfx"))
+
+        if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE )
 			vims_id = VIMS_STREAM_CHAIN_ENABLE;
 		multi_vims( vims_id, "%d", 0 );	
+
 		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
 	}
+
+    GtkWidget *check_streamfx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_streamfx"));
+    GtkWidget *curve_chain_togglechain = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_togglechain"));
+
+    toggle_siamese_widget(widget, check_streamfx, curve_chain_togglechain);
+
+}
+
+void on_chain_togglechain_toggled( GtkWidget *widget, gpointer user_data)
+{
+    switch(info->status_tokens[PLAY_MODE])
+    {
+      case MODE_STREAM:
+            on_check_streamfx_toggled( widget, user_data);
+        break;
+      case MODE_SAMPLE:
+            on_check_samplefx_toggled( widget, user_data);
+        break;
+      default:
+        return;
+    }
 }
 
 void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)
@@ -2936,31 +2991,14 @@ void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	gtk_tree_path_free(path);
 }
 
-
-void	curve_chain_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
+void curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
-	curve_toggleentry_toggled( widget, user_data);
-}
+    curve_toggleentry_toggled( widget, user_data);
 
-void	curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
-{
-	curve_toggleentry_toggled( widget, user_data);
+    GtkWidget *panel_toggleentry = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_panel_toggleentry"));
+    GtkWidget *chain_toggleentry = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_toggleentry"));
 
-	GtkWidget *siamese = glade_xml_get_widget_( info->main_window, "curve_chain_toggleentry");
-	if(siamese)
-	{
-		guint signal_id=g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
-		gulong handler_id=handler_id=g_signal_handler_find( (gpointer)siamese, G_SIGNAL_MATCH_ID, signal_id, 0, NULL, NULL, NULL );
-
-		if (handler_id)
-			g_signal_handler_block((gpointer)siamese, handler_id);
-
-		gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(siamese),
-		                              gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) )) ;
-
-		if (handler_id)
-			g_signal_handler_unblock((gpointer)siamese, handler_id);
-	}
+    toggle_siamese_widget(widget, panel_toggleentry, chain_toggleentry);
 }
 
 void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
