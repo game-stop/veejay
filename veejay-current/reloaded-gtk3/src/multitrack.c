@@ -828,7 +828,6 @@ void		*multitrack_new(
 
 	mt->master_track = 0;
 	mt->preview = gvr_preview_init( MAX_TRACKS, threads );
-//	gvr_set_master( mt->preview, mt->master_track );
 
 	parent__ = infog;
 
@@ -910,6 +909,12 @@ void		multitrack_disconnect(void *data)
 	multitracker_t *mt = (multitracker_t*) data;
 	//release connection to veejay
 	gvr_track_disconnect( mt->preview, 0 );
+}
+
+void    multitrack_set_master_track(void *data, int track)
+{
+	multitracker_t *mt = (multitracker_t*) data;
+    gvr_set_master( mt->preview, track );
 }
 
 int		multrack_audoadd( void *data, char *hostname, int port_num )

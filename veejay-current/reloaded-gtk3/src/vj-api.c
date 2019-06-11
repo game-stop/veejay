@@ -7164,10 +7164,12 @@ int veejay_update_multitrack( void *ptr )
 
     int tmp = 0;
 
-    for ( i = 0; i < STATUS_TOKENS; i ++ )
-    {
-        tmp += s->status_list[s->master][i];
-        info->status_tokens[i] = s->status_list[s->master][i];
+    if( s->status_list[s->master] != NULL ) {
+        for ( i = 0; i < STATUS_TOKENS; i ++ )
+        {
+            tmp += s->status_list[s->master][i];
+            info->status_tokens[i] = s->status_list[s->master][i];
+        }
     }
 
     if( tmp == 0 )
@@ -8383,6 +8385,7 @@ static int auto_connect_to_veejay(char *host, int port_num)
             info->watch.state = STATE_PLAYING;
             veejay_msg(VEEJAY_MSG_INFO,"Trying to connect to %s:%d", hostname, i);
             multrack_audoadd( info->mt, hostname, i);
+            multitrack_set_master_track( info->mt, 0 );
             // set reconnect info
             update_spin_value( "button_portnum", i );
             put_text( "entry_hostname", hostname );
@@ -8928,7 +8931,7 @@ void reloaded_show_launcher()
 
 void reloaded_schedule_restart()
 {
- //   info->watch.state = STATE_STOPPED;
+    info->watch.state = STATE_STOPPED;
 }
 
 void reloaded_restart()
@@ -8948,6 +8951,14 @@ gboolean    is_alive( int *do_sync )
 {
     void *data = info;
     vj_gui_t *gui = (vj_gui_t*) data;
+
+    if( gui->watch.state == STATE_STOPPED ) 
+    {
+       vj_gui_disconnect(TRUE);
+       reloaded_restart();
+       gui->watch.state = STATE_WAIT_FOR_USER;
+       return TRUE; 
+    }
 
     if( gui->watch.state == STATE_PLAYING )
     {
@@ -8994,6 +9005,7 @@ gboolean    is_alive( int *do_sync )
 #endif
             }
             multrack_audoadd( info->mt, remote, port );
+            multitrack_set_master_track( info->mt, 0 );
             multitrack_set_quality( info->mt, 1 );
 
             *do_sync = 1;
