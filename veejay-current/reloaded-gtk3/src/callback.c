@@ -1285,26 +1285,22 @@ void	on_v4l_color_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+        GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_COLOR, "%d %d",
 			info->selected_slot->sample_id,
 			(gint) (gtk_adjustment_get_value (a) * 65535.0) );
-	vj_midi_learning_vims_complex( info->midi, "v4l_color", VIMS_STREAM_SET_COLOR, info->selected_slot->sample_id,
-			1 );
-
+	    vj_midi_learning_vims_complex( info->midi, "v4l_color", VIMS_STREAM_SET_COLOR, info->selected_slot->sample_id,1 );
 	}
 }
 void	on_v4l_saturation_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-    GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
+        GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
 		multi_vims( VIMS_STREAM_SET_SATURATION, "%d %d",
 			info->selected_slot->sample_id,
 			(gint) (gtk_adjustment_get_value (a) * 65535.0) );
-	vj_midi_learning_vims_complex( info->midi, "v4l_saturation", VIMS_STREAM_SET_SATURATION, info->selected_slot->sample_id,
-			1 );
-
+	    vj_midi_learning_vims_complex( info->midi, "v4l_saturation", VIMS_STREAM_SET_SATURATION, info->selected_slot->sample_id,1 );
 	}
 }
 
