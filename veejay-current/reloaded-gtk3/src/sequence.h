@@ -57,7 +57,7 @@ int          gvr_track_get_portnum( void *preview, int num);
 
 int		gvr_track_test( void *preview, int track_id );
 
-sync_info	*gvr_sync( void *preview );
+sync_info	*gvr_sync( void *preview , void *data);
 
 #endif
 

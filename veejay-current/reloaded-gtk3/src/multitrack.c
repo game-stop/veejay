@@ -720,7 +720,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 void		*multitrack_sync( void * mt )
 {
 	multitracker_t *m = (multitracker_t*) mt;
-	sync_info *s = gvr_sync( m->preview );
+	sync_info *s = gvr_sync( m->preview,mt );
 	if(!s)
 		return NULL;
 	s->master = m->master_track;
@@ -876,6 +876,19 @@ int         multitrack_get_track_status(void *data, int track )
     return mt->track_status[ track ];
 }
 
+void		multitrack_cleanup_track( void *data, int track )
+{
+	multitracker_t *mt = (multitracker_t*) data;
+
+	mt->view[track]->status_lock = 1;
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mt->view[track]->toggle), FALSE );
+	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), FALSE );
+	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), FALSE );
+	gtk_image_clear( GTK_IMAGE(mt->view[track]->area ) );
+	mt->view[track]->status_lock = 0;
+    mt->track_status[ track ] = 0;
+}
+
 void		multitrack_close_track( void *data )
 {
 	multitracker_t *mt = (multitracker_t*) data;
@@ -883,14 +896,7 @@ void		multitrack_close_track( void *data )
 	if( mt->selected > 0 && mt->selected < MAX_TRACKS )
 	{
 		gvr_track_disconnect( mt->preview, mt->selected );
-		mt->view[mt->selected]->status_lock = 1;
-		gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(mt->view[mt->selected]->toggle), FALSE );
-		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[mt->selected]->panel), FALSE );
-		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[mt->selected]->toggle), FALSE );
-		gtk_image_clear( GTK_IMAGE(mt->view[mt->selected]->area ) );
-		mt->view[mt->selected]->status_lock = 0;
-        mt->track_status[ mt->selected ] = 0;
+        multitrack_cleanup_track(data, mt->selected );
 	}
 }
 

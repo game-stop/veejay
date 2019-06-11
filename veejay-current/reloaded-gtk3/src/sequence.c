@@ -43,7 +43,8 @@
 #define    RUP8(num)(((num)+8)&~8)
 
 extern void reloaded_schedule_restart();
-extern void    vj_msg(int type, const char format[], ...);
+extern void vj_msg(int type, const char format[], ...);
+extern void multitrack_cleanup_track( void *data, int track );
 
 typedef struct
 {
@@ -101,7 +102,7 @@ static int veejay_process_status( veejay_preview_t *vp, veejay_track_t *v );
 static int gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v );
 static int track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at );
 static int gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v );
-void gvr_veejay_grabber_step( void *data );
+void gvr_veejay_grabber_step( void *data, void *caller_data );
 
 void	*gvr_preview_init(int max_tracks, int use_threads)
 {
@@ -893,12 +894,12 @@ static int	*gvr_grab_heights( void *preview )
 	return list;
 }
 
-sync_info	*gvr_sync( void *preview )
+sync_info	*gvr_sync( void *preview, void *caller_data )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	sync_info *s = (sync_info*) vj_calloc(sizeof(sync_info));
 
-	gvr_veejay_grabber_step( preview );
+	gvr_veejay_grabber_step( preview, caller_data );
 
 	s->status_list = gvr_grab_stati( preview );
 	s->tracks      = vp->n_tracks;
@@ -1052,7 +1053,7 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 	return score;
 }
 
-void		gvr_veejay_grabber_step( void *data )
+void		gvr_veejay_grabber_step( void *data, void *caller_data )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) data;
 	int i;
@@ -1068,9 +1069,11 @@ void		gvr_veejay_grabber_step( void *data )
 		{
 		    gvr_get_preview_status( vp, i );
 	    }
-        else {
+        else 
+        {
            gvr_track_disconnect(vp, i);
-       }
+           multitrack_cleanup_track(caller_data, i);
+        }
 	}
 
 	for( i = 0; i < vp->n_tracks ; i ++ )
