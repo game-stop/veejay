@@ -317,45 +317,53 @@ void	on_toggle_fademethod_toggled(GtkWidget *w, gpointer user_data)
  * 1 = source entry FX
  * 2 = source mixing B
  */
-
 void	on_fx_m2_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-	multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 2 );
-	multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d", 0, info->uc.selected_chain_entry );
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ) {
+	    multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 2 );
+	    multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d", 0, info->uc.selected_chain_entry );
+    }
 }
 
 void	on_fx_m1_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-
-	multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 1);
-	multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d",0, info->uc.selected_chain_entry);
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ) {
+	    multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 1);
+	    multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d",0, info->uc.selected_chain_entry);
+    }
 }
 
 void	on_fx_m3_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-	multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 3);
-	multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d", 0, info->uc.selected_chain_entry );
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ) {
+	    multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 3);
+	    multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d", 0, info->uc.selected_chain_entry );
+    }
 }
 
 void	on_fx_m4_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-	multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 4);
-	multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d", 0, info->uc.selected_chain_entry );
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ) {
+	    multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 4);
+	    multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d", 0, info->uc.selected_chain_entry );
+    }
 }
 void	on_fx_mnone_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-	multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 0);
-	multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d", 0, info->uc.selected_chain_entry);
+    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ) {
+	    multi_vims( VIMS_CHAIN_FADE_METHOD, "%d %d",0, 0);
+	    multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d", 0, -1);
+    }
 }
 
 void	on_button_fadeout_clicked(GtkWidget *w, gpointer user_data)

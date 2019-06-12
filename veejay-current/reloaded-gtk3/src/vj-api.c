@@ -4115,14 +4115,17 @@ static void update_current_slot(int *history, int pm, int last_pm)
             gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] ), TRUE );
         }
 
-        if( history[FADE_ENTRY] != info->status_tokens[FADE_ENTRY] ) 
+        if( history[FADE_METHOD] != info->status_tokens[FADE_METHOD] ) 
         {
-            switch(info->status_tokens[FADE_ENTRY]) {
-                case 0: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_MNONE]), TRUE ); break;
+            switch(info->status_tokens[FADE_METHOD]) {
+                case -1:
+                        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_MNONE]), TRUE ); break;
                 case 1: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M1]), TRUE ); break;
                 case 2: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M2]), TRUE ); break;
                 case 3: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M3]), TRUE ); break;
                 case 4: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M4]), TRUE ); break;
+                default:
+                        break;
             }
         }
 
@@ -4383,9 +4386,14 @@ gboolean view_entry_selection_func (GtkTreeSelection *selection,
         if (!path_currently_selected && name != info->uc.selected_chain_entry)
         {
             multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
-            if( !is_button_toggled( "fx_mnone" )) {
+            int sl = info->status_lock;
+            info->status_lock = 1;
+            if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_MNONE]))) {
                 multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d",0, name );
+            } else {
+                multi_vims( VIMS_CHAIN_FADE_ENTRY,"%d %d",0,-1);
             }
+            info->status_lock = sl;
  
             update_label_i( "label_fxentry", name, 0 );
             vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY,name );
