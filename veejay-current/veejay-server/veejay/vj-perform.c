@@ -133,7 +133,7 @@ static uint8_t *audio_render_buffer = NULL;
 static uint8_t *down_sample_buffer = NULL;
 static uint8_t *down_sample_rec_buffer = NULL;
 static uint8_t *temp_buffer[4];
-static uint8_t temp_ssm = 0;
+static VJFrame temp_frame;
 static uint8_t *subrender_buffer[4];
 static uint8_t *feedback_buffer[4];
 static VJFrame feedback_frame;
@@ -862,8 +862,14 @@ int vj_perform_init(veejay_t * info)
     temp_buffer[1] = temp_buffer[0] + frame_len;
     temp_buffer[2] = temp_buffer[1] + frame_len;
     temp_buffer[3] = temp_buffer[2] + frame_len;
+
     if(mlock( temp_buffer[0], buf_len ) != 0 )
         mlock_success = 0;
+
+    veejay_memset(temp_buffer[2], 128, frame_len);
+    veejay_memset(temp_buffer[1], 128, frame_len);
+    veejay_memset(temp_buffer[3], 0, frame_len);
+    veejay_memset(temp_buffer[0], 0, frame_len);
 
     rgba_buffer[0] = (uint8_t*) vj_malloc( buf_len * 2 );
     if(!rgba_buffer[0] ) {
@@ -2919,27 +2925,25 @@ static void vj_perform_tag_fill_buffer(veejay_t * info)
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame)
 {
     vj_perform_copy3( frame->data, temp_buffer, frame->len, (frame->ssm ? frame->len : frame->uv_len), frame->stride[3] * frame->height  );
-    temp_ssm = frame->ssm;
+
+    veejay_memcpy( &temp_frame, frame, sizeof(VJFrame) );    
 }
 
 static  inline  void    vj_perform_supersample_chain( veejay_t *info, VJFrame *frame )
 {
-    //temp_buffer contains state of frame before entering render chain 
-    if(temp_ssm == 0 ) {
-        chroma_supersample(
-        info->settings->sample_mode,
-        frame,
-        temp_buffer );
+    if( frame->ssm == temp_frame.ssm ) {
+        return; // nothing to do
     }
-    //but top source is conditional
-    if( frame->ssm == 0 ) {
-        chroma_supersample(
-            info->settings->sample_mode,
-            frame,
-            frame->data );
-        vj_perform_set_444(frame); 
+
+    if( temp_frame.ssm == 0 && frame->ssm == 1 ) {
+        chroma_supersample(info->settings->sample_mode,&temp_frame, temp_buffer );
+        temp_frame.ssm = 1;
     }
-    info->effect_frame1->ssm = frame->ssm;
+
+    if( temp_frame.ssm == 1 && frame->ssm == 0 ) {
+        chroma_subsample( info->settings->sample_mode,&temp_frame,temp_frame.data);
+        temp_frame.ssm = 0;
+    }
 }
 
 void    vj_perform_follow_fade(int status) {
