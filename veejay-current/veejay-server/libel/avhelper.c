@@ -91,11 +91,11 @@ static struct
 typedef struct
 {
 	AVPacket packets[MAX_PACKETS];
+    AVFrame *frames[2];
+	int	frameinfo[2];
 	AVCodec *codec;
 	AVCodecContext *codec_ctx;
 	AVFormatContext *avformat_ctx;
-	AVFrame *frames[2];
-	int	frameinfo[2];
 	int frame_index;
 	int pixfmt;
 	int codec_id;
