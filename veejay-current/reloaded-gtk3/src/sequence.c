@@ -124,15 +124,33 @@ void	*gvr_preview_init(int max_tracks, int use_threads)
 static	void	gvr_close_connection( veejay_track_t *v )
 {
     veejay_msg(VEEJAY_MSG_INFO, "Closing connection %s:%d",v->hostname,v->port_num );
-
-    vj_client_close(v->fd);
-    vj_client_free(v->fd);
     
-    if(v->hostname) free(v->hostname);
-    if(v->status_buffer) free(v->status_buffer);
-    if(v->data_buffer) free(v->data_buffer);
-    if(v->tmp_buffer) free(v->tmp_buffer);
-    free(v);
+    if(v != NULL) {
+
+        if(v->fd) { 
+            vj_client_close(v->fd); 
+            vj_client_free(v->fd);
+            v->fd = NULL;
+        }
+    
+        if(v->hostname) { 
+            free(v->hostname);
+            v->hostname = NULL;
+        }
+        if(v->status_buffer) {
+            free(v->status_buffer);
+            v->status_buffer = NULL;
+        }
+        if(v->data_buffer) {
+            free(v->data_buffer);
+            v->data_buffer = NULL;
+        }
+        if(v->tmp_buffer) {
+            free(v->tmp_buffer);
+            v->tmp_buffer = NULL;
+        }
+        free(v);
+    }
 }
 
 static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
