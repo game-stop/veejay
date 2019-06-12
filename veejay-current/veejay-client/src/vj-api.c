@@ -1251,7 +1251,7 @@ void msg_vims(char *message);
 static void multi_vims(int id, const char format[],...);
 static void single_vims(int id);
 static gdouble get_numd(const char *name);
-static void vj_kf_select_parameter(int id);
+static int vj_kf_select_parameter(int id);
 static int get_nums(const char *name);
 static gchar *get_text(const char *name);
 static void put_text(const char *name, char *text);
@@ -3200,11 +3200,27 @@ static void vj_kf_reset()
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART], 0, total_frames, lo );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
 
-    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),0); 
+    GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
+    //block signal to prevent propagation
+    guint signal_id=g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
+    gulong handler_id=handler_id=g_signal_handler_find( (gpointer)curveparam,
+                                                        G_SIGNAL_MATCH_ID,
+                                                        signal_id,
+                                                        0, NULL, NULL, NULL );
+        vj_msg(VEEJAY_MSG_INFO, "before bcnahge!");
+    if (handler_id){
+        g_signal_handler_block((gpointer)curveparam, handler_id);
+        vj_msg(VEEJAY_MSG_INFO, "chnaged id ok!");
+    }
+    gtk_combo_box_set_active (GTK_COMBO_BOX(curveparam),0); 
+
+    if (handler_id)
+        g_signal_handler_unblock((gpointer)curveparam, handler_id);
 
     info->status_lock = osl;
 }
-
+//grid is still = 0 sometime .
+//on fx chain panel first click select the current fx chain entry not first (select != 0 server side before))
 static void vj_kf_refresh()
 {
     int *entry_tokens = &(info->uc.entry_tokens[0]);
@@ -3212,31 +3228,37 @@ static void vj_kf_refresh()
     int status = 0;
     if( entry_tokens[ENTRY_FXID] > 0 ) {
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3] , TRUE );
-        status = update_curve_widget(info->curve);
+        status = vj_kf_select_parameter(0);
+//        update_curve_widget(info->curve);
     }
     else {
-        GtkComboBox *kf_param = GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]);
-        if(gtk_combo_box_get_active(kf_param) != 0) {
-            gtk_combo_box_set_active (kf_param,0); // FX_PARAMETER_DEFAULT_NAME
-        }
+        //~ GtkComboBox *kf_param = GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]);
+        //~ if(gtk_combo_box_get_active(kf_param) != 0) {
+            //~ gtk_combo_box_set_active (kf_param,0); // FX_PARAMETER_DEFAULT_NAME
+        //~ }
         //~ if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
             //~ gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
         //~ }
+        vj_kf_reset();
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], FALSE );
     }
 
-    if( status == 0 ) {
-        vj_kf_reset();
-    }
+    //~ if( status == 0 ) {
+        //~ vj_kf_reset();
+    //~ }
 }
 
-static void vj_kf_select_parameter(int num)
+/*
+ * Return update_curve_widget() status
+ * 
+ */
+static int vj_kf_select_parameter(int num)
 {
     sample_slot_t *s = info->selected_slot;
     if(!s)
     {
-        gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),0);
-        return;
+        gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),FALSE);
+        return 0;
     }
     int *entry_tokens = &(info->uc.entry_tokens[0]);
 
@@ -3264,7 +3286,7 @@ static void vj_kf_select_parameter(int num)
                        lo, hi ,
                        entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
 
-    update_curve_widget( info->curve );
+    return update_curve_widget( info->curve );
 }
 
 static int update_curve_widget(GtkWidget *curve)
@@ -3286,7 +3308,7 @@ static int update_curve_widget(GtkWidget *curve)
     int checksum = data_checksum( (char*) blob, blen );
     if( info->uc.reload_hint_checksums[HINT_KF] == checksum ) {
         if( blob ) free(blob);
-        return 0;
+        return 1;
     }
     info->uc.reload_hint_checksums[HINT_KF] = checksum;
 
@@ -3335,9 +3357,9 @@ static int update_curve_widget(GtkWidget *curve)
             }
         }
     }
-    else {
-        reset_curve( curve );
-    }
+    //~ else {
+        //~ reset_curve( curve );
+    //~ }
   
     if(blob)    free(blob);
 
@@ -7784,8 +7806,8 @@ static void enable_fx_entry() {
     GtkWidget *kf_param = widget_cache[ WIDGET_COMBO_CURVE_FX_PARAM ];
     
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
-    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), FX_PARAMETER_DEFAULT_NAME);
-    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+    //~ gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), FX_PARAMETER_DEFAULT_NAME);
+    //~ gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
 
     int np = _effect_get_np( entry_tokens[ENTRY_FXID] );
     gint min,max,value;
@@ -7828,7 +7850,25 @@ static void enable_fx_entry() {
             update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i],min,max, value, 0);
         }
     }
-   
+
+    if (np){
+        guint signal_id=g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
+        gulong handler_id=handler_id=g_signal_handler_find( (gpointer)kf_param,
+                                                            G_SIGNAL_MATCH_ID,
+                                                            signal_id,
+                                                            0, NULL, NULL, NULL );
+
+        if (handler_id){
+            g_signal_handler_block((gpointer)kf_param, handler_id);
+        }
+        gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+
+        if (handler_id)
+            g_signal_handler_unblock((gpointer)kf_param, handler_id);
+
+
+    }
+
     min = 0; max = 1; value = 0; 
     for( i = np; i < MAX_UI_PARAMETERS; i ++ )
     {
@@ -7930,6 +7970,7 @@ static void process_reload_hints(int *history, int pm)
         if( lpi == 0 ) {
             if( entry_tokens[ENTRY_FXID] == 0 && gtk_widget_is_sensitive(widget_cache[WIDGET_FRAME_FXTREE2])) {
                 disable_fx_entry();
+                info->uc.reload_hint[HINT_KF] = 1;
             }
         } else if (lpi == 1 ) {
             if (entry_tokens[ENTRY_FXID] != 0 ) {

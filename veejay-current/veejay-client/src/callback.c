@@ -2892,7 +2892,7 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
     info->uc.reload_hint[HINT_KF] = 1;
 
     GtkWidget *kf_param = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
-    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param), 0); // <None>
+    //~ gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param), 0); // <None>
 
     reset_curve(info->curve);
 }
@@ -3017,22 +3017,24 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
     GtkWidget *kf_param = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
     gint active_kf_id = gtk_combo_box_get_active (GTK_COMBO_BOX(kf_param));
     if (active_kf_id != -1) {
-        if(active_kf_id == 0){
-            info->uc.selected_parameter_id = -1;
+        //~ if(active_kf_id == 0){
+            //~ info->uc.selected_parameter_id = -1;
 
-            if(gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ] ))
-               gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], FALSE);
+            //~ if(gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ] ))
+               //~ gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], FALSE);
 
-            if(gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ] ))
-               gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], FALSE);
+            //~ if(gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ] ))
+               //~ gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], FALSE);
 
 
-            if(info->status_lock)
-              return;
+            //~ if(info->status_lock)
+              //~ return;
 
-            vj_kf_reset();
-        } else {
-            KF_CHANGED (active_kf_id -1); ////None is id 0
+            //~ vj_kf_reset();
+        //~ } else 
+        {
+            vj_kf_select_parameter(active_kf_id);
+//            KF_CHANGED (active_kf_id);
             // if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ]))
             //   gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], TRUE);
 
