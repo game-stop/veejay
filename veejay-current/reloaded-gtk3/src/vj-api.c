@@ -72,7 +72,6 @@
 #include <veejay/vevo.h>
 #include <veejay/libvevo.h>
 #include <src/vmidi.h>
-
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -1336,8 +1335,6 @@ static void veejay_stop_connecting(vj_gui_t *gui);
 void reload_macros();
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 
-//#include <valgrind/callgrind.h>
-
 gboolean gveejay_idle(gpointer data)
 {
     if(gveejay_running())
@@ -1349,18 +1346,11 @@ gboolean gveejay_idle(gpointer data)
         } 
         if( sync )
         {
-//        CALLGRIND_START_INSTRUMENTATION;
-//        CALLGRIND_TOGGLE_COLLECT;
-
           if( gveejay_time_to_sync( get_ui_info() ) )
           {
             veejay_update_multitrack( get_ui_info() );
           }
-
-//      CALLGRIND_TOGGLE_COLLECT;
-//      CALLGRIND_STOP_INSTRUMENTATION;
-//      CALLGRIND_DUMP_STATS;
-
+          vj_midi_handle_events( info->midi );
         }
     }
     return TRUE;
@@ -3779,11 +3769,6 @@ static void update_rgbkey_from_slider()
                                               &color );
         info->entry_lock = 0;
     }
-}
-
-int update_gveejay()
-{
-    return vj_midi_handle_events( info->midi );
 }
 
 static  GdkPixbuf   *update_pixmap_entry( int status )

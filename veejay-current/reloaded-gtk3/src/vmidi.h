@@ -17,21 +17,14 @@
  */
 #ifndef VMIDI_H
 #define VMIDI_H
-
+#ifdef HAVE_ALSA
 void    *vj_midi_new(void *mw);
-
 int    vj_midi_handle_events(void *vv);
-
 void    vj_midi_play(void *vv );
-
 void    vj_midi_learn( void *vv );
-
 void    vj_midi_load(void *vv, const char *filename);
-
 void    vj_midi_save(void *vv, const char *filename);
-
 void	vj_midi_reset( void *vv );
-
 void    vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra );
 void    vj_midi_learning_vims_simple( void *vv, char *widget, int id );
 void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra );
@@ -39,4 +32,21 @@ void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, in
 void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b );
 void    vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg );
 void    vj_midi_learning_vims_spin( void *vv, char *widget, int id );
+#else
+#define vj_midi_new(a) NULL
+#define vj_midi_handle_events(a)
+#define vj_midi_play(a)
+#define vj_midi_learn(a)
+#define vj_midi_load(a,b)
+#define vj_midi_save(a,b)
+#define vj_midi_reset(a)
+#define vj_midi_learning_vims(a,b,c,d)
+#define vj_midi_learning_vims_simple(a,b,c)
+#define vj_midi_learning_vims_complex(a,b,c,d,e)
+#define vj_midi_learning_vims_fx(a,b,c,d,e,f,g)
+#define vj_midi_learning_vims_msg2(a,b,c,d,e)
+#define vj_midi_learning_vims_msg(a,b,c,d)
+#define vj_midi_learning_vims_spin(a,b,c)
+#endif
+
 #endif
