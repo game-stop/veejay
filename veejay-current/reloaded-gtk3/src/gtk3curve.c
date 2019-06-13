@@ -622,7 +622,7 @@ gtk3_curve_draw_labels(GtkWidget *widget, cairo_t *cr, gint hei, gint wid)
   }
 
   incr = 1;
-  sprintf(text,"%d", priv->xaxis_hi );
+  sprintf(text,"%d", (int)priv->xaxis_hi );
   cairo_text_extents(cr,text,&extents);
   while( ((extents.width * grid)/incr) > wid ) {
     incr ++;
