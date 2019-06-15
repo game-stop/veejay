@@ -34,7 +34,7 @@ First, make sure you system is up-to-date, and install the dependencies with:
 ```bash
 sudo apt-get install git autoconf automake libtool m4 gcc libjpeg62-dev \
 libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev  \
-gtk-3.0-dev libxml2-dev libsdl1.2-dev libjack0 libjack-dev jackd1
+gtk-3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1
 ```
 
 #### Build the veejay's applications

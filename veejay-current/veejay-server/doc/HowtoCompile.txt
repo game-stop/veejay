@@ -10,7 +10,7 @@ Required:
 * FFmpeg (libavcodec, libavformat, libavutil, libswscale) *please use ffmpeg instead of libav*
 * libjpeg
 * libxml2 for saving project data
-* SDL for the video window
+* SDL 2 for the video window
 * libdv for playback of DV Video
 * [http://www.gtk.org GTK-2.4 (GTK 2.6 recommended)
 * [http://www.gnome.org GdkPixbuf (comes with Gnome)
@@ -110,7 +110,7 @@ Start another terminal and type:
 
 Open another terminal (depends on sayVIMS, build in step 6)
 <pre>
- $ sayVIMS "600:;"
+ $ sayVIMS -m "600:;"
 </pre>
 
 (or press CTRL-C in the terminal running veejay)
