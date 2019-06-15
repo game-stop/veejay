@@ -2793,8 +2793,6 @@ void	on_curve_clear_parameter_clicked( GtkWidget *widget, gpointer user_data )
 
     multi_vims(VIMS_SAMPLE_KF_CLEAR, "%d %d",info->uc.selected_chain_entry,info->uc.selected_parameter_id);
     info->uc.reload_hint[HINT_KF] = 1;
-    reset_curve(info->curve);
-    vj_kf_select_parameter(info->uc.selected_parameter_id);
 }
 
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
@@ -2890,11 +2888,6 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_SAMPLE_KF_RESET, "%d", i );
 
     info->uc.reload_hint[HINT_KF] = 1;
-
-    GtkWidget *kf_param = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
-    //~ gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param), 0); // <None>
-
-    reset_curve(info->curve);
 }
 
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
@@ -2909,7 +2902,8 @@ void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 			return;
 		set_points_in_curve( GTK3_CURVE_TYPE_LINEAR, info->curve );
 	}
-}	
+}
+
 void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
@@ -2922,7 +2916,8 @@ void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 			return;
 		set_points_in_curve( GTK3_CURVE_TYPE_SPLINE, info->curve );
 	}
-}	
+}
+
 void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
@@ -2934,8 +2929,8 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 			return;
 		set_points_in_curve( GTK3_CURVE_TYPE_FREE, info->curve );
 	}
-
 }
+
 void	on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
@@ -3017,30 +3012,10 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
     GtkWidget *kf_param = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
     gint active_kf_id = gtk_combo_box_get_active (GTK_COMBO_BOX(kf_param));
     if (active_kf_id != -1) {
-        //~ if(active_kf_id == 0){
-            //~ info->uc.selected_parameter_id = -1;
+        vj_kf_select_parameter(active_kf_id);
 
-            //~ if(gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ] ))
-               //~ gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], FALSE);
-
-            //~ if(gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ] ))
-               //~ gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], FALSE);
-
-
-            //~ if(info->status_lock)
-              //~ return;
-
-            //~ vj_kf_reset();
-        //~ } else 
-        {
-            vj_kf_select_parameter(active_kf_id);
-//            KF_CHANGED (active_kf_id);
-            // if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ]))
-            //   gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], TRUE);
-
-            if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ]))
-               gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], TRUE);
-        }
+        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ]))
+           gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], TRUE);
     }
 }
 
