@@ -20,7 +20,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "solarize.h"
 
 vj_effect *solarize_init(int w,int h)

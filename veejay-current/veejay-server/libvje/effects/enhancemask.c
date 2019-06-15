@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "enhancemask.h"
 
 vj_effect *enhancemask_init(int width, int height)

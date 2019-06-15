@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "mtracer.h"
 #include "magicoverlays.h"
 

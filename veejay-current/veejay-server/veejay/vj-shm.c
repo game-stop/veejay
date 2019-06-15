@@ -32,10 +32,11 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <pthread.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
-#include <libvevo/vevo.h>
+#include <veejaycore/vevo.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/avutil.h>
 #include <libplugger/specs/livido.h>

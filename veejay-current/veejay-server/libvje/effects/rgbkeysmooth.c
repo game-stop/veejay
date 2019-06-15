@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "rgbkeysmooth.h"
 
 vj_effect *rgbkeysmooth_init(int w,int h)

@@ -24,11 +24,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
-#include <veejay/vims.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vims.h>
 #include <libvje/vje.h>
-#include <libvjnet/vj-client.h>
+#include <veejaycore/vj-client.h>
 #include <veejay/vj-share.h>
 #include <veejay/vj-shm.h>
 static vj_client	*vj_share_connect(char *hostname, int port)

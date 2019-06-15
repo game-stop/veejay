@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "contrast.h"
 
 vj_effect *contrast_init(int w, int h)

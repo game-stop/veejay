@@ -34,7 +34,7 @@
 #include <jack/ringbuffer.h>
 #include <pthread.h>
 #include <sys/time.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
 #include "bio2jack.h"
 
 /* set to 1 to enable debug messages */

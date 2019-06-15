@@ -28,10 +28,11 @@
 #include <SDL/SDL.h>
 #endif
 #include <stdarg.h>
-#include <libhash/hash.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/hash.h>
 #include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
 #include <veejay/vj-perform.h>
@@ -42,16 +43,16 @@
 #include <veejay/vj-macro.h>
 #include <libel/vj-avcodec.h>
 #include <libsamplerec/samplerecord.h>
-#include <mjpegtools/mpegconsts.h>
-#include <mjpegtools/mpegtimecode.h>
-#include <veejay/vims.h>
+#include <veejaycore/mpegconsts.h>
+#include <veejaycore/mpegtimecode.h>
+#include <veejaycore/vims.h>
 #include <veejay/vj-event.h>
 #ifdef HAVE_JACK
 #include <veejay/vj-jack.h>
 #endif
 #include <libstream/vj-tag.h>
 #include <libstream/vj-vloopback.h>
-#include <liblzo/lzo.h>
+#include <veejaycore/lzo.h>
 #include <veejay/vjkf.h>
 #ifdef HAVE_GL
 #include <veejay/gl.h>
@@ -59,10 +60,10 @@
 #ifdef USE_GDK_PIXBUF
 #include <libel/pixbuf.h>
 #endif
-#include <libvevo/vevo.h>
-#include <libvevo/libvevo.h>
+#include <veejaycore/vevo.h>
+#include <veejaycore/libvevo.h>
 #include <veejay/vj-OSC.h>
-#include <libvjnet/vj-server.h>
+#include <veejaycore/vj-server.h>
 #include <veejay/vj-share.h>
 #include <veejay/vevo.h>
 #include <veejay/vj-misc.h>
@@ -4188,7 +4189,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
         return;
     }
 
-    //FIXME refactor in libvevosample
+    //FIXME refactor in veejaycoresample
     if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->effect_frame1, v->current_edit_list, args[0]) == 1)
     {
         video_playback_setup *s = v->settings;

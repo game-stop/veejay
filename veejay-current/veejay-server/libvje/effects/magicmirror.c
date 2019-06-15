@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "motionmap.h"
 #include "magicmirror.h"
 

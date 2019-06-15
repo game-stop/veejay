@@ -29,7 +29,7 @@
 */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "ripple.h"
 
 #define RIPPLE_DEGREES 360

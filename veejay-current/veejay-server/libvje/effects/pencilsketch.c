@@ -19,10 +19,8 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "pencilsketch.h"
-
-extern int vj_task_available();
 
 vj_effect *pencilsketch_init(int w, int h)
 {

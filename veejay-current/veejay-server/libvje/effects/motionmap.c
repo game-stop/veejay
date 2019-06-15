@@ -20,9 +20,8 @@
 
 #include "common.h"
 #include <limits.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
-#include <veejay/vj-task.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include "softblur.h"
 #include "opacity.h"
 #include "motionmap.h"

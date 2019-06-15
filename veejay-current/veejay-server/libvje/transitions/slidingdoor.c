@@ -19,7 +19,7 @@
  */
 
 #include <libvje/effects/common.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "slidingdoor.h"
 
 vj_effect *slidingdoor_init(int width, int height)

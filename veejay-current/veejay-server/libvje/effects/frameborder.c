@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "frameborder.h"
 
 vj_effect *frameborder_init(int width, int height)

@@ -19,8 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
-#include <veejay/vj-task.h>
+#include <veejaycore/vjmem.h>
 #include "average-blend.h"
 
 extern void ac_average(const uint8_t *src1, const uint8_t *src2, uint8_t *dest, int bytes);

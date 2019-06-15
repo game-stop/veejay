@@ -22,6 +22,8 @@
  * Seems that YUV 4:2:0 (YV12) overlays have problems with multiple SDL video window
  */
 #include <config.h>
+#include <stdint.h>
+#include <veejaycore/defs.h>
 #ifdef HAVE_SDL
 #include <veejay/vj-sdl.h>
 #ifdef HAVE_SDL_TTF
@@ -31,11 +33,11 @@
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
-#include <libvjmsg/vj-msg.h>
-#include <veejay/vims.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vims.h>
+#include <veejaycore/vjmem.h>
 #include <libel/vj-avcodec.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <veejay/libveejay.h>
 #include <libel/avcommon.h>
 #include <string.h>

@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "posterize2.h"
 
 vj_effect *posterize2_init(int w, int h)

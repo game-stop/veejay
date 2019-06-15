@@ -24,10 +24,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 #include <libvje/vje.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libavcodec/version.h>
@@ -35,7 +35,7 @@
 #include <libavformat/version.h>
 #include <libel/avhelper.h>
 #include <libel/av.h>
-#include <libhash/hash.h>
+#include <veejaycore/hash.h>
 
 static struct
 {
@@ -119,7 +119,7 @@ typedef struct {
 	int codec_id;
 } fourcc_node;
 
-//from libvevo/vevo.c
+//from veejaycore/vevo.c
 static inline int hash_key_code( const char *str )           
 {
 	int hash = 5381;

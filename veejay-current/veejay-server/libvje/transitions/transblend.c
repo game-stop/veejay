@@ -19,7 +19,7 @@
  */
 
 #include <libvje/effects/common.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "transblend.h"
 #include <libvje/internal.h>
 

@@ -19,8 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
-#include <veejay/vj-task.h>
+#include <veejaycore/vjmem.h>
 #include "masktransition.h"
 
 vj_effect *masktransition_init(int width, int height)

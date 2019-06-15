@@ -25,7 +25,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "bathroom.h"
 
 static uint8_t *bathroom_frame[4] = { NULL,NULL,NULL,NULL };

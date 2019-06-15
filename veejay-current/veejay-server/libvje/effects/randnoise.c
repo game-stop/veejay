@@ -23,7 +23,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "randnoise.h"
 
 vj_effect *randnoise_init(int w, int h)

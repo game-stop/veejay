@@ -30,9 +30,11 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <stdint.h>
+#include <veejaycore/defs.h>
 #include <libel/lav_io.h>
 //#include <veejay/vj-lib.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
 #ifdef USE_GDK_PIXBUF
 #include <gmodule.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -44,9 +46,9 @@
 #include <lqt.h>
 #include <lqt_version.h>
 #endif
-#include <veejay/vims.h>
-#include <liblzo/lzo.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vims.h>
+#include <veejaycore/lzo.h>
+#include <veejaycore/vjmem.h>
 #include <libel/avcommon.h>
 #include <libel/avhelper.h>
 

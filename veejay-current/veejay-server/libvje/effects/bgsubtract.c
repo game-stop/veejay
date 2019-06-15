@@ -19,8 +19,8 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include <libsubsample/subsample.h>
 #include "softblur.h"
 #include "bgsubtract.h"

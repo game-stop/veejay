@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "dissolve.h"
 
 vj_effect *dissolve_init(int w, int h)

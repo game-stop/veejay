@@ -19,8 +19,9 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "opacitythreshold.h"
 
 vj_effect *opacitythreshold_init(int w, int h)

@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include <libvje/effects/common.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "transop.h"
 
 vj_effect *transop_init(int width, int height)

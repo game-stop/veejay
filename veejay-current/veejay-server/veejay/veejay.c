@@ -22,7 +22,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <sysexits.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
@@ -36,10 +38,9 @@
 #include <veejay/vj-lib.h>
 #include <veejay/vj-event.h>
 #include <veejay/libveejay.h>
-#include <libvevo/libvevo.h>
+#include <veejaycore/libvevo.h>
 #include <libvje/vje.h>
-#include <libvjmsg/vj-msg.h>
-#include <veejay/vims.h>
+#include <veejaycore/vims.h>
 #ifndef X_DISPLAY_MISSING
 #include <veejay/x11misc.h>
 #endif
@@ -51,7 +52,6 @@
 #include <glib-2.0/glib.h>
 #include <glib-2.0/glib-object.h>
 
-extern void	veejay_init_msg_ring(); 
 extern void vj_libav_ffmpeg_version();
 static veejay_t *info = NULL;
 static float override_fps = 0.0;
@@ -69,6 +69,34 @@ static int n_slots_ = 0;
 static int max_mem_ = 0;
 static int live =0;
 static int ta = 0;
+
+static void report_bug(void)
+{
+    veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to http://groups.google.com/group/veejay-discussion?hl=en");
+    veejay_msg(VEEJAY_MSG_WARNING, "Send at least veejay's output and include the command(s) you have used to start it");
+	veejay_msg(VEEJAY_MSG_WARNING, "Also, please consider sending in the recovery files if any have been created");
+	veejay_msg(VEEJAY_MSG_WARNING, "If you compiled it yourself, please include information about your system");
+/*
+	veejay_msg(VEEJAY_MSG_WARNING, "Dumping core file to: core.%d",getpid() );
+	
+	char cmd[128];
+	memset(cmd,0,sizeof(cmd));
+	sprintf(cmd, "generate-core-file");
+	int fd = open( "veejay.cmd", O_RDWR|O_CREAT );
+	if(!fd) {
+		veejay_msg(VEEJAY_MSG_ERROR,"Unable to write gdb batch commands, no core dump written. ");
+	} else {
+		int res = write( fd , cmd, strlen(cmd));
+		close(fd);
+		sprintf(cmd, "gdb -p %d -batch -x veejay.cmd", getpid());
+		veejay_msg(VEEJAY_MSG_WARNING,"Please wait! Running command '%s'", cmd);
+		system(cmd);
+		veejay_msg(VEEJAY_MSG_WARNING, "Done!");
+		veejay_msg(VEEJAY_MSG_INFO, "Please bzip2 and upload the coredump somewhere and tell us where to find it!");
+	}
+	*/	
+
+}
 
 static void CompiledWith()
 {
@@ -173,9 +201,6 @@ static void CompiledWith()
 #endif
 #ifdef HAVE_LIBLO
 	fprintf(stdout,"\tSupport for liblo\n");
-#endif
-#ifdef HAVE_MJPEGTOOLS
-	fprintf(stdout,"\tSupport for the Mjpegtools\n");
 #endif
 #ifdef HAVE_QRCODE
 	fprintf(stdout,"\tSupport for QR code\n");

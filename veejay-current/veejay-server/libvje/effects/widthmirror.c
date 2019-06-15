@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "widthmirror.h"
 
 vj_effect *widthmirror_init(int max_width,int h)

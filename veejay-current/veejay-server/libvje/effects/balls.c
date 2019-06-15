@@ -59,7 +59,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <math.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "common.h"
 #include "blob.h"
 

@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "bwotsu.h"
 
 vj_effect *bwotsu_init(int w, int h)

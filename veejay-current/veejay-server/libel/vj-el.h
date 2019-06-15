@@ -21,7 +21,7 @@
 #include <config.h>
 #include <libel/lav_io.h>
 #include <libvje/vje.h>
-#include <veejay/vims.h>
+#include <veejaycore/vims.h>
 #define N_EL_FRAME(x)  ( (x)&0xfffffffffffffLLU  )
 #define N_EL_FILE(x) (uint32_t)  ( ((x)>>52)&0xfffU ) 
 /* ((file)&0xfff<<52) */

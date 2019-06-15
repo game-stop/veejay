@@ -49,10 +49,6 @@ AC_ARG_ENABLE([sanitizer],
         AC_HELP_STRING([--enable-sanitizer],
                  [Enable AddressSanitizer]))
 
-AC_ARG_ENABLE([portleak],
-	      	AC_HELP_STRING([--enable-portleak],
-			      [Compile in vevo port validation (requires --enable-strict)]))
-
 AC_ARG_ENABLE([debug],
 		AC_HELP_STRING([--enable-debug],
 			     [Compile in debugging information]))
@@ -240,13 +236,6 @@ else
 fi
 if test "x$enable_sanitizer" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fsanitize=address -fno-omit-frame-pointer"
- AC_MSG_RESULT([yes])
-else
- AC_MSG_RESULT([no])
-fi
-AC_MSG_CHECKING(whether to compile in vevo port tracking)
-if test "x$enable_portleak" = "xyes"; then
- debugCFLAGS="$debugCFLAGS -DVEVO_TRACKPORTS"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -548,16 +537,6 @@ then
 		have_asm_avx=true
 	fi
 
-dnl	ac_cv_flag_avx=yes
-dnl	AC_MSG_CHECKING([for AVX assembler])
-dnl	AC_COMPILE_IFELSE(
-dnl		[AC_LANG_PROGRAM([[]], 
-dnl			[[asm("vmovaps %ymm1,%ymm0");]])],
-dnl				[AC_DEFINE(HAVE_ASM_AVX,1,[define if compiler supports avx inline assembler])
-dnl					AC_MSG_RESULT(yes)
-dnl					ac_cv_flag_avx=no
-dnl				],[AC_MSG_RESULT(no)])
-
 fi
 
 if test x$have_ppccpu = xtrue
@@ -607,11 +586,6 @@ EOF
     fi
 fi
 
-have_mjpegtools=false
-AC_SUBST(MJPEGTOOLS_CFLAGS)
-AC_SUBST(MJPGETOOLS_LIBS)
-
-PKG_CHECK_MODULES(LIBPNG, [libpng], have_libpng=true,have_libpng=false)
 PKG_CHECK_MODULES(LIBQRENCODE,[libqrencode >= 3.4.2], have_qrencode=true,have_qrencode=false)
 if test x$have_qrencode = xfalse;
 then
@@ -631,8 +605,6 @@ AC_SUBST(GLIB_LIBS)
 
 AC_SUBST(LIBQRENCODE_LIBS)
 AC_SUBST(LIBQRENCODE_CFLAGS)
-AC_SUBST(LIBPNG_LIBS)
-AC_SUBST(LIBPNG_CFLAGS)
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
@@ -952,14 +924,6 @@ if test x$with_xml2 != xno; then
 		AC_DEFINE(HAVE_XML2,1,[with XML])
 	],
 	[ have_xml2=false ])
-	
-dnl AM_PATH_XML2(2.5.4, [ 
-dnl	have_xml2=true
-dnl	AC_DEFINE(HAVE_XML2,,[Compiling with XML2])],,)
-dnl
-dnl	if test x$have_xml2 = xfalse ; then
-dnl		AC_MSG_WARN([cannot find The XML C library for gnome])
-dnl	fi
 fi
 
 if test x$have_xml2 != xtrue ; then
@@ -1030,6 +994,19 @@ if test x$have_unwind = xtrue ; then
    AC_DEFINE(HAVE_LIBUNWIND,1,[Define if you have libunwind installed])
 fi
 
+have_veejaycore=false
+PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.63 ],
+                  [ AC_SUBST(VEEJAYCORE_CFLAGS)
+                    AC_SUBST(VEEJAYCORE_LIBS)
+                    have_veejaycore=true
+                    AC_DEFINE(HAVE_VEEJAYCORE,1,[Veejay 1.5.x installed])
+                    ],
+                    [have_veejaycore=false])
+
+if test x$have_veejaycore != xtrue ; then
+    AC_MSG_ERROR([Cannot find libveejaycore 1.5.63 or later])
+fi
+
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
 AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
@@ -1057,8 +1034,6 @@ AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE2, test x$have_freetype2 = xtrue)
-AM_CONDITIONAL(HAVE_MJPEGTOOLS, test x$have_mjpegtools = xtrue )
-AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -1147,30 +1122,17 @@ dnl
 
 AC_CONFIG_FILES([Makefile])
 
-if test "$have_mjpegtools" = "false" ; then
-	AC_CONFIG_FILES([thirdparty/mjpegtools/Makefile])
-fi
-
 AC_CONFIG_FILES([
 thirdparty/Makefile
-thirdparty/fastarm/Makefile
-thirdparty/aclib/Makefile
 thirdparty/bio2jack/Makefile
-thirdparty/libhash/Makefile
-thirdparty/liblzo/Makefile
 thirdparty/libOSC/Makefile
 thirdparty/libresample/Makefile
 libvjxml/Makefile
-libvjmsg/Makefile
-libvevo/Makefile
-libvjmem/Makefile
 libvje/Makefile
 libplugger/Makefile
 libsample/Makefile
-libvjnet/Makefile
 libqrwrap/Makefile
 libsubsample/Makefile
-libyuv/Makefile
 libel/Makefile
 libstream/Makefile
 libsamplerec/Makefile
@@ -1229,6 +1191,7 @@ AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
+AC_MSG_NOTICE([  - Veejay Core                   : ${have_veejaycore}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - FFmpeg/AV AVFormat            : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg/AV AVCodec             : ${have_avcodec} ])
@@ -1248,10 +1211,6 @@ fi
 AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
-
-if test "$have_mjpegtools" = "true"; then
-	AC_MSG_NOTICE([  - Mjpegtools support            : ${have_mjpegtools}])
-fi
 
 AC_MSG_NOTICE([ Optional dependencies])
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])

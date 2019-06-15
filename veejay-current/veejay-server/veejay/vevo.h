@@ -24,7 +24,7 @@
 typedef struct livido_port_t void
 #endif
 
-#include <libvevo/vevo.h>
+#include <veejaycore/vevo.h>
 
 // rename functions
 /*

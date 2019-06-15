@@ -19,8 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
-#include <veejay/vj-task.h>
+#include <veejaycore/vjmem.h>
 #include "lumablend.h"
 
 vj_effect *lumablend_init(int w, int h)

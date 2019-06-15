@@ -24,10 +24,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
-#include <libvevo/libvevo.h>
-#include <veejay/vims.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/libvevo.h>
+#include <veejaycore/vims.h>
 #ifdef HAVE_XML2
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>

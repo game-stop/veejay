@@ -19,8 +19,9 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #ifdef SUPPORT_READ_DV2
 #include <libdv/dv.h>
 #include <stdint.h>
@@ -28,7 +29,7 @@
 #include <libel/vj-dv.h>
 #include <libel/vj-avcodec.h>
 #include <libel/avcommon.h>
-#include <libyuv/yuvconv.h> 
+#include <veejaycore/yuvconv.h> 
 #include <string.h>
 
 #define NTSC_W 720

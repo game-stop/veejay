@@ -31,14 +31,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include <libvje/effects/opacity.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <veejay/vj-viewport-cfg.h>
 #include <veejay/vj-viewport.h>
 #include <math.h>
@@ -2178,7 +2179,7 @@ void	viewport_projection_inc( void *data, int incr, int screen_width, int screen
 #define ANIMAX
 
 #ifdef ANIMAX
-#include <libvjnet/mcastsender.h>
+#include <veejaycore/mcastsender.h>
 #define GROUP "227.0.0.17"
 #define PORT_NUM 1234
 #endif

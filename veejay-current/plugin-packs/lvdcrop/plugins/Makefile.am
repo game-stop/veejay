@@ -10,7 +10,7 @@ if HAVE_GAVL
 lvd_scale0tilt_la_SOURCES = lvd_scale0tilt.c
 endif
 
-INCLUDES=$(FFMPEG_CFLAGS) $(GAVL_CFLAGS) $(VEEJAY_CFLAGS) -I$(top_srcdir)/lvdcrop
+AM_CPPFLAGS=$(FFMPEG_CFLAGS) $(GAVL_CFLAGS) $(VEEJAYCORE_CFLAGS) -I$(top_srcdir)/lvdcrop
 AM_CFLAGS=-I@top_srcdir@/include $(OPTCFLAGS) -DSILENT
 AM_LDFLAGS=-module -avoid-version -lm -export-dynamic -lstdc++ -DDYNAMIC -rdynamic $(FFMPEG_LIBS) $(GAVL_LIBS)
 AM_LIBTOOLFLAGS = --tag=disable-static

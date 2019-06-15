@@ -22,8 +22,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <math.h>
+#include <veejaycore/defs.h>
+#include <libvje/vje.h>
 #include <libvje/internal.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "common.h"
 
 char	**vje_build_param_list( int num, ... )

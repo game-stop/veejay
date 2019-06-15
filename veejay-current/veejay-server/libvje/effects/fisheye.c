@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "fisheye.h"
 
 #define    RUP8(num)(((num)+8)&~8)

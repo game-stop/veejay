@@ -18,15 +18,17 @@
  */
 #include <config.h>
 #include <string.h>
+#include <stdint.h>
+#include <veejaycore/defs.h>
 #include <libsample/sampleadm.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
 #include <libsubsample/subsample.h>
 #include <libsamplerec/samplerecord.h>
 #include <veejay/vj-misc.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libel/vj-avcodec.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 void	sample_reset_encoder(int sample_id);
 
 int sample_record_init(int len)

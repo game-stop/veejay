@@ -26,7 +26,9 @@
 #include <stdint.h>
 #include <math.h>
 #include <sys/types.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
+#include <veejaycore/vj-task.h>
 #define MAX_SCRATCH_FRAMES 50
 #define GREY_LEVELS 256
 

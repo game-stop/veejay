@@ -22,7 +22,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "maskstop.h"
 
 static uint8_t *vvmaskstop_buffer[6];

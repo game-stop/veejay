@@ -45,8 +45,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/defs.h>
 #include <libel/pixbuf.h>
 #include <libqrwrap/vlogo.h>
 #include <libqrwrap/qrwrapper.h>

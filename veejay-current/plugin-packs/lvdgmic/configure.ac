@@ -10,7 +10,6 @@ LVDGMICMICRO_VERSION=1
 LVDGMICVERSION=$LVDGMICMAJOR_VERSION.$LVDGMICMINOR_VERSION.$LVDGMICMICRO_VERSION
 LVDGMICCODENAME="Livido GMIC filters - build $LVDGMICMINOR_VERSION $LVDGMICMICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
-dnl AX_CONFIG_PREFIXED_HEADER([veejay-config.h], [VEEJAY], [config.h])
 
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
@@ -98,9 +97,6 @@ if test x$have_gmic = xfalse;
 then
 	AC_MSG_ERROR([gmic.h not found - please install gmic])
 fi
-
-dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_STDINT_H])
-dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_INTTYPES_H])
 
 AC_CHECK_FUNCS([posix_memalign memalign fmax lround pow bzero gettimeofday memset mmap strndup strstr strncasecmp])
 AC_CHECK_FUNCS([sched_get_priority_max])

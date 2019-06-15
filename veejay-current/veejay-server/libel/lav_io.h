@@ -25,11 +25,9 @@
 #endif
 // play with mlt here, avformat producer/several consumers (we can write to)
 // for normalized output (720x576/480) , dv1394 capture and playback
-#ifdef HAVE_MJPEGTOOLS
-#include <mjpegtools/yuv4mpeg.h>
-#else
-#include <yuv4mpeg.h>
-#endif
+#include <veejaycore/mjpeg_types.h>
+#include <veejaycore/mjpeg_logging.h>
+#include <veejaycore/yuv4mpeg.h>
 
 #define LAV_INTER_UNKNOWN       Y4M_UNKNOWN
 #define LAV_NOT_INTERLACED      Y4M_ILACE_NONE

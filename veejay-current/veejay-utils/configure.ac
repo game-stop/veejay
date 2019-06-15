@@ -90,9 +90,6 @@ AM_PROG_AS
 
 AC_CHECK_HEADERS([fenv.h stdint.h inttypes.h sys/types.h alloca.h])
 
-dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_STDINT_H])
-dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_INTTYPES_H])
-
 AC_CHECK_FUNCS([posix_memalign memalign fmax lround pow bzero gettimeofday memset mmap strndup strstr strncasecmp])
 AC_CHECK_FUNCS([sched_get_priority_max])
 AC_CHECK_FUNCS([select socket getpagesize memcpy])
@@ -182,16 +179,16 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
  have_dl_dlopen=true
 fi
 
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.50],
+PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.65],
 		[	
-		AC_SUBST(VEEJAY_CFLAGS)
-		AC_SUBST(VEEJAY_LIBS)
-		have_veejay=true
-		AC_DEFINE( HAVE_VEEJAY,1, [Veejay Installed])],
-			[have_veejay=false])
+		AC_SUBST(VEEJAYCORE_CFLAGS)
+		AC_SUBST(VEEJAYCORE_LIBS)
+		have_veejaycore=true
+		AC_DEFINE( HAVE_VEEJAYCORE,1, [Veejay Core Installed])],
+			[have_veejaycore=false])
 
-if test x$have_veejay != xtrue; then
-	AC_MSG_ERROR( [Cannot find veejay])
+if test x$have_veejaycore != xtrue; then
+	AC_MSG_ERROR( [Cannot find Veejay Core >= 1.5.65])
 fi
 
 dnl *********************************************************************
@@ -404,7 +401,7 @@ AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
-AC_MSG_NOTICE([  - Veejay                        : ${have_veejay}])
+AC_MSG_NOTICE([  - Veejay Core                   : ${have_veejaycore}])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Optional dependencies:])
 AC_MSG_NOTICE([  - AVUtil                        : ${have_avutil}])

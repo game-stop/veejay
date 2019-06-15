@@ -18,14 +18,16 @@
  */
 #include <config.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <veejaycore/defs.h>
 #include <libel/vj-avcodec.h>
 #include <libel/vj-el.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 #include <stdint.h>
 #include <string.h>
-#include <libyuv/yuvconv.h>
-#include <liblzo/lzo.h>
+#include <veejaycore/yuvconv.h>
+#include <veejaycore/lzo.h>
 #include <libstream/vj-yuv4mpeg.h>
 #ifdef SUPPORT_READ_DV2
 #define __FALLBACK_LIBDV

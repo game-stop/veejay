@@ -44,7 +44,7 @@
    Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "widthmirror.h"
 #include "distort.h"
 

@@ -18,8 +18,10 @@
  */
 #include <config.h>
 #include <string.h>
+#include <stdint.h>
+#include <veejaycore/defs.h>
 #include <libstream/vj-tag.h>
-#include <libhash/hash.h>
+#include <veejaycore/hash.h>
 #include <libvje/vje.h>
 #include <veejay/vjkf.h>
 #include <veejay/vj-shm.h>
@@ -34,13 +36,13 @@
 #include <libstream/vj-dv1394.h>
 #endif
 #include <libsubsample/subsample.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
 #include <libel/vj-avcodec.h>
-#include <libvjnet/vj-client.h>
-#include <veejay/vims.h>
+#include <veejaycore/vj-client.h>
+#include <veejaycore/vims.h>
 #include <veejay/vj-lib.h>
 #include <veejay/vj-misc.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <libvje/internal.h>
 #include <libvje/ctmf/ctmf.h>
 #include <libstream/vj-net.h>
@@ -49,7 +51,7 @@
 #ifdef HAVE_V4L2
 #include <libstream/v4l2utils.h>
 #endif
-#include <libvevo/libvevo.h>
+#include <veejaycore/libvevo.h>
 #include <veejay/vj-misc.h>
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>

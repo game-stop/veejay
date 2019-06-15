@@ -28,7 +28,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "dices.h"
 
 static int g_map_width = 0;

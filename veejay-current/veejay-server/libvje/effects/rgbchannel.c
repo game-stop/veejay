@@ -19,8 +19,8 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include "rgbchannel.h"
 

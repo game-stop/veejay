@@ -29,9 +29,9 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 //#include <libavutil/avutil.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include "softblur.h"
 #include "radioactive.h"
 

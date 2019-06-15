@@ -22,9 +22,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-common.h>
-#include <libvevo/libvevo.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-common.h>
+#include <veejaycore/veejaycore.h>
 #include <lo/lo.h>
 
 //@ client side implementation

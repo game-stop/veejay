@@ -19,7 +19,7 @@
  */
 
 #include <libvje/effects/common.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "transcarot.h"
 
 vj_effect *transcarot_init(int width, int height)

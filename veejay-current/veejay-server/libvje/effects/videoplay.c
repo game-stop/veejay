@@ -20,7 +20,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "videoplay.h"
 
 vj_effect *videoplay_init(int w, int h)

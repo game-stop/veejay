@@ -57,7 +57,7 @@
 */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "boids.h"
 
 typedef struct 

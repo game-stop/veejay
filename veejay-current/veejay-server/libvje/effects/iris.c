@@ -25,7 +25,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "iris.h"
 
 vj_effect *iris_init(int w, int h)

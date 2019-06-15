@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "cartonize.h"
 
 vj_effect *cartonize_init(int w, int h)

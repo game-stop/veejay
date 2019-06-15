@@ -18,7 +18,7 @@
  */
 
 #include <libvje/effects/common.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "transop.h"
 #include "wipe.h"
 

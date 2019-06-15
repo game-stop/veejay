@@ -23,9 +23,10 @@
  */
 #include <config.h>
 #include <stdint.h>
+#include <veejaycore/defs.h>
 #ifdef HAVE_ASM_MMX
-#include <libyuv/mmx.h>
-#include <libyuv/mmx_macros.h>
+#include <veejaycore/mmx.h>
+#include <veejaycore/mmx_macros.h>
 #include "subsample-mmx.h"
 #endif
 
@@ -35,11 +36,11 @@
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <mjpegtools/mjpeg_types.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
-#include <libyuv/yuvconv.h>
-#include <veejay/vj-task.h>
+#include <veejaycore/yuvconv.h>
+#include <veejaycore/vj-task.h>
 
 const char *ssm_id[SSM_COUNT] = {
   "unknown",

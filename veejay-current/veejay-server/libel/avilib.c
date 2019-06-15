@@ -29,8 +29,8 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include "avilib.h"
 
 #define    RUP8(num)(((num)+8)&~8)

@@ -1,7 +1,6 @@
 MAINTAINERCLEANFILES = Makefile.in
 AM_CPPFLAGS = -I$(top_srcdir)/libplugger -I$(includedir) \
-              -I$(top_srcdir)/thirdparty \
-              -I$(top_srcdir)/libvevo	               
+              -I$(top_srcdir)/thirdparty
 
 AM_CPPFLAGS += ${FFMPEG_CFLAGS} 
 

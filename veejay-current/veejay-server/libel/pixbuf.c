@@ -21,19 +21,20 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 #ifdef USE_GDK_PIXBUF
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #endif
 #include <libvje/vje.h>
 #include <libvje/effects/common.h>
 #include <libel/pixbuf.h>
-#include <veejay/vims.h>
+#include <veejaycore/vims.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <libel/avcommon.h>
 #define    RUP8(num)(((num)+8)&~8)
 

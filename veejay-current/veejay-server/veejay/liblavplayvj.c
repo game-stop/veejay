@@ -72,9 +72,9 @@
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
 #endif
-
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-misc.h>
@@ -84,15 +84,15 @@
 #include <libel/vj-avcodec.h>
 #include <libel/pixbuf.h>
 #include <libel/avcommon.h>
-#include <libvjnet/vj-client.h>
+#include <veejaycore/vj-client.h>
 #ifdef HAVE_JACK
 #include <veejay/vj-jack.h>
 #endif
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <veejay/vj-composite.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-OSC.h>
-#include <veejay/vj-task.h>
+#include <veejaycore/vj-task.h>
 #include <veejay/vj-split.h>
 #include <veejay/vj-macro.h>
 #include <libplugger/plugload.h>
@@ -101,7 +101,7 @@
 #include <veejay/vj-sdl-font.h>
 #endif
 #define QUEUE_LEN 1
-#include <veejay/vims.h>
+#include <veejaycore/vims.h>
 #include <libqrwrap/qrwrapper.h>
 #include <sched.h>
 #include <veejay/vj-shm.h>
@@ -111,14 +111,13 @@
 #include <SDL/SDL.h>
 #define MAX_SDL_OUT	2
 #endif
-#include <mpegconsts.h>
-#include <mpegtimecode.h>
+#include <veejaycore/mpegconsts.h>
+#include <veejaycore/mpegtimecode.h>
 #include <libstream/vj-tag.h>
 #include "libveejay.h"
-#include <mjpegtools/mjpeg_types.h>
+#include <veejaycore/mjpeg_types.h>
 #include "vj-perform.h"
-#include <libvjnet/vj-server.h>
-#include "mjpeg_types.h"
+#include <veejaycore/vj-server.h>
 #ifdef HAVE_DIRECTFB
 #include <veejay/vj-dfb.h>
 #endif
@@ -217,8 +216,6 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		if(re)
 			veejay_msg(VEEJAY_MSG_WARNING, "Saved Editlist to %s", recover_edl );
 	}
-
-	report_bug();
 
 	veejay_change_state( info, new_state );
 }

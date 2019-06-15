@@ -42,7 +42,7 @@
    this effect works in YCbCr space now. */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "reflection.h"
 
 static short reflect_aSin[2048];

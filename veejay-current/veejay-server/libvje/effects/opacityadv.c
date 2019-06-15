@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "opacityadv.h"
 
 vj_effect *opacityadv_init(int w, int h)

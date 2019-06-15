@@ -20,10 +20,10 @@
 #include <stdint.h>
 #include <SDL_ttf.h>
 #include <veejay/vj-sdl-font.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
-#include <libyuv/mmx.h>
-#include <libyuv/mmx_macros.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/mmx.h>
+#include <veejaycore/mmx_macros.h>
 #define DEFAULT_FONT ".veejay/default.ttf"
 #define MAX_LINES 10
 

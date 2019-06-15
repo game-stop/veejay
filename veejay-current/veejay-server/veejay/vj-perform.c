@@ -23,9 +23,10 @@
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <veejaycore/defs.h>
 #include <libsample/sampleadm.h>  
 #include <libstream/vj-tag.h>
-#include <libvjnet/vj-server.h>
+#include <veejaycore/vj-server.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
@@ -33,18 +34,18 @@
 #include <math.h>
 #include <libel/vj-avcodec.h>
 #include <veejay/vj-event.h>
-#include <mjpegtools/mpegconsts.h>
-#include <mjpegtools/mpegtimecode.h>
-#include <libyuv/yuvconv.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/mpegconsts.h>
+#include <veejaycore/mpegtimecode.h>
+#include <veejaycore/yuvconv.h>
+#include <veejaycore/vj-msg.h>
 #include <veejay/vj-perform.h>
 #include <veejay/libveejay.h>
 #include <libsamplerec/samplerecord.h>
 #include <libel/pixbuf.h>
 #include <libel/avcommon.h>
 #include <veejay/vj-misc.h>
-#include <veejay/vj-task.h>
-#include <liblzo/lzo.h>
+#include <veejaycore/vj-task.h>
+#include <veejaycore/lzo.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-composite.h>
 #ifdef HAVE_FREETYPE
@@ -55,7 +56,7 @@
 #include <veejay/vj-jack.h>
 #endif
 #include <libvje/internal.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <libvje/effects/opacity.h>
 #include <libvje/effects/masktransition.h>
 #include <libqrwrap/qrwrapper.h>
@@ -2794,7 +2795,6 @@ void vj_perform_record_offline_tag_frame(veejay_t *info)
                 df, frames_left)==-1)
             {
                 veejay_msg(VEEJAY_MSG_WARNING,"Error while auto splitting"); 
-                report_bug();
             }
         }
         else
@@ -2851,7 +2851,6 @@ void vj_perform_record_tag_frame(veejay_t *info) {
             {
                 veejay_msg(VEEJAY_MSG_WARNING,
                     "Error while auto splitting"); 
-                report_bug();
             }
         }
         else

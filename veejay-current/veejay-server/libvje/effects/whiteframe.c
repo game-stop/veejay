@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "whiteframe.h"
 
 vj_effect *whiteframe_init(int w,int h)

@@ -20,7 +20,7 @@
 
 /* distortion effects */
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "rotozoom.h"
 
 static int *test_roto[9];

@@ -21,12 +21,13 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
 #include <libvje/internal.h>
 #include <libplugger/plugload.h>
-#include <veejay/vj-task.h>
+#include <veejaycore/vj-task.h>
 extern vj_effect *vj_effects[]; 
 
 #define VEVO_PLUG_LIVIDO        0xffaa

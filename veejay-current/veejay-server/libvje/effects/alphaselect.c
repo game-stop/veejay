@@ -23,7 +23,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "alphaselect.h"
 
 vj_effect *alphaselect_init(int w, int h)

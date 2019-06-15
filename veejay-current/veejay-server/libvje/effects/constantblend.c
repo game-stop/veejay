@@ -26,7 +26,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "constantblend.h"
 #include <libvje/internal.h>
 

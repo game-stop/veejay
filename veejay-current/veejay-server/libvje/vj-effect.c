@@ -21,15 +21,16 @@
 #include <config.h>
 #include <stdio.h>
 #include <string.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
 #include <libvje/internal.h>
 #include <libavutil/pixfmt.h>
-#include <libel/avcommon.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/avcommon.h>
+#include <veejaycore/vjmem.h>
 #include "effects/common.h"
 #include <libplugger/plugload.h>
-#include <veejay/vims.h>
+#include <veejaycore/vims.h>
 
 uint8_t  pixel_Y_hi_ = 235;
 uint8_t  pixel_U_hi_ = 240;

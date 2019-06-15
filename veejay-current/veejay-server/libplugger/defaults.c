@@ -24,7 +24,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "defaults.h"
 
 #ifndef PATH_MAX

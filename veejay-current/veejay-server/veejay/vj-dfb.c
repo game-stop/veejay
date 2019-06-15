@@ -23,7 +23,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <stdlib.h>
 #include <config.h>
 #ifdef HAVE_DIRECTFB

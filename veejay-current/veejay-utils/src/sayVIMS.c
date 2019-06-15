@@ -29,11 +29,11 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <veejay/vims.h>
-#include <veejay/vje.h>
-#include <veejay/vj-client.h>
-#include <veejay/vjmem.h>
-#include <veejay/vj-msg.h>
+#include <veejaycore/vims.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vj-client.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #ifdef BASE64_AVUTIL
 #include <libavutil/base64.h>
 #endif

@@ -24,14 +24,15 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <dlfcn.h>
-#include <libhash/hash.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
-#include <libvevo/libvevo.h>
+#include <veejaycore/hash.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/libvevo.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
 #include <libplugger/defs.h>
 #include <libplugger/ldefs.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include <libplugger/portdef.h>
 #define LINUX 1 

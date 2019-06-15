@@ -19,7 +19,7 @@
   */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "transform.h"
 
 vj_effect *transform_init(int width,int height)

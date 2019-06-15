@@ -24,7 +24,6 @@
 #define VJE_NEED_INIT -2
 #define VJE_NO_FRAMES -3
 #define VJE_SUCCESS 0
-#include <libvje/vje.h>
 
 #include "./effects/alpha2img.h"
 #include "./effects/alphablend.h"

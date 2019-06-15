@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "coloradjust.h"
 
 vj_effect *coloradjust_init(int w, int h)

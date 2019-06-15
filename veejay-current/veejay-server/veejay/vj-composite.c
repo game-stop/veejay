@@ -26,8 +26,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-viewport.h>
@@ -36,8 +37,8 @@
 #include <libavutil/pixfmt.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-split.h>
-#include <libyuv/yuvconv.h>
-#include <veejay/vims.h>
+#include <veejaycore/yuvconv.h>
+#include <veejaycore/vims.h>
 #ifdef HAVE_GL
 #include <veejay/gl.h>
 #endif

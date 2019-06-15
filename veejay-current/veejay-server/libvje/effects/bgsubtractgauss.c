@@ -20,11 +20,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <float.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <math.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
-#include <libyuv/yuvconv.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/yuvconv.h>
+#include <veejaycore/vj-msg.h>
 #include <libsubsample/subsample.h>
 #include "bgsubtractgauss.h"
 #include "common.h"

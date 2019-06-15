@@ -25,7 +25,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "tripplicity.h"
 
 vj_effect *tripplicity_init(int w, int h)

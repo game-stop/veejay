@@ -26,7 +26,7 @@
 */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "nervous.h"
 
 #define		N_MAX	100

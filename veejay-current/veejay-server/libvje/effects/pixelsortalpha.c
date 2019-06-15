@@ -31,7 +31,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "pixelsortalpha.h"
 
 vj_effect *pixelsortalpha_init(int w, int h)

@@ -19,9 +19,8 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <libvje/internal.h>
-#include <veejay/vj-task.h>
 #include "magicoverlaysalpha.h"
 
 vj_effect *overlaymagicalpha_init(int w, int h)

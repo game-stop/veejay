@@ -19,7 +19,7 @@
  */
 
 #include <libvje/effects/common.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "transline.h"
 
 vj_effect *transline_init(int width, int height)

@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "levelcorrection.h"
 
 vj_effect *levelcorrection_init(int w,int h)

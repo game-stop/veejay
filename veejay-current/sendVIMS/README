@@ -9,8 +9,7 @@ requirements:
 	veejay-1.5.50
 
 pre build (optional):
-	copy the vims.h file from veejay-current/veejay-server/veejay/vims.h
-	The vims.h is taken from veejay 1.5.50
+	copy the vims.h file from veejay-core/veejaycore/vims.h
 
 	perl parse-vims.pl vims.h
 

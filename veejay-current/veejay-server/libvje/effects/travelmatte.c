@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "travelmatte.h"
 
 vj_effect *travelmatte_init(int w, int h)

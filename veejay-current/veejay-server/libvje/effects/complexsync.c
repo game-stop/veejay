@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "complexsync.h"
 
 static uint8_t *c_outofsync_buffer[4] = { NULL,NULL,NULL, NULL };

@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "keyselect.h"
 
 vj_effect *keyselect_init(int w, int h)

@@ -23,7 +23,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "waterrippletv.h"
 
 static uint8_t *ripple_data[3];

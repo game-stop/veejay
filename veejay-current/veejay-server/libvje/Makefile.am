@@ -10,11 +10,6 @@ AM_CPPFLAGS += $(FFMPEG_CFLAGS) $(GLIB_CFLAGS)
 
 AM_CFLAGS = $(VJE_CFLAGS) 
 
-pkginclude_HEADERS=vje.h
-
-EXTRA_DIST = vje.h
-EXTRA_DIST += specs/FreeFrame.h specs/frei0r.h
-
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 

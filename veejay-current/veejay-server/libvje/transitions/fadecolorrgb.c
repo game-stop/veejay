@@ -19,7 +19,7 @@
  */
 
 #include <libvje/effects/common.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "fadecolorrgb.h"
 
 vj_effect *fadecolorrgb_init(int w,int h)

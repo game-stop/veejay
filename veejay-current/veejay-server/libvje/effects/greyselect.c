@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "greyselect.h"
 
 vj_effect *greyselect_init(int w, int h)

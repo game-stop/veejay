@@ -36,18 +36,19 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <libhash/hash.h>
+#include <veejaycore/hash.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
-#include <veejay/vims.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vims.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 #include <libplugger/portdef.h>
-#include <libvevo/libvevo.h>
+#include <veejaycore/libvevo.h>
 #include <libplugger/defs.h>
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libplugger/utility.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <libavutil/avutil.h>
 #ifndef SAMPLE_MAX_PARAMETERS
 #define SAMPLE_MAX_PARAMETERS 32 //sampleadm.h

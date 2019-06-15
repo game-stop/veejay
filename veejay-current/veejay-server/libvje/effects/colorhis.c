@@ -19,10 +19,9 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <libavutil/pixfmt.h>
-#include <libyuv/yuvconv.h>
-#include <veejay/vims.h>
+#include <veejaycore/yuvconv.h>
 #include "colorhis.h"
 
 vj_effect *colorhis_init(int w, int h)

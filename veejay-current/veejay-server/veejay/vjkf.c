@@ -24,12 +24,13 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vjmem.h>
 #include <string.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvevo/vevo.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vevo.h>
 #include <veejay/vevo.h>
-#include <libvevo/libvevo.h>
+#include <veejaycore/libvevo.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-tag.h>
 #include <assert.h>

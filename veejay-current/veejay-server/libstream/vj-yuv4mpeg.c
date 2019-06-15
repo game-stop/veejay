@@ -21,17 +21,21 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <pthread.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
+#include <veejaycore/mjpeg_logging.h>
+#include <veejaycore/yuv4mpeg.h>
 #include <libstream/vj-yuv4mpeg.h>
 #include <string.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 
 static int lock(vj_yuv *t)
 {

@@ -30,7 +30,7 @@
 */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "lumamask.h"
 
 static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };

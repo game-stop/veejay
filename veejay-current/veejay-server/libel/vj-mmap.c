@@ -25,8 +25,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <libel/vj-mmap.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 
 #define PADDED(a,m) ( a > 0 ? (a / m->page_size) * m->page_size  : 0)
 

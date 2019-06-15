@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "photoplay.h"
 
 vj_effect *photoplay_init(int w, int h)

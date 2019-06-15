@@ -43,7 +43,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "radialblur.h"
 
 static uint8_t *radial_src[4] = { NULL,NULL,NULL,NULL};

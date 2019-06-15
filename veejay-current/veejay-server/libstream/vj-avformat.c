@@ -22,16 +22,17 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <veejaycore/defs.h>
 #include <libavutil/time.h>
 #include <libavcodec/avcodec.h>
 #include <libstream/vj-tag.h>
-#include <libyuv/yuvconv.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/yuvconv.h>
+#include <veejaycore/vjmem.h>
 #include <libavutil/pixfmt.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
 #include <libstream/vj-avformat.h>
 #include <time.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <libel/avcommon.h>
 #include <libel/avhelper.h>
 

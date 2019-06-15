@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "neighbours3.h"
 
 vj_effect *neighbours3_init(int w, int h)

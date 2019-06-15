@@ -18,9 +18,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include "common.h"
-#include <libvjmem/vjmem.h>
-#include <libyuv/yuvconv.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/yuvconv.h>
+#include <veejaycore/vj-msg.h>
 #include "softblur.h"
 #include "cali.h"
 

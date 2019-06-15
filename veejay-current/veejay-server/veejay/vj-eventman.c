@@ -17,13 +17,13 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <string.h>
-#include <libvevo/vevo.h>
+#include <veejaycore/vevo.h>
 #include <veejay/vj-event.h>
-#include <veejay/vims.h>
+#include <veejaycore/vims.h>
 #include <veejay/vevo.h>
-#include <libvevo/libvevo.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/libvevo.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 
 #define MAX_INDEX 1024
 

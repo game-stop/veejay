@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "slice.h"
 
 static uint8_t *slice_frame[4] = { NULL,NULL,NULL,NULL };

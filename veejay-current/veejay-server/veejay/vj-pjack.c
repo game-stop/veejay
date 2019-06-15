@@ -19,6 +19,8 @@
 
 #include <config.h>
 #ifdef HAVE_JACK
+#include <stdint.h>
+#include <veejaycore/defs.h>
 #include <bio2jack/bio2jack.h>
 #include <libel/vj-el.h>
 static int driver = 0;

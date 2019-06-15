@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "colmorphology.h"
 
 typedef uint8_t (*morph_func)(uint8_t *kernel, uint8_t mt[9] );

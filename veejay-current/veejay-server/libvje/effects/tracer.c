@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "tracer.h"
 
 #define func_opacity(a,b,p,q) (  ((a * p) + (b * q)) >> 8 )

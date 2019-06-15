@@ -18,7 +18,7 @@ LIVIDO_PLUGIN
 
 #include <libavutil/cpu.h>
 #include <libswscale/swscale.h>
-#include <veejay/avcommon.h>
+#include <veejaycore/avcommon.h>
 typedef struct
 {
 	struct SwsContext *sws;

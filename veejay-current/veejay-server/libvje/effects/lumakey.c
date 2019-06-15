@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "lumakey.h"
 
 vj_effect *lumakey_init(int width, int height)

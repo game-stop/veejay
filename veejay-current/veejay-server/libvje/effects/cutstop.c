@@ -22,7 +22,7 @@
 */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "cutstop.h"
 
 static uint8_t *vvcutstop_buffer[4] = { NULL,NULL,NULL,NULL };

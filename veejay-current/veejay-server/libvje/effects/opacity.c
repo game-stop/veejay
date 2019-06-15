@@ -36,8 +36,7 @@
 
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
-#include <veejay/vj-task.h>
+#include <veejaycore/vjmem.h>
 #include "opacity.h"
 
 vj_effect *opacity_init(int w, int h)

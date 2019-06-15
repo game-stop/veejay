@@ -24,7 +24,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "radcor.h"
 
 vj_effect *radcor_init(int w, int h)

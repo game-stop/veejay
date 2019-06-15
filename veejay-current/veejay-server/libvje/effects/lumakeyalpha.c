@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "lumakeyalpha.h"
 
 vj_effect *lumakeyalpha_init(int width, int height)

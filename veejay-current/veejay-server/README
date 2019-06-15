@@ -33,7 +33,7 @@ While playing, you can record the resulting video directly to disk (video sampli
 ====== quick install:
 
    order of packages:
-    veejay-server, veejay-client, veejay-utils, plugin-packs
+    veejay-core, veejay-server, veejay-client, veejay-utils, plugin-packs
 
    for each package:
      ./autogen.sh

@@ -19,7 +19,6 @@
 #ifndef VJ_PIXBUF_H
 #define VJ_PIXBUF_H
 #include <config.h>
-#include <libvje/vje.h>
 typedef struct
 {	
 	int	w;

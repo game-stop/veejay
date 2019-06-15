@@ -23,7 +23,8 @@
 #include <config.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vjmem.h>
 #ifdef SUPPORT_READ_DV2
 #include <stdint.h>
 #include <unistd.h>
@@ -31,7 +32,7 @@
 #include <fcntl.h>
 #include <libel/vj-el.h>
 #include <libel/vj-dv.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
 #include <libstream/vj-dv1394.h>
 #include <libstream/dv1394.h>
 #include <sys/mman.h>

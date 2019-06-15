@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "crosspixel.h"
 
 static uint8_t *cross_pixels[4] = { NULL,NULL,NULL, NULL};

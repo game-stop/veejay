@@ -30,24 +30,25 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include <libhash/hash.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/hash.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
-#include <libvevo/libvevo.h>
+#include <veejaycore/libvevo.h>
 #include <libplugger/defs.h>
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libplugger/portdef.h>
 #include <libplugger/defaults.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include <libplugger/utility.h>
 #include <libplugger/livido-loader.h>
 #include <libsubsample/subsample.h>
 #include <libel/avcommon.h>
 #include <veejay/vj-shm.h>
-#include <veejay/vims.h>
+#include <veejaycore/vims.h>
 #define LIVIDO_COPY 1
 
 #define IS_RGB_PALETTE( p ) ( p < 512 ? 1 : 0 )

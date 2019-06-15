@@ -18,7 +18,7 @@
  */
 #ifndef VJ_YUV4MPEG_H
 #define VJ_YUV4MPEG_H
-#include <mjpegtools/mpegconsts.h>
+#include <veejaycore/mpegconsts.h>
 
 typedef struct {
 	pthread_mutex_t mutex;

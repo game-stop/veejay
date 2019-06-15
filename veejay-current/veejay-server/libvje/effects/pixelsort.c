@@ -31,7 +31,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "pixelsort.h"
 
 vj_effect *pixelsort_init(int w, int h)

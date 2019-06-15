@@ -29,15 +29,16 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #ifdef HAVE_V4L2
 #include <linux/videodev2.h>
 #include <libstream/v4l2utils.h>
 #endif
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
-#include <veejay/vims.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vims.h>
 #include <libavutil/pixfmt.h>
 #include <libel/avcommon.h>
 #include <libstream/vj-vloopback.h>

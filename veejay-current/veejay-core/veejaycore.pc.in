@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: veejaycore
+Description: visual instrument and realtime video sampler
+Version: @VERSION@
+Libs: -L${libdir} -lveejaycore
+Cflags: -I${includedir}

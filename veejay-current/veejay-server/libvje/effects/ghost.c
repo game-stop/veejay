@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "ghost.h"
 
 static uint8_t 		*ghost_buf[4] = { NULL,NULL,NULL, NULL};

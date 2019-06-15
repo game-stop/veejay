@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "alphaflatten.h"
 
 vj_effect *alphaflatten_init(int w, int h)

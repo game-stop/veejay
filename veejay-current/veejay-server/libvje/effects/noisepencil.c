@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "noisepencil.h"
 
 static uint8_t *Yb_frame = NULL;

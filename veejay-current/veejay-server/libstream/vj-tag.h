@@ -40,7 +40,7 @@
 #include <config.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-yuv4mpeg.h>
-#include <libvjnet/vj-client.h>
+#include <veejaycore/vj-client.h>
 #include <libstream/vj-dv1394.h>
 #ifdef USE_GDK_PIXBUF
 typedef struct

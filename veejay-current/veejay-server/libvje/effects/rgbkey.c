@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 #include "rgbkey.h"

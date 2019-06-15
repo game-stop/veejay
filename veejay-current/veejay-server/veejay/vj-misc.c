@@ -28,20 +28,21 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/statfs.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-tag.h>
 #include <veejay/vj-misc.h>
 #include <veejay/vj-lib.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <libvje/internal.h>
 #ifdef HAVE_JPEG
 #include <veejay/jpegutils.h>
 #endif
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
 #include <libel/avcommon.h>
 #include <libxml/xmlmemory.h>
@@ -226,7 +227,7 @@ filelist_t *find_media_files( veejay_t *info )
 	return fl;
 }
 
-/* TODO: libvevosample
+/* TODO: veejaycoresample
  * fx state is currently global, damage control is to check fx chain of current playing sample
  * for FX that needs a background frame.
  * before: apply on all FX

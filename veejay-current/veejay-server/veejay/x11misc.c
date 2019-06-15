@@ -24,7 +24,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vj-msg.h>
 
 #ifdef HAVE_XINERAMA
 #include <X11/extensions/Xinerama.h>

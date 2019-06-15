@@ -25,7 +25,7 @@
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #include <libvjxml/vj-xml.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 static char *UTF8toLAT1(unsigned char *in)
 {
 	if (in == NULL)

@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <config.h>
 #include <libvje/vje.h>
-#include <libhash/hash.h>
+#include <veejaycore/hash.h>
 #include <libel/vj-el.h>
 #ifdef HAVE_XML2
 #include <libxml/xmlmemory.h>

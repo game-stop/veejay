@@ -49,7 +49,7 @@
 */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "blob.h"
 
 typedef struct 

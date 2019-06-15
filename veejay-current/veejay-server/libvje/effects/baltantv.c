@@ -24,7 +24,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "baltantv.h"
 
 #define PLANES 32

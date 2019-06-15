@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "average.h"
 
 static double *running_sum[4] = { NULL, NULL, NULL, NULL };

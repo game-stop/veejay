@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include "common.h"
- #include <libvjmem/vjmem.h>
+ #include <veejaycore/vjmem.h>
 #include "overclock.h"
 
 vj_effect *overclock_init(int w, int h)

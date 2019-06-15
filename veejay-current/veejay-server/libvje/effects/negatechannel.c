@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "negatechannel.h"
 
 vj_effect *negatechannel_init(int w, int h)

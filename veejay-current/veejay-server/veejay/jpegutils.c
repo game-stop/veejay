@@ -31,9 +31,12 @@
 #include <jpeglib.h>
 
 #include <jerror.h>
+#ifdef STRICT_CHECKING
 #include <assert.h>
-
-#include <libvjmsg/vj-msg.h>
+#endif
+#include <stdint.h>
+#include <veejaycore/defs.h>
+#include <veejaycore/vj-msg.h>
 
 #include "jpegutils.h"
 #include <libel/lav_io.h>
@@ -696,7 +699,9 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 		     y += 2, yc += numfields) {
 		    xd = yc * width / 2;
 		    for (x = 0; x < width / 2; x++, xd++) {
-			assert(xd < (width * height / 4));
+#ifdef STRICT_CHECKING
+            assert(xd < (width * height / 4));
+#endif
 			raw1[xd] = (chr1[y][x] + chr1[y + 1][x]) >> 1;
 			raw2[xd] = (chr2[y][x] + chr2[y + 1][x]) >> 1;
 		    }

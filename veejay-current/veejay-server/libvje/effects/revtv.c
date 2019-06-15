@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "revtv.h"
 
 vj_effect *revtv_init(int max_width, int max_height)

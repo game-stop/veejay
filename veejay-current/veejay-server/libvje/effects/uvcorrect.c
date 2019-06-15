@@ -37,7 +37,7 @@
   *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
   */
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "uvcorrect.h"
 
 static uint8_t *chrominance = NULL;

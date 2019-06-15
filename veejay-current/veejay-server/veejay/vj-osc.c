@@ -26,28 +26,29 @@
 */
 
 #include <config.h>
-#include <veejay/vims.h>
+#include <veejaycore/vims.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <libOSC/libosc.h>
+#include <veejaycore/defs.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
 #include <veejay/vj-lib.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 #include <veejay/vj-OSC.h>
 #include <veejay/vj-macro.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <netinet/in.h>
-#include <veejay/vims.h>
 #include <veejay/vj-lib.h>
 #include <veejay/vj-event.h>
 #include <veejay/vj-OSC.h>
-#include <libvevo/libvevo.h>
-#include <libvevo/vevo.h>
+#include <veejaycore/libvevo.h>
+#include <veejaycore/vevo.h>
 static veejay_t *osc_info;
 
 #ifdef HAVE_LIBLO
@@ -59,8 +60,7 @@ static vevo_port_t **osc_clients = NULL;
 #include <sys/types.h>
 #include <libstream/vj-tag.h>
 #include <libsample/sampleadm.h>
-#include <libvevo/vevo.h>
-#include <libvevo/libvevo.h>
+#include <veejaycore/vevo.h>
 
 #define NUM_RECEIVE_BUFFERS 100
 

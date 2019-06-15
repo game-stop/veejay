@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "mirrors.h"
 
 vj_effect *mirrors_init(int width,int height)

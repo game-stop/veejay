@@ -24,7 +24,7 @@
    of this effect */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "chromamagickalpha.h"
 // FIXME: mode 8 and 9 corrupt (green/purple cbcr)
 

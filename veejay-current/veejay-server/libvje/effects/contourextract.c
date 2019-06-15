@@ -20,10 +20,10 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include <libavutil/avutil.h>
-#include <libvjmsg/vj-msg.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/yuvconv.h>
 #include "softblur.h"
 #include "diff.h"
 #include "contourextract.h"

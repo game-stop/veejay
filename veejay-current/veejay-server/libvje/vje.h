@@ -37,42 +37,6 @@ typedef struct
 	int ref;
 } vjp_kf;   
 
-typedef struct VJFrame_t 
-{
-    int stride[4];
-	uint8_t *data[4];
-	int	uv_len;
-	int	len;
-	int	uv_width;
-	int	uv_height;
-	int	shift_v;
-	int	shift_h;
-	int	format;
-	int	width;
-	int	height;
-	int	ssm;
-	int	stand; //ccir/jpeg
-	float	fps;
-	double	timecode;
-} VJFrame __attribute__((aligned(16)));
-
-typedef struct VJRectangle_t
-{
-	int top;
-	int bottom;
-	int left;
-	int right;
-} VJRectangle;
-
-typedef struct VJFrameInfo_t
-{
-	int width;
-	int height;
-	float fps;
-	int64_t timecode;
-	uint8_t inverse;
-} VJFrameInfo __attribute__((aligned(16)));
-
 typedef struct {
 	char **description;
 	int limit;

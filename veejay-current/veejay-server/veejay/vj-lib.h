@@ -22,9 +22,9 @@
 #include <config.h>
 #include <sys/time.h>
 #include <libsample/sampleadm.h>
-#include <libvjnet/vj-server.h>
-#include <libvjnet/vj-client.h>
-#include <libyuv/yuvconv.h>
+#include <veejaycore/vj-server.h>
+#include <veejaycore/vj-client.h>
+#include <veejaycore/yuvconv.h>
 #include <libstream/vj-yuv4mpeg.h>
 #include <veejay/vj-sdl.h>
 #include <libel/lav_io.h>

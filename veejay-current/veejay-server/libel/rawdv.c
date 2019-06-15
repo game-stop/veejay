@@ -24,8 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <libvjmsg/vj-msg.h>
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vj-msg.h>
+#include <veejaycore/vjmem.h>
 #include <libel/vj-mmap.h>
 #include <libdv/dv.h>
 #include <libavutil/avutil.h>

@@ -19,7 +19,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "complexinvert.h"
 
 vj_effect *complexinvert_init(int w, int h)

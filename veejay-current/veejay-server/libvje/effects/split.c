@@ -17,7 +17,7 @@
  */
 
 #include "common.h"
-#include <libvjmem/vjmem.h>
+#include <veejaycore/vjmem.h>
 #include "split.h"
 
 static uint8_t *split_buf[4] = { NULL,NULL,NULL, NULL };

@@ -26,8 +26,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
+#include <veejaycore/vjmem.h>
+#include <veejaycore/vj-msg.h>
 #include <libel/elcache.h>
 
 typedef struct
