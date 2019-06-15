@@ -35,7 +35,7 @@
 #include <assert.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
-#include <mjpegtools/mjpeg_types.h>
+#include <veejaycore/mjpeg_types.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
