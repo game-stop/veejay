@@ -71,7 +71,8 @@
 #define VJ_IMAGE_EFFECT_MAX vj_effect_get_max_i()
 #define VJ_VIDEO_EFFECT_MIN vj_effect_get_min_v()
 #define VJ_VIDEO_EFFECT_MAX vj_effect_get_max_v()
-
+static int recount_hash = 1;
+static unsigned int sample_count = 0;
 static int this_sample_id = 0;  /* next available sample id */
 static int next_avail_num = 0;  /* available sample id */
 static int initialized = 0; /* whether we are initialized or not */
@@ -89,8 +90,11 @@ extern int    veejay_sprintf( char *s, size_t size, const char *format, ... );
 
 unsigned int sample_size()
 {
-//    return this_sample_id;
-    return (unsigned int) hash_count( SampleHash );
+    if(recount_hash) {
+        sample_count = (unsigned int) hash_count( SampleHash );
+        recount_hash = 0;
+    }
+    return sample_count;
 }
 
 int sample_highest()
@@ -384,6 +388,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 
 	si->macro = vj_macro_new();
 
+    recount_hash = 1;
+
     return si;
 }
 
@@ -503,10 +509,6 @@ int sample_copy(int sample_id)
 
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-//      copy->effect_chain[i] =
-//          (sample_eff_chain *) vj_malloc(sizeof(sample_eff_chain));
-//
-
         copy->effect_chain[i] = &b[i];
 
         if (copy->effect_chain[i] == NULL)
@@ -528,6 +530,8 @@ int sample_copy(int sample_id)
 
     if (sample_store(copy) != 0)
         return 0;
+
+    recount_hash = 1;
 
     return copy->sample_id;
 }
@@ -1076,6 +1080,8 @@ int sample_del(int sample_id)
 		vj_macro_free( si->macro );
 
         free(si);
+
+        recount_hash = 1;
 
         return 1;
     }

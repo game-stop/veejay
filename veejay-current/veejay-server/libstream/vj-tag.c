@@ -61,6 +61,8 @@
 #define SOURCE_NAME_LEN 255
 
 #include <libplugger/plugload.h>
+static int recount_hash = 1;
+static unsigned int sample_count = 0;
 static veejay_t *_tag_info = NULL;
 static hash_t *TagHash = NULL;
 static int this_tag_id = 0;
@@ -168,8 +170,11 @@ int vj_tag_highest_valid_id()
 
 unsigned int vj_tag_size()
 {
-//    return this_tag_id;
-    return (unsigned int) hash_count( TagHash );
+    if(recount_hash) {
+        sample_count = (unsigned int) hash_count( TagHash );
+        recount_hash = 0;
+    }
+    return sample_count;
 }
 
 void vj_tag_set_veejay_t(void *info) {
@@ -1170,6 +1175,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->macro = vj_macro_new();
 
     tag_cache[ tag->id ] = (void*) tag;
+    recount_hash = 1;
 
    return (int)(tag->id);
 }
@@ -1383,6 +1389,7 @@ int vj_tag_del(int id)
     next_avail_tag++;
 
     tag_cache[ id ] = NULL;
+    recount_hash = 1;
 
     return 1;
 }
