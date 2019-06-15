@@ -2306,9 +2306,7 @@ void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 void	on_check_priout_fullscreen_clicked(
 		GtkWidget *widget, gpointer user_data)
 {
-	gint on = 0;
-	if(is_button_toggled( "check_priout_fullscreen" ) )
-		on = 1;
+	gint on = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
 	multi_vims ( VIMS_FULLSCREEN, "%d", on );
 }
 
