@@ -81,6 +81,7 @@
 #include <veejay/vj-perform.h>
 #include <veejay/vj-plug.h>
 #include <veejay/vj-lib.h>
+#include <veejay/vj-sdl.h>
 #include <libel/vj-avcodec.h>
 #include <libel/pixbuf.h>
 #include <libel/avcommon.h>
@@ -97,9 +98,6 @@
 #include <veejay/vj-macro.h>
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
-#ifdef HAVE_SDL_TTF
-#include <veejay/vj-sdl-font.h>
-#endif
 #define QUEUE_LEN 1
 #include <veejaycore/vims.h>
 #include <libqrwrap/qrwrapper.h>
@@ -107,10 +105,6 @@
 #include <veejay/vj-shm.h>
 #include <pthread.h>
 #include <signal.h>
-#ifdef HAVE_SDL
-#include <SDL/SDL.h>
-#define MAX_SDL_OUT	2
-#endif
 #include <veejaycore/mpegconsts.h>
 #include <veejaycore/mpegtimecode.h>
 #include <libstream/vj-tag.h>
@@ -118,6 +112,9 @@
 #include <veejaycore/mjpeg_types.h>
 #include "vj-perform.h"
 #include <veejaycore/vj-server.h>
+#ifdef HAVE_SDL
+#include <SDL2/SDL.h>
+#endif
 #ifdef HAVE_DIRECTFB
 #include <veejay/vj-dfb.h>
 #endif
@@ -909,7 +906,6 @@ static int veejay_screen_update(veejay_t * info )
 #ifdef HAVE_DIRECTFB
 	uint8_t *c_frame[4];
 #endif
-	int i = 0;
 	int skip_update = 0;
 
 	video_playback_setup *settings = info->settings;
@@ -931,11 +927,7 @@ static int veejay_screen_update(veejay_t * info )
 	if(check_vp)
 	{
 		if( info->video_out == 0 ) {
-			if(!vj_sdl_lock( info->sdl[0] ) )
-				return 0;
-			composite_blit_yuyv( info->composite,frame, vj_sdl_get_yuv_overlay(info->sdl[0]),settings->composite);
-			if(!vj_sdl_unlock( info->sdl[0]) )
-				return 0;
+			composite_blit_yuyv( info->composite,frame, vj_sdl_get_buffer(info->sdl),settings->composite);
 		} 
 		if( info->video_out != 4 ) {
 			skip_update = 1;
@@ -989,21 +981,17 @@ static int veejay_screen_update(veejay_t * info )
 		
 #ifdef HAVE_SDL	
 	if(skip_update) {
-		if(info->video_out == 0 ) { 
-		   for(i = 0 ; i < MAX_SDL_OUT; i ++ )
-			if( info->sdl[i] )
-				vj_sdl_flip(info->sdl[i]);
-		}
+        vj_sdl_update_screen(info->sdl);
 		return 1;
 	}
 #endif
-    	switch (info->video_out)
+    switch (info->video_out)
 	{
 #ifdef HAVE_SDL
 		case 0:
-			for(i = 0 ; i < MAX_SDL_OUT; i ++ )
-			if( info->sdl[i] )
-				if(!vj_sdl_update_yuv_overlay( info->sdl[i], frame ) )  return 0;  
+			if( info->sdl ) {
+				vj_sdl_convert_and_update_screen( info->sdl, frame );
+            }
 	   	break;
 #endif
 		case 1:
@@ -1012,22 +1000,21 @@ static int veejay_screen_update(veejay_t * info )
 	    		if (vj_dfb_update_yuv_overlay(info->dfb, c_frame) != 0)
 			{
 				return 0;
-	    		}
+	    	}
 #endif
 	    	break;
 		case 2:
 #ifdef HAVE_DIRECTFB
 #ifdef HAVE_SDL
-			for( i = 0; i < MAX_SDL_OUT; i ++ )
-				if( info->sdl[i] ) 	
-		  			if(!vj_sdl_update_yuv_overlay( info->sdl[i], frame ) )
-					       	return 0;
+			if( info->sdl ) {
+		  		vj_sdl_convert_and_update_screen( info->sdl, frame );
+            }
 #endif
-	    		vj_perform_get_primary_frame_420p(info,c_frame);
-	    		if (vj_dfb_update_yuv_overlay(info->dfb, c_frame) != 0)
-				{
-					return 0;
-	    		}
+	    	vj_perform_get_primary_frame_420p(info,c_frame);
+	    	if (vj_dfb_update_yuv_overlay(info->dfb, c_frame) != 0)
+			{
+				return 0;
+	    	}
 #endif
 			 break;
 		case 3:
@@ -1468,7 +1455,7 @@ static	void	veejay_event_handle(veejay_t *info)
 					}
 				}
 				else if (mev->button == SDL_BUTTON_RIGHT ) {
-					but = 2;
+			    	but = 2;
 				}
 				else if (mev->button == SDL_BUTTON_MIDDLE ) {
 					if( info->uc->mouse[3] == 2 )
@@ -1478,27 +1465,31 @@ static	void	veejay_event_handle(veejay_t *info)
 					else {if( info->uc->mouse[3] == 0 )
 						but = 3;}
 				}
-				else if ((mev->button == SDL_BUTTON_WHEELUP ) && !alt_pressed && !ctrl_pressed)
+                mouse_x = event.button.x;
+				mouse_y = event.button.y;
+             }
+             if( info->use_mouse && event.type == SDL_MOUSEWHEEL ) {
+				if ((event.wheel.y > 0 ) && !alt_pressed && !ctrl_pressed)
 				{
 					but = 4;
 				}
-				else if ((mev->button == SDL_BUTTON_WHEELDOWN ) && !alt_pressed && !ctrl_pressed)
+				else if ((event.wheel.y < 0) && !alt_pressed && !ctrl_pressed)
 				{
 					but = 5;
 				}
-				else if ((mev->button == SDL_BUTTON_WHEELUP) && alt_pressed && !ctrl_pressed )
+				else if ((event.wheel.y  > 0) && alt_pressed && !ctrl_pressed )
 				{
 					but = 13;
 				}
-				else if ((mev->button == SDL_BUTTON_WHEELDOWN) && alt_pressed && !ctrl_pressed )
+				else if ((event.wheel.y < 0) && alt_pressed && !ctrl_pressed )
 				{
 					but = 14;
 				}
-				else if (mev->button == SDL_BUTTON_WHEELUP  )  
+				else if (event.wheel.y > 0)  
 				{	
 					but = 15;
 				}	
-				else if (mev->button == SDL_BUTTON_WHEELDOWN  )
+				else if (event.wheel.y < 0)
 				{
 					but = 16;
 				}
@@ -1528,11 +1519,6 @@ static void *veejay_mjpeg_playback_thread(void *arg)
     vj_osc_set_veejay_t(info); 
     vj_tag_set_veejay_t(info);
 
-#ifdef HAVE_SDL
-    if( info->settings->repeat_delay > 0 && info->settings->repeat_interval ) {
-	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
-	}
-#endif
     while (settings->state != LAVPLAY_STATE_STOP) {
 	pthread_mutex_lock(&(settings->valid_mutex));
 	while (settings->valid[settings->currently_processed_frame] == 0) {
@@ -1951,29 +1937,16 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	/* now setup the output driver */
 	switch (info->video_out)
 	{
-		 /*
-		case 3:
-#ifdef HAVE_GL
-			veejay_msg(VEEJAY_MSG_INFO, "Using output driver OpenGL");
-			info->gl = (void*) x_display_init(info);
-			x_display_open(info->gl, el->video_width, el->video_height );
-#endif
-			break;
-			*/
 		case 0:
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
 #ifdef HAVE_SDL
-			info->sdl[0] =
-			    (vj_sdl *) vj_sdl_allocate( info->video_output_width,info->video_output_height,info->pixel_format, info->use_keyb, info->use_mouse,info->show_cursor);
-			if( !info->sdl[0] )
+			info->sdl = vj_sdl_allocate( info->effect_frame1, info->use_keyb, info->use_mouse,info->show_cursor);
+			if( !info->sdl )
 				return -1;
-
-			if( x != -1 && y != -1 )
-				vj_sdl_set_geometry(info->sdl[0],x,y);
 
 			title = veejay_title( info );
 
-			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height, title,1,info->settings->full_screen,el->video_fps))
+			if (!vj_sdl_init(info->sdl, x,y,info->bes_width, info->bes_height, title,1,info->settings->full_screen,el->video_fps))
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
 				free(title);
@@ -2000,12 +1973,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			veejay_msg(VEEJAY_MSG_INFO, 
 			           "Using output driver SDL & DirectFB");
 #ifdef HAVE_SDL
-			info->sdl[0] = 	(vj_sdl *) vj_sdl_allocate(info->video_output_width,info->video_output_height, info->pixel_format, info->use_keyb,info->use_mouse,info->show_cursor);
-			if(!info->sdl[0])
+			info->sdl = vj_sdl_allocate(info->effect_frame1, info->use_keyb,info->use_mouse,info->show_cursor);
+			if(!info->sdl)
 				return -1;
 
 			title = veejay_title(info);	
-			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,title,1,info->settings->full_screen, el->video_fps)) {
+			if (!vj_sdl_init(info->sdl,x,y, info->bes_width, info->bes_height,title,1,info->settings->full_screen, el->video_fps)) {
 				free(title);
 				return -1;
 			}
@@ -2558,16 +2531,11 @@ static void veejay_playback_close(veejay_t *info)
 	}
 	
 #ifdef HAVE_SDL
-    for ( i = 0; i < MAX_SDL_OUT ; i ++ )
-	if( info->sdl[i] ) {
-#ifndef X_DISPLAY_MISSING
-		 if(info->sdl[i]->display)
-			 x11_enable_screensaver( info->sdl[i]->display);
-#endif
-		 vj_sdl_free(info->sdl[i]);
-	}
-
-	vj_sdl_quit();
+	if( info->sdl ) {
+		vj_sdl_enable_screensaver(); 
+        vj_sdl_free(info->sdl);
+    }
+    vj_sdl_quit();
 #endif
 #ifdef HAVE_DIRECTFB
     if( info->dfb ) {
@@ -2575,18 +2543,6 @@ static void veejay_playback_close(veejay_t *info)
 		free(info->dfb);
 	}
 #endif
-
-/*
-#ifdef HAVE_GL
-#ifndef X_DISPLAY_MISSING
-	if( info->video_out == 3 )
-	{
-		x11_enable_screensaver( x_get_display(info->gl) );
-		x_display_close( info->gl );
-    	}
-#endif
-#endif
-*/
 
 #ifdef HAVE_FREETYPE
 	vj_font_destroy( info->font );
@@ -2597,11 +2553,9 @@ static void veejay_playback_close(veejay_t *info)
 
 }
 
-
 static	void *veejay_playback_thread(void *data)
 {
     veejay_t *info = (veejay_t *) data;
-    int i;
 	sigset_t mask;
 	struct sigaction act;
 	sigemptyset(&mask);
@@ -2609,7 +2563,6 @@ static	void *veejay_playback_thread(void *data)
 	act.sa_handler = donothing2;
 	act.sa_flags = SA_SIGINFO | SA_ONESHOT;
 	sigemptyset(&act.sa_mask);
-
 
     pthread_sigmask( SIG_BLOCK, &mask, NULL );
 
@@ -2865,11 +2818,6 @@ veejay_t *veejay_malloc()
 #else
     info->video_out = 3;
 #endif
-#endif
-
-
-#ifdef HAVE_SDL
-	info->sdl = (vj_sdl**) vj_calloc(sizeof(vj_sdl*) * MAX_SDL_OUT ); 
 #endif
 
 	info->pixel_format = FMT_422F; //@default 

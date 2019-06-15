@@ -17,7 +17,7 @@ AM_CPPFLAGS += -I /usr/X11R6/include \
 		-I$(top_srcdir)/libvjxml \
 		$(FFMPEG_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) $(GLIB_CFLAGS) \
 		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) $(LIBLO_CFLAGS) \
-		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) \
+		$(DIRECTFB_CFLAGS) $(SDL2_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) \
 		$(LIBUNWIND_CFLAGS) $(PTHREAD_CFLAGS) $(LIBQRENCODE_CFLAGS) $(VEEJAYCORE_CFLAGS) 
 
 VEEJAY_LIB_FILE = libveejay.la
@@ -26,7 +26,7 @@ lib_LTLIBRARIES = $(VEEJAY_LIB_FILE)
 
 libveejay_la_SOURCES =  jpegutils.c vj-misc.c \
 			vj-osc.c vjkf.c vj-macro.c vj-event.c vj-eventman.c vj-perform.c \
-			x11misc.c vj-shm.c vj-sdl.c vj-sdl-font.c vj-dfb.c vj-viewport.c vj-composite.c \
+			x11misc.c vj-shm.c vj-sdl.c vj-dfb.c vj-viewport.c vj-composite.c \
 			vj-font.c vj-pjack.c vj-share.c vj-split.c liblavplayvj.c 
 
 libveejay_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
@@ -47,7 +47,7 @@ libveejay_la_LIBADD = \
 			$(top_builddir)/libqrwrap/libqrwrap.la \
 			$(top_builddir)/libvjxml/libvjxml.la 
 
-libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(SDL_TTF_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
+libveejay_la_LDFLAGS +=	$(SDL2_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
 			$(XML2_LIBS) $(JPEG_LIBS) $(LIBLO_LIBS) $(LIBUNWIND_LIBS) $(GLIB_LIBS) \
 		 	$(FFMPEG_LIBS) $(XINERAMA_LIBS) $(LIBPNG_LIBS) \
 			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(RT_LIBS) $(LIBQRENCODE_LIBS) \

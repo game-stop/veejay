@@ -9,7 +9,7 @@ To build from git/source tree:
 
 # 1 # get the required dependencies:
 
-  sudo apt-get install autoconf automake libtool m4 gcc libjpeg62-dev libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev gtk-2.0-dev libxml2-dev libsdl1.2-dev libjack0 libjack-dev jackd1 libquicktime-dev liblo-dev
+  sudo apt-get install autoconf automake libtool m4 gcc libjpeg62-dev libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev gtk-3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1 libquicktime-dev liblo-dev
 
 # 2 # run the autogen.sh script:
 
@@ -33,7 +33,7 @@ To build the deb package:
 ===========================
 
 # 1 # get the required software
-	sudo apt-get install devscripts libgtk2.0-dev autotools-dev libx11-dev libxml2-dev libxinerama-dev libswscale-dev libsdl1.2-dev libavformat-dev libjack-dev libavcodec-dev libglib2.0-dev libquicktime-dev libmjpegtools-dev libjpeg62-dev libfreetype6-dev libdv4-dev libavutil-dev libunwind-dev libdv4-dev
+	sudo apt-get install devscripts libgtk3.0-dev autotools-dev libx11-dev libxml2-dev libxinerama-dev libswscale-dev libsdl2-dev libavformat-dev libjack-dev libavcodec-dev libglib2.0-dev libquicktime-dev libmjpegtools-dev libjpeg62-dev libfreetype6-dev libdv4-dev libavutil-dev libunwind-dev libdv4-dev
 
 
 # 2 # build a .deb package 
@@ -61,7 +61,7 @@ To build from git/source tree:
 
 # 1 # get the required dependencies:
 
-  sudo apt-get install autoconf automake libtool m4 gcc libjpeg62-dev libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev libgtk2.0-dev libxml2-dev libsdl1.2-dev libjack0 libjack-dev jackd1 libquicktime-dev liblo-dev libunwind-dev libdv4-dev libjpeg-dev
+  sudo apt-get install autoconf automake libtool m4 gcc libjpeg62-dev libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev libgtk3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1 libquicktime-dev liblo-dev libunwind-dev libdv4-dev libjpeg-dev
 
 # 2 # run the autogen.sh script:
 

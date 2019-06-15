@@ -40,6 +40,7 @@
 #include <veejaycore/vj-msg.h>
 #include <veejay/vj-perform.h>
 #include <veejay/libveejay.h>
+#include <veejay/vj-sdl.h>
 #include <libsamplerec/samplerecord.h>
 #include <libel/pixbuf.h>
 #include <libel/avcommon.h>
@@ -3191,27 +3192,11 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 
 int vj_perform_get_width( veejay_t *info )
 {
-#ifdef HAVE_GL
-    if(info->video_out == 3 )
-        return  x_display_width(info->gl);
-#endif
-#ifdef HAVE_SDL
-    if(info->video_out <= 1 )
-        return vj_sdl_screen_w(info->sdl[0]);
-#endif
     return info->video_output_width;
 }
 
 int vj_perform_get_height( veejay_t *info )
 {
-#ifdef HAVE_GL
-    if(info->video_out == 3 )
-        return x_display_height(info->gl);
-#endif
-#ifdef HAVE_SDL
-    if(info->video_out <= 1 )
-        return vj_sdl_screen_h(info->sdl[0]);
-#endif
     return info->video_output_height;
 }
 
@@ -3374,7 +3359,7 @@ static  void    vj_perform_finish_render( veejay_t *info, video_playback_setup *
 #ifdef HAVE_SDL
             if( info->video_out == 0 ) {
                 //@ release focus
-                vj_sdl_grab( info->sdl[0], 0 );
+                vj_sdl_grab( info->sdl, 0 );
             }
 #endif
         }
@@ -3807,7 +3792,6 @@ void    vj_perform_randomize(veejay_t *info)
     int take_n   = 1 + (int) (n_sample * rand() / (RAND_MAX+1.0));
     int min_delay = 1;
     int max_delay = 0;
-    char timecode[15];
     int use = ( take_n == track_dup ? 0: 1 );
 
     while(!sample_exists(take_n)  || !use)
@@ -3836,11 +3820,7 @@ void    vj_perform_randomize(veejay_t *info)
     settings->randplayer.max_delay = max_delay;
     settings->randplayer.min_delay = min_delay; 
 
-    MPEG_timecode_t tc;
-    y4m_ratio_t ratio = mpeg_conform_framerate( (double)info->current_edit_list->video_fps );
-    mpeg_timecode(&tc,max_delay,mpeg_framerate_code(ratio),info->current_edit_list->video_fps );
-    sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
-    veejay_msg(VEEJAY_MSG_DEBUG, "Sample randomizer trigger in %s", timecode );
+    veejay_msg(VEEJAY_MSG_DEBUG, "Sample randomizer trigger in %d frame periods", max_delay);
 
     veejay_set_sample( info, take_n );
 }

@@ -844,26 +844,12 @@ dnl fi
 
 have_sdl=false
 if test x$with_sdl != xno ; then
-PKG_CHECK_MODULES( SDL, sdl >= 1.2.4, have_sdl=true,have_sdl=false)
+PKG_CHECK_MODULES( SDL2, sdl2 >= 2.0.0, have_sdl=true,have_sdl=false)
 if test x$have_sdl = xfalse ; then
- AC_MSG_ERROR([Could not find SDL 1.2.4 library!])
+ AC_MSG_ERROR([Could not find SDL 2.0 library!])
 fi
-AC_DEFINE(HAVE_SDL,1,[SDL library is installed])
+AC_DEFINE(HAVE_SDL,1,[SDL2 library is installed])
 fi
-
-dnl *********************************************************************
-dnl Check for SDL_ttf
-dnl *********************************************************************
-have_sdl_ttf=false
-if test x$with_sdl != xno ; then
-	PKG_CHECK_MODULES( SDL_TTF, SDL_ttf <= 2.0.11, have_sdl_ttf=true,have_sdl_ttf=false)
-	if test x$have_sdl_ttf = xtrue ; then
-		AC_DEFINE(HAVE_SDL_TTF,1,[SDL_TTF library is installed])
-		AC_SUBST(SDL_TTF_CFLAGS)
-		AC_SUBST(SDL_TTF_LIBS)
-	fi
-fi
-
 
 dnl *********************************************************************
 dnl Check for Liblo
@@ -1198,7 +1184,6 @@ AC_MSG_NOTICE([  - FFmpeg/AV AVCodec             : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg/AV Swscaler            : ${have_swscale} ])
 AC_MSG_NOTICE([  - FFmpeg/AV AVUtil              : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
-AC_MSG_NOTICE([  - SDL on-screen-logging         : ${have_sdl_ttf}])
 
 if test "$have_freetype" = "true"; then
 	AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])

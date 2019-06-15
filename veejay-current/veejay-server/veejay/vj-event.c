@@ -25,7 +25,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #ifdef HAVE_SDL
-#include <SDL/SDL.h>
+#include <SDL2/SDL.h>
 #endif
 #include <stdarg.h>
 #include <veejaycore/defs.h>
@@ -41,6 +41,7 @@
 #include <veejay/vj-composite.h>
 #include <veejay/vj-shm.h>
 #include <veejay/vj-macro.h>
+#include <veejay/vj-sdl.h>
 #include <libel/vj-avcodec.h>
 #include <libsamplerec/samplerecord.h>
 #include <veejaycore/mpegconsts.h>
@@ -69,7 +70,7 @@
 #include <veejay/vj-misc.h>
 #include <libvjxml/vj-xml.h>
 /* Highest possible SDL Key identifier */
-#define MAX_SDL_KEY (3 * SDLK_LAST) + 1  
+#define MAX_SDL_KEY (3 * SDL_SCANCODE_LAST) + 1  
 #define MSG_MIN_LEN   4 /* stripped ';' */
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
@@ -134,7 +135,7 @@ static hash_t *keyboard_eventid_map = NULL;
 
 
 // maximum number of key combinations
-#define MAX_KEY_MNE (SDLK_LAST * 16)
+#define MAX_KEY_MNE (SDL_NUM_SCANCODES * 16)
 static  vj_keyboard_event *keyboard_event_map_[MAX_KEY_MNE];
 
 typedef struct
@@ -206,169 +207,169 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
 } vj_event_default_sdl_keys[] = {
 
     { 0,0,0,NULL },
-    { VIMS_PROJ_INC,                SDLK_LEFT,      VIMS_MOD_CTRL, "-1 0"   },
-    { VIMS_PROJ_INC,                SDLK_RIGHT,     VIMS_MOD_CTRL, "1 0"    },
-    { VIMS_PROJ_INC,                SDLK_UP,        VIMS_MOD_CTRL, "0 -1"   },
-    { VIMS_PROJ_INC,                SDLK_DOWN,      VIMS_MOD_CTRL, "0 1"    },
-    { VIMS_EFFECT_SET_BG,           SDLK_b,         VIMS_MOD_ALT,   NULL    },
-    { VIMS_VIDEO_PLAY_FORWARD,      SDLK_KP6,       VIMS_MOD_NONE,  NULL    },
-    { VIMS_VIDEO_PLAY_BACKWARD,     SDLK_KP4,       VIMS_MOD_NONE,  NULL    },
-    { VIMS_VIDEO_PLAY_STOP,         SDLK_KP5,       VIMS_MOD_NONE,  NULL    },
-    { VIMS_VIDEO_PLAY_STOP_ALL,	    SDLK_KP5,	    VIMS_MOD_SHIFT, NULL    },
-    { VIMS_VIDEO_SKIP_FRAME,        SDLK_KP9,       VIMS_MOD_NONE,  "1" },
-    { VIMS_VIDEO_PREV_FRAME,        SDLK_KP7,       VIMS_MOD_NONE,  "1" },
-    { VIMS_VIDEO_SKIP_SECOND,       SDLK_KP8,       VIMS_MOD_NONE,  NULL    },
-    { VIMS_VIDEO_PREV_SECOND,       SDLK_KP2,       VIMS_MOD_NONE,  NULL    },
-    { VIMS_VIDEO_GOTO_START,        SDLK_KP1,       VIMS_MOD_NONE,  NULL    },
-    { VIMS_VIDEO_GOTO_END,          SDLK_KP3,       VIMS_MOD_NONE,  NULL    },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_a,         VIMS_MOD_NONE,  "1" },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_s,         VIMS_MOD_NONE,  "2" },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_d,         VIMS_MOD_NONE,  "3" },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_f,         VIMS_MOD_NONE,  "4" },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_g,         VIMS_MOD_NONE,  "5" },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_h,         VIMS_MOD_NONE,  "6" },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_j,         VIMS_MOD_NONE,  "7" },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_k,         VIMS_MOD_NONE,  "8" },
-    { VIMS_VIDEO_SET_SPEEDK,        SDLK_l,         VIMS_MOD_NONE,  "9" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_a,         VIMS_MOD_ALT,   "1" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_s,         VIMS_MOD_ALT,   "2" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_d,         VIMS_MOD_ALT,   "3" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_f,         VIMS_MOD_ALT,   "4" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_g,         VIMS_MOD_ALT,   "5" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_h,         VIMS_MOD_ALT,   "6" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_j,         VIMS_MOD_ALT,   "7" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_k,         VIMS_MOD_ALT,   "8" },
-    { VIMS_VIDEO_SET_SLOW,          SDLK_l,         VIMS_MOD_ALT,   "9"    },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_a,         VIMS_MOD_SHIFT,   "1" },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_s,         VIMS_MOD_SHIFT,   "2" },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_d,         VIMS_MOD_SHIFT,   "3" },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_f,         VIMS_MOD_SHIFT,   "4" },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_g,         VIMS_MOD_SHIFT,   "5" },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_h,         VIMS_MOD_SHIFT,   "6" },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_j,         VIMS_MOD_SHIFT,   "7" },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_k,         VIMS_MOD_SHIFT,   "8" },
-    { VIMS_SAMPLE_MIX_SET_SPEED,    SDLK_l,         VIMS_MOD_SHIFT,   "9" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_a,         VIMS_MOD_ALT_SHIFT,   "1" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_s,         VIMS_MOD_ALT_SHIFT,   "2" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_d,         VIMS_MOD_ALT_SHIFT,   "3" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_f,         VIMS_MOD_ALT_SHIFT,   "4" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_g,         VIMS_MOD_ALT_SHIFT,   "5" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_h,         VIMS_MOD_ALT_SHIFT,   "6" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_j,         VIMS_MOD_ALT_SHIFT,   "7" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_k,         VIMS_MOD_ALT_SHIFT,   "8" },
-    { VIMS_SAMPLE_MIX_SET_DUP,      SDLK_l,         VIMS_MOD_ALT_SHIFT,   "9" },
+    { VIMS_PROJ_INC,                SDL_SCANCODE_LEFT,      VIMS_MOD_CTRL, "-1 0"   },
+    { VIMS_PROJ_INC,                SDL_SCANCODE_RIGHT,     VIMS_MOD_CTRL, "1 0"    },
+    { VIMS_PROJ_INC,                SDL_SCANCODE_UP,        VIMS_MOD_CTRL, "0 -1"   },
+    { VIMS_PROJ_INC,                SDL_SCANCODE_DOWN,      VIMS_MOD_CTRL, "0 1"    },
+    { VIMS_EFFECT_SET_BG,           SDL_SCANCODE_B,         VIMS_MOD_ALT,   NULL    },
+    { VIMS_VIDEO_PLAY_FORWARD,      SDL_SCANCODE_KP_6,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_PLAY_BACKWARD,     SDL_SCANCODE_KP_4,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_PLAY_STOP,         SDL_SCANCODE_KP_5,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_PLAY_STOP_ALL,	    SDL_SCANCODE_KP_5,	    VIMS_MOD_SHIFT, NULL    },
+    { VIMS_VIDEO_SKIP_FRAME,        SDL_SCANCODE_KP_9,       VIMS_MOD_NONE,  "1" },
+    { VIMS_VIDEO_PREV_FRAME,        SDL_SCANCODE_KP_7,       VIMS_MOD_NONE,  "1" },
+    { VIMS_VIDEO_SKIP_SECOND,       SDL_SCANCODE_KP_8,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_PREV_SECOND,       SDL_SCANCODE_KP_2,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_GOTO_START,        SDL_SCANCODE_KP_1,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_GOTO_END,          SDL_SCANCODE_KP_3,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_A,         VIMS_MOD_NONE,  "1" },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_S,         VIMS_MOD_NONE,  "2" },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_D,         VIMS_MOD_NONE,  "3" },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_F,         VIMS_MOD_NONE,  "4" },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_G,         VIMS_MOD_NONE,  "5" },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_H,         VIMS_MOD_NONE,  "6" },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_J,         VIMS_MOD_NONE,  "7" },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_K,         VIMS_MOD_NONE,  "8" },
+    { VIMS_VIDEO_SET_SPEEDK,        SDL_SCANCODE_L,         VIMS_MOD_NONE,  "9" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_A,         VIMS_MOD_ALT,   "1" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_S,         VIMS_MOD_ALT,   "2" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_D,         VIMS_MOD_ALT,   "3" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_F,         VIMS_MOD_ALT,   "4" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_G,         VIMS_MOD_ALT,   "5" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_H,         VIMS_MOD_ALT,   "6" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_J,         VIMS_MOD_ALT,   "7" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_K,         VIMS_MOD_ALT,   "8" },
+    { VIMS_VIDEO_SET_SLOW,          SDL_SCANCODE_L,         VIMS_MOD_ALT,   "9"    },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_A,         VIMS_MOD_SHIFT,   "1" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_S,         VIMS_MOD_SHIFT,   "2" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_D,         VIMS_MOD_SHIFT,   "3" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_F,         VIMS_MOD_SHIFT,   "4" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_G,         VIMS_MOD_SHIFT,   "5" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_H,         VIMS_MOD_SHIFT,   "6" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_J,         VIMS_MOD_SHIFT,   "7" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_K,         VIMS_MOD_SHIFT,   "8" },
+    { VIMS_SAMPLE_MIX_SET_SPEED,    SDL_SCANCODE_L,         VIMS_MOD_SHIFT,   "9" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_A,         VIMS_MOD_ALT_SHIFT,   "1" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_S,         VIMS_MOD_ALT_SHIFT,   "2" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_D,         VIMS_MOD_ALT_SHIFT,   "3" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_F,         VIMS_MOD_ALT_SHIFT,   "4" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_G,         VIMS_MOD_ALT_SHIFT,   "5" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_H,         VIMS_MOD_ALT_SHIFT,   "6" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_J,         VIMS_MOD_ALT_SHIFT,   "7" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_K,         VIMS_MOD_ALT_SHIFT,   "8" },
+    { VIMS_SAMPLE_MIX_SET_DUP,      SDL_SCANCODE_L,         VIMS_MOD_ALT_SHIFT,   "9" },
     #ifdef HAVE_SDL
-    { VIMS_FULLSCREEN,              SDLK_f,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_FULLSCREEN,              SDL_SCANCODE_F,         VIMS_MOD_CTRL,  "2"    },
 #endif  
-    { VIMS_CHAIN_ENTRY_DOWN,        SDLK_KP_MINUS,  VIMS_MOD_NONE,  "1" },
-    { VIMS_CHAIN_ENTRY_UP,          SDLK_KP_PLUS,   VIMS_MOD_NONE,  "1" },
-    { VIMS_CHAIN_ENTRY_CHANNEL_INC, SDLK_EQUALS,    VIMS_MOD_NONE,  NULL    },
-    { VIMS_CHAIN_ENTRY_CHANNEL_DEC, SDLK_MINUS,     VIMS_MOD_NONE,  NULL    },
-    { VIMS_CHAIN_ENTRY_SOURCE_TOGGLE,SDLK_SLASH,    VIMS_MOD_NONE,  NULL    }, // stream/sample
-    { VIMS_CHAIN_ENTRY_INC_ARG,     SDLK_PAGEUP,    VIMS_MOD_NONE,  "0 1"   },
-    { VIMS_CHAIN_ENTRY_INC_ARG,     SDLK_KP_PERIOD, VIMS_MOD_NONE,  "1 1"   },
-    { VIMS_CHAIN_ENTRY_INC_ARG,     SDLK_PERIOD,    VIMS_MOD_NONE,  "2 1"   },
-    { VIMS_CHAIN_ENTRY_INC_ARG,     SDLK_w,         VIMS_MOD_NONE,  "3 1"   },
-    { VIMS_CHAIN_ENTRY_INC_ARG,     SDLK_r,         VIMS_MOD_NONE,  "4 1"   },
-    { VIMS_CHAIN_ENTRY_INC_ARG,     SDLK_y,         VIMS_MOD_NONE,  "5 1"   },
-    { VIMS_CHAIN_ENTRY_INC_ARG,     SDLK_i,         VIMS_MOD_NONE,  "6 1"   },
-    { VIMS_CHAIN_ENTRY_INC_ARG,     SDLK_p,         VIMS_MOD_NONE,  "7 1"   },
-    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDLK_PAGEDOWN,  VIMS_MOD_NONE,  "0 -1"  },
-    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDLK_KP0,       VIMS_MOD_NONE,  "1 -1"  },
-    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDLK_COMMA,     VIMS_MOD_NONE,  "2 -1"  },
-    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDLK_q,         VIMS_MOD_NONE,  "3 -1"  },
-    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDLK_e,         VIMS_MOD_NONE,  "4 -1"  },
-    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDLK_t,         VIMS_MOD_NONE,  "5 -1"  },
-    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDLK_u,         VIMS_MOD_NONE,  "6 -1"  },
-    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDLK_o,         VIMS_MOD_NONE,  "7 -1"  },
-    { VIMS_OSD,                     SDLK_o,         VIMS_MOD_CTRL,  NULL    },
-    { VIMS_COPYRIGHT,               SDLK_c,         VIMS_MOD_CTRL,  NULL    },
-    { VIMS_COMPOSITE,               SDLK_i,         VIMS_MOD_CTRL,  NULL    },
-    { VIMS_OSD_EXTRA,               SDLK_h,         VIMS_MOD_CTRL,  NULL    },
-    { VIMS_PROJ_STACK,              SDLK_v,         VIMS_MOD_CTRL,  "1 0"   },
-    { VIMS_PROJ_STACK,              SDLK_p,         VIMS_MOD_CTRL,  "0 1"   },
-    { VIMS_PROJ_TOGGLE,             SDLK_a,         VIMS_MOD_CTRL,  NULL    },
-    { VIMS_FRONTBACK,               SDLK_s,         VIMS_MOD_CTRL,  NULL    },
-    { VIMS_RENDER_DEPTH,            SDLK_d,         VIMS_MOD_CTRL,  "2" },
-    { VIMS_SELECT_BANK,             SDLK_1,         VIMS_MOD_NONE,  "1" },
-    { VIMS_SELECT_BANK,             SDLK_2,         VIMS_MOD_NONE,  "2" },
-    { VIMS_SELECT_BANK,             SDLK_3,         VIMS_MOD_NONE,  "3" },
-    { VIMS_SELECT_BANK,             SDLK_4,         VIMS_MOD_NONE,  "4" },
-    { VIMS_SELECT_BANK,             SDLK_5,         VIMS_MOD_NONE,  "5" },
-    { VIMS_SELECT_BANK,             SDLK_6,         VIMS_MOD_NONE,  "6" },
-    { VIMS_SELECT_BANK,             SDLK_7,         VIMS_MOD_NONE,  "7" },
-    { VIMS_SELECT_BANK,             SDLK_8,         VIMS_MOD_NONE,  "8" },
-    { VIMS_SELECT_BANK,             SDLK_9,         VIMS_MOD_NONE,  "9" },
-    { VIMS_SELECT_BANK,             SDLK_1,         VIMS_MOD_SHIFT, "1" },
-    { VIMS_SELECT_BANK,             SDLK_2,         VIMS_MOD_SHIFT, "2" },
-    { VIMS_SELECT_BANK,             SDLK_3,         VIMS_MOD_SHIFT, "3" },
-    { VIMS_SELECT_BANK,             SDLK_4,         VIMS_MOD_SHIFT, "4" },
-    { VIMS_SELECT_BANK,             SDLK_5,         VIMS_MOD_SHIFT, "5" },
-    { VIMS_SELECT_BANK,             SDLK_6,         VIMS_MOD_SHIFT, "6" },
-    { VIMS_SELECT_BANK,             SDLK_7,         VIMS_MOD_SHIFT, "7" },
-    { VIMS_SELECT_BANK,             SDLK_8,         VIMS_MOD_SHIFT, "8" },
-    { VIMS_SELECT_BANK,             SDLK_9,         VIMS_MOD_SHIFT, "9" },
-    { VIMS_SELECT_ID,               SDLK_F1,        VIMS_MOD_NONE,  "1" },
-    { VIMS_SELECT_ID,               SDLK_F2,        VIMS_MOD_NONE,  "2" },
-    { VIMS_SELECT_ID,               SDLK_F3,        VIMS_MOD_NONE,  "3" },
-    { VIMS_SELECT_ID,               SDLK_F4,        VIMS_MOD_NONE,  "4" },
-    { VIMS_SELECT_ID,               SDLK_F5,        VIMS_MOD_NONE,  "5" },
-    { VIMS_SELECT_ID,               SDLK_F6,        VIMS_MOD_NONE,  "6" },
-    { VIMS_SELECT_ID,               SDLK_F7,        VIMS_MOD_NONE,  "7" },
-    { VIMS_SELECT_ID,               SDLK_F8,        VIMS_MOD_NONE,  "8" },
-    { VIMS_SELECT_ID,               SDLK_F9,        VIMS_MOD_NONE,  "9" },
-    { VIMS_SELECT_ID,               SDLK_F10,       VIMS_MOD_NONE,  "10"    },
-    { VIMS_SELECT_ID,               SDLK_F11,       VIMS_MOD_NONE,  "11"    },
-    { VIMS_SELECT_ID,               SDLK_F12,       VIMS_MOD_NONE,  "12"    },
-    { VIMS_RESUME_ID,               SDLK_F1,        VIMS_MOD_SHIFT,  "1" },
-    { VIMS_RESUME_ID,               SDLK_F2,        VIMS_MOD_SHIFT,  "2" },
-    { VIMS_RESUME_ID,               SDLK_F3,        VIMS_MOD_SHIFT,  "3" },
-    { VIMS_RESUME_ID,               SDLK_F4,        VIMS_MOD_SHIFT,  "4" },
-    { VIMS_RESUME_ID,               SDLK_F5,        VIMS_MOD_SHIFT,  "5" },
-    { VIMS_RESUME_ID,               SDLK_F6,        VIMS_MOD_SHIFT,  "6" },
-    { VIMS_RESUME_ID,               SDLK_F7,        VIMS_MOD_SHIFT,  "7" },
-    { VIMS_RESUME_ID,               SDLK_F8,        VIMS_MOD_SHIFT,  "8" },
-    { VIMS_RESUME_ID,               SDLK_F9,        VIMS_MOD_SHIFT,  "9" },
-    { VIMS_RESUME_ID,               SDLK_F10,       VIMS_MOD_SHIFT,  "10"    },
-    { VIMS_RESUME_ID,               SDLK_F11,       VIMS_MOD_SHIFT,  "11"    },
-    { VIMS_RESUME_ID,               SDLK_F12,       VIMS_MOD_SHIFT,  "12"    },
-    { VIMS_SET_PLAIN_MODE,          SDLK_KP_DIVIDE, VIMS_MOD_NONE,  NULL    },
-    { VIMS_REC_AUTO_START,          SDLK_e,         VIMS_MOD_CTRL,  "100"   },
-    { VIMS_REC_STOP,                SDLK_t,         VIMS_MOD_CTRL,  NULL    },
-    { VIMS_REC_START,               SDLK_r,         VIMS_MOD_CTRL,  NULL    },
-    { VIMS_CHAIN_TOGGLE,            SDLK_END,       VIMS_MOD_NONE,  NULL    },
-    { VIMS_CHAIN_ENTRY_SET_STATE,   SDLK_END,       VIMS_MOD_ALT,   NULL    },  
-    { VIMS_CHAIN_ENTRY_CLEAR,       SDLK_DELETE,    VIMS_MOD_NONE,  NULL    },
-    { VIMS_FXLIST_INC,              SDLK_UP,        VIMS_MOD_NONE,  "1" },
-    { VIMS_FXLIST_DEC,              SDLK_DOWN,      VIMS_MOD_NONE,  "1" },
-    { VIMS_FXLIST_ADD,              SDLK_RETURN,    VIMS_MOD_NONE,  NULL    },
-    { VIMS_SET_SAMPLE_START,        SDLK_LEFTBRACKET,VIMS_MOD_NONE, NULL    },
-    { VIMS_SET_SAMPLE_END,          SDLK_RIGHTBRACKET,VIMS_MOD_NONE,    NULL    },
-    { VIMS_SAMPLE_SET_MARKER_START, SDLK_LEFTBRACKET,VIMS_MOD_ALT,  NULL    },
-    { VIMS_SAMPLE_SET_MARKER_END,   SDLK_RIGHTBRACKET,VIMS_MOD_ALT, NULL    },
-    { VIMS_SAMPLE_TOGGLE_LOOP,      SDLK_KP_MULTIPLY,VIMS_MOD_NONE,NULL },
-    { VIMS_SAMPLE_TOGGLE_RAND_LOOP, SDLK_KP_MULTIPLY, VIMS_MOD_SHIFT },
-    { VIMS_SWITCH_SAMPLE_STREAM,    SDLK_ESCAPE,    VIMS_MOD_NONE, NULL },
-    { VIMS_PRINT_INFO,              SDLK_HOME,      VIMS_MOD_NONE, NULL },
-    { VIMS_OSL,                     SDLK_HOME,      VIMS_MOD_CTRL, NULL },
-    { VIMS_SAMPLE_CLEAR_MARKER,     SDLK_BACKSPACE, VIMS_MOD_NONE, NULL },
-    { VIMS_MACRO,                   SDLK_SPACE,     VIMS_MOD_NONE, "2 1"    },
-    { VIMS_MACRO,                   SDLK_SPACE,     VIMS_MOD_SHIFT,  "1 1"  },
-    { VIMS_MACRO,                   SDLK_SPACE,     VIMS_MOD_CTRL, "0 0"    },
-    { VIMS_MACRO,                   SDLK_SPACE,     VIMS_MOD_CAPSLOCK, "3 1"},
-    { VIMS_MACRO_SELECT,            SDLK_F1,        VIMS_MOD_CTRL, "0"  },
-    { VIMS_MACRO_SELECT,            SDLK_F2,        VIMS_MOD_CTRL, "1"  },
-    { VIMS_MACRO_SELECT,            SDLK_F3,        VIMS_MOD_CTRL, "2"  },
-    { VIMS_MACRO_SELECT,            SDLK_F4,        VIMS_MOD_CTRL, "3"  },
-    { VIMS_MACRO_SELECT,            SDLK_F5,        VIMS_MOD_CTRL, "4"  },
-    { VIMS_MACRO_SELECT,            SDLK_F6,        VIMS_MOD_CTRL, "5"  },
-    { VIMS_MACRO_SELECT,            SDLK_F7,        VIMS_MOD_CTRL, "6"  },
-    { VIMS_MACRO_SELECT,            SDLK_F8,        VIMS_MOD_CTRL, "7"  },
-    { VIMS_MACRO_SELECT,            SDLK_F9,        VIMS_MOD_CTRL, "8"  },
-    { VIMS_MACRO_SELECT,            SDLK_F10,       VIMS_MOD_CTRL, "9"  },
-    { VIMS_MACRO_SELECT,            SDLK_F11,       VIMS_MOD_CTRL, "10" },
-    { VIMS_MACRO_SELECT,            SDLK_F12,       VIMS_MOD_CTRL, "11" },
-    { VIMS_SAMPLE_HOLD_FRAME,       SDLK_PAUSE,     VIMS_MOD_NONE, "0 0 5" },
+    { VIMS_CHAIN_ENTRY_DOWN,        SDL_SCANCODE_KP_MINUS,  VIMS_MOD_NONE,  "1" },
+    { VIMS_CHAIN_ENTRY_UP,          SDL_SCANCODE_KP_PLUS,   VIMS_MOD_NONE,  "1" },
+    { VIMS_CHAIN_ENTRY_CHANNEL_INC, SDL_SCANCODE_EQUALS,    VIMS_MOD_NONE,  NULL    },
+    { VIMS_CHAIN_ENTRY_CHANNEL_DEC, SDL_SCANCODE_MINUS,     VIMS_MOD_NONE,  NULL    },
+    { VIMS_CHAIN_ENTRY_SOURCE_TOGGLE,SDL_SCANCODE_SLASH,    VIMS_MOD_NONE,  NULL    }, // stream/sample
+    { VIMS_CHAIN_ENTRY_INC_ARG,     SDL_SCANCODE_PAGEUP,    VIMS_MOD_NONE,  "0 1"   },
+    { VIMS_CHAIN_ENTRY_INC_ARG,     SDL_SCANCODE_KP_PERIOD, VIMS_MOD_NONE,  "1 1"   },
+    { VIMS_CHAIN_ENTRY_INC_ARG,     SDL_SCANCODE_PERIOD,    VIMS_MOD_NONE,  "2 1"   },
+    { VIMS_CHAIN_ENTRY_INC_ARG,     SDL_SCANCODE_W,         VIMS_MOD_NONE,  "3 1"   },
+    { VIMS_CHAIN_ENTRY_INC_ARG,     SDL_SCANCODE_R,         VIMS_MOD_NONE,  "4 1"   },
+    { VIMS_CHAIN_ENTRY_INC_ARG,     SDL_SCANCODE_Y,         VIMS_MOD_NONE,  "5 1"   },
+    { VIMS_CHAIN_ENTRY_INC_ARG,     SDL_SCANCODE_I,         VIMS_MOD_NONE,  "6 1"   },
+    { VIMS_CHAIN_ENTRY_INC_ARG,     SDL_SCANCODE_P,         VIMS_MOD_NONE,  "7 1"   },
+    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_PAGEDOWN,  VIMS_MOD_NONE,  "0 -1"  },
+    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_KP_0,       VIMS_MOD_NONE,  "1 -1"  },
+    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_COMMA,     VIMS_MOD_NONE,  "2 -1"  },
+    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_Q,         VIMS_MOD_NONE,  "3 -1"  },
+    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_E,         VIMS_MOD_NONE,  "4 -1"  },
+    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_T,         VIMS_MOD_NONE,  "5 -1"  },
+    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_U,         VIMS_MOD_NONE,  "6 -1"  },
+    { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_O,         VIMS_MOD_NONE,  "7 -1"  },
+    { VIMS_OSD,                     SDL_SCANCODE_O,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_COPYRIGHT,               SDL_SCANCODE_C,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_COMPOSITE,               SDL_SCANCODE_I,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_OSD_EXTRA,               SDL_SCANCODE_H,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_PROJ_STACK,              SDL_SCANCODE_V,         VIMS_MOD_CTRL,  "1 0"   },
+    { VIMS_PROJ_STACK,              SDL_SCANCODE_P,         VIMS_MOD_CTRL,  "0 1"   },
+    { VIMS_PROJ_TOGGLE,             SDL_SCANCODE_A,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_FRONTBACK,               SDL_SCANCODE_S,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_RENDER_DEPTH,            SDL_SCANCODE_D,         VIMS_MOD_CTRL,  "2" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_1,         VIMS_MOD_NONE,  "1" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_2,         VIMS_MOD_NONE,  "2" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_3,         VIMS_MOD_NONE,  "3" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_4,         VIMS_MOD_NONE,  "4" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_5,         VIMS_MOD_NONE,  "5" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_6,         VIMS_MOD_NONE,  "6" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_7,         VIMS_MOD_NONE,  "7" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_8,         VIMS_MOD_NONE,  "8" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_9,         VIMS_MOD_NONE,  "9" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_1,         VIMS_MOD_SHIFT, "1" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_2,         VIMS_MOD_SHIFT, "2" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_3,         VIMS_MOD_SHIFT, "3" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_4,         VIMS_MOD_SHIFT, "4" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_5,         VIMS_MOD_SHIFT, "5" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_6,         VIMS_MOD_SHIFT, "6" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_7,         VIMS_MOD_SHIFT, "7" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_8,         VIMS_MOD_SHIFT, "8" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_9,         VIMS_MOD_SHIFT, "9" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F1,        VIMS_MOD_NONE,  "1" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F2,        VIMS_MOD_NONE,  "2" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F3,        VIMS_MOD_NONE,  "3" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F4,        VIMS_MOD_NONE,  "4" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F5,        VIMS_MOD_NONE,  "5" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F6,        VIMS_MOD_NONE,  "6" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F7,        VIMS_MOD_NONE,  "7" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F8,        VIMS_MOD_NONE,  "8" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F9,        VIMS_MOD_NONE,  "9" },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F10,       VIMS_MOD_NONE,  "10"    },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F11,       VIMS_MOD_NONE,  "11"    },
+    { VIMS_SELECT_ID,               SDL_SCANCODE_F12,       VIMS_MOD_NONE,  "12"    },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F1,        VIMS_MOD_SHIFT,  "1" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F2,        VIMS_MOD_SHIFT,  "2" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F3,        VIMS_MOD_SHIFT,  "3" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F4,        VIMS_MOD_SHIFT,  "4" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F5,        VIMS_MOD_SHIFT,  "5" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F6,        VIMS_MOD_SHIFT,  "6" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F7,        VIMS_MOD_SHIFT,  "7" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F8,        VIMS_MOD_SHIFT,  "8" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F9,        VIMS_MOD_SHIFT,  "9" },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F10,       VIMS_MOD_SHIFT,  "10"    },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F11,       VIMS_MOD_SHIFT,  "11"    },
+    { VIMS_RESUME_ID,               SDL_SCANCODE_F12,       VIMS_MOD_SHIFT,  "12"    },
+    { VIMS_SET_PLAIN_MODE,          SDL_SCANCODE_KP_DIVIDE, VIMS_MOD_NONE,  NULL    },
+    { VIMS_REC_AUTO_START,          SDL_SCANCODE_E,         VIMS_MOD_CTRL,  "100"   },
+    { VIMS_REC_STOP,                SDL_SCANCODE_T,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_REC_START,               SDL_SCANCODE_R,         VIMS_MOD_CTRL,  NULL    },
+    { VIMS_CHAIN_TOGGLE,            SDL_SCANCODE_END,       VIMS_MOD_NONE,  NULL    },
+    { VIMS_CHAIN_ENTRY_SET_STATE,   SDL_SCANCODE_END,       VIMS_MOD_ALT,   NULL    },  
+    { VIMS_CHAIN_ENTRY_CLEAR,       SDL_SCANCODE_DELETE,    VIMS_MOD_NONE,  NULL    },
+    { VIMS_FXLIST_INC,              SDL_SCANCODE_UP,        VIMS_MOD_NONE,  "1" },
+    { VIMS_FXLIST_DEC,              SDL_SCANCODE_DOWN,      VIMS_MOD_NONE,  "1" },
+    { VIMS_FXLIST_ADD,              SDL_SCANCODE_RETURN,    VIMS_MOD_NONE,  NULL    },
+    { VIMS_SET_SAMPLE_START,        SDL_SCANCODE_LEFTBRACKET,VIMS_MOD_NONE, NULL    },
+    { VIMS_SET_SAMPLE_END,          SDL_SCANCODE_RIGHTBRACKET,VIMS_MOD_NONE,    NULL    },
+    { VIMS_SAMPLE_SET_MARKER_START, SDL_SCANCODE_LEFTBRACKET,VIMS_MOD_ALT,  NULL    },
+    { VIMS_SAMPLE_SET_MARKER_END,   SDL_SCANCODE_RIGHTBRACKET,VIMS_MOD_ALT, NULL    },
+    { VIMS_SAMPLE_TOGGLE_LOOP,      SDL_SCANCODE_KP_MULTIPLY,VIMS_MOD_NONE,NULL },
+    { VIMS_SAMPLE_TOGGLE_RAND_LOOP, SDL_SCANCODE_KP_MULTIPLY, VIMS_MOD_SHIFT },
+    { VIMS_SWITCH_SAMPLE_STREAM,    SDL_SCANCODE_ESCAPE,    VIMS_MOD_NONE, NULL },
+    { VIMS_PRINT_INFO,              SDL_SCANCODE_HOME,      VIMS_MOD_NONE, NULL },
+    { VIMS_OSL,                     SDL_SCANCODE_HOME,      VIMS_MOD_CTRL, NULL },
+    { VIMS_SAMPLE_CLEAR_MARKER,     SDL_SCANCODE_BACKSPACE, VIMS_MOD_NONE, NULL },
+    { VIMS_MACRO,                   SDL_SCANCODE_SPACE,     VIMS_MOD_NONE, "2 1"    },
+    { VIMS_MACRO,                   SDL_SCANCODE_SPACE,     VIMS_MOD_SHIFT,  "1 1"  },
+    { VIMS_MACRO,                   SDL_SCANCODE_SPACE,     VIMS_MOD_CTRL, "0 0"    },
+    { VIMS_MACRO,                   SDL_SCANCODE_SPACE,     VIMS_MOD_CAPSLOCK, "3 1"},
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F1,        VIMS_MOD_CTRL, "0"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F2,        VIMS_MOD_CTRL, "1"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F3,        VIMS_MOD_CTRL, "2"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F4,        VIMS_MOD_CTRL, "3"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F5,        VIMS_MOD_CTRL, "4"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F6,        VIMS_MOD_CTRL, "5"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F7,        VIMS_MOD_CTRL, "6"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F8,        VIMS_MOD_CTRL, "7"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F9,        VIMS_MOD_CTRL, "8"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F10,       VIMS_MOD_CTRL, "9"  },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F11,       VIMS_MOD_CTRL, "10" },
+    { VIMS_MACRO_SELECT,            SDL_SCANCODE_F12,       VIMS_MOD_CTRL, "11" },
+    { VIMS_SAMPLE_HOLD_FRAME,       SDL_SCANCODE_PAUSE,     VIMS_MOD_NONE, "0 0 5" },
     { 0,0,0,NULL },
 };
 #endif
@@ -761,7 +762,7 @@ vj_keyboard_event *new_keyboard_event(
     if(!ev->vims)
         return NULL;
 
-    keyboard_event_map_ [ (modifier * SDLK_LAST) + symbol ] = ev;
+    keyboard_event_map_ [ (modifier * SDL_NUM_SCANCODES) + symbol ] = ev;
 
     configure_vims_key_event( ev,symbol,modifier, event_id, value );
 
@@ -1512,7 +1513,7 @@ void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
 int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 {
     SDL_KeyboardEvent *key = &event.key;
-    SDLMod mod = key->keysym.mod;
+    SDL_Keymod mod = key->keysym.mod;
     veejay_t *v =  (veejay_t*) ptr;
     int vims_mod = 0;
 
@@ -1526,18 +1527,18 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
         vims_mod = VIMS_MOD_CAPSLOCK; // FIXME change to |= or not ???
     }
 
-    int vims_key = key->keysym.sym;
-    int index = vims_mod * SDLK_LAST + vims_key;
+    int vims_key = key->keysym.scancode;
+    int index = vims_mod * SDL_NUM_SCANCODES + vims_key;
 
     vj_keyboard_event *ev = get_keyboard_event( index );
     if(!ev )
     {
-        if( event.button.button == SDL_BUTTON_WHEELUP && v->use_osd != 3 ) {
+        if(event.type == SDL_MOUSEWHEEL && event.wheel.y >0 && v->use_osd != 3 ) {
             char msg[100];
             sprintf(msg,"%03d:;", VIMS_VIDEO_SKIP_SECOND );
             vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
             return 1;
-        } else if (event.button.button == SDL_BUTTON_WHEELDOWN && v->use_osd != 3) {
+        } else if (event.type == SDL_MOUSEWHEEL && event.wheel.y < 0 && v->use_osd != 3) {
             char msg[100];
             sprintf(msg,"%03d:;", VIMS_VIDEO_PREV_SECOND );
             vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
@@ -1980,7 +1981,7 @@ vims_key_list   *vj_event_get_keys( int event_id )
 
 void    vj_event_unregister_keyb_event( int sdl_key, int modifier )
 {
-    int index = (modifier * SDLK_LAST) + sdl_key;
+    int index = (modifier * SDL_NUM_SCANCODES) + sdl_key;
     vj_keyboard_event *ev = get_keyboard_event( index );
     if(ev)
     {
@@ -2045,7 +2046,7 @@ static int vj_event_update_key_collection(vj_keyboard_event *ev, int index)
 
 int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, char *value)
 {
-    int offset = SDLK_LAST * modifier;
+    int offset = SDL_NUM_SCANCODES * modifier;
     int index = offset + symbol;
     int is_bundle = (event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END);
 
@@ -2972,50 +2973,40 @@ void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
-    // parsed display num!! -> index of SDL array
 
-    //int id = args[0];
-    int id = 0;
+
+    if(args[0] == 2) { // Its a toggle!
+        args[0] = (v->settings->full_screen ? 0 : 1);
+    }
 
     switch(v->video_out)
     {
-        /*
-        case 4:
-#ifdef HAVE_GL
-        {
-            int go_fs = x_display_get_fs( v->gl ) == 1 ? 0:1;
-            x_display_set_fullscreen( v->gl, go_fs );
-            v->settings->full_screen = go_fs;
-        }
-#endif
-            break;
-        */
         case 0:
         case 2:
 #ifdef HAVE_SDL
         {
-            int go_fs = v->sdl[id]->fs == 1 ? 0:1 ;
             char *caption = veejay_title(v);
 
-            vj_sdl *tmpsdl = vj_sdl_allocate( v->video_output_width,v->video_output_height,v->pixel_format,v->use_keyb,v->use_mouse,v->show_cursor);
+            void *tmpsdl = vj_sdl_allocate( v->effect_frame1,v->use_keyb,v->use_mouse,v->show_cursor);
             
             if(vj_sdl_init(
-                v->settings->ncpu,
                 tmpsdl,
+                -1,
+                -1,
                 v->bes_width,
                 v->bes_height,
                 caption,
                 1,
-                go_fs,
+                args[0],
                 v->current_edit_list->video_fps
             ) ) {
-                if( v->sdl[id] ) {
-                    vj_sdl_free(v->sdl[id]);
+                if( v->sdl ) {
+                    vj_sdl_free(v->sdl);
                 }
-                v->sdl[id] = tmpsdl;        
-                if( go_fs)
-                    vj_sdl_grab( v->sdl[id], 0 );
-                v->settings->full_screen = go_fs;
+                v->sdl = tmpsdl;        
+                if(args[0])
+                    vj_sdl_grab( v->sdl, 0 );
+                v->settings->full_screen = args[0];
             }
             else {
                 vj_sdl_free(tmpsdl);
@@ -3039,11 +3030,10 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
     veejay_t *v = (veejay_t*) ptr;
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    int id = 0;
     int w  = args[0];
     int h  = args[1];
-        int x  = args[2];
-        int y  = args[3];
+    int x  = args[2];
+    int y  = args[3];
 
     if( w < 0 || w > 4096 || h < 0 || h > 4096 || x < 0 || y < 0 )
     {
@@ -3058,15 +3048,13 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
             case 0:
             case 2:
 #ifdef HAVE_SDL
-                if( v->sdl[id] )
-                {
-                    vj_sdl_free( v->sdl[id] );
-                    v->sdl[id] = NULL;
-                    v->video_out = 5;
+                if( v->sdl) {
+                    vj_sdl_free(v->sdl);
                     vj_sdl_quit();
+                    v->sdl = NULL;
                     veejay_msg(VEEJAY_MSG_INFO, "Closed SDL window");
-                    return;
                 }
+                v->video_out = 5;
 #endif
                 break;
             default:
@@ -3081,48 +3069,58 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
         {
             case 5:
 #ifdef HAVE_SDL
-                if(!v->sdl[id] )
-                {
-                    v->sdl[id] = vj_sdl_allocate( 
-                        v->video_output_width,
-                        v->video_output_height,
-                        v->pixel_format,
-                        v->use_keyb,
-                        v->use_mouse,
-                        v->show_cursor );
+                if(!v->sdl) {
+                    v->sdl = vj_sdl_allocate( v->effect_frame1, v->use_keyb, v->use_mouse, v->show_cursor );
                     veejay_msg(VEEJAY_MSG_INFO, "Allocated SDL window");
                 
-                    if(vj_sdl_init( v->settings->ncpu,
-                        v->sdl[id],
-                        v->bes_width,
-                        v->bes_height,
+                    if(vj_sdl_init(
+                        v->sdl,
+                        x,
+                        y,
+                        w,
+                        h,
                         title,
                         1,
                         v->settings->full_screen,
                         v->current_edit_list->video_fps )
                     ) {
-                    veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
-                    v->video_out = 0;
+                        veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
+                        v->video_out = 0;
+                        v->bes_width = w;
+                        v->bes_height = h;
                     }
                 }
 #endif
             case 0:
-#ifdef HAVE_SDL             
-                if( x > 0 && y > 0 )
-                    vj_sdl_set_geometry(v->sdl[id],x,y);
-        
-                if( w > 0 && h > 0 )
-                    vj_sdl_resize( v->sdl[id], w, h, v->settings->full_screen );
+#ifdef HAVE_SDL  
+                if(v->sdl) {
+                    vj_sdl_free(v->sdl);
+                    vj_sdl_quit();
+                    v->sdl = NULL;
+                }           
+                if(!v->sdl) {
+                    v->sdl = vj_sdl_allocate( v->effect_frame1, v->use_keyb, v->use_mouse, v->show_cursor );
+                    veejay_msg(VEEJAY_MSG_INFO, "Allocated SDL window");
+                
+                    if(vj_sdl_init(
+                        v->sdl,
+                        x,
+                        y,
+                        w,
+                        h,
+                        title,
+                        1,
+                        v->settings->full_screen,
+                        v->current_edit_list->video_fps )
+                    ) {
+                        veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
+                        v->video_out = 0;
+                        v->bes_width = w;
+                        v->bes_height = h;
+                    }
+                }
 #endif              
                 break;
-        /*
-            case 4:
-#ifdef HAVE_GL
-                if( w > 0 && h > 0 )
-                    x_display_resize(w,h,w,h);  
-#endif
-                break;
-                */
             default:
                 break;
         }
@@ -6991,18 +6989,6 @@ void    vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 
 void    vj_event_toggle_osl( void *ptr, const char format[], va_list ap )
 {
-#ifdef HAVE_SDL_TTF
-    veejay_t *v = (veejay_t*) ptr;  
-    if( v->settings->composite ) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Sorry, on-screen-logging is not supported yet in projection mapping. Start veejay with -D");
-    } else {
-        veejay_toggle_osl();
-        veejay_msg(VEEJAY_MSG_INFO, "On screen logging is now %s",
-            (veejay_log_to_ringbuffer() ? "enabled": "disabled" ));
-    }
-#else
-    veejay_msg(VEEJAY_MSG_WARNING, "Sorry, on-screen-logging requires veejay to be build with SDL_ttf");
-#endif
 }
 
 void    vj_event_toggle_osd( void *ptr, const char format[], va_list ap )
@@ -7868,8 +7854,8 @@ void vj_event_print_sample_info(veejay_t *v, int id)
     video_playback_setup *s = v->settings;
     int y, i, j;
     long value;
-    char timecode[15];
-    char curtime[15];
+    char timecode[48];
+    char curtime[48];
     char sampletitle[200];
     MPEG_timecode_t tc;
     y4m_ratio_t ratio = mpeg_conform_framerate( (double)v->current_edit_list->video_fps );
@@ -7880,10 +7866,10 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 
     veejay_memset( &tc,0,sizeof(MPEG_timecode_t));
     mpeg_timecode(&tc, len, mpeg_framerate_code( ratio ),v->current_edit_list->video_fps);
-    sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
+    snprintf(timecode,sizeof(timecode), "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
 
     mpeg_timecode(&tc,  s->current_frame_num, mpeg_framerate_code(ratio),v->current_edit_list->video_fps);
-    sprintf(curtime, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
+    snprintf(curtime, sizeof(curtime), "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
     sample_get_description( id, sampletitle );
 
     veejay_msg(VEEJAY_MSG_INFO, 
@@ -9219,9 +9205,9 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
 
     P_A( args, sizeof(args), value,sizeof(value), format ,ap );
 
-    if( args[1] <= 0 || args[1] >= SDLK_LAST)
+    if( args[1] <= 0 || args[1] >= SDL_NUM_SCANCODES)
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid key identifier %d (range is 1 - %d)", args[1], SDLK_LAST);
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid key identifier %d (range is 1 - %d)", args[1], SDL_NUM_SCANCODES);
         return;
     }
     if( args[2] < 0 || args[2] > VIMS_MOD_SHIFT )

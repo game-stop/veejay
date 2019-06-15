@@ -178,9 +178,6 @@ static void CompiledWith()
 #endif
 #ifdef HAVE_SDL
 	fprintf(stdout,"\tSupport for Simple Direct Media Layer\n");
-#ifdef HAVE_SDL_TTF
-	fprintf(stdout,"\tSupport for On-Screen logging\n");
-#endif
 #endif
 #ifdef HAVE_JPEG
 	fprintf(stdout,"\tSupport for JPEG\n");

@@ -26,7 +26,6 @@
 #include <veejaycore/vj-client.h>
 #include <veejaycore/yuvconv.h>
 #include <libstream/vj-yuv4mpeg.h>
-#include <veejay/vj-sdl.h>
 #include <libel/lav_io.h>
 #include <libel/vj-el.h>
 
@@ -296,7 +295,7 @@ typedef struct {
 #endif
     void	*y4m;
 #ifdef HAVE_SDL
-    vj_sdl **sdl;		/* array of SDL windows */
+    void *sdl;
 #endif
     vj_yuv *output_stream;	/* output stream for dumping video */
     void *vloopback; // vloopback output
