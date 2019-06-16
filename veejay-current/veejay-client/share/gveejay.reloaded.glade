@@ -1535,6 +1535,12 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -10841,6 +10847,7 @@
                                                     <property name="secondary_icon_activatable">False</property>
                                                     <property name="adjustment">sample_record_duration</property>
                                                     <property name="climb_rate">1</property>
+                                                    <property name="value">1</property>
                                                     <signal name="value-changed" handler="on_spin_sampleduration_value_changed" swapped="no"/>
                                                   </object>
                                                 </child>

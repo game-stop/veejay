@@ -3869,12 +3869,7 @@ static void update_record_tab(int pm)
     }
     if(pm == MODE_SAMPLE)
     {
-        update_spin_value( "spin_sampleduration", 1 );
-        // combo_samplecodec
-        gint n_frames = sample_calctime();
-        char *time = format_time( n_frames,(double) info->el.fps );
-        update_label_str( "label_samplerecord_duration", time );
-        free(time);
+        on_spin_sampleduration_value_changed(NULL,NULL);
     }
 }
 
