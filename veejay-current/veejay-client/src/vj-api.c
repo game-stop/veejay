@@ -8361,7 +8361,7 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
         GdkRGBA bg,col,border;
         GtkStateFlags context_state = gtk_style_context_get_state(sc);
         vj_gtk_context_get_color(sc, "background-color", context_state, &bg);
-        vj_gtk_context_get_color(sc, "border-color", context_state, &bg);
+        vj_gtk_context_get_color(sc, "border-color", context_state, &border);
         gtk_style_context_get_color(sc, context_state, &col );
 
         gtk3_curve_set_color_background_rgba (GTK_WIDGET(gui->curve), bg.red, bg.green, bg.blue, 1.0);
