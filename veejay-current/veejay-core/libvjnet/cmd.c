@@ -311,6 +311,10 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 	while( length > 0 ) {
 		n = send( fd, ptr, length , MSG_NOSIGNAL );
 		if( n == -1 ) {
+            if(errno == EPIPE ) {
+                veejay_msg(VEEJAY_MSG_DEBUG, "The local end has been shut down,someone just hang up");
+                return -1;
+            }
 			veejay_msg(0, "Error sending buffer:%s", strerror(errno));
 			return -1;
 		}
