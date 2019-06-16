@@ -216,7 +216,7 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 			if( (info->sample_banks[i]->slot[j]->sample_id ==
 			    info->status_tokens[CURRENT_ID]) ) 
 			{
-				gtk_frame_set_label( GTK_FRAME( info->sample_banks[i]->gui_slot[j]->frame ) , title );
+                gtk_label_set_text( GTK_LABEL( info->sample_banks[i]->gui_slot[j]->title ), title );
 				return;
 			}
 		}
@@ -1664,34 +1664,34 @@ void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "Sample record stop");
 }
 
-static	int	sample_calctime_selection()
+static inline int sample_calctime (int nframes)
 {
-	int n_frames = info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START];
-	if( info->status_tokens[SAMPLE_LOOP] == 2 )
-		n_frames *= 2;
-	if( info->status_tokens[FRAME_DUP] > 0 )
-		n_frames *= info->status_tokens[FRAME_DUP];
+    if( info->status_tokens[SAMPLE_LOOP] == 2 )
+        nframes *= 2;
+    if( info->status_tokens[FRAME_DUP] > 0 )
+        nframes *= info->status_tokens[FRAME_DUP];
     int speed = info->status_tokens[SAMPLE_SPEED];
     if( speed == 0 )
        speed = 1;
-    n_frames = n_frames / abs(speed);
+    nframes = nframes / abs(speed);
 
-	return n_frames;
+    return nframes;
 }
 
-static	int	sample_calctime()
+static int sample_calctime_selection()
 {
-	int n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
-	if( info->status_tokens[SAMPLE_LOOP] == 2 )
-		n_frames *= 2;
-	if( info->status_tokens[FRAME_DUP] > 0 )
-		n_frames *= info->status_tokens[FRAME_DUP];
-    int speed = info->status_tokens[SAMPLE_SPEED];
-    if( speed == 0 )
-       speed = 1;
-    n_frames = n_frames / abs(speed);
+    int n_frames = info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START];
+    if (n_frames == 0 )
+        n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
 
-	return n_frames;
+    return sample_calctime(n_frames);
+}
+
+static int sample_calctime_mulloop()
+{
+    int n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
+
+    return sample_calctime(n_frames);
 }
 
 void	on_spin_sampleduration_value_changed(GtkWidget *widget , gpointer user_data)
@@ -1699,7 +1699,7 @@ void	on_spin_sampleduration_value_changed(GtkWidget *widget , gpointer user_data
     int n_frames = 0;
 	// get num and display label_samplerecord_duration
 	if( is_button_toggled( "sample_mulloop" )) {
-		n_frames = sample_calctime();
+		n_frames = sample_calctime_mulloop();
         n_frames *= get_nums( "spin_sampleduration" );
     }
 	else if ( is_button_toggled( "sample_mulframes" ) ) {
