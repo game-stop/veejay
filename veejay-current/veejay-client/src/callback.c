@@ -2793,8 +2793,6 @@ void	on_curve_clear_parameter_clicked( GtkWidget *widget, gpointer user_data )
 
     multi_vims(VIMS_SAMPLE_KF_CLEAR, "%d %d",info->uc.selected_chain_entry,info->uc.selected_parameter_id);
     info->uc.reload_hint[HINT_KF] = 1;
-    reset_curve(info->curve);
-    vj_kf_select_parameter(info->uc.selected_parameter_id);
 }
 
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
@@ -2890,11 +2888,6 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_SAMPLE_KF_RESET, "%d", i );
 
     info->uc.reload_hint[HINT_KF] = 1;
-
-    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
-    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param), 0); // <None>
-
-    reset_curve(info->curve);
 }
 
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
@@ -2909,7 +2902,8 @@ void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 			return;
 		set_points_in_curve( GTK3_CURVE_TYPE_LINEAR, info->curve );
 	}
-}	
+}
+
 void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
@@ -2922,7 +2916,8 @@ void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 			return;
 		set_points_in_curve( GTK3_CURVE_TYPE_SPLINE, info->curve );
 	}
-}	
+}
+
 void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
@@ -2934,8 +2929,8 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 			return;
 		set_points_in_curve( GTK3_CURVE_TYPE_FREE, info->curve );
 	}
-
 }
+
 void	on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
@@ -2959,42 +2954,47 @@ void	on_curve_toggleentry_param_toggled( GtkWidget *widget, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "%s FX parameter %d", (k==0 ? "Disabled" : "Enabled"), i );
 }
 
+void curve_toggleentry_activate( int selected_chain_entry, int active)
+{
+    int curve_type = 0;
+    if( is_button_toggled("curve_typespline")) {
+        curve_type = 1;
+    } else if ( is_button_toggled("curve_typefreehand")) {
+        curve_type = 2;
+    } else if (is_button_toggled("curve_typelinear")) {
+        curve_type = 0;
+    }
+
+    multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d",
+               selected_chain_entry, active, curve_type );
+
+    //update anim mode
+    GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
+    GtkTreeModel *model = gtk_tree_view_get_model( view );
+    GtkTreeIter iter;
+
+    GtkTreePath *path = gtk_tree_path_new_from_indices(selected_chain_entry, -1);
+    if(gtk_tree_model_get_iter(model, &iter, path))
+    {
+        GdkPixbuf *kf_toggle = update_pixmap_entry( active );
+        gtk_list_store_set (GTK_LIST_STORE( model ), &iter, FXC_KF, kf_toggle, FXC_KF_STATUS, active, -1);
+    }
+    gtk_tree_path_free(path);
+}
+
 void	curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
 
-	int selected_chain_entry = info->uc.selected_chain_entry;
+    int selected_chain_entry = info->uc.selected_chain_entry;
 	if( selected_chain_entry == -1 ) {
 		vj_msg(VEEJAY_MSG_INFO,"No parameter selected for animation");
 		return;
 	}
 
 	int active = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) );
-	int curve_type = 0;
-	if( is_button_toggled("curve_typespline")) {
-		curve_type = 1;
-	} else if ( is_button_toggled("curve_typefreehand")) {
-		curve_type = 2;
-	} else if (is_button_toggled("curve_typelinear")) {
-		curve_type = 0;
-	}
-
-	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d %d",
-	           selected_chain_entry, active, curve_type );
-
-	//update anim mode
-	GtkTreeView *view = GTK_TREE_VIEW(glade_xml_get_widget_(info->main_window, "tree_chain"));
-	GtkTreeModel *model = gtk_tree_view_get_model( view );
-	GtkTreeIter iter;
-
-	GtkTreePath *path = gtk_tree_path_new_from_indices(selected_chain_entry, -1);
-	if(gtk_tree_model_get_iter(model, &iter, path))
-	{
-		GdkPixbuf *kf_toggle = update_pixmap_entry( active );
-		gtk_list_store_set (GTK_LIST_STORE( model ), &iter, FXC_KF, kf_toggle, -1);
-	}
-	gtk_tree_path_free(path);
+    curve_toggleentry_activate(selected_chain_entry, active);
 }
 
 void curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
@@ -3002,38 +3002,20 @@ void curve_panel_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
     curve_toggleentry_toggled( widget, user_data);
 
     GtkWidget *panel_toggleentry = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_panel_toggleentry"));
-    GtkWidget *chain_toggleentry = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_toggleentry"));
+    GtkWidget *chain_toggleentry = widget_cache[WIDGET_CURVE_CHAIN_TOGGLEENTRY];
 
     toggle_siamese_widget(widget, panel_toggleentry, chain_toggleentry);
 }
 
 void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
 {
-    GtkWidget *kf_param = glade_xml_get_widget_(info->main_window,"combo_curve_fx_param");
+    GtkWidget *kf_param = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
     gint active_kf_id = gtk_combo_box_get_active (GTK_COMBO_BOX(kf_param));
     if (active_kf_id != -1) {
-        if(active_kf_id == 0){
-            info->uc.selected_parameter_id = -1;
+        vj_kf_select_parameter(active_kf_id);
 
-            if(gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ] ))
-               gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], FALSE);
-
-            if(gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ] ))
-               gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], FALSE);
-
-
-            if(info->status_lock)
-              return;
-
-            vj_kf_reset();
-        } else {
-            KF_CHANGED (active_kf_id -1); ////None is id 0
-            // if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ]))
-            //   gtk_widget_set_sensitive(widget_cache[ WIDGET_FXANIMCONTROLS ], TRUE);
-
-            if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ]))
-               gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], TRUE);
-        }
+        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CURVECONTAINER ]))
+           gtk_widget_set_sensitive(widget_cache[ WIDGET_CURVECONTAINER ], TRUE);
     }
 }
 
@@ -3505,42 +3487,61 @@ void	on_add_file1_activate(GtkWidget *w, gpointer user_data)
  *
  *  Signal handler over the effect chain.
  *
- *  Catch button press event on shift+click to toogle chain state.
+ *  Catch button press event on shift+click to toogle fx state.
+ *  Catch button press event on ctrl+click to toogle fx anim state.
  *  NOTA : works over the FULL row
  *
  ******************************************************/
 gboolean on_effectchain_button_pressed (GtkWidget *tree, GdkEventButton *event, gpointer userdata)
 {
-    /* shift key + single click with the left mouse button? */
-    if (event->state & GDK_SHIFT_MASK)
+    //filter events over ctrl and shift
+    int state_modifier = event->state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK);
+
+    if (state_modifier && (event->type == GDK_BUTTON_PRESS) && (event->button == 1))
     {
-        if (event->type == GDK_BUTTON_PRESS && event->button == 1)
+        GtkTreePath *path;
+        GtkTreeViewColumn *column;
+        gint cell_x, cell_y;
+
+        if(gtk_tree_view_get_path_at_pos( GTK_TREE_VIEW( tree ),
+                            (gint) event->x,
+                            (gint) event->y,
+                            &path, &column, &cell_x, &cell_y ))
+
         {
-            GtkTreePath *path;
-            GtkTreeViewColumn *column;
-            gint cell_x, cell_y;
+            /* get iter from clicked path */
+            GtkTreeIter iter;
+            gint fxcid = 0;
+            GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW( tree ));
 
-            if(gtk_tree_view_get_path_at_pos( GTK_TREE_VIEW( tree ),
-                                (gint) event->x,
-                                (gint) event->y,
-                                &path, &column, &cell_x, &cell_y ))
+            gtk_tree_model_get_iter(model, &iter, path);
+            gtk_tree_model_get(model,&iter, FXC_ID, &fxcid, -1 );
 
-            {
-                /* compare iter from tree selection and clicked path */
-                GtkTreeIter iter;
-                gint fxcid = 0;
-                GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW( tree ));
-
-                gtk_tree_model_get_iter(model, &iter, path);
-                gtk_tree_model_get(model,&iter, FXC_ID, &fxcid, -1 );
-
-                /* user can click on all row, uncomment and fix accordingly the test to check particular column */
-                //guint column_num = get_treeview_col_number_from_column ( column );
-                //if(column_num != -1)
+            switch (state_modifier){
+                case GDK_SHIFT_MASK:
                 {
-                    multi_vims(VIMS_CHAIN_ENTRY_SET_STATE, "%d %d",0, fxcid);
-                    info->uc.reload_hint[HINT_HISTORY] = 1;
+                    /* user can click on all row, uncomment and fix accordingly the test to check particular column */
+                    //guint column_num = get_treeview_col_number_from_column ( column );
+                    //if(column_num != -1)
+                    {
+                        multi_vims(VIMS_CHAIN_ENTRY_SET_STATE, "%d %d",0, fxcid);
+                        info->uc.reload_hint[HINT_HISTORY] = 1;
+                    }
                 }
+                break;
+
+                case GDK_CONTROL_MASK:
+                {
+                    /* user can click on all row, uncomment and fix accordingly the test to check particular column */
+                    //guint column_num = get_treeview_col_number_from_column ( column );
+                    //if(column_num != -1)
+                    {
+                        int active;
+                        gtk_tree_model_get ( model, &iter, FXC_KF_STATUS, &active, -1);
+                        curve_toggleentry_activate(fxcid, !active);
+                    }
+                }
+                break;
             }
         }
     }
@@ -4700,13 +4701,24 @@ void on_sample_loopstop_value_changed( GtkWidget *widget, gpointer user_data )
     multi_vims( VIMS_SAMPLE_SET_LOOPS, "%d %d", 0, get_nums("sample_loopstop"));
 }
 
-void on_sample_panel_switch_page( GtkWidget *widget, gpointer user_data ) 
+void on_sample_panel_switch_page(GtkNotebook *notebook,
+                                GtkWidget   *page,
+                                guint        page_num,
+                                gpointer     user_data)
 {
-    int page = gtk_notebook_get_current_page(GTK_NOTEBOOK(widget));
-    if( page == 1 ) {
+    if( page_num == 1 ) {
         update_spin_value("button_el_selstart", info->selection[0] );
         update_spin_value("button_el_selend", info->selection[1] );
     }
 }
 
+void on_notebook18_switch_page (GtkNotebook *notebook,
+                                GtkWidget   *page,
+                                guint        page_num,
+                                gpointer     user_data)
+{
+    if( page_num == 1 ) {
+        vj_kf_refresh(TRUE);
+    }
+}
 

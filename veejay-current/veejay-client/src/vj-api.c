@@ -73,6 +73,8 @@
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/libvevo.h>
 #include <src/vmidi.h>
+#include <src/utils-gtk.h>
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -719,7 +721,7 @@ static struct
     {"Select a SRT sequence to edit"},
     {"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample"},
     {"Filter the effects list by any string"},
-    {"Shift + Mouse left : Toogle selected fx chain"},
+    {"Shift + Mouse left : Toogle selected fx,\nControl + Mouse left : Toogle selected fx anim"},
     {NULL},
 };
 
@@ -1146,7 +1148,8 @@ enum
     FXC_KF = 3,
     FXC_MIXING = 4,
     FXC_SUBRENDER = 5,
-    FXC_N_COLS = 6,
+    FXC_KF_STATUS = 6,
+    FXC_N_COLS = 7,
 };
 
 enum {
@@ -1248,7 +1251,6 @@ void msg_vims(char *message);
 static void multi_vims(int id, const char format[],...);
 static void single_vims(int id);
 static gdouble get_numd(const char *name);
-static void vj_kf_select_parameter(int id);
 static int get_nums(const char *name);
 static gchar *get_text(const char *name);
 static void put_text(const char *name, char *text);
@@ -1320,7 +1322,7 @@ void free_samplebank(void);
 void reset_samplebank(void);
 int verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
 static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
-static int update_curve_widget( GtkWidget *curve );
+static void update_curve_widget( GtkWidget *curve );
 /* not used */ /* static void update_curve_accessibility(const char *name); */
 static void reset_tree(const char *name);
 static void reload_srt();
@@ -1330,7 +1332,8 @@ static void set_textview_buffer(const char *name, gchar *utf8text);
 void interrupt_cb();
 int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
-static void vj_kf_refresh();
+static void vj_kf_select_parameter(int id);
+static void vj_kf_refresh(gboolean force);
 static void vj_kf_reset();
 static void veejay_stop_connecting(vj_gui_t *gui);
 void reload_macros();
@@ -1373,6 +1376,7 @@ static void init_widget_cache()
     }
 }
 
+/* NOT USED
 static void identify_widget(GtkWidget *w)
 {
     for( int i = 0; widget_map[i].name != NULL; i ++ ) {
@@ -1383,6 +1387,7 @@ static void identify_widget(GtkWidget *w)
     }
     veejay_msg(VEEJAY_MSG_DEBUG, "Widget %p is not in widget_cache");
 }
+*/
 
 static gboolean is_edl_displayed()
 {
@@ -1390,6 +1395,14 @@ static gboolean is_edl_displayed()
     int sample_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK15] ));
 
     if( panel_page == 5 && sample_page == 2 )
+        return TRUE;
+    return FALSE;
+}
+
+static gboolean is_fxanim_displayed()
+{
+    int fxanim_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
+    if( fxanim_page == 1)
         return TRUE;
     return FALSE;
 }
@@ -3175,99 +3188,95 @@ static void vj_kf_reset()
 
     info->status_lock = 1;
     reset_curve( info->curve );
-    
+
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
     }
- 
+
+    /* update the time bounds accordingly the sample marker*/
     int total_frames = (info->status_tokens[PLAY_MODE] == MODE_STREAM ? 
                         info->status_tokens[SAMPLE_MARKER_END] : 
                         ( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[TOTAL_FRAMES]: 0) );
-  
     int lo = (info->selection[0] == info->selection[1] ? 0 : info->selection[0]);
     int hi = (info->selection[1] > info->selection[0] ? info->selection[1] : total_frames );
-
     if( lo == hi ) {
         lo = 0;
         hi = total_frames;
     }
-
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART], 0, total_frames, lo );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
 
-    gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),0); 
+    GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
+    //block "changed" signal to prevent propagation
+    guint signal_id=g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
+    gulong handler_id=handler_id=g_signal_handler_find( (gpointer)curveparam,
+                                                        G_SIGNAL_MATCH_ID,
+                                                        signal_id,
+                                                        0, NULL, NULL, NULL );
+    if (handler_id) g_signal_handler_block((gpointer)curveparam, handler_id);
+    gtk_combo_box_set_active (GTK_COMBO_BOX(curveparam),0);
+    if (handler_id) g_signal_handler_unblock((gpointer)curveparam, handler_id);
 
     info->status_lock = osl;
 }
 
-static void vj_kf_refresh()
+static void vj_kf_refresh(gboolean force)
 {
+    if(!force && !is_fxanim_displayed())
+        return;
+
     int *entry_tokens = &(info->uc.entry_tokens[0]);
 
-    int status = 0;
-    if( entry_tokens[ENTRY_FXID] > 0 ) {
+    if( entry_tokens[ENTRY_FXID] > 0 && _effect_get_np( entry_tokens[ENTRY_FXID] )) {
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3] , TRUE );
-        status = update_curve_widget(info->curve);
-    }
-    else {
-        GtkComboBox *kf_param = GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]);
-        if(gtk_combo_box_get_active(kf_param) != 0) {
-            gtk_combo_box_set_active (kf_param,0); // FX_PARAMETER_DEFAULT_NAME
-        }
-        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))) {
-            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE);
-        }
-        gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], FALSE );
-    }
 
-    if( status == 0 ) {
+        GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
+        //block "changed" signal to prevent propagation
+        guint signal_id=g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
+        gulong handler_id=handler_id=g_signal_handler_find( (gpointer)curveparam,
+                                                            G_SIGNAL_MATCH_ID,
+                                                            signal_id,
+                                                            0, NULL, NULL, NULL );
+        if (handler_id) g_signal_handler_block((gpointer)curveparam, handler_id);
+        gtk_combo_box_set_active (GTK_COMBO_BOX(curveparam),0);
+        if (handler_id) g_signal_handler_unblock((gpointer)curveparam, handler_id);
+
+        vj_kf_select_parameter(0);
+    } else {
         vj_kf_reset();
+        gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3], FALSE );
     }
 }
 
+/*! \brief Reset the current curve and update using the selected effect parameter
+ *
+ *  \sa reset_curve
+ *  \sa update_curve_widget
+ *
+ *  \param num the selected effect parameter
+ */
 static void vj_kf_select_parameter(int num)
 {
     sample_slot_t *s = info->selected_slot;
-    if(!s)
-    {
-        gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),0);
+    if(!s) {
+        gtk_combo_box_set_active (GTK_COMBO_BOX(widget_cache[WIDGET_COMBO_CURVE_FX_PARAM]),FALSE);
         return;
     }
-    int *entry_tokens = &(info->uc.entry_tokens[0]);
 
     info->uc.selected_parameter_id = num;
-
     reset_curve( info->curve );
-
-    int lo=0,hi=0;
-    if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
-    {
-        lo = info->status_tokens[SAMPLE_MARKER_START];
-        hi = info->status_tokens[SAMPLE_MARKER_END];
-    }
-    else
-    {
-        lo = 0;
-        hi = info->status_tokens[SAMPLE_MARKER_END];
-    }
-    if( lo == 0 && hi == 0 ) {
-        lo = 0;
-        hi = info->status_tokens[TOTAL_FRAMES];
-    }
-
-    set_initial_curve( info->curve, entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id, 
-                       lo, hi ,
-                       entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
-
     update_curve_widget( info->curve );
 }
 
-static int update_curve_widget(GtkWidget *curve)
+/*! \brief Ask server KF of current fx param and and set them. If none set initial value
+ *
+ *  \sa set_points_in_curve_ext
+ *  \sa set_initial_curve
+ *
+ *  \param num the selected effect parameter
+ */
+static void update_curve_widget(GtkWidget *curve)
 {
-    sample_slot_t *s = info->selected_slot;
-    if(!s ) 
-        return 0;
-
     int i = info->uc.selected_chain_entry; /* chain entry */
     int id = info->uc.entry_tokens[ENTRY_FXID];
     int blen = 0;
@@ -3278,35 +3287,32 @@ static int update_curve_widget(GtkWidget *curve)
     multi_vims( VIMS_SAMPLE_KF_GET, "%d %d",i,info->uc.selected_parameter_id );
 
     unsigned char *blob = (unsigned char*) recv_vims( 8, &blen );
-    int checksum = data_checksum( (char*) blob, blen );
+    int checksum = data_checksum( (char*) blob, blen ) + i + info->uc.selected_parameter_id;
+
     if( info->uc.reload_hint_checksums[HINT_KF] == checksum ) {
         if( blob ) free(blob);
-        return 0;
+        return;
     }
     info->uc.reload_hint_checksums[HINT_KF] = checksum;
 
+    /* update the time bounds accordingly the sample marker*/
     if( lo == hi && hi == 0 )
     {
-        if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
-        {
+        if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ) {
             lo = info->status_tokens[SAMPLE_START];
             hi = info->status_tokens[SAMPLE_END];
-        }
-        else
-        {
+        } else {
             lo = 0;
             hi = info->status_tokens[SAMPLE_MARKER_END];
         }
     }
-
     int total_frames = (info->status_tokens[PLAY_MODE] == MODE_STREAM ? 
                         info->status_tokens[SAMPLE_MARKER_END] : 
                         ( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[TOTAL_FRAMES]: 0) );
-  
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART],0, total_frames, lo );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
 
-
+    /* If parameter have KF set the points or set the initial curve */
     if( blob && blen > 0 )
     {
         p = set_points_in_curve_ext( curve, blob,id,i, &lo,&hi, &curve_type,&status );
@@ -3329,14 +3335,15 @@ static int update_curve_widget(GtkWidget *curve)
                 gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), status );
             }
         }
+    } else {
+        set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id,
+                           lo, hi ,
+                           info->uc.entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
     }
-    else {
-        reset_curve( curve );
-    }
-  
-    if(blob)    free(blob);
 
-    return 1;
+    if(blob) free(blob);
+
+    return;
 }
 
 static int get_nums(const char *name)
@@ -3824,8 +3831,9 @@ static gboolean chain_update_row(GtkTreeModel * model,
             }
 
             gchar *mixing = _utf8str(tmp);
+            int kf_status = gui->uc.entry_tokens[ENTRY_KF_STATUS];
             GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_VIDEO_ENABLED] );
-            GdkPixbuf *kf_toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_KF_STATUS] );
+            GdkPixbuf *kf_toggle = update_pixmap_entry( kf_status );
             GdkPixbuf *subrender_toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_SUBRENDER_ENTRY]);
             gtk_list_store_set( GTK_LIST_STORE(model),iter,
                                FXC_ID, entry,
@@ -3834,6 +3842,7 @@ static gboolean chain_update_row(GtkTreeModel * model,
                                FXC_KF, kf_toggle,
                                FXC_MIXING, mixing,
                                FXC_SUBRENDER, subrender_toggle,
+                               FXC_KF_STATUS, kf_status,
                                -1 );
             g_free(descr);
             g_free(mixing);
@@ -4829,7 +4838,7 @@ static void load_generator_info()
 static void setup_effectchain_info( void )
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
-    GtkListStore *store = gtk_list_store_new( FXC_N_COLS, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING, GDK_TYPE_PIXBUF );
+    GtkListStore *store = gtk_list_store_new( FXC_N_COLS, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF,G_TYPE_STRING, GDK_TYPE_PIXBUF, G_TYPE_INT);
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     g_object_unref( G_OBJECT( store ));
 
@@ -4953,8 +4962,9 @@ static void load_effectchain_info()
             gchar *mixing = _utf8str(tmp);
 
             gtk_list_store_append( store, &iter );
+            int kf_status = arr[7];
             GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
-            GdkPixbuf *kf_togglepf = update_pixmap_entry( arr[7] );
+            GdkPixbuf *kf_togglepf = update_pixmap_entry( kf_status );
             GdkPixbuf *subrender_toggle = update_pixmap_entry(arr[8]);
             gtk_list_store_set( store, &iter,
                                FXC_ID, arr[0],
@@ -4962,7 +4972,9 @@ static void load_effectchain_info()
                                FXC_FXSTATUS, toggle,
                                FXC_KF, kf_togglepf,
                                FXC_MIXING,mixing, 
-                               FXC_SUBRENDER, subrender_toggle,  -1 );
+                               FXC_SUBRENDER, subrender_toggle,
+                               FXC_KF_STATUS, kf_status,
+                                -1 );
             last_index ++;
             g_free(utf8_name);
             g_free(mixing);
@@ -7774,8 +7786,8 @@ static void enable_fx_entry() {
     GtkWidget *kf_param = widget_cache[ WIDGET_COMBO_CURVE_FX_PARAM ];
     
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(kf_param));
-    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), FX_PARAMETER_DEFAULT_NAME);
-    gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+    //~ gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(kf_param), FX_PARAMETER_DEFAULT_NAME);
+    //~ gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
 
     int np = _effect_get_np( entry_tokens[ENTRY_FXID] );
     gint min,max,value;
@@ -7818,7 +7830,25 @@ static void enable_fx_entry() {
             update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i],min,max, value, 0);
         }
     }
-   
+
+    if (np){
+        guint signal_id=g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
+        gulong handler_id=handler_id=g_signal_handler_find( (gpointer)kf_param,
+                                                            G_SIGNAL_MATCH_ID,
+                                                            signal_id,
+                                                            0, NULL, NULL, NULL );
+
+        if (handler_id){
+            g_signal_handler_block((gpointer)kf_param, handler_id);
+        }
+        gtk_combo_box_set_active (GTK_COMBO_BOX(kf_param),0);
+
+        if (handler_id)
+            g_signal_handler_unblock((gpointer)kf_param, handler_id);
+
+
+    }
+
     min = 0; max = 1; value = 0; 
     for( i = np; i < MAX_UI_PARAMETERS; i ++ )
     {
@@ -7920,10 +7950,12 @@ static void process_reload_hints(int *history, int pm)
         if( lpi == 0 ) {
             if( entry_tokens[ENTRY_FXID] == 0 && gtk_widget_is_sensitive(widget_cache[WIDGET_FRAME_FXTREE2])) {
                 disable_fx_entry();
+                info->uc.reload_hint[HINT_KF] = 1;
             }
         } else if (lpi == 1 ) {
             if (entry_tokens[ENTRY_FXID] != 0 ) {
                 enable_fx_entry();
+                info->uc.reload_hint[HINT_KF] = 1;
             }
         }
     }
@@ -7935,7 +7967,8 @@ static void process_reload_hints(int *history, int pm)
     }
 
     if ( info->uc.reload_hint[HINT_KF]) {
-        vj_kf_refresh();
+        info->uc.reload_hint_checksums[HINT_KF] = -1;
+        vj_kf_refresh(FALSE);
     }
 
     if( beta__ && info->uc.reload_hint[HINT_HISTORY]) {
@@ -8331,9 +8364,10 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
         }
         GtkStyleContext *sc = gtk_widget_get_style_context( GTK_WIDGET(gui->curve) );
         GdkRGBA bg,col,border;
-        gtk_style_context_get_background_color(sc, gtk_style_context_get_state(sc), &bg );
-        gtk_style_context_get_border_color(sc,gtk_style_context_get_state(sc), &border);
-        gtk_style_context_get_color(sc, gtk_style_context_get_state(sc), &col );
+        GtkStateFlags context_state = gtk_style_context_get_state(sc);
+        vj_gtk_context_get_color(sc, "background-color", context_state, &bg);
+        vj_gtk_context_get_color(sc, "border-color", context_state, &bg);
+        gtk_style_context_get_color(sc, context_state, &col );
 
         gtk3_curve_set_color_background_rgba (GTK_WIDGET(gui->curve), bg.red, bg.green, bg.blue, 1.0);
         gtk3_curve_set_color_curve_rgba (GTK_WIDGET(gui->curve), col.red, col.green, col.blue, 1.0);
@@ -9612,11 +9646,15 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 }
 
 
-/* --------------------------------------------------------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  *  Handler of mouse clicks on the GUI-elements of one slot
- *  single-click activates the slot and the loaded sample (if there is one)
- *  double-click or tripple-click activates it and plays it immediatelly
-   -------------------------------------------------------------------------------------------------------------------------- */
+ *
+ * - FIRST BUTTON
+ *  single-click : activates the slot and the loaded sample (if there is one)
+ *  single-click + modifier shift : select it has current channel source
+ *  double-click or tripple-click : activates it and plays it immediatelly
+ *
+ * --------------------------------------------------------------------------- */
 static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data)
 {
     gint bank_nr = -1;
@@ -9632,56 +9670,59 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
     if( info->sample_banks[ bank_nr ]->slot[ slot_nr ]->sample_id <= 0 )
         return FALSE;
 
+    sample_slot_t *select_slot = sample_banks[bank_nr]->slot[slot_nr];
     if( event->type == GDK_2BUTTON_PRESS )
     {
-        sample_slot_t *s = sample_banks[bank_nr]->slot[slot_nr];
-        multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", (s->sample_type==0? 0:1), s->sample_id);
-        vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, s->sample_type, s->sample_id );
+
+        multi_vims( VIMS_SET_MODE_AND_GO,
+                    "%d %d",
+                    (select_slot->sample_type==MODE_SAMPLE? MODE_SAMPLE:MODE_STREAM),
+                    select_slot->sample_id);
+        vj_midi_learning_vims_msg2( info->midi,
+                                    NULL,
+                                    VIMS_SET_MODE_AND_GO,
+                                    select_slot->sample_type,
+                                    select_slot->sample_id );
         vj_msg(VEEJAY_MSG_INFO,
                "Start playing %s %d",
-               (s->sample_type==0 ? "Sample" : "Stream" ), s->sample_id );
+               (select_slot->sample_type==MODE_SAMPLE ? "Sample" : "Stream" ),
+               select_slot->sample_id );
     }
     else if(event->type == GDK_BUTTON_PRESS )
     {
-        if( (event->state & GDK_SHIFT_MASK ) == GDK_SHIFT_MASK )
-        {
-            sample_slot_t *x = sample_banks[bank_nr]->slot[slot_nr];
-            multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
-                "%d %d %d %d",
-                0,
-                info->uc.selected_chain_entry,
-                x->sample_type,
-                x->sample_id );
+        switch(event->state & GDK_SHIFT_MASK){
+            case GDK_SHIFT_MASK :
+            {
+                multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+                    "%d %d %d %d",
+                    0,
+                    info->uc.selected_chain_entry,
+                    select_slot->sample_type,
+                    select_slot->sample_id );
 
-            if(x->sample_id == 1 )
-            {
                 vj_msg(VEEJAY_MSG_INFO,
-                       "Set mixing channel %d to Stream %d",
+                       "Set mixing channel %d to %s %d",
                        info->uc.selected_chain_entry,
-                       x->sample_id );
-            } else
-            {
-                vj_msg(VEEJAY_MSG_INFO,
-                       "Set mixing channel %d to Sample %d",
-                       info->uc.selected_chain_entry,
-                       x->sample_id);
+                       (select_slot->sample_type==MODE_SAMPLE ? "Sample" : "Stream" ),
+                       select_slot->sample_id );
+
+                char trip[100];
+                snprintf(trip, sizeof(trip), "%03d:%d %d %d %d",VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+                    0,
+                    info->uc.selected_chain_entry,
+                    select_slot->sample_type,
+                    select_slot->sample_id );
+
+                vj_midi_learning_vims( info->midi, NULL, trip, 0 );
             }
+            break;
 
-            char trip[100];
-            snprintf(trip, sizeof(trip), "%03d:%d %d %d %d",VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
-                0,
-                info->uc.selected_chain_entry,
-                x->sample_type,
-                x->sample_id );
-
-            vj_midi_learning_vims( info->midi, NULL, trip, 0 );
-        } 
-        else
-        {
-            set_selection_of_slot_in_samplebank(FALSE);
-            info->selection_slot = sample_banks[bank_nr]->slot[slot_nr];
-            info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
-            set_selection_of_slot_in_samplebank(TRUE );
+            default :
+                set_selection_of_slot_in_samplebank(FALSE);
+                info->selection_slot = select_slot;
+                info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
+                set_selection_of_slot_in_samplebank(TRUE );
+            break;
         }
     }
     return FALSE;

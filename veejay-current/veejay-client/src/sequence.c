@@ -122,10 +122,8 @@ void	*gvr_preview_init(int max_tracks, int use_threads)
 
 static	void	gvr_close_connection( veejay_track_t *v )
 {
-    veejay_msg(VEEJAY_MSG_INFO, "Closing connection %s:%d",v->hostname,v->port_num );
-    
     if(v != NULL) {
-
+        veejay_msg(VEEJAY_MSG_INFO, "Closing connection %s:%d",v->hostname,v->port_num );
         if(v->fd) { 
             vj_client_close(v->fd); 
             vj_client_free(v->fd);
