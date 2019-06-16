@@ -410,11 +410,8 @@ int veejay_free(veejay_t * info)
 	if( info->effect_frame2) free(info->effect_frame2);
 	if( info->effect_info) free( info->effect_info );
 	if( info->dummy ) free(info->dummy );
-#ifdef HAVE_SDL
-	free(info->sdl);
-#endif
-	free( info->seq );
-
+	
+    free( info->seq );
     free(info->status_what);
 	free(info->homedir);  
     free(info->uc);
