@@ -1333,7 +1333,7 @@ void interrupt_cb();
 int get_and_draw_frame(int type, char *wid_name);
 GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 static void vj_kf_select_parameter(int id);
-static void vj_kf_refresh();
+static void vj_kf_refresh(gboolean force);
 static void vj_kf_reset();
 static void veejay_stop_connecting(vj_gui_t *gui);
 void reload_macros();
@@ -1395,6 +1395,14 @@ static gboolean is_edl_displayed()
     int sample_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK15] ));
 
     if( panel_page == 5 && sample_page == 2 )
+        return TRUE;
+    return FALSE;
+}
+
+static gboolean is_fxanim_displayed()
+{
+    int fxanim_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
+    if( fxanim_page == 1)
         return TRUE;
     return FALSE;
 }
@@ -3212,11 +3220,13 @@ static void vj_kf_reset()
     info->status_lock = osl;
 }
 
-static void vj_kf_refresh()
+static void vj_kf_refresh(gboolean force)
 {
+    if(!force && !is_fxanim_displayed())
+        return;
+
     int *entry_tokens = &(info->uc.entry_tokens[0]);
 
-    int status = 0;
     if( entry_tokens[ENTRY_FXID] > 0 && _effect_get_np( entry_tokens[ENTRY_FXID] )) {
         gtk_widget_set_sensitive_( widget_cache[WIDGET_FRAME_FXTREE3] , TRUE );
 
@@ -7958,7 +7968,7 @@ static void process_reload_hints(int *history, int pm)
 
     if ( info->uc.reload_hint[HINT_KF]) {
         info->uc.reload_hint_checksums[HINT_KF] = -1;
-        vj_kf_refresh();
+        vj_kf_refresh(FALSE);
     }
 
     if( beta__ && info->uc.reload_hint[HINT_HISTORY]) {

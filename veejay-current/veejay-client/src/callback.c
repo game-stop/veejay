@@ -4701,13 +4701,24 @@ void on_sample_loopstop_value_changed( GtkWidget *widget, gpointer user_data )
     multi_vims( VIMS_SAMPLE_SET_LOOPS, "%d %d", 0, get_nums("sample_loopstop"));
 }
 
-void on_sample_panel_switch_page( GtkWidget *widget, gpointer user_data ) 
+void on_sample_panel_switch_page(GtkNotebook *notebook,
+                                GtkWidget   *page,
+                                guint        page_num,
+                                gpointer     user_data)
 {
-    int page = gtk_notebook_get_current_page(GTK_NOTEBOOK(widget));
-    if( page == 1 ) {
+    if( page_num == 1 ) {
         update_spin_value("button_el_selstart", info->selection[0] );
         update_spin_value("button_el_selend", info->selection[1] );
     }
 }
 
+void on_notebook18_switch_page (GtkNotebook *notebook,
+                                GtkWidget   *page,
+                                guint        page_num,
+                                gpointer     user_data)
+{
+    if( page_num == 1 ) {
+        vj_kf_refresh(TRUE);
+    }
+}
 
