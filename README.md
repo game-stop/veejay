@@ -12,17 +12,32 @@ You can cluster to allow a number of machines to work together over the network 
 
 The engine is historically based upon mjpegtools's lavplay and processes all video in YUV planar It performs at its best, currently with MJPEG AVI (through ffmpeg/libav) or one of veejay's internal formats. Veejay is built upon a servent architecture.
 
+see also : [README whatis](./veejay-current/veejay-server/doc/README.whatis.md)
+
 ### Veejay Applications:
 * __Reloaded__
-    A GUI developed in GLADE/GTK
+    A GUI developed in GLADE/GTK ([veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client))
 * __sendVIMS__
-    A PureData object allowing direct communications with the server
+    A PureData object allowing direct communications with the server ([sendVIMS](https://github.com/c0ntrol/veejay/tree/master/veejay-current/sendVIMS))
 * __sayVIMS__
-    A console based utility for quick'n'dirty scripting
+    A console based utility for quick'n'dirty scripting ([veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils))
+
+And of course [__Veejay__](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) himself ! The video output server (Ffmpeg/libSDL). Could be remote, headless, multiples ... !
 
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ## Installation
+
+#### Get all the dependencies
+First, make sure you system is up-to-date, and install the dependencies with:
+```bash
+sudo apt-get install git autoconf automake libtool m4 gcc libjpeg62-dev \
+libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev  \
+gtk-3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1
+```
+
+#### Build the veejay's applications
 
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
@@ -31,15 +46,18 @@ Veejay is divided into multiple packages. Each must be build separately and in a
 3. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
 4. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
 
-For each package, run confgure and make:
+For __each package__, run the triptich commands of the *GNU build system* (for a quick start you can build the first two):
 
 ```bash
  ./autogen.sh
  ./configure
  make && sudo make install
 ```
+ __Nota :__ in some configuration you should have to __manually build__ the __shared libraries cache__ just after the __first__ veejay-server installation (ex `sudo ldconfig` or similar)
 
-If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. 
+You do not need to pass any parameters to `./configure` for veejay to be optimized with the current cpu-type.
+If you want to build for a specific architecture or without sound support (jack) ... take a look to the
+`./configure --help` to adapt to many kinds of systems.
 
 Before running veejay, be sure to add or link some TrueType fonts in 
 
@@ -97,89 +115,112 @@ if you want to debug veejay-server (or if you want to submit a meaningful backtr
 
      ./configure --enable-debug
 
-[//]: # ( comment : END installation section duplicated in /veejay-server/doc/Instalation)
+see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 
+[//]: # ( comment : END installation section duplicated in /veejay-server/doc/Instalation)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
+
+## Quick Start & Play!
+
+### Let's VJing Now...
+
+[__Veejay Quick start and play!__](./veejay-current/veejay-server/doc/README.quickstart) : start veejay, manually send VIMS messages, tricks to video fifo or some essentials of keyboards user interaction...
 
 ## FEATURE OVERVIEW
 
 ### General
 
- * Free Software (GNU GPL) (1)
- * Servent architecture (2)
- * Soft realtime (3)
- * Frame accurate (4)
- * Loop based editing (5)
- * Native YUV(A) processing
+ * Free Software (GNU GPL)
+ * Servent architecture
+ * Soft realtime
+ * Frame accurate
+ * Loop based editing
+ * Native YUV processing
  * Crash recovery
+
+see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [README Memory](./veejay-current/veejay-server/doc/README.memory.md), [README Performance](./veejay-current/veejay-server/doc/README.performance.md)
 
 ### Media
 
- * Codecs: MJPEG,MPNG, DV, YUV (raw)
- * Containers: AVI , Quicktime, rawDV
+ * Codecs: MJPEG, MPNG, DV, YUV (raw)
+ * Containers: AVI, Quicktime, rawDV
  * Devices: USB webcams, DV1394, TV capture cards, etc.
  * Support for unlimited capture devices
- * Support for Image files (PNG ,JPEG,TIFF,etc)
+ * Support for Image files (PNG ,JPEG, TIFF, etc)
+
+see also : [README Video & Codecs](./veejay-current/veejay-server/doc/README.video-codec.md), [README audio](./veejay-current/veejay-server/doc/README.audio)
 
 ### Editing
 
- * 161 built-in FX , many unique and original FX filters 
+ * 161 built-in FX, many unique and original FX filters
  * 60 Livido filters
  * FX chain (20 slots) with Alpha Channels
- * All FX parameters can be animated.
+ * All FX parameters can be animated
  * Mix up to two layers per FX slot
  * Non destructive edit decision lists (cut/copy/paste/crop video)
  * Sample editor
  * Sequence editor
  * Live disk recorder (sampling)
  * Full deck save/restore
- * Live clip loading 
+ * Live clip loading
  * Live sample sequencing
+
+see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
 
 ### Trickplay
 
- * VIMS event recording/playback (6)
+ * VIMS event recording/playback
  * Various looping modes including bounce looping
  * Playback speed and direction
  * Video scratching
  * Change in-and out points of a sample (marker)
- * Slow motion audio / video (7)
+ * Slow motion audio / video
  * Fast motion audio / video
- * Dynamic framerate 
+ * Dynamic framerate
  * Random frame play
  * Random sample play
- * Access up to 4096 video samples instantly	
+ * Access up to 4096 video samples instantly
 
 ### Output
 
- * Audio trough Jack (low latency audio server) (8)
+ * Audio trough Jack (low latency audio server)
  * SDL video
- * Headless (no output)
+ * Headless (no video output)
  * YUV4MPEG streaming
  * V4L2 loopback devices
  * Network streaming (unicast and multicast)
+ * Preview rendering
  * Image grabbing
+
+ see also : [How to Network](./veejay-current/veejay-server/doc/NET.txt)
 
 ### Interaction
 
  * Programmable keyboard interface
- * VIMS (tcp/ip) 
+ * VIMS (tcp/ip)
  * OSC (udp)
  * PureData trough sendVIMS external
- * MIDI 
+ * MIDI
+
+see also : [How to PureData](./veejay-current/veejay-server/doc/HowtoVeejay-PureData.html)
 
 ### Viewing
 
  * Full screen or windowed mode
- * Perspective and foward projection (9)
+ * Perspective and foward projection
  * Twinview/BigDesktop
  * Split-screen video wall
- 
 
-### Additional
+see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
+
+### Plugins and more...
 
  * Support for Frei0r plugins
  * Support for LiVIDO plugins
  * Support for FreeFrame plugins (only for 32 bit systems!)
+ * Support for GMIC plugins
+
+see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3)
 
 ## Contact / Feedback & HELP
 
@@ -189,7 +230,7 @@ Please join our mailing list on http://groups.google.com/group/veejay-discussion
 
 Please use the ticket system on https://github.com/c0ntrol/veejay/issues or simply write a mail to the veejay-discussion group!
 
-ENJOY! And let us know about your performances/installations with veejay! 
+ENJOY! And let us know about your performances/installations with veejay!
 
 ---
 ```

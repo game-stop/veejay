@@ -1,6 +1,6 @@
 .TH "sayVIMS" 1
 .SH NAME
-sayVIMS - sends VIMS messages to veejay 
+sayVIMS - sends VIMS messages to veejay
 .SH SYNOPSIS
 .B sayVIMS [options] [filename]
 .SH DESCRIPTION
@@ -42,16 +42,15 @@ Verbose
 
 .SH USEFUL EXAMPLES
 .TP
-.B echo """600:;""" |sayVIMS
-Send the quit message to veejay running on localhost:3490
-
-.TP
-.B sayVIMS -h localhost -p3490 -m """017:;"""
+.B sayVIMS -h localhost -p3490 -m \/"017:;\/"
 Start sayVIMS and connect to veejay (and tell veejay go to sample starting position)
 .TP
-.B sayVIMS -g 224.0.0.50 -p5000 -m """017:;"""
+.B sayVIMS -g 224.0.0.50 -p5000 -m \/"017:;\/"
 Ditto, for multicast.
-
+.TP
+.B echo -e \/"17:;\/"\e\en\/"12:;\/" | sayVIMS
+Start sayVIMS (auto connect to veejay) reading messages from stdin (tell veejay go to sample starting position and stop all samples)
+.TP
 .SH Message Format
 A message is described as
 .B <selector>:<arguments>;
@@ -62,7 +61,7 @@ For example:
 The selector is a 3 digit number identifying some atomic function in veejay ("veejay -u|less" to list all events). The colon is used to indicate the start of the list of arguments. The semicolon denotes the end of message.
 .TP
 .SH Passing arguments
-Each of veejay's functions except an ordered argument list ; depending on the 
+Each of veejay's functions except an ordered argument list ; depending on the
 In case of messages clips, streams or effect chain some values refer to defaults or current:
 .TP
 .B 0 for current clip/stream
@@ -74,13 +73,13 @@ In case of messages clips, streams or effect chain some values refer to defaults
 .B -1 for current chain entry
 .TP
 .B >= 0 < 20 any chain entry
- 
+
 
 .SH AUTHOR
 This man page was written by Niels Elburg.
 If you have questions, remarks or you just want to
 contact the developers, the main mailing list for this
-project is: 
+project is:
 .I veejay-users@lists.sourceforge.net
 For more info see the website at
 .I http://veejay.sourceforge.net
@@ -89,4 +88,4 @@ This tool was first named 'sendVIMS' , but it
 confused to much with 'sendVIMS for PD' although
 the latter is derived from this one.
 .SH "SEE ALSO"
-.B veejay  
+.B veejay
