@@ -216,7 +216,7 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 			if( (info->sample_banks[i]->slot[j]->sample_id ==
 			    info->status_tokens[CURRENT_ID]) ) 
 			{
-				gtk_frame_set_label( GTK_FRAME( info->sample_banks[i]->gui_slot[j]->frame ) , title );
+                gtk_label_set_text( GTK_LABEL( info->sample_banks[i]->gui_slot[j]->title ), title );
 				return;
 			}
 		}
