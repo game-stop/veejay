@@ -131,8 +131,8 @@ dnl	[])
 
 have_linux=false
 have_darwin=false
-case $host in
-  *-*-linux*)
+case "${host_os}" in
+  linux*)
 	AC_CHECK_HEADER(linux/version.h,
 		[have_linux=true
 	         AC_DEFINE(HAVE_LINUX,1,[Linux platform])
@@ -141,8 +141,8 @@ case $host in
 		])
 		LIBM_LIBS="-lm"
 	;;
-   *-apple-darwin*)
-		AC_DEFINE(HAVE_DARWIN,1,[MAC OS X Darin])
+   darwin*)
+		AC_DEFINE(HAVE_DARWIN,1,[MAC OS X Darwin])
 		dnl OS-X/Darwin needs no-cpp-precomp
 		CFLAGS="$CFLAGS -no-cpp-precomp"
 		have_darwin=true
@@ -390,124 +390,142 @@ AC_SUBST(PROGRAM_NOPIC)
 
 if test x$have_x86cpu = xtrue
 then
-	AC_CACHE_CHECK(for MMX on processor(s), ac_cv_flag_mmx, [
-		if grep "^flags.* mmx" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_mmx=yes
-		else
-			ac_cv_flag_mmx=no
-		fi
-	])
+    if test x$have_darwin = xtrue
+    then
+        dnl Modern OSx, has MMX, SSE, SSE2 and SSE3
+        dnl This is not really the right way to do it, but should work for most systems.
+        ac_cv_flag_mmx=yes
+        ac_cv_flag_sse=yes
+        ac_cv_flag_sse2=yes
+        ac_cv_flag_cmov=yes
 
-	if test $ac_cv_flag_mmx = yes; then
-       		AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
+        AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
 		AC_DEFINE(HAVE_MMX,1,[Compiling in MMX support])
-       		have_asm_mmx=true
-	fi
+       	have_asm_mmx=true
 
-	AC_CACHE_CHECK(for SSE on processor(s), ac_cv_flag_sse, [
-		if grep "^flags.* sse" /proc/cpuinfo > /dev/null; then
- 			ac_cv_flag_sse=yes
-		else
-			ac_cv_flag_sse=no
-		fi
-	])
-
-	if test $ac_cv_flag_sse = yes; then
 		AC_DEFINE(HAVE_ASM_SSE,1,[Compiling in SSE support])
 		AC_DEFINE(HAVE_SSE,1,[Compiling in SSE support])
 		have_asm_sse=true
-	fi
-
-	AC_CACHE_CHECK(for SSE2 on processor(s), ac_cv_flag_sse2, [
-		if grep "^flags.* sse2" /proc/cpuinfo > /dev/null; then
- 			ac_cv_flag_sse2=yes
-		else
-			ac_cv_flag_sse2=no
-		fi
-	])
-
-	if test $ac_cv_flag_sse2 = yes; then
-		AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in SSE2 support])
+        
+        AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in SSE2 support])
 		AC_DEFINE(HAVE_SSE2,1,[Compiling in SSE2 support])
 		have_asm_sse2=true
-	fi
+        
+        AC_DEFINE(HAVE_CMOV,1,[Compiling in CMOV])
+	    have_cmov=true
+    fi
 
-	AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
-		if grep "^flags.* 3dnow" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_3dnow=yes
-		else
-			ac_cv_flag_3dnow=no
-		fi
-	])
+    if test x$have_linux = xtrue
+    then
+	    AC_CACHE_CHECK(for MMX on processor(s), ac_cv_flag_mmx, [
+		    if grep "^flags.* mmx" /proc/cpuinfo > /dev/null; then
+			    ac_cv_flag_mmx=yes
+		    else
+			    ac_cv_flag_mmx=no
+		    fi
+	    ])
 
-	if test $ac_cv_flag_3dnow = yes; then
-		AC_MSG_CHECKING([if your CPU understands 3DNOW femms])
-		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
+	    if test $ac_cv_flag_mmx = yes; then
+       		AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
+		    AC_DEFINE(HAVE_MMX,1,[Compiling in MMX support])
+       		have_asm_mmx=true
+	    fi
+
+	    AC_CACHE_CHECK(for SSE on processor(s), ac_cv_flag_sse, [
+	    	if grep "^flags.* sse" /proc/cpuinfo > /dev/null; then
+ 	    		ac_cv_flag_sse=yes
+	    	else
+	    		ac_cv_flag_sse=no
+		    fi
+	    ])
+
+	    if test $ac_cv_flag_sse = yes; then
+		    AC_DEFINE(HAVE_ASM_SSE,1,[Compiling in SSE support])
+		    AC_DEFINE(HAVE_SSE,1,[Compiling in SSE support])
+		    have_asm_sse=true
+	    fi
+
+	    AC_CACHE_CHECK(for SSE2 on processor(s), ac_cv_flag_sse2, [
+		    if grep "^flags.* sse2" /proc/cpuinfo > /dev/null; then
+ 			    ac_cv_flag_sse2=yes
+		    else
+		    	ac_cv_flag_sse2=no
+		    fi
+	    ])
+
+	    if test $ac_cv_flag_sse2 = yes; then
+		    AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in SSE2 support])
+		    AC_DEFINE(HAVE_SSE2,1,[Compiling in SSE2 support])
+		    have_asm_sse2=true
+	    fi
+
+	    AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
+	    	if grep "^flags.* 3dnow" /proc/cpuinfo > /dev/null; then
+	    		ac_cv_flag_3dnow=yes
+	    	else
+	    		ac_cv_flag_3dnow=no
+	    	fi
+	    ])
+
+	    if test $ac_cv_flag_3dnow = yes; then
+	    	AC_MSG_CHECKING([if your CPU understands 3DNOW femms])
+	    	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
 				[[__asm__ __volatile__("femms":::"memory");]])],
-			[have_asm_3dnow=true],
-			[have_asm_3dnow=false])
-		if test $have_asm_3dnow = true; then
-			AC_MSG_RESULT(yes)
-			AC_DEFINE(HAVE_ASM_3DNOW,1,[Compiling in 3Dnow])
-			have_asm_3dnow=true
-		else
-			AC_MSG_RESULT(no)
-		fi
-	fi
+		    	[have_asm_3dnow=true],
+		    	[have_asm_3dnow=false])
+		    if test $have_asm_3dnow = true; then
+		    	AC_MSG_RESULT(yes)
+	    		AC_DEFINE(HAVE_ASM_3DNOW,1,[Compiling in 3Dnow])
+    			have_asm_3dnow=true
+    		else
+    			AC_MSG_RESULT(no)
+    		fi
+    	fi
 
-	AC_CACHE_CHECK(for CMOV on processor(s), ac_cv_flag_cmov, [
-		if grep "^flags.* cmov" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_cmov=yes
-		else
-			ac_cv_flag_cmov=no
-		fi
-	])
+    	AC_CACHE_CHECK(for CMOV on processor(s), ac_cv_flag_cmov, [
+    		if grep "^flags.* cmov" /proc/cpuinfo > /dev/null; then
+    			ac_cv_flag_cmov=yes
+    		else
+    			ac_cv_flag_cmov=no
+    		fi
+    	])
 
-	if test $ac_cv_flag_cmov = yes; then
-		AC_DEFINE(HAVE_CMOV,1,[Compiling in CMOV])
-		have_cmov=true
-	fi
+        if test $ac_cv_flag_cmov = yes; then
+	    	AC_DEFINE(HAVE_CMOV,1,[Compiling in CMOV])
+	    	have_cmov=true
+	    fi
 
 
-	dnl check for MMX2
-	AC_CACHE_CHECK(for MMX2 on processor(s), ac_cv_flag_mmx2, [
-		if grep "^flags.* mmxext" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_mmx2=yes
-		else
-			ac_cv_flag_mmx2=no
-		fi
-	])
+	    dnl check for MMX2
+	    AC_CACHE_CHECK(for MMX2 on processor(s), ac_cv_flag_mmx2, [
+	    	if grep "^flags.* mmxext" /proc/cpuinfo > /dev/null; then
+	    		ac_cv_flag_mmx2=yes
+	    	else
+	    		ac_cv_flag_mmx2=no
+	    	fi
+	    ])
 
-	if test $ac_cv_flag_mmx2 = yes; then
-		AC_DEFINE(HAVE_ASM_MMX2,1,[Compiling in MMX2])
-		AC_DEFINE(HAVE_ASM_MMXEXT,1,[Compiling in MMXEXT])
-		have_asm_mmx2=true
-	fi
+	    if test $ac_cv_flag_mmx2 = yes; then
+	    	AC_DEFINE(HAVE_ASM_MMX2,1,[Compiling in MMX2])
+	    	AC_DEFINE(HAVE_ASM_MMXEXT,1,[Compiling in MMXEXT])
+	    	have_asm_mmx2=true
+	    fi   
 
-	dnl check for AVX
-	AC_CACHE_CHECK(for AVX on processor(s), ac_cv_flag_avx, [
-		if grep "^flags.* avx" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_avx=yes
-		else
-			ac_cv_flag_avx=no
-		fi
-	])
+	    dnl check for AVX
+	    AC_CACHE_CHECK(for AVX on processor(s), ac_cv_flag_avx, [
+	    	if grep "^flags.* avx" /proc/cpuinfo > /dev/null; then
+	     		ac_cv_flag_avx=yes
+		    else
+	    		ac_cv_flag_avx=no
+	    	fi
+	    ])
 
-	if test $ac_cv_flag_avx = yes; then
-		AC_DEFINE(HAVE_ASM_AVX,1,[Compiling in AVX])
-		have_asm_avx=true
-	fi
-
-dnl	ac_cv_flag_avx=yes
-dnl	AC_MSG_CHECKING([for AVX assembler])
-dnl	AC_COMPILE_IFELSE(
-dnl		[AC_LANG_PROGRAM([[]], 
-dnl			[[asm("vmovaps %ymm1,%ymm0");]])],
-dnl				[AC_DEFINE(HAVE_ASM_AVX,1,[define if compiler supports avx inline assembler])
-dnl					AC_MSG_RESULT(yes)
-dnl					ac_cv_flag_avx=no
-dnl				],[AC_MSG_RESULT(no)])
-
+	    if test $ac_cv_flag_avx = yes; then
+	    	AC_DEFINE(HAVE_ASM_AVX,1,[Compiling in AVX])
+	    	have_asm_avx=true
+	    fi
+    
+    fi
 fi
 
 if test x$have_ppccpu = xtrue
