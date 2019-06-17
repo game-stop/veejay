@@ -32,8 +32,9 @@ static int bg_[4];
 static int fg_[4];
 static int ln_[4];
 
-static int sample_calctime();
+static inline int sample_calctime(int nframes);
 static int sample_calctime_selection();
+static int sample_calctime_mulloop();
 
 static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill );
 
@@ -1621,7 +1622,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 
 	if( is_button_toggled( "sample_mulloop" ) )
 	{
-		int base = sample_calctime();
+		int base = sample_calctime_mulloop();
 		n_frames = base * dur_val;
         multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
 	}
