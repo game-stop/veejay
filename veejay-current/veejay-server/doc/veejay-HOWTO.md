@@ -169,10 +169,6 @@ Veejay consists out of several packages:
 <td><strong>sendVIMS</strong></td>
 <td>Simple VeeJay client for Pure Data</td>
 </tr>
-<tr class="odd">
-<td><strong>veejay-themes</strong></td>
-<td>Theme-pack for reloaded</td>
-</tr>
 </tbody>
 </table>
 
@@ -306,15 +302,14 @@ Before you install Veejay, you should install the following software
 packages. Although none of them is required, Veejay will be much less
 usable without them.
 
--   (required) mjpegtools &gt;= 1.9.0
 -   (required) The XML C library 2 for gnome &gt;= 2.5.4
 -   (required) ffmpeg (libavcodec, etc) &gt;= 0.50.0
 -   (optional) libdv &gt;= 1.02
--   (optional) The SDL library &gt;= 1.2.3
+-   (optional) The SDL library &gt;= 2.0.0
 -   (optional) JACK low latency audio server &gt;= 0.98.1
 -   (optional) DirectFB &gt;= 0.9.17
 -   (optional) FreeType &gt;= 2.1.9
--   (optional) GTK &gt;= 2.6.0
+-   (optional) GTK &gt;= 3.22.0
 -   (optional) libqrencode &gt;= 3.4.2
 
 
@@ -332,7 +327,6 @@ You can compile the following packages from source if your distribution
 does not include them :
 
 -   libavcodec, libavutil, libswscale and libavformat from the FFmpeg project
--   mjpegtools
 
 #### FFmpeg
 
@@ -343,16 +337,6 @@ downloading, run the configure script with the following options:
 $ ./configure --enable-swscaler --enable-shared --enable-gpl
 ...
 $ make
-# make install
-```
-#### MjpegTools
-
-You can download the MjpegTools from <http://mjpeg.sourceforge.net>
-
-Compilation of both packages is straightforward, in general the
-following will do it:
-```
-$ ./configure && make
 # make install
 ```
 <span id="3.2">3.2 Installing from archive</span>
