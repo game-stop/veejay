@@ -131,7 +131,7 @@ If you want to debug veejay-server (or if you want to submit a meaningful backtr
 
 see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 
-[//]: # ( comment : END installation section duplicated in /veejay-server/doc/Instalation)
+[//]: # ( comment : END Instalation section duplicated in /veejay-server/doc/Instalation)
 [//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ## Quick Start & Play!
@@ -141,6 +141,9 @@ see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 [__Veejay Quick start and play!__](./veejay-current/veejay-server/doc/README.quickstart) : start veejay, manually send VIMS messages, tricks to video fifo or some essentials of keyboards user interaction...
 
 ## FEATURE OVERVIEW
+
+[//]: # ( comment : BEGIN Feature section DUPLICATE in /veejay-server/doc/veejay-HOWTO.md)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ### General
 
@@ -164,13 +167,18 @@ see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [READ
 
 see also : [README Video & Codecs](./veejay-current/veejay-server/doc/README.video-codec.md), [README audio](./veejay-current/veejay-server/doc/README.audio)
 
-### Editing
+### FX processing
 
  * 161 built-in FX, many unique and original FX filters
  * 60 Livido filters
  * FX chain (20 slots) with Alpha Channels
  * All FX parameters can be animated
  * Mix up to two layers per FX slot
+
+see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
+
+### Editing
+
  * Non destructive edit decision lists (cut/copy/paste/crop video)
  * Sample editor
  * Sequence editor
@@ -179,12 +187,10 @@ see also : [README Video & Codecs](./veejay-current/veejay-server/doc/README.vid
  * Live clip loading
  * Live sample sequencing
 
-see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
-
 ### Trickplay
 
  * VIMS event recording/playback
- * Various looping modes including bounce looping
+ * Various looping modes including bounce and random
  * Playback speed and direction
  * Video scratching
  * Change in-and out points of a sample (marker)
@@ -197,6 +203,8 @@ see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[
 
 ### Output
 
+ * Full screen or windowed mode
+ * Perspective and foward projection
  * Audio trough Jack (low latency audio server)
  * SDL video
  * Headless (no video output)
@@ -206,7 +214,7 @@ see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[
  * Preview rendering
  * Image grabbing
 
- see also : [How to Network](./veejay-current/veejay-server/doc/NET.txt)
+see also : [How to Network](./veejay-current/veejay-server/doc/NET.txt)
 
 ### Interaction
 
@@ -233,8 +241,12 @@ see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
  * Support for LiVIDO plugins
  * Support for FreeFrame plugins (only for 32 bit systems!)
  * Support for GMIC plugins
+ * Android client!
 
 see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3)
+
+[//]: # ( comment : END Feature section DUPLICATE in /veejay-server/doc/veejay-HOWTO.md)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ## Contact / Feedback & HELP
 
