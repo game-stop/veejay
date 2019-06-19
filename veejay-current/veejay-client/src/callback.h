@@ -46,7 +46,6 @@ update_label_str( "value_friendlyname", _effect_get_hint( entry_tokens[ENTRY_FXI
 }\
 }
 
-/*int sample_calctime();*/
 void text_defaults();
 
 gboolean boxbg_draw ( GtkWidget *w,  cairo_t *cr);
