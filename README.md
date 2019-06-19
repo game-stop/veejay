@@ -4,9 +4,11 @@
 
 *a 'visual' instrument and realtime video sampler (for live video improvisation)*
 
-It allows you to "play" the video like you would play a piano
+It allows you to "play" the video like you would play a piano.
 
-While playing, you can record the resulting video directly to disk (video sampling), all effects are realtime and optimized for use on modern processors, Veejay likes the sound of your video's as much as their images: sound is kept in sync ( pitched when needed - trickplay) and delivered to JACK for possible further processing.
+While playing, you can record the resulting video directly to disk (video sampling), all effects are realtime and optimized for use on modern processors.
+
+Veejay likes the sound of your video's as much as their images: sound is kept in sync ( pitched when needed - trickplay) and delivered to [JACK](http://www.jackaudio.org/) for possible further processing.
 
 You can cluster to allow a number of machines to work together over the network (uncompressed streaming, veejay chaining) And much more...
 
@@ -16,13 +18,14 @@ see also : [README whatis](./veejay-current/veejay-server/doc/README.whatis.md)
 
 ### Veejay Applications:
 * __Reloaded__
-    A GUI developed in GLADE/GTK ([veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client))
+    A GUI developed in GLADE/GTK3 ([veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client))
 * __sendVIMS__
-    A PureData object allowing direct communications with the server ([sendVIMS](https://github.com/c0ntrol/veejay/tree/master/veejay-current/sendVIMS))
+    A PureData object allowing direct communications with the server ([sendVIMS](https://github.com/c0ntrol/veejay/tree/master/veejay-current/sendVIMS)) (_a bit outdated_)
 * __sayVIMS__
     A console based utility for quick'n'dirty scripting ([veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils))
 
-And of course [__Veejay__](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) himself ! The video output server (Ffmpeg/libSDL). Could be remote, headless, multiples ... !
+And of course [__Veejay__](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) himself !  
+The video output server (Ffmpeg/libSDL), a 'visual' instrument and realtime video sampler for live video improvisation such as live cinema, vjing, art installation ...
 
 [//]: # ( comment : installation section duplicated in /veejay-server/doc/Instalation)
 [//]: # ( WARNING : some URL/PATH have to be adapted )
@@ -30,6 +33,7 @@ And of course [__Veejay__](https://github.com/c0ntrol/veejay/tree/master/veejay-
 ## Installation
 
 #### Get all the dependencies
+
 First, make sure you system is up-to-date, and install the dependencies with:
 ```bash
 sudo apt-get install git autoconf automake libtool m4 gcc libjpeg62-dev \
@@ -41,10 +45,11 @@ gtk-3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1
 
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
-1. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server)
-2. [reloaded-gtk3](https://github.com/c0ntrol/veejay/tree/master/veejay-current/reloaded-gtk3) or [veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client) for GTK2
-3. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
-4. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
+1. [veejay-core](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-core) (__required__)
+2. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) (__required__)
+3. [veejay_client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client) (*optional*)
+4. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils) (*optional*)
+5. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs) (*optional*)
 
 For __each package__, run the triptich commands of the *GNU build system* (for a quick start you can build the first two):
 
@@ -53,15 +58,12 @@ For __each package__, run the triptich commands of the *GNU build system* (for a
  ./configure
  make && sudo make install
 ```
- __Nota :__ in some configuration you should have to __manually build__ the __shared libraries cache__ just after the __first__ veejay-server installation (ex `sudo ldconfig` or similar)
+ __IMPORTANT :__ in some configuration you should have to __manually build__ the __shared libraries cache__ just after the __first veejay-core__ installation (ex `sudo ldconfig` or similar)
 
-You do not need to pass any parameters to `./configure` for veejay to be optimized with the current cpu-type.
-If you want to build for a specific architecture or without sound support (jack) ... take a look to the
-`./configure --help` to adapt to many kinds of systems.
+__Configure :__ You do not need to pass any parameters to `./configure` for veejay to be optimized with the current cpu-type.
+If you want help to build for a specific architecture or with or without particular options (ex jack sound support) ... take a look to the `./configure --help` to adapt to many kinds of systems.
 
-Before running veejay, be sure to add or link some TrueType fonts in 
-
-    $HOME/.veejay/fonts
+Before running veejay, be sure to add or link some TrueType fonts in `$HOME/.veejay/fonts`
 
 ## Usage
 
@@ -85,11 +87,25 @@ veejay -p 4490 -g my-movie-B.avi
 reloaded -a
 ```
 
-## Building/Configuring plugins
+## Building and Configuring plugins
 
-There are several plugin-packs available for veejay: https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs 
+Veejay contain more than 160 built-in FX, many unique and original FX filters.  
+But you can have more !
 
-* lvdcrop ; a couple of crop filters and a port of frei0r's scale0tilt 
+### frei0r
+
+Veejay looks in a few common locations to find the [frei0r plugins pack](https://frei0r.dyne.org/):
+* /usr/local/lib/frei0r-1
+* /usr/lib/frei0r-1
+* /usr/lib64/frei0r-1
+
+You can list more location in the file `$HOME/.veejay/plugins.cfg`
+
+### plugin-packs
+
+There are several plugin-packs available for veejay: [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
+
+* lvdcrop ; a couple of crop filters and a port of frei0r's scale0tilt
 * lvdshared ; a couple of plugins that implement a producer/consumer mechanism for shared video resources
 * lvdgmic ; GMIC based filters, although slow in processing they are quite amazing
 
@@ -97,27 +113,25 @@ To compile and install a plugin-pack:
 ```bash
 cd plugin-packs/lvdgmic
 ./autogen.sh
-./configure && make 
+./configure
+make && sudo make install
 ```
 
-Veejay looks in a few common locations to find plugins:
-* /usr/local/lib/frei0r-1
-* /usr/lib/frei0r-1
-* /usr/lib64/frei0r-1
+### Default parameter values
 
-You can list more locations in $HOME/.veejay/plugins.cfg
+You can change the default FX parameter values by editing the files in `$HOME/.veejay/frei0r/` and `$HOME/.veejay/livido/`
 
-You can change the default parameter values by editing the files in $HOME/.veejay/frei0r/ and $HOME/.veejay/livido/
+**See Also** : For more verbose information about plugins and FX check [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)
 
 ## Debugging
 
-if you want to debug veejay-server (or if you want to submit a meaningful backtrace), build with:
+If you want to debug veejay-server (or if you want to submit a meaningful backtrace), build with:
 
      ./configure --enable-debug
 
 see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 
-[//]: # ( comment : END installation section duplicated in /veejay-server/doc/Instalation)
+[//]: # ( comment : END Instalation section duplicated in /veejay-server/doc/Instalation)
 [//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ## Quick Start & Play!
@@ -127,6 +141,9 @@ see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 [__Veejay Quick start and play!__](./veejay-current/veejay-server/doc/README.quickstart) : start veejay, manually send VIMS messages, tricks to video fifo or some essentials of keyboards user interaction...
 
 ## FEATURE OVERVIEW
+
+[//]: # ( comment : BEGIN Feature section DUPLICATE in /veejay-server/doc/veejay-HOWTO.md)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ### General
 
@@ -150,13 +167,18 @@ see also : [YUV processing](./veejay-current/veejay-server/doc/YCbCr.txt), [READ
 
 see also : [README Video & Codecs](./veejay-current/veejay-server/doc/README.video-codec.md), [README audio](./veejay-current/veejay-server/doc/README.audio)
 
-### Editing
+### FX processing
 
  * 161 built-in FX, many unique and original FX filters
  * 60 Livido filters
  * FX chain (20 slots) with Alpha Channels
  * All FX parameters can be animated
  * Mix up to two layers per FX slot
+
+see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
+
+### Editing
+
  * Non destructive edit decision lists (cut/copy/paste/crop video)
  * Sample editor
  * Sequence editor
@@ -165,12 +187,10 @@ see also : [README Video & Codecs](./veejay-current/veejay-server/doc/README.vid
  * Live clip loading
  * Live sample sequencing
 
-see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
-
 ### Trickplay
 
  * VIMS event recording/playback
- * Various looping modes including bounce looping
+ * Various looping modes including bounce and random
  * Playback speed and direction
  * Video scratching
  * Change in-and out points of a sample (marker)
@@ -183,6 +203,8 @@ see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[
 
 ### Output
 
+ * Full screen or windowed mode
+ * Perspective and foward projection
  * Audio trough Jack (low latency audio server)
  * SDL video
  * Headless (no video output)
@@ -192,7 +214,7 @@ see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[
  * Preview rendering
  * Image grabbing
 
- see also : [How to Network](./veejay-current/veejay-server/doc/NET.txt)
+see also : [How to Network](./veejay-current/veejay-server/doc/NET.txt)
 
 ### Interaction
 
@@ -219,8 +241,12 @@ see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
  * Support for LiVIDO plugins
  * Support for FreeFrame plugins (only for 32 bit systems!)
  * Support for GMIC plugins
+ * Android client!
 
 see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3)
+
+[//]: # ( comment : END Feature section DUPLICATE in /veejay-server/doc/veejay-HOWTO.md)
+[//]: # ( WARNING : some URL/PATH have to be adapted )
 
 ## Contact / Feedback & HELP
 
@@ -244,5 +270,3 @@ ENJOY! And let us know about your performances/installations with veejay!
               |__/       |___/          |_|                                      http://veejayhq.net
 ```
 ---
-
-
