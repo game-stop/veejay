@@ -2085,11 +2085,12 @@ void	*vj_hmalloc(size_t sze, const char *name)
 
 char	*vj_strdup( const char *s )
 {
-	size_t sl  = strlen(s);
+	/*size_t sl  = strlen(s);
 	size_t len = sl + 1;
 	char *ptr  = vj_malloc( len );
 	ptr[sl] = '\0';
-	return ptr ? memcpy( ptr, s, sl ) : NULL;
+	return ptr ? memcpy( ptr, s, sl ) : NULL;*/
+    return strdup(s);
 }
 
 char	*vj_strndup( const char *s, size_t n )
