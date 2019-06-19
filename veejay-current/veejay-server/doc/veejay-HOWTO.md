@@ -177,85 +177,89 @@ Veejay consists out of several packages:
 
 ### General
 
--   Free Software (GNU GPL)
--   Servent architecture
--   Soft realtime
--   Frame accurate
--   Loop based editing
--   Native YUV processing
--   Crash recovery
+ * Free Software (GNU GPL)
+ * Servent architecture
+ * Soft realtime
+ * Frame accurate
+ * Loop based editing
+ * Native YUV processing
+ * Crash recovery
 
 ### Media
 
--   Codecs: MJPEG, MPNG, DV, YUV (raw)
--   Containers: AVI, Quicktime, rawDV
--   Devices: USB webcams, DV1394, TV capture cards, etc.
--   Support for unlimited capture devices
--   Support for Image files (PNG ,JPEG, TIFF, etc)
+ * Codecs: MJPEG, MPNG, DV, YUV (raw)
+ * Containers: AVI, Quicktime, rawDV
+ * Devices: USB webcams, DV1394, TV capture cards, etc.
+ * Support for unlimited capture devices
+ * Support for Image files (PNG ,JPEG, TIFF, etc)
 
 ### FX processing
 
--   161 built-in FX, many unique and original FX filters
--   60 Livido filters
--   FX chain (20 slots) with Alpha Channels
--   All FX parameters can be animated.
--   Mix up to two layers per FX slot
+ * 161 built-in FX, many unique and original FX filters
+ * 60 Livido filters
+ * FX chain (20 slots) with Alpha Channels
+ * All FX parameters can be animated
+ * Mix up to two layers per FX slot
 
 ### Editing
 
--   Non destructive edit decision lists (cut/copy/paste/crop video)
--   Sample editor
--   Sequence editor
--   Live disk recorder (sampling)
--   Full deck save/restore
--   Live clip loading
--   Live sample sequencing
--   VIMS event recording/playback
--   Various looping modes including bounce and random
--   Playback speed and direction
--   Video scratching
--   Change in-and out points of a sample (marker)
--   Slow motion audio / video
--   Fast motion audio / video
--   Dynamic framerate
--   Random frame play
--   Random sample play
--   Access up to 4096 video samples instantly
--   Full screen or windowed mode
--   Perspective and foward projection
+ * Non destructive edit decision lists (cut/copy/paste/crop video)
+ * Sample editor
+ * Sequence editor
+ * Live disk recorder (sampling)
+ * Full deck save/restore
+ * Live clip loading
+ * Live sample sequencing
+
+### Trickplay
+
+ * VIMS event recording/playback
+ * Various looping modes including bounce and random
+ * Playback speed and direction
+ * Video scratching
+ * Change in-and out points of a sample (marker)
+ * Slow motion audio / video
+ * Fast motion audio / video
+ * Dynamic framerate
+ * Random frame play
+ * Random sample play
+ * Access up to 4096 video samples instantly
 
 ### Output
 
--   Audio trough Jack (low latency audio server)
--   SDL video
--   Headless (no video output)
--   YUV4MPEG streaming
--   V4L2 loopback devices
--   Network streaming (unicast and multicast)
--   Preview rendering
--   Image grabbing
+ * Full screen or windowed mode
+ * Perspective and foward projection
+ * Audio trough Jack (low latency audio server)
+ * SDL video
+ * Headless (no video output)
+ * YUV4MPEG streaming
+ * V4L2 loopback devices
+ * Network streaming (unicast and multicast)
+ * Preview rendering
+ * Image grabbing
 
 ### Interaction
 
--   Programmable keyboard interface
--   VIMS (tcp/ip)
--   OSC (udp)
--   PureData trough sendVIMS external
--   MIDI
+ * Programmable keyboard interface
+ * VIMS (tcp/ip)
+ * OSC (udp)
+ * PureData trough sendVIMS external
+ * MIDI
 
 ### Viewing
 
--   Full screen or windowed mode
--   Perspective and foward projection
--   Twinview/BigDesktop
--   Split-screen video wall
+ * Full screen or windowed mode
+ * Perspective and foward projection
+ * Twinview/BigDesktop
+ * Split-screen video wall
 
 ### Plugins and more...
 
--   Support for Frei0r plugins
--   Support for LiVIDO plugins
--   Support for FreeFrame plugins (only for 32 bit systems!)
--   Android client!
+ * Support for Frei0r plugins
+ * Support for LiVIDO plugins
+ * Support for FreeFrame plugins (only for 32 bit systems!)
+ * Support for GMIC plugins
+ * Android client!
 
 <span id="2.2">2.2</span> Hardware configuration
 ------------------------------------------------

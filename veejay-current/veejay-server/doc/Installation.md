@@ -2,26 +2,38 @@
 [//]: # ( comment : END installation section duplicated in /README.md)
 [//]: # ( WARNING : some URL/PATH have to be adapted )
 
-## Installation
+## Get all the dependencies
+
+First, make sure you system is up-to-date, and install the dependencies with:
+```bash
+sudo apt-get install git autoconf automake libtool m4 gcc libjpeg62-dev \
+libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev  \
+gtk-3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1
+```
+
+## Build the veejay's applications
 
 Veejay is divided into multiple packages. Each must be build separately and in a specific order. 
 
-1. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server)
-2. [veejay-client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client)
-3. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils)
-4. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
+1. [veejay-core](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-core) (__required__)
+2. [veejay-server](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-server) (__required__)
+3. [veejay_client](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-client) (*optional*)
+4. [veejay-utils](https://github.com/c0ntrol/veejay/tree/master/veejay-current/veejay-utils) (*optional*)
+5. [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs) (*optional*)
 
-For each package, run confgure and make:
-
+For __each package__, run the triptich commands of the *GNU build system* (for a quick start you can build the first two):
 
 ```bash
  ./autogen.sh
  ./configure
- make && make install
+ make && sudo make install
 ```
-__Nota :__ in some configuration you will have to rebuild the shared libraries cache just after veejay-server installation (ex `sudo ldconfig` or similar)
+ __IMPORTANT :__ in some configuration you should have to __manually build__ the __shared libraries cache__ just after the __first veejay-core__ installation (ex `sudo ldconfig` or similar)
 
-If you want veejay to be optimized for the current cpu-type, you do not need to pass any parameters. If you do not know what cpu veejay will be running on , pass `--with-arch-target=auto` to configure.
+__Configure :__ You do not need to pass any parameters to `./configure` for veejay to be optimized with the current cpu-type.
+If you want help to build for a specific architecture or with or without particular options (ex jack sound support) ... take a look to the `./configure --help` to adapt to many kinds of systems.
+
+Before running veejay, be sure to add or link some TrueType fonts in `$HOME/.veejay/fonts`
 
 ## Usage
 
@@ -50,19 +62,40 @@ reloaded -a
 Veejay contain more than 160 built-in FX, many unique and original FX filters.  
 But you can have more !
 
-There are several [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs) available for veejay.
+### frei0r
 
-Also, Veejay looks in a few common locations to find plugins. You can even list
-more locations in `$HOME/.veejay/plugins.cfg`
+Veejay looks in a few common locations to find the [frei0r plugins pack](https://frei0r.dyne.org/):
+* /usr/local/lib/frei0r-1
+* /usr/lib/frei0r-1
+* /usr/lib64/frei0r-1
 
-You can change the default FX parameter values by editing the files in
-`$HOME/.veejay/frei0r/` and `$HOME/.veejay/livido/`
+You can list more location in the file `$HOME/.veejay/plugins.cfg`
 
-For more verbose information about plugins and FX check [How to Plugins](./HowtoPlugins.md)
+### plugin-packs
+
+There are several plugin-packs available for veejay: [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/veejay-current/plugin-packs)
+
+* lvdcrop ; a couple of crop filters and a port of frei0r's scale0tilt
+* lvdshared ; a couple of plugins that implement a producer/consumer mechanism for shared video resources
+* lvdgmic ; GMIC based filters, although slow in processing they are quite amazing
+
+To compile and install a plugin-pack:
+```bash
+cd plugin-packs/lvdgmic
+./autogen.sh
+./configure
+make && sudo make install
+```
+
+### Default parameter values
+
+You can change the default FX parameter values by editing the files in `$HOME/.veejay/frei0r/` and `$HOME/.veejay/livido/`
+
+**See Also** : For more verbose information about plugins and FX check [How to Plugins](./HowtoPlugins.md)
 
 ## Debugging
 
-if you want to debug veejay-server (or if you want to submit a meaningful backtrace), build with:
+If you want to debug veejay-server (or if you want to submit a meaningful backtrace), build with:
 
      ./configure --enable-debug
 

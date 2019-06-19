@@ -3336,6 +3336,7 @@ static void update_curve_widget(GtkWidget *curve)
             }
         }
     } else {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), FALSE );
         set_initial_curve( curve, info->uc.entry_tokens[ENTRY_FXID], info->uc.selected_parameter_id,
                            lo, hi ,
                            info->uc.entry_tokens[ ENTRY_P0 + info->uc.selected_parameter_id ] );
