@@ -99,6 +99,11 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //#include <glib-2.0/glib.h> //@ for g_locale_to_utf8 and g_locale_from_utf8
 
 #include	<libvevo/pool.h>
+
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
+
 #define PORT_TYPE_PLUGIN_INFO 1
 #define PORT_TYPE_FILTER_CLASS 2
 #define PORT_TYPE_FILTER_INSTANCE 3
@@ -285,7 +290,13 @@ static vevo_property_t *prop_node_get(__vevo_port_t *port, ukey_t key)
 static port_index_t *port_node_new(__vevo_port_t *port,const char *key, ukey_t hash_key)
 {
 	port_index_t *i = (port_index_t *) vevo_pool_alloc_node(port_index_t, port->pool );
+#ifdef STRICT_CHECKING
+    assert(key != NULL);
+#endif
     i->key = vj_strdup(key);
+#ifdef STRICT_CHECKING
+    assert(key != NULL);
+#endif
     i->hash_code = hash_key;
     i->next = NULL;
     return i;
@@ -358,12 +369,15 @@ storage_put_atom_value(__vevo_port_t * port, void *src, int n,
  */
 static inline ukey_t hash_key_code( const char *str )   	
 {
-        ukey_t hash = 5381;
-        int c;
-		while( (c = (int) *str++) != 0)
-            hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+#ifdef STRICT_CHECKING
+    assert(str != NULL);
+#endif
+    ukey_t hash = 5381;
+    int c;
+	while( (c = (int) *str++) != 0)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
 
-        return hash;
+    return hash;
 }
 
 //! Flag a property as soft referenced. Use to avoid freeing a linked pointer.
@@ -441,7 +455,7 @@ static int vevo_property_exists( vevo_port_t *p, const char *key)
 {
 	__vevo_port_t *port = (__vevo_port_t *) p;
 
-    	ukey_t hash_key = hash_key_code(key);
+    ukey_t hash_key = hash_key_code(key);
 	if (!port->table) {
 		vevo_property_t *node = NULL;
 		if ((node = prop_node_get(port, hash_key)) != NULL) 
