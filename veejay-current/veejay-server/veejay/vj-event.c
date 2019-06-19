@@ -2197,12 +2197,13 @@ void vj_event_init(void *ptr)
         net_list[i].act = vj_event_none;
         net_list[i].list_id = 0;
     }
-
+#ifdef HAVE_SDL
     if( !(BundleHash = hash_create(MAX_KEY_MNE, int_bundle_compare, int_bundle_hash)))
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize hashtable for message bundles");
         return;
     }
+#endif
 
     vj_event_init_network_events();
 #ifdef HAVE_SDL
