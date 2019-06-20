@@ -85,7 +85,7 @@ typedef struct vj_effect_t {
 
 extern unsigned int get_pixel_range_min_Y();
 extern unsigned int get_pixel_range_min_UV();
-extern void vj_effect_initialize(int width, int height, int range);
+extern void vj_effect_initialize(int width, int height, int range, int cfg);
 extern void vj_effect_shutdown();
 extern int vj_effect_max_effects();
 extern int vj_effect_real_to_sequence(int effect_id);

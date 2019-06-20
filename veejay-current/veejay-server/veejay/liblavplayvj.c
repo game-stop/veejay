@@ -1875,7 +1875,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->audio = NO_AUDIO;
 	}
 
-	vj_effect_initialize( info->video_output_width,info->video_output_height,full_range);
+	vj_effect_initialize( info->video_output_width,info->video_output_height,full_range, info->read_plug_cfg);
 
 	if(info->dump)
 		vj_effect_dump();

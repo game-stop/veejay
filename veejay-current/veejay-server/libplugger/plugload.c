@@ -70,6 +70,7 @@ static  int	n_ff_ = 0;
 static	int	n_fr_ = 0;
 static  int	n_lvd_ = 0;
 static	int	base_fmt_ = -1;
+static  int read_cfg = 0;
 
 static struct {
 	const char *path;
@@ -115,13 +116,13 @@ static	void* instantiate_plugin( void *plugin, int w , int h )
 	switch( type )
 	{
 		case VEVO_PLUG_LIVIDO:
-			instance = livido_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_), base_fmt_ );
+			instance = livido_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_), base_fmt_, read_cfg );
 			break;
 		case VEVO_PLUG_FF:
 			instance = freeframe_plug_init( plugin,w,h);
 			break;
 		case VEVO_PLUG_FR:
-			instance = frei0r_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_) );
+			instance = frei0r_plug_init( plugin,w,h, yuv_to_alpha_fmt(base_fmt_), read_cfg );
 			break;
 		default:
 			veejay_msg(0, "Plugin type not supported");
@@ -443,11 +444,12 @@ void	plug_sys_free(void)
 	free_plugins();
 }
 
-void	plug_sys_init( int fmt, int w, int h )
+void	plug_sys_init( int fmt, int w, int h, int cfg )
 {
 	base_width_ = w;
 	base_height_ = h;
 	base_fmt_ = fmt;
+    read_cfg = cfg;
 	
 	plug_sys_set_palette( base_fmt_ );
 }

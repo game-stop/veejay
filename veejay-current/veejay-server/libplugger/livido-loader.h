@@ -24,7 +24,7 @@ int		lvd_livido_palette( int v );
 
 void	*deal_with_livido(void *handle, const char *name, int w, int h);
 
-void	*livido_plug_init( void *plugin, int w, int h, int pixfmt, int orgfmt );
+void	*livido_plug_init( void *plugin, int w, int h, int pixfmt, int orgfmt, int read_plug_cfg );
 
 int	livido_get_num_input_parameters(void *instance);
 

@@ -25,7 +25,7 @@
 	FIXME: must be refactored
  */
 void	plug_sys_free(void);
-void	plug_sys_init( int fmt, int w, int h );
+void	plug_sys_init( int fmt, int w, int h, int cfg );
 void	plug_sys_set_palette( int palette );
 int	plug_sys_detect_plugins(void);
 int 	plug_get_num_output_channels(int id);

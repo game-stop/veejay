@@ -370,7 +370,7 @@ static void vj_effect_deactivate_all()
 	}	
 }
 
-void vj_effect_initialize(int width, int height, int full_range)
+void vj_effect_initialize(int width, int height, int full_range, int custom_cfg)
 {
     if( full_range )
     {
@@ -564,7 +564,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	max_width = width;
 	max_height = height;
 
-	plug_sys_init( (full_range == 0 ? PIX_FMT_YUVA444P : PIX_FMT_YUVA444P ),width,height );
+	plug_sys_init( (full_range == 0 ? PIX_FMT_YUVA444P : PIX_FMT_YUVA444P ),width,height, custom_cfg );
 
 	n_ext_plugs_ = plug_sys_detect_plugins();
 

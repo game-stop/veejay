@@ -89,6 +89,7 @@ char	*veejay_valid_osc_name( const char *in )
 static	int	pref_palette_ = 0;
 static	int	pref_palette_ffmpeg_ = 0;
 static	int	livido_signature_ = VEVO_PLUG_LIVIDO;
+static  int read_plugin_configuration = 0;
 
 typedef	int	(*livido_set_parameter_f)( void *parameter, void *value );
 
@@ -837,11 +838,13 @@ void	*livido_get_name_space( void *instance )
 }
 
 /* initialize a plugin */
-void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_)
+void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_, int read_plug_cfg)
 {
 	void *plug_info = NULL;
 	void *filter_templ = NULL;
 	
+    read_plugin_configuration = read_plug_cfg;
+
 	if( vevo_property_get( plugin, "instance", 0, &plug_info) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Not a Livido plugin");
 		return NULL;
@@ -1335,7 +1338,9 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 		return NULL;
 	}
 
-	livido_read_plug_configuration( filter_templ, name );
+    if( read_plugin_configuration ) {
+	    livido_read_plug_configuration( filter_templ, name );
+    }
 
 	int n_params = livido_scan_parameters( filter_templ, port, w, h );
 	int n_oparams = livido_scan_out_parameters( filter_templ, port );

@@ -355,6 +355,7 @@ typedef struct {
 	int	use_mouse;
 	int	show_cursor;
 	int 	qrcode;
+    int read_plug_cfg;
 } veejay_t;
 
 typedef struct {

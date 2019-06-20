@@ -48,7 +48,7 @@
 #define    RUP8(num)(((num)+8)&~8)
 #define _VJ_MAX_PARAMS 32
 
-
+static int read_plugin_configuration = 0;
 static int frei0r_signature_ = VEVO_PLUG_FR;
 
 typedef f0r_instance_t (*f0r_construct_f)(unsigned int width, unsigned int height);
@@ -822,7 +822,9 @@ void* 	deal_with_fr( void *handle, char *name)
 
 	free( plug_name );
 
-	frei0r_read_plug_configuration(port, name);
+    if( read_plugin_configuration ) {
+	    frei0r_read_plug_configuration(port, name);
+    }
 
 	return port;
 }
@@ -877,8 +879,10 @@ void	frei0r_destroy()
 }
 
 
-void *frei0r_plug_init( void *plugin , int w, int h, int pf )
+void *frei0r_plug_init( void *plugin , int w, int h, int pf, int read_plug_cfg )
 {
+    read_plugin_configuration = read_plug_cfg;
+
 	void *instance = vpn( VEVO_ANONYMOUS_PORT );
 	f0r_construct_f base;
 	vevo_property_get( plugin, "construct", 0, &base);

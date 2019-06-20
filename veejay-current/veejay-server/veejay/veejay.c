@@ -335,6 +335,8 @@ static void Usage(char *progname)
 		"  -M/--dynamic-fx-chain\t\tDo not keep FX chain buffers in RAM (default off)\n");
 	fprintf(stderr,
 		"    /--split-screen\t\tLoad split screen configuration\n");
+    fprintf(stderr,
+        "    /--fx-custom-default-values Read FX custom default values from ~/.veejay/[livido,frei0r]\n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
@@ -565,6 +567,10 @@ static int set_option(const char *name, char *value)
 	{
 		info->settings->splitscreen = 1;
 	}
+    else if (strcmp(name, "fx-custom-default-values" ) == 0 )
+    {
+        info->read_plug_cfg = 1;
+    }
     else
 		nerr++;			/* unknown option - error */
 
@@ -635,6 +641,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"dynamic-fx-chain",0,0,0},
 	{"pace-correction",1,0,0},
 	{"split-screen",0,0,0},
+    {"fx-custom-default-values",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -809,7 +816,7 @@ int main(int argc, char **argv)
  	{
 		veejay_set_colors(0);
 		vj_event_init(NULL);
-		vj_effect_initialize(720,576,0);
+		vj_effect_initialize(720,576,0,info->read_plug_cfg);
 		vj_osc_allocate(VJ_PORT+2);	
 		vj_event_dump();
 		vj_effect_dump();
