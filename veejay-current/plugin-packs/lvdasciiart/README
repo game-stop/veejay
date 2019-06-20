@@ -1,0 +1,10 @@
+This plugin requires that you have the following packages installed:
+
+FreeType II (libfreetype2)
+FFmpeg (libavutil and libswscale)
+AALib (libaa1)
+
+
+On Ubuntu, you can use apt-get to install the packages:
+
+apt-get install libfreetype6-dev libaa1-dev libavutil-dev libswscale-dev
