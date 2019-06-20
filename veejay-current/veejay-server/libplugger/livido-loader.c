@@ -558,6 +558,12 @@ static	int	init_parameter_port(livido_port_t *ptr, livido_port_t *in_param )
 	}
 	
 	vevo_property_set( in_param, "HOST_parameter_func", LIVIDO_ATOM_TYPE_VOIDPTR,1,&pctrl );
+
+    void *priv = NULL;
+    error = vevo_property_get( ptr, "PLUGIN_param_private", 0, &priv );
+    if( error == VEVO_NO_ERROR ) {
+        vevo_property_set( in_param, "PLUGIN_param_private", LIVIDO_ATOM_TYPE_VOIDPTR,1,&priv );
+    }
 	return 1;
 }
 
