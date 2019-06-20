@@ -118,6 +118,9 @@
 #ifdef HAVE_DIRECTFB
 #include <veejay/vj-dfb.h>
 #endif
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 #ifdef HAVE_V4L2
 #include <libstream/vj-vloopback.h>
@@ -3040,7 +3043,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 	uint64_t n1 = (uint64_t) start;
 	uint64_t n2 = (uint64_t) end;
 
-	long len = end - start + 1;
+	long len = end - start;
   
 	if(el->is_empty)
 	{
@@ -3069,17 +3072,32 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 	}
 
     	/* copy edl frames */
-   	new_el->frame_list = (uint64_t *) vj_malloc(  sizeof(uint64_t) * len );
+    size_t ellen = (len+1) * sizeof(uint64_t);
+   	new_el->frame_list = (uint64_t *) vj_malloc( ellen );
 
 	if (!new_el->frame_list)
 	{
-		veejay_msg(0, "Out of memory, unable to allocate editlist of %ld bytes", len);
+		veejay_msg(0, "Out of memory, unable to allocate editlist of %ld bytes", ellen);
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		return NULL;
    	}
-
-	veejay_memcpy( new_el->frame_list , el->frame_list + n1, sizeof(uint64_t) * len );
-	new_el->video_frames = len;
+	
+//    veejay_memcpy( new_el->frame_list , el->frame_list + n1, ellen );
+    int i;
+    for( i = 0; i < len; i ++ ) {
+        new_el->frame_list[i] = el->frame_list[n1 + i];
+    }
+#ifdef STRICT_CHECKING
+    for( i = 0; i < len; i ++ ) {
+        if( new_el->frame_list[i] >= n2 ) {
+            veejay_msg(VEEJAY_MSG_ERROR,"sample [%ld-%ld] oob at %d (%ld)",
+                    (long)n1,(long)n2, i, (long) new_el->frame_list[i]);
+        }
+        assert( new_el->frame_list[i] < n2 );
+    }
+#endif
+    
+    new_el->video_frames = len;
 	new_el->total_frames = len - 1;
 	return new_el;
 }
