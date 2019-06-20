@@ -17,5 +17,5 @@
 * [README.whatis](./README.whatis.md)
 * A verbose and deep description - [veejay-HOWTO](./veejay-HOWTO.md)
 * [video-wall.md](./video-wall.md)
-* [VIMS.txt](./VIMS.txt)
+* VIMS is Veejay's IMS (Internal Message System) - [VIMS.md](./VIMS.md)
 * [YCbCr.txt](./YCbCr.txt)
