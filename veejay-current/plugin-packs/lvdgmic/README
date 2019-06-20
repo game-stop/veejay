@@ -2,6 +2,12 @@
 Veejay's GMIC plugin pack
 -------------------------
 
+You need to install libgmic-dev to build this package.
+
+(e.g, apt-get install libgmic-dev)
+
+
+
 veejay experiment using G'MIC (GREYC's Magic for Image Computing)
 
 https://gmicol.greyc.fr/
