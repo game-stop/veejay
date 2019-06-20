@@ -442,6 +442,31 @@ static void draw_glyph_op(int width, int height, uint8_t *bitbuffer, uint32_t bi
     }
 }
 
+
+// Use Y as opacity channel (each pixel equals opacity value) and copy-in chroma channels (ignore black)
+static void draw_glyph_op_nb(int width, int height, uint8_t *bitbuffer, uint32_t bitmap_rows, uint32_t bitmap_wid, uint32_t bitmap_pitch, uint8_t *Y, uint8_t *U, uint8_t *V, int x, int y, uint8_t *L, uint8_t *L1, uint8_t *L2)
+{
+    int r,c, p, pos;
+    for (r=0; (r < bitmap_rows) && (r+y < height); r++)
+    {
+        for (c=0; (c < bitmap_wid) && (c+x < width); c++)
+        {
+            pos = r * bitmap_pitch + c;
+            p  = (c+x) + ((y+r)*width);
+
+            uint8_t op1 = L[p];
+            uint8_t op0 = 0xff - op1;
+
+            Y[p] = ( op0 * Y[p] + op1 * bitbuffer[pos] ) >> 8;
+
+            if( bitbuffer[pos] > 0 ) {
+                U[ p ] = L1[p];
+                V[ p ] = L2[p];
+            }
+        }
+    }
+}
+
 static void draw_glyph( 
     FT_Bitmap *bitmap,
     int x,
@@ -484,6 +509,10 @@ static void draw_glyph(
         case 2:
             draw_glyph_op(width,height,bitbuffer,bitmap_rows,bitmap_wid,bitmap_pitch,Y,U,V,x,y,buffer[0],buffer[1],buffer[2]);
             break;
+        case 3:
+            draw_glyph_op_nb(width,height,bitbuffer,bitmap_rows,bitmap_wid,bitmap_pitch,Y,U,V,x,y,buffer[0],buffer[1],buffer[2]);
+            break;
+
     }
 }
 
@@ -962,7 +991,7 @@ livido_port_t   *livido_setup(livido_setup_t list[], int version)
 
         livido_set_int_value(port, "default", 0);
         livido_set_int_value(port, "min" ,0);
-        livido_set_int_value(port, "max", 2);
+        livido_set_int_value(port, "max", 3);
         
         livido_set_string_value( port, "description" ,"Mode");
 
