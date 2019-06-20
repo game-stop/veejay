@@ -1338,6 +1338,7 @@ static void vj_kf_reset();
 static void veejay_stop_connecting(vj_gui_t *gui);
 void reload_macros();
 void reportbug();
+void select_chain_entry(int entry);
 
 GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 
@@ -4361,6 +4362,15 @@ static void reset_tree(const char *name)
     }
 }
 
+void    select_chain_entry(int entry)
+{
+    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
+    GtkTreeSelection *sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+
+    GtkTreePath *path = gtk_tree_path_new_from_indices( entry, -1 );
+    gtk_tree_selection_select_path(sel, path);
+    gtk_tree_path_free(path);
+}
 // load effect controls
 
 gboolean view_entry_selection_func (GtkTreeSelection *selection,
@@ -7475,6 +7485,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( (pm == MODE_SAMPLE || pm == MODE_STREAM ) && info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ) {
         info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
+        select_chain_entry(info->uc.selected_chain_entry);
         info->uc.reload_hint[HINT_KF] = 1;
         info->uc.reload_hint[HINT_ENTRY] = 1;
     }
