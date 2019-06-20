@@ -33,7 +33,9 @@
 
 /* Standard C includes */
 #include <config.h>
+#ifdef STRICT_CHECKING
 #include <assert.h>
+#endif
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -207,7 +209,7 @@ static void ctmf_helper(
 
     Histogram H[4];
     uint16_t *h_coarse, *h_fine, luc[4][16];
-
+#ifdef STRICT_CHECKING
     assert( src );
     assert( dst );
     assert( r >= 0 );
@@ -215,6 +217,7 @@ static void ctmf_helper(
     assert( height >= 2*r+1 );
     assert( src_step != 0 );
     assert( dst_step != 0 );
+#endif
 
     /* SSE2 and MMX need aligned memory, provided by _mm_malloc(). */
 #if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_MMX)
@@ -295,7 +298,8 @@ static void ctmf_helper(
                         break;
                     }
                 }
-                assert( k < 16 );
+                
+                //assert( k < 16 );
 
                 /* Update corresponding histogram segment */
                 if ( luc[c][k] <= j-r ) {
@@ -326,7 +330,7 @@ static void ctmf_helper(
                         break;
                     }
                 }
-                assert( b < 16 );
+               // assert( b < 16 );
             }
         }
     }

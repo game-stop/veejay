@@ -18,52 +18,81 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
+// Uses: ctmf
+/*
+ * ctmf.c - Constant-time median filtering
+ * Copyright (C) 2006  Simon Perreault
+ *
+ * Reference: S. Perreault and P. Hébert, "Median Filtering in Constant Time",
+ * IEEE Transactions on Image Processing, September 2007.
+ *
+ * This program has been obtained from http://nomis80.org/ctmf.html. No patent
+ * covers this program, although it is subject to the following license:
+ */
+
+#include <unistd.h>
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include <ctmf/ctmf.h>
 #include "median.h"
 
+static long l2_cache_size_;
+
 vj_effect *medianfilter_init(int w, int h)
 {
-	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-	ve->num_params = 1;
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    ve->num_params = 1;
 
-	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-	ve->limits[0][0] = 0;
-	ve->limits[1][0] = (h / 4) - 1;
-	ve->defaults[0] = 3;// 255;
-	ve->description = "Constant Time Median Filter";
-	ve->sub_format = 0;
-	ve->extra_frame = 0;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Value" );
-	return ve;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 127;
+    ve->defaults[0] = 3;
+    ve->description = "Constant-time median filtering";
+    ve->sub_format = -1;
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list( ve->num_params, "Value" );
+    
+    l2_cache_size_ = sysconf( _SC_LEVEL2_CACHE_SIZE );
+    
+    return ve;
 }
 
 void medianfilter_apply( VJFrame *frame, int val)
 {
-	const unsigned int width = frame->width;
-	const unsigned int height = frame->height;
-	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
 
-	if( val == 0 )
-	   return; 
+    if( val == 0 )
+        return;
 
-	 uint8_t *buffer = (uint8_t*) vj_malloc(sizeof(uint8_t)*len*3);
-	 veejay_memset( buffer,0, len*3);
-	 ctmf( Y, buffer, width,height,width,width,val,1,1024*1024*8);
-	 ctmf( Cb,buffer + (len), width,height/2,width,width,val,1,512*1024);
-	 ctmf( Cr,buffer + (len*2), width,height/2,width,width,val,1,512*1024);
+    const unsigned int width = frame->width;
+    const unsigned int height = frame->height;
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    const int u_hei = frame->uv_height;
+    const int u_wid = frame->uv_width;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
 
-	 veejay_memcpy( Y, buffer, len);
-	 veejay_memcpy( Cb,buffer + (len), len);
-	 veejay_memcpy( Cr,buffer + (len*2), len);
-	 
-	 free(buffer);
+    uint8_t *buffer[3];
+    size_t bufsize = RUP8( len + uv_len + uv_len ) * sizeof(uint8_t);
 
+    buffer[0] = (uint8_t*) vj_malloc( bufsize );
+    if(!buffer[0]) {
+        return; // error
+    }
+    buffer[1] = buffer[0] + RUP8( len );
+    buffer[2] = buffer[1] + RUP8( uv_len );
+
+    ctmf( Y, buffer[0], width,height, width, width, val,1,l2_cache_size_);
+    ctmf( Cb,buffer[1], u_wid, u_hei, u_wid, u_wid, val,1,l2_cache_size_);
+    ctmf( Cr,buffer[2], u_wid, u_hei, u_wid, u_wid, val,1,l2_cache_size_);
+
+    veejay_memcpy( Y, buffer[0], len);
+    veejay_memcpy( Cb,buffer[1], uv_len);
+    veejay_memcpy( Cr,buffer[2], uv_len);
+
+    free(buffer[0]);
 }
