@@ -357,24 +357,29 @@ Decompress and untar the file by typing:
 ```
 $ tar -jxvf veejay-1.5.x.tar.bz2
 ```
-Change to the directory containing veejay's source's and configure the build:
+Veejay is divided in several packages. First you need the core libraries and veejay application.
+
+Change to the directory containing veejay's core source's and configure the build:
 ```
-$ cd veejay-1.5.x/veejay-current/veejay-server
+$ cd veejay-1.5.x/veejay-current/veejay-core
 
 $ ./configure
 ```
 On completion it will summarize the results of the `./configure` script.  
 You can run `./configure --help` to view all configure options and tweak your installation.
 
-Now, you can start building veejay (using all cores)
+Now, you can start building the core library (using all cores)
 ```
 $ make -j$(nproc)
 ```
 Followed by
 ```
-# make install && ldconfig
+# sudo make install && sudo ldconfig
 ```
-For **full installation instruction** please refer to this [documentation](./Installation.md)
+
+Repeat the same process (appart `ldconfig`) for veejay-server and other needed packages.
+
+For **full installation instruction** please refer to [Installation.md](./Installation.md)
 
 <span id="3.3">3.3 Installing from repository</span>
 -------------------------------------------
@@ -386,9 +391,12 @@ Download the last source code by typing :
 ```
 $ git clone https://github.com/c0ntrol/veejay.git
 ```
-Enter the directory containing veejay's source's :
+Veejay is divided in several packages. First you need the core libraries and veejay application.
+
+Change to the directory containing veejay's core source's and configure the build:
+
 ```
-$ cd veejay/veejay-current/veejay-server
+$ cd veejay/veejay-current/veejay-core
 ```
 You need to prepare and configure the build:
 ```
@@ -398,7 +406,7 @@ $ ./configure
 On completion it will summarize the results of the `./configure` script.  
 You can run `./configure --help` to view all configure options and tweak your installation.
 
-Now, you can start building veejay (using all cores)
+Now, you can start building the libraries (using all cores)
 ```
 $ make -j$(nproc)
 ```
@@ -406,7 +414,10 @@ Followed by
 ```
 # make install && ldconfig
 ```
-For **full installation instruction** please refer to this [documentation](./Installation.md)
+
+Repeat the same process (appart `ldconfig`) for veejay-server and other needed packages.
+
+For **full installation instruction** please refer to [Installation.md](./Installation.md)
 
 <span id="3.4">3.4 Setting up multicast</span>
 ------------------------

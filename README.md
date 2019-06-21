@@ -36,7 +36,7 @@ The video output server (Ffmpeg/libSDL), a 'visual' instrument and realtime vide
 
 First, make sure you system is up-to-date, and install the dependencies with:
 ```bash
-sudo apt-get install git autoconf automake libtool m4 gcc libjpeg62-dev \
+sudo apt-get install build-essential autoconf automake libtool m4 gcc libjpeg62-dev \
 libswscale-dev libavutil-dev libavcodec-dev libavformat-dev libx11-dev  \
 gtk-3.0-dev libxml2-dev libsdl2-dev libjack0 libjack-dev jackd1
 ```
@@ -56,7 +56,7 @@ For __each package__, run the triptich commands of the *GNU build system* (for a
 ```bash
  ./autogen.sh
  ./configure
- make && sudo make install
+ make -j$(nproc) && sudo make install
 ```
  __IMPORTANT :__ in some configuration you should have to __manually build__ the __shared libraries cache__ just after the __first veejay-core__ installation (ex `sudo ldconfig` or similar)
 
@@ -64,6 +64,8 @@ __Configure :__ You do not need to pass any parameters to `./configure` for veej
 If you want help to build for a specific architecture or with or without particular options (ex jack sound support) ... take a look to the `./configure --help` to adapt to many kinds of systems.
 
 Before running veejay, be sure to add or link some TrueType fonts in `$HOME/.veejay/fonts`
+
+Additional information about building veejay packages can be found in [HOWTO.compile.md](./veejay-current/veejay-server/doc/HOWTO.compile.md)
 
 ## Usage
 
