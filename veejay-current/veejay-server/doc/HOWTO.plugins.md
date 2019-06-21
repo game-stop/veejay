@@ -11,6 +11,7 @@ There are several [plugin-packs](https://github.com/c0ntrol/veejay/tree/master/v
 * **lvdcrop** ; a couple of crop filters and a port of frei0r's scale0tilt
 * **lvdshared** ; a couple of plugins that implement a producer/consumer mechanism for shared video resources
 * **lvdgmic** ; a couple of [GMIC](https://gmic.eu/) based filters, although slow in processing they are quite amazing
+* **lvdasciiart** ; let's do ascii ! ported from ffmpeg ASCII filter writen by Alexander Tumin
 
 To compile and install a plugin-pack:
 ```bash
