@@ -188,7 +188,93 @@ the second describes the duration (in frames) for the fade in.
 stream, the second for the chain entry and the last for the effect number.
 Idem for 182, but here starting from the 4th argument it takes preset values
 
-2 OSC  - Open Sound Control
+2 sayVIMS, an utility to talk to veejay
+=========================================
+
+[//]: # ( comment : BEGIN sayVIMS section DUPLICATE in /veejay-current/veejay-server/doc/HOWTO)
+[//]: # ( WARNING : section numbering have to be adapted )
+
+***sayVIMS*** is a commandline utility distributed with the veejay package. It allows you to send short commands in interactive mode, single VIMS message or files containing VIMS messages to batch-process to veejay.
+```
+Usage: sayVIMS [options] [messages]
+where options are:
+ -p          Veejay port (3490)
+ -g          Veejay groupname (224.0.0.31)
+ -h          Veejay hostname (localhost)
+ -m          Send single message
+ -i          Interactive mode
+ -f file     Read from (special) file
+ -d          Dump status to stdout
+ -b          Base64 encode binary data
+ -v          Verbose
+ -?          Print this help
+```
+
+In the following examples, lets say a veejay instance is running on host
+`localhost` using port `3490` (veejay default values).
+
+**Interactive Mode**
+```
+$ sayVIMS -i -h localhost -p 3490
+```
+In interactive mode, after a connection is establish with a veejay server,
+a prompt wait you to enter VIMS commands (see previous chapter about the VIMS message format). Simply press `[ENTER]` to send it. 
+
+```
+$ sayVIMS -i
+veejay sayVIMS 1.1.8
+    type 'quit' or press CTRL-c to exit
+    see 'veejay -u' for a list of commands
+017:;
+```
+Here, the `017` tells veejay to go to sample starting position.
+
+The connection remain open until you exit by typing `quit` or hit  `[Ctrl]-[c]`.
+
+**Single VIMS message**
+
+Also, you can send single VIMS format message.
+
+For example, add the Pixelate effect on the Effect Chain of the current
+playing stream or clip :
+```
+$ sayVIMS -h localhost -p 3490 -m "361:0 0 100 3;"
+```
+
+**Using files**
+
+Last but not least, sayVIMS can parse files containing VIMS messages.
+
+See the `veejay-server/test/examples` directory of the package for a list of perl
+scripts that output a VIMS script.
+```
+$ sayVIMS -f advocate.vims -h localhost -p 3490
+```
+
+**Others examples**
+
+Alternatively, you can start a secundary veejay and stream from peer to
+peer (TCP) in uncompressed video:
+```
+$ veejay -d -p 5000
+$ sayVIMS -h localhost -p 5000 -m "245:localhost 3490;"
+
+(press 'F7' in veejay to display the stream, prob. stream 7)
+```
+Or for multicast (UDP):
+```
+$ veejay -V 224.0.0.50 -p 5000 -n -L movie1.avi
+$ veejay -d
+$ sayVIMS -h localhost -p 3490 -m "246:224.0.0.50 5000;"
+$ veejay -d -p 4000
+$ sayVIMS -h localhost -p 4000 -m "246:224.0.0.50 5000;"
+```
+Have a look on [4.5.3 network](./veejay-HOWTO.md#4.5.3) for more UDP multicasting.
+
+[//]: # ( comment : END sayVIMS section DUPLICATE in /veejay-current/veejay-server/doc/HOWTO)
+[//]: # ( WARNING : url have to be adapted )
+
+3 OSC  - Open Sound Control
 ===================
 
 The OpenSound Control WWW page is http://opensoundcontrol.org/
