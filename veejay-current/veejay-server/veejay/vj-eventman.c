@@ -1018,7 +1018,7 @@ void		vj_init_vevo_events(void)
 				VIMS_REQUIRE_ALL_PARAMS,
 				SAMPLE_ID_HELP,
 				0,
-				"Looptype (0=None,1=Normal,2=Pingpong)",
+				"Looptype (0=Play once,1=Normal,2=Pingpong,3=Random frame,4=Play once (no pause))",
 				1,
 				NULL );
 
