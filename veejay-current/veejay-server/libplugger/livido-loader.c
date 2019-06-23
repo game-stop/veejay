@@ -384,9 +384,9 @@ static	int	livido_scan_out_parameters( void *plugin , void *plugger_port)
 	if( NP <= 0 )
 		return 0;
 
+    char key[16];
 	for( n = 0; n < NP; n ++ )
 	{
-		char key[16];
 		void *param = NULL;
 
 		if( vevo_property_get( plugin, "out_parameter_templates", n, &param ) != VEVO_NO_ERROR )
@@ -417,9 +417,9 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port, int w, int 
 	if( NP <= 0 )
 		return 0;
 
+    char key[20];
 	for( n = 0; n < NP; n ++ )
 	{
-		char key[20];
 		void *param = NULL;
 
 		if( vevo_property_get( plugin, "in_parameter_templates", n, &param ) != VEVO_NO_ERROR )
@@ -1011,7 +1011,7 @@ void	livido_plug_retrieve_values( void *instance, void *fx_values )
 {
 	int vj_np = vevo_property_num_elements( instance, "in_parameters" );
 	int i;
-	char vkey[8];
+	char vkey[16];
 	for( i = 0; i < vj_np; i ++ )
 	{
 		void *param = NULL;
@@ -1033,9 +1033,9 @@ int	livido_plug_read_output_parameters( void *instance, void *fx_values )
 	if(np <= 0)
 		return 0;
 
+    char vkey[16];
 	for( i = 0; i < np ; i ++ )
 	{
-		char	vkey[8];
 		void *param = NULL;
 
 		if( vevo_property_get( instance, "out_parameters", i, &param ) != VEVO_NO_ERROR )
@@ -1143,9 +1143,9 @@ void	livido_reverse_clone_parameter( void *instance, int seq, void *fx_value_por
 	int vj_np = vevo_property_num_elements( instance, "in_parameters" );
 	int i;
 
+    char vkey[16];
 	for( i = 0; i < vj_np; i ++ )
 	{
-		char	vkey[8];
 		void *param = NULL;
 		if( vevo_property_get( instance, "in_parameters", i, &param) != VEVO_NO_ERROR )
 			continue;
@@ -1158,9 +1158,9 @@ void	livido_clone_parameter( void *instance, int seq, void *fx_value_port )
 {
 	int vj_np = vevo_property_num_elements( instance, "in_parameters" );
 	int i;
+    char vkey[16];
 	for( i = 0; i < vj_np; i ++ )
 	{
-		char	vkey[8];
 		void *param = NULL;
 		if( vevo_property_get( instance, "in_parameters", i, &param) != VEVO_NO_ERROR )
 			continue;
