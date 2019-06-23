@@ -85,8 +85,8 @@ typedef struct {
     int encoder_active;
     int clone;
     unsigned long sequence_num;
-    char encoder_base[256];
-    char encoder_destination[256];
+    char encoder_base[1024];
+    char encoder_destination[2048];
     char descr[TAG_MAX_DESCR_LEN];
     int encoder_format;
     void *encoder;

@@ -1672,7 +1672,7 @@ int vj_tag_try_filename(int t1, char *filename, int format)
     }
     if(filename != NULL)
     {
-        snprintf(tag->encoder_base, 255, "%s", filename);
+        snprintf(tag->encoder_base, sizeof(tag->encoder_base), "%s", filename);
     }
     char ext[5];
     switch(format)
@@ -1692,7 +1692,7 @@ int vj_tag_try_filename(int t1, char *filename, int format)
             break;
     }   
     
-    sprintf(tag->encoder_destination, "%s-%04d.%s", tag->encoder_base, (int)tag->sequence_num, ext);
+    snprintf(tag->encoder_destination,sizeof(tag->encoder_destination), "%s-%04d.%s", tag->encoder_base, (int)tag->sequence_num, ext);
     return 1;
 }
 
