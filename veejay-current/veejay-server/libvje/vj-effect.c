@@ -129,6 +129,7 @@ static struct
 {   pixelsortalpha_malloc,pixelsortalpha_free,NULL,VJ_IMAGE_EFFECT_PIXELSORTALPHA },
 {   raster_malloc,raster_free,NULL,VJ_IMAGE_EFFECT_RASTER },
 {   dither_malloc,dither_free, NULL, VJ_IMAGE_EFFECT_DITHER },
+{   bloom_malloc,bloom_free, NULL, VJ_IMAGE_EFFECT_BLOOM },
 {	NULL,NULL,NULL,0},
 };
 
@@ -560,6 +561,7 @@ void vj_effect_initialize(int width, int height, int full_range, int custom_cfg)
 	vj_effects[VJ_IMAGE_EFFECT_POSTERIZE2]			= posterize2_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_PIXELSORT]           = pixelsort_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_PIXELSORTALPHA]           = pixelsortalpha_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_BLOOM]               = bloom_init(width,height);
 
 	max_width = width;
 	max_height = height;

@@ -282,7 +282,7 @@ case $host_cpu in
 
 	if test "x$enable_debug" != "xyes" ; then
 		SUBSAMPLE_CFLAGS=""
-		VJE_CFLAGS="-O3 -ftree-vectorize -ffast-math"
+		VJE_CFLAGS="-O3 -ftree-vectorize -ffast-math -fopenmp"
 	fi
 
 	AC_MSG_RESULT([x86])
@@ -296,7 +296,7 @@ case $host_cpu in
 		VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
 		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
 	fi
-	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
+	CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
 
 	AC_MSG_RESULT([x86_64])
     ;;
