@@ -107,7 +107,7 @@ char	*vj_event_vevo_help_vims( int id, int n )
 {
 	char *help = NULL;
 	char key[10];
-	snprintf(key, "help_%d", n);
+	snprintf(key, sizeof(key), "help_%d", n);
 	size_t len = vevo_property_element_size( index_map_[id], key, 0  );
 	if(len > 0 )
 	{
