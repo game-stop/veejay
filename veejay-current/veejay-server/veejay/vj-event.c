@@ -996,11 +996,7 @@ static  void    dump_arguments_(int net_id,int arglen, int np, int prefixed, cha
     int i;
     char *name = vj_event_vevo_get_event_name( net_id );
     veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%03d' : '%s'", net_id, name );
-    if(np < arglen) {
-        veejay_msg(VEEJAY_MSG_ERROR, "\tOnly %d arguments of %d seen",arglen,np);   
-    } else {
-        veejay_msg(VEEJAY_MSG_ERROR, "\tToo many parameters! %d of %d",np,arglen);
-    }
+    veejay_msg(VEEJAY_MSG_ERROR, "\tWrong number of arguments, got %d, need %d",arglen,np);   
     veejay_msg(VEEJAY_MSG_ERROR, "\tFormat is '%s'", fmt );
 
     for( i = prefixed; i < np; i ++ )
