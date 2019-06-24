@@ -1,110 +1,114 @@
+                                                                                                              
+        //    ) )                                             //   ) )                                        
+       //    / /                ( )      ___       / ___     ((         __  ___     ___        __     __  ___ 
+      //    / /     //   / /   / /     //   ) )   //\ \        \\        / /      //   ) )   //  ) )   / /    
+     //  \ \ /     //   / /   / /     //         //  \ \         ) )    / /      //   / /   //        / /     
+    ((____\ \     ((___( (   / /     ((____     //    \ \ ((___ / /    / /      ((___( (   //        / /      
 
-It is advised to read the howto and the MAN page as well. 
 
+_It is advised to read the howto and the MAN page as well._
+
+### Launch and select source
 You can launch veejay with
 
-$ veejay -d
+    $ veejay -d
 
 This should show some moving black/white footage. Most of the effects will be boring on this footage,
 so you can try to open your video4linux device with
 
-sayVIMS "240:0 1;" (device 0, channel 1)
+    $ sayVIMS -m "240:0 1;" (device 0, channel 1)
 
-Or, to use mplayer, create a FIFO first:
+or your dv1394 firewire device.
 
-$ mkfifo stream.yuv
+    $ sayVIMS -h localhost -p 3490 -m "241:63;"
 
-Use something like 'mplayer -vo yuv4mpeg -x 352 -y 288 -vf scale -zoom' 
+
+To use mplayer, create a FIFO first:
+
+    $ mkfifo stream.yuv
+
+Use something like `mplayer -vo yuv4mpeg -x 352 -y 288 -vf scale -zoom`
 
 and open the stream in veejay's console:
 
-sayVIMS "243:stream.yuv;"
+    $ sayVIMS -m "243:stream.yuv;"
 
 Move your mouse pointer to the SDL window (so it dissapears) and press 'ESC' to
 switch from the dummy footage to the last created or played video stream. 
 
-Try loading an AVI file with something like:
+Try loading an AVI file with something like:  
+_(mjpeg-video-file.avi __must be__ encoded for veejay, see [codec](./README.video-codec.md)_
 
-$ veejay -v mjpeg-video-file.avi
+    $ veejay -v -g mjpeg-video-file.avi
 
-The '-v' commandline option generates extra debugging output.
+The `-v` commandline option generates extra debugging output.  
+The `-g` load clips has samples.
 
 By default, veejay uses a SDL window for displaying video. You can specify veejay to
 write to STDOUT :
 
-$ veejay -O3 -o stdout mjpeg-video-file.avi | yuvplay
+    $ veejay -O3 -o stdout mjpeg-video-file.avi | yuvplay
 
-In this mode, the console input and SDL keyboard functions are disabled. You must use
-the sendVIMS commandline utility to interact with veejay or with an alternative utility like sendOSC.
-Refer to the howto for more information.
+__In this mode__, the console input and SDL keyboard functions __are disabled__. You must use
+the `sayVIMS` commandline utility to interact with veejay or with an alternative utility like sendOSC. Refer to the howto [VIMS](./VIMS.md) for more information.
 
+Let's discover with some SDL keyboard functions :
 
-Once you have loaded veejay (preferably with a videofile)
+### Sampling and select sample
+Once you have loaded veejay, preferably with a videofile :
 
-  (see man veejay for an overview of both console input and SDL keyboard events)
+* press [KP 1] , [left bracket], [KP 3], [right bracket] , [F1]
 
-   press 'KP 1' , 'left bracket', 'KP 3', 'right bracket' , 'F1'
+This will create a virtual clip (in memory) from your entire video file.
 
-   This will create a virtual clip (in memory) from your entire video file.
+* If you press [KP divide] , veejay will return to plain video mode so you can create more clips.
+* If you press [ESC] , veejay will switch from playing streams to playing clips or vice versa
 
-   If you press 'KP divide' , veejay will return to plain video mode so you can create more clips.
-   If you press 'ESC' , veejay will switch from playing streams to playing clips or vice versa
+* Press [F1] to [F12] to select a clip,
+* Press [1] to [9] to select a bank (1 = clips 1 to 12,  2 = clips 12 to 24, etc )
 
-   Press F1 to F12 to select a clip,
-   press 1 to 9 to select a bank (1 = clips 1 to 12,  2 = clips 12 to 24, etc )
+### Add an effect
+Once you are playing a clip/stream, simply press
 
-   Once you are playing a clip/stream, simply press
-     'Cursor UP' , 'ENTER'
+* [Cursor UP] , [ENTER]
 
-   If you add a video effect, try pressing '-' and '=' to select another channel and '/' to
-   toggle between clip/stream sources
+To add an effect in the current effect chain entry.
 
-
-   Veejay supports chaining of effects since day 0, a number of keys have some importance
-
-	'-' ,'=' and '/'
-
-	'END' for enabling/disabling the chain
-	'KP -' for selecting the previous entry
-	'KP +' for selecting the next entry
-        'ALT+END' for enabling/disabling the current selected entry
-	'ENTER' for adding an effect from the list to the chain
-	'DEL'  for removing an effect from the chain
-	
- 
-   Also, you can press 'HOME' to see clip or stream information.
-
-   Try the keys 'A' to 'L' to increase/decrease playback speed.
+If you add a video effect, try pressing [-] and [=] to select another channel and [/] to toggle between clip/stream sources
 
 
-Also, you can load some predefined custom effect chain templates that
-will put a template on your effect chain when you press SHIFT + some alphabetic character 
+### Effect chain
+Veejay supports chaining of effects since day 0, a number of keys have some importance :
+
+* [-] ,[=] and [/] , select previous / next channel and toggle sources
+* [END] enable / disable the chain
+* [KP -] select the previous entry
+* [KP +] select the next entry
+* [ALT]+[END] enable / disable the current selected entry
+* [ENTER] add an effect from the list to the chain
+* [DEL] remove an effect from the chain
+
+### More keys ?
+Also, you can press [HOME] to see clip or stream information.
+
+Try the keys [A] to [L] to increase/decrease playback speed.  
+Try the keys combinaison [ALT] + [A] to [L] to increase/decrease frame repetition.
+
+_See __man veejay__ for an overview of both console input and SDL keyboard events_
+
+### Load custom chain
+Also, you can load some predefined custom effect chain templates that will put a
+template on your effect chain when you press SHIFT + some alphabetic character.
 
 First, load an action file
 
-$ veejay -l test/livecinema/action-file.xml
+    $ veejay -l test/livecinema/action-file.xml
 
 Or in veejay's console
 
 > al test/livecinema/action-file.xml
 
-(activate a stream or clip and) press SHIFT+S or SHIFT+B or SHIFT+ ... 
-
-
-Except all that, try this:
-
-
-sayVIMS -h localhost -p 3490 "241:63;"
-(press F7)
-
-to open your dv1394 firewire device
-
-or
-sayVIMS -h localhost -p 3490 "240:0 1;"
-(press F7)
-
-to open your video4linux device /dev/video0, channel 1
-
+(activate a stream or clip and) press [SHIFT]+[S] or [SHIFT]+[B] or [SHIFT]+ ...
 
 
  Enjoy!

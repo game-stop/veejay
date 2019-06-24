@@ -21,4 +21,4 @@ Veejay's server address is encoded as string `HOST:PORTNUMBER`, for example
 
 The QR image is regenerated at each startup and placed in `$HOME/.veejay` as `QR-3490.png`
 
-See also [How to Compile](./HowtoCompile.txt) for precise compilation information.
+See also [How to Compile](./HOWTO.compile.md) for precise compilation information.
