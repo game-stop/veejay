@@ -3,6 +3,8 @@ Veejay HOWTO
 
 Matthijs van Henten ( cola(AT)cb3rob(dot)net )  
 Niels Elburg ( nielselburg(AT)yahoo(dot)de )  
+Jérôme Blanchi ( d.j.a.y(AT)free(dot)fr )  
+
 v1.0, 30 March 2003  
 v1.1, 22 June 2003  
 v1.2, 26 August 2003  
@@ -12,6 +14,7 @@ v2.0, 25 July 2004
 v2.1 27 January 2005  
 v2.2 22 April 2005  
 v3.0 8 March 2008  
+v3.1 21 June 2019  
 
 ------------------------------------------------------------------------
 
@@ -103,6 +106,7 @@ about veejay and trying it out.
 **Version 2.1** Updated Howto to match version 0.7.2</br>
 **Version 2.2** Updated Howto to match version 0.8</br>
 **Version 3.0** Large rewrite to match version 1.1</br>
+**Version 3.1** Large rewiew and update</br>
 
 <span id="1.5">1.5 New versions of this document</span>
 -------------------------------------------------------
@@ -118,7 +122,7 @@ know and we'll include a reference to it here.
 
 We rely on you, the reader, to make this HOWTO usefull. If you have any
 suggestions, corrections, or comments, translations, please send them to us (
-[veejay-users@lists.sourceforge.net](veejay-users@lists.sourceforge.net)
+[veejay-discussion@googlegroups.com](veejay-discussion@googlegroups.com)
 ), and we will try to incorporate them in the next revision. Please add
 'HOWTO veejay' to the Subject-line of the mail.  
 
@@ -171,6 +175,8 @@ Veejay consists out of several packages:
 </tr>
 </tbody>
 </table>
+
+See also [README.whatis](./README.whatis.md)
 
 <span id="2.1">2.1 Features</span>
 ----------------------------------
@@ -374,7 +380,7 @@ $ make -j$(nproc)
 ```
 Followed by
 ```
-# sudo make install && sudo ldconfig
+# make install && ldconfig
 ```
 
 Repeat the same process (appart `ldconfig`) for veejay-server and other needed packages.
@@ -1010,8 +1016,9 @@ as packages you can use in combination with veejay.
 <span id="6.2">6.2 Mailing Lists</span>
 ---------------------------------------
 
-There is a mailing list for veejay which is hosted by Sourceforge. The
-address is <veejay-users@lists.sourceforge.net>
+There is a mailing list for veejay which is hosted by google groups.  
+You can access to the archive at https://groups.google.com/forum/#!forum/veejay-discussion.  
+The address is `veejay-discussion[AT]googlegroups[DOT]com`  
 
 <span id="6.3">6.3 Veejay developer's lounge</span>
 ---------------------------------------------------

@@ -124,7 +124,7 @@ make && sudo make install
 
 You can change the default FX parameter values by editing the files in `$HOME/.veejay/frei0r/` and `$HOME/.veejay/livido/`
 
-**See Also** : For more verbose information about plugins and FX check [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)
+**See Also** : For more verbose information about plugins and FX check [How to Plugins](./veejay-current/veejay-server/doc/HOWTO.plugins.md)
 
 ## Debugging
 
@@ -132,7 +132,7 @@ If you want to debug veejay-server (or if you want to submit a meaningful backtr
 
      ./configure --enable-debug
 
-see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
+see also : [How to debug](./veejay-current/veejay-server/doc/HOWTO.debugging.md)
 
 [//]: # ( comment : END Instalation section duplicated in /veejay-server/doc/Instalation)
 [//]: # ( WARNING : some URL/PATH have to be adapted )
@@ -141,7 +141,7 @@ see also : [How to debug](./veejay-current/veejay-server/doc/HowToDebugging.txt)
 
 ### Let's VJing Now...
 
-[__Veejay Quick start and play!__](./veejay-current/veejay-server/doc/README.quickstart) : start veejay, manually send VIMS messages, tricks to video fifo or some essentials of keyboards user interaction...
+[__Veejay Quick start and play!__](./veejay-current/veejay-server/doc/README.quickstart.md) : start veejay, manually send VIMS messages, tricks to video fifo or some essentials of keyboards user interaction...
 
 ## FEATURE OVERVIEW
 
@@ -178,7 +178,7 @@ see also : [README Video & Codecs](./veejay-current/veejay-server/doc/README.vid
  * All FX parameters can be animated
  * Mix up to two layers per FX slot
 
-see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md)[README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
+see also : [HOWTO plugins](./veejay-current/veejay-server/doc/HOWTO.plugins.md), [README alpha](./veejay-current/veejay-server/doc/README.alpha.md)
 
 ### Editing
 
@@ -246,7 +246,7 @@ see also : [How to video wall](./veejay-current/veejay-server/doc/video-wall.md)
  * Support for GMIC plugins
  * Android client!
 
-see also : [How to Plugins](./veejay-current/veejay-server/doc/HowtoPlugins.md), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3)
+see also : [How to Plugins](./veejay-current/veejay-server/doc/HOWTO.plugins.md), [README odroid-xu3](./veejay-current/veejay-server/doc/README.odroid-xu3)
 
 [//]: # ( comment : END Feature section DUPLICATE in /veejay-server/doc/veejay-HOWTO.md)
 [//]: # ( WARNING : some URL/PATH have to be adapted )
