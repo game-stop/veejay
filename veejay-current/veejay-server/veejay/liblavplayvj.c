@@ -594,7 +594,7 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	settings->min_frame_num = 0;
 	settings->max_frame_num = sample_video_length( sample_id );
 	settings->first_frame = 1;
-	
+	/*
 #ifdef HAVE_FREETYPE
 	if(info->font && info->uc->sample_id != sample_id)
 	{
@@ -606,7 +606,7 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 		}
 	}
 #endif
-
+    */
 	 info->uc->sample_id = sample_id;
 	 info->last_sample_id = sample_id;
 
@@ -649,6 +649,7 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 		settings->current_playback_speed = 1;
 	settings->min_frame_num = 1;
 	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
+    /*
 #ifdef HAVE_FREETYPE
 	  if(info->font )
 	  {
@@ -660,6 +661,7 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 	  }
 #endif
+    */
 	info->last_tag_id = stream_id;
 	info->uc->sample_id = stream_id;
 
@@ -1761,13 +1763,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing Stream Manager");
 		return -1;
 	}
-
+#ifdef HAVE_FREETYPE
 	info->font = vj_font_init( info->video_output_width,info->video_output_height,el->video_fps,0 );
 
 	if(!info->font) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system");
 		return -1;
 	}
+#endif
 
 	if(info->settings->splitscreen) {
 		char split_cfg[1024];
@@ -2543,12 +2546,10 @@ static void veejay_playback_close(veejay_t *info)
 		free(info->dfb);
 	}
 #endif
-
 #ifdef HAVE_FREETYPE
-	vj_font_destroy( info->font );
+	//vj_font_destroy( info->font );
 	vj_font_destroy( info->osd );
 #endif
-
     vj_perform_free(info);
 
 }
@@ -3040,9 +3041,6 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 }
 editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end)
 {
-	uint64_t n1 = (uint64_t) start;
-	uint64_t n2 = (uint64_t) end;
-
 	long len = end - start;
   
 	if(el->is_empty)
@@ -3051,11 +3049,16 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 		return 0;
 	}
 
-	if( n2 > el->total_frames)
+	if( end > el->total_frames)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Sample end is outside of editlist");
 		return NULL;
 	}
+
+    if( start < 0 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Sample start cannot be a negative value");
+        return NULL;
+    }
 
 	if(len < 1 )
 	{
