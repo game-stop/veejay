@@ -189,6 +189,7 @@
 #include "./effects/zoom.h"
 #include "./effects/stretch.h"
 #include "./effects/bloom.h"
+#include "./effects/gammacompr.h"
 #include "./transitions/3bar.h"
 #include "./transitions/fadecolor.h"
 #include "./transitions/fadecolorrgb.h"
@@ -200,7 +201,7 @@
 #include "./transitions/vbar.h"
 #include "./transitions/wipe.h"
 
-#define VJ_IMAGE_EFFECT_MIN 86
+#define VJ_IMAGE_EFFECT_MIN 85
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -434,6 +435,7 @@ enum {
     VJ_IMAGE_EFFECT_PIXELSORTALPHA = 88,
     VJ_IMAGE_EFFECT_CREATIVESTRETCH = 87,
     VJ_IMAGE_EFFECT_BLOOM = 86,
+    VJ_IMAGE_EFFECT_GAMMACOMPR = 85,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
