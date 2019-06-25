@@ -56,6 +56,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
+
 #define    RUP8(num)(((num)+8)&~8)
 
 #ifdef SUPPORT_READ_DV2
@@ -1878,12 +1882,12 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 	return 1;
 }
 
-
-editlist	*vj_el_soft_clone(editlist *el)
+static editlist *vj_el_soft_clone_base(editlist *el)
 {
-	editlist *clone = (editlist*) vj_calloc(sizeof(editlist));
+    editlist *clone = (editlist*) vj_calloc(sizeof(editlist));
 	if(!clone)
 		return NULL;
+
 	clone->is_empty = el->is_empty;
 	clone->has_video = el->has_video;
 	clone->video_width = el->video_width;
@@ -1899,16 +1903,25 @@ editlist	*vj_el_soft_clone(editlist *el)
 	clone->audio_bps = el->audio_bps;
 	clone->video_frames = el->video_frames;
 	clone->total_frames = el->video_frames - 1;
+#ifdef STRICT_CHECKING
+    assert( clone->total_frames == el->total_frames );
+#endif
 	clone->num_video_files = el->num_video_files;
 	clone->max_frame_size = el->max_frame_size;
 	clone->MJPG_chroma = el->MJPG_chroma;
-	clone->frame_list = NULL;
 	clone->last_afile = el->last_afile;
 	clone->last_apos  = el->last_apos;
 	clone->auto_deinter = el->auto_deinter;
 	clone->pixel_format = el->pixel_format;
 	clone->is_clone = 1;
-	int i;
+
+    return clone;
+}
+
+editlist	*vj_el_soft_clone(editlist *el)
+{
+    editlist *clone = vj_el_soft_clone_base(el);
+    int i;
 	for( i = 0; i < MAX_EDIT_LIST_FILES; i ++ )
 	{
 		clone->video_file_list[i] = NULL;
@@ -1925,6 +1938,69 @@ editlist	*vj_el_soft_clone(editlist *el)
 		clone->decoders[i] = el->decoders[i]; 
 		clone->ctx[i] = el->ctx[i];
 	}
+
+	return clone;
+}
+
+editlist	*vj_el_soft_clone_range(editlist *el, long n1, long n2)
+{
+    editlist *clone = vj_el_soft_clone_base(el);
+    if(!clone) {
+        veejay_msg(0,"Failed to clone EDL (not enough memory)");
+        return NULL;
+    }
+    long nframe;
+    long len = n2 - n1;
+    uint64_t k = 0;
+    int idx = -1;
+    int last_file_idx = -1;
+
+    clone->frame_list = (uint64_t*) vj_calloc( sizeof(uint64_t) * (len+1));
+    if(!clone->frame_list) {
+        veejay_msg(0,"Failed to allocate enough memory to hold the frame list");
+        free(clone);
+        return NULL;
+    }
+
+    for( nframe = n1; nframe <= n2; nframe ++ ) {
+        uint64_t n  = el->frame_list[nframe];
+        int file_idx= N_EL_FILE(n);
+
+        if( file_idx != last_file_idx ) {
+            last_file_idx = file_idx;
+            idx ++;
+            veejay_msg(VEEJAY_MSG_DEBUG,"\tEDL position %ld is %s (%d)", nframe, el->video_file_list[ file_idx ], idx );
+        }
+
+        if( clone->video_file_list[ idx ] == NULL ) {
+            clone->video_file_list[ idx ] = vj_strdup( el->video_file_list[ file_idx ] );
+        }
+        if( clone->lav_fd[ idx ] == NULL ) {
+            clone->lav_fd[ idx ] = el->lav_fd[ file_idx ];
+        }
+        if( clone->num_frames[ idx ] == 0 ) {
+            clone->num_frames[ idx ] = ( len < el->num_frames[ file_idx ] ? len : el->num_frames[ file_idx ] );
+            len -= clone->num_frames[idx];
+            veejay_msg(VEEJAY_MSG_DEBUG,"\tEDL length is %ld, remaining length is %ld", clone->num_frames[idx], len );
+#ifdef STRICT_CHECKING
+            assert( len >= 0 );
+#endif            
+        }
+        if( clone->pixfmt[ idx ] == 0 ) {
+            clone->pixfmt[ idx ] = el->pixfmt[ file_idx ];
+        }
+        if( clone->decoders[ idx ] == NULL ) {
+            clone->decoders[ idx ] = el->decoders[ file_idx ];
+        }
+        if( clone->ctx[ idx ] == NULL ) {
+            clone->ctx[ idx ] = el->ctx[ file_idx ];
+        }
+
+        clone->frame_list[ k ++ ] = N_EL_FRAME( n );
+    }
+
+    clone->video_frames = k;
+    clone->total_frames = k - 1;
 
 	return clone;
 }
@@ -1957,7 +2033,7 @@ editlist	*vj_el_clone(editlist *el)
 		return clone;
 	
 	if(clone) vj_el_free(clone);
-	veejay_msg(VEEJAY_MSG_ERROR, "Cannot clone: Memory error?!");\
+	veejay_msg(VEEJAY_MSG_ERROR, "Not enough memory to clone EDL");\
 	
 	return NULL;
 }

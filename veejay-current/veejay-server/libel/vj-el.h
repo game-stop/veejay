@@ -129,6 +129,8 @@ editlist *vj_el_clone(editlist *el);
 
 editlist *vj_el_soft_clone(editlist *el);
 
+editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2);
+
 int		vj_el_framelist_clone( editlist *src, editlist *dst);
 
 char *vj_el_write_line_ascii( editlist *el, int *bytes_written );

@@ -3063,42 +3063,15 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 		return NULL;
 	}
 
+    veejay_msg(VEEJAY_MSG_DEBUG, "New EDL %ld - %ld (%ld frames)", start,end, len);
 	/* Copy edl */
-	editlist *new_el = vj_el_soft_clone( el );
+	editlist *new_el = vj_el_soft_clone_range( el,start,end );
 	if(!new_el)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot soft clone EDL");
 		return NULL;
 	}
 
-    	/* copy edl frames */
-    size_t ellen = (len+1) * sizeof(uint64_t);
-   	new_el->frame_list = (uint64_t *) vj_malloc( ellen );
-
-	if (!new_el->frame_list)
-	{
-		veejay_msg(0, "Out of memory, unable to allocate editlist of %ld bytes", ellen);
-		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
-		return NULL;
-   	}
-	
-//    veejay_memcpy( new_el->frame_list , el->frame_list + n1, ellen );
-    int i;
-    for( i = 0; i < len; i ++ ) {
-        new_el->frame_list[i] = el->frame_list[n1 + i];
-    }
-#ifdef STRICT_CHECKING
-    for( i = 0; i < len; i ++ ) {
-        if( new_el->frame_list[i] >= n2 ) {
-            veejay_msg(VEEJAY_MSG_ERROR,"sample [%ld-%ld] oob at %d (%ld)",
-                    (long)n1,(long)n2, i, (long) new_el->frame_list[i]);
-        }
-        assert( new_el->frame_list[i] < n2 );
-    }
-#endif
-    
-    new_el->video_frames = len;
-	new_el->total_frames = len - 1;
 	return new_el;
 }
 
