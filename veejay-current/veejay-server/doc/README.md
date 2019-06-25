@@ -23,7 +23,7 @@
 * [How to Ubuntu](./HowtoUbuntu.txt)
 
 ### Special concerns : codecs and hardware stuff
-* [README audio](./README.audio)
+* [README audio](./README.audio.md) : To gain audio support in veejay
 * [README video codec](./README.video-codec.md) : What codec choose and how
 * [YCbCr](./YCbCr.txt)
 * [README memory](./README.memory.md) : Memory concern with veejay
