@@ -54,7 +54,7 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 	   		effects/chromamagickalpha.c	effects/magicoverlaysalpha.c effects/gaussblur.c effects/levelcorrection.c \
 		   effects/masktransition.c effects/alphadampen.c effects/passthrough.c effects/alphatransition.c effects/randnoise.c \
 		   effects/bgsubtractgauss.c effects/bwotsu.c effects/meanfilter.c effects/bgpush.c effects/pixelsort.c effects/pixelsortalpha.c \
-		   effects/stretch.c effects/bloom.c effects/gammacompr.c
+		   effects/stretch.c effects/bloom.c effects/gammacompr.c effects/squares.c
 
 
 
