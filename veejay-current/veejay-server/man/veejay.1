@@ -8,13 +8,13 @@ veejay - a visual (video) instrument and video sampler for GNU/Linux
 is a visual instrument and realtime video sampler. It allows you
 to "play" the video like you would play a Piano.
 
-While playing, you can record the resulting video directly to disk (video sampling). Veejay keeps audio in sync and pitches when needed through trickplay (slow , faster, reverse, loop ) and delivered to JACK for possible further processing.
+While playing, you can record the resulting video directly to disk (video sampling). Veejay keeps audio in sync and pitches when needed through trickplay (slow , faster, reverse, loop) and delivered to JACK for possible further processing.
 
 Veejay can be operated live by using the keyboard (which is 100% user definable)
 and remotely over network (both unicast and multicast) using an inhouse message
 system that allows mapping of various protocols on top of it, including OSC.
 
-Veejay is beeing developed in the hope it will be usefull for VJ's , media artists
+Veejay is beeing developed in the hope it will be usefull for VJ's, media artists
 theathers and other interested users that want to use Free Software for their
 performances and/or video installations.
 
@@ -67,7 +67,11 @@ You can use veejay to calibrate a camera (or another input source) against a pro
 .TP
 .SH Interoperability
 .TP
-Veejay can be used with PD (PureData) by using sendVIMS, a small commandline utility that translates PD's symbols to veejay and vice versa.Look at the REFERENCES to find out where to download this utility. Also, by using the OpenSoundControl veejay can be used with a great number of sound and video processing applications.Also veejay can record video data to the yuv4mpeg format (mjpegtools), or stream uncompressed video over the network (uni - and multicast)
+Using the OpenSoundControl (OSC) veejay can be used with a great number of sound and video processing applications.
+.TP
+Veejay can record video data to the yuv4mpeg format (mjpegtools), or stream uncompressed video over the network (uni - and multicast)
+.TP
+The power come with VIMS, Veejay's IMS (Internal Message System). With sayVIMS; a command line utility; you can control mainly all veejay's function on the fly, headless. You can scripts your performance / video installation, you can even plug them with the real world ...!
 .SH OPTIONS
 .TP
 .B \-w/--output-width <num>
