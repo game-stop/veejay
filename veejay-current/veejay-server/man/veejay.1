@@ -351,16 +351,16 @@ Switch loop mode ("Normal" or "Ping Pong")
 Switch random loop mode ("Play once and keep playing last frame" or "Random")
 .TP
 .B [Keypad -]
-Decrease chain index pointer
+Decrease selected effect chain entry
 .TP
 .B [Keypad +]
-Increase chain index pointer
+Increase selected effect chain entry
 .TP
 .B [Keypad 1]
 Goto start of sample
 .TP
 .B [Keypad 2]
-Go back 25 frames 
+Go back 25 frames
 .TP
 .B [Keypad 3]
 Goto end of sample
@@ -420,7 +420,10 @@ Set current mixing channel speed to 1,2,3,4,5,6,7,8, or 9
 Set current mixing channel frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
 .TP
 .B [F1..F12]
-Select and play sample 1 .. 12
+Select and play sample bank 1 .. 12
+.TP
+.B [SHIFT] + [F1..F12]
+Select and resume sample bank 1 .. 12
 .TP
 .B [DELETE]
 Delete selected effect
@@ -431,12 +434,6 @@ Print sample/tag information
 .B [ESC]
 Switch between Plain -> Tag or Sample playback mode
 .TP
-.B [CURSOR RIGHT]
-Go up 5 positions in the effect list
-.TP
-.B [CURSOR LEFT]
-Go back 5 positions in the effect list
-.TP
 .B [UP]
 Go up 1 position in the effect list
 .TP
@@ -445,9 +442,6 @@ Go down 1 position in the effect list
 .TP
 .B [RETURN | ENTER]
 Add selected effect from list to sample
-.TP
-.B [v]
-Toggle sample's playlist
 .TP
 .B [-]
 Decrease mixing channel ID
@@ -458,47 +452,14 @@ Increase mixing channel ID
 .B SLASH
 Toggle mixing source between Clips and Streams
 .TP
-.B [z]
-Audio Fade in decrease (*)
-.TP
-.B [x]
-Audio Fade in increase (*)
-.TP
-.B [b]
-Toggle a selected effect on/off
-.TP
 .B [END]
 Enable/Disable Effect Chain
 .TP
 .B [Left ALT] + [END]
 Enable/Disable Video on selected Entry
 .TP
-.B [Right ALT] + [END]
-Enable/Disable Audio on selected Entry
-.TP
 .B [LCTRL] + [END]
 Enable/Disable Video on selected Entry
-.TP
-.B [RCTRL] + [END]
-Enable/Disable Audio on selected Entry
-.TP
-.B [NUMLOCK]
-Auto increment/decrement of a parameter-key
-.TP
-.B [n]
-Decrease trimmer value of selected effect
-.TP
-.B [m]
-Increase trimmer value of selected effect
-.TP
-.B [x]
-Decrease audio volume (not functional)
-.TP
-.B [c]
-Increase audio volume (not functional)
-.TP
-.B [0]
-Capture frame to jpeg file
 .TP
 .B [PgUp]
 Increase parameter 0 of selected effect
@@ -518,34 +479,34 @@ Increase parameter 2 of selected effect
 .B [,]
 Decrease parameter 2 of selected effect
 .TP
-.B [QUOTE]
-Increase parameter 3 of selected effect
-.TP
-.B [SEMICOLON]
+.B [q]
 Decrease parameter 3 of selected effect
 .TP
-.B [q]
-Decrease parameter 4 of selected effect
-.TP
 .B [w]
-Increase parameter 4 of selected effect
+Increase parameter 3 of selected effect
 .TP
 .B [e]
-Decrease parameter 5 of selected effect
+Decrease parameter 4 of selected effect
 .TP
 .B [r]
-Increase parameter 5 of selected effect
+Increase parameter 4 of selected effect
 .TP
 .B [t]
-Decrease parameter 6 of selected effect
+Decrease parameter 5 of selected effect
 .TP
 .B [y]
-Increase parameter 6 of selected effect
+Increase parameter 5 of selected effect
 .TP
 .B [u]
-Decrease parameter 7 of selected effect
+Decrease parameter 6 of selected effect
 .TP
 .B [i]
+Increase parameter 6 of selected effect
+.TP
+.B [o]
+Decrease parameter 7 of selected effect
+.TP
+.B [p]
 Increase parameter 7 of selected effect
 .TP
 .B [SHIFT] + [Spacebar]
