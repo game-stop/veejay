@@ -4,9 +4,10 @@ veejay - a visual (video) instrument and video sampler for GNU/Linux
 .SH SYNOPSIS
 .B veejay [options] Videofile1 [Videofile2 ... VideofileN]
 .SH DESCRIPTION
-.B veejay
-Veejay is a visual instrument and realtime video sampler. It allows you
+.B Veejay
+is a visual instrument and realtime video sampler. It allows you
 to "play" the video like you would play a Piano.
+
 While playing, you can record the resulting video directly to disk (video sampling). Veejay keeps audio in sync and pitches when needed through trickplay (slow , faster, reverse, loop ) and delivered to JACK for possible further processing.
 
 Veejay can be operated live by using the keyboard (which is 100% user definable)
@@ -17,44 +18,48 @@ Veejay is beeing developed in the hope it will be usefull for VJ's , media artis
 theathers and other interested users that want to use Free Software for their
 performances and/or video installations.
 
-.TP
-.SH Supported video codecs/formats
 
 .TP
-MJPEG AVI / Quicktime (fourcc: mjpg,mjpb,mjpa,jfif)
-.TP
-Lossless JPEG AVI (fourcc: ljpg)
-.TP
-Quasar DV codec (NTSC/PAL) AVI / Quicktime (fourcc: dv,dvhd,dvp,dvcp)
-.TP
-YUV4MPEG (chroma 4:2:0 jpeg/mpeg2, chroma 4:2:2) AVI / Y4M
-.TP
-Motion PNG (fourcc: mpng, png)
-.TP
-RAW YUV 4:2:2 planar JPEG/JFIF (sample range 0-255,8 bit, 3 planes) (fourcc: vj22,vj20)
-.TP
-RAW YUV 4:2:2 planar  Rec. 601 (Y’CbCr) (sample range 16-235 Y, 16-240 UV, 8 bit, 3 planes)
-.TP
-MLZO (YUV 4:2:2 planar compressed with OberHumer's LZO real-time data compression library) (fourcc: mlzo)
-.TP
-FFmpeg RAW format
-.TP
 .SH Supported video containers
+.TP
 AVI , QuickTime, DVVideo
+.TP
+.SH Supported video codecs/formats
+* MJPEG AVI / Quicktime (fourcc: mjpg,mjpb,mjpa,jfif)
+
+* Lossless JPEG AVI (fourcc: ljpg)
+
+* Quasar DV codec (NTSC/PAL) AVI / Quicktime (fourcc: dv,dvhd,dvp,dvcp)
+
+* YUV4MPEG (chroma 4:2:0 jpeg/mpeg2, chroma 4:2:2) AVI / Y4M
+
+* Motion PNG (fourcc: mpng, png)
+
+* RAW YUV 4:2:2 planar JPEG/JFIF (sample range 0-255,8 bit, 3 planes) (fourcc: vj22,vj20)
+
+* RAW YUV 4:2:2 planar  Rec. 601 (Y’CbCr) (sample range 16-235 Y, 16-240 UV, 8 bit, 3 planes)
+
+* MLZO (YUV 4:2:2 planar compressed with OberHumer's LZO real-time data compression library) (fourcc: mlzo)
+
+* FFmpeg RAW format
 .TP
 .SH Audio
 .TP
-Veejay uses Jack , a low latency audio server, to transport (playback) audio in sync with video. This allows you to process veejay's audio output in another sound processing application.
+Veejay uses Jack, a low latency audio server, to transport (playback) audio in sync with video. This allows you to process veejay's audio output in another sound processing application.
 .TP
 .SH General Usage (How to work with veejay)
 .TP
-Veejay has a console- and a video window ; the console is used for displaying messages only. If the mouse is moved over to the video window, you can use the keyboard like a piano to play/manipulate the video.
+Veejay has a console and a video window.
+
+* The console is used for displaying messages only.
+
+* If the mouse is moved over to the video window, you can use the keyboard like a piano to play/manipulate the video.
 .TP
-You can start veejay with multiple files , video files and/or Mjpegtools' EditList files. Upon startup, veejay creates a new EditList in memory containing all the files you have loaded. As a result, all files will appear as a single large video file.Next you can start making selections (samples) of your EditList. These samples will be placed in so called 'sample banks' and they can be triggered for playback by pressing the F-keys (1 to 12). You can select a bank by pressing a number 1 to 9.
+You can start veejay with multiple files, video files and/or Mjpegtools' EditList files. Upon startup, veejay creates a new EditList in memory containing all the files you have loaded. As a result, all files will appear as a single large video file. Next you can start making selections (samples) of your EditList. These samples will be placed in so called 'sample banks' and they can be triggered for playback by pressing the F-keys (1 to 12). You can select a bank by pressing a number 1 to 9.
 .TP
-Note that if you change the EditList (for example , when deleting portions of your editlist) you should save your editlist as well as your samplelist.
+Note that if you change the EditList (for example, when deleting portions of your editlist) you should save your editlist as well as your samplelist.
 .TP
-You can select effects to put on your samples by pressing the cursor keys up and down, once you have found an effect you would like to use, press ENTER and it will be added to the current chain entry. The current chain entry can be changed with the PLUG and MINUS key on your numeric keyboard. Look at the KEYBINDS in this manual page to see what other possibilities you could have. 
+You can select effects to put on your samples by pressing the cursor keys up and down, once you have found an effect you would like to use, press ENTER and it will be added to the current chain entry. The current chain entry can be changed with the PLUS and MINUS key on your numeric keyboard. Look at the KEYBINDINGS in this manual page to see what other possibilities you could have. 
 .TP
 .SH Interactive camera/projection system
 .TP
@@ -65,48 +70,63 @@ You can use veejay to calibrate a camera (or another input source) against a pro
 Veejay can be used with PD (PureData) by using sendVIMS, a small commandline utility that translates PD's symbols to veejay and vice versa.Look at the REFERENCES to find out where to download this utility. Also, by using the OpenSoundControl veejay can be used with a great number of sound and video processing applications.Also veejay can record video data to the yuv4mpeg format (mjpegtools), or stream uncompressed video over the network (uni - and multicast)
 .SH OPTIONS
 .TP
-.B \-w/--output-width
+.B \-w/--output-width <num>
 Specify video output width
 .TP
-.B \-h/--output-height
+.B \-h/--output-height <num>
 Specify video output height
 .TP
 .B \-p/--port <num>
 TCP port offset for communication with clients like 'reloaded' , 'sayVIMS' or sendVIMS for PD (default 3490)
 .TP
-.B \-O/--output [012345]
-specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = Open GL (requires ARB fragment shader), 4 = YUV4MPEG, 5 = VLOOPBACK
-options 4 and 5 require --output-file 
+.B \-O/--output [0..6]
+Specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = Open GL (requires ARB fragment shader), 4 = Y4M Stream 4:2:0, 5 = VLOOPBACK, 6 = Y4M Stream 4:2:2
+(options 4, 5 and 6 require --output-file)
 .TP
-.B \-s/--size NxN
-Scaled video dimensions for SDL video output
+.B \-o/--output-file [file]
+Write to file (for use with -O/--output)
 .TP
-.B \-a/--audio [01]
+.B \-s/--size WxH
+Scaled video dimensions for SDL video output (Width x Height)
+.TP
+.B \-a/--audio [0-1]
 Play audio 0 = off , 1 = on (default)
+.TP
+.B \-r/--audiorate <num>
+Set audio rate (defaults to 48Khz)
 .TP
 .B \--pace-correction [ms]
 Set audio pace correction in milliseconds.
 .TP
-.B \-c/--synchronization [01]
+.B \-c/--synchronization [0-1]
 Sync correction off/on (default on)
 .TP
 .B \-P/--preverse-pathnames
 Do not 'canonicalise' pathnames in editlists
 .TP
 .B \-v/--verbose 
-verbosity on/off    
+Verbosity on/off (default off)
 .TP
-.B \-t/--timer [01]
-timer to use ( none, default timer )
+.B \-t/--timer [0-1]
+Timer to use 0=none, 1=default timer (default=1)
 .TP
 .B \-f/--fps <num>
-Override framerate of video. Disables audio when used. 
+Override framerate of video. Disables audio when used. (default: read from first loaded file)
 .TP
-.B \-x/--geometryx <num>
+.B \-x/--geometry-x <num>
 Geometry x offset for SDL video window
 .TP
-.B \-y/--geometryy <num>
+.B \-y/--geometry-y <num>
 Geometry y offset for SDL video window
+.TP
+.B \--no-keyboard
+Disable keyboard for SDL video window
+.TP
+.B \--no-mouse
+Disable mouse for SDL video window
+.TP
+.B \--show-cursor
+Show mouse cursor in SDL video window
 .TP
 .B \-F/--action-file <filename>
 Configuration File to load at initialization.
@@ -125,59 +145,51 @@ Bezerk mode, if enabled it allows you to change input channels on the fly (witho
 Load every file on the commandline as a new sample
 .TP
 .B \-q/--quit
-Quit at end of video 
+Quit at end of the file
 .TP
 .B \-n/--no-color
-Dont use colored text.
+Dont use colored text in console output
 .TP
 .B \-u/--dump-events
 Dump veejay's documentation to stdout
 .TP
-.B \-m/--memory [0-100]
+.B \-m/--memory [0..100]
 Frame cache size in percentage of total system RAM 
 .TP
-.B \-j/--max_cache [0-100]
+.B \-j/--max_cache [0..100]
 Maximum number of samples to cache
 .TP
 .B \-B/--features
 Show compiled in options
 .TP
-.B \-Y/--yuv [01]
-Use 0 for YUV 4:2:2 Rec 601 or 1 for YUV 4:2:2 JPEG/JFIF
+.B \-Y/--yuv [0-1]
+Force YCbCr (defaults to YUV). Use 0 for YUV 4:2:2 Rec 601 or 1 for YUV 4:2:2 JPEG/JFIF
 .TP
-.B \-e/--swap-range
-Overwrite pixel sample range from input source ( Rec. 601 or JPEG/JFIF )
+.B \-e/--swap-range [0..3]
+Swap YUV range [0..255] <-> [16..235] on videofiles (0 = YUV 4:2:0 Planar,
+1 = YUV 4:2:2 Planar (default),2 = YUV 4:2:0 Planar full range, 3 = YUV 4:2:2 Planar full range)
+.TP
+.B \-I/--deinterlace
+Deinterlace video if it is interlaced
 .TP
 .B \-d/--dummy
 Start veejay with no video files (dummy mode). By default it will play black video (Stream 1 [F1])
 .TP
-.B \-W/--width
-Specify width of dummy video.
+.B \-W/--width <num>
+Specify width of dummy video
 .TP
-.B \-H/--height
+.B \-H/--height <num>
 Specify height of dummy video
 .TP
-.B \-R/--framerate
-Specify framerate of dummy video
+.B \-N/--norm [0..2]
+Set video norm of dummy video [0=PAL, 1=NTSC, 2=SECAM (defaults to PAL)]
 .TP
-.B \-N [01]
-Specify norm of dummy video (0=PAL, 1=NTSC). defaults to PAL
-.TP
-.B \--multicast-osc <address>
+.B \-M/--multicast-osc <address>
 Starts OSC receiver in multicast mode
 .TP
 .B \-T/--multicast-vims <address>
 Setup additional multicast frame sender / command receiver.
 The frame sender transmits on port offset + 3, send commands to port offset + 4, 
-.TP
-.B \  /--map-from-file <num frames>
-To reduce transfers between memory and disk, you can set a number
-of frames to be cached in memory from file (only valid for rawDV and AVI)
-Use smaller values for better performance 
-.TP
-.B \-V/--viewport
-Start with source viewport enabled. Use this if you have previously setup
-a viewport. Use CTRL+v to enable the viewport setup.
 .TP
 .B \-A/--all
 Start with all capture devices active as streams
@@ -186,16 +198,22 @@ Start with all capture devices active as streams
 Load and instantiate all plugins of type generator and start playing <num>
 .TP
 .B \-D/--composite
-Do not start with projection enabled. 
+Do not start with camera/projection calibration viewport.
 .TP
 .B \--qrcode-connection-info
-Encode veejay server IP and port number in QR code image
+Encode veejay server IP and port number in QR code image (available if build with qrcode support)
 .TP
 .B \-S/--scene-detection <threshold>
-Create new samples based on scene detection threshold. 
+Create new samples based on scene detection threshold.
 .TP
 .B \-M/--dynamic-fx-chain
 Do not keep the fx chain buffers in RAM. Specify this option if you prefer dynamic allocation instead (slower, but no RAM is reserved)
+.TP
+.B \--split-screen
+Load split screen configuration
+.TP
+.B \--fx-custom-default-values
+Read FX custom default values from ~/.veejay/[livido,frei0r]
 .TP
 .B \--benchmark NxN
 Benchmark veejay's core functions (multi-thread vs single thread model) using a specific resolution NxN
@@ -288,9 +306,6 @@ You must put a TrueType font file in $HOME/.veejay/fonts for veejay's OSD functi
 .B .veejay/recovery
 If veejay stops unexpectedly, it will try to save your samplelist and editlist before aborting. Most of the time, veejay will be able to fully recover.
 .TP
-.B .veejay/theme 
-Theme directory for GVeejayReloaded. 
-.TP
 .B .veejay/plugins.cfg
 If you want to load frei0r or freeframe plugins , set the paths
 to the .so files in the plugins.cfg file. Only support for single
@@ -313,35 +328,11 @@ Maximum number of attempts before giving up on capture device
 .B VEEJAY_V4L2_NO_THREADING
 Do not start a seperate thread for capturing. Use '1' to disable threads.
 .TP
-.SH EXAMPLES
-.TP
-.B veejay -u |less
-Startup veejay and list all events (VIMS/OSC) and effect descriptions 
-.TP
-.B veejay -p 4000 ~/my_video1.avi
-Startup veejay listening on port 4000 (use this to use multiple veejays)
-.TP
-.B veejay -d -W 352 -H 288 -R 25 -N 0
-Startup veejay using dummy video at 25 frames per second, dimensions 352x288
-and using PAL.
-.TP
-.B veejay movie1.avi -V 224.0.0.50 -p 5000 -n -v
-Startup veejay, using multicast protocol on port 5000 , with autolooping
-and no colored verbose output
-.TP
-.B veejay --output 5 --output-file /dev/video1
-Startup veejay headless and write video output to a vloopback device
-.TP
-.B veejay --output 4 --output-file /tmp/video-yuv4mpeg.pipe
-Startup veejay headless and write yuv4mpeg video to a named fifo pipe
-.TP
 .SH INTERFACE COMMANDS (STDIN)
 When you are running veejay with a SDL window you can use keybindings for
 realtime interaction. See 
 .B KEYBINDINGS
 for details.
-.TP
-
 .SH KEYBINDINGS
 .TP
 .B [Keypad *]
@@ -567,22 +558,45 @@ Stop recording
 .TP
 .B [CTRL] + [f]
 Toggle fullscreen / windowed mode
+.SH EXAMPLES
+.TP
+.B veejay -u |less
+Startup veejay and list all events (VIMS/OSC) and effect descriptions
+.TP
+.B veejay -p 4000 ~/my_video1.avi
+Startup veejay listening on port 4000 (use this to use multiple veejays)
+.TP
+.B veejay -d -W 352 -H 288 -R 25 -N 0
+Startup veejay using dummy video at 25 frames per second, dimensions 352x288
+and using PAL.
+.TP
+.B veejay movie1.avi -V 224.0.0.50 -p 5000 -n -v
+Startup veejay, using multicast protocol on port 5000, with autolooping
+and no colored verbose output
+.TP
+.B veejay --output 5 --output-file /dev/video1
+Startup veejay headless and write video output to a vloopback device
+.TP
+.B veejay --output 4 --output-file /tmp/video-yuv4mpeg.pipe
+Startup veejay headless and write yuv4mpeg video to a named fifo pipe
 .TP
 .SH REFERENCES
 .TP
-http://veejay.sourceforge.net
-http://veejayhq.net
+.I http://veejayhq.net
 .TP
 .SH BUGS
-see https://github.com/c0ntrol/veejay/issues
+.TP
+See
+.I https://github.com/c0ntrol/veejay/issues
 .SH AUTHOR
 This man page was written by Niels Elburg.
+
 If you have questions, remarks or you just want to
 contact the developers, the main mailing list for this
 project is: 
 .I http://groups.google.com/group/veejay-discussion/post?hl=en
+
 For more info see the website at
 .I http://veejayhq.net
-.I http://veejay.dyne.org
 .SH "SEE ALSO"
 .B veejay sayVIMS reloaded
