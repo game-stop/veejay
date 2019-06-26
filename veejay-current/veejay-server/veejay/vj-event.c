@@ -83,6 +83,7 @@
 #endif
 
 #include <libplugger/plugload.h>
+#include <libvje/internal.h>
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -7395,7 +7396,6 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 #endif
 }
 
-#define VJ_IMAGE_EFFECT_MIN 100
 void vj_event_effect_inc(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
