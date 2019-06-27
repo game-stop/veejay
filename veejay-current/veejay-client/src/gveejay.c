@@ -66,6 +66,7 @@ static gboolean arg_version = FALSE;
 static gchar *arg_style = NULL;
 static gboolean arg_smallaspossible = FALSE;
 static gboolean arg_fasterui = FALSE;
+static gboolean arg_help = FALSE;
 
 static const char skinfile[] = "gveejay.reloaded.glade"; //FIXME Has binary ressource ?
 
@@ -89,7 +90,7 @@ static void usage(char *progname)
     printf( "-a\t\tAuto-connect to local running veejays.\n");
     printf( "-L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
     printf( "-t\t\tLoad user defined stylesheet from FILE or use 'default'");
-
+    printf( "-?\t\tYou are looking at it");
     printf( "\n\n");
 }
 
@@ -174,6 +175,11 @@ gint vj_gui_command_line (GApplication            *app,
     if (arg_verbose )
     {
         verbosity = 1;
+    }
+
+    if( arg_help ) {
+        usage(argv[0]);
+        return EXIT_FAILURE;
     }
 
     if ( arg_geometry )
@@ -309,6 +315,7 @@ int main(int argc, char **argv)
     {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
     {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE or \"default\"", NULL },
     {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI",NULL},
+    {"help",        '?', 0, G_OPTION_ARG_NONE, &arg_help, "You are looking at it", NULL },
 #if GTK_CHECK_VERSION(3,22,30)
     {"faster-ui",   'f', 0, G_OPTION_ARG_NONE, &arg_fasterui, "Hide FX parameter sliders instead of disabling to reduce CPU usage (GTK3 3.22.30)", NULL},
 #endif
