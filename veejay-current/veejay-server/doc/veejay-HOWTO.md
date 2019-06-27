@@ -645,7 +645,7 @@ unset (wiped) :
 083:0 97 3;
 ```
 Alternativly, you can bind keys to any action identifier.  
-The complete list can be viewd by typing `veejay -u |less` or with `reloaded` in `Menu/Preferences/VIMS Bundle`.
+The complete list can be viewed by typing `veejay -u |less` or with `reloaded` in `Menu/Preferences/VIMS Bundle`.
 
 ```
 083:20 97 0 4;
