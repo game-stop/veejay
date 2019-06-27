@@ -2191,10 +2191,10 @@ void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 	if(filename)
 	{
 		multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
-		g_free( filename );
 		info->uc.reload_hint[HINT_BUNDLES] = 1;
 		vj_msg(VEEJAY_MSG_INFO ,"Tried to load '%s'",filename);
-	}
+	    g_free(filename);
+    }
 }
 
 static	void	load_server_files(char *buf, int len)
@@ -2635,8 +2635,8 @@ void on_vims_bundles_activate (GtkMenuItem     *menuitem,
 {
     GtkWidget *vims_bundles_window = glade_xml_get_widget_(info->main_window, "vims_bundles");
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
-    gtk_window_set_transient_for (GTK_WINDOW(vims_bundles_window),GTK_WINDOW (mainw));
-    gtk_window_set_keep_above( GTK_WINDOW(vims_bundles_window), TRUE );
+//    gtk_window_set_transient_for (GTK_WINDOW(vims_bundles_window),GTK_WINDOW (mainw));
+ //   gtk_window_set_keep_above( GTK_WINDOW(vims_bundles_window), TRUE );
 
     gtk_window_present(GTK_WINDOW(vims_bundles_window));
 }
