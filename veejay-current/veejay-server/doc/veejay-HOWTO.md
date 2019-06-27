@@ -580,7 +580,7 @@ You can dynamically assign keybindings to trigger a bundle in reloaded ( Menu ->
 
 There is an example Action File that a number of bundles with keybindings:
 ```
-$ veejay -v /path/to/video.avi -F test/livecinema/action-file.xml
+$ veejay -g /path/to/video.avi -F test/livecinema/action-file.xml
 ```
 
 The bundles can be triggered by the keys SHIFT + [ q,w,e,r,t,y,u,i,o,p,a,s,d,f,g,h,j,k,l,z,x,c,v,b,n,m ]

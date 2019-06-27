@@ -83,6 +83,7 @@
 #endif
 
 #include <libplugger/plugload.h>
+#include <libvje/internal.h>
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -4014,7 +4015,7 @@ void vj_event_mixing_sample_set_dup(void *ptr, const char format[], va_list ap)
 		if(type == 0) {
 			int sample_id = sample_get_chain_channel( v->uc->sample_id, entry );
 			sample_set_framedup( sample_id, args[0] );
-			veejay_msg(VEEJAY_MSG_INFO, "Changed speed of mixing sample %d to %d on entry %d",sample_id,args[0], entry);
+			veejay_msg(VEEJAY_MSG_INFO, "Changed frame duplication of mixing sample %d to %d on entry %d",sample_id,args[0], entry);
 		}
 	}
 	if(STREAM_PLAYING(v)) {
@@ -4023,7 +4024,7 @@ void vj_event_mixing_sample_set_dup(void *ptr, const char format[], va_list ap)
 		if( type == 0 ) {
 			int sample_id = vj_tag_get_chain_channel( v->uc->sample_id, entry );
 			sample_set_framedup( sample_id, args[0] );
-			veejay_msg(VEEJAY_MSG_INFO, "Changed speed of mixing sample %d to %d on entry %d",sample_id,args[0], entry);
+			veejay_msg(VEEJAY_MSG_INFO, "Changed frame duplication of mixing sample %d to %d on entry %d",sample_id,args[0], entry);
 		}
 	}
 }
@@ -4464,9 +4465,10 @@ void vj_event_chain_enable(void *ptr, const char format[], va_list ap)
         if(STREAM_PLAYING(v))
         {
             vj_tag_set_effect_status(v->uc->sample_id, 1);
-        }   
-        else
+        } else {
             p_invalid_mode();
+            return;
+        }
     }
     veejay_msg(VEEJAY_MSG_INFO, "Enabled effect chain");
 }
@@ -4644,7 +4646,7 @@ void vj_event_sample_chain_disable(void *ptr, const char format[], va_list ap)
     if(SAMPLE_PLAYING(v) && sample_exists(args[0]))
     {
         sample_set_effect_status(args[0], 0);
-        veejay_msg(VEEJAY_MSG_INFO, "Effect chain on stream %d is disabled",args[0]);
+        veejay_msg(VEEJAY_MSG_INFO, "Effect chain on sample %d is disabled",args[0]);
     }
     if(STREAM_PLAYING(v) && vj_tag_exists(args[0]))
     {
@@ -4697,11 +4699,11 @@ void vj_event_chain_entry_video_toggle(void *ptr, const char format[], va_list a
         if(sample_exists(args[0]))
         {
             if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
-
-            if(sample_set_chain_status(args[0],args[1],!sample_get_chain_status(args[0],args[1]))!=-1)
+            int status = !sample_get_chain_status(args[0],args[1]);
+            if(sample_set_chain_status(args[0],args[1], status)!=-1)
             {
-                veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
-                    vj_tag_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled" );
+                veejay_msg(VEEJAY_MSG_INFO, "Sample %d: Video on chain entry %d is %s",args[0],args[1],
+                    status == 1 ? "Enabled" : "Disabled" );
             }
         }
         else
@@ -4714,10 +4716,11 @@ void vj_event_chain_entry_video_toggle(void *ptr, const char format[], va_list a
         if(vj_tag_exists(args[0]))
         {
             if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
-            if(vj_tag_set_chain_status(args[0],args[1],!vj_tag_get_chain_status(args[0],args[1]))!=-1)
+            int status = !vj_tag_get_chain_status(args[0],args[1]);
+            if(vj_tag_set_chain_status(args[0],args[1],status)!=-1)
             {
                 veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Video on chain entry %d is %s",args[0],args[1],
-                    vj_tag_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled" );
+                    status == 1 ? "Enabled" : "Disabled" );
             }
         }
         else
@@ -7393,7 +7396,6 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 #endif
 }
 
-#define VJ_IMAGE_EFFECT_MIN 100
 void vj_event_effect_inc(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;

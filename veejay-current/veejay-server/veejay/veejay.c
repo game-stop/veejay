@@ -332,7 +332,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -S/--scene-detection <num>\tCreate new samples based on scene detection threshold <num>\n");
 	fprintf(stderr,
-		"  -M/--dynamic-fx-chain\t\tDo not keep FX chain buffers in RAM (default off)\n");
+		"  -X/--dynamic-fx-chain\t\tDo not keep FX chain buffers in RAM (default off)\n");
 	fprintf(stderr,
 		"    /--split-screen\t\tLoad split screen configuration\n");
     fprintf(stderr,
@@ -393,7 +393,7 @@ static int set_option(const char *name, char *value)
 		info->settings->use_vims_mcast = 1;
 		info->settings->vims_group_name = strdup(optarg);
 	}
-	else if (strcmp(name, "multicast-osc") == 0 )
+	else if (strcmp(name, "multicast-osc") == 0  || strcmp(name,"M")==0)
 	{
 		check_val(optarg,name);
 		info->settings->use_mcast = 1;
@@ -467,13 +467,13 @@ static int set_option(const char *name, char *value)
 		nerr++;
 	}
      }
-#ifdef HAVE_XINERAMA
-#ifndef X_DISPLAY_MISSING
-    else if (strcmp(name, "xinerama") == 0 || strcmp(name, "X") == 0 ) {
-	x11_user_select( atoi(optarg) );
-    }
-#endif
-#endif
+//~ #ifdef HAVE_XINERAMA
+//~ #ifndef X_DISPLAY_MISSING
+    //~ else if (strcmp(name, "xinerama") == 0 || strcmp(name, "X") == 0 ) {
+	//~ x11_user_select( atoi(optarg) );
+    //~ }
+//~ #endif
+//~ #endif
     else if (strcmp(name, "action-file")==0 || strcmp(name,"F")==0) {
 	check_val(optarg,name);
 	veejay_strncpy(info->action_file[0],(char*) optarg, strlen( (char*) optarg));
@@ -559,7 +559,7 @@ static int set_option(const char *name, char *value)
 	{
 		info->dummy->active = 1; // enable DUMMY MODE
 	}
-    else if (strcmp(name, "dynamic-fx-chain" ) == 0 || strcmp(name, "M" ) == 0 )
+    else if (strcmp(name, "dynamic-fx-chain" ) == 0 || strcmp(name, "X" ) == 0 )
 	{
 		info->uc->ram_chain = 0;
 	}
@@ -655,12 +655,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeMS:X:",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeM:S:X",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeMS:X:"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeM:S:X"
 						   )) != EOF)
 #endif
     {
