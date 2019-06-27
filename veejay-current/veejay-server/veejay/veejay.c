@@ -683,8 +683,10 @@ static int check_command_line_options(int argc, char *argv[])
     if (optind > argc)
 	nerr++;
 
-    if (nerr)
-	Usage(argv[0]);
+    if (nerr) {
+        Usage(argv[0]);
+        return 0;
+    }
 
     if(!info->dump)
 	{
