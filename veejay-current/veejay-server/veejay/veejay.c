@@ -338,6 +338,7 @@ static void Usage(char *progname)
     fprintf(stderr,
         "    /--fx-custom-default-values Read FX custom default values from ~/.veejay/[livido,frei0r]\n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
+    fprintf(stderr,"  -?/--help \t\t\tYou are looking at it\n");
 	fprintf(stderr,"\n\n");
 }
 
@@ -571,9 +572,13 @@ static int set_option(const char *name, char *value)
     {
         info->read_plug_cfg = 1;
     }
-    else
+    else if (strcmp(name, "help" ) == 0 || strcmp(name, "?") == 0 ) 
+    {
+        nerr++;
+    }
+    else {
 		nerr++;			/* unknown option - error */
-
+    }
     return nerr;
 }
 
@@ -642,6 +647,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"pace-correction",1,0,0},
 	{"split-screen",0,0,0},
     {"fx-custom-default-values",0,0,0},
+    {"help",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -655,12 +661,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeM:S:X",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeM:S:X?",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeM:S:X"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:T:F:Z:nILPVDugvBdibjqeM:S:X?"
 						   )) != EOF)
 #endif
     {
