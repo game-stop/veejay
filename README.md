@@ -217,7 +217,7 @@ see also : [HOWTO plugins](./veejay-current/veejay-server/doc/HOWTO.plugins.md),
  * Preview rendering
  * Image grabbing
 
-see also : [How to Network](./veejay-current/veejay-server/doc/NET.txt)
+see also : [README Network](./veejay-current/veejay-server/doc/README.network.md)
 
 ### Interaction
 
