@@ -85,14 +85,22 @@ static void squares_apply_max( VJFrame *frame, int radius)
     for( y = 0; y < h; y += radius ) {
         for( x = 0; x < w; x += radius ) {
             val = 0;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     if( Y[ y1 * w + x1 ] > val )
                         val = Y[ y1 * w + x1 ];
                 }
             }
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     Y[y1 * w + x1] = val;
                 }
             }
@@ -103,16 +111,24 @@ static void squares_apply_max( VJFrame *frame, int radius)
         for( x = 0; x < w; x += radius ) {
             sum = 0;
             uint32_t hit = 0;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     sum += U[ y1 * w + x1 ]-128; 
                     hit ++;
                 }
             }
             v = 1.0 / (double) hit;
             val = (sum * v);
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     U[y1 * w + x1] = 128 + val;
                 }
             }
@@ -123,16 +139,25 @@ static void squares_apply_max( VJFrame *frame, int radius)
         for( x = 0; x < w; x += radius ) {
             sum = 0;
             uint32_t hit = 0;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
+
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     sum += (V[ y1 * w + x1 ]-128); 
                     hit ++;
                 }
             }
             v = 1.0 / (double) hit;
             val = (sum * v);
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     V[y1 * w + x1] = 128 + val;
                 }
             }
@@ -156,15 +181,22 @@ static void squares_apply_min( VJFrame *frame, int radius)
 
     for( y = 0; y < h; y += radius ) {
         for( x = 0; x < w; x += radius ) {
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
             val = 0xff;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     if(Y[ y1 * w + x1 ] < val)
                         val = Y[ y1 * w + x1];
                 }
             }
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     Y[y1 * w + x1] = val;
                 }
             }
@@ -173,18 +205,26 @@ static void squares_apply_min( VJFrame *frame, int radius)
     
     for( y = 0; y < h; y += radius ) {
         for( x = 0; x < w; x += radius ) {
+
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
             sum = 0;
             uint32_t hit = 0;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     sum += U[ y1 * w + x1 ]-128; 
                     hit ++;
                 }
             }
             v = 1.0 / (double) hit;
             val = (sum * v);
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     U[y1 * w + x1] = 128 + val;
                 }
             }
@@ -193,18 +233,26 @@ static void squares_apply_min( VJFrame *frame, int radius)
 
     for( y = 0; y < h; y += radius ) {
         for( x = 0; x < w; x += radius ) {
+
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
             sum = 0;
             uint32_t hit = 0;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     sum += (V[ y1 * w + x1 ]-128); 
                     hit ++;
                 }
             }
             v = 1.0 / (double) hit;
             val = (sum * v);
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     V[y1 * w + x1] = 128 + val;
                 }
             }
@@ -228,18 +276,26 @@ static void squares_apply_average( VJFrame *frame, int radius)
   
     for( y = 0; y < h; y += radius ) {
         for( x = 0; x < w; x += radius ) {
+
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
             sum = 0;
             uint32_t hit = 0;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     sum += Y[ y1 * w + x1 ]; 
                     hit ++;
                 }
             }
             v = 1.0 / (double) hit;
             val = (sum * v);
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     Y[y1 * w + x1] = val;
                 }
             }
@@ -248,18 +304,26 @@ static void squares_apply_average( VJFrame *frame, int radius)
 
     for( y = 0; y < h; y += radius ) {
         for( x = 0; x < w; x += radius ) {
+
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
             sum = 0;
             uint32_t hit = 0;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     sum += U[ y1 * w + x1 ]-128; 
                     hit ++;
                 }
             }
             v = 1.0 / (double) hit;
             val = (sum * v);
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     U[y1 * w + x1] = 128 + val;
                 }
             }
@@ -268,18 +332,26 @@ static void squares_apply_average( VJFrame *frame, int radius)
 
     for( y = 0; y < h; y += radius ) {
         for( x = 0; x < w; x += radius ) {
+
+            int lim_x = (x + radius);
+            if( lim_x > w )
+                lim_x = w;
+            int lim_y = (y + radius);
+            if( lim_y > h)
+                lim_y = h;
+
             sum = 0;
             uint32_t hit = 0;
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     sum += (V[ y1 * w + x1 ]-128); 
                     hit ++;
                 }
             }
             v = 1.0 / (double) hit;
             val = (sum * v);
-            for( y1 = y; y1 < (y + radius) && y1 < h; y1 ++ ) {
-                for( x1 = x; x1 < (x + radius) && x1 < w; x1 ++ ) {
+            for( y1 = y; y1 < lim_y; y1 ++ ) {
+                for( x1 = x; x1 < lim_x; x1 ++ ) {
                     V[y1 * w + x1] = 128 + val;
                 }
             }
