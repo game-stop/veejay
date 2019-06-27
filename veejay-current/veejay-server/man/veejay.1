@@ -570,19 +570,26 @@ Startup veejay and list all events (VIMS/OSC) and effect descriptions
 .B veejay -p 4000 ~/my_video1.avi
 Startup veejay listening on port 4000 (use this to use multiple veejays)
 .TP
-.B veejay -d -W 352 -H 288 -R 25 -N 0
-Startup veejay using dummy video at 25 frames per second, dimensions 352x288
-and using PAL.
+.B veejay -d -W 352 -H 288 -N 0 -a 0
+Startup veejay using dummy video, dimensions 352x288, using PAL and no audio.
 .TP
-.B veejay movie1.avi -V 224.0.0.50 -p 5000 -n -v
-Startup veejay, using multicast protocol on port 5000, with autolooping
-and no colored verbose output
+.B veejay movie1.avi -M 224.0.0.50 -p 5000 -n -v
+Startup veejay, using osc multicast protocol on port 5000 and no colored but verbose output
 .TP
-.B veejay --output 5 --output-file /dev/video1
-Startup veejay headless and write video output to a vloopback device
+.B veejay -g movie1.avi movie2.avi movie3.avi --output 5 --output-file /dev/video1
+Startup veejay headless and use given clip as sample, the video output is writen
+to /dev/video1 (a video loopback device)
+
+You will need something like v4l2looback kernel module to setup the video loopback.
+
+Only the video channel is writen to the loopback device! audio, if any, still goes to jack
 .TP
-.B veejay --output 4 --output-file /tmp/video-yuv4mpeg.pipe
-Startup veejay headless and write yuv4mpeg video to a named fifo pipe
+.B veejay movie1.avi --output 4 --output-file /tmp/video-yuv4mpeg.pipe
+Startup veejay headless and write yuv4mpeg video to a named fifo pipe.
+
+Only video channel goes to the pipe! the audio still goes to jack
+
+Dues how pipe works, audio and video could lost synchro
 .TP
 .SH REFERENCES
 .TP
