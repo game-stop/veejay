@@ -211,7 +211,7 @@ void	vj_midi_load(void *vv, const char *filename)
 						if(cur->msg) free(cur->msg);
 						free(cur);
 					}
-					int error = vevo_property_set( v->vims, key, 1, VEVO_ATOM_TYPE_VOIDPTR, &d);
+					int error = vevo_property_set( v->vims, key, VEVO_ATOM_TYPE_VOIDPTR,1, &d);
 					if( error == VEVO_NO_ERROR )
 						count ++;
 #ifdef STRICT_CHECKING
@@ -304,7 +304,7 @@ void	vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra )
 		if( cur->msg ) free(cur->msg);
 		free(cur);
 	}
-	int error = vevo_property_set( v->vims, key, 1, VEVO_ATOM_TYPE_VOIDPTR, &d );
+	int error = vevo_property_set( v->vims, key, VEVO_ATOM_TYPE_VOIDPTR,1, &d );
 	if( error != VEVO_NO_ERROR )
 		return;
 	vj_msg( VEEJAY_MSG_INFO, 
