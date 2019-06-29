@@ -1063,6 +1063,20 @@ vevo_property_set(vevo_port_t * p,
 		    const char *key,
 		    int atom_type, int num_elements, void *src)
 {
+#ifdef STRICT_CHECKING
+    assert(
+            atom_type == VEVO_ATOM_TYPE_FUNCPTR ||
+            atom_type == VEVO_ATOM_TYPE_VOIDPTR ||
+            atom_type == VEVO_ATOM_TYPE_INT ||
+            atom_type == VEVO_ATOM_TYPE_DOUBLE ||
+            atom_type == VEVO_ATOM_TYPE_STRING ||
+            atom_type == VEVO_ATOM_TYPE_UTF8STRING ||
+            atom_type == VEVO_ATOM_TYPE_BOOL ||
+            atom_type == VEVO_ATOM_TYPE_PORTPTR ||
+            atom_type == VEVO_ATOM_TYPE_HIDDEN ||
+            atom_type == VEVO_ATOM_TYPE_UINT64
+        );
+#endif
     __vevo_port_t *port = (__vevo_port_t *) p;
     ukey_t hash_key = hash_key_code(key);
     int new = 1;
@@ -1110,7 +1124,7 @@ vevo_property_set(vevo_port_t * p,
     }
 
 #ifdef VVERBOSE
-	veejay_msg(VEEJAY_MSG_INFO, "Port %p <- set property %s", port, key );
+	veejay_msg(VEEJAY_MSG_INFO, "Port %p <- set property %s %p", port, key, src );
 #endif
 
     return VEVO_NO_ERROR;
