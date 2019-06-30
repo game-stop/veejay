@@ -396,6 +396,7 @@ void vje_load_mask(uint8_t val);
 void vje_mmx_negate_frame(uint8_t *dst, uint8_t *in, uint8_t val, int len );
 void vje_mmx_negate( uint8_t *dst, uint8_t *in );
 #endif
+void vje_build_value_hint_list_array( vj_value_hint_t **hints, int limit, int num, char **arr );
 void vje_build_value_hint_list( vj_value_hint_t **hints, int num, int limit, ... );
 vj_value_hint_t **vje_init_value_hint_list(int n_params);
 #endif

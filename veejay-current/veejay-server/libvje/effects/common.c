@@ -67,6 +67,19 @@ void vje_build_value_hint_list( vj_value_hint_t **hints, int limit, int num, ...
 	va_end(args);
 }
 
+void vje_build_value_hint_list_array( vj_value_hint_t **hints, int limit, int num, char **arr )
+{
+	vj_value_hint_t *hint = hints[num];
+	hint->description = (char**) vj_calloc(sizeof(char*) * (limit+1) );
+
+	int i;
+	for( i = 0; i <= limit; i ++ ) {
+		hint->description[i] = strdup( arr[i] );
+	}
+	hint->limit = limit;
+}
+
+
 vj_value_hint_t **vje_init_value_hint_list(int n_params)
 {
 	vj_value_hint_t **hints = (vj_value_hint_t**) vj_calloc(sizeof(vj_value_hint_t**) * n_params );
