@@ -9268,6 +9268,10 @@ void free_samplebank(void)
    }
 }
 
+static int dont_grow = 0;
+static int bank_img_w = 0;
+static int bank_img_h = 0;
+
 // approximate best image size for sample slot
 void setup_samplebank(gint num_cols, gint num_rows, GtkAllocation *allocation, int *idx, int *idy)
 {
@@ -9281,10 +9285,10 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkAllocation *allocation, i
 
     gint image_height = bank_hei / num_rows;
     gint image_width = bank_wid / num_cols;
-  
+   
     float ratio = (float) info->el.height / (float) info->el.width;
-
     float w,h;
+   
     if( ratio <= 1.0f ) {
         h = ratio * image_width;
         w = image_width;
@@ -9305,9 +9309,17 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkAllocation *allocation, i
         w = image_width;
     }
 
-
-    *idx = (int)w;
-    *idy = (int)h;
+    if(dont_grow == 0) {
+        bank_img_w = (int) w;
+        bank_img_h = (int) h;
+        *idx = bank_img_w;
+        *idy = bank_img_h;
+        dont_grow = 1;
+    }
+    else {
+        *idx = (int) bank_img_w;
+        *idy = (int) bank_img_h;
+    }
 }
 
 /* --------------------------------------------------------------------------------------------------------------------------
