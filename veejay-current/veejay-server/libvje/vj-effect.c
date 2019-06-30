@@ -134,6 +134,7 @@ static struct
 {   squares_malloc, squares_free, NULL, VJ_IMAGE_EFFECT_SQUARES },
 {   halftone_malloc, halftone_free, NULL, VJ_IMAGE_EFFECT_HALFTONE },
 {   dotillism_malloc, dotillism_free, NULL, VJ_IMAGE_EFFECT_DOTILLISM },
+{   pencilsketch2_malloc, pencilsketch2_free, NULL, VJ_IMAGE_EFFECT_PENCILSKETCH2 },
 {	NULL,NULL,NULL,0},
 };
 
@@ -570,6 +571,7 @@ void vj_effect_initialize(int width, int height, int full_range, int custom_cfg)
     vj_effects[VJ_IMAGE_EFFECT_SQUARES]             = squares_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_HALFTONE]            = halftone_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_DOTILLISM]           = dotillism_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_PENCILSKETCH2]       = pencilsketch2_init(width,height);
 	max_width = width;
 	max_height = height;
 

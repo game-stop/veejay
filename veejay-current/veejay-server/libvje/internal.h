@@ -193,6 +193,7 @@
 #include "./effects/squares.h"
 #include "./effects/halftone.h"
 #include "./effects/dotillism.h"
+#include "./effects/pencilsketch2.h"
 #include "./transitions/3bar.h"
 #include "./transitions/fadecolor.h"
 #include "./transitions/fadecolorrgb.h"
@@ -204,7 +205,7 @@
 #include "./transitions/vbar.h"
 #include "./transitions/wipe.h"
 
-#define VJ_IMAGE_EFFECT_MIN 82
+#define VJ_IMAGE_EFFECT_MIN 81
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -442,6 +443,7 @@ enum {
     VJ_IMAGE_EFFECT_SQUARES = 84,
     VJ_IMAGE_EFFECT_HALFTONE = 83,
     VJ_IMAGE_EFFECT_DOTILLISM = 82,
+    VJ_IMAGE_EFFECT_PENCILSKETCH2 = 81,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
