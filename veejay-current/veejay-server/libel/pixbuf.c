@@ -252,6 +252,13 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 		case PIX_FMT_YUVJ422P:
 			ulen = len / 2;
 			break;
+        case PIX_FMT_YUV444P:
+        case PIX_FMT_YUVJ444P:
+            ulen = len;
+            break;
+        case PIX_FMT_GRAY8:
+            ulen = 0;
+            break;
 		default:
 			break;
 	}
