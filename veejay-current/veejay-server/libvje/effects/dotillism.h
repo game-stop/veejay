@@ -18,10 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef SQUARES_H
-#define SQUARES_H
-vj_effect *squares_init(int w, int h);
-void squares_apply( VJFrame *frame, int radius, int mode, int off1, int off2);
-int squares_malloc(int w, int h);
-void squares_free();
+#ifndef DOTILLISM_H
+#define DOTILLISM_H
+vj_effect *dotillism_init(int w, int h);
+void dotillism_apply( VJFrame *frame, int radius, int levels, int space1, int space2, int invert);
+int dotillism_malloc(int w, int h);
+void dotillism_free();
 #endif
