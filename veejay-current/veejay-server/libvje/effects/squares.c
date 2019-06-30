@@ -32,7 +32,7 @@
 vj_effect *squares_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 4;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -41,14 +41,20 @@ vj_effect *squares_init(int w, int h)
     ve->limits[1][0] = ( w > h ? w / 2 : h / 2 );
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 2;
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = w/2;
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = h/2;
     ve->defaults[0] = ( w > h ? w / 64 : h / 64 );
     ve->defaults[1] = 0;
+    ve->defaults[2] = 0;
+    ve->defaults[3] = 0;
     ve->description = "Squares";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->parallel = 0;
 	ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Radius", "Mode" );
+    ve->param_description = vje_build_param_list( ve->num_params, "Radius", "Mode", "Offset X", "Offset Y" );
 
     ve->hints = vje_init_value_hint_list( ve->num_params );
 
@@ -67,7 +73,7 @@ void squares_free()
 {
 }
 
-static void squares_apply_max( VJFrame *frame, int radius)
+static void squares_apply_max( VJFrame *frame, int radius, int off_x, int off_y)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -82,8 +88,8 @@ static void squares_apply_max( VJFrame *frame, int radius)
 
     double v = 0;
 
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
             val = 0;
 
             int lim_x = (x + radius);
@@ -107,8 +113,8 @@ static void squares_apply_max( VJFrame *frame, int radius)
         }
     }
     
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
             sum = 0;
             uint32_t hit = 0;
 
@@ -135,8 +141,8 @@ static void squares_apply_max( VJFrame *frame, int radius)
         }
     }
 
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
             sum = 0;
             uint32_t hit = 0;
 
@@ -165,7 +171,7 @@ static void squares_apply_max( VJFrame *frame, int radius)
     }
 }
 
-static void squares_apply_min( VJFrame *frame, int radius)
+static void squares_apply_min( VJFrame *frame, int radius, int off_x, int off_y)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -179,8 +185,8 @@ static void squares_apply_min( VJFrame *frame, int radius)
     uint8_t  val = 0;
     double v = 0;
 
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
             int lim_x = (x + radius);
             if( lim_x > w )
                 lim_x = w;
@@ -203,8 +209,8 @@ static void squares_apply_min( VJFrame *frame, int radius)
         }
     }
     
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
 
             int lim_x = (x + radius);
             if( lim_x > w )
@@ -231,8 +237,8 @@ static void squares_apply_min( VJFrame *frame, int radius)
         }
     }
 
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
 
             int lim_x = (x + radius);
             if( lim_x > w )
@@ -261,7 +267,7 @@ static void squares_apply_min( VJFrame *frame, int radius)
 
 }
 
-static void squares_apply_average( VJFrame *frame, int radius)
+static void squares_apply_average( VJFrame *frame, int radius, int off_x, int off_y)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -274,8 +280,8 @@ static void squares_apply_average( VJFrame *frame, int radius)
     uint8_t val = 0;
     double v = 0;
   
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
 
             int lim_x = (x + radius);
             if( lim_x > w )
@@ -302,8 +308,8 @@ static void squares_apply_average( VJFrame *frame, int radius)
         }
     }
 
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
 
             int lim_x = (x + radius);
             if( lim_x > w )
@@ -330,8 +336,8 @@ static void squares_apply_average( VJFrame *frame, int radius)
         }
     }
 
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    for( y = off_y; y < (h-off_y); y += radius ) {
+        for( x = off_x; x < (w-off_x); x += radius ) {
 
             int lim_x = (x + radius);
             if( lim_x > w )
@@ -360,17 +366,17 @@ static void squares_apply_average( VJFrame *frame, int radius)
 
 }
 
-void squares_apply( VJFrame *frame, int radius, int mode)
+void squares_apply( VJFrame *frame, int radius, int mode, int offset_x, int offset_y)
 {
     switch(mode) {
         case 0:
-            squares_apply_average( frame, radius );
+            squares_apply_average( frame, radius, offset_x, offset_y );
             break;
         case 1:
-            squares_apply_min( frame, radius );
+            squares_apply_min( frame, radius, offset_x, offset_y );
             break;
         case 2:
-            squares_apply_max( frame, radius );
+            squares_apply_max( frame, radius, offset_x, offset_y );
             break;
     }
 
