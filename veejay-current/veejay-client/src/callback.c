@@ -4636,12 +4636,18 @@ void    on_macro_bank_select_value_changed( GtkWidget *w, gpointer data)
 
 void	on_midilearn_toggled( GtkWidget *w, gpointer data )
 {
-	vj_midi_learn( info->midi);
+    vj_midi_learn(info->midi,
+                  gtk_check_menu_item_get_active( GTK_CHECK_MENU_ITEM(w) )
+                 );
 }
 
 void	on_midievent_toggled( GtkWidget *w, gpointer data )
 {
-	vj_midi_play( info->midi );
+    int midi_play = gtk_check_menu_item_get_active( GTK_CHECK_MENU_ITEM(w));
+    GtkWidget *midi_learn = glade_xml_get_widget_( info->main_window, "midi_learn");
+    gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(midi_learn), FALSE);
+    gtk_widget_set_sensitive( midi_learn, !midi_play );
+    vj_midi_play( info->midi, midi_play);
 }
 
 void	on_load_midi_layout_activate( GtkWidget *w , gpointer data )

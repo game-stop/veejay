@@ -57,18 +57,24 @@ typedef struct
 } dvims_t;
 
 
-void	vj_midi_learn( void *vv )
+void	vj_midi_learn( void *vv , int start)
 {
-	vmidi_t *v = (vmidi_t*) vv;
-	if(!v->active) return;
-	v->learn = 1;
-	vj_msg(VEEJAY_MSG_INFO, "Learning MIDI commands. Touch a midi key and then click a widget");
+    vmidi_t *v = (vmidi_t*) vv;
+    if(!v->active) return;
+    if (!start) {
+        v->learn = 0;
+        int a = vj_midi_events(vv);
+        vj_msg(VEEJAY_MSG_INFO, "End learning MIDI, %d events registered.", a);
+        return;
+    }
+    v->learn = 1;
+    vj_msg(VEEJAY_MSG_INFO, "Learning MIDI commands. Touch a midi key and then click a widget");
 }
 
-void	vj_midi_play(void *vv )
+void	vj_midi_play(void *vv , int play)
 {
 	vmidi_t *v = (vmidi_t*) vv;
-        if(!v->active) return;
+    if(!v->active) return;
 
 	v->learn = 0;
 	int a = vj_midi_events(vv);

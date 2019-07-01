@@ -20,8 +20,8 @@
 #ifdef HAVE_ALSA
 void    *vj_midi_new(void *mw);
 int    vj_midi_handle_events(void *vv);
-void    vj_midi_play(void *vv );
-void    vj_midi_learn( void *vv );
+void    vj_midi_play(void *vv , int play);
+void    vj_midi_learn( void *vv , int start);
 void    vj_midi_load(void *vv, const char *filename);
 void    vj_midi_save(void *vv, const char *filename);
 void	vj_midi_reset( void *vv );
