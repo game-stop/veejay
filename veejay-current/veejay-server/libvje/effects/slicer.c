@@ -132,7 +132,7 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int val1, int val2,int shatt
 		srand( val1 * val2 * shatter );
 	}
 	else {
-		srand( val1 * val2 * shatter * frame->timecode );
+		srand( val1 * val2 * shatter * (int)( frame->timecode * 1000 ) );
 	}
 			
 	if( period != last_period ) {

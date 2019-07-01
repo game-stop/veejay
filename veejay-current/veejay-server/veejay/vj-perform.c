@@ -3618,7 +3618,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
     info->effect_frame_info->timecode = settings->current_frame_num;
     info->effect_frame1->ssm = 0;
     info->effect_frame2->ssm = 0;
-    info->effect_frame1->timecode = (double) settings->current_frame_num;
+    info->effect_frame1->timecode = settings->current_frame_num /  (double) (settings->max_frame_num - settings->min_frame_num);
 
     for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
         frame_buffer[i]->ssm = -1;
