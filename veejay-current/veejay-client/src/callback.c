@@ -548,7 +548,7 @@ void	on_button_el_pasteat_clicked(GtkWidget *w, gpointer *user_data)
 }
 void	on_button_el_save_clicked(GtkWidget *w, gpointer *user_data)
 {
-	gchar *filename = dialog_save_file( "Save EditList" );
+	gchar *filename = dialog_save_file( "Save EditList", "veejay-editlist.edl");
 	if(filename)
 	{
 		multi_vims( VIMS_EDITLIST_SAVE, "%s %d %d",
@@ -559,7 +559,7 @@ void	on_button_el_save_clicked(GtkWidget *w, gpointer *user_data)
 }
 void	on_button_el_savesel_clicked(GtkWidget *w, gpointer *user_data)
 {
-	gchar *filename = dialog_save_file( "Save EditList Selection" );
+	gchar *filename = dialog_save_file( "Save EditList Selection", "veejay-editlist.edl");
 	if(filename)
 	{
 		gint start = get_nums( "button_el_selstart" );
@@ -573,7 +573,7 @@ void	on_button_el_savesel_clicked(GtkWidget *w, gpointer *user_data)
 
 void	on_button_el_add_clicked(GtkWidget *w, gpointer *user_data)
 {
-	gchar *filename = dialog_open_file( "Append videofile to EditList",0 );
+	gchar *filename = dialog_open_file( "Append videofile to EditList", FILE_FILTER_DEFAULT );
 	if(filename)
 	{
 		multi_vims( VIMS_EDITLIST_ADD, "%s",
@@ -584,12 +584,12 @@ void	on_button_el_add_clicked(GtkWidget *w, gpointer *user_data)
 }
 void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 {
-	gchar *filename = dialog_open_file( "Append videofile (and create sample)",0);
-	if( !filename )
-		return;
-	
-	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
-	g_free(filename);
+	gchar *filename = dialog_open_file( "Append videofile (and create sample)",FILE_FILTER_DEFAULT);
+	if( filename )
+    {
+        multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
+        g_free(filename);
+    }
 }
 
 void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
@@ -1138,7 +1138,7 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 			erase_all = 1;
 	}
 
-	gchar *filename = dialog_open_file( "Open samplelist",1);
+	gchar *filename = dialog_open_file( "Open samplelist", FILE_FILTER_SL);
 	if(filename)
 	{
 		if(erase_all)
@@ -1152,17 +1152,17 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 	}
 }
 static char samplelist_name[1024];
-static int  has_samplelist_name = 0;
+static int  as_samplelist_name = 0;
 
 void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_save_file( "Save samplelist");
+	gchar *filename = dialog_save_file( "Save samplelist", "veejay-samplelist.sl");
 	if(filename)
 	{
 		multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename );
 		vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
 		strncpy( samplelist_name, filename,strlen(filename));
-		has_samplelist_name = 1;
+		as_samplelist_name = 1;
 		g_free(filename);
 	}
 }
@@ -1171,18 +1171,18 @@ gboolean	on_button_samplelist_qsave_clicked(GtkWidget *widget, GdkEvent *event, 
 {
 	//save as if shift click
 	if(event && ((GdkEventButton *) event)->state & GDK_SHIFT_MASK) {
-		has_samplelist_name = 0;
+		as_samplelist_name = 0;
 	}
 
-	if( has_samplelist_name == 0 ) {
-		gchar *filename = dialog_save_file( "Save samplelist");
+	if( as_samplelist_name == 0 ) {
+		gchar *filename = dialog_save_file( "Save samplelist", "veejay-samplelist.sl");
 		if(filename)
 		{
 			multi_vims( VIMS_SAMPLE_SAVE_SAMPLELIST, "%s", filename );
 			vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
 			strncpy( samplelist_name, filename, strlen(filename));
 			g_free(filename);
-			has_samplelist_name = 1;
+			as_samplelist_name = 1;
 		}
 	}
 	else {
@@ -1886,7 +1886,7 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 		vj_msg(VEEJAY_MSG_WARNING, "Any existing samples will be deleted.");
 	}
 
-	gchar *filename = dialog_open_file( "Open samplelist",1);
+	gchar *filename = dialog_open_file( "Open samplelist",FILE_FILTER_SL);
 	if(filename)
 	{
 		single_vims( VIMS_SAMPLE_DEL_ALL ); 
@@ -1897,7 +1897,7 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_samplelist_append_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Append a samplelist",1);
+	gchar *filename = dialog_open_file( "Append a samplelist",FILE_FILTER_SL);
 	if(filename)
 	{
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
@@ -2127,7 +2127,7 @@ void	on_vims_delete_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_save_file( "Save Bundles");
+	gchar *filename = dialog_save_file( "Save Bundles", "veejay-vimsbundle.xml");
 	if(filename)
 	{
 		multi_vims( VIMS_BUNDLE_SAVE, "%d %s",0, filename );
@@ -2138,7 +2138,7 @@ void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Load liveset / configfile",2);
+	gchar *filename = dialog_open_file( "Load liveset / configfile",FILE_FILTER_XML);
 
 	if(!filename)
 		return;
@@ -2161,7 +2161,7 @@ void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_saveconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_save_file( "Save liveset / configfile");
+	gchar *filename = dialog_save_file( "Save liveset / configfile", "veejay-liveset.xml");
 	if(filename)
 	{
 		multi_vims( VIMS_BUNDLE_SAVE, "%d %s", 1, filename );
@@ -2187,7 +2187,7 @@ void	on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Load Bundles",2 );
+	gchar *filename = dialog_open_file( "Load Bundles", FILE_FILTER_XML);
 	if(filename)
 	{
 		multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
@@ -2235,7 +2235,7 @@ static	void	load_server_files(char *buf, int len)
 void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 {
 	// open file browser for launcher
-/*	gchar *filename = dialog_open_file( "Open Videofile or EditList",0 );
+/*	gchar *filename = dialog_open_file( "Open Videofile or EditList",FILE_FILTER_DEFAULT );
 	if(filename)
 	{
 		put_text( "entry_filename", filename );
@@ -2367,7 +2367,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Select Action File",2 );
+	gchar *filename = dialog_open_file( "Select Action File",FILE_FILTER_XML );
 	if(filename)
 	{
 		put_text( "inputstream_filename", filename );
@@ -2377,12 +2377,13 @@ void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_y4m_new_clicked(GtkWidget *w, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Select YUV4MPEG input (fifo) file",3);
-	if(!filename)
-		return;
-
-	multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
-	gveejay_new_slot(MODE_STREAM);
+	gchar *filename = dialog_open_file( "Select YUV4MPEG input (fifo) file", FILE_FILTER_YUV);
+	if(filename)
+    {
+        multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
+        gveejay_new_slot(MODE_STREAM);
+        g_free(filename);
+    }
 }
 
 void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
@@ -2509,18 +2510,19 @@ void on_video_options_apply_clicked         (GtkButton       *button,
 	}
 }
 
-void	on_cali_save_button_clicked( GtkButton *button, gpointer user_data)
+void	on_cali_save_button_clicked( GtkButton *button, gpointer user_data) //TEST ME ! to fix filter
 {
-	gchar *filename = dialog_save_file( "Save calibration to file");
+	gchar *filename = dialog_save_file( "Save calibration to file", "veejay-calibration.xml");
 	if( filename ) {
 		multi_vims( VIMS_V4L_CALI, "%s", filename );
+        g_free(filename);
 	}
 }
 
 void	on_load_calibration_activate( GtkMenuItem     *menuitem,
 					     gpointer         user_data)
 {
-	gchar	*filename = dialog_open_file("Select calibration file to load",0);
+	gchar	*filename = dialog_open_file("Select calibration file to load",FILE_FILTER_XML);
 	if(filename)
 	{
 		multi_vims( VIMS_STREAM_NEW_CALI, "%s", filename );
@@ -2665,8 +2667,8 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 	switch( info->watch.state )
 	{
 		case STATE_STOPPED:
-			filename = dialog_open_file( "Open Action file / Liveset",2 );
-			if(filename)	
+			filename = dialog_open_file( "Open Action file / Liveset",FILE_FILTER_XML );
+			if(filename)
 			{
 				if(config_file)
 				    g_free(config_file);
@@ -2676,7 +2678,7 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 			}
 			break;
 		case STATE_PLAYING:
-			filename = dialog_open_file( "Open Samplelist ",1);
+			filename = dialog_open_file( "Open Samplelist ", FILE_FILTER_SL);
 			if(filename)
 			{
 				single_vims( VIMS_SAMPLE_DEL_ALL );
@@ -3148,11 +3150,10 @@ void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 
 void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Add videofile as new sample",0 );
+	gchar *filename = dialog_open_file( "Add videofile as new sample", FILE_FILTER_DEFAULT);
 	if(filename)
 	{
 		multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
-
 		g_free(filename);
 	}
 }
@@ -4003,7 +4004,7 @@ void	on_spin_text_y_value_changed( GtkWidget *w, gpointer data )
 }
 void	on_button_srt_save_clicked( GtkWidget *w, gpointer data )
 {
-	gchar *filename = dialog_save_file("Save SRT file");
+	gchar *filename = dialog_save_file("Save SRT file", "veejay-srt.file");
 	if( filename )
 	{
 		multi_vims( VIMS_SRT_SAVE, "%s", filename );
@@ -4012,7 +4013,7 @@ void	on_button_srt_save_clicked( GtkWidget *w, gpointer data )
 }
 void	on_button_srt_load_clicked( GtkWidget *w, gpointer data )
 {
-	gchar *filename = dialog_open_file("Load SRT file",4);
+	gchar *filename = dialog_open_file("Load SRT file",FILE_FILTER_NONE);
 	if( filename )
 	{
 		multi_vims( VIMS_SRT_LOAD, "%s", filename );
@@ -4652,7 +4653,7 @@ void	on_midievent_toggled( GtkWidget *w, gpointer data )
 
 void	on_load_midi_layout_activate( GtkWidget *w , gpointer data )
 {
-	gchar *filename = dialog_open_file( "Select MIDI configuration file to load",0);
+	gchar *filename = dialog_open_file( "Select MIDI configuration file to load",FILE_FILTER_CFG);
 	if( filename ) {
 		vj_midi_load( info->midi, filename );
 		g_free(filename);
@@ -4660,9 +4661,11 @@ void	on_load_midi_layout_activate( GtkWidget *w , gpointer data )
 }
 void	on_save_midi_layout_activate( GtkWidget *w, gpointer data )
 {
-	gchar *filename = dialog_save_file( "Save MIDI configuration to file");
-	if(filename)
+	gchar *filename = dialog_save_file( "Save MIDI configuration to file", "veejay-midi.cfg");
+	if(filename){
 		vj_midi_save( info->midi, filename );
+        g_free(filename);
+    }
 }
 
 void on_clear_midi_layout_activate( GtkWidget *w, gpointer data )
