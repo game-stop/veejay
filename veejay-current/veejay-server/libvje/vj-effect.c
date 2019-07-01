@@ -135,6 +135,7 @@ static struct
 {   halftone_malloc, halftone_free, NULL, VJ_IMAGE_EFFECT_HALFTONE },
 {   dotillism_malloc, dotillism_free, NULL, VJ_IMAGE_EFFECT_DOTILLISM },
 {   pencilsketch2_malloc, pencilsketch2_free, NULL, VJ_IMAGE_EFFECT_PENCILSKETCH2 },
+{   shapewipe_malloc, shapewipe_free, NULL, VJ_VIDEO_EFFECT_SHAPEWIPE },
 {	NULL,NULL,NULL,0},
 };
 
@@ -572,7 +573,9 @@ void vj_effect_initialize(int width, int height, int full_range, int custom_cfg)
     vj_effects[VJ_IMAGE_EFFECT_HALFTONE]            = halftone_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_DOTILLISM]           = dotillism_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_PENCILSKETCH2]       = pencilsketch2_init(width,height);
-	max_width = width;
+	vj_effects[VJ_VIDEO_EFFECT_SHAPEWIPE]           = shapewipe_init(width,height);
+    
+    max_width = width;
 	max_height = height;
 
 	plug_sys_init( (full_range == 0 ? PIX_FMT_YUVA444P : PIX_FMT_YUVA444P ),width,height, custom_cfg );

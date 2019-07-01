@@ -204,12 +204,13 @@
 #include "./transitions/transop.h"
 #include "./transitions/vbar.h"
 #include "./transitions/wipe.h"
+#include "./transitions/shapewipe.h"
 
 #define VJ_IMAGE_EFFECT_MIN 81
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 259
+#define VJ_VIDEO_EFFECT_MAX 260
 
 #define VJ_PLUGIN 500
 
@@ -321,6 +322,7 @@ enum {
 	VJ_VIDEO_EFFECT_MASKTRANSITION = 256,
 	VJ_VIDEO_EFFECT_PASSTHROUGH = 257,
 	VJ_VIDEO_EFFECT_ALPHATRANSITION = 258,
+    VJ_VIDEO_EFFECT_SHAPEWIPE = 259,
 };
 
 enum {

@@ -44,9 +44,7 @@ veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int o
 void vj_fastbw_picture_save_to_mem( VJFrame *f, int out_w, int out_h, int fmt );
 void vj_fast_picture_save_to_mem(VJFrame *f, int out_w, int out_h, int fmt );
 
-void	vj_picture_free();
-
+void vj_picture_free();
 #endif
-
 
 #endif
