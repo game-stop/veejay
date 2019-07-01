@@ -230,9 +230,11 @@ vj_effect *shapewipe_init(int w, int h)
 
     ve->hints = vje_init_value_hint_list( ve->num_params );
 
-    char **hints = get_shapelist_hints( shapelist, ve->limits[1][0] );
-    vje_build_value_hint_list_array( ve->hints, ve->limits[1][0], 0, hints );
-    free_shapelist_hints(hints, ve->limits[1][0]);
+    if(ve->limits[1][0] > 0) {
+        char **hints = get_shapelist_hints( shapelist, ve->limits[1][0] );
+        vje_build_value_hint_list_array( ve->hints, ve->limits[1][0], 0, hints );
+        free_shapelist_hints(hints, ve->limits[1][0]);
+    }
 
     vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "White to Black", "Black to White" );
 
@@ -262,7 +264,12 @@ void shapewipe_apply( VJFrame *frame, VJFrame *frame2, int shape, int threshold,
     if( shape != currentshape) {
         selected_shape = change_shape( selected_shape, shape, frame->width, frame->height );
         if(selected_shape == NULL) {
-            veejay_msg(0, "Unable to read %s", shapelist[ shape ] );
+            if( shape == 0 ) {
+                veejay_msg(0, "You didn't put any shape transitions in $HOME/.veejay/shapes, I have nothing to do!");
+            }
+            else {
+                veejay_msg(0, "Unable to read %s", shapelist[ shape ] );
+            }
             return;
         }
         currentshape = shape;
