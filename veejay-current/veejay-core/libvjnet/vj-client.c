@@ -350,7 +350,7 @@ int vj_client_send(vj_client *v, int sock_type,unsigned char *buf) {
 		return -1;
 	}
 
-	sprintf( (char*) blob, "V%03dD", len );
+	snprintf( (char*) blob,(len+HDR_LEN), "V%03dD", len );
 	memcpy( blob + HDR_LEN, buf, len );
 
 	if( v->mcast ) {

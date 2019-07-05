@@ -52,6 +52,7 @@ typedef struct
 {
 	char *msg;
 	int   len;
+    int   allocated;
 } vj_message;
 
 typedef struct {
@@ -74,11 +75,12 @@ typedef struct
 
 static int default_timeout_sec = 10;
 
-/* Message buffer is 4 MB per client per frame tick, this should be large enough to hold most KF packets
+/* Message buffer is 4 KB per client per frame tick
  */
 #define VJ_MAX_PENDING_MSG 4096
 #define RECV_SIZE RUP8(4096) 
 #define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1024)
+
 static	void	printbuf( FILE *f, uint8_t *buf , int len )
 {
 	int i;
@@ -101,6 +103,8 @@ static	void	printbuf( FILE *f, uint8_t *buf , int len )
 int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);
 int		_vj_server_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, int priority );
+static  void _vj_put_kf_msg(vj_server *vje, int link_id, char *buf, int buf_len, int num_msg);
+
 static void		_vj_server_empty_queue(vj_server *vje, int link_id);
 /*
 static		int geo_stat_ = 0;
@@ -536,7 +540,7 @@ static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, 
 	/* write size of data to header */
 	char hdr_buf[16];
 	snprintf(hdr_buf, sizeof(hdr_buf), "F%08dD", len );
-	if( sock_t_send_fd( Link[link_id]->handle, vje->send_size, hdr_buf, 10 ) <= 0 ) {
+	if( sock_t_send_fd( Link[link_id]->handle, vje->send_size, (unsigned char*) hdr_buf, 10 ) <= 0 ) {
 		veejay_msg(0, "Unable to send header to %s: %s", (char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
 		return 0;
 	}
@@ -716,8 +720,16 @@ static void	_vj_server_empty_queue(vj_server *vje, int link_id)
 
 	vj_simple_pool_reset( Link[link_id]->pool );
 
+    int n = Link[link_id]->n_queued;
+    int i;
+    for( i = 0; i < n; i ++ ) {
+        if( Link[link_id]->m_queue[i]->allocated )
+            free( Link[link_id]->m_queue[i]->msg );
+    }
+
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
+
 }
 
 #define _vj_malfunction(msg,content,buflen, index)\
@@ -789,24 +801,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 				return 0;
 			}
 		}
-		else if( s[i] == 'K' ) {
-			int len = 0;
-			char *str_ptr = &s[i];
-		
-			if(sscanf(str_ptr+1, "%8d",&len ))
-			{
-				i += len;
-				num_msg ++;
-			}
-			else
-			{
-				_vj_malfunction("VIMS (v) keyframe packet length not set", str_ptr, buf_len, i );
-				return 0;
-			}
-
-			i += 9;
-
-		} else {
+		else {
 			_vj_malfunction( "VIMS (v) Cannot identify message as VIMS message", buf, buf_len, i);
 			return 0;
 		}
@@ -823,11 +818,28 @@ void		vj_server_init_msg_pool(vj_server *vje, int link_id )
 	}
 }
 
-static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
+static  void _vj_put_kf_msg(vj_server *vje, int link_id, char *buf, int buf_len, int num_msg)
+{
+  	vj_link **Link = (vj_link**) vje->link;
+	vj_message **v = Link[link_id]->m_queue;
+
+    v[num_msg]->msg = buf;
+    v[num_msg]->len = buf_len;
+}
+static  void _vj_put_kf_msg_allocated(vj_server *vje, int link_id, char *buf, int buf_len, int num_msg)
+{
+  	vj_link **Link = (vj_link**) vje->link;
+	vj_message **v = Link[link_id]->m_queue;
+
+    v[num_msg]->msg = buf;
+    v[num_msg]->len = buf_len;
+    v[num_msg]->allocated = 1;
+}
+
+static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, int num_msg )
 {
 	int i = 0;
 	char *s = buf;
-	int num_msg = 0;
 	vj_link **Link = (vj_link**) vje->link;
 	vj_message **v = Link[link_id]->m_queue;
 
@@ -870,29 +882,8 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			i += ( 5 + slen);
 
 		}
-		else if (s[i] == 'K' )
-		{
-			str_ptr ++; //@ [K][ ]
-			if( sscanf(str_ptr, "%08d", &slen ) <= 0 )
-			{
-				veejay_msg(0, "Error parsing KF header in '%s' (%d bytes)", buf, buf_len );
-				return 0;
-			}
-
-			str_ptr += 8;
-			v[num_msg]->msg = vj_simple_pool_alloc( Link[link_id]->pool, slen );
-			if(v[num_msg]->msg) {
-				veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
-				v[num_msg]->len = slen;
-				num_msg++;
-			}
-			else {
-				veejay_msg(0, "Not enough message space for this KF packet. (drop)" );
-			}	
-			i += ( 9 + slen );
-
-		} else {
-			veejay_msg(0, "VIMS: First token not a VIMS message or KF packet (at [%s])", s );
+		else {
+			veejay_msg(0, "VIMS: Expected token not a VIMS message or KF packet (at [%s] #%d of %d)", s + i,i,buf_len );
 			return 0;
 		}
 	}
@@ -968,20 +959,163 @@ flushmore_lbl:
 
 }
 
-//@ return 0 when work is done
-int	vj_server_update( vj_server *vje, int id )
+#define V_TYPE_VIMS_DATA 1
+#define V_TYPE_VIMS_VIDEO 2
+#define V_TYPE_VIMS_KF 3
+#define KF_HEADER_LEN 8
+#define VIMS_HEADER_LEN 4
+
+static  void vj_server_log_msg(vj_server *vje, int link_id, char *buf, int buf_len)
+{ 
+  	vj_link **Link = (vj_link**) vje->link;
+		
+    fprintf(vje->logfd, "received %d bytes from handle %d (link %d)\n", buf_len,Link[link_id]->handle, link_id );
+    printbuf( vje->logfd, (uint8_t*) buf, buf_len );
+}
+
+static int vj_server_socket_consume(vj_server *vje, int sock_fd, int link_id, char *buffer, int buf_size, int flag)
+{
+    ssize_t n = 0;
+    
+    if(!vje->use_mcast) {
+        n = recv( sock_fd, buffer, buf_size, flag );
+    } else {
+        vj_proto **proto = (vj_proto**) vje->protocol;
+        n = mcast_recv( proto[0]->r, (void*) buffer, buf_size );
+    }
+	
+    if( n == - 1) {
+		if( errno == EAGAIN ) {
+            return 0;
+        }
+	    veejay_msg( 0, "Error: %s", strerror(errno) );
+	    return -1;
+    }
+    else if ( n == 0 ) {
+        veejay_msg( 0, "Remote has disconnected");
+        return -1;
+    }
+
+    if( vje->logfd ) {
+        vj_server_log_msg( vje, link_id, buffer, buf_size );
+    }
+    return (int) n;
+}
+
+
+static int vj_server_update_get_msg_kf(vj_server *vje, int sock_fd, int link_id, int *num_msg)
+{
+    char t_hdr[KF_HEADER_LEN];
+    int buf_size = vj_server_socket_consume( vje, sock_fd, link_id, t_hdr, KF_HEADER_LEN, 0 );
+    if( buf_size <= 0 )
+        return -1;
+
+    // KF messages have no null termination, their payload is packed ints
+
+    if(sscanf(t_hdr, "%8d", &buf_size ) != 1 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "VIMS K-message is corrupted");
+        return -1;
+    }
+    
+    char *buf = (char*) vj_calloc( sizeof(char) * buf_size );
+    if(!buf) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Out of memory error");
+        return -1;
+    }
+
+    int msg_size = vj_server_socket_consume( vje, sock_fd, link_id, buf, buf_size, MSG_WAITALL );
+    if( msg_size <= 0 )
+        return -1;
+
+    _vj_put_kf_msg(vje, link_id, buf, msg_size, *num_msg);
+
+    *num_msg = *num_msg + 1;
+    
+    return 1;
+}
+
+static int vj_server_update_get_msg_vd(vj_server *vje, int sock_fd, int link_id, int *num_msg)
+{
+	vj_link **Link = (vj_link**) vje->link;
+    char v_hdr[VIMS_HEADER_LEN];
+    int buf_size = vj_server_socket_consume( vje, sock_fd, link_id, v_hdr, VIMS_HEADER_LEN, 0 );
+    if( buf_size <= 0)
+        return -1;
+
+    if( sscanf(v_hdr, "%3dD", &buf_size) != 1 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "VIMS V-message is corrupted");
+        return -1;
+    }
+
+    int msg_buf_size = buf_size + 1; // messages are null terminated but not sent with null termination
+
+    char *buf = (char*) vj_simple_pool_alloc( Link[link_id]->pool, msg_buf_size );
+    if(!buf) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Not enough space in pool to queue received VIMS message");
+        return -1;
+    }
+    
+    int msg_size = vj_server_socket_consume( vje, sock_fd, link_id, buf, buf_size, MSG_WAITALL );
+    if( msg_size <= 0) {
+        free(buf);
+        return -1;
+    }
+
+    int net_id = 0;
+    if( sscanf(buf, "%d:", &net_id ) != 1 ) {
+        veejay_msg(VEEJAY_MSG_ERROR,"Expected VIMS identifier followed by semicolon");
+        free(buf);
+        return -1;
+    }  
+
+    if( buf[ msg_size - 1] != ';' ) {
+       veejay_msg(VEEJAY_MSG_ERROR, "Expected VIMS message end marker ';'");
+       free(buf);
+       return -1;
+    } 
+
+    buf[ msg_size ] = '\0';
+
+    _vj_put_kf_msg(vje, link_id, buf, msg_size, *num_msg);
+
+    *num_msg = *num_msg + 1;
+
+    return 1;
+}
+
+static int vj_server_update_get_msg_type(vj_server *vje, int sock_fd, int link_id)
+{
+    char ptr[1];
+
+    int result = vj_server_socket_consume( vje, sock_fd, link_id, ptr, 1, MSG_DONTWAIT );
+    if( result == -1 )
+        return -1;
+    if( result == 0 )
+        return 0;
+
+    switch( ptr[0] ) {
+        case 'D':
+            return V_TYPE_VIMS_DATA;
+        case 'V':
+            return V_TYPE_VIMS_VIDEO;
+        case 'K':
+            return V_TYPE_VIMS_KF;
+   }
+
+   veejay_msg(VEEJAY_MSG_ERROR, "Expected VIMS header token D,V or K"); 
+
+   return -1; 
+}
+
+static int vj_server_msg_pending(vj_server *vje, int id)
 {
 	int sock_fd = vje->handle;
-	int n = 0;
 	vj_link **Link = (vj_link**) vje->link;
 
 	if(!Link[id]->in_use)
 		return 0;
 
-	if( Link[id]->pool )
-		_vj_server_empty_queue(vje, id);
-
-	if(!vje->use_mcast)
+    if(!vje->use_mcast)
 	{
 		sock_fd = Link[id]->handle;
 
@@ -989,127 +1123,56 @@ int	vj_server_update( vj_server *vje, int id )
 			return 0; //@ nothing to receive, fall through
 	}
 
-	int bytes_received = 0;
-	if(!vje->use_mcast) {
+    return sock_fd;
+}
 
-		int max = vje->recv_bufsize;
-		
-		char *ptr = vje->recv_buf;
-		
-		n = recv( sock_fd, ptr, 1, 0 ); //@ all read operations are BLOCKING
-		if( n != 1 ) {
-			if(n == -1) {
-				veejay_msg(0, "Error: %s", strerror(errno));
-				return -1;
-			}
-			if(n == 0) {
-				veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection" );
-				return 0;
-			}
-		}
-		
-		int isD = (*ptr == 'D');
+static int vj_server_queue_vims_messages( vj_server *vje, int sock_fd, int id )
+{
+	vj_link **Link = (vj_link**) vje->link;
+    int msg_type = -1;
+    int num_msg = 0;
 
-		if( *ptr == 'V' || *ptr == 'K' || isD ) {
-			ptr ++;
-readmore_lbl:
-			n = recv( sock_fd, ptr, RECV_SIZE, 0 ); //@ read 4 kb
-			if( n == - 1) {
-				if( errno == EAGAIN ) {
-					goto readmore_lbl;
-				}
-				veejay_msg( 0, "Error: %s", strerror(errno) );
-				return -1;
-			}
+    // consume the whole buffer and prepare the message queue
+    while( (msg_type=vj_server_update_get_msg_type(vje,sock_fd, id)) > 0 ) {
 
-			if( n == RECV_SIZE && errno == EAGAIN) //@ read 4kb, but still data left
-			{ // deal with large messages
-				char *start = ptr;
-				ptr += n;
-				bytes_received += n;
-				if( bytes_received > max ) {
-					veejay_msg(VEEJAY_MSG_ERROR,"VIMS message does not fit the receive buffer");
-					return -1;
-				}
-				if( bytes_received == max ) {
-					veejay_msg(VEEJAY_MSG_WARNING,"VIMS message queue is full, discarding new messages");
-					vj_server_flush( sock_fd );
+        if( num_msg >= VJ_MAX_PENDING_MSG ) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Queue too small to handle all VIMS messages");
+            vj_server_flush(sock_fd);
+            goto gremlin_pool;
+        }
 
-					//now, delete partial messages from message buffer
-					if(!isD) {
-						int k;
-						for( k = RECV_SIZE; k > 0; k -- ) {
-							if(start[k] == ';') {
-								break;
-							}
-							start[k] = '\0';
-							bytes_received --;
-						}
-					}
+        switch( msg_type ) {
+            case V_TYPE_VIMS_KF:
+                if( vj_server_update_get_msg_kf(vje,sock_fd, id, &num_msg) == -1 )
+                    goto gremlin_pool;
+                break;
+            case V_TYPE_VIMS_DATA:
+            case V_TYPE_VIMS_VIDEO:
+                if( vj_server_update_get_msg_vd(vje,sock_fd, id, &num_msg) == -1 )
+                  goto gremlin_pool;
+                break;
+        }
+    }     
 
-					goto end_lbl;
-				}
-				goto readmore_lbl;
-			}
-			bytes_received += n;
-		}
+gremlin_pool:
+        
+	Link[id]->n_queued = num_msg;
+	Link[id]->n_retrieved = 0;
 
-end_lbl:
-		//bytes_received = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
-		if( vje->logfd ) {
-			fprintf(vje->logfd, "received %d bytes from handle %d (link %d)\n", 
-					bytes_received,Link[id]->handle,id );
-			printbuf( vje->logfd, (uint8_t*) vje->recv_buf, bytes_received );
-		}
-		
-	}
-	else
-	{
-		vj_proto **proto = (vj_proto**) vje->protocol;
-		bytes_received = mcast_recv( proto[0]->r, (void*) vje->recv_buf, RECV_SIZE );
-	}
+    return num_msg;
+}
 
-	if( bytes_received <= 0 ) {
-		if( bytes_received == -1 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Networking error with socket %d: %s",sock_fd,strerror(errno));
-		}
-		if( bytes_received == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Link %d closed connection, terminating client connection",id);
-		}
-		return -1; // close client now
-	}
+int	vj_server_update( vj_server *vje, int id )
+{
+	vj_link **Link = (vj_link**) vje->link;
+	if( Link[id]->pool )
+		_vj_server_empty_queue(vje, id);
 
+    int sock_fd = vj_server_msg_pending( vje,id );
+    if( sock_fd == 0 )
+        return 0;
 
-	char *msg_buf = vje->recv_buf;
-	int bytes_left = bytes_received;
-
-	int n_msg = _vj_verify_msg( vje, id, msg_buf, bytes_left ); 
-	
-	if(n_msg == 0 && bytes_received > 0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid VIMS instruction '%s'", msg_buf );
-		if( vje->logfd ) {
-			fprintf(vje->logfd, "no valid messages in buffer!\n" );
-			printbuf( vje->logfd, (uint8_t*)msg_buf, bytes_left );
-		}
-		return -1; //@ close client now
-	}
-
-
-	if( n_msg < VJ_MAX_PENDING_MSG )
-	{
-		int nn = _vj_parse_msg( vje, id, msg_buf, bytes_left );
-		if(nn != n_msg)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Veejay's message queue corrupted (end session!)");
-			return 0; 
-		}
-		return nn;
-	} else {
-		veejay_msg(VEEJAY_MSG_ERROR, "Queue too small to handle all VIMS messages");
-		return -1;
-	}
-	return 0;
+    return vj_server_queue_vims_messages(vje, sock_fd, id );
 }
 
 void vj_server_shutdown(vj_server *vje)
