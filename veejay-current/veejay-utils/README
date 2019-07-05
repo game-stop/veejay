@@ -13,7 +13,7 @@
           0x0x10           x10x0x10x0x10x   10x0x10x0x10x0    0x010x0     0x0x        0x10      0x0x    
 
 
-												version 1.1.7
+												version 1.X.X
 
  			 :: Veejay Utilities, a collection of commandline programs for veejay ::
 	                  	               http://veejayhq.net
@@ -24,27 +24,45 @@ Install
 
 See file 'INSTALL'
 
-See doc/Howto_Compile.html
-See doc/Howto_Compile_on_Ubuntu.html
+See veejay-server/doc/Installation.md
+See veejay-server/doc/HOWTO.compile.md
+See veejay-server/doc/Howto_Compile_on_Ubuntu.html
 
 Documentation
 =============
 
 man sayVIMS
 
+See veejay-server/doc/VIMS.md
+See veejay-server/doc/veejay-HOWTO.md
 
 Running
 =======
+
+Let's start `veejay` in dummy mode, then ask to quit using `sayVIMS`:
 
 $ veejay -d
 $ sayVIMS "600:;"
 
 List of all messages:
+
 $ veejay -u
 
 
 CONTACT / FEEDBACK & HELP
 =========================
 
-http://veejayhq.net
+The veejay website is over http://veejayhq.net
 
+You can join our mailing list on http://groups.google.com/group/veejay-discussion
+
+
+BUG REPORTS / BLEEDING EDGE SOURCE CODE
+=======================================
+
+Please use the ticket system on https://github.com/c0ntrol/veejay/issues
+
+The code is actually develloped from http://github.com/c0ntrol/veejay
+
+
+ENJOY! And let us know about your performances/installations with veejay!

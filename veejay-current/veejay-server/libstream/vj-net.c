@@ -103,7 +103,7 @@ static int connect_client(threaded_t *t, vj_tag *tag)
         return STATE_ERROR;
     }
        
-    veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
+    veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d",tag->source_name, tag->video_channel + 5);
     return STATE_RUNNING;
 }
 
@@ -121,7 +121,7 @@ static int connect_client_mcast(threaded_t *t, vj_tag *tag)
         return STATE_ERROR;
     }
        
-    veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name, tag->video_channel + 5);
+    veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d",tag->source_name, tag->video_channel + 5);
     return STATE_RUNNING;
 }
 

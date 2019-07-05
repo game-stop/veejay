@@ -1,3 +1,15 @@
+
+     __ __  ____  ___      ___   ___      __   ___   ___      ___     __ 
+    |  |  ||    ||   \    /  _] /   \    /  ] /   \ |   \    /  _]   /  ]
+    |  |  | |  | |    \  /  [_ |     |  /  / |     ||    \  /  [_   /  / 
+    |  |  | |  | |  D  ||    _]|  O  | /  /  |  O  ||  D  ||    _] /  /  
+    |  :  | |  | |     ||   [_ |     |/   \_ |     ||     ||   [_ /   \_ 
+     \   /  |  | |     ||     ||     |\     ||     ||     ||     |\     |
+      \_/  |____||_____||_____| \___/  \____| \___/ |_____||_____| \____|
+
+
+
+
 Video files
 =========================
 Basic knowledge
@@ -30,7 +42,10 @@ so... Which codec to use ?
 -------------
 [MotionJPEG](https://en.wikipedia.org/wiki/Motion_JPEG) (mjpeg) is the veejay codec of choice for most applications, it gives you a good tradeof between compression, quality and compatibility. M-JPEG is an intraframe-only compression, each video frame is coded separately as a JPEG image, giving advantage of rapidly changing motion in the video stream.
 
-If you ever want more speed, use AVI `yv16` or `i420` before recording to new samples. Either using console client and **sayVIMS** (`selector 302` _Set codec to use for recording_) or the gui client **Reloaded** [Sample/Stream panel] ---> [Recording to Disk panel] ---> [Codec drop down list].
+If you ever want more speed, use AVI `yv16` or `i420` before recording to new samples :
+
+* using console client and **sayVIMS** (`selector 302` _Set codec to use for recording_  (use 'x' to see list))
+* from gui client **reloaded** [Sample/Stream panel] ---> [Recording to Disk panel] ---> [Codec drop down list].
 
 ### Floss tools that support MJPEG:
 * [Cinelerra](http://cinelerra.org/) - Video editing and compositing software
@@ -49,6 +64,7 @@ If you ever want more speed, use AVI `yv16` or `i420` before recording to new sa
 Which resolutions to use ?
 ------------
 Veejay can do:
+
 * high resolutions aka HDTV
 * pal 16/9 : 1024x576
 * pal: 720x576
@@ -64,31 +80,39 @@ How to convert ?
 -------------
 ### You can use FFMpeg
 
+```shell
+$ ffmpeg -i input-file -c:v mjpeg -pix_fmt yuvj422p -q:v 1 -an output-file.avi
 ```
-$ ffmpeg -i input-file -c:v mjpeg -pix_fmt yuvj422p -q:v 0 -an output-file.avi
-```
+Your input video `input-file` will be transcode to `mjpeg` video codec, with a pixel
+format `yuvj422p` - color values from 0-255 and only horizontal chroma resolution is halved.
+For better performance (but less image accuracy...) you can choose `yuvj420p` , in that
+case, both horizontal and vertical chroma resolution are halved. Finally it use a
+video quantifier of `1` setting the quality scale (VBR) to best image quality.
+
 In previous example, audio is muted using the `-an` flag, consequently you would start **veejay** with `-a0` to disable audio.
 
-Optionally add PCM 16bit audio, 44.1/48.0 Khz, 2 channels, 8 bits per channel, HD resolution and 25 frames per second.
+Optionally add PCM WAVE 16bit audio, 48.0 Khz, 2 channels, 8 bits per channel, HD resolution and 25 frames per second.
+```shell
+$ ffmpeg -i input-file -q:v 1 -c:v mjpeg -s 720p -r 25 -pix_fmt yuvj422p -acodec pcm_s16le -ar 48000 -ac 2 output-file.avi
 ```
-$ ffmpeg -i input-file -c:v mjpeg -s 720p -r 25 -pix_fmt yuvj422p -acodec pcm_s16le -ar 44100 -ac 2 output-file.avi
-```
+For more detailled informations concerning audio, look at `README.audio.md`
+
 Check FFmpeg documentation for detailed description of transcoding process and possible customization/automation.
 
 ### Or, you can use mplayer
-```
+```shell
 $ mencoder -ovc lavc -oac pcm -lavcopts vcodec=mjpeg -o <outputfile> <inputfile>
 ```
 
 ***To scale on the fly, use***
-```
+```shell
 $ mencoder -ovc lavc -oac pcm -lavcopts vcodec=mjpeg -vf scale=352:288 -o <outputfile> <inputfile>
 ```
 
 ***Bulk encoding***
 
 A quick hint for bulk encoding a bunch of capture.dv files
-```
+```shell
 $ for i in `ls *dv`;do mencoder -ovc lavc -oac pcm -lavcopts vcodec=mjpeg -o `echo $i | sed s/.dv/.avi/` $i; done;
 ```
 
@@ -97,7 +121,7 @@ Consult mplayer documentation about other options, such as cropping and filterin
 Going deeper in videos
 ------------
 ### What is Dummy mode ?
-```
+```shell
 $ veejay -d
 ```
 
@@ -111,8 +135,8 @@ If you use a video file, veejay will take that file's properties as default sett
 You can create a fake v4l2 device (`/dev/videoX`), using [v42loopback](https://github.com/umlaeute/v4l2loopback).
 
 Setup a single virtual video device on `/dev/video0` (assuming that it does not previously exist), stream some screen capture to it and open veejay using this source (audio disabled)
-```
-$ sudo modprobe v4l2loopback
+```shell
+# modprobe v4l2loopback
 $ ffmpeg -f x11grab -r 25 -s 720x576 -i :0.0+5,10 -vcodec rawvideo -pix_fmt yuv422p -f v4l2 /dev/video0
 $ veejay -A1 -a0
 ```

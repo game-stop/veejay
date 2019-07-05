@@ -28,6 +28,6 @@
 * [YCbCr](./YCbCr.txt)
 * [README memory](./README.memory.md) : Memory concern with veejay
 * [README performance](./README.performance.md) : Performance tips
-* [README NETWORK](./NET.txt)
+* [README network](./README.network.md) : Advanced veejay network communication (aka how to use/synchronize multiple server over the network)
 
 * [README android](./README.android.md)

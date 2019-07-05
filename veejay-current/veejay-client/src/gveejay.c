@@ -36,6 +36,17 @@
 #include <veejaycore/libvevo.h>
 #include <src/vj-api.h>
 
+#define RELOADED_SUMMARY "-------------------------------------\n\
+Reloaded, a graphical interface for Veejay.\n\n\
+Reloaded is a client for veejay. As long as veejay \
+(the server) is running, you can connect and disconnect from it with reloaded.\n\
+-------------------------------------"
+
+#define RELOADED_DESCRIPTION "-------------------------------------\n\
+The veejay website is over http://veejayhq.net\n\n\
+If you found a bug, please use the ticket system on https://github.com/c0ntrol/veejay/issues\n\
+-------------------------------------"
+
 extern int mt_get_max_tracks();
 static int load_midi = 0;
 static int port_num = DEFAULT_PORT_NUM;
@@ -66,46 +77,17 @@ static gboolean arg_version = FALSE;
 static gchar *arg_style = NULL;
 static gboolean arg_smallaspossible = FALSE;
 static gboolean arg_fasterui = FALSE;
-static gboolean arg_help = FALSE;
+static gchar *help_text = NULL;
 
 static const char skinfile[] = "gveejay.reloaded.glade"; //FIXME Has binary ressource ?
 
 extern void reloaded_launcher( char *h, int p );
 
-static void usage(char *progname)
-{
-    printf( "Usage: %s <options>\n",progname);
-    printf( "where options are:\n");
-    printf( "-h\t\tVeejay host to connect to (defaults to localhost) \n");
-    printf( "-p\t\tVeejay port to connect to (defaults to %d) \n", DEFAULT_PORT_NUM);
-    printf( "-n\t\tDont use colored text\n");
-    printf( "-v\t\tBe extra verbose (usefull for debugging)\n");
-    printf( "-s\t\tSet bank resolution (row X columns)\n");
-    printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
-    printf( "-X\t\tSet number of tracks\n");
-    printf( "-V\t\tShow version, data directory and exit.\n");
-    printf( "-m <file>\tMIDI configuration file.\n");
-    printf( "-g\t\t<X,Y>\tWindow position on screen.\n");
-    printf( "-b\t\tEnable beta features.\n");
-    printf( "-a\t\tAuto-connect to local running veejays.\n");
-    printf( "-L\t\tLow-bandwith connection (disables image loading in samplebank)\n");
-    printf( "-t\t\tLoad user defined stylesheet from FILE or use 'default'");
-    printf( "-?\t\tYou are looking at it");
-    printf( "\n\n");
-}
-
 static volatile gulong g_trap_free_size = 0;
-static char **cargv = NULL;
-static  void  clone_args( char *argv[], int argc )
-{
-    int i = 0;
-    if( argc <= 0 )
-        return;
 
-    cargv = (char**) malloc(sizeof(char*) * (argc+1) );
-    memset( cargv, 0, sizeof(char*) * (argc+1));
-    for( i = 0; i < argc ; i ++ )
-        cargv[i] = strdup( argv[i] );
+static void usage ()
+{
+    g_printerr ("%s\n", help_text);  //FIXME why program name is (null) ???
 }
 
 void vj_gui_startup (GApplication *application, gpointer user_data)
@@ -160,9 +142,6 @@ gint vj_gui_command_line (GApplication            *app,
                           GApplicationCommandLine *cmdline)
 {
   int err = 0;
-  gint argc;
-  gchar **argv;
-  argv = g_application_command_line_get_arguments (cmdline, &argc);
 
 /* First check version and quit */
     if ( arg_version )
@@ -175,11 +154,6 @@ gint vj_gui_command_line (GApplication            *app,
     if (arg_verbose )
     {
         verbosity = 1;
-    }
-
-    if( arg_help ) {
-        usage(argv[0]);
-        return EXIT_FAILURE;
     }
 
     if ( arg_geometry )
@@ -265,7 +239,8 @@ gint vj_gui_command_line (GApplication            *app,
 
     if( err )
     {
-        usage(argv[0]);
+        usage();
+        g_free(help_text);
         return EXIT_FAILURE;
     }
 
@@ -278,9 +253,6 @@ gint vj_gui_command_line (GApplication            *app,
 
 int main(int argc, char **argv)
 {
-    if(!argc) { usage(argv[0]); exit(1);}
-    clone_args( argv, argc );
-
 /* default host to connect to */
     snprintf(hostname,sizeof(hostname), "127.0.0.1");
     char port_description [255];
@@ -315,20 +287,24 @@ int main(int argc, char **argv)
     {"tracks",      'X', 0, G_OPTION_ARG_INT, &arg_tracks,"Set number of tracks.", NULL},
     {"theme",       't', 0, G_OPTION_ARG_FILENAME, &arg_style, "CSS FILE or \"default\"", NULL },
     {"small-as-possible",'S',0,G_OPTION_ARG_NONE,&arg_smallaspossible, "Create the smallest possible UI",NULL},
-    {"help",        '?', 0, G_OPTION_ARG_NONE, &arg_help, "You are looking at it", NULL },
 #if GTK_CHECK_VERSION(3,22,30)
     {"faster-ui",   'f', 0, G_OPTION_ARG_NONE, &arg_fasterui, "Hide FX parameter sliders instead of disabling to reduce CPU usage (GTK3 3.22.30)", NULL},
 #endif
     {NULL}};
 
     context = g_option_context_new (NULL);
+    g_option_context_set_summary (context, RELOADED_SUMMARY);
+    g_option_context_set_description (context, RELOADED_DESCRIPTION);
     g_option_context_set_help_enabled(context, TRUE);
     g_option_context_add_main_entries (context, options, NULL);
     g_option_context_add_group (context, gtk_get_option_group (TRUE));
+
+    help_text = g_option_context_get_help (context, TRUE, NULL);
     if (!g_option_context_parse (context, &argc, &argv, &error))
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Option parsing failed: %s\n", error->message);
-        usage(argv[0]);
+        usage();
+        g_free (help_text);
         g_error_free (error);
         g_option_context_free(context);
         return -1;
