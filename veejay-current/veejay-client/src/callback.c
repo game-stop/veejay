@@ -2847,31 +2847,29 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	char header[64];
 	
-	int msg_len = 27 + (4*length); /*K00000000 */
+	int payload = 3 + 2 + 2 + 8 + 8 + 2 + 2 + ( sizeof(int) * length );
+ 
+	snprintf(header,sizeof(header), "K%08dkey%02d%02d%08d%08d%02d%02d",payload,i,j,start,end,type,status );
+	int hdr_len = strlen(header); //key000000000000000000000000 packet header
+    int tr_len = 9; //K00000000 transport header
+    size_t bufsize = tr_len + payload;
 
-	snprintf(header,sizeof(header), "K%08dkey%02d%02d%08d%08d%02d%02d",msg_len,i,j,start,end,type,status );
-	
-	int hdr_len = strlen(header);
-
-	unsigned char *buf = (unsigned char*) vj_calloc( sizeof(unsigned char) * msg_len + 9 );
+	unsigned char *buf = (unsigned char*) vj_malloc( sizeof(unsigned char) * bufsize );
 	strncpy( (char*) buf, header, hdr_len);
 	
 	unsigned char *ptr = buf + hdr_len;
 	int k;
 	int diff = max - min;
 	for( k = 0 ; k < length ; k++ ) {
-		// pval = ((Input - InputLow) / (InputHigh - InputLow)) * (OutputHigh - OutputLow) + OutputLow;
-		// with InputLow==0 and InputHigh==1 in gtkcurve range
 		int pval = ((data[k]) * ((float)diff)) + min;
 		ptr[0] = pval & 0xff;
 		ptr[1] = (pval >> 8) & 0xff;
 		ptr[2] = (pval >> 16) & 0xff;
 		ptr[3] = (pval >> 24) & 0xff;
-
 		ptr += 4;
 	}
 
-	vj_client_send_buf( info->client, V_CMD, buf, msg_len + 9  );
+	vj_client_send_buf( info->client, V_CMD, buf, bufsize );
 
 	vj_msg( VEEJAY_MSG_INFO, "Saved new animation for parameter %d on entry %d, start at frame %d and end at frame %d",j,i,start,end );
 				

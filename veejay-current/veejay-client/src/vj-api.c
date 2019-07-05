@@ -3091,14 +3091,14 @@ int get_loop_value()
 
 static void multi_vims(int id, const char format[],...)
 {
-    char block[1024];
+    char block[1032];
     char tmp[1024];
     va_list args;
     if(!info->client)
         return;
     va_start(args, format);
-    vsnprintf(tmp, sizeof(tmp)-1, format, args );
-    snprintf(block, sizeof(block)-1, "%03d:%s;",id,tmp);
+    vsnprintf(tmp, sizeof(tmp), format, args );
+    snprintf(block, sizeof(block), "%03d:%s;",id,tmp);
     va_end(args);
 
     if(vj_client_send( info->client, V_CMD, (unsigned char*) block)<=0 )
@@ -3107,10 +3107,10 @@ static void multi_vims(int id, const char format[],...)
 
 static void single_vims(int id)
 {
-    char block[10];
+    char block[8];
     if(!info->client)
         return;
-    sprintf(block, "%03d:;",id);
+    snprintf(block,sizeof(block), "%03d:;",id);
     if(vj_client_send( info->client, V_CMD, (unsigned char*) block)<=0 )
         reloaded_schedule_restart();
 }
