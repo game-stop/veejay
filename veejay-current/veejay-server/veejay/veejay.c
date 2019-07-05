@@ -392,6 +392,7 @@ static int set_option(const char *name, char *value)
 	{
 		check_val(optarg, name);
 		info->settings->use_vims_mcast = 1;
+        info->settings->mcast_frame_sender = 1;
 		info->settings->vims_group_name = strdup(optarg);
 	}
 	else if (strcmp(name, "multicast-osc") == 0  || strcmp(name,"M")==0)
