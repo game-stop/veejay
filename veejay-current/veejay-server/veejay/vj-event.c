@@ -1528,6 +1528,11 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     int index = vims_mod * SDL_NUM_SCANCODES + vims_key;
 
     vj_keyboard_event *ev = get_keyboard_event( index );
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+            "VIMS modifier: %d (SDL modifier %d/%x), Key %d, VIMS event %p",
+                vims_mod, mod,mod, vims_key, ev );
+
     if(!ev )
     {
         if(event.type == SDL_MOUSEWHEEL && event.wheel.y >0 && v->use_osd != 3 ) {
