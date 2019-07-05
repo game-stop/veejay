@@ -2387,6 +2387,8 @@ static void add_file_filters(GtkWidget *dialog, file_filter_t type )
             gtk_file_filter_add_pattern( filter, "*.cfg" );
             gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
             break;
+        default:
+            break;
     }
 
     filter = gtk_file_filter_new();

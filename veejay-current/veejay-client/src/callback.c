@@ -2143,18 +2143,7 @@ void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 	if(!filename)
 		return;
 
-	if( info->run_state == RUN_STATE_REMOTE )
-	{
-		multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
-	}
-	else
-	{
-		if(config_file)
-		g_free(config_file);
-		config_file = g_strdup( filename );
-		config_file_status = 1;	
-		vj_msg(VEEJAY_MSG_INFO, "You can launch Veejay now");
-	}
+	multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
 
 	g_free(filename);
 }
