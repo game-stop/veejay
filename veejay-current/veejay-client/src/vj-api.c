@@ -869,6 +869,16 @@ enum
     DV1394_DEVICE=1,
 };
 
+typedef enum
+{
+    FILE_FILTER_DEFAULT =0,
+    FILE_FILTER_SL,
+    FILE_FILTER_XML,
+    FILE_FILTER_YUV,
+    FILE_FILTER_CFG,
+    FILE_FILTER_NONE,
+} file_filter_t;
+
 // NUM_HINTS_MAX must be larger than NUM_HINTS and divisable by 8
 #define NUM_HINTS_MAX 32
 
@@ -2295,7 +2305,7 @@ static  gchar *get_relative_path(char *path)
     return _utf8str( basename( path ));
 }
 
-gchar *dialog_save_file(const char *title )
+gchar *dialog_save_file(const char *title, const char *current_name)
 {
     GtkWidget *parent_window = glade_xml_get_widget_(info->main_window,
                                                      "gveejay_window" );
@@ -2308,10 +2318,7 @@ gchar *dialog_save_file(const char *title )
 
     add_class(dialog, "reloaded" );
 
-#ifdef HAVE_GTK2_8
-    gtk_file_chooser_set_do_overwrite_confirmation( GTK_FILE_CHOOSER(dialog), TRUE );
-#endif
-    gtk_file_chooser_set_filename( GTK_FILE_CHOOSER(dialog), "veejay-samplelist.sl" );
+    gtk_file_chooser_set_current_name( GTK_FILE_CHOOSER(dialog), current_name );
 
     if( gtk_dialog_run( GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
     {
@@ -2342,41 +2349,44 @@ static struct
     { NULL, NULL },
 };
 
-static void add_file_filters(GtkWidget *dialog, int type )
+static void add_file_filters(GtkWidget *dialog, file_filter_t type )
 {
     GtkFileFilter *filter = NULL;
 
-    if(type == 0 )
-    {
-        int i;
-        for( i = 0; content_file_filters[i].descr != NULL ; i ++ )
-        {
+    switch(type) {
+        case FILE_FILTER_DEFAULT:
+            for(int i = 0; content_file_filters[i].descr != NULL ; i ++ )
+            {
+                filter = gtk_file_filter_new();
+                gtk_file_filter_set_name( filter, content_file_filters[i].descr);
+                gtk_file_filter_add_pattern( filter, content_file_filters[i].filter);
+                gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter );
+            }
+            break;
+        case FILE_FILTER_SL:
             filter = gtk_file_filter_new();
-            gtk_file_filter_set_name( filter, content_file_filters[i].descr);
-            gtk_file_filter_add_pattern( filter, content_file_filters[i].filter);
-            gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter );
-        }
-    }
-    if(type == 1 )
-    {
-        filter = gtk_file_filter_new();
-        gtk_file_filter_set_name( filter, "Sample List Files (*.sl)");
-        gtk_file_filter_add_pattern( filter, "*.sl");
-        gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
-    }
-    if(type == 2 )
-    {
-        filter = gtk_file_filter_new();
-        gtk_file_filter_set_name( filter, "Action Files (*.xml)");
-        gtk_file_filter_add_pattern( filter, "*.xml");
-        gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
-    }
-    if(type == 3 )
-    {
-        filter = gtk_file_filter_new();
-        gtk_file_filter_set_name( filter, "YUV4MPEG files (*.yuv)");
-        gtk_file_filter_add_pattern( filter, "*.yuv" );
-        gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
+            gtk_file_filter_set_name( filter, "Sample List Files (*.sl)");
+            gtk_file_filter_add_pattern( filter, "*.sl");
+            gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
+            break;
+        case FILE_FILTER_XML:
+            filter = gtk_file_filter_new();
+            gtk_file_filter_set_name( filter, "Action Files (*.xml)");
+            gtk_file_filter_add_pattern( filter, "*.xml");
+            gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
+            break;
+        case FILE_FILTER_YUV:
+            filter = gtk_file_filter_new();
+            gtk_file_filter_set_name( filter, "YUV4MPEG files (*.yuv)");
+            gtk_file_filter_add_pattern( filter, "*.yuv" );
+            gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
+            break;
+        case FILE_FILTER_CFG:
+            filter = gtk_file_filter_new();
+            gtk_file_filter_set_name( filter, "MIDI config files (*.cfg)");
+            gtk_file_filter_add_pattern( filter, "*.cfg" );
+            gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
+            break;
     }
 
     filter = gtk_file_filter_new();
@@ -2386,7 +2396,7 @@ static void add_file_filters(GtkWidget *dialog, int type )
 }
 
 
-gchar *dialog_open_file(const char *title, int type)
+gchar *dialog_open_file(const char *title, file_filter_t type)
 {
     static gchar *_file_path = NULL;
 
