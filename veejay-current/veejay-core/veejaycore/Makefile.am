@@ -31,7 +31,6 @@ libveejaycore_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) 
 
 
 libveejaycore_la_LIBADD = \
-			$(top_builddir)/thirdparty/aclib/libac.la \
 			$(top_builddir)/thirdparty/libhash/libhash.la \
 			$(top_builddir)/thirdparty/liblzo/libvjlzo.la \
 			$(top_builddir)/libvjmsg/libvjmsg.la \
