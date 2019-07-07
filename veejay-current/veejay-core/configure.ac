@@ -772,7 +772,6 @@ AC_CONFIG_FILES([
 thirdparty/Makefile
 thirdparty/mjpegtools/Makefile
 thirdparty/fastarm/Makefile
-thirdparty/aclib/Makefile
 thirdparty/libhash/Makefile
 thirdparty/liblzo/Makefile
 libvjmsg/Makefile
