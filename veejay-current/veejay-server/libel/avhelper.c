@@ -684,5 +684,5 @@ void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
 	e->output->data[1] = dst[1];
 	e->output->data[2] = dst[2];
 
-	yuv_convert_any3( e->scaler, e->input, e->frames[e->frame_index]->linesize, e->output, e->input->format, e->pixfmt );
+	yuv_convert_any3( e->scaler, e->input, e->frames[e->frame_index]->linesize, e->output);
 }

@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES=Makefile.in
 
-SUBDIRS = aclib libhash liblzo
+SUBDIRS = libhash liblzo
 
 SUBDIRS += mjpegtools 
 

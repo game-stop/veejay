@@ -121,7 +121,7 @@ void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height
 			vjsdl->sw_scale_width,vjsdl->sw_scale_height);
 }
 
-int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs, float fps)
+int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs, int vjfmt, float fps)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
 	int i = 0;
@@ -223,6 +223,16 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
 
     vj_sdl_grab( vjsdl, 0 );
 
+    int sdlmode = (vj_is_full_range(vjfmt) ? SDL_YUV_CONVERSION_JPEG : SDL_YUV_CONVERSION_BT601 );
+
+    if(sdlmode == SDL_YUV_CONVERSION_JPEG) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "SDL YUV conversion mode: JPEG");
+    }
+    if(sdlmode == SDL_YUV_CONVERSION_BT601) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "SDL YUV conversion mode: BT601");
+    }
+
+    SDL_SetYUVConversionMode( sdlmode );
     SDL_DisableScreenSaver();
 
     SDL_SetRenderDrawColor( vjsdl->renderer, 0,0,0,255 );

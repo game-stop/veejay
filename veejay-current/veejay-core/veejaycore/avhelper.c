@@ -116,14 +116,14 @@ typedef struct {
 } fourcc_node;
 
 //from libvevo/vevo.c
-static inline int hash_key_code( const char *str )           
+static inline int64_t hash_key_code( const char *str )           
 {
 	int hash = 5381;
     int c;
     while( (c = (int) *str++) != 0)
     	hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
 
-    return hash;
+    return (int64_t) hash;
 }
 static hash_val_t key_hash(const void *key)
 {
@@ -131,7 +131,7 @@ static hash_val_t key_hash(const void *key)
 }
 static int key_compare(const void *key1, const void *key2)
 {
-    return ((const int) key1 == (const int) key2 ? 0 : 1);
+    return ((const int64_t) key1 == (const int64_t) key2 ? 0 : 1);
 }
 
 int 	avhelper_get_codec_by_id(int id)
@@ -580,11 +580,12 @@ void	avhelper_close_decoder( void *ptr )
 		yuv_free_swscaler( e->scaler );
 	}
 
-    if(e->frames[0]->data[0])
+    if(e->frames[0]->data[0]) {
         avhelper_frame_unref(e->frames[0]);
-    if(e->frames[1]->data[0])
+    }
+    if(e->frames[1]->data[0]) {
         avhelper_frame_unref(e->frames[1]);
-
+    }
 	if(e->input)
 		free(e->input);
 	if(e->output)
@@ -680,5 +681,5 @@ void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
 	e->output->data[1] = dst[1];
 	e->output->data[2] = dst[2];
 
-	yuv_convert_any3( e->scaler, e->input, e->frames[e->frame_index]->linesize, e->output, e->input->format, e->pixfmt );
+	yuv_convert_any3( e->scaler, e->input, e->frames[e->frame_index]->linesize, e->output );
 }

@@ -33,6 +33,7 @@ const char *yuv_get_pixfmt_description(int fmt);
 int yuv_to_alpha_fmt(int fmt);
 int alpha_fmt_to_yuv(int fmt);
 void  yuv_set_pixel_range(int full_range);
+int yuv_get_pixel_range();
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);
 // yuv 4:2:2 packet to yuv 4:2:2 planar
@@ -105,10 +106,9 @@ void	yuv_convert_ac( VJFrame *src, VJFrame *dst, int a, int b );
 //void	yuv_convert_any( VJFrame *src, VJFrame *dst, int a, int b );
 
 
-void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt );
+void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst );
 
-void	yuv_convert_any3( void *scaler, VJFrame *src,int strides[], VJFrame *dst, int a, int b );
-
+void	yuv_convert_any3( void *scaler, VJFrame *src,int strides[], VJFrame *dst);
 
 VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt );
 
@@ -116,14 +116,13 @@ VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 
 const char	*yuv_get_scaler_name(int id);
 
-void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt );
+void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst );
 
-void    *yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt );
+void    *yuv_fx_context_create( VJFrame *src, VJFrame *dst );
 
 void    yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst );
 
 void    yuv_fx_context_destroy( void *ctx );
-
 
 void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h );
 void	yuv422to420planar( uint8_t *src[3], uint8_t *dst[3], int w, int h );

@@ -1125,6 +1125,7 @@ libsamplerec/Makefile
 veejay/Makefile
 man/Makefile
 livido-plugins/Makefile
+share/Makefile
 veejay.pc
 ])
 AC_OUTPUT

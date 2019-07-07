@@ -299,27 +299,17 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 				info->video_output_height,
 				info->pixel_format );
 
-    if( tmp.shift_v == 0 )
-    {
 	tmp.data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * tmp.len * 3);
 	tmp.data[1] = tmp.data[0] + tmp.len;
 	tmp.data[2] = tmp.data[1] + tmp.len + tmp.uv_len;
-
 	tmp.format = PIX_FMT_YUVJ420P;
 	
 	VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], info->video_output_width,
-					info->video_output_height , PIX_FMT_YUVJ422P);
+	     			info->video_output_height , (yuv_get_pixel_range() ? PIX_FMT_YUVJ422P: PIX_FMT_YUV422P ));
 
-	yuv_convert_any_ac( srci,&tmp, srci->format, tmp.format );
+	yuv_convert_any_ac( srci,&tmp );
 
-    	free(srci);
-    }
-    else
-    {
-	tmp.data[0] = src[0];
-	tmp.data[1] = src[1];
-	tmp.data[2] = src[2];
-    }	
+    free(srci);
 
 	if(info->uc->filename == NULL) 
 	{

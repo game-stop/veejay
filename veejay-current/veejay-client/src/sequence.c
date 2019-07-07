@@ -69,7 +69,8 @@ typedef struct
 	int   	 active;
 	int 	have_frame;
 	int	grey_scale;
-	int	preview;
+	int full_range;
+    int	preview;
 	int	width;
 	int	height;
 	int	prevmode;
@@ -197,7 +198,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		return n;
 	}
 
-	if( sscanf( (char*)tmp, "%6d%1d", &len,&(v->grey_scale) )<=0)
+	if( sscanf( (char*)tmp, "%6d%1d%d", &len,&(v->grey_scale),&(v->full_range) )!=3 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Can't parse header (datastream polluted)");
 		free(tmp);
@@ -394,7 +395,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 	gint bw = 0;
 
-	res = recvvims( v, 7, &bw, v->data_buffer );
+	res = recvvims( v, 8, &bw, v->data_buffer );
 	if( res <= 0 || bw <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Can't get a preview image! Only got %d bytes", bw);
@@ -403,7 +404,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 
 	int expected_len = (v->width * v->height);
-	int srcfmt = PIX_FMT_YUVJ420P; //default
+	int srcfmt = (v->full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
     
 	if(v->grey_scale) {
 		srcfmt = PIX_FMT_GRAY8;
@@ -426,9 +427,9 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	v->bw = 0;
 	
 	VJFrame *src1 = yuv_yuv_template( in, in + (v->width * v->height), in + (v->width * v->height) + (v->width*v->height)/4,v->width,v->height, srcfmt );
-	VJFrame *dst1 = yuv_rgb_template( v->tmp_buffer, v->width,v->height, PIX_FMT_BGR24 );
+	VJFrame *dst1 = yuv_rgb_template( v->tmp_buffer, v->width,v->height, PIX_FMT_RGB24 );
 
-	yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );	
+	yuv_convert_any_ac( src1, dst1 );
 
 	v->have_frame = 1;
 

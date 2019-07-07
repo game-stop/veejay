@@ -47,6 +47,7 @@
 #include <veejaycore/mpegconsts.h>
 #include <veejaycore/mpegtimecode.h>
 #include <veejaycore/vims.h>
+#include <veejaycore/yuvconv.h>
 #include <veejay/vj-event.h>
 #ifdef HAVE_JACK
 #include <veejay/vj-jack.h>
@@ -3001,6 +3002,7 @@ void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
                 caption,
                 1,
                 args[0],
+                v->pixel_format,
                 v->current_edit_list->video_fps
             ) ) {
                 if( v->sdl ) {
@@ -3085,6 +3087,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
                         title,
                         1,
                         v->settings->full_screen,
+                        v->pixel_format,
                         v->current_edit_list->video_fps )
                     ) {
                         veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
@@ -3114,6 +3117,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
                         title,
                         1,
                         v->settings->full_screen,
+                        v->pixel_format,
                         v->current_edit_list->video_fps )
                     ) {
                         veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
@@ -8293,23 +8297,20 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
         vj_fastbw_picture_save_to_mem(
                 &frame,
                 w,
-                h,
-                frame.format );
-
+                h);
         dstlen = w * h;
     }
     else {
         vj_fast_picture_save_to_mem(
                 &frame,
                 w,
-                h,
-                frame.format );
+                h);
         dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
     }
 
-    char header[8];
-    snprintf( header,sizeof(header), "%06d%1d", dstlen, use_bw_preview_ );
-    SEND_DATA(v, header, 7 );
+    char header[9];
+    snprintf( header,sizeof(header), "%06d%1d%1d", dstlen, use_bw_preview_, yuv_get_pixel_range() );
+    SEND_DATA(v, header, 8 );
     SEND_DATA(v, vj_perform_get_preview_buffer(), dstlen );
 }
 
@@ -8354,6 +8355,7 @@ void    vj_event_toggle_bw( void *ptr, const char format[], va_list ap )
         use_bw_preview_ = 0;
     else
         use_bw_preview_ = 1;
+    veejay_msg(VEEJAY_MSG_INFO, "Live image viewer is %s", (use_bw_preview_ ? "in color" : "in gray" ));
 }
 
 void    vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
@@ -9122,25 +9124,31 @@ void    vj_event_send_effect_list       (   void *ptr,  const char format[],    
     veejay_t *v = (veejay_t*)ptr;
     int i;
     char *priv_msg = NULL;
-    int   len = 0;
-
+    int len = 0;
     int n_fx = vj_effect_max_effects();
 
-    for( i = 0; i < n_fx; i ++ )
+    for( i = 0; i < n_fx; i ++ ) {
         len += vj_effect_get_summary_len( i );
+    }
 
-    priv_msg = (char*) malloc(sizeof(char) * (6 + len + 4096));
+    priv_msg = (char*) vj_malloc(sizeof(char) * (len+6+1) );
     sprintf(priv_msg, "%06d", len );
-    char line[4096];
-    char fline[4096];
+    
     for(i=0; i < n_fx; i++)
     {
+        char line[4096];
         if(vj_effect_get_summary(i,line))
         {
-            snprintf(fline,sizeof(fline), "%03zu%s", strlen(line), line );
-            veejay_strncat( priv_msg, fline, strlen(fline) );
+            char fline[5000];
+            int line_len = strlen(line);
+            snprintf(fline,sizeof(fline), "%04d%s", line_len, line );
+            veejay_strncat( priv_msg, fline, line_len + 4 );
         }
     }
+#ifdef STRICT_CHECKING
+    assert( len == priv_msg - 6 );
+#endif
+
     SEND_MSG(v,priv_msg);
     free(priv_msg);
 }
@@ -10578,23 +10586,20 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
         vj_fastbw_picture_save_to_mem(
                 frame,
                 w,
-                h,
-                frame->format );
-
+                h);
         dstlen = w * h;
     }
     else {
         vj_fast_picture_save_to_mem(
                 frame,
                 w,
-                h,
-                frame->format );
+                h );
         dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
     }
 
     char header[16];
-    snprintf( header,sizeof(header), "%06d%04d%2d", dstlen, args[0],args[1] );
-    SEND_DATA(v, header, 12 );
+    snprintf( header,sizeof(header), "%06d%04d%2d%d", dstlen, args[0],args[1], yuv_get_pixel_range() );
+    SEND_DATA(v, header, 13 );
     SEND_DATA(v, vj_perform_get_preview_buffer(), dstlen );
 
     free(frame);

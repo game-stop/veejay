@@ -166,6 +166,18 @@ static	int	n_ext_plugs_ = 0;
 
 int	rgb_parameter_conversion_type_ = 0;
 
+void    vj_effect_set_rgb_parameter_conversion_type(int full_range_yuv)
+{
+    if( full_range_yuv ) { 
+        rgb_parameter_conversion_type_ = GIMP_RGB;
+        veejay_msg(VEEJAY_MSG_DEBUG, "Using GIMP RGB conversion");
+    }
+    else {
+        rgb_parameter_conversion_type_ = CCIR601_RGB;
+        veejay_msg(VEEJAY_MSG_DEBUG, "Using CCIR601 RGB conversion");
+    }
+}
+
 static int _get_simple_effect( int effect_id)
 {
 	int i;
@@ -844,22 +856,31 @@ int vj_effect_get_summary_len(int entry)
 		return 0;
 
 	int p = vj_effects[entry]->num_params;
-	int len = strlen( vj_effects[entry]->description );
-	len += 3;
-	len += 3;
-	len += 1;
-	len += 1;
-	len += 1;
-	len += 2;
-	len += 3;
-	len += ( p * 18 );
+	int len = 0;
+	len += 3; // "%03d%s" name length, name
+    len += strlen( vj_effects[entry]->description );
+	len += 3; // "%03d" fx_id
+	len += 1; // "%01d" is_video
+	len += 1; // "%01d" has_rgb
+	len += 1; // "%01d" is_gen
+	len += 2; // "%02d" num_arg
 	int i;
-	for( i = 0; i < p; i ++ )
-		len += (strlen(vj_effects[entry]->param_description[i])+3);
+	for( i = 0; i < p; i ++ ) {
+	    len += 3;
+        len += (strlen(vj_effects[entry]->param_description[i]));
+        len += 6;
+        len += 6;
+        len += 6;
+    }
 
 	for( i = 0; i < p; i ++ ) {
-		len += vj_effect_get_hints_length( vj_effects[entry], i, vj_effects[entry]->limits[1][i] ) + 3;	
+        int lim =  vj_effects[entry]->limits[1][i];
+        int hints_len = vj_effect_get_hints_length( vj_effects[entry], i, lim );
+        len += 6;
+		len += hints_len;
 	}
+
+    len += 4;
 
 	return len;
 }
@@ -900,9 +921,8 @@ int vj_effect_get_summary(int entry, char *dst)
 	{
 		int limit = vj_effects[entry]->limits[1][i];
 		int vlen = vj_effect_get_hints_length( vj_effects[entry], i, limit );
-		
 		snprintf(tmp,sizeof(tmp),
-				"%03d",
+				"%06d",
 				vlen );
 		
 		strncat( dst, tmp, strlen(tmp) );
@@ -911,14 +931,15 @@ int vj_effect_get_summary(int entry, char *dst)
 			continue;
 
 		for( j = 0; j <= limit; j ++ ) {
+            int slen = strlen( vj_effects[entry]->hints[i]->description[j] );
 			snprintf(tmp,sizeof(tmp),
-				"%03zu%s",
-				strlen( vj_effects[entry]->hints[i]->description[j] ),
+				"%03d%s",
+                slen, 
 				vj_effects[entry]->hints[i]->description[j] );
+
 			strncat( dst,tmp,strlen(tmp));
 		}
 	}
-
 	return 1;
 }
 

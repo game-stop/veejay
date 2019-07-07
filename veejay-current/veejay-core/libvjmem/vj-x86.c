@@ -25,8 +25,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <aclib/ac.h>
-#include <aclib/imgconvert.h>
 #include <errno.h>
 #include <veejaycore/veejaycore.h>
 extern void find_best_memcpy(void);
@@ -125,10 +123,6 @@ int	mem_align_size()
 
 void vj_mem_init(void)
 {
-	ac_init( AC_ALL );
-
-	ac_imgconvert_init(AC_ALL);
-
 #ifdef ARCH_X86 
 	CACHE_LINE_SIZE = get_cache_line_size();
 #endif
@@ -149,7 +143,6 @@ void vj_mem_init(void)
 
 void	vj_mem_destroy()
 {
-	ac_destroy();
 }
 
 int	vj_mem_threaded_init(int w, int h)

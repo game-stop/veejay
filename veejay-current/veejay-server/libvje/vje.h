@@ -120,4 +120,5 @@ extern int vj_effect_is_parallel(int effect_id);
 extern int vj_effect_get_info( int effect_id, int *is_mixer, int *n_params );
 extern int vj_effect_get_static_bg(int effect_id);
 extern int vj_effect_is_transition_ready(int selector, int wid, int hei);
+extern void vj_effect_set_rgb_parameter_conversion_type(int full_range_yuv);
 #endif

@@ -1301,7 +1301,7 @@ static void setup_tree_text_column( const char *tree_name, int type, const char 
 static void setup_tree_pixmap_column( const char *tree_name, int type, const char *title );
 gchar *_utf8str( const char *c_str );
 static gchar *recv_vims(int len, int *bytes_written);
-static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1);
+static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1, int *arg2);
 static GdkPixbuf *update_pixmap_entry( int status );
 static gboolean chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,gpointer data);
 int resize_primary_ratio_y();
@@ -2197,11 +2197,10 @@ effect_constr* _effect_new( char *effect_line )
     int descr_len = 0;
     int p,q;
     char len[4];
-    //char line[100];
-    int offset = 0;
+    int offset  = 0;
 
     veejay_memset(len,0,sizeof(len));
-
+    
     if(!effect_line) return NULL;
 
     strncpy(len, effect_line, 3);
@@ -2211,17 +2210,23 @@ effect_constr* _effect_new( char *effect_line )
     ec = vj_calloc( sizeof(effect_constr));
     strncpy( ec->description, effect_line+3, descr_len );
 
-    sscanf(effect_line+(descr_len+3), "%03d%1d%1d%1d%02d", &(ec->id),&(ec->is_video),&(ec->has_rgb),&(ec->is_gen), &(ec->num_arg));
+    if(sscanf(effect_line+(descr_len+3), "%03d%1d%1d%1d%02d", &(ec->id),&(ec->is_video),&(ec->has_rgb),&(ec->is_gen), &(ec->num_arg)) != 5 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Error parsing FX");
+        free(ec);
+        return NULL;
+    }
+
     offset = descr_len + 11;
     for(p=0; p < ec->num_arg; p++)
     {
         int len = 0;
         int n = sscanf(effect_line+offset,"%06d%06d%06d%03d",
             &(ec->min[p]), &(ec->max[p]),&(ec->defaults[p]),&len );
-        if( n <= 0 )
+        if( n != 4 )
         {
-            veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX list" );
-            break;
+            veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX '%s' arguments", ec->description);
+            free(ec);
+            return NULL;
         }
         ec->param_description[p] = (char*) vj_calloc(sizeof(char) * (len+1) );
         strncpy( ec->param_description[p], effect_line + offset + 6 + 6 + 6 + 3, len );
@@ -2233,14 +2238,15 @@ effect_constr* _effect_new( char *effect_line )
     for(p=0; p < ec->num_arg; p++)
     {
         int hint_len = 0;
-        int n = sscanf( effect_line + offset, "%03d", &hint_len );
-        if( n <= 0 )
+        int n = sscanf( effect_line + offset, "%06d", &hint_len );
+        if( n != 1 )
         {
-            veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX list hints");
-            break;
+            veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX '%s' list hints", ec->description);
+            free(ec);
+            return NULL;
         }
 
-        offset += 3;
+        offset += 6;
 
         if(hint_len == 0)
             continue;
@@ -2253,12 +2259,14 @@ effect_constr* _effect_new( char *effect_line )
             n = sscanf( effect_line + offset, "%03d", &value_hint );
             if( n != 1) {
                 veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX list value hint");
-                break;
+                free(ec);
+                return NULL;
             }
 
             offset += 3;
             ec->hints[p]->description[q] = (char*) vj_calloc(sizeof(char) * value_hint + 1 );
             strncpy( ec->hints[p]->description[q], effect_line + offset, value_hint );
+            
             offset += value_hint;
         }
     }
@@ -2931,8 +2939,9 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
     uint8_t *data_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(wid * hei * 3));
     int sample_id = 0;
     int sample_type =0;
+    int full_range = 0;
     gint bw = 0;
-    gchar *data = recv_vims_args( 12, &bw, &sample_id, &sample_type );
+    gchar *data = recv_vims_args( 13, &bw, &sample_id, &sample_type,&full_range );
     if( data == NULL || bw <= 0 )
     {
         if( data_buffer )
@@ -2958,10 +2967,10 @@ int veejay_get_sample_image(int id, int type, int wid, int hei)
     uint8_t *in = (uint8_t*)data;
     uint8_t *out = data_buffer;
 
-    VJFrame *src1 = yuv_yuv_template( in, in + (wid * hei), in + (wid * hei) + (wid*hei)/4,wid,hei,PIX_FMT_YUV420P );
+    VJFrame *src1 = yuv_yuv_template( in, in + (wid * hei), in + (wid * hei) + (wid*hei)/4,wid,hei,(full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P) );
     VJFrame *dst1 = yuv_rgb_template( out, wid,hei,PIX_FMT_BGR24 );
 
-    yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );
+    yuv_convert_any_ac( src1, dst1 );
 
     GdkPixbuf *img = gdk_pixbuf_new_from_data(out,
                                               GDK_COLORSPACE_RGB,
@@ -3127,7 +3136,7 @@ static void single_vims(int id)
         reloaded_schedule_restart();
 }
 
-static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1)
+static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1, int *arg2)
 {
     int tmp_len = slen+1;
     unsigned char tmp[tmp_len];
@@ -3141,6 +3150,8 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1)
     if( sscanf( (char*)tmp + 6, "%04d", arg0 ) != 1 )
         return NULL;
     if( sscanf( (char*)tmp + 10, "%02d", arg1) != 1 )
+        return NULL;
+    if( sscanf( (char*)tmp + 12, "%1d", arg2) != 1 )
         return NULL;
     unsigned char *result = NULL;
     if( ret <= 0 || len <= 0 || slen <= 0)
@@ -5329,16 +5340,29 @@ void load_effectlist_info()
     int hi_id = 0;
     while( offset < fxlen )
     {
-        char tmp_len[4];
+        char tmp_len[5];
         veejay_memset(tmp_len,0,sizeof(tmp_len));
-        strncpy(tmp_len, fxtext + offset, 3 );
-        int len = atoi(tmp_len);
-        offset += 3;
+
+        strncpy(tmp_len, fxtext + offset, 4 );
+        int len = 0;
+        if( sscanf(tmp_len, "%4d", &len ) != 1 ) {
+            veejay_msg(0, "FX header length error");
+            exit(0);
+        }
+
+        offset += 4;
+
         if(len > 0)
         {
             effect_constr *ec;
             veejay_memset( line,0,sizeof(line));
-            strncpy( line, fxtext + offset, len );
+            memcpy( line, fxtext + offset, len );
+
+            int bad_len = strlen(line);
+            if( len != bad_len ) {
+                veejay_msg(0, "Expected %d bytes, only got %d", len, bad_len );
+                exit(0);
+            }
 
             ec = _effect_new(line);
             if( ec  ) {
@@ -5348,6 +5372,7 @@ void load_effectlist_info()
                     hi_id = ec->id;
             }
         }
+
         offset += len;
     }
 
@@ -5577,7 +5602,7 @@ int get_and_draw_frame(int type, char *wid_name)
 
     VJFrame *dst = yuv_rgb_template( out, w,h,PIX_FMT_BGR24 );
 
-    yuv_convert_any_ac( src,dst, src->format, dst->format );
+    yuv_convert_any_ac( src,dst );
 
     GdkPixbuf *pix = gdk_pixbuf_new_from_data(out,
                                               GDK_COLORSPACE_RGB,
@@ -6428,7 +6453,7 @@ static void reload_vimslist()
         int val[4];
         if( sscanf(line, "%04d%02d%03d%03d",
                &val[0],&val[1],&val[2],&val[3]) != 4 ) {
-            veejay_msg(0,"Expected exactly 4 tokens");
+            veejay_msg(0,"Expected exactly 4 tokens: [%s]", line);
         }
 
         if( val[0] < 0 || val[0] > 1024 ) {

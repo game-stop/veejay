@@ -24,8 +24,6 @@
 #include <libvjmem/vjmem.h>
 #include <veejaycore/defs.h>
 #include <libyuv/yuvconv.h>
-#include <aclib/ac.h>
-#include <aclib/imgconvert.h>
 #include <libvjmsg/vj-msg.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/avutil.h>
@@ -268,7 +266,6 @@ int	pixfmt_is_full_range(int pixfmt) {
 	return ( pixfmt == PIX_FMT_YUVJ420P || pixfmt == PIX_FMT_YUVJ422P || pixfmt == PIX_FMT_YUVJ444P ) ? 1:0;
 }
 
-
 static int	global_scaler_ = SWS_FAST_BILINEAR;
 static int	full_chroma_interpolation_ = 0;
 int	yuv_which_scaler()
@@ -317,31 +314,6 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 		CCIR_to_jpeg_tableY[i] = _CLAMP( (float)i * c - 16.0f ,  0.0f, 255.0f );
 		CCIR_to_jpeg_tableUV[i]= _CLAMP( (float)i * d - 16.0f ,  0.0f, 255.0f );
 	}
-
-	int flags = ac_cpuinfo();
-	
-	ac_init( flags );
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "(aclib) CPU Flags available:", ac_flagstotext( flags ));
-
-	veejay_memset( ffmpeg_aclib, 0, sizeof(ffmpeg_aclib ));
-
-	put( PIX_FMT_YUV420P, IMG_YUV420P );
-	put( PIX_FMT_YUV422P, IMG_YUV422P );
-	put( PIX_FMT_YUV444P, IMG_YUV444P );
-	put( PIX_FMT_YUVJ420P, IMG_YUV420P ); 
-	put( PIX_FMT_YUVJ422P, IMG_YUV422P );
-	put( PIX_FMT_YUVJ422P, IMG_YUV422P ); 
-	put( PIX_FMT_RGB24,   IMG_BGR24 );
-	put( PIX_FMT_BGR24,   IMG_RGB24 );
-	put( PIX_FMT_RGB32,   IMG_RGBA32 );
-	put( PIX_FMT_RGBA,    IMG_RGBA32 );
-	put( PIX_FMT_BGRA,    IMG_BGRA32 );
-	put( PIX_FMT_ARGB,    IMG_ARGB32 );
-	put( PIX_FMT_ABGR,    IMG_ABGR32 );
-	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
-	put( PIX_FMT_YUYV422, IMG_YUY2);
-	put( PIX_FMT_GRAY8,   IMG_Y8 );
 }
 
 void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
@@ -452,6 +424,11 @@ void			yuv_set_pixel_range(int full_range)
 	full_range_pixel_value_ = full_range;
 }
 
+int             yuv_get_pixel_range()
+{
+    return full_range_pixel_value_;
+}
+
 int			alpha_fmt_to_yuv(int fmt)
 {
 	switch(fmt) {
@@ -490,7 +467,6 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 	f->data[0] = Y;
 	f->data[1] = U;
 	f->data[2] = V;
-	f->data[3] = NULL;
 	f->width   = w;
 	f->height  = h;
 	switch(fmt)
@@ -503,6 +479,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[1] = w>>1;
 			f->stride[2] = w>>1;
 			f->shift_h = 1;
+            f->yuv_fmt = PIX_FMT_YUV422P;
+            f->range = (fmt == PIX_FMT_YUVJ422P ? 1 : 0 );
 			break;
 		case PIX_FMT_YUVA422P:
 			f->uv_width = w>>1;
@@ -511,6 +489,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[1] = f->stride[2] = w>>1;
 			f->stride[3] = w;
 			f->shift_h = 1;
+            f->yuv_fmt = PIX_FMT_YUVA422P;
+            f->range = full_range_pixel_value_;
 			break;
 		case PIX_FMT_YUV444P:
 		case PIX_FMT_YUVJ444P:
@@ -518,6 +498,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->uv_height=f->height;
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = f->stride[0];
+            f->yuv_fmt = PIX_FMT_YUV444P;
+            f->range = (fmt == PIX_FMT_YUVJ444P ? 1 : 0 );
 			break;
 		case PIX_FMT_YUVA444P:
 			f->uv_width = w;
@@ -525,6 +507,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = f->stride[0];
 			f->stride[3] = w;
+            f->yuv_fmt = PIX_FMT_YUVA444P;
+            f->range = full_range_pixel_value_;
 			break;
 		case PIX_FMT_YUV420P:
 		case PIX_FMT_YUVJ420P:
@@ -534,6 +518,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[1] = f->stride[2] = f->stride[0]>>1;
 			f->shift_v = 1;
 			f->shift_h = 1;
+            f->yuv_fmt = PIX_FMT_YUV420P;
+            f->range = (fmt == PIX_FMT_YUVJ420P ? 1 : 0 );
 			break;
 		case PIX_FMT_YUVA420P:
 			f->uv_width = w>>1;
@@ -543,21 +529,28 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[3] = f->stride[0];
 			f->shift_v = 1;
 			f->shift_h = 1;
+            f->yuv_fmt = PIX_FMT_YUVA420P;
+            f->range = full_range_pixel_value_;
 			break;
 		case PIX_FMT_GRAY8:
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = 0;
+            f->yuv_fmt = fmt;
+            f->range = full_range_pixel_value_;
 			break;
 		case PIX_FMT_YUYV422:
 		case PIX_FMT_UYVY422:
 			f->stride[0] = w * 2;
 			f->stride[1] = f->stride[2] = 0;
+            f->yuv_fmt = fmt;
+            f->range = full_range_pixel_value_;
 			break;
 		case PIX_FMT_RGB24:
 		case PIX_FMT_BGR24:
 			f->stride[0] = w * 3;
 			f->uv_width = 0; f->uv_height=0;
 			f->data[1] = NULL;f->data[2] = NULL;
+            f->yuv_fmt = fmt;
 			break;
 		case PIX_FMT_BGR32:
 		case PIX_FMT_RGB32:
@@ -566,6 +559,7 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[0] = w * 4;
 			f->uv_width = 0; f->uv_height = 0;
 			f->data[1] = NULL; f->data[2] = NULL;
+            f->yuv_fmt = fmt;
 			break;
 		default:
 		break;
@@ -599,45 +593,20 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 	f->stride[1] = 0;
 	f->stride[2] = 0;
 	f->len = w * h;
-
+    f->yuv_fmt = fmt;
 	return f;
 }
 
-void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt )
+void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst )
 {
-	uint8_t *dst_planes[3] = { dst, NULL, NULL };
-	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
-			dst_planes, ffmpeg_aclib[ dst_fmt] , src->width,src->height ))
-	{
-		veejay_msg(VEEJAY_MSG_WARNING,
-			"Unable to convert image %dx%d in %x to %dx%d in %x!",
-				src->width,src->height,src_fmt,
-				src->width,src->height,dst_fmt );
-		yuv_pixstr( __FUNCTION__, "src_fmt", src_fmt );
-		yuv_pixstr( __FUNCTION__, "dst_fmt", dst_fmt );
-	}
+    void *ctx = yuv_fx_context_create( src, dst );
+    yuv_fx_context_process( ctx, src,dst );
+    yuv_fx_context_destroy( ctx );
 }
 
-void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
+void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst )
 {
-	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
-			dst->data, ffmpeg_aclib[ dst_fmt] , dst->width,dst->height ))
-	{
-		veejay_msg(VEEJAY_MSG_WARNING,
-			"Unable to convert image %dx%d in %x to %dx%d in %x!",
-				src->width,src->height,src_fmt,
-				dst->width,dst->height,dst_fmt );
-		yuv_pixstr( __FUNCTION__, "src_fmt", src_fmt );
-		yuv_pixstr( __FUNCTION__, "dst_fmt", dst_fmt );
-
-	}
-	if( auto_conversion_ccir_jpeg_ )
-        	verify_CCIR_auto( src_fmt,dst_fmt, dst );
-}
-
-void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
-{
-	struct SwsContext *ctx = sws_getContext( src->width,src->height,src_fmt, dst->width,dst->height,dst_fmt,
+	struct SwsContext *ctx = sws_getContext( src->width,src->height, src->yuv_fmt, dst->width,dst->height,dst->yuv_fmt,
 			sws_context_flags_, NULL,NULL,NULL );
 	return (void*) ctx;
 }
@@ -654,7 +623,7 @@ void	yuv_fx_context_destroy( void *ctx )
 }
 
 
-void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[4], VJFrame *dst, int src_fmt, int dst_fmt )
+void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[4], VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) scaler;
 	int dst_stride[4] = { ru4(dst->stride[0]),ru4(dst->stride[1]),ru4(dst->stride[2]), ru4(dst->stride[3]) };
@@ -1153,6 +1122,24 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int swsc
 			NULL
 		);
 
+    int dummy[4];
+    int srcRange, dstRange;
+    int brightness,contrast,saturation;
+
+    sws_getColorspaceDetails( s->sws, (int**) &dummy, &srcRange, (int**) &dummy, &dstRange, &brightness,&contrast,&saturation );
+    const int *coefs = sws_getCoefficients(SWS_CS_DEFAULT);
+
+    srcRange = src->range;
+    dstRange = dst->range;
+
+    sws_setColorspaceDetails( s->sws, coefs, srcRange, coefs, dstRange, brightness, contrast, saturation );
+  
+#ifdef STRICT_CHECKING
+    veejay_msg(VEEJAY_MSG_DEBUG, "Initialized scaler context %dx%d@%d (%s) [%d] -> %dx%d@%d (%s) [%d]",
+            src->width,src->height,src->yuv_fmt,yuv_get_pixfmt_description(src->yuv_fmt), src->range,
+            dst->width,dst->height,dst->yuv_fmt,yuv_get_pixfmt_description(dst->yuv_fmt), dst->range );
+#endif
+
 	if(!s->sws)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG,"sws_getContext failed");
@@ -1242,6 +1229,22 @@ static void *yuv_init_sws_cached_context(vj_sws *s, VJFrame *src, VJFrame *dst, 
 		s->format = src->format;
 	}
 
+    int dummy[4];
+    int srcRange, dstRange;
+    int brightness,contrast,saturation;
+
+    sws_getColorspaceDetails( s->sws, (int**) &dummy, &srcRange, (int**) &dummy, &dstRange, &brightness,&contrast,&saturation );
+    const int *coefs = sws_getCoefficients(SWS_CS_DEFAULT);
+
+    srcRange = src->range;
+    dstRange = dst->range;
+
+    sws_setColorspaceDetails( s->sws, coefs, srcRange, coefs, dstRange, brightness, contrast, saturation );
+#ifdef STRICT_CHECKING
+    veejay_msg(VEEJAY_MSG_DEBUG, "Initialized scaler context %dx%d@%d (%s) [%d] -> %dx%d@%d (%s) [%d]",
+            src->width,src->height,src->yuv_fmt,yuv_get_pixfmt_description(src->yuv_fmt), src->range,
+            dst->width,dst->height,dst->yuv_fmt,yuv_get_pixfmt_description(dst->yuv_fmt), dst->range );
+#endif
 	if( s->sws == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Failed to get scaler context for %dx%d in %d -> %dx%d in %d",
@@ -1417,56 +1420,6 @@ int	yuv_sws_get_cpu_flags(void)
 
 	return swscale_flags;
 }
-/*
-void	yuv_deinterlace(
-		uint8_t *data[3],
-		const int width,
-		const int height,
-		int out_pix_fmt,
-		int shift,
-		uint8_t *Y,uint8_t *U, uint8_t *V )
-{
-	AVPicture p,q;
-	p.data[0] = data[0];
-	p.data[1] = data[1];
-	p.data[2] = data[2];
-	p.linesize[0] = width;
-	p.linesize[1] = width >> shift;
-	p.linesize[2] = width >> shift;
-	q.data[0] = Y;
-	q.data[1] = U;
-	q.data[2] = V;
-	q.linesize[0] = width;
-	q.linesize[1] = width >> shift;
-	q.linesize[2] = width >> shift;
-	avpicture_deinterlace( &p,&q, out_pix_fmt, width, height );
-}
-
-
-void 	rgb_deinterlace(
-		uint8_t *data[3],
-		const int width,
-		const int height,
-		int out_pix_fmt,
-		int shift,
-		uint8_t *R,uint8_t *G, uint8_t *B )
-{
-	AVPicture p,q;
-	p.data[0] = data[0];
-	p.data[1] = data[1];
-	p.data[2] = data[2];
-	p.linesize[0] = width * 3;
-	p.linesize[1] = 0;
-	p.linesize[2] = 0;
-	q.data[0] = R;
-	q.data[1] = G;
-	q.data[2] = B;
-	q.linesize[0] = width;
-	q.linesize[1] = 0;
-	q.linesize[2] = 0;
-	avpicture_deinterlace( &p,&q, out_pix_fmt, width, height );
-}
-*/
 
 static struct
 {	

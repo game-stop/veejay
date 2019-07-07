@@ -168,16 +168,13 @@ int veejay_get_state(veejay_t *info) {
 int	veejay_set_yuv_range(veejay_t *info) {
 	switch(info->pixel_format) {
 		case FMT_422:
-		//	rgb_parameter_conversion_type_ = 3; //JPEG/JFIF
-		//	rgb_parameter_conversion_type_ = 1; //CCIR601_RGB;
 			set_pixel_range( 235,240,16,16 );
-			veejay_msg(VEEJAY_MSG_DEBUG, "Using CCIR601 RGB <-> YUV ");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using YUV range { Y=16-235, U/V=16-240 }");
 			return 0;
 			break;
 		default:
-		//	rgb_parameter_conversion_type_ = 0; //GIMP_RGB;
 			set_pixel_range( 255, 255,0,0 );
-			veejay_msg(VEEJAY_MSG_DEBUG, "Using GIMP RGB <-> YUV ");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using YUV { Y=0-255, U/V=0-255 }");
 			break;
 	}
 	return 1;
@@ -1810,6 +1807,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	int full_range = veejay_set_yuv_range( info );
 	yuv_set_pixel_range(full_range);
+    vj_effect_set_rgb_parameter_conversion_type(full_range);
 
 	info->settings->sample_mode = SSM_422_444;
 /*
@@ -1949,7 +1947,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 			title = veejay_title( info );
 
-			if (!vj_sdl_init(info->sdl, x,y,info->bes_width, info->bes_height, title,1,info->settings->full_screen,el->video_fps))
+			if (!vj_sdl_init(info->sdl, x,y,info->bes_width, info->bes_height, title,1,info->settings->full_screen,info->pixel_format,el->video_fps))
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
 				free(title);
@@ -1981,7 +1979,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 				return -1;
 
 			title = veejay_title(info);	
-			if (!vj_sdl_init(info->sdl,x,y, info->bes_width, info->bes_height,title,1,info->settings->full_screen, el->video_fps)) {
+			if (!vj_sdl_init(info->sdl,x,y, info->bes_width, info->bes_height,title,1,info->settings->full_screen,info->pixel_format, el->video_fps)) {
 				free(title);
 				return -1;
 			}

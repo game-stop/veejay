@@ -6,6 +6,7 @@ SUBDIRS += libvje libplugger libsample libsubsample libel libstream libsamplerec
 SUBDIRS += veejay 
 SUBDIRS += livido-plugins
 SUBDIRS += man
+SUBDIRS += share
 
 ACLOCAL_AMFLAGS = -I m4 
 

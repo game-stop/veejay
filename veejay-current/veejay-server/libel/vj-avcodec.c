@@ -115,7 +115,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		}
 		else
 		{
-			e->dv = (void*)vj_dv_init_encoder( (void*)frame, out_pixel_format);
+			e->dv = (void*)vj_dv_init_encoder( (void*)frame, pf );
 		}
 	}
 	else {

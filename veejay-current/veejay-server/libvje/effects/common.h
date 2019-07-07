@@ -134,30 +134,6 @@ static inline double __sqrt_sd(double value) {
 #define V_Blueco	(0.439f )
 
 
-#define JPEGJFIF_RGB( r,g,b,y,u,v) \
- {\
-	r = y + 1.40200 * ( u - 128 );\
-	g = y - 0.34414 * ( v - 128 ) - 0.71414 * ( u - 128 );\
-	b = y + 1.77200 * ( v - 128 );\
- }
-
-#define COLOR_rgb2yuv(r,g,b, y,u,v ) \
- {\
- y = (int) (  (Y_Redco  * (float) r) + (Y_Greenco * (float)g) + (Y_Blueco * (float)b) + 16.0);\
- u = (int) (  (U_Redco  * (float) r) - (U_Greenco * (float)g) + (U_Blueco * (float)b) + 128.0);\
- v = (int) ( -(V_Redco  * (float) r) - (V_Greenco * (float)g) + (V_Blueco * (float)b) + 128.0);\
- }
-
-#define CCIR601_rgb2yuv(r,g,b,y,u,v) \
- {\
- float Ey = (0.299f * (float)r) + (0.587f * (float) g) + (0.114f * (float)b );\
- float Eu = (0.713f * ( ((float)r) - Ey ) );\
- float Ev = (0.564f * ( ((float)b) - Ey ) );\
- y = (int) ( 255.0 * Ey );\
- u = (int) (( 255.0 * Eu ) + 128);\
- v = (int) (( 255.0 * Ev ) + 128);\
-}
-
 /*
   http://www.w3.org/Graphics/JPEG/jfif.txt
   YCbCr (256 levels) can be computed directly from 8-bit RGB as follows:
@@ -190,6 +166,41 @@ static inline int myround(float n)
 }
 /* End colorspace.c */	
 
+
+#define JPEGJFIF_RGB( r,g,b,y,u,v) \
+ {\
+	r = y + 1.40200 * ( u - 128 );\
+	g = y - 0.34414 * ( v - 128 ) - 0.71414 * ( u - 128 );\
+	b = y + 1.77200 * ( v - 128 );\
+ }
+
+#define COLOR_rgb2yuv(r,g,b, y,u,v ) \
+ {\
+ y = (int) (  (Y_Redco  * (float) r) + (Y_Greenco * (float)g) + (Y_Blueco * (float)b) + 16.0);\
+ u = (int) (  (U_Redco  * (float) r) - (U_Greenco * (float)g) + (U_Blueco * (float)b) + 128.0);\
+ v = (int) ( -(V_Redco  * (float) r) - (V_Greenco * (float)g) + (V_Blueco * (float)b) + 128.0);\
+ }
+/*
+#define CCIR601_rgb2yuv(r,g,b,y,u,v) \
+ {\
+ float Ey = (0.299f * (float)r) + (0.587f * (float) g) + (0.114f * (float)b );\
+ float Eu = (0.713f * ( ((float)r) - Ey ) );\
+ float Ev = (0.564f * ( ((float)b) - Ey ) );\
+ y = (int) ( 255.0 * Ey );\
+ u = (int) (( 255.0 * Eu ) + 128);\
+ v = (int) (( 255.0 * Ev ) + 128);\
+}*/
+
+
+#define CCIR601_rgb2yuv(r,g,b,y,u,v)\
+{\
+    float Ey = ((0.2568f * (float)r ) + ( 0.5041f * (float) g) + (0.0979f * (float) b ) ) + 16.0;\
+    float Eu = ((-0.1482f * (float)r) + (-0.2910f * (float) g) + (0.4392f * (float) b ) ) + 128.0;\
+    float Ev = ((0.4392f * (float)r ) + (-0.3678f * (float) g) + (-0.0714f * (float) b )) + 128.0;\
+    y = CLAMP_Y(myround(Ey));\
+    u = CLAMP_UV(myround(Eu));\
+    v = CLAMP_UV(myround(Ev));\
+}
 
 #define GIMP_rgb2yuv(r,g,b,y,u,v)\
  {\

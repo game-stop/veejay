@@ -23,7 +23,7 @@
 #ifdef HAVE_SDL
 void *vj_sdl_allocate(VJFrame *frame, int k, int m, int s);
 void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height, int fs );
-int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs, float fps);
+int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs,int vjfmt, float fps);
 void vj_sdl_grab(void *ptr, int status);
 void vj_sdl_update_screen(void *ptr);
 void vj_sdl_convert_and_update_screen(void *ptr, uint8_t ** yuv420);

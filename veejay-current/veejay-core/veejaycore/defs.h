@@ -59,6 +59,8 @@ typedef struct VJFrame_t
     int stand; //ccir/jpeg
     float   fps;
     double  timecode;
+    int yuv_fmt;
+    int range;
 } VJFrame __attribute__((aligned(16)));
 
 typedef struct VJFrameInfo_t
