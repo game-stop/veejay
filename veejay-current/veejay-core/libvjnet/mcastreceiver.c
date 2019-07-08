@@ -128,28 +128,6 @@ mcast_receiver	*mcast_new_receiver( const char *group_name, int port )
 
 	return v;
 }
-int     mcast_receiver_set_peer( mcast_receiver *v, const char *hostname )
-{
-        struct hostent *host;
-        host = gethostbyname( hostname );
-        if(host)
-        {
-                v->addr.sin_family = host->h_addrtype;
-                if( host->h_length > (int) sizeof(v->addr.sin_addr))
-                        host->h_length = sizeof( v->addr.sin_addr );
-                memcpy( &(v->addr.sin_addr), host->h_addr, host->h_length );
-        }
-        else
-        {
-                v->addr.sin_family = AF_INET;
-                if( !inet_aton( hostname, &(v->addr.sin_addr) ) )
-                {
-					veejay_msg(0, "Invalid host '%s'", hostname );
-                    return 0;
-                }
-        }
-        return 1;
-}
 
 int	mcast_poll( mcast_receiver *v )
 {
