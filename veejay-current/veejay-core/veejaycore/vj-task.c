@@ -257,7 +257,10 @@ int		task_start(unsigned int max_workers)
 	}
 	exitFlag = 0;
 
+#ifdef HAVE_LINUX
 	cpu_set_t cpuset;
+#endif
+
 	pthread_cond_init( &tasks_completed, NULL );
 	pthread_cond_init( &current_task, NULL );
 	
@@ -269,15 +272,22 @@ int		task_start(unsigned int max_workers)
 		}
 		pthread_attr_setschedparam( &p_attr[i], &param );
 
+#ifdef HAVE_LINUX
+        /* Affinity API release notes for OS X v10.5 (https://developer.apple.com/library/archive/releasenotes/Performance/RN-AffinityAPI/
+         * The OS X kernel manages all thread placement.
+         * Setting n_cpu equal to the number of cores in a single cpu would let us share the L2 cache, but this requires a larger re-write and testing.
+         * See https://yyshen.github.io/2015/01/18/binding_threads_to_cores_osx.html
+         * However, only veejay-server currently uses this task manager.
+         */
 		if( n_cpu > 1 ) {
 			unsigned int selected_cpu = ((i+1)%n_cpu);
 			CPU_ZERO(&cpuset);
 			CPU_SET( selected_cpu, &cpuset );
 			
 			if(pthread_attr_setaffinity_np( &p_attr[i], sizeof(cpuset), &cpuset ) != 0 )
-				veejay_msg(0,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
+				veejay_msg(VEEJAY_MSG_WARNING,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
 		}
-
+#endif
 
 		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, NULL ) )
 		{
