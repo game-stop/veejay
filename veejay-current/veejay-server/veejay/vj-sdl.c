@@ -223,6 +223,7 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
 
     vj_sdl_grab( vjsdl, 0 );
 
+#if SDL_VERSION_ATLEAST(2,0,8)
     int sdlmode = (vj_is_full_range(vjfmt) ? SDL_YUV_CONVERSION_JPEG : SDL_YUV_CONVERSION_BT601 );
 
     if(sdlmode == SDL_YUV_CONVERSION_JPEG) {
@@ -233,6 +234,9 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
     }
 
     SDL_SetYUVConversionMode( sdlmode );
+#else
+    veejay_msg(VEEJAY_MSG_WARNING, "Please update SDL2 to a more recent version. Alternativly, see the -Y commandline option if you have color issues");
+#endif
     SDL_DisableScreenSaver();
 
     SDL_SetRenderDrawColor( vjsdl->renderer, 0,0,0,255 );
