@@ -61,9 +61,6 @@ typedef struct
 
 static	int		    sws_context_flags_ = 0;
 static	int		    full_range_pixel_value_ = 0;
-static  int		    ffmpeg_aclib[AV_PIX_FMT_NB];
-
-#define	put(a,b)	ffmpeg_aclib[a] = b
 
 static struct {
 	int i;
@@ -101,17 +98,6 @@ const char	*yuv_get_pixfmt_description(int fmt)
 		if( fmt == pixstr[i].i ) 
 			return pixstr[i].s;
 	return "NONE";
-}
-
-static void	yuv_pixstr( const char *s, const char *s2, int fmt ) {
-	const char *str = NULL;
-	int i;
-	for( i = 0; pixstr[i].s != NULL ; i ++ )
-		if( fmt == pixstr[i].i ) str = pixstr[i].s;
-	if( str ) 
-		veejay_msg(0, "%s: %s format %d : %s", s,s2,fmt, str );
-	else
-		veejay_msg(0, "%s: format %d invalid", s, fmt );
 }
 
 static	float	jpeg_to_CCIR_tableY[256];
