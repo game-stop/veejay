@@ -28,49 +28,55 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <pthread.h>
+#include <netinet/in.h>
 
 #ifndef MSG_NOSIGNAL
 #define MSG_NOSIGNAL 0
 #endif
 
-struct host_list {
-  struct hostent hostent;
-  char h_addr_space[1024]; 
-};
+static int sock_connect(const char *name, int port) {
 
-static int ref_count = 0;
-static pthread_key_t ghbn_key;
-static pthread_once_t ghbn_key_once = PTHREAD_ONCE_INIT;
+    char service[5];
+    snprintf(service,sizeof(service), "%d", port );
 
-static void ghbn_cleanup(void *data) {
-  struct host_list *current = (struct host_list *) data;
-  ref_count--;
-  free(current);
-}
+    int sock_fd;
+    struct addrinfo hints, *servinfo, *p;
 
-static void create_ghbn_key() {
-  pthread_key_create(&ghbn_key, ghbn_cleanup);
-}
+    memset( &hints, 0, sizeof(hints) );
 
-static struct hostent *sock_gethostbyname(const char *name) {
-	struct hostent *result;
-	int local_errno;
+    hints.ai_family = AF_UNSPEC; 
+    hints.ai_socktype = SOCK_STREAM;
 
-  	pthread_once(&ghbn_key_once, create_ghbn_key);
+    if( getaddrinfo( name, service, &hints, &servinfo ) != 0 ) {
+        veejay_msg(0, "Failed to resolve %s:%d :%s", name, port, strerror(errno));
+        return -1;
+    }
 
-	struct host_list *current = (struct host_list *) pthread_getspecific(ghbn_key);
-	
-	if (!current) {
- 	   	current = (struct host_list *) calloc(1, sizeof(struct host_list));
- 		current->hostent.h_name = "busy";
-	    	ref_count++;
-   		pthread_setspecific(ghbn_key, current);
-	}
-  
-	if (gethostbyname_r(name, &(current->hostent), current->h_addr_space,sizeof(current->h_addr_space),&result, &local_errno)) {
-		h_errno = local_errno;
-	}
-	return result;
+    for( p = servinfo; p != NULL; p = p->ai_next ) {
+        if (( sock_fd = socket( p->ai_family, p->ai_socktype, p->ai_protocol )) == -1 ) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Socket error: %s", strerror(errno));
+            continue;
+        }
+
+        if ( connect( sock_fd, p->ai_addr, p->ai_addrlen ) == -1 ) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Connect failed to %s:%d :%s", name, port, strerror(errno));
+            close(sock_fd);
+            continue;
+        }
+
+        break;
+    }
+
+    if( p == NULL ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to connect to %s:%d :%s", name, port, strerror(errno));
+        return -1;
+    }
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Established connection with %s:%d", name, port );
+
+    freeaddrinfo(servinfo);
+
+    return sock_fd;
 }
 
 vj_sock_t	*alloc_sock_t(void)
@@ -86,86 +92,13 @@ void		sock_t_free(vj_sock_t *s )
 	if(s) free(s);
 }
 
-#define TIMEOUT 3
-
-int			sock_t_connect_and_send_http( vj_sock_t *s, char *host, int port, char *buf, int buf_len )
-{
-	s->he = sock_gethostbyname( host );
-	if(s->he==NULL)
-		return 0;
-	s->sock_fd = socket( AF_INET, SOCK_STREAM , 0);
-	if(s->sock_fd < 0)
-	{
-		return 0;
-	}
-	s->port_num = port;
-	s->addr.sin_family = AF_INET;
-	s->addr.sin_port   = htons( port );
-	s->addr.sin_addr   = *( (struct in_addr*) s->he->h_addr );	
-	if( connect( s->sock_fd, (struct sockaddr*) &s->addr,
-			sizeof( struct sockaddr )) == -1 )
-	{
-		return 0;
-	}
-
-	struct sockaddr_in sinfo;
-	socklen_t sinfolen=0;
-	char server_name[1024];
-	if( getsockname(s->sock_fd,(struct sockaddr*) &sinfo,&sinfolen)==0) {
-		char *tmp = inet_ntoa( sinfo.sin_addr );
-		strncpy( server_name, tmp, 1024);
-	} else {
-		return 0;
-	}
-
-	int len = strlen(server_name) + 128 + buf_len;
-	char *msg = (char*) malloc(sizeof(char) * len );
-	struct utsname name;
-	if( uname(&name) == -1 ) {
-		snprintf(msg,len,"%s%s/veejay-%s\n\n",buf,server_name,PACKAGE_VERSION);
-	} else {
-		snprintf(msg,len,"%s%s/veejay-%s/%s-%s\n\n",buf,server_name,PACKAGE_VERSION,name.sysname,name.release );
-	}
-	int msg_len = strlen(msg);
-	int n = send(s->sock_fd,msg,msg_len, 0 );
-	free(msg);
-	
-	if( n == -1 )
-	{
-		return 0;
-	}
-
-	return n;
-}
-
 int			sock_t_connect( vj_sock_t *s, char *host, int port )
 {
-	s->he = sock_gethostbyname( host );
-	
-	if(s->he==NULL)
-		return 0;
-	
-	s->sock_fd = socket( AF_INET, SOCK_STREAM , 0);
+	s->sock_fd = sock_connect( host, port );
 	if(s->sock_fd < 0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Socket error with Veejay host %s:%d %s ", host,port,strerror(errno));
 		return 0;
-	}
-	s->port_num = port;
-	s->addr.sin_family = AF_INET;
-	s->addr.sin_port   = htons( port );
 	
-	s->addr.sin_addr   = *( (struct in_addr*) s->he->h_addr );	
-
-	if( connect( s->sock_fd, (struct sockaddr*) &s->addr,
-			sizeof( struct sockaddr )) == -1 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Connection error with Veejay host %s:%d %s",
-				host, port, strerror(errno));
-        close( s->sock_fd );
-		return 0;
-	}
-	unsigned int tmp = sizeof(int);
+    unsigned int tmp = sizeof(int);
 	if( getsockopt( s->sock_fd , SOL_SOCKET, SO_SNDBUF, (unsigned char*) &(s->send_size), &tmp) < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get buffer size for output: %s", strerror(errno));
@@ -230,41 +163,6 @@ int			sock_t_poll( vj_sock_t *s )
 	return 0;
 }
 
-/*
-static		int	timed_recv( int fd, void *buf, const int len, int timeout )
-{
-	fd_set fds;
-	int	n;
-
-	struct timeval tv;
-	memset( &tv, 0,sizeof(timeval));
-	FD_ZERO(&fds);
-	FD_SET( fd,&fds );
-
-	tv.tv_sec  = TIMEOUT;
-
-	n	  = select( fd + 1, &fds, NULL, NULL, &tv );
-	if( n == 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tsocket %x :: requested %d bytes", fd, len );
-	}
-
-	if( n == -1 )
-		return -1;
-
-	if( n == 0 )
-		return -5;
-
-	return recv( fd, buf, len, 0 );
-}
-
-void			sock_t_set_timeout( vj_sock_t *s, int t )
-{
-	int opt = t;
-	setsockopt( s->sock_fd, SOL_SOCKET, SO_SNDTIMEO, (char*) &opt, sizeof(int));
-	setsockopt( s->sock_fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &opt, sizeof(int));
-}
-*/
-
 int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 {
 	int bytes_left = len;
@@ -275,7 +173,6 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 	while( bytes_left > 0 )
 	{	
 sock_t_recv_lbl:		
-		//@ setup socket with SO_RCVTIMEO
 		n = recv( s->sock_fd, addr + bytes_done, bytes_left, MSG_WAITALL );
 		if ( n <= 0 ) {
 			if( n == -1 ) {

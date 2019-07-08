@@ -26,8 +26,6 @@
 #include <arpa/inet.h>
 typedef struct
 {
-	struct hostent *he;	
-	struct sockaddr_in addr;	
 	int	sock_fd;	
 	int port_num;
 	unsigned char *sbuf;
