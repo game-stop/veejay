@@ -29,6 +29,10 @@
 #include <sys/utsname.h>
 #include <pthread.h>
 
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
 struct host_list {
   struct hostent hostent;
   char h_addr_space[1024]; 
@@ -158,19 +162,31 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Connection error with Veejay host %s:%d %s",
 				host, port, strerror(errno));
+        close( s->sock_fd );
 		return 0;
 	}
 	unsigned int tmp = sizeof(int);
 	if( getsockopt( s->sock_fd , SOL_SOCKET, SO_SNDBUF, (unsigned char*) &(s->send_size), &tmp) < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get buffer size for output: %s", strerror(errno));
+        close( s->sock_fd );
 		return 0;
 	}
 	if( getsockopt( s->sock_fd, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &(s->recv_size), &tmp) < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get buffer size for input: %s", strerror(errno));
+        close( s->sock_fd );
 		return 0;
 	}
+
+#ifdef SO_NOSIGPIPE
+    int opt = 1;
+    if( setsockopt( s->sock_fd, SOL_SOCKET, SO_NOSIGPIPE, (void*) &opt, sizeof(int)) < 0 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to set SO_NOSIGPIPE: %s", strerror(errno));
+        close(s->sock_fd);
+        return 0;
+    }
+#endif
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Connected to host '%s' port %d, fd %d", host,port,s->sock_fd );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Receive buffer size is %d bytes, send buffer size is %d bytes", s->recv_size, s->send_size );
