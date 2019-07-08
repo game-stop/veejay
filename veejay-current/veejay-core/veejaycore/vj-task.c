@@ -39,7 +39,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <sys/statfs.h>
 #include <pthread.h>
 #include <sched.h>
 #include <veejaycore/defs.h>
