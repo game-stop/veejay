@@ -8285,7 +8285,7 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
     if( w <= 0 || h <= 0 || w >= max_w || h >= max_h )
     {
         veejay_msg(0, "Invalid image dimension %dx%d requested (max is %dx%d)",w,h,max_w,max_h );
-        SEND_MSG(v, "0000000" );
+        SEND_MSG(v, "00000000" );
         return;
     }
 
@@ -10510,6 +10510,7 @@ void    vj_event_macro_clear_bank( void *ptr,   const char format[], va_list ap 
 	}
 }
 
+#define SAMPLE_IMAGE_ERROR "00000000000000000"
 void    vj_event_get_sample_image       (   void *ptr,  const char format[],    va_list ap  )
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -10539,7 +10540,7 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
     if( w <= 0 || h <= 0 || w >= max_w || h >= max_h )
     {
         veejay_msg(0, "Invalid image dimension %dx%d requested (max is %dx%d)",w,h,max_w,max_h );
-        SEND_MSG(v, "000000000000" );
+        SEND_MSG(v, SAMPLE_IMAGE_ERROR );
         return;
     }
 
@@ -10548,7 +10549,7 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
     editlist *el = ( type == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_editlist(id) : v->edit_list );
     if( el == NULL && type == VJ_PLAYBACK_MODE_SAMPLE ) {
         veejay_msg(0, "No such sample %d", id );
-        SEND_MSG(v, "000000000000" );
+        SEND_MSG(v, SAMPLE_IMAGE_ERROR );
         return;
     }
 
@@ -10558,7 +10559,7 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
     }
     if( sample_image_buffer == NULL ) {
         veejay_msg(0, "Not enough memory", id );
-        SEND_MSG(v, "000000000000" );
+        SEND_MSG(v, SAMPLE_IMAGE_ERROR );
         return;
     }
 
@@ -10569,13 +10570,13 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
     if( startFrame >= 0 ) {
         int ret = vj_el_get_video_frame( el, startFrame, img );
         if( ret == 0 ) {
-            veejay_msg(VEEJAY_MSG_WARNING,"Unable to decode frame 1");
-            SEND_MSG(v, "000000000000" );
+            veejay_msg(VEEJAY_MSG_WARNING,"Unable to decode frame %ld", startFrame);
+            SEND_MSG(v, SAMPLE_IMAGE_ERROR );
             return;
         }
     }
     else {
-        SEND_MSG(v, "000000000000" );
+        SEND_MSG(v, SAMPLE_IMAGE_ERROR );
         return;
     }   
 
@@ -10598,7 +10599,7 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
     }
 
     char header[16];
-    snprintf( header,sizeof(header), "%06d%04d%2d%d", dstlen, args[0],args[1], yuv_get_pixel_range() );
+    snprintf( header,sizeof(header), "%06d%04d%2d%1d", dstlen, args[0],args[1], yuv_get_pixel_range() );
     SEND_DATA(v, header, 13 );
     SEND_DATA(v, vj_perform_get_preview_buffer(), dstlen );
 
