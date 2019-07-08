@@ -22,8 +22,6 @@
 #define AVERAGEBLEND_H
 vj_effect *average_blend_init();
 void average_blend_apply( VJFrame *frame, VJFrame *frame2, int average_blend);
-void average_blend_blend_luma_apply( uint8_t *src, uint8_t *dst, int len, int average_blend );
-void average_blend_blend_apply( uint8_t *src[3], uint8_t *dst[3], int len, int uv_len, int average_blend );
 void average_blend_applyN( VJFrame *frame, VJFrame *frame2, int average_blend);
 void average_blend_free();
 #endif

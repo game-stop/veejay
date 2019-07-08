@@ -47,7 +47,8 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
 			effects/contourextract.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
-			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c effects/median.c            effects/perspective.c \
+			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c effects/median.c \
+			effects/average-blend.c effects/perspective.c \
 			effects/toalpha.c effects/mixtoalpha.c effects/alpha2img.c effects/alphafill.c effects/alphaflatten.c \
 			effects/magicalphaoverlays.c effects/travelmatte.c effects/feathermask.c effects/alphaselect.c \
 		   effects/alphaselect2.c effects/alphablend.c effects/porterduff.c effects/alphanegate.c effects/lumakeyalpha.c \

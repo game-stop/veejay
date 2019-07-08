@@ -22,20 +22,18 @@
 #include <veejaycore/vjmem.h>
 #include "average-blend.h"
 
-extern void ac_average(const uint8_t *src1, const uint8_t *src2, uint8_t *dest, int bytes);
-
 vj_effect *average_blend_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 100;
+    ve->limits[1][0] = 7;
     ve->defaults[0] = 1;
-    ve->description = "Average (mixer)"; // expose aclib ac_average as vje fx
-    ve->sub_format = 0;
+    ve->description = "Average Mixer";
+    ve->sub_format = -1;
     ve->extra_frame = 1;
     ve->parallel = 1;
     ve->has_user = 0;
@@ -43,56 +41,49 @@ vj_effect *average_blend_init(int w, int h)
     return ve;
 }
 
-static void average_blend_apply1( VJFrame *frame, VJFrame *frame2, int average_blend)
+static inline void ac_average( uint8_t *dst, const uint8_t *src1, const uint8_t *src2, const int len )
 {
-	unsigned int i;
-	for( i = 0; i < average_blend; i ++ ) {
-		ac_average( frame->data[0], frame2->data[0], frame->data[0], frame->len );
-		ac_average( frame->data[1], frame2->data[1], frame->data[1], frame->uv_len );
-		ac_average( frame->data[2], frame2->data[2], frame->data[2], frame->uv_len );
-	}
+    unsigned int i;
+    for( i = 0; i < len; i ++ ) {
+        dst[i] = (src1[i] + src2[i]) >> 1;
+    }
 }
 
-static void	average_blend_apply_job( void *arg )
+static void average_blend_apply1( VJFrame *frame, VJFrame *frame2, int average_blend)
 {
-	vj_task_arg_t *t = (vj_task_arg_t*) arg;
-	unsigned int i;
-	for( i = 0; i < t->iparams[0]; i ++ ) {
-		ac_average( t->input[0], t->output[0], t->input[0], t->strides[0] );
-		ac_average( t->input[1], t->output[1], t->input[1], t->strides[1] );
-		ac_average( t->input[2], t->output[2], t->input[2], t->strides[2] );
-	}
+    unsigned int i;
+    for( i = 0; i < average_blend; i ++ ) {
+        ac_average( frame->data[0], frame2->data[0], frame->data[0], frame->len );
+        ac_average( frame->data[1], frame2->data[1], frame->data[1], frame->uv_len );
+        ac_average( frame->data[2], frame2->data[2], frame->data[2], frame->uv_len );
+    }
+}
+
+static void average_blend_apply_job( void *arg )
+{
+    vj_task_arg_t *t = (vj_task_arg_t*) arg;
+    unsigned int i;
+    for( i = 0; i < t->iparams[0]; i ++ ) {
+        ac_average( t->input[0], t->output[0], t->input[0], t->strides[0] );
+        ac_average( t->input[1], t->output[1], t->input[1], t->strides[1] );
+        ac_average( t->input[2], t->output[2], t->input[2], t->strides[2] );
+    }
 }
 
 void average_blend_apply( VJFrame *frame, VJFrame *frame2, int average_blend)
 {
-	average_blend_apply1( frame,frame2,average_blend );
+    average_blend_apply1( frame,frame2,average_blend );
 }
 
 void average_blend_applyN( VJFrame *frame, VJFrame *frame2,int average_blend)
 {
-	if( vj_task_available() ) {
-		vj_task_set_from_frame( frame );
-		vj_task_set_param( average_blend,0 );
-		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, (performer_job_routine) &average_blend_apply_job );
-	} else {
-		average_blend_apply1( frame,frame2,average_blend );
-	}
-}
-
-static void	average_blend_blend_apply1( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int average_blend )
-{
-}
-
-void	average_blend_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int average_blend )
-{
-	if( vj_task_available() ) {
-		vj_task_set_from_args( len,uv_len );
-		vj_task_set_param( average_blend,0 );
-		vj_task_run( src1, src2, NULL, NULL, 3, (performer_job_routine) &average_blend_apply_job );
-	} else {
-		average_blend_blend_apply1( src1,src2,len,uv_len,average_blend );
-	}
+    if( vj_task_available() ) {
+        vj_task_set_from_frame( frame );
+        vj_task_set_param( average_blend,0 );
+        vj_task_run( frame->data, frame2->data, NULL, NULL, 3, (performer_job_routine) &average_blend_apply_job );
+    } else {
+        average_blend_apply1( frame,frame2,average_blend );
+    }
 }
 
 void average_blend_free(){}

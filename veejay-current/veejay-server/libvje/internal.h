@@ -35,7 +35,7 @@
 #include "./effects/alphaselect.h"
 #include "./effects/alphatransition.h"
 #include "./effects/autoeq.h"
-//#include "./effects/average-blend.h"
+#include "./effects/average-blend.h"
 #include "./effects/average.h"
 #include "./effects/baltantv.h"
 #include "./effects/bathroom.h"

@@ -119,7 +119,7 @@ static struct
 {	slicer_malloc,slicer_free,NULL,VJ_VIDEO_EFFECT_SLICER},
 {	perspective_malloc,perspective_free,NULL,VJ_IMAGE_EFFECT_PERSPECTIVE},
 {	feathermask_malloc,feathermask_free,NULL,VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
-//{	average_malloc,average_free,NULL,VJ_IMAGE_EFFECT_AVERAGE},
+{	average_malloc,average_free,NULL,VJ_IMAGE_EFFECT_AVERAGE},
 {	rgbkey_malloc,rgbkey_free,NULL,VJ_VIDEO_EFFECT_RGBKEY},
 {	gaussblur_malloc,gaussblur_free,NULL,VJ_IMAGE_EFFECT_CHOKEMATTE},
 {	meanfilter_malloc,meanfilter_free,NULL,VJ_IMAGE_EFFECT_MEANFILTER},
@@ -450,7 +450,7 @@ void vj_effect_initialize(int width, int height, int full_range, int custom_cfg)
 	vj_effects[VJ_VIDEO_EFFECT_RADIOACTIVE]			= radioactivetv_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_RIPPLETV]			= water_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_SLICER]				= slicer_init(width,height);
-//	vj_effects[VJ_VIDEO_EFFECT_AVERAGEBLEND]		= average_blend_init(width,height);
+	vj_effects[VJ_VIDEO_EFFECT_AVERAGEBLEND]		= average_blend_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_IRIS]				= iris_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_MIXTOALPHA]			= mixtoalpha_init(width,height);
 	vj_effects[VJ_VIDEO_EFFECT_MAGICALPHA]			= overlayalphamagic_init(width,height);
@@ -506,7 +506,7 @@ void vj_effect_initialize(int width, int height, int full_range, int custom_cfg)
     vj_effects[VJ_IMAGE_EFFECT_CONTRAST]			= contrast_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_MOTIONBLUR]			= motionblur_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_SINOIDS]				= sinoids_init(width,height);
-//    vj_effects[VJ_IMAGE_EFFECT_AVERAGE]				= average_init(width,height);
+    vj_effects[VJ_IMAGE_EFFECT_AVERAGE]				= average_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_RIPPLE]				= ripple_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_BATHROOM]			= bathroom_init(width,height);
     vj_effects[VJ_IMAGE_EFFECT_SLICE]				= slice_init(width,height);
