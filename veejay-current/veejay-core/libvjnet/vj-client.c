@@ -205,7 +205,6 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		v->ports[0] = port_id + VJ_CMD_MCAST;
 		v->ports[1] = port_id + VJ_CMD_MCAST_IN;
 
-		mcast_sender_set_peer( v->s , group_name );
 		v->mcast = 1;
 
 		return 1;

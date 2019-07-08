@@ -91,29 +91,6 @@ mcast_sender	*mcast_new_sender( const char *group_name )
 	return v;
 }	
 
-int	mcast_sender_set_peer( mcast_sender *v, const char *hostname )
-{
-	struct hostent *host;
-	host = gethostbyname( hostname );
-	if(host)
-	{
-		v->addr.sin_family = host->h_addrtype;
-		if( host->h_length > (int) sizeof(v->addr.sin_addr))
-			host->h_length = sizeof( v->addr.sin_addr );
-		memcpy( &(v->addr.sin_addr), host->h_addr, host->h_length );
-	}
-	else
-	{
-		v->addr.sin_family = AF_INET;
-		if( !inet_aton( hostname, &(v->addr.sin_addr) ) )
-		{
-			print_error(" unknown host");
-			return 0;
-		}
-	}
-	return 1;
-}
-
 void		mcast_set_interface( mcast_sender *v, const char *interface )
 {
 	struct sockaddr_in	if_addr;
