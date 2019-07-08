@@ -36,5 +36,4 @@ int	mcast_poll( mcast_receiver *v );
 int	mcast_recv( mcast_receiver *v, void *dst, int len );
 uint8_t	*mcast_recv_frame( mcast_receiver *v, int *len, int *hdrlen, uint8_t *recvbuf );
 void mcast_close_receiver( mcast_receiver *v );
-int	mcast_receiver_set_peer( mcast_receiver *v, const char *hostname );
 #endif
