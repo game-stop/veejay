@@ -5727,6 +5727,8 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
     if( cali_onoff == 1 )
         reset_tree( "cali_sourcetree");
 
+    with_reset_slotselection = FALSE; //FIXME: there is a bug
+
     if( with_reset_slotselection )
     {
         reset_samplebank();
