@@ -154,6 +154,7 @@ static void vj_perform_record_buffer_free();
 static void *resample_context[(MAX_SPEED+1)];
 static void *downsample_context[(MAX_SPEED+1)];
 static uint32_t is_supersampled = 0;
+static uint8_t *tx_buffer[4];
 
 static const char *intro = 
     "A visual instrument for GNU/Linux\n";
@@ -181,9 +182,9 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num);
 static int vj_perform_increase_plain_frame(veejay_t * info, long num);
 static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0, uint8_t *p1, int subrender);
 static int vj_perform_apply_secundary(veejay_t * info, int this_sample_id,int sample_id,int type, int chain_entry, VJFrame *src, VJFrame *dst,uint8_t *p0, uint8_t *p1, int subrender);
-static int vj_perform_tag_complete_buffers(veejay_t * info, int *h);
+static int vj_perform_tag_complete_buffers(veejay_t * info, int *h, VJFrame *f0, VJFrame *f1, int sample_id, int pm);
 static int vj_perform_increase_sample_frame(veejay_t * info, long num);
-static int vj_perform_sample_complete_buffers(veejay_t * info, int *h);
+static int vj_perform_sample_complete_buffers(veejay_t * info, int *h, VJFrame *f0, VJFrame *f2, int sample_id, int pm);
 static int vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, VJFrame *dst,int chain_entry);
 static int vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info, VJFrame **frames, VJFrameInfo *frameinfo, int e, int c, int n_frames, void *ptr, int playmode );
 static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[4], int sample, int type);
@@ -206,7 +207,7 @@ static void vj_perform_set_444(VJFrame *frame)
     frame->uv_len = frame->len;
     frame->stride[1] = frame->stride[0];
     frame->stride[2] = frame->stride[0];
-    frame->format = PIX_FMT_YUVJ444P;
+    frame->format = (frame->range ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P);
 }
 
 static void vj_perform_set_422(VJFrame *frame)
@@ -218,7 +219,7 @@ static void vj_perform_set_422(VJFrame *frame)
     frame->uv_len = frame->uv_width * frame->uv_height;
     frame->stride[1] = frame->uv_width;
     frame->stride[2] = frame->stride[1];
-    frame->format = PIX_FMT_YUVJ422P;
+    frame->format = (frame->range ? PIX_FMT_YUV422P : PIX_FMT_YUVJ422P);
     frame->ssm = 0;
 }
 
@@ -374,7 +375,7 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
     video_playback_setup *settings = info->settings;
     settings->current_frame_num += num;
  
-    if (settings->current_frame_num >= settings->max_frame_num) {
+    if (settings->current_frame_num > settings->max_frame_num) {
         vj_tag_set_loop_stats( info->uc->sample_id, -1 );
     }
 
@@ -388,7 +389,7 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
     }
 
     if( info->seq->active ) {
-         if( settings->current_frame_num >= settings->max_frame_num ) {
+         if( settings->current_frame_num > settings->max_frame_num ) {
          	settings->current_frame_num = settings->min_frame_num;
             int type = 0;
             int n = vj_perform_next_sequence( info, &type );
@@ -396,7 +397,7 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
                 veejay_change_playback_mode(info,(type == 0 ? VJ_PLAYBACK_MODE_SAMPLE: VJ_PLAYBACK_MODE_TAG),n );
         }
     } else {
-		if( settings->current_frame_num >= settings->max_frame_num ) {
+		if( settings->current_frame_num > settings->max_frame_num ) {
         	settings->current_frame_num = settings->min_frame_num;
     
         	if( vj_perform_try_transition(info,1) ) {
@@ -405,7 +406,7 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
 		}
     }
 
-    if (settings->current_frame_num >= settings->max_frame_num) {
+    if (settings->current_frame_num > settings->max_frame_num) {
         settings->current_frame_num = settings->min_frame_num;
     }
 
@@ -715,11 +716,8 @@ static void vj_perform_free_row(int c)
 }
 
 #define vj_perform_row_used(c) ( frame_buffer[c]->Y == NULL ? 0 : 1 )
-static int  vj_perform_verify_rows(veejay_t *info )
+static int  vj_perform_verify_rows(veejay_t *info, int pm, int sample_id )
 {
-    if( pvar_.fx_status == 0 )
-        return 0;
-
     if( fx_chain_buffer )
         return 1;
     
@@ -728,8 +726,8 @@ static int  vj_perform_verify_rows(veejay_t *info )
     const int h = info->video_output_height;
     for(c=0; c < SAMPLE_MAX_EFFECTS; c++)
     {
-        v = (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ? 
-            sample_get_effect_any(info->uc->sample_id,c) : vj_tag_get_effect_any(info->uc->sample_id,c));
+        v = (pm == VJ_PLAYBACK_MODE_SAMPLE ? 
+            sample_get_effect_any(sample_id,c) : vj_tag_get_effect_any(sample_id,c));
     
         if( v > 0)
         {
@@ -884,6 +882,20 @@ int vj_perform_init(veejay_t * info)
         mlock_success = 0;
 
     veejay_memset( rgba_buffer[0], 0, buf_len * 2 );
+
+    tx_buffer[0] = (uint8_t*) vj_malloc( buf_len * 3);
+    if(!tx_buffer[0]) {
+        return 0;
+    }
+    tx_buffer[1] = (tx_buffer[0] + buf_len);
+    tx_buffer[2] = (tx_buffer[1] + buf_len);
+    tx_buffer[3] = (tx_buffer[2] + buf_len);
+
+    if( mlock( tx_buffer[0], buf_len * 4 ) != 0 )
+        mlock_success = 0;
+
+    veejay_memset( tx_buffer[0], 0, buf_len * 4 );
+
 
     subrender_buffer[0] = (uint8_t*) vj_malloc( buf_len * 3 ); //frame, p0, p1
     if(!subrender_buffer[0]) {
@@ -2148,7 +2160,7 @@ static int vj_perform_apply_secundary(veejay_t * info, int this_sample_id, int s
     return ssm;
 }
 
-static void vj_perform_tag_render_chain_entry(veejay_t *info, sample_eff_chain *fx_entry,int chain_entry, VJFrame *frames[2], int subrender)
+static void vj_perform_tag_render_chain_entry(veejay_t *info,int sample_id, int pm, sample_eff_chain *fx_entry,int chain_entry, VJFrame *frames[2], int subrender)
 {
     VJFrameInfo *frameinfo;
     video_playback_setup *settings = info->settings;
@@ -2161,7 +2173,7 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info, sample_eff_chain *
     frames[1]->data[3] = frame_buffer[chain_entry]->alpha; 
 
     vjp_kf *setup = info->effect_info;
-    setup->ref = info->uc->sample_id;
+    setup->ref = sample_id;
 
     int effect_id = fx_entry->effect_id;
     int sub_mode = vj_effect_get_subformat(effect_id);
@@ -2183,10 +2195,10 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info, sample_eff_chain *
     }
     
     if( pvar_.fade_entry == chain_entry && pvar_.fade_method == 1) {
-        vj_perform_pre_chain( info, frames[0] );
+        vj_perform_pre_chain( info, frames[0] ); //FIXME pvar initialization
     }
 
-    if(vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,fx_entry->fx_instance,info->uc->playback_mode) == -2)
+    if(vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,fx_entry->fx_instance,pm) == -2)
     {
         int res = 0;
         void *pfx = vj_effect_activate( effect_id, &res );
@@ -2194,7 +2206,7 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info, sample_eff_chain *
             settings->fxrow[chain_entry] = effect_id;
             if( pfx ) {
                 fx_entry->fx_instance = pfx;
-                vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx,info->uc->playback_mode );
+                vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx,pm );
             }
         }
     }
@@ -2323,7 +2335,7 @@ static  int vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,in
     return top.ssm;
 }
 
-static void vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_entry, int chain_entry, VJFrame *frames[2], int subrender)
+static void vj_perform_render_chain_entry(veejay_t *info,int sample_id, int pm, sample_eff_chain *fx_entry, int chain_entry, VJFrame *frames[2], int subrender)
 {
     VJFrameInfo *frameinfo;
     video_playback_setup *settings = info->settings;
@@ -2336,7 +2348,7 @@ static void vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
     frames[1]->data[3] = frame_buffer[chain_entry]->alpha;
 
     vjp_kf *setup = info->effect_info;
-    setup->ref = info->uc->sample_id;
+    setup->ref = sample_id;
 
     int effect_id = fx_entry->effect_id;
     int sub_mode = vj_effect_get_subformat(effect_id);
@@ -2358,11 +2370,11 @@ static void vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
     }
 
     if( pvar_.fade_entry == chain_entry && pvar_.fade_method == 1) {
-        vj_perform_pre_chain( info, frames[0] );
+        vj_perform_pre_chain( info, frames[0] ); //FIXME
     }
 
     if( vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
-            (int) settings->current_frame_num, fx_entry->fx_instance,info->uc->playback_mode   ) == -2 )
+            (int) settings->current_frame_num, fx_entry->fx_instance,pm  ) == -2 )
     {
         int res = 0;
         void *pfx = vj_effect_activate( effect_id, &res );
@@ -2370,7 +2382,7 @@ static void vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
             settings->fxrow[chain_entry] = effect_id;
             if( pfx ) {
                 fx_entry->fx_instance = pfx;
-                vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx,info->uc->playback_mode  );
+                vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx,pm);
             }
         }
     }
@@ -2382,22 +2394,28 @@ static void vj_perform_render_chain_entry(veejay_t *info, sample_eff_chain *fx_e
 
 static int clear_framebuffer__ = 0;
 
-static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
+static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444, VJFrame *f0, VJFrame *f1, int sample_id, int pm)
 {
     int chain_entry;
     vjp_kf *setup;
     VJFrame *frames[2];
     setup = info->effect_info;
-
+/*
     frames[0] = info->effect_frame1;
     frames[1] = info->effect_frame2;
     setup->ref = info->uc->sample_id;
-    frames[0]->data[0] = primary_buffer[0]->Y;
+    */
+
+    frames[0] = f0;
+    frames[1] = f1;
+    setup->ref = sample_id;
+/*
+    frames[0]->data[0] = primary_buffer[0]->Y;       // FIXME target buffer
     frames[0]->data[1] = primary_buffer[0]->Cb;
     frames[0]->data[2] = primary_buffer[0]->Cr;
     frames[0]->data[3] = primary_buffer[0]->alpha;
-    
-    sample_eff_chain **chain = sample_get_effect_chain( info->uc->sample_id );
+  */  
+    sample_eff_chain **chain = sample_get_effect_chain( sample_id );
     for( chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry ++ ) {
         if( chain[chain_entry]->clear ) {
             clear_framebuffer__ = 1;
@@ -2407,14 +2425,14 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
         }
     }
 
-    if(clear_framebuffer__ == 1 || info->settings->clear_alpha == 1)
+    if(clear_framebuffer__ == 1 || info->settings->clear_alpha == 1) // FIXME move this
     {
         if( frames[0]->stride[3] > 0 ) 
             veejay_memset( frames[0]->data[3], info->settings->alpha_value, frames[0]->stride[3] * frames[0]->height );
         clear_framebuffer__ = 0;
     }
 
-    if(pvar_.fader_active || pvar_.fade_value > 0 || pvar_.fade_alpha ) {
+    if(pvar_.fader_active || pvar_.fade_value > 0 || pvar_.fade_alpha ) { // FIXME move this
         if( pvar_.fade_entry == -1 ) {
             vj_perform_pre_chain( info, frames[0] );
         }
@@ -2423,34 +2441,33 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int *hint444)
     int subrender_entry = -1;
     for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
     {
-        int subrender = sample_get_subrender(info->uc->sample_id, chain_entry, &subrender_entry);
+        int subrender = sample_get_subrender(sample_id, chain_entry, &subrender_entry);
         sample_eff_chain *fx_entry = chain[chain_entry];
         if(fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
             continue;
         
-        vj_perform_render_chain_entry(info, fx_entry, chain_entry, frames, (subrender? subrender_entry: subrender));
+        vj_perform_render_chain_entry(info,sample_id,pm, fx_entry, chain_entry, frames, (subrender? subrender_entry: subrender));
     }
     *hint444 = frames[0]->ssm;
 
     return 1;
 }
 
-static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
+static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444, VJFrame *f0, VJFrame *f1, int sample_id, int pm  )
 {
     int chain_entry;
     VJFrame *frames[2];
     vjp_kf *setup = info->effect_info;
-
+/*
     frames[0] = info->effect_frame1;
     frames[1] = info->effect_frame2;
     setup->ref= info->uc->sample_id;
+*/
+    frames[0] = f0;
+    frames[1] = f1;
+    setup->ref = sample_id;
 
-    frames[0]->data[0] = primary_buffer[0]->Y;
-    frames[0]->data[1] = primary_buffer[0]->Cb;
-    frames[0]->data[2] = primary_buffer[0]->Cr;
-    frames[0]->data[3] = primary_buffer[0]->alpha;
-
-    sample_eff_chain **chain = vj_tag_get_effect_chain( info->uc->sample_id );
+    sample_eff_chain **chain = vj_tag_get_effect_chain( sample_id );
     for( chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry ++ ) {
         if( chain[chain_entry]->clear ) {
             clear_framebuffer__ = 1;
@@ -2467,6 +2484,7 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
         clear_framebuffer__ = 0;
     }
 
+    //FIME: chain entry fader
     if( pvar_.fader_active || pvar_.fade_value >0 || pvar_.fade_alpha) {
         if( pvar_.fade_entry == -1 ) {
             vj_perform_pre_chain( info, frames[0] );
@@ -2476,12 +2494,12 @@ static int vj_perform_tag_complete_buffers(veejay_t * info,int *hint444  )
     int subrender_entry = -1;
     for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
     {
-        int subrender = vj_tag_get_subrender( info->uc->sample_id, chain_entry, &subrender_entry );
+        int subrender = vj_tag_get_subrender( sample_id, chain_entry, &subrender_entry );
         sample_eff_chain *fx_entry = chain[chain_entry];
         if(fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
             continue;
 
-        vj_perform_tag_render_chain_entry( info, fx_entry, chain_entry, frames, (subrender ? subrender_entry : subrender));
+        vj_perform_tag_render_chain_entry( info,sample_id,pm, fx_entry, chain_entry, frames, (subrender ? subrender_entry : subrender));
     }
 
     *hint444 = frames[0]->ssm;
@@ -2524,7 +2542,7 @@ static void vj_perform_plain_fill_buffer(veejay_t * info, int *ret)
         *ret = vj_perform_get_frame_(info, 0, settings->current_frame_num,&frame,&frame, p0_buffer, p1_buffer,0 );
     }
 
-    if(info->uc->take_bg==1 )
+    if(info->uc->take_bg==1 ) //FIXME move this
     {
         info->uc->take_bg = vj_perform_take_bg(info,&frame);
     } 
@@ -2899,8 +2917,7 @@ static void vj_perform_tag_fill_buffer(veejay_t * info)
     
     if(!active)
     {
-        if (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE || type == VJ_TAG_TYPE_AVFORMAT ) 
-            vj_tag_enable( info->uc->sample_id );
+        vj_tag_enable( info->uc->sample_id );
     }
     else
     {
@@ -3348,6 +3365,11 @@ static  void    vj_perform_finish_render( veejay_t *info, video_playback_setup *
     pri[2] = primary_buffer[destination]->Cr;
     pri[3] = primary_buffer[destination]->alpha;
 
+    //FIXME set pointer to correct buffer
+    vj_perform_transition_sample( info, info->effect_frame1 );
+
+
+
     if( settings->composite  )
     { //@ scales in software
         if( settings->ca ) {
@@ -3584,6 +3606,7 @@ static  int vj_perform_render_magic( veejay_t *info, video_playback_setup *setti
 
     vj_perform_finish_render( info, settings,deep );
 
+
     return deep;
 }
 
@@ -3592,6 +3615,309 @@ void    vj_perform_record_video_frame(veejay_t *info)
     if( pvar_.enc_active )
         vj_perform_record_frame(info);
 }
+
+static void vj_perform_end_transition( veejay_t *info )
+{
+    video_playback_setup *settings = info->settings;
+    settings->transition.shape = (settings->transition.shape + 1) % 53;
+    veejay_change_playback_mode( info, settings->transition.next_type, settings->transition.next_id );
+    settings->transition.ready = 0;
+    settings->transition.active = 0;
+}
+
+static int vj_perform_transition_get_sample_position(int sample_id, int *max_sfd, int *cur_sfd, int *speed, int *start, int *end)
+{
+    int sample_b[4];
+
+    if(sample_get_short_info(sample_id,&sample_b[0],&sample_b[1],&sample_b[2],&sample_b[3])!=0) {
+        return 0;
+    }
+    int position = sample_get_position( sample_id );
+
+
+    *speed = sample_b[3];
+    *start = sample_b[0];
+    *end = sample_b[1];
+
+    if( sample_b[3] == 0 ) {
+        return sample_b[0] + position;
+    }
+    
+    int len_b = sample_b[1] - sample_b[0];
+
+    // duplicate frames
+    *max_sfd = sample_get_framedup( sample_id );
+    if(*max_sfd > 0 ) {
+        *cur_sfd = sample_get_framedups( sample_id );
+
+        *cur_sfd = *cur_sfd + 1;
+
+        if( *cur_sfd > *max_sfd )
+        {
+            *cur_sfd = 0;
+        }
+
+        sample_set_framedups( sample_id, *cur_sfd);
+    }
+
+    /* offset + start >= end */
+    if(sample_b[3] >= 0) /* sub sample plays forward */
+    {
+        position += sample_b[3]; /* speed */
+
+        if( sample_b[2] == 3 )
+            position = sample_b[0] + ( (int) ( (double) len_b * rand()/RAND_MAX) );
+    
+        /* offset reached sample end */
+        if(  position > len_b )
+        {
+            if(sample_b[2] == 2) /* sample is in pingpong loop */
+            {
+                /* then set speed in reverse and set offset to sample end */
+                //offset = sample_b[1] - sample_b[0];
+                position = len_b;
+                sample_set_speed( sample_id, (-1 * sample_b[3]) );
+                sample_update_offset( sample_id, position );
+                return sample_b[1];
+            }
+            if(sample_b[2] == 1)
+            {
+                position = 0;
+            }
+            if(sample_b[2] == 0)
+            {
+                position = 0; 
+                sample_set_speed(sample_id,0);
+            }
+            if(sample_b[2] == 3 )
+                position = 0;
+        }
+        sample_update_offset(sample_id, position);
+        return (sample_b[0] + position);
+    }
+
+    /* sub sample plays reverse */
+    position += sample_b[3]; /* speed */
+
+    if( sample_b[2] == 3 )
+        position = sample_b[0] + ( (int) ( (double) len_b * rand()/RAND_MAX));
+
+    if (  (sample_b[0] + position ) <=0  ) // < -(len_b)  )
+    {
+        /* reached start position */
+        if(sample_b[2] == 2)
+        {
+            position = 0;
+            sample_set_speed( sample_id, (-1 * sample_b[3]));
+            sample_update_offset( sample_id, position );
+            return sample_b[0];
+        }
+        if(sample_b[2] == 1)
+        {
+            position = len_b;
+        }   
+        if(sample_b[2]== 0)
+        {
+            sample_set_speed(sample_id , 0);
+            position = 0; // stop playing
+        }
+        if(sample_b[2] == 3 )
+            position = 0;
+    }
+    sample_update_offset(sample_id, position);
+    return (sample_b[0] + position); //1
+}
+
+static int vj_perform_transition_to_sample(veejay_t *info, VJFrame *destination, uint8_t *p0_buffer[4], uint8_t *p1_buffer[4])
+{
+    video_playback_setup *settings = info->settings;
+
+    int max_sfd = 1;
+    int cur_sfd = 0;
+    int speed = 0;
+    int start = 0;
+    int end = 0;
+    int sample_position = vj_perform_transition_get_sample_position( settings->transition.next_id, &max_sfd, &cur_sfd, &speed, &start, &end );
+    
+    editlist *el = sample_get_editlist( settings->transition.next_id );
+
+    sample_set_resume( settings->transition.next_id, sample_position );
+
+    if(max_sfd <= 1) {
+        int res = vj_el_get_video_frame( el, sample_position, destination->data );
+        if( res ) {
+            destination->ssm = 0;
+        }
+        return res;
+    }
+
+    //FIXME debug slow motion; position is not correct, no fluent transition here and interval seems to reset instead of progressing, bugs!
+    int uv_len = (destination->ssm == 1 ? destination->len : destination->uv_len );
+    
+    int  p0_frame = 0;
+    int  p1_frame = 0;
+
+    if( cur_sfd == 0 ) {
+        p0_frame = sample_position;
+        vj_el_get_video_frame( el, (long) p0_frame, p0_buffer );
+        p1_frame = sample_position + speed;
+
+        if( speed > 0 && p1_frame > end )
+            p1_frame = end;
+        else if ( speed < 0 && p1_frame < start )
+            p1_frame = start;
+
+        if( p1_frame != p0_frame )
+            if( vj_el_get_video_frame( el, (long) p1_frame, p1_buffer ) == 0 )
+                return 0;
+        
+        vj_perform_copy3( p0_buffer, destination->data, destination->len, uv_len,0 );
+    } 
+    else {
+        const uint32_t N = max_sfd;
+        const uint32_t n1 = cur_sfd;
+        const float frac = 1.0f / (float) N * n1;
+
+        vj_frame_slow_threaded( p0_buffer, p1_buffer, destination->data, destination->len, uv_len, frac );
+        
+        if( (n1 + 1 ) == N ) {
+            vj_perform_copy3( destination->data, p0_buffer, destination->len,uv_len,0);
+        }
+    }
+
+  
+    return 1; 
+}
+
+static int vj_perform_transition_to_stream(veejay_t *info, VJFrame *destination, uint8_t *p0_buffer[4], uint8_t *p1_buffer[4])
+{
+    video_playback_setup *settings = info->settings;
+    int success = 0;
+
+    int active = vj_tag_get_active( settings->transition.next_id );
+    if( active == 0 ) {
+        vj_tag_enable( settings->transition.next_id );
+    }
+
+    if(active == 1) {
+         if( vj_tag_get_frame( settings->transition.next_id, destination, NULL )) {
+            success = 1;
+         }
+    }
+
+    return success;
+}
+
+static void vj_perform_transition_to(veejay_t *info, VJFrame *destination, uint8_t *p0_buffer[4], uint8_t *p1_buffer[4])
+{
+    video_playback_setup *settings = info->settings;
+    int is444 = 0; //FIXME?
+
+    if( settings->transition.next_type == 0 ) {
+        if( vj_perform_transition_to_sample(info, destination, p0_buffer, p1_buffer ) == 0 ) {
+            dummy_rgb_apply( destination, 0, 0 , 0 );
+        }
+ 
+        if(vj_perform_verify_rows(info, settings->transition.next_type, settings->transition.next_id ) ) {
+            vj_perform_sample_complete_buffers(info, &is444, destination, info->effect_frame2, settings->transition.next_id, settings->transition.next_type);
+        }
+
+    }
+    else {
+        if( vj_perform_transition_to_stream(info, destination, p0_buffer, p1_buffer ) == 0) {
+            dummy_rgb_apply( destination, 0,0, 0);
+        }
+
+        if(vj_perform_verify_rows(info, settings->transition.next_type, settings->transition.next_id ) ) {
+            vj_perform_tag_complete_buffers(info, &is444, destination, info->effect_frame2, settings->transition.next_id, settings->transition.next_type);
+        }
+
+    }
+}
+
+
+static void vj_perform_get_transition_to( veejay_t *info, VJFrame *destination )
+{
+    video_playback_setup *settings = info->settings;
+
+    uint8_t *p0_buffer[4] = {
+        tx_buffer[0],
+        tx_buffer[0] + destination->len,
+        tx_buffer[0] + destination->len + destination->len,
+        tx_buffer[0] + destination->len + destination->len + destination->len
+    };
+    
+    uint8_t *p1_buffer[4] = {
+        tx_buffer[1],
+        tx_buffer[1] + destination->len,
+        tx_buffer[1] + destination->len + destination->len,
+        tx_buffer[1] + destination->len + destination->len + destination->len
+    };
+
+    vj_perform_transition_to(info, destination, p0_buffer, p1_buffer );
+}
+//FIXME: put effort in rendering transition sample in second thread.
+//FIXME: move this set of routines to a new file
+int vj_perform_transition_sample( veejay_t *info, VJFrame *current ) {
+    video_playback_setup *settings = info->settings;
+    if(settings->transition.active == 0) {
+        return 0;
+    }
+
+    // from 0 to 49 = 50 frames
+    if( settings->current_playback_speed > 0 ) {
+        settings->transition.timecode = 
+              (settings->current_frame_num - settings->transition.start) / (double) (settings->transition.end - settings->transition.start);
+    }
+    else if (settings->current_playback_speed < 0 ) {
+        settings->transition.timecode =
+            (settings->transition.start - settings->current_frame_num ) / (double) (settings->transition.start - settings->transition.end);
+    }
+
+    if( settings->transition.timecode < 0.0 || settings->transition.timecode > 1.0 ) {
+      //  vj_perform_end_transition( info );
+        return 0;
+    }
+
+    uint8_t *tx_buf[4] = {
+        tx_buffer[2],
+        tx_buffer[2] + current->len,
+        tx_buffer[2] + (2* current->len),
+        NULL
+    };
+
+    VJFrame *destination = yuv_yuv_template( tx_buf[0], tx_buf[1], tx_buf[2], current->width,current->height,info->effect_frame1->format );
+    
+    vj_perform_get_transition_to( info, destination );
+
+    if( !info->effect_frame1->ssm ) {
+        chroma_supersample( settings->sample_mode,info->effect_frame1,info->effect_frame1->data );
+        vj_perform_set_444( info->effect_frame1);
+    }
+    if( !destination->ssm ) {
+        chroma_supersample( settings->sample_mode,destination,destination->data);
+        vj_perform_set_444( destination);
+
+    }
+    
+    settings->transition.ready = shapewipe_apply1(  // TODO: use a function pointer
+                                        current, destination, 
+                                        settings->transition.timecode,
+                                        settings->transition.shape,
+                                        0,
+                                        1, // (settings->current_playback_speed > 0 ? 1 : 0),
+                                        1
+                                  );
+
+    if( settings->transition.ready == 1 ) {
+        vj_perform_end_transition( info );
+    }
+
+    free(destination);
+
+    return 1;
+}
+
 
 int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 {
@@ -3606,7 +3932,6 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
     int safe_fv = pvar_.fade_value;
 
     is_supersampled = 0;
-
     veejay_memset( &pvar_, 0, sizeof(varcache_t));
     
     pvar_.follow_fade = safe_ff;
@@ -3623,6 +3948,12 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
     for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
         frame_buffer[i]->ssm = -1;
     }
+
+    info->effect_frame1->data[0] = primary_buffer[0]->Y;       // FIXME target buffer
+    info->effect_frame1->data[1] = primary_buffer[0]->Cb;
+    info->effect_frame1->data[2] = primary_buffer[0]->Cr;
+    info->effect_frame1->data[3] = primary_buffer[0]->alpha;
+
 
     switch (info->uc->playback_mode)
     {
@@ -3645,8 +3976,8 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
             if( res > 0 ) {  
                 cached_sample_frames[0] = info->uc->sample_id;
 
-                if(vj_perform_verify_rows(info))
-                    vj_perform_sample_complete_buffers(info, &is444);
+                if(pvar_.fx_status && vj_perform_verify_rows(info, info->uc->playback_mode, info->uc->sample_id))
+                    vj_perform_sample_complete_buffers(info, &is444, info->effect_frame1, info->effect_frame2, info->uc->sample_id, info->uc->playback_mode);
 
                 cur_out = vj_perform_render_magic( info, info->settings,is444 );
             }
@@ -3679,8 +4010,8 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
             vj_perform_tag_fill_buffer(info);
 
-            if(vj_perform_verify_rows(info))
-                vj_perform_tag_complete_buffers(info, &is444);
+            if(pvar_.fx_status  && vj_perform_verify_rows(info, info->uc->playback_mode, info->uc->sample_id))
+                vj_perform_tag_complete_buffers(info, &is444, info->effect_frame1, info->effect_frame2, info->uc->sample_id, info->uc->playback_mode);//FIXME
                 
             cur_out = vj_perform_render_magic( info, info->settings, is444 );
             res = 1;     
@@ -3793,6 +4124,12 @@ void    vj_perform_randomize(veejay_t *info)
     int min_delay = 1;
     int max_delay = 0;
     int use = ( take_n == track_dup ? 0: 1 );
+
+    if(take_n == 1 && !sample_exists(take_n)) {
+        veejay_msg(0, "No samples to randomize");
+        settings->randplayer.mode = RANDMODE_INACTIVE;
+        return;
+    }
 
     while(!sample_exists(take_n)  || !use)
     {

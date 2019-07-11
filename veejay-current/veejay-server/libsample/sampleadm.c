@@ -707,6 +707,14 @@ int sample_entry_set_is_rendering(int s1, int position, int value) {
     return 1;
 }
 
+int sample_get_position(int s1)
+{
+    sample_info *si = sample_get(s1);
+
+    if(!si) return 0;
+
+    return si->offset;
+}
 
 int sample_update_offset(int s1, int n_frame)
 {

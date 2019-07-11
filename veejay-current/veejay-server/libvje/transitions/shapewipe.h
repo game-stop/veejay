@@ -23,5 +23,6 @@
 vj_effect *shapewipe_init(int w, int h);
 int shapewipe_malloc(int w, int h);
 void shapewipe_free();
-void shapewipe_apply( VJFrame *frame, VJFrame *frame2, int shape, int threshold, int duration, int automatic);
+void shapewipe_apply( VJFrame *frame, VJFrame *frame2, double timecode, int shape, int threshold, int duration, int automatic);
+int shapewipe_apply1( VJFrame *frame, VJFrame *frame2, double timecode, int shape, int threshold, int direction, int automatic);
 #endif

@@ -204,6 +204,7 @@ extern int sample_readFromFile(char *, void *vp, void *ptr, void *font, void *el
 extern int sample_writeToFile(char *, void *vp, void *ptr, void *font, int id, int mode);
 #endif
 extern int sample_update_offset(int s1, int nframe);
+extern int sample_get_position(int s1);
 extern int sample_set_state(int new_state);
 extern int sample_get_state();
 extern sample_info *sample_skeleton_new(long startFrame, long endFrame);

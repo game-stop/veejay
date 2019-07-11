@@ -262,13 +262,13 @@ void shapewipe_free() {
     }
 }
 
-void shapewipe_apply( VJFrame *frame, VJFrame *frame2, int shape, int threshold, int direction, int automatic)
+int shapewipe_apply1( VJFrame *frame, VJFrame *frame2, double timecode, int shape, int threshold, int direction, int automatic)
 {
     if( shape != currentshape) {
         selected_shape = change_shape( selected_shape, shape, frame->width, frame->height );
         if(selected_shape == NULL) {
             veejay_msg(0, "Unable to read %s", shapelist[ shape ] );
-            return;
+            return 0;
         }
         currentshape = shape;
         VJFrame *tmp = vj_picture_get( selected_shape );
@@ -283,22 +283,28 @@ void shapewipe_apply( VJFrame *frame, VJFrame *frame2, int shape, int threshold,
     if(direction) {
 
         if(automatic)
-            auto_threshold = (int) ( frame->timecode * range ) + shape_min;
+            auto_threshold = (int) ( timecode * range ) + shape_min;
 
         shape_wipe_1( frame->data, frame2->data, s->data[0], frame->len, auto_threshold );
-
-        if( auto_threshold == shape_min )
-            shape_completed = 0;
+        
+        if( auto_threshold >= shape_max )
+            return 1;
     }
     else {
 
         if(automatic)
-            auto_threshold = (int) range - (frame->timecode * range ) + shape_min;
+            auto_threshold = (int) range - (timecode * range ) + shape_min;
 
         shape_wipe_2( frame->data, frame2->data, s->data[0], frame->len, auto_threshold );
 
-        if( auto_threshold == shape_max )
-            shape_completed = 1;
+        if( auto_threshold <= shape_min )
+            return 1;
     }
 
+    return 0;
+}
+
+void shapewipe_apply( VJFrame *frame, VJFrame *frame2, double timecode, int shape, int threshold, int direction, int automatic)
+{
+    shape_completed = shapewipe_apply1(frame,frame2,timecode,shape,threshold,direction,automatic);
 }

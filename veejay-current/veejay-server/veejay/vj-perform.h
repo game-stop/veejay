@@ -23,6 +23,7 @@ int vj_perform_audio_start(veejay_t * info);
 
 void vj_perform_audio_status(struct timeval tmpstmp, unsigned int nb_out,
 			     unsigned int nb_err);
+int vj_perform_transition_sample( veejay_t *info, VJFrame *current );
 
 void vj_perform_audio_stop(veejay_t * info);
 

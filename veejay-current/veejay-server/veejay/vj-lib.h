@@ -115,6 +115,18 @@ typedef struct
 	int	rec_id;
 } sequencer_t;
 
+typedef struct
+{
+    int active;
+    int shape;
+    int next_id;
+    int next_type;
+    double timecode;
+    long start;
+    long end;
+    int ready;
+} transition_t;
+
 typedef struct {
 	pthread_t software_playback_thread;
 	pthread_t playback_thread;
@@ -206,6 +218,7 @@ typedef struct {
 	int	splitscreen;
 	int clear_alpha;
 	int alpha_value;
+    transition_t transition;
 } video_playback_setup;
 
 typedef struct {

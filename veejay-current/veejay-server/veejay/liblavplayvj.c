@@ -544,8 +544,11 @@ int veejay_init_editlist(veejay_t * info)
     return 0;
 }
 
-static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
+int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 {
+    if( info->settings->transition.active )
+        return 0;
+
 	if(!sample_stop_playing( info->uc->sample_id, new_sample_id ) )
 	{
 		veejay_msg(0, "Error while stopping sample %d", new_sample_id );
@@ -576,10 +579,10 @@ static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 }
 int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 {
-	int looptype,speed,start,end;
 	video_playback_setup *settings = info->settings;
+    int looptype,speed,start,end;
 
-	editlist *E = sample_get_editlist( sample_id );
+    editlist *E = sample_get_editlist( sample_id );
 	info->current_edit_list = E;
 	veejay_reset_el_buffer(info);
 
@@ -675,6 +678,7 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 {
+    video_playback_setup *settings = info->settings;
 	if( new_pm == VJ_PLAYBACK_MODE_SAMPLE ) {
 		if(!sample_exists(sample_id)) {
 			veejay_msg(0,"Sample %d does not exist");
@@ -691,6 +695,27 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 			return;	
 		}
 	}
+
+    if( settings->transition.ready == 0 && new_pm != VJ_PLAYBACK_MODE_PLAIN &&
+            (new_pm == info->uc->playback_mode && sample_id != info->uc->sample_id)) {
+        settings->transition.next_type = new_pm;
+        settings->transition.next_id = sample_id;
+        
+        if(settings->current_playback_speed < 0 ) {
+            settings->transition.start = settings->current_frame_num;
+            settings->transition.end = settings->current_frame_num - 50;
+            if(settings->transition.end < settings->min_frame_num)
+                settings->transition.end = settings->min_frame_num;
+        }
+        else if(settings->current_playback_speed > 0 ) {
+            settings->transition.start = settings->current_frame_num;
+            settings->transition.end = settings->current_frame_num + 50;
+            if( settings->transition.end > settings->max_frame_num )
+                settings->transition.end = settings->max_frame_num;
+        }
+        settings->transition.active = 1;
+        return;
+    }
 
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
 	{
