@@ -3794,6 +3794,12 @@ void    vj_perform_randomize(veejay_t *info)
     int max_delay = 0;
     int use = ( take_n == track_dup ? 0: 1 );
 
+    if(take_n == 1 && !sample_exists(take_n)) {
+        veejay_msg(0,"No samples to randomize");
+        settings->randplayer.mode = RANDMODE_ACTIVE;
+        return;
+    }
+
     while(!sample_exists(take_n)  || !use)
     {
         veejay_msg(VEEJAY_MSG_DEBUG, 
