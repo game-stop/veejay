@@ -3,6 +3,8 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -I$(top_srcdir)/thirdparty \
               -I$(top_builddir)/libvjmsg
 
+AM_CPPFLAGS += $(FFMPEG_CFLAGS)
+
 AM_CFLAGS = $(OP_CFLAGS)
 
 VJMEM_LIB_FILE = libvjmem.la
