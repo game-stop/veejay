@@ -4795,7 +4795,7 @@ void    vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     if( args[0] == 0 || args[0] == 1 ) {
-        vj_perform_follow_fade( args[0] );
+        vj_perform_follow_fade( ptr, args[0] );
     }
 }
 
@@ -8276,8 +8276,8 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     int w=0,h=0;
-    int max_w = vj_perform_preview_max_width();
-    int max_h = vj_perform_preview_max_height();
+    int max_w = vj_perform_preview_max_width(v);
+    int max_h = vj_perform_preview_max_height(v);
         
     w = args[0]; 
     h = args[1];
@@ -8297,21 +8297,23 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
         vj_fastbw_picture_save_to_mem(
                 &frame,
                 w,
-                h);
+                h,
+                vj_perform_get_preview_buffer(v));
         dstlen = w * h;
     }
     else {
         vj_fast_picture_save_to_mem(
                 &frame,
                 w,
-                h);
+                h,
+                vj_perform_get_preview_buffer(v));
         dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
     }
 
     char header[9];
     snprintf( header,sizeof(header), "%06d%1d%1d", dstlen, use_bw_preview_, yuv_get_pixel_range() );
     SEND_DATA(v, header, 8 );
-    SEND_DATA(v, vj_perform_get_preview_buffer(), dstlen );
+    SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen );
 }
 
 void    vj_event_get_cali_image     (   void *ptr,  const char format[],    va_list ap  )
@@ -10518,8 +10520,8 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
     
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    int max_w = vj_perform_preview_max_width();
-    int max_h = vj_perform_preview_max_height();
+    int max_w = vj_perform_preview_max_width(v);
+    int max_h = vj_perform_preview_max_height(v);
         
     int w = args[2]; 
     int h = args[3];
@@ -10587,21 +10589,23 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
         vj_fastbw_picture_save_to_mem(
                 frame,
                 w,
-                h);
+                h,
+                vj_perform_get_preview_buffer(v));
         dstlen = w * h;
     }
     else {
         vj_fast_picture_save_to_mem(
                 frame,
                 w,
-                h );
+                h,
+                vj_perform_get_preview_buffer(v) );
         dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
     }
 
     char header[16];
     snprintf( header,sizeof(header), "%06d%04d%2d%1d", dstlen, args[0],args[1], yuv_get_pixel_range() );
     SEND_DATA(v, header, 13 );
-    SEND_DATA(v, vj_perform_get_preview_buffer(), dstlen );
+    SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen );
 
     free(frame);
 

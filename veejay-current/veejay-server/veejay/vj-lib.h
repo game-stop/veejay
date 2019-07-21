@@ -298,6 +298,10 @@ typedef struct {
     VJFrame *effect_frame1;
 	VJFrame *effect_frame2;
 	VJFrameInfo *effect_frame_info;
+    VJFrame *effect_frame3;
+	VJFrame *effect_frame4;
+	VJFrameInfo *effect_frame_info2;
+    vjp_kf *effect_info2;	/* effect dependent variables */
     vjp_kf *effect_info;	/* effect dependent variables */
 #ifdef HAVE_DIRECTFB
     void *dfb;
@@ -369,6 +373,8 @@ typedef struct {
 	int	show_cursor;
 	int 	qrcode;
     int read_plug_cfg;
+
+    void *performer;
 } veejay_t;
 
 typedef struct {

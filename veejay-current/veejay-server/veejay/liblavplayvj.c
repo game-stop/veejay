@@ -409,6 +409,12 @@ int veejay_free(veejay_t * info)
 	if( info->effect_frame_info) free(info->effect_frame_info);
 	if( info->effect_frame2) free(info->effect_frame2);
 	if( info->effect_info) free( info->effect_info );
+	if( info->effect_frame3) free(info->effect_frame3);
+	if( info->effect_frame_info2) free(info->effect_frame_info2);
+	if( info->effect_frame4) free(info->effect_frame4);
+	if( info->effect_info2) free( info->effect_info2 );
+
+
 	if( info->dummy ) free(info->dummy );
 	
     free( info->seq );
@@ -2719,11 +2725,9 @@ int	prepare_cache_line(int perc, int n_slots)
 	}
 
 	max_memory -= mmap_memory;
-	max_memory -= (vj_perform_fx_chain_size()/1024);
 
 	if( perc > 0 && max_memory <= 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Please enter a larger value for -m");
-		veejay_msg(VEEJAY_MSG_ERROR, "Need a minimum of %ld MB RAM to run if -M is not specified", vj_perform_fx_chain_size()/(1024*1024));
 		return 1;
 	}
 
@@ -2786,9 +2790,16 @@ veejay_t *veejay_malloc()
     info->effect_frame_info = (VJFrameInfo*) vj_calloc(sizeof(VJFrameInfo));
 	if(!info->effect_frame_info)
 		return NULL;
+    info->effect_frame_info2 = (VJFrameInfo*) vj_calloc(sizeof(VJFrameInfo));
+	if(!info->effect_frame_info2)
+		return NULL;
 
     info->effect_info = (vjp_kf*) vj_calloc(sizeof(vjp_kf));
 	if(!info->effect_info) 
+		return NULL;   
+    
+    info->effect_info2 = (vjp_kf*) vj_calloc(sizeof(vjp_kf));
+	if(!info->effect_info2) 
 		return NULL;   
 
 	info->dummy = (dummy_t*) vj_calloc(sizeof(dummy_t));
@@ -3617,6 +3628,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	info->effect_frame_info->width = info->video_output_width;
 	info->effect_frame_info->height= info->video_output_height;
 
+	info->effect_frame_info2->width = info->video_output_width;
+	info->effect_frame_info2->height= info->video_output_height;
+
 	return 1;
 }
 
@@ -3767,6 +3781,10 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	info->effect_frame1->fps = info->settings->output_fps;
 	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame2->fps = info->settings->output_fps;
+	info->effect_frame3 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	info->effect_frame3->fps = info->settings->output_fps;
+	info->effect_frame4 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	info->effect_frame4->fps = info->settings->output_fps;
 
 	veejay_msg(VEEJAY_MSG_DEBUG,"Performer is working in %s (%d)", yuv_get_pixfmt_description(info->effect_frame1->format), info->effect_frame1->format);
 
