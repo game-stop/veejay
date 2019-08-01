@@ -20,8 +20,27 @@
 
 #ifndef CIRCLES_H
 #define CIRCLES_H
+
+typedef enum _vj_effect_orientation{
+    VJ_EFFECT_ORIENTATION_CENTER = 0,
+    VJ_EFFECT_ORIENTATION_NORTH,
+    VJ_EFFECT_ORIENTATION_NORTHEAST,
+    VJ_EFFECT_ORIENTATION_EAST,
+    VJ_EFFECT_ORIENTATION_SOUTHEAST,
+    VJ_EFFECT_ORIENTATION_SOUTH,
+    VJ_EFFECT_ORIENTATION_SOUTHWEST,
+    VJ_EFFECT_ORIENTATION_WEST,
+    VJ_EFFECT_ORIENTATION_NORTHWEST,
+}vj_effect_orientation;
+
+typedef enum _vj_effect_parity{
+    VJ_EFFECT_PARITY_EVEN = 0,
+    VJ_EFFECT_PARITY_ODD ,
+    VJ_EFFECT_PARITY_NO ,
+}vj_effect_parity;
+
 vj_effect *halftone_init(int w, int h);
-void halftone_apply( VJFrame *frame, int radius, int mode);
+void halftone_apply( VJFrame *frame, int radius, int mode, int orientation, int odd);
 int halftone_malloc(int w, int h);
 void halftone_free();
 #endif
