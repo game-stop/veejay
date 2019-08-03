@@ -74,89 +74,6 @@ void halftone_free()
 {
 }
 
-/****************************************************************************************************
- *
- * halftone_getbounds(int radius, int orientation, int odd, int * x_inf, int * y_inf, int * x_sup, int * y_sup)
- *
- * Adjust the given screen bounds depending the given orentation and parity of the grid
- *
- * \param radius
- * \param orientation type vj_effect_orientation
- * \param parity type vj_effect_parity
- * \param x_inf OUT
- * \param y_inf OUT
- * \param x_sup IN/OUT ; caller must initialize with with
- * \param y_sup IN/OUT ; caller must initialize with height
- *
- ****************************************************************************************************/
-static inline void halftone_getbounds(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int * x_inf, int * y_inf, int * x_sup, int * y_sup) {
-
-    int w, h;
-    int dotqtt_h;
-    int dotqtt_w;
-
-    w = *x_sup;
-    h = *y_sup;
-    switch (orientation) {
-        case VJ_EFFECT_ORIENTATION_CENTER:
-            dotqtt_h = (int) h / radius;
-            if (dotqtt_h * radius != h) dotqtt_h++;
-
-            dotqtt_w = (int) w / radius;
-            if (dotqtt_w * radius != w) dotqtt_w++;
-
-            switch(parity) {
-                case VJ_EFFECT_PARITY_EVEN:
-                    if ((dotqtt_h % 2) != 0) dotqtt_h++ ;
-                    if ((dotqtt_w % 2) != 0) dotqtt_w++ ;
-                break;
-                case VJ_EFFECT_PARITY_ODD:
-                    if ((dotqtt_h % 2) == 0) dotqtt_h++ ;
-                    if ((dotqtt_w % 2) == 0) dotqtt_w++ ;
-                break;
-                case VJ_EFFECT_PARITY_NO:
-                default:
-                break;
-            }
-
-            *x_inf = (w - (dotqtt_w * radius)) / 2;
-            *y_inf = (h - (dotqtt_h * radius)) / 2;
-        break;
-        case VJ_EFFECT_ORIENTATION_NORTHEAST: // North East is do nothing case.
-        break;
-        case VJ_EFFECT_ORIENTATION_NORTH:
-        break;
-        case VJ_EFFECT_ORIENTATION_EAST:
-        break;
-        case VJ_EFFECT_ORIENTATION_SOUTHEAST:
-        break;
-        case VJ_EFFECT_ORIENTATION_SOUTH:
-        break;
-        case VJ_EFFECT_ORIENTATION_SOUTHWEST:
-        break;
-        case VJ_EFFECT_ORIENTATION_WEST:
-        break;
-        case VJ_EFFECT_ORIENTATION_NORTHWEST:
-        break;
-    }
-}
-
-static inline void draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
-{
-  const int tx = (bw / 2);
-  const int ty = (bh / 2);
-  int x, y;
-
-  for (y = -radius; y <= radius; y++)
-    for (x = -radius; x <= radius; x++)
-      if ((x * x) + (y * y) <= (radius * radius)) {
-          if( (tx + x + cx) < w &&
-              (ty + y + cy) < h ) {
-            data[(ty + cy + y) * w + (tx + cx + x) ] = value;
-        }
-      }
-}
-
 static void halftone_apply_avg_col( VJFrame *frame, int radius, int orientation, int odd)
 {
     uint8_t *Y = frame->data[0];
@@ -176,7 +93,7 @@ static void halftone_apply_avg_col( VJFrame *frame, int radius, int orientation,
     x_sup = w;
     y_sup = h;
 
-    halftone_getbounds(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
 
     for( y = y_inf; y < h; y += radius ) {
         for( x = x_inf; x < w; x += radius ) {
@@ -207,9 +124,9 @@ static void halftone_apply_avg_col( VJFrame *frame, int radius, int orientation,
             uint32_t val = (sum / hit);
             int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
                
-            draw_circle( Y , x,y, bw, bh, w, h, wrad, val );
-            draw_circle( U , x,y, bw, bh, w, h, wrad, u );
-            draw_circle( V , x,y, bw, bh, w, h, wrad, v );
+            veejay_draw_circle( Y , x,y, bw, bh, w, h, wrad, val );
+            veejay_draw_circle( U , x,y, bw, bh, w, h, wrad, u );
+            veejay_draw_circle( V , x,y, bw, bh, w, h, wrad, v );
         }
     }
 
@@ -235,7 +152,7 @@ static void halftone_apply_avg_gray( VJFrame *frame, int radius, int orientation
     x_sup = w;
     y_sup = h;
 
-    halftone_getbounds(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
 
     for( y = y_inf; y < h; y += radius ) {
         for( x = x_inf; x < w; x += radius ) {
@@ -260,7 +177,7 @@ static void halftone_apply_avg_gray( VJFrame *frame, int radius, int orientation
 
             uint32_t val = (sum / hit);
             int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
-            draw_circle( Y,x,y, bw, bh, w, h, wrad, val );
+            veejay_draw_circle( Y,x,y, bw, bh, w, h, wrad, val );
         }
     }
 
@@ -288,7 +205,7 @@ static void halftone_apply_avg_black( VJFrame *frame, int radius, int orientatio
     x_sup = w;
     y_sup = h;
 
-    halftone_getbounds(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
 
     for( y = y_inf; y < h; y += radius ) {
         for( x = x_inf; x < w; x += radius ) {
@@ -313,7 +230,7 @@ static void halftone_apply_avg_black( VJFrame *frame, int radius, int orientatio
 
             uint32_t val = (sum / hit);
             int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
-            draw_circle( Y,x,y, bw, bh, w, h, wrad, pixel_Y_lo_ );
+            veejay_draw_circle( Y,x,y, bw, bh, w, h, wrad, pixel_Y_lo_ );
         }
     }
 
@@ -340,7 +257,7 @@ static void halftone_apply_avg_white( VJFrame *frame, int radius, int orientatio
     x_sup = w;
     y_sup = h;
 
-    halftone_getbounds(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+    grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
 
     for( y =  y_inf ; y < h; y += radius ) {
         for( x =  x_inf ; x < w; x += radius ) {
@@ -365,7 +282,7 @@ static void halftone_apply_avg_white( VJFrame *frame, int radius, int orientatio
 
             uint32_t val = (sum / hit);
             int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
-            draw_circle( Y,x,y, bw, bh, w, h, wrad, pixel_Y_hi_ );
+            veejay_draw_circle( Y,x,y, bw, bh, w, h, wrad, pixel_Y_hi_ );
         }
     }
 

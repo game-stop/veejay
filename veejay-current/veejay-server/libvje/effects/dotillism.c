@@ -95,22 +95,6 @@ static void dotillism_posterize_input(uint8_t *Y, const int len, const int level
     }
 }
 
-static inline void draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
-{
-  const int tx = (bw / 2);
-  const int ty = (bh / 2);
-  int x, y;
-
-  for (y = -radius; y <= radius; y++)
-    for (x = -radius; x <= radius; x++)
-      if ((x * x) + (y * y) <= (radius * radius)) {
-          if( (tx + x + cx) < w &&
-              (ty + y + cy) < h ) {
-            data[(ty + cy + y) * w + (tx + cx + x) ] = value;
-        }
-      }
-}
-
 static inline void draw_circle_add_Y( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
 {
   const int tx = (bw / 2);
@@ -183,9 +167,9 @@ static void dotillism_apply_stage1( VJFrame *frame, int radius)
             uint32_t val = map[ y * w + x ];
             int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
                
-            draw_circle( Y , x,y, bw, bh, w, h, wrad, val );
-            draw_circle( U , x,y, bw, bh, w, h, wrad, u );
-            draw_circle( V , x,y, bw, bh, w, h, wrad, v );
+            veejay_draw_circle( Y , x,y, bw, bh, w, h, wrad, val );
+            veejay_draw_circle( U , x,y, bw, bh, w, h, wrad, u );
+            veejay_draw_circle( V , x,y, bw, bh, w, h, wrad, v );
         }
     }
 

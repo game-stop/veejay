@@ -378,6 +378,9 @@ extern void motionmap_interpolate_frame(VJFrame *fx, int N, int n);
 extern uint8_t *motionmap_bgmap();
 extern uint32_t motionmap_activity();
 extern int    yuv_use_auto_ccir_jpeg();
+
+void veejay_draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value );
+
 void veejay_histogram_analyze( void *his, VJFrame *f , int t);
 void veejay_histogram_del(void *his);
 void *veejay_histogram_new();
@@ -401,6 +404,27 @@ void vje_mean_filter( const uint8_t *src, uint8_t *dst, const int w, const int h
 void init_sqrt_map_pixel_values();
 double sqrt_table_get_pixel( int x, int h );
 void sqrt_table_pixels_free();
+
+
+typedef enum _vj_effect_orientation{
+    VJ_EFFECT_ORIENTATION_CENTER = 0,
+    VJ_EFFECT_ORIENTATION_NORTH,
+    VJ_EFFECT_ORIENTATION_NORTHEAST,
+    VJ_EFFECT_ORIENTATION_EAST,
+    VJ_EFFECT_ORIENTATION_SOUTHEAST,
+    VJ_EFFECT_ORIENTATION_SOUTH,
+    VJ_EFFECT_ORIENTATION_SOUTHWEST,
+    VJ_EFFECT_ORIENTATION_WEST,
+    VJ_EFFECT_ORIENTATION_NORTHWEST,
+}vj_effect_orientation;
+
+typedef enum _vj_effect_parity{
+    VJ_EFFECT_PARITY_EVEN = 0,
+    VJ_EFFECT_PARITY_ODD ,
+    VJ_EFFECT_PARITY_NO ,
+}vj_effect_parity;
+
+void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int * x_inf, int * y_inf, int * x_sup, int * y_sup);
 
 #ifdef HAVE_ASM_MMX
 void vje_load_mask(uint8_t val);
