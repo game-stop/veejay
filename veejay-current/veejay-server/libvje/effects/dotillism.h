@@ -21,7 +21,7 @@
 #ifndef DOTILLISM_H
 #define DOTILLISM_H
 vj_effect *dotillism_init(int w, int h);
-void dotillism_apply( VJFrame *frame, int radius, int levels, int space1, int space2, int invert);
+void dotillism_apply( VJFrame *frame, int radius, int levels, int space1, int space2, int invert, int orientation, int parity);
 int dotillism_malloc(int w, int h);
 void dotillism_free();
 #endif
