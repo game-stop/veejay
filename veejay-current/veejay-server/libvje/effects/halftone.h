@@ -20,8 +20,9 @@
 
 #ifndef CIRCLES_H
 #define CIRCLES_H
+
 vj_effect *halftone_init(int w, int h);
-void halftone_apply( VJFrame *frame, int radius, int mode);
+void halftone_apply( VJFrame *frame, int radius, int mode, int orientation, int odd);
 int halftone_malloc(int w, int h);
 void halftone_free();
 #endif

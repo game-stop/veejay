@@ -26,7 +26,7 @@
 vj_effect *dotillism_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
+    ve->num_params = 7;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -41,17 +41,27 @@ vj_effect *dotillism_init(int w, int h)
     ve->limits[1][3] = w;
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 1;
+    ve->limits[0][5] = 0;
+    ve->limits[1][5] = 1;
+    ve->limits[0][6] = 0;
+    ve->limits[1][6] = 2;
     ve->defaults[0] = ( w > h ? w / 64 : h / 64 );
     ve->defaults[1] = 2;
     ve->defaults[2] = 0;
     ve->defaults[3] = 0;
     ve->defaults[4] = 0;
+    ve->defaults[5] = 0;
+    ve->defaults[6] = 0;
     ve->description = "Dotillism";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->parallel = 0;
 	ve->has_user = 0;
-    ve->param_description = vje_build_param_list( ve->num_params, "Radius", "Levels", "Vertical Spacing", "Horizontal Spacing", "Invert" );
+    ve->param_description = vje_build_param_list( ve->num_params, "Radius", "Levels", "Vertical Spacing", "Horizontal Spacing", "Invert", "Orientation", "Parity" );
+
+    ve->hints = vje_init_value_hint_list( ve->num_params );
+    vje_build_value_hint_list( ve->hints, ve->limits[1][5],5, "Centered", "North West");// , "North", "North East", "East", "South East" ...); // TODO
+    vje_build_value_hint_list( ve->hints, ve->limits[1][6],6, "Even", "Odd", "No parity"); //TODO add 'Berzek?' parameter aka broken/random parity; very cool on Mode animation
 
     return ve;
 }
@@ -95,22 +105,6 @@ static void dotillism_posterize_input(uint8_t *Y, const int len, const int level
     }
 }
 
-static inline void draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
-{
-  const int tx = (bw / 2);
-  const int ty = (bh / 2);
-  int x, y;
-
-  for (y = -radius; y <= radius; y++)
-    for (x = -radius; x <= radius; x++)
-      if ((x * x) + (y * y) <= (radius * radius)) {
-          if( (tx + x + cx) < w &&
-              (ty + y + cy) < h ) {
-            data[(ty + cy + y) * w + (tx + cx + x) ] = value;
-        }
-      }
-}
-
 static inline void draw_circle_add_Y( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
 {
   const int tx = (bw / 2);
@@ -145,7 +139,7 @@ static inline void draw_circle_add_UV( uint8_t *data, int cx, int cy, const int 
 }
 
 
-static void dotillism_apply_stage1( VJFrame *frame, int radius)
+static void dotillism_apply_stage1( VJFrame *frame, int radius, int orientation, int parity)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -157,10 +151,17 @@ static void dotillism_apply_stage1( VJFrame *frame, int radius)
     const int bw = radius;
     const int bh = radius;
 
-    int x,y,x1,y1;
+    int x,y,x1,y1,x_inf,y_inf, x_sup, y_sup;
 
-    for( y = 0; y < h; y += radius ) {
-        for( x = 0; x < w; x += radius ) {
+    x_inf = 0; // initial init for North East
+    y_inf = 0;
+    x_sup = w;
+    y_sup = h;
+
+    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup);
+
+    for( y = y_inf; y < h; y += radius ) {
+        for( x = x_inf; x < w; x += radius ) {
 
             uint8_t u = U[ y * w + x ];
             uint8_t v = V[ y * w + x ];
@@ -172,8 +173,8 @@ static void dotillism_apply_stage1( VJFrame *frame, int radius)
             if( lim_y > h)
                 lim_y = h;
 
-            for( y1 = y; y1 < lim_y; y1 ++ ) {
-                for( x1 = x; x1 < lim_x; x1 ++ ) {
+            for( y1 = (y < 0) ? 0 : y ; y1 < lim_y; y1 ++ ) {
+                for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
                     Y[ y1 * w + x1 ] = pixel_Y_lo_;
                     U[ y1 * w + x1 ] = 128;
                     V[ y1 * w + x1 ] = 128;
@@ -183,15 +184,15 @@ static void dotillism_apply_stage1( VJFrame *frame, int radius)
             uint32_t val = map[ y * w + x ];
             int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
                
-            draw_circle( Y , x,y, bw, bh, w, h, wrad, val );
-            draw_circle( U , x,y, bw, bh, w, h, wrad, u );
-            draw_circle( V , x,y, bw, bh, w, h, wrad, v );
+            veejay_draw_circle( Y , x,y, bw, bh, w, h, wrad, val );
+            veejay_draw_circle( U , x,y, bw, bh, w, h, wrad, u );
+            veejay_draw_circle( V , x,y, bw, bh, w, h, wrad, v );
         }
     }
 
 }
 
-static void dotillism_apply_stage2( VJFrame *frame, int radius, int space_y, int space_x)
+static void dotillism_apply_stage2( VJFrame *frame, int radius, int space_y, int space_x, int orientation, int parity)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -203,13 +204,20 @@ static void dotillism_apply_stage2( VJFrame *frame, int radius, int space_y, int
     const int bw = radius;
     const int bh = radius;
 
-    int x,y,x1,y1;
+    int x,y,x1,y1,x_inf,y_inf, x_sup, y_sup;
 
     int incr_y = rad + space_y;
     int incr_x = radius;
 
-    for( y = 0; y < h; y += incr_y ) {
-        for( x = 0; x < w; x += incr_x ) {
+    x_inf = 0; // initial init for North East
+    y_inf = 0;
+    x_sup = w;
+    y_sup = h;
+
+    grid_getbounds_from_orientation(radius, orientation, parity, &x_inf, &y_inf, &x_sup, &y_sup);
+
+    for( y = y_inf; y < h; y += incr_y ) {
+        for( x = x_inf; x < w; x += incr_x ) {
 
             uint8_t u = U[ y * w + x ];
             uint8_t v = V[ y * w + x ];
@@ -227,11 +235,11 @@ static void dotillism_apply_stage2( VJFrame *frame, int radius, int space_y, int
 }
 
 
-void dotillism_apply( VJFrame *frame, int radius, int levels, int min_v_spacing, int min_h_spacing, int invert)
+void dotillism_apply( VJFrame *frame, int radius, int levels, int min_v_spacing, int min_h_spacing, int invert, int orientation, int parity)
 {
     dotillism_posterize_input( frame->data[0], frame->len, levels, invert );
 
-    dotillism_apply_stage1( frame, radius );
+    dotillism_apply_stage1( frame, radius, orientation, parity);
 
-    dotillism_apply_stage2( frame, radius, min_v_spacing, min_h_spacing );
+    dotillism_apply_stage2( frame, radius, min_v_spacing, min_h_spacing, orientation, parity );
 }
