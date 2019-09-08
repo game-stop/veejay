@@ -22,16 +22,22 @@
 #include <veejaycore/vjmem.h>
 #include "slicer.h"
 
-static int *slice_xshift = NULL;
-static int *slice_yshift = NULL;
-static int last_period = -1;
-static int current_period = 1;
+typedef struct {
+    int *slice_xshift;
+    int *slice_yshift;
+    int last_period;
+    int current_period;
+} slicer_t;
 
-static	void recalc(int w, int h , uint8_t *Yinp, int v1, int v2, const int shatter )
+static	void recalc(slicer_t *s, int w, int h , uint8_t *Yinp, int v1, int v2, const int shatter )
 {
   int x,y,dx,dy,r;
   int valx = v1;
   int valy = v2;
+
+  int *slice_xshift = s->slice_xshift;
+  int *slice_yshift = s->slice_yshift;
+
   for(x = dx = 0; x < w; x++) 
   {
 	if(dx==0)
@@ -64,15 +70,26 @@ static	void recalc(int w, int h , uint8_t *Yinp, int v1, int v2, const int shatt
 
 }
 
-int     slicer_malloc(int width, int height)
+void *slicer_malloc(int width, int height)
 {
-    slice_xshift = (int*) vj_malloc(sizeof(int) * height);
-    if(!slice_xshift) return 0;
-    slice_yshift = (int*) vj_malloc(sizeof(int) * width);
-    if(!slice_yshift) return 0;
-	last_period = -1;
-	current_period = 1;
-    return 1;
+    slicer_t *s = (slicer_t*) vj_calloc(sizeof(slicer_t));
+    s->last_period = -1;
+    s->current_period = 1;
+
+    s->slice_xshift = (int*) vj_malloc(sizeof(int) * height);
+    if(!s->slice_xshift) {
+        free(s);
+        return NULL;
+    }
+
+    s->slice_yshift = (int*) vj_malloc(sizeof(int) * width);
+    if(!s->slice_yshift) {
+        free(s->slice_xshift);
+        free(s);
+        return NULL;
+    }
+
+    return (void*) s;
 }
 
 vj_effect *slicer_init(int w, int h)
@@ -112,7 +129,7 @@ vj_effect *slicer_init(int w, int h)
 }
 
 
-void slicer_apply( VJFrame *frame, VJFrame *frame2, int val1, int val2,int shatter, int period, int mode)
+void slicer_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
 	int x,y,p,q;
 	const unsigned int width = frame->width;
@@ -128,6 +145,17 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int val1, int val2,int shatt
 	uint8_t *aB = frame2->data[3];
 	int dx,dy;
 
+    int val1 = args[0];
+    int val2 = args[1];
+    int shatter = args[2];
+    int period = args[3];
+    int mode = args[4];
+
+    slicer_t *s = (slicer_t*) ptr;
+
+    int *slice_xshift = s->slice_xshift;
+    int *slice_yshift = s->slice_yshift;
+
 	if( period == 0 ) {
 		srand( val1 * val2 * shatter );
 	}
@@ -135,17 +163,17 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int val1, int val2,int shatt
 		srand( val1 * val2 * shatter * (int)( frame->timecode * 1000 ) );
 	}
 			
-	if( period != last_period ) {
-		last_period = period;
-		current_period = last_period;
+	if( period != s->last_period ) {
+		s->last_period = period;
+		s->current_period = s->last_period;
 	}
 
-	if( current_period <= 0 ) {
-		recalc( width, height, Y2, val1 ,val2, shatter );
-		current_period = last_period;
+	if( s->current_period <= 0 ) {
+		recalc( s, width, height, Y2, val1 ,val2, shatter );
+		s->current_period = s->last_period;
 	}
 
-	current_period --;
+	s->current_period --;
 
 	if( mode == 0 ) {
 		for(y=0; y < height; y++){
@@ -187,14 +215,10 @@ void slicer_apply( VJFrame *frame, VJFrame *frame2, int val1, int val2,int shatt
 	}
 }
 
-void slicer_free()
+void slicer_free(void *ptr)
 {
-	if ( slice_xshift )
-		free( slice_xshift );
-	if ( slice_yshift )
-		free( slice_yshift );
-	slice_xshift = NULL;
-	slice_yshift = NULL;
-	last_period = -1;
-	current_period = 1;
+    slicer_t *s = (slicer_t*) ptr;
+    free( s->slice_xshift );
+    free( s->slice_yshift );
+    free(s);
 }

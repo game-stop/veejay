@@ -21,5 +21,5 @@
 #ifndef KILLCHROMA_H
 #define KILLCHROMA_H
 vj_effect *killchroma_init();
-void killchroma_apply(VJFrame *v, int n);
+void killchroma_apply(void *ptr, VJFrame *v, int *args);
 #endif

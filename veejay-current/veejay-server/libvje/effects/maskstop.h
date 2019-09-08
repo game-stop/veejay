@@ -21,8 +21,8 @@
 #ifndef MASKSTOP_H
 #define MASKSTOP_H
 vj_effect *maskstop_init(int width, int height);
-int maskstop_malloc(int w, int h);
-void maskstop_free();
-void maskstop_apply( VJFrame *frame,int negmask, int swapmask, int framefreq, int maskfreq);
+void *maskstop_malloc(int w, int h);
+void maskstop_free(void *ptr);
+void maskstop_apply(void *ptr, VJFrame *frame,int *args);
 #endif
 

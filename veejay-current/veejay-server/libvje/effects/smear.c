@@ -21,6 +21,7 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "smear.h"
+#include "motionmap.h"
 
 vj_effect *smear_init(int w, int h)
 {
@@ -49,6 +50,23 @@ vj_effect *smear_init(int w, int h)
 
 	return ve;
 }
+
+typedef struct {
+    int n__;
+    int N__;
+    void *motionmap;
+} smear_t;
+
+void *smear_malloc(int w, int h)
+{
+    return (void*) vj_calloc(sizeof(smear_t));
+}
+
+void smear_free(void *ptr)
+{
+    free(ptr);
+}
+
 
 static void _smear_apply_x(VJFrame *frame, int width, int height, int val)
 {
@@ -146,30 +164,42 @@ static void _smear_apply_y(VJFrame *frame, int width, int height, int val)
 }
 
 
-static int n__ = 0;
-static int N__ = 0;
+int smear_request_fx() {
+    return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
+}
 
-void smear_apply( VJFrame *frame,int mode, int val)
+void smear_set_motionmap(void *ptr, void *priv)
+{
+    smear_t *s = (smear_t*) ptr;
+    s->motionmap = priv;
+}
+
+void smear_apply( void *ptr, VJFrame *frame, int *args )
 {
 	int interpolate = 1;
+    int mode = args[0];
+    int val = args[1];
+
 	int tmp1 = mode;
 	int tmp2 = val;
 	int motion = 0;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 
-	if(motionmap_active())
+    smear_t *s = (smear_t*) s;
+
+	if(motionmap_active(s->motionmap))
 	{
-		motionmap_scale_to( 255, 3, 0, 0, &tmp2, &tmp1, &n__, &N__ );
+		motionmap_scale_to(s->motionmap, 255, 3, 0, 0, &tmp2, &tmp1, &(s->n__), &(s->N__) );
 		motion = 1;
 	}
 	else
 	{
-		N__ = 0;
-		n__ = 0;
+		s->N__ = 0;
+		s->n__ = 0;
 	}
 
-	if( n__ == N__ || n__ == 0 )
+	if( s->n__ == s->N__ || s->n__ == 0 )
 		interpolate = 0;
 
 	switch(mode)
@@ -182,10 +212,10 @@ void smear_apply( VJFrame *frame,int mode, int val)
 	}
 
 	if( interpolate )
-		motionmap_interpolate_frame( frame, N__,n__ );
+		motionmap_interpolate_frame(s->motionmap, frame, s->N__,s->n__ );
 
 	if(motion)
-		motionmap_store_frame( frame );
+		motionmap_store_frame(s->motionmap, frame );
 
 }
 

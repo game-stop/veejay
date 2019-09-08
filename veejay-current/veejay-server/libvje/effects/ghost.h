@@ -21,8 +21,8 @@
 #ifndef GHOST_H
 #define GHOST_H
 vj_effect *ghost_init(int w, int h);
-void ghost_apply( VJFrame *frame, int op);
-int	ghost_malloc( int w, int h );
-void ghost_free(void);
+void ghost_apply(void *ptr, VJFrame *frame, int *args);
+void *ghost_malloc( int w, int h );
+void ghost_free(void *ptr);
 
 #endif

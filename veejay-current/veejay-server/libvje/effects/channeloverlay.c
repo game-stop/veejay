@@ -20,9 +20,9 @@
 
 #include <libvje/effects/common.h>
 #include <veejaycore/vjmem.h>
-#include "slidingdoor.h"
+#include "channeloverlay.h"
 
-vj_effect *slidingdoor_init(int width, int height)
+vj_effect *channeloverlay_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
@@ -56,8 +56,9 @@ vj_effect *slidingdoor_init(int width, int height)
 
 
 
-void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int mode)
-{
+void channeloverlay_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int mode = args[0];
+
 	unsigned int i;
 	const int len = frame->len;
 	const uint8_t *Y2 = frame2->data[0];

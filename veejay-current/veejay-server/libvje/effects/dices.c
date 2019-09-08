@@ -31,17 +31,19 @@
 #include <veejaycore/vjmem.h>
 #include "dices.h"
 
-static int g_map_width = 0;
-static int g_map_height = 0;
-static int g_cube_size = 0;
-static int g_cube_bits = 0;
-static uint8_t *g_dicemap=NULL;
-static uint8_t g_orientation=0;
+typedef struct {
+    int g_map_width;
+    int g_map_height;
+    int g_cube_size;
+    int g_cube_bits;
+    uint8_t *g_dicemap;
+    uint8_t g_orientation;
+} dices_t;
 
 #define VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT 4 //random
 
-static void dice_create_map(int w, int h);
-static void dice_create_map_orientation(int w, int h, int orientation);
+static void dice_create_map(dices_t *d, int w, int h);
+static void dice_create_map_orientation(dices_t *d, int w, int h, int orientation);
 
 typedef enum _dice_dir
 {
@@ -92,29 +94,46 @@ vj_effect *dices_init(int width, int height)
 	return ve;
 }
 
-int	dices_malloc(int width, int height)
+void *dices_malloc(int width, int height)
 {
-	g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height);
-	if(!g_dicemap) return 0;
+    dices_t *d = (dices_t*) vj_calloc(sizeof(dices_t));
+    if(!d) {
+        return NULL;
+    }
 
-	dice_create_map(width, height);
-	return 1;
+	d->g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * RUP8(width * height));
+	if(!d->g_dicemap) {
+        free(d);
+        return NULL;
+    }
+
+
+    d->g_orientation = -1;
+
+	return (void*) d;
 }
 
-void dices_free()
+void dices_free(void *ptr)
 {
-	if(g_dicemap)
-		free(g_dicemap);
-	g_dicemap  = NULL;
+    dices_t *d = (dices_t*) ptr;
+    free(d->g_dicemap);
+    free(d);
 }
 
-static void dice_create_map_orientation(int w, int h, int orientation)
+static void dice_create_map_orientation(dices_t *d, int w, int h, int orientation)
 {
 	int k,x, y, i = 0;
 	int maplen = (w * h);
-	g_map_height = h >> g_cube_bits;
-	g_map_width = w >> g_cube_bits;
-	g_cube_size = 1 << g_cube_bits;
+
+    uint8_t *g_dicemap = d->g_dicemap;
+
+	d->g_map_height = h >> d->g_cube_bits;
+	d->g_map_width = w >> d->g_cube_bits;
+	d->g_cube_size = 1 << d->g_cube_bits;
+
+    int g_map_height = d->g_map_height;
+    int g_map_width = d->g_map_width;
+
 	maplen = maplen / (g_map_height * g_map_width);
 	for( k = 0; k < maplen;k++)
 	{
@@ -129,14 +148,22 @@ static void dice_create_map_orientation(int w, int h, int orientation)
 	}
 }
 
-static void dice_create_map(int w, int h)
+static void dice_create_map(dices_t *d, int w, int h)
 {
 	int k,x, y, i = 0;
 	int maplen = (w * h);
-	g_map_height = h >> g_cube_bits;
-	g_map_width = w >> g_cube_bits;
-	g_cube_size = 1 << g_cube_bits;
+
+    uint8_t *g_dicemap = d->g_dicemap;
+
+	d->g_map_height = h >> d->g_cube_bits;
+	d->g_map_width = w >> d->g_cube_bits;
+	d->g_cube_size = 1 << d->g_cube_bits;
+
+    int g_map_height = d->g_map_height;
+    int g_map_width = d->g_map_width;
+
 	maplen = maplen / (g_map_height * g_map_width);
+
 	for( k = 0; k < maplen;k++)
 	{
 		for (y = 0; y < g_map_height; y++)
@@ -150,8 +177,12 @@ static void dice_create_map(int w, int h)
 	}
 }
 
-void dices_apply( void *data, VJFrame *frame, int cube_bits, int orientation)
-{
+void dices_apply( void *ptr, VJFrame *frame, int *args ) {
+    int cube_bits = args[0];
+    int orientation = args[1];
+
+    dices_t *d = (dices_t*) ptr;
+
 	int i = 0, map_x, map_y, map_i = 0, base, dx, dy, di=0;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
@@ -159,16 +190,22 @@ void dices_apply( void *data, VJFrame *frame, int cube_bits, int orientation)
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-	if ((cube_bits != g_cube_bits) || (orientation != g_orientation))
+	if ((cube_bits != d->g_cube_bits) || (orientation != d->g_orientation))
 	{
-		g_cube_bits = cube_bits;
-		g_orientation = orientation;
+		d->g_cube_bits = cube_bits;
+		d->g_orientation = orientation;
 
 		if( orientation == VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT) 
-			dice_create_map(width,height);
+			dice_create_map(d,width,height);
 		else
-			dice_create_map_orientation(width, height, orientation);
+			dice_create_map_orientation(d,width, height, orientation);
 	}
+
+    uint8_t *g_dicemap = d->g_dicemap;
+    int g_map_width = d->g_map_width;
+    int g_map_height = d->g_map_height;
+    int g_cube_bits = d->g_cube_bits;
+    int g_cube_size = d->g_cube_size;
 
 	//TODO dices map centering
 	// when dices size * dice width < frame width ,dice is shifted to be centered.

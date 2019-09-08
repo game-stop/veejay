@@ -201,8 +201,10 @@ void flip_both_yuvdata(VJFrame *frame)
     }
 }
 
-void flip_apply(VJFrame *frame, int h, int v)
-{
+void flip_apply(void *ptr, VJFrame *frame,int *args ) {
+    int h = args[0];
+    int v = args[1];
+
     if ((h == 0) && (v == 0))
         return;
     if ((h == 1) && (v == 1))

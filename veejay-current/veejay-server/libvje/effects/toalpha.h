@@ -21,5 +21,7 @@
 #ifndef TOALPHA_H
 #define TOALPHA_H
 vj_effect *toalpha_init(int w, int h);
-void toalpha_apply( VJFrame *frame, int mode);
+void *toalpha_malloc(int w, int h);
+void toalpha_free(void *ptr);
+void toalpha_apply( void *ptr, VJFrame *frame, int *args);
 #endif

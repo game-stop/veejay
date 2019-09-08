@@ -2032,14 +2032,14 @@ static void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
 
 void	init_parallel_tasks(int n_tasks) 
 {
-	if( n_tasks > 1 ) {	
-		vj_frame_copy = (frame_copy_routine) vj_frame_copyN;
-		vj_frame_clear= (frame_clear_routine) vj_frame_clearN;
-	}
-	else {
+//	if( n_tasks > 1 ) {	
+//		vj_frame_copy = (frame_copy_routine) vj_frame_copyN;
+//		vj_frame_clear= (frame_clear_routine) vj_frame_clearN;
+//	}
+//	else {
 		vj_frame_copy = (frame_copy_routine) vj_frame_simple_copy;
 		vj_frame_clear = (frame_clear_routine) vj_frame_simple_clear;
-	}
+//	}
 }
 
 void	benchmark_veejay(int w, int h)

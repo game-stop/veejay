@@ -23,10 +23,12 @@
 #include <libvje/internal.h>
 #include "magicscratcher.h"
 
-static uint8_t *mframe = NULL;
-static int m_frame = 0;
-static int m_reverse = 0;
-static int m_rerun = 0;
+typedef struct {
+    uint8_t *mframe;
+    int m_frame;
+    int m_reverse;
+    int m_rerun;
+} magicscratcher_t;
 
 vj_effect *magicscratcher_init(int w, int h)
 {
@@ -65,49 +67,64 @@ vj_effect *magicscratcher_init(int w, int h)
 
     return ve;
 }
-int magicscratcher_malloc(int w, int h)
-{
-   mframe =
-	(uint8_t *) vj_calloc( RUP8(w * h) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
-   if(!mframe) return 0;
-   return 1;
-	
-}
-void magicscratcher_free() {
-  if(mframe) free(mframe);
-  m_rerun = 0;
-}
 
-static void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
+void *magicscratcher_malloc(int w, int h)
 {
-    if (!m_reverse) {
-		veejay_memcpy(mframe + (w * h * m_frame), yuv1[0], (w * h));
-    } else {
-		veejay_memcpy(yuv1[0], mframe + (w * h * m_frame), (w * h));
+    magicscratcher_t *m = (magicscratcher_t*) vj_calloc(sizeof(magicscratcher_t));
+    if(!m) {
+        return NULL;
     }
-    if (m_reverse)
-		m_frame--;
-    else
-		m_frame++;
 
-    if (m_frame >= n ) {
+    m->mframe =	(uint8_t *) vj_calloc( RUP8(w * h) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
+    if(!m->mframe) {
+        free(m);
+        return NULL;
+    }
+    return (void*) m;
+}
+
+void magicscratcher_free(void *ptr) {
+    magicscratcher_t *m = (magicscratcher_t*) ptr;
+    free(m->mframe);
+    free(m);
+}
+
+static void store_mframe(magicscratcher_t *m, uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
+{
+    if (!m->m_reverse) {
+		veejay_memcpy(m->mframe + (w * h * m->m_frame), yuv1[0], (w * h));
+    } else {
+		veejay_memcpy(yuv1[0], m->mframe + (w * h * m->m_frame), (w * h));
+    }
+    if (m->m_reverse)
+		m->m_frame--;
+    else
+		m->m_frame++;
+
+    if (m->m_frame >= n ) {
 		if (no_reverse == 0) {
-		    m_reverse = 1;
-	    	m_frame = n - 1;
-			if(m_frame < 0 )
-				m_frame = 0;
+		    m->m_reverse = 1;
+	    	m->m_frame = n - 1;
+			if(m->m_frame < 0 )
+				m->m_frame = 0;
 		} else {
-	  	  m_frame = 0;
+	  	  m->m_frame = 0;
 		}
     }
 
-    if (m_frame == 0)
-		m_reverse = 0;
+    if (m->m_frame == 0)
+		m->m_reverse = 0;
 }
 
 
-void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse, int grayscale)
-{
+void magicscratcher_apply(void *ptr, VJFrame *frame, int *args ) {
+    int mode = args[0];
+    int n = args[1];
+    int no_reverse = args[2];
+    int grayscale = args[3];
+
+    magicscratcher_t *m = (magicscratcher_t*) ptr;
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	unsigned int x;
@@ -118,19 +135,19 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse, int g
     /* param 6 is cool ,8,7,10,13,15, ,9,11,12,14, 
 
        16 voor default ?, 17 (!),18,19, 20(!), 21, 24,,25,30 */
-    int offset = len * m_frame;
+    int offset = len * m->m_frame;
 
     pix_func_Y func_y = get_pix_func_Y((const int) mode);
 
-    if (m_frame == 0) {
-  	  veejay_memcpy(mframe + (len * m_frame), Y, len);
-	  if( m_rerun > 0 ) {
-		  veejay_memcpy( mframe + (len * m_rerun) , Y , len );  
+    if (m->m_frame == 0) {
+  	  veejay_memcpy(m->mframe + (len * m->m_frame), Y, len);
+	  if( m->m_rerun > 0 ) {
+		  veejay_memcpy( m->mframe + (len * m->m_rerun) , Y , len );  
 	  }
     }
 
     for (x = 0; x < len; x++) {
-		Y[x] = func_y( mframe[offset + x], Y[x]);
+		Y[x] = func_y( m->mframe[offset + x], Y[x]);
     }
 
     if (grayscale)
@@ -139,7 +156,8 @@ void magicscratcher_apply(VJFrame *frame, int mode, int n, int no_reverse, int g
         veejay_memset( Cr, 128, (frame->ssm ? len : frame->uv_len));
     }
 
-    m_rerun = m_frame;
+    m->m_rerun = m->m_frame;
 
-    store_mframe(frame->data, width, height, n, no_reverse);
+    store_mframe(m, frame->data, width, height, n, no_reverse);
 }
+

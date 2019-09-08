@@ -21,5 +21,5 @@
 #ifndef TRCITY_H
 #define TRCITY_H
 vj_effect *tripplicity_init();
-void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int opacityL, int opacityCb, int opacityCr);
+void tripplicity_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

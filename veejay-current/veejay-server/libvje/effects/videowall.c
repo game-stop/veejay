@@ -22,7 +22,17 @@
 #include <veejaycore/vjmem.h>
 #include "videowall.h"
 
+typedef struct {
+    picture_t **photo_list;
+    int	num_photos;
+    int frame_counter;
+    int *offset_table_x;
+    int *offset_table_y;
+} videowall_t;
+
 static inline	int	gcd(int p, int q ) { if(q==0) return p; else return(gcd(q,p%q)); }
+
+static void destroy_filmstrip(videowall_t *vw);
 
 static inline	int	n_pics(int w, int h)
 {
@@ -50,120 +60,125 @@ vj_effect *videowall_init(int w, int h)
     ve->defaults[2] = 1; 
     ve->defaults[3] = 0; 
     ve->description = "VideoWall / Tile Placement";
-    ve->sub_format = 1; // todo: optimize to work in 4:2:0/4:2:2, see also photo/video play.c
+    ve->sub_format = 1; 
     ve->extra_frame = 1;
     ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Photos","X Displacement", "Y displacement", "Lock update");
     return ve;
 }
 
-static picture_t **photo_list = NULL;
-static int	   num_photos = 0;
-static int	  frame_counter = 0;
-static int	  *offset_table_x = NULL;
-static int	  *offset_table_y = NULL;
-
-
-
-
-static	int prepare_filmstrip(int w, int h)
+static void *prepare_filmstrip(int w, int h)
 {
 	int i,j;
 	int picture_width = gcd(w,h);
 	int picture_height = gcd(w,h);
 	int film_length = n_pics(w,h);
 
-	photo_list = (picture_t**) vj_calloc(sizeof(picture_t*) * film_length  );
-	if(!photo_list)
-		return 0;
+    videowall_t *vw = (videowall_t*) vj_calloc(sizeof(videowall_t));
+    if(!vw) {
+        return NULL;
+    }
 
-	num_photos = film_length;
+	vw->photo_list = (picture_t**) vj_calloc(sizeof(picture_t*) * film_length  );
+	if(!vw->photo_list) {
+        destroy_filmstrip(vw);
+		return NULL;
+    }
+
+	vw->num_photos = film_length;
 
 	uint8_t val = 0;
-	int inc = num_photos % 255;
+	int inc = vw->num_photos % 255;
 
-	for ( i = 0; i < num_photos; i ++ )
+	for ( i = 0; i < vw->num_photos; i ++ )
 	{
-		photo_list[i] = vj_calloc(sizeof(picture_t));
-		if(!photo_list[i])
-			return 0;
-		photo_list[i]->w = picture_width;
-		photo_list[i]->h = picture_height;
+		vw->photo_list[i] = vj_calloc(sizeof(picture_t));
+		if(!vw->photo_list[i]) {
+			destroy_filmstrip(vw);
+            return NULL;
+        }
+		vw->photo_list[i]->w = picture_width;
+		vw->photo_list[i]->h = picture_height;
 		for( j = 0; j < 3; j ++ )
 		{
-			photo_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
-			if(!photo_list[i]->data[j])
-				return 0;
+			vw->photo_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
+			if(!vw->photo_list[i]->data[j]) {
+                destroy_filmstrip(vw);
+                return NULL;
+            }
 		}
-		veejay_memset( photo_list[i]->data[0], 0,
+		veejay_memset( vw->photo_list[i]->data[0], 0,
 				picture_width * picture_height );
-		veejay_memset( photo_list[i]->data[1],128,
+		veejay_memset( vw->photo_list[i]->data[1],128,
 				picture_width * picture_height );
-		veejay_memset( photo_list[i]->data[2],128,
+		veejay_memset( vw->photo_list[i]->data[2],128,
 				picture_width * picture_height );
 		val+= inc;
 	}
-	frame_counter = 0;
+	vw->frame_counter = 0;
 
-	offset_table_x = (int*) vj_calloc(sizeof(int) * film_length);
-	if(!offset_table_x)
-		return 0;
-	offset_table_y = (int*) vj_calloc(sizeof(int) * film_length);
-	if(!offset_table_y)
-		return 0;
+	vw->offset_table_x = (int*) vj_calloc(sizeof(int) * film_length);
+	if(!vw->offset_table_x) {
+		destroy_filmstrip(vw);
+        return NULL;
+    }
 
-	return 1;
+	vw->offset_table_y = (int*) vj_calloc(sizeof(int) * film_length);
+	if(!vw->offset_table_y) {
+        destroy_filmstrip(vw);
+        return NULL;
+    }
+
+	return (void*) vw;
 }
 
-static void destroy_filmstrip(void)
+static void destroy_filmstrip(videowall_t *vw)
 {
-	if(photo_list)
+	if(vw->photo_list)
 	{
 		int i = 0;
-		while(i < num_photos)
+		while(i < vw->num_photos)
 		{
-			if( photo_list[i] )
+			if( vw->photo_list[i] )
 			{
 				int j;
 				for( j = 0; j < 3; j ++ )
-					if(photo_list[i]->data[j]) 
-					 free(photo_list[i]->data[j]);
-				free(photo_list[i]);
+					if(vw->photo_list[i]->data[j]) 
+					 free(vw->photo_list[i]->data[j]);
+				free(vw->photo_list[i]);
 			}
 			i++;
 		}
-		free(photo_list);
+		free(vw->photo_list);
 	}
-	photo_list = NULL;
-	num_photos = 0;
-	frame_counter = 0;
-	if(offset_table_x) free(offset_table_x);
-	if(offset_table_y) free(offset_table_y);
+	vw->photo_list = NULL;
+	vw->num_photos = 0;
+	vw->frame_counter = 0;
+	if(vw->offset_table_x) free(vw->offset_table_x);
+	if(vw->offset_table_y) free(vw->offset_table_y);
+    free(vw);
 }
 
-
-
-int	videowall_malloc(int w, int h )
+void *videowall_malloc(int w, int h )
 {
-	prepare_filmstrip(w,h);
-	return 1;
+	return prepare_filmstrip(w,h);
 }
 
 
-void	videowall_free(void)
+void	videowall_free(void *ptr)
 {
-	destroy_filmstrip();
+	destroy_filmstrip(ptr);
 }
 
-static void	take_photo( uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
+static void	take_photo( videowall_t *vw, uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
 {
         int x,y,dx,dy;
         int sum;
         int dst_x, dst_y;
         int step_y;
         int step_x;
-        int box_width = photo_list[index]->w;
-        int box_height = photo_list[index]->h;
+        int box_width = vw->photo_list[index]->w;
+        int box_height = vw->photo_list[index]->h;
 
         step_x = w / box_width;
         step_y = h / box_height;
@@ -192,15 +207,15 @@ static void	take_photo( uint8_t *plane, uint8_t *dst_plane, int w, int h, int in
         }
 }
 
-static void put_photo( uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h, int index)
+static void put_photo( videowall_t *vw, uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h, int index)
 {
-	int n = (num_photos/2);
-	int box_w = photo_list[index]->w;
-	int box_h = photo_list[index]->h;
+	int n = (vw->num_photos/2);
+	int box_w = vw->photo_list[index]->w;
+	int box_h = vw->photo_list[index]->h;
 	int x,y;
 	// blits photos left -> right , < n ? :top : bottom
-	int	dy = offset_table_y[index];
-	int	dx = offset_table_x[index];
+	int	dy = vw->offset_table_y[index];
+	int	dx = vw->offset_table_x[index];
 	uint8_t *P = (index < n ? dst_plane + ( dy * dst_w ) : dst_plane + ((abs(dst_h-box_h-dy)%dst_h)*dst_w));
 	int	offset = (box_w * index + dx) % dst_w;	
 
@@ -214,7 +229,7 @@ static void put_photo( uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h,
 	}
 }
 
-void videowall_apply( VJFrame *frameA, VJFrame *frameB, int a,int b, int c, int d )
+void videowall_apply( void *ptr, VJFrame *frameA, VJFrame *frameB, int *args )
 {
 	unsigned int i;
 	const unsigned int width = frameA->width;
@@ -222,31 +237,36 @@ void videowall_apply( VJFrame *frameA, VJFrame *frameB, int a,int b, int c, int 
 	uint8_t *dstY = frameA->data[0];
 	uint8_t *dstU = frameA->data[1];
 	uint8_t *dstV = frameA->data[2];
+    videowall_t *vw = (videowall_t*) ptr;
+    int a = args[0];
+    int b = args[1];
+    int c = args[2];
+    int d = args[3];
 
 	if(d==0)
 	{
-		offset_table_x[a] = b;
-		offset_table_y[a] = c;
+		vw->offset_table_x[a] = b;
+		vw->offset_table_y[a] = c;
 	}
 
 	for( i = 0; i < 3; i ++ )
 	{
-		take_photo( frameA->data[i], photo_list[(frame_counter%num_photos)]->data[i], width, height , frame_counter % num_photos);
+		take_photo( vw, frameA->data[i], vw->photo_list[(vw->frame_counter%vw->num_photos)]->data[i], width, height , vw->frame_counter % vw->num_photos);
 	}
-	frame_counter++;
+	vw->frame_counter++;
 
 	for( i = 0; i < 3; i ++ )
 	{
-		take_photo( frameB->data[i], photo_list[(frame_counter%num_photos)]->data[i], width, height , frame_counter % num_photos);
+		take_photo( vw, frameB->data[i], vw->photo_list[(vw->frame_counter%vw->num_photos)]->data[i], width, height , vw->frame_counter % vw->num_photos);
 	}
 
-	for ( i = 0; i < num_photos; i ++ )
+	for ( i = 0; i < vw->num_photos; i ++ )
 	{
-		put_photo( dstY, photo_list[i]->data[0],width,height,i);
-		put_photo( dstU, photo_list[i]->data[1],width,height,i);
-		put_photo( dstV, photo_list[i]->data[2],width,height,i);
+		put_photo( vw, dstY, vw->photo_list[i]->data[0],width,height,i);
+		put_photo( vw, dstU, vw->photo_list[i]->data[1],width,height,i);
+		put_photo( vw, dstV, vw->photo_list[i]->data[2],width,height,i);
 	}
-	frame_counter++;
+	vw->frame_counter++;
 
 }
 

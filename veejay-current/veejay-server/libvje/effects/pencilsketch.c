@@ -150,9 +150,13 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	}
 
 
-void pencilsketch_apply(VJFrame *frame, int type, int threshold_min,
-                        int threshold_max, int mode)
-{
+void pencilsketch_apply(void *ptr, VJFrame *frame, int *args ) {
+    
+    int type = args[0];
+    int threshold_min = args[1];
+    int threshold_max = args[2];
+    int mode = args[3];
+
 	unsigned int i;
 	int len = frame->len;
 	const unsigned int width = frame->width;
@@ -231,8 +235,6 @@ void pencilsketch_apply(VJFrame *frame, int type, int threshold_min,
 			}
 		
 		}
-
-
 	}
 
 	if(type != 7) /* all b/w sketches */

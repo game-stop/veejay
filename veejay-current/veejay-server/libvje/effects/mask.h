@@ -21,6 +21,5 @@
 #ifndef SIMPLEMASK_H
 #define SIMPLEMASK_H
 vj_effect *simplemask_init();
-void simplemask_apply( VJFrame *frame, VJFrame *frame2, int threshold, int invert);
-void mask_free();
+void simplemask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

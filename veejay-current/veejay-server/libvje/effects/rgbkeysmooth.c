@@ -24,8 +24,7 @@
 
 vj_effect *rgbkeysmooth_init(int w,int h)
 {
-    vj_effect *ve;
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -65,10 +64,14 @@ vj_effect *rgbkeysmooth_init(int w,int h)
 }
 
 
-void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int i_angle,
-                        int r, int g, int b, int opacity, int i_noise)
-{
-
+void rgbkeysmooth_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+        
+    int i_angle = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int opacity = args[4];
+    int i_noise = args[5];
     uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;

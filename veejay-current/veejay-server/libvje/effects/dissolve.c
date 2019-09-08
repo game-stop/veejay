@@ -41,10 +41,9 @@ vj_effect *dissolve_init(int w, int h)
     return ve;
 }
 
+void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int opacity = args[0];
 
-
-void dissolve_apply(VJFrame *frame, VJFrame *frame2, int opacity)
-{
     unsigned int i;
     const int len = frame->len;
     const int op1 = (opacity > 255) ? 255 : opacity;

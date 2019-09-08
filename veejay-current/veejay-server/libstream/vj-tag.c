@@ -61,6 +61,8 @@
 #define SOURCE_NAME_LEN 255
 
 #include <libplugger/plugload.h>
+#include <libvje/libvje.h>
+
 static int recount_hash = 1;
 static unsigned int sample_count = 0;
 static veejay_t *_tag_info = NULL;
@@ -1966,27 +1968,6 @@ int vj_tag_get_effect_any(int t1, int position) {
     return tag->effect_chain[position]->effect_id;
 }
 
-int vj_tag_chain_malloc(int t1)
-{
-    vj_tag  *tag = vj_tag_get(t1);
-    int i=0;
-    int e_id = 0; 
-    int sum =0;
-
-    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-        e_id = tag->effect_chain[i]->effect_id;
-        if(e_id)
-        {
-            int res = 0;
-            tag->effect_chain[i]->fx_instance = vj_effect_activate(e_id, &res);
-            if( res )
-                   sum ++;
-        }
-    }
-    return sum; 
-}
-
 int vj_tag_chain_free(int t1, int global)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -1996,28 +1977,18 @@ int vj_tag_chain_free(int t1, int global)
    
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-        e_id = tag->effect_chain[i]->effect_id;
-        if(e_id!=-1)
-        {
-            if(vj_effect_initialized(e_id, tag->effect_chain[i]->fx_instance) )
-            {
-                vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance, global);
-                tag->effect_chain[i]->fx_instance = NULL;
-                tag->effect_chain[i]->clear = 1;
-                if(tag->effect_chain[i]->kf)
-                    vpf(tag->effect_chain[i]->kf );
-                tag->effect_chain[i]->kf = vpn(VEVO_ANONYMOUS_PORT );
+        if( tag->effect_chain[i]->effect_id == -1 )
+            continue;
 
-                sum++;
+        vjert_del_fx( tag->effect_chain[i],0,i ); //FIXME
+        sum++;
             
-                if( tag->effect_chain[i]->source_type == 1 && 
-                    vj_tag_get_active( tag->effect_chain[i]->channel ) && 
-                    vj_tag_get_type( tag->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) { //FIXME: check if this behaviour is correct
-                    vj_tag_disable( tag->effect_chain[i]->channel );
-                }
-            }
-
-        }
+        if( tag->effect_chain[i]->source_type == 1 && 
+            vj_tag_get_active( tag->effect_chain[i]->channel ) && 
+            vj_tag_get_type( tag->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) { //FIXME: check if this behaviour is correct
+            vj_tag_disable( tag->effect_chain[i]->channel );
+        
+        }   
     } 
 
     return sum;
@@ -2129,90 +2100,47 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     int params, i;
     vj_tag *tag = vj_tag_get(t1);
 
-    if (!tag)
+    if (!tag) {
         return 0;
-    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
+    }
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS) {
         return 0;
-
-    if( vj_effect_single_instance( effect_id ))
-		return 0;   
+    }
+    if (!vje_is_valid(effect_id))
+        return 0;
 
 	veejay_memset( &(tag->effect_chain[position]->transition), 0 ,sizeof(transition_eff));
 
-    if( tag->effect_chain[position]->effect_id != -1 && tag->effect_chain[position]->effect_id != effect_id )
-    {
-        //verify if the effect should be discarded
-        if(vj_effect_initialized( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance ))
-        {
-            if(!vj_effect_is_plugin( tag->effect_chain[position]->effect_id )) {
-                int frm = 1;
-                for( i =0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
-                    if( i == position )
-                        continue;
-                    if( tag->effect_chain[i]->effect_id == effect_id )
-                        frm = 0;
-                }
-                if( frm == 1 ) {
-                    vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance,1 );
-                    tag->effect_chain[position]->fx_instance = NULL;
-                    tag->effect_chain[position]->clear = 1;
-                }
-            } 
-            else {
-                vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance,1 );
-                tag->effect_chain[position]->fx_instance = NULL;
-                tag->effect_chain[position]->clear = 1;
-            }
-        }
-        if( tag->effect_chain[position]->source_type == 1 && 
-            vj_tag_get_active( tag->effect_chain[position]->channel ) && 
-            tag->effect_chain[position]->channel != t1 &&
-            vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) { //FIXME: test if this behaviour is correct
+    if( tag->effect_chain[position]->effect_id == -1 ) {
+        tag->effect_chain[position]->effect_id = effect_id;
+    }
+    else if( tag->effect_chain[position]->effect_id != effect_id ) {
+        vjert_del_fx( tag->effect_chain[position]->fx_instance,0, position ); //FIXME
+        tag->effect_chain[position]->effect_id = effect_id;
+    }
+
+    if( tag->effect_chain[position]->source_type == 1 && 
+        vj_tag_get_active( tag->effect_chain[position]->channel ) && 
+        tag->effect_chain[position]->channel != t1 &&
+        vj_tag_get_type( tag->effect_chain[position]->channel ) == VJ_TAG_TYPE_NET ) 
+    { //FIXME: test if this behaviour is correct
             vj_tag_disable( tag->effect_chain[position]->channel );
-        }
     }
 
-    if (!vj_effect_initialized(effect_id, tag->effect_chain[position]->fx_instance ))
-    {
-        int res = 0;
-        tag->effect_chain[position]->fx_instance = vj_effect_activate( effect_id, &res );
-        if(!res) {
-            veejay_msg(VEEJAY_MSG_ERROR, "Cannot activate FX %d", effect_id );
-            tag->effect_chain[position]->effect_id = -1;
-            tag->effect_chain[position]->e_flag = 1;
-            for( i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) 
-                tag->effect_chain[position]->arg[i] = 0;
-
-            tag->effect_chain[position]->frame_trimmer = 0;
-            if( position == tag->fade_entry )
-                tag->fade_entry = -1;
-            return 0;
-        }
+    params = vje_get_num_params(effect_id);
+    for (i = 0; i < params; i++) {
+        tag->effect_chain[position]->arg[i] = vje_get_param_default(effect_id, i);
     }
-
-    if( tag->effect_chain[position]->effect_id != effect_id )
-    {
-        params = vj_effect_get_num_params(effect_id);
-        for (i = 0; i < params; i++) {
-            tag->effect_chain[position]->arg[i] = vj_effect_get_default(effect_id, i);
-        }
-        tag->effect_chain[position]->e_flag = 1; 
-            tag->effect_chain[position]->kf_status = 0;
-        tag->effect_chain[position]->kf_type = 0;
-        if(tag->effect_chain[position]->kf)
-            vpf(tag->effect_chain[position]->kf );
-        // tag does not have chain_alloc_kf
-        tag->effect_chain[position]->kf = vpn(VEVO_ANONYMOUS_PORT );
-    }
-
-    tag->effect_chain[position]->effect_id = effect_id;
-
-    if (vj_effect_get_extra_frame(effect_id))
+    tag->effect_chain[position]->e_flag = 1; 
+    tag->effect_chain[position]->kf_status = 0;
+    tag->effect_chain[position]->kf_type = 0;
+    
+    if (vje_get_extra_frame(effect_id))
     {
         if(tag->effect_chain[position]->source_type < 0)
-         tag->effect_chain[position]->source_type = 1;
+            tag->effect_chain[position]->source_type = 1;
         if(tag->effect_chain[position]->channel <= 0 )
-         tag->effect_chain[position]->channel = t1;
+            tag->effect_chain[position]->channel = t1;
     }
     else 
     {
@@ -2236,8 +2164,9 @@ int vj_tag_chain_entry_set_transition_stop(int t1, int entry, int enabled, int l
 
 	int arg_len = 0;
     int is_mixer = 0;
+    int rgb = 0;
     
-	vj_effect_get_info( tag->effect_chain[entry]->effect_id, &is_mixer, &arg_len );
+	vje_get_info( tag->effect_chain[entry]->effect_id, &is_mixer, &arg_len, &rgb );
 
 	if(!is_mixer || arg_len <= 0)
 		return 0;
@@ -2276,7 +2205,8 @@ int vj_tag_chain_entry_transition_now(int t1, int entry, int *type) {
 
 	int arg_len = 0;
     int is_mixer = 0;
-    vj_effect_get_info( tag->effect_chain[entry]->effect_id, &is_mixer, &arg_len );
+    int rgb = 0;
+    vje_get_info( tag->effect_chain[entry]->effect_id, &is_mixer, &arg_len, &rgb );
 
 	if( is_mixer == 0 || arg_len == 0 )
 			return 0;
@@ -2285,8 +2215,9 @@ int vj_tag_chain_entry_transition_now(int t1, int entry, int *type) {
 			return 0;
 
 	// These type of FX know when the transition is done 
-	int state = vj_effect_is_transition_ready(
+	int state = vje_fx_is_transition_ready(
 				tag->effect_chain[entry]->effect_id,
+                tag->effect_chain[entry]->fx_instance,
 				_tag_info->effect_frame1->width,
 				_tag_info->effect_frame1->height );
 	if(state == TRANSITION_COMPLETED) {
@@ -2339,7 +2270,8 @@ void    vj_tag_cali_prepare_now( int t1, int fx_id ) {
     if( fx_id <=  0)
         return;
 
-    cali_prepare( vj_effect_get_data(fx_id),
+    //FIXME
+    cali_prepare( NULL, //@ ptr to cali instance
               p->mean[0],
               p->mean[1],
               p->mean[2],
@@ -2358,10 +2290,12 @@ void    vj_tag_cali_prepare( int t1 , int pos, int cali_tag) {
         return;
     if(tagc->source_type != VJ_TAG_TYPE_CALI)
         return;
+    //FIXME
+    /*
     int fx_id = vj_effect_real_to_sequence( tag->effect_chain[pos]->effect_id );
     if (fx_id >= 0 ) {
         vj_tag_cali_prepare_now( cali_tag, fx_id );
-    }
+    }*/
 }
 
 int vj_tag_get_chain_status(int t1, int position)
@@ -2810,54 +2744,27 @@ int vj_tag_set_selected_entry(int t1, int position)
     return 1;
 }
 
-static int vj_tag_chain_can_delete(vj_tag *tag, int reserved, int effect_id)
-{
-    int i;
-
-    if( vj_effect_is_plugin(effect_id ) )
-        return 1;
-
-    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-        if(i != reserved && effect_id == tag->effect_chain[i]->effect_id) 
-            return 0;
-    }
-    
-    return 1;
-}
-
 int vj_tag_chain_remove(int t1, int index)
 {
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
         return -1;
-    if( tag->effect_chain[index]->effect_id != -1)
-    {
-        if( vj_effect_initialized( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance ) && vj_tag_chain_can_delete( tag, index, tag->effect_chain[index]->effect_id ) )
-        {
-            vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance,1 );
-            tag->effect_chain[index]->fx_instance = NULL;
-            tag->effect_chain[index]->clear = 1;
-        }
-    }
 
-    tag->effect_chain[index]->effect_id = -1;
+    if( tag->effect_chain[index]->effect_id != -1 ) {
+        vjert_del_fx( tag->effect_chain[index],0,index ); //FIXME
+    }
+    
     tag->effect_chain[index]->e_flag = 0;
     tag->effect_chain[index]->is_rendering = 1;
-
-    if( tag->effect_chain[index]->kf )
-        vpf(tag->effect_chain[index]->kf );
-    
-    tag->effect_chain[index]->kf = vpn(VEVO_ANONYMOUS_PORT);
 
     if( tag->effect_chain[index]->source_type == 1 && 
         vj_tag_get_active( tag->effect_chain[index]->channel ) && 
         tag->effect_chain[index]->channel != t1 &&
-        vj_tag_get_type( tag->effect_chain[index]->channel ) == VJ_TAG_TYPE_NET ) { //FIXME test if this behaviour is correct
+        vj_tag_get_type( tag->effect_chain[index]->channel ) == VJ_TAG_TYPE_NET )
+    { //FIXME test if this behaviour is correct
         vj_tag_disable( tag->effect_chain[index]->channel );
     }
 
-    tag->effect_chain[index]->is_rendering = 1;
     tag->effect_chain[index]->source_type = 1;
     tag->effect_chain[index]->channel     = t1; //set to self
 
@@ -4005,7 +3912,7 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
         else {
 
             /* load the parameter values */
-            for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
+            for (j = 0; j < vje_get_num_params(effect_id); j++) {
                 vj_tag_set_effect_arg(dst_sample, chain_index, j, arg[j]);
             }
             vj_tag_set_chain_channel(dst_sample, chain_index, channel);
@@ -4273,10 +4180,10 @@ static void tagCreateEffect(xmlNodePtr node, sample_eff_chain * effect, int posi
     put_xml_int( node, "kf_type", effect->kf_type );
 
     childnode = xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENTS, NULL);
-    tagCreateArguments(childnode, effect->arg,vj_effect_get_num_params(effect->effect_id));
+    tagCreateArguments(childnode, effect->arg,vje_get_num_params(effect->effect_id));
 
     childnode = xmlNewChild(node, NULL, (const xmlChar*) "ANIM", NULL );
-    tagCreateKeys( childnode, vj_effect_get_num_params(effect->effect_id), effect->kf ); 
+    tagCreateKeys( childnode, vje_get_num_params(effect->effect_id), effect->kf ); 
 }
 
 static void tagCreateEffects(xmlNodePtr node, sample_eff_chain ** effects)

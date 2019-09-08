@@ -50,21 +50,30 @@ vj_effect *bloom_init(int width,int height)
 	return ve;
 }
 
-uint8_t *bloom_buf = NULL;
-int bloom_malloc(int width, int height)
+typedef struct {
+    uint8_t *bloom_buf;
+} bloom_t;
+
+void *bloom_malloc(int width, int height)
 {
-    if(bloom_buf == NULL) {
-        bloom_buf = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(width * height * 8));
+    bloom_t *b = (bloom_t*) vj_calloc(sizeof(bloom_t));
+    if(!b) {
+        return NULL;
     }
 
-    return 1;
+    b->bloom_buf = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(width * height * 8));
+    if(!b->bloom_buf) {
+        free(b);
+        return NULL;
+    }
+
+    return (void*) b;
 }
 
-void bloom_free() {
-    if(bloom_buf) {
-        free(bloom_buf);
-        bloom_buf = NULL;
-    }
+void bloom_free(void *ptr) {
+    bloom_t *b = (bloom_t*) ptr;
+    free(b->bloom_buf);
+    free(b);
 }
 
 static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r)
@@ -86,13 +95,19 @@ static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r)
 }
 
 
-void bloom_apply(VJFrame *frame, int a0, int b0, int c0, int threshold) {
+void bloom_apply(void *ptr, VJFrame *frame, int *args) {
+    int a0 = args[0];
+    int b0 = args[1];
+    int c0 = args[2];
+    int threshold = args[3];
+
+    bloom_t *b = (bloom_t*) ptr;
 
     const unsigned int len = frame->len;
     int width = frame->width;
     int height = frame->height;
     uint8_t *L = frame->data[0];
-    uint8_t *B = bloom_buf;
+    uint8_t *B = b->bloom_buf;
     uint8_t *B1h = B + RUP8(len);
     uint8_t *B1v = B1h + RUP8(len);
     uint8_t *B2h = B1v + RUP8(len);

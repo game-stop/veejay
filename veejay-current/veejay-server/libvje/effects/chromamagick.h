@@ -21,5 +21,5 @@
 #ifndef CHROMAMAGICK_H
 #define CHROMAMAGICK_H
 vj_effect *chromamagick_init();
-void chromamagick_apply(VJFrame *frame, VJFrame *frame2 ,int type, int op0);
+void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

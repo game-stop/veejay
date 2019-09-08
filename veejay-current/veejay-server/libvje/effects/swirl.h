@@ -21,7 +21,7 @@
 #ifndef SWIRL_H
 #define SWIRL_H
 vj_effect *swirl_init(int w, int h);
-int swirl_malloc(int w, int h);
-void swirl_free();
-void swirl_apply(VJFrame *frame, int val);
+void *swirl_malloc(int w, int h);
+void swirl_free(void *ptr);
+void swirl_apply(void *ptr, VJFrame *frame, int *args);
 #endif

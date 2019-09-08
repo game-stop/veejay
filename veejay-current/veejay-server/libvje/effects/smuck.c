@@ -22,8 +22,6 @@
 #include <veejaycore/vjmem.h>
 #include "smuck.h"
 
-static int smuck_rand_val;
-
 vj_effect *smuck_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -43,20 +41,37 @@ vj_effect *smuck_init(int w,int h)
     return ve;
 }
 
-static inline unsigned int smuck_fastrand()
+typedef struct {
+    int rand_val;
+} smuck_t;
+
+void* smuck_malloc(int w, int h) {
+    return (void*) vj_calloc( sizeof(smuck_t) );
+}
+
+void smuck_free(void *ptr) {
+    free(ptr);
+}
+
+static inline unsigned int smuck_fastrand(smuck_t *s)
 {
-    return (smuck_rand_val = smuck_rand_val * 1103516245 + 12345);
+    return (s->rand_val = s->rand_val * 1103516245 + 12345);
 }
 
 /* this effect comes from Effect TV as well; the code for this one is in Transform 
    different is the smuck table containing some values. 
    This effect was originally created by Buddy Smith, one of EffecTV's developers from the USA
 */
-void smuck_apply( VJFrame *frame, VJFrame *frame2, int n)
+void smuck_apply( void *ptr, VJFrame *frame, int *args)
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
     unsigned int yd, xd, x, y;
+    smuck_t *s = (smuck_t*) ptr;
+    int n = args[0];
+
+    VJFrame *frame2 = frame;
+
 	// different table ...
     const unsigned int smuck[18] =
 	{ 12, 21, 30, 60, 58, 59, 57, 56, 55, 54, 53, 89, 90, 88, 87, 86, 85, 114 };
@@ -64,8 +79,8 @@ void smuck_apply( VJFrame *frame, VJFrame *frame2, int n)
 	uint8_t *Y2 = frame2->data[0];
     for (y = 0; y < height; y++) {
 		for (x = 0; x < width; x++) {
-		    yd = y + (smuck_fastrand() >> smuck[n]) - 2;
-		    xd = x + (smuck_fastrand() >> smuck[n]) - 2;
+		    yd = y + (smuck_fastrand(s) >> smuck[n]) - 2;
+		    xd = x + (smuck_fastrand(s) >> smuck[n]) - 2;
 		    if (xd > width)
 				xd = width-1;
 		    if (yd > height)

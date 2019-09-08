@@ -120,7 +120,6 @@ vj_effect *water_init(int width, int height)
     ve->sub_format = 0;
     ve->extra_frame = 1;
     ve->has_user = 1;
-    ve->user_data = NULL;
 	ve->motion = 1;
 
 	ve->param_description= vje_build_param_list(ve->num_params, "Refresh Frequency",
@@ -134,30 +133,42 @@ vj_effect *water_init(int width, int height)
 
     return ve;
 }
-#define HIS_LEN (8*25)
-#define HIS_DEFAULT 2
 
-static uint32_t histogram_[HIS_LEN];
-
-int water_malloc(void **d, int width, int height)
+void  *water_malloc(int width, int height)
 {
-	*d = (void*) vj_calloc(sizeof(water_t));
-	water_t *w = (water_t*) *d;
-
+	water_t *w = (void*) vj_calloc(sizeof(water_t));
 	w->ripple_data[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * RUP8(width * height));
-	if(!w->ripple_data[0]) return 0;
+	if(!w->ripple_data[0]) {
+        free(w);
+        return NULL;
+    }
 
 	w->diff_img = (uint8_t*)vj_calloc(sizeof(uint8_t) * RUP8(width * height * 2));
-	if(!w->diff_img) return 0;
+	if(!w->diff_img) {
+        free(w->ripple_data[0]);
+        free(w);
+        return NULL;
+    }
 
 	w->map_h = height / 2 + 1;
 	w->map_w = width / 2 + 1;
 
 	w->map = (int*) vj_calloc (sizeof(int) * RUP8( w->map_h * w->map_w * 3));
-	if(!w->map) return 0;
+	if(!w->map) {
+        free(w->ripple_data[0]);
+        free(w->diff_img);
+        free(w);
+        return NULL;
+    }
 
 	w->vtable = (signed char*) vj_calloc( sizeof(signed char) * RUP8(w->map_w * w->map_h * 2));
-	if(!w->vtable) return 0;
+	if(!w->vtable) {
+        free(w->ripple_data[0]);
+        free(w->diff_img);
+        free(w->map);
+        free(w);
+        return NULL;
+    }
 
 	w->map3 = w->map + w->map_w * w->map_h * 2;
 
@@ -170,12 +181,12 @@ int water_malloc(void **d, int width, int height)
 	w->impact = 2;
 	w->loopnum = 2;
   
-	return 1;
+	return (void*) w;
 }
 
-void water_free(void *ud) {
+void water_free(void *ptr) {
 
-	water_t *w = (water_t*) ud;
+	water_t *w = (water_t*) ptr;
 	if(w) {
 		if(w->ripple_data[0]) free(w->ripple_data[0]);
 		if(w->map) free(w->map);	
@@ -215,6 +226,12 @@ static	void	drawmotionframe( VJFrame *f , water_t *w )
 
 /* globalactivity not used */
 /*
+
+#define HIS_LEN (8*25)
+#define HIS_DEFAULT 2
+
+static uint32_t histogram_[HIS_LEN];
+
 static int n__ = 0;
 static uint32_t keyv_ = 0;
 static uint32_t keyp_ = 0;
@@ -281,7 +298,7 @@ static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
                 //softblur_apply( f2, 0);
                 //veejay_memcpy(bg, f2->data[0], len );
                 vj_frame_copy1( f2->data[0],bg, len );
-		w->have_img = 1;
+		        w->have_img = 1;
                 return;
         }
 
@@ -327,7 +344,7 @@ static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
 	{
-		softblur_apply( f2, 0);
+		softblur_apply_internal( f2, 0);
 		//	veejay_memcpy(bg, f2->data[0], len );
 		vj_frame_copy1( f2->data[0], bg, len );
 		w->have_img = 1;
@@ -376,7 +393,7 @@ static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 	uint8_t *in = f2->data[0];
 	if(!w->have_img)
 	{
-		softblur_apply( f2, 0);
+		softblur_apply_internal( f2, 0);
 	//	veejay_memcpy(bg, f2->data[0], len );
 		vj_frame_copy1( f2->data[0], bg, len );
 		w->have_img = 1;
@@ -493,8 +510,7 @@ static void raindrop(water_t *w)
 	period--;
 }
 
-void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int fresh_rate,
-                 int loopnum, int decay, int mode, int threshold )
+void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) 
 {
 	int x, y, i;
 	int dx, dy;
@@ -504,7 +520,12 @@ void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int fresh_rat
 	signed char *vp;
 	uint8_t *src,*dest;
 	const int len = frame->len;
-	water_t *w = (water_t*) user_data;
+	water_t *w = (water_t*) ptr;
+    int fresh_rate = args[0];
+    int loopnum = args[1];
+    int decay = args[2];
+    int mode = args[3];
+    int threshold = args[4];
 
 	if(w->last_fresh_rate != fresh_rate)
 	{

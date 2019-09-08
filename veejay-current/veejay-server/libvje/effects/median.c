@@ -60,11 +60,39 @@ vj_effect *medianfilter_init(int w, int h)
     return ve;
 }
 
-void medianfilter_apply( VJFrame *frame, int val)
+typedef struct {
+    uint8_t *buffer[3];
+} medianfilter_t;
+
+void *medianfilter_malloc(int w, int h)
 {
+    medianfilter_t *m = (medianfilter_t*) vj_calloc(sizeof(medianfilter_t));
+    if(!m) {
+        return NULL;
+    }
+    m->buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w * h * 3));
+    if(!m->buffer[0]) {
+        free(m);
+        return NULL;
+    }
+    m->buffer[1] = m->buffer[0] + RUP8(w * h);
+    m->buffer[2] = m->buffer[1] + RUP8(w * h);
+    return (void*) m;
+}
+
+void medianfilter_free(void *ptr) {
+    medianfilter_t *m = (medianfilter_t*) ptr;
+    free(m->buffer[0]);
+    free(m);
+}
+
+void medianfilter_apply( void *ptr, VJFrame *frame, int *args ) {
+    int val = args[0];
 
     if( val == 0 )
         return;
+
+    medianfilter_t *m = (medianfilter_t*) ptr;
 
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;
@@ -76,15 +104,7 @@ void medianfilter_apply( VJFrame *frame, int val)
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    uint8_t *buffer[3];
-    size_t bufsize = RUP8( len + uv_len + uv_len ) * sizeof(uint8_t);
-
-    buffer[0] = (uint8_t*) vj_malloc( bufsize );
-    if(!buffer[0]) {
-        return; // error
-    }
-    buffer[1] = buffer[0] + RUP8( len );
-    buffer[2] = buffer[1] + RUP8( uv_len );
+    uint8_t **buffer = m->buffer;
 
     ctmf( Y, buffer[0], width,height, width, width, val,1,l2_cache_size_);
     ctmf( Cb,buffer[1], u_wid, u_hei, u_wid, u_wid, val,1,l2_cache_size_);
@@ -93,6 +113,4 @@ void medianfilter_apply( VJFrame *frame, int val)
     veejay_memcpy( Y, buffer[0], len);
     veejay_memcpy( Cb,buffer[1], uv_len);
     veejay_memcpy( Cr,buffer[2], uv_len);
-
-    free(buffer[0]);
 }

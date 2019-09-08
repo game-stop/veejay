@@ -23,8 +23,10 @@
 #include "mtracer.h"
 #include "magicoverlays.h"
 
-static uint8_t *mtrace_buffer[4] = { NULL,NULL,NULL,NULL };
-static int mtrace_counter = 0;
+typedef struct {
+    uint8_t *mtrace_buffer[4];
+    int mtrace_counter;
+} m_tracer_t;
 
 vj_effect *mtracer_init(int w, int h)
 {
@@ -58,43 +60,52 @@ vj_effect *mtracer_init(int w, int h)
 
     return ve;
 }
-void mtracer_free() {
-	if( mtrace_buffer[0] ) {
-		   free(mtrace_buffer[0]);
-	}
-	mtrace_buffer[0] = NULL;
+void mtracer_free(void *ptr) {
+    m_tracer_t *m = (m_tracer_t*) ptr;
+    free(m->mtrace_buffer[0]);
+    free(m);
 }
 
-int mtracer_malloc(int w, int h)
+void *mtracer_malloc(int w, int h)
 {
-	size_t buflen = RUP8( (w*h+w)) * sizeof(uint8_t);
-	mtrace_buffer[0] = (uint8_t*) vj_malloc( buflen );
-	if(!mtrace_buffer[0]) {
-		return 0;
-	}
-	return 1;
-}
-
-void mtracer_apply( VJFrame *frame, VJFrame *frame2, int mode, int n)
-{
-	const int len = frame->len;
-    VJFrame m;
-    veejay_memcpy( &m, frame, sizeof(VJFrame ));
-
-    if (mtrace_counter == 0) {
-		overlaymagic_apply(frame, frame2, mode,0);
-		vj_frame_copy1( mtrace_buffer[0], frame->data[0], len );
-    } else {
-		overlaymagic_apply(frame, frame2, mode,0);
-		m.data[0] = mtrace_buffer[0];
-		m.data[1] = frame->data[1];
-		m.data[2] = frame->data[2];
-		m.data[3] = frame->data[3];
-		overlaymagic_apply( &m, frame2, mode, 0 );
-		vj_frame_copy1( mtrace_buffer[0],frame->data[0], len );
+    m_tracer_t *m = (m_tracer_t*) vj_calloc(sizeof(m_tracer_t));
+    if(!m) {
+        return NULL;
     }
 
-    mtrace_counter++;
-    if (mtrace_counter >= n)
-	mtrace_counter = 0;
+	size_t buflen = RUP8( (w*h+w)) * sizeof(uint8_t);
+	m->mtrace_buffer[0] = (uint8_t*) vj_malloc( buflen );
+	if(!m->mtrace_buffer[0]) {
+        free(m);
+		return NULL;
+	}
+	return (void*) m;
+}
+
+void mtracer_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int mode = args[0];
+    int n = args[1];
+
+    m_tracer_t *m = (m_tracer_t*) ptr;
+
+	const int len = frame->len;
+    VJFrame mt;
+    veejay_memcpy( &mt, frame, sizeof(VJFrame ));
+
+    int om_args[2] = { mode, 0 };
+
+    if (m->mtrace_counter == 0) {
+		overlaymagic_apply(NULL, frame, frame2, om_args);
+		vj_frame_copy1( m->mtrace_buffer[0], frame->data[0], len );
+    } else {
+		overlaymagic_apply(NULL, frame, frame2, om_args);
+		mt.data[0] = m->mtrace_buffer[0];
+		mt.data[1] = frame->data[1];
+		mt.data[2] = frame->data[2];
+		mt.data[3] = frame->data[3];
+		overlaymagic_apply(NULL, &mt, frame2, om_args );
+		vj_frame_copy1( m->mtrace_buffer[0],frame->data[0], len );
+    }
+
+    m->mtrace_counter = (m->mtrace_counter % n);
 }

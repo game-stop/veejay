@@ -21,5 +21,5 @@
 #ifndef LUMAMAGIC_H
 #define LUMAMAGIC_H
 vj_effect *lumamagick_init();
-void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int op_a, int op_b);
+void lumamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

@@ -87,21 +87,31 @@ vj_effect *morphology_init(int w, int h)
 	return ve;
 }
 
+typedef struct {
+    uint8_t *binary_img;
+} morphology_t;
 
-static uint8_t *binary_img = NULL;
-
-int	morphology_malloc(int w, int h )
+void *morphology_malloc(int w, int h )
 {
-	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
-	if(!binary_img) return 0;
-	return 1;
+    morphology_t *m = (morphology_t*) vj_calloc(sizeof(morphology_t));
+    if(!m) {
+        return NULL;
+    }
+
+	m->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( w * h) );
+	if(!m->binary_img) {
+        free(m);
+        return NULL;
+    }
+
+	return (void*) m;
 }
 
-void		morphology_free(void)
+void		morphology_free(void *ptr)
 {
-	if(binary_img)
-		free(binary_img);
-	binary_img = NULL;
+    morphology_t *m = (morphology_t*) ptr;
+    free(m->binary_img);
+    free(m);
 }
 
 static uint8_t _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
@@ -132,7 +142,7 @@ static morph_func	_morphology_function(int i)
 	return _erode_kernel3x3;
 }
 
-static void morph_threshold_image( const uint8_t *I, const int len, const int threshold, uint8_t *O )
+static void morph_threshold_image( uint8_t *binary_img, const uint8_t *I, const int len, const int threshold, uint8_t *O )
 {
 	unsigned int i;
 	for( i = 0; i < len; i ++ )
@@ -141,8 +151,14 @@ static void morph_threshold_image( const uint8_t *I, const int len, const int th
 	}
 }
 
-void morphology_apply( VJFrame *frame, int threshold, int convolution_kernel, int mode, int channel )
-{
+void morphology_apply( void *ptr, VJFrame *frame, int *args ) {
+    int threshold = args[0];
+    int convolution_kernel = args[1];
+    int mode = args[2];
+    int channel = args[3];
+
+    morphology_t *m = (morphology_t*) ptr;
+
 	unsigned int x,y;
 	int len = frame->len;
 	int width = frame->width;
@@ -153,6 +169,8 @@ void morphology_apply( VJFrame *frame, int threshold, int convolution_kernel, in
 	
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+
+    uint8_t *binary_img = m->binary_img;
 
 	switch( channel ) {
 		case 1: I = frame->data[3];
@@ -169,7 +187,7 @@ void morphology_apply( VJFrame *frame, int threshold, int convolution_kernel, in
 		veejay_memcpy( binary_img, I, len );
 	}
 	else {
-		morph_threshold_image( I, len, threshold, binary_img );
+		morph_threshold_image( binary_img, I, len, threshold, binary_img );
 	}
 
 	if( channel == 0 ) { /* other channel is alpha */

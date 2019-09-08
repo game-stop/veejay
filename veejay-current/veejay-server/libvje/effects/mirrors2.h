@@ -21,6 +21,5 @@
 #ifndef MIRRORS2_H
 #define MIRRORS2_H
 vj_effect *mirrors2_init();
-void mirrors2_apply( VJFrame *frame, int type);
-void mirrors2_free();
+void mirrors2_apply( void *ptr, VJFrame *frame, int *args );
 #endif

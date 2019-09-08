@@ -821,8 +821,10 @@ static void overlaymagicalpha_try(VJFrame *frame, VJFrame *frame2)
     }
 }
 
-void overlaymagicalpha_apply(VJFrame *frame, VJFrame *frame2, int n, int clearchroma)
-{
+void overlaymagicalpha_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int n = args[0];
+    int clearchroma = args[1];
+
     switch (n) {
     case VJ_EFFECT_BLEND_ADDITIVE:
 	overlaymagicalpha_additive(frame, frame2);

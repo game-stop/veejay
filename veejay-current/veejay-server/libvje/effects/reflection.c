@@ -45,11 +45,13 @@
 #include <veejaycore/vjmem.h>
 #include "reflection.h"
 
-static short reflect_aSin[2048];
-static int reflection_map[2048][256];
-static int sin_index = 0;
-static int sin_index2 = 20;
-static uint8_t *reflection_buffer = NULL;
+typedef struct {
+    short reflect_aSin[2048];
+    int reflection_map[2048][256];
+    int sin_index;
+    int sin_index2; //  20
+    uint8_t *reflection_buffer;
+} reflection_t;
 
 vj_effect *reflection_init(int width,int height)
 {
@@ -75,14 +77,27 @@ vj_effect *reflection_init(int width,int height)
 	return ve;
 }
 
-int reflection_malloc(int width, int height)
+void *reflection_malloc(int width, int height)
 { 
+    reflection_t *r = (reflection_t*) vj_calloc(sizeof(reflection_t));
+    if(!r) {
+        return NULL;
+    }
+
+    r->reflection_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width));
+    if(!r->reflection_buffer) {
+        free(r);
+        return NULL;
+    }
+
+    r->sin_index2 = 20;
+
 	int i, x, y;
     float rad;
  
     for (i = 0; i < width; i++) {
 		rad = (float) i * 0.0174532 * 0.703125;
-		reflect_aSin[i] = (short) ((sin(rad) * 100.0) + 256.0);
+		r->reflect_aSin[i] = (short) ((sin(rad) * 100.0) + 256.0);
     }
     
 	for (x = 0; x < width; ++x) {
@@ -93,26 +108,28 @@ int reflection_malloc(int width, int height)
 		    zz *= 255.0;
 		    if (zz < 0.0)
 			zz = 0.0;
-		    reflection_map[x][y] = (int) zz;
+		    r->reflection_map[x][y] = (int) zz;
 		}
     }
-    
-	reflection_buffer = (uint8_t *) vj_malloc(sizeof(uint8_t) * RUP8(width) );
-    if(!reflection_buffer) return 0;
 
-    return 1;
+    return (void*) r;
 }
 
 
-
-void reflection_free() {
-  if(reflection_buffer) free(reflection_buffer);
-  reflection_buffer = NULL;
+void reflection_free(void *ptr) {
+    reflection_t *r = (reflection_t*) ptr;
+    free(r->reflection_buffer);
+    free(r);
 }
 
 
-void reflection_apply(VJFrame *frame, int index1, int index2, int move)
+void reflection_apply(void *ptr, VJFrame *frame, int *args)
 {
+    reflection_t *r = (reflection_t*) ptr;
+    int index1 = args[0];
+    int index2 = args[1];
+    int move = args[2];
+
     unsigned int normalx, normaly, x, y;
     unsigned int lightx, lighty, temp;
 	const unsigned int width = frame->width;
@@ -123,20 +140,22 @@ void reflection_apply(VJFrame *frame, int index1, int index2, int move)
     uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
+    uint8_t *reflection_buffer = r->reflection_buffer;
 
-    lightx = reflect_aSin[sin_index];
-    lighty = reflect_aSin[sin_index2];
+    lightx = r->reflect_aSin[r->sin_index];
+    lighty = r->reflect_aSin[r->sin_index2];
 
 
     if (!move) {
-		sin_index = index1;
-		sin_index2 = index2;
+		r->sin_index = index1;
+		r->sin_index2 = index2;
     } else {
-		sin_index += index1;
-		sin_index2 += index2;
+		r->sin_index += index1;
+		r->sin_index2 += index2;
     }
-    sin_index &= 511;
-    sin_index2 &= 511;
+    r->sin_index &= 511;
+    r->sin_index2 &= 511;
+
 
     for (x = 0; x < width; x++) {
 		reflection_buffer[x]= Y[x];
@@ -161,9 +180,9 @@ void reflection_apply(VJFrame *frame, int index1, int index2, int move)
 				normaly = 0;
 		    else if (normaly > 255)
 				normaly = 255;
-		    *row++ = reflection_map[normalx][normaly];
-            *cbrow++ = ((reflection_map[normalx][normaly] * (Cb[x + 1 + (y * width)]-128)) >> 8) +128;
-			*crrow++ = ((reflection_map[normalx][normaly] * (Cr[x + 1 + (y * width)]-128)) >> 8) +128;
+		    *row++ = r->reflection_map[normalx][normaly];
+            *cbrow++ = ((r->reflection_map[normalx][normaly] * (Cb[x + 1 + (y * width)]-128)) >> 8) +128;
+			*crrow++ = ((r->reflection_map[normalx][normaly] * (Cr[x + 1 + (y * width)]-128)) >> 8) +128;
 
 		    p = i2;
 		    reflection_buffer[x] = i2;

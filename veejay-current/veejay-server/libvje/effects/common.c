@@ -1493,7 +1493,6 @@ static	void	veejay_blit_histogram( uint8_t *D, uint32_t *h, int len )
 		D[i] = (h[i] > 0 ? (len / h[i]) : 0 );
 }
 
-
 static	inline	void	veejay_histogram_qdraw( uint32_t *histi, histogram_t *h, VJFrame *f, uint8_t *plane, int left, int down)
 {
 	uint8_t lut[256];
@@ -1689,6 +1688,22 @@ void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
 	histogram_t *h = (histogram_t*) his;
 
 	build_histogram( h, f );
+}
+
+inline void veejay_draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
+{
+  const int tx = (bw / 2);
+  const int ty = (bh / 2);
+  int x, y;
+
+  for (y = -radius; y <= radius; y++)
+    for (x = -radius; x <= radius; x++)
+      if ((x * x) + (y * y) <= (radius * radius)) {
+          if( (tx + x + cx) < w &&
+              (ty + y + cy) < h ) {
+            data[(ty + cy + y) * w + (tx + cx + x) ] = value;
+        }
+      }
 }
 
 #define max4(a,b,c,d) MAX(MAX(MAX(a,b),c),d)
@@ -2134,4 +2149,74 @@ void	sqrt_table_pixels_free() {
 	free(sqrt_map_pixel_values);
 }
 
+/****************************************************************************************************
+ *
+ * grid_getbounds_from_orientation(int radius, int orientation, int odd, int * x_inf, int * y_inf, int * x_sup, int * y_sup)
+ *
+ * Adjust the given screen bounds depending the given orentation and parity of the grid
+ *
+ * \param radius
+ * \param orientation type vj_effect_orientation
+ * \param parity type vj_effect_parity
+ * \param x_inf OUT
+ * \param y_inf OUT
+ * \param x_sup IN/OUT ; caller must initialize with with
+ * \param y_sup IN/OUT ; caller must initialize with height
+ *
+ ****************************************************************************************************/
+inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int * x_inf, int * y_inf, int * x_sup, int * y_sup) {
 
+    int w, h;
+    int dotqtt_h;
+    int dotqtt_w;
+
+    w = *x_sup;
+    h = *y_sup;
+    switch (orientation) {
+        case VJ_EFFECT_ORIENTATION_CENTER:
+            dotqtt_h = (int) h / radius;
+            if (dotqtt_h * radius != h) dotqtt_h++;
+
+            dotqtt_w = (int) w / radius;
+            if (dotqtt_w * radius != w) dotqtt_w++;
+
+            switch(parity) {
+                case VJ_EFFECT_PARITY_EVEN:
+                    if ((dotqtt_h % 2) != 0) dotqtt_h++ ;
+                    if ((dotqtt_w % 2) != 0) dotqtt_w++ ;
+                break;
+                case VJ_EFFECT_PARITY_ODD:
+                    if ((dotqtt_h % 2) == 0) dotqtt_h++ ;
+                    if ((dotqtt_w % 2) == 0) dotqtt_w++ ;
+                break;
+                case VJ_EFFECT_PARITY_NO:
+                default:
+                break;
+            }
+
+            *x_inf = (w - (dotqtt_w * radius)) / 2;
+            *y_inf = (h - (dotqtt_h * radius)) / 2;
+        break;
+        case VJ_EFFECT_ORIENTATION_NORTHEAST: // North East is do nothing case.
+        break;
+        case VJ_EFFECT_ORIENTATION_NORTH:
+        break;
+        case VJ_EFFECT_ORIENTATION_EAST:
+        break;
+        case VJ_EFFECT_ORIENTATION_SOUTHEAST:
+        break;
+        case VJ_EFFECT_ORIENTATION_SOUTH:
+        break;
+        case VJ_EFFECT_ORIENTATION_SOUTHWEST:
+        break;
+        case VJ_EFFECT_ORIENTATION_WEST:
+        break;
+        case VJ_EFFECT_ORIENTATION_NORTHWEST:
+        break;
+    }
+
+    // FIXME: y_inf * w + x_inf must be a positive value or bounds must be checked before accessing array
+    // for now, clip value into range
+    if(*y_inf < 0) *y_inf = 0;
+    if(*x_inf < 0) *x_inf = 0;
+}

@@ -21,6 +21,5 @@
 #ifndef TRAVELMATTE_H
 #define TRAVELMATTE_H
 vj_effect *travelmatte_init(int w, int h);
-void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int mode);
-void travelmatte_free();
+void travelmatte_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

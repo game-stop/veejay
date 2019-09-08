@@ -21,7 +21,7 @@
 #ifndef FLARE_H
 #define FLARE_H
 vj_effect *flare_init(int w, int h);
-int flare_malloc(int w, int h);
-void flare_apply(VJFrame *frame, int type, int theshold,int radius );
-void flare_free();
+void *flare_malloc(int w, int h);
+void flare_apply(void *ptr, VJFrame *frame, int *args );
+void flare_free(void *ptr);
 #endif

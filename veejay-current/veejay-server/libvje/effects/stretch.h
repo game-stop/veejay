@@ -21,5 +21,5 @@
 #ifndef STRETCH_H
 #define STRETCH_H
 vj_effect *stretch_init(int w, int h);
-void stretch_apply( VJFrame *frame, int upper, int lower, int gain, int u_level);
+void stretch_apply( void *ptr, VJFrame *frame, int *args);
 #endif

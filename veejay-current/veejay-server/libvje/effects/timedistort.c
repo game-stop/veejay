@@ -29,6 +29,8 @@
 #include <veejaycore/vjmem.h>
 #include "softblur.h"
 #include "timedistort.h"
+#include <libvje/internal.h>
+#include <libvje/effects/motionmap.h>
 
 #define PLANES 32
 
@@ -52,81 +54,108 @@ vj_effect *timedistort_init(int w, int h)
     return ve;
 }
 
-static int n__ = 0;
-static int N__ = 0;
-static uint8_t	*nonmap = NULL;
-static uint8_t *planes[4] = { NULL, NULL, NULL, NULL };
-static uint8_t *planetableY[PLANES];
-static uint8_t *planetableU[PLANES];
-static uint8_t *planetableV[PLANES];
+typedef struct {
+    int n__;
+    int N__;
+    uint8_t	*nonmap;
+    uint8_t *planes[4];
+    uint8_t *planetableY[PLANES];
+    uint8_t *planetableU[PLANES];
+    uint8_t *planetableV[PLANES];
+    uint8_t *warptime[2];
+    int state;
+    int plane;
+    int warptimeFrame;
+    int have_bg;
+    void *motionmap;
+} timedistort_t;
 
-static uint8_t *warptime[2];
-static int state = 0;
-static int plane = 0;
-static int warptimeFrame = 0;
-
-static int have_bg =0;
-int 	timedistort_malloc( int w, int h )
+void *timedistort_malloc( int w, int h )
 {	
 	unsigned int i;
-	if(nonmap) timedistort_free();
-	nonmap = vj_calloc( (RUP8(2 * w * h) + RUP8(2 * w)) * sizeof(uint8_t));
-	if(!nonmap)
-		return 0;
+    timedistort_t *td = (timedistort_t*) vj_calloc(sizeof(timedistort_t));
+    if(!td) {
+        return NULL;
+    }
 
-	planes[0] = vj_malloc( RUP8(PLANES * 3 * w * h) * sizeof(uint8_t));
-	planes[1] = planes[0] + RUP8(PLANES * w * h );
-	planes[2] = planes[1] + RUP8(PLANES * w * h );
+	td->nonmap = vj_calloc( (RUP8(2 * w * h) + RUP8(2 * w)) * sizeof(uint8_t));
+	if(!td->nonmap) {
+        free(td);
+		return NULL;
+    }
 
-	veejay_memset( planes[0],0, RUP8(PLANES * w * h ));
-	veejay_memset( planes[1],128,RUP8(PLANES * w * h  ));
-	veejay_memset( planes[2],128,RUP8(PLANES * w * h ));
+	td->planes[0] = vj_malloc( RUP8(PLANES * 3 * w * h) * sizeof(uint8_t));
+    if(!td->planes[0]) {
+        free(td->nonmap);
+        free(td);
+        return NULL;
+    }
+	td->planes[1] = td->planes[0] + RUP8(PLANES * w * h );
+	td->planes[2] = td->planes[1] + RUP8(PLANES * w * h );
 
-	have_bg = 0;
-	n__ = 0;
-	N__ = 0;
+	veejay_memset( td->planes[0],0, RUP8(PLANES * w * h ));
+	veejay_memset( td->planes[1],128,RUP8(PLANES * w * h  ));
+	veejay_memset( td->planes[2],128,RUP8(PLANES * w * h ));
+
+	td->have_bg = 0;
+	td->n__ = 0;
+	td->N__ = 0;
 	
 	for( i = 0; i < PLANES; i ++ )
 	{
-		planetableY[i] = &planes[0][ (w*h) * i ];
-		planetableU[i] = &planes[1][ (w*h) * i ];
-		planetableV[i] = &planes[2][ (w*h) * i ];
+		td->planetableY[i] = &(td->planes[0][ (w*h) * i ]);
+		td->planetableU[i] = &(td->planes[1][ (w*h) * i ]);
+		td->planetableV[i] = &(td->planes[2][ (w*h) * i ]);
 	}
 
-	warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)+w+1) );
-	warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)+w+1) );
-	if( warptime[0] == NULL || warptime[1] == NULL )
-		return 0;
+	td->warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)+w+1) );
+    if(!td->warptime[0]) {
+        free(td->nonmap);
+        free(td->planes[0]);
+        free(td);
+        return NULL;
+    }
+	td->warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)+w+1) );
+    if(!td->warptime[1]) {
+        free(td->nonmap);
+        free(td->planes[0]);
+        free(td->warptime[0]);
+        free(td);
+        return NULL;
+    }
 
-	plane = 0;
-	state = 1;
+	td->plane = 0;
+	td->state = 1;
 
-
-	return 1;
+	return (void*) td;
 }
 
-void	timedistort_free()
+void	timedistort_free(void *ptr)
 {
-	if(nonmap)
-		free(nonmap);
-	if( planes[0])
-		free(planes[0]);
-	if( warptime[0] )
-		free(warptime[0]);
-	if( warptime[1] )
-		free(warptime[1] );
-	veejay_memset( planetableY, 0, PLANES);
-	veejay_memset( planetableU, 0, PLANES);
-	veejay_memset( planetableV, 0, PLANES);
-	planes[0] = NULL;
-	warptime[0] = NULL;
-	warptime[1] = NULL;
-	state = 0;
-	plane = 0;
-	nonmap = NULL;
+    timedistort_t *td = (timedistort_t*) ptr;
+
+	if(td->nonmap)
+		free(td->nonmap);
+	if( td->planes[0])
+		free(td->planes[0]);
+	if( td->warptime[0] )
+		free(td->warptime[0]);
+	if( td->warptime[1] )
+		free(td->warptime[1] );
+    free(td);
 }
 
-void timedistort_apply( VJFrame *frame, int val)
+int timedistort_request_fx() {
+    return VJ_IMAGE_EFFECT_MOTIONMAP;
+}
+
+void timedistort_set_motionmap(void *ptr, void *priv)
+{
+    timedistort_t *t = (timedistort_t*) ptr;
+    t->motionmap = priv;
+}
+
+void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 {
 	unsigned int i;
 	const unsigned int width = frame->width;
@@ -137,31 +166,36 @@ void timedistort_apply( VJFrame *frame, int val)
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-	uint8_t *diff = nonmap;
-	uint8_t *prev = nonmap + len;
 	int interpolate = 1;
 	int motion = 0;
 	int tmp1,tmp2;
-	if(motionmap_active()) //@ use motion mapping frame
+
+    int val = args[0];
+
+    timedistort_t *td = (timedistort_t*) ptr;
+	uint8_t *diff = td->nonmap;
+	uint8_t *prev = td->nonmap + len;
+
+	if(motionmap_active(td->motionmap)) //@ use motion mapping frame
 	{
-		motionmap_scale_to( 255,255,1,1,&tmp1,&tmp2, &n__,&N__ );
-		motion = 1;
-		diff = motionmap_bgmap();
+		motionmap_scale_to(td->motionmap, 255,255,1,1,&tmp1,&tmp2, &(td->n__),&(td->N__) );
+		diff = motionmap_bgmap(td->motionmap);
+        motion = 1;
 	}
 	else
 	{
-		n__ = 0;
-		N__ = 0;
+		td->n__ = 0;
+		td->N__ = 0;
 
-		if(!have_bg)
+		if(!td->have_bg)
 		{
 			vj_frame_copy1( Y, prev, len );
 			VJFrame smooth;
 			veejay_memcpy(&smooth,frame, sizeof(VJFrame));
 			smooth.data[0] = prev;
-			softblur_apply(&smooth, 0 );
+			softblur_apply_internal(&smooth, 0 );
 			veejay_memset( diff, 0, len );
-			have_bg = 1;
+			td->have_bg = 1;
 			return;
 		}
 		else
@@ -175,20 +209,20 @@ void timedistort_apply( VJFrame *frame, int val)
 			VJFrame smooth;
 			veejay_memcpy(&smooth,frame, sizeof(VJFrame));
 			smooth.data[0] = prev;
-			softblur_apply(&smooth, 0 );
+			softblur_apply_internal(&smooth, 0 );
 		}
 	}
 	
-	if( n__ == N__ || n__ == 0 )
+	if( td->n__ == td->N__ || td->n__ == 0 )
 		interpolate = 0;
 
 	//@ process
-	uint8_t *planeTables[4] = { planetableY[plane], planetableU[plane], planetableV[plane], NULL };
+	uint8_t *planeTables[4] = { td->planetableY[td->plane], td->planetableU[td->plane], td->planetableV[td->plane], NULL };
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, planeTables, strides );
 
-	uint8_t *p = warptime[ warptimeFrame	] + width + 1;
-	uint8_t *q = warptime[ warptimeFrame ^ 1] + width + 1;
+	uint8_t *p = td->warptime[ td->warptimeFrame	] + width + 1;
+	uint8_t *q = td->warptime[ td->warptimeFrame ^ 1] + width + 1;
 
 	unsigned int x,y;
 	for( y = height - 2; y > 0 ; y -- )
@@ -204,7 +238,7 @@ void timedistort_apply( VJFrame *frame, int val)
 		p += 2;
 		q += 2;
 	}
-	q = warptime[ warptimeFrame ^ 1 ] + width + 1;
+	q = td->warptime[ td->warptimeFrame ^ 1 ] + width + 1;
 	int n_plane = 0;
 	for( i = 0; i < len; i ++ )
 	{
@@ -212,20 +246,20 @@ void timedistort_apply( VJFrame *frame, int val)
 			q[i] = PLANES - 1;
 		}
 
-		n_plane = ( plane - q[i] + PLANES ) & (PLANES-1);
+		n_plane = ( td->plane - q[i] + PLANES ) & (PLANES-1);
 
-		Y[i]  = planetableY[ n_plane ][i];
-		Cb[i] = planetableU[ n_plane ][i];
-		Cr[i] = planetableV[ n_plane ][i];
+		Y[i]  = td->planetableY[ n_plane ][i];
+		Cb[i] = td->planetableU[ n_plane ][i];
+		Cr[i] = td->planetableV[ n_plane ][i];
 	}
 
-	plane ++;
-	plane = plane & (PLANES-1);
-	warptimeFrame ^= 1;
+	td->plane ++;
+	td->plane = td->plane & (PLANES-1);
+	td->warptimeFrame ^= 1;
 
 	if(interpolate)
-		motionmap_interpolate_frame( frame, N__,n__ );
+		motionmap_interpolate_frame( td->motionmap,frame, td->N__,td->n__ );
 	if(motion)
-		motionmap_store_frame(frame);
+		motionmap_store_frame(td->motionmap,frame);
 
 }

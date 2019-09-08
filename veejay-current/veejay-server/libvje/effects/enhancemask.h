@@ -21,6 +21,5 @@
 #ifndef ENHANCEMASK_H
 #define ENHANCEMASK_H
 vj_effect *enhancemask_init(int w, int h);
-void enhancemask_apply(VJFrame *frame, int *t);
-void enhancemask_free();
+void enhancemask_apply(void *ptr, VJFrame *frame, int *t);
 #endif

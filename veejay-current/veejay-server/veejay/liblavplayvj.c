@@ -132,11 +132,16 @@
 #endif
 #define HZ 100
 #include <libel/vj-el.h>
+
+#include <libvje/libvje.h>
+#include <libvje/effects/shapewipe.h>
+
+#include <omp.h>
+
 #define VALUE_NOT_FILLED -10000
 
 extern void vj_osc_set_veejay_t(veejay_t *t);
 extern void GoMultiCast(const char *groupname);
-extern void set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
  
 #ifdef HAVE_SDL
 extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
@@ -168,12 +173,12 @@ int veejay_get_state(veejay_t *info) {
 int	veejay_set_yuv_range(veejay_t *info) {
 	switch(info->pixel_format) {
 		case FMT_422:
-			set_pixel_range( 235,240,16,16 );
+			vje_set_pixel_range( 235,240,16,16 );
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using YUV range { Y=16-235, U/V=16-240 }");
 			return 0;
 			break;
 		default:
-			set_pixel_range( 255, 255,0,0 );
+			vje_set_pixel_range( 255, 255,0,0 );
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using YUV { Y=0-255, U/V=0-255 }");
 			break;
 	}
@@ -389,7 +394,8 @@ int veejay_free(veejay_t * info)
 
 	vj_avcodec_free();
 
-	vj_effect_shutdown();
+    //FIXME
+	//vj_effect_shutdown();
 
 	task_destroy();
 
@@ -414,6 +420,9 @@ int veejay_free(veejay_t * info)
 	if( info->effect_frame4) free(info->effect_frame4);
 	if( info->effect_info2) free( info->effect_info2 );
 
+    if( info->settings->transition.ptr ) {
+        shapewipe_free(info->settings->transition.ptr);
+    }
 
 	if( info->dummy ) free(info->dummy );
 	
@@ -552,8 +561,9 @@ int veejay_init_editlist(veejay_t * info)
 
 int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 {
-    if( info->settings->transition.active )
+    if( info->settings->transition.active ) {
         return 0;
+    }
 
 	if(!sample_stop_playing( info->uc->sample_id, new_sample_id ) )
 	{
@@ -593,7 +603,6 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	veejay_reset_el_buffer(info);
 
 	sample_start_playing( sample_id, info->no_caching );
-	int tmp = sample_chain_malloc( sample_id );
 
    	sample_get_short_info( sample_id , &start,&end,&looptype,&speed);
 
@@ -633,8 +642,8 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
      veejay_set_speed(info, speed);
  	 
-	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, End=%d, Loop=%d)",
-			sample_id, tmp,info->sfd, speed, start, end, looptype );
+	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (Sl=%d, Speed=%d, Start=%d, End=%d, Loop=%d)",
+			sample_id, info->sfd, speed, start, end, looptype );
 	 
 	 return 1;
 }
@@ -650,7 +659,6 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 //	vj_tag_set_active( stream_id, 1 );
 
-	int	tmp = vj_tag_chain_malloc( stream_id);
 	if( settings->current_playback_speed == 0 )
 		settings->current_playback_speed = 1;
 	settings->min_frame_num = 1;
@@ -671,7 +679,7 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	info->last_tag_id = stream_id;
 	info->uc->sample_id = stream_id;
 
-	veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp, settings->max_frame_num );
+	veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (%ld - %ld)", stream_id, settings->min_frame_num, settings->max_frame_num );
 
 	info->current_edit_list = info->edit_list;
   	 
@@ -1838,7 +1846,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	int full_range = veejay_set_yuv_range( info );
 	yuv_set_pixel_range(full_range);
-    vj_effect_set_rgb_parameter_conversion_type(full_range);
+    vje_set_rgb_parameter_conversion_type(full_range);
 
 	info->settings->sample_mode = SSM_422_444;
 /*
@@ -1910,11 +1918,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->audio = NO_AUDIO;
 	}
 
-	vj_effect_initialize( info->video_output_width,info->video_output_height,full_range, info->read_plug_cfg);
+	vje_init( info->video_output_width,info->video_output_height);
+    //FIXME: plugin defaults
+    //full_range, info->read_plug_cfg);
 
 	if(info->dump)
-		vj_effect_dump();
-	if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
+		vje_dump();
+	
+    if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
 	{
 		if(sample_readFromFile( info->settings->action_scheduler.sl,
 		                       info->composite,
@@ -2180,6 +2191,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	}
 
 //	veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
+
+    info->settings->transition.ptr = shapewipe_malloc( info->video_output_width, info->video_output_height);
+    if(!info->settings->transition.ptr) {
+        veejay_msg(VEEJAY_MSG_ERROR,"Unable to initialize shapewipe");
+        return -1;
+    }
 
 	if(veejay_open(info) != 1)
 	{
@@ -2857,6 +2874,10 @@ veejay_t *veejay_malloc()
 
 	info->pixel_format = FMT_422F; //@default 
 	info->settings->ncpu = smp_check();
+
+    omp_set_num_threads( info->settings->ncpu );
+    veejay_msg(VEEJAY_MSG_INFO, "Set number of open mp threads to %d",
+            info->settings->ncpu);
 
 	int status = 0;
 	int acj    = 0;

@@ -79,8 +79,14 @@ static inline int _chroma_key( uint8_t fg_cb, uint8_t fg_cr, uint8_t cb, uint8_t
 
 
 
-void chromapalette_apply(VJFrame *frame, int angle, int r, int g, int b, int color_cb, int color_cr )
-{
+void chromapalette_apply(void *ptr, VJFrame *frame, int *args) {
+    int angle = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int color_cb = args[4];
+    int color_cr = args[5];
+
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];

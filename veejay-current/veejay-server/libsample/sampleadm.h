@@ -101,7 +101,7 @@ typedef struct transition_eff_t {
 typedef struct sample_eff_t {
     int effect_id;		/* effect ID */
     int e_flag;
-
+    void *vje_instance;
     int arg[SAMPLE_MAX_PARAMETERS];	/* array of arguments */
     int frame_offset;
     int frame_trimmer;		/* sub frame scratcher */
@@ -191,7 +191,6 @@ typedef struct sample_info_t {
 #define SAMPLE_MAX_DEPTH 4
 #define SAMPLE_DEC_BIBBER 1
 #define SAMPLE_DEC_FREEZE 2
-extern int sample_chain_malloc(int sample_id);
 extern int sample_chain_free(int sample_id, int global);
 extern unsigned int sample_size();
 extern int sample_highest();

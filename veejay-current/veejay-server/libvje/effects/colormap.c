@@ -50,16 +50,20 @@ vj_effect *colormap_init(int w, int h)
     return ve;
 }
 
-void colormap_apply( VJFrame *frame, int r, int g, int b)
-{
+void colormap_apply( void *ptr, VJFrame *frame, int *args ) {
+    int r = args[0];
+    int g = args[1];
+    int b = args[2];
+
     unsigned int i;
     const int uv_len = frame->uv_len;
 	uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-	int dummy = 0;
 	uint8_t u_[256];
 	uint8_t v_[256];
+
+    int dummy = 0;
 
 	for(i = 1; i < 257; i ++ )
 	{

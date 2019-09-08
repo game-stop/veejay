@@ -52,8 +52,35 @@ vj_effect *fadecolor_init(int w,int h)
 	return ve;
 }
 
-void colorfade_apply(VJFrame *frame, int opacity, int color)
-{
+typedef struct {
+    int value;
+} fc_t;
+
+void *fadecolor_malloc(int w, int h) {
+    return vj_calloc(sizeof(fc_t));
+}
+
+void fadecolor_free(void *ptr) {
+    free(ptr);
+}
+
+
+void fadecolor_apply(void *ptr, VJFrame *frame, int *args) {
+    int opacity = args[0];
+    int color = args[1];
+
+    fc_t *state = (fc_t*) ptr;
+
+    if (args[3] == 0)  {
+        if (state->value >= 255)
+            state->value = opacity;
+        state->value += (opacity / args[2]);
+    } else {
+        if (state->value <= 0)
+            state->value = opacity;
+        state->value -= (opacity / args[2]);
+    }
+
 	unsigned int i, op0, op1;
 	const int len = frame->len;
 	uint8_t colorCb = 128, colorCr = 128;
@@ -62,6 +89,8 @@ void colorfade_apply(VJFrame *frame, int opacity, int color)
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+
+    opacity = state->value;
 
 	switch (color) {
 		case VJ_EFFECT_COLOR_RED:

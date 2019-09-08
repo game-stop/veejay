@@ -21,7 +21,9 @@
 #ifndef SINOIDS_H
 #define SINOIDS_H
 vj_effect *sinoids_init(int w, int h);
-void sinoids_free();
-int sinoids_malloc(int w, int h);
-void sinoids_apply(VJFrame *frame, int a,int b);
+void sinoids_free(void *ptr);
+void *sinoids_malloc(int w, int h);
+void sinoids_apply(void *ptr, VJFrame *frame, int *args);
+int sinoids_request_fx();
+void sinoids_set_motionmap(void *ptr, void *priv );
 #endif

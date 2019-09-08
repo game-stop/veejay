@@ -1,7 +1,7 @@
-/* 
+/*
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2019 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,8 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef FADECOLORRGB_H
-#define FADECOLORRGB_H
-vj_effect *fadecolorrgb_init();
-void colorfadergb_apply(VJFrame *frame, int opacity, int r, int g, int b);
+#ifndef SHAPEWIPE_H
+#define SHAPEWIPE_H
+vj_effect *shapewipe_init(int w, int h);
+void *shapewipe_malloc(int w, int h);
+int shapewipe_ready(void *ptr, int w, int h);
+void shapewipe_free(void *ptr);
+void shapewipe_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
+int shapewipe_process( void *ptr, VJFrame *frame, VJFrame *frame2,double timecode, int shape, int threshold, int direction, int automatic);
 #endif

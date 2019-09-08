@@ -21,7 +21,7 @@
 #ifndef MTRACER_H
 #define MTRACER_H
 vj_effect *mtracer_init(int w, int h);
-int mtracer_malloc(int w, int h);
-void mtracer_free();
-void mtracer_apply(VJFrame *frame, VJFrame *frame2,int mode, int nframes);
+void *mtracer_malloc(int w, int h);
+void mtracer_free(void *ptr);
+void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args );
 #endif

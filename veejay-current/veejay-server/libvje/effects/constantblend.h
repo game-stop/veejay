@@ -21,5 +21,5 @@
 #ifndef constantblend_H
 #define constantblend_H
 vj_effect *constantblend_init(int w, int h);
-void constantblend_apply( VJFrame *frame, int a, int b, int c);
+void constantblend_apply( void *ptr, VJFrame *frame, int *args);
 #endif

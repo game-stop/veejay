@@ -21,7 +21,7 @@
 #ifndef FEATHERMASK_H
 #define FEATHERMASK_H
 vj_effect *feathermask_init(int w, int h);
-void feathermask_apply( VJFrame *frame);
-int feathermask_malloc(int width, int height);
-void feathermask_free();
+void feathermask_apply(void *ptr, VJFrame *frame, int *args);
+void *feathermask_malloc(int width, int height);
+void feathermask_free(void *ptr);
 #endif

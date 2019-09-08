@@ -59,9 +59,14 @@ vj_effect *transop_init(int width, int height)
 
 /* translate, twidth,theight: size of block to transform */
 /* moves block(x2,y2) to (x1,y1), size of block to move is twidth * theight  */
-void transop_apply( VJFrame *frame, VJFrame *frame2,
-		   int twidth, int theight, int x1, int y1, int x2, int y2 )
-{
+void transop_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int twidth = args[0];
+    int theight = args[1];
+    int x1 = args[2];
+    int y1 = args[3];
+    int x2 = args[4];
+    int y2 = args[5];
+
 	int x, y;
 
 	uint8_t *dY = frame->data[0];

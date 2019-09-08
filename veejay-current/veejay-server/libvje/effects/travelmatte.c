@@ -43,7 +43,7 @@ vj_effect *travelmatte_init(int w, int h)
 }
 
 
-void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int mode)
+void travelmatte_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
 	const int len = frame->len;
 
@@ -60,6 +60,8 @@ void travelmatte_apply( VJFrame *frame, VJFrame *frame2, int mode)
 	uint8_t *b1 = frame2->data[1];
 	uint8_t *b2 = frame2->data[2];
 	uint8_t *aB = frame2->data[3];
+
+    int mode = args[0];
 
 	unsigned int i;
 

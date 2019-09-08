@@ -21,5 +21,5 @@
 #ifndef GREYSELECT_H
 #define GREYSELECT_H
 vj_effect *greyselect_init();
-void greyselect_apply( VJFrame *frame, int i_angle,int red, int green, int blue, int swap);
+void greyselect_apply( void *ptr, VJFrame *frame, int *args );
 #endif

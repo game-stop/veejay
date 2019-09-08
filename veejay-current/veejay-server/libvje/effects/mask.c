@@ -96,8 +96,10 @@ static void mask_replace_white_fill(uint8_t *yuv1[3], uint8_t *yuv2[3],
   }
 }
 
-void simplemask_apply( VJFrame *frame, VJFrame *frame2, int threshold, int invert)
-{
+void simplemask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int threshold = args[0];
+    int invert = args[1];
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;

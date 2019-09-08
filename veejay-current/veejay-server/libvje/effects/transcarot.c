@@ -251,9 +251,14 @@ static void transcarot2_apply( VJFrame *frame, VJFrame *frame2, int point_size,
 
 }
 
-void transcarot_apply( VJFrame *frame, VJFrame *frame2, int p, int dy, int dye,
-					  int row, int opacity, int type)
-{
+void transcarot_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int p = args[0];
+    int dy = args[1];
+    int dye = args[2];
+	int row = args[3];
+    int opacity = args[4];
+    int type = args[5];
+
 	if (type == 1)
 		transcarot1_apply(frame, frame2, p, dy, dye, row, opacity);
 	if (type == 0)

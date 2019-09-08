@@ -21,7 +21,7 @@
 #ifndef CROSSPIXEL_H
 #define CROSSPIXEL_H
 vj_effect *crosspixel_init(int w, int h);
-int crosspixel_malloc(int w, int h);
-void crosspixel_free();
-void crosspixel_apply(VJFrame *frame, int type, int val);
+void *crosspixel_malloc(int w, int h);
+void crosspixel_free(void *ptr);
+void crosspixel_apply(void *ptr, VJFrame *frame, int *args);
 #endif

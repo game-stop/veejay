@@ -20,8 +20,8 @@
 
 #ifndef NOISEPENCIL_H
 #define NOISEPENCIL_H
-vj_effect *noisepencil_init  (int w, int h);
-void noisepencil_free();
-int noisepencil_malloc(int w, int h);
-void noisepencil_apply( VJFrame *frame, int t, int n, int a, int b);
+vj_effect *noisepencil_init(int w, int h);
+void noisepencil_free(void *ptr);
+void *noisepencil_malloc(int w, int h);
+void noisepencil_apply(void *ptr, VJFrame *frame, int *args );
 #endif

@@ -21,7 +21,7 @@
 #ifndef NERVOUS_H
 #define NERVOUS_H
 vj_effect *nervous_init(int w, int h);
-int nervous_malloc(int w, int h);
-void nervous_free(void);
-void nervous_apply(VJFrame *Frame, int delay);
+void *nervous_malloc(int w, int h);
+void nervous_free(void *ptr);
+void nervous_apply(void *ptr, VJFrame *Frame, int *args);
 #endif

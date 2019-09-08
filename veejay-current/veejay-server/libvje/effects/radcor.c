@@ -58,33 +58,43 @@ vj_effect *radcor_init(int w, int h)
 	return ve;
 }
 
-static uint8_t *badbuf = NULL;
-static uint32_t *Map = NULL;
-static int map_upd[4] = {0,0,0,0};
+typedef struct {
+    uint8_t *badbuf;
+    uint32_t *Map;
+    int map_upd[4];
+} radcor_t;
 
-int radcor_malloc( int w, int h )
+void *radcor_malloc( int w, int h )
 {
+    radcor_t *r = (radcor_t*) vj_calloc(sizeof(radcor_t));
+    if(!r) {
+        return NULL;
+    }
+
     const int len = RUP8(w * h);
     const int total_len = RUP8(len * 4);
 
-	badbuf = (uint8_t*) vj_malloc( sizeof(uint8_t) * total_len );
-	if(!badbuf)
-		return 0;
-	Map = (uint32_t*) vj_malloc( sizeof(uint32_t) * len );
-	veejay_memset( Map, 0, len );
-	if(!Map) {
-        free(badbuf);
-		return 0;
+	r->badbuf = (uint8_t*) vj_malloc( sizeof(uint8_t) * total_len );
+	if(!r->badbuf) {
+        free(r);
+		return NULL;
     }
-	return 1;
+
+	r->Map = (uint32_t*) vj_calloc( sizeof(uint32_t) * len );
+	if(!r->Map) {
+        free(r->badbuf);
+        free(r);
+		return NULL;
+    }
+	return (void*) r;
 }
 
-void radcor_free()
+void radcor_free(void *ptr)
 {
-	free(badbuf);
-	free(Map);
-	badbuf = NULL;
-	Map = NULL;
+    radcor_t *r = (radcor_t*) ptr;
+    free(r->badbuf);
+    free(r->Map);
+    free(r);
 }
 
 typedef struct
@@ -95,8 +105,15 @@ typedef struct
 } pixel_t;
 
 
-void radcor_apply( VJFrame *frame, int alpaX, int alpaY, int dir, int alpha)
+void radcor_apply( void *ptr, VJFrame *frame, int *args )
 {
+    int alpaX = args[0];
+    int alpaY = args[1];
+    int dir = args[2];
+    int alpha = args[3];
+
+    radcor_t *radcor = (radcor_t*) ptr;
+
 	int i,j;
 	int i2,j2;
 	const unsigned int width = frame->width;
@@ -113,17 +130,19 @@ void radcor_apply( VJFrame *frame, int alpaX, int alpaY, int dir, int alpha)
 	int nyout = ny;
 
 	//@ copy source image to internal buffer 
-	uint8_t *dest[4] = { badbuf, badbuf + len, badbuf + len + len, badbuf + len + len + len };
+	uint8_t *dest[4] = { radcor->badbuf, radcor->badbuf + len, radcor->badbuf + len + len, radcor->badbuf + len + len + len };
 	int strides[4] = { len, len, len, 0 };
 	if( alpha )
 		strides[3] = len;
 
 	vj_frame_copy( frame->data, dest, strides );
 
-	uint8_t *Yi = badbuf;
-	uint8_t *Cbi = badbuf + len;
-	uint8_t *Cri = badbuf + len + len;
-	uint8_t *Ai = badbuf + len + len + len;
+	uint8_t *Yi = radcor->badbuf;
+	uint8_t *Cbi = radcor->badbuf + len;
+	uint8_t *Cri = radcor->badbuf + len + len;
+	uint8_t *Ai = radcor->badbuf + len + len + len;
+
+    uint32_t *Map = radcor->Map;
 
 	double alphax = alpaX / (double) 1000.0;
 	double alphay = alpaY / (double) 1000.0;
@@ -142,11 +161,11 @@ void radcor_apply( VJFrame *frame, int alpaX, int alpaY, int dir, int alpha)
 
 	int update_map = 0;
 
-	if( map_upd[0] != alpaX || map_upd[1] != alpaY || map_upd[2] != dir )
+	if( radcor->map_upd[0] != alpaX || radcor->map_upd[1] != alpaY || radcor->map_upd[2] != dir )
 	{
-		map_upd[0] = alpaX;
-		map_upd[1] = alpaY;
-		map_upd[2] = dir;
+		radcor->map_upd[0] = alpaX;
+		radcor->map_upd[1] = alpaY;
+		radcor->map_upd[2] = dir;
 		update_map = 1;
 	}
 

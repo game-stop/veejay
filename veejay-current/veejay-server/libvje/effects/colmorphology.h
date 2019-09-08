@@ -21,7 +21,7 @@
 #ifndef COLMORPHOLOGY_H
 #define COLMORPHOLOGY_H
 vj_effect *colmorphology_init(int w, int h);
-void colmorphology_apply( VJFrame *frame, int t, int val, int n);
-int colmorphology_malloc(int w, int h);
-void colmorphology_free(void);
+void colmorphology_apply(void *ptr, VJFrame *frame, int *args);
+void *colmorphology_malloc(int w, int h);
+void colmorphology_free(void *ptr);
 #endif

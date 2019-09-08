@@ -21,7 +21,7 @@
 #ifndef VIDEOPLAY_H
 #define VIDEOPLAY_H
 vj_effect *videoplay_init(int w, int h);
-int videoplay_malloc(int w, int h);
-void videoplay_free(void);
-void videoplay_apply( VJFrame *frame, VJFrame *b, int size, int behaviour, int mode);
+void  *videoplay_malloc(int w, int h);
+void videoplay_free(void *ptr);
+void videoplay_apply( void *ptr, VJFrame *frame, VJFrame *b, int *args);
 #endif

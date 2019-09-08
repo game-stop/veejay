@@ -73,8 +73,13 @@ vj_effect *alphaselect_init(int w, int h)
 	return ve;
 }
 
-void alphaselect_apply( VJFrame *frame, int i_angle, int r, int g, int b, int swap)
-{
+void alphaselect_apply(void *ptr, VJFrame *frame, int *args) {
+    int i_angle = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int swap = args[4];
+
     uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;
     int cb, cr;

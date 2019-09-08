@@ -97,49 +97,56 @@ static int alloc_sws_context(FilterParam *f, int width, int height, unsigned int
 	return 1;
 }
 
-static uint8_t *temp = NULL;
-static FilterParam *gaussfilter = NULL;
-static int last_radius = 0;
-static int last_strength = 0;
-static int last_quality = 0;
 
-int	gaussblur_malloc(int w, int h)
+typedef struct {
+    uint8_t *temp;
+    FilterParam *gaussfilter;
+    int last_radius;
+    int last_strength;
+    int last_quality;
+} gaussblur_t;
+
+void *gaussblur_malloc(int w, int h)
 {
-	gaussfilter = (FilterParam*) vj_calloc(sizeof(FilterParam));
-	temp = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h));
-	if(temp == NULL)
-		return 0;
-	last_radius = 0;
-	last_strength = 0;
-	last_quality = 0;
-	return 1;
+    gaussblur_t *g = (gaussblur_t*) vj_calloc(sizeof(gaussblur_t));
+    if(!g) {
+        return NULL;
+    }
+	g->gaussfilter = (FilterParam*) vj_calloc(sizeof(FilterParam));
+    if(!g->gaussfilter) {
+        free(g);
+        return NULL;
+    }
+
+	g->temp = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h));
+    if(!g->temp) {
+        free(g->gaussfilter);
+        free(g);
+        return NULL;
+    }
+
+	return (void*) g;
 }
 
-void gaussblur_free()
+void gaussblur_free(void *ptr)
 {
-	if(temp) {
-		free(temp);
-		temp = NULL;
-	}
+    gaussblur_t *g = (gaussblur_t*) ptr;
+    if(g->gaussfilter->filter_context ) {
+        sws_freeContext( g->gaussfilter->filter_context );
+    }   
 
-	if( gaussfilter->filter_context ) {
-		sws_freeContext( gaussfilter->filter_context );
-		gaussfilter->filter_context = NULL;
-	}
-
-	if( gaussfilter ) {
-		free(gaussfilter);
-		gaussfilter = NULL;
-	}
+    free(g->gaussfilter);
+    free(g->temp);
+    free(g);
 }
 
-static int	 gaussfilter_init(int w, int h, int radius, int strength, int quality)
+static int	 gaussfilter_init(gaussblur_t *g, int w, int h, int radius, int strength, int quality)
 {
-	gaussfilter->radius = (float) radius * 0.01f;
-	gaussfilter->strength = (float) strength * 0.01f;
-	gaussfilter->quality = (float) quality * 0.01f;
+	g->gaussfilter->radius = (float) radius * 0.01f;
+	g->gaussfilter->strength = (float) strength * 0.01f;
+	g->gaussfilter->quality = (float) quality * 0.01f;
 
-	if(!alloc_sws_context( gaussfilter,w,h,yuv_sws_get_cpu_flags() ) )
+	if(!alloc_sws_context( g->gaussfilter,w,h,yuv_sws_get_cpu_flags() ) )
 		return 0;
 
 	return 1;
@@ -157,28 +164,34 @@ static void gaussblur(uint8_t *dst, const int dst_linesize,const uint8_t *src, c
 			  0, h, dst_array, dst_linesize_array);
 }
 
-void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality )
-{
+void gaussblur_apply(void *ptr, VJFrame *frame, int *args ) {
+    int radius = args[0];
+    int strength = args[1];
+    int quality = args[2];
+
+    gaussblur_t *g = (gaussblur_t*) ptr;
+
 	uint8_t *A = frame->data[3];
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;
 
-	if( last_radius != radius || last_strength != strength || last_quality != quality )
+	if( g->last_radius != radius || g->last_strength != strength || g->last_quality != quality )
 	{
-		if( gaussfilter->filter_context ) {
-			sws_freeContext( gaussfilter->filter_context );
+		if( g->gaussfilter->filter_context ) {
+			sws_freeContext( g->gaussfilter->filter_context );
+            g->gaussfilter->filter_context = NULL;
 		}
-		if( gaussfilter_init( width, height, radius, strength, quality ) == 0 )
+		if( gaussfilter_init( g, width, height, radius, strength, quality ) == 0 )
 			return;
 
-		last_radius = radius;
-		last_strength = strength;
-		last_quality = quality;
+		g->last_radius = radius;
+		g->last_strength = strength;
+		g->last_quality = quality;
 	}
 
 
-	veejay_memcpy( temp, A, len );
-	gaussblur( A, width, temp, width, width, height, gaussfilter->filter_context );
+	veejay_memcpy( g->temp, A, len );
+	gaussblur( A, width, g->temp, width, width, height, g->gaussfilter->filter_context );
 
 }

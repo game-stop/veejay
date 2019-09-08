@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,9 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef BAR_H
-#define BAR_H
-vj_effect *bar_init(int width, int height);
-void bar_apply(VJFrame *frame, VJFrame *frame2, int d, int x1, int x2,
-               int t1, int b1);
+#ifndef COMPLEXOP_H
+#define COMPLEXOP_H
+vj_effect *complexopacity_init();
+void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *bg, int *args);
 #endif

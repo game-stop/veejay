@@ -21,5 +21,5 @@
 #ifndef ALPHAFILL_H
 #define ALPHAFILL_H
 vj_effect *alphafill_init(int w, int h);
-void alphafill_apply( VJFrame *frame, int val);
+void alphafill_apply(void *ptr, VJFrame *frame, int *args);
 #endif

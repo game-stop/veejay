@@ -57,27 +57,37 @@ vj_effect *flare_init(int w, int h)
 	return ve;
 }
 
-static uint8_t *flare_buf[4] = { NULL,NULL,NULL,NULL};
+typedef struct {
+    uint8_t *flare_buf[4];
+} flare_t;
 
-int	flare_malloc(int w, int h)
+void *flare_malloc(int w, int h)
 {
-	int i;
-	for( i = 0; i < 3 ;i ++ ) {
-		flare_buf[i] = (uint8_t*) vj_malloc( RUP8(w * h) * sizeof(uint8_t));
-		if(!flare_buf[i])
-			return 0;
-	}
-	return 1;
+    flare_t *f = (flare_t*) vj_calloc(sizeof(flare_t));
+    if(!f) {
+        return NULL;
+    }
+
+    const int len = RUP8(w*h);
+    const int total_len = len * 3;
+
+    f->flare_buf[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * total_len );
+    if(!f->flare_buf[0]) {
+        free(f);
+        return NULL;
+    }
+
+    f->flare_buf[1] = f->flare_buf[0] + len;
+    f->flare_buf[2] = f->flare_buf[1] + len;
+	
+    return (void*) f;
 }
 
-void	flare_free(void)
+void	flare_free(void *ptr)
 {
-	int i;
-	for( i = 0; i < 3; i ++ ) {
-		if( flare_buf[i] ) 
-			free(flare_buf[i]);
-		flare_buf[i] = NULL;
-	}
+    flare_t *f = (flare_t*) ptr;
+    free(f->flare_buf[0]);
+    free(f);
 }
 
 static void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
@@ -259,8 +269,13 @@ static void flare_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_
 	}
 }
 
-void flare_apply(VJFrame *frame, int type, int op_a, int radius)
-{
+void flare_apply(void *ptr, VJFrame *frame, int *args) {
+    int type = args[0];
+    int op_a = args[1];
+    int radius = args[2];
+
+    flare_t *f = (flare_t*) ptr;
+
 	int y,x;
 	int plane = 0;
 	const unsigned int width = frame->width;
@@ -271,9 +286,9 @@ void flare_apply(VJFrame *frame, int type, int op_a, int radius)
 	VJFrame frame2;
 	veejay_memcpy( &frame2, frame, sizeof(VJFrame));
 	/* data is local */
-	frame2.data[0] = flare_buf[0];
-	frame2.data[1] = flare_buf[1];
-	frame2.data[2] = flare_buf[2];
+	frame2.data[0] = f->flare_buf[0];
+	frame2.data[1] = f->flare_buf[1];
+	frame2.data[2] = f->flare_buf[2];
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, frame2.data,strides );
 

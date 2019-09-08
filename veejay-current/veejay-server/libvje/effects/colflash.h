@@ -21,5 +21,7 @@
 #ifndef COLFLASH_H
 #define COLFLASH_H
 vj_effect *colflash_init();
-void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d);
+void *colflash_malloc(int w, int h);
+void colflash_free(void *ptr);
+void colflash_apply(void *ptr, VJFrame *frame, int *arsg);
 #endif

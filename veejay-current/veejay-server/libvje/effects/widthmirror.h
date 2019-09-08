@@ -21,5 +21,5 @@
 #ifndef WIDTHMIRROR_H
 #define WIDTHMIRROR_H
 vj_effect *widthmirror_init(int max_width, int h);
-void widthmirror_apply(VJFrame *frame, int div);
+void widthmirror_apply(void *ptr, VJFrame *frame, int *args);
 #endif

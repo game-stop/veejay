@@ -60,19 +60,29 @@ vj_effect *pixelsort_init(int w, int h)
     return ve;
 }
 
-static uint8_t *mask = NULL;
+typedef struct {
+    uint8_t *mask;
+} pixelsort_t;
 
-int pixelsort_malloc(int w, int h){
-    mask = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w + w * h) );
-    veejay_memset(mask, 0, RUP8(w + w*h) );
-    if(!mask)
-        return 0;
-    return 1;
+void *pixelsort_malloc(int w, int h){
+    pixelsort_t *p = (pixelsort_t*) vj_calloc(sizeof(pixelsort_t));
+    if(!p) {
+        return NULL;
+    }
+    p->mask = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(w + w * h) );
+    
+    if(!p->mask) {
+        free(p);
+        return NULL;
+    }
+
+    return (void*) p;
 }
 
-void pixelsort_free() {
-    if(mask) free(mask); 
-    mask = NULL;
+void pixelsort_free(void *ptr) {
+    pixelsort_t *p = (pixelsort_t*) ptr;
+    free(p->mask);
+    free(p);
 }
 
 static inline unsigned int firstNotBlackY(uint8_t *Y, unsigned int x, unsigned int y, unsigned int wid, unsigned int hei)
@@ -278,7 +288,7 @@ static inline void sort_y(uint8_t *P[4], unsigned int width, unsigned int x, uns
     csort32_unpackY( P, sorted, sortlen, x, y, width );
 }
 
-static unsigned int pixelsort_column(uint8_t *P[4], unsigned int width, unsigned int x1, unsigned int y1, unsigned int height, int mode)
+static unsigned int pixelsort_column(uint8_t *mask, uint8_t *P[4], unsigned int width, unsigned int x1, unsigned int y1, unsigned int height, int mode)
 {
     unsigned int x = x1;
     unsigned int y = y1;
@@ -310,7 +320,7 @@ static unsigned int pixelsort_column(uint8_t *P[4], unsigned int width, unsigned
     return y_end;
 }
 
-static unsigned int pixelsort_row(uint8_t *P[4],unsigned int width, unsigned int x1, unsigned int y1, int mode)
+static unsigned int pixelsort_row(uint8_t *mask, uint8_t *P[4],unsigned int width, unsigned int x1, unsigned int y1, int mode)
 {
     unsigned int x = x1;
     unsigned int y = y1;
@@ -342,28 +352,33 @@ static unsigned int pixelsort_row(uint8_t *P[4],unsigned int width, unsigned int
 }
 
 
-void pixelsort_apply( VJFrame *frame, int mode, int rows1st, int threshold)
-{
+void pixelsort_apply( void *ptr, VJFrame *frame, int *args) {
+    int mode = args[0];
+    int rows1st = args[1];
+    int threshold = args[2];
+
+    pixelsort_t *p = (pixelsort_t*) ptr;
+
     uint8_t pixel_Y_hi_ = pixel_Y_hi_;
     uint8_t pixel_Y_lo_ = pixel_Y_lo_;
     unsigned int x=0,y=0;
     unsigned int wid = frame->width;
     unsigned int hei = frame->height;
 
-    binarify_1src( mask, frame->data[0], threshold, 0, wid,hei );
+    binarify_1src( p->mask, frame->data[0], threshold, 0, wid,hei );
 
     switch(rows1st) {
         case 0:
             for( y = 0; y < frame->height; y ++ ) {
                 x = 0;
                 while( x < wid ) {
-                    x += pixelsort_row( frame->data, frame->width, x,y, mode );
+                    x += pixelsort_row( p->mask, frame->data, frame->width, x,y, mode );
                 }
             }
             for( x = 0; x < frame->width; x ++ ) {
                 y = 0;
                 while( y < hei ) {
-                    y += pixelsort_column( frame->data, frame->width, x, y, frame->height, mode );
+                    y += pixelsort_column( p->mask, frame->data, frame->width, x, y, frame->height, mode );
                 }
             }
         break;
@@ -371,13 +386,13 @@ void pixelsort_apply( VJFrame *frame, int mode, int rows1st, int threshold)
             for( x = 0; x < frame->width; x ++ ) {
                 y = 0;
                 while( y < hei ) {
-                    y += pixelsort_column( frame->data, frame->width, x, y, frame->height, mode );
+                    y += pixelsort_column( p->mask, frame->data, frame->width, x, y, frame->height, mode );
                 }
             }
             for( y = 0; y < frame->height; y ++ ) {
                 x = 0;
                 while( x < wid ) {
-                    x += pixelsort_row( frame->data, frame->width, x,y, mode );
+                    x += pixelsort_row( p->mask, frame->data, frame->width, x,y, mode );
                 }
             }
             break;
@@ -385,7 +400,7 @@ void pixelsort_apply( VJFrame *frame, int mode, int rows1st, int threshold)
             for( x = 0; x < frame->width; x ++ ) {
                 y = 0;
                 while( y < hei ) {
-                    y += pixelsort_column( frame->data, frame->width, x, y, frame->height, mode );
+                    y += pixelsort_column( p->mask, frame->data, frame->width, x, y, frame->height, mode );
                 } 
             }
             break;
@@ -393,7 +408,7 @@ void pixelsort_apply( VJFrame *frame, int mode, int rows1st, int threshold)
             for( y = 0; y < frame->height; y ++ ) {
                 x = 0;
                 while( x < wid ) {
-                    x += pixelsort_row( frame->data, frame->width, x,y, mode );
+                    x += pixelsort_row( p->mask, frame->data, frame->width, x,y, mode );
                 }
             }
             break;

@@ -22,7 +22,9 @@
 #include <veejaycore/vjmem.h>
 #include "noisepencil.h"
 
-static uint8_t *Yb_frame = NULL;
+typedef struct {
+    uint8_t *Yb_frame;
+} noisepencil_t;
 
 vj_effect *noisepencil_init(int width , int height)
 {
@@ -59,19 +61,29 @@ vj_effect *noisepencil_init(int width , int height)
 	return ve;
 }
 
-int  noisepencil_malloc(int width,int height)
+void *noisepencil_malloc(int width,int height)
 {
-	Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * width * height);
-	if(!Yb_frame) return 0;
-	return 1;
+    noisepencil_t *n = (noisepencil_t*) vj_calloc(sizeof(noisepencil_t));
+    if(!n) {
+        return NULL;
+    }
+
+	n->Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * RUP8(width * height));
+	if(!n->Yb_frame) {
+        free(n);
+        return NULL;
+    }
+
+	return (void*) n;
 }
 
-void noisepencil_free() {
-	if(Yb_frame) free(Yb_frame);
-	Yb_frame = NULL;
+void noisepencil_free(void *ptr) {
+    noisepencil_t *n = (noisepencil_t*) ptr;
+    free(n->Yb_frame);
+    free(n);
 }
 
-static void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
+static void noisepencil_1_apply(uint8_t *Yb_frame, uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
 
     int r, c;
     double k = (coeef/100.0);
@@ -113,7 +125,7 @@ static void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coee
 
 }
 
-static void noisepencil_2_apply(uint8_t *src[3], int width, int height, int coeef , int min_t, int max_t) {
+static void noisepencil_2_apply(uint8_t *Yb_frame, uint8_t *src[3], int width, int height, int coeef , int min_t, int max_t) {
 
     int r, c;
     double k = (coeef/1000.0);
@@ -161,7 +173,7 @@ static void noisepencil_2_apply(uint8_t *src[3], int width, int height, int coee
 
 }
 
-static void noisepencil_3_apply(uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
+static void noisepencil_3_apply(uint8_t *Yb_frame, uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
 
     int r, c;
     double k = (coeef/1000.0);
@@ -208,7 +220,7 @@ static void noisepencil_3_apply(uint8_t *src[3], int width, int height, int coee
 
 }
 
-static void noisepencil_4_apply(uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
+static void noisepencil_4_apply(uint8_t *Yb_frame, uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {
 
     int r, c;
     double k = (coeef/1000.0);
@@ -258,7 +270,7 @@ static void noisepencil_4_apply(uint8_t *src[3], int width, int height, int coee
 
 }
 
-static void noisepencil_5_apply(uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
+static void noisepencil_5_apply(uint8_t *Yb_frame, uint8_t *src[3], int width, int height, int coeef, int min_t , int max_t  ) {
 
     int r, c;
     double k = (coeef/1000.0);
@@ -308,25 +320,33 @@ static void noisepencil_5_apply(uint8_t *src[3], int width, int height, int coee
 
 
 /* with min_t -> max_t select the threshold to 'noise ' */
-void noisepencil_apply(VJFrame *frame, int type, int coeef, int min_t, int max_t)
-{
+void noisepencil_apply(void *ptr, VJFrame *frame, int *args ) {
+    int type = args[0];
+    int coeef = args[1];
+    int min_t = args[2];
+    int max_t = args[3];
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	switch(type) {
+
+    noisepencil_t *n = (noisepencil_t*) ptr;
+        
+        
+    switch(type) {
 		case 0:
-		noisepencil_1_apply(frame->data,width, height, coeef,min_t,max_t);
+		noisepencil_1_apply(n->Yb_frame, frame->data,width, height, coeef,min_t,max_t);
 			break;
 		case 1:
-		noisepencil_2_apply(frame->data, width, height, coeef,min_t,max_t);
+		noisepencil_2_apply(n->Yb_frame, frame->data, width, height, coeef,min_t,max_t);
 			break;
 		case 2:
-		noisepencil_3_apply(frame->data, width, height, coeef,min_t,max_t);
+		noisepencil_3_apply(n->Yb_frame, frame->data, width, height, coeef,min_t,max_t);
 			break;
 		case 3:
-		noisepencil_4_apply(frame->data, width, height, coeef,min_t,max_t);
+		noisepencil_4_apply(n->Yb_frame, frame->data, width, height, coeef,min_t,max_t);
 			break;
 		case 4:
-		noisepencil_5_apply(frame->data, width, height, coeef,min_t,max_t);
+		noisepencil_5_apply(n->Yb_frame, frame->data, width, height, coeef,min_t,max_t);
 			break;
 	}
 }

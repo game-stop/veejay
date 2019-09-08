@@ -21,5 +21,5 @@
 #ifndef BORDERS_H
 #define BORDERS_H
 vj_effect *borders_init(int width,int height);
-void borders_apply(VJFrame *frame, int size, int color);
+void borders_apply(void *ptr, VJFrame *frame, int *args);
 #endif

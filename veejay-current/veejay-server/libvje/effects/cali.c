@@ -24,13 +24,16 @@
 #include "softblur.h"
 #include "cali.h"
 
+// This is not an Effect
+
 typedef struct
 {
 	uint8_t	*b[3];
 	uint8_t *l[3];
 	uint8_t *m[3];
 	double mean[3];
-} cali_data;
+    int flood;
+} calidata_t;
 
 vj_effect *cali_init(int width, int height)
 {
@@ -51,7 +54,6 @@ vj_effect *cali_init(int width, int height)
     ve->extra_frame = 0;
     ve->sub_format = 0;
     ve->has_user = 1;
-    ve->user_data = NULL;
 
     ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Subtract Dark Current Only" );
 
@@ -62,12 +64,11 @@ vj_effect *cali_init(int width, int height)
     return ve;
 }
 
-#define ru8(num)(((num)+8)&~8)
-
+// this method is not part of FX api, instead it is directly called by libstream and libsample
 int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *data, int len, int uv_len )
 {
 	int	fl  = len + (2*uv_len);
-	cali_data *c = (cali_data*) ed;
+	calidata_t *c = (calidata_t*) ed;
 	c->b[0] = data;
 	c->b[1] = c->b[0] + len;
 	c->b[2] = c->b[1] + uv_len;
@@ -84,38 +85,34 @@ int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *d
 }
 
 
-int cali_malloc(void **d, int width, int height)
+void *cali_malloc(int width, int height)
 {
-	*d = (void*) vj_calloc(sizeof(cali_data));
-	if(*d==NULL)
-		return 0;
-	return 1;
+    calidata_t *d = (calidata_t*) vj_calloc(sizeof(calidata_t));
+	if(!d) 
+		return NULL;
+	return d;
 }
 
-void cali_free(void *d)
+void cali_free(void *ptr)
 {
-	if(d)
-	{
-		free(d);
-	}
-	d = NULL;
+    calidata_t *d = (calidata_t*) ptr;
+    free(d);
 }
 
+void cali_apply(void *ptr, VJFrame *frame, int *args ) {
+    int mode = args[0];
+    int full = args[1];
 
-static int flood =0;
-
-void cali_apply(void *ed, VJFrame *frame,int mode, int full)
-{
-	cali_data *c = (cali_data*) ed;
+	calidata_t *c = (calidata_t*) ptr;
 
 	if( c->b[0] == NULL || c->l[0] == NULL ||
 		c->mean[0] <= 0.0 || c->mean[1] <= 0.0 ||
 		c->mean[2] <= 0.0 ) {
-		if( flood == 0 ) {
+		if( c->flood == 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR,
 			"Please select a calibration source (use source/channel list)");
 		}
-		flood = (flood + 1) % 25;
+		c->flood = (c->flood + 1) % 25;
 		return;
 	}
 

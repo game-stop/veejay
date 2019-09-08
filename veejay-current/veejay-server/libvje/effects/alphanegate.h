@@ -21,5 +21,5 @@
 #ifndef ALPHANEGATE_H
 #define ALPHANEGATE_H
 vj_effect *alphanegate_init(int w, int h);
-void alphanegate_apply( VJFrame *frame, int val);
+void alphanegate_apply(void *ptr, VJFrame *frame, int *args);
 #endif

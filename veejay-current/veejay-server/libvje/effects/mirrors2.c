@@ -182,8 +182,9 @@ static void mirror_multi_ur(uint8_t * yuv[3], int width, int height)
 	}
 }
 
-void mirrors2_apply( VJFrame *frame, int type)
-{
+void mirrors2_apply(void *ptr, VJFrame *frame, int *args ) {
+    int type = args[0];
+
 	switch (type) {
 		case 0:
 			mirror_multi_dr(frame->data, frame->width, frame->height);

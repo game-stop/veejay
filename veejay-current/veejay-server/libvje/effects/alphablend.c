@@ -47,7 +47,7 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, uint8_t *aA
     return 0;
 }
 
-void alphablend_apply( VJFrame *frame, VJFrame *frame2)
+void alphablend_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
 	const int len = frame->len;
 	const int uv_len = (frame->ssm ? len : frame->uv_len );

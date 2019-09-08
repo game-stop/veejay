@@ -21,5 +21,5 @@
 #ifndef RAWMAN_H
 #define RAWMAN_H
 vj_effect *rawman_init();
-void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int Y);
+void rawman_apply(void *ptr, VJFrame *frame, int *args);
 #endif

@@ -53,8 +53,13 @@ vj_effect *posterize2_init(int w, int h)
 	return ve;	
 }
 
-void posterize2_apply(VJFrame *frame, int vfactor, int t1,int t2, int mode)
+void posterize2_apply(void *ptr, VJFrame *frame, int *args )
 {
+    int vfactor = args[0];
+    int t1 = args[1];
+    int t2 = args[2];
+    int mode = args[3];
+
 	const int len = frame->len;
 	const unsigned int factor = (256 / vfactor);
 	int i;

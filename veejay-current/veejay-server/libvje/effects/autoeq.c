@@ -53,45 +53,64 @@ vj_effect *autoeq_init(int w, int h)
     return ve;
 }
 
-static void	*histogram_ = NULL;
+typedef struct {
+    void	*histogram_;
+    uint8_t *tmp;
+} autoeq_t;
 
-int	autoeq_malloc(int w, int h)
+void *autoeq_malloc(int w, int h)
 {
-	if( histogram_ )
-		veejay_histogram_del(histogram_);
-	histogram_ = veejay_histogram_new();
-	return 1;
+    autoeq_t *a = (autoeq_t*) vj_calloc(sizeof(autoeq_t));
+    if(!a) {
+        return NULL;
+    }
+    a->tmp = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(w*h));
+    if(!a->tmp) {
+        free(a);
+        return NULL;
+    }
+
+	a->histogram_ = veejay_histogram_new();
+    if(!a->histogram_) {
+        free(a->tmp);
+        free(a);
+        return NULL;
+    }
+	return (void*) a;
 }
 
-void	autoeq_free()
+void	autoeq_free(void *ptr)
 {
-	if( histogram_ )
-		veejay_histogram_del(histogram_);
-	histogram_ = NULL;
+    autoeq_t *a = (autoeq_t*) ptr;
+	veejay_histogram_del(a->histogram_);
+    free(a->tmp);
+    free(a);
 }
 
 
-void autoeq_apply( VJFrame *frame, int val, int intensity, int strength)
-{
+void autoeq_apply( void *ptr, VJFrame *frame,int *args) {
+    int val = args[0];
+    int intensity = args[1];
+    int strength = args[2];
+    autoeq_t *a = (autoeq_t*) ptr;
+
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
 	if( val == 0 )
 	{
 		VJFrame tmp;
 		veejay_memcpy( &tmp, frame, sizeof(VJFrame));
-		tmp.data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * len );
+		tmp.data[0] = a->tmp;
 		vj_frame_copy1( frame->data[0], tmp.data[0], len );
 
-		veejay_histogram_draw( histogram_,&tmp, frame, intensity, strength );
+		veejay_histogram_draw( a->histogram_,&tmp, frame, intensity, strength );
 
 		vj_frame_clear1( frame->data[1], 128, uv_len );
 		vj_frame_clear1( frame->data[2], 128, uv_len );
-
-		free(tmp.data[0]);
 	}
 	else
 	{
-		veejay_histogram_analyze( histogram_, frame, 0 );
-		veejay_histogram_equalize( histogram_, frame, intensity, strength );
+		veejay_histogram_analyze( a->histogram_, frame, 0 );
+		veejay_histogram_equalize( a->histogram_, frame, intensity, strength );
 	}
 }

@@ -125,6 +125,7 @@ typedef struct
     long start;
     long end;
     int ready;
+    void *ptr;
 } transition_t;
 
 typedef struct {

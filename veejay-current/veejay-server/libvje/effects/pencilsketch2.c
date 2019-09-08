@@ -73,61 +73,76 @@ vj_effect *pencilsketch2_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Blur Radius", "Gamma Compression", "Strength", "Contrast", "Levels", "Grayscale" );
     return ve;
 }
-
-static uint8_t *pencilbuf = NULL;
-static uint8_t *pencilhblur = NULL;
-static uint8_t *pencilvblur = NULL;
-static void *histogram_ = NULL;
 #define GAMMA_MAX 256
-static double *gamma_table = NULL;
-static double gamma_value = 0;
 static void gammacompr_setup();
 
-int  pencilsketch2_malloc(int w, int h) {
-    if(pencilbuf == NULL) {
-        pencilbuf = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h*3) );
-        if(!pencilbuf) 
-            return 0;
-        pencilhblur = pencilbuf + RUP8(w*h);
-        pencilvblur = pencilhblur + RUP8(w*h);
+typedef struct {
+    uint8_t *pencilbuf;
+    uint8_t *pencilhblur;
+    uint8_t *pencilvblur;
+    void *histogram_;
+    double *gamma_table;
+    double gamma_value;
+} pencilsketch_t;
+
+void *pencilsketch2_malloc(int w, int h) {
+    
+    pencilsketch_t *p =(pencilsketch_t*) vj_calloc(sizeof(pencilsketch_t));
+    if(!p) {
+        return NULL;
     }
-    if( histogram_ ) {
-        veejay_histogram_del(histogram_);
+    
+    p->pencilbuf = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h*3) );
+    if(!p->pencilbuf) {
+        free(p);
+        return NULL;
     }
-    histogram_ = veejay_histogram_new();
-    if(gamma_table == NULL) {
-        gamma_table = (double**) vj_calloc(sizeof(double) * GAMMA_MAX );
-        gamma_value = 9000;
-        gammacompr_setup();
+
+    p->pencilhblur = p->pencilbuf + RUP8(w*h);
+    p->pencilvblur = p->pencilhblur + RUP8(w*h);
+    
+    p->histogram_ = veejay_histogram_new();
+    if(!p->histogram_) {
+        free(p->pencilbuf);
+        free(p);
+        return NULL;
     }
-    return 1;
+
+    p->gamma_table = (double*) vj_calloc(sizeof(double) * GAMMA_MAX );
+    if(!p->gamma_table) {
+        free(p->pencilbuf);
+        veejay_histogram_del(p->histogram_);
+        free(p);
+        return NULL;
+    }
+
+    p->gamma_value = 9000;
+    
+    gammacompr_setup(p);
+    
+    return (void*) p;
 }
 
-void pencilsketch2_free() {
-    if( pencilbuf ) {
-        free(pencilbuf);
-        pencilbuf = NULL;
-    }
-    if( histogram_) {
-        veejay_histogram_del(histogram_);
-        histogram_ = NULL;
-    }
-    if( gamma_table ) {
-        free(gamma_table);
-        gamma_table = NULL;
-    }
+void pencilsketch2_free(void *ptr) {
+
+    pencilsketch_t *p = (pencilsketch_t*) ptr;
+
+    free(p->pencilbuf);
+    veejay_histogram_del(p->histogram_);
+    free(p->gamma_table);
+    free(p);
 }
 
-static void gammacompr_setup()
+static void gammacompr_setup(pencilsketch_t *p)
 {
     int i;
     double val;
     double gm = (double) GAMMA_MAX;
     for (i = 0; i < GAMMA_MAX; i++) {
          val = i / gm;
-         val = pow(val, gamma_value + ((double) i * 0.01));
+         val = pow(val, p->gamma_value + ((double) i * 0.01));
          val = gm * val;
-         gamma_table[i] = (val < 0.0 ? 0.0 : val > 255.0 ? 255.0 : val);
+         p->gamma_table[i] = (val < 0.0 ? 0.0 : val > 255.0 ? 255.0 : val);
     }
 }
 
@@ -150,10 +165,9 @@ static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r)
     }
 }
 
-static void pencilsketch2_negate(uint8_t *src, const int len)
+static void pencilsketch2_negate(uint8_t *src, uint8_t *dst, const int len)
 {
     int i;
-    uint8_t *dst = pencilbuf;
     for( i = 0; i < len; i ++ ) {
         dst[i] = 0xff - src[i];
     }
@@ -196,7 +210,7 @@ static void pencilsketch2_contrast(uint8_t *dst, const int len, const int contra
     }
 }
 
-static void pencilsketch2_gammacompr(uint8_t *dst, const int len)
+static void pencilsketch2_gammacompr(double *gamma_table, uint8_t *dst, const int len)
 {
     int i;
     for( i = 0; i < len; i ++ ) {
@@ -204,20 +218,29 @@ static void pencilsketch2_gammacompr(uint8_t *dst, const int len)
     }
 }
 
-void pencilsketch2_apply( VJFrame *frame, int val, int gamma_compr, int strength, int contrast, int levels, int mode)
-{
+void pencilsketch2_apply( void *ptr, VJFrame *frame, int *args ) {
+    
+    int val = args[0];
+    int gamma_compr = args[1];
+    int strength = args[2];
+    int contrast = args[3];
+    int levels = args[4];
+    int mode = args[5];
+
+    pencilsketch_t *p = (pencilsketch_t*) ptr;
+
     double v = ( (double) gamma_compr - 4500.0) / 1000.0;
-    if (v != gamma_value) {
-        gamma_value = v;
-        gammacompr_setup();
+    if (v != p->gamma_value) {
+        p->gamma_value = v;
+        gammacompr_setup(p);
     }
 
-    pencilsketch2_negate(frame->data[0], frame->len);
+    pencilsketch2_negate(frame->data[0],p->pencilbuf, frame->len);
 
-    rhblur_apply( pencilhblur, pencilbuf, frame->width, frame->height, val );
-    rvblur_apply( pencilvblur, pencilhblur, frame->width, frame->height, val );
+    rhblur_apply( p->pencilhblur, p->pencilbuf, frame->width, frame->height, val );
+    rvblur_apply( p->pencilvblur, p->pencilhblur, frame->width, frame->height, val );
 
-    pencilsketch2_dodge( frame->data[0], pencilhblur, frame->data[0], frame->len );
+    pencilsketch2_dodge( frame->data[0], p->pencilhblur, frame->data[0], frame->len );
 
     if(mode) {
        veejay_memset( frame->data[1], 128, frame->uv_len );
@@ -229,13 +252,13 @@ void pencilsketch2_apply( VJFrame *frame, int val, int gamma_compr, int strength
     }
 
     if(strength > 0) {
-        veejay_histogram_analyze( histogram_, frame, 0 );
-        veejay_histogram_equalize( histogram_, frame, 0xff, strength );
+        veejay_histogram_analyze( p->histogram_, frame, 0 );
+        veejay_histogram_equalize( p->histogram_, frame, 0xff, strength );
     }
 
     if( contrast > 0) {
         pencilsketch2_contrast(frame->data[0], frame->len, contrast );
     }
 
-    pencilsketch2_gammacompr( frame->data[0], frame->len );
+    pencilsketch2_gammacompr(p->gamma_table, frame->data[0], frame->len );
 }

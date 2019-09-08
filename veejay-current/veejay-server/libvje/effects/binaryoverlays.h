@@ -21,6 +21,5 @@
 #ifndef BINARYOVERLAYS_H
 #define BINARYOVERLAYS_H
 vj_effect *binaryoverlay_init(int w, int h);
-void binaryoverlay_apply(VJFrame *frame, VJFrame *frame2, int n);
-void magicoverlays_free();
+void binaryoverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

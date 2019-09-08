@@ -21,5 +21,5 @@
 #ifndef CHROMAMAGICKALPHA_H
 #define CHROMAMAGICKALPHA_H
 vj_effect *chromamagickalpha_init();
-void chromamagickalpha_apply(VJFrame *frame, VJFrame *frame2, int type, int op0);
+void chromamagickalpha_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

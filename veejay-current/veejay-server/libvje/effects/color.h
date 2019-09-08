@@ -21,5 +21,5 @@
 #ifndef COLORVAL_H
 #define COLORVAL_H
 vj_effect *color_init();
-void color_apply( VJFrame *frame, int a, int b, int c);
+void color_apply(void *ptr, VJFrame *frame, int *args);
 #endif

@@ -18,8 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef TRANSOP_H
-#define TRANSOP_H
-vj_effect *transop_init(int width, int height);
-void transop_apply( VJFrame *frame, VJFrame *frame2,int twidth, int theight, int x1, int y1, int x2, int y2);
+#ifndef TRANSBLEND_H
+#define TRANSBLEND_H
+vj_effect *transblend_init(int width, int height);
+void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

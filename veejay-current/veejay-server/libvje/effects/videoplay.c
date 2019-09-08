@@ -23,6 +23,19 @@
 #include <veejaycore/vjmem.h>
 #include "videoplay.h"
 
+typedef struct {
+    picture_t **video_list;
+    int	num_videos;
+    int	frame_counter;
+    int	frame_delay;
+    int	*rt;
+    int last_mode;
+} videowall_t;
+
+#define DEFAULT_NUM_PHOTOS 2
+
+static void destroy_filmstrip(videowall_t *vw);
+
 vj_effect *videoplay_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -37,7 +50,7 @@ vj_effect *videoplay_init(int w, int h)
     ve->limits[1][1] = 250; // waterfall
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1 + get_matrix_func_n(); // mode
-    ve->defaults[0] = 2;
+    ve->defaults[0] = DEFAULT_NUM_PHOTOS;
     ve->defaults[1] = 1;
     ve->defaults[2] = 2;  
     ve->description = "Videoplay (timestretched mosaic)";
@@ -61,91 +74,96 @@ vj_effect *videoplay_init(int w, int h)
     return ve;
 }
 
-static picture_t **video_list = NULL;
-static int	   num_videos = 0;
-static int	  frame_counter = 0;
-static int	  frame_delay = 0;
-static int	*rt = NULL;
-static int last_mode = -1;
-
-static	int prepare_filmstrip(int film_length, int w, int h)
+static void *prepare_filmstrip(videowall_t *vw, int film_length, int w, int h)
 {
 	int i,j;
 	int picture_width = w / sqrt(film_length);
 	int picture_height = h / sqrt(film_length);
 
-	video_list = (picture_t**) vj_calloc(sizeof(picture_t*) * (film_length + 1) );
-	if(!video_list)
-		return 0;
-	rt = (int*) vj_calloc(sizeof(int) * film_length );
-	if(!rt) 
-		return 0;
+	vw->video_list = (picture_t**) vj_calloc(sizeof(picture_t*) * (film_length + 1) );
+	if(!vw->video_list) {
+        destroy_filmstrip(vw);
+		return NULL;
+    }
+	vw->rt = (int*) vj_calloc(sizeof(int) * film_length );
+	if(!vw->rt) {
+       destroy_filmstrip(vw); 
+	   return NULL;
+    }
 
-	num_videos = film_length;
+	vw->num_videos = film_length;
 
-	for ( i = 0; i < num_videos; i ++ )
+	for ( i = 0; i < film_length; i ++ )
 	{
-		video_list[i] = vj_calloc(sizeof(picture_t));
-		if(!video_list[i])
-			return 0;
-		video_list[i]->w = picture_width;
-		video_list[i]->h = picture_height;
+		vw->video_list[i] = vj_calloc(sizeof(picture_t));
+		if(!vw->video_list[i]) {
+            destroy_filmstrip(vw);
+			return NULL;
+        }
+		vw->video_list[i]->w = picture_width;
+		vw->video_list[i]->h = picture_height;
 		for( j = 0; j < 3; j ++ )
 		{
-			video_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
-			if(!video_list[i]->data[j])
-				return 0;
-			veejay_memset(video_list[i]->data[j], (j==0 ? pixel_Y_lo_ : 128), picture_width *picture_height );
+			vw->video_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
+			if(!vw->video_list[i]->data[j]) {
+                destroy_filmstrip(vw);
+				return NULL;
+            }
+			veejay_memset(vw->video_list[i]->data[j], (j==0 ? pixel_Y_lo_ : 128), picture_width *picture_height );
 		}
 	}
-	frame_counter = 0;
+	vw->frame_counter = 0;
+    vw->last_mode = -1;
 
-	return 1;
+	return (void*) vw;
 }
 
-static void destroy_filmstrip(void)
+static void destroy_filmstrip(videowall_t *vw)
 {
-	if(video_list)
+	if(vw->video_list)
 	{
 		int i = 0;
-		while(i < num_videos)
+		while(i < vw->num_videos)
 		{
-			if( video_list[i] )
+			if( vw->video_list[i] )
 			{
 				int j;
 				for( j = 0; j < 3; j ++ )
-					if(video_list[i]->data[j]) 
-					 free(video_list[i]->data[j]);
-				free(video_list[i]);
+					if(vw->video_list[i]->data[j]) 
+					 free(vw->video_list[i]->data[j]);
+				free(vw->video_list[i]);
 			}
 			i++;
 		}
-		free(video_list);
+		free(vw->video_list);
 	}
-	if( rt ) 
-		free(rt);
-	video_list = NULL;
-	num_videos = 0;
-	frame_counter = 0;
-	rt = NULL;
-	last_mode = -1;
+	if( vw->rt ) 
+		free(vw->rt);
+
+    vw->video_list = NULL;
+    vw->num_videos = 0;
+    vw->rt = NULL;
+    vw->last_mode = -1;
+    vw->frame_counter = 0;
+    vw->frame_delay = 0;
 }
 
 
 
-int	videoplay_malloc(int w, int h )
+void *videoplay_malloc(int w, int h )
 {
-	num_videos = 0;
-	return 1;
+    videowall_t *vw = (videowall_t*) vj_calloc(sizeof(videowall_t));
+    return prepare_filmstrip(vw,DEFAULT_NUM_PHOTOS, w,h);
 }
 
-
-void	videoplay_free(void)
+void	videoplay_free(void *ptr)
 {
-	destroy_filmstrip();
+	destroy_filmstrip(ptr);
+
+    free(ptr);
 }
 
-static void	take_video( uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
+static void	take_video( videowall_t *vw, uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
 {
 
 	int x,y,dx,dy;
@@ -153,8 +171,8 @@ static void	take_video( uint8_t *plane, uint8_t *dst_plane, int w, int h, int in
 	int dst_x, dst_y;
 	int step_y;
 	int step_x;
-	int box_width = video_list[index]->w;
-	int box_height = video_list[index]->h;
+	int box_width = vw->video_list[index]->w;
+	int box_height = vw->video_list[index]->h;
 
 	step_x = w / box_width;
 	step_y = h / box_height;
@@ -183,10 +201,10 @@ static void	take_video( uint8_t *plane, uint8_t *dst_plane, int w, int h, int in
 	}
 }
 
-static void put_video( uint8_t *dst_plane, uint8_t *video, int dst_w, int dst_h, int index , matrix_t matrix)
+static void put_video( videowall_t *vw, uint8_t *dst_plane, uint8_t *video, int dst_w, int dst_h, int index , matrix_t matrix)
 {
-	int box_w = video_list[index]->w;
-	int box_h = video_list[index]->h;
+	int box_w = vw->video_list[index]->w;
+	int box_h = vw->video_list[index]->h;
 	int x,y;
 
 	uint8_t *P = dst_plane + (matrix.h*dst_w);
@@ -202,7 +220,7 @@ static void put_video( uint8_t *dst_plane, uint8_t *video, int dst_w, int dst_h,
 	}
 }
 
-void videoplay_apply( VJFrame *frame, VJFrame *B, int size, int delay, int mode )
+void videoplay_apply( void *ptr, VJFrame *frame, VJFrame *B, int *args)
 {
 	unsigned int i;
 	const unsigned int width = frame->width;
@@ -210,72 +228,76 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int size, int delay, int mode 
 	uint8_t *dstY = frame->data[0];
 	uint8_t *dstU = frame->data[1];
 	uint8_t *dstV = frame->data[2];
+    videowall_t *vw = (videowall_t*) ptr;
+    int size = args[0];
+    int delay = args[1];
+    int mode = args[2];
 
-	if( (size*size) != num_videos || num_videos == 0 )
+	if( (size*size) != vw->num_videos || vw->num_videos == 0 )
 	{
-		destroy_filmstrip();
-		if(!prepare_filmstrip(size*size, width,height))
+		destroy_filmstrip(vw);
+		if(!prepare_filmstrip(vw, size*size, width,height))
 		{
 			return;
 		}
-		frame_delay = delay;
+		vw->frame_delay = delay;
 		
-		for( i = 0; i < num_videos; i ++ )
-			rt[i] = i;
+		for( i = 0; i < vw->num_videos; i ++ )
+			vw->rt[i] = i;
 
 		if( mode == 0)
-			fx_shuffle_int_array( rt, num_videos );
+			fx_shuffle_int_array( vw->rt, vw->num_videos );
 	}
 
-	if( last_mode != mode )
+	if( vw->last_mode != mode )
 	{
-		for( i = 0; i < num_videos; i ++ )
-			rt[i] = i;
+		for( i = 0; i < vw->num_videos; i ++ )
+			vw->rt[i] = i;
 
 		if (mode == 0)
-			fx_shuffle_int_array( rt, num_videos );
+			fx_shuffle_int_array( vw->rt, vw->num_videos );
 
 	}
 
-	last_mode = mode;
+	vw->last_mode = mode;
 
-	if( frame_delay )
-		frame_delay --;	
+	if( vw->frame_delay )
+		vw->frame_delay --;	
 
-	if( frame_delay == 0)
+	if( vw->frame_delay == 0)
 	{	
-		frame_delay = delay;
+		vw->frame_delay = delay;
 	}
 
 	
-	if(frame_delay == delay)
+	if(vw->frame_delay == delay)
 	{
 		for( i = 0; i < 3; i ++ )
 		{
-			take_video( B->data[i], video_list[(frame_counter%num_videos)]->data[i],
-				width, height , frame_counter % num_videos);
+			take_video( vw,B->data[i], vw->video_list[(vw->frame_counter%vw->num_videos)]->data[i],
+				width, height , vw->frame_counter % vw->num_videos);
 		}
 		for( i = 0; i < 3; i ++ )
 		{
-			take_video( frame->data[i], video_list[((frame_counter+1)%num_videos)]->data[i],
-			width, height , (frame_counter+1) % num_videos);
+			take_video( vw,frame->data[i], vw->video_list[((vw->frame_counter+1)%vw->num_videos)]->data[i],
+			width, height , (vw->frame_counter+1) % vw->num_videos);
 		}
 	}
 	else
 	{
-		int n = frame_counter - 1;
+		int n = vw->frame_counter - 1;
 		if(n>=0)
 		{	
 			for( i = 0; i < 3; i ++ )
 			{
-				take_video( frame->data[i], video_list[(n%num_videos)]->data[i],
-					width, height , frame_counter % num_videos);
+				take_video( vw,frame->data[i], vw->video_list[(n%vw->num_videos)]->data[i],
+					width, height , vw->frame_counter % vw->num_videos);
 			}
 			n++;
 			for( i = 0; i < 3; i ++ )
 			{
-				take_video( B->data[i], video_list[(n%num_videos)]->data[i],
-				width, height , (frame_counter+1) % num_videos);
+				take_video( vw,B->data[i], vw->video_list[(n%vw->num_videos)]->data[i],
+				width, height , (vw->frame_counter+1) % vw->num_videos);
 			}
 		}
 	}
@@ -288,16 +310,16 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int size, int delay, int mode 
 		matrix_placement = get_matrix_func(mode-1);
 	}
 
-	for ( i = 0; i < num_videos; i ++ )
+	for ( i = 0; i < vw->num_videos; i ++ )
 	{
-		matrix_t m = matrix_placement(rt[i], size,width,height );
-		put_video( dstY, video_list[i]->data[0],width,height,i, m);
-		put_video( dstU, video_list[i]->data[1],width,height,i, m);
-		put_video( dstV, video_list[i]->data[2],width,height,i, m);
+		matrix_t m = matrix_placement(vw->rt[i], size,width,height );
+		put_video( vw, dstY, vw->video_list[i]->data[0],width,height,i, m);
+		put_video( vw, dstU, vw->video_list[i]->data[1],width,height,i, m);
+		put_video( vw, dstV, vw->video_list[i]->data[2],width,height,i, m);
 	}
 
-	if( frame_delay == delay)
-		frame_counter+=2;
+	if( vw->frame_delay == delay)
+		vw->frame_counter+=2;
 
 }
 

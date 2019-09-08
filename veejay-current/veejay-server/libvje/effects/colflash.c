@@ -55,12 +55,35 @@ vj_effect *colflash_init(int w, int h)
     return ve;
 }
 
+typedef struct {
+    int color_flash_;
+    int color_delay_;
+    int delay_;
+} colflash_t;
 
-static int color_flash_ = 0;
-static int color_delay_ = 0;
-static int delay_ = 0;
-void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d)
+void *colflash_malloc(int w, int h )
 {
+    colflash_t *c = (colflash_t*) vj_calloc(sizeof(colflash_t));
+    if(!c) {
+        return NULL;
+    }
+    return (void*) c;
+}
+
+void colflash_free(void *ptr) {
+    colflash_t *c = (colflash_t*) ptr;
+    free(c);
+}
+
+void colflash_apply(void *ptr, VJFrame *frame, int *args) {
+    int f = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int d = args[4];
+
+    colflash_t *c = (colflash_t*) ptr;
+
 	const int len = frame->len;
 	const int uv_len = (frame->ssm ? len : frame->uv_len);
 
@@ -72,26 +95,26 @@ void colflash_apply( VJFrame *frame, int f,int r, int g, int b, int d)
 
 	_rgb2yuv( r,g,b,y,u,v );
 
-	if( d != delay_ )
+	if( d != c->delay_ )
 	{
-		delay_ = d;
-		color_delay_ = d;
+		c->delay_ = d;
+		c->color_delay_ = d;
 	}
 
-	if( color_delay_ )
+	if( c->color_delay_ )
 	{
 		veejay_memset(  Y, y, len );
 		veejay_memset( Cb, u, uv_len );
 		veejay_memset( Cr, v, uv_len );
-		color_delay_ -- ;
+		c->color_delay_ -- ;
 	}
 	else
 	{
-		color_flash_ ++ ;
-		if( color_flash_ >= f )
+		c->color_flash_ ++ ;
+		if( c->color_flash_ >= f )
 		{
-			color_delay_ = delay_;
-			color_flash_ = 0;
+			c->color_delay_ = c->delay_;
+			c->color_flash_ = 0;
 		}
 	}
 

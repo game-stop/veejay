@@ -46,8 +46,9 @@ vj_effect *killchroma_init(int w, int h)
 	return ve;
 }
 
-void killchroma_apply(VJFrame *frame, int n)
-{
+void killchroma_apply(void *ptr, VJFrame *frame, int *args ) {
+    int n = args[0];
+
 	const int len = frame->len;
 	if(n==0)
 	{

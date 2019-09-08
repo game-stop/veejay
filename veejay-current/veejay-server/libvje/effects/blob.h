@@ -21,7 +21,7 @@
 #ifndef BLOB_H
 #define BLOB_H
 vj_effect *blob_init(int w, int h);
-void blob_apply( VJFrame *frame, int p0,int p1, int p2, int p3);
-int	blob_malloc( int w, int h );
-void blob_free(void);
+void blob_apply(void *ptr, VJFrame *frame, int *args);
+void *blob_malloc( int w, int h );
+void blob_free(void *ptr);
 #endif

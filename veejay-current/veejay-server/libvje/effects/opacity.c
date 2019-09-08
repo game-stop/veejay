@@ -149,9 +149,9 @@ static void	opacity_apply_job( void *arg )
 
 }
 
-void opacity_apply( VJFrame *frame, VJFrame *frame2, int opacity)
+void opacity_apply( void *ptr,  VJFrame *frame, VJFrame *frame2, int *args )
 {
-	opacity_apply1( frame, frame2, opacity);
+	opacity_apply1( frame, frame2, args[0]);
 }
 
 void opacity_applyN( VJFrame *frame, VJFrame *frame2, int opacity)

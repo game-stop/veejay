@@ -52,14 +52,17 @@ vj_effect *randnoise_init(int w, int h)
     return ve;
 }
 
-static __thread unsigned long x = 123456789, y = 362436069, z = 521288629;
-
-void randnoise_apply( VJFrame *frame, int min, int max)
+void randnoise_apply( void *ptr, VJFrame *frame, int *args )
 {
+    int min = args[0];
+    int max = args[1];
     int i;
     const int len = frame->len;
     uint8_t *Y = frame->data[0];
 	unsigned long t;
+    unsigned long x = 123456789;
+    unsigned long y = 362436069;
+    unsigned long z = 521288629;
 
 	for( i = 0; i < len; i ++ )
 	{

@@ -32,8 +32,14 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "lumamask.h"
+#include "motionmap.h"
 
-static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
+typedef struct {
+    uint8_t *buf[4];
+    void *motionmap;
+    int n__;
+    int N__;
+} lumamask_t;
 
 vj_effect *lumamask_init(int width, int height)
 {
@@ -62,30 +68,50 @@ vj_effect *lumamask_init(int width, int height)
     return ve;
 }
 
-static int n__ = 0;
-static int N__ = 0;
-
-int lumamask_malloc(int width, int height)
-{
-   buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * width * height * 4);
-   if(!buf[0]) return 0;
-
-   veejay_memset( buf[0], 0, width * height );
-   buf[1] = buf[0] + (width *height);
-   veejay_memset( buf[1], 128, width * height );
-   buf[2] = buf[1] + (width *height);
-   veejay_memset( buf[2], 128, width * height );
-   buf[3] = buf[2] + (width *height);
-   veejay_memset( buf[3], 0, width * height );
-
-   n__ = 0;
-   N__ = 0;   
-   return 1;
+int lumamask_requests_fx() {
+    return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
 }
 
-void lumamask_apply( VJFrame *frame, VJFrame *frame2, int v_scale, int h_scale,
-                    int border, int alpha )
+void lumamask_set_motionmap(void *ptr, void *priv) {
+    lumamask_t* l = (lumamask_t*) ptr;
+    l->motionmap = priv;
+}
+
+void *lumamask_malloc(int width, int height)
 {
+    lumamask_t *l = (lumamask_t*) vj_calloc(sizeof(lumamask_t));
+    if(!l) {
+        return NULL;
+    }
+
+    l->buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8( width * height * 4) );
+    if(!l->buf[0]) {
+        free(l);
+        return NULL;
+    }
+
+    veejay_memset( l->buf[0], pixel_Y_lo_, width * height );
+   
+    l->buf[1] = l->buf[0] + RUP8(width *height);
+    veejay_memset( l->buf[1], 128, width * height );
+    
+    l->buf[2] = l->buf[1] + RUP8(width *height);
+    veejay_memset( l->buf[2], 128, width * height );
+   
+    l->buf[3] = l->buf[2] + RUP8(width *height);
+    veejay_memset( l->buf[3], 0, width * height );
+
+    return (void*) l;
+}
+
+void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int v_scale = args[0];
+    int h_scale = args[1];
+    int border = args[2];
+    int alpha = args[3];
+
+    lumamask_t *l = (lumamask_t*) ptr;
+
 	unsigned int x,y;
 	int dx,dy,nx,ny;
 	int tmp;
@@ -97,17 +123,18 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int v_scale, int h_scale,
 	const unsigned int height = frame->height;
 	const int len = frame->len;
 
-	if( motionmap_active() )
+	if( motionmap_active(l->motionmap) )
 	{
-		motionmap_scale_to(width,height,1,1,&tmp1,&tmp2,&n__,&N__ );
+		motionmap_scale_to(l->motionmap, width,height,1,1,&tmp1,&tmp2,&(l->n__),&(l->N__) );
 		motion = 1;
 	}
 	else
 	{
-		n__ = 0;
-		N__ = 0;
+		l->n__ = 0;
+		l->N__ = 0;
 	}	
-	if( n__ == N__ || n__ == 0 )
+
+	if( l->n__ == l->N__ || l->n__ == 0 )
 		interpolate = 0;
 
 	double w_ratio = (double) tmp1 / 128.0;
@@ -120,8 +147,9 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int v_scale, int h_scale,
 	uint8_t *Cr2 = frame2->data[2];
 	uint8_t *aA = frame->data[3];
 	uint8_t *aB = frame2->data[3];
+
 	int strides[4] = { len, len, len ,( alpha ? len : 0 )};
-	vj_frame_copy( frame->data, buf, strides );
+	vj_frame_copy( frame->data, l->buf, strides );
 
 	if( alpha == 0 )
 	{
@@ -257,17 +285,16 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int v_scale, int h_scale,
 	}
 
 	if( interpolate )
-		motionmap_interpolate_frame( frame, N__, n__ );
+		motionmap_interpolate_frame( l->motionmap, frame, l->N__, l->n__ );
 	
 	if( motion )
-		motionmap_store_frame( frame );
+		motionmap_store_frame( l->motionmap, frame );
 
 }
-void lumamask_free()
+
+void lumamask_free(void *ptr)
 {
-  if(buf[0]) free(buf[0]);
-  buf[0] = NULL;
-  buf[1] = NULL;
-  buf[2] = NULL;
-  buf[3] = NULL;
+    lumamask_t *l = (lumamask_t*) ptr;
+    free(l->buf[0]);
+    free(l);
 }

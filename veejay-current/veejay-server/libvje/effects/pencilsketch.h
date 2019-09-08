@@ -21,6 +21,5 @@
 #ifndef PENCILSKETCH_EFFECT_H
 #define PENCILSKETCH_EFFECT_H
 vj_effect *pencilsketch_init();
-void pencilsketch_apply(VJFrame *frame, int type, int threshold, int opacity,int mode);
-void pencilsketch_free();
+void pencilsketch_apply(void *ptr, VJFrame *frame, int *args);
 #endif

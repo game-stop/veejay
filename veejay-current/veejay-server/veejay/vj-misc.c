@@ -234,7 +234,7 @@ filelist_t *find_media_files( veejay_t *info )
  */
 int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
 {
-	int i;
+/*	int i;
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
 	{
 		for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
@@ -275,7 +275,11 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame)
 			}
 		}		
 	}
-	
+	*/
+
+    //FIXME: take bg
+    veejay_msg(0,"NOT IMPLEMENTED: %s", __FUNCTION__);    
+        
 	return 0;
 }
 

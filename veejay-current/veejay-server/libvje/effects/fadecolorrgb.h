@@ -18,10 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef TRANSBLEND_H
-#define TRANSBLEND_H
-vj_effect *transblend_init(int width, int height);
-void transblend_apply( VJFrame *frame, VJFrame *frame2, int mode,
-                      int twidth, int theight, int x1, int y1, int x2, int y2);
-
+#ifndef FADECOLORRGB_H
+#define FADECOLORRGB_H
+vj_effect *fadecolorrgb_init();
+void fadecolorrgb_apply(void *ptr, VJFrame *frame, int *args);
+void *fadecolorrgb_malloc(int w, int h);
+void fadecolorrgb_free(void *ptr);
 #endif

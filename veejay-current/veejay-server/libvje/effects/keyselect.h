@@ -21,5 +21,5 @@
 #ifndef KEYSELECT_H
 #define KEYSELECT_H
 vj_effect *keyselect_init();
-void keyselect_apply( VJFrame *frame, VJFrame *frame2, int i_angle,int red, int green, int blue, int mode, int noise);
+void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

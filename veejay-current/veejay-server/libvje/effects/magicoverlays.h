@@ -21,7 +21,7 @@
 #ifndef MAGICOVERLAYS_H
 #define MAGICOVERLAYS_H
 vj_effect *overlaymagic_init(int w, int h);
-void overlaymagic_apply(VJFrame *frame, VJFrame *frame2, int n, int mode);
+void overlaymagic_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args);
 void overlaymagic_adddistorted(VJFrame *frame, VJFrame *frame2 );
 void overlaymagic_add_distorted(VJFrame *frame, VJFrame *frame2 );
 void overlaymagic_subdistorted(VJFrame *frame, VJFrame *frame2 );

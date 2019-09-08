@@ -22,7 +22,9 @@
 #include <veejaycore/vjmem.h>
 #include "raster.h"
 
-static int *xval;
+typedef struct {
+    int *xval;
+} raster_t;
 
 vj_effect *raster_init(int w, int h)
 {
@@ -50,27 +52,42 @@ vj_effect *raster_init(int w, int h)
     return ve;
 }
 
-int raster_malloc (int w , int h)
+void *raster_malloc (int w , int h)
 {
-    xval = vj_malloc(sizeof(int)*w);
-    if (xval == NULL)
-        return 0;
-    return 1;
+    raster_t *t = (raster_t*) vj_calloc(sizeof(raster_t));
+    if(!t) {
+        return NULL;
+    }
+    
+    t->xval = vj_malloc(sizeof(int)*w);
+    if(!t->xval) {
+        free(t);
+        return NULL;
+    }
+
+    return (void*) t;
 }
 
-void raster_free()
+void raster_free(void *ptr)
 {
-    if (xval == NULL) free(xval);
+    raster_t *t = (raster_t*) ptr;
+    free(t->xval);
+    free(t);
 }
 
-void raster_apply(VJFrame *frame, int val, int mode)
-{
+void raster_apply(void *ptr, VJFrame *frame, int *args) {
+    int val = args[0];
+    int mode = args[1];
+
     int x,y, yval;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb= frame->data[1];
     uint8_t *Cr= frame->data[2];
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;
+
+    raster_t *t = (raster_t*) ptr;
+    int *xval = t->xval;
 
     if(val == 0 )
       return;

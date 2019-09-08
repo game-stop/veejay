@@ -21,5 +21,5 @@
 #ifndef DUPMAGIC_H
 #define DUPMAGIC_H
 vj_effect *dupmagic_init();
-void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n);
+void dupmagic_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args);
 #endif

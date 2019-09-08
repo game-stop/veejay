@@ -20,16 +20,23 @@
 
 #ifndef MOTIONMAP_H
 #define MOTIONMAP_H
+
+#ifndef VJ_IMAGE_EFFECT_MOTIONMAP_ID
+#define VJ_IMAGE_EFFECT_MOTIONMAP_ID 184
+#endif
+
 vj_effect *motionmap_init(int w, int h);
-void motionmap_apply( VJFrame *frame, int t, int n, int draw, int histo, int op, int ip, int la, int ad);
-int	motionmap_malloc(int w,int h);
-void	motionmap_free(void);
-int	motionmap_prepare( uint8_t *map[4], int w, int h );
-int	motionmap_active();
-int	motionmap_instances();
-int	motionmap_is_locked();
-uint8_t	*motionmap_interpolate_buffer();
-uint8_t *motionmap_bgmap();
-void	motionmap_store_frame( VJFrame *fx );
-void	motionmap_interpolate_frame( VJFrame *fx, int N, int n );
+void motionmap_apply( void *ptr, VJFrame *frame, int *args );
+void *motionmap_malloc(int w,int h);
+void motionmap_free(void *ptr);
+int	motionmap_prepare( void *ptr, VJFrame *frame );
+int	motionmap_active( void *ptr);
+int	motionmap_instances(void *ptr);
+int	motionmap_is_locked(void *ptr);
+uint8_t	*motionmap_interpolate_buffer(void *ptr);
+uint8_t *motionmap_bgmap(void *ptr);
+void motionmap_store_frame( void *ptr,VJFrame *fx );
+void motionmap_interpolate_frame( void *ptr,VJFrame *fx, int N, int n );
+void motionmap_scale_to( void *ptr, int p1max, int p2max, int p1min, int p2min, int *p1val, int *p2val, int *pos, int *len );
+uint32_t motionmap_activity(void *ptr);
 #endif

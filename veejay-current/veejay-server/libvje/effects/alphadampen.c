@@ -43,8 +43,9 @@ vj_effect *alphadampen_init(int w, int h)
 	return ve;
 }
 
-void alphadampen_apply( VJFrame *frame, int b1)
-{
+void alphadampen_apply( void *ptr, VJFrame *frame, int *args ) {
+    int b1 = args[0];
+
 	size_t i;
 	const int len = frame->len;
 	uint8_t tmp;
@@ -54,6 +55,6 @@ void alphadampen_apply( VJFrame *frame, int b1)
 	for( i = 0 ; i < len ; i ++ )
 	{
 		tmp = A[i];
-		A[i] = (tmp / base) * base; // loose fractional part
+		A[i] = (tmp / base) * base; // drop fractional part
 	}
 }

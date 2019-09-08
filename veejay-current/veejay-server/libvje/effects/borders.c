@@ -50,8 +50,10 @@ vj_effect *borders_init(int width,int height)
 	return ve;
 }
 
-void borders_apply( VJFrame *frame, int size, int color)
-{
+void borders_apply( void *ptr, VJFrame *frame, int *args ) {
+    int size = args[0];
+    int color = args[1];
+
 	blackborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
 						frame->width, frame->height, (size), (size), (size), (size),
 						frame->shift_h, frame->shift_v,color);

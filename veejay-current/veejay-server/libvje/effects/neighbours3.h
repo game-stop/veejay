@@ -21,7 +21,7 @@
 #ifndef NEIGHBOURS3_H
 #define NEIGHBOURS3_H
 vj_effect *neighbours3_init(int w, int h);
-int neighbours3_malloc(int w, int h);
-void neighbours3_free(void);
-void neighbours3_apply( VJFrame *frame, int brush_size, int level,int mode);
+void *neighbours3_malloc(int w, int h);
+void neighbours3_free(void *ptr);
+void neighbours3_apply(void *ptr, VJFrame *frame, int *args);
 #endif

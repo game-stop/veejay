@@ -82,8 +82,11 @@ static uint32_t	bwotsu( uint32_t *H, const int N )
 	return threshold;
 }
 
-void bwotsu_apply(VJFrame *frame, int mode, int skew, int invert)
-{
+void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
+    int mode = args[0];
+    int skew = args[1];
+    int invert = args[2];
+
 	uint32_t Histogram[256];
 	unsigned int i;
 	const int len = frame->len;

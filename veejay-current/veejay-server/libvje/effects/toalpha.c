@@ -22,7 +22,9 @@
 #include <veejaycore/vjmem.h>
 #include "toalpha.h"
 
-static int __lookup_table[256];
+typedef struct {
+    int lookup_table[256];
+} toalpha_t;
 
 vj_effect *toalpha_init(int w, int h)
 {
@@ -44,8 +46,6 @@ vj_effect *toalpha_init(int w, int h)
 
 	ve->alpha = FLAG_ALPHA_OUT;
 
-	__init_lookup_table( __lookup_table, 256, 16.0f, 235.0f, 0, 255 ); 
-
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Verbatim", "Full range" );
@@ -53,13 +53,32 @@ vj_effect *toalpha_init(int w, int h)
     return ve;
 }
 
+void *toalpha_malloc(int w, int h)
+{
+    toalpha_t *t = (toalpha_t*) vj_calloc(sizeof(toalpha_t));
+    if(!t) {
+        return NULL;
+    }
+	__init_lookup_table( t->lookup_table, 256, 16.0f, 235.0f, 0, 255 ); 
+    return t;
+}
 
-void toalpha_apply( VJFrame *frame, int mode)
+void toalpha_free(void *ptr) {
+    free(ptr);
+}
+
+
+void toalpha_apply( void *ptr, VJFrame *frame, int *args )
 {
 	const int len = frame->len;
 	uint8_t *a = frame->data[3];
 	uint8_t *Y = frame->data[0];
-		
+	
+    int mode = args[0];
+
+    toalpha_t *t = (toalpha_t*) ptr;
+    int *lookup_table = t->lookup_table;
+
 	if( mode == 0 ) {
 		veejay_memcpy(a, Y, len );
 	}
@@ -67,7 +86,7 @@ void toalpha_apply( VJFrame *frame, int mode)
 		int i;
 		for( i = 0; i < len; i ++ ) 
 		{
-			a[i] = __lookup_table[ Y[i] ];
+			a[i] = lookup_table[ Y[i] ];
 		}
 	}
 }

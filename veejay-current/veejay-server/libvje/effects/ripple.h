@@ -21,7 +21,7 @@
 #ifndef RIPPLE_H
 #define RIPPLE_H
 vj_effect *ripple_init(int w, int h);
-void ripple_free();
-int ripple_malloc(int w, int h);
-void ripple_apply(VJFrame *frame, int waves, int ampli,int atten);
+void ripple_free(void *ptr);
+void *ripple_malloc(int w, int h);
+void ripple_apply(void *ptr, VJFrame *frame, int *args);
 #endif

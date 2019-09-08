@@ -21,5 +21,5 @@
 #ifndef EMBOSS_H
 #define EMBOSS_H
 vj_effect *emboss_init();
-void emboss_apply(VJFrame *frame, int n);
+void emboss_apply(void *ptr, VJFrame *frame, int *args);
 #endif

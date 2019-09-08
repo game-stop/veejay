@@ -22,8 +22,6 @@
 #include <veejaycore/vjmem.h>
 #include "fisheye.h"
 
-#define    RUP8(num)(((num)+8)&~8)
-
 vj_effect *fisheye_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -47,31 +45,52 @@ vj_effect *fisheye_init(int w, int h)
     return ve;
 }
 
-static int _v = 0;
-static double *polar_map = NULL;
-static double *fish_angle = NULL;
-static int *cached_coords = NULL; 
-static uint8_t *buf[3] = { NULL,NULL,NULL };
+typedef struct {
+    int _v;
+    double *polar_map;
+    double *fish_angle;
+    int *cached_coords; 
+    uint8_t *buf[3];
+} fisheye_t;
 
-int	fisheye_malloc(int w, int h)
+void *fisheye_malloc(int w, int h)
 {
 	int x,y;
 	int h2=h/2;
 	int w2=w/2;
 	int p =0;
 
-	buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h  *  3 ) );
-	if(!buf[0]) return 0;
-	buf[1] = buf[0] + (w*h);
-	buf[2] = buf[1] + (w*h);
+    fisheye_t *f = (fisheye_t*) vj_calloc(sizeof(fisheye_t));
+    if(!f) {
+        return NULL;
+    }
 
-	polar_map = (double*) vj_calloc(sizeof(double) * RUP8(w* h) );
-	if(!polar_map) return 0;
-	fish_angle = (double*) vj_calloc(sizeof(double) * RUP8(w* h) );
-	if(!fish_angle) return 0;
+	f->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h  *  3 ) );
+	if(!f->buf[0]) {
+        fisheye_free(f);
+        return NULL;
+    }
 
-	cached_coords = (int*) vj_calloc(sizeof(int) * RUP8( w * h));
-	if(!cached_coords) return 0;
+	f->buf[1] = f->buf[0] + (w*h);
+	f->buf[2] = f->buf[1] + (w*h);
+
+	f->polar_map = (double*) vj_calloc(sizeof(double) * RUP8(w* h) );
+	if(!f->polar_map) {
+        fisheye_free(f);
+        return NULL;
+    }
+
+	f->fish_angle = (double*) vj_calloc(sizeof(double) * RUP8(w* h) );
+	if(!f->fish_angle) {
+        fisheye_free(f);
+        return NULL;
+    }
+
+	f->cached_coords = (int*) vj_calloc(sizeof(int) * RUP8( w * h));
+	if(!f->cached_coords) {
+        fisheye_free(f);
+        return NULL;
+    }
 
 	for(y=(-1 *h2); y < (h-h2); y++)
 	{
@@ -80,27 +99,25 @@ int	fisheye_malloc(int w, int h)
 			double res;
 			fast_sqrt( res,(double) (y*y+x*x));
 			p = (h2+y)*w+(w2+x);
-			polar_map[p] = res;
-			//polar_map[p] = sqrt( y*y + x*x );
-			fish_angle[p] = atan2( (float) y, x);
+			f->polar_map[p] = res;
+			f->fish_angle[p] = atan2( (float) y, x);
 		}
 	}
-	_v = 0;
-	return 1;
+	
+    return (void*) f;
 }
 
-void	fisheye_free()
+void	fisheye_free(void *ptr)
 {
-	if(buf[0])
-		free(buf[0]);
-	buf[0] =  NULL;
-	buf[1] =  NULL;
-	buf[2] =  NULL;
-	
-	if(polar_map) 	free(polar_map);
-	if(fish_angle)	free(fish_angle);
-	if(cached_coords) free(cached_coords);
+    fisheye_t *f = (fisheye_t*) ptr;
+    if(f->buf[0]) {
+        free(f->buf[0]);
+    }
+	if(f->polar_map) 	free(f->polar_map);
+	if(f->fish_angle)	free(f->fish_angle);
+	if(f->cached_coords) free(f->cached_coords);
 
+    free(f);
 }
 
 static double __fisheye(double r,double v, double e)
@@ -113,10 +130,12 @@ static double __fisheye_i(double r, double v, double e)
 	return v * log(1 + e * r);
 }	
 
+void fisheye_apply(void *ptr, VJFrame *frame, int *args) {
+    int v = args[0];
+    int alpha = args[1];
 
+    fisheye_t *f = (fisheye_t*) ptr;
 
-void fisheye_apply(VJFrame *frame, int v, int alpha )
-{
 	int i;
 	double (*pf)(double a, double b, double c);
 	const unsigned int width = frame->width;
@@ -125,6 +144,11 @@ void fisheye_apply(VJFrame *frame, int v, int alpha )
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+
+    double *polar_map = f->polar_map;
+    double *fish_angle = f->fish_angle;
+    int *cached_coords = f->cached_coords;
+    uint8_t **buf = f->buf;
 
 	if( v==0) v =1;
 
@@ -136,7 +160,7 @@ void fisheye_apply(VJFrame *frame, int v, int alpha )
 		pf = &__fisheye;
 	}
 
-	if( v != _v )
+	if( v != f->_v )
 	{
 		const double curve = 0.001 * v;
 		const unsigned int R = height/2;
@@ -174,7 +198,7 @@ void fisheye_apply(VJFrame *frame, int v, int alpha )
 
 			}
 		}
-		_v = v;
+		f->_v = v;
 	}
 
 	veejay_memcpy(buf[0], Y,(len));

@@ -21,6 +21,5 @@
 #ifndef POSTERIZE2_H
 #define POSTERIZE2_H
 vj_effect *posterize2_init();
-void posterize2_apply(VJFrame *frame, int factor,int t1,int t2, int mode);
-void posterize2_free();
+void posterize2_apply(void *ptr, VJFrame *frame, int *args);
 #endif

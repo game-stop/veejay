@@ -72,15 +72,15 @@ static inline double ccolor_sine(int u, double dsaturation)
 }
 
 
-void coloradjust_apply(VJFrame *frame, int val, int _degrees)
-{
+void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
+    int val = args[0];
+    int _degrees = args[1];
+
 	unsigned int i;
 	const int len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 //@ Hue, Saturation, copied from AVIDEMUX!
-//@ the commented out version is the same as the optimized version (?)	
-//
 
 	float hue = (float) ( (val/180.0) * M_PI);
 	float sat = (float) ( _degrees * 0.01 );
@@ -101,30 +101,4 @@ void coloradjust_apply(VJFrame *frame, int val, int _degrees)
 		Cr[i] = new_v;
 	}
 
-	
- /*   int cb, cr;
-	double dsaturation, dcolor;
-	const double degrees = (_degrees / 100.0);
-	double co, si;
-	const double dsat = val / 100.0;
-
-	for (i = 0; i < len; i++)
-	{
-		cb = Cb[i] - 128;
-		cr = Cr[i] - 128;
-		if (cb != 0 && cr != 0)
-		{
-			dsaturation = ccolor_sqrt((double) cb, (double) cr);
-			dcolor = ccolor_sine(cb, dsaturation);
-			if (cr < 0)
-				dcolor = M_PI - dcolor;
-
-			dcolor += (degrees * M_PI) / 180.0;
-			dsaturation *= dsat;
-			sin_cos(co,si, dcolor );
-			Cb[i] = si * dsaturation + 128;
-			Cr[i] = co * dsaturation + 128;
-		}
-	}
-*/
 }

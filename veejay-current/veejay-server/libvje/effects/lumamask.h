@@ -20,8 +20,10 @@
 
 #ifndef LUMAMASK_H
 #define LUMAMASK_H
-void lumamask_apply( VJFrame *frame, VJFrame *frame2, int mode, int h_scale, int border, int alpha);
+void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 vj_effect *lumamask_init(int w, int h);
-int lumamask_malloc(int w, int h);
-void lumamask_free();
+void *lumamask_malloc(int w, int h);
+void lumamask_free(void *ptr);
+int lumamask_requests_fx();
+void lumamask_set_motionmap(void *ptr, void *priv);
 #endif

@@ -18,15 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include "rgbkey.h"
-#include <stdlib.h>
-#include <sys/types.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "complexopacity.h"
-
 
 vj_effect *complexopacity_init(int w, int h)
 {
@@ -89,10 +84,13 @@ int accept_ipixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
     return 0;
 }
 
-void complexopacity_apply(VJFrame *frame, int width,
-			int height, int i_angle, int r, int g, int b,
-			int level )
-{
+void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *bg, int *args) {
+	int i_angle = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+	int level = args[4];
+
 
     uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
@@ -109,6 +107,8 @@ void complexopacity_apply(VJFrame *frame, int width,
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+    int width = frame->width;
+    int height = frame->height;
 	int	iy,iu,iv;
 	_rgb2yuv(r,g,b,iy,iu,iv);
 	_y = (float) iy;
@@ -133,9 +133,9 @@ void complexopacity_apply(VJFrame *frame, int width,
     fg_cb = frame->data[1];
     fg_cr = frame->data[2];
 
-    bg_y = frame->data[0];
-    bg_cb = frame->data[1];
-    bg_cr = frame->data[2];
+    bg_y = bg->data[0];
+    bg_cb = bg->data[1];
+    bg_cr = bg->data[2];
 
     for (pos = width + 1; pos < (len) - width - 1; pos++) {
 	int i = 0;
@@ -188,4 +188,3 @@ void complexopacity_apply(VJFrame *frame, int width,
 	}
     }
 }
-void complexopacity_free(){}

@@ -18,10 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef TRANSCAROT_H
-#define TRANSCAROT_H
-vj_effect *transcarot_init(int width, int height);
-
-void transcarot_apply( VJFrame *frame, VJFrame *frame2, int p, int dy, int dye,
-                      int row, int opacity, int type);
+#ifndef WIPE_H
+#define WIPE_H
+vj_effect *wipe_init();
+int  wipe_ready(void *ptr, int wid, int hei);
+void *wipe_malloc(int w, int h);
+void wipe_free(void *ptr);
+void wipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2,int *args);
 #endif

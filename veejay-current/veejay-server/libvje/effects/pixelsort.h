@@ -32,7 +32,7 @@
 #ifndef PIXELSORT_H
 #define PIXELSORT_H
 vj_effect *pixelsort_init(int w, int h);
-int pixelsort_malloc(int w, int h);
-void pixelsort_free();
-void pixelsort_apply( VJFrame *frame, int mode,int rows1st, int threshold);
+void  *pixelsort_malloc(int w, int h);
+void pixelsort_free(void *ptr);
+void pixelsort_apply(void *ptr, VJFrame *frame, int *args);
 #endif

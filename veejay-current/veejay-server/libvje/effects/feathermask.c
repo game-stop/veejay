@@ -35,20 +35,28 @@ vj_effect *feathermask_init(int w,int h)
     return ve;
 }
 
-static uint8_t *mask = NULL;
-int feathermask_malloc(int width, int height)
+typedef struct {
+    uint8_t *mask;
+} feathermask_t;
+
+void *feathermask_malloc(int width, int height)
 {
-    mask = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height));
-    if(!mask)
-		return 0;
-	return 1;
+    feathermask_t *f = (feathermask_t*) vj_calloc(sizeof(feathermask_t));
+    if(!f) {
+        return NULL;
+    }
+    f->mask = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height));
+    if(!f->mask) {
+		free(f);
+        return NULL;
+    }
+	return (void*) f;
 }
-void feathermask_free()
+void feathermask_free(void *ptr)
 {
-	if(mask) {
-		free(mask);
-		mask = NULL;
-	}
+    feathermask_t *f = (feathermask_t*) ptr;
+    free(f->mask);
+    free(f);
 }
 
 static void feathermask1_apply( VJFrame *frame, uint8_t *alpha, unsigned int width, unsigned int height)
@@ -73,12 +81,13 @@ static void feathermask1_apply( VJFrame *frame, uint8_t *alpha, unsigned int wid
 	}
 }
 
-void feathermask_apply(VJFrame *frame)
+void feathermask_apply(void *ptr, VJFrame *frame, int *args)
 {
+    feathermask_t *f = (feathermask_t*) ptr;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;
-	vj_frame_copy1( frame->data[3],mask, len );
-	feathermask1_apply(frame, mask, width, height);
+	vj_frame_copy1( frame->data[3],f->mask, len );
+	feathermask1_apply(frame, f->mask, width, height);
 }
 

@@ -41,8 +41,9 @@ vj_effect *deinterlace_init(int w, int h)
     return ve;
 }
 
-void deinterlace_apply(VJFrame *frame, int val)
-{
+void deinterlace_apply(void *ptr, VJFrame *frame, int *args) {
+    int val = args[0];
+
 	const unsigned int uv_width = frame->uv_width;
 	const unsigned int uv_height = frame->uv_height;
 	const unsigned int width = frame->width;
@@ -55,5 +56,3 @@ void deinterlace_apply(VJFrame *frame, int val)
 	deinterlace( Cb, uv_width,uv_height,val);
 	deinterlace( Cr, uv_width,uv_height,val);
 }
-
-void deinterlace_free(){}

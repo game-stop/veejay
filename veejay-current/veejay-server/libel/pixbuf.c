@@ -400,7 +400,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	}
 	
 	// convert frame to yuv
-	VJFrame *src = yuv_yuv_template( frame[0],frame[1],frame[2],w,h,fmt );
+	VJFrame *src = yuv_yuv_template( frame[0],frame[2],frame[1],w,h,fmt );
 	VJFrame *dst = yuv_rgb_template(
 		(uint8_t*) gdk_pixbuf_get_pixels( img_ ),
 				   gdk_pixbuf_get_width(  img_ ),

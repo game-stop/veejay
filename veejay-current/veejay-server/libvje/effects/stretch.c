@@ -54,16 +54,20 @@ vj_effect *stretch_init(int w, int h)
 }
 
 
-void stretch_apply( VJFrame *frame, int upper, int lower, int gain, int gain_saturation)
+void stretch_apply( void *ptr, VJFrame *frame, int *args )
 {
     unsigned int i;
     const int len = frame->len;
-    const int uv_len = (frame->ssm ? len : frame->uv_len );
 
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
+    int upper = args[0];
+    int lower = args[1];
+    int gain = args[2];
+    int gain_saturation = args[3];
+   
     double gainFactor = (gain * 0.01);
     double satFactor = (gain_saturation * 0.01);
     double cb,cr;

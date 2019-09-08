@@ -21,5 +21,5 @@
 #ifndef TRANSFORM_H
 #define TRANSFORM_H
 vj_effect *transform_init(int w, int height);
-void transform_apply(VJFrame *frame, VJFrame *frame2, int size);
+void transform_apply(void *ptr, VJFrame *frame, int *args);
 #endif

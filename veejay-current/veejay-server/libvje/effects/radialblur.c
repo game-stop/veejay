@@ -46,7 +46,9 @@
 #include <veejaycore/vjmem.h>
 #include "radialblur.h"
 
-static uint8_t *radial_src[4] = { NULL,NULL,NULL,NULL};
+typedef struct {
+    uint8_t *radial_src[4];
+} radialblur_t;
 
 vj_effect *radialblur_init(int w,int h)
 {
@@ -73,14 +75,23 @@ vj_effect *radialblur_init(int w,int h)
     return ve;
 }
 
-int	radialblur_malloc(int w, int h)
+void *radialblur_malloc(int w, int h)
 {
-	int i;
-	for( i = 0; i < 3; i ++ ) {
-		radial_src[i] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h));
-		if(!radial_src[i]) return 0;
-	}
-	return 1;
+    radialblur_t *r = (radialblur_t*) vj_calloc(sizeof(radialblur_t));
+    if(!r) {
+        return NULL;
+    }
+
+    r->radial_src[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h*3));
+    if(!r->radial_src[0]) {
+        free(r);
+        return NULL;
+    }
+
+    r->radial_src[1] = r->radial_src[0] + RUP8(w*h);
+    r->radial_src[2] = r->radial_src[1] + RUP8(w*h);
+	
+    return (void*) r;
 }
 
 
@@ -103,8 +114,13 @@ static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r , int 
 }
 
 
-void radialblur_apply(VJFrame *frame, int radius, int power, int direction)
-{
+void radialblur_apply(void *ptr, VJFrame *frame, int *args ) {
+    int radius = args[0];
+    int power = args[1];
+    int direction = args[2];
+
+    radialblur_t *r = (radialblur_t*) ptr;
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;
@@ -117,38 +133,33 @@ void radialblur_apply(VJFrame *frame, int radius, int power, int direction)
 	if(radius == 0) return;
 	// inplace
 	int strides[4] = { len, uv_len, uv_len, 0 };
-	vj_frame_copy( frame->data, radial_src, strides );
+	vj_frame_copy( frame->data, r->radial_src, strides );
 
 	switch(direction)
 	{
-		case 0: rhblur_apply( Y, radial_src[0],width, height, radius, power );
-			rhblur_apply( Cb, radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rhblur_apply( Cr, radial_src[2],frame->uv_width, frame->uv_height, radius, power );
+		case 0: rhblur_apply( Y, r->radial_src[0],width, height, radius, power );
+			rhblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
+			rhblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
 			break;
-		case 1: rvblur_apply( Y, radial_src[0],width, height, radius, power ); 
-			rvblur_apply( Cb, radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rvblur_apply( Cr, radial_src[2],frame->uv_width, frame->uv_height, radius, power );
+		case 1: rvblur_apply( Y, r->radial_src[0],width, height, radius, power ); 
+			rvblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
+			rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
 			break;
 		case 2:
-			rhblur_apply( Y, radial_src[0],width, height, radius, power );
-			rhblur_apply( Cb, radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rhblur_apply( Cr, radial_src[2],frame->uv_width, frame->uv_height, radius, power );
-			rvblur_apply( Y, radial_src[0],width, height, radius, power ); 
-			rvblur_apply( Cb, radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rvblur_apply( Cr, radial_src[2],frame->uv_width, frame->uv_height, radius, power );
+			rhblur_apply( Y, r->radial_src[0],width, height, radius, power );
+			rhblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
+			rhblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
+			rvblur_apply( Y, r->radial_src[0],width, height, radius, power ); 
+			rvblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
+			rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
 			break;
 		
 	}
-
 }
 
-
-void radialblur_free()
+void radialblur_free(void *ptr)
 {
-	int i;
-	for( i = 0; i < 3 ; i ++ ) {
-		if( radial_src[i] )
-		   free(radial_src[i]);
-		radial_src[i] = NULL;
-	}
+    radialblur_t *r = (radialblur_t*) ptr;
+    free( r->radial_src[0] );
+    free( r );
 }

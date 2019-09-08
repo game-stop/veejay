@@ -98,9 +98,12 @@ static void transline2_apply(uint8_t *yuv1[4], uint8_t *yuv2[4], int width, int 
     }
 }
 
-void transline_apply( VJFrame *frame, VJFrame *frame2, int distance,
-                     int line_width, int opacity, int type)
-{
+void transline_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int distance = args[0];
+    int line_width = args[1];
+    int opacity = args[2];
+    int type = args[3];
+
     if (type == 1)
 		transline1_apply(frame->data, frame2->data, frame->width, frame->height, distance, line_width);
     if (type == 0)

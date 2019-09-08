@@ -21,7 +21,7 @@
 #ifndef NEIGHBOURS4_H
 #define NEIGHBOURS4_H
 vj_effect *neighbours4_init(int w, int h);
-int neighbours4_malloc(int w, int h);
-void neighbours4_free(void);
-void neighbours4_apply( VJFrame *frame, int radius,int brush_size, int level,int mode);
+void *neighbours4_malloc(int w, int h);
+void neighbours4_free(void *ptr);
+void neighbours4_apply(void *ptr,VJFrame *frame,int *args);
 #endif

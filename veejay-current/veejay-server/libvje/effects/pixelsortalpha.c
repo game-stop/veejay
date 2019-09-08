@@ -58,14 +58,6 @@ vj_effect *pixelsortalpha_init(int w, int h)
     return ve;
 }
 
-
-int pixelsortalpha_malloc(int w, int h){
-    return 1;
-}
-
-void pixelsortalpha_free() {
-}
-
 static inline unsigned int firstNotBlackY(uint8_t *Y, unsigned int x, unsigned int y, unsigned int wid, unsigned int hei)
 {
     while( Y[y * wid + x] <= pixel_Y_lo_ ) { /* skip black pixels in column */
@@ -336,8 +328,10 @@ static unsigned int pixelsortalpha_row(uint8_t *P[4],unsigned int width, unsigne
 }
 
 
-void pixelsortalpha_apply( VJFrame *frame, int mode, int rows1st )
-{
+void pixelsortalpha_apply( void *ptr, VJFrame *frame, int *args ) {
+    int mode = args[0];
+    int rows1st = args[1];
+
     uint8_t pixel_Y_hi_ = pixel_Y_hi_;
     uint8_t pixel_Y_lo_ = pixel_Y_lo_;
     unsigned int x=0,y=0;

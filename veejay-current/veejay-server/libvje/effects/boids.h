@@ -21,8 +21,7 @@
 #ifndef BOIDS_H
 #define BOIDS_H
 vj_effect *boids_init(int w, int h);
-void boids_apply( VJFrame *frame, int p0,int p1, int p2, int p3, int p4, int p5,
-                 int p6, int p7);
-int	boids_malloc( int w, int h );
-void boids_free(void);
+void boids_apply( void *ptr, VJFrame *frame,int *args);
+void *boids_malloc( int w, int h );
+void boids_free(void *ptr);
 #endif

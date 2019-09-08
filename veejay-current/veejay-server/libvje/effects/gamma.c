@@ -22,8 +22,11 @@
 #include <veejaycore/vjmem.h>
 #include "gamma.h"
 
-static __thread int gamma_flag = 0;
-static __thread uint8_t table[256];
+
+typedef struct {
+    int gamma_flag;
+    uint8_t table[256];
+} gamma_t;
 
 vj_effect *gamma_init(int w, int h)
 {
@@ -44,8 +47,20 @@ vj_effect *gamma_init(int w, int h)
 	return ve;
 }
 
-static void gamma_setup(int width, int height,
-			double gamma_value)
+void *gamma_malloc(int w, int h) {
+    gamma_t *g = (gamma_t*) vj_calloc( sizeof(gamma_t) );
+    if(!g) {
+        return NULL;
+    }
+    return (void*) g;
+}
+
+void gamma_free(void *ptr) {
+    gamma_t *g = (gamma_t*) ptr;
+    free(g);
+}
+
+static void gamma_setup(gamma_t *g, int width, int height, double gamma_value)
 {
     int i;
     double val;
@@ -54,20 +69,25 @@ static void gamma_setup(int width, int height,
 		val = i / 256.0;
 		val = pow(val, gamma_value);
 		val = 256.0 * val;
-		table[i] = val;
+		g->table[i] = val;
     }
 }
 
-void gamma_apply(VJFrame *frame, int gamma_value)
-{
+void gamma_apply(void *ptr, VJFrame *frame, int *args ) {
+    int gamma_value = args[0];
+
+    gamma_t *g = (gamma_t*) ptr;
+
 	unsigned int i;
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
     
-    if (gamma_value != gamma_flag) {
-		gamma_setup(frame->width, frame->height, (double) (gamma_value / 100.0));
-		gamma_flag = gamma_value;
+    if (gamma_value != g->gamma_flag) {
+		gamma_setup(g, frame->width, frame->height, (double) (gamma_value / 100.0));
+		g->gamma_flag = gamma_value;
 	}
+
+    uint8_t *table = g->table;
 
     for (i = 0; i < len; i++) {
 		Y[i] = (uint8_t) table[Y[i]];

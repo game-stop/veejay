@@ -57,7 +57,7 @@ vj_effect *tripplicity_init(int w, int h)
 
 
 
-void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int opacityL, int opacityCb, int opacityCr)
+void tripplicity_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
     unsigned int i;
     const int len =  frame->len;
@@ -68,6 +68,10 @@ void tripplicity_apply( VJFrame *frame, VJFrame *frame2, int opacityL, int opaci
     const uint8_t *Y2 = frame2->data[0];
  	const uint8_t *Cb2= frame2->data[1];
 	const uint8_t *Cr2= frame2->data[2];
+    int opacityL = args[0];
+    int opacityCb = args[1];
+    int opacityCr = args[2];
+
     const uint8_t op1  = (opacityL > 255) ? 255 : opacityL;
     const uint8_t op0  = 255 - op1;
     const uint8_t opCb1= (opacityCb > 255) ? 255: opacityCb;

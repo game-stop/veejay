@@ -21,5 +21,5 @@
 #ifndef FIBDOWNSCALE_H
 #define FIBDOWNSCALE_H
 vj_effect *fibdownscale_init();
-void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n);
+void fibdownscale_apply(void *ptr, VJFrame *frame, int *args );
 #endif

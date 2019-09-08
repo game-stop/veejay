@@ -21,7 +21,7 @@
 #ifndef TRACER_H
 #define TRACER_H
 vj_effect *tracer_init(int w, int h);
-int tracer_malloc(int w, int h);
-void tracer_free();
-void tracer_apply(VJFrame *frame, VJFrame *frame2, int opacity, int nframes);
+void *tracer_malloc(int w, int h);
+void tracer_free(void *ptr);
+void tracer_apply(void *ptr,VJFrame *frame, VJFrame *frame2, int *args);
 #endif

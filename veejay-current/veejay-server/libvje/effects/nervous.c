@@ -29,11 +29,12 @@
 #include <veejaycore/vjmem.h>
 #include "nervous.h"
 
-#define		N_MAX	100
-#define        RUP8(num)(((num)+8)&~8)
+#define N_MAX 100
 
-static uint8_t *nervous_buf[4] = { NULL,NULL,NULL,NULL }; // huge buffer
-static int		frames_elapsed;
+typedef struct {
+    uint8_t *nervous_buf[4];
+    int	frames_elapsed;
+} nervous_t;
 
 vj_effect *nervous_init(int w, int h)
 {
@@ -54,58 +55,66 @@ vj_effect *nervous_init(int w, int h)
     return ve;
 }
 
-int	nervous_malloc(int w, int h )
+void *nervous_malloc(int w, int h )
 {
-    const int total_len = RUP8(w * h * N_MAX * 4);
-	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len);
-	if(!nervous_buf[0]) {
-		return 0;
+    nervous_t *n = (nervous_t*) vj_calloc(sizeof(nervous_t));
+    if(!n) {
+        return NULL;
+    }
+
+    size_t total_len = RUP8(w * h * N_MAX * 4);
+	n->nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len);
+	if(!n->nervous_buf[0]) {
+        free(n);
+		return NULL;
 	}
-	nervous_buf[1] = nervous_buf[0] + RUP8(w*h*N_MAX);
-	nervous_buf[2] = nervous_buf[1] + RUP8(w*h*N_MAX);
-	nervous_buf[3] = nervous_buf[2] + RUP8(w*h*N_MAX);
-	frames_elapsed = 0;
 
-	vj_frame_clear1( nervous_buf[0], 0, (w*h) * N_MAX );
-	vj_frame_clear1( nervous_buf[1], 128, (w*h) * N_MAX );
-	vj_frame_clear1( nervous_buf[2], 128, (w*h) * N_MAX );
-	vj_frame_clear1( nervous_buf[3], 0, (w*h) * N_MAX );
+	n->nervous_buf[1] = n->nervous_buf[0] + RUP8(w*h*N_MAX);
+	n->nervous_buf[2] = n->nervous_buf[1] + RUP8(w*h*N_MAX);
+	n->nervous_buf[3] = n->nervous_buf[2] + RUP8(w*h*N_MAX);
+	n->frames_elapsed = 0;
 
-	return 1;
+	vj_frame_clear1( n->nervous_buf[0], 0, (w*h) * N_MAX );
+	vj_frame_clear1( n->nervous_buf[1], 128, (w*h) * N_MAX );
+	vj_frame_clear1( n->nervous_buf[2], 128, (w*h) * N_MAX );
+	vj_frame_clear1( n->nervous_buf[3], 0, (w*h) * N_MAX );
+
+	return (void*) n;
 }
 
-void	nervous_free(void)
+void	nervous_free(void *ptr)
 {
-	if( nervous_buf[0] ) free(nervous_buf[0]);
-	nervous_buf[0] = NULL;
-	nervous_buf[1] = NULL;
-	nervous_buf[2] = NULL;
-	nervous_buf[3] = NULL;
+    nervous_t *n = (nervous_t*) ptr;
+
+	free(n->nervous_buf[0]);
+    free(n);
 }	
 
 
-void nervous_apply( VJFrame *frame, int delay)
-{
+void nervous_apply( void *ptr, VJFrame *frame, int *args ) {
+    int length = args[0];
+    nervous_t *n = (nervous_t*) ptr;
+
 	const int len = frame->len;
 	int uv_len = (frame->ssm == 1 ? len : frame->uv_len);
-	uint8_t *NY = nervous_buf[0] + (len * frames_elapsed );
-	uint8_t *NCb= nervous_buf[1] + (uv_len * frames_elapsed );
-	uint8_t *NCr= nervous_buf[2] + (uv_len * frames_elapsed );
-	uint8_t *NA = nervous_buf[3] + (len * frames_elapsed);
+	uint8_t *NY = n->nervous_buf[0] + (len * n->frames_elapsed );
+	uint8_t *NCb= n->nervous_buf[1] + (uv_len * n->frames_elapsed );
+	uint8_t *NCr= n->nervous_buf[2] + (uv_len * n->frames_elapsed );
+	uint8_t *NA = n->nervous_buf[3] + (len * n->frames_elapsed);
 	uint8_t *dest[4] = { NY, NCb, NCr, NA };
 	int strides[4] = { len, uv_len,uv_len, len };
 	// copy original into nervous buf	
 	vj_frame_copy( frame->data, dest, strides );
 
-	if(frames_elapsed > 0)
+	if(n->frames_elapsed > 0)
 	{
 		// take a random frame
-		unsigned int index = (unsigned int) ((double)frames_elapsed * rand() / (RAND_MAX+1.0) );
+		unsigned int index = (unsigned int) ((double)n->frames_elapsed * rand() / (RAND_MAX+1.0) );
 		// setup pointers
-		uint8_t *sY = nervous_buf[0] + (len * index);
-		uint8_t *sCb = nervous_buf[1] + (uv_len * index);
-		uint8_t *sCr = nervous_buf[2] + (uv_len * index);
-		uint8_t *sA = nervous_buf[3] + (len * index);
+		uint8_t *sY = n->nervous_buf[0] + (len * index);
+		uint8_t *sCb = n->nervous_buf[1] + (uv_len * index);
+		uint8_t *sCr = n->nervous_buf[2] + (uv_len * index);
+		uint8_t *sA = n->nervous_buf[3] + (len * index);
 		// copy it to dst
 		dest[0] = sY;
 		dest[1] = sCb;
@@ -114,9 +123,9 @@ void nervous_apply( VJFrame *frame, int delay)
 		vj_frame_copy( dest, frame->data, strides );
 	}
 
-	frames_elapsed ++;
+	n->frames_elapsed ++;
 
-	if( frames_elapsed == N_MAX )
-		frames_elapsed = 0;
+	if( n->frames_elapsed == length )
+		n->frames_elapsed = 0;
 
 }

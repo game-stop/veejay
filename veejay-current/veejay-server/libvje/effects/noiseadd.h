@@ -21,7 +21,7 @@
 #ifndef NOISEADD_H
 #define NOISEADD_H
 vj_effect *noiseadd_init(int w, int h);
-void noiseadd_free();
-int noiseadd_malloc(int w, int h);
-void noiseadd_apply( VJFrame *frame, int t, int n);
+void noiseadd_free(void *ptr);
+void *noiseadd_malloc(int w, int h);
+void noiseadd_apply( void *ptr, VJFrame *frame, int *args );
 #endif

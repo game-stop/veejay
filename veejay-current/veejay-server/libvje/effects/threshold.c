@@ -48,21 +48,30 @@ vj_effect *threshold_init(int w, int h)
     return ve;
 }
 
+typedef struct {
+    uint8_t *binary_img;
+} threshold_t;
 
-static uint8_t *binary_img;
 
-int		threshold_malloc(int w, int h )
+void	*threshold_malloc(int w, int h )
 {
-	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
-	if(!binary_img) return 0;
-	return 1;
+    threshold_t *t = (threshold_t*) vj_calloc( sizeof(threshold_t) );
+    if(!t) {
+        return NULL;
+    }
+	t->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
+	if(!t->binary_img) {
+        free(t);
+        return NULL;
+    }
+	return (void*) t;
 }
 
-void		threshold_free(void)
+void		threshold_free(void *ptr)
 {
-	if(binary_img)
-		free(binary_img);
-	binary_img = NULL;
+    threshold_t *t = (threshold_t*) ptr;
+    free(t);
+	free(t->binary_img);
 }
 
 #ifndef MIN
@@ -72,7 +81,7 @@ void		threshold_free(void)
 #define MAX(a,b) ( (a)>(b) ? (a) : (b) )
 #endif
 
-void threshold_apply( VJFrame *frame, VJFrame *frame2, int threshold, int reverse )
+void threshold_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
 	unsigned int y,x;
 	const unsigned int width = frame->width;
@@ -84,7 +93,15 @@ void threshold_apply( VJFrame *frame, VJFrame *frame2, int threshold, int revers
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2=frame2->data[1];
 	uint8_t *Cr2=frame2->data[2];
-	softblur_apply( frame, 0);
+
+    int threshold = args[0];
+    int reverse = args[1];
+
+    threshold_t *t = (threshold_t*) ptr;
+
+    uint8_t *binary_img = t->binary_img;
+
+	softblur_apply_internal( frame, 0);
 
 	binarify_1src( binary_img,Y,threshold,0, width,height);
 

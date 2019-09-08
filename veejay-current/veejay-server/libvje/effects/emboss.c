@@ -305,8 +305,10 @@ static void blur_dark_framedata(VJFrame *frame, int width, int height)
 	}
 }
 
-void emboss_apply(VJFrame *frame, int n)
+void emboss_apply(void *ptr, VJFrame *frame, int *args)
 {
+    int n = args[0];
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 

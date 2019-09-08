@@ -302,8 +302,9 @@ static void _binary_and( VJFrame *frame, VJFrame *frame2, int w, int h )
 
 
 
-void binaryoverlay_apply( VJFrame *frame, VJFrame *frame2, int mode )
-{
+void binaryoverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int mode = args[0];
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 

@@ -21,5 +21,5 @@
 #ifndef WHITEFRAME_H
 #define WHITEFRAME_H
 vj_effect *whiteframe_init();
-void whiteframe_apply(VJFrame *frame, VJFrame *frame2);
+void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

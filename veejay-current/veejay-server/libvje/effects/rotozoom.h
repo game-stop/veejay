@@ -21,8 +21,7 @@
 #ifndef ROTOZOOM_H
 #define ROTOZOOM_H
 vj_effect *rotozoom_init(int width, int height);
-int rotozoom_malloc(int w, int h);
-void rotozoom_destroy();
-void rotozoom_free();
-void rotozoom_apply( VJFrame *frame, int mode, int rot, int zoom, int autom);
+void *rotozoom_malloc(int w, int h);
+void rotozoom_free(void *ptr);
+void rotozoom_apply(void *ptr, VJFrame *frame, int *args);
 #endif

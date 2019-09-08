@@ -26,19 +26,23 @@
 #include <veejaycore/vjmem.h>
 #include "waterrippletv.h"
 
-static uint8_t *ripple_data[3];
-
-static int stat;
-static signed char *vtable;
-static int *map;
-static int *map1, *map2, *map3;
-static int map_h, map_w;
-static int sqrtable[256];
-static const int point = 16;
-static const int impact = 2;
-//static const int decay = 8;
-//static const int loopnum = 2;
-static int tick = 0;
+typedef struct {
+    uint8_t *ripple_data[3];
+    int stat;
+    signed char *vtable;
+    int *map;
+    int *map1;
+    int *map2;
+    int *map3;
+    int map_h;
+    int map_w;
+    int sqrtable[256];
+    int point;
+    int impact;
+    int tick;
+    unsigned int wfastrand_val;
+    int last_fresh_rate;
+} ripple_tv;
 
 /* from EffecTV:
  * fastrand - fast fake random number generator
@@ -47,22 +51,21 @@ static int tick = 0;
  *          generates 1,2,3,0,1,2,3,0...
  *          You should use high-order bits.
  */
-static unsigned int wfastrand_val;
 
-static unsigned int wfastrand()
+static unsigned int wfastrand(ripple_tv *r)
 {
-	return (wfastrand_val=wfastrand_val*1103515245+12345);
+	return (r->wfastrand_val=r->wfastrand_val*1103515245+12345);
 }
 
-static void setTable()
+static void setTable(ripple_tv *r)
 {
 	int i;
 
 	for(i=0; i<128; i++) {
-		sqrtable[i] = i*i;
+		r->sqrtable[i] = i*i;
 	}
 	for(i=1; i<=128; i++) {
-		sqrtable[256-i] = -i*i;
+		r->sqrtable[256-i] = -i*i;
 	}
 }
 
@@ -92,51 +95,71 @@ vj_effect *waterrippletv_init(int width, int height)
 return ve;
 }
 
-int waterrippletv_malloc(int width, int height)
+void  *waterrippletv_malloc(int width, int height)
 {
-	ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width * height));
-	if(!ripple_data[0]) return 0;
-	veejay_memset( ripple_data[0], pixel_Y_lo_, width*height);
+    ripple_tv *r = (ripple_tv*) vj_calloc(sizeof(ripple_tv));
+    if(!r) {
+        return NULL;
+    }
+	r->ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width * height));
+	if(!r->ripple_data[0]) {
+        free(r);
+        return NULL;
+    }
 
-	map_h = height / 2 + 1;
-	map_w = width / 2 + 1;
-	map = (int*) vj_calloc (sizeof(int) * RUP8(map_h * map_w * 3));
-	if(!map) return 0;
-	vtable = (signed char*) vj_calloc( sizeof(signed char) * RUP8(map_w * map_h * 2));
-	if(!vtable) return 0;
-	map3 = map + map_w * map_h * 2;
-	setTable();
-	map1 = map;
-	map2 = map + map_h*map_w;
-	stat = 1;
+	veejay_memset( r->ripple_data[0], pixel_Y_lo_, width*height);
 
-	return 1;
+	r->map_h = height / 2 + 1;
+	r->map_w = width / 2 + 1;
+	r->map = (int*) vj_calloc (sizeof(int) * RUP8(r->map_h * r->map_w * 3));
+	if(!r->map) {
+        free(r->ripple_data[0]);
+        free(r);
+        return NULL;
+    }
+	r->vtable = (signed char*) vj_calloc( sizeof(signed char) * RUP8(r->map_w * r->map_h * 2));
+	if(!r->vtable) {
+        free(r->ripple_data[0]);
+        free(r->map);
+        free(r);
+        return 0;
+    }
+	r->map3 = r->map + r->map_w * r->map_h * 2;
+	setTable(r);
+	r->map1 = r->map;
+	r->map2 = r->map + r->map_h*r->map_w;
+	r->stat = 1;
+    r->point = 16;
+        
+	return (void*) r;
 }
 
-void waterrippletv_free() {
-	if(ripple_data[0]) free(ripple_data[0]);
-	if(map) free(map);
-	if(vtable) free(vtable);
+void waterrippletv_free(void *ptr) {
+    ripple_tv *r = (ripple_tv*) ptr;
+	free(r->ripple_data[0]);
+	free(r->map);
+	free(r->vtable);
+    free(r);
 }
 
 
-static inline void drop(int power)
+static inline void drop(ripple_tv *r, int power)
 {
 	int x, y;
 	int *p, *q;
-	x = wfastrand()%(map_w-4)+2;
-	y = wfastrand()%(map_h-4)+2;
-	p = map1 + y*map_w + x;
-	q = map2 + y*map_w + x;
+	x = wfastrand(r)%(r->map_w-4)+2;
+	y = wfastrand(r)%(r->map_h-4)+2;
+	p = r->map1 + y*r->map_w + x;
+	q = r->map2 + y*r->map_w + x;
 	*p = power;
 	*q = power;
-	*(p-map_w) = *(p-1) = *(p+1) = *(p+map_w) = power/2;
-	*(p-map_w-1) = *(p-map_w+1) = *(p+map_w-1) = *(p+map_w+1) = power/4;
-	*(q-map_w) = *(q-1) = *(q+1) = *(q+map_w) = power/2;
-	*(q-map_w-1) = *(q-map_w+1) = *(q+map_w-1) = *(p+map_w+1) = power/4;
+	*(p-r->map_w) = *(p-1) = *(p+1) = *(p+r->map_w) = power/2;
+	*(p-r->map_w-1) = *(p-r->map_w+1) = *(p+r->map_w-1) = *(p+r->map_w+1) = power/4;
+	*(q-r->map_w) = *(q-1) = *(q+1) = *(q+r->map_w) = power/2;
+	*(q-r->map_w-1) = *(q-r->map_w+1) = *(q+r->map_w-1) = *(p+r->map_w+1) = power/4;
 }
 
-static void raindrop()
+static void raindrop(ripple_tv *r)
 {
 	static int period = 0;
 	static int rain_stat = 0;
@@ -151,11 +174,11 @@ static void raindrop()
 	if(period == 0) {
 		switch(rain_stat) {
 		case 0:
-			period = (wfastrand()>>23)+100;
+			period = (wfastrand(r)>>23)+100;
 			drop_prob = 0;
 			drop_prob_increment = 0x00ffffff/period;
-			drop_power = (-(wfastrand()>>28)-2)<<point;
-			drops_per_frame_max = 2<<(wfastrand()>>30); // 2,4,8 or 16
+			drop_power = (-(wfastrand(r)>>28)-2)<<r->point;
+			drops_per_frame_max = 2<<(wfastrand(r)>>30); // 2,4,8 or 16
 			rain_stat = 1;
 			break;
 		case 1:
@@ -166,7 +189,7 @@ static void raindrop()
 			rain_stat = 2;
 			break;
 		case 2:
-			period = (wfastrand()>>22)+1000;
+			period = (wfastrand(r)>>22)+1000;
 			drop_prob_increment = 0;
 			rain_stat = 3;
 			break;
@@ -176,13 +199,13 @@ static void raindrop()
 			rain_stat = 4;
 			break;
 		case 4:
-			period = (wfastrand()>>24)+60;
+			period = (wfastrand(r)>>24)+60;
 			drop_prob_increment = -(drop_prob/period);
 			rain_stat = 5;
 			break;
 		case 5:
 		default:
-			period = (wfastrand()>>23)+500;
+			period = (wfastrand(r)>>23)+500;
 			drop_prob = 0;
 			rain_stat = 0;
 			break;
@@ -194,8 +217,8 @@ static void raindrop()
 		break;
 	case 1:
 	case 5:
-		if((wfastrand()>>8)<drop_prob) {
-			drop(drop_power);
+		if((wfastrand(r)>>8)<drop_prob) {
+			drop(r,drop_power);
 		}
 		drop_prob += drop_prob_increment;
 		break;
@@ -203,7 +226,7 @@ static void raindrop()
 	case 3:
 	case 4:
 		for(i=drops_per_frame/16; i>0; i--) {
-			drop(drop_power);
+			drop(r,drop_power);
 		}
 		drops_per_frame += drop_prob_increment;
 		break;
@@ -211,8 +234,7 @@ static void raindrop()
 	period--;
 }
 
-static int last_fresh_rate = 0;
-void	waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay)
+void	waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
 {
 	int x, y, i;
 	int dx, dy;
@@ -222,34 +244,38 @@ void	waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay)
 	signed char *vp;
 	uint8_t *src,*dest;
 	const int len = frame->len;
+    int fresh_rate = args[0];
+    int loopnum = args[1];
+    int decay = args[2];
+    ripple_tv *rip = (ripple_tv*) ptr;
 
-	if(last_fresh_rate != fresh_rate || tick > fresh_rate)
+	if(rip->last_fresh_rate != fresh_rate || rip->tick > fresh_rate)
 	{
-		last_fresh_rate = fresh_rate;
-		veejay_memset( map, 0, (map_h*map_w*2*sizeof(int)));
-		tick = 0;
+		rip->last_fresh_rate = fresh_rate;
+		veejay_memset( rip->map, 0, (rip->map_h*rip->map_w*2*sizeof(int)));
+		rip->tick = 0;
 	}
 
-	tick ++;
-	veejay_memcpy ( ripple_data[0], frame->data[0],len);
+	rip->tick ++;
+	veejay_memcpy ( rip->ripple_data[0], frame->data[0],len);
 
 	dest = frame->data[0];
-	src = ripple_data[0];
+	src = rip->ripple_data[0];
 
 	/* impact from the motion or rain drop */
-	raindrop();
+	raindrop(rip);
 
 	/* simulate surface wave */
-	wi = map_w;
-	hi = map_h;
+	wi = rip->map_w;
+	hi = rip->map_h;
 	
 	/* This function is called only 30 times per second. To increase a speed
 	 * of wave, iterates this loop several times. */
 	for(i=loopnum; i>0; i--) {
 		/* wave simulation */
-		p = map1 + wi + 1;
-		q = map2 + wi + 1;
-		r = map3 + wi + 1;
+		p = rip->map1 + wi + 1;
+		q = rip->map2 + wi + 1;
+		r = rip->map3 + wi + 1;
 		for(y=hi-2; y>0; y--) {
 			for(x=wi-2; x>0; x--) {
 				h = *(p-wi-1) + *(p-wi+1) + *(p+wi-1) + *(p+wi+1)
@@ -268,8 +294,8 @@ void	waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay)
 		}
 
 		/* low pass filter */
-		p = map3 + wi + 1;
-		q = map2 + wi + 1;
+		p = rip->map3 + wi + 1;
+		q = rip->map2 + wi + 1;
 		for(y=hi-2; y>0; y--) {
 			for(x=wi-2; x>0; x--) {
 				h = *(p-wi) + *(p-1) + *(p+1) + *(p+wi) + (*p)*60;
@@ -281,19 +307,19 @@ void	waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay)
 			q+=2;
 		}
 
-		p = map1;
-		map1 = map2;
-		map2 = p;
+		p = rip->map1;
+		rip->map1 = rip->map2;
+		rip->map2 = p;
 	}
 
-	vp = vtable;
-	p = map1;
+	vp = rip->vtable;
+	p = rip->map1;
 	for(y=hi-1; y>0; y--) {
 		for(x=wi-1; x>0; x--) {
 			/* difference of the height between two voxel. They are twiced to
 			 * emphasise the wave. */
-			vp[0] = sqrtable[((p[0] - p[1])>>(point-1))&0xff]; 
-			vp[1] = sqrtable[((p[0] - p[wi])>>(point-1))&0xff]; 
+			vp[0] = rip->sqrtable[((p[0] - p[1])>>(rip->point-1))&0xff]; 
+			vp[1] = rip->sqrtable[((p[0] - p[wi])>>(rip->point-1))&0xff]; 
 			p++;
 			vp+=2;
 		}
@@ -303,7 +329,7 @@ void	waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay)
 
 	hi = frame->height;
 	wi = frame->width;
-	vp = vtable;
+	vp = rip->vtable;
 
 /*	dest2 = dest;
         p = map1;
@@ -347,7 +373,7 @@ void	waterrippletv_apply(VJFrame *frame, int fresh_rate, int loopnum, int decay)
 			if(dx>=wi) dx=wi-1;
 			dest[1] = src[dy*wi+dx];
 
-			dy = y + 1 + (v+(int)vp[map_w*2+1])/2;
+			dy = y + 1 + (v+(int)vp[rip->map_w*2+1])/2;
 			if(dy<0) dy=0;
 			if(dy>=hi) dy=hi-1;
 			dest[wi] = src[dy*wi+i];

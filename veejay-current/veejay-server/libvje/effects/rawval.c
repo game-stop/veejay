@@ -51,9 +51,13 @@ vj_effect *rawval_init(int w,int h)
     return ve;
 }
 
-void rawval_apply( VJFrame *frame, const int color_cb, const int color_cr,
-                  const int new_color_cb, const int new_color_cr)
+void rawval_apply( void *ptr, VJFrame *frame, int *args)
 {
+    const int color_cb = args[0];
+    const int color_cr = args[1];
+    const int new_color_cb = args[2];
+    const int new_color_cr = args[3];
+
     unsigned int i;
 	const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	uint8_t *Cb= frame->data[1];

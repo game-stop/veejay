@@ -51,8 +51,10 @@ vj_effect *chromium_init(int w, int h)
     return ve;
 }
 
-void chromium_apply(VJFrame *frame, int m )
-{
+void chromium_apply(void *ptr, VJFrame *frame, int *args ) {
+
+    int m = args[0];
+
     const int len = (frame->ssm ? frame->len : frame->uv_len);
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
@@ -120,19 +122,6 @@ void chromium_apply(VJFrame *frame, int m )
           Cb[i] = 0xaa - Cb[i];
         }
         break;
-
-/*
-		case 4:
-		// U - blue - Y , V = Red - Y
-		// U = 0.492 * ( B - Y )
-		for( i = 0; i < len; i++)
-		{
-			tmp = 0.492 * (VJ_EFFECT_CB_YELLOW - yuv[0][i * 2]);
-			t = 128 + (uint8_t) tmp;
-			Cb[i] = t;
-		}
-		break;
-*/
     }
 
 }

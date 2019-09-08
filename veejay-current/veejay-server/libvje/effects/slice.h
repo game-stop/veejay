@@ -21,7 +21,9 @@
 #ifndef SLICE_H
 #define SLICE_H
 vj_effect *slice_init(int width, int height);
-int slice_malloc(int width, int height);
-void slice_free();
-void slice_apply(VJFrame *frame, int val, int re_init);
+void *slice_malloc(int width, int height);
+void slice_free(void *ptr);
+void slice_apply(void *ptr, VJFrame *frame, int *args);
+int slice_request_fx();
+void slice_set_motionmap(void *ptr, void *priv);
 #endif

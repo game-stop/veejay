@@ -50,8 +50,10 @@ vj_effect *negatechannel_init(int w, int h)
     return ve;
 }
 
-void negatechannel_apply( VJFrame *frame, int chan, int val)
-{
+void negatechannel_apply( void *ptr, VJFrame *frame, int *args ) {
+    int chan = args[0];
+    int val = args[1];
+
     int i;
     const int len = frame->len;
     const int uv_len = (frame->ssm ? len : frame->uv_len);

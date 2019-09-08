@@ -21,7 +21,7 @@
 #ifndef MORPHOLOGY_H
 #define MORPHOLOGY_H
 vj_effect *morphology_init(int w, int h);
-void morphology_apply( VJFrame *frame, int threshold, int kernel, int mode, int channel);
-int morphology_malloc(int w, int h);
-void morphology_free(void);
+void morphology_apply( void *ptr, VJFrame *frame, int *arsg);
+void *morphology_malloc(int w, int h);
+void morphology_free(void *ptr);
 #endif

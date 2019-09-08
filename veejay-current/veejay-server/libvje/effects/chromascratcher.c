@@ -23,13 +23,13 @@
 #include "chromascratcher.h"
 #include "chromamagick.h"
 
-#define    RUP8(num)(((num)+8)&~8)
-static uint8_t *cframe[4] = {NULL,NULL,NULL,NULL};
-static int cnframe = 0;
-static int cnreverse = 0;
-static int chroma_restart = 0;
-
-static VJFrame _tmp;
+typedef struct {
+    uint8_t *cframe[4];
+    int cnframe;
+    int cnreverse;
+    int chroma_restart;
+    VJFrame _tmp;
+} chromascratcher_t;
 
 vj_effect *chromascratcher_init(int w, int h)
 {
@@ -72,33 +72,44 @@ vj_effect *chromascratcher_init(int w, int h)
 	return ve;
 }
 
-int	chromascratcher_malloc(int w, int h)
+void *chromascratcher_malloc(int w, int h)
 {
-    cframe[0] =
-	(uint8_t *) vj_malloc( RUP8(w * h * 3) * MAX_SCRATCH_FRAMES * sizeof(uint8_t) );
-    if(!cframe[0]) return 0;
+    chromascratcher_t *c = (chromascratcher_t*) vj_calloc(sizeof(chromascratcher_t));
+    if(!c) {
+        return NULL;
+    }
 
-    cframe[1] = cframe[0] + ( w * h * MAX_SCRATCH_FRAMES );
-    cframe[2] = cframe[1] + ( w * h * MAX_SCRATCH_FRAMES );
+    c->cframe[0] = (uint8_t *) vj_malloc( RUP8(w * h * 3) * MAX_SCRATCH_FRAMES * sizeof(uint8_t) );
+    if(!c->cframe[0]) {
+        free(c);
+        return NULL;
+    }
+
+    c->cframe[1] = c->cframe[0] + ( w * h * MAX_SCRATCH_FRAMES );
+    c->cframe[2] = c->cframe[1] + ( w * h * MAX_SCRATCH_FRAMES );
 
 
     int strides[4] = { w * h * MAX_SCRATCH_FRAMES, w * h * MAX_SCRATCH_FRAMES, w * h * MAX_SCRATCH_FRAMES, 0 };
-    vj_frame_clear( cframe, strides, 128 );
+    
+    vj_frame_clear( c->cframe, strides, 128 );
 
-    return 1;
+    return (void*) c;
 }
 
-void chromascratcher_free() {
-   if(cframe[0])
-	   free(cframe[0]);
-   cframe[0] = NULL;
-   cframe[1] = NULL;
-   cframe[2] = NULL;
+void chromascratcher_free(void *ptr) {
+
+    chromascratcher_t *c = (chromascratcher_t*) ptr;
+    free(c->cframe[0]);
+    free(c);
 }
 
-static void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
+static void chromastore_frame(chromascratcher_t *c, VJFrame *src, int w, int h, int n, int no_reverse)
 {
 	int strides[4] = { (w * h), (w*h), (w*h) , 0 };
+    int cnframe = c->cnframe;
+    uint8_t **cframe = c->cframe;
+    int cnreverse = c->cnreverse;
+
 	uint8_t *dest[4] = {
 		cframe[0] + (w*h*cnframe),
 		cframe[1] + (w*h*cnframe),
@@ -130,13 +141,25 @@ static void chromastore_frame(VJFrame *src, int w, int h, int n, int no_reverse)
    	if (cnframe == 0)
 		cnreverse = 0;
 
+    c->cnreverse = cnreverse;
+    c->cnframe = cnframe;
+
 }
 
 
 
-void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int n,
-                           int no_reverse)
-{
+void chromascratcher_apply(void *ptr, VJFrame *frame, int *args) {
+    int mode = args[0];
+    int opacity = args[1];
+    int n = args[2];
+    int no_reverse = args[3];
+
+    chromascratcher_t *c = (chromascratcher_t*) ptr;
+
+    int cnframe = c->cnframe;
+    uint8_t **cframe = c->cframe;
+    int chroma_restart = c->chroma_restart;
+
     unsigned int i;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
@@ -147,6 +170,7 @@ void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int n,
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+    VJFrame _tmp;
     veejay_memcpy( &_tmp, frame, (sizeof(VJFrame)));
 	_tmp.data[0] = cframe[0];
 	_tmp.data[1] = cframe[1];
@@ -166,7 +190,8 @@ void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int n,
 
     if(mode>3) {
 	   int matte_mode = mode - 3;
-   	   chromamagick_apply( frame,&_tmp,matte_mode,opacity);
+       int ch_args[2] = { matte_mode, opacity };
+   	   chromamagick_apply( NULL,frame,&_tmp,ch_args);
     }
     else {
 	    switch (mode) {		/* scratching with a sequence of frames (no scene changes) */
@@ -214,5 +239,6 @@ void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int n,
 		}
 	}
 
-	chromastore_frame(frame, width, height, n, no_reverse);
+	chromastore_frame(c, frame, width, height, n, no_reverse);
+    c->chroma_restart = chroma_restart;
 }

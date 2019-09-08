@@ -25,6 +25,7 @@
 #define VJE_NO_FRAMES -3
 #define VJE_SUCCESS 0
 
+#include "./effects/3bar.h"
 #include "./effects/alpha2img.h"
 #include "./effects/alphablend.h"
 #include "./effects/alphadampen.h"
@@ -44,6 +45,7 @@
 #include "./effects/bgsubtract.h"
 #include "./effects/binaryoverlays.h"
 #include "./effects/blob.h"
+#include "./effects/bloom.h"
 #include "./effects/boids.h"
 #include "./effects/borders.h"
 #include "./effects/bwotsu.h"
@@ -52,6 +54,7 @@
 #include "./effects/cartonize.h"
 #include "./effects/chameleonblend.h"
 #include "./effects/chameleon.h"
+#include "./effects/channeloverlay.h"
 #include "./effects/chromamagickalpha.h"
 #include "./effects/chromamagick.h"
 #include "./effects/chromapalette.h"
@@ -66,11 +69,11 @@
 #include "./effects/colorshift.h"
 #include "./effects/common.h"
 #include "./effects/complexinvert.h"
+#include "./effects/complexopacity.h"
 #include "./effects/complexsaturate.h"
 #include "./effects/complexsync.h"
 #include "./effects/complexthreshold.h"
 #include "./effects/constantblend.h"
-#include "./effects/contourextract.h"
 #include "./effects/contrast.h"
 #include "./effects/crosspixel.h"
 #include "./effects/cutstop.h"
@@ -82,20 +85,25 @@
 #include "./effects/dissolve.h"
 #include "./effects/distort.h"
 #include "./effects/dither.h"
+#include "./effects/dotillism.h"
 #include "./effects/dummy.h"
 #include "./effects/dupmagic.h"
 #include "./effects/emboss.h"
 #include "./effects/enhancemask.h"
+#include "./effects/fadecolor.h"
+#include "./effects/fadecolorrgb.h"
 #include "./effects/feathermask.h"
 #include "./effects/fibdownscale.h"
 #include "./effects/fisheye.h"
 #include "./effects/flare.h"
 #include "./effects/flip.h"
 #include "./effects/frameborder.h"
+#include "./effects/gammacompr.h"
 #include "./effects/gamma.h"
 #include "./effects/gaussblur.h"
 #include "./effects/ghost.h"
 #include "./effects/greyselect.h"
+#include "./effects/halftone.h"
 #include "./effects/iris.h"
 #include "./effects/isolate.h"
 #include "./effects/keyselect.h"
@@ -133,21 +141,22 @@
 #include "./effects/nervous.h"
 #include "./effects/noiseadd.h"
 #include "./effects/noisepencil.h"
-#include "./effects/pixelsort.h"
-#include "./effects/pixelsortalpha.h"
 #include "./effects/opacityadv.h"
 #include "./effects/opacity.h"
 #include "./effects/opacitythreshold.h"
 #include "./effects/overclock.h"
 #include "./effects/passthrough.h"
+#include "./effects/pencilsketch2.h"
 #include "./effects/pencilsketch.h"
 #include "./effects/perspective.h"
 #include "./effects/photoplay.h"
 #include "./effects/picinpic.h"
 #include "./effects/pixelate.h"
+#include "./effects/pixelsortalpha.h"
+#include "./effects/pixelsort.h"
 #include "./effects/porterduff.h"
-#include "./effects/posterize.h"
 #include "./effects/posterize2.h"
+#include "./effects/posterize.h"
 #include "./effects/radcor.h"
 #include "./effects/radialblur.h"
 #include "./effects/radioactive.h"
@@ -163,6 +172,7 @@
 #include "./effects/ripple.h"
 #include "./effects/rotozoom.h"
 #include "./effects/scratcher.h"
+#include "./effects/shapewipe.h"
 #include "./effects/sinoids.h"
 #include "./effects/slice.h"
 #include "./effects/slicer.h"
@@ -171,51 +181,39 @@
 #include "./effects/softblur.h"
 #include "./effects/solarize.h"
 #include "./effects/split.h"
+#include "./effects/squares.h"
+#include "./effects/stretch.h"
 #include "./effects/swirl.h"
 #include "./effects/threshold.h"
 #include "./effects/timedistort.h"
 #include "./effects/toalpha.h"
 #include "./effects/tracer.h"
+#include "./effects/transblend.h"
+#include "./effects/transcarot.h"
 #include "./effects/transform.h"
+#include "./effects/transline.h"
+#include "./effects/transop.h"
 #include "./effects/travelmatte.h"
 #include "./effects/tripplicity.h"
 #include "./effects/uvcorrect.h"
+#include "./effects/vbar.h"
 #include "./effects/videoplay.h"
 #include "./effects/videowall.h"
 #include "./effects/water.h"
 #include "./effects/waterrippletv.h"
 #include "./effects/whiteframe.h"
 #include "./effects/widthmirror.h"
+#include "./effects/wipe.h"
 #include "./effects/zoom.h"
-#include "./effects/stretch.h"
-#include "./effects/bloom.h"
-#include "./effects/gammacompr.h"
-#include "./effects/squares.h"
-#include "./effects/halftone.h"
-#include "./effects/dotillism.h"
-#include "./effects/pencilsketch2.h"
-#include "./transitions/3bar.h"
-#include "./transitions/fadecolor.h"
-#include "./transitions/fadecolorrgb.h"
-#include "./transitions/slidingdoor.h"
-#include "./transitions/transblend.h"
-#include "./transitions/transcarot.h"
-#include "./transitions/transline.h"
-#include "./transitions/transop.h"
-#include "./transitions/vbar.h"
-#include "./transitions/wipe.h"
-#include "./transitions/shapewipe.h"
 
 #define VJ_IMAGE_EFFECT_MIN 81
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 260
-
-#define VJ_PLUGIN 500
-
+#define VJ_VIDEO_EFFECT_MAX 261
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN + 1)
+#define VJ_PLUGIN 500
 
 enum {
     VJ_EFFECT_LUM_RED = 65,
@@ -323,6 +321,7 @@ enum {
 	VJ_VIDEO_EFFECT_PASSTHROUGH = 257,
 	VJ_VIDEO_EFFECT_ALPHATRANSITION = 258,
     VJ_VIDEO_EFFECT_SHAPEWIPE = 259,
+    VJ_VIDEO_EFFECT_COMPLEXOPACITY = 260,
 };
 
 enum {

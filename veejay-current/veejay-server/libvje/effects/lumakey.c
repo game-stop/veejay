@@ -301,9 +301,13 @@ static void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width
 	}
 }
 
-void lumakey_apply( VJFrame *frame, VJFrame *frame2, int type,
-				   int threshold, int threshold2, int feather, int d)
-{
+void lumakey_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int type = args[0];
+    int threshold = args[1];
+    int threshold2 = args[2];
+    int feather = args[3];
+    int d = args[4];
+
 	switch(type)
 	{
 		case 0:

@@ -21,10 +21,8 @@
 #ifndef DIFFEFFECT_H
 #define DIFFEFFECT_H
 vj_effect *diff_init(int width, int height);
-void diff_free(void *d);
-int diff_malloc(void **c, int w, int h);
-int diff_prepare(void *d, uint8_t *map[4], int w, int h); 
-void diff_apply(void *d , VJFrame *frame,VJFrame *frame2,
-                int threshold, int reverse, int mode, int feather);
-void diff_destroy();
+void diff_free(void *ptr);
+void *diff_malloc(int w, int h);
+int diff_prepare(void *ptr, VJFrame *frame);
+void diff_apply(void *ptr, VJFrame *frame,VJFrame *frame2, int *args);
 #endif

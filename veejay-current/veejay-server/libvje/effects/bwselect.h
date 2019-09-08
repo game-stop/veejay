@@ -21,5 +21,7 @@
 #ifndef BWSELECT_H
 #define BWSELECT_H
 vj_effect *bwselect_init();
-void bwselect_apply(VJFrame *frame, int min_threshold,int max_threshold, int mode, int gamma);
+void *bwselect_malloc(int w, int h);
+void bwselect_free(void *ptr);
+void bwselect_apply(void *ptr,VJFrame *frame, int *args);
 #endif
