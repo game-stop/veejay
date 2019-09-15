@@ -21,6 +21,8 @@
 #include <config.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
+#include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
@@ -133,4 +135,17 @@ void vjert_apply( void *ptr, VJFrame **frames, int chain_id, int chain_position,
         vjert_process_fx( entry, frames, chain_id, chain_position, args );
     }
 }
+
+void vjert_update( void *ptr, VJFrame *frame )
+{
+    sample_eff_chain **chain = (sample_eff_chain**) ptr;
+    int i;
+    for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+        sample_eff_chain *entry = chain[i];
+        if(entry->fx_instance) {
+            vje_fx_prepare( entry->effect_id, entry->fx_instance, frame );
+        }
+    }
+}
+
 

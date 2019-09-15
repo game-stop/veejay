@@ -27,7 +27,7 @@ unsigned int get_pixel_range_min_Y();
 void vje_set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 void vje_set_rgb_parameter_conversion_type(int full_range);
 int vje_get_rgb_parameter_conversion_type();
-
+void vje_set_bg(VJFrame *bg);
 // enable/disable running multithreaded FX 
 void vje_enable_parallel(); 
 void vje_disable_parallel();
@@ -72,5 +72,6 @@ void vje_dump();
 // processing
 void vjert_apply( void *entry, VJFrame **frames, int chain_id, int chain_position, int *args ); //FIXME
 void vjert_del_fx( void *ptr, int chain_id, int chain_position ); //FIXME
+void vjert_update( void *ptr, VJFrame *frame );
 
 #endif

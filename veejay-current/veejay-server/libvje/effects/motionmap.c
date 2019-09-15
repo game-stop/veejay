@@ -66,6 +66,7 @@ vj_effect *motionmap_init(int w, int h)
     ve->has_user = 0;
     ve->global = 1;
     ve->n_out = 2;
+    ve->static_bg = 1;
     ve->param_description = vje_build_param_list( ve->num_params, 
 			"Difference Threshold", "Maximum Motion Energy","Draw Motion Map","History in frames" ,"Decay", "Interpolate frames", "Activity Mode", "Activity Decay");
 

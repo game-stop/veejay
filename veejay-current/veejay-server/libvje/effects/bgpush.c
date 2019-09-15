@@ -38,7 +38,7 @@ vj_effect *bgpush_init(int w, int h)
     ve->parallel = 0;
     ve->has_user = 0;
     ve->global = 1;
-
+    ve->static_bg = 1;
     return ve;
 }
 

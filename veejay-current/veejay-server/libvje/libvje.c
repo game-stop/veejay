@@ -213,8 +213,8 @@ static struct {
     { cartonize_init,NULL,NULL,NULL,NULL,cartonize_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CARTONIZE},
     { bwselect_init,bwselect_malloc,bwselect_free,NULL,NULL,bwselect_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BWSELECT },
     { bwotsu_init,NULL,NULL,NULL,NULL,bwotsu_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_BWOTSU },
-    { borders_init,NULL,NULL,NULL,NULL,borders_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_BORDERS }, //FIXME impact?
-    { boids_init,boids_malloc,boids_free,NULL,NULL,boids_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_VIDBOIDS }, //FIXME test
+    { borders_init,NULL,NULL,NULL,NULL,borders_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_BORDERS }, 
+    { boids_init,boids_malloc,boids_free,NULL,NULL,boids_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_VIDBOIDS },
     { bloom_init,bloom_malloc,bloom_free,NULL,NULL,bloom_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLOOM },
     { blob_init,blob_malloc,blob_free,NULL,NULL,blob_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_VIDBLOB },
     { binaryoverlay_init,NULL,NULL,NULL,NULL,NULL,binaryoverlay_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_BINARYOVERLAY },
@@ -240,18 +240,12 @@ static struct {
     { transline_init,NULL,NULL,NULL,NULL,NULL,transline_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_LINE },
     { transcarot_init,NULL,NULL,NULL,NULL,NULL,transcarot_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_CAROT },
     { transblend_init,NULL,NULL,NULL,NULL,NULL,transblend_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_TRANSBLEND },
-    { channeloverlay_init,NULL,NULL,NULL,NULL,NULL,channeloverlay_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_SLIDINGDOOR }, //FIXME rename enum
-    { fadecolorrgb_init,fadecolorrgb_malloc,fadecolorrgb_free,NULL,NULL,fadecolorrgb_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FADECOLORRGB }, //FIXME: rename enum
-    { fadecolor_init,fadecolor_malloc,fadecolor_free,NULL,NULL,fadecolor_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FADECOLORRGB }, //FIXME: renameenum
+    { channeloverlay_init,NULL,NULL,NULL,NULL,NULL,channeloverlay_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_CHANNELOVERLAY },
+    { fadecolorrgb_init,fadecolorrgb_malloc,fadecolorrgb_free,NULL,NULL,fadecolorrgb_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FADECOLORRGB },
+    { fadecolor_init,fadecolor_malloc,fadecolor_free,NULL,NULL,fadecolor_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FADECOLORRGB },
     { bar_init,bar_malloc,bar_free,NULL,NULL,NULL,bar_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_3BAR },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
 
-    // FIXME: list all FX and modify them on the fly: no static variables, move them to private structure (ptr)
-    //
-    // FIXME: update Makefile.am
-    // FIXME: delete vj-effect.c, vj-effect.h, vj-effman.c
-    // FIXME: update all callers with new vje_* function calls
-    //
     // FIXME: global tagged FX : motionmap, bgsubtract, bgsubtractgauss, bgpush
     //        1 motionmap per FX (set of FX that can request motionmap)
     //        1 static bg per motionmap
@@ -264,6 +258,7 @@ static vj_fx_priv_map_t **vj_fx_priv_chain = NULL;
 static int num_fx = 0;
 static int VJ_INTERNAL = 0;
 static int LAST_ID = 0;
+static VJFrame *vj_fx_bg = NULL;
 
 uint8_t  pixel_Y_hi_ = 235;
 uint8_t  pixel_U_hi_ = 240;
@@ -273,6 +268,31 @@ uint8_t  pixel_U_lo_ = 16;
 static void vje_global_store(int chain_id, int entry, int fx_id, void *ptr);
 static int vje_global_couple(int chain_id, int ref_id, int fx_id, void *ptr);
 static void vje_global_clear(int chain_id, int entry);
+
+void    vje_set_bg(VJFrame *bg)
+{
+    if(vj_fx_bg == NULL) {
+        vj_fx_bg = vj_calloc(sizeof(VJFrame));
+    }
+    else {
+        if(vj_fx_bg->data[0]) {
+            free(vj_fx_bg->data[0]);
+        }
+    }
+
+    veejay_memcpy(vj_fx_bg, bg, sizeof(VJFrame));
+    
+    vj_fx_bg->data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( bg->len * 3 ) ); // enough space to hold 4:4:4
+    vj_fx_bg->data[1] = vj_fx_bg->data[0] + RUP8(bg->len);
+    vj_fx_bg->data[2] = vj_fx_bg->data[1] + RUP8(bg->len);
+    vj_fx_bg->data[3] = NULL;
+
+    veejay_memcpy( vj_fx_bg->data[0], bg->data[0], bg->len );
+    veejay_memcpy( vj_fx_bg->data[1], bg->data[1], bg->uv_len );
+    veejay_memcpy( vj_fx_bg->data[2], bg->data[2], bg->uv_len );
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Frame stored in FX process chain as background frame");
+}
 
 unsigned int	get_pixel_range_min_Y() {
 	return pixel_Y_lo_;
@@ -525,8 +545,20 @@ void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
 void vje_fx_prepare( int fx_id, void *ptr, VJFrame *A )
 {
     int idx = vj_fx_map[ fx_id ];
+
+    VJFrame *bg = A;
+
+    //FX that are tagged with static_bg = 1 get a pointer to stored VJFrame
+    //other FX, get A passed in
+    if( vj_effect_map[ idx ] != NULL ) {
+        if( vj_effect_map[idx]->static_bg && vj_fx_bg != NULL ) {
+            bg = vj_fx_bg;
+            veejay_msg(VEEJAY_MSG_DEBUG, "Using background frame stored in FX process chain");
+        }
+    }
+
     if( vj_fx[ idx ].prepare != NULL ) {
-        vj_fx[ idx ].prepare( ptr, A );
+        vj_fx[ idx ].prepare( ptr, bg );
     }
 }
 

@@ -43,6 +43,7 @@ vj_effect *chameleonblend_init(int w, int h)
 	ve->defaults[0] = 0;
 	ve->description = "ChameleonTV (EffectTV)";
 	ve->sub_format = 1;
+    ve->static_bg = 1;
 	ve->extra_frame = 1;
 	ve->has_user = 0;
 	ve->motion = 1;

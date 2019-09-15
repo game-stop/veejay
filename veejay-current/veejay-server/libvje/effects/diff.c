@@ -58,6 +58,7 @@ vj_effect *diff_init(int width, int height)
 	ve->extra_frame = 1;
 	ve->sub_format = 1;
 	ve->has_user = 1;
+    ve->static_bg = 1;
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show mask/image", "Thinning" );
 	ve->hints = vje_init_value_hint_list( ve->num_params );

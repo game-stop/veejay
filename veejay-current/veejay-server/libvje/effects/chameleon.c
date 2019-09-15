@@ -44,6 +44,7 @@ vj_effect *chameleon_init(int w, int h)
 	ve->description = "ChameleonTV (EffectTV)";
 	ve->sub_format = 1;
 	ve->extra_frame = 0;
+    ve->static_bg = 1;
 	ve->has_user = 0;
 	ve->motion = 1;
 	ve->param_description = vje_build_param_list(ve->num_params, "Appearing/Dissapearing");
