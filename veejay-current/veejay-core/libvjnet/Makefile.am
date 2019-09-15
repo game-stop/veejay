@@ -7,6 +7,8 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -I$(top_srcdir)/vjmem \
               -I$(top_srcdir)/vjmsg 
 
+AM_CPPFLAGS += $(FFMPEG_CFLAGS)
+
 VJNET_LIB_FILE = libvjnet.la
 EXTRA_DIST = vj-client.h bswap.h cmd.h mcastreceiver.h mcastsender.h packet.h vj-server.h
 pkginclude_HEADERS = vj-client.h vj-server.h

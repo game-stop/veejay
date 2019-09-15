@@ -918,12 +918,12 @@ fi
 
 have_freetype=false
 have_freetype2=false
-dnl PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
-dnl		AC_SUBST(FREETYPE2_CFLAGS)
-dnl		AC_SUBST(FREETYPE2_LIBS)
-dnl		AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
-dnl		have_freetype2=true],
-dnl		[have_freetype2=false] )
+PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
+		AC_SUBST(FREETYPE2_CFLAGS)
+        AC_SUBST(FREETYPE2_LIBS)
+	    AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
+		have_freetype2=true],
+		[have_freetype2=false] )
 
 if test x$have_freetype2 != xtrue; then
 	AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
