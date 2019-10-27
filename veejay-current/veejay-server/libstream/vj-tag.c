@@ -2157,7 +2157,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
         tag->effect_chain[position]->effect_id = effect_id;
     }
     else if( tag->effect_chain[position]->effect_id != effect_id ) {
-        vjert_del_fx( tag->effect_chain[position]->fx_instance,0, position ); //FIXME
+        vjert_del_fx( tag->effect_chain[position],0, position );
         tag->effect_chain[position]->effect_id = effect_id;
     }
 
