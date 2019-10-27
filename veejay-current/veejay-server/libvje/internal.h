@@ -205,8 +205,9 @@
 #include "./effects/widthmirror.h"
 #include "./effects/wipe.h"
 #include "./effects/zoom.h"
+#include "./effects/buffer.h"
 
-#define VJ_IMAGE_EFFECT_MIN 81
+#define VJ_IMAGE_EFFECT_MIN 80
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -445,6 +446,7 @@ enum {
     VJ_IMAGE_EFFECT_HALFTONE = 83,
     VJ_IMAGE_EFFECT_DOTILLISM = 82,
     VJ_IMAGE_EFFECT_PENCILSKETCH2 = 81,
+    VJ_IMAGE_EFFECT_BUFFER = 80,
 	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

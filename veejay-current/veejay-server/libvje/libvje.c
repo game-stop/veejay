@@ -244,7 +244,9 @@ static struct {
     { fadecolorrgb_init,fadecolorrgb_malloc,fadecolorrgb_free,NULL,NULL,fadecolorrgb_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FADECOLORRGB },
     { fadecolor_init,fadecolor_malloc,fadecolor_free,NULL,NULL,fadecolor_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FADECOLORRGB },
     { bar_init,bar_malloc,bar_free,NULL,NULL,NULL,bar_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_3BAR },
+    { buffer_init,buffer_malloc,buffer_free,NULL,NULL,buffer_apply,NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_BUFFER },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
+
 
     // FIXME: global tagged FX : motionmap, bgsubtract, bgsubtractgauss, bgpush
     //        1 motionmap per FX (set of FX that can request motionmap)
