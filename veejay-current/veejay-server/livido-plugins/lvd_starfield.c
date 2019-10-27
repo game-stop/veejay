@@ -213,6 +213,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	int palettes0[] = {
            	LIVIDO_PALETTE_YUV420P,
            	LIVIDO_PALETTE_YUV422P,
+            LIVIDO_PALETTE_YUV444P,
             0
 	};
 	
@@ -221,7 +222,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	port = out_chans[0];
 	
 	    livido_set_string_value( port, "name", "Output Channel");
-		livido_set_int_array( port, "palette_list", 3, palettes0);
+		livido_set_int_array( port, "palette_list", 4, palettes0);
 		livido_set_int_value( port, "flags", 0);
 	
 	//@ setup parameters (INDEX type, 0-255) 

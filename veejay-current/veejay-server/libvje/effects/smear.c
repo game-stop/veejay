@@ -186,7 +186,7 @@ void smear_apply( void *ptr, VJFrame *frame, int *args )
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 
-    smear_t *s = (smear_t*) s;
+    smear_t *s = (smear_t*) ptr;
 
 	if(motionmap_active(s->motionmap))
 	{

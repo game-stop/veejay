@@ -92,25 +92,29 @@ void buffer_free( void *ptr )
 
 static int put_frame( buffer_t *b, VJFrame *frame )
 {
-    VJFrame *dst = (VJFrame*) vj_malloc( sizeof(VJFrame) );
+    VJFrame *dst = (VJFrame*) vj_calloc( sizeof(VJFrame) );
     if(!dst) {
         return 0;
     }
     
-    veejay_memcpy( dst, frame, sizeof(VJFrame) );
-
-    dst->data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (frame->len + frame->uv_len + frame->uv_len) );
+    dst->data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (frame->len + frame->uv_len + frame->uv_len + frame->len) );
     if(!dst->data[0]) {
         free(dst);
         return 0;
     }
     dst->data[1] = dst->data[0] + frame->len;
     dst->data[2] = dst->data[1] + frame->uv_len;
+    dst->data[3] = dst->data[2] + frame->uv_len;
 
     veejay_memcpy( dst->data[0], frame->data[0], frame->len );
     veejay_memcpy( dst->data[1], frame->data[1], frame->uv_len );
     veejay_memcpy( dst->data[2], frame->data[2], frame->uv_len );
-    dst->stride[3] = 0;
+    veejay_memcpy( dst->data[3], frame->data[3], frame->len );
+
+    dst->stride[3] = frame->stride[3];
+    dst->len = frame->len;
+    dst->uv_len = frame->uv_len;
+    dst->ssm = frame->ssm;
 
     b->frames[ b->write_pos ] = dst;
     
@@ -129,6 +133,7 @@ static void get_frame( buffer_t *b, VJFrame *dst)
     veejay_memcpy( dst->data[0], b->frames[ pos ]->data[0], b->frames[ pos ]->len );
     veejay_memcpy( dst->data[1], b->frames[ pos ]->data[1], b->frames[ pos ]->uv_len );
     veejay_memcpy( dst->data[2], b->frames[ pos ]->data[2], b->frames[ pos ]->uv_len );
+    veejay_memcpy( dst->data[3], b->frames[ pos ]->data[3], b->frames[ pos ]->len );
 
     dst->len        = b->frames[ pos ]->len;
     dst->uv_len     = b->frames[ pos ]->uv_len;

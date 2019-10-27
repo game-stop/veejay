@@ -70,13 +70,15 @@ int	init_instance( livido_port_t *my_instance )
         return LIVIDO_ERROR_MEMORY_ALLOCATION;
     }
 
+    livido_memset( particles, 0, sizeof(particles_t) );
+
     particles->particles = (PARTICLE**) livido_malloc(sizeof(PARTICLE*) * MAX_PARTICLES );
 	if(!particles->particles) {
         free(particles);
         return LIVIDO_ERROR_MEMORY_ALLOCATION;
     }
 
-    particles->fire = (uint8_t*) livido_malloc( sizeof(uint8_t) * w * h );
+    particles->fire = (uint8_t*) livido_malloc( sizeof(uint8_t) * (w * h) + (w + w) );
     if(!particles->fire) {
         free(particles->particles);
         free(particles);
@@ -180,7 +182,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	}
 
 
-
+    const int lim = w * h;
 	uint32_t temp,index,buf;
 	uint8_t *fire = parts->fire;
 
@@ -207,10 +209,15 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 			temp = particles[i]->ypos * w + particles[i]->xpos;
 
 			fire[temp] = particles[i]->colorindex;
-			fire[temp - 1] = particles[i]->colorindex;
+			
+            fire[temp - 1] = particles[i]->colorindex;
 			fire[temp + w] = particles[i]->colorindex;
-			fire[temp - w] = particles[i]->colorindex;
-			fire[temp + 1] = particles[i]->colorindex;
+            
+            if ( (temp-w) > 0 && (temp-w) < lim ) 
+                fire[temp - w] = particles[i]->colorindex;
+            
+            fire[temp + 1] = particles[i]->colorindex;
+            
 		}
 	}
 

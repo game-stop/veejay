@@ -166,7 +166,7 @@ void rotozoom_free(void *ptr) {
         if( r->test_roto[j] )
             free(r->test_roto[j]);
         if( r->test_roto2[j] )
-            free(r->test_roto2);
+            free(r->test_roto2[j]);
     }
 
     free(r);
