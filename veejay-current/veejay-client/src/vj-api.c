@@ -1268,7 +1268,7 @@ static void set_toggle_button(const char *name, int status);
 static void update_slider_gvalue(const char *name, gdouble value );
 static void update_slider_value2(GtkWidget *w, gint value, gint scale);
 static void update_slider_range2(GtkWidget *w, gint min, gint max, gint value, gint scaled);
-
+void refresh_sample_slot_image(int int_id);
 static void update_slider_value(const char *name, gint value, gint scale);
 static void update_slider_range(const char *name, gint min, gint max, gint value, gint scaled);
 //static  void update_knob_range( GtkWidget *w, gdouble min, gdouble max, gdouble value, gint scaled );
@@ -3164,12 +3164,15 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1,
     return (gchar*) result;
 }
 
+
 static gchar *recv_vims(int slen, int *bytes_written)
 {
     int tmp_len = slen+1;
     unsigned char tmp[tmp_len];
     veejay_memset(tmp,0,sizeof(tmp));
+    
     int ret = vj_client_read( info->client, V_CMD, tmp, slen );
+
     if( ret == -1 )
         reloaded_schedule_restart();
     int len = 0;
@@ -3178,10 +3181,12 @@ static gchar *recv_vims(int slen, int *bytes_written)
     unsigned char *result = NULL;
     if( ret <= 0 || len <= 0 || slen <= 0)
         return (gchar*)result;
+
     result = (unsigned char*) vj_calloc(sizeof(unsigned char) * (len + 1) );
     *bytes_written = vj_client_read( info->client, V_CMD, result, len );
     if( *bytes_written == -1 )
         reloaded_schedule_restart();
+
     return (gchar*) result;
 }
 
@@ -4170,6 +4175,7 @@ static void update_current_slot(int *history, int pm, int last_pm)
          //   update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
         }
+
     }
 
     if( pm == MODE_SAMPLE|| pm == MODE_STREAM )
@@ -5716,6 +5722,13 @@ static void load_sequence_list()
     free(text);
 }
 
+void refresh_sample_slot_image(int int_id)
+{
+    if( !disable_sample_image ) {
+        veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
+    }
+}
+
 static void load_samplelist_info(gboolean with_reset_slotselection)
 {
     char line[300];
@@ -5727,7 +5740,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
     if( cali_onoff == 1 )
         reset_tree( "cali_sourcetree");
 
-    with_reset_slotselection = FALSE; // FIXME: there is a bug
+    //with_reset_slotselection = FALSE; // FIXME: there is a bug
 
     if( with_reset_slotselection )
     {
@@ -5774,9 +5787,6 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
                         add_sample_to_sample_banks(bank_page, tmp_slot );
                         add_sample_to_effect_sources_list( int_id,0, title, timecode);
                         free_slot(tmp_slot);
-                        if( !disable_sample_image ) {
-                            veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
-                        }
                     }
                     else
                     {
@@ -5905,6 +5915,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
     if(no_samples) {
         samplebank_ready_ = 1; // as long as there are no samples, samplebank will not initialize
     }
+
 }
 
 gboolean view_el_selection_func (GtkTreeSelection *selection,

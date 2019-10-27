@@ -1557,6 +1557,18 @@
                       <placeholder/>
                     </child>
                     <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="generators_close">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -3309,6 +3321,12 @@
     <property name="lower">2</property>
     <property name="upper">10000000</property>
     <property name="value">2</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="transition_shap">
+    <property name="lower">-1</property>
+    <property name="upper">100</property>
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
@@ -11213,6 +11231,7 @@
                                             <property name="width_request">200</property>
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="halign">start</property>
                                             <property name="text" translatable="yes">0</property>
                                             <property name="primary_icon_activatable">False</property>
                                             <property name="secondary_icon_activatable">False</property>
@@ -11240,8 +11259,10 @@
                                         </child>
                                         <child>
                                           <object class="GtkSpinButton" id="spin_sampleend">
+                                            <property name="width_request">200</property>
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="halign">start</property>
                                             <property name="text" translatable="yes">0</property>
                                             <property name="primary_icon_activatable">False</property>
                                             <property name="secondary_icon_activatable">False</property>
@@ -11271,6 +11292,8 @@
                                           <object class="GtkSpinButton" id="spin_samplespeed">
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="halign">start</property>
+                                            <property name="width_chars">6</property>
                                             <property name="text" translatable="yes">0</property>
                                             <property name="primary_icon_activatable">False</property>
                                             <property name="secondary_icon_activatable">False</property>
@@ -11301,6 +11324,8 @@
                                           <object class="GtkSpinButton" id="spin_framedelay">
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
+                                            <property name="halign">start</property>
+                                            <property name="width_chars">6</property>
                                             <property name="text" translatable="yes">0</property>
                                             <property name="primary_icon_activatable">False</property>
                                             <property name="secondary_icon_activatable">False</property>
@@ -11331,12 +11356,96 @@
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
                                             <property name="tooltip_text" translatable="yes">Change the loop stop boundary (signals SEQ player and macro playback to rollover)</property>
+                                            <property name="halign">start</property>
+                                            <property name="width_chars">6</property>
                                             <property name="adjustment">loop_stop</property>
                                             <signal name="value-changed" handler="on_sample_loopstop_value_changed" swapped="no"/>
                                           </object>
                                           <packing>
                                             <property name="left_attach">1</property>
                                             <property name="top_attach">4</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="label" translatable="yes">Transition</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">5</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="label" translatable="yes">Transition shape</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">6</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="label" translatable="yes">Transition length</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">7</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkCheckButton" id="transition_active">
+                                            <property name="label" translatable="yes">Enabled</property>
+                                            <property name="name">transition_active</property>
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="receives_default">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="draw_indicator">True</property>
+                                            <signal name="toggled" handler="transition_set_active" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">5</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="transition_shape">
+                                            <property name="name">transition_shape</property>
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="halign">start</property>
+                                            <property name="width_chars">6</property>
+                                            <property name="adjustment">transition_shap</property>
+                                            <property name="climb_rate">1</property>
+                                            <signal name="value-changed" handler="transition_shape_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">6</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="transition_length">
+                                            <property name="name">transition_lenghth</property>
+                                            <property name="width_request">200</property>
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="adjustment">start_pos</property>
+                                            <signal name="value-changed" handler="transition_length_value_changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">7</property>
                                           </packing>
                                         </child>
                                       </object>

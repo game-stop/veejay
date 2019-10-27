@@ -336,4 +336,6 @@ void	vj_event_connect_split_shm( void *ptr, const char format[], va_list ap );
 void	vj_event_get_sample_image(void *ptr,const char format[],va_list	ap	);
 void	vj_event_alpha_composite(void *ptr, const char format[], va_list ap );
 void	vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap);
+void    vj_event_set_transition(void *ptr, const char format[], va_list ap);
+
 #endif

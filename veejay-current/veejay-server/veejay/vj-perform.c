@@ -730,6 +730,9 @@ static void vj_perform_record_buffer_free(veejay_t *info)
 {
     performer_global_t *g = (performer_global_t*) info->performer;
 
+    if( g == NULL )
+        return;
+
     if(g->record_buffer) {
         if(g->record_buffer->Y) {
             free(g->record_buffer->Y);
@@ -1200,6 +1203,7 @@ void vj_perform_free(veejay_t * info)
 
     sample_record_free();
 
+    if(global) {
     if (global->preview_buffer){
         if(global->preview_buffer->Y)
             free(global->preview_buffer->Y);
@@ -1212,13 +1216,16 @@ void vj_perform_free(veejay_t * info)
 
     vj_perform_free_performer( global->A );
     vj_perform_free_performer( global->B );
+    }
 
     if(info->edit_list && info->edit_list->has_audio)
         vj_perform_close_audio(global->A);
 
     vj_perform_record_buffer_free(info);
 
-    vj_avcodec_stop(global->encoder_,0);
+    if( global ) {
+        vj_avcodec_stop(global->encoder_,0);
+    }
 }
 
 int vj_perform_preview_max_width(veejay_t *info) {
@@ -3485,7 +3492,6 @@ void    vj_perform_record_video_frame(veejay_t *info)
 static void vj_perform_end_transition( veejay_t *info )
 {
     video_playback_setup *settings = info->settings;
-    settings->transition.shape = (settings->transition.shape + 1) % 53;
     veejay_change_playback_mode( info, settings->transition.next_type, settings->transition.next_id );
     settings->transition.ready = 0;
     settings->transition.active = 0;

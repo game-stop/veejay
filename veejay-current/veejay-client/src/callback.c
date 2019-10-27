@@ -3758,6 +3758,38 @@ on_vims_messenger_clear_clicked( GtkButton *togglebutton, gpointer user_data)
 	clear_textview_buffer( "vims_messenger_textview");
 }
 
+static void set_transition()
+{
+    multi_vims(
+            VIMS_SET_TRANSITION,
+            "%d %d %d %d %d",
+            info->status_tokens[PLAY_MODE],
+            info->status_tokens[CURRENT_ID],
+            is_button_toggled( "transition_active" ),
+            get_nums( "transition_shape" ),
+            get_nums( "transition_length" )
+            );
+}
+
+void
+transition_length_value_changed( GtkWidget *widget, gpointer user_data)
+{
+    set_transition();
+}
+
+void
+transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
+{
+    set_transition();
+}
+
+void
+transition_set_active( GtkWidget *widget, gpointer user_data)
+{
+    set_transition();
+}
+
+
 void
 on_vims_messenger_single_clicked( void )
 {

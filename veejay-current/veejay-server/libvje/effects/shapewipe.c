@@ -220,6 +220,11 @@ static void shape_wipe_2( uint8_t *dst[3], uint8_t *src[3], uint8_t *pattern, co
     }
 }
 
+int shapewipe_get_num_shapes(void *ptr)
+{
+    shape_t *s = (shape_t*) ptr;
+    return s->shapeidx - 1;
+}
 
 int shapewipe_ready(void *ptr, int w, int h)
 {

@@ -715,20 +715,30 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
         settings->transition.next_type = new_pm;
         settings->transition.next_id = sample_id;
         
+        int transition_length = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_length( sample_id ) : vj_tag_get_transition_length( sample_id ) );
+        int transition_shape = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_shape( sample_id ) : vj_tag_get_transition_shape( sample_id ) );
+
+        if( transition_shape == -1 ) {
+            transition_shape = ( (int) ( (double) shapewipe_get_num_shapes( settings->transition.ptr ) * rand() / (RAND_MAX)));
+        }
+
         if(settings->current_playback_speed < 0 ) {
             settings->transition.start = settings->current_frame_num;
-            settings->transition.end = settings->current_frame_num - 50;
+            settings->transition.end = settings->current_frame_num - transition_length;
             if(settings->transition.end < settings->min_frame_num)
                 settings->transition.end = settings->min_frame_num;
         }
         else if(settings->current_playback_speed > 0 ) {
             settings->transition.start = settings->current_frame_num;
-            settings->transition.end = settings->current_frame_num + 50;
+            settings->transition.end = settings->current_frame_num + transition_length;
             if( settings->transition.end > settings->max_frame_num )
                 settings->transition.end = settings->max_frame_num;
         }
-        settings->transition.active = 1;
-        return;
+        settings->transition.shape = transition_shape;
+        settings->transition.active = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_active( sample_id ) : vj_tag_get_transition_active(sample_id));
+        
+        if(settings->transition.active)
+            return;
     }
 
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )

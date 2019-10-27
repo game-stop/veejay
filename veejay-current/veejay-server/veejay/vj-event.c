@@ -415,7 +415,7 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 #define SEND_MSG(v,str)\
 {\
 int bf_len = strlen(str);\
-if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, bf_len) < 0) { \
+    if(bf_len && vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, bf_len) < 0) { \
     _vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
     _vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
     _vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], v->uc->current_link);} \
@@ -3835,6 +3835,45 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
         veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d",
             args[1],args[0]); 
     }
+}
+
+void vj_event_set_transition(void *ptr, const char format[], va_list ap)
+{
+    int args[5];
+    veejay_t *v = (veejay_t*) ptr;
+    P_A( args, sizeof(args), NULL, 0, format, ap );
+
+    int playmode = args[0];
+    int sample_id = args[1];
+
+    if(playmode != VJ_PLAYBACK_MODE_SAMPLE && playmode != VJ_PLAYBACK_MODE_TAG) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode");
+        return;
+    }
+
+    if(playmode == VJ_PLAYBACK_MODE_SAMPLE) {
+        SAMPLE_DEFAULTS(sample_id);
+    }
+    else {
+        STREAM_DEFAULTS(sample_id);
+    }
+
+    int transition_active = args[2];
+    int transition_shape = args[3];
+    int transition_length = args[4];
+
+    if( playmode == VJ_PLAYBACK_MODE_SAMPLE ) {
+        sample_set_transition_length( sample_id, transition_length );
+        sample_set_transition_shape( sample_id, transition_shape );
+        sample_set_transition_active( sample_id, transition_active );
+    }
+
+    if( playmode == VJ_PLAYBACK_MODE_TAG ) {
+        vj_tag_set_transition_length( sample_id, transition_length );
+        vj_tag_set_transition_shape( sample_id, transition_shape );
+        vj_tag_set_transition_active( sample_id, transition_active );
+    }
+
 }
 
 void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap) 

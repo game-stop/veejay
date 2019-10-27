@@ -138,6 +138,9 @@ typedef struct {
 	int 	loop_stat;
 	int	loop_stat_stop;
 	void	*macro;
+    int transition_shape;
+    int transition_length;
+    int transition_active;
 } vj_tag;
 
 #define V4L_BLACKFRAME 1
@@ -379,6 +382,14 @@ int vj_tag_chain_entry_transition_now(int s1, int entry, int *type);
 int vj_tag_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop_at, int frame_pos);
 int vj_tag_chain_entry_transition_now(int s1, int entry, int *type);
 void vj_tag_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype);
+
+int vj_tag_get_transition_shape(int s1);
+int vj_tag_get_transition_length(int s1);
+void vj_tag_set_transition_shape(int s1, int shape);
+void vj_tag_set_transition_length(int s1, int length);
+int vj_tag_get_transition_active(int t1);
+void vj_tag_set_transition_active(int t1, int status);
+
 #ifdef HAVE_XML2
 void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);
 void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp);

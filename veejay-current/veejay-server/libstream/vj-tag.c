@@ -748,6 +748,48 @@ int vj_tag_generator_set_arg(int t1, int *values)
     return 0;
 }
 
+int vj_tag_get_transition_shape(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return 0;
+    return tag->transition_shape;
+}
+
+int vj_tag_get_transition_length(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return 0;
+    return tag->transition_length;
+}
+
+int vj_tag_get_transition_active(int t1) 
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return 0;
+    return tag->transition_active;
+}
+
+void vj_tag_set_transition_shape(int t1, int shape) 
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return;
+    tag->transition_shape = shape;
+}
+
+void vj_tag_set_transition_length(int t1, int length) 
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return;
+    tag->transition_length = length;
+}
+
+void vj_tag_set_transition_active(int t1, int status)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag) return;
+    tag->transition_active = status;
+}
+
 int vj_tag_generator_get_args(int t1, int *args, int *n_args, int *fx_id)
 {
     vj_tag *tag = vj_tag_get(t1);

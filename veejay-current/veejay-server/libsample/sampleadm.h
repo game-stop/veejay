@@ -93,7 +93,7 @@ enum {
 };
 
 typedef struct transition_eff_t {
-	int args[SAMPLE_MAX_PARAMETERS];
+	int args[SAMPLE_MAX_PARAMETERS]; // sequencer hard cut transition
 	int enabled;
 	int at_loop;
 } transition_eff;
@@ -185,6 +185,10 @@ typedef struct sample_info_t {
     int	loop_stat;
     int loop_stat_stop;
     void *macro;
+
+    int transition_shape;
+    int transition_length;
+    int transition_active;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -380,6 +384,13 @@ extern sample_eff_chain **sample_get_effect_chain(int s1);
 extern int sample_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop, int frame_pos);
 extern int sample_chain_entry_transition_now(int s1, int entry, int *type);
 extern void sample_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype);
+
+extern int sample_get_transition_shape(int s1);
+extern int sample_get_transition_length(int s1);
+extern void sample_set_transition_shape(int s1, int shape);
+extern void sample_set_transition_length(int s1, int length);
+extern int sample_get_transition_active(int t1);
+extern void sample_set_transition_active(int t1, int status);
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);

@@ -1805,6 +1805,42 @@ int	sample_loop_dec(int s1)
 	return sample->loops;	
 }
 
+int sample_get_transition_shape(int s1) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) return 0;
+    return sample->transition_shape;
+}
+
+int sample_get_transition_length(int s1) {
+    sample_info *sample = sample_get(s1);
+	if(!sample) return 0;
+    return sample->transition_length;
+}
+
+void sample_set_transition_shape(int s1, int shape) {
+    sample_info *sample = sample_get(s1);
+	if(!sample) return;
+    sample->transition_shape = shape;
+}
+
+void sample_set_transition_length(int s1, int length) {
+    sample_info *sample = sample_get(s1);
+	if(!sample) return;
+    sample->transition_length = length;
+}
+
+int sample_get_transition_active( int s1 ) {
+    sample_info *sample = sample_get(s1);
+    if(!sample) return 0;
+    return sample->transition_active;
+}
+
+void sample_set_transition_active(int s1, int status) {
+    sample_info *sample = sample_get(s1);
+    if(!sample) return;
+    sample->transition_active = status;
+}
+
 /****************************************************************************************************
  *
  * sample_set_speed
