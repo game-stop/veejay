@@ -2257,7 +2257,8 @@ void on_button_offline_start_clicked(GtkWidget *widget, gpointer user_data)
 
 	if( stream_id > 0 ) {
 		multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d", stream_id, get_nums("spin_offlineduration1" ), is_button_toggled("button_offline_autoplay1"));
-	}	
+	    vj_msg(VEEJAY_MSG_INFO, "Started offline recording from stream %d", stream_id );
+    }	
 	else {
 		vj_msg(VEEJAY_MSG_INFO, "You can only use this recorder on streams, not samples!");
 	}

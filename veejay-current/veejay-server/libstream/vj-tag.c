@@ -2497,8 +2497,7 @@ int vj_tag_disable(int t1) {
     }
 
 	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT ) {
-		tag->active = avformat_thread_set_state( tag,0 );
-		return 1;
+		avformat_thread_set_state( tag,0 );
 	}
 
     if(tag->source_type == VJ_TAG_TYPE_V4L && !tag->clone )

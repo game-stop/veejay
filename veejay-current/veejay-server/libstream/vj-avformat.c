@@ -183,6 +183,7 @@ int	avformat_thread_set_state(vj_tag *tag, int new_state)
 	if(trylock(t) == 0 ) {
 		t->state = new_state;
 		unlock(t);
+        veejay_msg(VEEJAY_MSG_DEBUG, "Changed state of %s to %d", tag->source_name, new_state);
 		return 1;
 	} else {
 		veejay_msg(VEEJAY_MSG_WARNING,"[%s] Thread is busy, cannot set state to %d",tag->source_name, new_state); 

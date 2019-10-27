@@ -2451,6 +2451,11 @@ static int vj_perform_render_sample_frame(veejay_t *info, performer_t *p, uint8_
 
 static int vj_perform_render_offline_tag_frame(veejay_t *info, uint8_t *frame[4])
 {
+
+    if(vj_tag_get_active( info->settings->offline_tag_id ) == 0 ) {
+        vj_tag_enable( info->settings->offline_tag_id );
+    }
+
     vj_tag_get_frame( info->settings->offline_tag_id, info->effect_frame1, NULL );
 
     return vj_tag_record_frame( info->settings->offline_tag_id, info->effect_frame1->data, NULL, 0, info->pixel_format );
