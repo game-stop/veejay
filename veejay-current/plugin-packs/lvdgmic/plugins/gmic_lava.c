@@ -62,7 +62,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int smoothness = lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int sharpness = lvd_extract_param_index(my_instance, "in_parameters",2);
 	
-	snprintf(cmd,sizeof(cmd),"-gimp_lava %d,%d,%d,%d", perturbation, smoothness, sharpness );
+	snprintf(cmd,sizeof(cmd),"-gimp_lava %d,%d,%d", perturbation, smoothness, sharpness );
 
 	lvdgmic_push( gmic, w, h, 0, A, 0);
 
