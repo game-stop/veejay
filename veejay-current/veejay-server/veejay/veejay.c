@@ -61,6 +61,7 @@ static int default_geometry_y = -1;
 static	int	use_keyb = 1;
 static	int	use_mouse = 1;
 static	int	show_cursor = 0;
+static int borderless = 0;
 static int force_video_file = 0; // unused
 static int override_pix_fmt = 0;
 static int switch_jpeg = 0;
@@ -295,6 +296,8 @@ static void Usage(char *progname)
 		"  -x/--geometry-x <num> \tTop left x offset for SDL video window\n");
 	fprintf(stderr,
 		"  -y/--geometry-y <num> \tTop left y offset for SDL video window\n");
+    fprintf(stderr,
+        "  --borderless\t\t\tOpen video window without title bar\n");
 	fprintf(stderr,
 		"  --no-keyboard\t\t\tdisable keyboard for SDL video window\n");
 	fprintf(stderr,
@@ -495,6 +498,9 @@ static int set_option(const char *name, char *value)
 	else if (strcmp(name, "no-keyboard") == 0 ) {
 		use_keyb = 0;
 	}
+    else if (strcmp(name, "borderless") == 0 ) {
+        borderless = 1;
+    }
 	else if (strcmp(name, "no-mouse") == 0 ) {
 		use_mouse = 0;
 	}
@@ -620,6 +626,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"geometry-y",1,0,0},
 	{"no-keyboard",0,0,0},
 	{"no-mouse",0,0,0},
+    {"borderless",0,0,0},
 	{"show-cursor",0,0,0},
 	{"auto-loop",0,0,0},
 	{"fps",1,0,0},
@@ -888,7 +895,7 @@ int main(int argc, char **argv)
 	info->use_keyb = use_keyb;
 	info->use_mouse = use_mouse;
 	info->show_cursor = show_cursor;
-
+    info->borderless = borderless;
 
 	if(veejay_init(
 		info,

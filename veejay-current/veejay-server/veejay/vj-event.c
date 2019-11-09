@@ -2992,12 +2992,15 @@ void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
         {
             char *caption = veejay_title(v);
 
-            void *tmpsdl = vj_sdl_allocate( v->effect_frame1,v->use_keyb,v->use_mouse,v->show_cursor);
-            
+            void *tmpsdl = vj_sdl_allocate( v->effect_frame1,v->use_keyb,v->use_mouse,v->show_cursor, v->borderless );
+           
+            int x = -1, y = -1;
+            vj_sdl_get_position( v->sdl, &x, &y );
+
             if(vj_sdl_init(
                 tmpsdl,
-                -1,
-                -1,
+                x,
+                y,
                 v->bes_width,
                 v->bes_height,
                 caption,
@@ -3041,7 +3044,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
     int x  = args[2];
     int y  = args[3];
 
-    if( w < 0 || w > 4096 || h < 0 || h > 4096 || x < 0 || y < 0 )
+    if( w < 0 || w > 4096 || h < 0 || h > 4096)
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Invalid arguments '%d %d %d %d'", w,h,x,y );
         return;
@@ -3076,7 +3079,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
             case 5:
 #ifdef HAVE_SDL
                 if(!v->sdl) {
-                    v->sdl = vj_sdl_allocate( v->effect_frame1, v->use_keyb, v->use_mouse, v->show_cursor );
+                    v->sdl = vj_sdl_allocate( v->effect_frame1, v->use_keyb, v->use_mouse, v->show_cursor, v->borderless );
                     veejay_msg(VEEJAY_MSG_INFO, "Allocated SDL window");
                 
                     if(vj_sdl_init(
@@ -3106,7 +3109,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
                     v->sdl = NULL;
                 }           
                 if(!v->sdl) {
-                    v->sdl = vj_sdl_allocate( v->effect_frame1, v->use_keyb, v->use_mouse, v->show_cursor );
+                    v->sdl = vj_sdl_allocate( v->effect_frame1, v->use_keyb, v->use_mouse, v->show_cursor, v->borderless );
                     veejay_msg(VEEJAY_MSG_INFO, "Allocated SDL window");
                 
                     if(vj_sdl_init(

@@ -1986,9 +1986,9 @@ void		vj_init_vevo_events(void)
 				"Height",
 				0,
 				"X offset",
-				0,
+				-1,
 				"Y offset",
-				0,
+				-1,
 				NULL );
 #endif
 	index_map_[VIMS_SET_PLAY_MODE]				=	_new_event(

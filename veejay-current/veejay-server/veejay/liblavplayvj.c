@@ -1993,7 +1993,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		case 0:
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
 #ifdef HAVE_SDL
-			info->sdl = vj_sdl_allocate( info->effect_frame1, info->use_keyb, info->use_mouse,info->show_cursor);
+			info->sdl = vj_sdl_allocate( info->effect_frame1, info->use_keyb, info->use_mouse,info->show_cursor, info->borderless);
 			if( !info->sdl )
 				return -1;
 
@@ -2026,7 +2026,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			veejay_msg(VEEJAY_MSG_INFO, 
 			           "Using output driver SDL & DirectFB");
 #ifdef HAVE_SDL
-			info->sdl = vj_sdl_allocate(info->effect_frame1, info->use_keyb,info->use_mouse,info->show_cursor);
+			info->sdl = vj_sdl_allocate(info->effect_frame1, info->use_keyb,info->use_mouse,info->show_cursor, info->borderless);
 			if(!info->sdl)
 				return -1;
 

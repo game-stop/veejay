@@ -372,6 +372,7 @@ typedef struct {
 	int	use_keyb;
 	int	use_mouse;
 	int	show_cursor;
+    int borderless;
 	int 	qrcode;
     int read_plug_cfg;
 
