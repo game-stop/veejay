@@ -410,7 +410,7 @@ static struct
     {  FB_WIDGET_NOTEBOOK15, WIDGET_NOTEBOOK15 },
     {  FB_WIDGET_VBOX623, WIDGET_VBOX623 },
     {  FB_WIDGET_SAMPLEGRID_FRAME,FB_WIDGET_SAMPLEGRID_FRAME },
-    {  FB_WIDGET_PANELS, WIDGET_PANELS },
+    {  FB_WIDGET_NONE, -1 }
 };
 
 
@@ -7515,6 +7515,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
                 gtk_toggle_button_get_active(  GTK_TOGGLE_BUTTON( widget_cache[WIDGET_FEEDBACKBUTTON] ) )) {
             gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_FEEDBACKBUTTON] ), info->status_tokens[FEEDBACK] );
         }
+
+        vj_msg(VEEJAY_MSG_INFO,"Feedback on main source is %s", (info->status_tokens[FEEDBACK] ? "enabled" : "disabled" ) );
     }
 
     if( info->status_tokens[MACRO] != history[MACRO] )
