@@ -75,18 +75,22 @@ static int eval_state(threaded_t *t, vj_tag *tag)
 	int ret = 0;
 	lock(t);
 
-	if(t->state == STATE_ERROR || t->decoder == NULL) {
+	if(t->state == STATE_ERROR || (t->decoder == NULL && t->state != STATE_QUIT)) {
 			if(t->decoder) {
 				avhelper_close_decoder(t->decoder);
 				t->decoder = NULL;
 			}
-			veejay_msg(VEEJAY_MSG_INFO, "[%s] ... Waiting for thread to become ready",tag->source_name);
+			veejay_msg(VEEJAY_MSG_INFO, "[%s] ... Waiting for stream to start playing",tag->source_name);
 
 			t->decoder = avhelper_get_stream_decoder( tag->source_name, t->info->format, t->info->width, t->info->height );
 			if(t->decoder != NULL) {
 				t->spvf = avhelper_get_spvf(t->decoder);
-				t->state = STATE_RUNNING;
-			}
+				t->state = STATE_INACTIVE;
+
+                veejay_msg(VEEJAY_MSG_INFO, "[%s] Ready", tag->source_name );
+			} else {
+                t->state = STATE_ERROR;
+            }
 	}
 
 	ret = t->state;
@@ -115,7 +119,6 @@ static void	*reader_thread(void *data)
 				break;
 			case STATE_RUNNING:	
 				{
-					double time_start = av_gettime_relative() / 1000000.0;
 					while( (result = avhelper_recv_frame_packet(t->decoder))== 2) {}
 					if( result < 0 ) {
 						veejay_msg(0, "[%s] There was an error retrieving the frame", tag->source_name);
@@ -137,15 +140,6 @@ static void	*reader_thread(void *data)
 							t->have_frame = 1;
 						}
 						unlock(t);
-
-						double time_end = av_gettime_relative() / 1000000.0;
-						double time_diff = time_end - time_start;
-						double spvf = t->spvf + t->elapsed; // if FX chain is slow, slow down thread - no point in decoding 
-						// naive implementation for clock, source is too slow for playback at specified framerate when time_diff > spvf
-						if( time_diff < spvf && t->have_frame ) {
-							unsigned int usec = (unsigned int) (( spvf - time_diff ) * 1000000.0);
-							av_usleep(usec);
-						}
 					}
 				}
 				break;

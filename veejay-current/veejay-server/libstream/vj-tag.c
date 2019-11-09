@@ -2554,7 +2554,7 @@ int vj_tag_enable(int t1) {
 	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT )
 	{
 		if(!avformat_thread_set_state(tag,1)) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Thread is not ready to change state");
+			veejay_msg(VEEJAY_MSG_ERROR, "Stream is not yet ready to start playing");
 			return -1;
 		}
 	}
