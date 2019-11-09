@@ -2014,7 +2014,6 @@ int vj_tag_chain_free(int t1, int global)
 {
     vj_tag *tag = vj_tag_get(t1);
     int i=0;
-    int e_id = 0; 
     int sum = 0;
    
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
@@ -2148,8 +2147,9 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS) {
         return 0;
     }
-    if (!vje_is_valid(effect_id))
+    if (!vje_is_valid(effect_id)) {
         return 0;
+    }
 
 	veejay_memset( &(tag->effect_chain[position]->transition), 0 ,sizeof(transition_eff));
 
