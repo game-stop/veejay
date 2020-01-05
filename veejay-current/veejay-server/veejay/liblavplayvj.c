@@ -584,6 +584,10 @@ int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 }
 static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 {
+    if( info->settings->transition.active ) {
+        return;
+    }
+
 	vj_tag_disable( info->uc->sample_id );
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
@@ -710,13 +714,12 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		}
 	}
 
-    if( settings->transition.ready == 0 && new_pm != VJ_PLAYBACK_MODE_PLAIN &&
-            (new_pm == info->uc->playback_mode && sample_id != info->uc->sample_id)) {
+    if( settings->transition.ready == 0 && new_pm != VJ_PLAYBACK_MODE_PLAIN && ( sample_id != info->uc->sample_id || new_pm != info->uc->playback_mode)) {
         settings->transition.next_type = new_pm;
         settings->transition.next_id = sample_id;
         
-        int transition_length = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_length( sample_id ) : vj_tag_get_transition_length( sample_id ) );
-        int transition_shape = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_shape( sample_id ) : vj_tag_get_transition_shape( sample_id ) );
+        int transition_length = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_length( info->uc->sample_id ) : vj_tag_get_transition_length( info->uc->sample_id ) );
+        int transition_shape = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_shape( info->uc->sample_id ) : vj_tag_get_transition_shape( info->uc->sample_id ) );
 
         if( transition_shape == -1 ) {
             transition_shape = ( (int) ( (double) shapewipe_get_num_shapes( settings->transition.ptr ) * rand() / (RAND_MAX)));
@@ -735,8 +738,11 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
                 settings->transition.end = settings->max_frame_num;
         }
         settings->transition.shape = transition_shape;
-        settings->transition.active = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_active( sample_id ) : vj_tag_get_transition_active(sample_id));
+        settings->transition.active = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_active( info->uc->sample_id ) : vj_tag_get_transition_active(info->uc->sample_id));
         
+    
+        veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d is transitioning to [%d.%d]", info->uc->sample_id, new_pm, sample_id );
+
         if(settings->transition.active)
             return;
     }
@@ -1166,7 +1172,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		// 33 status symbols
+		// 36 status symbols
 			{
 				char *ptr = info->status_what;
 				*ptr++ = ' ';
@@ -1202,6 +1208,10 @@ static void veejay_pipe_write_status(veejay_t * info)
 				*ptr++ = '0'; *ptr++ = ' ';
                 *ptr++ = '0'; *ptr++ = ' ';
                 *ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0'; *ptr++ = ' ';
+
                 ptr = vj_sprintf(ptr, settings->feedback); *ptr++ = ' ';
 				ptr = vj_sprintf(ptr, tags); *ptr++ = ' ';
 			}

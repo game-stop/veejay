@@ -326,6 +326,12 @@ enum {
   WIDGET_MACROPLAY1 = 235,
   WIDGET_MACROSTOP1 = 236,
   WIDGET_SPIN_SAMPLEDURATION = 237,
+  WIDGET_SAMPLE_TRANSITION_ACTIVE = 238,
+  WIDGET_SAMPLE_TRANSITION_LENGTH = 239,
+  WIDGET_SAMPLE_TRANSITION_SHAPE = 240,
+  WIDGET_STREAM_TRANSITION_ACTIVE = 241,
+  WIDGET_STREAM_TRANSITION_LENGTH = 242,
+  WIDGET_STREAM_TRANSITION_SHAPE = 243,
 };
 
 
@@ -707,6 +713,13 @@ static struct
     { "macroplay1",              WIDGET_MACROPLAY1 },
     { "macrostop1",              WIDGET_MACROSTOP1 },
     { "spin_sampleduration",   WIDGET_SPIN_SAMPLEDURATION },
+    { "transition_active",      WIDGET_SAMPLE_TRANSITION_ACTIVE },
+    { "transition_length",      WIDGET_SAMPLE_TRANSITION_LENGTH },
+    { "transition_shape",       WIDGET_SAMPLE_TRANSITION_SHAPE },
+    { "tag_transition_active",      WIDGET_STREAM_TRANSITION_ACTIVE },
+    { "tag_transition_length",      WIDGET_STREAM_TRANSITION_LENGTH },
+    { "tag_transition_shape",       WIDGET_STREAM_TRANSITION_SHAPE },
+
     { NULL, -1 },
 };
 
@@ -4092,6 +4105,18 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
         gint speed = info->status_tokens[SAMPLE_SPEED];
 
+        if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+        }
+        
+        if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH]) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+        }
+
+        if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]), info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+        }
+
         if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
         {
             speed = info->status_tokens[SAMPLE_SPEED];
@@ -4178,11 +4203,27 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
     }
 
-    if( pm == MODE_SAMPLE|| pm == MODE_STREAM )
-    if( history[CHAIN_FADE] != info->status_tokens[CHAIN_FADE] )
-    {
-        double val = (double) info->status_tokens[CHAIN_FADE];
-        update_slider_value( "manualopacity", val,0 );
+    if( pm == MODE_STREAM ) {
+         if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+        }
+        
+        if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH]) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH]), info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+        }
+
+        if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE]), info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+        }
+
+    }
+
+    if( pm == MODE_SAMPLE || pm == MODE_STREAM ) {
+        if( history[CHAIN_FADE] != info->status_tokens[CHAIN_FADE] )
+         {
+            double val = (double) info->status_tokens[CHAIN_FADE];
+            update_slider_value( "manualopacity", val,0 );
+        }
     }
 
 }

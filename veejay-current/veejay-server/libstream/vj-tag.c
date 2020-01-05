@@ -759,7 +759,12 @@ int vj_tag_get_transition_length(int t1)
 {
     vj_tag *tag = vj_tag_get(t1);
     if(!tag) return 0;
-    return tag->transition_length;
+
+    int transition_length = tag->transition_length;
+    if( transition_length > tag->n_frames )
+        transition_length = tag->n_frames;
+
+    return transition_length;
 }
 
 int vj_tag_get_transition_active(int t1) 
@@ -780,7 +785,13 @@ void vj_tag_set_transition_length(int t1, int length)
 {
     vj_tag *tag = vj_tag_get(t1);
     if(!tag) return;
-    tag->transition_length = length;
+
+    int transition_length = length;
+    if( transition_length > tag->n_frames ) {
+        transition_length = tag->n_frames;
+    }
+
+    tag->transition_length = transition_length;
 }
 
 void vj_tag_set_transition_active(int t1, int status)
@@ -788,6 +799,12 @@ void vj_tag_set_transition_active(int t1, int status)
     vj_tag *tag = vj_tag_get(t1);
     if(!tag) return;
     tag->transition_active = status;
+
+    if( tag->transition_active == 1 ) {
+        if( tag->transition_length <= 0 ) {
+            vj_tag_set_transition_length( t1, 25 );
+        }
+    }
 }
 
 int vj_tag_generator_get_args(int t1, int *args, int *n_args, int *fx_id)
@@ -3839,6 +3856,9 @@ int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int p
     ptr = vj_sprintf( ptr, tag->fade_alpha ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, tag->loop_stat ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, tag->loop_stat_stop); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, tag->transition_active); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, tag->transition_length); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, tag->transition_shape); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, feedback ); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, samples );
     return 0;

@@ -1814,7 +1814,18 @@ int sample_get_transition_shape(int s1) {
 int sample_get_transition_length(int s1) {
     sample_info *sample = sample_get(s1);
 	if(!sample) return 0;
-    return sample->transition_length;
+    int transition_length = sample->transition_length;
+    if (sample->marker_end > 0 && sample->marker_start >= 0) {
+        if( transition_length > ( sample->marker_end - sample->marker_start ) )
+            transition_length = sample->marker_end - sample->marker_start;
+    }
+    else {
+        if( transition_length > ( sample->last_frame - sample->first_frame ) ) 
+            transition_length = sample->last_frame - sample->first_frame;
+    }
+
+
+    return transition_length;
 }
 
 void sample_set_transition_shape(int s1, int shape) {
@@ -1826,7 +1837,17 @@ void sample_set_transition_shape(int s1, int shape) {
 void sample_set_transition_length(int s1, int length) {
     sample_info *sample = sample_get(s1);
 	if(!sample) return;
-    sample->transition_length = length;
+    int transition_length = length;
+    if (sample->marker_end > 0 && sample->marker_start >= 0) {
+        if( transition_length > ( sample->marker_end - sample->marker_start ) )
+            transition_length = sample->marker_end - sample->marker_start;
+    }
+    else {
+        if( transition_length > ( sample->last_frame - sample->first_frame ) ) 
+            transition_length = sample->last_frame - sample->first_frame;
+    }
+
+    sample->transition_length = transition_length;
 }
 
 int sample_get_transition_active( int s1 ) {
@@ -1839,6 +1860,12 @@ void sample_set_transition_active(int s1, int status) {
     sample_info *sample = sample_get(s1);
     if(!sample) return;
     sample->transition_active = status;
+
+    if( sample->transition_active == 1 ) {
+        if( sample->transition_length <= 0 ) {
+            sample_set_transition_length( s1, 25 );
+        }
+    }
 }
 
 /****************************************************************************************************
@@ -2765,6 +2792,9 @@ int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfp
     ptr = vj_sprintf( ptr, sample->fade_alpha );*ptr++ = ' ';
     ptr = vj_sprintf( ptr, sample->loop_stat); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, sample->loop_stat_stop); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, sample->transition_active); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, sample->transition_length); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, sample->transition_shape); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, feedback); *ptr ++ = ' ';
     ptr = vj_sprintf( ptr, tags );
     return 0;

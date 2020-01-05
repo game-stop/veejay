@@ -3775,21 +3775,62 @@ static void set_transition()
 void
 transition_length_value_changed( GtkWidget *widget, gpointer user_data)
 {
+    if(info->status_lock)
+        return;
     set_transition();
 }
 
 void
 transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
 {
+    if(info->status_lock)
+        return;
     set_transition();
 }
 
 void
 transition_set_active( GtkWidget *widget, gpointer user_data)
 {
+    if(info->status_lock)
+        return;
     set_transition();
 }
 
+static void tag_set_transition()
+{
+    multi_vims(
+            VIMS_SET_TRANSITION,
+            "%d %d %d %d %d",
+            info->status_tokens[PLAY_MODE],
+            info->status_tokens[CURRENT_ID],
+            is_button_toggled( "tag_transition_active" ),
+            get_nums( "tag_transition_shape" ),
+            get_nums( "tag_transition_length" )
+            );
+}
+
+void
+on_tag_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    tag_set_transition();
+}
+
+void
+on_tag_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    tag_set_transition();
+}
+
+void on_tag_transition_active_toggled( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    tag_set_transition();
+}
 
 void
 on_vims_messenger_single_clicked( void )
