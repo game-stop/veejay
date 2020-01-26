@@ -192,7 +192,7 @@ static void shape_find_min_max(uint8_t *data, const int len, int *min, int *max 
     *max = b;
 }
 
-static void shape_wipe_1( uint8_t *dst[3], uint8_t *src[3], uint8_t *pattern, const int len, const int threshold)
+static void shape_wipe_1( uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
 {
     int i;
     for( i = 0; i < len; i ++ ) 
@@ -206,7 +206,7 @@ static void shape_wipe_1( uint8_t *dst[3], uint8_t *src[3], uint8_t *pattern, co
     }
 }
 
-static void shape_wipe_2( uint8_t *dst[3], uint8_t *src[3], uint8_t *pattern, const int len, const int threshold)
+static void shape_wipe_2( uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
 {
     int i;
     for( i = 0; i < len; i ++ ) 
