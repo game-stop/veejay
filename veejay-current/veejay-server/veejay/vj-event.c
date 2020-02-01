@@ -285,6 +285,7 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_T,         VIMS_MOD_NONE,  "5 -1"  },
     { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_U,         VIMS_MOD_NONE,  "6 -1"  },
     { VIMS_CHAIN_ENTRY_DEC_ARG,     SDL_SCANCODE_O,         VIMS_MOD_NONE,  "7 -1"  },
+    { VIMS_TOGGLE_TRANSITIONS,      SDL_SCANCODE_T,         VIMS_MOD_SHIFT, NULL    },
     { VIMS_OSD,                     SDL_SCANCODE_O,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_COPYRIGHT,               SDL_SCANCODE_C,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_COMPOSITE,               SDL_SCANCODE_I,         VIMS_MOD_CTRL,  NULL    },
@@ -7029,6 +7030,50 @@ void    vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
         v->use_osd=3;
         veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to save and exit");
     }
+}
+
+void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap )
+{
+    veejay_t *v = (veejay_t*) ptr;
+    int i;
+    if(v->settings->transition.global_state == 0) {
+
+        int n = sample_highest();
+        for( i = 1; i <= n; i ++ ) {
+            if(!sample_exists(i))
+                continue;
+            sample_set_transition_shape( i, -1 );
+            sample_set_transition_active( i, 1 );
+        }
+        n = vj_tag_highest_valid_id();
+        for( i = 1; i <= n; i ++ ) {
+            if(!vj_tag_exists(i))
+                continue;
+            vj_tag_set_transition_shape(i, -1);
+            vj_tag_set_transition_active( i, 1 );
+        }
+
+        v->settings->transition.global_state = 1;
+    }
+    else {
+        int n = sample_highest();
+        for( i = 1; i <= n; i ++ ) {
+            if(!sample_exists(i))
+                continue;
+            sample_set_transition_active( i, 0 );
+        }
+        n = vj_tag_highest_valid_id();
+        for( i = 0; i <= n; i ++ ) {
+            if(!vj_tag_exists(i))
+                continue;
+            vj_tag_set_transition_active(i, 0 );
+        }
+        
+        v->settings->transition.global_state = 0;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "Random transitions between samples %s",
+            (v->settings->transition.global_state == 0 ? "disabled" : "enabled" ));
 }
 
 void    vj_event_toggle_osl( void *ptr, const char format[], va_list ap )

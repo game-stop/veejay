@@ -126,6 +126,7 @@ typedef struct
     long end;
     int ready;
     void *ptr;
+    int global_state;
 } transition_t;
 
 typedef struct {

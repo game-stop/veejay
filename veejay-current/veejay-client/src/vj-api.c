@@ -4108,13 +4108,13 @@ static void update_current_slot(int *history, int pm, int last_pm)
         if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
             gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
         }
-        
+
         if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH]) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
         }
 
         if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]), info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
         }
 
         if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )

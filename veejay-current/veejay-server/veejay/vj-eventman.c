@@ -1973,6 +1973,14 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
+    index_map_[VIMS_TOGGLE_TRANSITIONS]         =   _new_event(
+                NULL,
+                VIMS_TOGGLE_TRANSITIONS,
+                "Toggle random transitions between samples",
+                vj_event_toggle_transitions,
+                0,
+                VIMS_ALLOW_ANY,
+                NULL );
 #ifdef HAVE_SDL
 	index_map_[VIMS_RESIZE_SDL_SCREEN]			=	_new_event(
 				"%d %d %d %d",

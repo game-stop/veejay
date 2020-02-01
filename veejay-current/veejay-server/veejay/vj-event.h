@@ -315,7 +315,7 @@ void	vj_event_sequencer_del_sample(		void *ptr, 	const char format[], 	va_list a
 void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap );
 void	vj_event_projection_inc( void *ptr, const char format[], va_list ap);
 void	vj_event_projection_dec( void *ptr, const char format[], va_list ap);
-
+void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap);
 void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap );
 
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap );
