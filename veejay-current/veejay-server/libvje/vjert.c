@@ -49,9 +49,8 @@ static int vjert_new_fx( sample_eff_chain *entry,int chain_id, int chain_positio
     return 0;
 }
 
-void vjert_del_fx( void *ptr, int chain_id, int chain_position ) {
+void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ) {
     sample_eff_chain *entry  = (sample_eff_chain*) ptr;
-
     if( entry->fx_instance ) {
         if( entry->effect_id >= VJ_PLUGIN ) {
             plug_deactivate( entry->fx_instance );
@@ -61,15 +60,16 @@ void vjert_del_fx( void *ptr, int chain_id, int chain_position ) {
         }
 
         entry->fx_instance = NULL;
+    }
+
+    if( clear ) {
         entry->effect_id = -1;
+        if( entry->kf ) {
+            vpf( entry->kf );
+            entry->kf = NULL;
+        }
+        entry->kf = vpn( VEVO_ANONYMOUS_PORT );
     }
-
-    if( entry->kf ) {
-        vpf( entry->kf );
-        entry->kf = NULL;
-    }
-
-    entry->kf = vpn( VEVO_ANONYMOUS_PORT );
 }
 
 static void vjert_process_fx( sample_eff_chain *entry, VJFrame **frames, int chain_id, int chain_position, int *args )

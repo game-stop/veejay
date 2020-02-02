@@ -71,7 +71,7 @@ void vje_dump();
 
 // processing
 void vjert_apply( void *entry, VJFrame **frames, int chain_id, int chain_position, int *args ); //FIXME
-void vjert_del_fx( void *ptr, int chain_id, int chain_position ); //FIXME
+void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ); //FIXME
 void vjert_update( void *ptr, VJFrame *frame );
 
 #endif

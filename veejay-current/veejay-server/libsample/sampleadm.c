@@ -2173,7 +2173,7 @@ int sample_chain_free(int s1, int global)
         if( sample->effect_chain[i]->effect_id == -1 )
             continue;
 
-        vjert_del_fx( sample->effect_chain[i] ,0,i);//FIXME
+        vjert_del_fx( sample->effect_chain[i] ,0,i,0);
         sum ++; 
         
         if( sample->effect_chain[i]->source_type == 1 && 
@@ -2294,7 +2294,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
         sample->effect_chain[c]->effect_id = effect_nr;
     }
     else if ( sample->effect_chain[c]->effect_id != effect_nr ) {
-        vjert_del_fx( sample->effect_chain[c],0,c ); //FIXME
+        vjert_del_fx( sample->effect_chain[c],0,c,1 );
         sample->effect_chain[c]->effect_id = effect_nr;
     }
 
@@ -2453,7 +2453,7 @@ int sample_chain_clear(int s1)
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
     {
         if( sample->effect_chain[i]->effect_id != - 1 ) {
-            vjert_del_fx( sample->effect_chain[i],0,i ); //FIXME
+            vjert_del_fx( sample->effect_chain[i],0,i,1 );
         }
 
         sample->effect_chain[i]->effect_id = -1;
@@ -2559,7 +2559,7 @@ int sample_chain_remove(int s1, int position)
     
     if(sample->effect_chain[position]->effect_id != -1)
     {
-        vjert_del_fx( sample->effect_chain[position],0,position ); //FIXME
+        vjert_del_fx( sample->effect_chain[position],0,position,1 );
     }
 
     sample->effect_chain[position]->effect_id = -1;

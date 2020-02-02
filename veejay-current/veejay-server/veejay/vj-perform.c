@@ -2208,7 +2208,7 @@ static  int vj_perform_preprocess_secundary( veejay_t *info,performer_t *p, int 
     switch( mode ) {
         case VJ_PLAYBACK_MODE_SAMPLE:   
             chain = sample_get_effect_chain( id );
-            for( n=0; n < SAMPLE_MAX_EFFECTS-1; n ++ ) {
+            for( n=0; n < SAMPLE_MAX_EFFECTS; n ++ ) {
                 sample_eff_chain *fx_entry = chain[n];
                 if( fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
                     continue;

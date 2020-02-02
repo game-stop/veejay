@@ -2038,7 +2038,7 @@ int vj_tag_chain_free(int t1, int global)
         if( tag->effect_chain[i]->effect_id == -1 )
             continue;
 
-        vjert_del_fx( tag->effect_chain[i],0,i ); //FIXME
+        vjert_del_fx( tag->effect_chain[i],0,i,0);
         sum++;
             
         if( tag->effect_chain[i]->source_type == 1 && 
@@ -2174,7 +2174,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
         tag->effect_chain[position]->effect_id = effect_id;
     }
     else if( tag->effect_chain[position]->effect_id != effect_id ) {
-        vjert_del_fx( tag->effect_chain[position],0, position );
+        vjert_del_fx( tag->effect_chain[position],0,position,1);
         tag->effect_chain[position]->effect_id = effect_id;
     }
 
@@ -2809,7 +2809,7 @@ int vj_tag_chain_remove(int t1, int index)
         return -1;
 
     if( tag->effect_chain[index]->effect_id != -1 ) {
-        vjert_del_fx( tag->effect_chain[index],0,index ); //FIXME
+        vjert_del_fx( tag->effect_chain[index],0,index,1);
     }
     
     tag->effect_chain[index]->e_flag = 0;
