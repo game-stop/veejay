@@ -7042,14 +7042,14 @@ void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap 
         for( i = 1; i <= n; i ++ ) {
             if(!sample_exists(i))
                 continue;
-            sample_set_transition_shape( i, -1 );
+           // sample_set_transition_shape( i, -1 );
             sample_set_transition_active( i, 1 );
         }
         n = vj_tag_highest_valid_id();
         for( i = 1; i <= n; i ++ ) {
             if(!vj_tag_exists(i))
                 continue;
-            vj_tag_set_transition_shape(i, -1);
+           // vj_tag_set_transition_shape(i, -1);
             vj_tag_set_transition_active( i, 1 );
         }
 
@@ -7072,7 +7072,7 @@ void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap 
         v->settings->transition.global_state = 0;
     }
 
-    veejay_msg(VEEJAY_MSG_INFO, "Random transitions between samples %s",
+    veejay_msg(VEEJAY_MSG_INFO, "Transitions between samples %s",
             (v->settings->transition.global_state == 0 ? "disabled" : "enabled" ));
 }
 

@@ -4036,7 +4036,8 @@ void    vj_perform_randomize(veejay_t *info)
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Sample randomizer trigger in %d frame periods", max_delay);
 
-    veejay_set_sample( info, take_n );
+    veejay_change_playback_mode( info, VJ_PLAYBACK_MODE_SAMPLE, take_n);
+    //veejay_set_sample( info, take_n );
 }
 
 int vj_perform_rand_update(veejay_t *info)
