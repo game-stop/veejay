@@ -739,10 +739,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
         }
         settings->transition.shape = transition_shape;
         settings->transition.active = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_active( info->uc->sample_id ) : vj_tag_get_transition_active(info->uc->sample_id));
-        
     
-        veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d is transitioning to [%d.%d]", info->uc->sample_id, new_pm, sample_id );
-
         if(settings->transition.active)
             return;
     }
