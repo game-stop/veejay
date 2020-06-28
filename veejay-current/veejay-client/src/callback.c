@@ -1221,6 +1221,18 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 	}
 }
 
+void
+on_button_samplestart_value_refresh_clicked ( GtkWidget *widget, gpointer user_data )
+{
+    gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART]), 0 );
+}
+
+void
+on_button_sampleend_value_reset_clicked ( GtkWidget *widget, gpointer user_data )
+{
+    gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]), G_MAXDOUBLE);
+}
+
 void	on_slow_slider_value_changed( GtkWidget *widget, gpointer user_data )
 {
 	if(!info->status_lock) {
