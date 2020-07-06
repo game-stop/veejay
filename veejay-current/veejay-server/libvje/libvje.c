@@ -245,6 +245,7 @@ static struct {
     { fadecolor_init,fadecolor_malloc,fadecolor_free,NULL,NULL,fadecolor_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FADECOLORRGB },
     { bar_init,bar_malloc,bar_free,NULL,NULL,NULL,bar_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_3BAR },
     { buffer_init,buffer_malloc,buffer_free,NULL,NULL,buffer_apply,NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_BUFFER },
+    { blackreplace_init,NULL,NULL,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
 
 

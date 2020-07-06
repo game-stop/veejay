@@ -206,8 +206,9 @@
 #include "./effects/wipe.h"
 #include "./effects/zoom.h"
 #include "./effects/buffer.h"
+#include "./effects/blackreplace.h"
 
-#define VJ_IMAGE_EFFECT_MIN 80
+#define VJ_IMAGE_EFFECT_MIN 79
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -447,7 +448,8 @@ enum {
     VJ_IMAGE_EFFECT_DOTILLISM = 82,
     VJ_IMAGE_EFFECT_PENCILSKETCH2 = 81,
     VJ_IMAGE_EFFECT_BUFFER = 80,
-	VJ_IMAGE_EFFECT_DUMMY=0,
+	VJ_IMAGE_EFFECT_BLACKREPLACE = 79,
+    VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
 

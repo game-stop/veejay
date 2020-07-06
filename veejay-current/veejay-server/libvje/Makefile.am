@@ -195,6 +195,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/widthmirror.c \
     effects/wipe.c \
     effects/zoom.c \
-	effects/buffer.c
+	effects/buffer.c \
+	effects/blackreplace.c
 		
 
