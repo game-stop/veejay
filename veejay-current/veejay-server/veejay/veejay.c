@@ -933,7 +933,7 @@ int main(int argc, char **argv)
 
 	while( 1 ) { //@ until your PC stops working
 		
-		clock_nanosleep( CLOCK_MONOTONIC, 0, &req, NULL );
+		clock_nanosleep( CLOCK_REALTIME, 0, &req, NULL );
 
 		current_state = veejay_get_state(info);
 		

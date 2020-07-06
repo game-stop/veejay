@@ -227,7 +227,7 @@ getDriver(int deviceID)
   if(drv->jackd_died && drv->client == 0)
   {
 	struct timespec now;
-	clock_gettime( CLOCK_MONOTONIC, &now);
+	clock_gettime( CLOCK_REALTIME, &now);
 
     /* wait 250ms before trying again */
     if(TimeValDifference(&drv->last_reconnect_attempt, &now) >= 250)
@@ -424,7 +424,7 @@ JACK_callback(nframes_t nframes, void *arg)
   struct timespec tmp_tp;
   unsigned int i;
 
-  clock_gettime(CLOCK_MONOTONIC, &tmp_tp );
+  clock_gettime(CLOCK_REALTIME, &tmp_tp );
 
   __sync_lock_test_and_set( &(drv->previousTime.tv_sec), tmp_tp.tv_sec );
   __sync_lock_test_and_set( &(drv->previousTime.tv_nsec), tmp_tp.tv_nsec );
@@ -1876,7 +1876,7 @@ JACK_GetPositionFromDriver(jack_driver_t * drv, enum pos_enum position,
 //    type_str = "PLAYED";
     return_val = drv->played_client_bytes;
 //    gettimeofday(&now, 0);
-    clock_gettime( CLOCK_MONOTONIC, &now );
+    clock_gettime( CLOCK_REALTIME, &now );
 
     elapsedMS = TimeValDifference(&drv->previousTime, &now);    /* find the elapsed milliseconds since last JACK_Callback() */
 
@@ -2066,7 +2066,7 @@ JACK_CleanupDriver(jack_driver_t * drv)
   drv->output_sample_rate_ratio = 1.0;
   drv->input_sample_rate_ratio = 1.0;
   drv->jackd_died = FALSE;
-  clock_gettime(CLOCK_MONOTONIC, &drv->previousTime);  /* record the current time */
+  clock_gettime(CLOCK_REALTIME, &drv->previousTime);  /* record the current time */
   memcpy( &drv->last_reconnect_attempt, &drv->previousTime, sizeof(struct timespec));
 }
 
