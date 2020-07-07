@@ -55,6 +55,7 @@
 #include <libstream/vj-tag.h>
 #include <libvjxml/vj-xml.h>
 #include <veejay/vj-macro.h>
+#include <libvje/internal.h>
 //#define KAZLIB_OPAQUE_DEBUG 1
 
 #ifdef HAVE_XML2
@@ -625,7 +626,7 @@ int sample_has_cali_fx(int sample_id)
         return -1;
     int i;
     for( i =0;i < SAMPLE_MAX_EFFECTS; i ++ ) {
-        if(si->effect_chain[i]->effect_id == 190)
+        if(si->effect_chain[i]->effect_id == VJ_IMAGE_EFFECT_CALI)
             return i;
     }
     return -1;
@@ -633,23 +634,13 @@ int sample_has_cali_fx(int sample_id)
 
 void    sample_cali_prepare( int sample_id, int slot, int chan )
 {
-    sample_info *si = sample_get(sample_id);
-        if(si == NULL)
-        return;
     vj_tag  *tag    = vj_tag_get( chan );
     if( tag == NULL || tag->source_type != VJ_TAG_TYPE_CALI )
         return;
 
-    //FIXME: prepare cali
-    /*
-    int fx_id = nvj_effect_real_to_sequence(
-            si->effect_chain[slot]->effect_id );
-    if( fx_id >= 0 ) {
-        vj_tag_cali_prepare_now( chan, fx_id );
-        veejay_msg(VEEJAY_MSG_DEBUG, "Prepared calibration data");
-    }*/
+    vj_tag_cali_prepare_now( tag );
+    veejay_msg(VEEJAY_MSG_DEBUG, "Prepared calibration data");
 }
-
 
 
 int sample_get_el_position( int sample_id, int *start, int *end )

@@ -62,6 +62,7 @@
 
 #include <libplugger/plugload.h>
 #include <libvje/libvje.h>
+#include <libvje/effects/cali.h>
 
 static int recount_hash = 1;
 static unsigned int sample_count = 0;
@@ -84,7 +85,7 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 
 extern int  frei0r_get_param_count( void *port);
 extern void dummy_rgb_apply(VJFrame *frame, int r, int g, int b);
-extern int cali_prepare( void *ed, double meanY, double meanU, double meanV, uint8_t *data, int len, int uv_len );
+
 
 #define RUP8(num)(((num)+8)&~8)
 
@@ -97,6 +98,7 @@ typedef struct
     int uv_len;
     int len;
     double  mean[3];
+    void *ptr;
 } cali_tag_t;
 
 #define CALI_DARK 0 
@@ -484,7 +486,7 @@ static  int cali_write_file( char *file, vj_tag *tag , editlist *el)
             h,
             len,
             uv_len,
-                tag->mean[0],
+            tag->mean[0],
             tag->mean[1],
             tag->mean[2]    );
 
@@ -592,7 +594,7 @@ static int  cali_read_file( cali_tag_t *p, char *file,int w, int h )
 
     p->data = (uint8_t*) vj_malloc(sizeof(uint8_t) * 3 * (len+uv_len+uv_len));
     p->bf = p->data;
-        p->lf = p->data + (len + (2*uv_len));
+    p->lf = p->data + (len + (2*uv_len));
     p->mf = p->lf + (len + (2*uv_len));
 
     p->uv_len = uv_len;
@@ -632,17 +634,23 @@ static int  _vj_tag_new_cali( vj_tag *tag, int stream_nr, int w, int h )
     
     cali_tag_t *p = NULL;
 
-    p = (cali_tag_t*) vj_malloc(sizeof(cali_tag_t));
+    p = (cali_tag_t*) vj_calloc(sizeof(cali_tag_t));
     if(!p)
         return 0;
-    memset(p, 0, sizeof(cali_tag_t));
 
     if(!cali_read_file( p, tag->source_name,w,h ) ) {
         veejay_msg(VEEJAY_MSG_ERROR, "Failed to find dark frame '%s'", tag->source_name );
         free(p);
         return 0;
     }
-    
+
+    p->ptr = cali_malloc(0,0);
+    if(!p->ptr) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate");
+        free(p);
+        return 0;
+    }
+
     vj_tag_input->cali[stream_nr] = (void*)p;
     
     veejay_msg(VEEJAY_MSG_INFO, "Image Calibration files ready");
@@ -974,7 +982,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->opacity = 0;
     tag->priv = NULL;
     tag->subrender = 1;
-    
+
 	if(type == VJ_TAG_TYPE_AVFORMAT )
 		tag->priv = avformat_thread_allocate(_tag_info->effect_frame1);
 
@@ -1348,14 +1356,7 @@ int vj_tag_del(int id)
             v4l2_thread_stop( v4l2_thread_info_get(vj_tag_input->v4l2[tag->index]));
         }
 #endif
-        if(tag->blackframe)free(tag->blackframe);
-        if( tag->bf ) free(tag->bf);
-        if( tag->bfu ) free(tag->bfu);
-        if( tag->bfv ) free(tag->bfv);
-        if( tag->lf ) free(tag->lf);
-        if( tag->lfu ) free(tag->lfu);
-        if( tag->lfv ) free(tag->lfv);
-
+    
         break;
      case VJ_TAG_TYPE_YUV4MPEG: 
         veejay_msg(VEEJAY_MSG_INFO,"Closing yuv4mpeg file %s (Stream %d)",
@@ -1387,7 +1388,8 @@ int vj_tag_del(int id)
         {
         cali_tag_t *calpic = (cali_tag_t*) vj_tag_input->cali[tag->index];
         if(calpic) {
-            if(calpic->lf) free(calpic->data);
+            if(calpic->data) free(calpic->data);
+            if(calpic->ptr) cali_free(calpic->ptr);
             free(calpic);
         }
         vj_tag_input->cali[tag->index] = NULL;
@@ -1408,6 +1410,14 @@ int vj_tag_del(int id)
     }
   
     vj_tag_chain_free( tag->id,1 );
+
+    if(tag->blackframe)free(tag->blackframe);
+    if( tag->bf ) free(tag->bf);
+    if( tag->bfu ) free(tag->bfu);
+    if( tag->bfv ) free(tag->bfv);
+    if( tag->lf ) free(tag->lf);
+    if( tag->lfu ) free(tag->lfu);
+    if( tag->lfv ) free(tag->lfv);
 
     if(tag->encoder_active)
         vj_tag_stop_encoder( tag->id ); 
@@ -2317,20 +2327,14 @@ int vj_tag_has_cali_fx( int t1 ) {
     return -1;
 }
 
-void    vj_tag_cali_prepare_now( int t1, int fx_id ) {
-    vj_tag *tag = vj_tag_get(t1);
-    if(tag==NULL)
-        return;
+void    vj_tag_cali_prepare_now( vj_tag *tag  ) {
     if(tag->source_type != VJ_TAG_TYPE_CALI )
         return;
     cali_tag_t *p = (cali_tag_t*) vj_tag_input->cali[tag->index];
     if( p == NULL )
         return;
-    if( fx_id <=  0)
-        return;
 
-    //FIXME
-    cali_prepare( NULL, //@ ptr to cali instance
+    cali_prepare( p->ptr, //@ ptr to cali instance
               p->mean[0],
               p->mean[1],
               p->mean[2],
@@ -2341,20 +2345,12 @@ void    vj_tag_cali_prepare_now( int t1, int fx_id ) {
 }
 
 void    vj_tag_cali_prepare( int t1 , int pos, int cali_tag) {
-    vj_tag *tag = vj_tag_get(t1);
-    if (!tag)
-    return;
     vj_tag *tagc = vj_tag_get(cali_tag);
     if(!tagc)
         return;
     if(tagc->source_type != VJ_TAG_TYPE_CALI)
         return;
-    //FIXME
-    /*
-    int fx_id = vj_effect_real_to_sequence( tag->effect_chain[pos]->effect_id );
-    if (fx_id >= 0 ) {
-        vj_tag_cali_prepare_now( cali_tag, fx_id );
-    }*/
+    vj_tag_cali_prepare_now( tagc );
 }
 
 int vj_tag_get_chain_status(int t1, int position)
@@ -3269,9 +3265,6 @@ static  void    whiteframe_new(uint8_t *buf, int w, int h, int uv_len, uint8_t *
     }
 
     mean_of_y = mean_of_y / (w*h);
-
-    tag->tabmean[0][ tag->bf_count - 1 ] = mean_of_y;
-
     mean_of_u = mean_of_u / uv_len;
     mean_of_v = mean_of_v / uv_len;
 
@@ -3336,13 +3329,12 @@ static void whiteframe_process( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h
     mean_of_y = mean_of_y / (w*h);
     mean_of_u = mean_of_u / uv_len;
     mean_of_v = mean_of_v / uv_len;
-    tag->tabmean[0][ tag->bf_count - 1 ] = mean_of_y;
 }
 
 static  void    master_lightframe(int w,int h, int uv_len, vj_tag *tag)
 {
     int i;
-    int duration =tag->cali_duration -1;
+    int duration =tag->cali_duration;
     uint8_t *bf = cali_get(tag,CALI_LIGHT,w*h,uv_len);
     uint8_t *bu = bf + (w*h);
     uint8_t *bv = bu + uv_len;
@@ -3389,7 +3381,7 @@ static  void    master_lightframe(int w,int h, int uv_len, vj_tag *tag)
 static  void    master_blackframe(int w, int h, int uv_len, vj_tag *tag )
 {
     int i;
-    int duration =tag->cali_duration - 1;
+    int duration =tag->cali_duration;
     uint8_t *bf = cali_get(tag,CALI_DARK,w*h,uv_len);
     uint8_t *bu = bf + (w*h);
     uint8_t *bv = bu + uv_len;
@@ -3566,37 +3558,47 @@ int vj_tag_grab_blackframe(int t1, int duration, int median_radius , int mode)
     if(!tag)
         return 0;
     if( tag->source_type != VJ_TAG_TYPE_V4L ) {
-    veejay_msg(VEEJAY_MSG_INFO, "Source is not a video device");
-    return 0;
+        veejay_msg(VEEJAY_MSG_WARNING, "Calibration source is not a video device");
     }
     
-    if( duration <= 0 )
+    if( duration < 1 )
         return 0;
 
     if( median_radius <= 0 ) {
         median_radius = 0;
     }
 
-    veejay_msg(VEEJAY_MSG_INFO, "Creating %s (%d frames) median=%d",(mode==0?"Blackframe":"Lightframe"),duration, median_radius );    
+    tag->cali_duration = duration;
+
+    veejay_msg(VEEJAY_MSG_INFO,"Setup per-pixel camera calibration:");
+    veejay_msg(VEEJAY_MSG_INFO,"  This method attempts to fix the inhomogenous brightness distribution. Each little pixel in your CCD camera is slightly different.");
+    veejay_msg(VEEJAY_MSG_INFO,"  This method may also help reduce the effect of dust collected on the lens.");
+    veejay_msg(VEEJAY_MSG_INFO,"  Processing starts immediately after taking the dark and light frames.");
+    veejay_msg(VEEJAY_MSG_INFO,"  Take the dark frame while having the cap on the lens.");
+    veejay_msg(VEEJAY_MSG_INFO,"  Take the light frame while illuminating the lens with a light source. The image should be white.");
+    veejay_msg(VEEJAY_MSG_INFO,"  You can save the dark,light and flattened image frame using reloaded.");
+    veejay_msg(VEEJAY_MSG_INFO,"\tMode: %s", (mode == 0 ? "Darkframe" : "Lightframe" ) );
+    veejay_msg(VEEJAY_MSG_INFO,"\tMedian radius: %d", median_radius );
+    veejay_msg(VEEJAY_MSG_INFO,"\tDuration: %d", duration );
 
     tag->noise_suppression = (mode == 0 ? V4L_BLACKFRAME : V4L_WHITEFRAME );
     tag->median_radius     = median_radius;
-    tag->bf_count      = duration;
-    tag->has_white     = (mode == 1 ? 1 :0);
+    tag->bf_index          = 0;
+    tag->has_white         = (mode == 1 ? 1 :0);
+    
     return 1;
 }
+
 int vj_tag_drop_blackframe(int t1)
 {
     vj_tag *tag = vj_tag_get(t1);
     if(!tag)
-    return 0;
-    if( tag->source_type != VJ_TAG_TYPE_V4L ) {
-    veejay_msg(VEEJAY_MSG_INFO, "Source is not a video device");
-    return 0;
-    }
+        return 0;
+
     if( tag->blackframe ) {
-    tag->noise_suppression = -1;
-    veejay_msg(VEEJAY_MSG_INFO, "Black Frame dropped");
+        tag->noise_suppression = -1;
+        free(tag->blackframe);
+        tag->blackframe = NULL;
     }
 
     return 1;
@@ -3627,94 +3629,11 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
                         v4l2_get_dst( vj_tag_input->v4l2[tag->index], buffer[0],buffer[1],buffer[2],buffer[3]));
         }
 #endif
-        switch( tag->noise_suppression ) {
-            case V4L_BLACKFRAME:
-                tag->cali_duration = tag->bf_count;
-                blackframe_new(width,height,uv_len,buffer[0],buffer[1],buffer[2],tag->median_radius,tag);
-                tag->tabmean[0]    = (double*) vj_malloc(sizeof(double)* tag->cali_duration);
-                if(tag->blackframe == NULL ) {
-                    tag->noise_suppression = 0;
-                } else {
-                    tag->bf_count --;
-                    tag->noise_suppression = V4L_BLACKFRAME_NEXT;
-                    if(tag->bf_count==0) {
-                        master_blackframe(width,height,uv_len,tag);
-                        tag->noise_suppression = V4L_BLACKFRAME_PROCESS;
-                        veejay_msg(VEEJAY_MSG_INFO, "Please create a lightframe (white)");
-                    }
-                }
-                //@ grab black frame
-                break;
-            case V4L_WHITEFRAME:
-                tag->cali_duration = tag->bf_count;
-                if(!tag->blackframe) {
-                    veejay_msg(0, "Please start with a black frame first (Put cap on lens)");
-                    tag->noise_suppression = 0;
-                    break;
-                }
-                whiteframe_new( tag->blackframe,width,height,uv_len,buffer[0],buffer[1],buffer[2],tag->median_radius, tag);
-                tag->bf_count --;
-                tag->noise_suppression = V4L_WHITEFRAME_NEXT;
-                if(tag->bf_count <= 0 ) {
-                    tag->noise_suppression = V4L_BLACKFRAME_PROCESS;
-                    master_lightframe( width,height,uv_len,tag );
-                    master_flatframe( width,height,uv_len, tag );
-                    veejay_msg(VEEJAY_MSG_DEBUG, "Master flat frame");
-                }
-                break;
-            case V4L_WHITEFRAME_NEXT:
-                whiteframe_process(buffer[0],buffer[1],buffer[2],width,height,uv_len,tag->median_radius,tag );
-                tag->bf_count --;
-                if( tag->bf_count <= 0 ) {
-                    tag->noise_suppression = V4L_BLACKFRAME_PROCESS;
-                    master_lightframe( width,height,uv_len,tag);    
-                    master_flatframe( width,height,uv_len, tag );
-                    veejay_msg(VEEJAY_MSG_DEBUG, "Master flat frame");
-                } else {
-                    veejay_msg(VEEJAY_MSG_DEBUG, "Whiteframe %d",tag->bf_count );
-                }
-                break;
-            case V4L_BLACKFRAME_NEXT:
-                blackframe_process( buffer[0],buffer[1],buffer[2],width,height,uv_len, tag->median_radius,tag );
-                if( tag->bf_count <= 0 ) {
-                    tag->noise_suppression = 0;
-                    master_blackframe(width,height,uv_len,tag);
-                    veejay_msg(VEEJAY_MSG_INFO, "Please create a lightframe");
-                } else {
-                    veejay_msg(VEEJAY_MSG_DEBUG, "Blackframe %d", tag->bf_count );
-                    tag->bf_count --;
-                }
-                break;
-            case V4L_BLACKFRAME_PROCESS:
-                blackframe_subtract( tag,buffer[0],buffer[1],buffer[2],width,height,uv_len, tag->has_white , tag->mean[0],tag->mean[1],tag->mean[2]);
-                break;
-            case -1:
-                if( tag->blackframe ) {
-                    free(tag->blackframe);
-                    tag->blackframe = NULL;
-                    tag->noise_suppression = 0;
-                }
-                if( tag->bf ) free(tag->bf);
-                if( tag->bfu ) free(tag->bfu);
-                if( tag->bfv ) free(tag->bfv);
-                if( tag->lf ) free(tag->lf);
-                if( tag->lfu ) free(tag->lfu);
-                if( tag->lfv ) free(tag->lfv);
-                if( tag->tabmean[0]) free(tag->tabmean[0]);
-                break;
-                //@ process black frame
-            default:    
-                break;
-        }
-        if( tag->noise_suppression !=  0 && tag->noise_suppression != 6 && tag->noise_suppression != 3 )
-            veejay_msg(VEEJAY_MSG_DEBUG, "Calibration step %d of %d", tag->bf_count, tag->cali_duration );
-
-        return 1;
-        break;
+         break;
     case VJ_TAG_TYPE_CALI:
         {
             cali_tag_t *p = (cali_tag_t*)vj_tag_input->cali[tag->index];
-            if(p) {
+            if(p && p->mf) {
                 veejay_memcpy(buffer[0], p->mf, len );
                 veejay_memcpy(buffer[1], p->mf + len, uv_len );
                 veejay_memcpy(buffer[2], p->mf + len  + uv_len, uv_len);
@@ -3792,6 +3711,71 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
         break;
         default:
         break;
+    }
+
+
+    switch( tag->noise_suppression ) {
+                    
+        case V4L_BLACKFRAME_PROCESS:
+            blackframe_subtract( tag,buffer[0],buffer[1],buffer[2],width,height,uv_len, tag->has_white , tag->mean[0],tag->mean[1],tag->mean[2]);
+            break;
+
+        case V4L_BLACKFRAME:
+            blackframe_new(width,height,uv_len,buffer[0],buffer[1],buffer[2],tag->median_radius,tag);
+            tag->noise_suppression = V4L_BLACKFRAME_NEXT;
+            tag->bf_index ++;
+            veejay_msg(VEEJAY_MSG_INFO,"Processed dark frame %d/%d", tag->bf_index, tag->cali_duration);
+            break;
+
+        case V4L_BLACKFRAME_NEXT:
+            blackframe_process( buffer[0],buffer[1],buffer[2],width,height,uv_len, tag->median_radius,tag );
+            tag->bf_index ++;
+            if(tag->bf_index == tag->cali_duration) {
+                tag->noise_suppression = 0;
+                master_blackframe(width,height,uv_len,tag);
+                veejay_msg(VEEJAY_MSG_INFO, "Please create a lightframe now");
+            }
+            veejay_msg(VEEJAY_MSG_INFO, "Processed darkframe %d/%d", tag->bf_index, tag->cali_duration); 
+            
+            break;
+        case V4L_WHITEFRAME:
+            if(!tag->blackframe) {
+                veejay_msg(0, "Please start with a dark frame first (Put cap on lens)");
+                tag->noise_suppression = 0;
+                break;
+            }
+            
+            whiteframe_new( tag->blackframe,width,height,uv_len,buffer[0],buffer[1],buffer[2],tag->median_radius, tag);
+            tag->bf_index ++;
+            tag->noise_suppression = V4L_WHITEFRAME_NEXT;
+            veejay_msg(VEEJAY_MSG_INFO,"Processed light frame %d/%d", tag->bf_index, tag->cali_duration);
+
+            break;
+        case V4L_WHITEFRAME_NEXT:
+            whiteframe_process(buffer[0],buffer[1],buffer[2],width,height,uv_len,tag->median_radius,tag );
+            tag->bf_index ++;
+            if( tag->bf_index == tag->cali_duration ) {
+                tag->noise_suppression = V4L_BLACKFRAME_PROCESS; // actual processing 
+                master_lightframe( width,height,uv_len,tag);    
+                master_flatframe( width,height,uv_len, tag );
+                veejay_msg(VEEJAY_MSG_DEBUG, "Mastered flat frame. Ready for processing. Mean is %g,%g,%g", tag->mean[0], tag->mean[1], tag->mean[2]);
+            }
+            veejay_msg(VEEJAY_MSG_INFO, "Processed light frame %d/%d", tag->bf_index, tag->cali_duration );
+            
+            break;
+        case -1:
+            if( tag->blackframe ) { free(tag->blackframe); tag->blackframe = NULL; }
+            if( tag->bf ) { free(tag->bf); tag->bf = NULL; }
+            if( tag->bfu ) { free(tag->bfu); tag->bfu = NULL; }
+            if( tag->bfv ) { free(tag->bfv); tag->bfv = NULL; }
+            if( tag->lf ) { free(tag->lf); tag->lf = NULL; }
+            if( tag->lfu ) { free(tag->lfu); tag->lfu = NULL; }
+            if( tag->lfv ) { free(tag->lfv); tag->lfv = NULL; }
+            
+            veejay_msg(VEEJAY_MSG_INFO, "Calibration data cleaned up");
+            break;
+        default:    
+           break;
     }
 
     return 1;

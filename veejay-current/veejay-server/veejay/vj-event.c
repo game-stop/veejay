@@ -5978,7 +5978,7 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
                     (source == VJ_TAG_TYPE_NONE ? "sample" : "stream") , channel_id);
                 if( source != VJ_TAG_TYPE_NONE ) {
                     int slot = sample_has_cali_fx( args[0]);//@sample
-                        if( slot >= 0 ) {
+                    if( slot >= 0 ) {
                         sample_cali_prepare( args[0],slot,channel_id);
                         veejay_msg(VEEJAY_MSG_DEBUG, "Using calibration data of stream %d",channel_id);
                     }
@@ -8395,7 +8395,7 @@ void    vj_event_get_cali_image     (   void *ptr,  const char format[],    va_l
     int id   = args[0];
     int type = args[1];
     
-    if( !vj_tag_exists(id) || vj_tag_get_type(id) != VJ_TAG_TYPE_V4L || type < 0 || type > 2)
+    if( !vj_tag_exists(id) )
     {
         SEND_MSG(v, "000000000" );
         return;
@@ -8416,7 +8416,7 @@ void    vj_event_get_cali_image     (   void *ptr,  const char format[],    va_l
         SEND_MSG( v, header );
         int res = vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, buf,len);
         if(!res) {
-            veejay_msg(0,"Failed to get calibration image");
+            veejay_msg(0,"Failed to send calibration image. Header: [%s]",header);
         }
     }
 }

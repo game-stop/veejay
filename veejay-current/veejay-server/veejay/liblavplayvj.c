@@ -1112,7 +1112,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 
 		int usec_since_lastframe=0;
 		for (;;) {
-			clock_gettime( CLOCK_REALTIME, &now );
+			clock_gettime( CLOCK_MONOTONIC, &now );
 		
 			usec_since_lastframe = (now.tv_nsec - settings->lastframe_completion.tv_nsec)/1000;
 		
@@ -1126,13 +1126,13 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 			}
 	
 			nsecsleep.tv_nsec = (settings->usec_per_frame - usec_since_lastframe -  1000000 / HZ) * 1000;    	
-	    		nsecsleep.tv_sec = 0;
-	    		clock_nanosleep(CLOCK_REALTIME,0, &nsecsleep, NULL);
+	    	nsecsleep.tv_sec = 0;
+	    	clock_nanosleep(CLOCK_MONOTONIC,0, &nsecsleep, NULL);
 		}
     }
 
     settings->first_frame = 0;
-    clock_gettime( CLOCK_REALTIME, &(settings->lastframe_completion) );
+    clock_gettime( CLOCK_MONOTONIC, &(settings->lastframe_completion) );
     settings->syncinfo[settings->currently_processed_frame].timestamp = settings->lastframe_completion;
 }
 
@@ -2383,7 +2383,7 @@ static void veejay_playback_cycle(veejay_t * info)
 			frame = bs.frame;
 
 			stats.nsync++;
-			clock_gettime( CLOCK_REALTIME, &time_now);
+			clock_gettime( CLOCK_MONOTONIC, &time_now);
 
 			long  d1 = (time_now.tv_sec * 1000000000) + time_now.tv_nsec;
 			long  n1 = (bs.timestamp.tv_sec * 1000000000) +  bs.timestamp.tv_nsec;

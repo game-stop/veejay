@@ -2541,15 +2541,14 @@ void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
 	}
 	gint duration=get_nums( "cali_duration_spin" );
 
-	if( cali_stream_id <= 0 )  {
-		if(info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
-			cali_stream_id =
-				info->status_tokens[CURRENT_ID];
-	}
+    if( info->status_tokens[STREAM_TYPE] != STREAM_VIDEO4LINUX ) {
+        vj_msg(VEEJAY_MSG_INFO,"Please use a camera source for light/dark frame calibration");
+    }
+
+	cali_stream_id = info->status_tokens[CURRENT_ID];
 
 	if( cali_stream_id <= 0 ) {
 		error_dialog( "Error", "No source selected to calibrate. Play a Live stream or double click one in the List");
-		
 		return;
 	}
 
@@ -2560,9 +2559,6 @@ void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
 			method );
 
 	info->uc.cali_duration = duration;
-
-	//@ substract duration in status pipe
-	
 }
 
 void	on_cali_darkframe_clicked( GtkButton *button, gpointer data ) 

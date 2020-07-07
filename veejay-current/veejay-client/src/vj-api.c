@@ -7722,47 +7722,39 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( pm == MODE_STREAM )
     {
-        if( info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
+        if(info->uc.cali_duration > 0 )
         {
-            if(info->uc.cali_duration > 0 )
+            GtkWidget *tb = widget_cache[WIDGET_CALI_TAKE_BUTTON];
+            info->uc.cali_duration--;
+            vj_msg(VEEJAY_MSG_INFO, "Calibrate step %d of %d",info->uc.cali_duration,info->uc.cali_stage);
+            if(info->uc.cali_duration == 0)
             {
-                GtkWidget *tb = widget_cache[WIDGET_CALI_TAKE_BUTTON];
-                info->uc.cali_duration--;
-                vj_msg(VEEJAY_MSG_INFO,
-                       "Calibrate step %d of %d",
-                       info->uc.cali_duration,
-                       info->uc.cali_stage);
-                if(info->uc.cali_duration == 0)
+                info->uc.cali_stage ++; //@ cali_stage = 1, done capturing black frames
+                switch(info->uc.cali_stage)
                 {
-                    info->uc.cali_stage ++; //@ cali_stage = 1, done capturing black frames
-
-                    switch(info->uc.cali_stage)
-                    {
-                        case 1: //@ capturing black frames
-                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                                "Please take an image of a uniformly lit area in placed in front of your lens.");
-                            gtk_button_set_label( GTK_BUTTON(tb), "Take White Frames");
-                            break;
-                        case 2:
-                        case 3:
-                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                                "Image calibrated. You may need to adjust brightness.");
-                            if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ] ))
-                                gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], TRUE);
-                            break;
-                        default:
-                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                                "Image calibrated. You may need to adjust brightness.");
-                            gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
-                            veejay_msg(VEEJAY_MSG_ERROR, "Warning, mem leak if not reset first.");
-                            break;
-                    }
-
-                    if(info->uc.cali_stage >= 2 )
-                    {
-                        info->uc.cali_stage = 0;
-                    }
-                }
+                    case 1: //@ capturing black frames
+                        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                            "Please take an image of a uniformly lit area in placed in front of your lens.");
+                        gtk_button_set_label( GTK_BUTTON(tb), "Take White Frames");
+                        break;
+                    case 2:
+                    case 3:
+                        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                            "Image calibrated. You may need to adjust brightness.");
+                        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ] ))
+                             gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], TRUE);
+                         break;
+                    default:
+                        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                            "Image calibrated. You may need to adjust brightness.");
+                        gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
+                        veejay_msg(VEEJAY_MSG_ERROR, "Warning, mem leak if not reset first.");
+                         break;
+               }
+               if(info->uc.cali_stage >= 2 )
+               {
+                   info->uc.cali_stage = 0;
+               }
             }
         }
     }
@@ -9985,7 +9977,7 @@ static void add_sample_to_effect_sources_list(gint id,
                        -1 );
 
     GtkTreeIter iter2;
-    if(type == STREAM_NO_STREAM)
+    if(type != STREAM_NO_STREAM)
     {
         gtk_list_store_append( cali_sourcestore,&iter2);
         gtk_list_store_set(cali_sourcestore,&iter2,

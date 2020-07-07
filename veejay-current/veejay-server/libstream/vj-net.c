@@ -58,7 +58,7 @@ static	void	net_delay(long ms, long sec )
 	struct timespec ts;
 	ts.tv_sec = sec;
 	ts.tv_nsec = MS_TO_NANO( ms );
-	clock_nanosleep( CLOCK_REALTIME,0, &ts, NULL );
+	clock_nanosleep( CLOCK_MONOTONIC,0, &ts, NULL );
 }
 
 static int my_screen_id = -1;

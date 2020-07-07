@@ -163,7 +163,7 @@ static int selected_best_memset = 1;
 static double get_time()
 {
 	struct timespec ts;
-	clock_gettime( CLOCK_REALTIME, &ts );
+	clock_gettime( CLOCK_MONOTONIC, &ts );
 	return (double) ts.tv_sec + (double) ts.tv_nsec / 1000000000.0;
 }
 
