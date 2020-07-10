@@ -612,6 +612,9 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
 	settings->min_frame_num = 0;
 	settings->max_frame_num = sample_video_length( sample_id );
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Start playing sample %d, from frame %ld to %ld", sample_id, settings->min_frame_num, settings->max_frame_num );
+
 	settings->first_frame = 1;
 	/*
 #ifdef HAVE_FREETYPE
@@ -714,7 +717,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		}
 	}
 
-    if( settings->transition.ready == 0 && new_pm != VJ_PLAYBACK_MODE_PLAIN && ( sample_id != info->uc->sample_id || new_pm != info->uc->playback_mode)) {
+    if( !info->seq->active && settings->transition.ready == 0 && new_pm != VJ_PLAYBACK_MODE_PLAIN && ( sample_id != info->uc->sample_id || new_pm != info->uc->playback_mode)) {
         settings->transition.next_type = new_pm;
         settings->transition.next_id = sample_id;
         
@@ -1866,22 +1869,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
     vje_set_rgb_parameter_conversion_type(full_range);
 
 	info->settings->sample_mode = SSM_422_444;
-/*
-	veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:2 Planar, %d x %d",
-	           info->video_output_width,
-	           info->video_output_height);
-	veejay_msg(VEEJAY_MSG_DEBUG, "FX Frame Info: %d x %d, ssm=%d, format=%d",
-	           info->effect_frame1->width,info->effect_frame1->height,
-	           info->effect_frame1->ssm,
-	           info->effect_frame1->format );
-	veejay_msg(VEEJAY_MSG_DEBUG, "               %d x %d (h=%d,v=%d)",
-	           info->effect_frame1->uv_width,info->effect_frame1->uv_height,
-	           info->effect_frame1->shift_v, info->effect_frame1->shift_h );
-	veejay_msg(VEEJAY_MSG_DEBUG, "               Y=%d bytes, UV=%d bytes",
-	           info->effect_frame1->len,
-	           info->effect_frame1->uv_len );
-	veejay_msg(VEEJAY_MSG_DEBUG, "               full range=%d",
-			full_range ); */
 
 	if(( info->effect_frame1->width % 4) != 0 || (info->effect_frame1->height % 4) != 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "You should specify an output resolution that is a multiple of 4");
@@ -2245,7 +2232,6 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 	else
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Using First-In-First-Out II scheduling for process %d", pid);
-		veejay_msg(VEEJAY_MSG_DEBUG, "Priority is set to %d (RT)", schp.sched_priority );
 	}
 }
 
@@ -2337,10 +2323,8 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	stats.nqueue = QUEUE_LEN;
 	settings->spas = 1.0 / (double) el->audio_rate;
-	veejay_msg(VEEJAY_MSG_DEBUG, "Output 1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
-
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "Output dimensions: %dx%d, backend scaler: %dx%d",
+	veejay_msg(VEEJAY_MSG_INFO, "Output 1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
+	veejay_msg(VEEJAY_MSG_INFO, "Output dimensions: %dx%d, backend scaler: %dx%d",
 	           info->video_output_width,info->video_output_height,info->bes_width,info->bes_height );
 
 

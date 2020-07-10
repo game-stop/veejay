@@ -60,6 +60,7 @@
 #include <veejaycore/vjmem.h>
 #include <libvje/effects/opacity.h>
 #include <libvje/effects/masktransition.h>
+#include <libvje/effects/shapewipe.h>
 #include <libqrwrap/qrwrapper.h>
 #include <veejay/vj-split.h>
 #include <libresample/resample.h>
@@ -258,8 +259,6 @@ static void vj_perform_supersample(video_playback_setup *settings,performer_t *p
             vj_perform_set_444(two);
         }
 
-   //     veejay_msg(VEEJAY_MSG_DEBUG, "chain is now supersampled, fx=%d, a=%d,b=%d",sm,(one == NULL ? -1 : one->ssm), (two == NULL ? -1 : two->ssm) );
-
         return;
     }
     
@@ -273,9 +272,6 @@ static void vj_perform_supersample(video_playback_setup *settings,performer_t *p
             vj_perform_set_444(two);
         }
         p->is_supersampled = 1;
- //       veejay_msg(VEEJAY_MSG_DEBUG, "set chain supersampled, fx=%d, a=%d,b=%d",sm,(one == NULL ? -1 : one->ssm), (two == NULL ? -1 : two->ssm) );
-
-
     } 
     else if( sm == 0 ) {
         if(one != NULL && one->ssm == 1) { 
@@ -380,7 +376,6 @@ static ycbcr_frame *vj_perform_sample_is_cached(veejay_t *info,int sample_id)
                     info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
                 return NULL;
             }
-      //      veejay_msg(VEEJAY_MSG_DEBUG, "sample %d is cached, source is %p", sample_id, g->cached_sample_frames[c].frame);
             return g->cached_sample_frames[c].frame;
         }
     }
@@ -478,19 +473,9 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
     return 0;
 }
 
-static  int vj_perform_next_sequence( veejay_t *info, int *type )
+static  int vj_perform_get_next_sequence_id(veejay_t *info, int *type, int current, int *new_current)
 {
-
-    if( info->seq->samples[info->seq->current].type == 0 &&
-        info->seq->samples[info->seq->current].sample_id > 0 ) {
-    
-        if(sample_loop_dec(info->seq->samples[info->seq->current].sample_id) != 0) /* loop count zero, select next sequence */
-            return 0;
-        veejay_prepare_sample_positions( info->seq->samples[info->seq->current].sample_id );
-    }
-
-
-    int cur = info->seq->current + 1;
+    int cur = current; // info->seq->current + 1;
     int cycle = 0;
     
     if( cur >= MAX_SEQUENCES )
@@ -510,18 +495,72 @@ static  int vj_perform_next_sequence( veejay_t *info, int *type )
         }
     }
 
-    info->seq->current = cur;
+    *type = info->seq->samples[cur].type;
+    *new_current = cur;
 
-    if( info->seq->samples[info->seq->current].type == 0 ) {
-        sample_update_ascociated_samples( info->seq->samples[cur].sample_id );
-        sample_reset_offset( info->seq->samples[cur].sample_id );
-        sample_set_loops( info->seq->samples[cur].sample_id, -1 ); /* reset loop count */
+    return info->seq->samples[cur].sample_id;
+}
+
+static  int vj_perform_next_sequence( veejay_t *info, int *type )
+{
+    video_playback_setup *settings = info->settings;
+
+    if( info->seq->samples[info->seq->current].type == 0 &&
+        info->seq->samples[info->seq->current].sample_id > 0 ) {
+    
+        if(sample_loop_dec(info->seq->samples[info->seq->current].sample_id) != 0) /* loop count zero, select next sequence */
+            return 0;
+        veejay_prepare_sample_positions( info->seq->samples[info->seq->current].sample_id );
+    }
+
+    int new_current = -1;
+    int sample_id = vj_perform_get_next_sequence_id(info,type, info->seq->current + 1, &new_current);
+
+    int next_type = -1;
+    int current_type = *type;
+    int tmp = 0;
+    int next_sample_id = vj_perform_get_next_sequence_id(info,&next_type, new_current + 1, &tmp );
+
+    if( next_sample_id > 0 ) {
+         
+         int transition_length = ( current_type == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_length( sample_id ) : vj_tag_get_transition_length( sample_id ) );
+         int transition_shape = ( current_type == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_shape( sample_id ) : vj_tag_get_transition_shape( sample_id ) );
+         if(transition_shape == -1) {
+            transition_shape = ( (int) ( (double) shapewipe_get_num_shapes( settings->transition.ptr ) * rand() / (RAND_MAX)));
+         }
+         int speed = (current_type == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_speed(sample_id) : 1 );
+         int start = (current_type == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_startFrame( sample_id) : 1 );
+         int end = (current_type == VJ_PLAYBACK_MODE_SAMPLE ?  sample_get_endFrame(sample_id) : vj_tag_get_n_frames(sample_id));
+         if( speed < 0 ) {
+             settings->transition.start = start + transition_length;
+             settings->transition.end = start;
+         }
+         else if(speed > 0 ) {
+             settings->transition.start = end - transition_length;
+             settings->transition.end = end;
+         }
+
+         settings->transition.shape = transition_shape;
+         settings->transition.active = ( current_type == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_active( sample_id ) : vj_tag_get_transition_active(sample_id));
+         settings->transition.next_type = next_type;
+         settings->transition.next_id = next_sample_id;
+    }
+
+    if(sample_id == 0 )
+        return 0;
+
+    info->seq->current = new_current;
+
+    if( *type == 0 ) {
+        sample_update_ascociated_samples( sample_id );
+        sample_reset_offset( sample_id );
+        sample_set_loops( sample_id, -1 ); /* reset loop count */
     }
     else {
-        vj_tag_reset_offset( info->seq->samples[cur].sample_id );
+        vj_tag_reset_offset( sample_id );
     }
-    *type = info->seq->samples[cur].type;
-    return info->seq->samples[cur].sample_id;
+
+    return sample_id;
 }
 
 static  int vj_perform_try_transition( veejay_t *info, int is_tag )
@@ -568,12 +607,11 @@ static  int vj_perform_try_sequence( veejay_t *info )
     int n = vj_perform_next_sequence( info, &type );
     if( n > 0 )
     {
-        veejay_msg(VEEJAY_MSG_INFO, "Sequence play selects %s %d", (type == 0 ? "sample" : "stream" ) , info->seq->samples[info->seq->current].sample_id);
+        veejay_msg(VEEJAY_MSG_INFO, "Sequence play selects %s %d", (type == 0 ? "sample" : "stream" ) , n );
         
-        veejay_change_playback_mode( info, 
-                info->seq->samples[ info->seq->current ].type == 0 ? VJ_PLAYBACK_MODE_SAMPLE : VJ_PLAYBACK_MODE_TAG,
-                info->seq->samples[ info->seq->current ].sample_id);
+        //@ setup transition
 
+        veejay_change_playback_mode( info, (type == 0 ? VJ_PLAYBACK_MODE_SAMPLE: VJ_PLAYBACK_MODE_TAG ), n );
         return 1;
     }
     return 0;
@@ -2907,12 +2945,10 @@ static int vj_perform_post_chain_sample(veejay_t *info,performer_t *p, VJFrame *
             if( p->pvar_.follow_fade ) {
               follow = 1;
             }
-            veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto Fade Out done");
         }
         if((dir>0) && (opacity==255))
         {
             sample_reset_fader(sample_id);
-            veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto fade In done");
             if( p->pvar_.follow_fade ) {
               follow = 1;
             }
@@ -3000,7 +3036,6 @@ static int vj_perform_post_chain_tag(veejay_t *info,performer_t *p, VJFrame *fra
             if( p->pvar_.follow_fade ) {
                follow = 1;
             }
-            veejay_msg(VEEJAY_MSG_DEBUG, "Stream Chain Auto Fade done");
         }
         if((dir > 0) && (opacity == 255))
         {
@@ -3008,7 +3043,6 @@ static int vj_perform_post_chain_tag(veejay_t *info,performer_t *p, VJFrame *fra
             if( p->pvar_.follow_fade ) {
                follow = 1;
             }
-            veejay_msg(VEEJAY_MSG_DEBUG, "Stream Chain Auto Fade done");
         }
         } else if(mode){
             if( p->pvar_.follow_fade ) {
@@ -3913,8 +3947,6 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
     performer_global_t *g = (performer_global_t*) info->performer;
     performer_t *p = g->A;
     if( p->pvar_.follow_run ) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "Following to [%d,%d]", p->pvar_.follow_now[0], p->pvar_.follow_now[1] );
-
         if( p->pvar_.follow_now[1] == 0 ) {
             info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
             veejay_set_sample( info, p->pvar_.follow_now[0] );
@@ -4022,10 +4054,9 @@ void    vj_perform_randomize(veejay_t *info)
     settings->randplayer.max_delay = max_delay;
     settings->randplayer.min_delay = min_delay; 
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "Sample randomizer trigger in %d frame periods", max_delay);
+    veejay_msg(VEEJAY_MSG_INFO, "Sample randomizer trigger in %d frame periods", max_delay);
 
     veejay_change_playback_mode( info, VJ_PLAYBACK_MODE_SAMPLE, take_n);
-    //veejay_set_sample( info, take_n );
 }
 
 int vj_perform_rand_update(veejay_t *info)
