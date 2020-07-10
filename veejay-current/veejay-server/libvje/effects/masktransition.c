@@ -122,25 +122,21 @@ static void alpha_transition_apply_job( void *arg )
 
 void	alpha_transition_apply( VJFrame *frame, uint8_t *B[4], int time_index )
 {
-	if(vj_task_available() ) {
-		vj_task_set_from_frame( frame );
-		vj_task_set_param( time_index,0 );
-		vj_task_run( frame->data, B, NULL, NULL, 4, (performer_job_routine) &alpha_transition_apply_job );
-	} else { 
-		alpha_blend_transition(
-			frame->data[0],frame->data[1],frame->data[2], frame->data[3],
-			B[0],B[1],B[2],B[3],
-			frame->len,
-			frame->width,
-			time_index,
-			SMOOTH_DEFAULT,
-		    USE_FROM_A
-		);
-	}
+	alpha_blend_transition(
+		frame->data[0],frame->data[1],frame->data[2], frame->data[3],
+		B[0],B[1],B[2],B[3],
+		frame->len,
+		frame->width,
+		time_index,
+		SMOOTH_DEFAULT,
+	    USE_FROM_A
+	);
 }
 
-void masktransition_apply( VJFrame *frame, VJFrame *frame2, int time_index, int duration  )
-{
+void masktransition_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int time_index = args[0];
+    int duration = args[1];
+
 	alpha_blend_transition(
 		frame->data[0],frame->data[1],frame->data[2],frame->data[3],
 		frame2->data[0],frame2->data[1],frame2->data[2],frame->data[3],

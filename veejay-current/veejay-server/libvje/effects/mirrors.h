@@ -21,5 +21,9 @@
 #ifndef MIRRORS_H
 #define MIRRORS_H
 vj_effect *mirrors_init(int width,int height);
-void mirrors_apply( VJFrame *frame, int type, int factor);
+void mirrors_apply(void *ptr,  VJFrame *frame, int *args );
+void *mirrors_malloc(int w, int h);
+void mirrors_free(void *ptr);
+int mirrors_request_fx(); 
+void mirrors_set_motionmap(void *ptr, void *priv);
 #endif

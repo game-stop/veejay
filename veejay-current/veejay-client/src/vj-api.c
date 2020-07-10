@@ -326,6 +326,12 @@ enum {
   WIDGET_MACROPLAY1 = 235,
   WIDGET_MACROSTOP1 = 236,
   WIDGET_SPIN_SAMPLEDURATION = 237,
+  WIDGET_SAMPLE_TRANSITION_ACTIVE = 238,
+  WIDGET_SAMPLE_TRANSITION_LENGTH = 239,
+  WIDGET_SAMPLE_TRANSITION_SHAPE = 240,
+  WIDGET_STREAM_TRANSITION_ACTIVE = 241,
+  WIDGET_STREAM_TRANSITION_LENGTH = 242,
+  WIDGET_STREAM_TRANSITION_SHAPE = 243,
 };
 
 
@@ -410,7 +416,7 @@ static struct
     {  FB_WIDGET_NOTEBOOK15, WIDGET_NOTEBOOK15 },
     {  FB_WIDGET_VBOX623, WIDGET_VBOX623 },
     {  FB_WIDGET_SAMPLEGRID_FRAME,FB_WIDGET_SAMPLEGRID_FRAME },
-    {  FB_WIDGET_PANELS, WIDGET_PANELS },
+    {  FB_WIDGET_NONE, -1 }
 };
 
 
@@ -707,6 +713,13 @@ static struct
     { "macroplay1",              WIDGET_MACROPLAY1 },
     { "macrostop1",              WIDGET_MACROSTOP1 },
     { "spin_sampleduration",   WIDGET_SPIN_SAMPLEDURATION },
+    { "transition_active",      WIDGET_SAMPLE_TRANSITION_ACTIVE },
+    { "transition_length",      WIDGET_SAMPLE_TRANSITION_LENGTH },
+    { "transition_shape",       WIDGET_SAMPLE_TRANSITION_SHAPE },
+    { "tag_transition_active",      WIDGET_STREAM_TRANSITION_ACTIVE },
+    { "tag_transition_length",      WIDGET_STREAM_TRANSITION_LENGTH },
+    { "tag_transition_shape",       WIDGET_STREAM_TRANSITION_SHAPE },
+
     { NULL, -1 },
 };
 
@@ -1268,7 +1281,7 @@ static void set_toggle_button(const char *name, int status);
 static void update_slider_gvalue(const char *name, gdouble value );
 static void update_slider_value2(GtkWidget *w, gint value, gint scale);
 static void update_slider_range2(GtkWidget *w, gint min, gint max, gint value, gint scaled);
-
+void refresh_sample_slot_image(int int_id);
 static void update_slider_value(const char *name, gint value, gint scale);
 static void update_slider_range(const char *name, gint min, gint max, gint value, gint scaled);
 //static  void update_knob_range( GtkWidget *w, gdouble min, gdouble max, gdouble value, gint scaled );
@@ -3164,12 +3177,15 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1,
     return (gchar*) result;
 }
 
+
 static gchar *recv_vims(int slen, int *bytes_written)
 {
     int tmp_len = slen+1;
     unsigned char tmp[tmp_len];
     veejay_memset(tmp,0,sizeof(tmp));
+    
     int ret = vj_client_read( info->client, V_CMD, tmp, slen );
+
     if( ret == -1 )
         reloaded_schedule_restart();
     int len = 0;
@@ -3178,10 +3194,12 @@ static gchar *recv_vims(int slen, int *bytes_written)
     unsigned char *result = NULL;
     if( ret <= 0 || len <= 0 || slen <= 0)
         return (gchar*)result;
+
     result = (unsigned char*) vj_calloc(sizeof(unsigned char) * (len + 1) );
     *bytes_written = vj_client_read( info->client, V_CMD, result, len );
     if( *bytes_written == -1 )
         reloaded_schedule_restart();
+
     return (gchar*) result;
 }
 
@@ -4087,6 +4105,18 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
         gint speed = info->status_tokens[SAMPLE_SPEED];
 
+        if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+        }
+
+        if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH]) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+        }
+
+        if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+        }
+
         if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
         {
             speed = info->status_tokens[SAMPLE_SPEED];
@@ -4170,13 +4200,30 @@ static void update_current_slot(int *history, int pm, int last_pm)
          //   update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
         }
+
     }
 
-    if( pm == MODE_SAMPLE|| pm == MODE_STREAM )
-    if( history[CHAIN_FADE] != info->status_tokens[CHAIN_FADE] )
-    {
-        double val = (double) info->status_tokens[CHAIN_FADE];
-        update_slider_value( "manualopacity", val,0 );
+    if( pm == MODE_STREAM ) {
+         if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+        }
+        
+        if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH]) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH]), info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+        }
+
+        if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE]), info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+        }
+
+    }
+
+    if( pm == MODE_SAMPLE || pm == MODE_STREAM ) {
+        if( history[CHAIN_FADE] != info->status_tokens[CHAIN_FADE] )
+         {
+            double val = (double) info->status_tokens[CHAIN_FADE];
+            update_slider_value( "manualopacity", val,0 );
+        }
     }
 
 }
@@ -5716,6 +5763,13 @@ static void load_sequence_list()
     free(text);
 }
 
+void refresh_sample_slot_image(int int_id)
+{
+    if( !disable_sample_image ) {
+        veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
+    }
+}
+
 static void load_samplelist_info(gboolean with_reset_slotselection)
 {
     char line[300];
@@ -5727,7 +5781,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
     if( cali_onoff == 1 )
         reset_tree( "cali_sourcetree");
 
-    with_reset_slotselection = FALSE; //FIXME: there is a bug
+    //with_reset_slotselection = FALSE; // FIXME: there is a bug
 
     if( with_reset_slotselection )
     {
@@ -5774,9 +5828,6 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
                         add_sample_to_sample_banks(bank_page, tmp_slot );
                         add_sample_to_effect_sources_list( int_id,0, title, timecode);
                         free_slot(tmp_slot);
-                        if( !disable_sample_image ) {
-                            veejay_get_sample_image( int_id, 0, info->image_dimensions[0], info->image_dimensions[1] );
-                        }
                     }
                     else
                     {
@@ -5905,6 +5956,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
     if(no_samples) {
         samplebank_ready_ = 1; // as long as there are no samples, samplebank will not initialize
     }
+
 }
 
 gboolean view_el_selection_func (GtkTreeSelection *selection,
@@ -7504,6 +7556,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
                 gtk_toggle_button_get_active(  GTK_TOGGLE_BUTTON( widget_cache[WIDGET_FEEDBACKBUTTON] ) )) {
             gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_FEEDBACKBUTTON] ), info->status_tokens[FEEDBACK] );
         }
+
+        vj_msg(VEEJAY_MSG_INFO,"Feedback on main source is %s", (info->status_tokens[FEEDBACK] ? "enabled" : "disabled" ) );
     }
 
     if( info->status_tokens[MACRO] != history[MACRO] )
@@ -7668,47 +7722,39 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( pm == MODE_STREAM )
     {
-        if( info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
+        if(info->uc.cali_duration > 0 )
         {
-            if(info->uc.cali_duration > 0 )
+            GtkWidget *tb = widget_cache[WIDGET_CALI_TAKE_BUTTON];
+            info->uc.cali_duration--;
+            vj_msg(VEEJAY_MSG_INFO, "Calibrate step %d of %d",info->uc.cali_duration,info->uc.cali_stage);
+            if(info->uc.cali_duration == 0)
             {
-                GtkWidget *tb = widget_cache[WIDGET_CALI_TAKE_BUTTON];
-                info->uc.cali_duration--;
-                vj_msg(VEEJAY_MSG_INFO,
-                       "Calibrate step %d of %d",
-                       info->uc.cali_duration,
-                       info->uc.cali_stage);
-                if(info->uc.cali_duration == 0)
+                info->uc.cali_stage ++; //@ cali_stage = 1, done capturing black frames
+                switch(info->uc.cali_stage)
                 {
-                    info->uc.cali_stage ++; //@ cali_stage = 1, done capturing black frames
-
-                    switch(info->uc.cali_stage)
-                    {
-                        case 1: //@ capturing black frames
-                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                                "Please take an image of a uniformly lit area in placed in front of your lens.");
-                            gtk_button_set_label( GTK_BUTTON(tb), "Take White Frames");
-                            break;
-                        case 2:
-                        case 3:
-                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                                "Image calibrated. You may need to adjust brightness.");
-                            if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ] ))
-                                gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], TRUE);
-                            break;
-                        default:
-                            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
-                                "Image calibrated. You may need to adjust brightness.");
-                            gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
-                            veejay_msg(VEEJAY_MSG_ERROR, "Warning, mem leak if not reset first.");
-                            break;
-                    }
-
-                    if(info->uc.cali_stage >= 2 )
-                    {
-                        info->uc.cali_stage = 0;
-                    }
-                }
+                    case 1: //@ capturing black frames
+                        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                            "Please take an image of a uniformly lit area in placed in front of your lens.");
+                        gtk_button_set_label( GTK_BUTTON(tb), "Take White Frames");
+                        break;
+                    case 2:
+                    case 3:
+                        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                            "Image calibrated. You may need to adjust brightness.");
+                        if(!gtk_widget_is_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ] ))
+                             gtk_widget_set_sensitive(widget_cache[ WIDGET_CALI_SAVE_BUTTON ], TRUE);
+                         break;
+                    default:
+                        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_CURRENT_STEP_LABEL] ),
+                            "Image calibrated. You may need to adjust brightness.");
+                        gtk_button_set_label( GTK_BUTTON(tb), "Take Black Frames");
+                        veejay_msg(VEEJAY_MSG_ERROR, "Warning, mem leak if not reset first.");
+                         break;
+               }
+               if(info->uc.cali_stage >= 2 )
+               {
+                   info->uc.cali_stage = 0;
+               }
             }
         }
     }
@@ -9931,7 +9977,7 @@ static void add_sample_to_effect_sources_list(gint id,
                        -1 );
 
     GtkTreeIter iter2;
-    if(type == STREAM_NO_STREAM)
+    if(type != STREAM_NO_STREAM)
     {
         gtk_list_store_append( cali_sourcestore,&iter2);
         gtk_list_store_set(cali_sourcestore,&iter2,

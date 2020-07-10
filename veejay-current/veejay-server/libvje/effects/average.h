@@ -21,8 +21,8 @@
 #ifndef AVERAGE_H
 #define AVERAGE_H
 vj_effect *average_init();
-void average_apply(VJFrame *src, int sum, int mode);
-void average_free();
-int	average_malloc(int width, int height);
-void average_free();
+void average_apply(void *ptr, VJFrame *src, int *args);
+void average_free(void *ptr);
+void *average_malloc(int width, int height);
+void average_free(void *ptr);
 #endif

@@ -21,8 +21,7 @@
 #ifndef CHROMASCRATCHER_H
 #define CHROMASCRATCHER_H
 vj_effect *chromascratcher_init(int w, int h);
-int chromascratcher_malloc(int w, int h);
-void chromascratcher_free();
-void chromascratcher_apply(VJFrame *frame, int mode, int opacity, int nframes,
-                           int no_reverse);
+void *chromascratcher_malloc(int w, int h);
+void chromascratcher_free(void *ptr);
+void chromascratcher_apply(void *ptr, VJFrame *frame,int *args);
 #endif

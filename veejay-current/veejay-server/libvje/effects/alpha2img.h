@@ -21,5 +21,5 @@
 #ifndef ALPHA2IMG_H
 #define ALPHA2IMG_H
 vj_effect *alpha2img_init(int w, int h);
-void alpha2img_apply( VJFrame *frame);
+void alpha2img_apply(void *ptr, VJFrame *frame, int *args);
 #endif

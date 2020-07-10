@@ -20,8 +20,8 @@
 
 #ifndef AGAUSSB_H
 #define AGAUSSB_H
-void gaussblur_apply(VJFrame *frame, int radius, int strength, int quality );
-void gaussblur_free();
-int	gaussblur_malloc(int w, int h);
+void gaussblur_apply(void *ptr, VJFrame *frame, int *args );
+void gaussblur_free(void *ptr);
+void *gaussblur_malloc(int w, int h);
 vj_effect *gaussblur_init(int w,int h);
 #endif

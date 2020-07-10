@@ -21,5 +21,5 @@
 #ifndef DISSOLVE_H
 #define DISSOLVE_H
 vj_effect *dissolve_init(int w, int h);
-void dissolve_apply( VJFrame *frame, VJFrame *frame2, int dissolve);
+void dissolve_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args );
 #endif

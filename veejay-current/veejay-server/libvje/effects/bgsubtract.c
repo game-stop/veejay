@@ -25,12 +25,13 @@
 #include "softblur.h"
 #include "bgsubtract.h"
 
-static uint8_t *static_bg__ = NULL;
-static uint8_t *bg_frame__[4] = { NULL,NULL,NULL,NULL };
-static int bg_ssm = 0;
-static unsigned int bg_n = 0;
-static uint8_t instance = 0;
-static int auto_hist = 0;
+typedef struct {
+    uint8_t *static_bg__;
+    uint8_t *bg_frame__[4];
+    int bg_ssm ;
+    unsigned int bg_n;
+    int auto_hist;
+} bgsubtract_t;
 
 vj_effect *bgsubtract_init(int width, int height)
 {
@@ -57,7 +58,6 @@ vj_effect *bgsubtract_init(int width, int height)
 	ve->extra_frame = 0;
 	ve->sub_format = -1;
 	ve->has_user = 1;
-	ve->user_data = NULL;
 	ve->sub_format = 0;
 	ve->parallel = 0;
 	ve->global = 1; /* this effect is not freed when switching samples */
@@ -72,101 +72,92 @@ vj_effect *bgsubtract_init(int width, int height)
 
 	ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
 
-	const char *hist = getenv( "VEEJAY_BG_AUTO_HISTOGRAM_EQ" );
-	if( hist ) {
-		auto_hist = atoi( hist );
-	}
-
 	return ve;
 }
 
-int bgsubtract_instances()
+void *bgsubtract_malloc(int width, int height)
 {
-	return instance;
-}
+    bgsubtract_t *b = (bgsubtract_t*) vj_calloc(sizeof(bgsubtract_t));
+    if(!b) {
+        return NULL;
+    }
 
-int bgsubtract_malloc(int width, int height)
-{
-	if(static_bg__ == NULL){
-		static_bg__ = (uint8_t*) vj_malloc( RUP8(width + width*height)*4);
-		bg_frame__[0] = static_bg__;
-		bg_frame__[1] = bg_frame__[0] + RUP8(width*height);
-		bg_frame__[2] = bg_frame__[1] + RUP8(width*height);
-		bg_frame__[3] = bg_frame__[2] + RUP8(width*height);
+    b->static_bg__ = (uint8_t*) vj_malloc( RUP8(width + width*height)*4);
+    if(!b->static_bg__) {
+        free(b);
+        return NULL;
+    }
+
+	b->bg_frame__[0] = b->static_bg__;
+    b->bg_frame__[1] = b->bg_frame__[0] + RUP8(width*height);
+    b->bg_frame__[2] = b->bg_frame__[1] + RUP8(width*height);
+    b->bg_frame__[3] = b->bg_frame__[2] + RUP8(width*height);
+
+    const char *hist = getenv( "VEEJAY_BG_AUTO_HISTOGRAM_EQ" );
+	if( hist ) {
+		b->auto_hist = atoi( hist );
 	}
-	
-	instance = 1;
-	
+
 	veejay_msg( VEEJAY_MSG_INFO,
 			"You can enable/disable the histogram equalizer by setting env var VEEJAY_BG_AUTO_HISTOGRAM_EQ" );
 	veejay_msg( VEEJAY_MSG_INFO,
-			"Histogram equalization is %s", (auto_hist ? "enabled" : "disabled" ));
+			"Histogram equalization is %s", (b->auto_hist ? "enabled" : "disabled" ));
 
-	return 1;
+	return (void*) b;
 }
 
-void bgsubtract_free()
+void bgsubtract_free(void *ptr)
 {
-	if( static_bg__ ) {
-		free(static_bg__ );
-
-		bg_frame__[0] = NULL;
-		bg_frame__[1] = NULL;
-		bg_frame__[2] = NULL;
-		bg_frame__[3] = NULL;
-		static_bg__ = NULL;
-	}
-
-	bg_ssm = 0;
-	instance = 0;
+    bgsubtract_t *b = (bgsubtract_t*) ptr;
+    free(b->static_bg__);
+    free(b);
 }
 
-int bgsubtract_prepare(VJFrame *frame)
+int bgsubtract_prepare(void *ptr, VJFrame *frame)
 {
-	if(!static_bg__ )
-	{
-		return 0;
-	}
+    bgsubtract_t *b = (bgsubtract_t*) ptr;
 	
-	if( auto_hist )
+	if( b->auto_hist )
 		vje_histogram_auto_eq( frame );
 
 	//@ copy the iamge
-	veejay_memcpy( bg_frame__[0], frame->data[0], frame->len );
+	veejay_memcpy( b->bg_frame__[0], frame->data[0], frame->len );
 	
 	if( frame->ssm ) {
-		veejay_memcpy( bg_frame__[1], frame->data[1], frame->len );
-		veejay_memcpy( bg_frame__[2], frame->data[2], frame->len );
-		bg_ssm = 1;
+		veejay_memcpy( b->bg_frame__[1], frame->data[1], frame->len );
+		veejay_memcpy( b->bg_frame__[2], frame->data[2], frame->len );
+		b->bg_ssm = 1;
 	}
 	else {
 		// if data is not subsampled, upsample chroma planes now 
-		veejay_memcpy( bg_frame__[1], frame->data[1], frame->uv_len );
-		veejay_memcpy( bg_frame__[2], frame->data[2], frame->uv_len );
-		chroma_supersample( SSM_422_444, frame, bg_frame__ );
-		bg_ssm = 1;
+		veejay_memcpy( b->bg_frame__[1], frame->data[1], frame->uv_len );
+		veejay_memcpy( b->bg_frame__[2], frame->data[2], frame->uv_len );
+		chroma_supersample( SSM_422_444, frame, b->bg_frame__ );
+		b->bg_ssm = 1;
 	}
 
-	bg_n = 0;
+	b->bg_n = 0;
 
-	veejay_msg(2, "Subtract background: Snapped background frame (4:4:4 = %d)", bg_ssm);
-	return 1;
+	veejay_msg(2, "Subtract background: Snapped background frame (4:4:4 = %d)", b->bg_ssm);
+
+    return 1;
 }
 
 /* always returns chroma planes in 4:4:4 */
-uint8_t* bgsubtract_get_bg_frame(unsigned int plane)
+uint8_t* bgsubtract_get_bg_frame(void *ptr, unsigned int plane)
 {
-	if( static_bg__ == NULL )
-		return NULL;
-	return bg_frame__[ plane ];
+    bgsubtract_t *b = (bgsubtract_t*) ptr;
+	return b->bg_frame__[ plane ];
 }
 
-static void bgsubtract_cma_frame( const int len, uint8_t *I, uint8_t *O )
+static void bgsubtract_cma_frame( bgsubtract_t *b, const int len, uint8_t *I, uint8_t *O )
 {
 	int i;
+    const int bg_n1 = (b->bg_n) + 1;
+    const int bg_n = b->bg_n;
 	for( i = 0; i < len; i ++ )
 	{
-		O[i] = ((I[i] + (bg_n * O[i])) / (bg_n+1)); 
+		O[i] = ((I[i] + (bg_n * O[i])) / bg_n1); 
 	}
 }
 static void bgsubtract_avg_frame( const int len, uint8_t *I, uint8_t *O)
@@ -178,39 +169,45 @@ static void bgsubtract_avg_frame( const int len, uint8_t *I, uint8_t *O)
 	}
 }
 
-static void bgsubtract_show_bg( VJFrame *frame )
+static void bgsubtract_show_bg( bgsubtract_t *b, VJFrame *frame )
 {
-	veejay_memcpy( frame->data[0], bg_frame__[0], frame->len );
-	if( bg_ssm && frame->ssm ) {
-		veejay_memcpy( frame->data[1], bg_frame__[1], frame->len );
-		veejay_memcpy( frame->data[2], bg_frame__[2], frame->len );
+	veejay_memcpy( frame->data[0], b->bg_frame__[0], frame->len );
+	if( b->bg_ssm && frame->ssm ) {
+		veejay_memcpy( frame->data[1], b->bg_frame__[1], frame->len );
+		veejay_memcpy( frame->data[2], b->bg_frame__[2], frame->len );
 	} else { /* subsampling does not match */
 		veejay_memset( frame->data[1], 128, frame->uv_len );
 		veejay_memset( frame->data[2], 128, frame->uv_len );
 	}	
 }
 
-void bgsubtract_apply(VJFrame *frame,int threshold, int method, int enabled, int alpha )
-{
+void bgsubtract_apply(void *ptr, VJFrame *frame, int *args) {
+    int threshold = args[0];
+    int method = args[1];
+    int enabled = args[2];
+    int alpha = args[3];
+
 	const int len = frame->len;
 	const int uv_len = (frame->ssm ? len : frame->uv_len );
 
-	if( auto_hist )
+    bgsubtract_t *b = (bgsubtract_t*) ptr;
+
+	if( b->auto_hist )
 		vje_histogram_auto_eq( frame );
 
 	if( enabled == 0 ) {
 		switch( method ) {
 			case 0:
-				bgsubtract_show_bg( frame );
+				bgsubtract_show_bg( b, frame );
 				break;
 			case 1:
-				bgsubtract_cma_frame( len, frame->data[0], bg_frame__[0] );
-				bgsubtract_show_bg( frame );
-				bg_n ++;
+				bgsubtract_cma_frame( b, len, frame->data[0], b->bg_frame__[0] );
+				bgsubtract_show_bg( b, frame );
+				b->bg_n ++;
 				break;
 			case 2:
-				bgsubtract_avg_frame( len, frame->data[0], bg_frame__[0] );
-				bgsubtract_show_bg( frame );
+				bgsubtract_avg_frame( len, frame->data[0], b->bg_frame__[0] );
+				bgsubtract_show_bg(b, frame );
 				break;	
 			default:
 			break;
@@ -220,10 +217,10 @@ void bgsubtract_apply(VJFrame *frame,int threshold, int method, int enabled, int
 		if( alpha == 0 ) {
 			veejay_memset( frame->data[1], 128, uv_len );
 			veejay_memset( frame->data[2], 128, uv_len );
-			vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[0], threshold, len );
+			vje_diff_plane( b->bg_frame__[0], frame->data[0], frame->data[0], threshold, len );
 		}
 		else {
-			vje_diff_plane( bg_frame__[0], frame->data[0], frame->data[3], threshold, len );
+			vje_diff_plane( b->bg_frame__[0], frame->data[0], frame->data[3], threshold, len );
 		}
 	}
 }

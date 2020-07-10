@@ -68,8 +68,6 @@ static int	__initialized = 0;
 
 extern int	get_ffmpeg_pixfmt(int id);
 
-extern uint8_t *vj_perform_get_preview_buffer();
-
 static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, int dst_h, int dst_fmt,
 			uint8_t *dY, uint8_t *dU, uint8_t *dV, uint8_t *dA )
 {
@@ -402,7 +400,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	}
 	
 	// convert frame to yuv
-	VJFrame *src = yuv_yuv_template( frame[0],frame[1],frame[2],w,h,fmt );
+	VJFrame *src = yuv_yuv_template( frame[0],frame[2],frame[1],w,h,fmt );
 	VJFrame *dst = yuv_rgb_template(
 		(uint8_t*) gdk_pixbuf_get_pixels( img_ ),
 				   gdk_pixbuf_get_width(  img_ ),
@@ -447,13 +445,13 @@ void		vj_picture_free()
 #define update_pic_data(a,b,c) { pic_data_[0] = a; pic_data_[1] = b; pic_data_[2] = c;}
 
 uint8_t val = 0;
-void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h )
+void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t *dst )
 {
 	uint8_t *dest[4];	
 	VJFrame src;
 	VJFrame *src1 = &src;
 
-	dest[0] = vj_perform_get_preview_buffer();
+	dest[0] = dst;
 	dest[1] = dest[0] + (out_w * out_h);
 	dest[2] = dest[1] + (out_w * out_h)/4;
 	dest[3] = NULL;
@@ -477,13 +475,13 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h )
     free(dst1);
 }
 
-void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h )
+void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t *dst )
 {
 	uint8_t *planes[4]; 
 	VJFrame src;
 	VJFrame *src1 = &src;
 	
-	planes[0] = vj_perform_get_preview_buffer();
+	planes[0] = dst;
 
 	veejay_memcpy( src1, frame,sizeof(VJFrame));
 

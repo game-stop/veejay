@@ -21,7 +21,7 @@
 #ifndef COLORHIS_H
 #define COLORHIS_H
 vj_effect *colorhis_init(int w, int h);
-int colorhis_malloc(int w , int h );
-void colorhis_free( );
-void colorhis_apply( VJFrame *frame, int mode,int val, int intensity, int strength);
+void *colorhis_malloc(int w , int h );
+void colorhis_free(void *ptr);
+void colorhis_apply(void *ptr, VJFrame *frame, int *args);
 #endif

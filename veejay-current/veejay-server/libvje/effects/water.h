@@ -21,8 +21,7 @@
 #ifndef WATERRIPPLE_H
 #define WATERRIPPLE_H
 vj_effect *water_init(int width, int height);
-int water_malloc(void **d, int width, int height);
-void water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int fresh_rate,
-                 int loopnum, int decay, int mode, int threshold );
-void water_free(void *ud);
+void  *water_malloc(int width, int height);
+void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
+void water_free(void *ptr);
 #endif

@@ -60,9 +60,13 @@ vj_effect *complexinvert_init(int w, int h)
     return ve;
 }
 
-void complexinvert_apply(VJFrame *frame, int i_angle, int r, int g, int b,
-                         int i_noise)
-{
+void complexinvert_apply(void *ptr, VJFrame *frame, int *args) {
+    int i_angle = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int i_noise = args[4];
+
 	uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
     int accept_angle_tg, accept_angle_ctg, one_over_kc;

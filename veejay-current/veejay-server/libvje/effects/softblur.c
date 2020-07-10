@@ -170,8 +170,11 @@ static void softblur1_apply( VJFrame *frame)
 }
 #endif
 
-void softblur_apply(VJFrame *frame, int type)
+void softblur_apply(void *ptr, VJFrame *frame, int *args)
 {
+   
+    int type = args[0];
+
     switch (type) {
  	   case 0:
 #ifdef HAVE_ASM_MMX
@@ -186,3 +189,18 @@ void softblur_apply(VJFrame *frame, int type)
     }
 }
 
+void softblur_apply_internal(VJFrame *frame, int type)
+{
+    switch (type) {
+ 	   case 0:
+#ifdef HAVE_ASM_MMX
+			mmx_blur(frame);
+#else
+			softblur1_apply(frame);
+#endif
+		break;
+	    case 1:
+			softblur3_apply(frame);
+		break;
+    }
+}

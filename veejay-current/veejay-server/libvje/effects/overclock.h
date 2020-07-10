@@ -21,7 +21,7 @@
 #ifndef OVERCLOCK_H
 #define OVERCLOCK_H
 vj_effect *overclock_init(int w, int h);
-int overclock_malloc(int w, int h );
-void overclock_free();
-void overclock_apply(VJFrame *frame, int val, int r);
+void *overclock_malloc(int w, int h );
+void overclock_free(void *ptr);
+void overclock_apply(void *ptr, VJFrame *frame, int *args);
 #endif

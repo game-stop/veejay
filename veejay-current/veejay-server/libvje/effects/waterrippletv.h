@@ -21,7 +21,7 @@
 #ifndef WARIPPLETV_H
 #define WARIPPLETV_H
 vj_effect* waterrippletv_init(int width, int height);
-int waterrippletv_malloc(int w, int h);
-void waterrippletv_free();
-void waterrippletv_apply(VJFrame *frame, int val, int loop, int decay);
+void *waterrippletv_malloc(int w, int h);
+void waterrippletv_free(void *ptr);
+void waterrippletv_apply(void *ptr,VJFrame *frame, int *args);
 #endif

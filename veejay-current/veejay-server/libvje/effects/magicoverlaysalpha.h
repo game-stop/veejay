@@ -21,5 +21,5 @@
 #ifndef MAGICOVERLAYSALPHA_H
 #define MAGICOVERLAYSALPHA_H
 vj_effect *overlaymagicalpha_init(int w, int h);
-void overlaymagicalpha_apply( VJFrame *frame, VJFrame *frame2, int n, int mode);
+void overlaymagicalpha_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

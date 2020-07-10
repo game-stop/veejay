@@ -21,7 +21,7 @@
 #ifndef RASTER_H
 #define RASTER_H
 vj_effect *raster_init(int w, int h);
-void raster_apply( VJFrame *frame, int val, int mode);
-int raster_malloc (int w , int h);
-void raster_free(void);
+void raster_apply( void *ptr, VJFrame *frame, int *args);
+void *raster_malloc (int w , int h);
+void raster_free(void *ptr);
 #endif

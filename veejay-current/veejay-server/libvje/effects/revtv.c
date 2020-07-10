@@ -55,8 +55,13 @@ vj_effect *revtv_init(int max_width, int max_height)
  * added the variable 'color' , so the user is free to choose replacement result. Default was 0xff.
  *
  **********************************************************************************************/
-void revtv_apply(VJFrame *frame, int linespace, int vscale, int color, int color_num)
+void revtv_apply(void *ptr, VJFrame *frame, int *args )
 {
+    int linespace = args[0];
+    int vscale = args[1];
+    int color = args[2];
+    int color_num = args[3];
+
     int x, y;
     uint8_t *nsrc;
     int X1, X2, X3;

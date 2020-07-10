@@ -21,7 +21,7 @@
 #ifndef FISHEYE_H
 #define FISHEYE_H
 vj_effect *fisheye_init(int w, int h);
-int fisheye_malloc(int w, int h);
-void fisheye_free();
-void fisheye_apply(VJFrame *frame, int val, int alpha );
+void *fisheye_malloc(int w, int h);
+void fisheye_free(void *ptr);
+void fisheye_apply(void *ptr, VJFrame *frame, int *args);
 #endif

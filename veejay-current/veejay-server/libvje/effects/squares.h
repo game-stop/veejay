@@ -21,7 +21,5 @@
 #ifndef SQUARES_H
 #define SQUARES_H
 vj_effect *squares_init(int w, int h);
-void squares_apply( VJFrame *frame, int radius, int mode, int off1, int off2);
-int squares_malloc(int w, int h);
-void squares_free();
+void squares_apply( void *ptr, VJFrame *frame, int *args);
 #endif

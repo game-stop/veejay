@@ -182,8 +182,10 @@ static void softmask_applyycbcr(VJFrame *frame, int paramt)
 }
 
 
-void colorshift_apply(VJFrame *frame, int type, int value)
-{
+void colorshift_apply(void *ptr, VJFrame *frame, int *args ) {
+    int type = args[0];
+    int value = args[1];
+
     switch (type) {
     case 0:
 	softmask_apply(frame, value);

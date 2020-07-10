@@ -356,8 +356,10 @@ static void divide( uint8_t *A, uint8_t *B, int n_pixels )
 	}
 }
 
-void porterduff_apply(VJFrame *frame, VJFrame *frame2, int mode)
-{
+void porterduff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ){
+
+    int mode = args[0];
+
 	const int len = frame->len;
 	switch( mode )
 	{

@@ -149,8 +149,12 @@ static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_
 	}
 }
 
-void alphatransition_apply( VJFrame *frame, VJFrame *frame2, int time_index, int duration, int direction, int threshold  )
-{
+void alphatransition_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int time_index = args[0];
+    int duration = args[1];
+    int direction = args[2];
+    int threshold = args[3];
+
 	alpha_blend_transition(
 		frame->data[0],frame->data[1],frame->data[2],frame->data[3],
 		frame2->data[0],frame2->data[1],frame2->data[2],frame->data[3],

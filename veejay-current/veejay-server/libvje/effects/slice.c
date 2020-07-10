@@ -21,13 +21,20 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "slice.h"
+#include "motionmap.h"
 
-static uint8_t *slice_frame[4] = { NULL,NULL,NULL,NULL };
-static int *slice_xshift = NULL;
-static int *slice_yshift = NULL;
-static int n__ = 0;
-static int N__ = 0;
-void slice_recalc(int width, int height, int val);
+typedef struct {
+    uint8_t *slice_frame[4];
+    int *slice_xshift;
+    int *slice_yshift;
+    int frame_periods;
+    int current_period;
+    int n__;
+    int N__;
+    void *motionmap;
+} slice_t;
+
+void slice_recalc(slice_t *s, int width, int height, int val);
 
 vj_effect *slice_init(int width,int height)
 {
@@ -46,50 +53,60 @@ vj_effect *slice_init(int width,int height)
     ve->description = "Slice Window";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->has_user =0;
 	ve->motion = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Slices", "Slice Period");
 
     return ve;
 }
 
-int 	slice_malloc(int width, int height)
+void *slice_malloc(int width, int height)
 {
-    slice_frame[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height * 4));
-    if(!slice_frame[0])
-	    return 0;
-    slice_frame[1] = slice_frame[0] + RUP8(width * height);
-    slice_frame[2] = slice_frame[1] + RUP8(width * height);
-	slice_frame[3] = slice_frame[2] + RUP8(width * height);
-    slice_xshift = (int*) vj_malloc(sizeof(int) * height);
-    if(!slice_xshift) return 0;
-    slice_yshift = (int*) vj_malloc(sizeof(int) * width);
-    if(!slice_yshift) return 0;
-    slice_recalc(width,height, 63);
-    n__ = 0;
-    N__ = 0; 
-    return 1;
+    slice_t *s = (slice_t*) vj_calloc(sizeof(slice_t));
+    if(!s) {
+        return NULL;
+    }
+    s->slice_frame[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height * 4));
+    if(!s->slice_frame[0]) {
+	    free(s);
+        return NULL;
+    }
+    s->slice_frame[1] = s->slice_frame[0] + RUP8(width * height);
+    s->slice_frame[2] = s->slice_frame[1] + RUP8(width * height);
+	s->slice_frame[3] = s->slice_frame[2] + RUP8(width * height);
+    s->slice_xshift = (int*) vj_malloc(sizeof(int) * height);
+    if(!s->slice_xshift) {
+        free(s->slice_frame[0]);
+        free(s);
+        return NULL;
+    }
+    s->slice_yshift = (int*) vj_malloc(sizeof(int) * width);
+    if(!s->slice_yshift) {
+        free(s->slice_frame[0]);
+        free(s->slice_xshift);
+        free(s);
+    }
+
+    slice_recalc(s, width,height, 63);
+    
+    return (void*) s;
 }
 
 
-void slice_free() {
- if(slice_frame[0])
-	 free(slice_frame[0]);
- slice_frame[0] = NULL;
- slice_frame[1] = NULL;
- slice_frame[2] = NULL;
- slice_frame[3] = NULL;
- if(slice_xshift)
-	 free(slice_xshift);
- if(slice_yshift)
-	 free(slice_yshift);
- slice_yshift = NULL;
- slice_xshift = NULL;
+void slice_free(void *ptr) {
+    slice_t *s = (slice_t*) ptr;
+    free(s->slice_frame[0]);
+    free(s->slice_xshift);
+    free(s->slice_yshift);
+    free(s);
 }
 
 /* much like the bathroom window, width height indicate block size within frame */
-void slice_recalc(int width, int height, int val) {
+void slice_recalc(slice_t *s, int width, int height, int val) {
   unsigned int x,y,dx,dy,r;
+
+  int *slice_xshift = s->slice_xshift;
+  int *slice_yshift = s->slice_yshift;
+
   for(x = dx = 0; x < width; x++) 
   {
     if(dx==0)
@@ -110,10 +127,9 @@ void slice_recalc(int width, int height, int val) {
   }
 }
 
-int frame_periods = 0;
-int current_period = 0;
-
-void slice_apply(VJFrame *frame, int val, int re_init) {
+void slice_apply(void *ptr, VJFrame *frame, int *args ) {
+    int val = args[0];
+    int re_init = args[1];
 	unsigned int x,y,dx,dy;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
@@ -123,19 +139,25 @@ void slice_apply(VJFrame *frame, int val, int re_init) {
 	uint8_t *Cr= frame->data[2];
 	uint8_t *A = frame->data[3];
 
+    slice_t *s = (slice_t*) ptr;
+
 	int interpolate = 1;
 	int tmp1 = val;
 	int tmp2 = re_init;
 	int motion = 0;
 
-	if( frame_periods != re_init ) {
-		frame_periods = re_init;
-		current_period = frame_periods;
+    uint8_t **slice_frame = s->slice_frame;
+    int *slice_xshift = s->slice_xshift;
+    int *slice_yshift = s->slice_yshift;
+
+	if( s->frame_periods != re_init ) {
+		s->frame_periods = re_init;
+		s->current_period = s->frame_periods;
 	}
 
-	if( motionmap_active())
+	if( motionmap_active(s->motionmap))
 	{
-		motionmap_scale_to( 128,1, 2, 0, &tmp1, &tmp2, &n__ , &N__ );
+		motionmap_scale_to(s->motionmap, 128,1, 2, 0, &tmp1, &tmp2, &(s->n__) , &(s->N__) );
 		if( val >= 64 )
 		{
 			if( (rand() % 25 )== 0)
@@ -149,24 +171,24 @@ void slice_apply(VJFrame *frame, int val, int re_init) {
 	}
 	else
 	{
-		n__ = 0;
-		N__ = 0;
+		s->n__ = 0;
+		s->N__ = 0;
 	}
 
-	if( n__ == N__ || n__ == 0 )
+	if( s->n__ == s->N__ || s->n__ == 0 )
 		interpolate = 0;
 
-  if( motionmap_active() ) {
-	 if(tmp2==1) slice_recalc(width,height,tmp1);
+  if( motionmap_active(s->motionmap) ) {
+	 if(tmp2==1) slice_recalc(s,width,height,tmp1);
   }
   else {
-		current_period --;
+		s->current_period --;
 	  
-		if (current_period == 0 ) {
-			slice_recalc(width,height,tmp1);
+		if (s->current_period == 0 ) {
+			slice_recalc(s,width,height,tmp1);
 		}
-		if( current_period <= 0 ) {
-			current_period = frame_periods;
+		if( s->current_period <= 0 ) {
+			s->current_period = s->frame_periods;
 		}
   }
 
@@ -187,10 +209,20 @@ void slice_apply(VJFrame *frame, int val, int re_init) {
   }
 
 	if( interpolate )
-		motionmap_interpolate_frame( frame, N__, n__ );
+		motionmap_interpolate_frame( s->motionmap, frame, s->N__, s->n__ );
 
 	if( motion )
-		motionmap_store_frame( frame );
+		motionmap_store_frame( s->motionmap, frame );
 
+}
+
+int slice_request_fx() {
+    return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
+}
+
+void slice_set_motionmap(void *ptr, void *priv)
+{
+    slice_t *s = (slice_t*) ptr;
+    s->motionmap = priv;
 }
 

@@ -21,8 +21,5 @@
 #ifndef COMPLEXSATURATE_H
 #define COMPLEXSATURATE_H
 vj_effect *complexsaturation_init();
-void complexsaturation_apply(VJFrame *frame, int i_angle,
-                             int red, int green, int blue,
-                             int adjust_degrees, int adjust_v, int i_noise );
-void complexsaturate_free();
+void complexsaturation_apply(void *ptr, VJFrame *frame, int *args);
 #endif

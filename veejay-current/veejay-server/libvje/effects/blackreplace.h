@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2020 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,10 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef TRANSBLEND_H
-#define TRANSBLEND_H
-vj_effect *transblend_init(int width, int height);
-void transblend_apply( VJFrame *frame, VJFrame *frame2, int mode,
-                      int twidth, int theight, int x1, int y1, int x2, int y2);
-
+#ifndef BLACKREPLACE_H
+#define BLACKREPLACE_H
+vj_effect *blackreplace_init(int w, int h);
+void blackreplace_apply(void *ptr, VJFrame *frame, int *args);
 #endif

@@ -27,9 +27,9 @@
 #ifndef PUSH_H
 #define PUSH_H
 vj_effect *bgpush_init(int w, int h);
-void bgpush_apply( VJFrame *frame );
-int bgpush_malloc(int w, int h);
-void bgpush_free();
-int bgpush_prepare( VJFrame *frame );
-uint8_t *bgpush_get_bg_frame( unsigned int plane );
+void bgpush_apply( void *ptr, VJFrame *frame, int *args );
+void *bgpush_malloc(int w, int h);
+void bgpush_free(void *ptr);
+int bgpush_prepare( void *ptr, VJFrame *frame );
+uint8_t *bgpush_get_bg_frame(void *ptr, unsigned int plane );
 #endif

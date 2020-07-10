@@ -60,6 +60,7 @@
 #include <libplugger/freeframe-loader.h>
 #include <libplugger/frei0r-loader.h>
 #include <libplugger/livido-loader.h>
+#include <libvje/libvje.h>
 
 static	vevo_port_t **index_map_ = NULL;
 static  vevo_port_t *illegal_plugins_ =NULL;
@@ -880,8 +881,8 @@ void	plug_print_all()
 	}
 	*/
 
-	veejay_msg(VEEJAY_MSG_INFO, "Loaded %d plugins and %d built-in FX (%d in total)",
-			index_,vj_effect_max_effects(),vj_effect_max_effects()+index_);
+	veejay_msg(VEEJAY_MSG_INFO, "Loaded %d plugins, total FX is %d",
+			index_,vje_max_effects());
 		
 }
 

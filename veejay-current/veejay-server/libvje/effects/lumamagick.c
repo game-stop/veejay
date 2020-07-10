@@ -1001,8 +1001,11 @@ static void lumamagick_addlum(VJFrame *frame, VJFrame *frame2, int op_a, int op_
 	}
 }
 
-void lumamagic_apply(VJFrame *frame, VJFrame *frame2, int n, int op_a, int op_b)
-{
+void lumamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int n = args[0];
+    int op_a = args[1];
+    int op_b = args[2];
+
 	switch (n)
 	{
 		case VJ_EFFECT_BLEND_ADDDISTORT:

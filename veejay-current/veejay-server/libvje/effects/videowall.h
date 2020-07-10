@@ -21,7 +21,7 @@
 #ifndef VIDEOWALL_H
 #define VIDEOWALL_H
 vj_effect *videowall_init(int w, int h);
-int videowall_malloc(int w, int h);
-void videowall_free(void);
-void videowall_apply( VJFrame *frameA, VJFrame *frameB, int a, int b , int c, int d);
+void *videowall_malloc(int w, int h);
+void videowall_free(void *ptr);
+void videowall_apply( void *ptr, VJFrame *frameA, VJFrame *frameB, int *args);
 #endif

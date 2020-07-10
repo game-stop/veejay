@@ -66,15 +66,6 @@ vj_effect *squares_init(int w, int h)
     return ve;
 }
 
-int  squares_malloc(int w, int h) 
-{
-    return 1;
-}
-
-void squares_free() 
-{
-}
-
 static void squares_apply_max( VJFrame *frame, int radius, int orientation, int parity)
 {
     uint8_t *Y = frame->data[0];
@@ -391,8 +382,12 @@ static void squares_apply_average( VJFrame *frame, int radius, int orientation, 
 
 }
 
-void squares_apply( VJFrame *frame, int radius, int mode, int orientation, int parity)
-{
+void squares_apply( void *ptr, VJFrame *frame, int *args ) {
+    int radius = args[0];
+    int mode = args[1];
+    int orientation = args[2];
+    int parity = args[3];
+
     switch(mode) {
         case 0:
             squares_apply_average( frame, radius, (vj_effect_orientation)orientation, (vj_effect_parity)parity );

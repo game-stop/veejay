@@ -23,91 +23,84 @@
 #include <libsubsample/subsample.h>
 #include "bgpush.h"
 
-static uint8_t *frame_data = NULL;
-static uint8_t *frame_ptr[4] = { NULL,NULL,NULL,NULL };
+typedef struct {
+    uint8_t *frame_data;
+    uint8_t *frame_ptr[4];
+} bgpush_t;
 
 vj_effect *bgpush_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 0;
-    ve->description = "Background take-frame (singleton)";
+    ve->description = "Background take-frame";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 0;
     ve->has_user = 0;
     ve->global = 1;
-
+    ve->static_bg = 1;
     return ve;
 }
 
-int bgpush_malloc(int w, int h)
+void *bgpush_malloc(int w, int h)
 {
-	if( frame_data == NULL ) {
-		frame_data =  (uint8_t*) vj_malloc( RUP8(w*h*4) );
-		if( frame_data == NULL )
-			return 0;
-		frame_ptr[0] = frame_data;
-		frame_ptr[1] = frame_ptr[0] + RUP8(w*h);
-		frame_ptr[2] = frame_ptr[1] + RUP8(w*h);
-		frame_ptr[3] = frame_ptr[2] + RUP8(w*h);
+    bgpush_t *b = (bgpush_t*) vj_calloc(sizeof(bgpush_t));
+    if(!b) {
+        free(b);
+        return NULL;
+    }
+    
+	b->frame_data =  (uint8_t*) vj_malloc( RUP8(w*h*4) );
+	b->frame_ptr[0] = b->frame_data;
+	b->frame_ptr[1] = b->frame_ptr[0] + RUP8(w*h);
+	b->frame_ptr[2] = b->frame_ptr[1] + RUP8(w*h);
+	b->frame_ptr[3] = b->frame_ptr[2] + RUP8(w*h);
 
-		veejay_memset( frame_ptr[0], 0, w * h );
-		veejay_memset( frame_ptr[1], 128, w * h );
-		veejay_memset( frame_ptr[2], 128, w * h );
-		veejay_memset( frame_ptr[3], 0, w * h );
-	}
-
-	return 1;
-}
-
-void bgpush_free()
-{
-	if( frame_data ) {
-		free(frame_data);
-		frame_data = NULL;
-		frame_ptr[0] = NULL;
-		frame_ptr[1] = NULL;
-		frame_ptr[2] = NULL;
-		frame_ptr[3] = NULL;
-	}
-}
-
-static int have_bg = 0;
-
-int bgpush_prepare( VJFrame *frame )
-{
-	if( frame_data == NULL )
-		return 0;
-	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
+	veejay_memset( b->frame_ptr[0], 0, w * h );
+	veejay_memset( b->frame_ptr[1], 128, w * h );
+	veejay_memset( b->frame_ptr[2], 128, w * h );
+	veejay_memset( b->frame_ptr[3], 0, w * h );
 	
-	veejay_memcpy( frame_ptr[0], frame->data[0], frame->len );
-	veejay_memcpy( frame_ptr[1], frame->data[1], uv_len );
-	veejay_memcpy( frame_ptr[2], frame->data[2], uv_len );
+	return (void*) b;
+}
+
+void bgpush_free(void *ptr)
+{
+    bgpush_t *b = (bgpush_t*) ptr;
+
+	free(b->frame_data);
+    free(b);
+}
+
+int bgpush_prepare(void *ptr, VJFrame *frame )
+{
+	const int uv_len = (frame->ssm ? frame->len : frame->uv_len );
+	bgpush_t *b = (bgpush_t*) ptr;
+
+	veejay_memcpy( b->frame_ptr[0], frame->data[0], frame->len );
+	veejay_memcpy( b->frame_ptr[1], frame->data[1], uv_len );
+	veejay_memcpy( b->frame_ptr[2], frame->data[2], uv_len );
 
 	if( frame->stride[3] > 0 )
-		veejay_memcpy( frame_ptr[3], frame->data[3], frame->len );
+		veejay_memcpy( b->frame_ptr[3], frame->data[3], frame->len );
 
 	if( frame->ssm == 0 ) {
-		chroma_supersample( SSM_422_444, frame, frame_ptr );
+		chroma_supersample( SSM_422_444, frame, b->frame_ptr );
 	}
-
-	have_bg = 1;
 
 	return 1;
 }
 
 //FIXME: issue #78 , background frame in 4:4:4
 //alpha channel should be cleared according to info->settings->alpha_value
-void bgpush_apply( VJFrame *frame )
+void bgpush_apply( void *ptr, VJFrame *frame, int *args )
 {
-	if( have_bg == 0 ) {
-		veejay_msg(0, "BG Push: Snap the background frame with VIMS 339 or mask button in reloaded");
-	}
 }
 
-uint8_t *bgpush_get_bg_frame( unsigned int plane )
+uint8_t *bgpush_get_bg_frame( void *ptr, unsigned int plane )
 {
-	if( frame_data == NULL )
+    bgpush_t *b = (bgpush_t*) ptr;
+	if( b->frame_data == NULL )
 		return NULL;
-	return frame_ptr[plane];
+	return b->frame_ptr[plane];
 }

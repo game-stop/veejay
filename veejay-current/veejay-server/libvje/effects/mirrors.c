@@ -21,6 +21,7 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "mirrors.h"
+#include "motionmap.h"
 
 vj_effect *mirrors_init(int width,int height)
 {
@@ -130,28 +131,60 @@ static void _mirrors_h( uint8_t *yuv[3], int width, int height, int factor, int 
 	}
 }
 
-static int n__ = 0;
-static int N__ = 0;
-
-void mirrors_apply(VJFrame *frame, int type, int factor )
+typedef struct {
+    int n__;
+    int N__;
+    void *motionmap;
+} mirrors_t;
+    
+void *mirrors_malloc(int w, int h)
 {
+    mirrors_t *m = (mirrors_t*) vj_calloc(sizeof(mirrors_t));
+    if(!m) {
+        return NULL;
+    }
+    return m;
+}       
+
+void mirrors_free(void *ptr)
+{
+    mirrors_t *m = (mirrors_t*) ptr;
+    free(m);
+}
+
+int mirrors_request_fx() {
+    return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
+}
+
+void mirrors_set_motionmap(void *ptr, void *priv) {
+    mirrors_t *m = (mirrors_t*) ptr;
+    m->motionmap = priv;
+}   
+
+void mirrors_apply(void *ptr, VJFrame *frame, int *args ) {
+    int type = args[0];
+    int factor = args[1];
+
+    mirrors_t *m = (mirrors_t*) ptr;
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	int interpolate = 1;
 	int motion = 0;
 	int tmp1 = 0;
 	int tmp2 = factor;
-	if( motionmap_active() )
+
+	if( motionmap_active(m->motionmap) )
 	{
 		int hi = (int)((float)(width * 0.33));
 
-		motionmap_scale_to( hi,hi,0,0,&tmp1,&tmp2,&n__,&N__);
+		motionmap_scale_to( m->motionmap, hi,hi,0,0,&tmp1,&tmp2,&(m->n__),&(m->N__));
 		motion = 1;
 	}
 	else
 	{
-		n__ = 0;
-		N__ = 0;
+		m->n__ = 0;
+		m->N__ = 0;
 		interpolate=0;
 	}
 
@@ -171,7 +204,7 @@ void mirrors_apply(VJFrame *frame, int type, int factor )
 	}
 
 	if( interpolate )
-		motionmap_interpolate_frame( frame, N__,n__ );
+		motionmap_interpolate_frame( m->motionmap, frame, m->N__,m->n__ );
 	if( motion )
-		motionmap_store_frame( frame );
+		motionmap_store_frame( m->motionmap, frame );
 }

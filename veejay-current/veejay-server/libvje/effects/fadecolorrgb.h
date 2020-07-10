@@ -21,5 +21,7 @@
 #ifndef FADECOLORRGB_H
 #define FADECOLORRGB_H
 vj_effect *fadecolorrgb_init();
-void colorfadergb_apply(VJFrame *frame, int opacity, int r, int g, int b);
+void fadecolorrgb_apply(void *ptr, VJFrame *frame, int *args);
+void *fadecolorrgb_malloc(int w, int h);
+void fadecolorrgb_free(void *ptr);
 #endif

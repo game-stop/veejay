@@ -21,10 +21,9 @@
 #ifndef BGSUBTRACT_H
 #define BGSUBTRACT_H
 vj_effect *bgsubtract_init(int width, int height);
-int bgsubtract_instances();
-void bgsubtract_free();
-int bgsubtract_malloc(int w, int h);
-int bgsubtract_prepare(VJFrame *frame); 
-void bgsubtract_apply(VJFrame *frame,int threshold, int method, int enabled, int to_alpha);
-uint8_t *bgsubtract_get_bg_frame(unsigned int plane);
+void bgsubtract_free(void *ptr);
+void *bgsubtract_malloc(int w, int h);
+int bgsubtract_prepare(void *ptr, VJFrame *frame); 
+void bgsubtract_apply(void *ptr, VJFrame *frame, int *args);
+uint8_t *bgsubtract_get_bg_frame(void *ptr, unsigned int plane);
 #endif

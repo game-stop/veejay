@@ -66,29 +66,34 @@ vj_effect *dotillism_init(int w, int h)
     return ve;
 }
 
-static uint8_t *map = NULL;
+typedef struct {
+    uint8_t *map;
+} dotillism_t;
 
-int  dotillism_malloc(int w, int h) 
+void *dotillism_malloc(int w, int h) 
 {
-    if(map == NULL) {
-        map = (uint8_t*) vj_malloc( RUP8(w*h) );
-        if(!map) {
-            return 0;
-        }
+    dotillism_t *d = (dotillism_t*) vj_calloc(sizeof(dotillism_t));
+    if(!d) {
+        return NULL;
+    }
+    d->map = (uint8_t*) vj_malloc( RUP8(w*h) );
+    if(!d->map) {
+        free(d->map);
+        free(d);
+        return NULL;
     }
 
-    return 1;
+    return (void*) d;
 }
 
-void dotillism_free() 
+void dotillism_free(void *ptr) 
 {
-    if(map) {
-        free(map);
-        map = NULL;
-    }
+    dotillism_t *d = (dotillism_t*) ptr;
+    free(d->map);
+    free(d);
 }
 
-static void dotillism_posterize_input(uint8_t *Y, const int len, const int levels, const int invert)
+static void dotillism_posterize_input(uint8_t *map, uint8_t *Y, const int len, const int levels, const int invert)
 {
     const unsigned int factor = (256 / levels);
     unsigned int i;
@@ -139,7 +144,7 @@ static inline void draw_circle_add_UV( uint8_t *data, int cx, int cy, const int 
 }
 
 
-static void dotillism_apply_stage1( VJFrame *frame, int radius, int orientation, int parity)
+static void dotillism_apply_stage1( uint8_t *map, VJFrame *frame, int radius, int orientation, int parity)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -192,7 +197,7 @@ static void dotillism_apply_stage1( VJFrame *frame, int radius, int orientation,
 
 }
 
-static void dotillism_apply_stage2( VJFrame *frame, int radius, int space_y, int space_x, int orientation, int parity)
+static void dotillism_apply_stage2( uint8_t *map, VJFrame *frame, int radius, int space_y, int space_x, int orientation, int parity)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -235,11 +240,20 @@ static void dotillism_apply_stage2( VJFrame *frame, int radius, int space_y, int
 }
 
 
-void dotillism_apply( VJFrame *frame, int radius, int levels, int min_v_spacing, int min_h_spacing, int invert, int orientation, int parity)
-{
-    dotillism_posterize_input( frame->data[0], frame->len, levels, invert );
+void dotillism_apply( void *ptr, VJFrame *frame, int *args ) {
+    int radius = args[0];
+    int levels = args[1];
+    int min_v_spacing = args[2];
+    int min_h_spacing = args[3];
+    int invert = args[4];
+    int orientation = args[5];
+    int parity = args[6];
 
-    dotillism_apply_stage1( frame, radius, orientation, parity);
+    dotillism_t *d = (dotillism_t*) ptr;
 
-    dotillism_apply_stage2( frame, radius, min_v_spacing, min_h_spacing, orientation, parity );
+    dotillism_posterize_input( d->map,frame->data[0], frame->len, levels, invert );
+
+    dotillism_apply_stage1( d->map, frame, radius, orientation, parity);
+
+    dotillism_apply_stage2( d->map, frame, radius, min_v_spacing, min_h_spacing, orientation, parity );
 }

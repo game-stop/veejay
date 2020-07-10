@@ -21,7 +21,7 @@
 #ifndef DISTORT_H
 #define DISTORT_H
 vj_effect *distortion_init(int w, int h);
-void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, int inc_val4, int inc_val5, int inc_val6 );
-int  distortion_malloc(int w, int h);
-void distortion_free();
+void distortion_apply(void *ptr, VJFrame *frame, int *args);
+void *distortion_malloc(int w, int h);
+void distortion_free(void *ptr);
 #endif

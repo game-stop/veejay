@@ -56,16 +56,30 @@ vj_effect *bar_init(int width, int height)
     return ve;
 }
 
-/* p0 351 , p1 92 : positioneert image 1 bovenaan
-   p4 beweegt image offset verticaal (frame in frame)
-   p5 beweegt image offset horizontaal (frame in frame) */
-static int bar_top_auto = 0;
-static int bar_bot_auto = 0;
-static int bar_top_vert = 0;
+typedef struct {
+    int bar_top_auto;
+    int bar_bot_auto;
+    int bar_top_vert;
+    int bar_bot_vert;
+} bar_t;
 
-static int bar_bot_vert = 0;
+void *bar_malloc(int w, int h) {
+    return vj_calloc(sizeof(bar_t));
+}
 
-void bar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_y, int top_x, int bot_x  ) {
+void bar_free(void *ptr) {
+    free(ptr);
+}
+
+
+void bar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int divider = args[0];
+    int top_y = args[1];
+    int bot_y = args[2];
+    int top_x = args[3];
+    int bot_x = args[4];
+
+    bar_t *bar = (bar_t*) ptr;
 
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
@@ -76,8 +90,8 @@ void bar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_
 	unsigned int bottom_height = (height - top_height);
 	int y,x;
 	int yy=0;
-	int y2 = bar_top_auto + top_y;  /* destination */
-	int x2 = bar_top_vert + top_x;
+	int y2 = bar->bar_top_auto + top_y;  /* destination */
+	int x2 = bar->bar_top_vert + top_x;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -85,8 +99,8 @@ void bar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
 
-	if(y2 > width) { y2 = 0; bar_top_auto = 0; }
-	if(x2 > (bottom_height)) {x2 = 0; bar_top_vert = 0; }
+	if(y2 > width) { y2 = 0; bar->bar_top_auto = 0; }
+	if(x2 > (bottom_height)) {x2 = 0; bar->bar_top_vert = 0; }
 	/* start with top frame in a frame */
 	for( y = 0; y < top_height; y++ ) {
 		for ( x = 0; x < top_width; x++ ) {
@@ -96,10 +110,10 @@ void bar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_
 		}
 	}
 	/* do bottom part */
-	y2 = bar_bot_auto + bot_y;
-	x2 = bar_bot_vert + bot_x;
-	if(y2 > width) { y2 = 0; bar_bot_auto = 0; }
-	if(x2 > (bottom_height)) { x2 = 0; bar_bot_vert = 0; }
+	y2 = bar->bar_bot_auto + bot_y;
+	x2 = bar->bar_bot_vert + bot_x;
+	if(y2 > width) { y2 = 0; bar->bar_bot_auto = 0; }
+	if(x2 > (bottom_height)) { x2 = 0; bar->bar_bot_vert = 0; }
 	/* start with bottom frame in a frame */
 	for ( y = bottom_height; y < height; y++) {
 		yy++;
@@ -110,8 +124,8 @@ void bar_apply(VJFrame *frame, VJFrame *frame2, int divider, int top_y, int bot_
 		}
 	}
 
-	bar_top_auto += top_y;
-	bar_bot_auto += bot_y;
-	bar_top_vert += top_x;
-	bar_bot_vert += bot_x;
+	bar->bar_top_auto += top_y;
+	bar->bar_bot_auto += bot_y;
+	bar->bar_top_vert += top_x;
+	bar->bar_bot_vert += bot_x;
 }

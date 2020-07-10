@@ -22,7 +22,7 @@
 #ifndef SPLIT_H
 #define SPLIT_H
 vj_effect *split_init(int width, int height);
-int split_malloc(int w, int h);
-void split_free();
-void split_apply( VJFrame *frame, VJFrame *frame2, int n, int swap);
+void *split_malloc(int w, int h);
+void split_free(void *ptr);
+void split_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

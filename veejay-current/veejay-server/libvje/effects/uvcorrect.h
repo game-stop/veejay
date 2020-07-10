@@ -21,8 +21,7 @@
 #ifndef UVCORRECT_H
 #define UVCORRECT_H
 vj_effect *uvcorrect_init(int w, int h);
-int uvcorrect_malloc(int w, int h);
-void uvcorrect_free(void);
-void uvcorrect_apply(VJFrame *frame, int alpha, int ualpha, int valpha, int uf, 
-                     int vf, int min, int max );
+void *uvcorrect_malloc(int w, int h);
+void uvcorrect_free(void *ptr);
+void uvcorrect_apply(void *ptr, VJFrame *frame, int *args);
 #endif

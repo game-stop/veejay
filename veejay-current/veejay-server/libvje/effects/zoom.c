@@ -64,68 +64,69 @@ vj_effect *zoom_init(int width , int height)
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][3], 3, "Forward", "Reverse" );
 
-
     return ve;
 }
-static int zoom_[4] = { 0,0,0,0 };
-static void *zoom_vp_ = NULL;
 
-static uint8_t *zoom_private_[4] = { NULL, NULL, NULL, NULL };
+typedef struct {
+    int zoom_[4];
+    void *zoom_vp_;
+    uint8_t *zoom_private_[4];
+} zoom_t;
 
-int	zoom_malloc(int width, int height)
+void *zoom_malloc(int width, int height)
 {
-	int i,j;
-	for( i = 0; i < 4; i ++ ) {	
-		zoom_private_[i] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height+width));
-		if(!zoom_private_[i]) {
-            for( j = 0; j < i; j ++ ) {
-                free(zoom_private_[j]);
-                zoom_private_[j] = NULL;
-            }
-			return 0;
-        }
-	}
+    zoom_t *z = (zoom_t*) vj_calloc(sizeof(zoom_t));
+    if(!z)
+        return NULL;
+    z->zoom_private_[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( width * height + width ) * 4 );
+    z->zoom_private_[1] = z->zoom_private_[0] + RUP8(width * height + width);
+    z->zoom_private_[2] = z->zoom_private_[1] + RUP8(width * height + width);
+    z->zoom_private_[3] = z->zoom_private_[2] + RUP8(width * height + width);
 
-	return 1;
+	return (void*) z;
 }
 
-void zoom_free() {
-	int i;
-	for( i = 0; i < 4; i ++ ) {	
-	    if( zoom_private_[i] ) {
-		    free(zoom_private_[i] );
-	        zoom_private_[i] = NULL;
-	    }
+void zoom_free(void *ptr) {
+
+    zoom_t *z = (zoom_t*) ptr;
+    free( z->zoom_private_[0] );
+    if( z->zoom_vp_) {
+        viewport_destroy( z->zoom_vp_ );
     }
-	if( zoom_vp_ )
-		viewport_destroy( zoom_vp_ );
-	zoom_vp_ = NULL;
+    free( z );
 }
 
-void zoom_apply( VJFrame *frame, int x, int y, int factor, int dir, int alpha)
+void zoom_apply( void *ptr, VJFrame *frame, int *args )
 {
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;
+    const int x = args[0];
+    const int y = args[1];
+    const int factor = args[2];
+    const int dir = args[3];
+    const int alpha = args[4];
 
-	if( zoom_[0] != x || zoom_[1] != y || zoom_[2] != factor || !zoom_vp_ || dir != zoom_[3])
+    zoom_t *z = (zoom_t*) ptr;
+
+	if( z->zoom_[0] != x || z->zoom_[1] != y || z->zoom_[2] != factor || !z->zoom_vp_ || dir != z->zoom_[3])
 	{
-		if( zoom_vp_ )
-			viewport_destroy( zoom_vp_ );
-		zoom_vp_ = viewport_fx_zoom_init( VP_QUADZOOM, width,height,x,y,factor, dir );
-		if(!zoom_vp_ )
+		if( z->zoom_vp_ )
+			viewport_destroy( z->zoom_vp_ );
+		z->zoom_vp_ = viewport_fx_zoom_init( VP_QUADZOOM, width,height,x,y,factor, dir );
+		if(!z->zoom_vp_ )
 			return;
-		zoom_[0] = x; zoom_[1] = y; zoom_[2] = factor; zoom_[3] = dir;
+		z->zoom_[0] = x; z->zoom_[1] = y; z->zoom_[2] = factor; z->zoom_[3] = dir;
 	}
 
 	int strides[4] = { len, len, len, (alpha ? len : 0 ) };
-	vj_frame_copy( frame->data, zoom_private_, strides );
+	vj_frame_copy( frame->data, z->zoom_private_, strides );
 
 	if(alpha == 0) {
-		viewport_process_dynamic( zoom_vp_, zoom_private_, frame->data );
+		viewport_process_dynamic( z->zoom_vp_, z->zoom_private_, frame->data );
 	}
 	else {
-		viewport_process_dynamic_alpha( zoom_vp_, zoom_private_, frame->data );
+		viewport_process_dynamic_alpha( z->zoom_vp_, z->zoom_private_, frame->data );
 	}
 	
 }

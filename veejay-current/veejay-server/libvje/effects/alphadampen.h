@@ -21,5 +21,5 @@
 #ifndef ALPHA_DAMPEN_H
 #define ALPHA_DAMPEN_H
 vj_effect *alphadampen_init(int w, int h);
-void alphadampen_apply( VJFrame *frame, int b1);
+void alphadampen_apply( void *ptr, VJFrame *frame, int *args );
 #endif

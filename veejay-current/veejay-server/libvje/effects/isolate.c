@@ -61,8 +61,13 @@ vj_effect *isolate_init(int w, int h)
 
 /* another key derivate */
 
-void isolate_apply( VJFrame *frame, int i_angle, int r, int g, int b, int opacity)
-{
+void isolate_apply( void *ptr, VJFrame *frame, int *args ) {
+    int i_angle = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int opacity = args[4];
+
 	const int len = frame->len;
 	uint8_t *fg_cb, *fg_cr;
     int accept_angle_tg;

@@ -1221,6 +1221,18 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 	}
 }
 
+void
+on_button_samplestart_value_refresh_clicked ( GtkWidget *widget, gpointer user_data )
+{
+    gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART]), 0 );
+}
+
+void
+on_button_sampleend_value_reset_clicked ( GtkWidget *widget, gpointer user_data )
+{
+    gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]), G_MAXDOUBLE);
+}
+
 void	on_slow_slider_value_changed( GtkWidget *widget, gpointer user_data )
 {
 	if(!info->status_lock) {
@@ -2257,7 +2269,8 @@ void on_button_offline_start_clicked(GtkWidget *widget, gpointer user_data)
 
 	if( stream_id > 0 ) {
 		multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d %d", stream_id, get_nums("spin_offlineduration1" ), is_button_toggled("button_offline_autoplay1"));
-	}	
+	    vj_msg(VEEJAY_MSG_INFO, "Started offline recording from stream %d", stream_id );
+    }	
 	else {
 		vj_msg(VEEJAY_MSG_INFO, "You can only use this recorder on streams, not samples!");
 	}
@@ -2540,15 +2553,14 @@ void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
 	}
 	gint duration=get_nums( "cali_duration_spin" );
 
-	if( cali_stream_id <= 0 )  {
-		if(info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
-			cali_stream_id =
-				info->status_tokens[CURRENT_ID];
-	}
+    if( info->status_tokens[STREAM_TYPE] != STREAM_VIDEO4LINUX ) {
+        vj_msg(VEEJAY_MSG_INFO,"Please use a camera source for light/dark frame calibration");
+    }
+
+	cali_stream_id = info->status_tokens[CURRENT_ID];
 
 	if( cali_stream_id <= 0 ) {
 		error_dialog( "Error", "No source selected to calibrate. Play a Live stream or double click one in the List");
-		
 		return;
 	}
 
@@ -2559,9 +2571,6 @@ void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
 			method );
 
 	info->uc.cali_duration = duration;
-
-	//@ substract duration in status pipe
-	
 }
 
 void	on_cali_darkframe_clicked( GtkButton *button, gpointer data ) 
@@ -3756,6 +3765,79 @@ void
 on_vims_messenger_clear_clicked( GtkButton *togglebutton, gpointer user_data)
 {
 	clear_textview_buffer( "vims_messenger_textview");
+}
+
+static void set_transition()
+{
+    multi_vims(
+            VIMS_SET_TRANSITION,
+            "%d %d %d %d %d",
+            info->status_tokens[PLAY_MODE],
+            info->status_tokens[CURRENT_ID],
+            is_button_toggled( "transition_active" ),
+            get_nums( "transition_shape" ),
+            get_nums( "transition_length" )
+            );
+}
+
+void
+transition_length_value_changed( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    set_transition();
+}
+
+void
+transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    set_transition();
+}
+
+void
+transition_set_active( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    set_transition();
+}
+
+static void tag_set_transition()
+{
+    multi_vims(
+            VIMS_SET_TRANSITION,
+            "%d %d %d %d %d",
+            info->status_tokens[PLAY_MODE],
+            info->status_tokens[CURRENT_ID],
+            is_button_toggled( "tag_transition_active" ),
+            get_nums( "tag_transition_shape" ),
+            get_nums( "tag_transition_length" )
+            );
+}
+
+void
+on_tag_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    tag_set_transition();
+}
+
+void
+on_tag_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    tag_set_transition();
+}
+
+void on_tag_transition_active_toggled( GtkWidget *widget, gpointer user_data)
+{
+    if(info->status_lock)
+        return;
+    tag_set_transition();
 }
 
 void

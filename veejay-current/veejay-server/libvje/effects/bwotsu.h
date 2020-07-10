@@ -21,5 +21,5 @@
 #ifndef BWOTSU_H
 #define BWOTSU_H
 vj_effect *bwotsu_init();
-void bwotsu_apply(VJFrame *frame, int mode, int skew, int invert );
+void bwotsu_apply(void *ptr, VJFrame *frame, int *args);
 #endif

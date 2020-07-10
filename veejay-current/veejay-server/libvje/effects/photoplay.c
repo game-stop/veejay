@@ -59,92 +59,105 @@ vj_effect *photoplay_init(int w, int h)
     return ve;
 }
 
-static picture_t **photo_list = NULL;
-static int	num_photos = 0;
-static int	frame_counter = 0;
-static int	frame_delay = 0;
-static int	*rt = NULL;
-static int	last_mode = -1;	
+typedef struct {
+    picture_t **photo_list;
+    int	num_photos;
+    int	frame_counter;
+    int	frame_delay;
+    int	*rt;
+    int	last_mode;
+} photoplay_t;
 
-static	int prepare_filmstrip(int film_length, int w, int h)
+static	int prepare_filmstrip(photoplay_t *p, int film_length, int w, int h)
 {
 	int i,j;
 	int picture_width = w / sqrt(film_length);
 	int picture_height = h / sqrt(film_length);
 
-	photo_list = (picture_t**) vj_calloc(sizeof(picture_t*) * (film_length + 1) );
-	if(!photo_list)
+	p->photo_list = (picture_t**) vj_calloc(sizeof(picture_t*) * (film_length + 1) );
+	if(!p->photo_list)
 		return 0;
 
-	rt = (int*) vj_calloc(sizeof(int) * film_length );
-	if(!rt)
-		return 0;
+	p->rt = (int*) vj_calloc(sizeof(int) * film_length );
+	if(!p->rt) 
+        return 0;
+    
+	p->num_photos = film_length;
 
-	num_photos = film_length;
-
-	for ( i = 0; i < num_photos; i ++ )
+	for ( i = 0; i < p->num_photos; i ++ )
 	{
-		photo_list[i] = vj_malloc(sizeof(picture_t));
-		if(!photo_list[i])
+		p->photo_list[i] = vj_malloc(sizeof(picture_t));
+		if(!p->photo_list[i])
 			return 0;
-		photo_list[i]->w = picture_width;
-		photo_list[i]->h = picture_height;
+		p->photo_list[i]->w = picture_width;
+		p->photo_list[i]->h = picture_height;
 		for( j = 0; j < 3; j ++ )
 		{
-			photo_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
-			if(!photo_list[i]->data[j])
+			p->photo_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
+			if(!p->photo_list[i]->data[j])
 				return 0;
-			veejay_memset(photo_list[i]->data[j], (j==0 ? pixel_Y_lo_ : 128), picture_width *picture_height );
+			veejay_memset(p->photo_list[i]->data[j], (j==0 ? pixel_Y_lo_ : 128), picture_width *picture_height );
 		}
 	}
-	frame_counter = 0;
+	p->frame_counter = 0;
 
 	return 1;
 }
 
-static void destroy_filmstrip(void)
+static void destroy_filmstrip(photoplay_t *p)
 {
-	if(photo_list)
+	if(p->photo_list)
 	{
 		int i = 0;
-		while(i < num_photos)
+		while(i < p->num_photos)
 		{
-			if( photo_list[i] )
+			if( p->photo_list[i] )
 			{
 				int j;
-				for( j = 0; j < 3; j ++ )
-					if(photo_list[i]->data[j]) 
-					 free(photo_list[i]->data[j]);
-				free(photo_list[i]);
+				for( j = 0; j < 3; j ++ ) {
+					if(p->photo_list[i]->data[j]) {
+					 free(p->photo_list[i]->data[j]);
+                     p->photo_list[i]->data[j] = NULL;
+                    }
+                }
+				free(p->photo_list[i]);
+                p->photo_list[i] = NULL;
 			}
 			i++;
 		}
-		free(photo_list);
+		free(p->photo_list);
+        p->photo_list = NULL;
 	}
-	if(rt)
-		free(rt);
-	photo_list = NULL;
-	num_photos = 0;
-	frame_counter = 0;
-	rt = NULL;
-	last_mode = -1;
+	if(p->rt) {
+		free(p->rt);
+        p->rt = NULL;
+    }
+    p->num_photos = 0;
+    p->frame_counter = 0;
+    p->last_mode = -1;
+    p->frame_delay = 0;
 }
 
 
 
-int	photoplay_malloc(int w, int h )
+void *photoplay_malloc(int w, int h )
 {
-	num_photos = 0;
-	return 1;
+    photoplay_t *p = (photoplay_t*) vj_calloc(sizeof(photoplay_t));
+    if(!p) {
+        return NULL;
+    }
+    return (void*) p;
 }
 
 
-void	photoplay_free(void)
+void	photoplay_free(void *ptr)
 {
-	destroy_filmstrip();
+    photoplay_t *p = (photoplay_t*) ptr;
+	destroy_filmstrip(p);
+    free(p);
 }
 
-static void	take_photo( uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
+static void	take_photo( photoplay_t *p, uint8_t *plane, uint8_t *dst_plane, int w, int h, int index )
 {
 
 	int x,y,dx,dy;
@@ -152,8 +165,8 @@ static void	take_photo( uint8_t *plane, uint8_t *dst_plane, int w, int h, int in
 	int dst_x, dst_y;
 	int step_y;
 	int step_x;
-	int box_width = photo_list[index]->w;
-	int box_height = photo_list[index]->h;
+	int box_width = p->photo_list[index]->w;
+	int box_height = p->photo_list[index]->h;
 
 	step_x = w / box_width;
 	step_y = h / box_height;
@@ -182,10 +195,10 @@ static void	take_photo( uint8_t *plane, uint8_t *dst_plane, int w, int h, int in
 	}
 }
 
-static void put_photo( uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h, int index , matrix_t matrix)
+static void put_photo( photoplay_t *p, uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h, int index , matrix_t matrix)
 {
-	int box_w = photo_list[index]->w;
-	int box_h = photo_list[index]->h;
+	int box_w = p->photo_list[index]->w;
+	int box_h = p->photo_list[index]->h;
 	int x,y;
 
 	uint8_t *P = dst_plane + (matrix.h*dst_w);
@@ -201,8 +214,11 @@ static void put_photo( uint8_t *dst_plane, uint8_t *photo, int dst_w, int dst_h,
 	}
 }
 
-void photoplay_apply( VJFrame *frame, int size, int delay, int mode )
-{
+void photoplay_apply(  void *ptr, VJFrame *frame, int *args ) {
+    int size = args[0];
+    int delay = args[1];
+    int mode = args[2];
+
 	unsigned int i;
 
 	const unsigned int width = frame->width;
@@ -211,44 +227,47 @@ void photoplay_apply( VJFrame *frame, int size, int delay, int mode )
 	uint8_t *dstU = frame->data[1];
 	uint8_t *dstV = frame->data[2];
 
-	if( (size*size) != num_photos || num_photos == 0)
+    photoplay_t *p = (photoplay_t*) ptr;
+
+	if( (size*size) != p->num_photos || p->num_photos == 0)
 	{
-		destroy_filmstrip();
-		if(!prepare_filmstrip(size*size, width,height))
+		destroy_filmstrip(p);
+		if(!prepare_filmstrip(p,size*size, width,height))
 		{
+            destroy_filmstrip(p);
 			return;
 		}
-		frame_delay = 0;
+		p->frame_delay = 0;
 
-		for( i = 0; i < num_photos; i ++ )
-			rt[i] = i;
+		for( i = 0; i < p->num_photos; i ++ )
+			p->rt[i] = i;
 
 		if( mode == 0)
-			fx_shuffle_int_array( rt, num_photos );
+			fx_shuffle_int_array( p->rt, p->num_photos );
 	}
 
-	if(last_mode != mode)
+	if(p->last_mode != mode)
 	{
-		for( i = 0; i < num_photos; i ++ )
-			rt[i] = i;
+		for( i = 0; i < p->num_photos; i ++ )
+			p->rt[i] = i;
 
 		if( mode == 0)
-			fx_shuffle_int_array( rt, num_photos );
+			fx_shuffle_int_array( p->rt, p->num_photos );
 
 	}
 
-	last_mode = mode;
+	p->last_mode = mode;
 
-	if( frame_delay )
-		frame_delay --;
+	if( p->frame_delay )
+		p->frame_delay --;
 
-	if( frame_delay == 0)
+	if( p->frame_delay == 0)
 	{	
 		for( i = 0; i < 3; i ++ )
 		{
-			take_photo( frame->data[i], photo_list[(frame_counter%num_photos)]->data[i], width, height , frame_counter % num_photos);
+			take_photo(p, frame->data[i], p->photo_list[(p->frame_counter%p->num_photos)]->data[i], width, height , p->frame_counter % p->num_photos);
 		}
-		frame_delay = delay;
+		p->frame_delay = delay;
 	}
 
 
@@ -260,15 +279,15 @@ void photoplay_apply( VJFrame *frame, int size, int delay, int mode )
 		matrix_placement = get_matrix_func(mode-1);
 	}
 
-	for( i = 0; i < num_photos; i ++ ) 
+	for( i = 0; i < p->num_photos; i ++ ) 
 	{
-		matrix_t m = matrix_placement( rt[i], size,width,height );
-		put_photo( dstY, photo_list[i]->data[0],width,height,i,m);
-		put_photo( dstU, photo_list[i]->data[1],width,height,i,m);
-		put_photo( dstV, photo_list[i]->data[2],width,height,i,m);
+		matrix_t m = matrix_placement( p->rt[i], size,width,height );
+		put_photo(p, dstY, p->photo_list[i]->data[0],width,height,i,m);
+		put_photo(p, dstU, p->photo_list[i]->data[1],width,height,i,m);
+		put_photo(p, dstV, p->photo_list[i]->data[2],width,height,i,m);
 	}
 
-	if(frame_delay == delay)
-		frame_counter ++;
+	if(p->frame_delay == delay)
+		p->frame_counter ++;
 }
 

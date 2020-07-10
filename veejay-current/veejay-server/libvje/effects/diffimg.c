@@ -58,8 +58,11 @@ vj_effect *diffimg_init(int width, int height)
     return ve;
 }
 
-void diffimg_apply(VJFrame *frame, int type, int threshold_min, int threshold_max)
-{
+void diffimg_apply(void *ptr, VJFrame *frame, int *args) {
+    int type = args[0];
+    int threshold_min = args[1];
+    int threshold_max = args[2];
+
 	unsigned int i;
 	const int width = frame->width;
 	const int len = frame->len - width - 2;

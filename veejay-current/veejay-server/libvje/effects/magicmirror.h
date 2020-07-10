@@ -21,7 +21,9 @@
 #ifndef MAGICMIRROR_H
 #define MAGICMIRROR_H
 vj_effect *magicmirror_init(int w, int h);
-int magicmirror_malloc(int w, int h);
-void magicmirror_apply( VJFrame *frame, int a, int b, int na, int nb, int alpha);
-void magicmirror_free();
+void *magicmirror_malloc(int w, int h);
+void magicmirror_apply(void *ptr, VJFrame *frame, int *args);
+void magicmirror_free(void *ptr);
+int magicmirror_request_fx();
+void magicmirror_set_motionmap(void *ptr, void *priv);
 #endif

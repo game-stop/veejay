@@ -926,8 +926,10 @@ static void chromamagic_modadd(VJFrame *frame, VJFrame *frame2, int op_a)
 }
 
 
-void chromamagick_apply(VJFrame *frame, VJFrame *frame2, int type, int op_a)
-{
+void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int type = args[0];
+    int op_a = args[1];
+
     switch (type) {
     case 0:
 	chromamagic_addsubselectlum(frame, frame2, op_a);

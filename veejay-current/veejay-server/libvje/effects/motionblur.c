@@ -22,7 +22,6 @@
 #include <veejaycore/vjmem.h>
 #include "motionblur.h"
 
-static uint8_t *previous_frame[3] = { NULL,NULL,NULL };
 vj_effect *motionblur_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -41,34 +40,53 @@ vj_effect *motionblur_init(int width, int height)
 	ve->param_description = vje_build_param_list( ve->num_params, "Frames" );
 	 return ve;
 }
-static	int	 last_max = 0;
-static int n_motion_frames = 0;
-int motionblur_malloc(int width, int height)
+
+typedef struct {
+    uint8_t *previous_frame[3];
+    int last_max;
+    int n_motion_frames;
+} motionblur_t;
+
+void *motionblur_malloc(int width, int height)
 {
-	int i;
-	for( i = 0;i < 3 ; i ++ )
-		previous_frame[i] = vj_malloc(sizeof(uint8_t) * width * height);
-	n_motion_frames = 0;
-	return 1;
+    motionblur_t *m = (motionblur_t*) vj_calloc(sizeof(motionblur_t));
+    if(!m) {
+        return NULL;
+    }
+    m->previous_frame[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(width * height *3));
+    if(!m->previous_frame[0]) {
+        free(m);
+        return NULL;
+    }
+    m->previous_frame[1] = m->previous_frame[0] + RUP8(width*height);
+    m->previous_frame[2] = m->previous_frame[1] + RUP8(width*height);
+	
+    return (void*) m;
 }
 
-void motionblur_free() {
-	int i;
-	for( i =0; i < 3 ; i ++ )
-	  free(previous_frame[i]); 
+void motionblur_free(void *ptr) {
+
+    motionblur_t *m = (motionblur_t*) ptr;
+    free(m->previous_frame[0]);
+    free(m);
 }
 
 
-void motionblur_apply( VJFrame *frame, int n) {
+void motionblur_apply( void *ptr, VJFrame *frame, int *args ) {
+    int n = args[0];
 	const int len = frame->len;
 	const int uv_len = frame->uv_len;
+
+    motionblur_t *m = (motionblur_t*) ptr;
 
 	unsigned int i;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-        if(n_motion_frames > 0) {
+    uint8_t **previous_frame = m->previous_frame;
+
+    if(m->n_motion_frames > 0) {
 	  
 	  for(i=0; i < len; i++) {
 		Y[i] = (Y[i] + previous_frame[0][i])>>1;
@@ -95,18 +113,13 @@ void motionblur_apply( VJFrame *frame, int n) {
 		}
 	}
 
-	n_motion_frames ++;
+	m->n_motion_frames ++;
 
-	if( last_max != n ) {
-		last_max = n;
-		if( n_motion_frames > last_max ) {
-			n_motion_frames = 1;
+	if( m->last_max != n ) {
+		m->last_max = n;
+		if( m->n_motion_frames > m->last_max ) {
+			m->n_motion_frames = 1;
 		}
-	}
-	uint8_t t = num_threaded_tasks();
-	if( t <= 0 ) t = 1;
-	if(n_motion_frames >= ( n * t ) ) {
-		n_motion_frames = 0;
 	}
 
 }

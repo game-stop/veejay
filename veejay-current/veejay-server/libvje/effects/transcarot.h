@@ -18,8 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef SLIDINGDOOR_H
-#define SLIDINGDOOR_H
-vj_effect *slidingdoor_init(int width, int height);
-void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int mode);
+#ifndef TRANSCAROT_H
+#define TRANSCAROT_H
+vj_effect *transcarot_init(int width, int height);
+void transcarot_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

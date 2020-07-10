@@ -25,14 +25,12 @@
 #include "softblur.h"
 #include "diff.h"
 
-static uint8_t *static_bg = NULL;
-static uint32_t *dt_map = NULL;
-
-typedef struct
-{
+typedef struct {
+    uint8_t *static_bg;
+    uint32_t *dt_map;
 	uint8_t *data;
 	uint8_t *current;
-} diff_data;
+} diff_t;
 
 vj_effect *diff_init(int width, int height)
 {
@@ -60,7 +58,7 @@ vj_effect *diff_init(int width, int height)
 	ve->extra_frame = 1;
 	ve->sub_format = 1;
 	ve->has_user = 1;
-	ve->user_data = NULL;
+    ve->static_bg = 1;
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show mask/image", "Thinning" );
 	ve->hints = vje_init_value_hint_list( ve->num_params );
@@ -70,65 +68,72 @@ vj_effect *diff_init(int width, int height)
 	return ve;
 }
 
-void	diff_destroy(void)
+void *diff_malloc(int width, int height)
 {
-	if(static_bg)
-		free(static_bg);
-	if(dt_map)
-		free(dt_map);
-	static_bg = NULL;
-	dt_map = NULL;
+	diff_t *d = (diff_t*) vj_calloc(sizeof(diff_t));
+    if(!d) {
+        return NULL;
+    }
+
+	d->data = (uint8_t*) vj_calloc( RUP8(sizeof(uint8_t) * width * height + width) );
+    if(!d->data) {
+        diff_free(d);
+        return NULL;
+    }
+	d->static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height ) + RUP8(width * 2));
+	if(!d->static_bg) {
+        diff_free(d);
+        return NULL;
+    }
+
+	d->dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * RUP8(width * height) + RUP8(width * 2));
+	if(!d->dt_map) {
+        diff_free(d);
+        return NULL;
+    }
+
+    return (void*) d;
 }
 
-int diff_malloc(void **d, int width, int height)
+void diff_free(void *ptr)
 {
-	diff_data *my;
-	*d = (void*) vj_calloc(sizeof(diff_data));
-	my = (diff_data*) *d;
-	my->data = (uint8_t*) vj_calloc( RUP8(sizeof(uint8_t) * width * height + width) );
-
-	if(static_bg == NULL)	
-		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height ) + RUP8(width * 2));
-	if(dt_map == NULL )
-		dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * RUP8(width * height) + RUP8(width * 2));
-	return 1;
+    diff_t *d = (diff_t*) ptr;
+    if(d->data) {
+        free(d->data);
+    }
+    if(d->static_bg) {
+        free(d->static_bg);
+    }
+    if(d->dt_map) {
+        free(d->dt_map);
+    }
+    free(d);
 }
 
-void diff_free(void *d)
+int diff_prepare(void *ptr, VJFrame *frame )
 {
-	if(d)
-	{
-		diff_data *my = (diff_data*) d;
-		if(my->data) free(my->data);
-		free(d);
-	}
-	d = NULL;
-}
-
-int diff_prepare(void *user, uint8_t *map[4], int width, int height)
-{
-	if(!static_bg )
-	{
-		return 0;
-	}
-	
-	veejay_memcpy( static_bg, map[0], (width*height));
+    diff_t *d = (diff_t*) ptr;
+	veejay_memcpy( d->static_bg, frame->data[0], frame->len );
 	
 	VJFrame tmp;
 	veejay_memset( &tmp, 0, sizeof(VJFrame));
-	tmp.data[0] = static_bg;
-	tmp.width = width;
-	tmp.height = height;
-	softblur_apply( &tmp, 0);
+	tmp.data[0] = d->static_bg;
+    tmp.len = frame->len;
+    tmp.width = frame->width;
+    tmp.height = frame->height;
+	softblur_apply_internal( &tmp, 0);
 	veejay_msg(2 , "Map B to A: Snapped background frame");
 
 	return 1;
 }
 
 
-void diff_apply(void *ed, VJFrame *frame, VJFrame *frame2, int threshold,
-                int reverse, int mode, int feather)
-{
+void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int threshold = args[0];
+    int reverse = args[1];
+    int mode = args[2];
+    int feather = args[3];
+
 	unsigned int i;
 	const int len = frame->len;
 	const unsigned int width = frame->width;
@@ -139,21 +144,23 @@ void diff_apply(void *ed, VJFrame *frame, VJFrame *frame2, int threshold,
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
-	diff_data *ud = (diff_data*) ed;
+	diff_t *d = (diff_t*) ptr;
+
+    uint32_t *dt_map = d->dt_map;
+    uint8_t *static_bg = d->static_bg;
 
 	//@ clear distance transform map
 	vj_frame_clear1( (uint8_t*) dt_map, 0 , len * sizeof(uint32_t) );
 
-	//@ todo: optimize with mmx
-	binarify( ud->data, static_bg, frame->data[0], threshold, reverse,len );
+	binarify( d->data, static_bg, frame->data[0], threshold, reverse,len );
 
 	//@ calculate distance map
-	veejay_distance_transform8( ud->data, width, height, dt_map );
+	veejay_distance_transform8( d->data, width, height, dt_map );
 	
 	if(mode==1)
 	{
 		//@ show difference image in grayscale
-		vj_frame_copy1( ud->data, Y, len );
+		vj_frame_copy1( d->data, Y, len );
 		vj_frame_clear1( Cb, 128, len );
 		vj_frame_clear1( Cr, 128, len );
 

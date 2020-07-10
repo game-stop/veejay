@@ -18,10 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef TRANSLINE_H
-#define TRANSLINE_H
-vj_effect *transline_init(int width, int height);
-
-void transline_apply( VJFrame *frame, VJFrame *frame2, int distance,
-                     int line_width, int opacity, int type);
+#ifndef CHANNELOVERLAY_H
+#define CHANNELOVERLAY_H
+vj_effect *channeloverlay_init(int width, int height);
+void channeloverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

@@ -132,11 +132,16 @@
 #endif
 #define HZ 100
 #include <libel/vj-el.h>
+
+#include <libvje/libvje.h>
+#include <libvje/effects/shapewipe.h>
+
+#include <omp.h>
+
 #define VALUE_NOT_FILLED -10000
 
 extern void vj_osc_set_veejay_t(veejay_t *t);
 extern void GoMultiCast(const char *groupname);
-extern void set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
  
 #ifdef HAVE_SDL
 extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
@@ -168,12 +173,12 @@ int veejay_get_state(veejay_t *info) {
 int	veejay_set_yuv_range(veejay_t *info) {
 	switch(info->pixel_format) {
 		case FMT_422:
-			set_pixel_range( 235,240,16,16 );
+			vje_set_pixel_range( 235,240,16,16 );
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using YUV range { Y=16-235, U/V=16-240 }");
 			return 0;
 			break;
 		default:
-			set_pixel_range( 255, 255,0,0 );
+			vje_set_pixel_range( 255, 255,0,0 );
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using YUV { Y=0-255, U/V=0-255 }");
 			break;
 	}
@@ -389,7 +394,8 @@ int veejay_free(veejay_t * info)
 
 	vj_avcodec_free();
 
-	vj_effect_shutdown();
+    //FIXME
+	//vj_effect_shutdown();
 
 	task_destroy();
 
@@ -409,6 +415,15 @@ int veejay_free(veejay_t * info)
 	if( info->effect_frame_info) free(info->effect_frame_info);
 	if( info->effect_frame2) free(info->effect_frame2);
 	if( info->effect_info) free( info->effect_info );
+	if( info->effect_frame3) free(info->effect_frame3);
+	if( info->effect_frame_info2) free(info->effect_frame_info2);
+	if( info->effect_frame4) free(info->effect_frame4);
+	if( info->effect_info2) free( info->effect_info2 );
+
+    if( info->settings->transition.ptr ) {
+        shapewipe_free(info->settings->transition.ptr);
+    }
+
 	if( info->dummy ) free(info->dummy );
 	
     free( info->seq );
@@ -544,8 +559,12 @@ int veejay_init_editlist(veejay_t * info)
     return 0;
 }
 
-static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
+int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 {
+    if( info->settings->transition.active ) {
+        return 0;
+    }
+
 	if(!sample_stop_playing( info->uc->sample_id, new_sample_id ) )
 	{
 		veejay_msg(0, "Error while stopping sample %d", new_sample_id );
@@ -565,6 +584,10 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 }
 static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 {
+    if( info->settings->transition.active ) {
+        return;
+    }
+
 	vj_tag_disable( info->uc->sample_id );
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
@@ -576,20 +599,22 @@ static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 }
 int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 {
-	int looptype,speed,start,end;
 	video_playback_setup *settings = info->settings;
+    int looptype,speed,start,end;
 
-	editlist *E = sample_get_editlist( sample_id );
+    editlist *E = sample_get_editlist( sample_id );
 	info->current_edit_list = E;
 	veejay_reset_el_buffer(info);
 
 	sample_start_playing( sample_id, info->no_caching );
-	int tmp = sample_chain_malloc( sample_id );
 
    	sample_get_short_info( sample_id , &start,&end,&looptype,&speed);
 
 	settings->min_frame_num = 0;
 	settings->max_frame_num = sample_video_length( sample_id );
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Start playing sample %d, from frame %ld to %ld", sample_id, settings->min_frame_num, settings->max_frame_num );
+
 	settings->first_frame = 1;
 	/*
 #ifdef HAVE_FREETYPE
@@ -624,8 +649,8 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
      veejay_set_speed(info, speed);
  	 
-	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, End=%d, Loop=%d)",
-			sample_id, tmp,info->sfd, speed, start, end, looptype );
+	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (Sl=%d, Speed=%d, Start=%d, End=%d, Loop=%d)",
+			sample_id, info->sfd, speed, start, end, looptype );
 	 
 	 return 1;
 }
@@ -641,7 +666,6 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 //	vj_tag_set_active( stream_id, 1 );
 
-	int	tmp = vj_tag_chain_malloc( stream_id);
 	if( settings->current_playback_speed == 0 )
 		settings->current_playback_speed = 1;
 	settings->min_frame_num = 1;
@@ -662,7 +686,7 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	info->last_tag_id = stream_id;
 	info->uc->sample_id = stream_id;
 
-	veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp, settings->max_frame_num );
+	veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (%ld - %ld)", stream_id, settings->min_frame_num, settings->max_frame_num );
 
 	info->current_edit_list = info->edit_list;
   	 
@@ -675,6 +699,7 @@ static int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 {
+    video_playback_setup *settings = info->settings;
 	if( new_pm == VJ_PLAYBACK_MODE_SAMPLE ) {
 		if(!sample_exists(sample_id)) {
 			veejay_msg(0,"Sample %d does not exist");
@@ -691,6 +716,36 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 			return;	
 		}
 	}
+
+    if( !info->seq->active && settings->transition.ready == 0 && new_pm != VJ_PLAYBACK_MODE_PLAIN && ( sample_id != info->uc->sample_id || new_pm != info->uc->playback_mode)) {
+        settings->transition.next_type = new_pm;
+        settings->transition.next_id = sample_id;
+        
+        int transition_length = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_length( info->uc->sample_id ) : vj_tag_get_transition_length( info->uc->sample_id ) );
+        int transition_shape = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_shape( info->uc->sample_id ) : vj_tag_get_transition_shape( info->uc->sample_id ) );
+
+        if( transition_shape == -1 ) {
+            transition_shape = ( (int) ( (double) shapewipe_get_num_shapes( settings->transition.ptr ) * rand() / (RAND_MAX)));
+        }
+
+        if(settings->current_playback_speed < 0 ) {
+            settings->transition.start = settings->current_frame_num;
+            settings->transition.end = settings->current_frame_num - transition_length;
+            if(settings->transition.end < settings->min_frame_num)
+                settings->transition.end = settings->min_frame_num;
+        }
+        else if(settings->current_playback_speed > 0 ) {
+            settings->transition.start = settings->current_frame_num;
+            settings->transition.end = settings->current_frame_num + transition_length;
+            if( settings->transition.end > settings->max_frame_num )
+                settings->transition.end = settings->max_frame_num;
+        }
+        settings->transition.shape = transition_shape;
+        settings->transition.active = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_active( info->uc->sample_id ) : vj_tag_get_transition_active(info->uc->sample_id));
+    
+        if(settings->transition.active)
+            return;
+    }
 
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
 	{
@@ -1060,7 +1115,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 
 		int usec_since_lastframe=0;
 		for (;;) {
-			clock_gettime( CLOCK_REALTIME, &now );
+			clock_gettime( CLOCK_MONOTONIC, &now );
 		
 			usec_since_lastframe = (now.tv_nsec - settings->lastframe_completion.tv_nsec)/1000;
 		
@@ -1074,13 +1129,13 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 			}
 	
 			nsecsleep.tv_nsec = (settings->usec_per_frame - usec_since_lastframe -  1000000 / HZ) * 1000;    	
-	    		nsecsleep.tv_sec = 0;
-	    		clock_nanosleep(CLOCK_REALTIME,0, &nsecsleep, NULL);
+	    	nsecsleep.tv_sec = 0;
+	    	clock_nanosleep(CLOCK_MONOTONIC,0, &nsecsleep, NULL);
 		}
     }
 
     settings->first_frame = 0;
-    clock_gettime( CLOCK_REALTIME, &(settings->lastframe_completion) );
+    clock_gettime( CLOCK_MONOTONIC, &(settings->lastframe_completion) );
     settings->syncinfo[settings->currently_processed_frame].timestamp = settings->lastframe_completion;
 }
 
@@ -1117,7 +1172,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		// 33 status symbols
+		// 36 status symbols
 			{
 				char *ptr = info->status_what;
 				*ptr++ = ' ';
@@ -1153,6 +1208,10 @@ static void veejay_pipe_write_status(veejay_t * info)
 				*ptr++ = '0'; *ptr++ = ' ';
                 *ptr++ = '0'; *ptr++ = ' ';
                 *ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0'; *ptr++ = ' ';
+                *ptr++ = '0'; *ptr++ = ' ';
+
                 ptr = vj_sprintf(ptr, settings->feedback); *ptr++ = ' ';
 				ptr = vj_sprintf(ptr, tags); *ptr++ = ' ';
 			}
@@ -1807,25 +1866,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 	int full_range = veejay_set_yuv_range( info );
 	yuv_set_pixel_range(full_range);
-    vj_effect_set_rgb_parameter_conversion_type(full_range);
+    vje_set_rgb_parameter_conversion_type(full_range);
 
 	info->settings->sample_mode = SSM_422_444;
-/*
-	veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:2 Planar, %d x %d",
-	           info->video_output_width,
-	           info->video_output_height);
-	veejay_msg(VEEJAY_MSG_DEBUG, "FX Frame Info: %d x %d, ssm=%d, format=%d",
-	           info->effect_frame1->width,info->effect_frame1->height,
-	           info->effect_frame1->ssm,
-	           info->effect_frame1->format );
-	veejay_msg(VEEJAY_MSG_DEBUG, "               %d x %d (h=%d,v=%d)",
-	           info->effect_frame1->uv_width,info->effect_frame1->uv_height,
-	           info->effect_frame1->shift_v, info->effect_frame1->shift_h );
-	veejay_msg(VEEJAY_MSG_DEBUG, "               Y=%d bytes, UV=%d bytes",
-	           info->effect_frame1->len,
-	           info->effect_frame1->uv_len );
-	veejay_msg(VEEJAY_MSG_DEBUG, "               full range=%d",
-			full_range ); */
 
 	if(( info->effect_frame1->width % 4) != 0 || (info->effect_frame1->height % 4) != 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "You should specify an output resolution that is a multiple of 4");
@@ -1879,11 +1922,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->audio = NO_AUDIO;
 	}
 
-	vj_effect_initialize( info->video_output_width,info->video_output_height,full_range, info->read_plug_cfg);
+	vje_init( info->video_output_width,info->video_output_height);
+    //FIXME: plugin defaults
+    //full_range, info->read_plug_cfg);
 
 	if(info->dump)
-		vj_effect_dump();
-	if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
+		vje_dump();
+	
+    if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
 	{
 		if(sample_readFromFile( info->settings->action_scheduler.sl,
 		                       info->composite,
@@ -1941,7 +1987,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		case 0:
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
 #ifdef HAVE_SDL
-			info->sdl = vj_sdl_allocate( info->effect_frame1, info->use_keyb, info->use_mouse,info->show_cursor);
+			info->sdl = vj_sdl_allocate( info->effect_frame1, info->use_keyb, info->use_mouse,info->show_cursor, info->borderless);
 			if( !info->sdl )
 				return -1;
 
@@ -1974,7 +2020,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			veejay_msg(VEEJAY_MSG_INFO, 
 			           "Using output driver SDL & DirectFB");
 #ifdef HAVE_SDL
-			info->sdl = vj_sdl_allocate(info->effect_frame1, info->use_keyb,info->use_mouse,info->show_cursor);
+			info->sdl = vj_sdl_allocate(info->effect_frame1, info->use_keyb,info->use_mouse,info->show_cursor, info->borderless);
 			if(!info->sdl)
 				return -1;
 
@@ -2150,6 +2196,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 
 //	veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
 
+    info->settings->transition.ptr = shapewipe_malloc( info->video_output_width, info->video_output_height);
+    if(!info->settings->transition.ptr) {
+        veejay_msg(VEEJAY_MSG_ERROR,"Unable to initialize shapewipe");
+        return -1;
+    }
+
 	if(veejay_open(info) != 1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize the threading system");
@@ -2180,7 +2232,6 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 	else
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Using First-In-First-Out II scheduling for process %d", pid);
-		veejay_msg(VEEJAY_MSG_DEBUG, "Priority is set to %d (RT)", schp.sched_priority );
 	}
 }
 
@@ -2272,10 +2323,8 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	stats.nqueue = QUEUE_LEN;
 	settings->spas = 1.0 / (double) el->audio_rate;
-	veejay_msg(VEEJAY_MSG_DEBUG, "Output 1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
-
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "Output dimensions: %dx%d, backend scaler: %dx%d",
+	veejay_msg(VEEJAY_MSG_INFO, "Output 1.0/%2.2f seconds per video frame: %4.4f",settings->output_fps,1.0 / settings->spvf);
+	veejay_msg(VEEJAY_MSG_INFO, "Output dimensions: %dx%d, backend scaler: %dx%d",
 	           info->video_output_width,info->video_output_height,info->bes_width,info->bes_height );
 
 
@@ -2318,7 +2367,7 @@ static void veejay_playback_cycle(veejay_t * info)
 			frame = bs.frame;
 
 			stats.nsync++;
-			clock_gettime( CLOCK_REALTIME, &time_now);
+			clock_gettime( CLOCK_MONOTONIC, &time_now);
 
 			long  d1 = (time_now.tv_sec * 1000000000) + time_now.tv_nsec;
 			long  n1 = (bs.timestamp.tv_sec * 1000000000) +  bs.timestamp.tv_nsec;
@@ -2694,11 +2743,9 @@ int	prepare_cache_line(int perc, int n_slots)
 	}
 
 	max_memory -= mmap_memory;
-	max_memory -= (vj_perform_fx_chain_size()/1024);
 
 	if( perc > 0 && max_memory <= 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Please enter a larger value for -m");
-		veejay_msg(VEEJAY_MSG_ERROR, "Need a minimum of %ld MB RAM to run if -M is not specified", vj_perform_fx_chain_size()/(1024*1024));
 		return 1;
 	}
 
@@ -2761,9 +2808,16 @@ veejay_t *veejay_malloc()
     info->effect_frame_info = (VJFrameInfo*) vj_calloc(sizeof(VJFrameInfo));
 	if(!info->effect_frame_info)
 		return NULL;
+    info->effect_frame_info2 = (VJFrameInfo*) vj_calloc(sizeof(VJFrameInfo));
+	if(!info->effect_frame_info2)
+		return NULL;
 
     info->effect_info = (vjp_kf*) vj_calloc(sizeof(vjp_kf));
 	if(!info->effect_info) 
+		return NULL;   
+    
+    info->effect_info2 = (vjp_kf*) vj_calloc(sizeof(vjp_kf));
+	if(!info->effect_info2) 
 		return NULL;   
 
 	info->dummy = (dummy_t*) vj_calloc(sizeof(dummy_t));
@@ -2821,6 +2875,10 @@ veejay_t *veejay_malloc()
 
 	info->pixel_format = FMT_422F; //@default 
 	info->settings->ncpu = smp_check();
+
+    omp_set_num_threads( info->settings->ncpu );
+    veejay_msg(VEEJAY_MSG_INFO, "Set number of open mp threads to %d",
+            info->settings->ncpu);
 
 	int status = 0;
 	int acj    = 0;
@@ -3592,6 +3650,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	info->effect_frame_info->width = info->video_output_width;
 	info->effect_frame_info->height= info->video_output_height;
 
+	info->effect_frame_info2->width = info->video_output_width;
+	info->effect_frame_info2->height= info->video_output_height;
+
 	return 1;
 }
 
@@ -3742,6 +3803,10 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	info->effect_frame1->fps = info->settings->output_fps;
 	info->effect_frame2 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
 	info->effect_frame2->fps = info->settings->output_fps;
+	info->effect_frame3 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	info->effect_frame3->fps = info->settings->output_fps;
+	info->effect_frame4 = yuv_yuv_template( NULL,NULL,NULL, info->dummy->width, info->dummy->height, yuv_to_alpha_fmt(vj_to_pixfmt(info->pixel_format)) );
+	info->effect_frame4->fps = info->settings->output_fps;
 
 	veejay_msg(VEEJAY_MSG_DEBUG,"Performer is working in %s (%d)", yuv_get_pixfmt_description(info->effect_frame1->format), info->effect_frame1->format);
 

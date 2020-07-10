@@ -49,22 +49,31 @@ vj_effect *differencemap_init(int w, int h)
     return ve;
 }
 
-static uint8_t *binary_img = NULL;
-static int nframe = 0;
+typedef struct {
+    uint8_t *binary_img;
+} diffmap_t;
 
-int		differencemap_malloc(int w, int h )
+void *differencemap_malloc(int w, int h )
 {
-	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h*2) + RUP8(w*2) );
-	nframe = 0;
-	if(!binary_img) return 0;
-	return 1;
+    diffmap_t *d = (diffmap_t*) vj_calloc(sizeof(diffmap_t));
+    if(!d) {
+        return NULL;
+    }
+
+	d->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h*2) + RUP8(w*2) );
+	if(!d->binary_img) {
+        free(d);
+        return NULL;
+    }
+
+    return (void*) d;
 }
 
-void		differencemap_free(void)
+void		differencemap_free(void *ptr)
 {
-	if(binary_img) 
-		free(binary_img);
-	binary_img = NULL;
+    diffmap_t *d = (diffmap_t*) ptr;
+    free(d->binary_img);
+    free(d);
 }
 
 #ifndef MIN
@@ -74,9 +83,13 @@ void		differencemap_free(void)
 #define MAX(a,b) ( (a)>(b) ? (a) : (b) )
 #endif
 
-void differencemap_apply( VJFrame *frame, VJFrame *frame2, int threshold, int reverse,
-		int show )
-{
+void differencemap_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int threshold = args[0];
+    int reverse = args[1];
+	int show = args[2];
+    
+    diffmap_t *d = (diffmap_t*) ptr;
+
 	unsigned int x,y;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
@@ -87,6 +100,7 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2, int threshold, int re
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2=frame2->data[1];
 	uint8_t *Cr2=frame2->data[2];
+    uint8_t *binary_img = d->binary_img;
 
 //	morph_func	p = _dilate_kernel3x3;
 	uint8_t *previous_img = binary_img + len;
@@ -96,7 +110,7 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2, int threshold, int re
 	VJFrame tmp;
 	veejay_memcpy(&tmp, frame, sizeof(VJFrame));
 	tmp.data[0] = previous_img;
-	softblur_apply( &tmp, 0);
+	softblur_apply_internal( &tmp, 0);
 
 	binarify_1src( binary_img,previous_img,threshold,reverse, width,height);
 	//@ clear image
@@ -115,72 +129,22 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2, int threshold, int re
 
 	len -= width;
 
-//	if(!reverse)
-//	{
-		for(y = width; y < len; y += width  )
-		{	
-			for(x = 1; x < width-1; x ++)
-			{	
-				if(binary_img[x+y]) //@ found white pixel
-				{
-				/*	uint8_t mt[9] = {
-					binary_img[x-1+y-width], binary_img[x+y-width], binary_img[x+1+y-width],
-					binary_img[x-1+y], 	binary_img[x+y]	    , binary_img[x+1+y],
-					binary_img[x-1+y+width], binary_img[x+y+width], binary_img[x+1+y+width]
-					};
-					if( p( kernel, mt ) ) //@ replace pixel for B
-					{
-						 Y[x + y] = Y2[x+y];
-						Cb[x + y] = Cb2[1][x+y];
-						Cr[x + y] = Cr[2][x+y];
-					}
-					else //@ black
-					{
-						Y[x + y] = 0;
-						Cb[x + y] = 128;
-						Cr[x+ y] = 128;
-					}*/
-					Y[x+y] = Y2[x+y];
-					Cb[x+y] = Cb2[x+y];
-					Cr[x+y] = Cr2[x+y];
-				}
-				else
-				{
-					Y[x+y] = pixel_Y_lo_;
-					Cb[x+y] = 128;
-					Cr[x+y] = 128;
-				}
+	for(y = width; y < len; y += width  )
+	{	
+		for(x = 1; x < width-1; x ++)
+        {	
+			if(binary_img[x+y]) //@ found white pixel
+			{
+				Y[x+y] = Y2[x+y];
+		    	Cb[x+y] = Cb2[x+y];
+				Cr[x+y] = Cr2[x+y];
 			}
-		}
-//	}
-/*	else
-	{
-		for(y = width; y < len; y += width  )
-		{	
-			for(x = 1; x < width-1; x ++)
-			{	
-				if(!binary_img[x+y]) //@ found black pixel
-				{
-				uint8_t mt[9] = {
-					0xff-binary_img[x-1+y-width], 0xff-binary_img[x+y-width], 0xff-binary_img[x+1+y-width],
-					0xff-binary_img[x-1+y], 	0xff-binary_img[x+y]	    , 0xff-binary_img[x+1+y],
-					0xff-binary_img[x-1+y+width], 0xff-binary_img[x+y+width], 0xff-binary_img[x+1+y+width]
-					};
-				if( p( kernel, mt ) )
-				{
-					 Y[x + y] = frame2->data[0][x+y];
-					Cb[x + y] = frame2->data[1][x+y];
-					Cr[x + y] = frame2->data[2][x+y];
-				}
-				else
-				{
-					Y[x + y] = 0;
-					Cb[x + y] = 128;
-					Cr[x + y] = 128;
-				}
+			else
+			{
+	    		Y[x+y] = pixel_Y_lo_;
+				Cb[x+y] = 128;
+				Cr[x+y] = 128;
 			}
 		}
 	}
-//#endif
-*/
 }

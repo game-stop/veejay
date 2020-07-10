@@ -21,5 +21,5 @@
 #ifndef CHROMIUM_H
 #define CHROMIUM_H
 vj_effect *chromium_init(int w, int h);
-void chromium_apply(VJFrame *frame, int n);
+void chromium_apply(void *ptr, VJFrame *frame, int *args);
 #endif

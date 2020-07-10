@@ -40,7 +40,9 @@
 #include <veejaycore/vjmem.h>
 #include "uvcorrect.h"
 
-static uint8_t *chrominance = NULL;
+typedef struct {
+    uint8_t *chrominance;
+} uvcorrect_t;
 
 vj_effect *uvcorrect_init(int w, int h)
 {
@@ -86,20 +88,28 @@ vj_effect *uvcorrect_init(int w, int h)
     return ve;
 }
 
-int	uvcorrect_malloc(int w, int h )
+void *uvcorrect_malloc(int w, int h )
 {
-	chrominance = (uint8_t*) vj_malloc (sizeof(uint8_t) * 2 * 256 * 256 );
-	if(!chrominance) return 0;
-	return 1;
+    uvcorrect_t *uv = (uvcorrect_t*) vj_calloc(sizeof(uvcorrect_t));
+    if(!uv) {
+        return NULL;
+    }
+	uv->chrominance = (uint8_t*) vj_malloc (sizeof(uint8_t) * 2 * 256 * 256 );
+	if(!uv->chrominance) {
+        free(uv);
+        return NULL;
+    }
+	return uv;
 }
 
-void	uvcorrect_free()
+void	uvcorrect_free(void *ptr)
 {
-	if(chrominance) free(chrominance);
-	chrominance= NULL;
+    uvcorrect_t *uv = (uvcorrect_t*) ptr;
+    if(uv->chrominance) free(uv->chrominance);
+	free(uv);
 }
 
-static inline void _chrominance_treatment(uint8_t *u,uint8_t *v, const int len)
+static inline void _chrominance_treatment(uvcorrect_t *uv, uint8_t *u,uint8_t *v, const int len)
 {
   uint8_t *Uu_c_p, *Vu_c_p;
   uint32_t i, base;
@@ -111,19 +121,28 @@ static inline void _chrominance_treatment(uint8_t *u,uint8_t *v, const int len)
   for (i = 0; i < len; i++)
     {
       base = ((((uint32_t) * Uu_c_p) << 8) + (*Vu_c_p)) << 1;	// base = ((((uint32_t)*Uu_c_p) * 256) + (*Vu_c_p)) * 2
-      *(Uu_c_p++) = chrominance[base++];
-      *(Vu_c_p++) = chrominance[base];
+      *(Uu_c_p++) = uv->chrominance[base++];
+      *(Vu_c_p++) = uv->chrominance[base];
     }
 
 }
 
-void uvcorrect_apply(VJFrame *frame, int angle, int urot_center, int vrot_center,
-                     int iuFactor, int ivFactor, int uv_min, int uv_max )
+void uvcorrect_apply(void *ptr, VJFrame *frame, int *args )
 {
 	float fU,fV,si,co;
 	uint16_t iU,iV;
-
-	const float f_angle = (float) angle / 180.0 * M_PI; 
+    uvcorrect_t *uv = (uvcorrect_t*) ptr;
+	uint8_t *Uplane = frame->data[1];
+	uint8_t *Vplane = frame->data[2];
+	// chrominance vector
+	uint8_t *table = uv->chrominance;
+    int angle = args[0];
+    int urot_center = args[1];
+    int vrot_center = args[2];
+    int iuFactor = args[3];
+    int ivFactor = args[4];
+    int uv_min = args[5];
+    int uv_max = args[6];
 	const uint8_t centerU = urot_center;
 	const uint8_t centerV = vrot_center;
 	const float Ufactor = (float)iuFactor * 0.1;
@@ -131,10 +150,7 @@ void uvcorrect_apply(VJFrame *frame, int angle, int urot_center, int vrot_center
 	const int uv_len = (frame->ssm ? frame->len : frame->uv_len);
 	const uint8_t uvmin = (uint8_t) uv_min;
 	const uint8_t uvmax = (uint8_t) uv_max;
-	uint8_t *Uplane = frame->data[1];
-	uint8_t *Vplane = frame->data[2];
-	// chrominance vector
-	uint8_t *table = chrominance;
+	const float f_angle = (float) angle / 180.0 * M_PI; 
 
 	sin_cos ( si, co, f_angle );
 
@@ -179,7 +195,7 @@ void uvcorrect_apply(VJFrame *frame, int angle, int urot_center, int vrot_center
 		}
 	}
 
-	_chrominance_treatment( Uplane,Vplane , uv_len );
+	_chrominance_treatment( uv, Uplane,Vplane , uv_len );
 
 
 }

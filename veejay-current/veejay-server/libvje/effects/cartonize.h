@@ -21,5 +21,5 @@
 #ifndef CARTONIZE_H
 #define CARTONIZE_H
 vj_effect *cartonize_init(int w, int h);
-void cartonize_apply( VJFrame *frame, int b1, int b2, int b3);
+void cartonize_apply( void *ptr, VJFrame *frame, int *args);
 #endif

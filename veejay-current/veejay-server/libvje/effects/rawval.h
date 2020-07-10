@@ -21,5 +21,5 @@
 #ifndef RAWVAL_H
 #define RAWVAL_H
 vj_effect *rawval_init();
-void rawval_apply( VJFrame *frame, int a, int b, int na, int nb);
+void rawval_apply(void *ptr, VJFrame *frame, int *args);
 #endif

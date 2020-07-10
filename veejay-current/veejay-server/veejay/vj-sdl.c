@@ -52,6 +52,7 @@ typedef struct vj_sdl_t {
     int show_cursor;
     int mouse_motion;
     int use_keyboard;
+    int borderless;
     int width;
     int height;
     int sw_scale_width;
@@ -66,7 +67,7 @@ typedef struct vj_sdl_t {
     uint8_t *pixels;
 } vj_sdl;
 
-void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_cursor)
+void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_cursor, int borderless)
 {
     vj_sdl *vjsdl = (vj_sdl *) vj_calloc(sizeof(vj_sdl));
     if (!vjsdl)
@@ -80,6 +81,7 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
     vjsdl->height = frame->height;
     vjsdl->sw_scale_width = 0;
     vjsdl->sw_scale_height = 0;
+    vjsdl->borderless = borderless;
 
     sws_template templ;	
     memset(&templ,0,sizeof(sws_template));
@@ -114,11 +116,22 @@ void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height
         SDL_DestroyWindow(vjsdl->screen);
     }
 
-    vjsdl->screen = SDL_CreateWindow( vjsdl->caption, vjsdl->x, vjsdl->y, vjsdl->sw_scale_width, vjsdl->sw_scale_height,
-            (fs ? SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL : SDL_WINDOW_OPENGL));
+    int flags = (fs ? SDL_WINDOW_FULLSCREEN : (vjsdl->borderless ? SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS : SDL_WINDOW_OPENGL ) );
 
-	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d",
-			vjsdl->sw_scale_width,vjsdl->sw_scale_height);
+    vjsdl->screen = SDL_CreateWindow( vjsdl->caption, 
+            (vjsdl->x >= 0 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED ),
+            (vjsdl->y >= 0 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED ),
+            vjsdl->sw_scale_width, vjsdl->sw_scale_height, flags );
+
+	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d, position x=%d, y=%d",
+			vjsdl->sw_scale_width,vjsdl->sw_scale_height, vjsdl->x, vjsdl->y);
+}
+
+void vj_sdl_get_position( void *ptr, int *x, int *y )
+{
+    vj_sdl *vjsdl = (vj_sdl*) ptr;
+    *x = vjsdl->x;
+    *y = vjsdl->y;
 }
 
 int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, char *caption, int show, int fs, int vjfmt, float fps)
@@ -136,6 +149,12 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
 		vjsdl->sw_scale_width = scaled_width;
 	if (scaled_height)
 		vjsdl->sw_scale_height = scaled_height;
+    if( x >= 0 ) {
+        vjsdl->x = x;
+    }
+    if( y >=0 ) {
+        vjsdl->y = y;
+    }
 
     if( caption )
         vjsdl->caption = strdup(caption);
@@ -143,11 +162,12 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
     // SDL2: key repeat behaviour has changed; measure interval or look at repeat value on keysym
 	//int ms = ( 1.0 / fps ) * 1000;
 
+    int flags = (fs ? SDL_WINDOW_FULLSCREEN : (vjsdl->borderless ? SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS: SDL_WINDOW_OPENGL ));
+
 	vjsdl->screen = SDL_CreateWindow(vjsdl->caption, 
-            (x >= 0 ? x : SDL_WINDOWPOS_UNDEFINED),
-            (y >= 0 ? y : SDL_WINDOWPOS_UNDEFINED),
-            vjsdl->sw_scale_width, vjsdl->sw_scale_height,
-            (fs ? SDL_WINDOW_FULLSCREEN : SDL_WINDOW_OPENGL) );
+            (vjsdl->x >= 0 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED),
+            (vjsdl->y >= 0 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED),
+            vjsdl->sw_scale_width, vjsdl->sw_scale_height, flags );
 
     if(!vjsdl->screen)
     {
@@ -204,7 +224,7 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
         return 0;
     }
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "SDL Output dimensions: %d x %d", vjsdl->sw_scale_width, vjsdl->sw_scale_height );
+	veejay_msg(VEEJAY_MSG_DEBUG, "SDL Output dimensions: %d x %d @ %d,%d", vjsdl->sw_scale_width, vjsdl->sw_scale_height,vjsdl->x,vjsdl->y );
 
 	if (vjsdl->use_keyboard == 1) 
 		SDL_EventState(SDL_KEYDOWN, SDL_ENABLE);
@@ -257,7 +277,6 @@ void    vj_sdl_enable_screensaver()
 
 void	vj_sdl_grab(void *ptr, int status)
 {
-    vj_sdl *vjsdl = (vj_sdl*) ptr;
 	SDL_SetRelativeMouseMode( (status==1? SDL_TRUE : SDL_FALSE) );
 	veejay_msg(VEEJAY_MSG_DEBUG, "%s", status == 1 ? "Released mouse focus": "Grabbed mouse focus");
 }

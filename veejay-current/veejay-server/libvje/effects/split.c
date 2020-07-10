@@ -20,8 +20,6 @@
 #include <veejaycore/vjmem.h>
 #include "split.h"
 
-static uint8_t *split_buf[4] = { NULL,NULL,NULL, NULL };
-
 vj_effect *split_init(int width,int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -46,21 +44,33 @@ vj_effect *split_init(int width,int height)
     return ve;
 }
 
-int	split_malloc(int width, int height)
+typedef struct {
+    uint8_t *split_buf[4];
+} split_t;
+
+
+void *split_malloc(int width, int height)
 {
-	split_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( width + (width*height*3) ));
-	if(!split_buf[0])
-		return 0;
-	split_buf[1] = split_buf[0] + RUP8(width*height);
-	split_buf[2] = split_buf[1] + RUP8(width*height);
-	return 1;
+    split_t *s = (split_t*) vj_calloc( sizeof(split_t) );
+    if(!s) {
+        return NULL;
+    }
+	s->split_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( width + (width*height*3) ));
+	if(!s->split_buf[0]) {
+        free(s);
+		return NULL;
+    }
+
+	s->split_buf[1] = s->split_buf[0] + RUP8(width*height);
+	s->split_buf[2] = s->split_buf[1] + RUP8(width*height);
+
+	return (void*)s;
 }
 
-void split_free() {
-	if(split_buf[0]) free(split_buf[0]);
-	split_buf[0] = NULL;
-	split_buf[1] = NULL;
-	split_buf[2] = NULL;
+void split_free(void *ptr) {
+    split_t *s = (split_t*) ptr;
+    free(s->split_buf[0]);
+    free(s);
 }
 
 static void split_fib_downscale(VJFrame *frame, int width, int height)
@@ -122,15 +132,16 @@ static void split_fib_downscaleb(VJFrame *frame, int width, int height)
     vj_frame_copy( frame->data, output, strides );
 }
 
-static void split_push_downscale_uh(VJFrame *frame, int width, int height)
+static void split_push_downscale_uh(void *ptr, VJFrame *frame, int width, int height)
 {
 	int len = frame->len/2;
     int uvlen = frame->uv_len/2;
 	int	strides[4] = { len,uvlen,uvlen ,0};
-	vj_frame_copy( frame->data, split_buf,strides );
+    split_t *s = (split_t*) ptr;
+	vj_frame_copy( frame->data, s->split_buf,strides );
 }
 
-static void split_push_vscale_left(VJFrame *frame, int width, int height)
+static void split_push_vscale_left(void *ptr, VJFrame *frame, int width, int height)
 {
     unsigned int x, y, y1;
 
@@ -141,6 +152,9 @@ static void split_push_vscale_left(VJFrame *frame, int width, int height)
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
+
+    split_t *s = (split_t*) ptr;
+    uint8_t **split_buf = s->split_buf;
 
     for (y = 0; y < height; y++)
 	{
@@ -182,7 +196,7 @@ static void split_push_vscale_left(VJFrame *frame, int width, int height)
 
 }
 
-static void split_push_vscale_right(VJFrame *frame, int width, int height)
+static void split_push_vscale_right(void *ptr, VJFrame *frame, int width, int height)
 {
     unsigned int x, y, y1;
     unsigned int wlen = width >> 1;
@@ -193,6 +207,8 @@ static void split_push_vscale_right(VJFrame *frame, int width, int height)
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
+    split_t *s = (split_t*) ptr;
+    uint8_t **split_buf = s->split_buf;
 
     for (y = 0; y < height; y++) {
 		y1 = y * width;
@@ -524,12 +540,15 @@ static void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 	vj_frame_copy( frame2->data, frame->data, strides );
 }
 
-void split_apply(VJFrame *frame, VJFrame *frame2, int n, int swap)
+void split_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
+    int n = args[0];
+    int swap = args[1];
+
     switch (n) {
     case 0:
 	if (swap)
-		split_push_downscale_uh(frame2, frame->width, frame->height);
+		split_push_downscale_uh(ptr, frame2, frame->width, frame->height);
 	split_h_first_half(frame, frame2, frame->width, frame->height);
 	break;
     case 1:
@@ -540,28 +559,28 @@ void split_apply(VJFrame *frame, VJFrame *frame2, int n, int swap)
 	break;
     case 3:
 	if (swap)
-		split_push_downscale_uh(frame2, frame->width, frame->height);
+		split_push_downscale_uh(ptr, frame2, frame->width, frame->height);
 	 /**/ split_h_second_halfs(frame, frame2, frame->width, frame->height);
 	break;
     case 4:
 	if (swap)
-		split_push_vscale_left(frame2, frame->width, frame->height);
+		split_push_vscale_left(ptr,frame2, frame->width, frame->height);
 	 /**/ split_v_first_half(frame, frame2, frame->width, frame->height);
 	break;
     case 5:
 	if (swap)
-		split_push_vscale_right(frame2, frame->width, frame->height);
+		split_push_vscale_right(ptr, frame2, frame->width, frame->height);
 	 /**/ split_v_second_half(frame, frame2, frame->width, frame->height);
 	break;
     case 6:
 	if (swap)
-		split_push_vscale_left(frame2, frame->width, frame->height);
+		split_push_vscale_left(ptr,frame2, frame->width, frame->height);
 	 /**/ split_v_first_halfs(frame, frame2, frame->width, frame->height);
 	break;
 
     case 7:
 	if (swap)
-		split_push_vscale_right(frame2, frame->width, frame->height);
+		split_push_vscale_right(ptr, frame2, frame->width, frame->height);
 	    split_v_second_halfs(frame, frame2, frame->width, frame->height);
 	break;
     case 8:
@@ -585,13 +604,12 @@ void split_apply(VJFrame *frame, VJFrame *frame2, int n, int swap)
 	 /**/ split_corner_framedata_dl(frame, frame2, frame->width, frame->height);
 	break;
     case 12:
-	split_push_vscale_left(frame2, frame->width, frame->height);
-	 /**/ split_push_vscale_right(frame, frame->width, frame->height);
+	split_push_vscale_left(ptr, frame2, frame->width, frame->height);
+	 /**/ split_push_vscale_right(ptr, frame, frame->width, frame->height);
 	split_v_first_half(frame, frame2, frame->width, frame->height);
 	break;
     case 13:
-	split_push_downscale_uh(frame2, frame->width, frame->height);
-	 // split_push_downscale_lh(frame, frame->width, frame->height);
+	split_push_downscale_uh(ptr, frame2, frame->width, frame->height);
 	split_h_first_half(frame, frame2, frame->width, frame->height);
 	break;
     }

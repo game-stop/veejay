@@ -21,5 +21,5 @@
 #ifndef PORTERDUFF_H
 #define PORTERUDFF_H
 vj_effect *porterduff_init();
-void porterduff_apply( VJFrame *frame, VJFrame *frame2,int mode );
+void porterduff_apply( void *ptr, VJFrame *frame, VJFrame *frame2,int *args );
 #endif

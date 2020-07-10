@@ -51,46 +51,53 @@ vj_effect *wipe_init(int w,int h)
 
 }
 
-//FIXME: private data
+typedef struct {
+    double g_wipe_width;
+    double g_wipe_height;
+} wipe_t;
 
-static double g_wipe_width = 0;
-static double g_wipe_height = 0;
-
-int  wipe_ready(int width, int height) { //FIXME pass in fx instance data
-    if (g_wipe_width == width && g_wipe_height == height)
+int  wipe_ready(void *ptr, int width, int height) { 
+    wipe_t *w = (wipe_t*) ptr;
+    if (w->g_wipe_width == width && w->g_wipe_height == height)
 	    return TRANSITION_COMPLETED;
     return TRANSITION_RUNNING;
 }
 
-void    *wipe_instantiate(VJFrame *frame)
+void *wipe_malloc( int w, int h )
 {
     fx_wipe_t *prv = (fx_wipe_t*) vj_calloc(sizeof(fx_wipe_t));
     return prv;
 }
 
-void    wipe_destroy(void *ptr)
+void wipe_free(void *ptr)
 {
     free(ptr);
 }
 
 
-void wipe_apply( VJFrame *frame, VJFrame *frame2, int inc, int restart) //FIXME pass in fx instance data, take parameters from array
-{
+void wipe_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int inc = args[0];
+    int restart = args[1];
+
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;
     double ratio = (double) width / (double) height;
+    wipe_t *w = (wipe_t*) ptr;
 
-    transop_apply(frame, frame2, (int) g_wipe_width, (int) g_wipe_height, 0, 0, 0, 0);
+  
+    int transop_args[6] = { (int) w->g_wipe_width,(int) w->g_wipe_height, 0,0,0,0 };
+
+    transop_apply(NULL, frame, frame2,transop_args );
     
-    g_wipe_width += ratio * ((double ) inc);
-    g_wipe_height += ((double) inc);
+    w->g_wipe_width += ratio * ((double ) inc);
+    w->g_wipe_height += ((double) inc);
 
-    if(g_wipe_width > width && g_wipe_height > height) {
-        g_wipe_width = width;
-        g_wipe_height = height;
+    if(w->g_wipe_width > width && w->g_wipe_height > height) {
+        w->g_wipe_width = width;
+        w->g_wipe_height = height;
     }
     if(restart) {
-        g_wipe_width = 0;
-        g_wipe_height = 0;
+        w->g_wipe_width = 0;
+        w->g_wipe_height = 0;
     }
 }

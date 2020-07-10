@@ -21,5 +21,5 @@
 #ifndef LUMAKEY_H
 #define LUMAKEY_H
 vj_effect *lumakey_init();
-void lumakey_apply( VJFrame *frame, VJFrame *frame2, int type,int threshold, int threshold2, int feather, int d);
+void lumakey_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

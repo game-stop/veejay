@@ -18,8 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef VBAR_H
-#define VBAR_H
-vj_effect *vbar_init(int width, int height);
-void vbar_apply( VJFrame *frame, VJFrame *frame2, int d, int x1, int x2, int t1, int b1);
+#ifndef BAR_H
+#define BAR_H
+vj_effect *bar_init(int width, int height);
+void *bar_malloc(int w, int h);
+void bar_free(void *ptr);
+void bar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

@@ -21,5 +21,5 @@
 #ifndef CHANNELNEGATION_H
 #define CHANNELNEGATION_H
 vj_effect *negatechannel_init(int w, int h);
-void negatechannel_apply( VJFrame *frame, int chan, int val);
+void negatechannel_apply( void *ptr, VJFrame *frame, int *args );
 #endif

@@ -21,5 +21,5 @@
 #ifndef NEGATION_H
 #define NEGATION_H
 vj_effect *negation_init(int w, int h);
-void negation_apply( VJFrame *frame, int val);
+void negation_apply(void *ptr, VJFrame *frame, int *args);
 #endif

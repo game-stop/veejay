@@ -22,8 +22,11 @@
 #include <veejaycore/vjmem.h>
 #include "complexsync.h"
 
-static uint8_t *c_outofsync_buffer[4] = { NULL,NULL,NULL, NULL };
-static int complex_not_completed = 0;
+typedef struct {
+    uint8_t *c_outofsync_buffer[4];
+    int complex_not_completed;
+    int position;
+} complexsync_t;
 
 vj_effect *complexsync_init(int width, int height)
 {
@@ -51,50 +54,79 @@ vj_effect *complexsync_init(int width, int height)
     return ve;
 }
 
-int complexsync_ready(int width, int height)
+int complexsync_ready(void *ptr, int width, int height)
 {
-    return !complex_not_completed;
+    complexsync_t *c = (complexsync_t*) ptr;
+    return !c->complex_not_completed;
 }
 
-int complexsync_malloc(int width, int height)
+void *complexsync_malloc(int width, int height)
 {
-   c_outofsync_buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height*3) );
-   c_outofsync_buffer[1] = c_outofsync_buffer[0] + RUP8(width*height);
-   c_outofsync_buffer[2] = c_outofsync_buffer[1] + RUP8(width*height);
+    complexsync_t *c = (complexsync_t*) vj_calloc(sizeof(complexsync_t));
+    if(!c) {
+        return NULL;
+    }
+
+    c->c_outofsync_buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height*3) );
+    if(!c->c_outofsync_buffer[0]) {
+        free(c);
+        return NULL;
+    }
+
+    c->c_outofsync_buffer[1] = c->c_outofsync_buffer[0] + RUP8(width*height);
+    c->c_outofsync_buffer[2] = c->c_outofsync_buffer[1] + RUP8(width*height);
   
-   vj_frame_clear1( c_outofsync_buffer[0] , pixel_Y_lo_ , RUP8(width*height));
-   vj_frame_clear1( c_outofsync_buffer[1] , 128, RUP8(width*height*2) );
-   return 1;
+    vj_frame_clear1( c->c_outofsync_buffer[0] , pixel_Y_lo_ , RUP8(width*height));
+    vj_frame_clear1( c->c_outofsync_buffer[1] , 128, RUP8(width*height*2) );
 
+    return (void*) c;
 }
 
-void complexsync_free() {
-	 if(c_outofsync_buffer[0])
-	    free(c_outofsync_buffer[0]);
-   	 c_outofsync_buffer[0] = NULL;
+void complexsync_free(void *ptr) {
+
+    complexsync_t *c = (complexsync_t*) ptr;
+
+	free(c->c_outofsync_buffer[0]);
+    free(c);
 }
 
-void complexsync_apply(VJFrame *frame, VJFrame *frame2, int val)
-{
-	const int len = frame->len;
+void complexsync_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int val = args[0];
+	int auto_inc = args[1];
+    int duration = args[2];
+
+    complexsync_t *c = (complexsync_t*) ptr;
+
+    const int len = frame->len;
 	const unsigned int width = frame->width;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
-	int region = width * val;
 	int planes[4] = { len, len, len, 0 };
 	
-	vj_frame_copy( frame->data, c_outofsync_buffer, planes );
+    if( auto_inc == 1 ) {
+        if( duration == 0 )
+            duration = 1;
+        c->position += ( val / duration ) + 1;
+        if( c->position > frame->height - 2 )
+            c->position = 1;
+    } else {
+        c->position = val;
+    }
+
+    int region = width * c->position;
+
+	vj_frame_copy( frame->data, c->c_outofsync_buffer, planes );
 	vj_frame_copy( frame2->data, frame->data, planes );
 
-    complex_not_completed = (len - region) > 0;
+    c->complex_not_completed = (len - region) > 0;
 
-    if( complex_not_completed )
+    if( c->complex_not_completed )
 	{
 		uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
 		int dst_strides[4] = { len - region, len - region, len - region,0 };
 
-		vj_frame_copy( c_outofsync_buffer, dest, dst_strides );
+		vj_frame_copy( c->c_outofsync_buffer, dest, dst_strides );
 	}
 }

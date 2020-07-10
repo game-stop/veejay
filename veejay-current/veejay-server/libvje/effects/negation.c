@@ -43,8 +43,9 @@ vj_effect *negation_init(int w, int h)
 }
 
 
-void negation_apply( VJFrame *frame, int val)
-{
+void negation_apply( void *ptr, VJFrame *frame, int *args ) {
+    int val = args[0];
+
     int i;
     const int len = frame->len;
     const int uv_len = (frame->ssm ? len : frame->uv_len );

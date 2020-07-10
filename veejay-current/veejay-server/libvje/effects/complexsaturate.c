@@ -68,11 +68,15 @@ vj_effect *complexsaturation_init(int w, int h)
     return ve;
 }
 
-void complexsaturation_apply(VJFrame *frame, int i_angle, int r, int g, int b,
-                             int adjust_v, int adjust_degrees, int i_noise)
-{
-//	double degrees = adjust_degrees * 0.01;
-//	double dsat = adjust_v * 0.01;
+void complexsaturation_apply(void *ptr, VJFrame *frame,int *args ) {
+    int i_angle = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int adjust_v = args[4];
+    int adjust_degrees = args[5];
+    int i_noise = args[6];
+
 	const int len = frame->len;
 
 	float	hue	= (adjust_degrees/180.0)*M_PI;
@@ -173,8 +177,5 @@ void complexsaturation_apply(VJFrame *frame, int i_angle, int r, int g, int b,
 				Cr[pos] = new_v;
 			}
     		}
-
 	}
 }
-
-void complexsaturate_free(){}

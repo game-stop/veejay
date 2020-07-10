@@ -25,10 +25,9 @@
 #include <stdint.h>
 
 vj_effect *bgsubtractgauss_init(int width, int height);
-int bgsubtractgauss_instances();
-void bgsubtractgauss_free();
-int bgsubtractgauss_malloc(int w, int h);
-int bgsubtractgauss_prepare(VJFrame *frame); 
-void bgsubtractgauss_apply(VJFrame *frame, int alpha, int threshold,int noise, int mode, int period, int morph);
-uint8_t *bgsubtractgauss_get_bg_frame(unsigned int plane);
+void bgsubtractgauss_free(void *ptr);
+void *bgsubtractgauss_malloc(int w, int h);
+int bgsubtractgauss_prepare(void *ptr, VJFrame *frame); 
+void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args);
+uint8_t *bgsubtractgauss_get_bg_frame(void *ptr, unsigned int plane);
 #endif

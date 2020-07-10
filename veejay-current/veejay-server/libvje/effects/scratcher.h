@@ -21,7 +21,7 @@
 #ifndef SCRATCHER_H
 #define SCRATCHER_H
 vj_effect *scratcher_init(int w, int h);
-int scratcher_malloc(int w, int h);
-void scratcher_free();
-void scratcher_apply(VJFrame *frame,int opacity, int nframes, int no_reverse);
+void *scratcher_malloc(int w, int h);
+void scratcher_free(void *ptr);
+void scratcher_apply(void *ptr, VJFrame *frame, int *args );
 #endif

@@ -4,9 +4,9 @@
 #include "vj-lib.h"
 
 /* multithreaded code, what starts in queue belongs to playback_thread */
-uint8_t *vj_perform_get_preview_buffer();
-int vj_perform_preview_max_width();
-int vj_perform_preview_max_height();
+uint8_t *vj_perform_get_preview_buffer(veejay_t *info);
+int vj_perform_preview_max_width(veejay_t *info);
+int vj_perform_preview_max_height(veejay_t *info);
 
 void	vj_perform_update_plugin_frame(VJFrame *frame);         
 
@@ -23,6 +23,7 @@ int vj_perform_audio_start(veejay_t * info);
 
 void vj_perform_audio_status(struct timeval tmpstmp, unsigned int nb_out,
 			     unsigned int nb_err);
+int vj_perform_transition_sample( veejay_t *info, VJFrame *a, VJFrame *b );
 
 void vj_perform_audio_stop(veejay_t * info);
 
@@ -60,7 +61,7 @@ int        vj_perform_get_sampling();
 int	vj_perform_get_width( veejay_t *info );
 int	vj_perform_get_height( veejay_t *info );
 
-void	vj_perform_follow_fade(int status);
+void	vj_perform_follow_fade(veejay_t *info, int status);
 size_t	vj_perform_fx_chain_size();
 
 void	vj_perform_record_video_frame(veejay_t *info);

@@ -53,21 +53,30 @@ vj_effect *colmorphology_init(int w, int h)
     return ve;
 }
 
+typedef struct {
+    uint8_t *binary_img;
+} colmorph_t;
 
-static uint8_t *binary_img;
-
-int		colmorphology_malloc(int w, int h )
+void *colmorphology_malloc(int w, int h )
 {
-	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
-	if(!binary_img) return 0;
-	return 1;
+    colmorph_t *c = (colmorph_t*) vj_calloc(sizeof(colmorph_t));
+    if(!c) {
+        return NULL;
+    }
+	c->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
+    if(!c->binary_img) {
+        free(c);
+        return NULL;
+    }
+
+    return (void*) c;
 }
 
-void		colmorphology_free(void)
+void		colmorphology_free(void *ptr)
 {
-	if(binary_img)
-		free(binary_img);
-	binary_img = NULL;
+    colmorph_t *c = (colmorph_t*) ptr;
+    free(c->binary_img);
+    free(c);
 }
 
 static inline uint8_t _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
@@ -91,9 +100,14 @@ static inline uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
 	return pixel_Y_hi_;
 }
 
-void colmorphology_apply( VJFrame *frame, int threshold, int type, int passes )
-{
-	unsigned int i,x,y;
+void colmorphology_apply( void *ptr, VJFrame *frame, int *args ) {
+    int threshold = args[0];
+    int type = args[1];
+    int passes = args[2];
+
+    colmorph_t *c = (colmorph_t*) ptr;
+
+    unsigned int i,x,y;
 	const unsigned int width = frame->width;
 	int len = frame->len;
 	uint8_t *Y = frame->data[0];
@@ -107,6 +121,8 @@ void colmorphology_apply( VJFrame *frame, int threshold, int type, int passes )
 		 { 1,1,1, 0,0,0, 0,0,0 },
 		 { 0,0,0, 0,0,0, 1,1,1 }
 		};
+
+    uint8_t *binary_img = c->binary_img;
 
 	for( i = 0; i < len; i ++ )
 	{

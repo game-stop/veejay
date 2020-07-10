@@ -21,5 +21,5 @@
 #ifndef PIXELATE_H
 #define PIXELATE_H
 vj_effect *pixelate_init(int w, int h);
-void pixelate_apply( VJFrame *frame, int val);
+void pixelate_apply( void *ptr, VJFrame *frame, int *args);
 #endif

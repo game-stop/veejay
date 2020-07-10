@@ -18,9 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef WIPE_H
-#define WIPE_H
-vj_effect *wipe_init();
-int  wipe_ready(int wid, int hei);
-void wipe_apply( VJFrame *frame, VJFrame *frame2, int mode, int restart);
+#ifndef VBAR_H
+#define VBAR_H
+vj_effect *vbar_init(int width, int height);
+void *vbar_malloc(int w, int h);
+void vbar_free(void *ptr);
+void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args );
 #endif

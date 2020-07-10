@@ -21,7 +21,7 @@
 #ifndef BATHROOM_H
 #define BATHROOM_H
 vj_effect *bathroom_init(int w, int h);
-int bathroom_malloc(int w, int h);
-void bathroom_free();
-void bathroom_apply(VJFrame *Frame, int mode, int val, int x0, int x1);
+void *bathroom_malloc(int w, int h);
+void bathroom_free(void *ptr);
+void bathroom_apply(void *ptr, VJFrame *Frame,int *args);
 #endif

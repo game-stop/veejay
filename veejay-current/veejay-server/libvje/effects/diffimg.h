@@ -21,5 +21,5 @@
 #ifndef DIFFIMGEFFECT_H
 #define DIFFIMGEFFECT_H
 vj_effect *diffimg_init();
-void diffimg_apply(VJFrame *frame, int type, int threshold, int opacity);
+void diffimg_apply(void *ptr, VJFrame *frame, int *args);
 #endif

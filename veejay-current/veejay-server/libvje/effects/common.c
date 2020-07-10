@@ -2214,4 +2214,9 @@ inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation or
         case VJ_EFFECT_ORIENTATION_NORTHWEST:
         break;
     }
+
+    // FIXME: y_inf * w + x_inf must be a positive value or bounds must be checked before accessing array
+    // for now, clip value into range
+    if(*y_inf < 0) *y_inf = 0;
+    if(*x_inf < 0) *x_inf = 0;
 }

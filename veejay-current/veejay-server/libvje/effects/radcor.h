@@ -21,7 +21,7 @@
 #ifndef LENSCOR_H
 #define LENSCOR_H
 vj_effect *radcor_init(int w, int h);
-int radcor_malloc(int w, int h);
-void radcor_free();
-void radcor_apply( VJFrame *frame, int a, int b, int c, int alpha);
+void *radcor_malloc(int w, int h);
+void radcor_free(void *ptr);
+void radcor_apply( void *ptr, VJFrame *frame, int *args);
 #endif

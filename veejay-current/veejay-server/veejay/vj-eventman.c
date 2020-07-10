@@ -376,6 +376,25 @@ void		vj_init_vevo_events(void)
 {	
 	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * MAX_INDEX );
 
+    index_map_[ VIMS_SET_TRANSITION ] = _new_event(
+                "%d %d %d %d %d",
+                VIMS_SET_TRANSITION,
+                "Set shape transition when switching samples",
+                vj_event_set_transition,
+                5,
+                VIMS_ALLOW_ANY,
+                "Playback mode (0=sample,1=stream)",
+                0,
+                "Sample ID",
+                0,
+                "Transition Enabled (0=disabled,1=enabled)",
+                0,
+                "Transition Shape (0 .. MAX SHAPES)",
+                0,
+                "Transition Length (in frames)",
+                0,
+                NULL );
+
 	index_map_[VIMS_MACRO] = _new_event(
 				"%d",
 				VIMS_MACRO,
@@ -1954,6 +1973,14 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
+    index_map_[VIMS_TOGGLE_TRANSITIONS]         =   _new_event(
+                NULL,
+                VIMS_TOGGLE_TRANSITIONS,
+                "Toggle random transitions between samples",
+                vj_event_toggle_transitions,
+                0,
+                VIMS_ALLOW_ANY,
+                NULL );
 #ifdef HAVE_SDL
 	index_map_[VIMS_RESIZE_SDL_SCREEN]			=	_new_event(
 				"%d %d %d %d",
@@ -1967,9 +1994,9 @@ void		vj_init_vevo_events(void)
 				"Height",
 				0,
 				"X offset",
-				0,
+				-1,
 				"Y offset",
-				0,
+				-1,
 				NULL );
 #endif
 	index_map_[VIMS_SET_PLAY_MODE]				=	_new_event(

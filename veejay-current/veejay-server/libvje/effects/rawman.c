@@ -51,8 +51,11 @@ vj_effect *rawman_init(int w,int h)
     return ve;
 }
 
-void rawman_apply(VJFrame *frame, unsigned int mode, unsigned int YY)
-{
+void rawman_apply(void *ptr, VJFrame *frame, int *args )
+{    
+    int mode = args[0];
+    unsigned int YY = (unsigned int) args[1];
+
     const int len = frame->len;
     unsigned int i;
     uint8_t *Y = frame->data[0];

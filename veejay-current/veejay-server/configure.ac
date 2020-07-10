@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.65],[http://www.veejayhq.net])
+AC_INIT([veejay],[1.5.66],[http://www.veejayhq.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=65
+VEEJAY_MICRO_VERSION=66
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -919,11 +919,11 @@ fi
 have_freetype=false
 have_freetype2=false
 PKG_CHECK_MODULES( FREETYPE2, [freetype2], [
-	AC_SUBST(FREETYPE2_CFLAGS)
-	AC_SUBST(FREETYPE2_LIBS)
-	AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
-	have_freetype2=true],
-	[have_freetype2=false] )
+		AC_SUBST(FREETYPE2_CFLAGS)
+        AC_SUBST(FREETYPE2_LIBS)
+	    AC_DEFINE(HAVE_FREETYPE,,[compiling with freetype])
+		have_freetype2=true],
+		[have_freetype2=false] )
 
 if test x$have_freetype2 != xtrue; then
 	AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)

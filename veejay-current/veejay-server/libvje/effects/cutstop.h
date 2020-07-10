@@ -20,8 +20,8 @@
 
 #ifndef CUTSTOP_H
 #define CUTSTOP_H
-void cutstop_free() ;
+void cutstop_free(void *ptr);
 vj_effect *cutstop_init(int width , int height);
-int	cutstop_malloc(int width, int height);
-void cutstop_apply( VJFrame *frame, int treshold, int freq, int cutmode, int holdmode);
+void *cutstop_malloc(int width, int height);
+void cutstop_apply( void *ptr, VJFrame *frame, int *args);
 #endif

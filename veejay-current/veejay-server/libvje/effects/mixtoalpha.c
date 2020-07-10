@@ -52,15 +52,46 @@ vj_effect *mixtoalpha_init(int w, int h)
     return ve;
 }
 
-void mixtoalpha_apply( VJFrame *frame, VJFrame *frame2, int mode, int scale)
+typedef struct {
+    uint8_t *lookup_table;
+} mixtoalpha_t;
+
+void *mixtoalpha_malloc(int w, int h)
 {
+    mixtoalpha_t *m = (mixtoalpha_t*) vj_calloc(sizeof(mixtoalpha_t));
+    if(!m) {
+        return NULL;
+    }
+
+    m->lookup_table = (uint8_t*) vj_malloc(sizeof(uint8_t) * 256 );
+    if(!m->lookup_table) {
+        free(m);
+        return NULL;
+    }
+
+    __init_lookup_table( m->lookup_table, 256, 16.0f,235.0f, 0, 255 );
+
+    return (void*) m;
+}
+
+void mixtoalpha_free(void *ptr) {
+    mixtoalpha_t *m = (mixtoalpha_t*) ptr;
+    free(m->lookup_table);
+    free(m);
+}
+
+
+void mixtoalpha_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int mode = args[0];
+    int scale = args[1];
+
 	const int len = frame->len;
 	uint8_t *a = frame->data[3];
 	const uint8_t *Y = frame2->data[0];
-	uint8_t __lookup_table[256];
-	__init_lookup_table( __lookup_table,256, 16.0f, 235.0f, 0, 255 ); 
 
-	const uint8_t *T = (const uint8_t*) __lookup_table;
+    mixtoalpha_t *m = (mixtoalpha_t*) ptr;
+
+	const uint8_t *T = (const uint8_t*) m->lookup_table;
 	
 	if( mode == 0 ) {
 		veejay_memcpy(a, Y, len );

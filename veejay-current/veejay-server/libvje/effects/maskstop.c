@@ -25,9 +25,11 @@
 #include <veejaycore/vjmem.h>
 #include "maskstop.h"
 
-static uint8_t *vvmaskstop_buffer[6];
-static unsigned int frq_frame;
-static unsigned int frq_mask;
+typedef struct {
+    uint8_t *vvmaskstop_buffer[6];
+    unsigned int frq_frame;
+    unsigned int frq_mask;
+} vvmask_t;
 
 vj_effect *maskstop_init(int width , int height)
 {
@@ -59,64 +61,84 @@ vj_effect *maskstop_init(int width , int height)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
-	
-	frq_frame = 256;
-	frq_mask = 256;
 
     return ve;
 }
 
-int	maskstop_malloc(int width, int height)
+void *maskstop_malloc(int width, int height)
 {
+    vvmask_t *v = (vvmask_t*) vj_calloc(sizeof(vvmask_t));
+    if(!v) {
+        return NULL;
+    }
+
 	int i;
-	vvmaskstop_buffer[0] =  (uint8_t*) vj_malloc( sizeof(uint8_t)  * width * height  * 6 );
+	v->vvmaskstop_buffer[0] =  (uint8_t*) vj_malloc( sizeof(uint8_t)  * RUP8(width * height)  * 6 );
+    if(!v->vvmaskstop_buffer[0]) {
+        free(v);
+        return NULL;
+    }
+
 	for( i = 1; i < 6; i ++ )
-		vvmaskstop_buffer[i] = vvmaskstop_buffer[(i-1)] + (width * height);
-	veejay_memset( vvmaskstop_buffer[1], 128, (width*height)*2);
-	veejay_memset( vvmaskstop_buffer[2], 128, (width*height)*2);
+		v->vvmaskstop_buffer[i] = v->vvmaskstop_buffer[(i-1)] + RUP8(width * height);
+	
+    veejay_memset( v->vvmaskstop_buffer[1], 128, RUP8(width*height));
+	veejay_memset( v->vvmaskstop_buffer[2], 128, RUP8(width*height));
+    veejay_memset( v->vvmaskstop_buffer[4], 128, RUP8(width*height));
+	veejay_memset( v->vvmaskstop_buffer[5], 128, RUP8(width*height));
+    veejay_memset( v->vvmaskstop_buffer[0], pixel_Y_lo_, RUP8(width*height));
+    veejay_memset( v->vvmaskstop_buffer[3], pixel_Y_lo_, RUP8(width*height));
+	
+	v->frq_frame = 256;
+	v->frq_mask = 256;
 
-	return 1;
+	return (void*) v;
 }
 
-void maskstop_free() {
-	if(vvmaskstop_buffer[0])
-		free(vvmaskstop_buffer[0]);
-	int i;
-	for(i = 0 ;i < 6  ; i++)
-		vvmaskstop_buffer[i] = NULL;
+void maskstop_free(void *ptr) {
+
+    vvmask_t *v = (vvmask_t*) ptr;
+    free(v->vvmaskstop_buffer[0]);
+    free(v);
 }
 
 
-void maskstop_apply( VJFrame *frame, int negmask, int swapmask, int framefreq, int maskfreq)
-{
+void maskstop_apply( void *ptr, VJFrame *frame, int *args ) {
+    int negmask = args[0];
+    int swapmask = args[1];
+    int framefreq = args[2];
+    int maskfreq = args[3];
+
+    vvmask_t *v = (vvmask_t*) ptr;
+
 	int i=0;
 	const int len = frame->len;
  
-	uint8_t *Yframe = vvmaskstop_buffer[0];
-	uint8_t *Uframe = vvmaskstop_buffer[1];
-	uint8_t *Vframe = vvmaskstop_buffer[2];
-	uint8_t *Ymask  = vvmaskstop_buffer[3];
-	uint8_t *Umask  = vvmaskstop_buffer[4];
-	uint8_t *Vmask  = vvmaskstop_buffer[5];
+	uint8_t *Yframe = v->vvmaskstop_buffer[0];
+	uint8_t *Uframe = v->vvmaskstop_buffer[1];
+	uint8_t *Vframe = v->vvmaskstop_buffer[2];
+	uint8_t *Ymask  = v->vvmaskstop_buffer[3];
+	uint8_t *Umask  = v->vvmaskstop_buffer[4];
+	uint8_t *Vmask  = v->vvmaskstop_buffer[5];
 	uint8_t *Ydest  = frame->data[0];
 	uint8_t *Udest  = frame->data[1];
 	uint8_t *Vdest  = frame->data[2];
 	
-	frq_frame = frq_frame + framefreq;
-	frq_mask = frq_mask + maskfreq;
+	v->frq_frame = v->frq_frame + framefreq;
+	v->frq_mask = v->frq_mask + maskfreq;
 	
-	if (frq_frame > 255) {
+	if (v->frq_frame > 255) {
 		veejay_memcpy(Yframe, Ydest, len);
 		veejay_memcpy(Uframe, Udest, len);
 		veejay_memcpy(Vframe, Vdest, len);
-		frq_frame = 0;
+		v->frq_frame = 0;
 	}
 
-	if (frq_mask > 255) {
+	if (v->frq_mask > 255) {
 		veejay_memcpy(Ymask, Ydest, len);
 		veejay_memcpy(Umask, Udest, len);
 		veejay_memcpy(Vmask, Vdest, len);
-		frq_mask = 0;
+		v->frq_mask = 0;
 	}
 
 	// negmask acts like transparency mask:  new p = ((p0 * a) + (p1 * (255-a))) / 255 

@@ -21,6 +21,5 @@
 #ifndef CONTRAST_H
 #define CONTRAST_H
 vj_effect *contrast_init();
-void contrast_apply(VJFrame *frame, int *t);
-void contrast_free();
+void contrast_apply(void *ptr, VJFrame *frame, int *t);
 #endif

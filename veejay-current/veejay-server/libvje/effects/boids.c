@@ -59,7 +59,6 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "boids.h"
-
 typedef struct 
 {
 	short x;	// x
@@ -74,17 +73,23 @@ typedef struct
 #define	BLOB_RECT 0
 #define BLOB_CIRCLE 1
 
-static blob_t 		*blobs_;
-static uint8_t 		**blob_;
-static uint8_t 		*blob_image_;
+typedef struct {
+    blob_t 	*blobs_;
+    uint8_t **blob_;
+    uint8_t *blob_image_;
+    int	blob_ready_;
+    int	blob_radius_; // 16
+    int	blob_dradius_;
+    int	blob_sradius_;
+    int	blob_num_; // 100
+    int	blob_type_; // 1
+    int	blob_home_radius_; // 203
+} boids_t;
 
-static int		blob_ready_	 = 0;
-static int		blob_radius_ 	 = 16;
-static int		blob_dradius_ 	 = 0;
-static int		blob_sradius_ 	 = 0;
-static int		blob_num_	 = 100;
-static int		blob_type_	 = 1;
-static int		blob_home_radius_= 203;
+static void boid_rule1_( boids_t *b, int boid_id, double v1[2] );
+static void	boid_rule2_( boids_t *b, int boid_id, double v1[2] );
+static void	boid_rule3_( boids_t *b, int boid_id, double v1[2] );
+static void	boid_rule4_( boids_t *b, int boid_id, int velocity_limit );
 
 vj_effect *boids_init(int w, int h)
 {
@@ -129,22 +134,22 @@ vj_effect *boids_init(int w, int h)
 
 
 
-static void	blob_home_position( int blob_id, int w, int h , double v[2] )
+static void	blob_home_position(boids_t *b, int blob_id, int w, int h , double v[2] )
 {
-	double theta = 360.0 / ( (double) blob_num_ ) * blob_id;
+	double theta = 360.0 / ( (double) b->blob_num_ ) * blob_id;
 	double rad = (theta / 180.0 ) * M_PI;
 	double ratio = (w/h);
 	double cx = ( double )( w/ 2);
 	double cy = ( double )( h/ 2) * ratio;
-	v[0] = cx + cos(rad) * blob_home_radius_;
-	v[1] = cy + sin(rad) * blob_home_radius_;
+	v[0] = cx + cos(rad) * b->blob_home_radius_;
+	v[1] = cy + sin(rad) * b->blob_home_radius_;
 }
 
-static void	blob_init_( blob_t *b , int blob_id, int w , int h)
+static void	blob_init_( boids_t *g, blob_t *b , int blob_id, int w , int h)
 {
 	double v[2];
 
-	blob_home_position( blob_id,w,h,v );
+	blob_home_position(g, blob_id,w,h,v );
 
 	b->x = v[0];
 	b->y = v[1];
@@ -152,147 +157,199 @@ static void	blob_init_( blob_t *b , int blob_id, int w , int h)
 	b->vy = 0.01;
 }
 
-int	boids_malloc(int w, int h)
+static int boids_reinit(boids_t *b, int radius, int num, int w, int h)
 {
-	int j,i;
-	int dist_sqrt;
+    int i,j;
+    if( b->blob_ ) {
+        for( i = 0; i < b->blob_dradius_; i ++ ) {
+            if(b->blob_[i]) free(b->blob_[i]);
+        }
+        free(b->blob_);
+    }
 
-	if(blob_radius_ <= 0)
-		return 0;
+    b->blob_radius_ = radius;
+   	b->blob_dradius_ = b->blob_radius_ * 2;
+	b->blob_sradius_ = b->blob_radius_ * b->blob_radius_;
 
-	blob_dradius_ = blob_radius_ * 2;
-	blob_sradius_ = blob_radius_ * blob_radius_;
+	b->blob_ = (uint8_t**) vj_calloc(sizeof(uint8_t*) * b->blob_dradius_ );
+    if(!b->blob_) {
+        return 0;
+    }
 
-	blob_ = (uint8_t**) vj_malloc(sizeof(uint8_t*) * blob_dradius_ );
-	for(i = 0; i < blob_dradius_ ; i ++ )
+	for(i = 0; i < b->blob_dradius_ ; i ++ )
 	{
-		blob_[i] = (uint8_t*) vj_calloc(sizeof(uint8_t) * blob_dradius_ );
-		if(!blob_[i]) return 0;
+		b->blob_[i] = (uint8_t*) vj_calloc(sizeof(uint8_t) * b->blob_dradius_ );
+		if(!b->blob_[i]) {
+            return 0;
+        }
 	}
 
-	blobs_ = (blob_t*) vj_calloc(sizeof(blob_t) * blob_num_ );
-	if(!blobs_ ) return 0;
 
-	blob_image_ = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h );
-	if(!blob_image_) return 0;
+    if(b->blobs_) {
+        free(b->blobs_);
+    }
 
-		
+    b->blob_num_ = num;
+    b->blobs_ = (blob_t*) vj_calloc(sizeof(blob_t) * b->blob_num_ );
+	if(!b->blobs_) {
+        return 0;
+    }
+    
+    int blob_radius_ = b->blob_radius_;
 	for( i = -blob_radius_ ; i < blob_radius_ ; ++ i )
 	{
 		for( j = -blob_radius_ ; j < blob_radius_ ; ++ j ) 
 		{
-			dist_sqrt = i * i + j * j;
-			if( dist_sqrt < blob_sradius_ )
+			int dist_sqrt = i * i + j * j;
+			if( dist_sqrt < b->blob_sradius_ )
 			{
-				blob_[i + blob_radius_][j + blob_radius_] = 0xff;
+				b->blob_[i + blob_radius_][j + blob_radius_] = 0xff;
 			}
 			else
 			{
-				blob_[i + blob_radius_][j + blob_radius_ ] = 0x0; // was 0
+				b->blob_[i + blob_radius_][j + blob_radius_ ] = 0x0; // was 0
 			}
 		}
 	}
 
+    int blob_num_ = b->blob_num_;
+        
 	for( i = 0; i < blob_num_ ; i ++ )
 	{
-		blob_init_( blobs_ + i ,i, w , h );
+		blob_init_( b,b->blobs_ + i ,i, w , h );
 	}
 
-	veejay_memset( blob_image_ , 0 , w * h );
 
-	blob_ready_  = 1;
+    return 1;
+}
 
-	return 1;
+void *boids_malloc(int w, int h)
+{
+    boids_t *b = (boids_t*) vj_calloc(sizeof(boids_t));
+    if(!b) {
+        return NULL;
+    }
+
+    if(!boids_reinit( b, 16, 100,w,h )) {
+        boids_free(b);
+        return NULL;
+    }
+
+    b->blob_type_ = 1;
+    b->blob_home_radius_ = 203;
+
+	b->blob_image_ = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h );
+	if(!b->blob_image_) {
+        boids_free(b);
+        return NULL;
+    }
+
+  	veejay_memset( b->blob_image_ , 0 , w * h );
+
+	b->blob_ready_  = 1;
+
+	return (void*) b;
 }
 
 
-void boids_free()
+void boids_free(void *ptr)
 {
+    boids_t *b = (boids_t*) ptr;
+
 	int i;
-	for (i = 0; i < blob_dradius_ ; i ++ )
-		if( blob_[i] ) free( blob_[i] );
-	if(blobs_)
-		free(blobs_);
-	if(blob_image_)
-		free(blob_image_);
+    if( b->blob_ ) {
+	    for (i = 0; i < b->blob_dradius_ ; i ++ ) {
+		    if( b->blob_[i] ) 
+                free( b->blob_[i] );
+        }
+        free(b->blob_);
+    }
+	if(b->blobs_)
+		free(b->blobs_);
+	if(b->blob_image_)
+		free(b->blob_image_);
+    free(b);
 }
 
-typedef void (*blob_func)(int s, int width);
+typedef void (*blob_func)(boids_t *b, int s, int width);
 
-static void	blob_render_circle(int s, int width)
+static void	blob_render_circle(boids_t *b, int s, int width)
 {
 	int i,j;
+    int blob_dradius_ = b->blob_dradius_;
+
 	for( i = 0; i < blob_dradius_ ; ++ i )	
 	{
 		for( j = 0; j < blob_dradius_ ; ++ j)
 		{
-			if( blob_image_[ s + j ] + blob_[i][j] > 255 ) 
-				    blob_image_[s + j] = 0xff;
+			if( b->blob_image_[ s + j ] + b->blob_[i][j] > 255 ) 
+				    b->blob_image_[s + j] = 0xff;
 			else
-					blob_image_[s + j] += blob_[i][j];
+					b->blob_image_[s + j] += b->blob_[i][j];
 		}
 		s += width;
 	}
 }
 
-static void	blob_render_rect(int s, int width)
+static void	blob_render_rect(boids_t *b, int s, int width)
 {
 	int i,j;
+    int blob_dradius_ = b->blob_dradius_;
 	for( i = 0; i < blob_dradius_ ; ++ i )	
 	{
 		for( j = 0; j < blob_dradius_ ; ++ j)
 		{
-			blob_image_[s + j] = 0xff;
+			b->blob_image_[s + j] = 0xff;
 		}
 		s += width;
 	}
 }
 
-static blob_func	blob_render(void)
+static blob_func	blob_render(boids_t *b)
 {
-	if( blob_type_ == BLOB_RECT)
+	if( b->blob_type_ == BLOB_RECT)
 		return blob_render_rect;
 	return blob_render_circle;
 }
 
 
 // calculate center of mass
-static	void	boid_rule1_( int boid_id, double v1[2] )
+static	void	boid_rule1_( boids_t *b, int boid_id, double v1[2] )
 {
 	int i;
 	double v[2] = { 0.0, 0.0 };
-	for( i = 0; i < blob_num_ ; i ++ )
+	for( i = 0; i < b->blob_num_ ; i ++ )
 	{
 		if( i != boid_id )
 		{
-			v[0] += (double) blobs_[i].x;
-			v[1] += (double) blobs_[i].y;
+			v[0] += (double) b->blobs_[i].x;
+			v[1] += (double) b->blobs_[i].y;
 		}
 	}
-	v[0] = v[0] / ( (double) blob_num_ - 1 );
-	v[1] = v[1] / ( (double) blob_num_ - 1 );
-	v1[0] = (v[0] - ((double)blobs_[boid_id].x)) / 100.0;  	
-	v1[1] = (v[1] - ((double)blobs_[boid_id].y)) / 100.0;
+	v[0] = v[0] / ( (double) b->blob_num_ - 1 );
+	v[1] = v[1] / ( (double) b->blob_num_ - 1 );
+	v1[0] = (v[0] - ((double)b->blobs_[boid_id].x)) / 100.0;  	
+	v1[1] = (v[1] - ((double)b->blobs_[boid_id].y)) / 100.0;
 }
 
 
 // try to keep a small distance away from other blobs
-static void	boid_rule2_( int boid_id, double v1[2] )
+static void	boid_rule2_( boids_t *b, int boid_id, double v1[2] )
 {
 	double v[2] = {0.0 , 0.0};
 	int i;
-	for( i = 0; i < blob_num_; i ++ )
+	for( i = 0; i < b->blob_num_; i ++ )
 	{
 		if( i != boid_id)
 		{
 			// find nearby blob		
-			double d = ( blobs_[boid_id].x - blobs_[i].x ) * ( blobs_[boid_id].x - blobs_[i].x ) +
-					    ( blobs_[boid_id].y - blobs_[i].y ) * ( blobs_[boid_id].y - blobs_[i].y );
+			double d = ( b->blobs_[boid_id].x - b->blobs_[i].x ) * ( b->blobs_[boid_id].x - b->blobs_[i].x ) +
+					    ( b->blobs_[boid_id].y - b->blobs_[i].y ) * ( b->blobs_[boid_id].y - b->blobs_[i].y );
 			
-			if( d < blob_sradius_ )
+			if( d < b->blob_sradius_ )
 			{
-				v[0] = v[0] - ((double) ( blobs_[boid_id].x - blobs_[i].x ));
-				v[1] = v[1] - ((double) ( blobs_[boid_id].y - blobs_[i].y ));
+				v[0] = v[0] - ((double) ( b->blobs_[boid_id].x - b->blobs_[i].x ));
+				v[1] = v[1] - ((double) ( b->blobs_[boid_id].y - b->blobs_[i].y ));
 			}
 		}
 	}
@@ -301,36 +358,45 @@ static void	boid_rule2_( int boid_id, double v1[2] )
 }
 	
 // try to match velocity with near blobs
-static void	boid_rule3_( int boid_id, double v1[2] )
+static void	boid_rule3_( boids_t *b, int boid_id, double v1[2] )
 {
 	double v[2] = { 0.0, 0.0 };
 	int i;
-	for( i = 0; i < blob_num_; i ++ )
+	for( i = 0; i < b->blob_num_; i ++ )
 	{
 		if( boid_id != i )
 		{
-			v[0] = v[0] + blobs_[i].vx;
-			v[1] = v[1] + blobs_[i].vy;
+			v[0] = v[0] + b->blobs_[i].vx;
+			v[1] = v[1] + b->blobs_[i].vy;
 		}
 	}
-	v1[0] = v[0] /( (double)( blob_num_ -1 ));
-	v1[0] = ( v[0] - blobs_[boid_id].vx ) / 8;
-	v1[1] = v[1] /( (double)( blob_num_ -1 ));
-	v1[1] = ( v[1] - blobs_[boid_id].vy ) / 8;
+	v1[0] = v[0] /( (double)( b->blob_num_ -1 ));
+	v1[0] = ( v[0] - b->blobs_[boid_id].vx ) / 8;
+	v1[1] = v[1] /( (double)( b->blob_num_ -1 ));
+	v1[1] = ( v[1] - b->blobs_[boid_id].vy ) / 8;
 }
 
-static void	boid_rule4_( int boid_id, int vlim )
+static void	boid_rule4_( boids_t *b, int boid_id, int vlim )
 {
 	// speed limiter
-	if( blobs_[boid_id].vx > vlim )
-		blobs_[boid_id].vx = ( blobs_[boid_id].vx / fabs( blobs_[boid_id].vx) ) * vlim;
-	if( blobs_[boid_id].vy > vlim )
-		blobs_[boid_id].vy = ( blobs_[boid_id].vy / fabs( blobs_[boid_id].vy) ) * vlim;
+	if( b->blobs_[boid_id].vx > vlim )
+		b->blobs_[boid_id].vx = ( b->blobs_[boid_id].vx / fabs( b->blobs_[boid_id].vx) ) * vlim;
+	if( b->blobs_[boid_id].vy > vlim )
+		b->blobs_[boid_id].vy = ( b->blobs_[boid_id].vy / fabs( b->blobs_[boid_id].vy) ) * vlim;
 }
 
-void boids_apply(VJFrame *frame, int radius, int num, int shape, int m1, int m2,
-                 int m3, int speed, int home_radius )
-{
+void boids_apply(void *ptr, VJFrame *frame, int *args ) {
+    int radius = args[0];
+    int num = args[1];
+    int shape = args[2];
+    int m1 = args[3];
+    int m2 = args[4];
+    int m3 = args[5];
+    int speed = args[6];
+    int home_radius = args[7];
+
+    boids_t *b = (boids_t*) ptr;
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;
@@ -341,33 +407,31 @@ void boids_apply(VJFrame *frame, int radius, int num, int shape, int m1, int m2,
 	const double M1 = ( (m1==0? 0.0 : m1/100.0) );
 	const double M2 = ( (m2==0? 0.0 : m2/100.0) );
 	const double M3 = ( (m3==0? 0.0 : m3/1000.0) );
-	blob_func f = blob_render();
+	blob_func f = blob_render(b);
 
-	blob_type_ = shape;
+	b->blob_type_ = shape;
 
-	if( radius != blob_radius_ || num != blob_num_ )
+	if( radius != b->blob_radius_ || num != b->blob_num_ )
 	{ // reinitialize
-		blob_radius_ = radius;
-		blob_num_ 	 = num;
-		boids_free();
-		boids_malloc(width,height);
+        if(!boids_reinit(b, radius, num, frame->width, frame->height ))
+            return;
 	}
 
-	if( home_radius != blob_home_radius_ )
+	if( home_radius != b->blob_home_radius_ )
 	{
-		blob_home_radius_ = home_radius;
-		for( i = 0; i < blob_num_ ; i ++ )
-			blob_init_(blobs_ + i , i, width, height);
+		b->blob_home_radius_ = home_radius;
+		for( i = 0; i < b->blob_num_ ; i ++ )
+			blob_init_(b,b->blobs_ + i , i, width, height);
 	}
 
 	// move boid to new positions
-	for( i = 0; i < blob_num_; i ++)
+	for( i = 0; i < b->blob_num_; i ++)
 	{
 		double v1[2],v2[2],v3[2];
 
-		boid_rule1_( i, v1 );
-		boid_rule2_( i, v2 );
-		boid_rule3_( i, v3 );
+		boid_rule1_(b, i, v1 );
+		boid_rule2_(b, i, v2 );
+		boid_rule3_(b, i, v3 );
 
 		v1[0] *= M1;
 		v1[1] *= M1;
@@ -376,42 +440,42 @@ void boids_apply(VJFrame *frame, int radius, int num, int shape, int m1, int m2,
 		v3[0] *= M3;
 		v3[1] *= M3;
 
-		blobs_[i].vx = blobs_[i].vx + v1[0] + v2[0] + v3[0];
-		blobs_[i].vy = blobs_[i].vy + v1[1] + v2[1] + v3[1];
+		b->blobs_[i].vx = b->blobs_[i].vx + v1[0] + v2[0] + v3[0];
+		b->blobs_[i].vy = b->blobs_[i].vy + v1[1] + v2[1] + v3[1];
 
-		boid_rule4_( i, speed * speed );
+		boid_rule4_( b,i, speed * speed );
 
-		blobs_[i].x = blobs_[i].x + (short) blobs_[i].vx;
-		blobs_[i].y = blobs_[i].y + (short) blobs_[i].vy;
+		b->blobs_[i].x = b->blobs_[i].x + (short) b->blobs_[i].vx;
+		b->blobs_[i].y = b->blobs_[i].y + (short) b->blobs_[i].vy;
 
 	}
 
 	// fill blob
-	for( k = 0; k < blob_num_ ; k ++ )
+	for( k = 0; k < b->blob_num_ ; k ++ )
 	{
-		if( (blobs_[k].x > 0) &&
-			(blobs_[k].x < (width - blob_dradius_)) &&
-			(blobs_[k].y > 0) &&
-			(blobs_[k].y < (height - blob_dradius_)) )
+		if( (b->blobs_[k].x > 0) &&
+			(b->blobs_[k].x < (width - b->blob_dradius_)) &&
+			(b->blobs_[k].y > 0) &&
+			(b->blobs_[k].y < (height - b->blob_dradius_)) )
 		{
-			s = blobs_[k].x + blobs_[k].y * width;
-			f(s,width);
+			s = b->blobs_[k].x + b->blobs_[k].y * width;
+			f(b,s,width);
 		}
 		else
 		{
-			blob_init_( blobs_ + k,k,width ,height );
+			blob_init_(b,b->blobs_ + k,k,width ,height );
 		}
 	}
 
 	// project blob onto video frame
 	for(i = 0; i < len ; i ++ )
 	{
-		if( blob_image_[i]  == 0x0 )
+		if( b->blob_image_[i]  == 0x0 )
 		{
 			srcY[i] = 16;
 			srcCb[i] = 128;
 			srcCr[i] = 128;
 		}
-		blob_image_[i] = 0x0;
+		b->blob_image_[i] = 0x0;
 	}
 }

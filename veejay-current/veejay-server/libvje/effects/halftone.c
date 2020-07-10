@@ -65,15 +65,6 @@ vj_effect *halftone_init(int w, int h)
     return ve;
 }
 
-int  halftone_malloc(int w, int h) 
-{
-    return 1;
-}
-
-void halftone_free() 
-{
-}
-
 static void halftone_apply_avg_col( VJFrame *frame, int radius, int orientation, int odd)
 {
     uint8_t *Y = frame->data[0];
@@ -290,8 +281,12 @@ static void halftone_apply_avg_white( VJFrame *frame, int radius, int orientatio
     veejay_memset( V, 128, w * h );
 }
 
-void halftone_apply( VJFrame *frame, int radius, int mode, int orientation, int parity)
-{
+void halftone_apply( void *ptr, VJFrame *frame, int *args ) {
+    int radius = args[0];
+    int mode = args[1];
+    int orientation = args[2];
+    int parity = args[3];
+
     switch(mode) {
         case 0:
             halftone_apply_avg_white( frame, radius, (vj_effect_orientation)orientation, (vj_effect_parity)parity);

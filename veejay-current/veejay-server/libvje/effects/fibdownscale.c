@@ -110,11 +110,17 @@ static void fibrectangle1_apply(VJFrame *frame, VJFrame *frame2)
 	}
 }
 
-void fibdownscale_apply(VJFrame *frame, VJFrame *frame2, int n)
-{
-	if (n == 0)
-		fibdownscale1_apply(frame, frame2);
-	if (n == 1)
-		fibrectangle1_apply(frame, frame2);
+void fibdownscale_apply(void *ptr, VJFrame *frame, int *args ) {
+    int n = args[0];
+    int repeat = args[1];
+
+    VJFrame *frame2 = frame;
+
+    for( int i = 0; i < repeat ; i ++ ) {
+	    if (n == 0)
+		    fibdownscale1_apply(frame, frame2);
+	    if (n == 1)
+		    fibrectangle1_apply(frame, frame2);
+    }
 }
 

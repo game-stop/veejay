@@ -98,7 +98,7 @@ static void contrast_y_apply(VJFrame *frame, int *s) {
 
 }
 
-void contrast_apply(VJFrame *frame,int *s )
+void contrast_apply(void *ptr, VJFrame *frame,int *s )
 {
 	switch(s[0])
 	{
@@ -115,4 +115,3 @@ void contrast_apply(VJFrame *frame,int *s )
 	}
 }
 
-void contrast_free(){}

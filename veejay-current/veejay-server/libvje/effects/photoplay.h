@@ -21,7 +21,7 @@
 #ifndef PHOTOPLAY_H
 #define PHOTOPLAY_H
 vj_effect *photoplay_init(int w, int h);
-int photoplay_malloc(int w, int h);
-void photoplay_free(void);
-void photoplay_apply( VJFrame *frame, int size, int behaviour, int mode);
+void *photoplay_malloc(int w, int h);
+void photoplay_free(void *ptr);
+void photoplay_apply(void *ptr, VJFrame *frame, int *args);
 #endif

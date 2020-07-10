@@ -21,5 +21,5 @@
 #ifndef RANDNOISE_H
 #define RANDNOISE_H
 vj_effect *randnoise_init(int w, int h);
-void randnoise_apply( VJFrame *frame, int min, int max);
+void randnoise_apply(void *ptr, VJFrame *frame, int *args);
 #endif

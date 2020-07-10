@@ -21,7 +21,7 @@
 #ifndef BLOOM_H
 #define BLOOM_H
 vj_effect *bloom_init(int w, int h);
-int bloom_malloc(int w, int h);
-void bloom_free();
-void bloom_apply(VJFrame *Frame, int a0, int b0, int c0, int threshold);
+void *bloom_malloc(int w, int h);
+void bloom_free(void *ptr);
+void bloom_apply(void *ptr, VJFrame *Frame, int *args);
 #endif

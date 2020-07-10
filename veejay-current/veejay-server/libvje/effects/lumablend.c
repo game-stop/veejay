@@ -31,8 +31,6 @@ vj_effect *lumablend_init(int w, int h)
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	ve->limits[0][0] = 0;	/* type */
 	ve->limits[1][0] = 2;
-	if(vj_task_available() )
-	  ve->limits[1][0] = 1; /* no blur */
 	ve->limits[0][1] = 0;	/* threshold 1 */
 	ve->limits[1][1] = 255;
 	ve->limits[0][2] = 0;	/* threshold 2 */
@@ -195,9 +193,12 @@ static void opacity_by_threshold_blur(VJFrame *frame, VJFrame *frame2,
 
 }
 
-void lumablend_apply(VJFrame *frame, VJFrame *frame2, int type,
-					 int t1, int t2, int opacity)
-{
+void lumablend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int type = args[0];
+    int t1 = args[1];
+    int t2 = args[2];
+    int opacity = args[3];
+
 	switch (type) {
 		case 0:
 			opacity_by_threshold(frame, frame2, t1, t2, opacity);

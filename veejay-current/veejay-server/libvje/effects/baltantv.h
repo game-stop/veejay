@@ -21,7 +21,7 @@
 #ifndef BALTAN_TVH
 #define BALTAN_TVH
 vj_effect *baltantv_init(int w, int h);
-void baltantv_apply( VJFrame *frame, int stride, int mode);
-int baltantv_malloc(int w, int h );
-void baltantv_free();
+void baltantv_apply(void *ptr, VJFrame *frame, int *args);
+void *baltantv_malloc(int w, int h );
+void baltantv_free(void *ptr);
 #endif

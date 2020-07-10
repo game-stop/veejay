@@ -52,35 +52,47 @@ vj_effect *neighbours2_init(int w, int h)
 	return ve;
 }
 
-static	int pixel_histogram[256];
-static	int y_map[256];
-static  int cb_map[256];
-static int cr_map[256];
-static uint8_t  *tmp_buf[2];
-static uint8_t  *chromacity[2];
+typedef struct {
+	int pixel_histogram[256];
+	int y_map[256];
+    int cb_map[256];
+    int cr_map[256];
+    uint8_t *tmp_buf[2];
+    uint8_t *chromacity[2];
+} nb_t;
 
-
-int		neighbours2_malloc(int w, int h )
+void *neighbours2_malloc(int w, int h )
 {
-	tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 2);
-	if(!tmp_buf[0] ) return 0;
-	tmp_buf[1] = tmp_buf[0] + (w*h);
-	chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h *2);
-	if(!chromacity[0]) return 0;
-	chromacity[1] = chromacity[0] + (w*h);
-	return 1;
+    nb_t *n = (nb_t*) vj_calloc(sizeof(nb_t));
+    if(!n) {
+        return NULL;
+    }
+
+	n->tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * 2));
+	if(!n->tmp_buf[0] ) {
+        free(n);
+        return NULL;
+    }
+
+	n->tmp_buf[1] = n->tmp_buf[0] + RUP8(w*h);
+	n->chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h *2));
+	if(!n->chromacity[0]) {
+        free(n->tmp_buf[0]);
+        free(n);
+        return NULL;
+    }
+
+	n->chromacity[1] = n->chromacity[0] + RUP8(w*h);
+	return (void*) n;
 }
 
-void		neighbours2_free(void)
+void neighbours2_free(void *ptr)
 {
-	if(tmp_buf[0])
-		free(tmp_buf[0]);
-	if(chromacity[0])
-		free(chromacity[0]);
-	tmp_buf[0] = NULL;
-	tmp_buf[1] = NULL;
-	chromacity[0] = NULL;
-	chromacity[1] = NULL;
+    nb_t *n = (nb_t*) ptr;
+
+	free(n->tmp_buf[0]);
+	free(n->chromacity[0]);
+    free(n);
 }
 
 typedef struct
@@ -100,7 +112,11 @@ static inline pixel_t evaluate_pixel_bc(
 		const uint8_t *premul,		/* map data */
 		const uint8_t *image,		/* image data */
 		const uint8_t *image_cb,
-		const uint8_t *image_cr
+		const uint8_t *image_cr,
+        int *pixel_histogram,
+        int *y_map,
+        int *cb_map,
+        int *cr_map
 )
 {
 	unsigned int 	brightness;		/* scaled brightnes */
@@ -169,7 +185,9 @@ static inline uint8_t evaluate_pixel_b(
 		const int w,			/* width of image */
 		const int h,			/* height of image */
 		const uint8_t *premul,		/* map data */
-		const uint8_t *image		/* image data */
+		const uint8_t *image,		/* image data */
+        int *pixel_histogram,
+        int *y_map
 )
 {
 	unsigned int 	brightness;		/* scaled brightnes */
@@ -222,12 +240,17 @@ static inline uint8_t evaluate_pixel_b(
 	return( (uint8_t) (  y_map[ peak_index] ));
 }
 
-void neighbours2_apply( VJFrame *frame, int brush_size, int intensity_level, int mode )
-{
+void neighbours2_apply( void *ptr, VJFrame *frame, int *args ) {
+    int brush_size = args[0];
+    int intensity_level = args[1];
+    int mode = args[2];
+
+    nb_t *n = (nb_t*) ptr;
+
 	int x,y; 
 	const double intensity = intensity_level / 255.0;
-	uint8_t *Y = tmp_buf[0];
-	uint8_t *Y2 = tmp_buf[1];
+	uint8_t *Y = n->tmp_buf[0];
+	uint8_t *Y2 = n->tmp_buf[1];
 
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
@@ -241,7 +264,7 @@ void neighbours2_apply( VJFrame *frame, int brush_size, int intensity_level, int
 	if(mode)
 	{
 		int strides[4] = { 0, len, len,0 };
-		uint8_t *dest[4] = { NULL, chromacity[0],chromacity[1],NULL };
+		uint8_t *dest[4] = { NULL, n->chromacity[0],n->chromacity[1],NULL };
 		vj_frame_copy( frame->data, dest, strides );
 	}
 
@@ -262,7 +285,9 @@ void neighbours2_apply( VJFrame *frame, int brush_size, int intensity_level, int
 						width,
 						height,
 						Y,
-						Y2
+						Y2,
+                        n->pixel_histogram,
+                        n->y_map
 				);
 			}
 		}
@@ -282,8 +307,12 @@ void neighbours2_apply( VJFrame *frame, int brush_size, int intensity_level, int
 						height,
 						Y,
 						Y2,
-						chromacity[0],
-						chromacity[1]
+						n->chromacity[0],
+						n->chromacity[1],
+                        n->pixel_histogram,
+                        n->y_map,
+                        n->cb_map,
+                        n->cr_map
 					);
 				*(dstY++) = tmp.y;
 				*(dstCb++) = tmp.u;

@@ -22,9 +22,11 @@
 #include <veejaycore/vjmem.h>
 #include "average.h"
 
-static double *running_sum[4] = { NULL, NULL, NULL, NULL };
-static int last_params[2] = { 0,0 };
-static int frame_count = -1;
+typedef struct {
+    double *running_sum[4];
+    int last_params[2];
+    int frame_count;
+} average_t;
 
 vj_effect *average_init(int w, int h)
 {
@@ -53,42 +55,52 @@ vj_effect *average_init(int w, int h)
  	return ve;
 }
 
-int	average_malloc(int width, int height)
+void *average_malloc(int width, int height)
 {
-	running_sum[0] = (double*) vj_calloc( sizeof(double) * RUP8(width * height * 3 ));
-	if(!running_sum[0])
-		return 0;
-	running_sum[1] = running_sum[0] + RUP8(width*height);
-	running_sum[2] = running_sum[1] + RUP8(width*height);
-	return 1;
+    average_t *a = (average_t*) vj_calloc(sizeof(average_t));
+    if(!a) {
+        return NULL;
+    }
+	a->running_sum[0] = (double*) vj_calloc( sizeof(double) * RUP8(width * height * 3 ));
+	if(!a->running_sum[0]) {
+	    free(a);
+        return NULL;
+    }
+	a->running_sum[1] = a->running_sum[0] + RUP8(width*height);
+	a->running_sum[2] = a->running_sum[1] + RUP8(width*height);
+	a->frame_count = 1;
+    return (void*) a;
 }
 
-void average_free() 
+void average_free(void *ptr) 
 {
-	if(running_sum[0]) {
-		free(running_sum[0]);
-		running_sum[0] = NULL;
-	}
-	last_params[0] = 0;
-	last_params[1] = 0;
-	frame_count = -1;
+    average_t *a = (average_t*) ptr;
+	free(a->running_sum[0]);
+    free(a);
 }	
 
-void average_apply(VJFrame *frame, int max_sum, int mode)
-{
+void average_apply(void *ptr, VJFrame *frame, int *args) {
+    int max_sum = args[0];
+    int mode = args[1];
+
     unsigned int i;
     const int len = frame->len;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
+
+    average_t *a = (average_t*) ptr;
+    double **running_sum = a->running_sum;
     
-	if( last_params[0] != max_sum || last_params[1] != mode || ( mode == 0 && frame_count == max_sum) )
+	if( a->last_params[0] != max_sum || a->last_params[1] != mode || ( mode == 0 && a->frame_count == max_sum) )
 	{
 		veejay_memset( running_sum[0], 0, sizeof(double) * (len + len + len) );
-		last_params[0] = max_sum;
-		last_params[1] = mode;
-		frame_count = 1;
+		a->last_params[0] = max_sum;
+		a->last_params[1] = mode;
+		a->frame_count = 1;
 	}
+
+    int frame_count = a->frame_count;
 
 	if( mode == 0 )
 	{
@@ -130,5 +142,7 @@ void average_apply(VJFrame *frame, int max_sum, int mode)
 		}
 		frame_count ++;
 	}
+
+    a->frame_count = a->frame_count;
 }
 

@@ -51,6 +51,7 @@
 #include <build.h>
 #include <glib-2.0/glib.h>
 #include <glib-2.0/glib-object.h>
+#include <libvje/libvje.h>
 
 extern void vj_libav_ffmpeg_version();
 static veejay_t *info = NULL;
@@ -60,6 +61,7 @@ static int default_geometry_y = -1;
 static	int	use_keyb = 1;
 static	int	use_mouse = 1;
 static	int	show_cursor = 0;
+static int borderless = 0;
 static int force_video_file = 0; // unused
 static int override_pix_fmt = 0;
 static int switch_jpeg = 0;
@@ -294,6 +296,8 @@ static void Usage(char *progname)
 		"  -x/--geometry-x <num> \tTop left x offset for SDL video window\n");
 	fprintf(stderr,
 		"  -y/--geometry-y <num> \tTop left y offset for SDL video window\n");
+    fprintf(stderr,
+        "  --borderless\t\t\tOpen video window without title bar\n");
 	fprintf(stderr,
 		"  --no-keyboard\t\t\tdisable keyboard for SDL video window\n");
 	fprintf(stderr,
@@ -494,6 +498,9 @@ static int set_option(const char *name, char *value)
 	else if (strcmp(name, "no-keyboard") == 0 ) {
 		use_keyb = 0;
 	}
+    else if (strcmp(name, "borderless") == 0 ) {
+        borderless = 1;
+    }
 	else if (strcmp(name, "no-mouse") == 0 ) {
 		use_mouse = 0;
 	}
@@ -619,6 +626,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"geometry-y",1,0,0},
 	{"no-keyboard",0,0,0},
 	{"no-mouse",0,0,0},
+    {"borderless",0,0,0},
 	{"show-cursor",0,0,0},
 	{"auto-loop",0,0,0},
 	{"fps",1,0,0},
@@ -825,10 +833,10 @@ int main(int argc, char **argv)
  	{
 		veejay_set_colors(0);
 		vj_event_init(NULL);
-		vj_effect_initialize(720,576,0,info->read_plug_cfg);
+		vje_init(720,576); //FIXME custom deafult values ,0,info->read_plug_cfg);
 		vj_osc_allocate(VJ_PORT+2);	
 		vj_event_dump();
-		vj_effect_dump();
+		vje_dump();
 			fprintf(stdout, "Environment variables:\n\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tinterval of key pressed to repeat while pressed down.\n\tVEEJAY_PLAYBACK_CACHE\t\tSample cache size in MB\n\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\n\tVEEJAY_DESKTOP_GEOMETRY\t\tSpecifiy a geometry for veejay to position the video window.\n\tVEEJAY_VIDEO_POSITION\t\tPosition of video window\n\tVEEJAY_VIDEO_SIZE\t\tSize of video window, defaults to full screen size.\n\tVEEJAY_RUN_MODE\t\t\tRun in \"classic\" (352x288 Dummy) or default (720x576). \n");
 			fprintf(stdout,"\tVEEJAY_V4L2_NO_THREADING\tSet to 1 to query frame in main-loop\n");
 			fprintf(stdout,"\tVEEJAY_MULTITHREAD_TASKS\tSet the number of parallel tasks (multithreading) to use (default is equal to the number of cpu-cores)\n");
@@ -887,7 +895,7 @@ int main(int argc, char **argv)
 	info->use_keyb = use_keyb;
 	info->use_mouse = use_mouse;
 	info->show_cursor = show_cursor;
-
+    info->borderless = borderless;
 
 	if(veejay_init(
 		info,
@@ -925,7 +933,7 @@ int main(int argc, char **argv)
 
 	while( 1 ) { //@ until your PC stops working
 		
-		clock_nanosleep( CLOCK_REALTIME, 0, &req, NULL );
+		clock_nanosleep( CLOCK_MONOTONIC, 0, &req, NULL );
 
 		current_state = veejay_get_state(info);
 		

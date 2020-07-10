@@ -21,5 +21,5 @@
 #ifndef LUMAKEYA_H
 #define LUMAKEYA_H
 vj_effect *lumakeyalpha_init(int w, int h);
-void lumakeyalpha_apply( VJFrame *frame, VJFrame *frame2, int type, int opacity );
+void lumakeyalpha_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args );
 #endif

@@ -131,11 +131,17 @@ static blend_func get_blend_func(const int mode) {
 }
 
 /*
+Originally from:
 http://www.cs.utah.edu/~michael/chroma/
 */
-void keyselect_apply( VJFrame *frame, VJFrame *frame2, int i_angle,
-                     int r, int g, int b, int mode, int i_noise)
-{
+void keyselect_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int i_angle = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int mode = args[4];
+    int i_noise = args[5];
+
 	uint8_t *fg_y, *fg_cb, *fg_cr;
     uint8_t *bg_y, *bg_cb, *bg_cr;
 	const unsigned int width = frame->width;

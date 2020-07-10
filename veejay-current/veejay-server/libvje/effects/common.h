@@ -67,6 +67,8 @@ extern void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, const int val, c
 extern void set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 
 extern void veejay_msg(int type, const char format[], ...);
+extern int vje_get_rgb_parameter_conversion_type();
+
 
 #define ALPHA_BLEND( a0, p0, p1 ) ( ((0xff - a0) * p0 + (a0 * p1) ) >> 8 )
 #define FEATHER( P, op0, aB, Q, op1 ) \
@@ -231,11 +233,11 @@ enum
 
 #define	_rgb2yuv(r,g,b,y,u,v)\
 {\
- if( rgb_parameter_conversion_type_ == GIMP_RGB )\
+ if( vje_get_rgb_parameter_conversion_type() == GIMP_RGB )\
 	GIMP_rgb2yuv(r,g,b,y,u,v)\
- if( rgb_parameter_conversion_type_ == CCIR601_RGB )\
+ if( vje_get_rgb_parameter_conversion_type() == CCIR601_RGB )\
 	CCIR601_rgb2yuv(r,g,b,y,u,v)\
- if( rgb_parameter_conversion_type_ == OLD_RGB )\
+ if( vje_get_rgb_parameter_conversion_type() == OLD_RGB )\
 	COLOR_rgb2yuv(r,g,b,y,u,v)\
 }	
 #define round1(x) ( (int32_t)( (x>0) ? (x) : (x) ))
@@ -370,13 +372,6 @@ void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcSte
 void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
 extern void viewport_destroy(void *v);
 extern void vj_get_yuvgrey_template(VJFrame *src, int w, int h);
-extern	int motionmap_active();
-extern void motionmap_scale_to( int p1max, int p2max,int p1min,int p2min, int *p1val, int *p2val, int *pos, int *len );
-extern void motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n );
-extern void motionmap_store_frame(VJFrame *fx);
-extern void motionmap_interpolate_frame(VJFrame *fx, int N, int n);
-extern uint8_t *motionmap_bgmap();
-extern uint32_t motionmap_activity();
 extern int    yuv_use_auto_ccir_jpeg();
 
 void veejay_draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value );

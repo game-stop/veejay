@@ -21,5 +21,5 @@
 #ifndef SOLARIZE_H
 #define SOLARIZE_H
 vj_effect *solarize_init();
-void solarize_apply(VJFrame *frame, int threshold);
+void solarize_apply(void *ptr, VJFrame *frame, int *args);
 #endif

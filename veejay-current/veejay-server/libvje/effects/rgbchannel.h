@@ -21,5 +21,5 @@
 #ifndef RGBCHANNEL_H
 #define RGBCHANNEL_H
 vj_effect *rgbchannel_init(int w, int h);
-void rgbchannel_apply( VJFrame *frame, int r, int g, int b);
+void rgbchannel_apply( void *ptr, VJFrame *frame, int *args);
 #endif

@@ -41,6 +41,7 @@
 #include <libsample/sampleadm.h>
 #include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
+#include <libvje/libvje.h>
 #include <libsubsample/subsample.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vevo.h>
@@ -54,6 +55,7 @@
 #include <libstream/vj-tag.h>
 #include <libvjxml/vj-xml.h>
 #include <veejay/vj-macro.h>
+#include <libvje/internal.h>
 //#define KAZLIB_OPAQUE_DEBUG 1
 
 #ifdef HAVE_XML2
@@ -66,11 +68,6 @@
 #define FOURCC_FMT      FOURCC ('f', 'm', 't', ' ')
 #define FOURCC_DATA     FOURCC ('d', 'a', 't', 'a')
 
-
-#define VJ_IMAGE_EFFECT_MIN vj_effect_get_min_i()
-#define VJ_IMAGE_EFFECT_MAX vj_effect_get_max_i()
-#define VJ_VIDEO_EFFECT_MIN vj_effect_get_min_v()
-#define VJ_VIDEO_EFFECT_MAX vj_effect_get_max_v()
 static int recount_hash = 1;
 static unsigned int sample_count = 0;
 static int this_sample_id = 0;  /* next available sample id */
@@ -629,7 +626,7 @@ int sample_has_cali_fx(int sample_id)
         return -1;
     int i;
     for( i =0;i < SAMPLE_MAX_EFFECTS; i ++ ) {
-        if(si->effect_chain[i]->effect_id == 190)
+        if(si->effect_chain[i]->effect_id == VJ_IMAGE_EFFECT_CALI)
             return i;
     }
     return -1;
@@ -637,20 +634,13 @@ int sample_has_cali_fx(int sample_id)
 
 void    sample_cali_prepare( int sample_id, int slot, int chan )
 {
-    sample_info *si = sample_get(sample_id);
-        if(si == NULL)
-        return;
     vj_tag  *tag    = vj_tag_get( chan );
     if( tag == NULL || tag->source_type != VJ_TAG_TYPE_CALI )
         return;
-    int fx_id = vj_effect_real_to_sequence(
-            si->effect_chain[slot]->effect_id );
-    if( fx_id >= 0 ) {
-        vj_tag_cali_prepare_now( chan, fx_id );
-        veejay_msg(VEEJAY_MSG_DEBUG, "Prepared calibration data");
-    }
-}
 
+    vj_tag_cali_prepare_now( tag );
+    veejay_msg(VEEJAY_MSG_DEBUG, "Prepared calibration data");
+}
 
 
 int sample_get_el_position( int sample_id, int *start, int *end )
@@ -707,6 +697,14 @@ int sample_entry_set_is_rendering(int s1, int position, int value) {
     return 1;
 }
 
+int sample_get_position(int s1)
+{
+    sample_info *si = sample_get(s1);
+
+    if(!si) return 0;
+
+    return si->offset;
+}
 
 int sample_update_offset(int s1, int n_frame)
 {
@@ -1507,7 +1505,7 @@ int sample_has_extra_frame(int s1, int position)
     return -1;
     if (sample->effect_chain[position]->effect_id == -1)
     return -1;
-    if (vj_effect_get_extra_frame
+    if (vje_get_extra_frame
     (sample->effect_chain[position]->effect_id) == 1)
     return 1;
     return -1;
@@ -1796,6 +1794,69 @@ int	sample_loop_dec(int s1)
 	if(sample->loops > 0)
 		sample->loops --;
 	return sample->loops;	
+}
+
+int sample_get_transition_shape(int s1) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) return 0;
+    return sample->transition_shape;
+}
+
+int sample_get_transition_length(int s1) {
+    sample_info *sample = sample_get(s1);
+	if(!sample) return 0;
+    int transition_length = sample->transition_length;
+    if (sample->marker_end > 0 && sample->marker_start >= 0) {
+        if( transition_length > ( sample->marker_end - sample->marker_start ) )
+            transition_length = sample->marker_end - sample->marker_start;
+    }
+    else {
+        if( transition_length > ( sample->last_frame - sample->first_frame ) ) 
+            transition_length = sample->last_frame - sample->first_frame;
+    }
+
+
+    return transition_length;
+}
+
+void sample_set_transition_shape(int s1, int shape) {
+    sample_info *sample = sample_get(s1);
+	if(!sample) return;
+    sample->transition_shape = shape;
+}
+
+void sample_set_transition_length(int s1, int length) {
+    sample_info *sample = sample_get(s1);
+	if(!sample) return;
+    int transition_length = length;
+    if (sample->marker_end > 0 && sample->marker_start >= 0) {
+        if( transition_length > ( sample->marker_end - sample->marker_start ) )
+            transition_length = sample->marker_end - sample->marker_start;
+    }
+    else {
+        if( transition_length > ( sample->last_frame - sample->first_frame ) ) 
+            transition_length = sample->last_frame - sample->first_frame;
+    }
+
+    sample->transition_length = transition_length;
+}
+
+int sample_get_transition_active( int s1 ) {
+    sample_info *sample = sample_get(s1);
+    if(!sample) return 0;
+    return sample->transition_active;
+}
+
+void sample_set_transition_active(int s1, int status) {
+    sample_info *sample = sample_get(s1);
+    if(!sample) return;
+    sample->transition_active = status;
+
+    if( sample->transition_active == 1 ) {
+        if( sample->transition_length <= 0 ) {
+            sample_set_transition_length( s1, 25 );
+        }
+    }
 }
 
 /****************************************************************************************************
@@ -2090,28 +2151,6 @@ int sample_set_next(int s1, int next_sample_id)
  *
  ****************************************************************************************************/
 
-int sample_chain_malloc(int s1)
-{
-    sample_info *sample = sample_get(s1);
-    int i=0;
-    int e_id = 0; 
-    int sum =0;
-    if (!sample)
-    return -1;
-    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-    e_id = sample->effect_chain[i]->effect_id;
-    if(e_id)
-    {
-        int res = 0;
-        sample->effect_chain[i]->fx_instance = vj_effect_activate(e_id, &res );
-        if(res) sum++;
-    }
-    } 
-//    veejay_msg(VEEJAY_MSG_DEBUG, "Allocated %d effects",sum);
-    return sum; 
-}
-
 int sample_chain_free(int s1, int global)
 {
     sample_info *sample = sample_get(s1);
@@ -2122,22 +2161,16 @@ int sample_chain_free(int s1, int global)
         return -1;
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-        e_id = sample->effect_chain[i]->effect_id;
-        if(e_id!=-1)
-        {
-            if(vj_effect_initialized(e_id, sample->effect_chain[i]->fx_instance))
-            {
-                vj_effect_deactivate(e_id, sample->effect_chain[i]->fx_instance, global);
-                sample->effect_chain[i]->fx_instance = NULL;
-                sample->effect_chain[i]->clear = 1;
-                sum++;
-                
-                if( sample->effect_chain[i]->source_type == 1 && 
-                    vj_tag_get_active( sample->effect_chain[i]->channel ) &&
-                    vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
-                        vj_tag_disable( sample->effect_chain[i]->channel );
-                }
-            }
+        if( sample->effect_chain[i]->effect_id == -1 )
+            continue;
+
+        vjert_del_fx( sample->effect_chain[i] ,0,i,0);
+        sum ++; 
+        
+        if( sample->effect_chain[i]->source_type == 1 && 
+            vj_tag_get_active( sample->effect_chain[i]->channel ) &&
+            vj_tag_get_type( sample->effect_chain[i]->channel ) == VJ_TAG_TYPE_NET ) {
+                 vj_tag_disable( sample->effect_chain[i]->channel );
         }
     }
 
@@ -2243,86 +2276,32 @@ int sample_chain_add(int s1, int c, int effect_nr)
     if (c < 0 || c >= SAMPLE_MAX_EFFECTS)
         return 0;
 
-    if( vj_effect_single_instance( effect_nr ))
+    if(!vje_is_valid(effect_nr))
         return 0;
 
     veejay_memset( &(sample->effect_chain[c]->transition), 0 ,sizeof(transition_eff));
 
-    if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
-    {
-        //verify if the effect should be discarded
-        if(vj_effect_initialized( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance )  ) 
-        {
-            if(!vj_effect_is_plugin( sample->effect_chain[c]->effect_id ) ) {
-                int frm = 1;
-                
-                for( i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
-                    if( i == c )
-                        continue;
-                    if( sample->effect_chain[i]->effect_id == effect_nr )
-                        frm = 0;
-                }
-            
-                if( frm == 1 ) {
-                    vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance,1 );
-                    sample->effect_chain[c]->fx_instance = NULL;
-                    sample->effect_chain[c]->clear = 1;
-                }
-            } else {
-                vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance,1 );
-                sample->effect_chain[c]->fx_instance = NULL;
-                sample->effect_chain[c]->clear = 1;
-            }
-        }
+    if( sample->effect_chain[c]->effect_id == -1 ) {
+        sample->effect_chain[c]->effect_id = effect_nr;
+    }
+    else if ( sample->effect_chain[c]->effect_id != effect_nr ) {
+        vjert_del_fx( sample->effect_chain[c],0,c,1 );
+        sample->effect_chain[c]->effect_id = effect_nr;
     }
 
-    if(!vj_effect_initialized(effect_nr, sample->effect_chain[c]->fx_instance) )
+    effect_params = vje_get_num_params(effect_nr);
+    for (i = 0; i < effect_params; i++)
     {
-        int res = 0;
-        sample->effect_chain[c]->fx_instance = vj_effect_activate( effect_nr, &res );
-        if(!res)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Cannot activate %d", effect_nr);
-            //@ clear
-            sample->effect_chain[c]->effect_id = -1;
-            sample->effect_chain[c]->e_flag = 1;
-            for( i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ )
-                sample->effect_chain[c]->arg[i] = 0;
-    
-            sample->effect_chain[c]->frame_trimmer = 0;
-            if( c == sample->fade_entry )
-                sample->fade_entry = -1;
-            return 0;
-        }
+        sample->effect_chain[c]->arg[i] = vje_get_param_default(effect_nr, i);
     }
 
-    effect_params = vj_effect_get_num_params(effect_nr);
-    if( sample->effect_chain[c]->effect_id != effect_nr ) {
-        if( effect_params > 0 ) {
-            /* there are parameters, set default values */
-            for (i = 0; i < effect_params; i++)
-            {
-                int val = vj_effect_get_default(effect_nr, i);
-                sample->effect_chain[c]->arg[i] = val;
-            }
-        }
-        /* effect enabled standard */
-        sample->effect_chain[c]->e_flag = 1;
-        //clear fx anim
-        sample->effect_chain[c]->kf_status = 0;
-        sample->effect_chain[c]->kf_type = 0;
-        if(sample->effect_chain[c]->kf)
-            vpf(sample->effect_chain[c]->kf );
-        sample->effect_chain[c]->kf = NULL;
-    }
+    sample->effect_chain[c]->e_flag = 1;
+    sample->effect_chain[c]->kf_status = 0;
+    sample->effect_chain[c]->kf_type = 0;
 
-    sample->effect_chain[c]->effect_id = effect_nr;
-
-    if (vj_effect_get_extra_frame(effect_nr))
+    if (vje_get_extra_frame(effect_nr))
     {
-        //sample->effect_chain[c]->frame_offset = 0;
         sample->effect_chain[c]->frame_trimmer = 0;
-
         if(s1 > 1)
             s1 = s1 - 1;
         if(!sample_exists(s1)) s1 = s1 + 1;
@@ -2333,7 +2312,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
             sample->effect_chain[c]->source_type = 0;
 
         veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with sample %d",
-            vj_effect_get_description(sample->effect_chain[c]->effect_id),c,sample->effect_chain[c]->channel);
+            vje_get_description(sample->effect_chain[c]->effect_id),c,sample->effect_chain[c]->channel);
 
     }
     else
@@ -2464,14 +2443,8 @@ int sample_chain_clear(int s1)
     
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-        if(sample->effect_chain[i]->effect_id != -1)
-        {
-            if(vj_effect_initialized( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance )) {
-                vj_effect_deactivate( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance,1 ); 
-                sample->effect_chain[i]->fx_instance = NULL;
-                sample->effect_chain[i]->clear = 1;
-            }
-        
+        if( sample->effect_chain[i]->effect_id != - 1 ) {
+            vjert_del_fx( sample->effect_chain[i],0,i,1 );
         }
 
         sample->effect_chain[i]->effect_id = -1;
@@ -2480,9 +2453,6 @@ int sample_chain_clear(int s1)
         sample->effect_chain[i]->volume = 0;
         sample->effect_chain[i]->a_flag = 0;
         sample->effect_chain[i]->is_rendering = 1;
-        if( sample->effect_chain[i]->kf )   
-            vpf( sample->effect_chain[i]->kf );
-        sample->effect_chain[i]->kf = NULL;
     
         int src_type = sample->effect_chain[i]->source_type;
         int id       = sample->effect_chain[i]->channel;
@@ -2566,24 +2536,6 @@ int sample_chain_get_free_entry(int s1)
  * Removes an Effect from the chain of sample <sample_nr> on entry <position>
  *
  ****************************************************************************************************/
-
-
-static int _sample_can_free(sample_info *sample, int reserved, int effect_id)
-{
-    int i;
-
-    if( vj_effect_is_plugin(effect_id ) )
-        return 1;
-
-    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-        if(i != reserved && effect_id == sample->effect_chain[i]->effect_id) 
-            return 0;
-    }
-    return 1;
-}
-
-
 int sample_chain_remove(int s1, int position)
 {
     int j;
@@ -2593,24 +2545,20 @@ int sample_chain_remove(int s1, int position)
         return -1;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
         return -1;
+
+    
+    
     if(sample->effect_chain[position]->effect_id != -1)
     {
-        if(vj_effect_initialized( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance ) && _sample_can_free( sample, position, sample->effect_chain[position]->effect_id) ) { 
-            vj_effect_deactivate( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance, 1);    
-            sample->effect_chain[position]->fx_instance = NULL;
-            sample->effect_chain[position]->clear = 1;
-        }
+        vjert_del_fx( sample->effect_chain[position],0,position,1 );
     }
+
     sample->effect_chain[position]->effect_id = -1;
     sample->effect_chain[position]->frame_offset = 0;
     sample->effect_chain[position]->frame_trimmer = 0;
     sample->effect_chain[position]->volume = 0;
     sample->effect_chain[position]->a_flag = 0;
     sample->effect_chain[position]->is_rendering = 1;
-
-    if( sample->effect_chain[position]->kf )
-        vpf( sample->effect_chain[position]->kf );
-    sample->effect_chain[position]->kf = NULL;
 
     int src_type = sample->effect_chain[position]->source_type;
     int id       = sample->effect_chain[position]->channel;
@@ -2694,8 +2642,8 @@ int sample_chain_entry_set_transition_stop(int s1, int entry, int enabled, int l
 
 	int arg_len = 0;
     int is_mixer = 0;
-    
-	vj_effect_get_info( sample->effect_chain[entry]->effect_id, &is_mixer, &arg_len );
+    int rgb = 0;
+	vje_get_info( sample->effect_chain[entry]->effect_id, &is_mixer, &arg_len, &rgb );
 
 	if(!is_mixer || arg_len <= 0)
 		return 0;
@@ -2734,7 +2682,8 @@ int sample_chain_entry_transition_now(int s1, int entry, int *type) {
 
 	int arg_len = 0;
     int is_mixer = 0;
-    vj_effect_get_info( sample->effect_chain[entry]->effect_id, &is_mixer, &arg_len );
+    int rgb = 0;
+    vje_get_info( sample->effect_chain[entry]->effect_id, &is_mixer, &arg_len, &rgb );
 
 	if( is_mixer == 0 || arg_len == 0 )
 			return 0;
@@ -2743,8 +2692,9 @@ int sample_chain_entry_transition_now(int s1, int entry, int *type) {
 			return 0;
 
 	// These type of FX know when the transition is done 
-	int state = vj_effect_is_transition_ready(
+	int state = vje_fx_is_transition_ready(
 				sample->effect_chain[entry]->effect_id,
+                sample->effect_chain[entry]->fx_instance,
 				__sample_project_settings.width,
 				__sample_project_settings.height );
 	if(state == TRANSITION_COMPLETED) {
@@ -2833,6 +2783,9 @@ int sample_chain_sprint_status( int s1,int tags,int cache,int sa,int ca, int pfp
     ptr = vj_sprintf( ptr, sample->fade_alpha );*ptr++ = ' ';
     ptr = vj_sprintf( ptr, sample->loop_stat); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, sample->loop_stat_stop); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, sample->transition_active); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, sample->transition_length); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, sample->transition_shape); *ptr++ = ' ';
     ptr = vj_sprintf( ptr, feedback); *ptr ++ = ' ';
     ptr = vj_sprintf( ptr, tags );
     return 0;
@@ -2975,7 +2928,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
         }
         else {
             /* load the parameter values */
-            for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
+            for (j = 0; j < vje_get_num_params(effect_id); j++) {
                 sample_set_effect_arg(dst_sample, chain_index, j, arg[j]);
             }
             sample_set_chain_channel(dst_sample, chain_index, channel);
@@ -3452,11 +3405,11 @@ void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
     put_xml_int( node, "kf_type", effect->kf_type );
 
     childnode = xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENTS, NULL);
-    CreateArguments(childnode, effect->arg, vj_effect_get_num_params(effect->effect_id));
+    CreateArguments(childnode, effect->arg, vje_get_num_params(effect->effect_id));
 
     if( effect->kf != NULL ) {
      childnode = xmlNewChild(node,NULL,(const xmlChar*) "ANIM", NULL );
-     CreateKeys( childnode, vj_effect_get_num_params(effect->effect_id), effect->kf );
+     CreateKeys( childnode, vje_get_num_params(effect->effect_id), effect->kf );
     }
 }
 

@@ -18,8 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include "transop.h"
-#include <stdlib.h>
-#include <stdio.h>
-
-void motiondetect_free(){}
+#ifndef FADECOLOR_H
+#define FADECOLOR_H
+vj_effect *fadecolor_init();
+void *fadecolor_malloc(int w, int h);
+void fadecolor_free(void *ptr);
+void fadecolor_apply(void *ptr, VJFrame *frame, int *args);
+#endif

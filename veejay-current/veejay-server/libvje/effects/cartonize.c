@@ -50,8 +50,11 @@ vj_effect *cartonize_init(int w, int h)
     return ve;
 }
 
-void cartonize_apply( VJFrame *frame, int b1, int b2, int b3)
-{
+void cartonize_apply( void *ptr, VJFrame *frame, int *args) {
+    int b1 = args[0];
+    int b2 = args[1];
+    int b3 = args[2];
+
     unsigned int i;
     const int len = frame->len;
     int uv_len = (frame->ssm ? len : frame->uv_len);

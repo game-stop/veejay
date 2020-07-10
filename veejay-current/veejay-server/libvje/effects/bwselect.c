@@ -60,10 +60,12 @@ vj_effect *bwselect_init(int w, int h)
     return ve;
 }
 
-static __thread int last_gamma = 0;
-static __thread uint8_t table[256];
+typedef struct {    
+    int last_gamma;
+    uint8_t table[256];
+} bwselect_t;
 
-static void gamma_setup(double gamma_value)
+static void gamma_setup(bwselect_t *b, double gamma_value)
 {
     int i;
     double val;
@@ -72,12 +74,34 @@ static void gamma_setup(double gamma_value)
 		val = i / 256.0;
 		val = pow(val, gamma_value);
 		val = 256.0 * val;
-		table[i] = val;
+		b->table[i] = val;
     }
 }
 
-void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int gamma, int mode)
+void *bwselect_malloc(int w, int h)
 {
+    bwselect_t *b = (bwselect_t*) vj_calloc(sizeof(bwselect_t));
+    if(!b) {
+        return NULL;
+    }
+    
+    return (void*) b;
+}
+
+void bwselect_free(void *ptr)
+{
+    bwselect_t *b = (bwselect_t*) ptr;
+    free(b);
+}
+
+void bwselect_apply(void *ptr, VJFrame *frame, int *args) {
+    int min_threshold = args[0];
+    int max_threshold = args[1];
+    int gamma = args[2];
+    int mode = args[3];
+
+    bwselect_t *b = (bwselect_t*) ptr;
+
 	int r,c;
 	const unsigned int width = frame->width;
 	const int len = frame->len;
@@ -119,9 +143,10 @@ void bwselect_apply(VJFrame *frame, int min_threshold, int max_threshold, int ga
 	}
 	else
 	{
-		if( gamma != last_gamma ) {
-			gamma_setup( (double) gamma / 100.0 );
-			last_gamma = gamma;
+        uint8_t *table = b->table;
+		if( gamma != b->last_gamma ) {
+			gamma_setup( b, (double) gamma / 100.0 );
+			b->last_gamma = gamma;
 		}
 	
 		if( mode == 0 ) {

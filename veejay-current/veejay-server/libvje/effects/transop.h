@@ -1,7 +1,7 @@
-/*
+/* 
  * Linux VeeJay
  *
- * Copyright(C)2019 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,10 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef SHAPEWIPE_H
-#define SHAPEWIPE_H
-vj_effect *shapewipe_init(int w, int h);
-int shapewipe_malloc(int w, int h);
-void shapewipe_free();
-void shapewipe_apply( VJFrame *frame, VJFrame *frame2, int shape, int threshold, int duration, int automatic);
+#ifndef TRANSOP_H
+#define TRANSOP_H
+vj_effect *transop_init(int width, int height);
+void transop_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

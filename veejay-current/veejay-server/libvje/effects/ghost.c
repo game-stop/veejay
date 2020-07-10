@@ -22,9 +22,11 @@
 #include <veejaycore/vjmem.h>
 #include "ghost.h"
 
-static uint8_t 		*ghost_buf[4] = { NULL,NULL,NULL, NULL};
-static uint8_t 		*diff_map = NULL;
-static int		 diff_period = 0;
+typedef struct {
+    uint8_t *ghost_buf[4];
+    uint8_t *diff_map;
+    int diff_period;
+} ghost_t;
 
 vj_effect *ghost_init(int w, int h)
 {
@@ -44,32 +46,43 @@ vj_effect *ghost_init(int w, int h)
     return ve;
 }
 
-int	ghost_malloc(int w, int h)
+void *ghost_malloc(int w, int h)
 {
+    ghost_t *g = (ghost_t*) vj_calloc(sizeof(ghost_t));
+    if(!g) {
+        return NULL;
+    }
+
 	const int len = RUP8(w * h);
     const int total_len = RUP8(len * 4);
 
-	ghost_buf[0] = vj_malloc( sizeof(uint8_t) * total_len);
-	ghost_buf[1] = ghost_buf[0] + len;
-	ghost_buf[2] = ghost_buf[1] + len;
-    diff_map = ghost_buf[2] + len;
-	diff_period = 0;
+	g->ghost_buf[0] = vj_malloc( sizeof(uint8_t) * total_len);
+    if(!g->ghost_buf[0]) {
+        free(g);
+        return NULL;
+    }
 
-	return 1;
+	g->ghost_buf[1] = g->ghost_buf[0] + len;
+	g->ghost_buf[2] = g->ghost_buf[1] + len;
+    g->diff_map = g->ghost_buf[2] + len;
+	g->diff_period = 0;
+
+	return (void*) g;
 }
 
-void ghost_free()
+void ghost_free(void *ptr)
 {
-	if(ghost_buf[0])
-		free(ghost_buf[0]);
-	ghost_buf[0] = NULL;
-    ghost_buf[1] = NULL;
-    ghost_buf[2] = NULL;
-	diff_map = NULL;
+    ghost_t *g = (ghost_t*) ptr;
+
+	free(g->ghost_buf[0]);
+    free(g);
 }
 
-void ghost_apply(VJFrame *frame, int opacity)
-{
+void ghost_apply(void *ptr, VJFrame *frame, int *args ) {
+    int opacity = args[0];
+
+    ghost_t *g = (ghost_t*) ptr;
+
 	register int q,z=0;
 	int x,y,i;
 	const unsigned int width = frame->width;
@@ -79,21 +92,21 @@ void ghost_apply(VJFrame *frame, int opacity)
 	uint8_t *srcY = frame->data[0];
 	uint8_t *srcCb= frame->data[1];
 	uint8_t *srcCr= frame->data[2];
-	uint8_t *dY  = ghost_buf[0];
-	uint8_t *dCb = ghost_buf[1];
-	uint8_t *dCr = ghost_buf[2];
-	uint8_t *bm = diff_map;
+	uint8_t *dY  = g->ghost_buf[0];
+	uint8_t *dCb = g->ghost_buf[1];
+	uint8_t *dCr = g->ghost_buf[2];
+	uint8_t *bm = g->diff_map;
 
 	const uint8_t kernel[9] =
 	{
 		1,1,1,1,1,1,1,1,1
 	};
 	// first time running 
-	if(diff_period == 0)
+	if(g->diff_period == 0)
 	{
 		int strides[4] = { len, len, len, 0 };
-		vj_frame_copy( frame->data, ghost_buf, strides );
-		diff_period = 1;
+		vj_frame_copy( frame->data, g->ghost_buf, strides );
+		g->diff_period = 1;
 		return;
 	}
 

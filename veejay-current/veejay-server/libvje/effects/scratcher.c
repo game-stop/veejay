@@ -23,11 +23,14 @@
 #include "opacity.h"
 #include "scratcher.h"
 
-static uint8_t *frame[4] = { NULL,NULL,NULL,NULL };
-static int nframe = 0;
-static int nreverse = 0;
-static int last_reverse = 1;
-static int last_n = 8;
+typedef struct {
+    uint8_t *frame[4];
+    int nframe;
+    int nreverse;
+    int last_reverse;
+    int last_n;
+} scratcher_t;
+
 
 vj_effect *scratcher_init(int w, int h)
 {
@@ -54,98 +57,114 @@ vj_effect *scratcher_init(int w, int h)
 
 }
 
-void scratcher_free() {
-   if(frame[0])
-	  free(frame[0]);
-	frame[0] = NULL;
-	frame[1] = NULL;
-	frame[2] = NULL;
+void scratcher_free(void *ptr) {
+    scratcher_t *s = (scratcher_t*) ptr;
+    free(s->frame[0]);
+    free(s);
 }
 
-int scratcher_malloc(int w, int h)
+void *scratcher_malloc(int w, int h)
 {
+    scratcher_t *s = (scratcher_t*) vj_calloc(sizeof(scratcher_t));
+    if(!s) {
+        return NULL;
+    }
+
+    s->last_reverse = 1;
+    s->last_n = 8;
+
 	/* need memory for bounce mode ... */
-    frame[0] = (uint8_t *) vj_malloc(w * h * 3 * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
-	if(!frame[0]) 
-		return 0;
-	
-    veejay_memset( frame[0], pixel_Y_lo_, w * h * MAX_SCRATCH_FRAMES );
+    s->frame[0] = (uint8_t *) vj_malloc( RUP8(w * h * 3) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
+	if(!s->frame[0]) {
+        free(s);
+        return NULL;
+    }
 
-    frame[1] =
-	    frame[0] + ( w * h * MAX_SCRATCH_FRAMES );
-    frame[2] =
-	    frame[1] + ( w * h  * MAX_SCRATCH_FRAMES );
+    veejay_memset( s->frame[0], pixel_Y_lo_, w * h * MAX_SCRATCH_FRAMES );
 
-    veejay_memset( frame[1], 128, (w * h * MAX_SCRATCH_FRAMES) );
-    veejay_memset( frame[2], 128, (w * h * MAX_SCRATCH_FRAMES) );
-    return 1;
+    s->frame[1] =
+	    s->frame[0] + ( RUP8(w * h) * MAX_SCRATCH_FRAMES );
+    s->frame[2] =
+	    s->frame[1] + ( RUP8(w * h)  * MAX_SCRATCH_FRAMES );
+
+    veejay_memset( s->frame[1], 128, (w * h * MAX_SCRATCH_FRAMES) );
+    veejay_memset( s->frame[2], 128, (w * h * MAX_SCRATCH_FRAMES) );
+    
+    return (void*) s;
 }
 
 
-static void store_frame(VJFrame *src, int n, int no_reverse)
+static void store_frame(scratcher_t *s, VJFrame *src, int n, int no_reverse )
 {
 	const int len = src->len;
-	int uv_len = src->uv_len;
+	const int uv_len = src->uv_len;
 	int strides[4] = { len, uv_len, uv_len , 0 };
 
 	uint8_t *dest[4] = {
-		frame[0] + (len*nframe),
-		frame[1] + (uv_len*nframe),
-		frame[2] + (uv_len*nframe),
+		s->frame[0] + (len*s->nframe),
+		s->frame[1] + (uv_len*s->nframe),
+		s->frame[2] + (uv_len*s->nframe),
        	NULL
 	};
 
-	if (!nreverse) {
+	if (!s->nreverse) {
 		vj_frame_copy( src->data, dest, strides ); 
     }
 	else {
 		vj_frame_copy( dest, src->data, strides );
     }
 
-	if (nreverse)
-		nframe--;
+	if (s->nreverse)
+		s->nframe--;
 	else
-		nframe++;
+		s->nframe++;
 
-	if (nframe >= n) {
-		if (no_reverse == 0) {
-		    nreverse = 1;
-		    nframe = n - 1;
-			if(nframe < 0)
-				nframe = 0;
+	if (s->nframe >= n) {
+		if (s->nreverse == 0) {
+		    s->nreverse = 1;
+		    s->nframe = n - 1;
+			if(s->nframe < 0)
+				s->nframe = 0;
 		} else {
-		    nframe = 0;
+		    s->nframe = 0;
 		}
     }
 
-   	if (nframe == 0)
-		nreverse = 0;
+   	if (s->nframe == 0)
+		s->nreverse = 0;
 
 }
 
 
-void scratcher_apply(VJFrame *src,int opacity, int n, int no_reverse)
+void scratcher_apply(void *ptr, VJFrame *src, int *args)
 {
     const int len = src->len;
-    const int offset = len * nframe;
     const int uv_len = src->uv_len;
-    const int uv_offset = uv_len * nframe;
+
+    int opacity = args[0];
+    int n = args[1];
+    int no_reverse = args[2];
+    
+    scratcher_t *s = (scratcher_t*) ptr;
+    const int offset = len * s->nframe;
+    const int uv_offset = uv_len * s->nframe;
+
 
 	VJFrame tmp;
 	veejay_memcpy( &tmp, src, sizeof(VJFrame) );
 	
-	tmp.data[0] = frame[0] + offset;
-	tmp.data[1] = frame[1] + uv_offset;
-	tmp.data[2] = frame[2] + uv_offset;
+	tmp.data[0] = s->frame[0] + offset;
+	tmp.data[1] = s->frame[1] + uv_offset;
+	tmp.data[2] = s->frame[2] + uv_offset;
 
-	if( no_reverse != last_reverse || n != last_n )
+	if( no_reverse != s->last_reverse || n != s->last_n )
 	{
-		last_reverse = no_reverse;
-		nframe = n;
-		last_n = n;
+		s->last_reverse = no_reverse;
+		s->nframe = n;
+		s->last_n = n;
 	}		
 
-	if( nframe == 0 ) {
+	if( s->nframe == 0 ) {
 		tmp.data[0] = src->data[0];
 		tmp.data[1] = src->data[1];
 		tmp.data[2] = src->data[2];
@@ -153,5 +172,5 @@ void scratcher_apply(VJFrame *src,int opacity, int n, int no_reverse)
 
 	opacity_applyN( src, &tmp, opacity );
 	
-	store_frame( src, n, no_reverse);
+	store_frame(s, src, n, no_reverse);
 }

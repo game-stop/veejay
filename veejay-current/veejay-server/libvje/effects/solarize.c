@@ -34,7 +34,6 @@ vj_effect *solarize_init(int w,int h)
 
     ve->limits[0][0] = 1;	/* threshold */
     ve->limits[1][0] = 255;
-	// negation by threshold 
     ve->description = "Solarize";
 	ve->parallel = 1;
     ve->sub_format = 1;
@@ -44,7 +43,7 @@ vj_effect *solarize_init(int w,int h)
     return ve;
 }
 
-void solarize_apply( VJFrame *frame, int threshold)
+void solarize_apply( void *ptr, VJFrame *frame, int *args )
 {
     unsigned int i;
 	const int len= frame->len;
@@ -52,6 +51,9 @@ void solarize_apply( VJFrame *frame, int threshold)
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
+
+    int threshold = args[0];
+
     for (i = 0; i < len; i++) {
 		val = Y[i];
 		if (val > threshold)

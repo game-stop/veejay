@@ -22,7 +22,6 @@
 #define PICINPIC_H
 vj_effect *picinpic_init( int w, int h );
 void picinpic_free(void *d);
-int picinpic_malloc( void **c, int w , int h );
-void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
-                    int twidth, int theight, int x1, int y1 );
+void *picinpic_malloc( int w , int h );
+void picinpic_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args );
 #endif

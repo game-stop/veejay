@@ -21,7 +21,7 @@
 #ifndef PERSPECTIVE_H
 #define PERSPECTIVE_H
 vj_effect *perspective_init(int width, int height);
-int perspective_malloc(int w, int h);
-void perspective_free();
-void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse);
+void *perspective_malloc(int w, int h);
+void perspective_free(void *ptr);
+void perspective_apply( void *ptr, VJFrame *frame, int *args );
 #endif

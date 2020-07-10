@@ -21,6 +21,5 @@
 #ifndef DEINTERLACE_H
 #define DEINTERLACE_H
 vj_effect *deinterlace_init();
-void deinterlace_apply(VJFrame *frame, int val);
-void deinterlace_free();
+void deinterlace_apply(void *ptr, VJFrame *frame, int *args);
 #endif

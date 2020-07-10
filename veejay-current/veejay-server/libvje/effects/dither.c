@@ -51,45 +51,69 @@ vj_effect *dither_init(int w, int h)
 	return ve;
 }
 
-int **dith = NULL;
-int dither_malloc(int w, int h)
+typedef struct {
+    int **dith;
+    int w;
+    int last_size;
+} dither_t;
+
+void *dither_malloc(int w, int h)
 {
+    dither_t *d = (dither_t*) vj_calloc(sizeof(dither_t));
+    if(!d) {
+        return NULL;
+    }
+
     unsigned int i;
-    dith = (int**) vj_calloc(sizeof(int*) * w);
-    if(!dith)
-        return 0;
+    d->dith = (int**) vj_calloc(sizeof(int*) * w);
+    if(!d->dith) {
+        free(d);
+        return NULL;
+    }
+
     for( i = 0; i < w; i ++ ) {
-        dith[i] = (int*) vj_calloc(sizeof(int) * w);
-        if(!dith[i]) {
+        d->dith[i] = (int*) vj_calloc(sizeof(int) * w);
+        if(!d->dith[i]) {
             int j;
             for( j = 0; j < i; j ++ )
-                if( dith[i] ) free(dith[i]);
-            free(dith);
-            dith = NULL;
-            return 0;
+                if( d->dith[i] ) free(d->dith[i]);
+            free(d->dith);
+            free(d);
+            return NULL;
         }
     }
-    return 1;
+
+    d->w = w;
+
+    return (void*) d;
 }
 
-void dither_free()
+void dither_free(void *ptr)
 {
-    if(dith) {
-        free(dith);
-        dith = NULL;
+    dither_t *d = (dither_t*) ptr;
+    for( int i = 0; i < d->w; i ++ ) {
+        if(d->dith[i]) {
+            free(d->dith[i]);
+        }
     }
+    free(d->dith);
+    free(d);
 }
 
-static int last_size = 0;
-void dither_apply(VJFrame *frame, int size, int random_on)
-{
+void dither_apply(void *ptr, VJFrame *frame, int *args) {
+    int size = args[0];
+    int random_on = args[1];
+
+    dither_t *dh = (dither_t*) ptr;
+
 	int w_, h_;
 	int i, j, d, v, l, m;
 	uint8_t *Y = frame->data[0];
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
+    int **dith = dh->dith;
 
-	if( last_size != size || random_on )
+	if( dh->last_size != size || random_on )
 	{
 		for (l = 0; l < size; l++)
 		{
@@ -98,7 +122,7 @@ void dither_apply(VJFrame *frame, int size, int random_on)
 				dith[l][m] = (int) ((double) (size) * rand() / (RAND_MAX + 1.0));
 			}
 		}
-		last_size = size;
+		dh->last_size = size;
 	}
 
 	for (h_ = 0; h_ < height; h_++)

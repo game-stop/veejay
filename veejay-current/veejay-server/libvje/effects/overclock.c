@@ -43,23 +43,37 @@ vj_effect *overclock_init(int w, int h)
     return ve;
 }
 
-static uint8_t *oc_buf[3] = { NULL,NULL,NULL };
+typedef struct {
+    uint8_t *oc_buf[3];
+} overclock_t;
 
-int overclock_malloc(int w, int h)
+void *overclock_malloc(int w, int h)
 {
+    overclock_t *o = (overclock_t*) vj_calloc(sizeof(overclock_t));
+    if(!o) {
+        return NULL;
+    }
+
 	const int len = w* h;
-	oc_buf[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
-	if(oc_buf[0]==NULL) return 0;
-	return 1;
+	o->oc_buf[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
+	if(!o->oc_buf[0]) {
+        free(o);
+        return NULL;
+    }
+    return (void*) o;
 }
 
-void overclock_free()
+void overclock_free(void *ptr) 
 {
-	if(oc_buf[0]) free( oc_buf[0] );
+    overclock_t *o = (overclock_t*) ptr;
+    free(o->oc_buf[0]);
+    free(o);
 }
 
-void overclock_apply(VJFrame *frame, int n, int radius )
-{
+void overclock_apply(void *ptr, VJFrame *frame, int *args ) {
+    int n = args[0];
+    int radius = args[1];
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
     int x,y,dx,dy;
@@ -68,6 +82,10 @@ void overclock_apply(VJFrame *frame, int n, int radius )
     int i = 0;
     int N = ((n==0?1:n) * 2);
     uint8_t *Y = frame->data[0];
+
+    overclock_t *o = (overclock_t*) ptr;
+
+    uint8_t **oc_buf = o->oc_buf;
 
 	for ( y = 0 ; y < height ; y ++)
 	{

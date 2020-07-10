@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,8 +21,11 @@
 #ifndef CHAMELEONBLEND_H
 #define CHAMELEONBLEND_H
 vj_effect *chameleonblend_init(int w, int h);
-void chameleonblend_apply( VJFrame *frame, VJFrame *source, int mode);
-int chameleonblend_malloc(int w, int h );
-int chameleonblend_prepare( uint8_t *bg[4],int w, int h );
-void chameleonblend_free();
+void chameleonblend_apply( void *ptr, VJFrame *frame, VJFrame *source, int *args);
+void *chameleonblend_malloc(int w, int h );
+void chameleonblend_free(void *ptr);
+int chameleonblend_prepare(void *ptr, VJFrame *frame);
+int chameleonblend_request_fx();
+void chameleonblend_set_motionmap(void *ptr, void *priv);
+
 #endif

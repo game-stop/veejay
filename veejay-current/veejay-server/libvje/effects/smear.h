@@ -21,5 +21,10 @@
 #ifndef SMEAR_H
 #define SMEAR_H
 vj_effect *smear_init(int w, int h);
-void smear_apply(VJFrame *frame, int mode, int val);
+void smear_apply(void *ptr, VJFrame *frame, int *args);
+void *smear_malloc(int w, int h);
+void smear_free(void *ptr);
+void smear_set_motionmap(void *ptr, void *priv);
+int smear_request_fx();
+
 #endif

@@ -364,7 +364,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 			    return -1;
             }
 
-	        if( status_to_arr( (char*) v->status_buffer, v->status_tokens ) < 34 )
+	        if( status_to_arr( (char*) v->status_buffer, v->status_tokens ) < 36 )
             {
                 veejay_msg(VEEJAY_MSG_WARNING, "Expected more status tokens");
                 return 0;

@@ -41,33 +41,54 @@ vj_effect *swirl_init(int w, int h)
     return ve;
 }
 
-static double *polar_map = NULL;
-static double *fish_angle = NULL;
-static int *cached_coords = NULL;
-static uint8_t *buf[4] = { NULL,NULL,NULL,NULL };
+typedef struct {
+    double *polar_map;
+    double *fish_angle;
+    int *cached_coords;
+    uint8_t *buf[4];
+    int v;
+} swirl_t;
 
-
-int swirl_malloc(int w, int h)
+void  *swirl_malloc(int w, int h)
 {
 	int x,y;
 	int h2=h/2;
 	int w2=w/2;
 	int p = 0;
-	
-	int i;
-	for( i = 0; i < 3;i ++ ) {
-		buf[i] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h));
-		if(!buf[i])
-			return 0;
-	}
-	
-	polar_map = (double*) vj_calloc(sizeof(double) * w* h );
-	if(!polar_map) return 0;
-	fish_angle = (double*) vj_calloc(sizeof(double) * w* h );
-	if(!fish_angle) return 0;
 
-	cached_coords = (int*) vj_calloc(sizeof(int) * w * h );
-	if(!cached_coords) return 0;
+
+    swirl_t *s = (swirl_t*) vj_calloc( sizeof(swirl_t) );
+    if(!s) {
+        return NULL;
+    }
+    s->buf[0] = vj_malloc( sizeof(uint8_t) * RUP8(w*h*3));
+    if(!s->buf[0]) {
+        swirl_free(s);
+        return NULL;
+    }
+    s->buf[1] = s->buf[0] + RUP8(w*h);
+    s->buf[2] = s->buf[1] + RUP8(w*h);
+
+	s->polar_map = (double*) vj_calloc(sizeof(double) * RUP8(w * h) );
+	if(!s->polar_map) {
+        swirl_free(s);
+        return NULL;
+    }
+
+	s->fish_angle = (double*) vj_calloc(sizeof(double) * RUP8(w * h) );
+	if(!s->fish_angle) {
+        swirl_free(s);
+        return NULL;
+    }
+
+	s->cached_coords = (int*) vj_calloc(sizeof(int) * RUP8(w * h) );
+	if(!s->cached_coords) {
+        swirl_free(s);
+        return NULL;
+    }
+
+    double *polar_map = s->polar_map;
+    double *fish_angle = s->fish_angle;
 
 	for(y=(-1 *h2); y < (h-h2); y++)
 	{
@@ -79,32 +100,27 @@ int swirl_malloc(int w, int h)
 		}
 	}
 
-	return 1;
+	return (void*) s;
 }
 
-void	swirl_free()
+void	swirl_free(void *ptr)
 {
-	int i;
-	for( i = 0; i < 3; i ++ ) {
-		if(buf[i])
-			free(buf[i]);
-		buf[i] = NULL;
-	}
-	
-	if(polar_map) 
-		free(polar_map);
-	if(fish_angle)
-		free(fish_angle);
-	if(cached_coords)
-		free(cached_coords);
-	polar_map = NULL;
-	fish_angle = NULL;
-	cached_coords = NULL;
+    swirl_t *s = (swirl_t*) ptr;
+
+    if(s) {
+        if( s->buf[0] ) 
+            free(s->buf[0] );
+        if( s->polar_map )
+            free(s->polar_map);
+        if( s->fish_angle )
+            free(s->fish_angle);
+        if( s->cached_coords )
+            free(s->cached_coords );
+        free(s);
+    }
 }
 
-
-static int _v = 0;
-void swirl_apply(VJFrame *frame, int v)
+void swirl_apply(void *ptr, VJFrame *frame, int *args)
 {
 	int i;
 	const unsigned int width = frame->width;
@@ -114,14 +130,20 @@ void swirl_apply(VJFrame *frame, int v)
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-	if( v != _v )
+    int v = args[0];
+    swirl_t *s = (swirl_t*) ptr;
+
+    double *polar_map = s->polar_map;
+    double *fish_angle = s->fish_angle;
+    int *cached_coords = s->cached_coords;
+    uint8_t **buf = s->buf;
+
+	if( s->v != v )
 	{
-		//const double curve = (double) v; 
 		const unsigned int R = width;
 		const double coeef = v;
-		//const double coeef = R / log(curve * R + 1);
-		//const double coeef = R / log( curve * R + 2);
-		/* pre calculate */
+		
+        /* pre calculate */
 		int px,py;
 		double r,a;
 		double si,co;
@@ -161,7 +183,7 @@ void swirl_apply(VJFrame *frame, int v)
 				cached_coords[i] = -1;
 			}
 		}
-		_v = v;
+		s->v = v;
 	}
 
 	int strides[4] = { len, len, len , 0 };

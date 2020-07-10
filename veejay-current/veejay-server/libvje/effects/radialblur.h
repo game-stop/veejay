@@ -21,7 +21,7 @@
 #ifndef RADIALBLUR_H
 #define RADIALBLUR_H
 vj_effect *radialblur_init(int w, int h);
-int radialblur_malloc(int w, int h);
-void radialblur_apply(VJFrame *frame, int r, int p, int n);
-void radialblur_free();
+void *radialblur_malloc(int w, int h);
+void radialblur_apply(void *ptr, VJFrame *frame, int *args);
+void radialblur_free(void *ptr);
 #endif

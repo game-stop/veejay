@@ -21,5 +21,7 @@
 #ifndef SMUCK_H
 #define SMUCK_H
 vj_effect *smuck_init();
-void smuck_apply(VJFrame *frame, VJFrame *frame2, int level);
+void smuck_apply(void *ptr, VJFrame *frame, int *args);
+void *smuck_malloc(int w, int h);
+void smuck_free(void *ptr);
 #endif

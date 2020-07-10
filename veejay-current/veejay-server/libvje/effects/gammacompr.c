@@ -55,42 +55,54 @@ vj_effect *gammacompr_init(int w, int h)
 }
 
 #define GAMMA_MAX 256
-static double *gamma_table = NULL;
-static void gammacompr_setup();
-static double gamma_value = 0;
+typedef struct {
+    double *gamma_table;
+    double gamma_value;
+} gammacompr_t;
 
-int gammacompr_malloc(int w, int h)
+void *gammacompr_malloc(int w, int h)
 {
-    if(gamma_table == NULL) {
-        gamma_table = (double**) vj_calloc(sizeof(double) * GAMMA_MAX );
+    gammacompr_t *g = (gammacompr_t*) vj_calloc(sizeof(gammacompr_t));
+    if(!g) {
+        return NULL;
+    }
+
+    g->gamma_table = (double*) vj_calloc(sizeof(double) * GAMMA_MAX );
+    if(!g->gamma_table) {
+        free(g);
+        return NULL;
     }
     
-    return 1;
+    return (void*) g;
 }   
 
-void gammacompr_free() 
+void gammacompr_free(void *ptr) 
 {
-    if(gamma_table) {
-        free(gamma_table);
-        gamma_table = NULL;
-    }
+    gammacompr_t *g = (gammacompr_t*) ptr;
+    free(g->gamma_table);
+    free(g);
 }
 
-static void gammacompr_setup()
+static void gammacompr_setup(gammacompr_t *g)
 {
     int i;
     double val;
     double gm = (double) GAMMA_MAX;
     for (i = 0; i < GAMMA_MAX; i++) {
 	     val = i / gm;
-	     val = pow(val, gamma_value + ((double) i * 0.01));
+	     val = pow(val, g->gamma_value + ((double) i * 0.01));
 	     val = gm * val;
-	     gamma_table[i] = (val < 0.0 ? 0.0 : val > 255.0 ? 255.0 : val);
+	     g->gamma_table[i] = (val < 0.0 ? 0.0 : val > 255.0 ? 255.0 : val);
     }
 }
 
-void gammacompr_apply(VJFrame *frame, int value, int white_threshold, int black_threshold)
-{
+void gammacompr_apply(void *ptr, VJFrame *frame, int *args ) {
+    int value = args[0];
+    int white_threshold = args[1];
+    int black_threshold = args[2];
+
+    gammacompr_t *g = (gammacompr_t*) ptr;
+
 	unsigned int i;
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
@@ -98,10 +110,12 @@ void gammacompr_apply(VJFrame *frame, int value, int white_threshold, int black_
     uint8_t *V = frame->data[2];
     double v = ( (double) value - 3000.0) / 1000.0;
     
-    if (v != gamma_value) {
-        gamma_value = v;
-        gammacompr_setup();
+    if (v != g->gamma_value) {
+        g->gamma_value = v;
+        gammacompr_setup(g);
 	}
+
+    double *gamma_table = g->gamma_table;
 
     for (i = 0; i < len; i++) {
 		Y[i] = (uint8_t) gamma_table[Y[i]];

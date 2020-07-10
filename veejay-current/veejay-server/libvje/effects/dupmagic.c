@@ -50,8 +50,9 @@ vj_effect *dupmagic_init(int w, int h)
 	return ve;
 }
 
-void dupmagic_apply(VJFrame *frame, VJFrame *frame2,int n)
-{
+void dupmagic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    int n = args[0];
+
     switch (n) {
     case 1:
 		overlaymagic_additive(frame, frame );

@@ -69,31 +69,38 @@ vj_effect *radioactivetv_init(int w, int h)
     return ve;
 }
 
-
-static  uint8_t *diffbuf = NULL;
-static	uint8_t *blurzoombuf = NULL;
-static	int	*blurzoomx = NULL;
-static  int	*blurzoomy = NULL;
-static	int	buf_width_blocks = 0;
-static	int	buf_width = 0;
-static  int	buf_height = 0;
-static  int	buf_area = 0;
-static  int	buf_margin_left = 0;
-static  int	buf_margin_right = 0;
-static	int	first_frame=0;
-static	int	last_mode=-1;
-static	float	ratio_ = 0.95;
+typedef struct {
+    uint8_t *diffbuf;
+	uint8_t *blurzoombuf;
+	int	*blurzoomx;
+    int	*blurzoomy;
+    int	buf_width_blocks;
+	int	buf_width;
+    int	buf_height;
+    int	buf_area;
+    int	buf_margin_left;
+    int	buf_margin_right;
+    int	first_frame;
+    int	last_mode; // -1;
+	float ratio_; // 0.95;
+} radioactive_t;
 
 #define VIDEO_HWIDTH (buf_width/2)
 #define VIDEO_HHEIGHT (buf_height/2)
 
 
-/* this table assumes that video_width is times of 32 */
-static void setTable(void)
+/* this table assumes that video_width is multiple of 32 */
+static void setTable(radioactive_t *r)
 {
 	unsigned int bits;
 	int x, y, tx, ty, xx;
 	int ptr, prevptr;
+    int *blurzoomx = r->blurzoomx;
+    int *blurzoomy = r->blurzoomy;
+    int buf_width_blocks = r->buf_width_blocks;
+    float ratio_ = r->ratio_;
+    int buf_width = r->buf_width;
+    int buf_height = r->buf_height;
 
 	prevptr = (int)(0.5+ratio_*(-VIDEO_HWIDTH)+VIDEO_HWIDTH);
 	for(xx=0; xx<(buf_width_blocks); xx++){
@@ -119,18 +126,19 @@ static void setTable(void)
 		prevptr = ty * buf_width + xx;
 	}
 }		
-static void kentaro_blur(void)
+
+static void kentaro_blur(radioactive_t *r)
 {
 	int x, y;
 	int width;
 	unsigned char *p, *q;
 	unsigned char v;
 	
-	width = buf_width;
-	p = blurzoombuf + width + 1;
-	q = p + buf_area;
+	width = r->buf_width;
+	p = r->blurzoombuf + width + 1;
+	q = p + r->buf_area;
 
-	for(y=buf_height-2; y>0; y--) {
+	for(y=r->buf_height-2; y>0; y--) {
 		for(x=width-2; x>0; x--) {
 			v = (*(p-width) + *(p-1) + *(p+1) + *(p+width))/4 - 1;
 			if(v == 255) v = 0;
@@ -142,17 +150,19 @@ static void kentaro_blur(void)
 		q += 2;
 	}
 }
-static void zoom(void)
+
+static void zoom(radioactive_t *r)
 {
 	int b, x, y;
 	unsigned char *p, *q;
 	int blocks, height;
 	int dx;
-
-	p = blurzoombuf + buf_area;
-	q = blurzoombuf;
-	height = buf_height;
-	blocks = buf_width_blocks;
+    int *blurzoomy = r->blurzoomy;
+    int *blurzoomx = r->blurzoomx;
+	p = r->blurzoombuf + r->buf_area;
+	q = r->blurzoombuf;
+	height = r->buf_height;
+	blocks = r->buf_width_blocks;
 
 	for(y=0; y<height; y++) {
 		p += blurzoomy[y];
@@ -167,72 +177,91 @@ static void zoom(void)
 	}
 }
 
-static void blurzoomcore(void)
+static void blurzoomcore(radioactive_t *r)
 {
-	kentaro_blur();
-	zoom();
+	kentaro_blur(r);
+	zoom(r);
 }
 
-int	radioactivetv_malloc(int w, int h)
+void *radioactivetv_malloc(int w, int h)
 {
-	buf_width_blocks = (w / 32 );
-	if( buf_width_blocks > 255 )
-	{
-		return 0;
-	}
-	buf_width = buf_width_blocks * 32;
-	buf_height = h;
+    if( (w/32) > 255 )
+        return NULL;
 
-	buf_area = buf_width * buf_height;
-	buf_margin_left = (w - buf_width ) >> 1;
-	buf_margin_right = (w - buf_width - buf_margin_left);
+    radioactive_t *r = (radioactive_t*) vj_calloc(sizeof(radioactive_t));
+    if(!r) {
+        return NULL;
+    }
+
+    r->ratio_ = 0.95f;
+    r->last_mode = -1;
+
+	r->buf_width_blocks = (w / 32 );
+	r->buf_width = r->buf_width_blocks * 32;
+	r->buf_height = h;
+
+	r->buf_area = r->buf_width * r->buf_height;
+	r->buf_margin_left = (w - r->buf_width ) >> 1;
+	r->buf_margin_right = (w - r->buf_width - r->buf_margin_left);
 	
-	blurzoombuf = (uint8_t*) vj_calloc( RUP8(buf_area * 2 ));
-	if(!blurzoombuf)
-		return 0;
+	r->blurzoombuf = (uint8_t*) vj_calloc( RUP8(r->buf_area * 2 ));
+	if(!r->blurzoombuf) {
+        radioactivetv_free(r);
+		return NULL;
+    }
 	
-	blurzoomx = (int*) vj_calloc( RUP8(buf_width * sizeof(int)));
-	blurzoomy = (int*) vj_calloc( RUP8(buf_width * sizeof(int)));
+	r->blurzoomx = (int*) vj_calloc( RUP8(r->buf_width * sizeof(int)));
+    if(!r->blurzoomx) {
+        radioactivetv_free(r);
+        return NULL;
+    }
 
-	if( blurzoomx == NULL || blurzoomy == NULL )
-	{
-		if(blurzoombuf) free(blurzoombuf);
-		return 0;
-	}
+	r->blurzoomy = (int*) vj_calloc( RUP8(r->buf_width * sizeof(int)));
+    if(!r->blurzoomy) {
+        radioactivetv_free(r);
+        return NULL;
+    }
 
-	diffbuf   = (uint8_t*) vj_calloc( RUP8((4*w) + 2 * w * h * sizeof(uint8_t)));
+	r->diffbuf   = (uint8_t*) vj_calloc( RUP8((4*w) + 2 * w * h * sizeof(uint8_t)));
+    if(!r->diffbuf) {
+        radioactivetv_free(r);
+        return NULL;
+    }
 
-	setTable();
+	setTable(r);
 
-	first_frame = 0;
-	last_mode   = -1;
-	ratio_	    = 0.95;
-	return 1;
+	return (void*) r;
 }
 
-void	radioactivetv_free()
+void	radioactivetv_free(void *ptr)
 {
-	if(blurzoombuf)
-		free(blurzoombuf);
-	blurzoombuf = NULL;
-	if(blurzoomx ) free(blurzoomx);
-	blurzoomx = NULL;
-	if(blurzoomy ) free(blurzoomy);
-	blurzoomy = NULL;
-
-	if(diffbuf) free(diffbuf);
-	diffbuf = NULL;
-
+    radioactive_t *r = (radioactive_t*) ptr;
+    if(r) {
+	    if(r->blurzoombuf)
+		    free(r->blurzoombuf);
+	    if(r->blurzoomx )
+            free(r->blurzoomx);
+	    if(r->blurzoomy )
+            free(r->blurzoomy);
+	    if(r->diffbuf)
+            free(r->diffbuf);
+    }
 }
-void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int mode, int snapRatio,
-                         int snapInterval, int threshold)
-{
+
+void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) {
+    int mode = args[0];
+    int snapRatio = args[1];
+    int snapInterval = args[2];
+    int threshold = args[3];
+
 	unsigned int x, y;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;
 
-	uint8_t *diff = diffbuf;
+    radioactive_t *r = (radioactive_t*) ptr;
+
+	uint8_t *diff = r->diffbuf;
 	uint8_t *prev = diff + len;
 	uint8_t *lum = frame->data[0];
 	uint8_t *dstY = lum;
@@ -242,33 +271,40 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int mode, int snapRatio
 	uint8_t *blueY = blue->data[0];
 	uint8_t *blueU = blue->data[1];
 	uint8_t *blueV = blue->data[2];
-	float new_ratio = ratio_;
-	VJFrame smooth;
+	float new_ratio = r->ratio_;
+
+    int buf_width = r->buf_width;
+    int buf_height = r->buf_height;
+    int buf_margin_left = r->buf_margin_left;
+    int buf_margin_right = r->buf_margin_right;
+
+    VJFrame smooth;
 	veejay_memcpy( &smooth, frame, sizeof(VJFrame));
 	smooth.data[0] = prev;
 
 	//@ set new zoom ratio 
 	new_ratio = (snapRatio * 0.01);
-	if ( ratio_ != new_ratio )
+	if ( r->ratio_ != new_ratio )
 	{
-		ratio_ = new_ratio;
-		setTable();
+		r->ratio_ = new_ratio;
+		setTable(r);
 	}
 
-	if( !first_frame )
+	if( !r->first_frame )
 	{	//@ take current
 		veejay_memcpy( prev, lum, len );
-		softblur_apply( &smooth, 0);
-		first_frame++;
+		softblur_apply_internal( &smooth, 0);
+		r->first_frame++;
 		return;
 	}
-	if( last_mode != mode )
+
+	if( r->last_mode != mode )
 	{
 //@ mode changed, reset
-		veejay_memset( blurzoombuf, 0, 2*buf_area);
+		veejay_memset( r->blurzoombuf, 0, 2*r->buf_area);
 		veejay_memset( diff, 0, len );
 		veejay_memset( prev, 0, len );
-		last_mode = mode;
+		r->last_mode = mode;
 	}
 
 	uint8_t *d = diff;
@@ -342,8 +378,8 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int mode, int snapRatio
 //@ end of diff
 
 
-	p = blurzoombuf;
-	d += buf_margin_left;
+	p = r->blurzoombuf;
+	d += r->buf_margin_left;
 	for( y = 0; y < buf_height; y++ ) {
 		for( x = 0; x< buf_width; x ++ ) {
 			p[x] |= ( (d[x] * snapInterval)>>7);
@@ -352,16 +388,16 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int mode, int snapRatio
 		p += buf_width;
 	}
 	//@ prepare frame for next difference take
-	softblur_apply( &smooth, 0);
+	softblur_apply_internal( &smooth, 0);
 
-	blurzoomcore();
-	p = blurzoombuf;
+	blurzoomcore(r);
+	p = r->blurzoombuf;
 
 	if(mode >= 3 )
 	{
 		veejay_memset( dstU,128,len);
 		veejay_memset( dstV,128,len);
-		veejay_memcpy( dstY, blurzoombuf, len );
+		veejay_memcpy( dstY, r->blurzoombuf, len );
 		return;
 	}
 

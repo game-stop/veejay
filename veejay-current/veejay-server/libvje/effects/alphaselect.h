@@ -21,6 +21,5 @@
 #ifndef ALPHASELECT_H
 #define ALPHASELECT_H
 vj_effect *alphaselect_init();
-void alphaselect_apply( VJFrame *frame, int i_angle, int red, int green, int blue, int swap);
-void alphaselect_free();
+void alphaselect_apply(void *ptr, VJFrame *frame, int *args );
 #endif

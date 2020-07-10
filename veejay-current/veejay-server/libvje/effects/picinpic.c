@@ -68,24 +68,23 @@ vj_effect *picinpic_init(int width, int height)
     ve->extra_frame = 1;
 
     ve->has_user = 1;
-    ve->user_data = NULL;
 
 	ve->param_description = vje_build_param_list( ve->num_params, "Width", "Height", "X offset", "Y offset" );
     return ve;
 }
 
-int	picinpic_malloc(void **d, int w, int h)
+void *picinpic_malloc(int w, int h)
 {
-	pic_t *my;
-	*d = (void*) vj_calloc(sizeof(pic_t));
-	my = (pic_t*) *d;
-
+	pic_t *my = (pic_t*) vj_calloc(sizeof(pic_t));
+    if(!my) {
+        return NULL;
+    }
 	my->scaler = NULL;
 	my->template.flags = 1;
 	my->w = 0;
 	my->h = 0;
 	my->frame = NULL;
-	return 1;	
+	return (void*) my;	
 }
 
 static int	nearest_div(int val )
@@ -96,21 +95,23 @@ static int	nearest_div(int val )
 	return val;
 }
 
-void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
-                    int twidth, int theight, int x1, int y1 )
-{
+void picinpic_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+                    
+    int twidth = args[0];
+    int theight = args[1];
+    int x1 = args[2];
+    int y1 = args[3];
+
 	int x, y;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
-	pic_t	*picture = (pic_t*) user_data;
+	pic_t	*picture = (pic_t*) ptr;
 	int view_width = nearest_div(twidth);
 	int view_height = nearest_div(theight);
 	int dy = nearest_div(y1);
 	int dx = nearest_div(x1);
-
-	//@ round view_width to nearest multiple of 2,4,8
-
-
+	
+    //@ round view_width to nearest multiple of 2,4,8
 	if ( (dx + view_width ) > width )
 		view_width = width - dx;
 	if ( (dy + view_height ) > height )
@@ -209,5 +210,4 @@ void picinpic_free(void *d)
 
 		free( my );
 	}
-	d=NULL;
 }

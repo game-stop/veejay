@@ -21,8 +21,7 @@
 #ifndef MAGICSCRATCHER_H
 #define MAGICSCRATCHER_H
 vj_effect *magicscratcher_init(int w, int h);
-int magicscratcher_malloc(int w, int h);
-void magicscratcher_free();
-void magicscratcher_apply( VJFrame *frame, int type, int nframes, int no_reverse,
-                          int grayscale);
+void *magicscratcher_malloc(int w, int h);
+void magicscratcher_free(void *ptr);
+void magicscratcher_apply(void *ptr, VJFrame *frame, int *args);
 #endif

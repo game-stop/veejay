@@ -22,19 +22,21 @@
 #include <veejaycore/vjmem.h>
 #include "motionmap.h"
 #include "magicmirror.h"
+#include "motionmap.h"
 
-
-// if d or n changes, tables need to be calculated
-static uint8_t *magicmirrorbuf[4] = { NULL,NULL,NULL,NULL };
-static double *funhouse_x = NULL;
-static double *funhouse_y = NULL;
-static unsigned int *cache_x = NULL;
-static unsigned int *cache_y = NULL;
-static unsigned int last[4] = {0,0,20,20};
-static int cx1 = 0;
-static int cx2 = 0;
-static int n__ = 0;
-static int N__ = 0;
+typedef struct {
+    uint8_t *magicmirrorbuf[4];
+    double *funhouse_x;
+    double *funhouse_y;
+    unsigned int *cache_x;
+    unsigned int *cache_y;
+    unsigned int last[4]; // {0,0,20,20};
+    int cx1;
+    int cx2;
+    int n__;
+    int N__;
+    void *motionmap;
+} magicmirror_t;
 
 vj_effect *magicmirror_init(int w, int h)
 {
@@ -76,53 +78,84 @@ vj_effect *magicmirror_init(int w, int h)
 	return ve;
 }
 
-int magicmirror_malloc(int w, int h)
+void *magicmirror_malloc(int w, int h)
 {
-	magicmirrorbuf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*RUP8(w*h*4));
-	if(!magicmirrorbuf[0])
-		return 0;
+    magicmirror_t *m = (magicmirror_t*) vj_calloc(sizeof(magicmirror_t));
+    if(!m) {
+        return NULL;
+    }
 
-	magicmirrorbuf[1] = magicmirrorbuf[0] + RUP8(w*h);
-	magicmirrorbuf[2] = magicmirrorbuf[1] + RUP8(w*h);
-	magicmirrorbuf[3] = magicmirrorbuf[2] + RUP8(w*h);
+	m->magicmirrorbuf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*RUP8(w*h*4));
+	if(!m->magicmirrorbuf[0]) {
+		free(m);
+        return NULL;
+    }
+
+	m->magicmirrorbuf[1] = m->magicmirrorbuf[0] + RUP8(w*h);
+	m->magicmirrorbuf[2] = m->magicmirrorbuf[1] + RUP8(w*h);
+	m->magicmirrorbuf[3] = m->magicmirrorbuf[2] + RUP8(w*h);
 	
-	funhouse_x = (double*)vj_calloc(sizeof(double) * w );
-	if(!funhouse_x) return 0;
+	m->funhouse_x = (double*)vj_calloc(sizeof(double) * w );
+	if(!m->funhouse_x) {
+        free(m->magicmirrorbuf[0]);
+        free(m);
+        return NULL;
+    }
 
-	cache_x = (unsigned int *)vj_calloc(sizeof(unsigned int)*w);
-	if(!cache_x) return 0;
+	m->cache_x = (unsigned int *)vj_calloc(sizeof(unsigned int)*w);
+	if(!m->cache_x) {
+        free(m->magicmirrorbuf[0]);
+        free(m->funhouse_x);
+        free(m);
+        return NULL;
+    }
 
-	funhouse_y = (double*)vj_calloc(sizeof(double) * h );
-	if(!funhouse_y) return 0;
+	m->funhouse_y = (double*)vj_calloc(sizeof(double) * h );
+	if(!m->funhouse_y) {
+        free(m->magicmirrorbuf[0]);
+        free(m->funhouse_x);
+        free(m->cache_x);
+        free(m);
+        return NULL;
+    }
 
-	cache_y = (unsigned int*)vj_calloc(sizeof(unsigned int)*h);
-	if(!cache_y) return 0;
+	m->cache_y = (unsigned int*)vj_calloc(sizeof(unsigned int)*h);
+	if(!m->cache_y) {
+        free(m->magicmirrorbuf[0]);
+        free(m->funhouse_x);
+        free(m->funhouse_y);
+        free(m->cache_x);
+        free(m);
+        return NULL;
+    }   
 
-	n__ =0;
-	N__ =0;
+    m->last[2] = 20;
+    m->last[3] = 20;
 
-	return 1;
+	return (void*) m;
 }
 
-void magicmirror_free()
+void magicmirror_free(void *ptr)
 {
-	if(magicmirrorbuf[0]) free(magicmirrorbuf[0]);
-	if(funhouse_x) free(funhouse_x);
-	if(funhouse_y) free(funhouse_y);
-	if(cache_x) free(cache_x);
-	if(cache_y) free(cache_y);
-	magicmirrorbuf[0] = NULL;
-	magicmirrorbuf[1] = NULL;
-	magicmirrorbuf[2] = NULL;
-	magicmirrorbuf[3] = NULL;
-	cache_x = NULL;
-	cache_y  = NULL;
-	funhouse_x = NULL;
-	funhouse_y = NULL;
+    magicmirror_t *m = (magicmirror_t*) ptr;
+
+    free(m->magicmirrorbuf[0]);
+    free(m->funhouse_x);
+    free(m->funhouse_y);
+    free(m->cache_x);
+    free(m->cache_y);
+    free(m);
 }
 
-void magicmirror_apply( VJFrame *frame, int vx, int vy, int d, int n, int alpha )
-{
+void magicmirror_apply( void *ptr, VJFrame *frame, int *args) {
+    int vx = args[0];
+    int vy = args[1];
+    int d = args[2];
+    int n = args[3];
+    int alpha = args[4];
+    
+    magicmirror_t *m = (magicmirror_t*) ptr;
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;
@@ -130,25 +163,26 @@ void magicmirror_apply( VJFrame *frame, int vx, int vy, int d, int n, int alpha 
 	double c2 = (double)vy;
 	int motion = 0;
 	int interpolate = 1;
-	if( motionmap_active())
+
+	if( motionmap_active(m->motionmap))
 	{
-		if( motionmap_is_locked() ) {
-			d = cx1;
-			n = cx2;
+		if( motionmap_is_locked(m->motionmap) ) {
+			d = m->cx1;
+			n = m->cx2;
 		} else {
-			motionmap_scale_to( 100,100,0,0, &d, &n, &n__, &N__ );
-			cx1 = d;
-			cx2 = n;
+			motionmap_scale_to( m->motionmap, 100,100,0,0, &d, &n, &(m->n__), &(m->N__) );
+			m->cx1 = d;
+			m->cx2 = n;
 		}
 		motion = 1;
 	}
 	else
 	{
-		n__ = 0;
-		N__ = 0;
+		m->n__ = 0;
+		m->N__ = 0;
 	}
 
-	if( N__ == n__ || n__ == 0 )
+	if( m->N__ == m->n__ || m->n__ == 0 )
 		interpolate = 0;
 
 	double c3 = (double)d * 0.001;
@@ -159,19 +193,24 @@ void magicmirror_apply( VJFrame *frame, int vx, int vy, int d, int n, int alpha 
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 	uint8_t *A = frame->data[3];
+    double *funhouse_x = m->funhouse_x;
+    double *funhouse_y = m->funhouse_y;
+    unsigned int *cache_x = m->cache_x;
+    unsigned int *cache_y = m->cache_y;
+    uint8_t **magicmirrorbuf = m->magicmirrorbuf;
 
-	if( d != last[1] ) {
-		changed = 1; last[1] =d;
+	if( d != m->last[1] ) {
+		changed = 1; m->last[1] =d;
 	}
-	if( n != last[0] ) {
-		changed = 1; last[0] = n;
+	if( n != m->last[0] ) {
+		changed = 1; m->last[0] = n;
 	}
 
-	if( vx != last[2] ) {
-		changed = 1; last[2] = vx;
+	if( vx != m->last[2] ) {
+		changed = 1; m->last[2] = vx;
 	}
-	if( vy != last[3] ) {
-		changed = 1; last[3] = vy;
+	if( vy != m->last[3] ) {
+		changed = 1; m->last[3] = vy;
 	} 
 
 	if(changed==1)
@@ -240,39 +279,6 @@ void magicmirror_apply( VJFrame *frame, int vx, int vy, int d, int n, int alpha 
 						}
 					}
 					break;
-				case 2: 
-					{
-						//@ try get a bg from somwhere
-						uint8_t *bgY = vj_effect_get_bg( 0, 0 );
-						uint8_t *bgCb= vj_effect_get_bg( 0, 1 );
-						uint8_t *bgCr= vj_effect_get_bg( 0, 2 );
-
-						if( bgY == NULL || bgCb == NULL || bgCr == NULL ) {
-							veejay_msg(0,"This mode requires 'Subtract background' FX");
-							break;
-						}
-						for(y=1; y < height-1; y++)
-						{
-							for(x=1; x < width-1; x++)
-							{
-								q = y * width + x;
-								p = cache_y[y] * width + cache_x[x];
-
-								if( A[q] ) {
-									Y[q] = magicmirrorbuf[0][p];
-									Cb[q] = magicmirrorbuf[1][p];
-									Cr[q] = magicmirrorbuf[2][p];
-								} else if ( Am[q] ) {
-									//@ put in pixels from static bg 
-									Y[q] = bgY[q];
-									Cb[q] = bgCb[q];
-									Cr[q] = bgCr[q];
-								}
-							}
-						}
-
-					}
-					break;
 		}
 	}
 	else {
@@ -293,12 +299,23 @@ void magicmirror_apply( VJFrame *frame, int vx, int vy, int d, int n, int alpha 
 
 	if( interpolate )
 	{
-		motionmap_interpolate_frame( frame, N__, n__ );
+		motionmap_interpolate_frame( m->motionmap, frame, m->N__, m->n__ );
 	}
 
 	if( motion )
 	{
-		motionmap_store_frame(frame);
+		motionmap_store_frame( m->motionmap, frame );
 	}
 
 }
+
+int magicmirror_request_fx() {
+    return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
+}
+
+void magicmirror_set_motionmap(void *ptr, void *priv)
+{
+    magicmirror_t *m = (magicmirror_t*) ptr;
+    m->motionmap = priv;
+}
+

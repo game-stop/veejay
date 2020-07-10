@@ -120,10 +120,9 @@ typedef struct {
     void *viewport;
     int noise_suppression;
     uint8_t *blackframe;
-    int bf_count;
+    int bf_index;
     int median_radius;
     int has_white;
-    double *tabmean[3];
     double mean[3];
     double *bf;
     double *bfu;
@@ -138,6 +137,9 @@ typedef struct {
 	int 	loop_stat;
 	int	loop_stat_stop;
 	void	*macro;
+    int transition_shape;
+    int transition_length;
+    int transition_active;
 } vj_tag;
 
 #define V4L_BLACKFRAME 1
@@ -147,7 +149,7 @@ typedef struct {
 void	*vj_tag_get_dict( int id );
 int	vj_tag_set_composite(void *compiz,int id, int n);
 int	vj_tag_get_composite(int t1);
-int 	vj_tag_chain_malloc(int e);
+int 	vj_tag_chain_malloc(int e, VJFrame *frame);
 int 	vj_tag_chain_free(int e,int global);
 int	vj_tag_get_v4l_properties(int t1, int *arr );
 int 	vj_tag_init(int w, int h, int pix_fmt, int driver);
@@ -348,7 +350,7 @@ int	vj_tag_get_width();
 int	vj_tag_get_height();
 int	vj_tag_get_uvlen();
 void  vj_tag_cali_prepare( int t1 , int pos, int cali_tag);
-void	vj_tag_cali_prepare_now(int a, int b);
+void	vj_tag_cali_prepare_now(vj_tag *b);
 int	vj_tag_chain_set_kfs( int s1, int len, unsigned char *data );
 unsigned char *	vj_tag_chain_get_kfs( int s1, int entry, int parameter_id, int *len );
 int	vj_tag_get_kf_status(int t1, int entry, int *type);
@@ -379,6 +381,14 @@ int vj_tag_chain_entry_transition_now(int s1, int entry, int *type);
 int vj_tag_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop_at, int frame_pos);
 int vj_tag_chain_entry_transition_now(int s1, int entry, int *type);
 void vj_tag_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype);
+
+int vj_tag_get_transition_shape(int s1);
+int vj_tag_get_transition_length(int s1);
+void vj_tag_set_transition_shape(int s1, int shape);
+void vj_tag_set_transition_length(int s1, int length);
+int vj_tag_get_transition_active(int t1);
+void vj_tag_set_transition_active(int t1, int status);
+
 #ifdef HAVE_XML2
 void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);
 void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp);

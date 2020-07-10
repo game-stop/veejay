@@ -30,22 +30,18 @@ vj_effect *transform_init(int width,int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 5;
-    //ve->defaults[1] = 1;
     ve->limits[0][0] = 1;
     ve->limits[1][0] = (height / 16);
 
-    //ve->limits[0][1] = 1;
-    //ve->limits[1][1] = 4096;
-
     ve->description = "Transform Cubics";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
    	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Cubics");
     return ve;
 }
 
-void transform_apply(VJFrame *frame, VJFrame *frame2, const int size)
+void transform_apply(void *ptr, VJFrame *frame, int *args)
 {
     unsigned int ty, tx, y, x;
     const unsigned int uv_height = frame->uv_height;
@@ -55,10 +51,10 @@ void transform_apply(VJFrame *frame, VJFrame *frame2, const int size)
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-
+    uint8_t *Y2 = frame->data[0];
+ 	uint8_t *Cb2= frame->data[1];
+	uint8_t *Cr2= frame->data[2];
+    int size = args[0];
 
     /* Luminance */
     for (y = 1; y < height; y++)

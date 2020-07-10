@@ -48,22 +48,18 @@
 #include "widthmirror.h"
 #include "distort.h"
 
-static int plasma_table[512];
-static int plasma_pos1 = 0;
-static int plasma_pos2 = 0;
-static int *plasma_map = NULL;
-static uint8_t *plasma_buf[4] = { NULL,NULL,NULL, NULL };
+typedef struct {
+    int plasma_table[512];
+    int plasma_pos1;
+    int plasma_pos2;
+    int *plasma_map;
+    uint8_t *plasma_buf[4];
+} distortion_t;
 
 vj_effect *distortion_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    int i;
-    float rad;
-    for (i = 0; i < 512; i++) {
-		rad = ((float) i * 0.703125f) * 0.0174532f;
-		plasma_table[i] = myround( sinf(rad) * 1024.0f );
-    }
-
+  
     ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -97,49 +93,60 @@ vj_effect *distortion_init(int width, int height)
     return ve;
 }
 
-int distortion_malloc(int w, int h)
+void *distortion_malloc(int w, int h)
 {
-	if( plasma_map == NULL ) {
-		plasma_map = (int*) vj_calloc( sizeof(int) * RUP8( w * h ) );
-		if(!plasma_map)
-			return 0;
+    distortion_t *d = (distortion_t*) vj_calloc( sizeof(distortion_t) );
+    if(!d) {
+        return NULL;
+    }
+
+    d->plasma_map = (int*) vj_calloc( sizeof(int) * RUP8( w * h ) );
+	if(!d->plasma_map) {
+        free(d);
+        return NULL;
 	}
 
-	if( plasma_buf[0] == NULL ) {
-		plasma_buf[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( w * h * 3 ));
-		if(plasma_buf[0] == NULL ) {
-			free(plasma_map);
-			return 0;
-		}
-		plasma_buf[1] = plasma_buf[0] + RUP8(w*h);
-		plasma_buf[2] = plasma_buf[1] + RUP8(w*h);
+	d->plasma_buf[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( w * h * 3 ));
+	if(!d->plasma_buf[0]) {
+		free(d->plasma_map);
+		free(d);
+        return NULL;
+    }
 
-		veejay_memset( plasma_buf[0], 0, RUP8(w*h));
-		veejay_memset( plasma_buf[1], 128,RUP8(w*h));
-		veejay_memset( plasma_buf[2], 128,RUP8(w*h));
-	}
+    d->plasma_buf[1] = d->plasma_buf[0] + RUP8(w*h);
+	d->plasma_buf[2] = d->plasma_buf[1] + RUP8(w*h);
 
-	return 1; 
+	veejay_memset( d->plasma_buf[0], 0, RUP8(w*h));
+	veejay_memset( d->plasma_buf[1], 128,RUP8(w*h));
+	veejay_memset( d->plasma_buf[2], 128,RUP8(w*h));
+	
+    int i;
+    float rad;
+    for (i = 0; i < 512; i++) {
+		rad = ((float) i * 0.703125f) * 0.0174532f;
+		d->plasma_table[i] = myround( sinf(rad) * 1024.0f );
+    }
+
+    return (void*) d;
 }
 
-void distortion_free()
+void distortion_free(void *ptr)
 {
-	if( plasma_map ) {
-		free(plasma_map);
-	}
-	plasma_map = NULL;
-
-	if( plasma_buf[0] ) {
-		free(plasma_buf[0]);
-	}
-	plasma_buf[0] = NULL;
-	plasma_buf[1] = NULL;
-	plasma_buf[2] = NULL;
-	plasma_buf[3] = NULL;
+    distortion_t *d = (distortion_t*) ptr;
+    free(d->plasma_map);
+	free(d->plasma_buf[0]);
+    free(d);
 }
 
-void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, int inc_val4, int inc_val5, int inc_val6 )
-{
+void distortion_apply(void *ptr, VJFrame *frame, int *args ) {
+    int inc_val1 = args[0];
+    int inc_val2 = args[1];
+    int inc_val3 = args[2];
+    int inc_val4 = args[3];
+    int inc_val5 = args[4];
+    int inc_val6 = args[5];
+
+    distortion_t *d = (distortion_t*) ptr;
 
     int x, i, j;
     int tpos1 = 0, tpos2 = 0, tpos3 = 0, tpos4 = 0;
@@ -152,7 +159,14 @@ void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, 
 	const unsigned int width = frame->width;
 	const int len = frame->len;
 
+    int *plasma_map = d->plasma_map;
+    uint8_t **plasma_buf = d->plasma_buf;
+    int *plasma_table = d->plasma_table;
+
 	int strides[4] = { len,len,len, 0 };
+
+    int plasma_pos1 = d->plasma_pos1;
+    int plasma_pos2 = d->plasma_pos2;
 
 	vj_frame_copy( frame->data, plasma_buf, strides );
 
@@ -188,5 +202,8 @@ void distortion_apply(VJFrame *frame, int inc_val1, int inc_val2, int inc_val3, 
 		Cb[i]= plasma_buf[1][ plasma_map[i] ];
 		Cr[i]= plasma_buf[2][ plasma_map[i] ];
 	}
+
+    d->plasma_pos1 = d->plasma_pos1;
+    d->plasma_pos2 = d->plasma_pos2;
 
 }

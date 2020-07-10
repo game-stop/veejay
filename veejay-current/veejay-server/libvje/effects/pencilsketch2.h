@@ -21,7 +21,7 @@
 #ifndef PENCILSKETCH2_H
 #define PENCILSKETCH2_H
 vj_effect *pencilsketch2_init(int w, int h);
-int pencilsketch2_malloc(int w, int h);
-void pencilsketch2_free();
-void pencilsketch2_apply( VJFrame *frame, int blurradius, int gammacompr,int strength, int contrast, int levels, int mode);
+void *pencilsketch2_malloc(int w, int h);
+void pencilsketch2_free(void *ptr);
+void pencilsketch2_apply(void *ptr, VJFrame *frame, int *args);
 #endif

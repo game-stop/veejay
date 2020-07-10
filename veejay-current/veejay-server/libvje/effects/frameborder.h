@@ -21,5 +21,5 @@
 #ifndef FRAMEBORDER_H
 #define FRAMEBORDER_H
 vj_effect *frameborder_init(int width, int height);
-void frameborder_apply( VJFrame *frame, VJFrame *frame2, int size);
+void frameborder_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

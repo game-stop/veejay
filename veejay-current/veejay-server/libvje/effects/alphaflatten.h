@@ -21,5 +21,5 @@
 #ifndef ALPHAFLATTEN_H
 #define ALPHAFLATTEN_H
 vj_effect *alphaflatten_init(int w, int h);
-void alphaflatten_apply( VJFrame *frame, int mode);
+void alphaflatten_apply(void *ptr, VJFrame *frame, int *args);
 #endif

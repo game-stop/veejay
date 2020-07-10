@@ -21,5 +21,7 @@
 #ifndef MEDIANFILT_H
 #define MEDIANFILT_H
 vj_effect *medianfilter_init(int w, int h);
-void medianfilter_apply( VJFrame *frame, int val);
+void medianfilter_apply( void *ptr, VJFrame *frame, int *args);
+void *medianfilter_malloc( int w, int h );
+void medianfilter_free(void *ptr);
 #endif

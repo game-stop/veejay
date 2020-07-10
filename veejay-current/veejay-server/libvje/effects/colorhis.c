@@ -59,72 +59,83 @@ vj_effect *colorhis_init(int w, int h)
     return ve;
 }
 
-static void	*histogram_ = NULL;
-static VJFrame *rgb_frame_ = NULL;
-static uint8_t *rgb_ = NULL;
-static void *convert_yuv = NULL;
-static void *convert_rgb = NULL;
+typedef struct {
+    void	*histogram_;
+    VJFrame *rgb_frame_;
+    uint8_t *rgb_;
+    void *convert_yuv;
+    void *convert_rgb;
+} colorhis_t;
 
-int	colorhis_malloc(int w, int h)
+void *colorhis_malloc(int w, int h)
 {
-	if( histogram_ )
-		veejay_histogram_del(histogram_);
-	if( rgb_ )
-		free(rgb_);
-	histogram_ = veejay_histogram_new();
-	rgb_ = vj_malloc(sizeof(uint8_t) * w * h * 3 );
-	if(rgb_ == NULL )
-		return 0;
-	rgb_frame_ = yuv_rgb_template( rgb_, w, h, AV_PIX_FMT_RGB24 );
-	if(rgb_frame_ == NULL)
-		return 0;
+    colorhis_t *c = (colorhis_t*) vj_calloc(sizeof(colorhis_t));
+    if(!c) {
+        return NULL;
+    }
+	c->histogram_ = veejay_histogram_new();
+    if(!c->histogram_) {
+        free(c);
+        return NULL;
+    }
 
-	return 1;
+	c->rgb_ = vj_malloc(sizeof(uint8_t) * RUP8(w * h * 3) );
+    if(!c->rgb_) {
+        veejay_histogram_del(c->histogram_);
+        free(c);
+        return NULL;
+    }
+	
+    c->rgb_frame_ = yuv_rgb_template( c->rgb_, w, h, AV_PIX_FMT_RGB24 );
+    if(!c->rgb_frame_) {
+        veejay_histogram_del(c->histogram_);
+        free(c->rgb_);
+        free(c);
+        return NULL;
+    }
+
+	return (void*) c;
 }
 
-void	colorhis_free()
+void	colorhis_free(void *ptr)
 {
-	if( histogram_ )
-		veejay_histogram_del(histogram_);
-	if( rgb_ )
-		free(rgb_);
-	if( rgb_frame_)
-		free(rgb_frame_);
-	rgb_ = NULL;
-	rgb_frame_ = NULL;
-	histogram_ = NULL;
-
-	if( convert_yuv )
-		yuv_fx_context_destroy( convert_yuv );
-	if( convert_rgb )
-		yuv_fx_context_destroy( convert_rgb );
-
-	convert_rgb = NULL;
-	convert_yuv = NULL;
+    colorhis_t *c = (colorhis_t*) ptr;
+	veejay_histogram_del(c->histogram_);
+	free(c->rgb_);
+	free(c->rgb_frame_);
+    if(c->convert_yuv)
+		yuv_fx_context_destroy( c->convert_yuv );
+	if(c->convert_rgb )
+		yuv_fx_context_destroy( c->convert_rgb );
+    free(c);
 }
 
 
-void colorhis_apply( VJFrame *frame,int mode, int val, int intensity, int strength)
-{
-	int src_fmt = (frame->uv_height == frame->height ? AV_PIX_FMT_YUV422P : AV_PIX_FMT_YUV420P);
+void colorhis_apply( void *ptr, VJFrame *frame, int *args) {
+    int mode = args[0];
+    int val = args[1];
+    int intensity = args[2];
+    int strength = args[3];
 
-	if(!convert_yuv)
-		convert_yuv = yuv_fx_context_create( frame, rgb_frame_ );
+    colorhis_t *c = (colorhis_t*) ptr;
 
-	yuv_fx_context_process( convert_yuv, frame, rgb_frame_ );
+	if(!c->convert_yuv)
+		c->convert_yuv = yuv_fx_context_create( frame, c->rgb_frame_ );
+
+	yuv_fx_context_process( c->convert_yuv, frame, c->rgb_frame_ );
 
 	if( val == 0 )
 	{
-		veejay_histogram_draw_rgb( histogram_, frame, rgb_, intensity, strength, mode );
+		veejay_histogram_draw_rgb( c->histogram_, frame, c->rgb_, intensity, strength, mode );
 	}
 	else
 	{
-		veejay_histogram_analyze_rgb( histogram_,rgb_, frame );
-		veejay_histogram_equalize_rgb( histogram_, frame, rgb_, intensity, strength, mode );
+		veejay_histogram_analyze_rgb( c->histogram_,c->rgb_, frame );
+		veejay_histogram_equalize_rgb( c->histogram_, frame, c->rgb_, intensity, strength, mode );
 
-		if(!convert_rgb )
-			convert_rgb = yuv_fx_context_create( rgb_frame_, frame);
-		yuv_fx_context_process( convert_rgb, rgb_frame_, frame );
+		if(!c->convert_rgb )
+			c->convert_rgb = yuv_fx_context_create( c->rgb_frame_, frame);
+		yuv_fx_context_process( c->convert_rgb, c->rgb_frame_, frame );
 	}
 }
 

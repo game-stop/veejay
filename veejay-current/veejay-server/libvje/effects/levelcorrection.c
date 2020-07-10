@@ -60,8 +60,12 @@ vj_effect *levelcorrection_init(int w,int h)
 	return ve;
 }
 
-void levelcorrection_apply(VJFrame *frame, int min, int max, int bmin,int bmax)
-{
+void levelcorrection_apply(void *ptr, VJFrame *frame, int *args) {
+    int min = args[0];
+    int max = args[1];
+    int bmin = args[2];
+    int bmax = args[3];
+
 	unsigned int pos;
 	uint8_t *A = frame->data[3];
 	const int len = frame->len;

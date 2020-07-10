@@ -61,8 +61,38 @@ vj_effect *fadecolorrgb_init(int w,int h)
     return ve;
 }
 
-void colorfadergb_apply( VJFrame *frame, int opacity, int r, int g, int b)
-{
+typedef struct {
+    int value;
+} fc_t;
+
+void *fadecolorrgb_malloc(int w, int h) {
+    return (void*) vj_calloc(sizeof(fc_t));
+}
+
+void fadecolorrgb_free(void *ptr) {
+    free(ptr);
+}
+
+void fadecolorrgb_apply( void *ptr, VJFrame *frame, int *args) {
+    int opacity = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+
+    fc_t *state = (fc_t*) ptr;
+
+    if (args[4] == 0) {
+        if(state->value >= 255 ) {
+           state->value = opacity;
+        }
+        state->value += (opacity / args[5]);
+    } else {
+        if ( state->value <= 0 ) {
+            state->value = opacity;
+        }
+        state->value = (opacity / args[5]);
+    }
+
     unsigned int i, op0, op1;
     const int len = frame->len;
     unsigned int colorCb = 128, colorCr = 128;
@@ -71,6 +101,8 @@ void colorfadergb_apply( VJFrame *frame, int opacity, int r, int g, int b)
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
+
+    opacity = state->value;
 
     colorY = ((0.257 * r) + (0.504 * g) + (0.098 * b) + 16);
     colorCb = ((0.439 * r) - (0.368 * g) - (0.071 * b) + 128);

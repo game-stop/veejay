@@ -36,7 +36,7 @@ vj_effect *alpha2img_init(int w, int h)
 }
 
 
-void alpha2img_apply( VJFrame *frame)
+void alpha2img_apply(void *ptr, VJFrame *frame, int *args)
 {
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

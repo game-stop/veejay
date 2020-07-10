@@ -52,8 +52,11 @@ vj_effect *rgbchannel_init(int w, int h)
     return ve;
 }
 
-void rgbchannel_apply( VJFrame *frame, int chr, int chg , int chb)
-{
+void rgbchannel_apply( void *ptr, VJFrame *frame, int *args) {
+    
+    const int chr = args[0];
+    const int chg = args[1];
+    const int chb = args[2];
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	int row_stride = width * 4;

@@ -51,8 +51,10 @@ vj_effect *iris_init(int w, int h)
 }
 
 
-void iris_apply( VJFrame *frame, VJFrame *frame2, int val, int shape)
-{
+void iris_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
+    int val = args[0];
+    int shape = args[1];
+
     int i,j,k=0;
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;

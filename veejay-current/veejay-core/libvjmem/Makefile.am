@@ -6,6 +6,7 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
 AM_CPPFLAGS += $(FFMPEG_CFLAGS)
 
 AM_CFLAGS = $(OP_CFLAGS)
+AM_CPPFLAGS += $(FFMPEG_CFLAGS)
 
 VJMEM_LIB_FILE = libvjmem.la
 pkginclude_HEADERS = vjmem.h

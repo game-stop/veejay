@@ -21,5 +21,5 @@
 #ifndef ALPHABLEND_H
 #define ALPHABLEND_H
 vj_effect *alphablend_init(int w, int h);
-void alphablend_apply( VJFrame *frame, VJFrame *frame2);
+void alphablend_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

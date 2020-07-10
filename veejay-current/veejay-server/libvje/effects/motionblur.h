@@ -21,7 +21,7 @@
 #ifndef MOTIONBLUR_H
 #define MOTIONBLUR_H
 vj_effect *motionblur_init(int w, int h);
-int motionblur_malloc(int w, int h);
-void motionblur_free();
-void motionblur_apply( VJFrame *frame, int n);
+void *motionblur_malloc(int w, int h);
+void motionblur_free(void *ptr);
+void motionblur_apply( void *ptr, VJFrame *frame, int *args );
 #endif

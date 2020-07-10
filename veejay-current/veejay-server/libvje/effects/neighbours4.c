@@ -55,12 +55,22 @@ vj_effect *neighbours4_init(int w, int h)
     return ve;
 }
 
-static	int pixel_histogram[256];
-static	int y_map[256];
-static  int cb_map[256];
-static int cr_map[256];
-static uint8_t  *tmp_buf[2];
-static uint8_t  *chromacity[2];
+typedef struct
+{
+	double x;
+	double y;
+} relpoint_t;
+
+typedef struct {
+	int pixel_histogram[256];
+	int y_map[256];
+    int cb_map[256];
+    int cr_map[256];
+    uint8_t *tmp_buf[2];
+    uint8_t *chromacity[2];
+    relpoint_t points[2048];
+} nb_t;
+
 typedef struct
 {
 	uint8_t y;
@@ -68,46 +78,41 @@ typedef struct
 	uint8_t v;
 } pixel_t;
 
-typedef struct
+void *neighbours4_malloc(int w, int h )
 {
-	double x;
-	double y;
-} relpoint_t;
+    nb_t *n = (nb_t*) vj_calloc(sizeof(nb_t));
+    if(!n) {
+        return NULL;
+    }
 
-static	relpoint_t	points[2048];
+	n->tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * 2));
+	if(!n->tmp_buf[0] ) {
+        free(n);
+        return NULL;
+    }
 
+	n->tmp_buf[1] = n->tmp_buf[0] + RUP8(w*h);
 
-
-int		neighbours4_malloc(int w, int h )
-{
-	tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 2);
-	if(!tmp_buf[0] ) return 0;
-	tmp_buf[1] = tmp_buf[0] + (w*h);
-	chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h *2);
-	if(!chromacity[0]) return 0;
-	chromacity[1] = chromacity[0] + (w*h);
-	int i;
-	for(i = 0; i < w; i ++ )
-	{
-		points[i].x = 0.0;
-		points[i].y = 0.0;
-	}
-	return 1;
+	n->chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h *2));
+	if(!n->chromacity[0]) {
+        free(n->tmp_buf[0]);
+        free(n);
+        return NULL;
+    }
+	
+    n->chromacity[1] = n->chromacity[0] + (w*h);
+	return (void*) n;
 }
 
-void		neighbours4_free(void)
+void neighbours4_free(void *ptr)
 {
-	if(tmp_buf[0])
-		free(tmp_buf[0]);
-	if(chromacity[0])
-		free(chromacity[0]);
-	tmp_buf[0] = NULL;
-	tmp_buf[1] = NULL;
-	chromacity[0] = NULL;
-	chromacity[1] = NULL;
+    nb_t *n = (nb_t*) ptr;
+	free(n->tmp_buf[0]);
+	free(n->chromacity[0]);
+    free(n);
 }
 
-static 	void create_circle( double radius, int depth, int w )
+static 	void create_circle( double radius, int depth, int w,relpoint_t *points )
 {
 	double t = 0.0;
 	int index = 0;
@@ -132,7 +137,11 @@ static inline pixel_t evaluate_pixel_bc(
 		const uint8_t *image,		/* image data */
 		const uint8_t *image_cb,
 		const uint8_t *image_cr,
-		const relpoint_t *pts	/* relative coordinate map */
+		const relpoint_t *pts,	/* relative coordinate map */
+        int *pixel_histogram,
+        int *y_map,
+        int *cb_map,
+        int *cr_map
 )
 {
 	unsigned int 	brightness;		/* scaled brightnes */
@@ -209,7 +218,9 @@ static inline uint8_t evaluate_pixel_b(
 		const int h,			/* height of image */
 		const uint8_t *premul,		/* map data */
 		const uint8_t *image,		/* image data */
-		const relpoint_t *pts	/* relative coordinate map*/
+		const relpoint_t *pts,	/* relative coordinate map*/
+        int *pixel_histogram,
+        int *y_map
 )
 {
 	unsigned int 	brightness;		/* scaled brightnes */
@@ -262,13 +273,18 @@ static inline uint8_t evaluate_pixel_b(
 	return( (uint8_t) (  y_map[ peak_index] / peak_value ));
 }
 
-void neighbours4_apply( VJFrame *frame, int radius, int brush_size,
-                       int intensity_level, int mode )
-{
+void neighbours4_apply( void *ptr, VJFrame *frame, int *args ) {
+    int radius = args[0];
+    int brush_size = args[1];
+    int intensity_level = args[2];
+    int mode = args[3];
+
+    nb_t *n = (nb_t*) ptr;
+
 	int x,y; 
 	const double intensity = intensity_level / 255.0;
-	uint8_t *Y = tmp_buf[0];
-	uint8_t *Y2 = tmp_buf[1];
+	uint8_t *Y = n->tmp_buf[0];
+	uint8_t *Y2 = n->tmp_buf[1];
 
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
@@ -279,14 +295,14 @@ void neighbours4_apply( VJFrame *frame, int radius, int brush_size,
 	double	r      = (double)radius;
 	// keep luma
 	vj_frame_copy1( frame->data[0], Y2, len );
-	create_circle( r, brush_size,width ); 
+	create_circle( r, brush_size,width, n->points ); 
 
-	relpoint_t *p_points = &points[0];
+	relpoint_t *p_points = &(n->points[0]);
 
 	if(mode)
 	{
 		int strides[4] = { 0,len, len };
-		uint8_t *dest[3] = { NULL, chromacity[0], chromacity[1] };
+		uint8_t *dest[3] = { NULL, n->chromacity[0], n->chromacity[1] };
 		vj_frame_copy( frame->data, dest, strides );
 	}
 
@@ -309,7 +325,9 @@ void neighbours4_apply( VJFrame *frame, int radius, int brush_size,
 						height,
 						Y,
 						Y2,
-						p_points
+						p_points,
+                        n->pixel_histogram,
+                        n->y_map
 				);
 			}
 		}
@@ -331,9 +349,13 @@ void neighbours4_apply( VJFrame *frame, int radius, int brush_size,
 						height,
 						Y,
 						Y2,
-						chromacity[0],
-						chromacity[1],
-						p_points
+						n->chromacity[0],
+						n->chromacity[1],
+						p_points,
+                        n->pixel_histogram,
+                        n->y_map,
+                        n->cb_map,
+                        n->cr_map
 					);
 				*(dstY++) = tmp.y;
 				*(dstCb++) = tmp.u;

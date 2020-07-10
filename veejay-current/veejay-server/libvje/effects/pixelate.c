@@ -22,30 +22,15 @@
 #include <veejaycore/vjmem.h>
 #include "pixelate.h"
 
-static uint8_t values[2048];
-
 vj_effect *pixelate_init(int width, int height)
 {
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-
-	veejay_memset( values, 0, sizeof(values) );
-
-	int i;
-	int nvalues=0;
-
-	for(i=0; i < width; i++)
-	{
-		values[nvalues] = 1 + i;
-		nvalues++; 
-	}
-
 	ve->num_params = 1;
-
 	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	ve->limits[0][0] = 1;
-	ve->limits[1][0] = nvalues-2;
+	ve->limits[1][0] = 2048;
 	ve->defaults[0] = 8;
 	ve->description = "Pixelate";
 	ve->sub_format = -1;
@@ -53,15 +38,14 @@ vj_effect *pixelate_init(int width, int height)
 	ve->has_user =0;
 	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Pixels");
-	
 	return ve;
 }
 
-void pixelate_apply( VJFrame *frame, int vv )
+void pixelate_apply( void *ptr, VJFrame *frame, int *args )
 {
 	unsigned int i,j ;
 	const int len = frame->len;
-	const unsigned int v = values[vv];
+	const unsigned int v = args[0];
 	const int uv_len = (frame->ssm ? len : frame->uv_len);
 	unsigned int u_v = v >> (frame->ssm ? frame->shift_h: 1 );
 	if( u_v == 0 )

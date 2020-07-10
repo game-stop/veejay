@@ -115,6 +115,20 @@ typedef struct
 	int	rec_id;
 } sequencer_t;
 
+typedef struct
+{
+    int active;
+    int shape;
+    int next_id;
+    int next_type;
+    double timecode;
+    long start;
+    long end;
+    int ready;
+    void *ptr;
+    int global_state;
+} transition_t;
+
 typedef struct {
 	pthread_t software_playback_thread;
 	pthread_t playback_thread;
@@ -206,6 +220,7 @@ typedef struct {
 	int	splitscreen;
 	int clear_alpha;
 	int alpha_value;
+    transition_t transition;
 } video_playback_setup;
 
 typedef struct {
@@ -285,6 +300,10 @@ typedef struct {
     VJFrame *effect_frame1;
 	VJFrame *effect_frame2;
 	VJFrameInfo *effect_frame_info;
+    VJFrame *effect_frame3;
+	VJFrame *effect_frame4;
+	VJFrameInfo *effect_frame_info2;
+    vjp_kf *effect_info2;	/* effect dependent variables */
     vjp_kf *effect_info;	/* effect dependent variables */
 #ifdef HAVE_DIRECTFB
     void *dfb;
@@ -354,8 +373,11 @@ typedef struct {
 	int	use_keyb;
 	int	use_mouse;
 	int	show_cursor;
+    int borderless;
 	int 	qrcode;
     int read_plug_cfg;
+
+    void *performer;
 } veejay_t;
 
 typedef struct {

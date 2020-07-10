@@ -21,7 +21,7 @@
 #ifndef AUTOEQ_H
 #define AUTOEQ_H
 vj_effect *autoeq_init(int w, int h);
-int autoeq_malloc(int w , int h );
-void autoeq_free( );
-void autoeq_apply( VJFrame *frame, int val, int intensity, int strength);
+void *autoeq_malloc(int w, int h );
+void autoeq_free(void *ptr);
+void autoeq_apply(void *ptr, VJFrame *frame, int *args );
 #endif

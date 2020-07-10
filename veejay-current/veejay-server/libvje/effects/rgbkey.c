@@ -80,15 +80,6 @@ vj_effect *rgbkey_init(int w,int h)
 	return ve;
 }
 
-int	rgbkey_malloc(int w, int h)
-{
-	return 1;
-}
-
-void	rgbkey_free()
-{
-}
-
 /*
  * originally from http://gc-films.com/chromakey.html
  */
@@ -108,9 +99,14 @@ static inline double color_distance( uint8_t Cb, uint8_t Cr, int Cbk, int Crk, d
 		return 1.0; /* far from color key == fg */
 }
 
-void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int tola, int r, int g,int b,
-                  int tolb, int operator)
-{
+void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+    
+    int tola = args[0];
+    int r = args[1];
+    int g = args[2];
+    int b = args[3];
+    int tolb = args[4];
+    int operator = args[5];
 	unsigned int pos;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];

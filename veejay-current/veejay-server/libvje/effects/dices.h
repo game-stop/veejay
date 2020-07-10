@@ -21,7 +21,7 @@
 #ifndef DICES_H
 #define DICES_H
 vj_effect *dices_init(int width, int height);
-int dices_malloc(int w, int h);
-void dices_free();
-void dices_apply( void *data, VJFrame *frame, int cube_bits, int orientation);
+void *dices_malloc(int w, int h);
+void dices_free(void *ptr);
+void dices_apply( void *ptr, VJFrame *frame, int *args);
 #endif

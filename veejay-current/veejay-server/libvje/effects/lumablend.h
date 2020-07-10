@@ -21,6 +21,5 @@
 #ifndef LUMABLEND_H
 #define LUMABLEND_H
 vj_effect *lumablend_init();
-void lumablend_apply( VJFrame *frame, VJFrame *frame2,
-                     int threhold1, int threshold2, int opacity, int type);
+void lumablend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

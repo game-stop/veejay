@@ -27,7 +27,7 @@
 #include <veejaycore/vjmem.h>
 #include "baltantv.h"
 
-#define PLANES 32
+#define PLANES 50
 
 vj_effect *baltantv_init(int w, int h)
 {
@@ -57,59 +57,70 @@ vj_effect *baltantv_init(int w, int h)
     return ve;
 }
 
-static	unsigned int	plane_ = 0;
-static	uint8_t	*planetableY_ = NULL;
-static	int8_t	*planetableU_ = NULL;
-static	int8_t	*planetableV_ = NULL;
 
+typedef struct {
+    unsigned int	plane_ ;
+    uint8_t	*planetableY_;
+    int8_t	*planetableU_;
+    int8_t	*planetableV_;
+} baltantv_t;
 
-int	baltantv_malloc(int w, int h)
+void *baltantv_malloc(int w, int h)
 {
-	planetableY_ = (uint8_t*) vj_malloc( sizeof(uint8_t*) * PLANES * RUP8(w * h));
-	planetableU_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * RUP8(w * h));
-	planetableV_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * RUP8(w * h));
+    baltantv_t *b = (baltantv_t*) vj_calloc(sizeof(baltantv_t));
+    if(!b) {
+        return NULL;
+    }
 
-    veejay_memset( planetableY_, 0, PLANES * RUP8(w*h));
-    veejay_memset( planetableU_, 0, PLANES * RUP8(w*h));
-    veejay_memset( planetableV_, 0, PLANES * RUP8(w*h));
+	b->planetableY_ = (uint8_t*) vj_calloc( sizeof(uint8_t*) * PLANES * RUP8(w * h));
+    if(!b->planetableY_) {
+        free(b);
+        return NULL;
+    }
+	b->planetableU_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * RUP8(w * h));
+    if(!b->planetableU_) {
+        free(b->planetableY_);
+        free(b);
+        return NULL;
+    }
+	b->planetableV_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * RUP8(w * h));
+    if(!b->planetableV_) {
+        free(b->planetableY_);
+        free(b->planetableU_);
+        return NULL;
+    }
 
-	if(!planetableY_ || !planetableU_ || !planetableV_) {
-		veejay_msg(0,"Not enough memory to allocate %d planes of size %dx%d", PLANES,w,h);
-		baltantv_free();
-        return 0;
-	}
+    veejay_memset( b->planetableU_, 0, PLANES * RUP8(w*h));
+    veejay_memset( b->planetableV_, 0, PLANES * RUP8(w*h));
 
-	return 1;
+	return (void*) b;
 }
 
-void	baltantv_free()
+void	baltantv_free(void *ptr)
 {
-	plane_ = 0;
-    if(planetableY_) {
-        free(planetableY_);
-        planetableY_ = NULL;
-    }
-    if(planetableU_) {
-        free(planetableU_);
-        planetableU_ = NULL;
-    }
-    if(planetableV_) {
-        free(planetableV_);
-        planetableV_ = NULL;
-    }
+    baltantv_t *b = (baltantv_t*) ptr;
+    free(b->planetableY_);
+    free(b->planetableU_);
+    free(b->planetableV_);
+    free(b);
 }
 
-void baltantv_apply( VJFrame *frame, int stride, int mode)
-{
+void baltantv_apply( void *ptr, VJFrame *frame, int *args) {
+    int stride = args[0];
+    int mode = args[1];
+
 	unsigned int i,cf;
 	const int len = frame->len;
     const int uv_len = frame->uv_len;
 	uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
-	uint8_t *pDstY = planetableY_ + (plane_ * len);
-    int8_t *pDstU = planetableU_ + (plane_ * uv_len);
-    int8_t *pDstV = planetableV_ + (plane_ * uv_len);
+
+    baltantv_t *b = (baltantv_t*) ptr;
+
+	uint8_t *pDstY = b->planetableY_ + (b->plane_ * len);
+    int8_t *pDstU = b->planetableU_ + (b->plane_ * uv_len);
+    int8_t *pDstV = b->planetableV_ + (b->plane_ * uv_len);
     uint32_t y;
     int32_t u,v;
 
@@ -121,25 +132,25 @@ void baltantv_apply( VJFrame *frame, int stride, int mode)
         pDstV[i] = ((V[i]-128)) >> 2;
     }
 
-	cf = plane_ & (stride-1);
+	cf = b->plane_ & (stride-1);
 
 	uint8_t *pSrcY[4] = {
-			planetableY_ + (cf * len),
-			planetableY_ + ((cf+stride)   * len),
-			planetableY_ + ((cf+stride*2) * len),
-			planetableY_ + ((cf+stride*3) * len)
+			b->planetableY_ + (cf * len),
+			b->planetableY_ + ((cf+stride)   * len),
+			b->planetableY_ + ((cf+stride*2) * len),
+			b->planetableY_ + ((cf+stride*3) * len)
 		};
     int8_t *pSrcU[4] = {
-			planetableU_ + (cf * uv_len),
-			planetableU_ + ((cf+stride)   * uv_len),
-			planetableU_ + ((cf+stride*2) * uv_len),
-			planetableU_ + ((cf+stride*3) * uv_len)
+			b->planetableU_ + (cf * uv_len),
+			b->planetableU_ + ((cf+stride)   * uv_len),
+			b->planetableU_ + ((cf+stride*2) * uv_len),
+			b->planetableU_ + ((cf+stride*3) * uv_len)
 		};
 	int8_t *pSrcV[4] = {
-			planetableV_ + (cf * uv_len),
-			planetableV_ + ((cf+stride)   * uv_len),
-			planetableV_ + ((cf+stride*2) * uv_len),
-			planetableV_ + ((cf+stride*3) * uv_len)
+			b->planetableV_ + (cf * uv_len),
+			b->planetableV_ + ((cf+stride)   * uv_len),
+			b->planetableV_ + ((cf+stride*2) * uv_len),
+			b->planetableV_ + ((cf+stride*3) * uv_len)
 		};
 
 
@@ -198,7 +209,7 @@ void baltantv_apply( VJFrame *frame, int stride, int mode)
 		}
 
 	}
-	plane_ ++;
+	b->plane_ ++;
 
-	plane_ = plane_ & (PLANES-1);
+	b->plane_ = b->plane_ & (PLANES-1);
 }

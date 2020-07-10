@@ -64,67 +64,81 @@ vj_effect *perspective_init(int width , int height)
             "Reverse"   );
     return ve;
 }
-static int perspective_[9] = { 0 };
-static void *perspective_vp_ = NULL;
 
-static uint8_t *perspective_private_[4] = { NULL, NULL, NULL, NULL };
+typedef struct {
+    int perspective_[9];
+    void *perspective_vp_;
+    uint8_t *perspective_private_[4];
+} perspective_t;
 
-int perspective_malloc(int width, int height)
+void *perspective_malloc(int width, int height)
 {
-    int i;
-    for( i = 0; i < 3; i ++ ) { 
-        perspective_private_[i] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height+width));
-        if(!perspective_private_[i])
-            return 0;
-    }
-    veejay_memset( perspective_, 0, sizeof(perspective_));
-
-    return 1;
-}
-
-void perspective_free() {
-    int i;
-    for( i = 0; i < 3; i ++ ) { 
-        if( perspective_private_[i] )
-            free(perspective_private_[i] );
-        perspective_private_[i] = NULL;
+    perspective_t *p = (perspective_t*) vj_calloc( sizeof(perspective_t ));
+    if(!p) {
+        return NULL;
     }
 
-    if( perspective_vp_ )
-        viewport_destroy( perspective_vp_ );
-    perspective_vp_ = NULL;
+    p->perspective_private_[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8((width*height+width)*3));
+    if(!p->perspective_private_[0]) {
+        free(p);
+        return NULL;
+    }
+
+    p->perspective_private_[1] = p->perspective_private_[0] + RUP8( width * height + width );
+    p->perspective_private_[2] = p->perspective_private_[1] + RUP8( width * height + width );
+
+    return (void*) p;
 }
 
-void perspective_apply( VJFrame *frame, int x1, int y1, int x2, int y2,
-                       int x3, int y3, int x4, int y4, int reverse)
-{
+void perspective_free(void *ptr) {
+    perspective_t *p = (perspective_t*) ptr;
+
+    free(p->perspective_private_[0] );
+    viewport_destroy( p->perspective_vp_ );
+    free(p);
+}
+
+void perspective_apply( void *ptr, VJFrame *frame, int *args ) {
+    
+    int x1 = args[0];
+    int y1 = args[1];
+    int x2 = args[2];
+    int y2 = args[3];
+    int x3 = args[4];
+    int y3 = args[5];
+    int x4 = args[6];
+    int y4 = args[7];
+    int reverse = args[8];
+
+    perspective_t *p = (perspective_t*) ptr;
+
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;
     const int len = frame->len;
 
-    if( x1 != perspective_[0] || y1 != perspective_[1] || x2 != perspective_[2] || y2 != perspective_[3] ||
-            x3 != perspective_[4] || y3 != perspective_[5] || x4 != perspective_[6] || y4 != perspective_[7] || reverse != perspective_[8] )
+    if( x1 != p->perspective_[0] || y1 != p->perspective_[1] || x2 != p->perspective_[2] || y2 != p->perspective_[3] ||
+            x3 != p->perspective_[4] || y3 != p->perspective_[5] || x4 != p->perspective_[6] || y4 != p->perspective_[7] || reverse != p->perspective_[8] )
     {
-        if( perspective_vp_ )
-            viewport_destroy( perspective_vp_ );
-        perspective_vp_ = viewport_fx_init_map( width,height,x1,y1, x2,y2, x3,y3, x4,y4, reverse );
-        if(!perspective_vp_ )
+        if( p->perspective_vp_ )
+            viewport_destroy( p->perspective_vp_ );
+        p->perspective_vp_ = viewport_fx_init_map( width,height,x1,y1, x2,y2, x3,y3, x4,y4, reverse );
+        if(!p->perspective_vp_ )
             return;
-        perspective_[0] = x1;
-        perspective_[1] = y1;
-        perspective_[2] = x2;
-        perspective_[3] = y2;
-        perspective_[4] = x3;
-        perspective_[5] = y3;
-        perspective_[6] = x4;
-        perspective_[7] = y4;
-        perspective_[8] = reverse;
+        p->perspective_[0] = x1;
+        p->perspective_[1] = y1;
+        p->perspective_[2] = x2;
+        p->perspective_[3] = y2;
+        p->perspective_[4] = x3;
+        p->perspective_[5] = y3;
+        p->perspective_[6] = x4;
+        p->perspective_[7] = y4;
+        p->perspective_[8] = reverse;
     }
 
     int strides[4] = { len, len, len, 0 };
-    vj_frame_copy( frame->data, perspective_private_, strides );
+    vj_frame_copy( frame->data, p->perspective_private_, strides );
 
-    viewport_process_dynamic( perspective_vp_, perspective_private_, frame->data );
+    viewport_process_dynamic( p->perspective_vp_, p->perspective_private_, frame->data );
     
 }
 

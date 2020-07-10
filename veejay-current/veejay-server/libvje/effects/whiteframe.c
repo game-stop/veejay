@@ -39,7 +39,7 @@ vj_effect *whiteframe_init(int w,int h)
 }
 
 /* this method was created for magic motion */
-void whiteframe_apply( VJFrame *frame, VJFrame *frame2)
+void whiteframe_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
     unsigned int i;
     const int len = frame->len;
@@ -51,7 +51,7 @@ void whiteframe_apply( VJFrame *frame, VJFrame *frame2)
     uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-    /* look for white pixels in luminance channel and swap with yuv2 */
+    /* look for white pixels in luminance channel and swap with input B */
     for (i = 0; i < len; i++)
 	{
 		p = Y[i];

@@ -22,7 +22,9 @@
 #include <veejaycore/vjmem.h>
 #include "crosspixel.h"
 
-static uint8_t *cross_pixels[4] = { NULL,NULL,NULL, NULL};
+typedef struct {
+    uint8_t *cross_pixels[4];
+} crosspixel_t;
 
 vj_effect *crosspixel_init(int w, int h)
 {
@@ -51,29 +53,41 @@ vj_effect *crosspixel_init(int w, int h)
     return ve;
 }
 
-int crosspixel_malloc(int w, int h)
+void *crosspixel_malloc(int w, int h)
 {
+    crosspixel_t *c = (crosspixel_t*) vj_calloc(sizeof(crosspixel_t));
+    if(!c) {
+        return NULL;
+    }
+
     const int total_len = RUP8( w * h * 3 );
     const int len = RUP8(w * h);
 
-    cross_pixels[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len );
-    if(!cross_pixels[0])
-        return 0;
+    c->cross_pixels[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len );
+    if(!c->cross_pixels[0]) {
+        free(c);
+        return NULL;
+    }
 
-    cross_pixels[1] = cross_pixels[0] + len;
-    cross_pixels[2] = cross_pixels[1] + len;
+    c->cross_pixels[1] = c->cross_pixels[0] + len;
+    c->cross_pixels[2] = c->cross_pixels[1] + len;
 
-    return 1;
+    return (void*) c;
 }
 
-void crosspixel_free() {
+void crosspixel_free(void *ptr) {
     
-    if(cross_pixels[0])
-        free(cross_pixels[0]);
-    cross_pixels[0] = NULL;
+    crosspixel_t *c = (crosspixel_t*) ptr;
+    free(c->cross_pixels[0]);
+    free(c);
 }
 
-void crosspixel_apply(VJFrame *frame, int t,int v) {
+void crosspixel_apply(void *ptr, VJFrame *frame, int *args) {
+    int t = args[0];
+    int v = args[1];
+
+    crosspixel_t *c = (crosspixel_t*) ptr;
+
     unsigned int x,y,pos;
     const unsigned int vv = v * 2; // only even numbers 
     const unsigned int u_vv = vv >> frame->shift_h; // sfhit = / 2, shift_v = 2
@@ -89,6 +103,9 @@ void crosspixel_apply(VJFrame *frame, int t,int v) {
 	const unsigned int uv_height = frame->uv_height;
 
     unsigned int p = 0;
+
+    uint8_t **cross_pixels = c->cross_pixels;
+
    	int strides[4] = { len, uv_len, uv_len ,0};
 	vj_frame_copy( frame->data, cross_pixels, strides );
 

@@ -25,8 +25,10 @@
 #include <veejaycore/vjmem.h>
 #include "cutstop.h"
 
-static uint8_t *vvcutstop_buffer[4] = { NULL,NULL,NULL,NULL };
-static unsigned int frq_cnt = 0;
+typedef struct {
+    uint8_t *vvcutstop_buffer[4];
+    unsigned int frq_cnt;
+} cutstop_t;
 
 vj_effect *cutstop_init(int width , int height)
 {
@@ -57,54 +59,70 @@ vj_effect *cutstop_init(int width , int height)
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Frame freq", "Cut mode", "Hold front/back" );	
-	frq_cnt = 256;
 
     return ve;
 }
 
-int	cutstop_malloc(int width, int height)
+void *cutstop_malloc(int width, int height)
 {
-	int i;
-	for( i = 0; i < 3 ;i ++ ) {
-		vvcutstop_buffer[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8( width * height )); 
-		if(!vvcutstop_buffer[i] )
-			return 0;
-	}
-	veejay_memset( vvcutstop_buffer[0],0, width*height);
-	veejay_memset( vvcutstop_buffer[1],128,(width*height));
-	veejay_memset( vvcutstop_buffer[2],128,(width*height));
-	return 1;
+    cutstop_t *c = (cutstop_t*) vj_calloc(sizeof(cutstop_t));
+    if(!c) {
+        return NULL;
+    }
+
+    const int len = RUP8(width*height);
+    const int total_len = 3 * len;
+
+    c->vvcutstop_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len);
+    if(!c->vvcutstop_buffer[0]) {
+        free(c);
+        return NULL;
+    }
+
+    c->vvcutstop_buffer[1] = c->vvcutstop_buffer[0] + len;
+    c->vvcutstop_buffer[2] = c->vvcutstop_buffer[1] + len;
+
+	veejay_memset( c->vvcutstop_buffer[0], pixel_Y_lo_, width*height);
+	veejay_memset( c->vvcutstop_buffer[1],128,(width*height));
+	veejay_memset( c->vvcutstop_buffer[2],128,(width*height));
+
+    c->frq_cnt = 256;
+
+	return (void*) c;
 }
 
-void cutstop_free() {
-	int i;
-	for( i = 0; i < 3; i ++ ) {
-		if(vvcutstop_buffer[i]) 
-		  free(vvcutstop_buffer[i]);
-		vvcutstop_buffer[i] = NULL;
-	}
+void cutstop_free(void *ptr) {
+    cutstop_t *c = (cutstop_t*) ptr;
+    free(c->vvcutstop_buffer[0]);
+    free(c);
 }
 
 
-void cutstop_apply( VJFrame *frame, int threshold, int freq, int cutmode, int holdmode)
-{
+void cutstop_apply( void *ptr, VJFrame *frame, int *args) {
+    int threshold = args[0];
+    int freq = args[1];
+    int cutmode = args[2];
+    int holdmode = args[3];
+
+    cutstop_t *c = (cutstop_t*) ptr;
+
 	int i=0;
 	const int len = frame->len;
 
-	uint8_t *Yb = vvcutstop_buffer[0];
-	uint8_t *Ub = vvcutstop_buffer[1];
-	uint8_t *Vb = vvcutstop_buffer[2];
+	uint8_t *Yb = c->vvcutstop_buffer[0];
+	uint8_t *Ub = c->vvcutstop_buffer[1];
+	uint8_t *Vb = c->vvcutstop_buffer[2];
 	uint8_t *Yd = frame->data[0];
 	uint8_t *Ud = frame->data[1];
 	uint8_t *Vd = frame->data[2];
 	
-	frq_cnt = frq_cnt + freq;
+	c->frq_cnt = c->frq_cnt + freq;
 	
-	if (freq == 255 || frq_cnt > 255) {
+	if (freq == 255 || c->frq_cnt > 255) {
 		veejay_memcpy(Yb, Yd, len);
 		veejay_memcpy(Ub, Ud, len);
 		veejay_memcpy(Vb, Vd, len);
-		frq_cnt = 0;
+		c->frq_cnt = 0;
 	}	
 	// moved cutmode & holdmode outside loop	
 	if(cutmode && !holdmode)

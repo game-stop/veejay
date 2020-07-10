@@ -315,7 +315,7 @@ void	vj_event_sequencer_del_sample(		void *ptr, 	const char format[], 	va_list a
 void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap );
 void	vj_event_projection_inc( void *ptr, const char format[], va_list ap);
 void	vj_event_projection_dec( void *ptr, const char format[], va_list ap);
-
+void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap);
 void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap );
 
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap );
@@ -336,4 +336,6 @@ void	vj_event_connect_split_shm( void *ptr, const char format[], va_list ap );
 void	vj_event_get_sample_image(void *ptr,const char format[],va_list	ap	);
 void	vj_event_alpha_composite(void *ptr, const char format[], va_list ap );
 void	vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap);
+void    vj_event_set_transition(void *ptr, const char format[], va_list ap);
+
 #endif

@@ -21,7 +21,7 @@
 #ifndef NEIGHBOURS5_H
 #define NEIGHBOURS5_H
 vj_effect *neighbours5_init(int w, int h);
-int neighbours5_malloc(int w, int h);
-void neighbours5_free(void);
-void neighbours5_apply( VJFrame *frame, int radius,int brush_size, int level);
+void *neighbours5_malloc(int w, int h);
+void neighbours5_free(void *ptr);
+void neighbours5_apply( void *ptr, VJFrame *frame, int *args );
 #endif

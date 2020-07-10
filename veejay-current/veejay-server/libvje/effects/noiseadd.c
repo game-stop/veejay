@@ -22,7 +22,9 @@
 #include <veejaycore/vjmem.h>
 #include "noiseadd.h"
 
-static uint8_t *Yb_frame;
+typedef struct {
+    uint8_t *Yb_frame;
+} noiseadd_t;
 
 vj_effect *noiseadd_init(int width , int height)
 {
@@ -44,7 +46,6 @@ vj_effect *noiseadd_init(int width , int height)
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Amplification");
 
-
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
 	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
@@ -53,20 +54,27 @@ vj_effect *noiseadd_init(int width , int height)
     return ve;
 }
 
-int noiseadd_malloc(int width, int height)
+void *noiseadd_malloc(int width, int height)
 {
-  
-  Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * width * height);
-  if(!Yb_frame) return 0;
-  return 1;
+  noiseadd_t *n = (noiseadd_t*) vj_calloc(sizeof(noiseadd_t));
+  if(!n) {
+      return NULL;
+  }
+  n->Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * RUP8(width * height));
+  if(!n->Yb_frame) {
+      free(n);
+      return NULL;
+  }
+  return (void*) n;
 }
 
-void noiseadd_free() {
-  if(Yb_frame) free(Yb_frame);
-  Yb_frame = NULL;
+void noiseadd_free(void *ptr) {
+    noiseadd_t *n = (noiseadd_t*) ptr;
+    free(n->Yb_frame);
+    free(n);
 }
 
-static void noiseblur1x3_maskapply(VJFrame* frame, int coeef ) {
+static void noiseblur1x3_maskapply(uint8_t *Yb_frame, VJFrame* frame, int coeef ) {
 
     int r, c;
     double k = (coeef/100.0);
@@ -93,7 +101,7 @@ static void noiseblur1x3_maskapply(VJFrame* frame, int coeef ) {
 
 }
 
-static void noiseblur3x3_maskapply(VJFrame* frame, int coeef ) {
+static void noiseblur3x3_maskapply(uint8_t *Yb_frame, VJFrame* frame, int coeef ) {
 
     int r, c;
     const double k = (coeef/1000.0);
@@ -126,7 +134,7 @@ static void noiseblur3x3_maskapply(VJFrame* frame, int coeef ) {
 
 }
 
-static void noiseneg3x3_maskapply(VJFrame *frame, int coeef ) {
+static void noiseneg3x3_maskapply(uint8_t *Yb_frame, VJFrame *frame, int coeef ) {
 
     int r, c;
     const double k = (coeef/1000.0);
@@ -196,14 +204,18 @@ static void noiseadd3x3_maskapply(VJFrame *frame, int coeef ) {
 }
 */
 
-void noiseadd_apply( VJFrame *frame, int type, int coeef) {
+void noiseadd_apply( void *ptr, VJFrame *frame, int *args ) {
+    int type = args[0];
+    int coeef = args[1];
+
+    noiseadd_t *n = (noiseadd_t*) ptr;
 
 	switch(type) {
-	case 0:
-	noiseblur1x3_maskapply(frame, coeef);	break;
-	case 1:
-	noiseblur3x3_maskapply(frame, coeef);	break;
-	case 2:
-	noiseneg3x3_maskapply(frame, coeef);	 break;
+	    case 0:
+	        noiseblur1x3_maskapply(n->Yb_frame, frame, coeef);	break;
+	    case 1:
+	        noiseblur3x3_maskapply(n->Yb_frame, frame, coeef);	break;
+	    case 2:
+	        noiseneg3x3_maskapply(n->Yb_frame, frame, coeef);	 break;
 	}
 }
