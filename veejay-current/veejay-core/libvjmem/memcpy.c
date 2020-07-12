@@ -2102,14 +2102,89 @@ char	*vj_strndup( const char *s, size_t n )
 }
 
 
-char	*vj_sprintf( char *dst, int value )
-{
-	char number[16];
-	int n;
-	snprintf(number,sizeof(number),"%d", value);
-	n = strlen( number );
-	*dst = '\0';
-	strncat( dst, number, n );
-	return dst + n;
+static const char digit_pairs[201] = {
+  "00010203040506070809"
+  "10111213141516171819"
+  "20212223242526272829"
+  "30313233343536373839"
+  "40414243444546474849"
+  "50515253545556575859"
+  "60616263646566676869"
+  "70717273747576777879"
+  "80818283848586878889"
+  "90919293949596979899"
+};
+// https://stackoverflow.com/questions/4351371/c-performance-challenge-integer-to-stdstring-conversion
+// fast int to string function by user434507
+// modified to append a space at the end instead of null-terminator
+char *vj_sprintf(char* c, int n) {
+    int sign = -(n<0);
+    unsigned int val = (n^sign)-sign;
+
+    int size;
+    if(val>=10000) {
+        if(val>=10000000) {
+            if(val>=1000000000) {
+                size=10;
+            }
+            else if(val>=100000000) {
+                size=9;
+            }
+            else size=8;
+        }
+        else {
+            if(val>=1000000) {
+                size=7;
+            }
+            else if(val>=100000) {
+                size=6;
+            }
+            else size=5;
+        }
+    }
+    else {
+        if(val>=100) {
+            if(val>=1000) {
+                size=4;
+            }
+            else size=3;
+        }
+        else {
+            if(val>=10) {
+                size=2;
+            }
+            else if(n==0) {
+                c[0]='0';
+                c[1] = ' ';
+                return c + 2;
+            }
+            else size=1;
+        }
+    }
+    size -= sign;
+    if(sign)
+      *c='-';
+
+    c += size-1;
+    while(val>=100) {
+        int pos = val % 100;
+        val /= 100;
+        *(short*)(c-1)=*(short*)(digit_pairs+2*pos); 
+        c-=2;
+    }
+    while(val>0) {
+        *c--='0' + (val % 10);
+        val /= 10;
+    }
+    
+    if(sign) { 
+        c[size] = ' ';
+        return c + size + 1;
+    }
+    else {
+        c[size + 1] = ' ';
+    }
+
+    return c + size + 2;
 }
 

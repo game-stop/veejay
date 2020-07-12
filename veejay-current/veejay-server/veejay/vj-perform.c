@@ -2351,10 +2351,11 @@ static int clear_framebuffer__ = 0;
 
 static void vj_perform_sample_complete_buffers(veejay_t * info,performer_t *p, vjp_kf *effect_info, int *hint444, VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup)
 {
-    sample_eff_chain **chain = sample_get_effect_chain( sample_id );
-    if( chain == NULL )
+    sample_info *si = sample_get(sample_id);
+    if(si == NULL)
         return;
 
+    sample_eff_chain **chain = si->effect_chain;
     performer_global_t *g = (performer_global_t*) info->performer;
 
     int chain_entry;
@@ -2369,10 +2370,8 @@ static void vj_perform_sample_complete_buffers(veejay_t * info,performer_t *p, v
         }
     }
 
-    int subrender_entry = -1;
     for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
     {
-        int subrender = sample_get_subrender(sample_id, chain_entry, &subrender_entry);
         sample_eff_chain *fx_entry = chain[chain_entry];
         if(fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
             continue;
@@ -2386,17 +2385,18 @@ static void vj_perform_sample_complete_buffers(veejay_t * info,performer_t *p, v
                vje_get_subformat( fx_entry->effect_id )
         );
 
-        vj_perform_render_chain_entry(info,p,effect_info,sample_id,pm,fx_entry,chain_entry,frames,(subrender? subrender_entry: subrender));
+        vj_perform_render_chain_entry(info,p,effect_info,sample_id,pm,fx_entry,chain_entry,frames,(si->subrender? fx_entry->is_rendering: si->subrender));
     }
     *hint444 = frames[0]->ssm;
 }
 
 static void vj_perform_tag_complete_buffers(veejay_t * info, performer_t *p,vjp_kf *effect_info, int *hint444, VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup  )
 {
-    sample_eff_chain **chain = vj_tag_get_effect_chain( sample_id );
-    if( chain == NULL )
+    vj_tag *tag = vj_tag_get( sample_id );
+    if(tag == NULL)
         return;
-    
+
+    sample_eff_chain **chain = tag->effect_chain;
     performer_global_t *g = (performer_global_t*) info->performer;
     int chain_entry;
     VJFrame *frames[2];
@@ -2410,15 +2410,12 @@ static void vj_perform_tag_complete_buffers(veejay_t * info, performer_t *p,vjp_
         }
     }
 
-    int subrender_entry = -1;
     for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
     {
-        int subrender = vj_tag_get_subrender( sample_id, chain_entry, &subrender_entry );
         sample_eff_chain *fx_entry = chain[chain_entry];
         if(fx_entry->e_flag == 0 || fx_entry->effect_id <= 0)
             continue;
-
-        vj_perform_tag_render_chain_entry(info,p,effect_info,sample_id,pm,fx_entry,chain_entry,frames,(subrender ? subrender_entry : subrender));
+        vj_perform_tag_render_chain_entry(info,p,effect_info,sample_id,pm,fx_entry,chain_entry,frames,(tag->subrender ? fx_entry->is_rendering : tag->subrender));
     }
 
     *hint444 = frames[0]->ssm;

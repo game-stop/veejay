@@ -205,7 +205,7 @@ static int int_tag_compare(const void *key1, const void *key2)
 
 vj_tag *vj_tag_get(int id)
 {
-    if (id <= 0 || id > this_tag_id || TagHash == NULL) {
+    if (id <= 0 || id > this_tag_id) {
         return NULL;
     }
 #ifdef ARCH_X86_64
@@ -3806,45 +3806,48 @@ int vj_tag_sprint_status( int tag_id,int samples,int cache,int sa, int ca, int p
         e_s = tag->encoder_total_frames_recorded;
     }
 
-
     char *ptr = str;
-    ptr = vj_sprintf( ptr, pfps ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, frame ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, mode ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag_id ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->effect_toggle ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->color_r ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->color_g ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->color_b ); *ptr++ = ' ';
-    *ptr++ = '0'; *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, e_a ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, e_d ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, e_s ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, vj_tag_size() ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->source_type ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->n_frames ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->selected_entry ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, ts ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, cache ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, curfps ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, (int) lo ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, (int) hi ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, sa ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, ca ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, (int) tag->fader_val ); *ptr++ = ' ';
-    *ptr++ = '0'; *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, macro ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->subrender); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->fade_method); *ptr++ = ' '; 
-    ptr = vj_sprintf( ptr, tag->fade_entry ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->fade_alpha ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->loop_stat ); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->loop_stat_stop); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->transition_active); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->transition_length); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, tag->transition_shape); *ptr++ = ' ';
-    ptr = vj_sprintf( ptr, feedback ); *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, pfps ); 
+    ptr = vj_sprintf( ptr, frame );
+    ptr = vj_sprintf( ptr, mode );
+    ptr = vj_sprintf( ptr, tag_id );
+    ptr = vj_sprintf( ptr, tag->effect_toggle );
+    ptr = vj_sprintf( ptr, tag->color_r );
+    ptr = vj_sprintf( ptr, tag->color_g );
+    ptr = vj_sprintf( ptr, tag->color_b );
+    *ptr++ = '0';
+    *ptr++ = ' ';
+    
+    ptr = vj_sprintf( ptr, e_a );
+    ptr = vj_sprintf( ptr, e_d );
+    ptr = vj_sprintf( ptr, e_s );
+    ptr = vj_sprintf( ptr, vj_tag_size() );
+    ptr = vj_sprintf( ptr, tag->source_type ); 
+    ptr = vj_sprintf( ptr, tag->n_frames ); 
+    ptr = vj_sprintf( ptr, tag->selected_entry );
+    ptr = vj_sprintf( ptr, ts );
+    ptr = vj_sprintf( ptr, cache );
+    ptr = vj_sprintf( ptr, curfps );
+    ptr = vj_sprintf( ptr, (int) lo );
+    ptr = vj_sprintf( ptr, (int) hi );
+    ptr = vj_sprintf( ptr, sa );
+    ptr = vj_sprintf( ptr, ca );
+    ptr = vj_sprintf( ptr, (int) tag->fader_val );
+    *ptr++ = '0'; 
+    *ptr++ = ' ';
+    ptr = vj_sprintf( ptr, macro ); 
+    ptr = vj_sprintf( ptr, tag->subrender);
+    ptr = vj_sprintf( ptr, tag->fade_method);
+    ptr = vj_sprintf( ptr, tag->fade_entry );
+    ptr = vj_sprintf( ptr, tag->fade_alpha );
+    ptr = vj_sprintf( ptr, tag->loop_stat );
+    ptr = vj_sprintf( ptr, tag->loop_stat_stop);
+    ptr = vj_sprintf( ptr, tag->transition_active);
+    ptr = vj_sprintf( ptr, tag->transition_length);
+    ptr = vj_sprintf( ptr, tag->transition_shape);
+    ptr = vj_sprintf( ptr, feedback );
     ptr = vj_sprintf( ptr, samples );
+
     return 0;
 }
 

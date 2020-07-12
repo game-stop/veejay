@@ -1154,7 +1154,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 	int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES );
 	if(tags>0)
 		total_slots+=tags;
-   
+  
 	switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
 			cache_used = sample_cache_used(0);
