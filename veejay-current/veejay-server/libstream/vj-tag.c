@@ -214,13 +214,15 @@ vj_tag *vj_tag_get(int id)
     uint32_t tid = (uint32_t) id;
 #endif
 
-    if( tag_cache[ id ] == NULL ) {
-        hnode_t *tag_node = hash_lookup(TagHash, (void *) tid);
-        if (!tag_node) {
-            return NULL;
-        }
-        tag_cache[ id ] = hnode_get(tag_node);
+    if( tag_cache[ id ] != NULL )
+        return (vj_tag*) tag_cache[id];
+
+    hnode_t *tag_node = hash_lookup(TagHash, (void *) tid);
+    if (!tag_node) {
+        return NULL;
     }
+    tag_cache[ id ] = hnode_get(tag_node);
+    
     return (vj_tag*) tag_cache[id];
 }
 

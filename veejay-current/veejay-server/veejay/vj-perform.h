@@ -66,4 +66,12 @@ size_t	vj_perform_fx_chain_size();
 
 void	vj_perform_record_video_frame(veejay_t *info);
 
+int vj_perform_try_sequencer(veejay_t *info);
+
+int vj_perform_get_next_sequence_id(veejay_t *info, int *type, int current, int *new_current);
+
+void vj_perform_setup_transition(veejay_t *info, int next_sample_id, int next_type, int sample_id, int current_type );
+
+void    vj_perform_reset_transition(veejay_t *info);
+
 #endif

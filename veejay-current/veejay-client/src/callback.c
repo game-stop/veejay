@@ -2634,7 +2634,7 @@ void on_vims_bundles_activate (GtkMenuItem     *menuitem,
                                gpointer         user_data)
 {
     GtkWidget *vims_bundles_window = glade_xml_get_widget_(info->main_window, "vims_bundles");
-    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+// GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 //    gtk_window_set_transient_for (GTK_WINDOW(vims_bundles_window),GTK_WINDOW (mainw));
  //   gtk_window_set_keep_above( GTK_WINDOW(vims_bundles_window), TRUE );
 
@@ -2738,7 +2738,7 @@ void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
 	if(info->status_lock)
 		return;
 
-	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", get_nums("stream_length") );
+	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget ) ) );
 }
 
 int	on_curve_buttontime_clicked()
@@ -3767,77 +3767,79 @@ on_vims_messenger_clear_clicked( GtkButton *togglebutton, gpointer user_data)
 	clear_textview_buffer( "vims_messenger_textview");
 }
 
-static void set_transition()
+static void set_transition(int active, int shape, int length)
 {
+    if(info->status_lock)
+        return;
+
     multi_vims(
             VIMS_SET_TRANSITION,
             "%d %d %d %d %d",
             info->status_tokens[PLAY_MODE],
             info->status_tokens[CURRENT_ID],
-            is_button_toggled( "transition_active" ),
-            get_nums( "transition_shape" ),
-            get_nums( "transition_length" )
-            );
+            active, 
+            shape,
+            length );
+
 }
 
 void
 transition_length_value_changed( GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
-        return;
-    set_transition();
+    set_transition(
+            info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
+            info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
+            (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) )
+            );
 }
 
 void
 transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
-        return;
-    set_transition();
+    set_transition(
+            info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
+            (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ),
+            info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
+            );
 }
 
 void
 transition_set_active( GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
-        return;
-    set_transition();
-}
-
-static void tag_set_transition()
-{
-    multi_vims(
-            VIMS_SET_TRANSITION,
-            "%d %d %d %d %d",
-            info->status_tokens[PLAY_MODE],
-            info->status_tokens[CURRENT_ID],
-            is_button_toggled( "tag_transition_active" ),
-            get_nums( "tag_transition_shape" ),
-            get_nums( "tag_transition_length" )
+    set_transition(
+            gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ),
+            info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
+            info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
             );
 }
 
 void
 on_tag_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
-        return;
-    tag_set_transition();
+     set_transition(
+            info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
+            info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
+            (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) )
+            );
 }
 
 void
 on_tag_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
-        return;
-    tag_set_transition();
+    set_transition(
+            info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
+            (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ),
+            info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
+            );
 }
 
 void on_tag_transition_active_toggled( GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock)
-        return;
-    tag_set_transition();
+    set_transition(
+            gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ),
+            info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
+            info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
+            );
 }
 
 void

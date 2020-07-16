@@ -4105,18 +4105,6 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
         gint speed = info->status_tokens[SAMPLE_SPEED];
 
-        if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
-            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
-        }
-
-        if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH]) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
-        }
-
-        if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
-        }
-
         if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
         {
             speed = info->status_tokens[SAMPLE_SPEED];
@@ -4141,12 +4129,13 @@ static void update_current_slot(int *history, int pm, int last_pm)
             update_slider_value("slow_slider", info->status_tokens[FRAME_DUP],0);
         }
 
-        /* veejay keeps sample limits , dont use update_spin_range for spin_samplestart and spin_sampleend */
-        if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] || get_nums("spin_samplestart") != info->status_tokens[SAMPLE_START]))
+        if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] || 
+                    (int) gtk_spin_button_get_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART])) != info->status_tokens[SAMPLE_START]))
         {
             update = 1;
         }
-        if( (history[SAMPLE_END] != info->status_tokens[SAMPLE_END] || get_nums("spin_sampleend") != info->status_tokens[SAMPLE_END]) )
+        if( (history[SAMPLE_END] != info->status_tokens[SAMPLE_END] || 
+                    (int) gtk_spin_button_get_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND])) != info->status_tokens[SAMPLE_END]) )
         {
             update = 1;
         }
@@ -4180,7 +4169,7 @@ static void update_current_slot(int *history, int pm, int last_pm)
             speed = info->status_tokens[SAMPLE_SPEED];
             if(speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 
-            gint len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
+            gint len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START] + 1;
 
             int speed = info->status_tokens[SAMPLE_SPEED];
             if(speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
@@ -4191,6 +4180,9 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
             gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART]), (gdouble) info->status_tokens[SAMPLE_START] );
             gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]), (gdouble) info->status_tokens[SAMPLE_END]);
+
+            update_spin_range2( widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH], 1,
+                    info->status_tokens[SAMPLE_END], info->status_tokens[SAMPLE_TRANSITION_LENGTH] );
 
             timeline_set_length( info->tl,
                 (gdouble) info->status_tokens[SAMPLE_END], 
@@ -4204,18 +4196,30 @@ static void update_current_slot(int *history, int pm, int last_pm)
     }
 
     if( pm == MODE_STREAM ) {
-         if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
+        if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
             gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
         }
         
         if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH]) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH]), info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
         }
 
         if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE]), info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+        }
+    }
+    else if ( pm == MODE_SAMPLE ) {
+        if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+        }
+        
+        if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH] ) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
         }
 
+        if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE] ) {
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+        }
     }
 
     if( pm == MODE_SAMPLE || pm == MODE_STREAM ) {
@@ -7483,6 +7487,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_STREAM_LENGTH] ), (gdouble) info->status_tokens[SAMPLE_MARKER_END]);
 
             gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_STREAM_LENGTH_LABEL] ), time );
+
+            update_spin_range2( widget_cache[WIDGET_STREAM_TRANSITION_LENGTH], 1, info->status_tokens[SAMPLE_MARKER_END], info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
         }
 
         if( pm != MODE_SAMPLE) {

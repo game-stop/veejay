@@ -3878,6 +3878,9 @@ void vj_event_set_transition(void *ptr, const char format[], va_list ap)
         vj_tag_set_transition_active( sample_id, transition_active );
     }
 
+
+    veejay_msg(VEEJAY_MSG_DEBUG,"Sample %d set transition active %d, shape %d, length %d",
+            sample_id, transition_active, transition_shape, transition_length );
 }
 
 void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap) 
@@ -10432,15 +10435,26 @@ void    vj_event_sample_sequencer_active(   void *ptr,  const char format[],    
     {
         v->seq->active = 0;
         v->seq->current = 0;
-	veejay_reset_sample_positions( v, -1 );
+        vj_perform_reset_transition(v);
+    	veejay_reset_sample_positions( v, -1 );
         veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer disabled");
     }
     else 
     {
-        v->seq->active = 1;
-	v->seq->current = 0;
-	veejay_reset_sample_positions( v, -1 );
-        veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer enabled");
+        v->seq->current = 0;
+
+        int next_type = 0;
+        int next_sample_id = vj_perform_get_next_sequence_id(v, &next_type, 0, &(v->seq->current) );
+    
+        if( next_sample_id > 0 ) {
+            v->seq->active = 1;
+            veejay_reset_sample_positions( v, -1 );
+            veejay_change_playback_mode(v, (next_type == VJ_PLAYBACK_MODE_SAMPLE ? VJ_PLAYBACK_MODE_SAMPLE: VJ_PLAYBACK_MODE_TAG ), next_sample_id );
+            veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer enabled");
+        }
+        else {
+            veejay_msg(VEEJAY_MSG_ERROR,"Sample sequencer is empty");
+        }
     }
 }
 

@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.36.0 -->
+<!-- Generated with glade 3.22.1 -->
 <interface>
   <requires lib="gtk+" version="3.16"/>
   <object class="GtkWindow">
     <property name="can_focus">False</property>
-    <child>
+    <child type="titlebar">
       <placeholder/>
     </child>
-    <child type="titlebar">
+    <child>
       <placeholder/>
     </child>
   </object>
   <object class="GtkApplicationWindow">
     <property name="can_focus">False</property>
-    <child>
+    <child type="titlebar">
       <placeholder/>
     </child>
-    <child type="titlebar">
+    <child>
       <placeholder/>
     </child>
   </object>
@@ -142,6 +142,9 @@
     <property name="destroy_with_parent">True</property>
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_generator_window_delete_event" swapped="no"/>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <child>
       <object class="GtkFrame" id="frame_generator">
         <property name="visible">True</property>
@@ -189,6 +192,12 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
@@ -1662,9 +1671,6 @@
         </child>
       </object>
     </child>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -1716,6 +1722,9 @@
     <property name="title" translatable="yes">Image Calibration</property>
     <property name="destroy_with_parent">True</property>
     <signal name="delete-event" handler="on_calibration_window_delete_event" swapped="no"/>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <child>
       <object class="GtkBox" id="vbox637">
         <property name="visible">True</property>
@@ -1834,7 +1843,7 @@
                       <object class="GtkAlignment" id="alignment556">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="xalign">0,97000002861022949219</property>
+                        <property name="xalign">0</property>
                         <property name="xscale">0</property>
                         <property name="left_padding">12</property>
                         <child>
@@ -1922,7 +1931,7 @@
                       <object class="GtkAlignment" id="alignment558">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="xalign">0,97000002861022949219</property>
+                        <property name="xalign">0</property>
                         <property name="xscale">0</property>
                         <property name="left_padding">12</property>
                         <child>
@@ -2012,7 +2021,7 @@
                           <object class="GtkAlignment" id="alignment559">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="xalign">0,97000002861022949219</property>
+                            <property name="xalign">0</property>
                             <property name="xscale">0</property>
                             <property name="left_padding">12</property>
                             <child>
@@ -2269,7 +2278,7 @@
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
                                         <property name="yalign">0</property>
-                                        <property name="yscale">0,43999999761581420898</property>
+                                        <property name="yscale">0</property>
                                         <property name="left_padding">12</property>
                                         <child>
                                           <object class="GtkBox" id="vbox641">
@@ -2431,7 +2440,7 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="xalign">0</property>
-                    <property name="yalign">0,00999999977648258209</property>
+                    <property name="yalign">0</property>
                     <property name="left_padding">133</property>
                     <property name="right_padding">132</property>
                     <child>
@@ -2506,9 +2515,6 @@
         </child>
       </object>
     </child>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -2558,6 +2564,9 @@
     <property name="default_height">400</property>
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_inputstream_window_delete_event" swapped="no"/>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <child>
       <object class="GtkFrame" id="frame161">
         <property name="width_request">340</property>
@@ -2919,9 +2928,6 @@
         </child>
       </object>
     </child>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -2933,6 +2939,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_veejay_connection_close" swapped="no"/>
     <signal name="delete-event" handler="on_veejay_connection_close" swapped="no"/>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox3">
         <property name="visible">True</property>
@@ -3173,9 +3182,6 @@
     <action-widgets>
       <action-widget response="-7">veejay_connection_close</action-widget>
     </action-widgets>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -3339,6 +3345,13 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="transition_lengt">
+    <property name="upper">1000000</property>
+    <property name="lower">0</property>
+    <property name="value">0</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
   <object class="GtkAdjustment" id="transition_shap">
     <property name="lower">-1</property>
     <property name="upper">100</property>
@@ -3422,6 +3435,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_video_options_close" swapped="no"/>
     <signal name="delete-event" handler="on_video_options_close" swapped="no"/>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="vbox_video_options">
         <property name="visible">True</property>
@@ -4275,9 +4291,6 @@
     <action-widgets>
       <action-widget response="-7">button117</action-widget>
     </action-widgets>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -4291,6 +4304,9 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_vims_bundles_close" swapped="no"/>
     <signal name="delete-event" handler="on_vims_bundles_close" swapped="no"/>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox5">
         <property name="visible">True</property>
@@ -4664,9 +4680,6 @@
     <action-widgets>
       <action-widget response="-7">vims_bundles_close</action-widget>
     </action-widgets>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -4690,6 +4703,9 @@
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Reloaded</property>
     <property name="icon">veejay-icon.png</property>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <child>
       <object class="GtkBox" id="veejay_box">
         <property name="visible">True</property>
@@ -5162,7 +5178,7 @@
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
                                         <property name="width_chars">20</property>
-                                        <property name="xalign">0,10000000149011611938</property>
+                                        <property name="xalign">0</property>
                                       </object>
                                       <packing>
                                         <property name="expand">True</property>
@@ -5185,8 +5201,8 @@
                                           <object class="GtkImage" id="image3514">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="xalign">0,50000000000000000000</property>
-                                            <property name="yalign">0,50000000000000000000</property>
+                                            <property name="xalign">0</property>
+                                            <property name="yalign">0</property>
                                             <property name="xpad">0</property>
                                             <property name="ypad">0</property>
                                             <property name="pixbuf">icon_follow.png</property>
@@ -5230,8 +5246,8 @@
                                           <object class="GtkImage" id="image3515">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="xalign">0,50000000000000000000</property>
-                                            <property name="yalign">0,50000000000000000000</property>
+                                            <property name="xalign">0</property>
+                                            <property name="yalign">0</property>
                                             <property name="xpad">0</property>
                                             <property name="ypad">0</property>
                                             <property name="pixbuf">icon_render.png</property>
@@ -5278,7 +5294,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -5423,7 +5439,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -5567,7 +5583,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -5713,7 +5729,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -5857,7 +5873,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -6001,7 +6017,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -6145,7 +6161,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -6289,7 +6305,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -6433,7 +6449,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -6579,7 +6595,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -6723,7 +6739,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -6867,7 +6883,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -7011,7 +7027,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -7155,7 +7171,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -7299,7 +7315,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -7447,7 +7463,7 @@
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="angle">90</property>
-                                                    <property name="yalign">0,94999998807907104492</property>
+                                                    <property name="yalign">0</property>
                                                     <style>
                                                       <class name="p_label"/>
                                                     </style>
@@ -8940,7 +8956,7 @@
                                                           <object class="GtkProgressBar" id="rec_seq_progress">
                                                             <property name="visible">True</property>
                                                             <property name="can_focus">False</property>
-                                                            <property name="pulse_step">0,10000000149000000393</property>
+                                                            <property name="pulse_step">0</property>
                                                           </object>
                                                         </child>
                                                       </object>
@@ -9206,7 +9222,7 @@
                           <object class="GtkFrame" id="syncframe">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="label_xalign">0,50000000000000000000</property>
+                            <property name="label_xalign">0</property>
                             <child>
                               <object class="GtkBox" id="hbox877">
                                 <property name="visible">True</property>
@@ -11115,7 +11131,7 @@
                                       <object class="GtkProgressBar" id="samplerecord_progress">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
-                                        <property name="pulse_step">0,10000000149000000393</property>
+                                        <property name="pulse_step">0</property>
                                       </object>
                                     </child>
                                     <child type="label">
@@ -11448,11 +11464,11 @@
                                         </child>
                                         <child>
                                           <object class="GtkSpinButton" id="transition_length">
-                                            <property name="name">transition_lenghth</property>
+                                            <property name="name">transition_length</property>
                                             <property name="width_request">200</property>
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
-                                            <property name="adjustment">start_pos</property>
+                                            <property name="adjustment">transition_lengt</property>
                                             <signal name="value-changed" handler="transition_length_value_changed" swapped="no"/>
                                           </object>
                                           <packing>
@@ -12742,12 +12758,12 @@
                                             </child>
                                             <child>
                                               <object class="GtkSpinButton" id="tag_transition_length">
-                                                <property name="name">transition_lenghth</property>
+                                                <property name="name">transition_length</property>
                                                 <property name="width_request">200</property>
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="text" translatable="yes">0</property>
-                                                <property name="adjustment">start_pos</property>
+                                                <property name="adjustment">transition_lengt</property>
                                                 <signal name="value-changed" handler="on_tag_transition_length_value_changed" swapped="no"/>
                                               </object>
                                               <packing>
@@ -14924,7 +14940,7 @@
                                       <object class="GtkProgressBar" id="streamrecord_progress">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
-                                        <property name="pulse_step">0,10000000149000000393</property>
+                                        <property name="pulse_step">0</property>
                                       </object>
                                     </child>
                                   </object>
@@ -15227,7 +15243,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="margin_left">8</property>
                                 <property name="label" translatable="yes">Frame position</property>
                                 <property name="xalign">0</property>
-                                <property name="yalign">0,50000000000000000000</property>
+                                <property name="yalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -15241,7 +15257,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="margin_left">8</property>
                                 <property name="label" translatable="yes">Dup position</property>
                                 <property name="xalign">0</property>
-                                <property name="yalign">0,50000000000000000000</property>
+                                <property name="yalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -15255,7 +15271,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="margin_left">8</property>
                                 <property name="label" translatable="yes">Loop position</property>
                                 <property name="xalign">0</property>
-                                <property name="yalign">0,50000000000000000000</property>
+                                <property name="yalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -15314,7 +15330,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                 <property name="margin_left">8</property>
                                 <property name="label" translatable="yes">VIMS message</property>
                                 <property name="xalign">0</property>
-                                <property name="yalign">0,50000000000000000000</property>
+                                <property name="yalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -16176,7 +16192,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                             <property name="tooltip_text" translatable="yes">Elapsed loops</property>
                                             <property name="label" translatable="yes">0</property>
                                             <property name="xalign">0</property>
-                                            <property name="yalign">0,50000000000000000000</property>
+                                            <property name="yalign">0</property>
                                           </object>
                                           <packing>
                                             <property name="expand">False</property>
@@ -16192,7 +16208,7 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
                                             <property name="tooltip_text" translatable="yes">Loop stop boundary (0=no stop)</property>
                                             <property name="label" translatable="yes">0</property>
                                             <property name="xalign">0</property>
-                                            <property name="yalign">0,50000000000000000000</property>
+                                            <property name="yalign">0</property>
                                           </object>
                                           <packing>
                                             <property name="expand">False</property>
@@ -19280,9 +19296,6 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
           </packing>
         </child>
       </object>
-    </child>
-    <child type="titlebar">
-      <placeholder/>
     </child>
     <style>
       <class name="reloaded"/>
