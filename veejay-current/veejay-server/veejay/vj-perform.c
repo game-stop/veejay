@@ -3704,15 +3704,6 @@ int vj_perform_transition_sample( veejay_t *info, VJFrame *srcA, VJFrame *srcB )
     return 1;
 }
 
-/*
- *
- *     if(info->uc->take_bg==1 ) //FIXME implement functionailty to snapshot a frame as bg
-    {
-        info->uc->take_bg = vj_perform_take_bg(info,&frame);
-    } 
-
-    */
-
 static void vj_perform_queue_fx_entry( veejay_t *info, int sample_id, int entry_id, sample_eff_chain *entry, performer_t *p, VJFrame *a, VJFrame *b,const int is_sample, int *alpha_clear )
 {
     if( entry->clear && b->stride[3] > 0 ) {

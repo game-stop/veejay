@@ -81,9 +81,6 @@ int bgpush_prepare(void *ptr, VJFrame *frame )
 	veejay_memcpy( b->frame_ptr[1], frame->data[1], uv_len );
 	veejay_memcpy( b->frame_ptr[2], frame->data[2], uv_len );
 
-	if( frame->stride[3] > 0 )
-		veejay_memcpy( b->frame_ptr[3], frame->data[3], frame->len );
-
 	if( frame->ssm == 0 ) {
 		chroma_supersample( SSM_422_444, frame, b->frame_ptr );
 	}

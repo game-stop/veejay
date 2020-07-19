@@ -280,6 +280,7 @@ void    vje_set_bg(VJFrame *bg)
     else {
         if(vj_fx_bg->data[0]) {
             free(vj_fx_bg->data[0]);
+            vj_fx_bg->data[0] = NULL;
         }
     }
 

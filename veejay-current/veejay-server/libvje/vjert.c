@@ -140,6 +140,9 @@ void vjert_update( void *ptr, VJFrame *frame )
 {
     sample_eff_chain **chain = (sample_eff_chain**) ptr;
     int i;
+
+    vje_set_bg(frame);
+
     for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
         sample_eff_chain *entry = chain[i];
         if(entry->fx_instance) {
