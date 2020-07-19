@@ -4613,38 +4613,6 @@ void    vj_event_all_samples_chain_toggle(void *ptr, const char format[], va_lis
     }
 }
 
-void vj_event_sample_chain_transition(void *ptr, const char format[], va_list ap)
-{
-    veejay_t *v = (veejay_t*) ptr;
-    int args[4];
-    P_A(args,sizeof(args),NULL,0,format,ap);
-
-    if(SAMPLE_PLAYING(v)) {
-        SAMPLE_DEFAULTS(args[0]);
-	
-        if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
-
-    	int ok = sample_chain_entry_set_transition_stop( args[0], args[1], args[2],args[3], v->settings->current_frame_num );
-    	if(!ok) {
-    		veejay_msg(VEEJAY_MSG_ERROR, "Failed to configure transition at entry %d of sample %d", args[1],args[0]);
-    	}
-    	else {
-	    	veejay_msg(VEEJAY_MSG_INFO,"Transition configured at entry %d of sample %d",args[1],args[0]);
-	    }
-    }
-    if(STREAM_PLAYING(v)) {
-        STREAM_DEFAULTS(args[0]);
-        if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
-    	int ok = vj_tag_chain_entry_set_transition_stop( args[0], args[1], args[2],args[3], v->settings->current_frame_num );
-    	if(!ok) {
-    		veejay_msg(VEEJAY_MSG_ERROR, "Failed to configure transition at entry %d of stream %d", args[1],args[0]);
-    	}
-    	else {
-	    	veejay_msg(VEEJAY_MSG_INFO,"Transition configured at entry %d of stream %d",args[1],args[0]);
-	    }
-    }
-}
-
 void vj_event_tag_chain_enable(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -8716,7 +8684,6 @@ void    vj_event_send_chain_entry       (   void *ptr,  const char format[],    
             int transition_enabled = 0;
             int transition_loop = 0;
             int subrender_entry = sample_entry_is_rendering(args[0],args[1]);
-            sample_chain_entry_get_transition(args[0],args[1], &transition_enabled,&transition_loop);
 
             for(p = 0 ; p < num_params; p++)
                 params[p] = sample_get_effect_arg(args[0],args[1],p);
@@ -8773,7 +8740,6 @@ void    vj_event_send_chain_entry       (   void *ptr,  const char format[],    
             int transition_enabled = 0;
             int transition_loop = 0;
             int subrender_entry = vj_tag_entry_is_rendering(args[0],args[1]);
-            vj_tag_chain_entry_get_transition(args[0],args[1], &transition_enabled,&transition_loop);
 
             for(p = 0 ; p < num_params; p++)
                 params[p] = vj_tag_get_effect_arg(args[0],args[1],p);

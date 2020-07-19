@@ -1212,7 +1212,34 @@ int sample_set_resume(int s1,long position)
     sample_info *sample = sample_get(s1);
     if(!sample)
         return -1;
-    sample->resume_pos = position;
+
+    if(position == -1) {
+        int start = sample_get_startFrame(s1);
+        int end = sample_get_endFrame(s1);
+
+        if( sample->speed < 0) {
+            if(sample->resume_pos <= start) {
+                sample->speed = sample->speed * -1;
+                sample->resume_pos = start;
+            }
+            else {
+                sample->resume_pos = end;
+            }
+        }
+        else if(sample->speed >= 0) {
+            if(sample->resume_pos >= end) {
+                sample->speed = sample->speed * -1;
+                sample->resume_pos = end;
+            }
+            else {
+                sample->resume_pos = start;
+            }
+        }
+        sample->loop_pp = 0;
+    }
+    else {
+        sample->resume_pos = position;
+    }
     return 1;
 }
 long    sample_get_resume(int s1)
@@ -1767,7 +1794,8 @@ void sample_set_loop_stats(int s1, int loops) {
 
 int	sample_get_loops(int s1) {
 	sample_info *sample = sample_get(s1);
-		if (!sample) return 0;
+	if (!sample) return 0;
+
 	return sample->loops;
 }
 
@@ -1776,12 +1804,7 @@ void sample_set_loops(int s1, int loops) {
 	if(!sample) return;
 	if(loops==-1) {
         int lss = sample->loop_stat_stop;
-		if(sample->looptype == 2) {
-			sample->loops = (lss > 0 ? lss * 2: 2);
-		}
-		else {
-			sample->loops = (lss > 0 ? lss : 1);
-		}
+		sample->loops = (lss > 0 ? lss: 0);
 		return;
 	}
 	sample->loops = loops;
@@ -1791,11 +1814,46 @@ int	sample_loop_dec(int s1)
 {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return 0;
-	if(sample->loops > 0)
-		sample->loops --;
-	return sample->loops;	
+    
+    if(sample->looptype == 2)
+    {
+        sample->loop_pp = (sample->loop_pp + 1 ) % 2;
+        if( sample->loop_pp == 1 ) {
+            return 0;
+        }
+    }
+
+    if(sample->loops > 0 ) {
+	    sample->loops --;
+    }
+
+    return (sample->loops == 0 ? 1: 0);
 }
 
+int sample_at_next_loop(int s1)
+{
+    sample_info *sample = sample_get(s1);
+    if(!sample)
+        return 0;
+
+    int pp = sample->loop_pp;
+    int lo = sample->loops;
+
+    if(sample->looptype == 2) {
+        pp = ( pp + 1 ) % 2;
+        if( pp == 1 )
+            return 0;
+    }
+
+    if( lo > 0 ) {
+        lo --;
+    }
+
+    return (lo == 0 ? 1: 0);
+}
+
+
+#define DEFAULT_TRANSITION_LENGTH 25
 int sample_get_transition_shape(int s1) {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return 0;
@@ -1815,7 +1873,6 @@ int sample_get_transition_length(int s1) {
             transition_length = sample->last_frame - sample->first_frame;
     }
 
-
     return transition_length;
 }
 
@@ -1829,6 +1886,11 @@ void sample_set_transition_length(int s1, int length) {
     sample_info *sample = sample_get(s1);
 	if(!sample) return;
     int transition_length = length;
+    
+    if(transition_length <= 0) {
+        transition_length = DEFAULT_TRANSITION_LENGTH;
+    }
+
     if (sample->marker_end > 0 && sample->marker_start >= 0) {
         if( transition_length > ( sample->marker_end - sample->marker_start ) )
             transition_length = sample->marker_end - sample->marker_start;
@@ -1837,7 +1899,6 @@ void sample_set_transition_length(int s1, int length) {
         if( transition_length > ( sample->last_frame - sample->first_frame ) ) 
             transition_length = sample->last_frame - sample->first_frame;
     }
-
     sample->transition_length = transition_length;
 }
 
@@ -1852,10 +1913,8 @@ void sample_set_transition_active(int s1, int status) {
     if(!sample) return;
     sample->transition_active = status;
 
-    if( sample->transition_active == 1 ) {
-        if( sample->transition_length <= 0 ) {
-            sample_set_transition_length( s1, 25 );
-        }
+    if( sample->transition_length <= 0 ) {
+        sample_set_transition_length( s1, 0);
     }
 }
 
@@ -1874,12 +1933,14 @@ int sample_set_speed(int s1, int speed)
     int len = sample->last_frame -
             sample->first_frame;
     if( (speed < -(MAX_SPEED) ) || (speed > MAX_SPEED))
-    return -1;
+        return -1;
     if( speed > len )
-    return -1;
+        return -1;
     if( speed < -(len))
-    return -1;
+        return -1;
+    
     sample->speed = speed;
+
     return 1;
 }
 int sample_set_framedups(int s1, int n) {
@@ -1933,14 +1994,6 @@ int sample_set_looptype(int s1, int looptype)
 
     if( looptype >= 0 && looptype < 5 ) {
         sample->looptype = looptype;
-
-		if(looptype == 2) {
-			sample->loops = 2;
-		}
-		else {
-			sample->loops = 1;
-		}
-
         return 1;
     }
     return 0;
@@ -2279,8 +2332,6 @@ int sample_chain_add(int s1, int c, int effect_nr)
     if(!vje_is_valid(effect_nr))
         return 0;
 
-    veejay_memset( &(sample->effect_chain[c]->transition), 0 ,sizeof(transition_eff));
-
     if( sample->effect_chain[c]->effect_id == -1 ) {
         sample->effect_chain[c]->effect_id = effect_nr;
     }
@@ -2472,11 +2523,8 @@ int sample_chain_clear(int s1)
 
         sample->effect_chain[i]->source_type = 0;
         sample->effect_chain[i]->channel = s1;
-		sample->effect_chain[i]->transition.enabled = 0;
-		sample->effect_chain[i]->transition.at_loop = 0;
         for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
             sample->effect_chain[i]->arg[j] = 0;
-			sample->effect_chain[i]->transition.args[j] = 0;
 		}
     }
 
@@ -2577,12 +2625,9 @@ int sample_chain_remove(int s1, int position)
 
     sample->effect_chain[position]->source_type = 0;
     sample->effect_chain[position]->channel = 0;
-	sample->effect_chain[position]->transition.enabled = 0;
-	sample->effect_chain[position]->transition.at_loop = 0;
 
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
         sample->effect_chain[position]->arg[j] = 0;
-		sample->effect_chain[position]->transition.args[j] = 0;
 	}
 
     if( position == sample->fade_entry )
@@ -2630,97 +2675,6 @@ int sample_set_editlist(int s1, editlist *edl)
     sample->edit_list = edl;
     sample->soft_edl = 1;
     return 1;
-}
-
-int sample_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop_at, int frame_pos) {
-	sample_info *sample = sample_get(s1);
-	if(!sample)
-		return 0;
-
-	if( sample->effect_chain[entry]->effect_id <= 0 ) 
-		return 0;
-
-	int arg_len = 0;
-    int is_mixer = 0;
-    int rgb = 0;
-	vje_get_info( sample->effect_chain[entry]->effect_id, &is_mixer, &arg_len, &rgb );
-
-	if(!is_mixer || arg_len <= 0)
-		return 0;
-
-	if( enabled == 1 ) {
-		if( sample_get_all_effect_arg( s1, entry, sample->effect_chain[entry]->transition.args, arg_len, frame_pos ) == -1 )
-			return 0;
-
-		sample->effect_chain[entry]->transition.enabled = 1;
-	}
-	else {
-		for( int i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) {
-			sample->effect_chain[entry]->transition.args[i] = 0;
-		}
-		sample->effect_chain[entry]->transition.enabled = 0;
-	}
-	sample->effect_chain[entry]->transition.at_loop = loop_at;
-
-	return 1;
-}
-
-void sample_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype)
-{
-    sample_info *sample = sample_get(s1);
-    *enabled =  sample->effect_chain[entry]->transition.enabled;
-    *looptype =  sample->effect_chain[entry]->transition.at_loop;
-}
-
-int sample_chain_entry_transition_now(int s1, int entry, int *type) {
-	sample_info *sample = sample_get(s1);
-	if(!sample) 
-			return 0;
-	
-	if( sample->effect_chain[entry]->effect_id <= 0 )
-			return 0;
-
-	int arg_len = 0;
-    int is_mixer = 0;
-    int rgb = 0;
-    vje_get_info( sample->effect_chain[entry]->effect_id, &is_mixer, &arg_len, &rgb );
-
-	if( is_mixer == 0 || arg_len == 0 )
-			return 0;
-
-	if( sample->effect_chain[entry]->transition.enabled == 0 )
-			return 0;
-
-	// These type of FX know when the transition is done 
-	int state = vje_fx_is_transition_ready(
-				sample->effect_chain[entry]->effect_id,
-                sample->effect_chain[entry]->fx_instance,
-				__sample_project_settings.width,
-				__sample_project_settings.height );
-	if(state == TRANSITION_COMPLETED) {
-		if( sample->loop_stat < sample->effect_chain[entry]->transition.at_loop )
-				return 0;
-
-        sample->effect_chain[entry]->transition.enabled = 0; // Turn off transition when completed
-
-		*type = sample->effect_chain[entry]->source_type;
-		return sample->effect_chain[entry]->channel;
-	} else if(state == TRANSITION_RUNNING) {
-		return 0;
-	}
-
-	// Any other FX, the user can define the transition by defining parameter values
-	for( int i = 0;i < arg_len; i ++ ) {
-		if( sample->effect_chain[entry]->arg[i] < sample->effect_chain[entry]->transition.args[i] ) {
-			return 0;
-		}
-	}
-
-	if( sample->loop_stat < sample->effect_chain[entry]->transition.at_loop )
-			return 0;
-
-	*type = sample->effect_chain[entry]->source_type;
-	return sample->effect_chain[entry]->channel;
 }
 
 /* print sample status information into an allocated string str*/

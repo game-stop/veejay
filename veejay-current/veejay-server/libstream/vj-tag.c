@@ -797,6 +797,10 @@ void vj_tag_set_transition_length(int t1, int length)
     if(!tag) return;
 
     int transition_length = length;
+    if( transition_length <= 0 ) {
+        transition_length = 25;
+    }
+
     if( transition_length > tag->n_frames ) {
         transition_length = tag->n_frames;
     }
@@ -2180,8 +2184,6 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
         return 0;
     }
 
-	veejay_memset( &(tag->effect_chain[position]->transition), 0 ,sizeof(transition_eff));
-
     if( tag->effect_chain[position]->effect_id == -1 ) {
         tag->effect_chain[position]->effect_id = effect_id;
     }
@@ -2223,98 +2225,6 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
         }
     }
     return 1;
-}
-
-int vj_tag_chain_entry_set_transition_stop(int t1, int entry, int enabled, int loop_at, int frame_pos) {
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag)
-		return 0;
-
-	if( tag->effect_chain[entry]->effect_id <= 0 ) 
-		return 0;
-
-	int arg_len = 0;
-    int is_mixer = 0;
-    int rgb = 0;
-    
-	vje_get_info( tag->effect_chain[entry]->effect_id, &is_mixer, &arg_len, &rgb );
-
-	if(!is_mixer || arg_len <= 0)
-		return 0;
-
-	if( enabled == 1 ) {
-		if( vj_tag_get_all_effect_args( t1, entry, tag->effect_chain[entry]->transition.args, arg_len, frame_pos ) == -1 )
-			return 0;
-		tag->effect_chain[entry]->transition.enabled = 1;
-	}
-	else {
-		for( int i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) {
-			tag->effect_chain[entry]->transition.args[i] = 0;
-		}
-		tag->effect_chain[entry]->transition.enabled = 0;
-	}
-	
-    tag->effect_chain[entry]->transition.at_loop = loop_at;
-
-	return 1;
-} 
-
-void vj_tag_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype)
-{
-    vj_tag *tag = vj_tag_get(s1);
-    *enabled =  tag->effect_chain[entry]->transition.enabled;
-    *looptype =  tag->effect_chain[entry]->transition.at_loop;
-}
-
-int vj_tag_chain_entry_transition_now(int t1, int entry, int *type) {
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) 
-		return 0;
-	
-	if( tag->effect_chain[entry]->effect_id <= 0 )
-		return 0;
-
-	int arg_len = 0;
-    int is_mixer = 0;
-    int rgb = 0;
-    vje_get_info( tag->effect_chain[entry]->effect_id, &is_mixer, &arg_len, &rgb );
-
-	if( is_mixer == 0 || arg_len == 0 )
-			return 0;
-
-	if( tag->effect_chain[entry]->transition.enabled == 0 )
-			return 0;
-
-	// These type of FX know when the transition is done 
-	int state = vje_fx_is_transition_ready(
-				tag->effect_chain[entry]->effect_id,
-                tag->effect_chain[entry]->fx_instance,
-				_tag_info->effect_frame1->width,
-				_tag_info->effect_frame1->height );
-	if(state == TRANSITION_COMPLETED) {
-		if( tag->loop_stat < tag->effect_chain[entry]->transition.at_loop )
-				return 0;
-
-        tag->effect_chain[entry]->transition.enabled = 0; // Turn off transition when completed
-
-		*type = tag->effect_chain[entry]->source_type;
-		return tag->effect_chain[entry]->channel;
-	} else if(state == TRANSITION_RUNNING) {
-		return 0;
-	}
-
-	// Any other FX, the user can define the transition by defining parameter values
-	for( int i = 0;i < arg_len; i ++ ) {
-		if( tag->effect_chain[entry]->arg[i] < tag->effect_chain[entry]->transition.args[i] ) {
-			return 0;
-		}
-	}
-
-	if( tag->loop_stat < tag->effect_chain[entry]->transition.at_loop )
-			return 0;
-
-	*type = tag->effect_chain[entry]->source_type;
-	return tag->effect_chain[entry]->channel;
 }
 
 int vj_tag_has_cali_fx( int t1 ) {
@@ -2824,13 +2734,9 @@ int vj_tag_chain_remove(int t1, int index)
     tag->effect_chain[index]->source_type = 1;
     tag->effect_chain[index]->channel     = t1; //set to self
 
-	tag->effect_chain[index]->transition.enabled = 0;
-	tag->effect_chain[index]->transition.at_loop = 0;
-
     int j;
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
         tag->effect_chain[index]->arg[j] = 0;
-		tag->effect_chain[index]->transition.args[j] = 0;
 	}
 
     if( index == tag->fade_entry )
@@ -2902,7 +2808,46 @@ void 	vj_tag_set_loop_stats(int s1, int loops) {
 		tag->loop_stat = loops;
 }
 
+int     vj_tag_get_loops(int t1) {
+    vj_tag *tag = vj_tag_get(t1);
+    if(tag) {
+        return tag->loops;
+    }
+    return 0;
+}
 
+void     vj_tag_set_loops(int t1, int loops) {
+    vj_tag *tag = vj_tag_get(t1);
+    if(tag) {
+        if(loops == -1) {
+            tag->loops = tag->loop_stat_stop;
+            return;
+        }
+        tag->loops = loops;
+    }
+}
+
+
+int     vj_tag_loop_dec(int t1) {
+    vj_tag *tag = vj_tag_get(t1);
+    if(tag && tag->loops > 0) {
+        tag->loops --;
+    }
+    return tag->loops;
+}
+
+int     vj_tag_at_next_loop(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag)
+        return 0;
+    int lo = tag->loops;
+
+    if(lo > 0)
+        lo --;
+
+    return (lo == 0 ? 1: 0);
+}
 
 // very old code, 2 callers; 150 and 255 size of dst
 void vj_tag_get_source_name(int t1, char *dst)
@@ -3020,6 +2965,32 @@ int vj_tag_get_offset(int t1, int chain_entry)
 
     return tag->effect_chain[chain_entry]->frame_offset;
 }
+
+
+void	vj_tag_update_ascociated_samples(int s1)
+{
+    vj_tag *sample = vj_tag_get(s1);
+    if(!sample) {
+        return;
+    }
+	
+	int p = 0;
+    for( p = 0; p < SAMPLE_MAX_EFFECTS; p ++ ) {
+		if( sample->effect_chain[p]->source_type != 0  ) 
+			continue;
+		if( !sample_exists(sample->effect_chain[p]->channel) )
+			continue;
+
+		int pos = sample->effect_chain[p]->frame_offset;
+		if(pos == 0 )
+			continue;	
+
+		sample_set_resume( sample->effect_chain[p]->channel, pos );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d will resume playback from position %d",
+					sample->effect_chain[p]->channel, pos );
+	}
+}
+
 
 long vj_tag_get_encoded_frames(int s1) {
   vj_tag *si = vj_tag_get(s1);

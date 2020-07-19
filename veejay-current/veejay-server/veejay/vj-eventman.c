@@ -1332,23 +1332,6 @@ void		vj_init_vevo_events(void)
 				1,
 				NULL );
 
-	index_map_[VIMS_SAMPLE_MIX_TRANSITION]  =	_new_event(
-				"%d %d %d %d",
-				VIMS_SAMPLE_MIX_TRANSITION,
-				"Switch to Mixing Sample when current FX parameter value set is seen at the end of loop N",
-				vj_event_sample_chain_transition,
-				4,
-				VIMS_ALLOW_ANY,
-				SAMPLE_ID_HELP,
-				0,
-				"Chain Index (-1=current)",
-				-1,
-				"Enabled or Disabled",
-				0,
-				"Stop at Loop",
-				0,
-				NULL );
-
 	index_map_[VIMS_SAMPLE_MIX_SET_DUP]		=	_new_event(
 				"%d",
 				VIMS_SAMPLE_MIX_SET_DUP,

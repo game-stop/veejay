@@ -74,4 +74,6 @@ void vj_perform_setup_transition(veejay_t *info, int next_sample_id, int next_ty
 
 void    vj_perform_reset_transition(veejay_t *info);
 
+void	vj_tag_update_ascociated_samples(int s1);
+int vj_perform_seq_setup_transition(veejay_t *info);
 #endif

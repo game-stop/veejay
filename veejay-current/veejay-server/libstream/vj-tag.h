@@ -134,6 +134,7 @@ typedef struct {
 	void	*generator;
 	int	subrender;
 	int		genargs[16];
+    int     loops;
 	int 	loop_stat;
 	int	loop_stat_stop;
 	void	*macro;
@@ -163,6 +164,10 @@ void 	vj_tag_set_loop_stats(int s1, int loops);
 int	vj_tag_get_loop_stats(int s1);
 void 	vj_tag_set_loop_stat_stop(int s1, int loop_stop); 
 int	vj_tag_get_loop_stat_stop(int s1);
+int vj_tag_loop_dec(int t1);
+int vj_tag_get_loops(int t1);
+void vj_tag_set_loops(int t1, int loops);
+int vj_tag_at_next_loop(int t1);
 
 void	vj_tag_free(void);
 /* Change color of solid stream*/
@@ -377,10 +382,6 @@ int	vj_tag_has_cali_fx( int t1 );
 int     vj_tag_cali_write_file( int t1, char *name, editlist *el );
 uint8_t *vj_tag_get_cali_data( int t1, int what );
 void	vj_tag_set_chain_paused(int t1, int paused);
-int vj_tag_chain_entry_transition_now(int s1, int entry, int *type);
-int vj_tag_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop_at, int frame_pos);
-int vj_tag_chain_entry_transition_now(int s1, int entry, int *type);
-void vj_tag_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype);
 
 int vj_tag_get_transition_shape(int s1);
 int vj_tag_get_transition_length(int s1);
@@ -388,6 +389,7 @@ void vj_tag_set_transition_shape(int s1, int shape);
 void vj_tag_set_transition_length(int s1, int length);
 int vj_tag_get_transition_active(int t1);
 void vj_tag_set_transition_active(int t1, int status);
+void	vj_tag_update_ascociated_samples(int s1);
 
 #ifdef HAVE_XML2
 void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);

@@ -92,12 +92,6 @@ enum {
     SAMPLE_PEEK = 2,
 };
 
-typedef struct transition_eff_t {
-	int args[SAMPLE_MAX_PARAMETERS]; // sequencer hard cut transition
-	int enabled;
-	int at_loop;
-} transition_eff;
-
 typedef struct sample_eff_t {
     int effect_id;		/* effect ID */
     int e_flag;
@@ -117,7 +111,6 @@ typedef struct sample_eff_t {
     int kf_type;		/* store type used */
     void *fx_instance;		/* lib plugger instance */
 	int clear;
-	transition_eff transition;
 } sample_eff_chain;
 
 
@@ -184,6 +177,7 @@ typedef struct sample_info_t {
     int	loops;
     int	loop_stat;
     int loop_stat_stop;
+    int loop_pp;
     void *macro;
 
     int transition_shape;
@@ -369,6 +363,7 @@ extern void sample_set_loop_stats(int s1, int loops);
 extern int sample_get_loop_stats(int s1);
 extern void sample_set_loop_stat_stop(int s1, int loop_stop);
 extern int sample_get_loop_stat_stop(int s1);
+extern int samlpe_at_next_loop(int s1);
 
 extern int sample_get_frame_length(int s1);
 extern int sample_loop_dec(int s1);
@@ -380,10 +375,6 @@ extern void	sample_update_ascociated_samples(int s1);
 extern void	sample_chain_alloc_kf( int s1, int entry );
 extern void	sample_set_chain_paused( int s1, int paused );
 extern sample_eff_chain **sample_get_effect_chain(int s1);
-
-extern int sample_chain_entry_set_transition_stop(int s1, int entry, int enabled, int loop, int frame_pos);
-extern int sample_chain_entry_transition_now(int s1, int entry, int *type);
-extern void sample_chain_entry_get_transition(int s1, int entry, int *enabled, int *looptype);
 
 extern int sample_get_transition_shape(int s1);
 extern int sample_get_transition_length(int s1);
