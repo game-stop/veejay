@@ -1235,6 +1235,11 @@ int sample_set_resume(int s1,long position)
                 sample->resume_pos = start;
             }
         }
+
+        if(sample->offset > 0) {
+            sample->resume_pos = sample->offset;
+        }
+
         sample->loop_pp = 0;
     }
     else {

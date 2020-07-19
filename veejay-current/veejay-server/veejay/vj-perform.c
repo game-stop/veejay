@@ -3656,6 +3656,9 @@ static int vj_perform_transition_get_sample_position(int sample_id)
             position = 0;
     }
     sample_update_offset(sample_id, position);
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d is at position %d", sample_id, position);
+
     return (sample_b[0] + position); //1
 }
 
