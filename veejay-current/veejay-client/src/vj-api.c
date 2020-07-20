@@ -3258,7 +3258,6 @@ static void vj_kf_reset()
     if (handler_id) g_signal_handler_block((gpointer)curveparam, handler_id);
     gtk_combo_box_set_active (GTK_COMBO_BOX(curveparam),0);
     if (handler_id) g_signal_handler_unblock((gpointer)curveparam, handler_id);
-
     info->status_lock = osl;
 }
 
@@ -3353,6 +3352,8 @@ static void update_curve_widget(GtkWidget *curve)
                         ( info->status_tokens[PLAY_MODE] == MODE_SAMPLE ? info->status_tokens[TOTAL_FRAMES]: 0) );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINSTART],0, total_frames, lo );
     update_spin_range2( widget_cache[WIDGET_CURVE_SPINEND], 0, total_frames, hi );
+
+    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TYPELINEAR]), TRUE );
 
     /* If parameter have KF set the points or set the initial curve */
     if( blob && blen > 0 )
