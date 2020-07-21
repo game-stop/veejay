@@ -3250,14 +3250,19 @@ static void vj_kf_reset()
 
     GtkWidget* curveparam = widget_cache[WIDGET_COMBO_CURVE_FX_PARAM];
     //block "changed" signal to prevent propagation
-    guint signal_id=g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
-    gulong handler_id=handler_id=g_signal_handler_find( (gpointer)curveparam,
+    guint signal_id = g_signal_lookup("changed", GTK_TYPE_COMBO_BOX);
+    gulong handler_id = g_signal_handler_find( (gpointer)curveparam,
                                                         G_SIGNAL_MATCH_ID,
                                                         signal_id,
                                                         0, NULL, NULL, NULL );
-    if (handler_id) g_signal_handler_block((gpointer)curveparam, handler_id);
+    if (handler_id) {
+        g_signal_handler_block((gpointer)curveparam, handler_id);
+    }
     gtk_combo_box_set_active (GTK_COMBO_BOX(curveparam),0);
-    if (handler_id) g_signal_handler_unblock((gpointer)curveparam, handler_id);
+    if (handler_id) {
+        g_signal_handler_unblock((gpointer)curveparam, handler_id);
+    }
+
     info->status_lock = osl;
 }
 
@@ -4182,9 +4187,6 @@ static void update_current_slot(int *history, int pm, int last_pm)
             gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART]), (gdouble) info->status_tokens[SAMPLE_START] );
             gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLEEND]), (gdouble) info->status_tokens[SAMPLE_END]);
 
-            update_spin_range2( widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH], 1,
-                    info->status_tokens[SAMPLE_END], info->status_tokens[SAMPLE_TRANSITION_LENGTH] );
-
             timeline_set_length( info->tl,
                 (gdouble) info->status_tokens[SAMPLE_END], 
                 info->status_tokens[FRAME_NUM] );
@@ -4193,33 +4195,63 @@ static void update_current_slot(int *history, int pm, int last_pm)
          //   update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
         }
-
     }
 
-    if( pm == MODE_STREAM ) {
-        if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
-            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+    if (update){
+
+        //block "value-changed" signal to prevent propagation
+        guint signal_id = g_signal_lookup("value-changed", GTK_TYPE_SPIN_BUTTON);
+
+        gpointer widget_stl = (gpointer)widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH];
+        gpointer widget_sts = (gpointer)widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE];
+
+        gulong handler_stl = g_signal_handler_find( widget_stl,
+                                                    G_SIGNAL_MATCH_ID,
+                                                    signal_id,
+                                                    0, NULL, NULL, NULL );
+        gulong handler_sts = g_signal_handler_find( widget_sts,
+                                                    G_SIGNAL_MATCH_ID,
+                                                    signal_id,
+                                                    0, NULL, NULL, NULL );
+
+        if (handler_stl){
+            g_signal_handler_block(widget_stl, handler_stl);
         }
-        
-        if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH]) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+        if (handler_sts){
+            g_signal_handler_block(widget_sts, handler_sts);
         }
 
-        if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+        if( pm == MODE_STREAM ) {
+            if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+            }
+
+            update_spin_range2( widget_stl, (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH],
+                    info->status_tokens[SAMPLE_END], info->status_tokens[SAMPLE_TRANSITION_LENGTH] );
+
+            if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
+                gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+            }
         }
-    }
-    else if ( pm == MODE_SAMPLE ) {
-        if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
-            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
-        }
-        
-        if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH] ) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+        else if ( pm == MODE_SAMPLE ) {
+            if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+            }
+
+            if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH] ) {
+                gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+            }
+
+            if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE] ) {
+                gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+            }
         }
 
-        if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE] ) {
-            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+        if (handler_stl) {
+            g_signal_handler_unblock(widget_stl, handler_stl);
+        }
+        if (handler_sts) {
+            g_signal_handler_unblock(widget_sts, handler_sts);
         }
     }
 
