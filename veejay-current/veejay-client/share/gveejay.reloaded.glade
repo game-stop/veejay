@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.22.1 -->
+<!-- Generated with glade 3.36.0 -->
 <interface>
   <requires lib="gtk+" version="3.16"/>
   <object class="GtkWindow">
     <property name="can_focus">False</property>
-    <child type="titlebar">
+    <child>
       <placeholder/>
     </child>
-    <child>
+    <child type="titlebar">
       <placeholder/>
     </child>
   </object>
   <object class="GtkApplicationWindow">
     <property name="can_focus">False</property>
-    <child type="titlebar">
+    <child>
       <placeholder/>
     </child>
-    <child>
+    <child type="titlebar">
       <placeholder/>
     </child>
   </object>
@@ -142,9 +142,6 @@
     <property name="destroy_with_parent">True</property>
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_generator_window_delete_event" swapped="no"/>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <child>
       <object class="GtkFrame" id="frame_generator">
         <property name="visible">True</property>
@@ -192,6 +189,12 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="n_columns">4</property>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                     <child>
                       <placeholder/>
                     </child>
@@ -1671,6 +1674,9 @@
         </child>
       </object>
     </child>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -1722,9 +1728,6 @@
     <property name="title" translatable="yes">Image Calibration</property>
     <property name="destroy_with_parent">True</property>
     <signal name="delete-event" handler="on_calibration_window_delete_event" swapped="no"/>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <child>
       <object class="GtkBox" id="vbox637">
         <property name="visible">True</property>
@@ -2515,6 +2518,9 @@
         </child>
       </object>
     </child>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -2566,9 +2572,6 @@
     <property name="default_height">400</property>
     <property name="icon">icon_stream.png</property>
     <signal name="delete-event" handler="on_inputstream_window_delete_event" swapped="no"/>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <child>
       <object class="GtkFrame" id="frame161">
         <property name="width_request">340</property>
@@ -2930,6 +2933,9 @@
         </child>
       </object>
     </child>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -2941,9 +2947,6 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_veejay_connection_close" swapped="no"/>
     <signal name="delete-event" handler="on_veejay_connection_close" swapped="no"/>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox3">
         <property name="visible">True</property>
@@ -3184,6 +3187,9 @@
     <action-widgets>
       <action-widget response="-7">veejay_connection_close</action-widget>
     </action-widgets>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -3349,8 +3355,6 @@
   </object>
   <object class="GtkAdjustment" id="transition_lengt">
     <property name="upper">1000000</property>
-    <property name="lower">0</property>
-    <property name="value">0</property>
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
@@ -3437,9 +3441,6 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_video_options_close" swapped="no"/>
     <signal name="delete-event" handler="on_video_options_close" swapped="no"/>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="vbox_video_options">
         <property name="visible">True</property>
@@ -4293,6 +4294,9 @@
     <action-widgets>
       <action-widget response="-7">button117</action-widget>
     </action-widgets>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -4306,9 +4310,6 @@
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_vims_bundles_close" swapped="no"/>
     <signal name="delete-event" handler="on_vims_bundles_close" swapped="no"/>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox5">
         <property name="visible">True</property>
@@ -4682,6 +4683,9 @@
     <action-widgets>
       <action-widget response="-7">vims_bundles_close</action-widget>
     </action-widgets>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
     <style>
       <class name="reloaded"/>
     </style>
@@ -4705,9 +4709,6 @@
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Reloaded</property>
     <property name="icon">veejay-icon.png</property>
-    <child type="titlebar">
-      <placeholder/>
-    </child>
     <child>
       <object class="GtkBox" id="veejay_box">
         <property name="visible">True</property>
@@ -11441,7 +11442,7 @@
                                             <property name="receives_default">False</property>
                                             <property name="halign">start</property>
                                             <property name="draw_indicator">True</property>
-                                            <signal name="toggled" handler="transition_set_active" swapped="no"/>
+                                            <signal name="toggled" handler="on_transition_active_toggled" swapped="no"/>
                                           </object>
                                           <packing>
                                             <property name="left_attach">1</property>
@@ -11457,7 +11458,7 @@
                                             <property name="width_chars">6</property>
                                             <property name="adjustment">transition_shap</property>
                                             <property name="climb_rate">1</property>
-                                            <signal name="value-changed" handler="transition_shape_value_changed" swapped="no"/>
+                                            <signal name="value-changed" handler="on_transition_shape_value_changed" swapped="no"/>
                                           </object>
                                           <packing>
                                             <property name="left_attach">1</property>
@@ -11471,7 +11472,7 @@
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
                                             <property name="adjustment">transition_lengt</property>
-                                            <signal name="value-changed" handler="transition_length_value_changed" swapped="no"/>
+                                            <signal name="value-changed" handler="on_transition_length_value_changed" swapped="no"/>
                                           </object>
                                           <packing>
                                             <property name="left_attach">1</property>
@@ -12710,7 +12711,7 @@
                                                 <property name="receives_default">False</property>
                                                 <property name="halign">start</property>
                                                 <property name="draw_indicator">True</property>
-                                                <signal name="toggled" handler="on_tag_transition_active_toggled" swapped="no"/>
+                                                <signal name="toggled" handler="on_transition_set_active" swapped="no"/>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">1</property>
@@ -12739,7 +12740,7 @@
                                                 <property name="text" translatable="yes">0</property>
                                                 <property name="adjustment">transition_shap</property>
                                                 <property name="climb_rate">1</property>
-                                                <signal name="value-changed" handler="on_tag_transition_shape_value_changed" swapped="no"/>
+                                                <signal name="value-changed" handler="on_transition_shape_value_changed" swapped="no"/>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">1</property>
@@ -12766,7 +12767,7 @@
                                                 <property name="can_focus">True</property>
                                                 <property name="text" translatable="yes">0</property>
                                                 <property name="adjustment">transition_lengt</property>
-                                                <signal name="value-changed" handler="on_tag_transition_length_value_changed" swapped="no"/>
+                                                <signal name="value-changed" handler="on_transition_length_value_changed" swapped="no"/>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">1</property>
@@ -19298,6 +19299,9 @@ Events may not always be triggered if veejay is configured to keep in sync (hard
           </packing>
         </child>
       </object>
+    </child>
+    <child type="titlebar">
+      <placeholder/>
     </child>
     <style>
       <class name="reloaded"/>

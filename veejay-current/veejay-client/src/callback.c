@@ -3784,7 +3784,7 @@ static void set_transition(int active, int shape, int length)
 }
 
 void
-transition_length_value_changed( GtkWidget *widget, gpointer user_data)
+on_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
 {
     set_transition(
             info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
@@ -3794,7 +3794,7 @@ transition_length_value_changed( GtkWidget *widget, gpointer user_data)
 }
 
 void
-transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
+on_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
 {
     set_transition(
             info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
@@ -3804,36 +3804,7 @@ transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
 }
 
 void
-transition_set_active( GtkWidget *widget, gpointer user_data)
-{
-    set_transition(
-            gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ),
-            info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
-            info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
-            );
-}
-
-void
-on_tag_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
-{
-     set_transition(
-            info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
-            info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
-            (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) )
-            );
-}
-
-void
-on_tag_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
-{
-    set_transition(
-            info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
-            (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ),
-            info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
-            );
-}
-
-void on_tag_transition_active_toggled( GtkWidget *widget, gpointer user_data)
+on_transition_active_toggled( GtkWidget *widget, gpointer user_data)
 {
     set_transition(
             gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ),
