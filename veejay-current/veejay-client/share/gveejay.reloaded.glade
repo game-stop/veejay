@@ -12711,7 +12711,7 @@
                                                 <property name="receives_default">False</property>
                                                 <property name="halign">start</property>
                                                 <property name="draw_indicator">True</property>
-                                                <signal name="toggled" handler="on_transition_set_active" swapped="no"/>
+                                                <signal name="toggled" handler="on_transition_active_toggled" swapped="no"/>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">1</property>
