@@ -149,6 +149,7 @@ void    vj_event_sample_set_loops       (   void *ptr,  const char format[],    
 void	vj_event_hold_frame(	void *ptr, const char format[], va_list ap );
 void	vj_event_sample_set_marker		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_set_frame			(	void *ptr, 	const char format[], 	va_list ap	);
+void    vj_event_set_frame_percentage   (   void *ptr,  const char format[],    va_list ap );
 void 	vj_event_set_play_mode			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_set_play_mode_go		(	void *ptr,	const char format[], 	va_list ap	); 
 void	vj_event_switch_sample_tag		(	void *ptr,	const char format[],	va_list ap	);

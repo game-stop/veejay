@@ -295,7 +295,7 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_PROJ_TOGGLE,             SDL_SCANCODE_A,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_FRONTBACK,               SDL_SCANCODE_S,         VIMS_MOD_CTRL,  NULL    },
     { VIMS_RENDER_DEPTH,            SDL_SCANCODE_D,         VIMS_MOD_CTRL,  "2" },
-    { VIMS_SELECT_BANK,             SDL_SCANCODE_1,         VIMS_MOD_NONE,  "1" },
+  /*  { VIMS_SELECT_BANK,             SDL_SCANCODE_1,         VIMS_MOD_NONE,  "1" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_2,         VIMS_MOD_NONE,  "2" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_3,         VIMS_MOD_NONE,  "3" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_4,         VIMS_MOD_NONE,  "4" },
@@ -303,7 +303,7 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_SELECT_BANK,             SDL_SCANCODE_6,         VIMS_MOD_NONE,  "6" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_7,         VIMS_MOD_NONE,  "7" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_8,         VIMS_MOD_NONE,  "8" },
-    { VIMS_SELECT_BANK,             SDL_SCANCODE_9,         VIMS_MOD_NONE,  "9" },
+    { VIMS_SELECT_BANK,             SDL_SCANCODE_9,         VIMS_MOD_NONE,  "9" }, */
     { VIMS_SELECT_BANK,             SDL_SCANCODE_1,         VIMS_MOD_SHIFT, "1" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_2,         VIMS_MOD_SHIFT, "2" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_3,         VIMS_MOD_SHIFT, "3" },
@@ -313,6 +313,16 @@ static struct {                 /* hardcoded keyboard layout (the default keys) 
     { VIMS_SELECT_BANK,             SDL_SCANCODE_7,         VIMS_MOD_SHIFT, "7" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_8,         VIMS_MOD_SHIFT, "8" },
     { VIMS_SELECT_BANK,             SDL_SCANCODE_9,         VIMS_MOD_SHIFT, "9" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_0,      VIMS_MOD_NONE, "0" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_1,      VIMS_MOD_NONE, "10" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_2,      VIMS_MOD_NONE, "20" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_3,      VIMS_MOD_NONE, "30" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_4,      VIMS_MOD_NONE, "40" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_5,      VIMS_MOD_NONE, "50" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_6,      VIMS_MOD_NONE, "60" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_7,      VIMS_MOD_NONE, "70" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_8,      VIMS_MOD_NONE, "80" },
+    { VIMS_VIDEO_SET_FRAME_PERCENTAGE, SDL_SCANCODE_9,      VIMS_MOD_NONE, "90" },
     { VIMS_SELECT_ID,               SDL_SCANCODE_F1,        VIMS_MOD_NONE,  "1" },
     { VIMS_SELECT_ID,               SDL_SCANCODE_F2,        VIMS_MOD_NONE,  "2" },
     { VIMS_SELECT_ID,               SDL_SCANCODE_F3,        VIMS_MOD_NONE,  "3" },
@@ -3405,6 +3415,24 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
     }
 }
 
+void vj_event_set_frame_percentage(void *ptr, const char format[], va_list ap)
+{
+    int args[1];
+    veejay_t *v = (veejay_t*) ptr;
+    if(!STREAM_PLAYING(v))
+    {
+        P_A(args,sizeof(args),NULL,0,format,ap);
+        
+        int len = sample_get_endFrame(v->uc->sample_id) - sample_get_startFrame(v->uc->sample_id);
+        float p = fabs( ( (float)args[0] * 0.01f)); // absolute values
+        int perc = (int) ((len * p) + 0.5f); // round to nearest integer
+        veejay_set_frame(v, perc);
+    }
+    else
+    {
+        p_invalid_mode();
+    }
+}
 
 void    vj_event_projection_dec( void *ptr, const char format[], va_list ap )
 {

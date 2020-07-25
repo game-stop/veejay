@@ -643,6 +643,18 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+    index_map_[VIMS_VIDEO_SET_FRAME_PERCENTAGE] = _new_event(
+                "%d",
+                VIMS_VIDEO_SET_FRAME_PERCENTAGE,
+                "Set current frame number by percentage of sample length",
+                vj_event_set_frame_percentage,
+                1,
+                VIMS_ALLOW_ANY,
+                "Percentage",
+                10,
+                NULL );
+
+
 	index_map_[VIMS_CHAIN_ENTRY_UP]		= 	_new_event(
 				"%d",
 				VIMS_CHAIN_ENTRY_UP,
