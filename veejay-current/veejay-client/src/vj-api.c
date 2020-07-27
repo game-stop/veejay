@@ -3991,7 +3991,13 @@ static void update_current_slot(int *history, int pm, int last_pm)
         info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_KF] = 1;
 
-        put_text( "entry_samplename", "" );
+
+        sample_gui_slot_t* guislot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
+        if (slot != NULL)
+            put_text( "entry_samplename", guislot->title );
+        else
+            put_text( "entry_samplename", "" );
+
         set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
 
     }
@@ -5873,6 +5879,7 @@ static void load_samplelist_info(gboolean with_reset_slotselection)
                 }
                 if( info->status_tokens[CURRENT_ID] == values[0] && info->status_tokens[PLAY_MODE] == 0 )
                     put_text( "entry_samplename", title );
+
                 free(timecode);
                 g_free(title);
             }
@@ -9827,9 +9834,9 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
                                     select_slot->sample_type,
                                     select_slot->sample_id );
         vj_msg(VEEJAY_MSG_INFO,
-               "Start playing %s %d",
+               "Start playing %s %d (%s)",
                (select_slot->sample_type==MODE_SAMPLE ? "Sample" : "Stream" ),
-               select_slot->sample_id );
+               select_slot->sample_id, select_slot->title );
     }
     else if(event->type == GDK_BUTTON_PRESS )
     {
