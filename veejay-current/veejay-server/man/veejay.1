@@ -55,7 +55,7 @@ Veejay has a console and a video window.
 
 * If the mouse is moved over to the video window, you can use the keyboard like a piano to play/manipulate the video.
 .TP
-You can start veejay with multiple files, video files and/or Mjpegtools' EditList files. Upon startup, veejay creates a new EditList in memory containing all the files you have loaded. As a result, all files will appear as a single large video file. Next you can start making selections (samples) of your EditList. These samples will be placed in so called 'sample banks' and they can be triggered for playback by pressing the F-keys (1 to 12). You can select a bank by pressing a number 1 to 9.
+You can start veejay with multiple files, video files and/or Mjpegtools' EditList files. Upon startup, veejay creates a new EditList in memory containing all the files you have loaded. As a result, all files will appear as a single large video file. Next you can start making selections (samples) of your EditList. These samples will be placed in a slot in a so called 'sample banks' and they can be triggered for continue or playback by combining the F-keys (1 to 12) with SHIFT. You can select a sample bank holding SHIFT and pressing a number 1 to 9.
 .TP
 Note that if you change the EditList (for example, when deleting portions of your editlist) you should save your editlist as well as your samplelist.
 .TP
@@ -348,12 +348,6 @@ Switch loop mode ("Normal" or "Ping Pong")
 .B [SHIFT] + [Keypad *]
 Switch random loop mode ("Play once and keep playing last frame" or "Random")
 .TP
-.B [Keypad -]
-Decrease selected effect chain entry
-.TP
-.B [Keypad +]
-Increase selected effect chain entry
-.TP
 .B [Keypad 1]
 Goto start of sample
 .TP
@@ -403,19 +397,22 @@ Delete current marker
 Set playback speed to 1,2,3,4,5,6,7,8, or 9
 .TP
 .B [ALT] + [a|s|d|f|g|h|j|k|l]
-Set frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
+Adjust frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
 .TP
 .B [1..9]
-Set sample range 0-12, 12-24, 24-36 etc.
+Quick jump into sample position : 10%, 20%, 30% etc.
+.TP
+.B [SHIFT] + [1..9]
+Sample bank selection: range [0-12], [12-24], [24-36] etc.
 .TP
 .B [ALT] + [1..9]
-Set channel ID 1-9, depending on sample range
+Change the channel ID 1-9, depending on sample range
 .TP
 .B [SHIFT] + [a,s,d,f,g,h,j,k,l]
 Set current mixing channel speed to 1,2,3,4,5,6,7,8, or 9
 .TP
 .B [SHIFT] + [ALT] + [a|s|d|f|g|h|j|k|l]
-Set current mixing channel frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
+Adjust current mixing channel frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
 .TP
 .B [F1..F12]
 Select and play sample bank 1 .. 12
@@ -423,14 +420,17 @@ Select and play sample bank 1 .. 12
 .B [SHIFT] + [F1..F12]
 Select and resume sample bank 1 .. 12
 .TP
-.B [DELETE]
-Delete selected effect
-.TP
-.B [Home]
-Print sample/tag information
-.TP
 .B [ESC]
 Switch between Plain -> Tag or Sample playback mode
+.TP
+.B [SHIFT] + [t]
+Toggle transitions between samples
+.TP
+.B [RETURN | ENTER]
+Add selected effect from list to sample effect chain
+.TP
+.B [DELETE]
+Delete effect from selected chain entry
 .TP
 .B [UP]
 Go up 1 position in the effect list
@@ -438,8 +438,11 @@ Go up 1 position in the effect list
 .B [DOWN]
 Go down 1 position in the effect list
 .TP
-.B [RETURN | ENTER]
-Add selected effect from list to sample
+.B [Keypad -]
+Decrease selected effect chain entry
+.TP
+.B [Keypad +]
+Increase selected effect chain entry
 .TP
 .B [-]
 Decrease mixing channel ID
@@ -447,7 +450,7 @@ Decrease mixing channel ID
 .B [=]
 Increase mixing channel ID
 .TP
-.B SLASH
+.B [/]
 Toggle mixing source between Clips and Streams
 .TP
 .B [END]
@@ -565,6 +568,9 @@ Stop recording
 .TP
 .B [CTRL] + [f]
 Toggle fullscreen / windowed mode
+.TP
+.B [Home]
+Print sample/tag information
 .SH EXAMPLES
 .TP
 .B veejay -u |less
