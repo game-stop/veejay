@@ -209,6 +209,7 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 	multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0,title );
 
 	//@ dont reload sample, print info to samplebank
+    // FIXME remplace loop by find_gui_slot_by_sample (info->current) ?
 	int i,j;
 	for( i= 0; i < NUM_BANKS; i ++ )
 	{
