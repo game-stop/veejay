@@ -65,7 +65,9 @@ This will create a virtual clip (in memory) from your entire video file.
 * If you press [ESC] , veejay will switch from playing streams to playing clips or vice versa
 
 * Press [F1] to [F12] to select a clip,
-* Press [1] to [9] to select a bank (1 = clips 1 to 12,  2 = clips 12 to 24, etc )
+* Press [SHIFT] + [t] to toggle transitionning between clips,
+* Press [1] to [9] to quick jump into clip position, 10%, 20%, 30% ect.
+* Press [SHIFT] + [1] to [9] to select a clip bank (1 = clips 1 to 12,  2 = clips 12 to 24, etc )
 
 ### Add an effect
 Once you are playing a clip/stream, simply press
