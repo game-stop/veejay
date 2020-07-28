@@ -208,6 +208,7 @@ See also [README.whatis](./README.whatis.md)
  * FX chain (20 slots) with Alpha Channels
  * All FX parameters can be animated
  * Mix up to two layers per FX slot
+ * Transitions between clips
 
 ### Editing
 
