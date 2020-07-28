@@ -625,7 +625,7 @@ const char *vje_get_description( int fx_id )
 
 const char *vje_get_param_description( int fx_id, int param_nr )
 {
-    if( param_nr < 0 || param_nr > vje_get_num_params(fx_id) )
+    if( param_nr < 0 || param_nr >= vje_get_num_params(fx_id) )
         return NULL;
     int idx = vj_fx_map[ fx_id ];
     return vj_effect_map[ idx ]->param_description[ param_nr ];
@@ -633,7 +633,7 @@ const char *vje_get_param_description( int fx_id, int param_nr )
 
 int vje_get_param_default( int fx_id, int param_nr )
 {
-    if( param_nr < 0 || param_nr > vje_get_num_params(fx_id) )
+    if( param_nr < 0 || param_nr >= vje_get_num_params(fx_id) )
         return 0;
     int idx = vj_fx_map[ fx_id ];
     return vj_effect_map[ idx ]->defaults[ param_nr ];
@@ -641,7 +641,7 @@ int vje_get_param_default( int fx_id, int param_nr )
 
 int vje_get_param_min_limit( int fx_id, int param_nr )
 {
-    if( param_nr < 0 || param_nr > vje_get_num_params(fx_id) )
+    if( param_nr < 0 || param_nr >= vje_get_num_params(fx_id) )
         return 0;
     int idx = vj_fx_map[ fx_id ];
     return vj_effect_map[ idx ]->limits[0][ param_nr ];
@@ -649,7 +649,7 @@ int vje_get_param_min_limit( int fx_id, int param_nr )
 
 int vje_get_param_max_limit( int fx_id, int param_nr )
 {
-    if( param_nr < 0 || param_nr > vje_get_num_params(fx_id) )
+    if( param_nr < 0 || param_nr >= vje_get_num_params(fx_id) )
         return 0;
     int idx = vj_fx_map[ fx_id ];
     return vj_effect_map [ idx ]->limits[1][ param_nr ];
@@ -663,7 +663,7 @@ int vje_get_extra_frame( int fx_id )
 
 int vje_is_param_value_valid( int fx_id, int param_nr, int value )
 {
-    if( param_nr < 0 || param_nr > vje_get_num_params(fx_id) )
+    if( param_nr < 0 || param_nr >= vje_get_num_params(fx_id) )
        return 0;
     int idx = vj_fx_map[ fx_id ];
     vj_effect *fx = vj_effect_map[ idx ];
