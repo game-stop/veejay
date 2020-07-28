@@ -176,11 +176,11 @@ typedef struct
     ycbcr_frame *preview_buffer;
     int preview_max_w;
     int preview_max_h;
-    ycbcr_frame *record_buffer;   // needed for recording invisible streams
     performer_t *A;
     performer_t *B;
     VJFrame feedback_frame;
     uint8_t *feedback_buffer[4];
+    VJFrame *offline_frame;
 } performer_global_t;
 
 static const char *intro = 
@@ -760,50 +760,38 @@ static int vj_perform_record_buffer_init(veejay_t *info)
 {
     performer_global_t *g = (performer_global_t*) info->performer;
 
-    if(g->record_buffer->Cb==NULL)
-            g->record_buffer->Cb = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(info->effect_frame1->uv_len) );
-    if(!g->record_buffer->Cb) return 0;
+    g->offline_frame = (VJFrame*) vj_calloc(sizeof(VJFrame));
+    if(!g->offline_frame) return 0;
 
-    if(g->record_buffer->Cr==NULL)
-            g->record_buffer->Cr = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(info->effect_frame1->uv_len) );
+    veejay_memcpy( g->offline_frame, info->effect_frame1, sizeof(VJFrame) );
 
-    if(!g->record_buffer->Cr) return 0;
+    uint8_t *region = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( g->offline_frame->len * 3 ) );
+    if(!region) return 0;
 
-    if(g->record_buffer->Y == NULL)
-        g->record_buffer->Y = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(info->effect_frame1->len));
+    g->offline_frame->data[0] = region;
+    g->offline_frame->data[1] = region + RUP8( g->offline_frame->len );
+    g->offline_frame->data[2] = region + RUP8( g->offline_frame->len + g->offline_frame->uv_len );
 
-    if(!g->record_buffer->Y) return 0;
+    veejay_memset( g->offline_frame->data[0] , pixel_Y_lo_, g->offline_frame->len );
+    veejay_memset( g->offline_frame->data[1], 128, g->offline_frame->uv_len );
+    veejay_memset( g->offline_frame->data[2], 128, g->offline_frame->uv_len );
 
-    veejay_memset( g->record_buffer->Y , pixel_Y_lo_, info->effect_frame1->len );
-    veejay_memset( g->record_buffer->Cb, 128, info->effect_frame1->uv_len );
-    veejay_memset( g->record_buffer->Cr, 128, info->effect_frame1->uv_len );
+    g->offline_frame->data[3] = NULL;
 
     return 1;
 }
 
-static void vj_perform_record_buffer_free(veejay_t *info)
+static void vj_perform_record_buffer_free(performer_global_t *g)
 {
-    performer_global_t *g = (performer_global_t*) info->performer;
-
-    if( g == NULL )
-        return;
-
-    if(g->record_buffer) {
-        if(g->record_buffer->Y) {
-            free(g->record_buffer->Y);
-            g->record_buffer->Y = NULL;
+    if(g->offline_frame) {
+        if(g->offline_frame->data[0]) {
+            free(g->offline_frame->data[0]);
+            g->offline_frame->data[0] = NULL;
         }
-        if(g->record_buffer->Cb) {
-            free(g->record_buffer->Cb);
-            g->record_buffer->Cb = NULL;
-        }
-        if(g->record_buffer->Cr) {
-            free(g->record_buffer->Cr);
-            g->record_buffer->Cr = NULL;
-        }
-        free(g->record_buffer);
-        g->record_buffer = NULL;
+        free(g->offline_frame);
+        g->offline_frame = NULL;
     }
+
 }
 
 int vj_perform_allocate(veejay_t *info)
@@ -820,11 +808,6 @@ int vj_perform_allocate(veejay_t *info)
     global->preview_max_h = info->video_output_height * 2;
     global->preview_buffer->Y = (uint8_t*) vj_calloc( RUP8(global->preview_max_w * global->preview_max_h * 2) );
     if(!global->preview_buffer->Y) {
-        return 1;
-    }
-
-    global->record_buffer = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame) );
-    if(!global->record_buffer) {
         return 1;
     }
 
@@ -1280,7 +1263,7 @@ void vj_perform_free(veejay_t * info)
     if(info->edit_list && info->edit_list->has_audio)
         vj_perform_close_audio(global->A);
 
-    vj_perform_record_buffer_free(info);
+    vj_perform_record_buffer_free(global);
 
     if( global ) {
         vj_avcodec_stop(global->encoder_,0);
@@ -2500,16 +2483,17 @@ static int vj_perform_render_sample_frame(veejay_t *info, performer_t *p, uint8_
     return sample_record_frame( sample,frame,p->audio_rec_buffer,audio_len,info->pixel_format );
 }
 
-static int vj_perform_render_offline_tag_frame(veejay_t *info, uint8_t *frame[4])
+static int vj_perform_render_offline_tag_frame(veejay_t *info)
 {
+    performer_global_t *g = (performer_global_t*) info->performer;
 
     if(vj_tag_get_active( info->settings->offline_tag_id ) == 0 ) {
         vj_tag_enable( info->settings->offline_tag_id );
     }
 
-    vj_tag_get_frame( info->settings->offline_tag_id, info->effect_frame1, NULL );
+    vj_tag_get_frame( info->settings->offline_tag_id, g->offline_frame, NULL );
 
-    return vj_tag_record_frame( info->settings->offline_tag_id, info->effect_frame1->data, NULL, 0, info->pixel_format );
+    return vj_tag_record_frame( info->settings->offline_tag_id, g->offline_frame->data, NULL, 0, info->pixel_format );
 }
     
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
@@ -2519,25 +2503,37 @@ static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
 
 static int vj_perform_record_offline_commit_single(veejay_t *info)
 {
-    char filename[1024];
-
+    char filename[2048];
     int stream_id = info->settings->offline_tag_id;
+    
     if(vj_tag_get_encoded_file(stream_id, filename))
     {
         int df = vj_event_get_video_format();
         int id = 0;
+
+        if(info->settings->offline_linked_sample_id == -1 ) {
+            id = 0;
+            veejay_msg(VEEJAY_MSG_INFO, "Adding recorded video file %s to a new sample", filename);
+        }
+        else {
+            id = info->settings->offline_linked_sample_id;
+            veejay_msg(VEEJAY_MSG_INFO, "Appending recorded video file %s to sample %d", filename, id );
+        }
+
         if( df == ENCODER_YUV4MPEG || df == ENCODER_YUV4MPEG420 ) {
+            if(info->settings->offline_linked_sample_id > 0) {
+                veejay_msg(VEEJAY_MSG_WARNING, "Cannot append to a yuv4mpeg stream (change recording format)");
+            }
             id = veejay_create_tag( info, VJ_TAG_TYPE_YUV4MPEG,filename,info->nstreams,0,0 );
         } else {
-            id = veejay_edit_addmovie_sample(info, filename, 0);
+            
+            id = veejay_edit_addmovie_sample(info, filename, id);
+            veejay_msg(VEEJAY_MSG_INFO, "Sample %d has new video data", id );
         }
-        if( id <= 0 )
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Adding file %s to new sample", filename);
-            return 0;
-        }
+
         return id;
     }
+
     return 0;
 }
 
@@ -2624,7 +2620,7 @@ void vj_perform_record_offline_stop(veejay_t *info)
     settings->offline_record = 0;
     settings->offline_created_sample = 0;
     settings->offline_tag_id = 0;
-
+//FIXME
     if( play ) {
         if(df != ENCODER_YUV4MPEG && df != ENCODER_YUV4MPEG420)
         {
@@ -2638,6 +2634,8 @@ void vj_perform_record_offline_stop(veejay_t *info)
             veejay_msg(VEEJAY_MSG_INFO, "Completed offline recording");
         }
     }
+
+    vj_perform_record_buffer_free(info->performer);
 }
 
 void vj_perform_record_stop(veejay_t *info)
@@ -2730,20 +2728,15 @@ void vj_perform_record_offline_tag_frame(veejay_t *info)
     int stream_id = settings->offline_tag_id;
     performer_global_t *g = (performer_global_t*) info->performer;
  
-    if( g->record_buffer->Y == NULL )
-        vj_perform_record_buffer_init(info);
+    if( g->offline_frame == NULL ) {
+        if(vj_perform_record_buffer_init(info) == 0) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate buffer for recorder");
+            vj_tag_stop_encoder(stream_id);
+            return;
+        }
+    }
 
-    frame[0] = g->record_buffer->Y;
-    frame[1] = g->record_buffer->Cb;
-    frame[2] = g->record_buffer->Cr;
-    frame[3] = NULL;
-
-    info->effect_frame1->data[0] = frame[0];
-    info->effect_frame1->data[1] = frame[1];
-    info->effect_frame1->data[2] = frame[2];
-    info->effect_frame1->data[3] = frame[3];
-
-    res = vj_perform_render_offline_tag_frame(info, frame);
+    res = vj_perform_render_offline_tag_frame(info);
 
     if( res == 2)
     {
@@ -3501,7 +3494,6 @@ static  void    vj_perform_render_font( veejay_t *info, video_playback_setup *se
 #endif
 }
 
-//FIXME refactor recorders - there only needs to be two: online (what is playing) , offline (what is not playing but active)
 static  void    vj_perform_record_frame( veejay_t *info )
 {
     if( info->settings->offline_record )

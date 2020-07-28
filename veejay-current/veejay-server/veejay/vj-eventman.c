@@ -654,7 +654,6 @@ void		vj_init_vevo_events(void)
                 10,
                 NULL );
 
-
 	index_map_[VIMS_CHAIN_ENTRY_UP]		= 	_new_event(
 				"%d",
 				VIMS_CHAIN_ENTRY_UP,
@@ -1586,11 +1585,11 @@ void		vj_init_vevo_events(void)
 #endif
 
 	index_map_[VIMS_STREAM_OFFLINE_REC_START]		=	_new_event(
-				"%d %d %d",
+				"%d %d %d %d",
 				VIMS_STREAM_OFFLINE_REC_START,
 				"Start offline recording from stream",
 				vj_event_tag_rec_offline_start,
-				3,
+				4,
 				VIMS_REQUIRE_ALL_PARAMS,
 				STREAM_ID_HELP,
 				0,
@@ -1598,7 +1597,10 @@ void		vj_init_vevo_events(void)
 				0,
 				"Auto Play (0=disable,1=enable)",
 				0,
+                "Sample Link ID",
+                0,
 				NULL );
+
 	index_map_[VIMS_STREAM_OFFLINE_REC_STOP]			=	_new_event(
 				NULL,
 				VIMS_STREAM_OFFLINE_REC_STOP,

@@ -3498,25 +3498,21 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
 {
 	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
-	uint64_t n, i;
+	uint64_t i,n;
 	uint64_t c = el->video_frames;
 	if( el->is_empty )
 		c -= 2;
 
-	n = el->num_video_files;
+	n = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
+		info->edit_list->video_norm, get_ffmpeg_pixfmt(info->pixel_format), info->video_output_width, info->video_output_height );
 
-	int res = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
-		info->edit_list->video_norm, info->pixel_format, info->video_output_width, info->video_output_height );
-
-	if (res < 0)
+	if (n < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Error adding file '%s' to EDL", movie );
 		return 0;
 	}
 
-	long end = el->video_frames;
-
-	el->frame_list = (uint64_t *) realloc(el->frame_list, (end + el->num_frames[n])*sizeof(uint64_t));
+	el->frame_list = (uint64_t *) realloc(el->frame_list, (c + el->num_frames[n])*sizeof(uint64_t));
 	if (el->frame_list==NULL)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
@@ -3526,11 +3522,11 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start 
 
 	for (i = 0; i < el->num_frames[n]; i++)
 	{
-		el->frame_list[c] = EL_ENTRY(n, i);
-		c++;
+		el->frame_list[c ++] = EL_ENTRY(n, i);
 	}
  
 	el->video_frames = c;
+    el->total_frames = el->video_frames - 1;
 	settings->max_frame_num = el->total_frames;
 	settings->min_frame_num = 0;
 
