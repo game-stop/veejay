@@ -7963,12 +7963,11 @@ void vj_event_print_sample_info(veejay_t *v, int id)
     }
     
     veejay_msg(VEEJAY_MSG_INFO, 
-        "[%09ld] - [%09ld] @ %4.2f [speed %d] [%s looping]",
+        "[%09ld]>[%09ld]@%4.2f [speed %d] [%s-loop] [transition%sactive (shape n°%02d>%d frames)]",
         start,end, (float)speed * v->current_edit_list->video_fps,speed,
-        (sample_get_looptype(id) ==
-        2 ? "pingpong" : (sample_get_looptype(id)==1 ? "normal" : (sample_get_looptype(id)==3 ? "random" : "none"))  )
+        (sample_get_looptype(id) == 2 ? "pingpong" : (sample_get_looptype(id)==1 ? "normal" : (sample_get_looptype(id)==3 ? "random" : "no"))),
+        (sample_get_transition_active(id) == 1 ? " " : " not " ), sample_get_transition_shape(id), sample_get_transition_length(id));
 
-        );
 
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
     {
