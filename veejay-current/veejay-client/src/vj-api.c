@@ -3993,7 +3993,7 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
 
         sample_gui_slot_t* guislot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
-        if (slot != NULL)
+        if (guislot != NULL)
             put_text( "entry_samplename", guislot->title );
         else
             put_text( "entry_samplename", "" );
