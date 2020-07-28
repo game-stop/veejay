@@ -363,7 +363,7 @@ extern void sample_set_loop_stats(int s1, int loops);
 extern int sample_get_loop_stats(int s1);
 extern void sample_set_loop_stat_stop(int s1, int loop_stop);
 extern int sample_get_loop_stat_stop(int s1);
-extern int samlpe_at_next_loop(int s1);
+extern int sample_at_next_loop(int s1);
 
 extern int sample_get_frame_length(int s1);
 extern int sample_loop_dec(int s1);
