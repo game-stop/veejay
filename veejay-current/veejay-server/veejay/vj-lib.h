@@ -169,6 +169,7 @@ typedef struct {
 	int offline_record;
 	int offline_tag_id;
 	int offline_created_sample;
+    int offline_linked_sample_id;
 	int sample_record;
 	int sample_record_id;
 	int sample_record_switch;

@@ -7350,7 +7350,7 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
-    int args[3];
+    int args[4];
 	P_A(args,sizeof(args), NULL,0,format,ap);
 
     if( v->settings->offline_record )
@@ -7391,7 +7391,8 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
             veejay_msg(VEEJAY_MSG_INFO, "(Offline) recording from stream %d", args[0]);
             s->offline_record = 1;
             s->offline_tag_id = args[0];
-            s->offline_created_sample = args[2];
+            s->offline_created_sample = args[2];  // auto play
+            s->offline_linked_sample_id = ( sample_exists(args[3]) ? args[3]: -1 );
         } 
         else
         {
