@@ -633,13 +633,8 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
     veejay_set_speed(info, speed);
 
-	veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (Sl=%d, Speed=%d, Start=%d, End=%d, Loop=%d, Cur=%ld) [transition to: %d pos %d - %d active %d - ready %d]",
-			sample_id, info->sfd, speed, start, end, looptype, (int) info->settings->current_frame_num,
-            settings->transition.next_id,    //FIXME
-            settings->transition.start,    //FIXME
-            settings->transition.end,    //FIXME
-            settings->transition.active,     //FIXME
-            settings->transition.ready
+	veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (Slow: %d, Speed: %d, Start: %d, End: %d, Looptype: %d, Current position: %ld)",
+			sample_id, info->sfd, speed, start, end, looptype, info->settings->current_frame_num
             );
 	 
 	return 1;

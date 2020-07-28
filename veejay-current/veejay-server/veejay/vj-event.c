@@ -7794,16 +7794,21 @@ void vj_event_print_tag_info(veejay_t *v, int id)
     vj_tag_get_description(id, title);
     vj_tag_get_source_name(id, source);
 
-    if(v->settings->tag_record)
-        veejay_msg(VEEJAY_MSG_INFO, "Stream '%s' [%d]/[%d] [%s] %s recorded: %06ld frames ",
+    if(v->settings->tag_record) {
+        veejay_msg(VEEJAY_MSG_INFO, "Stream '%s' [%d]/[%d] [%s] [transition%sactive (shape n°%02d>%d frames)] [recorded: %06ld frames]",
             title,id,vj_tag_size(),description,
-        (vj_tag_get_active(id) ? "is active" : "is not active"),
-        vj_tag_get_encoded_frames(id));
-    else
-    veejay_msg(VEEJAY_MSG_INFO,
-        "Stream [%d]/[%d] [%s] %s ",
-        id, vj_tag_size(), description,
-        (vj_tag_get_active(id) == 1 ? "is active" : "is not active"));
+            (vj_tag_get_transition_active(id) == 1 ? " " : " not " ),
+            vj_tag_get_transition_shape(id),
+            vj_tag_get_transition_length(id),
+            vj_tag_get_encoded_frames(id));
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_INFO, "Stream '%s' [%d]/[%d] [%s] [transition%sactive (shape n°%02d>%d frames)]",
+            title,id,vj_tag_size(),description,
+            (vj_tag_get_transition_active(id) == 1 ? " " : " not " ),
+            vj_tag_get_transition_shape(id),
+            vj_tag_get_transition_length(id));
+    }
 
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
     {
