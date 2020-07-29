@@ -3992,9 +3992,9 @@ static void update_current_slot(int *history, int pm, int last_pm)
         info->uc.reload_hint[HINT_KF] = 1;
 
 
-        sample_gui_slot_t* guislot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
-        if (guislot != NULL)
-            put_text( "entry_samplename", guislot->title );
+        sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
+        if (gui_slot != NULL)
+            put_text( "entry_samplename", gtk_label_get_text( GTK_LABEL(gui_slot->title)) );
         else
             put_text( "entry_samplename", "" );
 
