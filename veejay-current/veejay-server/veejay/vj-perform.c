@@ -2721,8 +2721,8 @@ void vj_perform_record_offline_stop(veejay_t *info)
         int n_frames = 0;
         int linked_id = 0;
         int rec_format = 0;
-        sample_get_offline_recorder( info->uc->sample_id, &n_frames, &linked_id, &rec_format );
-        vj_perform_start_offline_recorder(info, rec_format, linked_id, n_frames, 0, info->uc->sample_id ); 
+        sample_get_offline_recorder( settings->offline_linked_sample_id, &n_frames, &linked_id, &rec_format );
+        vj_perform_start_offline_recorder(info, rec_format, linked_id, n_frames, 0, settings->offline_linked_sample_id ); 
     }
     else {
         settings->offline_record = 0;
