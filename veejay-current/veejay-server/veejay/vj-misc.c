@@ -353,28 +353,10 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 
 int	veejay_create_temp_file(const char *prefix, char *dst)
 {
-	time_t today_time_;
-	struct tm *today;
+    struct timespec now;
+    clock_gettime( CLOCK_MONOTONIC, &now );
 
-	today_time_ = time(NULL);
-	today = localtime( &today_time_ );
-	/* time:
-		prefix_01-01-04-hh:mm:ss
-           put time in filename, on cp a.o. the creation date
-	   will be set to localtime (annoying for users who
-	   copy arround files)
-	*/
-
-	sprintf(dst,
-		"%s_%02d%02d%02d_%02d%02d%02d",		
-		prefix,
-		today->tm_mday,
-		today->tm_mon,
-		(today->tm_year%100),
-		today->tm_hour,
-		today->tm_min,
-		today->tm_sec);
-
+	sprintf(dst, "%s_%ld_%ld",prefix, now.tv_sec, now.tv_nsec ); 
 	return 1;
 }
 

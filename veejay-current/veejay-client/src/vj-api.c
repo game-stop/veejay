@@ -332,6 +332,11 @@ enum {
   WIDGET_STREAM_TRANSITION_ACTIVE = 241,
   WIDGET_STREAM_TRANSITION_LENGTH = 242,
   WIDGET_STREAM_TRANSITION_SHAPE = 243,
+  WIDGET_OFFLINE_STOP_SAMPLE = 244,
+  WIDGET_OFFLINE_START_SAMPLE = 245,
+  WIDGET_BUFFEREDSTREAMID = 246,
+  WIDGET_BUFFEREDSTREAMLENGTH = 247
+
 };
 
 
@@ -352,6 +357,10 @@ enum {
  SAMPLE_WIDGET_FXPANEL,
  SAMPLE_WIDGET_BUTTON_083,
  SAMPLE_WIDGET_PANEL,
+ SAMPLE_WIDGET_OFFLINE_STOP_SAMPLE,
+ SAMPLE_WIDGET_OFFLINE_START_SAMPLE,
+ SAMPLE_WIDGET_BUFFEREDSTREAMID,
+ SAMPLE_WIDGET_BUFFEREDSTREAMLENGTH,
  SAMPLE_WIDGET_NONE // must be last
 };
 
@@ -462,6 +471,10 @@ static struct
     {  SAMPLE_WIDGET_FXPANEL,                   WIDGET_FXPANEL },
     {  SAMPLE_WIDGET_BUTTON_083,                WIDGET_BUTTON_083 },
     {  SAMPLE_WIDGET_PANEL,                     WIDGET_PANELS },
+    {  SAMPLE_WIDGET_OFFLINE_STOP_SAMPLE,       WIDGET_OFFLINE_STOP_SAMPLE },
+    {  SAMPLE_WIDGET_OFFLINE_START_SAMPLE,      WIDGET_OFFLINE_START_SAMPLE },
+    {  SAMPLE_WIDGET_BUFFEREDSTREAMID,          WIDGET_BUFFEREDSTREAMID },
+    {  SAMPLE_WIDGET_BUFFEREDSTREAMLENGTH,      WIDGET_BUFFEREDSTREAMLENGTH },
     {  SAMPLE_WIDGET_NONE,                      -1 },
 };
 
@@ -719,6 +732,10 @@ static struct
     { "tag_transition_active",      WIDGET_STREAM_TRANSITION_ACTIVE },
     { "tag_transition_length",      WIDGET_STREAM_TRANSITION_LENGTH },
     { "tag_transition_shape",       WIDGET_STREAM_TRANSITION_SHAPE },
+    { "button_offline_stop_sample",    WIDGET_OFFLINE_STOP_SAMPLE },
+    { "button_offline_start_sample",    WIDGET_OFFLINE_START_SAMPLE },
+    { "spin_bufferedstreamid",       WIDGET_BUFFEREDSTREAMID },
+    { "spin_bufferedstreamlength",   WIDGET_BUFFEREDSTREAMLENGTH },
 
     { NULL, -1 },
 };
@@ -7687,6 +7704,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
         info->uc.real_num_samples = n_samples;
         info->uc.real_num_streams = n_streams;
+
+        update_spin_range2( widget_cache[WIDGET_BUFFEREDSTREAMID], 1, n_streams, info->status_tokens[CURRENT_ID] );
     }
 
     if( info->status_tokens[SAMPLE_LOOP_STAT_STOP] != history[SAMPLE_LOOP_STAT_STOP] ) {

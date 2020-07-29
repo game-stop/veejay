@@ -66,7 +66,10 @@ size_t	vj_perform_fx_chain_size();
 
 void	vj_perform_record_video_frame(veejay_t *info);
 
-int vj_perform_try_sequencer(veejay_t *info);
+void vj_perform_start_offline_recorder(veejay_t *v, int rec_format, int stream_id, int duration, int autoplay, int sample_id);
+int vj_perform_commit_offline_recording(veejay_t *info, int id, char *recording);
+
+int vj_perform_try_sequence(veejay_t *info);
 
 int vj_perform_get_next_sequence_id(veejay_t *info, int *type, int current, int *new_current);
 

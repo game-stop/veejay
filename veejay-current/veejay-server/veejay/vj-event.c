@@ -7367,41 +7367,11 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
     
     if( vj_tag_exists(args[0]))
     {
-        char tmp[1024];
-        int rec_format = _recorder_format;
-        char prefix[40];
-
-        if(rec_format==-1)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "(Offline) Error, no video recording format selected");
-            return;
-        }
-
-        snprintf(prefix,sizeof(prefix),"stream-%02d", args[0]);
-
-        if(!veejay_create_temp_file(prefix, tmp ))
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "(Offline) Error creating temporary file %s. Unable to start offline recorder", tmp);
-            return;
-        }
-
-        if( vj_tag_init_encoder( args[0], tmp, rec_format, args[1]) ) 
-        {
-            video_playback_setup *s = v->settings;
-            veejay_msg(VEEJAY_MSG_INFO, "(Offline) recording from stream %d", args[0]);
-            s->offline_record = 1;
-            s->offline_tag_id = args[0];
-            s->offline_created_sample = args[2];  // auto play
-            s->offline_linked_sample_id = ( sample_exists(args[3]) ? args[3]: -1 );
-        } 
-        else
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "(Offline) error starting recording stream %d",args[0]);
-        }
+        vj_perform_start_offline_recorder(v,_recorder_format, args[0], args[1], args[2], args[3]);
     }
     else
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "(Offline) Unable to record from stream %d as it does not exists",args[0]);
+        veejay_msg(VEEJAY_MSG_ERROR, "(Offline) Unable to record from non-existing stream %d",args[0]);
     }
 }
 
@@ -7414,29 +7384,28 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
     {
         if( vj_tag_stop_encoder( s->offline_tag_id ) == 1 )
         {
+            int id = 0;
+
             vj_tag_get_encoded_file(s->offline_tag_id, avi_file);
-            
-            // create new sample    
-            int ns = veejay_edit_addmovie_sample(v,avi_file,0);
-            if(ns)
-            {
-                if( vj_tag_get_encoded_frames(s->offline_tag_id) > 0)
-                    veejay_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s",
-                            ns,avi_file);
-            }       
-            else
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList",avi_file);
+
+            if( v->settings->offline_linked_sample_id == -1 ) {
+                id = 0;
             }
+            else {
+                id = v->settings->offline_linked_sample_id;
+            }
+
+            int new_id = vj_perform_commit_offline_recording(v, id, avi_file );
 
             vj_tag_reset_encoder(s->offline_tag_id);
 
-            if(s->offline_created_sample) 
+            if(s->offline_created_sample && new_id > 0 )
             {
-                int last_id = sample_highest_valid_id();
-                veejay_msg(VEEJAY_MSG_INFO, "Playing new sample %d now ",last_id );
-                veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,last_id );
+                veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d now ",new_id );
+                veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,new_id );
             }
+
+            veejay_msg(VEEJAY_MSG_INFO, "Stopped offline recorder");
         }
         s->offline_record = 0;
         s->offline_tag_id = 0;

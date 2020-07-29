@@ -2291,6 +2291,30 @@ int sample_chain_set_kf_status( int s1, int entry, int status )
    return 1;    
 }
 
+void sample_set_offline_recorder( int s1, int duration, int linked_id, int rec_format )
+{
+    sample_info *sample = sample_get(s1);
+    if(sample) {
+        sample->offline_record.duration = duration;
+        sample->offline_record.linked_id = linked_id;
+        sample->offline_record.rec_format = rec_format;
+    }
+}
+
+int sample_get_offline_recorder( int s1, int *duration, int *linked_id, int *rec_format )
+{
+    sample_info *sample = sample_get(s1);
+    if(!sample)
+        return 0;
+    
+    *duration = sample->offline_record.duration;
+    *linked_id = sample->offline_record.linked_id;
+    *rec_format = sample->offline_record.rec_format;
+
+    return 1;
+}
+
+
 unsigned char * sample_chain_get_kfs( int s1, int entry, int parameter_id, int *len )
 {
    sample_info *sample = sample_get(s1);

@@ -2501,11 +2501,52 @@ static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
     return vj_tag_record_frame( info->uc->sample_id, frame, NULL, 0, info->pixel_format);
 }   
 
+int vj_perform_commit_offline_recording(veejay_t *info, int id, char *recording)
+{
+    sample_info *sample = NULL;
+    if( id > 0 ) {
+        sample = sample_get(id);
+        if(!sample) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Sample %d no longer exists, creating new sample for recording", id);
+            id = 0;
+        }
+    }
+
+    int new_id = -1;
+
+    if( id > 0 && sample != NULL ) {
+        long end_pos = sample->last_frame;
+        new_id = veejay_edit_addmovie_sample( info, recording, id );
+        if(new_id != -1) {
+            if(end_pos < sample->last_frame) {
+                sample->first_frame = end_pos;
+            }
+            veejay_msg(VEEJAY_MSG_DEBUG, "Sample position set to %ld - %ld to loop newly recorded video %s",
+                    sample->first_frame, sample->last_frame, recording );
+        }
+        else {
+            veejay_msg(VEEJAY_MSG_ERROR,"Failed to add recording %s to EditList", recording);
+        }
+    }
+
+    if( id == 0 ) {
+        new_id = veejay_edit_addmovie_sample(info, recording, 0 );
+        if(new_id != -1) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Added recording %s to new sample", recording);
+        }
+        else {
+            veejay_msg(VEEJAY_MSG_ERROR, "Failed to add recording %s to EditList", recording );
+        }
+    }
+
+    return new_id;
+}
+
 static int vj_perform_record_offline_commit_single(veejay_t *info)
 {
     char filename[2048];
     int stream_id = info->settings->offline_tag_id;
-    
+    int n_id = 0;
     if(vj_tag_get_encoded_file(stream_id, filename))
     {
         int df = vj_event_get_video_format();
@@ -2524,14 +2565,15 @@ static int vj_perform_record_offline_commit_single(veejay_t *info)
             if(info->settings->offline_linked_sample_id > 0) {
                 veejay_msg(VEEJAY_MSG_WARNING, "Cannot append to a yuv4mpeg stream (change recording format)");
             }
-            id = veejay_create_tag( info, VJ_TAG_TYPE_YUV4MPEG,filename,info->nstreams,0,0 );
+            n_id = veejay_create_tag( info, VJ_TAG_TYPE_YUV4MPEG,filename,info->nstreams,0,0 );
         } else {
-            
-            id = veejay_edit_addmovie_sample(info, filename, id);
-            veejay_msg(VEEJAY_MSG_INFO, "Sample %d has new video data", id );
+
+            n_id = vj_perform_commit_offline_recording( info, id, filename );
+
+            veejay_msg(VEEJAY_MSG_INFO, "Sample %d has new video data", n_id );
         }
 
-        return id;
+        return n_id;
     }
 
     return 0;
@@ -2606,6 +2648,46 @@ static int vj_perform_record_commit_single(veejay_t *info)
     return 0;
 }
 
+void vj_perform_start_offline_recorder(veejay_t *v, int rec_format, int stream_id, int duration, int autoplay, int sample_id)
+{
+    char tmp[2048];
+    char prefix[40];
+    video_playback_setup *s = v->settings;
+
+    if(rec_format==-1)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "No video recording format selected");
+        return;
+    }
+
+    snprintf(prefix,sizeof(prefix),"stream-%02d", stream_id);
+
+    if(!veejay_create_temp_file(prefix, tmp ))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Error creating temporary file %s. Unable to start offline recorder", tmp);
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Created temporary file %s", tmp );
+
+    if( vj_tag_init_encoder(stream_id, tmp, rec_format,duration) ) 
+    {
+        video_playback_setup *s = v->settings;
+        s->offline_record = 1;
+        s->offline_tag_id = stream_id;
+        s->offline_created_sample = autoplay;
+        s->offline_linked_sample_id = ( sample_exists(sample_id) ? sample_id: -1 );
+
+        if(v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && s->offline_linked_sample_id > 0 ) {
+            sample_set_offline_recorder( v->uc->sample_id, duration, stream_id, rec_format );
+        }
+    }
+    else
+    {
+       veejay_msg(VEEJAY_MSG_ERROR, "Error starting offline recorder stream %d",stream_id);
+    }
+}
+
 void vj_perform_record_offline_stop(veejay_t *info)
 {   
     video_playback_setup *settings = info->settings;
@@ -2617,17 +2699,15 @@ void vj_perform_record_offline_stop(veejay_t *info)
     vj_tag_reset_encoder(stream_id);
     vj_tag_reset_autosplit(stream_id);
     
-    settings->offline_record = 0;
-    settings->offline_created_sample = 0;
-    settings->offline_tag_id = 0;
-//FIXME
     if( play ) {
         if(df != ENCODER_YUV4MPEG && df != ENCODER_YUV4MPEG420)
         {
             info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
             int id = sample_highest_valid_id();
             veejay_set_sample(info, id );
-            veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
+            if( id > 0 ) {
+                veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
+            }
         }
         else {
 
@@ -2636,6 +2716,20 @@ void vj_perform_record_offline_stop(veejay_t *info)
     }
 
     vj_perform_record_buffer_free(info->performer);
+
+    if( settings->offline_linked_sample_id > 0 ) {
+        int n_frames = 0;
+        int linked_id = 0;
+        int rec_format = 0;
+        sample_get_offline_recorder( info->uc->sample_id, &n_frames, &linked_id, &rec_format );
+        vj_perform_start_offline_recorder(info, rec_format, linked_id, n_frames, 0, info->uc->sample_id ); 
+    }
+    else {
+        settings->offline_record = 0;
+        settings->offline_created_sample = 0;
+        settings->offline_tag_id = 0;
+    }
+    
 }
 
 void vj_perform_record_stop(veejay_t *info)
@@ -2653,7 +2747,9 @@ void vj_perform_record_stop(veejay_t *info)
         if( df != ENCODER_YUV4MPEG && df != ENCODER_YUV4MPEG420 ) {
             int id = sample_highest_valid_id();
             veejay_set_sample( info,id);
-            veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
+            if(id > 0 ) {
+                veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
+            }
         } else {
             veejay_msg(VEEJAY_MSG_WARNING, "Not autoplaying new streams");
         }
@@ -2681,8 +2777,10 @@ void vj_perform_record_stop(veejay_t *info)
         {
             info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
             int id = sample_highest_valid_id();
-            veejay_set_sample(info, id );
-            veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
+            if( id > 0 ) {
+                veejay_set_sample(info, id );
+                veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d",id);
+            }
         }
         else {
 

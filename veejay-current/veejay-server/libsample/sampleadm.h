@@ -113,10 +113,16 @@ typedef struct sample_eff_t {
 	int clear;
 } sample_eff_chain;
 
+typedef struct sample_off_rec_t {
+    int duration;
+    int linked_id;
+    int rec_format;
+} sample_offline_recorder;
 
 typedef struct sample_info_t {
     int sample_id;		/* identifies a unique sample */
     sample_eff_chain *effect_chain[SAMPLE_MAX_EFFECTS];	/* effect chain */
+    sample_offline_recorder offline_record; /* buffered stream */
     long first_frame;		/* start of sample */
     long last_frame;		/* end of sample */
     char descr[SAMPLE_MAX_DESCR_LEN];
@@ -382,6 +388,8 @@ extern void sample_set_transition_shape(int s1, int shape);
 extern void sample_set_transition_length(int s1, int length);
 extern int sample_get_transition_active(int t1);
 extern void sample_set_transition_active(int t1, int status);
+extern void sample_set_offline_recorder( int s1, int duration, int linked_id, int rec_format);
+extern int sample_get_offline_recorder( int s1, int *duration, int *linked_id, int *rec_format );
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);

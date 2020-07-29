@@ -4775,3 +4775,28 @@ void on_notebook18_switch_page (GtkNotebook *notebook,
     }
 }
 
+void on_button_offline_stop_sample_clicked(GtkWidget *widget, gpointer user_data)
+{
+    single_vims( VIMS_STREAM_OFFLINE_REC_STOP );
+}
+
+void on_button_offline_start_sample_clicked(GtkWidget *widget, gpointer user_data)
+{
+    int stream_id = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget_cache[ WIDGET_BUFFEREDSTREAMID ] ));
+    int n_frames = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget_cache[ WIDGET_BUFFEREDSTREAMLENGTH ] ));
+    int cur_id = info->status_tokens[ CURRENT_ID ];
+
+    multi_vims( VIMS_STREAM_OFFLINE_REC_START, "%d %d 0 %d", stream_id, n_frames, cur_id );
+
+    vj_msg(VEEJAY_MSG_INFO, "Signalled offline stream recorder to loop-record %d frames from stream %d and append the recording to sample %d",
+            n_frames, stream_id, cur_id );
+}
+
+void on_spin_bufferedstreamid_value_changed(GtkWidget *widget, gpointer user_data)
+{
+}
+
+void on_spin_bufferedstreamlength_value_changed(GtkWidget *widget, gpointer user_data)
+{
+}
+
