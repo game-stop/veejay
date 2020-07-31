@@ -3939,6 +3939,13 @@ static void update_record_tab(int pm)
     }
 }
 
+/******************************************************
+ * update_current_slot()
+ *   update current slot specific widgets when updating
+ *   the global information
+ *
+ * see update_globalinfo ()
+ ******************************************************/
 static void update_current_slot(int *history, int pm, int last_pm)
 {
     gint update = 0;
@@ -4008,18 +4015,10 @@ static void update_current_slot(int *history, int pm, int last_pm)
         info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_KF] = 1;
 
-
-        sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
-        if (gui_slot != NULL)
-            put_text( "entry_samplename", gtk_label_get_text( GTK_LABEL(gui_slot->title)) );
-        else
-            put_text( "entry_samplename", "" );
-
         set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
-
     }
 
-    /* Actions for stream */
+    /* Actions for stream mode*/
     if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )
     {
         /* Is a solid color stream */
@@ -4045,9 +4044,9 @@ static void update_current_slot(int *history, int pm, int last_pm)
         update_label_str( "playhint", "Streaming");
     
         info->uc.reload_hint[HINT_KF] = 1;
-    }
+    }/* End actions for stream mode */
 
-    /* Actions for sample */
+    /* Actions for sample mode*/
     if( pm == MODE_SAMPLE )
     {
         int marker_go = 0;
@@ -4214,15 +4213,19 @@ static void update_current_slot(int *history, int pm, int last_pm)
                 (gdouble) info->status_tokens[SAMPLE_END], 
                 info->status_tokens[FRAME_NUM] );
 
+            sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
+            if (gui_slot != NULL)
+                put_text( "entry_samplename", gtk_label_get_text( GTK_LABEL(gui_slot->title)) );
+
          //   update_spin_range( "spin_text_start", 0, n_frames ,0);
          //   update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
         }
-    }
+    }/* End of actions for sample mode */
 
-    if (update){
+    /* Block transitions widgets "value-changed" signal to prevent propagation */
+    if (pm == MODE_SAMPLE || pm == MODE_STREAM){
 
-        //block "value-changed" signal to prevent propagation
         guint signal_id = g_signal_lookup("value-changed", GTK_TYPE_SPIN_BUTTON);
 
         gpointer widget_stl = (gpointer)widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH];
@@ -4276,7 +4279,7 @@ static void update_current_slot(int *history, int pm, int last_pm)
         if (handler_sts) {
             g_signal_handler_unblock(widget_sts, handler_sts);
         }
-    }
+    }/* End block transitions wdg signals */
 
     if( pm == MODE_SAMPLE || pm == MODE_STREAM ) {
         if( history[CHAIN_FADE] != info->status_tokens[CHAIN_FADE] )
