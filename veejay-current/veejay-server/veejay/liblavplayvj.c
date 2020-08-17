@@ -698,15 +698,11 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
     settings->transition.active = 0;*/
 
     if( !info->seq->active && settings->transition.ready == 0 && new_pm != VJ_PLAYBACK_MODE_PLAIN && ( sample_id != info->uc->sample_id || new_pm != info->uc->playback_mode)) {
+        int current_pm = info->uc->playback_mode;
         settings->transition.next_type = new_pm;
         settings->transition.next_id = sample_id;
-        
-        int transition_length = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_length( info->uc->sample_id ) : vj_tag_get_transition_length( info->uc->sample_id ) );
-        int transition_shape = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_shape( info->uc->sample_id ) : vj_tag_get_transition_shape( info->uc->sample_id ) );
 
-        if( transition_shape == -1 ) {
-            transition_shape = ( (int) ( (double) shapewipe_get_num_shapes( settings->transition.ptr ) * rand() / (RAND_MAX)));
-        }
+        int transition_length = ( current_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_length( info->uc->sample_id ) : vj_tag_get_transition_length( info->uc->sample_id ) );
 
         if(settings->current_playback_speed < 0 ) {
             settings->transition.start = settings->current_frame_num;
@@ -720,8 +716,12 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
             if( settings->transition.end > settings->max_frame_num )
                 settings->transition.end = settings->max_frame_num;
         }
-        settings->transition.shape = transition_shape;
-        settings->transition.active = ( new_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_active( info->uc->sample_id ) : vj_tag_get_transition_active(info->uc->sample_id));
+
+        int transition_shape = ( current_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_shape( info->uc->sample_id ) : vj_tag_get_transition_shape( info->uc->sample_id ) );
+
+        settings->transition.shape = ( transition_shape != -1 ? transition_shape : ( (int) ( (double) shapewipe_get_num_shapes( settings->transition.ptr ) * rand() / (RAND_MAX))));
+
+        settings->transition.active = ( current_pm == VJ_PLAYBACK_MODE_SAMPLE ? sample_get_transition_active( info->uc->sample_id ) : vj_tag_get_transition_active(info->uc->sample_id));
     
         settings->transition.ready = 0;
 
