@@ -33,7 +33,7 @@ AC_SUBST(LT_AGE)
 dnl **********************************************************************
 dnl Options
 
-AC_CONFIG_MACRO_DIR([m4])
+#AC_CONFIG_MACRO_DIR([m4])
 
 
 dnl kill CFLAGS
