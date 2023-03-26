@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 AC_INIT([veejay],[1.5.66],[http://www.veejayhq.net])
-AC_PREREQ(2.57)
+AC_PREREQ([2.71])
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
@@ -33,7 +33,7 @@ AC_SUBST(LT_AGE)
 dnl **********************************************************************
 dnl Options
 
-AC_CONFIG_MACRO_DIR([m4])
+dnl AC_CONFIG_MACRO_DIR([m4])
 
 
 dnl kill CFLAGS
@@ -42,67 +42,58 @@ CFLAGS=""
 dnl enable auto vectorization for libvjmem, libvje and libyuv
 
 AC_ARG_ENABLE([strict],
-		AC_HELP_STRING([--enable-strict],
-			     [Compile in paranoia assertion checking]))
+		AS_HELP_STRING([--enable-strict],[Compile in paranoia assertion checking]))
 
 AC_ARG_ENABLE([sanitizer],
-        AC_HELP_STRING([--enable-sanitizer],
-                 [Enable AddressSanitizer]))
+        AS_HELP_STRING([--enable-sanitizer],[Enable AddressSanitizer]))
 
 AC_ARG_ENABLE([debug],
-		AC_HELP_STRING([--enable-debug],
-			     [Compile in debugging information]))
+		AS_HELP_STRING([--enable-debug],[Compile in debugging information]))
 AC_ARG_ENABLE([profile],
-		AC_HELP_STRING([--enable-profiling],
-			     [Compile in profiling information]))
+		AS_HELP_STRING([--enable-profiling],[Compile in profiling information]))
 AC_ARG_ENABLE([compile-warnings],     
-              AC_HELP_STRING([--enable-compile-warnings],
-                             [Turn on compiler warnings.]))
+              AS_HELP_STRING([--enable-compile-warnings],[Turn on compiler warnings.]))
 AC_ARG_ENABLE([warnings_as_errors],   
-              AC_HELP_STRING([--enable-warnings_as_errors],
-                             [Compiler warnings are errors.]))
+              AS_HELP_STRING([--enable-warnings_as_errors],[Compiler warnings are errors.]))
 AC_ARG_WITH([extra-cflags],
-            AC_HELP_STRING([--with-extra-cflags=flags],
-                           [Options to be added to CFLAGS (optional)]))
+            AS_HELP_STRING([--with-extra-cflags=flags],[Options to be added to CFLAGS (optional)]))
 AC_ARG_WITH([libdv],
-            AC_HELP_STRING([--without-libdv], [Do not use libdv.]),
+            AS_HELP_STRING([--without-libdv],[Do not use libdv.]),
             [], [with_libdv=yes])
 
 AC_ARG_WITH([pixbuf],
-            AC_HELP_STRING([--without-pixbuf], [Do not use GDK pixbuf]),
+            AS_HELP_STRING([--without-pixbuf],[Do not use GDK pixbuf]),
             [], [with_pixbuf=yes])
 
 AC_ARG_WITH([playthread],
-            AC_HELP_STRING([--without-playthread], [Do not use playback thread]),
+            AS_HELP_STRING([--without-playthread],[Do not use playback thread]),
             [], [with_playthread=yes])
 	    
 AC_ARG_WITH([directfb],
-	     AC_HELP_STRING([--without-directfb], [Do not use DirectFB.]),
+	     AS_HELP_STRING([--without-directfb],[Do not use DirectFB.]),
 	 	[], [with_directfb=yes])
 AC_ARG_WITH([sdl],
-	     AC_HELP_STRING([--without-sdl], [Do not use SDL.]),
+	     AS_HELP_STRING([--without-sdl],[Do not use SDL.]),
 	        [], [with_sdl=yes])
 AC_ARG_WITH([jack],
-		AC_HELP_STRING([--without-jack], [Do not use jack.]),
+		AS_HELP_STRING([--without-jack],[Do not use jack.]),
 		[], [with_jack=yes])
 
 AC_ARG_ENABLE([v4l1],
-		AC_HELP_STRING([--enable-v4l1],
-			     [Compile with video4linux instead of video4linux 2]))
+		AS_HELP_STRING([--enable-v4l1],[Compile with video4linux instead of video4linux 2]))
 
 AC_ARG_WITH([xml2],
-		AC_HELP_STRING([--without-xml2], [Do not use the XML library for Gnome]),
+		AS_HELP_STRING([--without-xml2],[Do not use the XML library for Gnome]),
 		[], [with_xml2=yes])
 
 AC_ARG_WITH([jpeg],
-		AC_HELP_STRING([--without-jpeg], [Do not JPEG support]),
+		AS_HELP_STRING([--without-jpeg],[Do not JPEG support]),
 		[],	[with_libjpeg=yes])
 
 AC_ARG_WITH([jpeg-mmx],
-            AC_HELP_STRING([--with-jpegmmx=PFX],
-                           [Prefix where jpeg-mmx is installed (optional).]))
+            AS_HELP_STRING([--with-jpegmmx=PFX],[Prefix where jpeg-mmx is installed (optional).]))
 
-AC_ARG_WITH([v4l2], AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
+AC_ARG_WITH([v4l2], AS_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
 		[],	[with_v4l2=yes])
 
 arch_target="auto"
@@ -110,10 +101,10 @@ AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic, auto or us
 					[Build a generic binary, auto-detect current cpu type or user defined -mtune/-march setting)]),
 					[ arch_target="$withval"])
 
-AC_GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 
 dnl Initialize libtool
-AC_PROG_LIBTOOL
+LT_INIT
 
 dnl Checks for programs.
 AC_PROG_AWK
@@ -160,7 +151,6 @@ AC_SEARCH_LIBS([clock_gettime], [rt],
 
 AC_SUBST(LIBGETOPT_LIB)
 
-AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 
