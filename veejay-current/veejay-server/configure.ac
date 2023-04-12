@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 AC_INIT([veejay],[1.5.66],[http://www.veejayhq.net])
-AC_PREREQ([2.71])
+AC_PREREQ([2.69])
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
