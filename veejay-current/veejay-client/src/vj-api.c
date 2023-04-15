@@ -729,9 +729,9 @@ static struct
     { "transition_active",      WIDGET_SAMPLE_TRANSITION_ACTIVE },
     { "transition_length",      WIDGET_SAMPLE_TRANSITION_LENGTH },
     { "transition_shape",       WIDGET_SAMPLE_TRANSITION_SHAPE },
-    { "tag_transition_active",      WIDGET_STREAM_TRANSITION_ACTIVE },
-    { "tag_transition_length",      WIDGET_STREAM_TRANSITION_LENGTH },
-    { "tag_transition_shape",       WIDGET_STREAM_TRANSITION_SHAPE },
+    { "stream_transition_active",      WIDGET_STREAM_TRANSITION_ACTIVE },
+    { "stream_transition_length",      WIDGET_STREAM_TRANSITION_LENGTH },
+    { "stream_transition_shape",       WIDGET_STREAM_TRANSITION_SHAPE },
     { "button_offline_stop_sample",    WIDGET_OFFLINE_STOP_SAMPLE },
     { "button_offline_start_sample",    WIDGET_OFFLINE_START_SAMPLE },
     { "spin_bufferedstreamid",       WIDGET_BUFFEREDSTREAMID },
@@ -3939,6 +3939,108 @@ static void update_record_tab(int pm)
     }
 }
 
+/******************************************************
+ * update_current_slot_transition_state()
+ *   update current slot transition widgets
+ *
+ * see update_current_slot()
+ ******************************************************/
+static void update_current_slot_transition_state(int * history, int pm)
+{
+    int sl = info->status_lock;
+
+    if (history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE]){
+        info->status_lock = 1;
+
+        if( pm == MODE_STREAM ) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]),
+                                        info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+        } else if ( pm == MODE_SAMPLE ) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]),
+                                        info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
+        }
+    }
+
+    if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH] ) {
+        /* Block transitions widgets "value-changed" signal to prevent propagation */
+        guint signal_id = g_signal_lookup("value-changed", GTK_TYPE_SPIN_BUTTON);
+
+        if( pm == MODE_STREAM ) {
+            gpointer widget_stl = (gpointer)widget_cache[WIDGET_STREAM_TRANSITION_LENGTH];
+            gulong handler_stl = g_signal_handler_find( widget_stl,
+                                                        G_SIGNAL_MATCH_ID,
+                                                        signal_id,
+                                                        0, NULL, NULL, NULL );
+
+            if (handler_stl) g_signal_handler_block(widget_stl, handler_stl);
+
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_stl),
+                                    (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+
+            if (handler_stl) g_signal_handler_unblock(widget_stl, handler_stl);
+
+        } else if ( pm == MODE_SAMPLE ) {
+            gpointer widget_stl = (gpointer)widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH];
+            gulong handler_stl = g_signal_handler_find( widget_stl,
+                                                        G_SIGNAL_MATCH_ID,
+                                                        signal_id,
+                                                        0, NULL, NULL, NULL );
+            if (handler_stl) g_signal_handler_block(widget_stl, handler_stl);
+
+            update_spin_range2( GTK_SPIN_BUTTON(widget_stl),
+                    (gdouble) info->status_tokens[SAMPLE_START],
+                    info->status_tokens[SAMPLE_END],
+                    info->status_tokens[SAMPLE_TRANSITION_LENGTH] );
+
+            if (handler_stl) g_signal_handler_unblock(widget_stl, handler_stl);
+        }
+    }
+
+    if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
+        /* Block transitions widgets "value-changed" signal to prevent propagation */
+        guint signal_id = g_signal_lookup("value-changed", GTK_TYPE_SPIN_BUTTON);
+
+        info->status_lock = 1;
+
+        if( pm == MODE_STREAM ) {
+            gpointer widget_sts = (gpointer)widget_cache[WIDGET_STREAM_TRANSITION_SHAPE];
+            gulong handler_sts = g_signal_handler_find( widget_sts,
+                                                        G_SIGNAL_MATCH_ID,
+                                                        signal_id,
+                                                        0, NULL, NULL, NULL );
+
+            if (handler_sts) g_signal_handler_block(widget_sts, handler_sts);
+
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_sts),
+                                    (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+
+            if (handler_sts) g_signal_handler_unblock(widget_sts, handler_sts);
+
+        } else if ( pm == MODE_SAMPLE ) {
+            gpointer widget_sts = (gpointer)widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE];
+            gulong handler_sts = g_signal_handler_find( widget_sts,
+                                                        G_SIGNAL_MATCH_ID,
+                                                        signal_id,
+                                                        0, NULL, NULL, NULL );
+
+            if (handler_sts) g_signal_handler_block(widget_sts, handler_sts);
+
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_sts),
+                                    (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
+
+            if (handler_sts) g_signal_handler_unblock(widget_sts, handler_sts);
+        }
+    }
+    info->status_lock = sl;
+}
+
+/******************************************************
+ * update_current_slot()
+ *   update current slot specific widgets when updating
+ *   the global information
+ *
+ * see update_globalinfo ()
+ ******************************************************/
 static void update_current_slot(int *history, int pm, int last_pm)
 {
     gint update = 0;
@@ -4008,6 +4110,7 @@ static void update_current_slot(int *history, int pm, int last_pm)
         info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_KF] = 1;
 
+
 		if( info->selected_slot != NULL ) {
         	sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
         	if (gui_slot != NULL)
@@ -4017,9 +4120,8 @@ static void update_current_slot(int *history, int pm, int last_pm)
 
         	set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
 		}
-    }
 
-    /* Actions for stream */
+    /* Actions for stream mode*/
     if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )
     {
         /* Is a solid color stream */
@@ -4045,9 +4147,9 @@ static void update_current_slot(int *history, int pm, int last_pm)
         update_label_str( "playhint", "Streaming");
     
         info->uc.reload_hint[HINT_KF] = 1;
-    }
+    }/* End actions for stream mode */
 
-    /* Actions for sample */
+    /* Actions for sample mode*/
     if( pm == MODE_SAMPLE )
     {
         int marker_go = 0;
@@ -4214,69 +4316,17 @@ static void update_current_slot(int *history, int pm, int last_pm)
                 (gdouble) info->status_tokens[SAMPLE_END], 
                 info->status_tokens[FRAME_NUM] );
 
+            sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
+            if (gui_slot != NULL)
+                put_text( "entry_samplename", gtk_label_get_text( GTK_LABEL(gui_slot->title)) );
+
          //   update_spin_range( "spin_text_start", 0, n_frames ,0);
          //   update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
         }
-    }
+    }/* End of actions for sample mode */
 
-    if (update){
-
-        //block "value-changed" signal to prevent propagation
-        guint signal_id = g_signal_lookup("value-changed", GTK_TYPE_SPIN_BUTTON);
-
-        gpointer widget_stl = (gpointer)widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH];
-        gpointer widget_sts = (gpointer)widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE];
-
-        gulong handler_stl = g_signal_handler_find( widget_stl,
-                                                    G_SIGNAL_MATCH_ID,
-                                                    signal_id,
-                                                    0, NULL, NULL, NULL );
-        gulong handler_sts = g_signal_handler_find( widget_sts,
-                                                    G_SIGNAL_MATCH_ID,
-                                                    signal_id,
-                                                    0, NULL, NULL, NULL );
-
-        if (handler_stl){
-            g_signal_handler_block(widget_stl, handler_stl);
-        }
-        if (handler_sts){
-            g_signal_handler_block(widget_sts, handler_sts);
-        }
-
-        if( pm == MODE_STREAM ) {
-            if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
-                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
-            }
-
-            if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH] ) {
-                gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
-            }
-
-            if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
-                gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE]), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
-            }
-        }
-        else if ( pm == MODE_SAMPLE ) {
-            if( history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE] ) {
-                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
-            }
-
-            update_spin_range2( widget_stl, (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH],
-                    info->status_tokens[SAMPLE_END], info->status_tokens[SAMPLE_TRANSITION_LENGTH] );
-
-            if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE] ) {
-                gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_sts), (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
-            }
-        }
-
-        if (handler_stl) {
-            g_signal_handler_unblock(widget_stl, handler_stl);
-        }
-        if (handler_sts) {
-            g_signal_handler_unblock(widget_sts, handler_sts);
-        }
-    }
+    update_current_slot_transition_state(history, pm);
 
     if( pm == MODE_SAMPLE || pm == MODE_STREAM ) {
         if( history[CHAIN_FADE] != info->status_tokens[CHAIN_FADE] )

@@ -3879,7 +3879,7 @@ void vj_event_set_transition(void *ptr, const char format[], va_list ap)
     int sample_id = args[1];
 
     if(playmode != VJ_PLAYBACK_MODE_SAMPLE && playmode != VJ_PLAYBACK_MODE_TAG) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode");
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback (%d) mode on setting transition", playmode);
         return;
     }
 
