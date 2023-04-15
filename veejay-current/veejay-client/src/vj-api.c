@@ -4110,8 +4110,16 @@ static void update_current_slot(int *history, int pm, int last_pm)
         info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_KF] = 1;
 
-        set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
-    }
+
+		if( info->selected_slot != NULL ) {
+        	sample_gui_slot_t* gui_slot = find_gui_slot_by_sample(info->selected_slot->sample_id, info->selected_slot->sample_type);
+        	if (gui_slot != NULL)
+            	put_text( "entry_samplename", gtk_label_get_text( GTK_LABEL(gui_slot->title)) );
+        	else
+            	put_text( "entry_samplename", "" );
+
+        	set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
+		}
 
     /* Actions for stream mode*/
     if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )

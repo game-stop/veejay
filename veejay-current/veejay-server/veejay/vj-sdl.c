@@ -177,6 +177,16 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
 
     // Iterate through available driver and try in order of priority
     char *sdl_driver = getenv("VEEJAY_SDL_DRIVER");
+    char *shrd = getenv("VEEJAY_SDL_HINT_RENDER_DRIVER");
+    char *shfa = getenv("VEEJAY_SDL_HINT_FRAMEBUFFER_ACCELERATION");
+   
+    if( shrd != NULL ) {
+      SDL_SetHint( SDL_HINT_RENDER_DRIVER, shrd );
+    }
+    if( shfa != NULL ) {
+      SDL_SetHint( SDL_HINT_FRAMEBUFFER_ACCELERATION, shfa );
+    }
+
     if(sdl_driver == NULL) {
         int num_renderers = SDL_GetNumRenderDrivers();
         int flags[3] = { SDL_RENDERER_PRESENTVSYNC, SDL_RENDERER_ACCELERATED, SDL_RENDERER_SOFTWARE };
@@ -216,6 +226,7 @@ int vj_sdl_init(void *ptr, int x, int y, int scaled_width, int scaled_height, ch
     }
 
     SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "linear" );
+ 
     SDL_RenderSetLogicalSize( vjsdl->renderer, vjsdl->width, vjsdl->height );
 
     vjsdl->texture = SDL_CreateTexture( vjsdl->renderer, SDL_PIXELFORMAT_YUY2, SDL_TEXTUREACCESS_STREAMING, vjsdl->width,vjsdl->height);
