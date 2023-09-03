@@ -82,8 +82,8 @@ static int sock_connect(const char *name, int port) {
 vj_sock_t	*alloc_sock_t(void)
 {
 	vj_sock_t *s = (vj_sock_t*) malloc(sizeof(vj_sock_t));
-	memset( s, 0, sizeof(vj_sock_t));
 	if(!s) return NULL;
+	memset( s, 0, sizeof(vj_sock_t));
 	return s;
 }
 

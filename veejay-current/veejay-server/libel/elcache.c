@@ -105,7 +105,7 @@ static	int	cache_locate_slot( cache_t *v, long frame_num)
 
 void	*init_cache( unsigned int n_slots )
 {
-	if(n_slots <= 0)
+	if(n_slots == 0)
 		return NULL;
 	cache_t *v = (cache_t*) vj_calloc(sizeof(cache_t));
 	v->len = n_slots;

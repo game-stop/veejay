@@ -316,9 +316,9 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 		return;
 	}
 	char port[6];
-	snprintf( port, sizeof(port-1), "%d", args[0] );
+	snprintf( port, sizeof(port), "%d", args[0] );
 	char name[1024];
-	snprintf(name, sizeof(name)-1, "%s:%s", str,port );
+	snprintf(name, sizeof(name), "%s:%s", str,port );
 	char *cmd = "/status";
 	char *nptr = name;
 	if( osc_has_connection( name ) ) {
