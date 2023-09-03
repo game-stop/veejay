@@ -66,7 +66,7 @@ typedef struct {
 
 //static void vj_macro_print(vj_macro_t *macro);
 
-static  int vvm_[VIMS_QUIT];
+static  int vvm_[VIMS_QUIT+1];
 
 void *vj_macro_new(void)
 {
@@ -606,7 +606,7 @@ static void vj_macro_load_bank( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
         
         if( !xmlStrcmp( cur->name, (const xmlChar*) XMLTAG_MACRO_MESSAGES)) {
             vj_macro_load_messages( ptr, key, doc, cur->xmlChildrenNode );
-            free(key);
+            if(key != NULL) { free(key); key = NULL; }
         }
       
         cur = cur->next;

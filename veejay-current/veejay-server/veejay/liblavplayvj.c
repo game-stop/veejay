@@ -454,9 +454,7 @@ void veejay_busy(veejay_t * info)
 
 void veejay_quit(veejay_t * info)
 {
-	vj_lock(info);
-    veejay_change_state(info, LAVPLAY_STATE_STOP);
-    vj_unlock(info);
+	veejay_change_state(info, LAVPLAY_STATE_STOP);
 }
 
 

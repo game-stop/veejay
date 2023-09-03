@@ -1179,6 +1179,8 @@ static  unsigned char   *get_font_name( vj_font_t *f,unsigned char *font, int id
             if(fontName) free(fontName);
             return NULL;
         }
+        free(fontName);
+        fontName = nfontName;
     }
 
     int i;

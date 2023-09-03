@@ -2190,7 +2190,6 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info,performer_t *p,vjp_
     }
 
     vj_perform_apply_first(info,p,setup,frames,fx_entry,effect_id,chain_entry,(int) settings->current_frame_num,fx_entry->fx_instance,pm);
-    settings->fxrow[ chain_entry ] = effect_id;
     
     if( p->pvar_.fade_entry == chain_entry && p->pvar_.fade_method == 2) {
         vj_perform_pre_chain( p, frames[0] );
@@ -2267,7 +2266,6 @@ static  int vj_perform_preprocess_secundary( veejay_t *info,performer_t *p, int 
                 vj_perform_supersample( settings,p, subframes[0], subframes[1], sm );
 
                 vj_perform_apply_first(info,p,&setup,subframes,fx_entry,fx_id,n,(int) settings->current_frame_num,fx_entry->fx_instance, mode );
-                settings->fxrow[n] = fx_id;
             }
             break;
         case VJ_PLAYBACK_MODE_TAG:
@@ -2288,7 +2286,6 @@ static  int vj_perform_preprocess_secundary( veejay_t *info,performer_t *p, int 
                 vj_perform_supersample(settings,p, subframes[0],subframes[1], sm);
 
                 vj_perform_apply_first(info,p,&setup,subframes,fx_entry,fx_id,n,(int) settings->current_frame_num,fx_entry->fx_instance, mode );
-                settings->fxrow[n] = fx_id; 
             }
             break;
     }

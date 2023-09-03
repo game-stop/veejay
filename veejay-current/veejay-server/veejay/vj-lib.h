@@ -204,7 +204,6 @@ typedef struct {
 	int	cx;
 	int	cn;
 	int	ca;
-	int	fxrow[3];
 	int	fxdepth;
 	int	repeat_delay;
 	int	repeat_interval;
