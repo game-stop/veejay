@@ -41,7 +41,12 @@ static char *UTF8toLAT1(unsigned char *in)
 
 	if (UTF8Toisolat1(out, &out_size, in, &in_size) != 0)
 		veejay_memcpy( out, in, out_size );
-	out = realloc(out, out_size + 1);
+	unsigned char *nout = realloc(out, out_size + 1);
+	if( nout == NULL) {
+		if(out) free(out);
+		return NULL;
+	}
+
 	out[out_size] = 0;	
 
 	return (char*) out;

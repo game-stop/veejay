@@ -66,7 +66,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int alpha = lvd_extract_param_index(my_instance, "in_parameters",5);
 	int sigma = lvd_extract_param_index(my_instance, "in_parameters",6);
 
-	snprintf(cmd,sizeof(cmd),"-erode %d -erode %d -equalize 255 -smooth %f,%f,%f,%f",
+	snprintf(cmd,sizeof(cmd),"-erode %d -erode %d -equalize 255 -smooth %f,%f,%f,%f,%f",
 		erode1,
 		erode2,
 		amplitude/100.0f,

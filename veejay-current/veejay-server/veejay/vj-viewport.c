@@ -1978,6 +1978,7 @@ static	viewport_config_t 	*viewport_load_settings( char *path )
 	if( len <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "File %s is empty",path);
+		fclose(fd);
 		free(vc);
 		return NULL;
 	}

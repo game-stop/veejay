@@ -629,6 +629,7 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... )
 	int done;
 	va_start(arg,format);
 	done = vsnprintf( s,size, format, arg );
+	va_end(arg);
 	return done;
 }
 #endif

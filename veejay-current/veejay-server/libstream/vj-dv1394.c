@@ -122,8 +122,8 @@ vj_dv1394      *vj_dv1394_init(void *e, int channel, int quality)
 	if( vj_dv1394_start(v) <= 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to start capturing");
-		if(v)free(v);
 		close(v->handle);
+		if(v)free(v);
 		return NULL;
 	}
 

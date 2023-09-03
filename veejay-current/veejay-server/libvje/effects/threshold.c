@@ -70,8 +70,8 @@ void	*threshold_malloc(int w, int h )
 void		threshold_free(void *ptr)
 {
     threshold_t *t = (threshold_t*) ptr;
-    free(t);
 	free(t->binary_img);
+	free(t);
 }
 
 #ifndef MIN

@@ -1317,7 +1317,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		if (fd == NULL)
 		{
 		   	 veejay_msg(VEEJAY_MSG_DEBUG,"Error opening %s:", filename[nf]);
-			 fclose(fd);
 			 vj_el_free(el);
 			 return NULL;
 		}

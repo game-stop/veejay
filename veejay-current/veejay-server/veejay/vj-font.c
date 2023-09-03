@@ -458,12 +458,14 @@ int vj_font_load_srt( void *font, const char *filename )
     if( len <= 0 )
     {
         veejay_msg(VEEJAY_MSG_ERROR, "SRT file '%s' is empty", filename );
+        fclose(f);
         return 0;
     }
     rewind( f );
 
     ff->fd_buf = (uint8_t*) vj_calloc( len );
     if(!ff->fd_buf) {
+        fclose(f);
         return 0;
     }
     fread( ff->fd_buf, len,1, f );
@@ -1172,8 +1174,9 @@ static  unsigned char   *get_font_name( vj_font_t *f,unsigned char *font, int id
 
     while( (tlen/2+1) > fontLen ) {
         fontLen *= 2;
-        fontName = (char*) realloc( fontName, fontLen );
-        if( fontName == NULL ) {
+        char * nfontName = (char*) realloc( fontName, fontLen );
+        if( nfontName == NULL ) {
+            if(fontName) free(fontName);
             return NULL;
         }
     }

@@ -84,6 +84,7 @@ void *slice_malloc(int width, int height)
         free(s->slice_frame[0]);
         free(s->slice_xshift);
         free(s);
+        return NULL;
     }
 
     slice_recalc(s, width,height, 63);

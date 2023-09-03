@@ -158,6 +158,7 @@ void *bgsubtractgauss_malloc(int width, int height)
 		free(b->morph_frame__);
         free(b->pMu);
 		free(b);
+		return NULL;
     }
 	
 	b->mean =  (uint8_t*) vj_calloc( RUP8(width*height) );
@@ -168,6 +169,7 @@ void *bgsubtractgauss_malloc(int width, int height)
         free(b->pMu);
         free(b->pVar);
 		free(b);
+		return NULL;
     }
 
     const char *hist = getenv( "VEEJAY_BG_AUTO_HISTOGRAM_EQ" );

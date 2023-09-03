@@ -114,9 +114,9 @@ int	init_instance( livido_port_t *my_instance )
 	entry->vecy = (int *)livido_malloc(sizeof(int) * video_area);
 	
     if(entry->vecx == NULL || entry->vecy == NULL) {
-		free(entry);
         if(entry->vecx) free(entry->vecx);
         if(entry->vecy) free(entry->vecy);
+		free(entry);
 		return LIVIDO_ERROR_MEMORY_ALLOCATION;
 	}
 

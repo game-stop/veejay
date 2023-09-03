@@ -80,6 +80,7 @@ void *neighbours3_malloc(int w, int h )
 	if(!n->chromacity[0]) {
         free(n->tmp_buf[0]);
         free(n);
+		return NULL;
     }
 
 	n->chromacity[1] = n->chromacity[0] + (w*h);
