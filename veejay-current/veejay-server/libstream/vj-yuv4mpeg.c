@@ -88,7 +88,7 @@ static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width, int h
 
 int vj_yuv_stream_start_read(vj_yuv * yuv4mpeg, char *filename, int width,int height) {
 	int fd = open(filename,O_RDONLY);
-	if(!fd) {
+	if(fd < 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video stream %s\n", filename);
 		return -1;
 	}
@@ -187,7 +187,7 @@ int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, VJFrame *frame, int out_chroma
 int vj_yuv_stream_open_pipe(vj_yuv *yuv4mpeg, char *filename)
 {
 	yuv4mpeg->fd = open(filename,O_WRONLY,0600);
-    if(!yuv4mpeg->fd) 
+    if(yuv4mpeg->fd < 0) 
 		return 0;
 	return 1;
 }
@@ -269,7 +269,7 @@ int vj_yuv_stream_start_write(vj_yuv * yuv4mpeg,VJFrame *frame, char *filename, 
 				{
 		   	 		/* the file is a regular file */
 		   	 		yuv4mpeg->fd = open(filename, O_APPEND | O_WRONLY, 0600);
-		  			if (!yuv4mpeg->fd)
+		  			if (yuv4mpeg->fd < 0)
 						return -1;
 				}
 	    		else
@@ -277,14 +277,14 @@ int vj_yuv_stream_start_write(vj_yuv * yuv4mpeg,VJFrame *frame, char *filename, 
 					if (S_ISFIFO(sstat.st_mode))
 			  			veejay_msg(VEEJAY_MSG_INFO, "Waiting for a program to open %s", filename);
 		       			yuv4mpeg->fd = open(filename,O_WRONLY,0600);
-   			     		if(!yuv4mpeg->fd) return 0;
+   			     		if(yuv4mpeg->fd <= 0) return 0;
 				}
 	   		}
 	    	else
 	    	{
 				veejay_msg(VEEJAY_MSG_INFO, "Creating YUV4MPEG regular file '%s'",filename);
 				yuv4mpeg->fd = open(filename, O_CREAT | O_WRONLY, 0600);
-  				if (!yuv4mpeg->fd)
+  				if (yuv4mpeg->fd < 0)
  					return -1;
    	    	 }
 		}

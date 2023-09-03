@@ -270,7 +270,7 @@ void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int ds
 	}
 
 	v->fd = open( device_name, O_RDWR ); //, S_IRUSR|S_IWUSR );
-	if( v->fd <= 0 ) {
+	if( v->fd < 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "vloop: Cannot open vloopback device '%s': %s", device_name, strerror(errno) );
 		free(v);
 		return NULL;

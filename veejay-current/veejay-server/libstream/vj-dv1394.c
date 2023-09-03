@@ -99,7 +99,7 @@ vj_dv1394      *vj_dv1394_init(void *e, int channel, int quality)
 	v->channel = channel == -1 ? DV1394_DEFAULT_CHANNEL : channel;
 	v->index = 0;
 	v->quality = quality;
-	if( v->handle <= 0 )
+	if( v->handle < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "opening /dev/dv1394'");
 		if(v) free(v);

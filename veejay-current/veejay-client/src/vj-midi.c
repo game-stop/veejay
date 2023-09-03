@@ -154,7 +154,7 @@ void	vj_midi_load(void *vv, const char *filename)
 	}
 
 	int fd = open( filename, O_RDONLY );
-	if(!fd)
+	if(fd < 0)
 	{
 		vj_msg(VEEJAY_MSG_ERROR, "Unable to open file '%s': %s", filename, strerror(errno));
 		return;
@@ -246,7 +246,7 @@ void	vj_midi_save(void *vv, const char *filename)
         if(!v->active) return;
 
 	int fd = open( filename, O_TRUNC|O_CREAT|O_WRONLY,S_IRWXU );
-	if(!fd)
+	if(fd<0)
 	{
 		vj_msg(VEEJAY_MSG_ERROR, "Unable to save MIDI settings to %s",filename);
 		return;

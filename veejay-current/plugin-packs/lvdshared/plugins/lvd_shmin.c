@@ -93,7 +93,7 @@ int	init_instance( livido_port_t *my_instance )
 		char *home = getenv("HOME");
 		snprintf(path,sizeof(path)-1, "%s/.veejay/veejay.shm", home );
 		int fd = open( path, O_RDWR );
-		if(fd <= 0) {
+		if(fd < 0) {
 			return LIVIDO_ERROR_ENVIRONMENT;
 		}
 		char buf[256];

@@ -79,7 +79,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	decoder = dv_decoder_new( 1,0,0);
 	dv->fd = open( filename, O_RDONLY );
 	
-	if(!dv->fd)
+	if(dv->fd < 0)
 	{
 		dv_decoder_free(decoder); 
 		rawdv_free(dv);
