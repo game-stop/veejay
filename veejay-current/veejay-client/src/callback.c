@@ -3787,6 +3787,9 @@ static void set_transition(int active, int shape, int length)
 void
 on_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
 {
+    if(info->status_lock)
+        return;
+
     set_transition(
             info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
             info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
@@ -3797,6 +3800,9 @@ on_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
 void
 on_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
 {
+    if(info->status_lock)
+        return;
+
     set_transition(
             info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
             (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ),
@@ -3807,6 +3813,9 @@ on_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
 void
 on_transition_active_toggled( GtkWidget *widget, gpointer user_data)
 {
+    if(info->status_lock)
+        return;
+
     set_transition(
             gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ),
             info->status_tokens[ SAMPLE_TRANSITION_SHAPE ],
