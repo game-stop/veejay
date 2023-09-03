@@ -386,25 +386,26 @@ static	char	*get_livido_plug_path()
 	veejay_memset(lvdpath,0,sizeof(lvdpath));
 	veejay_memset(target, 0, sizeof(target));
 
-	int  err = readlink( location, target, sizeof(target) - 1 );
-	if( err >= 0 )
-	{
-	 int n = err;
-	 while( target[n] != '/' && n > 0 ) {
-	   n--; //@ strip name of executable
-	 }
-	 if( n > 0 ) n --;
-	 
-	 while( target[n] != '/' && n > 0 ) {
-	   n--; //@ strip bin dir of executable
-	 }
-	 
-	 strncpy(lvdpath, target, n );
- 	 strcat( lvdpath, "/lib/livido-plugins" );	 
-
-	 return vj_strdup( lvdpath );
+	int  ret = readlink( location, target, sizeof(target) - 1 );
+	if(ret <= 0) {
+		return NULL;
 	}
-	return NULL;
+
+	int n = ret;
+	while( target[n] != '/' && n > 0 ) {
+	   n--; //@ strip name of executable
+	}
+	
+	if( n > 0 ) n --;
+	 
+	while( target[n] != '/' && n > 0 ) {
+	   n--; //@ strip bin dir of executable
+	}
+	 
+	strncpy(lvdpath, target, n );
+ 	strcat( lvdpath, "/lib/livido-plugins" );	 
+
+	return vj_strdup( lvdpath );
 }
 
 
