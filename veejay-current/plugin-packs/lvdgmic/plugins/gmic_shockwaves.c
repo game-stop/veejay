@@ -61,7 +61,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 	int lowfreq = lvd_extract_param_index( my_instance,"in_parameters", 1 );
 	int freqrange = lvd_extract_param_index(my_instance, "in_parameters",2);
 	
-	snprintf(cmd,sizeof(cmd),"-gimp_shockwaves %f,%f,%f,%f", (float)amplitude *0.1f, (float)lowfreq*0.1f, (float)freqrange*0.1f );
+	snprintf(cmd,sizeof(cmd),"-gimp_shockwaves %f,%f,%f", (float)amplitude *0.1f, (float)lowfreq*0.1f, (float)freqrange*0.1f );
 
 	lvdgmic_push( gmic, w, h, 0, A, 0);
 
