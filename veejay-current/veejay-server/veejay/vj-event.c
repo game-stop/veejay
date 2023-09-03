@@ -9209,9 +9209,10 @@ int vj_event_load_bundles(char *bundle_file)
     if(!fd) return -1;
     while(fgets(buf,4096,fd))
     {
+        char *ptr;
         buf[strlen(buf)-1] = 0;
-        event_name = strtok(buf, "|");
-        event_msg = strtok(NULL, "|");
+        event_name = strtok_r(buf, "|",&ptr);
+        event_msg = strtok_r(NULL, "|",&ptr);
         if(event_msg!=NULL && event_name!=NULL) {
             //veejay_msg(VEEJAY_MSG_INFO, "Event: %s , Msg [%s]",event_name,event_msg);
             event_id = atoi( event_name );

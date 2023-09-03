@@ -185,13 +185,15 @@ void CommandLineMode(int argc, char *argv[], void *handle) {
     }
 
     for (i = 0; i < argc; i++) {
-        messageName = strtok(argv[i], ",");
+        char *saveptr;
+        messageName = strtok_r(argv[i], ",",&saveptr);
         if (messageName == NULL) {
             break;
         }
 
         j = 0;
-        while ((token = strtok(NULL, ",")) != NULL) {
+        char *saveptr;
+        while ((token = strtok_r(NULL, ",", &saveptr)) != NULL) {
             args[j] = ParseToken(token);
             j++;
 	    if (j >= MAX_ARGS) {

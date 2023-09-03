@@ -562,14 +562,14 @@ y4m_xtag_list_t *y4m_fi_xtags(y4m_frame_info_t *fi)
 
 int y4m_parse_stream_tags(char *s, y4m_stream_info_t *i)
 {
-  char *token, *value;
+  char *token, *value, *ptr;
   char tag;
   int err;
 
   /* parse fields */
-  for (token = strtok(s, Y4M_DELIM); 
+  for (token = strtok_r(s, Y4M_DELIM, &ptr); 
        token != NULL; 
-       token = strtok(NULL, Y4M_DELIM)) {
+       token = strtok_r(NULL, Y4M_DELIM, &ptr)) {
     if (token[0] == '\0') continue;   /* skip empty strings */
     tag = token[0];
     value = token + 1;
@@ -652,14 +652,14 @@ int y4m_parse_stream_tags(char *s, y4m_stream_info_t *i)
 static int y4m_parse_frame_tags(char *s, const y4m_stream_info_t *si,
 				y4m_frame_info_t *fi)
 {
-  char *token, *value;
+  char *token, *value, *ptr;
   char tag;
   int err;
 
   /* parse fields */
-  for (token = strtok(s, Y4M_DELIM); 
+  for (token = strtok_r(s, Y4M_DELIM, &ptr); 
        token != NULL; 
-       token = strtok(NULL, Y4M_DELIM)) {
+       token = strtok_r(NULL, Y4M_DELIM, &ptr)) {
     if (token[0] == '\0') continue;   /* skip empty strings */
     tag = token[0];
     value = token + 1;

@@ -427,11 +427,12 @@ static	int	scan_plugins()
 
 	if( read( fd, data, CONFIG_FILE_LEN ) > 0 )
 	{
-		char *pch = strtok( data, "\n" );
+		char *ptr;
+		char *pch = strtok_r( data, "\n", &ptr );
 		while( pch != NULL )
 		{
 			add_to_plugin_list( pch );
-			pch = strtok( NULL, "\n");
+			pch = strtok_r( NULL, "\n", &ptr);
 		}
 	}
 
