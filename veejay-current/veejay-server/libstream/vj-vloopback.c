@@ -210,6 +210,7 @@ static void vj_vloopback_setup_ptrs( uint8_t *buf, uint8_t *planes[4], int pixfm
 
 static	int vj_vloopback_user_pixelformat( VJFrame *src )
 {
+	int result = -1;
 #ifdef HAVE_V4L2
 	char *str = getenv( "VEEJAY_VLOOPBACK_PIXELFORMAT" );
 	if( str != NULL ) {
@@ -218,17 +219,26 @@ static	int vj_vloopback_user_pixelformat( VJFrame *src )
 			if( strcasecmp( str, vloopback_pixfmt[i].name ) == 0 ) {
 				veejay_msg(VEEJAY_MSG_DEBUG, "vloop: user defined pixel format %s (%d)",
 					vloopback_pixfmt[i].name, vloopback_pixfmt[i].fmt );
-				return v4l2_ffmpeg2v4l2( vloopback_pixfmt[i].fmt );
+				result = i;
+				break;
 			}
 		}
 
-		veejay_msg(0, "Invalid pixel format for VEEJAY_VLOOPBACK_PIXELFORMAT. Please use one of the following:");
-		for( i = 0; vloopback_pixfmt[i].name != NULL; i ++ ) {
-			veejay_msg(0, "\t%s", vloopback_pixfmt[i].name );
+		if( result == -1) {
+			veejay_msg(0, "Invalid pixel format for VEEJAY_VLOOPBACK_PIXELFORMAT. Please use one of the following:");
+			for( i = 0; vloopback_pixfmt[i].name != NULL; i ++ ) {
+				veejay_msg(0, "\t%s", vloopback_pixfmt[i].name );
+			}
+			
+			return v4l2_ffmpeg2v4l2( src->format );
 		}
-	}
+
 	
-	return v4l2_ffmpeg2v4l2( src->format );
+		veejay_msg(VEEJAY_MSG_INFO, "Selected pixel format %s for vloopback device. Choose another with VEEJAY_VLOOPBACK_PIXELFORMAT",
+			vloopback_pixfmt[ result ].name);
+
+		return v4l2_ffmpeg2v4l2( vloopback_pixfmt[ result ].fmt );
+	}
 #else
 	return src->format;
 #endif
