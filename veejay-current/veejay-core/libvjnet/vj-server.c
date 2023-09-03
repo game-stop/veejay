@@ -1141,6 +1141,7 @@ char *vj_server_my_ip()
 	}
 
 	struct sockaddr_in local;
+	veejay_memset(&local,0,sizeof(local));
 	socklen_t len = sizeof(local);
 	if( getsockname( sock, (struct sockaddr*)&local, &len ) < 0 ) {
 		close(sock);

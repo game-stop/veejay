@@ -1466,7 +1466,8 @@ spline_solve (int n, gfloat x[], gfloat y[], gfloat y2[])
   gfloat p, sig, *u;
   gint i, k;
 
-  u = g_malloc ((n - 1) * sizeof (u[0]));
+  u = g_malloc0 ((n - 1) * sizeof (u[0]));
+  
 
   y2[0] = u[0] = 0.0; /* set lower boundary condition to "natural" */
 

@@ -1058,7 +1058,6 @@ int main(void)
 		break;
 	    case 'q':
 		exit(0);
-		break;
 	    case '\0':
 		break;
 	    case 'p':

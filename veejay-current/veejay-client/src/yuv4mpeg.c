@@ -80,7 +80,7 @@ ssize_t y4m_read(int fd, void *buf, size_t len)
        if (n == 0)
 	 return len;  /* n == 0 --> eof */
        else
-	 return -len; /* n < 0 --> error */
+	 return -1; /* n < 0 --> error */
      }
      ptr += n;
      len -= n;
@@ -95,7 +95,7 @@ ssize_t y4m_write(int fd, const void *buf, size_t len)
 
    while (len > 0) {
      n = write(fd, ptr, len);
-     if (n <= 0) return -len;  /* return amount left to write */
+     if (n <= 0) return -1;  /* return amount left to write */
      ptr += n;
      len -= n;
    }
@@ -151,7 +151,11 @@ static void set_cb_writer_from_fd(y4m_cb_writer_t * ret, int * fd)
 
 static char *y4m_new_xtag(void)
 {
-  return _y4m_alloc(Y4M_MAX_XTAG_SIZE * sizeof(char));
+  char *res = _y4m_alloc(Y4M_MAX_XTAG_SIZE * sizeof(char));
+  if(res == NULL)
+    return NULL;
+  memset( res, 0, Y4M_MAX_XTAG_SIZE * sizeof(char));
+  return res;
 }
 
 void y4m_init_xtag_list(y4m_xtag_list_t *xtags)
