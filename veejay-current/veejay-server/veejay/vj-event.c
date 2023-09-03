@@ -3895,19 +3895,23 @@ void vj_event_set_transition(void *ptr, const char format[], va_list ap)
     int transition_length = args[4];
 
     if( playmode == VJ_PLAYBACK_MODE_SAMPLE ) {
-        sample_set_transition_length( sample_id, transition_length );
+        if(transition_length > 0)
+            sample_set_transition_length( sample_id, transition_length );
+
         sample_set_transition_shape( sample_id, transition_shape );
         sample_set_transition_active( sample_id, transition_active );
     }
 
     if( playmode == VJ_PLAYBACK_MODE_TAG ) {
-        vj_tag_set_transition_length( sample_id, transition_length );
+        if(transition_length > 0)
+            vj_tag_set_transition_length( sample_id, transition_length );
         vj_tag_set_transition_shape( sample_id, transition_shape );
         vj_tag_set_transition_active( sample_id, transition_active );
     }
 
 
-    veejay_msg(VEEJAY_MSG_DEBUG,"Sample %d set transition active %d, shape %d, length %d",
+    veejay_msg(VEEJAY_MSG_DEBUG,"%s %d set transition active %d, shape %d, length %d",
+            (playmode == VJ_PLAYBACK_MODE_SAMPLE ? "Sample"  : "Stream"),
             sample_id, transition_active, transition_shape, transition_length );
 }
 

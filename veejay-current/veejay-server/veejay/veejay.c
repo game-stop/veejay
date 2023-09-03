@@ -754,9 +754,9 @@ static void print_license()
 
 static void donothing(int sig)
 {
-	vj_lock(info);
+//	vj_lock(info);
 	veejay_handle_signal( info, sig );	
-	vj_unlock(info);
+//	vj_unlock(info);
 }
 
 static void	veejay_backtrace_handler(int n , siginfo_t *si, void *ptr)

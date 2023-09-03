@@ -797,9 +797,8 @@ void vj_tag_set_transition_length(int t1, int length)
     if(!tag) return;
 
     int transition_length = length;
-    if( transition_length <= 0 ) {
-        transition_length = 25;
-    }
+    if( transition_length < 0)
+        transition_length = 0;
 
     if( transition_length > tag->n_frames ) {
         transition_length = tag->n_frames;
@@ -816,7 +815,7 @@ void vj_tag_set_transition_active(int t1, int status)
 
     if( tag->transition_active == 1 ) {
         if( tag->transition_length <= 0 ) {
-            vj_tag_set_transition_length( t1, 25 );
+            vj_tag_set_transition_length( t1, tag->n_frames );
         }
     }
 }
@@ -988,6 +987,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->opacity = 0;
     tag->priv = NULL;
     tag->subrender = 1;
+    tag->transition_length = 25;
 
 	if(type == VJ_TAG_TYPE_AVFORMAT )
 		tag->priv = avformat_thread_allocate(_tag_info->effect_frame1);
@@ -1011,7 +1011,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             {
                 veejay_msg(0, "Unable to open capture stream '%dx%d' (norm=%c,format=%x,device=%d,channel=%d)", w,h,el->video_norm, pix_fmt, extra,channel );
                 free(tag->source_name);
+                if(tag->method_filename) 
+                  free(tag->method_filename);
                 free(tag);
+                
                 return -1;
             }
             break;
@@ -1020,7 +1023,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
             if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette,type) != 1 ) {
                 free(tag->source_name);
+                if(tag->method_filename) 
+                  free(tag->method_filename);
                 free(tag);
+                
                 return -1;
             }
     break;
@@ -1029,6 +1035,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 		if(!avformat_thread_start(tag, _tag_info->effect_frame1)) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to start thread");
 			free(tag->source_name);
+            if(tag->method_filename) 
+                  free(tag->method_filename);
 			free(tag);
 			return -1;
 		}
@@ -1048,6 +1056,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 #else
     veejay_msg(VEEJAY_MSG_DEBUG, "libdv not enabled at compile time");
     free(tag->source_name);
+    if(tag->method_filename) 
+        free(tag->method_filename);
     free(tag);
     return -1;
 #endif
@@ -1056,6 +1066,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename);
     if( _vj_tag_new_picture(tag, stream_nr, w, h, fps) != 1 ) {
         free(tag->source_name);
+        if(tag->method_filename) 
+            free(tag->method_filename);
         free(tag);
         return -1;
     }
@@ -1065,6 +1077,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     snprintf(tag->source_name,SOURCE_NAME_LEN,"%s",filename);
     if(_vj_tag_new_cali( tag,stream_nr,w,h) != 1 ) {
         free(tag->source_name);
+        if(tag->method_filename) 
+            free(tag->method_filename);
         free(tag);
         return -1;
     }
@@ -1074,6 +1088,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     if (_vj_tag_new_yuv4mpeg(tag, stream_nr, w,h,fps) != 1)
     {
         free(tag->source_name);
+        if(tag->method_filename) 
+            free(tag->method_filename);
         free(tag);
         return -1;
     }
@@ -1099,7 +1115,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                 channel = plug_get_idx_by_name( filename );
                 if( channel == - 1) {
                     veejay_msg(0, "'%s' not found",filename );
-                    free(tag->source_name );
+                    free(tag->source_name);
+                    if(tag->method_filename) 
+                        free(tag->method_filename);
                     free(tag);
                     return -1;
                 }
@@ -1115,6 +1133,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         if( tag->generator == NULL ) {
             veejay_msg(0, "Unable to load selected generator");
             free(tag->source_name);
+            if(tag->method_filename) 
+                free(tag->method_filename);
             free(tag);
             return -1;
         }
@@ -1130,6 +1150,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                     veejay_msg(0, "Plug '%s' is not a generator", filename);
                     plug_deactivate(tag->generator);
                     free(tag->source_name);
+                    if(tag->method_filename) 
+                        free(tag->method_filename);
                     free(tag);
                     return -1;
             }
@@ -1142,6 +1164,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         }
         else {
             free(tag->source_name);
+            if(tag->method_filename) 
+                free(tag->method_filename);
             free(tag);
             return -1;
         }

@@ -360,6 +360,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->fade_alpha = 0;
     si->fade_entry = -1;
     si->subrender = 1;
+    si->transition_length = 25;
     si->edit_list_file = sample_default_edl_name(si->sample_id);
 
     sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
@@ -1893,7 +1894,7 @@ void sample_set_transition_length(int s1, int length) {
     int transition_length = length;
     
     if(transition_length <= 0) {
-        transition_length = DEFAULT_TRANSITION_LENGTH;
+        transition_length = 0;
     }
 
     if (sample->marker_end > 0 && sample->marker_start >= 0) {
@@ -1919,7 +1920,7 @@ void sample_set_transition_active(int s1, int status) {
     sample->transition_active = status;
 
     if( sample->transition_length <= 0 ) {
-        sample_set_transition_length( s1, 0);
+        sample_set_transition_length( s1, DEFAULT_TRANSITION_LENGTH);
     }
 }
 

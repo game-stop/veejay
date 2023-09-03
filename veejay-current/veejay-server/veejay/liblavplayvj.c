@@ -195,9 +195,9 @@ void veejay_change_state(veejay_t * info, int new_state)
 {
 	video_playback_setup *settings = (video_playback_setup *) info->settings;
 
-//	pthread_mutex_lock(&(settings->valid_mutex));
+	pthread_mutex_lock(&(settings->valid_mutex));
 	settings->state = new_state;
-//	pthread_mutex_unlock(&(settings->valid_mutex));
+	pthread_mutex_unlock(&(settings->valid_mutex));
 }
 
 void veejay_change_state_save(veejay_t * info, int new_state)
@@ -633,7 +633,7 @@ int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
     veejay_set_speed(info, speed);
 
-	veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (Slow: %d, Speed: %d, Start: %d, End: %d, Looptype: %d, Current position: %ld)",
+	veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (Slow: %d, Speed: %d, Start: %d, End: %d, Looptype: %d, Current position: %d)",
 			sample_id, info->sfd, speed, start, end, looptype, info->settings->current_frame_num
             );
 	 
@@ -1176,6 +1176,8 @@ static void veejay_pipe_write_status(veejay_t * info)
 	int seq_cur = (info->seq->active ? info->seq->current : MAX_SEQUENCES );
 	if(tags>0)
 		total_slots+=tags;
+
+	veejay_memset( info->status_what, 0, sizeof(info->status_what));
   
 	switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
@@ -1387,7 +1389,6 @@ void veejay_handle_signal(void *arg, int sig)
 	veejay_t *info = (veejay_t *) arg;
 	if (sig == SIGINT || sig == SIGQUIT )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Veejay interrupted by user. Bye!");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 	}
 	else 
@@ -1660,7 +1661,6 @@ int veejay_open(veejay_t * info)
 {
 	video_playback_setup *settings = (video_playback_setup *) info->settings;
 	int i;
-	veejay_msg(VEEJAY_MSG_DEBUG, "Initializing the threading system");
 
 	veejay_memset( &(settings->lastframe_completion), 0, sizeof(struct timeval));
 
