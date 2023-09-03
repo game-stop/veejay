@@ -6872,6 +6872,7 @@ static void reload_editlist_contents()
         if( sscanf( tmp, "%d", &iter ) != 1 )
         {
             free(tmp);
+            free(file);
             free(eltext);
             return;
         }
@@ -6883,6 +6884,7 @@ static void reload_editlist_contents()
         if( sscanf(tmp, "%ld", &num_frames ) != 1 )
         {
             free(tmp);
+            free(file);
             free(eltext);
             return;
         }
@@ -6894,6 +6896,7 @@ static void reload_editlist_contents()
         if( sscanf( tmp, "%d", &fourcc_len) != 1 )
         {
             free(tmp);
+            free(file);
             free(eltext);
             return;
         }

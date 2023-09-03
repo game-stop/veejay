@@ -1349,7 +1349,8 @@ void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcSte
 	for(x=0; x<radius; x++){
 		sum+= src[x*srcStep]<<1;
 	}
-	sum+= src[radius*srcStep];
+	if( radius & srcStep )
+		sum+= src[radius*srcStep];
 
 	for(x=0; x<=radius; x++){
 		sum+= src[(radius+x)*srcStep] - src[(radius-x)*srcStep];

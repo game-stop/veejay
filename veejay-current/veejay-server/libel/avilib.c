@@ -1,8 +1,8 @@
 /*
  *  avilib.c
  *
- *  Copyright (C) Thomas Östreich - June 2001
- *  multiple audio track support Copyright (C) 2002 Thomas Östreich 
+ *  Copyright (C) Thomas ï¿½streich - June 2001
+ *  multiple audio track support Copyright (C) 2002 Thomas ï¿½streich 
  *
  *  Original code:
  *  Copyright (C) 1999 Rainer Johanni <Rainer@Johanni.de> 
@@ -2229,8 +2229,9 @@ int avi_parse_index_from_file(avi_t *AVI, char *filename)
     fgets(data, 100, fd);
 
     if ( strncasecmp(data, "AVIIDX1", 7) != 0) {
-	fprintf(stderr, "%s: Not an AVI index file\n", filename);
-	return -1;
+	   fclose(fd);
+      fprintf(stderr, "%s: Not an AVI index file\n", filename);
+	   return -1;
     }
 
     // read comment

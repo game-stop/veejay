@@ -176,9 +176,9 @@ static void gray_emboss_framedata(VJFrame *frame, int width, int height)
 	uint8_t val;
 	uint8_t *Y = frame->data[0];
 	const int len = frame->len;
-	for (r = 0; r < len; r += width)
+	for (r = 1; r < len - 1; r += width)
 	{
-		for (c = 0; c < width; c++)
+		for (c = 1; c < width - 1; c++)
 		{
 			val = (Y[r - 1 + c - 1] -
 			       Y[r - 1 + c] -
@@ -205,9 +205,9 @@ static void aggressive_emboss_framedata(VJFrame *frame, int width, int height)
 	uint8_t val;
 	uint8_t *Y = frame->data[0];
 	const int len = frame->len;
-	for (r = 0; r < len; r += width)
+	for (r = 1; r < len - 1; r += width)
 	{
-		for (c = 0; c < width; c++)
+		for (c = 1; c < width - 1; c++)
 		{
 			val = (Y[r - 1 + c - 1] -
 			       Y[r - 1 + c] -
@@ -233,9 +233,9 @@ static void dark_emboss_framedata(VJFrame *frame, int width, int height)
 	int r, c;
 	uint8_t *Y = frame->data[0];
 	const int len = frame->len;
-	for (r = 0; r < len; r += width)
+	for (r = 1; r < len - 1; r += width)
 	{
-		for (c = 0; c < width; c++)
+		for (c = 1; c < width - 1; c++)
 		{
 			Y[c + r] = (Y[r - 1 + c - 1] -
 			            Y[r - 1 + c] -
@@ -260,9 +260,9 @@ static void grayish_mood_framedata(VJFrame *frame, int width, int height)
 	int r, c;
 	uint8_t *Y = frame->data[0];
 	const int len = frame->len;
-	for (r = 0; r < len; r += width)
+	for (r = 1; r < len - 1; r += width)
 	{
-		for (c = 0; c < width; c++)
+		for (c = 1; c < width - 1; c++)
 		{
 			Y[c + r] = (Y[r - 1 + c - 1] -
 			            Y[r - 1 + c] -

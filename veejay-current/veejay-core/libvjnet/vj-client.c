@@ -296,6 +296,8 @@ int vj_client_read_frame_data( vj_client *v, int datalen)
 	if(v->space_len < datalen || v->space == NULL) {
 		v->space_len = RUP8(datalen);
 		v->space = (uint8_t*) realloc( v->space, v->space_len );
+		if(v->space == NULL)
+		  return 0;
 	}	
 
 	int n = sock_t_recv( v->fd[0],v->space,datalen );

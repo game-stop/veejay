@@ -108,14 +108,14 @@ void *timedistort_malloc( int w, int h )
 		td->planetableV[i] = &(td->planes[2][ (w*h) * i ]);
 	}
 
-	td->warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)+w+1) );
+	td->warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)) );
     if(!td->warptime[0]) {
         free(td->nonmap);
         free(td->planes[0]);
         free(td);
         return NULL;
     }
-	td->warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)+w+1) );
+	td->warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)) );
     if(!td->warptime[1]) {
         free(td->nonmap);
         free(td->planes[0]);
@@ -221,8 +221,8 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, planeTables, strides );
 
-	uint8_t *p = td->warptime[ td->warptimeFrame	] + width + 1;
-	uint8_t *q = td->warptime[ td->warptimeFrame ^ 1] + width + 1;
+	uint8_t *p = td->warptime[ td->warptimeFrame	];
+	uint8_t *q = td->warptime[ td->warptimeFrame ^ 1];
 
 	unsigned int x,y;
 	for( y = height - 2; y > 0 ; y -- )
@@ -233,12 +233,13 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 			if( i > 3 ) i-= 3;
 			p++;
 			*q++ = i >> 2;
-	
+			if( x % width != 0 )
+				p++;
 		}
 		p += 2;
 		q += 2;
 	}
-	q = td->warptime[ td->warptimeFrame ^ 1 ] + width + 1;
+	q = td->warptime[ td->warptimeFrame ^ 1 ];
 	int n_plane = 0;
 	for( i = 0; i < len; i ++ )
 	{

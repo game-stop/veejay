@@ -57,8 +57,8 @@ typedef struct
 	GtkWidget *sub_frame;
 	GtkWidget *sub_hbox;
 	GtkWidget *toggle;
-	GtkWidget *buttons[8];
-	GtkWidget *icons[8];
+	GtkWidget *buttons[9];
+	GtkWidget *icons[9];
 	GtkWidget *button_box;
 	GtkWidget *timeline_;
 	GtkWidget *labels_[4];

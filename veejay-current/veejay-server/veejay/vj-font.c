@@ -1174,13 +1174,10 @@ static  unsigned char   *get_font_name( vj_font_t *f,unsigned char *font, int id
 
     while( (tlen/2+1) > fontLen ) {
         fontLen *= 2;
-        char * nfontName = (char*) realloc( fontName, fontLen );
-        if( nfontName == NULL ) {
-            if(fontName) free(fontName);
+        fontName = (char*) realloc( fontName, fontLen );
+        if( fontName == NULL ) {
             return NULL;
         }
-        free(fontName);
-        fontName = nfontName;
     }
 
     int i;

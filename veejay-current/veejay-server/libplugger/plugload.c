@@ -384,12 +384,11 @@ static	char	*get_livido_plug_path()
 	char lvdpath[1024];
 	
 	veejay_memset(lvdpath,0,sizeof(lvdpath));
+	veejay_memset(target, 0, sizeof(target));
 
 	int  err = readlink( location, target, sizeof(target) );
 	if( err >= 0 )
 	{
-	 target[err] = '\0';
-
 	 int n = err;
 	 while( target[n] != '/' && n > 0 ) {
 	   n--; //@ strip name of executable

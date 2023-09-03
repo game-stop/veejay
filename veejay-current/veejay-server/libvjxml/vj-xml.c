@@ -33,7 +33,7 @@ static char *UTF8toLAT1(unsigned char *in)
 
 	int in_size = strlen( (char*) in ) + 1;
 	int out_size = in_size;
-	unsigned char *out = malloc((size_t) out_size);
+	unsigned char *out = vj_calloc((size_t) out_size);
 
 	if (out == NULL) {
 		return NULL;
@@ -41,15 +41,8 @@ static char *UTF8toLAT1(unsigned char *in)
 
 	if (UTF8Toisolat1(out, &out_size, in, &in_size) != 0)
 		veejay_memcpy( out, in, out_size );
-	unsigned char *nout = realloc(out, out_size + 1);
-	if( nout == NULL) {
-		if(out) free(out);
-		return NULL;
-	}
 
-	out[out_size] = 0;	
-
-	return (char*) out;
+	return realloc(out, out_size + 1);
 }
 
 
