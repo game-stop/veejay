@@ -386,7 +386,7 @@ static	char	*get_livido_plug_path()
 	veejay_memset(lvdpath,0,sizeof(lvdpath));
 	veejay_memset(target, 0, sizeof(target));
 
-	int  err = readlink( location, target, sizeof(target) );
+	int  err = readlink( location, target, sizeof(target) - 1 );
 	if( err >= 0 )
 	{
 	 int n = err;

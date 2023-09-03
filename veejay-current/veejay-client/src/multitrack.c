@@ -64,7 +64,7 @@ typedef struct
 	GtkWidget *labels_[4];
 	GtkWidget *sliders_[4];
 	GtkWidget *button_box2;
-	GtkWidget *buttons2[8];
+	GtkWidget *buttons2[9];
 	void *tracks;
 	gint dim[2];
 	int  num;
