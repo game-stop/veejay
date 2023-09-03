@@ -56,9 +56,9 @@ typedef struct {
 } macro_block_t;
 
 typedef struct {
-	void *macro_bank[MAX_MACRO_BANKS];
+	void *macro_bank[MAX_MACRO_BANKS+1];
 	void *playback_bank; // the playback bank consumes the messages in this port
-	int loop_stat_stop[MAX_MACRO_BANKS];
+	int loop_stat_stop[MAX_MACRO_BANKS+1];
 	uint8_t current_bank;
 	uint8_t play_bank;
 	uint8_t status;

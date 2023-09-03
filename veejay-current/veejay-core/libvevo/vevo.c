@@ -1484,7 +1484,13 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 				idx ++;
 				if( idx >= N ) {
 					N *= 2;
-					list = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
+					char **nlist = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
+					if(nlist == NULL) {
+					    if( list ) free(list);
+					    return NULL;
+					}
+					if(list) free(list);
+					list = nlist;
 				}
 			}
 		}

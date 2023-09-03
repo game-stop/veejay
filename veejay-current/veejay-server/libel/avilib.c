@@ -86,8 +86,8 @@ static void avierror(long AVI_errno) {
 	if(AVI_errno < 0 || AVI_errno > 14) {
 		veejay_msg(0, "AVI Error: %s", avi_error_list[0]);
 	}
-
-	veejay_msg(0, "AVI Error: %s", avi_error_list[ AVI_errno ] );
+	else
+		veejay_msg(0, "AVI Error: %s", avi_error_list[ AVI_errno ] );
 }
 
 
