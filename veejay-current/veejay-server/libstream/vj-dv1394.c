@@ -89,7 +89,7 @@ vj_dv1394      *vj_dv1394_init(void *e, int channel, int quality)
 	if(!v) {
 		return NULL;
 	}
-}
+
 	v->map_size = (el->video_norm == 'p' ? DV_PAL_SIZE: DV_NTSC_SIZE);
 	v->handle = -1;
 	v->width = el->video_width;
