@@ -296,7 +296,9 @@ void vj_sdl_update_screen(void *ptr)
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
 
-    SDL_UpdateTexture( vjsdl->texture, NULL, vjsdl->pixels, vjsdl->width * 2 );
+    if( SDL_UpdateTexture( vjsdl->texture, NULL, vjsdl->pixels, vjsdl->width * 2 ) != 0 ) {
+        veejay_msg(0, "%s" , SDL_GetError());
+    }
 
     SDL_RenderClear( vjsdl->renderer );
     SDL_RenderCopy( vjsdl->renderer, vjsdl->texture, NULL,NULL );

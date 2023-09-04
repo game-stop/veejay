@@ -1052,7 +1052,7 @@ static int veejay_screen_update(veejay_t * info )
         }
 #endif
 #endif
-		
+
 #ifdef HAVE_SDL	
 	if(skip_update) {
         vj_sdl_update_screen(info->sdl);
@@ -1584,6 +1584,86 @@ static	void	veejay_event_handle(veejay_t *info)
 #endif
 }
 
+static int veejay_setup_video_out(veejay_t *info) {
+	char *title;
+	int x = 0, y = 0;
+	editlist *el = info->edit_list;
+
+	if( info->uc->geox != 0 && info->uc->geoy != 0 )
+	{
+		x = info->uc->geox;
+		y = info->uc->geoy;
+	}
+
+	switch(info->video_out) {
+		case 0:
+			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
+#ifdef HAVE_SDL
+			info->sdl = vj_sdl_allocate( info->effect_frame1, info->use_keyb, info->use_mouse,info->show_cursor, info->borderless);
+			if( !info->sdl )
+				return -1;
+
+			title = veejay_title( info );
+
+			if (!vj_sdl_init(info->sdl, x,y,info->bes_width, info->bes_height, title,1,info->settings->full_screen,info->pixel_format,el->video_fps))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
+				free(title);
+				return -1;
+			}
+			free(title);
+#endif
+		break;
+
+		case 1:
+			veejay_msg(VEEJAY_MSG_INFO, "Using output driver DirectFB");
+#ifdef HAVE_DIRECTFB
+			info->dfb =(vj_dfb *) vj_dfb_allocate(info->video_output_width,info->video_output_height,
+			                                      el->video_norm);
+			if( !info->dfb )
+				return -1;
+			if (vj_dfb_init(info->dfb) != 0)
+				return -1;
+#endif
+		break;
+
+
+		case 2:
+			veejay_msg(VEEJAY_MSG_INFO, 
+			           "Using output driver SDL & DirectFB");
+#ifdef HAVE_SDL
+			info->sdl = vj_sdl_allocate(info->effect_frame1, info->use_keyb,info->use_mouse,info->show_cursor, info->borderless);
+			if(!info->sdl)
+				return -1;
+
+			title = veejay_title(info);	
+			if (!vj_sdl_init(info->sdl,x,y, info->bes_width, info->bes_height,title,1,info->settings->full_screen,info->pixel_format, el->video_fps)) {
+				free(title);
+				return -1;
+			}
+			free(title);
+#endif
+#ifdef HAVE_DIRECTFB
+			info->dfb = (vj_dfb *) vj_dfb_allocate( info->video_output_width, info->video_output_height, el->video_norm);
+			if(!info->dfb)
+				return -1;
+
+			if (vj_dfb_init(info->dfb) != 0)
+				return -1;
+#endif
+		break;
+		case 3:
+	    case 4:
+		case 5:
+			break;
+		default:
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345]");
+			return -1;
+	}
+
+	return 0;
+}
+
 static void *veejay_mjpeg_playback_thread(void *arg)
 {
     veejay_t *info = (veejay_t *) arg;
@@ -1597,6 +1677,12 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 
     vj_osc_set_veejay_t(info); 
     vj_tag_set_veejay_t(info);
+
+	/* now setup the output driver */
+	if( veejay_setup_video_out(info) != 0 ) {
+		veejay_msg( VEEJAY_MSG_ERROR, "Failed to setup output driver");
+    	pthread_exit(NULL);
+	}
 
     while (settings->state != LAVPLAY_STATE_STOP) {
 	pthread_mutex_lock(&(settings->valid_mutex));
@@ -1616,7 +1702,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	}
 	pthread_mutex_unlock(&(settings->valid_mutex));
 
-        if( settings->state != LAVPLAY_STATE_PAUSED && settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
+    if( settings->state != LAVPLAY_STATE_PAUSED && settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
 		!veejay_screen_update(info)  )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d. I won't give up yet!", settings->current_frame_num);
@@ -2005,62 +2091,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	switch (info->video_out)
 	{
 		case 0:
-			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
-#ifdef HAVE_SDL
-			info->sdl = vj_sdl_allocate( info->effect_frame1, info->use_keyb, info->use_mouse,info->show_cursor, info->borderless);
-			if( !info->sdl )
-				return -1;
-
-			title = veejay_title( info );
-
-			if (!vj_sdl_init(info->sdl, x,y,info->bes_width, info->bes_height, title,1,info->settings->full_screen,info->pixel_format,el->video_fps))
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
-				free(title);
-				return -1;
-			}
-			free(title);
-#endif
-		break;
-
 		case 1:
-			veejay_msg(VEEJAY_MSG_INFO, "Using output driver DirectFB");
-#ifdef HAVE_DIRECTFB
-			info->dfb =(vj_dfb *) vj_dfb_allocate(info->video_output_width,info->video_output_height,
-			                                      el->video_norm);
-			if( !info->dfb )
-				return -1;
-			if (vj_dfb_init(info->dfb) != 0)
-				return -1;
-#endif
-		break;
-
-
 		case 2:
-			veejay_msg(VEEJAY_MSG_INFO, 
-			           "Using output driver SDL & DirectFB");
-#ifdef HAVE_SDL
-			info->sdl = vj_sdl_allocate(info->effect_frame1, info->use_keyb,info->use_mouse,info->show_cursor, info->borderless);
-			if(!info->sdl)
-				return -1;
-
-			title = veejay_title(info);	
-			if (!vj_sdl_init(info->sdl,x,y, info->bes_width, info->bes_height,title,1,info->settings->full_screen,info->pixel_format, el->video_fps)) {
-				free(title);
-				return -1;
-			}
-			free(title);
-#endif
-#ifdef HAVE_DIRECTFB
-			info->dfb = (vj_dfb *) vj_dfb_allocate( info->video_output_width, info->video_output_height, el->video_norm);
-			if(!info->dfb)
-				return -1;
-
-			if (vj_dfb_init(info->dfb) != 0)
-				return -1;
-#endif
-		break;
-
+			break;
 		case 3:
 			veejay_msg(VEEJAY_MSG_INFO, "Entering headless mode (no visual output)");
 		break;
@@ -2093,9 +2126,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		break;
 
 		default:
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345]");
-			return -1;
-		break;
+			break;
 	}
 
 	if( gen_tags > 0 ) {

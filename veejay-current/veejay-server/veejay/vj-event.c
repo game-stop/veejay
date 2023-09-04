@@ -2990,7 +2990,6 @@ void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-
     if(args[0] == 2) { // Its a toggle!
         args[0] = (v->settings->full_screen ? 0 : 1);
     }
