@@ -350,7 +350,9 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 
 dnl If you get here, you can change AC_MSG_ERROR to AC_MSG_RESULT
 dnl and uncomment setting the CFLAGS below to have it compile anyway on your system
-	AC_MSG_ERROR([unknown])
+
+        AC_MSG_INFO([Host CPU is: $host_cpu])
+        AC_MSG_ERROR([unknown arch])
 
 dnl	OP_CFLAGS="$USER_CFLAGS"
 dnl	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
