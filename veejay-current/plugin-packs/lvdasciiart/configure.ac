@@ -181,6 +181,21 @@ case $host_cpu in
 	        CFLAGS="-m64 -fPIC -DPIC -ftree-vectorize -O3 -ffast-math"
         fi
     ;;
+  aarch64* )
+      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+      if test "x$enable_debug" != "xyes" ; then
+          VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
+          SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+      fi
+      CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
+      have_arm=true
+      AC_MSG_RESULT(aarch64)
+            ;;
+  arm|armv7l)
+      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+      have_arm=true
+      AC_MSG_RESULT(arm)
+      ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
 	AC_DEFINE(ARCH_PPC,1,[Compiling for PowerPC])
