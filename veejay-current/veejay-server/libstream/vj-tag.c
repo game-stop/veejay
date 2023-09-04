@@ -1221,6 +1221,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 
         if( _vj_tag_new_clone(tag,channel) == 0 ) {
             free(tag->source_name);
+            if(tag->method_filename) 
+                free(tag->method_filename);
             free(tag);
             return -1;
         }
@@ -1228,6 +1230,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     default:
         veejay_msg(0, "Stream type %d invalid", type );
         free(tag->source_name);
+        if(tag->method_filename) 
+            free(tag->method_filename);
         free(tag);
         return -1;
     }
@@ -1243,7 +1247,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         tag->effect_chain[i]->e_flag = 0;
         tag->effect_chain[i]->frame_trimmer = 0;
         tag->effect_chain[i]->frame_offset = 0;
-	tag->effect_chain[i]->speed = INT_MAX;
+	    tag->effect_chain[i]->speed = INT_MAX;
         tag->effect_chain[i]->volume = 0;
         tag->effect_chain[i]->a_flag = 0;
         tag->effect_chain[i]->channel = 0;
@@ -1261,6 +1265,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     {
         veejay_msg(0, "Unable to store stream %d - Internal Error", tag->id);
         free(tag->source_name);
+        if(tag->method_filename) 
+            free(tag->method_filename);
         free(tag);
         return -1;
     }
@@ -2336,15 +2342,15 @@ int vj_tag_get_all_effect_args(int t1, int position, int *args,
     int i = 0;
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
-        return -1;
+        return 0;
     if (arg_len == 0 )
         return 1;
     if (!args)
-        return -1;
+        return 0;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
-        return -1;
+        return 0;
     if (arg_len < 0 || arg_len > SAMPLE_MAX_PARAMETERS)
-        return -1;
+        return 0;
 
     if( tag->effect_chain[position]->kf_status )
     {
@@ -2369,7 +2375,7 @@ int vj_tag_get_all_effect_args(int t1, int position, int *args,
             args[i] = tag->effect_chain[position]->arg[i];
     }
 
-        return 1;
+    return 1;
 }
 
 int vj_tag_get_effect_arg(int t1, int position, int argnr)

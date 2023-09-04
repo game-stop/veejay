@@ -1488,13 +1488,15 @@ int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int 
     sample_info *sample;
     sample = sample_get(s1);
     if( arg_len == 0)
-    return 1;
+        return 1;
+
     if (!sample)
-    return -1;
+        return 0;
+
     if (position >= SAMPLE_MAX_EFFECTS)
-    return -1;
+        return 0;
     if (arg_len < 0 || arg_len > SAMPLE_MAX_PARAMETERS)
-    return -1;
+        return 0;
 
     if( sample->effect_chain[position]->kf )
     {
