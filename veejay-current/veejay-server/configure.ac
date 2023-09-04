@@ -330,7 +330,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	fi
 
 	;;
-   aarch64 )
+   aarch64* )
         AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	if test "x$enable_debug" != "xyes" ; then
 	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
