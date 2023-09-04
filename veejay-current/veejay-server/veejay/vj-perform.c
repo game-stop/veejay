@@ -148,7 +148,6 @@ typedef struct
 
     void *resample_context[(MAX_SPEED+1)];
     void *downsample_context[(MAX_SPEED+1)];
-    uint32_t is_supersampled;
 
     VJFrame *tmp1;
     VJFrame *tmp2;
@@ -252,19 +251,6 @@ static void vj_perform_set_422(VJFrame *frame)
 
 static void vj_perform_supersample(video_playback_setup *settings,performer_t *p, VJFrame *one, VJFrame *two, int sm)
 {
-    if(p->is_supersampled) {
-        if(one != NULL && one->ssm == 0) {
-            chroma_supersample( settings->sample_mode,one,one->data );
-            vj_perform_set_444(one);
-        }
-        if(two != NULL && two->ssm == 0) {
-            chroma_supersample( settings->sample_mode,two,two->data );
-            vj_perform_set_444(two);
-        }
-
-        return;
-    }
-    
     if(sm == 1) {
         if(one != NULL && one->ssm == 0) {
             chroma_supersample( settings->sample_mode,one,one->data );
@@ -274,7 +260,6 @@ static void vj_perform_supersample(video_playback_setup *settings,performer_t *p
             chroma_supersample( settings->sample_mode,two,two->data );
             vj_perform_set_444(two);
         }
-        p->is_supersampled = 1;
     } 
     else if( sm == 0 ) {
         if(one != NULL && one->ssm == 1) { 
@@ -3884,7 +3869,6 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
     int safe_ff = p->pvar_.follow_fade;
     int safe_fv = p->pvar_.fade_value;
 
-    p->is_supersampled = 0;
     veejay_memset( &(p->pvar_), 0, sizeof(varcache_t));
     
     p->pvar_.follow_fade = safe_ff;
