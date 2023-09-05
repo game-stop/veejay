@@ -253,7 +253,7 @@ case $host_cpu in
       AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
       if test "x$enable_debug" != "xyes" ; then
           VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-          SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+          SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC -mfpu=neon"
       fi
       CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
       have_arm=true
