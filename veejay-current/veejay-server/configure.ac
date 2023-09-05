@@ -405,7 +405,7 @@ then
 
 	else
 		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
-		FASTARM_CFLAGS="$ARCHFLAGS -Wa, -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
+		FASTARM_CFLAGS="$ARCHFLAGS"
 	fi
 	
 	if test "x$enable_debug" != "xyes" ; then

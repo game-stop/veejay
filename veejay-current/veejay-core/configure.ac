@@ -370,11 +370,11 @@ then
 	if test $ac_cv_flag_neon = yes ; then
 		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
 		USER_CFLAGS="-mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
-		FASTARM_CFLAGS="$ARCHFLAGS -Wa,-march=armv7-a -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
+		FASTARM_CFLAGS="$ARCHFLAGS -Wa,-march=armv7-a,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
 
 	else
 		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
-		FASTARM_CFLAGS="$ARCHFLAGS -Wa, -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
+		FASTARM_CFLAGS="$ARCHFLAGS"
 	fi
 	
 	if test "x$enable_debug" != "xyes" ; then
