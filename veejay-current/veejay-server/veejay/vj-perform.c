@@ -1516,6 +1516,7 @@ static int vj_perform_use_cached_frame(ycbcr_frame *cached_frame, VJFrame *dst)
     veejay_memcpy( dst->data[0], cached_frame->Y, dst->stride[0] *  dst->height );
     veejay_memcpy( dst->data[1], cached_frame->Cb, dst->stride[1] * dst->height );
     veejay_memcpy( dst->data[2], cached_frame->Cr, dst->stride[2] * dst->height );
+
     //veejay_memcpy( dst->data[3], cached_frame->data[3], cached_frame->stride[3] * cached_frame->height );
     return dst->ssm;
 }
@@ -1916,7 +1917,7 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, performer_t *p, int s
             if(len > 0 ) {
                error = 0;
                ssm = dst->ssm;
-
+//NEL
                global->cached_sample_frames[ global->n_cached_sample_frames ].sample_id = sample_id;
                global->cached_sample_frames[ global->n_cached_sample_frames ].frame = p->frame_buffer[ chain_entry ];
                global->n_cached_sample_frames ++;
@@ -2158,7 +2159,7 @@ static void vj_perform_tag_render_chain_entry(veejay_t *info,performer_t *p,vjp_
     vj_perform_supersample(settings,p, frames[0], (ef ? frames[1] : NULL), sub_mode );
 
     p->frame_buffer[chain_entry]->ssm = frames[0]->ssm;
-
+    
     if(ef)
     {
         frames[1]->ssm = vj_perform_apply_secundary_tag(info,p,fx_entry->channel,fx_entry->source_type,chain_entry,frames[0],frames[1],p->frame_buffer[chain_entry]->P0, p->frame_buffer[chain_entry]->P1, 0 );

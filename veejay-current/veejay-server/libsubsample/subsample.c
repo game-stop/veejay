@@ -29,6 +29,9 @@
 #include <veejaycore/mmx_macros.h>
 #include "subsample-mmx.h"
 #endif
+#ifdef HAVE_ARM
+#include <arm_neon.h>
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -109,6 +112,7 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
         16 source pixels)
 */
 
+#ifndef HAVE_ARM
 static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 {
   const uint8_t *in0, *in1;
@@ -139,6 +143,50 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
     in1 += width*2;
   }
 }
+#else
+static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
+{
+    const uint8_t *in0, *in1;
+    uint8_t *out;
+    int x, y;
+    in0 = buffer;
+    in1 = buffer + width;
+    out = buffer;
+
+    for (y = 0; y < height; y += 4)
+    {
+        for (x = 0; x < width; x += 4)
+        {
+            uint8x16_t vin0 = vld1q_u8(in0);
+            uint8x16_t vin1 = vld1q_u8(in1);
+			uint8x16_t vresult = vrhaddq_u8(vin0, vin1);
+			vst1q_u8(out, vresult);
+
+            in0 += 16;
+            in1 += 16;
+            out += 4;
+        }
+
+        for (; x < width; x += 2)
+        {
+            uint8x8_t vin0 = vld1_u8(in0);
+            uint8x8_t vin1 = vld1_u8(in1);
+
+            uint8x8_t vresult = vrhadd_u8(vin0, vin1);
+            vst1_u8(out, vresult);
+
+            in0 += 8;
+            in1 += 8;
+            out += 1;
+        }
+
+        in0 += width * 2;
+        in1 += width * 2;
+    }
+}
+#endif
+
+#ifndef HAVE_ARM
 static void ss_444_to_420jpeg_cp(uint8_t *buffer,uint8_t *dest, int width, int height)
 {
   const uint8_t *in0, *in1;
@@ -169,6 +217,55 @@ static void ss_444_to_420jpeg_cp(uint8_t *buffer,uint8_t *dest, int width, int h
     in1 += width*2;
   }
 }
+#else
+static void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
+{
+    const uint8_t *in0, *in1;
+    uint8_t *out;
+    int x, y;
+    in0 = buffer;
+    in1 = buffer + width;
+    out = dest;
+
+    for (y = 0; y < height; y += 4)
+    {
+        for (x = 0; x < width; x += 4)
+        {
+            uint8x16_t vin0 = vld1q_u8(in0);
+            uint8x16_t vin1 = vld1q_u8(in1);
+
+            uint8x16_t vresult = vrhaddq_u8(vin0, vin1);
+
+            vst1q_u8(out, vresult);
+
+            in0 += 16;
+            in1 += 16;
+            out += 4;
+        }
+
+        for (; x < width; x += 2)
+        {
+            uint8x8_t vin0 = vld1_u8(in0);
+            uint8x8_t vin1 = vld1_u8(in1);
+
+            uint8x8_t vresult = vrhadd_u8(vin0, vin1);
+
+            vst1_u8(out, vresult);
+
+            in0 += 8;
+            in1 += 8;
+            out += 1;
+        }
+
+        in0 += width * 2;
+        in1 += width * 2;
+    }
+}
+#endif
+
+
+
+
 /* horizontal interstitial siting
  *
  *    Y   Y   Y   Y
@@ -360,8 +457,8 @@ static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int hei
 
 static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 {
-#ifndef HAVE_ASM_MMX
-	uint8_t *in, *out0, *out1;
+#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM) 
+    uint8_t *in, *out0, *out1;
 	unsigned int x, y;
 	in = buffer + (width * height / 4) - 1;
 	out1 = buffer + (width * height) - 1;
@@ -377,7 +474,37 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 		out0 -= width;
 		out1 -= width;
 	}
-#else
+#endif
+
+#ifdef HAVE_ARM
+    uint8_t *in, *out0, *out1;
+    unsigned int x, y;
+    in = buffer + (width * height / 4) - 1;
+    out1 = buffer + (width * height) - 1;
+    out0 = out1 - width;
+    uint8x16_t val, val_dup;
+
+    for (y = height - 1; y >= 0; y -= 2)
+    {
+        for (x = width - 1; x >= 0; x -= 16)
+        {
+            val = vld1q_u8(in);
+			val_dup = vdupq_n_u8(vgetq_lane_u8(val, 0));
+
+            vst1q_u8(out1 - 15, val_dup);
+            vst1q_u8(out0 - 15, val_dup);
+
+            in--;
+            out1 -= 16;
+            out0 -= 16;
+        }
+
+        out0 -= width;
+        out1 -= width;
+    }
+#endif
+
+#ifdef HAVE_ASM_MMX
 	int x,y;
 	const int mmx_stride = width >> 3;
 	uint8_t *src = buffer + ((width * height) >> 2)-1;
@@ -406,6 +533,7 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
             	SFENCE"     \n\t"
             	:::"memory");
 #endif
+
 }
 
 static inline void downsample2x1( const uint8_t *src, uint8_t *dst, const int width )
@@ -451,6 +579,48 @@ static inline void downsample32x16( const uint8_t *src, uint8_t *dst, const int 
 }
 #endif
 
+#ifdef HAVE_ARM
+static inline void downsample32x16(const uint8_t *src, uint8_t *dst, const int width, const int left)
+{
+    unsigned int x;
+    unsigned int x1 = 0;
+    unsigned int i;
+
+    for (x = 0; x < width - left; x += 32, x1 += 16)
+    {
+        uint8x16x2_t vsrc = vld2q_u8(&src[x]);
+	    uint8x16_t vsum = vrhaddq_u8(vsrc.val[0], vsrc.val[1]);
+	    vst1q_u8(&dst[x1], vsum);
+    }
+
+    for (i = 0; i < left; i += 2, x1++)
+    {
+        dst[x1] = (src[x + i] + src[x + i + 1] + 1) >> 1;
+    }
+}
+
+static inline void downsample16x8(const uint8_t *src, uint8_t *dst, const int width)
+{
+    unsigned int x;
+    unsigned int x1 = 0;
+    
+    for (x = 0; x < width; x += 16, x1 += 8)
+    {
+        uint8x16_t vsrc = vld1q_u8(&src[x]);
+        uint8x8_t vsum = vpadd_u8(vget_low_u8(vsrc), vget_high_u8(vsrc));
+        vsum = vrshr_n_u8(vsum, 1);
+        vst1_u8(&dst[x1], vsum);
+    }
+    
+    for (; x < width; x += 2, x1++)
+    {
+        dst[x1] = (src[x] + src[x + 1] + 1) >> 1;
+    }
+}
+
+#endif
+
+
 static void ss_444_to_422_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
 {
 	const unsigned int dst_stride = width >> 1;
@@ -464,7 +634,7 @@ static void ss_444_to_422_cp(uint8_t *buffer, uint8_t *dest, int width, int heig
 		uint8_t *src = buffer + (y*width);
 		uint8_t *dst = dest + (y*dst_stride);
 	
-#ifdef HAVE_ASM_MMX
+#if defined(HAVE_ASM_MMX) || defined(HAVE_ARM)
 		downsample32x16( src, dst, width,left );
 #else
 		downsample2x1( src, dst, width  );
@@ -478,6 +648,23 @@ static void ss_444_to_422_cp(uint8_t *buffer, uint8_t *dest, int width, int heig
 #endif
 }
 
+#ifdef HAVE_ARM
+static inline void subsample_up_1x16to1x32(uint8_t *in, uint8_t *out)
+{
+    uint8x16_t vzero = vdupq_n_u8(0);
+    uint8x16_t vin = vld1q_u8(in);
+
+    uint8x8_t vin_low = vget_low_u8(vin);
+    uint8x8_t vin_high = vget_high_u8(vin);
+
+    vin_low = vshrq_n_u8(vin_low, 1);
+    vin_high = vshrq_n_u8(vin_high, 1);
+
+    uint8x16_t vout = vcombine_u8(vin_low, vin_high);
+
+    vst1q_u8(out, vout);
+}
+#endif
 
 
 static void tr_422_to_444( uint8_t *buffer, int width, int height)
@@ -485,7 +672,7 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 	int x,y;
 	const int stride = width >> 1;
 
-#ifndef HAVE_ASM_MMX
+#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 	for( y = height-1; y > 0 ; y -- ) {
 		uint8_t *dst = buffer + (y * width);
 		uint8_t *src = buffer + (y * stride);
@@ -496,9 +683,9 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 			dst+=2; // increment dst
 		}
 	}
-#else
-//	const int mmx_stride = stride >> 3;
-//	int left = (mmx_stride % 16); /* FIXME */
+#endif
+
+#if defined(HAVE_ASM_MMX) || defined(HAVE_ARM)
 	for( y = height -1 ; y > 0; y -- ) {
 		uint8_t *src = buffer + (y* stride);
 		uint8_t *dst = buffer + (y* width);
@@ -507,7 +694,8 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 			subsample_up_1x16to1x32( &src[x], &dst[x1] );
 		}
 	}
-
+#endif
+#if defined(HAVE_ASM_MMX)
 	__asm__(_EMMS"       \n\t"
            	SFENCE"     \n\t"
             	:::"memory");
@@ -518,7 +706,7 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 {
 	int x,y;
 	const int stride = width >> 1;
-#ifndef HAVE_ASM_MMX
+#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 	for( y = height; y > 0 ; y -- ) {
 		uint8_t *d = out + (y * width);
 		uint8_t *s = in + (y * stride);
@@ -529,9 +717,9 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 			d+=2; // increment dst
 		}
 	}
-#else
-//	const int mmx_stride = stride >> 3;
-//	int left = (mmx_stride % 16);  /* FIXME */
+#endif
+
+#if defined(HAVE_ASM_MMX) || defined(HAVE_ARM)
 	int x1 = 0;
 	for( y = height -1 ; y > 0; y -- ) {
 		uint8_t *src = in + (y* stride);
@@ -540,7 +728,9 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 			subsample_up_1x16to1x32(&src[x], &dst[x1] );
 		}
 	}
+#endif
 
+#ifdef HAVE_ASM_MMX
 	__asm__(_EMMS"       \n\t"
            	SFENCE"     \n\t"
             	:::"memory");
@@ -612,7 +802,7 @@ static void	chroma_subsample_task( void *ptr )
 			break;
 		case SSM_422_444:
 	   	 	ss_444_to_422_cp(f->output[1],f->input[1],f->width,f->height);
-		    	ss_444_to_422_cp(f->output[2],f->input[2],f->width,f->height);
+		    ss_444_to_422_cp(f->output[2],f->input[2],f->width,f->height);
     		break;
 		default:
 			break;
@@ -691,8 +881,8 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 
 	switch (mode) {
 		case SSM_420_JPEG_BOX:
-	      		ss_420jpeg_to_444(ycbcr[1], frame->width, frame->height);
-	    		ss_420jpeg_to_444(ycbcr[2], frame->width, frame->height);
+	      	ss_420jpeg_to_444(ycbcr[1], frame->width, frame->height);
+	    	ss_420jpeg_to_444(ycbcr[2], frame->width, frame->height);
 		break;
 		case SSM_420_JPEG_TR:
 			tr_420jpeg_to_444(_chroma_supersample_data,ycbcr[1], frame->width, frame->height);
