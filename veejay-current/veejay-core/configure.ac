@@ -291,34 +291,28 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	fi
 
 	;;
-   aarch64* )
-        AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	if test "x$enable_debug" != "xyes" ; then
+   aarch64* |arm)
+     AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	 if test "x$enable_debug" != "xyes" ; then
 	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
 	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
-	fi
-	CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
-	have_arm=true
-	AC_MSG_RESULT(aarch64)
-        ;;
-   arm|armv7l)
-	AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-        AC_COMPILE_IFELSE([
-        AC_LANG_PROGRAM([
-          #include <stdint.h>
-          #if defined(__arm__) && defined(__ARM_ARCH_7A__)
-          #define HAVE_ARMV7A 1
-          #endif
-          ], [return HAVE_ARMV7A;])
-        ], [
-	      AC_DEFINE([HAVE_ARMV7A], [1], [Define if ARMv7-A architecture is detected])
-	      have_armv7a=true   
-	   ])
-	
-	have_arm=true
-	AC_MSG_RESULT(arm)
-	;;
-
+	 fi
+	 CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
+	 have_arm=true
+	 AC_MSG_RESULT([arm])
+     ;;
+    arm7* )
+     AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	 AC_DEFINE(HAVE_ARM7,1,[Compiling for ARM7L CPU])
+	 if test "x$enable_debug" != "xyes" ; then
+	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
+	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+	 fi
+	 CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
+	 have_arm=true
+	 have_armv7a=true
+	 AC_MSG_RESULT([arm7])
+	 ;;
   *)
 
 dnl If you get here, you can change AC_MSG_ERROR to AC_MSG_RESULT
@@ -368,13 +362,10 @@ then
 		fi
 	])
 
-	AC_MSG_RESULT($ac_cv_flag_neon)	
-
 	if test $ac_cv_flag_neon = yes ; then
 		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
 		USER_CFLAGS="-mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
-		FASTARM_CFLAGS="$ARCHFLAGS -Wa,-march=armv7-a,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
-
+		FASTARM_CFLAGS="$ARCHFLAGS -march=armv7-a -mthumb -mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
 	else
 		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
 		FASTARM_CFLAGS="$ARCHFLAGS"
@@ -396,20 +387,18 @@ fi
 
 if test x$have_arm = xtrue
 then
-	AC_CACHE_CHECK(for ASIMD on processor(s), ac_cv_flag_neon, [
+	AC_CACHE_CHECK(for ASIMD on processor(s), ac_cv_flag_asimd, [
 		if grep "^Features.* asimd" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_asimd=yes
 		else
 			ac_cv_flag_asimd=no
 		fi
 	])
-
-	AC_MSG_RESULT($ac_cv_flag_asimd)	
-
-	if test $ac_cv_flag_asimd = yes ; then
-		AC_DEFINE(HAVE_ASIMD,1,[Compiling in ASIMD support])
-	fi
 	
+	if test $ac_cv_flag_neon = yes ; then
+		AC_DEFINE(HAVE_ARM_ASIMD, 1,[Compiling in ASIMD support])
+	fi
+
 	if test "x$enable_debug" != "xyes" ; then
 		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
 	else
@@ -422,6 +411,8 @@ then
 	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 	AC_SUBST(FASTARM_CFLAGS)
 fi
+
+
 
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 
@@ -866,7 +857,6 @@ if test "$have_armv7a"  = "true"; then
 AC_MSG_NOTICE([   arm7a])
 AC_MSG_NOTICE([    NEON    enabled     : ${ac_cv_flag_neon}])
 fi
-
 
 if test "$have_mips" = "true" ; then
 AC_MSG_NOTICE([   mips])
