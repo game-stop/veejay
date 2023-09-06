@@ -71,6 +71,17 @@ static int has_cpuid(void)
 	return 0;
 }
 
+#ifdef HAVE_ARM
+static int get_cache_line_size() {
+	int cache_line_size;
+
+    asm volatile("mrs %0, ctr_el0" : "=r"(cache_line_size));
+    cache_line_size &= 0xFF; 
+
+    return cache_line_size;
+}
+#endif
+#if defined(ARCH_X86_64) || defined(ARCH_X86)
 // copied from Mplayer (want to have cache line size detection ;) )
 static void do_cpuid(unsigned int ax, unsigned int *p)
 {
@@ -110,6 +121,7 @@ static int	get_cache_line_size()
 	}
 	return ret;
 }
+#endif
 
 int	cpu_cache_size()
 {
@@ -127,6 +139,9 @@ void vj_mem_init(void)
 	CACHE_LINE_SIZE = get_cache_line_size();
 #endif
 #ifdef ARCH_X86_64
+	CACHE_LINE_SIZE = get_cache_line_size();
+#endif
+#if defined (HAVE_ARM)
 	CACHE_LINE_SIZE = get_cache_line_size();
 #endif
 	if(MEM_ALIGNMENT_SIZE == 0)
