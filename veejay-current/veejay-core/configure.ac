@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 AC_INIT([veejaycore],[1.5.65],[http://www.veejayhq.net])
-AC_PREREQ(2.57)
+AC_PREREQ([2.71])
 AC_CONFIG_SRCDIR([veejaycore/core.c])
 
 VEEJAYCORE_MAJOR_VERSION=1
@@ -42,47 +42,38 @@ CFLAGS=""
 dnl enable auto vectorization for libvjmem, libvje and libyuv
 
 AC_ARG_ENABLE([strict],
-		AC_HELP_STRING([--enable-strict],
-			     [Compile in paranoia assertion checking]))
+		AS_HELP_STRING([--enable-strict],[Compile in paranoia assertion checking]))
 
 AC_ARG_ENABLE([sanitizer],
-        AC_HELP_STRING([--enable-sanitizer],
-                 [Enable AddressSanitizer]))
+        AS_HELP_STRING([--enable-sanitizer],[Enable AddressSanitizer]))
 
 AC_ARG_ENABLE([portleak],
-	      	AC_HELP_STRING([--enable-portleak],
-			      [Compile in vevo port validation (requires --enable-strict)]))
+	      	AS_HELP_STRING([--enable-portleak],[Compile in vevo port validation (requires --enable-strict)]))
 
 AC_ARG_ENABLE([debug],
-		AC_HELP_STRING([--enable-debug],
-			     [Compile in debugging information]))
+		AS_HELP_STRING([--enable-debug],[Compile in debugging information]))
 AC_ARG_ENABLE([profile],
-		AC_HELP_STRING([--enable-profiling],
-			     [Compile in profiling information]))
+		AS_HELP_STRING([--enable-profiling],[Compile in profiling information]))
 AC_ARG_ENABLE([compile-warnings],     
-              AC_HELP_STRING([--enable-compile-warnings],
-                             [Turn on compiler warnings.]))
+              AS_HELP_STRING([--enable-compile-warnings],[Turn on compiler warnings.]))
 AC_ARG_ENABLE([warnings_as_errors],   
-              AC_HELP_STRING([--enable-warnings_as_errors],
-                             [Compiler warnings are errors.]))
+              AS_HELP_STRING([--enable-warnings_as_errors],[Compiler warnings are errors.]))
 AC_ARG_WITH([extra-cflags],
-            AC_HELP_STRING([--with-extra-cflags=flags],
-                           [Options to be added to CFLAGS (optional)]))
+            AS_HELP_STRING([--with-extra-cflags=flags],[Options to be added to CFLAGS (optional)]))
 arch_target="auto"
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic, auto or user defined],
 					[Build a generic binary, auto-detect current cpu type or user defined -mtune/-march setting)]),
 					[ arch_target="$withval"])
 
-AC_GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 
 dnl Initialize libtool
-AC_PROG_LIBTOOL
+LT_INIT
 
 dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
 AC_PROG_YACC
-AM_PROG_LEX
 AC_PROG_CXX
 AC_PROG_INSTALL
 AC_PROG_LN_S
@@ -119,8 +110,6 @@ AC_SEARCH_LIBS([clock_gettime], [rt],
 
 
 AC_SUBST(LIBGETOPT_LIB)
-
-AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 
@@ -227,6 +216,7 @@ have_mips=false
 have_ppccpu=false
 have_ps2=false
 have_arm=false
+have_armv7a=false
 
 OP_CFLAGS=""
 VJE_CFLAGS=""
@@ -313,6 +303,18 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
         ;;
    arm|armv7l)
 	AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+        AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([
+          #include <stdint.h>
+          #if defined(__arm__) && defined(__ARM_ARCH_7A__)
+          #define HAVE_ARMV7A 1
+          #endif
+          ], [return HAVE_ARMV7A;])
+        ], [
+	      AC_DEFINE([HAVE_ARMV7A], [1], [Define if ARMv7-A architecture is detected])
+	      have_armv7a=true   
+	   ])
+	
 	have_arm=true
 	AC_MSG_RESULT(arm)
 	;;
@@ -321,7 +323,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 
 dnl If you get here, you can change AC_MSG_ERROR to AC_MSG_RESULT
 dnl and uncomment setting the CFLAGS below to have it compile anyway on your system
-	AC_MSG_ERROR([unknown])
+	AC_MSG_ERROR([unknown, good luck])
 
 dnl	OP_CFLAGS="$USER_CFLAGS"
 dnl	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
@@ -356,7 +358,7 @@ else
 fi
 
 dnl ARM architecture detect NEON and set CFLAGS
-if test x$have_arm = xtrue
+if test x$have_armv7a = xtrue
 then
 	AC_CACHE_CHECK(for NEON on processor(s), ac_cv_flag_neon, [
 		if grep "^Features.* neon" /proc/cpuinfo > /dev/null; then
@@ -365,6 +367,7 @@ then
 			ac_cv_flag_neon=no
 		fi
 	])
+
 	AC_MSG_RESULT($ac_cv_flag_neon)	
 
 	if test $ac_cv_flag_neon = yes ; then
@@ -388,6 +391,35 @@ then
 	VJE_CFLAGS="$USER_CFLAGS"
 	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 
+	AC_SUBST(FASTARM_CFLAGS)
+fi
+
+if test x$have_arm = xtrue
+then
+	AC_CACHE_CHECK(for ASIMD on processor(s), ac_cv_flag_neon, [
+		if grep "^Features.* asimd" /proc/cpuinfo > /dev/null; then
+			ac_cv_flag_asimd=yes
+		else
+			ac_cv_flag_asimd=no
+		fi
+	])
+
+	AC_MSG_RESULT($ac_cv_flag_asimd)	
+
+	if test $ac_cv_flag_asimd = yes ; then
+		AC_DEFINE(HAVE_ASIMD,1,[Compiling in ASIMD support])
+	fi
+	
+	if test "x$enable_debug" != "xyes" ; then
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
+	else
+		USER_CFLAGS="$USER_CFLAGS -g -Wall"
+	fi
+
+	OP_CFLAGS="$USER_CFLAGS"
+	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
+	VJE_CFLAGS="$USER_CFLAGS"
+	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 	AC_SUBST(FASTARM_CFLAGS)
 fi
 
@@ -698,6 +730,7 @@ AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
+AM_CONDITIONAL(HAVE_ARMV7A, test x$have_armv7a = xtrue )
 
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
@@ -827,8 +860,13 @@ fi
 
 if test "$have_arm" = "true" ; then
 AC_MSG_NOTICE([   arm])
+AC_MSG_NOTICE([    ASIMD    enabled     : ${ac_cv_flag_asimd}])
+fi
+if test "$have_armv7a"  = "true"; then
+AC_MSG_NOTICE([   arm7a])
 AC_MSG_NOTICE([    NEON    enabled     : ${ac_cv_flag_neon}])
 fi
+
 
 if test "$have_mips" = "true" ; then
 AC_MSG_NOTICE([   mips])
