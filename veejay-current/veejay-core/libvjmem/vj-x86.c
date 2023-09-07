@@ -135,15 +135,10 @@ int	mem_align_size()
 
 void vj_mem_init(void)
 {
-#ifdef ARCH_X86 
+#if defined(ARCH_X86) || defined(ARCH_X86_X64) || defined(HAVE_ARM) 
 	CACHE_LINE_SIZE = get_cache_line_size();
 #endif
-#ifdef ARCH_X86_64
-	CACHE_LINE_SIZE = get_cache_line_size();
-#endif
-#if defined (HAVE_ARM)
-	CACHE_LINE_SIZE = get_cache_line_size();
-#endif
+
 	if(MEM_ALIGNMENT_SIZE == 0)
 		MEM_ALIGNMENT_SIZE = getpagesize();
 	

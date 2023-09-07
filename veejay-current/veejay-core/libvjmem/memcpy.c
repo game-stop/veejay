@@ -140,8 +140,11 @@
 #include <libyuv/mmx_macros.h>
 #include <veejaycore/veejaycore.h>
 #include <libavutil/cpu.h>
-#ifdef HAVE_ARM
+#ifdef HAVE_ARM7A
 #include <fastarm/new_arm.h>
+#endif
+#ifdef HAVE_ASIMD
+#include <arm_neon.h>
 #endif
 
 #define BUFSIZE 1024
@@ -1398,6 +1401,41 @@ static void *memcpy_neon( void *to, const void *from, size_t n )
 	return retval;
 }
 #endif
+#ifdef HAVE_ARM_ASIMD
+static void memcpy_asimd_256(uint8_t *dst, const uint8_t *src) {
+    uint8x16_t data;
+    for (int i = 0; i < 16; ++i) {
+        data = vld1q_u8(src);
+        vst1q_u8(dst, data);
+        src += 16;
+        dst += 16;
+    }
+}
+static void *memcpy_asimd(void *to, const void *from, size_t n) {
+    void *retval = to;
+    uint8_t *src = (uint8_t *)from;
+    uint8_t *dst = (uint8_t *)to;
+
+    if (n >= 256) {
+        size_t i = n >> 8;
+        size_t r = n & 255;
+
+        for (; i > 0; i--) {
+            memcpy_asimd_256(dst, src);
+            src += 256;
+            dst += 256;
+        }
+
+        if (r) {
+            memcpy(dst, src, r);
+        }
+    } else {
+        memcpy(to, from, n);
+    }
+
+    return retval;
+}
+#endif
 
 /* Fast memory set. See comments for fast_memcpy */
 static void fast_memset(void * to, int val, size_t len)
@@ -1407,7 +1445,23 @@ static void fast_memset(void * to, int val, size_t len)
 		fast_memset_finish();
 }
 
+#ifdef HAVE_ARM_ASIMD
+void memset_asimd(void *dst, uint8_t val, size_t len) {
+    uint8x16_t value = vdupq_n_u8(val);
+	uint8_t *dst_bytes = (uint8_t *)dst;
+	size_t num_blocks = len / 16;
 
+    for (size_t i = 0; i < num_blocks; i++) {
+        vst1q_u8(dst_bytes, value);
+        dst_bytes += 16;
+    }
+
+    size_t remaining_bytes = len % 16;
+	for (size_t i = 0; i < remaining_bytes; i++) {
+        *dst_bytes++ = val;
+    }
+}
+#endif
 
 static struct {
      const char	*name;
@@ -1448,7 +1502,10 @@ static struct {
 #ifdef HAVE_ARM_NEON
 	{ "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_NEON },
 #endif
-#ifdef HAVE_ARM
+#ifdef HAVE_ARM_ASIMD
+	{ "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
+#endif
+#ifdef HAVE_ARM7A
 	{ "new mempcy for cortex with line size of 32, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_32_preload_192,0,0 },
 	{ "new memcpy for cortex with line size of 64, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>" ,(void*) memcpy_new_line_size_64_preload_192, 0, 0 },
     { "new memcpy for cortex with line size of 64, preload offset of 192, aligned access (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_64_preload_192_aligned_access, 0, 0 },
@@ -1479,7 +1536,10 @@ static struct {
 #ifdef HAVE_ARM_NEON
 	{ "memset_neon (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_neon,0, AV_CPU_FLAG_NEON },
 #endif
-#ifdef HAVE_ARM
+#ifdef HAVE_ARM_ASIMD
+	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
+#endif
+#ifdef HAVE_ARM7A
 	{ "memset align 0 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_0,0,0 },
 	{ "memset align 8 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_8,0,0 },
 	{ "memset align 32 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_32,0,0 },
