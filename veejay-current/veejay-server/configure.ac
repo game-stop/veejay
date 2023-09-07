@@ -1050,7 +1050,7 @@ AM_CONDITIONAL(HAVE_FREETYPE2, test x$have_freetype2 = xtrue)
 AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
 AM_CONDITIONAL(HAVE_ARM_NEON, test x$ac_cv_flag_neon = xtrue )
 AM_CONDITIONAL(HAVE_ARM_ASIMD, test x$ac_cv_flag_asimd = xtrue )
-AM_CONDITIONAL(HAVE_ARM7A, test x$have_armv7a = xtrue )
+AM_CONDITIONAL(HAVE_ARMV7A, test x$have_armv7a = xtrue )
 
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS

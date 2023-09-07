@@ -1329,6 +1329,20 @@ double	m_get_angle( int x, int y )
 	return (atan2( (float)y,x));
 }
 
+double atan2_approx(double y, double x) {
+    const double epsilon = 1e-6; 
+    if (fabs(x) < epsilon) {
+        if (y >= 0) return M_PI / 2.0;
+        else return -M_PI / 2.0;
+    }
+
+    double atan_approx = atan(y / x);
+
+    if (x > 0) return atan_approx;
+    else if (y >= 0) return atan_approx + M_PI;
+    return atan_approx - M_PI;
+}
+
 double	m_get_polar_x( double r, double a)
 {
 	return ( r * cos(a) );	
@@ -1338,8 +1352,7 @@ double	m_get_polar_y( double r, double a)
 	return ( r * sin(a) );
 }
 
-//copied from xine
-void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep){
+void veejay_blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep){
 	int x;
 	const int length= radius*2 + 1;
 	const int inv= ((1<<16) + length/2)/length;
@@ -1374,14 +1387,14 @@ void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep
 	uint8_t *a= temp[0], *b=temp[1];
 	
 	if(radius){
-		blur(a, src, w, radius, 1, srcStep);
+		veejay_blur(a, src, w, radius, 1, srcStep);
 		for(; power>2; power--){
 			uint8_t *c;
-			blur(b, a, w, radius, 1, 1);
+			veejay_blur(b, a, w, radius, 1, 1);
 			c=a; a=b; b=c;
 		}
 		if(power>1)
-			blur(dst, a, w, radius, dstStep, 1);
+			veejay_blur(dst, a, w, radius, dstStep, 1);
 		else{
 			int i;
 			for(i=0; i<w; i++)

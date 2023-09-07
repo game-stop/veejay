@@ -17,10 +17,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "bloom.h"
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 vj_effect *bloom_init(int width,int height)
 {
@@ -30,11 +32,11 @@ vj_effect *bloom_init(int width,int height)
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	ve->limits[0][0] = 0;
-	ve->limits[1][0] = 64;
+	ve->limits[1][0] = (width/2)-1;
 	ve->limits[0][1] = 0;
-	ve->limits[1][1] = 64;
+	ve->limits[1][1] = (width/2)-1;
 	ve->limits[0][2] = 0;
-	ve->limits[1][2] = 64;
+	ve->limits[1][2] = (width/2)-1;
     ve->limits[0][3] = 0;
 	ve->limits[1][3] = 255;
 
@@ -76,12 +78,13 @@ void bloom_free(void *ptr) {
     free(b);
 }
 
+
 static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r)
 {
 	int y;
 	for(y = 0; y < h ; y ++ )
 	{
-		blur( dst + y * w, src + y *w , w, r,1, 1);
+		veejay_blur( dst + y * w, src + y *w , w, r,1, 1);
 	}	
 
 }
@@ -90,7 +93,7 @@ static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r)
 	int x;
 	for(x=0; x < w; x++)
 	{
-		blur( dst + x, src + x , h, r, w, w );
+		veejay_blur( dst + x, src + x , h, r, w, w );
 	}
 }
 

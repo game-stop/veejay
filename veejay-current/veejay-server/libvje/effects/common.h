@@ -29,6 +29,12 @@
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
 #include <veejaycore/vj-task.h>
+#ifdef HAVE_ARM
+#include <arm_neon.h>
+#endif
+#ifdef HAVE_ASM_SSE
+#include <emmintrin.h>
+#endif
 #define MAX_SCRATCH_FRAMES 50
 #define GREY_LEVELS 256
 
@@ -368,7 +374,7 @@ int calculate_cbcr_value(uint8_t *Cb,uint8_t *Cr, int w, int h);
 uint32_t veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M);
 int i_cmp( const void *a, const void *b );
 int compare_l8( const void *a, const void *b );
-void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
+void veejay_blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
 void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
 extern void viewport_destroy(void *v);
 extern void vj_get_yuvgrey_template(VJFrame *src, int w, int h);
@@ -420,6 +426,8 @@ typedef enum _vj_effect_parity{
 }vj_effect_parity;
 
 void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int * x_inf, int * y_inf, int * x_sup, int * y_sup);
+
+double atan2_approx(double y, double x);
 
 #ifdef HAVE_ASM_MMX
 void vje_load_mask(uint8_t val);

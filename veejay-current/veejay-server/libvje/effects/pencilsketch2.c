@@ -152,7 +152,7 @@ static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r)
     int y;
     for(y = 0; y < h ; y ++ )
     {
-        blur( dst + y * w, src + y *w , w, r,1, 1);
+        veejay_blur( dst + y * w, src + y *w , w, r,1, 1);
     }       
 }
 
@@ -161,7 +161,7 @@ static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r)
     int x;
     for(x=0; x < w; x++)
     {
-        blur( dst + x, src + x , h, r, w, w );
+        veejay_blur( dst + x, src + x , h, r, w, w );
     }
 }
 
