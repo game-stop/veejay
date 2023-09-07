@@ -4,7 +4,7 @@ SUBDIRS = libhash liblzo
 
 SUBDIRS += mjpegtools 
 
-if HAVE_ARMV7A
+if HAVE_ARMV7
 SUBDIRS += fastarm
 endif
 

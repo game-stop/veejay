@@ -387,7 +387,7 @@ else
 fi
 
 dnl ARM architecture detect NEON and set CFLAGS
-if test x$have_arm = xtrue
+if test x$have_armv7a = xtrue
 then
 	AC_CACHE_CHECK(for NEON on processor(s), ac_cv_flag_neon, [
 		if grep "^Features.* neon" /proc/cpuinfo > /dev/null; then
@@ -396,13 +396,11 @@ then
 			ac_cv_flag_neon=no
 		fi
 	])
-	AC_MSG_RESULT($ac_cv_flag_neon)	
 
 	if test $ac_cv_flag_neon = yes ; then
 		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
 		USER_CFLAGS="-mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
-		FASTARM_CFLAGS="$ARCHFLAGS -Wa,-march=armv7-a -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
-
+		FASTARM_CFLAGS="$ARCHFLAGS -march=armv7-a -mthumb -mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
 	else
 		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
 		FASTARM_CFLAGS="$ARCHFLAGS"
@@ -419,6 +417,33 @@ then
 	VJE_CFLAGS="$USER_CFLAGS"
 	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 
+	AC_SUBST(FASTARM_CFLAGS)
+fi
+
+if test x$have_arm = xtrue
+then
+	AC_CACHE_CHECK(for ASIMD on processor(s), ac_cv_flag_asimd, [
+		if grep "^Features.* asimd" /proc/cpuinfo > /dev/null; then
+			ac_cv_flag_asimd=yes
+		else
+			ac_cv_flag_asimd=no
+		fi
+	])
+	
+	if test $ac_cv_flag_asimd = yes ; then
+		AC_DEFINE(HAVE_ARM_ASIMD, 1,[Compiling in ASIMD support])
+	fi
+
+	if test "x$enable_debug" != "xyes" ; then
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
+	else
+		USER_CFLAGS="$USER_CFLAGS -g -Wall"
+	fi
+
+	OP_CFLAGS="$USER_CFLAGS"
+	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
+	VJE_CFLAGS="$USER_CFLAGS"
+	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 	AC_SUBST(FASTARM_CFLAGS)
 fi
 
@@ -1022,6 +1047,11 @@ AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE2, test x$have_freetype2 = xtrue)
+AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
+AM_CONDITIONAL(HAVE_ARM_NEON, test x$ac_cv_flag_neon = xtrue )
+AM_CONDITIONAL(HAVE_ARM_ASIMD, test x$ac_cv_flag_asimd = xtrue )
+AM_CONDITIONAL(HAVE_ARM7A, test x$have_armv7a = xtrue )
+
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -1162,6 +1192,10 @@ fi
 
 if test "$have_arm" = "true" ; then
 AC_MSG_NOTICE([   arm])
+AC_MSG_NOTICE([    ASIMD    enabled     : ${ac_cv_flag_asimd}])
+fi
+if test "$have_armv7a"  = "true"; then
+AC_MSG_NOTICE([   arm7a])
 AC_MSG_NOTICE([    NEON    enabled     : ${ac_cv_flag_neon}])
 fi
 

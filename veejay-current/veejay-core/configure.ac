@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 AC_INIT([veejaycore],[1.5.65],[http://www.veejayhq.net])
-AC_PREREQ([2.71])
+AC_PREREQ([2.69])
 AC_CONFIG_SRCDIR([veejaycore/core.c])
 
 VEEJAYCORE_MAJOR_VERSION=1
@@ -395,7 +395,7 @@ then
 		fi
 	])
 	
-	if test $ac_cv_flag_neon = yes ; then
+	if test $ac_cv_flag_asimd = yes ; then
 		AC_DEFINE(HAVE_ARM_ASIMD, 1,[Compiling in ASIMD support])
 	fi
 
@@ -721,7 +721,9 @@ AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
-AM_CONDITIONAL(HAVE_ARMV7A, test x$have_armv7a = xtrue )
+AM_CONDITIONAL(HAVE_ARM_NEON, test x$ac_cv_flag_neon = xtrue )
+AM_CONDITIONAL(HAVE_ARM_ASIMD, test x$ac_cv_flag_asimd = xtrue )
+AM_CONDITIONAL(HAVE_ARM7A, test x$have_armv7a = xtrue )
 
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS

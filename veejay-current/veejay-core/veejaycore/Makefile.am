@@ -40,7 +40,7 @@ libveejaycore_la_LIBADD = \
 			$(top_builddir)/thirdparty/mjpegtools/libmjpegutils.la \
 			$(top_builddir)/libvevo/libvevo.la
 
-if HAVE_ARM
+if HAVE_ARM_NEON
 libveejaycore_la_LIBADD+=$(top_builddir)/thirdparty/fastarm/libfastarm.la
 endif
 

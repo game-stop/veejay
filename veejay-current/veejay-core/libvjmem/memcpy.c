@@ -140,10 +140,13 @@
 #include <libyuv/mmx_macros.h>
 #include <veejaycore/veejaycore.h>
 #include <libavutil/cpu.h>
-#ifdef HAVE_ARM7A
+#ifdef HAVE_ARM
+#include <arm_neon.h>
+#endif
+#ifdef HAVE_ARM_NEON
 #include <fastarm/new_arm.h>
 #endif
-#ifdef HAVE_ASIMD
+#ifdef HAVE_ARM_ASIMD
 #include <arm_neon.h>
 #endif
 
