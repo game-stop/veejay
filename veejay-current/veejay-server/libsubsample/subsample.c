@@ -869,13 +869,14 @@ static inline void subsample_up_1x16to1x32(uint8_t *in, uint8_t *out)
     uint8x8_t vin_low = vget_low_u8(vin);
     uint8x8_t vin_high = vget_high_u8(vin);
 
-    vin_low = vshrq_n_u8(vin_low, 1);
-    vin_high = vshrq_n_u8(vin_high, 1);
+    vin_low = vshr_n_u8(vin_low, 1); 
+    vin_high = vshr_n_u8(vin_high, 1); 
 
     uint8x16_t vout = vcombine_u8(vin_low, vin_high);
 
     vst1q_u8(out, vout);
 }
+
 #endif
 
 
