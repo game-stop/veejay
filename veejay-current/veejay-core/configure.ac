@@ -303,7 +303,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
      ;;
     arm7* )
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	 AC_DEFINE(HAVE_ARM7,1,[Compiling for ARM7L CPU])
+	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARM7L CPU])
 	 if test "x$enable_debug" != "xyes" ; then
 	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
 	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
@@ -723,7 +723,7 @@ AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
 AM_CONDITIONAL(HAVE_ARM_NEON, test x$ac_cv_flag_neon = xtrue )
 AM_CONDITIONAL(HAVE_ARM_ASIMD, test x$ac_cv_flag_asimd = xtrue )
-AM_CONDITIONAL(HAVE_ARM7A, test x$have_armv7a = xtrue )
+AM_CONDITIONAL(HAVE_ARMV7A, test x$have_armv7a = xtrue )
 
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
