@@ -29,6 +29,9 @@
 #include <veejaycore/mmx_macros.h>
 #include "subsample-mmx.h"
 #endif
+#ifdef HAVE_ASM_SSE2
+#include <emmintrin.h>
+#endif
 #ifdef HAVE_ARM
 #include <arm_neon.h>
 #endif
@@ -44,6 +47,10 @@
 #include <libvje/vje.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/vj-task.h>
+
+
+#define BLANK_CRB in0[1]
+#define BLANK_CRB_2 (in0[1] << 1)
 
 const char *ssm_id[SSM_COUNT] = {
   "unknown",
@@ -112,7 +119,7 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
         16 source pixels)
 */
 
-#ifndef HAVE_ARM
+#if !defined(HAVE_ARM) && !defined(HAVE_ASM_SSE2)
 static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 {
   const uint8_t *in0, *in1;
@@ -143,7 +150,8 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
     in1 += width*2;
   }
 }
-#else
+#endif
+#ifdef HAVE_ARM
 static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 {
     const uint8_t *in0, *in1;
@@ -186,7 +194,7 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 }
 #endif
 
-#ifndef HAVE_ARM
+#if !defined(HAVE_ARM) && !defined(HAVE_ASM_SSE2)
 static void ss_444_to_420jpeg_cp(uint8_t *buffer,uint8_t *dest, int width, int height)
 {
   const uint8_t *in0, *in1;
@@ -217,7 +225,8 @@ static void ss_444_to_420jpeg_cp(uint8_t *buffer,uint8_t *dest, int width, int h
     in1 += width*2;
   }
 }
-#else
+#endif
+#ifdef HAVE_ARM
 static void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
 {
     const uint8_t *in0, *in1;
@@ -262,9 +271,110 @@ static void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int 
     }
 }
 #endif
+#ifdef HAVE_ASM_SSE2
+static void ss_444_to_420jpeg_cp(uint8_t* buffer, uint8_t* dest, int width, int height) {
+    const uint8_t* in0, * in1;
+    uint8_t* out;
+    int x, y = height;
+    in0 = buffer;
+    in1 = buffer + width;
+    out = dest;
 
+    for (y = 0; y < height; y += 4) {
+        for (x = 0; x < width; x += 4) {
+            __m128i vin0 = _mm_unpacklo_epi8(_mm_loadu_si128((__m128i*)in0), _mm_setzero_si128());
+            __m128i vin1 = _mm_unpacklo_epi8(_mm_loadu_si128((__m128i*)in1), _mm_setzero_si128());
 
+            __m128i result0 = _mm_sra_epi16(_mm_adds_epu16(vin0, _mm_slli_epi16(vin1, 1)), _mm_set1_epi16(4));
+            __m128i result1 = _mm_sra_epi16(_mm_adds_epu16(vin1, _mm_slli_epi16(vin0, 1)), _mm_set1_epi16(4));
 
+            __m128i packed_result = _mm_packus_epi16(result0, result1);
+
+            _mm_storeu_si128((__m128i*)out, packed_result);
+
+            in0 += 16;
+            in1 += 16;
+            out += 16;
+        }
+
+        for (; x < width; x += 2) {
+            __m128i vin0 = _mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)in0), _mm_setzero_si128());
+            __m128i vin1 = _mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)in1), _mm_setzero_si128());
+
+            __m128i result = _mm_sra_epi16(_mm_adds_epu16(vin0, _mm_slli_epi16(vin1, 1)), _mm_set1_epi16(4));
+
+            __m128i packed_result = _mm_packus_epi16(result, result);
+
+            _mm_storel_epi64((__m128i*)out, packed_result);
+
+            in0 += 8;
+            in1 += 8;
+            out += 8;
+        }
+
+        in0 += width * 2;
+        in1 += width * 2;
+    }
+}
+#endif
+
+#ifdef HAVE_ASM_SSE2
+static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
+{
+    const uint8_t *in0, *in1;
+    uint8_t *out;
+    int x, y;
+
+    in0 = buffer;
+    in1 = buffer + width;
+    out = buffer;
+
+    for (y = 0; y < height; y += 4)
+    {
+        for (x = 0; x < width; x += 4)
+        {
+            __m128i vin0 = _mm_loadu_si128((__m128i*)in0);
+            __m128i vin1 = _mm_loadu_si128((__m128i*)in1);
+
+            __m128i vsum0 = _mm_adds_epu8(vin0, _mm_slli_epi16(vin1, 1));
+            __m128i vsum1 = _mm_adds_epu8(_mm_srli_epi16(vin0, 1), _mm_slli_epi16(vin1, 3));
+            __m128i vsum2 = _mm_adds_epu8(_mm_srli_epi16(vin0, 3), _mm_slli_epi16(vin1, 4));
+            __m128i vsum3 = _mm_adds_epu8(_mm_srli_epi16(vin0, 4), _mm_slli_epi16(vin1, 3));
+
+            vsum0 = _mm_srli_epi16(_mm_adds_epu8(vsum0, _mm_set1_epi8(8)), 4);
+            vsum1 = _mm_srli_epi16(_mm_adds_epu8(vsum1, _mm_set1_epi8(8)), 4);
+            vsum2 = _mm_srli_epi16(_mm_adds_epu8(vsum2, _mm_set1_epi8(8)), 4);
+            vsum3 = _mm_srli_epi16(_mm_adds_epu8(vsum3, _mm_set1_epi8(8)), 4);
+
+            __m128i vout = _mm_packus_epi16(_mm_packus_epi16(vsum0, vsum1), _mm_packus_epi16(vsum2, vsum3));
+            _mm_storeu_si128((__m128i*)out, vout);
+
+            in0 += 8;
+            in1 += 8;
+            out += 4;
+        }
+
+        for (; x < width; x += 2)
+        {
+            __m128i vin0 = _mm_loadl_epi64((__m128i*)in0);
+            __m128i vin1 = _mm_loadl_epi64((__m128i*)in1);
+
+            __m128i vsum = _mm_adds_epu8(vin0, _mm_slli_epi16(vin1, 1));
+            vsum = _mm_srli_epi16(_mm_adds_epu8(vsum, _mm_set1_epi8(8)), 4);
+
+            _mm_storel_epi64((__m128i*)out, vsum);
+
+            in0 += 2;
+            in1 += 2;
+            out++;
+        }
+
+        in0 += width * 2;
+        in1 += width * 2;
+    }
+}
+#endif
+ 
 
 /* horizontal interstitial siting
  *
@@ -304,11 +414,7 @@ static void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int 
  *   center sample is simply reused.
  *              
  */             
-
-
-#define BLANK_CRB in0[1]
-#define BLANK_CRB_2 (in0[1] << 1)
-
+#if !defined(HAVE_ARM) && !defined(HAVE_ASM_SSE2)
 static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
 {
   uint8_t *inm, *in0, *inp, *out0, *out1;
@@ -331,110 +437,17 @@ static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int hei
       inp = in0 + width/2;
     }
     for (x = width; x > 0; x -= 2) {
-#if 0
-      if ((x == 2) && (y == 2)) {
-	cmm = in0[1];
-	cm0 = in0[1];
-	cmp = in0[2];
-	c0m = in0[1];
-	c0p = in0[2];
-	cpm = inp[1];
-	cp0 = inp[1];
-	cpp = inp[2];
-      } else if ((x == 2) && (y == height)) {
-	cmm = inm[1];
-	cm0 = inm[1];
-	cmp = inm[2];
-	c0m = in0[1];
-	c0p = in0[2];
-	cpm = in0[1];
-	cp0 = in0[1];
-	cpp = in0[2];
-      } else if ((x == width) && (y == height)) {
-	cmm = inm[0];
-	cm0 = inm[1];
-	cmp = inm[1];
-	c0m = in0[0];
-	c0p = in0[1];
-	cpm = in0[0];
-	cp0 = in0[1];
-	cpp = in0[1];
-      } else if ((x == width) && (y == 2)) {
-	cmm = in0[0];
-	cm0 = (y == 2) ? BLANK_CRB : inm[1];
-      cmp = ((x == width) || (y == 2)) ? BLANK_CRB : inm[2];
-      c0m = (x == 2) ? BLANK_CRB : in0[0];
-      c0p = (x == width) ? BLANK_CRB : in0[2];
-      cpm = ((x == 2) || (y == height)) ? BLANK_CRB : inp[0];
-      cp0 = (y == height) ? BLANK_CRB : inp[1];
-      cpp = ((x == width) || (y == height)) ? BLANK_CRB : inp[2];
-      } else if (x == 2) {
-      cmm = ((x == 2) || (y == 2)) ? BLANK_CRB : inm[0];
-      cm0 = (y == 2) ? BLANK_CRB : inm[1];
-      cmp = ((x == width) || (y == 2)) ? BLANK_CRB : inm[2];
-      c0m = (x == 2) ? BLANK_CRB : in0[0];
-      c0p = (x == width) ? BLANK_CRB : in0[2];
-      cpm = ((x == 2) || (y == height)) ? BLANK_CRB : inp[0];
-      cp0 = (y == height) ? BLANK_CRB : inp[1];
-      cpp = ((x == width) || (y == height)) ? BLANK_CRB : inp[2];
-      } else if (y == 2) {
-      cmm = ((x == 2) || (y == 2)) ? BLANK_CRB : inm[0];
-      cm0 = (y == 2) ? BLANK_CRB : inm[1];
-      cmp = ((x == width) || (y == 2)) ? BLANK_CRB : inm[2];
-      c0m = (x == 2) ? BLANK_CRB : in0[0];
-      c0p = (x == width) ? BLANK_CRB : in0[2];
-      cpm = ((x == 2) || (y == height)) ? BLANK_CRB : inp[0];
-      cp0 = (y == height) ? BLANK_CRB : inp[1];
-      cpp = ((x == width) || (y == height)) ? BLANK_CRB : inp[2];
-      } else if (x == width) {
-      cmm = ((x == 2) || (y == 2)) ? BLANK_CRB : inm[0];
-      cm0 = (y == 2) ? BLANK_CRB : inm[1];
-      cmp = ((x == width) || (y == 2)) ? BLANK_CRB : inm[2];
-      c0m = (x == 2) ? BLANK_CRB : in0[0];
-      c0p = (x == width) ? BLANK_CRB : in0[2];
-      cpm = ((x == 2) || (y == height)) ? BLANK_CRB : inp[0];
-      cp0 = (y == height) ? BLANK_CRB : inp[1];
-      cpp = ((x == width) || (y == height)) ? BLANK_CRB : inp[2];
-      } else if (y == height) {
-      cmm = ((x == 2) || (y == 2)) ? BLANK_CRB : inm[0];
-      cm0 = (y == 2) ? BLANK_CRB : inm[1];
-      cmp = ((x == width) || (y == 2)) ? BLANK_CRB : inm[2];
-      c0m = (x == 2) ? BLANK_CRB : in0[0];
-      c0p = (x == width) ? BLANK_CRB : in0[2];
-      cpm = ((x == 2) || (y == height)) ? BLANK_CRB : inp[0];
-      cp0 = (y == height) ? BLANK_CRB : inp[1];
-      cpp = ((x == width) || (y == height)) ? BLANK_CRB : inp[2];
-      } else {
-      cmm = ((x == 2) || (y == 2)) ? BLANK_CRB : inm[0];
-      cm0 = (y == 2) ? BLANK_CRB : inm[1];
-      cmp = ((x == width) || (y == 2)) ? BLANK_CRB : inm[2];
-      c0m = (x == 2) ? BLANK_CRB : in0[0];
-      c0p = (x == width) ? BLANK_CRB : in0[2];
-      cpm = ((x == 2) || (y == height)) ? BLANK_CRB : inp[0];
-      cp0 = (y == height) ? BLANK_CRB : inp[1];
-      cpp = ((x == width) || (y == height)) ? BLANK_CRB : inp[2];
-      }
-      c00 = in0[1];
 
       cmm = ((x == 2) || (y == 2)) ? BLANK_CRB : inm[0];
       cm0 = (y == 2) ? BLANK_CRB : inm[1];
       cmp = ((x == width) || (y == 2)) ? BLANK_CRB : inm[2];
       c0m = (x == 2) ? BLANK_CRB : in0[0];
-      c0p = (x == width) ? BLANK_CRB : in0[2];
-      cpm = ((x == 2) || (y == height)) ? BLANK_CRB : inp[0];
-      cp0 = (y == height) ? BLANK_CRB : inp[1];
-      cpp = ((x == width) || (y == height)) ? BLANK_CRB : inp[2];
-#else
-      cmm = ((x == 2) || (y == 2)) ? BLANK_CRB : inm[0];
-      cm0 = (y == 2) ? BLANK_CRB : inm[1];
-      cmp = ((x == width) || (y == 2)) ? BLANK_CRB : inm[2];
-      c0m = (x == 2) ? BLANK_CRB : in0[0];
       c00 = in0[1];
       c0p = (x == width) ? BLANK_CRB : in0[2];
       cpm = ((x == 2) || (y == height)) ? BLANK_CRB : inp[0];
       cp0 = (y == height) ? BLANK_CRB : inp[1];
       cpp = ((x == width) || (y == height)) ? BLANK_CRB : inp[2];
-#endif
+
       inm--;
       in0--;
       inp--;
@@ -448,6 +461,113 @@ static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int hei
     out0 -= width;
   }
 }
+#endif
+#ifdef HAVE_ASM_SSE2
+static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
+{
+    uint8_t *inm, *in0, *inp, *out0, *out1;
+    int x, y;
+
+    uint8_t *saveme = data;
+
+    veejay_memcpy(saveme, buffer, width);
+
+    in0 = buffer + (width * height / 4) - 2;
+    inm = in0 - width / 2;
+    inp = in0 + width / 2;
+    out1 = buffer + (width * height) - 1;
+    out0 = out1 - width;
+
+    __m128i zero = _mm_setzero_si128();
+    __m128i eight = _mm_set1_epi8(8);
+
+    for (y = height; y > 0; y -= 2) {
+        if (y == 2) {
+            in0 = saveme + width / 2 - 2;
+            inp = in0 + width / 2;
+        }
+        for (x = width; x > 0; x -= 2) {
+            __m128i vin0 = _mm_loadu_si128((__m128i*)in0);
+            __m128i vinm = _mm_loadu_si128((__m128i*)inm);
+            __m128i vinp = _mm_loadu_si128((__m128i*)inp);
+
+            __m128i vsum1 = _mm_adds_epu8(_mm_adds_epu8(_mm_adds_epu8(_mm_adds_epu8(vin0, vinp), _mm_adds_epu8(vinm, vin0)), _mm_adds_epu8(vinm, vinp)), eight);
+            __m128i vsum2 = _mm_adds_epu8(_mm_adds_epu8(_mm_adds_epu8(vinm, vinp), _mm_adds_epu8(vin0, vin0)), eight);
+            __m128i vsum3 = _mm_adds_epu8(_mm_adds_epu8(_mm_adds_epu8(vinm, vinm), _mm_adds_epu8(vin0, vin0)), eight);
+
+            __m128i vout0 = _mm_srli_epi16(vsum1, 4);
+            __m128i vout1 = _mm_srli_epi16(vsum2, 4);
+            __m128i vout2 = _mm_srli_epi16(vsum3, 4);
+
+            _mm_storeu_si128((__m128i*)out1, vout0);
+            _mm_storeu_si128((__m128i*)out0, vout1);
+            _mm_storeu_si128((__m128i*)(out1 - width), vout2);
+
+            inm--;
+            in0--;
+            inp--;
+
+            out1 -= 2;
+            out0 -= 2;
+        }
+        out1 -= width;
+        out0 -= width;
+    }
+}
+#endif
+#ifdef HAVE_ARM
+static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
+{
+    uint8_t *inm, *in0, *inp, *out0, *out1;
+    int x, y;
+
+    uint8_t *saveme = data;
+
+    veejay_memcpy(saveme, buffer, width);
+
+    in0 = buffer + (width * height / 4) - 2;
+    inm = in0 - width / 2;
+    inp = in0 + width / 2;
+    out1 = buffer + (width * height) - 1;
+    out0 = out1 - width;
+
+    uint8x16_t zero = vdupq_n_u8(0);
+    uint8x16_t eight = vdupq_n_u8(8);
+
+    for (y = height; y > 0; y -= 2) {
+        if (y == 2) {
+            in0 = saveme + width / 2 - 2;
+            inp = in0 + width / 2;
+        }
+        for (x = width; x > 0; x -= 2) {
+            uint8x16_t vin0 = vld1q_u8(in0);
+            uint8x16_t vinm = vld1q_u8(inm);
+            uint8x16_t vinp = vld1q_u8(inp);
+
+            uint8x16_t vsum1 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vqaddq_u8(vin0, vinp), vinm), vin0), vinp);
+            uint8x16_t vsum2 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vinm, vinp), vin0), vin0);
+            uint8x16_t vsum3 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vinm, vinm), vin0), vin0);
+
+            uint8x16_t vout0 = vshrq_n_u8(vsum1, 4);
+            uint8x16_t vout1 = vshrq_n_u8(vsum2, 4);
+            uint8x16_t vout2 = vshrq_n_u8(vsum3, 4);
+
+            vst1q_u8(out1, vout0);
+            vst1q_u8(out0, vout1);
+            vst1q_u8(out1 - width, vout2);
+
+            inm -= 16;
+            in0 -= 16;
+            inp -= 16;
+
+            out1 -= 16;
+            out0 -= 16;
+        }
+        out1 -= width;
+        out0 -= width;
+    }
+}
+#endif
 
 // lame box filter
 // the dampening of high frequencies depend
@@ -457,7 +577,7 @@ static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int hei
 
 static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 {
-#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM) 
+#if !defined(HAVE_ASM_SSE2) && !defined(HAVE_ARM) && !defined(HAVE_ASM_MMX)
     uint8_t *in, *out0, *out1;
 	unsigned int x, y;
 	in = buffer + (width * height / 4) - 1;
@@ -476,7 +596,43 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 	}
 #endif
 
-#ifdef HAVE_ARM
+#ifdef HAVE_ARM_NEON
+	uint8_t *in, *out0, *out1;
+    int x, y;
+
+    in = buffer + (width * height / 4) - 1;
+    out1 = buffer + (width * height) - 1;
+    out0 = out1 - width;
+
+    for (y = height - 1; y >= 0; y -= 2) {
+        for (x = width - 1; x >= 0; x -= 8) { // Process 8 pixels at a time
+            uint8x8_t val = vld1_u8(in);
+            
+            // Duplicate the value
+            uint8x8x2_t duplicated_val;
+            duplicated_val.val[0] = val;
+            duplicated_val.val[1] = val;
+            
+            vst1q_u8(out1 - 8, vreinterpretq_u8_u16(vzip_u16(
+                vreinterpret_u16_u8(duplicated_val.val[0]),
+                vreinterpret_u16_u8(duplicated_val.val[1])
+            )));
+            
+            vst1q_u8(out0 - 8, vreinterpretq_u8_u16(vzip_u16(
+                vreinterpret_u16_u8(duplicated_val.val[0]),
+                vreinterpret_u16_u8(duplicated_val.val[1])
+            )));
+            
+            in -= 8;
+            out1 -= 8;
+            out0 -= 8;
+        }
+        out0 -= width;
+        out1 -= width;
+    }
+#endif
+
+#ifdef HAVE_ARM_ASIMD
     uint8_t *in, *out0, *out1;
     unsigned int x, y;
     in = buffer + (width * height / 4) - 1;
@@ -504,6 +660,29 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
     }
 #endif
 
+#ifdef HAVE_ASM_SSE2
+    uint8_t *in, *out0, *out1;
+    unsigned int x, y;
+
+    in = buffer + (width * height / 4) - 1;
+    out1 = buffer + (width * height) - 1;
+    out0 = out1 - width;
+
+    for (y = height - 1; y >= 0; y -= 2) {
+        for (x = width - 1; x >= 0; x -= 2) {
+            uint8_t val = *(in--);
+
+            __m128i val128 = _mm_set1_epi8(val);
+
+            _mm_storel_epi64((__m128i*)(out1--), val128);
+            _mm_storel_epi64((__m128i*)(out1--), val128);
+            _mm_storel_epi64((__m128i*)(out0--), val128);
+            _mm_storel_epi64((__m128i*)(out0--), val128);
+        }
+        out0 -= width;
+        out1 -= width;
+    }
+#else
 #ifdef HAVE_ASM_MMX
 	int x,y;
 	const int mmx_stride = width >> 3;
@@ -533,9 +712,11 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
             	SFENCE"     \n\t"
             	:::"memory");
 #endif
+#endif
 
 }
 
+#if !defined(HAVE_ASM_SSE) && !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 static inline void downsample2x1( const uint8_t *src, uint8_t *dst, const int width )
 {
 	unsigned int x;
@@ -545,7 +726,9 @@ static inline void downsample2x1( const uint8_t *src, uint8_t *dst, const int wi
 		dst[x1] = ( src[x] + src[x+1] + 1 ) >> 1;
 	}
 }
+#endif
 
+#ifndef HAVE_ASM_SSE2
 #ifdef HAVE_ASM_MMX
 static inline void downsample16x8( const uint8_t *src, uint8_t *dst, const int width, const int left )
 {
@@ -578,6 +761,30 @@ static inline void downsample32x16( const uint8_t *src, uint8_t *dst, const int 
 
 }
 #endif
+#endif
+
+#ifdef HAVE_ASM_SSE2
+static inline void downsample2x1(const uint8_t *src, uint8_t *dst, const int width) {
+    unsigned int x;
+    unsigned int x1 = 0;
+
+    for (x = 0; x < width; x += 16, x1 += 8) {
+        __m128i src128 = _mm_loadu_si128((__m128i*)&src[x]);
+
+        __m128i srcLow = _mm_unpacklo_epi8(src128, _mm_setzero_si128());
+        __m128i srcHigh = _mm_unpackhi_epi8(src128, _mm_setzero_si128());
+
+        __m128i sum = _mm_add_epi16(srcLow, srcHigh);
+        sum = _mm_add_epi16(sum, _mm_set1_epi16(1));
+
+        __m128i result = _mm_srli_epi16(sum, 1);
+
+        __m128i result8 = _mm_packus_epi16(result, result);
+        _mm_storeu_si128((__m128i*)&dst[x1], result8);
+    }
+}
+
+#endif
 
 #ifdef HAVE_ARM
 static inline void downsample32x16(const uint8_t *src, uint8_t *dst, const int width, const int left)
@@ -589,8 +796,8 @@ static inline void downsample32x16(const uint8_t *src, uint8_t *dst, const int w
     for (x = 0; x < width - left; x += 32, x1 += 16)
     {
         uint8x16x2_t vsrc = vld2q_u8(&src[x]);
-	    uint8x16_t vsum = vrhaddq_u8(vsrc.val[0], vsrc.val[1]);
-	    vst1q_u8(&dst[x1], vsum);
+        uint8x16_t vsum = vrhaddq_u8(vsrc.val[0], vsrc.val[1]);
+        vst1q_u8(&dst[x1], vsum);
     }
 
     for (i = 0; i < left; i += 2, x1++)
@@ -617,34 +824,39 @@ static inline void downsample16x8(const uint8_t *src, uint8_t *dst, const int wi
         dst[x1] = (src[x] + src[x + 1] + 1) >> 1;
     }
 }
-
-#endif
-
+#endif 
 
 static void ss_444_to_422_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
 {
 	const unsigned int dst_stride = width >> 1;
 	int y;
-#ifdef HAVE_ASM_MMX
 	const unsigned int left = dst_stride % 8;
+#ifndef HAVE_ASM_SSE2
+#ifdef HAVE_ASM_MMX
 	subsample_load_mask16to8();
+#endif
 #endif
 
 	for( y = 0; y < height; y ++ ) {
 		uint8_t *src = buffer + (y*width);
 		uint8_t *dst = dest + (y*dst_stride);
-	
+
+#ifndef HAVE_ASM_SSE2
 #if defined(HAVE_ASM_MMX) || defined(HAVE_ARM)
 		downsample32x16( src, dst, width,left );
-#else
+#endif
+#endif
+#ifdef HAVE_ASM_SSE2
 		downsample2x1( src, dst, width  );
 #endif
 	}
 
+#ifndef HAVE_ASM_SSE2
 #ifdef HAVE_ASM_MMX
 	__asm__(_EMMS"       \n\t"
            	SFENCE"     \n\t"
             	:::"memory");
+#endif
 #endif
 }
 
@@ -671,7 +883,7 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 {
 	int x,y;
 	const int stride = width >> 1;
-
+#ifndef HAVE_ASM_SSE2
 #if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 	for( y = height-1; y > 0 ; y -- ) {
 		uint8_t *dst = buffer + (y * width);
@@ -684,7 +896,21 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 		}
 	}
 #endif
+#endif
+#ifdef HAVE_ASM_SSE2
+    for (y = height - 1; y > 0; y--) {
+        uint8_t* dst = buffer + (y * width);
+        uint8_t* src = buffer + (y * stride);
+        for (x = 0; x < stride; x++) {
+            __m128i srcValue = _mm_set1_epi8(src[x]);
+            __m128i duplicatedValue = _mm_unpacklo_epi8(srcValue, srcValue);
+            _mm_storeu_si128((__m128i*)dst, duplicatedValue);
+            dst += 2;
+        }
+    }
+#endif
 
+#ifndef HAVE_ASM_SSE2
 #if defined(HAVE_ASM_MMX) || defined(HAVE_ARM)
 	for( y = height -1 ; y > 0; y -- ) {
 		uint8_t *src = buffer + (y* stride);
@@ -700,12 +926,14 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
            	SFENCE"     \n\t"
             	:::"memory");
 #endif
+#endif
 }
 
 static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 {
 	int x,y;
 	const int stride = width >> 1;
+#ifndef HAVE_ASM_SSE2
 #if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 	for( y = height; y > 0 ; y -- ) {
 		uint8_t *d = out + (y * width);
@@ -718,7 +946,25 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 		}
 	}
 #endif
+#endif
 
+#ifdef HAVE_ASM_SSE2
+    for (y = height; y > 0; y--) {
+        uint8_t* d = out + (y * width);
+        uint8_t* s = in + (y * stride);
+        for (x = 0; x < stride; x++) {
+            __m128i srcValue = _mm_set1_epi8(s[x]);
+
+            __m128i duplicatedValue = _mm_unpacklo_epi8(srcValue, srcValue);
+
+            _mm_storeu_si128((__m128i*)d, duplicatedValue);
+
+            d += 2;
+        }
+    }
+#endif
+
+#ifndef HAVE_ASM_SSE2
 #if defined(HAVE_ASM_MMX) || defined(HAVE_ARM)
 	int x1 = 0;
 	for( y = height -1 ; y > 0; y -- ) {
@@ -734,6 +980,7 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 	__asm__(_EMMS"       \n\t"
            	SFENCE"     \n\t"
             	:::"memory");
+#endif
 #endif
 
 }
@@ -758,6 +1005,7 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
  *            C
  */
 
+#if !defined(HAVE_ARM) && !defined(HAVE_ASM_SSE2) 
 static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 {
   uint8_t *in0, *in1, *out;
@@ -785,7 +1033,90 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
     in1 += width + 1;
   }
 }
-      
+#endif
+#ifdef HAVE_ARM
+static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
+{
+    uint8_t *in0, *in1, *out;
+    int x, y;
+
+    in0 = buffer;
+    in1 = buffer + width;
+    out = buffer;
+
+    for (y = 0; y < height; y += 2)
+    {
+        /* first column boundary condition -- just repeat it to the right */
+        uint8x8_t v0 = vld1_u8(in0);
+        uint8x8_t v1 = vld1_u8(in1);
+        uint16x8_t vsum = vaddl_u8(v0, v1);
+        vsum = vshrq_n_u16(vsum, 1);
+        uint8x8_t vout = vqmovn_u16(vsum);
+        vst1_u8(out, vout);
+        out++;
+        in0++;
+        in1++;
+
+        /* rest of columns just loop */
+        for (x = 2; x < width; x += 2)
+        {
+            v0 = vld1_u8(in0);
+            v1 = vld1_u8(in1);
+            vsum = vaddl_u8(v0, v1);
+            vsum = vshrq_n_u16(vsum, 1);
+            vout = vqmovn_u16(vsum);
+            vst1_u8(out, vout);
+            in0 += 2;
+            in1 += 2;
+            out++;
+        }
+
+        in0 += width + 1;
+        in1 += width + 1;
+    }
+}
+#endif
+#ifdef HAVE_ASM_SSE2
+static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
+{
+    uint8_t *in0, *in1, *out;
+    int x, y;
+
+    in0 = buffer;
+    in1 = buffer + width;
+    out = buffer;
+
+    for (y = 0; y < height; y += 2)
+    {
+        __m128i v0 = _mm_loadu_si128((__m128i*)in0);
+        __m128i v1 = _mm_loadu_si128((__m128i*)in1);
+        __m128i vsum = _mm_adds_epu8(v0, v1);
+        vsum = _mm_srli_epi16(vsum, 1);
+        __m128i vout = _mm_packus_epi16(vsum, _mm_setzero_si128());
+        _mm_storel_epi64((__m128i*)out, vout);
+        out++;
+        in0++;
+        in1++;
+
+        for (x = 2; x < width; x += 2)
+        {
+            v0 = _mm_loadu_si128((__m128i*)in0);
+            v1 = _mm_loadu_si128((__m128i*)in1);
+            vsum = _mm_adds_epu8(v0, v1);
+            vsum = _mm_srli_epi16(vsum, 1);
+            vout = _mm_packus_epi16(vsum, _mm_setzero_si128());
+            _mm_storel_epi64((__m128i*)out, vout);
+            in0 += 2;
+            in1 += 2;
+            out++;
+        }
+
+        in0 += width + 1;
+        in1 += width + 1;
+    }
+}
+#endif
+    
 static void	chroma_subsample_task( void *ptr )
 {
 	vj_task_arg_t *f = (vj_task_arg_t*) ptr;
