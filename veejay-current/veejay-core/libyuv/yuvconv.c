@@ -33,7 +33,7 @@
 #include <libyuv/mmx_macros.h>
 #include <veejaycore/avcommon.h>
 #ifdef HAVE_ARM
-#include <arm_neon>
+#include <arm_neon.h>
 #endif
 
 #define Y4M_CHROMA_420JPEG     0  /* 4:2:0, H/V centered, for JPEG/MPEG-1 */
