@@ -207,10 +207,10 @@ case $host_cpu in
   aarch64* )
       AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
       if test "x$enable_debug" != "xyes" ; then
-          VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-          SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+          VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -fPIC -DPIC"
+          SUBSAMPLE_CFLAGS="-fPIC -DPIC"
       fi
-      CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
+      CFLAGS="$CFLAGS -fPIC -DPIC -fopenmp"
       have_arm=true
       AC_MSG_RESULT(aarch64)
             ;;
@@ -315,7 +315,7 @@ then
 	if test $ac_cv_flag_neon = yes ; then
 		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
 		USER_CFLAGS="-mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
-		FASTARM_CFLAGS="$ARCHFLAGS -Wa,-march=armv7-a -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
+		FASTARM_CFLAGS="$ARCHFLAGS -Wa,-march=armv7-a -mthumb -Wa,-mthumb -Wa,-mimplicit-it=always -mthumb-interwork-DCONFIG_THUMB" 
 
 	else
 		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"

@@ -219,10 +219,10 @@ case $host_cpu in
   aarch64* |arm)
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -fPIC -DPIC"
+	    SUBSAMPLE_CFLAGS="-fPIC -DPIC"
 	 fi
-	 CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
+	 CFLAGS="$CFLAGS -fPIC -DPIC -fopenmp"
 	 have_arm=true
 	 AC_MSG_RESULT([arm])
      ;;
@@ -230,10 +230,10 @@ case $host_cpu in
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARM7L CPU])
 	 if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -fPIC -DPIC"
+	    SUBSAMPLE_CFLAGS="-fPIC -DPIC"
 	 fi
-	 CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
+	 CFLAGS="$CFLAGS -fPIC -DPIC -fopenmp"
 	 have_arm=true
 	 have_armv7a=true
 	 AC_MSG_RESULT([arm7])
