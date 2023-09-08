@@ -38,6 +38,9 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "opacity.h"
+#ifdef HAVE_ARM
+#include <arm_neon.h>
+#endif
 
 vj_effect *opacity_init(int w, int h)
 {
@@ -93,7 +96,8 @@ static	inline int	blend_plane(uint8_t *dst, uint8_t *A, uint8_t *B, int size, in
 	}
 	return i;
 }
-#else
+#endif
+#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, int opacity )
 {
     unsigned int i, op0, op1;
@@ -103,6 +107,31 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, i
     for( i = 0; i < size; i ++ )
 		dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
 
+
+    return 0;
+}
+#endif
+
+#ifdef HAVE_ARM
+static inline int blend_plane(uint8_t *dst, uint8_t *A, uint8_t *B, int size, int opacity) {
+    unsigned int i;
+    uint8x8_t op0v, op1v, Av, Bv;
+
+    int op1 = (opacity > 255) ? 255 : opacity;
+    int op0 = 255 - op1;
+
+    op0v = vdup_n_u8(op0);
+    op1v = vdup_n_u8(op1);
+
+    for (i = 0; i < size; i += 8) {
+        Av = vld1_u8(&A[i]);
+        Bv = vld1_u8(&B[i]);
+
+        uint16x8_t blended = vmlal_u8(vmull_u8(op0v, Av), op1v, Bv);
+        uint8x8_t result = vshrn_n_u16(blended, 8);
+
+        vst1_u8(&dst[i], result);
+    }
 
     return 0;
 }

@@ -32,6 +32,9 @@
 #include <veejaycore/vj-task.h>
 #include <libyuv/mmx_macros.h>
 #include <veejaycore/avcommon.h>
+#ifdef HAVE_ARM
+#include <arm_neon>
+#endif
 
 #define Y4M_CHROMA_420JPEG     0  /* 4:2:0, H/V centered, for JPEG/MPEG-1 */
 #define Y4M_CHROMA_420MPEG2    1  /* 4:2:0, H cosited, for MPEG-2         */
@@ -154,7 +157,6 @@ void	verify_CCIR_auto(int a, int b, VJFrame *dst )
 	int b_is_CCIR = is_CCIR(b);
 	int b_is_JPEG = is_JPEG(b);
 
-
 	if( a_is_JPEG && b_is_CCIR ) {
 		yuv_scale_pixels_from_y( dst->data[0], dst->len );
 		yuv_scale_pixels_from_uv( dst->data[1], dst->uv_len );
@@ -165,8 +167,6 @@ void	verify_CCIR_auto(int a, int b, VJFrame *dst )
 		yuv_scale_pixels_from_ycbcr( dst->data[1], 16.0f, 240.0f, dst->uv_len );
 		yuv_scale_pixels_from_ycbcr( dst->data[2], 16.0f, 240.0f, dst->uv_len );
 	}
-
-
 }
 
 int	yuv_use_auto_ccir_jpeg()
@@ -699,7 +699,6 @@ void yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 static mmx_t mmx_00ffw =   { 0x00ff00ff00ff00ffLL };
 
 #ifdef HAVE_ASM_MMX2
-//#ifdef MMXEXT
 #define MOVQ_R2M(reg,mem) movntq_r2m(reg, mem)
 #else
 #define MOVQ_R2M(reg,mem) movq_r2m(reg, mem)
@@ -846,9 +845,7 @@ void	yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, i
 			dst_v += 4;
 		}
 	}
-#ifdef HAVE_ASM_MMX
         __asm__ __volatile__ ( _EMMS:::"memory");
-#endif	
 }
 
 void vj_yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
@@ -875,13 +872,14 @@ void vj_yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 		dst_u += width;
 		dst_v += width;
 	}
-#ifdef HAVE_ASM_MMX
-        __asm__ __volatile__ ( _EMMS:::"memory");
-#endif
+    __asm__ __volatile__ ( _EMMS:::"memory");
 }
-#else
-// non mmx functions
 
+#endif
+
+
+// non mmx functions
+#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 void vj_yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 		int width, int height)
 {
@@ -985,6 +983,46 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 			U+=2;
 			V+=2;
 		}
+    }
+}
+#endif
+
+#ifdef HAVE_ARM
+void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h) {
+    int x, y;
+    uint8_t *Y = yuv422[0];
+    uint8_t *U = yuv422[1];
+    uint8_t *V = yuv422[2];
+
+    for (y = 0; y < h; y++) {
+        Y = yuv422[0] + y * w;
+        U = yuv422[1] + (y >> 1) * w;
+        V = yuv422[2] + (y >> 1) * w;
+
+        for (x = 0; x < w; x += 16) {  
+			uint8x8_t y0 = vld1_u8(Y);
+            uint8x8_t u0 = vld1_u8(U);
+            uint8x8_t y1 = vld1_u8(Y + 8);
+            uint8x8_t v0 = vld1_u8(V);
+
+            uint8x8x2_t yuyv0;
+            yuyv0.val[0] = y0;
+            yuyv0.val[1] = u0;
+            yuyv0.val[0] = vext_u8(y0, v0, 1);  
+			
+            uint8x8x2_t yuyv1;
+            yuyv1.val[0] = y1;
+            yuyv1.val[1] = vext_u8(u0, y1, 7);  
+			yuyv1.val[0] = v0;
+
+            vst2_u8(pixels, yuyv0);
+            vst2_u8(pixels + 16, yuyv1);
+
+            pixels += 32; 
+			Y += 16;
+            U += 8;
+            V += 8;
+        }
     }
 }
 
@@ -1453,7 +1491,7 @@ void	yuv422to420planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 		}
 	}	
 }
-#ifndef HAVE_ASM_MMX
+#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 {
 	unsigned int x,y;
@@ -1475,7 +1513,34 @@ void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 		}
 	}
 }
-#else
+#endif
+
+#ifdef HAVE_ARM
+void yuv420to422planar(uint8_t *src[3], uint8_t *dst[3], int w, int h) {
+    const int wid = w >> 1;
+    const int hei = h >> 1;
+
+    uint8_t *u_dst = dst[1];
+    uint8_t *v_dst = dst[2];
+    uint8_t *u_src = src[1];
+    uint8_t *v_src = src[2];
+
+    for (int y = 0; y < hei; y++) {
+        uint8x8_t u_values = vdup_n_u8(u_src[y * wid]);
+        uint8x8_t v_values = vdup_n_u8(v_src[y * wid]);
+
+        for (int x = 0; x < wid; x += 8) {
+            vst1_u8(u_dst, u_values);
+            vst1_u8(v_dst, v_values);
+
+            u_dst += 8;
+            v_dst += 8;
+        }
+    }
+}
+#endif
+
+#ifdef HAVE_ASM_MMX
 static	inline	void copy8( uint8_t *to, uint8_t *to2, uint8_t *from ) {
 	__asm__ __volatile__ (
 			"movq	(%0),	%%mm0\n" 

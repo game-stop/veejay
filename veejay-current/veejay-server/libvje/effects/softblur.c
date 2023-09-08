@@ -21,6 +21,9 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "softblur.h"
+#ifdef HAVE_ARM
+#include <arm_neon.h>
+#endif
 
 vj_effect *softblur_init(int w,int h)
 {
@@ -150,7 +153,8 @@ static	void	mmx_blur(VJFrame *frame)
 
 	do_emms;
 }
-#else
+#endif
+#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 static void softblur1_apply( VJFrame *frame)
 {
     int r, c;
@@ -167,6 +171,36 @@ static void softblur1_apply( VJFrame *frame)
 		}
     }
 
+}
+#endif
+
+#ifdef HAVE_ARM
+static void softblur1_apply(VJFrame *frame) {
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    const int width = frame->width;
+
+    const int aligned_width = (width / 16) * 16;
+
+    for (int r = 0; r < len; r += width) {
+        for (int c = 1; c < aligned_width - 1; c += 16) {
+            uint8x16_t prev = vld1q_u8(&Y[r + c - 1]);
+            uint8x16_t current = vld1q_u8(&Y[r + c]);
+            uint8x16_t next = vld1q_u8(&Y[r + c + 1]);
+
+            uint16x8_t sum_low = vaddl_u8(vget_low_u8(prev), vget_low_u8(current));
+            uint16x8_t sum_high = vaddl_u8(vget_high_u8(prev), vget_high_u8(current));
+            sum_low = vaddw_u8(sum_low, vget_low_u8(next));
+            sum_high = vaddw_u8(sum_high, vget_high_u8(next));
+
+            uint8x16_t result = vcombine_u8(vshrn_n_u16(sum_low, 2), vshrn_n_u16(sum_high, 2));
+            vst1q_u8(&Y[r + c], result);
+        }
+
+        for (int c = aligned_width; c < width - 1; c++) {
+            Y[r + c] = (Y[r + c - 1] + Y[r + c] + Y[r + c + 1]) / 3;
+        }
+    }
 }
 #endif
 

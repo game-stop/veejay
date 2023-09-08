@@ -333,10 +333,10 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
    aarch64* )
         AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -fPIC -DPIC"
+	    SUBSAMPLE_CFLAGS="-fPIC -DPIC"
 	fi
-	CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
+	CFLAGS="$CFLAGS -fPIC -DPIC -fopenmp"
 	have_arm=true
 	AC_MSG_RESULT(aarch64)
         ;;
@@ -436,13 +436,13 @@ then
 	if test "x$enable_debug" != "xyes" ; then
 		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
 	else
-		USER_CFLAGS="$USER_CFLAGS -g -Wall"
+		USER_CFLAGS="$USER_CFLAGS -g -Wall -fopenmp"
 	fi
 
 	OP_CFLAGS="$USER_CFLAGS"
 	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
 	VJE_CFLAGS="$USER_CFLAGS"
-	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+	CFLAGS="$CFLAGS $USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 	AC_SUBST(FASTARM_CFLAGS)
 fi
 
@@ -672,7 +672,7 @@ AC_CHECK_HEADER(X11/Xlib.h, HAVE_X="yes", HAVE_X="no")
 
 if test "x$HAVE_X" = "xno"
 then
-	AC_MSG_ERROR([Cannot find X11 development files.])
+        AC_MSG_NOTICE([Cannot find X11 development files.])
 else
 	X_LIBS="$X_LIBS $X_PRE_LIBS $X_EXTRA_LIBS"
 	X_LIBS="$X_LIBS -lX11"
@@ -718,7 +718,7 @@ if test x$with_v4l2 != xno ; then
 				   with_v4l=no
 			fi
 			],
-                  [AC_MSG_ERROR([videodev2.h not found - please install the linux kernel headers or try configure with --enable-v4l1])])
+                  [AC_MSG_NOTICE([videodev2.h not found - please install the linux kernel headers or try configure with --enable-v4l1])])
           fi
 fi
 
@@ -733,7 +733,7 @@ AC_CHECK_LIB(pthread, pthread_create,
     have_pthread=true ],,)
 
 if test x$have_pthread != xtrue ; then
-	AC_MSG_ERROR([Cannot find pthread library])
+	AC_MSG_NOTICE([Cannot find pthread library])
 fi
 
 have_dl_dlopen=false
@@ -1232,7 +1232,6 @@ fi
 AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
-
 AC_MSG_NOTICE([ Optional dependencies])
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
@@ -1242,5 +1241,6 @@ AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - libunwind                     : ${have_unwind}])
 AC_MSG_NOTICE([  - QR code support (libqrencode) : ${have_qrencode}])
+
 
 cat NEWS
