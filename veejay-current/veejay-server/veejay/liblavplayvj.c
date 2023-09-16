@@ -84,7 +84,7 @@
 #include <veejay/vj-sdl.h>
 #include <libel/vj-avcodec.h>
 #include <libel/pixbuf.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #include <veejaycore/vj-client.h>
 #ifdef HAVE_JACK
 #include <veejay/vj-jack.h>

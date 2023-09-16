@@ -32,8 +32,8 @@
 #include <libstream/vj-net.h>
 #include <time.h>
 #include <veejaycore/yuvconv.h>
-#include <libel/avcommon.h>
-#include <libel/avhelper.h>
+#include <veejaycore/avcommon.h>
+#include <veejaycore/avhelper.h>
 #include <libvje/effects/common.h>
 
 typedef struct

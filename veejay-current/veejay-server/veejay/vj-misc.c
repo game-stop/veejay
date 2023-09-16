@@ -44,7 +44,7 @@
 #include <libvje/vje.h>
 #include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #include <pthread.h>

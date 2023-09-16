@@ -29,7 +29,7 @@
 #include <libavutil/avutil.h>
 #include "../effects/common.h"
 #include "../libel/pixbuf.h"
-#include "../libel/avcommon.h"
+#include <veejaycore/avcommon.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include "shapewipe.h"

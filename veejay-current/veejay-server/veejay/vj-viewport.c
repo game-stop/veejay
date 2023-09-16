@@ -43,7 +43,7 @@
 #include <veejay/vj-viewport-cfg.h>
 #include <veejay/vj-viewport.h>
 #include <math.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 
 #define X0 0
 #define Y0 1

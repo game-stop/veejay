@@ -35,7 +35,7 @@
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
 #include <veejaycore/yuvconv.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #define    RUP8(num)(((num)+8)&~8)
 
 typedef struct

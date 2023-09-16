@@ -42,7 +42,7 @@
 #ifdef HAVE_GL
 #include <veejay/gl.h>
 #endif
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 
 typedef struct
 {

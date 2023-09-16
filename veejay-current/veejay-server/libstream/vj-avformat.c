@@ -33,8 +33,8 @@
 #include <libstream/vj-avformat.h>
 #include <time.h>
 #include <veejaycore/yuvconv.h>
-#include <libel/avcommon.h>
-#include <libel/avhelper.h>
+#include <veejaycore/avcommon.h>
+#include <veejaycore/avhelper.h>
 
 typedef struct
 {

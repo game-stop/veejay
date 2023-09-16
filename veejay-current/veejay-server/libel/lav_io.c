@@ -49,8 +49,8 @@
 #include <veejaycore/vims.h>
 #include <veejaycore/lzo.h>
 #include <veejaycore/vjmem.h>
-#include <libel/avcommon.h>
-#include <libel/avhelper.h>
+#include <veejaycore/avcommon.h>
+#include <veejaycore/avhelper.h>
 
 #define QUICKTIME_MJPG_TAG 0x6d6a7067
 extern int get_ffmpeg_pixfmt(int p);

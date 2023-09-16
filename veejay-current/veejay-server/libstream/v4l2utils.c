@@ -78,8 +78,8 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libel/av.h>
-#include <libel/avhelper.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avhelper.h>
+#include <veejaycore/avcommon.h>
 #define        RUP8(num)(((num)+8)&~8)
 
 //#include <pthread.h>
@@ -578,6 +578,29 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 
 #if LIBAVCODEC_BUILD > 5400
 	v->c	   = avcodec_alloc_context3( v->codec );
+
+	int n_threads = 0;
+
+	char *num_decode_threads = getenv( "VEEJAY_NUM_DECODE_THREADS" );
+    if( num_decode_threads ) {
+        n_threads = atoi(num_decode_threads);
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_NUM_DECODE_THREADS not set!");
+		int n = task_num_cpus();
+		if( n > 1 )
+			n_threads = 2;
+		if( n > 3 )
+			n_threads = 4;
+    }
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Using %d decoding threads (ffmpeg)", n_threads);
+
+	if( n_threads > 0 ) {
+		v->c->thread_count = n_threads;
+		v->c->thread_type = FF_THREAD_FRAME;
+	}
+
 #else
 	v->c 	   = avcodec_alloc_context();
 #endif

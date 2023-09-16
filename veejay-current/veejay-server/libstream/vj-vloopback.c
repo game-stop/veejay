@@ -40,7 +40,7 @@
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vims.h>
 #include <libavutil/pixfmt.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #include <libstream/vj-vloopback.h>
 #include <libvje/effects/common.h>
 

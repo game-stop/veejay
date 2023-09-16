@@ -43,7 +43,7 @@
 #include <libplugger/defaults.h>
 #include <libplugger/specs/frei0r.h>
 #include <libplugger/frei0r-loader.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 
 #define    RUP8(num)(((num)+8)&~8)
 #define _VJ_MAX_PARAMS 32

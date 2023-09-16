@@ -36,7 +36,7 @@
 #include <libel/vj-avcodec.h>
 #include <veejaycore/yuvconv.h>
 #include <veejay/libveejay.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #include <string.h>
 #include <stdlib.h>
 

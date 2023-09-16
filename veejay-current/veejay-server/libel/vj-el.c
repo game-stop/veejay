@@ -38,7 +38,7 @@
 #include <libel/vj-avcodec.h>
 #include <libel/elcache.h>
 #include <libel/pixbuf.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #include <limits.h>
 #include <veejaycore/mpegconsts.h>
 #include <veejaycore/mpegtimecode.h>
@@ -47,7 +47,7 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <libel/avhelper.h>
+#include <veejaycore/avhelper.h>
 #include <libel/av.h>
 #include <veejaycore/vj-task.h>
 #include <veejaycore/lzo.h>

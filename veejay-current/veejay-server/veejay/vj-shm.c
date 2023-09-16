@@ -40,7 +40,7 @@
 #include <libavutil/pixfmt.h>
 #include <libavutil/avutil.h>
 #include <libplugger/specs/livido.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #include <veejay/vj-shm.h>
 #define HEADER_LENGTH 4096
 #ifndef PATH_MAX

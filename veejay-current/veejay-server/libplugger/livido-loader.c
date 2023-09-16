@@ -46,7 +46,7 @@
 #include <libplugger/utility.h>
 #include <libplugger/livido-loader.h>
 #include <libsubsample/subsample.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #include <veejay/vj-shm.h>
 #include <veejaycore/vims.h>
 #define LIVIDO_COPY 1

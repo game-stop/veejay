@@ -43,7 +43,7 @@
 #include <veejay/vj-sdl.h>
 #include <libsamplerec/samplerecord.h>
 #include <libel/pixbuf.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 #include <veejay/vj-misc.h>
 #include <veejaycore/vj-task.h>
 #include <veejaycore/lzo.h>

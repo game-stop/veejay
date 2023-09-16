@@ -40,7 +40,7 @@
 #define V_BITS 24
 #include <libplugger/freeframe-loader.h>
 #include <libvje/vje.h>
-#include <libel/avcommon.h>
+#include <veejaycore/avcommon.h>
 
 typedef struct
 {

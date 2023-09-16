@@ -24,6 +24,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <veejaycore/defs.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
 #include <libvje/vje.h>
@@ -33,7 +35,7 @@
 #include <libavcodec/version.h>
 #include <libavformat/avformat.h>
 #include <libavformat/version.h>
-#include <libel/avhelper.h>
+#include <veejaycore/avhelper.h>
 #include <libel/av.h>
 #include <veejaycore/hash.h>
 
@@ -136,6 +138,26 @@ static hash_val_t key_hash(const void *key)
 static int key_compare(const void *key1, const void *key2)
 {
     return ((const int) key1 == (const int) key2 ? 0 : 1);
+}
+
+static int avhelper_set_num_decoders() {
+	int n_threads = 0;
+
+	char *num_decode_threads = getenv( "VEEJAY_NUM_DECODE_THREADS" );
+    if( num_decode_threads ) {
+        n_threads = atoi(num_decode_threads);
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_NUM_DECODE_THREADS not set!");
+		int n = task_num_cpus();
+		if( n > 1 )
+			n_threads = 2;
+		if( n > 3 )
+			n_threads = 4;
+    }
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Using %d decoding threads (ffmpeg)", n_threads);
+	return n_threads;
 }
 
 int 	avhelper_get_codec_by_id(int id)
@@ -254,6 +276,14 @@ void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 
 #if LIBAVCODEC_BUILD > 5400
 	x->codec_ctx = avcodec_alloc_context3(x->codec);
+
+	int n_threads = avhelper_set_num_decoders();
+
+	if( n_threads > 0 ) {
+		x->codec_ctx->thread_count = n_threads;
+		x->codec_ctx->thread_type = FF_THREAD_FRAME;
+	}
+
 	if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
 #else
 	x->codec_ctx = avcodec_alloc_context();
@@ -504,6 +534,14 @@ further:
 	}
 
 #if LIBAVCODEC_BUILD > 5400
+
+	int n_threads = avhelper_set_num_decoders();
+
+	if( n_threads > 0 ) {
+		x->codec_ctx->thread_count = n_threads;
+		x->codec_ctx->thread_type = FF_THREAD_FRAME;
+	}
+
 	if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
 #else
 	if ( avcodec_open( x->codec_ctx, x->codec ) < 0 ) 
