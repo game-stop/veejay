@@ -986,26 +986,26 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 #endif
 
 #ifdef HAVE_ARM
-  int optimized_pixels = width - (width & 15);
+    int optimized_pixels = width - (width & 15);
 
-  for (y = height - 1; y > 0; y--) {
-    uint8_t *dst = buffer + (y * width);
-    uint8_t *src = buffer + (y * width / 2);
+    for (y = height - 1; y >= 0; y--) { 
+        uint8_t *dst = buffer + (y * width);
+        uint8_t *src = buffer + (y * width / 2);
 
-    uint8x8_t vin = vld1_u8(src);
-    uint8x8_t vout = vcombine_u8(vin, vin);
+        for (x = 0; x < optimized_pixels; x += 16) { 
+            uint8x8_t vin = vld1_u8(src);
+            uint8x16_t vout = vcombine_u8(vin, vin);
+            vst1q_u8(dst, vout);
+            src += 8;
+            dst += 16;
+        }
 
-    vst1_u8(dst, vout);
-
-    src += 8;
-    dst += 8;
-
-    for (x = optimized_pixels; x < width; x += 2) {
-        dst[0] = src[x];
-        dst[1] = src[x];
-        dst += 2;
+        for (; x < width; x += 2) {
+            dst[0] = src[x];
+            dst[1] = src[x];
+            dst += 2;
+        }
     }
-  }
 #endif
 
 }
