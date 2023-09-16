@@ -1105,7 +1105,7 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
  *            C
  */
 
-#if !defined(HAVE_ARM) && !defined(HAVE_ASM_SSE2) 
+#if !defined(HAVE_ASM_SSE2) 
 static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 {
   uint8_t *in0, *in1, *out;
@@ -1131,40 +1131,6 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
     }
     in0 += width + 1;
     in1 += width + 1;
-  }
-}
-#endif
-#ifdef HAVE_ARM
-static void ss_444_to_420mpeg2_neon(uint8_t *buffer, int width, int height) {
-  uint8_t *in0, *in1, *out;
-  int x, y;
-
-  in0 = buffer;
-  in1 = buffer + width;
-  out = buffer;
-
-  uint8x8_t vzero = vdup_n_u8(0);
-
-  for (y = 0; y < height; y += 2) {
-    for (x = 0; x < width; x += 16) { 
-      uint8x8_t vin0_1 = vld1_u8(in0);
-      uint8x8_t vin0_2 = vld1_u8(in0 + 8);
-      uint8x8_t vin1_1 = vld1_u8(in1);
-      uint8x8_t vin1_2 = vld1_u8(in1 + 8);
-
-      uint16x8_t vsum1 = vaddl_u8(vin0_1, vin0_2);
-      vsum1 = vaddw_u8(vsum1, vin1_1);
-      vsum1 = vaddw_u8(vsum1, vin1_2);
-      vsum1 = vshrn_n_u16(vsum1, 2);
-
-      vst1_u8(out, vreinterpret_u8_u16(vget_low_u16(vsum1)));
-      in0 += 16;
-      in1 += 16;
-      out += 8;
-    }
-
-    in0 += width;
-    in1 += width;
   }
 }
 #endif
