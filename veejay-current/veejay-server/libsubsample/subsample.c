@@ -160,7 +160,7 @@ void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
     uint8_t *out;
     int x, y;
 
-    const bool is_width_even = (width & 2) == 0;
+    const uint8_t is_width_even = (width & 2) == 0;
 
     in0 = buffer;
     in1 = buffer + width;
@@ -239,7 +239,7 @@ void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
     uint8_t *out;
     int x, y;
 
-    const bool is_width_even = (width & 2) == 0;
+    const uint8_t is_width_even = (width & 2) == 0;
 
     in0 = buffer;
     in1 = buffer + width;
@@ -542,7 +542,7 @@ static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int hei
     uint8x16_t zero = vdupq_n_u8(0);
     uint8x16_t eight = vdupq_n_u8(8);
 
-    const bool is_width_multiple_of_16 = (width & 14) == 0;
+    const uint8_t is_width_multiple_of_16 = (width & 14) == 0;
 
     for (y = height; y > 0; y -= 2) {
         if (y == 2) {
