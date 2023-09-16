@@ -1062,33 +1062,17 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 #endif
 
 #ifdef HAVE_ARM
-    for (y = height; y > 0; y--) {
-        uint8_t *d = out + (y * width);
-        uint8_t *s = in + (y * stride);
+for (y = height; y > 0; y--) {
+        uint8_t *d = out + ((y - 1) * width); 
+        uint8_t *s = in + ((y - 1) * stride); 
 
-        for (x = 0; x < stride; x += 8) {
-            uint8x8_t vin = vld1_u8(s);        uint8_t *d = out + (y * width);
-        uint8_t *s = in + (y * stride);
-
-        for (x = 0; x < stride; x += 8) {
+        for (x = 0; x < stride; x += 8) { 
             uint8x8_t vin = vld1_u8(s);
             uint8x8_t vout = vcombine_u8(vin, vin);
             vst1_u8(d, vout);
 
             s += 8;
-            d += 8;
-        }
-
-        for (; x < stride; x += 2) {
-            d[0] = s[x];
-            d[1] = s[x];
-            d += 2;
-        }
-            uint8x8_t vout = vcombine_u8(vin, vin);
-            vst1_u8(d, vout);
-
-            s += 8;
-            d += 8;
+            d += 16;
         }
 
         for (; x < stride; x += 2) {
