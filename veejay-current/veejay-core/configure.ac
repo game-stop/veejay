@@ -232,8 +232,7 @@ case $host_cpu in
 	PROGRAM_NOPIC="-fno-PIC"
 
 	if test "x$enable_debug" != "xyes" ; then
-		SUBSAMPLE_CFLAGS=""
-		VJE_CFLAGS="-O3 -ftree-vectorize -ffast-math"
+		CFLAGS="$CFLAGS -O3 -ftree-vectorize -ffast-math -fopenmp"
 	fi
 
 	AC_MSG_RESULT([x86])
@@ -244,10 +243,8 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
-		VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+		CFLAGS="$CFLAGS -O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC -fopenmp"
 	fi
-	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
 
 	AC_MSG_RESULT([x86_64])
     ;;
@@ -266,7 +263,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
    		PROGRAM_NOPIC=""
       		;;
     	esac
-
+	CFLAGS="$CFLAGS -O3"
 	AC_MSG_RESULT([powerpc])
     ;;
    mips | mipsel)
@@ -290,14 +287,14 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 		AC_MSG_RESULT(no)
 	fi
 
+	CFLAGS="$CFLAGS -O3"
+
 	;;
    aarch64* |arm)
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+	     CFLAGS="$CFLAGS -O3 -ftree-vectorize -m64 -fPIC -DPIC -fopenmp"
 	 fi
-	 CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
 	 have_arm=true
 	 AC_MSG_RESULT([arm])
      ;;
@@ -305,10 +302,8 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARM7L CPU])
 	 if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
+	 	CFLAGS="$CFLAGS -O3 -ftree-vectorize -m64 -fPIC -DPIC -fopenmp"
 	 fi
-	 CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
 	 have_arm=true
 	 have_armv7a=true
 	 AC_MSG_RESULT([arm7])
@@ -429,7 +424,9 @@ then
         dnl This is not really the right way to do it, but should work for most systems.
         ac_cv_flag_mmx=yes
         ac_cv_flag_sse=yes
-        ac_cv_flag_sse2=yes
+        ac_cv_flag_sse4_2=yes
+	ac_cv_flag_sse4_1=yes
+	ac_cv_flag_sse2=yes
         ac_cv_flag_cmov=yes
 
         AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
@@ -491,6 +488,36 @@ then
 		    AC_DEFINE(HAVE_SSE2,1,[Compiling in SSE2 support])
 		    have_asm_sse2=true
 	    fi
+
+	    AC_CACHE_CHECK(for SSE4_2 on processor(s), ac_cv_flag_sse4_2, [
+	    	if grep "^flags.* sse4_2" /proc/cpuinfo > /dev/null; then
+ 	    		ac_cv_flag_sse4_2=yes
+	    	else
+	    		ac_cv_flag_sse4_2=no
+		    fi
+	    ])
+
+	    if test $ac_cv_flag_sse4_2 = yes; then
+		    AC_DEFINE(HAVE_ASM_SSE4_2,1,[Compiling in SSE4_2 support])
+		    AC_DEFINE(HAVE_SSE4_2,1,[Compiling in SSE4_2 support])
+		    have_asm_sse4_2=true
+	    fi
+
+
+	    AC_CACHE_CHECK(for SSE4_1 on processor(s), ac_cv_flag_sse4_1, [
+	    	if grep "^flags.* sse4_1" /proc/cpuinfo > /dev/null; then
+ 	    		ac_cv_flag_sse4_1=yes
+	    	else
+	    		ac_cv_flag_sse4_1=no
+		    fi
+	    ])
+
+	    if test $ac_cv_flag_sse4_1 = yes; then
+		    AC_DEFINE(HAVE_ASM_SSE4_1,1,[Compiling in SSE4_1 support])
+		    AC_DEFINE(HAVE_SSE4_1,1,[Compiling in SSE4_1 support])
+		    have_asm_sse4_1=true
+	    fi
+
 
 	    AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
 	    	if grep "^flags.* 3dnow" /proc/cpuinfo > /dev/null; then
@@ -714,6 +741,8 @@ AM_CONDITIONAL(ARCH_X86_64, test x$have_x86_64cpu = xtrue)
 AM_CONDITIONAL(HAVE_ALTIVEC, test x$have_altivec = xtrue)
 AM_CONDITIONAL(HAVE_ASM_MMX2, test x$have_asm_mmx2 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_SSE, test x$have_asm_sse = xtrue)
+AM_CONDITIONAL(HAVE_ASM_SSE4_2, test x$have_asm_sse4_2 = xtrue)
+AM_CONDITIONAL(HAVE_ASM_SSE4_1, test x$have_asm_sse4_1 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_SSE2, test x$have_asm_sse2 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_NASM, test x$have_asm_nasm = xtrue)
 AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
@@ -840,6 +869,8 @@ AC_MSG_NOTICE([   x86  ])
 AC_MSG_NOTICE([    MMX     enabled     : ${ac_cv_flag_mmx}])
 AC_MSG_NOTICE([    MMX2    enabled     : ${ac_cv_flag_mmx2}])
 AC_MSG_NOTICE([    SSE     enabled     : ${ac_cv_flag_sse}])
+AC_MSG_NOTICE([    SSE4_2  enabled     : ${ac_cv_flag_sse4_2}])
+AC_MSG_NOTICE([    SSE4_1  enabled     : ${ac_cv_flag_sse4_1}])
 AC_MSG_NOTICE([    SSE2    enabled     : ${ac_cv_flag_sse2}])
 AC_MSG_NOTICE([    3DNOW   enabled     : ${ac_cv_flag_3dnow}])
 AC_MSG_NOTICE([    CMOV    enabled     : ${ac_cv_flag_cmov}])

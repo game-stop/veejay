@@ -69,3 +69,4 @@ veejay_headers = vims.h jpegutils.h vevo.h vj-composite.h vj-jack.h \
 veejay_SOURCES	= veejay.c ${veejay_headers} 
 veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@
 veejay_LDFLAGS  = $(VEEJAYCORE_LIBS)
+

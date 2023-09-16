@@ -1161,7 +1161,7 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int swsc
 #ifdef STRICT_CHECKING
     veejay_msg(VEEJAY_MSG_DEBUG, "Initialized scaler context %dx%d@%d (%s) [%d] -> %dx%d@%d (%s) [%d]",
             src->width,src->height,src->yuv_fmt,yuv_get_pixfmt_description(src->yuv_fmt), src->range,
-            dst->width,dst->height,dst->yuv_fmt,yuv_get_pixfmt_description(dst->yuv_fmt), dst->range );
+            dst->width,dst->height,dst->yuv_fmt,yuv_get_pixfmt_description(dst->yuv_fmt), dst->range);
 #endif
 
 	if(!s->sws)

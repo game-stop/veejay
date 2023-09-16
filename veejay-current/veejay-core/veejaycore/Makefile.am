@@ -24,7 +24,7 @@ VEEJAYCORE_LIB_FILE = libveejaycore.la
 
 lib_LTLIBRARIES = $(VEEJAYCORE_LIB_FILE) 
 
-libveejaycore_la_SOURCES = core.c vj-task.c avhelper.c 
+libveejaycore_la_SOURCES = core.c vj-task.c  
 
 libveejaycore_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 		       -release $(LT_RELEASE) -no-undefined -export-dynamic $(DEBUGLIBS)

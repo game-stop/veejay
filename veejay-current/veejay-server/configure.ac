@@ -111,7 +111,6 @@ AC_PROG_AWK
 AC_PROG_CC
 dnl AM_PROG_CC_STDC
 AC_PROG_YACC
-AM_PROG_LEX
 AC_PROG_CXX
 AC_PROG_INSTALL
 AC_PROG_LN_S
@@ -495,6 +494,34 @@ then
 		AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in SSE2 support])
 		AC_DEFINE(HAVE_SSE2,1,[Compiling in SSE2 support])
 		have_asm_sse2=true
+	fi
+
+	AC_CACHE_CHECK(for SSE4_2 on processor(s), ac_cv_flag_sse4_2, [
+		if grep "^flags.* sse4_2" /proc/cpuinfo > /dev/null; then
+ 	    		ac_cv_flag_sse4_2=yes
+	    	else
+	    		ac_cv_flag_sse4_2=no
+	    fi
+	])
+
+	if test $ac_cv_flag_sse4_2 = yes; then
+		AC_DEFINE(HAVE_ASM_SSE4_2,1,[Compiling in SSE4_2 support])
+		AC_DEFINE(HAVE_SSE4_2,1,[Compiling in SSE4_2 support])
+		have_asm_sse4_2=true
+	fi
+
+	AC_CACHE_CHECK(for SSE4_1 on processor(s), ac_cv_flag_sse4_1, [
+		if grep "^flags.* sse4_1" /proc/cpuinfo > /dev/null; then
+ 	    		ac_cv_flag_sse4_1=yes
+	    	else
+	    		ac_cv_flag_sse4_1=no
+	    fi
+	])
+
+	if test $ac_cv_flag_sse4_1 = yes; then
+		AC_DEFINE(HAVE_ASM_SSE4_1,1,[Compiling in SSE4_1 support])
+		AC_DEFINE(HAVE_SSE4_1,1,[Compiling in SSE4_1 support])
+		have_asm_sse4_1=true
 	fi
 
 	AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
@@ -1031,6 +1058,8 @@ AM_CONDITIONAL(HAVE_ALTIVEC, test x$have_altivec = xtrue)
 AM_CONDITIONAL(HAVE_ASM_MMX2, test x$have_asm_mmx2 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_ASM_SSE2, test x$have_asm_sse2 = xtrue)
+AM_CONDITIONAL(HAVE_ASM_SSE4_2, test x$have_asm_sse4_2 = xtrue)
+AM_CONDITIONAL(HAVE_ASM_SSE4_1, test x$have_asm_sse4_1 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_NASM, test x$have_asm_nasm = xtrue)
 AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
@@ -1179,6 +1208,8 @@ AC_MSG_NOTICE([    MMX     enabled     : ${ac_cv_flag_mmx}])
 AC_MSG_NOTICE([    MMX2    enabled     : ${ac_cv_flag_mmx2}])
 AC_MSG_NOTICE([    SSE     enabled     : ${ac_cv_flag_sse}])
 AC_MSG_NOTICE([    SSE2    enabled     : ${ac_cv_flag_sse2}])
+AC_MSG_NOTICE([    SSE4_2  enabled     : ${ac_cv_flag_sse4_2}])
+AC_MSG_NOTICE([    SSE4_1  enabled     : ${ac_cv_flag_sse4_1}])
 AC_MSG_NOTICE([    3DNOW   enabled     : ${ac_cv_flag_3dnow}])
 AC_MSG_NOTICE([    CMOV    enabled     : ${ac_cv_flag_cmov}])
 AC_MSG_NOTICE([    AVX     enabled     : ${ac_cv_flag_avx}])

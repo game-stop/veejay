@@ -149,6 +149,9 @@
 #ifdef HAVE_ARM_ASIMD
 #include <arm_neon.h>
 #endif
+#if defined (__SSE2__) || defined(__SSE4_2__) || defined(_SSE4_1__)
+#include <immintrin.h>
+#endif
 
 #define BUFSIZE 1024
 
@@ -575,6 +578,120 @@ void	packed_plane_clear( size_t len, void *to )
 	}
 }
 
+#if defined (__SSE4_1__)
+static void *sse41_memcpy(void *to, const void *from, size_t len) {
+  void *retval = to;
+
+  if (len >= 128) {
+    register uintptr_t delta;
+    /* Align destination to SSE_MMREG_SIZE -boundary */
+    delta = ((uintptr_t)to) & (SSE_MMREG_SIZE - 1);
+    if (delta) {
+      delta = SSE_MMREG_SIZE - delta;
+      len -= delta;
+      __memcpy(to, from, delta);
+    }
+
+    __m128i xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7;
+
+    // Prefetch data
+    _mm_prefetch((char *)from + 128, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 160, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 192, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 224, _MM_HINT_NTA);
+
+    // Load data into registers
+    xmm0 = _mm_load_si128((__m128i *)from);
+    xmm1 = _mm_load_si128((__m128i *)((char *)from + 16));
+    xmm2 = _mm_load_si128((__m128i *)((char *)from + 32));
+    xmm3 = _mm_load_si128((__m128i *)((char *)from + 48));
+    xmm4 = _mm_load_si128((__m128i *)((char *)from + 64));
+    xmm5 = _mm_load_si128((__m128i *)((char *)from + 80));
+    xmm6 = _mm_load_si128((__m128i *)((char *)from + 96));
+    xmm7 = _mm_load_si128((__m128i *)((char *)from + 112));
+
+    // Store data from registers to destination
+    _mm_store_si128((__m128i *)to, xmm0);
+    _mm_store_si128((__m128i *)((char *)to + 16), xmm1);
+    _mm_store_si128((__m128i *)((char *)to + 32), xmm2);
+    _mm_store_si128((__m128i *)((char *)to + 48), xmm3);
+    _mm_store_si128((__m128i *)((char *)to + 64), xmm4);
+    _mm_store_si128((__m128i *)((char *)to + 80), xmm5);
+    _mm_store_si128((__m128i *)((char *)to + 96), xmm6);
+    _mm_store_si128((__m128i *)((char *)to + 112), xmm7);
+
+    // Increment pointers
+    from += 128;
+    to += 128;
+    len -= 128;
+  }
+
+  // Copy the remaining bytes
+  if (len) {
+    __memcpy(to, from, len);
+  }
+
+  return retval;
+}
+#endif
+
+#if defined (__SSE4_2__ )
+static void *sse42_memcpy(void *to, const void *from, size_t len) {
+  void *retval = to;
+
+  if (len >= 128) {
+    register uintptr_t delta;
+    /* Align destination to SSE_MMREG_SIZE -boundary */
+    delta = ((uintptr_t)to) & (SSE_MMREG_SIZE - 1);
+    if (delta) {
+      delta = SSE_MMREG_SIZE - delta;
+      len -= delta;
+      __memcpy(to, from, delta);
+    }
+
+    __m128i xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7;
+
+    // Prefetch data
+    _mm_prefetch((char *)from + 128, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 160, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 192, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 224, _MM_HINT_NTA);
+
+    // Load data into registers
+    xmm0 = _mm_load_si128((__m128i *)from);
+    xmm1 = _mm_load_si128((__m128i *)((char *)from + 16));
+    xmm2 = _mm_load_si128((__m128i *)((char *)from + 32));
+    xmm3 = _mm_load_si128((__m128i *)((char *)from + 48));
+    xmm4 = _mm_load_si128((__m128i *)((char *)from + 64));
+    xmm5 = _mm_load_si128((__m128i *)((char *)from + 80));
+    xmm6 = _mm_load_si128((__m128i *)((char *)from + 96));
+    xmm7 = _mm_load_si128((__m128i *)((char *)from + 112));
+
+    // Store data from registers to destination
+    _mm_storeu_si128((__m128i *)to, xmm0);
+    _mm_storeu_si128((__m128i *)((char *)to + 16), xmm1);
+    _mm_storeu_si128((__m128i *)((char *)to + 32), xmm2);
+    _mm_storeu_si128((__m128i *)((char *)to + 48), xmm3);
+    _mm_storeu_si128((__m128i *)((char *)to + 64), xmm4);
+    _mm_storeu_si128((__m128i *)((char *)to + 80), xmm5);
+    _mm_storeu_si128((__m128i *)((char *)to + 96), xmm6);
+    _mm_storeu_si128((__m128i *)((char *)to + 112), xmm7);
+
+    // Increment pointers
+    from += 128;
+    to += 128;
+    len -= 128;
+  }
+
+  // Copy the remaining bytes
+  if (len) {
+    __memcpy(to, from, len);
+  }
+
+  return retval;
+}
+
+#endif
 
 #if defined (__SSE2__)
 
@@ -652,6 +769,62 @@ static void *sse2_memcpy(void * to, const void * from, size_t len)
     if(len) __memcpy(to, from, len);
     return retval;
 }
+
+static void *sse2_memcpy_unaligned(void *to, const void *from, size_t len) {
+  void *retval = to;
+
+  if (len >= 128) {
+    register uintptr_t delta;
+    /* Align destination to SSE_MMREG_SIZE -boundary */
+    delta = ((uintptr_t)to) & (SSE_MMREG_SIZE - 1);
+    if (delta) {
+      delta = SSE_MMREG_SIZE - delta;
+      len -= delta;
+      __memcpy(to, from, delta);
+    }
+
+    __m128i xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7;
+
+    // Prefetch data
+    _mm_prefetch((char *)from + 128, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 160, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 192, _MM_HINT_NTA);
+    _mm_prefetch((char *)from + 224, _MM_HINT_NTA);
+
+    // Load data into registers
+    xmm0 = _mm_loadu_si128((__m128i *)from);
+    xmm1 = _mm_loadu_si128((__m128i *)((char *)from + 16));
+    xmm2 = _mm_loadu_si128((__m128i *)((char *)from + 32));
+    xmm3 = _mm_loadu_si128((__m128i *)((char *)from + 48));
+    xmm4 = _mm_loadu_si128((__m128i *)((char *)from + 64));
+    xmm5 = _mm_loadu_si128((__m128i *)((char *)from + 80));
+    xmm6 = _mm_loadu_si128((__m128i *)((char *)from + 96));
+    xmm7 = _mm_loadu_si128((__m128i *)((char *)from + 112));
+
+    // Store data from registers to destination
+    _mm_storeu_si128((__m128i *)to, xmm0);
+    _mm_storeu_si128((__m128i *)((char *)to + 16), xmm1);
+    _mm_storeu_si128((__m128i *)((char *)to + 32), xmm2);
+    _mm_storeu_si128((__m128i *)((char *)to + 48), xmm3);
+    _mm_storeu_si128((__m128i *)((char *)to + 64), xmm4);
+    _mm_storeu_si128((__m128i *)((char *)to + 80), xmm5);
+    _mm_storeu_si128((__m128i *)((char *)to + 96), xmm6);
+    _mm_storeu_si128((__m128i *)((char *)to + 112), xmm7);
+
+    // Increment pointers
+    from += 128;
+    to += 128;
+    len -= 128;
+  }
+
+  // Copy the remaining bytes
+  if (len) {
+    __memcpy(to, from, len);
+  }
+
+  return retval;
+}
+
 #endif
 
 #ifdef HAVE_ASM_SSE
@@ -1330,6 +1503,64 @@ void fast_memset_dirty(void * to, int val, size_t len)
 #endif
 }
 
+#ifdef HAVE_ASM_SSE4_1
+void *sse41_memset(void *to, uint8_t value, size_t len) {
+  void *retval = to;
+
+  // Check alignment and use aligned stores if possible
+  uintptr_t delta = ((uintptr_t)to) & (SSE_MMREG_SIZE - 1);
+  if (delta) {
+    delta = SSE_MMREG_SIZE - delta;
+    len -= delta;
+    memset(to, value, delta);
+    to = (void *)((char *)to + delta);
+
+	if( len <= 0 ) {
+		fprintf(stderr, "Alignment issue");
+		return;
+	}
+  }
+
+  // Use larger prefetch distances for better performance
+  _mm_prefetch((void *)((char *)to + 128), _MM_HINT_NTA);
+  _mm_prefetch((void *)((char *)to + 256), _MM_HINT_NTA);
+
+  __m128i xmm0 = _mm_set1_epi8(value);
+
+  // Unroll the loop and use aligned stores when possible
+  while (len >= 128) {
+	if (((uintptr_t)to) & (SSE_MMREG_SIZE - 1)) {
+      fprintf(stderr, "Warning: Alignment issue detected in loop operation.\n");
+      break; // Print a warning but continue with the loop
+    }
+    _mm_store_si128((__m128i *)to, xmm0);
+    _mm_store_si128((__m128i *)((char *)to + 16), xmm0);
+    _mm_store_si128((__m128i *)((char *)to + 32), xmm0);
+    _mm_store_si128((__m128i *)((char *)to + 48), xmm0);
+    _mm_store_si128((__m128i *)((char *)to + 64), xmm0);
+    _mm_store_si128((__m128i *)((char *)to + 80), xmm0);
+    _mm_store_si128((__m128i *)((char *)to + 96), xmm0);
+    _mm_store_si128((__m128i *)((char *)to + 112), xmm0);
+    
+    to = (void *)((char *)to + 128);
+    len -= 128;
+  }
+
+  // Copy the remaining bytes
+  if (len >= 16) {
+    memset(to, value, len);
+  } else {
+    // Avoid loop unrolling for small copies
+    for (size_t i = 0; i < len; i++) {
+      *((uint8_t *)to + i) = value;
+    }
+  }
+
+  return retval;
+}
+#endif
+
+
 static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
      return __memcpy(to,from,len);
 }
@@ -1496,8 +1727,14 @@ static struct {
   /* based on xine-lib + William Chan + other */
 #if defined (__SSE2__)
 	 { "SSE2 optimized memcpy() (128)", (void*) sse2_memcpy, 0,AV_CPU_FLAG_SSE2},
+	 { "SSE2 optimized memcpy() (128) v2" , (void*) sse2_memcpy_unaligned, 0, AV_CPU_FLAG_SSE2},
 #endif
-
+#ifdef HAVE_ASM_SSE4_1
+	{ "SSE4_1 optimized memcpy()" , (void*) sse41_memcpy, 0, AV_CPU_FLAG_SSE4},
+#endif
+#ifdef HAVE_ASM_SSE4_2
+	{ "SSE4_2 optimized memcpy()" , (void*) sse42_memcpy, 0, AV_CPU_FLAG_SSE42},
+#endif
 	/* aclib_template.c: */
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE ) || defined( HAVE_ASM_MMX2)
      { "MMX/MMX2/SSE optimized memcpy() v1", (void*) fast_memcpy, 0,AV_CPU_FLAG_MMX |AV_CPU_FLAG_SSE |AV_CPU_FLAG_MMX2 },
@@ -1547,6 +1784,9 @@ static struct {
 	{ "memset align 8 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_8,0,0 },
 	{ "memset align 32 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_32,0,0 },
 #endif
+#ifdef HAVE_ASM_SSE4_1
+  //  { "SSE4_1 memset()", (void*) sse41_memset,0, AV_CPU_FLAG_SSE4},
+#endif
 	{ NULL, NULL, 0, 0},
 };
 
@@ -1561,6 +1801,7 @@ void	memcpy_report()
 	for( i = 1; memcpy_method[i].name; i ++ ) {
 		fprintf(stdout,"\t%g : %s\n",memcpy_method[i].t,  memcpy_method[i].name );
 	}
+
 }
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
@@ -1629,10 +1870,10 @@ void find_best_memcpy()
      int i, k;
      int bufsize = 720 * 576 * 4;
 
-     if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
+     if (!(buf1 = (char*) malloc( bufsize * sizeof(char))))
           return;
 
-     if (!(buf2 = (char*) malloc( bufsize * sizeof(char) ))) {
+     if (!(buf2 = (char*) malloc( bufsize * sizeof(char)))) {
           free( buf1 );
           return;
      }
@@ -1656,7 +1897,7 @@ void find_best_memcpy()
 		}
 
 		t = get_time();
-		for( k = 0; k < 128; k ++ ) {
+		for( k = 0; k < 1024; k ++ ) {
 			memcpy_method[i].function( buf1,buf2, bufsize );
 		}
 		t = get_time() - t;
@@ -1723,7 +1964,7 @@ void find_best_memset()
 	}
 
 	t = get_time();
-	for( k = 0; k < 128; k ++ ) {
+	for( k = 0; k < 1024; k ++ ) {
 		memset_method[i].function( buf1 , 0 , bufsize );
 	}
 	t = get_time() - t;
