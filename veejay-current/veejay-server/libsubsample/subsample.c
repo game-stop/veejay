@@ -1139,49 +1139,32 @@ static void ss_444_to_420mpeg2_neon(uint8_t *buffer, int width, int height) {
   uint8_t *in0, *in1, *out;
   int x, y;
 
-  in0 = buffer;          
+  in0 = buffer;
   in1 = buffer + width;
   out = buffer;
 
   uint8x8_t vzero = vdup_n_u8(0);
 
   for (y = 0; y < height; y += 2) {
-    uint8x8_t vin0 = vld1_u8(in0);
-    uint8x8_t vin1 = vld1_u8(in1);
+    for (x = 0; x < width; x += 16) { // Process 16 pixels at a time
+      uint8x8_t vin0_1 = vld1_u8(in0);
+      uint8x8_t vin0_2 = vld1_u8(in0 + 8);
+      uint8x8_t vin1_1 = vld1_u8(in1);
+      uint8x8_t vin1_2 = vld1_u8(in1 + 8);
 
-    uint8x8_t vsum = vin0;
-    vsum = vadd_u8(vsum, vmul_n_u8(vin0, 2));
-    vsum = vadd_u8(vsum, vin1);
-    vsum = vadd_u8(vsum, vmul_n_u8(vin1, 2));
+      uint8x8_t vsum1 = vadd_u8(vin0_1, vin0_2);
+      vsum1 = vadd_u8(vsum1, vin1_1);
+      vsum1 = vadd_u8(vsum1, vin1_2);
+      vsum1 = vshrn_n_u16(vpaddl_u8(vsum1), 2); // Corrected to shift right by 2
 
-    uint8x8_t vout = vshr_n_u8(vsum, 3);
-
-    vst1_u8(out, vout);
-
-    in0 += 1;
-    in1 += 1;
-    out += 1;
-
-    for (x = 2; x < width; x += 2) {
-      vin0 = vld1_u8(in0);
-      vin1 = vld1_u8(in1);
-
-      vsum = vin0;
-      vsum = vadd_u8(vsum, vmul_n_u8(vin0, 2));
-      vsum = vadd_u8(vsum, vin1);
-      vsum = vadd_u8(vsum, vmul_n_u8(vin1, 2));
-
-      vout = vshr_n_u8(vsum, 3);
-
-      vst1_u8(out, vout);
-
-      in0 += 2;
-      in1 += 2;
-      out += 2;
+      vst1_u8(out, vsum1);
+      in0 += 16;
+      in1 += 16;
+      out += 8;
     }
 
-    in0 += width + 1;
-    in1 += width + 1;
+    in0 += width;
+    in1 += width;
   }
 }
 #endif
