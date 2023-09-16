@@ -991,18 +991,19 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
   for (y = height - 1; y > 0; y--) {
     uint8_t *dst = buffer + (y * width);
     uint8_t *src = buffer + (y * width / 2);
-    for (x = 0; x < optimized_pixels; x += 16) {
-      uint8x16_t vin = vld1q_u8(src);
-      uint8x16_t vout = vcombine_u8(vin, vin);
-      vst1q_u8(dst, vout);
 
-      src += 16;
-      dst += 16;
-    }
-    for (; x < width; x += 2) {
-      dst[0] = src[x];
-      dst[1] = src[x];
-      dst += 2;
+    uint8x8_t vin = vld1_u8(src);
+    uint8x8_t vout = vcombine_u8(vin, vin);
+
+    vst1_u8(dst, vout);
+
+    src += 8;
+    dst += 8;
+
+    for (x = optimized_pixels; x < width; x += 2) {
+        dst[0] = src[x];
+        dst[1] = src[x];
+        dst += 2;
     }
   }
 #endif
@@ -1061,26 +1062,41 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 #endif
 
 #ifdef HAVE_ARM
+    for (y = height; y > 0; y--) {
+        uint8_t *d = out + (y * width);
+        uint8_t *s = in + (y * stride);
 
-  for (y = height; y > 0; y--) {
-    uint8_t *d = out + (y * width);
-    uint8_t *s = in + (y * stride);
+        for (x = 0; x < stride; x += 8) {
+            uint8x8_t vin = vld1_u8(s);        uint8_t *d = out + (y * width);
+        uint8_t *s = in + (y * stride);
 
-    for (x = 0; x < stride; x += 16) {
-      uint8x16_t vin = vld1q_u8(s);
-      uint8x16_t vout = vcombine_u8(vin, vin);
-      vst1q_u8(d, vout);
+        for (x = 0; x < stride; x += 8) {
+            uint8x8_t vin = vld1_u8(s);
+            uint8x8_t vout = vcombine_u8(vin, vin);
+            vst1_u8(d, vout);
 
-      s += 16;
-      d += 16;
+            s += 8;
+            d += 8;
+        }
+
+        for (; x < stride; x += 2) {
+            d[0] = s[x];
+            d[1] = s[x];
+            d += 2;
+        }
+            uint8x8_t vout = vcombine_u8(vin, vin);
+            vst1_u8(d, vout);
+
+            s += 8;
+            d += 8;
+        }
+
+        for (; x < stride; x += 2) {
+            d[0] = s[x];
+            d[1] = s[x];
+            d += 2;
+        }
     }
-
-    for (; x < stride; x += 2) {
-      d[0] = s[x];
-      d[1] = s[x];
-      d += 2;
-    }
-  }
 #endif
 
 }
@@ -1143,37 +1159,37 @@ static void ss_444_to_420mpeg2_neon(uint8_t *buffer, int width, int height) {
   in1 = buffer + width;
   out = buffer;
 
-  uint8x16_t vzero = vdupq_n_u8(0);
+  uint8x8_t vzero = vdup_n_u8(0);
 
   for (y = 0; y < height; y += 2) {
-    uint8x16_t vin0 = vld1q_u8(in0);
-    uint8x16_t vin1 = vld1q_u8(in1);
+    uint8x8_t vin0 = vld1_u8(in0);
+    uint8x8_t vin1 = vld1_u8(in1);
 
-    uint8x16_t vsum = vin0;
-    vsum = vaddq_u8(vsum, vmulq_n_u8(vin0, 2));
-    vsum = vaddq_u8(vsum, vin1);
-    vsum = vaddq_u8(vsum, vmulq_n_u8(vin1, 2));
+    uint8x8_t vsum = vin0;
+    vsum = vadd_u8(vsum, vmul_n_u8(vin0, 2));
+    vsum = vadd_u8(vsum, vin1);
+    vsum = vadd_u8(vsum, vmul_n_u8(vin1, 2));
 
-    uint8x16_t vout = vshrq_n_u8(vsum, 3);
+    uint8x8_t vout = vshr_n_u8(vsum, 3);
 
-    vst1q_u8(out, vout);
+    vst1_u8(out, vout);
 
     in0 += 1;
     in1 += 1;
     out += 1;
 
     for (x = 2; x < width; x += 2) {
-      vin0 = vld1q_u8(in0);
-      vin1 = vld1q_u8(in1);
+      vin0 = vld1_u8(in0);
+      vin1 = vld1_u8(in1);
 
       vsum = vin0;
-      vsum = vaddq_u8(vsum, vmulq_n_u8(vin0, 2));
-      vsum = vaddq_u8(vsum, vin1);
-      vsum = vaddq_u8(vsum, vmulq_n_u8(vin1, 2));
+      vsum = vadd_u8(vsum, vmul_n_u8(vin0, 2));
+      vsum = vadd_u8(vsum, vin1);
+      vsum = vadd_u8(vsum, vmul_n_u8(vin1, 2));
 
-      vout = vshrq_n_u8(vsum, 3);
+      vout = vshr_n_u8(vsum, 3);
 
-      vst1q_u8(out, vout);
+      vst1_u8(out, vout);
 
       in0 += 2;
       in1 += 2;
