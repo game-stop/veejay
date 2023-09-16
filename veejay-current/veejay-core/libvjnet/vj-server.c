@@ -911,20 +911,17 @@ static int vj_server_update_get_msg_vd(vj_server *vje, int sock_fd, int link_id,
     
     int msg_size = vj_server_socket_consume( vje, sock_fd, link_id, buf, buf_size, MSG_WAITALL );
     if( msg_size <= 0) {
-        free(buf);
         return -1;
     }
 
     int net_id = 0;
     if( sscanf(buf, "%d:", &net_id ) != 1 ) {
         veejay_msg(VEEJAY_MSG_ERROR,"Expected VIMS identifier followed by semicolon");
-        free(buf);
         return -1;
     }  
 
     if( buf[ msg_size - 1] != ';' ) {
        veejay_msg(VEEJAY_MSG_ERROR, "Expected VIMS message end marker ';'");
-       free(buf);
        return -1;
     } 
 
