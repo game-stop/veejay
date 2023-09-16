@@ -48,6 +48,8 @@
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/vj-task.h>
 
+#define    RUP8(num)(((num)+8)&~8)
+
 
 #define BLANK_CRB in0[1]
 #define BLANK_CRB_2 (in0[1] << 1)
@@ -152,11 +154,14 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 }
 #endif
 #ifdef HAVE_ARM
-static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
+void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 {
     const uint8_t *in0, *in1;
     uint8_t *out;
     int x, y;
+
+    const bool is_width_even = (width & 2) == 0;
+
     in0 = buffer;
     in1 = buffer + width;
     out = buffer;
@@ -167,15 +172,16 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
         {
             uint8x16_t vin0 = vld1q_u8(in0);
             uint8x16_t vin1 = vld1q_u8(in1);
-			uint8x16_t vresult = vrhaddq_u8(vin0, vin1);
-			vst1q_u8(out, vresult);
+
+            uint8x16_t vresult = vrhaddq_u8(vin0, vin1);
+            vst1q_u8(out, vresult);
 
             in0 += 16;
             in1 += 16;
             out += 4;
         }
 
-        for (; x < width; x += 2)
+        if (!is_width_even)
         {
             uint8x8_t vin0 = vld1_u8(in0);
             uint8x8_t vin1 = vld1_u8(in1);
@@ -227,11 +233,14 @@ static void ss_444_to_420jpeg_cp(uint8_t *buffer,uint8_t *dest, int width, int h
 }
 #endif
 #ifdef HAVE_ARM
-static void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
+void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
 {
     const uint8_t *in0, *in1;
     uint8_t *out;
     int x, y;
+
+    const bool is_width_even = (width & 2) == 0;
+
     in0 = buffer;
     in1 = buffer + width;
     out = dest;
@@ -252,7 +261,7 @@ static void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int 
             out += 4;
         }
 
-        for (; x < width; x += 2)
+        if (!is_width_even)
         {
             uint8x8_t vin0 = vld1_u8(in0);
             uint8x8_t vin1 = vld1_u8(in1);
@@ -522,7 +531,6 @@ static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int hei
     int x, y;
 
     uint8_t *saveme = data;
-
     veejay_memcpy(saveme, buffer, width);
 
     in0 = buffer + (width * height / 4) - 2;
@@ -534,37 +542,68 @@ static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int hei
     uint8x16_t zero = vdupq_n_u8(0);
     uint8x16_t eight = vdupq_n_u8(8);
 
+    const bool is_width_multiple_of_16 = (width & 14) == 0;
+
     for (y = height; y > 0; y -= 2) {
         if (y == 2) {
             in0 = saveme + width / 2 - 2;
             inp = in0 + width / 2;
         }
-        for (x = width; x > 0; x -= 2) {
-            uint8x16_t vin0 = vld1q_u8(in0);
-            uint8x16_t vinm = vld1q_u8(inm);
-            uint8x16_t vinp = vld1q_u8(inp);
 
-            uint8x16_t vsum1 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vqaddq_u8(vin0, vinp), vinm), vin0), vinp);
-            uint8x16_t vsum2 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vinm, vinp), vin0), vin0);
-            uint8x16_t vsum3 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vinm, vinm), vin0), vin0);
+        if (is_width_multiple_of_16) {
+            for (x = width; x > 0; x -= 16) {
+                uint8x16_t vin0 = vld1q_u8(in0);
+                uint8x16_t vinm = vld1q_u8(inm);
+                uint8x16_t vinp = vld1q_u8(inp);
 
-            uint8x16_t vout0 = vshrq_n_u8(vsum1, 4);
-            uint8x16_t vout1 = vshrq_n_u8(vsum2, 4);
-            uint8x16_t vout2 = vshrq_n_u8(vsum3, 4);
+                uint8x16_t vsum1 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vqaddq_u8(vin0, vinp), vinm), vin0), vinp);
+                uint8x16_t vsum2 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vinm, vinp), vin0), vin0);
+                uint8x16_t vsum3 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vinm, vinm), vin0), vin0);
 
-            vst1q_u8(out1, vout0);
-            vst1q_u8(out0, vout1);
-            vst1q_u8(out1 - width, vout2);
+                uint8x16_t vout0 = vshrq_n_u8(vsum1, 4);
+                uint8x16_t vout1 = vshrq_n_u8(vsum2, 4);
+                uint8x16_t vout2 = vshrq_n_u8(vsum3, 4);
 
-            inm -= 16;
-            in0 -= 16;
-            inp -= 16;
+                vst1q_u8(out1, vout0);
+                vst1q_u8(out0, vout1);
+                vst1q_u8(out1 - width, vout2);
 
-            out1 -= 16;
-            out0 -= 16;
+                inm -= 16;
+                in0 -= 16;
+                inp -= 16;
+
+                out1 -= 16;
+                out0 -= 16;
+            }
+        } else {
+            for (x = width; x > 0; x -= 2) {
+
+                if (x & 14) {
+                    uint8x8_t vin0 = vld1_u8(in0);
+                    uint8x8_t vinm = vld1_u8(inm);
+                    uint8x8_t vinp = vld1_u8(inp);
+
+                    uint8x8_t vsum1 = vqadd_u8(vqadd_u8(vqadd_u8(vqadd_u8(vin0, vinp), vinm), vin0), vinp);
+                    uint8x8_t vsum2 = vqadd_u8(vqadd_u8(vqadd_u8(vinm, vinp), vin0), vin0);
+                    uint8x8_t vsum3 = vqadd_u8(vqadd_u8(vqadd_u8(vinm, vinm), vin0), vin0);
+
+                    uint8x8_t vout0 = vshr_n_u8(vsum1, 4);
+                    uint8x8_t vout1 = vshr_n_u8(vsum2, 4);
+                    uint8x8_t vout2 = vshr_n_u8(vsum3, 4);
+
+                    vst1_u8(out1, vout0);
+                    vst1_u8(out0, vout1);
+                    vst1_u8(out1 - width, vout2);
+
+                    inm -= 8;
+                    in0 -= 8;
+                    inp -= 8;
+
+                    out1 -= 8;
+                    out0 -= 8;
+                }
+            }
         }
-        out1 -= width;
-        out0 -= width;
     }
 }
 #endif
@@ -597,36 +636,46 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 #endif
 
 #ifdef HAVE_ARM_NEON
-	uint8_t *in, *out0, *out1;
+    uint8_t *in, *out0, *out1;
     int x, y;
 
     in = buffer + (width * height / 4) - 1;
     out1 = buffer + (width * height) - 1;
     out0 = out1 - width;
 
+    int optimized_pixels = width - (width & 7);
+
     for (y = height - 1; y >= 0; y -= 2) {
-        for (x = width - 1; x >= 0; x -= 8) { // Process 8 pixels at a time
+        for (x = optimized_pixels - 1; x >= 0; x -= 8) {
             uint8x8_t val = vld1_u8(in);
-            
-            // Duplicate the value
+
             uint8x8x2_t duplicated_val;
             duplicated_val.val[0] = val;
             duplicated_val.val[1] = val;
-            
+
             vst1q_u8(out1 - 8, vreinterpretq_u8_u16(vzip_u16(
                 vreinterpret_u16_u8(duplicated_val.val[0]),
                 vreinterpret_u16_u8(duplicated_val.val[1])
             )));
-            
+
             vst1q_u8(out0 - 8, vreinterpretq_u8_u16(vzip_u16(
                 vreinterpret_u16_u8(duplicated_val.val[0]),
                 vreinterpret_u16_u8(duplicated_val.val[1])
             )));
-            
+
             in -= 8;
             out1 -= 8;
             out0 -= 8;
         }
+
+        for (x = width - 1; x >= optimized_pixels; x -= 2) {
+            uint8_t val = *(in--);
+            *(out1--) = val;
+            *(out1--) = val;
+            *(out0--) = val;
+            *(out0--) = val;
+        }
+
         out0 -= width;
         out1 -= width;
     }
@@ -640,19 +689,27 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
     out0 = out1 - width;
     uint8x16_t val, val_dup;
 
-    for (y = height - 1; y >= 0; y -= 2)
-    {
-        for (x = width - 1; x >= 0; x -= 16)
-        {
+    int optimized_pixels = width - (width & 15);
+
+    for (y = height - 1; y >= 0; y -= 2) {
+        for (x = optimized_pixels - 1; x >= 0; x -= 16) {
             val = vld1q_u8(in);
-			val_dup = vdupq_n_u8(vgetq_lane_u8(val, 0));
+            val_dup = vdupq_n_u8(vgetq_lane_u8(val, 0));
 
             vst1q_u8(out1 - 15, val_dup);
             vst1q_u8(out0 - 15, val_dup);
 
-            in--;
+            in -= 16;
             out1 -= 16;
             out0 -= 16;
+        }
+
+        for (x = width - 1; x >= optimized_pixels; x -= 2) {
+            uint8_t val = *(in--);
+            *(out1--) = val;
+            *(out1--) = val;
+            *(out0--) = val;
+            *(out0--) = val;
         }
 
         out0 -= width;
@@ -793,7 +850,12 @@ static inline void downsample32x16(const uint8_t *src, uint8_t *dst, const int w
     unsigned int x1 = 0;
     unsigned int i;
 
-    for (x = 0; x < width - left; x += 32, x1 += 16)
+    int optimized_pixels = width - left;
+    if (optimized_pixels & 31) {
+        optimized_pixels -= 31;
+    }
+
+    for (x = 0; x < optimized_pixels; x += 32, x1 += 16)
     {
         uint8x16x2_t vsrc = vld2q_u8(&src[x]);
         uint8x16_t vsum = vrhaddq_u8(vsrc.val[0], vsrc.val[1]);
@@ -805,22 +867,19 @@ static inline void downsample32x16(const uint8_t *src, uint8_t *dst, const int w
         dst[x1] = (src[x + i] + src[x + i + 1] + 1) >> 1;
     }
 }
-
 static inline void downsample16x8(const uint8_t *src, uint8_t *dst, const int width)
 {
     unsigned int x;
     unsigned int x1 = 0;
-    
-    for (x = 0; x < width; x += 16, x1 += 8)
-    {
+
+    for (x = 0; x < width - 16; x += 16, x1 += 8) {
         uint8x16_t vsrc = vld1q_u8(&src[x]);
         uint8x8_t vsum = vpadd_u8(vget_low_u8(vsrc), vget_high_u8(vsrc));
         vsum = vrshr_n_u8(vsum, 1);
         vst1_u8(&dst[x1], vsum);
     }
-    
-    for (; x < width; x += 2, x1++)
-    {
+
+    for (; x < width; x += 2, x1++) {
         dst[x1] = (src[x] + src[x + 1] + 1) >> 1;
     }
 }
@@ -876,7 +935,6 @@ static inline void subsample_up_1x16to1x32(uint8_t *in, uint8_t *out)
 
     vst1q_u8(out, vout);
 }
-
 #endif
 
 
@@ -912,7 +970,7 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 #endif
 
 #ifndef HAVE_ASM_SSE2
-#if defined(HAVE_ASM_MMX) || defined(HAVE_ARM)
+#if defined(HAVE_ASM_MMX)
 	for( y = height -1 ; y > 0; y -- ) {
 		uint8_t *src = buffer + (y* stride);
 		uint8_t *dst = buffer + (y* width);
@@ -921,13 +979,34 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 			subsample_up_1x16to1x32( &src[x], &dst[x1] );
 		}
 	}
-#endif
-#if defined(HAVE_ASM_MMX)
 	__asm__(_EMMS"       \n\t"
            	SFENCE"     \n\t"
             	:::"memory");
 #endif
 #endif
+
+#ifdef HAVE_ARM
+  int optimized_pixels = width - (width & 15);
+
+  for (y = height - 1; y > 0; y--) {
+    uint8_t *dst = buffer + (y * width);
+    uint8_t *src = buffer + (y * width / 2);
+    for (x = 0; x < optimized_pixels; x += 16) {
+      uint8x16_t vin = vld1q_u8(src);
+      uint8x16_t vout = vcombine_u8(vin, vin);
+      vst1q_u8(dst, vout);
+
+      src += 16;
+      dst += 16;
+    }
+    for (; x < width; x += 2) {
+      dst[0] = src[x];
+      dst[1] = src[x];
+      dst += 2;
+    }
+  }
+#endif
+
 }
 
 static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
@@ -966,7 +1045,7 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 #endif
 
 #ifndef HAVE_ASM_SSE2
-#if defined(HAVE_ASM_MMX) || defined(HAVE_ARM)
+#if defined(HAVE_ASM_MMX)
 	int x1 = 0;
 	for( y = height -1 ; y > 0; y -- ) {
 		uint8_t *src = in + (y* stride);
@@ -975,13 +1054,33 @@ static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
 			subsample_up_1x16to1x32(&src[x], &dst[x1] );
 		}
 	}
-#endif
-
-#ifdef HAVE_ASM_MMX
 	__asm__(_EMMS"       \n\t"
            	SFENCE"     \n\t"
             	:::"memory");
 #endif
+#endif
+
+#ifdef HAVE_ARM
+
+  for (y = height; y > 0; y--) {
+    uint8_t *d = out + (y * width);
+    uint8_t *s = in + (y * stride);
+
+    for (x = 0; x < stride; x += 16) {
+      uint8x16_t vin = vld1q_u8(s);
+      uint8x16_t vout = vcombine_u8(vin, vin);
+      vst1q_u8(d, vout);
+
+      s += 16;
+      d += 16;
+    }
+
+    for (; x < stride; x += 2) {
+      d[0] = s[x];
+      d[1] = s[x];
+      d += 2;
+    }
+  }
 #endif
 
 }
@@ -1036,45 +1135,54 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 }
 #endif
 #ifdef HAVE_ARM
-static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
-{
-    uint8_t *in0, *in1, *out;
-    int x, y;
+static void ss_444_to_420mpeg2_neon(uint8_t *buffer, int width, int height) {
+  uint8_t *in0, *in1, *out;
+  int x, y;
 
-    in0 = buffer;
-    in1 = buffer + width;
-    out = buffer;
+  in0 = buffer;          
+  in1 = buffer + width;
+  out = buffer;
 
-    for (y = 0; y < height; y += 2)
-    {
-        /* first column boundary condition -- just repeat it to the right */
-        uint8x8_t v0 = vld1_u8(in0);
-        uint8x8_t v1 = vld1_u8(in1);
-        uint16x8_t vsum = vaddl_u8(v0, v1);
-        vsum = vshrq_n_u16(vsum, 1);
-        uint8x8_t vout = vqmovn_u16(vsum);
-        vst1_u8(out, vout);
-        out++;
-        in0++;
-        in1++;
+  uint8x16_t vzero = vdupq_n_u8(0);
 
-        /* rest of columns just loop */
-        for (x = 2; x < width; x += 2)
-        {
-            v0 = vld1_u8(in0);
-            v1 = vld1_u8(in1);
-            vsum = vaddl_u8(v0, v1);
-            vsum = vshrq_n_u16(vsum, 1);
-            vout = vqmovn_u16(vsum);
-            vst1_u8(out, vout);
-            in0 += 2;
-            in1 += 2;
-            out++;
-        }
+  for (y = 0; y < height; y += 2) {
+    uint8x16_t vin0 = vld1q_u8(in0);
+    uint8x16_t vin1 = vld1q_u8(in1);
 
-        in0 += width + 1;
-        in1 += width + 1;
+    uint8x16_t vsum = vin0;
+    vsum = vaddq_u8(vsum, vmulq_n_u8(vin0, 2));
+    vsum = vaddq_u8(vsum, vin1);
+    vsum = vaddq_u8(vsum, vmulq_n_u8(vin1, 2));
+
+    uint8x16_t vout = vshrq_n_u8(vsum, 3);
+
+    vst1q_u8(out, vout);
+
+    in0 += 1;
+    in1 += 1;
+    out += 1;
+
+    for (x = 2; x < width; x += 2) {
+      vin0 = vld1q_u8(in0);
+      vin1 = vld1q_u8(in1);
+
+      vsum = vin0;
+      vsum = vaddq_u8(vsum, vmulq_n_u8(vin0, 2));
+      vsum = vaddq_u8(vsum, vin1);
+      vsum = vaddq_u8(vsum, vmulq_n_u8(vin1, 2));
+
+      vout = vshrq_n_u8(vsum, 3);
+
+      vst1q_u8(out, vout);
+
+      in0 += 2;
+      in1 += 2;
+      out += 2;
     }
+
+    in0 += width + 1;
+    in1 += width + 1;
+  }
 }
 #endif
 #ifdef HAVE_ASM_SSE2
@@ -1203,12 +1311,13 @@ void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
 }
 
 
-static uint8_t *_chroma_supersample_data = NULL;
-
 void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 {
-	if( _chroma_supersample_data == NULL && mode == SSM_420_JPEG_TR ) {
- 		_chroma_supersample_data = (uint8_t*) vj_calloc( sizeof(uint8_t) * frame->width * 2 );
+    uint8_t *_chroma_supersample_data = NULL;
+
+
+	if( mode == SSM_420_JPEG_TR ) {
+ 		_chroma_supersample_data = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(frame->width * 2) );
 	}
 
 	switch (mode) {
@@ -1227,4 +1336,7 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
   		default:
    		break;
  	 }
+
+     if( _chroma_supersample_data != NULL )
+        free( _chroma_supersample_data );
 }
