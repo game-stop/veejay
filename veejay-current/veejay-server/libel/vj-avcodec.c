@@ -229,9 +229,16 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		e->context->pix_fmt = get_ffmpeg_pixfmt( out_pixel_format );
 		pf = e->context->pix_fmt;
 
-	
 		char *descr = vj_avcodec_get_codec_name( id );
 #if LIBAVCODEC_BUILD > 5400
+
+		int n_threads = avhelper_set_num_decoders();
+
+		if( n_threads > 0 ) {
+			e->context->thread_count = n_threads;
+			e->context->thread_type = FF_THREAD_FRAME;
+		}
+		
 		if ( avcodec_open2( e->context, e->codec, NULL ) )
 #else
 		if ( avcodec_open( e->context, e->codec ) < 0 )
