@@ -178,31 +178,8 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	  if(id != CODEC_ID_DVVIDEO )
 		{
 #endif
-#if LIBAVCODEC_BUILD > 5400
-		e->context = avcodec_alloc_context3(e->codec);
-
-		int n_threads = 0;
-
-		char *num_decode_threads = getenv( "VEEJAY_NUM_DECODE_THREADS" );
-		if( num_decode_threads ) {
-			n_threads = atoi(num_decode_threads);
-		}
-		else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_NUM_DECODE_THREADS not set!");
-			int n = task_num_cpus();
-			if( n > 1 )
-				n_threads = 2;
-			if( n > 3 )
-				n_threads = 4;
-		}
-
-		veejay_msg(VEEJAY_MSG_DEBUG, "Using %d decoding threads (ffmpeg)", n_threads);
-
-		if( n_threads > 0 ) {
-			e->context->thread_count = n_threads;
-			e->context->thread_type = FF_THREAD_FRAME;
-		}
-
+#if LIBAVCODEC_BUILD > 5400  
+   	    e->context = avcodec_alloc_context3(e->codec);
 #else
 		e->context = avcodec_alloc_context();
 #endif
@@ -238,7 +215,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 			e->context->thread_count = n_threads;
 			e->context->thread_type = FF_THREAD_FRAME;
 		}
-		
+
 		if ( avcodec_open2( e->context, e->codec, NULL ) )
 #else
 		if ( avcodec_open( e->context, e->codec ) < 0 )
