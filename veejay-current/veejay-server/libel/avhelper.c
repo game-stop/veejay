@@ -141,14 +141,24 @@ static int key_compare(const void *key1, const void *key2)
 }
 
 #include <libavutil/hwcontext.h>
-void avhelper_hwaccel(AVCodecContext *codec_context) {
-  AVCodecHWConfig *hw_config = avcodec_get_hw_config(codec_context,0);
-  
-  if (hw_config != NULL) {
-    veejay_msg(0, "Using hardware acceleration");
-  } else {
-	veejay_msg(0, "Not using hardware acceleration");
-  }
+int avhelper_hwaccel(AVCodecContext *codec_context) {
+	int i;
+
+	for( i = 0;; i++ ) {
+
+		AVCodecHWConfig *hw_config = avcodec_get_hw_config(codec_context,i);
+		if(!hw_config) {
+			veejay_msg(0, "Decoder %s does not support hwaccel", codec_context->codec->name);
+			return 0;
+		}
+
+		if( hw_config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX ) {
+			veejay_msg(VEEJAY_MSG_INFO, "Codec supports hardware acceleration");
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 
