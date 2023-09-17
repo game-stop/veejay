@@ -1756,27 +1756,37 @@ static void fast_memset(void * to, int val, size_t len)
 #ifdef HAVE_ARM_ASIMD
 
 void memset_asimd_v3(void *dst, uint8_t val, size_t len) {
-    uint8x16_t value = vdupq_n_u8(val);
+    uint8x16_t value = vdupq_n_u8(val);  
     uint8_t *dst_bytes = (uint8_t *)dst;
-    size_t num_blocks = len / 16;
+
+    const int CACHE_LINE_SIZE = cpu_cache_size();
+    size_t offset = (CACHE_LINE_SIZE - ((uintptr_t)dst_bytes % CACHE_LINE_SIZE)) % CACHE_LINE_SIZE;
+
+    for (size_t i = 0; i < offset; i++) {
+        *dst_bytes++ = val;
+        len--;
+    }
 
     value = vld1q_u8(&val);
 
-    for (size_t i = 0; i < num_blocks; i++) {
-        uint8x16_t dst_data = vld1q_u8(dst_bytes);
+    size_t num_lines = len / CACHE_LINE_SIZE;
 
-        dst_data = vorrq_u8(dst_data, value);
-
-        vst1q_u8(dst_bytes, dst_data);
-        dst_bytes += 16;
+    for (size_t i = 0; i < num_lines; i++) {
+        for (size_t j = 0; j < CACHE_LINE_SIZE / 16; j++) {
+            uint8x16_t dst_data = vld1q_u8(dst_bytes);
+            dst_data = vorrq_u8(dst_data, value);
+            vst1q_u8(dst_bytes, dst_data);
+            dst_bytes += 16;
+        }
     }
 
-    size_t remaining_bytes = len % 16;
-
+    size_t remaining_bytes = len % CACHE_LINE_SIZE;
     for (size_t i = 0; i < remaining_bytes; i++) {
         *dst_bytes++ = val;
     }
 }
+
+
 
 void memset_asimd(void *dst, uint8_t val, size_t len) {
     uint8x16_t value = vdupq_n_u8(val);

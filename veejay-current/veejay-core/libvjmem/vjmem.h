@@ -65,4 +65,5 @@ extern void *vj_simple_pool_alloc( void *ptr, size_t s );
 extern void *vj_simple_pool_init( size_t s );
 extern void vj_simple_pool_reset( void *ptr );
 extern void vj_mem_destroy();
+
 #endif
