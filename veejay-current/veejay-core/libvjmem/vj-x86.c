@@ -73,11 +73,10 @@ static int has_cpuid(void)
 
 #ifdef HAVE_ARM
 static int get_cache_line_size() {
-	int cache_line_size;
-
-    asm volatile("mrs %0, ctr_el0" : "=r"(cache_line_size));
-    cache_line_size &= 0xFF; 
-
+    int ctr_el0;
+    asm volatile("mrs %0, ctr_el0" : "=r"(ctr_el0));
+    int cwgr_val = (ctr_el0 >> 32) & 0x7;
+    int cache_line_size = 64 << cwgr_val;
     return cache_line_size;
 }
 #endif
