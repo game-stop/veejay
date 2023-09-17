@@ -239,6 +239,7 @@ static	int vj_vloopback_user_pixelformat( VJFrame *src )
 
 		return v4l2_ffmpeg2v4l2( vloopback_pixfmt[ result ].fmt );
 	}
+	return src->format;
 #else
 	return src->format;
 #endif
