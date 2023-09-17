@@ -1682,6 +1682,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	if( veejay_setup_video_out(info) != 0 ) {
 		veejay_msg( VEEJAY_MSG_ERROR, "Failed to setup output driver");
     	pthread_exit(NULL);
+		return NULL;
 	}
 
     while (settings->state != LAVPLAY_STATE_STOP) {
