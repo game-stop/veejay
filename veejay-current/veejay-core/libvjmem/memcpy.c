@@ -1636,6 +1636,61 @@ static void *memcpy_neon( void *to, const void *from, size_t n )
 }
 #endif
 #ifdef HAVE_ARM_ASIMD
+#include <stdint.h>
+#include <stddef.h>
+#include <arm_neon.h>
+
+static void memcpy_asimd_256_v3(uint8_t *dst, const uint8_t *src) {
+    uint8x16_t data;
+
+    __asm__ volatile (
+        "prfm pldl1strm, [%0, #256] \n"
+        :
+        : "r" (src)
+        : "memory"
+    );
+
+    for (int i = 0; i < 16; ++i) {
+        data = vld1q_u8(src);
+        vst1q_u8(dst, data);
+        src += 16;
+        dst += 16;
+    }
+}
+
+static void *memcpy_asimd_v3(void *to, const void *from, size_t n) {
+    void *retval = to;
+    const uint8_t *src = (const uint8_t *)from;
+    uint8_t *dst = (uint8_t *)to;
+
+    if (n >= 256) {
+        size_t i = n >> 8;
+        size_t r = n & 255;
+
+        for (; i > 0; i--) {
+            __asm__ volatile (
+                "prfm pldl1strm, [%0, #256] \n"
+                :
+                : "r" (src)
+                : "memory"
+            );
+
+            memcpy_asimd_256_v3(dst, src);
+            src += 256;
+            dst += 256;
+        }
+
+        if (r) {
+            memcpy(dst, src, r);
+        }
+    } else {
+        memcpy(to, from, n);
+    }
+
+    return retval;
+}
+
+
 static void memcpy_asimd_256(uint8_t *dst, const uint8_t *src) {
     uint8x16_t data;
     for (int i = 0; i < 16; ++i) {
@@ -1715,6 +1770,45 @@ static void fast_memset(void * to, int val, size_t len)
 }
 
 #ifdef HAVE_ARM_ASIMD
+
+void memset_asimd_v3(void *dst, uint8_t val, size_t len) {
+    uint8x16_t value = vdupq_n_u8(val);
+    uint8_t *dst_bytes = (uint8_t *)dst;
+    size_t num_blocks = len / 16;
+
+    __asm__ volatile (
+        "prfm pldl1strm, [%0, #64] \n"
+        :
+        : "r" (&value)
+        : "memory"
+    );
+
+    for (size_t i = 0; i < num_blocks; i++) {
+        __asm__ volatile (
+            "prfm pldl1keep, [%0, #64] \n"
+            :
+            : "r" (dst_bytes)
+            : "memory"
+        );
+
+        vst1q_u8(dst_bytes, value);
+        dst_bytes += 16;
+    }
+
+    size_t remaining_bytes = len % 16;
+
+    __asm__ volatile (
+        "prfm pldl1keep, [%0, %1] \n"
+        :
+        : "r" (dst_bytes), "I" (remaining_bytes)
+        : "memory"
+    );
+
+    for (size_t i = 0; i < remaining_bytes; i++) {
+        *dst_bytes++ = val;
+    }
+}
+
 void memset_asimd(void *dst, uint8_t val, size_t len) {
     uint8x16_t value = vdupq_n_u8(val);
 	uint8_t *dst_bytes = (uint8_t *)dst;
@@ -1805,6 +1899,8 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
+	{ "Advanced SIMD ARMv8-A memcpy() v3", (void*) memcpy_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
+	
 //	{ "Advanced SIMD ARMv8-A memcpy v2()", (void*) memcpy_asimdv2, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARMV7A
@@ -1840,6 +1936,8 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
+	{ "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
+	
 //	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
 	
 #endif
