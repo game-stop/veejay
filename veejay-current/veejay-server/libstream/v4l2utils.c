@@ -598,8 +598,8 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 		int n_threads = avhelper_set_num_decoders();
 
 		if( n_threads > 0 ) {
-			e->context->thread_count = n_threads;
-			e->context->thread_type = FF_THREAD_FRAME;
+			v->c->thread_count = n_threads;
+			v->c->thread_type = FF_THREAD_FRAME;
 		}
 
 	if( avcodec_open2( v->c, v->codec, NULL ) < 0 )
