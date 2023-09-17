@@ -140,7 +140,7 @@ static int key_compare(const void *key1, const void *key2)
     return ((const int) key1 == (const int) key2 ? 0 : 1);
 }
 
-static int avhelper_set_num_decoders() {
+int avhelper_set_num_decoders() {
 	int n_threads = 0;
 
 	char *num_decode_threads = getenv( "VEEJAY_NUM_DECODE_THREADS" );

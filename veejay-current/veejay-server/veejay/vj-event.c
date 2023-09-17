@@ -7238,7 +7238,7 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
     }
 
     char tmp[255];
-    char prefix[255];
+    char prefix[512];
     if(args[0] <= 0) 
     {
         veejay_msg(VEEJAY_MSG_ERROR,"Number of frames to record must be > 0");
@@ -7251,9 +7251,9 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
         return;
     }   
 
-    char sourcename[255];   
+    char sourcename[512];   
     vj_tag_get_description( v->uc->sample_id, sourcename );
-    sprintf(prefix,"%s-%02d-", sourcename, v->uc->sample_id);
+    snprintf(prefix,sizeof(prefix),"%s-%02d-", sourcename, v->uc->sample_id);
     if(! veejay_create_temp_file(prefix, tmp )) 
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot create temporary file %s", tmp);
