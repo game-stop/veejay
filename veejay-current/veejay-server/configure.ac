@@ -285,7 +285,7 @@ case $host_cpu in
 		VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
 		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC -ftree-vectorize"
 	else
-		VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -m64 -fPIC -DPIC"
+		VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -m64 -fPIC -DPIC -g"
 	fi
 	CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
 
@@ -332,12 +332,15 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 
 	;;
    aarch64* )
-        AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+    AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-fPIC -DPIC -ftree-vectorize"
+	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -ftree-vectorize"
+	    SUBSAMPLE_CFLAGS="O3 -fPIC -DPIC"
+	else
+	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -g -ftree-vectorize"
+	    SUBSAMPLE_CFLAGS="-O3 -fPIC -DPIC -g"
+
 	fi
-	CFLAGS="$CFLAGS -fPIC -DPIC -fopenmp"
 	have_arm=true
 	AC_MSG_RESULT(aarch64)
         ;;
@@ -413,9 +416,8 @@ then
 	fi
 
 	OP_CFLAGS="$USER_CFLAGS"
-	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
-	VJE_CFLAGS="$USER_CFLAGS"
-	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+	SUBSAMPLE_CFLAGS="$SUBSAMPLE $USER_CFLAGS"
+	CFLAGS="$CFLAGS $USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 
 	AC_SUBST(FASTARM_CFLAGS)
 fi
@@ -435,14 +437,13 @@ then
 	fi
 
 	if test "x$enable_debug" != "xyes" ; then
-		USER_CFLAGS="$USER_CFLAGS -O3 -ftree-vectorize -fno-stack-protector"
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
 	else
-		USER_CFLAGS="$USER_CFLAGS -g -Wall -fopenmp"
+		USER_CFLAGS="$USER_CFLAGS -O3 -g -fno-stack-protector -Wall -fopenmp"
 	fi
 
 	OP_CFLAGS="$USER_CFLAGS"
 	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
-	VJE_CFLAGS="$USER_CFLAGS"
 	CFLAGS="$CFLAGS $USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 	AC_SUBST(FASTARM_CFLAGS)
 fi
