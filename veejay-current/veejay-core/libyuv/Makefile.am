@@ -1,5 +1,5 @@
 # Makefile for veejay
-AM_CFLAGS = $(OP_CFLAGS)
+AM_CFLAGS = $(OP_CFLAGS) -ftree-vectorize
 MAINTAINERCLEANFILES = Makefile.in
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
