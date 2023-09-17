@@ -28,7 +28,7 @@
 #include <veejaycore/defs.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
-#include <libvje/vje.h>
+#include "../veejay-server/libvje/vje.h"
 #include <veejaycore/yuvconv.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
@@ -36,7 +36,7 @@
 #include <libavformat/avformat.h>
 #include <libavformat/version.h>
 #include <veejaycore/avhelper.h>
-#include <libel/av.h>
+#include "../veejay-server/libel/av.h"
 #include <veejaycore/hash.h>
 
 static struct

@@ -1517,7 +1517,7 @@ void *sse41_memset(void *to, uint8_t value, size_t len) {
 
 	if( len <= 0 ) {
 		fprintf(stderr, "Alignment issue");
-		return;
+		return NULL;
 	}
   }
 

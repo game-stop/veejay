@@ -32,7 +32,7 @@ extern void find_best_memset(void);
 extern void yuyv_plane_init();
 extern void benchmark_tasks(int n_tasks, long n_frames, int w, int h);
 extern void init_parallel_tasks(int n_tasks);
-static int MEM_ALIGNMENT_SIZE = 32;
+static int MEM_ALIGNMENT_SIZE = 0;
 static int CACHE_LINE_SIZE = 64;
 
 
@@ -140,7 +140,7 @@ void vj_mem_init(void)
 #endif
 
 	if(MEM_ALIGNMENT_SIZE == 0)
-		MEM_ALIGNMENT_SIZE = getpagesize();
+		MEM_ALIGNMENT_SIZE = sysconf(_SC_PAGE_SIZE);
 	
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
@@ -211,31 +211,33 @@ void *vj_malloc_(size_t size)
 {
 	if( size <= 0 )
 		return NULL;
+
 	void *ptr = NULL;
 #ifdef HAVE_POSIX_MEMALIGN
-    size_t aligned_size = (size + 15) & ~0x0F;
-    int err = posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, aligned_size );
-	if( err == EINVAL )
-	{
-		veejay_msg(0, "Memory is not a multiple of %d : %d", sizeof(void*), aligned_size );
-		return NULL;	
-	}
-	if( err == ENOMEM ) 
-	{
-		veejay_msg(0, "Unable to allocate %d bytes of memory",size );
-		return NULL;
-	}
+    size_t aligned_size = (size + MEM_ALIGNMENT_SIZE - 1) & ~(MEM_ALIGNMENT_SIZE - 1);
+    
+    int err = posix_memalign(&ptr, MEM_ALIGNMENT_SIZE, aligned_size);
+    if (err == EINVAL) {
+        veejay_msg(0, "Error: Memory size is not a multiple of %zu: %zu\n", MEM_ALIGNMENT_SIZE, aligned_size);
+        return NULL;
+    } else if (err == ENOMEM) {
+        veejay_msg(0, "Error: Unable to allocate %zu bytes of memory\n", size);
+        return NULL;
+    }
 #else
 #ifdef HAVE_MEMALIGN
-	ptr = memalign( MEM_ALIGNMENT_SIZE, size );
-#else	
-	ptr = malloc ( size ) ;
+    ptr = memalign(MEM_ALIGNMENT_SIZE, size);
+#else
+    ptr = malloc(size);
 #endif
 #endif
-	if(!ptr)
-		return NULL;
 
-	return ptr;
+    if (!ptr) {
+        veejay_msg(0, "Error: Failed to allocate %zu bytes of memory\n", size);
+        return NULL;
+    }
+
+    return ptr;
 }
 #define    RUP8(num)(((num)+8)&~8)
 
