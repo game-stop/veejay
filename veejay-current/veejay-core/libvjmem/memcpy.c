@@ -1670,43 +1670,32 @@ static void *memcpy_asimd(void *to, const void *from, size_t n) {
     return retval;
 }
 
-#define ASIMD_ALIGNMENT 16
 static void memcpy_asimd_256v2(uint8_t *dst, const uint8_t *src) {
-    uint8x16_t data0, data1, data2, data3;
-
+    uint8x16_t data;
     for (int i = 0; i < 16; ++i) {
-        data0 = vld1q_u8(src);
-        data1 = vld1q_u8(src + 16);
-        data2 = vld1q_u8(src + 32);
-        data3 = vld1q_u8(src + 48);
-
-        vst1q_u8(dst, data0);
-        vst1q_u8(dst + 16, data1);
-        vst1q_u8(dst + 32, data2);
-        vst1q_u8(dst + 48, data3);
-
-        src += 64;
-        dst += 64;
+        data = vld1q_u8(src);
+        vst1q_u8(dst, data);
+        src += 16;
+        dst += 16;
     }
 }
-
 static void *memcpy_asimdv2(void *to, const void *from, size_t n) {
     void *retval = to;
     uint8_t *src = (uint8_t *)from;
     uint8_t *dst = (uint8_t *)to;
 
     if (n >= 256) {
-        size_t blocks = n / 256;
-        size_t remainder = n % 256;
+        size_t i = n >> 8;
+        size_t r = n & 255;
 
-        for (size_t i = 0; i < blocks; i++) {
+        for (; i > 0; i--) {
             memcpy_asimd_256v2(dst, src);
             src += 256;
             dst += 256;
         }
 
-        if (remainder > 0) {
-            memcpy(dst, src, remainder);
+        if (r) {
+            memcpy(dst, src, r);
         }
     } else {
         memcpy(to, from, n);
