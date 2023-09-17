@@ -334,12 +334,13 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
    aarch64* )
     AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	if test "x$enable_debug" != "xyes" ; then
-	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -ftree-vectorize"
+	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -fopenmp"
 	    SUBSAMPLE_CFLAGS="O3 -fPIC -DPIC"
+		VJE_CFLAGS="-O3 -ftree-vectorize -fPIC -DPIC -g -ffast-math"
 	else
-	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -g"
+	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -g -fopenmp"
 	    SUBSAMPLE_CFLAGS="-O3 -fPIC -DPIC -g"
-
+	    VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -ffast-math -fPIC -DPIC -g"
 	fi
 	have_arm=true
 	AC_MSG_RESULT(aarch64)
