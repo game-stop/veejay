@@ -437,9 +437,9 @@ then
 	fi
 
 	if test "x$enable_debug" != "xyes" ; then
-		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector -ftree-vectorize"
 	else
-		USER_CFLAGS="$USER_CFLAGS -O3 -g -fno-stack-protector -Wall -fopenmp"
+		USER_CFLAGS="$USER_CFLAGS -O3 -g -fno-stack-protector -ftree-vectorize -Wall -fopenmp"
 	fi
 
 	OP_CFLAGS="$USER_CFLAGS"
