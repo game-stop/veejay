@@ -350,7 +350,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 		return NULL;
 	}
 
-	size_t size = RUP8(frame->width * frame->height * 4);
+	size_t size = RUP8(HEADER_LENGTH + (frame->width * frame->height * 4));
 
 	//@ create
 	v->shm_id = shmget( v->key,size, IPC_CREAT |0666 );
