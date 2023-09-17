@@ -1414,14 +1414,18 @@ static void veejay_handle_callbacks(veejay_t *info) {
 	/*  update network */
 	vj_event_update_remote( (void*)info );
 
-	veejay_pipe_write_status( info );
+	
+	int no_status_line = 1;
 
-	/* create status message and write to clients */
-//	int status_line_len = strlen( info->status_line );
 	int i;
 	for( i = 0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
 		if( !vj_server_link_can_write( info->vjs[VEEJAY_PORT_STA],  i ) ) 
-			continue;
+			continue;	
+	    if( no_status_line ) {
+			veejay_pipe_write_status(info);
+			no_status_line = 0;
+		}
+
 		int res = vj_server_send( info->vjs[VEEJAY_PORT_STA], i, (uint8_t*)info->status_line, info->status_line_len);
 		if( res < 0 ) {
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_CMD], i );
