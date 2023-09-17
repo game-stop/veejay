@@ -337,7 +337,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -ftree-vectorize"
 	    SUBSAMPLE_CFLAGS="O3 -fPIC -DPIC"
 	else
-	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -g -ftree-vectorize"
+	    CFLAGS="-O3 -ffast-math -fPIC -DPIC -g"
 	    SUBSAMPLE_CFLAGS="-O3 -fPIC -DPIC -g"
 
 	fi
@@ -437,9 +437,9 @@ then
 	fi
 
 	if test "x$enable_debug" != "xyes" ; then
-		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector -ftree-vectorize"
+		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
 	else
-		USER_CFLAGS="$USER_CFLAGS -O3 -g -fno-stack-protector -ftree-vectorize -Wall -fopenmp"
+		USER_CFLAGS="$USER_CFLAGS -O3 -g -fno-stack-protector -Wall -fopenmp"
 	fi
 
 	OP_CFLAGS="$USER_CFLAGS"
