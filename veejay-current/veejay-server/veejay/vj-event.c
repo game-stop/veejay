@@ -7238,7 +7238,7 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
     }
 
     char tmp[255];
-    char prefix[512];
+    char prefix[1024];
     if(args[0] <= 0) 
     {
         veejay_msg(VEEJAY_MSG_ERROR,"Number of frames to record must be > 0");
