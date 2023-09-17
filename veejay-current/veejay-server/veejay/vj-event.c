@@ -10655,7 +10655,7 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
         dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
     }
 
-    char header[16];
+    char header[32];
     snprintf( header,sizeof(header), "%06d%04d%2d%1d", dstlen, args[0],args[1], yuv_get_pixel_range() );
     SEND_DATA(v, header, 13 );
     SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen );
