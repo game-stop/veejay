@@ -1755,8 +1755,9 @@ static void fast_memset(void * to, int val, size_t len)
 }
 
 #ifdef HAVE_ARM_ASIMD
-void memset_asimd_v3(void *dst, uint8_t val, size_t len) {
-uint8_t *dst_bytes = (uint8_t *)dst;
+
+void memcpy_neon(void *dst, const void *src, size_t len) {
+    uint8_t *dst_bytes = (uint8_t *)dst;
     const uint8_t *src_bytes = (const uint8_t *)src;
     size_t num_blocks = len / 16;
 
@@ -1773,9 +1774,32 @@ uint8_t *dst_bytes = (uint8_t *)dst;
     size_t remaining_bytes = len % 16;
 
     for (size_t i = 0; i < remaining_bytes; i++) {
-        *dst_bytes++ = *src_bytes++; 
+        *dst_bytes++ = *src_bytes++;
     }
 }
+
+void memset_asimd_v3(void *dst, uint8_t val, size_t len) {
+    uint8_t buffer[16];
+	
+    for (size_t i = 0; i < 16; i++) {
+        buffer[i] = val;
+    }
+
+    size_t num_blocks = len / 16;
+    uint8_t *dst_bytes = (uint8_t *)dst;
+
+    for (size_t i = 0; i < num_blocks; i++) {
+        memcpy_neon(dst_bytes, buffer, 16);
+        dst_bytes += 16;
+    }
+
+    size_t remaining_bytes = len % 16;
+
+    for (size_t i = 0; i < remaining_bytes; i++) {
+        *dst_bytes++ = val;
+    }
+}
+
 
 void memset_asimd(void *dst, uint8_t val, size_t len) {
     uint8x16_t value = vdupq_n_u8(val);
