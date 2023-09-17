@@ -425,8 +425,8 @@ then
         ac_cv_flag_mmx=yes
         ac_cv_flag_sse=yes
         ac_cv_flag_sse4_2=yes
-	ac_cv_flag_sse4_1=yes
-	ac_cv_flag_sse2=yes
+		ac_cv_flag_sse4_1=yes
+		ac_cv_flag_sse2=yes
         ac_cv_flag_cmov=yes
 
         AC_DEFINE(HAVE_ASM_MMX,1,[Compiling in MMX support])
@@ -501,6 +501,7 @@ then
 		    AC_DEFINE(HAVE_ASM_SSE4_2,1,[Compiling in SSE4_2 support])
 		    AC_DEFINE(HAVE_SSE4_2,1,[Compiling in SSE4_2 support])
 		    have_asm_sse4_2=true
+			CFLAGS="$CFLAGS -msse4.2"
 	    fi
 
 
@@ -696,17 +697,14 @@ AC_CHECK_LIB( rt, clock_gettime, [
 	RT_LIBS="-lrt" ])
 AC_SUBST(RT_LIBS)
 
-dnl Check for the pthread lib
-dnl
-AC_SUBST(PTHREAD_LIBS)
-have_pthread=false
-AC_CHECK_LIB(pthread, pthread_create,
-  [ PTHREAD_LIBS="-lpthread" 
-    AC_DEFINE(HAVE_LIBPTHREAD,1,[Compiling with pthread library])
-    have_pthread=true ],,)
+AC_CHECK_LIB([pthread], [pthread_create], [PTHREAD_LIBS="-lpthread"], [], [])
+AC_SUBST([PTHREAD_LIBS])
 
-if test x$have_pthread != xtrue ; then
-	AC_MSG_ERROR([Cannot find pthread library])
+if test "x$PTHREAD_LIBS" != "x"; then
+  AC_DEFINE([HAVE_LIBPTHREAD], [1], [Define to 1 if you have the pthread library (-lpthread).])
+  have_pthread=true
+else
+  have_pthread=false
 fi
 
 have_dl_dlopen=false

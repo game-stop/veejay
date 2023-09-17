@@ -27,6 +27,13 @@
 #define HASH_IMPLEMENTATION
 #include "hash.h"
 
+#ifdef HAVE_ASM_SSE4_2
+#include <immintrin.h>
+#endif
+#ifdef HAVE_ARM
+#include <arm_neon>
+#endif
+
 #ifdef KAZLIB_RCSID
 static const char rcsid[] = "$Id: hash.c,v 1.36.2.11 2000/11/13 01:36:45 kaz Exp $";
 #endif
