@@ -66,6 +66,17 @@ If echo is silent, you must set the PKG_CONFIG_PATH to point to the directory co
 
 You can see all the configure flags with `./configure --help`
 
+
+## Optimization flags
+
+You can set -mcpu and -mtune to compile veejay with optimizations specific to your CPU
+
+For example, on RPI4:
+
+```
+export CFLAGS="-mcpu=cortex-a72 -mtune=cortex-a72" 
+```
+
 ## Building
 
 1. Get the last sources from Veejay's repository:
