@@ -23,7 +23,7 @@
 #include <netinet/tcp.h>
 
 #define VJ_PORT 3490
-#define VJ_MAX_CONNECTIONS 16
+#define VJ_MAX_CONNECTIONS 8
 
 #define VEEJAY_SERVER_LOG "/tmp/veejay.net.log"
 

@@ -2929,8 +2929,6 @@ veejay_t *veejay_malloc()
 	info->settings->ncpu = smp_check();
 
     omp_set_num_threads( info->settings->ncpu );
-    veejay_msg(VEEJAY_MSG_INFO, "Set number of open mp threads to %d",
-            info->settings->ncpu);
 
 	int status = 0;
 	int acj    = 0;
