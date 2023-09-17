@@ -148,6 +148,7 @@
 #endif
 #ifdef HAVE_ARM_ASIMD
 #include <arm_neon.h>
+#include <arm_sve.h>
 #endif
 #if defined (__SSE2__) || defined(__SSE4_2__) || defined(_SSE4_1__)
 #include <immintrin.h>
@@ -1754,31 +1755,27 @@ static void fast_memset(void * to, int val, size_t len)
 }
 
 #ifdef HAVE_ARM_ASIMD
-
 void memset_asimd_v3(void *dst, uint8_t val, size_t len) {
-    uint8x16_t value = vdupq_n_u8(val);  
-    uint8_t *dst_bytes = (uint8_t *)dst;
+uint8_t *dst_bytes = (uint8_t *)dst;
+    const uint8_t *src_bytes = (const uint8_t *)src;
+    size_t num_blocks = len / 16;
 
-    size_t num_blocks = len / 64;  
     for (size_t i = 0; i < num_blocks; i++) {
-         __asm__ volatile("prfm pldl1keep, [%0, %1]" : : "r" (dst_bytes), "i" (64));
-
-        vst1q_u8(dst_bytes, value);
-        vst1q_u8(dst_bytes + 16, value);
-        vst1q_u8(dst_bytes + 32, value);
-        vst1q_u8(dst_bytes + 48, value);
-
-        dst_bytes += 64;
+        __asm__ volatile(
+            "ld1 {v0.16b}, [%0], #16 \n"
+            "st1 {v0.16b}, [%1], #16 \n"
+            : "+r"(src_bytes), "+r"(dst_bytes)
+            :
+            : "v0"
+        );
     }
 
-    size_t remaining_bytes = len % 64;
+    size_t remaining_bytes = len % 16;
 
     for (size_t i = 0; i < remaining_bytes; i++) {
-        *dst_bytes++ = val;
+        *dst_bytes++ = *src_bytes++; 
     }
-
 }
-
 
 void memset_asimd(void *dst, uint8_t val, size_t len) {
     uint8x16_t value = vdupq_n_u8(val);
