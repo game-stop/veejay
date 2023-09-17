@@ -146,7 +146,7 @@ int avhelper_hwaccel(AVCodecContext *codec_context) {
 
 	for( i = 0;; i++ ) {
 
-		AVCodecHWConfig *hw_config = avcodec_get_hw_config(codec_context,i);
+		AVCodecHWConfig *hw_config = avcodec_get_hw_config(codec_context->codec,i);
 		if(!hw_config) {
 			veejay_msg(0, "Decoder %s does not support hwaccel", codec_context->codec->name);
 			return 0;
