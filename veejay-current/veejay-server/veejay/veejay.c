@@ -124,6 +124,15 @@ static void CompiledWith()
 #ifdef ARCH_X86
 	fprintf(stdout, "\tX86\n");
 #endif
+#ifdef HAVE_ARM_ASIMD
+    fprintf(stdout, "\tARM ASIMD\n");
+#endif
+#ifdef HAVE_ARM_NEON
+    fprintf(stdout, "\tARM NEON\n");
+#endif
+#ifdef HAVE_ARM
+    fprintf(stdout, "\tARM\n");
+#endif
 #ifdef HAVE_DARWIN
 	fprintf(stdout, "\tDarwin\n");
 #endif
