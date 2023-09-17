@@ -1669,6 +1669,41 @@ static void *memcpy_asimd(void *to, const void *from, size_t n) {
 
     return retval;
 }
+
+static void memcpy_asimd_256v2(uint8_t *dst, const uint8_t *src) {
+    uint8x16_t data;
+    for (int i = 0; i < 16; ++i) {
+        data = vld1q_u8(src);
+        vst1q_u8(dst, data);
+        src += 16;
+        dst += 16;
+    }
+}
+static void *memcpy_asimdv2(void *to, const void *from, size_t n) {
+    void *retval = to;
+    uint8_t *src = (uint8_t *)from;
+    uint8_t *dst = (uint8_t *)to;
+
+    if (n >= 256) {
+        size_t i = n >> 8;
+        size_t r = n & 255;
+
+        for (; i > 0; i--) {
+            memcpy_asimd_256v2(dst, src);
+            src += 256;
+            dst += 256;
+        }
+
+        if (r) {
+            memcpy(dst, src, r);
+        }
+    } else {
+        memcpy(to, from, n);
+    }
+
+    return retval;
+}
+
 #endif
 
 /* Fast memory set. See comments for fast_memcpy */
@@ -1692,6 +1727,32 @@ void memset_asimd(void *dst, uint8_t val, size_t len) {
 
     size_t remaining_bytes = len % 16;
 	for (size_t i = 0; i < remaining_bytes; i++) {
+        *dst_bytes++ = val;
+    }
+}
+void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
+    uint8x16_t value = vdupq_n_u8(val);
+    uint8_t *dst_bytes = (uint8_t *)dst;
+    size_t num_blocks = len / 16;
+
+    size_t alignment_offset = (size_t)dst_bytes & 0xF;
+    size_t start_offset = (alignment_offset > 0) ? (16 - alignment_offset) : 0;
+
+    for (size_t i = 0; i < start_offset; i++) {
+        *dst_bytes++ = val;
+    }
+
+    for (size_t i = 0; i < num_blocks; i += 4) {
+        vst1q_u8(dst_bytes, value);
+        vst1q_u8(dst_bytes + 16, value);
+        vst1q_u8(dst_bytes + 32, value);
+        vst1q_u8(dst_bytes + 48, value);
+
+        dst_bytes += 64;
+    }
+
+    size_t remaining_bytes = len % 16;
+    for (size_t i = 0; i < remaining_bytes; i++) {
         *dst_bytes++ = val;
     }
 }
@@ -1744,6 +1805,7 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
+	{ "Advanced SIMD ARMv8-A memcpy v2()", (void*) memcpy_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARMV7A
 	{ "new mempcy for cortex with line size of 32, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_32_preload_192,0,0 },
@@ -1778,6 +1840,8 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
+	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
+	
 #endif
 #ifdef HAVE_ARM7A
 	{ "memset align 0 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_0,0,0 },
