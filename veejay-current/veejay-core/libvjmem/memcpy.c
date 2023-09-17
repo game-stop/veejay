@@ -1805,7 +1805,7 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
-	{ "Advanced SIMD ARMv8-A memcpy v2()", (void*) memcpy_asimdv2, 0, AV_CPU_FLAG_ARMV8 },
+//	{ "Advanced SIMD ARMv8-A memcpy v2()", (void*) memcpy_asimdv2, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARMV7A
 	{ "new mempcy for cortex with line size of 32, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_32_preload_192,0,0 },
@@ -1840,7 +1840,7 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
-	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
+//	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
 	
 #endif
 #ifdef HAVE_ARM7A
@@ -2486,6 +2486,50 @@ static const char digit_pairs[201] = {
 // fast int to string function by user434507
 // modified to append a space at the end instead of null-terminator
 char *vj_sprintf(char* c, int n) {
+    int sign = (n < 0);
+    unsigned int val = (n ^ sign) - sign;
+
+    int size = 0;
+
+    if (val == 0) {
+        *c++ = '0';
+        *c++ = ' ';
+        return c;
+    }
+
+    while (val > 0) {
+        *c++ = '0' + (val % 10);
+        val /= 10;
+        size++;
+    }
+
+    if (sign) {
+        *c++ = '-';
+        size++;
+    }
+
+    int spaces = 12 - size;  
+	while (spaces-- > 0) {
+        *c++ = ' ';
+    }
+
+    char *start = c - size - (sign ? 1 : 0);
+    char *end = c - 1;
+
+    while (start < end) {
+        char temp = *start;
+        *start = *end;
+        *end = temp;
+        start++;
+        end--;
+    }
+
+    return c;
+}
+
+/*
+
+char *vj_sprintf(char* c, int n) {
     int sign = -(n<0);
     unsigned int val = (n^sign)-sign;
 
@@ -2556,3 +2600,4 @@ char *vj_sprintf(char* c, int n) {
     return c + size + 2;
 }
 
+*/
