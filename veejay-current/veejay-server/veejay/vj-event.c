@@ -8578,8 +8578,8 @@ void    vj_event_send_sample_stack      (   void *ptr,  const char format[],    
 void    vj_event_send_stream_args       (   void *ptr, const char format[],     va_list ap )
 {
 
-    char fline[100];
-    char line[1000];
+    char fline[1024];
+    char line[8192];
     int args[4];
     veejay_t *v = (veejay_t*)ptr;
     P_A(args,sizeof(args),NULL,0,format,ap);
