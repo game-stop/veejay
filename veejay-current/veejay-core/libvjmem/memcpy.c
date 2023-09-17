@@ -1805,7 +1805,7 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
-	{ "Advanced SIMD ARMv8-A memcpy v2()", (void*) memcpy_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
+	{ "Advanced SIMD ARMv8-A memcpy v2()", (void*) memcpy_asimdv2, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARMV7A
 	{ "new mempcy for cortex with line size of 32, preload offset of 192 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memcpy_new_line_size_32_preload_192,0,0 },
