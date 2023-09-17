@@ -140,7 +140,7 @@ void vj_mem_init(void)
 #endif
 
 	if(MEM_ALIGNMENT_SIZE == 0)
-		MEM_ALIGNMENT_SIZE = sysconf(_SC_PAGE_SIZE);
+		MEM_ALIGNMENT_SIZE = getpagesize();
 	
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
