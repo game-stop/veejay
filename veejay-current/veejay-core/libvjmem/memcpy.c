@@ -1637,6 +1637,44 @@ static void *memcpy_neon( void *to, const void *from, size_t n )
 }
 #endif
 #ifdef HAVE_ARM_ASIMD
+static void memcpy_asimd_256_v3(uint8_t *dst, const uint8_t *src) {
+    uint8x16_t data;
+
+    data = vld1q_u8(src);
+
+    for (int i = 0; i < 16; ++i) {
+        vst1q_u8(dst, data);
+        src += 16;
+        dst += 16;
+    }
+}
+
+static void *memcpy_asimd_v3(void *to, const void *from, size_t n) {
+    void *retval = to;
+    const uint8_t *src = (const uint8_t *)from;
+    uint8_t *dst = (uint8_t *)to;
+
+    if (n >= 256) {
+        size_t i = n >> 8;
+        size_t r = n & 255;
+
+        uint8x16_t data = vld1q_u8(src);
+
+        for (; i > 0; i--) {
+            memcpy_asimd_256_v3(dst, src);
+            src += 256;
+            dst += 256;
+        }
+
+        if (r) {
+            memcpy(dst, src, r);
+        }
+    } else {
+        memcpy(to, from, n);
+    }
+
+    return retval;
+}
 static void memcpy_asimd_256(uint8_t *dst, const uint8_t *src) {
     uint8x16_t data;
     for (int i = 0; i < 16; ++i) {
