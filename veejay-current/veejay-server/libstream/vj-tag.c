@@ -3084,11 +3084,13 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
 
     long nframe = tag->encoder_frames_recorded; 
 
-   buf_len =    vj_avcodec_encode_frame( tag->encoder, nframe, tag->encoder_format, buffer, vj_avcodec_get_buf(tag->encoder), tag->encoder_max_size, pixel_format);
-   if(buf_len <= 0 ) {
-    veejay_msg(VEEJAY_MSG_ERROR, "Unable to encode frame" ); 
-    return -1;
-   }
+    uint8_t *dst = vj_avcodec_get_buf(tag->encoder);
+
+    buf_len =    vj_avcodec_encode_frame( tag->encoder, nframe, tag->encoder_format, buffer,dst, tag->encoder_max_size, pixel_format);
+    if(buf_len <= 0 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to encode frame" ); 
+        return -1;
+    }
 
     if(tag->encoder_file ) {
         if(lav_write_frame(tag->encoder_file, vj_avcodec_get_buf(tag->encoder), buf_len,1))
