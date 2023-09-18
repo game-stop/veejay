@@ -1908,6 +1908,40 @@ void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
     dst8[i] = val;
   }
 }
+
+void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
+    uint8x16_t value_v = vdupq_n_u8(value);
+
+    size_t num_blocks = size / 64;
+    size_t remaining_bytes = size % 64;
+
+    for (size_t i = 0; i < num_blocks; i++) {
+        vst1q_u8(dst, value_v);
+		dst += 16; 
+		vst1q_u8(dst, value_v);
+        dst += 16;
+        vst1q_u8(dst, value_v);
+        dst += 16;
+        vst1q_u8(dst, value_v);
+        dst += 16;
+        vst1q_u8(dst, value_v);
+        dst += 16;
+        vst1q_u8(dst, value_v);
+        dst += 16;
+        vst1q_u8(dst, value_v);
+        dst += 16;
+        vst1q_u8(dst, value_v);
+        dst += 16;
+    }
+
+    while (remaining_bytes > 0) {
+        *dst = value;
+        dst++;
+        remaining_bytes--;
+    }
+}
+
+
 #endif
 
 static struct {
@@ -1998,6 +2032,8 @@ static struct {
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
 	{ "Advanced SIMD memset() v4", (void*) memset_asimd_v4, 0, AV_CPU_FLAG_ARMV8 },	
+	{ "Advanced SIMD memset() with line size of 64", (void*) memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },	
+	
 //	{ "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },	
 //	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
 	
