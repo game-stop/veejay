@@ -38,6 +38,7 @@ vj_effect *dummy_init(int w, int h)
     ve->description = "Dummy Frame";
     ve->sub_format = 0;
     ve->extra_frame = 0;
+    	ve->parallel = 1;
 	ve->has_user= 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Color");
 	return ve;
@@ -76,4 +77,36 @@ void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
  	veejay_memset( Y, colorY, len);
    	veejay_memset( Cb,colorCb,uv_len);
    	veejay_memset( Cr,colorCr,uv_len);
+}
+
+static void	dummy_apply_job( void *arg )
+{
+	vj_task_arg_t *t = (vj_task_arg_t*) arg;
+	int colorCb=128, colorCr=128, colorY=0;
+
+	uint8_t *Y = t->input[0];
+	uint8_t *Cb = t->input[1];
+	uint8_t *Cr = t->input[2];
+
+	_rgb2yuv(t->iparams[0],t->iparams[1],t->iparams[2],colorY,colorCb,colorCr);
+  
+ 	veejay_memset( Y, colorY, t->strides[0]);
+   	veejay_memset( Cb,colorCb,t->strides[1]);
+   	veejay_memset( Cr,colorCr,t->strides[2]);
+
+}
+
+
+void dummy_applyN( VJFrame *frame, int r, int g, int b)
+{
+	if( vj_task_available() ) {
+		vj_task_set_from_frame( frame );
+		vj_task_set_param( r,0 );
+        vj_task_set_param( g,1 );
+        vj_task_set_param( b,2 );
+        
+		vj_task_run( frame->data, NULL, NULL, NULL, 3, (performer_job_routine) &dummy_apply_job );
+	} else {
+		dummy_rgb_apply( frame,r,g,b );
+	}
 }
