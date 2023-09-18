@@ -1910,28 +1910,33 @@ void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
 }
 
 void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
-    uint8x16_t value_v = vdupq_n_u8(value);
+ 	uint8x16_t value_v = vdupq_n_u8(value);
 
     size_t num_blocks = size / 64;
     size_t remaining_bytes = size % 64;
 
     for (size_t i = 0; i < num_blocks; i++) {
-        vst1q_u8(dst, value_v);
+        vst1q_u8(dst, value_v); 
+		dst += 16;
+		vst1q_u8(dst, value_v);
 		dst += 16; 
 		vst1q_u8(dst, value_v);
-        dst += 16;
+		dst += 16;
+		vst1q_u8(dst, value_v);
+		dst += 16;
+	}
+
+	while (remaining_bytes >= 16) {
         vst1q_u8(dst, value_v);
         dst += 16;
-        vst1q_u8(dst, value_v);
-        dst += 16;
-        vst1q_u8(dst, value_v);
-        dst += 16;
-        vst1q_u8(dst, value_v);
-        dst += 16;
-        vst1q_u8(dst, value_v);
-        dst += 16;
-        vst1q_u8(dst, value_v);
-        dst += 16;
+        remaining_bytes -= 16;
+    }
+
+    while (remaining_bytes >= 8) {
+        uint64x1_t value_u64 = vdup_n_u64(*((uint64_t*)&value));
+        vst1_u8(dst, vreinterpret_u8_u64(value_u64));
+        dst += 8;
+        remaining_bytes -= 8;
     }
 
     while (remaining_bytes > 0) {
@@ -1940,8 +1945,6 @@ void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
         remaining_bytes--;
     }
 }
-
-
 #endif
 
 static struct {
