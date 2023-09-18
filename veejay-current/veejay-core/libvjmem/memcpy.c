@@ -581,6 +581,32 @@ void	packed_plane_clear( size_t len, void *to )
 	}
 }
 
+
+void *memset_64(void *ptr, int value, size_t num) {
+    uint8_t *dest = (uint8_t *)ptr;
+    uint8_t byte_value = (uint8_t)value;
+    size_t num_bytes = num;
+
+    size_t num_words = num_bytes / sizeof(size_t);
+    size_t remainder = num_bytes % sizeof(size_t);
+    size_t pattern = 0;
+
+    for (size_t i = 0; i < sizeof(size_t); i++) {
+        pattern = (pattern << 8) | byte_value;
+    }
+
+    for (size_t i = 0; i < num_words; i++) {
+        *((size_t *)(dest + i * sizeof(size_t))) = pattern;
+    }
+
+    for (size_t i = 0; i < remainder; i++) {
+        dest[num_words * sizeof(size_t) + i] = byte_value;
+    }
+
+    return ptr;
+}
+
+
 #if defined (__SSE4_1__)
 static void *sse41_memcpy(void *to, const void *from, size_t len) {
   void *retval = to;
@@ -1505,31 +1531,6 @@ void fast_memset_dirty(void * to, int val, size_t len)
 	memset(to,val,len);
 #endif
 }
-
-void *memset_64(void *ptr, int value, size_t num) {
-    uint8_t *dest = (uint8_t *)ptr;
-    uint8_t byte_value = (uint8_t)value;
-    size_t num_bytes = num;
-
-    size_t num_words = num_bytes / sizeof(size_t);
-    size_t remainder = num_bytes % sizeof(size_t);
-    size_t pattern = 0;
-
-    for (size_t i = 0; i < sizeof(size_t); i++) {
-        pattern = (pattern << 8) | byte_value;
-    }
-
-    for (size_t i = 0; i < num_words; i++) {
-        *((size_t *)(dest + i * sizeof(size_t))) = pattern;
-    }
-
-    for (size_t i = 0; i < remainder; i++) {
-        dest[num_words * sizeof(size_t) + i] = byte_value;
-    }
-
-    return ptr;
-}
-
 
 #ifdef HAVE_ASM_SSE4_2
 void *sse42_memset(void *ptr, uint8_t value, size_t num) {
@@ -2811,19 +2812,6 @@ char	*vj_strndup( const char *s, size_t n )
 	return ptr ? memcpy( ptr,s,n ) : NULL;
 }
 
-
-static const char digit_pairs[201] = {
-  "00010203040506070809"
-  "10111213141516171819"
-  "20212223242526272829"
-  "30313233343536373839"
-  "40414243444546474849"
-  "50515253545556575859"
-  "60616263646566676869"
-  "70717273747576777879"
-  "80818283848586878889"
-  "90919293949596979899"
-};
 // https://stackoverflow.com/questions/4351371/c-performance-challenge-integer-to-stdstring-conversion
 // fast int to string function by user434507
 // modified to append a space at the end instead of null-terminator
