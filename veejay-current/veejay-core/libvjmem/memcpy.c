@@ -1568,9 +1568,6 @@ static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
 
 #endif
 #ifdef HAVE_ARM_ASIMD
-#include <stdint.h>
-#include <stddef.h>
-
 static inline void memcpy_neon_256(uint8_t *dst, const uint8_t *src)
 {
     __asm__ volatile(
@@ -1582,26 +1579,15 @@ static inline void memcpy_neon_256(uint8_t *dst, const uint8_t *src)
         "prfm pldl1keep, [%[src], #384]\n"
         "prfm pldl1keep, [%[src], #448]\n"
 
+        "1:\n"
         "ld1 {v0.16b}, [%[src]], #16\n"
-        "ld1 {v1.16b}, [%[src]], #16\n"
-        "ld1 {v2.16b}, [%[src]], #16\n"
-        "ld1 {v3.16b}, [%[src]], #16\n"
-        "ld1 {v4.16b}, [%[src]], #16\n"
-        "ld1 {v5.16b}, [%[src]], #16\n"
-        "ld1 {v6.16b}, [%[src]], #16\n"
-        "ld1 {v7.16b}, [%[src]], #16\n"
-
         "st1 {v0.16b}, [%[dst]], #16\n"
-        "st1 {v1.16b}, [%[dst]], #16\n"
-        "st1 {v2.16b}, [%[dst]], #16\n"
-        "st1 {v3.16b}, [%[dst]], #16\n"
-        "st1 {v4.16b}, [%[dst]], #16\n"
-        "st1 {v5.16b}, [%[dst]], #16\n"
-        "st1 {v6.16b}, [%[dst]], #16\n"
-        "st1 {v7.16b}, [%[dst]], #16\n"
-        : [src] "+r"(src), [dst] "+r"(dst)
+
+        "subs %w[n], %w[n], #1\n"
+        "bne 1b\n"
+        : [src] "+r"(src), [dst] "+r"(dst), [n] "+r"(256)
         :
-        : "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7"
+        : "memory", "v0"
     );
 }
 
@@ -1611,31 +1597,18 @@ static void *memcpy_neon(void *to, const void *from, size_t n)
 
     if (n < 16)
     {
-        // Fallback to regular memcpy for small sizes
         memcpy(to, from, n);
         return retval;
     }
 
-    size_t i = n >> 8;
-    size_t r = n & 255;
-
     uint8_t *src = (uint8_t *)from;
     uint8_t *dst = (uint8_t *)to;
 
-    for (; i > 0; i--)
-    {
-        memcpy_neon_256(dst, src);
-        src += 256;
-        dst += 256;
-    }
-
-    if (r)
-    {
-        memcpy(dst, src, r);
-    }
+    memcpy_neon_256(dst, src);
 
     return retval;
 }
+
 #endif
    
 
