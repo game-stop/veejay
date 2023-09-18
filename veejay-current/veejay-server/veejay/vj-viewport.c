@@ -1191,7 +1191,7 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 	float ttx,tty;
 	int32_t x,y;
 	int32_t itx,ity;
-
+/*
 #if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
 
 	fast_memset_dirty( outY , 0, ty1 * v->w );
@@ -1210,6 +1210,10 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 		}
 	}
 #endif
+*/
+	veejay_memset( outY, 0, ty1 * v->w );
+	veejay_memset( outU, 128, ty1 * v->w );
+	veejay_memset( outV, 128, ty1 * v->w );
 	
 	for( y = ty1; y < ty2; y ++ )
 	{
@@ -1265,7 +1269,7 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 		}
 
 	}
-
+/*
 #if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
 	int rest = h - ty2;
 	fast_memset_dirty( outY + (ty2 * v->w),0, rest * v->w );
@@ -1283,6 +1287,11 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 		}			
 	}
 #endif	
+*/
+	const int rest = h - ty2;
+	veejay_memset( outY + (ty2 * v->w),0, rest * v->w );
+	veejay_memset( outU + (ty2 * v->w), 128, rest * v->w );
+	veejay_memset( outV + (ty2 * v->w), 128, rest * v->w );
 }
 
 void		viewport_process_dynamic_alpha( void *data, uint8_t *in[4], uint8_t *out[4] )
@@ -1323,7 +1332,7 @@ void		viewport_process_dynamic_alpha( void *data, uint8_t *in[4], uint8_t *out[4
 	float ttx,tty;
 	int32_t x,y;
 	int32_t itx,ity;
-
+/*
 #if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
 
 	fast_memset_dirty( outY , 0, ty1 * v->w );
@@ -1344,6 +1353,11 @@ void		viewport_process_dynamic_alpha( void *data, uint8_t *in[4], uint8_t *out[4
 		}
 	}
 #endif
+*/
+	veejay_memset( outY , 0, ty1 * v->w );
+	veejay_memset( outU , 128, ty1 * v->w );
+	veejay_memset( outV , 128, ty1 * v->w );
+	veejay_memset( outA,0, ty1*v->w);
 	
 	for( y = ty1; y < ty2; y ++ )
 	{
@@ -1403,7 +1417,7 @@ void		viewport_process_dynamic_alpha( void *data, uint8_t *in[4], uint8_t *out[4
 		}
 
 	}
-
+/*
 #if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
 	int rest = h - ty2;
 	fast_memset_dirty( outY + (ty2 * v->w),0, rest * v->w );
@@ -1423,6 +1437,12 @@ void		viewport_process_dynamic_alpha( void *data, uint8_t *in[4], uint8_t *out[4
 		}			
 	}
 #endif	
+*/
+	const int rest = h - ty2;
+	veejay_memset( outY + (ty2 * v->w),0, rest * v->w );
+	veejay_memset( outU + (ty2 * v->w), 128, rest * v->w );
+	veejay_memset( outV + (ty2 * v->w), 128, rest * v->w );
+	veejay_memset( outA + (ty2 * v->w), 0, rest * v->w );
 }
 
 void			viewport_destroy( void *data )

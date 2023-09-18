@@ -111,7 +111,12 @@ static void CompiledWith()
 	    BUILD_MACHINE,
 	    BUILD_DATE );
 
-	fprintf(stdout,"Compilation flags:\n");
+	fprintf(stdout,
+		"Detected cpu cache line size: %d\n", cpu_cache_size());
+	fprintf(stdout,
+		"Memory alignment size: %d\n" , mem_align_size());
+
+	fprintf(stdout,"\nArchitecture:\n");
 #ifdef ARCH_MIPS
 	fprintf(stdout, "\tMIPS\n");
 #endif
@@ -133,13 +138,16 @@ static void CompiledWith()
 #ifdef HAVE_ARM
     fprintf(stdout, "\tARM\n");
 #endif
+#ifdef HAVE_ARMV7A
+	fprintf(stdout, "\tARMv7A\n");
+#endif
 #ifdef HAVE_DARWIN
 	fprintf(stdout, "\tDarwin\n");
 #endif
 #ifdef HAVE_PS2
 	fprintf(stdout, "\tSony Playstation 2 (TM)\n");
 #endif
-	fprintf(stdout, "Compiled in support for:\n");
+	fprintf(stdout, "\n\nCompiled in support for:\n");
 #ifdef HAVE_ALTIVEC
 	fprintf(stdout,"\tAltivec\n");
 #endif
@@ -152,8 +160,17 @@ static void CompiledWith()
 #ifdef HAVE_ASM_SSE2
 	fprintf(stdout,"\tSSE2\n");
 #endif
+#ifdef HAVE_ASM_SSE4_1
+	fprintf(stdout,"\tSSE4.1\n");
+#endif
+#ifdef HAVE_ASM_SSE4_2
+	fprintf(stdout,"\tSSE4.2\n");
+#endif
 #ifdef HAVE_ASM_MMX
 	fprintf(stdout,"\tMMX\n");
+#endif
+#ifdef HAVE_ASM_MMXEXT
+	fprintf(stdout,"\tMMXEXT\n");
 #endif
 #ifdef HAVE_ASM_MMX2	
 	fprintf(stdout,"\tMMX2\n");
@@ -167,16 +184,13 @@ static void CompiledWith()
 	
 	memcpy_report();
 
-	fprintf(stdout,"Dependencies:\n");
+	fprintf(stdout,"\n\nDependencies:\n");
 
 #ifdef USE_GDK_PIXBUF
 	fprintf(stdout,"\tSupport for GDK image loading\n");
 #endif
 #ifdef HAVE_JACK
 	fprintf(stdout,"\tSupport for Jack Audio Connection Kit\n");
-#endif
-#ifdef SUPPORT_READ_DV2
-	fprintf(stdout,"\tSupport for Digital Video\n");
 #endif
 #ifdef SUPPORT_READ_DV2
 	fprintf(stdout,"\tSupport for Digital Video\n");

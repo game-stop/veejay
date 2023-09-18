@@ -1484,13 +1484,15 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 				idx ++;
 				if( idx >= N ) {
 					N *= 2;
-					char **nlist = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
+					vevo_storage_t **nlist = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
 					if(nlist == NULL) {
 					    if( list ) free(list);
 					    return NULL;
 					}
-					if(list) free(list);
-					list = nlist;
+					if( list != nlist ) {
+						if(list) free(list);
+						list = nlist;
+					}
 				}
 			}
 		}
@@ -1516,7 +1518,15 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 				idx ++;
 				if( idx >= N ) {
 					N *= 2;
-					list = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
+					vevo_storage_t **nlist = (vevo_storage_t**) realloc( list, sizeof(vevo_storage_t*) * N  );
+					if(nlist == NULL) {
+					    if( list ) free(list);
+					    return NULL;
+					}
+					if( list != nlist ) {
+						if(list) free(list);
+						list = nlist;
+					}
 				}
 			}
 		}
@@ -1739,15 +1749,13 @@ static	char	*vevo_format_inline_property( vevo_port_t *port, int n_elem, int typ
 		
 	if( token[0])
 	{
-		int len = n_elem * strlen(token) + 1;
+		size_t st_len = strlen(token);
+		int len = n_elem * st_len + 1;
 		res = (char*) calloc(1, sizeof(char) * len );
-		/*for( i =0; i < n_elem; i ++ ) {
-			while( *res ) *res ++;
-			while( *res++ = *token++ );
-			res--;
-		} FIXME: test me
-		*/
-		strncat( res,token,strlen(token) );
+		if(res == NULL) {
+			return NULL;
+		}
+		strncat( res,token,st_len);
 	}
 	return res;
 }
@@ -2284,7 +2292,8 @@ char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
 							
 						    for( k = 0; pstr[k] != NULL; k ++ )
 						    {
-							    strncat(tmp, pstr[k], strlen(pstr[k]));
+								size_t pklen = strlen( pstr[k] );
+							    strncat(tmp, pstr[k], pklen);
 							    free(pstr[k]);
 						    }
 							free(pstr);

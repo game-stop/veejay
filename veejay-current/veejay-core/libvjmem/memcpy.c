@@ -167,6 +167,8 @@
 #define CONFUSION_FACTOR 0
 //Feel free to fine-tune the above 2, it might be possible to get some speedup with them :)
 
+#define FIND_BEST_MAX_ITERATIONS 100
+
 static int selected_best_memcpy = 1;
 static int selected_best_memset = 1;
 
@@ -1504,60 +1506,167 @@ void fast_memset_dirty(void * to, int val, size_t len)
 #endif
 }
 
-#ifdef HAVE_ASM_SSE4_1
-void *sse41_memset(void *to, uint8_t value, size_t len) {
-  void *retval = to;
+void *memset_64(void *ptr, int value, size_t num) {
+    uint8_t *dest = (uint8_t *)ptr;
+    uint8_t byte_value = (uint8_t)value;
+    size_t num_bytes = num;
 
-  // Check alignment and use aligned stores if possible
-  uintptr_t delta = ((uintptr_t)to) & (SSE_MMREG_SIZE - 1);
-  if (delta) {
-    delta = SSE_MMREG_SIZE - delta;
-    len -= delta;
-    memset(to, value, delta);
-    to = (void *)((char *)to + delta);
+    size_t num_words = num_bytes / sizeof(size_t);
+    size_t remainder = num_bytes % sizeof(size_t);
+    size_t pattern = 0;
 
-	if( len <= 0 ) {
-		fprintf(stderr, "Alignment issue");
-		return NULL;
+    for (size_t i = 0; i < sizeof(size_t); i++) {
+        pattern = (pattern << 8) | byte_value;
+    }
+
+    for (size_t i = 0; i < num_words; i++) {
+        *((size_t *)(dest + i * sizeof(size_t))) = pattern;
+    }
+
+    for (size_t i = 0; i < remainder; i++) {
+        dest[num_words * sizeof(size_t) + i] = byte_value;
+    }
+
+    return ptr;
+}
+
+
+#ifdef HAVE_ASM_SSE4_2
+void *sse42_memset(void *ptr, uint8_t value, size_t num) {
+    uint8_t *dest = (uint8_t *)ptr;
+    uint8_t byte_value = (uint8_t)value;
+
+    if (num < 128) {
+        return memset(dest, byte_value, num);
+    }
+
+    size_t alignment_offset = (size_t)dest % 16;
+    size_t offset = 16 - alignment_offset;
+
+    if (alignment_offset > 0) {
+        memset(dest, byte_value, offset);
+        dest += offset;
+        num -= offset;
+    }
+
+    __m128i xmm_value = _mm_set1_epi8(byte_value);
+    size_t num_xmm_sets = num / 16;
+
+    for (size_t i = 0; i < num_xmm_sets; i++) {
+        _mm_storeu_si128((__m128i *)dest, xmm_value);
+        dest += 16;
+    }
+
+    size_t remaining_bytes = num % 16;
+    if (remaining_bytes > 0) {
+        memset(dest, byte_value, remaining_bytes);
+    }
+
+    return ptr;
+}
+void *sse42_aligned_memset(void *to, uint8_t value, size_t len) {
+
+    if (len < 128) {
+        return memset(to, value, len);
+    }
+
+	if(! ( ((uintptr_t) to % 16 == 0) && (len % 16 == 0))) {
+		return sse42_memset(to,value,len);
 	}
+
+	void *retval = to;
+
+	__m128i xmm_value = _mm_set1_epi8(value);
+
+	while (len >= 16) {
+		_mm_store_si128((__m128i *)to, xmm_value);
+		to = (void *)((char *)to + 16);
+		len -= 16;
+	}
+
+	if (len > 0) {
+		memset(to, value, len);
+	}
+
+	return retval;
+}
+#endif
+#ifdef HAVE_ASM_SSE4_1
+void *sse41_memset_v2(void *to, uint8_t value, size_t len) {
+  void *retval = to;
+  size_t remainder = (uintptr_t)to % 16;
+
+  if (remainder) {
+    size_t offset = 16 - remainder;
+    if (offset > len) offset = len;
+    small_memset(to, value, offset);
+    to = (void *)((char *)to + offset);
+    len -= offset;
   }
 
-  // Use larger prefetch distances for better performance
-  _mm_prefetch((void *)((char *)to + 128), _MM_HINT_NTA);
-  _mm_prefetch((void *)((char *)to + 256), _MM_HINT_NTA);
+  __m128i xmm_value = _mm_set1_epi8(value);
 
-  __m128i xmm0 = _mm_set1_epi8(value);
-
-  // Unroll the loop and use aligned stores when possible
-  while (len >= 128) {
-	if (((uintptr_t)to) & (SSE_MMREG_SIZE - 1)) {
-      fprintf(stderr, "Warning: Alignment issue detected in loop operation.\n");
-      break; // Print a warning but continue with the loop
+  while (len >= 16) {
+    if ((uintptr_t)to % 16 == 0) {
+      _mm_store_si128((__m128i *)to, xmm_value);
+    } else {
+      memcpy(to, &xmm_value, 16);
     }
-    _mm_store_si128((__m128i *)to, xmm0);
-    _mm_store_si128((__m128i *)((char *)to + 16), xmm0);
-    _mm_store_si128((__m128i *)((char *)to + 32), xmm0);
-    _mm_store_si128((__m128i *)((char *)to + 48), xmm0);
-    _mm_store_si128((__m128i *)((char *)to + 64), xmm0);
-    _mm_store_si128((__m128i *)((char *)to + 80), xmm0);
-    _mm_store_si128((__m128i *)((char *)to + 96), xmm0);
-    _mm_store_si128((__m128i *)((char *)to + 112), xmm0);
-    
-    to = (void *)((char *)to + 128);
-    len -= 128;
+    to = (void *)((char *)to + 16);
+    len -= 16;
   }
 
-  // Copy the remaining bytes
-  if (len >= 16) {
-    memset(to, value, len);
-  } else {
-    // Avoid loop unrolling for small copies
-    for (size_t i = 0; i < len; i++) {
-      *((uint8_t *)to + i) = value;
-    }
+  if (len > 0) {
+    small_memset(to, value, len);
   }
 
   return retval;
+}
+
+void *sse41_memset(void *to, uint8_t value, size_t len) {
+
+	if (len < 128) {
+        return memset(to, value, len);
+    }
+
+	void *retval = to;
+
+	uintptr_t delta = ((uintptr_t)to) & (SSE_MMREG_SIZE - 1);
+	if (delta) {
+		delta = SSE_MMREG_SIZE - delta;
+		len -= delta;
+		memset(to, value, delta);
+		to = (void *)((char *)to + delta);
+	}
+
+	_mm_prefetch((void *)((char *)to + 128), _MM_HINT_NTA);
+	_mm_prefetch((void *)((char *)to + 256), _MM_HINT_NTA);
+
+	__m128i xmm0 = _mm_set1_epi8(value);
+
+	while (len >= 128) {
+		_mm_store_si128((__m128i *)to, xmm0);
+		_mm_store_si128((__m128i *)((char *)to + 16), xmm0);
+		_mm_store_si128((__m128i *)((char *)to + 32), xmm0);
+		_mm_store_si128((__m128i *)((char *)to + 48), xmm0);
+		_mm_store_si128((__m128i *)((char *)to + 64), xmm0);
+		_mm_store_si128((__m128i *)((char *)to + 80), xmm0);
+		_mm_store_si128((__m128i *)((char *)to + 96), xmm0);
+		_mm_store_si128((__m128i *)((char *)to + 112), xmm0);
+		
+		to = (void *)((char *)to + 128);
+		len -= 128;
+	}
+
+	if (len >= 16) {
+		memset(to, value, len);
+	} else {
+		for (size_t i = 0; i < len; i++) {
+			*((uint8_t *)to + i) = value;
+		}
+	}
+
+	return retval;
 }
 #endif
 
@@ -2081,8 +2190,15 @@ static struct {
 	{ "memset align 32 (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_new_align_32,0,0 },
 #endif
 #ifdef HAVE_ASM_SSE4_1
-  //  { "SSE4_1 memset()", (void*) sse41_memset,0, AV_CPU_FLAG_SSE4},
+    { "SSE4_1 memset()", (void*) sse41_memset,0, AV_CPU_FLAG_SSE4},
+	{ "SSE4_1 memset() v2", (void*) sse41_memset_v2,0, AV_CPU_FLAG_SSE4},
 #endif
+#ifdef HAVE_ASM_SSE4_2
+	{ "SSE4_2 unaligned memset()", (void*) sse42_memset,0, AV_CPU_FLAG_SSE42},
+	{ "SSE4_2 aligned memset()", (void*) sse42_aligned_memset, 0, AV_CPU_FLAG_SSE42 },
+#endif
+    { "64-bit word memset()", (void*) memset_64, 0, 0},
+
 	{ NULL, NULL, 0, 0},
 };
 
@@ -2090,7 +2206,7 @@ static struct {
 void	memcpy_report()
 {
 	int i;
-	fprintf(stdout,"SIMD benchmark results:\n");
+	fprintf(stdout,"\n\nSIMD benchmark results:\n");
 	for( i = 1; memset_method[i].name; i ++ ) {
 		fprintf(stdout,"\t%g : %s\n",memset_method[i].t,  memset_method[i].name );
 	}
@@ -2098,21 +2214,15 @@ void	memcpy_report()
 		fprintf(stdout,"\t%g : %s\n",memcpy_method[i].t,  memcpy_method[i].name );
 	}
 
+	fprintf(stdout, "\n");
+	fprintf(stdout, "best memcpy(): %s\n", memcpy_method[ selected_best_memcpy ].name );
+	fprintf(stdout, "best memset(): %s\n" ,memset_method[ selected_best_memset ].name );
+
 }
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
 
 void *(* veejay_memset)(void *what, uint8_t val, size_t len ) = 0;
-
-char *get_memcpy_descr()
-{
-	return strdup( memcpy_method[selected_best_memcpy].name );
-}
-
-char *get_memset_descr()
-{
-	return strdup( memset_method[selected_best_memset].name );
-}
 
 static int set_user_selected_memcpy()
 {
@@ -2164,7 +2274,7 @@ void find_best_memcpy()
      double t;
      char *buf1, *buf2;
      int i, k;
-     int bufsize = 720 * 576 * 4;
+     int bufsize = 10 * 1048576;
 
      if (!(buf1 = (char*) malloc( bufsize * sizeof(char))))
           return;
@@ -2176,7 +2286,7 @@ void find_best_memcpy()
 
      int cpu_flags = av_get_cpu_flags();
 	
-	veejay_msg(VEEJAY_MSG_DEBUG, "Finding best memcpy ..." );	
+	veejay_msg(VEEJAY_MSG_INFO, "Finding best memcpy ... (copy %ld blocks of %2.2f Mb)",FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );	
 
      memset(buf1,0, bufsize);
      memset(buf2,0, bufsize);
@@ -2193,7 +2303,7 @@ void find_best_memcpy()
 		}
 
 		t = get_time();
-		for( k = 0; k < 1024; k ++ ) {
+		for( k = 0; k < FIND_BEST_MAX_ITERATIONS; k ++ ) {
 			memcpy_method[i].function( buf1,buf2, bufsize );
 		}
 		t = get_time() - t;
@@ -2236,7 +2346,7 @@ void find_best_memset()
 	double t;
 	char *buf1, *buf2;
 	int i, k;
-	int bufsize = 720 * 576 * 4;
+	int bufsize = 10 * 1048576;
 	int cpu_flags = av_get_cpu_flags();
 	
 	if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
@@ -2247,7 +2357,7 @@ void find_best_memset()
 		return;
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Finding best memset..." );
+	veejay_msg(VEEJAY_MSG_INFO, "Finding best memset... (clear %d blocks of %2.2f Mb)", FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );
 
 	memset( buf1, 0, bufsize * sizeof(char));
 	memset( buf2, 0, bufsize * sizeof(char));
@@ -2260,7 +2370,7 @@ void find_best_memset()
 	}
 
 	t = get_time();
-	for( k = 0; k < 1024; k ++ ) {
+	for( k = 0; k < FIND_BEST_MAX_ITERATIONS; k ++ ) {
 		memset_method[i].function( buf1 , 0 , bufsize );
 	}
 	t = get_time() - t;
