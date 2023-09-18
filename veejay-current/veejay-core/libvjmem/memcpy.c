@@ -1567,53 +1567,6 @@ static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
 }
 
 #endif
-#ifdef HAVE_ARM_ASIMD
-static inline void memcpy_neon_256(uint8_t *dst, const uint8_t *src)
-{
-    asm volatile(
-        "prfm pldl1keep, [%[src], #64]\n"
-        "prfm pldl1keep, [%[src], #128]\n"
-        "prfm pldl1keep, [%[src], #192]\n"
-        "prfm pldl1keep, [%[src], #256]\n"
-        "prfm pldl1keep, [%[src], #320]\n"
-        "prfm pldl1keep, [%[src], #384]\n"
-        "prfm pldl1keep, [%[src], #448]\n"
-
-        "1:\n"
-        "ld1 {v0.16b}, [%[src]], #16\n"
-        "st1 {v0.16b}, [%[dst]], #16\n"
-
-        "subs %w[n], %w[n], #1\n"
-        "bne 1b\n"
-        : [src] "+r"(src), [dst] "+r"(dst), [n] "+r"(256)
-        :
-        : "memory", "v0"
-    );
-}
-
-static void *memcpy_neon(void *to, const void *from, size_t n)
-{
-    void *retval = to;
-
-    if (n < 16)
-    {
-        memcpy(to, from, n);
-        return retval;
-    }
-
-    uint8_t *src = (uint8_t *)from;
-    uint8_t *dst = (uint8_t *)to;
-
-    memcpy_neon_256(dst, src);
-
-    return retval;
-}
-
-#endif
-   
-
-
-
 #ifdef HAVE_ARM_NEON
 static inline void memcpy_neon_256( uint8_t *dst, const uint8_t *src )
 {
@@ -1921,7 +1874,7 @@ static struct {
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE ) || defined( HAVE_ASM_MMX2)
      { "MMX/MMX2/SSE optimized memcpy() v1", (void*) fast_memcpy, 0,AV_CPU_FLAG_MMX |AV_CPU_FLAG_SSE |AV_CPU_FLAG_MMX2 },
 #endif  
-#if defined (HAVE_ARM_NEON) || defined(HAVE_ARM_ASIMD)
+#if defined (HAVE_ARM_NEON)
 	{ "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_NEON },
 #endif
 #ifdef HAVE_ARM_ASIMD
