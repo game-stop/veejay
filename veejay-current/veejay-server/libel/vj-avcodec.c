@@ -589,7 +589,7 @@ static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, 
 		return avcodec_encode_video(ctx,buf,len,frame);
 	}
 
-	return 0;
+	return -1;
 }
 
 int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src[4], uint8_t *buf, int buf_len,

@@ -306,17 +306,17 @@ void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 		x->codec_ctx->thread_type = FF_THREAD_FRAME;
 	}
 
-	AVDictionary *options = NULL;
-	av_dict_set(&options, "hwaccel", "auto", 0);
+	//AVDictionary *options = NULL;
+	//av_dict_set(&options, "hwaccel", "auto", 0);
 
-	if ( avcodec_open2( x->codec_ctx, x->codec, &options ) < 0 )
+	if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
 #else
 	x->codec_ctx = avcodec_alloc_context();
 	if ( avcodec_open( x->codec_ctx, x->codec ) < 0 ) 
 #endif
 	{
 		free(x);
-		av_dict_free(&options);
+		//av_dict_free(&options);
 		return NULL;
 	}
 
@@ -324,9 +324,9 @@ void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 	x->frames[1] = avhelper_alloc_frame();
 
 	x->output = yuv_yuv_template( NULL,NULL,NULL, output->width, output->height, alpha_fmt_to_yuv(output->format) );
-	av_dict_free(&options);
+	//av_dict_free(&options);
 
-	avhelper_hwaccel(x->codec_ctx);
+	//avhelper_hwaccel(x->codec_ctx);
 
 	return (void*) x;
 }
@@ -571,17 +571,17 @@ further:
 		x->codec_ctx->thread_type = FF_THREAD_FRAME;
 	}
 
-	AVDictionary *options = NULL;
-	av_dict_set(&options, "hwaccel", "auto", 0);
+	//AVDictionary *options = NULL;
+	//av_dict_set(&options, "hwaccel", "auto", 0);
 
-	if ( avcodec_open2( x->codec_ctx, x->codec, &options ) < 0 )
+	if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
 #else
 	if ( avcodec_open( x->codec_ctx, x->codec ) < 0 ) 
 #endif
 	{
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
-		av_dict_free(&options);
+		//av_dict_free(&options);
 		return NULL;
 	}
 
@@ -607,7 +607,7 @@ further:
 			break;
 	}
 	av_free(f);
-	av_dict_free(&options);
+	//av_dict_free(&options);
 
 	if(!got_picture) {
 		veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: Unable to get whole picture from %s", filename );
@@ -624,7 +624,7 @@ further:
 	x->frames[1] = avhelper_alloc_frame();
 	x->input = yuv_yuv_template( NULL,NULL,NULL, x->codec_ctx->width,x->codec_ctx->height, x->pixfmt );
 
-	avhelper_hwaccel(x->codec_ctx);
+	//avhelper_hwaccel(x->codec_ctx);
 
 	return (void*) x;
 }
