@@ -242,9 +242,6 @@ void vj_osc_free(void *d)
 			if( ot->addr ) {
 				free_token( ot->addr );
 			}
-			if( ot->descr ) {
-				free(ot->descr);
-			}
 			free(ot);
 	}
 	free(c->addr);
