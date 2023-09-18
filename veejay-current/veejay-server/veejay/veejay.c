@@ -896,19 +896,6 @@ int main(int argc, char **argv)
 		if( sigismember( &(settings->signal_set), i ))
 			sigaction( i, &action, 0 );
 	
-	char *mem_func = get_memcpy_descr();
-	if(mem_func)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Using SIMD %s", mem_func);
-		free(mem_func);
-	}
-	mem_func = get_memset_descr();
-	if(mem_func)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Using SIMD %s", mem_func);
-		free(mem_func);
-	}
-
 	veejay_msg(VEEJAY_MSG_INFO,
 		"CPU cache line size: %d bytes", cpu_cache_size());
 
