@@ -1637,6 +1637,68 @@ static void *memcpy_neon( void *to, const void *from, size_t n )
 }
 #endif
 #ifdef HAVE_ARM_ASIMD
+static inline void memcpy_neon_256(uint8_t *dst, const uint8_t *src) {
+    __asm__ volatile(
+        "prfm pldl1keep, [%[src], #64]\n\t"
+        "prfm pldl1keep, [%[src], #128]\n\t"
+        "prfm pldl1keep, [%[src], #192]\n\t"
+        "prfm pldl1keep, [%[src], #256]\n\t"
+        "prfm pldl1keep, [%[src], #320]\n\t"
+        "prfm pldl1keep, [%[src], #384]\n\t"
+        "prfm pldl1keep, [%[src], #448]\n\t"
+        "ld1 {v0.8b, v1.8b, v2.8b, v3.8b}, [%[src]], #32\n\t"
+        "ld1 {v4.8b, v5.8b, v6.8b, v7.8b}, [%[src]], #32\n\t"
+        "ld1 {v8.8b, v9.8b, v10.8b, v11.8b}, [%[src]], #32\n\t"
+        "ld1 {v12.8b, v13.8b, v14.8b, v15.8b}, [%[src]], #32\n\t"
+        "ld1 {v16.8b, v17.8b, v18.8b, v19.8b}, [%[src]], #32\n\t"
+        "ld1 {v20.8b, v21.8b, v22.8b, v23.8b}, [%[src]], #32\n\t"
+        "ld1 {v24.8b, v25.8b, v26.8b, v27.8b}, [%[src]], #32\n\t"
+        "ld1 {v28.8b, v29.8b, v30.8b, v31.8b}, [%[src]]\n\t"
+        "st1 {v0.8b, v1.8b, v2.8b, v3.8b}, [%[dst]], #32\n\t"
+        "st1 {v4.8b, v5.8b, v6.8b, v7.8b}, [%[dst]], #32\n\t"
+        "st1 {v8.8b, v9.8b, v10.8b, v11.8b}, [%[dst]], #32\n\t"
+        "st1 {v12.8b, v13.8b, v14.8b, v15.8b}, [%[dst]], #32\n\t"
+        "st1 {v16.8b, v17.8b, v18.8b, v19.8b}, [%[dst]], #32\n\t"
+        "st1 {v20.8b, v21.8b, v22.8b, v23.8b}, [%[dst]], #32\n\t"
+        "st1 {v24.8b, v25.8b, v26.8b, v27.8b}, [%[dst]], #32\n\t"
+        "st1 {v28.8b, v29.8b, v30.8b, v31.8b}, [%[dst]]\n\t"
+        : [src] "+r"(src), [dst] "+r"(dst)
+        :
+        : "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
+          "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15",
+          "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
+          "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31"
+    );
+}
+
+static void *memcpy_neon(void *to, const void *from, size_t n) {
+    void *retval = to;
+
+    if (n < 16) {
+        memcpy(to, from, n);
+        return retval;
+    }
+
+    size_t i = n >> 8;
+    size_t r = n & 255;
+
+    uint8_t *src = (uint8_t *)from;
+    uint8_t *dst = (uint8_t *)to;
+
+    for (; i > 0; i--) {
+        memcpy_neon_256(dst, src);
+        src += 256;
+        dst += 256;
+    }
+
+    if (r) {
+        memcpy(dst, src, r);
+    }
+
+    return retval;
+}
+
+
 static void memcpy_asimd_256_v3(uint8_t *dst, const uint8_t *src) {
     uint8x16_t data;
 
@@ -1779,6 +1841,8 @@ void *memset_asimd_v3(void *dst, uint8_t val, size_t n) {
     }
     return retval;
 }
+
+
 #endif
 
 /* Fast memory set. See comments for fast_memcpy */
@@ -1888,9 +1952,13 @@ static struct {
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE ) || defined( HAVE_ASM_MMX2)
      { "MMX/MMX2/SSE optimized memcpy() v1", (void*) fast_memcpy, 0,AV_CPU_FLAG_MMX |AV_CPU_FLAG_SSE |AV_CPU_FLAG_MMX2 },
 #endif  
-#if defined (HAVE_ARM_NEON)
+#if defined (HAVE_ARM_NEON) 
 	{ "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_NEON },
 #endif
+#if defined (HAVE_ARM_ASIMD) 
+	{ "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_ARMV8 },
+#endif
+
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
 //	{ "Advanced SIMD ARMv8-A memcpy() v3", (void*) memcpy_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },	
@@ -2617,78 +2685,3 @@ char *vj_sprintf(char* c, int n) {
 
     return c;
 }
-
-/*
-
-char *vj_sprintf(char* c, int n) {
-    int sign = -(n<0);
-    unsigned int val = (n^sign)-sign;
-
-    int size;
-    if(val>=10000) {
-        if(val>=10000000) {
-            if(val>=1000000000) {
-                size=10;
-            }
-            else if(val>=100000000) {
-                size=9;
-            }
-            else size=8;
-        }
-        else {
-            if(val>=1000000) {
-                size=7;
-            }
-            else if(val>=100000) {
-                size=6;
-            }
-            else size=5;
-        }
-    }
-    else {
-        if(val>=100) {
-            if(val>=1000) {
-                size=4;
-            }
-            else size=3;
-        }
-        else {
-            if(val>=10) {
-                size=2;
-            }
-            else if(n==0) {
-                c[0]='0';
-                c[1] = ' ';
-                return c + 2;
-            }
-            else size=1;
-        }
-    }
-    size -= sign;
-    if(sign)
-      *c='-';
-
-    c += size-1;
-    while(val>=100) {
-        int pos = val % 100;
-        val /= 100;
-        *(short*)(c-1)=*(short*)(digit_pairs+2*pos); 
-        c-=2;
-    }
-    while(val>0) {
-        *c--='0' + (val % 10);
-        val /= 10;
-    }
-    
-    if(sign) { 
-        c[size] = ' ';
-        return c + size + 1;
-    }
-    else {
-        c[size + 1] = ' ';
-    }
-
-    return c + size + 2;
-}
-
-*/
