@@ -1567,6 +1567,68 @@ static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
 }
 
 #endif
+
+#ifdef HAVE_ARM_ASIMD
+#include <asm/cputype.h>
+void memset_tailored(void *buf, int c, size_t n, uint32_t flags) {
+  if (flags & MEMSET_FLAG_FP) {
+    vst1q_u8((uint8_t *)buf, vdupq_n_u8(c));
+    buf = (void *)((uint8_t *)buf + 16);
+    n -= 16;
+  }
+
+  if (flags & MEMSET_FLAG_ASIMD) {
+    vextq_u8((uint8_t *)buf, (uint8_t *)buf, c, 0);
+    buf = (void *)((uint8_t *)buf + 16);
+    n -= 16;
+  }
+
+  if (flags & MEMSET_FLAG_EVTSTRM) {
+    // Use the event stream instructions to perform the memset operation.
+    asm volatile("esetid 0, %0" : : "r"(c));
+    asm volatile("esetid 1, %1" : : "r"(n));
+    asm volatile("esync");
+    asm volatile("esetid 0, %0" : : "r"(0));
+    asm volatile("esetid 1, %1" : : "r"(0));
+    asm volatile("esync");
+  }
+
+  if (flags & MEMSET_FLAG_CRC32) {
+    // Use the crc32 instructions to perform the memset operation.
+    uint32_t crc = 0;
+    for (size_t i = 0; i < n; i++) {
+      crc = crc32_le(crc, (uint8_t *)buf + i, 1);
+    }
+    asm volatile("str %0, [%1], #4" : : "r"(crc), "r"(buf));
+  }
+
+  if (flags & MEMSET_FLAG_CPUID) {
+    // Use the cpuid instructions to determine the optimal memset operation for the current CPU.
+    uint32_t cpuid = get_cpuid();
+    switch (cpuid) {
+      case CPUID_ARM_CORTEX_A72:
+        // Use the neon intrinsics to perform the memset operation.
+        vst1q_u8((uint8_t *)buf, vdupq_n_u8(c));
+        buf = (void *)((uint8_t *)buf + 16);
+        n -= 16;
+        break;
+
+      case CPUID_ARM_CORTEX_A53:
+        // Use the asimd intrinsics to perform the memset operation.
+        vextq_u8((uint8_t *)buf, (uint8_t *)buf, c, 0);
+        buf = (void *)((uint8_t *)buf + 16);
+        n -= 16;
+        break;
+
+      default:
+        // Use the standard memset operation.
+        memset(buf, c, n);
+        break;
+    }
+  }
+}
+#endif
+
 #ifdef HAVE_ARM_NEON
 static inline void memcpy_neon_256( uint8_t *dst, const uint8_t *src )
 {
@@ -1830,6 +1892,18 @@ void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
         *dst_bytes++ = val;
     }
 }
+void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
+  uint8x16_t v = vdupq_n_u8(val);
+  size_t multiple_of_16 = len & ~0xF;
+
+  uint8_t *dst8 = (uint8_t *)dst;
+  for (size_t i = 0; i < multiple_of_16; i += 16) {
+    vst1q_u8(dst8 + i, v);
+  }
+
+  for (size_t i = multiple_of_16; i < len; i++) {
+    dst8[i] = val;
+  }
 #endif
 
 static struct {
@@ -1915,6 +1989,7 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
+	{ "Advanced SIMD memset() v4", (void*) memset_asimd_v4, 0, AV_CPU_FLAG_ARMV8 },	
 //	{ "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },	
 //	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
 	
