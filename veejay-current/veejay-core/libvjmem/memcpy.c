@@ -2333,6 +2333,8 @@ set_best_memcpy_method:
 	}
 
 	selected_best_memcpy = best;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Selected %s", memcpy_method[best].name);
 }
 
 void find_best_memset()
@@ -2392,6 +2394,7 @@ set_best_memset_method:
 	}
 
 	selected_best_memset = best;
+	veejay_msg(VEEJAY_MSG_INFO, "Selected %s", memset_method[best].name);
 }
 
 static	void	vj_frame_copy_job( void *arg ) {
