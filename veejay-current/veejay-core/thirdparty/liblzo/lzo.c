@@ -98,6 +98,7 @@ static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , lzo_ui
 */
 #define LZO_ALIGN_SIZE(size) \
 	 ( ((size) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ) * sizeof(lzo_align_t)
+#define RUP8(num)(((num)+8)&~8)
 
 void	*lzo_new( )
 {
@@ -110,7 +111,7 @@ void	*lzo_new( )
 	}
 
 	l->wrkmem = (lzo_bytep)
-		vj_calloc( LZO_ALIGN_SIZE( LZO1X_1_MEM_COMPRESS ) );
+		vj_calloc( RUP8(2 * LZO_ALIGN_SIZE( LZO1X_1_MEM_COMPRESS )) );
 
 	if(l->wrkmem == NULL )
 	{
