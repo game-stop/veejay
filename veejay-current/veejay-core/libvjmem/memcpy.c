@@ -581,32 +581,6 @@ void	packed_plane_clear( size_t len, void *to )
 	}
 }
 
-
-void *memset_64(void *ptr, int value, size_t num) {
-    uint8_t *dest = (uint8_t *)ptr;
-    uint8_t byte_value = (uint8_t)value;
-    size_t num_bytes = num;
-
-    size_t num_words = num_bytes / sizeof(size_t);
-    size_t remainder = num_bytes % sizeof(size_t);
-    size_t pattern = 0;
-
-    for (size_t i = 0; i < sizeof(size_t); i++) {
-        pattern = (pattern << 8) | byte_value;
-    }
-
-    for (size_t i = 0; i < num_words; i++) {
-        *((size_t *)(dest + i * sizeof(size_t))) = pattern;
-    }
-
-    for (size_t i = 0; i < remainder; i++) {
-        dest[num_words * sizeof(size_t) + i] = byte_value;
-    }
-
-    return ptr;
-}
-
-
 #if defined (__SSE4_1__)
 static void *sse41_memcpy(void *to, const void *from, size_t len) {
   void *retval = to;
@@ -2090,6 +2064,30 @@ void memset_asimd_32(uint8_t *dst, uint8_t value, size_t size) {
 }
 
 #endif
+
+void *memset_64(void *ptr, int value, size_t num) {
+    uint8_t *dest = (uint8_t *)ptr;
+    uint8_t byte_value = (uint8_t)value;
+    size_t num_bytes = num;
+
+    size_t num_words = num_bytes / sizeof(size_t);
+    size_t remainder = num_bytes % sizeof(size_t);
+    size_t pattern = 0;
+
+    for (size_t i = 0; i < sizeof(size_t); i++) {
+        pattern = (pattern << 8) | byte_value;
+    }
+
+    for (size_t i = 0; i < num_words; i++) {
+        *((size_t *)(dest + i * sizeof(size_t))) = pattern;
+    }
+
+    for (size_t i = 0; i < remainder; i++) {
+        dest[num_words * sizeof(size_t) + i] = byte_value;
+    }
+
+    return ptr;
+}
 
 static struct {
      const char	*name;
