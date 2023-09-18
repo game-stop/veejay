@@ -1880,8 +1880,7 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD ARMv8-A memcpy()", (void*) memcpy_asimd, 0, AV_CPU_FLAG_ARMV8 },
-	{ "Advanced SIMD ARMv8-A memcpy() v3", (void*) memcpy_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
-	
+//	{ "Advanced SIMD ARMv8-A memcpy() v3", (void*) memcpy_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },	
 //	{ "Advanced SIMD ARMv8-A memcpy v2()", (void*) memcpy_asimdv2, 0, AV_CPU_FLAG_ARMV8 },
 #endif
 #ifdef HAVE_ARMV7A
@@ -1917,8 +1916,7 @@ static struct {
 #endif
 #ifdef HAVE_ARM_ASIMD
 	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
-	{ "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
-	
+//	{ "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },	
 //	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
 	
 #endif
