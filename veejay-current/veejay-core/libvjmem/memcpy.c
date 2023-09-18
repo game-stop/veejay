@@ -1843,6 +1843,7 @@ void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
   for (size_t i = multiple_of_16; i < len; i++) {
     dst8[i] = val;
   }
+}
 #endif
 
 static struct {
