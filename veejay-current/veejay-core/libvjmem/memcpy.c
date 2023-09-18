@@ -1567,6 +1567,79 @@ static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
 }
 
 #endif
+#ifdef HAVE_ARM_ASIMD
+#include <stdint.h>
+#include <stddef.h>
+
+static inline void memcpy_neon_256(uint8_t *dst, const uint8_t *src)
+{
+    __asm__ volatile(
+        "prfm pldl1keep, [%[src], #64]\n"
+        "prfm pldl1keep, [%[src], #128]\n"
+        "prfm pldl1keep, [%[src], #192]\n"
+        "prfm pldl1keep, [%[src], #256]\n"
+        "prfm pldl1keep, [%[src], #320]\n"
+        "prfm pldl1keep, [%[src], #384]\n"
+        "prfm pldl1keep, [%[src], #448]\n"
+
+        "ld1 {v0.16b}, [%[src]], #16\n"
+        "ld1 {v1.16b}, [%[src]], #16\n"
+        "ld1 {v2.16b}, [%[src]], #16\n"
+        "ld1 {v3.16b}, [%[src]], #16\n"
+        "ld1 {v4.16b}, [%[src]], #16\n"
+        "ld1 {v5.16b}, [%[src]], #16\n"
+        "ld1 {v6.16b}, [%[src]], #16\n"
+        "ld1 {v7.16b}, [%[src]], #16\n"
+
+        "st1 {v0.16b}, [%[dst]], #16\n"
+        "st1 {v1.16b}, [%[dst]], #16\n"
+        "st1 {v2.16b}, [%[dst]], #16\n"
+        "st1 {v3.16b}, [%[dst]], #16\n"
+        "st1 {v4.16b}, [%[dst]], #16\n"
+        "st1 {v5.16b}, [%[dst]], #16\n"
+        "st1 {v6.16b}, [%[dst]], #16\n"
+        "st1 {v7.16b}, [%[dst]], #16\n"
+        : [src] "+r"(src), [dst] "+r"(dst)
+        :
+        : "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7"
+    );
+}
+
+static void *memcpy_neon(void *to, const void *from, size_t n)
+{
+    void *retval = to;
+
+    if (n < 16)
+    {
+        // Fallback to regular memcpy for small sizes
+        memcpy(to, from, n);
+        return retval;
+    }
+
+    size_t i = n >> 8;
+    size_t r = n & 255;
+
+    uint8_t *src = (uint8_t *)from;
+    uint8_t *dst = (uint8_t *)to;
+
+    for (; i > 0; i--)
+    {
+        memcpy_neon_256(dst, src);
+        src += 256;
+        dst += 256;
+    }
+
+    if (r)
+    {
+        memcpy(dst, src, r);
+    }
+
+    return retval;
+}
+#endif
+   
+
+
 
 #ifdef HAVE_ARM_NEON
 static inline void memcpy_neon_256( uint8_t *dst, const uint8_t *src )
@@ -1875,7 +1948,7 @@ static struct {
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE ) || defined( HAVE_ASM_MMX2)
      { "MMX/MMX2/SSE optimized memcpy() v1", (void*) fast_memcpy, 0,AV_CPU_FLAG_MMX |AV_CPU_FLAG_SSE |AV_CPU_FLAG_MMX2 },
 #endif  
-#ifdef HAVE_ARM_NEON
+#if defined (HAVE_ARM_NEON) || defined(HAVE_ARM_ASIMD)
 	{ "NEON optimized memcpy()", (void*) memcpy_neon, 0, AV_CPU_FLAG_NEON },
 #endif
 #ifdef HAVE_ARM_ASIMD
