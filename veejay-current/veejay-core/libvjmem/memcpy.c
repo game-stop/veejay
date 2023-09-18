@@ -2070,7 +2070,7 @@ static struct {
 	{ "Advanced SIMD memset()", (void*) memset_asimd, 0, AV_CPU_FLAG_ARMV8 },
 	{ "Advanced SIMD memset() v4", (void*) memset_asimd_v4, 0, AV_CPU_FLAG_ARMV8 },	
 	{ "Advanced SIMD memset() with line size of 64", (void*) memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },	
-	{ "Advanced SIMD memset() with line size of 32", (void*) memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },	
+	{ "Advanced SIMD memset() with line size of 32", (void*) memset_asimd_32, 0, AV_CPU_FLAG_ARMV8 },	
 //	{ "Advanced SIMD memset() v3", (void*) memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },	
 //	{ "Advanced SIMD memset() v2", (void*) memset_asimd_v2, 0, AV_CPU_FLAG_ARMV8 },
 	
