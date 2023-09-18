@@ -1570,7 +1570,7 @@ static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
 #ifdef HAVE_ARM_ASIMD
 static inline void memcpy_neon_256(uint8_t *dst, const uint8_t *src)
 {
-    __asm__ volatile(
+    asm volatile(
         "prfm pldl1keep, [%[src], #64]\n"
         "prfm pldl1keep, [%[src], #128]\n"
         "prfm pldl1keep, [%[src], #192]\n"
