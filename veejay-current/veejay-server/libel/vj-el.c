@@ -886,13 +886,13 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 			return lzo_decompress_el( d->lzo_decoder, data,res, dst, el_width_, el_height_, el_pixel_format_);
 			break;			
 		default:
-
+			{
 			int ret = avhelper_decode_video_direct( el->ctx[ N_EL_FILE(n) ], data, res, dst, el_pixel_format_,el_width_,el_height_ );
 
 			avhelper_decode_finish( el->ctx[ N_EL_FILE(n)] );
 
 			return ret;
-
+			}
 			break;
 	}
 
