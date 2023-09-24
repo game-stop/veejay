@@ -2484,6 +2484,11 @@ set_best_memset_method:
 	veejay_msg(VEEJAY_MSG_INFO, "Selected %s", memset_method[best].name);
 }
 
+void    vj_mem_set_defaults() {
+	veejay_memset = memset_method[1].function;
+	veejay_memcpy = memcpy_method[1].function;
+}
+
 static	void	vj_frame_copy_job( void *arg ) {
 	int i;
 	vj_task_arg_t *info = (vj_task_arg_t*) arg;
