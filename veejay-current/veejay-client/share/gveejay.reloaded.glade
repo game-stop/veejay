@@ -11060,6 +11060,7 @@
                                                       <item>Quicktime-DV</item>
                                                       <item>Quicktime-MJPEG</item>
                                                       <item>MLZO</item>
+                                                      <item>QOIY</item>
                                                       <item>YUV (current)</item>
                                                     </items>
                                                     <child internal-child="entry">
@@ -12889,6 +12890,7 @@
                                           <item>Quicktime-DV</item>
                                           <item>Quicktime-MJPEG</item>
                                           <item>MLZO</item>
+                                          <item>QOIY</item>
                                           <item>YUV (current)</item>
                                         </items>
                                         <child internal-child="entry">

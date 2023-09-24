@@ -19,7 +19,6 @@
 
 #ifndef AVHELPER_H
 #define AVHELPER_H
-
 #include <libavcodec/version.h>
 
 #define CODEC_ID_YUV420 999
@@ -27,6 +26,7 @@
 #define CODEC_ID_YUV422F 997
 #define CODEC_ID_YUV420F 996
 #define CODEC_ID_YUVLZO 900
+#define CODEC_ID_QOI 993
 
 // This is not a library, it is a collection of helper functions for various purposes
 
