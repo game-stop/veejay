@@ -1967,7 +1967,7 @@ static void fast_memset(void * to, int val, size_t len)
 #ifdef HAVE_ARM_ASIMD
 void memset_asimd(void *dst, uint8_t val, size_t len) {
 
-	if( len == 0 || ptr == dst ) 
+	if( len == 0 || NULL == dst ) 
 		return dst;
 
     uint8x16_t value = vdupq_n_u8(val);
@@ -1986,7 +1986,7 @@ void memset_asimd(void *dst, uint8_t val, size_t len) {
 }
 void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
 
-	if( len == 0 || ptr == dst ) 
+	if( len == 0 || NULL == dst ) 
 		return dst;
 
     uint8x16_t value = vdupq_n_u8(val);
@@ -2015,7 +2015,7 @@ void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
     }
 }
 void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
-  if( len == 0 || ptr == dst ) 
+  if( len == 0 || NULL == dst ) 
  	return dst;
 
   uint8x16_t v = vdupq_n_u8(val);
@@ -2033,7 +2033,7 @@ void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
 
 void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
 
-	if( size == 0 || ptr == dst ) 
+	if( size == 0 || NULL == dst ) 
 		return dst;
 
  	uint8x16_t value_v = vdupq_n_u8(value);
