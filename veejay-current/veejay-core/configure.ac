@@ -286,7 +286,7 @@ case $host_cpu in
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 OP_CFLAGS="$OP_CFLAGS -fPIC -DPIC"
 	 have_arm=true
-	 OP_CFLAGS="$OP_CFLAGS -O3 --fPIC -DPIC"
+	 OP_CFLAGS="$OP_CFLAGS -O3 -ftree-vectorize -fPIC -DPIC"
 	 AC_MSG_RESULT([arm])
      ;;
     arm7* )
