@@ -284,15 +284,15 @@ case $host_cpu in
 	;;
    aarch64* |arm)
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	 OP_CFLAGS="$OP_CFLAGS -m64 -fPIC -DPIC"
+	 OP_CFLAGS="$OP_CFLAGS -fPIC -DPIC"
 	 have_arm=true
-	 OP_CFLAGS="$OP_CFLAGS -O3 -m64 -fPIC -DPIC"
+	 OP_CFLAGS="$OP_CFLAGS -O3 --fPIC -DPIC"
 	 AC_MSG_RESULT([arm])
      ;;
     arm7* )
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARM7L CPU])
-	 OP_CFLAGS="$OP_CFLAGS -O3 -m64 -fPIC -DPIC"
+	 OP_CFLAGS="$OP_CFLAGS -O3 -fPIC -DPIC"
 	
 	 have_arm=true
 	 have_armv7a=true
