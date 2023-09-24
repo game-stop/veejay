@@ -7134,6 +7134,7 @@ static struct {
     int   id;
 } recorder_formats[] = {
     { "mlzo", ENCODER_LZO },
+    { "qoiy" , ENCODER_QOI },
     { "y4m422", ENCODER_YUV4MPEG },
     { "y4m420", ENCODER_YUV4MPEG420 },
     { "yv16", ENCODER_YUV422 },

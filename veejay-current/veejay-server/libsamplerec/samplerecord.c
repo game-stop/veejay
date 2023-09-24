@@ -169,6 +169,8 @@ static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, i
 		si->encoder_max_size = 2048 + tmp + tmp1 + tmp1;break;
 		case ENCODER_LZO:
 		si->encoder_max_size = (tmp * 3 ); break;
+		case ENCODER_QOI:
+		si->encoder_max_size = 2048 + tmp; break;
 		case ENCODER_DVVIDEO:
 		si->encoder_max_size = ( frame->height == 480 ? 120000: 144000); break;
 		default:

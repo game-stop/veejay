@@ -48,6 +48,7 @@ static struct
 {
 	{ "vj20", CODEC_ID_YUV420F	},
 	{ "vj22", CODEC_ID_YUV422F	},
+	{ "qoiy", CODEC_ID_QOI },
     { "mjpg" ,CODEC_ID_MJPEG 	},
 	{ "mjpb", CODEC_ID_MJPEGB	},
 	{ "i420", CODEC_ID_YUV420	},

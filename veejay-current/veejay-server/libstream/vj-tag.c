@@ -1834,6 +1834,8 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
             tag->encoder_max_size = 2048 + tmp + (tmp/2) + (tmp/2);break;
             case ENCODER_LZO:
             tag->encoder_max_size = tmp * 3; break;
+            case ENCODER_QOI:
+            tag->encoder_max_size = 2048 + tmp; break;
             default:
             tag->encoder_max_size = vj_avcodec_get_buf_size(tag->encoder);
             break;

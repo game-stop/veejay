@@ -235,6 +235,11 @@ lav_file_t *lav_open_output_file(char *filename, char format,
         veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI LZO (veejay's fourcc)");
         sprintf(fourcc, "MLZO" );
         break;
+    case 'o':
+    case 'O':
+        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI QOI");
+        sprintf(fourcc, "QOIY");
+        break;
     case 'v':
         veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI VJ20 (veejay's fourcc)");
         sprintf(fourcc,"VJ20");
@@ -399,6 +404,8 @@ long    lav_bytes_remain( lav_file_t *lav_file )
         case 'l':
         case 'd':
         case 'H':
+        case 'o':
+        case 'O':
           return AVI_bytes_remain( lav_file->avi_fd );
         default:
          return -1;
@@ -435,6 +442,8 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
         case 'Y':
         case 'L':   
         case 'l':
+        case 'o':
+        case 'O':
         case 'd':
         case 'H':
             if(n==0) {
@@ -1261,6 +1270,13 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
         return lav_fd;
     }
     
+    if( strncasecmp( video_comp, "qoiy", 4 ) == 0 )
+    {
+        lav_fd->MJPG_chroma = CHROMA422;
+        lav_fd->interlacing = LAV_NOT_INTERLACED;
+        return lav_fd;
+    }
+
     if (strncasecmp(video_comp,"dvsd",4)==0 ||
         strncasecmp(video_comp,"dvcp",4) ==0 ||
         strncasecmp(video_comp,"dxsd",4) == 0 ||
@@ -1359,6 +1375,8 @@ const char *lav_strerror(void)
       case 'M':
       case 'P':
       case 'L':
+      case 'o':
+      case 'O':
       case 'D':
       case 'H':
          return AVI_strerror();

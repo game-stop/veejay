@@ -40,6 +40,8 @@
 #include <veejaycore/av.h>
 #include <veejaycore/avhelper.h>
 #include <veejaycore/avcommon.h>
+#define QOI_IMPLEMENTATION 1
+#include <libel/qoi.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -250,7 +252,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		}
 	}
 	
-	if(id != 998 && id != 999 && id != 900 && id != 997 && id != 996 && id != 995 && id != 994)
+	if(id != 998 && id != 999 && id != 900 && id != 997 && id != 996 && id != 995 && id != 994 && id != 993)
 	{
 #ifdef __FALLBACK_LIBDV
 		if(id != CODEC_ID_DVVIDEO)
@@ -273,7 +275,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 
 	}
 
-	if( id != 998 && id != 999 && id!= 900 && id != 997 && id != 996 && id != CODEC_ID_DVVIDEO && id != 995 && id != 994 )
+	if( id != 998 && id != 999 && id!= 900 && id != 997 && id != 996 && id != CODEC_ID_DVVIDEO && id != 995 && id != 994 && id != 993)
 	{
 #ifdef __FALLBACK_LIBDV
 	  if(id != CODEC_ID_DVVIDEO )
@@ -450,6 +452,8 @@ int		vj_avcodec_find_codec( int encoder )
 			return 996;
 		case ENCODER_LZO:
 			return 900;
+		case ENCODER_QOI:
+			return 993;
 		case ENCODER_YUV4MPEG:
 			return 995;
 		case ENCODER_YUV4MPEG420:
@@ -489,6 +493,8 @@ char		vj_avcodec_find_lav( int encoder )
 			return 'v';
 		case ENCODER_LZO:
 			return 'L';
+		case ENCODER_QOI:
+			return 'o';
 		case ENCODER_YUV4MPEG:
 		case ENCODER_YUV4MPEG420:
 			return 'S';
@@ -514,6 +520,7 @@ static struct {
 	{ "YUV 4:2:2 Planar, CCIR 601. 16-235/16-240", ENCODER_YUV422 },
 	{ "YUV 4:2:0 Planar, CCIR 601, 16-235/16-240", ENCODER_YUV420 },
 	{ "YUV 4:2:2 Planar, LZO compressed (experimental)", ENCODER_LZO },
+	{ "QOI grayscale, QOI (experimental)", ENCODER_QOI },
 	{ "DIVX",  ENCODER_DIVX },
 	{ "Quicktime DV", ENCODER_QUICKTIME_DV },
 	{ "Quicktime MJPEG", ENCODER_QUICKTIME_MJPEG },	
@@ -716,6 +723,19 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	int in_fmt)
 {
 	vj_encoder *av = (vj_encoder*) encoder;
+
+	if(format == ENCODER_QOI) {
+		int res = 0;
+	    qoi_desc d;
+		d.channels = 1;
+		d.colorspace = QOI_LINEAR;
+		d.height = av->height;
+		d.width = av->width;
+	
+	    qoi_encode( src, &d, &res, buf, buf_len );
+
+		return res;
+	}
 
 	if(format == ENCODER_LZO )
 		return lzo_compress_frame( av->lzo, av->in_frame,src, buf );

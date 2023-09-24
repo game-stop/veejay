@@ -51,6 +51,7 @@
 #include <libel/av.h>
 #include <veejaycore/vj-task.h>
 #include <veejaycore/lzo.h>
+#include <libel/qoi.h>
 #include <math.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -71,6 +72,7 @@
 #define CODEC_ID_YUV422 998
 #define CODEC_ID_YUV422F 997
 #define CODEC_ID_YUV420F 996
+#define CODEC_ID_QOI 993
 #define CODEC_ID_YUVLZO 900
 #define DUMMY_FRAMES 2
 #define RUP16(num)(((num)+16)&~16)
@@ -313,7 +315,7 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 	{
 		d->lzo_decoder = lzo_new( el_pixel_format_, el_width_, el_height_ , 1);
 	}
-	else if ( id == CODEC_ID_YUV422 || id == CODEC_ID_YUV420 || id == CODEC_ID_YUV420F || id == CODEC_ID_YUV422F ) {
+	else if ( id == CODEC_ID_YUV422 || id == CODEC_ID_YUV420 || id == CODEC_ID_YUV420F || id == CODEC_ID_YUV422F || id == CODEC_ID_QOI ) {
 		
 	}
 	else if( ctx )
@@ -884,7 +886,19 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 			break;
 		case CODEC_ID_YUVLZO:
 			return lzo_decompress_el( d->lzo_decoder, data,res, dst, el_width_, el_height_, el_pixel_format_);
-			break;			
+			break;
+		case CODEC_ID_QOI:
+			{
+				qoi_desc d;
+				d.channels = 1;
+				d.colorspace = QOI_LINEAR;
+				d.height = el_height_;
+				d.width = el_width_;
+		    	qoi_decode( data,res, &d, 1, dst, el_out_->len );
+			
+				return 1;
+			}
+			break;		
 		default:
 			{
 			int ret = avhelper_decode_video_direct( el->ctx[ N_EL_FILE(n) ], data, res, dst, el_pixel_format_,el_width_,el_height_ );
@@ -978,6 +992,9 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 			break;
 		case CODEC_ID_YUV422F:
 			ret = PIX_FMT_YUVJ422P;
+			break;
+		case CODEC_ID_QOI:
+			ret = PIX_FMT_GRAY8;
 			break;
 		case CODEC_ID_YUV420:
 			ret = PIX_FMT_YUV420P;

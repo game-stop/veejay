@@ -37,7 +37,8 @@
 #define ENCODER_YUV4MPEG 13
 #define ENCODER_YUV4MPEG420 14
 #define ENCODER_HUFFYUV 15
-#define NUM_ENCODERS 16
+#define ENCODER_QOI 16
+#define NUM_ENCODERS 17
 
 typedef struct
 {
