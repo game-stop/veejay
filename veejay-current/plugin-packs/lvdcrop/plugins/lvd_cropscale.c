@@ -46,8 +46,8 @@ int	init_instance( livido_port_t *my_instance )
         return LIVIDO_ERROR_MEMORY_ALLOCATION;\
     }
 
-	c->buf[1]     = c->buf[0] + RUP8(w*h);
-	c->buf[2]     = c->buf[1] + RUP8(w*h);
+	c->buf[1]     = c->buf[0] + (w*h);
+	c->buf[2]     = c->buf[1] + (w*h);
 	c->flags	  = SWS_FAST_BILINEAR;
 
 	c->w		  = -1;

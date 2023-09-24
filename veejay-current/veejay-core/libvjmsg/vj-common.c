@@ -159,10 +159,16 @@ void	veejay_print_backtrace()
 
 	s = backtrace( space, 100 );
 	strings = backtrace_symbols(space,s);
+	if(strings == NULL ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get backtrace");
+		return;
+	}
 
-	for( i = 0; i < s ; i ++ ) 
+	for( i = 0; i < s ; i ++ ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strings[i] );
-
+	}
+	
+	free(strings);
 }
 #endif
 

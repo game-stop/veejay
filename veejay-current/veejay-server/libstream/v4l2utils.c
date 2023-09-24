@@ -77,7 +77,7 @@
 #include <veejay/jpegutils.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
-#include <libel/av.h>
+#include <veejaycore/av.h>
 #include <veejaycore/avhelper.h>
 #include <veejaycore/avcommon.h>
 #define        RUP8(num)(((num)+8)&~8)
@@ -576,7 +576,7 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 		return 0;
 	}
 
-#if LIBAVCODEC_BUILD > 5400
+#if LIBAVCODEC_VERSION_MAJOR > 54
 	v->c	   = avcodec_alloc_context3( v->codec );
 #else
 	v->c 	   = avcodec_alloc_context();
@@ -590,17 +590,23 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 	v->picture->data[1] = vj_malloc( sizeof(uint8_t) * RUP8(wid * hei + wid));
 	v->picture->data[2] = vj_malloc( sizeof(uint8_t) * RUP8(wid * hei + wid));
 
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	if( v->codec->capabilities & CODEC_CAP_TRUNCATED)
 		v->c->flags |= CODEC_FLAG_TRUNCATED;
+#endif
 
-#if LIBAVCODEC_BUILD > 5400
+#if LIBAVCODEC_VERSION_MAJOR > 54
 
-		int n_threads = avhelper_set_num_decoders();
+	int n_threads = avhelper_set_num_decoders();
 
-		if( n_threads > 0 ) {
-			v->c->thread_count = n_threads;
-			v->c->thread_type = FF_THREAD_FRAME;
-		}
+	if (v->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+		v->c->thread_type = FF_THREAD_FRAME;
+		v->c->thread_count = n_threads;	
+	}
+	else if (v->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+		v->c->thread_type = FF_THREAD_SLICE;
+		v->c->thread_count = n_threads;	
+	}
 
 	if( avcodec_open2( v->c, v->codec, NULL ) < 0 )
 #else
@@ -1283,12 +1289,14 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 		v4l2_set_output_pointers( v,src );
 
 	if( v->is_jpeg ) {
+		
+
 		AVPacket pkt;
 		memset( &pkt, 0, sizeof(AVPacket));
 		pkt.data = src;
 	    pkt.size = length;
 
-	    int res = avcodec_decode_video2( 
+	    int res = avhelper_decode_video3( 
 						v->c, 
 						v->picture, 
 						&got_picture,
@@ -1401,7 +1409,8 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 		pkt.data = src;
 	    pkt.size = length;
 
-	    int res = avcodec_decode_video2( 
+
+	    int res = avhelper_decode_video3( 
 						v->c, 
 						v->picture, 
 						&got_picture,

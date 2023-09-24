@@ -81,8 +81,8 @@ void *rotozoom_malloc(int width, int height)
         return NULL;
     }
 
-    r->rotobuffer[1] = r->rotobuffer[0] + RUP8(width * height);
-    r->rotobuffer[2] = r->rotobuffer[1] + RUP8(width * height);
+    r->rotobuffer[1] = r->rotobuffer[0] + (width * height);
+    r->rotobuffer[2] = r->rotobuffer[1] + (width * height);
 
     int j;
     for (j = 0; j < 9; j++) {

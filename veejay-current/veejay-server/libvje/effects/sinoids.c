@@ -83,8 +83,8 @@ void *sinoids_malloc(int width, int height)
         return NULL;
     }
 
-    s->sinoid_frame[1] = s->sinoid_frame[0] + RUP8(width*height);
-    s->sinoid_frame[2] = s->sinoid_frame[1] + RUP8(width*height);
+    s->sinoid_frame[1] = s->sinoid_frame[0] + (width*height);
+    s->sinoid_frame[2] = s->sinoid_frame[1] + (width*height);
     
     for(i=0; i < width; i++ ) {
 	    s->sinoids_X[i] = (int) ( sin( ((double)i/(double)width) * 2 * 3.1415926) * 1);

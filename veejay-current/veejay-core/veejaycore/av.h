@@ -87,6 +87,10 @@ extern void av_frame_unref(AVFrame *ptr) __attribute((weak));
 #define CODEC_ID_HUFFYUV AV_CODEC_ID_HUFFYUV
 #endif
 
+#ifndef CODEC_ID_FFVHUFF
+#define CODEC_ID_FFVHUFF AV_CODEC_ID_FFVHUFF
+#endif
+
 #ifndef CODEC_ID_CYUV
 #define CODEC_ID_CYUV AV_CODEC_ID_CYUV
 #endif

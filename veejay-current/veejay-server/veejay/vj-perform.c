@@ -754,8 +754,8 @@ static int vj_perform_record_buffer_init(veejay_t *info)
     if(!region) return 0;
 
     g->offline_frame->data[0] = region;
-    g->offline_frame->data[1] = region + RUP8( g->offline_frame->len );
-    g->offline_frame->data[2] = region + RUP8( g->offline_frame->len + g->offline_frame->uv_len );
+    g->offline_frame->data[1] = region + ( g->offline_frame->len );
+    g->offline_frame->data[2] = region + ( g->offline_frame->len + g->offline_frame->uv_len );
 
     veejay_memset( g->offline_frame->data[0] , pixel_Y_lo_, g->offline_frame->len );
     veejay_memset( g->offline_frame->data[1], 128, g->offline_frame->uv_len );
@@ -1347,7 +1347,7 @@ static int vj_perform_compress_primary_frame_s2(veejay_t *info,VJFrame *frame )
             ENCODER_MJPEG,
             frame->data, 
             vj_avcodec_get_buf(g->encoder_), 
-            8 * 16 * 65535, 
+            vj_avcodec_get_buf_size(g->encoder_),
             frame->format);
 }
 

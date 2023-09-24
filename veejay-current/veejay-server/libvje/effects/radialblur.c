@@ -88,8 +88,8 @@ void *radialblur_malloc(int w, int h)
         return NULL;
     }
 
-    r->radial_src[1] = r->radial_src[0] + RUP8(w*h);
-    r->radial_src[2] = r->radial_src[1] + RUP8(w*h);
+    r->radial_src[1] = r->radial_src[0] + (w*h);
+    r->radial_src[2] = r->radial_src[1] + (w*h);
 	
     return (void*) r;
 }

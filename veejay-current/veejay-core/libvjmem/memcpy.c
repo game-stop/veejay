@@ -169,6 +169,10 @@
 
 #define FIND_BEST_MAX_ITERATIONS 100
 
+
+#define is_aligned__(PTR,LEN) \
+	(((uintptr_t)(const void*)(PTR)) % (LEN) == 0 )
+
 static int selected_best_memcpy = 1;
 static int selected_best_memset = 1;
 
@@ -286,7 +290,7 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #ifdef HAVE_ASM_AVX
 #define AVX_MMREG_SIZE 32
 #endif
-#ifdef HAVE_ASM_SSE
+#if defined(HAVE_ASM_SSE) || defined(HAVE_ASM_SSE2) || defined(__SSE4_1__)
 #define SSE_MMREG_SIZE 16
 #endif
 #ifdef HAVE_ASM_MMX
@@ -336,8 +340,6 @@ static __inline__ void * __memcpy(void * to, const void * from, size_t n)
 #define EMMS     "emms"
 //#endif
 
-#define is_aligned__(PTR,LEN) \
-	(((uintptr_t)(const void*)(PTR)) % (LEN) == 0 )
 
 
 char	*veejay_strncpy( char *dest, const char *src, size_t n )
@@ -586,6 +588,11 @@ static void *sse41_memcpy(void *to, const void *from, size_t len) {
   void *retval = to;
 
   if (len >= 128) {
+	if(!is_aligned__(from,SSE_MMREG_SIZE)) {
+		memcpy( to,from,len);
+		return to;
+	} 
+
     register uintptr_t delta;
     /* Align destination to SSE_MMREG_SIZE -boundary */
     delta = ((uintptr_t)to) & (SSE_MMREG_SIZE - 1);
@@ -643,6 +650,11 @@ static void *sse42_memcpy(void *to, const void *from, size_t len) {
   void *retval = to;
 
   if (len >= 128) {
+	if(!is_aligned__(from,SSE_MMREG_SIZE)) {
+		memcpy( to,from,len);
+		return to;
+	} 
+
     register uintptr_t delta;
     /* Align destination to SSE_MMREG_SIZE -boundary */
     delta = ((uintptr_t)to) & (SSE_MMREG_SIZE - 1);
@@ -704,14 +716,17 @@ static void *sse42_memcpy(void *to, const void *from, size_t len) {
  * http://www.ibiblio.org/gferg/ldp/GCC-Inline-Assembly-HOWTO.html#ss5.4
  */
 
-
-/* for veejay, moving 128 bytes a time makes a difference */
 static void *sse2_memcpy(void * to, const void * from, size_t len)
 {
     void *retval = to;
 
     if(len >= 128)
     {
+		if(!is_aligned__(from,SSE_MMREG_SIZE)) {
+			memcpy( to,from,len);
+			return to;
+		} 
+
         register uintptr_t delta;
         /* Align destination to SSE_MMREG_SIZE -boundary */
         delta = ((uintptr_t)to)&(SSE_MMREG_SIZE-1);
@@ -839,10 +854,10 @@ static void *sse_memcpy2(void * to, const void * from, size_t len)
 	
 	if(len >= 128)
 	{
-	/*	if(!is_aligned__(from,SSE_MMREG_SIZE)) {
+		if(!is_aligned__(from,SSE_MMREG_SIZE)) {
 			memcpy( to,from,len);
 			return to;
-		} */
+		} 
 
 		register uintptr_t delta;
    
@@ -857,7 +872,7 @@ static void *sse_memcpy2(void * to, const void * from, size_t len)
 		i = len >> 7; /* len/128 */
 		len&=127;
 
-		for(; i>0; i--)
+		for(; i>1; i--)
 		{   
 			__asm__ __volatile__ (
 				"movups (%0),  %%xmm0\n"
@@ -880,6 +895,18 @@ static void *sse_memcpy2(void * to, const void * from, size_t len)
 			from = ((const unsigned char *)from) + 128;
 			to = ((unsigned char *)to) + 128;
 		}
+		
+		if (len >= SSE_MMREG_SIZE) {
+            __asm__ __volatile__ (
+                "movups (%0),  %%xmm0\n"
+                "movntps %%xmm0, (%1)\n"
+                :: "r" (from), "r" (to) : "memory");
+            from = ((const unsigned char *)from) + 16;
+            to = ((unsigned char *)to) + 16;
+        }
+		if (len) {
+            memcpy(to, from, len);
+        }
 		/* since movntq is weakly-ordered, a "sfence"
 		 * is needed to become ordered again. */
 		__asm__ __volatile__ ("sfence":::"memory");
@@ -1939,6 +1966,10 @@ static void fast_memset(void * to, int val, size_t len)
 
 #ifdef HAVE_ARM_ASIMD
 void memset_asimd(void *dst, uint8_t val, size_t len) {
+
+	if( len == 0 || ptr == dst ) 
+		return dst;
+
     uint8x16_t value = vdupq_n_u8(val);
 	uint8_t *dst_bytes = (uint8_t *)dst;
 	size_t num_blocks = len / 16;
@@ -1954,6 +1985,10 @@ void memset_asimd(void *dst, uint8_t val, size_t len) {
     }
 }
 void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
+
+	if( len == 0 || ptr == dst ) 
+		return dst;
+
     uint8x16_t value = vdupq_n_u8(val);
     uint8_t *dst_bytes = (uint8_t *)dst;
     size_t num_blocks = len / 16;
@@ -1980,6 +2015,9 @@ void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
     }
 }
 void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
+  if( len == 0 || ptr == dst ) 
+ 	return dst;
+
   uint8x16_t v = vdupq_n_u8(val);
   size_t multiple_of_16 = len & ~0xF;
 
@@ -1994,6 +2032,10 @@ void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
 }
 
 void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
+
+	if( size == 0 || ptr == dst ) 
+		return dst;
+
  	uint8x16_t value_v = vdupq_n_u8(value);
 
     size_t num_blocks = size / 64;
@@ -2031,6 +2073,9 @@ void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
 }
 
 void memset_asimd_32(uint8_t *dst, uint8_t value, size_t size) {
+	if( size == 0 || dst == NULL ) 
+		return dst;
+
  	uint8x16_t value_v = vdupq_n_u8(value);
 
     size_t num_blocks = size / 32;
@@ -2066,6 +2111,10 @@ void memset_asimd_32(uint8_t *dst, uint8_t value, size_t size) {
 #endif
 
 void *memset_64(void *ptr, int value, size_t num) {
+
+	if( num == 0 || ptr == NULL ) 
+		return ptr;
+
     uint8_t *dest = (uint8_t *)ptr;
     uint8_t byte_value = (uint8_t)value;
     size_t num_bytes = num;
@@ -2264,6 +2313,27 @@ static int set_user_selected_memset()
 	return 0;
 }
 
+static void mem_fill_block(uint8_t *dst, size_t len) {
+	int i;
+	for( i = 0; i < len ; i ++ ) {
+		dst[i] = i % 255;
+	}
+}
+
+static int mem_verify( uint8_t *source, uint8_t *good, size_t len) {
+	if( memcmp(source,good,len) == 0 )
+		return 1;
+	return 0;
+}
+
+static int mem_validate( uint8_t *buffer, uint8_t *validation_buffer, size_t len, int index) {
+	if(!mem_verify(buffer, validation_buffer, len ) ) {
+		veejay_msg(0,"Function failed test, skip");
+		return 0;
+	}
+	return 1;
+}
+
 void find_best_memcpy()
 {
 	int best = set_user_selected_memcpy();
@@ -2271,29 +2341,40 @@ void find_best_memcpy()
 		goto set_best_memcpy_method;
 
      double t;
-     char *buf1, *buf2;
+     uint8_t *buf1, *buf2, *validbuf;
      int i, k;
      int bufsize = 10 * 1048576;
 
-     if (!(buf1 = (char*) malloc( bufsize * sizeof(char))))
+     if (!(buf1 = (uint8_t*) malloc( bufsize * sizeof(uint8_t))))
           return;
 
-     if (!(buf2 = (char*) malloc( bufsize * sizeof(char)))) {
+     if (!(buf2 = (uint8_t*) malloc( bufsize * sizeof(uint8_t)))) {
           free( buf1 );
+          return;
+     }
+
+	 if (!(validbuf = (uint8_t*) malloc( bufsize * sizeof(uint8_t)))) {
+          free( buf1 );
+		  free( buf2 );
           return;
      }
 
      int cpu_flags = av_get_cpu_flags();
 	
-	veejay_msg(VEEJAY_MSG_INFO, "Finding best memcpy ... (copy %ld blocks of %2.2f Mb)",FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );	
+	 veejay_msg(VEEJAY_MSG_INFO, "Finding best memcpy ... (copy %ld blocks of %2.2f Mb)",FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );	
 
      memset(buf1,0, bufsize);
      memset(buf2,0, bufsize);
-
+	 
      /* make sure buffers are present on physical memory */
      memcpy( buf1, buf2, bufsize);
      memcpy( buf2, buf1, bufsize );
 
+	 /* fill */
+	 mem_fill_block(buf1, bufsize);
+	 memset(buf2, 0, bufsize);
+	 mem_fill_block(validbuf, bufsize);
+	 
 	for( i = 1; memcpy_method[i].name; i ++ ) {
 		
 		if( memcpy_method[i].cpu_require && !(cpu_flags & memcpy_method[i].cpu_require ) ) {
@@ -2303,9 +2384,14 @@ void find_best_memcpy()
 
 		t = get_time();
 		for( k = 0; k < FIND_BEST_MAX_ITERATIONS; k ++ ) {
-			memcpy_method[i].function( buf1,buf2, bufsize );
+			memcpy_method[i].function( buf2,buf1, bufsize );
 		}
 		t = get_time() - t;
+		
+		if(!mem_verify(buf2,validbuf, bufsize)) {
+			t = 0;			
+		}
+
 		memcpy_method[i].t = t;
 	}
 
@@ -2324,6 +2410,7 @@ void find_best_memcpy()
 
     free( buf1 );
     free( buf2 );
+	free( validbuf );
 
 set_best_memcpy_method:
 	if (best) {

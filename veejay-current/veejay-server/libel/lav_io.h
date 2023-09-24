@@ -70,7 +70,6 @@ typedef struct
    int         sar_h;  /* "clip aspect ratio" height */
    int         has_audio;
    int         bps;
-   int         is_MJPG;
    int         MJPG_chroma;
    long	       mmap_size;
    int	       bogus_len;
@@ -94,7 +93,6 @@ int  lav_video_height(lav_file_t *lav_file);
 double lav_frame_rate(lav_file_t *lav_file);
 int  lav_video_interlacing(lav_file_t *lav_file);
 void lav_video_clipaspect(lav_file_t *lav_file, int *sar_w, int *sar_h);
-int  lav_video_is_MJPG(lav_file_t *lav_file);
 int lav_is_DV(lav_file_t *lav_file);
 int  lav_video_MJPG_chroma(lav_file_t *lav_file);
 const char *lav_video_compressor(lav_file_t *lav_file);

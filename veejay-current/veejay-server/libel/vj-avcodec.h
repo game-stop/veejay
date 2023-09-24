@@ -43,9 +43,10 @@ typedef struct
 {
 	AVCodec *codec;
 	AVCodec *audiocodec;
-//	AVFrame *frame;
+	AVFrame *frame;
 	AVCodecContext	*context;
-	int out_fmt;
+	AVPacket *packet;
+	//int out_fmt;
 	int uv_len;
 	int len;
 	int sub_sample;	
@@ -53,19 +54,23 @@ typedef struct
 	int encoder_id;
 	int width;
 	int height;
-	int format;
+	//int format;
 	uint8_t *data[4];
 	void *lzo;
 	int	shift_y;
 	int	shift_x;
 	void	*dv;
 	void	*y4m;
+	VJFrame *out_frame;
+	VJFrame *in_frame;
+	void *scaler;
 } vj_encoder;
 
 int		vj_avcodec_init(int pix, int verbose);
 char		vj_avcodec_find_lav(int format);
 int		vj_avcodec_encode_frame(void *encoder,long nframe, int format, uint8_t *src[4], uint8_t *dst, int dst_len, int pixel_format);
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av );
+int 			vj_avcodec_get_buf_size( vj_encoder *av );
 const char		*vj_avcodec_get_encoder_name(int encoder);
 int		vj_avcodec_free();
 void vj_libav_ffmpeg_version();
@@ -90,8 +95,5 @@ void 		*vj_avcodec_start( VJFrame *frame, int encoder, char *filename );
 int		vj_avcodec_stop( void *encoder , int fmt);
 
 void               vj_avcodec_close_encoder( vj_encoder *av );
-
-
-void	yuv_scale_pixels_from_yuv_copy( uint8_t *plane, uint8_t *dst, float min, float max, int len );
 
 #endif

@@ -35,6 +35,9 @@
 #ifdef HAVE_ARM
 #include <arm_neon.h>
 #endif
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 #define Y4M_CHROMA_420JPEG     0  /* 4:2:0, H/V centered, for JPEG/MPEG-1 */
 #define Y4M_CHROMA_420MPEG2    1  /* 4:2:0, H cosited, for MPEG-2         */
@@ -1428,9 +1431,35 @@ void	yuv_convert_and_scale_grey(void *sws , VJFrame *src, VJFrame *dst)
 
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride );
 }
+
+#ifdef STRICT_CHECKING
+static size_t get_alignment(void* ptr) {
+    uintptr_t address = (uintptr_t)ptr;
+    size_t alignment = 1;
+    
+    // Keep shifting the alignment to the left until the lowest bit is 1
+    while ((address & 1) == 0) {
+        alignment <<= 1;
+        address >>= 1;
+    }
+    
+    return alignment;
+}
+
+static int is_aligned( char *msg, void *ptr, size_t alignment ) {
+	uintptr_t address = (uintptr_t)ptr;
+
+	int isa = (address % alignment) == 0;
+	if(!isa) {
+		veejay_msg(VEEJAY_MSG_ERROR, "%s is not aligned to %d bytes. it's current alignment is %d bytes", msg, alignment, get_alignment(ptr) );
+	}
+}
+#endif
+
 void	yuv_convert_and_scale_packed(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
+
 	const int src_stride[3] = { src->width,src->uv_width,src->uv_width };
 	const int dst_stride[3] = { dst->width * 2,0,0 };
 
@@ -1474,23 +1503,18 @@ const char	*yuv_get_scaler_name(int id)
 	return NULL;
 }
 
-void	yuv422to420planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
-{
-	unsigned int x,y,k=0;
-	const int hei = h >> 1;
-	const int wid = w >> 1;
-	uint8_t *u = dst[1];
-	uint8_t *v = dst[2];
-	uint8_t *a = src[1];
-	uint8_t *b = src[2];
-	for( y = 0 ; y < hei; y ++ ) {
-		for( x= 0; x < wid ; x ++ ) {
-			u[k] = a[ (y<<1) * wid + x ]; //@ drop left chroma
-			v[k] = b[ (y<<1) * wid + x ];	
-			k++;
-		}
-	}	
+
+void yuv422to420planar(uint8_t *src[3], uint8_t *dst[3], int len ) {
+	
+	const int half = len / 2;
+	int i;
+	for( i = 0; i < half; i ++ ) {
+		dst[1][i] = ( src[1][2 * i] + src[1][2 * i + 1]) / 2;
+		dst[2][i] = ( src[2][2 * i] + src[2][2 * i + 1]) / 2;
+	}
+
 }
+
 #if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
 void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 {
@@ -1510,6 +1534,7 @@ void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 			u[k + wid ] = a[y*wid+x];
 			v[k] = b[ y * wid + x];
 			v[k + wid ] = b[y * wid + x ];
+			k += 2;
 		}
 	}
 }
@@ -1676,10 +1701,10 @@ static void	yuy_scale_pixels_from_yuv_job( void *arg)
 	}
 }
 
-void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len ) 
+void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len, int uv_len ) 
 {
 	if(vj_task_available() ) {
-		int strides[4] = { len, len/2,len/2, 0 };
+		int strides[4] = { len, uv_len,uv_len, 0 };
 		vj_task_run( src,dst,NULL, strides, 3, (performer_job_routine) &yuy_scale_pixels_from_yuv_job );
 	}
 	else {

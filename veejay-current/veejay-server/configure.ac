@@ -282,7 +282,7 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
 	if test "x$enable_debug" != "xyes" ; then
-		VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
+		VJE_CFLAGS="-ffast-math -m64 -fPIC -DPIC"
 		SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC -ftree-vectorize"
 	else
 		VJE_CFLAGS="-O3 -ftree-vectorize -fopt-info-vec-optimized -m64 -fPIC -DPIC -g"

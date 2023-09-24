@@ -92,13 +92,13 @@ void *lumamask_malloc(int width, int height)
 
     veejay_memset( l->buf[0], pixel_Y_lo_, width * height );
    
-    l->buf[1] = l->buf[0] + RUP8(width *height);
+    l->buf[1] = l->buf[0] + (width *height);
     veejay_memset( l->buf[1], 128, width * height );
     
-    l->buf[2] = l->buf[1] + RUP8(width *height);
+    l->buf[2] = l->buf[1] + (width *height);
     veejay_memset( l->buf[2], 128, width * height );
    
-    l->buf[3] = l->buf[2] + RUP8(width *height);
+    l->buf[3] = l->buf[2] + (width *height);
     veejay_memset( l->buf[3], 0, width * height );
 
     return (void*) l;

@@ -18,7 +18,7 @@ AM_CPPFLAGS += -I /usr/X11R6/include \
 		$(LIBAVFORMAT_CFLAGS) $(LIBAVCODEC_CFLAGS) $(LIBAVUTIL_CFLAGS) $(LIBSWSCALE_CFLAGS) $(GLIB_CFLAGS) \
 		$(PTHREAD_CFLAGS) 
 
-pkginclude_HEADERS = core.h vj-task.h defs.h avhelper.h avcommon.h vims.h
+pkginclude_HEADERS = core.h vj-task.h defs.h av.h avhelper.h avcommon.h vims.h
 
 VEEJAYCORE_LIB_FILE = libveejaycore.la
 

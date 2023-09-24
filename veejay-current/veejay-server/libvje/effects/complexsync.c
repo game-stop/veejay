@@ -73,11 +73,11 @@ void *complexsync_malloc(int width, int height)
         return NULL;
     }
 
-    c->c_outofsync_buffer[1] = c->c_outofsync_buffer[0] + RUP8(width*height);
-    c->c_outofsync_buffer[2] = c->c_outofsync_buffer[1] + RUP8(width*height);
+    c->c_outofsync_buffer[1] = c->c_outofsync_buffer[0] + (width*height);
+    c->c_outofsync_buffer[2] = c->c_outofsync_buffer[1] + (width*height);
   
-    vj_frame_clear1( c->c_outofsync_buffer[0] , pixel_Y_lo_ , RUP8(width*height));
-    vj_frame_clear1( c->c_outofsync_buffer[1] , 128, RUP8(width*height*2) );
+    vj_frame_clear1( c->c_outofsync_buffer[0] , pixel_Y_lo_ , (width*height));
+    vj_frame_clear1( c->c_outofsync_buffer[1] , 128, (width*height*2) );
 
     return (void*) c;
 }

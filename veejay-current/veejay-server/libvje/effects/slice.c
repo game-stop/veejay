@@ -70,9 +70,9 @@ void *slice_malloc(int width, int height)
 	    free(s);
         return NULL;
     }
-    s->slice_frame[1] = s->slice_frame[0] + RUP8(width * height);
-    s->slice_frame[2] = s->slice_frame[1] + RUP8(width * height);
-	s->slice_frame[3] = s->slice_frame[2] + RUP8(width * height);
+    s->slice_frame[1] = s->slice_frame[0] + (width * height);
+    s->slice_frame[2] = s->slice_frame[1] + (width * height);
+	s->slice_frame[3] = s->slice_frame[2] + (width * height);
     s->slice_xshift = (int*) vj_malloc(sizeof(int) * height);
     if(!s->slice_xshift) {
         free(s->slice_frame[0]);

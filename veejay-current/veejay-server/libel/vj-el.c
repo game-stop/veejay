@@ -73,6 +73,8 @@
 #define CODEC_ID_YUV420F 996
 #define CODEC_ID_YUVLZO 900
 #define DUMMY_FRAMES 2
+#define RUP16(num)(((num)+16)&~16)
+
 
 static struct
 {
@@ -113,10 +115,8 @@ typedef struct
         AVCodec *codec;
         AVFrame *frame;
         AVCodecContext  *context;
-        uint8_t *tmp_buffer; 
-        uint8_t *deinterlace_buffer[3];
-	VJFrame *img;
-	int fmt;
+        uint8_t *tmp_buffer;
+		int fmt;
         int ref;
 #ifdef SUPPORT_READ_DV2
 	vj_dv_decoder *dv_decoder;
@@ -162,8 +162,6 @@ static void	_el_free_decoder( vj_decoder *d )
 	{
 		if(d->tmp_buffer)
 			free( d->tmp_buffer );
-		if(d->deinterlace_buffer[0])
-			free(d->deinterlace_buffer[0]);
 #ifdef SUPPORT_READ_DV2
 		if( d->dv_decoder ) {
 			vj_dv_free_decoder( d->dv_decoder );
@@ -172,10 +170,6 @@ static void	_el_free_decoder( vj_decoder *d )
 		if(d->frame) {
 			av_free(d->frame);
 		}
-
-		if(d->img)
-			free(d->img);
-
 		if( d->lzo_decoder )
 			lzo_free(d->lzo_decoder);
 
@@ -183,7 +177,6 @@ static void	_el_free_decoder( vj_decoder *d )
 	}
 	d = NULL;
 }
-#define LARGE_NUM (256*256*256*64)
 
 static int el_pixel_format_org = 1;
 static int el_pixel_format_ = 1;
@@ -308,10 +301,9 @@ int	vj_el_cache_size()
 
 static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, float fps, int pixel_format, int out_fmt, long max_frame_size)
 {
-        vj_decoder *d = (vj_decoder*) vj_calloc(sizeof(vj_decoder));
-        if(!d)
+   vj_decoder *d = (vj_decoder*) vj_calloc(sizeof(vj_decoder));
+   if(!d)
 	  return NULL;
-
 #ifdef SUPPORT_READ_DV2
 	if( id == CODEC_ID_DVVIDEO )
 		d->dv_decoder = vj_dv_decoder_init(1, width, height, out_fmt );
@@ -319,7 +311,7 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 
 	if( id == CODEC_ID_YUVLZO )
 	{
-		d->lzo_decoder = lzo_new();
+		d->lzo_decoder = lzo_new( el_pixel_format_, el_width_, el_height_ , 1);
 	}
 	else if ( id == CODEC_ID_YUV422 || id == CODEC_ID_YUV420 || id == CODEC_ID_YUV420F || id == CODEC_ID_YUV422F ) {
 		
@@ -329,15 +321,16 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 		d->codec = avhelper_get_codec(ctx);
 		d->context = avhelper_get_codec_ctx(ctx);
 		d->frame = avhelper_alloc_frame();
-		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
-		d->img->width = width;
-		d->img->height = height;
 	}
 
-	size_t safe_max_frame_size = (max_frame_size < GREMLIN_GUARDIAN) ? 128 * 1024: RUP8(max_frame_size);
+	
+	size_t safe_max_frame_size = RUP8( AV_INPUT_BUFFER_PADDING_SIZE  + max_frame_size + GREMLIN_GUARDIAN );
+	
+	veejay_msg(VEEJAY_MSG_DEBUG, "Decoder buffer is %d bytes" , safe_max_frame_size);
+	
 
 	d->tmp_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * safe_max_frame_size );
-        d->fmt = id;
+    d->fmt = id;
 
 	return d;
 }
@@ -437,7 +430,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		return -1;
 	}
 
+#ifdef USE_GDK_PIXBUF
 	if( !elfd->picture )
+#endif
 		el->ctx[n] = avhelper_get_decoder( filename, out_format, width, height );
 
 	if( el->ctx[n] == NULL ) {
@@ -651,8 +646,15 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
 
 	if( el->decoders[n] == NULL ) {
-		long max_frame_size = get_max_frame_size( el->lav_fd[n] );
+		
 		decoder_id = el->lav_fd[n]->codec_id;
+
+		long max_frame_size = (el->video_width * el->video_height * 4);
+		if( decoder_id < 900 && decoder_id != AV_CODEC_ID_HUFFYUV ) 
+			max_frame_size = get_max_frame_size( el->lav_fd[n] );
+
+		max_frame_size = RUP16( max_frame_size );
+
 		el->decoders[n] = 
 			_el_new_decoder( el->ctx[n], decoder_id, el->video_width, el->video_height, el->video_fps, el->pixfmt[ n ],el_pixel_format_, max_frame_size );
 		if( el->decoders[n] == NULL ) {
@@ -794,10 +796,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 	if(el->cache)
 		in_cache = get_cached_frame( el->cache, nframe, &res, &in_pix_fmt );
 
-
 	int decoder_id = lav_video_compressor_type( el->lav_fd[N_EL_FILE(n)] );
-		
-
 
 	if(! in_cache )	
 	{
@@ -841,7 +840,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 	uint8_t *in[3] = { NULL,NULL,NULL };
 	int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len ,0};
 	uint8_t *dataplanes[4] = { data , data + el_out_->len, data + el_out_->len + el_out_->uv_len,0 };
-	switch( decoder_id )
+	switch( decoder_id ) //FIXME: use swscaler ?
 	{
 		case CODEC_ID_YUV420:
 			vj_frame_copy1( data,dst[0], el_out_->len );
@@ -884,22 +883,16 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 			return 1;
 			break;
 		case CODEC_ID_YUVLZO:
-			if(  ( in_pix_fmt == PIX_FMT_YUVJ420P || in_pix_fmt == PIX_FMT_YUV420P  ) ) {
-				inter = lzo_decompress420into422(d->lzo_decoder, data,res,dst, el->video_width,el->video_height );
-			} 
-			else { 
-				inter = lzo_decompress_el( d->lzo_decoder, data,res, dst,el->video_width*el->video_height);
-			}
-
-			return inter;
-
+			return lzo_decompress_el( d->lzo_decoder, data,res, dst, el_width_, el_height_, el_pixel_format_);
 			break;			
 		default:
 
-			if( avhelper_decode_video( el->ctx[ N_EL_FILE(n) ], data, res ) ) {
-				avhelper_rescale_video( el->ctx[N_EL_FILE(n) ], dst );
-				return 1;
-			}
+			int ret = avhelper_decode_video_direct( el->ctx[ N_EL_FILE(n) ], data, res, dst, el_pixel_format_,el_width_,el_height_ );
+
+			avhelper_decode_finish( el->ctx[ N_EL_FILE(n)] );
+
+			return ret;
+
 			break;
 	}
 
@@ -918,7 +911,7 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 		return -1;
 	}
 	
-    	int decoder_id = lav_video_compressor_type( lav );
+   	int decoder_id = lav_video_compressor_type( lav );
 
 	if( decoder_id < 0 )
 	{
@@ -960,6 +953,7 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 
 	if(!d)
 	{
+		veejay_msg(0, "Failed to initialize decoder");
 		return -1;
 	} 
 
@@ -976,6 +970,9 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 	int ret = -1;
 	switch( decoder_id )
 	{
+		case CODEC_ID_HUFFYUV:
+			ret = PIX_FMT_YUV422P;
+			break;
 		case CODEC_ID_YUV420F:
 			ret = PIX_FMT_YUVJ420P;
 			break;

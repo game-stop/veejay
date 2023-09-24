@@ -61,8 +61,8 @@ void *split_malloc(int width, int height)
 		return NULL;
     }
 
-	s->split_buf[1] = s->split_buf[0] + RUP8(width*height);
-	s->split_buf[2] = s->split_buf[1] + RUP8(width*height);
+	s->split_buf[1] = s->split_buf[0] + (width*height);
+	s->split_buf[2] = s->split_buf[1] + (width*height);
 
 	return (void*)s;
 }

@@ -137,7 +137,7 @@ int contourextract_malloc(void **d, int width, int height)
 	my->bitmap = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height ));
 	
 	if(static_bg == NULL)	
-		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height) + RUP8(width*2));
+		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( (width * height + (width*2)) )   );
 	if(dt_map == NULL )
 		dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * RUP8( width * height ));
 

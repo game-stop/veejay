@@ -424,7 +424,7 @@ void motionmap_apply( void *ptr, VJFrame *frame, int *args )
 		mm->activity_decay = act_decay;
 	}
 
-    motionmap_calc_diff( (const uint8_t*) mm->bg_image, mm->prev_img, (const uint8_t*) frame->data[0], mm->diff_img, mm->diff_img + RUP8(len), mm->binary_img, len, threshold );
+    motionmap_calc_diff( (const uint8_t*) mm->bg_image, mm->prev_img, (const uint8_t*) frame->data[0], mm->diff_img, mm->diff_img + len, mm->binary_img, len, threshold );
 
 	if( draw )
 	{

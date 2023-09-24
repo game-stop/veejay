@@ -256,8 +256,9 @@ static void	*mcast_reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
 	threaded_t *t = tag->priv;
+	const int len = vj_tag_get_width() * vj_tag_get_height() * 4;
 	const int padded = 256;
-	int max_len = padded + RUP8( 1920 * 1080 * 3 );
+	const int max_len = padded + len;
 		
 	for( ;; ) {
 		int error = 0;

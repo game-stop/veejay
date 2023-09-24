@@ -66,8 +66,8 @@ void *average_malloc(int width, int height)
 	    free(a);
         return NULL;
     }
-	a->running_sum[1] = a->running_sum[0] + RUP8(width*height);
-	a->running_sum[2] = a->running_sum[1] + RUP8(width*height);
+	a->running_sum[1] = a->running_sum[0] + (width*height);
+	a->running_sum[2] = a->running_sum[1] + (width*height);
 	a->frame_count = 1;
     return (void*) a;
 }

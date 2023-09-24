@@ -105,6 +105,11 @@ AC_CHECK_SIZEOF([long int])
 AC_CHECK_SIZEOF([size_t])
 AC_CHECK_SIZEOF([float])
 
+
+AC_TYPE_OFF_T
+AC_CHECK_TYPE(ptrdiff_t, long)
+AC_TYPE_SIZE_T
+
 AC_SEARCH_LIBS([clock_gettime], [rt],
 	       [AC_DEFINE(HAVE_POSIX_TIMERS,[1],[Set to 1 if clock_gettime and POSIX timers are available])])
 
@@ -134,6 +139,7 @@ case "${host_os}" in
 		AC_DEFINE(HAVE_DARWIN,1,[MAC OS X Darwin])
 		dnl OS-X/Darwin needs no-cpp-precomp
 		CFLAGS="$CFLAGS -no-cpp-precomp"
+		OP_CFLAGS="$OP_CFLAGS -no-cpp-precomp"
 		have_darwin=true
 		LIBM_LIBS=""
 	;;	
@@ -155,7 +161,7 @@ fi
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
- debugCFLAGS="-g"
+ debugCFLAGS="-g -Wall"
  CFLAGS="$CFLAGS $debugCFLAGS"
  AC_MSG_RESULT([yes])
 else
@@ -219,8 +225,7 @@ have_arm=false
 have_armv7a=false
 
 OP_CFLAGS=""
-VJE_CFLAGS=""
-SUBSAMPLE_CFLAGS=""
+LZO_EXTRA_CFLAGS="-DMINILZO_HAVE_CONFIG_H"
 
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
@@ -228,13 +233,8 @@ case $host_cpu in
 	AC_DEFINE(HAVE_X86CPU,1, [Compiling for x86 architecture CPU])
 	AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
 	have_x86cpu=true
-
 	PROGRAM_NOPIC="-fno-PIC"
-
-	if test "x$enable_debug" != "xyes" ; then
-		CFLAGS="$CFLAGS -O3 -ftree-vectorize -ffast-math -fopenmp"
-	fi
-
+	OP_CFLAGS="-O3 -ffast-math"
 	AC_MSG_RESULT([x86])
     ;;
   x86_64*|k8-*)
@@ -242,10 +242,7 @@ case $host_cpu in
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	if test "x$enable_debug" != "xyes" ; then
-		CFLAGS="$CFLAGS -O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC -fopenmp"
-	fi
-
+	OP_CFLAGS="$OP_CFLAGS -O3 -ftree-vectorize -ffast-math -fopenmp -m64"
 	AC_MSG_RESULT([x86_64])
     ;;
   powerpc | powerpc64)
@@ -256,14 +253,12 @@ case $host_cpu in
 	case $host in
 	      *-apple-darwin*)
 		PROGRAM_NOPIC="-mdynamic-no-pic" # dynamic-no-pic is an Apple gcc option
-dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
-
 	        ;;
      		 *)
    		PROGRAM_NOPIC=""
       		;;
     	esac
-	CFLAGS="$CFLAGS -O3"
+	OP_CFLAGS="$OP_CFLAGS -O3"
 	AC_MSG_RESULT([powerpc])
     ;;
    mips | mipsel)
@@ -276,7 +271,7 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
                 ]])],
 		[have_ps2=true],
 		[have_ps2=false])
-
+	OP_CFLAGS="$OP_CFLAGS -O3 -ffast-math"
 	AC_MSG_RESULT([mips])
 
 	AC_MSG_CHECKING([if we are compiling on playstation2 hardware])
@@ -286,24 +281,19 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	else
 		AC_MSG_RESULT(no)
 	fi
-
-	CFLAGS="$CFLAGS -O3"
-
 	;;
    aarch64* |arm)
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	 if test "x$enable_debug" != "xyes" ; then
-	     CFLAGS="$CFLAGS -O3 -ftree-vectorize -m64 -fPIC -DPIC -fopenmp"
-	 fi
+	 OP_CFLAGS="$OP_CFLAGS -m64 -fPIC -DPIC"
 	 have_arm=true
+	 OP_CFLAGS="$OP_CFLAGS -O3 -m64 -fPIC -DPIC"
 	 AC_MSG_RESULT([arm])
      ;;
     arm7* )
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARM7L CPU])
-	 if test "x$enable_debug" != "xyes" ; then
-	 	CFLAGS="$CFLAGS -O3 -ftree-vectorize -m64 -fPIC -DPIC -fopenmp"
-	 fi
+	 OP_CFLAGS="$OP_CFLAGS -O3 -m64 -fPIC -DPIC"
+	
 	 have_arm=true
 	 have_armv7a=true
 	 AC_MSG_RESULT([arm7])
@@ -314,15 +304,9 @@ dnl If you get here, you can change AC_MSG_ERROR to AC_MSG_RESULT
 dnl and uncomment setting the CFLAGS below to have it compile anyway on your system
 	AC_MSG_ERROR([unknown, good luck])
 
-dnl	OP_CFLAGS="$USER_CFLAGS"
-dnl	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
-dnl	VJE_CFLAGS="$USER_CFLAGS"
-dnl	CFLAGS="$USER_CFLAGS"
 
     ;;
 esac
-
-CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 
 if test x$host_alias != x; then
 	dnl Cross compiling
@@ -341,7 +325,7 @@ else
 		TMP=`$srcdir/cpuinfo.sh`
 		ARCHFLAGS=`cat veejay.arch`
 	else
-       		ARCHFLAGS="-mtune=$arch_target"
+       	ARCHFLAGS="-mtune=$arch_target"
 	fi
 		AC_MSG_RESULT($ARCHFLAGS)
 fi
@@ -359,24 +343,13 @@ then
 
 	if test $ac_cv_flag_neon = yes ; then
 		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
-		USER_CFLAGS="-mfpu=neon -ftree-vectorize -mvectorize-with-neon-quad $USER_CFLAGS"
+		OP_CFLAGS="$OP_CFLAGS -mfpu=neon -mvectorize-with-neon-quad"
 		FASTARM_CFLAGS="$ARCHFLAGS -march=armv7-a -mthumb -mimplicit-it=always -mthumb-interwork -DCONFIG_THUMB"
 	else
-		USER_CFLAGS="-march=native -ftree-vectorize $USER_CFLAGS"
+		OP_CFLAGS="$OP_CFLAGS -march=native"
 		FASTARM_CFLAGS="$ARCHFLAGS"
 	fi
 	
-	if test "x$enable_debug" != "xyes" ; then
-		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
-	else
-		USER_CFLAGS="$USER_CFLAGS -g -Wall"
-	fi
-
-	OP_CFLAGS="$USER_CFLAGS"
-	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
-	VJE_CFLAGS="$USER_CFLAGS"
-	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
-
 	AC_SUBST(FASTARM_CFLAGS)
 fi
 
@@ -394,19 +367,8 @@ then
 		AC_DEFINE(HAVE_ARM_ASIMD, 1,[Compiling in ASIMD support])
 	fi
 
-	if test "x$enable_debug" != "xyes" ; then
-		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
-	else
-		USER_CFLAGS="$USER_CFLAGS -g -Wall"
-	fi
-
-	OP_CFLAGS="$USER_CFLAGS"
-	SUBSAMPLE_CFLAGS="$USER_CFLAGS"
-	VJE_CFLAGS="$USER_CFLAGS"
-	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 	AC_SUBST(FASTARM_CFLAGS)
 fi
-
 
 
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
@@ -501,7 +463,7 @@ then
 		    AC_DEFINE(HAVE_ASM_SSE4_2,1,[Compiling in SSE4_2 support])
 		    AC_DEFINE(HAVE_SSE4_2,1,[Compiling in SSE4_2 support])
 		    have_asm_sse4_2=true
-			CFLAGS="$CFLAGS -msse4.2"
+			OP_CFLAGS="$OP_CFLAGS -msse4.2"
 	    fi
 
 
@@ -759,9 +721,10 @@ dnl We do this last as it can screw up library detection etc...
 
 CFLAGS="$ARCHFLAGS $CFLAGS"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
-OP_CFLAGS="$VJE_CFLAGS"
+
 
 AC_SUBST(OP_CFLAGS)
+AC_SUBST(LZO_EXTRA_CFLAGS)
 
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
@@ -790,14 +753,9 @@ fi
 if test "x$cflags_set" != "xyes" ; then
   if test "x$enable_debug" = "xyes" ; then
   	CFLAGS="$debugCFLAGS $warnCFLAGS $CFLAGS"
-	VJE_CFLAGS="$debugCFLAGS $warnCFLAGS $VJE_CFLAGS"
-	OP_CFLAGS="$debugCFLAGS $warnCFLAGS $OP_CFLAGS"
-	SUBSAMPLE_CFLAGS="$debugCFLAGS $warnCFLAGS $SUBSAMPLE_CFLAGS"
+	OP_CFLAGS=""
   else
  	CFLAGS="$CFLAGS $warnCFLAGS"
-	VJE_CFLAGS="$debugCFLAGS $VJE_CFLAGS"
-	OP_CFLAGS="$debugCFLAGS $OP_CFLAGS"
-	SUBSAMPLE_CFLAGS="$debugCFLAGS $SUBSAMPLE_CFLAGS"
   fi
   CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
   cflags_set=yes
@@ -857,7 +815,9 @@ AC_DEFINE(VERSION, ${VERSION})
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Veejay-Core ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
-AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
+AC_MSG_NOTICE([ Compiler flags: ])
+AC_MSG_NOTICE([ CFLAGS=$CFLAGS ])
+AC_MSG_NOTICE([ OP_CFLAGS=$OP_CFLAGS ])
 AC_MSG_NOTICE([   architecture: $arch_target])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])

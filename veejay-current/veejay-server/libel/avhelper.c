@@ -35,8 +35,9 @@
 #include <libavcodec/version.h>
 #include <libavformat/avformat.h>
 #include <libavformat/version.h>
+#include <libavutil/imgutils.h>
 #include <veejaycore/avhelper.h>
-#include <libel/av.h>
+#include <veejaycore/av.h>
 #include <veejaycore/hash.h>
 
 static struct
@@ -47,23 +48,20 @@ static struct
 {
 	{ "vj20", CODEC_ID_YUV420F	},
 	{ "vj22", CODEC_ID_YUV422F	},
-    	{ "mjpg" ,CODEC_ID_MJPEG 	},
+    { "mjpg" ,CODEC_ID_MJPEG 	},
 	{ "mjpb", CODEC_ID_MJPEGB	},
 	{ "i420", CODEC_ID_YUV420	},
-    	{ "i422", CODEC_ID_YUV422	},
+    { "i422", CODEC_ID_YUV422	},
 	{ "dmb1", CODEC_ID_MJPEG	},
 	{ "jpeg", CODEC_ID_MJPEG	},
 	{ "mjpa", CODEC_ID_MJPEG	},
-	{ "mjpb", CODEC_ID_MJPEG	},
-	{ "jfif", CODEC_ID_MJPEG	},
 	{ "jfif", CODEC_ID_MJPEG	},
 	{ "png", CODEC_ID_PNG		},
 	{ "mpng", CODEC_ID_PNG		},
-#if LIBAVCODEC_BUILD > 4680
+#if LIBAVCODEC_VERSION_MAJOR > 46 && LIBAVCODEC_VERSION_MINOR > 80
 	{ "sp5x", CODEC_ID_SP5X		}, 
 #endif
 	{ "jpgl", CODEC_ID_MJPEG 	},
-	{ "jpgl", CODEC_ID_MJPEG	},
 	{ "ljpg", CODEC_ID_LJPEG	},
 	{ "dvsd", CODEC_ID_DVVIDEO	},
 	{ "dvcp", CODEC_ID_DVVIDEO	},
@@ -72,7 +70,6 @@ static struct
 	{ "dvp", CODEC_ID_DVVIDEO	},
 	{ "yuv", CODEC_ID_YUV420	},
 	{ "iyuv", CODEC_ID_YUV420	},
-	{ "i420", CODEC_ID_YUV420	},
 	{ "yv16", CODEC_ID_YUV422	},
 	{ "yv12", CODEC_ID_YUV420	},
 	{ "mlzo", CODEC_ID_YUVLZO	}, 
@@ -87,17 +84,33 @@ static struct
 	{ NULL  , 0,				},
 };
 
+//from gst-ffmpeg, round up a number
+#define GEN_MASK(x) ((1<<(x))-1)
+#define ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) & ~GEN_MASK(x))
+#define ROUND_UP_2(x) ROUND_UP_X (x, 1)
+#define ROUND_UP_4(x) ROUND_UP_X (x, 2)
+#define ROUND_UP_8(x) ROUND_UP_X (x, 3)
+#define DIV_ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) >> (x))
+#define RUP8(num)(((num)+8)&~8)
 
 #define MAX_PACKETS 5
 
 typedef struct
 {
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	AVPacket packets[MAX_PACKETS];
+#else
+	AVPacket *packets[MAX_PACKETS];
+#endif
     AVFrame *frames[2];
 	int	frameinfo[2];
 	AVCodec *codec;
 	AVCodecContext *codec_ctx;
 	AVFormatContext *avformat_ctx;
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	AVPacket *packet;
+	AVFrame *frame;
+#endif
 	int frame_index;
 	int pixfmt;
 	int codec_id;
@@ -227,6 +240,9 @@ int	avhelper_get_codec_by_key( int key )
 	}
 	
 	hnode_t *node = hash_lookup( fourccTable,(const void*) k);
+	if( node == NULL ) {
+		return -1;
+	}
 	fourcc_node *fourcc = hnode_get(node);
 	if(fourcc) {
 		return fourcc->codec_id;
@@ -248,7 +264,16 @@ void	*avhelper_get_codec( void *ptr )
 	return e->codec;
 }
 
-#if LIBAVCODEC_BUILD > 5400
+void	avhelper_codec_close( AVCodecContext *ctx ) {
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	avcodec_free_context(&ctx);
+#else
+	avcodec_close(ctx);
+#endif
+}
+
+
+#if LIBAVCODEC_VERSION_MAJOR > 54 && LIBAVCODEC_VERSION_MAJOR < 60
 static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *got_picture, uint8_t *data, int pktsize ) {
 	AVPacket pkt;
 	veejay_memset( &pkt, 0, sizeof(AVPacket));
@@ -256,13 +281,54 @@ static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *g
 	pkt.size = pktsize;
 	return avcodec_decode_video2( avctx, picture, got_picture, &pkt );
 }
+#else
+static int avcodec_decode_video( AVPacket *pkt, AVCodecContext *avctx, AVFrame *picture, int *got_picture, uint8_t *data, int pktsize ) {
+	pkt->data = data;
+	pkt->size = pktsize;
+
+	int ret = avcodec_send_packet( avctx, pkt );
+	if( ret < 0 ) {
+		veejay_msg(0, "Error submitting a packet to the decoder");
+		return ret;
+	}
+
+	ret = avcodec_receive_frame( avctx, picture );
+	if( ret < 0 ) {
+		if( ret == AVERROR_EOF ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "There is no output");
+			*got_picture = 0;
+			return ret;
+		}
+	}
+
+	*got_picture = 1;
+
+	av_packet_unref(pkt);
+
+	return ret;
+}
 #endif
+
+int avhelper_decode_video3( AVCodecContext *avctx, AVFrame *frame, int *got_picture, AVPacket *pkt ) {
+#if LIBAVCODEC_VERSION_MAJOR < 60
+	return avcodec_decode_video(avctx,frame,got_picture,pkt->data,pkt->size);
+#else
+	return avcodec_decode_video(pkt, avctx,frame,got_picture,pkt->data,pkt->size);
+#endif
+}
+
 
 void avhelper_frame_unref(AVFrame *ptr)
 {
 #if (LIBAVCODEC_VERSION_MAJOR > 55 && LIBAVCODEC_VERSION_MINOR > 40) || (LIBAVCODEC_VERSION_MAJOR == 56 && LIBAVCODEC_VERSION_MINOR > 0)
 	av_frame_unref( ptr );
 #endif
+
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	//av_frame_free(&ptr);
+#endif
+
+
 }
 
 void avhelper_free_context(AVCodecContext **avctx)
@@ -277,15 +343,25 @@ void avhelper_free_context(AVCodecContext **avctx)
 }
 
 static void avhelper_close_input_file( AVFormatContext *s ) {
-#if LIBAVCODEC_BUILD > 5400
+#if LIBAVCODEC_VERSION_MAJOR > 54
 	avformat_close_input(&s);
 #else
 	av_close_input_file(s);
 #endif
 }
 
+void avhelper_free_packet(AVPacket *pkt) {
+#if LIBAVCODEC_VERSION_MAJOR < 60
+	av_free_packet( pkt );
+#else
+	av_packet_unref( pkt );
+#endif
+}
+
+
 void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 	el_decoder_t *x = (el_decoder_t*) vj_calloc( sizeof( el_decoder_t ));
+	int j;
 	if(!x) {
 		return NULL;
 	}
@@ -296,14 +372,17 @@ void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 		return NULL;
 	}
 
-#if LIBAVCODEC_BUILD > 5400
+#if LIBAVCODEC_VERSION_MAJOR > 54
 	x->codec_ctx = avcodec_alloc_context3(x->codec);
 
 	int n_threads = avhelper_set_num_decoders();
-
-	if( n_threads > 0 ) {
-		x->codec_ctx->thread_count = n_threads;
+	if (x->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
 		x->codec_ctx->thread_type = FF_THREAD_FRAME;
+		x->codec_ctx->thread_count = n_threads;	
+	}
+	else if (x->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+		x->codec_ctx->thread_type = FF_THREAD_SLICE;
+		x->codec_ctx->thread_count = n_threads;	
 	}
 
 	//AVDictionary *options = NULL;
@@ -322,7 +401,11 @@ void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
 
 	x->frames[0] = avhelper_alloc_frame();
 	x->frames[1] = avhelper_alloc_frame();
-
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	for(j = 0; j < MAX_PACKETS; j ++ ) {
+		x->packets[j] = av_packet_alloc();
+	}
+#endif
 	x->output = yuv_yuv_template( NULL,NULL,NULL, output->width, output->height, alpha_fmt_to_yuv(output->format) );
 	//av_dict_free(&options);
 
@@ -359,14 +442,26 @@ double avhelper_get_spvf( void *decoder ) {
 int avhelper_recv_frame_packet( void *decoder )
 {
     el_decoder_t *x = (el_decoder_t*) decoder;
-
+#if LIBAVCODEC_VERSION_MAJOR < 60
     veejay_memset( &(x->packets[x->write_index]), 0 , sizeof(AVPacket));
+#else
 
+#endif
+
+#if LIBAVCODEC_VERSION_MAJOR < 60
     int ret = av_read_frame(x->avformat_ctx, &(x->packets[x->write_index]) );
+#else
+	int ret = av_read_frame(x->avformat_ctx, x->packets[x->write_index] );
+#endif
 
     if( ret == OK ) {
+#if LIBAVCODEC_VERSION_MAJOR < 60
         if( x->packets[ x->write_index ].stream_index != x->video_stream_id ) {
-            av_free_packet( &(x->packets[x->write_index]) );
+			avhelper_free_packet( &(x->packets[x->write_index]) );
+#else
+		if( x->packets[ x->write_index ]->stream_index != x->video_stream_id ) {
+			avhelper_free_packet( x->packets[x->write_index] );
+#endif
             return 2; // discarded
         }
 
@@ -377,12 +472,15 @@ int avhelper_recv_frame_packet( void *decoder )
     return -1; // error
 }
 
-int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len ) 
+int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )  //FIXME callers
 {
 	int got_picture = 0;
 	el_decoder_t * e = (el_decoder_t*) ptr;
-
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	avcodec_decode_video( e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
+#else
+	avcodec_decode_video( e->packets[e->frame_index], e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
+#endif
 
 	//avhelper_frame_unref(e->frames[e->frame_index]);
 
@@ -405,16 +503,25 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
     while(1) {
 
         // only decode video
+#if LIBAVCODEC_VERSION_MAJOR < 60
         if( x->packets[ x->read_index ].stream_index != x->video_stream_id )
             break;
-
-        // poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
+		// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
         // this function, is the only function, that may manipulate frame_index, as it is used together with avhelper_get_decoded_video
         // other functions in this source file, assume an index of 0 
         result = avcodec_decode_video( x->codec_ctx, x->frames[x->frame_index], &gp, x->packets[ x->read_index ].data, x->packets[ x->read_index ].size );
         //avhelper_frame_unref(x->frames[x->frame_index]);
-
-        av_free_packet( &(x->packets[x->write_index]) );
+		 avhelper_free_packet( &(x->packets[x->write_index]) );
+#else
+        if( x->packets[ x->read_index ]->stream_index != x->video_stream_id )
+            break;
+		// poor man 'double buffering'; when the decode is successful, decode next frame into its own buffer and increment frame_index.
+        // this function, is the only function, that may manipulate frame_index, as it is used together with avhelper_get_decoded_video
+        // other functions in this source file, assume an index of 0 
+        result = avcodec_decode_video( x->packets[x->read_index], x->codec_ctx, x->frames[x->frame_index], &gp, x->packets[ x->read_index ]->data, x->packets[ x->read_index ]->size );
+        //avhelper_frame_unref(x->frames[x->frame_index]);
+		 avhelper_free_packet( x->packets[x->write_index]);
+#endif
 
         x->read_index = (x->read_index + 1) % MAX_PACKETS;
 
@@ -423,7 +530,7 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
     }
     *got_picture = gp;
 
-	if(gp) {
+	if(gp) { //FIXME callers and finish decode to increment frame
 		x->frameinfo[x->frame_index] = 1; /* we have a full picture at this index */
 		x->frame_index = (x->frame_index + 1) % 2; /* use next available buffer */
         x->frameinfo[x->frame_index] = 0;
@@ -432,44 +539,15 @@ int avhelper_recv_decode( void *decoder, int *got_picture )
     return result;
 }
 
-
-int	avhelper_get_frame( void *decoder, int *got_picture )
-{
-	el_decoder_t *x = (el_decoder_t*) decoder;
-
-	veejay_memset( &(x->packets[0]), 0, sizeof(AVPacket));
-	
-	int gp = 0;
-	int result = 0;
-	while(1) {
-	    int ret = av_read_frame(x->avformat_ctx, &(x->packets[0]));
-		if( ret < 0 )
-			break;
-
-		if ( x->packets[0].stream_index == x->video_stream_id ) {
-			result = avcodec_decode_video( x->codec_ctx,x->frames[x->frame_index],&gp, x->packets[0].data, x->packets[0].size );
-			avhelper_frame_unref(x->frames[x->frame_index]);
-		}
-				
-		av_free_packet( &(x->packets[0]) );	
-
-		if( gp )
-			break;
-	}
-
-    *got_picture = gp;
-
-	return result;
-}
-
 static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pixfmt, int dst_width, int dst_height, int force_intra_frame_only ) {
 	char errbuf[512];
 	el_decoder_t *x = (el_decoder_t*) vj_calloc( sizeof( el_decoder_t ));
+	int ret;
 	if(!x) {
 		return NULL;
 	}
 
-#if LIBAVCODEC_BUILD > 5400
+#if LIBAVCODEC_VERSION_MAJOR > 54
 	int err = avformat_open_input( &(x->avformat_ctx), filename, NULL, NULL );
 #else
 	int err = av_open_input_file( &(x->avformat_ctx),filename,NULL,0,NULL );
@@ -477,20 +555,19 @@ static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pi
 
 	if(err < 0 ) {
 		av_strerror( err, errbuf, sizeof(errbuf));
-		veejay_msg(VEEJAY_MSG_DEBUG, "Error opening %s: %s", filename,errbuf );
+		veejay_msg(VEEJAY_MSG_ERROR, "Error opening %s: %s", filename,errbuf );
 		free(x);
 		return NULL;
 	}
 
-#if LIBAVCODEC_BUILD > 5400
-	/* avformat_find_stream_info leaks memory */
+#if LIBAVCODEC_VERSION_MAJOR > 54
 	err = avformat_find_stream_info( x->avformat_ctx, NULL );
 #else
 	err = av_find_stream_info( x->avformat_ctx );
 #endif
 	if( err < 0 ) {
 		av_strerror( err, errbuf, sizeof(errbuf));
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s: %s" ,filename,errbuf );
+		veejay_msg(VEEJAY_MSG_ERROR, "Error getting stream info from %s: %s" ,filename,errbuf );
 	}
 
 	if(err < 0 ) {
@@ -498,11 +575,12 @@ static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pi
 		free(x);
 		return NULL;
 	}
-	
+
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	unsigned int i,j;
 	unsigned int n = x->avformat_ctx->nb_streams;
 	
-        x->video_stream_id = -1;
+    x->video_stream_id = -1;
 
 	for( i = 0; i < n; i ++ )
 	{
@@ -521,10 +599,13 @@ static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pi
 				        		sup_codec = 1;
 				        		goto further;
 				        	}
+							veejay_msg(VEEJAY_MSG_DEBUG, "%s = %d", _supported_codecs[j].name, sup_codec);
 				        }	
                                 }
 further:
 				if( !sup_codec ) {
+					veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: Not a supported codec %d", 
+						x->avformat_ctx->streams[i]->codec->codec_id);
 					avhelper_close_input_file( x->avformat_ctx );
 					free(x);
 					return NULL;
@@ -533,6 +614,7 @@ further:
 				x->codec = avcodec_find_decoder( x->avformat_ctx->streams[i]->codec->codec_id );
 				if(x->codec == NULL ) 
 				{
+					veejay_msg(VEEJAY_MSG_ERROR,"FFmpeg: Unable to find decoder" );
 					avhelper_close_input_file( x->avformat_ctx );
 					free(x);
 					return NULL;
@@ -546,68 +628,197 @@ further:
 	}
 
 	if( x->video_stream_id == -1 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: No video streams found");
+		veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: No video streams found");
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
 		return NULL;
 	}
 
 	x->codec_ctx = x->avformat_ctx->streams[x->video_stream_id]->codec;
+#else
+  int stream_index;
+    AVStream *st; int j;
+   
+    ret = av_find_best_stream(x->avformat_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
+    if (ret < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Could not find %s stream in input file '%s'\n",
+                av_get_media_type_string(AVMEDIA_TYPE_VIDEO), filename);
+		avhelper_close_input_file( x->avformat_ctx );
+		free(x);
+        return NULL;
+    } else {
+        stream_index = ret;
+        st = x->avformat_ctx->streams[stream_index];
+
+		int sup_codec = !force_intra_frame_only;
+		if( force_intra_frame_only ) {
+			for( j = 0; _supported_codecs[j].name != NULL; j ++ ) {
+				if( st->codecpar->codec_id == _supported_codecs[j].id ) {
+					sup_codec = 1;
+					break;
+				}
+			}
+		
+			if( !sup_codec ) {
+				if(st->codecpar->codec_id == 0) 
+					veejay_msg(VEEJAY_MSG_DEBUG, "Continue, file is not recognized by ffmpeg (codec not found)");
+				veejay_msg(VEEJAY_MSG_DEBUG, "The codec %d is not supportedr ", st->codecpar->codec_id);
+				avhelper_close_input_file( x->avformat_ctx );
+				free(x);
+				return NULL;
+			}
+		}
+
+        /* find decoder for the stream */
+        x->codec = avcodec_find_decoder(st->codecpar->codec_id);
+        if (!x->codec) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Failed to find %s codec\n",
+                    av_get_media_type_string(AVMEDIA_TYPE_VIDEO));
+					avhelper_close_input_file( x->avformat_ctx );
+			free(x);
+            return NULL;
+        }
+
+		x->video_stream_id = stream_index;
+    }
+#endif
 
 	int wid = dst_width;
 	int hei = dst_height;
 
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	if( wid == -1 && hei == -1 ) {
 		wid = x->codec_ctx->width;
 		hei = x->codec_ctx->height;
 	}
-
-#if LIBAVCODEC_BUILD > 5400
-
-	int n_threads = avhelper_set_num_decoders();
-
-	if( n_threads > 0 ) {
-		x->codec_ctx->thread_count = n_threads;
-		x->codec_ctx->thread_type = FF_THREAD_FRAME;
-	}
-
-	//AVDictionary *options = NULL;
-	//av_dict_set(&options, "hwaccel", "auto", 0);
-
-	if ( avcodec_open2( x->codec_ctx, x->codec, NULL ) < 0 )
 #else
-	if ( avcodec_open( x->codec_ctx, x->codec ) < 0 ) 
-#endif
-	{
+	AVCodecContext *dec_ctx = avcodec_alloc_context3(x->codec);
+	if(!dec_ctx) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate the codec context");
+		avhelper_codec_close(dec_ctx);
 		avhelper_close_input_file( x->avformat_ctx );
 		free(x);
-		//av_dict_free(&options);
 		return NULL;
 	}
 
+	/* Copy codec parameters from input stream to output codec context */
+	if ((ret = avcodec_parameters_to_context(dec_ctx, st->codecpar)) < 0) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy %s codec parameters to decoder context");
+		avhelper_codec_close(dec_ctx);
+		avhelper_close_input_file( x->avformat_ctx );
+		free(x);
+		return NULL;
+	}
+	if( wid == -1 && hei == -1 ) {
+		wid = dec_ctx->width;
+		hei = dec_ctx->height;
+	}
+#endif
+
+#if LIBAVCODECBUILD > 5400
+	int n_threads = avhelper_set_num_decoders();
+
+	if (x->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+		x->codec_ctx->thread_type = FF_THREAD_FRAME;
+		x->codec_ctx->thread_count = n_threads;	
+	}
+	else if (x->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+		x->codec_ctx->thread_type = FF_THREAD_SLICE;
+		x->codec_ctx->thread_count = n_threads;	
+	}
+
+#endif
+
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	/* Init the decoders */
+	if ((ret = avcodec_open2(dec_ctx, x->codec, NULL)) < 0) 
+#endif
+#if LIBAVCODEC_VERSION_MAJOR > 54 && LIBAVCODEC_VERSION_MAJOR < 60
+	if ((ret = avcodec_open2( x->codec_ctx, x->codec, NULL )) < 0 )
+#endif
+#if LIBAVCODEC_VERSION_MAJOR < 54
+	if ((ret = avcodec_open( x->codec_ctx, x->codec )) < 0 ) 
+#endif
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, " FFmpeg: Unable to open codec");
+		avhelper_close_input_file( x->avformat_ctx );
+		free(x);
+		return NULL;
+	}
+
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	x->codec_ctx = dec_ctx;
+	for(j = 0; j < MAX_PACKETS; j ++ ) {
+		x->packets[j] = av_packet_alloc();
+	}
+
+#endif
+
+	int got_picture = 0;
+
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	veejay_memset( &(x->packets[0]), 0, sizeof(AVPacket));
 	AVFrame *f = avhelper_alloc_frame();
 	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
 	x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
-
-	int got_picture = 0;
+	
 	while(1) {
-	    	int ret = av_read_frame(x->avformat_ctx, &(x->packets[0]));
-		if( ret < 0 )
+	    int ret = av_read_frame(x->avformat_ctx, &(x->packets[0]));
+		if( ret < 0 ) {
+			av_strerror( err, errbuf, sizeof(errbuf));
+			veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: read error: %s", errbuf);
 			break;
+		}
 
 		if ( x->packets[0].stream_index == x->video_stream_id ) {
-			avcodec_decode_video( x->codec_ctx,f,&got_picture, x->packets[0].data, x->packets[0].size );
+			ret = avcodec_decode_video( x->codec_ctx,f,&got_picture, x->packets[0].data, x->packets[0].size );
+
 			avhelper_frame_unref( f );
+			if( ret < 0 ) {
+				av_strerror( err, errbuf, sizeof(errbuf));
+				veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: decode error: %s", errbuf);
+			}
 		}
 				
-		av_free_packet( &(x->packets[0]) );	
+		avhelper_free_packet( &(x->packets[0]) );	
 
 		if( got_picture )
 			break;
 	}
 	av_free(f);
-	//av_dict_free(&options);
+#else
+	AVFrame *f = avhelper_alloc_frame();
+	x->output = yuv_yuv_template( NULL,NULL,NULL, wid, hei, dst_pixfmt );
+	x->spvf = ( (double) x->codec_ctx->framerate.den ) / ( (double) x->codec_ctx->framerate.num);
+	
+	while(1) {
+	    int ret = av_read_frame(x->avformat_ctx, x->packets[0]);
+		if( ret < 0 ) {
+			av_strerror( err, errbuf, sizeof(errbuf));
+			veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: read error: %s", errbuf);
+			break;
+		}
+
+		if ( x->packets[0]->stream_index == x->video_stream_id ) {
+			ret = avcodec_decode_video( x->packets[0], x->codec_ctx,f,&got_picture, x->packets[0]->data, x->packets[0]->size );
+
+			avhelper_frame_unref( f );
+			if( ret < 0 ) {
+				av_strerror( err, errbuf, sizeof(errbuf));
+				veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: decode error: %s", errbuf);
+			}
+		}
+				
+		avhelper_free_packet( x->packets[0] );	
+
+		if( got_picture )
+			break;
+	}
+	av_packet_free( &(x->packets[0]));
+	av_free(f);
+#endif
+
+
 
 	if(!got_picture) {
 		veejay_msg(VEEJAY_MSG_ERROR, "FFmpeg: Unable to get whole picture from %s", filename );
@@ -624,7 +835,7 @@ further:
 	x->frames[1] = avhelper_alloc_frame();
 	x->input = yuv_yuv_template( NULL,NULL,NULL, x->codec_ctx->width,x->codec_ctx->height, x->pixfmt );
 
-	//avhelper_hwaccel(x->codec_ctx);
+
 
 	return (void*) x;
 }
@@ -645,11 +856,17 @@ void	*avhelper_alloc_frame()
 void	avhelper_close_decoder( void *ptr ) 
 {
 	el_decoder_t *e = (el_decoder_t*) ptr;
-	avcodec_close( e->codec_ctx );
+	avhelper_codec_close( e->codec_ctx );
 
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	for( int i = 0; i < MAX_PACKETS ; i ++ ) {
-		av_free_packet( &(e->packets[i]) );
+		avhelper_free_packet( &(e->packets[i]) );
 	}
+#else
+	for( int i = 0; i < MAX_PACKETS ; i ++ ) {
+		av_packet_free( &(e->packets[i]) );
+	}
+#endif
 	
 	if(e->avformat_ctx) {
 		avhelper_close_input_file( e->avformat_ctx );
@@ -663,14 +880,23 @@ void	avhelper_close_decoder( void *ptr )
     if(e->frames[1]->data[0])
         avhelper_frame_unref(e->frames[1]);
 
+
 	if(e->input)
 		free(e->input);
 	if(e->output)
 		free(e->output);
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	av_frame_free( &(e->frames[0]) );
+	av_frame_free( &(e->frames[1]) );
+
+	av_frame_free( &(e->frame) );
+	av_packet_free( &(e->packet));
+#else
 	if(e->frames[0])
 		av_free(e->frames[0]);
 	if(e->frames[1])
 		av_free(e->frames[1]);
+#endif
 	free(e);
 }
 
@@ -686,19 +912,63 @@ VJFrame *avhelper_get_output_frame( void *ptr)
 	return e->output;
 }
 
-int	avhelper_decode_video( void *ptr, uint8_t *data, int len ) 
+int avhelper_decode_video_direct( void *ptr, uint8_t *data, int len, uint8_t *dst[4], int pf, int w, int h ) {
+	el_decoder_t *e = (el_decoder_t*) ptr;
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+	if(e->packets[0] == NULL) {
+		for( int i = 0; i < MAX_PACKETS; i ++ ) {
+			e->packets[i] = av_packet_alloc();
+		}
+	}
+#endif
+
+	int ret = avhelper_decode_video(ptr, data, len );
+	if( ret < 0 ) {
+		return ret;
+	}
+	return avhelper_rescale_video(ptr, dst );
+}
+
+void avhelper_decode_finish( void *ptr )
+{
+	el_decoder_t * e = (el_decoder_t*) ptr;
+
+
+#if LIBAVCODEC_VERSION_MAJOR >= 60	
+	av_frame_unref( e->frames[e->frame_index] );
+#endif
+
+    e->frameinfo[e->frame_index] = 1;
+    e->frame_index = (e->frame_index +1) %2;
+    e->frameinfo[e->frame_index] = 0;
+
+}
+
+int	avhelper_decode_video( void *ptr, uint8_t *data, int len ) //FIXME: decoding with ffmpeg 4 crashes because of bad packet / frame (data) handling
 {
 	int got_picture = 0;
 	el_decoder_t * e = (el_decoder_t*) ptr;
-
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	int result = avcodec_decode_video( e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
-	
-	if(!got_picture || result <= 0) {
-        e->frameinfo[e->frame_index] = 1;
-        e->frame_index = (e->frame_index +1) %2;
-        e->frameinfo[e->frame_index] = 0;
+#else
+	int result = avcodec_decode_video( e->packets[0], e->codec_ctx, e->frames[e->frame_index], &got_picture, data, len );
+#endif
+
+	if(!got_picture || result < 0) {
+//#if LIBAVCODEC_BUILD >= 6000
+//		av_frame_unref( e->frames[e->frame_index] );
+//#endif	
 		return 0;
 	}
+
+/*
+    e->frameinfo[e->frame_index] = 1;
+    e->frame_index = (e->frame_index +1) %2;
+    e->frameinfo[e->frame_index] = 0;
+*/
+//#if LIBAVCODEC_BUILD >= 6000
+//	av_frame_unref( e->frames[e->frame_index] );
+//#endif	
 	return 1;
 }
 
@@ -726,7 +996,7 @@ VJFrame	*avhelper_get_decoded_video(void *ptr) {
 	return e->input;
 }
 
-void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
+int	avhelper_rescale_video(void *ptr, uint8_t *dst[4])
 {
 	el_decoder_t * e = (el_decoder_t*) ptr;
 
@@ -745,7 +1015,7 @@ void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
 				e->input->width,e->input->height,e->input->format,e->input->data[0],e->input->data[1],e->input->data[2],
 				e->output->width,e->output->height,e->output->format,e->output->data[0],e->output->data[1],e->output->data[2]);
 			
-			return;
+			return 0;
 		}
 	}
 
@@ -759,4 +1029,6 @@ void	avhelper_rescale_video(void *ptr, uint8_t *dst[3])
 	e->output->data[2] = dst[2];
 
 	yuv_convert_any3( e->scaler, e->input, e->frames[e->frame_index]->linesize, e->output);
+
+	return 1;
 }

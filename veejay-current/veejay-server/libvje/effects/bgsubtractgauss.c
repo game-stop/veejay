@@ -120,12 +120,12 @@ void *bgsubtractgauss_malloc(int width, int height)
     }
 
 	b->static_bg_frame__[0] = b->static_bg__;
-	b->static_bg_frame__[1] = b->static_bg_frame__[0] + RUP8(width*height);
-	b->static_bg_frame__[2] = b->static_bg_frame__[1] + RUP8(width*height);
-	b->static_bg_frame__[3] = b->static_bg_frame__[2] + RUP8(width*height);
+	b->static_bg_frame__[1] = b->static_bg_frame__[0] + (width*height);
+	b->static_bg_frame__[2] = b->static_bg_frame__[1] + (width*height);
+	b->static_bg_frame__[3] = b->static_bg_frame__[2] + (width*height);
 
-	veejay_memset( b->static_bg_frame__[1], 128, RUP8(width*height));
-	veejay_memset( b->static_bg_frame__[2], 128, RUP8(width*height));
+	veejay_memset( b->static_bg_frame__[1], 128, (width*height));
+	veejay_memset( b->static_bg_frame__[2], 128, (width*height));
 	
 	b->fg_frame__ = (uint8_t*) vj_calloc( RUP8(width*height*2) );
 	if(!b->fg_frame__ ) {

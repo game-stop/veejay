@@ -32,9 +32,22 @@ extern void find_best_memset(void);
 extern void yuyv_plane_init();
 extern void benchmark_tasks(int n_tasks, long n_frames, int w, int h);
 extern void init_parallel_tasks(int n_tasks);
-static int MEM_ALIGNMENT_SIZE = 0;
+
 extern int CACHE_LINE_SIZE = 64;
 
+#if defined(HAVE_ASM_SSE) || defined(HAVE_ASM_SSE2) || defined(__SSE4_2__) || defined(__SSE4_1__)
+#define MEM_ALIGNMENT_SIZE 16
+#elif defined (HAVE_ASM_AVX2)
+#define MEM_ALIGNMENT_SIZE 64
+#elif defined (HAVE_ASM_AVX)
+#define MEM_ALIGNMENT_SIZE 32
+#elif defined (__ARM_ARCH_7A__)
+#define MEM_ALIGNMENT_SIZE 8
+#elif defined (__ARM_ARCH_8A__ )
+#define MEM_ALIGNMENT_SIZE 16
+#else
+#define MEM_ALIGNMENT_SIZE 8
+#endif
 
 static int has_cpuid(void)
 {
@@ -138,8 +151,6 @@ void vj_mem_init(void)
 	CACHE_LINE_SIZE = get_cache_line_size();
 #endif
 
-	if(MEM_ALIGNMENT_SIZE == 0)
-		MEM_ALIGNMENT_SIZE = getpagesize();
 	
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
@@ -277,7 +288,7 @@ void	*vj_simple_pool_alloc( void *ptr, size_t s )
 	if( s > pool->len || (pool->cur + s) > pool->len ) {
 		return NULL;
 	}
-	uint8_t *addr = (uint8_t*) pool->addr + RUP8(pool->cur);
+	uint8_t *addr = (uint8_t*) pool->addr + (pool->cur);
 
 	pool->cur += RUP8(s);
 

@@ -160,7 +160,7 @@ static  char    *get_print_buf(int size) {
     int s = size;
     if( s<= 0)
         s = SEND_BUF;
-    char *res = (char*) vj_calloc(sizeof(char) * s );
+    char *res = (char*) vj_calloc(sizeof(char) * RUP8(s) );
     return res;
 }
 
@@ -1523,28 +1523,32 @@ void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
 int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 {
     SDL_KeyboardEvent *key = &event.key;
-    SDL_Keymod mod = key->keysym.mod;
     veejay_t *v =  (veejay_t*) ptr;
     int vims_mod = 0;
+ 	vj_keyboard_event *ev = NULL;
 
-    if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT )) // could use direct KMOD_SHIFT ?
-        vims_mod |= VIMS_MOD_SHIFT;
-    if( (mod & KMOD_LALT) || (mod & KMOD_ALT) ) // ONLY LEFT SHIFT !!!
-        vims_mod |= VIMS_MOD_ALT;
-    if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) ) // Both CTRL (but not explicit l & r)
-        vims_mod |= VIMS_MOD_CTRL;
-    if( (mod & KMOD_CAPS) ) {
-        vims_mod = VIMS_MOD_CAPSLOCK; // FIXME change to |= or not ???
-    }
+    if( event.type == SDL_KEYDOWN || event.type == SDL_KEYUP ) {	
+		SDL_Keymod mod = key->keysym.mod;
+    
+    	if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT )) // could use direct KMOD_SHIFT ?
+			vims_mod |= VIMS_MOD_SHIFT;
+		if( (mod & KMOD_LALT) || (mod & KMOD_ALT) ) // ONLY LEFT SHIFT !!!
+			vims_mod |= VIMS_MOD_ALT;
+    	if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) ) // Both CTRL (but not explicit l & r)
+			vims_mod |= VIMS_MOD_CTRL;
+		if( (mod & KMOD_CAPS) ) {
+   	    	vims_mod = VIMS_MOD_CAPSLOCK; // FIXME change to |= or not ???
+	    }
 
-    int vims_key = key->keysym.scancode;
-    int index = vims_mod * SDL_NUM_SCANCODES + vims_key;
+    	int vims_key = key->keysym.scancode;
+    	int index = vims_mod * SDL_NUM_SCANCODES + vims_key;
 
-    vj_keyboard_event *ev = get_keyboard_event( index );
+    	ev = get_keyboard_event( index );
 
-    veejay_msg(VEEJAY_MSG_DEBUG,
+    	veejay_msg(VEEJAY_MSG_DEBUG,
             "VIMS modifier: %d (SDL modifier %d/%x), Key %d, VIMS event %p",
                 vims_mod, mod,mod, vims_key, ev );
+    }
 
     if(!ev )
     {
@@ -2190,7 +2194,7 @@ static void vj_event_init_keyboard_defaults()
 
 void vj_event_init(void *ptr)
 {
-	veejay_t *v = (veejay_t*) ptr;
+    veejay_t *v = (veejay_t*) ptr;
     int i;
 #ifdef HAVE_SDL 
     veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
@@ -8625,7 +8629,6 @@ void    vj_event_send_generator_list( void *ptr, const char format[], va_list ap
     int i;
     char *s_print_buf = get_print_buf(6 + (total * 128));
     veejay_t *v = (veejay_t*) ptr;
-
     if( s_print_buf == NULL ) {
         SEND_MSG(v, "00000" );  
     }

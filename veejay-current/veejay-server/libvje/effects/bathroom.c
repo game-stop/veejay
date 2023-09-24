@@ -86,9 +86,9 @@ void *bathroom_malloc(int width, int height)
 		return NULL;
     }
 
-	b->bathroom_frame[1] = b->bathroom_frame[0] + RUP8(width*height);
-	b->bathroom_frame[2] = b->bathroom_frame[1] + RUP8(width*height);
-	b->bathroom_frame[3] = b->bathroom_frame[2] + RUP8(width*height);
+	b->bathroom_frame[1] = b->bathroom_frame[0] + (width*height);
+	b->bathroom_frame[2] = b->bathroom_frame[1] + (width*height);
+	b->bathroom_frame[3] = b->bathroom_frame[2] + (width*height);
 
     return (void*) b;
 }

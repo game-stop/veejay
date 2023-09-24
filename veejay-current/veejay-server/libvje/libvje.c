@@ -287,8 +287,8 @@ void    vje_set_bg(VJFrame *bg)
     veejay_memcpy(vj_fx_bg, bg, sizeof(VJFrame));
     
     vj_fx_bg->data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( bg->len * 3 ) ); // enough space to hold 4:4:4
-    vj_fx_bg->data[1] = vj_fx_bg->data[0] + RUP8(bg->len);
-    vj_fx_bg->data[2] = vj_fx_bg->data[1] + RUP8(bg->len);
+    vj_fx_bg->data[1] = vj_fx_bg->data[0] + bg->len;
+    vj_fx_bg->data[2] = vj_fx_bg->data[1] + bg->len;
     vj_fx_bg->data[3] = NULL;
 
     veejay_memcpy( vj_fx_bg->data[0], bg->data[0], bg->len );

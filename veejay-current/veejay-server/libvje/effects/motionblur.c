@@ -58,8 +58,8 @@ void *motionblur_malloc(int width, int height)
         free(m);
         return NULL;
     }
-    m->previous_frame[1] = m->previous_frame[0] + RUP8(width*height);
-    m->previous_frame[2] = m->previous_frame[1] + RUP8(width*height);
+    m->previous_frame[1] = m->previous_frame[0] + (width*height);
+    m->previous_frame[2] = m->previous_frame[1] + (width*height);
 	
     return (void*) m;
 }

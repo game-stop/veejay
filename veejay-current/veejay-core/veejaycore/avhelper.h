@@ -20,6 +20,8 @@
 #ifndef AVHELPER_H
 #define AVHELPER_H
 
+#include <libavcodec/version.h>
+
 #define CODEC_ID_YUV420 999
 #define CODEC_ID_YUV422 998
 #define CODEC_ID_YUV422F 997
@@ -42,7 +44,9 @@ void	avhelper_close_decoder( void *ptr );
 
 int	avhelper_decode_video( void *ptr, uint8_t *data, int len);
 
-void	avhelper_rescale_video(void *ptr, uint8_t *dst[4]);
+int	avhelper_rescale_video(void *ptr, uint8_t *dst[4]);
+
+int avhelper_decode_video_direct( void *ptr, uint8_t *data, int len, uint8_t *dst[4], int pf, int w, int h );
 
 void	*avhelper_get_decoder( const char *filename, int dst_pixfmt, int dst_width, int dst_height );
 
@@ -50,13 +54,15 @@ void	*avhelper_get_stream_decoder( const char *filename, int dst_pixfmt, int dst
 
 VJFrame	*avhelper_get_decoded_video(void *ptr);
 
+int avhelper_decode_video3( AVCodecContext *avctx, AVFrame *frame, int *got_picture,AVPacket *pkt);
+
 void	avhelper_free_context(AVCodecContext **avctx);
 
 void	avhelper_frame_unref(AVFrame *ptr);
 
 void	*avhelper_get_mjpeg_decoder(VJFrame *output_info);
 
-int	avhelper_get_frame( void *decoder, int *got_picture );
+void    avhelper_free_packet(AVPacket *pkt);
 
 VJFrame	*avhelper_get_input_frame( void *ptr );
 

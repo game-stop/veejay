@@ -172,7 +172,7 @@ static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, i
 		case ENCODER_DVVIDEO:
 		si->encoder_max_size = ( frame->height == 480 ? 120000: 144000); break;
 		default:
-		si->encoder_max_size = 8 * ( 16 * 65535 );
+		si->encoder_max_size = vj_avcodec_get_buf_size( si->encoder );
 		break;
 	}
 	
@@ -273,19 +273,24 @@ int sample_record_frame(int s1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
    buf_len =  vj_avcodec_encode_frame(si->encoder,  nframe,
 		si->encoder_format, buffer, vj_avcodec_get_buf(si->encoder), si->encoder_max_size, pix_fmt);
 
-   if(buf_len <= 0) 
+   if(buf_len < 0) 
    {
-
   	veejay_msg(VEEJAY_MSG_ERROR, "Unable to encode frame");
 	return -1;
    }
+
+   if(buf_len == 0) {
+		return (sample_continue_record(s1));
+   }
+
+
 //	si->rec_total_bytes += buf_len;
 
 
    //@ if writing to AVI/QT
    if( si->encoder_file != NULL ) {
 
-    if(lav_write_frame( (lav_file_t*) si->encoder_file,vj_avcodec_get_buf(si->encoder),buf_len,1))
+    if(lav_write_frame( (lav_file_t*) si->encoder_file,vj_avcodec_get_buf(si->encoder),buf_len,1) < 0)
 	{
 			veejay_msg(VEEJAY_MSG_ERROR, "%s", lav_strerror());
 			if( si->encoder_frames_recorded > 1 ) {

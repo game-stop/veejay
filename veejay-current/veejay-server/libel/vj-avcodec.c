@@ -18,6 +18,7 @@
  */
 #include <config.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <veejaycore/defs.h>
 #include <libel/vj-avcodec.h>
@@ -36,9 +37,12 @@
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <libel/av.h>
+#include <veejaycore/av.h>
 #include <veejaycore/avhelper.h>
 #include <veejaycore/avcommon.h>
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 //from gst-ffmpeg, round up a number
 #define GEN_MASK(x) ((1<<(x))-1)
@@ -50,6 +54,7 @@
 #define RUP8(num)(((num)+8)&~8)
 
 static int out_pixel_format = FMT_422F; 
+
 
 static char*	vj_avcodec_get_codec_name(int codec_id )
 {
@@ -98,12 +103,95 @@ uint8_t 		*vj_avcodec_get_buf( vj_encoder *av )
 	return av->data[0];
 }
 
+int 			vj_avcodec_get_buf_size( vj_encoder *av )
+{
+	return av->out_frame->len + av->out_frame->uv_len + av->out_frame->uv_len;
+}
+
 static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filename)
 {
 	vj_encoder *e = (vj_encoder*) vj_calloc(sizeof(vj_encoder));
+	char errbuf[512];
+
 	if(!e) return NULL;
 
-	int pf = get_ffmpeg_pixfmt( out_pixel_format );
+	int selected_out_pixfmt = out_pixel_format;
+	int chroma_val = -1;
+	
+	switch( id ) {
+		case 997:
+			selected_out_pixfmt = FMT_422F;
+			break;
+		case 996:
+			selected_out_pixfmt = FMT_420F;
+			break;
+		case 995:
+			selected_out_pixfmt = FMT_422;
+			chroma_val = Y4M_CHROMA_422;
+			break;
+		case 994:
+			selected_out_pixfmt = FMT_420;
+			chroma_val = (out_pixel_format == FMT_422F || out_pixel_format == FMT_420F ? Y4M_CHROMA_420JPEG : Y4M_CHROMA_420MPEG2);
+			break;
+		case 999:
+			selected_out_pixfmt = FMT_420;
+			break;
+		case 998:
+			selected_out_pixfmt = FMT_422;
+			break;
+		case CODEC_ID_HUFFYUV:
+			selected_out_pixfmt = FMT_422;
+			break;
+		default:
+			break;
+	}
+
+	int pf = get_ffmpeg_pixfmt( selected_out_pixfmt );
+
+	e->out_frame = yuv_yuv_template( NULL,NULL,NULL, frame->width, frame->height, pf );
+	e->in_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
+	veejay_memcpy( e->in_frame, frame, sizeof(VJFrame));
+
+	e->data[0] = (uint8_t*) vj_malloc(RUP8(e->out_frame->len * 4));
+	e->data[1] = e->data[0] + e->out_frame->len;
+	e->data[2] = e->data[1] + e->out_frame->len;
+	e->data[3] = NULL;
+
+	e->out_frame->data[0] = e->data[0];
+	e->out_frame->data[1] = e->data[1];
+	e->out_frame->data[2] = e->data[2];
+	 
+	e->in_frame->data[0] = NULL;
+	e->in_frame->data[1] = NULL;
+	e->in_frame->data[2] = NULL;
+	e->in_frame->data[3] = NULL;
+
+	veejay_memset( e->data[0], 0, e->out_frame->len);
+	veejay_memset( e->data[1], 128, e->out_frame->uv_len);
+	veejay_memset( e->data[2], 128, e->out_frame->uv_len );
+
+
+	// strip any A*
+	e->in_frame->format = vj_to_pixfmt( out_pixel_format );
+	e->in_frame->stride[3] = 0;
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Selected output pixel format: %s (internal out fmt %d, chroma %d). Source is %s", yuv_get_pixfmt_description(pf), selected_out_pixfmt, chroma_val,
+	 	yuv_get_pixfmt_description(e->in_frame->format));
+
+
+	if( id > 900 ) {
+		sws_template tmpl;
+		tmpl.flags = 1;
+		e->scaler = yuv_init_swscaler( e->in_frame,e->out_frame, &tmpl, yuv_sws_get_cpu_flags());
+		if(e->scaler == NULL) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize scaler context");
+			free(e->out_frame);
+			free(e->in_frame);
+			free(e->data[0]);
+			free(e);
+			return NULL;
+		}
+	}
 
 #ifdef SUPPORT_READ_DV2
 	if( id == CODEC_ID_DVVIDEO )
@@ -111,6 +199,10 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		if(!is_dv_resolution(frame->width, frame->height ))
 		{	
 			veejay_msg(VEEJAY_MSG_ERROR,"\tSource video is not in DV resolution");
+			free(e->out_frame);
+			free(e->in_frame);
+			free(e->data[0]);
+			free(e);
 			return NULL;
 		}
 		else
@@ -120,35 +212,40 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	}
 	else {
 #endif
-		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(frame->len + frame->uv_len + frame->uv_len) );
-		e->data[1] = e->data[0] + frame->len;
-		e->data[2] = e->data[1] + frame->uv_len;
-		e->data[3] = NULL;
+		
 #ifdef SUPPORT_READ_DV2
 	}
 #endif
 	
 	if( id == 900 )
 	{
-		e->lzo = lzo_new();
+		e->lzo = lzo_new(frame->format, frame->width, frame->height, 0 );
 	}
 
 	if( id == 995 || id == 994) {
-		e->y4m = vj_yuv4mpeg_alloc(frame->width,frame->height,frame->fps, out_pixel_format );
+		e->y4m = vj_yuv4mpeg_alloc(frame->width,frame->height,frame->fps, selected_out_pixfmt );
 		if( !e->y4m) {
 			veejay_msg(0, "Error while trying to setup Y4M stream, abort");
-			return NULL;
-		}
+			free(e->out_frame);
+			free(e->in_frame);
+			free(e->data[0]);
+			yuv_free_swscaler(e->scaler);
 
-		int chroma_val = Y4M_CHROMA_422;
-		if( id == 994 ) {
-			chroma_val = Y4M_CHROMA_420MPEG2;
+			free(e);
+			
+			return NULL;
 		}
 
 		if( vj_yuv_stream_start_write( e->y4m, frame,filename,chroma_val )== -1 )
 		{
 			veejay_msg(0, "Unable to write header to  YUV4MPEG stream");
 			vj_yuv4mpeg_free( e->y4m );
+			free(e->out_frame);
+			free(e->in_frame);
+			free(e->data[0]);
+			yuv_free_swscaler(e->scaler);
+			
+			free(e);
 			return NULL;
 		}
 	}
@@ -164,7 +261,11 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 			{
 			 char *descr = vj_avcodec_get_codec_name(id);
 			 veejay_msg(VEEJAY_MSG_ERROR, "Unable to find encoder '%s'", 	descr );
-			 free(descr);
+			 free(e->out_frame);
+			 free(e->in_frame);
+			 free(e->data[0]);
+			 free(e);
+			 return NULL;
 			}
 #ifdef __FALLBACK_LIBDV
 		}
@@ -178,7 +279,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	  if(id != CODEC_ID_DVVIDEO )
 		{
 #endif
-#if LIBAVCODEC_BUILD > 5400  
+#if LIBAVCODEC_VERSION_MAJOR > 54  
    	    e->context = avcodec_alloc_context3(e->codec);
 #else
 		e->context = avcodec_alloc_context();
@@ -186,11 +287,34 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		e->context->bit_rate = 2750 * 1024;
 		e->context->width = frame->width;
  		e->context->height = frame->height;
-#if LIBAVCODEC_BUILD > 5010
+		
+#if LIBAVCODEC_VERSION_MAJOR >= 50
 		e->context->time_base = (AVRational) { 1, frame->fps };
 #else
 		e->context->frame_rate = frame->fps;
 		e->context->frame_rate_base = 1;
+#endif
+#if LIBAVCODEC_VERSION_MAJOR >= 60
+		e->packet = av_packet_alloc();
+		e->frame = av_frame_alloc();
+		e->frame->format = get_ffmpeg_pixfmt( selected_out_pixfmt );
+		e->frame->width = frame->width;
+		e->frame->height = frame->height;
+
+	    int av_ret = av_frame_get_buffer(e->frame, 0);
+		if( av_ret < 0 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate buffers for encoder");
+			 free(e->out_frame);
+			 free(e->in_frame);
+			 free(e->data[0]);
+			 av_packet_free(&(e->packet));
+			 av_frame_free(&(e->frame));
+			 free(e);
+		
+			return av_ret;
+		}
+
+		e->context->framerate = (AVRational) { 1, frame->fps };
 #endif
 		e->context->sample_aspect_ratio.den = 1;
 		e->context->sample_aspect_ratio.num = 1;
@@ -201,35 +325,56 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		e->context->flags = CODEC_FLAG_QSCALE;
 		e->context->gop_size = 0;
 		e->context->workaround_bugs = FF_BUG_AUTODETECT;
+#if LIBAVCODEC_VERSION_MAJOR < 60
 		e->context->prediction_method = 0;
+#endif
 		e->context->dct_algo = FF_DCT_AUTO; 
-		e->context->pix_fmt = get_ffmpeg_pixfmt( out_pixel_format );
-		pf = e->context->pix_fmt;
+		e->context->pix_fmt = pf;
 
+		//pf = e->context->pix_fmt;
 		char *descr = vj_avcodec_get_codec_name( id );
-#if LIBAVCODEC_BUILD > 5400
+#if LIBAVCODEC_VERSION_MAJOR > 54
 
 		int n_threads = avhelper_set_num_decoders();
 
-		if( n_threads > 0 ) {
-			e->context->thread_count = n_threads;
+		if (e->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
 			e->context->thread_type = FF_THREAD_FRAME;
+			e->context->thread_count = n_threads;	
+		}
+		else if (e->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+			e->context->thread_type = FF_THREAD_SLICE;
+			e->context->thread_count = n_threads;	
 		}
 
-		if ( avcodec_open2( e->context, e->codec, NULL ) )
+		int ret = avcodec_open2( e->context, e->codec, NULL );
 #else
-		if ( avcodec_open( e->context, e->codec ) < 0 )
+		int ( avcodec_open( e->context, e->codec ) < 0 );
 #endif
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open codec '%s'" , descr );
+		if( ret < 0 ) {
+			av_strerror( ret, errbuf, sizeof(errbuf));
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open codec '%s': %s" , descr, errbuf );
 			avhelper_free_context( &(e->context) );
-			if(e) free(e);
+			free(e->out_frame);
+			free(e->in_frame);
+			free(e->data[0]);
+			free(e);
 			if(descr) free(descr);
 			return NULL;
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened codec %s", descr );
+			veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened codec %s [in pixfmt=%d]", descr, e->context->pix_fmt );
+			if(e->context->color_range == AVCOL_RANGE_JPEG ) {
+				veejay_msg(VEEJAY_MSG_INFO, "color range is jpeg");
+			}
+			if(e->context->color_range == AVCOL_RANGE_UNSPECIFIED) {
+				veejay_msg(VEEJAY_MSG_WARNING, "Color range not specified" );
+			}
+
+			if(e->context->color_range == AVCOL_RANGE_MPEG ) {
+				veejay_msg(VEEJAY_MSG_INFO, "color range is mpeg");
+			}
+
 			free(descr);
 		}
 #ifdef __FALLBACK_LIBDV
@@ -237,15 +382,14 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 #endif
 	}
 
-	e->width = frame->width;
-	e->height = frame->height;
+	e->width = e->out_frame->width;
+	e->height = e->out_frame->height;
 	e->encoder_id = id;
-	e->shift_y = frame->shift_v;
-	e->shift_x = frame->shift_h;
-	e->len = frame->len;
-	e->uv_len = frame->uv_len;
-	e->out_fmt = pixfmt_to_vj( pf );
-	e->format = pf;
+	e->shift_y = e->out_frame->shift_v;
+	e->shift_x = e->out_frame->shift_h;
+	e->len = e->out_frame->len;
+	e->uv_len = e->out_frame->uv_len;
+
 	return e;
 }
 void		vj_avcodec_close_encoder( vj_encoder *av )
@@ -265,8 +409,16 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 		if(av->dv)
 			vj_dv_free_encoder( (vj_dv_encoder*) av->dv );
 #endif
+		if(av->scaler)
+			yuv_free_swscaler(av->scaler);
+
+	    if(av->out_frame)
+			free(av->out_frame);
+		if(av->in_frame)
+			free(av->in_frame);
 		if(av->y4m)
 			vj_yuv4mpeg_free( (vj_yuv*) av->y4m );
+
 		free(av);
 	}
 	av = NULL;
@@ -314,8 +466,9 @@ char		vj_avcodec_find_lav( int encoder )
 	switch( encoder)
 	{
 		case ENCODER_MJPEG:
-		case ENCODER_HUFFYUV:
 			return 'a';
+		case ENCODER_HUFFYUV:
+			return 'H';
 		case ENCODER_QUICKTIME_MJPEG:
 		       	return 'q';
 		case ENCODER_DVVIDEO:
@@ -391,7 +544,17 @@ int		vj_avcodec_stop( void *encoder , int fmt)
 		return 1;
 	}
 
+#if LIBAVCODEC_MAJOR >= 60 
+
+#endif
+
 	vj_avcodec_close_encoder( env );
+
+#if LIBAVCODEC_MAJOR >= 60
+	av_packet_free( &(env->packet) );
+	av_frame_free( &(env->frame) );
+#endif
+
 	encoder = NULL;
 	return 1;
 }
@@ -420,19 +583,26 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 {
 	out_pixel_format = pixel_format;
 	
-	av_log_set_level( AV_LOG_QUIET);
-
 	char *av_log_setting = getenv("VEEJAY_AV_LOG");
 	if(av_log_setting != NULL) {
 		int level = atoi(av_log_setting);
 		veejay_msg(VEEJAY_MSG_DEBUG, "ffmpeg/libav log level set to %d", level);
 		av_log_set_level(level);
 	}
+	else {
+		veejay_msg(VEEJAY_MSG_DEBUG, "ffmpeg/libav log level not set (use VEEJAY_AV_LOG=level)");
+		av_log_set_level( AV_LOG_QUIET);
+	}
 
-#if LIBAVCODEC_BUILD < 5400
+	veejay_msg(VEEJAY_MSG_INFO, "ffmpeg/libav library version %d.%d.%d", LIBAVCODEC_VERSION_MAJOR, LIBAVCODEC_VERSION_MINOR, LIBAVCODEC_VERSION_MICRO);
+
+#if LIBAVCODEC_VERSION_MAJOR < 54
 	avcodec_register_all();
+	
 #else
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	av_register_all();
+#endif
 #endif
 	return 1;
 }
@@ -442,152 +612,102 @@ int		vj_avcodec_free()
 	return 1;
 }
 
-static void long2str(unsigned char *dst, int32_t n)
-{
-   dst[0] = (n    )&0xff;
-   dst[1] = (n>> 8)&0xff;
-   dst[2] = (n>>16)&0xff;
-   dst[3] = (n>>24)&0xff;
-}
 
-
-static	int	vj_avcodec_lzo( vj_encoder  *av, uint8_t *src[3], uint8_t *dst , int buf_len )
-{
-	uint8_t *dstI = dst + (3 * 4);
-	uint32_t s1,s2,s3;
-	uint32_t *size1 = &s1, *size2=&s2,*size3=&s3;
-	int32_t res;
-	int32_t sum = 0;
-
-	res = lzo_compress( av->lzo, src[0], dstI, size1 , av->len);
-	if( res == 0 )
-	{
-		veejay_msg(0,"\tunable to compress Y plane");
-		return 0;
-	}
-
-	long2str( dst, res );
-	sum += res;
-
-	res = lzo_compress( av->lzo, src[1], dstI + sum, size2 , av->uv_len );
-	if( res == 0 )
-	{
-		veejay_msg(0,"\tunable to compress U plane");
-		return 0;
-	}
-
-	long2str( dst + 4, res );
-	sum += res;
-
-	res = lzo_compress( av->lzo, src[2], dstI + sum, size3 , av->uv_len );
-	if( res == 0 )
-	{
-		veejay_msg(0,"\tunable to compress V plane");
-		return 0;
-	}
-
-	sum += res;
-	long2str( dst + 8, res );
-	
-	return (sum + 12);
-}
-static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst, int in_fmt )
+static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst)
 {
 	if(!av)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No encoder !!");
+		veejay_msg(VEEJAY_MSG_ERROR, "The encoder is not initialized");
 		return 0;
 	}
 
-	if( av->encoder_id == 999 )
-	{
-		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->len/4),NULL };
-		vj_frame_copy1(src[0], dest[0],  av->len );
-		yuv422to420planar( src,dest, av->width,av->height );
+	VJFrame *A = av->in_frame;
+	VJFrame *B = av->out_frame;
 
-		if(in_fmt == FMT_422F ) 
-		{
-			yuv_scale_pixels_from_y( dest[0],  av->len );
-			yuv_scale_pixels_from_uv( dest[1], av->len/2 );
-		}
+	//setup pointers
+	A->data[0] = src[0]; 
+	A->data[1] = src[1]; 
+	A->data[2] = src[2]; 
+	A->data[3] = NULL;
+	
+	B->data[0] = dst;    
+	B->data[1] = dst + B->len; 
+	B->data[2] = dst + B->len + B->uv_len;
+	B->data[3] = NULL;
 
-		return ( av->len + (av->len/2) );
-	}
-	if( av->encoder_id == 996 )
-	{
-		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->len/4),NULL };
-		vj_frame_copy1( src[0], dest[0], av->len );
-		yuv422to420planar( src,dest, av->width,av->height );
-
-		if(in_fmt == FMT_422 ) 
-		{
-			yuv_scale_pixels_from_ycbcr( dest[0], 16.0f,235.0f, av->len );
-			yuv_scale_pixels_from_ycbcr( dest[1], 16.0f,240.0f, av->len/2 );
-		}
-
-		return ( av->len + (av->len/2) );
-	}
-
-
-	if( av->encoder_id == 998 )
-	{
-		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->uv_len), NULL };
-		int strides[4] = { av->len, av->uv_len, av->uv_len, 0 };
-		vj_frame_copy( src, dest, strides );
-
-		if(in_fmt == FMT_422F ) 
-		{
-			yuv_scale_pixels_from_y( dest[0], av->len );
-			yuv_scale_pixels_from_uv( dest[1], av->uv_len * 2 );
-		}
-
-		return ( av->len + av->len );
-	}
-
-	if( av->encoder_id == 997 )
-	{
-		uint8_t *dest[4] = { dst, dst + (av->len), dst + (av->len + av->uv_len), NULL };
-		int strides[4] = { av->len, av->uv_len,av->uv_len, 0 };
-		vj_frame_copy( src, dest, strides );
-
-		if(in_fmt == FMT_422 ) 
-		{
-			yuv_scale_pixels_from_ycbcr( dest[0], 16.0f,235.0f, av->len );
-			yuv_scale_pixels_from_ycbcr( dest[1], 16.0f,240.0f, av->uv_len * 2 );
-		}
-
-		return ( av->len + av->len );
-	}
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "Unknown encoder select: %d", av->encoder_id);	
-
-	return 0;
+	yuv_convert_and_scale( av->scaler, A, B);
+	
+	return (B->len + B->uv_len + B->uv_len);
 }
 
-static int vj_avcodec_encode_video( AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame )
+static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame )
 {
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	if( avcodec_encode_video2) {
-		AVPacket pkt;
-		veejay_memset(&pkt,0,sizeof(pkt));
+		char errbuf[512];
 		int got_packet_ptr = 0;
-		pkt.data = buf;
-		pkt.size = len;
+		pkt->data = buf;
+		pkt->size = len;
 
-		int res = avcodec_encode_video2( ctx, &pkt, frame, &got_packet_ptr);
+		int res = avcodec_encode_video2( ctx, pkt, frame, &got_packet_ptr);
+		if( res < 0) {
+			av_strerror( res, errbuf, sizeof(errbuf));
+			veejay_msg(0, "Unable to encode frame: %s", errbuf);
+			return -1;
+		}
 
 		if( res == 0 ) {
-			return pkt.size;
+			veejay_msg(VEEJAY_MSG_DEBUG, "Encoded frame to %d bytes", pkt->size);
+			return pkt->size;
 		}
 
-		if( res == -1) {
-			veejay_msg(0, "Unable to encode frame");
-		}
-
-		return 0;
+		return -1;
 	}
 	else if( avcodec_encode_video ) {
 		return avcodec_encode_video(ctx,buf,len,frame);
 	}
+#else
+
+	int ret = av_frame_make_writable(frame);
+	if(ret < 0) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to make buffer writable");
+		return -1;
+	}
+
+	ret = avcodec_send_frame( ctx, frame );
+	if( ret < 0 ) {
+		veejay_msg(0, "Error sending frame to decoder: %s", av_err2str(ret));
+		return -1;
+	}
+
+	pkt->data = buf;
+	pkt->size = len;
+
+	 while (ret >= 0)
+     {
+         ret = avcodec_receive_packet(ctx, pkt);
+
+         if (ret == AVERROR(EAGAIN) || ret == 0) {  // need new input, we are ready
+		 	ret = pkt->size;
+		 	break;
+		 }
+         if (ret < 0) {
+			break;
+		 }
+     }
+ 
+	av_packet_unref(pkt);
+/*	if( ret > 0 ) {
+		char name[256];
+		sprintf(name, "frame-%d.jpg", ret);
+		FILE *f = fopen( name, "wb");
+		fwrite( buf, ret, 1, f);
+		fclose(f);
+	} */
+
+	return ret;
+
+#endif
 
 	return -1;
 }
@@ -598,21 +718,22 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	vj_encoder *av = (vj_encoder*) encoder;
 
 	if(format == ENCODER_LZO )
-		return vj_avcodec_lzo( encoder, src, buf, buf_len );
-	
-	if(format == ENCODER_YUV420 || format == ENCODER_YUV422 || format == ENCODER_YUV422F || format == ENCODER_YUV420F) // no compression, just copy
-		return vj_avcodec_copy_frame( encoder,src, buf, in_fmt );
+		return lzo_compress_frame( av->lzo, av->in_frame,src, buf );
+		
+	if(format == ENCODER_YUV420 || format == ENCODER_YUV422 || format == ENCODER_YUV422F || format == ENCODER_YUV420F)
+		return vj_avcodec_copy_frame( encoder,src, buf );
 
 	if(format == ENCODER_YUV4MPEG || format == ENCODER_YUV4MPEG420 ) {
-		if( in_fmt == FMT_422 ) {
-			vj_yuv_put_frame( av->y4m, src );
-			return ( av->width * av->height ) * 2;
-		} else {
-			yuv_scale_pixels_from_yuv( src,av->data,av->width*av->height);
-			vj_yuv_put_frame(av->y4m, av->data );
-			return ( av->width * av->height ) * 2;
-		}
+			if( in_fmt == FMT_422 ) {
+					vj_yuv_put_frame( av->y4m, src );
+					return ( av->width * av->height ) * 2;
+			} else {
+					yuv_scale_pixels_from_yuv( src,av->data,av->len, av->uv_len);
+					vj_yuv_put_frame(av->y4m, av->data );
+					return ( av->width * av->height ) * 2;
+			}
 	}
+
 
 #ifdef __FALLBACK_LIBDV
 	if(format == ENCODER_DVVIDEO || format == ENCODER_QUICKTIME_DV )
@@ -621,6 +742,7 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 		return vj_dv_encode_frame( dv,src );
 	}
 #endif
+#if LIBAVCODEC_VERSION_MAJOR < 60
 	AVFrame pict;
 	int stride,w2,stride2;
 	veejay_memset( &pict, 0, sizeof(pict));
@@ -630,15 +752,40 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	pict.data[0] = src[0];
 	pict.data[1] = src[1];
 	pict.data[2] = src[2];
-	pict.format  = av->format;
-	stride = ROUND_UP_4( av->width );
-	w2 = DIV_ROUND_UP_X(av->width, av->shift_x);
-	stride2 = ROUND_UP_4( w2 );
-	pict.linesize[0] = stride;
-	pict.linesize[1] = stride2;
-	pict.linesize[2] = stride2;
-	pict.width = av->width;
-	pict.height = av->height;
-	return vj_avcodec_encode_video( av->context, buf, buf_len, &pict );
+	pict.format  = av->out_frame->format;
+
+	pict.linesize[0] = ROUND_UP_4( av->out_frame->width );
+	pict.linesize[1] = ROUND_UP_4( av->out_frame->uv_width );
+	pict.linesize[2] = ROUND_UP_4( av->out_frame->uv_width );
+
+
+	pict.width = av->out_frame->width;
+	pict.height = av->out_frame->height;
+
+	AVPacket pkt;
+	veejay_memset(&pkt,0,sizeof(pkt));
+		
+	return vj_avcodec_encode_video( &pkt, av->context, buf, buf_len, &pict );
+#else
+	av->frame->pts = (int64_t) nframe;
+	av->frame->quality = FF_QP2LAMBDA * 3.0;
+	
+	av->frame->data[0] = src[0];
+	av->frame->data[1] = src[1];
+	av->frame->data[2] = src[2];
+
+	av->frame->linesize[0] = ROUND_UP_4( av->out_frame->width );
+	av->frame->linesize[1] = ROUND_UP_4( av->out_frame->uv_width );
+	av->frame->linesize[2] = ROUND_UP_4( av->out_frame->uv_width );
+
+	//av->frame->quality = 1;
+	//av->frame->key_frame = 1;
+	av->frame->pict_type = AV_PICTURE_TYPE_I;
+
+	//av->frame->quality = 1;
+	int ret = vj_avcodec_encode_video( av->packet, av->context, buf, buf_len, av->frame );
+
+	return ret;
+#endif
 }
 

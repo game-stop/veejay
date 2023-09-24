@@ -1708,6 +1708,9 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d. I won't give up yet!", settings->current_frame_num);
 	}
 
+	veejay_event_handle(info);
+
+
 	settings->currently_processed_entry = 
 		settings->buffer_entry[settings->currently_processed_frame];
 
@@ -2413,7 +2416,7 @@ static void veejay_playback_cycle(veejay_t * info)
 				goto FINISH;
 			}
 
-			veejay_event_handle(info);
+//			veejay_event_handle(info);
 
 			frame = bs.frame;
 

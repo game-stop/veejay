@@ -98,8 +98,8 @@ void *pencilsketch2_malloc(int w, int h) {
         return NULL;
     }
 
-    p->pencilhblur = p->pencilbuf + RUP8(w*h);
-    p->pencilvblur = p->pencilhblur + RUP8(w*h);
+    p->pencilhblur = p->pencilbuf + (w*h);
+    p->pencilvblur = p->pencilhblur + (w*h);
     
     p->histogram_ = veejay_histogram_new();
     if(!p->histogram_) {

@@ -84,8 +84,8 @@ void *perspective_malloc(int width, int height)
         return NULL;
     }
 
-    p->perspective_private_[1] = p->perspective_private_[0] + RUP8( width * height + width );
-    p->perspective_private_[2] = p->perspective_private_[1] + RUP8( width * height + width );
+    p->perspective_private_[1] = p->perspective_private_[0] + ( width * height + width );
+    p->perspective_private_[2] = p->perspective_private_[1] + ( width * height + width );
 
     return (void*) p;
 }

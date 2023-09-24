@@ -616,8 +616,8 @@ int init_instance( livido_port_t *my_instance )
     aa->aa_flags = 0;
 
     aa->buf[0] = (uint8_t*) livido_malloc (sizeof(uint8_t) * RUP8(w * h * 3 ) );
-    aa->buf[1] = aa->buf[0] + RUP8(w*h);
-    aa->buf[2] = aa->buf[1] + RUP8(w*h);
+    aa->buf[1] = aa->buf[0] + w*h;
+    aa->buf[2] = aa->buf[1] + w*h;
 
     livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &aa);
 

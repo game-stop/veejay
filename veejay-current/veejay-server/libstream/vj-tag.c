@@ -1835,7 +1835,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
             case ENCODER_LZO:
             tag->encoder_max_size = tmp * 3; break;
             default:
-            tag->encoder_max_size = ( 4 * 65535 );
+            tag->encoder_max_size = vj_avcodec_get_buf_size(tag->encoder);
             break;
         }
 
@@ -3090,8 +3090,13 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
         return -1;
     }
 
+    if( ret == 0 ) {
+        veejay_msg(VEEJAY_MSG_DEBUG, "Failed to encode frame %ld", nframe );
+        return (vj_tag_continue_record(t1));
+    }
+
     if(tag->encoder_file ) {
-        if(lav_write_frame(tag->encoder_file, vj_avcodec_get_buf(tag->encoder), ret,1))
+        if(lav_write_frame(tag->encoder_file, vj_avcodec_get_buf(tag->encoder), ret,1) < 0)
         {
             veejay_msg(VEEJAY_MSG_ERROR, "%s", lav_strerror());
             if( tag->encoder_frames_recorded > 1 ) {

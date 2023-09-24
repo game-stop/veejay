@@ -113,12 +113,12 @@ void *distortion_malloc(int w, int h)
         return NULL;
     }
 
-    d->plasma_buf[1] = d->plasma_buf[0] + RUP8(w*h);
-	d->plasma_buf[2] = d->plasma_buf[1] + RUP8(w*h);
+    d->plasma_buf[1] = d->plasma_buf[0] + (w*h);
+	d->plasma_buf[2] = d->plasma_buf[1] + (w*h);
 
-	veejay_memset( d->plasma_buf[0], 0, RUP8(w*h));
-	veejay_memset( d->plasma_buf[1], 128,RUP8(w*h));
-	veejay_memset( d->plasma_buf[2], 128,RUP8(w*h));
+	veejay_memset( d->plasma_buf[0], 0, (w*h));
+	veejay_memset( d->plasma_buf[1], 128,(w*h));
+	veejay_memset( d->plasma_buf[2], 128,(w*h));
 	
     int i;
     float rad;

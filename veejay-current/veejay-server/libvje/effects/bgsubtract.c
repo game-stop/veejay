@@ -89,9 +89,9 @@ void *bgsubtract_malloc(int width, int height)
     }
 
 	b->bg_frame__[0] = b->static_bg__;
-    b->bg_frame__[1] = b->bg_frame__[0] + RUP8(width*height);
-    b->bg_frame__[2] = b->bg_frame__[1] + RUP8(width*height);
-    b->bg_frame__[3] = b->bg_frame__[2] + RUP8(width*height);
+    b->bg_frame__[1] = b->bg_frame__[0] + (width*height);
+    b->bg_frame__[2] = b->bg_frame__[1] + (width*height);
+    b->bg_frame__[3] = b->bg_frame__[2] + (width*height);
 
     const char *hist = getenv( "VEEJAY_BG_AUTO_HISTOGRAM_EQ" );
 	if( hist ) {

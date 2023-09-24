@@ -175,29 +175,8 @@ int lav_query_APP_length(char format)
 
 int lav_query_polarity(char format)
 {
-   /* Quicktime needs TOP_FIRST, for AVI we have the choice */
-
    switch(format)
    {
- /*     case 'b': // todo: must implement polarity for DV?
-        return LAV_NOT_INTERLACED;
-
-      case 'a': return LAV_INTER_TOP_FIRST;
-      case 'A': return LAV_INTER_BOTTOM_FIRST;
-      case 'D': return LAV_NOT_INTERLACED; //divx
-      case 'Y': return LAV_NOT_INTERLACED; // planar yuv 4:2:0 (yv12)
-      case 'P': return LAV_NOT_INTERLACED; // planar yuv 4:2:2 (yv16)
-      case 'V': return LAV_NOT_INTERLACED; // planar yuv 4:2:0 (yv12)
-      case 'v': return LAV_NOT_INTERLACED; // planar yuv 4:2:2 (yv16)
-
-      case 'M': return LAV_NOT_INTERLACED; // mpeg4 , 
-      case 'd': return LAV_INTER_BOTTOM_FIRST;  // DV, interlaced 
-      case 'j': return LAV_INTER_TOP_FIRST;
-      case 'q': return LAV_INTER_TOP_FIRST;
-      case 'L': return LAV_NOT_INTERLACED;
-      case 'l': return LAV_NOT_INTERLACED;
-      case 'm': return LAV_INTER_TOP_FIRST;
-      case 'x': return LAV_NOT_INTERLACED; // picture is always not interlaced*/
       default:  return LAV_NOT_INTERLACED;
    }
 }
@@ -226,7 +205,6 @@ lav_file_t *lav_open_output_file(char *filename, char format,
    lav_fd->interlacing = interlaced ? lav_query_polarity(format):LAV_NOT_INTERLACED;
    lav_fd->has_audio   = (asize>0 && achans>0);
    lav_fd->bps         = (asize*achans+7)/8;
-   lav_fd->is_MJPG     = 1;
    lav_fd->MJPG_chroma = _lav_io_default_chroma;
   
    char fourcc[16];
@@ -240,6 +218,10 @@ lav_file_t *lav_open_output_file(char *filename, char format,
              /* Open AVI output file */
         veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI MJPEG");
         sprintf(fourcc, "MJPG" );
+        break;
+    case 'H':
+        veejay_msg(VEEJAY_MSG_DEBUG,"\tWriting output file in AVI HFYU");
+        sprintf(fourcc, "HFYU");
         break;
     case 'c':
         veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI MJPEG-b");
@@ -373,7 +355,9 @@ int lav_close(lav_file_t *lav_file)
             break;
 #endif
         case 'x':
+#ifdef USE_GDK_PIXBUF
             vj_picture_cleanup( lav_file->picture );
+#endif
             ret = 1;
             break;
 #ifdef HAVE_LIBQUICKTIME
@@ -414,6 +398,7 @@ long    lav_bytes_remain( lav_file_t *lav_file )
         case 'L':   
         case 'l':
         case 'd':
+        case 'H':
           return AVI_bytes_remain( lav_file->avi_fd );
         default:
          return -1;
@@ -451,6 +436,7 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
         case 'L':   
         case 'l':
         case 'd':
+        case 'H':
             if(n==0) {
                 res = AVI_write_frame( lav_file->avi_fd, buff, size );
             }   
@@ -660,11 +646,6 @@ void lav_video_clipaspect(lav_file_t *lav_file, int *sar_w, int *sar_h)
   return;
 }
 
-int lav_video_is_MJPG(lav_file_t *lav_file)
-{
-   return lav_file->is_MJPG;
-}
-
 int lav_video_MJPG_chroma(lav_file_t *lav_file)
 {
     return lav_file->MJPG_chroma;
@@ -678,6 +659,7 @@ int lav_video_compressor_type(lav_file_t *lav_file)
 #define FOURCC_DV "dvsd"
 #define FOURCC_PIC "pict"
 #define FOURCC_LZO "mlzo" 
+#define FOURCC_HUFFYUV "hfyu"
 
 const char *lav_video_compressor(lav_file_t *lav_file)
 {
@@ -702,6 +684,7 @@ const char *lav_video_compressor(lav_file_t *lav_file)
    if(lav_file->format == 'q' || lav_file->format == 'Q')
     return quicktime_video_compressor(lav_file->qt_fd,0);
 #endif
+
    return AVI_video_compressor(lav_file->avi_fd);
 }
 
@@ -853,13 +836,14 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
 #endif
    int kf = 1;  
    int ret = (AVI_read_frame(lav_file->avi_fd,vidbuf,&kf));
-/*
+
+#ifdef STRICT_CHECKING
    if(!kf)
    {
-//  veejay_msg(0, "Requested frame is not a keyframe");
+    veejay_msg(VEEJAY_MSG_DEBUG, "Requested frame is not a keyframe");
     return ret;
    }
-*/
+#endif
    return ret;
 
 }
@@ -1009,7 +993,6 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
    lav_fd->sar_h       = 0; 
    lav_fd->has_audio   = 0;
    lav_fd->bps         = 0;
-   lav_fd->is_MJPG     = 0;
    lav_fd->MJPG_chroma = CHROMAUNKNOWN;
    lav_fd->mmap_size   = mmap_size;
 
@@ -1255,11 +1238,18 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     }
 
     if (strncasecmp(video_comp,"yv16",4)==0 ||
-        strncasecmp(video_comp,"i422",4)==0 ||
-        strncasecmp(video_comp,"hfyu",4)==0)
+        strncasecmp(video_comp,"i422",4)==0)
     {
         lav_fd->MJPG_chroma = CHROMA422;
         lav_fd->format = 'P';
+        lav_fd->interlacing = LAV_NOT_INTERLACED;
+        return lav_fd; 
+    }
+
+    if (strncasecmp(video_comp,"hfyu",4)==0)
+    {
+        lav_fd->MJPG_chroma = CHROMA422;
+        lav_fd->format = 'H';
         lav_fd->interlacing = LAV_NOT_INTERLACED;
         return lav_fd; 
     }
@@ -1318,7 +1308,6 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     {
         lav_fd->MJPG_chroma = CHROMA420;
         lav_fd->interlacing = LAV_INTER_UNKNOWN;
-        lav_fd->is_MJPG = 1;
         if ( lav_set_video_position(lav_fd,0) < 0 ) goto ERREXIT;
         lav_fd->MJPG_chroma = CHROMAUNKNOWN;
         lav_fd->interlacing = LAV_INTER_UNKNOWN;
@@ -1326,7 +1315,7 @@ lav_file_t *lav_open_input_file(char *filename, long mmap_size)
     }
     
     ierr = ERROR_FORMAT;
-    veejay_msg(VEEJAY_MSG_ERROR, "Unrecognized format '%s'", video_comp);
+    veejay_msg(VEEJAY_MSG_ERROR, "Unrecognized format '%s' in %s", video_comp, filename);
 
 ERREXIT:
    lav_close(lav_fd);
@@ -1371,6 +1360,7 @@ const char *lav_strerror(void)
       case 'P':
       case 'L':
       case 'D':
+      case 'H':
          return AVI_strerror();
       default:
          /* No or unknown video format */

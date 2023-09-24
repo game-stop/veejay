@@ -75,8 +75,8 @@ void *medianfilter_malloc(int w, int h)
         free(m);
         return NULL;
     }
-    m->buffer[1] = m->buffer[0] + RUP8(w * h);
-    m->buffer[2] = m->buffer[1] + RUP8(w * h);
+    m->buffer[1] = m->buffer[0] + (w * h);
+    m->buffer[2] = m->buffer[1] + (w * h);
     return (void*) m;
 }
 

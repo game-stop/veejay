@@ -66,8 +66,8 @@ void  *swirl_malloc(int w, int h)
         swirl_free(s);
         return NULL;
     }
-    s->buf[1] = s->buf[0] + RUP8(w*h);
-    s->buf[2] = s->buf[1] + RUP8(w*h);
+    s->buf[1] = s->buf[0] + (w*h);
+    s->buf[2] = s->buf[1] + (w*h);
 
 	s->polar_map = (double*) vj_calloc(sizeof(double) * RUP8(w * h) );
 	if(!s->polar_map) {

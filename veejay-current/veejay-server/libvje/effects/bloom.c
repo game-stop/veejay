@@ -111,12 +111,12 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args) {
     int height = frame->height;
     uint8_t *L = frame->data[0];
     uint8_t *B = b->bloom_buf;
-    uint8_t *B1h = B + RUP8(len);
-    uint8_t *B1v = B1h + RUP8(len);
-    uint8_t *B2h = B1v + RUP8(len);
-    uint8_t *B2v = B2h + RUP8(len);
-    uint8_t *B3h = B2v + RUP8(len);
-    uint8_t *B3v = B3h + RUP8(len);
+    uint8_t *B1h = B + len;
+    uint8_t *B1v = B1h + len;
+    uint8_t *B2h = B1v + len;
+    uint8_t *B2v = B2h + len;
+    uint8_t *B3h = B2v + len;
+    uint8_t *B3v = B3h + len;
 
     for( int i = 0; i < len; i ++ ) {
         if( L[i] > threshold )

@@ -19,13 +19,10 @@
 
 #ifndef LZOH
 #define LZOH
-
-void    *lzo_new(  );
+#define LZO_AL(size) (((size) + (sizeof(long) - 1)) / sizeof(long))
+void    *lzo_new( int pf, int wid, int hei, int is_decoder );
 void	lzo_print_buf( uint8_t *buf, int len );
 void	lzo_free( void *lzo );
-long 	lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, int ilen );
-long	lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h );
-long    lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len,uint8_t *dst[3], int uv_len);
-long    lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len,uint8_t *dst[3], int uv_len, uint32_t s1, uint32_t s2, uint32_t s3	);
-
+long    lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len,uint8_t *dst[4], int width, int height, int pixfmt);
+long	lzo_compress_frame( void *lzo, VJFrame *frame, uint8_t *src[4], uint8_t *dst );
 #endif

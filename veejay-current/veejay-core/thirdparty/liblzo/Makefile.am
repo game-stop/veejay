@@ -1,6 +1,6 @@
 # Makefile for veejay
 MAINTAINERCLEANFILES = Makefile.in
-AM_CFLAGS = $(OP_CFLAGS)
+AM_CFLAGS = $(LZO_EXTRA_CFLAGS)
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -I$(top_srcdir)/thirdparty \

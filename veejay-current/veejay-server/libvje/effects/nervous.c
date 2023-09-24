@@ -69,9 +69,9 @@ void *nervous_malloc(int w, int h )
 		return NULL;
 	}
 
-	n->nervous_buf[1] = n->nervous_buf[0] + RUP8(w*h*N_MAX);
-	n->nervous_buf[2] = n->nervous_buf[1] + RUP8(w*h*N_MAX);
-	n->nervous_buf[3] = n->nervous_buf[2] + RUP8(w*h*N_MAX);
+	n->nervous_buf[1] = n->nervous_buf[0] + (w*h*N_MAX);
+	n->nervous_buf[2] = n->nervous_buf[1] + (w*h*N_MAX);
+	n->nervous_buf[3] = n->nervous_buf[2] + (w*h*N_MAX);
 	n->frames_elapsed = 0;
 
 	vj_frame_clear1( n->nervous_buf[0], 0, (w*h) * N_MAX );

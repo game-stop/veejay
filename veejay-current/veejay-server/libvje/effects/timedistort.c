@@ -78,7 +78,7 @@ void *timedistort_malloc( int w, int h )
         return NULL;
     }
 
-	td->nonmap = vj_calloc( (RUP8(2 * w * h) + RUP8(2 * w)) * sizeof(uint8_t));
+	td->nonmap = vj_calloc( (RUP8(2 * w * h + (2 * w))) * sizeof(uint8_t));
 	if(!td->nonmap) {
         free(td);
 		return NULL;
@@ -90,12 +90,12 @@ void *timedistort_malloc( int w, int h )
         free(td);
         return NULL;
     }
-	td->planes[1] = td->planes[0] + RUP8(PLANES * w * h );
-	td->planes[2] = td->planes[1] + RUP8(PLANES * w * h );
+	td->planes[1] = td->planes[0] + (PLANES * w * h );
+	td->planes[2] = td->planes[1] + (PLANES * w * h );
 
-	veejay_memset( td->planes[0],0, RUP8(PLANES * w * h ));
-	veejay_memset( td->planes[1],128,RUP8(PLANES * w * h  ));
-	veejay_memset( td->planes[2],128,RUP8(PLANES * w * h ));
+	veejay_memset( td->planes[0],0, (PLANES * w * h ));
+	veejay_memset( td->planes[1],128,(PLANES * w * h  ));
+	veejay_memset( td->planes[2],128,(PLANES * w * h ));
 
 	td->have_bg = 0;
 	td->n__ = 0;

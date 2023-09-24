@@ -80,14 +80,14 @@ void *maskstop_malloc(int width, int height)
     }
 
 	for( i = 1; i < 6; i ++ )
-		v->vvmaskstop_buffer[i] = v->vvmaskstop_buffer[(i-1)] + RUP8(width * height);
+		v->vvmaskstop_buffer[i] = v->vvmaskstop_buffer[(i-1)] + (width * height);
 	
-    veejay_memset( v->vvmaskstop_buffer[1], 128, RUP8(width*height));
-	veejay_memset( v->vvmaskstop_buffer[2], 128, RUP8(width*height));
-    veejay_memset( v->vvmaskstop_buffer[4], 128, RUP8(width*height));
-	veejay_memset( v->vvmaskstop_buffer[5], 128, RUP8(width*height));
-    veejay_memset( v->vvmaskstop_buffer[0], pixel_Y_lo_, RUP8(width*height));
-    veejay_memset( v->vvmaskstop_buffer[3], pixel_Y_lo_, RUP8(width*height));
+    veejay_memset( v->vvmaskstop_buffer[1], 128, (width*height));
+	veejay_memset( v->vvmaskstop_buffer[2], 128, (width*height));
+    veejay_memset( v->vvmaskstop_buffer[4], 128, (width*height));
+	veejay_memset( v->vvmaskstop_buffer[5], 128, (width*height));
+    veejay_memset( v->vvmaskstop_buffer[0], pixel_Y_lo_, (width*height));
+    veejay_memset( v->vvmaskstop_buffer[3], pixel_Y_lo_, (width*height));
 	
 	v->frq_frame = 256;
 	v->frq_mask = 256;
