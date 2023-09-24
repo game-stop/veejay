@@ -322,6 +322,7 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 	lzo_uint result_len = 0;
 	lzo_uint offset = LZO_HEADER_LEN;
 	unsigned int is_direct = 0;
+	unsigned int old_format = 0;
 	
 	len[0] = str2ulong( linbuf );   //pixel format
 	len[1] = str2ulong( linbuf+4 ); // length of first plane
@@ -332,6 +333,10 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 	if( len[1] + len[2] + len[3] > linbuf_len || len[1] + len[2] + len[3] <= 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "LZO: Invalid length data in MLZO header");
 		return -1;
+	}
+
+	if( len[2] > 0 && len[3] > 0 ) {
+		old_format = 1;
 	}
 	
 	if( 1 == 1 && width == l->out_frame->width && height == l->out_frame->height &&
@@ -380,9 +385,29 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 		veejay_msg(VEEJAY_MSG_ERROR, "LZO Cannot allocate work memory for LZO1X_1");
 		return 0;
 	}
-	
-	result_len = lzo_decompress_plane(l, linbuf + offset, len[1] + len[2] + len[3], is_direct, dst[0], expected_length);
-    sum += result_len;
+
+	if( old_format ) {
+		result_len = lzo_decompress_plane(l, linbuf + offset, len[1], is_direct, dst[0], l->in_frame->len);
+		if( result_len == 0 )
+			goto mlzo_decode_exit;
+    	sum += result_len;
+		offset += len[1];
+		result_len = lzo_decompress_plane(l, linbuf + offset, len[2], is_direct, dst[1], l->in_frame->uv_len);
+		if( result_len == 0 )
+			goto mlzo_decode_exit;
+    	sum += result_len;
+		offset += len[2];
+		result_len = lzo_decompress_plane(l, linbuf + offset, len[3], is_direct, dst[2], l->in_frame->uv_len);
+		if( result_len == 0 )
+			goto mlzo_decode_exit;
+    	sum += result_len;
+	}
+	else {
+		result_len = lzo_decompress_plane(l, linbuf + offset, len[1] + len[2] + len[3], is_direct, dst[0], expected_length);
+    	sum += result_len;
+	}
+
+mlzo_decode_exit:
 
 	if(!is_direct) {
 		yuv_convert_and_scale( l->scaler, l->in_frame, l->out_frame);
