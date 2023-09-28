@@ -61,14 +61,14 @@ void  *swirl_malloc(int w, int h)
     if(!s) {
         return NULL;
     }
-    s->buf[0] = vj_malloc( sizeof(uint8_t) * (w*h*3));
+ /*   s->buf[0] = vj_malloc( sizeof(uint8_t) * (w*h*3));
     if(!s->buf[0]) {
         swirl_free(s);
         return NULL;
     }
     s->buf[1] = s->buf[0] + (w*h);
     s->buf[2] = s->buf[1] + (w*h);
-
+*/
 	s->polar_map = (double*) vj_calloc(sizeof(double) * (w * h) );
 	if(!s->polar_map) {
         swirl_free(s);
@@ -108,8 +108,8 @@ void	swirl_free(void *ptr)
     swirl_t *s = (swirl_t*) ptr;
 
     if(s) {
-        if( s->buf[0] ) 
-            free(s->buf[0] );
+     //   if( s->buf[0] ) 
+     //       free(s->buf[0] );
         if( s->polar_map )
             free(s->polar_map);
         if( s->fish_angle )
@@ -136,7 +136,7 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     double *polar_map = s->polar_map;
     double *fish_angle = s->fish_angle;
     int *cached_coords = s->cached_coords;
-    uint8_t **buf = s->buf;
+ //   uint8_t **buf = s->buf;
 
 	if( s->v != v )
 	{
@@ -150,58 +150,32 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
 		const int w2 = width/2;
 		const int h2 = height/2;
 
-		for(i=0; i < len; i++)
-		{
+		for (i = 0; i < len; i++) {
 			r = polar_map[i];
 			a = fish_angle[i];
-			if(r <= R)
-			{
-				//uncomment for simple fisheye
-				//p_y = a;
-				//p_r = (r*r)/R;
-				//sin_cos( co, si, p_y );
-				sin_cos( co,si, (a+r/coeef));
-				px = (int) ( r * co );
-				py = (int) ( r * si );
-				//sin_cos( co, si, (double)v );
-				//px = (int) (r * co);
-				//py = (int) (r * si);
-				//px = (int) ( p_r * co);
-				//py = (int) ( p_r * si);
-				px += w2;
-				py += h2;
 
-				if(px < 0) px =0;
-				if(px > width) px = width;
-				if(py < 0) py = 0;
-				if(py >= (height-1)) py = height-1;
+			sin_cos(co, si, (a + r / coeef));
 
-				cached_coords[i] = (py * width)+px;
-			}
-			else
-			{
-				cached_coords[i] = -1;
-			}
+			px = (int)(r * co) + w2;
+			py = (int)(r * si) + h2;
+
+			px = (px < 0) ? 0 : ((px >= width) ? (width - 1) : px);
+			py = (py < 0) ? 0 : ((py >= height) ? (height - 1) : py);
+
+			cached_coords[i] = (py * width) + px;
 		}
 		s->v = v;
 	}
 
-	int strides[4] = { len, len, len , 0 };
-	vj_frame_copy( frame->data, buf, strides );
+//	int strides[4] = { len, len, len , 0 };
+//	vj_frame_copy( frame->data, buf, strides );
 
 	for(i=0; i < len; i++)
 	{
-		if(cached_coords[i] == -1)
-		{
-			Y[i] = pixel_Y_lo_;
-			Cb[i] = 128;
-			Cr[i] = 128;
-		}
-		else
-		{
-			Y[i] = Y[ cached_coords[i] ];
-			Cb[i] = Cb[ cached_coords[i] ];
-			Cr[i] = Cr[ cached_coords[i] ];
-		}
+		int idx = (cached_coords[i] == -1) ? 0 : cached_coords[i];
+
+		Y[i] = Y[idx];
+		Cb[i] = Cb[idx];
+		Cr[i] = Cr[idx];
 	}
 }

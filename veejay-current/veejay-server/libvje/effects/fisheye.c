@@ -179,18 +179,13 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args) {
 			{
 				r = pf( r, coeef, curve );
 				sin_cos( si,co, a);
-				px =(int) ( r * co);
-				py =(int) ( r * si);
+				px =(int) ( r * co) + w2;
+				py =(int) ( r * si) + h2;
 				
-				px += w2;
-				py += h2;
+        		px = (px < 0) ? 0 : (px >= width) ? (width - 1) : px;
+        		py = (py < 0) ? 0 : (py >= height - 1) ? (height - 1) : py;
 
-				if(px < 0) px =0;
-				if(px > width) px = width;
-				if(py < 0) py = 0;
-				if(py >= (height-1)) py = height-1;
-
-				cached_coords[i] = (py * width)+px;
+        		cached_coords[i] = (py * width) + px;
 			}
 			else
 			{
@@ -202,24 +197,19 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args) {
 	}
 
 	veejay_memcpy(buf[0], Y,(len));
-	veejay_memcpy(buf[1], Cb,(len));
-	veejay_memcpy(buf[2], Cr,(len));
-
+	
 	if( alpha == 0 ) {
+		veejay_memcpy(buf[1], Cb,(len));
+		veejay_memcpy(buf[2], Cr,(len));
+
 		for(i=0; i < len; i++)
 		{
-			if(cached_coords[i] == -1)
-			{
-				Y[i] = pixel_Y_lo_;
-				Cb[i] = 128;
-				Cr[i] = 128;
-			}
-			else
-			{
-				Y[i] = buf[0][ cached_coords[i] ];
-				Cb[i] = buf[1][ cached_coords[i] ];
-				Cr[i] = buf[2][ cached_coords[i] ];
-			}
+			int idx = (cached_coords[i] == -1) ? 0 : cached_coords[i];
+
+			Y[i] = buf[0][ idx ];
+			Cb[i] = buf[1][ idx ];
+			Cr[i] = buf[2][ idx ];
+			
 		}
 	}
 	else 
@@ -227,14 +217,8 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args) {
 		uint8_t *A = frame->data[3];
 		for(i=0; i < len; i++)
 		{
-			if(cached_coords[i] == -1)
-			{
-				A[i] = 0;
-			}
-			else
-			{
-				A[i] = buf[0][ cached_coords[i] ];
-			}
+			int idx = (cached_coords[i] == -1) ? 0 : cached_coords[i];
+			A[i] = buf[0][ idx];
 		}
 
 	}

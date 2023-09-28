@@ -67,16 +67,15 @@ static void feathermask1_apply( VJFrame *frame, uint8_t *alpha, unsigned int wid
 	
 	for(r=width; r < len; r+=width) {
 		for(c=1; c < (width-1); c++) {
-			if( alpha[r+c] != 0xff ) {
-				aA[r+c] = (
-						alpha[ r + c - width ] +
-						alpha[ r + c + width ] +
-						alpha[ r + c - 1 ] +
-						alpha[ r + c + 1 ] +
-						alpha[ r + c ] 
-							) / 5;
-
-			}	
+			if (alpha[r + c] != 0xff) {
+                int sum =
+                    alpha[r + c - width] +
+                    alpha[r + c + width] +
+                    alpha[r + c - 1] +
+                    alpha[r + c + 1] +
+                    alpha[r + c];
+                aA[r + c] = (uint8_t)(sum / 5);
+            }
 		}
 	}
 }
