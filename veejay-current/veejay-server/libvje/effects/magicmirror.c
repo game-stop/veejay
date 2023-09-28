@@ -95,10 +95,12 @@ void *magicmirror_malloc(int w, int h)
 	m->magicmirrorbuf[2] = m->magicmirrorbuf[1] + (w*h);
 	m->magicmirrorbuf[3] = m->magicmirrorbuf[2] + (w*h);
 	
-	m->magicmirrorbuf[1][0] = 128;
-	m->magicmirrorbuf[2][0] = 128;
-	m->magicmirrorbuf[1][w] = 128;
-	m->magicmirrorbuf[2][w] = 128;
+	for( int i = 0; i < h; i ++ ) {
+	m->magicmirrorbuf[1][0 + i * w] = 128;
+	m->magicmirrorbuf[2][0 + i * w] = 128;
+	m->magicmirrorbuf[1][w -1 + i * w] = 128;
+	m->magicmirrorbuf[2][w -1 + i * w] = 128;
+	}
 	
 	m->funhouse_x = (double*)vj_calloc(sizeof(double) * w );
 	if(!m->funhouse_x) {
