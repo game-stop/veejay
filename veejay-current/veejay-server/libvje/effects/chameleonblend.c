@@ -95,8 +95,8 @@ void *chameleonblend_malloc(int w, int h)
         return NULL;
     }
 
-    const int len = RUP8(w*h);
-    const int safe_zone = RUP8(w*2);
+    const int len = (w*h);
+    const int safe_zone = (w*2);
     c->bgimage[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (len + safe_zone) * 3 );
     if(!c->bgimage[0]) {
         free(c);

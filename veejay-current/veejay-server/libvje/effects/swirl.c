@@ -61,7 +61,7 @@ void  *swirl_malloc(int w, int h)
     if(!s) {
         return NULL;
     }
-    s->buf[0] = vj_malloc( sizeof(uint8_t) * RUP8(w*h*3));
+    s->buf[0] = vj_malloc( sizeof(uint8_t) * (w*h*3));
     if(!s->buf[0]) {
         swirl_free(s);
         return NULL;
@@ -69,19 +69,19 @@ void  *swirl_malloc(int w, int h)
     s->buf[1] = s->buf[0] + (w*h);
     s->buf[2] = s->buf[1] + (w*h);
 
-	s->polar_map = (double*) vj_calloc(sizeof(double) * RUP8(w * h) );
+	s->polar_map = (double*) vj_calloc(sizeof(double) * (w * h) );
 	if(!s->polar_map) {
         swirl_free(s);
         return NULL;
     }
 
-	s->fish_angle = (double*) vj_calloc(sizeof(double) * RUP8(w * h) );
+	s->fish_angle = (double*) vj_calloc(sizeof(double) * (w * h) );
 	if(!s->fish_angle) {
         swirl_free(s);
         return NULL;
     }
 
-	s->cached_coords = (int*) vj_calloc(sizeof(int) * RUP8(w * h) );
+	s->cached_coords = (int*) vj_calloc(sizeof(int) * (w * h) );
 	if(!s->cached_coords) {
         swirl_free(s);
         return NULL;

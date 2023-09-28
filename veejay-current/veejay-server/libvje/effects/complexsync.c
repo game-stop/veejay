@@ -67,7 +67,7 @@ void *complexsync_malloc(int width, int height)
         return NULL;
     }
 
-    c->c_outofsync_buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height*3) );
+    c->c_outofsync_buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (width*height*3) );
     if(!c->c_outofsync_buffer[0]) {
         free(c);
         return NULL;

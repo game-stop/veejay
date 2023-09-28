@@ -89,7 +89,7 @@ static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_
 			lookup[i] = 0xff * ( (double) (time_index - i ) / dur );
 	}
 
-	uint8_t AA[ RUP8(w) ];
+	uint8_t AA[ w + 16 ];
 
 	for( i = 0; i < len; i += w )
 	{

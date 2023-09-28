@@ -70,7 +70,7 @@ void *medianfilter_malloc(int w, int h)
     if(!m) {
         return NULL;
     }
-    m->buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w * h * 3));
+    m->buffer[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (w * h * 3));
     if(!m->buffer[0]) {
         free(m);
         return NULL;

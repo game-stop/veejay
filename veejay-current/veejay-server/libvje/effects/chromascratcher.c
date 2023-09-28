@@ -79,7 +79,7 @@ void *chromascratcher_malloc(int w, int h)
         return NULL;
     }
 
-    c->cframe[0] = (uint8_t *) vj_malloc( RUP8(w * h * 3) * MAX_SCRATCH_FRAMES * sizeof(uint8_t) );
+    c->cframe[0] = (uint8_t *) vj_malloc( w * h * 3 * MAX_SCRATCH_FRAMES * sizeof(uint8_t) );
     if(!c->cframe[0]) {
         free(c);
         return NULL;

@@ -74,7 +74,7 @@ void *scratcher_malloc(int w, int h)
     s->last_n = 8;
 
 	/* need memory for bounce mode ... */
-    s->frame[0] = (uint8_t *) vj_malloc( RUP8(w * h * 3) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
+    s->frame[0] = (uint8_t *) vj_malloc( (w * h * 3) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
 	if(!s->frame[0]) {
         free(s);
         return NULL;
@@ -83,9 +83,9 @@ void *scratcher_malloc(int w, int h)
     veejay_memset( s->frame[0], pixel_Y_lo_, w * h * MAX_SCRATCH_FRAMES );
 
     s->frame[1] =
-	    s->frame[0] + ( RUP8(w * h) * MAX_SCRATCH_FRAMES );
+	    s->frame[0] + ( (w * h) * MAX_SCRATCH_FRAMES );
     s->frame[2] =
-	    s->frame[1] + ( RUP8(w * h)  * MAX_SCRATCH_FRAMES );
+	    s->frame[1] + ( (w * h)  * MAX_SCRATCH_FRAMES );
 
     veejay_memset( s->frame[1], 128, (w * h * MAX_SCRATCH_FRAMES) );
     veejay_memset( s->frame[2], 128, (w * h * MAX_SCRATCH_FRAMES) );

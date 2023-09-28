@@ -76,7 +76,7 @@ void *sinoids_malloc(int width, int height)
 
     }
 
-    s->sinoid_frame[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width*height*3));
+    s->sinoid_frame[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * (width*height*3));
     if(!s->sinoid_frame[0]) {
         free(s->sinoids_X);
         free(s);

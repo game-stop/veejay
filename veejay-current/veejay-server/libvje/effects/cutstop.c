@@ -70,7 +70,7 @@ void *cutstop_malloc(int width, int height)
         return NULL;
     }
 
-    const int len = RUP8(width*height);
+    const int len = (width*height);
     const int total_len = 3 * len;
 
     c->vvcutstop_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len);

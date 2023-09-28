@@ -35,10 +35,6 @@ extern void av_frame_unref(AVFrame *ptr) __attribute((weak));
 
 #if FF_VJE_BACKPORT
 
-#ifndef CODEC_ID_MJPEGB
-#define CODEC_ID_MJPEGB AV_CODEC_ID_MJPEGB
-#endif
-
 #ifndef CODEC_ID_MPEG4
 #define CODEC_ID_MPEG4 AV_CODEC_ID_MPEG4
 #endif

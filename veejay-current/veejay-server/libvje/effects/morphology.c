@@ -98,7 +98,7 @@ void *morphology_malloc(int w, int h )
         return NULL;
     }
 
-	m->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( w * h) );
+	m->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * ( w * h) );
 	if(!m->binary_img) {
         free(m);
         return NULL;

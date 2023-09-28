@@ -56,8 +56,8 @@ void *tracer_malloc(int w, int h)
     if(!t) {
         return NULL;
     }
-	const int len = RUP8(w * h);
-    const int total_len = RUP8(len * 3);
+	const int len = (w * h);
+    const int total_len = (len * 3);
     
     t->trace_buffer[0] = (uint8_t *) vj_malloc(sizeof(uint8_t) * total_len );
     if(!t->trace_buffer[0]) {

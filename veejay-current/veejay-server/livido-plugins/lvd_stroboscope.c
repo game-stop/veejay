@@ -21,9 +21,6 @@ typedef struct
 	int current;
 } hold_buffer_t;
 
-#define RUP8(num)(((num)+8)&~8)
-
-
 int	init_instance( livido_port_t *my_instance )
 {
 	int w = 0, h = 0;
@@ -33,7 +30,7 @@ int	init_instance( livido_port_t *my_instance )
     if(!hb) {
         return LIVIDO_ERROR_MEMORY_ALLOCATION;
     }
-    hb->buffer = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8( w * h * 3));
+    hb->buffer = (uint8_t*) livido_malloc( sizeof(uint8_t) * ( w * h * 3));
     if(!hb->buffer) {
         free(hb);
         return LIVIDO_ERROR_MEMORY_ALLOCATION;

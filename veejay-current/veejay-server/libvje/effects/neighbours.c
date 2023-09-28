@@ -70,7 +70,7 @@ void *neighbours_malloc(int w, int h )
         return NULL;
     }
 
-	n->tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h * 2));
+	n->tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h * 2));
 	if(!n->tmp_buf[0]) {
         free(n);
         return NULL;
@@ -78,7 +78,7 @@ void *neighbours_malloc(int w, int h )
 
 	n->tmp_buf[1] = n->tmp_buf[0] + (w*h);
 
-	n->chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h *2));
+	n->chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h *2));
 	if(!n->chromacity[0]) {
         free(n->tmp_buf[0]);
         free(n);

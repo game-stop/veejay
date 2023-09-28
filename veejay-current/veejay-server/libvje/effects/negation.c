@@ -37,7 +37,7 @@ vj_effect *negation_init(int w, int h)
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->parallel = 1;
-	ve->has_user = 0;
+    ve->has_user = 0;
     ve->param_description = vje_build_param_list( ve->num_params, "Value" );
     return ve;
 }
@@ -61,5 +61,5 @@ void negation_apply( void *ptr, VJFrame *frame, int *args ) {
 	for( i = 0; i < uv_len; i ++ ) {
 		Cb[i] = val - Cb[i];
 		Cr[i] = val - Cr[i];
-	}
+	} 
 }

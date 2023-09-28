@@ -101,7 +101,7 @@ void  *waterrippletv_malloc(int width, int height)
     if(!r) {
         return NULL;
     }
-	r->ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width * height));
+	r->ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * (width * height));
 	if(!r->ripple_data[0]) {
         free(r);
         return NULL;
@@ -111,13 +111,13 @@ void  *waterrippletv_malloc(int width, int height)
 
 	r->map_h = height / 2 + 1;
 	r->map_w = width / 2 + 1;
-	r->map = (int*) vj_calloc (sizeof(int) * RUP8(r->map_h * r->map_w * 3));
+	r->map = (int*) vj_calloc (sizeof(int) * (r->map_h * r->map_w * 3));
 	if(!r->map) {
         free(r->ripple_data[0]);
         free(r);
         return NULL;
     }
-	r->vtable = (signed char*) vj_calloc( sizeof(signed char) * RUP8(r->map_w * r->map_h * 2));
+	r->vtable = (signed char*) vj_calloc( sizeof(signed char) * (r->map_w * r->map_h * 2));
 	if(!r->vtable) {
         free(r->ripple_data[0]);
         free(r->map);

@@ -101,7 +101,7 @@ void *dices_malloc(int width, int height)
         return NULL;
     }
 
-	d->g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * RUP8(width * height));
+	d->g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * (width * height));
 	if(!d->g_dicemap) {
         free(d);
         return NULL;

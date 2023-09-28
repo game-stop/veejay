@@ -111,20 +111,20 @@ void *motionmap_malloc(int w, int h )
         return NULL;
     }
 
-	mm->bg_image = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w * h));
+	mm->bg_image = (uint8_t*) vj_malloc( sizeof(uint8_t) * (w * h));
     if(!mm->bg_image) {
         free(mm);
         return NULL;
     }
 
-	mm->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h));
+	mm->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h));
     if(!mm->binary_img) {
         free(mm->bg_image);
         free(mm);
         return NULL;
     }
     
-	mm->prev_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h));
+	mm->prev_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w*h));
     if(!mm->prev_img) {
         free(mm->bg_image);
         free(mm->binary_img);
@@ -132,7 +132,7 @@ void *motionmap_malloc(int w, int h )
         return NULL;
     }
 
-	mm->interpolate_buf = vj_malloc( sizeof(uint8_t) * RUP8(w*h*3));
+	mm->interpolate_buf = vj_malloc( sizeof(uint8_t) * (w*h*3));
     if(!mm->interpolate_buf) {
         free(mm->bg_image);
         free(mm->binary_img);
@@ -140,7 +140,7 @@ void *motionmap_malloc(int w, int h )
         free(mm);
         return NULL;
     }
-	mm->diff_img = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h*2));
+	mm->diff_img = (uint8_t*) vj_malloc( sizeof(uint8_t) * (w*h*2));
     if(!mm->diff_img) {
         free(mm->bg_image);
         free(mm->binary_img);

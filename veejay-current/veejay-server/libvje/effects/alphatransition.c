@@ -101,7 +101,7 @@ static void	alpha_blend_transition( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_
 									unsigned int time_index, const unsigned int dur, const int direction, const int threshold )
 {
 	uint8_t lookup[256];
-	uint8_t AA[ RUP8(w+7) ];
+	uint8_t AA[ (w+16) ];
 
 	const uint8_t *T  = (const uint8_t*) lookup;
 	const uint8_t *aA = a0;

@@ -47,7 +47,6 @@ static int unlock(vj_yuv *t)
 	return pthread_mutex_unlock( &(t->mutex ));
 }
 
-#define     RUP8(num)(((num)+8)&~8)
 vj_yuv *vj_yuv4mpeg_alloc(int w, int h, float fps, int out_pixel_format)
 {
     vj_yuv *yuv4mpeg = (vj_yuv *) vj_calloc(sizeof(vj_yuv));
@@ -118,7 +117,7 @@ static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width, int h
 
     yuv4mpeg->chroma = y4m_si_get_chroma( &(yuv4mpeg->streaminfo) );
 
-	yuv4mpeg->buf[0] = vj_calloc( sizeof(uint8_t) * RUP8( w * h * 4) );
+	yuv4mpeg->buf[0] = vj_calloc( sizeof(uint8_t) * ( w * h * 4) );
 	yuv4mpeg->buf[1] = yuv4mpeg->buf[0] + (w*h);
 	yuv4mpeg->buf[2] = yuv4mpeg->buf[1] + (w*h);
 	yuv4mpeg->buf[3] = yuv4mpeg->buf[2] + (w*h);

@@ -65,7 +65,7 @@ void *slice_malloc(int width, int height)
     if(!s) {
         return NULL;
     }
-    s->slice_frame[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8(width * height * 4));
+    s->slice_frame[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * (width * height * 4));
     if(!s->slice_frame[0]) {
 	    free(s);
         return NULL;

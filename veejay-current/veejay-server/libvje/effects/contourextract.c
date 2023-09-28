@@ -133,13 +133,13 @@ int contourextract_malloc(void **d, int width, int height)
 	dw_ = nearest_div( width / 8  );
 	dh_ = nearest_div( height / 8 );
 
-	my->current = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( dw_ * dh_ * 3 ));
-	my->bitmap = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height ));
+	my->current = (uint8_t*) vj_calloc( sizeof(uint8_t) * ( dw_ * dh_ * 3 ));
+	my->bitmap = (uint8_t*) vj_calloc( sizeof(uint8_t) * ( width * height ));
 	
 	if(static_bg == NULL)	
-		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( (width * height + (width*2)) )   );
+		static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * ( (width * height + (width*2)) )   );
 	if(dt_map == NULL )
-		dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * RUP8( width * height ));
+		dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * ( width * height ));
 
 	veejay_memset( &template_, 0, sizeof(sws_template) );
 	veejay_memset( proj_, 0, sizeof(proj_) );

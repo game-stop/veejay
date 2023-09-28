@@ -84,7 +84,7 @@ void *reflection_malloc(int width, int height)
         return NULL;
     }
 
-    r->reflection_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(width));
+    r->reflection_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * (width));
     if(!r->reflection_buffer) {
         free(r);
         return NULL;

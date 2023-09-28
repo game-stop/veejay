@@ -71,8 +71,8 @@ void *radcor_malloc( int w, int h )
         return NULL;
     }
 
-    const int len = RUP8(w * h);
-    const int total_len = RUP8(len * 4);
+    const int len = (w * h);
+    const int total_len = (len * 4);
 
 	r->badbuf = (uint8_t*) vj_malloc( sizeof(uint8_t) * total_len );
 	if(!r->badbuf) {

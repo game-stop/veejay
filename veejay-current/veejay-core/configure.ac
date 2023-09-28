@@ -54,6 +54,8 @@ AC_ARG_ENABLE([debug],
 		AS_HELP_STRING([--enable-debug],[Compile in debugging information]))
 AC_ARG_ENABLE([profile],
 		AS_HELP_STRING([--enable-profiling],[Compile in profiling information]))
+AC_ARG_ENABLE([strict],
+		AS_HELP_STRING([--enable-strict],[Compile in strict checking]))
 AC_ARG_ENABLE([compile-warnings],     
               AS_HELP_STRING([--enable-compile-warnings],[Turn on compiler warnings.]))
 AC_ARG_ENABLE([warnings_as_errors],   
@@ -172,6 +174,13 @@ if test "x$enable_profiling" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fprofile-arcs -ftest-coverage"
  DEBUGLIBS="-lgcov"
  AC_SUBST(DEBUGLIBS)
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
+AC_MSG_CHECKING(whether to compile in assertion checking)
+if test "x$enable_strict" = "xyes" ; then
+ debugCFLAGS="$debugCFLAGS -DSTRICT_CHECKING"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])

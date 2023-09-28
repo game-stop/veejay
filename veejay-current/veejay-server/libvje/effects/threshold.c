@@ -59,7 +59,7 @@ void	*threshold_malloc(int w, int h )
     if(!t) {
         return NULL;
     }
-	t->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
+	t->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h) );
 	if(!t->binary_img) {
         free(t);
         return NULL;

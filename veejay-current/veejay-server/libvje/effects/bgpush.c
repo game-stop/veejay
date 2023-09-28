@@ -50,7 +50,7 @@ void *bgpush_malloc(int w, int h)
         return NULL;
     }
     
-	b->frame_data =  (uint8_t*) vj_malloc( RUP8(w*h*4) );
+	b->frame_data =  (uint8_t*) vj_malloc( (w*h*4) );
 	b->frame_ptr[0] = b->frame_data;
 	b->frame_ptr[1] = b->frame_ptr[0] + (w*h);
 	b->frame_ptr[2] = b->frame_ptr[1] + (w*h);

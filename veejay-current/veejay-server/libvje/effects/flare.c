@@ -68,7 +68,7 @@ void *flare_malloc(int w, int h)
         return NULL;
     }
 
-    const int len = RUP8(w*h);
+    const int len = w*h;
     const int total_len = len * 3;
 
     f->flare_buf[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * total_len );

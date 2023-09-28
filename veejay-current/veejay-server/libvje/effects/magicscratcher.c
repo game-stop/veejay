@@ -75,7 +75,7 @@ void *magicscratcher_malloc(int w, int h)
         return NULL;
     }
 
-    m->mframe =	(uint8_t *) vj_calloc( RUP8(w * h) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
+    m->mframe =	(uint8_t *) vj_calloc( (w * h) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
     if(!m->mframe) {
         free(m);
         return NULL;

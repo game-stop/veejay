@@ -151,9 +151,9 @@ void picinpic_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 	if( picture->frame == NULL ) {
 		picture->frame = yuv_yuv_template( NULL,NULL,NULL ,view_width,view_height,pixfmt );
 		// needs seperately allocated planes
-		picture->frame->data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( view_width * view_height ));
-		picture->frame->data[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( view_width * view_height ));
-		picture->frame->data[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( view_width * view_height ));
+		picture->frame->data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * ( view_width * view_height ));
+		picture->frame->data[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * ( view_width * view_height ));
+		picture->frame->data[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * ( view_width * view_height ));
 	}
 
 	if( picture->scaler == NULL ) {

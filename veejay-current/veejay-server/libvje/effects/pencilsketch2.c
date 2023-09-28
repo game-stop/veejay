@@ -92,7 +92,7 @@ void *pencilsketch2_malloc(int w, int h) {
         return NULL;
     }
     
-    p->pencilbuf = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h*3) );
+    p->pencilbuf = (uint8_t*) vj_malloc( sizeof(uint8_t) * (w*h*3) );
     if(!p->pencilbuf) {
         free(p);
         return NULL;

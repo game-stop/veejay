@@ -48,9 +48,12 @@ static struct
 {
 	{ "vj20", CODEC_ID_YUV420F	},
 	{ "vj22", CODEC_ID_YUV422F	},
-	{ "qoiy", CODEC_ID_QOI },
+	{ "qoiy", CODEC_ID_QOIY },
+#if LIBAVACODEC_VERSION_MAJOR >= 59  
+    // ffmpeg has support for QOI since 59
+	{ "qoif" , AV_CODEC_ID_QOI},
+#endif
     { "mjpg" ,CODEC_ID_MJPEG 	},
-	{ "mjpb", CODEC_ID_MJPEGB	},
 	{ "i420", CODEC_ID_YUV420	},
     { "i422", CODEC_ID_YUV422	},
 	{ "dmb1", CODEC_ID_MJPEG	},
@@ -92,7 +95,6 @@ static struct
 #define ROUND_UP_4(x) ROUND_UP_X (x, 2)
 #define ROUND_UP_8(x) ROUND_UP_X (x, 3)
 #define DIV_ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) >> (x))
-#define RUP8(num)(((num)+8)&~8)
 
 #define MAX_PACKETS 5
 
@@ -289,7 +291,7 @@ static int avcodec_decode_video( AVPacket *pkt, AVCodecContext *avctx, AVFrame *
 
 	int ret = avcodec_send_packet( avctx, pkt );
 	if( ret < 0 ) {
-		veejay_msg(0, "Error submitting a packet to the decoder");
+		veejay_msg(0, "Error submitting a packet to the decoder: %s", av_err2str(ret));
 		return ret;
 	}
 

@@ -53,7 +53,7 @@ void *motionblur_malloc(int width, int height)
     if(!m) {
         return NULL;
     }
-    m->previous_frame[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(width * height *3));
+    m->previous_frame[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (width * height *3));
     if(!m->previous_frame[0]) {
         free(m);
         return NULL;

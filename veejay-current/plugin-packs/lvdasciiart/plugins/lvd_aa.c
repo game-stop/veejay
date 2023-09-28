@@ -72,7 +72,6 @@ LIVIDO_PLUGIN
 #include FT_GLYPH_H
 #include FT_STROKER_H
 #define NUM_GLYPHS 256
-#define RUP8(num)(((num)+8)&~8)
 
 typedef struct Glyph {
     FT_Glyph *glyph;  ///< freetype glyph
@@ -600,7 +599,7 @@ int init_instance( livido_port_t *my_instance )
 
     livido_memset(aa,0,sizeof(lvd_aa_t));
     
-    aa->scale.buf[0] = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8( w * h) );
+    aa->scale.buf[0] = (uint8_t*) livido_malloc( sizeof(uint8_t) * ( w * h) );
     if(!aa->scale.buf[0]) {
         livido_free(aa);
         return LIVIDO_ERROR_MEMORY_ALLOCATION;
@@ -615,7 +614,7 @@ int init_instance( livido_port_t *my_instance )
     aa->font = -1;
     aa->aa_flags = 0;
 
-    aa->buf[0] = (uint8_t*) livido_malloc (sizeof(uint8_t) * RUP8(w * h * 3 ) );
+    aa->buf[0] = (uint8_t*) livido_malloc (sizeof(uint8_t) * (w * h * 3 ) );
     aa->buf[1] = aa->buf[0] + w*h;
     aa->buf[2] = aa->buf[1] + w*h;
 
@@ -750,8 +749,8 @@ int     process_instance( livido_port_t *my_instance, double timecode )
     uint8_t *fb[3] = { framebuffer, NULL, NULL };
 
     if( aa->scale.sws == NULL ) {
-        aa->scale.w = RUP8(w/density);
-        aa->scale.h = RUP8(h/density);
+        aa->scale.w = (w/density);
+        aa->scale.h = (h/density);
         aa->scale.sws = sws_getContext( w, h, AV_PIX_FMT_YUV444P, aa->scale.w, aa->scale.h, AV_PIX_FMT_GRAY8, aa->scale.flags,NULL,NULL,NULL);
         if(aa->scale.sws == NULL)
             return LIVIDO_ERROR_INTERNAL;

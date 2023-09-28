@@ -14,8 +14,6 @@ LIVIDO_PLUGIN
 #include	"utils.h"
 #include	"livido-utils.c"
 
-#define RUP8(num)(((num)+8)&~8)
-
 #include <libavutil/cpu.h>
 #include <libswscale/swscale.h>
 #include <veejaycore/avcommon.h>
@@ -40,7 +38,7 @@ int	init_instance( livido_port_t *my_instance )
 
 	livido_memset(c,0,sizeof(lvd_crop_t));
 
-	c->buf[0]     = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8(w * h * 4));
+	c->buf[0]     = (uint8_t*) livido_malloc( sizeof(uint8_t) * (w * h * 4));
     if(!c->buf[0]) {
         free(c);
         return LIVIDO_ERROR_MEMORY_ALLOCATION;\

@@ -60,7 +60,7 @@ void *noiseadd_malloc(int width, int height)
   if(!n) {
       return NULL;
   }
-  n->Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * RUP8(width * height));
+  n->Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * (width * height));
   if(!n->Yb_frame) {
       free(n);
       return NULL;

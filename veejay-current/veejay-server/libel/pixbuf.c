@@ -36,7 +36,6 @@
 #include <libswscale/swscale.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/avcommon.h>
-#define    RUP8(num)(((num)+8)&~8)
 
 typedef struct
 {
@@ -97,7 +96,7 @@ static	VJFrame *open_pixbuf( vj_pixbuf_t *pic, const char *filename, int dst_w, 
 	int img_fmt = PIX_FMT_RGB24;
 
 	if( pic->pixels == NULL ) {
-		pic->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(pixbuf_size + dst_w)  );
+		pic->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * (pixbuf_size + dst_w)  );
 		if(!pic->pixels) {
 			g_object_unref(image);
 			return NULL;
@@ -261,7 +260,7 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			break;
 	}
 
-	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(4 * len));
+	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * (4 * len));
 	if(!pic->space) {
 		free(pic->filename);
 		free(pic);

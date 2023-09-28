@@ -76,7 +76,7 @@ void *dotillism_malloc(int w, int h)
     if(!d) {
         return NULL;
     }
-    d->map = (uint8_t*) vj_malloc( RUP8(w*h) );
+    d->map = (uint8_t*) vj_malloc( w*h );
     if(!d->map) {
         free(d->map);
         free(d);

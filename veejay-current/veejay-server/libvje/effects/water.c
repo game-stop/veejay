@@ -137,13 +137,13 @@ vj_effect *water_init(int width, int height)
 void  *water_malloc(int width, int height)
 {
 	water_t *w = (void*) vj_calloc(sizeof(water_t));
-	w->ripple_data[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * RUP8(width * height));
+	w->ripple_data[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * (width * height));
 	if(!w->ripple_data[0]) {
         free(w);
         return NULL;
     }
 
-	w->diff_img = (uint8_t*)vj_calloc(sizeof(uint8_t) * RUP8(width * height * 2));
+	w->diff_img = (uint8_t*)vj_calloc(sizeof(uint8_t) * (width * height * 2));
 	if(!w->diff_img) {
         free(w->ripple_data[0]);
         free(w);
@@ -153,7 +153,7 @@ void  *water_malloc(int width, int height)
 	w->map_h = height / 2 + 1;
 	w->map_w = width / 2 + 1;
 
-	w->map = (int*) vj_calloc (sizeof(int) * RUP8( w->map_h * w->map_w * 3));
+	w->map = (int*) vj_calloc (sizeof(int) * ( w->map_h * w->map_w * 3));
 	if(!w->map) {
         free(w->ripple_data[0]);
         free(w->diff_img);
@@ -161,7 +161,7 @@ void  *water_malloc(int width, int height)
         return NULL;
     }
 
-	w->vtable = (signed char*) vj_calloc( sizeof(signed char) * RUP8(w->map_w * w->map_h * 2));
+	w->vtable = (signed char*) vj_calloc( sizeof(signed char) * (w->map_w * w->map_h * 2));
 	if(!w->vtable) {
         free(w->ripple_data[0]);
         free(w->diff_img);

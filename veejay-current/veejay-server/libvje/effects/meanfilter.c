@@ -39,7 +39,7 @@ vj_effect *meanfilter_init(int w, int h)
 int meanfilter_malloc(int w, int h)
 {
 	if( mean == NULL ) {
-		mean =  (uint8_t*) vj_calloc( RUP8(w*h) );
+		mean =  (uint8_t*) vj_calloc( (w*h) );
 		if( mean == NULL )
 			return 0;
 	}

@@ -86,9 +86,6 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, int w, int h, float fps);
 extern int  frei0r_get_param_count( void *port);
 extern void dummy_rgb_apply(VJFrame *frame, int r, int g, int b);
 
-
-#define RUP8(num)(((num)+8)&~8)
-
 typedef struct
 {
     uint8_t *data;

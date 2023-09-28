@@ -118,7 +118,7 @@ void *gaussblur_malloc(int w, int h)
         return NULL;
     }
 
-	g->temp = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(w*h));
+	g->temp = (uint8_t*) vj_malloc( sizeof(uint8_t) * (w*h));
     if(!g->temp) {
         free(g->gaussfilter);
         free(g);

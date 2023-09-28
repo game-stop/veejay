@@ -72,26 +72,26 @@ void *baltantv_malloc(int w, int h)
         return NULL;
     }
 
-	b->planetableY_ = (uint8_t*) vj_calloc( sizeof(uint8_t*) * PLANES * RUP8(w * h));
+	b->planetableY_ = (uint8_t*) vj_calloc( sizeof(uint8_t*) * PLANES * (w * h));
     if(!b->planetableY_) {
         free(b);
         return NULL;
     }
-	b->planetableU_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * RUP8(w * h));
+	b->planetableU_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * (w * h));
     if(!b->planetableU_) {
         free(b->planetableY_);
         free(b);
         return NULL;
     }
-	b->planetableV_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * RUP8(w * h));
+	b->planetableV_ = (int8_t*) vj_malloc( sizeof(int8_t*) * PLANES * (w * h));
     if(!b->planetableV_) {
         free(b->planetableY_);
         free(b->planetableU_);
         return NULL;
     }
 
-    veejay_memset( b->planetableU_, 0, PLANES * RUP8(w*h));
-    veejay_memset( b->planetableV_, 0, PLANES * RUP8(w*h));
+    veejay_memset( b->planetableU_, 0, PLANES * (w*h));
+    veejay_memset( b->planetableV_, 0, PLANES * (w*h));
 
 	return (void*) b;
 }

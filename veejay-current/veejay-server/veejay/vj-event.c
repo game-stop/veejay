@@ -160,7 +160,7 @@ static  char    *get_print_buf(int size) {
     int s = size;
     if( s<= 0)
         s = SEND_BUF;
-    char *res = (char*) vj_calloc(sizeof(char) * RUP8(s) );
+    char *res = (char*) vj_calloc(sizeof(char) * s );
     return res;
 }
 
@@ -7147,8 +7147,6 @@ static struct {
 #endif
     { "dvsd", ENCODER_DVVIDEO },
     { "mjpeg", ENCODER_MJPEG },
-    { "mjpeg-b", ENCODER_MJPEGB },
-    { "mjpegb", ENCODER_MJPEGB },
     { "ljpeg", ENCODER_LJPEG },
 #ifdef HAVE_LIBQUICKTIME
     { "quicktime-mjpeg", ENCODER_QUICKTIME_MJPEG },

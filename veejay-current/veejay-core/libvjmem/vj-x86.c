@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
+#include <libvevo/libvevo.h>
 #include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
@@ -162,6 +163,14 @@ void vj_mem_init(void)
 	task_init();
 }
 
+void vj_mem_optimize() {
+#ifndef STRICT_CHECKING
+	find_best_memcpy();	
+	find_best_memset();
+#endif
+}
+
+
 void	vj_mem_destroy()
 {
 }
@@ -222,7 +231,6 @@ void *vj_malloc_(size_t size)
 {
 	if( size <= 0 )
 		return NULL;
-
 	void *ptr = NULL;
 #ifdef HAVE_POSIX_MEMALIGN
     size_t aligned_size = (size + MEM_ALIGNMENT_SIZE - 1) & ~(MEM_ALIGNMENT_SIZE - 1);
@@ -250,13 +258,12 @@ void *vj_malloc_(size_t size)
 
     return ptr;
 }
-#define    RUP8(num)(((num)+8)&~8)
 
 void	*vj_calloc_( size_t size )
 {
 	void *ptr = vj_malloc_(size);
 	if(ptr)
-		veejay_memset(ptr,0,size);
+		memset(ptr,0,size);
 	return ptr;
 }
 
@@ -272,7 +279,7 @@ void	*vj_simple_pool_init( size_t s )
 	v_simple_pool_t *pool = (v_simple_pool_t*) vj_malloc( sizeof(v_simple_pool_t) );
 	if(!pool)
 		return NULL;
-	void *addr = vj_calloc_( RUP8(s) );
+	void *addr = vj_calloc_( s + 16 );
 	if(!addr) {
 		free(pool);
 		return NULL;
@@ -291,7 +298,7 @@ void	*vj_simple_pool_alloc( void *ptr, size_t s )
 	}
 	uint8_t *addr = (uint8_t*) pool->addr + (pool->cur);
 
-	pool->cur += RUP8(s);
+	pool->cur += s;
 
 	return (void*) ( addr + pool->cur );
 }

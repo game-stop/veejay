@@ -45,7 +45,7 @@ void *feathermask_malloc(int width, int height)
     if(!f) {
         return NULL;
     }
-    f->mask = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height));
+    f->mask = (uint8_t*)vj_malloc(sizeof(uint8_t) * (width*height));
     if(!f->mask) {
 		free(f);
         return NULL;

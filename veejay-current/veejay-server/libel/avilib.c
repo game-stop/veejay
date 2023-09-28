@@ -33,8 +33,6 @@
 #include <veejaycore/vj-msg.h>
 #include "avilib.h"
 
-#define    RUP8(num)(((num)+8)&~8)
-
 #ifndef	O_BINARY
 #define O_BINARY 0
 #endif
@@ -321,13 +319,13 @@ static int avi_init_super_index(avi_t *AVI, unsigned char *idxtag, avisuperindex
     veejay_memset (sil->dwReserved, 0, sizeof (sil->dwReserved));
 
     // NR_IXNN_CHUNKS == allow 32 indices which means 32 GB files -- arbitrary
-    sil->aIndex = vj_calloc( RUP8(sil->wLongsPerEntry * NR_IXNN_CHUNKS) * sizeof (uint32_t));
+    sil->aIndex = vj_calloc( (sil->wLongsPerEntry * NR_IXNN_CHUNKS) * sizeof (uint32_t));
     if (!sil->aIndex) {
 	AVI_errno = AVI_ERR_NO_MEM;
 	return -1;
     }
 
-    sil->stdindex = vj_calloc(RUP8( NR_IXNN_CHUNKS * sizeof (avistdindex_chunk *)));
+    sil->stdindex = vj_calloc(( NR_IXNN_CHUNKS * sizeof (avistdindex_chunk *)));
     if (!sil->stdindex) {
 	AVI_errno = AVI_ERR_NO_MEM;
 	return -1;

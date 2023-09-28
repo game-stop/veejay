@@ -79,7 +79,7 @@ void *colorhis_malloc(int w, int h)
         return NULL;
     }
 
-	c->rgb_ = vj_malloc(sizeof(uint8_t) * RUP8(w * h * 3) );
+	c->rgb_ = vj_malloc(sizeof(uint8_t) * (w * h * 3) );
     if(!c->rgb_) {
         veejay_histogram_del(c->histogram_);
         free(c);

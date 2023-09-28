@@ -70,8 +70,6 @@ typedef struct
 	char tmp_path[1024];
 } composite_t;
 
-//@ round to multiple of 8
-#define    RUP8(num)(((num)+8)&~8)
 
 void	*composite_get_vp( void *data )
 {
@@ -121,7 +119,7 @@ void	*composite_init( int pw, int ph, int iw, int ih, char *homedir, int sample_
 		return NULL;
 	}
 
-	c->proj_plane[0] = (uint8_t*) vj_calloc( RUP8( pw * ph * 3) + RUP8(pw * 3) * sizeof(uint8_t));
+	c->proj_plane[0] = (uint8_t*) vj_calloc( ( pw * ph * 3) + (pw * 3) * sizeof(uint8_t));
 	c->proj_plane[1] = c->proj_plane[0] + (pw * ph) + (pw);
 	c->proj_plane[2] = c->proj_plane[1] + (pw * ph) + (pw);
 	viewport_set_marker( c->vp1, 1 );
@@ -152,7 +150,7 @@ void	*composite_init( int pw, int ph, int iw, int ih, char *homedir, int sample_
 
 	if( strncasecmp( gf_instr, "1", 1 ) == 0 ) {
 		c->has_mirror_plane = 1;
-		c->mirror_plane[0] = (uint8_t*) vj_calloc( RUP8( iw * ih * 3) + RUP8(iw * 3) * sizeof(uint8_t));
+		c->mirror_plane[0] = (uint8_t*) vj_calloc( ( iw * ih * 3) + (iw * 3) * sizeof(uint8_t));
 		c->mirror_plane[1] = c->mirror_plane[0] + (iw * ih) + (iw);
 		c->mirror_plane[2] = c->mirror_plane[1] + (iw * ih) + (iw);
 		c->mirror_row_start = 0;

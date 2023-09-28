@@ -63,7 +63,7 @@ void *bloom_malloc(int width, int height)
         return NULL;
     }
 
-    b->bloom_buf = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(width * height * 8));
+    b->bloom_buf = (uint8_t*) vj_calloc(sizeof(uint8_t) * (width * height * 8));
     if(!b->bloom_buf) {
         free(b);
         return NULL;

@@ -61,8 +61,6 @@
 #include <assert.h>
 #endif
 
-#define    RUP8(num)(((num)+8)&~8)
-
 #ifdef SUPPORT_READ_DV2
 #include "rawdv.h"
 #include "vj-dv.h"
@@ -72,11 +70,9 @@
 #define CODEC_ID_YUV422 998
 #define CODEC_ID_YUV422F 997
 #define CODEC_ID_YUV420F 996
-#define CODEC_ID_QOI 993
+#define CODEC_ID_QOIY 993
 #define CODEC_ID_YUVLZO 900
 #define DUMMY_FRAMES 2
-#define RUP16(num)(((num)+16)&~16)
-
 
 static struct
 {
@@ -315,7 +311,7 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 	{
 		d->lzo_decoder = lzo_new( el_pixel_format_, el_width_, el_height_ , 1);
 	}
-	else if ( id == CODEC_ID_YUV422 || id == CODEC_ID_YUV420 || id == CODEC_ID_YUV420F || id == CODEC_ID_YUV422F || id == CODEC_ID_QOI ) {
+	else if ( id == CODEC_ID_YUV422 || id == CODEC_ID_YUV420 || id == CODEC_ID_YUV420F || id == CODEC_ID_YUV422F || id == CODEC_ID_QOIY ) {
 		
 	}
 	else if( ctx )
@@ -326,7 +322,7 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 	}
 
 	
-	size_t safe_max_frame_size = RUP8( AV_INPUT_BUFFER_PADDING_SIZE  + max_frame_size + GREMLIN_GUARDIAN );
+	size_t safe_max_frame_size = ( AV_INPUT_BUFFER_PADDING_SIZE  + max_frame_size + GREMLIN_GUARDIAN );
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Decoder buffer is %d bytes" , safe_max_frame_size);
 	
@@ -655,7 +651,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		if( decoder_id < 900 && decoder_id != AV_CODEC_ID_HUFFYUV ) 
 			max_frame_size = get_max_frame_size( el->lav_fd[n] );
 
-		max_frame_size = RUP16( max_frame_size );
+		max_frame_size = ( max_frame_size );
 
 		el->decoders[n] = 
 			_el_new_decoder( el->ctx[n], decoder_id, el->video_width, el->video_height, el->video_fps, el->pixfmt[ n ],el_pixel_format_, max_frame_size );
@@ -887,7 +883,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 		case CODEC_ID_YUVLZO:
 			return lzo_decompress_el( d->lzo_decoder, data,res, dst, el_width_, el_height_, el_pixel_format_);
 			break;
-		case CODEC_ID_QOI:
+		case CODEC_ID_QOIY:
 			{
 				qoi_desc d;
 				d.channels = 1;
@@ -993,8 +989,8 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 		case CODEC_ID_YUV422F:
 			ret = PIX_FMT_YUVJ422P;
 			break;
-		case CODEC_ID_QOI:
-			ret = PIX_FMT_GRAY8;
+		case CODEC_ID_QOIY:
+			ret = PIX_FMT_YUVJ422P;
 			break;
 		case CODEC_ID_YUV420:
 			ret = PIX_FMT_YUV420P;
@@ -1476,7 +1472,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		     		n = open_video_file(filename[nf], el, flags, deinterlace,force,norm, av_pixfmt, width, height);
 				if(n >= 0 )
 				{
-			       		el->frame_list = (uint64_t *) realloc(el->frame_list, (RUP8(el->video_frames + el->num_frames[n])) * sizeof(uint64_t));
+			       		el->frame_list = (uint64_t *) realloc(el->frame_list, (el->video_frames + el->num_frames[n]) * sizeof(uint64_t));
 					if (el->frame_list==NULL)
 					{
 						veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
@@ -2023,7 +2019,7 @@ int		vj_el_framelist_clone( editlist *src, editlist *dst)
 	if(!src || !dst) return 0;
 	if(dst->frame_list)
 		return 0;
-	dst->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * RUP8(src->video_frames) );
+	dst->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * src->video_frames );
 	if(!dst->frame_list)
 		return 0;
 	

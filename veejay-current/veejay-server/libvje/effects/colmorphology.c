@@ -63,7 +63,7 @@ void *colmorphology_malloc(int w, int h )
     if(!c) {
         return NULL;
     }
-	c->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h) );
+	c->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h) );
     if(!c->binary_img) {
         free(c);
         return NULL;

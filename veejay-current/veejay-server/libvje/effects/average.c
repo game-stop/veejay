@@ -61,7 +61,7 @@ void *average_malloc(int width, int height)
     if(!a) {
         return NULL;
     }
-	a->running_sum[0] = (double*) vj_calloc( sizeof(double) * RUP8(width * height * 3 ));
+	a->running_sum[0] = (double*) vj_calloc( sizeof(double) * (width * height * 3 ));
 	if(!a->running_sum[0]) {
 	    free(a);
         return NULL;

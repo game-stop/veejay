@@ -60,8 +60,8 @@ void *crosspixel_malloc(int w, int h)
         return NULL;
     }
 
-    const int total_len = RUP8( w * h * 3 );
-    const int len = RUP8(w * h);
+    const int total_len = ( w * h * 3 );
+    const int len = (w * h);
 
     c->cross_pixels[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len );
     if(!c->cross_pixels[0]) {

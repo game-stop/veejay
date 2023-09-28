@@ -53,10 +53,8 @@
 #define ROUND_UP_4(x) ROUND_UP_X (x, 2)
 #define ROUND_UP_8(x) ROUND_UP_X (x, 3)
 #define DIV_ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) >> (x))
-#define RUP8(num)(((num)+8)&~8)
 
 static int out_pixel_format = FMT_422F; 
-
 
 static char*	vj_avcodec_get_codec_name(int codec_id )
 {
@@ -64,8 +62,10 @@ static char*	vj_avcodec_get_codec_name(int codec_id )
 	switch(codec_id)
 	{
 		case CODEC_ID_MJPEG: snprintf(name,sizeof(name),"MJPEG"); break;
+#if LIBAVCODEC_VERSION_MAJOR >= 59
+		case AV_CODEC_ID_QOI: snprintf(name, sizeof(name), "QOI (ffmpeg)"); break;
+#endif
 		case CODEC_ID_MPEG4: snprintf(name,sizeof(name), "MPEG4"); break;
-		case CODEC_ID_MJPEGB: snprintf(name,sizeof(name),"MJPEGB");break;
 		case CODEC_ID_MSMPEG4V3: snprintf(name,sizeof(name), "DIVX"); break;
 		case CODEC_ID_DVVIDEO: snprintf(name,sizeof(name), "DVVideo"); break;
 		case CODEC_ID_LJPEG: snprintf(name,sizeof(name), "LJPEG" );break;
@@ -77,9 +77,10 @@ static char*	vj_avcodec_get_codec_name(int codec_id )
 		case 996 : snprintf(name,sizeof(name), "RAW YUV 4:2:0 Planar JPEG"); break;
 		case 995 : snprintf(name,sizeof(name), "YUV4MPEG Stream 4:2:2"); break;
 		case 994 : snprintf(name,sizeof(name), "YUV4MPEG Stream 4:2:0"); break;
+		case 993 : snprintf(name,sizeof(name), "QOI YUV 4:2:2 Planar (experimental)"); break;
 		case 999 : snprintf(name,sizeof(name), "RAW YUV 4:2:0 Planar"); break;
 		case 998 : snprintf(name,sizeof(name), "RAW YUV 4:2:2 Planar"); break;
-		case 900 : snprintf(name,sizeof(name), "LZO YUV 4:2:2 Planar"); break;
+		case 900 : snprintf(name,sizeof(name), "LZO YUV 4:2:2 Planar (experimental)"); break;
 		default:
 			snprintf(name,sizeof(name), "Unknown"); break;
 	}
@@ -154,7 +155,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	e->in_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
 	veejay_memcpy( e->in_frame, frame, sizeof(VJFrame));
 
-	e->data[0] = (uint8_t*) vj_malloc(RUP8(e->out_frame->len * 4));
+	e->data[0] = (uint8_t*) vj_malloc((e->out_frame->len * 4));
 	e->data[1] = e->data[0] + e->out_frame->len;
 	e->data[2] = e->data[1] + e->out_frame->len;
 	e->data[3] = NULL;
@@ -436,8 +437,6 @@ int		vj_avcodec_find_codec( int encoder )
 		case ENCODER_DVVIDEO:
 		case ENCODER_QUICKTIME_DV:
 			return CODEC_ID_DVVIDEO;
-		case ENCODER_MJPEGB:
-			return CODEC_ID_MJPEGB;
 		case ENCODER_HUFFYUV:
 			return CODEC_ID_HUFFYUV;
 		case ENCODER_LJPEG:
@@ -479,8 +478,6 @@ char		vj_avcodec_find_lav( int encoder )
 			return 'd';
 		case ENCODER_QUICKTIME_DV:
 			return 'Q';
-		case ENCODER_MJPEGB:
-			return 'c';
 		case ENCODER_LJPEG:
 			return 'l';
 		case ENCODER_YUV420:
@@ -513,7 +510,6 @@ static struct {
 	{ "Invalid codec", -1 },
 	{ "DV2", ENCODER_DVVIDEO },
 	{ "MJPEG", ENCODER_MJPEG },
-	{ "MJPEGB", ENCODER_MJPEGB },
 	{ "HuffYUV", ENCODER_HUFFYUV },
 	{ "YUV 4:2:2 Planar, 0-255 full range", ENCODER_YUV422F },
 	{ "YUV 4:2:0 Planar, 0-255 full range", ENCODER_YUV420F },
@@ -622,16 +618,9 @@ int		vj_avcodec_free()
 
 static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst)
 {
-	if(!av)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "The encoder is not initialized");
-		return 0;
-	}
-
 	VJFrame *A = av->in_frame;
 	VJFrame *B = av->out_frame;
 
-	//setup pointers
 	A->data[0] = src[0]; 
 	A->data[1] = src[1]; 
 	A->data[2] = src[2]; 
@@ -643,6 +632,8 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst
 	B->data[3] = NULL;
 
 	yuv_convert_and_scale( av->scaler, A, B);
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "From %s -> %s (%d, %d)",  yuv_get_pixfmt_description(A->format), yuv_get_pixfmt_description(B->format), B->len, B->uv_len);
 	
 	return (B->len + B->uv_len + B->uv_len);
 }
@@ -699,18 +690,24 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 		 	break;
 		 }
          if (ret < 0) {
+			veejay_msg( VEEJAY_MSG_ERROR, "Encoding failed: %s", av_err2str(ret));
 			break;
 		 }
+
+		
      }
+
+	 if(pkt->size > 0)
+	   ret = pkt->size;
  
 	av_packet_unref(pkt);
-/*	if( ret > 0 ) {
+	if( ret > 0 ) {
 		char name[256];
 		sprintf(name, "frame-%d.jpg", ret);
 		FILE *f = fopen( name, "wb");
 		fwrite( buf, ret, 1, f);
 		fclose(f);
-	} */
+	} 
 
 	return ret;
 
@@ -794,9 +791,9 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 	av->frame->data[1] = src[1];
 	av->frame->data[2] = src[2];
 
-	av->frame->linesize[0] = ROUND_UP_4( av->out_frame->width );
-	av->frame->linesize[1] = ROUND_UP_4( av->out_frame->uv_width );
-	av->frame->linesize[2] = ROUND_UP_4( av->out_frame->uv_width );
+	av->frame->linesize[0] = av->out_frame->width;
+	av->frame->linesize[1] = av->out_frame->uv_width;
+	av->frame->linesize[2] = av->out_frame->uv_width;
 
 	//av->frame->quality = 1;
 	//av->frame->key_frame = 1;
@@ -804,6 +801,8 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 
 	//av->frame->quality = 1;
 	int ret = vj_avcodec_encode_video( av->packet, av->context, buf, buf_len, av->frame );
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Encoded frame %ld to %d bytes" ,nframe, ret );
 
 	return ret;
 #endif

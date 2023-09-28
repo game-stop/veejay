@@ -78,7 +78,7 @@ void *zoom_malloc(int width, int height)
     zoom_t *z = (zoom_t*) vj_calloc(sizeof(zoom_t));
     if(!z)
         return NULL;
-    z->zoom_private_[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( width * height + width ) * 4 );
+    z->zoom_private_[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * ( width * height + width ) * 4 );
     z->zoom_private_[1] = z->zoom_private_[0] + (width * height + width);
     z->zoom_private_[2] = z->zoom_private_[1] + (width * height + width);
     z->zoom_private_[3] = z->zoom_private_[2] + (width * height + width);

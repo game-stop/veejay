@@ -832,6 +832,7 @@ int main(int argc, char **argv)
 #endif
 
 	vj_mem_init();
+	vj_mem_optimize();
 
 	vevo_strict_init();
 	

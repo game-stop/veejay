@@ -82,7 +82,7 @@ void *bgsubtract_malloc(int width, int height)
         return NULL;
     }
 
-    b->static_bg__ = (uint8_t*) vj_malloc( RUP8(width + width*height)*4);
+    b->static_bg__ = (uint8_t*) vj_malloc( (width + width*height)*4);
     if(!b->static_bg__) {
         free(b);
         return NULL;

@@ -78,7 +78,7 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-#define RUP8(num)(((num)+8)&~8)
+
 #ifdef ARCH_X86_64
 static gpointer castIntToGpointer( int val )
 {
@@ -102,6 +102,23 @@ static int samplebank_ready_ = 0;
 static int faster_ui_ = 0;
 
 static GtkWidget *widget_cache[MAX_WIDGET_CACHE];
+
+//FIXME: declare some symbols here because veejaycore is not correctly structured
+int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )  {
+	return -1;
+}
+void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
+	return NULL;
+}
+
+int	avhelper_decode_video( void *ptr, uint8_t *data, int len) {
+	return -1;
+}
+void	avhelper_close_decoder( void *ptr ) {
+}
+int	avhelper_rescale_video(void *ptr, uint8_t *dst[4]) {
+	return -1;
+}
 
 enum {
   WIDGET_IMAGEA = 0,
@@ -2966,7 +2983,7 @@ void update_gui();
 int veejay_get_sample_image(int id, int type, int wid, int hei)
 {
     multi_vims( VIMS_GET_SAMPLE_IMAGE, "%d %d %d %d", id, type, wid, hei );
-    uint8_t *data_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(wid * hei * 3));
+    uint8_t *data_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * (wid * hei * 3));
     int sample_id = 0;
     int sample_type =0;
     int full_range = 0;
@@ -3186,7 +3203,7 @@ static gchar *recv_vims_args(int slen, int *bytes_written, int *arg0, int *arg1,
     unsigned char *result = NULL;
     if( ret <= 0 || len <= 0 || slen <= 0)
         return (gchar*)result;
-    result = (unsigned char*) vj_calloc(sizeof(unsigned char) * RUP8(len + 1 + 16) );
+    result = (unsigned char*) vj_calloc(sizeof(unsigned char) * (len + 16) );
     *bytes_written = vj_client_read( info->client, V_CMD, result, len );
     if( *bytes_written == -1 )
         reloaded_schedule_restart();

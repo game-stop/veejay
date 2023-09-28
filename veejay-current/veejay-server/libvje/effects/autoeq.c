@@ -64,7 +64,7 @@ void *autoeq_malloc(int w, int h)
     if(!a) {
         return NULL;
     }
-    a->tmp = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(w*h));
+    a->tmp = (uint8_t*) vj_calloc(sizeof(uint8_t) * (w*h));
     if(!a->tmp) {
         free(a);
         return NULL;

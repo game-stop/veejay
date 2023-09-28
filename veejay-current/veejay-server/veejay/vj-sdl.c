@@ -40,9 +40,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define RUP8(num)(((num)+8)&~8)
-#define RUP16(num)(((num)+16)&~16)
-
 typedef struct vj_sdl_t {
     SDL_Window *screen;
     SDL_Renderer *renderer;
@@ -93,7 +90,7 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
 
     vjsdl->src_frame = (void*) src;
     vjsdl->dst_frame = (void*) dst;
-    vjsdl->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP16( frame->len * 2 ) );
+    vjsdl->pixels = (uint8_t*) vj_calloc(sizeof(uint8_t) * ( frame->len * 2 ) );
 
     return (void*) vjsdl;
 }

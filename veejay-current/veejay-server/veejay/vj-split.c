@@ -37,7 +37,6 @@
 #include <libplugger/specs/livido.h>
 #include <string.h>
 
-#define RUP8(num)(((num)+8)&~8)
 #define LOCALHOST "127.0.0.1" 
 #define SHM_ADDR_OFFSET 4096
 
@@ -337,7 +336,7 @@ static int vj_split_allocate_screen( void *ptr, int screen_id, int wid, int hei,
 		return 0;
 	}
 	
-	box->data = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(dst->len*4));
+	box->data = (uint8_t*) vj_malloc( sizeof(uint8_t) * (dst->len*4));
 
 	dst->data[0] = box->data;
 	dst->data[1] = box->data + dst->len;

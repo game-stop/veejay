@@ -47,7 +47,6 @@
 LIVIDO_PLUGIN
 #include	"utils.h"
 #include	"livido-utils.c"
-#define RUP8(num)(((num)+8)&~8)
 
 #include <libavutil/cpu.h>
 #include <math.h>

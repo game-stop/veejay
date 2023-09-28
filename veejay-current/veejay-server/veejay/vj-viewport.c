@@ -60,8 +60,6 @@
 #define MAX(a,b) ( (a)>(b) ? (a) : (b) )
 #endif
 
-#define        RUP8(num)(((num)+8)&~8)
-
 #define clamp1(x, y, z) ((x) = ((x) < (y) ? (y) : ((x) > (z) ? (z) : (x))))
 #define distance1(x1,y1,x2,y2) (  sqrt( (x1 - x2) * (x1 - x2) + ( y1 - y2 ) * (y1 -y2 ) ) )
 
@@ -1798,7 +1796,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	v->m = NULL;
 	v->grid = NULL;
 	v->ui  = vj_calloc( sizeof(ui_t));
-	v->ui->buf[0] = vj_calloc(sizeof(uint8_t) * RUP8(w * h) );
+	v->ui->buf[0] = vj_calloc(sizeof(uint8_t) * (w * h) );
 	v->ui->scale  = 0.5f;
 	v->ui->scaler = viewport_init_swscaler(v->ui,iw,ih);
 	v->saved_w = w;
@@ -1864,7 +1862,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	}
 
 	// Allocate memory for map
-	v->map = (int32_t*) vj_calloc(sizeof(int32_t) * RUP8(v->w * v->h + (v->w*2)) );
+	v->map = (int32_t*) vj_calloc(sizeof(int32_t) * (v->w * v->h + (v->w*2)) );
 	if(!v->map) {
 		free(v->ui->buf[0]);
 		free(v->ui);
@@ -1917,7 +1915,7 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	q->usermouse[2] = 0.0;
 	q->usermouse[3] = 0.0;
 	q->ui  = vj_calloc( sizeof(ui_t));
-	q->ui->buf[0] = vj_calloc(sizeof(uint8_t) * RUP8(new_w * new_h) );
+	q->ui->buf[0] = vj_calloc(sizeof(uint8_t) * (new_w * new_h) );
 	q->ui->scale  = 1.0f;
 	q->ui->scaler = viewport_init_swscaler(q->ui,new_w,new_h);
 	q->disable = 0;
@@ -1945,7 +1943,7 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	}
 
 	// Allocate memory for map
-	q->map = (int32_t*) vj_malloc(sizeof(int32_t) * RUP8(q->w * q->h + (q->w*2)) );
+	q->map = (int32_t*) vj_malloc(sizeof(int32_t) * (q->w * q->h + (q->w*2)) );
 
 	const int len = q->w * q->h;
 	const int eln = len + ( q->w * 2 );

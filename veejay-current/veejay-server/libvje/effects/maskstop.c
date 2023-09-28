@@ -73,7 +73,7 @@ void *maskstop_malloc(int width, int height)
     }
 
 	int i;
-	v->vvmaskstop_buffer[0] =  (uint8_t*) vj_malloc( sizeof(uint8_t)  * RUP8(width * height)  * 6 );
+	v->vvmaskstop_buffer[0] =  (uint8_t*) vj_malloc( sizeof(uint8_t)  * width * height  * 6);
     if(!v->vvmaskstop_buffer[0]) {
         free(v);
         return NULL;

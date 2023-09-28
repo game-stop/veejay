@@ -223,10 +223,6 @@ lav_file_t *lav_open_output_file(char *filename, char format,
         veejay_msg(VEEJAY_MSG_DEBUG,"\tWriting output file in AVI HFYU");
         sprintf(fourcc, "HFYU");
         break;
-    case 'c':
-        veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI MJPEG-b");
-        sprintf(fourcc, "MJPB" );
-        break;
     case 'l':
         veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI LJPEG");
         sprintf(fourcc, "JPGL");

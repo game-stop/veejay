@@ -33,11 +33,31 @@ extern void avcodec_free_context(AVCodecContext **avctx) __attribute__((weak));
 extern void av_frame_unref(AVFrame *ptr) __attribute((weak));
 
 
-#if FF_VJE_BACKPORT
-
-#ifndef CODEC_ID_MJPEGB
-#define CODEC_ID_MJPEGB AV_CODEC_ID_MJPEGB
+#ifndef CODEC_ID_YUV420
+#define CODEC_ID_YUV420 999
 #endif
+
+#ifndef CODEC_ID_YUV422
+#define CODEC_ID_YUV422 998
+#endif
+
+#ifndef CODEC_ID_YUV422F
+#define CODEC_ID_YUV422F 997
+#endif
+
+#ifndef CODEC_ID_YUV420F
+#define CODEC_ID_YUV420F 996
+#endif
+
+#ifndef CODEC_ID_YUVLZO
+#define CODEC_ID_YUVLZO 900
+#endif
+
+#ifndef CODEC_ID_QOIY
+#define CODEC_ID_QOIY 993
+#endif
+
+#if FF_VJE_BACKPORT
 
 #ifndef CODEC_ID_MPEG4
 #define CODEC_ID_MPEG4 AV_CODEC_ID_MPEG4

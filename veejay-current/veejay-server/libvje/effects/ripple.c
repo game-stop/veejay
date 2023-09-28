@@ -78,25 +78,25 @@ void *ripple_malloc(int width, int height)
     }
 
     
-    r->ripple_table = (double*) vj_malloc(sizeof(double) * (RUP8(width * height) + width) );
+    r->ripple_table = (double*) vj_malloc(sizeof(double) * ((width * height) + width) );
     if(!r->ripple_table) {
         free(r);
         return NULL;
     }
 
-    r->ripple_data[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * 3 * ( RUP8(width * height) + width) );
+    r->ripple_data[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * 3 * ( (width * height) + width) );
     if(!r->ripple_data[0]) {
         free(r->ripple_table);
         free(r);
         return NULL;
     }
 
-    r->ripple_data[1] = r->ripple_data[0] +(RUP8(width*height) + width);
-    r->ripple_data[2] = r->ripple_data[1] +(RUP8(width*height) + width);
+    r->ripple_data[1] = r->ripple_data[0] +((width*height) + width);
+    r->ripple_data[2] = r->ripple_data[1] +((width*height) + width);
 
-	veejay_memset( r->ripple_data[1], 128, RUP8(width * height) + width );
-	veejay_memset( r->ripple_data[2], 128, RUP8(width * height) + width );
-    veejay_memset( r->ripple_data[0], pixel_Y_lo_, RUP8(width*height) + width);
+	veejay_memset( r->ripple_data[1], 128, (width * height) + width );
+	veejay_memset( r->ripple_data[2], 128, (width * height) + width );
+    veejay_memset( r->ripple_data[0], pixel_Y_lo_, (width*height) + width);
 
     r->ripple_sin = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
     if(!r->ripple_sin) {

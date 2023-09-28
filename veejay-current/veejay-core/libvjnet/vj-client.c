@@ -47,7 +47,6 @@
 #define VJC_NO_MEM 1
 #define VJC_SOCKET 2
 #define VJC_BAD_HOST 3
-#define RUP8(num)(((num)+8)&~8)
 
 extern int get_ffmpeg_pixfmt( int p);
 
@@ -241,7 +240,7 @@ void vj_client_rescale_video( vj_client *v, uint8_t *data[4] ) {
 int	vj_client_read_mcast_data( vj_client *v, int max_len )
 {
 	if( v->space == NULL ) {
-		v->space = vj_calloc( sizeof(uint8_t) * RUP8( max_len ));
+		v->space = vj_calloc( sizeof(uint8_t) * max_len );
 		if(v->space == NULL)
 			return 0;
 	}
@@ -294,7 +293,7 @@ int vj_client_read_frame_hdr( vj_client *v )
 int vj_client_read_frame_data( vj_client *v, int datalen)
 {
 	if(v->space_len < datalen || v->space == NULL) {
-		v->space_len = RUP8(datalen);
+		v->space_len = datalen;
 		v->space = (uint8_t*) realloc( v->space, v->space_len );
 		if(v->space == NULL)
 		  return 0;

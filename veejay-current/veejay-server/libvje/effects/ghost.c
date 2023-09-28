@@ -53,8 +53,8 @@ void *ghost_malloc(int w, int h)
         return NULL;
     }
 
-	const int len = RUP8(w * h);
-    const int total_len = RUP8(len * 4);
+	const int len = (w * h);
+    const int total_len = (len * 4);
 
 	g->ghost_buf[0] = vj_malloc( sizeof(uint8_t) * total_len);
     if(!g->ghost_buf[0]) {

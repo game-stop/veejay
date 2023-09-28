@@ -392,7 +392,7 @@ static void PrintTypeTaggedArgs(void *v, int n) {
 
     for (thisType = typeTags + 1; *thisType != 0; ++thisType) {
 	switch (*thisType) {
-	    case 'i': case 'r': case 'm': case 'c':
+	    case 'i': case 'r': case 'm':
 	    printf("%d ", ntohl(*((int *) p)));
 	    p += 4;
 	    break;

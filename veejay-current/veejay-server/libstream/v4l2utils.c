@@ -80,8 +80,6 @@
 #include <veejaycore/av.h>
 #include <veejaycore/avhelper.h>
 #include <veejaycore/avcommon.h>
-#define        RUP8(num)(((num)+8)&~8)
-
 //#include <pthread.h>
 typedef struct {
 		void *start;
@@ -586,9 +584,9 @@ static	int	v4l2_setup_avcodec_capture( v4l2info *v, int wid, int hei, int codec_
 	v->picture = avhelper_alloc_frame();
 	v->picture->width = wid;
 	v->picture->height = hei;
-	v->picture->data[0] = vj_malloc( sizeof(uint8_t) * RUP8(wid * hei + wid));
-	v->picture->data[1] = vj_malloc( sizeof(uint8_t) * RUP8(wid * hei + wid));
-	v->picture->data[2] = vj_malloc( sizeof(uint8_t) * RUP8(wid * hei + wid));
+	v->picture->data[0] = vj_malloc( sizeof(uint8_t) * (wid * hei + wid));
+	v->picture->data[1] = vj_malloc( sizeof(uint8_t) * (wid * hei + wid));
+	v->picture->data[2] = vj_malloc( sizeof(uint8_t) * (wid * hei + wid));
 
 #if LIBAVCODEC_VERSION_MAJOR < 60
 	if( v->codec->capabilities & CODEC_CAP_TRUNCATED)
@@ -1192,7 +1190,7 @@ v4l2_rw_fallback:
 		veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: read/write buffer size is %d bytes", v->format.fmt.pix.sizeimage );
 
 		v->buffers[0].length = v->sizeimage;
-		v->buffers[0].start = vj_malloc( RUP8( v->sizeimage * 2 ) );
+		v->buffers[0].start = vj_malloc( ( v->sizeimage * 2 ) );
 
 	}
 
@@ -2087,7 +2085,7 @@ static	void	*v4l2_grabber_thread( void *v )
 	//@ FIXME:  VEEJAY_V4L2_NO_THREADING=1 and no framebuffer is allocated ...
 	
 	for( j = 0; j < N_FRAMES; j ++ ) {
-		uint8_t *ptr = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8(planes[0] * 4) );
+		uint8_t *ptr = (uint8_t*) vj_malloc( sizeof(uint8_t) * (planes[0] * 4) );
 		if(!ptr) {
 			i->stop = 1;
 			v4l2_close( v4l2 );

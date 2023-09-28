@@ -204,25 +204,25 @@ void *radioactivetv_malloc(int w, int h)
 	r->buf_margin_left = (w - r->buf_width ) >> 1;
 	r->buf_margin_right = (w - r->buf_width - r->buf_margin_left);
 	
-	r->blurzoombuf = (uint8_t*) vj_calloc( RUP8(r->buf_area * 2 ));
+	r->blurzoombuf = (uint8_t*) vj_calloc( (r->buf_area * 2 ));
 	if(!r->blurzoombuf) {
         radioactivetv_free(r);
 		return NULL;
     }
 	
-	r->blurzoomx = (int*) vj_calloc( RUP8(r->buf_width * sizeof(int)));
+	r->blurzoomx = (int*) vj_calloc( (r->buf_width * sizeof(int)));
     if(!r->blurzoomx) {
         radioactivetv_free(r);
         return NULL;
     }
 
-	r->blurzoomy = (int*) vj_calloc( RUP8(r->buf_width * sizeof(int)));
+	r->blurzoomy = (int*) vj_calloc( (r->buf_width * sizeof(int)));
     if(!r->blurzoomy) {
         radioactivetv_free(r);
         return NULL;
     }
 
-	r->diffbuf   = (uint8_t*) vj_calloc( RUP8((4*w) + 2 * w * h * sizeof(uint8_t)));
+	r->diffbuf   = (uint8_t*) vj_calloc( ((4*w) + 2 * w * h * sizeof(uint8_t)));
     if(!r->diffbuf) {
         radioactivetv_free(r);
         return NULL;

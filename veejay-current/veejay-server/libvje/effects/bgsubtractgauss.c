@@ -113,7 +113,7 @@ void *bgsubtractgauss_malloc(int width, int height)
         return NULL;
     }
 
-	b->static_bg__ = (uint8_t*) vj_malloc( RUP8(width*height*4));
+	b->static_bg__ = (uint8_t*) vj_malloc( (width*height*4));
 	if(!b->static_bg__ ) {
         free(b);
         return NULL;
@@ -127,14 +127,14 @@ void *bgsubtractgauss_malloc(int width, int height)
 	veejay_memset( b->static_bg_frame__[1], 128, (width*height));
 	veejay_memset( b->static_bg_frame__[2], 128, (width*height));
 	
-	b->fg_frame__ = (uint8_t*) vj_calloc( RUP8(width*height*2) );
+	b->fg_frame__ = (uint8_t*) vj_calloc( (width*height*2) );
 	if(!b->fg_frame__ ) {
         free(b->static_bg__);
         free(b);
         return NULL;
     }
 
-	b->morph_frame__ = (uint8_t*) vj_calloc( RUP8(width*height));
+	b->morph_frame__ = (uint8_t*) vj_calloc( (width*height));
 	if(!b->morph_frame__) {
         free(b->static_bg__);
         free(b->fg_frame__);
@@ -142,7 +142,7 @@ void *bgsubtractgauss_malloc(int width, int height)
         return NULL;
     }
 
-	b->pMu = (double*) vj_malloc( RUP8(sizeof(double) * width * height ));
+	b->pMu = (double*) vj_malloc( (sizeof(double) * width * height ));
 	if(!b->pMu ) {
 		free(b->static_bg__);
 		free(b->fg_frame__); 
@@ -151,7 +151,7 @@ void *bgsubtractgauss_malloc(int width, int height)
         return NULL;
 	}
 
-	b->pVar = (double*) vj_malloc( RUP8(sizeof(double) * width * height ));
+	b->pVar = (double*) vj_malloc( (sizeof(double) * width * height ));
 	if( !b->pVar ) {
         free(b->static_bg__);
 		free(b->fg_frame__); 
@@ -161,7 +161,7 @@ void *bgsubtractgauss_malloc(int width, int height)
 		return NULL;
     }
 	
-	b->mean =  (uint8_t*) vj_calloc( RUP8(width*height) );
+	b->mean =  (uint8_t*) vj_calloc( (width*height) );
 	if( !b->mean ) {
 	    free(b->static_bg__);
 		free(b->fg_frame__); 

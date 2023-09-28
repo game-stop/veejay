@@ -75,18 +75,18 @@ void *diff_malloc(int width, int height)
         return NULL;
     }
 
-	d->data = (uint8_t*) vj_calloc( RUP8(sizeof(uint8_t) * width * height + width) );
+	d->data = (uint8_t*) vj_calloc( (sizeof(uint8_t) * width * height + width) );
     if(!d->data) {
         diff_free(d);
         return NULL;
     }
-	d->static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8( width * height ) + RUP8(width * 2));
+	d->static_bg = (uint8_t*) vj_calloc( sizeof(uint8_t) * ( width * height ) + (width * 2));
 	if(!d->static_bg) {
         diff_free(d);
         return NULL;
     }
 
-	d->dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * RUP8(width * height) + RUP8(width * 2));
+	d->dt_map = (uint32_t*) vj_calloc( sizeof(uint32_t) * (width * height) + (width * 2));
 	if(!d->dt_map) {
         diff_free(d);
         return NULL;

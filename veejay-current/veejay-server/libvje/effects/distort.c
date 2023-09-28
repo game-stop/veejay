@@ -100,13 +100,13 @@ void *distortion_malloc(int w, int h)
         return NULL;
     }
 
-    d->plasma_map = (int*) vj_calloc( sizeof(int) * RUP8( w * h ) );
+    d->plasma_map = (int*) vj_calloc( sizeof(int) * ( w * h ) );
 	if(!d->plasma_map) {
         free(d);
         return NULL;
 	}
 
-	d->plasma_buf[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( w * h * 3 ));
+	d->plasma_buf[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * ( w * h * 3 ));
 	if(!d->plasma_buf[0]) {
 		free(d->plasma_map);
 		free(d);

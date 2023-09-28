@@ -2269,7 +2269,6 @@ void	memcpy_report()
 }
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
-
 void *(* veejay_memset)(void *what, uint8_t val, size_t len ) = 0;
 
 static int set_user_selected_memcpy()
@@ -2485,8 +2484,14 @@ set_best_memset_method:
 }
 
 void    vj_mem_set_defaults() {
+#ifdef STRICT_CHECKING
+	veejay_memset = memset;
+	veejay_memcpy = memcpy;
+	veejay_msg(VEEJAY_MSG_WARNING, "Using default memcpy() / memset() functions");
+#else
 	veejay_memset = memset_method[1].function;
 	veejay_memcpy = memcpy_method[1].function;
+#endif
 }
 
 static	void	vj_frame_copy_job( void *arg ) {

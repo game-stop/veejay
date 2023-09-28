@@ -80,7 +80,7 @@ void *bathroom_malloc(int width, int height)
         return NULL;
     }
 
-   	b->bathroom_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width*height * 4));
+   	b->bathroom_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * (width*height * 4));
 	if(!b->bathroom_frame[0]) {
         free(b);
 		return NULL;

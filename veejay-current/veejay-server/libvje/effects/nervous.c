@@ -62,7 +62,7 @@ void *nervous_malloc(int w, int h )
         return NULL;
     }
 
-    size_t total_len = RUP8(w * h * N_MAX * 4);
+    size_t total_len = (w * h * N_MAX * 4);
 	n->nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * total_len);
 	if(!n->nervous_buf[0]) {
         free(n);

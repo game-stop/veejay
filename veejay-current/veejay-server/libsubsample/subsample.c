@@ -48,9 +48,6 @@
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/vj-task.h>
 
-#define    RUP8(num)(((num)+8)&~8)
-
-
 #define BLANK_CRB in0[1]
 #define BLANK_CRB_2 (in0[1] << 1)
 
@@ -1266,7 +1263,7 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 
 
 	if( mode == SSM_420_JPEG_TR ) {
- 		_chroma_supersample_data = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(frame->width * 2) );
+ 		_chroma_supersample_data = (uint8_t*) vj_calloc( sizeof(uint8_t) * (frame->width * 2) );
 	}
 
 	switch (mode) {

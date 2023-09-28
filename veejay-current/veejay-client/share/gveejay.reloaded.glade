@@ -11052,7 +11052,6 @@
                                                       <item>VJ20 (YUV 4:2:0 Planar)</item>
                                                       <item>VJ22 (YUV 4:2:2 Planar)</item>
                                                       <item>MJPEG</item>
-                                                      <item>MJPEGB</item>
                                                       <item>HUFFYUV</item>
                                                       <item>DVVIDEO</item>
                                                       <item>YV16 (YCbCr 4:2:2 Planar)</item>
@@ -12882,7 +12881,6 @@
                                           <item>VJ20 (YUV 4:2:0 Planar)</item>
                                           <item>VJ22 (YUV 4:2:2 Planar)</item>
                                           <item>MJPEG</item>
-                                          <item>MJPEGB</item>
                                           <item>HUFFYUV</item>
                                           <item>DVVIDEO</item>
                                           <item>YV16 (YCbCr 4:2:2 Planar)</item>

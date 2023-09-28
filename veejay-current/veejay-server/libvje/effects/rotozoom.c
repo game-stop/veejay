@@ -75,7 +75,7 @@ void *rotozoom_malloc(int width, int height)
         return NULL;
     }
 
-    r->rotobuffer[0] = (uint8_t *) vj_calloc(sizeof(uint8_t) * RUP8(width * height * 3));
+    r->rotobuffer[0] = (uint8_t *) vj_calloc(sizeof(uint8_t) * (width * height * 3));
     if(!r->rotobuffer[0]) {
         free(r);
         return NULL;

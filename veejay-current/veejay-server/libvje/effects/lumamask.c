@@ -84,7 +84,7 @@ void *lumamask_malloc(int width, int height)
         return NULL;
     }
 
-    l->buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * RUP8( width * height * 4) );
+    l->buf[0] = (uint8_t*)vj_malloc( sizeof(uint8_t) * ( width * height * 4) );
     if(!l->buf[0]) {
         free(l);
         return NULL;

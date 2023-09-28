@@ -144,7 +144,7 @@ static int vj_vloopback_set_format( vj_vloopback_t *v, int dst_w, int dst_h, int
 		return 0;
 	}
 
-	v->size = RUP8( format.fmt.pix.sizeimage ); 
+	v->size = format.fmt.pix.sizeimage; 
 
 	struct v4l2_streamparm sfps;
 	veejay_memset(&sfps,0,sizeof(sfps));

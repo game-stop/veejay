@@ -85,7 +85,7 @@ void *magicmirror_malloc(int w, int h)
         return NULL;
     }
 
-	m->magicmirrorbuf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*RUP8(w*h*4));
+	m->magicmirrorbuf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*(w*h*4));
 	if(!m->magicmirrorbuf[0]) {
 		free(m);
         return NULL;
@@ -94,6 +94,11 @@ void *magicmirror_malloc(int w, int h)
 	m->magicmirrorbuf[1] = m->magicmirrorbuf[0] + (w*h);
 	m->magicmirrorbuf[2] = m->magicmirrorbuf[1] + (w*h);
 	m->magicmirrorbuf[3] = m->magicmirrorbuf[2] + (w*h);
+	
+	m->magicmirrorbuf[1][0] = 128;
+	m->magicmirrorbuf[2][0] = 128;
+	m->magicmirrorbuf[1][w] = 128;
+	m->magicmirrorbuf[2][w] = 128;
 	
 	m->funhouse_x = (double*)vj_calloc(sizeof(double) * w );
 	if(!m->funhouse_x) {

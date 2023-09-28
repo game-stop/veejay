@@ -78,7 +78,7 @@ void *perspective_malloc(int width, int height)
         return NULL;
     }
 
-    p->perspective_private_[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8((width*height+width)*3));
+    p->perspective_private_[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * ((width*height+width)*3));
     if(!p->perspective_private_[0]) {
         free(p);
         return NULL;

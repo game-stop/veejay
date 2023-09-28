@@ -78,13 +78,13 @@ void *timedistort_malloc( int w, int h )
         return NULL;
     }
 
-	td->nonmap = vj_calloc( (RUP8(2 * w * h + (2 * w))) * sizeof(uint8_t));
+	td->nonmap = vj_calloc( ((2 * w * h + (2 * w))) * sizeof(uint8_t));
 	if(!td->nonmap) {
         free(td);
 		return NULL;
     }
 
-	td->planes[0] = vj_malloc( RUP8(PLANES * 3 * w * h) * sizeof(uint8_t));
+	td->planes[0] = vj_malloc( (PLANES * 3 * w * h) * sizeof(uint8_t));
     if(!td->planes[0]) {
         free(td->nonmap);
         free(td);
@@ -108,14 +108,14 @@ void *timedistort_malloc( int w, int h )
 		td->planetableV[i] = &(td->planes[2][ (w*h) * i ]);
 	}
 
-	td->warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)) );
+	td->warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * ((w * h)) );
     if(!td->warptime[0]) {
         free(td->nonmap);
         free(td->planes[0]);
         free(td);
         return NULL;
     }
-	td->warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)) );
+	td->warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * ((w * h)) );
     if(!td->warptime[1]) {
         free(td->nonmap);
         free(td->planes[0]);

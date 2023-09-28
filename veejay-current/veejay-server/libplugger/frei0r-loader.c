@@ -45,7 +45,6 @@
 #include <libplugger/frei0r-loader.h>
 #include <veejaycore/avcommon.h>
 
-#define    RUP8(num)(((num)+8)&~8)
 #define _VJ_MAX_PARAMS 32
 
 static int read_plugin_configuration = 0;
@@ -929,15 +928,15 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf, int read_plug_cfg )
 
 	fr0_conv_t *fr = (fr0_conv_t*) vj_calloc(sizeof(fr0_conv_t));
 	int i;
-	fr->buf        = (uint8_t*) vj_malloc((sizeof(uint8_t) * RUP8( w * h * n_planes ) ));
+	fr->buf        = (uint8_t*) vj_malloc((sizeof(uint8_t) * ( w * h * n_planes ) ));
 	uint8_t *bufx  = fr->buf;
 
 	for( i = 0; i < (n_in+1); i ++ ) { //@ extra buffer for rgb output
 		fr->in[i] = yuv_rgb_template(bufx, w,h, frfmt );
-		bufx   += RUP8(w*h*4);
+		bufx   += (w*h*4);
 	}
 
-	fr->out          = yuv_yuv_template(bufx, bufx+RUP8(w*h), bufx+RUP8(w*h*2), w,h,pf );
+	fr->out          = yuv_yuv_template(bufx, bufx+(w*h), bufx+(w*h*2), w,h,pf );
 	fr->out->data[3] = bufx + (fr->out->len + fr->out->uv_len + fr->out->uv_len);
 
 	if( out_scaler__ == NULL ) {

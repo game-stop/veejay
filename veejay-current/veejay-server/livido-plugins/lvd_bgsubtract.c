@@ -16,8 +16,6 @@ LIVIDO_PLUGIN
 
 #include 	"lvd_common.h"
 
-#define RUP8(num)(((num)+8)&~8)
-
 typedef struct
 {
 	uint8_t *bg;
@@ -33,7 +31,7 @@ int	init_instance( livido_port_t *my_instance )
     if(!b) {
         return LIVIDO_ERROR_MEMORY_ALLOCATION;
     }
-    b->bg = (uint8_t*) livido_malloc( sizeof(uint8_t) * RUP8(w * h) );
+    b->bg = (uint8_t*) livido_malloc( sizeof(uint8_t) * (w * h) );
     if(!b->bg) {
         free(b);
         return LIVIDO_ERROR_MEMORY_ALLOCATION;

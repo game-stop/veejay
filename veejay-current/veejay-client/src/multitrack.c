@@ -44,7 +44,6 @@
 #include <src/gtktimeselection.h>
 #include <src/vj-api.h>
 #include <src/multitrack.h>
-#define RUP8(num)(num/8*8)
 
 typedef struct
 {
@@ -165,8 +164,8 @@ void		multitrack_get_preview_dimensions( int w , int h, int *dst_w, int *dst_h )
 		tmp_h = tmp_w / ratio;
 	}
 
-	*dst_w = RUP8(tmp_w);
-	*dst_h = RUP8(tmp_h);
+	*dst_w = tmp_w;
+	*dst_h = tmp_h;
 }
 
 static void	calculate_img_dimension(int w, int h, int *dst_w, int *dst_h, float *result, int max_w, int max_h, int quality)
@@ -194,8 +193,8 @@ static void	calculate_img_dimension(int w, int h, int *dst_w, int *dst_h, float 
 		tmp_h = tmp_w / ratio;
 	}
 
-	*dst_w = RUP8(tmp_w);
-	*dst_h = RUP8(tmp_h);
+	*dst_w = tmp_w;
+	*dst_h = tmp_h;
 }
 
 

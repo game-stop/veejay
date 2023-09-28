@@ -73,7 +73,7 @@ void *mtracer_malloc(int w, int h)
         return NULL;
     }
 
-	size_t buflen = RUP8( (w*h+w)) * sizeof(uint8_t);
+	size_t buflen = ( (w*h+w)) * sizeof(uint8_t);
 	m->mtrace_buffer[0] = (uint8_t*) vj_malloc( buflen );
 	if(!m->mtrace_buffer[0]) {
         free(m);

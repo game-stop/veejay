@@ -25,6 +25,7 @@
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
 extern void *(* veejay_memset)(void *to, uint8_t val, size_t len);
 extern void vj_mem_init(void);
+extern void vj_mem_optimize();
 extern void vj_mem_set_defaults();
 extern int vj_mem_threaded_init(int w, int h);
 extern void vj_mem_threaded_stop(void);
@@ -64,5 +65,9 @@ extern void *vj_simple_pool_alloc( void *ptr, size_t s );
 extern void *vj_simple_pool_init( size_t s );
 extern void vj_simple_pool_reset( void *ptr );
 extern void vj_mem_destroy();
+
+#ifdef STRICT_CHECKING
+extern void *get_malloc_refs();
+#endif
 
 #endif

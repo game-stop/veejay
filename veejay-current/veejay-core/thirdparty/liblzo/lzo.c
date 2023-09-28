@@ -103,11 +103,8 @@ static int lzo_verify_compression(uint8_t *in, int in_len, uint8_t *out , lzo_ui
 
 }
 
-#define RUP16(num)(((num)+16)&~16)
 #define LZO_ALIGN_SIZE(size) \
 	 ( ((size) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ) * sizeof(lzo_align_t)
-#define RUP8(num)(((num)+8)&~8)
-
 
 void	*lzo_new( int pixfmt, int width, int height, int is_decoder )
 {

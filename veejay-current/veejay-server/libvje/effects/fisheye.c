@@ -65,7 +65,7 @@ void *fisheye_malloc(int w, int h)
         return NULL;
     }
 
-	f->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w * h  *  3 ) );
+	f->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h  *  3 ) );
 	if(!f->buf[0]) {
         fisheye_free(f);
         return NULL;
@@ -74,19 +74,19 @@ void *fisheye_malloc(int w, int h)
 	f->buf[1] = f->buf[0] + (w*h);
 	f->buf[2] = f->buf[1] + (w*h);
 
-	f->polar_map = (double*) vj_calloc(sizeof(double) * RUP8(w* h) );
+	f->polar_map = (double*) vj_calloc(sizeof(double) * (w * h) );
 	if(!f->polar_map) {
         fisheye_free(f);
         return NULL;
     }
 
-	f->fish_angle = (double*) vj_calloc(sizeof(double) * RUP8(w* h) );
+	f->fish_angle = (double*) vj_calloc(sizeof(double) * (w * h) );
 	if(!f->fish_angle) {
         fisheye_free(f);
         return NULL;
     }
 
-	f->cached_coords = (int*) vj_calloc(sizeof(int) * RUP8( w * h));
+	f->cached_coords = (int*) vj_calloc(sizeof(int) * ( w * h));
 	if(!f->cached_coords) {
         fisheye_free(f);
         return NULL;

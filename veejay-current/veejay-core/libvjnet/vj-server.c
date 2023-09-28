@@ -42,7 +42,6 @@
 #include <libvjnet/vj-server.h>
 #include <libvjnet/cmd.h>
 
-#define RUP8(num)(((num)+8)&~8)
 
 #define __INVALID 0
 #define __SENDER 1
@@ -78,7 +77,7 @@ static int default_timeout_sec = 10;
 /* Message buffer is 4 KB per client per frame tick
  */
 #define VJ_MAX_PENDING_MSG 4096
-#define RECV_SIZE RUP8(4096) 
+#define RECV_SIZE 4096 
 #define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1024)
 
 static	void	printbuf( FILE *f, uint8_t *buf , int len )
@@ -378,7 +377,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 	if (!vjs)
 		return NULL;
 
-	size_t bl = RUP8(buflen);
+	size_t bl = buflen;
 	if( bl < RECV_SIZE ) {
 		bl = RECV_SIZE; //@ Ensure that receive buffer is minimally 4kb
 	}

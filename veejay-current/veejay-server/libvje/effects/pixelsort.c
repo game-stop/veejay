@@ -69,7 +69,7 @@ void *pixelsort_malloc(int w, int h){
     if(!p) {
         return NULL;
     }
-    p->mask = (uint8_t*) vj_calloc(sizeof(uint8_t) * RUP8(w + w * h) );
+    p->mask = (uint8_t*) vj_calloc(sizeof(uint8_t) * (w + w * h) );
     
     if(!p->mask) {
         free(p);

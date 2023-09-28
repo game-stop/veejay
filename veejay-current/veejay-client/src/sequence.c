@@ -39,8 +39,6 @@
 #include <string.h>
 #include "common.h"
 
-#define    RUP8(num)(((num)+8)&~8)
-
 extern void reloaded_schedule_restart();
 extern void vj_msg(int type, const char format[], ...);
 extern void multitrack_cleanup_track( void *data, int track );
@@ -595,13 +593,13 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 		return 0;
 	}
 
-	vt->data_buffer = (uint8_t*) vj_calloc( RUP8( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3) );
+	vt->data_buffer = (uint8_t*) vj_calloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3);
 	if(vt->data_buffer == NULL ) {
 		vj_client_free( fd );
 		return 0;
 	}
 
-	vt->tmp_buffer = (uint8_t*) vj_calloc( RUP8( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4) );
+	vt->tmp_buffer = (uint8_t*) vj_calloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4);
 	if(vt->tmp_buffer == NULL ) {
 		vj_client_free( fd );
 		return 0;

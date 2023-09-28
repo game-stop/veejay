@@ -60,7 +60,7 @@ void *differencemap_malloc(int w, int h )
         return NULL;
     }
 
-	d->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8( (w*h*2) + (w*2)) );
+	d->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * ( (w*h*2) + (w*2)) );
 	if(!d->binary_img) {
         free(d);
         return NULL;
