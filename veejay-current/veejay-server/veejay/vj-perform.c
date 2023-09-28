@@ -222,7 +222,7 @@ static void vj_perform_reverse_audio_frame(veejay_t * info, int len, uint8_t *bu
 #endif
 static void vj_perform_end_transition(veejay_t *info, int mode, int sample);
 
-static void vj_perform_set_444__(const char *func,const int line, VJFrame *frame)
+static void vj_perform_set_444__(VJFrame *frame)
 {
     frame->ssm = 1;
     frame->shift_h = 0;
@@ -235,7 +235,7 @@ static void vj_perform_set_444__(const char *func,const int line, VJFrame *frame
     frame->format = (frame->range ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P);
 }
 
-static void vj_perform_set_422__( const char *func, const int line, VJFrame *frame)
+static void vj_perform_set_422__( VJFrame *frame)
 {
     frame->shift_h = 1;
     frame->shift_v = 0;
@@ -248,8 +248,8 @@ static void vj_perform_set_422__( const char *func, const int line, VJFrame *fra
     frame->ssm = 0;
 }
 
-#define vj_perform_set_444(f)  vj_perform_set_444__( __FUNCTION__, __LINE__ ,f)
-#define vj_perform_set_422(f)  vj_perform_set_422__( __FUNCTION__, __LINE__,f)
+#define vj_perform_set_444(f)  vj_perform_set_444__( f)
+#define vj_perform_set_422(f)  vj_perform_set_422__( f)
 
 static void vj_perform_supersample(video_playback_setup *settings,performer_t *p, VJFrame *one, VJFrame *two, int sm, int chain_entry)
 {
