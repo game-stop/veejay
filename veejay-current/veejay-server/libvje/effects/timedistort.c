@@ -32,6 +32,7 @@
 #include <libvje/internal.h>
 #include <libvje/effects/motionmap.h>
 
+
 #define PLANES 32
 
 vj_effect *timedistort_init(int w, int h)
@@ -78,13 +79,13 @@ void *timedistort_malloc( int w, int h )
         return NULL;
     }
 
-	td->nonmap = vj_calloc( ((2 * w * h + (2 * w))) * sizeof(uint8_t));
+	td->nonmap = vj_calloc(((2 * w * h + (2 * w))) * sizeof(uint8_t));
 	if(!td->nonmap) {
         free(td);
 		return NULL;
     }
 
-	td->planes[0] = vj_malloc( (PLANES * 3 * w * h) * sizeof(uint8_t));
+	td->planes[0] = vj_malloc((PLANES * 3 * w * h) * sizeof(uint8_t));
     if(!td->planes[0]) {
         free(td->nonmap);
         free(td);
@@ -221,8 +222,8 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 	int strides[4] = { len, len, len, 0 };
 	vj_frame_copy( frame->data, planeTables, strides );
 
-	uint8_t *p = td->warptime[ td->warptimeFrame	];
-	uint8_t *q = td->warptime[ td->warptimeFrame ^ 1];
+	uint8_t *p = td->warptime[ td->warptimeFrame	] + width + 1;
+	uint8_t *q = td->warptime[ td->warptimeFrame ^ 1] + width + 1;
 
 	unsigned int x,y;
 	for( y = height - 2; y > 0 ; y -- )
@@ -233,8 +234,6 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 			if( i > 3 ) i-= 3;
 			p++;
 			*q++ = i >> 2;
-			if( x % width != 0 )
-				p++;
 		}
 		p += 2;
 		q += 2;
