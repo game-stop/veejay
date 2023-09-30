@@ -30,7 +30,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
-
+#include <cairo.h>
 #include "gtktimeselection.h"
 #include "utils-gtk.h"
 
@@ -720,66 +720,28 @@ static gboolean event_motion (GtkWidget *widget, GdkEventMotion *ev, gpointer us
 
 /*!
  *  draw a rounded rectangle
- */
-void cairo_rectangle_round ( cairo_t * cr,
-                             double x0,
-                             double y0,
-                             double width,
-                             double height,
-                             double radius)
+*/ 
+void cairo_rectangle_round(cairo_t *cr, double x0, double y0, double width, double height, double radius)
 {
-  double    x1, y1;
+    if (width <= 0.001 || height <= 0.001) {
+        return;
+    }
 
-  x1 = x0 + width;
-  y1 = y0 + height;
-  if (width <= 0.001 || height <= 0.001)
-    return;
-  if (width / 2 < radius)
-    {
-      if (height / 2 < radius)
-        {
-          cairo_move_to (cr, x0, (y0 + y1) / 2);
-          cairo_curve_to (cr, x0, y0, x0, y0, (x0 + x1) / 2, y0);
-          cairo_curve_to (cr, x1, y0, x1, y0, x1, (y0 + y1) / 2);
-          cairo_curve_to (cr, x1, y1, x1, y1, (x1 + x0) / 2, y1);
-          cairo_curve_to (cr, x0, y1, x0, y1, x0, (y0 + y1) / 2);
-        }
-      else
-        {
-          cairo_move_to (cr, x0, y0 + radius);
-          cairo_curve_to (cr, x0, y0, x0, y0, (x0 + x1) / 2, y0);
-          cairo_curve_to (cr, x1, y0, x1, y0, x1, y0 + radius);
-          cairo_line_to (cr, x1, y1 - radius);
-          cairo_curve_to (cr, x1, y1, x1, y1, (x1 + x0) / 2, y1);
-          cairo_curve_to (cr, x0, y1, x0, y1, x0, y1 - radius);
-        }
-    }
-  else
-{
-      if (height / 2 < radius)
-        {
-          cairo_move_to (cr, x0, (y0 + y1) / 2);
-          cairo_curve_to (cr, x0, y0, x0, y0, x0 + radius, y0);
-          cairo_line_to (cr, x1 - radius, y0);
-          cairo_curve_to (cr, x1, y0, x1, y0, x1, (y0 + y1) / 2);
-          cairo_curve_to (cr, x1, y1, x1, y1, x1 - radius, y1);
-          cairo_line_to (cr, x0 + radius, y1);
-          cairo_curve_to (cr, x0, y1, x0, y1, x0, (y0 + y1) / 2);
-        }
-      else
-        {
-          cairo_move_to (cr, x0, y0 + radius);
-          cairo_curve_to (cr, x0, y0, x0, y0, x0 + radius, y0);
-          cairo_line_to (cr, x1 - radius, y0);
-          cairo_curve_to (cr, x1, y0, x1, y0, x1, y0 + radius);
-          cairo_line_to (cr, x1, y1 - radius);
-          cairo_curve_to (cr, x1, y1, x1, y1, x1 - radius, y1);
-          cairo_line_to (cr, x0 + radius, y1);
-          cairo_curve_to (cr, x0, y1, x0, y1, x0, y1 - radius);
-        }
-    }
-  cairo_close_path (cr);
+    double x1 = x0 + width;
+    double y1 = y0 + height;
+
+    radius = fmin(fmin(radius, width / 2), height / 2);
+
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - radius, y0 + radius, radius, -M_PI_2, 0);
+    cairo_arc(cr, x1 - radius, y1 - radius, radius, 0, M_PI_2);
+    cairo_arc(cr, x0 + radius, y1 - radius, radius, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + radius, y0 + radius, radius, M_PI, 1.5 * M_PI);
+    cairo_close_path(cr);
+
+    cairo_fill(cr);
 }
+
 
 static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
 {
@@ -800,13 +762,15 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
   vj_gtk_context_get_color(sc, "border-color",GTK_STATE_FLAG_NORMAL, &col2);
 
   double x1 = marker_width * te->point;
+
+  cairo_set_antialias(cr, CAIRO_ANTIALIAS_FAST);
+
   cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
   cairo_move_to(cr, x1,te->font_line );
   sprintf(text, "%d",  (gint)te->point );
   cairo_set_source_rgba( cr, color.red,color.green,color.blue,0.3 );
   cairo_show_text(cr, text);
 
-/* Draw stepper */
   if( te->has_stepper )
   {
     cairo_set_source_rgba( cr, col2.red,col2.green,col2.blue,1.0); 
@@ -838,13 +802,11 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
     }
   }
   
-  /* Draw selection */
   if( te->has_selection )
   {
     gdouble in = te->in * width;
     gdouble out = te->out * width;
 
-    /* If user is editing in_point */
     if( te->grab_button == 1 && te->current_location != MOUSE_STEPPER )
     {
       gdouble f = te->in * te->num_video_frames;
@@ -912,6 +874,7 @@ static gboolean timeline_draw (GtkWidget *widget, cairo_t *cr )
  
   return FALSE;
 }
+
 
 GtkWidget *timeline_new(void)
 {

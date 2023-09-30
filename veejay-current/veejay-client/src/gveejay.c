@@ -124,7 +124,7 @@ static void vj_gui_activate (GApplication* app, gpointer        user_data)
         }
 
         if(!gtk_events_pending() ) {
-            g_usleep(500);
+            g_usleep(5000);
         }
     }
 
