@@ -37,7 +37,7 @@ vj_effect *split_init(int width,int height)
     ve->limits[1][1] = 1;
 
     ve->description = "Splitted Screens";
-    ve->sub_format = 0;
+    ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Switch");
@@ -544,4 +544,74 @@ void split_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
     int n = args[0];
     int swap = args[1];
+
+    switch (n) {
+    case 0:
+	if (swap)
+		split_push_downscale_uh(ptr, frame2, frame->width, frame->height);
+	split_h_first_half(frame, frame2, frame->width, frame->height);
+	break;
+    case 1:
+	split_h_second_half(frame, frame2, frame->width, frame->height);
+	break;
+    case 2:
+	 /**/ split_h_first_halfs(frame, frame2, frame->width, frame->height);
+	break;
+    case 3:
+	if (swap)
+		split_push_downscale_uh(ptr, frame2, frame->width, frame->height);
+	 /**/ split_h_second_halfs(frame, frame2, frame->width, frame->height);
+	break;
+    case 4:
+	if (swap)
+		split_push_vscale_left(ptr,frame2, frame->width, frame->height);
+	 /**/ split_v_first_half(frame, frame2, frame->width, frame->height);
+	break;
+    case 5:
+	if (swap)
+		split_push_vscale_right(ptr, frame2, frame->width, frame->height);
+	 /**/ split_v_second_half(frame, frame2, frame->width, frame->height);
+	break;
+    case 6:
+	if (swap)
+		split_push_vscale_left(ptr,frame2, frame->width, frame->height);
+	 /**/ split_v_first_halfs(frame, frame2, frame->width, frame->height);
+	break;
+
+    case 7:
+	if (swap)
+		split_push_vscale_right(ptr, frame2, frame->width, frame->height);
+	    split_v_second_halfs(frame, frame2, frame->width, frame->height);
+	break;
+    case 8:
+	if (swap)
+		split_fib_downscale(frame2, frame->width, frame->height);
+	split_corner_framedata_ul(frame, frame2, frame->width, frame->height);
+	break;
+    case 9:
+	if (swap)
+		split_fib_downscale(frame2, frame->width, frame->height);
+	split_corner_framedata_ur(frame, frame2, frame->width, frame->height);
+	break;
+    case 10:
+	if (swap)
+		split_fib_downscaleb(frame2, frame->width, frame->height);
+	split_corner_framedata_dr(frame, frame2, frame->width, frame->height);
+	break;
+    case 11:
+	if (swap)
+		split_fib_downscaleb(frame2, frame->width, frame->height);
+	 /**/ split_corner_framedata_dl(frame, frame2, frame->width, frame->height);
+	break;
+    case 12:
+	split_push_vscale_left(ptr, frame2, frame->width, frame->height);
+	 /**/ split_push_vscale_right(ptr, frame, frame->width, frame->height);
+	split_v_first_half(frame, frame2, frame->width, frame->height);
+	break;
+    case 13:
+	split_push_downscale_uh(ptr, frame2, frame->width, frame->height);
+	split_h_first_half(frame, frame2, frame->width, frame->height);
+	break;
+    }
+
 }
