@@ -74,9 +74,7 @@ typedef struct
 
 static int default_timeout_sec = 10;
 
-/* Message buffer is 4 KB per client per frame tick
- */
-#define VJ_MAX_PENDING_MSG 4096
+#define VJ_MAX_PENDING_MSG 128
 #define RECV_SIZE 4096 
 #define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1024)
 
@@ -877,8 +875,10 @@ static int vj_server_update_get_msg_kf(vj_server *vje, int sock_fd, int link_id,
     }
 
     int msg_size = vj_server_socket_consume( vje, sock_fd, link_id, buf, buf_size, MSG_WAITALL );
-    if( msg_size <= 0 )
+    if( msg_size <= 0 ) {
+	free(buf);
         return -1;
+    }
 
     _vj_put_kf_msg(vje, link_id, buf, msg_size, *num_msg);
 
