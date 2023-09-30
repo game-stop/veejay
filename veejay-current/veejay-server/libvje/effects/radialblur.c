@@ -121,6 +121,9 @@ void radialblur_apply(void *ptr, VJFrame *frame, int *args ) {
 
     radialblur_t *r = (radialblur_t*) ptr;
 
+	if( radius == 0 )
+			return; 
+
 	const unsigned int width = frame->width;
 	const unsigned int height = frame->height;
 	const int len = frame->len;
@@ -130,18 +133,18 @@ void radialblur_apply(void *ptr, VJFrame *frame, int *args ) {
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-	if(radius == 0) return;
-	// inplace
 	int strides[4] = { len, uv_len, uv_len, 0 };
 	vj_frame_copy( frame->data, r->radial_src, strides );
 
 	switch(direction)
 	{
-		case 0: rhblur_apply( Y, r->radial_src[0],width, height, radius, power );
+		case 0: 
+			rhblur_apply( Y, r->radial_src[0],width, height, radius, power );
 			rhblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
 			rhblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
 			break;
-		case 1: rvblur_apply( Y, r->radial_src[0],width, height, radius, power ); 
+		case 1: 
+			rvblur_apply( Y, r->radial_src[0],width, height, radius, power ); 
 			rvblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
 			rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
 			break;

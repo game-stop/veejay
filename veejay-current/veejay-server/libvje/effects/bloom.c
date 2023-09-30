@@ -119,12 +119,9 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *B3v = B3h + len;
 
     for( int i = 0; i < len; i ++ ) {
-        if( L[i] > threshold )
-            B[i] = L[i];
-        else
-            B[i] = 0;
-
+        B[i] = ( L[i] > threshold ? L[i] : 0 );
     }
+
     // just view threshold mask
     if( a0 == 0 && b0 == 0 && c0 == 0 ) {
         veejay_memcpy( frame->data[0], B, len );
@@ -132,39 +129,19 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args) {
         veejay_memset( frame->data[2], 128, frame->uv_len );
         return;
     }
- 
-#pragma omp parallel
-    {
-        #pragma omp single
-        {
-            #pragma omp task
-            {
-                if( a0 > 0 ) { 
-                    rhblur_apply( B1h, B, width, height, a0 );   
-                    rvblur_apply( B1v, B1h, width, height, a0 );
-                }
-            }
-
-            #pragma omp task
-            {
-                if( b0 > 0 ) { 
-                    rhblur_apply( B2h, B, width, height, b0 );
-                    rvblur_apply( B2v, B2h, width, height, b0 );
-                }
-            }
-
-            #pragma omp task
-            {
-                if( c0 > 0 ) {
-                    rhblur_apply( B3h, B, width, height, c0 );
-                    rvblur_apply( B3v, B3h, width, height, c0 );
-                }
-            }
-
-            #pragma omp taskwait
-
-       }
-   }  // end parallel region
+	
+    if( a0 > 0 ) { 
+		rhblur_apply( B1h, B, width, height, a0 );   
+		rvblur_apply( B1v, B1h, width, height, a0 );
+    }
+    if( b0 > 0 ) { 
+        rhblur_apply( B2h, B, width, height, b0 );
+        rvblur_apply( B2v, B2h, width, height, b0 );
+    }
+    if( c0 > 0 ) {
+        rhblur_apply( B3h, B, width, height, c0 );
+        rvblur_apply( B3v, B3h, width, height, c0 );
+    }
 
     for( int i = 0; i < len; i ++ ) {
         uint16_t v = B1v[i] + B2v[i] + B3v[i] + L[i];
