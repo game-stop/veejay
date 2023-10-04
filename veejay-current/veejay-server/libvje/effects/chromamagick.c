@@ -39,7 +39,7 @@ vj_effect *chromamagick_init(int w, int h)
 	ve->parallel = 1;
     ve->description = "Chroma Magic";
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 26;
+    ve->limits[1][0] = 27;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->parallel = 1;
@@ -56,7 +56,7 @@ vj_effect *chromamagick_init(int w, int h)
 		"Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
 		"Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
 		"Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
-		"Darken", "Lighten", "Modulo Add" 
+		"Darken", "Lighten", "Modulo Add", "Pixel Fuckery" 
 	);
 
 
@@ -367,17 +367,17 @@ static void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int op_a) {
 	for(i=0; i < len; i++) {
 		a = (Y[i]*o1) >> 7;
 		b = (Y2[i]*o2) >> 7;
-		Y[i] = a + (( 2 * b ) - 255);
+		Y[i] = a + (( 2 * b ) - 255) & 0xff;
 
-		a = Cb[i];
-		b = Cb2[i];
+		a = Cb[i] - 128;
+		b = Cb2[i] - 128;
 
-		Cb[i] = a + ( ( 2 * b ) - 255 );
+		Cb[i] = (( a + ( ( 2 * b ) - 255 )) + 128 ) & 0xff;
 
-		a = Cr[i] ;
-		b = Cr2[i] ;
+		a = Cr[i] - 128;
+		b = Cr2[i] - 128;
 
-		Cr[i] = a + ( ( 2 * b ) - 255 );
+		Cr[i] = ((a + ( ( 2 * b ) - 255 )) + 128 ) & 0xff;
 	}
 
 }
@@ -465,6 +465,45 @@ static void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int op_a) {
 
 }
 
+
+static void chromamagic_pixelfuckery( VJFrame *frame, VJFrame *frame2, int op_a ) {
+	unsigned int i;
+	const int len = frame->len;
+ 	uint8_t *Y = frame->data[0];
+	uint8_t *Cb = frame->data[1];
+	uint8_t *Cr = frame->data[2];
+	uint8_t *Y2 = frame2->data[0];
+	uint8_t *Cb2 = frame2->data[1];
+	uint8_t *Cr2 = frame2->data[2];
+
+	int op_a_minus_b, a_minus_b;
+
+    for (i = 0; i < len; i++) {
+        op_a_minus_b = op_a - Y2[i];
+        a_minus_b = Y[i] - Y2[i];
+
+        if (a_minus_b != 0) {
+            Y[i] = 255 - ((op_a_minus_b * op_a_minus_b * 256) / a_minus_b);
+        }
+
+        op_a_minus_b = 256 - Cb2[i];
+        a_minus_b = Cb[i] - Cb2[i];
+
+        if (a_minus_b != 0) {
+            Cb[i] = 255 - ((op_a_minus_b * op_a_minus_b * 256) / a_minus_b);
+        }
+
+        op_a_minus_b = 256 - Cr2[i];
+        a_minus_b = Cr[i] - Cr2[i];
+
+        if (a_minus_b != 0) {
+            Cr[i] = 255 - ((op_a_minus_b * op_a_minus_b * 256) / a_minus_b);
+        }
+    }
+
+}
+
+
 static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a ) {
 	unsigned int i;
 	const int len = frame->len;
@@ -480,21 +519,21 @@ static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a ) {
 	for(i=0; i < len; i++) {
 		a = Y[i];
 		b = Y2[i];
-		if( a > pixel_Y_lo_ )
+		if( a > pixel_Y_lo_ && a != 0 )
 		  Y[i] = 255 - (( op_a - b) * (op_a - b)) / a;
 		
 		a = Cb[i];
 		b = Cb2[i];
 
-		if( a > pixel_U_lo_ )
+		if( a > pixel_U_lo_ && a != 0 )
 			Cb[i] = 255 - (( 256 - b) * ( 256 - b )) / a;
 		
 		a = Cr[i];
 		b = Cr2[i];
 
-		if( a > pixel_U_lo_ )
+		if( a > pixel_U_lo_ && a != 0)
 			Cr[i] = 255 - ((256 -b ) * (256 - b)) /a ;
-	}
+	} 
 }
 
 
@@ -1011,6 +1050,9 @@ void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
 	break;
   case 26:
 	chromamagic_modadd( frame,frame2, op_a);
+	break;
+  case 27:
+	chromamagic_pixelfuckery( frame, frame2, op_a );
 	break;
     }
 }
