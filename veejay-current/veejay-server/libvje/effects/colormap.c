@@ -41,8 +41,8 @@ vj_effect *colormap_init(int w, int h)
     ve->defaults[1] = 109;
     ve->defaults[2] = 92;
 
-    ve->description = "Color mapping";
-    ve->sub_format = 1;
+    ve->description = "Color Harmony";
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->parallel = 1;
@@ -57,22 +57,22 @@ void colormap_apply( void *ptr, VJFrame *frame, int *args ) {
 
     unsigned int i;
     const int uv_len = frame->uv_len;
-	uint8_t *Y = frame->data[0];
+	
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
+	
 	uint8_t u_[256];
 	uint8_t v_[256];
 
-    int dummy = 0;
-
-	for(i = 1; i < 257; i ++ )
+	for(i = 0; i < 256; i ++ )
 	{
-		COLOR_rgb2yuv( (r % i),(g % i),(b % i), dummy, u_[i-1],v_[i-1]);
+		u_[i] = ( i + b - g ) > 255 ? 255 : (( i + b - g) < 0 ? 0 : (  i + b - g ));
+		v_[i] = ( i + r -g ) > 255 ? 255 : (( i + r - g ) < 0 ? 0 : ( i + r - g ));
 	}
     
     for (i = 0; i < uv_len; i++)
 	{
-		Cb[i] = u_[ Y[i] ];
-		Cr[i] = v_[ Y[i] ];
+		Cb[i] = u_[ Cb[i] ];
+		Cr[i] = v_[ Cr[i] ];
 	}
 }
