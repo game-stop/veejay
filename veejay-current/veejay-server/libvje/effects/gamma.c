@@ -66,10 +66,10 @@ static void gamma_setup(gamma_t *g, int width, int height, double gamma_value)
     double val;
 
     for (i = 0; i < 256; i++) {
-		val = i / 256.0;
+		val = i / 255.0;
 		val = pow(val, gamma_value);
-		val = 256.0 * val;
-		g->table[i] = val;
+		val = 255.0 * val;
+		g->table[i] = (uint8_t) ((val < 0) ? 0 : ((val > 255 ) ? 255: val));
     }
 }
 

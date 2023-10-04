@@ -100,6 +100,30 @@ extern int vje_get_rgb_parameter_conversion_type();
 #define fast_exp(res,x ) res = exp(x)
 #endif
 
+static inline a_sin( double x ) {
+	const double B = 4.0 / M_PI;
+	const double C = -4.0 / (M_PI * M_PI);
+	const double P = 0.225;
+
+	x = fmod( x + M_PI, 2.0 * M_PI ) - M_PI;
+
+	double y = B * x + C * x * fabs(x);
+
+	return P * (y * fabs(y) - y) + y;
+}
+
+static inline a_cos( double x ) {
+	const double B = 4.0 / M_PI;
+	const double C = -4.0 / (M_PI * M_PI);
+	const double P = 0.225;
+
+	x = fmod( x + M_PI , 2.0 * M_PI ) - M_PI;
+
+	double y = B * x + C * x * fabs(x);
+
+	return P * (y * fabs(y) - y) + y;
+}
+
 #if defined(HAVE_ASM_SSE2)
 #include <emmintrin.h>
 static inline double __sqrt_sd(double value) {
