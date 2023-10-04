@@ -207,8 +207,9 @@
 #include "./effects/zoom.h"
 #include "./effects/buffer.h"
 #include "./effects/blackreplace.h"
+#include "./effects/rainbowshift.h"
 
-#define VJ_IMAGE_EFFECT_MIN 79
+#define VJ_IMAGE_EFFECT_MIN 78
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -449,6 +450,7 @@ enum {
     VJ_IMAGE_EFFECT_PENCILSKETCH2 = 81,
     VJ_IMAGE_EFFECT_BUFFER = 80,
 	VJ_IMAGE_EFFECT_BLACKREPLACE = 79,
+	VJ_IMAGE_EFFECT_RAINBOWSHIFT = 78,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
