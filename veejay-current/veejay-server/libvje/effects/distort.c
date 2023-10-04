@@ -116,10 +116,6 @@ void *distortion_malloc(int w, int h)
     d->plasma_buf[1] = d->plasma_buf[0] + (w*h);
 	d->plasma_buf[2] = d->plasma_buf[1] + (w*h);
 
-	veejay_memset( d->plasma_buf[0], 0, (w*h));
-	veejay_memset( d->plasma_buf[1], 128,(w*h));
-	veejay_memset( d->plasma_buf[2], 128,(w*h));
-	
     int i;
     float rad;
     for (i = 0; i < 512; i++) {
@@ -183,7 +179,7 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args ) {
 		    x = (plasma_table[tpos1] + plasma_table[tpos2] +
 					plasma_table[tpos3] + plasma_table[tpos4] );
 
-			if( x < 0 ) { x = x * -1; }
+			x = (x ^ (x >> 31)) - (x >> 31);
 
 		    plasma_map[i * width +j] = x;
 			tpos1 += inc_val1;
@@ -203,7 +199,7 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args ) {
 		Cr[i]= plasma_buf[2][ plasma_map[i] ];
 	}
 
-    d->plasma_pos1 = d->plasma_pos1;
-    d->plasma_pos2 = d->plasma_pos2;
+    d->plasma_pos1 = plasma_pos1;
+    d->plasma_pos2 = plasma_pos2;
 
 }
