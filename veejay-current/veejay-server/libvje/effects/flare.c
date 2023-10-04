@@ -22,11 +22,6 @@
 #include <veejaycore/vjmem.h>
 #include "flare.h"
 
-/* blend by blurred mask.
-   derived from radial blur and chromamagick effect.
-   FIXME: add remaining blend modes from chromamagick effect
- */
-
 vj_effect *flare_init(int w, int h)
 {
 	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -34,12 +29,12 @@ vj_effect *flare_init(int w, int h)
 	ve->defaults =  (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-	ve->defaults[0] = 3;
+	ve->defaults[0] = 0;
 	ve->defaults[1] = 25;
-	ve->defaults[2] = 100;
+	ve->defaults[2] = 15;
 	ve->description = "Flare (Glow)";
 	ve->limits[0][0] = 0; /* p0 = type, p2 = opacity, p3 = radius */
-	ve->limits[1][0] = 5;
+	ve->limits[1][0] = 3;
 	ve->limits[0][1] = 0;
 	ve->limits[1][1] = 255;
 	ve->limits[0][2] = 0;
@@ -51,8 +46,7 @@ vj_effect *flare_init(int w, int h)
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints,ve->limits[1][0],0, "Simple", "Exclusive", "Additive", "Unfreeze",
-		   "Darken", "Lighten" );
+	vje_build_value_hint_list( ve->hints,ve->limits[1][0],0, "Simple", "Exclusive", "Darken", "Lighten" );
 
 	return ve;
 }
@@ -89,115 +83,40 @@ void	flare_free(void *ptr)
     free(f->flare_buf[0]);
     free(f);
 }
-
 static void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
 
-	unsigned int i;
-	const int len = frame->len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+    int a, b, c;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
 
-	int a=0, b=0, c=0;
-	const unsigned int o1 = op_a;
-	const unsigned int o2 = 255 - a;
+    for (i = 0; i < len; i++) {
+        a = Y[i];
+        b = Y2[i];
 
+        a = (a * o1) >> 8;
+        b = (b * o2) >> 8;
+        Y[i] = a + b - ((a * b) >> 8);
 
-	for (i = 0; i < len; i++)
-	{
-		a = Y[i];
-		b = Y2[i];
+        a = Cb[i] - 128;
+        b = Cb2[i] - 128;
+        c = a + b - ((a * b) >> 8);
+        c += 128;
+        Cb[i] = CLAMP_UV(c);
 
-		a *= o1;
-		b *= o2;
-		a = a >> 8;
-		b = b >> 8;	
-		Y[i] = (a+b) - ((a * b) >> 8);
-		// CLAMP_Y(c);
-	
-		a = Cb[i]-128;
-		b = Cb2[i]-128;
-		c = (a + b) - (( a * b) >> 8);
-		c += 128;
-		Cb[i] = CLAMP_UV(c);
-
-		a = Cr[i]-128;
-		b = Cr2[i]-128;
-		c = (a + b) - ((a*b) >> 8);
-		c += 128;
-		Cr[i] = CLAMP_UV(c);
-    	}
-}
-
-static void flare_additive(VJFrame *frame, VJFrame *frame2, int width,
-		int height, int op_a) {
-
-	unsigned int i;
-	const int len = frame->len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
-
-	int a,b;	
-	const unsigned int o1 = op_a;
- 	const unsigned int o2 = 255 - op_a;
-
-	for(i=0; i < len; i++)
-	{
-		a = (Y[i]*o1) >> 7;
-		b = (Y2[i]*o2) >> 7;
-		Y[i] = a + (( 2 * b ) - 255);
-
-		a = Cb[i];
-		b = Cb2[i];
-
-		Cb[i] = a + ( ( 2 * b ) - 255 );
-
-		a = Cr[i] ;
-		b = Cr2[i] ;
-
-		Cr[i] = a + ( ( 2 * b ) - 255 );
-	}
-}
-
-static void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
-	unsigned int i;
-	const int len = frame->len;
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
-
-	int a=0,b=0;
-
-	for(i=0; i < len; i++)
-	{
-		a = Y[i];
-		b = Y2[i];
-		if ( a < 16 ) a = 16;
-		Y[i] = 255 - (( op_a - b) * (op_a - b)) / a;
-		//Y[i] = CLAMP_Y(c);
-		
-		a = Cb[i];
-		b = Cb2[i];
-		if ( a < 16) a = 16;
-		Cb[i] = 255 - (( 255 - b) * ( 255 - b )) / a;
-		//Cb[i] = CLAMP_UV(c);
-		
-		a = Cr[i];
-		b = Cr2[i];
-		if ( a < 16 ) a = 16;
-		Cr[i] = 255 - ((255 -b ) * (255 - b)) /a ;
-		//Cr[i] = CLAMP_UV(c);
-	}
+        a = Cr[i] - 128;
+        b = Cr2[i] - 128;
+        c = a + b - ((a * b) >> 8);
+        c += 128;
+        Cr[i] = CLAMP_UV(c);
+    }
 }
 
 static void flare_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
@@ -239,7 +158,7 @@ static void	flare_simple( VJFrame *frame, VJFrame *frame2, int w, int h, int op_
 	{
 		premul = ((Y2[i] * op_a) + (solid * 0xff )) >> 8; 
 		Y[i] = ( (Y[i] >> 1) + (premul >> 1 ) );
-    	}
+    }
 
 }
 
@@ -302,7 +221,7 @@ void flare_apply(void *ptr, VJFrame *frame, int *args) {
 				   frame2.data[plane] + (y * width),
 					width,
 					radius,
-					2,
+					1,
 					1,	
 					1 );
 	}
@@ -314,7 +233,7 @@ void flare_apply(void *ptr, VJFrame *frame, int *args) {
 				frame2.data[plane] + x,
 				height,
 				radius,
-				2,
+				1,
 				width,
 				width );
 
@@ -325,16 +244,10 @@ void flare_apply(void *ptr, VJFrame *frame, int *args) {
     	case 1:
 			flare_exclusive(frame,&frame2,width,height,op_a);
 			break;
-		case  2:
-			flare_additive(frame,&frame2,width,height,op_a);
-			break;
-		case  3:
-			flare_unfreeze(frame,&frame2,width,height,op_a);
-			break;
-		case  4:
+		case 2:
 			flare_darken(frame,&frame2,width,height,op_a);
 			break;
-		case 5:
+		case 3:
 			flare_lighten( frame, &frame2, width, height, op_a );
 			break;
 
