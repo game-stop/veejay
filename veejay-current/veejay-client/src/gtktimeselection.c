@@ -151,6 +151,8 @@ static  gboolean  timeline_draw(GtkWidget *widget, cairo_t *cr );
 static  GObjectClass  *parent_class = NULL;
 static  gint  timeline_signals[LAST_SIGNAL] = { 0 };
 
+extern  void on_timeline_move_selection();
+
 struct _TimelineSelectionClass
 {
   GtkWidgetClass  parent_class;
@@ -563,15 +565,29 @@ static  void  move_selection( GtkWidget *widget, gdouble x, gdouble width )
 
   gdouble dx3  = (0.5 * (te->out - te->in)) * width;
 
-  gdouble dx1  = x - dx3;
-  gdouble dx2  = x + dx3;
+  gdouble dx1  = CLAMP(x - dx3, 0, width);
+  gdouble dx2  = CLAMP(x + dx3, 0, width);
+
+  gdouble range = te->out - te->in;
 
   te->in = (1.0/width) * dx1;
   te->out = (1.0/width ) * dx2;
 
+  // keep marker length when boundary is reached
+  if(te->in <= 0) {
+    te->in = 0;
+    te->out = range;
+  }
+  else if( te->in >= (1.0 - range)) {
+    te->in = 1.0 - range;
+    te->out = 1.0;
+  }
+  
   timeline_set_out_point(widget, te->out );
   timeline_set_in_point(widget, te->in );
   te->move_x = x;
+
+  on_timeline_move_selection();
 }
 
 static gboolean

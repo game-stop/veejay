@@ -3918,6 +3918,48 @@ void vj_event_set_transition(void *ptr, const char format[], va_list ap)
             sample_id, transition_active, transition_shape, transition_length );
 }
 
+void vj_event_sample_move_marker(void *ptr, const char format[], va_list ap)
+{
+    int args[2];
+    veejay_t *v = (veejay_t*) ptr;
+
+    P_A(args,sizeof(args),NULL,0,format,ap);
+
+    SAMPLE_DEFAULTS(args[0]);
+
+    sample_info *s = sample_get(args[0]);
+    if( s == NULL ) {
+        p_no_sample( args[0] );
+        return;
+    }
+
+    int len = s->marker_end - s->marker_start;
+    if( len <= 0 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "No marker set");
+        return;
+    }
+
+    int mid = len / 2;
+
+    int marker_start = args[1] - mid;
+    int marker_end   = args[1] + mid;
+
+    if(marker_start < s->first_frame) {
+        marker_start = s->first_frame;
+        marker_end = len;
+    }
+
+    if (marker_end > s->last_frame) {
+        marker_end = s->last_frame;
+        marker_start = marker_end - len;
+    }
+
+    if(marker_start < 0)
+      marker_start = s->first_frame;
+
+    veejay_msg(VEEJAY_MSG_INFO, "Moved marker selection to %d - %d", marker_start, marker_end);
+}
+
 void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap) 
 {
     int args[2];

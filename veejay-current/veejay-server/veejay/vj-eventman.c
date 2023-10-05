@@ -1212,6 +1212,19 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[ VIMS_SAMPLE_MOVE_MARKER ]		=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_MOVE_MARKER,
+				"Move in/out point selection",
+				vj_event_sample_move_marker,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				"Position",
+				0,
+				NULL);		
+
 	index_map_[VIMS_SAMPLE_CLEAR_MARKER]		=	_new_event(
 				"%d",
 				VIMS_SAMPLE_CLEAR_MARKER,

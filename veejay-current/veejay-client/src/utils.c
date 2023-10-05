@@ -104,3 +104,9 @@ char   *format_time(int pos, double fps)
     return strdup(temp);
 }
 
+char   *format_framenum(int pos) 
+{
+	char temp[64];
+	snprintf(temp, sizeof(temp), "%8d", pos);
+	return strdup(temp);
+}

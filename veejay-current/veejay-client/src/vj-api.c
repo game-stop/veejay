@@ -3098,7 +3098,7 @@ void vj_msg(int type, const char format[], ...)
         return;
 
     char tmp[1024];
-    char buf[1024];
+    char buf[1048];
     char prefix[20];
     va_list args;
 
@@ -3966,20 +3966,20 @@ static void update_current_slot_transition_state(int * history, int pm)
 {
     if (history[SAMPLE_TRANSITION_ACTIVE] != info->status_tokens[SAMPLE_TRANSITION_ACTIVE]){
         if( pm == MODE_STREAM ) {
-            gtk_toggle_button_set_active(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE],
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]),
                                         info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
         } else if ( pm == MODE_SAMPLE ) {
-            gtk_toggle_button_set_active(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE],
+            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]),
                                         info->status_tokens[SAMPLE_TRANSITION_ACTIVE]);
         }
     }
 
     if( history[SAMPLE_TRANSITION_LENGTH] != info->status_tokens[SAMPLE_TRANSITION_LENGTH] ) {
         if( pm == MODE_STREAM ) {   
-            gtk_spin_button_set_value(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH],
+            gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH]),
                                     (gdouble) info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
         } else if ( pm == MODE_SAMPLE ) {
-            update_spin_range2( widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH],
+            update_spin_range2( GTK_WIDGET(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]),
                     (gdouble) info->status_tokens[SAMPLE_START],
                     info->status_tokens[SAMPLE_END],
                     info->status_tokens[SAMPLE_TRANSITION_LENGTH] );
@@ -3988,10 +3988,10 @@ static void update_current_slot_transition_state(int * history, int pm)
 
     if( history[SAMPLE_TRANSITION_SHAPE] != info->status_tokens[SAMPLE_TRANSITION_SHAPE]) {
         if( pm == MODE_STREAM ) {
-            gtk_spin_button_set_value(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE],
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE]),
                                     (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
         } else if ( pm == MODE_SAMPLE ) {
-            gtk_spin_button_set_value(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE],
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE]),
                                     (gdouble) info->status_tokens[SAMPLE_TRANSITION_SHAPE]);
         }
     }
@@ -4134,12 +4134,8 @@ static void update_current_slot(int *history, int pm, int last_pm) {
                     marker_go = 1;
                 }
             }
-            char *dur = format_time( info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START],
-                (double)info->el.fps );
-            char *start = format_time( info->status_tokens[SAMPLE_MARKER_START] , (double)info->el.fps);
-            update_label_str( "label_markerduration", dur );
-            update_label_str( "label_markerstart", start );
-            free(dur);
+            char *start = format_framenum( info->status_tokens[SAMPLE_MARKER_START] );
+            gtk_label_set_text( GTK_LABEL(widget_cache[WIDGET_LABEL_MARKERSTART]), start);
             free(start);
         }
 
@@ -4162,12 +4158,19 @@ static void update_current_slot(int *history, int pm, int last_pm) {
                 }
             }
 
-            char *end = format_time( info->status_tokens[SAMPLE_MARKER_END], (double)info->el.fps );
+            char *end = format_framenum( info->status_tokens[SAMPLE_MARKER_END]);
             gtk_label_set_text( GTK_LABEL(widget_cache[WIDGET_LABEL_MARKEREND]), end);
             free(end);
 
             update = 1;
         }
+
+        if( history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START] ||
+            history[SAMPLE_MARKER_END] != info->status_tokens[SAMPLE_MARKER_END]) {
+                char *dur = format_framenum( info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START]);
+                gtk_label_set_text( GTK_LABEL(widget_cache[WIDGET_LABEL_MARKERDURATION]),dur);
+                free(dur);        
+            }
 
         if( marker_go )
         {
@@ -7523,7 +7526,7 @@ static void update_status_accessibility(int old_pm, int new_pm)
 static void set_pm_page_label(int sample_id, int type)
 {
     gchar ostitle[100];
-    gchar ftitle[100];
+    gchar ftitle[108];
     switch(type)
     {
         case 0:
@@ -8688,7 +8691,7 @@ void vj_gui_init(const char *glade_file,
     if (!gtk_builder_add_from_file (gui->main_window, glade_path, &error))
     {
         free(gui);
-        free(gui->main_window);
+        //free(gui->main_window);
         veejay_msg(VEEJAY_MSG_ERROR, "Couldn't load builder file: %s , %s", error->message, glade_path);
         g_error_free (error);
         return;
@@ -8847,7 +8850,7 @@ void vj_gui_init(const char *glade_file,
 
     vj_gui_activate_stylesheet(gui);
     veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));
-    info->midi =  vj_midi_new( info->main_window );
+    info->midi =  vj_midi_new( info->main_window, info->tl );
  
 
     if(!beta) // srt-titling sequence stuff

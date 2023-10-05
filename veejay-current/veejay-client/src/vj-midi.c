@@ -30,6 +30,7 @@
 #include <veejaycore/libvevo.h>
 #include <veejaycore/vevo.h>
 #include <src/vj-api.h>
+#include <src/gtktimeselection.h>
 
 extern GtkWidget      *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 extern void    msg_vims(char *message);
@@ -47,6 +48,7 @@ typedef struct
 	int		learn_event[4];
 	int		active;
 	void		*mw;
+	void		*timeline;
 } vmidi_t;
 
 typedef struct
@@ -361,6 +363,13 @@ void	vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b )
 	vj_midi_learning_vims( vv, widget, message, 0 );
 }
 
+void	vj_midi_learning_vims_msg2_extra(void *vv, int id,int a, int extra )
+{
+	char message[100];
+	snprintf(message,sizeof(message), "%03d:%d", id, a );
+	vj_midi_learning_vims( vv, NULL, message, extra );
+}
+
 void	vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c, int extra )
 {
 	char message[100];
@@ -369,6 +378,7 @@ void	vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c
 	snprintf(wid, sizeof(wid),"slider_p%d", widget );
 	vj_midi_learning_vims( vv, wid, message, extra );
 }
+
 
 static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 {
@@ -419,6 +429,14 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 					gtk_spin_button_get_range( GTK_SPIN_BUTTON(
 							glade_xml_get_widget_( v->mw, d->widget)), &min, &max);
 				
+				break;
+				case 3: // timeline selection range
+					min = timeline_get_in_point( v->timeline );
+					max = timeline_get_out_point( v->timeline );
+				break;
+				case 4: //timeline range
+					min = 0;
+					max = timeline_get_length( v->timeline );
 				break;
 			}
 			
@@ -563,7 +581,7 @@ int	vj_midi_handle_events(void *vv)
 }
 
 
-void	*vj_midi_new(void *mw)
+void	*vj_midi_new(void *mw, void *timeline)
 {
 	vmidi_t *v = (vmidi_t*) vj_calloc(sizeof(vmidi_t));
 	int portid = 0;
@@ -592,6 +610,7 @@ void	*vj_midi_new(void *mw)
 	}
 	v->pfd     = (struct pollfd *) vj_calloc( v->npfd * sizeof( struct pollfd ));
 	v->mw      = mw;
+	v->timeline = timeline;
 	v->learn   = 0;
 	v->vims    = vpn(VEVO_ANONYMOUS_PORT);	
 	v->active = 1;

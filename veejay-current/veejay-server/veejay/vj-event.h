@@ -143,6 +143,7 @@ void 	vj_event_sample_set_pp			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_set_start			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_sample_start			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_set_marker_start		(	void *ptr,	const char format[],	va_list ap	);
+void    vj_event_sample_move_marker     (   void *ptr, const char format[],     va_list ap );
 void	vj_event_sample_set_marker_end		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_sample_set_marker_clear		(	void *ptr,	const char format[],	va_list ap	);
 void    vj_event_sample_set_loops       (   void *ptr,  const char format[],     va_list ap );

@@ -18,7 +18,7 @@
 #ifndef VMIDI_H
 #define VMIDI_H
 #ifdef HAVE_ALSA
-void    *vj_midi_new(void *mw);
+void    *vj_midi_new(void *mw, void *timeline);
 int    vj_midi_handle_events(void *vv);
 void    vj_midi_play(void *vv , int play);
 void    vj_midi_learn( void *vv , int start);
@@ -30,6 +30,7 @@ void    vj_midi_learning_vims_simple( void *vv, char *widget, int id );
 void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra );
 void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c, int extra );
 void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b );
+void    vj_midi_learning_vims_msg2_extra(void *vv, int id, int arg, int extra );
 void    vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg );
 void    vj_midi_learning_vims_spin( void *vv, char *widget, int id );
 #else
@@ -45,6 +46,7 @@ void    vj_midi_learning_vims_simple( void *vv, char *widget, int id ) {}
 void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra ) {}
 void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c, int extra ) {}
 void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b ) {}
+void    vj_midi_learning_vims_msg2_extra(void *vv, int id, int arg, int extra ) {}
 void    vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg ) {}
 void    vj_midi_learning_vims_spin( void *vv, char *widget, int id ) {}
 #endif

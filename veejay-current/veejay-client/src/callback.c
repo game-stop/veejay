@@ -1883,7 +1883,7 @@ void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
 	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0 );
-	char *dur = format_time( 0,info->el.fps );
+	char *dur = format_framenum( 0 );
 	update_label_str( "label_markerduration", dur );
 	free(dur);
 }
@@ -3071,6 +3071,10 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 				page_needed );
 }
 
+void	on_timeline_move_selection() {
+	vj_midi_learning_vims_msg2_extra( info->midi, VIMS_SAMPLE_MOVE_MARKER, 0, 4);
+}
+
 void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
 {
     if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE && !info->status_lock) {
@@ -3091,7 +3095,42 @@ void	on_timeline_value_changed( GtkWidget *widget, gpointer user_data )
 	{
 		gdouble pos = timeline_get_pos( TIMELINE_SELECTION(widget) );
 		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", (gint)pos );
+		vj_midi_learning_vims_msg2_extra(info->midi, VIMS_VIDEO_SET_FRAME, 0, 4 );
 	}
+}
+
+void	on_len_div_clicked(GtkWidget *widget, gpointer user_data)
+{
+	gdouble pos1 = timeline_get_in_point( info->tl );
+	gdouble pos2 = timeline_get_out_point( info->tl );
+
+	gdouble npos1 = (pos1 + pos2) / 2 - (pos2 - pos1) / 4;
+	gdouble npos2 = (pos1 + pos2) / 2 + (pos2 - pos1) / 4;
+
+	if( npos1 < 0.0 ) npos1 = 0.0; else if (npos1 > 1.0) npos1 = 1.0;
+	if( npos2 < 0.0 ) npos2 = 0.0; else if (npos2 > 1.0) npos2 = 1.0;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Shrink marker selection to %g - %g", npos1, npos2 );
+
+	timeline_set_in_point( info->tl, npos1 );
+	timeline_set_out_point( info->tl, npos2 );
+}
+
+void	on_len_mul_clicked(GtkWidget *widget, gpointer user_data)
+{
+	gdouble pos1 = timeline_get_in_point( info->tl );
+	gdouble pos2 = timeline_get_out_point( info->tl );
+
+	gdouble npos1 = (pos1 + pos2) / 2 - ( pos2 - pos1 );
+	gdouble npos2 = (pos1 + pos2) / 2 + ( pos2 - pos1 );
+
+	if( npos1 < 0.0 ) npos1 = 0.0; else if (npos1 > 1.0) npos1 = 1.0;
+	if( npos2 < 0.0 ) npos2 = 0.0; else if (npos2 > 1.0) npos2 = 1.0;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Grow marker selection to %g - %g" , npos1, npos2 );
+
+	timeline_set_in_point( info->tl, npos1 );
+	timeline_set_out_point( info->tl, npos2 );
 }
 
 void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
@@ -3106,13 +3145,18 @@ void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 		if(pos2 > pos1 )
 		{
 			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,(gint) pos1, (gint) pos2 );
-			char *dur = format_time( pos2 - pos1,info->el.fps );
+			char *dur = format_framenum( pos2 - pos1);
+			char *end = format_framenum( pos2 );
 			update_label_str( "label_markerduration", dur );
+			update_label_str( "label_markerend", end);
 			free(dur);
+			free(end);
 
-            update_spin_value ( "button_el_selend", pos2 );
-            update_spin_value ( "curve_spinend", pos2 );
-            info->selection[0] = pos2;
+			update_spin_value ( "button_el_selend", pos2 );
+			update_spin_value ( "curve_spinend", pos2 );
+			info->selection[0] = pos2;
+
+			vj_midi_learning_vims_msg2_extra(info->midi, VIMS_SAMPLE_SET_MARKER_END, 0, 4); 
 		}
 		else
 			vj_msg(VEEJAY_MSG_INFO, "Set Out point after In point !");
@@ -3132,13 +3176,18 @@ void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 		if(pos1 < pos2 )
 		{
 			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0, (gint) pos1, (gint) pos2 );
-			char *dur = format_time( pos2 - pos1,info->el.fps );
+			char *dur = format_framenum( pos2 - pos1 );
+			char *start = format_framenum(pos1);
 			update_label_str( "label_markerduration", dur );
+			update_label_str( "label_markerstart", start);
 			free(dur);
+			free(start);
 
-            update_spin_value( "button_el_selstart",pos1 );
-            update_spin_value( "curve_spinstart", pos1 );
-            info->selection[1] = pos1;
+			update_spin_value( "button_el_selstart",pos1 );
+			update_spin_value( "curve_spinstart", pos1 );
+			info->selection[1] = pos1;
+
+			vj_midi_learning_vims_msg2_extra(info->midi, VIMS_SAMPLE_SET_MARKER_START, 0, 4); 
 		}
 		else
 			vj_msg(VEEJAY_MSG_INFO,"Set In Point before Out Point !");
@@ -3250,8 +3299,7 @@ void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
 {
 	int start_pos = get_nums( "curve_spinstart" );
 
-	char *start_time = format_time(
-			start_pos,info->el.fps );
+	char *start_time = format_time(start_pos,info->el.fps );
 	update_label_str( "curve_starttime", start_time );
 	free(start_time);
 
