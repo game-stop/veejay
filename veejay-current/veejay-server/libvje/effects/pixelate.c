@@ -30,44 +30,55 @@ vj_effect *pixelate_init(int width, int height)
 	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	ve->limits[0][0] = 1;
-	ve->limits[1][0] = 2048;
+	ve->limits[1][0] = (width < height ? width: height);
 	ve->defaults[0] = 8;
 	ve->description = "Pixelate";
 	ve->sub_format = -1;
 	ve->extra_frame = 0;
 	ve->has_user =0;
 	ve->parallel = 1;
-	ve->param_description = vje_build_param_list( ve->num_params, "Pixels");
+	ve->param_description = vje_build_param_list( ve->num_params, "Pixel Size");
 	return ve;
 }
 
 void pixelate_apply( void *ptr, VJFrame *frame, int *args )
 {
-	unsigned int i,j ;
-	const int len = frame->len;
-	const unsigned int v = args[0];
-	const int uv_len = (frame->ssm ? len : frame->uv_len);
-	unsigned int u_v = v >> (frame->ssm ? frame->shift_h: 1 );
-	if( u_v == 0 )
-		u_v = 1;
-	
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
 
-	for (i = 0; i < len; i+=v) {
-		for(j=0; j < v; j++)
-		{
-			Y[i+j] = Y[i];
-		}
-	}
+	int pixelSize = args[0];
+    int width = frame->width;
+    int height = frame->height;
 
-	for (i = 0; i < uv_len; i+=u_v) {
-		for(j=0; j < u_v; j++)
-		{
-			Cb[i+j] = Cb[i];
-			Cr[i+j] = Cr[i];
-		}
-	}
+    for (int i = 0; i < height; i += pixelSize) {
+        for (int j = 0; j < width; j += pixelSize) {
+            int totalY = 0;
+            int totalU = 0;
+            int totalV = 0;
+            int count = 0;
+
+            for (int y = i; y < i + pixelSize && y < height; ++y) {
+                for (int x = j; x < j + pixelSize && x < width; ++x) {
+                    int index = y * width + x;
+                    totalY += frame->data[0][index];
+                    totalU += frame->data[1][index];
+                    totalV += frame->data[2][index];
+                    count++;
+                }
+            }
+
+            int averageY = totalY / count;
+            int averageU = totalU / count;
+            int averageV = totalV / count;
+
+            for (int y = i; y < i + pixelSize && y < height; ++y) {
+                for (int x = j; x < j + pixelSize && x < width; ++x) {
+                    int index = y * width + x;
+                    frame->data[0][index] = (uint8_t)averageY;
+                    frame->data[1][index] = (uint8_t)averageU;
+                    frame->data[2][index] = (uint8_t)averageV;
+                }
+            }
+        }
+    }
+
 }
 
