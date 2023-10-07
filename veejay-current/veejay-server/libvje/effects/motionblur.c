@@ -29,98 +29,101 @@ vj_effect *motionblur_init(int width, int height)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 15;
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1000; /* time in frames */
-    ve->description = "Motion blur";
-    ve->sub_format = 0;
+    ve->defaults[0] = 5;
+    ve->limits[0][0] = 1;
+    ve->limits[1][0] = fmin(width,height)/3; 
+	ve->description = "Motion Blur";
+    ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->parallel = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Frames" );
-	 return ve;
+	ve->param_description = vje_build_param_list( ve->num_params, "Strength" );
+	return ve;
 }
 
 typedef struct {
-    uint8_t *previous_frame[3];
-    int last_max;
-    int n_motion_frames;
+    uint8_t *buf[3];
 } motionblur_t;
 
-void *motionblur_malloc(int width, int height)
-{
-    motionblur_t *m = (motionblur_t*) vj_calloc(sizeof(motionblur_t));
-    if(!m) {
-        return NULL;
-    }
-    m->previous_frame[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (width * height *3));
-    if(!m->previous_frame[0]) {
-        free(m);
-        return NULL;
-    }
-    m->previous_frame[1] = m->previous_frame[0] + (width*height);
-    m->previous_frame[2] = m->previous_frame[1] + (width*height);
-	
-    return (void*) m;
+void	*motionblur_malloc(int w, int h) {
+	motionblur_t *m = (motionblur_t*) vj_malloc(sizeof(motionblur_t));
+	if(!m) {
+		return NULL;
+	}
+	m->buf[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h * 3 );
+    if(!m->buf[0]) {
+		free(m);
+		return NULL;
+	}
+
+	m->buf[1] = m->buf[0] + (w*h);
+	m->buf[2] = m->buf[1] + (w*h);
+		
+	return (void*) m;
 }
 
-void motionblur_free(void *ptr) {
-
-    motionblur_t *m = (motionblur_t*) ptr;
-    free(m->previous_frame[0]);
-    free(m);
+void	motionblur_free( void *ptr ) {
+	motionblur_t *m = (motionblur_t*) ptr;
+	if(m->buf[0]) {
+		free(m->buf[0]);
+	}
+	free(m);
 }
 
+void motionblur_apply(void *ptr, VJFrame *frame, int *args) {
+    motionblur_t *m = (motionblur_t *)ptr;
+    const int width = frame->width;
+    const int height = frame->height;
+    const int blurStrength = args[0];
 
-void motionblur_apply( void *ptr, VJFrame *frame, int *args ) {
-    int n = args[0];
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
+    uint8_t *tempY = m->buf[0];
+    uint8_t *tempU = m->buf[1];
+    uint8_t *tempV = m->buf[2];
 
-    motionblur_t *m = (motionblur_t*) ptr;
+    for (int i = 0; i < height; ++i) {
+        for (int j = 0; j < width; ++j) {
+            int totalY = 0;
+            int totalU = 0;
+            int totalV = 0;
+            int count = 0;
 
-	unsigned int i;
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
+            for (int k = -blurStrength; k <= blurStrength; ++k) {
+                int row = (i + k < 0) ? 0 : ((i + k >= height) ? height - 1 : i + k);
+                int pixelIndex = row * width + j;
+                totalY += frame->data[0][pixelIndex];
+                totalU += frame->data[1][pixelIndex];
+                totalV += frame->data[2][pixelIndex];
+                count++;
+            }
 
-    uint8_t **previous_frame = m->previous_frame;
+            int currentIndex = i * width + j;
+            tempY[currentIndex] = totalY / count;
+            tempU[currentIndex] = totalU / count;
+            tempV[currentIndex] = totalV / count;
+        }
+    }
 
-    if(m->n_motion_frames > 0) {
-	  
-	  for(i=0; i < len; i++) {
-		Y[i] = (Y[i] + previous_frame[0][i])>>1;
-		previous_frame[0][i] = Y[i];
-  	  }
+    for (int i = 0; i < height; ++i) {
+        for (int j = 0; j < width; ++j) {
+            int totalY = 0;
+            int totalU = 0;
+            int totalV = 0;
+            int count = 0;
 
+            for (int k = -blurStrength; k <= blurStrength; ++k) {
+                int col = (j + k < 0) ? 0 : ((j + k >= width) ? width - 1 : j + k);
+                int pixelIndex = i * width + col;
+                totalY += tempY[pixelIndex];
+                totalU += tempU[pixelIndex];
+                totalV += tempV[pixelIndex];
+                count++;
+            }
 
-	  for(i=0; i < uv_len; i++) {
-		Cb[i] = (Cb[i] + previous_frame[1][i])>>1;
-		Cr[i] = (Cr[i] + previous_frame[2][i])>>1;
-		previous_frame[1][i] = Cb[i];
-		previous_frame[2][i] = Cr[i];
-    	  }
-	  
-	}
-	else 
-	{
-		for( i = 0; i < len ;  i ++ ) {
-			previous_frame[0][i] = Y[i];
-		}
-		for( i = 0; i < uv_len ;  i ++ ) {
-			previous_frame[1][i] = Cb[i];
-			previous_frame[2][i] = Cr[i];		
-		}
-	}
-
-	m->n_motion_frames ++;
-
-	if( m->last_max != n ) {
-		m->last_max = n;
-		if( m->n_motion_frames > m->last_max ) {
-			m->n_motion_frames = 1;
-		}
-	}
-
+            int currentIndex = i * width + j;
+            frame->data[0][currentIndex] = (uint8_t)((totalY < 0) ? 0 : ((totalY > 255 * count) ? 255 : totalY / count));
+            frame->data[1][currentIndex] = (uint8_t)((totalU < 0) ? 0 : ((totalU > 255 * count) ? 255 : totalU / count));
+            frame->data[2][currentIndex] = (uint8_t)((totalV < 0) ? 0 : ((totalV > 255 * count) ? 255 : totalV / count));
+        }
+    }
 }
 
