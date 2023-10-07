@@ -197,6 +197,8 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/zoom.c \
 	effects/buffer.c \
 	effects/rainbowshift.c \
+	effects/vintagefilm.c \
+	effects/mirrordistortion.c \
 	effects/blackreplace.c
 		
 

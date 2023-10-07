@@ -138,6 +138,8 @@ static struct {
     { neighbours5_init,neighbours5_malloc,neighbours5_free,NULL,NULL,neighbours5_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEIGHBOUR5 },
     { negation_init,NULL,NULL,NULL,NULL,negation_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_NEGATION },
     { rainbowshift_init, NULL,NULL,NULL,NULL, rainbowshift_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RAINBOWSHIFT },
+    { vintagefilm_init,NULL,NULL,NULL,NULL, vintagefilm_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_VINTAGEFILM },
+    { mirrordistortion_init,mirrordistortion_malloc,mirrordistortion_free,NULL,NULL,mirrordistortion_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_MIRRORDISTORTION },
     { negatechannel_init,NULL,NULL,NULL,NULL,negatechannel_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEGATECHANNEL },
     { mtracer_init,mtracer_malloc,mtracer_free,NULL,NULL,NULL,mtracer_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_MTRACER },
     { overlaymagic_init,NULL,NULL,NULL,NULL,NULL,overlaymagic_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_OVERLAYMAGIC },

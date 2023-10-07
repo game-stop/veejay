@@ -208,8 +208,10 @@
 #include "./effects/buffer.h"
 #include "./effects/blackreplace.h"
 #include "./effects/rainbowshift.h"
+#include "./effects/vintagefilm.h"
+#include "./effects/mirrordistortion.h"
 
-#define VJ_IMAGE_EFFECT_MIN 78
+#define VJ_IMAGE_EFFECT_MIN 76
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -451,6 +453,8 @@ enum {
     VJ_IMAGE_EFFECT_BUFFER = 80,
 	VJ_IMAGE_EFFECT_BLACKREPLACE = 79,
 	VJ_IMAGE_EFFECT_RAINBOWSHIFT = 78,
+	VJ_IMAGE_EFFECT_VINTAGEFILM = 77,
+	VJ_IMAGE_EFFECT_MIRRORDISTORTION = 76,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
