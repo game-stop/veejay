@@ -20,7 +20,7 @@
 
 
 /* Note that the 'opacity' parameter is sometimes used as a 
-   threshold value or substraction value depending on the mode
+   threshold value or subtraction value depending on the mode
    of this effect */
 
 #include "common.h"
@@ -39,7 +39,7 @@ vj_effect *chromamagick_init(int w, int h)
 	ve->parallel = 1;
     ve->description = "Chroma Magic";
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 27;
+    ve->limits[1][0] = 28;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->parallel = 1;
@@ -56,7 +56,7 @@ vj_effect *chromamagick_init(int w, int h)
 		"Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
 		"Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
 		"Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
-		"Darken", "Lighten", "Modulo Add", "Pixel Fuckery" 
+		"Darken", "Lighten", "Modulo Add", "Pixel Fuckery", "Quilt" 
 	);
 
 
@@ -194,15 +194,15 @@ static void chromamagic_diffreplace(VJFrame *frame, VJFrame *frame2, int thresho
 		{		
 			a = ( Y[i] * op_a );
 			b = ( Y2[i] * op_b );
-			Y[i] = (a + b) >> 8;
-			a = ( Cb[i] * op_a );
-			b = ( Cb2[i] * op_b );
+			Y[i] = CLAMP_Y(a + b) >> 8;
 
-			Cb[i] = (a + b) >> 8;
-			a = ( Cr[i] * op_a );
-			b = ( Cr2[i] * op_b );
-
-			Cr[i] = (a + b) >> 8;
+			a = ( Cb[i] * op_a ) >> 8;
+			b = ( Cb2[i] * op_b ) >> 8;
+			Cb[i] = CLAMP_UV(a + b);
+			
+			a = ( Cr[i] * op_a ) >> 8;
+			b = ( Cr2[i] * op_b ) >> 8;
+			Cr[i] = CLAMP_UV(a + b);
 		}
 	}
 }
@@ -337,15 +337,15 @@ static void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int op_a) {
 			b = Cb2[i] * o2;
 			Y[i] = 255 - ( (a + b) >>8 );
 
-			a = (Cb[i]-128) * o1;
-			b = (Cb2[i]-128) * o2;
-			Cb[i] = 255 - ( 128 + (( a + b ) >> 8 ));
+			a = (Cb[i] - 128) * o1;
+			b = (Cb2[i] - 128) * o2;
+			d = 128 + ((a + b) >> 8);
+			Cb[i] = CLAMP_UV(d);
 
-
-			a = (Cr[i]-128) * o1;
-			b = (Cr2[i]-128) * o2;
-			Cr[i] = 255 - ( 128 + (( a + b ) >> 8 ));
-		
+			a = (Cr[i] - 128) * o1;
+			b = (Cr2[i] - 128) * o2;
+			d = 128 + ((a + b) >> 8);
+			Cr[i] = CLAMP_UV(d);
 		}
 	}
 }
@@ -465,6 +465,39 @@ static void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int op_a) {
 
 }
 
+static void chromamagic_quilt( VJFrame *frame, VJFrame *frame2, int op_a ) {
+
+	unsigned int i;
+	const int len = frame->len;
+	const int width = frame->width;
+	const int height = frame->height;
+	int x,y;
+	uint8_t *Y = frame->data[0];
+	uint8_t *Cb = frame->data[1];
+	uint8_t *Cr = frame->data[2];
+	uint8_t *Y2 = frame2->data[0];
+	uint8_t *Cb2 = frame2->data[1];
+	uint8_t *Cr2 = frame2->data[2];
+	float blendFactorX, blendFactorY;
+	float alpha = (float) op_a / 255.0f;
+
+	for ( i = 0; i < len ; i++ ) {
+	    x = i % width;
+        y = i / width;
+
+        blendFactorX = (float)x / width * alpha;
+        blendFactorY = (float)y / height * alpha;
+
+        uint8_t y = Y[i] * (1 - blendFactorX) + Y2[i] * blendFactorX;
+        uint8_t u = Cb[i] * (1 - blendFactorY) + Cb2[i] * blendFactorY;
+        uint8_t v = Cr[i] * (1 - blendFactorX) + Cr2[i] * blendFactorX;
+
+        Y[i] = y;
+        Cb[i] = u;
+        Cr[i] = v;	
+	}
+
+}
 
 static void chromamagic_pixelfuckery( VJFrame *frame, VJFrame *frame2, int op_a ) {
 	unsigned int i;
@@ -517,22 +550,28 @@ static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a ) {
 	int a,b;
 
 	for(i=0; i < len; i++) {
-		a = Y[i];
-		b = Y2[i];
-		if( a > pixel_Y_lo_ && a != 0 )
-		  Y[i] = 255 - (( op_a - b) * (op_a - b)) / a;
-		
-		a = Cb[i];
-		b = Cb2[i];
+        a = Y[i];
+        b = Y2[i];
+        if (a > pixel_Y_lo_ && a != 0) {
+            int diff = op_a - b;
+            Y[i] = CLAMP_Y(255 - ((diff * diff) / a));
+        }
 
-		if( a > pixel_U_lo_ && a != 0 )
-			Cb[i] = 255 - (( 256 - b) * ( 256 - b )) / a;
-		
-		a = Cr[i];
-		b = Cr2[i];
+        a = Cb[i];
+        b = Cb2[i];
 
-		if( a > pixel_U_lo_ && a != 0)
-			Cr[i] = 255 - ((256 -b ) * (256 - b)) /a ;
+        if (a > pixel_U_lo_ && a != 0) {
+            int diff = 256 - b;
+            Cb[i] = CLAMP_UV(255 - ((diff * diff) / a));
+        }
+
+        a = Cr[i];
+        b = Cr2[i];
+
+        if (a > pixel_U_lo_ && a != 0) {
+            int diff = 256 - b;
+            Cr[i] = CLAMP_UV(255 - ((diff * diff) / a));
+        }
 	} 
 }
 
@@ -627,21 +666,21 @@ static void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int op_a ) {
 		a = Y[i] * Y[i];
 		b = o1 - Y2[i];
 		if ( b > pixel_Y_lo_ )
-			Y[i] = a / b;
+			Y[i] = CLAMP_Y(a / b);
 	
 		a = Cb[i] * Cb2[i];
 		b = 255 - Cb2[i];
 		if( b > pixel_U_lo_ )
-			Cb[i] = a / b;
+			Cb[i] = CLAMP_UV( a / b );
 
 		a = Cr[i] * Cr[i];;
 		b = 255 - Cr2[i];
 		if( b > pixel_U_lo_ )
-			Cr[i] = ( a / b );
+			Cr[i] = CLAMP_UV( a / b );
 	}
 }
 
-static void chromamagic_substract(VJFrame *frame, VJFrame *frame2, int op_a) {
+static void chromamagic_subtract(VJFrame *frame, VJFrame *frame2, int op_a) {
 	unsigned int i;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -655,21 +694,18 @@ static void chromamagic_substract(VJFrame *frame, VJFrame *frame2, int op_a) {
 	const unsigned int o1 = op_a;
 	const unsigned int o2 = 255 - op_a;
 
-	for( i=0; i < len; i++ )
-	{
-		a = Y[i];
-		b = Y2[i];
+	for (i = 0; i < len; i++) {
+        a = Y[i] - ((Y2[i] * o1) >> 8);
+        Y[i] = CLAMP_Y(a);
 
-		Y[i] = a - ((b * o1) >> 8);
+        a = Cb[i];
+        b = Cb2[i];
+        Cb[i] = CLAMP_UV(((a * o2 + b * o1) >> 8));
 
-		a = Cb[i];
-		b = Cb2[i];
-		Cb[i] = (((a * o2) + (b * o1))>>8);
-
-		a = Cr[i];
-		b = Cr2[i];
-		Cr[i] = (((a * o2) + (b * o1)) >> 8);
-	}
+        a = Cr[i];
+        b = Cr2[i];
+        Cr[i] = CLAMP_UV(((a * o2 + b * o1) >> 8));
+    }
 
 }
 
@@ -688,7 +724,8 @@ static void chromamagic_add(VJFrame *frame, VJFrame *frame2, int op_a) {
 	for(i=0; i < len; i++) {
 		a = Y[i];
 		b = Y2[i];
-		Y[i] = a + (( 2 * b ) - op_a);
+		c = a + (( 2 * b ) - op_a);
+		Y[i] = CLAMP_Y(c);
 
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
@@ -818,20 +855,15 @@ static void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int op_a) {
 		if( a >= op_a) c = a;
 		else {
 			Y[i] = (a << 8) / ( 256 - b );
+            a = Cb[i] - 128;
+            b = Cb2[i] - 128;
+            c = (a << 7) / (128 - b) + 128;
+            Cb[i] = CLAMP_UV(c);
 
-			a = Cb[i] - 128;
-			b = Cb2[i] - 128;
-			if ( b > 127 ) b = 127;
-			c = ( a << 7 ) / ( 128 - b );
-			c += 128;
-			Cb[i] = CLAMP_UV(c);
-
-			a = Cr[i] - 128;
-			b = Cr2[i] - 128;
-			if ( b > 127 ) b = 127;
-			c = ( a << 7 ) / ( 128 - b);
-			c += 128;
-			Cr[i] = CLAMP_UV(c);
+            a = Cr[i] - 128;
+            b = Cr2[i] - 128;
+           	c = (a << 7) / (128 - b) + 128;
+            Cr[i] = CLAMP_UV(c);
 		}
 	}
 }
@@ -907,26 +939,19 @@ static void chromamagic_reflect(VJFrame *frame, VJFrame *frame2, int op_a) {
 
 		if ( b > op_a ) c = b;
 		else {
-			Y[i] = (a * a) / ( 256 - b );
+			Y[i] = CLAMP_Y((a * a) / (256 - b));
 
-			a = Cb[i];
-			b = Cb2[i];
-			a -= 128;
-			b -= 128;
-			if ( b == 128 ) b = 127;
-			c = ( a * a ) / ( 128 - b);
-			c += 128;
-			Cb[i] = CLAMP_UV(c);
+			a = Cb[i] - 128;
+			b = Cb2[i] - 128;
+			if (b == 128) b = 127;
+			c = CLAMP_UV((a * a) / (128 - b) + 128);
+			Cb[i] = c;
 
-			a = Cr[i];
-			b = Cr2[i];
-			a -= 128;
-			b -= 128;
-			if ( b == 128) b = 127;
-			c = ( a * a ) / ( 128 - b);
-			c += 128;
-			Cr[i] = CLAMP_UV(c);
-
+			a = Cr[i] - 128;
+			b = Cr2[i] - 128;
+			if (b == 128) b = 127;
+			c = CLAMP_UV((a * a) / (128 - b) + 128);
+			Cr[i] = c;
 		}
 	}
 }
@@ -949,17 +974,17 @@ static void chromamagic_modadd(VJFrame *frame, VJFrame *frame2, int op_a)
 	{
 		a = (Y[i] * op_a) >> 8;
 		b = (Y2[i] * op_b) >> 8;
-		Y[i] = (a + ( 2 * b - 128)) & 255;
+		Y[i] = CLAMP_Y(a + ( 2 * b - 128));
 
 		a = (Cb[i] * op_a) >> 8;
 		b = (Cb2[i] * op_b ) >> 8;
 
-		Cb[i] =  (a + ( 2 * b )) & 255;
+		Cb[i] = CLAMP_UV(a + ( 2 * b ));
 
 		a = (Cr[i] * op_a ) >> 8;
 		b = (Cr2[i] * op_b ) >> 8;
 
-		Cr[i] = (a + ( 2 * b ) ) & 255;
+		Cr[i] = CLAMP_UV(a + ( 2 * b ) );
 
     }
 }
@@ -1019,7 +1044,7 @@ void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
 	chromamagic_divide(frame,frame2, op_a);
 	break;
   case 16:
-	chromamagic_substract(frame,frame2, op_a);
+	chromamagic_subtract(frame,frame2, op_a);
 	break;
   case 17:
 	chromamagic_add(frame,frame2, op_a);
@@ -1054,7 +1079,12 @@ void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
   case 27:
 	chromamagic_pixelfuckery( frame, frame2, op_a );
 	break;
+  case 28:
+	chromamagic_quilt(frame,frame2,op_a);
+	break;
+    
     }
+
 }
 
 
