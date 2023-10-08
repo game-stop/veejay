@@ -100,7 +100,7 @@ extern int vje_get_rgb_parameter_conversion_type();
 #define fast_exp(res,x ) res = exp(x)
 #endif
 
-static inline a_sin( double x ) {
+static inline double a_sin( double x ) {
 	const double B = 4.0 / M_PI;
 	const double C = -4.0 / (M_PI * M_PI);
 	const double P = 0.225;
@@ -112,7 +112,7 @@ static inline a_sin( double x ) {
 	return P * (y * fabs(y) - y) + y;
 }
 
-static inline a_cos( double x ) {
+static inline double a_cos( double x ) {
 	const double B = 4.0 / M_PI;
 	const double C = -4.0 / (M_PI * M_PI);
 	const double P = 0.225;
