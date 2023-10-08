@@ -236,7 +236,7 @@ long		lzo_compress_frame( void *lzo, VJFrame *frame, uint8_t *alt_data[4], uint8
 	lzot *l = (lzot*) lzo;
 
 	lzo_uint s1=0,s2=0,s3=0,pf= frame->format;
-	lzo_uint *size1 = &s1, *size2=&s2,*size3=&s3;
+	lzo_uint *size1 = &s1;
 	lzo_uint res;
 	lzo_uint pos = LZO_HEADER_LEN;
 

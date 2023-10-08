@@ -1453,6 +1453,7 @@ static int is_aligned( char *msg, void *ptr, size_t alignment ) {
 	if(!isa) {
 		veejay_msg(VEEJAY_MSG_ERROR, "%s is not aligned to %d bytes. it's current alignment is %d bytes", msg, alignment, get_alignment(ptr) );
 	}
+	return isa;
 }
 #endif
 

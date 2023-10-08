@@ -108,7 +108,7 @@ void	yuv_convert_ac( VJFrame *src, VJFrame *dst, int a, int b );
 
 void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst );
 
-void	yuv_convert_any3( void *scaler, VJFrame *src,int strides[], VJFrame *dst);
+void	yuv_convert_any3( void *scaler, VJFrame *src,int strides[4], VJFrame *dst);
 
 VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt );
 

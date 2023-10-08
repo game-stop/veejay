@@ -34,7 +34,7 @@ extern void yuyv_plane_init();
 extern void benchmark_tasks(int n_tasks, long n_frames, int w, int h);
 extern void init_parallel_tasks(int n_tasks);
 
-extern int CACHE_LINE_SIZE = 64;
+static int CACHE_LINE_SIZE = 64;
 
 #if defined(HAVE_ASM_SSE) || defined(HAVE_ASM_SSE2) || defined(__SSE4_2__) || defined(__SSE4_1__)
 #define MEM_ALIGNMENT_SIZE 16
