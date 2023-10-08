@@ -24,6 +24,9 @@
 #ifdef HAVE_ARM
 #include <arm_neon.h>
 #endif
+#ifdef HAVE_ASM_SSE2
+#include <emmintrin.h>
+#endif
 
 vj_effect *softblur_init(int w,int h)
 {
@@ -204,6 +207,63 @@ static void softblur1_apply(VJFrame *frame) {
 }
 #endif
 
+#ifdef HAVE_ASM_SSE2
+static void sse2_blur(VJFrame *frame) {
+    const int len = frame->len;
+    const int width = frame->width;
+    int scrsh = len >> 1;
+
+    uint8_t *buf = frame->data[0];
+
+    for (int i = 0; i < scrsh; i += 16) {
+        __m128i mm0 = _mm_load_si128((__m128i *)(buf + i));
+        __m128i mm1 = _mm_load_si128((__m128i *)(buf + i + width));
+        __m128i mm2 = _mm_load_si128((__m128i *)(buf + i + width + 1));
+        __m128i mm3 = _mm_load_si128((__m128i *)(buf + i + width - 1));
+
+        mm0 = _mm_unpacklo_epi8(mm0, _mm_setzero_si128());
+        mm1 = _mm_unpacklo_epi8(mm1, _mm_setzero_si128());
+        mm2 = _mm_unpacklo_epi8(mm2, _mm_setzero_si128());
+        mm3 = _mm_unpacklo_epi8(mm3, _mm_setzero_si128());
+
+        mm0 = _mm_add_epi16(mm0, mm1);
+        mm0 = _mm_add_epi16(mm0, mm2);
+        mm0 = _mm_add_epi16(mm0, mm3);
+
+        mm0 = _mm_srli_epi16(mm0, 2);
+
+        mm0 = _mm_packus_epi16(mm0, mm0);
+
+        _mm_storel_epi64((__m128i *)(buf + i), mm0);
+    }
+
+    for (int i = len - 16; i > scrsh; i -= 16) {
+        __m128i mm0 = _mm_load_si128((__m128i *)(buf + i));
+        __m128i mm1 = _mm_load_si128((__m128i *)(buf + i + width));
+        __m128i mm2 = _mm_load_si128((__m128i *)(buf + i + 1));
+        __m128i mm3 = _mm_load_si128((__m128i *)(buf + i + width - 1));
+
+        mm0 = _mm_unpacklo_epi8(mm0, _mm_setzero_si128());
+        mm1 = _mm_unpacklo_epi8(mm1, _mm_setzero_si128());
+        mm2 = _mm_unpacklo_epi8(mm2, _mm_setzero_si128());
+        mm3 = _mm_unpacklo_epi8(mm3, _mm_setzero_si128());
+
+        mm0 = _mm_add_epi16(mm0, mm1);
+        mm0 = _mm_add_epi16(mm0, mm2);
+        mm0 = _mm_add_epi16(mm0, mm3);
+
+        mm0 = _mm_srli_epi16(mm0, 2);
+
+        mm0 = _mm_packus_epi16(mm0, mm0);
+
+        _mm_storel_epi64((__m128i *)(buf + i), mm0);
+    }
+
+    _mm_empty();
+}
+#endif
+
+
 void softblur_apply(void *ptr, VJFrame *frame, int *args)
 {
    
@@ -211,10 +271,14 @@ void softblur_apply(void *ptr, VJFrame *frame, int *args)
 
     switch (type) {
  	   case 0:
+#ifdef HAVE_ASM_SSE2
+		   	sse2_blur(frame);
+#else
 #ifdef HAVE_ASM_MMX
 			mmx_blur(frame);
 #else
 			softblur1_apply(frame);
+#endif
 #endif
 		break;
 	    case 1:
@@ -227,10 +291,14 @@ void softblur_apply_internal(VJFrame *frame, int type)
 {
     switch (type) {
  	   case 0:
+#ifdef HAVE_ASM_SSE2
+		   	sse2_blur(frame);
+#else
 #ifdef HAVE_ASM_MMX
 			mmx_blur(frame);
 #else
 			softblur1_apply(frame);
+#endif
 #endif
 		break;
 	    case 1:
