@@ -154,6 +154,9 @@
 #include <immintrin.h>
 #endif
 
+#ifdef HAVE_ASM_SSE2
+#include <smmintrin.h>
+#endif
 #define BUFSIZE 1024
 
 
@@ -2526,13 +2529,32 @@ static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 
 static inline void vj_frame_slow1( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
 {
-#ifndef HAVE_ASM_MMX
+#ifndef HAVE_ASM_MMX 
 	int i;
 	for( i = 0; i < len; i ++  ) {
 		dst[i] = a[i] + ( frac * ( b[i] - a[i] ) ); 
 	}
 #else
-	uint32_t ialpha = (256 * frac);
+#ifdef HAVE_ASM_SSE2
+    int i;
+    __m128i frac128 = _mm_set1_epi32((int)(frac * 65536.0f)); 
+
+    for (i = 0; i <= len - 16; i += 16) {
+        __m128i a_vec = _mm_loadu_si128((__m128i*)(a + i));
+        __m128i b_vec = _mm_loadu_si128((__m128i*)(b + i));
+
+        __m128i diff = _mm_sub_epi16(b_vec, a_vec);
+        __m128i scaled_diff = _mm_mulhi_epi16(diff, frac128);
+        __m128i result = _mm_add_epi16(a_vec, scaled_diff);
+
+        _mm_storeu_si128((__m128i*)(dst + i), result);
+    }
+
+    for (; i < len; ++i) {
+        dst[i] = a[i] + (uint8_t)((frac * (b[i] - a[i])) + 0.5f);
+    }
+#else
+    uint32_t ialpha = (256 * frac);
     unsigned int i;
 
     ialpha |= ialpha << 16;
@@ -2562,6 +2584,7 @@ static inline void vj_frame_slow1( uint8_t *dst, uint8_t *a, uint8_t *b, const i
 			, [src2] "m" (*(b + i))
 			, [alpha] "m" (ialpha));
 	}
+#endif
 #endif
 }
 
