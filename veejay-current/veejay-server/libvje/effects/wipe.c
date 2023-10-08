@@ -35,7 +35,7 @@ vj_effect *wipe_init(int w,int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 0;
-    ve->defaults[1] = 0;
+    ve->defaults[1] = 1;
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = (w > h ? w: h);
@@ -52,20 +52,21 @@ vj_effect *wipe_init(int w,int h)
 }
 
 typedef struct {
-    double g_wipe_width;
-    double g_wipe_height;
+	int wipePosition;
+	int wipeDirection;
 } wipe_t;
 
 int  wipe_ready(void *ptr, int width, int height) { 
     wipe_t *w = (wipe_t*) ptr;
-    if (w->g_wipe_width == width && w->g_wipe_height == height)
-	    return TRANSITION_COMPLETED;
+	if( w->wipePosition >= width || w->wipePosition <= 0 )
+		return TRANSITION_COMPLETED;
     return TRANSITION_RUNNING;
 }
 
 void *wipe_malloc( int w, int h )
 {
-    fx_wipe_t *prv = (fx_wipe_t*) vj_calloc(sizeof(fx_wipe_t));
+    wipe_t *prv = (wipe_t*) vj_calloc(sizeof(wipe_t));
+	prv->wipeDirection = 1;
     return prv;
 }
 
@@ -76,28 +77,32 @@ void wipe_free(void *ptr)
 
 
 void wipe_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int inc = args[0];
+	wipe_t *wipe = (wipe_t*) ptr;
+
+	int width = frame->width;
+    int height = frame->height;
+    int speed = args[0];
     int restart = args[1];
 
-    const unsigned int width = frame->width;
-    const unsigned int height = frame->height;
-    double ratio = (double) width / (double) height;
-    wipe_t *w = (wipe_t*) ptr;
+    wipe->wipePosition += speed * wipe->wipeDirection;
 
-  
-    int transop_args[6] = { (int) w->g_wipe_width,(int) w->g_wipe_height, 0,0,0,0 };
-
-    transop_apply(NULL, frame, frame2,transop_args );
-    
-    w->g_wipe_width += ratio * ((double ) inc);
-    w->g_wipe_height += ((double) inc);
-
-    if(w->g_wipe_width > width && w->g_wipe_height > height) {
-        w->g_wipe_width = width;
-        w->g_wipe_height = height;
+    if (wipe->wipePosition >= width) {
+        wipe->wipePosition = width - 1;
+        wipe->wipeDirection = -1;
+    } else if (wipe->wipePosition <= 0) {
+        wipe->wipePosition = 0;
+        wipe->wipeDirection = 1;
     }
-    if(restart) {
-        w->g_wipe_width = 0;
-        w->g_wipe_height = 0;
+
+    for (int i = 0; i < height; ++i) {
+        for (int j = 0; j < width; ++j) {
+            int index = i * width + j;
+
+            if (j >= wipe->wipePosition) {
+                frame->data[0][index] = frame2->data[0][index];
+                frame->data[1][index] = frame2->data[1][index];
+                frame->data[2][index] = frame2->data[2][index];
+            }
+        }
     }
 }
