@@ -1352,12 +1352,30 @@ double	m_get_polar_y( double r, double a)
 	return ( r * sin(a) );
 }
 
-void veejay_blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep){
-	int x;
-	const int length= radius*2 + 1;
-	const int inv= ((1<<16) + length/2)/length;
-	const int R = (radius - 1);
-	int sum= 0;
+// originally copied from xine
+void veejay_blur(uint8_t *dst, uint8_t *src, int w, int qradius, int dstStep, int srcStep){
+	unsigned int x;
+	const int radius = ( qradius % 2 == 0 ? qradius + 1 : qradius );
+	const unsigned int length= radius*2 + 1;
+	const int64_t inv= ((1LL<<16) + length/2)/length;
+	int64_t sum= 0;
+
+	if( radius == 1 ) {
+		for( x = 1; x < w - 1; x ++ ) {
+			dst[x * dstStep] = (src[(x - 1) * srcStep] + src[x * srcStep] + src[(x + 1) * srcStep]) / 3;
+		}
+		return;
+	}
+
+	if( radius == 2 ) {
+		for( x = radius; x < w - radius; x ++ ) {
+            sum = src[(x - 2) * srcStep] + src[(x - 1) * srcStep] +
+                  src[x * srcStep] + src[(x + 1) * srcStep] +
+                  src[(x + 2) * srcStep];
+            dst[x * dstStep] = (sum + 2) / 5; // Add 2 for proper rounding
+		}
+		return;
+	}
 
 	for(x=0; x<radius; x++){
 		sum+= src[x*srcStep]<<1;
@@ -1367,46 +1385,100 @@ void veejay_blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int
 
 	for(x=0; x<=radius; x++){
 		sum+= src[(radius+x)*srcStep] - src[(radius-x)*srcStep];
-		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
+		dst[x*dstStep]= (sum*inv + (1LL<<15))>>16;
 	}
 
 	for(; x<w-radius; x++){
-		sum+= src[(radius+x)*srcStep] - src[(x-R)*srcStep];
-		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
+		sum+= src[(radius+x)*srcStep] - src[(x-radius-1)*srcStep];
+		dst[x*dstStep]= (sum*inv + (1LL<<15))>>16;
 	}
 
 	for(; x<w; x++){
-		sum+= src[(2*w-radius-x-1)*srcStep] - src[(x-R)*srcStep];
-		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
+       		sum += src[(radius + x) * srcStep] - src[(x-radius-1) * srcStep];
+        	dst[x * dstStep] = (sum * inv + (1LL << 15)) >> 16;
 	}
-}
-
-//copied from xine
-void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep){
-	uint8_t temp[2][4096];
-	uint8_t *a= temp[0], *b=temp[1];
 	
-	if(radius){
-		veejay_blur(a, src, w, radius, 1, srcStep);
-		for(; power>2; power--){
-			uint8_t *c;
-			veejay_blur(b, a, w, radius, 1, 1);
-			c=a; a=b; b=c;
-		}
-		if(power>1)
-			veejay_blur(dst, a, w, radius, dstStep, 1);
-		else{
-			int i;
-			for(i=0; i<w; i++)
-				dst[i*dstStep]= a[i];
-		}
-	}else{
-		int i;
-		for(i=0; i<w; i++)
-			dst[i*dstStep]= src[i*srcStep];
-	}
-}
+ /*   for (x = 0; x <= radius; x++) {
+        int leftIndex = (radius - x) * srcStep;
+        int rightIndex = (radius + x) * srcStep;
+        if (leftIndex >= 0 && leftIndex < w * srcStep && rightIndex >= 0 && rightIndex < w * srcStep) {
+            sum += src[rightIndex] - src[leftIndex];
+        }
+        dst[x * dstStep] = (sum * inv + (1 << 15)) >> 16;
+    }
 
+    for (; x < w - radius; x++) {
+        int leftIndex = (x - radius) * srcStep;
+        int rightIndex = (x + radius) * srcStep;
+        if (leftIndex >= 0 && leftIndex < w * srcStep && rightIndex >= 0 && rightIndex < w * srcStep) {
+            sum += src[rightIndex] - src[leftIndex];
+        }
+        dst[x * dstStep] = (sum * inv + (1 << 15)) >> 16;
+    }
+
+    for (; x < w; x++) {
+        int leftIndex = (x - radius - 1) * srcStep;
+        int rightIndex = (x + radius) * srcStep;
+        if (leftIndex >= 0 && leftIndex < w * srcStep && rightIndex >= 0 && rightIndex < w * srcStep) {
+            sum += src[rightIndex] - src[leftIndex];
+        }
+        dst[x * dstStep] = (sum * inv + (1 << 15)) >> 16;
+    } */
+	
+}
+void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep) {
+    uint8_t temp[2][4096];
+    uint8_t *a = temp[0], *b = temp[1];
+    if (radius) {
+		// mirror pad the temporary buffer to avoid artifacts
+		for (int i = 0; i <= radius; i++) {
+            a[w + i] = src[w - radius + i];
+			b[w + i] = a[w + i];
+        }
+		veejay_blur(a, src, w, radius, 1, srcStep);
+
+        for (; power > 2; power--) {
+            uint8_t *c;
+            veejay_blur(b, a, w, radius, 1, 1);
+            c = a; a = b; b = c;
+        }
+
+        if (power > 1) {
+            veejay_blur(dst, a, w, radius, dstStep, 1);
+        } else {
+			// swapping between a and b for arbitrary radius and power == 0 introduces artifacts
+			//	int i;
+			//  for(i=0; i<w; i++)
+			//	   dst[i*dstStep]= a[i];	
+
+
+			// this also introduces artifacts, but they are pixels copied from the original source and not uninitialized bytes as before
+            if (radius & srcStep) {
+                b[0] = (src[0] + src[1]) / 2;
+            } else {
+                b[0] = src[0];
+            }
+
+            for (int x = 1; x < w - 1; x++) {
+                b[x] = (src[(x - 1) * srcStep] + src[x * srcStep] + src[(x + 1) * srcStep]) / 3;
+            }
+
+            if (radius & srcStep) {
+                b[w - 1] = (src[(w - 2) * srcStep] + src[(w - 1) * srcStep]) / 2;
+            } else {
+                b[w - 1] = src[(w - 1) * srcStep];
+            }
+
+            veejay_blur(dst, b, w, radius, dstStep, 1);
+			veejay_memcpy(&dst[(w - radius) * dstStep], &b[w - radius], radius); 
+        }
+    } else {
+        int i;
+        for (i = 0; i < w; i++) {
+            dst[i * dstStep] = src[i * srcStep];
+        }
+    }
+}
 
 typedef struct 
 {
