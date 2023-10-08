@@ -87,7 +87,7 @@ void *sinoids_malloc(int width, int height)
     s->sinoid_frame[2] = s->sinoid_frame[1] + (width*height);
     
     for(i=0; i < width; i++ ) {
-	    s->sinoids_X[i] = (int) ( sin( ((double)i/(double)width) * 2 * 3.1415926) * 1);
+	    s->sinoids_X[i] = (int) ( a_sin( ((double)i/(double)width) * 2 * 3.1415926) * 1);
 	    s->sinoids_X[i] *= 4;
 	}
 
@@ -110,7 +110,7 @@ static void sinoids_recalc(sinoids_t *s, int width, int z) {
 	double zoom = ( (double)z / 10.0);
     int *sinoids_X = s->sinoids_X;
 	for(i=0; i < width; i++ ) {
-	  sinoids_X[i] = (int) ( sin( ((double)i/(double)width) * 2 * 3.1415926) * zoom);
+	  sinoids_X[i] = (int) ( a_sin( ((double)i/(double)width) * 2 * 3.1415926) * zoom);
 	  sinoids_X[i] *= 4;
 	}
 }

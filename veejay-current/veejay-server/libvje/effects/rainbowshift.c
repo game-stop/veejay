@@ -67,7 +67,7 @@ void rainbowshift_apply( void *ptr, VJFrame *frame, int *args ) {
 
 	
 	for (i = 0; i < len; i++) {
-        double wave_shift = shift_amplitude * sin(2 * M_PI * shift_frequency * i / len);
+        double wave_shift = shift_amplitude * a_sin(2 * M_PI * shift_frequency * i / len);
 
         Cb[i] = (Cb[i] + (int)wave_shift) & 255;
         Cr[i] = (Cr[i] - (int)wave_shift) & 255;

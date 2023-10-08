@@ -120,8 +120,8 @@ static 	void create_circle( double radius, int depth, int w,relpoint_t *points )
 	while( index <= depth)
 	{
 		double r = (t / 180.0) * M_PI;
-		points[index].x = cos(r) * radius;
-		points[index].y = sin(r) * radius;
+		points[index].x = a_cos(r) * radius;
+		points[index].y = a_sin(r) * radius;
 		t += theta;
 		index++;
 	}

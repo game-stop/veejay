@@ -53,11 +53,11 @@ vj_effect *coloradjust_init(int w, int h)
 /* these methods were derived from yuv-subtitler */
 static inline uint8_t ccolor_adjust_u(double dcolor, double dsaturation)
 {
-	return (sin(dcolor) * dsaturation) + 128;
+	return (a_sin(dcolor) * dsaturation) + 128;
 }
 static inline uint8_t ccolor_adjust_v(double dcolor, double dsaturation)
 {
-	return (cos(dcolor) * dsaturation) + 128;
+	return (a_cos(dcolor) * dsaturation) + 128;
 }
 static inline double ccolor_sqrt(double u, double v)
 {
@@ -85,8 +85,8 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
 	float hue = (float) ( (val/180.0) * M_PI);
 	float sat = (float) ( _degrees * 0.01 );
 	
-	const int s = (int) rint( sin(hue) * (1<<16) * sat );
-	const int c = (int) rint( cos(hue) * (1<<16) * sat );
+	const int s = (int) rint( a_sin(hue) * (1<<16) * sat );
+	const int c = (int) rint( a_cos(hue) * (1<<16) * sat );
 	
 	for( i = 0 ; i < len ;i ++ )
 	{

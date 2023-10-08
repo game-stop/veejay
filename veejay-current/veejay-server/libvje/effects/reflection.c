@@ -97,7 +97,7 @@ void *reflection_malloc(int width, int height)
  
     for (i = 0; i < width; i++) {
 		rad = (float) i * 0.0174532 * 0.703125;
-		r->reflect_aSin[i] = (short) ((sin(rad) * 100.0) + 256.0);
+		r->reflect_aSin[i] = (short) ((a_sin(rad) * 100.0) + 256.0);
     }
     
 	for (x = 0; x < width; ++x) {

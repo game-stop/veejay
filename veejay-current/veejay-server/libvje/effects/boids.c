@@ -141,8 +141,8 @@ static void	blob_home_position(boids_t *b, int blob_id, int w, int h , double v[
 	double ratio = (w/h);
 	double cx = ( double )( w/ 2);
 	double cy = ( double )( h/ 2) * ratio;
-	v[0] = cx + cos(rad) * b->blob_home_radius_;
-	v[1] = cy + sin(rad) * b->blob_home_radius_;
+	v[0] = cx + a_cos(rad) * b->blob_home_radius_;
+	v[1] = cy + a_sin(rad) * b->blob_home_radius_;
 }
 
 static void	blob_init_( boids_t *g, blob_t *b , int blob_id, int w , int h)

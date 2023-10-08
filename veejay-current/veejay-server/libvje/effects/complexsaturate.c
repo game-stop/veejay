@@ -123,8 +123,8 @@ void complexsaturation_apply(void *ptr, VJFrame *frame,int *args ) {
     bg_y = frame->data[0];
     bg_cb = frame->data[1];
     bg_cr = frame->data[2];
-	const int s = (int) rint( sin(hue) * (1<<16) * sat );
-	const int c = (int) rint( cos(hue) * (1<<16) * sat );
+	const int s = (int) rint( a_sin(hue) * (1<<16) * sat );
+	const int c = (int) rint( a_cos(hue) * (1<<16) * sat );
 	for (pos = 0; pos < len; pos++)
 	{
 		short xx, yy;

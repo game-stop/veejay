@@ -129,10 +129,10 @@ void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args ) {
 
 	if( distortionFactor != m->distortion ) {
 		for( i = 0; i < w; i ++ ) {
-			m->cos_lut[i] = cos( i * distortionFactor );
+			m->cos_lut[i] = a_cos( i * distortionFactor );
 		}	
 		for( i = 0; i < h; i ++ ) {
-			m->sin_lut[i] = sin( i * distortionFactor );
+			m->sin_lut[i] = a_sin( i * distortionFactor );
 		}
 		m->distortion = distortionFactor;
 	}
