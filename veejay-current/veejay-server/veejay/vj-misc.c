@@ -472,7 +472,7 @@ int	verify_working_dir()
 
 	int c = 0;
 	while( n -- ) {
-		char tmp[1024];
+		char tmp[2028];
 		snprintf( tmp, sizeof(tmp), "%s/%s", path, files[n]->d_name );
 		if( try_file( tmp ) )
 			c++;

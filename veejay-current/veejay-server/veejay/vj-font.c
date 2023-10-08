@@ -1934,7 +1934,8 @@ static inline void draw_transparent_box(
   };
 
   int p;
-  
+ 
+#pragma omp simd 
   for (j = y; j < height; j++)
     for (i = x; i < width; i++) 
       { 

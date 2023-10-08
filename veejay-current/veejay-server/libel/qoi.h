@@ -277,7 +277,7 @@ is set to the size in bytes of the encoded data.
 
 The returned qoi data should be free()d after use. */
 
-void *qoi_encode(const unsigned char *pixels[3], const qoi_desc *desc, int *out_len, unsigned char *bytes, int max_size );
+void *qoi_encode(const unsigned char *pixels[4], const qoi_desc *desc, int *out_len, unsigned char *bytes, int max_size );
 
 
 /* Decode a QOI image from memory.
@@ -288,7 +288,7 @@ is filled with the description from the file header.
 
 The returned pixel data should be free()d after use. */
 
-void *qoi_decode(const void *data, int size, qoi_desc *desc, int channels, unsigned char *pixels[3], int px_len);
+void *qoi_decode(const void *data, int size, qoi_desc *desc, int channels, unsigned char *pixels[4], int px_len);
 
 
 #ifdef __cplusplus
@@ -496,7 +496,6 @@ void *qoi_encode(const unsigned char *pixels[4], const qoi_desc *desc, int *out_
 	return bytes;
 }
 
-#pragma unroll
 void *qoi_decode(const void *data, int size, qoi_desc *desc, int channels, unsigned char *pixels[4], int px_len) {
 	const unsigned char *bytes;
 	unsigned int header_magic;

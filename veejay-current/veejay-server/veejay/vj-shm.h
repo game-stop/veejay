@@ -21,11 +21,11 @@
 
 #ifndef VJ_SHM
 #define VJ_SHM
-int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[3] );
+int		vj_shm_write( void *vv, uint8_t *frame[4], int plane_sizes[4] );
 void	*vj_shm_new_slave(int shm_id);
 void	vj_shm_free_slave(void *vv);
 void	*vj_shm_new_master(const char *homedir, VJFrame *frame);
-int		vj_shm_read( void *vv, uint8_t *dst[3] );
+int		vj_shm_read( void *vv, uint8_t *dst[4] );
 int		vj_shm_stop( void *vv );
 void	vj_shm_free(void *vv);
 int		vj_shm_get_status( void *vv );

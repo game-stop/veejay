@@ -74,6 +74,7 @@ static inline void stroboscope(
 	const int uv_len = (w*h) >> shift;
 	unsigned int i;
 	
+#pragma omp simd
 	for( i = 0; i < uv_len; i ++ )
 	{
 		if( Y1[(i<<shift)] > Y2[(i<<shift)] ) {
@@ -86,6 +87,7 @@ static inline void stroboscope(
 		}
 	}
 
+#pragma omp simd
 	for( i = 0; i < len; i ++ )
 	{
 		if( Y1[i] > Y2[i] ) {
@@ -99,6 +101,7 @@ static inline void stroboscope(
 	// post process
 	if( feather > 0 )
 	{
+#pragma omp simd
 		for( i = 0; i < uv_len; i ++ ) {
 			if( abs( Y1[(i<<shift)] - Y2[(i<<shift)] ) < feather ) {
 				O1[i] = ( A1[i] + B1[i] ) >> 1;
@@ -112,6 +115,7 @@ static inline void stroboscope(
 static inline void fading_stroboscope( uint8_t *O, uint8_t *A, uint8_t *B, uint8_t *Op, const int len )
 {
 	unsigned int i;
+#pragma omp simd
 	for( i = 0; i < len; i ++ )
 	{
 		O[i] = ( ( 0xff - Op[i]) * A[i] + (Op[i]) * B[i] ) >> 8;
@@ -131,7 +135,8 @@ static inline void fading_stroboscopeUV(
 {
 	const int uv_len = (w*h) >> shift;
 	unsigned int i;
-	
+
+#pragma omp simd
 	for( i = 0; i < uv_len; i ++ )
 	{
 		if( Y1[(i<<shift)] > Y2[(i<<shift)] ) {
@@ -146,6 +151,7 @@ static inline void fading_stroboscopeUV(
 
 	if( feather > 0 )
 	{
+#pragma omp simd
 		for( i = 0; i < uv_len; i ++ ) {
 			if( abs( Y1[(i<<shift)] - Y2[(i<<shift)] ) < feather ) {
 				O1[i] = ( A1[i] + B1[i] ) >> 1;

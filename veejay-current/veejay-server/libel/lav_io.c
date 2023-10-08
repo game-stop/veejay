@@ -126,7 +126,7 @@ void    lav_set_project(int w, int h, float f, int fmt)
 #define M_APP1  0xE1
 #define TMP_EXTENSION ".tmp"
 
-void set_fourcc(lav_file_t *lav_file, char *fourcc)
+void set_fourcc(lav_file_t *lav_file, const char *fourcc)
 {
 	/* ensure fourcc is in lowercase */
 	char fourcc_lc[5];

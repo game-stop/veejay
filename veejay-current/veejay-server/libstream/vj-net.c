@@ -378,7 +378,6 @@ int	net_thread_start(vj_tag *tag, VJFrame *info)
 
 void	net_thread_stop(vj_tag *tag)
 {
-	int p_err = 0;
 	threaded_t *t = (threaded_t*)tag->priv;
 	
 	lock(t);

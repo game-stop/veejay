@@ -472,13 +472,13 @@ static  int cali_write_file( char *file, vj_tag *tag , editlist *el)
         return 0;
     }
 
-    char header[256];
+    char header[248];
     int     w   =   vj_tag_input->width;
     int h   =   vj_tag_input->height;
     int len =   (w*h);
     int uv_len  =   vj_tag_input->uv_len;
 
-    char fileheader[256];
+    char fileheader[252];
 
     snprintf(header,sizeof(header),"%08d %08d %08d %08d %g %g %g",
             w,

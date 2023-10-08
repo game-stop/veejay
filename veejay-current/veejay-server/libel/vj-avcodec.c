@@ -54,6 +54,8 @@
 #define ROUND_UP_8(x) ROUND_UP_X (x, 3)
 #define DIV_ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) >> (x))
 
+extern int avhelper_set_num_decoders();
+
 static int out_pixel_format = FMT_422F; 
 
 static char*	vj_avcodec_get_codec_name(int codec_id )
@@ -761,7 +763,6 @@ int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src
 #endif
 #if LIBAVCODEC_VERSION_MAJOR < 60
 	AVFrame pict;
-	int stride,w2,stride2;
 	veejay_memset( &pict, 0, sizeof(pict));
 
 	pict.quality = 1;

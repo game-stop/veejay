@@ -80,6 +80,9 @@
 #include <veejaycore/av.h>
 #include <veejaycore/avhelper.h>
 #include <veejaycore/avcommon.h>
+
+extern int avhelper_set_num_decoders();
+
 //#include <pthread.h>
 typedef struct {
 		void *start;

@@ -32,6 +32,7 @@ extern void avcodec_free_context(AVCodecContext **avctx) __attribute__((weak));
 
 extern void av_frame_unref(AVFrame *ptr) __attribute((weak));
 
+extern void avhelper_decode_finish( void *ptr );
 
 #if FF_VJE_BACKPORT
 
@@ -84,7 +85,7 @@ extern void av_frame_unref(AVFrame *ptr) __attribute((weak));
 #endif
 
 #ifndef CODEC_ID_FFVHUFF
-#define CODEC_ID_HUFFYUV AV_CODEC_ID_FFVHUFF
+#define CODEC_ID_FFVHUFF AV_CODEC_ID_FFVHUFF
 #endif
 
 #ifndef CODEC_ID_CYUV

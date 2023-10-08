@@ -67,7 +67,7 @@ void vj_yuv_stream_stop_read(vj_yuv * yuv4mpeg);
 
 void vj_yuv_stream_stop_write(vj_yuv * yuv4mpeg);
 
-int vj_yuv_get_frame(vj_yuv *, uint8_t **);
+int vj_yuv_get_frame(vj_yuv *, uint8_t *dst[3]);
 
 int vj_yuv_put_frame(vj_yuv * vjyuv, uint8_t **src);
 

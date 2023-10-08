@@ -52,7 +52,7 @@
 #define max(a,b)   (((a) < (b)) ? (b) : (a))
 
 #define MAX_OUTPUT_PORTS  2
-#define MAX_INPUT_PORTS   0
+#define MAX_INPUT_PORTS   2
 
 #define DEFAULT_VOLUME 100
 

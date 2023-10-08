@@ -2053,7 +2053,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	}
 
 	int instances = 0;
-	char *title = NULL;
 
 	while( (instances < 4 ) && !vj_server_setup(info))
 	{
@@ -2776,7 +2775,11 @@ int	prepare_cache_line(int perc, int n_slots)
 		return 1;
 	}
 
-	fgets(line, 128, file );
+	if(fgets(line, 128, file ) == NULL ) {
+		fclose(file);
+		return 1;
+	}
+
 	sscanf( line, "%*s %i", &total );
 	fclose(file);
 /*	fgets( line,128, file );
@@ -3137,8 +3140,9 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 
     k = 0;
 
+#pragma omp simd
     for (i = n1; i <= n2; i++) {
-		settings->save_list[k] = el->frame_list[i];
+	settings->save_list[k] = el->frame_list[i];
         k++;
     }
     settings->save_list_len = (n2 - n1 + 1);

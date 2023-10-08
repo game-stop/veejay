@@ -834,7 +834,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 	}
 
 	uint8_t *data = ( in_cache == NULL ? d->tmp_buffer: in_cache );
-	int inter = 0;
 	uint8_t *in[3] = { NULL,NULL,NULL };
 	int strides[4] = { el_out_->len, el_out_->uv_len, el_out_->uv_len ,0};
 	uint8_t *dataplanes[4] = { data , data + el_out_->len, data + el_out_->len + el_out_->uv_len,0 };
@@ -1344,7 +1343,12 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 			   	/* Ok, it is a edit list */
 		    	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list %s opened", filename[nf]);
 		    	/* Read second line: Video norm */
-		    	fgets(line, 1024, fd);
+		    	if( fgets(line, 1024, fd) == NULL ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "Failed to read %s", filename[nf]);
+				fclose(fd);
+				vj_el_free(el);
+				return NULL;
+			}
 		    	if (line[0] != 'N' && line[0] != 'n' && line[0] != 'P' && line[0] != 'p' && line[0] != 's' && line[0] != 'S')
 				{
 					veejay_msg(VEEJAY_MSG_DEBUG,"Edit list second line is not NTSC/PAL/SECAM");
@@ -1381,7 +1385,11 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 
 			    for (i = 0; i < num_list_files; i++)
 				{
-					fgets(line, 1024, fd);
+					if(fgets(line, 1024, fd) == NULL ) {
+						fclose(fd);
+						vj_el_free(el);
+						return NULL;
+					}
 					n = strlen(line);
 
 					if (line[n - 1] != '\n')

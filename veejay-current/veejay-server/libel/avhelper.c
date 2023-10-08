@@ -28,6 +28,7 @@
 #include <veejaycore/defs.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
+#include <veejaycore/vj-task.h>
 #include <libvje/vje.h>
 #include <veejaycore/yuvconv.h>
 #include <libavutil/avutil.h>
