@@ -43,7 +43,7 @@ vj_effect *porterduff_init(int w,int h)
 
 	ve->param_description = vje_build_param_list(ve->num_params, "Operator");
 	ve->has_user = 0;
-    ve->description = "Porter Duff operations (RGBA)";
+    ve->description = "Porter Duff operations (Luma only)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->rgb_conv = 0;
@@ -248,10 +248,10 @@ static void xor( uint8_t *A, uint8_t *B, int n_pixels )
 
 	for( i = 0; i < n_pixels; i ++ )
 	{
-		uint8_t aD = ( bB[3] + aA[3] - 2 * bB[3] * aA[3]) >> 8;
+		uint8_t aD = CLAMP_Y(( bB[3] + aA[3] - 2 * bB[3] * aA[3]) >> 8);
 		for( j = 0; j < 3; j ++ ) 
 		{
-			aA[j] = (bB[j] * ( 0xff - aA[3]) + aA[j] * ( 0xff - bB[3]) ) >> 8;
+			aA[j] = CLAMP_Y( (bB[j] * ( 0xff - aA[3]) + aA[j] * ( 0xff - bB[3]) ) >> 8 );
 		}
 		aA[3] = aD;
 		aA += 4;
@@ -349,7 +349,7 @@ static void divide( uint8_t *A, uint8_t *B, int n_pixels )
 		for( j = 0; j < 3; j ++ ) 
 		{
 			float d = ( bB[j] == 0 ? 0.0f : aA[j] / bB[j]);
-			aA[j] = (uint8_t)( d * 0xff );
+			aA[j] = (uint8_t)CLAMP_Y( d * 0xff );
 		}
 		aA += 4;
 		bB += 4;
