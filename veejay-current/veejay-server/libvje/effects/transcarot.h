@@ -21,5 +21,7 @@
 #ifndef TRANSCAROT_H
 #define TRANSCAROT_H
 vj_effect *transcarot_init(int width, int height);
+void *transcarot_malloc(int w, int h);
+void transcarot_free(void *ptr);
 void transcarot_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

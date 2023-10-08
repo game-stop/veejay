@@ -25,87 +25,83 @@
 vj_effect *transline_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    ve->num_params = 2;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 150;	/* opacity */
-    ve->defaults[1] = 10;	/* line width */
-    ve->defaults[2] = 3;	/* distance */
-    ve->defaults[3] = 0;	/* type */
+    ve->defaults[0] = 1;
+    ve->defaults[1] = 1;
     
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 255;
+    ve->limits[1][0] = (width > height ? width : height);
 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = width;
-    ve->limits[0][2] = 2;
-    ve->limits[1][2] = width;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 1;
+    
     ve->sub_format = 1;
-    ve->description = "Transition Line";
+    ve->description = "Transition Wipe Cross";
     ve->extra_frame = 1;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Line width", "Distance" , "Mode");
+	ve->param_description = vje_build_param_list(ve->num_params, "Speed", "Bounce");
     return ve;
 }
 
-static void transline1_apply(uint8_t *yuv1[4], uint8_t *yuv2[4], int width, int height, int distance, int line_width)
-{
-    int x, y, z;
-    int step;
+typedef struct {
+	float wipePositionX;
+	float wipePositionY;
+	int directionX;
+	int directionY;
+} wipe_t;
 
-    for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x += distance) {
-	    	step = line_width;
-	    	if (distance < step)
-				step = distance - 1;
-	    	for (z = 0; z < step; z++) {
-				yuv1[0][(y * width + x + z)] = yuv2[0][(y * width + x + z)];
-				yuv1[1][(y * width + x + z)] = yuv2[1][(y * width + x + z)];
-				yuv1[2][(y * width + x + z)] = yuv2[2][(y * width + x + z)];
-	    	}
-		}
-    }
+void *transline_malloc(int w, int h)
+{
+	wipe_t *wipe = (wipe_t*) vj_calloc(sizeof(wipe_t));
+	wipe->directionX = 1;
+	wipe->directionY = 1;
+	return wipe;
 }
 
-static void transline2_apply(uint8_t *yuv1[4], uint8_t *yuv2[4], int width, int height, int distance, int line_width, int opacity)
-{
-    unsigned int op0, op1;
-    int x, y, z;
-    int step;
-
-    op1 = (opacity > 255) ? 255 : opacity;
-    op0 = 255 - op1;
-    for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x += distance) {
-	    	step = line_width;
-	    	if (distance < step)
-				step = distance - 1;
-	    	for (z = 0; z < step; z++) {
-				yuv1[0][(y * width + x + z)] =
-		   		 	(op0 * yuv1[0][(y * width + x + z)] +
-		   	 		 op1 * yuv2[0][(y * width + x + z)]) >> 8;
-				yuv1[1][(y * width + x + z)] =
-		   			(op0 * yuv1[1][(y * width + x + z)] +
-		   		  	op1 * yuv2[1][(y * width + x + z)]) >> 8;
-				yuv1[2][(y * width + x + z)] =
-				    (op0 * yuv1[2][(y * width + x + z)] +
-				     op1 * yuv2[2][(y * width + x + z)]) >> 8;
-	    	}
-		}
-    }
+void transline_free(void *ptr) {
+	free(ptr);
 }
 
 void transline_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
-    int distance = args[0];
-    int line_width = args[1];
-    int opacity = args[2];
-    int type = args[3];
+    wipe_t *wipe = (wipe_t *)ptr;
+    int width = frame->width;
+    int height = frame->height;
+    int speed = args[0];
+    int bounce = args[1];
 
-    if (type == 1)
-		transline1_apply(frame->data, frame2->data, frame->width, frame->height, distance, line_width);
-    if (type == 0)
-		transline2_apply(frame->data, frame2->data, frame->width, frame->height, distance, line_width, opacity);
+    int centerX = width / 2;
+    int centerY = height / 2;
+
+	double scale = 1.0 * wipe->wipePositionX / width;
+	const int crossWidth = width * scale;
+	const int crossHeight = height * scale;
+
+ 	wipe->wipePositionX += speed * wipe->directionX;
+
+    // Check if the wipe reaches the edge or goes negative
+    if (wipe->wipePositionX >= width || wipe->wipePositionX <= 0) {
+        if (bounce) {
+            wipe->directionX *= -1;
+        }
+        wipe->wipePositionX = (wipe->directionX > 0) ? 0 : centerX;
+    }
+
+    for (int i = 0; i < height; ++i) {
+        for (int j = 0; j < width; ++j) {
+            int index = i * width + j;
+
+            // Check if the pixel is inside the cross shape
+            if ((j >= centerX - crossWidth / 2 && j <= centerX + crossWidth / 2) ||
+                (i >= centerY - crossHeight / 2 && i <= centerY + crossHeight / 2)) {
+                // Copy the pixel from the second frame
+                frame->data[0][index] = frame2->data[0][index];
+                frame->data[1][index] = frame2->data[1][index];
+                frame->data[2][index] = frame2->data[2][index];
+            }
+        }
+    }
+
 }

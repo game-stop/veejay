@@ -21,5 +21,7 @@
 #ifndef TRANSBLEND_H
 #define TRANSBLEND_H
 vj_effect *transblend_init(int width, int height);
+void *transblend_malloc(int w, int h);
+void transblend_free(void *ptr);
 void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 #endif

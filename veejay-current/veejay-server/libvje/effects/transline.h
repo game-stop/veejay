@@ -21,5 +21,7 @@
 #ifndef TRANSLINE_H
 #define TRANSLINE_H
 vj_effect *transline_init(int width, int height);
+void *transline_malloc(int w, int h);
+void transline_free(void *ptr);
 void transline_apply( void *ptr,VJFrame *frame, VJFrame *frame2, int *args );
 #endif

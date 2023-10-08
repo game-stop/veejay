@@ -48,7 +48,7 @@ vj_effect *transop_init(int width, int height)
     ve->limits[0][5] = 0;
     ve->limits[1][5] = width;
 
-    ve->description = "Transition Translate";
+    ve->description = "Frame Translate";
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
