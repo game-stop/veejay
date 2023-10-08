@@ -86,20 +86,6 @@ extern int vje_get_rgb_parameter_conversion_type();
 #define do_emms __asm__ __volatile__ ( "emms":::"memory" )
 #endif
 
-#ifdef ARCH_X86_64
-#define sin_cos(si, co, x) asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
-#define fast_sin(res__,x) asm ("fsin" : "=t" (res__) : "0" (x))
-#define fast_cos(res__,x) asm ("fcos" : "=t" (res__) : "0" (x))
-#define fast_abs(res__,x) asm ("fabs" : "=t" (res__) : "0" (x))
-#define fast_exp(res__,x) asm ("fexp" : "=t" (res__) : "0" (x))
-#else
-#define sin_cos(si, co, x)     si = sin(x); co = cos(x)
-#define fast_sin(res,x ) res = sin(x)
-#define fast_cos(res,x ) res = cos(x)
-#define fast_abs(res,x ) res = abs(x)
-#define fast_exp(res,x ) res = exp(x)
-#endif
-
 static inline double a_sin( double x ) {
 	const double B = 4.0 / M_PI;
 	const double C = -4.0 / (M_PI * M_PI);
@@ -123,6 +109,21 @@ static inline double a_cos( double x ) {
 
 	return P * (y * fabs(y) - y) + y;
 }
+
+#ifdef ARCH_X86_64
+#define sin_cos(si, co, x) asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
+#define fast_sin(res__,x) asm ("fsin" : "=t" (res__) : "0" (x))
+#define fast_cos(res__,x) asm ("fcos" : "=t" (res__) : "0" (x))
+#define fast_abs(res__,x) asm ("fabs" : "=t" (res__) : "0" (x))
+#define fast_exp(res__,x) asm ("fexp" : "=t" (res__) : "0" (x))
+#else
+#define sin_cos(si, co, x)     si = sin(x); co = cos(x)
+#define fast_sin(res,x ) res = a_sin(x)
+#define fast_cos(res,x ) res = a_cos(x)
+#define fast_abs(res,x ) res = abs(x)
+#define fast_exp(res,x ) res = exp(x)
+#endif
+
 
 #if defined(HAVE_ASM_SSE2)
 #include <emmintrin.h>
