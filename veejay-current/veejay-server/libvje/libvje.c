@@ -780,7 +780,7 @@ int vje_get_summarylen(int fx_id)
 	return len;
 }
 
-
+#define MAX_TEMP_SIZE 4096 
 int vje_get_summary(int fx_id, char *dst)
 {
     CHECK_BOUNDS(fx_id)
@@ -797,9 +797,9 @@ int vje_get_summary(int fx_id, char *dst)
 
 	int p = fx->num_params;
 	int i,j;		
-	char tmp[4096];
+	char tmp[MAX_TEMP_SIZE];
 
-	sprintf(dst,"%03zu%s%03d%1d%1d%1d%02d",
+	snprintf(dst,MAX_TEMP_SIZE, "%03zu%s%03d%1d%1d%1d%02d",
 		strlen( fx->description),
 		fx->description,
 		fx_id,
@@ -810,7 +810,7 @@ int vje_get_summary(int fx_id, char *dst)
 		);
 	for(i=0; i < p; i++)
 	{
-		snprintf(tmp,sizeof(tmp),
+		snprintf(tmp,MAX_TEMP_SIZE,
 			"%06d%06d%06d%03zu%s",
 			fx->limits[0][i],
 			fx->limits[1][i],
@@ -819,32 +819,24 @@ int vje_get_summary(int fx_id, char *dst)
 			fx->param_description[i]
 		
 		);
-		strncat( dst, tmp,strlen(tmp) );
+		strncat( dst, tmp,MAX_TEMP_SIZE - strlen(tmp) - 1 );
 	}
+	for (i = 0; i < p; i++) {
+    	int limit = fx->limits[1][i];
+		int vlen = vje_get_param_hints_length(fx_id, i, limit);
+ 		snprintf(tmp, MAX_TEMP_SIZE, "%06d", vlen);
 
-	for(i=0; i < p; i ++ )
-	{
-		int limit = fx->limits[1][i];
-		int vlen = vje_get_param_hints_length( fx_id, i, limit );
-		snprintf(tmp,sizeof(tmp),
-				"%06d",
-				vlen );
-		
-		strncat( dst, tmp, strlen(tmp) );
-		
-		if( vlen == 0 )
-			continue;
+ 		strncat(dst, tmp, MAX_TEMP_SIZE - strlen(dst) - 1);
 
-		for( j = 0; j <= limit; j ++ ) {
-            int slen = strlen( fx->hints[i]->description[j] );
-			snprintf(tmp,sizeof(tmp),
-				"%03d%s",
-                slen, 
-				fx->hints[i]->description[j] );
+  		if (vlen > 0) {
+    		for (j = 0; j <= limit; j++) {
+            	int slen = strlen(fx->hints[i]->description[j]);
+                snprintf(tmp, MAX_TEMP_SIZE, "%03d%s", slen, fx->hints[i]->description[j]);
+                strncat(dst, tmp, MAX_TEMP_SIZE - strlen(dst) - 1);
+            }
+        }
+    }
 
-			strncat( dst,tmp,strlen(tmp));
-		}
-	}
 	return 1;
 }
 
