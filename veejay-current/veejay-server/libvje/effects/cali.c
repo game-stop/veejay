@@ -193,6 +193,7 @@ void cali_apply(void *ptr, VJFrame *frame, int *args ) {
 			else
 				Y[i] = p;
 		}
+#pragma omp simd
 		for( i = 0; i < uv_len; i ++ ) {
 			p = chroma + ( (U[i]-chroma) - (bu[i]-chroma));
 			if( p < 0 )

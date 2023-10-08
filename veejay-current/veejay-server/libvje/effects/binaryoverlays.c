@@ -62,10 +62,12 @@ static void _binary_not_and( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cr2 = frame2->data[2];
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = ~(Y[i]) & ~(Y2[i]);
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + (~(Cb[i]-128) & ~(Cb2[i]-128));
@@ -84,10 +86,12 @@ static void _binary_not_xor( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cr2 = frame2->data[2];
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = ~(Y[i]) ^ ~(Y2[i]);
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + (~(Cb[i]-128) ^ ~(Cb2[i]-128));
@@ -107,10 +111,12 @@ static void _binary_not_or( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cr2 = frame2->data[2];
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = ~(Y[i]) | ~(Y2[i]);
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + ( ~(Cb[i]-128) | ~(Cb2[i]-128) );
@@ -131,10 +137,12 @@ static void _binary_not_and_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = Y[i] & ~(Y2[i]);
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + ( (Cb[i]-128) & ~(Cb2[i]));
@@ -153,10 +161,12 @@ static void _binary_not_xor_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cr2 = frame2->data[2];
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = Y[i] ^ ~(Y2[i]);
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + ( (Cb[i]-128) ^ ~(Cb2[i]-128));
@@ -176,10 +186,12 @@ static void _binary_not_or_lh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cr2 = frame2->data[2];
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = Y[i] | ~(Y2[i]);
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + ( (Cb[i]-128) | ~(Cb2[i]-128));
@@ -198,10 +210,12 @@ static void _binary_not_and_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cr2 = frame2->data[2];
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = ~(Y[i]) & Y2[i];
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + ( ~(Cb[i]-128) & (Cb2[i]-128));
@@ -220,10 +234,12 @@ static void _binary_not_xor_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cr2 = frame2->data[2];
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = ~(Y[i]) ^ Y2[i];
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + ( ~(Cb[i]-128) ^ (Cb2[i]-128));
@@ -243,10 +259,12 @@ static void _binary_not_or_rh( VJFrame *frame, VJFrame *frame2, int w, int h )
 	uint8_t *Cr2 = frame2->data[2];
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		Y[i] = ~(Y[i]) | Y2[i];
 	}
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = 128 + ( ~(Cb[i]-128) | (Cb2[i]-128));
@@ -270,8 +288,10 @@ static void _binary_or( VJFrame *frame, VJFrame *frame2, int w, int h )
 
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 		Y[i] = Y[i] | Y2[i];
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = Cb[i] | Cb2[i];
@@ -291,8 +311,10 @@ static void _binary_and( VJFrame *frame, VJFrame *frame2, int w, int h )
 
 
 	int i;
+#pragma omp simd
 	for(i=0; i < len; i++)
 		Y[i] = Y[i] & Y2[i];
+#pragma omp simd
 	for(i=0; i < uv_len; i++)
 	{
 		Cb[i] = Cb[i] & Cb2[i];

@@ -150,6 +150,7 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args) {
 		}
 	
 		if( mode == 0 ) {
+#pragma omp simd
 			for(r=0; r < len; r+=width) {
 				for(c=0; c < width; c++) {
 					uint8_t p = table[ Y[r+c] ];

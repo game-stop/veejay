@@ -63,22 +63,26 @@ void chromium_apply(void *ptr, VJFrame *frame, int *args ) {
     double tmp;
     switch(m){
         case 0:
+#pragma omp simd
         for( i = 0; i < len ; i++) {
           Cb[i] = 0xff - Cb[i];
         }
         break;
         case 1:
+#pragma omp simd
         for( i = 0; i < len ; i++) {
           Cr[i] = 0xff - Cr[i];
         }
         break;
         case 2:
+#pragma omp simd
         for( i = 0; i < len; i++) {
           Cb[i] = 0xff - Cb[i];
           Cr[i] = 0xff - Cr[i];
         }
         break;
         case 3:
+#pragma omp simd
         // swap cb/cr
         for (i = 0; i < len ; i++) {
           tmp = Cb[i];
@@ -87,16 +91,19 @@ void chromium_apply(void *ptr, VJFrame *frame, int *args ) {
         }
         break;
         case 4:
+#pragma omp simd
         for (i = 0; i < len ; i++) {
           Cb[i] = 0xff - Cr[i];
         }
         break;
         case 5:
+#pragma omp simd
         for (i = 0; i < len ; i++) {
           Cr[i] = 0xff - Cb[i];
         }
         break;
         case 6:
+#pragma omp simd
         for (i = 0; i < len ; i++) {
           tmp = Cr[i];
           Cr[i] = 0xff - Cb[i];
@@ -104,6 +111,7 @@ void chromium_apply(void *ptr, VJFrame *frame, int *args ) {
         }
         break;
         case 7:
+#pragma omp simd
         for (i = 0; i < len ; i++) {
           tmp = Cr[i];
           Cr[i] = Cb[i];
@@ -111,6 +119,7 @@ void chromium_apply(void *ptr, VJFrame *frame, int *args ) {
         }
         break;
         case 8:
+#pragma omp simd
         for (i = 0; i < len ; i++) {
           tmp = Cr[i];
           Cr[i] = 0xff - Cb[i];
@@ -118,7 +127,8 @@ void chromium_apply(void *ptr, VJFrame *frame, int *args ) {
         }
         break;
         case 9: // yellow on white
-        for( i = 0; i < len ; i++) {
+#pragma omp simd
+	for( i = 0; i < len ; i++) {
           Cb[i] = 0xaa - Cb[i];
         }
         break;

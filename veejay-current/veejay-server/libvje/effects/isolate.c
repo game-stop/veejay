@@ -95,6 +95,7 @@ void isolate_apply( void *ptr, VJFrame *frame, int *args ) {
     fg_cb = Cb;
     fg_cr = Cr;
 
+#pragma omp simd
     for (pos = len; pos != 0; pos--) {
 		short xx, yy;
 		xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;

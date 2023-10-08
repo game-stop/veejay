@@ -177,7 +177,6 @@ static void dotillism_apply_stage1( uint8_t *map, VJFrame *frame, int radius, in
             int lim_y = (y + radius);
             if( lim_y > h)
                 lim_y = h;
-
             for( y1 = (y < 0) ? 0 : y ; y1 < lim_y; y1 ++ ) {
                 for( x1 = (x < 0) ? 0 : x; x1 < lim_x; x1 ++ ) {
                     Y[ y1 * w + x1 ] = pixel_Y_lo_;

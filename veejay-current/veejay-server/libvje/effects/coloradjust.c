@@ -88,6 +88,7 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
 	const int s = (int) rint( a_sin(hue) * (1<<16) * sat );
 	const int c = (int) rint( a_cos(hue) * (1<<16) * sat );
 	
+#pragma omp simd
 	for( i = 0 ; i < len ;i ++ )
 	{
 		const int u = Cb[i] - 128;

@@ -62,6 +62,7 @@ void alphaflatten_apply( void *ptr, VJFrame *frame, int *args ) {
 	uint8_t *a2 = frame->data[2];
 	uint8_t *aA = frame->data[3];
 
+#pragma omp simd
 	for( i = 0; i < len; i ++ )
 	{
 		unsigned int op1 = 0xff - aA[i];

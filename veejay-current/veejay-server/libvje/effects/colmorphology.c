@@ -124,6 +124,7 @@ void colmorphology_apply( void *ptr, VJFrame *frame, int *args ) {
 
     uint8_t *binary_img = c->binary_img;
 
+#pragma omp simd
 	for( i = 0; i < len; i ++ )
 	{
 		binary_img[i] = (  Y[i] < threshold ? 0: 0xff );

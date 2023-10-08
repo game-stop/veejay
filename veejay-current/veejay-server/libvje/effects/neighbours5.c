@@ -270,6 +270,7 @@ void neighbours5_apply( void *ptr, VJFrame *frame, int *args ) {
 	}
 
 	// premultiply intensity map
+#pragma omp simd
 	for( y = 0 ; y < len ; y ++ )
 		Y[y] = (uint8_t) ( (double)Y2[y] * intensity );
 

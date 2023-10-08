@@ -168,6 +168,7 @@ static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r)
 static void pencilsketch2_negate(uint8_t *src, uint8_t *dst, const int len)
 {
     int i;
+#pragma omp simd
     for( i = 0; i < len; i ++ ) {
         dst[i] = 0xff - src[i];
     }
@@ -177,6 +178,7 @@ static void pencilsketch2_posterize(uint8_t *dst, const int len, const int level
 {
     const int factor = (256 / levels);
     int i;
+#pragma omp simd
     for( i = 0; i < len; i ++ ) {
         dst[i] = dst[i] - (dst[i] % factor);
     }       
@@ -185,6 +187,7 @@ static void pencilsketch2_posterize(uint8_t *dst, const int len, const int level
 static void pencilsketch2_dodge(uint8_t *result, uint8_t *front, uint8_t *back, const int len)
 {
     int i;
+#pragma omp simd
     for( i = 0; i < len; i ++ ) {
        
         if( back[i] == 0xff ) {
@@ -200,6 +203,7 @@ static void pencilsketch2_dodge(uint8_t *result, uint8_t *front, uint8_t *back, 
 static void pencilsketch2_contrast(uint8_t *dst, const int len, const int contrast)
 {
     int i;
+#pragma omp simd
     for( i = 0; i < len; i ++ ) {
         int m = dst[i];
         m -= 128;

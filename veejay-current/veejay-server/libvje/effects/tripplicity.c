@@ -78,12 +78,13 @@ void tripplicity_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
     const uint8_t opCb0= 255 - opCb1;
     const uint8_t opCr1= (opacityCr > 255) ? 255: opacityCr;
     const uint8_t opCr0= 255 - opCr1;
-
+#pragma omp simd
     for (i = 0; i < len; i++)
     {
 		Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
     }
 
+#pragma omp simd
     for (i = 0; i < uv_len; i++)
     {
 		Cb[i] = (opCb0 * Cb[i] + opCb1 * Cb2[i]) >> 8;

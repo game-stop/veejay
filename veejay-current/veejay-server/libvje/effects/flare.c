@@ -97,6 +97,7 @@ static void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int heig
     const unsigned int o1 = op_a;
     const unsigned int o2 = 255 - op_a;
 
+#pragma omp simd
     for (i = 0; i < len; i++) {
         a = Y[i];
         b = Y2[i];
@@ -133,7 +134,7 @@ static void flare_darken(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a
 
 	const unsigned int o1 = op_a;
 	const unsigned int o2 = 255 - op_a;
-
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		if(Y[i] > Y2[i])
@@ -154,6 +155,7 @@ static void	flare_simple( VJFrame *frame, VJFrame *frame2, int w, int h, int op_
 
 	const uint8_t solid = 255 - op_a;
 	uint8_t premul;
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		premul = ((Y2[i] * op_a) + (solid * 0xff )) >> 8; 
@@ -176,7 +178,7 @@ static void flare_lighten(VJFrame *frame, VJFrame *frame2, int w, int h, int op_
 
 	const unsigned int o1 = op_a;
 	const unsigned int o2 = 255 - op_a;
-
+#pragma omp simd
 	for(i=0; i < len; i++)
 	{
 		if(Y[i] < Y2[i])

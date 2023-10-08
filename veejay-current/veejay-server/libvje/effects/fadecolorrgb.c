@@ -111,8 +111,10 @@ void fadecolorrgb_apply( void *ptr, VJFrame *frame, int *args) {
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
 
+#pragma omp simd
     for (i = 0; i < len; i++)
 		Y[i] = (op0 * Y[i] + op1 * colorY) >> 8;
+#pragma omp simd
     for (i = 0; i < uv_len; i++) {
 		Cb[i] = (op0 * Cb[i] + op1 * colorCb) >> 8;
 		Cr[i] = (op0 * Cr[i] + op1 * colorCr) >> 8;

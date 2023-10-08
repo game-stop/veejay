@@ -62,7 +62,7 @@ static void porterduff_dst( uint8_t *A, uint8_t *B, int n_pixels)
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ ) 
 	{
 		for( j = 0; j < 3; j ++ )
@@ -80,7 +80,7 @@ static void porterduff_atop( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels ; i ++ ) 
 	{
 		for( j = 0; j < 3; j ++ ) 
@@ -97,7 +97,7 @@ static void porterduff_dst_in( uint8_t *A, uint8_t *B, int n_pixels)
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i++ ) 
 	{
 		for( j = 0; j < 3; j ++ ) 
@@ -114,7 +114,7 @@ static void porterduff_dst_out( uint8_t *A, uint8_t *B, int n_pixels)
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		uint8_t aD = (aA[3] * ( 0xff - bB[3] )) >> 8;
@@ -133,7 +133,7 @@ static void porterduff_dst_over( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		uint8_t aD = ((bB[3] + aA[3]) - (bB[3] * aA[3]))>>8;
@@ -152,7 +152,7 @@ static void porterduff_src_over( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		for( j = 0; j < 3 ; j ++ )
@@ -169,7 +169,7 @@ static void porterduff_src_atop( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		uint8_t aD = ( (aA[3] * bB[3] ) >> 8 );
@@ -188,7 +188,7 @@ static void porterduff_src_in( uint8_t *A, uint8_t *B, int n_pixels)
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		uint8_t aD = ( (aA[3] * bB[3] ) >> 8 );
@@ -207,7 +207,7 @@ static void porterduff_src_out( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		uint8_t aD = ( bB[3] * ( 0xff - aA[3])) >> 8;
@@ -226,7 +226,7 @@ static void svg_multiply( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		uint8_t aD = ( bB[3] + aA[3] - bB[3] * aA[3]) >> 8;
@@ -245,7 +245,7 @@ static void xor( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		uint8_t aD = CLAMP_Y(( bB[3] + aA[3] - 2 * bB[3] * aA[3]) >> 8);
@@ -263,7 +263,7 @@ static void add( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		for( j = 0; j < 3; j ++ ) 
@@ -281,7 +281,7 @@ static void subtract( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		for( j = 0; j < 3; j ++ ) 
@@ -343,7 +343,7 @@ static void divide( uint8_t *A, uint8_t *B, int n_pixels )
 	int i,j;
 	uint8_t *aA = A;
 	uint8_t *bB = B;
-
+#pragma omp simd
 	for( i = 0; i < n_pixels; i ++ )
 	{
 		for( j = 0; j < 3; j ++ ) 

@@ -63,6 +63,7 @@ static void contrast_cb_apply(VJFrame *frame, int *s) {
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
+#pragma omp simd
 	for(r=0; r < uv_len; r++) {
 		cb = Cb[r];
 		cb -= 128;
@@ -86,7 +87,7 @@ static void contrast_y_apply(VJFrame *frame, int *s) {
 	register int m;
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
-
+#pragma omp simd
 	for(r=0; r < len; r++) {
 		m = Y[r];
 		m -= 128;

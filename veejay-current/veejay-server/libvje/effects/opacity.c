@@ -103,7 +103,7 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, i
     unsigned int i, op0, op1;
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
-
+#pragma omp simd
     for( i = 0; i < size; i ++ )
 		dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
 
@@ -228,6 +228,7 @@ void	opacity_blend_luma_apply( uint8_t *A, uint8_t *B, int len,int opacity )
 #ifdef HAVE_ASM_MMX
 	do_emms;
 #endif
+
 	while (y--)
 		A[y] = ((opacity * (A[y] - B[y])) >> 8 ) + A[y];
 }

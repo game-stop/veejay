@@ -118,6 +118,7 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *B3h = B2v + len;
     uint8_t *B3v = B3h + len;
 
+#pragma omp simd
     for( int i = 0; i < len; i ++ ) {
         B[i] = ( L[i] > threshold ? L[i] : 0 );
     }
@@ -143,6 +144,7 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args) {
         rvblur_apply( B3v, B3h, width, height, c0 );
     }
 
+#pragma omp simd
     for( int i = 0; i < len; i ++ ) {
         uint16_t v = B1v[i] + B2v[i] + B3v[i] + L[i];
 

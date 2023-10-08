@@ -98,15 +98,24 @@ void *radialblur_malloc(int w, int h)
 static void rhblur_apply( uint8_t *dst , uint8_t *src, int w, int h, int r , int p)
 {
 	int y;
+	
+	if( r == 0 && dst == src )
+		return;
+
 	for(y = 0; y < h ; y ++ )
 	{
 		blur2( dst + y * w, src + y *w , w, r,p, 1, 1);
 	}	
 
 }
+
 static void rvblur_apply( uint8_t *dst, uint8_t *src, int w, int h, int r , int p)
 {
 	int x;
+
+	if( r == 0 && dst == src )
+		return;
+
 	for(x=0; x < w; x++)
 	{
 		blur2( dst + x, src + x , h, r, p, w, w );
@@ -149,12 +158,13 @@ void radialblur_apply(void *ptr, VJFrame *frame, int *args ) {
 			rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
 			break;
 		case 2:
-			rhblur_apply( Y, r->radial_src[0],width, height, radius, power );
-			rhblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
-			rhblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
 			rvblur_apply( Y, r->radial_src[0],width, height, radius, power ); 
 			rvblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
 			rvblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
+			rhblur_apply( Y, r->radial_src[0],width, height, radius, power );
+			rhblur_apply( Cb, r->radial_src[1],frame->uv_width, frame->uv_height, radius, power );
+			rhblur_apply( Cr, r->radial_src[2],frame->uv_width, frame->uv_height, radius, power );
+
 			break;
 		
 	}

@@ -145,6 +145,7 @@ static morph_func	_morphology_function(int i)
 static void morph_threshold_image( uint8_t *binary_img, const uint8_t *I, const int len, const int threshold, uint8_t *O )
 {
 	unsigned int i;
+#pragma omp simd
 	for( i = 0; i < len; i ++ )
 	{
 		binary_img[i] = (  I[i] < threshold ? 0: 0xff );

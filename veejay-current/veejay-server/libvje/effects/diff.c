@@ -169,6 +169,7 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 	else if (mode == 2 )
 	{
 		//@ show dt map as grayscale image, intensity starts at 128
+#pragma omp simd
 		for( i = 0; i  < len ; i ++ )
 		{
 			if( dt_map[i] == feather )	
@@ -186,6 +187,7 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 		return;
 	}
 
+#pragma omp simd
 	//@ process dt map
 	for( i = 0; i < len ;i ++ )
 	{

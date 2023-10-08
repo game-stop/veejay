@@ -280,6 +280,7 @@ void	motionmap_lerp_frame( void *ptr, VJFrame *cur, VJFrame *prev, int N, int n 
 		V0[i] = V1[i] + ( frac * (V0[i] - V1[i]));
 	}
 #else
+#pragma omp simd
 	for ( i = 0; i < len ; i ++ ) {
 		Y0[i] = Y1[i] + ( frac * (Y0[i] - Y1[i]));
 		U0[i] = U1[i] + ( frac * (U0[i] - U1[i]));

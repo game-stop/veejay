@@ -187,7 +187,6 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args ) {
 	else
 	{
 		len = len - width - 1;
-
 		for(i=0; i < len; i++)
 		{
 			y = Y[i];
@@ -211,7 +210,6 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args ) {
 				Y[i] = pixel_Y_hi_;
 			}
 		}
-
 		for(i = len; i < (len+width-1); i ++ ) {
 			y = Y[i];
 			yb = y;

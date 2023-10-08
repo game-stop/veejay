@@ -44,6 +44,7 @@ vj_effect *average_blend_init(int w, int h)
 static inline void ac_average( uint8_t *dst, const uint8_t *src1, const uint8_t *src2, const int len )
 {
     unsigned int i;
+#pragma omp simd
     for( i = 0; i < len; i ++ ) {
         dst[i] = (src1[i] + src2[i]) >> 1;
     }

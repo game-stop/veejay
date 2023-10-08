@@ -156,7 +156,7 @@ void reflection_apply(void *ptr, VJFrame *frame, int *args)
     r->sin_index &= 511;
     r->sin_index2 &= 511;
 
-
+#pragma omp simd
     for (x = 0; x < width; x++) {
 		reflection_buffer[x]= Y[x];
     }

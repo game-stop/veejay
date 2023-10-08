@@ -79,6 +79,7 @@ static void softmask2_applycr(VJFrame *frame, int paramt)
 	uint8_t *Cr = frame->data[2];
 	const int len = (frame->ssm ? frame->len : frame->uv_len);
     unsigned int x;
+#pragma omp simd
     for (x = 0; x < len; x++)
 		Cr[x] &= paramt;
 }
@@ -89,7 +90,8 @@ static void softmask2_applycbcr(VJFrame *frame, int paramt)
     unsigned int x;
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-    for (x = 0; x < len; x++) {
+#pragma omp simd
+    	for (x = 0; x < len; x++) {
 		Cb[x] &= paramt;
 		Cr[x] &= paramt;
     }
@@ -105,10 +107,10 @@ static void softmask2_applyycbcr(VJFrame *frame, int paramt)
 	uint8_t *Cr = frame->data[2];
 	
     unsigned int x;
-
+#pragma omp simd
     for (x = 0; x < len; x++)
 		Y[x] &= paramt;
-
+#pragma omp simd
     for (x = 0; x < uv_len; x++) {
 		Cb[x] &= paramt;
 		Cr[x] &= paramt;
@@ -121,7 +123,7 @@ static void softmask_apply(VJFrame *frame, int paramt)
     unsigned int x;
 	uint8_t *Y = frame->data[0];
 	
-
+#pragma omp simd
     for (x = 0; x < len; x++)
 		Y[x] |= paramt;
 }
@@ -133,6 +135,7 @@ static void softmask_applycb(VJFrame *frame, int paramt)
 	uint8_t *Cb = frame->data[1];
 	
     unsigned int x;
+#pragma omp simd
     for (x = 0; x < len; x++)
 		Cb[x] |= paramt;
 }
@@ -144,6 +147,7 @@ static void softmask_applycr(VJFrame *frame, int paramt)
 	uint8_t *Cr = frame->data[2];
 
     unsigned int x;
+#pragma omp simd
     for (x = 0; x < len; x++)
 		Cr[x] |= paramt;
 }
@@ -155,7 +159,7 @@ static void softmask_applycbcr(VJFrame *frame, int paramt)
     unsigned int x;
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-
+#pragma omp simd
     for (x = 0; x < len; x++)
 	{
 		Cb[x] |= paramt;
@@ -172,9 +176,11 @@ static void softmask_applyycbcr(VJFrame *frame, int paramt)
 	const int uv_len = (frame->ssm ? len : frame->uv_len);
 
     unsigned int x;
+#pragma omp simd
     for (x = 0; x < len; x++)
 		Y[x] |= paramt;
 
+#pragma omp simd
     for (x = 0; x < uv_len; x++) {
 		Cb[x] |= paramt;
 		Cr[x] |= paramt;

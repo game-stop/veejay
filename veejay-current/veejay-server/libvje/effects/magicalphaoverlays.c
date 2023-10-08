@@ -67,7 +67,7 @@ static void overlayalphamagic_adddistorted(VJFrame *frame, VJFrame *frame2)
 
 	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
-
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		A[i] = CLAMP_Y(A[i] + A2[i]);
     }
@@ -82,6 +82,7 @@ static void overlayalphamagic_add_distorted(VJFrame *frame, VJFrame *frame2)
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		y1 = A[i];
 		y2 = A2[i];
@@ -98,6 +99,7 @@ static void overlayalphamagic_subdistorted(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     uint8_t y1, y2;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		y1 = A[i];
 		y2 = A2[i];
@@ -128,6 +130,7 @@ static void overlayalphamagic_multiply(VJFrame *frame, VJFrame *frame2)
     const int len = frame->len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
+#pragma omp simd
     for (i = 0; i < len; i++) 
 	A[i] = (A[i] * A2[i]) >> 8;
 }
@@ -138,6 +141,7 @@ static void overlayalphamagic_simpledivide(VJFrame *frame, VJFrame *frame2)
     const int len = frame->len;
     uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		if(A2[i] > 1 )
 			A[i] = A[i] / A2[i];
@@ -151,6 +155,7 @@ static void overlayalphamagic_divide(VJFrame *frame, VJFrame *frame2)
     const int len = frame->len;
   	uint8_t *A = frame->data[3];
 	uint8_t *A2 = frame2->data[3];
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		b = A[i] * A[i];
 		c = 255 - A2[i];
@@ -168,8 +173,10 @@ static void overlayalphamagic_additive(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a;
-	while(len--) { 
-		a = A[len] + (2 * A2[len]) - 255;
+    int i;
+#pragma omp simd
+    for ( i = 0; i < len; i ++ ) {
+		a = A[i] + (2 * A2[i]) - 255;
 		A[len] = CLAMP_Y(a);
 	}
 }
@@ -181,7 +188,7 @@ static void overlayalphamagic_substractive(VJFrame *frame, VJFrame *frame2)
     const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
-
+#pragma omp simd
     for (i = 0; i < len; i++) 
 		A[i] = CLAMP_Y( A[i] - A2[i] );
 }
@@ -194,6 +201,7 @@ static void overlayalphamagic_softburn(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b, c;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 	a = A[i];
 	b = A2[i];
@@ -221,6 +229,7 @@ static void overlayalphamagic_inverseburn(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b, c;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 	a = A[i];
 	b = A2[i];
@@ -240,6 +249,7 @@ static void overlayalphamagic_colordodge(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b, c;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -262,6 +272,7 @@ static void overlayalphamagic_mulsub(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = 255 - A2[i];
@@ -278,6 +289,7 @@ static void overlayalphamagic_lighten(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b, c;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -297,6 +309,7 @@ static void overlayalphamagic_difference(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -311,7 +324,7 @@ static void overlayalphamagic_diffnegate(VJFrame *frame, VJFrame *frame2)
     int a, b;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
-
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = (255 - A[i]);
 		b = A2[i];
@@ -327,6 +340,7 @@ static void overlayalphamagic_exclusive(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int c;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		c = A[i] + (2 * A2[i]) - 255;
 		A[i] = CLAMP_Y(c - (( A[i] * A2[i] ) >> 8 ));	
@@ -341,6 +355,7 @@ static void overlayalphamagic_basecolor(VJFrame *frame, VJFrame *frame2)
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
 
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -358,6 +373,7 @@ static void overlayalphamagic_freeze(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -374,6 +390,7 @@ static void overlayalphamagic_unfreeze(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -409,7 +426,7 @@ static void overlayalphamagic_relativeaddlum(VJFrame *frame, VJFrame *frame2)
     const int len = frame->len;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
-
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		c = a >> 1;
@@ -427,6 +444,7 @@ static void overlayalphamagic_relativesublum(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -442,6 +460,7 @@ static void overlayalphamagic_relativeadd(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b, c, d;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		c = a >> 1;
@@ -459,6 +478,7 @@ static void overlayalphamagic_relativesub(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -475,6 +495,7 @@ static void overlayalphamagic_minsubselect(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -493,6 +514,7 @@ static void overlayalphamagic_maxsubselect(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -510,7 +532,7 @@ static void overlayalphamagic_addsubselect(VJFrame *frame, VJFrame *frame2)
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
     int c, a, b;
-
+#pragma omp simd
 	for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -530,6 +552,7 @@ static void overlayalphamagic_maxselect(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -546,6 +569,7 @@ static void overlayalphamagic_minselect(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -562,6 +586,7 @@ static void overlayalphamagic_addtest(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int c, a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -578,6 +603,7 @@ static void overlayalphamagic_addtest2(VJFrame *frame, VJFrame *frame2)
     uint8_t *A2 = frame2->data[3];
 
     int c, a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 		a = A[i];
 		b = A2[i];
@@ -593,6 +619,7 @@ static void overlayalphamagic_addtest4(VJFrame *frame, VJFrame *frame2)
 	uint8_t *A = frame->data[3];
 	uint8_t *A2 = frame2->data[3];
     int a, b;
+#pragma omp simd
     for (i = 0; i < len; i++) {
 	a = A[i];
 	b = A2[i];
@@ -611,7 +638,7 @@ static void overlayalphamagic_try (VJFrame *frame, VJFrame *frame2, int width, i
     int a, b, p, q;
   	uint8_t *A = frame->data[3];
     uint8_t *A2 = frame2->data[3];
-
+#pragma omp simd
     for (i = 0; i < len; i++) {
 	/* calc p */
 	a = A[i];

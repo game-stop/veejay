@@ -86,6 +86,7 @@ static void lumamagick_adddistorted(VJFrame *frame, VJFrame *frame2, int op_a, i
 	int a, b, c;
 	const double opacity_a = op_a * 0.01;
 	const int opacity_b = op_b * 0.01;
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -93,6 +94,7 @@ static void lumamagick_adddistorted(VJFrame *frame, VJFrame *frame2, int op_a, i
 		c = a + b;
 		Y[i] = CLAMP_Y(c);
 	}
+#pragma omp simd
 	for (i = 0; i < uv_len; i++)
 	{
 		a = Cb[i];
@@ -122,7 +124,7 @@ static void lumamagick_add_distorted(VJFrame *frame, VJFrame *frame2, int op_a, 
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		y1 = Y[i] * opacity_a;
@@ -132,6 +134,7 @@ static void lumamagick_add_distorted(VJFrame *frame, VJFrame *frame2, int op_a, 
 		y3 += y2;
 		Y[i] = y3;
 	}
+#pragma omp simd
 	for (i = 0; i < uv_len; i++)
 	{
 		cb = Cb[i] * opacity_a;
@@ -163,7 +166,7 @@ static void lumamagick_subdistorted(VJFrame *frame, VJFrame *frame2, int op_a, i
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		y1 = Y[i] * opacity_a;
@@ -171,6 +174,8 @@ static void lumamagick_subdistorted(VJFrame *frame, VJFrame *frame2, int op_a, i
 		y1 -= y2;
 		Y[i] = y1;
 	}
+
+#pragma omp simd
 	for (i = 0; i < uv_len; i++)
 	{
 		cb = Cb[i];
@@ -198,7 +203,7 @@ static void lumamagick_sub_distorted(VJFrame *frame, VJFrame *frame2, int op_a, 
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		y1 = Y[i] * opacity_a;
@@ -208,6 +213,7 @@ static void lumamagick_sub_distorted(VJFrame *frame, VJFrame *frame2, int op_a, 
 		y3 -= y2;
 		Y[i] = y3;
 	}
+#pragma omp simd
 	for (i = 0; i < uv_len; i++)
 	{
 		cb = Cb[i];
@@ -234,7 +240,7 @@ static void lumamagick_multiply(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		y1 = Y[i] * opacity_a;
@@ -253,7 +259,7 @@ static void lumamagick_divide(VJFrame *frame, VJFrame *frame2 , int op_a, int op
 	const double opacity_b = op_b * 0.01;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		b = (Y[i] * opacity_a) * (Y[i] * opacity_a);
@@ -272,7 +278,7 @@ static void lumamagick_negdiv(VJFrame *frame, VJFrame *frame2, int op_a ,int op_
 	int b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-
+#pragma omp simd
 	for (i = 0; i < len; i++) 
 	{
 		b = (Y[i] * opacity_a) * (Y[i] * opacity_a);
@@ -293,7 +299,7 @@ static void lumamagick_additive(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++) 
 	{
 		a = (Y[i] * opacity_a) + ((2 * (Y2[i] * opacity_b)) - 0xff);
@@ -310,7 +316,7 @@ static void lumamagick_substractive(VJFrame *frame, VJFrame *frame2, int op_a, i
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++) 
 	{
 		a = (Y[i] * opacity_a) + ((Y2[i] - 0xff) * opacity_b);
@@ -327,7 +333,7 @@ static void lumamagick_softburn(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -358,7 +364,7 @@ static void lumamagick_inverseburn(VJFrame *frame, VJFrame *frame2, int op_a, in
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -380,7 +386,7 @@ static void lumamagick_colordodge(VJFrame *frame, VJFrame *frame2, int op_a, int
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -407,7 +413,7 @@ static void lumamagick_mulsub(VJFrame *frame, VJFrame *frame2 , int op_a, int op
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -428,7 +434,7 @@ static void lumamagick_lighten(VJFrame *frame, VJFrame *frame2, int op_a, int op
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -450,7 +456,7 @@ static void lumamagick_difference(VJFrame *frame, VJFrame *frame2, int op_a, int
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -468,7 +474,7 @@ static void lumamagick_diffnegate(VJFrame *frame, VJFrame *frame2, int op_a, int
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = (0xff - Y[i]) * opacity_a;
@@ -486,7 +492,7 @@ static void lumamagick_exclusive(VJFrame *frame, VJFrame *frame2, int op_a, int 
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -507,7 +513,7 @@ static void lumamagick_basecolor(VJFrame *frame, VJFrame *frame2, int op_a, int 
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -527,7 +533,7 @@ static void lumamagick_freeze(VJFrame *frame, VJFrame *frame2 , int op_a, int op
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -551,7 +557,7 @@ static void lumamagick_unfreeze(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -576,6 +582,7 @@ static void lumamagick_hardlight(VJFrame *frame, VJFrame *frame2, int op_a, int 
 	int a, b, c;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -599,7 +606,7 @@ static void lumamagick_relativeaddlum(VJFrame *frame, VJFrame *frame2, int op_a,
 	int a, b, c, d;
 	const double opacity_a = op_a * 0.01;
 	const double opacity_b = op_b * 0.01;
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -619,7 +626,7 @@ static void lumamagick_relativesublum(VJFrame *frame, VJFrame *frame2, int op_a,
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -643,7 +650,7 @@ static void lumamagick_relativeadd(VJFrame *frame, VJFrame *frame2, int op_a, in
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -652,6 +659,7 @@ static void lumamagick_relativeadd(VJFrame *frame, VJFrame *frame2, int op_a, in
 		d = b >> 1;
 		Y[i] = c + d;
 	}
+#pragma omp simd
 	for (i = 0; i < uv_len; i++)
 	{
 		a = Cb[i];
@@ -682,13 +690,14 @@ static void lumamagick_relativesub(VJFrame *frame, VJFrame *frame2, int op_a, in
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
 		b = Y2[i] * opacity_b;
 		Y[i] = (a - b + 0xff) >> 1;
 	}
+#pragma omp simd
 	for (i = 0; i < uv_len; i++)
 	{
 		a = Cb[i];
@@ -709,7 +718,7 @@ static void lumamagick_minsubselect(VJFrame *frame, VJFrame *frame2, int op_a, i
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -730,7 +739,7 @@ static void lumamagick_maxsubselect(VJFrame *frame, VJFrame *frame2, int op_a, i
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 	a = Y[i] * opacity_a;
@@ -812,7 +821,7 @@ static void lumamagick_addtest(VJFrame *frame, VJFrame *frame2, int op_a, int op
 	const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Y2 = frame2->data[0];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -836,7 +845,7 @@ static void lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -844,6 +853,7 @@ static void lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int op_a, int o
 		c = a + ((2 * b) - 0xff);
 		Y[i] = CLAMP_Y(c);
 	}
+#pragma omp simd
 	for (i = 0; i < uv_len; i++)
 	{
 		a = Cb[i];
@@ -934,7 +944,7 @@ static void lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int op_a, int o
 	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
+#pragma omp simd
 	for (i = 0; i < len; i++)
 	{
 		a = Y[i] * opacity_a;
@@ -945,6 +955,7 @@ static void lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int op_a, int o
 
 		Y[i] = c;
 	}
+#pragma omp simd
 	for (i = 0; i < uv_len; i++)
 	{
 		//a = Cb[i] * opacity_a;

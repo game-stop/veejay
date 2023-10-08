@@ -112,7 +112,7 @@ void ghost_apply(void *ptr, VJFrame *frame, int *args ) {
 
 
 	// absolute difference on threshold
-
+#pragma omp simd
 	for(i = 0; i < len; i ++ )
 		bm[i] = ( abs(srcY[i] - dY[i]) > 1 ? 0xff: 0x0);
 

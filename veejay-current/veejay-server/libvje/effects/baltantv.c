@@ -143,11 +143,12 @@ void baltantv_apply( void *ptr, VJFrame *frame, int *args) {
 		b->plane_ = 0;
 		b->stride = stride;
 	}
-
+#pragma omp simd
 	for( i = 0; i < len ; i ++ ) {
 		pDstY[i] = Y[i];
 		cY[i] = Y[i];
     }
+#pragma omp simd
     for( i = 0; i < uv_len; i ++ ) {
         pDstU[i] = (U[i]-128);
         pDstV[i] = (V[i]-128);

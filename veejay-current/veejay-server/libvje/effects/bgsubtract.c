@@ -155,7 +155,8 @@ static void bgsubtract_cma_frame( bgsubtract_t *b, const int len, uint8_t *I, ui
 	int i;
     const int bg_n1 = (b->bg_n) + 1;
     const int bg_n = b->bg_n;
-	for( i = 0; i < len; i ++ )
+#pragma omp simd	
+    	for( i = 0; i < len; i ++ )
 	{
 		O[i] = ((I[i] + (bg_n * O[i])) / bg_n1); 
 	}
@@ -163,6 +164,7 @@ static void bgsubtract_cma_frame( bgsubtract_t *b, const int len, uint8_t *I, ui
 static void bgsubtract_avg_frame( const int len, uint8_t *I, uint8_t *O)
 {
 	int i;
+#pragma omp simd
 	for( i = 0; i < len; i ++ )
 	{
 		O[i] = (O[i] + I[i]) >> 1;

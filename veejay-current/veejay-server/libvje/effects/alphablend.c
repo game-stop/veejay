@@ -38,6 +38,7 @@ vj_effect *alphablend_init(int w, int h)
 static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, uint8_t *aA, size_t size )
 {
     size_t i;
+#pragma omp simd
 	for( i = 0; i < size; i ++ )
 	{
 		unsigned int op0 = aA[i];

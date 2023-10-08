@@ -124,6 +124,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
 
 	switch( mode ) {
 		case 0:
+#pragma omp simd
 			for( i = 0; i < len; i ++ )
 			{
 				if( Y[i] < threshold )
@@ -136,6 +137,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args) {
 
 			break;
 		case 1:
+#pragma omp simd
 			for( i = 0; i < len; i ++ )
 			{
 				if( Y[i] < threshold )

@@ -97,10 +97,12 @@ void tracer_apply(void *ptr,VJFrame *frame, VJFrame *frame2, int *args )
         
     if (t->trace_counter == 0)
 	{
+#pragma omp simd
 		for (x = 0; x < len; x++)
 		{
 		    Y[x] = func_opacity(Y[x], Y2[x], op0, op1);
 		}
+#pragma omp simd
 		for (x = 0; x < uv_len; x++)
 		{
 	   	 	Cb[x] = func_opacity(Cb[x], Cb2[x], op0, op1);
@@ -111,14 +113,16 @@ void tracer_apply(void *ptr,VJFrame *frame, VJFrame *frame2, int *args )
     }
 	else
 	{
+#pragma omp simd
 		for (x = 0; x < len; x++)
 		{
 	  	    Y[x] = ((op0 * Y[x]) + (op1 * trace_buffer[0][x])) >> 8;
-	    }
+	  	}
+#pragma omp simd
 		for (x = 0; x < uv_len; x++)
 		{
-	   	 	Cb[x] = ((op0 * Cb[x]) + (op1 * trace_buffer[1][x])) >> 8;
-	    	Cr[x] = ((op0 * Cr[x]) + (op1 * trace_buffer[2][x])) >> 8;
+	   		Cb[x] = ((op0 * Cb[x]) + (op1 * trace_buffer[1][x])) >> 8;
+	    		Cr[x] = ((op0 * Cr[x]) + (op1 * trace_buffer[2][x])) >> 8;
 		}
 		int strides[4] = { len, uv_len, uv_len, 0 };
 		vj_frame_copy( frame->data, trace_buffer, strides );

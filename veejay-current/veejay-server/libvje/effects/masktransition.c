@@ -52,6 +52,7 @@ static inline void alpha_blend(uint8_t *Y,
 						size_t w)
 {
 	size_t j;
+#pragma omp simd
 	for( j = 0; j < w; j ++ )
 	{
 		Y[j] = ((AA[j] * Y[j]) + ((0xff-AA[j]) * Y2[j])) >> 8;

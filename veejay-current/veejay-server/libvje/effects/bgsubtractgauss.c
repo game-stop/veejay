@@ -100,7 +100,9 @@ static void bg_init( bgsubtract_t *b, double noise, const int len )
 	int i;
     double *pVar = b->pVar;
     double *pMu = b->pMu;
-	for( i = 0; i < len; i ++ ) {
+	
+#pragma omp simd
+    for( i = 0; i < len; i ++ ) {
 		pVar[i] = noise;
 		pMu[i] = 0.0;
 	}
@@ -255,6 +257,7 @@ static void bg_subtract( bgsubtract_t *b, VJFrame *frame, double threshold, uint
     double *pMu = b->pMu;
     double *pVar = b->pVar;
 
+#pragma omp simd
 	for( i = 0; i < len; i ++ )
 	{
 		double dY = ((double) Y[i]) - pMu[i];
@@ -342,6 +345,7 @@ static void bg_update( bgsubtract_t *b, VJFrame *frame, double threshold, double
     double *pMu = b->pMu;
     double *pVar = b->pVar;
 
+#pragma omp simd
 	for( i = 0; i < len; i ++ )
 	{
 		double src = (double) Y[i];

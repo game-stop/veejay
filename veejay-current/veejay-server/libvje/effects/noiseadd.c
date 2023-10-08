@@ -92,6 +92,7 @@ static void noiseblur1x3_maskapply(uint8_t *Yb_frame, VJFrame* frame, int coeef 
 	}
     }
     
+#pragma omp simd
     for(c=0; c < len; c++) {
 	  /* get higher signal frequencies and*/	
 	  /* multiply result with coeffcient to get d*/
@@ -125,6 +126,7 @@ static void noiseblur3x3_maskapply(uint8_t *Yb_frame, VJFrame* frame, int coeef 
 	}
     }
 
+#pragma omp simd
     for(c=width; c < len; c++) {
 	  /* get higher signal frequencies and*/	
 	  /* multiply result with coeffcient to get d*/
@@ -143,7 +145,7 @@ static void noiseneg3x3_maskapply(uint8_t *Yb_frame, VJFrame *frame, int coeef )
     const int len = (frame->len)-width;
 	uint8_t *Y = frame->data[0];
 
-
+#pragma omp simd
     for (r = width; r < len; r += width) {
 	for (c = 1; c < width-1; c++) {
 		Yb_frame[c + r] = 255 - ((Y[r - width + c - 1] +
@@ -158,7 +160,7 @@ static void noiseneg3x3_maskapply(uint8_t *Yb_frame, VJFrame *frame, int coeef )
 		    )) / 9;
 	}
     }
-
+#pragma omp simd
     for(c=width; c < len; c++) {
 	  /* get higher signal frequencies and*/	
 	  /* multiply result with coeffcient to get d*/

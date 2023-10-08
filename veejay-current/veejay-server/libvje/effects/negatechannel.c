@@ -64,20 +64,24 @@ void negatechannel_apply( void *ptr, VJFrame *frame, int *args ) {
 
     switch( chan ) {
 		case 0:
+#pragma omp simd
 			for (i = 0; i < len; i++) {
 				Y[i] = val - Y[i];
 		    }
 			break;
 		case 1:
+#pragma omp simd
 			for (i = 0; i < uv_len; i++) {
 				Cb[i] = val - Cb[i];
 		    }
 			break;
 		case 2:
+#pragma omp simd
 			for (i = 0; i < uv_len; i++) {
 				Cr[i] = val - Cr[i];
 			}
 		case 3:
+#pragma omp simd
 			for( i = 0; i < uv_len; i ++ ) {
 				Cb[i] = val - Cb[i];
 				Cr[i] = val - Cr[i];

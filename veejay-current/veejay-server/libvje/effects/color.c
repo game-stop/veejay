@@ -73,6 +73,7 @@ void color_apply(void *ptr, VJFrame *frame, int *args) {
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
+#pragma omp simd
 	for (i = 0; i < uv_len; i++) {
 		p1 = Cb[i];
 		p2 = Cr[i];
