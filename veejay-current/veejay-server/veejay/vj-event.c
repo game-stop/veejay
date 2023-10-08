@@ -577,7 +577,7 @@ void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod);
 #ifdef HAVE_SDL
 static vims_key_list * vj_event_get_keys( int event_id );
 int vj_event_single_fire(void *ptr , SDL_Event event, int pressed);
-int vj_event_register_keyb_event(int event_id, int key_id, int key_mod, char *args);
+int vj_event_register_keyb_event(int event_id, int key_id, int key_mod, const char *args);
 void vj_event_unregister_keyb_event(int key_id, int key_mod);
 #endif
 
@@ -2063,7 +2063,7 @@ static int vj_event_update_key_collection(vj_keyboard_event *ev, int index)
     return 1;
 }
 
-int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, char *value)
+int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, const char *value)
 {
     int offset = SDL_NUM_SCANCODES * modifier;
     int index = offset + symbol;
@@ -2071,7 +2071,7 @@ int     vj_event_register_keyb_event(int event_id, int symbol, int modifier, cha
 
     vj_keyboard_event *ff = get_keyboard_event(index);
     if( ff == NULL ) {
-        char *extra = value;
+        char *extra = (char*) value;
         /* registering a new bundle or vims event triggered by key action */
         if(is_bundle) {
             char val[10];
@@ -6922,7 +6922,7 @@ void    vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
     STREAM_DEFAULTS(args[0]);
 
     char send_msg[128];
-    char message[128];
+    char message[125];
 
     sprintf( send_msg, "000" );
 
@@ -8091,7 +8091,7 @@ void    vj_event_send_track_list        (   void *ptr,  const char format[],    
                 if(tag->source_type == VJ_TAG_TYPE_NET )
                 {
                     char cmd[275];
-                    char space[275];
+                    char space[270];
                     snprintf(space,sizeof(space)-1,"%s %d", tag->descr, tag->id );
                     snprintf(cmd,sizeof(cmd)-1,"%03zu%s",strlen(space),space);
                     APPEND_MSG(print_buf,cmd); 
@@ -8122,7 +8122,7 @@ void    vj_event_send_tag_list          (   void *ptr,  const char format[],    
     n = vj_tag_highest();
     if (n >= 1 )
     {
-        char line[300];
+        char line[512];
         char *print_buf = get_print_buf(SEND_BUF);
 
         for(i=start_from_tag; i <= n; i++)
@@ -8131,7 +8131,7 @@ void    vj_event_send_tag_list          (   void *ptr,  const char format[],    
             {   
                 vj_tag *tag = vj_tag_get(i);
                 char source_name[255];
-                char cmd[300];
+                char cmd[524];
                 vj_tag_get_source_name( i, source_name );
                 snprintf(line,sizeof(line),"%05d%02d%03d%03d%03d%03d%03zu%s",
                     i,
@@ -8353,7 +8353,7 @@ void    vj_event_get_image_part         (   void *ptr,  const char format[],    
         }
     }
 
-    char header[9];
+    char header[16];
     snprintf( header, sizeof(header), "%08d",len );
     SEND_DATA(v, header, 8 );
     SEND_DATA(v, start_addr, len );
@@ -8401,7 +8401,7 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
         dstlen = (w * h) + ((w*h)/4) + ((w*h)/4);
     }
 
-    char header[9];
+    char header[16];
     snprintf( header,sizeof(header), "%06d%1d%1d", dstlen, use_bw_preview_, yuv_get_pixel_range() );
     SEND_DATA(v, header, 8 );
     SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen );
@@ -8513,8 +8513,8 @@ void    vj_event_send_sample_list       (   void *ptr,  const char format[],    
     veejay_t *v = (veejay_t*)ptr;
     int args[2];
     int start_from_sample = 1;
-    char cmd[512];
-    char line[512];
+    char cmd[596];
+    char line[800];
     int i,n;
     P_A(args,sizeof(args),NULL,0,format,ap);
     if(args[0] > 0 )
@@ -8563,10 +8563,10 @@ void    vj_event_send_sample_list       (   void *ptr,  const char format[],    
 
 void    vj_event_send_sample_stack      (   void *ptr,  const char format[],    va_list ap )
 {
-    char line[32];
+    char line[64];
     int args[4];
-    char    buffer[1024];
-    char    message[1024];  
+    char    buffer[2000];
+    char    message[2048];  
     veejay_t *v = (veejay_t*)ptr;
     P_A(args,sizeof(args),NULL,0,format,ap);
 
@@ -8623,7 +8623,7 @@ void    vj_event_send_sample_stack      (   void *ptr,  const char format[],    
 void    vj_event_send_stream_args       (   void *ptr, const char format[],     va_list ap )
 {
 
-    char fline[1024];
+    char fline[8224];
     char line[8192];
     int args[4];
     veejay_t *v = (veejay_t*)ptr;
@@ -8702,8 +8702,8 @@ void    vj_event_send_generator_list( void *ptr, const char format[], va_list ap
 
 void    vj_event_send_chain_entry       (   void *ptr,  const char format[],    va_list ap  )
 {
-    char fline[1024];
-    char line[1024];
+    char fline[1096];
+    char line[1090];
     int args[4];
     int error = 1;
     veejay_t *v = (veejay_t*)ptr;
@@ -8838,8 +8838,8 @@ void    vj_event_send_chain_entry       (   void *ptr,  const char format[],    
 
 void    vj_event_send_chain_entry_parameters    (   void *ptr,  const char format[],    va_list ap  )
 {
-    char fline[1024];
-    char line[1024];
+    char fline[1096];
+    char line[1032];
     int args[4];
     int error = 1;
     veejay_t *v = (veejay_t*)ptr;
