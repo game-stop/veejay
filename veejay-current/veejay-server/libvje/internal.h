@@ -210,8 +210,10 @@
 #include "./effects/rainbowshift.h"
 #include "./effects/vintagefilm.h"
 #include "./effects/mirrordistortion.h"
+#include "./effects/shutterdrag.h"
+#include "./effects/pointilism.h"
 
-#define VJ_IMAGE_EFFECT_MIN 76
+#define VJ_IMAGE_EFFECT_MIN 74
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -455,6 +457,8 @@ enum {
 	VJ_IMAGE_EFFECT_RAINBOWSHIFT = 78,
 	VJ_IMAGE_EFFECT_VINTAGEFILM = 77,
 	VJ_IMAGE_EFFECT_MIRRORDISTORTION = 76,
+	VJ_IMAGE_EFFECT_SHUTTERDRAG = 75,
+	VJ_IMAGE_EFFECT_POINTILISM = 74,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
