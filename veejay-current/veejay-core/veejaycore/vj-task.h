@@ -43,6 +43,7 @@ typedef struct
 	float fparam;
 	int iparam;  
 	int iparams[32];
+	int offset;
 } vj_task_arg_t;
 
 int		vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func );

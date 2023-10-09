@@ -61,6 +61,7 @@ typedef struct VJFrame_t
     double  timecode;
     int yuv_fmt;
     int range;
+    int offset;
 } VJFrame __attribute__((aligned(16)));
 
 typedef struct VJFrameInfo_t
