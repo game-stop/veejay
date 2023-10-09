@@ -70,6 +70,7 @@ typedef struct {
 static struct task running_tasks[MAX_WORKERS];
 static pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t tasks_completed;
+static pthread_cond_t current_task;
 struct task *tasks_ = NULL;
 struct task *tail_task_= NULL;
 static pthread_t p_threads[MAX_WORKERS];
@@ -130,8 +131,12 @@ static void		task_reset()
 		veejay_memset( job_list[i],0, sizeof(pjob_t));
 		veejay_memset( vj_task_args[i],0, sizeof(vj_task_arg_t));
 		veejay_memset( &(running_tasks[i]), 0, sizeof(struct task));
+	
+		atomic_store_explicit( &(tasks_done[i]), 0, memory_order_relaxed );
 	}
 
+	atomic_store_explicit( &total_tasks, 0, memory_order_relaxed );
+	
 	numThreads = 0;
 }
 
@@ -156,16 +161,16 @@ static struct	task	*task_get()
 }
 
 static void task_run(struct task *task, void *data, uint8_t id) {
-
+	
 	(*task->handler)(data);
 
     atomic_fetch_add(&tasks_done[id],1);
-    if (task_is_work_done()) {
-        pthread_mutex_lock(&queue_mutex);
+    
+	if (task_is_work_done()) {
+		pthread_mutex_lock(&queue_mutex);
 		pthread_cond_signal(&tasks_completed);
 		pthread_mutex_unlock(&queue_mutex);
 	}
-
 }
 
 
@@ -176,22 +181,26 @@ static void	*task_thread(void *data)
 	{
 		struct task *t = NULL;
 
-		while( atomic_load(&total_tasks) == 0 && !atomic_load(&exitFlag)) {
+		while( atomic_load(&total_tasks) == 0) {
+			if(atomic_load(&exitFlag)) {
+				pthread_exit(NULL);
+				return NULL;
+			}
+
 			pthread_mutex_lock(&queue_mutex);
-			pthread_cond_wait(&tasks_completed, &queue_mutex );
+			pthread_cond_wait(&current_task, &queue_mutex );
 			pthread_mutex_unlock(&queue_mutex);
 
 		}
 
-		if(atomic_load(&exitFlag) && atomic_load(&total_tasks) == 0) {
-			pthread_exit(NULL);
-		}
 		t = task_get();
 	
 		if( t != NULL ) {
 			task_run( t, t->data, t->task_id );
 		}
 	}
+
+	return NULL;
 }
 
 static uint8_t	task_get_workers()
@@ -228,9 +237,11 @@ int		task_start(unsigned int max_workers)
 	if( max_workers >= MAX_WORKERS ) {
 		return 0;
 	}
+
 	atomic_store(&exitFlag, 0);
 
 	pthread_cond_init( &tasks_completed, NULL );
+	pthread_cond_init( &current_task, NULL );
 
 	for( i = 0 ; i < max_workers; i ++ ) {
 		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, NULL ) )
@@ -254,9 +265,10 @@ uint8_t	num_threaded_tasks()
 void		task_stop(unsigned int max_workers)
 {
 	unsigned int i;
+	
+	atomic_store_explicit(&exitFlag, 1, memory_order_relaxed);
 
 	pthread_mutex_lock(&queue_mutex);	
-	atomic_store(&exitFlag, 1);
 	pthread_cond_broadcast( &tasks_completed );
 	pthread_mutex_unlock(&queue_mutex);
 
@@ -265,8 +277,8 @@ void		task_stop(unsigned int max_workers)
 		pthread_attr_destroy( &p_attr[i] );
 	}
 
+	pthread_cond_destroy( &current_task );
 	pthread_cond_destroy( &tasks_completed );
-	pthread_mutex_destroy( &queue_mutex );
 
 	task_reset();
 }
@@ -274,14 +286,16 @@ void		task_stop(unsigned int max_workers)
 void	performer_job( uint8_t n )
 {
 	uint8_t i;
+	for( i = 0; i < n; i ++ ) {
+		atomic_store(&tasks_done[i],0); 
+	}
 
 	pthread_mutex_lock(&queue_mutex);
 	for( i = 0; i < n; i ++ ) {
-		pjob_t *slot  = job_list[i];
-		atomic_store(&tasks_done[i],0);
+		pjob_t *slot = job_list[i];
 		task_add( i, slot->job, slot->arg );
 	}
-	pthread_cond_broadcast( &tasks_completed );
+	pthread_cond_broadcast( &current_task );
 	pthread_mutex_unlock(&queue_mutex);
 
 	while(!task_is_work_done()) {
