@@ -512,6 +512,7 @@ then
 		AC_DEFINE(HAVE_ASM_SSE4_2,1,[Compiling in SSE4_2 support])
 		AC_DEFINE(HAVE_SSE4_2,1,[Compiling in SSE4_2 support])
 		have_asm_sse4_2=true
+		VJE_CFLAGS="$VJE_CFLAGS -msse4.2"
 	fi
 
 	AC_CACHE_CHECK(for SSE4_1 on processor(s), ac_cv_flag_sse4_1, [
@@ -526,6 +527,7 @@ then
 		AC_DEFINE(HAVE_ASM_SSE4_1,1,[Compiling in SSE4_1 support])
 		AC_DEFINE(HAVE_SSE4_1,1,[Compiling in SSE4_1 support])
 		have_asm_sse4_1=true
+		VJE_CFLAGS="$VJE_CFLAGS -msse4.1"
 	fi
 
 	AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
