@@ -35,11 +35,11 @@ vj_effect *pointilism_init(int w, int h)
     ve->defaults[2] = 2;
     ve->defaults[3] = 0;
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 32;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 32;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 32;
+    ve->limits[1][0] = 16;
+    ve->limits[0][1] = 1;
+    ve->limits[1][1] = 16;
+    ve->limits[0][2] = 1;
+    ve->limits[1][2] = 16;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 1;
     ve->param_description = vje_build_param_list(ve->num_params, "Min" , "Max", "Kernel" , "Loop" );
@@ -93,8 +93,8 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args) {
     const int w = frame->width;
     const int h = frame->height;
 
-    const int minRadius = args[0];
-    const int maxRadius = args[1];
+    int minRadius = args[0];
+    int maxRadius = args[1];
 
     const int kernelRadius = args[2];
     const uint8_t *srcY = frame->data[0];
@@ -106,7 +106,14 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args) {
 
     int x,y,kx,ky,nx,ny,dx,dy;
 
-    const int radiusLimit = ( kernelRadius > maxRadius ? kernelRadius: maxRadius );
+    int radiusLimit = ( kernelRadius > maxRadius ? kernelRadius: maxRadius );
+    if( minRadius > radiusLimit )
+	radiusLimit = minRadius;
+    if( minRadius > maxRadius ) {
+	int tmp = maxRadius;
+	maxRadius = minRadius;
+	minRadius = tmp;
+    }
 
     for( y = radiusLimit; y < h - radiusLimit; y ++ ) {
         for( x = radiusLimit; x < w - radiusLimit ; x ++ ) {
