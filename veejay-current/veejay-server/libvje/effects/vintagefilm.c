@@ -46,7 +46,7 @@ vj_effect *vintagefilm_init(int w, int h)
 	ve->extra_frame = 0;
 	ve->sub_format = 1;
 	ve->has_user = 0;
-	ve->parallel = 0;
+	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Scratch Intensity", "Dust Intensity", "Flicker Intensity", "Flicker Frequency" );
 
 	ve->hints = vje_init_value_hint_list( ve->num_params );
@@ -84,10 +84,10 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args ) {
 			return;
 
 	if( rand() % flickerFrequency == 0 ) {
-    	float brightnessScale = 1.0 + flickerIntensity;
-    	for (int i = 0; i < frame->len; ++i) {
-       		frame->data[0][i] = (uint8_t)fmin(frame->data[0][i] * brightnessScale, 255);
-    	}
+		float brightnessScale = 1.0 + flickerIntensity;
+		for (int i = 0; i < frame->len; ++i) {
+			frame->data[0][i] = (uint8_t)fmin(frame->data[0][i] * brightnessScale, 255);
+		}
 	}
 
 
