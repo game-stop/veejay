@@ -43,7 +43,7 @@ vj_effect *lumablend_init(int w, int h)
 	ve->defaults[3] = 150;
 	ve->description = "Opacity by Threshold";
 	ve->extra_frame = 1;
-	ve->parallel = 0;
+	ve->parallel = 1;
 	ve->sub_format = 1;
 	ve->parallel = 1;
 	ve->has_user = 0;
