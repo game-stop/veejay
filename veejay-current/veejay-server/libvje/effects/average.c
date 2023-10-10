@@ -31,28 +31,21 @@ typedef struct {
 vj_effect *average_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 1;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 1000;
-	ve->limits[0][1] = 0;
-	ve->limits[1][1] = 1;
     ve->defaults[0] = 1;
-	ve->defaults[1] = 0;
-	ve->parallel = 0; //@ cannot run in parallel
-    ve->description = "Average";
+	ve->parallel = 1; 
+    ve->description = "Running Average";
     ve->sub_format = 1; 
     ve->extra_frame = 0;
 	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Number of frames to average", "Mode");
+	ve->param_description = vje_build_param_list( ve->num_params, "Number of frames" );
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
-
-	vje_build_value_hint_list( ve->hints, ve->limits[1][1], 1, "Running Average", "Average" );
-
- 	return ve;
+	return ve;
 }
 
 void *average_malloc(int width, int height)
@@ -63,7 +56,7 @@ void *average_malloc(int width, int height)
     }
 	a->running_sum[0] = (double*) vj_calloc( sizeof(double) * (width * height * 3 ));
 	if(!a->running_sum[0]) {
-	    free(a);
+		free(a);
         return NULL;
     }
 	a->running_sum[1] = a->running_sum[0] + (width*height);
@@ -81,68 +74,29 @@ void average_free(void *ptr)
 
 void average_apply(void *ptr, VJFrame *frame, int *args) {
     int max_sum = args[0];
-    int mode = args[1];
+    double weight = 1.0 / max_sum;
 
-    unsigned int i;
     const int len = frame->len;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    average_t *a = (average_t*) ptr;
-    double **running_sum = a->running_sum;
-    
-	if( a->last_params[0] != max_sum || a->last_params[1] != mode || ( mode == 0 && a->frame_count == max_sum) )
-	{
-		veejay_memset( running_sum[0], 0, sizeof(double) * (len + len + len) );
-		a->last_params[0] = max_sum;
-		a->last_params[1] = mode;
-		a->frame_count = 1;
-	}
+    average_t *a = (average_t *)ptr;
+    double *running_sum[3];
+    running_sum[0] = a->running_sum[0] + frame->offset;
+    running_sum[1] = a->running_sum[1] + frame->offset;
+    running_sum[2] = a->running_sum[2] + frame->offset;
 
-    int frame_count = a->frame_count;
+    for (int i = 0; i < len; i++) {
+        running_sum[0][i] = (1 - weight) * running_sum[0][i] + weight * Y[i];
+        running_sum[1][i] = (1 - weight) * running_sum[1][i] + weight * (Cb[i] - 128);
+        running_sum[2][i] = (1 - weight) * running_sum[2][i] + weight * (Cr[i] - 128);
+    }
 
-	if( mode == 0 )
-	{
-		if( frame_count <= max_sum ) {
-			for (i = 0; i < len; i++) {
-				running_sum[0][i] += Y[i];
-				running_sum[1][i] += Cb[i];
-				running_sum[2][i] += Cr[i];
-			}
-		}
-
-		if( frame_count > 2 ) {
-
-			for (i = 0; i < len; i++) {
-				Y[i] = (uint8_t)(running_sum[0][i] / frame_count );
-				Cb[i] = (uint8_t)(running_sum[1][i] / frame_count );
-				Cr[i] = (uint8_t)(running_sum[2][i] / frame_count );
-			}
-		}
-
-		if( frame_count <= max_sum )
-			frame_count ++;
-	}
-	else
-	{
-		for (i = 0; i < len; i++) {
-			running_sum[0][i] += Y[i];
-			running_sum[1][i] += Cb[i];
-			running_sum[2][i] += Cr[i];
-		}
-
-		if( frame_count > 2 )
-		{
-			for (i = 0; i < len; i++) {
-				Y[i] = (running_sum[0][i] / frame_count );
-				Cb[i] = (running_sum[1][i] / frame_count );
-				Cr[i] = (running_sum[2][i] / frame_count );
-			}
-		}
-		frame_count ++;
-	}
-
-    a->frame_count = a->frame_count;
+    for (int i = 0; i < len; i++) {
+        Y[i] = (uint8_t)running_sum[0][i];
+        Cb[i] = (uint8_t)(128 + running_sum[1][i]);
+        Cr[i] = (uint8_t)(128 + running_sum[2][i]);
+    }
 }
 
