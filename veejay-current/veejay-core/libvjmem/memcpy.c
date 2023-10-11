@@ -2027,7 +2027,7 @@ void memset_asimd_v4(void *dst, uint8_t val, size_t len) {
 void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
 
 	if( size == 0 || NULL == dst ) 
-		return dst;
+		return;
 
  	uint8x16_t value_v = vdupq_n_u8(value);
 
@@ -2063,6 +2063,7 @@ void memset_asimd_64(uint8_t *dst, uint8_t value, size_t size) {
         dst++;
         remaining_bytes--;
     }
+
 }
 
 void memset_asimd_32(uint8_t *dst, uint8_t value, size_t size) {
