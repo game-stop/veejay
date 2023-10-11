@@ -37,8 +37,6 @@ extern void init_parallel_tasks(int n_tasks);
 #define vj_calloc(i) vj_calloc_(i)
 extern void find_best_memset();
 extern void find_best_memcpy();
-extern void fast_memset_dirty(void * to, int val, size_t len);
-extern void fast_memset_finish();
 extern void packed_plane_clear( size_t len, void *to );
 extern void yuyv_plane_clear( size_t len, void *to );
 extern int cpu_cache_size();

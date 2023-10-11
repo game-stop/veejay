@@ -1436,98 +1436,6 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 }
 #endif
 
-#if defined(HAVE_ASM_MMX2) || defined(HAVE_ASM_SSE)
-void fast_memset_finish()
-{
-#ifdef HAVE_ASM_MMX2
-	/* since movntq is weakly-ordered, a "sfence"
-	 * is needed to become ordered again. */
-	__asm__ __volatile__ ("sfence":::"memory");
-#endif
-#ifndef HAVE_ASM_SSE
-    /* enables to use FPU */
-    __asm__ __volatile__ (EMMS:::"memory");
-#endif
-
-}
-
-
-void fast_memset_dirty(void * to, int val, size_t len)
-{
-#if defined ( HAVE_ASM_MMX ) || defined ( HAVE_ASM_SSE )
-	size_t i;
-	unsigned char mm_reg[AC_MMREG_SIZE], *pmm_reg;
-	unsigned char *t = to;
-    
-  	if(len >= MIN_LEN)
-	{
-	  register unsigned long int delta;
-      delta = ((unsigned long int)to)&(AC_MMREG_SIZE-1);
-      if(delta)
-	  {
-	    delta=AC_MMREG_SIZE-delta;
-	    len -= delta;
-	    small_memset(t, val, delta);
-	  }
-	  i = len >> 7; /* len/128 */
-	  len&=127;
-	  pmm_reg = mm_reg;
-	  small_memset(pmm_reg,val,sizeof(mm_reg));
-#ifdef HAVE_ASM_SSE /* Only P3 (may be Cyrix3) */
-	__asm__ __volatile__(
-		"movups (%0), %%xmm0\n"
-		:: "r"(mm_reg):"memory");
-	for(; i>0; i--)
-	{
-		__asm__ __volatile__ (
-		"movntps %%xmm0, (%0)\n"
-		"movntps %%xmm0, 16(%0)\n"
-		"movntps %%xmm0, 32(%0)\n"
-		"movntps %%xmm0, 48(%0)\n"
-		"movntps %%xmm0, 64(%0)\n"
-		"movntps %%xmm0, 80(%0)\n"
-		"movntps %%xmm0, 96(%0)\n"
-		"movntps %%xmm0, 112(%0)\n"
-		:: "r" (t) : "memory");
-		t+=128;
-	}
-#else
-	__asm__ __volatile__(
-		"movq (%0), %%mm0\n"
-		:: "r"(mm_reg):"memory");
-	for(; i>0; i--)
-	{
-		__asm__ __volatile__ (
-		MOVNTQ" %%mm0, (%0)\n"
-		MOVNTQ" %%mm0, 8(%0)\n"
-		MOVNTQ" %%mm0, 16(%0)\n"
-		MOVNTQ" %%mm0, 24(%0)\n"
-		MOVNTQ" %%mm0, 32(%0)\n"
-		MOVNTQ" %%mm0, 40(%0)\n"
-		MOVNTQ" %%mm0, 48(%0)\n"
-		MOVNTQ" %%mm0, 56(%0)\n"
-		MOVNTQ" %%mm0, 64(%0)\n"
-		MOVNTQ" %%mm0, 72(%0)\n"
-		MOVNTQ" %%mm0, 80(%0)\n"
-		MOVNTQ" %%mm0, 88(%0)\n"
-		MOVNTQ" %%mm0, 96(%0)\n"
-		MOVNTQ" %%mm0, 104(%0)\n"
-		MOVNTQ" %%mm0, 112(%0)\n"
-		MOVNTQ" %%mm0, 120(%0)\n"
-		:: "r" (t) : "memory");
-		t+=128;
-	}
-#endif /* Have SSE */
-	}
-	/*
-	 *	Now do the tail of the block
-	 */
-	if(len) small_memset(t, val, len);
-#endif
-	memset(to,val,len);
-}
-#endif
-
 #ifdef HAVE_ASM_SSE4_2
 void *sse42_memset(void *ptr, uint8_t value, size_t num) {
     uint8_t *dest = (uint8_t *)ptr;
@@ -1951,14 +1859,6 @@ void *memset_asimd_v3(void *dst, uint8_t val, size_t n) {
 
 #endif
 
-/* Fast memory set. See comments for fast_memcpy */
-static void fast_memset(void * to, int val, size_t len)
-{
-	fast_memset_dirty( to, val , len );
-	if(len >= MIN_LEN)
-		fast_memset_finish();
-}
-
 #ifdef HAVE_ARM_ASIMD
 void memset_asimd(void *dst, uint8_t val, size_t len) {
 
@@ -2213,9 +2113,6 @@ static struct {
 {
 	{ NULL, NULL, 0,0},
 	{ "glibc memset()",(void*)memset,0,0},
-#if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_MMX2) || defined(HAVE_ASM_SSE)
-	{ "MMX/MMX2/SSE optimized memset()", (void*) fast_memset,0,AV_CPU_FLAG_MMX|AV_CPU_FLAG_SSE|AV_CPU_FLAG_MMX2 },
-#endif 
 #ifdef HAVE_ARM_NEON
 	{ "memset_neon (C) Harm Hanemaaijer <fgenfb@yahoo.com>", (void*) memset_neon,0, AV_CPU_FLAG_NEON },
 #endif
