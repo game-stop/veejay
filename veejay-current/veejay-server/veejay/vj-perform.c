@@ -2023,7 +2023,7 @@ static  int vj_perform_get_frame_( veejay_t *info, int s1, long nframe, VJFrame 
         const uint32_t n1 = cur_sfd;
         const float frac = 1.0f / (float) N * n1;
 
-        vj_frame_slow_threaded( p0_buffer, p1_buffer, dst->data, dst->len, uv_len, frac );
+        vj_frame_slow_single( p0_buffer, p1_buffer, dst->data, dst->len, uv_len, frac );
         
         if( (n1 + 1 ) == N ) {
             vj_perform_copy3( dst->data, p0_buffer, dst->len,uv_len,0);
