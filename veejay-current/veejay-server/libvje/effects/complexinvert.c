@@ -27,14 +27,14 @@ vj_effect *complexinvert_init(int w, int h)
     vj_effect *ve;
     ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 5;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 3000;	/* angle */
-    ve->defaults[1] = 0;	/* r */
-    ve->defaults[2] = 0;	/* g */
-    ve->defaults[3] = 255;	/* b */
-    ve->defaults[4] = 3000; /* noise suppression*/
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->defaults[0] = 3000; /* angle */
+    ve->defaults[1] = 0;    /* r */
+    ve->defaults[2] = 0;    /* g */
+    ve->defaults[3] = 255;  /* b */
+    ve->defaults[4] = 0; /* noise suppression*/
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 9000;
     ve->parallel = 1;
@@ -47,16 +47,16 @@ vj_effect *complexinvert_init(int w, int h)
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
 
-	ve->limits[0][4] = 0;
-	ve->limits[1][4] = 5500;
-	ve->has_user = 0;
+    ve->limits[0][4] = 0;
+    ve->limits[1][4] = 100;
+    ve->has_user = 0;
     ve->description = "Complex Invert (RGB)";
     ve->extra_frame = 0;
     ve->sub_format = 1;
-	ve->rgb_conv = 1;
-	ve->parallel = 1;
-	ve->param_description = vje_build_param_list(
-					ve->num_params, "Angle", "Red", "Green", "Blue", "Noise suppression" );
+    ve->rgb_conv = 1;
+    ve->parallel = 1;
+    ve->param_description = vje_build_param_list(
+                    ve->num_params, "Angle", "Red", "Green", "Blue", "Noise suppression" );
     return ve;
 }
 
@@ -67,90 +67,38 @@ void complexinvert_apply(void *ptr, VJFrame *frame, int *args) {
     int b = args[3];
     int i_noise = args[4];
 
-	uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
-    uint8_t cb, cr;
-    int kbg, x1, y1;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
-    float angle = (float) i_angle /100.0f;
-    float noise_level = (i_noise / 100.0);
-    unsigned int pos;
-    uint8_t val, tmp1;
     uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-	const int len = frame->len;
-	int	iy=pixel_Y_lo_,iu=128,iv=128;
-	_rgb2yuv( r,g,b, iy,iu,iv );
-	_y = (float) iy;
-	aa = (float) iu;
-	bb = (float) iv;
-    tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 0xff * (aa / tmp);
-    cr = 0xff* (bb / tmp);
-    kg1 = tmp;
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    const int len = frame->len;
+    unsigned int pos;
 
-    /* obtain coordinate system for cb / cr */
-    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
+    int iy = pixel_Y_lo_;
+    int iu = 128;
+    int iv = 128;
+    
+    _rgb2yuv(r, g, b, iy, iu, iv);
 
-	tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = 0xf * (float) (_y) / kg1;
-    kg = kg1;
+    int cb = (iu * 0xff) / 255;
+    int cr = (iv * 0xff) / 255;
+    int noiseThreshold = (i_noise * 255) / 100;
+    noiseThreshold *= noiseThreshold;
+    float angle = (float) (i_angle * 0.01) * (M_PI / 180.0f);
+    int accept_angle_tg = (int)(15.0f * tanf(angle));
 
-    /* intialize pointers */
-    fg_y = frame->data[0];
-    fg_cb = frame->data[1];
-    fg_cr = frame->data[2];
+    for (pos = 0; pos < len; pos++) {
+        int xx = (((Cb[pos]) * cb) + ((Cr[pos]) * cr)) >> 7;
+        int yy = (((Cr[pos]) * cb) - ((Cb[pos]) * cr)) >> 7;
 
-    bg_y = frame->data[0];
-    bg_cb = frame->data[1];
-    bg_cr = frame->data[2];
+        int distanceSquared = (xx * xx) + (yy * yy);
 
-    for (pos = 0; pos < len; pos++)
-	{
-		short xx, yy;
-
-		xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-		yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-
-
-	/* accept angle should not be > 90 degrees 
-	   reasonable results between 10 and 80 degrees.
-	 */
-
-		val = (xx * accept_angle_tg) >> 4;
-		if (abs(yy) < val )
-		{
-  			val = (yy * accept_angle_ctg) >> 4;
-
-		    x1 = abs(val);
-		    y1 = yy;
-		    tmp1 = xx - x1;
-
-		    kbg = (tmp1 * one_over_kc) >> 1;
-			if (kbg > 255)
-				kbg = 255;
-
-		    val = (tmp1 * kfgy_scale) >> 4;
-		    val = fg_y[pos] - val;
-	   		Y[pos] = val;
- 			val = ((x1 * cb) - (y1 * cr)) >> 7;
-	    	Cb[pos] = val;
-	    	val = ((x1 * cr) - (y1 * cb)) >> 7;
-	    	Cr[pos] = val;
-
-	    	val = (yy * yy) + (kg * kg);
-	    	if (val < (noise_level * noise_level)) {
-				kbg = 255;
-	    	}
-
-			Y[pos] = 0xff - ((Y[pos] + (kbg * bg_y[pos])) >> 8);
-	    	Cb[pos] = 0xff - ((Cb[pos] + (kbg * bg_cb[pos])) >> 8);
-   			Cr[pos] = 0xff - ( (Cr[pos] + (kbg * bg_cr[pos])) >> 8);
-	    }
-	}
+        int val = (xx * accept_angle_tg) >> 4;
+        //TODO: blur Y into temporary buffer and use Y[pos] = 0xff - blurredBuffer[pos]
+        if ((abs(yy) < val) && (distanceSquared >= noiseThreshold)) {
+            Y[pos] = 0xff - Y[pos];
+            Cb[pos] = 0xff - Cb[pos];
+            Cr[pos] = 0xff - Cr[pos];
+        }
+    }
 }
+

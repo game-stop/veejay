@@ -21,20 +21,23 @@
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "rgbkeysmooth.h"
+#include "softblur.h"
 
 vj_effect *rgbkeysmooth_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 1200;	/* angle */
-    ve->defaults[1] = 0;	/* r */
-    ve->defaults[2] = 0;	/* g */
-    ve->defaults[3] = 255;	/* b */
-    ve->defaults[4] = 150;	/* opacity */
-    ve->defaults[5] = 1500;	/* noise level */
+    ve->num_params = 8;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->defaults[0] = 1200; /* angle */
+    ve->defaults[1] = 0;    /* r */
+    ve->defaults[2] = 0;    /* g */
+    ve->defaults[3] = 255;  /* b */
+    ve->defaults[4] = 0;    /* opacity */
+    ve->defaults[5] = 255;  /* opacity */
+    ve->defaults[6] = 150;  /* noise */
+    ve->defaults[7] = 0;    /* mode */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 9000;
 
@@ -51,125 +54,198 @@ vj_effect *rgbkeysmooth_init(int w,int h)
     ve->limits[1][4] = 255;
 
     ve->limits[0][5] = 0;
-    ve->limits[1][5] = 5500;
+    ve->limits[1][5] = 255;
+
+    ve->limits[0][6] = 0;
+    ve->limits[1][6] = 255;
+
+    ve->limits[0][7] = 0;
+    ve->limits[1][7] = 3;
 
     ve->has_user = 0;
-    ve->description = "Transparent Chroma Key (RGB)";
+    ve->description = "Chroma Key with Feathering";
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-    ve->parallel = 1;
-	ve->param_description = vje_build_param_list( ve->num_params,"Angle","Red","Green","Blue","Opacity","Noise level");
+    ve->parallel = 0;
+    ve->param_description = vje_build_param_list( ve->num_params,"Angle","Red","Green","Blue","Erosion Opacity","Dilation Opacity", "Noise level", "Preview Mask");
     return ve;
+}
+
+typedef struct {
+    uint8_t *matte;
+    uint8_t *eroded_mask;
+    uint8_t *mask;
+    uint8_t *blurred_mask;
+} rgbkey_t;
+
+void *rgbkeysmooth_malloc(int w, int h)
+{
+    rgbkey_t *t = (rgbkey_t*) vj_malloc(sizeof(rgbkey_t));
+    if(!t) {
+        return NULL;
+    }
+    t->matte = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * 4);
+    if(!t->matte) {
+        free(t);
+        return NULL;
+    }
+    t->eroded_mask = t->matte + (w*h);
+    t->mask = t->eroded_mask + (w*h);
+    t->blurred_mask = t->mask +(w*h);
+    return (void*) t;
+}
+
+void rgbkeysmooth_free(void *ptr) {
+    rgbkey_t *t = (rgbkey_t*) ptr;
+    free(t->matte);
+    free(t);
+}
+
+void dilate_and_smooth_matte(uint8_t *dilated_mask, const uint8_t *mask, int width, int height, int opacity) {
+    for (int y = 1; y < height - 1; ++y) {
+        for (int x = 1; x < width - 1; ++x) {
+            int max_val = 0;
+            for (int i = -1; i <= 1; ++i) {
+                for (int j = -1; j <= 1; ++j) {
+                    int val = mask[(y + i) * width + (x + j)];
+                    if (val > max_val) {
+                        max_val = val;
+                    }
+                }
+            }
+            if( max_val > 0 ) {
+                max_val = (uint8_t) ((max_val * opacity) >> 8);
+            }
+            dilated_mask[y * width + x] = max_val;
+        }
+    }
+}
+
+
+void erode_and_smooth_matte(uint8_t *eroded_mask, const uint8_t *matte_mask, int width, int height, int opacity) {
+    for (int y = 1; y < height - 1; ++y) {
+        for (int x = 1; x < width - 1; ++x) {
+            int sum = 9 * matte_mask[y * width + x];
+            sum -= matte_mask[(y - 1) * width + x - 1];
+            sum -= matte_mask[(y - 1) * width + x];
+            sum -= matte_mask[(y - 1) * width + x + 1];
+            sum -= matte_mask[y * width + x - 1];
+            sum -= matte_mask[y * width + x + 1];
+            sum -= matte_mask[(y + 1) * width + x - 1];
+            sum -= matte_mask[(y + 1) * width + x];
+            sum -= matte_mask[(y + 1) * width + x + 1];
+
+            eroded_mask[y * width + x] = (sum == 9 * 255) ? 255 : 0;
+
+        }
+    }
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            eroded_mask[y * width + x] = (((matte_mask[y * width + x] * (255 - opacity) + eroded_mask[y * width + x] * opacity) >> 8));
+        }
+    }
+
+}
+
+void blur_matte(uint8_t *blurred_mask, const uint8_t *mask, int width, int height, int blur_radius) {
+    for (int y = blur_radius; y < height - blur_radius; ++y) {
+        for (int x = blur_radius; x < width - blur_radius; ++x) {
+            int blur_sum = 0;
+            for (int i = -blur_radius; i <= blur_radius; ++i) {
+                for (int j = -blur_radius; j <= blur_radius; ++j) {
+                    blur_sum += mask[(y + i) * width + (x + j)];
+                }
+            }
+            blurred_mask[y * width + x] = (uint8_t)(blur_sum / ((2 * blur_radius + 1) * (2 * blur_radius + 1)));
+        }
+    }
 }
 
 
 void rgbkeysmooth_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-        
-    int i_angle = args[0];
+    rgbkey_t *t = (rgbkey_t*) ptr;
+
     int r = args[1];
     int g = args[2];
     int b = args[3];
-    int opacity = args[4];
-    int i_noise = args[5];
-    uint8_t *fg_y, *fg_cb, *fg_cr;
-    uint8_t *bg_y, *bg_cb, *bg_cr;
-    int accept_angle_tg, accept_angle_ctg, one_over_kc;
-    int kfgy_scale, kg;
-    int cb, cr;
-    int kbg, x1, y1;
-    float kg1, tmp, aa = 255.0f, bb = 255.0f, _y = 0;
-    float angle = (float) i_angle /100.0f;
-    float noise_level = (i_noise / 100.0f);
-    unsigned int pos;
-    uint8_t val, tmp1;
+    int angleThreshold = (args[0] * 0.01f);
+    int noiseParam = args[6];
+    int erosion_opacity = args[4];
+    int dilation_opacity = args[5];
+    int mode = args[7];
+
+    int iy=0, iu=128, iv=128;
+    _rgb2yuv(r, g, b, iy, iu, iv);
+
+    int angleThresholdSquared = angleThreshold * angleThreshold;
+    int noiseThreshold = noiseParam * noiseParam;
+
     uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
     uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
-	const int len = frame->len;
-	int	iy=16,iu=128,iv=128;
-	unsigned int op0 = opacity > 255 ? 255 : opacity;
-	unsigned int op1 = 255 - op0;
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+    const int len = frame->len;
 
-	_rgb2yuv( r,g,b, iy,iu,iv );
-	_y = (float) iy;
-	aa = (float) iu;
-	bb = (float) iv;
-    tmp = sqrt(((aa * aa) + (bb * bb)));
-    cb = 255 * (aa / tmp);
-    cr = 255 * (bb / tmp);
-    kg1 = tmp;
+    int pos;
 
-    /* obtain coordinate system for cb / cr */
-    accept_angle_tg = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-    accept_angle_ctg= (int)( 15.0f / tanf(M_PI * angle / 180.0f));
+    uint8_t *matte = t->matte + frame->offset;
+    uint8_t *eroded_matte = t->eroded_mask + frame->offset;
+    uint8_t *fg = t->mask + frame->offset;
+    uint8_t *dilated_matte = t->blurred_mask + frame->offset;
 
+    for ( pos = 0; pos < len; pos++) {
+        int Y_diff = abs(Y[pos] - iy);
+        int Cb_diff = abs(Cb[pos] - iu);
+        int Cr_diff = abs(Cr[pos] - iv);
 
-    tmp = 1 / kg1;
-    one_over_kc = 0xff * 2 * tmp - 0xff;
-    kfgy_scale = 0xf * (float) (_y) / kg1;
-    kg = kg1;
+        int angleDiffSquared = (Cb_diff * Cb_diff) + (Cr_diff * Cr_diff);
 
-    /* intialize pointers */
-    fg_y = Y;
-    fg_cb = Cb;
-    fg_cr = Cr;
-	/* 2005: swap these !! */
-    bg_y = Y2;
-    bg_cb = Cb2;
-    bg_cr = Cr2;
+        int distanceSquared = Y_diff * Y_diff;
 
-    for (pos = len; pos != 0; pos--) {
-	short xx, yy;
-	/* convert foreground to xz coordinates where x direction is
-	   defined by key color */
-
-	xx = (((fg_cb[pos]) * cb) + ((fg_cr[pos]) * cr)) >> 7;
-	yy = (((fg_cr[pos]) * cb) - ((fg_cb[pos]) * cr)) >> 7;
-
-	/* accept angle should not be > 90 degrees 
-	   reasonable results between 10 and 80 degrees.
-	 */
-
-	val = (xx * accept_angle_tg) >> 4;
-	if (abs(yy) < val) {
-	    /* compute fg, suppress fg in xz according to kfg 
-	*/
-	    val = (yy * accept_angle_ctg) >> 4;
-
-	    x1 = abs(val);
-	    y1 = yy;
-	    tmp1 = xx - x1;
-
-	    kbg = (tmp1 * one_over_kc) >> 1;
-
-	    val = (tmp1 * kfgy_scale) >> 4;
-	    val = fg_y[pos] - val;
-
-	    Y[pos] = val;
-
-	    // convert suppressed fg back to cbcr 
-		// cb,cr are signed, go back to unsigned !
-	    Cb[pos] = ((x1 * cb) - (y1 * cr)) >> 7;
-	    Cr[pos] = ((x1 * cr) - (y1 * cb)) >> 7;
-
-	    // deal with noise 
-	    val = (yy * yy) + (kg * kg);
-	    if (val < (noise_level * noise_level)) {
-		kbg = 255;
-	    }
-
-	    Y[pos] = ( Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    Y[pos] = ( Y[pos] * op0 + bg_y[pos]  * op1 ) >> 8;
-	    Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	    Cb[pos] = (Cb[pos] * op0 + bg_cb[pos]  * op1) >> 8;
-	    Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	    Cr[pos] = (Cr[pos] * op0 + bg_cr[pos] * op1 ) >> 8;
-		
-	}
+        if (angleDiffSquared <= angleThresholdSquared && distanceSquared <= noiseThreshold) {
+            matte[pos] = 0;
+        }
+        else {
+            matte[pos] = 0xff;
+        }   
     }
 
+    erode_and_smooth_matte( eroded_matte, matte, frame->width, frame->height, erosion_opacity );
+
+    dilate_and_smooth_matte( dilated_matte, eroded_matte, frame->width, frame->height, dilation_opacity );
+
+    blur_matte( fg, dilated_matte, frame->width,frame->height, 2 );
+
+    if( mode == 0 ) {
+        for( pos = 0; pos < len ; pos ++ ) {
+            unsigned int mask = fg[pos];
+            unsigned int invMask = 0xff - mask;
+        
+            Y[pos]  = (( Y[pos] * mask +  Y2[pos] * invMask) >> 8);
+            Cb[pos] = ((Cb[pos] * mask + Cb2[pos] * invMask) >> 8);
+            Cr[pos] = ((Cr[pos] * mask + Cr2[pos] * invMask) >> 8);    
+        }
+    }
+    else {
+        veejay_memset( Cb, 128, frame->len );
+        veejay_memset( Cr, 128, frame->len );
+
+        switch(mode) {
+          case 1:
+                veejay_memcpy( Y, matte, frame->len );
+            break;
+          case 2:
+                veejay_memcpy( Y, eroded_matte, frame->len );
+            break;
+          case 3:
+                veejay_memcpy( Y, fg, frame->len );
+            break;
+        }
+
+    }
 }
+

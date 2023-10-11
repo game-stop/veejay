@@ -79,11 +79,11 @@ void stretch_apply( void *ptr, VJFrame *frame, int *args )
 		
         if( Y[i] > lower && Y[i] < upper ) {
         
-            cb = (double)(Cb[i]);
-            cr = (double)(Cr[i]);
+            cb = (double)(Cb[i]-128);
+            cr = (double)(Cr[i]-128);
 
-            Cb[i] = (cb + (cb * gainFactor));
-            Cr[i] = (cr - (cr * gainFactor));
+            Cb[i] = 128 + (cb + (cb * gainFactor));
+            Cr[i] = 128 + (cr - (cr * gainFactor));
         }
 	}
 }

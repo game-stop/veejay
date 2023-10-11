@@ -138,7 +138,7 @@ static inline int blend_plane(uint8_t *dst, uint8_t *A, uint8_t *B, int size, in
 #endif
 
 
-static void opacity_apply1( VJFrame *frame, VJFrame *frame2, int opacity)
+void opacity_apply1( VJFrame *frame, VJFrame *frame2, int opacity)
 {
 	int y = blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame->len, opacity );
 	int u = blend_plane( frame->data[1], frame->data[1], frame2->data[1], (frame->ssm ? frame->len : frame->uv_len), opacity );
@@ -183,17 +183,6 @@ void opacity_apply( void *ptr,  VJFrame *frame, VJFrame *frame2, int *args )
 	opacity_apply1( frame, frame2, args[0]);
 }
 
-void opacity_applyN( VJFrame *frame, VJFrame *frame2, int opacity)
-{
-	if( vj_task_available() ) {
-		vj_task_set_from_frame( frame );
-		vj_task_set_param( opacity,0 );
-		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, (performer_job_routine) &opacity_apply_job );
-	} else {
-		opacity_apply1( frame,frame2,opacity );
-	}
-}
-	
 //@ used in performer
 static void	opacity_blend_apply1( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int opacity )
 {
@@ -214,13 +203,7 @@ static void	opacity_blend_apply1( uint8_t *src1[3], uint8_t *src2[3], int len, i
 
 void	opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int opacity )
 {
-	if( vj_task_available() ) {
-		vj_task_set_from_args( len,uv_len );
-		vj_task_set_param( opacity,0 );
-		vj_task_run( src1, src2, NULL, NULL, 3, (performer_job_routine) &opacity_apply_job );
-	} else {
-		opacity_blend_apply1( src1,src2,len,uv_len,opacity );
-	}
+	opacity_blend_apply1( src1,src2,len,uv_len,opacity );
 }
 void	opacity_blend_luma_apply( uint8_t *A, uint8_t *B, int len,int opacity )
 {

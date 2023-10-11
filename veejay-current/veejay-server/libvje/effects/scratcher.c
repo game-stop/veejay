@@ -170,7 +170,7 @@ void scratcher_apply(void *ptr, VJFrame *src, int *args)
 		tmp.data[2] = src->data[2];
 	}
 
-	opacity_applyN( src, &tmp, opacity );
+	opacity_apply1( src, &tmp,opacity );
 	
 	store_frame(s, src, n, no_reverse);
 }

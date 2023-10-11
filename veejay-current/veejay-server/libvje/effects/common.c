@@ -495,9 +495,9 @@ void blackborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 
 
 // fastrand (C) FUKUCHI, Kentaro (EffectTV)
-unsigned int fastrand(int val)
-{
-    return (val = val * 1103516245 + 12345);
+unsigned long long fastrand(unsigned long long val) {
+    unsigned long long v = val * 1103516245 + 12345;
+    return v & 0xFFFFFFFF; 
 }
 
 

@@ -377,7 +377,7 @@ uint8_t bl_pix_noswap_Y(uint8_t y1, uint8_t y2);
 uint8_t bl_pix_noswap_C(uint8_t y1, uint8_t y2);
 uint8_t bl_pix_seldiff_Y(uint8_t y1, uint8_t y2);
 uint8_t bl_pix_subtract_Y(uint8_t y1, uint8_t y2);
-unsigned int fastrand(int val);
+unsigned long long fastrand(unsigned long long val);
 int bl_pix_get_color_y(int color_num);
 int bl_pix_get_color_cb(int color_num);
 int bl_pix_get_color_cr(int color_num);

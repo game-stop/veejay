@@ -97,16 +97,3 @@ static void	dummy_apply_job( void *arg )
 }
 
 
-void dummy_applyN( VJFrame *frame, int r, int g, int b)
-{
-	if( vj_task_available() ) {
-		vj_task_set_from_frame( frame );
-		vj_task_set_param( r,0 );
-        vj_task_set_param( g,1 );
-        vj_task_set_param( b,2 );
-        
-		vj_task_run( frame->data, NULL, NULL, NULL, 3, (performer_job_routine) &dummy_apply_job );
-	} else {
-		dummy_rgb_apply( frame,r,g,b );
-	}
-}
