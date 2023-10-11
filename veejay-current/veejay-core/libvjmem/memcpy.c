@@ -1436,6 +1436,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 }
 #endif
 
+#if defined(HAVE_ASM_MMX2) || defined(HAVE_ASM_SSE)
 void fast_memset_finish()
 {
 #ifdef HAVE_ASM_MMX2
@@ -1449,6 +1450,7 @@ void fast_memset_finish()
 #endif
 
 }
+
 
 void fast_memset_dirty(void * to, int val, size_t len)
 {
@@ -1521,10 +1523,10 @@ void fast_memset_dirty(void * to, int val, size_t len)
 	 *	Now do the tail of the block
 	 */
 	if(len) small_memset(t, val, len);
-#elif
-	memset(to,val,len);
 #endif
+	memset(to,val,len);
 }
+#endif
 
 #ifdef HAVE_ASM_SSE4_2
 void *sse42_memset(void *ptr, uint8_t value, size_t num) {
