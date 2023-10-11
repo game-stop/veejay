@@ -101,7 +101,7 @@ static struct {
     { scratcher_init,scratcher_malloc,scratcher_free,NULL,NULL,scratcher_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SCRATCHER},
     { rotozoom_init,rotozoom_malloc,rotozoom_free,NULL,NULL,rotozoom_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_ROTOZOOM },
     { ripple_init,ripple_malloc,ripple_free,NULL,NULL,ripple_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_RIPPLE },
-    { rgbkeysmooth_init,NULL,NULL,NULL,NULL,NULL,rgbkeysmooth_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RGBKEYSMOOTH },
+    { rgbkeysmooth_init,rgbkeysmooth_malloc,rgbkeysmooth_free,NULL,NULL,NULL,rgbkeysmooth_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RGBKEYSMOOTH },
     { rgbkey_init,NULL,NULL,NULL,NULL,NULL,rgbkey_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RGBKEY },
     { rgbchannel_init,NULL,NULL,NULL,NULL,rgbchannel_apply,NULL, NULL,NULL,NULL, VJ_IMAGE_EFFECT_RGBCHANNEL},
     { revtv_init,NULL,NULL,NULL,NULL,revtv_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_REVTV },
@@ -471,8 +471,8 @@ static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A,
     if(!fx->parallel)
         return 0;
 
-    if(!vj_task_available())
-        return 0;
+    if( vj_task_get_num_cpus() < 2 )
+	return 0;
 
     int i;
 
