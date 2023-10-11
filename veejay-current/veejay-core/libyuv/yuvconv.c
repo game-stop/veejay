@@ -628,6 +628,7 @@ void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
     uint8_t *Cb = yuv420[1];
     uint8_t *Cr = yuv420[2];
     uint8_t *Y  = yuv420[0];
+#pragma omp simd
     for (y = 0; y < height; ++y) {
 	for (x = 0; x < width; x +=2) {
 	    *(dest + 0) = Y[0];
@@ -652,8 +653,7 @@ void yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 		       int height)
 {
     unsigned int x, y;
-
-
+#pragma omp simd
     for (y = 0; y < height; ++y) {
 	uint8_t *Y = yuv420[0] + y * width;
 	uint8_t *Cb = yuv420[1] + (y >> 1) * (width >> 1);
@@ -1788,7 +1788,7 @@ void yuv444_yvu444_1plane(
 	uint8_t *vp = data[1];
 	int len = (width * height) >> 2;
 	uint8_t *dst = dst_buffer;
-
+#pragma omp simd
 	for( x=0; x < len; x ++ )
 	{
 		dst[0] = packv0__( yp[0],up[0],vp[0],yp[1]);
