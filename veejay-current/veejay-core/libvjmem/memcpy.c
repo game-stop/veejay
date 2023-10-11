@@ -245,24 +245,18 @@ static void	yuyv_plane_clear_job( void *arg )
 
 void	yuyv_plane_clear( size_t len, void *to )
 {
-	if( vj_task_available() ) {
-		uint8_t * t    = (uint8_t*) to;
-		uint8_t *in[4] = { t, NULL,NULL,NULL };
-		vj_task_run( in, in, NULL, NULL, 1, (performer_job_routine) &yuyv_plane_clear_job );
+	uint8_t *t = (uint8_t*) to;
+	unsigned int i;
+	i = len;
+	for( ; i > 0 ; i -- )
+	{
+		t[0] = 0;
+		t[1] = 128;
+		t[2] = 0;
+		t[3] = 128;
+		t += 4;
 	}
-	else {
-		uint8_t *t = (uint8_t*) to;
-		unsigned int i;
-		i = len;
-		for( ; i > 0 ; i -- )
-		{
-			t[0] = 0;
-			t[1] = 128;
-			t[2] = 0;
-			t[3] = 128;
-			t += 4;
-		}
-	}
+
 }
 #endif
 
@@ -465,12 +459,6 @@ void	yuyv_plane_clear( size_t len, void *to )
 {
 	uint8_t *t = (uint8_t*) to;
 	unsigned int i;
-	if( vj_task_available() ) {
-		int strides[4] = { len, 0,0, 0 };
-		uint8_t *in[4] = { t, NULL,NULL,NULL};
-		vj_task_run( in,in, NULL,strides, 1,(performer_job_routine) &yuyv_plane_clear_job );
-		return;
-	}	
 #ifdef HAVE_ASM_MMX2
 	__asm __volatile(
 		"movq	(%0),	%%mm0\n"
@@ -2618,7 +2606,7 @@ static void	vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint
 
 void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
-	if( vj_task_available() ) {
+	if( vj_task_get_num_cpus() > 1 ) {
 		int strides[4] = { len, uv_len, uv_len, 0 };
 		vj_task_set_float( frac );
 		vj_task_run( p0_buffer, img, p1_buffer,strides, 4,(performer_job_routine) &vj_frame_slow_job );
@@ -2852,10 +2840,8 @@ static void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
 
 	if( n_tasks > 1 ) {
 		veejay_msg(VEEJAY_MSG_INFO, "Using %d tasks", n_tasks );
-		task_start(n_tasks);
 		run_benchmark_test( n_tasks, benchmark_threaded_slow, "multi-threaded slow frame", n_frames, dest, source, planes );
 		run_benchmark_test( n_tasks, benchmark_threaded_copy, "multi-threaded memory copy", n_frames, dest, source, planes );
-		task_stop(n_tasks);
 	}
 
 	free(src);
@@ -2883,7 +2869,7 @@ void	benchmark_veejay(int w, int h)
 
 	veejay_msg(VEEJAY_MSG_INFO, "Starting benchmark %dx%d YUVP 4:2:2 (100 frames)", w,h);
 
-	int n_tasks = task_num_cpus();
+	int n_tasks = vj_task_get_num_cpus();
 	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
 	if( str2 ) {
 		n_tasks = atoi(str2);

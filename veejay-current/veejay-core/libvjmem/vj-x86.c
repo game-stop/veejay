@@ -177,7 +177,7 @@ void	vj_mem_destroy()
 
 int	vj_mem_threaded_init(int w, int h)
 {
-	int n_cpus = task_num_cpus();
+	int n_cpus = vj_task_get_num_cpus();
 	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
 	
 	int num_tasks = 1;
@@ -208,24 +208,9 @@ int	vj_mem_threaded_init(int w, int h)
 
 	init_parallel_tasks( num_tasks ); // sets functions pointer to single/multi threaded versions
 	
-	if( num_tasks > 1 ) {
-		int res = task_start( num_tasks );
-		if( res != num_tasks ) {
-			veejay_msg(0, "Failed to initialize threadpool of %d workers", num_tasks );
-			return 0;
-		}
-		veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer", num_tasks, n_cpus );
-	}
-
 	return 1;
 }
 
-void	vj_mem_threaded_stop()
-{
-	int tasks = num_threaded_tasks();
-	if( tasks > 0 )
-		task_stop( tasks );
-}
 
 void *vj_malloc_(size_t size)
 {

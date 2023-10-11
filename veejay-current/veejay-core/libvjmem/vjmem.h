@@ -28,7 +28,6 @@ extern void vj_mem_init(void);
 extern void vj_mem_optimize();
 extern void vj_mem_set_defaults();
 extern int vj_mem_threaded_init(int w, int h);
-extern void vj_mem_threaded_stop(void);
 extern void *vj_malloc_(size_t size);
 extern void *vj_calloc_(size_t size );
 extern void memcpy_report();

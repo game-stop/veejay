@@ -1631,20 +1631,13 @@ static void	yuy2_scale_pixels_from_yuv_job( void *arg )
 
 void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
 {
-	if(vj_task_available() ) {
-		uint8_t *in[4] = { plane,NULL,NULL,NULL };
-		int strides[4] = { len * 2, 0, 0, 0 };
-		vj_task_run( in,in,NULL, strides, 1, (performer_job_routine) &yuy2_scale_pixels_from_yuv_job );
-	}
-	else {
-		unsigned int rlen = 2 * len ;
-		unsigned int i;
-		for( i = 0; i < rlen; i += 4 ) {
-			plane[i+0] = jpeg_to_CCIR_tableY[ plane[i+0] ];
-			plane[i+1] = jpeg_to_CCIR_tableUV[plane[i+1] ];
-			plane[i+2] = jpeg_to_CCIR_tableY[ plane[i+2] ];
-			plane[i+3] = jpeg_to_CCIR_tableUV[ plane[i+3] ];
-		}
+	unsigned int rlen = 2 * len ;
+	unsigned int i;
+	for( i = 0; i < rlen; i += 4 ) {
+		plane[i+0] = jpeg_to_CCIR_tableY[ plane[i+0] ];
+		plane[i+1] = jpeg_to_CCIR_tableUV[plane[i+1] ];
+		plane[i+2] = jpeg_to_CCIR_tableY[ plane[i+2] ];
+		plane[i+3] = jpeg_to_CCIR_tableUV[ plane[i+3] ];
 	}
 }
 
@@ -1664,20 +1657,13 @@ static void	yuy2_scale_pixels_from_ycbcr_job( void *arg )
 
 void	yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len )
 {
-	if(vj_task_available() ) {
-		uint8_t *in[4] = { plane,NULL,NULL,NULL };
-		int strides[4] = { len * 2, 0, 0, 0 };
-		vj_task_run( in,in,NULL, strides, 1, (performer_job_routine) &yuy2_scale_pixels_from_ycbcr_job );
-	}
-	else {
-		unsigned int rlen = 2 * len ;
-		unsigned int i;
-		for( i = 0; i < rlen; i += 4 ) {
-			plane[i+0] = CCIR_to_jpeg_tableY[ plane[i+0] ];
-			plane[i+1] = CCIR_to_jpeg_tableUV[plane[i+1] ];
-			plane[i+2] = CCIR_to_jpeg_tableY[ plane[i+2] ];
-			plane[i+3] = CCIR_to_jpeg_tableUV[ plane[i+3] ];
-		}
+	unsigned int rlen = 2 * len ;
+	unsigned int i;
+	for( i = 0; i < rlen; i += 4 ) {
+		plane[i+0] = CCIR_to_jpeg_tableY[ plane[i+0] ];
+		plane[i+1] = CCIR_to_jpeg_tableUV[plane[i+1] ];
+		plane[i+2] = CCIR_to_jpeg_tableY[ plane[i+2] ];
+		plane[i+3] = CCIR_to_jpeg_tableUV[ plane[i+3] ];
 	}
 }
 
@@ -1704,26 +1690,20 @@ static void	yuy_scale_pixels_from_yuv_job( void *arg)
 
 void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len, int uv_len ) 
 {
-	if(vj_task_available() ) {
-		int strides[4] = { len, uv_len,uv_len, 0 };
-		vj_task_run( src,dst,NULL, strides, 3, (performer_job_routine) &yuy_scale_pixels_from_yuv_job );
+	unsigned int i;
+	uint8_t *y = src[0];
+	int8_t *u = src[1];
+	uint8_t *v = src[2];
+	uint8_t *dY = dst[0];
+	uint8_t *dU = dst[1];
+	uint8_t *dV = dst[2];
+	for( i = 0; i < len ; i ++ ) {
+		dY[i] = jpeg_to_CCIR_tableY[ y[i] ];
 	}
-	else {
-		unsigned int i;
-		uint8_t *y = src[0];
-		uint8_t *u = src[1];
-		uint8_t *v = src[2];
-		uint8_t *dY = dst[0];
-		uint8_t *dU = dst[1];
-		uint8_t *dV = dst[2];
-		for( i = 0; i < len ; i ++ ) {
-			dY[i] = jpeg_to_CCIR_tableY[ y[i] ];
-		}
-		len = len / 2;
-		for( i = 0; i < len ; i ++ ) {
-			dU[i] = jpeg_to_CCIR_tableUV[ u[i] ];
-			dV[i] = jpeg_to_CCIR_tableUV[ v[i] ];
-		}
+	len = len / 2;
+	for( i = 0; i < len ; i ++ ) {
+		dU[i] = jpeg_to_CCIR_tableUV[ u[i] ];
+		dV[i] = jpeg_to_CCIR_tableUV[ v[i] ];
 	}
 }
 void	yuv_scale_pixels_from_y( uint8_t *plane, int len )
