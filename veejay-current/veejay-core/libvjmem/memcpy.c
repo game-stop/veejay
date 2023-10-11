@@ -1980,7 +1980,7 @@ void memset_asimd(void *dst, uint8_t val, size_t len) {
 void memset_asimd_v2(void *dst, uint8_t val, size_t len) {
 
 	if( len == 0 || NULL == dst ) 
-		return dst;
+		return;
 
     uint8x16_t value = vdupq_n_u8(val);
     uint8_t *dst_bytes = (uint8_t *)dst;
