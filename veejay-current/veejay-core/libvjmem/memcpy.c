@@ -1521,7 +1521,7 @@ void fast_memset_dirty(void * to, int val, size_t len)
 	 *	Now do the tail of the block
 	 */
 	if(len) small_memset(t, val, len);
-#else
+#elif
 	memset(to,val,len);
 #endif
 }
