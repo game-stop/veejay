@@ -1692,7 +1692,7 @@ void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len, int u
 {
 	unsigned int i;
 	uint8_t *y = src[0];
-	int8_t *u = src[1];
+	uint8_t *u = src[1];
 	uint8_t *v = src[2];
 	uint8_t *dY = dst[0];
 	uint8_t *dU = dst[1];
@@ -1801,5 +1801,13 @@ void yuv444_yvu444_1plane(
 		dst += 3;
 	}	
 	
+}
+
+void yuv_interpolate_frames( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
+{
+	int i;
+	for( i = 0; i < len; i ++  ) {
+		dst[i] = a[i] + ( frac * ( b[i] - a[i] ) ); 
+	}
 }
 

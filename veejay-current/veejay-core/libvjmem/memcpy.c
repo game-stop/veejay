@@ -138,6 +138,8 @@
 #include <libvjmsg/vj-msg.h>
 #include <libyuv/mmx.h>
 #include <libyuv/mmx_macros.h>
+#include <veejaycore/defs.h>
+#include <libyuv/yuvconv.h>
 #include <veejaycore/veejaycore.h>
 #include <libavutil/cpu.h>
 #ifdef HAVE_ARM
@@ -2515,67 +2517,6 @@ static void	vj_frame_clearN( uint8_t **input, int *strides, unsigned int val )
 	vj_task_run( input, input, NULL, strides,3, (performer_job_routine) &vj_frame_clear_job );
 }
 
-static inline void vj_frame_slow1( uint8_t *dst, uint8_t *a, uint8_t *b, const int len, const float frac )
-{
-#ifndef HAVE_ASM_MMX 
-	int i;
-	for( i = 0; i < len; i ++  ) {
-		dst[i] = a[i] + ( frac * ( b[i] - a[i] ) ); 
-	}
-#else
-#ifdef HAVE_ASM_SSE2
-    int i;
-    __m128i frac128 = _mm_set1_epi32((int)(frac * 65536.0f)); 
-
-    for (i = 0; i <= len - 16; i += 16) {
-        __m128i a_vec = _mm_loadu_si128((__m128i*)(a + i));
-        __m128i b_vec = _mm_loadu_si128((__m128i*)(b + i));
-
-        __m128i diff = _mm_sub_epi16(b_vec, a_vec);
-        __m128i scaled_diff = _mm_mulhi_epi16(diff, frac128);
-        __m128i result = _mm_add_epi16(a_vec, scaled_diff);
-
-        _mm_storeu_si128((__m128i*)(dst + i), result);
-    }
-
-    for (; i < len; ++i) {
-        dst[i] = a[i] + (uint8_t)((frac * (b[i] - a[i])) + 0.5f);
-    }
-#else
-    uint32_t ialpha = (256 * frac);
-    unsigned int i;
-
-    ialpha |= ialpha << 16;
-
-    __asm __volatile
-				("\n\t pxor %%mm6, %%mm6"
-                ::);
-
-	for (i = 0; i < len; i += 4) {
-		__asm __volatile
-			("\n\t movd %[alpha], %%mm3"
-			"\n\t movd %[src2], %%mm0"
-			"\n\t psllq $32, %%mm3"
-			"\n\t movd %[alpha], %%mm2"
-			"\n\t movd %[src1], %%mm1"
-			"\n\t por %%mm3, %%mm2"
-			"\n\t punpcklbw %%mm6, %%mm0"  
-			"\n\t punpcklbw %%mm6, %%mm1"  
-			"\n\t psubsw %%mm1, %%mm0"     
-			"\n\t pmullw %%mm2, %%mm0"     
-			"\n\t psrlw $8, %%mm0"        
-			"\n\t paddb %%mm1, %%mm0"     
-			"\n\t packuswb %%mm0, %%mm0\n\t"
-			"\n\t movd %%mm0, %[dest]\n\t"
-			: [dest] "=m" (*(dst + i))
-			: [src1] "m" (*(a + i))
-			, [src2] "m" (*(b + i))
-			, [alpha] "m" (ialpha));
-	}
-#endif
-#endif
-}
-
 static void	vj_frame_slow_job( void *arg )
 {
 	vj_task_arg_t *job = (vj_task_arg_t*) arg;
@@ -2590,17 +2531,17 @@ static void	vj_frame_slow_job( void *arg )
 		uint8_t *b = p1_buffer[i];
 		uint8_t *d = img[i];
 		const unsigned int len = job->strides[i];
-		vj_frame_slow1(d,a,b,len,frac );	
+		yuv_interpolate_frames(d,a,b,len,frac );	
 	}
 
 
 }
 
-static void	vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
+void	vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
-	vj_frame_slow1(img[0],p0_buffer[0],p1_buffer[0],len,frac );	
-	vj_frame_slow1(img[1],p0_buffer[1],p1_buffer[1],uv_len,frac );	
-	vj_frame_slow1(img[2],p0_buffer[2],p1_buffer[2],uv_len,frac );	
+	yuv_interpolate_frames(img[0],p0_buffer[0],p1_buffer[0],len,frac );	
+	yuv_interpolate_frames(img[1],p0_buffer[1],p1_buffer[1],uv_len,frac );	
+	yuv_interpolate_frames(img[2],p0_buffer[2],p1_buffer[2],uv_len,frac );	
 }
 
 
@@ -2838,11 +2779,9 @@ static void benchmark_tasks(unsigned int n_tasks, long n_frames, int w, int h)
 	run_benchmark_test( n_tasks, benchmark_single_copy, "single-threaded memory copy", n_frames, dest, source, planes );
 	run_benchmark_test( n_tasks, benchmark_single_slow, "single-threaded slow frame", n_frames, dest, source, planes );
 
-	if( n_tasks > 1 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "Using %d tasks", n_tasks );
-		run_benchmark_test( n_tasks, benchmark_threaded_slow, "multi-threaded slow frame", n_frames, dest, source, planes );
-		run_benchmark_test( n_tasks, benchmark_threaded_copy, "multi-threaded memory copy", n_frames, dest, source, planes );
-	}
+//	run_benchmark_test( n_tasks, benchmark_threaded_slow, "multi-threaded slow frame", n_frames, dest, source, planes );
+//	run_benchmark_test( n_tasks, benchmark_threaded_copy, "multi-threaded memory copy", n_frames, dest, source, planes );
+	
 
 	free(src);
 	free(dst);
