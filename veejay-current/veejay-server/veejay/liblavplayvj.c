@@ -379,8 +379,6 @@ int veejay_free(veejay_t * info)
 
     veejay_playback_close(info);
 
-	vj_mem_threaded_stop();
-
 	vj_event_destroy(info);
 
 	vj_tag_free();
@@ -3055,7 +3053,7 @@ int veejay_main(veejay_t * info)
     	/* Flush the Linux File buffers to disk */
     	//sync();
    
-	if( task_num_cpus() > 1 ) {
+	if( vj_task_get_num_cpus() > 1 ) {
 		CPU_ZERO( &cpuset );
 		CPU_SET ( 0, &cpuset ); /* run on the first cpu */
 

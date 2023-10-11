@@ -188,7 +188,7 @@ int avhelper_set_num_decoders() {
     }
     else {
         veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_NUM_DECODE_THREADS not set!");
-		int n = task_num_cpus();
+		int n = vj_task_get_num_cpus();
 		if( n > 1 )
 			n_threads = 2;
 		if( n > 3 )

@@ -838,7 +838,6 @@ int main(int argc, char **argv)
 	
 	info = veejay_malloc();
 	if (!info) {
-		vj_mem_threaded_stop();
 		return 1;
 	}
 	
