@@ -29,7 +29,6 @@ typedef struct
 	uint8_t *input[4];
 	uint8_t *output[4];
 	uint8_t *temp[4];
-	void *priv;
 	void *ptr;
 	int width;
 	int height;
@@ -41,12 +40,14 @@ typedef struct
 	int jobnum; 
 	int format;
 	float fparam;
-	int iparam;  
 	int iparams[32];
 	int offset;
 } vj_task_arg_t;
 
-int		vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func );
+uint8_t vj_task_get_workers();
+int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func );
+void	vj_task_lock();
+void	vj_task_unlock();
 void	vj_task_set_float( float f );
 void	vj_task_set_ptr( void *ptr );
 void	vj_task_set_to_frame( VJFrame *frame, int pos, int job );

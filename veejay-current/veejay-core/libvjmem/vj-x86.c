@@ -165,8 +165,8 @@ void vj_mem_init(void)
 
 void vj_mem_optimize() {
 #ifndef STRICT_CHECKING
-	find_best_memcpy();	
-	find_best_memset();
+	//find_best_memcpy();	
+	//find_best_memset();
 #endif
 }
 
@@ -177,36 +177,7 @@ void	vj_mem_destroy()
 
 int	vj_mem_threaded_init(int w, int h)
 {
-	int n_cpus = vj_task_get_num_cpus();
-	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
-	
-	int num_tasks = 1;
-	
-	if( str2 != NULL ) {
-		num_tasks  = atoi( str2 );
-	
-		if( num_tasks >= MAX_WORKERS ) {
-			veejay_msg(0, "Maximum number of tasks is %d", MAX_WORKERS);
-			return -1;
-		}
-	
-		if( num_tasks <= 1 ) {
-			veejay_msg( VEEJAY_MSG_DEBUG, "Not multithreading pixel operations (VEEJAY_MULTITHREAD_TASKS=%d)", num_tasks);
-		}
-	} 
-	else {
-		if( w >= 720 && h >= 480) {
-			num_tasks = n_cpus;
-			if( num_tasks < 1 )
-				num_tasks = 1;
-		}
-		
-	}
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "Set maximum number of multithread tasks to %d", num_tasks );
-	veejay_msg( VEEJAY_MSG_DEBUG,"Use envvar VEEJAY_MULTITHREAD_TASKS=<num threads> to change");
-
-	init_parallel_tasks( num_tasks ); // sets functions pointer to single/multi threaded versions
+	init_parallel_tasks( 0 ); // sets functions pointer to single/multi threaded versions
 	
 	return 1;
 }

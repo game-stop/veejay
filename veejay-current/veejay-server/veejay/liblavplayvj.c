@@ -967,9 +967,6 @@ void veejay_stop_sampling(veejay_t * info)
 
 /******************************************************
  * veejay_SDL_update()
- *   when using software playback - there's a new frame
- *   new frame can enter by body, or be put in info->vb->yuv.
- *   this will probably change.
  * return value: 1 on success, 0 on error
  ******************************************************/
 static int veejay_screen_update(veejay_t * info )

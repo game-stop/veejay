@@ -46,7 +46,6 @@
 #include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
 #include <veejaycore/yuvconv.h>
-#include <veejaycore/vj-task.h>
 
 #define BLANK_CRB in0[1]
 #define BLANK_CRB_2 (in0[1] << 1)
@@ -1172,50 +1171,6 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 }
 #endif
     
-static void	chroma_subsample_task( void *ptr )
-{
-	vj_task_arg_t *f = (vj_task_arg_t*) ptr;
-
-	switch (f->iparams[0]) {
-		case SSM_420_JPEG_BOX:
-		case SSM_420_JPEG_TR: 
-			ss_444_to_420jpeg(f->input[1], f->width, f->height);
-  			ss_444_to_420jpeg(f->input[2], f->width, f->height);
-    		break;
-		case SSM_420_MPEG2:
-			ss_444_to_420mpeg2(f->input[1], f->width, f->height);
-			ss_444_to_420mpeg2(f->input[2], f->width, f->height);
-			break;
-		case SSM_422_444:
-	   	 	ss_444_to_422_cp(f->output[1],f->input[1],f->width,f->height);
-		    ss_444_to_422_cp(f->output[2],f->input[2],f->width,f->height);
-    		break;
-		default:
-			break;
-	}
-}
-static void chroma_supersample_task( void *ptr )
-{
-	vj_task_arg_t *f = (vj_task_arg_t*) ptr; 
-
-	switch (f->iparams[0]) {
-		case SSM_420_JPEG_BOX:
-			ss_420jpeg_to_444(f->input[1], f->width, f->height);
-			ss_420jpeg_to_444(f->input[2], f->width, f->height);
-			break;
-		case SSM_420_JPEG_TR:
-			tr_420jpeg_to_444(f->priv,f->input[1], f->width, f->height);
-			tr_420jpeg_to_444(f->priv,f->input[2], f->width, f->height);
-			break;
-	  	 case SSM_422_444:
-			tr_422_to_444t(f->input[1],f->output[1],f->width,f->height);
-			tr_422_to_444t(f->input[2],f->output[2],f->width,f->height);
-		 	break;
-		default:
-	   	 	break;
-	}
-}
-
 void chroma_subsample_cp(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[], uint8_t *dcbcr[])
 {
 	switch (mode) {

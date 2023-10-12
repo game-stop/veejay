@@ -61,25 +61,37 @@ typedef struct {
 typedef struct {
     pjob_t *queue;
     int queue_size;
-    int front;
-    int rear;
     pthread_mutex_t lock;
-    pthread_cond_t task_available;
+	pthread_cond_t start_signal;
     pthread_cond_t task_completed;
     pthread_t threads[MAX_WORKERS];
     atomic_int stop_flag;
+	int num_submitted_tasks;
+	int num_completed_tasks;
 } thread_pool_t;
 
+typedef struct {
+	thread_pool_t *pool;
+	int job_num;
+} task_thread_args_t;
+
+static task_thread_args_t *thread_args[MAX_WORKERS];
 
 static unsigned int n_cpu = 0;
 static uint8_t numThreads = 0;
 static thread_pool_t *task_pool = NULL;
 
-static uint8_t  task_get_workers()
+uint8_t  vj_task_get_workers()
 {
         return numThreads;
 }
 
+void	vj_task_lock() {
+	pthread_mutex_lock(&task_pool->lock);
+}
+void	vj_task_unlock() {
+	pthread_mutex_unlock(&task_pool->lock);
+}
 
 int	vj_task_get_num_cpus()
 {
@@ -101,14 +113,14 @@ int	vj_task_get_num_cpus()
 
 void	vj_task_set_float( float f ){
 	uint8_t i;
-	uint8_t n = task_get_workers();
+	uint8_t n = vj_task_get_workers();
 	for( i = 0; i < n; i ++ )
 		vj_task_args[i]->fparam = f;
 }
 
 void	vj_task_set_param( int val , int idx ){
 	uint8_t i;
-	uint8_t n = task_get_workers();
+	uint8_t n = vj_task_get_workers();
 
 	for( i = 0; i < n; i ++ )
 		vj_task_args[i]->iparams[idx] = val;
@@ -117,7 +129,7 @@ void	vj_task_set_param( int val , int idx ){
 void	vj_task_set_ptr( void *ptr )
 {
 	uint8_t i;
-	uint8_t n = task_get_workers();
+	uint8_t n = vj_task_get_workers();
 
 	for( i = 0; i < n; i ++ ) {
 		vj_task_args[i]->ptr = ptr;
@@ -126,7 +138,7 @@ void	vj_task_set_ptr( void *ptr )
 
 void	vj_task_set_from_args( int len, int uv_len )
 {
-	uint8_t n = task_get_workers();
+	uint8_t n = vj_task_get_workers();
 	uint8_t i;
 	
 	for( i = 0; i < n; i ++ ) {
@@ -141,6 +153,7 @@ void	vj_task_set_from_args( int len, int uv_len )
 void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 {
 	vj_task_arg_t *first = vj_task_args[job];
+
 	in->width = first->width;
 	in->height= first->height;
 	in->ssm   = first->ssm;
@@ -200,7 +213,7 @@ void	vj_task_set_to_frame( VJFrame *in, int i, int job )
 
 void	vj_task_set_from_frame( VJFrame *in )
 {
-	const uint8_t n = task_get_workers();
+	const uint8_t n = vj_task_get_workers();
 	uint8_t i;
 
 	if( in->format == PIX_FMT_RGBA ) 
@@ -250,90 +263,96 @@ void	vj_task_set_from_frame( VJFrame *in )
 
 
 static void* task_worker(void *arg) {
-    thread_pool_t *pool = (thread_pool_t *)arg;
+    task_thread_args_t *ptr = (task_thread_args_t*) arg;
+	thread_pool_t *pool = (thread_pool_t *)ptr->pool;
+	int job_num = ptr->job_num;
 
     while (1) {
         pthread_mutex_lock(&pool->lock);
-
-        while (pool->front == pool->rear && !atomic_load(&pool->stop_flag)) {
-            pthread_cond_wait(&pool->task_available, &pool->lock);
-        }
+		pthread_cond_wait(&pool->start_signal, &pool->lock);
 
         if (atomic_load(&pool->stop_flag)) {
             pthread_mutex_unlock(&pool->lock);
             pthread_exit(NULL);
         }
 
-        pjob_t task = pool->queue[pool->front];
-        pool->front = (pool->front + 1) % pool->queue_size;
-        pthread_cond_signal(&pool->task_completed);
-
-        pthread_mutex_unlock(&pool->lock);
+        pjob_t task = pool->queue[ job_num ];
+		pthread_mutex_unlock(&pool->lock);
 
         task.job(task.arg);
 
-	task.job = NULL;
-	task.arg = NULL;
+		pthread_mutex_lock(&pool->lock);
+        pool->num_completed_tasks ++;
+
+		if( pool->num_completed_tasks == pool->num_submitted_tasks ) {
+			pthread_cond_broadcast( &pool->task_completed );
+		}
+		pthread_mutex_unlock(&pool->lock);
+	
+		task.job = NULL;
+		task.arg = NULL;
+
     }
 
     return NULL;
 }
 
-static thread_pool_t* create_thread_pool(int num_threads, int queue_size) {
-    thread_pool_t *pool = (thread_pool_t *)malloc(sizeof(thread_pool_t));
-    pool->queue = (pjob_t *)malloc(sizeof(pjob_t) * queue_size);
-    pool->queue_size = queue_size;
-    pool->front = 0;
-    pool->rear = 0;
+static thread_pool_t* create_thread_pool(int num_threads) {
+    thread_pool_t *pool = (thread_pool_t *)vj_malloc(sizeof(thread_pool_t));
+    pool->queue = (pjob_t *)vj_calloc(sizeof(pjob_t) * num_threads);
+    pool->queue_size = num_threads;
     pthread_mutex_init(&pool->lock, NULL);
-    pthread_cond_init(&pool->task_available, NULL);
     pthread_cond_init(&pool->task_completed, NULL);
+	pthread_cond_init(&pool->start_signal, NULL);
+
     atomic_init(&pool->stop_flag, 0);
-
-    for (int i = 0; i < num_threads; ++i) {
-        pthread_create(&(pool->threads[i]), NULL, task_worker, (void *)pool);
+	
+    for (int i = 0; i < num_threads; i++) {
+    	task_thread_args_t *args = thread_args[i];
+		args->pool = pool;
+		args->job_num = i;
+		pthread_create(&(pool->threads[i]), NULL, task_worker, args);
     }
-
-    veejay_msg(VEEJAY_MSG_INFO, "Created thread pool with %d workers" , num_threads );
 
     return pool;
 }
 
 static void submit_job(thread_pool_t *pool, performer_job_routine job, void *arg) {
-    pthread_mutex_lock(&pool->lock);
 
-    while ((pool->rear + 1) % pool->queue_size == pool->front) {
-        pthread_cond_wait(&pool->task_completed, &pool->lock);
-    }
+	int idx = pool->num_submitted_tasks;
 
-    pool->queue[pool->rear].job = job;
-    pool->queue[pool->rear].arg = arg;
-    pool->rear = (pool->rear + 1) % pool->queue_size;
+    pool->queue[idx].job = job;
+    pool->queue[idx].arg = arg;
+	pool->num_submitted_tasks ++;
 
-    pthread_cond_signal(&pool->task_available);
-    pthread_mutex_unlock(&pool->lock);
+}
+
+static void start_all_threads(thread_pool_t *pool) {
+	pthread_mutex_lock(&pool->lock);
+    pthread_cond_broadcast(&pool->start_signal);
+    pthread_mutex_unlock(&pool->lock);	
 }
 
 static void wait_all_tasks_completed(thread_pool_t *pool) {
     pthread_mutex_lock(&pool->lock);
-    while (pool->front != pool->rear) {
+    while (pool->num_completed_tasks != pool->num_submitted_tasks) {
         pthread_cond_wait(&pool->task_completed, &pool->lock);
-    }
+	}
+	pool->num_submitted_tasks = 0;
+	pool->num_completed_tasks = 0;
     pthread_mutex_unlock(&pool->lock);
 }
 
 static void destroy_thread_pool(thread_pool_t *pool) {
     pthread_mutex_lock(&pool->lock);
     atomic_store(&pool->stop_flag, 1);
-    pthread_cond_broadcast(&pool->task_available);
     pthread_mutex_unlock(&pool->lock);
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < numThreads; i++) {
         pthread_join(pool->threads[i], NULL);
     }
 
     pthread_mutex_destroy(&pool->lock);
-    pthread_cond_destroy(&pool->task_available);
     pthread_cond_destroy(&pool->task_completed);
 
     free(pool->queue);
@@ -343,7 +362,7 @@ static void destroy_thread_pool(thread_pool_t *pool) {
 
 int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int n_planes, performer_job_routine func )
 {
-	const uint8_t n = task_get_workers();
+	const uint8_t n = vj_task_get_workers();
 	if( n <= 1 ) {
         	return 0;
     	}
@@ -379,25 +398,21 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 			if( buf3 != NULL )
 				f[j]->temp[i] = buf3[i] + (f[j]->strides[i]* j); 
 		}
+		
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "New job!" );
 	for( i = 0; i < n; i ++ ) {
-		f[i]->jobnum = i;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Queue task %d [%p, %p] [ %d %d %d ]",
-				f[i]->input[0],
-				f[i]->output[0],
-				f[i]->strides[0],
-				f[i]->strides[1],
-				f[i]->strides[2] );
-
-		submit_job( task_pool, func, f[i] );
+	    f[i]->jobnum = i;
 	}	
 
-	wait_all_tasks_completed(task_pool);
 	for( i = 0; i < n; i ++ ) {
-		veejay_memset( f[i], 0, sizeof(vj_task_arg_t));
+	     submit_job( task_pool, func, f[i] );
 	}
+
+
+	start_all_threads(task_pool);	
+
+	wait_all_tasks_completed(task_pool);
 
 	return 1;
 }
@@ -421,14 +436,14 @@ void task_init()
 	}
 
 	if( numThreads < 0 || numThreads > MAX_WORKERS ) {
-		numThreads = n_cpu;
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid value for VEEJAY_MULTITHREAD_TASKS, using default (%d)",numThreads);
+		numThreads = n_cpu/2;
 	}
 
 	int i;
 	for( i = 0; i < MAX_WORKERS ; i ++ ) {
 	    vj_task_args[i] = vj_calloc( sizeof(vj_task_arg_t) );
+		thread_args[i] = vj_calloc(sizeof(task_thread_args_t));
 	}
 
-	task_pool = create_thread_pool( n_cpu, numThreads );
+	task_pool = create_thread_pool( numThreads );
 }

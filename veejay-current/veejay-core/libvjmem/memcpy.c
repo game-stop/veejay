@@ -2447,7 +2447,7 @@ void	vj_frame_slow_single( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **i
 
 void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
-	if( vj_task_get_num_cpus() > 1 ) {
+	if( vj_task_get_workers() > 1 ) {
 		int strides[4] = { len, uv_len, uv_len, 0 };
 		vj_task_set_float( frac );
 		vj_task_run( p0_buffer, img, p1_buffer,strides, 4,(performer_job_routine) &vj_frame_slow_job );
@@ -2708,17 +2708,9 @@ void	benchmark_veejay(int w, int h)
 
 	veejay_msg(VEEJAY_MSG_INFO, "Starting benchmark %dx%d YUVP 4:2:2 (100 frames)", w,h);
 
-	int n_tasks = vj_task_get_num_cpus();
-	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
-	if( str2 ) {
-		n_tasks = atoi(str2);
-	}
+	init_parallel_tasks( 0 );
 
-	veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_MULTITHREAD_TASKS=%d", n_tasks );
-
-	init_parallel_tasks( n_tasks );
-
-	benchmark_tasks( n_tasks,100,w,h );
+	benchmark_tasks( 0,100,w,h );
 }
 
 void	*vj_hmalloc(size_t sze, const char *name)

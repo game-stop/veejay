@@ -3947,13 +3947,6 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
     int transition_enabled = info->settings->transition.active;
     if(transition_enabled) {
-        /*if(info->settings->current_playback_speed < 0 ) {
-            if(info->settings->current_frame_num < info->settings->transition.end || info->settings->current_frame_num > info->settings->transition.start)
-                transition_enabled = 0;
-        } else {
-            if(info->settings->current_frame_num < info->settings->transition.start || info->settings->current_frame_num > info->settings->transition.end )
-                transition_enabled = 0;
-        }*/
         if(info->settings->current_frame_num < info->settings->transition.start || info->settings->current_frame_num > info->settings->transition.end )
                 transition_enabled = 0;
     }

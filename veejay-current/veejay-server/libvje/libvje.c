@@ -443,19 +443,19 @@ void vje_fx_free( int fx_id, int chain_id, int entry, void *ptr )
 static void vje_fx_parallel_apply( void *arg )
 {
     vj_task_arg_t *v = (vj_task_arg_t*) arg;
+    VJFrame a,b;
+
     int idx = v->iparams[0];
     int extra_frame = v->iparams[1];
     int *param_values = &(v->iparams[2]);
 
-    VJFrame a,b;
-
     vj_task_set_to_frame( &a, 0, v->jobnum );
 
     if(extra_frame) {
-        vj_task_set_to_frame( &b, 1, v->jobnum );
 #ifdef STRICT_CHECKING
         assert( vj_fx[ idx ].fx_process != NULL );
 #endif
+	vj_task_set_to_frame( &b, 1, v->jobnum );
         vj_fx[ idx ].fx_process( v->ptr, &a, &b, param_values );
     }
     else {
@@ -471,7 +471,7 @@ static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A,
     if(!fx->parallel)
         return 0;
 
-    if( vj_task_get_num_cpus() < 2 )
+    if( vj_task_get_workers() <= 0 )
 	return 0;
 
     int i;
@@ -479,7 +479,7 @@ static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A,
     vj_task_set_from_frame( A );
     vj_task_set_param( idx, 0 );
     vj_task_set_param( fx->extra_frame, 1 );
-    vj_task_set_ptr( instance );
+    vj_task_set_ptr( instance ); 
 
     for( i = 0; i < fx->num_params; i ++ ) {
         vj_task_set_param( args[i], 2 + i );
@@ -530,7 +530,7 @@ void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
     else {
         int doneProcessing = 0;
 
-        if( parallel_enabled ) {
+        if( parallel_enabled && fx->parallel ) {
             doneProcessing = vje_fx_parallize( fx, ptr, idx, A, B, args );
         }
 
