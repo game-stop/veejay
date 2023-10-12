@@ -351,9 +351,9 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	vj_task_arg_t **f = (vj_task_arg_t**) vj_task_args;
 	uint8_t i,j;
 
-	for ( i = 0; i < n_planes; i ++ ) {
-		f[0]->input[i] = buf1[i];
-		f[0]->output[i]= buf2[i];
+	for ( i = 0; i < n_planes; i ++ ) { 
+		f[0]->input[i] = buf1[i]; //frame
+		f[0]->output[i]= buf2[i]; //frame2
 	}
 
 	if( buf3 != NULL ) {
@@ -361,8 +361,6 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 			f[0]->temp[i]  = buf3[i];
 		}
 	}
-
-	f[0]->jobnum = 0;
 
 	if( strides != NULL ) {
 		for( j = 0; j < n; j ++ ) {
@@ -381,14 +379,25 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 			if( buf3 != NULL )
 				f[j]->temp[i] = buf3[i] + (f[j]->strides[i]* j); 
 		}
-		f[j]->jobnum = j;
 	}
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "New job!" );
 	for( i = 0; i < n; i ++ ) {
+		f[i]->jobnum = i;
+		veejay_msg(VEEJAY_MSG_DEBUG, "Queue task %d [%p, %p] [ %d %d %d ]",
+				f[i]->input[0],
+				f[i]->output[0],
+				f[i]->strides[0],
+				f[i]->strides[1],
+				f[i]->strides[2] );
+
 		submit_job( task_pool, func, f[i] );
 	}	
 
 	wait_all_tasks_completed(task_pool);
+	for( i = 0; i < n; i ++ ) {
+		veejay_memset( f[i], 0, sizeof(vj_task_arg_t));
+	}
 
 	return 1;
 }

@@ -87,15 +87,17 @@ static	void	printbuf( FILE *f, uint8_t *buf , int len )
 		}
 		fprintf(f, "%02x ", buf[i]);
 	}
-	fprintf(f, "\ntext:\n");
+	fprintf(f, "\ntext:");
 	for( i = 0; i < len ; i ++ ) {
 		if( (i%32) == 0 ) {
 			fprintf(f, "\n");
 		}
-		fprintf(f, "%c ", buf[i]);
+		fprintf(f, "%c", buf[i]);
 	}
 
-	fprintf(f, "\n");
+
+
+	fprintf(f, "\n-------\n");
 }
 int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);
@@ -266,7 +268,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
    	}
 
 	if(vjs->logfd) {
-		fprintf( vjs->logfd, "selected port %d, maximum connections is %d", port_num, VJ_MAX_CONNECTIONS );
+		fprintf( vjs->logfd, "selected port %d, maximum connections is %d\n", port_num, VJ_MAX_CONNECTIONS );
 	}
 
 	int send_size = 1024 * 1024;
@@ -281,7 +283,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		return 0;
 	}
 	if(vjs->logfd) {
-		fprintf( vjs->logfd, "socket send buffer size is %d bytes", vjs->send_size );
+		fprintf( vjs->logfd, "socket send buffer size is %d bytes\n", vjs->send_size );
 	}
 
 	if( setsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (const char*) &send_size, sizeof(send_size)) == 1 )
@@ -295,7 +297,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		return 0;
 	}
 	if(vjs->logfd) {
-		fprintf( vjs->logfd, "socket recv buffer size is %d bytes", vjs->recv_size );
+		fprintf( vjs->logfd, "socket recv buffer size is %d bytes\n", vjs->recv_size );
 	}
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Port: %d [ receive buffer is %d bytes, send buffer is %d bytes ]", port_num, vjs->recv_size, vjs->send_size );
@@ -349,7 +351,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	vjs->link = (void**) link;
 	vjs->nr_of_connections = vjs->handle;
 	if(vjs->logfd) {
-		fprintf( vjs->logfd, "allocated queue for max %d connctions", VJ_MAX_CONNECTIONS );
+		fprintf( vjs->logfd, "allocated queue for max %d connctions\n", VJ_MAX_CONNECTIONS );
 	}
 
 	switch(vjs->server_type )
@@ -409,9 +411,9 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 
 	char *netlog = getenv("VEEJAY_LOG_NET_IO" );
 
-	if( netlog != NULL && strncasecmp("ON",netlog, 2) == 0 ) {
+	if( netlog != NULL ) {
 		char logpath[1024];
-		sprintf( logpath, "%s.%d", VEEJAY_SERVER_LOG, port_offset );
+		snprintf( logpath,sizeof(logpath), "%s.%d", netlog, port_offset );
 		vjs->logfd       = fopen( logpath, "w" );
 		if(!vjs->logfd) {
 			veejay_msg(VEEJAY_MSG_WARNING, "Unable to open %s for logging Network I/O\n", VEEJAY_SERVER_LOG );
@@ -421,8 +423,9 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 			fprintf( vjs->logfd, "Server setup: port %d, name %s type %d\n", port_offset,mcast_group_name,type);
 			fprintf( vjs->logfd, "receive buffer size: %d bytes\n", vjs->recv_bufsize);
 		}
+		veejay_msg(VEEJAY_MSG_WARNING, "Logging network messages to %s", netlog );
 	} else {
-		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_LOG_NET_IO=logfile not set");
+		veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_LOG_NET_IO=/tmp/veejay-server-log not set");
 	}
 
 	char *timeout = getenv("VEEJAY_NET_TIMEOUT");

@@ -220,12 +220,17 @@ void	vj_midi_load(void *vv, const char *filename)
 						free(cur);
 					}
 					int error = vevo_property_set( v->vims, key, VEVO_ATOM_TYPE_VOIDPTR,1, &d);
-					if( error == VEVO_NO_ERROR )
+					if( error == VEVO_NO_ERROR ) {
+						veejay_msg(VEEJAY_MSG_DEBUG, "Loaded MIDI %s [%d] VIMS: '%s' origin: %s",
+							key,
+							extra,
+							message,
+						        widget);
 						count ++;
+					}
 #ifdef STRICT_CHECKING
 					else {
 						veejay_msg(VEEJAY_MSG_ERROR, "Error loading MIDI event '%s': %d",key, error );
-
 					}
 #endif
 				}
@@ -273,8 +278,9 @@ void	vj_midi_save(void *vv, const char *filename)
 				d->extra,
 				(d->widget == NULL ? "none" : d->widget ),
 				d->msg );
-			if( write( fd, tmp, strlen( tmp )) >= 0 )
+			if( write( fd, tmp, strlen( tmp )) >= 0 ) {
 				count ++;
+			}
 		}
 		free(items[i]);
 	}
@@ -313,15 +319,22 @@ void	vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra )
 		free(cur);
 	}
 	int error = vevo_property_set( v->vims, key, VEVO_ATOM_TYPE_VOIDPTR,1, &d );
-	if( error != VEVO_NO_ERROR )
+	if( error != VEVO_NO_ERROR ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "MIDI failed to store %s", key );
 		return;
-	vj_msg( VEEJAY_MSG_INFO, 
-		"Midi %x: %x ,%x learned", v->learn_event[0],v->learn_event[1],v->learn_event[2]);
+	}
+	veejay_msg( VEEJAY_MSG_INFO, 
+		"MIDI %x: %x ,%x learned: VIMS '%s' %d, origin: %s", 
+			v->learn_event[0],
+			v->learn_event[1],
+			v->learn_event[2], d->msg, d->extra, d->widget);
+	vj_msg(VEEJAY_MSG_INFO, "MIDI event %x: %x,%x to VIMS %s / %d", v->learn_event[0],v->learn_event[1],v->learn_event[2],
+			d->msg, d->extra );
 }
 
 void	vj_midi_learning_vims_simple( void *vv, char *widget, int id )
 {
-	char message[100];
+	char message[8];
 	if( widget == NULL )
 		snprintf(message,sizeof(message), "%03d:;", id );
 	else
@@ -331,7 +344,7 @@ void	vj_midi_learning_vims_simple( void *vv, char *widget, int id )
 
 void	vj_midi_learning_vims_spin( void *vv, char *widget, int id )
 {
-	char message[100];
+	char message[8];
 	if( widget == NULL )
 		snprintf(message,sizeof(message), "%03d:;", id );
 	else
@@ -342,7 +355,7 @@ void	vj_midi_learning_vims_spin( void *vv, char *widget, int id )
 
 void	vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra)
 {
-	char message[100];
+	char message[16];
 	snprintf( message, sizeof(message), "%03d:%d",id, first );
 
 	vj_midi_learning_vims( vv, widget, message, extra );
@@ -350,7 +363,7 @@ void	vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , 
 
 void	vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg )
 {
-	char message[100];
+	char message[32];
 	snprintf(message, sizeof(message), "%03d:%d;",id, arg );
 
 	vj_midi_learning_vims( vv, widget, message, 0 );
@@ -358,22 +371,22 @@ void	vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg )
 
 void	vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b )
 {
-	char message[100];
+	char message[32];
 	snprintf(message,sizeof(message), "%03d:%d %d;", id, arg,b );
 	vj_midi_learning_vims( vv, widget, message, 0 );
 }
 
 void	vj_midi_learning_vims_msg2_extra(void *vv, int id,int a, int extra )
 {
-	char message[100];
+	char message[32];
 	snprintf(message,sizeof(message), "%03d:%d", id, a );
 	vj_midi_learning_vims( vv, NULL, message, extra );
 }
 
 void	vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c, int extra )
 {
-	char message[100];
-	char wid[100];
+	char message[32];
+	char wid[32];
 	snprintf(message,sizeof(message), "%03d:%d %d %d", id, a,b,c );
 	snprintf(wid, sizeof(wid),"slider_p%d", widget );
 	vj_midi_learning_vims( vv, wid, message, extra );
@@ -443,18 +456,28 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			if( data[0] == SND_SEQ_EVENT_PITCHBEND )
 			{
 				val =  ( (data[2]/16384.0f) * (max-min) );
+				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI pitch bend %d (min=%g,max=%g) data [%d,%d,%d]",
+					val, min,max,data[0],data[1],data[2] );
 			}
 			else if( data[0] == SND_SEQ_EVENT_CONTROLLER || data[0] == SND_SEQ_EVENT_KEYPRESS )
 			{
 				val = ((max-min)/127.0) * data[2] + min;
+				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI controller %d (min=%g,max=%g) data [%d,%d,%d]",
+					val, min,max, data[0],data[1],data[2]);
 			}
 		   	else {
+				veejay_msg(VEEJAY_MSG_WARNING, "MIDI unknown event [%d,%d,%d]",
+					data[0],data[1],data[2] );
 				vj_msg(VEEJAY_MSG_INFO, "MIDI: what's this %x,%x,%x ?",data[0],data[1],data[2]);
 				return;
 			}
 
+			
+
 			char vims_msg[255];
 			snprintf(vims_msg,sizeof(vims_msg), "%s %d;", d->msg, (int) val );
+
+			veejay_msg(VEEJAY_MSG_DEBUG,"\tVIMS message template '%s'", vims_msg);
 
 			/* use control/param as sample_id */
 			int tmpv[3];
@@ -463,21 +486,25 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			    if(tmpv[1] == 0 && tmpv[0] >= 100 && tmpv[0] < 200) //@ VIMS: sample events, replace 0 (current_id) for control/param number
 			    {
 				snprintf(vims_msg,sizeof(vims_msg),"%03d:%d %d;", tmpv[0], data[1], (int)val);
-			    	veejay_msg(VEEJAY_MSG_DEBUG, "(midi) using control/param %d as sample identifer",data[1]);
+			    	veejay_msg(VEEJAY_MSG_DEBUG, "\t(midi) replace 0 for %d as sample identifer",data[1]);
 			    }	    
 			}
 
+			
 			msg_vims( vims_msg );
 			vj_msg(VEEJAY_MSG_INFO, "MIDI %x:%x, %x ->  vims %s", data[0], data[1],data[2], vims_msg);
 		}
 		else
 		{
+			veejay_msg(VEEJAY_MSG_DEBUG,"\tVIMS messsage: %s",d->msg);
+
 			msg_vims( d->msg );
 			vj_msg(VEEJAY_MSG_INFO, "MIDI %x: %x,%x -> vims %s", data[0],data[1],data[2], d->msg);
 		}
 	}
 	else
 	{
+		veejay_msg(VEEJAY_MSG_WARNING, "MIDI, no event for: [%d,%d,%d]", data[0],data[1], data[2]);
 		vj_msg(VEEJAY_MSG_ERROR, "No vims event for MIDI %x:%x,%x found",data[0],data[1],data[2]);
 	}
 }

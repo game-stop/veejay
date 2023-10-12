@@ -202,6 +202,8 @@ typedef enum { //WARNING ; on change this think to update keyboard_event_map_[] 
 #define VIMS_MOD_CTRL_ALT         VIMS_MOD_CTRL|VIMS_MOD_ALT
 #define VIMS_MOD_CTRL_ALT_SHIFT   VIMS_MOD_CTRL|VIMS_MOD_ALT|VIMS_MOD_SHIFT
 
+static int vims_logging = 0;
+
 static struct {                 /* hardcoded keyboard layout (the default keys) */
     int event_id;           
     int key_sym;            
@@ -982,6 +984,10 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
                 if(msg[offset+j] == ';')
                 {
                     found_end_of_msg = offset+j+1;
+					if(found_end_of_msg > sizeof(atomic_msg)) {
+						veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) internal buffer overrun");
+					   return;	
+					}
                     veejay_strncpy(atomic_msg, msg+offset, (found_end_of_msg-offset));
                     atomic_msg[ (found_end_of_msg-offset) ] ='\0';
                     offset += j + 1;
@@ -1195,7 +1201,11 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
     veejay_t *v = (veejay_t*)ptr;
     int net_id = 0;
     int np = 0;
-    
+   
+    if(vims_logging) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS incoming [%d][%s]", msg_len, msg );
+    }
+
     if( msg == NULL )
     {
         veejay_msg(VEEJAY_MSG_ERROR, "Dropped empty VIMS message");
@@ -1383,7 +1393,7 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		}
 	}
 
-    return 0;
+    return 1;
 }
 
 void vj_event_update_remote(void *ptr)
@@ -1418,7 +1428,11 @@ void vj_event_update_remote(void *ptr)
                 int len =0;
                 while( ( buf = vj_server_retrieve_msg( v->vjs[VEEJAY_PORT_MAT], 0, buf,&len )) != NULL )
                 {   
-                    vj_event_parse_msg( v, buf,len );
+                    if(!vj_event_parse_msg( v, buf,len )) {
+						if(vims_logging) {
+							veejay_msg(VEEJAY_MSG_WARNING, "VIMS malformed: [%d]'%s'",buf, len );
+						}
+					}
                 }
             }
         }
@@ -1553,13 +1567,13 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     if(!ev )
     {
         if(event.type == SDL_MOUSEWHEEL && event.wheel.y >0 && v->use_osd != 3 ) {
-            char msg[100];
-            sprintf(msg,"%03d:;", VIMS_VIDEO_SKIP_SECOND );
+            char msg[8];
+            snprintf(msg,"%03d:;", sizeof(msg), VIMS_VIDEO_SKIP_SECOND );
             vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
             return 1;
         } else if (event.type == SDL_MOUSEWHEEL && event.wheel.y < 0 && v->use_osd != 3) {
-            char msg[100];
-            sprintf(msg,"%03d:;", VIMS_VIDEO_PREV_SECOND );
+            char msg[8];
+            snprintf(msg,sizeof(msg), "%03d:;", VIMS_VIDEO_PREV_SECOND );
             vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
             return 1;
         }   
@@ -2119,6 +2133,12 @@ static void vj_event_init_network_events()
         }
     }   
     veejay_msg(VEEJAY_MSG_DEBUG, "Registered %d VIMS events", net_id );
+
+    if( getenv("VEEJAY_LOG_NET_IO") != NULL ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Enabling VIMS message receiver logging");
+		vims_logging = 1;
+    }
+
 }
 #ifdef HAVE_SDL
 char *find_keyboard_default(int id)
@@ -4318,7 +4338,6 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
         return;
     }
 
-    //FIXME refactor in veejaycoresample
     if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->effect_frame1, v->current_edit_list, args[0]) == 1)
     {
         video_playback_setup *s = v->settings;
