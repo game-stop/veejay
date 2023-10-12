@@ -54,9 +54,9 @@ static void average_blend_apply1( VJFrame *frame, VJFrame *frame2, int average_b
 {
     unsigned int i;
     for( i = 0; i < average_blend; i ++ ) {
-        ac_average( frame->data[0], frame2->data[0], frame->data[0], frame->len );
-        ac_average( frame->data[1], frame2->data[1], frame->data[1], frame->uv_len );
-        ac_average( frame->data[2], frame2->data[2], frame->data[2], frame->uv_len );
+        ac_average( frame->data[0], frame->data[0], frame2->data[0], frame->len );
+        ac_average( frame->data[1], frame->data[1], frame2->data[1], frame->uv_len );
+        ac_average( frame->data[2], frame->data[2], frame2->data[2], frame->uv_len );
     }
 }
 

@@ -310,13 +310,13 @@ static void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int op_a) {
 		a = Cb[i];
 		b = Cb2[i];
 
-		c = a + (2 * b);
-		Cb[i] = CLAMP_UV(c - 0xff);
+		c = a + (2 * b) - 0xff;
+		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i];
 		b = Cr2[i];
-		c = a + (2 * b);
-		Cr[i] = CLAMP_UV(c - 0xff);
+		c = a + (2 * b) - 0xff;
+		Cr[i] = CLAMP_UV(c);
    	 }
 
 }
