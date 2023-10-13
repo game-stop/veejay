@@ -32,7 +32,7 @@ vj_effect *chromapalette_init(int w, int h)
 	//angle,r,g,b,cbc,crc
 
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 4500;
+    ve->limits[1][0] = 9000;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
@@ -44,9 +44,9 @@ vj_effect *chromapalette_init(int w, int h)
     ve->limits[1][4] = 255;
 
     ve->limits[0][5] = 0;
-    ve->limits[1][5] = 255;	
+    ve->limits[1][5] = 255;
 
-    ve->defaults[0] = 3190;//angle
+    ve->defaults[0] = 3000;//angle
     ve->defaults[1] = 255;   //r
     ve->defaults[2] = 0;   //g
     ve->defaults[3] = 0; //b
@@ -60,14 +60,15 @@ vj_effect *chromapalette_init(int w, int h)
     ve->has_help = 1;
 	ve->has_user = 0;
 	ve->rgb_conv = 1;
+	ve->parallel = 1;
 	ve->param_description = vje_build_param_list( ve->num_params, "Angle", "Red","Green","Blue", "Chroma Blue","Chroma Red" );
     return ve;
 }
 
 static inline int _chroma_key( uint8_t fg_cb, uint8_t fg_cr, uint8_t cb, uint8_t cr, int angle)
 {
-	short xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
-	short yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
+	int xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
+	int yy = ((fg_cr * cb) - (fg_cb * cr)) >> 7;
 	int val = (xx * angle) >> 4;
 
 	if( abs(yy) < val ) 
@@ -77,7 +78,7 @@ static inline int _chroma_key( uint8_t fg_cb, uint8_t fg_cr, uint8_t cb, uint8_t
 }
 
 void chromapalette_apply(void *ptr, VJFrame *frame, int *args) {
-    int angle = args[0];
+    int i_angle = args[0];
     int r = args[1];
     int g = args[2];
     int b = args[3];
@@ -101,24 +102,10 @@ void chromapalette_apply(void *ptr, VJFrame *frame, int *args) {
 	const float bb = (const float) v;
 
     float tmp = sqrt(((aa * aa) + (bb * bb)));
+	float angle = (float)(i_angle * 0.01) * (M_PI / 180.0f);
     const int colorKeycb = 127 * (aa / tmp);
     const int colorKeycr = 127 * (bb / tmp);
-    const int accept_angle = (int)( 15.0f * tanf(M_PI * angle / 180.0f));
-	/*
-
-				chrominance is defined as the difference between a color and a reference value luminance
-
-				U = blue - Y
-			    V = red - Y
-
-				this effect does (on key selection)
-
-				U = color_cb - Y
-				V = color_cr - Y
-				
-				4:2:0 is supersampled to 4:4:4 so there is a chroma value for every Y
-
-	*/
+    const int accept_angle = (int)( 15.0f * tanf(angle));
 
 	if(color_cb != 0 && color_cr != 0) //both cb and cr
 	{
@@ -127,7 +114,7 @@ void chromapalette_apply(void *ptr, VJFrame *frame, int *args) {
 				if( _chroma_key( Cb[i] , Cr[i], colorKeycb,colorKeycr, accept_angle))
 				{
 					U = 128 + (int)(((float)(color_cb - Y[i]) * cb_mul) + 0.5);
-	            	V = 128 + (int)(((float)(color_cr - Y[i]) * cr_mul) + 0.5);
+	    	       	V = 128 + (int)(((float)(color_cr - Y[i]) * cr_mul) + 0.5);
 					Cb[i] = CLAMP_UV( U );
 					Cr[i] = CLAMP_UV( V );
 				}

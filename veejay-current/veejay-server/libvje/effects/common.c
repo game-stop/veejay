@@ -627,8 +627,6 @@ uint8_t bl_pix_divide_Y(uint8_t y1, uint8_t y2)
 {
 	int c = y1 * y2;
 	int b = 0xff - y2;
-	if( b <= pixel_Y_lo_ || c <= pixel_Y_lo_ )
-		return pixel_Y_lo_;
 	return CLAMP_Y( c / b );
 }
 
@@ -646,7 +644,7 @@ uint8_t bl_pix_substract_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_softburn_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
     a = y1;
     b = y2;
     if ((a + b) < 0xff) {
@@ -681,7 +679,7 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_colordodge_Y(uint8_t y1, uint8_t y2)
 {
-    return CLAMP_Y((y2 >> 8) / (256 - y1));
+    return CLAMP_Y((y2 >> 8) / (0xff - y1));
 }
 
 uint8_t bl_pix_mulsub_Y(uint8_t y1, uint8_t y2)
@@ -726,7 +724,7 @@ uint8_t bl_pix_exclusive_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_basecolor_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, c, new_Y;
+    int a, b, c, new_Y;
     a = y1;
     b = y2;
     c = a * b >> 7;
@@ -736,7 +734,7 @@ uint8_t bl_pix_basecolor_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_freeze_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
     a = y1;
     b = y2;
     if (b <= pixel_Y_lo_) {
@@ -749,7 +747,7 @@ uint8_t bl_pix_freeze_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_unfreeze_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
     a = y1;
     b = y2;
     if (a <= pixel_Y_lo_) {
@@ -762,7 +760,7 @@ uint8_t bl_pix_unfreeze_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_hardlight_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
     a = y1;
     b = y2;
     if (b < 128) {
@@ -775,7 +773,7 @@ uint8_t bl_pix_hardlight_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_relativeadd_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, c, d, new_Y;
+    int a, b, c, d, new_Y;
     a = y1;
     b = y2;
     c = a >> 1;
@@ -786,14 +784,14 @@ uint8_t bl_pix_relativeadd_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_relativeadd_C(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_C;
+    int new_C;
     new_C = (y1 - y2 + 0xff) >> 1;
     return CLAMP_Y(new_C);
 }
 
 uint8_t bl_pix_relativesub_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
     a = y1;
     b = y2;
     new_Y = (a - b + 0xff) >> 1;
@@ -802,7 +800,7 @@ uint8_t bl_pix_relativesub_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_maxsubsel_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
     a = y1;
     b = y2;
     if (b > a) {
@@ -815,7 +813,7 @@ uint8_t bl_pix_maxsubsel_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_minsubsel_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
     a = y1;
     b = y2;
     if (b < a) {
@@ -859,7 +857,7 @@ uint8_t bl_pix_muldiv_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_add_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
     a = y1;
     b = y2;
     if ((0xff - b) <= 0) {
@@ -896,7 +894,7 @@ uint8_t bl_pix_relneg_C(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_selfreeze_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
 
     a = y1;
     b = y2;
@@ -908,12 +906,12 @@ uint8_t bl_pix_selfreeze_Y(uint8_t y1, uint8_t y2)
 		}
 		return CLAMP_Y(new_Y);
     }
-    return 0;
+    return pixel_Y_lo_;
 }
 
 uint8_t bl_pix_selunfreeze_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
 
     a = y1;
     b = y2;
@@ -943,7 +941,7 @@ uint8_t bl_pix_seldiff_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_seldiffneg_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    int a, b, new_Y;
 
     a = y1;
     b = y2;
@@ -951,7 +949,7 @@ uint8_t bl_pix_seldiffneg_Y(uint8_t y1, uint8_t y2)
 	new_Y = 0xff - abs(0xff - a - b);
 	return CLAMP_Y(new_Y);
     }
-    return 0;
+    return pixel_Y_lo_;
 }
 
 uint8_t bl_pix_swap_Y(uint8_t y1, uint8_t y2)
