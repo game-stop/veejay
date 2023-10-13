@@ -446,10 +446,13 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 				case 3: // timeline selection range
 					min = timeline_get_in_point( v->timeline );
 					max = timeline_get_out_point( v->timeline );
+					if( max > min ) {
+					    veejay_msg(VEEJAY_MSG_ERROR, "Invalid range %g - %g",min,max );
+					}
 				break;
 				case 4: //timeline range
-					min = 0;
-					max = timeline_get_length( v->timeline );
+					min = 0.0;
+					max = (double) timeline_get_length( v->timeline );
 				break;
 			}
 			
@@ -472,9 +475,7 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 				return;
 			}
 
-			
-
-			char vims_msg[255];
+			char vims_msg[64];
 			snprintf(vims_msg,sizeof(vims_msg), "%s %d;", d->msg, (int) val );
 
 			veejay_msg(VEEJAY_MSG_DEBUG,"\tVIMS message template '%s'", vims_msg);
@@ -483,10 +484,19 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			int tmpv[3];
 			if ( sscanf(vims_msg, "%03d:%d %d;",&tmpv[0],&tmpv[1],&tmpv[2]) == 3 )
 			{
-			    if(tmpv[1] == 0 && tmpv[0] >= 100 && tmpv[0] < 200) //@ VIMS: sample events, replace 0 (current_id) for control/param number
+			    // 108 = frame
+			    // 109 = frame
+			    // 115 = frame
+			    if( tmpv[0] == 108 || tmpv[0] == 109 || tmpv[0] == 115 ) {
+					//@ VIMS: sample marker events, replace frame for control/param value
+					snprintf(vims_msg, sizeof(vims_msg), "%03d:%d %d;", tmpv[0], 0, (int) val );
+			    	veejay_msg(VEEJAY_MSG_DEBUG, "\t(midi) send value %d for %d", val, tmpv[0]);
+				}	
+				else if(tmpv[1] == 0 && tmpv[0] >= 100 && tmpv[0] < 200) 
+					//@ VIMS: sample events, replace 0 (current_id) for control/param value
 			    {
-				snprintf(vims_msg,sizeof(vims_msg),"%03d:%d %d;", tmpv[0], data[1], (int)val);
-			    	veejay_msg(VEEJAY_MSG_DEBUG, "\t(midi) replace 0 for %d as sample identifer",data[1]);
+					snprintf(vims_msg,sizeof(vims_msg),"%03d:%d %d;", tmpv[0], data[1], (int)val);
+			    	veejay_msg(VEEJAY_MSG_DEBUG, "\t(midi) send sample_id %d for %d and value %d",data[1],tmpv[0], val);
 			    }	    
 			}
 
