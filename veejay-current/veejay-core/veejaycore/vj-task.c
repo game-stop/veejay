@@ -269,29 +269,35 @@ static void* task_worker(void *arg) {
 
     while (1) {
         pthread_mutex_lock(&pool->lock);
-		pthread_cond_wait(&pool->start_signal, &pool->lock);
+		while( pool->queue[ job_num ].job == NULL) {
+			pthread_cond_wait(&pool->start_signal, &pool->lock);
+ 			if (atomic_load(&pool->stop_flag)) {
+            	pthread_mutex_unlock(&pool->lock);
+            	pthread_exit(NULL);
+			}	
+		}
+		pthread_mutex_unlock(&pool->lock);
 
         if (atomic_load(&pool->stop_flag)) {
-            pthread_mutex_unlock(&pool->lock);
             pthread_exit(NULL);
         }
 
         pjob_t task = pool->queue[ job_num ];
-		pthread_mutex_unlock(&pool->lock);
 
         task.job(task.arg);
 
+		
 		pthread_mutex_lock(&pool->lock);
-        pool->num_completed_tasks ++;
-
+        
+		pool->num_completed_tasks ++;
 		if( pool->num_completed_tasks == pool->num_submitted_tasks ) {
-			pthread_cond_broadcast( &pool->task_completed );
+			pthread_cond_signal( &pool->task_completed );
+			pool->num_completed_tasks = 0;
+			pool->num_submitted_tasks = 0;
 		}
+		pool->queue[ job_num ].job = NULL;
+		pool->queue[ job_num ].arg = NULL;
 		pthread_mutex_unlock(&pool->lock);
-	
-		task.job = NULL;
-		task.arg = NULL;
-
     }
 
     return NULL;
@@ -336,17 +342,17 @@ static void start_all_threads(thread_pool_t *pool) {
 static void wait_all_tasks_completed(thread_pool_t *pool) {
     pthread_mutex_lock(&pool->lock);
     while (pool->num_completed_tasks != pool->num_submitted_tasks) {
-        pthread_cond_wait(&pool->task_completed, &pool->lock);
+		pthread_cond_wait(&pool->task_completed, &pool->lock);
 	}
-	pool->num_submitted_tasks = 0;
-	pool->num_completed_tasks = 0;
     pthread_mutex_unlock(&pool->lock);
 }
 
 static void destroy_thread_pool(thread_pool_t *pool) {
-    pthread_mutex_lock(&pool->lock);
+    //pthread_mutex_lock(&pool->lock);
     atomic_store(&pool->stop_flag, 1);
-    pthread_mutex_unlock(&pool->lock);
+    //pthread_mutex_unlock(&pool->lock);
+
+	start_all_threads( pool );
 
     for (int i = 0; i < numThreads; i++) {
         pthread_join(pool->threads[i], NULL);
@@ -405,13 +411,15 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	    f[i]->jobnum = i;
 	}	
 
+	vj_task_lock();
+
 	for( i = 0; i < n; i ++ ) {
 	     submit_job( task_pool, func, f[i] );
 	}
-
+	vj_task_unlock();
 
 	start_all_threads(task_pool);	
-
+	
 	wait_all_tasks_completed(task_pool);
 
 	return 1;
