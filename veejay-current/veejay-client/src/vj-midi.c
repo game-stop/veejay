@@ -471,7 +471,7 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 		   	else {
 				veejay_msg(VEEJAY_MSG_WARNING, "MIDI unknown event [%d,%d,%d]",
 					data[0],data[1],data[2] );
-				vj_msg(VEEJAY_MSG_INFO, "MIDI: what's this %x,%x,%x ?",data[0],data[1],data[2]);
+				vj_msg(VEEJAY_MSG_INFO, "MIDI: what's this %d,%x,%x ?",data[0],data[1],data[2]);
 				return;
 			}
 
@@ -490,7 +490,7 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			    if( tmpv[0] == 108 || tmpv[0] == 109 || tmpv[0] == 115 ) {
 					//@ VIMS: sample marker events, replace frame for control/param value
 					snprintf(vims_msg, sizeof(vims_msg), "%03d:%d %d;", tmpv[0], 0, (int) val );
-			    	veejay_msg(VEEJAY_MSG_DEBUG, "\t(midi) send value %d for %d", val, tmpv[0]);
+			    	veejay_msg(VEEJAY_MSG_DEBUG, "\t(midi) send sample_id 0 (current) with value %d to VIMS %d", val, tmpv[0]);
 				}	
 				else if(tmpv[1] == 0 && tmpv[0] >= 100 && tmpv[0] < 200) 
 					//@ VIMS: sample events, replace 0 (current_id) for control/param value
