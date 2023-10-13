@@ -32,9 +32,9 @@ vj_effect *diffimg_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->defaults[0] = 6;	/* type */
-    ve->defaults[1] = 15;	/* min */
-    ve->defaults[2] = 240;	/* max */
+    ve->defaults[0] = 6;    /* type */
+    ve->defaults[1] = 15;   /* min */
+    ve->defaults[2] = 240;  /* max */
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 6;
@@ -43,17 +43,17 @@ vj_effect *diffimg_init(int width, int height)
 
     ve->limits[1][2] = 255;
     ve->limits[0][2] = 1;
-	ve->param_description = vje_build_param_list( ve->num_params,"Mode", "Min threshold", "Max threshold" );
+    ve->param_description = vje_build_param_list( ve->num_params,"Mode", "Min threshold", "Max threshold" );
     ve->description = "Enhanced Magic Blend";
     ve->extra_frame = 0;
     ve->sub_format = -1;
-	ve->has_user = 0;
-	ve->parallel = 0;
+    ve->has_user = 0;
+    ve->parallel = 1;
 
-	ve->hints = vje_init_value_hint_list (ve->num_params);
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-	                          "Negation", "Minimum", "Maximum", "Lenght", "None", "Quantize", "Negation2"
-	);
+    ve->hints = vje_init_value_hint_list (ve->num_params);
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+                              "Negation", "Minimum", "Maximum", "Lenght", "None", "Quantize", "Negation2"
+    );
 
     return ve;
 }
@@ -63,34 +63,39 @@ void diffimg_apply(void *ptr, VJFrame *frame, int *args) {
     int threshold_min = args[1];
     int threshold_max = args[2];
 
-	unsigned int i;
-	const int width = frame->width;
-	const int len = frame->len - width - 2;
-	int d,m;
-	uint8_t y,yb;
- 	uint8_t *Y = frame->data[0];
+    unsigned int i;
+    const int width = frame->width;
+    const int len = frame->len - width - 1;
+    int d,m;
+    uint8_t y,yb;
+    uint8_t *Y = frame->data[0];
 
-	_pf _pff = _get_pf(type);
+    _pf _pff = _get_pf(type);
 
-	uint8_t lo = pixel_Y_lo_;
-	if( lo == 0 )
-		lo = 1;
+    uint8_t lo = pixel_Y_lo_;
+    if( lo == 0 )
+        lo = 1;
 
-	for(i=0; i < len; i++)
-	{
-		y = Y[i];
-		yb = y;
-		if(y >= threshold_min && y <= threshold_max)
-		{
-			m = (Y[i+1] + Y[i+width] + Y[i+width+1]+2) >> 2;
-			d = Y[i] - m;
-			d *= 500;
-			d /= 100;
-			m = m + d;
-			y = ((((y << 1) - (255 - m))>>1) + Y[i])>>1;
-			if(y < lo) y = lo; else if (y > pixel_Y_hi_) y = pixel_Y_hi_;
-			Y[i] = _pff(y,yb);
-		}
+    for(i=0; i < len; i++)
+    {
+        y = Y[i];
+        yb = y;
+        if(y >= threshold_min && y <= threshold_max)
+        {
+            m = (Y[i+1] + Y[i+width] + Y[i+width+1]+2) >> 2;
+            d = Y[i] - m;
+            d *= 500;
+            d /= 100;
+            m = m + d;
+            y = ((((y << 1) - (255 - m))>>1) + Y[i])>>1;
+            if(y < lo) y = lo; else if (y > pixel_Y_hi_) y = pixel_Y_hi_;
+            Y[i] = _pff(y,yb);
+        }
 
-	}
+    }
+
+    for(i = len; i < (len + width); i ++ ) {
+	Y[i] = Y[i - width];
+    }
+
 }

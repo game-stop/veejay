@@ -152,13 +152,6 @@ static void halftone_apply_avg_col( VJFrame *frame, int radius, int orientation,
             uint8_t u = U[ y * w + x ];
             uint8_t v = V[ y * w + x ];
 
-            //~ int lim_x = (x + radius);
-            //~ if( lim_x > w )
-                //~ lim_x = w;
-            //~ int lim_y = (y + radius);
-            //~ if( lim_y > h)
-                //~ lim_y = h;
-
             // clip negative index (out of image) for colors pickup
             for( y1 = (y < 0) ? 0 : y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
                 for( x1 = (x < 0) ? 0 : x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
@@ -208,13 +201,6 @@ static void halftone_apply_avg_gray( VJFrame *frame, int radius, int orientation
             uint32_t sum = 0;
             uint32_t hit = 0;
 
-            //~ int lim_x = (x + radius);
-            //~ if( lim_x > w )
-                //~ lim_x = w;
-            //~ int lim_y = (y + radius);
-            //~ if( lim_y > h)
-                //~ lim_y = h;
-
             // clip negative index (out of image) for colors pickup
             for( y1 = (y < 0) ? 0 : y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
                 for( x1 = (x < 0) ? 0 : x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
@@ -261,13 +247,6 @@ static void halftone_apply_avg_black( VJFrame *frame, int radius, int orientatio
             uint32_t sum = 0;
             uint32_t hit = 0;
 
-            //~ int lim_x = (x + radius);
-            //~ if( lim_x > w )
-                //~ lim_x = w;
-            //~ int lim_y = (y + radius);
-            //~ if( lim_y > h)
-                //~ lim_y = h;
-
             // clip negative index (out of image) for colors pickup
             for( y1 = (y < 0) ? 0 : y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
                 for( x1 = (x < 0) ? 0 : x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
@@ -312,13 +291,6 @@ static void halftone_apply_avg_white( VJFrame *frame, int radius, int orientatio
         for( x =  x_inf ; x < w; x += radius ) {
             uint32_t sum = 0;
             uint32_t hit = 0;
-
-            //~ int lim_x = (x + radius);
-            //~ if( lim_x > w )
-                //~ lim_x = w;
-            //~ int lim_y = (y + radius);
-            //~ if( lim_y > h)
-                //~ lim_y = h;
 
             // clip negative index (out of image) for colors pickup
             for( y1 = (y < 0) ? 0 : y ; y1 < (y + radius) && y1 < h; y1 ++ ) {

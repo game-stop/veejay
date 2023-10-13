@@ -1774,20 +1774,30 @@ void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
 	build_histogram( h, f );
 }
 
-inline void veejay_draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value )
+inline void veejay_draw_circle(uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value)
 {
-  const int tx = (bw / 2);
-  const int ty = (bh / 2);
-  int x, y;
+    const int tx = bw >> 1;
+    const int ty = bh >> 1;
+    const int radiusSquared = radius * radius;
+    const int minX = (cx - tx < 0) ? 0 : (cx - tx);
+    const int minY = (cy - ty < 0) ? 0 : (cy - ty);
+    const int maxX = (cx + tx >= w) ? (w - 1) : (cx + tx);
+    const int maxY = (cy + ty >= h) ? (h - 1) : (cy + ty);
 
-  for (y = -radius; y <= radius; y++)
-    for (x = -radius; x <= radius; x++)
-      if ((x * x) + (y * y) <= (radius * radius)) {
-          if( (tx + x + cx) < w &&
-              (ty + y + cy) < h ) {
-            data[(ty + cy + y) * w + (tx + cx + x) ] = value;
+    for (int y = minY; y <= maxY; y++)
+    {
+        int yOffset = (y - cy) * (y - cy);
+        for (int x = minX; x <= maxX; x++)
+        {
+            int xOffset = (x - cx) * (x - cx);
+            int distanceSquared = xOffset + yOffset;
+
+            if (distanceSquared <= radiusSquared)
+            {
+                data[y * w + x] = value;
+            }
         }
-      }
+    }
 }
 
 #define max4(a,b,c,d) MAX(MAX(MAX(a,b),c),d)
