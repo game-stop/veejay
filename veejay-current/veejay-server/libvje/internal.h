@@ -212,8 +212,9 @@
 #include "./effects/mirrordistortion.h"
 #include "./effects/shutterdrag.h"
 #include "./effects/pointilism.h"
+#include "./effects/smartblur.h"
 
-#define VJ_IMAGE_EFFECT_MIN 74
+#define VJ_IMAGE_EFFECT_MIN 73
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -459,6 +460,7 @@ enum {
 	VJ_IMAGE_EFFECT_MIRRORDISTORTION = 76,
 	VJ_IMAGE_EFFECT_SHUTTERDRAG = 75,
 	VJ_IMAGE_EFFECT_POINTILISM = 74,
+	VJ_IMAGE_EFFECT_SMARTBLUR = 73,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
