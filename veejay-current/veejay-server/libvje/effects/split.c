@@ -80,7 +80,7 @@ static void split_fib_downscale(VJFrame *frame, int width, int height)
     unsigned int x, y;
     int uv_width;
     const int ilen = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->len;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
@@ -97,16 +97,16 @@ static void split_fib_downscale(VJFrame *frame, int width, int height)
     }
 
     i = 0;
-    uv_width = frame->uv_width;
+    uv_width = frame->width;
 
-    for (y = 0; y < uv_len; y += uv_width)
+    for (y = 0; y < uv_len; y += width)
 	{
 		for (x = 0; x < uv_width; x++) {
 			i++;
 			f = (i + 1) + (i - 1);
-			 if( f >= uv_len ) break;
-			 Cb[y + x] = Cb[f];
-			  Cr[y + x] = Cr[f];
+			if( f >= uv_len ) break;
+			Cb[y + x] = Cb[f];
+			Cr[y + x] = Cr[f];
 		}
     }
 
@@ -115,7 +115,7 @@ static void split_fib_downscale(VJFrame *frame, int width, int height)
 static void split_fib_downscaleb(VJFrame *frame, int width, int height)
 {
     int len = frame->len / 2;
-    unsigned int uv_len = frame->uv_len /2;
+    unsigned int uv_len = frame->len /2;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
@@ -135,7 +135,7 @@ static void split_fib_downscaleb(VJFrame *frame, int width, int height)
 static void split_push_downscale_uh(void *ptr, VJFrame *frame, int width, int height)
 {
 	int len = frame->len/2;
-    int uvlen = frame->uv_len/2;
+    int uvlen = frame->len/2;
 	int	strides[4] = { len,uvlen,uvlen ,0};
     split_t *s = (split_t*) ptr;
 	vj_frame_copy( frame->data, s->split_buf,strides );
@@ -146,9 +146,9 @@ static void split_push_vscale_left(void *ptr, VJFrame *frame, int width, int hei
     unsigned int x, y, y1;
 
     unsigned int wlen = width >> 1; //half
-    const int uv_height = frame->uv_height;
-    const int uv_width = frame->uv_width;
-    const int uv_wlen = frame->uv_width >> frame->shift_h;
+    const int uv_height = frame->height;
+    const int uv_width = frame->width;
+    const int uv_wlen = frame->width>>1;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -200,9 +200,9 @@ static void split_push_vscale_right(void *ptr, VJFrame *frame, int width, int he
 {
     unsigned int x, y, y1;
     unsigned int wlen = width >> 1;
-	const int uv_height = frame->uv_height;
-    const int uv_width = frame->uv_width;
-    const int uv_wlen = frame->uv_width / 2;
+	const int uv_height = frame->height;
+    const int uv_width = frame->width;
+    const int uv_wlen = frame->width / 2;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -247,9 +247,9 @@ static void split_corner_framedata_ul(VJFrame *frame, VJFrame *frame2,
     unsigned int h_len = height / 2;
     unsigned int x, y;
     unsigned int y1;
-    const int uv_width = frame->uv_width;
-    const int uv_wlen = frame->uv_width / 2;
-    const int uv_hlen = frame->uv_height / 2;
+    const int uv_width = frame->width;
+    const int uv_wlen = frame->width / 2;
+    const int uv_hlen = frame->height / 2;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -281,9 +281,9 @@ static void split_corner_framedata_ur(VJFrame *frame, VJFrame *frame2,
     unsigned int h_len = height / 2;
     unsigned int x, y;
     unsigned int y1;
-    const int uv_width = frame->uv_width;
-    const int uv_wlen = frame->uv_width / 2;
-    const int uv_hlen = frame->uv_height / 2;
+    const int uv_width = frame->width;
+    const int uv_wlen = frame->width / 2;
+    const int uv_hlen = frame->height / 2;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -314,10 +314,10 @@ static void split_corner_framedata_dl(VJFrame *frame, VJFrame *frame2,
     unsigned int h_len = height / 2;
     unsigned int x, y;
     unsigned int y1;
-    const int uv_height = frame->uv_height;
-    const int uv_width = frame->uv_width;
-    const int uv_wlen = frame->uv_width / 2;
-    const int uv_hlen = frame->uv_height / 2;
+    const int uv_height = frame->height;
+    const int uv_width = frame->width;
+    const int uv_wlen = frame->width / 2;
+    const int uv_hlen = frame->height / 2;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -351,9 +351,9 @@ static void split_corner_framedata_dr(VJFrame *frame, VJFrame *frame2,
     unsigned int x, y;
     unsigned int y1;
     const int uv_height = frame->uv_height;
-    const int uv_width = frame->uv_width;
-    const int uv_wlen = frame->uv_width / 2;
-    const int uv_hlen = frame->uv_height / 2;
+    const int uv_width = frame->width;
+    const int uv_wlen = frame->width / 2;
+    const int uv_hlen = frame->height / 2;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
@@ -383,8 +383,8 @@ static void split_v_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 {
 
     unsigned int r, c;
-    const int uv_height = frame->uv_height;
-    const int uv_width = frame->uv_width;
+    const int uv_height = frame->height;
+    const int uv_width = frame->width;
     const int uv_len = uv_height * uv_width;
 
 	uint8_t *Y = frame->data[0];
@@ -413,8 +413,8 @@ static void split_v_second_half(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
     unsigned int r, c;
-    const int uv_height = frame->uv_height;
-    const int uv_width = frame->uv_width;
+    const int uv_height = frame->height;
+    const int uv_width = frame->width;
     const int uv_len = uv_height * uv_width;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
@@ -444,8 +444,8 @@ static void split_v_first_half(VJFrame *frame, VJFrame *frame2, int width,
 {
     unsigned int r, c;
 
-    const int uv_height = frame->uv_height;
-    const int uv_width = frame->uv_width;
+    const int uv_height = frame->height;
+    const int uv_width = frame->width;
     const int uv_len = uv_height * uv_width;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
@@ -477,8 +477,8 @@ static void split_v_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 	unsigned int c;
     const int lw = width / 2;
     const int len = frame->len;
-    const int uv_height = frame->uv_height;
-    const int uv_width = frame->uv_width;
+    const int uv_height = frame->height;
+    const int uv_width = frame->width;
     const int uv_len = uv_height * uv_width;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
@@ -507,7 +507,7 @@ static void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
 			int height)
 {
 	const int len = frame->len / 2;
-	const int uv_len = frame->uv_len / 2;
+	const int uv_len = frame->len / 2;
 	int strides[4] = { len,uv_len,uv_len, 0 };
 
 	vj_frame_copy( frame2->data, frame->data, strides );    
@@ -517,7 +517,7 @@ static void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
 	const int len = frame->len / 2;
-	const int uv_len = frame->uv_len / 2;
+	const int uv_len = frame->len / 2;
 	int strides[4] = { len, uv_len, uv_len, 0 };
 	vj_frame_copy( frame2->data,frame->data, strides );
 }
@@ -526,7 +526,7 @@ static void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
 	const int len = frame->len / 2;
-	const int uv_len = frame->uv_len / 2;
+	const int uv_len = frame->len / 2;
 	int strides[4] = { len,uv_len,uv_len, 0 };
 	vj_frame_copy( frame2->data, frame->data, strides );
 }
@@ -535,7 +535,7 @@ static void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			  int height)
 {
 	const int len = frame->len / 2;
-	const int uv_len = frame->uv_len / 2;
+	const int uv_len = frame->len / 2;
 	int strides[4] = { len, uv_len, uv_len, 0 };
 	vj_frame_copy( frame2->data, frame->data, strides );
 }
