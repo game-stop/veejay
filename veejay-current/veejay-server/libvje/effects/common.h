@@ -78,13 +78,20 @@ extern int vje_get_rgb_parameter_conversion_type();
 #define FEATHER( P, op0, aB, Q, op1 ) \
 	( ( P * op0 ) + ALPHA_BLEND( aB, P, Q) * op1 ) >> 8;
 
-//#ifdef HAVE_ASM_3DNOW
-//#define do_emms __asm__ __volatile__( "femms":::"memory" )
-//#else
-
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 #define do_emms __asm__ __volatile__ ( "emms":::"memory" )
 #endif
+
+static inline double a_fmod(double x, double m) {
+  while (x >= m) {
+    x -= m;
+  } 
+  while (x < -m) {
+    x += m;
+  }
+
+  return x;
+}
 
 static const double __B = 4.0 / M_PI;
 static const double __C = -4.0 / (M_PI * M_PI);
@@ -92,7 +99,7 @@ static const double __P = 0.225;
 
 static inline double a_sin( double x ) {
 
-	x = fmod( x + M_PI, 2.0 * M_PI ) - M_PI;
+	x = a_fmod( x + M_PI, 2.0 * M_PI ) - M_PI;
 
 	double y = __B * x + __C * x * fabs(x);
 
