@@ -312,31 +312,8 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 //@ varying diff methods (strobe, normal, average, etc)
 	switch( mode )
 	{
-		case 0:
-			for( y = 0; y < len; y ++ ){
-				diff[y] = abs(lum[y] - prev[y]);
-				if(diff[y] < threshold )
-					diff[y] = 0;
-				prev[y] = (prev[y] + lum[y])>>1;
-			}
-			break;
-		case 1:
-			for( y = 0; y < len; y ++ ) {
-				diff[y] = abs(lum[y] - prev[y]);
-				if(diff[y] < threshold )
-					diff[y] = 0;
-				prev[y] = lum[y];
-			}
-			break;
-		case 2:
-			for( y = 0; y < len; y ++ ){
-				diff[y] = ( prev[y] >> 1 ) + (lum[y] >> 1);
-				if( diff[y] < threshold )
-					diff[y] = 0;
-				prev[y] = lum[y];
-			}
-			break;
 		case 3:
+		case 0:
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs( lum[y] - prev[y] );
 				diff[y] = (prev[y] + lum[y] + lum[y] + lum[y])>>2;
@@ -346,6 +323,7 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 			}
 			break;
 		case 4:
+		case 1:
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs( lum[y] - prev[y] );
 				diff[y] = (lum[y] - prev[y])>>1;
@@ -357,6 +335,7 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 			}
 			break;
 		case 5:
+		case 2:
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs(lum[y] - prev[y]);
 				if(diff[y] < threshold )
