@@ -86,28 +86,21 @@ extern int vje_get_rgb_parameter_conversion_type();
 #define do_emms __asm__ __volatile__ ( "emms":::"memory" )
 #endif
 
+static const double __B = 4.0 / M_PI;
+static const double __C = -4.0 / (M_PI * M_PI);
+static const double __P = 0.225;
+
 static inline double a_sin( double x ) {
-	const double B = 4.0 / M_PI;
-	const double C = -4.0 / (M_PI * M_PI);
-	const double P = 0.225;
 
 	x = fmod( x + M_PI, 2.0 * M_PI ) - M_PI;
 
-	double y = B * x + C * x * fabs(x);
+	double y = __B * x + __C * x * fabs(x);
 
-	return P * (y * fabs(y) - y) + y;
+	return __P * (y * fabs(y) - y) + y;
 }
 
 static inline double a_cos( double x ) {
-	const double B = 4.0 / M_PI;
-	const double C = -4.0 / (M_PI * M_PI);
-	const double P = 0.225;
-
-	x = fmod( x + M_PI , 2.0 * M_PI ) - M_PI;
-
-	double y = B * x + C * x * fabs(x);
-
-	return P * (y * fabs(y) - y) + y;
+	return a_sin( x + M_PI_2 );
 }
 
 #ifdef ARCH_X86_64

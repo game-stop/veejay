@@ -213,8 +213,11 @@
 #include "./effects/shutterdrag.h"
 #include "./effects/pointilism.h"
 #include "./effects/smartblur.h"
+#include "./effects/wave.h"
+#include "./effects/ripplewave.h"
+#include "./effects/luminouswave.h"
 
-#define VJ_IMAGE_EFFECT_MIN 73
+#define VJ_IMAGE_EFFECT_MIN 70
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -461,7 +464,10 @@ enum {
 	VJ_IMAGE_EFFECT_SHUTTERDRAG = 75,
 	VJ_IMAGE_EFFECT_POINTILISM = 74,
 	VJ_IMAGE_EFFECT_SMARTBLUR = 73,
-    VJ_IMAGE_EFFECT_DUMMY=0,
+	VJ_IMAGE_EFFECT_WAVE = 72,
+	VJ_IMAGE_EFFECT_RIPPLEWAVE = 71,
+	VJ_IMAGE_EFFECT_LUMINOUSWAVE = 70,
+    	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
 
