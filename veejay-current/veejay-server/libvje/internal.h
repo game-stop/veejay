@@ -216,12 +216,13 @@
 #include "./effects/wave.h"
 #include "./effects/ripplewave.h"
 #include "./effects/luminouswave.h"
+#include "./effects/melt.h"
 
 #define VJ_IMAGE_EFFECT_MIN 70
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 261
+#define VJ_VIDEO_EFFECT_MAX 262
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN + 1)
 #define VJ_PLUGIN 500
@@ -333,6 +334,7 @@ enum {
 	VJ_VIDEO_EFFECT_ALPHATRANSITION = 258,
     VJ_VIDEO_EFFECT_SHAPEWIPE = 259,
     VJ_VIDEO_EFFECT_COMPLEXOPACITY = 260,
+    VJ_VIDEO_EFFECT_MELT = 261
 };
 
 enum {

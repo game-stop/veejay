@@ -149,6 +149,7 @@ static struct {
     { negatechannel_init,NULL,NULL,NULL,NULL,negatechannel_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEGATECHANNEL },
     { mtracer_init,mtracer_malloc,mtracer_free,NULL,NULL,NULL,mtracer_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_MTRACER },
     { overlaymagic_init,NULL,NULL,NULL,NULL,NULL,overlaymagic_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_OVERLAYMAGIC },
+    { melt_init, melt_malloc,melt_free,NULL,NULL,NULL, melt_apply, NULL, NULL, NULL, VJ_VIDEO_EFFECT_MELT },
     { motionblur_init,motionblur_malloc,motionblur_free,NULL,NULL,motionblur_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MOTIONBLUR },
     { morphology_init,morphology_malloc,morphology_free,NULL,NULL,morphology_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MORPHOLOGY },
     { mixtoalpha_init,mixtoalpha_malloc,mixtoalpha_free,NULL,NULL,NULL,mixtoalpha_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_MIXTOALPHA }, 
