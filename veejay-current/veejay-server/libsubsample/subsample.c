@@ -933,13 +933,12 @@ static inline void subsample_up_1x16to1x32(uint8_t *in, uint8_t *out)
 }
 #endif
 
-
 static void tr_422_to_444( uint8_t *buffer, int width, int height)
 {
 	int x,y;
 	const int stride = width >> 1;
-#ifndef HAVE_ASM_SSE2
-#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
+
+#pragma omp simd	
 	for( y = height-1; y > 0 ; y -- ) {
 		uint8_t *dst = buffer + (y * width);
 		uint8_t *src = buffer + (y * stride);
@@ -950,135 +949,6 @@ static void tr_422_to_444( uint8_t *buffer, int width, int height)
 			dst+=2; // increment dst
 		}
 	}
-#endif
-#endif
-#ifdef HAVE_ASM_SSE2
-    for (y = height - 1; y > 0; y--) {
-        uint8_t* dst = buffer + (y * width);
-        uint8_t* src = buffer + (y * stride);
-        for (x = 0; x < stride; x++) {
-            __m128i srcValue = _mm_set1_epi8(src[x]);
-            __m128i duplicatedValue = _mm_unpacklo_epi8(srcValue, srcValue);
-            _mm_storeu_si128((__m128i*)dst, duplicatedValue);
-            dst += 2;
-        }
-    }
-#endif
-
-#ifndef HAVE_ASM_SSE2
-#if defined(HAVE_ASM_MMX)
-	for( y = height -1 ; y > 0; y -- ) {
-		uint8_t *src = buffer + (y* stride);
-		uint8_t *dst = buffer + (y* width);
-		unsigned int x1 = 0;	
-		for( x = 0; x < stride; x += 16, x1 += 32 ) {
-			subsample_up_1x16to1x32( &src[x], &dst[x1] );
-		}
-	}
-	__asm__(_EMMS"       \n\t"
-           	SFENCE"     \n\t"
-            	:::"memory");
-#endif
-#endif
-
-#ifdef HAVE_ARM
-    int optimized_pixels = width - (width & 15);
-
-    for (y = height - 1; y >= 0; y--) { 
-        uint8_t *dst = buffer + (y * width);
-        uint8_t *src = buffer + (y * width / 2);
-
-        for (x = 0; x < optimized_pixels; x += 16) { 
-            uint8x8_t vin = vld1_u8(src);
-            uint8x16_t vout = vcombine_u8(vin, vin);
-            vst1q_u8(dst, vout);
-            src += 8;
-            dst += 16;
-        }
-
-        for (; x < width; x += 2) {
-            dst[0] = src[x];
-            dst[1] = src[x];
-            dst += 2;
-        }
-    }
-#endif
-
-}
-
-static void tr_422_to_444t(uint8_t *out, uint8_t *in, int width, int height)
-{
-	int x,y;
-	const int stride = width >> 1;
-#ifndef HAVE_ASM_SSE2
-#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
-	for( y = height; y > 0 ; y -- ) {
-		uint8_t *d = out + (y * width);
-		uint8_t *s = in + (y * stride);
-		for(x=0; x < stride; x++) // for 1 row
-		{
-			d[0] = s[x]; //put to dst
-			d[1] = s[x];
-			d+=2; // increment dst
-		}
-	}
-#endif
-#endif
-
-#ifdef HAVE_ASM_SSE2
-    for (y = height; y > 0; y--) {
-        uint8_t* d = out + (y * width);
-        uint8_t* s = in + (y * stride);
-        for (x = 0; x < stride; x++) {
-            __m128i srcValue = _mm_set1_epi8(s[x]);
-
-            __m128i duplicatedValue = _mm_unpacklo_epi8(srcValue, srcValue);
-
-            _mm_storeu_si128((__m128i*)d, duplicatedValue);
-
-            d += 2;
-        }
-    }
-#endif
-
-#ifndef HAVE_ASM_SSE2
-#if defined(HAVE_ASM_MMX)
-	int x1 = 0;
-	for( y = height -1 ; y > 0; y -- ) {
-		uint8_t *src = in + (y* stride);
-		uint8_t *dst = out + (y* width);
-		for( x = 0; x < stride; x += 16, x1 += 32 ) {
-			subsample_up_1x16to1x32(&src[x], &dst[x1] );
-		}
-	}
-	__asm__(_EMMS"       \n\t"
-           	SFENCE"     \n\t"
-            	:::"memory");
-#endif
-#endif
-
-#ifdef HAVE_ARM
-    for (y = height; y > 0; y--) {
-            uint8_t *d = out + ((y - 1) * width);
-            uint8_t *s = in + ((y - 1) * stride);
-
-            for (x = 0; x < stride; x += 8) {
-                uint8x8_t vin = vld1_u8(s);
-                uint8x16_t vout = vcombine_u8(vin, vin); 
-                vst1q_u8(d, vout); 
-
-                s += 8;
-                d += 16;
-            }
-
-            for (; x < stride; x += 2) {
-                d[0] = s[x];
-                d[1] = s[x];
-                d += 2;
-            }
-    }
-#endif
-
 }
 
 /* vertical intersitial siting; horizontal cositing
