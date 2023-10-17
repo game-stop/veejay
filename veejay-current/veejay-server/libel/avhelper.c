@@ -603,7 +603,6 @@ static inline void	*avhelper_get_decoder_intra( const char *filename, int dst_pi
 				        		sup_codec = 1;
 				        		goto further;
 				        	}
-							veejay_msg(VEEJAY_MSG_DEBUG, "%s = %d", _supported_codecs[j].name, sup_codec);
 				        }	
                                 }
 further:

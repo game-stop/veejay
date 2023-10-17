@@ -80,50 +80,60 @@ void motionblur_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *tempU = m->buf[1];
     uint8_t *tempV = m->buf[2];
 
-    for (int i = 0; i < height; ++i) {
-        for (int j = 0; j < width; ++j) {
-            int totalY = 0;
-            int totalU = 0;
-            int totalV = 0;
-            int count = 0;
+	for (int i = 0; i < height; ++i) {
+    	for (int j = 0; j < width; ++j) {
+        	int totalY = 0;
+       		int totalU = 0;
+        	int totalV = 0;
+        	int count = 0;
 
-            for (int k = -blurStrength; k <= blurStrength; ++k) {
-                int row = (i + k < 0) ? 0 : ((i + k >= height) ? height - 1 : i + k);
-                int pixelIndex = row * width + j;
-                totalY += frame->data[0][pixelIndex];
-                totalU += frame->data[1][pixelIndex];
-                totalV += frame->data[2][pixelIndex];
-                count++;
-            }
+        	const int startK = (i - blurStrength < 0) ? -i : -blurStrength;
+        	const int endK = (i + blurStrength >= height) ? height - 1 - i : blurStrength;
 
-            int currentIndex = i * width + j;
-            tempY[currentIndex] = totalY / count;
-            tempU[currentIndex] = totalU / count;
-            tempV[currentIndex] = totalV / count;
-        }
-    }
+#pragma omp simd
+        	for (int k = startK; k <= endK; ++k) {
+            	int row = i + k;
+            	int pixelIndex = row * width + j;
+            	totalY += frame->data[0][pixelIndex];
+            	totalU += frame->data[1][pixelIndex];
+            	totalV += frame->data[2][pixelIndex];
+            	count++;
+        	}
 
-    for (int i = 0; i < height; ++i) {
-        for (int j = 0; j < width; ++j) {
-            int totalY = 0;
-            int totalU = 0;
-            int totalV = 0;
-            int count = 0;
+        	const int currentIndex = i * width + j;
+        	tempY[currentIndex] = totalY / count;
+        	tempU[currentIndex] = totalU / count;
+        	tempV[currentIndex] = totalV / count;
+    	}
+	}
 
-            for (int k = -blurStrength; k <= blurStrength; ++k) {
-                int col = (j + k < 0) ? 0 : ((j + k >= width) ? width - 1 : j + k);
-                int pixelIndex = i * width + col;
-                totalY += tempY[pixelIndex];
-                totalU += tempU[pixelIndex];
-                totalV += tempV[pixelIndex];
-                count++;
-            }
+	for (int i = 0; i < height; ++i) {
+    		for (int j = 0; j < width; ++j) {
+        		int totalY = 0;
+        		int totalU = 0;
+        		int totalV = 0;
+        		int count = 0;
 
-            int currentIndex = i * width + j;
-            frame->data[0][currentIndex] = (uint8_t)((totalY < 0) ? 0 : ((totalY > 255 * count) ? 255 : totalY / count));
-            frame->data[1][currentIndex] = (uint8_t)((totalU < 0) ? 0 : ((totalU > 255 * count) ? 255 : totalU / count));
-            frame->data[2][currentIndex] = (uint8_t)((totalV < 0) ? 0 : ((totalV > 255 * count) ? 255 : totalV / count));
-        }
-    }
+        		const int startK = (j - blurStrength < 0) ? -j : -blurStrength;
+        		const int endK = (j + blurStrength >= width) ? width - 1 - j : blurStrength;
+
+#pragma omp simd
+        		for (int k = startK; k <= endK; ++k) {
+            			int col = j + k;
+            			int pixelIndex = i * width + col;
+            			totalY += tempY[pixelIndex];
+            			totalU += tempU[pixelIndex];
+            	   		totalV += tempV[pixelIndex];
+        	    		count++;
+	        	}
+	
+        		const int currentIndex = i * width + j;
+        		frame->data[0][currentIndex] = (uint8_t)(totalY / count);
+       			frame->data[1][currentIndex] = (uint8_t)(totalU / count);
+       			frame->data[2][currentIndex] = (uint8_t)(totalV / count);
+    		}
+	}
+
+
 }
 

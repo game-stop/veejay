@@ -2568,14 +2568,17 @@ static void Welcome(veejay_t *info)
 			info->current_edit_list->video_fps, 
 			info->current_edit_list->video_inter==0 ? "Not interlaced" : "Interlaced" );
 	if(info->audio==AUDIO_PLAY && info->edit_list->has_audio)
-	veejay_msg(VEEJAY_MSG_WARNING, "                        %ldHz %d Channels %dBps (%d Bit) %s %s",
+	veejay_msg(VEEJAY_MSG_WARNING, "                        %ldHz %d Channels %dBps (%d Bit)",
 			info->current_edit_list->audio_rate,
 			info->current_edit_list->audio_chans,
 			info->current_edit_list->audio_bps,
-			info->current_edit_list->audio_bits,
-			(info->no_bezerk==0?"[Bezerk]" : " " ),
-			(info->verbose==0?" " : "[Debug]")  );
-  
+			info->current_edit_list->audio_bits);
+
+
+	veejay_msg(VEEJAY_MSG_INFO, "Bezeker: %s", (info->no_bezerk == 0 ? "Sample restart when switching mixing channels" : 
+		"No sample restart when switching mixing channels" ));
+  	veejay_msg(VEEJAY_MSG_INFO, "Log level: %s", (info->verbose == 0 ? "Normal" : "Verbose" ));
+
 	if(info->settings->composite )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Software composite - projection screen is %d x %d",
