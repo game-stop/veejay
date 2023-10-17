@@ -489,8 +489,6 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			    // 115 = frame
 			    if( tmpv[0] == 108 || tmpv[0] == 109 || tmpv[0] == 115 ) {
 					//@ VIMS: sample marker events, replace frame for control/param value
-					if(d->extra == 3 )
-						val = 127 - val;
 					snprintf(vims_msg, sizeof(vims_msg), "%03d:%d %d;", tmpv[0], 0, (int) val );
 			    	veejay_msg(VEEJAY_MSG_DEBUG, "\t(midi) send sample_id 0 (current) with value %d to VIMS %d", val, tmpv[0]);
 				}	
