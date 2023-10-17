@@ -217,8 +217,9 @@
 #include "./effects/ripplewave.h"
 #include "./effects/luminouswave.h"
 #include "./effects/melt.h"
+#include "./effects/camerabounce.h"
 
-#define VJ_IMAGE_EFFECT_MIN 70
+#define VJ_IMAGE_EFFECT_MIN 69
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -469,6 +470,7 @@ enum {
 	VJ_IMAGE_EFFECT_WAVE = 72,
 	VJ_IMAGE_EFFECT_RIPPLEWAVE = 71,
 	VJ_IMAGE_EFFECT_LUMINOUSWAVE = 70,
+	VJ_IMAGE_EFFECT_CAMERABOUNCE = 69,
     	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

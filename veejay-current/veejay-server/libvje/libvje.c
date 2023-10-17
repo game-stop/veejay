@@ -151,6 +151,7 @@ static struct {
     { overlaymagic_init,NULL,NULL,NULL,NULL,NULL,overlaymagic_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_OVERLAYMAGIC },
     { melt_init, melt_malloc,melt_free,NULL,NULL,NULL, melt_apply, NULL, NULL, NULL, VJ_VIDEO_EFFECT_MELT },
     { motionblur_init,motionblur_malloc,motionblur_free,NULL,NULL,motionblur_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MOTIONBLUR },
+    { camerabounce_init,camerabounce_malloc,camerabounce_free,NULL,NULL,camerabounce_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CAMERABOUNCE },
     { morphology_init,morphology_malloc,morphology_free,NULL,NULL,morphology_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MORPHOLOGY },
     { mixtoalpha_init,mixtoalpha_malloc,mixtoalpha_free,NULL,NULL,NULL,mixtoalpha_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_MIXTOALPHA }, 
     { mirrors_init,mirrors_malloc,mirrors_free,NULL,NULL,mirrors_apply,NULL,NULL,mirrors_request_fx,mirrors_set_motionmap, VJ_IMAGE_EFFECT_MIRRORS },
