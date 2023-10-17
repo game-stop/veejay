@@ -48,9 +48,9 @@ vj_effect *lumamask_init(int width, int height)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 1;
+    ve->limits[0][0] = -width;
     ve->limits[1][0] = width;
-    ve->limits[0][1] = 1;
+    ve->limits[0][1] = -height;
     ve->limits[1][1] = height;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;
@@ -162,9 +162,9 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 				// calculate new location of pixel
 				tmp = Y2[(y*width+x)] - 128;
 				// new x offset 
-				dx = w_ratio * tmp;
+				dx = -w_ratio * tmp;
 				// new y offset 
-				dy = h_ratio * tmp;
+				dy = -h_ratio * tmp;
 				// new pixel coordinates
 				nx = x + dx;
 				ny = y + dy;
@@ -191,8 +191,8 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 			for(x=0; x < width ; x++)
 			{
 				tmp = Y2[(y*width+x)] - 128;
-				dx = w_ratio * tmp;
-				dy = h_ratio * tmp;
+				dx = -w_ratio * tmp;
+				dy = -h_ratio * tmp;
 				nx = x + dx;
 				ny = y + dy;
 				while( nx < 0 )
@@ -226,9 +226,9 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 				// calculate new location of pixel
 				tmp = Y2[(y*width+x)] - 128;
 				// new x offset 
-				dx = w_ratio * tmp;
+				dx = -w_ratio * tmp;
 				// new y offset 
-				dy = h_ratio * tmp;
+				dy = -h_ratio * tmp;
 				// new pixel coordinates
 				nx = x + dx;
 				ny = y + dy;
@@ -257,8 +257,8 @@ void lumamask_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args ) {
 			for(x=0; x < width ; x++)
 			{
 				tmp = Y2[(y*width+x)] - 128;
-				dx = w_ratio * tmp;
-				dy = h_ratio * tmp;
+				dx = -w_ratio * tmp;
+				dy = -h_ratio * tmp;
 				nx = x + dx;
 				ny = y + dy;
 				while( nx < 0 )
