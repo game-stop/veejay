@@ -206,6 +206,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/ripplewave.c \
 	effects/luminouswave.c \
 	effects/melt.c \
+	effects/camerabounce.c \
 	effects/blackreplace.c
 		
 
