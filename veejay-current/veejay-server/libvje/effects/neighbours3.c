@@ -134,14 +134,10 @@ static inline pixel_t evaluate_pixel_bc(
 	if( y0 < 0 ) y0 = 0;
 	if( y1 >= h ) y1 = h-1;
 
-	/* clear histogram and y_map */
-	for( i =0 ; i < max_; i ++ )
-	{
-		pixel_histogram[i] = 0;
-		y_map[i]  = 0;
-		cb_map[i] = 0;
-		cr_map[i] = 0;
-	}
+	veejay_memset( pixel_histogram, 0, max_ * sizeof(int));
+	veejay_memset( y_map, 0, max_ * sizeof(int));
+	veejay_memset( cb_map, 0, max_ * sizeof(int));
+	veejay_memset( cr_map, 0, max_ * sizeof(int));
 
 	/* fill histogram, cummulative add of luma values */
 	/* this innerloop is executed w * h * brush_size and counts
@@ -212,12 +208,8 @@ static inline uint8_t evaluate_pixel_b(
 	if( y0 < 0 ) y0 = 0;
 	if( y1 >= h ) y1 = h-1;
 
-	/* clear histogram and y_map */
-	for( i =0 ; i < max_; i ++ )
-	{
-		pixel_histogram[i] = 0;
-		y_map[i]  = 0;
-	}
+	veejay_memset( pixel_histogram, 0, max_ * sizeof(int));
+	veejay_memset( y_map, 0, max_ * sizeof(int));
 
 	i = y;
 	for( j = x0; j < x1; j ++ )
