@@ -1083,6 +1083,8 @@ void chroma_subsample_init()
 	char *mode = getenv( "VEEJAY_SUBSAMPLE_MODE" );
 	subsample_444_to_422 f = ss_444_to_422_drop;
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Use VEEJAY_SUBSAMPLE_MODE=drop|average|bilinear|mitchell to select a subsampling method");
+
 	if( mode != NULL ) {
 		if(strcmp(mode, "drop") == 0 ) {
 			f = ss_444_to_422_drop;
