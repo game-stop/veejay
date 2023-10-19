@@ -5,6 +5,7 @@
  *  Copyright (C) 2001 Matthew J. Marjanovic <maddog@mir.com>
  *                2004 Niels Elburg <nwelburg@gmail.com>
  *                2014 added mmx routines
+ *                2023 added drop,average,bilinear & mitchell natravali
  *
  *  This program is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
