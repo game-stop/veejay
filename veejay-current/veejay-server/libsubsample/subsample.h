@@ -36,7 +36,7 @@ typedef enum subsample_mode {
 extern const char *ssm_id[SSM_COUNT];
 extern const char *ssm_description[SSM_COUNT];
 
+void chroma_subsample_init();
 void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
-void chroma_subsample_cp(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[], uint8_t *dcbcr[] );
 void chroma_supersample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
 #endif
