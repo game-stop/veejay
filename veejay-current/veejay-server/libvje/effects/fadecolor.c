@@ -34,7 +34,7 @@ vj_effect *fadecolor_init(int w,int h)
 	ve->defaults[1] = VJ_EFFECT_COLOR_BLACK;
 	ve->defaults[2] = 15;
 	ve->defaults[3] = 1;
-	ve->sub_format = 0;
+	ve->sub_format = -1;
 	ve->limits[0][0] = 1;
 	ve->limits[1][0] = 255;
 

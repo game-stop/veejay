@@ -117,7 +117,7 @@ vj_effect *water_init(int width, int height)
     ve->defaults[3] = 1;
     ve->defaults[4] = 45;
     ve->description = "Water ripples";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 1;
     ve->has_user = 1;
 	ve->motion = 1;

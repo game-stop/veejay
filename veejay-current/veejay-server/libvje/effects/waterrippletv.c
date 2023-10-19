@@ -88,7 +88,7 @@ vj_effect *waterrippletv_init(int width, int height)
     ve->defaults[1] = 1;
     ve->defaults[2] = 8;
     ve->description = "RippleTV  (EffectTV)";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Refresh Frequency", "Wavespeed", "Decay" );    

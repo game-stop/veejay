@@ -26,15 +26,15 @@ vj_effect *whiteframe_init(int w,int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 0;
-    ve->defaults = NULL;	/* default values */
-    ve->limits[0] = NULL;	/* min */
-    ve->limits[1] = NULL;	/* max */
+    ve->defaults = NULL;    /* default values */
+    ve->limits[0] = NULL;   /* min */
+    ve->limits[1] = NULL;   /* max */
     ve->description = "Replace Pure White (MG)";
     ve->extra_frame = 1;
-    ve->sub_format = 0;
-	ve->has_user = 0;
-	ve->parallel = 1;	
-	ve->param_description = NULL;
+    ve->sub_format = -1;
+    ve->has_user = 0;
+    ve->parallel = 1;   
+    ve->param_description = NULL;
     return ve;
 }
 
@@ -43,31 +43,30 @@ void whiteframe_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args )
 {
     unsigned int i;
     const int len = frame->len;
-	const int uv_len = frame->uv_len;
+    const int uv_len = frame->uv_len;
     uint8_t p;
     uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
+    uint8_t *Cb= frame->data[1];
+    uint8_t *Cr= frame->data[2];
     uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
+    uint8_t *Cb2= frame2->data[1];
+    uint8_t *Cr2= frame2->data[2];
     /* look for white pixels in luminance channel and swap with input B */
     for (i = 0; i < len; i++)
-	{
-		p = Y[i];
-		if (p >= pixel_Y_hi_)
-		{
-		    Y[i] = Y2[i];
-		}
+    {
+        p = Y[i];
+        if (p >= pixel_Y_hi_)
+        {
+            Y[i] = Y2[i];
+        }
     }
 
     for (i = 0; i < uv_len; i++)
-	{
-		p = Cb[i];
-		if (p == 128)
-		{
-		    Cb[i] = Cb2[i];
-		    Cr[i] = Cr2[i];
-		}
+    {
+        if (Cb[i] == 128)
+        {
+            Cb[i] = Cb2[i];
+            Cr[i] = Cr2[i];
+        }
     }
 }

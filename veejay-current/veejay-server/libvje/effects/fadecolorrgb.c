@@ -35,7 +35,7 @@ vj_effect *fadecolorrgb_init(int w,int h)
     ve->defaults[3] = 0;
     ve->defaults[4] = 0;
     ve->defaults[5] = 75;
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 255;
 

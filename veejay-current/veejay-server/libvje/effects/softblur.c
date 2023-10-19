@@ -40,7 +40,7 @@ vj_effect *softblur_init(int w,int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 1; /* 3*/
     ve->description = "Soft Blur (1x3) and (3x3)";
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Kernel size");

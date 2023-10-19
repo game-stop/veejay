@@ -58,7 +58,6 @@ vj_effect *bgsubtract_init(int width, int height)
 	ve->extra_frame = 0;
 	ve->sub_format = -1;
 	ve->has_user = 1;
-	ve->sub_format = 0;
 	ve->parallel = 0;
 	ve->global = 1; /* this effect is not freed when switching samples */
 

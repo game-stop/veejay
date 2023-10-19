@@ -85,7 +85,7 @@ vj_effect *contourextract_init(int width, int height)
     
     ve->description = "Contour extraction";
     ve->extra_frame = 0;
-    ve->sub_format = 0;
+    ve->sub_format = -1;
     ve->has_user = 1;
     ve->user_data = NULL;
 	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show image/contour", "Take background", "Thinning", "Min weight" );
