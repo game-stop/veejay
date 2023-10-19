@@ -1016,6 +1016,8 @@ int vj_perform_init(veejay_t * info)
 
     performer_global_t *global = (performer_global_t*) info->performer;
 
+	chroma_subsample_init();	
+
     global->A = vj_perform_init_performer(info,0);
     global->B = vj_perform_init_performer(info,1);
 
