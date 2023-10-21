@@ -1134,6 +1134,19 @@ char *vj_server_my_ip()
 	if( sock <= 0 )
 		return NULL;
 
+    struct timeval timeout;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(sock, &fds);
+
+    if (select(sock + 1, NULL, &fds, NULL, &timeout) <= 0) {
+    	veejay_msg(0, "Timeout");
+		close(sock);
+        return NULL;
+    }
+
 	if( connect(sock, info->ai_addr, info->ai_addrlen ) < 0 ) {
 		close(sock);
 		return NULL;
