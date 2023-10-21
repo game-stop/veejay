@@ -489,7 +489,8 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			    // 115 = frame
 			    if( tmpv[0] == 108 || tmpv[0] == 109 || tmpv[0] == 115 ) {
 					//@ VIMS: sample marker events, replace frame for control/param value
-					if(d->extra == 3) {
+					if(d->extra == 3 && tmpv[0] == 108) {
+						// invert in point
 						val = 127 - ( ((max-min)/127.0) * data[2] + min);
 					}
 					snprintf(vims_msg, sizeof(vims_msg), "%03d:%d %d;", tmpv[0], 0, (int) val );

@@ -4083,33 +4083,31 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         	set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
 	}
 
-    /* Actions for stream mode*/
-    if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )
-    {
-        /* Is a solid color stream */
-        if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
-        {
-            if( ( history[STREAM_COL_R] != info->status_tokens[STREAM_COL_R] ) ||
-                ( history[STREAM_COL_G] != info->status_tokens[STREAM_COL_G] ) ||
-                ( history[STREAM_COL_B] != info->status_tokens[STREAM_COL_B] ) )
-             {
-                info->uc.reload_hint[HINT_RGBSOLID] = 1;
-             }
-        }
+    	/* Actions for stream mode*/
+    	if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )
+    	{
+        	/* Is a solid color stream */
+        	if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
+        	{
+            		if( ( history[STREAM_COL_R] != info->status_tokens[STREAM_COL_R] ) ||
+                	( history[STREAM_COL_G] != info->status_tokens[STREAM_COL_G] ) ||
+                	( history[STREAM_COL_B] != info->status_tokens[STREAM_COL_B] ) )
+             	{
+               	 	info->uc.reload_hint[HINT_RGBSOLID] = 1;
+             	}
+        	}
 
-        if( info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR )
-        {
-            info->uc.reload_hint[HINT_GENERATOR] = 1;
-        }
+        	if( info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR )
+        	{
+            	info->uc.reload_hint[HINT_GENERATOR] = 1;
+        	}
 
-        /*char *time = format_time( info->status_frame,(double)info->el.fps );
-        update_label_str( "label_curtime", time );
-        free(time);*/
-        
-        update_label_str( "playhint", "Streaming");
+        	update_label_str( "playhint", "Streaming");
     
-        info->uc.reload_hint[HINT_KF] = 1;
-    }/* End actions for stream mode */
+        	info->uc.reload_hint[HINT_KF] = 1;
+    	}/* End actions for stream mode */
+	
+	}
 
     /* Actions for sample mode*/
     if( pm == MODE_SAMPLE )
@@ -4236,30 +4234,6 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             update = 1;
         }
 
-        if( (history[SUBRENDER] != info->status_tokens[SUBRENDER] || gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_TOGGLE_SUBRENDER ]) ) != info->status_tokens[SUBRENDER]) )
-        {
-            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_SUBRENDER ] ) , TRUE );
-        }
-
-        if( history[FADE_ALPHA] != info->status_tokens[FADE_ALPHA] || info->status_tokens[FADE_ALPHA] != gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] )) )
-        {
-            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] ), TRUE );
-        }
-
-        if( history[FADE_METHOD] != info->status_tokens[FADE_METHOD] ) 
-        {
-            switch(info->status_tokens[FADE_METHOD]) {
-                case -1:
-                        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_MNONE]), TRUE ); break;
-                case 1: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M1]), TRUE ); break;
-                case 2: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M2]), TRUE ); break;
-                case 3: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M3]), TRUE ); break;
-                case 4: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M4]), TRUE ); break;
-                default:
-                        break;
-            }
-        }
-
         if(update)
         {
             speed = info->status_tokens[SAMPLE_SPEED];
@@ -4288,6 +4262,7 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         }
     }
 
+
     update_current_slot_transition_state(history, pm);
 
     if( pm == MODE_SAMPLE || pm == MODE_STREAM ) {
@@ -4298,7 +4273,33 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         }
     }
 
+	if( (history[SUBRENDER] != info->status_tokens[SUBRENDER] || gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget_cache[ WIDGET_TOGGLE_SUBRENDER ]) ) != info->status_tokens[SUBRENDER]) )
+    {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_SUBRENDER ] ) , TRUE );
     }
+
+    if( history[FADE_ALPHA] != info->status_tokens[FADE_ALPHA] || info->status_tokens[FADE_ALPHA] != gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] )) )
+    {
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_TOGGLE_FADEMETHOD ] ), TRUE );
+    }
+
+    if( history[FADE_METHOD] != info->status_tokens[FADE_METHOD] ) 
+    {
+        switch(info->status_tokens[FADE_METHOD]) {
+             case -1:
+                     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_MNONE]), TRUE ); break;
+             case 1: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M1]), TRUE ); break;
+             case 2: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M2]), TRUE ); break;
+             case 3: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M3]), TRUE ); break;
+             case 4: gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_FX_M4]), TRUE ); break;
+             default:
+                 break;
+        }
+    }
+
+
+
+    
 }
 
 static void on_vims_messenger(void)
