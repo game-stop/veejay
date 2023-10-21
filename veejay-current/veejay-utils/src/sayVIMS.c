@@ -366,8 +366,6 @@ skip_img_read:
 
 		if(errno == 0) /* end of file reached */
 			fprintf(stderr, "EOF reached\n");
-		else
-			fprintf(stderr, "an error occured: %s\n", strerror(errno));
 
 		return -1; 
 	}
