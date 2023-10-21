@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 AC_INIT([lvdshared-plugin],[0.0.1],[veejay-users@lists.sourceforge.net])
-AC_PREREQ(2.57)
+AC_PREREQ([2.71])
 AC_CONFIG_SRCDIR([plugins/lvd_shmin.c])
 
 LVDGMICMAJOR_VERSION=0
@@ -31,31 +31,22 @@ AC_SUBST(LT_AGE)
 dnl **********************************************************************
 dnl Options
 
-AC_CONFIG_MACRO_DIR([m4])
-
 dnl kill CFLAGS
 CFLAGS=""
 AC_ARG_ENABLE([strict],
-		AC_HELP_STRING([--enable-strict],
-			     [Compile in paranoia assertion checking]))
+		AS_HELP_STRING([--enable-strict],[Compile in paranoia assertion checking]))
 AC_ARG_ENABLE([debug],
-		AC_HELP_STRING([--enable-debug],
-			     [Compile in debugging information]))
+		AS_HELP_STRING([--enable-debug],[Compile in debugging information]))
 AC_ARG_ENABLE([profile],
-		AC_HELP_STRING([--enable-profiling],
-			     [Compile in profiling information]))
+		AS_HELP_STRING([--enable-profiling],[Compile in profiling information]))
 AC_ARG_ENABLE([compile-warnings],     
-              AC_HELP_STRING([--enable-compile-warnings],
-                             [Turn on compiler warnings.]))
+              AS_HELP_STRING([--enable-compile-warnings],[Turn on compiler warnings.]))
 AC_ARG_ENABLE([warnings_as_errors],   
-              AC_HELP_STRING([--enable-warnings_as_errors],
-                             [Compiler warnings are errors.]))
+              AS_HELP_STRING([--enable-warnings_as_errors],[Compiler warnings are errors.]))
 AC_ARG_ENABLE([simd-accel],
-              AC_HELP_STRING([--enable-simd-accel],
-                             [use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
+              AS_HELP_STRING([--enable-simd-accel],[use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
 AC_ARG_WITH([extra-cflags],
-            AC_HELP_STRING([--with-extra-cflags=flags],
-                           [Options to be added to CFLAGS (optional)]))
+            AS_HELP_STRING([--with-extra-cflags=flags],[Options to be added to CFLAGS (optional)]))
 
 
 user_specified_target=
@@ -65,17 +56,15 @@ AC_ARG_WITH([arch-target], AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
 
 
 
-AC_GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 
 dnl Initialize libtool
-AC_PROG_LIBTOOL
+LT_INIT
 
 dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
-AM_PROG_CC_STDC
 AC_PROG_YACC
-AM_PROG_LEX
 AC_PROG_CXX
 AC_PROG_INSTALL
 AC_PROG_LN_S
@@ -119,8 +108,6 @@ AC_SUBST(LIBAVUTIL_CFLAGS)
 AC_SUBST(LIBAVUTIL_LIBS)
 
 AC_SUBST(LIBGETOPT_LIB)
-
-AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 

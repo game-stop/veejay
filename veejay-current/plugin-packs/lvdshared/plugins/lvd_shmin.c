@@ -52,29 +52,10 @@ typedef struct
 
 
 static	inline int	lvd_to_ffmpeg( int lvd, int fr ) {
-	switch( lvd ) {
-		case LIVIDO_PALETTE_YUV422P:
-			if( fr )
-				return PIX_FMT_YUVJ422P;
-			return PIX_FMT_YUV422P;
-		case LIVIDO_PALETTE_RGB24:
-			return PIX_FMT_RGB24;
-		case LIVIDO_PALETTE_RGBA32:
-			return PIX_FMT_RGBA;
-		case LIVIDO_PALETTE_YUV444P:
-			if(fr)
-				return PIX_FMT_YUVJ444P;
-			return PIX_FMT_YUV444P;
-		case LIVIDO_PALETTE_YUVA8888:
-			return PIX_FMT_YUVA444P;
-		case LIVIDO_PALETTE_YUVA422:
-			return PIX_FMT_YUVA422P;
-	}
-
 	if( fr ) 
 		return PIX_FMT_YUVJ422P;
 
-	return PIX_FMT_YUV422P;
+	return PIX_FMT_YUVJ422P;
 }
 
 int	init_instance( livido_port_t *my_instance )
@@ -128,7 +109,7 @@ int	init_instance( livido_port_t *my_instance )
 
 	//@ read format and dimensions from shared memory
 	int lvd_shm_palette = data->header[5]; //@ read livido palette format 
-	int	lvd_shm_width	= data->header[0]; //@ read width of frame in shm
+	int lvd_shm_width	= data->header[0]; //@ read width of frame in shm
 	int lvd_shm_height  = data->header[1]; //@ ... height ...
 	int cpu_flags		= 0;
 	cpu_flags		    = cpu_flags | SWS_FAST_BILINEAR;
@@ -240,14 +221,8 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	int srcW      = v->header[0];
 	int srcH	  = v->header[1];
 
-	int	 n = 1; //@ stride width
-	if( srcFormat == PIX_FMT_RGB24 )
-		n = 3;
-	if( srcFormat == PIX_FMT_RGB32 )
-		n = 4;
-
-	int  strides[4] = 		{ srcW * n, 0, 0, 0 };
-	int  dst_strides[4] = 	{ w, w>>1, w>>1, 0 }; //@ width >> 1 
+	int  strides[4] = { v->header[2], v->header[3], v->header[4], 0 };
+	int  dst_strides[4] = 	{ w, w/2, w/2, 0 };
 
 	uint8_t *in[4] = { //@ pointers to planes in shm
 		start_addr, 
@@ -255,26 +230,9 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		NULL,
 		NULL };
 
-	if( srcFormat == PIX_FMT_YUVJ422P || srcFormat == PIX_FMT_YUV422P || srcFormat == PIX_FMT_YUVA422P ) {
-		strides[0] = srcW;
-		strides[1] = strides[0] >> 1;
-		strides[2] = strides[1];
-		in[1] = in[0] + ( srcW * srcH );
-		in[2] = in[1] + ( (srcW>>1) * srcH);
-	} else if ( srcFormat == PIX_FMT_YUV444P || srcFormat == PIX_FMT_YUVJ444P || srcFormat == PIX_FMT_YUVA444P ) {
-		strides[0] = srcW;
-		strides[1] = srcW;
-		strides[2] = srcW;
-		in[1] = in[0] + (srcW * srcH);
-		in[2] = in[1] + (srcW * srcH);
-	} 
+	in[1] = in[0] + v->header[2] * srcH;
+	in[2] = in[1] + v->header[3] * srcH;
 
-	if( srcFormat == PIX_FMT_YUVA422P || srcFormat == PIX_FMT_YUVA444P ) {
-		strides[3] = strides[0];
-		dst_strides[3] = dst_strides[0];
-		in[3] = in[2] + (strides[1] * srcH);
-	}
-	
 	sws_scale( sws, (const uint8_t *const *)in, strides,0, srcH,(uint8_t * const*) O, dst_strides );
 
 	res = pthread_rwlock_unlock( &v->rwlock );
@@ -325,13 +283,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	
 	//@ some palettes veejay-classic uses
 	int palettes0[] = {
-           	LIVIDO_PALETTE_YUV422P,
-			LIVIDO_PALETTE_RGB24,
-			LIVIDO_PALETTE_RGBA32,
-			LIVIDO_PALETTE_YUVA422,
-			LIVIDO_PALETTE_YUVA8888,
-            LIVIDO_PALETTE_YUV444P,
-            0
+           LIVIDO_PALETTE_YUV422P,
+           0
 	};
 	
 	//@ setup output channel
@@ -339,7 +292,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	port = out_chans[0];
 	
 	    livido_set_string_value( port, "name", "Output Channel");
-		livido_set_int_array( port, "palette_list", 4, palettes0);
+		livido_set_int_array( port, "palette_list", 1, palettes0);
 		livido_set_int_value( port, "flags", 0);
 	
 
