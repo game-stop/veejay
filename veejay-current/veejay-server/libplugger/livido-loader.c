@@ -581,7 +581,7 @@ static	int	match_palette(livido_port_t *ptr, int palette )
 	return 0;
 }
 
-static	int	find_cheap_palette(livido_port_t *c, livido_port_t *ptr , int w)
+static	int	find_cheap_palette(livido_port_t *c, livido_port_t *ptr)
 {
 	int palette = LIVIDO_PALETTE_YUV444P;
 	if( match_palette(ptr,palette ))
@@ -590,7 +590,7 @@ static	int	find_cheap_palette(livido_port_t *c, livido_port_t *ptr , int w)
 		return 1;
 	}
 	else {
-		palette = LIVIDO_PALETTE_YUV444P;
+		palette = LIVIDO_PALETTE_YUV422P;
 		if( match_palette(ptr,palette ))
 		{
 			vevo_property_set( c, "current_palette", LIVIDO_ATOM_TYPE_INT,1, &palette );
@@ -623,7 +623,7 @@ static	int	init_channel_port(livido_port_t *ptr, livido_port_t *in_channel, int 
 		vevo_property_set( in_channel, "current_palette", LIVIDO_ATOM_TYPE_INT,1,&pref_palette_ );
 	else
 	{
-		if(!find_cheap_palette(in_channel ,ptr,w))
+		if(!find_cheap_palette(in_channel ,ptr))
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "No support for any palette in plugin");
 			return 0;

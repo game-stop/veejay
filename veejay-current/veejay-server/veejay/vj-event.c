@@ -3977,7 +3977,10 @@ void vj_event_sample_move_marker(void *ptr, const char format[], va_list ap)
     if(marker_start < 0)
       marker_start = s->first_frame;
 
-    veejay_msg(VEEJAY_MSG_INFO, "Moved marker selection to %d - %d", marker_start, marker_end);
+	s->marker_start = marker_start;
+	s->marker_end = marker_end;
+
+    veejay_msg(VEEJAY_MSG_INFO, "Moved marker selection to %d - %d", s->marker_start, s->marker_end);
 }
 
 void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap) 
@@ -4025,9 +4028,10 @@ void vj_event_sample_set_marker_end(void *ptr, const char format[], va_list ap)
         int start = 0; int end = 0;
         if ( sample_get_el_position( args[0], &start, &end ) )
         {
-            args[1] = end - args[1]; // add sample's ending position
+            //args[1] = end - args[1]; // add sample's ending position
             if( sample_set_marker_end( args[0], args[1] ) )
             {
+				
                 veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker ending position set at position %d", args[0],args[1]);
             }
             else

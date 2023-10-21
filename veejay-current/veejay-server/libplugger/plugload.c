@@ -1060,7 +1060,7 @@ vj_effect *plug_get_plugin( int fx_id ) {
 	size_t name_len = vevo_property_element_size( port, "name", 0);
 	vje->description = (char*) vj_calloc(name_len);
 	vje->is_gen = is_gen;
-    vje->sub_format = 1;
+        vje->sub_format = 1;
 	vevo_property_get( port, "name", 0 , &(vje->description));
 	vevo_property_get( port, "num_params", 0, &(vje->num_params));
 	vevo_property_get( port, "mixer", 0, &(vje->extra_frame));

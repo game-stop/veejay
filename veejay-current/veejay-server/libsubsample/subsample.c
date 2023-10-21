@@ -73,7 +73,6 @@ const char *ssm_description[SSM_COUNT] = {
 };
 
 #define B1 9362
-static int mitchell_netravali_lut[4][4];
 
 typedef void (*subsample_444_to_422)( uint8_t *restrict U, uint8_t *restrict V, const int width, const int height );
 
@@ -138,10 +137,10 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
     }
     for (  ; x < width; x +=2 )
     {
- 	out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
+    out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
         in0 += 2;
         in1 += 2;
-	out++;
+    out++;
     }
     in0 += width*2;
     in1 += width*2;
@@ -356,7 +355,7 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
  *    C   C   C   C      
  *           
  *    Y   Y   Y   Y       
- *    C       C     	out0  
+ *    C       C         out0  
  *    Y   Y   Y   Y       
  *    C       C  
  *
@@ -574,21 +573,21 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 {
 #if !defined(HAVE_ASM_SSE2) && !defined(HAVE_ARM) && !defined(HAVE_ASM_MMX)
     uint8_t *in, *out0, *out1;
-	unsigned int x, y;
-	in = buffer + (width * height / 4) - 1;
-	out1 = buffer + (width * height) - 1;
-	out0 = out1 - width;
-	for (y = height - 1; y >= 0; y -= 2) {
-		for (x = width - 1; x >= 0; x -=2) {
-			uint8_t val = *(in--);
-			*(out1--) = val;
-			*(out1--) = val;
-			*(out0--) = val;
-			*(out0--) = val;
-		}
-		out0 -= width;
-		out1 -= width;
-	}
+    unsigned int x, y;
+    in = buffer + (width * height / 4) - 1;
+    out1 = buffer + (width * height) - 1;
+    out0 = out1 - width;
+    for (y = height - 1; y >= 0; y -= 2) {
+        for (x = width - 1; x >= 0; x -=2) {
+            uint8_t val = *(in--);
+            *(out1--) = val;
+            *(out1--) = val;
+            *(out0--) = val;
+            *(out0--) = val;
+        }
+        out0 -= width;
+        out1 -= width;
+    }
 #endif
 
 #ifdef HAVE_ARM_NEON
@@ -697,33 +696,33 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
     }
 #else
 #ifdef HAVE_ASM_MMX
-	int x,y;
-	const int mmx_stride = width >> 3;
-	uint8_t *src = buffer + ((width * height) >> 2)-1;
-	uint8_t *dst = buffer + (width * height) -1;
-	uint8_t *dst2 = dst - width;
+    int x,y;
+    const int mmx_stride = width >> 3;
+    uint8_t *src = buffer + ((width * height) >> 2)-1;
+    uint8_t *dst = buffer + (width * height) -1;
+    uint8_t *dst2 = dst - width;
 
-	for( y = height-1; y >= 0; y -= 2)
-	{
-		for( x = 0; x < mmx_stride; x ++ )
-		{
-			movq_m2r( *src,mm0 );
-			movq_m2r( *src,mm1 );
-			movq_r2m(mm0, *dst );
-			movq_r2m(mm1, *(dst+8) );
-			movq_r2m(mm0, *dst2 );
-			movq_r2m(mm1, *(dst2+8) );
-			dst += 16;
-			dst2 += 16;
-			src += 8;
-		}
-		dst -= width;	
-		dst2 -= width;
-	}
+    for( y = height-1; y >= 0; y -= 2)
+    {
+        for( x = 0; x < mmx_stride; x ++ )
+        {
+            movq_m2r( *src,mm0 );
+            movq_m2r( *src,mm1 );
+            movq_r2m(mm0, *dst );
+            movq_r2m(mm1, *(dst+8) );
+            movq_r2m(mm0, *dst2 );
+            movq_r2m(mm1, *(dst2+8) );
+            dst += 16;
+            dst2 += 16;
+            src += 8;
+        }
+        dst -= width;   
+        dst2 -= width;
+    }
 
-	__asm__(_EMMS"       \n\t"
-            	SFENCE"     \n\t"
-            	:::"memory");
+    __asm__(_EMMS"       \n\t"
+                SFENCE"     \n\t"
+                :::"memory");
 #endif
 #endif
 
@@ -733,12 +732,12 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
  * subsample YUV 4:4:4 to YUV 4:2:2 using drop method
  */
 void ss_444_to_422_drop(uint8_t *U, uint8_t *V, int width, int height) {
-	const int dest_width = width - 1;
-	const int stride = width >> 1;
+    const int dest_width = width - 1;
+    const int stride = width >> 1;
     for (int y = 0; y < height; y++) {
-		int x = 0;
+        int x = 0;
 #ifdef HAVE_ASM_SSE2
-		for( ; x < dest_width - 15; x += 16 ) {
+        for( ; x < dest_width - 15; x += 16 ) {
             __m128i u_values = _mm_loadu_si128((__m128i*)(U + y * width + x));
             __m128i v_values = _mm_loadu_si128((__m128i*)(V + y * width + x));
             __m128i u_low = _mm_unpacklo_epi64(u_values, u_values);
@@ -746,7 +745,7 @@ void ss_444_to_422_drop(uint8_t *U, uint8_t *V, int width, int height) {
             _mm_storeu_si128((__m128i*)(U + y * stride + (x >> 1)), u_low);
             _mm_storeu_si128((__m128i*)(V + y * stride + (x >> 1)), v_low);
    
-		}
+        }
 #else
 #ifdef HAVE_ARM_ASIMD
         for(; x < dest_width - 15; x += 16) {
@@ -761,11 +760,11 @@ void ss_444_to_422_drop(uint8_t *U, uint8_t *V, int width, int height) {
         }
 #endif
 #endif
-    	for (; x < dest_width; x += 2) {
-        	U[y * stride + (x >> 1)] = U[y * width + x];
-        	V[y * stride + (x >> 1)] = V[y * width + x];
-    	}
-	}
+        for (; x < dest_width; x += 2) {
+            U[y * stride + (x >> 1)] = U[y * width + x];
+            V[y * stride + (x >> 1)] = V[y * width + x];
+        }
+    }
 }
 
 /*
@@ -776,7 +775,7 @@ void ss_444_to_422_average(uint8_t *U, uint8_t *V, int width, int height) {
     const int stride = width >> 1;
 
     for (int y = 0; y < height; y++) {
-		int x = 0;
+        int x = 0;
 #ifdef HAVE_ASM_SSE2
         for (; x < dest_width - 15; x += 16) {
             __m128i U_values1 = _mm_loadu_si128((__m128i *)(U + y * width + x * 2));
@@ -848,9 +847,7 @@ void ss_444_to_422_average(uint8_t *U, uint8_t *V, int width, int height) {
 #define B (1.0/ 3.0)
 #define WEIGHT_SCALE (1<<16)
 static void ss_444_to_422_bilinear(uint8_t *restrict U, uint8_t *restrict V, const int width, const int height) {
-	const int dest_width = width >> 1;
-	const int B_WEIGHT_SCALE = B * WEIGHT_SCALE;
-	const int HALF_WEIGHT = WEIGHT_SCALE >> 1;
+    const int dest_width = width >> 1;
 
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < dest_width; j++) {
@@ -858,25 +855,26 @@ static void ss_444_to_422_bilinear(uint8_t *restrict U, uint8_t *restrict V, con
 
             int totalU = 0;
             int totalV = 0;
+            int totalWeight = 0;
 
-            for (int u = -1; u <= 2; u++) {
-                const int diff = (2 * j + u) - src_idx;
-                const int fu = diff * diff;
+            const int weight1 = WEIGHT_SCALE;
+            const int weight2 = WEIGHT_SCALE * 2;
 
-                const int weightInt = (2 * fu - fu * diff) * B_WEIGHT_SCALE;
+            const int srcUIdx1 = i * width + src_idx;
+            const int srcUIdx2 = i * width + src_idx + 1;
+            const int srcVIdx1 = i * width + src_idx;
+            const int srcVIdx2 = i * width + src_idx + 1;
 
-                int dest_idx = i + u;
-                dest_idx = (dest_idx < 0) ? 0 : ((dest_idx >= height) ? height - 1 : dest_idx);
+            totalU += (U[srcUIdx1] - 128) * weight1;
+            totalV += (V[srcVIdx1] - 128) * weight1;
+            totalWeight += weight1;
 
-                const int srcU = U[dest_idx * width + src_idx];
-                const int srcV = V[dest_idx * width + src_idx];
+            totalU += (U[srcUIdx2] - 128) * weight2;
+            totalV += (V[srcVIdx2] - 128) * weight2;
+            totalWeight += weight2;
 
-                totalU += (srcU - 128) * weightInt;
-                totalV += (srcV - 128) * weightInt;
-            }
-
-            U[i * dest_width + j] = (uint8_t)((totalU + HALF_WEIGHT) / WEIGHT_SCALE) + 128;
-            V[i * dest_width + j] = (uint8_t)((totalV + HALF_WEIGHT) / WEIGHT_SCALE) + 128;
+            U[i * dest_width + j] = (uint8_t)(((totalU + (totalWeight >> 1)) / totalWeight) + 128);
+            V[i * dest_width + j] = (uint8_t)(((totalV + (totalWeight >> 1)) / totalWeight) + 128);
         }
     }
 }
@@ -894,7 +892,7 @@ static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *re
             const int src_idx = 2 * j;
             int totalU = 0, totalV = 0;
             
-			for (int u = -1; u <= 2; u++) {
+            for (int u = -1; u <= 2; u++) {
                 int dest_idx = i + u;
                 dest_idx = (dest_idx < 0) ? 0 : ((dest_idx >= height) ? height - 1 : dest_idx);
 
@@ -916,52 +914,71 @@ static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *re
 */
 
 static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *restrict V, const int width, const int height) {
-    const int dest_width = width >> 1;
+    const int output_width = width >> 1;
+    int i,j;
 
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < dest_width; j++) {
-            const int src_idx = 2 * j;
+    for( i = 0; i < 1; i ++ ) {
+        for (j = 0; j < output_width; j++) {
+            const int src_index = i * width + j * 2;
+
+            U[i * output_width + j] = U[src_index];
+            V[i * output_width + j] = V[src_index];
+        }
+    }
+
+    for (; i < height; i++) {
+        for (int j = 0; j < output_width; j++) {
+            const int chroma_col = 2 * j;
+            const int output_idx = i * output_width + j;
             int totalU = 0, totalV = 0;
-			int idx = i * dest_width + j;
 
-            for (int u = -1; u <= 2; u++) {
-                int dest_idx = i + u;
-                dest_idx = (dest_idx < 0) ? 0 : ((dest_idx >= height) ? height - 1 : dest_idx);
+            for (int u = 0; u < 4; u++) {
+                int source_row = i + u - 1;
+                source_row = (source_row < 0) ? 0 : ((source_row >= height) ? height - 1 : source_row);
 
-                const int fu = ((2 * j + u) - src_idx) * ((2 * j + u) - src_idx);
-                const int weightInt = mitchell_netravali_lut[u + 1][fu];
+                const int fu = ((2 * j + u - 1) - chroma_col) * ((2 * j + u - 1) - chroma_col);
+                const int weightInt = (((1 << 17) - fu) * B1 + (fu * B1 >> 16)) >> 16;
 
-                const int srcU = U[dest_idx * width + src_idx] - 128;
-                const int srcV = V[dest_idx * width + src_idx] - 128;
+                const int srcU = U[source_row * width + chroma_col] - 128;
+                const int srcV = V[source_row * width + chroma_col] - 128;
 
                 totalU += srcU * weightInt;
                 totalV += srcV * weightInt;
             }
 
-            U[idx] = (uint8_t)((totalU + (1 << 14)) >> 15) + 128;
-            V[idx] = (uint8_t)((totalV + (1 << 14)) >> 15) + 128;
+            totalU = ( totalU + ( 1 << 14 ) ) >> 15;
+            totalV = ( totalV + ( 1 << 14 ) ) >> 15;
+
+            totalU += 128;
+            totalV += 128;
+
+            totalU = (totalU < 0 ? 0 : totalU > 0xff ? 0xff: totalU);
+            totalV = (totalV < 0 ? 0 : totalV > 0xff ? 0xff: totalV);
+
+            U[output_idx] = (uint8_t) totalU;
+            V[output_idx] = (uint8_t) totalV;
         }
     }
 }
 
-void tr_422_to_444(uint8_t *chromaChannel, int width, int height) {
+void tr_422_to_444_dup(uint8_t *chromaChannel, int width, int height) {
     const int src_width = width >> 1;
-	const int hei = height - 1;
-	const int wid = src_width - 1;
-	for (int y = hei; y >= 0; y--) {
-		int x = wid;
+    const int hei = height - 1;
+    const int wid = src_width - 1;
+    for (int y = hei; y >= 0; y--) {
+        int x = wid;
 #ifdef HAVE_ASM_SSE2
-		for (int x = src_width - 1; x >= 0; x -= 16) {
-	    	__m128i pixels = _mm_loadu_si128((__m128i*)&chromaChannel[y * src_width + x]);
-   			__m128i result = _mm_unpacklo_epi8(pixels, pixels);
-        	_mm_storeu_si128((__m128i*)&chromaChannel[y * width + 2 * x], result);
-		}
+        for (int x = src_width - 1; x >= 0; x -= 16) {
+            __m128i pixels = _mm_loadu_si128((__m128i*)&chromaChannel[y * src_width + x]);
+        __m128i result = _mm_unpacklo_epi8(pixels, pixels);
+            _mm_storeu_si128((__m128i*)&chromaChannel[y * width + 2 * x], result);
+        }
 #else
 #ifdef HAVE_ARM_SIMD
         for (int x = src_width - 1; x >= 0; x -= 16) {
             uint8x16_t pixels = vld1q_u8(&chromaChannel[y * src_width + x]);
             uint8x16_t result = vdupq_n_u8(vgetq_lane_u8(pixels, 0));
-            vst1q_u8(&chromaChannel[y * dst_stride + 2 * x], result);
+            vst1q_u8(&chromaChannel[y * width + 2 * x], result);
         }
 #endif
 #endif
@@ -1008,14 +1025,14 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
   for (y = 0; y < height; y += 2) {
     /* first column boundary condition -- just repeat it to right */
     *out = (in0[0] + (2 * in0[0]) + in0[1] +
-	    in1[0] + (2 * in1[0]) + in1[1]) >> 3;
+        in1[0] + (2 * in1[0]) + in1[1]) >> 3;
     out++;
     in0++;
     in1++;
     /* rest of columns just loop */
     for (x = 2; x < width; x += 2) {
       *out = (in0[0] + (2 * in0[1]) + in0[2] +
-	      in1[0] + (2 * in1[1]) + in1[2]) >> 3;
+          in1[0] + (2 * in1[1]) + in1[2]) >> 3;
       in0 += 2;
       in1 += 2;
       out++;
@@ -1069,68 +1086,57 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 
 static subsample_444_to_422 subsample_444_to_422_in;
 
-static void init_mitchell_netravali_lut() {
-	for( int u = -1; u <= 2; ++u ) {
-		for(int fu = 0; fu < 4; ++fu ) {
-			int idx = u + 1;
-			mitchell_netravali_lut[idx][fu] = (((1 << 17) - (fu * fu * 65536 / 4)) * B1 + ((fu * fu * B1) >> 16)) >> 16;
-		}
-	}
-}
-
 void chroma_subsample_init()
 {
-	char *mode = getenv( "VEEJAY_SUBSAMPLE_MODE" );
-	subsample_444_to_422 f = ss_444_to_422_drop;
+    char *mode = getenv( "VEEJAY_SUBSAMPLE_MODE" );
+    subsample_444_to_422 f = ss_444_to_422_drop;
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Use VEEJAY_SUBSAMPLE_MODE=drop|average|bilinear|mitchell to select a subsampling method");
+    veejay_msg(VEEJAY_MSG_DEBUG, "Use VEEJAY_SUBSAMPLE_MODE=drop|average|bilinear|mitchell to select a subsampling method");
 
-	if( mode != NULL ) {
-		if(strcmp(mode, "drop") == 0 ) {
-			f = ss_444_to_422_drop;
-			veejay_msg(VEEJAY_MSG_INFO, "Subsampling using drop method");
-		}
-		else if (strcmp(mode, "average") == 0 ) { 
-			f = ss_444_to_422_average;
-			veejay_msg(VEEJAY_MSG_INFO, "Subsampling using average method");
-		}
-		else if (strcmp(mode, "bilinear") == 0 ) {
-			f = ss_444_to_422_bilinear;
-			veejay_msg(VEEJAY_MSG_INFO, "Subsampling using bilinear method");
-		}
-		else if (strcmp(mode, "mitchell") == 0 ) {
-			f = ss_444_to_422_in_mitchell_netravali;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Subsampling using mitchell-netravali method");
-		
-			init_mitchell_netravali_lut();
-		}
-		else {
-			veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUBSAMPLE_MODE, using drop method" );
-			f = ss_444_to_422_drop;
-		}
-	}
+    if( mode != NULL ) {
+        if(strcmp(mode, "drop") == 0 ) {
+            f = ss_444_to_422_drop;
+            veejay_msg(VEEJAY_MSG_INFO, "Subsampling using drop method");
+        }
+        else if (strcmp(mode, "average") == 0 ) { 
+            f = ss_444_to_422_average;
+            veejay_msg(VEEJAY_MSG_INFO, "Subsampling using average method");
+        }
+        else if (strcmp(mode, "bilinear") == 0 ) {
+            f = ss_444_to_422_bilinear;
+            veejay_msg(VEEJAY_MSG_INFO, "Subsampling using bilinear method");
+        }
+        else if (strcmp(mode, "mitchell") == 0 ) {
+            f = ss_444_to_422_in_mitchell_netravali;
+            veejay_msg(VEEJAY_MSG_DEBUG, "Subsampling using mitchell-netravali method");
+        }
+        else {
+            veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUBSAMPLE_MODE, using drop method" );
+            f = ss_444_to_422_drop;
+        }
+    }
 
-	subsample_444_to_422_in = f;
+    subsample_444_to_422_in = f;
 }
 
 void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
 {
-	switch (mode) {
-		case SSM_422_444:
-		    subsample_444_to_422_in(ycbcr[1],ycbcr[2],frame->width,frame->height);
-    		break;
-		case SSM_420_JPEG_BOX:
-		case SSM_420_JPEG_TR: 
-			ss_444_to_420jpeg(ycbcr[1], frame->width, frame->height);
- 			ss_444_to_420jpeg(ycbcr[2], frame->width, frame->height);
-			break;
-		case SSM_420_MPEG2:
-			ss_444_to_420mpeg2(ycbcr[1], frame->width, frame->height);
-			ss_444_to_420mpeg2(ycbcr[2], frame->width, frame->height);
-			break;
-		default:
-			break;
-  	}
+    switch (mode) {
+        case SSM_422_444:
+            subsample_444_to_422_in(ycbcr[1],ycbcr[2],frame->width,frame->height);
+            break;
+        case SSM_420_JPEG_BOX:
+        case SSM_420_JPEG_TR: 
+            ss_444_to_420jpeg(ycbcr[1], frame->width, frame->height);
+            ss_444_to_420jpeg(ycbcr[2], frame->width, frame->height);
+            break;
+        case SSM_420_MPEG2:
+            ss_444_to_420mpeg2(ycbcr[1], frame->width, frame->height);
+            ss_444_to_420mpeg2(ycbcr[2], frame->width, frame->height);
+            break;
+        default:
+            break;
+    }
 }
 
 
@@ -1139,26 +1145,26 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
     uint8_t *_chroma_supersample_data = NULL;
 
 
-	if( mode == SSM_420_JPEG_TR ) {
- 		_chroma_supersample_data = (uint8_t*) vj_calloc( sizeof(uint8_t) * (frame->width * 2) );
-	}
+    if( mode == SSM_420_JPEG_TR ) {
+        _chroma_supersample_data = (uint8_t*) vj_calloc( sizeof(uint8_t) * (frame->width * 2) );
+    }
 
-	switch (mode) {
-		case SSM_422_444:
- 			tr_422_to_444(ycbcr[1],frame->width,frame->height);
- 			tr_422_to_444(ycbcr[2],frame->width,frame->height);
-   		break;
-		case SSM_420_JPEG_BOX:
-	      	ss_420jpeg_to_444(ycbcr[1], frame->width, frame->height);
-	    	ss_420jpeg_to_444(ycbcr[2], frame->width, frame->height);
-		break;
-		case SSM_420_JPEG_TR:
-			tr_420jpeg_to_444(_chroma_supersample_data,ycbcr[1], frame->width, frame->height);
-			tr_420jpeg_to_444(_chroma_supersample_data,ycbcr[2], frame->width, frame->height);
-		break;
-  		default:
-   			break;
- 	 }
+    switch (mode) {
+        case SSM_422_444:
+            tr_422_to_444_dup(ycbcr[1],frame->width,frame->height);
+            tr_422_to_444_dup(ycbcr[2],frame->width,frame->height);
+        break;
+        case SSM_420_JPEG_BOX:
+            ss_420jpeg_to_444(ycbcr[1], frame->width, frame->height);
+            ss_420jpeg_to_444(ycbcr[2], frame->width, frame->height);
+        break;
+        case SSM_420_JPEG_TR:
+            tr_420jpeg_to_444(_chroma_supersample_data,ycbcr[1], frame->width, frame->height);
+            tr_420jpeg_to_444(_chroma_supersample_data,ycbcr[2], frame->width, frame->height);
+        break;
+        default:
+            break;
+     }
 
      if( _chroma_supersample_data != NULL )
         free( _chroma_supersample_data );

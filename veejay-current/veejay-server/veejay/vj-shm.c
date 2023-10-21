@@ -327,10 +327,12 @@ static	int	ffmpeg_to_lvd(int fmt)
 {
 	int res;
 	switch(fmt) {
-		case PIX_FMT_YUVA422P: res = LIVIDO_PALETTE_YUVA422; break;
-		case PIX_FMT_YUVA444P: res = LIVIDO_PALETTE_YUVA8888; break;
-		case PIX_FMT_YUVJ422P: case PIX_FMT_YUV422P: res = LIVIDO_PALETTE_YUV422P; break;
-		case PIX_FMT_YUVJ444P: case PIX_FMT_YUV444P: res = LIVIDO_PALETTE_YUV444P; break;
+		case PIX_FMT_YUVA422P: res = LIVIDO_PALETTE_YUV422P; break;
+		case PIX_FMT_YUVA444P: res = LIVIDO_PALETTE_YUV444P; break;
+		case PIX_FMT_YUVJ422P: 
+		case PIX_FMT_YUV422P: res = LIVIDO_PALETTE_YUV422P; break;
+		case PIX_FMT_YUVJ444P: 
+		case PIX_FMT_YUV444P: res = LIVIDO_PALETTE_YUV444P; break;
 		default:
 			res = LIVIDO_PALETTE_YUV422P;
 			break;
@@ -387,7 +389,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	data->header[2]      = frame->stride[0];
 	data->header[3]      = frame->stride[1];
 	data->header[4]      = frame->stride[2];
-	data->header[5]      = ffmpeg_to_lvd( frame->format );
+	data->header[5]      = LIVIDO_PALETTE_YUV422P;
 
 /*	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Starting address: %p", data );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource:  Frame data      : %p", data + HEADER_LENGTH );
@@ -396,8 +398,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	veejay_msg(VEEJAY_MSG_DEBUG,"Shared Resource:  Planes {%d,%d,%d,X} LVD pixel format %d",
 			data->header[2],data->header[3],data->header[4],data->header[5]);
 */
-	v->alpha = ( data->header[5] == LIVIDO_PALETTE_YUVA8888 ? 1 :
-				 (data->header[5] == LIVIDO_PALETTE_YUVA422 ? 1 : 0) );
+	v->alpha = 0;
 
 	if(v->alpha) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Shared Resource: includes alpha channel information");
