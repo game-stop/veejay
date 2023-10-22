@@ -731,36 +731,12 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 /*
  * subsample YUV 4:4:4 to YUV 4:2:2 using drop method
  */
-void ss_444_to_422_drop(uint8_t *U, uint8_t *V, int width, int height) {
+void ss_444_to_422_drop(uint8_t *restrict U, uint8_t *restrict V, int width, int height) {
     const int dest_width = width - 1;
     const int stride = width >> 1;
     for (int y = 0; y < height; y++) {
-        int x = 0;
-#ifdef HAVE_ASM_SSE2
-        for( ; x < dest_width - 15; x += 16 ) {
-            __m128i u_values = _mm_loadu_si128((__m128i*)(U + y * width + x));
-            __m128i v_values = _mm_loadu_si128((__m128i*)(V + y * width + x));
-            __m128i u_low = _mm_unpacklo_epi64(u_values, u_values);
-            __m128i v_low = _mm_unpacklo_epi64(v_values, v_values);
-            _mm_storeu_si128((__m128i*)(U + y * stride + (x >> 1)), u_low);
-            _mm_storeu_si128((__m128i*)(V + y * stride + (x >> 1)), v_low);
-   
-        }
-#else
-#ifdef HAVE_ARM_ASIMD
-        for(; x < dest_width - 15; x += 16) {
-            uint8x16_t u_values = vld1q_u8(U + y * width + x);
-            uint8x16_t v_values = vld1q_u8(V + y * width + x);
-            
-            uint8x8_t u_low = vget_low_u8(u_values);
-            uint8x8_t v_low = vget_low_u8(v_values);
-            
-            vst1_u8(U + y * stride + (x >> 1), u_low);
-            vst1_u8(V + y * stride + (x >> 1), v_low);
-        }
-#endif
-#endif
-        for (; x < dest_width; x += 2) {
+#pragma omp simd
+        for (int x = 0; x < dest_width; x += 2) {
             U[y * stride + (x >> 1)] = U[y * width + x];
             V[y * stride + (x >> 1)] = V[y * width + x];
         }
@@ -770,71 +746,14 @@ void ss_444_to_422_drop(uint8_t *U, uint8_t *V, int width, int height) {
 /*
  * subsample YUV 4:4:4 to YUV 4:2:2 using average method
  */
-void ss_444_to_422_average(uint8_t *U, uint8_t *V, int width, int height) {
+void ss_444_to_422_average(uint8_t *restrict U, uint8_t *restrict V, int width, int height) {
     const int dest_width = width >> 1;
     const int stride = width >> 1;
-
-    for (int y = 0; y < height; y++) {
-        int x = 0;
-#ifdef HAVE_ASM_SSE2
-        for (; x < dest_width - 15; x += 16) {
-            __m128i U_values1 = _mm_loadu_si128((__m128i *)(U + y * width + x * 2));
-            __m128i V_values1 = _mm_loadu_si128((__m128i *)(V + y * width + x * 2));
-            __m128i U_values2 = _mm_loadu_si128((__m128i *)(U + y * width + (x + 8) * 2));
-            __m128i V_values2 = _mm_loadu_si128((__m128i *)(V + y * width + (x + 8) * 2));
-
-            __m128i U_sum1 = _mm_add_epi16(_mm_unpacklo_epi8(U_values1, _mm_setzero_si128()),
-                                           _mm_unpackhi_epi8(U_values1, _mm_setzero_si128()));
-            __m128i V_sum1 = _mm_add_epi16(_mm_unpacklo_epi8(V_values1, _mm_setzero_si128()),
-                                           _mm_unpackhi_epi8(V_values1, _mm_setzero_si128()));
-            __m128i U_sum2 = _mm_add_epi16(_mm_unpacklo_epi8(U_values2, _mm_setzero_si128()),
-                                           _mm_unpackhi_epi8(U_values2, _mm_setzero_si128()));
-            __m128i V_sum2 = _mm_add_epi16(_mm_unpacklo_epi8(V_values2, _mm_setzero_si128()),
-                                           _mm_unpackhi_epi8(V_values2, _mm_setzero_si128()));
-
-            U_sum1 = _mm_srli_epi16(_mm_add_epi16(U_sum1, _mm_set1_epi16(1)), 1);
-            V_sum1 = _mm_srli_epi16(_mm_add_epi16(V_sum1, _mm_set1_epi16(1)), 1);
-            U_sum2 = _mm_srli_epi16(_mm_add_epi16(U_sum2, _mm_set1_epi16(1)), 1);
-            V_sum2 = _mm_srli_epi16(_mm_add_epi16(V_sum2, _mm_set1_epi16(1)), 1);
-            U_sum1 = _mm_packus_epi16(U_sum1, U_sum2);
-            V_sum1 = _mm_packus_epi16(V_sum1, V_sum2);
-
-            _mm_storeu_si128((__m128i *)(U + y * stride + x), U_sum1);
-            _mm_storeu_si128((__m128i *)(V + y * stride + x), V_sum1);
-        }
-#else
-#ifdef HAVE_ARM_ASIMD
-        for (; x < dest_width - 15; x += 16) {
-            uint8x16_t U_values1 = vld1q_u8(U + y * width + x * 2);
-            uint8x16_t V_values1 = vld1q_u8(V + y * width + x * 2);
-            uint8x16_t U_values2 = vld1q_u8(U + y * width + (x + 8) * 2);
-            uint8x16_t V_values2 = vld1q_u8(V + y * width + (x + 8) * 2);
-
-            uint16x8_t U_sum1 = vmovl_u8(vget_low_u8(U_values1));
-            uint16x8_t V_sum1 = vmovl_u8(vget_low_u8(V_values1));
-            U_sum1 = vaddq_u16(U_sum1, vmovl_u8(vget_high_u8(U_values1)));
-            V_sum1 = vaddq_u16(V_sum1, vmovl_u8(vget_high_u8(V_values1)));
-
-            uint16x8_t U_sum2 = vmovl_u8(vget_low_u8(U_values2));
-            uint16x8_t V_sum2 = vmovl_u8(vget_low_u8(V_values2));
-            U_sum2 = vaddq_u16(U_sum2, vmovl_u8(vget_high_u8(U_values2)));
-            V_sum2 = vaddq_u16(V_sum2, vmovl_u8(vget_high_u8(V_values2)));
-
-            U_sum1 = vshrq_n_u16(vaddq_u16(U_sum1, vdupq_n_u16(1)), 1);
-            V_sum1 = vshrq_n_u16(vaddq_u16(V_sum1, vdupq_n_u16(1)), 1);
-            U_sum2 = vshrq_n_u16(vaddq_u16(U_sum2, vdupq_n_u16(1)), 1);
-            V_sum2 = vshrq_n_u16(vaddq_u16(V_sum2, vdupq_n_u16(1)), 1);
-
-            uint8x8_t U_result = vqmovn_u16(vcombine_u16(vget_low_u16(U_sum1), vget_low_u16(U_sum2)));
-            uint8x8_t V_result = vqmovn_u16(vcombine_u16(vget_low_u16(V_sum1), vget_low_u16(V_sum2)));
-
-            vst1_u8(U + y * stride + x, U_result);
-            vst1_u8(V + y * stride + x, V_result);
-        }
-#endif
-#endif
-        for (; x < dest_width; x++) {
-            int src_index = y * width + x * 2;
+    int x,y;
+    for (y = 0; y < height; y++) {
+#pragma omp simd
+        for (x = 0; x < dest_width; x++) {
+            const int src_index = y * width + x * 2;
             U[y * stride + x] = (U[src_index] + U[src_index + 1] + 1) >> 1;
             V[y * stride + x] = (V[src_index] + V[src_index + 1] + 1) >> 1;
         }
@@ -850,6 +769,7 @@ static void ss_444_to_422_bilinear(uint8_t *restrict U, uint8_t *restrict V, con
     const int dest_width = width >> 1;
 
     for (int i = 0; i < height; i++) {
+#pragma omp simd
         for (int j = 0; j < dest_width; j++) {
             const int src_idx = 2 * j;
 
@@ -881,38 +801,8 @@ static void ss_444_to_422_bilinear(uint8_t *restrict U, uint8_t *restrict V, con
 
 /*
  * subsample YUV 4:4:4 to YUV 4:2:2 using mitchell netravali
- * without lookup table, keep for reference
  *
- *
-static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *restrict V, const int width, const int height) {
-    const int dest_width = width >> 1;
-
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < dest_width; j++) {
-            const int src_idx = 2 * j;
-            int totalU = 0, totalV = 0;
-            
-            for (int u = -1; u <= 2; u++) {
-                int dest_idx = i + u;
-                dest_idx = (dest_idx < 0) ? 0 : ((dest_idx >= height) ? height - 1 : dest_idx);
-
-                int fu = ((2 * j + u) - src_idx) * ((2 * j + u) - src_idx) << 16 >> 2;
-                int weightInt = (((1 << 17) - fu) * B1 + (fu * B1 >> 16)) >> 16;
-
-                int srcU = U[dest_idx * width + src_idx] - 128;
-                int srcV = V[dest_idx * width + src_idx] - 128;
-
-                totalU += (srcU * weightInt) + ((srcU * weightInt >> 31) & 1);
-                totalV += (srcV * weightInt) + ((srcV * weightInt >> 31) & 1);
-            }
-
-            U[i * dest_width + j] = (uint8_t)((totalU + (1 << 14)) >> 15) + 128;
-            V[i * dest_width + j] = (uint8_t)((totalV + (1 << 14)) >> 15) + 128;
-        }
-    }
-}
 */
-
 static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *restrict V, const int width, const int height) {
     const int output_width = width >> 1;
     int i,j;
@@ -927,6 +817,7 @@ static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *re
     }
 
     for (; i < height; i++) {
+#pragma omp simd
         for (int j = 0; j < output_width; j++) {
             const int chroma_col = 2 * j;
             const int output_idx = i * output_width + j;
@@ -962,35 +853,43 @@ static void ss_444_to_422_in_mitchell_netravali(uint8_t *restrict U, uint8_t *re
 }
 
 void tr_422_to_444_dup(uint8_t *chromaChannel, int width, int height) {
-    const int src_width = width >> 1;
-    const int hei = height - 1;
-    const int wid = src_width - 1;
-    for (int y = hei; y >= 0; y--) {
-        int x = wid;
+  const int src_width = width >> 1;
+  const int hei = height - 1;
+  const int wid = src_width - 1;
+
+  // duplicate the last pixel in the row
+  chromaChannel[hei * width + 1] = chromaChannel[hei * src_width + wid];
+
+  for (int y = hei; y >= 0; y--) {
+    int x = wid - 1;
+    // upsample the pixels using a bilinear filter.
+    chromaChannel[y * width + 2 * wid + 1] = (chromaChannel[y * src_width + wid] + chromaChannel[y * src_width + wid + 1]) >> 1;
+    chromaChannel[y * width + 2 * wid] = (chromaChannel[y * src_width + wid] + chromaChannel[y * src_width + wid - 1]) >> 1;
+
 #ifdef HAVE_ASM_SSE2
-        for (int x = src_width - 1; x >= 0; x -= 16) {
-            __m128i pixels = _mm_loadu_si128((__m128i*)&chromaChannel[y * src_width + x]);
-        __m128i result = _mm_unpacklo_epi8(pixels, pixels);
-            _mm_storeu_si128((__m128i*)&chromaChannel[y * width + 2 * x], result);
-        }
-#else
-#ifdef HAVE_ARM_SIMD
-        for (int x = src_width - 1; x >= 0; x -= 16) {
-            uint8x16_t pixels = vld1q_u8(&chromaChannel[y * src_width + x]);
-            uint8x16_t result = vdupq_n_u8(vgetq_lane_u8(pixels, 0));
-            vst1q_u8(&chromaChannel[y * width + 2 * x], result);
-        }
-#endif
-#endif
-        for (; x >= 0; x--) {
-            const uint8_t pixel = chromaChannel[y * src_width + x];
-
-            chromaChannel[y * width + 2 * x] = pixel;
-            chromaChannel[y * width + 2 * x + 1] = pixel;
-        }
-
-        chromaChannel[y * width] = chromaChannel[y * width + 1];
+    for (; x >= 0; x -= 8) {
+        __m128i pixels = _mm_loadl_epi64((__m128i*)&chromaChannel[y * src_width + x]);
+        __m128i duplicated_pixels = _mm_unpacklo_epi8(pixels, pixels);
+        _mm_storeu_si128((__m128i*)&chromaChannel[y * width + 2 * x], duplicated_pixels);
     }
+#else
+#ifdef HAVE_ARM_ASIMD
+    for (; x >= 0; x -= 8) {
+        uint8x8_t pixels = vld1_u8(&chromaChannel[y * src_width + x]);
+        uint8x8x2_t duplicated_pixels;
+        duplicated_pixels.val[0] = pixels;
+        duplicated_pixels.val[1] = pixels;
+        vst2_u8(&chromaChannel[y * width + 2 * x], duplicated_pixels);
+    }
+#endif
+#endif
+
+    for ( ; x >= 0; x--) {
+      const uint8_t pixel = chromaChannel[y * src_width + x];
+      chromaChannel[y * width + 2 * x + 1] = pixel;
+      chromaChannel[y * width + 2 * x] = pixel;
+    }
+  }
 }
 
 /* vertical intersitial siting; horizontal cositing
