@@ -35,11 +35,11 @@ vj_effect *coloradjust_init(int w, int h)
     ve->limits[1][1] = 256;
 
 	ve->limits[0][2] = 0;
-	ve->limits[1][2] = 256;
+	ve->limits[1][2] = 1024;
 
     ve->defaults[0] = 50;
     ve->defaults[1] = 50;
-	ve->defaults[2] = 0;
+	ve->defaults[2] = 256;
 
     ve->param_description = vje_build_param_list( ve->num_params, "Degrees", "Intensity", "Exposure" );
     ve->description = "Exposure, Hue and Saturation";
@@ -50,18 +50,13 @@ vj_effect *coloradjust_init(int w, int h)
     return ve;
 }
 
-static inline float my_pow2(int scaledValue) {
-    return (float)(1 << (scaledValue >> 8));
-}
-
-
 void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
 	int val = args[0];
     int _degrees = args[1];
     int exposureValue = args[2];
 
     unsigned int i;
-    const int len = (frame->ssm ? frame->len : frame->uv_len);
+    const int len = frame->len;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
@@ -73,7 +68,7 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args) {
     const int c = (int) rint( a_cos(hue) * (1<<16) * sat );
 
 	if( exposureValue > 0.0f ) {
-    	float powValue = exposureValue / 256.0f; // my_pow2( exposureValue );
+    	float powValue = exposureValue / 256.0f; 
 #pragma opm simd
 		for( i = 0; i < len ; i ++ ) 
 		{
