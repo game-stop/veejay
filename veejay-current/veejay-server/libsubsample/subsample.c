@@ -1151,7 +1151,8 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 
     switch (mode) {
         case SSM_422_444:
-            tr_422_to_444_dup(ycbcr[1],frame->width,frame->height);
+            //tr_422_to_444_dup(ycbcr[1],ycbcr[2],ycbcr[0],frame->width,frame->height);
+            tr_422_to_444_dup(ycbcr[1], frame->width,frame->height);
             tr_422_to_444_dup(ycbcr[2],frame->width,frame->height);
         break;
         case SSM_420_JPEG_BOX:
