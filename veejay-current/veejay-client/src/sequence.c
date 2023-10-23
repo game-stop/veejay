@@ -43,6 +43,8 @@ extern void reloaded_schedule_restart();
 extern void vj_msg(int type, const char format[], ...);
 extern void multitrack_cleanup_track( void *data, int track );
 
+extern int alphaonly_view;
+
 typedef struct
 {
 	uint8_t *image_data[__MAX_TRACKS];
@@ -383,9 +385,9 @@ extern int     is_button_toggled(const char *name);
 static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 {
 	if(!v->have_frame && (v->width <= 0 || v->height <= 0) )
-		return 1;
+		return 0;
 
-	gint res = sendvims( v, VIMS_RGB24_IMAGE, "%d %d", v->width,v->height );
+	gint res = sendvims( v, VIMS_RGB24_IMAGE, "%d %d %d", v->width,v->height, alphaonly_view );
 	if( res <= 0 )
 	{
 		v->have_frame = 0;
@@ -402,20 +404,18 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 
 	int expected_len = (v->width * v->height);
+	int expected_len_uv = expected_len/2;
 	int srcfmt = (v->full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
-    
-	if(v->grey_scale) {
-		srcfmt = PIX_FMT_GRAY8;
+   
+
+	if( bw == expected_len) {
+	    srcfmt = PIX_FMT_GRAY8;
+	}
+	else if( bw == (expected_len + expected_len_uv)) {
+	    //ok
 	}
 	else {
-		expected_len += (v->width*v->height/4);
-		expected_len += (v->width*v->height/4);
-	}
-
-	if( bw != expected_len )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Corrupted image. Should be %dx%d but have %d bytes %s",
-			v->width,v->height,abs(bw - expected_len),( (bw-expected_len<0)? "too few" : "too many") );
+		veejay_msg(VEEJAY_MSG_ERROR, "Expected different amount of data to be received");
 		v->have_frame = 0;
 		return 0;
 	}

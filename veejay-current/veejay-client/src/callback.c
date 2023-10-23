@@ -3435,6 +3435,13 @@ void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
     vj_msg(VEEJAY_MSG_INFO,"Changed preview to greyscale");
 }
 
+int alphaonly_view = 0;
+void		on_previewalphaonly_toggled( GtkWidget *w, gpointer user_data)
+{
+	alphaonly_view = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(w) );
+	vj_msg(VEEJAY_MSG_INFO, "Live viewing %s", (alphaonly_view ? "Alpha only" : "Preview" ) );	
+}
+
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
     int enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));

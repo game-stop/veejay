@@ -2470,29 +2470,33 @@ void		vj_init_vevo_events(void)
 #endif
 #ifdef USE_SWSCALER
 	index_map_[VIMS_RGB24_IMAGE]				=	_new_event(
-				"%d %d",	
+				"%d %d %d",	
 				VIMS_RGB24_IMAGE,
 				"GUI: Get preview image (raw RGB24)",
 				vj_event_get_scaled_image,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
+				3,
+				VIMS_ALLOW_ANY,
 				"Width",
 				0,
 				"Height",
+				0,
+				"Alpha Only",
 				0,
 				NULL );
 #else
 #ifdef USE_GDK_PIXBUF
 		index_map_[VIMS_RGB24_IMAGE]				=	_new_event(
-				"%d %d",	
+				"%d %d %d",	
 				VIMS_RGB24_IMAGE,
 				"GUI: Get preview image (raw RGB24)",
 				vj_event_get_scaled_image,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
+				3,
+				VIMS_ALLOW_ANY,
 				"Width",
 				0,
 				"Height",
+				0,
+				"Alpha Only",
 				0,
 				NULL );
 #endif

@@ -8386,16 +8386,17 @@ void    vj_event_get_image_part         (   void *ptr,  const char format[],    
 void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    va_list ap  )
 {
     veejay_t *v = (veejay_t*)ptr;
-    int args[2];
+    int args[3];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    int w=0,h=0;
+    int w=0,h=0,alpha=0;
     int max_w = vj_perform_preview_max_width(v);
     int max_h = vj_perform_preview_max_height(v);
         
     w = args[0]; 
     h = args[1];
-
+    alpha = args[2];
+   
     if( w <= 0 || h <= 0 || w >= max_w || h >= max_h )
     {
         veejay_msg(0, "Invalid image dimension %dx%d requested (max is %dx%d)",w,h,max_w,max_h );
@@ -8407,7 +8408,12 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
     VJFrame frame;
     veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
     vj_perform_get_primary_frame( v, frame.data );
-    if( use_bw_preview_ ) {
+
+    if( alpha ) {
+		vj_fast_alpha_picture_save_to_mem( &frame, w,h, vj_perform_get_preview_buffer(v));
+		dstlen = w * h;
+    }
+	else if( use_bw_preview_ ) {
         vj_fastbw_picture_save_to_mem(
                 &frame,
                 w,
