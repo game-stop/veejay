@@ -374,7 +374,7 @@ void	on_button_fadeout_clicked(GtkWidget *w, gpointer user_data)
 	char *timenow = format_time( num, info->el.fps );
 	int vims_id = is_button_toggled( "toggle_fademethod" ) ? VIMS_CHAIN_FADE_OUT: VIMS_CHAIN_FADE_IN;
 	multi_vims( vims_id, "0 %d", num );
-	vj_midi_learning_vims_complex( info->midi, "button_fadedur", vims_id, 0, num );
+	vj_midi_learning_vims_complex( info->midi, "button_fadedur", vims_id, 0, 2 );
 	vj_msg(VEEJAY_MSG_INFO, "Fade out duration %s (frames %d)",timenow,num );
 	if(timenow) free(timenow);
 }
@@ -385,7 +385,7 @@ void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 	char *timenow = format_time( num, info->el.fps );
 	int vims_id = is_button_toggled( "toggle_fademethod" ) ? VIMS_CHAIN_FADE_IN: VIMS_CHAIN_FADE_OUT;
 	multi_vims( vims_id, "0 %d", num );
-	vj_midi_learning_vims_complex( info->midi, "button_fadedur",vims_id, 0,num );
+	vj_midi_learning_vims_complex( info->midi, "button_fadedur",vims_id, 0, 2 );
 	vj_msg(VEEJAY_MSG_INFO, "Fade in duration %s (frames %d)",timenow,num );
 	if(timenow) free(timenow);
 }
@@ -395,14 +395,15 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 	if(info->status_lock)
 		return;
 
-  GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
-  gdouble val = gtk_adjustment_get_value (a);
+	GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( w ));
+	gdouble val = gtk_adjustment_get_value (a);
+	
 	int mode = is_button_toggled("toggle_fademethod");
 	int value = ( mode == 1 ? 0xff - (int) val : (int) val );
 
 	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d", value );
 	
-	vj_midi_learning_vims_complex( info->midi, "manualopacity", VIMS_CHAIN_FADE_IN, 0,1 );
+	vj_midi_learning_vims_complex( info->midi, "manualopacity", VIMS_CHAIN_MANUAL_FADE, 0,1 );
 	
 	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val ); 
 }
