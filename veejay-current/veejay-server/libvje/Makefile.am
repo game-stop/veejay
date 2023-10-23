@@ -209,6 +209,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/camerabounce.c \
 	effects/flashopacity.c \
 	effects/colortemp.c \
+	effects/cosmichue.c \
 	effects/blackreplace.c
 		
 

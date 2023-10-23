@@ -138,6 +138,7 @@ static struct {
     { neighbours5_init,neighbours5_malloc,neighbours5_free,NULL,NULL,neighbours5_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEIGHBOUR5 },
     { negation_init,NULL,NULL,NULL,NULL,negation_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_NEGATION },
     { colortemp_init,NULL,NULL,NULL,NULL,colortemp_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COLORTEMP },
+    { cosmichue_init,NULL,NULL,NULL,NULL,cosmichue_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COSMICHUE },
     { rainbowshift_init, NULL,NULL,NULL,NULL, rainbowshift_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RAINBOWSHIFT },
     { vintagefilm_init,NULL,NULL,NULL,NULL, vintagefilm_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_VINTAGEFILM },
     { mirrordistortion_init,mirrordistortion_malloc,mirrordistortion_free,NULL,NULL,mirrordistortion_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_MIRRORDISTORTION },

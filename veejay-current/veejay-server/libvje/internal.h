@@ -220,8 +220,9 @@
 #include "./effects/camerabounce.h"
 #include "./effects/flashopacity.h"
 #include "./effects/colortemp.h"
+#include "./effects/cosmichue.h"
 
-#define VJ_IMAGE_EFFECT_MIN 68
+#define VJ_IMAGE_EFFECT_MIN 67
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -475,6 +476,7 @@ enum {
 	VJ_IMAGE_EFFECT_LUMINOUSWAVE = 70,
 	VJ_IMAGE_EFFECT_CAMERABOUNCE = 69,
 	VJ_IMAGE_EFFECT_COLORTEMP = 68,
+	VJ_IMAGE_EFFECT_COSMICHUE = 67,
     	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
