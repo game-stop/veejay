@@ -505,6 +505,18 @@ void timeline_set_in_point( GtkWidget *widget, gdouble pos )
   gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
 }
 
+void timeline_set_in_and_out_point(GtkWidget *widget, gdouble start, gdouble end)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+  if( start < 0.0 ) start = 0.0; else if ( start > 1.0 ) end = 1.0;
+  if( end < 0.0 ) end = 0.0; else if ( end > 1.0 ) end = 1.0;
+
+  g_object_set( G_OBJECT(te), "in", start, NULL );
+  g_object_set( G_OBJECT(te), "out", end, NULL );
+
+  gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
+}
+
 void timeline_set_selection( GtkWidget *widget, gboolean active)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);

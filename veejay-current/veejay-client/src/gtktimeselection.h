@@ -1,5 +1,5 @@
 /* veejay - Linux VeeJay
- * 	     (C) 2002-2004 Niels Elburg <nwelburg@gmail.com> 
+ *       (C) 2002-2004 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -36,30 +36,31 @@ extern "C"
 typedef struct _TimelineSelection TimelineSelection;
 typedef struct _TimelineSelectionClass TimelineSelectionClass;
 
-GType		timeline_get_type	(void);
-GtkWidget*	timeline_new		(void);
+GType       timeline_get_type   (void);
+GtkWidget*  timeline_new        (void);
 
-gdouble		timeline_get_length	(TimelineSelection *te);
-gdouble		timeline_get_pos	(TimelineSelection *te);
-gdouble		timeline_get_in_point	(TimelineSelection *te );
-gdouble		timeline_get_out_point  (TimelineSelection *te );
-gboolean	timeline_get_selection  (TimelineSelection *te );
-gboolean	timeline_get_bind	(TimelineSelection *te );
+gdouble     timeline_get_length (TimelineSelection *te);
+gdouble     timeline_get_pos    (TimelineSelection *te);
+gdouble     timeline_get_in_point   (TimelineSelection *te );
+gdouble     timeline_get_out_point  (TimelineSelection *te );
+gboolean    timeline_get_selection  (TimelineSelection *te );
+gboolean    timeline_get_bind   (TimelineSelection *te );
 gdouble     timeline_get_point (TimelineSelection *te);
 
-void		timeline_set_pos	(GtkWidget *widget, gdouble pos );
+void        timeline_set_pos    (GtkWidget *widget, gdouble pos );
 
-void		timeline_set_in_point	(GtkWidget *widget, gdouble pos);
-void		timeline_set_out_point	(GtkWidget *widget, gdouble pos);
+void        timeline_set_in_point   (GtkWidget *widget, gdouble pos);
+void        timeline_set_out_point  (GtkWidget *widget, gdouble pos);
+void        timeline_set_length (GtkWidget *widget, gdouble length, gdouble pos);
 
-void		timeline_set_length	(GtkWidget *widget, gdouble length, gdouble pos);
-
-void		timeline_set_bind	(GtkWidget *widget, gboolean active); 
+void        timeline_set_bind   (GtkWidget *widget, gboolean active); 
 void        timeline_set_point  (GtkWidget *widget, gdouble point);
 
-void		timeline_clear_points( GtkWidget *widget );
+void	    timeline_set_in_and_out_point( GtkWidget *widget, gdouble start, gdouble end );
 
-void 		timeline_set_selection( GtkWidget *widget, gboolean active);
+void        timeline_clear_points( GtkWidget *widget );
+
+void        timeline_set_selection( GtkWidget *widget, gboolean active);
 
 
 #ifdef __cplusplus

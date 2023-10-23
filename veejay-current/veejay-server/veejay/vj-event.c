@@ -1568,7 +1568,7 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     {
         if(event.type == SDL_MOUSEWHEEL && event.wheel.y >0 && v->use_osd != 3 ) {
             char msg[8];
-            snprintf(msg,"%03d:;", sizeof(msg), VIMS_VIDEO_SKIP_SECOND );
+            snprintf(msg,sizeof(msg),"%03d:;", sizeof(msg), VIMS_VIDEO_SKIP_SECOND );
             vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
             return 1;
         } else if (event.type == SDL_MOUSEWHEEL && event.wheel.y < 0 && v->use_osd != 3) {
@@ -3981,6 +3981,70 @@ void vj_event_sample_move_marker(void *ptr, const char format[], va_list ap)
 	s->marker_end = marker_end;
 
     veejay_msg(VEEJAY_MSG_INFO, "Moved marker selection to %d - %d", s->marker_start, s->marker_end);
+}
+
+void vj_event_sample_grow_marker(void *ptr, const char format[], va_list ap)
+{
+    int args[2];
+    veejay_t *v = (veejay_t*)ptr;
+    
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    
+    SAMPLE_DEFAULTS(args[0]);
+
+    sample_info *s = sample_get(args[0]);
+    if( s == NULL ) {
+        p_no_sample( args[0] );
+        return;
+    }
+
+	int start = s->first_frame;
+	int end = s->last_frame;
+    int pos1 = s->marker_start;
+	int pos2 = s->marker_end;
+
+	int npos1 = (pos1 + pos2) / 2 - ( pos2 - pos1 );
+	int npos2 = (pos1 + pos2) / 2 + ( pos2 - pos1 );
+
+	if( npos1 < start ) npos1 = start; else if (npos1 > end) npos1 = end;
+	if( npos2 < start ) npos2 = start; else if (npos2 > end) npos2 = end;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Grow marker selection to %d - %d" , npos1, npos2 );
+
+	s->marker_start = npos1;
+	s->marker_end = npos2;
+}
+
+void vj_event_sample_shrink_marker(void *ptr, const char format[], va_list ap)
+{
+    int args[2];
+    veejay_t *v = (veejay_t*)ptr;
+    
+    P_A(args,sizeof(args),NULL,0,format,ap);
+    
+    SAMPLE_DEFAULTS(args[0]);
+
+    sample_info *s = sample_get(args[0]);
+    if( s == NULL ) {
+        p_no_sample( args[0] );
+        return;
+    }
+
+	int start = s->first_frame;
+	int end = s->last_frame;
+    int pos1 = s->marker_start;
+	int pos2 = s->marker_end;
+
+	int npos1 = (pos1 + pos2) / 2 - (pos2 - pos1) / 4;
+	int npos2 = (pos1 + pos2) / 2 + (pos2 - pos1) / 4;
+
+	if( npos1 < start ) npos1 = start; else if (npos1 > end) npos1 = end;
+	if( npos2 < start ) npos2 = start; else if (npos2 > end) npos2 = end;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Shrink marker selection to %d - %d", npos1, npos2 );
+
+	s->marker_start = npos1;
+	s->marker_end = npos2;
 }
 
 void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap) 

@@ -3110,10 +3110,11 @@ void	on_len_div_clicked(GtkWidget *widget, gpointer user_data)
 	if( npos1 < 0.0 ) npos1 = 0.0; else if (npos1 > 1.0) npos1 = 1.0;
 	if( npos2 < 0.0 ) npos2 = 0.0; else if (npos2 > 1.0) npos2 = 1.0;
 
-	veejay_msg(VEEJAY_MSG_INFO, "Shrink marker selection to %g - %g", npos1, npos2 );
+	timeline_set_in_and_out_point( info->tl, npos1, npos2 );
 
-	timeline_set_in_point( info->tl, npos1 );
-	timeline_set_out_point( info->tl, npos2 );
+	multi_vims( VIMS_SAMPLE_SHRINK_MARKER, "%d", 0 );
+
+	vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_SHRINK_MARKER, 0); 
 }
 
 void	on_len_mul_clicked(GtkWidget *widget, gpointer user_data)
@@ -3127,10 +3128,11 @@ void	on_len_mul_clicked(GtkWidget *widget, gpointer user_data)
 	if( npos1 < 0.0 ) npos1 = 0.0; else if (npos1 > 1.0) npos1 = 1.0;
 	if( npos2 < 0.0 ) npos2 = 0.0; else if (npos2 > 1.0) npos2 = 1.0;
 
-	veejay_msg(VEEJAY_MSG_INFO, "Grow marker selection to %g - %g" , npos1, npos2 );
+	timeline_set_in_and_out_point( info->tl, npos1, npos2 );
 
-	timeline_set_in_point( info->tl, npos1 );
-	timeline_set_out_point( info->tl, npos2 );
+	multi_vims( VIMS_SAMPLE_GROW_MARKER , "%d", 0);
+
+	vj_midi_learning_vims_msg(info->midi, NULL, VIMS_SAMPLE_GROW_MARKER, 0);
 }
 
 void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
@@ -3155,7 +3157,7 @@ void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 			update_spin_value ( "button_el_selend", pos2 );
 			update_spin_value ( "curve_spinend", pos2 );
 			info->selection[0] = pos2;
-
+			
 			vj_midi_learning_vims_msg2_extra(info->midi, VIMS_SAMPLE_SET_MARKER_END, 0, 4); 
 		}
 		else

@@ -1211,6 +1211,28 @@ void		vj_init_vevo_events(void)
 				"Ending position",
 				0,
 				NULL );
+	
+	index_map_[ VIMS_SAMPLE_GROW_MARKER ]          =       _new_event(
+				"%d",
+				VIMS_SAMPLE_GROW_MARKER,
+				"Grow marker",
+				vj_event_sample_grow_marker,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				NULL);
+	index_map_[ VIMS_SAMPLE_SHRINK_MARKER ]         =       _new_event(
+				"%d",
+				VIMS_SAMPLE_SHRINK_MARKER,
+				"Shrink marker",
+				vj_event_sample_shrink_marker,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				NULL);
+
 
 	index_map_[ VIMS_SAMPLE_MOVE_MARKER ]		=	_new_event(
 				"%d %d",
