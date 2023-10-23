@@ -27,20 +27,20 @@ vj_effect *colortemp_init(int w, int h)
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params); /* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 781;
     ve->defaults[0] = 137;
 
-	ve->limits[0][1] = 0;
-	ve->limits[1][1] = 1;
-	ve->defaults[1] = 1;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 1;
+    ve->defaults[1] = 1;
 
-	ve->limits[0][2] = 0;
-	ve->limits[1][2] = 255;
-	ve->defaults[2] = 0;
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 255;
+    ve->defaults[2] = 0;
 
     ve->description = "Color Temperature";
     ve->sub_format = 1;
@@ -52,9 +52,9 @@ vj_effect *colortemp_init(int w, int h)
 }
 
 static struct {
-	int r;
-	int g;
-	int b;
+    int r;
+    int g;
+    int b;
 } blackbody_t[] = {
     { 255 , 51 , 0 },
     { 255 , 56 , 0 },
@@ -842,49 +842,49 @@ static struct {
 
 void colortemp_apply( void *ptr, VJFrame *frame, int *args ) {
     const int temperature = args[0];
-	const int mode = args[1];
-	int opacity = args[2];
+    const int mode = args[1];
+    int opacity = args[2];
 
-	int i;
-	uint8_t *Y = frame->data[0];	
-	uint8_t *U = frame->data[1];
-	uint8_t *V = frame->data[2];
+    int i;
+    uint8_t *Y = frame->data[0];    
+    uint8_t *U = frame->data[1];
+    uint8_t *V = frame->data[2];
 
     int iy = pixel_Y_lo_;
     int iu = 128;
     int iv = 128;
 
     _rgb2yuv( blackbody_t[temperature].r,
-			  blackbody_t[temperature].g,
-			  blackbody_t[temperature].b,
-			  iy,iu,iv );
+              blackbody_t[temperature].g,
+              blackbody_t[temperature].b,
+              iy,iu,iv );
 
-	iu -= 128;
-	iv -= 128;
+    iu -= 128;
+    iv -= 128;
 
-	if( mode == 1 ) {
-		uint64_t sum = 0;
+    if( mode == 1 ) {
+        uint64_t sum = 0;
 #pragma omp simd
-		for( i = 0; i < frame->len; i ++ ) {
-			sum += Y[i];
-		}
-		opacity = sum / frame->len;
-	}
+        for( i = 0; i < frame->len; i ++ ) {
+            sum += Y[i];
+        }
+        opacity = sum / frame->len;
+    }
 
 #pragma omp simd
     for ( i = 0; i < frame->len; i++) {
-		int u = U[i] - 128;
-		int v = V[i] - 128;
+        int u = U[i] - 128;
+        int v = V[i] - 128;
 
-   		u = 128 + ((opacity * (u - iu) >> 8 ) + u);
-   		v = 128 + ((opacity * (v - iv) >> 8 ) + v);
-	
-	    u = (u < 0) ? 0 : (u > 255) ? 255 : u;
-	    v = (v < 0) ? 0 : (v > 255) ? 255 : v;
+        u = 128 + ((opacity * (u - iu) >> 8 ) + u);
+        v = 128 + ((opacity * (v - iv) >> 8 ) + v);
+    
+        u = (u < 0) ? 0 : (u > 255) ? 255 : u;
+        v = (v < 0) ? 0 : (v > 255) ? 255 : v;
 
-		U[i] = (uint8_t) u;
-		V[i] = (uint8_t) v;
-	}
+        U[i] = (uint8_t) u;
+        V[i] = (uint8_t) v;
+    }
 
 }
 
