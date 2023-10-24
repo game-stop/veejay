@@ -2465,7 +2465,7 @@ int sample_set_offset(int s1, int chain_entry, int frame_offset)
     if (!sample)
     return -1;
     sample->effect_chain[chain_entry]->frame_offset = frame_offset;
-    return 1;
+	return 1;
 }
 
 int sample_set_trimmer(int s1, int chain_entry, int trimmer)

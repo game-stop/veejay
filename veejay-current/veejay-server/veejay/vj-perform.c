@@ -564,7 +564,7 @@ int vj_perform_try_sequence( veejay_t *info )
         if( vj_perform_seq_setup_transition(info) == 0 ) {
             info->seq->active = 0;
             info->seq->current = 0;
-    	    veejay_reset_sample_positions( info, -1 );
+            veejay_reset_sample_positions( info, -1 );
             return 0;
         }
     }
@@ -1016,7 +1016,7 @@ int vj_perform_init(veejay_t * info)
 
     performer_global_t *global = (performer_global_t*) info->performer;
 
-	chroma_subsample_init();	
+    chroma_subsample_init();    
 
     global->A = vj_perform_init_performer(info,0);
     global->B = vj_perform_init_performer(info,1);
@@ -1210,8 +1210,8 @@ void vj_perform_free(veejay_t * info)
 {
     performer_global_t *global = (performer_global_t*)info->performer;
     if( global == NULL ) {
-	    return;
-    }	    
+        return;
+    }       
 
     munlockall();
 
@@ -1593,12 +1593,12 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
             {
                 offset = 0;
             }
-            if(sample_b[2] == 0)
+            else if(sample_b[2] == 0)
             {
                 offset = 0; 
                 sample_set_speed(b,0);
             }
-            if(sample_b[2] == 3 )
+            else if(sample_b[2] == 3 )
                 offset = 0;
         }
         sample_set_offset(a,chain_entry,offset);
@@ -1611,7 +1611,7 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
         if( sample_b[2] == 3 )
             offset = sample_b[0] + ( (int) ( (double) len_b * rand()/RAND_MAX));
 
-        if (  (sample_b[0] + offset ) <=0  ) // < -(len_b)  )
+        if (  (sample_b[0] + offset ) < 0  ) // < -(len_b)  )
         {
             /* reached start position */
             if(sample_b[2] == 2)
@@ -1627,12 +1627,12 @@ static int vj_perform_get_subframe(veejay_t * info, int this_sample_id, int sub_
                 offset = len_b;
                 //offset = sample_b[1]; // play from end to start
             }   
-            if(sample_b[2]== 0)
+            else if(sample_b[2]== 0)
             {
                 sample_set_speed(b , 0);
                 offset = 0; // stop playing
             }
-            if(sample_b[2] == 3 )
+            else if(sample_b[2] == 3 )
                 offset = 0;
         }
         sample_set_offset(a, chain_entry, offset);
