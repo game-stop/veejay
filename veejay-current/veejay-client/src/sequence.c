@@ -153,7 +153,7 @@ static	void	gvr_close_connection( veejay_track_t *v )
 
 static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 {
-	gchar	block[255];	
+	gchar	block[32];	
 	gchar	tmp[255];
 	va_list args;
 	gint    n;
