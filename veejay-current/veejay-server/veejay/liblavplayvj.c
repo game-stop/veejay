@@ -2153,7 +2153,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		}
 	}
 
-	if(def_tags && id <= 0)
+	if(def_tags >= 0 && id <= 0)
 	{
 		char vidfile[1024];
 		int default_chan = 1;
@@ -2163,8 +2163,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		else
 			veejay_msg(VEEJAY_MSG_DEBUG, "env VEEJAY_DEFAULT_CHANNEL=channel not set (defaulting to 1)");
 
-		snprintf(vidfile,sizeof(vidfile),"/dev/video%d", (def_tags-1));
-		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, vidfile, info->nstreams, default_chan, (def_tags-1) );
+		snprintf(vidfile,sizeof(vidfile),"/dev/video%d", def_tags);
+		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, vidfile, info->nstreams, default_chan, def_tags );
 		if( nid> 0)
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Requested capture device available as stream %d", nid );
@@ -2173,8 +2173,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		{
 			return -1;
 		}
+
 		info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
 		info->uc->sample_id = nid;
+	
 	}
 	else if( info->uc->file_as_sample && id <= 0)
 	{

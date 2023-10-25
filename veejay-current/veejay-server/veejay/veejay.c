@@ -69,8 +69,8 @@ static char override_norm = '\0';
 static int auto_loop = 0;
 static int n_slots_ = 0;
 static int max_mem_ = 0;
-static int live =0;
-static int ta = 0;
+static int live = -1;
+static int ta = -1;
 
 static void report_bug(void)
 {
@@ -913,7 +913,7 @@ int main(int argc, char **argv)
 		default_geometry_y,
 		NULL,
 		live,
-	    ta	)< 0)
+	    	ta )< 0)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
 		main_ret = 1;

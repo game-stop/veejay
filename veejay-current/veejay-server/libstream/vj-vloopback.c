@@ -239,11 +239,9 @@ static	int vj_vloopback_user_pixelformat( VJFrame *src )
 
 		return v4l2_ffmpeg2v4l2( vloopback_pixfmt[ result ].fmt );
 	}
-	return src->format;
-#else
-	return src->format;
 #endif
-
+	
+	return v4l2_ffmpeg2v4l2( alpha_fmt_to_yuv( src->format ) );
 }
 
 void *vj_vloopback_open(const char *device_name, VJFrame *src, int dst_w, int dst_h, int dst_format ) 
