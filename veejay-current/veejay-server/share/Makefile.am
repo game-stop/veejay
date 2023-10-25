@@ -1,11 +1,11 @@
-SHAPEARCHIVE=shapes.tar.lz
+SHAPEARCHIVE=shapes.tar.gz
 
 dist_pkgdata_DATA=$(SHAPEARCHIVE)
 
 install-data-hook:
 	cd $(DESTDIR)$(pkgdatadir); \
-	cat $(SHAPEARCHIVE) | unlzma | tar --list > uninstall_manifest.txt; \
-	cat $(SHAPEARCHIVE) | unlzma | tar --no-same-owner --extract; \
+	cat $(SHAPEARCHIVE) | gunzip | tar --list > uninstall_manifest.txt; \
+	cat $(SHAPEARCHIVE) | gunzip | tar --no-same-owner --extract; \
 	rm --force $(SHAPEARCHIVE)
 
 # todo: uninstall files listed in uninstall_manifest.txt
