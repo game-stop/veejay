@@ -212,6 +212,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/cosmichue.c \
 	effects/glitch.c \
 	effects/sobel.c \
+	effects/colortap.c \
 	effects/blackreplace.c
 		
 
