@@ -42,7 +42,7 @@ vj_effect *halftone_init(int w, int h)
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 4;
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
+    ve->limits[1][2] = 8;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 2;
     ve->defaults[0] = ( w > h ? w / 64 : h / 64 );
@@ -59,7 +59,7 @@ vj_effect *halftone_init(int w, int h)
     ve->hints = vje_init_value_hint_list( ve->num_params );
 
     vje_build_value_hint_list( ve->hints, ve->limits[1][1],1, "White Dots", "Black Dots", "Gray Dots", "Colored Dots", "Averaged Colored Dots" );
-    vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, "Centered", "North West");// , "North", "North East", "East", "South East" ...); // TODO
+    vje_build_value_hint_list( ve->hints, ve->limits[1][2],2, "Centered", "North", "North East", "East" , "South East", "South West", "West" , "North West");
     vje_build_value_hint_list( ve->hints, ve->limits[1][3],3, "Even", "Odd", "No parity"); //TODO add 'Berzek?' parameter aka broken/random parity; very cool on Mode animation
 
     return ve;
@@ -86,10 +86,50 @@ static void halftone_apply_avg_col2( VJFrame *frame, int radius, int orientation
 
     grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
 
+	for (y = 0; y < y_inf; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+        	U[index] = 128;
+        	V[index] = 128;
+    	}
+	}
+
+	for (y = (h - radius); y < h; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+        	U[index] = 128;
+        	V[index] = 128;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = 0; x < x_inf; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+        	U[index] = 128;
+        	V[index] = 128;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = (w - radius); x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+        	U[index] = 128;
+        	V[index] = 128;
+    	}
+	}
+
     for( y = y_inf; y < h; y += radius ) {
         for( x = x_inf; x < w; x += radius ) {
             uint32_t sum = 0;
-	    int32_t  sumU = 0, sumV = 0;
+		    int32_t  sumU = 0, sumV = 0;
             uint32_t hit = 0;
 
             // clip negative index (out of image) for colors pickup
@@ -110,8 +150,8 @@ static void halftone_apply_avg_col2( VJFrame *frame, int radius, int orientation
             uint32_t val = (sum / hit);
             int wrad = 1 + (int) ( ((double) val / 255.0  ) * rad);
              
-	    uint32_t valU = 128 + ( sumU / hit );
-	    uint32_t valV = 128 + ( sumV / hit );
+	    	uint32_t valU = 128 + ( sumU / hit );
+		    uint32_t valV = 128 + ( sumV / hit );
 
             veejay_draw_circle( Y , x,y, bw, bh, w, h, wrad, val );
             veejay_draw_circle( U , x,y, bw, bh, w, h, wrad, valU );
@@ -144,8 +184,49 @@ static void halftone_apply_avg_col( VJFrame *frame, int radius, int orientation,
 
     grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
 
-    for( y = y_inf; y < h; y += radius ) {
-        for( x = x_inf; x < w; x += radius ) {
+	for (y = 0; y < y_inf; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+        	U[index] = 128;
+        	V[index] = 128;
+    	}
+	}
+
+	for (y = (h - radius); y < h; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+        	U[index] = 128;
+        	V[index] = 128;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = 0; x < x_inf; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+        	U[index] = 128;
+        	V[index] = 128;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = (w - radius); x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+        	U[index] = 128;
+        	V[index] = 128;
+    	}
+	}
+
+
+    for( y = y_inf; y < (h-radius); y += radius ) {
+        for( x = x_inf; x < (w-radius); x += radius ) {
             uint32_t sum = 0;
             uint32_t hit = 0;
 
@@ -196,6 +277,38 @@ static void halftone_apply_avg_gray( VJFrame *frame, int radius, int orientation
 
     grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
 
+	for (y = 0; y < y_inf; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = (h - radius); y < h; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = 0; x < x_inf; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = (w - radius); x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
     for( y = y_inf; y < h; y += radius ) {
         for( x = x_inf; x < w; x += radius ) {
             uint32_t sum = 0;
@@ -242,6 +355,38 @@ static void halftone_apply_avg_black( VJFrame *frame, int radius, int orientatio
 
     grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
 
+	for (y = 0; y < y_inf; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = (h - radius); y < h; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = 0; x < x_inf; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = (w - radius); x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
     for( y = y_inf; y < h; y += radius ) {
         for( x = x_inf; x < w; x += radius ) {
             uint32_t sum = 0;
@@ -286,6 +431,38 @@ static void halftone_apply_avg_white( VJFrame *frame, int radius, int orientatio
     y_sup = h;
 
     grid_getbounds_from_orientation(radius, orientation, odd, &x_inf, &y_inf, &x_sup, &y_sup);
+
+	for (y = 0; y < y_inf; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = (h - radius); y < h; y++) {
+#pragma omp simd
+		for (x = 0; x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = 0; x < x_inf; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
+
+	for (y = y_inf; y < (h - radius); y++) {
+#pragma omp simd
+		for (x = (w - radius); x < w; x++) {
+        	int index = y * w + x;
+        	Y[index] = pixel_Y_lo_;
+    	}
+	}
 
     for( y =  y_inf ; y < h; y += radius ) {
         for( x =  x_inf ; x < w; x += radius ) {

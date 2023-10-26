@@ -2258,59 +2258,91 @@ void	sqrt_table_pixels_free() {
  * \param y_sup IN/OUT ; caller must initialize with height
  *
  ****************************************************************************************************/
-inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int * x_inf, int * y_inf, int * x_sup, int * y_sup) {
-
+inline void grid_getbounds_from_orientation(int radius, vj_effect_orientation orientation, vj_effect_parity parity, int *x_inf, int *y_inf, int *x_sup, int *y_sup) {
     int w, h;
-    int dotqtt_h;
-    int dotqtt_w;
+    int dotqtt_h, dotqtt_w;
 
     w = *x_sup;
     h = *y_sup;
+
+    switch (parity) {
+	    case VJ_EFFECT_PARITY_EVEN:
+    		if ((dotqtt_h % 2) != 0) dotqtt_h++;
+            if ((dotqtt_w % 2) != 0) dotqtt_w++;
+            break;
+        case VJ_EFFECT_PARITY_ODD:
+            if ((dotqtt_h % 2) == 0) dotqtt_h++;
+            if ((dotqtt_w % 2) == 0) dotqtt_w++;
+            break;
+        case VJ_EFFECT_PARITY_NO:
+        default:
+           break;
+    }
+
     switch (orientation) {
         case VJ_EFFECT_ORIENTATION_CENTER:
             dotqtt_h = (int) h / radius;
             if (dotqtt_h * radius != h) dotqtt_h++;
-
             dotqtt_w = (int) w / radius;
             if (dotqtt_w * radius != w) dotqtt_w++;
 
-            switch(parity) {
-                case VJ_EFFECT_PARITY_EVEN:
-                    if ((dotqtt_h % 2) != 0) dotqtt_h++ ;
-                    if ((dotqtt_w % 2) != 0) dotqtt_w++ ;
-                break;
-                case VJ_EFFECT_PARITY_ODD:
-                    if ((dotqtt_h % 2) == 0) dotqtt_h++ ;
-                    if ((dotqtt_w % 2) == 0) dotqtt_w++ ;
-                break;
-                case VJ_EFFECT_PARITY_NO:
-                default:
-                break;
-            }
-
             *x_inf = (w - (dotqtt_w * radius)) / 2;
             *y_inf = (h - (dotqtt_h * radius)) / 2;
-        break;
-        case VJ_EFFECT_ORIENTATION_NORTHEAST: // North East is do nothing case.
-        break;
+            break;
+        case VJ_EFFECT_ORIENTATION_NORTHEAST:
+            dotqtt_h = (int) h / radius;
+            dotqtt_w = (int) w / radius;
+            *x_inf = 0;
+            *y_inf = 0;
+            break;
         case VJ_EFFECT_ORIENTATION_NORTH:
-        break;
+            dotqtt_h = (int) h / radius;
+            dotqtt_w = (int) w / radius;
+            *x_inf = (w - (dotqtt_w * radius)) / 2;
+            *y_inf = 0;
+            break;
         case VJ_EFFECT_ORIENTATION_EAST:
-        break;
+            dotqtt_h = (int) h / radius;
+            dotqtt_w = (int) w / radius;
+            *x_inf = 0;
+            *y_inf = (h - (dotqtt_h * radius)) / 2;
+            break;
         case VJ_EFFECT_ORIENTATION_SOUTHEAST:
-        break;
+            dotqtt_h = (int) h / radius;
+            dotqtt_w = (int) w / radius;
+            *x_inf = 0;
+            *y_inf = h - (dotqtt_h * radius);
+            break;
         case VJ_EFFECT_ORIENTATION_SOUTH:
-        break;
+            dotqtt_h = (int) h / radius;
+            dotqtt_w = (int) w / radius;
+            *x_inf = (w - (dotqtt_w * radius)) / 2;
+            *y_inf = h - (dotqtt_h * radius);
+            break;
         case VJ_EFFECT_ORIENTATION_SOUTHWEST:
-        break;
+            dotqtt_h = (int) h / radius;
+            dotqtt_w = (int) w / radius;
+            *x_inf = w - (dotqtt_w * radius);
+            *y_inf = h - (dotqtt_h * radius);
+            break;
         case VJ_EFFECT_ORIENTATION_WEST:
-        break;
+            dotqtt_h = (int) h / radius;
+            dotqtt_w = (int) w / radius;
+            *x_inf = w - (dotqtt_w * radius);
+            *y_inf = (h - (dotqtt_h * radius)) / 2;
+            break;
         case VJ_EFFECT_ORIENTATION_NORTHWEST:
-        break;
+            dotqtt_h = (int) h / radius;
+            dotqtt_w = (int) w / radius;
+            *x_inf = w - (dotqtt_w * radius);
+            *y_inf = 0;
+            break;
+        default:
+            break;
     }
 
-    // FIXME: y_inf * w + x_inf must be a positive value or bounds must be checked before accessing array
-    // for now, clip value into range
-    if(*y_inf < 0) *y_inf = 0;
-    if(*x_inf < 0) *x_inf = 0;
+    if (*y_inf < 0) *y_inf = 0;
+    if (*x_inf < 0) *x_inf = 0;
+    if (*y_inf > h - radius) *y_inf = h - radius;
+    if (*x_inf > w - radius) *x_inf = w - radius;
 }

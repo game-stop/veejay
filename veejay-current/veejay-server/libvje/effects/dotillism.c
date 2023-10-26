@@ -42,7 +42,7 @@ vj_effect *dotillism_init(int w, int h)
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 1;
     ve->limits[0][5] = 0;
-    ve->limits[1][5] = 1;
+    ve->limits[1][5] = 8;
     ve->limits[0][6] = 0;
     ve->limits[1][6] = 2;
     ve->defaults[0] = ( w > h ? w / 64 : h / 64 );
@@ -60,7 +60,7 @@ vj_effect *dotillism_init(int w, int h)
     ve->param_description = vje_build_param_list( ve->num_params, "Radius", "Levels", "Vertical Spacing", "Horizontal Spacing", "Invert", "Orientation", "Parity" );
 
     ve->hints = vje_init_value_hint_list( ve->num_params );
-    //vje_build_value_hint_list( ve->hints, ve->limits[1][5],5, "Centered", "North", "North East", "East" , "South East", "South West", "West" , "North West");
+    vje_build_value_hint_list( ve->hints, ve->limits[1][5],5, "Centered", "North", "North East", "East" , "South East", "South West", "West" , "North West");
     vje_build_value_hint_list( ve->hints, ve->limits[1][6],6, "Even", "Odd", "No parity"); //TODO add 'Berzek?' parameter aka broken/random parity; very cool on Mode animation
 
     return ve;
