@@ -308,9 +308,9 @@ void blob_apply(void *ptr, VJFrame *frame, int *args) {
 	// project blob onto video frame
 	for(i = 0; i < len ; i ++ )
 	{
-		if( b->blob_image_[i]  == 0x0 )
+		if( b->blob_image_[i] == 0x0 )
 		{
-			srcY[i] = 16;
+			srcY[i] = pixel_Y_lo_;
 			srcCb[i] = 128;
 			srcCr[i] = 128;
 		}

@@ -472,7 +472,7 @@ void boids_apply(void *ptr, VJFrame *frame, int *args ) {
 	{
 		if( b->blob_image_[i]  == 0x0 )
 		{
-			srcY[i] = 16;
+			srcY[i] = pixel_Y_lo_;
 			srcCb[i] = 128;
 			srcCr[i] = 128;
 		}
