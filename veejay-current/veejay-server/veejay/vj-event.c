@@ -1559,9 +1559,9 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 
         ev = get_keyboard_event( index );
 
-        veejay_msg(VEEJAY_MSG_DEBUG,
+        /* veejay_msg(VEEJAY_MSG_DEBUG,
             "VIMS modifier: %d (SDL modifier %d/%x), Key %d, VIMS event %p",
-                vims_mod, mod,mod, vims_key, ev );
+                vims_mod, mod,mod, vims_key, ev ); */
     }
 
     if(!ev )
