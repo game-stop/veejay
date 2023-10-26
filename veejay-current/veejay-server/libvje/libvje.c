@@ -138,6 +138,7 @@ static struct {
     { neighbours5_init,neighbours5_malloc,neighbours5_free,NULL,NULL,neighbours5_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_NEIGHBOUR5 },
     { negation_init,NULL,NULL,NULL,NULL,negation_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_NEGATION },
     { glitch_init,glitch_malloc,glitch_free,NULL,NULL,glitch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_GLITCH },
+    { sobel_init, sobel_malloc,sobel_free,NULL,NULL,sobel_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_SOBEL },
     { colortemp_init,NULL,NULL,NULL,NULL,colortemp_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COLORTEMP },
     { cosmichue_init,NULL,NULL,NULL,NULL,cosmichue_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COSMICHUE },
     { rainbowshift_init, NULL,NULL,NULL,NULL, rainbowshift_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RAINBOWSHIFT },

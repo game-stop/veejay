@@ -222,8 +222,9 @@
 #include "./effects/colortemp.h"
 #include "./effects/cosmichue.h"
 #include "./effects/glitch.h"
+#include "./effects/sobel.h"
 
-#define VJ_IMAGE_EFFECT_MIN 66
+#define VJ_IMAGE_EFFECT_MIN 65
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -479,6 +480,7 @@ enum {
 	VJ_IMAGE_EFFECT_COLORTEMP = 68,
 	VJ_IMAGE_EFFECT_COSMICHUE = 67,
 	VJ_IMAGE_EFFECT_GLITCH = 66,
+	VJ_IMAGE_EFFECT_SOBEL = 65,
     	VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
