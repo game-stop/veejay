@@ -72,7 +72,7 @@ const char *ssm_description[SSM_COUNT] = {
 #endif
 };
 
-#define B1 9362
+#define B1 4461
 
 typedef void (*subsample_444_to_422)( uint8_t *restrict U, uint8_t *restrict V, const int width, const int height );
 
