@@ -51,6 +51,7 @@
 
 #define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
 #define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
+#define CLAMP_LAB( a )( a < 0 ? 0 : (a > 255 ? 255: a ) )
 
 #ifndef MIN
 #define MIN(a,b) ( (a)>(b) ? (b) : (a) )

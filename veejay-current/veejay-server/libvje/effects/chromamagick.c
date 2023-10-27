@@ -38,7 +38,7 @@ vj_effect *chromamagick_init(int w, int h)
 	ve->parallel = 1;
     ve->description = "Chroma Magic";
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 31;
+    ve->limits[1][0] = 38;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->parallel = 1;
@@ -56,7 +56,7 @@ vj_effect *chromamagick_init(int w, int h)
 		"Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
 		"Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
 		"Darken", "Lighten", "Modulo Add", "Pixel Fuckery", "Quilt", 
-		"Dodge LAB", "Additive LAB" , "Divide LAB"
+		"Dodge LAB", "Additive LAB" , "Divide LAB", "Freeze LAB", "Unfreeze LAB", "Darken LAB", "Lighten LAB", "Softlight LAB", "Hardlight LAB", "Difference LAB"
 	);
 
 
@@ -463,6 +463,59 @@ static void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2, int op_a)
     }
 }
 
+static void chromamagic_freeze2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    unsigned int i;
+    int L1, a1, b1, L2, a2, b2;
+    int c;
+
+    if (op_a == 0) op_a = 255;
+
+    #pragma omp simd
+    for (i = 0; i < len; i++) {
+        // Convert YUV to LAB for frame 1
+        L1 = (Y[i] * 100) >> 8;
+        a1 = (((Cb[i] - 128) * 127) >> 8);
+        b1 = (((Cr[i] - 128) * 127) >> 8);
+
+        // Convert YUV to LAB for frame 2
+        L2 = (Y2[i] * 100) >> 8;
+        a2 = (((Cb2[i] - 128) * 127) >> 8);
+        b2 = (((Cr2[i] - 128) * 127) >> 8);
+
+		L2 = L2 | 1;
+		a2 = a2 | 1;
+		b2 = b2 | 1;
+
+        // Apply freeze blending operation on L channel
+        c = L1 - (((op_a - L1) * (op_a - L1)) / L2);
+        c = CLAMP_LAB(c);
+        L1 = c;
+
+        // Apply freeze blending operation on a channel
+        c = a1 - (((op_a - a1) * (op_a - a1)) / a2);
+        c = CLAMP_LAB(c);
+        a1 = c;
+
+        // Apply freeze blending operation on b channel
+        c = b1 - (((op_a - b1) * (op_a - b1)) / b2);
+        c = CLAMP_LAB(c);
+        b1 = c;
+
+        // Convert LAB back to YUV for frame 1
+        Y[i] = (uint8_t)((L1 * 255 + 128) / 100);
+        Cb[i] = (uint8_t)(a1 + 128);
+        Cr[i] = (uint8_t)(b1 + 128);
+    }
+}
+
 static void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int op_a) {
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
@@ -582,6 +635,63 @@ static void chromamagic_pixelfuckery( VJFrame *frame, VJFrame *frame2, int op_a 
 
 }
 
+static void chromamagic_unfreeze2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    int L1, a1, b1, L2, a2, b2;
+    int diff_L, diff_a, diff_b;
+
+    #pragma omp simd
+    for(i = 0; i < len; i++) {
+        L1 = (Y[i] * 100) >> 8;
+        a1 = (((Cb[i] - 128) * 127) >> 8);
+        b1 = (((Cr[i] - 128) * 127) >> 8);
+
+        L2 = (Y2[i] * 100) >> 8;
+        a2 = (((Cb2[i] - 128) * 127) >> 8);
+        b2 = (((Cr2[i] - 128) * 127) >> 8);
+
+        diff_L = L1 - L2;
+        diff_a = a1 - a2;
+        diff_b = b1 - b2;
+
+		L2 = L2 | 1;
+		a2 = a2 | 1;
+		b2 = b2 | 1;
+
+        diff_L = (diff_L * op_a) / 255;
+        diff_a = (diff_a * op_a) / 255;
+        diff_b = (diff_b * op_a) / 255;
+
+        if (L1 > 0 && L2 >= pixel_Y_lo_) {
+            L1 = 255 - ((diff_L * diff_L) / L2);
+        }
+
+        if (a1 > 0 && a2 >= pixel_U_lo_) {
+            a1 = 255 - ((diff_a * diff_a) / a2);
+        }
+
+        if (b1 > 0 && b2 >= pixel_U_lo_) {
+            b1 = 255 - ((diff_b * diff_b) / b2);
+        }
+
+	    L1 = CLAMP_LAB(L1);
+        a1 = CLAMP_LAB(a1);
+        b1 = CLAMP_LAB(b1);
+
+        Y[i] = (uint8_t)((L1 * 255 + 128) / 100);
+        Cb[i] = (uint8_t)(a1 + 128);
+        Cr[i] = (uint8_t)(b1 + 128);
+    }
+}
+
 
 static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a ) {
 	unsigned int i;
@@ -620,6 +730,49 @@ static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a ) {
             Cr[i] = CLAMP_UV(255 - ((diff * diff) / a));
         }
 	} 
+}
+
+static void chromamagic_hardlight2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    int L1, a1, b1, L2, a2, b2;
+    int blended_L, blended_a, blended_b;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
+
+    #pragma omp simd
+    for (i = 0; i < len; i++) {
+        L1 = (Y[i] * 100) >> 8;
+        a1 = (((Cb[i] - 128) * 127) >> 8);
+        b1 = (((Cr[i] - 128) * 127) >> 8);
+
+        L2 = (Y2[i] * 100) >> 8;
+        a2 = (((Cb2[i] - 128) * 127) >> 8);
+        b2 = (((Cr2[i] - 128) * 127) >> 8);
+
+        blended_L = (L2 < 128) ? ((2 * L1 * L2) >> 7) : (255 - ((2 * (255 - L1) * (255 - L2)) >> 7));
+        blended_a = (a2 < 128) ? ((2 * a1 * a2) >> 7) : (255 - ((2 * (255 - a1) * (255 - a2)) >> 7));
+        blended_b = (b2 < 128) ? ((2 * b1 * b2) >> 7) : (255 - ((2 * (255 - b1) * (255 - b2)) >> 7));
+
+        blended_L = (blended_L * o1 + L2 * o2) >> 8;
+        blended_a = (blended_a * o1 + a2 * o2) >> 8;
+        blended_b = (blended_b * o1 + b2 * o2) >> 8;
+
+        blended_L = CLAMP_LAB(blended_L);
+        blended_a = CLAMP_LAB(blended_a);
+        blended_b = CLAMP_LAB(blended_b);
+
+        Y[i] = (uint8_t)((blended_L * 255 + 128) / 100);
+        Cb[i] = (uint8_t)(blended_a + 128);
+        Cr[i] = (uint8_t)(blended_b + 128);
+    }
 }
 
 
@@ -663,6 +816,8 @@ static void chromamagic_hardlight( VJFrame *frame, VJFrame *frame2, int op_a) {
 
 	}
 }
+
+
 
 static void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int op_a ) {
 	unsigned int i;
@@ -711,6 +866,8 @@ static void chromamagic_divide2(VJFrame *frame, VJFrame *frame2, int op_a) {
 
     int L1, a1, b1, L2, a2, b2;
     int blended_L, blended_a, blended_b;
+	
+	int alpha = (op_a * 255) / 100;
 
     #pragma omp simd
     for(i = 0; i < len; i++) {
@@ -722,9 +879,13 @@ static void chromamagic_divide2(VJFrame *frame, VJFrame *frame2, int op_a) {
         a2 = (((Cb2[i] - 128) * 127) >> 8);
         b2 = (((Cr2[i] - 128) * 127) >> 8);
 
-        blended_L = L1 * L2;
-        blended_a = a1 * a2;
-        blended_b = b1 * b2;
+		L2 = L2 | 1;
+        a2 = a2 | 1;
+        b2 = b2 | 1;
+
+        blended_L = ((L1 * 255) / L2) * alpha / 255;
+        blended_a = ((a1 * 255) / a2) * alpha / 255;
+        blended_b = ((b1 * 255) / b2) * alpha / 255;
 
         Y[i] = (uint8_t)CLAMP_Y((blended_L * 255 + 128) >> 8);
         Cb[i] = (uint8_t)CLAMP_UV(((blended_a * 255 + 32768) >> 16) + 128);
@@ -855,6 +1016,49 @@ static void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int op_a) {
 	}
 }
 
+
+static void chromamagic_difference2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    int L1, a1, b1, L2, a2, b2;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
+
+    int L_diff, a_diff, b_diff;
+    #pragma omp simd
+    for (i = 0; i < len; i++) {
+        L1 = (Y[i] * 100) >> 8;
+        a1 = (((Cb[i] - 128) * 127) >> 8);
+        b1 = (((Cr[i] - 128) * 127) >> 8);
+
+        L2 = (Y2[i] * 100) >> 8;
+        a2 = (((Cb2[i] - 128) * 127) >> 8);
+        b2 = (((Cr2[i] - 128) * 127) >> 8);
+
+        L_diff = abs(L1 - L2);
+        a_diff = abs(a1 - a2);
+        b_diff = abs(b1 - b2);
+
+        L1 = ((L_diff * o1 + L2 * o2) >> 7);
+        a1 = ((a_diff * o1 + 128) >> 7);
+        b1 = ((b_diff * o1 + 128) >> 7);
+
+        Y[i] = (uint8_t)((L1 * 255 + 50) / 100);
+        Cb[i] = (uint8_t)(a1 + 128);
+        Cr[i] = (uint8_t)(b1 + 128);
+  
+	}
+	
+}
+
+
 static void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int op_a) {
 	unsigned int i;
 	const int len = frame->len;
@@ -887,6 +1091,55 @@ static void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int op_a) {
 		Cr[i] = CLAMP_UV(c);
 	}
 }
+
+static void chromamagic_softlightmode2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    int L1, a1, b1, L2, a2, b2;
+    int blended_L, blended_a, blended_b;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
+
+    #pragma omp simd
+    for (i = 0; i < len; i++) {
+        L1 = (Y[i] * 100) >> 8;
+        a1 = (((Cb[i] - 128) * 127) >> 8);
+        b1 = (((Cr[i] - 128) * 127) >> 8);
+
+        L2 = (Y2[i] * 100) >> 8;
+        a2 = (((Cb2[i] - 128) * 127) >> 8);
+        b2 = (((Cr2[i] - 128) * 127) >> 8);
+
+        if (L1 < 128) {
+            blended_L = L1 * L2 / 128;
+        } else {
+            blended_L = 255 - ((255 - L1) * (255 - L2) / 128);
+        }
+
+        blended_a = a1 + ((a1 * (2 * a2 - 255) * (255 - L2)) >> 16);
+        blended_b = b1 + ((b1 * (2 * b2 - 255) * (255 - L2)) >> 16);
+
+        blended_L = CLAMP_LAB(blended_L);
+        blended_a = CLAMP_LAB(blended_a);
+        blended_b = CLAMP_LAB(blended_b);
+
+        blended_L = (blended_L * o1 + L2 * o2) >> 8;
+        blended_a = (blended_a * o1 + a2 * o2) >> 8;
+        blended_b = (blended_b * o1 + b2 * o2) >> 8;
+
+        Y[i] = (uint8_t)((blended_L * 255 + 128) / 100);
+        Cb[i] = (uint8_t)(blended_a + 128);
+        Cr[i] = (uint8_t)(blended_b + 128);
+    }
+}
+
 
 /* not really softlight but still cool */
 static void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2, int op_a) {
@@ -994,6 +1247,51 @@ static void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int op_a) {
 	}
 }
 
+
+static void chromamagic_darken2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    int L1, a1, b1, L2, a2, b2;
+    int blended_L, blended_a, blended_b;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
+
+    #pragma omp simd
+    for (i = 0; i < len; i++) {
+        L1 = (Y[i] * 100) >> 8;
+        a1 = (((Cb[i] - 128) * 127) >> 8);
+        b1 = (((Cr[i] - 128) * 127) >> 8);
+
+        L2 = (Y2[i] * 100) >> 8;
+        a2 = (((Cb2[i] - 128) * 127) >> 8);
+        b2 = (((Cr2[i] - 128) * 127) >> 8);
+
+        blended_L = (L1 * o1 + L2 * o2) >> 8;
+        blended_a = (a1 * o1 + a2 * o2) >> 8;
+        blended_b = (b1 * o1 + b2 * o2) >> 8;
+
+        blended_L = (blended_L < L1) ? blended_L : L1;
+        blended_a = (blended_a < a1) ? blended_a : a1;
+        blended_b = (blended_b < b1) ? blended_b : b1;
+
+        blended_L = CLAMP_LAB(blended_L);
+        blended_a = CLAMP_LAB(blended_a);
+        blended_b = CLAMP_LAB(blended_b);
+
+        Y[i] = (uint8_t)((blended_L * 255 + 128) / 100);
+        Cb[i] = (uint8_t)(blended_a + 128);
+        Cr[i] = (uint8_t)(blended_b + 128);
+    }
+}
+
+
 static void chromamagic_darken(VJFrame *frame, VJFrame *frame2, int op_a)
 {
 
@@ -1019,6 +1317,50 @@ static void chromamagic_darken(VJFrame *frame, VJFrame *frame2, int op_a)
 		}
 	}
 }
+
+static void chromamagic_lighten2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    int L1, a1, b1, L2, a2, b2;
+    int blended_L, blended_a, blended_b;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
+
+    #pragma omp simd
+    for (i = 0; i < len; i++) {
+        L1 = (Y[i] * 100) >> 8;
+        a1 = (((Cb[i] - 128) * 127) >> 8);
+        b1 = (((Cr[i] - 128) * 127) >> 8);
+
+        L2 = (Y2[i] * 100) >> 8;
+        a2 = (((Cb2[i] - 128) * 127) >> 8);
+        b2 = (((Cr2[i] - 128) * 127) >> 8);
+
+        blended_L = (L1 * o1 + L2 * o2) >> 8;
+        blended_a = (a1 * o1 + a2 * o2) >> 8;
+        blended_b = (b1 * o1 + b2 * o2) >> 8;
+
+        blended_L = (blended_L > L1) ? blended_L : L1;
+        blended_a = (blended_a > a1) ? blended_a : a1;
+        blended_b = (blended_b > b1) ? blended_b : b1;
+
+        blended_L = CLAMP_LAB(blended_L);
+        blended_a = CLAMP_LAB(blended_a);
+        blended_b = CLAMP_LAB(blended_b);
+
+        Y[i] = (uint8_t)((blended_L * 255 + 128) / 100);
+        Cb[i] = (uint8_t)(blended_a + 128);
+        Cr[i] = (uint8_t)(blended_b + 128);
+    }
+}
+
 
 static void chromamagic_lighten(VJFrame *frame, VJFrame *frame2, int op_a)
 {
@@ -1215,9 +1557,30 @@ void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
 	chromamagic_additive2(frame,frame2,op_a);
 	break;
   case 31:
-	chromamagic_divide(frame, frame2, op_a);
+	chromamagic_divide2(frame,frame2,op_a);
 	break;
-  }
+  case 32:
+	chromamagic_freeze2(frame,frame2,op_a);
+	break;
+  case 33:
+	chromamagic_unfreeze2(frame,frame2,op_a);
+	break;
+  case 34:
+	chromamagic_darken2(frame,frame2,op_a);
+	break;
+  case 35:
+	chromamagic_lighten2(frame,frame2,op_a);
+	break;
+  case 36:
+	chromamagic_softlightmode2(frame,frame2,op_a);
+	break;
+  case 37:
+	chromamagic_hardlight2(frame,frame2,op_a);
+	break;
+  case 38:
+	chromamagic_difference2(frame,frame2,op_a);
+	break;
+	}
 }
 
 
