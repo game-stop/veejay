@@ -38,7 +38,7 @@ vj_effect *chromamagick_init(int w, int h)
 	ve->parallel = 1;
     ve->description = "Chroma Magic";
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 38;
+    ve->limits[1][0] = 40;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->parallel = 1;
@@ -55,8 +55,11 @@ vj_effect *chromamagick_init(int w, int h)
 		"Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
 		"Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
 		"Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
-		"Darken", "Lighten", "Modulo Add", "Pixel Fuckery", "Quilt", 
-		"Dodge LAB", "Additive LAB" , "Divide LAB", "Freeze LAB", "Unfreeze LAB", "Darken LAB", "Lighten LAB", "Softlight LAB", "Hardlight LAB", "Difference LAB"
+		"Darken", "Lighten", "Modulo Add", "Pixel Fuckery", "Quilt",
+	   // process in LAB space:	
+		"Dodge LAB", "Additive LAB" , "Divide LAB", "Freeze LAB", "Unfreeze LAB", 
+		"Darken LAB", "Lighten LAB", "Softlight LAB", "Hardlight LAB", "Difference LAB",
+		"Screen LAB", "Multiply LAB"
 	);
 
 
@@ -480,12 +483,10 @@ static void chromamagic_freeze2(VJFrame *frame, VJFrame *frame2, int op_a) {
 
     #pragma omp simd
     for (i = 0; i < len; i++) {
-        // Convert YUV to LAB for frame 1
         L1 = (Y[i] * 100) >> 8;
         a1 = (((Cb[i] - 128) * 127) >> 8);
         b1 = (((Cr[i] - 128) * 127) >> 8);
 
-        // Convert YUV to LAB for frame 2
         L2 = (Y2[i] * 100) >> 8;
         a2 = (((Cb2[i] - 128) * 127) >> 8);
         b2 = (((Cr2[i] - 128) * 127) >> 8);
@@ -494,22 +495,18 @@ static void chromamagic_freeze2(VJFrame *frame, VJFrame *frame2, int op_a) {
 		a2 = a2 | 1;
 		b2 = b2 | 1;
 
-        // Apply freeze blending operation on L channel
         c = L1 - (((op_a - L1) * (op_a - L1)) / L2);
         c = CLAMP_LAB(c);
         L1 = c;
 
-        // Apply freeze blending operation on a channel
         c = a1 - (((op_a - a1) * (op_a - a1)) / a2);
         c = CLAMP_LAB(c);
         a1 = c;
 
-        // Apply freeze blending operation on b channel
         c = b1 - (((op_a - b1) * (op_a - b1)) / b2);
         c = CLAMP_LAB(c);
         b1 = c;
 
-        // Convert LAB back to YUV for frame 1
         Y[i] = (uint8_t)((L1 * 255 + 128) / 100);
         Cb[i] = (uint8_t)(a1 + 128);
         Cr[i] = (uint8_t)(b1 + 128);
@@ -817,6 +814,34 @@ static void chromamagic_hardlight( VJFrame *frame, VJFrame *frame2, int op_a) {
 	}
 }
 
+static void chromamagic_multiply2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    for(i = 0; i < len; i++) {
+        int L1 = (Y[i] * 100) / 255;
+        int a1 = ((Cb[i] - 128) * 127) / 255;
+        int b1 = ((Cr[i] - 128) * 127) / 255;
+
+        int L2 = (Y2[i] * 100) / 255;
+        int a2 = ((Cb2[i] - 128) * 127) / 255;
+        int b2 = ((Cr2[i] - 128) * 127) / 255;
+
+        L1 = (L1 * L2 * 255) / 10000;
+        a1 = (a1 * a2 * 255) / 16256;
+        b1 = (b1 * b2 * 255) / 16256;
+
+        Y[i] = (uint8_t)(L1);
+        Cb[i] = (uint8_t)(a1 + 128);
+        Cr[i] = (uint8_t)(b1 + 128);
+    }
+}
 
 
 static void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int op_a ) {
@@ -985,6 +1010,35 @@ static void chromamagic_add(VJFrame *frame, VJFrame *frame2, int op_a) {
 		c += 128;	
 		Cr[i] = CLAMP_UV(c);
 	}
+}
+
+static void chromamagic_screen2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
+    uint8_t *Y2 = frame2->data[0];
+    uint8_t *Cb2 = frame2->data[1];
+    uint8_t *Cr2 = frame2->data[2];
+
+    for(i = 0; i < len; i++) {
+        int inverted_Y = 255 - ((255 - Y[i]) * 255) / 255;
+        int a1 = ((Cb[i] - 128) * 127) / 256;
+        int b1 = ((Cr[i] - 128) * 127) / 256;
+        
+        int inverted_Y2 = 255 - ((255 - Y2[i]) * 255) / 255;
+        int a2 = ((Cb2[i] - 128) * 127) / 256;
+        int b2 = ((Cr2[i] - 128) * 127) / 256;
+        
+        int blended_Y = (inverted_Y * (256 - op_a) + inverted_Y2 * op_a) / 256;
+        int blended_a = (a1 * (256 - op_a) + a2 * op_a) / 256;
+        int blended_b = (b1 * (256 - op_a) + b2 * op_a) / 256;
+
+        Y[i] = (uint8_t)((255 - blended_Y) + 0.5);
+        Cb[i] = (uint8_t)(blended_a + 128);
+        Cr[i] = (uint8_t)(blended_b + 128);
+    }
 }
 
 static void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int op_a) {
@@ -1579,6 +1633,12 @@ void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
 	break;
   case 38:
 	chromamagic_difference2(frame,frame2,op_a);
+	break;
+  case 39:
+    chromamagic_screen2(frame,frame2,op_a);
+	break;
+  case 40:
+	chromamagic_multiply2(frame,frame2,op_a);
 	break;
 	}
 }
