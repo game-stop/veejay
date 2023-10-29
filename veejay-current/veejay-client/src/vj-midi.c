@@ -424,6 +424,7 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			double min = 0.0;
 			double max = 0.0;
 			double val = 0.0;
+			double range = 127.0;
 			switch(d->extra)
 			{
 				case 1: //slider
@@ -457,14 +458,16 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			
 			if( data[0] == SND_SEQ_EVENT_PITCHBEND )
 			{
-				val =  ( (data[2]/16384.0f) * (max-min) );
-				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI: pitch bend %d (min=%g,max=%g) data [%d,%d,%d]",
+				range = 16384.0f;
+				val = (( data[2] + (range/2.0f) ) / range ) * (max-min);
+				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI: pitch bend %g (min=%g,max=%g) data [%d,%d,%d]",
 					val, min,max,data[0],data[1],data[2] );
 			}
 			else if( data[0] == SND_SEQ_EVENT_CONTROLLER || data[0] == SND_SEQ_EVENT_KEYPRESS )
 			{
-				val = ((max-min)/127.0) * data[2] + min;
-				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI: controller %d (min=%g,max=%g) data [%d,%d,%d]",
+				range = 127.0f;
+				val = ((max-min)/range) * data[2] + min;
+				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI: controller %g (min=%g,max=%g) data [%d,%d,%d]",
 					val, min,max, data[0],data[1],data[2]);
 			}
 
@@ -482,7 +485,7 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 					//@ VIMS: sample marker events, replace frame for control/param value
 					if(d->extra == 3 && tmpv[0] == 108) {
 						// invert in point
-						val = 127 - ( ((max-min)/127.0) * data[2] + min);
+						val = range - ( ((max-min)/range) * data[2] + min);
 					}
 					snprintf(vims_msg, sizeof(vims_msg), "%03d:%d %d;", tmpv[0], 0, (int) val );
 				}	
@@ -495,7 +498,7 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 
 			
 			msg_vims( vims_msg );
-			vj_msg(VEEJAY_MSG_INFO, "MIDI %x:%x, %x ->  vims %s", data[0], data[1],data[2], vims_msg);
+			vj_msg(VEEJAY_MSG_INFO, "MIDI %x:%x, %x {%g, %g}->  vims %s", data[0], data[1],data[2],range,val,vims_msg);
 		}
 		else
 		{
@@ -533,9 +536,7 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 				break;
 			case SND_SEQ_EVENT_PITCHBEND:
 				data[1] = ev->data.control.channel;
-				int msb = ev->data.control.value;
-				int lsb = ev->data.control.value & 0x7f;
-				data[2] = ( msb << 7 ) | lsb;
+				data[2] = ev->data.control.value;
 				break;
 			case SND_SEQ_EVENT_NOTE:
 				data[1] = ev->data.control.channel;
