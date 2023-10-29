@@ -534,7 +534,7 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 			case SND_SEQ_EVENT_PITCHBEND:
 				data[1] = ev->data.control.channel;
 				int msb = ev->data.control.value;
-				int lsb = snd_seq_ev_pitchbend_get_value( ev );
+				int lsb = ev->data.control.value & 0x7f;
 				data[2] = ( msb << 7 ) | lsb;
 				break;
 			case SND_SEQ_EVENT_NOTE:
