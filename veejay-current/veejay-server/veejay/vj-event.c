@@ -4074,17 +4074,13 @@ void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap
 
     if( sample_exists(args[0]) )
     {
-        int start = 0; int end = 0;
-        if ( sample_get_el_position( args[0], &start, &end ) )
+        if( sample_set_marker_start( args[0], args[1] ) )
         {
-            if( sample_set_marker_start( args[0], args[1] ) )
-            {
-                veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker starting position set at %d", args[0],args[1]);
-            }
-            else
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker position %d for sample %d (limits are %d - %d)",args[1],args[0],start,end);
-            }
+            veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker starting position set at %d", args[0],args[1]);
+        }
+        else
+        {
+            veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker position %d for sample %d",args[1],args[0]);
         }
     }
     else
@@ -4105,20 +4101,14 @@ void vj_event_sample_set_marker_end(void *ptr, const char format[], va_list ap)
 
     if( sample_exists(args[0]) )
     {
-        int start = 0; int end = 0;
-        if ( sample_get_el_position( args[0], &start, &end ) )
+        if( sample_set_marker_end( args[0], args[1] ) )
         {
-            //args[1] = end - args[1]; // add sample's ending position
-            if( sample_set_marker_end( args[0], args[1] ) )
-            {
-                
-                veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker ending position set at position %d", args[0],args[1]);
-            }
-            else
-            {
-                veejay_msg(VEEJAY_MSG_INFO, "Marker position out side of sample boundaries");
-            }
-        }   
+            veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker ending position set at position %d", args[0],args[1]);
+        }
+        else
+        {
+            veejay_msg(VEEJAY_MSG_INFO, "Marker position out side of sample boundaries");
+        }
     }
     else
     {
@@ -4137,18 +4127,13 @@ void vj_event_sample_set_marker(void *ptr, const char format[], va_list ap)
 
     if( sample_exists(args[0]) )
     {
-        int start = 0;
-        int end = 0;
-        if( sample_get_el_position( args[0], &start, &end ) )
+        if( sample_set_marker( args[0], args[1],args[2] ) )
         {
-            if( sample_set_marker( args[0], args[1],args[2] ) )
-            {
-                veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker starting position at %d, ending position at %d", args[0],args[1],args[2]);
-            }
-            else
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for sample %d",args[1],args[2],args[0]);
-            }
+            veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker starting position at %d, ending position at %d", args[0],args[1],args[2]);
+        }
+        else
+        {
+            veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for sample %d",args[1],args[2],args[0]);
         }
     }
     else

@@ -548,7 +548,7 @@ int sample_get_longest(int sample_id)
     {
         int len;
         int start,end;
-        if( si->marker_start == si->marker_end ) {
+        if( si->marker_start == 0 && si->marker_end == 0 ) {
            len =  (si->last_frame - si->first_frame );
            start = si->first_frame;
            end = si->last_frame;
@@ -877,16 +877,14 @@ int sample_set_marker_start(int sample_id, int marker)
     sample_info *si = sample_get(sample_id);
     if (!si)
         return -1;
-    if(si->speed < 0 )
-    {
-        int swap = si->marker_end;
-        si->marker_end = marker;
-        si->marker_start = swap;
-    }
-    else
-    {
-        si->marker_start = marker;
-    }
+
+    if( marker < si->first_frame )
+        marker = si->first_frame;
+    else if( marker >= si->last_frame )
+        marker = si->last_frame - 1;
+
+    si->marker_start = marker;
+    
     return 1;
 }
 
@@ -896,16 +894,17 @@ int sample_set_marker(int sample_id, int start, int end)
     if(!si) return 0;
     
     if( start < si->first_frame )
-        return 0;
-    if( start > si->last_frame )
-        return 0;
-    if( end < si->first_frame )
-        return 0;
-    if( end > si->last_frame )
-        return 0; 
+        start = si->first_frame;
+    else if( start >= si->last_frame )
+        start = si->last_frame - 1;
+    
+    if( end <= si->first_frame )
+        end = si->first_frame + 1;
+    else if( end > si->last_frame )
+        end = si->last_frame; 
 
-    si->marker_start    = start;
-    si->marker_end  = end;
+    si->marker_start = start;
+    si->marker_end = end;
     
     return 1;
 }
@@ -916,17 +915,12 @@ int sample_set_marker_end(int sample_id, int marker)
     if (!si)
         return -1;
 
-    if(si->speed < 0 )
-    {
-        // mapping in reverse!
-        int swap            = si->marker_start;
-        si->marker_start    = marker;
-        si->marker_end      = swap;
-    }
-    else
-    {
-        si->marker_end      = marker;
-    }
+    if( marker <= si->first_frame )
+        marker = si->first_frame + 1;
+    else if( marker > si->last_frame )
+        marker = si->last_frame; 
+
+    si->marker_end      = marker;
     
     return 1;
 }
@@ -3210,13 +3204,6 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 
     if( marker_end != marker_start || marker_end != 0 )
     {
-        //check if marker is sane
-        if( marker_start > marker_end && skel->speed == 0 ) {
-            int tmp = marker_start;
-            marker_start = marker_end;
-            marker_end = tmp;
-        }
-
         skel->marker_start = marker_start;
         skel->marker_end = marker_end;
     }
