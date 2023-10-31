@@ -4112,7 +4112,6 @@ static void update_current_slot(int *history, int pm, int last_pm) {
     /* Actions for sample mode*/
     if( pm == MODE_SAMPLE )
     {
-        int marker_go = 0;
         /* Update marker bounds */
         if( (history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START]) )
         {
@@ -4122,14 +4121,12 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             {
                 gdouble in = (1.0 / (gdouble)info->status_tokens[TOTAL_FRAMES]) * nm;
                 timeline_set_in_point( info->tl, in );
-                marker_go = 1;
             }
             else
             {
                 if(pm == MODE_SAMPLE)
                 {
                     timeline_set_in_point( info->tl, 0.0 );
-                    marker_go = 1;
                 }
             }
             char *start = format_framenum( info->status_tokens[SAMPLE_MARKER_START] );
@@ -4145,14 +4142,12 @@ static void update_current_slot(int *history, int pm, int last_pm) {
                 gdouble out = (1.0/ (gdouble)info->status_tokens[TOTAL_FRAMES]) * nm;
 
                 timeline_set_out_point( info->tl, out );
-                marker_go = 1;
             }
             else
             {
                 if(pm == MODE_SAMPLE)
                 {
                     timeline_set_out_point(info->tl, 1.0 );
-                    marker_go = 1;
                 }
             }
 
@@ -4169,11 +4164,6 @@ static void update_current_slot(int *history, int pm, int last_pm) {
                 gtk_label_set_text( GTK_LABEL(widget_cache[WIDGET_LABEL_MARKERDURATION]),dur);
                 free(dur);        
             }
-
-        if( marker_go )
-        {
-            info->uc.reload_hint[HINT_MARKER] = 1;
-        }
 
         if( history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
         {

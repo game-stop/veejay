@@ -467,6 +467,19 @@ gboolean timeline_get_bind( TimelineSelection *te )
   return result;
 }
 
+gdouble snap_to_nearest_valid_position(gdouble pos, int num_video_frames) {
+    if (pos < 0.0) {
+        pos = 0.0;
+    } else if (pos > 1.0) {
+        pos = 1.0;
+    }
+
+    gdouble frameInterval = 1.0 / num_video_frames;
+    gdouble snappedPos = round(pos / frameInterval) * frameInterval;
+
+    return snappedPos;
+}
+
 void timeline_set_bind(GtkWidget *widget, gboolean active)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
@@ -477,7 +490,7 @@ void timeline_set_bind(GtkWidget *widget, gboolean active)
 void timeline_set_out_point( GtkWidget *widget, gdouble pos )
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  if( pos < 0.0 ) pos = 0.0; else if (pos > 1.0 ) pos = 1.0;
+  pos = snap_to_nearest_valid_position( pos, te->num_video_frames );
   g_object_set( G_OBJECT(te), "out", pos, NULL );
   g_signal_emit(te->widget, timeline_signals[OUT_CHANGED], 0);
   gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
@@ -499,7 +512,7 @@ void timeline_clear_points( GtkWidget *widget )
 void timeline_set_in_point( GtkWidget *widget, gdouble pos )
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  if( pos < 0.0 ) pos = 0.0; else if (pos > 1.0 ) pos = 1.0;
+  pos = snap_to_nearest_valid_position( pos, te->num_video_frames );
   g_object_set( G_OBJECT(te), "in", pos, NULL );
   g_signal_emit(te->widget, timeline_signals[IN_CHANGED], 0);
   gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
@@ -508,9 +521,8 @@ void timeline_set_in_point( GtkWidget *widget, gdouble pos )
 void timeline_set_in_and_out_point(GtkWidget *widget, gdouble start, gdouble end)
 {
   TimelineSelection *te = TIMELINE_SELECTION(widget);
-  if( start < 0.0 ) start = 0.0; else if ( start > 1.0 ) end = 1.0;
-  if( end < 0.0 ) end = 0.0; else if ( end > 1.0 ) end = 1.0;
-
+  start = snap_to_nearest_valid_position( start, te->num_video_frames );
+  end = snap_to_nearest_valid_position( end, te->num_video_frames );
   g_object_set( G_OBJECT(te), "in", start, NULL );
   g_object_set( G_OBJECT(te), "out", end, NULL );
 
@@ -535,7 +547,7 @@ void  timeline_set_length( GtkWidget *widget, gdouble length, gdouble pos)
 void  timeline_set_pos( GtkWidget *widget,gdouble pos)
 {
   TimelineSelection *te = TIMELINE_SELECTION( widget );
-  if( pos < 0.0 ) pos = 0.0;
+  //pos = snap_to_nearest_valid_position( pos, te->num_video_frames );
   g_object_set( G_OBJECT(te), "pos", pos, NULL );
   g_signal_emit( te->widget, timeline_signals[POS_CHANGED], 0);
   gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
