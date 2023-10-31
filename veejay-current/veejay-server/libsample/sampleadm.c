@@ -713,18 +713,21 @@ int sample_update_offset(int s1, int n_frame)
     sample_info *si = sample_get(s1);
 
     if(!si) return -1;
-    si->offset = (n_frame - si->first_frame);
-    len = si->last_frame - si->first_frame;
+    
+	int has_marker = si->marker_start >= 0 && si->marker_end > 0;
+	int start_frame = ( has_marker ? si->marker_start : si->first_frame );
+	int end_frame = ( has_marker ? si->marker_end : si->last_frame );
+
+    si->offset = (n_frame - start_frame);
+    len = end_frame - start_frame;
+    
     if(si->offset < 0) 
     {   
-        veejay_msg(VEEJAY_MSG_WARNING,"Sample bounces outside sample by %d frames",
-            si->offset);
         si->offset = 0;
     }
+    
     if(si->offset > len) 
     {
-         veejay_msg(VEEJAY_MSG_WARNING,"Sample bounces outside sample with %d frames",
-            si->offset);
          si->offset = len;
     }
     return 1;

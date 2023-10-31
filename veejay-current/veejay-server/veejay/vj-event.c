@@ -3885,11 +3885,6 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
     {
         veejay_msg(VEEJAY_MSG_INFO, "Changed speed of sample %d to %d",args[0],args[1]);
     }
-    else
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d",
-            args[1],args[0]); 
-    }
 }
 
 void vj_event_set_transition(void *ptr, const char format[], va_list ap)
