@@ -38,6 +38,7 @@ extern void    vj_msg(int type, const char format[], ...);
 extern int prompt_dialog(const char *title, char *msg);
 static	int	vj_midi_events(void *vv );
 
+#define MAX_14BIT_CONTROLLERS 64
 typedef struct
 {
 	snd_seq_t	*sequencer;
@@ -49,6 +50,7 @@ typedef struct
 	int		active;
 	void		*mw;
 	void		*timeline;
+	int		controllers[MAX_14BIT_CONTROLLERS];
 } vmidi_t;
 
 typedef struct
@@ -458,17 +460,17 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 			
 			if( data[0] == SND_SEQ_EVENT_PITCHBEND )
 			{
-				range = 16384.0f;
+				range = (double) data[3];
 				val = (( data[2] + (range/2.0f) ) / range ) * (max-min);
-				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI: pitch bend %g (min=%g,max=%g) data [%d,%d,%d]",
-					val, min,max,data[0],data[1],data[2] );
+				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI: pitch bend %g (min=%g,max=%g) data [%d,%d,%d,%d]",
+					val, min,max,data[0],data[1],data[2],data[3] );
 			}
 			else if( data[0] == SND_SEQ_EVENT_CONTROLLER || data[0] == SND_SEQ_EVENT_KEYPRESS )
 			{
-				range = 127.0f;
+				range = (double) data[3];
 				val = ((max-min)/range) * data[2] + min;
-				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI: controller %g (min=%g,max=%g) data [%d,%d,%d]",
-					val, min,max, data[0],data[1],data[2]);
+				veejay_msg(VEEJAY_MSG_DEBUG, "MIDI: controller value=%g (min=%g,max=%g) data [%d,%d,%d,%d]",
+					val, min,max, data[0],data[1],data[2],data[3]);
 			}
 
 			char vims_msg[64];
@@ -495,7 +497,6 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 				snprintf(vims_msg,sizeof(vims_msg),"%03d:%d %d;", tmpv[0], data[1], (int)val);
 			    }	    
 			}
-
 			
 			msg_vims( vims_msg );
 			vj_msg(VEEJAY_MSG_INFO, "MIDI %x:%x, %x {%g, %g}->  vims %s", data[0], data[1],data[2],range,val,vims_msg);
@@ -513,12 +514,23 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 	}
 }
 
+static  inline int is_14bit_controller_number(vmidi_t *v, int param) {
+	for( int i = 0; i < MAX_14BIT_CONTROLLERS; i ++ ) {
+	   if( v->controllers[i] == -1 ) // first occurence of -1 ends the search
+		 return 0;
+	   if( v->controllers[i] == param)
+	     return 1; // its a 14 bit midi control number
+	}
+	return 0;
+}
+
 static	int		vj_dequeue_midi_event( vmidi_t *v )
 {
 	int ret = 0;
 	int err = 0;
+	int lsb = -1;
 	while( snd_seq_event_input_pending( v->sequencer, 1 ) > 0 ) {
-		int data[4] = { 0,0,0,0};
+		int data[4] = { 0,0,127,0 };
 		int isvalid = 1;
 		snd_seq_event_t *ev = NULL;
 
@@ -529,14 +541,30 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 		data[0] = ev->type;
 		switch( ev->type )
 		{
-			/* controller: channel <0-N>, <modwheel 0-127> */
 			case SND_SEQ_EVENT_CONTROLLER:
-				data[1] = ev->data.control.channel*256+ev->data.control.param; // OB: added chan+param as identifier
-				data[2] = ev->data.control.value;
+				if( is_14bit_controller_number(v, ev->data.control.param) ) {
+					if( lsb == -1 ) {
+						lsb = ev->data.control.value;
+						isvalid = 0; // it's 2 midi events for 14 bit ?
+					}
+					else {
+						int control_number = ev->data.control.param;
+						int control_value = (ev->data.control.value << 7) + lsb;
+						data[1] = control_number;
+						data[2] = control_value;
+						data[3] = 16384;
+					}
+				}
+				else
+				{
+					data[1] = ev->data.control.channel*256+ev->data.control.param;
+					data[2] = ev->data.control.value;
+				}
 				break;
 			case SND_SEQ_EVENT_PITCHBEND:
 				data[1] = ev->data.control.channel;
 				data[2] = ev->data.control.value;
+				data[3] = 16384;
 				break;
 			case SND_SEQ_EVENT_NOTE:
 				data[1] = ev->data.control.channel;
@@ -559,23 +587,12 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 				data[2] = ev->data.control.value;
 				break;
 			default:
-				data[1] = -1;
-				data[2] = -1;
 				isvalid = 0;
-				veejay_msg(VEEJAY_MSG_WARNING, "unknown midi event received: %d %x %x",ev->type,data[1],data[2],data[2]);
 				break;
 		}
 
-		if(ev->data.control.param == SND_SEQ_EVENT_CONTROL14) {	    
-		    int control_number = ev->data.control.value & 0x7F;
-        	    int control_value = (ev->data.control.value >> 7) & 0x7F;
-		    data[1] = control_number;
-		    data[2] = control_value;
-	
-		    veejay_msg(VEEJAY_MSG_DEBUG, "14 bit MIDI type = %d, param = %d, control number = %d, control value = %d",
-		        ev->type, ev->data.control.param, control_number, control_value );
-				    
-		}
+		veejay_msg(VEEJAY_MSG_DEBUG, "MIDI type %d param %d , data [ %d, %d, %d ] valid = %d",
+			ev->type, ev->data.control.param, data[0], data[1], data[2], isvalid );
 
 		if( isvalid == 1 ) {
 			vj_midi_send_vims_now( v, data );
@@ -609,6 +626,34 @@ int	vj_midi_handle_events(void *vv)
 	return 0;
 }
 
+void	scan_14bit_midi_from_env(vmidi_t *v)
+{
+	// initialize
+	for( int i = 0; i < MAX_14BIT_CONTROLLERS; i ++ ) {
+		v->controllers[i] = -1;
+	}
+
+	// check if any
+	char* env_var = getenv("VEEJAY_14BIT_MIDI_CONTROLLERS");
+    if (env_var == NULL) {
+        veejay_msg(VEEJAY_MSG_WARNING,"Environment variable VEEJAY_14BIT_MIDI_CONTROLLERS not set");
+        return;
+    }
+
+    char* saveptr = NULL;
+    char* token = NULL;
+    int num_controllers = 0;
+
+    token = strtok_r(env_var, ",", &saveptr);
+    while (token != NULL && num_controllers < MAX_14BIT_CONTROLLERS) {
+        v->controllers[num_controllers] = atoi(token);
+        token = strtok_r(NULL, ",", &saveptr);
+    	veejay_msg(VEEJAY_MSG_DEBUG, "Control number %d is 14 bit", v->controllers[num_controllers]);
+		num_controllers++;
+	}
+
+
+}
 
 void	*vj_midi_new(void *mw, void *timeline)
 {
@@ -647,6 +692,11 @@ void	*vj_midi_new(void *mw, void *timeline)
 
 	veejay_msg(VEEJAY_MSG_INFO, "MIDI listener active! Type 'aconnect -o' to see where to connect to.");
 	veejay_msg(VEEJAY_MSG_INFO, "For example: $ aconnect 128 129");
+
+	veejay_msg(VEEJAY_MSG_INFO, "In case of 14 bit MIDI events, you can set VEEJAY_14BIT_MIDI_CONTROLLERS=param,param,param");
+	veejay_msg(VEEJAY_MSG_INFO, "For example: $ export VEEJAY_14BIT_MIDI_CONTROLLERS=60,61,62");
+
+	scan_14bit_midi_from_env(v);
 
 	return (void*) v;
 }
