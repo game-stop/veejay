@@ -566,6 +566,17 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 				break;
 		}
 
+		if(ev->data.control.param == SND_SEQ_EVENT_CONTROL14) {	    
+		    int control_number = ev->data.control.value & 0x7F;
+        	    int control_value = (ev->data.control.value >> 7) & 0x7F;
+		    data[1] = control_number;
+		    data[2] = control_value;
+	
+		    veejay_msg(VEEJAY_MSG_DEBUG, "14 bit MIDI type = %d, param = %d, control number = %d, control value = %d",
+		        ev->type, ev->data.control.param, control_number, control_value );
+				    
+		}
+
 		if( isvalid == 1 ) {
 			vj_midi_send_vims_now( v, data );
 		}
