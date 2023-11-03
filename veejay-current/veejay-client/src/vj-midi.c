@@ -620,8 +620,8 @@ static  int     vj_dequeue_midi_event( vmidi_t *v )
                 break;
         }
 
-        veejay_msg(VEEJAY_MSG_DEBUG, "MIDI type %d param %d , data [ %d, %d, %d ] valid = %d",
-            ev->type, ev->data.control.param, data[0], data[1], data[2], isvalid );
+        veejay_msg(VEEJAY_MSG_DEBUG, "MIDI type %d param %d , data [ %d, %d, %d, %d ] valid = %d",
+            ev->type, ev->data.control.param, data[0], data[1], data[2],data[3], isvalid );
 
         if( isvalid == 1 ) {
             vj_midi_send_vims_now( v, data );
