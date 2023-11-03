@@ -43,6 +43,7 @@ typedef struct
 {
 	snd_seq_t	*sequencer;
 	void		*vims;
+	void        *events;
 	struct pollfd	*pfd;
 	int		npfd;
 	int		learn;
@@ -136,8 +137,10 @@ void	vj_midi_reset( void *vv )
 	free(items);
 	
 	vpf(v->vims);
+	vpf(v->events);
 
-	v->vims = vpn(VEVO_ANONYMOUS_PORT);
+	v->vims   = vpn(VEVO_ANONYMOUS_PORT);
+	v->events = vpn(VEVO_ANONYMOUS_PORT);
 
 	vj_msg(VEEJAY_MSG_INFO, "Cleared %d MIDI events.",a);
 }
@@ -524,11 +527,35 @@ static  inline int is_14bit_controller_number(vmidi_t *v, int param) {
 	return 0;
 }
 
+static  int     midi_lsb(vmidi_t *v, int type, int param, int value )
+{
+	char key[32];
+	int lsb = -1;
+	int val = value;
+	// format key for control number
+	snprintf(key, sizeof(key), "%d-%d", type, param);
+	
+	// if the control number has a lsb value
+	int error = vevo_property_get( v->events, key, 0, &lsb );
+	if( error == VEVO_NO_ERROR ) {
+	    // delete the lsb 
+		vevo_property_del( v->events, key );
+		// and return its value
+		return lsb;
+	}
+	else {
+		// no lsb value, set it
+		vevo_property_set( v->events, key, VEVO_ATOM_TYPE_INT, 1, &val );
+	}
+	
+	return lsb;   
+}
+
 static	int		vj_dequeue_midi_event( vmidi_t *v )
 {
 	int ret = 0;
 	int err = 0;
-	int lsb = -1;
+
 	while( snd_seq_event_input_pending( v->sequencer, 1 ) > 0 ) {
 		int data[4] = { 0,0,127,0 };
 		int isvalid = 1;
@@ -543,8 +570,8 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 		{
 			case SND_SEQ_EVENT_CONTROLLER:
 				if( is_14bit_controller_number(v, ev->data.control.param) ) {
+					int lsb = midi_lsb( v, data[0], ev->data.control.param, ev->data.control.value );
 					if( lsb == -1 ) {
-						lsb = ev->data.control.value;
 						isvalid = 0; // it's 2 midi events for 14 bit ?
 					}
 					else {
@@ -553,7 +580,6 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 						data[1] = control_number;
 						data[2] = control_value;
 						data[3] = 16384;
-						lsb = -1; //reset after 2nd event
 					}
 				}
 				else
