@@ -553,6 +553,7 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 						data[1] = control_number;
 						data[2] = control_value;
 						data[3] = 16384;
+						lsb = -1; //reset after 2nd event
 					}
 				}
 				else
