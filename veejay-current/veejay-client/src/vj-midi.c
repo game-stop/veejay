@@ -559,7 +559,7 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 	int err = 0;
 
 	while( snd_seq_event_input_pending( v->sequencer, 1 ) > 0 ) {
-		int data[4] = { 0,0,127,0 };
+		int data[4] = { 0,0,0,127 };
 		int isvalid = 1;
 		snd_seq_event_t *ev = NULL;
 
