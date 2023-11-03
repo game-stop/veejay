@@ -547,7 +547,7 @@ static  int     midi_lsb(vmidi_t *v, int type, int param, int value )
 	else {
 		// no lsb value, set it
 		vevo_property_set( v->events, key, VEVO_ATOM_TYPE_INT, 1, &val );
-		veejay_msg(VEEJAY_MSG_DEBUG, "control number %d <- lsb = %d", param, lsb);
+		veejay_msg(VEEJAY_MSG_DEBUG, "control number %d <- lsb = %d", param, val);
 	}
 	
 	return lsb;   
