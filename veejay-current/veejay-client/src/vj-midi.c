@@ -578,7 +578,7 @@ static  int     vj_dequeue_midi_event( vmidi_t *v )
                     }
                     else {
                         int control_number = ev->data.control.param;
-                        int control_value = (ev->data.control.value << 7) + lsb;
+                        int control_value = (ev->data.control.value << 7) | lsb;
                         data[1] = control_number;
                         data[2] = control_value;
                         data[3] = 16384;
