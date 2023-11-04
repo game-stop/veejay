@@ -590,6 +590,11 @@ static  int     vj_dequeue_midi_event( vmidi_t *v )
                     data[2] = ev->data.control.value;
                 }
                 break;
+	    case SND_SEQ_EVENT_CONTROL14:
+		data[1] = ev->data.control.param;
+		data[2] = ev->data.control.value;
+		data[3] = 16384;
+		break;
             case SND_SEQ_EVENT_PITCHBEND:
                 data[1] = ev->data.control.channel;
                 data[2] = ev->data.control.value;
@@ -723,8 +728,8 @@ void    *vj_midi_new(void *mw, void *timeline)
     veejay_msg(VEEJAY_MSG_INFO, "MIDI listener active! Type 'aconnect -o' to see where to connect to.");
     veejay_msg(VEEJAY_MSG_INFO, "For example: $ aconnect 128 129");
 
-    veejay_msg(VEEJAY_MSG_INFO, "In case of 14 bit MIDI events, you can set VEEJAY_14BIT_MIDI_CONTROLLERS=param,param,param");
-    veejay_msg(VEEJAY_MSG_INFO, "For example: $ export VEEJAY_14BIT_MIDI_CONTROLLERS=60,61,62");
+    veejay_msg(VEEJAY_MSG_DEBUG, "In case of devices sending 2 events for 14 bit values, you can set VEEJAY_14BIT_MIDI_CONTROLLERS=param,param,param");
+    veejay_msg(VEEJAY_MSG_DEBUG, "For example: $ export VEEJAY_14BIT_MIDI_CONTROLLERS=60,61,62");
 
     scan_14bit_midi_from_env(v);
 
