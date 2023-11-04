@@ -166,6 +166,7 @@ static struct {
     { masktransition_init,NULL,NULL,NULL,NULL,NULL,masktransition_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_MASKTRANSITION },
     { maskstop_init,maskstop_malloc,maskstop_free,NULL,NULL,maskstop_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_MASKSTOP },
     { simplemask_init,NULL,NULL,NULL,NULL,NULL,simplemask_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_MASK },
+    { histomatch_init,histomatch_malloc,histomatch_free, NULL,NULL,NULL,histomatch_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_HISTOMATCH },
     { shapewipe_init,shapewipe_malloc,shapewipe_free,NULL,NULL,NULL,shapewipe_apply,shapewipe_ready,NULL,NULL,VJ_VIDEO_EFFECT_SHAPEWIPE },
     { magicmirror_init,magicmirror_malloc,magicmirror_free,NULL,NULL,magicmirror_apply,NULL,NULL,magicmirror_request_fx,magicmirror_set_motionmap,VJ_IMAGE_EFFECT_MAGICMIRROR },
     { magicscratcher_init,magicscratcher_malloc,magicscratcher_free,NULL,NULL,magicscratcher_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MAGICSCRATCHER },

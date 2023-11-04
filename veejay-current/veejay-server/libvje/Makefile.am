@@ -214,6 +214,7 @@ libvje_la_SOURCES =	libvje.c vjert.c \
 	effects/sobel.c \
 	effects/colortap.c \
 	effects/edgeglow.c \
+	effects/histomatch.c \
 	effects/blackreplace.c
 		
 
