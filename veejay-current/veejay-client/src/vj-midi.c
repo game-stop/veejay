@@ -590,15 +590,34 @@ static  int     vj_dequeue_midi_event( vmidi_t *v )
                     data[2] = ev->data.control.value;
                 }
                 break;
-	    case SND_SEQ_EVENT_CONTROL14:
-		data[1] = ev->data.control.param;
-		data[2] = ev->data.control.value;
-		data[3] = 16384;
-		break;
+			case SND_SEQ_EVENT_NONREGPARAM:
+	    	case SND_SEQ_EVENT_REGPARAM:
+				if( is_14bit_controller_number(v, ev->data.control.param) ) {
+					int lsb = midi_lsb( v, data[0], ev->data.control.param, ev->data.control.value );
+					if( lsb == -1 ) {
+						isvalid = 0;
+					}
+					else {
+						data[1] = ev->data.control.param;
+						data[2] = (ev->data.control.value << 7) | lsb;
+						data[3] = 16384;
+					}
+				}
+				else {
+						data[1] = ev->data.control.param;
+						data[2] = ev->data.control.value;
+						data[3] = 16384;
+				}
+				break;
+	    	case SND_SEQ_EVENT_CONTROL14:
+				data[1] = ev->data.control.param;
+				data[2] = ev->data.control.value;
+				data[3] = 16384;
+				break;
             case SND_SEQ_EVENT_PITCHBEND:
                 data[1] = ev->data.control.channel;
                 data[2] = ev->data.control.value;
-                data[3] = 16384;
+                data[3] = 16384; // scaled by half range
                 break;
             case SND_SEQ_EVENT_NOTE:
                 data[1] = ev->data.control.channel;
