@@ -204,6 +204,7 @@ static struct {
     { diffimg_init,NULL,NULL,NULL,NULL,diffimg_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DIFF },
     { diff_init,diff_malloc,diff_free,diff_prepare,NULL,NULL,diff_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DIFF },
     { dices_init,dices_malloc,dices_free,NULL,NULL,dices_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DICES },
+    { gradientfield_init,gradientfield_malloc,gradientfield_free,NULL,NULL,gradientfield_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_GRADIENTFIELD },
     { deinterlace_init,NULL,NULL,NULL,NULL,deinterlace_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DEINTERLACE },
     { cutstop_init,cutstop_malloc,cutstop_free,NULL,NULL,cutstop_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CUTSTOP },
     { crosspixel_init,crosspixel_malloc,crosspixel_free,NULL,NULL,crosspixel_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CROSSPIXEL },

@@ -226,8 +226,9 @@
 #include "./effects/colortap.h"
 #include "./effects/edgeglow.h"
 #include "./effects/histomatch.h"
+#include "./effects/gradientfield.h"
 
-#define VJ_IMAGE_EFFECT_MIN 63
+#define VJ_IMAGE_EFFECT_MIN 64
 #define VJ_IMAGE_EFFECT_MAX 199
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -487,6 +488,7 @@ enum {
     VJ_IMAGE_EFFECT_SOBEL = 65,
     VJ_IMAGE_EFFECT_COLORTAP = 64,
     VJ_IMAGE_EFFECT_EDGEGLOW = 63,
+    VJ_IMAGE_EFFECT_GRADIENTFIELD = 64,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
