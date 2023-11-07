@@ -42,7 +42,7 @@ vj_effect *dotillism_init(int w, int h)
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 1;
     ve->limits[0][5] = 0;
-    ve->limits[1][5] = 8;
+    ve->limits[1][5] = 7;
     ve->limits[0][6] = 0;
     ve->limits[1][6] = 2;
     ve->defaults[0] = ( w > h ? w / 64 : h / 64 );

@@ -42,7 +42,7 @@ vj_effect *halftone_init(int w, int h)
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 4;
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 8;
+    ve->limits[1][2] = 7;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 2;
     ve->defaults[0] = ( w > h ? w / 64 : h / 64 );
