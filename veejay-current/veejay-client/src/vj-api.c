@@ -8737,10 +8737,6 @@ void vj_gui_init(const char *glade_file,
     gtk_container_add( GTK_CONTAINER(frame), info->tl );
     gtk_widget_show_all(frame);
 
-#ifdef STRICT_CHECKING
-    debug_spinboxes();
-#endif
-
     snprintf(text, sizeof(text), "Reloaded - version %s",VERSION);
     gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,
                                                         "build_revision")),

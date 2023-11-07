@@ -274,3 +274,33 @@ void	vj_simple_pool_free( void *ptr )
 		free(pool);
 	}
 }
+
+static size_t get_alignment(void* ptr) {
+    uintptr_t address = (uintptr_t)ptr;
+    size_t alignment = 1;
+
+    while ((address & 1) == 0) {
+        alignment <<= 1;
+        address >>= 1;
+    }
+
+    return alignment;
+}
+   
+int	check_desired_alignment( void *ptr ) {
+	size_t align = mem_align_size();
+	if( ptr == NULL )
+	    return 1;
+	if( (uintptr_t) ptr % align != 0 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Data %p is not aligned at %u bytes but at %u bytes", ptr, align, get_alignment(ptr));
+		return 0;
+	}	
+	return 1;
+}
+
+uint8_t *realign_buffer( uint8_t *ptr, size_t offset ) {
+	size_t alignment = mem_align_size();
+	size_t misalignment = (size_t)( ptr + offset ) % alignment;
+	size_t padding = ( misalignment != 0 ) ? ( alignment - misalignment ) : 0;
+	return ptr + offset + padding;
+}

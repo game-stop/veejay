@@ -63,7 +63,8 @@ extern void *vj_simple_pool_alloc( void *ptr, size_t s );
 extern void *vj_simple_pool_init( size_t s );
 extern void vj_simple_pool_reset( void *ptr );
 extern void vj_mem_destroy();
-
+extern int check_desired_alignment( void *ptr );
+extern uint8_t *realign_buffer(uint8_t *ptr, size_t offset);
 #ifdef STRICT_CHECKING
 extern void *get_malloc_refs();
 #endif

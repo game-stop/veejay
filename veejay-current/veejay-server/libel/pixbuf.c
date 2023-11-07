@@ -451,8 +451,12 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, uint8_t 
     VJFrame *src1 = &src;
 
     dest[0] = dst;
-    dest[1] = dest[0] + (out_w * out_h);
-    dest[2] = dest[1] + (out_w * out_h)/4;
+//    dest[1] = dest[0] + (out_w * out_h);
+//    dest[2] = dest[1] + (out_w * out_h)/4;
+
+    dest[1] = realign_buffer( dest[0], out_w * out_h );
+    dest[2] = realign_buffer( dest[1], (out_w*out_h)/4);
+
     dest[3] = NULL;
     
     veejay_memcpy( src1, frame,sizeof(VJFrame));

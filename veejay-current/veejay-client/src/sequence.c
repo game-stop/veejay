@@ -423,8 +423,17 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	uint8_t *in = v->data_buffer;
 	
 	v->bw = 0;
-	
-	VJFrame *src1 = yuv_yuv_template( in, in + (v->width * v->height), in + (v->width * v->height) + (v->width*v->height)/4,v->width,v->height, srcfmt );
+
+	uint8_t *buf_u = realign_buffer( in, v->width * v->height );
+	uint8_t *buf_v = realign_buffer( buf_u , (v->width * v->height) / 4 );
+
+#ifdef STRICT_CHECKING
+	check_desired_alignment( buf_u );
+	check_desired_alignment( buf_v );
+	check_desired_alignment( v->tmp_buffer );
+#endif
+
+	VJFrame *src1 = yuv_yuv_template( in, buf_u, buf_v,v->width,v->height, srcfmt );
 	VJFrame *dst1 = yuv_rgb_template( v->tmp_buffer, v->width,v->height, PIX_FMT_RGB24 );
 
 	yuv_convert_any_ac( src1, dst1 );
@@ -604,6 +613,11 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 		vj_client_free( fd );
 		return 0;
 	}
+
+#ifdef STRICT_CHECKING
+	check_desired_alignment( vt->data_buffer );
+	check_desired_alignment( vt->tmp_buffer );
+#endif
 
 	*new_track = track_num;
 

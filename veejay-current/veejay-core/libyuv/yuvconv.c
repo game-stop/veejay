@@ -602,6 +602,14 @@ void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst )
 
 void	yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst )
 {
+#ifdef STRICT_CHECKING
+	check_desired_alignment( src->data[0] );
+	check_desired_alignment( src->data[1] );
+	check_desired_alignment( src->data[2] );
+	check_desired_alignment( dst->data[0] );
+	check_desired_alignment( dst->data[1] );
+	check_desired_alignment( dst->data[2] );
+#endif
 	sws_scale( (struct SwsContext*) ctx,(const uint8_t * const*) src->data, src->stride,0,src->height,(uint8_t * const*) dst->data,dst->stride );
 }
 
@@ -616,6 +624,14 @@ void	yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[4], VJFrame *d
 {
 	vj_sws *s = (vj_sws*) scaler;
 	int dst_stride[4] = { ru4(dst->stride[0]),ru4(dst->stride[1]),ru4(dst->stride[2]), ru4(dst->stride[3]) };
+#ifdef STRICT_CHECKING
+	check_desired_alignment( src->data[0] );
+	check_desired_alignment( src->data[1] );
+	check_desired_alignment( src->data[2] );
+	check_desired_alignment( dst->data[0] );
+	check_desired_alignment( dst->data[1] );
+	check_desired_alignment( dst->data[2] );
+#endif
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride);
 }	
 
@@ -1379,7 +1395,10 @@ void	yuv_convert_and_scale_gray_rgb(void *sws,VJFrame *src, VJFrame *dst)
 	vj_sws *s = (vj_sws*) sws;
 	const int src_stride[3] = { src->width,0,0 };
 	const int dst_stride[3] = { src->width * 3, 0,0 };
-
+#ifdef STRICT_CHECKING
+	check_desired_alignment( src->data[0] );
+	check_desired_alignment( dst->data[0] );
+#endif
 	sws_scale( s->sws,(const uint8_t * const*) src->data,src_stride, 0,src->height,(uint8_t * const*)dst->data, dst_stride );
 }
 void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
@@ -1396,6 +1415,12 @@ void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 	
 	const int src_stride[4] = { src->width*n,0,0,0};
 	const int dst_stride[4] = { dst->width,dst->uv_width,dst->uv_width,dst->stride[3] };
+#ifdef STRICT_CHECKING
+	check_desired_alignment( src->data[0] );
+	check_desired_alignment( dst->data[0] );
+	check_desired_alignment( dst->data[1] );
+	check_desired_alignment( dst->data[2] );
+#endif
 
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height, (uint8_t * const*)dst->data, dst_stride );
 }
@@ -1415,12 +1440,25 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 
 	const int src_stride[4] = { src->width,src->uv_width,src->uv_width,src->stride[3] };
 	const int dst_stride[4] = { dst->width*n,0,0,0 };
-
+#ifdef STRICT_CHECKING
+	check_desired_alignment( src->data[0] );
+	check_desired_alignment( src->data[1] );
+	check_desired_alignment( src->data[2] );
+	check_desired_alignment( dst->data[0] );
+#endif
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride );
 }
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
+#ifdef STRICT_CHECKING
+	check_desired_alignment( src->data[0] );
+	check_desired_alignment( src->data[1] );
+	check_desired_alignment( src->data[2] );
+	check_desired_alignment( dst->data[0] );
+	check_desired_alignment( dst->data[1] );
+	check_desired_alignment( dst->data[2] );
+#endif
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src->stride, 0, src->height,(uint8_t * const*)dst->data, dst->stride );
 }
 void	yuv_convert_and_scale_grey(void *sws , VJFrame *src, VJFrame *dst)
@@ -1428,34 +1466,12 @@ void	yuv_convert_and_scale_grey(void *sws , VJFrame *src, VJFrame *dst)
 	vj_sws *s = (vj_sws*) sws;
 	const int src_stride[3] = { src->width,0,0 };
 	const int dst_stride[3] = { dst->width,0,0 };
-
+#ifdef STRICT_CHECKING
+	check_desired_alignment( src->data[0] );
+	check_desired_alignment( dst->data[0] );
+#endif
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*) dst->data, dst_stride );
 }
-
-#ifdef STRICT_CHECKING
-static size_t get_alignment(void* ptr) {
-    uintptr_t address = (uintptr_t)ptr;
-    size_t alignment = 1;
-    
-    // Keep shifting the alignment to the left until the lowest bit is 1
-    while ((address & 1) == 0) {
-        alignment <<= 1;
-        address >>= 1;
-    }
-    
-    return alignment;
-}
-
-static int is_aligned( char *msg, void *ptr, size_t alignment ) {
-	uintptr_t address = (uintptr_t)ptr;
-
-	int isa = (address % alignment) == 0;
-	if(!isa) {
-		veejay_msg(VEEJAY_MSG_ERROR, "%s is not aligned to %d bytes. it's current alignment is %d bytes", msg, alignment, get_alignment(ptr) );
-	}
-	return isa;
-}
-#endif
 
 void	yuv_convert_and_scale_packed(void *sws , VJFrame *src, VJFrame *dst)
 {
@@ -1463,7 +1479,12 @@ void	yuv_convert_and_scale_packed(void *sws , VJFrame *src, VJFrame *dst)
 
 	const int src_stride[3] = { src->width,src->uv_width,src->uv_width };
 	const int dst_stride[3] = { dst->width * 2,0,0 };
-
+#ifdef STRICT_CHECKING
+	check_desired_alignment( src->data[0] );
+	check_desired_alignment( src->data[1] );
+	check_desired_alignment( src->data[2] );
+	check_desired_alignment( dst->data[0] );
+#endif
 	sws_scale( s->sws,(const uint8_t * const*) src->data, src_stride, 0, src->height,(uint8_t * const*)dst->data, dst_stride );
 }
 
