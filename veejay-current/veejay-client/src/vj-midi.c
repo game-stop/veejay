@@ -32,9 +32,9 @@
 #include <src/vj-api.h>
 #include <src/gtktimeselection.h>
 
-extern GtkWidget      *glade_xml_get_widget_( GtkBuilder *m, const char *name );
-extern void    msg_vims(char *message);
-extern void    vj_msg(int type, const char format[], ...);
+extern GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
+extern void msg_vims(char *message);
+extern void vj_msg(int type, const char format[], ...);
 extern int prompt_dialog(const char *title, char *msg);
 static  int vj_midi_events(void *vv );
 
@@ -49,8 +49,9 @@ typedef struct
     int     learn;
     int     learn_event[4];
     int     active;
-    void        *mw;
-    void        *timeline;
+    void    *mw;
+    void    *timeline;
+    snd_seq_timestamp_t last_time;
     int     controllers[MAX_14BIT_CONTROLLERS];
 } vmidi_t;
 
@@ -148,7 +149,7 @@ void    vj_midi_reset( void *vv )
 void    vj_midi_load(void *vv, const char *filename)
 {
     vmidi_t *v = (vmidi_t*) vv;
-        if(!v->active) return;
+    if(!v->active) return;
 
     int a = vj_midi_events(vv);
     if( a > 0 )
@@ -250,7 +251,7 @@ void    vj_midi_load(void *vv, const char *filename)
 void    vj_midi_save(void *vv, const char *filename)
 {
     vmidi_t *v = (vmidi_t*) vv;
-        if(!v->active) return;
+    if(!v->active) return;
 
     int fd = open( filename, O_TRUNC|O_CREAT|O_WRONLY,S_IRWXU );
     if(fd<0)
@@ -293,7 +294,7 @@ void    vj_midi_save(void *vv, const char *filename)
 void    vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra )
 {
     vmidi_t *v = (vmidi_t*) vv;
-        if(!v->active) return;
+    if(!v->active) return;
 
     if( !v->learn )
         return;
@@ -567,6 +568,15 @@ static  int     vj_dequeue_midi_event( vmidi_t *v )
         if( err == -ENOSPC || err == -EAGAIN )
             return ret;
 
+        if( ev->time < v->last_time ) {
+            veejay_msg(VEEJAY_MSG_DEBUG, "Discard MIDI %d ( %d, %d ) , out of order", ev->type,ev->data.control.param,
+                ev->data.control.value );
+            snd_seq_free_event(ev);
+            continue;
+        }
+
+        v->last_time = ev->time;
+
         data[0] = ev->type;
         switch( ev->type )
         {
@@ -590,30 +600,30 @@ static  int     vj_dequeue_midi_event( vmidi_t *v )
                     data[2] = ev->data.control.value;
                 }
                 break;
-			case SND_SEQ_EVENT_NONREGPARAM:
-	    	case SND_SEQ_EVENT_REGPARAM:
-				if( is_14bit_controller_number(v, ev->data.control.param) ) {
-					int lsb = midi_lsb( v, data[0], ev->data.control.param, ev->data.control.value );
-					if( lsb == -1 ) {
-						isvalid = 0;
-					}
-					else {
-						data[1] = ev->data.control.param;
-						data[2] = (ev->data.control.value << 7) | lsb;
-						data[3] = 16384;
-					}
-				}
-				else {
-						data[1] = ev->data.control.param;
-						data[2] = ev->data.control.value;
-						data[3] = 16384;
-				}
-				break;
-	    	case SND_SEQ_EVENT_CONTROL14:
-				data[1] = ev->data.control.param;
-				data[2] = ev->data.control.value;
-				data[3] = 16384;
-				break;
+            case SND_SEQ_EVENT_NONREGPARAM:
+            case SND_SEQ_EVENT_REGPARAM:
+                if( is_14bit_controller_number(v, ev->data.control.param) ) {
+                    int lsb = midi_lsb( v, data[0], ev->data.control.param, ev->data.control.value );
+                    if( lsb == -1 ) {
+                        isvalid = 0;
+                    }
+                    else {
+                        data[1] = ev->data.control.param;
+                        data[2] = (ev->data.control.value << 7) | lsb;
+                        data[3] = 16384;
+                    }
+                }
+                else {
+                        data[1] = ev->data.control.param;
+                        data[2] = ev->data.control.value;
+                        data[3] = 16384;
+                }
+                break;
+            case SND_SEQ_EVENT_CONTROL14:
+                data[1] = ev->data.control.param;
+                data[2] = ev->data.control.value;
+                data[3] = 16384;
+                break;
             case SND_SEQ_EVENT_PITCHBEND:
                 data[1] = ev->data.control.channel;
                 data[2] = ev->data.control.value;
