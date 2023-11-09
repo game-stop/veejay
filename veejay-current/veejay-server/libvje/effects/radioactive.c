@@ -139,6 +139,7 @@ static void kentaro_blur(radioactive_t *r)
 	q = p + r->buf_area;
 
 	for(y=r->buf_height-2; y>0; y--) {
+#pragma omp simd
 		for(x=width-2; x>0; x--) {
 			v = (*(p-width) + *(p-1) + *(p+1) + *(p+width))/4 - 1;
 			if(v == 255) v = 0;
@@ -324,6 +325,7 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 			break;
 		case 4:
 		case 1:
+#pragma omp simd
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs( lum[y] - prev[y] );
 				diff[y] = (lum[y] - prev[y])>>1;
@@ -336,6 +338,7 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 			break;
 		case 5:
 		case 2:
+#pragma omp simd
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs(lum[y] - prev[y]);
 				if(diff[y] < threshold )
@@ -344,6 +347,7 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 			}
 			break;
 		case 6:
+#pragma omp simd
 			for( y = 0; y < len; y ++ ){
 				if( abs( lum[y] - prev[y]) > threshold )
 					diff[y] = lum[y]>>2;
@@ -360,6 +364,7 @@ void radioactivetv_apply( void *ptr, VJFrame *frame, VJFrame *blue, int *args ) 
 	p = r->blurzoombuf;
 	d += r->buf_margin_left;
 	for( y = 0; y < buf_height; y++ ) {
+#pragma omp simd
 		for( x = 0; x< buf_width; x ++ ) {
 			p[x] |= ( (d[x] * snapInterval)>>7);
 		}

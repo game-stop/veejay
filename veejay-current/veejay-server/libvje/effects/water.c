@@ -584,6 +584,7 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 		q = w->map2 + wi + 1;
 		r = w->map3 + wi + 1;
 		for(y=hi-2; y>0; y--) {
+#pragma omp simd
 			for(x=wi-2; x>0; x--) {
 				h = *(p-wi-1) + *(p-wi+1) + *(p+wi-1) + *(p+wi+1)
 				  + *(p-wi) + *(p-1) + *(p+1) + *(p+wi) - (*p)*9;
@@ -604,6 +605,7 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 		p = w->map3 + wi + 1;
 		q = w->map2 + wi + 1;
 		for(y=hi-2; y>0; y--) {
+#pragma omp simd
 			for(x=wi-2; x>0; x--) {
 				h = *(p-wi) + *(p-1) + *(p+1) + *(p+wi) + (*p)*60;
 				*q = h >> 6;

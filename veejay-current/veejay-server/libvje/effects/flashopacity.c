@@ -149,11 +149,12 @@ void flashopacity_apply( void *ptr,  VJFrame *frame, VJFrame *frame2, int *args 
     }
     else if ( currentFrame >= hInterval && currentFrame < interval) {
         int opacity = opacityStart + (currentFrame - hInterval) * (opacityEnd - opacityStart) / hInterval;
-
+#pragma omp simd
         for (i = 0; i < len; i++)
         {
             Y[i] = (Y[i] * (0xff - opacity) + Y2[i] * opacity) / 0xff;
         }
+#pragma omp simd
         for( i = 0; i < uv_len; i ++ ) 
         {
             U[i] = (U[i] * (0xff - opacity) + U2[i] * opacity) / 0xff;

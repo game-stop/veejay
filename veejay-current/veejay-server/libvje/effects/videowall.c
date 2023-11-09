@@ -216,11 +216,12 @@ static void put_photo( videowall_t *vw, uint8_t *dst_plane, uint8_t *photo, int 
 	// blits photos left -> right , < n ? :top : bottom
 	int	dy = vw->offset_table_y[index];
 	int	dx = vw->offset_table_x[index];
-	uint8_t *P = (index < n ? dst_plane + ( dy * dst_w ) : dst_plane + ((abs(dst_h-box_h-dy)%dst_h)*dst_w));
+	uint8_t *restrict P = (index < n ? dst_plane + ( dy * dst_w ) : dst_plane + ((abs(dst_h-box_h-dy)%dst_h)*dst_w));
 	int	offset = (box_w * index + dx) % dst_w;	
 
 	for( y = 0 ; y < box_h ; y ++ )
 	{
+#pragma omp simd
 		for( x = 0; x < box_w; x ++ )
 		{
 			*(P + offset + x ) = photo[(y*box_h)+x];

@@ -201,11 +201,12 @@ static void put_photo( photoplay_t *p, uint8_t *dst_plane, uint8_t *photo, int d
 	int box_h = p->photo_list[index]->h;
 	int x,y;
 
-	uint8_t *P = dst_plane + (matrix.h*dst_w);
+	uint8_t *restrict P = dst_plane + (matrix.h*dst_w);
 	int	offset = matrix.w;
 
 	for( y = 0; y < box_h; y ++ )
 	{
+#pragma omp simd
 		for( x = 0; x < box_w; x ++ )
 		{
 			*(P+offset+x) = photo[(y*box_w)+x];

@@ -33,7 +33,7 @@ vj_effect *noiseadd_init(int width , int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->defaults[0] = 0;	/* type */
+    ve->defaults[0] = 0;    /* type */
     ve->defaults[1] = 1000;
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 2;
@@ -43,13 +43,13 @@ vj_effect *noiseadd_init(int width , int height)
 
     ve->extra_frame = 0;
     ve->sub_format = -1;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Amplification");
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Amplification");
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"1x3 Mask", "3x3 Mask" ,"3x3 Inverted Mask" );
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+        "1x3 Mask", "3x3 Mask" ,"3x3 Inverted Mask" );
 
     return ve;
 }
@@ -79,26 +79,27 @@ static void noiseblur1x3_maskapply(uint8_t *Yb_frame, VJFrame* frame, int coeef 
     int r, c;
     double k = (coeef/100.0);
     uint8_t d;
-	const unsigned int width = frame->width;
+    const unsigned int width = frame->width;
     const int len = frame->len;
-	uint8_t *Y = frame->data[0];
+    uint8_t *restrict Y = frame->data[0];
 
     for (r = 0; r < len; r += width) {
-	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = (Y[r + c - 1] +
-				  Y[r + c] +
-				  Y[r + c + 1]
-		    ) / 3;
-	}
+#pragma omp simd
+        for (c = 1; c < width-1; c++) {
+            Yb_frame[c + r] = (Y[r + c - 1] +
+                  Y[r + c] +
+                  Y[r + c + 1]
+            ) / 3;
+        }
     }
     
 #pragma omp simd
     for(c=0; c < len; c++) {
-	  /* get higher signal frequencies and*/	
-	  /* multiply result with coeffcient to get d*/
-	  d = (Yb_frame[c] - Y[c]) * k;
-	  Y[c] = d;
-	}
+      /* get higher signal frequencies and*/    
+      /* multiply result with coeffcient to get d*/
+      d = (Yb_frame[c] - Y[c]) * k;
+      Y[c] = d;
+    }
 
 }
 
@@ -107,32 +108,32 @@ static void noiseblur3x3_maskapply(uint8_t *Yb_frame, VJFrame* frame, int coeef 
     int r, c;
     const double k = (coeef/1000.0);
     uint8_t d;
-	const unsigned int width = frame->width;
+    const unsigned int width = frame->width;
     const int len = (frame->len)-width;
-	uint8_t *Y = frame->data[0];
+    uint8_t *Y = frame->data[0];
 
     for (r = width; r < len; r += width) {
-	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = (Y[r - width + c - 1] +
-				  Y[r - width + c] +
-				  Y[r - width + c + 1] +
-				  Y[r + width + c - 1] +
-				  Y[r + width + c] +
-				  Y[r + width + c + 1] +
-				  Y[r + c] +
-				  Y[r + c + 1] +
-				  Y[r + c - 1]  
-		    ) / 9;
-	}
+    for (c = 1; c < width-1; c++) {
+        Yb_frame[c + r] = (Y[r - width + c - 1] +
+                  Y[r - width + c] +
+                  Y[r - width + c + 1] +
+                  Y[r + width + c - 1] +
+                  Y[r + width + c] +
+                  Y[r + width + c + 1] +
+                  Y[r + c] +
+                  Y[r + c + 1] +
+                  Y[r + c - 1]  
+            ) / 9;
+    }
     }
 
 #pragma omp simd
     for(c=width; c < len; c++) {
-	  /* get higher signal frequencies and*/	
-	  /* multiply result with coeffcient to get d*/
-	  d = (Yb_frame[c] - Y[c]) * k;
-	  Y[c] = d;
-	}
+      /* get higher signal frequencies and*/    
+      /* multiply result with coeffcient to get d*/
+      d = (Yb_frame[c] - Y[c]) * k;
+      Y[c] = d;
+    }
 
 }
 
@@ -141,32 +142,32 @@ static void noiseneg3x3_maskapply(uint8_t *Yb_frame, VJFrame *frame, int coeef )
     int r, c;
     const double k = (coeef/1000.0);
     uint8_t d;
-	const unsigned int width = frame->width;
+    const unsigned int width = frame->width;
     const int len = (frame->len)-width;
-	uint8_t *Y = frame->data[0];
+    uint8_t *Y = frame->data[0];
 
 #pragma omp simd
     for (r = width; r < len; r += width) {
-	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = 255 - ((Y[r - width + c - 1] +
-				  Y[r - width + c] +
-				  Y[r - width + c + 1] +
-				  Y[r + width + c - 1] +
-				  Y[r + width + c] +
-				  Y[r + width + c + 1] +
-				  Y[r + c] +
-				  Y[r + c + 1] +
-				  Y[r + c - 1]  
-		    )) / 9;
-	}
+    for (c = 1; c < width-1; c++) {
+        Yb_frame[c + r] = 255 - ((Y[r - width + c - 1] +
+                  Y[r - width + c] +
+                  Y[r - width + c + 1] +
+                  Y[r + width + c - 1] +
+                  Y[r + width + c] +
+                  Y[r + width + c + 1] +
+                  Y[r + c] +
+                  Y[r + c + 1] +
+                  Y[r + c - 1]  
+            )) / 9;
+    }
     }
 #pragma omp simd
     for(c=width; c < len; c++) {
-	  /* get higher signal frequencies and*/	
-	  /* multiply result with coeffcient to get d*/
-	  d = (Y[c] - Yb_frame[c]) * k;
-	  Y[c] = d;
-	}
+      /* get higher signal frequencies and*/    
+      /* multiply result with coeffcient to get d*/
+      d = (Y[c] - Yb_frame[c]) * k;
+      Y[c] = d;
+    }
 
 }
 
@@ -176,32 +177,32 @@ static void noiseadd3x3_maskapply(VJFrame *frame, int coeef ) {
     int r, c;
     const double k = (coeef/1000.0);
     uint8_t d;
-	const int width = frame->width;
+    const int width = frame->width;
     const int len = (frame->len)-width;
-	uint8_t *Y = frame->data[0];
+    uint8_t *Y = frame->data[0];
 
 
     for (r = width; r < len; r += width) {
-	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = (Y[r - width + c - 1] +
-				  Y[r - width + c] +
-				  Y[r - width + c + 1] +
-				  Y[r + width + c - 1] +
-				  Y[r + width + c] +
-				  Y[r + width + c + 1] +
-				  Y[r + c] +
-				  Y[r + c + 1] +
-				  Y[r + c - 1]  
-		    ) / 9;
-	}
+    for (c = 1; c < width-1; c++) {
+        Yb_frame[c + r] = (Y[r - width + c - 1] +
+                  Y[r - width + c] +
+                  Y[r - width + c + 1] +
+                  Y[r + width + c - 1] +
+                  Y[r + width + c] +
+                  Y[r + width + c + 1] +
+                  Y[r + c] +
+                  Y[r + c + 1] +
+                  Y[r + c - 1]  
+            ) / 9;
+    }
     }
 
     for(c=width; c < len; c++) {
-	  // get higher signal frequencies and
-	  // multiply result with coeffcient to get d
-	  d = (Y[c] - Yb_frame[c]) * k;
-	  Y[c] = d;
-	}
+      // get higher signal frequencies and
+      // multiply result with coeffcient to get d
+      d = (Y[c] - Yb_frame[c]) * k;
+      Y[c] = d;
+    }
 
 }
 */
@@ -212,12 +213,12 @@ void noiseadd_apply( void *ptr, VJFrame *frame, int *args ) {
 
     noiseadd_t *n = (noiseadd_t*) ptr;
 
-	switch(type) {
-	    case 0:
-	        noiseblur1x3_maskapply(n->Yb_frame, frame, coeef);	break;
-	    case 1:
-	        noiseblur3x3_maskapply(n->Yb_frame, frame, coeef);	break;
-	    case 2:
-	        noiseneg3x3_maskapply(n->Yb_frame, frame, coeef);	 break;
-	}
+    switch(type) {
+        case 0:
+            noiseblur1x3_maskapply(n->Yb_frame, frame, coeef);  break;
+        case 1:
+            noiseblur3x3_maskapply(n->Yb_frame, frame, coeef);  break;
+        case 2:
+            noiseneg3x3_maskapply(n->Yb_frame, frame, coeef);    break;
+    }
 }

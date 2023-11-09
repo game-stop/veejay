@@ -136,12 +136,12 @@ static void halftone_apply_avg_col2( VJFrame *frame, int radius, int orientation
             for( y1 = (y < 0) ? 0 : y ; y1 < (y + radius) && y1 < h; y1 ++ ) {
                 for( x1 = (x < 0) ? 0 : x ; x1 < (x + radius) && x1 < w; x1 ++ ) {
                     sum += Y[ y1 * w + x1 ];
-		    sumU += (U[ y1 * w + x1 ] - 128);
-		    sumV += (V[ y1 * w + x1 ] - 128);
+		            sumU += (U[ y1 * w + x1 ] - 128);
+		            sumV += (V[ y1 * w + x1 ] - 128);
 
                     hit ++;
                     
-		    Y[ y1 * w + x1 ] = pixel_Y_lo_;
+		            Y[ y1 * w + x1 ] = pixel_Y_lo_;
                     U[ y1 * w + x1 ] = 128;
                     V[ y1 * w + x1 ] = 128;
                 }
@@ -413,9 +413,9 @@ static void halftone_apply_avg_black( VJFrame *frame, int radius, int orientatio
 
 static void halftone_apply_avg_white( VJFrame *frame, int radius, int orientation, int odd)
 {
-    uint8_t *Y = frame->data[0];
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
     
     const int w = frame->width;
     const int h = frame->height;

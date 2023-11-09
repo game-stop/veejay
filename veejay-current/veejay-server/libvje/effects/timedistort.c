@@ -163,9 +163,9 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 	const unsigned int height = frame->height;
 	const int len = frame->len;
 
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
+	uint8_t *restrict Y = frame->data[0];
+	uint8_t *restrict Cb = frame->data[1];
+	uint8_t *restrict Cr = frame->data[2];
 
 	int interpolate = 1;
 	int motion = 0;
@@ -174,8 +174,8 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
     int val = args[0];
 
     timedistort_t *td = (timedistort_t*) ptr;
-	uint8_t *diff = td->nonmap;
-	uint8_t *prev = td->nonmap + len;
+	uint8_t *restrict diff = td->nonmap;
+	uint8_t *restrict prev = td->nonmap + len;
 
 	if(motionmap_active(td->motionmap)) //@ use motion mapping frame
 	{
@@ -228,6 +228,7 @@ void timedistort_apply( void *ptr,  VJFrame *frame, int *args )
 	unsigned int x,y;
 	for( y = height - 2; y > 0 ; y -- )
 	{
+#pragma omp simd
 		for( x = width - 2; x > 0; x -- )
 		{
 			i = *(p - width) + *(p-1) + *(p+1) + *(p + width);

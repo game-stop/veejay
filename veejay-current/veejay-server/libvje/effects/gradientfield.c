@@ -453,7 +453,7 @@ void gradientfield_apply( void *ptr, VJFrame *frame, int *args ) {
             const int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
 
             const int gradientMagnitudeSquared = gx * gx + gy * gy;
-            float direction = lut[(abs_gy << 8) / (abs_gx + 1)] + directionalBias;
+            float direction = (abs_gx != 0) ? lut[(abs_gy << 8) / (abs_gx + 1)] + directionalBias: 0.0f;
 
          /*   if (gx < 0) {
                 direction = M_PI - direction;
